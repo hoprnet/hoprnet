@@ -1,2 +1,2 @@
 # messagingProtocol
-Anonymous messaging protocol with incentivation
+Anonymous messaging protocol with incentivations
