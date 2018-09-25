@@ -58,18 +58,18 @@ By this, party A will commit to the derivation of k_{BC} and give party B the op
 * correctly derived k_{BC}
 * that the signature is invalid although he has derived the correct keys
 
-The smart contract will then derive the key again, calculate the corresponding hash values and derive the required key. The contract will then check whether the key matches and whether the transaction is correct respectively the signature is valid. The smart contract will be executed trustfully since it is run on the blockchain and other miners won't accect a packet with a wrong execution of that smart contract.
+The smart contract will then derive the key again, calculate the corresponding hash values and derive the required key. The contract will then check whether the key matches and whether the transaction is correct respectively the signature is valid. The smart contract will be executed trustfully since it is run on the blockchain and other miners won't accept a packet with a wrong execution of that smart contract.
 
 In case that the signature of the transaction is invalid, the smart contract will detect that party A has embedded a wrong transaction. The smart contract will then transfer the requested money to B and withdraws the transaction fees from the account of A.
 
 Otherwise it will let party B pay the transaction fees in order to punish misuse of the contract.
 
 ## WrongAcknowledgement
-In order to get the correct acknowledgemt which should include the key k_C, party P_B will send P_C a challenge to provide a value k'_C such that H(k'_C) = H(k_C). Since H is a collision-resistant hash function (and this implies that it is also hard to find pre-images) it will be infeasible for party P_C to answer that challenge correctly with a different value than k_C.
+In order to get the correct acknowledgement which should include the key k_C, party P_B will send P_C a challenge to provide a value k'_C such that H(k'_C) = H(k_C). Since H is a collision-resistant hash function (and this implies that it is also hard to find pre-images) it will be infeasible for party P_C to answer that challenge correctly with a different value than k_C.
 
 So, party B will send Sig_B(H(k_C)) || H(k_C) to party P_C and party will respond to that challenge with Sig_C(k_C || Sig_B(H(k_C))) || k_C and discloses thereby k_C that allows party P_B to decrypt the transaction of party P_A.
 
-It may also happen that party P_C answers for some reason the challenge with a wrong aknowledgement message that contains an invalid key k_C. Party P_B will only accept messages that are signed by P_C, so the message will contain a signature of P_C. In case that P_C has signed an incorrect key k'_C, party P_C will call the smart contract with Sig_C(k'_C || Sig_B(H(k_C))) and checks whether H(k'_C) = H(k_C). In case that this not the case, the smart contract will cancel the payment from P_B to P_C and let P_C pay the transaction fees.
+It may also happen that party P_C answers for some reason the challenge with a wrong acknowledgement message that contains an invalid key k_C. Party P_B will only accept messages that are signed by P_C, so the message will contain a signature of P_C. In case that P_C has signed an incorrect key k'_C, party P_C will call the smart contract with Sig_C(k'_C || Sig_B(H(k_C))) and checks whether H(k'_C) = H(k_C). In case that this not the case, the smart contract will cancel the payment from P_B to P_C and let P_C pay the transaction fees.
 
 Otherwise party P_B has to pay the transaction fees to prevent from misuse of that functionality.
 
