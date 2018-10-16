@@ -385,6 +385,13 @@ Encryption is free, but you must pay for anonymity.
 \end{frame}
 
 
+\note{JB: Nobody make such religious sounding statements for anonymity.
+
+... in other words you must ask people to do work on your behalf.
+
+If work is being done, then we have an economy of sorts, and we should try to measure contributions.}
+
+
 
 \begin{frame}{How do you make a mix network?}
 \begin{center}
@@ -409,13 +416,6 @@ Encryption is free, but you must pay for anonymity.
 
 
 
-\note{JB: Nobody make such religious sounding statements for anonymity.
-
-... in other words you must ask people to do work on your behalf.
-
-If work is being done, then we have an economy of sorts, and we should try to measure contributions.}
-
-
 \begin{frame}{Idea 1: Blind signed tokens}
 
 Can users pay mix nodes with blind signed tokens?${}^\dag$
@@ -434,7 +434,6 @@ ${}^\dag$ David Chaum. {\em Blind Signatures for Untraceable Payments} CRYPTO '8
 \end{frame}
 
 \note{
-
 David Chaum invented an anonymous payment technology called blind signatures
  about two years before he invented mix networks.
 
@@ -485,6 +484,11 @@ If the user is refunded, then their guard node learns this fact.
 If the money stays put, then dropping packets becomes profitable.
 
 Who burns the funds?  Who enforces the burning?  Aka on which channel are the funds burnt?
+
+%If a packet is dropped then remaining funds should be burnt because
+%  refunding users deanonymizes them, but
+%  if funds stay put then dropping packets becomes profitable.
+
 }
 
 
@@ -516,7 +520,9 @@ Build cover traffic with a verifiable random function (VRF):
 
 
 \note{
-All nodes send cover traffic in Loopix.
+All nodes send cover traffic in Loopix, but..
+
+We do not require all nodes or all traffic types be eligible for the lottery, as nodes get paid even if they do not send the packet.
 }
 
 
