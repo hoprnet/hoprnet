@@ -9,7 +9,7 @@
             "type": "node",
             "request": "launch",
             "name": "Launch Program",
-            "program": "${workspaceFolder}/src/js/paymentChannels/test.js"
+            "program": "${workspaceFolder}/src/js/messageDelivery/test.js"
         }
     ]
 }

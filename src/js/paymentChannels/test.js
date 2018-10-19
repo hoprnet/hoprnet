@@ -1,11 +1,8 @@
 'use strict'
 
-const crypto = require('crypto')
-const Header = require('../messageDelivery/header')
 const testing = require('../testing/')
 const waterfall = require('async/waterfall')
 const parallel = require('async/parallel')
-const utils = require('../utils')
 
 const PaymentChannel = require('./index')
 const handler = require('./handlers')
@@ -50,19 +47,3 @@ waterfall([
         })
     }
 )
-
-module.exports.createTestHeader = function (amount) {
-    let keys = generateDummyKeys(amount)
-
-    let destination = crypto.randomBytes(2 * Header.KAPPA)
-
-    console.log('destination: ' + destination)
-    let nodes = [keys[0].publicKey, keys[0].publicKey]
-    let result = Header.generateHeader(
-        nodes,
-        destination
-    )
-
-    result.keys = keys
-    return result
-}

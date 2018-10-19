@@ -1,174 +1,267 @@
 'use strict'
 
 const crypto = require('crypto')
-const web3 = require('web3')
+const Web3 = require('web3')
+//const web3 = new Web3(new Web3.providers.HttpProvider('http://localhost:8545'))
 const Header = require('../messageDelivery/header')
 const { bufferXOR_in_place, bufferXOR } = require('../utils')
 const secp256k1 = require('secp256k1')
-const PaymentChannel = require('./paymentChannel')
+const PaymentChannel = require('../paymentChannels')
+const waterfall = require('async/waterfall')
 
 const MESSAGE_FEE = 0.0001 // ETH
-const HASH_ALGORITHM = 'keccak256'
+const HASH_ALGORITHM = 'sha256'
 const HASH_LENGTH = 64
+const HASH_LENGTH_ = 32
+const CHALLENGE_LENGTH = 32
 
 const SIGNATURE_LENGTH = 64
-// create payment channel
+const KEY_LENGTH = 32
 
-// close payment channel
+const TIMEOUT = 9000
 
-// update payment channel
+
+let ack = {
+    pubKey: '',
+}
 
 class Payments {
-    constructor(decrypted, ) {
-        //this.channel = new PaymentChannel()
+    constructor() {
+        this.contract // = new web3.eth.Contract('{}', undefined)
+        this.ownAddress
+        this.channels = new Map()
+        this.protocolExecutions = new Map()
 
-        this.amountA = null
-        this.amountB = null
+        this.challenges = new Map()
+        this.responses = new Map()
+
+        this.pubKey = ''
+        this.secretKey = ''
+
+        // this.contract = new web3.eth.contract(jsonABI, address)
     }
 
-    static createProvingValues(secretKey, hop, nextHop) {
-        let keyHalfA = web3.utils.sha3(
-            bufferXOR_in_place(
-                Header.deriveTransactionKey(hop),
-                Header.deriveTransactionKeyBlinded(hop)
-            )
-        )
-        let keyHalfB = web3.utils.sha3(
-            bufferXOR_in_place(
-                Header.deriveTransactionKey(nextHop),
-                Header.deriveTransactionKeyBlinded(hop)
-            )
-        )
-        let key = bufferXOR(
-            keyHalfA,
-            keyHalfB
-        )
-        let hashedKey = web3.utils.sha3(key)
+    createChallenge(hashedKey, encryptedSignature) {
+        if (!Buffer.isBuffer(hashedKey) || hashedKey.length !== HASH_LENGTH_)
+            throw Error('Invalid hashed key format.')
 
-        let encryptedSignature = bufferXOR(
-            key,
-            this.channel.transfer(secretKey, MESSAGE_FEE, hop, nextHop)
-        )
+        let signedChallenge = secp256k1.sign(hashedKey, this.secretKey)
 
-        return secp256k1.sign(
-            web3.utils.sha3(
-                Buffer.concat(
-                    [
-                        keyHalfA,
-                        keyHalfB,
-                        hashedKey,
-                        encryptedSignature
-                    ]
-                )
-            ).slice(2),
-            secretKey
-        )
+        this.challenges.set(hashedKey, encryptedSignature)
+
+        // delete the key-value pair after some time
+        // setTimeoutPromise(TIMEOUT, this.challenges, hashedKey).then((challenges, hashedKey) => {
+        //     if (challenges && hashedKey)
+        //         challenges.delete(hashedKey)
+        // })
+
+        return {
+            hashedKey: hashedKey,
+            signature: signedChallenge
+        }
     }
 
-    static createForwardChallenge(secretKey, hashedKey) {
-        if (!Buffer.isBuffer(secretKey) || !secp256k1.privateKeyVerify(secretKey))
-            throw Error('Invalid secret key.')
+    verifyChallenge(pubKey, challenge) {
+        if (!challenge || !challenge.hasOwnProperty('signature') || !challenge.hasOwnProperty('hashedKey'))
+            throw Error('Invalid challenge format.')
 
-        if (!Buffer.isBuffer(hashedKey))
-            throw Error('Invalid key.')
+        if (!Buffer.isBuffer(pubKey) || !secp256k1.publicKeyVerify(pubKey))
+            throw Error('Invalid public key.')
 
-        return secp256k1.sign(
-            Buffer.from(web3.utils.sha3(hashedKey).slice(2), 'hex'),
-            secretKey
-        )
-    }
-
-    static createAcknowledgement(publicKeySender, derivedSecret, secretKey, signature) {
-        if (!Buffer.isBuffer(publicKeySender) || !secp256k1.publicKeyVerify(publicKeySender))
-            throw Error('Invalid secret key.')
-
-        if (!Buffer.isBuffer(secretKey) || !secp256k1.privateKeyVerify(secretKey))
-            throw Error('Invalid secret key.')
-
-        if (!Buffer.isBuffer(signature) || signature.length != SIGNATURE_LENGTH)
+        if (!Buffer.isBuffer(challenge.signature) || challenge.signature.length !== SIGNATURE_LENGTH)
             throw Error('Invalid signature format.')
+
+        if (!Buffer.isBuffer(challenge.hashedKey) || !challenge.hashedKey.length != CHALLENGE_LENGTH)
+            throw Error('Invalid challenge format.')
+
+        if (!secp256k1.verify(challenge.hashedKey, challenge.signature, pubKey)) {
+            throw Error('General error.')
+        }
+    }
+
+    createResponse(pubKeyPrevious, challenge, derivedSecret) {
+        // should throw some errors if anything is wrong
+        this.verifyChallenge(pubKeyPrevious, challenge)
 
         let key = Header.deriveTransactionKey(derivedSecret)
 
-        if (!secp256k1.verify(
-            web3.utils.sha3(key).slice(2),
-            signature,
-            publicKeySender
-        ))
-            throw Error('General error.') // TODO: Call BullShitContract
-
-        return secp256k1.sign(
-            Buffer.from(
-                web3.utils.sha3(
-                    Buffer.concat([signature, key], HASH_LENGTH + SIGNATURE_LENGTH)
-                ).slice(2),
-                'hex'
-            ),
-            secretKey
+        let toSign = hash(
+            Buffer.concat(
+                [
+                    key,
+                    challenge.signature
+                ], HASH_LENGTH_ + SIGNATURE_LENGTH)
         )
+
+        let response = {
+            key: key,
+            challengeSignature: challenge.signature,
+            signature: secp256k1.sign(toSign, this.secretKey)
+        }
+
+        this.response.set(challenges.hashedKey, key)
+
+        // delete the key-value pair after some time
+        setTimeoutPromise(TIMEOUT, this.responses, hashedKey).then((responses, hashedKey) => {
+            if (responses && hashedKey)
+                responses.delete(hashedKey)
+        })
+
+        return response
     }
 
-    static verifyAcknowledgement(signatureNextHop, key, nextPubKey, signature, hashedKey, pubkey) {
-        if (!Buffer.isBuffer(signatureNextHop) || !Buffer.isBuffer(key) || !Buffer.isBuffer(signature) || !Buffer.isBuffer(hashedKey))
-            throw Error('Invalid input values.')
+    verifyResponse(pubKeyNext, response) {
+        if (!Buffer.isBuffer(pubKeyNext) || !secp256k1.publicKeyVerify(pubKeyNext))
+            throw Error('Invalid public key.')
 
-        if (signatureNextHop.length !== SIGNATURE_LENGTH || signature.length !== SIGNATURE_LENGTH)
-            throw Error('Invalid signature format.')
+        if (!response || !response.hasOwnProperty('key') || !response.hasOwnProperty('signature') || !response.hasOwnProperty('challengeSignature'))
+            throw Error('Invalid response format.')
 
-        if (key.length !== HASH_LENGTH || hashedKey.length !== HASH_LENGTH)
-            throw Error('Invalid input format.')
+        if (!Buffer.isBuffer(response.key) || !Buffer.isBuffer(response.signature) || !Buffer.isBuffer(response.challengeSignature))
+            throw Error('Invalid response format.')
 
-        if (Buffer.from(web3.utils.sha3(key).slice(2), 'hex').compare(hashedKey) !== 0)
+        if (response.key.length !== HASH_LENGTH_ || response.signature.length !== SIGNATURE_LENGTH || response.challengeSignature.length !== SIGNATURE_LENGTH)
+            throw Error('Invalid response format.')
+
+        let hashedKey = hash(challenges.key)
+
+        if (!secp256k1.verify(hashedKey, response.challengeSignature, this.pubKey))
             throw Error('General error.')
 
-        if (!secp256k1.verify(hashedKey, signature, pubkey))
+        let toVerify = hash(
+            Buffer.concat(
+                [
+                    key,
+                    response.challengeSignature
+                ], HASH_LENGTH_ + SIGNATURE_LENGTH)
+        )
+
+        if (!secp256k1.verify(toVerify, response.signature, pubKeyNext))
             throw Error('General error.')
-
-        let bitStr = Buffer.from(
-            web3.utils.sha3(
-                Buffer.concat([signature, key], HASH_LENGTH + SIGNATURE_LENGTH)
-            ), 'hex')
-
-        if (!secp256k1.verify(bitStr, signatureNextHop, nextPubKey))
-            throw Error('General error.')
-
-        return key
     }
+
+    handleResponse(response, pubKeyNext, pubKeyPrevious, derivedSecret) {
+        // should throw some errors
+        this.verifyResponse(pubKeyNext, response)
+
+        let hashedKey = hash(response.key)
+        let found = this.challenges.get(response.challengeSignature)
+        if (!found || hash(found).compare(hashedKey) !== 0)
+            console.log('unknown challenge') // throw Error('Unknown challenge.')
+
+        let key = deriveKey(Header.deriveTransactionKey(derivedSecret), response.key)
+
+        let encryptedTransaction = this.challenges.get(hash(key))
+
+        if (encryptedTransaction) {
+            let transaction = bufferXOR(encryptedTransaction, key)
+
+            this.channels.get(pubKeyPrevious).update(transaction)
+
+        }
+
+        // web3.eth.
+    }
+
+    createTransaction(amount, to, helperValues, cb) {
+        this.verifyHelperValues(helperValues)
+
+        if (amount < MESSAGE_FEE)
+            throw Error('Insufficient amount. Please take at least ' + MESSAGE_FEE)
+
+        let factor = amount / MESSAGE_FEE
+        if (Math.trunc(factor) !== factor)
+            throw Error('Please provide an integer multiple of the message fee. Got ' + factor + ' instead.')
+
+
+        waterfall([
+            (cb) => {
+                let channel = this.channels.get(to)
+                if (!channel) {
+                    PaymentChannel.createPaymentChannel(self, to, amount, this.channels, cb)
+                } else {
+                    cb(null, channel)
+                }
+            },
+            (channel, cb) => {
+                if (!channel.isValid()) {
+                    channel.renew(cb)
+                } else {
+                    cb(null, channel)
+                }
+            },
+            (channel, cb) => channel.createTransaction(amount, cb)
+        ], (err, tx) => {
+            if (err) { throw err }
+            let encryptedTransaction = bufferXOR(tx, helperValues.key)
+
+            cb({
+                transactionBody: amount,
+                encryptedTransaction: encryptedTransaction,
+                provingValue: this.signKeyDerivation(helperValues, encryptedTransaction)
+            })
+        })
+        
+    }
+
+    verifyHelperValues(helperValues, key, keyHalfA, keyHalfB) {
+        if (!helperValues.hasOwnProperty('key') || !helperValues.hasOwnProperty('keyHalfA') || !helperValues.hasOwnProperty('keyHalfB'))
+            throw Error('Invalid input parameters.')
+
+        if (!Buffer.isBuffer(helperValues.key) || !Buffer.isBuffer(helperValues.keyHalfA) || !Buffer.isBuffer(helperValues.keyHalfB))
+            throw Error('Invalid input parameters.')
+
+        if (helperValues.key.length !== KEY_LENGTH || helperValues.keyHalfA.length !== KEY_LENGTH || helperValues.keyHalfB.length !== KEY_LENGTH)
+            throw Error('Invalid input parameters.')
+
+        if (key.compare(hash(bufferXOR(keyHalfA, keyHalfB))) !== 0) {
+            return false
+        } else {
+            return true
+        }
+    }
+
+    signKeyDerivation(helperValues, encryptedTransaction) {
+        let toSign = hash(Buffer.concat(
+            [
+                hash(helperValues.keyHalfA),
+                hash(helperValues.keyHalfB),
+                hash(helperValues.key),
+                encryptedTransaction
+            ],
+            3 * HASH_LENGTH + SIGNATURE_LENGTH
+        ))
+
+        return secp256k1.sign(toSign, this.secretKey)
+    }
+
 
     static deriveKey(secret, secretNextHop) {
         k_A = Header.deriveTransactionKey(secret)
         k_B = Header.deriveTransactionKey(secretNextHop)
 
-        return Buffer.from(
-            web3.utils.sha3(bufferXOR(k_A, k_B)).slice(2), 'hex'
-        )
+        return hash(bufferXOR(k_A, k_B))
     }
+}
 
-    static createHelperValues(secret, secretNextHop, secretNextNextHop) {
-        if (!Buffer.isBuffer(secret) || !Buffer.isBuffer(secretNextHop) || !Buffer.isBuffer(secretNextNextHop))
-            throw Error('Invalid input values.')
+function hash(buf) {
+    if (!Buffer.isBuffer(buf))
+        throw Error('Invalid input. Please use a Buffer')
 
-        if (!secp256k1.publicKeyVerify(secret) || !secp256k1.publicKeyVerify(secretNextHop) || !secp256k1.publicKeyVerify(secretNextNextHop))
-            throw Error('Invalid keys.')
+    return Buffer.from(
+        web3.utils.sha3(buf).slice(2),
+        'hex'
+    )
+}
 
-        let k_A_blinder = Header.deriveTransactionKeyBlinded(secret)
-        let k_B = Header.deriveTransactionKeyBlinded(secretNextHop)
+function deriveKey(keyHalfA, keyHalfB) {
+    if (!Buffer.isBuffer(keyHalfA) || !Buffer.keyHalfB(keyHalfB))
+        throw Error('Invalid input parameter.')
 
-        let hashedKeyHalfB = Buffer.from(web3.utils.sha3(bufferXOR(k_B, k_A_blinder)).slice(2), 'hex')
+    if (keyHalfA.length !== HASH_LENGTH_ || keyHalfB.length !== HASH_LENGTH_)
+        throw Error('Invalid input parameter.')
 
-        let key_AB = Payments.deriveKey(secret, secretNextHop)
-        let key_C = Header.deriveTransactionKey(secretNextNextHop)
-
-        let hashed_key_AB = Buffer.from(web3.utils.sha3(key_AB).slice(2), 'hex')
-        let hashed_key_C = Buffer.from(web3.utils.sha3(key_C).slice(2), 'hex')
-
-        return Buffer.concat([
-            hashed_key_AB,
-            hashed_key_C,
-            Payments.deriveKey(secretNextHop, secretNextNextHop),
-            hashedKeyHalfB,
-        ], 4 * HASH_LENGTH)
-    }
+    return hash(bufferXOR(keyHalfA, keyHalfB))
 }
 
 function test() {
@@ -180,4 +273,8 @@ function test() {
     let x = new Payments()
     Payments.createForwardChallenge(privKey, Buffer.alloc(32).fill(0))
 }
-test()
+
+// web3.eth.getGasPrice().then((syncing) => {
+//     console.log(syncing)
+//})
+//test()

@@ -1,7 +1,8 @@
 'use strict'
 
 const last = require('lodash.last')
-const {sha3} = require('web3').utils
+const { sha3 } = require('web3').utils
+const bn = require('bn.js')
 
 
 module.exports.parseJSON = function (str) {
@@ -29,7 +30,7 @@ module.exports.bufferXOR_in_place = function (result, buf2) {
         throw Error('Input values have to be provided as Buffers. Got ' + typeof result + ' and ' + typeof buf2)
 
     if (result.length !== buf2.length)
-        throw Error('Buffer must have the same lenght. Got buffers of length ' + result.length + ' and ' + buf2.length)
+        throw Error('Buffer must have the same length. Got buffers of length ' + result.length + ' and ' + buf2.length)
 
     result.forEach((elem, index, elems) => {
         elems[index] = elem ^ buf2[index]
@@ -77,4 +78,8 @@ module.exports.hash = function (buf) {
         throw Error('Invalid input. Please use a Buffer')
 
     return Buffer.from(sha3(buf).slice(2), 'hex')
+}
+
+module.exports.moveForward = function (buf) {
+    
 }

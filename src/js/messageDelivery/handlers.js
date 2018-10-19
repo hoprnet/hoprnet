@@ -1,27 +1,40 @@
 'use strict'
 
 const pull = require('pull-stream')
-const PeerId = require('peer-id')
+const multihash = require('multihashes')
+
 const Header = require('./header')
 const prp = require('./prp')
-const multihash = require('multihashes')
 
 const payments = require('../payments/index')
 const constants = require('../constants')
 
-module.exports = (node, secretKey) => {
+module.exports = (node, secretKey, handleMessage) => {
     node.handle(constants.relayProtocol, (err, conn) => {
+        if (err) { throw err }
+
         pull(
             conn,
             processMessage(secretKey, node, console.log),
             conn
         )
     })
+
+    node.handle(constants.relayProtocol, (err, conn) => {
+        if (err) { throw err }
+
+        pull(
+            conn,
+            pull.collect(values => {
+                handleMessage(new Header(values[0], values[1], values[2]), values[3])
+            })
+        )
+    })
 }
 
 function processMessage(secretKey, node, callback) {
     return function (read) {
-        return function readable(end, reply) {
+        return function (end, reply) {
             let header = {}
             let state = 0
             read(end, function next(end, data) {
@@ -42,6 +55,7 @@ function processMessage(secretKey, node, callback) {
                             header = new Header(header.alpha, header.beta, header.gamma).forwardTransform(secretKey)
                             state++
                             read(end, next)
+                            break;
                         case 3:
                             const { key, iv } = Header.deriveCipherParameters(header.derived_secret)
                             const plaintext = prp.createPRP(key, iv).inverse(data).toString()
@@ -56,7 +70,7 @@ function processMessage(secretKey, node, callback) {
                             reply(end, payments.createAckMessage(node.peerInfo.id.toBytes()))
                             break
                         default:
-                            throw Error('Unable to parse header.')
+                            throw Error('Error while trying to parse header.')
                     }
                 } else {
                     reply(end, null)
@@ -66,7 +80,7 @@ function processMessage(secretKey, node, callback) {
     }
 }
 
-function forwardMessage(node, header, msg) {
+function forwardMessage(node, header, msg, cb) {
     node.peerRouting.findPeer(multihash.encode(header.address, 'sha2-256'), (err, peerInfo) => {
         if (err) { throw err }
 
@@ -79,7 +93,7 @@ function forwardMessage(node, header, msg) {
                 pull.collect((err, ack) => {
                     if (err) { throw err }
 
-                    payments.verifyAckMessage(ack)
+                    payments.handleAckMessage(ack, cb)
                 })
             )
         })

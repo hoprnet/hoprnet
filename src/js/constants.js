@@ -8,3 +8,5 @@ const PAYMENT_CHANNEL_PROTOCOL = '/paymentChannel/0.0.1'
 module.exports.relayProtocol = RELAY_PROTOCOL
 module.exports.keyExchangeProtocol = KEX_PROTOCOL
 module.exports.paymentChannelProtocol = PAYMENT_CHANNEL_PROTOCOL
+
+module.exports.protocolName = 'ipfs' // hopper

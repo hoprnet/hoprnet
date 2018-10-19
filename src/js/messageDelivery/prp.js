@@ -6,14 +6,14 @@ const withIs = require('class-is')
 const crypto = require('blake2')
 const { bufferXOR_in_place } = require('../utils')
 
-const KEY_LENGTH = 128 // Bytes
-const IV_LENGTH = 48 // Bytes
-const MIN_LENGTH = 32 // Bytes
-const HASH_ALGORITHM = 'blake2sp'
+const INTERMEDIATE_KEY_LENGTH = 32
+const INTERMEDIATE_IV_LENGTH = 12
 
-module.exports.KEY_LENGTH = KEY_LENGTH
-module.exports.IV_LENGTH = IV_LENGTH
-module.exports.MIN_LENGTH = MIN_LENGTH
+const HASH_LENGTH = 32
+const KEY_LENGTH = 4 * INTERMEDIATE_KEY_LENGTH // 128 Bytes
+const IV_LENGTH = 4 * INTERMEDIATE_IV_LENGTH // Bytes
+const MIN_LENGTH = HASH_LENGTH // Bytes
+const HASH_ALGORITHM = 'blake2bp'
 
 class PRP {
     constructor(key, iv) {
@@ -24,15 +24,15 @@ class PRP {
             throw Error('Invalid initialisation vector. Expected Buffer of size ' + IV_LENGTH + ' bytes.')
 
 
-        this.k1 = key.slice(0, 32)
-        this.k2 = key.slice(32, 64)
-        this.k3 = key.slice(64, 96)
-        this.k4 = key.slice(96, 128)
+        this.k1 = key.slice(0, INTERMEDIATE_KEY_LENGTH)
+        this.k2 = key.slice(INTERMEDIATE_KEY_LENGTH, 2 * INTERMEDIATE_KEY_LENGTH)
+        this.k3 = key.slice(2 * INTERMEDIATE_KEY_LENGTH, 3 * INTERMEDIATE_KEY_LENGTH)
+        this.k4 = key.slice(3 * INTERMEDIATE_KEY_LENGTH, 4 * INTERMEDIATE_KEY_LENGTH)
 
-        this.iv1 = iv.slice(0, 12)
-        this.iv2 = iv.slice(12, 24)
-        this.iv3 = iv.slice(24, 36)
-        this.iv4 = iv.slice(36, 48)
+        this.iv1 = iv.slice(0, INTERMEDIATE_IV_LENGTH)
+        this.iv2 = iv.slice(INTERMEDIATE_IV_LENGTH, 2 * INTERMEDIATE_IV_LENGTH)
+        this.iv3 = iv.slice(2 * INTERMEDIATE_IV_LENGTH, 3 * INTERMEDIATE_IV_LENGTH)
+        this.iv4 = iv.slice(3 * INTERMEDIATE_IV_LENGTH, 4 * INTERMEDIATE_IV_LENGTH)
 
         this.initialised = true
     }
@@ -48,7 +48,7 @@ class PRP {
     static get MIN_LENGTH() {
         return MIN_LENGTH
     }
-    
+
     static createPRP(key, iv) {
         return new PRP(key, iv)
     }
@@ -63,30 +63,14 @@ class PRP {
         if (plaintext.length < MIN_LENGTH)
             throw Error('Expected plaintext with a length of a least ' + MIN_LENGTH + ' bytes. Got ' + plaintext.length)
 
-        let l = plaintext.slice(0, 32)
-        let r = plaintext.slice(32)
+        const data = plaintext
 
-        let final
+        encrypt(data, this.k1, this.iv1)
+        hash(data, this.k2, this.iv2)
+        encrypt(data, this.k3, this.iv3)
+        hash(data, this.k4, this.iv4)
 
-        const cipher1 = chacha.chacha20(bufferXOR_in_place(this.k1, l), this.iv1);
-        r = cipher1.update(r)
-        final = cipher1.final()
-        r = Buffer.concat([r, final], r.length + final.length)
-
-        const hash1 = crypto.createHash(HASH_ALGORITHM)
-        hash1.update(Buffer.concat([this.k2, this.iv2, r]))
-        l = bufferXOR_in_place(l, hash1.digest())
-
-        const cipher2 = chacha.chacha20(bufferXOR_in_place(this.k3, l), this.iv3);
-        r = cipher2.update(r)
-        final = cipher2.final()
-        r = Buffer.concat([r, final], r.length + final.length)
-
-        const hash2 = crypto.createHash(HASH_ALGORITHM)
-        hash2.update(Buffer.concat([this.k4, this.iv4, r]))
-        l = bufferXOR_in_place(l, hash2.digest())
-
-        return Buffer.concat([l, r], l.length + r.length)
+        return data
     }
 
     inverse(ciphertext) {
@@ -99,30 +83,33 @@ class PRP {
         if (ciphertext.length < MIN_LENGTH)
             throw Error('Expected ciphertext with a length of a least ' + MIN_LENGTH + ' bytes. Got ' + ciphertext.length)
 
-        let l = ciphertext.slice(0, 32)
-        let r = ciphertext.slice(32)
+        const data = ciphertext
 
-        let final
+        hash(data, this.k4, this.iv4)
+        encrypt(data, this.k3, this.iv3)
+        hash(data, this.k2, this.iv2)
+        encrypt(data, this.k1, this.iv1)
 
-        const hash2 = crypto.createHash(HASH_ALGORITHM)
-        hash2.update(Buffer.concat([this.k4, this.iv4, r]))
-        l = bufferXOR_in_place(l, hash2.digest())
-
-        const cipher2 = chacha.chacha20(bufferXOR_in_place(this.k3, l), this.iv3);
-        r = cipher2.update(r)
-        final = cipher2.final()
-        r = Buffer.concat([r, final], r.length + final.length)
-
-        const hash1 = crypto.createHash(HASH_ALGORITHM)
-        hash1.update(Buffer.concat([this.k2, this.iv2, r]))
-        l = bufferXOR_in_place(l, hash1.digest())
-
-        const cipher1 = chacha.chacha20(bufferXOR_in_place(this.k1, l), this.iv1);
-        r = cipher1.update(r)
-        final = cipher1.final()
-        r = Buffer.concat([r, final], r.length + final.length)
-
-        return Buffer.concat([l, r], l.length + r.length)
+        return data
     }
 }
+
+function hash(data, k, iv) {
+    const hash = crypto.createKeyedHash(
+        HASH_ALGORITHM,
+        Buffer.concat([k, iv], INTERMEDIATE_KEY_LENGTH + INTERMEDIATE_IV_LENGTH),
+        {digestLength: 32}
+    )
+    hash.update(data.slice(HASH_LENGTH))
+
+    bufferXOR_in_place(data.slice(0, HASH_LENGTH), hash.digest())
+}
+
+function encrypt(data, k, iv) {
+    const cipher = chacha.chacha20(bufferXOR_in_place(k, data.slice(0, HASH_LENGTH)), iv);
+
+    const ciphertext = cipher.update(data.slice(HASH_LENGTH))
+    ciphertext.copy(data, HASH_LENGTH)
+}
+
 module.exports = withIs(PRP, { className: 'PRP' })
