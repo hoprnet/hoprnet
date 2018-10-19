@@ -133,8 +133,11 @@ class Header {
 
         const { key, iv } = Header.derivePRGParameters(this.derivedSecret)
 
-        const tmp = Buffer.alloc(Header.BETA_LENGTH(this.MAX_HOPS) + ADDRESS_SIZE + MAC_SIZE + PROVING_VALUES_SIZE).fill(0)
-        this.beta.copy(tmp, 0, 0, Header.BETA_LENGTH(this.MAX_HOPS))
+        const tmp = Buffer
+        .alloc(Header.BETA_LENGTH(this.MAX_HOPS) + ADDRESS_SIZE + MAC_SIZE + PROVING_VALUES_SIZE)
+        .fill(this.beta, 0, Header.BETA_LENGTH(this.MAX_HOPS))
+        .fill(0, Header.BETA_LENGTH(this.MAX_HOPS), ADDRESS_SIZE + MAC_SIZE + PROVING_VALUES_SIZE)
+        // this.beta.copy(tmp, 0, 0, Header.BETA_LENGTH(this.MAX_HOPS))
 
         bufferXOR(
             tmp,
@@ -327,6 +330,7 @@ class Header {
                 let paddingLength = (options.maxHops - secrets.length) * (ADDRESS_SIZE + MAC_SIZE + PROVING_VALUES_SIZE)
 
                 if (index === secrets.length - 1) {
+                    console.log(peerIds[index].toB58String())
                     Multihash
                         .decode(peerIds[index].id).digest
                         .copy(header.beta, 0, 0, ADDRESS_SIZE)
@@ -352,8 +356,9 @@ class Header {
                     tmp
                         .copy(header.beta, ADDRESS_SIZE + MAC_SIZE + PROVING_VALUES_SIZE, 0, Header.BETA_LENGTH(options.maxHops) - (ADDRESS_SIZE + MAC_SIZE + PROVING_VALUES_SIZE))
 
+                    console.log(peerIds[index + 1].toB58String())
                     Multihash
-                        .decode(peerIds[secrets.length - (index + 1)].id).digest
+                        .decode(peerIds[index + 1].id).digest
                         .copy(header.beta, 0, 0, ADDRESS_SIZE)
                     header.gamma
                         .copy(header.beta, ADDRESS_SIZE, 0, MAC_SIZE)

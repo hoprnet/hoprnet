@@ -38,7 +38,7 @@ const isFunction = require('lodash.isfunction')
 
 
 const PACKET_SIZE = 500
-const MAX_HOPS = 2
+const MAX_HOPS = 4
 
 const PROTOCOL_VERSION = '0.0.1'
 const PROTOCOL_NAME = 'ipfs'
@@ -92,6 +92,7 @@ class Hopper extends libp2p {
                             header.forwardTransform(this.peerInfo.id.privKey.marshal())
 
                             const { key, iv } = Header.deriveCipherParameters(header.derivedSecret)
+                            console.log('Decrypting with ' + bs58.encode(header.derivedSecret))
                             prp.createPRP(key, iv).inverse(data.slice(Header.SIZE(MAX_HOPS)))
 
                             const targetPeerId = PeerId.createFromBytes(header.address)
@@ -218,7 +219,8 @@ class Hopper extends libp2p {
 
         times(data.length / (PACKET_SIZE + PADDING_LENGTH), (n, cb) => {
             this.sampleNodes(destination, (err, intermediateNodes) => {
-                
+                intermediateNodes.concat([destination]).forEach(node => console.log(node.toB58String()))
+
                 const { header, secrets, identifier } = Header.createHeader(intermediateNodes.concat([destination]), {
                     maxHops: MAX_HOPS
                 })
@@ -226,6 +228,7 @@ class Hopper extends libp2p {
                 // Encrypt message
                 forEachRight(secrets, secret => {
                     const { key, iv } = Header.deriveCipherParameters(secret)
+                    console.log('Encrypting with ' + bs58.encode(secret))
 
                     prp.createPRP(key, iv).permutate(data)
                 })
@@ -250,7 +253,7 @@ class Hopper extends libp2p {
         filter(this.peerBook.getAll(), (peerInfo, cb) => {
             const res =
                 this.peerInfo.id.id.compare(peerInfo.id.id) !== 0 &&
-                this.peerInfo.id.id.compare(destination.id) !== 0
+                destination.id.compare(peerInfo.id.id) !== 0
             cb(null, res)
         }, (err, peerInfos) => {
             cb(null, peerInfos.slice(0, MAX_HOPS - 1).map(peerInfo => peerInfo.id))
