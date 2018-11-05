@@ -4,7 +4,7 @@ const chacha = require('chacha')
 const withIs = require('class-is')
 // const blake2 = require('blake2')
 const crypto = require('blake2')
-const { bufferXOR_in_place } = require('../utils')
+const { bufferXOR } = require('../utils')
 
 const INTERMEDIATE_KEY_LENGTH = 32
 const INTERMEDIATE_IV_LENGTH = 12
@@ -22,7 +22,6 @@ class PRP {
 
         if (!Buffer.isBuffer(iv) || iv.length != IV_LENGTH)
             throw Error('Invalid initialisation vector. Expected Buffer of size ' + IV_LENGTH + ' bytes.')
-
 
         this.k1 = key.slice(0, INTERMEDIATE_KEY_LENGTH)
         this.k2 = key.slice(INTERMEDIATE_KEY_LENGTH, 2 * INTERMEDIATE_KEY_LENGTH)
@@ -102,11 +101,12 @@ function hash(data, k, iv) {
     )
     hash.update(data.slice(HASH_LENGTH))
 
-    bufferXOR_in_place(data.slice(0, HASH_LENGTH), hash.digest())
+    data
+        .fill(bufferXOR(data.slice(0, HASH_LENGTH), hash.digest()), 0, HASH_LENGTH)
 }
 
 function encrypt(data, k, iv) {
-    const cipher = chacha.chacha20(bufferXOR_in_place(k, data.slice(0, HASH_LENGTH)), iv);
+    const cipher = chacha.chacha20(bufferXOR(k, data.slice(0, HASH_LENGTH)), iv);
 
     const ciphertext = cipher.update(data.slice(HASH_LENGTH))
     ciphertext.copy(data, HASH_LENGTH)

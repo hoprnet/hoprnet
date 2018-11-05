@@ -10,7 +10,7 @@ const PeerInfo = require('peer-info')
 const MessageDelivery = require('./index')
 const toPull = require('stream-to-pull-stream')
 
-const AMOUNT_OF_NODES = 5
+const AMOUNT_OF_NODES = 3
 waterfall([
     (cb) => times(AMOUNT_OF_NODES, (n, cb) => {
         MessageDelivery.createNode(cb, console.log)
@@ -20,8 +20,6 @@ waterfall([
     if (err) { throw err }
 
     nodes.slice(1).forEach(node => nodes[0].peerBook.put(node.peerInfo))
-
-    nodes.forEach(node => console.log())
 
     nodes[0].sendMessage('test test test', nodes[2].peerInfo.id)
 })

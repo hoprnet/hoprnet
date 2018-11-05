@@ -1,8 +1,6 @@
 'use strict'
 
-const last = require('lodash.last')
 const { sha3 } = require('web3').utils
-const bn = require('bn.js')
 
 
 module.exports.parseJSON = function (str) {
@@ -25,52 +23,39 @@ module.exports.bufferXOR = function (buf1, buf2) {
     return buf1.map((elem, index) => (elem ^ buf2[index]))
 }
 
-module.exports.bufferXOR_in_place = function (result, buf2) {
-    if (!Buffer.isBuffer(result) || !Buffer.isBuffer(buf2))
-        throw Error('Input values have to be provided as Buffers. Got ' + typeof result + ' and ' + typeof buf2)
+module.exports.numberToBuffer = function (i, length) {
+    if (i < 0)
+        throw Error('Not implemented!')
 
-    if (result.length !== buf2.length)
-        throw Error('Buffer must have the same length. Got buffers of length ' + result.length + ' and ' + buf2.length)
-
-    result.forEach((elem, index, elems) => {
-        elems[index] = elem ^ buf2[index]
-    })
-
-    return result
+    return Buffer.from(i.toString(16).padStart(length * 2, '0'), 'hex')
 }
 
-module.exports.bufferADD_in_place = function (buf, add) {
-    if (!Buffer.isBuffer(buf))
-        throw Error('Expected Buffer as input. Got ' + typeof buf)
+module.exports.bufferToNumber = function (buf) {
+    if (!Buffer.isBuffer(buf) || buf.length === 0)
+        throw Error('Invalid input value. Expected a non-empty buffer.')
 
-    //  shortcut
-    if (last(buf) + add <= 255) {
-        buf[buf.length - 1] = last(buf) + add
+    return parseInt(buf.toString('hex'), 16)
+}
 
-        return buf
+module.exports.bufferADD = function (buf1, buf2) {
+    if (!Buffer.isBuffer(buf1))
+        throw Error('Expected a buffer. Got \"' + typeof buf1 + '\" instead.')
+
+    const a = Number.parseInt(buf1.toString('hex'))
+    let b, length
+
+    if (Buffer.isBuffer(buf2)) {
+        b = Number.parseInt(buf2.toString('hex'))
+        length = Math.max(buf1.length, buf2.length)
+
+    } else if (Number.isInteger(buf2)) {
+        b = buf2
+        length = buf1.length
+    } else {
+        throw Error('Invalid input values. Got \"' + typeof buf1 + '\" and \"' + typeof buf2 + '\".')
     }
 
-    throw Error('TODO')
-    // let maxlength = Math.max(buf.length, add.length)
-
-    // if (maxlength > buf.length) {
-    //     buf = Buffer.concat([Buffer.allocate(maxlength - buf.length).fill(0), buf], maxlength)
-    // }
-
-    // let overflow = 0
-    // for (let i = 0; i < add.length; i++) {
-    //     if (buf[i] + add[i] + overflow)
-    //     buf[i] = buf[i] 
-    //     overflow = buf[i] + add[i] - 255
-
-    // }
-    // if (buf.l)
-    // let overflow = add - last(buf) 
-
-    // while(overflow > 255) {
-
-    // }
-
+    return module.exports.numberToBuffer(a + b, length)
 }
 
 module.exports.hash = function (buf) {
@@ -78,8 +63,4 @@ module.exports.hash = function (buf) {
         throw Error('Invalid input. Please use a Buffer')
 
     return Buffer.from(sha3(buf).slice(2), 'hex')
-}
-
-module.exports.moveForward = function (buf) {
-    
 }
