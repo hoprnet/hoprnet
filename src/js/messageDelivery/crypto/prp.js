@@ -2,9 +2,8 @@
 
 const chacha = require('chacha')
 const withIs = require('class-is')
-// const blake2 = require('blake2')
 const crypto = require('blake2')
-const { bufferXOR } = require('../utils')
+const { bufferXOR } = require('../../utils')
 
 const INTERMEDIATE_KEY_LENGTH = 32
 const INTERMEDIATE_IV_LENGTH = 12

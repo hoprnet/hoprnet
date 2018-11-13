@@ -6,13 +6,21 @@ const defaultsDeep = require('@nodeutils/defaults-deep')
 const Packet = require('./packet')
 const registerHandlers = require('./handlers')
 const c = require('./constants')
+const crawlNetwork = require('./crawlNetwork')
+const getPubKey = require('./getPubKey')
 
+// DEMO
+const { randomBytes } = require('crypto')
+const { bufferToNumber, randomSubset } = require('../utils')
+// END DEMO
 
 const libp2p = require('libp2p')
 const TCP = require('libp2p-tcp')
 const MUXER = require('libp2p-mplex')
 const KadDHT = require('libp2p-kad-dht')
+const SECIO = require('libp2p-secio')
 const libp2pCrypto = require('libp2p-crypto')
+
 const PeerInfo = require('peer-info')
 const PeerId = require('peer-id')
 const wrtc = require('wrtc')
@@ -27,16 +35,13 @@ const bs58 = require('bs58')
 const waterfall = require('async/waterfall')
 const parallel = require('async/parallel')
 const times = require('async/times')
-const filter = require('async/filter')
 
 
 
 const PACKET_SIZE = 500
-const MAX_HOPS = 4
 
 
-
-const BOOTSTRAP_NODE = Multiaddr('/ip4/127.0.0.1/tcp/9090/')
+// const BOOTSTRAP_NODE = Multiaddr('/ip4/127.0.0.1/tcp/9090/')
 
 
 
@@ -48,7 +53,7 @@ class Hopper extends libp2p {
             modules: {
                 transport: [TCP],
                 streamMuxer: [MUXER],
-                // connEncryption: [SECIO],
+                connEncryption: [SECIO],
                 dht: KadDHT,
                 // peerDiscovery: [WebRTC.discovery]
             },
@@ -65,14 +70,26 @@ class Hopper extends libp2p {
         super(defaultsDeep(_options, defaults))
 
         this.seenTags = new Set()
+        this.pendingTransactions = new Map()
+        this.crawlNetwork = crawlNetwork(this)
+        this.getPubKey = getPubKey(this)
     }
 
     start(output, callback) {
         waterfall([
-            (cb) => super.start(err => {
-                cb(err)
-            }),
-            (cb) => registerHandlers(this, output, cb)
+            (cb) => super.start(cb),
+            // TODO: Fix libp2p's switch implementation / specify meaning of first parameter
+            (_, cb) => registerHandlers(this, output, cb),
+            // DEMO
+            (node, cb) => {
+                this.on('peer:connect', peer => {
+                    console.log('[\'' + node.peerInfo.id.toB58String() + '\']: Incoming connection from \'' + peer.id.toB58String() + '\'.')
+                    if (c.DEMO && this.peerBook.getAllArray().length == c.MAX_HOPS && process.argv.length == 2) {
+                        setInterval(demo.bind(this), 4000)
+                    }
+                })
+                cb(null, node)
+            }
         ], callback)
     }
 
@@ -84,10 +101,8 @@ class Hopper extends libp2p {
 
         waterfall([
             (cb) => libp2pCrypto.keys.generateKeyPair('secp256k1', 256, cb),
-            (key, cb) => waterfall([
-                (cb) => key.public.hash(cb),
-                (id, cb) => PeerInfo.create(new PeerId(id, key, key.public), cb)
-            ], cb),
+            (key, cb) => key.public.hash((err, id) => cb(err, key, id)),
+            (key, id, cb) => PeerInfo.create(new PeerId(id, key, key.public), cb),
             (peerInfo, cb) => {
                 // TCP
                 options.addrs.push(Multiaddr('/ip4/0.0.0.0/tcp/0'))
@@ -113,11 +128,11 @@ class Hopper extends libp2p {
         ], cb)
     }
 
-    sendMessage(msg, destination) {
+    sendMessage(msg, destination, cb) {
         if (!msg)
             throw Error('Expecting non-empty message.')
 
-        switch(typeof msg) {
+        switch (typeof msg) {
             case 'number':
                 msg = msg.toString()
             case 'string':
@@ -127,67 +142,42 @@ class Hopper extends libp2p {
                 throw Error('Invalid input value. Got \"' + typeof msg + '\".')
         }
 
-        times(Math.ceil(msg.length / c.PACKET_SIZE),
-            (n, cb) => waterfall([
-                (cb) => this.sampleNodes(destination, cb),
-                (intermediateNodes, cb) =>
-                    Packet.createPacket(
-                        this,
-                        msg.slice(n * c.PACKET_SIZE, Math.min(msg.length, (n + 1) * c.PACKET_SIZE)),
-                        intermediateNodes,
-                        destination,
-                        (err, packet) => cb(err, packet, intermediateNodes)
-                    ),
-                (packet, intermediateNodes, cb) => this.dialProtocol(intermediateNodes[0], c.PROTOCOL_STRING, (err, conn) => cb(err, conn, packet)),
-                (conn, packet, cb) => {
-                    pull(
-                        pull.once(packet.toBuffer()),
-                        conn
-                    )
-                    cb()
-                }
-            ], cb),
-            (err, identifiers) => {
-                // console.log(err, identifiers)
+        times(Math.ceil(msg.length / c.PACKET_SIZE), (n, cb) => waterfall([
+            (cb) => this.getIntermediateNodes(destination.id, cb),
+            (intermediateNodes, cb) =>
+                Packet.createPacket(
+                    this,
+                    msg.slice(n * c.PACKET_SIZE, Math.min(msg.length, (n + 1) * c.PACKET_SIZE)),
+                    intermediateNodes,
+                    destination,
+                    (err, packet) => cb(err, packet, intermediateNodes[0])
+                ),
+            (packet, firstNode, cb) => this.dialProtocol(firstNode, c.PROTOCOL_STRING, (err, conn) => cb(err, conn, packet)),
+            (conn, packet, cb) => {
+                pull(
+                    pull.once(packet.toBuffer()),
+                    conn
+                )
+                cb()
             }
-        )
-        // this.sampleNodes(destination, (err, intermediateNodes) => {
-        //     intermediateNodes.concat([destination]).forEach(node => console.log(node.toB58String()))
-
-        //     const { header, secrets, identifier } = Header.createHeader(intermediateNodes.concat([destination]))
-
-        //     // Encrypt message
-        //     forEachRight(secrets, secret => {
-        //         const { key, iv } = Header.deriveCipherParameters(secret)
-        //         console.log('Encrypting with ' + bs58.encode(secret))
-
-        //         prp.createPRP(key, iv).permutate(data)
-        //     })
-
-        //     this.dialProtocol(intermediateNodes[0], PROTOCOL_STRING, (err, conn) => {
-        //         if (err) { cb(err) }
-
-
-
-        //         cb(null, identifier)
-        //     })
-        // })
+        ], cb), cb)
     }
 
-sampleNodes(destination, cb) {
-    filter(this.peerBook.getAll(), (peerInfo, cb) => {
-        const res =
-            this.peerInfo.id.id.compare(peerInfo.id.id) !== 0 &&
-            destination.id.compare(peerInfo.id.id) !== 0
-        cb(null, res)
-    }, (err, peerInfos) => {
-        cb(null, peerInfos.slice(0, MAX_HOPS - 1).map(peerInfo => peerInfo.id))
-    })
+    getIntermediateNodes(destination, cb) {
+        const comparator = (peerInfo) => {
+            return this.peerInfo.id.id.compare(peerInfo.id.id) !== 0 &&
+                destination.id.compare(peerInfo.id.id) !== 0
+        }
+        waterfall([
+            (cb) => this.crawlNetwork(cb, comparator),
+            (cb) => cb(null, randomSubset(
+                this.peerBook.getAllArray(), c.MAX_HOPS - 1, comparator))
+        ], cb)
+    }
 }
 
-handleHeader(header, ciphertext) {
-    console.log(header, ciphertext)
-}
+function demo() {
+    this.sendMessage('HelloWorld ' + Date.now().toString(), this.peerBook.getAllArray()[bufferToNumber(randomBytes(4)) % (this.peerBook.getAllArray().length)])
 }
 
 module.exports = withIs(Hopper, { className: 'hopper', symbolName: '@validitylabs/hopper/hopper' })

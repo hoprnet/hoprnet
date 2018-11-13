@@ -150,13 +150,11 @@ module.exports.peerInfoToString = (peerInfo) => {
 }
 
 module.exports.warmUpNodes = (nodes, cb) => {
-    times(nodes.length - 1, (n, cb) => {
-        // console.log('trying to connect from ' + nodes[n].peerInfo.id.toB58String() + ' to ' + nodes[n + 1].peerInfo.id.toB58String())
-        nodes[n].dial(nodes[n+1].peerInfo, (err, conn) => {
-            if (err) { throw err }
-            cb(null)
-        })
-    }, (err) => cb(err, nodes))
+    times(
+        nodes.length - 1,
+        (n, cb) => nodes[n].dial(nodes[n + 1].peerInfo, (err, conn) => cb(err)),
+        (err) => cb(err, nodes)
+    )
 }
 
 function generateKeyPair() {

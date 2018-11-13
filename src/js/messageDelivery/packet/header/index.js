@@ -8,11 +8,12 @@ const bs58 = require('bs58')
 const multihashes = require('multihashes')
 
 const createHeader = require('./createHeader')
-const prp = require('../../prp')
-const prg = require('../../prg')
+const prp = require('../../crypto/prp')
+const prg = require('../../crypto/prg')
 const { bufferXOR, bufferADD } = require('../../../utils')
 const constants = require('../../constants')
 const p = require('./parameters')
+
 
 const MAC_KEY_LENGTH = 16
 const HASH_KEY_PRG = 'P'
@@ -111,8 +112,6 @@ class Header {
     }
 
     extractHeaderInformation() {
-        console.log('derived secret ' + bs58.encode(this.derivedSecret))
-
         const { key, iv } = Header.derivePRGParameters(this.derivedSecret)
         const tmp = Buffer
             .alloc(Header.BETA_LENGTH + p.PER_HOP_SIZE)
@@ -127,8 +126,6 @@ class Header {
                 ), 0, Header.BETA_LENGTH + p.PER_HOP_SIZE)
 
         this.data = this.data || Buffer.alloc(p.ADDRESS_SIZE + p.PROVING_VALUES_SIZE + p.COMPRESSED_PUBLIC_KEY_LENGTH)
-
-        console.log(tmp.slice(0, p.ADDRESS_SIZE).toString('hex'))
 
         this.data
             .fill(tmp.slice(0, p.ADDRESS_SIZE), 0, p.ADDRESS_SIZE)

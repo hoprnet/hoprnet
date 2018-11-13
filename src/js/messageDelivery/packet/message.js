@@ -5,7 +5,7 @@ const withIs = require('class-is')
 
 const constants = require('../constants')
 const Header = require('./header')
-const PRP = require('../prp')
+const PRP = require('../crypto/prp')
 
 const PADDING = Buffer.from('PADDING')
 const PADDING_LENGTH = PADDING.length
@@ -32,16 +32,18 @@ class Message {
         return this.buffer.slice(0, lastIndex)
     }
 
-    static createMessage(msg) {
-        return new Message(
-            Buffer.concat(
-                [
-                    msg,
-                    PADDING,
-                    Buffer.alloc(constants.PACKET_SIZE - msg.length).fill(0)
-                ],
-                Message.SIZE)
-        )
+    static createMessage(msg, buffer = Buffer.alloc(Message.SIZE)) {
+        if (!Buffer.isBuffer(msg))
+            throw Error('Wrong input values. Expected a Buffer. Got \"' + typeof msg + '\" instead.')
+
+        const msgLength = msg.length
+        
+        buffer
+            .fill(msg, 0, msgLength)
+            .fill(PADDING, msgLength, msgLength + PADDING_LENGTH)
+            .fill(0, msgLength + PADDING_LENGTH, Message.SIZE)
+
+        return new Message(buffer)
     }
 
     static fromBuffer(buf) {
@@ -68,6 +70,8 @@ class Message {
         const { key, iv } = Header.deriveCipherParameters(secret)
 
         PRP.createPRP(key, iv).inverse(this.buffer)
+
+        return this
     }
 }
 

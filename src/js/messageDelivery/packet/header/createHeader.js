@@ -6,17 +6,20 @@ const Multihash = require('multihashes')
 const bs58 = require('bs58')
 const forEachRight = require('lodash.foreachright');
 
-const createProvingValues = require('./createProvingValues')
-const prg = require('../../prg')
-const { bufferXOR } = require('../../../utils')
-const constants = require('../../constants')
+const { deriveKey } = require('../../../payments/keyDerivation')
+const prg = require('../../crypto/prg')
+const { hash, bufferXOR } = require('../../../utils')
+const c = require('../../constants')
 
 const p = require('./parameters')
 
 module.exports = (Header, header, peerIds) => {
     function checkPeerIds() {
         if (!Array.isArray(peerIds))
-            throw Error('Expected array of peerIds. Got ' + typeof publicKeys)
+            throw Error('Expected array of peerIds. Got \"' + typeof publicKeys + '\" instead.')
+
+        if (peerIds.length > c.MAX_HOPS)
+            peerIds = peerIds.slice(0, c.MAX_HOPS)
 
         peerIds.forEach((peerId, index) => {
             if (peerId === undefined || peerId.id === undefined || peerId.pubKey === undefined)
@@ -25,7 +28,7 @@ module.exports = (Header, header, peerIds) => {
     }
 
     function generateKeyShares() {
-        let done = false, alpha, secrets, privKey
+        let done = false, secrets, privKey
 
         // Generate the Diffie-Hellman key shares and
         // the respective blinding factors for the
@@ -44,6 +47,7 @@ module.exports = (Header, header, peerIds) => {
             do {
                 privKey = crypto.randomBytes(p.PRIVATE_KEY_LENGTH)
             } while (!secp256k1.privateKeyVerify(privKey))
+            
             header.alpha
                 .fill(secp256k1.publicKeyCreate(privKey), 0, p.COMPRESSED_PUBLIC_KEY_LENGTH)
 
@@ -79,11 +83,11 @@ module.exports = (Header, header, peerIds) => {
     }
 
     function generateFiller(secrets) {
-        const filler = Buffer.alloc(p.PER_HOP_SIZE * (constants.MAX_HOPS - 1)).fill(0)
+        const filler = Buffer.alloc(p.PER_HOP_SIZE * (c.MAX_HOPS - 1)).fill(0)
         let length
 
-        for (let index = 0; index < (constants.MAX_HOPS - 1); index++) {
-            let { key, iv } = Header.derivePRGParameters(secrets[index], p.LAST_HOP_SIZE + (constants.MAX_HOPS - 1 - index) * p.PER_HOP_SIZE)
+        for (let index = 0; index < (c.MAX_HOPS - 1); index++) {
+            let { key, iv } = Header.derivePRGParameters(secrets[index], p.LAST_HOP_SIZE + (c.MAX_HOPS - 1 - index) * p.PER_HOP_SIZE)
 
             length = (index + 1) * p.PER_HOP_SIZE
 
@@ -102,11 +106,9 @@ module.exports = (Header, header, peerIds) => {
         forEachRight(secrets, (secret, index) => {
             const { key, iv } = Header.derivePRGParameters(secret)
 
-            let paddingLength = (constants.MAX_HOPS - secrets.length) * p.PER_HOP_SIZE
+            let paddingLength = (c.MAX_HOPS - secrets.length) * p.PER_HOP_SIZE
 
             if (index === secrets.length - 1) {
-                console.log(Multihash.decode(peerIds[index].id).digest.toString('hex'))
-
                 header.beta
                     .fill(Multihash.decode(peerIds[index].id).digest, 0, p.DESINATION_SIZE)
                     .fill(identifier, p.DESINATION_SIZE, p.DESINATION_SIZE + p.IDENTIFIER_SIZE)
@@ -125,42 +127,27 @@ module.exports = (Header, header, peerIds) => {
                     .fill(filler, p.LAST_HOP_SIZE + paddingLength, Header.BETA_LENGTH)
 
             } else {
-                console.log(Multihash.decode(peerIds[index + 1].id).digest.toString('hex'))
                 tmp
                     .fill(header.beta, 0, Header.BETA_LENGTH - p.PER_HOP_SIZE)
 
                 header.beta
                     .fill(Multihash.decode(peerIds[index + 1].id).digest, 0, p.ADDRESS_SIZE)
                     .fill(header.gamma, p.ADDRESS_SIZE, p.ADDRESS_SIZE + p.MAC_SIZE)
+                    .fill(hash(Header.deriveTransactionKey(secrets[index + 1])), p.ADDRESS_SIZE + p.MAC_SIZE, p.ADDRESS_SIZE + p.MAC_SIZE + p.HASH_LENGTH)
                     .fill(tmp, p.PER_HOP_SIZE, Header.BETA_LENGTH)
 
-                createProvingValues(Header, header.beta.slice(p.ADDRESS_SIZE + p.MAC_SIZE, p.ADDRESS_SIZE + p.MAC_SIZE + p.PROVING_VALUES_SIZE), secrets, index)
-
+                if (secrets.length > 2 && index <= secrets.length - 2) {
+                    header.beta
+                        .fill(hash(deriveKey(Header, secrets.slice(index, index + 2))), p.ADDRESS_SIZE + p.MAC_SIZE + p.HASH_LENGTH, p.ADDRESS_SIZE + p.MAC_SIZE + p.HASH_LENGTH + p.HASH_LENGTH)
+                        // TODO
+                        // .fill(deriveKey(Header, secrets.slice(index + 1, index + 3)), p.ADDRESS_SIZE + p.MAC_SIZE + p.HASH_LENGTH + p.HASH_LENGTH, p.ADDRESS_SIZE + p.MAC_SIZE + p.HASH_LENGTH + p.HASH_LENGTH + p.KEY_LENGTH)
+                }
                 header.beta
                     .fill(
                         bufferXOR(
                             header.beta,
                             prg.createPRG(key, iv).digest(Header.BETA_LENGTH)
                         ), 0, Header.BETA_LENGTH)
-
-                console.log(header.beta.slice(0, p.ADDRESS_SIZE).toString('hex'))
-
-                // header.beta
-                //     .copy(tmp, 0, 0, Header.BETA_LENGTH - (ADDRESS_SIZE + MAC_SIZE + PROVING_VALUES_SIZE))
-                // tmp
-                //     .copy(header.beta, ADDRESS_SIZE + MAC_SIZE + PROVING_VALUES_SIZE, 0, Header.BETA_LENGTH - (ADDRESS_SIZE + MAC_SIZE + PROVING_VALUES_SIZE))
-
-                // console.log(peerIds[index + 1].toB58String())
-                // Multihash
-                //     .decode(peerIds[index + 1].id).digest
-                //     .copy(header.beta, 0, 0, ADDRESS_SIZE)
-                // header.gamma
-                //     .copy(header.beta, ADDRESS_SIZE, 0, MAC_SIZE)
-
-                // header.beta = bufferXOR(
-                //     header.beta,
-                //     prg.createPRG(key, iv).digest(Header.BETA_LENGTH)
-                // )
             }
 
             header.gamma
@@ -185,7 +172,7 @@ module.exports = (Header, header, peerIds) => {
     const filler = generateFiller(secrets)
     createBetaAndGamma(secrets, filler, identifier)
 
-    printValues(header, secrets)
+    // printValues(header, secrets)
 
     return {
         header: header,

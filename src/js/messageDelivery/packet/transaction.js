@@ -38,8 +38,8 @@ class Transaction {
     }
 
     static createTransaction(amount, to, secretKey, buffer = Buffer.alloc(Transaction.SIZE)) {
-        if (!Buffer.isBuffer(to) || !secp256k1.publicKeyVerify(to))
-            throw Error('Invalid recipient.')
+        // if (!Buffer.isBuffer(to) || !secp256k1.publicKeyVerify(to))
+        //     throw Error('Invalid recipient.')
 
         return new Transaction(buffer
             .fill(0, 0, SIGNATURE_LENGTH)

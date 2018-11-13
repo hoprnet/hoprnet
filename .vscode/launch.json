@@ -9,7 +9,10 @@
             "type": "node",
             "request": "launch",
             "name": "Launch Program",
-            "program": "${workspaceFolder}/src/js/messageDelivery/test.js"
+            "program": "${workspaceFolder}/src/js/messageDelivery/test.js",
+            // "args": [
+            //     "/ip4/192.168.1.41/tcp/53975/ipfs/QmQfdZuo3TYGWuq8cjKEes1p5bxDEc7uxyapqGYEwDTcLU"
+            // ]
         }
     ]
 }

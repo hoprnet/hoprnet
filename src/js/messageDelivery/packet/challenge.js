@@ -2,11 +2,12 @@
 
 const secp256k1 = require('secp256k1')
 const withIs = require('class-is')
-const hkdf = require('futoin-hkdf')
 
+const { hash } = require('../../utils')
 
 const SIGNATURE_LENGTH = 64
 const KEY_LENGTH = 32
+const HASH_LENGTH = 32
 const HASH_KEY_KEY_HALF = 'KEY_HALF'
 
 class Challenge {
@@ -37,33 +38,47 @@ class Challenge {
     }
 
     static createChallenge(secret, secretKey, buffer = Buffer.alloc(SIGNATURE_LENGTH)) {
-        console.log('Create challenge with secret ' + secret.toString('base64'))
+        // console.log('Create challenge with secret ' + secret.toString('base64'))
         if (!Buffer.isBuffer(secret))
             throw Error('Invalid secret format.')
 
         if (!secp256k1.privateKeyVerify(secretKey))
             throw Error('Invalid private key format.')
 
-        const hashedKey = Challenge.deriveHashedKey(secret)
+        const challenge = new Challenge(buffer)
 
-        buffer.fill(secp256k1.sign(hashedKey, secretKey).signature, 0, SIGNATURE_LENGTH)
+        challenge.challengeSignature
+            .fill(secp256k1.sign(Challenge.deriveHashedKey(secret), secretKey).signature, 0, SIGNATURE_LENGTH)
+        // console.log('create challenge with signature' + challenge.challengeSignature.toString('base64'))
 
-        return new Challenge(buffer)
+        return challenge
     }
 
-    updateChallenge(secret, secretKey) {
-        Challenge.createChallenge(secret, secretKey, this.buffer)
+    updateChallenge(hashedKey, secretKey) {
+        if (!Buffer.isBuffer(hashedKey) || hashedKey.length !== HASH_LENGTH)
+            throw Error('Wrong input value. Expected a hashed key of size ' + HASH_LENGTH + ' bytes.')
+
+        if (!secp256k1.privateKeyVerify(secretKey))
+            throw Error('Invalid private key format.')
+
+        this.challengeSignature
+            .fill(secp256k1.sign(hashedKey, secretKey).signature, 0, SIGNATURE_LENGTH)
+        
+        console.log('Update challenge with secret ' + hashedKey.toString('base64'))
     }
 
     static deriveHashedKey(secret) {
-        return hkdf(secret, KEY_LENGTH, { salt: HASH_KEY_KEY_HALF })
+        return hash(secret)
     }
 
     verify(pubKey, secret) {
         console.log('Verify challenge with secret ' + secret.toString('base64'))
+        console.log('verify with pub key ' + pubKey.toString('base64'))
+
         if (!Buffer.isBuffer(pubKey) || !secp256k1.publicKeyVerify(pubKey))
             throw Error('Invalid public key.')
 
+        console.log(secp256k1.verify(Challenge.deriveHashedKey(secret), this.challengeSignature, pubKey) ? 'Verification OK.' : 'Verification failed.')
         return secp256k1.verify(Challenge.deriveHashedKey(secret), this.challengeSignature, pubKey)
     }
 }

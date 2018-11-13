@@ -11,8 +11,8 @@ const Message = require('./message')
 const parallel = require('async/parallel')
 const series = require('async/series')
 
-const c = require('../constants')
-const { hash } = require('../../utils')
+const { RELAY_FEE } = require('../constants')
+const { hash, deepCopy } = require('../../utils')
 
 class Packet {
     constructor(_header, _transaction, _challenge, _message) {
@@ -27,17 +27,18 @@ class Packet {
     }
 
     static createPacket(node, msg, intermediateNodes, destination, cb) {
-        const { header, secrets, identifier } = Header.createHeader(intermediateNodes.concat([destination]))
+        const { header, secrets, identifier } = Header.createHeader(intermediateNodes.concat([destination]).map(peerInfo => peerInfo.id))
 
-        intermediateNodes.forEach((node, index) => console.log('Intermediate ' + index + ' : ' + node.toB58String()))
-        console.log('Destination ' + destination.toB58String())
+        console.log('\n\n[\'' + node.peerInfo.id.toB58String() + '\']: ---------- New Packet ----------')
+        intermediateNodes.forEach((peerInfo, index) => console.log('[\'' + node.peerInfo.id.toB58String() + '\']: Intermediate ' + index + ' : ' + peerInfo.id.toB58String()))
+        console.log('[\'' + node.peerInfo.id.toB58String() + '\']: Destination ' + destination.id.toB58String())
 
         parallel({
-            challenge: (cb) => cb(null, Challenge.createChallenge(hash(Header.deriveTransactionKey(secrets[0])), node.peerInfo.id.privKey.marshal())),
+            challenge: (cb) => cb(null, Challenge.createChallenge(Header.deriveTransactionKey(secrets[0]), node.peerInfo.id.privKey.marshal())),
             message: (cb) => cb(null, Message.createMessage(msg).onionEncrypt(secrets)),
             transaction: (cb) => {
                 if (intermediateNodes.length > 0) {
-                    cb(null, Transaction.createTransaction((secrets.length - 1) * c.RELAY_FEE, intermediateNodes[0].pubKey.marshal(), node.peerInfo.id.privKey.marshal()))
+                    cb(null, Transaction.createTransaction((secrets.length - 1) * RELAY_FEE, intermediateNodes[0].id.pubKey.marshal(), node.peerInfo.id.privKey.marshal()))
                 } else {
                     throw Error('TODO: implement direct message transfer')
                 }
@@ -51,7 +52,7 @@ class Packet {
         })
     }
 
-    forwardTransform(node, pubKeyPrevious, cb) {
+    forwardTransform(node, previousPeerId, cb) {
         if (!this.transaction.verify())
             throw Error('TODO: No transaction')
 
@@ -73,13 +74,22 @@ class Packet {
                 this.header.extractHeaderInformation()
                 cb()
             },
-            (cb) => cb(!this.challenge.verify(pubKeyPrevious, hash(Header.deriveTransactionKey(this.header.derivedSecret)))),
+            (cb) => cb(!this.challenge.verify(previousPeerId.pubKey.marshal(), Header.deriveTransactionKey(this.header.derivedSecret))),
+            (cb) => {
+                // save transaction
+                node.pendingTransactions.set(this.header.hashedKeyHalf, deepCopy(this.transaction, Transaction))
+                cb()
+            },
             (cb) => parallel([
                 (cb) => {
                     this.header.transformForNextNode()
                     cb()
                 },
                 (cb) => {
+                    // Challenge Backup
+                    this.oldChallenge = deepCopy(this.challenge, Challenge)
+
+                    console.log('Update challenge with pubKey ' + node.peerInfo.id.pubKey.marshal().toString('base64') + ' and secret key ' + node.peerInfo.id.privKey.marshal().toString('base64'))
                     this.challenge.updateChallenge(this.header.hashedKeyHalf, node.peerInfo.id.privKey.marshal())
                     cb()
                 },
@@ -88,17 +98,10 @@ class Packet {
                     cb()
                 }
             ], cb)
-        ], (err) => {
-            if (err) {
-                cb(err)
-            } else {
-                cb(null, this)
-            }
-        })
+        ], (err) => err ? cb(err) : cb(null, this))
     }
 
     getTargetPeerId() {
-        console.log('Next Hop ' + this.header.address.toString('hex'))
         return PeerId.createFromBytes(this.header.address)
     }
 
@@ -111,11 +114,14 @@ class Packet {
         ], Packet.SIZE)
     }
 
-    addTransaction(to, node, cb) {
-        if (this.transaction.value < c.RELAY_FEE)
+    addTransaction(targetPeerId, node, cb) {
+        if (this.transaction.value < RELAY_FEE)
             throw Error('Insufficient funds.')
 
-        this.transaction.forwardTransaction(this.transaction.value - c.RELAY_FEE, to.pubKey.marshal(), node.peerInfo.id.privKey.marshal())
+        // if (!targetPeerId.pubKey)
+        //     throw Error('Invalid peerID. Please provide one with a valid public key.')
+
+        this.transaction.forwardTransaction(this.transaction.value - RELAY_FEE, null /* targetPeerId.pubKey.marshal() */ , node.peerInfo.id.privKey.marshal())
         cb()
     }
 

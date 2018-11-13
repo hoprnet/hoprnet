@@ -2,12 +2,14 @@
 
 const withIs = require('class-is')
 const secp256k1 = require('secp256k1')
+const parallel = require('async/parallel')
 
 const { hash } = require('../utils')
-const Header = require('../messageDelivery/packet/header')
+const Header = require('./packet/header')
+const p = require('./packet/header/parameters')
 
 const SIGNATURE_LENGTH = 64
-const KEY_LENGTH = SIGNATURE_LENGTH
+const KEY_LENGTH = p.KEY_LENGTH
 
 class Acknowledgement {
     constructor(buf) {
@@ -44,33 +46,44 @@ class Acknowledgement {
         return new Acknowledgement(buf)
     }
 
-    static create(challenge, derivedSecret, secretKey) {
-        const key = Header.deriveTransactionKeyBlinding(derivedSecret)
+    static create(challenge, derivedSecret, secretKey, buffer = Buffer.alloc(Acknowledgement.SIZE)) {
+        const ack = new Acknowledgement(buffer)
 
-        const buf = Buffer.concat(
-            [key, challenge.challengeSignature, Buffer.alloc(SIGNATURE_LENGTH)],
-            KEY_LENGTH + 2 * SIGNATURE_LENGTH)
+        ack.key
+            .fill(Header.deriveTransactionKey(derivedSecret), 0, KEY_LENGTH)
 
-        Buffer.from(secp256k1.sign(hash(buf.slice(0, KEY_LENGTH + SIGNATURE_LENGTH)), secretKey).signature)
-            .copy(buf, KEY_LENGTH + SIGNATURE_LENGTH, 0, SIGNATURE_LENGTH)
+        ack.challengeSignature
+            .fill(challenge.challengeSignature, 0, SIGNATURE_LENGTH)
 
-        return new Acknowledgement(buf)
+        // console.log('challengeSignature ' + ack.challengeSignature.toString('base64'))
+
+        ack.responseSignature
+            .fill(
+                secp256k1.sign(
+                    prepareSignature(ack),
+                    secretKey).signature,
+                0, SIGNATURE_LENGTH)
+
+        return ack
     }
 
-    isValid(pubKeyNext) {
+    verify(pubKeyNext, ownPubkey, cb) {
         if (!Buffer.isBuffer(pubKeyNext) || !secp256k1.publicKeyVerify(pubKeyNext))
             throw Error('Invalid public key.')
 
-        const hashedKey = hash(this.key)
+        console.log('trying to verify with value ' + hash(this.key).toString('base64'))
 
-        if (!secp256k1.verify(hashedKey, this.challengeSignature, pubKeyNext))
-            return false
-
-        if (!secp256k1.verify(this.buffer.slice(0, KEY_LENGTH + SIGNATURE_LENGTH), response.signature, pubKeyNext))
-            return false
-
-        return true
+        parallel([
+            (cb) => cb(null, secp256k1.verify(hash(this.key), this.challengeSignature, ownPubkey)),
+            (cb) => cb(null, secp256k1.verify(prepareSignature(this), this.responseSignature, pubKeyNext))
+        ], (err, results) => cb(err, results.every(x => x)))
     }
+}
+
+function prepareSignature(ack) {
+    return hash(
+        Buffer.concat(
+            [ack.key, ack.challengeSignature], KEY_LENGTH + SIGNATURE_LENGTH))
 }
 
 module.exports = withIs(Acknowledgement, { className: 'Acknowledgement', symbolName: '@validitylabs/hopper/Acknowledgement' })
