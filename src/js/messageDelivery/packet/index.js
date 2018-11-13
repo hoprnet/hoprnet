@@ -89,7 +89,6 @@ class Packet {
                     // Challenge Backup
                     this.oldChallenge = deepCopy(this.challenge, Challenge)
 
-                    console.log('Update challenge with pubKey ' + node.peerInfo.id.pubKey.marshal().toString('base64') + ' and secret key ' + node.peerInfo.id.privKey.marshal().toString('base64'))
                     this.challenge.updateChallenge(this.header.hashedKeyHalf, node.peerInfo.id.privKey.marshal())
                     cb()
                 },

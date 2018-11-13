@@ -64,7 +64,6 @@ class Challenge {
         this.challengeSignature
             .fill(secp256k1.sign(hashedKey, secretKey).signature, 0, SIGNATURE_LENGTH)
         
-        console.log('Update challenge with secret ' + hashedKey.toString('base64'))
     }
 
     static deriveHashedKey(secret) {
@@ -72,9 +71,6 @@ class Challenge {
     }
 
     verify(pubKey, secret) {
-        console.log('Verify challenge with secret ' + secret.toString('base64'))
-        console.log('verify with pub key ' + pubKey.toString('base64'))
-
         if (!Buffer.isBuffer(pubKey) || !secp256k1.publicKeyVerify(pubKey))
             throw Error('Invalid public key.')
 

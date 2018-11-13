@@ -2,6 +2,8 @@
 
 const pull = require('pull-stream')
 const waterfall = require('async/waterfall')
+const Multihash = require('multihashes')
+const crypto = require('crypto')
 
 const { PROTOCOL_DELIVER_PUBKEY } = require('./constants')
 
@@ -30,6 +32,17 @@ module.exports = (node) => (peerInfo, callback) => waterfall([
     },
     (conn, cb) => pull(
         conn,
-        pull.drain(cb)
+        pull.drain(pubKey => waterfall([
+            (cb) => conn.getPeerInfo(cb),
+            (peerInfo, cb) => {
+                const multihash = Multihash.encode(crypto.createHash('sha256').update(pubKey).digest(), 'sha2-256')
+
+                if (peerInfo.id.id.compare(multihash) === 0) {
+                    cb(null, pubKey)
+                } else {
+                    cb(Error('General error.'))
+                }
+            }
+        ]))
     )
 ], callback) 

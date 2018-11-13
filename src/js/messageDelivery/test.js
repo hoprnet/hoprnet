@@ -17,5 +17,5 @@ waterfall([
 ], (err, nodes) => {
     if (err) { throw err }
 
-    nodes[0].sendMessage('test_test_test ' + Date.now().toString(), nodes[2].peerInfo)
+    nodes[0].sendMessage('test_test_test ' + Date.now().toString(), nodes[3].peerInfo)
 })
