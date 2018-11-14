@@ -4,7 +4,7 @@ const withIs = require('class-is')
 const secp256k1 = require('secp256k1')
 const parallel = require('async/parallel')
 
-const { hash } = require('../utils')
+const { hash } = require('./utils')
 const Header = require('./packet/header')
 const p = require('./packet/header/parameters')
 
@@ -70,8 +70,6 @@ class Acknowledgement {
     verify(pubKeyNext, ownPubkey, cb) {
         if (!Buffer.isBuffer(pubKeyNext) || !secp256k1.publicKeyVerify(pubKeyNext))
             throw Error('Invalid public key.')
-
-        console.log('trying to verify with value ' + hash(this.key).toString('base64'))
 
         parallel([
             (cb) => cb(null, secp256k1.verify(hash(this.key), this.challengeSignature, ownPubkey)),

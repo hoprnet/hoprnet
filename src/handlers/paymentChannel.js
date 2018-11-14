@@ -2,10 +2,10 @@
 
 const { PROTOCOL_PAYMENT_CHANNEL } = require('../constants')
 const pull = require('pull-stream')
-const utils = require('../../utils')
+const utils = require('../utils')
 const pullJson = require('pull-json-doubleline')
 const waterfall = require('async/waterfall')
-const paymentChannel = require('../paymentChannel')
+const paymentChannel = require('../paymentChannels/paymentChannel')
 
 // module.exports.registerFunctionality = (node, registerChannel) => {
 //     node.handle(constants.paymentChannelProtocol, (protocol, conn) => {

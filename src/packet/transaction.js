@@ -3,7 +3,7 @@
 const secp256k1 = require('secp256k1')
 const withIs = require('class-is')
 
-const { numberToBuffer, bufferToNumber } = require('../../utils')
+const { numberToBuffer, bufferToNumber } = require('../utils')
 
 const SIGNATURE_LENGTH = 64
 const KEY_LENGTH = SIGNATURE_LENGTH

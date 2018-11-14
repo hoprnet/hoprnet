@@ -12,7 +12,7 @@ const parallel = require('async/parallel')
 const series = require('async/series')
 
 const { RELAY_FEE } = require('../constants')
-const { hash, deepCopy } = require('../../utils')
+const { hash, deepCopy } = require('../utils')
 
 class Packet {
     constructor(_header, _transaction, _challenge, _message) {

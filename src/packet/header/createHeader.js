@@ -8,7 +8,7 @@ const forEachRight = require('lodash.foreachright');
 
 const { deriveKey } = require('../../../payments/keyDerivation')
 const prg = require('../../crypto/prg')
-const { hash, bufferXOR } = require('../../../utils')
+const { hash, bufferXOR } = require('../../utils')
 const c = require('../../constants')
 
 const p = require('./parameters')

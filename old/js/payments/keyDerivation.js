@@ -4,7 +4,7 @@ const secp256k1 = require('secp256k1')
 const withIs = require('class-is')
 
 
-const { hash, bufferXOR } = require('../utils')
+const { hash, bufferXOR } = require('../messageDelivery/utils')
 const Header = require('../messageDelivery/packet/header')
 
 const SIGNATURE_LENGTH = 64

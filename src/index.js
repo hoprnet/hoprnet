@@ -5,13 +5,14 @@ const defaultsDeep = require('@nodeutils/defaults-deep')
 
 const Packet = require('./packet')
 const registerHandlers = require('./handlers')
+const PaymentChannels = require('./paymentChannels')
 const c = require('./constants')
 const crawlNetwork = require('./crawlNetwork')
 const getPubKey = require('./getPubKey')
 
 // DEMO
 const { randomBytes } = require('crypto')
-const { bufferToNumber, randomSubset } = require('../utils')
+const { bufferToNumber, randomSubset } = require('./utils')
 // END DEMO
 
 const libp2p = require('libp2p')
@@ -73,6 +74,7 @@ class Hopper extends libp2p {
         this.pendingTransactions = new Map()
         this.crawlNetwork = crawlNetwork(this)
         this.getPubKey = getPubKey(this)
+        this.paymentChannels = new PaymentChannels(this)
     }
 
     start(output, callback) {

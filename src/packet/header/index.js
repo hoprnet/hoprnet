@@ -10,7 +10,7 @@ const multihashes = require('multihashes')
 const createHeader = require('./createHeader')
 const prp = require('../../crypto/prp')
 const prg = require('../../crypto/prg')
-const { bufferXOR, bufferADD } = require('../../../utils')
+const { bufferXOR, bufferADD } = require('../../utils')
 const constants = require('../../constants')
 const p = require('./parameters')
 

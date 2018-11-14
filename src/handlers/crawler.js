@@ -4,7 +4,7 @@ const pull = require('pull-stream')
 const waterfall = require('async/waterfall')
 
 const { PROTOCOL_CRAWLING, MARSHALLED_PUBLIC_KEY_SIZE, CRAWLING_RESPONSE_NODES } = require('../constants')
-const { randomSubset } = require('../../utils')
+const { randomSubset } = require('../utils')
 
 module.exports = (node) => node.handle(PROTOCOL_CRAWLING, (protocol, conn) => waterfall([
     (cb) => conn.getPeerInfo(cb),

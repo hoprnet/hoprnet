@@ -134,8 +134,8 @@ module.exports.randomPermutation = function (array) {
 
 const PeerId = require('peer-id')
 const PREFIX = 0x12
-const c = require('./messageDelivery/constants')
-const p = require('./messageDelivery/packet/header/parameters')
+const c = require('./constants')
+const p = require('./packet/header/parameters')
 const Multihash = require('multihashes')
 
 module.exports.keyPairToPeerId = function (key) {
