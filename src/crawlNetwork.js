@@ -33,8 +33,7 @@ module.exports = (node) =>
                             cb(null, currentPeerInfo)
                         }
                     },
-                    (peerInfo, cb) => node.dialProtocol(peerInfo, PROTOCOL_CRAWLING, (err, conn) => cb(err, conn, peerInfo)),
-
+                    (peerInfo, cb) => node.dial(peerInfo, PROTOCOL_CRAWLING, (err, conn) => cb(err, conn, peerInfo)),
                     (conn, currentPeerInfo, cb) => pull(
                             conn,
                             pull.filter(data => data.length > 0 && data.length % MARSHALLED_PUBLIC_KEY_SIZE === 0),

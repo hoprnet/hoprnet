@@ -24,11 +24,11 @@ const libp2pCrypto = require('libp2p-crypto')
 
 const PeerInfo = require('peer-info')
 const PeerId = require('peer-id')
-const wrtc = require('wrtc')
+// const wrtc = require('wrtc')
 const WStar = require('libp2p-webrtc-star')
-const WebRTC = new WStar({
-    wrtc: wrtc
-})
+// const WebRTC = new WStar({
+//     wrtc: wrtc
+// })
 
 const pull = require('pull-stream')
 const Multiaddr = require('multiaddr')
@@ -37,11 +37,6 @@ const waterfall = require('async/waterfall')
 const parallel = require('async/parallel')
 const times = require('async/times')
 
-
-
-const PACKET_SIZE = 500
-
-
 // const BOOTSTRAP_NODE = Multiaddr('/ip4/127.0.0.1/tcp/9090/')
 
 
@@ -49,26 +44,27 @@ const PACKET_SIZE = 500
 const ACKNOWLEDGEMENT_SIZE = 1000000
 
 class Hopper extends libp2p {
-    constructor(_options) {
-        const defaults = {
-            modules: {
-                transport: [TCP],
-                streamMuxer: [MUXER],
-                connEncryption: [SECIO],
-                dht: KadDHT,
-                // peerDiscovery: [WebRTC.discovery]
+    constructor(peerInfo) {
+        const modules = {
+            transport: [new TCP],
+            connection: {
+                muxer: [MUXER]
             },
-            config: {
-                dht: {
-                    kBucketSize: 20
-                },
-                EXPERIMENTAL: {
-                    // dht must be enabled
-                    dht: true
-                }
+            // connEncryption: [SECIO],
+            DHT: KadDHT,
+            // peerDiscovery: [WebRTC.discovery]
+        }
+        const options = {
+            dht: {
+                kBucketSize: 20
+            },
+            EXPERIMENTAL: {
+                // dht must be enabled
+                dht: true
             }
         }
-        super(defaultsDeep(_options, defaults))
+
+        super(modules, peerInfo, null, options)
 
         this.seenTags = new Set()
         this.pendingTransactions = new Map()
@@ -122,9 +118,8 @@ class Hopper extends libp2p {
                     peerInfo.multiaddrs.add(addr)
                 })
 
-                let node = new Hopper({
-                    peerInfo
-                })
+                let node = new Hopper(peerInfo)
+
                 node.start(output, cb)
             }
         ], cb)
@@ -154,7 +149,7 @@ class Hopper extends libp2p {
                     destination,
                     (err, packet) => cb(err, packet, intermediateNodes[0])
                 ),
-            (packet, firstNode, cb) => this.dialProtocol(firstNode, c.PROTOCOL_STRING, (err, conn) => cb(err, conn, packet)),
+            (packet, firstNode, cb) => this.dial(firstNode, c.PROTOCOL_STRING, (err, conn) => cb(err, conn, packet)),
             (conn, packet, cb) => {
                 pull(
                     pull.once(packet.toBuffer()),

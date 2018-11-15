@@ -21,7 +21,7 @@ module.exports = (node, output) => node.handle(c.PROTOCOL_STRING, (protocol, con
                 (cb) => node.peerRouting.findPeer(targetPeerId, cb),
                 (targetPeerInfo, cb) => parallel({
                     transaction: (cb) => packet.addTransaction(targetPeerInfo.id, node, cb),
-                    conn: (cb) => node.dialProtocol(targetPeerInfo, c.PROTOCOL_STRING, cb)
+                    conn: (cb) => node.dial(targetPeerInfo, c.PROTOCOL_STRING, cb)
                 }, cb),
                 (results, cb) => {
                     pull(
@@ -37,7 +37,7 @@ module.exports = (node, output) => node.handle(c.PROTOCOL_STRING, (protocol, con
     function sendAcknowledgement(packet, peerInfo, cb) {
         console.log('[\'' + node.peerInfo.id.toB58String() + '\']: Acknowledging to node \'' + peerInfo.id.toB58String() + '\'.')
         waterfall([
-            (cb) => node.dialProtocol(peerInfo, c.PROTOCOL_ACKNOWLEDGEMENT, cb),
+            (cb) => node.dial(peerInfo, c.PROTOCOL_ACKNOWLEDGEMENT, cb),
             (conn, cb) => {
                 pull(
                     pull.once(

@@ -6,7 +6,7 @@ const Multihash = require('multihashes')
 const bs58 = require('bs58')
 const forEachRight = require('lodash.foreachright');
 
-const { deriveKey } = require('../../../payments/keyDerivation')
+const { deriveKey } = require('../../../old/payments/keyDerivation')
 const prg = require('../../crypto/prg')
 const { hash, bufferXOR } = require('../../utils')
 const c = require('../../constants')

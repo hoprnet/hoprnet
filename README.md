@@ -21,7 +21,7 @@ If the adversary also were able to observe actions that follow the reception of 
 
 To hide who is communicating with whom, sender and receiver need other parties that helps them hiding that kind of information. More precisely, sender and receiver will always rely on services of other parties.
 
-There might exist several parties that deliver this service __for free_ in order to support their ideological beliefs. _For free_ means in that context that these parties pay the incurred costs. These costs include not only the price to buy the requirred hardware but also recurring costs like electricity and maintenance work. In addition to that, one might also consider [legal costs](https://trac.torproject.org/projects/tor/wiki/TorRelayGuide#Legalconsiderationsforexitrelayoperators) in order to deal with abuse complaints.
+There might exist several parties that deliver this service _for free_ in order to support their ideological beliefs. _For free_ means in that context that these parties pay the incurred costs. These costs include not only the price to buy the requirred hardware but also recurring costs like electricity and maintenance work. In addition to that, one might also consider [legal costs](https://trac.torproject.org/projects/tor/wiki/TorRelayGuide#Legalconsiderationsforexitrelayoperators) in order to deal with abuse complaints.
 
 As there is **no incentive** to run this service, people that use this network need to rely on altruistic parties that offer these services for the greater good - for other possibly malicious reasons to operate this service. It seems therefore very reasonable to compensate these people for the service they offer in order to give participants a meaningful business model.
 

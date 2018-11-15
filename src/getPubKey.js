@@ -28,7 +28,7 @@ module.exports = (node) => (peerInfo, callback) => waterfall([
             return callback(null, node.peerBook.get(peerInfo.id).id.pubKey.marshal())
         }
 
-        node.dialProtocol(peerInfo, PROTOCOL_DELIVER_PUBKEY, cb)
+        node.dial(peerInfo, PROTOCOL_DELIVER_PUBKEY, cb)
     },
     (conn, cb) => pull(
         conn,

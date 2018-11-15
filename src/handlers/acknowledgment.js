@@ -5,7 +5,7 @@ const waterfall = require('async/waterfall')
 
 const { PROTOCOL_ACKNOWLEDGEMENT, PROTOCOL_DELIVER_PUBKEY, COM} = require('../constants')
 const Acknowledgement = require('../acknowledgement')
-const KeyDerivation = require('../../payments/keyDerivation')
+const KeyDerivation = require('../../old/payments/keyDerivation')
 
 module.exports = (node) => node.handle(PROTOCOL_ACKNOWLEDGEMENT, (protocol, conn) => {
     pull(
