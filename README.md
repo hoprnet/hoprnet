@@ -36,7 +36,7 @@ As there is **no incentive** to run this service, people that use this network n
 ## Technical Description
 The construction consists of two layers: one for message delivery and one for payments. Messages are embedded within [SPHINX packet format](https://cypherpunks.ca/~iang/pubs/Sphinx_Oakland09.pdf) that provably hides the relation between sender and receiver. The payment layer uses off-chain payments and staked nodes to process transactions.
 
-For further details, see the full [protocol specification](/wiki).
+For further details, see the full [protocol specification](../wiki).
 
 ## Usage
 ```sh
