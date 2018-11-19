@@ -32,7 +32,7 @@ If there is **no incentive** to run a service that provides anonymity, people th
 * Decentralized message delivery & decentralized directory service through [WebRTC](https://webrtc.org)
 * No usage of inefficient cryptographic building blocks like [homomorphic encryption](https://en.wikipedia.org/wiki/Homomorphic_encryption) or [zero-knowledge proofs](https://en.wikipedia.org/wiki/Zero-knowledge_proof)
 * No need for a special *utility token* to use the network
-* Agnostic to choice of token / coin / blockchain*
+* Agnostic to the choice of token / coin / blockchain*
 
 \* The blockchain need to support basic smart contracts.
 
