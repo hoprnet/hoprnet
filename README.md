@@ -27,26 +27,30 @@ If there is **no incentive** to run a service that provides anonymity, people th
 
 ## Key features
 * Meta-data protection
-* Incentivations for relay operators
+* Privacy-preserving incentivations for relay operators
 * Automatic dispute resolution for payments
-* Decentralized message delivery
+* Decentralized message delivery & decentralized directory service through [WebRTC](https://webrtc.org)
 * No usage of inefficient cryptographic building blocks like [homomorphic encryption](https://en.wikipedia.org/wiki/Homomorphic_encryption) or [zero-knowledge proofs](https://en.wikipedia.org/wiki/Zero-knowledge_proof)
+* No need for a special *utility token* to use the network
+* Agnostic to choice of token / coin / blockchain*
+
+\* The blockchain need to support basic smart contracts.
 
 ## State of the art
 |   | [TOR](https://torproject.org) | [Whisper](https://github.com/ethereum/wiki/wiki/Whisper) | [Orchid](https://www.orchid.com/) | [HOPR](#) | 
 | - | --- | ------- | ------ | ---- |
 | Message overhead | # of hops | >= # of of network participants | # of hops | # of hops |
-| Decentral | partly* | ✅ | ✅ | ✅ |
+| Decentral | partially* | ✅ | ✅ | ✅ |
 | Sender anonymity for message delivery | ✅** | ❌ | ?? | ✅ |
-| Receiver anonymity for message deliver | ✅** | ✅ | ?? | ✅ |
+| Receiver anonymity for message delivery | ✅** | ✅ | ?? | ✅ |
 | Incentivations | ❌ | ❌ | ✅ | ✅ |
-| Privacy Presering Incentivations | N/A | N/A | ❌*** | ✅ |
+| Privacy-preserving Incentivations | N/A | N/A | ❌*** | ✅ |
 
 \* Not fully decentral due to central directory service. \
 \*\* If entry node and exit node don't collude. \
 \*\*\* Probably in a future version according to the [whitepaper](https://www.orchid.com/whitepaper.pdf).
 
-For further details, have a look at a [more detailed comparison](../../wiki/State-Of-The-Art)
+For further details, have a look at a [more detailed comparison](../../wiki/State-Of-The-Art).
 
 ## Technical Description
 The construction consists of two layers: one for message delivery and one for payments. Messages are embedded within [SPHINX packet format](https://cypherpunks.ca/~iang/pubs/Sphinx_Oakland09.pdf) that provably hides the relation between sender and receiver. The payment layer uses off-chain payments and staked nodes to process transactions.
