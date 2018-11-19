@@ -32,6 +32,21 @@ As there is **no incentive** to run this service, people that use this network n
 * Decentralized message delivery
 * No usage of inefficient cryptographic building blocks like [homomorphic encryption](https://en.wikipedia.org/wiki/Homomorphic_encryption) or [zero-knowledge proofs](https://en.wikipedia.org/wiki/Zero-knowledge_proof)
 
+## State of the art
+|   | [TOR](https://torproject.org) | [Whisper](https://github.com/ethereum/wiki/wiki/Whisper) | [Orchid](https://www.orchid.com/) | [HOPR](https://github.com/validitylabs/messagingProtocol) | 
+| - | --- | ------- | ------ | ---- |
+| Message overhead | # of hops | at least # of of network participants | # of hops | # of hops |
+| Decentral | partly* | ✅ | ✅ | ✅ |
+| Sender anonymity for message delivery | ✅** | ❌ | ?? | ✅ |
+| Receiver anonymity for message deliver | ✅** | ✅ | ?? | ✅ |
+| Incentivations | ❌ | ❌ | ✅ | ✅ |
+| Privacy Presering Incentivation | N/A | N/A | ❌*** | ✅ |
+
+\* Not fully decentral due to central directory service. \
+\*\* If entry node and exit node don't collude. \
+\*\*\* Probably in a future version according to the [whitepaper](https://www.orchid.com/whitepaper.pdf).
+
+For further details, have a look at a [more detailed comparison](../../wiki/State-Of-The-Art)
 
 ## Technical Description
 The construction consists of two layers: one for message delivery and one for payments. Messages are embedded within [SPHINX packet format](https://cypherpunks.ca/~iang/pubs/Sphinx_Oakland09.pdf) that provably hides the relation between sender and receiver. The payment layer uses off-chain payments and staked nodes to process transactions.
