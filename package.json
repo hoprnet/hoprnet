@@ -1,5 +1,10 @@
 {
     "name": "messaging-protocol",
+    "author": {
+        "name": "Validity Labs AG",
+        "email": "info@validitylabs.org",
+        "url": "https://validitylabs.org"
+    },
     "version": "0.0.1",
     "description": "Privacy preserving messaging protocol with incentivations for relay operators",
     "repository": {
