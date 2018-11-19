@@ -41,8 +41,8 @@ If there is **no incentive** to run a service that provides anonymity, people th
 | - | --- | ------- | ------ | ---- |
 | Asymptotic message overhead | O(# of hops) | O((# of participants) * TTL) | O(# of hops) | O(# of hops) |
 | Decentral | partially* | ✅ | ✅ | ✅ |
-| Sender anonymity for message delivery | ✅** | ❌ | ?? | ✅ |
-| Receiver anonymity for message delivery | ✅** | ✅ | ?? | ✅ |
+| Sender anonymity | ✅** | ❌ | ?? | ✅ |
+| Receiver anonymity  | ✅** | ✅ | ?? | ✅ |
 | Incentivations | ❌ | ❌ | ✅ | ✅ |
 | Privacy-preserving Incentivations | N/A | N/A | ❌*** | ✅ |
 
