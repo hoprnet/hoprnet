@@ -26,15 +26,16 @@ If there is **no incentive** to run a service that provides anonymity, people th
 
 
 ## Key features
-* Meta-data protection
-* Privacy-preserving incentivations for relay operators
+* Metadata protection
+* Comprises message layer and payment layer
+* Privacy-preserving payments for relay operators to incentivize them 
 * Automatic dispute resolution for payments
 * Decentralized message delivery & decentralized directory service through [WebRTC](https://webrtc.org)
 * No usage of inefficient cryptographic building blocks like [homomorphic encryption](https://en.wikipedia.org/wiki/Homomorphic_encryption) or [zero-knowledge proofs](https://en.wikipedia.org/wiki/Zero-knowledge_proof)
-* No need for a special *utility token* to use the network
+* Works with any coin or token as a medium of exchange
 * Agnostic to the choice of token / coin / blockchain*
 
-\* The blockchain need to support basic smart contracts.
+\* The blockchain needs to support basic smart contracts.
 
 ## State of the art
 |   | [TOR](https://torproject.org) | [Whisper](https://github.com/ethereum/wiki/wiki/Whisper) | [Orchid](https://www.orchid.com/) | [HOPR](#) | 
@@ -55,9 +56,9 @@ Note: the message overhead is given in [Big-O Notation](https://en.wikipedia.org
 For further details, have a look at a [more detailed comparison](../../wiki/State-Of-The-Art).
 
 ## Technical Description
-The construction consists of two layers: one for message delivery and one for payments. Messages are embedded within [SPHINX packet format](https://cypherpunks.ca/~iang/pubs/Sphinx_Oakland09.pdf) that provably hides the relation between sender and receiver. The payment layer uses off-chain payments and staked nodes to process transactions.
+The construction consists of two layers: one for message delivery and one for payments. Messages are embedded within [SPHINX packet format](https://cypherpunks.ca/~iang/pubs/Sphinx_Oakland09.pdf) that provably hides the relation between sender and receiver. The payment layer uses off-chain payments via payment channels and node operators need to stake assets to process transactions.
 
-For further details, see the full [protocol specification](../../wiki).
+For further details, see the full [protocol specification on the wiki](../../wiki).
 
 
 ## Usage
