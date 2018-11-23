@@ -22,6 +22,7 @@
         "electron-webrtc": "^0.3.0",
         "eslint": "^5.9.0",
         "futoin-hkdf": "^1.0.2",
+        "ganache-core": "^2.3.1",
         "libp2p": "^0.10.0",
         "libp2p-crypto": "^0.14.1",
         "libp2p-crypto-secp256k1": "^0.2.2",
@@ -35,7 +36,7 @@
         "lodash.foreachright": "^4.4.0",
         "lodash.reduce": "^4.6.0",
         "secp256k1": "^3.5.2",
-        "web3": "^1.0.0-beta.36",
-        "wrtc": "^0.2.1"
+        "solc": "^0.5.0",
+        "web3": "^1.0.0-beta.36"
     }
 }

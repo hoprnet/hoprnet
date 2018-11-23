@@ -10,6 +10,12 @@ const c = require('./constants')
 const crawlNetwork = require('./crawlNetwork')
 const getPubKey = require('./getPubKey')
 
+// DEVELOPMENT
+const Ganache = require('ganache-core')
+const Web3 = require('web3')
+const web3 = new Web3(Ganache.provider())
+// END DEVELOPMENT
+
 // DEMO
 const { randomBytes } = require('crypto')
 const { bufferToNumber, randomSubset } = require('./utils')
@@ -38,8 +44,6 @@ const parallel = require('async/parallel')
 const times = require('async/times')
 
 // const BOOTSTRAP_NODE = Multiaddr('/ip4/127.0.0.1/tcp/9090/')
-
-
 
 const ACKNOWLEDGEMENT_SIZE = 1000000
 
