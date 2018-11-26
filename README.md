@@ -40,7 +40,7 @@ If there is **no incentive** to run a service that provides anonymity, people th
 ## State of the art
 |   | [TOR](https://torproject.org) | [Whisper](https://github.com/ethereum/wiki/wiki/Whisper) | [Orchid](https://www.orchid.com/) | [HOPR](#) | 
 | - | --- | ------- | ------ | ---- |
-| Asymptotic message overhead | O(# of hops) | O((# of participants) * TTL) | O(# of hops) | O(# of hops) |
+| Asymptotic message overhead | O(# of hops) | O((# of participants) ^ 2 * TTL) | O(# of hops) | O(# of hops) |
 | Decentral | partially* | ✅ | ✅ | ✅ |
 | Sender anonymity | ✅** | ❌ | ?? | ✅ |
 | Receiver anonymity  | ✅** | ✅ | ?? | ✅ |
