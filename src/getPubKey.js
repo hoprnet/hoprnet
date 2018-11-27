@@ -8,7 +8,7 @@ const crypto = require('crypto')
 const { PROTOCOL_DELIVER_PUBKEY } = require('./constants')
 
 module.exports = (node) => (peerInfo, callback) => {
-    function hasPublicKey(cb) {
+    function hasPublicKey(peerInfo, cb) {
         if (peerInfo.id.pubKey) {
             return callback(null, peerInfo.id.pubKey.marshal())
         } else if (node.peerBook.get(peerInfo.id).id.pubKey) {
