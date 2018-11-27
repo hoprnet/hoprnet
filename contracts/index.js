@@ -1,44 +1,34 @@
 'use strict'
 
 const { execFile } = require('child_process');
+const { waterfall, each, some, parallel } = require('async')
+const { readFile, existsSync, stat } = require('fs')
 
+const sourceFiles = ['PaymentChannel.sol']
 
-const waterfall = require('async/waterfall')
-const each = require('async/each')
-const some = require('async/some')
-const parallel = require('async/parallel')
-
-const fs = require('fs')
-
-const files = ['PaymentChannel.sol']
-
-module.exports = (cb) => {
-    let contract;
-
-    waterfall([
-        (cb) => each(files, (file, cb) => rebuildIfNecessary(file, cb), cb),
-        (cb) => parallel({
-            abi: (cb) => fs.readFile(deriveBuildString(__dirname + '/' + files[0], 'abi'), cb),
-            binary: (cb) => fs.readFile(deriveBuildString(__dirname + '/' + files[0], 'bin'), cb)
-        }, cb)
-    ], cb)
-}
+module.exports = (cb) => waterfall([
+    (cb) => each(sourceFiles, (file, cb) => rebuildIfNecessary(file, cb), cb),
+    (cb) => parallel({
+        abi: (cb) => readFile(deriveBuildString(__dirname + '/' + sourceFiles[0], 'abi'), cb),
+        binary: (cb) => readFile(deriveBuildString(__dirname + '/' + sourceFiles[0], 'bin'), cb)
+    }, cb)
+], cb)
 
 
 function rebuildIfNecessary(file, cb) {
-    if (!fs.existsSync(__dirname + '/' + file))
+    if (!existsSync(__dirname + '/' + file))
         throw Error('File does not exists.')
 
     waterfall([
-        (cb) => fs.stat(__dirname + '/' + file, cb),
+        (cb) => stat(__dirname + '/' + file, cb),
         (sourceFileStats, cb) => {
             if (
-                !fs.existsSync(__dirname + '/' + deriveBuildString(file, 'bin')) ||
-                !fs.existsSync(__dirname + '/' + deriveBuildString(file, 'abi'))
+                !existsSync(__dirname + '/' + deriveBuildString(file, 'bin')) ||
+                !existsSync(__dirname + '/' + deriveBuildString(file, 'abi'))
             ) {
                 compile(file, cb)
             } else {
-                some(['abi', 'bin'], (suffix, cb) => fs.stat(__dirname + '/' + deriveBuildString(file, suffix), (err, stats) => {
+                some(['abi', 'bin'], (suffix, cb) => stat(__dirname + '/' + deriveBuildString(file, suffix), (err, stats) => {
                     if (err) {
                         cb(err)
                     } else {
