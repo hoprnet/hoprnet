@@ -11,9 +11,9 @@ const crawlNetwork = require('./crawlNetwork')
 const getPubKey = require('./getPubKey')
 
 // DEVELOPMENT
-const Ganache = require('ganache-core')
-const Web3 = require('web3')
-const web3 = new Web3(Ganache.provider())
+// const Ganache = require('ganache-core')
+// const Web3 = require('web3')
+// const web3 = new Web3(Ganache.provider())
 // END DEVELOPMENT
 
 // DEMO
@@ -39,13 +39,9 @@ const WStar = require('libp2p-webrtc-star')
 const pull = require('pull-stream')
 const Multiaddr = require('multiaddr')
 const bs58 = require('bs58')
-const waterfall = require('async/waterfall')
-const parallel = require('async/parallel')
-const times = require('async/times')
+const { waterfall, parallel, times } = require('async')
 
 // const BOOTSTRAP_NODE = Multiaddr('/ip4/127.0.0.1/tcp/9090/')
-
-const ACKNOWLEDGEMENT_SIZE = 1000000
 
 class Hopper extends libp2p {
     constructor(peerInfo) {
@@ -178,7 +174,7 @@ class Hopper extends libp2p {
 }
 
 function demo() {
-    this.sendMessage('HelloWorld ' + Date.now().toString(), this.peerBook.getAllArray()[bufferToNumber(randomBytes(4)) % (this.peerBook.getAllArray().length)])
+    this.sendMessage('HelloWorld! ' + Date.now().toString(), this.peerBook.getAllArray()[bufferToNumber(randomBytes(4)) % (this.peerBook.getAllArray().length)])
 }
 
 module.exports = withIs(Hopper, { className: 'hopper', symbolName: '@validitylabs/hopper/hopper' })

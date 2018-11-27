@@ -8,8 +8,7 @@ const Transaction = require('./transaction')
 const Challenge = require('./challenge')
 const Message = require('./message')
 
-const parallel = require('async/parallel')
-const series = require('async/series')
+const { parallel , series } = require('async')
 
 const { RELAY_FEE } = require('../constants')
 const { hash, deepCopy } = require('../utils')

@@ -12,7 +12,7 @@ const fs = require('fs')
 
 const files = ['PaymentChannel.sol']
 
-module.exports = (web3, cb) => {
+module.exports = (cb) => {
     let contract;
 
     waterfall([
@@ -21,13 +21,7 @@ module.exports = (web3, cb) => {
             abi: (cb) => fs.readFile(deriveBuildString(__dirname + '/' + files[0], 'abi'), cb),
             binary: (cb) => fs.readFile(deriveBuildString(__dirname + '/' + files[0], 'bin'), cb)
         }, cb)
-    ], (err, results) => {
-        if (err) { throw err }
-        
-        cb(null, new web3.eth.Contract(JSON.parse(results.abi), {
-            data: results.binary.toString()
-        }))
-    })
+    ], cb)
 }
 
 

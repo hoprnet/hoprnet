@@ -5,11 +5,8 @@ const PeerInfo = require('peer-info')
 
 const pull = require('pull-stream')
 
-const doWhilst = require('async/doWhilst')
-const times = require('async/times')
-const waterfall = require('async/waterfall')
-const filter = require('async/filter')
-const eachSeries = require('async/eachSeries')
+const { doWhilst, times, waterfall, filter, eachSeries } = require('async')
+
 
 const { MAX_HOPS, PROTOCOL_CRAWLING, MARSHALLED_PUBLIC_KEY_SIZE } = require('./constants')
 

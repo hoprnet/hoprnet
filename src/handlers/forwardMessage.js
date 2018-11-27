@@ -1,9 +1,7 @@
 'use strict'
 
 const pull = require('pull-stream')
-const waterfall = require('async/waterfall')
-const parallel = require('async/parallel')
-
+const { waterfall, parallel } = require('async')
 
 const c = require('../constants')
 const Packet = require('../packet')
