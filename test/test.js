@@ -1,76 +1,118 @@
 'use strict'
 
-const waterfall = require('async/waterfall')
-const times = require('async/times')
-const parallel = require('async/parallel')
+const { waterfall, times, parallel, map, each } = require('async')
 
-const MessageDelivery = require('../src/index')
+const Hopper = require('../src/index')
 const c = require('../src/constants')
 
-const fs = require('fs')
-const Ganache = require('ganache-core')
-const Web3 = require('web3')
+const getPeerInfo = require('../src/getPeerInfo')
 
-const createKeccakHash = require('keccak')
-const secp256k1 = require('secp256k1')
+const Ganache = require('ganache-core')
+const Eth = require('web3-eth')
+const { toWei, hexToBytes } = require('web3').utils
+
 
 
 const getContract = require('../contracts')
+const { pubKeyToEthereumAddress } = require('../src/utils')
 
 const AMOUNT_OF_NODES = Math.max(3, c.MAX_HOPS + 1)
 
 function warmUpNodes(nodes, cb) {
     times(
         nodes.length - 1,
-        (n, cb) => nodes[n].dial(nodes[n + 1].peerInfo, (err, conn) => cb(err)),
-        (err) => cb(err, nodes)
+        (n, cb) => nodes[n].dial(nodes[n + 1].peerInfo, cb),
+        (err, _) => cb(err)
     )
 }
 
-function toEthereumAddress(node) {
-    return '0x'.concat(
-        createKeccakHash('keccak256').update(
-            secp256k1.publicKeyConvert(node.peerInfo.id.pubKey.marshal(), false).slice(1)
-        ).digest().slice(12).toString('hex').toUpperCase()
-    )
+function getGUIGanacheProvider() {
+    return 'http://localhost:7545'
 }
 
-function getWeb3(nodes) {
-    return new Web3(Ganache.provider({
-        accounts: nodes.map((node) => {
+function getWeb3Provider(peerInfos) {
+    return Ganache.provider({
+        accounts: peerInfos.map((peerInfo) => {
             return {
                 balance: '0xd3c21bcecceda0000000',
-                secretKey: '0x'.concat(node.peerInfo.id.privKey.marshal().toString('hex'))
+                secretKey: '0x'.concat(peerInfo.id.privKey.marshal().toString('hex'))
             }
         })
-    }))
+    })
 }
 
-let web3
+let provider, pInfos, nodes
 
 waterfall([
     (cb) => parallel({
-        nodes: (cb) => waterfall([
-            (cb) => times(AMOUNT_OF_NODES, (n, cb) =>
-                MessageDelivery.createNode(cb, console.log), cb),
-            (nodes, cb) => warmUpNodes(nodes, cb),
-            (nodes, cb) => setTimeout(() => cb(null, nodes), 200)
-        ], cb),
+        peerInfos: (cb) => times(AMOUNT_OF_NODES, (n, cb) => getPeerInfo(null, cb), cb),
         compiledContract: (cb) => getContract(cb)
     }, cb),
-    ({ nodes, compiledContract }, cb) => {
-        web3 = getWeb3(nodes)
+    ({ peerInfos, compiledContract }, cb) => {
+        pInfos = peerInfos
+        
+        // provider = getGUIGanacheProvider()
+        provider = getWeb3Provider(pInfos)
+        const eth = new Eth(provider)
 
-        new web3.eth.Contract(JSON.parse(compiledContract.abi.toString()))
+        new eth.Contract(JSON.parse(compiledContract.abi.toString()))
             .deploy({
                 data: compiledContract.binary.toString()
-            }).send({
-                from: toEthereumAddress(nodes[0]),
+            })
+            .send({
+                from: pubKeyToEthereumAddress(pInfos[0].id.pubKey.marshal()),
                 gas: 2570333, // 2370333
                 gasPrice: '30000000000000'
-            }).then((contract) => cb(null, contract, nodes))
-    }
-], (err, contract, nodes) => {
+            })
+            .on('receipt', (receipt) => {
+                console.log('Successfully deployed contract at address \'' + receipt.contractAddress + '\'.')
+            })
+            .then((contract) => cb(null, contract))
+    },
+    (contract, cb) => map(pInfos, (peerInfo, cb) =>
+        Hopper.startNode(provider, console.log, contract, cb, peerInfo)
+        , cb),
+    (_nodes, cb) => {
+        nodes = _nodes
+        warmUpNodes(nodes, cb)
+    },
+    (cb) => each(nodes, (node, cb) => node.contract.methods.stakeMoney()
+        .send({
+            from: pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()),
+            value: toWei('1', 'ether')
+        }, cb)
+        .on('receipt', (receipt) => {
+            console.log(receipt)
+            console.log(Buffer.from(hexToBytes(pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()))).toString('base64'))
+            console.log('[\'' + node.peerInfo.id.toB58String() + '\']: Staking ' + toWei('1', 'ether') + ' wei.')
+        })
+        , cb),
+    (cb) => setTimeout(() => cb(null), 200)
+], (err) => {
     if (err) { throw err }
-    nodes[0].sendMessage('test_test_test ' + Date.now().toString(), nodes[3].peerInfo)
+
+
+    setInterval(() => {
+        nodes[0].sendMessage('test_test_test ' + Date.now().toString(), nodes[3].peerInfo)
+    }, 4000)
+    // nodes[0].sendMessage('test_test_test ' + Date.now().toString(), nodes[3].peerInfo)
 })
+
+
+
+// waterfall([
+//     (cb) => parallel({
+//         nodes: (cb) => waterfall([
+//             (cb) => times(AMOUNT_OF_NODES, (n, cb) =>
+//                 MessageDelivery.createNode(cb, console.log), cb),
+//             (nodes, cb) => warmUpNodes(nodes, cb),
+//             (nodes, cb) => setTimeout(() => cb(null, nodes), 200)
+//         ], cb),
+//         compiledContract: (cb) => getContract(cb)
+//     }, cb),
+//     ({ nodes, compiledContract }, cb) => {
+
+// ], (err, contract, nodes) => {
+
+// })
+

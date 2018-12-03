@@ -47,10 +47,11 @@ contract Hopper {
     // Keeps track of the states of the
     // participating parties.
     mapping(address => State) private states;
-    
+
     function stakeMoney() public payable {
         require(msg.value > 0, "Please provide a non-zero amount of money.");
         
+        states[msg.sender].isSet = true;
         states[msg.sender].stakedMoney = states[msg.sender].stakedMoney + uint128(msg.value);
     }
     
@@ -86,6 +87,10 @@ contract Hopper {
             channels[getId(counterParty)] = Channel(ChannelState.PARTYA_FUNDED, amount, amount, 0, 0);
         }
     }
+
+    function isOpen(address counterParty) public view returns (bool) {
+        return channels[getId(counterParty)].state < ChannelState.UNINITIALIZED && channels[getId(counterParty)].state < ChannelState.WITHDRAWN;
+    }
     
     function fund(address counterParty, uint128 amount) public {
         State storage state = states[msg.sender];
@@ -116,7 +121,7 @@ contract Hopper {
         channel.state = ChannelState.ACTIVE;
     }
     
-    function settle(address counterParty, uint256 index, uint256 balanceA, bytes32 r, bytes32 s) public {
+    function settle(address counterParty, uint32 index, uint128 balanceA, bytes32 r, bytes32 s) public {
         bytes32 channelId = getId(counterParty);
         Channel storage channel = channels[channelId];
         
@@ -126,7 +131,7 @@ contract Hopper {
             "Invalid channel.");
                
         // is the proof valid?
-        bytes32 hashedMessage = keccak256(abi.encodePacked(channelId, balanceA));
+        bytes32 hashedMessage = keccak256(abi.encodePacked(channelId, balanceA, index));
         require(ecrecover(hashedMessage, 0, r, s) == counterParty, "Invalid signature.");
         
                 

@@ -18,7 +18,10 @@ module.exports = (node, output) => node.handle(c.PROTOCOL_STRING, (protocol, con
             waterfall([
                 (cb) => node.peerRouting.findPeer(targetPeerId, cb),
                 (targetPeerInfo, cb) => parallel({
-                    transaction: (cb) => packet.addTransaction(targetPeerInfo.id, node, cb),
+                    transaction: (cb) => waterfall([
+                        (cb) => node.getPubKey(targetPeerInfo, cb),
+                        (targetPeerId, cb) => packet.addTransaction(targetPeerId, node, cb)
+                    ], cb),
                     conn: (cb) => node.dial(targetPeerInfo, c.PROTOCOL_STRING, cb)
                 }, cb),
                 (results, cb) => {
@@ -58,6 +61,18 @@ module.exports = (node, output) => node.handle(c.PROTOCOL_STRING, (protocol, con
             data.length > 0 && data.length % Packet.SIZE === 0
         ),
         pull.map(data => Packet.fromBuffer(data)),
+        // (read) => (end, reply) => waterfall([
+        //     (cb) => read(end, cb),
+        //     (packet, cb) => waterfall([
+        //         (cb) => conn.getPeerInfo(cb),
+        //         (senderPeerInfo, cb) => packet.forwardTransform(node, senderPeerInfo.id, (err, packet) => cb(err, packet, senderPeerInfo)),
+        //     ], cb),
+        //     (packet, senderPeerInfo, cb) => parallel([
+        //         (cb) => forwardPacket(packet, cb),
+        //         (cb) => sendAcknowledgement(packet, senderPeerInfo, cb)
+        //     ], cb)
+        // ]),
+        // conn
         pull.drain(packet => waterfall([
             (cb) => conn.getPeerInfo(cb),
             (senderPeerInfo, cb) => {

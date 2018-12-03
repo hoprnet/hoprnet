@@ -8,8 +8,9 @@ const Transaction = require('./transaction')
 const Challenge = require('./challenge')
 const Message = require('./message')
 
-const { parallel , series } = require('async')
+const { parallel, series } = require('async')
 
+const { deriveKey } = require('./transaction/keyDerivation')
 const { RELAY_FEE } = require('../constants')
 const { hash, deepCopy } = require('../utils')
 
@@ -35,18 +36,20 @@ class Packet {
         parallel({
             challenge: (cb) => cb(null, Challenge.createChallenge(Header.deriveTransactionKey(secrets[0]), node.peerInfo.id.privKey.marshal())),
             message: (cb) => cb(null, Message.createMessage(msg).onionEncrypt(secrets)),
-            transaction: (cb) => {
-                if (intermediateNodes.length > 0) {
-                    cb(null, Transaction.createTransaction((secrets.length - 1) * RELAY_FEE, intermediateNodes[0].id.pubKey.marshal(), node.peerInfo.id.privKey.marshal()))
-                } else {
-                    throw Error('TODO: implement direct message transfer')
-                }
-            }
+            transaction: (cb) => Transaction.createTransaction((secrets.length - 1) * RELAY_FEE, intermediateNodes[0].id, node, cb)
         }, (err, results) => {
             if (err) {
-                cb(err) 
+                cb(err)
             } else {
-                cb(null, new Packet(header, results.transaction, results.challenge, results.message))
+                const encryptedTx = results.transaction.encrypt(deriveKey(Header, secrets.slice(0,2)))
+
+                node.pendingTransactions.set(hash(Header.deriveTransactionKey(secrets[0])).toString('base64'), encryptedTx)
+
+                cb(null, new Packet(
+                    header, 
+                    encryptedTx, 
+                    results.challenge, 
+                    results.message))
             }
         })
     }
@@ -76,7 +79,7 @@ class Packet {
             (cb) => cb(!this.challenge.verify(previousPeerId.pubKey.marshal(), Header.deriveTransactionKey(this.header.derivedSecret))),
             (cb) => {
                 // save transaction
-                node.pendingTransactions.set(this.header.hashedKeyHalf, deepCopy(this.transaction, Transaction))
+                node.pendingTransactions.set(this.header.hashedKeyHalf.toString('base64'), deepCopy(this.transaction, Transaction))
                 cb()
             },
             (cb) => parallel([
@@ -116,11 +119,7 @@ class Packet {
         if (this.transaction.value < RELAY_FEE)
             throw Error('Insufficient funds.')
 
-        // if (!targetPeerId.pubKey)
-        //     throw Error('Invalid peerID. Please provide one with a valid public key.')
-
-        this.transaction.forwardTransaction(this.transaction.value - RELAY_FEE, null /* targetPeerId.pubKey.marshal() */ , node.peerInfo.id.privKey.marshal())
-        cb()
+        this.transaction.forwardTransaction(RELAY_FEE, targetPeerId, node, cb)
     }
 
     static fromBuffer(buf) {

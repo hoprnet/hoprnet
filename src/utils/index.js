@@ -1,6 +1,6 @@
 'use strict'
 
-const { sha3 } = require('web3').utils
+const { sha3, hexToBytes, toChecksumAddress } = require('web3').utils
 const { randomBytes } = require('crypto')
 
 // ==========================
@@ -38,7 +38,7 @@ module.exports.parseJSON = function (str) {
 // Buffer methods
 // ==========================
 
-module.exports.bufferADD = function (buf1, buf2) {
+module.exports.bufferADD = (buf1, buf2) => {
     if (!Buffer.isBuffer(buf1))
         throw Error('Expected a buffer. Got \"' + typeof buf1 + '\" instead.')
 
@@ -60,7 +60,7 @@ module.exports.bufferADD = function (buf1, buf2) {
     return module.exports.numberToBuffer(a + b, length)
 }
 
-module.exports.bufferXOR = function (buf1, buf2) {
+module.exports.bufferXOR = (buf1, buf2) => {
     if (!Buffer.isBuffer(buf1) || !Buffer.isBuffer(buf2))
         throw Error('Input values have to be provided as Buffers. Got ' + typeof buf1 + ' and ' + typeof buf2)
 
@@ -70,14 +70,14 @@ module.exports.bufferXOR = function (buf1, buf2) {
     return buf1.map((elem, index) => (elem ^ buf2[index]))
 }
 
-module.exports.numberToBuffer = function (i, length) {
+module.exports.numberToBuffer = (i, length) => {
     if (i < 0)
         throw Error('Not implemented!')
 
     return Buffer.from(i.toString(16).padStart(length * 2, '0'), 'hex')
 }
 
-module.exports.bufferToNumber = function (buf) {
+module.exports.bufferToNumber = (buf) => {
     if (!Buffer.isBuffer(buf) || buf.length === 0)
         throw Error('Invalid input value. Expected a non-empty buffer.')
 
@@ -88,7 +88,7 @@ module.exports.bufferToNumber = function (buf) {
 // Collection methods
 // ==========================
 
-module.exports.randomSubset = function (array, subsetSize, filter = _ => true) {
+module.exports.randomSubset = (array, subsetSize, filter = _ => true) => {
     if (!Number.isInteger(subsetSize) || subsetSize < 0)
         throw Error('Invalid input arguments. Please provide a positive subset size. Got \"' + subsetSize + '\" instead.')
 
@@ -134,7 +134,6 @@ module.exports.randomPermutation = function (array) {
 
 const PeerId = require('peer-id')
 const PREFIX = 0x12
-const c = require('../constants')
 const p = require('../packet/header/parameters')
 const Multihash = require('multihashes')
 
@@ -145,18 +144,45 @@ module.exports.keyPairToPeerId = function (key) {
 module.exports.pubKeyToPeerId = function (buf) {
     if (!Buffer.isBuffer(buf) || buf.length !== p.COMPRESSED_PUBLIC_KEY_LENGTH)
         throw Error('Invalid input parameter. Expected a Buffer of size ' + p.COMPRESSED_PUBLIC_KEY_LENGTH + '. Got ' + typeof buf + ' instead.')
-    
+
     return PeerId.createFromBytes(Multihash.encode(key.public.marshal(), PREFIX))
 }
 
-module.exports.peerIdToPubKey = function (peerId) {
-    return Multihash.decode(peerId.toBytes()).digest
+module.exports.peerIdToPubKey = (peerId) =>
+    Multihash.decode(peerId.toBytes()).digest
 
-    if (buf.length !== c.PEERID_LENGTH)
-        throw Error('Invalid input argument.')
 
-    if (buf.slice(0,1).compare(Buffer.from(PREFIX.slice(2), 'hex')) !== 0)
-        throw Error('Invalid prefix')
+// ==========================
+// Ethereum methods
+// ==========================
+const secp256k1 = require('secp256k1')
 
-    return buf.slice(1)
+module.exports.pubKeyToEthereumAddress = (pubKey) => {
+    const hash = sha3(secp256k1.publicKeyConvert(pubKey, false).slice(1))
+
+    // Maybe RegExp + str.replace is faster
+    return toChecksumAddress(hash.slice(0,2).concat(hash.slice(26)))
+}
+
+// TODO
+module.exports.isPartyA = (sender, otherParty) => {
+    if (typeof sender === 'string' && typeof otherParty === 'string') {
+        return Buffer.compare(Buffer.from(hexToBytes(sender), 0, ETHEUREUM_ADDRESS_SIZE), Buffer.from(hexToBytes(otherParty), 0, ETHEUREUM_ADDRESS_SIZE)) < 0
+    } else if (Buffer.isBuffer(sender) && Buffer.isBuffer(otherParty)) {
+        return Buffer.compare(sender, otherParty) < 0
+    }
+}
+
+const ETHEUREUM_ADDRESS_SIZE = 20 // Bytes
+module.exports.getId = (sender, otherParty) => {
+    sender = Buffer.from(hexToBytes(sender), 0, ETHEUREUM_ADDRESS_SIZE)
+    otherParty = Buffer.from(hexToBytes(otherParty), 0, ETHEUREUM_ADDRESS_SIZE)
+
+    if (module.exports.isPartyA(sender, otherParty)) {
+        console.log('[\'' + sender.toString('base64') + '\ \'' + otherParty.toString('base64') + '\']: ChannelId: \'' + module.exports.hash(Buffer.concat([sender, otherParty], 2 * ETHEUREUM_ADDRESS_SIZE)).toString('base64') + '\' as party A.')
+        return module.exports.hash(Buffer.concat([sender, otherParty], 2 * ETHEUREUM_ADDRESS_SIZE))
+    } else {
+        console.log('[\'' + sender.toString('base64') + '\ \'' + otherParty.toString('base64') + '\']: ChannelId: \'' + module.exports.hash(Buffer.concat([otherParty, sender], 2 * ETHEUREUM_ADDRESS_SIZE)).toString('base64') + '\' as party B.')
+        return module.exports.hash(Buffer.concat([otherParty, sender], 2 * ETHEUREUM_ADDRESS_SIZE))
+    }
 }

@@ -1,55 +1,38 @@
 'use strict'
 
+const Transaction = require('../packet/transaction')
+
 const { PROTOCOL_PAYMENT_CHANNEL } = require('../constants')
 const pull = require('pull-stream')
-const utils = require('../utils')
-const pullJson = require('pull-json-doubleline')
-const waterfall = require('async/waterfall')
-const paymentChannel = require('../paymentChannels/paymentChannel')
-
-// module.exports.registerFunctionality = (node, registerChannel) => {
-//     node.handle(constants.paymentChannelProtocol, (protocol, conn) => {
-//         conn.getPeerInfo((err, peerId) => {
-//             if (err) { throw err }
-
-//             pull(
-//                 conn,
-//                 pull.map(str => utils.parseJSON(str)),
-//                 processMessage(node, peerId, registerChannel),
-//                 pullJson.stringify(),
-//                 conn
-//             )
-//         })
-//     })
-// }
-
-// function processMessage(node, peerId, registerChannel) {
-//     return function (read) {
-//         return function (end, reply) {
-//             read(end, function next(end, tx) {
-//                 if (!end) {
-//                     waterfall([
-//                         (cb) => paymentChannel.establish(node, peerId, tx, cb),
-//                         // registerChannel() ...
-//                     ], (err, tx, channel) => {
-//                         if (err) { throw err }
-//                         reply(end, tx)
-//                     })
-//                 } else {
-//                     reply(end, null)
-//                 }
-//             })
-//         }
-//     }
-// }
+const secp256k1 = require('secp256k1')
+const { getId, pubKeyToEthereumAddress, bufferToNumber } = require('../utils')
+const { waterfall } = require('async')
 
 module.exports = (node) => node.handle(PROTOCOL_PAYMENT_CHANNEL, (protocol, conn) => pull(
     conn,
-    (read) => {
-        return function (end, reply) {
-            read(end, function next(end, data) {
-            })
+    pull.filter((data) => data.length === Transaction.SIZE),
+    pull.map((data) => {
+        return Transaction.fromBuffer(data)
+    }),
+    (read) => (end, reply) => waterfall([
+        (cb) => read(end, cb),
+        (transaction, cb) => {
+            const pubKey = secp256k1.recover(transaction.hash(), transaction.signature, bufferToNumber(transaction.recovery))
+
+            if (getId(
+                pubKeyToEthereumAddress(pubKey),
+                pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal())
+            ).compare(transaction.channelId) !== 0)
+                throw Error('General error.')
+
+            node.openPaymentChannels.set(transaction.channelId.toString('base64'), transaction)
+
+            cb(null, secp256k1.sign(
+                transaction.hash(),
+                node.peerInfo.id.privKey.marshal()).signature)
         }
-    },
+    ], (err, data) => {
+        reply(err, data)
+    }),
     conn
 ))

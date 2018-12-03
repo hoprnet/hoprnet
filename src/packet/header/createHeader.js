@@ -6,7 +6,7 @@ const Multihash = require('multihashes')
 const bs58 = require('bs58')
 const forEachRight = require('lodash.foreachright');
 
-const { deriveKey } = require('../../../old/payments/keyDerivation')
+const { deriveKey } = require('../transaction/keyDerivation')
 const prg = require('../../crypto/prg')
 const { hash, bufferXOR } = require('../../utils')
 const c = require('../../constants')
@@ -136,11 +136,10 @@ module.exports = (Header, header, peerIds) => {
                     .fill(hash(Header.deriveTransactionKey(secrets[index + 1])), p.ADDRESS_SIZE + p.MAC_SIZE, p.ADDRESS_SIZE + p.MAC_SIZE + p.HASH_LENGTH)
                     .fill(tmp, p.PER_HOP_SIZE, Header.BETA_LENGTH)
 
-                if (secrets.length > 2 && index <= secrets.length - 2) {
+                if (secrets.length > 2 && index < secrets.length - 2) {
                     header.beta
                         .fill(hash(deriveKey(Header, secrets.slice(index, index + 2))), p.ADDRESS_SIZE + p.MAC_SIZE + p.HASH_LENGTH, p.ADDRESS_SIZE + p.MAC_SIZE + p.HASH_LENGTH + p.HASH_LENGTH)
-                        // TODO
-                        // .fill(deriveKey(Header, secrets.slice(index + 1, index + 3)), p.ADDRESS_SIZE + p.MAC_SIZE + p.HASH_LENGTH + p.HASH_LENGTH, p.ADDRESS_SIZE + p.MAC_SIZE + p.HASH_LENGTH + p.HASH_LENGTH + p.KEY_LENGTH)
+                        .fill(deriveKey(Header, secrets.slice(index + 1, index + 3)), p.ADDRESS_SIZE + p.MAC_SIZE + p.HASH_LENGTH + p.HASH_LENGTH, p.ADDRESS_SIZE + p.MAC_SIZE + p.HASH_LENGTH + p.HASH_LENGTH + p.KEY_LENGTH)
                 }
                 header.beta
                     .fill(

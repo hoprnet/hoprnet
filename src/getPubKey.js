@@ -1,18 +1,18 @@
 'use strict'
 
 const pull = require('pull-stream')
-const waterfall = require('async/waterfall')
-const Multihash = require('multihashes')
-const crypto = require('crypto')
+const { waterfall, parallel } = require('async')
+const PeerId = require('peer-id')
 
 const { PROTOCOL_DELIVER_PUBKEY } = require('./constants')
 
+// TODO add pubKey to peerBook
 module.exports = (node) => (peerInfo, callback) => {
     function hasPublicKey(peerInfo, cb) {
         if (peerInfo.id.pubKey) {
-            return callback(null, peerInfo.id.pubKey.marshal())
-        } else if (node.peerBook.get(peerInfo.id).id.pubKey) {
-            return callback(null, node.peerBook.get(peerInfo.id).id.pubKey.marshal())
+            callback(null, peerInfo.id)
+        } else if (node.peerBook.has(peerInfo.id) && node.peerBook.get(peerInfo.id).id.pubKey) {
+            callback(null, node.peerBook.get(peerInfo.id).id)
         } else {
             cb(null, peerInfo)
         }
@@ -29,20 +29,19 @@ module.exports = (node) => (peerInfo, callback) => {
         },
         (peerInfo, cb) => hasPublicKey(peerInfo, cb),
         (peerInfo, cb) => node.dial(peerInfo, PROTOCOL_DELIVER_PUBKEY, cb),
-        (conn, cb) => pull(
-            conn,
-            pull.drain(pubKey => waterfall([
-                (cb) => conn.getPeerInfo(cb),
-                (peerInfo, cb) => {
-                    const multihash = Multihash.encode(crypto.createHash('sha256').update(pubKey).digest(), 'sha2-256')
-
-                    if (peerInfo.id.id.compare(multihash) === 0) {
-                        cb(null, pubKey)
-                    } else {
-                        cb(Error('General error.'))
-                    }
-                }
-            ]))
-        )
+        (conn, cb) => parallel({
+            peerId: (cb) => waterfall([
+                (cb) => pull(conn, pull.drain((pubKey) => cb(null, pubKey))),
+                (pubKey, cb) => PeerId.createFromPubKey(pubKey, cb)
+            ], cb),
+            peerInfo: (cb) => conn.getPeerInfo(cb)
+        }, cb),
+        ({ peerId, peerInfo }, cb) => {
+            if (peerId.toBytes().compare(peerInfo.id.toBytes()) === 0) {
+                cb(null, peerId)
+            } else {
+                cb(Error('General error.'))
+            }
+        }
     ], callback)
 }

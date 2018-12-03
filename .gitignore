@@ -12,5 +12,8 @@
 contracts/*.bin
 contracts/*.abi
 
+# Exclude keys
+keys
+
 # Exclude deprecated stuff
 old

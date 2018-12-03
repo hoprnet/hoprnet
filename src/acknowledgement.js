@@ -20,6 +20,10 @@ class Acknowledgement {
         return this.buffer.slice(0, KEY_LENGTH)
     }
 
+    get hashedKey() {
+        return hash(this.key)
+    }
+
     get challengeSignature() {
         return this.buffer.slice(KEY_LENGTH, KEY_LENGTH + SIGNATURE_LENGTH)
     }
@@ -46,6 +50,12 @@ class Acknowledgement {
         return new Acknowledgement(buf)
     }
 
+    hash() {
+        return hash(
+            Buffer.concat(
+                [this.key, this.challengeSignature], KEY_LENGTH + SIGNATURE_LENGTH))
+    }
+
     static create(challenge, derivedSecret, secretKey, buffer = Buffer.alloc(Acknowledgement.SIZE)) {
         const ack = new Acknowledgement(buffer)
 
@@ -60,7 +70,7 @@ class Acknowledgement {
         ack.responseSignature
             .fill(
                 secp256k1.sign(
-                    prepareSignature(ack),
+                    ack.hash(),
                     secretKey).signature,
                 0, SIGNATURE_LENGTH)
 
@@ -73,15 +83,9 @@ class Acknowledgement {
 
         parallel([
             (cb) => cb(null, secp256k1.verify(hash(this.key), this.challengeSignature, ownPubkey)),
-            (cb) => cb(null, secp256k1.verify(prepareSignature(this), this.responseSignature, pubKeyNext))
+            (cb) => cb(null, secp256k1.verify(this.hash(), this.responseSignature, pubKeyNext))
         ], (err, results) => cb(err, results.every(x => x)))
     }
-}
-
-function prepareSignature(ack) {
-    return hash(
-        Buffer.concat(
-            [ack.key, ack.challengeSignature], KEY_LENGTH + SIGNATURE_LENGTH))
 }
 
 module.exports = withIs(Acknowledgement, { className: 'Acknowledgement', symbolName: '@validitylabs/hopper/Acknowledgement' })

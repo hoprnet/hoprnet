@@ -3,30 +3,32 @@
 const pull = require('pull-stream')
 const waterfall = require('async/waterfall')
 
-const { PROTOCOL_ACKNOWLEDGEMENT, PROTOCOL_DELIVER_PUBKEY, COM} = require('../constants')
+const { PROTOCOL_ACKNOWLEDGEMENT } = require('../constants')
 const Acknowledgement = require('../acknowledgement')
-const KeyDerivation = require('../../old/payments/keyDerivation')
+const KeyDerivation = require('../packet/transaction/keyDerivation')
 
-module.exports = (node) => node.handle(PROTOCOL_ACKNOWLEDGEMENT, (protocol, conn) => {
-    pull(
-        conn,
-        pull.filter(data =>
-            data.length > 0 && data.length === Acknowledgement.SIZE
-        ),
-        pull.map(data => Acknowledgement.fromBuffer(data)),
-        pull.drain(ack => {
-            waterfall([
-                (cb) => conn.getPeerInfo(cb),
-                (peerInfo, cb) => node.getPubKey(peerInfo, cb),
-                (pubKey, cb) => {
-                    ack.verify(pubKey, node.peerInfo.id.pubKey.marshal(), cb)
-                },
-                (valid, cb) => {
-                    console.log('Acknowledgement ' + (valid ? 'valid' : 'NOT VALID') + '.')
-                }
-            ], (err) => {
-                // console.log(err)
-            })
-        })
-    )
-})
+module.exports = (node) => node.handle(PROTOCOL_ACKNOWLEDGEMENT, (protocol, conn) => pull(
+    conn,
+    pull.filter(data =>
+        data.length > 0 && data.length === Acknowledgement.SIZE
+    ),
+    pull.map(data => Acknowledgement.fromBuffer(data)),
+    pull.drain(ack => waterfall([
+        (cb) => conn.getPeerInfo(cb),
+        (peerInfo, cb) => node.getPubKey(peerInfo, cb),
+        (peerId, cb) => ack.verify(peerId.pubKey.marshal(), node.peerInfo.id.pubKey.marshal(), cb),
+        (valid, cb) => {
+            if (!node.pendingTransactions.has(ack.hashedKey.toString('base64')))
+                throw Error('General error.')
+
+            const tx = node.pendingTransactions
+                .get(ack.hashedKey.toString('base64'))
+                .decrypt(ack.key)
+
+            if (!tx.verify)
+                throw Error('General error')
+                
+            console.log('Acknowledgement ' + (valid ? 'valid' : 'NOT VALID') + '.')
+        }
+    ]))
+))
