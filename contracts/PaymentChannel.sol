@@ -10,7 +10,7 @@ contract Hopper {
     
     // Tell payment channel partners that channel has 
     // been settled
-    event ChannelSettled(bytes32 channelId, uint nonce);
+    event SettleChannel(bytes32 channelId, uint32 nonce);
 
     // Track the state of the
     enum ChannelState {
@@ -27,16 +27,16 @@ contract Hopper {
         uint128 balance;
         uint128 balanceA;
         uint32 index;
-        uint settlementBlock;
+        uint256 settlementBlock;
     }
 
     // Open channels
-    mapping(bytes32 => Channel) private channels;
+    mapping(bytes32 => Channel) public channels;
     
     struct State {
         bool isSet;
         // number of open channels
-        // Note: the smart contract doesn't the actual
+        // Note: the smart contract doesn't know the actual
         //       channels but it knows how many open ones
         //       there are.
         uint16 openChannels;
@@ -46,7 +46,22 @@ contract Hopper {
 
     // Keeps track of the states of the
     // participating parties.
-    mapping(address => State) private states;
+    mapping(address => State) public states;
+
+    modifier enoughFunds(uint128 amount) {
+        require(amount <= states[msg.sender].stakedMoney, "Insufficient funds.");
+        _;
+    }
+
+    modifier channelExists(address counterParty) {
+        bytes32 channelId = getId(counterParty);
+        Channel memory channel = channels[channelId];
+        
+        require(
+            channel.state > ChannelState.UNINITIALIZED && 
+            channel.state < ChannelState.WITHDRAWN, "Channel does not exist.");
+        _;
+    }
 
     function stakeMoney() public payable {
         require(msg.value > 0, "Please provide a non-zero amount of money.");
@@ -55,23 +70,20 @@ contract Hopper {
         states[msg.sender].stakedMoney = states[msg.sender].stakedMoney + uint128(msg.value);
     }
     
-    /* Dummy */
-    function howMuchMoney() public view returns (uint256) {
-        return states[msg.sender].stakedMoney;
-    }
-    
-    function unstakeMoney(uint128 amount) public {
+    function unstakeMoney(uint128 amount) public enoughFunds(amount) {
         require(states[msg.sender].openChannels == 0, "Waiting for remaining channels to close.");
-        require(amount <= states[msg.sender].stakedMoney, "Insufficient funds.");
         
-        states[msg.sender].stakedMoney = states[msg.sender].stakedMoney - amount;
-        
+        if (amount == states[msg.sender].stakedMoney) {
+            delete states[msg.sender];
+        } else {
+            states[msg.sender].stakedMoney = states[msg.sender].stakedMoney - amount;
+        }
+
         msg.sender.transfer(amount);
     }
     
-    function create(address counterParty, uint128 amount) public {
+    function create(address counterParty, uint128 amount) public enoughFunds(amount) {
         require(channels[getId(counterParty)].state == ChannelState.UNINITIALIZED, "Channel already exists.");
-        require(states[msg.sender].isSet && states[msg.sender].stakedMoney >= amount, "Insufficient funds.");
         
         states[msg.sender].stakedMoney = states[msg.sender].stakedMoney - amount;
         
@@ -87,18 +99,8 @@ contract Hopper {
             channels[getId(counterParty)] = Channel(ChannelState.PARTYA_FUNDED, amount, amount, 0, 0);
         }
     }
-
-    function isOpen(address counterParty) public view returns (bool) {
-        return channels[getId(counterParty)].state < ChannelState.UNINITIALIZED && channels[getId(counterParty)].state < ChannelState.WITHDRAWN;
-    }
     
-    function fund(address counterParty, uint128 amount) public {
-        State storage state = states[msg.sender];
-        require(
-            state.isSet && 
-            state.stakedMoney >= amount,
-            "Insufficient funds");
-
+    function fund(address counterParty, uint128 amount) public enoughFunds(amount) channelExists(counterParty) {
         states[msg.sender].stakedMoney = states[msg.sender].stakedMoney - amount;
 
         Channel storage channel = channels[getId(counterParty)];
@@ -121,7 +123,7 @@ contract Hopper {
         channel.state = ChannelState.ACTIVE;
     }
     
-    function settle(address counterParty, uint32 index, uint128 balanceA, bytes32 r, bytes32 s) public {
+    function settle(address counterParty, uint32 index, uint128 balanceA, bytes32 r, bytes32 s) public channelExists(counterParty) {
         bytes32 channelId = getId(counterParty);
         Channel storage channel = channels[channelId];
         
@@ -138,10 +140,10 @@ contract Hopper {
         channel.state = ChannelState.PENDING_SETTLEMENT;
         channel.settlementBlock = block.number;
         
-        emit ChannelSettled(channelId, index);
+        emit SettleChannel(channelId, index);
     }
     
-    function withdraw(address counterParty) public {
+    function withdraw(address counterParty) public channelExists(counterParty) {
         Channel storage channel = channels[getId(counterParty)];
         require(
             channel.state == ChannelState.PENDING_SETTLEMENT && 
@@ -181,11 +183,11 @@ contract Hopper {
         return bytes20(msg.sender) < bytes20(counterParty);
     }
     
-    function getId(address partyB) private view returns (bytes32) {
-        if (isPartyA(partyB)) {
-            return keccak256(abi.encodePacked(msg.sender, partyB));
+    function getId(address counterParty) private view returns (bytes32) {
+        if (isPartyA(counterParty)) {
+            return keccak256(abi.encodePacked(msg.sender, counterParty));
         } else {
-            return keccak256(abi.encodePacked(partyB, msg.sender));
+            return keccak256(abi.encodePacked(counterParty, msg.sender));
         }
     }
     
