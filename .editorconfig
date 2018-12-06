@@ -1,0 +1,39 @@
+# EditorConfig is awesome: http://EditorConfig.org
+
+# top-most EditorConfig file
+root = true
+charset = utf-8
+
+# Get rid of whitespace to avoid diffs with a bunch of EOL changes
+trim_trailing_whitespace = true
+
+# Unix-style newlines with a newline ending every file
+[*]
+end_of_line = lf
+insert_final_newline = true
+indent_style = space
+charset = utf-8
+trim_trailing_whitespace = true
+
+# bower.json, package.json or .travis.yml
+[{{package,bower}.json,.travis.yml}]
+indent_style = space
+indent_size = 2
+
+[{*.js,*.jsx}]
+indent_style = space
+indent_size = 4
+
+[*.sass]
+indent_style = space
+indent_size = 2
+
+# YAML-Files
+[*.yaml, *.yml]
+indent_style = space
+indent_size = 2
+
+[*.sol]
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = false

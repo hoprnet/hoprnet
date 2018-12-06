@@ -12,11 +12,27 @@
         "url": "https://github.com/validitylabs/messagingProtocol.git"
     },
     "scripts": {
-        "start": "node test/test_cli.js"
+        "dev": "npx truffle develop",
+        "lint": "npx solhint --formatter table contracts/**/*.sol",
+        "compile": "npx cross-env NODE_ENV=develop cross-env TASK=compile node ./tools/server/index",
+        "migrate": "npx cross-env NODE_ENV=develop cross-env TASK=migrate node ./tools/server/index",
+        "bundle": "npx cross-env TASK=bundle node ./tools/server/index",
+        "test": "yarn lint && npx cross-env NODE_ENV=develop cross-env TASK=test node ./tools/server/index",
+        "coverage": "npx cross-env NODE_ENV=develop cross-env TASK=coverage node ./tools/server/index",
+        "start": "node test/test_cli.js",
+        "clean": "npx shx rm -fr docs db dist build bin coverage",
+        "reset": "npx yarn run clean && npx shx rm -fr node_modules",
+        "update": "yarn run reset && yarn upgrade",
+        "postinstall": "node ./tools/hashChecker.js"
     },
     "dependencies": {
         "@nodeutils/defaults-deep": "^1.1.0",
         "async": "^2.6.1",
+        "babel-cli": "^6.26.0",
+        "babel-eslint": "^10.0.1",
+        "babel-polyfill": "^6.26.0",
+        "babel-preset-env": "^1.7.0",
+        "babel-register": "^6.26.0",
         "blake2": "^2.0.1",
         "chacha": "^2.1.0",
         "electron-webrtc": "^0.3.0",
@@ -35,8 +51,15 @@
         "lodash.clonedeep": "^4.5.0",
         "lodash.foreachright": "^4.4.0",
         "lodash.reduce": "^4.6.0",
+        "openzeppelin-solidity": "^2.0.0",
+        "prompt": "^1.0.0",
         "secp256k1": "^3.5.2",
         "solc": "^0.5.0",
+        "solcpiler": "^1.0.0-beta.9",
+        "solhint": "^1.4.0",
+        "solidity-coverage": "^0.5.11",
+        "truffle": "^4.1.14",
+        "truffle-hdwallet-provider": "^0.0.6",
         "web3": "^1.0.0-beta.36"
     }
 }

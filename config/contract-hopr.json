@@ -1,0 +1,14 @@
+{
+    "comment startTime":    "Tuesday, February 1, 2022 10:00:00 AM",
+    "startTime":            1643709600,
+    "comment endTime":      "Tuesday, February 15, 2022 10:00:00 AM",
+    "endTime":              1644919200,
+    "comment usdPerEth":    "1250 USD / ether - test value to pass in the constructor for the rate parameter",
+    "usdPerEth":            1250,
+    "comment NAME": "token name",
+    "NAME": "VL Token",
+    "comment SYMBOL": "token symbol",
+    "SYMBOL": "VLT",
+    "comment DECIMALS": "token decimals",
+    "DECIMALS": 18
+}
