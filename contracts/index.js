@@ -4,7 +4,7 @@ const { execFile } = require('child_process');
 const { waterfall, each, some, parallel } = require('async')
 const { readFile, existsSync, stat } = require('fs')
 
-const sourceFiles = ['PaymentChannel.sol']
+const sourceFiles = ['HoprChannel.sol']
 
 module.exports = (cb) => waterfall([
     (cb) => each(sourceFiles, (file, cb) => rebuildIfNecessary(file, cb), cb),

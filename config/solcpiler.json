@@ -1,0 +1,6 @@
+{
+    "outputJsDir": "./build/bundle",
+    "outputSolDir": "./build/bundle",
+    "solcVersion": "v0.4.24+commit.e67f0147",
+    "input": "./contracts/**/*.sol"
+}

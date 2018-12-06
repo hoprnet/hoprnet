@@ -17,3 +17,9 @@ keys
 
 # Exclude deprecated stuff
 old
+
+# Exclude .secrets
+.secrets.json
+
+# Exclude build dir
+build/**
