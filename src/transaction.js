@@ -2,14 +2,8 @@
 
 const secp256k1 = require('secp256k1')
 const withIs = require('class-is')
-const { waterfall } = require('async')
 
-const { pubKeyToEthereumAddress, numberToBuffer, bufferToNumber, getId, isPartyA, bufferXOR } = require('../../utils')
-const createKeccakHash = require('keccak')
-
-const { toWei } = require('web3').utils
-
-const openPaymentChannel = require('./open')
+const { hash, numberToBuffer, bufferToNumber, bufferXOR } = require('./utils')
 
 const SIGNATURE_LENGTH = 64
 const KEY_LENGTH = 32
@@ -64,16 +58,11 @@ class Transaction {
     }
 
     hash() {
-        return createKeccakHash('keccak256')
-            .update(this.buffer.slice(SIGNATURE_LENGTH + 1))
-            .digest()
+        return hash(this.buffer.slice(SIGNATURE_LENGTH + 1))
     }
 
-    sign(node, to) {
-        const signature = secp256k1.sign(
-            this.hash(),
-            node.peerInfo.id.privKey.marshal()
-        )
+    sign(privKey) {
+        const signature = secp256k1.sign(this.hash(), privKey)
 
         this.signature.fill(signature.signature, 0, SIGNATURE_LENGTH)
         this.recovery.fill(numberToBuffer(signature.recovery, 1), 0, 1)
@@ -94,43 +83,6 @@ class Transaction {
         return this.buffer
     }
 
-    static createTransaction(amount, to, node, cb) {
-        const channelId = getId(
-            pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()),
-            pubKeyToEthereumAddress(to.pubKey.marshal()))
-
-        waterfall([
-            (cb) => {
-                if (node.openPaymentChannels.has(channelId.toString('base64'))) {
-                    cb(null, node.openPaymentChannels.get(channelId.toString('base64')))
-                } else {
-                    console.log('[\'' + node.peerInfo.id.toB58String() + '\']: Does not have a payment channel with party \'' + to.toB58String() + '\', so let\'s open one.')
-                    openPaymentChannel(Transaction, to, node, cb)
-                }
-            },
-            (lastTransaction, cb) => {
-                lastTransaction.value = lastTransaction.value + getBalanceA(node, to) * amount
-                lastTransaction.index = lastTransaction.index + 1
-
-                lastTransaction.sign(node, to)
-
-                cb(null, lastTransaction)
-            }
-        ], cb)
-    }
-
-    forwardTransaction(amount, to, node, cb) {
-        if (amount >= this.value)
-            throw Error('Node did not take the relay fee.')
-
-        Transaction.createTransaction(amount, to, node, cb, this.buffer)
-    }
-
-    verify() {
-        console.log('Received ' + this.value + ' wei.')
-        return true
-    }
-
     encrypt(key) {
         if (!Buffer.isBuffer(key) || key.length !== KEY_LENGTH)
             throw Error('Invalid key.')
@@ -149,17 +101,6 @@ class Transaction {
         this.signature.fill(bufferXOR(Buffer.concat([key, key], 2 * KEY_LENGTH), this.signature), 0, SIGNATURE_LENGTH)
 
         return this
-    }
-}
-
-function getBalanceA(node, to) {
-    if (isPartyA(
-        pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()),
-        pubKeyToEthereumAddress(to.pubKey.marshal()))
-    ) {
-        return +1
-    } else {
-        return -1
     }
 }
 

@@ -4,9 +4,11 @@ const withIs = require('class-is')
 
 const libp2p = require('libp2p')
 const TCP = require('libp2p-tcp')
-const MUXER = require('libp2p-mplex')
+const MPLEX = require('libp2p-mplex')
 const KadDHT = require('libp2p-kad-dht')
 const SECIO = require('libp2p-secio')
+const defaultsDeep = require('@nodeutils/defaults-deep')
+
 
 const Eth = require('web3-eth')
 
@@ -31,43 +33,64 @@ const WStar = require('libp2p-webrtc-star')
 //     wrtc: wrtc
 // })
 
+const PaymentChannels = require('./paymentChannels')
+
+
 const pull = require('pull-stream')
-const bs58 = require('bs58')
-const { waterfall, parallel, times } = require('async')
+const { waterfall, times } = require('async')
 
 // const BOOTSTRAP_NODE = Multiaddr('/ip4/127.0.0.1/tcp/9090/')
 
 class Hopper extends libp2p {
-    constructor(peerInfo, provider, contract) {
-        const modules = {
-            transport: [new TCP],
-            connection: {
-                muxer: [MUXER]
+    constructor(_options, provider, contract) {
+        const defaults = {
+            // The libp2p modules for this libp2p bundle
+            modules: {
+                transport: [
+                    TCP
+                ],
+                streamMuxer: [
+                    MPLEX
+                ],
+                connEncryption: [
+                    SECIO
+                ],
+                dht: KadDHT
             },
-            // connEncryption: [SECIO],
-            DHT: KadDHT,
-            // peerDiscovery: [WebRTC.discovery]
+            config: {
+                dht: {
+                  kBucketSize: 20
+                },
+                EXPERIMENTAL: {
+                  // dht must be enabled
+                  dht: true
+                }
+              }
+         
         }
-        const options = {
-            dht: {
-                kBucketSize: 20
-            },
-            EXPERIMENTAL: {
-                // dht must be enabled
-                dht: true
-            }
-        }
-
-        super(modules, peerInfo, null, options)
+        super(defaultsDeep(_options, defaults))
 
         // Maybe this is not necessary
         this.eth = new Eth(provider)
-        this.contract = contract
+
         this.seenTags = new Set()
         this.pendingTransactions = new Map()
-        this.openPaymentChannels = new Map()
+        this.paymentChannels = new PaymentChannels(this, contract)
         this.crawlNetwork = crawlNetwork(this)
         this.getPubKey = getPubKey(this)
+
+        const findPeer = this.peerRouting.findPeer
+        const self = this
+        this.peerRouting.findPeer = function (peerId, cb) {
+            console.log('[\'' + self.peerInfo.id.toB58String() + '\']: Searching for \'' + peerId.toB58String() + '\'.')
+            findPeer(peerId, (err, peerInfo) => {
+                if (err)
+                    console.log(err)
+
+                console.log('[\'' + self.peerInfo.id.toB58String() + '\']: Found peer')
+                cb(err, peerInfo)
+            })
+        }
     }
 
     static startNode(provider, output, contract, cb, peerInfo) {
@@ -82,13 +105,13 @@ class Hopper extends libp2p {
                 }
             },
             (peerInfo, cb) => {
-                node = new Hopper(peerInfo, provider, contract)
+                node = new Hopper({
+                    peerInfo: peerInfo
+                }, provider, contract)
                 cb(null)
             },
             (cb) => node.start(cb),
-            (_,cb) => {
-                registerHandlers(node, output, cb)
-            },
+            (cb) => registerHandlers(node, output, cb),
         ], cb)
     }
 
@@ -116,7 +139,7 @@ class Hopper extends libp2p {
                     destination,
                     (err, packet) => cb(err, packet, intermediateNodes[0])
                 ),
-            (packet, firstNode, cb) => this.dial(firstNode, c.PROTOCOL_STRING, (err, conn) => cb(err, conn, packet)),
+            (packet, firstNode, cb) => this.dialProtocol(firstNode, c.PROTOCOL_STRING, (err, conn) => cb(err, conn, packet)),
             (conn, packet, cb) => {
                 pull(
                     pull.once(packet.toBuffer()),

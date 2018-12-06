@@ -4,22 +4,22 @@ const withIs = require('class-is')
 const PeerId = require('peer-id')
 
 const Header = require('./header')
-const Transaction = require('./transaction')
+const Transaction = require('../transaction')
 const Challenge = require('./challenge')
 const Message = require('./message')
 
-const { parallel, series } = require('async')
+const { parallel } = require('async')
 
-const { deriveKey } = require('./transaction/keyDerivation')
+const { deriveKey } = require('../paymentChannels/keyDerivation')
 const { RELAY_FEE } = require('../constants')
 const { hash, deepCopy } = require('../utils')
 
 class Packet {
-    constructor(_header, _transaction, _challenge, _message) {
-        this.header = _header
-        this.transaction = _transaction
-        this.challenge = _challenge
-        this.message = _message
+    constructor(header, transaction, challenge, message) {
+        this.header = header
+        this.transaction = transaction
+        this.challenge = challenge
+        this.message = message
     }
 
     static get SIZE() {
@@ -36,70 +36,75 @@ class Packet {
         parallel({
             challenge: (cb) => cb(null, Challenge.createChallenge(Header.deriveTransactionKey(secrets[0]), node.peerInfo.id.privKey.marshal())),
             message: (cb) => cb(null, Message.createMessage(msg).onionEncrypt(secrets)),
-            transaction: (cb) => Transaction.createTransaction((secrets.length - 1) * RELAY_FEE, intermediateNodes[0].id, node, cb)
+            transaction: (cb) => node.paymentChannels.transfer((secrets.length - 1) * RELAY_FEE, intermediateNodes[0].id, cb)
         }, (err, results) => {
-            if (err) {
-                cb(err)
-            } else {
-                const encryptedTx = results.transaction.encrypt(deriveKey(Header, secrets.slice(0,2)))
+            if (err) { throw err }
 
-                node.pendingTransactions.set(hash(Header.deriveTransactionKey(secrets[0])).toString('base64'), encryptedTx)
+            const encryptedTx = results.transaction.encrypt(deriveKey(Header, secrets.slice(0, 2)))
 
-                cb(null, new Packet(
-                    header, 
-                    encryptedTx, 
-                    results.challenge, 
-                    results.message))
-            }
+            node.pendingTransactions.set(hash(Header.deriveTransactionKey(secrets[0])).toString('base64'), encryptedTx)
+
+
+            cb(null, new Packet(
+                header,
+                encryptedTx,
+                results.challenge,
+                results.message))
         })
     }
 
     forwardTransform(node, previousPeerId, cb) {
-        if (!this.transaction.verify())
-            throw Error('TODO: No transaction')
+        const receivedMoney = node.paymentChannels.getEmbeddedMoney(previousPeerId, this.transaction)
+
+        if (receivedMoney < RELAY_FEE)
+            throw Error('Bad transaction.')
 
         this.header.deriveSecret(node.peerInfo.id.privKey.marshal())
 
-        series([
-            (cb) => parallel([
-                (cb) => {
-                    const tag = Header.deriveTagParameters(this.header.derivedSecret)
-                    if (node.seenTags.has(tag))
-                        cb(Error('General error.'))
+        const tag = Header.deriveTagParameters(this.header.derivedSecret)
+        if (node.seenTags.has(tag))
+            throw Error('General error.')
 
-                    node.seenTags.add(tag)
-                    cb()
-                },
-                (cb) => cb(!this.header.verify()),
-            ], cb),
-            (cb) => {
-                this.header.extractHeaderInformation()
-                cb()
-            },
-            (cb) => cb(!this.challenge.verify(previousPeerId.pubKey.marshal(), Header.deriveTransactionKey(this.header.derivedSecret))),
-            (cb) => {
-                // save transaction
-                node.pendingTransactions.set(this.header.hashedKeyHalf.toString('base64'), deepCopy(this.transaction, Transaction))
-                cb()
-            },
-            (cb) => parallel([
-                (cb) => {
-                    this.header.transformForNextNode()
-                    cb()
-                },
-                (cb) => {
-                    // Challenge Backup
-                    this.oldChallenge = deepCopy(this.challenge, Challenge)
+        node.seenTags.add(tag)
 
-                    this.challenge.updateChallenge(this.header.hashedKeyHalf, node.peerInfo.id.privKey.marshal())
-                    cb()
-                },
-                (cb) => {
-                    this.message.decrypt(this.header.derivedSecret)
-                    cb()
-                }
-            ], cb)
-        ], (err) => err ? cb(err) : cb(null, this))
+        if (!this.header.verify)
+            throw Error('General error.')
+
+        this.header.extractHeaderInformation()
+
+        if (!this.challenge.verify(previousPeerId.pubKey.marshal(), Header.deriveTransactionKey(this.header.derivedSecret)))
+            throw Error('General error.')
+
+        this.oldChallenge = deepCopy(this.challenge, Challenge)
+        node.pendingTransactions.set(this.header.hashedKeyHalf.toString('base64'), deepCopy(this.transaction, Transaction))
+
+        if (this.header.address.equals(node.peerInfo.id.toBytes())) {
+            this.message.decrypt(this.header.derivedSecret, (err, message) => {
+                this.message = message
+
+                cb(null, this)
+            })
+        } else {
+            parallel({
+                transaction: (cb) => node.paymentChannels.transfer(receivedMoney - RELAY_FEE, this.getTargetPeerId(), cb),
+                message: (cb) => this.message.decrypt(this.header.derivedSecret, cb),
+                challenge: (cb) => this.challenge.updateChallenge(this.header.hashedKeyHalf, node.peerInfo.id.privKey.marshal(), cb),
+                header: (cb) => this.header.transformForNextNode(cb)
+            }, (err, results) => {
+                if (err) { throw err }
+
+                this.header = results.header
+                this.transaction = results.transaction
+                this.challenge = results.challenge
+                this.message = results.message
+
+                cb(null, this)
+            })
+        }
+
+
+
+
     }
 
     getTargetPeerId() {
@@ -113,13 +118,6 @@ class Packet {
             this.challenge.toBuffer(),
             this.message.toBuffer(),
         ], Packet.SIZE)
-    }
-
-    addTransaction(targetPeerId, node, cb) {
-        if (this.transaction.value < RELAY_FEE)
-            throw Error('Insufficient funds.')
-
-        this.transaction.forwardTransaction(RELAY_FEE, targetPeerId, node, cb)
     }
 
     static fromBuffer(buf) {

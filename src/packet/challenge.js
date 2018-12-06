@@ -54,7 +54,7 @@ class Challenge {
         return challenge
     }
 
-    updateChallenge(hashedKey, secretKey) {
+    updateChallenge(hashedKey, secretKey, cb) {
         if (!Buffer.isBuffer(hashedKey) || hashedKey.length !== HASH_LENGTH)
             throw Error('Wrong input value. Expected a hashed key of size ' + HASH_LENGTH + ' bytes.')
 
@@ -64,6 +64,7 @@ class Challenge {
         this.challengeSignature
             .fill(secp256k1.sign(hashedKey, secretKey).signature, 0, SIGNATURE_LENGTH)
         
+        cb(null, this)
     }
 
     static deriveHashedKey(secret) {

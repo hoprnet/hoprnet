@@ -18,11 +18,15 @@ module.exports = (node) =>
 
         doWhilst(
             (cbWhilst) => {
+                console.log('foo')
+
                 if (peers.length === 0)
                     throw Error('Unable to find enough other nodes in the network.')
 
                 times(Math.min(peers.length, MAX_HOPS), (_, next) => waterfall([
                     (cb) => {
+                        console.log('bar')
+
                         const currentPeerInfo = peers.pop()
                         if (currentPeerInfo.multiaddrs.size === 0) {
                             node.peerRouting.findPeer(currentPeerInfo.id, cb)
@@ -30,32 +34,24 @@ module.exports = (node) =>
                             cb(null, currentPeerInfo)
                         }
                     },
-                    (peerInfo, cb) => node.dial(peerInfo, PROTOCOL_CRAWLING, (err, conn) => cb(err, conn, peerInfo)),
+                    (peerInfo, cb) => node.dialProtocol(peerInfo, PROTOCOL_CRAWLING, (err, conn) => cb(err, conn, peerInfo)),
                     (conn, currentPeerInfo, cb) => pull(
-                            conn,
-                            pull.filter(data => data.length > 0 && data.length % MARSHALLED_PUBLIC_KEY_SIZE === 0),
-                            pull.drain(buf => waterfall([
-                                // TODO: Add multiaddrs to response to decrease amount of rountrips
-                                (cb) => times(buf.length / MARSHALLED_PUBLIC_KEY_SIZE,
-                                    (n, next) => waterfall([
-                                        (cb) => PeerId.createFromPubKey(buf.slice(n * MARSHALLED_PUBLIC_KEY_SIZE, (n + 1) * MARSHALLED_PUBLIC_KEY_SIZE), cb),
-                                        (peerId, cb) => PeerInfo.create(peerId, cb)
-                                    ], next),
-                                    cb),
-                                (peerInfos, cb) => filter(peerInfos,
-                                    (peerInfo, cb) =>
-                                        cb(null, currentPeerInfo.id.toBytes().compare(peerInfo.id.toBytes()) !== 0)
-                                    , cb),
-                                (peerInfos, cb) => eachSeries(peerInfos,
-                                    (peerInfo, cb) => {
-                                        if (!node.peerBook.has(peerInfo.id.toB58String()))
-                                            newNodes.push(peerInfo)
+                        conn,
+                        pull.filter(data =>
+                            data.length > 0 && data.length % MARSHALLED_PUBLIC_KEY_SIZE === 0),
+                        pull.asyncMap((pubKey, cb) => waterfall([
+                            (cb) => PeerId.createFromPubKey(pubKey, cb),
+                            (peerId, cb) => PeerInfo.create(peerId, cb)
+                        ], cb)),
+                        pull.filter(peerInfo =>
+                            currentPeerInfo.id.toBytes().compare(peerInfo.id.toBytes()) !== 0
+                        ),
+                        pull.drain(peerInfo => {
+                            if (!node.peerBook.has(peerInfo.id.toB58String()))
+                                newNodes.push(peerInfo)
 
-                                        cb(null, node.peerBook.put(peerInfo))
-                                    }, cb)
-                            ], cb))
-                        )
-
+                            node.peerBook.put(peerInfo)
+                        }, cb))
                 ], next), (err) => {
                     if (err) { throw err }
 

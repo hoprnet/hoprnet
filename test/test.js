@@ -61,7 +61,7 @@ waterfall([
             })
             .send({
                 from: pubKeyToEthereumAddress(pInfos[0].id.pubKey.marshal()),
-                gas: 2570333, // 2370333
+                gas: 3000333, // 2370333
                 gasPrice: '30000000000000'
             })
             .on('receipt', (receipt) => {
@@ -76,7 +76,7 @@ waterfall([
         nodes = _nodes
         warmUpNodes(nodes, cb)
     },
-    (cb) => each(nodes, (node, cb) => node.contract.methods.stakeMoney()
+    (cb) => each(nodes, (node, cb) => node.paymentChannels.contract.methods.stakeMoney()
         .send({
             from: pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()),
             value: toWei('1', 'ether')
@@ -87,15 +87,15 @@ waterfall([
             console.log('[\'' + node.peerInfo.id.toB58String() + '\']: Staking ' + toWei('1', 'ether') + ' wei.')
         })
         , cb),
-    (cb) => setTimeout(() => cb(null), 200)
+    (cb) => setTimeout(() => cb(null), 500)
 ], (err) => {
     if (err) { throw err }
 
 
-    setInterval(() => {
+    setTimeout(() => {
         nodes[0].sendMessage('test_test_test ' + Date.now().toString(), nodes[3].peerInfo)
-    }, 4000)
-    // nodes[0].sendMessage('test_test_test ' + Date.now().toString(), nodes[3].peerInfo)
+    }, 20000)
+    nodes[0].sendMessage('test_test_test ' + Date.now().toString(), nodes[2].peerInfo)
 })
 
 

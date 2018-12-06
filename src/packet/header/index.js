@@ -138,9 +138,11 @@ class Header {
             .fill(tmp.slice(p.PER_HOP_SIZE, p.PER_HOP_SIZE + Header.BETA_LENGTH), 0, Header.BETA_LENGTH)
     }
 
-    transformForNextNode() {
+    transformForNextNode(cb) {
         this.alpha
             .fill(secp256k1.publicKeyTweakMul(this.alpha, Header.deriveBlinding(this.alpha, this.derivedSecret)), 0, p.COMPRESSED_PUBLIC_KEY_LENGTH)
+        
+        cb(null, this)
     }
 
     static deriveTagParameters(secret) {

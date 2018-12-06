@@ -17,17 +17,11 @@ module.exports = (node, output) => node.handle(c.PROTOCOL_STRING, (protocol, con
 
             waterfall([
                 (cb) => node.peerRouting.findPeer(targetPeerId, cb),
-                (targetPeerInfo, cb) => parallel({
-                    transaction: (cb) => waterfall([
-                        (cb) => node.getPubKey(targetPeerInfo, cb),
-                        (targetPeerId, cb) => packet.addTransaction(targetPeerId, node, cb)
-                    ], cb),
-                    conn: (cb) => node.dial(targetPeerInfo, c.PROTOCOL_STRING, cb)
-                }, cb),
-                (results, cb) => {
+                (targetPeerInfo, cb) => node.dialProtocol(targetPeerInfo, c.PROTOCOL_STRING, cb),
+                (conn, cb) => {
                     pull(
                         pull.once(packet.toBuffer()),
-                        results.conn
+                        conn
                     )
                     cb(null)
                 }
@@ -38,7 +32,7 @@ module.exports = (node, output) => node.handle(c.PROTOCOL_STRING, (protocol, con
     function sendAcknowledgement(packet, peerInfo, cb) {
         console.log('[\'' + node.peerInfo.id.toB58String() + '\']: Acknowledging to node \'' + peerInfo.id.toB58String() + '\'.')
         waterfall([
-            (cb) => node.dial(peerInfo, c.PROTOCOL_ACKNOWLEDGEMENT, cb),
+            (cb) => node.dialProtocol(peerInfo, c.PROTOCOL_ACKNOWLEDGEMENT, cb),
             (conn, cb) => {
                 pull(
                     pull.once(
@@ -57,36 +51,16 @@ module.exports = (node, output) => node.handle(c.PROTOCOL_STRING, (protocol, con
 
     pull(
         conn,
-        pull.filter(data =>
-            data.length > 0 && data.length % Packet.SIZE === 0
-        ),
+        pull.filter(data => data.length > 0 && data.length % Packet.SIZE === 0),
         pull.map(data => Packet.fromBuffer(data)),
-        // (read) => (end, reply) => waterfall([
-        //     (cb) => read(end, cb),
-        //     (packet, cb) => waterfall([
-        //         (cb) => conn.getPeerInfo(cb),
-        //         (senderPeerInfo, cb) => packet.forwardTransform(node, senderPeerInfo.id, (err, packet) => cb(err, packet, senderPeerInfo)),
-        //     ], cb),
-        //     (packet, senderPeerInfo, cb) => parallel([
-        //         (cb) => forwardPacket(packet, cb),
-        //         (cb) => sendAcknowledgement(packet, senderPeerInfo, cb)
-        //     ], cb)
-        // ]),
-        // conn
-        pull.drain(packet => waterfall([
+        pull.drain((packet) => waterfall([
             (cb) => conn.getPeerInfo(cb),
-            (senderPeerInfo, cb) => {
-                packet.forwardTransform(node, senderPeerInfo.id, (err, packet) => cb(err, packet, senderPeerInfo))
-            },
+            (senderPeerInfo, cb) => packet.forwardTransform(node, senderPeerInfo.id, (err, packet) => cb(err, packet, senderPeerInfo)),
             (packet, senderPeerInfo, cb) => parallel([
                 (cb) => forwardPacket(packet, cb),
                 (cb) => sendAcknowledgement(packet, senderPeerInfo, cb)
             ], cb)
-        ], (err) => {
-            // console.log(err)
-        }), () => {
-            // console.log('Ended')
-        })
+        ]))
     )
 })
 

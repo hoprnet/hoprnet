@@ -28,7 +28,7 @@ module.exports = (node) => (peerInfo, callback) => {
             }
         },
         (peerInfo, cb) => hasPublicKey(peerInfo, cb),
-        (peerInfo, cb) => node.dial(peerInfo, PROTOCOL_DELIVER_PUBKEY, cb),
+        (peerInfo, cb) => node.dialProtocol(peerInfo, PROTOCOL_DELIVER_PUBKEY, cb),
         (conn, cb) => parallel({
             peerId: (cb) => waterfall([
                 (cb) => pull(conn, pull.drain((pubKey) => cb(null, pubKey))),
