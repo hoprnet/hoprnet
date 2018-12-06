@@ -23,3 +23,6 @@ old
 
 # Exclude build dir
 build/**
+
+# Exclude db dir
+db
