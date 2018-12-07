@@ -30,11 +30,17 @@ contract('HoprChannel contract', ([sender, node1, node2, node3, node4, node6, no
     describe('stake ether for PC funds', () => {
         let tx = [];
 
-        it('send ether to hopr channel contract', async () => {
+        it('stake ether in HoprChannel contract', async () => {
             tx[0] = await hoprChannelInstance.stakeEther({from: sender, value: web3.utils.toWei("2", "ether")});
             tx[1] = await hoprChannelInstance.stakeEther({from: node1, value: web3.utils.toWei("2", "ether")});
             tx[2] = await hoprChannelInstance.stakeEther({from: node2, value: web3.utils.toWei("2", "ether")});
             tx[3] = await hoprChannelInstance.stakeEther({from: receiver, value: web3.utils.toWei("2", "ether")});
+        });
+
+        it('verify balance of HoprChannel contract', async () => {
+            const balance = await web3.eth.getBalance(hoprChannelInstance.address);
+
+            assert.equal(balance.toString(), Number(8e18).toString(), 'balance !=');
         });
 
         it('verify state of each account', async () => {
