@@ -89,6 +89,10 @@ contract HoprChannel {
 
         msg.sender.transfer(amount);
     }
+
+    function getStakedAmount(address _address) public view returns (uint256) {
+        return states[_address].stakedEther;
+    }
     
     /**
     * @notice create payment channel TODO: finish desc
@@ -177,9 +181,7 @@ contract HoprChannel {
             channel.balanceA <= channel.balance, 
             "Invalid channel.");
 
-        require(
-            channel.settlementBlock.add(BLOCK_CONFIRMATION) <= block.number, 
-            "Channel not withdrawable yet.");
+        require(channel.settlementBlock.add(BLOCK_CONFIRMATION) >= block.number, "Channel not withdrawable yet.");
         
         channel.state = ChannelState.WITHDRAWN;
         
