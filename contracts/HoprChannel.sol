@@ -1,4 +1,4 @@
-pragma solidity ^0.5.0;
+pragma solidity 0.5.0;
 
 // import "openzeppelin-solidity/contracts/cryptography/ECDSA.sol";
 import "./math/SafeMath.sol";
@@ -10,7 +10,7 @@ contract HoprChannel {
     // using ECDSA for bytes32;
     
     // constant RELAY_FEE = 1
-    uint8 constant private BLOCK_HEIGHT = 15;
+    uint8 constant private BLOCK_CONFIRMATION = 15;
     
     // Tell payment channel partners that channel has been settled
     event SettledChannel(bytes32 channelId, uint256 nonce);
@@ -178,7 +178,7 @@ contract HoprChannel {
             "Invalid channel.");
 
         require(
-            channel.settlementBlock.add(BLOCK_HEIGHT) <= channel.settlementBlock.add(block.number), 
+            channel.settlementBlock.add(BLOCK_CONFIRMATION) <= block.number, 
             "Channel not withdrawable yet.");
         
         channel.state = ChannelState.WITHDRAWN;

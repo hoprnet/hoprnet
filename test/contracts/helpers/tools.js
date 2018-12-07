@@ -2,16 +2,15 @@
 const {soliditySha3} = require('web3-utils');
 
 const INTERFACE_ID_LENGTH = 4;
+/**
+ * @const BigNumber Pointer to web3.BigNumber
+ */
 export const BigNumber = web3.BigNumber;
 
 /** COMMONLY USED CONSTANTS */
 
 export const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
-export const MAX_UINT256 = new BigNumber(2).pow(256).minus(1);
-
-/**
- * @const BigNumber Pointer to web3.BigNumber
- */
+// export const MAX_UINT256 = TWO.pow(256).sub(1);
 
 /**
  * @const Network config from JSON file
