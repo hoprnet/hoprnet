@@ -106,51 +106,74 @@ module.exports.randomSubset = (array, subsetSize, filter = _ => true) => {
 
     const byteAmount = Math.max(Math.ceil(Math.log2(array.length)) / 8, 1)
 
-    const indexSet = new Set()
+    // if (subsetSize == 1) {
+        
+    //     return [array[module.exports.bufferToNumber(randomBytes(byteAmount)) % array.length]]
+    // }
 
-    while (indexSet.size < subsetSize) {
-        const index = module.exports.bufferToNumber(randomBytes(byteAmount)) % array.length
+    let notChosen = new Set()
+    let chosen = new Set()
+    let found, breakUp = false
+    
+    let index = 0
+    for (let i = 0; i < subsetSize && !breakUp; i++) {
+        index = (index + module.exports.bufferToNumber(randomBytes(byteAmount))) % array.length
+        
+        found = false
 
-        if (filter(array[index]))
-            indexSet.add(index)
+        do {
+            while(chosen.has(index) || notChosen.has(index)) {
+                index = (index + 1) % array.length
+            }
+
+            if (!filter(array[index])) {
+                notChosen.add(index)
+                index = (index + 1) % array.length
+                found = false
+            } else {
+                chosen.add(index)
+                found = true
+            }
+
+            if (notChosen.size + chosen.size == array.length && chosen.size < subsetSize) {
+                breakUp = true
+                break
+            }
+
+
+        } while(!found)
     }
 
-    const res = []
-    indexSet.forEach(index => {
-        res.push(array[index])
-    })
+    const result = []
+    for (let index of chosen) {
+        result.push(array[index])
+    }
 
-    return res
+    return result
 }
 
-module.exports.randomPermutation = function (array) {
-    // TODO
+// Implementation of the (optimized) Fisher-Yates
+// shuffling algorithm
+module.exports.randomPermutation = (array) => {
+    if (array.length <= 1)
+        return array
+        
+    let i, j, tmp
+
+    const byteAmount = Math.max(Math.ceil(Math.log2(array.length)) / 8, 1)
+
+    for (i = array.length - 1; i > 0; i--) {
+        j = module.exports.bufferToNumber(randomBytes(byteAmount)) % (i + 1)
+        tmp = array[i]
+        array[i] = array[j]
+        array[j] = tmp
+    }
+
     return array
 }
 
-// ==========================
-// PeerId methods
-// ==========================
-
-const PeerId = require('peer-id')
-const PREFIX = 0x12
-const p = require('../packet/header/parameters')
-const Multihash = require('multihashes')
-
-module.exports.keyPairToPeerId = function (key) {
-    return new PeerId(Multihash.encode(key.public.marshal(), PREFIX), key, key.public)
-}
-
-module.exports.pubKeyToPeerId = function (buf) {
-    if (!Buffer.isBuffer(buf) || buf.length !== p.COMPRESSED_PUBLIC_KEY_LENGTH)
-        throw Error('Invalid input parameter. Expected a Buffer of size ' + p.COMPRESSED_PUBLIC_KEY_LENGTH + '. Got ' + typeof buf + ' instead.')
-
-    return PeerId.createFromBytes(Multihash.encode(key.public.marshal(), PREFIX))
-}
-
-module.exports.peerIdToPubKey = (peerId) =>
-    Multihash.decode(peerId.toBytes()).digest
-
+// TODO: Proper random number generation
+// module.exports.randomNumber(start, end)
 
 // ==========================
 // Ethereum methods
@@ -160,16 +183,16 @@ const secp256k1 = require('secp256k1')
 module.exports.pubKeyToEthereumAddress = (pubKey) => {
     const hash = sha3(secp256k1.publicKeyConvert(pubKey, false).slice(1))
 
-    // Maybe RegExp + str.replace is faster
     return toChecksumAddress(hash.slice(0,2).concat(hash.slice(26)))
 }
 
-// TODO
 module.exports.isPartyA = (sender, otherParty) => {
     if (typeof sender === 'string' && typeof otherParty === 'string') {
         return Buffer.compare(Buffer.from(hexToBytes(sender), 0, ETHEUREUM_ADDRESS_SIZE), Buffer.from(hexToBytes(otherParty), 0, ETHEUREUM_ADDRESS_SIZE)) < 0
     } else if (Buffer.isBuffer(sender) && Buffer.isBuffer(otherParty)) {
         return Buffer.compare(sender, otherParty) < 0
+    } else {
+        throw Error('Invalid argument')
     }
 }
 
@@ -179,10 +202,10 @@ module.exports.getId = (sender, otherParty) => {
     otherParty = Buffer.from(hexToBytes(otherParty), 0, ETHEUREUM_ADDRESS_SIZE)
 
     if (module.exports.isPartyA(sender, otherParty)) {
-        console.log('[\'' + sender.toString('base64') + '\ \'' + otherParty.toString('base64') + '\']: ChannelId: \'' + module.exports.hash(Buffer.concat([sender, otherParty], 2 * ETHEUREUM_ADDRESS_SIZE)).toString('base64') + '\' as party A.')
+        // console.log('[\'' + sender.toString('base64') + '\ \'' + otherParty.toString('base64') + '\']: ChannelId: \'' + module.exports.hash(Buffer.concat([sender, otherParty], 2 * ETHEUREUM_ADDRESS_SIZE)).toString('base64') + '\' as party A.')
         return module.exports.hash(Buffer.concat([sender, otherParty], 2 * ETHEUREUM_ADDRESS_SIZE))
     } else {
-        console.log('[\'' + sender.toString('base64') + '\ \'' + otherParty.toString('base64') + '\']: ChannelId: \'' + module.exports.hash(Buffer.concat([otherParty, sender], 2 * ETHEUREUM_ADDRESS_SIZE)).toString('base64') + '\' as party B.')
+        // console.log('[\'' + sender.toString('base64') + '\ \'' + otherParty.toString('base64') + '\']: ChannelId: \'' + module.exports.hash(Buffer.concat([otherParty, sender], 2 * ETHEUREUM_ADDRESS_SIZE)).toString('base64') + '\' as party B.')
         return module.exports.hash(Buffer.concat([otherParty, sender], 2 * ETHEUREUM_ADDRESS_SIZE))
     }
 }

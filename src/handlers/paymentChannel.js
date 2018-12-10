@@ -14,20 +14,21 @@ module.exports = (node) => node.handle(PROTOCOL_PAYMENT_CHANNEL, (protocol, conn
     pull.map((data) => Transaction.fromBuffer(data)),
     (read) => (end, reply) => waterfall([
         (cb) => read(end, cb),
-        (transaction, cb) => {
-            const pubKey = secp256k1.recover(transaction.hash(), transaction.signature, bufferToNumber(transaction.recovery))
+        (tx, cb) => {
+            const pubKey = secp256k1.recover(tx.hash(), tx.signature, bufferToNumber(tx.recovery))
 
             const channelId = getId(
                 pubKeyToEthereumAddress(pubKey),
                 pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()))
 
-            if (channelId.compare(transaction.channelId) !== 0)
+            if (channelId.compare(tx.channelId) !== 0)
                 throw Error('General error.')
 
-            node.paymentChannels.set(channelId, transaction)
+            node.paymentChannels.set(tx)
+            node.paymentChannels.registerSettlementListener(tx.channelId)
 
             cb(null, secp256k1.sign(
-                transaction.hash(),
+                tx.hash(),
                 node.peerInfo.id.privKey.marshal()).signature)
         }
     ], reply),

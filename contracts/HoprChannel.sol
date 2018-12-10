@@ -1,12 +1,12 @@
-pragma solidity 0.4.24;
+pragma solidity ^0.5.0;
 
 // import "openzeppelin-solidity/contracts/cryptography/ECDSA.sol";
-import "openzeppelin-solidity/contracts/math/SafeMath.sol";
+// import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 
 
 /* solhint-disable max-line-length */
 contract HoprChannel {
-    using SafeMath for uint256;
+    // using SafeMath for uint256;
     // using ECDSA for bytes32;
     
     // constant RELAY_FEE = 1
@@ -71,7 +71,7 @@ contract HoprChannel {
         require(msg.value > 0, "Please provide a non-zero amount of ether.");
         
         states[msg.sender].isSet = true;
-        states[msg.sender].stakedEther = states[msg.sender].stakedEther.add(uint256(msg.value));
+        states[msg.sender].stakedEther = states[msg.sender].stakedEther + uint256(msg.value);
     }
     
     /**
@@ -84,7 +84,7 @@ contract HoprChannel {
         if (amount == states[msg.sender].stakedEther) {
             delete states[msg.sender];
         } else {
-            states[msg.sender].stakedEther = states[msg.sender].stakedEther.sub(amount);
+            states[msg.sender].stakedEther = states[msg.sender].stakedEther - amount;
         }
 
         msg.sender.transfer(amount);
@@ -98,11 +98,11 @@ contract HoprChannel {
     function create(address counterParty, uint256 amount) public enoughFunds(amount) {
         require(channels[getId(counterParty)].state == ChannelState.UNINITIALIZED, "Channel already exists.");
         
-        states[msg.sender].stakedEther = states[msg.sender].stakedEther.sub(amount);
+        states[msg.sender].stakedEther = states[msg.sender].stakedEther - amount;
         
         // Register the channels at both participants' state
-        states[msg.sender].openChannels = states[msg.sender].openChannels.add(1);
-        states[counterParty].openChannels = states[counterParty].openChannels.add(1);
+        states[msg.sender].openChannels = states[msg.sender].openChannels + 1;
+        states[counterParty].openChannels = states[counterParty].openChannels + 1;
         
         if (isPartyA(counterParty)) {
             // msg.sender == partyB
@@ -119,7 +119,7 @@ contract HoprChannel {
     * @param amount uint256
     */
     function fund(address counterParty, uint256 amount) public enoughFunds(amount) channelExists(counterParty) {
-        states[msg.sender].stakedEther = states[msg.sender].stakedEther.sub(amount);
+        states[msg.sender].stakedEther = states[msg.sender].stakedEther - amount;
 
         Channel storage channel = channels[getId(counterParty)];
 
@@ -127,13 +127,13 @@ contract HoprChannel {
             // msg.sender == partyB
             require(channel.state == ChannelState.PARTYA_FUNDED, "Channel already exists.");
             
-            channel.balance = channel.balance.add(amount);
+            channel.balance = channel.balance + amount;
         } else {
             // msg.sender == partyA
             require(channel.state == ChannelState.PARTYB_FUNDED, "Channel already exists.");
             
-            channel.balance = channel.balance.add(amount);
-            channel.balanceA = channel.balanceA.add(amount);
+            channel.balance = channel.balance + amount;
+            channel.balanceA = channel.balanceA + amount;
         }
         channel.state = ChannelState.ACTIVE;
     }
@@ -178,7 +178,7 @@ contract HoprChannel {
             "Invalid channel.");
 
         require(
-            channel.settlementBlock.add(BLOCK_HEIGHT) <= channel.settlementBlock.add(block.number), 
+            channel.settlementBlock + BLOCK_HEIGHT <= block.number, 
             "Channel not withdrawable yet.");
         
         channel.state = ChannelState.WITHDRAWN;
@@ -188,17 +188,17 @@ contract HoprChannel {
             states[counterParty].openChannels > 0, 
             "Something went wrong. Double spend?");
 
-        states[msg.sender].openChannels = states[msg.sender].openChannels.sub(1);
-        states[counterParty].openChannels = states[counterParty].openChannels.sub(1);
+        states[msg.sender].openChannels = states[msg.sender].openChannels - 1;
+        states[counterParty].openChannels = states[counterParty].openChannels - 1;
         
         if (isPartyA(counterParty)) {
             // msg.sender == partyB
-            states[msg.sender].stakedEther = states[msg.sender].stakedEther.add((channel.balance.sub(channel.balanceA)));
-            states[counterParty].stakedEther = states[counterParty].stakedEther.add(channel.balanceA);
+            states[msg.sender].stakedEther = states[msg.sender].stakedEther + (channel.balance - channel.balanceA);
+            states[counterParty].stakedEther = states[counterParty].stakedEther + channel.balanceA;
         } else {
             // msg.sender == partyA
-            states[counterParty].stakedEther = states[counterParty].stakedEther.add((channel.balance.sub(channel.balanceA)));
-            states[msg.sender].stakedEther = states[msg.sender].stakedEther.add(channel.balanceA); 
+            states[counterParty].stakedEther = states[counterParty].stakedEther + (channel.balance - channel.balanceA);
+            states[msg.sender].stakedEther = states[msg.sender].stakedEther + channel.balanceA; 
         }
         
         delete channels[getId(counterParty)];
