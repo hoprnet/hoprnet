@@ -5,61 +5,77 @@ const PeerInfo = require('peer-info')
 
 const pull = require('pull-stream')
 
-const { doWhilst, times, waterfall, filter, eachSeries } = require('async')
+const flatten = require('lodash.flatten');
+const uniqWith = require('lodash.uniqwith')
+const remove = require('lodash.remove')
+
+const { randomSubset } = require('./utils')
+
+const { doWhilst, map, waterfall } = require('async')
 
 
 const { MAX_HOPS, PROTOCOL_CRAWLING, MARSHALLED_PUBLIC_KEY_SIZE } = require('./constants')
 
 module.exports = (node) =>
     (cb, comparator = _ => true) => {
+        let nodes = [], selected, currentPeerInfo
 
-        let peers = node.peerBook.getAllArray()
-        let newNodes = []
+        node.peerBook.getAllArray().forEach((peerInfo) => {
+            nodes.push(peerInfo.id.toB58String())
+        })
+
+        console.log('Crawling started')
 
         doWhilst(
             (cbWhilst) => {
-                console.log('foo')
-
-                if (peers.length === 0)
+                if (nodes.size === 0)
                     throw Error('Unable to find enough other nodes in the network.')
 
-                times(Math.min(peers.length, MAX_HOPS), (_, next) => waterfall([
-                    (cb) => {
-                        console.log('bar')
+                    console.log('Crawling started')
 
-                        const currentPeerInfo = peers.pop()
+                selected = randomSubset(nodes, Math.min(nodes.length, MAX_HOPS))
+                nodes = remove(nodes, selected)
+
+                map(selected, (currentNode, cb) => waterfall([
+                    (cb) => {
+                        currentPeerInfo = node.peerBook.get(currentNode)
                         if (currentPeerInfo.multiaddrs.size === 0) {
                             node.peerRouting.findPeer(currentPeerInfo.id, cb)
                         } else {
                             cb(null, currentPeerInfo)
                         }
                     },
-                    (peerInfo, cb) => node.dialProtocol(peerInfo, PROTOCOL_CRAWLING, (err, conn) => cb(err, conn, peerInfo)),
-                    (conn, currentPeerInfo, cb) => pull(
+                    (peerInfo, cb) => node.dialProtocol(peerInfo, PROTOCOL_CRAWLING, cb),
+                    (conn, cb) => pull(
                         conn,
                         pull.filter(data =>
-                            data.length > 0 && data.length % MARSHALLED_PUBLIC_KEY_SIZE === 0),
+                            data.length > 0 &&
+                            data.length % MARSHALLED_PUBLIC_KEY_SIZE === 0),
                         pull.asyncMap((pubKey, cb) => waterfall([
                             (cb) => PeerId.createFromPubKey(pubKey, cb),
                             (peerId, cb) => PeerInfo.create(peerId, cb)
                         ], cb)),
                         pull.filter(peerInfo =>
-                            currentPeerInfo.id.toBytes().compare(peerInfo.id.toBytes()) !== 0
+                            // received node != known nodes
+                            !node.peerBook.has(peerInfo.id.toB58String()) &&
+                            // received node != self
+                            node.peerInfo.id.toBytes().compare(peerInfo.id.toBytes()) !== 0
                         ),
-                        pull.drain(peerInfo => {
-                            if (!node.peerBook.has(peerInfo.id.toB58String()))
-                                newNodes.push(peerInfo)
-
-                            node.peerBook.put(peerInfo)
-                        }, cb))
-                ], next), (err) => {
+                        pull.collect(cb))
+                ], cb), (err, newNodes) => {
                     if (err) { throw err }
+
+                    newNodes = uniqWith(flatten(newNodes), (a, b) => 
+                        a.id.toBytes().compare(b.id.toBytes())
+                    )
+
+                    newNodes.forEach(peerInfo => {
+                        node.peerBook.put(peerInfo)
+                        nodes.push(peerInfo.id.toB58String())
+                    })
 
                     console.log('[\'' + node.peerInfo.id.toB58String() + '\']: Received ' + newNodes.length + ' new node' + (newNodes.length === 1 ? '' : 's') + '.')
                     console.log('[\'' + node.peerInfo.id.toB58String() + '\']: Now holding peer information of ' + node.peerBook.getAllArray().length + ' node' + (node.peerBook.getAllArray().length === 1 ? '' : 's') + ' in the network.')
-
-                    peers = peers.concat(newNodes)
-                    newNodes = []
 
                     cbWhilst()
                 })

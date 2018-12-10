@@ -1,47 +1,50 @@
 'use strict'
 
 const pull = require('pull-stream')
-const { waterfall, parallel } = require('async')
+const { waterfall } = require('async')
 const PeerId = require('peer-id')
+const PeerInfo = require('peer-info')
 
-const { PROTOCOL_DELIVER_PUBKEY } = require('./constants')
+const { PROTOCOL_DELIVER_PUBKEY, MARSHALLED_PUBLIC_KEY_SIZE } = require('./constants')
 
 // TODO add pubKey to peerBook
 module.exports = (node) => (peerInfo, callback) => {
-    function hasPublicKey(peerInfo, cb) {
-        if (peerInfo.id.pubKey) {
-            callback(null, peerInfo.id)
-        } else if (node.peerBook.has(peerInfo.id) && node.peerBook.get(peerInfo.id).id.pubKey) {
-            callback(null, node.peerBook.get(peerInfo.id).id)
-        } else {
-            cb(null, peerInfo)
-        }
+    if (peerInfo.id.pubKey) {
+        callback(null, peerInfo)
+    } else if (node.peerBook.has(peerInfo.id) && node.peerBook.get(peerInfo.id).id.pubKey) {
+        callback(null, node.peerBook.get(peerInfo.id))
+    } else if (peerInfo.id.toBytes().compare(node.peerInfo.id.toBytes()) === 0) {
+        callback(null, node.peerInfo)
+    } else {
+        waterfall([
+            (cb) => node.peerRouting.findPeer(peerInfo.id, cb),
+            (targetPeerInfo, cb) => {
+                if (targetPeerInfo.id.pubKey) {
+                    cb(null, targetPeerInfo)
+                } else if (node.peerBook.has(targetPeerInfo.id) && node.peerBook.get(targetPeerInfo.id).id.pubKey) {
+                    cb(null, node.peerBook.get(peerInfo.id))
+                } else {
+                    node.dialProtocol(targetPeerInfo, PROTOCOL_DELIVER_PUBKEY, (err, conn) => waterfall([
+                        (cb) => pull(
+                            conn,
+                            pull.filter((data) => data.length > 0 && data.length === MARSHALLED_PUBLIC_KEY_SIZE),
+                            pull.collect(cb)
+                        ),
+                        (data, cb) => {
+                            if (data.length !== 1)
+                                cb(Error('Invalid response'))
+    
+                            PeerId.createFromPubKey(data[0], cb)
+                        },
+                        (peerId, cb) => PeerInfo.create(peerId, cb),
+                        (peerInfo, cb) => {
+                            targetPeerInfo.multiaddrs.forEach((addr) => {
+                                peerInfo.multiaddrs.add(addr)
+                            })
+                            cb(null, peerInfo)
+                        }
+                    ], cb))
+                }
+            }], callback)
     }
-
-    waterfall([
-        (cb) => hasPublicKey(peerInfo, cb),
-        (peerInfo, cb) => {
-            if (!peerInfo.multiaddrs.size) {
-                node.peerRouting.findPeer(peerInfo.id, cb)
-            } else {
-                cb(null, peerInfo)
-            }
-        },
-        (peerInfo, cb) => hasPublicKey(peerInfo, cb),
-        (peerInfo, cb) => node.dialProtocol(peerInfo, PROTOCOL_DELIVER_PUBKEY, cb),
-        (conn, cb) => parallel({
-            peerId: (cb) => waterfall([
-                (cb) => pull(conn, pull.drain((pubKey) => cb(null, pubKey))),
-                (pubKey, cb) => PeerId.createFromPubKey(pubKey, cb)
-            ], cb),
-            peerInfo: (cb) => conn.getPeerInfo(cb)
-        }, cb),
-        ({ peerId, peerInfo }, cb) => {
-            if (peerId.toBytes().compare(peerInfo.id.toBytes()) === 0) {
-                cb(null, peerId)
-            } else {
-                cb(Error('General error.'))
-            }
-        }
-    ], callback)
 }
