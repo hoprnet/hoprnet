@@ -23,7 +23,7 @@ class PaymentChannel {
     }
 
     registerSettlementListener(channelId) {
-        this.contract.once('SettleChannel', {
+        this.contract.once('SettledChannel', {
             filter: {
                 channelId: bytesToHex(channelId)
             }
@@ -34,9 +34,7 @@ class PaymentChannel {
         const self = pubKeyToEthereumAddress(this.node.peerInfo.id.pubKey.marshal())
         const otherParty = pubKeyToEthereumAddress(from.pubKey.marshal())
 
-        const channelId = getId(self, otherParty)
-
-        const lastValue = this.get(channelId)
+        const lastValue = this.get(tx.channelId)
 
         if (isPartyA(self, otherParty)) {
             return tx.value - lastValue
@@ -45,10 +43,8 @@ class PaymentChannel {
         }
     }
 
-    set(channelId, transaction) {
-        this.openPaymentChannels.set(transaction.channelId.toString('base64'), transaction)
-
-        this.registerSettlementListener(channelId)
+    set(tx) {
+        this.openPaymentChannels.set(tx.channelId.toString('base64'), tx)
     }
 
     get(channelId) {

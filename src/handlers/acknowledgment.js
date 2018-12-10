@@ -16,7 +16,7 @@ module.exports = (node) => node.handle(PROTOCOL_ACKNOWLEDGEMENT, (protocol, conn
     pull.drain(ack => waterfall([
         (cb) => conn.getPeerInfo(cb),
         (peerInfo, cb) => node.getPubKey(peerInfo, cb),
-        (peerId, cb) => ack.verify(peerId.pubKey.marshal(), node.peerInfo.id.pubKey.marshal(), cb),
+        (peerInfo, cb) => ack.verify(peerInfo.id.pubKey.marshal(), node.peerInfo.id.pubKey.marshal(), cb),
         (valid, cb) => {
             if (!node.pendingTransactions.has(ack.hashedKey.toString('base64')))
                 throw Error('General error.')

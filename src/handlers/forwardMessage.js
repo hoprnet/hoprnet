@@ -55,6 +55,7 @@ module.exports = (node, output) => node.handle(c.PROTOCOL_STRING, (protocol, con
         pull.map(data => Packet.fromBuffer(data)),
         pull.drain((packet) => waterfall([
             (cb) => conn.getPeerInfo(cb),
+            (peerInfo, cb) => node.getPubKey(peerInfo, cb),
             (senderPeerInfo, cb) => packet.forwardTransform(node, senderPeerInfo.id, (err, packet) => cb(err, packet, senderPeerInfo)),
             (packet, senderPeerInfo, cb) => parallel([
                 (cb) => forwardPacket(packet, cb),

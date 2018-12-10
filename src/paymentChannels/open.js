@@ -13,7 +13,7 @@ const SIGNATURE_LENGTH = 64
 const Transaction = require('../transaction')
 
 module.exports = (self) => (to, cb) => waterfall([
-    (cb) => self.node.peerRouting.findPeer(to, cb),
+    (cb) => self.node.peerRouting.findPeer(to.id, cb),
     (peerInfo, cb) => self.node.dialProtocol(peerInfo, PROTOCOL_PAYMENT_CHANNEL, cb),
     (conn, cb) => {
         const tx = new Transaction()
@@ -23,7 +23,7 @@ module.exports = (self) => (to, cb) => waterfall([
 
         tx.channelId = getId(
             pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal()),
-            pubKeyToEthereumAddress(to.pubKey.marshal()))
+            pubKeyToEthereumAddress(to.id.pubKey.marshal()))
 
         tx.sign(self.node.peerInfo.id.privKey.marshal())
 
@@ -32,14 +32,15 @@ module.exports = (self) => (to, cb) => waterfall([
             conn,
             pull.filter((data) =>
                 data.length === SIGNATURE_LENGTH &&
-                verify(tx.hash(), data, to.pubKey.marshal())
+                verify(tx.hash(), data, to.id.pubKey.marshal())
             ),
             pull.drain((signature) => {
                 tx.signature.fill(signature, 0, SIGNATURE_LENGTH)
 
-                self.set(tx.channelId, tx)
+                self.set(tx)
+                self.registerSettlementListener(tx.channelId)
 
-                self.contract.methods.create(pubKeyToEthereumAddress(to.pubKey.marshal()), toWei('1', 'shannon')).send({
+                self.contract.methods.create(pubKeyToEthereumAddress(to.id.pubKey.marshal()), toWei('1', 'shannon')).send({
                     from: pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal()),
                     gas: 250333, // arbitrary
                     gasPrice: '30000000000000'
