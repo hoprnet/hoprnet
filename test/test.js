@@ -76,7 +76,7 @@ waterfall([
         nodes = _nodes
         warmUpNodes(nodes, cb)
     },
-    (cb) => each(nodes, (node, cb) => node.paymentChannels.contract.methods.stakeMoney()
+    (cb) => each(nodes, (node, cb) => node.paymentChannels.contract.methods.stakeEther()
         .send({
             from: pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()),
             value: toWei('1', 'ether')
@@ -92,27 +92,8 @@ waterfall([
     if (err) { throw err }
 
 
-    setTimeout(() => {
+    setInterval(() => {
         nodes[0].sendMessage('test_test_test ' + Date.now().toString(), nodes[3].peerInfo)
-    }, 20000)
-    nodes[0].sendMessage('test_test_test ' + Date.now().toString(), nodes[2].peerInfo)
+    }, 4000)
+    nodes[0].sendMessage('test_test_test ' + Date.now().toString(), nodes[3].peerInfo)
 })
-
-
-
-// waterfall([
-//     (cb) => parallel({
-//         nodes: (cb) => waterfall([
-//             (cb) => times(AMOUNT_OF_NODES, (n, cb) =>
-//                 MessageDelivery.createNode(cb, console.log), cb),
-//             (nodes, cb) => warmUpNodes(nodes, cb),
-//             (nodes, cb) => setTimeout(() => cb(null, nodes), 200)
-//         ], cb),
-//         compiledContract: (cb) => getContract(cb)
-//     }, cb),
-//     ({ nodes, compiledContract }, cb) => {
-
-// ], (err, contract, nodes) => {
-
-// })
-

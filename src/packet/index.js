@@ -101,10 +101,6 @@ class Packet {
                 cb(null, this)
             })
         }
-
-
-
-
     }
 
     getTargetPeerId() {

@@ -9,8 +9,8 @@ const sourceFiles = ['HoprChannel.sol']
 module.exports = (cb) => waterfall([
     (cb) => each(sourceFiles, (file, cb) => rebuildIfNecessary(file, cb), cb),
     (cb) => parallel({
-        abi: (cb) => readFile(deriveBuildString(__dirname + '/' + sourceFiles[0], 'abi'), cb),
-        binary: (cb) => readFile(deriveBuildString(__dirname + '/' + sourceFiles[0], 'bin'), cb)
+        abi: (cb) => readFile(deriveBuildString(__dirname + '/' + sourceFiles[0], '.abi'), cb),
+        binary: (cb) => readFile(deriveBuildString(__dirname + '/' + sourceFiles[0], '.bin'), cb)
     }, cb)
 ], cb)
 
@@ -23,12 +23,12 @@ function rebuildIfNecessary(file, cb) {
         (cb) => stat(__dirname + '/' + file, cb),
         (sourceFileStats, cb) => {
             if (
-                !existsSync(__dirname + '/' + deriveBuildString(file, 'bin')) ||
-                !existsSync(__dirname + '/' + deriveBuildString(file, 'abi'))
+                !existsSync(__dirname + '/' + deriveBuildString(file, '.bin')) ||
+                !existsSync(__dirname + '/' + deriveBuildString(file, '.abi'))
             ) {
                 compile(file, cb)
             } else {
-                some(['abi', 'bin'], (suffix, cb) => stat(__dirname + '/' + deriveBuildString(file, suffix), (err, stats) => {
+                some(['.abi', '.bin'], (suffix, cb) => stat(__dirname + '/' + deriveBuildString(file, suffix), (err, stats) => {
                     if (err) {
                         cb(err)
                     } else {
@@ -44,14 +44,14 @@ function rebuildIfNecessary(file, cb) {
                 })
             }
         }
-    ], (err, stdout) => {
+    ], (err, stdout, stderr) => {
         if (err) { throw err }
         cb()
     })
 }
 
 function compile(file, cb) {
-    execFile('solcjs', [file, '--abi', '--bin'], {
+    execFile('solc', [file, '--overwrite', '--abi', '--bin', '-o', '.'], {
         cwd: __dirname
     }, cb)
 }
@@ -62,5 +62,5 @@ function deriveBuildString(str, suffix) {
     if (lastIndex < 0)
         throw Error('Please provide a file whose filename ends on \".sol\".')
 
-    return str.slice(0, lastIndex).concat('_sol_Hopper.').concat(suffix)
+    return str.slice(0, lastIndex).concat(suffix)
 }
