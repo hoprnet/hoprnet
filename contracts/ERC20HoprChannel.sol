@@ -82,11 +82,16 @@ contract HoprChannel {
     }
 
     /**
-    * @notice desposit tokens to stake
+    * @notice desposit tokens to stake.
+    * @dev msg.sender must `approve(amount)` before calling this method
+    * @param amount uint256
     */
     function stakeFunds(uint256 amount) public {
         require(amount > 0, "Please provide a non-zero amount of tokens.");
         
+        // transfer tokens from msg.sender to this contract instance
+        token.transferFrom(msg.sender, address(this), amount);
+
         states[msg.sender].isSet = true;
         states[msg.sender].stakedFunds = states[msg.sender].stakedFunds.add(amount);
     }
