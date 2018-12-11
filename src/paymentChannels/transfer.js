@@ -15,27 +15,24 @@ module.exports = (self) => (amount, to, cb) => waterfall([
             pubKeyToEthereumAddress(toPeerInfo.id.pubKey.marshal()))
 
         if (self.has(channelId)) {
-            cb(null, self.get(channelId), null)
+            cb(null, self.get(channelId))
         } else {
             self.open(toPeerInfo, cb)
         }
     },
-    (lastTransaction, receipt, cb) => {
-        if (receipt)
-            console.log(receipt)
-
+    (lastTx, cb) => {
         if (isPartyA(
             pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal()), 
             pubKeyToEthereumAddress(to.pubKey.marshal()))) {
-            lastTransaction.value = lastTransaction.value + amount
+            lastTx.value = lastTx.value - amount
         } else {
-            lastTransaction.value = lastTransaction.value - amount
+            lastTx.value = lastTx.value + amount
         }
-        lastTransaction.index = lastTransaction.index + 1
-        lastTransaction.sign(self.node.peerInfo.id.privKey.marshal())
+        lastTx.index = lastTx.index + 1
+        lastTx.sign(self.node.peerInfo.id.privKey.marshal())
 
-        self.set(lastTransaction)
+        self.set(lastTx)
 
-        cb(null, lastTransaction)
+        cb(null, lastTx)
     }
 ], cb)

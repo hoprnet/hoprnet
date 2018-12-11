@@ -13,6 +13,7 @@ class PaymentChannel {
     constructor(node, contract) {
 
         this.openPaymentChannels = new Map()
+        this.restoreTransactions = new Map()
 
         this.contract = contract
 
@@ -34,12 +35,12 @@ class PaymentChannel {
         const self = pubKeyToEthereumAddress(this.node.peerInfo.id.pubKey.marshal())
         const otherParty = pubKeyToEthereumAddress(from.pubKey.marshal())
 
-        const lastValue = this.get(tx.channelId)
+        const last = this.get(tx.channelId)
 
         if (isPartyA(self, otherParty)) {
-            return tx.value - lastValue
+            return tx.value - last.value
         } else {
-            return lastValue - tx.value
+            return last.value - tx.value
         }
     }
 
@@ -47,8 +48,16 @@ class PaymentChannel {
         this.openPaymentChannels.set(tx.channelId.toString('base64'), tx)
     }
 
+    setRestoreTransaction(restoreTx) {
+        this.restoreTransactions.set(restoreTx.channelId.toString('base64'), restoreTx)
+    }
+
     get(channelId) {
         return this.openPaymentChannels.get(channelId.toString('base64'))
+    }
+
+    getRestoreTransaction(channelId) {
+        return this.restoreTransactions.get(channelId.toString('base64'))
     }
 
     has(channelId) {

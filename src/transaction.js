@@ -3,12 +3,12 @@
 const secp256k1 = require('secp256k1')
 const withIs = require('class-is')
 
-const { hash, numberToBuffer, bufferToNumber, bufferXOR } = require('./utils')
+const { hash, numberToBuffer, bufferToNumber, bufferXOR, getId, pubKeyToEthereumAddress } = require('./utils')
 
 const SIGNATURE_LENGTH = 64
 const KEY_LENGTH = 32
-const VALUE_LENGTH = 16
-const INDEX_LENGTH = 4
+const VALUE_LENGTH = 32
+const INDEX_LENGTH = 32
 const CHANNEL_ID_SIZE = 32
 
 class Transaction {
@@ -19,6 +19,10 @@ class Transaction {
 
     get signature() {
         return this.buffer.slice(0, SIGNATURE_LENGTH)
+    }
+
+    get recovery() {
+        return this.buffer.slice(SIGNATURE_LENGTH, SIGNATURE_LENGTH + 1)
     }
 
     get value() {
@@ -35,8 +39,10 @@ class Transaction {
         return bufferToNumber(this.buffer.slice(SIGNATURE_LENGTH + 1 + VALUE_LENGTH, SIGNATURE_LENGTH + 1 + VALUE_LENGTH + INDEX_LENGTH))
     }
 
-    get recovery() {
-        return this.buffer.slice(SIGNATURE_LENGTH, SIGNATURE_LENGTH + 1)
+    set index(newIndex) {
+        this.buffer
+            .slice(SIGNATURE_LENGTH + 1 + VALUE_LENGTH, SIGNATURE_LENGTH + 1 + VALUE_LENGTH + INDEX_LENGTH)
+            .fill(numberToBuffer(newIndex, INDEX_LENGTH), 0, INDEX_LENGTH)
     }
 
     get channelId() {
@@ -45,12 +51,6 @@ class Transaction {
 
     set channelId(channelId) {
         this.channelId.fill(channelId, 0, CHANNEL_ID_SIZE)
-    }
-
-    set index(newIndex) {
-        this.buffer
-            .slice(SIGNATURE_LENGTH + VALUE_LENGTH, SIGNATURE_LENGTH + VALUE_LENGTH + INDEX_LENGTH)
-            .fill(numberToBuffer(newIndex, INDEX_LENGTH), 0, INDEX_LENGTH)
     }
 
     static get SIZE() {
@@ -68,8 +68,11 @@ class Transaction {
         this.recovery.fill(numberToBuffer(signature.recovery, 1), 0, 1)
     }
 
-    verify(node, to) {
-        return secp256k1.verify(this.hash(), this.signature, to.pubKey.marshal())
+    verify(node) {
+        return getId(
+            pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()),
+            pubKeyToEthereumAddress(secp256k1.recover(this.hash(), this.signature, bufferToNumber(this.recovery)))
+        ).compare(this.channelId) === 0
     }
 
     static fromBuffer(buf) {

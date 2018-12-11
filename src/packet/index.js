@@ -10,9 +10,8 @@ const Message = require('./message')
 
 const { parallel } = require('async')
 
-const { deriveKey } = require('../paymentChannels/keyDerivation')
 const { RELAY_FEE } = require('../constants')
-const { hash, deepCopy } = require('../utils')
+const { hash, bufferXOR, deepCopy } = require('../utils')
 
 class Packet {
     constructor(header, transaction, challenge, message) {
@@ -40,10 +39,14 @@ class Packet {
         }, (err, results) => {
             if (err) { throw err }
 
-            const encryptedTx = results.transaction.encrypt(deriveKey(Header, secrets.slice(0, 2)))
 
-            node.pendingTransactions.set(hash(Header.deriveTransactionKey(secrets[0])).toString('base64'), encryptedTx)
+            console.log('[\'' + node.peerInfo.id.toB58String() + '\']: Encrypting with  \'' + hash(bufferXOR(Header.deriveTransactionKey(secrets[0]), Header.deriveTransactionKey(secrets[1]))).toString('base64') + '\'.')
+            const encryptedTx = results.transaction.encrypt(hash(bufferXOR(Header.deriveTransactionKey(secrets[0]), Header.deriveTransactionKey(secrets[1]))))
 
+            node.pendingTransactions.set(hash(Header.deriveTransactionKey(secrets[0])).toString('base64'), {
+                transaction: null,
+                ownKeyHalf: null
+            })
 
             cb(null, new Packet(
                 header,
@@ -56,8 +59,7 @@ class Packet {
     forwardTransform(node, previousPeerId, cb) {
         const receivedMoney = node.paymentChannels.getEmbeddedMoney(previousPeerId, this.transaction)
 
-        if (receivedMoney < RELAY_FEE)
-            throw Error('Bad transaction.')
+        console.log('Received ' + receivedMoney + ' wei.')
 
         this.header.deriveSecret(node.peerInfo.id.privKey.marshal())
 
@@ -67,7 +69,7 @@ class Packet {
 
         node.seenTags.add(tag)
 
-        if (!this.header.verify)
+        if (!this.header.verify())
             throw Error('General error.')
 
         this.header.extractHeaderInformation()
@@ -76,7 +78,10 @@ class Packet {
             throw Error('General error.')
 
         this.oldChallenge = deepCopy(this.challenge, Challenge)
-        node.pendingTransactions.set(this.header.hashedKeyHalf.toString('base64'), deepCopy(this.transaction, Transaction))
+        node.pendingTransactions.set(this.header.hashedKeyHalf.toString('base64'), {
+            transaction: deepCopy(this.transaction, Transaction),
+            ownKeyHalf: Header.deriveTransactionKey(this.header.derivedSecret)
+        })
 
         if (this.header.address.equals(node.peerInfo.id.toBytes())) {
             this.message.decrypt(this.header.derivedSecret, (err, message) => {
@@ -93,8 +98,12 @@ class Packet {
             }, (err, results) => {
                 if (err) { throw err }
 
+                if (receivedMoney < RELAY_FEE)
+                    throw Error('Bad transaction.')
+
                 this.header = results.header
-                this.transaction = results.transaction
+                console.log('[\'' + node.peerInfo.id.toB58String() + '\']: Encrypting with  \'' + this.header.encryptionKey.toString('base64') + '\'.')
+                this.transaction = results.transaction.encrypt(this.header.encryptionKey)
                 this.challenge = results.challenge
                 this.message = results.message
 
