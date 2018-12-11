@@ -13,7 +13,7 @@ contract HoprChannel {
     uint8 constant private BLOCK_HEIGHT = 15;
     
     // Tell payment channel partners that the channel has been settled
-    event SettledChannel(bytes32 channelId, uint256 nonce);
+    event SettledChannel(bytes32 channelId, uint256 index);
 
     // Tell payment channel partners that the channel has been opened
     event OpenedChannel(bytes32 channelId, uint256 amount);
@@ -175,20 +175,20 @@ contract HoprChannel {
     * @param r bytes32
     * @param s bytes32
     */
-    function settle(address counterParty, uint256 index, uint256 balanceA, bytes32 r, bytes32 s) public channelExists(counterParty) {
+    function settle(address counterParty, uint256 index, uint256 balanceA, bytes32 r, bytes32 s, bytes1 v) public channelExists(counterParty) {
         bytes32 channelId = getId(counterParty);
         Channel storage channel = channels[channelId];
         
         require(
             channel.index < index &&
-            channel.state == ChannelState.PARTYA_FUNDED || channel.state == ChannelState.PARTYB_FUNDED,
+            channel.state == ChannelState.ACTIVE,
             "Invalid channel.");
                
         // is the proof valid?
-        bytes32 hashedMessage = keccak256(abi.encodePacked(channelId, balanceA, index));
-        require(ecrecover(hashedMessage, 0, r, s) == counterParty, "Invalid signature.");
+        bytes32 hashedMessage = keccak256(abi.encodePacked(balanceA, index, channelId));
+        require(ecrecover(hashedMessage, uint8(v) + 27, r, s) == counterParty, "Invalid signature.");
         
-                
+        channel.index = index;
         channel.state = ChannelState.PENDING_SETTLEMENT;
         channel.settlementBlock = block.number;
         
