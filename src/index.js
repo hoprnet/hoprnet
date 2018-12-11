@@ -79,18 +79,18 @@ class Hopper extends libp2p {
         this.crawlNetwork = crawlNetwork(this)
         this.getPubKey = getPubKey(this)
 
-        const findPeer = this.peerRouting.findPeer
-        const self = this
-        this.peerRouting.findPeer = function (peerId, cb) {
-            console.log('[\'' + self.peerInfo.id.toB58String() + '\']: Searching for \'' + peerId.toB58String() + '\'.')
-            findPeer(peerId, (err, peerInfo) => {
-                if (err)
-                    console.log(err)
+        // const findPeer = this.peerRouting.findPeer
+        // const self = this
+        // this.peerRouting.findPeer = function (peerId, cb) {
+        //     console.log('[\'' + self.peerInfo.id.toB58String() + '\']: Searching for \'' + peerId.toB58String() + '\'.')
+        //     findPeer(peerId, (err, peerInfo) => {
+        //         if (err)
+        //             console.log(err)
 
-                console.log('[\'' + self.peerInfo.id.toB58String() + '\']: Found peer')
-                cb(err, peerInfo)
-            })
-        }
+        //         console.log('[\'' + self.peerInfo.id.toB58String() + '\']: Found peer')
+        //         cb(err, peerInfo)
+        //     })
+        // }
     }
 
     static startNode(provider, output, contract, cb, peerInfo) {

@@ -8,11 +8,9 @@ const pull = require('pull-stream')
 const flatten = require('lodash.flatten');
 const uniqWith = require('lodash.uniqwith')
 const remove = require('lodash.remove')
-
-const { randomSubset } = require('./utils')
-
 const { doWhilst, map, waterfall } = require('async')
 
+const { randomSubset } = require('./utils')
 
 const { MAX_HOPS, PROTOCOL_CRAWLING, MARSHALLED_PUBLIC_KEY_SIZE } = require('./constants')
 
@@ -24,14 +22,10 @@ module.exports = (node) =>
             nodes.push(peerInfo.id.toB58String())
         })
 
-        console.log('Crawling started')
-
         doWhilst(
             (cbWhilst) => {
                 if (nodes.size === 0)
                     throw Error('Unable to find enough other nodes in the network.')
-
-                    console.log('Crawling started')
 
                 selected = randomSubset(nodes, Math.min(nodes.length, MAX_HOPS))
                 nodes = remove(nodes, selected)
