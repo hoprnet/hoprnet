@@ -23,7 +23,7 @@ old
 .secrets.json
 
 # Exclude build dir
-build/**
+build
 
 # Exclude db dir
 db
