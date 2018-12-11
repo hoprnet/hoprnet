@@ -21,6 +21,9 @@ contract HoprChannel {
 
     // Tell payment channel partners that the channel has been opened
     event OpenedChannel(bytes32 channelId, uint256 amount);
+    
+    event StakedFunds(address indexed staker, uint256 amount);
+    event UnstakedFunds(address indexed staker, uint256 amount);
 
     // Track the state of the channels
     enum ChannelState {
@@ -94,6 +97,8 @@ contract HoprChannel {
 
         states[msg.sender].isSet = true;
         states[msg.sender].stakedFunds = states[msg.sender].stakedFunds.add(amount);
+
+        emit StakedFunds(msg.sender, amount);
     }
     
     /**
@@ -111,6 +116,8 @@ contract HoprChannel {
 
         // msg.sender.transfer(amount);
         token.transfer(msg.sender, amount);
+
+        emit UnstakedFunds(msg.sender, amount);
     }
 
     function getStakedAmount(address _address) public view returns (uint256) {
