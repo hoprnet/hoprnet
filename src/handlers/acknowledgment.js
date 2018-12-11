@@ -4,8 +4,8 @@ const pull = require('pull-stream')
 const waterfall = require('async/waterfall')
 
 const { PROTOCOL_ACKNOWLEDGEMENT } = require('../constants')
+const { bufferXOR, hash } = require('../utils')
 const Acknowledgement = require('../acknowledgement')
-const KeyDerivation = require('../paymentChannels/keyDerivation')
 
 module.exports = (node) => node.handle(PROTOCOL_ACKNOWLEDGEMENT, (protocol, conn) => pull(
     conn,
@@ -21,14 +21,20 @@ module.exports = (node) => node.handle(PROTOCOL_ACKNOWLEDGEMENT, (protocol, conn
             if (!node.pendingTransactions.has(ack.hashedKey.toString('base64')))
                 throw Error('General error.')
 
-            const tx = node.pendingTransactions
+            const { transaction, ownKeyHalf } = node.pendingTransactions
                 .get(ack.hashedKey.toString('base64'))
-                .decrypt(ack.key)
 
-            if (!tx.verify)
-                throw Error('General error')
-                
-            console.log('Acknowledgement ' + (valid ? 'valid' : 'NOT VALID') + '.')
+            if (transaction && ownKeyHalf) {
+                console.log('[\'' + node.peerInfo.id.toB58String() + '\']: Decrypting with  \'' + hash(bufferXOR(ownKeyHalf, ack.key)).toString('base64') + '\'.')
+
+                transaction.decrypt(hash(bufferXOR(ownKeyHalf, ack.key)))
+
+                if (!transaction.verify(node))
+                    throw Error('General error')
+
+                node.paymentChannels.set(transaction)
+                console.log('Acknowledgement ' + (valid ? 'valid' : 'NOT VALID') + '.')
+            }
         }
     ]))
 ))

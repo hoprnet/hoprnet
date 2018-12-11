@@ -3,7 +3,7 @@
 const secp256k1 = require('secp256k1')
 const withIs = require('class-is')
 
-const { hash, numberToBuffer, bufferToNumber, bufferXOR } = require('./utils')
+const { hash, numberToBuffer, bufferToNumber, bufferXOR, getId, pubKeyToEthereumAddress } = require('./utils')
 
 const SIGNATURE_LENGTH = 64
 const KEY_LENGTH = 32
@@ -68,8 +68,11 @@ class Transaction {
         this.recovery.fill(numberToBuffer(signature.recovery, 1), 0, 1)
     }
 
-    verify(node, to) {
-        return secp256k1.verify(this.hash(), this.signature, to.pubKey.marshal())
+    verify(node) {
+        return getId(
+            pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()),
+            pubKeyToEthereumAddress(secp256k1.recover(this.hash(), this.signature, bufferToNumber(this.recovery)))
+        ).compare(this.channelId) === 0
     }
 
     static fromBuffer(buf) {
