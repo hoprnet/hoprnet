@@ -12,10 +12,13 @@ contract HoprChannel {
     // constant RELAY_FEE = 1
     uint8 constant private BLOCK_HEIGHT = 15;
     
-    // Tell payment channel partners that channel has been settled
+    // Tell payment channel partners that the channel has been settled
     event SettledChannel(bytes32 channelId, uint256 nonce);
 
-    // Track the state of the
+    // Tell payment channel partners that the channel has been opened
+    event OpenedChannel(bytes32 channelId, uint256 amount);
+
+    // Track the state of the channels
     enum ChannelState {
         UNINITIALIZED, // 0
         PARTYA_FUNDED, // 1
@@ -138,6 +141,32 @@ contract HoprChannel {
         channel.state = ChannelState.ACTIVE;
     }
     
+    /**
+    * @notice pre-fund channel by with staked Ether of both parties
+    * @param counterParty address of the counter party
+    * @param amount uint256 how much money both parties put into the channel
+    * @param r bytes32 signature first part
+    * @param s bytes32 signature second part
+    * @param v uint8 version
+     */
+    function createFunded(address counterParty, uint256 amount, bytes32 r, bytes32 s, bytes1 v) public enoughFunds(amount) {
+        require(channels[getId(counterParty)].state == ChannelState.UNINITIALIZED, "Channel already exists.");
+
+        require(states[counterParty].stakedEther >= amount, "Insufficient funds");
+
+        bytes32 hashedMessage = keccak256(abi.encodePacked(amount, uint256(0), getId(counterParty)));
+
+        require(ecrecover(hashedMessage, uint8(v) + 27, r, s) == counterParty, "Invalid opening transaction");
+
+        states[msg.sender].stakedEther = states[msg.sender].stakedEther - amount;
+        states[counterParty].stakedEther = states[counterParty].stakedEther - amount;
+
+        states[msg.sender].openChannels = states[msg.sender].openChannels + 1;
+        states[counterParty].openChannels = states[counterParty].openChannels + 1;
+        
+        channels[getId(counterParty)] = Channel(ChannelState.ACTIVE, 2 * amount, amount, 0, 0);        
+    }
+
     /**
     * @notice settle payment channel TODO: finish desc
     * @param counterParty address of the counter party
