@@ -7,8 +7,8 @@ const { hash, numberToBuffer, bufferToNumber, bufferXOR } = require('./utils')
 
 const SIGNATURE_LENGTH = 64
 const KEY_LENGTH = 32
-const VALUE_LENGTH = 16
-const INDEX_LENGTH = 4
+const VALUE_LENGTH = 32
+const INDEX_LENGTH = 32
 const CHANNEL_ID_SIZE = 32
 
 class Transaction {
@@ -19,6 +19,10 @@ class Transaction {
 
     get signature() {
         return this.buffer.slice(0, SIGNATURE_LENGTH)
+    }
+
+    get recovery() {
+        return this.buffer.slice(SIGNATURE_LENGTH, SIGNATURE_LENGTH + 1)
     }
 
     get value() {
@@ -35,8 +39,10 @@ class Transaction {
         return bufferToNumber(this.buffer.slice(SIGNATURE_LENGTH + 1 + VALUE_LENGTH, SIGNATURE_LENGTH + 1 + VALUE_LENGTH + INDEX_LENGTH))
     }
 
-    get recovery() {
-        return this.buffer.slice(SIGNATURE_LENGTH, SIGNATURE_LENGTH + 1)
+    set index(newIndex) {
+        this.buffer
+            .slice(SIGNATURE_LENGTH + 1 + VALUE_LENGTH, SIGNATURE_LENGTH + 1 + VALUE_LENGTH + INDEX_LENGTH)
+            .fill(numberToBuffer(newIndex, INDEX_LENGTH), 0, INDEX_LENGTH)
     }
 
     get channelId() {
@@ -45,12 +51,6 @@ class Transaction {
 
     set channelId(channelId) {
         this.channelId.fill(channelId, 0, CHANNEL_ID_SIZE)
-    }
-
-    set index(newIndex) {
-        this.buffer
-            .slice(SIGNATURE_LENGTH + VALUE_LENGTH, SIGNATURE_LENGTH + VALUE_LENGTH + INDEX_LENGTH)
-            .fill(numberToBuffer(newIndex, INDEX_LENGTH), 0, INDEX_LENGTH)
     }
 
     static get SIZE() {
