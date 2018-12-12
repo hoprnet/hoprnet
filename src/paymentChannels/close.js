@@ -2,30 +2,24 @@
 
 const { waterfall } = require('async')
 
-module.exports = (self) => (err, event) => waterfall([
-    (cb) => {
-        if (err) { throw err }
-        const lastTransaction = self.get(event.channelId)
+module.exports = (self) => (err, event) => {
+    if (err) { throw err }
+
+    const channelId = Buffer.from(event.returnValues.channelId.slice(2), 'hex')
+
+    if (self.has(channelId)) {
+        const lastTransaction = self.get(Buffer.from(event.returnValues.channelId.slice(2), 'hex'))
 
         if (
-            parseInt(event.index) < parseInt(lastTransaction.index)
-            && null /*better Transation */) {
-            self.contract.methods
-                .settle(
-                    lastTransaction.to,
-                    lastTransaction.index,
-                    lastTransaction.signature.slice(0, 32),
-                    lastTransaction.slice(32))
-                .send({
-                    from: pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal()),
-                    gas: 250333, // arbitrary
-                    gasPrice: '30000000000000'
-                }, cb)
+            parseInt(event.returnValues.index) < parseInt(lastTransaction.index)
+            && null /* better Transation */) {
+            self.settle(lastTransaction.channelId, (err) => {
+                if (err) { throw err }
+    
+                self.delete(lastTransaction.channelId)
+            })
         } else {
-            cb(null, null)
+            self.delete(lastTransaction.channelId)
         }
-    },
-    (receipt, cb) => {
-        self.delete(channelId)
     }
-])
+}

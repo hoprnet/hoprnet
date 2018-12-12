@@ -3,11 +3,12 @@
 const fs = require('fs')
 
 const { bytesToHex } = require('web3').utils
-const { isPartyA, getId, pubKeyToEthereumAddress } = require('../utils')
+const { isPartyA, pubKeyToEthereumAddress } = require('../utils')
 
 const open = require('./open')
 const close = require('./close')
 const transfer = require('./transfer')
+const settle = require('./settle')
 
 class PaymentChannel {
     constructor(node, contract) {
@@ -21,12 +22,13 @@ class PaymentChannel {
         this.open = open(this)
         this.close = close(this)
         this.transfer = transfer(this)
+        this.settle = settle(this)
     }
 
     registerSettlementListener(channelId) {
         this.contract.once('SettledChannel', {
             filter: {
-                channelId: bytesToHex(channelId)
+                channelId: [bytesToHex(channelId)]
             }
         }, this.close)
     }
