@@ -59,7 +59,7 @@ class Packet {
     forwardTransform(node, previousPeerId, cb) {
         const receivedMoney = node.paymentChannels.getEmbeddedMoney(previousPeerId, this.transaction)
 
-        console.log('Received ' + receivedMoney + ' wei.')
+        console.log('[\'' + node.peerInfo.id.toB58String() + '\']: Received ' + receivedMoney + ' wei.')
 
         this.header.deriveSecret(node.peerInfo.id.privKey.marshal())
 
@@ -90,6 +90,9 @@ class Packet {
                 cb(null, this)
             })
         } else {
+            if (receivedMoney < RELAY_FEE)
+                throw Error('Bad transaction.')
+
             parallel({
                 transaction: (cb) => node.paymentChannels.transfer(receivedMoney - RELAY_FEE, this.getTargetPeerId(), cb),
                 message: (cb) => this.message.decrypt(this.header.derivedSecret, cb),
@@ -97,9 +100,6 @@ class Packet {
                 header: (cb) => this.header.transformForNextNode(cb)
             }, (err, results) => {
                 if (err) { throw err }
-
-                if (receivedMoney < RELAY_FEE)
-                    throw Error('Bad transaction.')
 
                 this.header = results.header
                 console.log('[\'' + node.peerInfo.id.toB58String() + '\']: Encrypting with  \'' + this.header.encryptionKey.toString('base64') + '\'.')
