@@ -7,14 +7,18 @@ const { randomBytes } = require('crypto')
 // General methods
 // ==========================
 
-module.exports.hash = function (buf) {
+module.exports.hash = (buf) => {
     if (!Buffer.isBuffer(buf))
         throw Error('Invalid input. Please use a Buffer')
 
     return Buffer.from(sha3(buf).slice(2), 'hex')
 }
-
-module.exports.deepCopy = function (instance, Class) {
+/**
+ * Generate deep Copy of an instance
+ * @param  {} instance instance of T
+ * @param  {} Class T
+ */
+module.exports.deepCopy = (instance, Class) => {
     if (typeof instance.toBuffer !== 'function' || !['function', 'number'].includes(typeof Class.SIZE) || typeof Class.fromBuffer !== 'function')
         throw Error('Invalid object.')
 
@@ -24,20 +28,27 @@ module.exports.deepCopy = function (instance, Class) {
     return Class.fromBuffer(buf)
 }
 
-module.exports.parseJSON = function (str) {
-    return JSON.parse(str, (key, value) => {
+/**
+ * Parse JSON while recovering all Buffer elements
+ * @param  {String} str JSON string
+ */
+module.exports.parseJSON = (str) => 
+    JSON.parse(str || '', (key, value) => {
         if (value && value.type === 'Buffer') {
             return Buffer.from(value.data)
         }
 
         return value
     })
-}
 
 // ==========================
 // Buffer methods
 // ==========================
-
+/**
+ * result = buf1 + buf2
+ * @param  {Buffer} buf1
+ * @param  {Buffer} buf2
+ */
 module.exports.bufferADD = (buf1, buf2) => {
     if (!Buffer.isBuffer(buf1))
         throw Error('Expected a buffer. Got \"' + typeof buf1 + '\" instead.')
@@ -59,7 +70,14 @@ module.exports.bufferADD = (buf1, buf2) => {
 
     return module.exports.numberToBuffer(a + b, length)
 }
-
+/**
+ * Bitwise XOR of two Buffers.
+ * 
+ * @param  {Buffer} buf1 first Buffer
+ * @param  {Buffer} buf2 second Buffer
+ * 
+ * @returns {Buffer} @param buf1 ^ @param buf2
+ */
 module.exports.bufferXOR = (buf1, buf2) => {
     if (!Buffer.isBuffer(buf1) || !Buffer.isBuffer(buf2))
         throw Error('Input values have to be provided as Buffers. Got ' + typeof buf1 + ' and ' + typeof buf2)
@@ -87,7 +105,21 @@ module.exports.bufferToNumber = (buf) => {
 // ==========================
 // Collection methods
 // ==========================
-
+/**
+ * Picks @param subsetSize elements at random from @param array .
+ * The order of the picked elements does not coincide with their
+ * order in @param array
+ * 
+ * @param  {Array} array the array to pick the elements from
+ * @param  {Number} subsetSize the requested size of the subset
+ * @param  {Function} filter
+ * 
+ * @returns {Array} array with at most @param subsetSize elements
+ * that pass the test.
+ * 
+ * @notice If less than @param subsetSize elements pass the test,
+ * the result will contain less than @param subsetSize elements. 
+ */
 module.exports.randomSubset = (array, subsetSize, filter = _ => true) => {
     if (!Number.isInteger(subsetSize) || subsetSize < 0)
         throw Error('Invalid input arguments. Please provide a positive subset size. Got \"' + subsetSize + '\" instead.')
@@ -102,14 +134,26 @@ module.exports.randomSubset = (array, subsetSize, filter = _ => true) => {
         return []
 
     if (subsetSize === array.length)
-        return module.exports.randomPermutation(array)
+        // Returns a random permutation of all elements that pass
+        // the test
+        return module.exports.randomPermutation(array.filter(filter))
 
     const byteAmount = Math.max(Math.ceil(Math.log2(array.length)) / 8, 1)
 
-    // if (subsetSize == 1) {
-        
-    //     return [array[module.exports.bufferToNumber(randomBytes(byteAmount)) % array.length]]
-    // }
+    if (subsetSize == 1) {
+        let i = 0
+        let index = module.exports.bufferToNumber(randomBytes(byteAmount)) % array.length
+        while (!filter(array[index])) {
+            if (i === array.length) {
+                // There seems to be no element in the array
+                // that passes the test.
+                return []
+            }
+            i++
+            index = (index + 1) % array.length
+        }
+        return [array[index]]
+    }
 
     let notChosen = new Set()
     let chosen = new Set()
@@ -152,9 +196,16 @@ module.exports.randomSubset = (array, subsetSize, filter = _ => true) => {
     return result
 }
 
-// Implementation of the (optimized) Fisher-Yates
-// shuffling algorithm
+/**
+ * Return a random permutation of the given @param array
+ * by using the (optimized) Fisher-Yates shuffling algorithm.
+ * 
+ * @param  {Array} array the array to permutate
+ */
 module.exports.randomPermutation = (array) => {
+    if (!Array.isArray(array))
+        throw Error('Invalid input parameters. Got \'' + typeof array + '\' instead of Buffer.')
+        
     if (array.length <= 1)
         return array
         
@@ -179,7 +230,13 @@ module.exports.randomPermutation = (array) => {
 // Ethereum methods
 // ==========================
 const secp256k1 = require('secp256k1')
-
+/**
+ * Derives an Ethereum address from the given public key.
+ * 
+ * @param  {Buffer} pubKey given as compressed elliptic curve point.
+ * 
+ * @returns {String} e.g. 0xc1912fEE45d61C87Cc5EA59DaE31190FFFFf232d
+ */
 module.exports.pubKeyToEthereumAddress = (pubKey) => {
     const hash = sha3(secp256k1.publicKeyConvert(pubKey, false).slice(1))
 
@@ -209,3 +266,12 @@ module.exports.getId = (sender, otherParty) => {
         return module.exports.hash(Buffer.concat([otherParty, sender], 2 * ETHEUREUM_ADDRESS_SIZE))
     }
 }
+
+// ==========================
+// libp2p methods
+// ==========================
+const libp2p_crypto = require('libp2p-crypto').keys
+const PeerId = require('peer-id')
+
+module.exports.pubKeyToPeerId = (pubKey, cb) => 
+    PeerId.createFromPubKey(new libp2p_crypto.supportedKeys.secp256k1.Secp256k1PublicKey(pubKey).bytes, cb)

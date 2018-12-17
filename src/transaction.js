@@ -57,12 +57,12 @@ class Transaction {
         return SIGNATURE_LENGTH + VALUE_LENGTH + INDEX_LENGTH + 1 + CHANNEL_ID_SIZE
     }
 
-    hash() {
+    get hash() {
         return hash(this.buffer.slice(SIGNATURE_LENGTH + 1))
     }
 
     sign(privKey) {
-        const signature = secp256k1.sign(this.hash(), privKey)
+        const signature = secp256k1.sign(this.hash, privKey)
 
         this.signature.fill(signature.signature, 0, SIGNATURE_LENGTH)
         this.recovery.fill(numberToBuffer(signature.recovery, 1), 0, 1)
@@ -71,7 +71,7 @@ class Transaction {
     verify(node) {
         return getId(
             pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()),
-            pubKeyToEthereumAddress(secp256k1.recover(this.hash(), this.signature, bufferToNumber(this.recovery)))
+            pubKeyToEthereumAddress(secp256k1.recover(this.hash, this.signature, bufferToNumber(this.recovery)))
         ).compare(this.channelId) === 0
     }
 

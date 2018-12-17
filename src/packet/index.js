@@ -103,7 +103,7 @@ class Packet {
 
                 this.header = results.header
                 console.log('[\'' + node.peerInfo.id.toB58String() + '\']: Encrypting with  \'' + this.header.encryptionKey.toString('base64') + '\'.')
-                this.transaction = results.transaction.encrypt(this.header.encryptionKey)
+                this.transaction = deepCopy(results.transaction, Transaction).encrypt(this.header.encryptionKey)
                 this.challenge = results.challenge
                 this.message = results.message
 
