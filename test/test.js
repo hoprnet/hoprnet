@@ -112,7 +112,7 @@ waterfall([
                 value: toWei('1', 'ether')
             }, cb)
             .on('receipt', (receipt) => {
-                console.log('[\'' + node.peerInfo.id.toB58String() + '\']: Own Ethereum address is \'' + Buffer.from(hexToBytes(pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()))).toString('base64') + '\'.')
+                console.log('[\'' + node.peerInfo.id.toB58String() + '\']: Own Ethereum address is \'' + pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()) + '\'.')
                 console.log('[\'' + node.peerInfo.id.toB58String() + '\']: Staking ' + toWei('1', 'ether') + ' wei.')
             }), cb),
         /**
@@ -132,10 +132,7 @@ waterfall([
         /**
          * Close the payment channel
          */
-        (cb) => each(nodes[1].paymentChannels.openPaymentChannels.values(), (tx, cb) => {
-            nodes[1].paymentChannels.settle(tx.channelId, cb)
-        }, cb)
-
+        (cb) => nodes[1].paymentChannels.payout(cb)
     ], cb)
 
 ], (err) => {
