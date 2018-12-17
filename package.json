@@ -22,8 +22,7 @@
         "start": "node test/test_cli.js",
         "clean": "npx shx rm -fr docs db dist build bin coverage",
         "reset": "npx yarn run clean && npx shx rm -fr node_modules",
-        "update": "yarn run reset && yarn upgrade",
-        "postinstall": "node ./tools/hashChecker.js"
+        "update": "yarn run reset && yarn upgrade"
     },
     "dependencies": {
         "@nodeutils/defaults-deep": "^1.1.0",
@@ -33,8 +32,12 @@
         "babel-polyfill": "^6.26.0",
         "babel-preset-env": "^1.7.0",
         "babel-register": "^6.26.0",
+        "bignumber.js": "^8.0.1",
         "blake2": "^2.0.1",
         "chacha": "^2.1.0",
+        "chai": "^4.1.2",
+        "chai-as-promised": "^7.1.1",
+        "chai-bignumber": "^2.0.2",
         "electron-webrtc": "^0.3.0",
         "eslint": "^5.9.0",
         "futoin-hkdf": "^1.0.2",

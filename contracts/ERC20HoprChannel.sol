@@ -2,21 +2,28 @@ pragma solidity ^0.5.0;
 
 // import "openzeppelin-solidity/contracts/cryptography/ECDSA.sol";
 import "./math/SafeMath.sol";
+import "./token/ERC20/IERC20.sol";
 
 
 /* solhint-disable max-line-length */
 contract HoprChannel {
     using SafeMath for uint256;
     // using ECDSA for bytes32;
+
+    // ERC20 Token used to pay the HOPR fees
+    IERC20 public token;
     
     // constant RELAY_FEE = 1
     uint8 constant private BLOCK_CONFIRMATION = 15;
     
     // Tell payment channel partners that the channel has been settled
-    event SettledChannel(bytes32 indexed channelId, uint256 index, uint256 amountA) anonymous;
+    event SettledChannel(bytes32 channelId, uint256 nonce);
 
     // Tell payment channel partners that the channel has been opened
     event OpenedChannel(bytes32 channelId, uint256 amount);
+    
+    event StakedFunds(address indexed staker, uint256 amount);
+    event UnstakedFunds(address indexed staker, uint256 amount);
 
     // Track the state of the channels
     enum ChannelState {
@@ -46,7 +53,7 @@ contract HoprChannel {
         //       channels but it knows how many open ones
         //       there are.
         uint256 openChannels;
-        uint256 stakedEther;
+        uint256 stakedFunds;
         int32 counter;
     }
 
@@ -55,7 +62,7 @@ contract HoprChannel {
     mapping(address => State) public states;
 
     modifier enoughFunds(uint256 amount) {
-        require(amount <= states[msg.sender].stakedEther, "Insufficient funds.");
+        require(amount <= states[msg.sender].stakedFunds, "Insufficient funds.");
         _;
     }
 
@@ -68,33 +75,53 @@ contract HoprChannel {
     }
 
     /**
-    * @notice desposit ether to stake
+    * @notice configures the ERC20 token variable
+    * @param _token address of the ERC20 token
     */
-    function stakeEther() public payable {
-        require(msg.value > 0, "Please provide a non-zero amount of ether.");
+    constructor(address _token) public {
+        require(_token != address(0), "Invalid address");
+
+        token = IERC20(_token);
+    }
+
+    /**
+    * @notice desposit tokens to stake.
+    * @dev msg.sender must `approve(amount)` before calling this method
+    * @param amount uint256
+    */
+    function stakeFunds(uint256 amount) public {
+        require(amount > 0, "Please provide a non-zero amount of tokens.");
         
+        // transfer tokens from msg.sender to this contract instance
+        token.transferFrom(msg.sender, address(this), amount);
+
         states[msg.sender].isSet = true;
-        states[msg.sender].stakedEther = states[msg.sender].stakedEther.add(uint256(msg.value));
+        states[msg.sender].stakedFunds = states[msg.sender].stakedFunds.add(amount);
+
+        emit StakedFunds(msg.sender, amount);
     }
     
     /**
-    * @notice withdrawal staked ether
+    * @notice withdrawal staked tokens
     * @param amount uint256
     */
-    function unstakeEther(uint256 amount) public enoughFunds(amount) {
+    function unstakeFunds(uint256 amount) public enoughFunds(amount) {
         require(states[msg.sender].openChannels == 0, "Waiting for remaining channels to close.");
         
-        if (amount == states[msg.sender].stakedEther) {
+        if (amount == states[msg.sender].stakedFunds) {
             delete states[msg.sender];
         } else {
-            states[msg.sender].stakedEther = states[msg.sender].stakedEther.sub(amount);
+            states[msg.sender].stakedFunds = states[msg.sender].stakedFunds.sub(amount);
         }
 
-        msg.sender.transfer(amount);
+        // msg.sender.transfer(amount);
+        token.transfer(msg.sender, amount);
+
+        emit UnstakedFunds(msg.sender, amount);
     }
 
     function getStakedAmount(address _address) public view returns (uint256) {
-        return states[_address].stakedEther;
+        return states[_address].stakedFunds;
     }
     
     /**
@@ -105,7 +132,7 @@ contract HoprChannel {
     function create(address counterParty, uint256 amount) public enoughFunds(amount) {
         require(channels[getId(counterParty)].state == ChannelState.UNINITIALIZED, "Channel already exists.");
         
-        states[msg.sender].stakedEther = states[msg.sender].stakedEther.sub(amount);
+        states[msg.sender].stakedFunds = states[msg.sender].stakedFunds.sub(amount);
         
         // Register the channels at both participants' state
         states[msg.sender].openChannels = states[msg.sender].openChannels.add(1);
@@ -126,7 +153,7 @@ contract HoprChannel {
     * @param amount uint256
     */
     function fund(address counterParty, uint256 amount) public enoughFunds(amount) channelExists(counterParty) {
-        states[msg.sender].stakedEther = states[msg.sender].stakedEther.sub(amount);
+        states[msg.sender].stakedFunds = states[msg.sender].stakedFunds.sub(amount);
 
         Channel storage channel = channels[getId(counterParty)];
 
@@ -146,7 +173,7 @@ contract HoprChannel {
     }
     
     /**
-    * @notice pre-fund channel by with staked Ether of both parties
+    * @notice pre-fund channel with staked tokens of both parties
     * @param counterParty address of the counter party
     * @param amount uint256 how much money both parties put into the channel
     * @param r bytes32 signature first part
@@ -156,14 +183,14 @@ contract HoprChannel {
     function createFunded(address counterParty, uint256 amount, bytes32 r, bytes32 s, bytes1 v) public enoughFunds(amount) {
         require(channels[getId(counterParty)].state == ChannelState.UNINITIALIZED, "Channel already exists.");
 
-        require(states[counterParty].stakedEther >= amount, "Insufficient funds");
+        require(states[counterParty].stakedFunds >= amount, "Insufficient funds");
 
-        bytes32 hashedMessage = keccak256(abi.encodePacked(amount, uint256(1), getId(counterParty)));
+        bytes32 hashedMessage = keccak256(abi.encodePacked(amount, uint256(0), getId(counterParty)));
 
         require(ecrecover(hashedMessage, uint8(v) + 27, r, s) == counterParty, "Invalid opening transaction");
 
-        states[msg.sender].stakedEther = states[msg.sender].stakedEther - amount;
-        states[counterParty].stakedEther = states[counterParty].stakedEther - amount;
+        states[msg.sender].stakedFunds = states[msg.sender].stakedFunds - amount;
+        states[counterParty].stakedFunds = states[counterParty].stakedFunds - amount;
 
         states[msg.sender].openChannels = states[msg.sender].openChannels + 1;
         states[counterParty].openChannels = states[counterParty].openChannels + 1;
@@ -179,25 +206,24 @@ contract HoprChannel {
     * @param r bytes32
     * @param s bytes32
     */
-    function settle(address counterParty, uint256 index, uint256 balanceA, bytes32 r, bytes32 s, bytes1 v) public channelExists(counterParty) {
+    function settle(address counterParty, uint256 index, uint256 balanceA, bytes32 r, bytes32 s) public channelExists(counterParty) {
         bytes32 channelId = getId(counterParty);
         Channel storage channel = channels[channelId];
         
         require(
             channel.index < index &&
-            channel.state == ChannelState.ACTIVE || channel.state == ChannelState.PENDING_SETTLEMENT,
+            channel.state == ChannelState.PARTYA_FUNDED || channel.state == ChannelState.PARTYB_FUNDED,
             "Invalid channel.");
                
         // is the proof valid?
-        bytes32 hashedMessage = keccak256(abi.encodePacked(balanceA, index, channelId));
-        require(ecrecover(hashedMessage, uint8(v) + 27, r, s) == counterParty, "Invalid signature.");
+        bytes32 hashedMessage = keccak256(abi.encodePacked(channelId, balanceA, index));
+        require(ecrecover(hashedMessage, 0, r, s) == counterParty, "Invalid signature.");
         
-        channel.balanceA = balanceA;
-        channel.index = index;
+                
         channel.state = ChannelState.PENDING_SETTLEMENT;
         channel.settlementBlock = block.number;
         
-        emit SettledChannel(channelId, index, balanceA);
+        emit SettledChannel(channelId, index);
     }
     
     /**
@@ -211,8 +237,7 @@ contract HoprChannel {
             channel.balanceA <= channel.balance, 
             "Invalid channel.");
 
-        require(channel.settlementBlock.add(BLOCK_CONFIRMATION) >= block.number, 
-            "Channel not withdrawable yet.");
+        require(channel.settlementBlock.add(BLOCK_CONFIRMATION) >= block.number, "Channel not withdrawable yet.");
         
         channel.state = ChannelState.WITHDRAWN;
         
@@ -226,12 +251,12 @@ contract HoprChannel {
         
         if (isPartyA(counterParty)) {
             // msg.sender == partyB
-            states[msg.sender].stakedEther = states[msg.sender].stakedEther.add((channel.balance.sub(channel.balanceA)));
-            states[counterParty].stakedEther = states[counterParty].stakedEther.add(channel.balanceA);
+            states[msg.sender].stakedFunds = states[msg.sender].stakedFunds.add((channel.balance.sub(channel.balanceA)));
+            states[counterParty].stakedFunds = states[counterParty].stakedFunds.add(channel.balanceA);
         } else {
             // msg.sender == partyA
-            states[counterParty].stakedEther = states[counterParty].stakedEther.add((channel.balance.sub(channel.balanceA)));
-            states[msg.sender].stakedEther = states[msg.sender].stakedEther.add(channel.balanceA); 
+            states[counterParty].stakedFunds = states[counterParty].stakedFunds.add((channel.balance.sub(channel.balanceA)));
+            states[msg.sender].stakedFunds = states[msg.sender].stakedFunds.add(channel.balanceA); 
         }
 
         delete channels[getId(counterParty)];

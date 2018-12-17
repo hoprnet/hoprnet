@@ -226,16 +226,16 @@ export async function run() {
             break;
 
         case 'test':
-            const tests = getTests();
+            // const tests = getTests();
 
             listen(spawnServer());
 
-            spawnSync('truffle migrate --reset --compile-all --network develop', {
-                stdio: 'inherit',
-                shell: true
-            });
+            // spawnSync('truffle migrate --reset --compile-all --network develop', {
+            //     stdio: 'inherit',
+            //     shell: true
+            // });
 
-            spawnSync('truffle test ' + ' --network develop --migrations_directory migrations_null', {
+            spawnSync('truffle test ' + ' --network develop', {
                 stdio: 'inherit',
                 shell: true
             });

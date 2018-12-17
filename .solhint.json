@@ -1,5 +1,6 @@
 {
     "extends": "default",
     "rules": {
+        "compiler-fixed": false
     }
 }
