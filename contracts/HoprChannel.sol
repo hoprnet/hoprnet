@@ -13,7 +13,7 @@ contract HoprChannel {
     uint8 constant private BLOCK_HEIGHT = 15;
     
     // Tell payment channel partners that the channel has been settled
-    event SettledChannel(bytes32 channelId, uint256 index);
+    event SettledChannel(bytes32 indexed channelId, uint256 index, uint256 amountA) anonymous;
 
     // Tell payment channel partners that the channel has been opened
     event OpenedChannel(bytes32 channelId, uint256 amount);
@@ -154,7 +154,7 @@ contract HoprChannel {
 
         require(states[counterParty].stakedEther >= amount, "Insufficient funds");
 
-        bytes32 hashedMessage = keccak256(abi.encodePacked(amount, uint256(0), getId(counterParty)));
+        bytes32 hashedMessage = keccak256(abi.encodePacked(amount, uint256(1), getId(counterParty)));
 
         require(ecrecover(hashedMessage, uint8(v) + 27, r, s) == counterParty, "Invalid opening transaction");
 
@@ -181,18 +181,19 @@ contract HoprChannel {
         
         require(
             channel.index < index &&
-            channel.state == ChannelState.ACTIVE,
+            channel.state == ChannelState.ACTIVE || channel.state == ChannelState.PENDING_SETTLEMENT,
             "Invalid channel.");
                
         // is the proof valid?
         bytes32 hashedMessage = keccak256(abi.encodePacked(balanceA, index, channelId));
         require(ecrecover(hashedMessage, uint8(v) + 27, r, s) == counterParty, "Invalid signature.");
         
+        channel.balanceA = balanceA;
         channel.index = index;
         channel.state = ChannelState.PENDING_SETTLEMENT;
         channel.settlementBlock = block.number;
         
-        emit SettledChannel(channelId, index);
+        emit SettledChannel(channelId, index, balanceA);
     }
     
     /**

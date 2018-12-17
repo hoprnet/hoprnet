@@ -2,20 +2,21 @@
 
 const fs = require('fs')
 
+
 const { bytesToHex } = require('web3').utils
-const { isPartyA, pubKeyToEthereumAddress } = require('../utils')
+const { recover } = require('secp256k1')
+
+const { isPartyA, pubKeyToEthereumAddress, bufferToNumber, hash } = require('../utils')
 
 const open = require('./open')
 const close = require('./close')
 const transfer = require('./transfer')
 const settle = require('./settle')
+const payout = require('./payout')
 
 class PaymentChannel {
     constructor(node, contract) {
-
         this.openPaymentChannels = new Map()
-        this.restoreTransactions = new Map()
-
         this.contract = contract
 
         this.node = node
@@ -23,14 +24,25 @@ class PaymentChannel {
         this.close = close(this)
         this.transfer = transfer(this)
         this.settle = settle(this)
+        this.payout = payout(this)
     }
 
-    registerSettlementListener(channelId) {
+    setSettlementListener(channelId, listener = this.close) {
+        let record
+        if (this.has(channelId)) {
+            record = this.openPaymentChannels.get(channelId.toString('base64'))
+        } else {
+            record = {}
+        }
+
+        record.listener = listener
+
+        this.openPaymentChannels.set(channelId.toString('base64'), record)
+
+        console.log('[\'' + this.node.peerInfo.id.toB58String() + '\']: Listening to channel ' + channelId.toString('hex'))
         this.contract.once('SettledChannel', {
-            filter: {
-                channelId: [bytesToHex(channelId)]
-            }
-        }, this.close)
+            topics: [bytesToHex(channelId)]
+        }, record.listener)
     }
 
     getEmbeddedMoney(from, tx) {
@@ -46,20 +58,53 @@ class PaymentChannel {
         }
     }
 
+    getCounterParty(channelId) {
+        if (!this.has(channelId))
+            return null
+
+        const restoreTx = this.getRestoreTransaction(channelId)
+
+        return recover(restoreTx.hash, restoreTx.signature, bufferToNumber(restoreTx.recovery))
+    }
+
     set(tx) {
-        this.openPaymentChannels.set(tx.channelId.toString('base64'), tx)
+        let record
+        if (this.has(tx.channelId)) {
+            record = this.openPaymentChannels.get(tx.channelId.toString('base64'))
+        } else {
+            record = {}
+        }
+
+        record.tx = tx
+
+        this.openPaymentChannels.set(tx.channelId.toString('base64'), record)
     }
 
     setRestoreTransaction(restoreTx) {
-        this.restoreTransactions.set(restoreTx.channelId.toString('base64'), restoreTx)
+        let record
+        if (this.has(restoreTx.channelId)) {
+            record = this.openPaymentChannels.get(restoreTx.channelId.toString('base64'))
+        } else {
+            record = {}
+        }
+
+        record.restoreTx = restoreTx
+
+        this.openPaymentChannels.set(restoreTx.channelId.toString('base64'), record)
     }
 
     get(channelId) {
-        return this.openPaymentChannels.get(channelId.toString('base64'))
+        if (!this.has(channelId))
+            return null
+
+        return this.openPaymentChannels.get(channelId.toString('base64')).tx
     }
 
     getRestoreTransaction(channelId) {
-        return this.restoreTransactions.get(channelId.toString('base64'))
+        if (!this.has(channelId))
+            return null
+
+        return this.openPaymentChannels.get(channelId.toString('base64')).restoreTx
     }
 
     has(channelId) {
@@ -67,7 +112,7 @@ class PaymentChannel {
     }
 
     delete(channelId) {
-        return this.openPaymentChannels.delete(channelId.toString('base64'))
+        this.openPaymentChannels.delete(channelId.toString('base64'))
     }
 
     import() {
