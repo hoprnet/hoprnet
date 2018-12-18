@@ -335,6 +335,8 @@ module.exports.mineBlock = (provider) => waterfall([
         method: 'eth_blockNumber',
         id: Date.now()
     }, (err, response) => {
+        if (err) { throw err }
+        
         console.log('%sNow on block %d.%s', blueText, parseInt(response.result, 16), resetColor)
     })
 ])

@@ -19,7 +19,7 @@
         "bundle": "npx cross-env TASK=bundle node ./tools/server/index",
         "test": "yarn lint && npx cross-env NODE_ENV=develop cross-env TASK=test node ./tools/server/index",
         "coverage": "npx cross-env NODE_ENV=develop cross-env TASK=coverage node ./tools/server/index",
-        "start": "node test/test_cli.js",
+        "start": "node test/test.js",
         "clean": "npx shx rm -fr docs db dist build bin coverage",
         "reset": "npx yarn run clean && npx shx rm -fr node_modules",
         "update": "yarn run reset && yarn upgrade"
