@@ -2,7 +2,7 @@
 
 const secp256k1 = require('secp256k1')
 const pull = require('pull-stream')
-const { waterfall, each } = require('async')
+const { waterfall, map } = require('async')
 const { bufferToNumber, pubKeyToPeerId } = require('../utils')
 
 const bs58 = require('bs58')
@@ -12,7 +12,7 @@ const SETTLEMENT_TIMEOUT = 3000
 
 module.exports = (self) => (cb) => {
     console.log('[\'' + self.node.peerInfo.id.toB58String() + '\']: Closing channels ' + Array.from(self.openPaymentChannels.keys()).join(', ') + '.')
-    each(self.openPaymentChannels.values(), (record, cb) => {
+    map(self.openPaymentChannels.values(), (record, cb) => {
         let counterParty = secp256k1.recover(record.tx.hash, record.tx.signature, bufferToNumber(record.tx.recovery))
 
         if (self.node.peerInfo.id.pubKey.marshal().compare(counterParty) === 0) {
@@ -28,17 +28,17 @@ module.exports = (self) => (cb) => {
 
                     const now = Date.now()
 
-                    const timeout = setTimeout(self.settle, SETTLEMENT_TIMEOUT, record.tx.channelId, true, cb)
+                    // TODO: Implement proper transaction handling
+                    const timeout = setTimeout(self.settle, SETTLEMENT_TIMEOUT, record.tx.channelId, true)
 
-                    const listener = record.listener
-                    self.setSettlementListener(record.tx.channelId, (err, event, subscription) => {
-                        console.log('Decorated listener.')
+                    self.on('closed ' + record.restoreTx.channelId.toString('base64'), (receivedMoney) => {
                         if (Date.now() - now < SETTLEMENT_TIMEOUT) {
+                            // Prevent node from settling channel itself with a probably
+                            // outdated transaction
                             clearTimeout(timeout)
-                            console.log('Timeout cleared.')
-                            // self.close(err, event, null, cb)
                         }
-                        listener(err, event, subscription, cb)
+
+                        cb(null, receivedMoney)
                     })
 
                     pull(
@@ -49,9 +49,16 @@ module.exports = (self) => (cb) => {
                 }),
             ], cb)
         } else {
-            self.settle(record.tx.channelId, cb)
+            self.on('closed ' + record.restoreTx.channelId.toString('base64'), (receivedMoney) => {
+                // Callback just when the channel is settled, i.e. the closing listener
+                // emits the 'closed <channelId>' event.
+                cb(null, receivedMoney)
+            })
+            self.settle(record.tx.channelId)
         }
-    }, (err) => {
-        throw Error('foo')
+    }, (err, results) => {
+        if (err) { throw err }
+
+        cb(null, results.reduce((acc, receivedMoney) => acc + receivedMoney, 0))
     })
 }

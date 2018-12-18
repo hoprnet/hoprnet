@@ -211,7 +211,7 @@ contract HoprChannel {
             channel.balanceA <= channel.balance, 
             "Invalid channel.");
 
-        require(channel.settlementBlock.add(BLOCK_CONFIRMATION) >= block.number, 
+        require(channel.settlementBlock.add(BLOCK_CONFIRMATION) <= block.number, 
             "Channel not withdrawable yet.");
         
         channel.state = ChannelState.WITHDRAWN;

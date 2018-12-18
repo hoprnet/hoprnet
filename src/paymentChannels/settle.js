@@ -1,8 +1,6 @@
 'use strict'
 
-const secp256k1 = require('secp256k1')
-
-const { isPartyA, pubKeyToEthereumAddress, bufferToNumber } = require('../utils')
+const { isPartyA, pubKeyToEthereumAddress } = require('../utils')
 
 module.exports = (self) => (channelId, useRestoreTx = false, cb = () => {}) => {
     if (typeof useRestoreTx === 'function') {
@@ -35,11 +33,9 @@ module.exports = (self) => (channelId, useRestoreTx = false, cb = () => {}) => {
             from: pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal()),
             gas: 250333, // arbitrary
             gasPrice: '30000000000000'
-        }).on('error', (err) => {
-            console.log(err)
-        })
-        
-        .then((receipt) => {    
+        }, (err, txHash) => {
+            if (err) { throw err }
+
             console.log('[\'' + self.node.peerInfo.id.toB58String() + '\']: Settled payment channel \'' + channelId.toString('hex') + '\'.')
 
             let receivedMoney
@@ -49,9 +45,9 @@ module.exports = (self) => (channelId, useRestoreTx = false, cb = () => {}) => {
             } else {
                 receivedMoney = initialTx.value - lastTx.value
             }
-            // console.log('[\'' + self.node.peerInfo.id.toB58String() + '\']: Finally receiving \'' + receivedMoney + '\' wei in channel \'' + channelId.toString('base64') + '\'.')
-    
-            cb()
+            
+            cb(null, receivedMoney)
+
         })
     } else {
         cb()

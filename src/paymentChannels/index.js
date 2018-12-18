@@ -2,6 +2,9 @@
 
 const fs = require('fs')
 
+const EventEmitter = require('events');
+
+
 
 const { bytesToHex } = require('web3').utils
 const { recover } = require('secp256k1')
@@ -14,8 +17,10 @@ const transfer = require('./transfer')
 const settle = require('./settle')
 const payout = require('./payout')
 
-class PaymentChannel {
+class PaymentChannel extends EventEmitter {
     constructor(node, contract) {
+        super()
+
         this.openPaymentChannels = new Map()
         this.contract = contract
 

@@ -32,7 +32,7 @@ module.exports.deepCopy = (instance, Class) => {
  * Parse JSON while recovering all Buffer elements
  * @param  {String} str JSON string
  */
-module.exports.parseJSON = (str) => 
+module.exports.parseJSON = (str) =>
     JSON.parse(str || '', (key, value) => {
         if (value && value.type === 'Buffer') {
             return Buffer.from(value.data)
@@ -158,15 +158,15 @@ module.exports.randomSubset = (array, subsetSize, filter = _ => true) => {
     let notChosen = new Set()
     let chosen = new Set()
     let found, breakUp = false
-    
+
     let index = 0
     for (let i = 0; i < subsetSize && !breakUp; i++) {
         index = (index + module.exports.bufferToNumber(randomBytes(byteAmount))) % array.length
-        
+
         found = false
 
         do {
-            while(chosen.has(index) || notChosen.has(index)) {
+            while (chosen.has(index) || notChosen.has(index)) {
                 index = (index + 1) % array.length
             }
 
@@ -185,7 +185,7 @@ module.exports.randomSubset = (array, subsetSize, filter = _ => true) => {
             }
 
 
-        } while(!found)
+        } while (!found)
     }
 
     const result = []
@@ -205,10 +205,10 @@ module.exports.randomSubset = (array, subsetSize, filter = _ => true) => {
 module.exports.randomPermutation = (array) => {
     if (!Array.isArray(array))
         throw Error('Invalid input parameters. Got \'' + typeof array + '\' instead of Buffer.')
-        
+
     if (array.length <= 1)
         return array
-        
+
     let i, j, tmp
 
     const byteAmount = Math.max(Math.ceil(Math.log2(array.length)) / 8, 1)
@@ -240,7 +240,7 @@ const secp256k1 = require('secp256k1')
 module.exports.pubKeyToEthereumAddress = (pubKey) => {
     const hash = sha3(secp256k1.publicKeyConvert(pubKey, false).slice(1))
 
-    return toChecksumAddress(hash.slice(0,2).concat(hash.slice(26)))
+    return toChecksumAddress(hash.slice(0, 2).concat(hash.slice(26)))
 }
 
 module.exports.isPartyA = (sender, otherParty) => {
@@ -273,5 +273,22 @@ module.exports.getId = (sender, otherParty) => {
 const libp2p_crypto = require('libp2p-crypto').keys
 const PeerId = require('peer-id')
 
-module.exports.pubKeyToPeerId = (pubKey, cb) => 
+module.exports.pubKeyToPeerId = (pubKey, cb) =>
     PeerId.createFromPubKey(new libp2p_crypto.supportedKeys.secp256k1.Secp256k1PublicKey(pubKey).bytes, cb)
+
+
+// ==========================
+// Ganache-core methods   <-- ONLY FOR TESTING
+// ==========================
+const { timesSeries } = require('async')
+module.exports.mineBlocks = (provider, number) => {
+    const resetColor = "\x1b[0m"
+    const blueText = "\x1b[34m"
+    console.log('%sMining %d blocks%s', blueText, number, resetColor)
+    timesSeries(number, (n, cb) =>
+        provider.send({
+            jsonrpc: '2.0',
+            method: 'evm_mine',
+            id: Date.now() + n,
+        }, cb))
+}
