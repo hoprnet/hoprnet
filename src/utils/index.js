@@ -277,7 +277,11 @@ module.exports.isPartyA = (sender, otherParty) => {
 const ETHEUREUM_ADDRESS_SIZE = 20 // Bytes
 
 /**
- * Computes the ID that is used by 
+ * Computes the ID that is used by the smart contract to 
+ * identify the payment channels.
+ * 
+ * @param {String} sender an ethereum address
+ * @param {String} otherParty another ethereum address
  */
 module.exports.getId = (sender, otherParty) => {
     sender = Buffer.from(hexToBytes(sender), 0, ETHEUREUM_ADDRESS_SIZE)
@@ -315,6 +319,12 @@ const blueText = "\x1b[34m"
  * @param {Object} provider a valid Web3 provider
  */
 module.exports.mineBlock = (provider) => waterfall([
+    (cb) => provider.send({
+        jsonrpc: '2.0',
+        method: 'evm_increaseTime',
+        params: [123],
+        id: Date.now(),
+    }, (err, result) => cb(err)),
     (cb) => provider.send({
         jsonrpc: '2.0',
         method: 'evm_mine',
