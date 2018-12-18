@@ -195,7 +195,7 @@ contract HoprChannel {
         channel.balanceA = balanceA;
         channel.index = index;
         channel.state = ChannelState.PENDING_SETTLEMENT;
-        channel.settlementBlock = block.number;
+        channel.settlementBlock = block.number.add(BLOCK_CONFIRMATION);
         
         emit SettledChannel(channelId, index, balanceA);
     }
@@ -206,13 +206,13 @@ contract HoprChannel {
     */
     function withdraw(address counterParty) public channelExists(counterParty) {
         Channel storage channel = channels[getId(counterParty)];
+        
         require(
             channel.state == ChannelState.PENDING_SETTLEMENT && 
             channel.balanceA <= channel.balance, 
             "Invalid channel.");
 
-        require(channel.settlementBlock.add(BLOCK_CONFIRMATION) <= block.number, 
-            "Channel not withdrawable yet.");
+        require(channel.settlementBlock <= block.number, "Channel not withdrawable yet.");
         
         channel.state = ChannelState.WITHDRAWN;
         

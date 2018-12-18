@@ -1,9 +1,7 @@
 'use strict'
 
 const { waterfall } = require('async')
-const { isPartyA, pubKeyToEthereumAddress, mineBlocks } = require('../utils')
-
-const CONFIRMATION_TIME = 15
+const { isPartyA, pubKeyToEthereumAddress, mineBlock } = require('../utils')
 
 module.exports = (self) => {
     function hasBetterTx(channelId, amountA, counterParty) {
@@ -50,19 +48,29 @@ module.exports = (self) => {
                     cb(null)
                 }
             },
-            (cb) => {
-                const subscription = self.node.eth.subscribe('newBlockHeaders')
-                    .on('data', (block) => {
-                        if (block.number > event.blockNumber + CONFIRMATION_TIME) {
-                            subscription.unsubscribe(cb)
-                        }
-                    })
+            (cb) => self.contract.methods.channels(channelId).call({
+                from: pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal())
+            }, cb),
+            (channel, cb) => self.node.eth.getBlockNumber((err, blockNumber) => cb(err, blockNumber, channel)),
+            (blockNumber, channel, cb) => {
+                if (blockNumber < channel.settlementBlock) {
+                    const subscription = self.node.eth.subscribe('newBlockHeaders')
+                        .on('data', (block) => {
+                            if (block.number > parseInt(channel.settlementBlock)) {
+                                subscription.unsubscribe((err, ok) => cb(err))
+                            } else {
+                                // ================ Only for testing ================
+                                mineBlock(self.contract.currentProvider)
+                                // ==================================================
 
-                // Only for testing!
-                mineBlocks(self.contract.currentProvider, CONFIRMATION_TIME + 3)
+                            }
+                        })
+                } else {
+                    cb()
+                }
             },
-            (_, cb) => {
-                if (self.eventNames().some((name) => 
+            (cb) => {
+                if (self.eventNames().some((name) =>
                     name === 'closed '.concat(channelId.toString('base64'))
                 )) {
                     interested = true
