@@ -9,7 +9,7 @@ const getPeerInfo = require('../src/getPeerInfo')
 
 const Ganache = require('ganache-core')
 const Eth = require('web3-eth')
-const { toWei, hexToBytes } = require('web3').utils
+const { toWei } = require('web3').utils
 
 const getContract = require('../contracts')
 const { pubKeyToEthereumAddress } = require('../src/utils')
@@ -84,6 +84,9 @@ waterfall([
                 gas: 3000333, // 2370333
                 gasPrice: '30000000000000'
             })
+            .on('err', (err) => {
+                console.log('err: ' + err)
+            })
             .on('receipt', (receipt) => {
                 console.log('Successfully deployed contract at address \'' + receipt.contractAddress + '\'.')
             })
@@ -94,7 +97,8 @@ waterfall([
          * Start nodes, node will start listening on the network interface
          */
         Hopper.startNode(provider, console.log, contract, cb, peerInfo)
-        , cb),
+        , cb)
+    ,
     (_nodes, cb) => parallel([
         (cb) => {
             /**
@@ -135,6 +139,8 @@ waterfall([
         (cb) => nodes[1].paymentChannels.payout(cb)
     ], cb)
 
-], (err) => {
+], (err, result) => {
     if (err) { throw err }
+
+    console.log('Received ' + result[1] + ' wei.')
 })

@@ -229,7 +229,7 @@ module.exports.randomPermutation = (array) => {
 // ==========================
 // Ethereum methods
 // ==========================
-const secp256k1 = require('secp256k1')
+const { publicKeyConvert } = require('secp256k1')
 /**
  * Derives an Ethereum address from the given public key.
  * 
@@ -238,22 +238,47 @@ const secp256k1 = require('secp256k1')
  * @returns {String} e.g. 0xc1912fEE45d61C87Cc5EA59DaE31190FFFFf232d
  */
 module.exports.pubKeyToEthereumAddress = (pubKey) => {
-    const hash = sha3(secp256k1.publicKeyConvert(pubKey, false).slice(1))
+    const hash = sha3(publicKeyConvert(pubKey, false).slice(1))
 
     return toChecksumAddress(hash.slice(0, 2).concat(hash.slice(26)))
 }
 
+/**
+ * Checks whether the ethereum address of the @param sender is
+ * smaller than the ethereum address of the @param otherParty
+ * 
+ * @param {String | Buffer} sender an ethereum address
+ * @param {String | Buffer} otherParty another ethereum address
+ */
 module.exports.isPartyA = (sender, otherParty) => {
-    if (typeof sender === 'string' && typeof otherParty === 'string') {
-        return Buffer.compare(Buffer.from(hexToBytes(sender), 0, ETHEUREUM_ADDRESS_SIZE), Buffer.from(hexToBytes(otherParty), 0, ETHEUREUM_ADDRESS_SIZE)) < 0
-    } else if (Buffer.isBuffer(sender) && Buffer.isBuffer(otherParty)) {
-        return Buffer.compare(sender, otherParty) < 0
-    } else {
-        throw Error('Invalid argument')
+    if (typeof sender === 'string') {
+        if (sender.length !== 42)
+            throw Error('Invalid input parameters')
+
+        sender = Buffer.from(sender.slice(2), 'hex')
     }
+
+    if (typeof otherParty === 'string') {
+        if (otherParty.length !== 42) {
+            throw Error('Invalid input parameters')
+        }
+        otherParty = Buffer.from(otherParty.slice(2), 'hex')
+    }
+
+    if (!Buffer.isBuffer(sender, otherParty))
+        throw Error('Invalid input parameters')
+
+    if (sender.length !== 20 || otherParty.length !== 20)
+        throw Error('Invalid input parameters')
+
+    return Buffer.compare(sender, otherParty) < 0
 }
 
 const ETHEUREUM_ADDRESS_SIZE = 20 // Bytes
+
+/**
+ * Computes the ID that is used by 
+ */
 module.exports.getId = (sender, otherParty) => {
     sender = Buffer.from(hexToBytes(sender), 0, ETHEUREUM_ADDRESS_SIZE)
     otherParty = Buffer.from(hexToBytes(otherParty), 0, ETHEUREUM_ADDRESS_SIZE)
@@ -280,15 +305,53 @@ module.exports.pubKeyToPeerId = (pubKey, cb) =>
 // ==========================
 // Ganache-core methods   <-- ONLY FOR TESTING
 // ==========================
-const { timesSeries } = require('async')
-module.exports.mineBlocks = (provider, number) => {
-    const resetColor = "\x1b[0m"
-    const blueText = "\x1b[34m"
-    console.log('%sMining %d blocks%s', blueText, number, resetColor)
-    timesSeries(number, (n, cb) =>
-        provider.send({
+const { waterfall, during } = require('async')
+
+const resetColor = "\x1b[0m"
+const blueText = "\x1b[34m"
+/**
+ * Mine a single block
+ * 
+ * @param {Object} provider a valid Web3 provider
+ */
+module.exports.mineBlock = (provider) => waterfall([
+    (cb) => provider.send({
+        jsonrpc: '2.0',
+        method: 'evm_mine',
+        id: Date.now(),
+    }, (err, result) => cb(err)),
+    () => provider.send({
+        jsonrpc: '2.0',
+        method: 'eth_blockNumber',
+        id: Date.now()
+    }, (err, response) => {
+        console.log('%sNow on block %d.%s', blueText, parseInt(response.result, 16), resetColor)
+    })
+])
+
+/**
+ * Go to a specific block by mining probably empty blocks
+ * 
+ * @param {Object} provider a valid Web3 provider
+ * @param {Number} blockNumber the block to go to
+ */
+module.exports.gotoBlock = (provider, blockNumber, cb) => {
+
+    console.log('%sGoing to block %d by mining probably empty blocks%s', blueText, blockNumber, resetColor)
+
+    during(
+        (cb) => provider.send({
+            jsonrpc: '2.0',
+            method: 'eth_blockNumber',
+            id: Date.now()
+        }, (err, response) => {
+            console.log('Block ' + parseInt(response.result, 16))
+            cb(err, parseInt(response.result, 16) < blockNumber)
+        }),
+        (cb) => provider.send({
             jsonrpc: '2.0',
             method: 'evm_mine',
-            id: Date.now() + n,
-        }, cb))
+            id: Date.now(),
+        }, cb),
+        cb)
 }
