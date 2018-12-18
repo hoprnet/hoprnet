@@ -15,7 +15,7 @@ const getContract = require('../contracts')
 const { pubKeyToEthereumAddress } = require('../src/utils')
 
 const AMOUNT_OF_NODES = Math.max(3, c.MAX_HOPS + 1)
-const AMOUNT_OF_MESSAGES = 4
+const AMOUNT_OF_MESSAGES = 5
 
 /**
  * Allow nodes to find each other by establishing connections
