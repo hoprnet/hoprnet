@@ -4,12 +4,7 @@
 
 A privacy-preserving messaging protocol that incentivizes users to participate in the network.
 
-## [Wiki](https://github.com/validitylabs/messagingProtocol/wiki)
-
-## Technical Description
-The construction consists of two layers: one for message delivery and one for payments. Messages are embedded within [SPHINX packet format](https://cypherpunks.ca/~iang/pubs/Sphinx_Oakland09.pdf) that provably hides the relation between sender and receiver. The payment layer uses off-chain payments via payment channels and node operators need to stake assets to process transactions.
-
-For further details, see the full [protocol specification on the wiki](../../wiki).
+### For further details, see the full [protocol specification on the wiki](../../wiki)
 
 ## Technical Demo
 There is a standalone demo to showcase the functionality:
