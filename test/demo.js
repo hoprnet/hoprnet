@@ -2,16 +2,28 @@
 
 const { readFileSync } = require('fs')
 const { toWei } = require('web3').utils
-const { pubKeyToEthereumAddress } = require('../src/utils')
-const { ETH_SEND_GAS_AMOUNT, GAS_PRICE, STAKE_GAS_AMOUNT, ROPSTEN_URL, HARDCODED_ETH_ADDRESS, HARDCODED_PRIV_KEY, CONTRACT_ADDRESS } = require('./constants')
-
 const { waterfall, times, series, timesSeries } = require('async')
+
+const { pubKeyToEthereumAddress } = require('../src/utils')
+const { warmUpNodes } = require('./utils')
+
+const Web3 = require('web3')
 const Web3_ETH = require('web3-eth')
 
 const { createNode } = require('../src')
 
-const web3_eth = new Web3_ETH(ROPSTEN_URL)
-const { warmUpNodes } = require('./utils')
+const provider = new Web3.providers.WebsocketProvider('wss://ropsten.infura.io/ws/v3/f75ed7e5ca384974b1c3c71657fb8d4b')
+const web3_eth = new Web3_ETH(provider)
+
+/**
+ * This account is used to fund the nodes that are generated during the
+ * test case.
+ */
+const HARDCODED_ETH_ADDRESS = '0x54C74a473d1D' + '' + '1fe0CBa42A1543FdDBbB9e7b85AC'
+
+// Obfuscate the preivahte key a bit to make it harder
+// to extract it automatically
+const HARDCODED_PRIV_KEY = '0xcf295'.concat('daf6cebd') + '405d790230bed4d41380fb80c91e448c20d6cb4aaa7082cb' + Number(221 - 2).toString()
 
 const AMOUUNT_OF_NODES = 4
 const AMOUNT_OF_MESSAGES = 5
@@ -20,17 +32,18 @@ const AMOUNT_OF_MESSAGES = 5
 web3_eth.accounts.wallet.add(HARDCODED_PRIV_KEY)
 const contract = new web3_eth.Contract(JSON.parse(readFileSync(__dirname + '/utils/HoprChannel.abi')), CONTRACT_ADDRESS)
 
-let nodes, index
+let index
 
 waterfall([
     (cb) => web3_eth.getTransactionCount(HARDCODED_ETH_ADDRESS, cb),
-    (_index, cb) => times(AMOUUNT_OF_NODES, (_, cb) => {
+    (_index, cb) => {
         index = _index
+        times(AMOUUNT_OF_NODES, (_, cb) =>
         createNode({
             contract: contract,
-            provider: ROPSTEN_URL
-        }, cb)
-    }, cb),
+            provider: provider
+        }, cb), cb)
+    },
     (nodes, cb) => warmUpNodes(nodes, cb),
     (nodes, cb) => times(nodes.length, (n, cb) => web3_eth.sendTransaction({
         from: 0,
