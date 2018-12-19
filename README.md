@@ -4,7 +4,9 @@
 
 A privacy-preserving messaging protocol that incentivizes users to participate in the network.
 
+### For further details, see the full [protocol specification on the wiki](../../wiki)
 
+<<<<<<< HEAD
 ## Table of contents
 - [Background](#background)
 - [Key features](#key-features)
@@ -62,16 +64,21 @@ For further details, see the full [protocol specification on the wiki](../../wik
 
 ## Technical demo
 There is a standalone demo to showcase the functionality with a local Ganache core instance:
+=======
+## Technical Demo
+There is a standalone demo to showcase the functionality:
+>>>>>>> f39d00318051dc9a9878c8bf13a07db7cf90c60c
 
-Please make sure that `solc`, the Solidity compiler, is available in your search path, see [here](https://solidity.readthedocs.io/en/latest/installing-solidity.html#binary-packages) how to install `solc` on your platform.
+Please make sure that `solc`, the Solidity compiler, is available in your environment path, see [here](https://solidity.readthedocs.io/en/latest/installing-solidity.html#binary-packages) how to install `solc` on your platform.
 
+### Executing
 ```sh
 git clone https://github.com/validitylabs/messagingProtocol.git
 cd messagingProtocol
 yarn install
 yarn start
 ```
-
+### Demo Script
 The demo will
 - compile the contracts in `contracts/` and deploy them to a local Ganache-core instance
 - generate four key pairs
@@ -92,4 +99,3 @@ The demo will
     - settle the payment channels of that party
     - let the nodes listen to the on-chain Settle event and post a better transaction in case that a malicious party tries to close the channel with an unprofitable transaction
     - withdraw the money
-
