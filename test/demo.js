@@ -2,15 +2,19 @@
 
 const { readFileSync } = require('fs')
 const { toWei } = require('web3').utils
-const { pubKeyToEthereumAddress } = require('../src/utils')
-
 const { waterfall, times, series, timesSeries } = require('async')
+
+const { pubKeyToEthereumAddress } = require('../src/utils')
+const { warmUpNodes } = require('./utils')
+
+const Web3 = require('web3')
 const Web3_ETH = require('web3-eth')
 
 const { createNode } = require('../src')
 
-const web3_eth = new Web3_ETH('https://ropsten.infura.io/v3/f75ed7e5ca384974b1c3c71657fb8d4b')
-const { warmUpNodes } = require('./utils')
+const provider = new Web3.providers.WebsocketProvider('wss://ropsten.infura.io/ws/v3/f75ed7e5ca384974b1c3c71657fb8d4b')
+const web3_eth = new Web3_ETH(provider)
+
 /**
  * This account is used to fund the nodes that are generated during the
  * test case.
@@ -30,17 +34,18 @@ const CONTRACT_ADDRESS = '0x696FBD3b9471490' + 'd7807204E25FDc'.concat('c4911f32
 web3_eth.accounts.wallet.add(HARDCODED_PRIV_KEY)
 const contract = new web3_eth.Contract(JSON.parse(readFileSync(__dirname + '/utils/HoprChannel.abi')), CONTRACT_ADDRESS)
 
-let nodes, index
+let index
 
 waterfall([
     (cb) => web3_eth.getTransactionCount(HARDCODED_ETH_ADDRESS, cb),
-    (_index, cb) => times(AMOUUNT_OF_NODES, (_, cb) => {
+    (_index, cb) => {
         index = _index
+        times(AMOUUNT_OF_NODES, (_, cb) =>
         createNode({
             contract: contract,
-            provider: 'https://ropsten.infura.io/v3/f75ed7e5ca384974b1c3c71657fb8d4b'
-        }, cb)
-    }, cb),
+            provider: provider
+        }, cb), cb)
+    },
     (nodes, cb) => warmUpNodes(nodes, cb),
     (nodes, cb) => times(nodes.length, (n, cb) => web3_eth.sendTransaction({
         from: 0,
