@@ -24,11 +24,11 @@ module.exports.RELAY_FEE = '100' // Wei
 module.exports.DEMO = false
 
 // HoprChannel Contract Configuration TODO: detect ENV variable to decide between mainnet or testnet
-import * as contract from '../config/contract-hopr.json';
+const contract = require('../config/contract-hopr.json');
 module.exports.CONTRACT_ADDRESS = contract.ropstenContractAddress;
 
 // Gas Unit Configuration TODO: get all safe upper bound gas amounts
-import * as gas from '../config/gasUnits.json';
+const gas = require('../config/gasUnits.json');
 module.exports.STAKE_GAS_AMOUNT = gas.stakeAmount;
 module.exports.UNSTAKE_GAS_AMOUNT = gas.unstakeAmount;
 module.exports.CREATE_GAS_AMOUNT = gas.createAmount;
@@ -37,14 +37,14 @@ module.exports.DEFAULT_GAS_AMOUNT = gas.defaultAmount;
 module.exports.ETH_SEND_GAS_AMOUNT = gas.simpleTxAmount;
 module.exports.GAS_PRICE = gas.gasPrice;
 
-import * as secrets from '../config/.secrets.json';
+const secrets = require('../config/.secrets.json');
 // Infura API Configuration
 module.exports.INFURA_KEY = secrets.infuraApiKey;
-module.exports.ROPSTEN_URL = secrets.infuraRopstenURL + INFURA_KEY;
-module.exports.ROPSTEN_WSS_URL = secrets.infuraRopstenWssURL + INFURA_KEY;
+module.exports.ROPSTEN_URL = secrets.infuraRopstenURL + secrets.infuraApiKey;
+module.exports.ROPSTEN_WSS_URL = secrets.infuraRopstenWssURL + secrets.infuraApiKey;
 
-module.exports.MAINNET_URL = secrets.infuraMainnetURL + INFURA_KEY;
-module.exports.MAINNET_WSS_URL = secrets.infuraMainnetWssURL + INFURA_KEY;
+module.exports.MAINNET_URL = secrets.infuraMainnetURL + secrets.infuraApiKey;
+module.exports.MAINNET_WSS_URL = secrets.infuraMainnetWssURL + secrets.infuraApiKey;
 
 // Private Key Configuration
 module.exports.HARDCODED_ETH_ADDRESS = secrets.fundAccountEthAddress;

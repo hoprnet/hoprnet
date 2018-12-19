@@ -7,7 +7,7 @@ const { waterfall, times, series, timesSeries } = require('async')
 const { pubKeyToEthereumAddress } = require('../src/utils')
 const { warmUpNodes } = require('./utils')
 
-const { ETH_SEND_GAS_AMOUNT, GAS_PRICE, STAKE_GAS_AMOUNT, ROPSTEN_WSS_URL, HARDCODED_ETH_ADDRESS, HARDCODED_PRIV_KEY, CONTRACT_ADDRESS } = require('./constants')
+const { ETH_SEND_GAS_AMOUNT, GAS_PRICE, STAKE_GAS_AMOUNT, ROPSTEN_WSS_URL, HARDCODED_ETH_ADDRESS, HARDCODED_PRIV_KEY, CONTRACT_ADDRESS } = require('../src/constants')
 
 const Web3 = require('web3')
 const Web3_ETH = require('web3-eth')
