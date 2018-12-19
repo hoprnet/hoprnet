@@ -61,7 +61,7 @@ The construction consists of two layers: one for message delivery and one for pa
 For further details, see the full [protocol specification on the wiki](../../wiki).
 
 ## Technical demo
-There is a standalone demo to showcase the functionality:
+There is a standalone demo to showcase the functionality with a local Ganache core instance:
 
 Please make sure that `solc`, the Solidity compiler, is available in your search path, see [here](https://solidity.readthedocs.io/en/latest/installing-solidity.html#binary-packages) how to install `solc` on your platform.
 
@@ -73,7 +73,7 @@ yarn start
 ```
 
 The demo will
-- compile the contracts in `contracts/`
+- compile the contracts in `contracts/` and deploy them to a local Ganache-core instance
 - generate four key pairs
 - create four test nodes and equip them with the previously generated key pairs
 - start all four nodes such that they listen on some port on your machine
