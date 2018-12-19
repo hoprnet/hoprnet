@@ -41,7 +41,10 @@ import * as secrets from '../config/.secrets.json';
 // Infura API Configuration
 module.exports.INFURA_KEY = secrets.infuraApiKey;
 module.exports.ROPSTEN_URL = secrets.infuraRopstenURL + INFURA_KEY;
+module.exports.ROPSTEN_WSS_URL = secrets.infuraRopstenWssURL + INFURA_KEY;
+
 module.exports.MAINNET_URL = secrets.infuraMainnetURL + INFURA_KEY;
+module.exports.MAINNET_WSS_URL = secrets.infuraMainnetWssURL + INFURA_KEY;
 
 // Private Key Configuration
 module.exports.HARDCODED_ETH_ADDRESS = secrets.fundAccountEthAddress;

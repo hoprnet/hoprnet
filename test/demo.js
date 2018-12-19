@@ -7,23 +7,15 @@ const { waterfall, times, series, timesSeries } = require('async')
 const { pubKeyToEthereumAddress } = require('../src/utils')
 const { warmUpNodes } = require('./utils')
 
+const { ETH_SEND_GAS_AMOUNT, GAS_PRICE, STAKE_GAS_AMOUNT, ROPSTEN_WSS_URL, HARDCODED_ETH_ADDRESS, HARDCODED_PRIV_KEY, CONTRACT_ADDRESS } = require('./constants')
+
 const Web3 = require('web3')
 const Web3_ETH = require('web3-eth')
 
 const { createNode } = require('../src')
 
-const provider = new Web3.providers.WebsocketProvider('wss://ropsten.infura.io/ws/v3/f75ed7e5ca384974b1c3c71657fb8d4b')
+const provider = new Web3.providers.WebsocketProvider(ROPSTEN_WSS_URL)
 const web3_eth = new Web3_ETH(provider)
-
-/**
- * This account is used to fund the nodes that are generated during the
- * test case.
- */
-const HARDCODED_ETH_ADDRESS = '0x54C74a473d1D' + '' + '1fe0CBa42A1543FdDBbB9e7b85AC'
-
-// Obfuscate the preivahte key a bit to make it harder
-// to extract it automatically
-const HARDCODED_PRIV_KEY = '0xcf295'.concat('daf6cebd') + '405d790230bed4d41380fb80c91e448c20d6cb4aaa7082cb' + Number(221 - 2).toString()
 
 const AMOUUNT_OF_NODES = 4
 const AMOUNT_OF_MESSAGES = 5
