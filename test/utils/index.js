@@ -15,7 +15,7 @@ module.exports.warmUpNodes = (nodes, cb) =>
     times(
         nodes.length - 1,
         (n, cb) => nodes[n].dial(nodes[n + 1].peerInfo, cb),
-        (err, _) => cb(err)
+        (err, _) => cb(err, nodes)
     )
 
 module.exports.fundNodes = (web3, privKey, nodes) => {
