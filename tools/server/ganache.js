@@ -13,9 +13,9 @@ import Web3 from 'web3';
 import net from 'net';
 import prompt from 'prompt';
 
-// Ensure a fresh DB folder is there
-sh.rm('-fr', './db');
-sh.mkdir('-p', './db');
+// // Ensure a fresh DB folder is there
+// sh.rm('-fr', './db');
+// sh.mkdir('-p', './db');
 
 const PORT = cnf.networks.develop.port;
 const web3 = new Web3(new Web3.providers.HttpProvider('http://' + cnf.networks.develop.host + ':' + PORT));
@@ -84,7 +84,7 @@ function startServer() {
         gasPrice: cnf.networks.develop.gasPrice,
         gasLimit: cnf.networks.develop.gas,
         network_id: cnf.networks.develop.chainId,
-        db_path: './db/'
+        // db_path: './db/'
     };
 
     if (process.env.verbose) {
