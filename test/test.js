@@ -2,7 +2,7 @@
 
 const { waterfall, times, timesSeries, series, each, parallel, map } = require('async')
 
-const Hopper = require('../src/index')
+const HOPR = require('../src/index')
 const c = require('../src/constants')
 
 const getPeerInfo = require('../src/getPeerInfo')
@@ -11,32 +11,13 @@ const Ganache = require('ganache-core')
 const Eth = require('web3-eth')
 const { toWei } = require('web3').utils
 
+const { warmUpNodes } = require('./utils')
+
 const getContract = require('../contracts')
 const { pubKeyToEthereumAddress } = require('../src/utils')
 
 const AMOUNT_OF_NODES = Math.max(3, c.MAX_HOPS + 1)
 const AMOUNT_OF_MESSAGES = 5
-
-/**
- * Allow nodes to find each other by establishing connections
- * between adjacent nodes.
- * 
- * Connection from A -> B, B -> C, C -> D, ...
- * 
- * @param {Hopper} nodes nodes that will have open connections afterwards
- * @param {Function} cb callback that is called when finished
- */
-function warmUpNodes(nodes, cb) {
-    times(
-        nodes.length - 1,
-        (n, cb) => nodes[n].dial(nodes[n + 1].peerInfo, cb),
-        (err, _) => cb(err)
-    )
-}
-
-function getGUIGanacheProvider() {
-    return 'http://localhost:7545'
-}
 
 /**
  * Feed Ganache-Core with accounts and balances. The
@@ -94,11 +75,14 @@ waterfall([
     },
     (contract, cb) => map(pInfos, (peerInfo, cb) =>
         /**
-         * Start nodes, node will start listening on the network interface
+         * Start nodes, each node will start listening on the network interface
          */
-        Hopper.startNode(provider, console.log, contract, cb, peerInfo)
-        , cb)
-    ,
+        HOPR.createNode({
+            provider: provider,
+            output: console.log,
+            contract: contract,
+            peerInfo: peerInfo
+        }, cb), cb),
     (_nodes, cb) => parallel([
         (cb) => {
             /**
@@ -129,7 +113,7 @@ waterfall([
          * Send dummy messages every other second
          */
         (cb) => timesSeries(AMOUNT_OF_MESSAGES, (n, cb) => {
-            nodes[0].sendMessage('test_test_test ' + Date.now().toString(), nodes[3].peerInfo)
+            nodes[0].sendMessage('test_test_test ' + Date.now().toString(), nodes[3].peerInfo.id)
 
             setTimeout(cb, 2000)
         }, cb),

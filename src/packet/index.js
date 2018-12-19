@@ -25,20 +25,19 @@ class Packet {
         return Header.SIZE + Transaction.SIZE + Challenge.SIZE + Message.SIZE
     }
 
-    static createPacket(node, msg, intermediateNodes, destination, cb) {
-        const { header, secrets, identifier } = Header.createHeader(intermediateNodes.concat([destination]).map(peerInfo => peerInfo.id))
+    static createPacket(node, msg, path, cb) {
+        const { header, secrets, identifier } = Header.createHeader(path)
 
         console.log('\n\n[\'' + node.peerInfo.id.toB58String() + '\']: ---------- New Packet ----------')
-        intermediateNodes.forEach((peerInfo, index) => console.log('[\'' + node.peerInfo.id.toB58String() + '\']: Intermediate ' + index + ' : ' + peerInfo.id.toB58String()))
-        console.log('[\'' + node.peerInfo.id.toB58String() + '\']: Destination ' + destination.id.toB58String())
+        path.slice(0, Math.max(0, path.length - 1)).forEach((peerId, index) => console.log('[\'' + node.peerInfo.id.toB58String() + '\']: Intermediate ' + index + ': \'' + peerId.toB58String()) + '\'')
+        console.log('[\'' + node.peerInfo.id.toB58String() + '\']: Destination: \'' + path[path.length - 1].toB58String() + '\'')
 
         parallel({
             challenge: (cb) => cb(null, Challenge.createChallenge(Header.deriveTransactionKey(secrets[0]), node.peerInfo.id.privKey.marshal())),
             message: (cb) => cb(null, Message.createMessage(msg).onionEncrypt(secrets)),
-            transaction: (cb) => node.paymentChannels.transfer((secrets.length - 1) * RELAY_FEE, intermediateNodes[0].id, cb)
+            transaction: (cb) => node.paymentChannels.transfer((secrets.length - 1) * RELAY_FEE, path[0], cb)
         }, (err, results) => {
             if (err) { throw err }
-
 
             console.log('[\'' + node.peerInfo.id.toB58String() + '\']: Encrypting with  \'' + hash(bufferXOR(Header.deriveTransactionKey(secrets[0]), Header.deriveTransactionKey(secrets[1]))).toString('base64') + '\'.')
             const encryptedTx = results.transaction.encrypt(hash(bufferXOR(Header.deriveTransactionKey(secrets[0]), Header.deriveTransactionKey(secrets[1]))))
