@@ -11,7 +11,7 @@ require('babel-polyfill');
 const network   = process.env.NETWORK;
 let secrets     = '';
 
-if (network === 'rinkebyInfura') {
+if (network === 'rinkebyInfura' || network === 'ropstenInfura') {
     secrets = require('./config/.secrets.json');
 }
 
@@ -54,7 +54,8 @@ module.exports = {
             gas:        cnf.networks.coverage.gas,
             gasPrice:   cnf.networks.coverage.gasPrice
         },
-        rinkebyInfura:  getRinkebyConfig()
+        rinkebyInfura:  getRinkebyConfig(),
+        ropstenInfura: getRopstenConfig()
     },
     build_directory:            buildDir,            // eslint-disable-line
     contracts_build_directory:  buildDirContracts,   // eslint-disable-line
@@ -75,6 +76,22 @@ function getRinkebyConfig() {
             from:       rinkebyProvider.getAddress(),
             gas:        cnf.networks.rinkeby.gas,
             gasPrice:   cnf.networks.rinkeby.gasPrice
+        };
+    }
+}
+
+function getRopstenConfig() {
+    let ropstenProvider = '';
+
+    if (network === 'ropstenInfura') {
+        ropstenProvider = new HDWalletProvider(secrets.ropsten.mnemonic, secrets.ropsten.host);
+
+        return {
+            network_id: cnf.networks.ropsten.chainId, // eslint-disable-line
+            provider:   ropstenProvider,
+            from:       ropstenProvider.getAddress(),
+            gas:        cnf.networks.ropsten.gas,
+            gasPrice:   cnf.networks.ropsten.gasPrice
         };
     }
 }

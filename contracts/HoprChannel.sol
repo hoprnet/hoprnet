@@ -83,7 +83,7 @@ contract HoprChannel {
     */
     function unstakeEther(uint256 amount) public enoughFunds(amount) {
         require(states[msg.sender].openChannels == 0, "Waiting for remaining channels to close.");
-        
+
         if (amount == states[msg.sender].stakedEther) {
             delete states[msg.sender];
         } else {
