@@ -15,7 +15,7 @@ const defaultsDeep = require('@nodeutils/defaults-deep')
 const { isPeerInfo } = require('peer-info')
 
 
-const Eth = require('web3-eth')
+const Web3 = require('web3')
 
 
 const { createPacket } = require('./packet')
@@ -53,7 +53,7 @@ class Hopper extends libp2p {
      * @param {Object} _options 
      * @param {Object} provider 
      */
-    constructor(_options, provider) {
+    constructor(_options, web3) {
         if (!_options || !_options.peerInfo || !isPeerInfo(_options.peerInfo))
             throw Error('Invalid input parameters. Expected a valid PeerInfo, but got \'' + typeof _options.peerInfo + '\' instead.')
 
@@ -98,7 +98,7 @@ class Hopper extends libp2p {
         super(defaultsDeep(_options, defaults))
 
         // Maybe this is not necessary
-        this.eth = new Eth(provider)
+        this.web3 = web3
 
         this.seenTags = new Set()
         this.pendingTransactions = new Map()
@@ -118,7 +118,7 @@ class Hopper extends libp2p {
             options = {}
         }
 
-        options.provider = options.provider || 'http://localhost:8545'
+        options.web3 = options.web3 || new Web3('http://localhost:8545')
         options.output = options.output || console.log
         options.contract = options.contract || new Eth.Contract(JSON.parse(readFileSync(resolve('./contracts/HoprChannel.abi'))))
 
@@ -126,7 +126,7 @@ class Hopper extends libp2p {
             (cb) =>
                 isPeerInfo(options.peerInfo) ? cb(null, options.peerInfo) : getPeerInfo(null, cb),
             (peerInfo, cb) =>
-                (new Hopper({ peerInfo: peerInfo }, options.provider, options.contract)).start(options.output, options.contract, cb),
+                (new Hopper({ peerInfo: peerInfo }, options.web3, options.contract)).start(options.output, options.contract, cb),
         ], cb)
     }
 

@@ -57,18 +57,23 @@ module.exports = (self) => (to, cb) => waterfall([
                     gas: DEFAULT_GAS_AMOUNT, // arbitrary
                     gasPrice: GAS_PRICE,
                     nonce: self.nonce
-                }, (err, hash) => {
-                    if (err) { throw err }
-                    self.setSettlementListener(restoreTx.channelId)
-                    self.setRestoreTransaction(restoreTx)
-
-                    const tx = deepCopy(restoreTx, Transaction)
-                    self.set(tx)
-
-                    console.log('[\'' + self.node.peerInfo.id.toB58String() + '\']: Opened payment channel with txHash \'' + hash + '\'.')
-
-                    cb(null, tx)
                 })
-            }))
+                    .on('error', cb)
+                    .on('transactionHash', (hash) => console.log('[\'' + self.node.peerInfo.id.toB58String() + '\']: Opened payment channel with txHash \'' + hash + '\'.'))
+                    .on('confirmation', (n, receipt) => {
+                        if (n == 0) {
+                            self.setSettlementListener(restoreTx.channelId)
+                            self.setRestoreTransaction(restoreTx)
+
+                            const tx = deepCopy(restoreTx, Transaction)
+                            self.set(tx)
+
+                            console.log('[\'' + self.node.peerInfo.id.toB58String() + '\']: Opened payment channel with txHash \'' + hash + '\'.')
+
+                            cb(null, tx)
+                        }
+                    })
+            })
+        )
     }
 ], cb)

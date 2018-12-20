@@ -8,7 +8,7 @@ const c = require('../src/constants')
 const getPeerInfo = require('../src/getPeerInfo')
 
 const Ganache = require('ganache-core')
-const Eth = require('web3-eth')
+const Web3 = require('web3')
 const { toWei } = require('web3').utils
 
 const { warmUpNodes } = require('./utils')
@@ -54,9 +54,9 @@ waterfall([
 
         // provider = getGUIGanacheProvider()
         provider = getWeb3Provider(pInfos)
-        const eth = new Eth(provider)
+        const web3 = new Web3(provider)
 
-        new eth.Contract(JSON.parse(compiledContract.abi.toString()))
+        new web3.eth.Contract(JSON.parse(compiledContract.abi.toString()))
             .deploy({
                 data: compiledContract.binary.toString()
             })
@@ -71,14 +71,14 @@ waterfall([
             .on('receipt', (receipt) => {
                 console.log('Successfully deployed contract at address \'' + receipt.contractAddress + '\'.')
             })
-            .then((contract) => cb(null, contract))
+            .then((contract) => cb(null, contract, web3))
     },
-    (contract, cb) => map(pInfos, (peerInfo, cb) =>
+    (contract, web3, cb) => map(pInfos, (peerInfo, cb) =>
         /**
          * Start nodes, each node will start listening on the network interface
          */
         HOPR.createNode({
-            provider: provider,
+            web3: web3,
             output: console.log,
             contract: contract,
             peerInfo: peerInfo

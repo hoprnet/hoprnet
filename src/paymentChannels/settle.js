@@ -3,7 +3,7 @@
 const { isPartyA, pubKeyToEthereumAddress } = require('../utils')
 const { DEFAULT_GAS_AMOUNT, GAS_PRICE } = require('../constants')
 
-module.exports = (self) => (channelId, useRestoreTx = false, cb = () => {}) => {
+module.exports = (self) => (channelId, useRestoreTx = false, cb = () => { }) => {
     if (typeof useRestoreTx === 'function') {
         cb = useRestoreTx
         useRestoreTx = false
@@ -38,25 +38,26 @@ module.exports = (self) => (channelId, useRestoreTx = false, cb = () => {}) => {
             gas: DEFAULT_GAS_AMOUNT, // arbitrary
             gasPrice: GAS_PRICE,
             nonce: self.nonce
-        }, (err, hash) => {
-            if (err) { throw err }
-
-            console.log('[\'' + self.node.peerInfo.id.toB58String() + '\']: Settled payment channel \'' + channelId.toString('hex') + '\'. TxHash \'' + hash + '\'.')
-    
-            let receivedMoney
-            if (isPartyA(
-                pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal()), counterParty)) {
-                receivedMoney = lastTx.value - initialTx.value
-            } else {
-                receivedMoney = initialTx.value - lastTx.value
-            }
-    
-            cb(null, receivedMoney)
         })
+            .on('error', cb)
+            .on('transactionHash', (hash) => console.log('[\'' + self.node.peerInfo.id.toB58String() + '\']: Settled payment channel \'' + channelId.toString('hex') + '\'. TxHash \'' + hash + '\'.'))
+            .on('confirmation', (n, receipt) => {
+                if (n == 0) {
+                    let receivedMoney
+                    if (isPartyA(
+                        pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal()), counterParty)) {
+                        receivedMoney = lastTx.value - initialTx.value
+                    } else {
+                        receivedMoney = initialTx.value - lastTx.value
+                    }
+
+                    cb(null, receivedMoney)
+                }
+            })
 
 
     } else {
-        return
+        cb(null, 0)
     }
 
 }
