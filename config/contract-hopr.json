@@ -22,6 +22,7 @@
 
     "mnemonic": "tribe explain movie boat make addict item invest fit sense rail enlist",
 
-    "ropstenContractAddress": "0x82C7482Cb6405048Dac3B2fAdC9Aa193b81AfD51",
+    "ropstenContractAddress": "0x35e7B26883D2b24170A254642fE13ABF573B7987",
+    "rinkbeyContractAddress": "0x696FBD3b9471490d7807204E25FDcc4911f3221F",
     "mainnetContractAddress": "0x0"
 }
