@@ -19,5 +19,10 @@
     "node8Address": "0x41f31d963db9280e2465bf1994b472162677411f",
     "receiverPK":   "5171d2b67bd88da5aec9e8f800e9523bdc6c95ef6a02b183cab528de1df88c1e",
     "receiverAddress": "0x21547ae4745de102a11fc5a9a3eed71470342f3e",
-    "mnemonic": "tribe explain movie boat make addict item invest fit sense rail enlist"
+
+    "mnemonic": "tribe explain movie boat make addict item invest fit sense rail enlist",
+
+    "ropstenContractAddress": "0x35e7B26883D2b24170A254642fE13ABF573B7987",
+    "rinkbeyContractAddress": "0x696FBD3b9471490d7807204E25FDcc4911f3221F",
+    "mainnetContractAddress": "0x0"
 }

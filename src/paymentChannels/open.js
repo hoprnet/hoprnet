@@ -7,7 +7,7 @@ const { toWei } = require('web3').utils
 const { getId, pubKeyToEthereumAddress, deepCopy, bufferToNumber } = require('../utils')
 const { recover } = require('secp256k1')
 
-const { PROTOCOL_PAYMENT_CHANNEL } = require('../constants')
+const { PROTOCOL_PAYMENT_CHANNEL, DEFAULT_GAS_AMOUNT, GAS_PRICE } = require('../constants')
 const SIGNATURE_LENGTH = 64
 
 const Transaction = require('../transaction')
@@ -15,6 +15,7 @@ const Transaction = require('../transaction')
 module.exports = (self) => (to, cb) => waterfall([
     (cb) => self.node.peerRouting.findPeer(to.id, cb),
     (peerInfo, cb) => self.node.dialProtocol(peerInfo, PROTOCOL_PAYMENT_CHANNEL, cb),
+    (conn, cb) => setTimeout(cb, 40000, null, conn),
     (conn, cb) => {
         const restoreTx = new Transaction()
 
@@ -48,16 +49,15 @@ module.exports = (self) => (to, cb) => waterfall([
 
                 self.contract.methods.createFunded(
                     pubKeyToEthereumAddress(to.id.pubKey.marshal()),
-                    toWei('1', 'shannon'),
+                    toWei('1', 'mwei'),
                     restoreTx.signature.slice(0, 32),
                     restoreTx.signature.slice(32, 64),
                     restoreTx.recovery
                 ).send({
                     from: pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal()),
-                    gas: 1000000, // arbitrary
-                    nonce: self.nonce
-                    // gasPrice: '30000000000000'
-                }, (err, hash) => {
+                    gas: DEFAULT_GAS_AMOUNT, // arbitrary
+                    gasPrice: GAS_PRICE
+                }, (err, result) => {
                     if (err) { throw err }
                     self.setSettlementListener(restoreTx.channelId)
                     self.setRestoreTransaction(restoreTx)

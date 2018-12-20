@@ -32,3 +32,6 @@ db
 # Exclude Solidity Coverage Report
 coverage
 coverage.json
+
+# Exclude .secrets.json file
+.secrets.json
