@@ -33,7 +33,7 @@ class PaymentChannel extends EventEmitter {
     }
 
     static createPaymentChannels(node, contract, cb) {
-        node.eth.getTransactionCount(pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()), (err, nonce) => {
+        node.web3.eth.getTransactionCount(pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()), (err, nonce) => {
             if (err) { throw err }
 
             node.paymentChannels = new PaymentChannel(node, contract, nonce)

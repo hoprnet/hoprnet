@@ -10,65 +10,75 @@ const { warmUpNodes } = require('./utils')
 const { ETH_SEND_GAS_AMOUNT, GAS_PRICE, STAKE_GAS_AMOUNT, ROPSTEN_WSS_URL, HARDCODED_ETH_ADDRESS, HARDCODED_PRIV_KEY, CONTRACT_ADDRESS } = require('../src/constants')
 
 const Web3 = require('web3')
-const Web3_ETH = require('web3-eth')
+const web3 = new Web3(new Web3.providers.WebsocketProvider(ROPSTEN_WSS_URL))
 
 const { createNode } = require('../src')
 
-const provider = new Web3.providers.WebsocketProvider(ROPSTEN_WSS_URL)
-const web3_eth = new Web3_ETH(provider)
 
 const AMOUUNT_OF_NODES = 4
 const AMOUNT_OF_MESSAGES = 3
 
 // Add the private to the Web3 wallet
-web3_eth.accounts.wallet.add(HARDCODED_PRIV_KEY)
-const contract = new web3_eth.Contract(JSON.parse(readFileSync(__dirname + '/utils/HoprChannel.abi')), CONTRACT_ADDRESS)
+web3.eth.accounts.wallet.add(HARDCODED_PRIV_KEY)
+const contract = new web3.eth.Contract(JSON.parse(readFileSync(__dirname + '/utils/HoprChannel.abi')), CONTRACT_ADDRESS)
 
 let index
 
 waterfall([
-    (cb) => web3_eth.getTransactionCount(HARDCODED_ETH_ADDRESS, cb),
+    (cb) => web3.eth.getTransactionCount(HARDCODED_ETH_ADDRESS, cb),
     (_index, cb) => {
         index = _index
         times(AMOUUNT_OF_NODES, (_, cb) =>
             createNode({
                 contract: contract,
-                provider: provider
+                web3: web3
             }, cb), cb)
     },
     (nodes, cb) => warmUpNodes(nodes, cb),
-    (nodes, cb) => times(nodes.length, (n, cb) => web3_eth.sendTransaction({
+    (nodes, cb) => times(nodes.length, (n, cb) => web3.eth.sendTransaction({
         from: 0,
         to: pubKeyToEthereumAddress(nodes[n].peerInfo.id.pubKey.marshal()),
-        value: toWei('0.1', 'ether'),
+        value: toWei('0.005', 'ether'),
         gas: ETH_SEND_GAS_AMOUNT,
         gasPrice: GAS_PRICE,
         nonce: n + index
-    }, cb), (err) => cb(err, nodes)),
-    // Wait some time to let the txs become final
-    (nodes, cb) => setTimeout(cb, 30000, null, nodes),
+    })
+        .on('error', cb)
+        .on('transactionHash', (hash) => console.log('[\'' + nodes[n].peerInfo.id.toB58String() + '\']: Received ' + toWei('0.1', 'ether') + '. TxHash \'' + hash + '\'.'))
+        .on('confirmation', (n, receipt) => {
+            if (n == 0)
+                cb(null)
+        }), (err) => cb(err, nodes)),
     (nodes, cb) => {
-        index += nodes.length
-
+        nodes.forEach(node => node.web3.eth.accounts.wallet.add('0x'.concat(node.peerInfo.id.privKey.marshal().toString('hex'))))
         times(AMOUUNT_OF_NODES, (n, cb) => {
-            web3_eth.accounts.wallet.add('0x'.concat(nodes[n].peerInfo.id.privKey.marshal().toString('hex')))
 
-            contract.methods.stakeEther().send({
-                from: pubKeyToEthereumAddress(nodes[n].peerInfo.id.pubKey.marshal()),
+
+            nodes[n].paymentChannels.nonce = node.paymentChannels.nonce + 1
+
+            nodes[n].web3.eth.accounts.signTransaction({
+                nonce: nodes[n].paymentChannels.nonce,
                 value: toWei('1', 'gwei'),
                 gas: STAKE_GAS_AMOUNT,
                 gasPrice: GAS_PRICE,
-                nonce: n + index
-            }, cb)
+                to: CONTRACT_ADDRESS,
+                data: contract.methods.stakeEther().encodeABI()
+            }, '0x'.concat(nodes[n].peerInfo.id.privKey.marshal().toString('hex')), (err, tx) => {
+                nodes[n].web3.eth.sendSignedTransaction(tx)
+            })
+                .on('error', cb)
+                .on('transactionHash', (hash) => console.log('[\'' + nodes[n].peerInfo.id.toB58String() + '\']: Staked ' + toWei('0.1', 'ether') + '. TxHash \'' + hash + '\'.'))
+                .on('confirmation', (n, receipt) => {
+                    if (n == 0)
+                        cb(null)
+                })
         }, (err) => cb(err, nodes))
     },
-    // Wait some time to let the txs become final
-    (nodes, cb) => setTimeout(cb, 7000, null, nodes),
     (nodes, cb) => series([
         (cb) => timesSeries(AMOUNT_OF_MESSAGES, (n, cb) => {
             nodes[0].sendMessage('test_test_test ' + Date.now().toString(), nodes[3].peerInfo.id)
 
-            setTimeout(cb, 10000)
+            setTimeout(cb, 15000)
         }, cb),
         (cb) => nodes[1].paymentChannels.payout(cb)
     ], cb),

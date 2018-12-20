@@ -52,10 +52,10 @@ module.exports = (self) => {
             (cb) => self.contract.methods.channels(channelId).call({
                 from: pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal())
             }, cb),
-            (channel, cb) => self.node.eth.getBlockNumber((err, blockNumber) => cb(err, blockNumber, channel)),
+            (channel, cb) => self.node.web3.eth.getBlockNumber((err, blockNumber) => cb(err, blockNumber, channel)),
             (blockNumber, channel, cb) => {
                 if (blockNumber < channel.settlementBlock) {
-                    const subscription = self.node.eth.subscribe('newBlockHeaders')
+                    const subscription = self.node.web3.eth.subscribe('newBlockHeaders')
                         .on('data', (block) => {
                             console.log('Waiting ... Block \'' + block.number + '\'.')
                             if (block.number > parseInt(channel.settlementBlock)) {
@@ -106,7 +106,7 @@ module.exports = (self) => {
                 receivedMoney = initialTx.value - amountA
             }
 
-            console.log('[\'' + self.node.peerInfo.id.toB58String() + '\']: Closed payment channel \'' + channelId.toString('hex') + '\' and received ' + receivedMoney + ' wei. TxHash \'' + hash + '\'.')
+            console.log('[\'' + self.node.peerInfo.id.toB58String() + '\']: Closed payment channel \'' + channelId.toString('hex') + '\' and received ' + receivedMoney + ' wei.' + (hash ? ' TxHash \''.concat(hash).concat('\'.') : ''))
 
             self.delete(lastTx.channelId)
 
