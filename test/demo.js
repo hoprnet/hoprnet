@@ -46,7 +46,7 @@ waterfall([
         nonce: n + index
     }, cb), (err) => cb(err, nodes)),
     // Wait some time to let the txs become final
-    (nodes, cb) => setTimeout(cb, 15000, null, nodes),
+    (nodes, cb) => setTimeout(cb, 30000, null, nodes),
     (nodes, cb) => {
         index += nodes.length
 

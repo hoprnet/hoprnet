@@ -2,6 +2,7 @@
 
 const { waterfall } = require('async')
 const { isPartyA, pubKeyToEthereumAddress, mineBlock } = require('../utils')
+const { DEFAULT_GAS_AMOUNT, GAS_PRICE } = require('../constants')
 
 module.exports = (self) => {
     function hasBetterTx(channelId, amountA, counterParty) {
@@ -76,8 +77,8 @@ module.exports = (self) => {
                     interested = true
                     self.contract.methods.withdraw(pubKeyToEthereumAddress(counterParty)).send({
                         from: pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal()),
-                        gas: 250333, // arbitrary
-                        gasPrice: '30000000000000'
+                        gas: DEFAULT_GAS_AMOUNT, // arbitrary
+                        gasPrice: GAS_PRICE
                     }, cb)
                 } else {
                     cb()

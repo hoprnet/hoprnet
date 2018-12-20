@@ -1,6 +1,7 @@
 'use strict'
 
 const { isPartyA, pubKeyToEthereumAddress } = require('../utils')
+const { DEFAULT_GAS_AMOUNT, GAS_PRICE } = require('../constants')
 
 module.exports = (self) => (channelId, useRestoreTx = false, cb = () => {}) => {
     if (typeof useRestoreTx === 'function') {
@@ -31,8 +32,8 @@ module.exports = (self) => (channelId, useRestoreTx = false, cb = () => {}) => {
             lastTx.recovery
         ).send({
             from: pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal()),
-            gas: 250333, // arbitrary
-            gasPrice: '30000000000000'
+            gas: DEFAULT_GAS_AMOUNT, // arbitrary
+            gasPrice: GAS_PRICE
         }, (err, txHash) => {
             if (err) { throw err }
 

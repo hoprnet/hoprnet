@@ -3,7 +3,7 @@
     "unstakeAmount": 40000,
     "createAmount": 150000,
     "fundAmount": 50000,
-    "defaultAmount": 300000,
+    "defaultAmount": 600000,
     "simpleTxAmount": 21000,
     "gasPrice": 10000000000
 }
