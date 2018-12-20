@@ -14,7 +14,10 @@ const Web3_ETH = require('web3-eth')
 
 const { createNode } = require('../src')
 
+const provider = new Web3.providers.HttpProvider(ROPSTEN_URL)
 const provider = new Web3.providers.WebsocketProvider(ROPSTEN_WSS_URL)
+
+const web3_Http = new Web3_ETH(provider)
 const web3_eth = new Web3_ETH(provider)
 
 const AMOUUNT_OF_NODES = 4
