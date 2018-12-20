@@ -36,8 +36,9 @@ module.exports = (self) => (channelId, useRestoreTx = false, cb = () => {}) => {
         ).send({
             from: pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal()),
             gas: DEFAULT_GAS_AMOUNT, // arbitrary
-            gasPrice: GAS_PRICE
-        }, (err, txHash) => {
+            gasPrice: GAS_PRICE,
+            nonce: self.nonce
+        }, (err, hash) => {
             if (err) { throw err }
 
             console.log('[\'' + self.node.peerInfo.id.toB58String() + '\']: Settled payment channel \'' + channelId.toString('hex') + '\'. TxHash \'' + hash + '\'.')

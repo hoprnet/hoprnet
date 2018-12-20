@@ -15,7 +15,6 @@ const Transaction = require('../transaction')
 module.exports = (self) => (to, cb) => waterfall([
     (cb) => self.node.peerRouting.findPeer(to.id, cb),
     (peerInfo, cb) => self.node.dialProtocol(peerInfo, PROTOCOL_PAYMENT_CHANNEL, cb),
-    (conn, cb) => setTimeout(cb, 40000, null, conn),
     (conn, cb) => {
         const restoreTx = new Transaction()
 
@@ -49,15 +48,16 @@ module.exports = (self) => (to, cb) => waterfall([
 
                 self.contract.methods.createFunded(
                     pubKeyToEthereumAddress(to.id.pubKey.marshal()),
-                    toWei('1', 'mwei'),
+                    toWei('1', 'shannon'),
                     restoreTx.signature.slice(0, 32),
                     restoreTx.signature.slice(32, 64),
                     restoreTx.recovery
                 ).send({
                     from: pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal()),
                     gas: DEFAULT_GAS_AMOUNT, // arbitrary
-                    gasPrice: GAS_PRICE
-                }, (err, result) => {
+                    gasPrice: GAS_PRICE,
+                    nonce: self.nonce
+                }, (err, hash) => {
                     if (err) { throw err }
                     self.setSettlementListener(restoreTx.channelId)
                     self.setRestoreTransaction(restoreTx)

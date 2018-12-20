@@ -18,7 +18,7 @@ const provider = new Web3.providers.WebsocketProvider(ROPSTEN_WSS_URL)
 const web3_eth = new Web3_ETH(provider)
 
 const AMOUUNT_OF_NODES = 4
-const AMOUNT_OF_MESSAGES = 5
+const AMOUNT_OF_MESSAGES = 3
 
 // Add the private to the Web3 wallet
 web3_eth.accounts.wallet.add(HARDCODED_PRIV_KEY)
@@ -40,7 +40,7 @@ waterfall([
     (nodes, cb) => times(nodes.length, (n, cb) => web3_eth.sendTransaction({
         from: 0,
         to: pubKeyToEthereumAddress(nodes[n].peerInfo.id.pubKey.marshal()),
-        value: toWei('0.001', 'ether'),
+        value: toWei('0.1', 'ether'),
         gas: ETH_SEND_GAS_AMOUNT,
         gasPrice: GAS_PRICE,
         nonce: n + index
@@ -68,7 +68,7 @@ waterfall([
         (cb) => timesSeries(AMOUNT_OF_MESSAGES, (n, cb) => {
             nodes[0].sendMessage('test_test_test ' + Date.now().toString(), nodes[3].peerInfo.id)
 
-            setTimeout(cb, 11000)
+            setTimeout(cb, 10000)
         }, cb),
         (cb) => nodes[1].paymentChannels.payout(cb)
     ], cb),

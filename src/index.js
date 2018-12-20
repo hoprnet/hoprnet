@@ -52,9 +52,8 @@ class Hopper extends libp2p {
      * 
      * @param {Object} _options 
      * @param {Object} provider 
-     * @param {Object} contract 
      */
-    constructor(_options, provider, contract) {
+    constructor(_options, provider) {
         if (!_options || !_options.peerInfo || !isPeerInfo(_options.peerInfo))
             throw Error('Invalid input parameters. Expected a valid PeerInfo, but got \'' + typeof _options.peerInfo + '\' instead.')
 

@@ -57,19 +57,20 @@ module.exports = (self) => {
                 if (blockNumber < channel.settlementBlock) {
                     const subscription = self.node.eth.subscribe('newBlockHeaders')
                         .on('data', (block) => {
+                            console.log('Waiting ... Block \'' + block.number + '\'.')
                             if (block.number > parseInt(channel.settlementBlock)) {
                                 subscription.unsubscribe((err, ok) => cb(err))
                             }
-                            // else {
-                            //     // ================ Only for testing ================
-                            //     mineBlock(self.contract.currentProvider)
-                            //     // ==================================================
+                            else {
+                                // ================ Only for testing ================
+                                //mineBlock(self.contract.currentProvider)
+                                // ==================================================
 
-                            // }
+                            }
                         })
 
                     // ================ Only for testing ================
-                    // mineBlock(self.contract.currentProvider)
+                    //mineBlock(self.contract.currentProvider)
                     // ==================================================
                 } else {
                     cb()
@@ -84,7 +85,8 @@ module.exports = (self) => {
                     self.contract.methods.withdraw(pubKeyToEthereumAddress(counterParty)).send({
                         from: pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal()),
                         gas: DEFAULT_GAS_AMOUNT, // arbitrary
-                        gasPrice: GAS_PRICE
+                        gasPrice: GAS_PRICE,
+                        nonce: self.nonce
                     }, cb)
                 } else {
                     cb()
