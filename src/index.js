@@ -103,7 +103,6 @@ class Hopper extends libp2p {
 
         this.seenTags = new Set()
         this.pendingTransactions = new Map()
-        this.paymentChannels = new PaymentChannels(this, contract)
         this.crawlNetwork = crawlNetwork(this)
         this.getPubKey = getPubKey(this)
     }
@@ -128,7 +127,7 @@ class Hopper extends libp2p {
             (cb) =>
                 isPeerInfo(options.peerInfo) ? cb(null, options.peerInfo) : getPeerInfo(null, cb),
             (peerInfo, cb) =>
-                (new Hopper({ peerInfo: peerInfo }, options.provider, options.contract)).start(options.output, cb),
+                (new Hopper({ peerInfo: peerInfo }, options.provider, options.contract)).start(options.output, options.contract, cb),
         ], cb)
     }
 
@@ -138,9 +137,10 @@ class Hopper extends libp2p {
      * @param {Function} output function to which the plaintext of the received message is passed
      * @param {Function} cb callback when node is ready
      */
-    start(output, cb) {
+    start(output, contract, cb) {
         waterfall([
             (cb) => super.start((err, _) => cb(err)),
+            (cb) => PaymentChannels.createPaymentChannels(this, contract, cb),
             (cb) => registerHandlers(this, output, cb)
         ], cb)
     }

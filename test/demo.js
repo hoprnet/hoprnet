@@ -12,7 +12,7 @@ const Web3_ETH = require('web3-eth')
 
 const { createNode } = require('../src')
 
-const provider = new Web3.providers.WebsocketProvider('wss://ropsten.infura.io/ws/v3/f75ed7e5ca384974b1c3c71657fb8d4b')
+const provider = new Web3.providers.WebsocketProvider('wss://rinkeby.infura.io/ws/v3/9623e709032449deb1d09a5943f4516a')
 const web3_eth = new Web3_ETH(provider)
 
 /**
@@ -41,44 +41,42 @@ waterfall([
     (_index, cb) => {
         index = _index
         times(AMOUUNT_OF_NODES, (_, cb) =>
-        createNode({
-            contract: contract,
-            provider: provider
-        }, cb), cb)
+            createNode({
+                contract: contract,
+                provider: provider
+            }, cb), cb)
     },
     (nodes, cb) => warmUpNodes(nodes, cb),
     (nodes, cb) => times(nodes.length, (n, cb) => web3_eth.sendTransaction({
         from: 0,
         to: pubKeyToEthereumAddress(nodes[n].peerInfo.id.pubKey.marshal()),
-        value: toWei('0.001', 'ether'),
+        value: toWei('0.01', 'ether'),
         gas: 300000,
         // gasPrice: 1000000000,
         nonce: n + index
-    }, cb), (err) => cb(err, nodes)),
-    // Wait some time to let the txs become final
-    (nodes, cb) => setTimeout(cb, 15000, null, nodes),
-    (nodes, cb) => {
-        index += nodes.length
+    }), (err) => cb(err, nodes)),
+    (nodes, cb) => times(AMOUUNT_OF_NODES, (n, cb) => {
+        web3_eth.accounts.wallet.add('0x'.concat(nodes[n].peerInfo.id.privKey.marshal().toString('hex')))
 
-        times(AMOUUNT_OF_NODES, (n, cb) => {
-            web3_eth.accounts.wallet.add('0x'.concat(nodes[n].peerInfo.id.privKey.marshal().toString('hex')))
-
-            contract.methods.stakeEther().send({
-                from: pubKeyToEthereumAddress(nodes[n].peerInfo.id.pubKey.marshal()),
-                value: toWei('1', 'gwei'),
-                gas: 230000,
-                // gasPrice: 1000000000,
-                nonce: n + index
-            }, cb)
-        }, (err) => cb(err, nodes))
-    },
+        contract.methods.stakeEther().send({
+            from: pubKeyToEthereumAddress(nodes[n].peerInfo.id.pubKey.marshal()),
+            value: toWei('1', 'gwei'),
+            gas: 230000,
+            // gasPrice: 1000000000,
+            nonce: n + index
+        }, (err, hash) => {
+            if (err) { cb(err) }
+            console.log('[\'' + nodes[n].peerInfo.id.toB58String() + '\']: Staked ether with txHash \'' + hash + '\'.')
+            cb(err, nodes)
+        })
+    }, (err) => cb(err, nodes)),
     // Wait some time to let the txs become final
-    (nodes, cb) => setTimeout(cb, 10000, null, nodes),
+    (nodes, cb) => setTimeout(cb, 7000, null, nodes),
     (nodes, cb) => series([
         (cb) => timesSeries(AMOUNT_OF_MESSAGES, (n, cb) => {
             nodes[0].sendMessage('test_test_test ' + Date.now().toString(), nodes[3].peerInfo.id)
 
-            setTimeout(cb, 5000)
+            setTimeout(cb, 11000)
         }, cb),
         (cb) => nodes[1].paymentChannels.payout(cb)
     ], cb),

@@ -15,13 +15,16 @@ module.exports = (self) => (channelId, useRestoreTx = false, cb = () => {}) => {
         lastTx = self.get(channelId)
     }
 
-    if (lastTx) { 
+    if (lastTx) {
         console.log('[\'' + self.node.peerInfo.id.toB58String() + '\']: Trying to close payment channel \'' + channelId.toString('hex') + '\'.')
 
         const counterParty = pubKeyToEthereumAddress(self.getCounterParty(channelId))
-        
+
         const initialTx = self.getRestoreTransaction(channelId)
-    
+
+        // TODO this might fail when settling more than one transaction at the same time
+        self.nonce = self.nonce + 1
+
         self.contract.methods.settle(
             counterParty,
             lastTx.index,
@@ -31,13 +34,14 @@ module.exports = (self) => (channelId, useRestoreTx = false, cb = () => {}) => {
             lastTx.recovery
         ).send({
             from: pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal()),
-            gas: 250333, // arbitrary
-            gasPrice: '30000000000000'
-        }, (err, txHash) => {
+            gas: 100000, // arbitrary
+            nonce: self.nonce
+            // gasPrice: '30000000000000'
+        }, (err, hash) => {
             if (err) { throw err }
 
-            console.log('[\'' + self.node.peerInfo.id.toB58String() + '\']: Settled payment channel \'' + channelId.toString('hex') + '\'.')
-
+            console.log('[\'' + self.node.peerInfo.id.toB58String() + '\']: Settled payment channel \'' + channelId.toString('hex') + '\'. TxHash \'' + hash + '\'.')
+    
             let receivedMoney
             if (isPartyA(
                 pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal()), counterParty)) {
@@ -45,12 +49,13 @@ module.exports = (self) => (channelId, useRestoreTx = false, cb = () => {}) => {
             } else {
                 receivedMoney = initialTx.value - lastTx.value
             }
-            
+    
             cb(null, receivedMoney)
-
         })
+
+
     } else {
-        cb()
+        return
     }
 
 }

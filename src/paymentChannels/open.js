@@ -27,10 +27,13 @@ module.exports = (self) => (to, cb) => waterfall([
 
         restoreTx.sign(self.node.peerInfo.id.privKey.marshal())
 
+        // TODO this might fail when opening more than one channel at the same time
+        self.nonce = self.nonce + 1
+
         pull(
             pull.once(restoreTx.toBuffer()),
             conn,
-            pull.filter((data) => 
+            pull.filter((data) =>
                 Buffer.isBuffer(data) &&
                 data.length === SIGNATURE_LENGTH + 1 &&
                 recover(restoreTx.hash, data.slice(0, SIGNATURE_LENGTH), bufferToNumber(data.slice(SIGNATURE_LENGTH)))
@@ -51,20 +54,21 @@ module.exports = (self) => (to, cb) => waterfall([
                     restoreTx.recovery
                 ).send({
                     from: pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal()),
-                    gas: 250333, // arbitrary
-                    gasPrice: '30000000000000'
-                }, (err, result) => {
+                    gas: 1000000, // arbitrary
+                    nonce: self.nonce
+                    // gasPrice: '30000000000000'
+                }, (err, hash) => {
                     if (err) { throw err }
-
                     self.setSettlementListener(restoreTx.channelId)
                     self.setRestoreTransaction(restoreTx)
 
                     const tx = deepCopy(restoreTx, Transaction)
                     self.set(tx)
 
-                    cb(err, tx)
+                    console.log('[\'' + self.node.peerInfo.id.toB58String() + '\']: Opened payment channel with txHash \'' + hash + '\'.')
+
+                    cb(null, tx)
                 })
-            })
-        )
-    },
+            }))
+    }
 ], cb)

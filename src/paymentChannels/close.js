@@ -58,13 +58,18 @@ module.exports = (self) => {
                         .on('data', (block) => {
                             if (block.number > parseInt(channel.settlementBlock)) {
                                 subscription.unsubscribe((err, ok) => cb(err))
-                            } else {
-                                // ================ Only for testing ================
-                                mineBlock(self.contract.currentProvider)
-                                // ==================================================
-
                             }
+                            // else {
+                            //     // ================ Only for testing ================
+                            //     mineBlock(self.contract.currentProvider)
+                            //     // ==================================================
+
+                            // }
                         })
+
+                    // ================ Only for testing ================
+                    // mineBlock(self.contract.currentProvider)
+                    // ==================================================
                 } else {
                     cb()
                 }
@@ -74,16 +79,18 @@ module.exports = (self) => {
                     name === 'closed '.concat(channelId.toString('base64'))
                 )) {
                     interested = true
+                    self.nonce = self.nonce + 1
                     self.contract.methods.withdraw(pubKeyToEthereumAddress(counterParty)).send({
                         from: pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal()),
-                        gas: 250333, // arbitrary
-                        gasPrice: '30000000000000'
+                        gas: 100000, // arbitrary
+                        // gasPrice: '30000000000000'
+                        nonce: self.nonce
                     }, cb)
                 } else {
                     cb()
                 }
             }
-        ], (err) => {
+        ], (err, hash) => {
             if (err) { throw err }
 
             let receivedMoney
@@ -97,7 +104,7 @@ module.exports = (self) => {
                 receivedMoney = initialTx.value - amountA
             }
 
-            console.log('[\'' + self.node.peerInfo.id.toB58String() + '\']: Closed payment channel \'' + channelId.toString('hex') + '\' and received ' + receivedMoney + ' wei.')
+            console.log('[\'' + self.node.peerInfo.id.toB58String() + '\']: Closed payment channel \'' + channelId.toString('hex') + '\' and received ' + receivedMoney + ' wei. TxHash \'' + hash + '\'.')
 
             self.delete(lastTx.channelId)
 

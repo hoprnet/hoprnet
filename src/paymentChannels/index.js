@@ -5,7 +5,6 @@ const fs = require('fs')
 const EventEmitter = require('events');
 
 
-
 const { bytesToHex } = require('web3').utils
 const { recover } = require('secp256k1')
 
@@ -18,10 +17,11 @@ const settle = require('./settle')
 const payout = require('./payout')
 
 class PaymentChannel extends EventEmitter {
-    constructor(node, contract) {
+    constructor(node, contract, nonce) {
         super()
 
         this.openPaymentChannels = new Map()
+        this.nonce = nonce
         this.contract = contract
 
         this.node = node
@@ -30,6 +30,16 @@ class PaymentChannel extends EventEmitter {
         this.transfer = transfer(this)
         this.settle = settle(this)
         this.payout = payout(this)
+    }
+
+    static createPaymentChannels(node, contract, cb) {
+        node.eth.getTransactionCount(pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()), (err, nonce) => {
+            if (err) { throw err }
+
+            node.paymentChannels = new PaymentChannel(node, contract, nonce)
+
+            cb()
+        })
     }
 
     setSettlementListener(channelId, listener = this.close) {
