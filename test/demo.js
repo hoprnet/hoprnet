@@ -51,20 +51,21 @@ waterfall([
         }), (err) => cb(err, nodes)),
     (nodes, cb) => {
         nodes.forEach(node => node.web3.eth.accounts.wallet.add('0x'.concat(node.peerInfo.id.privKey.marshal().toString('hex'))))
+
         times(AMOUUNT_OF_NODES, (n, cb) => {
 
 
-            nodes[n].paymentChannels.nonce = node.paymentChannels.nonce + 1
+            // nodes[n].paymentChannels.nonce = node.paymentChannels.nonce + 1 // this was failing for an unknown reason, not sure why there is a nodes[n] and node 
 
             nodes[n].web3.eth.accounts.signTransaction({
-                nonce: nodes[n].paymentChannels.nonce,
+                // nonce: nodes[n].paymentChannels.nonce, // (optional) The nonce to use when signing this transaction. Default will use web3.eth.getTransactionCount().
                 value: toWei('1', 'gwei'),
                 gas: STAKE_GAS_AMOUNT,
                 gasPrice: GAS_PRICE,
                 to: CONTRACT_ADDRESS,
                 data: contract.methods.stakeEther().encodeABI()
             }, '0x'.concat(nodes[n].peerInfo.id.privKey.marshal().toString('hex')), (err, tx) => {
-                nodes[n].web3.eth.sendSignedTransaction(tx)
+                nodes[n].web3.eth.sendSignedTransaction(tx.rawTransaction) // this was OGly sending a JSON object - it is expecting a string. Debugging stops here??
             })
                 .on('error', cb)
                 .on('transactionHash', (hash) => console.log('[\'' + nodes[n].peerInfo.id.toB58String() + '\']: Staked ' + toWei('0.1', 'ether') + '. TxHash \'' + hash + '\'.'))
