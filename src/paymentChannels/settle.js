@@ -1,6 +1,6 @@
 'use strict'
 
-const { isPartyA, pubKeyToEthereumAddress } = require('../utils')
+const { isPartyA, pubKeyToEthereumAddress, contractCall } = require('../utils')
 const { DEFAULT_GAS_AMOUNT, GAS_PRICE } = require('../constants')
 
 module.exports = (self) => (channelId, useRestoreTx = false, cb = () => { }) => {
@@ -26,36 +26,32 @@ module.exports = (self) => (channelId, useRestoreTx = false, cb = () => { }) => 
         // TODO this might fail when settling more than one transaction at the same time
         self.nonce = self.nonce + 1
 
-        self.contract.methods.settle(
-            counterParty,
-            lastTx.index,
-            lastTx.value,
-            lastTx.signature.slice(0, 32),
-            lastTx.signature.slice(32, 64),
-            lastTx.recovery
-        ).send({
-            from: pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal()),
-            gas: DEFAULT_GAS_AMOUNT, // arbitrary
+        contractCall({
+            nonce: self.nonce,
+            to: self.contract._address,
+            gas: 1000000,
             gasPrice: GAS_PRICE,
-            nonce: self.nonce
+            data: self.contract.methods.settle(
+                counterParty,
+                lastTx.index,
+                lastTx.value,
+                lastTx.signature.slice(0, 32),
+                lastTx.signature.slice(32, 64),
+                lastTx.recovery
+            ).encodeABI()
+        }, self.node.peerInfo.id, self.node.web3, (err, hash) => {
+            if (err) { throw err }
+
+            let receivedMoney
+            if (isPartyA(
+                pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal()), counterParty)) {
+                receivedMoney = lastTx.value - initialTx.value
+            } else {
+                receivedMoney = initialTx.value - lastTx.value
+            }
+
+            cb(null, receivedMoney)
         })
-            .on('error', cb)
-            .on('transactionHash', (hash) => console.log('[\'' + self.node.peerInfo.id.toB58String() + '\']: Settled payment channel \'' + channelId.toString('hex') + '\'. TxHash \'' + hash + '\'.'))
-            .on('confirmation', (n, receipt) => {
-                if (n == 0) {
-                    let receivedMoney
-                    if (isPartyA(
-                        pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal()), counterParty)) {
-                        receivedMoney = lastTx.value - initialTx.value
-                    } else {
-                        receivedMoney = initialTx.value - lastTx.value
-                    }
-
-                    cb(null, receivedMoney)
-                }
-            })
-
-
     } else {
         cb(null, 0)
     }

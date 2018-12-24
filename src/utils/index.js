@@ -1,6 +1,6 @@
 'use strict'
 
-const { sha3, hexToBytes, toChecksumAddress } = require('web3').utils
+const { sha3, hexToBytes, toChecksumAddress, toWei } = require('web3').utils
 const { randomBytes } = require('crypto')
 
 // ==========================
@@ -306,6 +306,9 @@ module.exports.pubKeyToPeerId = (pubKey, cb) =>
     PeerId.createFromPubKey(new libp2p_crypto.supportedKeys.secp256k1.Secp256k1PublicKey(pubKey).bytes, cb)
 
 
+// module.exports.privKeyToPeerId = (privKey, cb) =>
+//     PeerId.createFromPrivKey(new libp2p_crypto.supportedKeys.secp256k1.Secp256k1PrivateKey(privKey).bytes, cb)
+
 // ==========================
 // Ganache-core methods   <-- ONLY FOR TESTING
 // ==========================
@@ -336,34 +339,74 @@ module.exports.mineBlock = (provider) => waterfall([
         id: Date.now()
     }, (err, response) => {
         if (err) { throw err }
-        
+
         console.log('%sNow on block %d.%s', blueText, parseInt(response.result, 16), resetColor)
     })
 ])
 
-/**
- * Go to a specific block by mining probably empty blocks
- * 
- * @param {Object} provider a valid Web3 provider
- * @param {Number} blockNumber the block to go to
- */
-module.exports.gotoBlock = (provider, blockNumber, cb) => {
+// /**
+//  * Go to a specific block by mining probably empty blocks
+//  * 
+//  * @param {Object} provider a valid Web3 provider
+//  * @param {Number} blockNumber the block to go to
+//  */
+// module.exports.gotoBlock = (provider, blockNumber, cb) => {
 
-    console.log('%sGoing to block %d by mining probably empty blocks%s', blueText, blockNumber, resetColor)
+//     console.log('%sGoing to block %d by mining probably empty blocks%s', blueText, blockNumber, resetColor)
 
-    during(
-        (cb) => provider.send({
-            jsonrpc: '2.0',
-            method: 'eth_blockNumber',
-            id: Date.now()
-        }, (err, response) => {
-            console.log('Block ' + parseInt(response.result, 16))
-            cb(err, parseInt(response.result, 16) < blockNumber)
-        }),
-        (cb) => provider.send({
-            jsonrpc: '2.0',
-            method: 'evm_mine',
-            id: Date.now(),
-        }, cb),
-        cb)
+//     during(
+//         (cb) => provider.send({
+//             jsonrpc: '2.0',
+//             method: 'eth_blockNumber',
+//             id: Date.now()
+//         }, (err, response) => {
+//             console.log('Block ' + parseInt(response.result, 16))
+//             cb(err, parseInt(response.result, 16) < blockNumber)
+//         }),
+//         (cb) => provider.send({
+//             jsonrpc: '2.0',
+//             method: 'evm_mine',
+//             id: Date.now(),
+//         }, cb),
+//         cb)
+// }
+
+// ==========================
+// Web3.js methods
+// ==========================
+
+module.exports.sendTransaction = (tx, peerId, web3, cb) =>
+    web3.eth.accounts.privateKeyToAccount(
+        typeof peerId === 'string' ?
+            peerId :
+            '0x'.concat(peerId.privKey.marshal().toString('hex'))
+    ).signTransaction(tx, (err, signedTransaction) => {
+        console.log(err, signedTransaction.rawTransaction)
+
+        let called = false
+        web3.eth.sendSignedTransaction(signedTransaction.rawTransaction)
+            .on('error', cb)
+            .on('transactionHash', (hash) => console.log('[\'' + '' + '\']: Staked ' + toWei('0.1', 'ether') + '. TxHash \'' + hash + '\'.'))
+            .on('confirmation', () => {
+                if (!called) {
+                    called = true
+                    cb()
+                }
+            })
+    })
+
+module.exports.contractCall = (tx, peerId, web3, cb) => {
+    if (!tx.data)
+        throw Error('Invalid contract call without a message invocation specified in the data field.')
+        
+    web3.eth.accounts.privateKeyToAccount(
+        typeof peerId === 'string' ?
+            peerId :
+            '0x'.concat(peerId.privKey.marshal().toString('hex'))
+    ).signTransaction(tx, (err, signedTransaction) => {
+        console.log(err, signedTransaction.rawTransaction)
+
+        web3.eth.sendSignedTransaction(signedTransaction.rawTransaction, cb)
+    })
 }
+

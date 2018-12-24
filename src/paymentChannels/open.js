@@ -4,10 +4,10 @@ const pull = require('pull-stream')
 
 const { waterfall } = require('async')
 const { toWei } = require('web3').utils
-const { getId, pubKeyToEthereumAddress, deepCopy, bufferToNumber } = require('../utils')
+const { getId, pubKeyToEthereumAddress, deepCopy, bufferToNumber, sendTransaction, contractCall } = require('../utils')
 const { recover } = require('secp256k1')
 
-const { PROTOCOL_PAYMENT_CHANNEL, DEFAULT_GAS_AMOUNT, GAS_PRICE } = require('../constants')
+const { PROTOCOL_PAYMENT_CHANNEL, CREATE_GAS_AMOUNT, GAS_PRICE } = require('../constants')
 const SIGNATURE_LENGTH = 64
 
 const Transaction = require('../transaction')
@@ -27,9 +27,6 @@ module.exports = (self) => (to, cb) => waterfall([
 
         restoreTx.sign(self.node.peerInfo.id.privKey.marshal())
 
-        // TODO this might fail when opening more than one channel at the same time
-        self.nonce = self.nonce + 1
-
         pull(
             pull.once(restoreTx.toBuffer()),
             conn,
@@ -45,34 +42,34 @@ module.exports = (self) => (to, cb) => waterfall([
 
                 restoreTx.signature.fill(signatures[0].slice(0, SIGNATURE_LENGTH))
                 restoreTx.recovery.fill(signatures[0].slice(SIGNATURE_LENGTH))
+                
+                self.nonce = self.nonce + 1
 
-                self.contract.methods.createFunded(
-                    pubKeyToEthereumAddress(to.id.pubKey.marshal()),
-                    toWei('1', 'shannon'),
-                    restoreTx.signature.slice(0, 32),
-                    restoreTx.signature.slice(32, 64),
-                    restoreTx.recovery
-                ).send({
-                    from: pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal()),
-                    gas: DEFAULT_GAS_AMOUNT, // arbitrary
+                contractCall({
+                    nonce: self.nonce,
+                    to: self.contract._address,
+                    gas: 1000000,
                     gasPrice: GAS_PRICE,
-                    nonce: self.nonce
+                    data: self.contract.methods.createFunded(
+                        pubKeyToEthereumAddress(to.id.pubKey.marshal()),
+                        toWei('1', 'shannon'),
+                        restoreTx.signature.slice(0, 32),
+                        restoreTx.signature.slice(32, 64),
+                        restoreTx.recovery
+                    ).encodeABI()
+                }, self.node.peerInfo.id, self.node.web3, (err, hash) => {
+                    if (err) { throw err }
+
+                    self.setSettlementListener(restoreTx.channelId)
+                    self.setRestoreTransaction(restoreTx)
+
+                    const tx = deepCopy(restoreTx, Transaction)
+                    self.set(tx)
+
+                    console.log('[\'' + self.node.peerInfo.id.toB58String() + '\']: Opened payment channel with txHash \'' + hash + '\'.')
+
+                    cb(null, tx)
                 })
-                    .on('error', cb)
-                    .on('transactionHash', (hash) => console.log('[\'' + self.node.peerInfo.id.toB58String() + '\']: Opened payment channel with txHash \'' + hash + '\'.'))
-                    .on('confirmation', (n, receipt) => {
-                        if (n == 0) {
-                            self.setSettlementListener(restoreTx.channelId)
-                            self.setRestoreTransaction(restoreTx)
-
-                            const tx = deepCopy(restoreTx, Transaction)
-                            self.set(tx)
-
-                            console.log('[\'' + self.node.peerInfo.id.toB58String() + '\']: Opened payment channel with txHash \'' + hash + '\'.')
-
-                            cb(null, tx)
-                        }
-                    })
             })
         )
     }

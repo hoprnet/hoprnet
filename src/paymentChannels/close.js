@@ -1,7 +1,7 @@
 'use strict'
 
 const { waterfall } = require('async')
-const { isPartyA, pubKeyToEthereumAddress, mineBlock } = require('../utils')
+const { isPartyA, pubKeyToEthereumAddress, mineBlock, contractCall } = require('../utils')
 const { DEFAULT_GAS_AMOUNT, GAS_PRICE } = require('../constants')
 
 module.exports = (self) => {
@@ -82,12 +82,13 @@ module.exports = (self) => {
                 )) {
                     interested = true
                     self.nonce = self.nonce + 1
-                    self.contract.methods.withdraw(pubKeyToEthereumAddress(counterParty)).send({
-                        from: pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal()),
-                        gas: DEFAULT_GAS_AMOUNT, // arbitrary
+
+                    contractCall({
+                        to: self.contract._address,
+                        gas: 1000000,
                         gasPrice: GAS_PRICE,
-                        nonce: self.nonce
-                    }, cb)
+                        data: self.contract.methods.withdraw(pubKeyToEthereumAddress(counterParty)).encodeABI()
+                    }, self.node.peerInfo.id, self.node.web3, cb)
                 } else {
                     cb()
                 }
