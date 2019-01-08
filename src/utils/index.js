@@ -1,7 +1,7 @@
 'use strict'
 
 const { sha3, hexToBytes, toChecksumAddress, toWei } = require('web3').utils
-const { randomBytes } = require('crypto')
+const { randomBytes, createHash } = require('crypto')
 
 // ==========================
 // General methods
@@ -41,6 +41,8 @@ module.exports.parseJSON = (str) =>
         return value
     })
 
+module.exports.log = (peerId, msg) => 
+    console.log(`['\x1b[34m${peerId.toB58String()}\x1b[0m']: ${msg}`)
 // ==========================
 // Buffer methods
 // ==========================
@@ -301,10 +303,23 @@ module.exports.getId = (sender, otherParty) => {
 // ==========================
 const libp2p_crypto = require('libp2p-crypto').keys
 const PeerId = require('peer-id')
+const Multihash = require('multihashes')
 
 module.exports.pubKeyToPeerId = (pubKey, cb) =>
     PeerId.createFromPubKey(new libp2p_crypto.supportedKeys.secp256k1.Secp256k1PublicKey(pubKey).bytes, cb)
 
+module.exports.privKeyToPeerId = (privKey, cb) => {
+    if (!Buffer.isBuffer(privKey)) {
+        if (privKey.startsWith('0x')) {
+            privKey = privKey.slice(2)
+        }
+        privKey = Buffer.from(privKey, 'hex')
+    }
+
+    privKey = new libp2p_crypto.supportedKeys.secp256k1.Secp256k1PrivateKey(privKey)
+
+    return new PeerId(Multihash.encode(privKey.public.bytes, 'sha2-256'), privKey, privKey.public)
+}
 
 // module.exports.privKeyToPeerId = (privKey, cb) =>
 //     PeerId.createFromPrivKey(new libp2p_crypto.supportedKeys.secp256k1.Secp256k1PrivateKey(privKey).bytes, cb)
@@ -374,39 +389,40 @@ module.exports.mineBlock = (provider) => waterfall([
 // ==========================
 // Web3.js methods
 // ==========================
+const defaultsDeep = require('@nodeutils/defaults-deep')
+const { GAS_PRICE } = require('../constants')
+/**
+ * Creates a web3 account from a peerId instance
+ * 
+ * @param {Object} peerId a peerId instance
+ * @param {Object} web3 a web3.js instance
+ */
+module.exports.peerIdToWeb3Account = (peerId, web3) =>
+    web3.eth.accounts.privateKeyToAccount('0x'.concat(peerId.privKey.marshal().toString('hex')))
 
-module.exports.sendTransaction = (tx, peerId, web3, cb) =>
-    web3.eth.accounts.privateKeyToAccount(
-        typeof peerId === 'string' ?
-            peerId :
-            '0x'.concat(peerId.privKey.marshal().toString('hex'))
-    ).signTransaction(tx, (err, signedTransaction) => {
-        console.log(err, signedTransaction.rawTransaction)
+/**
+ * Signs a transaction with the private key that is given by 
+ * the peerId instance and publishes it to the network given by
+ * the web3.js instance
+ * 
+ * @param {Object} tx an Ethereum transaction
+ * @param {Object} peerId a peerId
+ * @param {Object} web3 a web3.js instance
+ * @param {Function} cb the function that is called when finished
+ */
+module.exports.sendTransaction = async (tx, peerId, web3, cb = () => { }) => {
+    const signedTx = await this.peerIdToWeb3Account(peerId, web3).signTransaction(defaultsDeep(tx, {
+        gasPrice: GAS_PRICE
+    }))
 
-        let called = false
-        web3.eth.sendSignedTransaction(signedTransaction.rawTransaction)
-            .on('error', cb)
-            .on('transactionHash', (hash) => console.log('[\'' + '' + '\']: Staked ' + toWei('0.1', 'ether') + '. TxHash \'' + hash + '\'.'))
-            .on('confirmation', () => {
-                if (!called) {
-                    called = true
-                    cb()
-                }
-            })
-    })
+    web3.eth.sendSignedTransaction(signedTx.rawTransaction)
+        .on('error', cb)
+        .on('receipt', (receipt) => {
+            if (!receipt.status)
+                throw Error('Reverted tx')
 
-module.exports.contractCall = (tx, peerId, web3, cb) => {
-    if (!tx.data)
-        throw Error('Invalid contract call without a message invocation specified in the data field.')
-        
-    web3.eth.accounts.privateKeyToAccount(
-        typeof peerId === 'string' ?
-            peerId :
-            '0x'.concat(peerId.privKey.marshal().toString('hex'))
-    ).signTransaction(tx, (err, signedTransaction) => {
-        console.log(err, signedTransaction.rawTransaction)
+            // console.log('[\'%s\']: Published tx with TxHash %s', peerId.toB58String(), receipt.transactionHash)
 
-        web3.eth.sendSignedTransaction(signedTransaction.rawTransaction, cb)
-    })
+            cb(null, receipt)
+        })
 }
-

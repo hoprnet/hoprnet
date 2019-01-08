@@ -4,7 +4,7 @@ const pull = require('pull-stream')
 
 const { waterfall } = require('async')
 const { toWei } = require('web3').utils
-const { getId, pubKeyToEthereumAddress, deepCopy, bufferToNumber, sendTransaction, contractCall } = require('../utils')
+const { getId, pubKeyToEthereumAddress, deepCopy, bufferToNumber, log } = require('../utils')
 const { recover } = require('secp256k1')
 
 const { PROTOCOL_PAYMENT_CHANNEL, CREATE_GAS_AMOUNT, GAS_PRICE } = require('../constants')
@@ -37,27 +37,22 @@ module.exports = (self) => (to, cb) => waterfall([
                     .compare(to.id.pubKey.marshal()) === 0
             ),
             pull.collect((err, signatures) => {
+                if (err)
+                    throw err
+
                 if (signatures.length !== 1)
                     throw Error('Invalid response')
 
                 restoreTx.signature.fill(signatures[0].slice(0, SIGNATURE_LENGTH))
                 restoreTx.recovery.fill(signatures[0].slice(SIGNATURE_LENGTH))
-                
-                self.nonce = self.nonce + 1
 
-                contractCall({
-                    nonce: self.nonce,
-                    to: self.contract._address,
-                    gas: 1000000,
-                    gasPrice: GAS_PRICE,
-                    data: self.contract.methods.createFunded(
-                        pubKeyToEthereumAddress(to.id.pubKey.marshal()),
-                        toWei('1', 'shannon'),
-                        restoreTx.signature.slice(0, 32),
-                        restoreTx.signature.slice(32, 64),
-                        restoreTx.recovery
-                    ).encodeABI()
-                }, self.node.peerInfo.id, self.node.web3, (err, hash) => {
+                self.contractCall(self.contract.methods.createFunded(
+                    pubKeyToEthereumAddress(to.id.pubKey.marshal()),
+                    toWei('1', 'shannon'),
+                    restoreTx.signature.slice(0, 32),
+                    restoreTx.signature.slice(32, 64),
+                    restoreTx.recovery
+                ), (err, receipt) => {
                     if (err) { throw err }
 
                     self.setSettlementListener(restoreTx.channelId)
@@ -66,7 +61,7 @@ module.exports = (self) => (to, cb) => waterfall([
                     const tx = deepCopy(restoreTx, Transaction)
                     self.set(tx)
 
-                    console.log('[\'' + self.node.peerInfo.id.toB58String() + '\']: Opened payment channel with txHash \'' + hash + '\'.')
+                    log(self.node.peerInfo.id, `Opened payment channel \x1b[33m${restoreTx.channelId.toString('hex')}\x1b[0m with txHash \x1b[32m${receipt.transactionHash}\x1b[0m. Nonce is now \x1b[31m${self.nonce - 1}\x1b[0m.`)
 
                     cb(null, tx)
                 })

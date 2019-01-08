@@ -1,7 +1,6 @@
 'use strict'
 
-const { isPartyA, pubKeyToEthereumAddress, contractCall } = require('../utils')
-const { DEFAULT_GAS_AMOUNT, GAS_PRICE } = require('../constants')
+const { isPartyA, pubKeyToEthereumAddress, log } = require('../utils')
 
 module.exports = (self) => (channelId, useRestoreTx = false, cb = () => { }) => {
     if (typeof useRestoreTx === 'function') {
@@ -17,29 +16,20 @@ module.exports = (self) => (channelId, useRestoreTx = false, cb = () => { }) => 
     }
 
     if (lastTx) {
-        console.log('[\'' + self.node.peerInfo.id.toB58String() + '\']: Trying to close payment channel \'' + channelId.toString('hex') + '\'.')
+        log(self.node.peerInfo.id, `Trying to close payment channel \x1b[33m${channelId.toString('hex')}\x1b[0m. Nonce is ${self.nonce}`)
 
         const counterParty = pubKeyToEthereumAddress(self.getCounterParty(channelId))
 
         const initialTx = self.getRestoreTransaction(channelId)
 
-        // TODO this might fail when settling more than one transaction at the same time
-        self.nonce = self.nonce + 1
-
-        contractCall({
-            nonce: self.nonce,
-            to: self.contract._address,
-            gas: 1000000,
-            gasPrice: GAS_PRICE,
-            data: self.contract.methods.settle(
-                counterParty,
-                lastTx.index,
-                lastTx.value,
-                lastTx.signature.slice(0, 32),
-                lastTx.signature.slice(32, 64),
-                lastTx.recovery
-            ).encodeABI()
-        }, self.node.peerInfo.id, self.node.web3, (err, hash) => {
+        self.contractCall(self.contract.methods.settle(
+            counterParty,
+            lastTx.index,
+            lastTx.value,
+            lastTx.signature.slice(0, 32),
+            lastTx.signature.slice(32, 64),
+            lastTx.recovery
+        ), (err, receipt) => {
             if (err) { throw err }
 
             let receivedMoney
@@ -49,6 +39,8 @@ module.exports = (self) => (channelId, useRestoreTx = false, cb = () => { }) => 
             } else {
                 receivedMoney = initialTx.value - lastTx.value
             }
+
+            log(self.node.peerInfo.id, `Settled channel \x1b[33m${channelId.toString('hex')}\x1b[0m with txHash \x1b[32m${receipt.transactionHash}\x1b[0m. Nonce is now \x1b[31m${self.nonce}\x1b[0m`)
 
             cb(null, receivedMoney)
         })

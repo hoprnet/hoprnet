@@ -1,8 +1,7 @@
 'use strict'
 
 const { waterfall } = require('async')
-const { isPartyA, pubKeyToEthereumAddress, mineBlock, contractCall } = require('../utils')
-const { DEFAULT_GAS_AMOUNT, GAS_PRICE } = require('../constants')
+const { isPartyA, pubKeyToEthereumAddress, mineBlock, log } = require('../utils')
 
 module.exports = (self) => {
     function hasBetterTx(channelId, amountA, counterParty) {
@@ -27,8 +26,6 @@ module.exports = (self) => {
             console.log('[\'' + self.node.peerInfo.id.toB58String() + '\']: Listening to wrong channel. Channel \'' + channelId.toString('hex') + '\'.')
             return
         }
-
-
 
         const amountA = parseInt(event.returnValues.amountA)
         const lastTx = self.get(channelId)
@@ -59,18 +56,21 @@ module.exports = (self) => {
                         .on('data', (block) => {
                             console.log('Waiting ... Block \'' + block.number + '\'.')
                             if (block.number > parseInt(channel.settlementBlock)) {
-                                subscription.unsubscribe((err, ok) => cb(err))
+                                subscription.unsubscribe((err, ok) => {
+                                    if (ok)
+                                        cb(err)
+                                })
                             }
                             else {
                                 // ================ Only for testing ================
-                                //mineBlock(self.contract.currentProvider)
+                                 mineBlock(self.contract.currentProvider)
                                 // ==================================================
 
                             }
                         })
 
                     // ================ Only for testing ================
-                    //mineBlock(self.contract.currentProvider)
+                     mineBlock(self.contract.currentProvider)
                     // ==================================================
                 } else {
                     cb()
@@ -81,19 +81,13 @@ module.exports = (self) => {
                     name === 'closed '.concat(channelId.toString('base64'))
                 )) {
                     interested = true
-                    self.nonce = self.nonce + 1
 
-                    contractCall({
-                        to: self.contract._address,
-                        gas: 1000000,
-                        gasPrice: GAS_PRICE,
-                        data: self.contract.methods.withdraw(pubKeyToEthereumAddress(counterParty)).encodeABI()
-                    }, self.node.peerInfo.id, self.node.web3, cb)
+                    self.contractCall(self.contract.methods.withdraw(pubKeyToEthereumAddress(counterParty)), cb)
                 } else {
                     cb()
                 }
             }
-        ], (err, hash) => {
+        ], (err, receipt) => {
             if (err) { throw err }
 
             let receivedMoney
@@ -107,7 +101,7 @@ module.exports = (self) => {
                 receivedMoney = initialTx.value - amountA
             }
 
-            console.log('[\'' + self.node.peerInfo.id.toB58String() + '\']: Closed payment channel \'' + channelId.toString('hex') + '\' and received ' + receivedMoney + ' wei.' + (hash ? ' TxHash \''.concat(hash).concat('\'.') : ''))
+            log(self.node.peerInfo.id, `Closed payment channel \x1b[33m${initialTx.channelId.toString('hex')}\x1b[0m and ${receivedMoney < 0 ? 'spent' : 'received'} \x1b[35m${Math.abs(receivedMoney)} wei\x1b[0m. ${receipt ? ` TxHash \x1b[32m${receipt.transactionHash}.` : ''}`)
 
             self.delete(lastTx.channelId)
 
