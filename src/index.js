@@ -120,7 +120,7 @@ class Hopper extends libp2p {
 
         options.web3 = options.web3 || new Web3('http://localhost:8545')
         options.output = options.output || console.log
-        options.contract = options.contract || new Eth.Contract(JSON.parse(readFileSync(resolve('./contracts/HoprChannel.abi'))))
+        // options.contract = options.contract || new options.web3.eth.Contract(JSON.parse(readFileSync(resolve('./contracts/HoprChannel.abi'))))
 
         waterfall([
             (cb) =>

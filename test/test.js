@@ -1,22 +1,33 @@
 'use strict'
 
-const { waterfall, times, timesSeries, series, each, parallel, map } = require('async')
+const { waterfall, times, timesSeries, series, each, parallel } = require('async')
 
-const HOPR = require('../src/index')
-const c = require('../src/constants')
-
-const getPeerInfo = require('../src/getPeerInfo')
+const { createNode } = require('../src/index')
+const { GAS_PRICE, MAX_HOPS } = require('../src/constants')
 
 const Ganache = require('ganache-core')
+
+const FUNDING_ACCOUNT = '0xB3Aa2138DE698597e2e3F84f60eF415d13731b6f'
+const FUNDING_KEY = '0xb3faf133044aebecbd8871a920818783f8e3e809a425f131046492925110ebc0'
+
 const Web3 = require('web3')
+const web3 = new Web3(Ganache.provider({
+    accounts: [
+        {
+            balance: '0xd3c21bcecceda0000000',
+            secretKey: FUNDING_KEY
+        }
+    ]
+}))
+
 const { toWei } = require('web3').utils
 
-const { warmUpNodes } = require('./utils')
+const { warmUpNodes, sendTransaction } = require('./utils')
 
 const getContract = require('../contracts')
 const { pubKeyToEthereumAddress } = require('../src/utils')
 
-const AMOUNT_OF_NODES = Math.max(3, c.MAX_HOPS + 1)
+const AMOUNT_OF_NODES = Math.max(3, MAX_HOPS + 1)
 const AMOUNT_OF_MESSAGES = 5
 
 /**
@@ -36,53 +47,26 @@ function getWeb3Provider(peerInfos) {
     })
 }
 
-let provider, pInfos, nodes
+let provider, pInfos, nodes, index = 0
 
 waterfall([
-    (cb) => parallel({
-        /**
-         * Compile contract, generate peer config
-         */
-        peerInfos: (cb) => times(AMOUNT_OF_NODES, (n, cb) => getPeerInfo(null, cb), cb),
-        compiledContract: (cb) => getContract(cb)
-    }, cb),
-    ({ peerInfos, compiledContract }, cb) => {
-        /**
-         * Register Web3 provider and deploy contract.
-         */
-        pInfos = peerInfos
+    (cb) => getContract(cb),
+    (compiledContract, cb) => sendTransaction({
+        to: 0,
+        gas: 3000333, // 2370333
+        gasPrice: GAS_PRICE,
+        nonce: index,
+        data: '0x'.concat(compiledContract.binary.toString())
+    }, privKeyToPeerId(FUNDING_KEY), web3, cb),
+    (receipt, cb) => {
+        const contract = new web3.eth.Contract(JSON.parse(readFileSync(path.resolve(__dirname, '../contracts/HoprChannel.abi'))), toChecksumAddress(receipt.contractAddress))
 
-        // provider = getGUIGanacheProvider()
-        provider = getWeb3Provider(pInfos)
-        const web3 = new Web3(provider)
-
-        new web3.eth.Contract(JSON.parse(compiledContract.abi.toString()))
-            .deploy({
-                data: compiledContract.binary.toString()
-            })
-            .send({
-                from: pubKeyToEthereumAddress(pInfos[0].id.pubKey.marshal()),
-                gas: 3000333, // 2370333
-                gasPrice: '30000000000000'
-            })
-            .on('err', (err) => {
-                console.log('err: ' + err)
-            })
-            .on('receipt', (receipt) => {
-                console.log('Successfully deployed contract at address \'' + receipt.contractAddress + '\'.')
-            })
-            .then((contract) => cb(null, contract, web3))
+        times(AMOUUNT_OF_NODES, (_, cb) =>
+            createNode({
+                contract: contract,
+                web3: web3
+            }, cb), cb)
     },
-    (contract, web3, cb) => map(pInfos, (peerInfo, cb) =>
-        /**
-         * Start nodes, each node will start listening on the network interface
-         */
-        HOPR.createNode({
-            web3: web3,
-            output: console.log,
-            contract: contract,
-            peerInfo: peerInfo
-        }, cb), cb),
     (_nodes, cb) => parallel([
         (cb) => {
             /**
@@ -115,7 +99,7 @@ waterfall([
         (cb) => timesSeries(AMOUNT_OF_MESSAGES, (n, cb) => {
             nodes[0].sendMessage('test_test_test ' + Date.now().toString(), nodes[3].peerInfo.id)
 
-            setTimeout(cb, 2000)
+            // setTimeout(cb, 30000)
         }, cb),
         /**
          * Close the payment channel

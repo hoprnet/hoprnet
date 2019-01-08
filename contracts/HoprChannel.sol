@@ -10,7 +10,7 @@ contract HoprChannel {
     // using ECDSA for bytes32;
     
     // constant RELAY_FEE = 1
-    uint8 constant private BLOCK_CONFIRMATION = 15;
+    uint8 constant private BLOCK_CONFIRMATION = 4;
     
     // Tell payment channel partners that the channel has been settled
     event SettledChannel(bytes32 indexed channelId, uint256 index, uint256 amountA) anonymous;
