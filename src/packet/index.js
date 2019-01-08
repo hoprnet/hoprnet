@@ -11,7 +11,7 @@ const Message = require('./message')
 const { parallel } = require('async')
 
 const { RELAY_FEE } = require('../constants')
-const { hash, bufferXOR, deepCopy } = require('../utils')
+const { hash, bufferXOR, deepCopy, log } = require('../utils')
 
 class Packet {
     constructor(header, transaction, challenge, message) {
@@ -28,9 +28,11 @@ class Packet {
     static createPacket(node, msg, path, cb) {
         const { header, secrets, identifier } = Header.createHeader(path)
 
-        console.log('\n\n[\'' + node.peerInfo.id.toB58String() + '\']: ---------- New Packet ----------')
-        path.slice(0, Math.max(0, path.length - 1)).forEach((peerId, index) => console.log('[\'' + node.peerInfo.id.toB58String() + '\']: Intermediate ' + index + ': \'' + peerId.toB58String()) + '\'')
-        console.log('[\'' + node.peerInfo.id.toB58String() + '\']: Destination: \'' + path[path.length - 1].toB58String() + '\'')
+        log(node.peerInfo.id,'---------- New Packet ----------')
+        path
+            .slice(0, Math.max(0, path.length - 1))
+            .forEach((peerId, index) => log(node.peerInfo.id, `Intermediate ${index} : \x1b[34m${peerId.toB58String()}\x1b[0m`))
+        log(node.peerInfo.id, `Destination    : \x1b[34m${path[path.length - 1].toB58String()}\x1b[0m`)
 
         parallel({
             challenge: (cb) => cb(null, Challenge.createChallenge(Header.deriveTransactionKey(secrets[0]), node.peerInfo.id.privKey.marshal())),
@@ -39,7 +41,7 @@ class Packet {
         }, (err, results) => {
             if (err) { throw err }
 
-            console.log('[\'' + node.peerInfo.id.toB58String() + '\']: Encrypting with  \'' + hash(bufferXOR(Header.deriveTransactionKey(secrets[0]), Header.deriveTransactionKey(secrets[1]))).toString('base64') + '\'.')
+            log(node.peerInfo.id, `Encrypting with  \'${hash(bufferXOR(Header.deriveTransactionKey(secrets[0]), Header.deriveTransactionKey(secrets[1]))).toString('base64')}\'.`)
             const encryptedTx = results.transaction.encrypt(hash(bufferXOR(Header.deriveTransactionKey(secrets[0]), Header.deriveTransactionKey(secrets[1]))))
 
             node.pendingTransactions.set(hash(Header.deriveTransactionKey(secrets[0])).toString('base64'), {
@@ -58,7 +60,7 @@ class Packet {
     forwardTransform(node, previousPeerId, cb) {
         const receivedMoney = node.paymentChannels.getEmbeddedMoney(previousPeerId, this.transaction)
 
-        console.log('[\'' + node.peerInfo.id.toB58String() + '\']: Received ' + receivedMoney + ' wei.')
+        log(node.peerInfo.id, `Received \x1b[35m${receivedMoney} wei\x1b[0m.`)
 
         this.header.deriveSecret(node.peerInfo.id.privKey.marshal())
 
