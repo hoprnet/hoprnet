@@ -162,13 +162,13 @@ contract HoprChannel {
 
         require(ecrecover(hashedMessage, uint8(v) + 27, r, s) == counterParty, "Invalid opening transaction");
 
-        states[msg.sender].stakedEther = states[msg.sender].stakedEther - amount;
-        states[counterParty].stakedEther = states[counterParty].stakedEther - amount;
+        states[msg.sender].stakedEther = states[msg.sender].stakedEther.sub(amount);
+        states[counterParty].stakedEther = states[counterParty].stakedEther.sub(amount);
 
-        states[msg.sender].openChannels = states[msg.sender].openChannels + 1;
-        states[counterParty].openChannels = states[counterParty].openChannels + 1;
+        states[msg.sender].openChannels = states[msg.sender].openChannels.add(1);
+        states[counterParty].openChannels = states[counterParty].openChannels.add(1);
         
-        channels[getId(counterParty)] = Channel(ChannelState.ACTIVE, 2 * amount, amount, 0, 0);        
+        channels[getId(counterParty)] = Channel(ChannelState.ACTIVE, uint256(2).mul(amount), amount, 0, 0);        
     }
 
     /**
@@ -205,7 +205,8 @@ contract HoprChannel {
     * @param counterParty address of the counter party
     */
     function withdraw(address counterParty) public channelExists(counterParty) {
-        Channel storage channel = channels[getId(counterParty)];
+        bytes32 channelId = getId(counterParty);
+        Channel storage channel = channels[channelId];
         
         require(
             channel.state == ChannelState.PENDING_SETTLEMENT && 
@@ -234,7 +235,7 @@ contract HoprChannel {
             states[msg.sender].stakedEther = states[msg.sender].stakedEther.add(channel.balanceA); 
         }
 
-        delete channels[getId(counterParty)];
+        delete channels[channelId];
     }
 
     /*** PRIVATE | INTERNAL ***/
