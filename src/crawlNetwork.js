@@ -10,7 +10,7 @@ const uniqWith = require('lodash.uniqwith')
 const remove = require('lodash.remove')
 const { doWhilst, map, waterfall } = require('async')
 
-const { randomSubset } = require('./utils')
+const { randomSubset, log } = require('./utils')
 
 const { MAX_HOPS, PROTOCOL_CRAWLING, MARSHALLED_PUBLIC_KEY_SIZE } = require('./constants')
 
@@ -68,8 +68,8 @@ module.exports = (node) =>
                         nodes.push(peerInfo.id.toB58String())
                     })
 
-                    console.log('[\'' + node.peerInfo.id.toB58String() + '\']: Received ' + newNodes.length + ' new node' + (newNodes.length === 1 ? '' : 's') + '.')
-                    console.log('[\'' + node.peerInfo.id.toB58String() + '\']: Now holding peer information of ' + node.peerBook.getAllArray().length + ' node' + (node.peerBook.getAllArray().length === 1 ? '' : 's') + ' in the network.')
+                    log(node.peerInfo.id, `Received ${newNodes.length} new node${newNodes.length === 1 ? '' : 's'}.`)
+                    log(node.peerInfo.id, `Now holding peer information of ${node.peerBook.getAllArray().length} node${node.peerBook.getAllArray().length === 1 ? '' : 's'} in the network.`)
 
                     cbWhilst()
                 })

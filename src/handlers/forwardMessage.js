@@ -2,6 +2,7 @@
 
 const pull = require('pull-stream')
 const { waterfall, parallel } = require('async')
+const { log } = require('../utils')
 
 const c = require('../constants')
 const Packet = require('../packet')
@@ -13,7 +14,7 @@ module.exports = (node, output) => node.handle(c.PROTOCOL_STRING, (protocol, con
         if (node.peerInfo.id.toBytes().compare(targetPeerId.toBytes()) === 0) {
             output(demo(packet.message.plaintext.toString()))
         } else {
-            console.log('[\'' + node.peerInfo.id.toB58String() + '\']: Forwarding to node \'' + targetPeerId.toB58String() + '\'.')
+            log(node.peerInfo.id, `Forwarding to node \x1b[34m${targetPeerId.toB58String()}\x1b[0m.`)
 
             waterfall([
                 (cb) => node.peerRouting.findPeer(targetPeerId, cb),
@@ -30,7 +31,7 @@ module.exports = (node, output) => node.handle(c.PROTOCOL_STRING, (protocol, con
     }
 
     function sendAcknowledgement(packet, peerInfo, cb) {
-        console.log('[\'' + node.peerInfo.id.toB58String() + '\']: Acknowledging to node \'' + peerInfo.id.toB58String() + '\'.')
+        log(node.peerInfo.id, `Acknowledging to node \x1b[34m${peerInfo.id.toB58String()}\x1b[0m.`)
         waterfall([
             (cb) => node.dialProtocol(peerInfo, c.PROTOCOL_ACKNOWLEDGEMENT, cb),
             (conn, cb) => {
