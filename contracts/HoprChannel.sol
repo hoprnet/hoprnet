@@ -178,7 +178,7 @@ contract HoprChannel {
     * @param balancesA uint256[]
     * @param r bytes32[]
     * @param s bytes32[]
-    * @param v bytes1
+    * @param v bytes1[]
     */
     function closeChannels(
         address[] calldata counterParties, 
