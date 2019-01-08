@@ -162,13 +162,13 @@ contract HoprChannel {
 
         require(ecrecover(hashedMessage, uint8(v) + 27, r, s) == counterParty, "Invalid opening transaction");
 
-        states[msg.sender].stakedEther = states[msg.sender].stakedEther - amount;
-        states[counterParty].stakedEther = states[counterParty].stakedEther - amount;
+        states[msg.sender].stakedEther = states[msg.sender].stakedEther.sub(amount);
+        states[counterParty].stakedEther = states[counterParty].stakedEther.sub(amount);
 
-        states[msg.sender].openChannels = states[msg.sender].openChannels + 1;
-        states[counterParty].openChannels = states[counterParty].openChannels + 1;
+        states[msg.sender].openChannels = states[msg.sender].openChannels.add(1);
+        states[counterParty].openChannels = states[counterParty].openChannels.add(1);
         
-        channels[getId(counterParty)] = Channel(ChannelState.ACTIVE, 2 * amount, amount, 0, 0);        
+        channels[getId(counterParty)] = Channel(ChannelState.ACTIVE, uint256(2).mul(amount), amount, 0, 0);        
     }
 
     /**
