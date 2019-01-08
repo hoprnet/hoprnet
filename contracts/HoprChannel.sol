@@ -205,7 +205,8 @@ contract HoprChannel {
     * @param counterParty address of the counter party
     */
     function withdraw(address counterParty) public channelExists(counterParty) {
-        Channel storage channel = channels[getId(counterParty)];
+        bytes32 channelId = getId(counterParty);
+        Channel storage channel = channels[channelId];
         
         require(
             channel.state == ChannelState.PENDING_SETTLEMENT && 
@@ -234,7 +235,7 @@ contract HoprChannel {
             states[msg.sender].stakedEther = states[msg.sender].stakedEther.add(channel.balanceA); 
         }
 
-        delete channels[getId(counterParty)];
+        delete channels[channelId];
     }
 
     /*** PRIVATE | INTERNAL ***/
