@@ -63,14 +63,14 @@ module.exports = (self) => {
                             }
                             else {
                                 // ================ Only for testing ================
-                                 mineBlock(self.contract.currentProvider)
+                                // mineBlock(self.contract.currentProvider)
                                 // ==================================================
 
                             }
                         })
 
                     // ================ Only for testing ================
-                     mineBlock(self.contract.currentProvider)
+                    // mineBlock(self.contract.currentProvider)
                     // ==================================================
                 } else {
                     cb()
