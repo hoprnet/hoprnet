@@ -57,7 +57,7 @@ module.exports = (self) => {
                     const subscription = self.node.web3.eth.subscribe('newBlockHeaders')
                         .on('data', (block) => {
                             console.log('Waiting ... Block \'' + block.number + '\'.')
-                            if (block.number > parseInt(channel.settlementBlock)) {
+                            if (block.number > parseInt(channel.settleTimestamp)) {
                                 subscription.unsubscribe((err, ok) => {
                                     if (ok)
                                         cb(err)
