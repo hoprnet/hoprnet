@@ -9,6 +9,11 @@ A privacy-preserving messaging protocol that incentivizes users to participate i
 ## Technical Demo
 There is a standalone demo to showcase the functionality:
 
+### Requirements
+- `solc` >= 0.5
+- `Node.js` >= 11.0
+- `npx` 
+
 Please make sure that `solc`, the Solidity compiler, is available in your environment path, see [here](https://solidity.readthedocs.io/en/latest/installing-solidity.html#binary-packages) how to install `solc` on your platform.
 
 ### Executing
