@@ -50,9 +50,10 @@ module.exports = (self) => {
             (cb) => self.contract.methods.channels(channelId).call({
                 from: pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal())
             }, cb),
-            (channel, cb) => self.node.web3.eth.getBlockNumber((err, blockNumber) => cb(err, blockNumber, channel)),
-            (blockNumber, channel, cb) => {
-                if (blockNumber < channel.settlementBlock) {
+            // (channel, cb) => self.node.web3.eth.getBlockNumber((err, blockNumber) => cb(err, blockNumber, channel)),
+            (channel, cb) => self.node.web3.eth.getBlock((err, block) => cb(err, block, channel)),
+            (block, channel, cb) => {
+                if (block.timestamp < channel.settleTimestamp) {
                     const subscription = self.node.web3.eth.subscribe('newBlockHeaders')
                         .on('data', (block) => {
                             console.log('Waiting ... Block \'' + block.number + '\'.')
