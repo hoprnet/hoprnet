@@ -10,7 +10,7 @@ contract HoprChannel {
     // using ECDSA for bytes32;
     
     // constant RELAY_FEE = 1
-    uint256 constant private TIME_CONFIRMATION = 12 hours;
+    uint256 constant private TIME_CONFIRMATION = 1 mintues; // testnet value TODO: adjust for mainnet use
     
     // Tell payment channel partners that the channel has been settled and closed
     event ClosedChannel(bytes32 indexed channelId, uint256 index, uint256 amountA) anonymous;
