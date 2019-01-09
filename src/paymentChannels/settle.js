@@ -22,7 +22,7 @@ module.exports = (self) => (channelId, useRestoreTx = false, cb = () => { }) => 
 
         const initialTx = self.getRestoreTransaction(channelId)
 
-        self.contractCall(self.contract.methods.closeChannel(
+        self.contractCall(self.contract.methods.settle(
             counterParty,
             lastTx.index,
             lastTx.value,
