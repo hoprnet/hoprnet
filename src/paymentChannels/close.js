@@ -2,6 +2,7 @@
 
 const { waterfall } = require('neo-async')
 const { isPartyA, pubKeyToEthereumAddress, mineBlock, log } = require('../utils')
+const { NET } = require('../constants')
 
 module.exports = (self) => {
     function hasBetterTx(channelId, amountA, counterParty) {
@@ -60,8 +61,7 @@ module.exports = (self) => {
                                     if (ok)
                                         cb(err)
                                 })
-                            }
-                            else {
+                            } else if (NET === 'ganache') {
                                 // ================ Only for testing ================
                                 mineBlock(self.contract.currentProvider)
                                 // ==================================================
@@ -69,9 +69,12 @@ module.exports = (self) => {
                             }
                         })
 
-                    // ================ Only for testing ================
-                    mineBlock(self.contract.currentProvider)
-                    // ==================================================
+                    if (NET === 'ganache') {
+                        // ================ Only for testing ================
+                        mineBlock(self.contract.currentProvider)
+                        // ==================================================
+                    }
+                    
                 } else {
                     cb()
                 }
