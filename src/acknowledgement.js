@@ -1,8 +1,7 @@
 'use strict'
 
-const withIs = require('class-is')
-const secp256k1 = require('secp256k1')
-const parallel = require('async/parallel')
+const { sign, verify, publicKeyVerify } = require('secp256k1')
+const { parallel } = require('async')
 
 const { hash } = require('./utils')
 const Header = require('./packet/header')
@@ -69,7 +68,7 @@ class Acknowledgement {
 
         ack.responseSignature
             .fill(
-                secp256k1.sign(
+                sign(
                     ack.hash(),
                     secretKey).signature,
                 0, SIGNATURE_LENGTH)
@@ -78,14 +77,14 @@ class Acknowledgement {
     }
 
     verify(pubKeyNext, ownPubkey, cb) {
-        if (!Buffer.isBuffer(pubKeyNext) || !secp256k1.publicKeyVerify(pubKeyNext))
+        if (!Buffer.isBuffer(pubKeyNext) || !publicKeyVerify(pubKeyNext))
             throw Error('Invalid public key.')
 
         parallel([
-            (cb) => cb(null, secp256k1.verify(hash(this.key), this.challengeSignature, ownPubkey)),
-            (cb) => cb(null, secp256k1.verify(this.hash(), this.responseSignature, pubKeyNext))
+            (cb) => cb(null, verify(hash(this.key), this.challengeSignature, ownPubkey)),
+            (cb) => cb(null, verify(this.hash(), this.responseSignature, pubKeyNext))
         ], (err, results) => cb(err, results.every(x => x)))
     }
 }
 
-module.exports = withIs(Acknowledgement, { className: 'Acknowledgement', symbolName: '@validitylabs/hopper/Acknowledgement' })
+module.exports = Acknowledgement

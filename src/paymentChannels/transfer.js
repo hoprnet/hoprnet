@@ -1,6 +1,6 @@
 'use strict'
 
-const { waterfall } = require('async')
+const { waterfall } = require('neo-async')
 const PeerInfo = require('peer-info')
 
 const { isPartyA, getId, pubKeyToEthereumAddress } = require('../utils')

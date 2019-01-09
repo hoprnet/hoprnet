@@ -2,7 +2,7 @@
 
 const pull = require('pull-stream')
 
-const { waterfall } = require('async')
+const { waterfall } = require('neo-async')
 const { toWei } = require('web3').utils
 const { getId, pubKeyToEthereumAddress, deepCopy, bufferToNumber, log } = require('../utils')
 const { recover } = require('secp256k1')

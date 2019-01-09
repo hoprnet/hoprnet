@@ -18,7 +18,6 @@
         "migrate": "npx cross-env NODE_ENV=develop cross-env TASK=migrate node ./tools/server/index",
         "test": "yarn lint && npx cross-env NODE_ENV=develop cross-env TASK=test node ./tools/server/index",
         "coverage": "npx cross-env NODE_ENV=develop cross-env TASK=coverage node ./tools/server/index",
-        "start": "node test/test.js",
         "demo": "node test/demo.js",
         "clean": "npx shx rm -fr docs db dist build bin coverage",
         "reset": "npx yarn run clean && npx shx rm -fr node_modules",
@@ -26,7 +25,6 @@
     },
     "dependencies": {
         "@nodeutils/defaults-deep": "^1.1.0",
-        "async": "^2.6.1",
         "babel-cli": "^6.26.0",
         "babel-eslint": "^10.0.1",
         "babel-polyfill": "^6.26.0",
@@ -57,6 +55,7 @@
         "lodash.reduce": "^4.6.0",
         "lodash.remove": "^4.7.0",
         "lodash.uniqwith": "^4.5.0",
+        "neo-async": "^2.6.0",
         "openzeppelin-solidity": "^2.1.1",
         "prompt": "^1.0.0",
         "secp256k1": "^3.6.1",

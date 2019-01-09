@@ -1,8 +1,7 @@
 'use strict'
 
 const chacha = require('chacha')
-const withIs = require('class-is')
-const crypto = require('blake2')
+const { createKeyedHash } = require('blake2')
 const { bufferXOR } = require('../utils')
 
 const INTERMEDIATE_KEY_LENGTH = 32
@@ -93,7 +92,7 @@ class PRP {
 }
 
 function hash(data, k, iv) {
-    const hash = crypto.createKeyedHash(
+    const hash = createKeyedHash(
         HASH_ALGORITHM,
         Buffer.concat([k, iv], INTERMEDIATE_KEY_LENGTH + INTERMEDIATE_IV_LENGTH),
         {digestLength: 32}
@@ -111,4 +110,4 @@ function encrypt(data, k, iv) {
     ciphertext.copy(data, HASH_LENGTH)
 }
 
-module.exports = withIs(PRP, { className: 'PRP' })
+module.exports = PRP

@@ -205,11 +205,10 @@ class Hopper extends libp2p {
             this.peerInfo.id.id.compare(peerInfo.id.id) !== 0 &&
             destination.id.compare(peerInfo.id.id) !== 0
 
-        waterfall([
-            (cb) => this.crawlNetwork(cb, comparator),
-            (cb) => cb(null, randomSubset(
+        this.crawlNetwork(() => {
+            cb(null, randomSubset(
                 this.peerBook.getAllArray(), c.MAX_HOPS - 1, comparator))
-        ], cb)
+        }, comparator)
     }
 }
 

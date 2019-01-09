@@ -1,7 +1,7 @@
 'use strict'
 
 const defaultsDeep = require('@nodeutils/defaults-deep')
-const { waterfall } = require('async')
+const { waterfall } = require('neo-async')
 const { generateKeyPair } = require('libp2p-crypto').keys
 
 const PeerInfo = require('peer-info')

@@ -1,7 +1,7 @@
 'use strict'
 
 const pull = require('pull-stream')
-const waterfall = require('async/waterfall')
+const { waterfall } = require('neo-async')
 
 const { PROTOCOL_CRAWLING, CRAWLING_RESPONSE_NODES } = require('../constants')
 const { randomSubset } = require('../utils')

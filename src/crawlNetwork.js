@@ -8,7 +8,7 @@ const pull = require('pull-stream')
 const flatten = require('lodash.flatten');
 const uniqWith = require('lodash.uniqwith')
 const remove = require('lodash.remove')
-const { doWhilst, map, waterfall } = require('async')
+const { doWhilst, map, waterfall } = require('neo-async')
 
 const { randomSubset, log } = require('./utils')
 

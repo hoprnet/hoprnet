@@ -1,6 +1,5 @@
 'use strict'
 
-const withIs = require('class-is')
 const PeerId = require('peer-id')
 
 const Header = require('./header')
@@ -8,7 +7,7 @@ const Transaction = require('../transaction')
 const Challenge = require('./challenge')
 const Message = require('./message')
 
-const { parallel } = require('async')
+const { parallel } = require('neo-async')
 
 const { RELAY_FEE } = require('../constants')
 const { hash, bufferXOR, deepCopy, log } = require('../utils')
@@ -136,4 +135,4 @@ class Packet {
     }
 }
 
-module.exports = withIs(Packet, { className: 'Packet', symbolName: '@validitylabs/hopper/Packet' })
+module.exports = Packet
