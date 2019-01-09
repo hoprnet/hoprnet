@@ -54,6 +54,6 @@ The demo will
     - wait for an acknowledgement to be able to decrypt the encrypted transactions that they've received during the protocol execution
     - open a payment channel to the next hop in the case there is no one yet
 - let one party initiate a payout which will
-    - settle the payment channels of that party
-    - let the nodes listen to the on-chain Settle event and post a better transaction in case that a malicious party tries to close the channel with an unprofitable transaction
+    - settle & close the payment channels of that party
+    - let the nodes listen to the on-chain ClosedChannel event and post a better transaction in case that a malicious party tries to close the channel with an unprofitable transaction
     - withdraw the money

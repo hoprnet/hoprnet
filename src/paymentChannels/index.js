@@ -55,7 +55,7 @@ class PaymentChannel extends EventEmitter {
         this.openPaymentChannels.set(channelId.toString('base64'), record)
 
         log(this.node.peerInfo.id, `Listening to channel \x1b[33m${channelId.toString('hex')}\x1b[0m`)
-        this.contract.once('SettledChannel', {
+        this.contract.once('ClosedChannel', {
             topics: [bytesToHex(channelId)]
         }, record.listener)
     }

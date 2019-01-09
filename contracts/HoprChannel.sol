@@ -10,10 +10,10 @@ contract HoprChannel {
     // using ECDSA for bytes32;
     
     // constant RELAY_FEE = 1
-    uint8 constant private BLOCK_CONFIRMATION = 4;
+    uint256 constant private TIME_CONFIRMATION = 12 hours;
     
-    // Tell payment channel partners that the channel has been settled
-    event SettledChannel(bytes32 indexed channelId, uint256 index, uint256 amountA) anonymous;
+    // Tell payment channel partners that the channel has been settled and closed
+    event ClosedChannel(bytes32 indexed channelId, uint256 index, uint256 amountA) anonymous;
 
     // Tell payment channel partners that the channel has been opened
     event OpenedChannel(bytes32 channelId, uint256 amount);
@@ -33,7 +33,7 @@ contract HoprChannel {
         uint256 balance;
         uint256 balanceA;
         uint256 index;
-        uint256 settlementBlock;
+        uint256 settleTimestamp;
     }
 
     // Open channels
@@ -172,14 +172,42 @@ contract HoprChannel {
     }
 
     /**
-    * @notice settle payment channel TODO: finish desc
+    * @notice settle & close multiple payment channels within 1 transaction
+    * @param counterParties address[] of the counter party
+    * @param indexes uint256[]
+    * @param balancesA uint256[]
+    * @param r bytes32[]
+    * @param s bytes32[]
+    * @param v bytes1[]
+    */
+    function closeChannels(
+        address[] calldata counterParties, 
+        uint256[] calldata indexes, 
+        uint256[] calldata balancesA, 
+        bytes32[] calldata r, 
+        bytes32[] calldata s, 
+        bytes1[] calldata v) 
+        external {
+            uint256 length = counterParties.length;
+            require(
+                length == indexes.length && length == balancesA.length && length == r.length && length == s.length && length == v.length,
+                "array length mismatched");
+
+            for(uint256 i = 0; i < length; i.add(1)) {
+                closeChannel(counterParties[i], indexes[i], balancesA[i], r[i], s[i], v[i]);
+            }
+    }
+
+    /**
+    * @notice settle & close payment channel
     * @param counterParty address of the counter party
     * @param index uint256
     * @param balanceA uint256
     * @param r bytes32
     * @param s bytes32
+    * @param v bytes1
     */
-    function settle(address counterParty, uint256 index, uint256 balanceA, bytes32 r, bytes32 s, bytes1 v) public channelExists(counterParty) {
+    function closeChannel(address counterParty, uint256 index, uint256 balanceA, bytes32 r, bytes32 s, bytes1 v) public channelExists(counterParty) {
         bytes32 channelId = getId(counterParty);
         Channel storage channel = channels[channelId];
         
@@ -195,13 +223,13 @@ contract HoprChannel {
         channel.balanceA = balanceA;
         channel.index = index;
         channel.state = ChannelState.PENDING_SETTLEMENT;
-        channel.settlementBlock = block.number.add(BLOCK_CONFIRMATION);
+        channel.settleTimestamp = block.timestamp.add(TIME_CONFIRMATION);
         
-        emit SettledChannel(channelId, index, balanceA);
+        emit ClosedChannel(channelId, index, balanceA);
     }
     
     /**
-    * @notice TODO: finish desc
+    * @notice withdrawal pending balance from payment channel
     * @param counterParty address of the counter party
     */
     function withdraw(address counterParty) public channelExists(counterParty) {
@@ -213,7 +241,7 @@ contract HoprChannel {
             channel.balanceA <= channel.balance, 
             "Invalid channel.");
 
-        require(channel.settlementBlock <= block.number, "Channel not withdrawable yet.");
+        require(channel.settleTimestamp <= block.timestamp, "Channel not withdrawable yet.");
         
         channel.state = ChannelState.WITHDRAWN;
         
