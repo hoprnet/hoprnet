@@ -31,7 +31,7 @@ module.exports = (self) => (cb) => {
                     // TODO: Implement proper transaction handling
                     const timeout = setTimeout(self.settle, SETTLEMENT_TIMEOUT, record.tx.channelId, true)
 
-                    self.contract.once('SettledChannel', {
+                    self.contract.once('ClosedChannel', {
                         topics: [`0x${record.restoreTx.channelId.toString('hex')}`]
                     }, (err) => {
                         if (err)
