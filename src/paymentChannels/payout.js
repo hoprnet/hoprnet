@@ -2,7 +2,7 @@
 
 const secp256k1 = require('secp256k1')
 const pull = require('pull-stream')
-const { waterfall, map } = require('async')
+const { waterfall, map } = require('neo-async')
 const { bufferToNumber, pubKeyToPeerId } = require('../utils')
 
 const bs58 = require('bs58')

@@ -1,7 +1,7 @@
 'use strict'
 
 const pull = require('pull-stream')
-const { waterfall, parallel } = require('async')
+const { waterfall, parallel } = require('neo-async')
 const { log } = require('../utils')
 
 const c = require('../constants')

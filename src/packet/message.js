@@ -1,7 +1,6 @@
 'use strict'
 
 const forEachRight = require('lodash.foreachright')
-const withIs = require('class-is')
 
 const constants = require('../constants')
 const Header = require('./header')
@@ -75,4 +74,4 @@ class Message {
     }
 }
 
-module.exports = withIs(Message, { className: 'Message', symbolName: '@validitylabs/hopper/Message' })
+module.exports = Message

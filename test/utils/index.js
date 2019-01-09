@@ -1,6 +1,6 @@
 'use stric'
 
-const { times } = require('async')
+const { times } = require('neo-async')
 
 /**
  * Allow nodes to find each other by establishing connections
@@ -17,12 +17,3 @@ module.exports.warmUpNodes = (nodes, cb) =>
         (n, cb) => nodes[n].dial(nodes[n + 1].peerInfo, cb),
         (err, _) => cb(err, nodes)
     )
-
-module.exports.fundNodes = (web3, privKey, nodes) => {
-
-    const batch = new web3.BatchRequest()
-
-    nodes.forEach((node) => {
-
-    })
-}

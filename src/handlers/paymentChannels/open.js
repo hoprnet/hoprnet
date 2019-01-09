@@ -6,7 +6,7 @@ const { PROTOCOL_PAYMENT_CHANNEL } = require('../../constants')
 const pull = require('pull-stream')
 const secp256k1 = require('secp256k1')
 const { deepCopy, getId, pubKeyToEthereumAddress, bufferToNumber, numberToBuffer } = require('../../utils')
-const { waterfall } = require('async')
+const { waterfall } = require('neo-async')
 
 const SIGNATURE_LENGTH = 64
 

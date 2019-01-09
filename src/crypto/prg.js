@@ -1,7 +1,6 @@
 'use strict'
 
 const crypto = require('crypto')
-const withIs = require('class-is')
 
 const BLOCK_LENGTH = 16
 const KEY_LENGTH = BLOCK_LENGTH
@@ -62,4 +61,4 @@ class PRG {
     }
 }
 
-module.exports = withIs(PRG, { className: 'PRG' })
+module.exports = PRG

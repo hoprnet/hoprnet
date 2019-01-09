@@ -1,7 +1,7 @@
 'use strict'
 
 const pull = require('pull-stream')
-const { waterfall } = require('async')
+const { waterfall } = require('neo-async')
 const PeerId = require('peer-id')
 const PeerInfo = require('peer-info')
 

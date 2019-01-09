@@ -1,6 +1,6 @@
 'use strict'
 
-const { waterfall } = require('async')
+const { waterfall } = require('neo-async')
 const { isPartyA, pubKeyToEthereumAddress, mineBlock, log } = require('../utils')
 
 module.exports = (self) => {
@@ -63,14 +63,14 @@ module.exports = (self) => {
                             }
                             else {
                                 // ================ Only for testing ================
-                                // mineBlock(self.contract.currentProvider)
+                                mineBlock(self.contract.currentProvider)
                                 // ==================================================
 
                             }
                         })
 
                     // ================ Only for testing ================
-                    // mineBlock(self.contract.currentProvider)
+                    mineBlock(self.contract.currentProvider)
                     // ==================================================
                 } else {
                     cb()
@@ -101,7 +101,7 @@ module.exports = (self) => {
                 receivedMoney = initialTx.value - amountA
             }
 
-            log(self.node.peerInfo.id, `Closed payment channel \x1b[33m${initialTx.channelId.toString('hex')}\x1b[0m and ${receivedMoney < 0 ? 'spent' : 'received'} \x1b[35m${Math.abs(receivedMoney)} wei\x1b[0m. ${receipt ? ` TxHash \x1b[32m${receipt.transactionHash}.` : ''}`)
+            log(self.node.peerInfo.id, `Closed payment channel \x1b[33m${initialTx.channelId.toString('hex')}\x1b[0m and ${receivedMoney < 0 ? 'spent' : 'received'} \x1b[35m${Math.abs(receivedMoney)} wei\x1b[0m. ${receipt ? ` TxHash \x1b[32m${receipt.transactionHash}\x1b[0m.` : ''}`)
 
             self.delete(lastTx.channelId)
 
