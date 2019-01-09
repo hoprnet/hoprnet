@@ -12,7 +12,7 @@ yarn.lock
 
 # Exclude compiled contracts
 contracts/*.bin
-# contracts/*.abi
+contracts/*.abi
 
 # Exclude keys
 keys
