@@ -42,7 +42,7 @@ module.exports = (self) => {
                 ) {
                     console.log('[\'' + self.node.peerInfo.id.toB58String() + '\']: Found better transaction for payment channel \'' + channelId.toString('hex') + '\'.')
 
-                    self.settle(lastTx.channelId, cb)
+                    self.closeChannel(lastTx.channelId, cb)
                 } else {
                     cb(null)
                 }
@@ -50,13 +50,14 @@ module.exports = (self) => {
             (cb) => self.contract.methods.channels(channelId).call({
                 from: pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal())
             }, cb),
-            (channel, cb) => self.node.web3.eth.getBlockNumber((err, blockNumber) => cb(err, blockNumber, channel)),
-            (blockNumber, channel, cb) => {
-                if (blockNumber < channel.settlementBlock) {
+            // (channel, cb) => self.node.web3.eth.getBlockNumber((err, blockNumber) => cb(err, blockNumber, channel)),
+            (channel, cb) => self.node.web3.eth.getBlock((err, block) => cb(err, block, channel)),
+            (block, channel, cb) => {
+                if (block.timestamp < channel.settleTimestamp) {
                     const subscription = self.node.web3.eth.subscribe('newBlockHeaders')
                         .on('data', (block) => {
-                            console.log('Waiting ... Block \'' + block.number + '\'.')
-                            if (block.number > parseInt(channel.settlementBlock)) {
+                            console.log('Waiting ... Block #\'' + block.number + ' timestamp: ' + block.timestamp + '\'.')
+                            if (block.timestamp > parseInt(channel.settleTimestamp)) {
                                 subscription.unsubscribe((err, ok) => {
                                     if (ok)
                                         cb(err)
