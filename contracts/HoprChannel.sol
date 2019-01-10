@@ -180,23 +180,23 @@ contract HoprChannel {
     * @param s bytes32[]
     * @param v bytes1[]
     */
-    function closeChannels(
-        address[] calldata counterParties, 
-        uint256[] calldata indexes, 
-        uint256[] calldata balancesA, 
-        bytes32[] calldata r, 
-        bytes32[] calldata s, 
-        bytes1[] calldata v) 
-        external {
-            uint256 length = counterParties.length;
-            require(
-                length == indexes.length && length == balancesA.length && length == r.length && length == s.length && length == v.length,
-                "array length mismatched");
+    // function closeChannels(
+    //     address[] calldata counterParties, 
+    //     uint256[] calldata indexes, 
+    //     uint256[] calldata balancesA, 
+    //     bytes32[] calldata r, 
+    //     bytes32[] calldata s, 
+    //     bytes1[] calldata v) 
+    //     external {
+    //         uint256 length = counterParties.length;
+    //         require(
+    //             length == indexes.length && length == balancesA.length && length == r.length && length == s.length && length == v.length,
+    //             "array length mismatched");
 
-            for(uint256 i = 0; i < length; i.add(1)) {
-                closeChannel(counterParties[i], indexes[i], balancesA[i], r[i], s[i], v[i]);
-            }
-    }
+    //         for(uint256 i = 0; i < length; i.add(1)) {
+    //             closeChannel(counterParties[i], indexes[i], balancesA[i], r[i], s[i], v[i]);
+    //         }
+    // }
 
     /**
     * @notice settle & close payment channel

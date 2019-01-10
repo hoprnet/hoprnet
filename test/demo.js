@@ -31,7 +31,7 @@ if (NET === 'ganache') {
 }
 
 const AMOUUNT_OF_NODES = 4
-const AMOUNT_OF_MESSAGES = 4
+const AMOUNT_OF_MESSAGES = 1
 
 let index, compiledContract
 
@@ -57,7 +57,7 @@ waterfall([
                 gas: 3000333, // 2370333
                 gasPrice: GAS_PRICE,
                 nonce: index,
-                data: compiledContract.deployedByteCode
+                data: compiledContract.bytecode
             }, privKeyToPeerId(FUNDING_KEY), web3, (err, receipt) => {
                 if (err)
                     throw err

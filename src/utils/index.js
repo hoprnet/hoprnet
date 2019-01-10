@@ -327,20 +327,19 @@ module.exports.privKeyToPeerId = (privKey, cb) => {
 // ==========================
 // Ganache-core methods   <-- ONLY FOR TESTING
 // ==========================
-const { waterfall, during } = require('async')
-
-const resetColor = "\x1b[0m"
-const blueText = "\x1b[34m"
+const { waterfall } = require('neo-async')
+const ONE_MINUTE = 60 * 1000
 /**
  * Mine a single block
  * 
  * @param {Object} provider a valid Web3 provider
+ * @param {Number} amountOfTime increase the timestamp by that amount of time, default 1 minute
  */
-module.exports.mineBlock = (provider) => waterfall([
+module.exports.mineBlock = (provider, amountOfTime = ONE_MINUTE) => waterfall([
     (cb) => provider.send({
         jsonrpc: '2.0',
         method: 'evm_increaseTime',
-        params: [123],
+        params: [amountOfTime],
         id: Date.now(),
     }, (err, result) => cb(err)),
     (cb) => provider.send({
@@ -355,7 +354,7 @@ module.exports.mineBlock = (provider) => waterfall([
     }, (err, response) => {
         if (err) { throw err }
 
-        console.log('%sNow on block %d.%s', blueText, parseInt(response.result, 16), resetColor)
+        console.log(`\x1b[34mNow on block ${parseInt(response.result, 16)}.\x1b[0m`)
     })
 ])
 
