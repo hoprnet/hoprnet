@@ -1,7 +1,7 @@
 pragma solidity ^0.5.0;
 
 // import "openzeppelin-solidity/contracts/cryptography/ECDSA.sol";
-import "./math/SafeMath.sol";
+import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 
 
 /* solhint-disable max-line-length */
