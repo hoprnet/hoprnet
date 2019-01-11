@@ -70,11 +70,11 @@ contract HoprChannel {
     /**
     * @notice desposit ether to stake
     */
-    function stakeEther() public payable {
-        require(msg.value > 0, "Please provide a non-zero amount of ether.");
-        
-        states[msg.sender].isSet = true;
-        states[msg.sender].stakedEther = states[msg.sender].stakedEther.add(uint256(msg.value));
+    function() external payable {
+        if (msg.value > 0) {
+            states[msg.sender].isSet = true;
+            states[msg.sender].stakedEther = states[msg.sender].stakedEther.add(uint256(msg.value));
+        }
     }
     
     /**

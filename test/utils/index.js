@@ -109,8 +109,7 @@ module.exports.createFundedNodes = (amountOfNodes, contract, web3, peerId, nonce
                         to: node.paymentChannels.contract._address,
                         value: toWei('0.000001', 'ether'),
                         gas: STAKE_GAS_AMOUNT,
-                        gasPrice: GAS_PRICE,
-                        data: node.paymentChannels.contract.methods.stakeEther().encodeABI()
+                        gasPrice: GAS_PRICE
                     }, node.peerInfo.id, node.web3, (err) => {
                         if (err)
                             throw err
