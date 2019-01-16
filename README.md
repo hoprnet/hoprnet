@@ -33,7 +33,7 @@ Then go to `config/` and create a `.secrets.json` similar to the following one.
 ```json
 {
     "infuraRopstenURL": "https://ropsten.infura.io/v3/",
-    "infuraApiKey": "YOUR_API_KEY",
+    "infuraApiKey": "INFURA_PRODUCT_ID",
     "infuraRopstenWssURL": "wss://ropsten.infura.io/ws/v3/",
     "fundAccountEthAddress": "YOUR_ETHEREUM_ADDRESS",
     "fundAccountPrivateKey": "YOUR_PRIVATE_KEY"
@@ -41,7 +41,7 @@ Then go to `config/` and create a `.secrets.json` similar to the following one.
 ```
 
 Please make sure that you have:
-- whitelisted the contract `0x35e7B26883D2b24170A254642fE13ABF573B7987` in your Infura account
+- whitelisted the contract `0xA2AAC5A8A1776e9c8Ef8F70C82B4e5a56Eb08605` in your Infura account
 - got some funds on your Ropsten testnet account, if you don't you may want to use the [faucet](https://faucet.ropsten.be/) to receive test ether.
 
 ### Demo Script
