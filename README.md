@@ -9,7 +9,7 @@ A privacy-preserving messaging protocol that incentivizes users to participate i
 ## Technical Demo
 There is a standalone demo to showcase the functionality:
 
-### Requirements
+### Software Requirements
 - `solc` >= 0.5
 - `Node.js` >= 11.0
 - `npx` 
@@ -18,6 +18,10 @@ Please make sure that `solc`, the Solidity compiler, is available in your enviro
 
 
 On Windows? 👀 here: [Windows Setup](../../wiki/Setup#Windows)
+
+### Account Requirements
+- [`Ethereum Key Pair`](../../wiki/Setup/#PrivateKeyGeneration)
+- [`Infura API Key`](../../wiki/Setup/#Infura) (Infura calls this a `Product ID`)
 
 ### Executing
 
