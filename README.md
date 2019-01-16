@@ -21,6 +21,11 @@ Please make sure that `solc`, the Solidity compiler, is available in your enviro
 git clone https://github.com/validitylabs/messagingProtocol.git
 cd messagingProtocol
 yarn install
+
+// Do configuration steps below first before preceding! 
+
+yarn compile
+yarn demo
 ```
 
 Then go to `config/` and create a `.secrets.json` similar to the following one.
