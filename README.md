@@ -16,9 +16,10 @@ There is a standalone demo to showcase the functionality:
 
 Please make sure that `solc`, the Solidity compiler, is available in your environment path, see [here](https://solidity.readthedocs.io/en/latest/installing-solidity.html#binary-packages) how to install `solc` on your platform.
 
-### Executing
 
 On Windows? 👀 here: [Windows Setup](../../wiki/Setup#Windows)
+
+### Executing
 
 ```sh
 git clone https://github.com/validitylabs/messagingProtocol.git
