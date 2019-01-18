@@ -2,6 +2,8 @@
 
 const pull = require('pull-stream')
 const { waterfall } = require('neo-async')
+const lp = require('pull-length-prefixed')
+
 
 const { PROTOCOL_CRAWLING, CRAWLING_RESPONSE_NODES } = require('../constants')
 const { randomSubset } = require('../utils')
@@ -21,6 +23,7 @@ module.exports = (node) => node.handle(PROTOCOL_CRAWLING, (protocol, conn) => wa
                         peerInfo.id.toBytes().compare(node.peerInfo.id.toBytes()) !== 0
                 ).map((peerInfo) => peerInfo.id.pubKey.bytes)
             ),
+            lp.encode(),
             conn
         )
     }

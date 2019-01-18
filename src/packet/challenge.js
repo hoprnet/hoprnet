@@ -1,8 +1,8 @@
 'use strict'
 
-const { sign, privateKeyVerify, publicKeyVerify, verify } = require('secp256k1')
+const { sign, verify } = require('secp256k1')
 
-const { hash } = require('../utils')
+const { hash, numberToBuffer } = require('../utils')
 
 const SIGNATURE_LENGTH = 64
 const KEY_LENGTH = 32
@@ -18,8 +18,12 @@ class Challenge {
         return this.buffer.slice(0, SIGNATURE_LENGTH)
     }
 
+    get challengeSignatureRecovery() {
+        return this.buffer.slice(SIGNATURE_LENGTH, SIGNATURE_LENGTH + 1)
+    }
+
     static get SIZE() {
-        return SIGNATURE_LENGTH
+        return SIGNATURE_LENGTH + 1
     }
 
     toBuffer() {
@@ -28,40 +32,52 @@ class Challenge {
 
     static fromBuffer(buf) {
         if (!Buffer.isBuffer(buf))
-            throw Error('Invalid input. Expected a buffer. Got \"' + typeof buf + '\".')
+            throw Error(`Invalid input. Expected a buffer. Got '${typeof buf}' instead.`)
 
-        if (buf.length !== SIGNATURE_LENGTH)
-            throw Error('Expected a buffer of size ' + SIGNATURE_LENGTH + '. Got a buffer of size ' + buf.length + '.')
+        if (buf.length !== Challenge.SIZE)
+            throw Error(`Expected a buffer of size ${Challenge.SIZE}. Got a buffer of size ${buf.length}.`)
 
         return new Challenge(buf)
     }
 
-    static createChallenge(secret, secretKey, buffer = Buffer.alloc(SIGNATURE_LENGTH)) {
-        // console.log('Create challenge with secret ' + secret.toString('base64'))
+    signChallenge(hashedKey, peerId) {
+        const signature = sign(hashedKey, peerId.privKey.marshal())
+
+        this.challengeSignature
+            .fill(signature.signature, 0, SIGNATURE_LENGTH)
+
+        this.challengeSignatureRecovery
+            .fill(numberToBuffer(signature.recovery, 1), 0, 1)
+    }
+
+    /**
+     * 
+     * @param {Buffer} secret 
+     * @param {PeerId} peerId contains secret key
+     * @param {Buffer} buffer (optional) Buffer to store the generated Challenge instance
+     */
+    static createChallenge(secret, peerId, buffer = Buffer.alloc(Challenge.SIZE)) {
         if (!Buffer.isBuffer(secret))
             throw Error('Invalid secret format.')
 
-        if (!privateKeyVerify(secretKey))
-            throw Error('Invalid private key format.')
-
         const challenge = new Challenge(buffer)
-
-        challenge.challengeSignature
-            .fill(sign(Challenge.deriveHashedKey(secret), secretKey).signature, 0, SIGNATURE_LENGTH)
-        // console.log('create challenge with signature' + challenge.challengeSignature.toString('base64'))
+        
+        challenge.signChallenge(Challenge.deriveHashedKey(secret), peerId)
 
         return challenge
     }
 
-    updateChallenge(hashedKey, secretKey, cb) {
+    /**
+     * 
+     * @param {*} hashedKey 
+     * @param {*} peerId contains the secret key
+     * @param {*} cb 
+     */
+    updateChallenge(hashedKey, peerId, cb) {
         if (!Buffer.isBuffer(hashedKey) || hashedKey.length !== HASH_LENGTH)
-            throw Error('Wrong input value. Expected a hashed key of size ' + HASH_LENGTH + ' bytes.')
+            throw Error(`Wrong input value. Expected a hashed key of size ${HASH_LENGTH} bytes.`)
 
-        if (!privateKeyVerify(secretKey))
-            throw Error('Invalid private key format.')
-
-        this.challengeSignature
-            .fill(sign(hashedKey, secretKey).signature, 0, SIGNATURE_LENGTH)
+        this.signChallenge(hashedKey, peerId)
         
         cb(null, this)
     }
@@ -70,12 +86,11 @@ class Challenge {
         return hash(secret)
     }
 
-    verify(pubKey, secret) {
-        if (!Buffer.isBuffer(pubKey) || !publicKeyVerify(pubKey))
-            throw Error('Invalid public key.')
+    verify(peerId, secret) {
+        if (!peerId.pubKey)
+            throw Error('Unable to verify challenge without a public key.')
 
-        console.log(verify(Challenge.deriveHashedKey(secret), this.challengeSignature, pubKey) ? 'Verification OK.' : 'Verification failed.')
-        return verify(Challenge.deriveHashedKey(secret), this.challengeSignature, pubKey)
+        return verify(Challenge.deriveHashedKey(secret), this.challengeSignature, peerId.pubKey.marshal())
     }
 }
 

@@ -1,14 +1,15 @@
 'use strict'
 
-const fs = require('fs')
-
 const EventEmitter = require('events');
+const Transaction = require('../transaction')
 
-
-const { bytesToHex } = require('web3').utils
+const { bytesToHex, BN } = require('web3').utils
 const { recover } = require('secp256k1')
+const toPull = require('stream-to-pull-stream')
+const pull = require('pull-stream')
 
-const { isPartyA, pubKeyToEthereumAddress, bufferToNumber, sendTransaction, log } = require('../utils')
+
+const { isPartyA, pubKeyToEthereumAddress, sendTransaction, log, getId } = require('../utils')
 
 const open = require('./open')
 const close = require('./close')
@@ -20,7 +21,7 @@ class PaymentChannel extends EventEmitter {
     constructor(node, contract, nonce) {
         super()
 
-        this.openPaymentChannels = new Map()
+        // this.openPaymentChannels = new Map()
         this.nonce = nonce
         this.contract = contract
 
@@ -42,101 +43,138 @@ class PaymentChannel extends EventEmitter {
         })
     }
 
-    setSettlementListener(channelId, listener = this.close) {
-        let record
-        if (this.has(channelId)) {
-            record = this.openPaymentChannels.get(channelId.toString('base64'))
-        } else {
-            record = {}
-        }
-
-        record.listener = listener
-
-        this.openPaymentChannels.set(channelId.toString('base64'), record)
-
+    setSettlementListener(tx, listener = this.close) {
+        const channelId = tx.getChannelId(this.node.peerInfo.id)
         log(this.node.peerInfo.id, `Listening to channel \x1b[33m${channelId.toString('hex')}\x1b[0m`)
+
         this.contract.once('ClosedChannel', {
             topics: [bytesToHex(channelId)]
-        }, record.listener)
+        }, listener)
     }
 
-    getEmbeddedMoney(from, tx) {
+    getEmbeddedMoney(from, receivedTx, cb) {
         const self = pubKeyToEthereumAddress(this.node.peerInfo.id.pubKey.marshal())
         const otherParty = pubKeyToEthereumAddress(from.pubKey.marshal())
 
-        const last = this.get(tx.channelId)
+        this.getChannel(getId(
+            pubKeyToEthereumAddress(this.node.peerInfo.id.pubKey.marshal()),
+            pubKeyToEthereumAddress(from.pubKey.marshal())
+        ), (err, { tx, restoreTx }) => {
+            if (err)
+                throw err
 
-        if (isPartyA(self, otherParty)) {
-            return tx.value - last.value
-        } else {
-            return last.value - tx.value
+            const lastValue = new BN(tx.value)
+            const currentValue = new BN(receivedTx.value)
+
+            if (isPartyA(self, otherParty)) {
+                cb(null, currentValue.isub(lastValue))
+            } else {
+                cb(null, lastValue.isub(currentValue))
+            }
+        })
+    }
+
+    setChannel(newRecord, channelId, cb) {
+        if (typeof channelId === 'function') {
+            if (!newRecord.tx)
+                throw Error('Unable to compute channelId.')
+
+            cb = channelId
+            channelId = newRecord.tx.getChannelId(this.node.peerInfo.id)
+        }
+
+        const key = this.getKey(channelId)
+        
+        this.getChannel(channelId, (err, record = {}) => {
+            if (err)
+                throw err
+
+            Object.assign(record, newRecord)
+
+            this.node.db.put(key, this.toBuffer(record), cb)
+        })
+    }
+
+    getKey(channelId) {
+        return Buffer.concat([Buffer.from('payments-channel-'), channelId], 17 + 32)
+    }
+
+    toBuffer(record) {
+        return Buffer.concat([
+            record.tx ? record.tx.toBuffer() : Buffer.alloc(Transaction.SIZE, 0),
+            record.restoreTx ? record.restoreTx.toBuffer() : Buffer.alloc(Transaction.SIZE, 0),
+            record.index ? record.index : Buffer.alloc(Transaction.INDEX_LENGTH, 0)
+        ], Transaction.SIZE + Transaction.SIZE + Transaction.INDEX_LENGTH)
+    }
+    fromBuffer(buf) {
+        return {
+            tx: Transaction.fromBuffer(buf.slice(0, Transaction.SIZE)),
+            restoreTx: Transaction.fromBuffer(buf.slice(Transaction.SIZE, Transaction.SIZE + Transaction.SIZE)),
+            index: buf.slice(Transaction.SIZE + Transaction.SIZE,  Transaction.SIZE + Transaction.SIZE + Transaction.INDEX_LENGTH)
         }
     }
 
-    getCounterParty(channelId) {
-        if (!this.has(channelId))
-            return null
+    getChannel(channelId, cb) {
+        const key = this.getKey(channelId)
 
-        const restoreTx = this.getRestoreTransaction(channelId)
-
-        return recover(restoreTx.hash, restoreTx.signature, bufferToNumber(restoreTx.recovery))
+        this.node.db.get(key, (err, record) => {
+            if (err) {
+                if (err.notFound) {
+                    cb(null)
+                } else {
+                    cb(err)
+                }
+            } else {
+                cb(null, this.fromBuffer(record))
+            }
+        })
     }
 
-    set(tx) {
-        let record
-        if (this.has(tx.channelId)) {
-            record = this.openPaymentChannels.get(tx.channelId.toString('base64'))
-        } else {
-            record = {}
-        }
+    deleteChannel(channelId, cb) {
+        const key = `payments-channel-${channelId.toString('base64')}`
 
-        record.tx = tx
-
-        this.openPaymentChannels.set(tx.channelId.toString('base64'), record)
+        this.node.db.del(key, cb)
     }
 
-    setRestoreTransaction(restoreTx) {
-        let record
-        if (this.has(restoreTx.channelId)) {
-            record = this.openPaymentChannels.get(restoreTx.channelId.toString('base64'))
-        } else {
-            record = {}
-        }
+    getChannels() {
+        return pull(
+            toPull(this.node.db.createReadStream({
+                // payments-channel-\000...\000
+                gt: this.getKey(Buffer.alloc(32, 0)),
+                // payments-channel-\255...\255
+                lt: this.getKey(Buffer.alloc(46, 255))
+            })),
+            pull.map(record => {
 
-        record.restoreTx = restoreTx
-
-        this.openPaymentChannels.set(restoreTx.channelId.toString('base64'), record)
+            
+                
+                return Object.assign(record, {
+                value: this.fromBuffer(record.value)
+            })})
+        )
     }
 
-    get(channelId) {
-        if (!this.has(channelId))
-            return null
+    // getRestoreTransaction(channelId) {
+    //     if (!this.has(channelId))
+    //         return null
 
-        return this.openPaymentChannels.get(channelId.toString('base64')).tx
-    }
+    //     return this.openPaymentChannels.get(channelId.toString('base64')).restoreTx
+    // }
 
-    getRestoreTransaction(channelId) {
-        if (!this.has(channelId))
-            return null
+    // has(channelId) {
+    //     return this.openPaymentChannels.has(channelId.toString('base64'))
+    // }
 
-        return this.openPaymentChannels.get(channelId.toString('base64')).restoreTx
-    }
-
-    has(channelId) {
-        return this.openPaymentChannels.has(channelId.toString('base64'))
-    }
-
-    delete(channelId) {
-        this.openPaymentChannels.delete(channelId.toString('base64'))
-    }
+    // delete(channelId) {
+    //     this.openPaymentChannels.delete(channelId.toString('base64'))
+    // }
 
     /**
      * Takes a transaction object generetad by web3.js and publishes it in the
      * network. It automatically determines the necessary amount of gas i
      * 
      * @param {Object} txObject the txObject generated by web3.js
-     * @param {Object} paymentChannel a paymentChannel instance
-     * @param {Object} web3 a web3.js instance
+     * @param {Web3} web3 a web3.js instance
      * @param {Function} cb the function to be called afterwards
      */
     async contractCall(txObject, value, cb = () => { }) {
@@ -159,8 +197,6 @@ class PaymentChannel extends EventEmitter {
         }, this.node.peerInfo.id, this.node.web3, (err, receipt) => {
             if (err)
                 throw err
-
-            
 
             cb(null, receipt)
         })

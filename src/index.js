@@ -1,10 +1,5 @@
 'use strict'
 
-const withIs = require('class-is')
-
-const { readFileSync } = require('fs')
-const { resolve } = require('path')
-
 const libp2p = require('libp2p')
 const TCP = require('libp2p-tcp')
 const MPLEX = require('libp2p-mplex')
@@ -14,9 +9,7 @@ const defaultsDeep = require('@nodeutils/defaults-deep')
 
 const { isPeerInfo } = require('peer-info')
 
-
 const Web3 = require('web3')
-
 
 const { createPacket } = require('./packet')
 const registerHandlers = require('./handlers')
@@ -24,13 +17,8 @@ const c = require('./constants')
 const crawlNetwork = require('./crawlNetwork')
 const getPubKey = require('./getPubKey')
 const getPeerInfo = require('./getPeerInfo')
-
-// DEMO
-const { randomBytes } = require('crypto')
-const { bufferToNumber, randomSubset } = require('./utils')
-// END DEMO
-
-
+const { randomSubset } = require('./utils')
+const PendingTransactions = require('./pendingTransactions')
 
 // const wrtc = require('wrtc')
 const WStar = require('libp2p-webrtc-star')
@@ -38,11 +26,14 @@ const WStar = require('libp2p-webrtc-star')
 //     wrtc: wrtc
 // })
 
+const levelup = require('levelup')
+const leveldown = require('leveldown')
+
 const PaymentChannels = require('./paymentChannels')
 
-
 const pull = require('pull-stream')
-const { waterfall, times, parallel } = require('async')
+const lp = require('pull-length-prefixed')
+const { waterfall, times, parallel } = require('neo-async')
 
 // const BOOTSTRAP_NODE = Multiaddr('/ip4/127.0.0.1/tcp/9090/')
 
@@ -101,13 +92,14 @@ class Hopper extends libp2p {
         this.web3 = web3
 
         this.seenTags = new Set()
-        this.pendingTransactions = new Map()
         this.crawlNetwork = crawlNetwork(this)
         this.getPubKey = getPubKey(this)
+        this.db = levelup(leveldown(`db/${this.peerInfo.id.toB58String()}`))
+        this.pendingTransactions = new PendingTransactions(this.db)
     }
 
     /**
-     * Creates a new node and invokes @param cb with (err, node) when finished.
+     * Creates a new node and invokes @param cb with `(err, node)` when finished.
      * 
      * @param {Object} options 
      * @param {Function} cb callback when node is ready
@@ -131,7 +123,8 @@ class Hopper extends libp2p {
     }
 
     /**
-     * This method starts the node and registers all necessary handlers.
+     * This method starts the node and registers all necessary handlers. It will
+     * also open the database and creates one if it doesn't exists.
      * 
      * @param {Function} output function to which the plaintext of the received message is passed
      * @param {Function} cb callback when node is ready
@@ -140,12 +133,12 @@ class Hopper extends libp2p {
         waterfall([
             (cb) => super.start((err, _) => cb(err)),
             (cb) => PaymentChannels.createPaymentChannels(this, contract, cb),
-            (cb) => registerHandlers(this, output, cb)
+            (cb) => registerHandlers(this, output, cb),
         ], cb)
     }
 
     /**
-     * Send a message.
+     * Sends a message.
      * 
      * @notice THIS METHOD WILL SPEND YOUR ETHER.
      * @notice This method will fail if there are not enough funds to open
@@ -192,6 +185,7 @@ class Hopper extends libp2p {
                 ({ conn, packet }, cb) => {
                     pull(
                         pull.once(packet.toBuffer()),
+                        lp.encode(),
                         conn
                     )
                     cb()
@@ -200,6 +194,13 @@ class Hopper extends libp2p {
         }, cb)
     }
 
+    /**
+     * Takes a destination and samples randomly intermediate nodes
+     * that will relay that message before it reaches its destination.
+     * 
+     * @param {Object} destination instance of peerInfo that contains the peerId of the destination 
+     * @param {Function} cb the function that called afterwards
+     */
     getIntermediateNodes(destination, cb) {
         const comparator = (peerInfo) =>
             this.peerInfo.id.id.compare(peerInfo.id.id) !== 0 &&
@@ -212,4 +213,4 @@ class Hopper extends libp2p {
     }
 }
 
-module.exports = withIs(Hopper, { className: 'hopper', symbolName: '@validitylabs/hopper/hopper' })
+module.exports = Hopper

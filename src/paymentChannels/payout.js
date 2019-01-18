@@ -1,69 +1,78 @@
 'use strict'
 
-const secp256k1 = require('secp256k1')
 const pull = require('pull-stream')
-const { waterfall, map } = require('neo-async')
-const { bufferToNumber, pubKeyToPeerId } = require('../utils')
+const lp = require('pull-length-prefixed')
 
-const bs58 = require('bs58')
+const { waterfall } = require('neo-async')
+const { pubKeyToPeerId, log } = require('../utils')
+const { BN } = require('web3-utils')
+
 const c = require('../constants')
 
 const SETTLEMENT_TIMEOUT = 40000
 
 module.exports = (self) => (cb) => {
-    console.log('[\'' + self.node.peerInfo.id.toB58String() + '\']: Closing channels ' + Array.from(self.openPaymentChannels.keys()).map(ch => `\x1b[33m${Buffer.from(ch, 'base64').toString('hex')}\x1b[0m`).join(', ') + '.')
-    map(self.openPaymentChannels.values(), (record, cb) => {
-        let counterParty = secp256k1.recover(record.tx.hash, record.tx.signature, bufferToNumber(record.tx.recovery))
+    // console.log('[\'' + self.node.peerInfo.id.toB58String() + '\']: Closing channels ' + Array.from(self.openPaymentChannels.keys()).map(ch => `\x1b[33m${Buffer.from(ch, 'base64').toString('hex')}\x1b[0m`).join(', ') + '.')
 
-        if (self.node.peerInfo.id.pubKey.marshal().compare(counterParty) === 0) {
-            waterfall([
-                (cb) => pubKeyToPeerId(
-                    secp256k1.recover(
-                        record.restoreTx.hash,
-                        record.restoreTx.signature,
-                        bufferToNumber(record.restoreTx.recovery)), cb),
-                (peerId, cb) => self.node.peerRouting.findPeer(peerId, cb),
-                (peerInfo, cb) => self.node.dialProtocol(peerInfo, c.PROTOCOL_SETTLE_CHANNEL, (err, conn) => {
-                    if (err) { throw err }
+    pull(
+        self.getChannels(),
+        pull.asyncMap((data, cb) => {
+            const channelId = data.key.slice(17)
+            const { tx, restoreTx, index } = data.value
 
-                    const now = Date.now()
+            if (index.compare(tx.index) === 1) { // index > tx.index ?
+                waterfall([
+                    (cb) => pubKeyToPeerId(restoreTx.counterparty, cb),
+                    (peerId, cb) => self.node.peerRouting.findPeer(peerId, cb),
+                ], (err, peerInfo) => {
+                    if (err)
+                        throw err
 
-                    // TODO: Implement proper transaction handling
-                    const timeout = setTimeout(self.settle, SETTLEMENT_TIMEOUT, record.tx.channelId, true)
-
-                    self.contract.once('ClosedChannel', {
-                        topics: [`0x${record.restoreTx.channelId.toString('hex')}`]
-                    }, (err) => {
+                    self.node.dialProtocol(peerInfo, c.PROTOCOL_SETTLE_CHANNEL, (err, conn) => {
                         if (err)
                             throw err
 
-                        if (Date.now() - now < SETTLEMENT_TIMEOUT) {
-                            // Prevent node from settling channel itself with a probably
-                            // outdated transaction
-                            clearTimeout(timeout)
-                        }
+                        const now = Date.now()
+
+                        // TODO: Implement proper transaction handling
+                        const timeout = setTimeout(self.settle, SETTLEMENT_TIMEOUT, channelId, true)
+
+                        self.contract.once('ClosedChannel', {
+                            topics: [`0x${channelId.toString('hex')}`]
+                        }, (err) => {
+                            if (err)
+                                throw err
+
+                            if (Date.now() - now < SETTLEMENT_TIMEOUT) {
+                                // Prevent node from settling channel itself with a probably
+                                // outdated transaction
+                                clearTimeout(timeout)
+                            }
+                        })
+
+                        pull(
+                            pull.once(channelId),
+                            lp.encode(),
+                            conn
+                        )
                     })
+                })
+            } else {
+                self.settle(channelId)
+            }
 
-                    pull(
-                        pull.once(record.tx.channelId),
-                        conn
-                    )
+            self.on(`closed ${channelId.toString('base64')}`, (receivedMoney) => {
+                // Callback just when the channel is settled, i.e. the closing listener
+                // emits the 'closed <channelId>' event.
 
-                }),
-            ], cb)
-        } else {
-            self.settle(record.tx.channelId)
-        }
+                cb(null, receivedMoney)
+            })
+        }),
+        pull.collect((err, values) => {
+            if (err)
+                throw err
 
-        self.on('closed ' + record.restoreTx.channelId.toString('base64'), (receivedMoney) => {
-            // Callback just when the channel is settled, i.e. the closing listener
-            // emits the 'closed <channelId>' event.
-            cb(null, receivedMoney)
+            cb(null, values.reduce((acc, receivedMoney) => acc.iadd(receivedMoney), new BN('0')))
         })
-
-    }, (err, results) => {
-        if (err) { throw err }
-
-        cb(null, results.reduce((acc, receivedMoney) => acc + receivedMoney, 0))
-    })
+    )
 }

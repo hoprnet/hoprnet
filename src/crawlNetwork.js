@@ -4,6 +4,7 @@ const PeerId = require('peer-id')
 const PeerInfo = require('peer-info')
 
 const pull = require('pull-stream')
+const lp = require('pull-length-prefixed')
 
 const flatten = require('lodash.flatten');
 const uniqWith = require('lodash.uniqwith')
@@ -42,6 +43,7 @@ module.exports = (node) =>
                     (peerInfo, cb) => node.dialProtocol(peerInfo, PROTOCOL_CRAWLING, cb),
                     (conn, cb) => pull(
                         conn,
+                        lp.decode(),
                         pull.filter(data =>
                             data.length > 0 &&
                             data.length % MARSHALLED_PUBLIC_KEY_SIZE === 0),

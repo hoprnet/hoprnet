@@ -1,40 +1,40 @@
 'use strict'
 
 const pull = require('pull-stream')
+const lp = require('pull-length-prefixed')
 
 const { waterfall } = require('neo-async')
-const { toWei } = require('web3').utils
-const { getId, pubKeyToEthereumAddress, deepCopy, bufferToNumber, log } = require('../utils')
+const { randomBytes } = require('crypto')
+const { toWei, BN } = require('web3').utils
+const { deepCopy, bufferToNumber, numberToBuffer, log } = require('../utils')
 const { recover } = require('secp256k1')
 
-const { PROTOCOL_PAYMENT_CHANNEL, CREATE_GAS_AMOUNT, GAS_PRICE } = require('../constants')
-const SIGNATURE_LENGTH = 64
+const { PROTOCOL_PAYMENT_CHANNEL } = require('../constants')
 
 const Transaction = require('../transaction')
 
 module.exports = (self) => (to, cb) => waterfall([
-    (cb) => self.node.peerRouting.findPeer(to.id, cb),
+    (cb) => self.node.peerRouting.findPeer(to, cb),
     (peerInfo, cb) => self.node.dialProtocol(peerInfo, PROTOCOL_PAYMENT_CHANNEL, cb),
     (conn, cb) => {
         const restoreTx = new Transaction()
 
-        restoreTx.value = parseInt(toWei('1', 'shannon'))
-        restoreTx.index = 1
+        restoreTx.nonce = randomBytes(Transaction.NONCE_LENGTH)
+        restoreTx.value = (new BN(toWei('1', 'shannon'))).toBuffer('be', Transaction.VALUE_LENGTH)
+        restoreTx.index = numberToBuffer(1, Transaction.INDEX_LENGTH)
 
-        restoreTx.channelId = getId(
-            pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal()),
-            pubKeyToEthereumAddress(to.id.pubKey.marshal()))
-
-        restoreTx.sign(self.node.peerInfo.id.privKey.marshal())
+        restoreTx.sign(self.node.peerInfo.id)
 
         pull(
             pull.once(restoreTx.toBuffer()),
+            lp.encode(),
             conn,
+            lp.decode(),
             pull.filter((data) =>
                 Buffer.isBuffer(data) &&
-                data.length === SIGNATURE_LENGTH + 1 &&
-                recover(restoreTx.hash, data.slice(0, SIGNATURE_LENGTH), bufferToNumber(data.slice(SIGNATURE_LENGTH)))
-                    .compare(to.id.pubKey.marshal()) === 0
+                data.length === Transaction.SIGNATURE_LENGTH + Transaction.RECOVERY_LENGTH &&
+                recover(restoreTx.hash, data.slice(0, Transaction.SIGNATURE_LENGTH), bufferToNumber(data.slice(Transaction.SIGNATURE_LENGTH)))
+                    .compare(to.pubKey.marshal()) === 0
             ),
             pull.collect((err, signatures) => {
                 if (err)
@@ -43,27 +43,35 @@ module.exports = (self) => (to, cb) => waterfall([
                 if (signatures.length !== 1)
                     throw Error('Invalid response')
 
-                restoreTx.signature.fill(signatures[0].slice(0, SIGNATURE_LENGTH))
-                restoreTx.recovery.fill(signatures[0].slice(SIGNATURE_LENGTH))
+                restoreTx.signature = signatures[0].slice(0, Transaction.SIGNATURE_LENGTH)
+                restoreTx.recovery = signatures[0].slice(Transaction.SIGNATURE_LENGTH)
 
                 self.contractCall(self.contract.methods.createFunded(
-                    pubKeyToEthereumAddress(to.id.pubKey.marshal()),
-                    toWei('1', 'shannon'),
+                    restoreTx.nonce,
+                    (new BN(restoreTx.value)).toString(),
                     restoreTx.signature.slice(0, 32),
                     restoreTx.signature.slice(32, 64),
-                    restoreTx.recovery
+                    bufferToNumber(restoreTx.recovery) + 27
                 ), (err, receipt) => {
-                    if (err) { throw err }
+                    if (err)
+                        throw err
 
-                    self.setSettlementListener(restoreTx.channelId)
-                    self.setRestoreTransaction(restoreTx)
+                    self.setSettlementListener(restoreTx)
 
                     const tx = deepCopy(restoreTx, Transaction)
-                    self.set(tx)
 
-                    log(self.node.peerInfo.id, `Opened payment channel \x1b[33m${restoreTx.channelId.toString('hex')}\x1b[0m with txHash \x1b[32m${receipt.transactionHash}\x1b[0m. Nonce is now \x1b[31m${self.nonce - 1}\x1b[0m.`)
+                    self.setChannel({
+                        restoreTx: restoreTx,
+                        tx: tx,
+                        index: restoreTx.index
+                    }, (err) => {
+                        if (err)
+                            throw err
 
-                    cb(null, tx)
+                        log(self.node.peerInfo.id, `Opened payment channel \x1b[33m${restoreTx.getChannelId(self.node.peerInfo.id).toString('hex')}\x1b[0m with txHash \x1b[32m${receipt.transactionHash}\x1b[0m. Nonce is now \x1b[31m${self.nonce - 1}\x1b[0m.`)
+
+                        cb(null, tx)
+                    })
                 })
             })
         )

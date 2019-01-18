@@ -1,40 +1,46 @@
 'use strict'
 
 const pull = require('pull-stream')
-const { waterfall } = require('neo-async')
+const lp = require('pull-length-prefixed')
+const { pubKeyToPeerId } = require('../utils')
+const { decode } = require('multihashes')
 
 const { PROTOCOL_ACKNOWLEDGEMENT } = require('../constants')
-const { bufferXOR, hash } = require('../utils')
+const { bufferXOR, hash, log } = require('../utils')
 const Acknowledgement = require('../acknowledgement')
 
 module.exports = (node) => node.handle(PROTOCOL_ACKNOWLEDGEMENT, (protocol, conn) => pull(
     conn,
+    lp.decode(),
     pull.filter(data =>
         data.length > 0 && data.length === Acknowledgement.SIZE
     ),
     pull.map(data => Acknowledgement.fromBuffer(data)),
-    pull.drain(ack => waterfall([
-        (cb) => conn.getPeerInfo(cb),
-        (peerInfo, cb) => node.getPubKey(peerInfo, cb),
-        (peerInfo, cb) => ack.verify(peerInfo.id.pubKey.marshal(), node.peerInfo.id.pubKey.marshal(), cb),
-        (valid, cb) => {
-            if (!node.pendingTransactions.has(ack.hashedKey.toString('base64')))
+    pull.drain(ack => {
+        if (ack.challengeSigningParty.compare(node.peerInfo.id.pubKey.marshal()) !== 0)
+            throw Error('General error.')
+
+        node.pendingTransactions.getEncryptedTransaction(ack.hashedKey, (err, record) => {
+            if (!record)
                 throw Error('General error.')
 
-            const { transaction, ownKeyHalf } = node.pendingTransactions
-                .get(ack.hashedKey.toString('base64'))
+            const { transaction, ownKeyHalf, hashedPubKey } = record
 
-            if (transaction && ownKeyHalf) {
-                console.log('[\'' + node.peerInfo.id.toB58String() + '\']: Decrypting with  \'' + hash(bufferXOR(ownKeyHalf, ack.key)).toString('base64') + '\'.')
+            pubKeyToPeerId(ack.responseSigningParty, (err, peerId) => {
+                if (decode(peerId.toBytes()).digest.compare(hashedPubKey) !== 0)
+                    throw Error('General error.')
 
                 transaction.decrypt(hash(bufferXOR(ownKeyHalf, ack.key)))
 
-                if (!transaction.verify(node))
-                    throw Error('General error')
+                const channelId = transaction.getChannelId(node.peerInfo.id)
+                node.paymentChannels.getChannel(channelId, (err, record) => {
+                    if (!record)
+                        throw Error('General error.')
 
-                node.paymentChannels.set(transaction)
-                console.log('Acknowledgement ' + (valid ? 'valid' : 'NOT VALID') + '.')
-            }
-        }
-    ]))
-))
+                    node.paymentChannels.setChannel({
+                        tx: transaction
+                    }, channelId)
+                })
+            })
+        })
+    })))

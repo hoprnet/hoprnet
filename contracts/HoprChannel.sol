@@ -13,7 +13,7 @@ contract HoprChannel {
     uint256 constant private TIME_CONFIRMATION = 1 minutes; // testnet value TODO: adjust for mainnet use
     
     // Tell payment channel partners that the channel has been settled and closed
-    event ClosedChannel(bytes32 indexed channelId, uint256 index, uint256 amountA) anonymous;
+    event ClosedChannel(bytes32 indexed channelId, bytes16 index, uint256 amountA) anonymous;
 
     // Tell payment channel partners that the channel has been opened
     event OpenedChannel(bytes32 channelId, uint256 amount);
@@ -32,7 +32,7 @@ contract HoprChannel {
         ChannelState state;
         uint256 balance;
         uint256 balanceA;
-        uint256 index;
+        bytes16 index;
         uint256 settleTimestamp;
     }
 
@@ -147,28 +147,29 @@ contract HoprChannel {
     
     /**
     * @notice pre-fund channel by with staked Ether of both parties
-    * @param counterParty address of the counter party
+    * @param nonce nonce to prevent against replay attacks
     * @param amount uint256 how much money both parties put into the channel
     * @param r bytes32 signature first part
     * @param s bytes32 signature second part
     * @param v uint8 version
      */
-    function createFunded(address counterParty, uint256 amount, bytes32 r, bytes32 s, bytes1 v) public enoughFunds(amount) {
-        require(channels[getId(counterParty)].state == ChannelState.UNINITIALIZED, "Channel already exists.");
+    function createFunded(bytes16 nonce, uint256 amount, bytes32 r, bytes32 s, uint8 v) public enoughFunds(amount) {
+        bytes32 hashedMessage = keccak256(abi.encodePacked(nonce, uint128(1), amount));
+        address counterparty = ecrecover(hashedMessage, v, r, s);
 
-        require(states[counterParty].stakedEther >= amount, "Insufficient funds");
+        require(states[counterparty].stakedEther >= amount, "Insufficient funds");
 
-        bytes32 hashedMessage = keccak256(abi.encodePacked(amount, uint256(1), getId(counterParty)));
+        bytes32 channelId = getId(counterparty);
 
-        require(ecrecover(hashedMessage, uint8(v) + 27, r, s) == counterParty, "Invalid opening transaction");
+        require(channels[channelId].state == ChannelState.UNINITIALIZED, "Channel already exists.");
 
         states[msg.sender].stakedEther = states[msg.sender].stakedEther.sub(amount);
-        states[counterParty].stakedEther = states[counterParty].stakedEther.sub(amount);
+        states[counterparty].stakedEther = states[counterparty].stakedEther.sub(amount);
 
         states[msg.sender].openChannels = states[msg.sender].openChannels.add(1);
-        states[counterParty].openChannels = states[counterParty].openChannels.add(1);
+        states[counterparty].openChannels = states[counterparty].openChannels.add(1);
         
-        channels[getId(counterParty)] = Channel(ChannelState.ACTIVE, uint256(2).mul(amount), amount, 0, 0);        
+        channels[channelId] = Channel(ChannelState.ACTIVE, uint256(2).mul(amount), amount, 0, 0);        
     }
 
     /**
@@ -200,25 +201,25 @@ contract HoprChannel {
 
     /**
     * @notice settle & close payment channel
-    * @param counterParty address of the counter party
-    * @param index uint256
+    * @param index bytes16
+    * @param nonce bytes16
     * @param balanceA uint256
     * @param r bytes32
     * @param s bytes32
     * @param v bytes1
     */
-    function closeChannel(address counterParty, uint256 index, uint256 balanceA, bytes32 r, bytes32 s, bytes1 v) public channelExists(counterParty) {
-        bytes32 channelId = getId(counterParty);
+
+    function closeChannel(bytes16 index, bytes16 nonce, uint256 balanceA, bytes32 r, bytes32 s, uint8 v) public {
+        bytes32 hashedMessage = keccak256(abi.encodePacked(nonce, index, balanceA));
+        address counterparty = ecrecover(hashedMessage, v, r, s);
+
+        bytes32 channelId = getId(counterparty);
         Channel storage channel = channels[channelId];
         
         require(
             channel.index < index &&
             channel.state == ChannelState.ACTIVE || channel.state == ChannelState.PENDING_SETTLEMENT,
             "Invalid channel.");
-               
-        // is the proof valid?
-        bytes32 hashedMessage = keccak256(abi.encodePacked(balanceA, index, channelId));
-        require(ecrecover(hashedMessage, uint8(v) + 27, r, s) == counterParty, "Invalid signature.");
         
         channel.balanceA = balanceA;
         channel.index = index;

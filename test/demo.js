@@ -31,7 +31,7 @@ if (NET === 'ganache') {
 }
 
 const AMOUUNT_OF_NODES = 4
-const AMOUNT_OF_MESSAGES = 1
+const AMOUNT_OF_MESSAGES = 3
 
 let index, compiledContract
 

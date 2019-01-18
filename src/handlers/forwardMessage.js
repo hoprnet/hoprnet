@@ -1,6 +1,7 @@
 'use strict'
 
 const pull = require('pull-stream')
+const lp = require('pull-length-prefixed')
 const { waterfall, parallel } = require('neo-async')
 const { log } = require('../utils')
 
@@ -22,6 +23,7 @@ module.exports = (node, output) => node.handle(c.PROTOCOL_STRING, (protocol, con
                 (conn, cb) => {
                     pull(
                         pull.once(packet.toBuffer()),
+                        lp.encode(),
                         conn
                     )
                     cb(null)
@@ -40,9 +42,10 @@ module.exports = (node, output) => node.handle(c.PROTOCOL_STRING, (protocol, con
                         Acknowledgement.create(
                             packet.oldChallenge,
                             packet.header.derivedSecret,
-                            node.peerInfo.id.privKey.marshal()
+                            node.peerInfo.id
                         ).toBuffer()
                     ),
+                    lp.encode(),
                     conn
                 )
                 cb()
@@ -52,6 +55,7 @@ module.exports = (node, output) => node.handle(c.PROTOCOL_STRING, (protocol, con
 
     pull(
         conn,
+        lp.decode(),
         pull.filter(data => data.length > 0 && data.length % Packet.SIZE === 0),
         pull.map(data => Packet.fromBuffer(data)),
         pull.drain((packet) => waterfall([

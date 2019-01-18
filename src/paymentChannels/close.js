@@ -3,46 +3,41 @@
 const { waterfall } = require('neo-async')
 const { isPartyA, pubKeyToEthereumAddress, mineBlock, log } = require('../utils')
 const { NET } = require('../constants')
+const { BN } = require('web3-utils')
 
-module.exports = (self) => {
-    function hasBetterTx(channelId, amountA, counterParty) {
-        const lastTx = self.get(channelId)
+module.exports = (self) => (err, event) => {
+    if (err)
+        throw err
 
-        if (isPartyA(
-            pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal()),
-            pubKeyToEthereumAddress(counterParty)
-        )) {
-            return lastTx.value > amountA
-        } else {
-            return amountA > lastTx.value
-        }
-    }
+    const channelId = Buffer.from(event.returnValues.channelId.slice(2), 'hex')
 
-    return (err, event) => {
-        if (err) { throw err }
+    self.getChannel(channelId, (err, record) => {
+        if (err)
+            throw err
 
-        const channelId = Buffer.from(event.returnValues.channelId.slice(2), 'hex')
+        if (!record)
+            log(self.node.peerInfo.id, `Listening to wrong channel. ${channelId.toString('hex')}.`)
 
-        if (!self.has(channelId)) {
-            console.log('[\'' + self.node.peerInfo.id.toB58String() + '\']: Listening to wrong channel. Channel \'' + channelId.toString('hex') + '\'.')
-            return
-        }
-
-        const amountA = parseInt(event.returnValues.amountA)
-        const lastTx = self.get(channelId)
-        const counterParty = self.getCounterParty(channelId)
+        const { tx, restoreTx, index } = record
+        const amountA = new BN(event.returnValues.amountA)
+        const counterparty = record.restoreTx.counterparty
 
         let interested = false
+
+        const partyA = isPartyA(
+            pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal()),
+            pubKeyToEthereumAddress(counterparty)
+        )
 
         waterfall([
             (cb) => {
                 if (
-                    parseInt(event.returnValues.index) < parseInt(lastTx.index) &&
-                    hasBetterTx(channelId, amountA, counterParty)
+                    Buffer.from(event.returnValues.index.replace('0x', ''), 'hex').compare(tx.index) === -1 &&
+                    (partyA ? new BN(tx.value).gt(amountA) : amountA.gt(new BN(tx.value)))
                 ) {
-                    console.log('[\'' + self.node.peerInfo.id.toB58String() + '\']: Found better transaction for payment channel \'' + channelId.toString('hex') + '\'.')
+                    log(self.node.peerInfo.id, `Found better transaction for payment channel ${channelId.toString('hex')}.`)
 
-                    self.settle(lastTx.channelId, cb)
+                    self.settle(channelId, cb)
                 } else {
                     cb(null)
                 }
@@ -52,11 +47,12 @@ module.exports = (self) => {
             }, cb),
             (channel, cb) => self.node.web3.eth.getBlock((err, block) => cb(err, block, channel)),
             (block, channel, cb) => {
-                if (parseInt(block.timestamp) < parseInt(channel.settleTimestamp)) {
+                if (block.timestamp < parseInt(channel.settleTimestamp)) {
                     const subscription = self.node.web3.eth.subscribe('newBlockHeaders')
                         .on('data', (block) => {
-                            console.log('Waiting ... Block \'' + block.number + '\'.')
-                            if (parseInt(block.timestamp) > parseInt(channel.settleTimestamp)) {
+                            log(self.node.peerInfo.id, `Waiting ... Block ${block.number}.`)
+
+                            if (block.timestamp > parseInt(channel.settleTimestamp)) {
                                 subscription.unsubscribe((err, ok) => {
                                     if (ok)
                                         cb(err)
@@ -81,36 +77,33 @@ module.exports = (self) => {
             },
             (cb) => {
                 if (self.eventNames().some((name) =>
-                    name === 'closed '.concat(channelId.toString('base64'))
+                    name === `closed ${channelId.toString('base64')}`
                 )) {
                     interested = true
 
-                    self.contractCall(self.contract.methods.withdraw(pubKeyToEthereumAddress(counterParty)), cb)
+                    self.contractCall(self.contract.methods.withdraw(pubKeyToEthereumAddress(counterparty)), cb)
                 } else {
                     cb()
                 }
             }
         ], (err, receipt) => {
-            if (err) { throw err }
+            if (err)
+                throw err
 
-            let receivedMoney
-            const initialTx = self.getRestoreTransaction(channelId)
-            if (isPartyA(
-                pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal()),
-                pubKeyToEthereumAddress(counterParty)
-            )) {
-                receivedMoney = amountA - initialTx.value
-            } else {
-                receivedMoney = initialTx.value - amountA
-            }
+            const initialValue = new BN(restoreTx.value)
 
-            log(self.node.peerInfo.id, `Closed payment channel \x1b[33m${initialTx.channelId.toString('hex')}\x1b[0m and ${receivedMoney < 0 ? 'spent' : 'received'} \x1b[35m${Math.abs(receivedMoney)} wei\x1b[0m. ${receipt ? ` TxHash \x1b[32m${receipt.transactionHash}\x1b[0m.` : ''}`)
+            const receivedMoney = partyA ? amountA.isub(initialValue) : initialValue.isub(amountA)
 
-            self.delete(lastTx.channelId)
+            log(self.node.peerInfo.id, `Closed payment channel \x1b[33m${channelId.toString('hex')}\x1b[0m and ${receivedMoney.isNeg() ? 'spent' : 'received'} \x1b[35m${receivedMoney.abs().toString()} wei\x1b[0m. ${receipt ? ` TxHash \x1b[32m${receipt.transactionHash}\x1b[0m.` : ''}`)
 
-            if (interested) {
-                self.emit('closed ' + channelId.toString('base64'), receivedMoney)
-            }
+            self.deleteChannel(channelId, (err) => {
+                if (err)
+                    throw err
+
+                if (interested) {
+                    self.emit(`closed ${channelId.toString('base64')}`, receivedMoney)
+                }
+            })
         })
-    }
+    })
 } 

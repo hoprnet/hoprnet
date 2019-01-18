@@ -1,7 +1,10 @@
 'use strict'
 
-const { sha3, hexToBytes, toChecksumAddress, toWei } = require('web3').utils
-const { randomBytes, createHash } = require('crypto')
+const { sha3, hexToBytes, toChecksumAddress } = require('web3').utils
+const { randomBytes } = require('crypto')
+
+const { waterfall } = require('neo-async')
+
 
 // ==========================
 // General methods
@@ -284,16 +287,15 @@ const ETHEUREUM_ADDRESS_SIZE = 20 // Bytes
  * 
  * @param {String} sender an ethereum address
  * @param {String} otherParty another ethereum address
+ * @returns {Buffer} the Id
  */
 module.exports.getId = (sender, otherParty) => {
     sender = Buffer.from(hexToBytes(sender), 0, ETHEUREUM_ADDRESS_SIZE)
     otherParty = Buffer.from(hexToBytes(otherParty), 0, ETHEUREUM_ADDRESS_SIZE)
 
     if (module.exports.isPartyA(sender, otherParty)) {
-        // console.log('[\'' + sender.toString('base64') + '\ \'' + otherParty.toString('base64') + '\']: ChannelId: \'' + module.exports.hash(Buffer.concat([sender, otherParty], 2 * ETHEUREUM_ADDRESS_SIZE)).toString('base64') + '\' as party A.')
         return module.exports.hash(Buffer.concat([sender, otherParty], 2 * ETHEUREUM_ADDRESS_SIZE))
     } else {
-        // console.log('[\'' + sender.toString('base64') + '\ \'' + otherParty.toString('base64') + '\']: ChannelId: \'' + module.exports.hash(Buffer.concat([otherParty, sender], 2 * ETHEUREUM_ADDRESS_SIZE)).toString('base64') + '\' as party B.')
         return module.exports.hash(Buffer.concat([otherParty, sender], 2 * ETHEUREUM_ADDRESS_SIZE))
     }
 }
@@ -327,10 +329,9 @@ module.exports.privKeyToPeerId = (privKey, cb) => {
 // ==========================
 // Ganache-core methods   <-- ONLY FOR TESTING
 // ==========================
-const { waterfall } = require('neo-async')
 const ONE_MINUTE = 60 * 1000
 /**
- * Mine a single block
+ * Mine a single block and increase the timestamp by the given amount.
  * 
  * @param {Object} provider a valid Web3 provider
  * @param {Number} amountOfTime increase the timestamp by that amount of time, default 1 minute
@@ -357,33 +358,6 @@ module.exports.mineBlock = (provider, amountOfTime = ONE_MINUTE) => waterfall([
         console.log(`\x1b[34mNow on block ${parseInt(response.result, 16)}.\x1b[0m`)
     })
 ])
-
-// /**
-//  * Go to a specific block by mining probably empty blocks
-//  * 
-//  * @param {Object} provider a valid Web3 provider
-//  * @param {Number} blockNumber the block to go to
-//  */
-// module.exports.gotoBlock = (provider, blockNumber, cb) => {
-
-//     console.log('%sGoing to block %d by mining probably empty blocks%s', blueText, blockNumber, resetColor)
-
-//     during(
-//         (cb) => provider.send({
-//             jsonrpc: '2.0',
-//             method: 'eth_blockNumber',
-//             id: Date.now()
-//         }, (err, response) => {
-//             console.log('Block ' + parseInt(response.result, 16))
-//             cb(err, parseInt(response.result, 16) < blockNumber)
-//         }),
-//         (cb) => provider.send({
-//             jsonrpc: '2.0',
-//             method: 'evm_mine',
-//             id: Date.now(),
-//         }, cb),
-//         cb)
-// }
 
 // ==========================
 // Web3.js methods
