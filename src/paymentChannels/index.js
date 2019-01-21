@@ -3,13 +3,11 @@
 const EventEmitter = require('events');
 const Transaction = require('../transaction')
 
-const { bytesToHex, BN } = require('web3').utils
-const { recover } = require('secp256k1')
+const { BN } = require('web3').utils
 const toPull = require('stream-to-pull-stream')
 const pull = require('pull-stream')
 
-
-const { isPartyA, pubKeyToEthereumAddress, sendTransaction, log, getId } = require('../utils')
+const { isPartyA, pubKeyToEthereumAddress, sendTransaction, log } = require('../utils')
 
 const open = require('./open')
 const close = require('./close')
@@ -17,11 +15,12 @@ const transfer = require('./transfer')
 const settle = require('./settle')
 const payout = require('./payout')
 
+const HASH_LENGTH = 32
+
 class PaymentChannel extends EventEmitter {
     constructor(node, contract, nonce) {
         super()
 
-        // this.openPaymentChannels = new Map()
         this.nonce = nonce
         this.contract = contract
 
@@ -43,48 +42,50 @@ class PaymentChannel extends EventEmitter {
         })
     }
 
-    setSettlementListener(tx, listener = this.close) {
-        const channelId = tx.getChannelId(this.node.peerInfo.id)
+    setSettlementListener(channelId, listener = this.close) {
+        if (!Buffer.isBuffer(channelId) || channelId.length !== HASH_LENGTH)
+            throw Error(`Invalid input parameter. Expected a Buffer of size ${HASH_LENGTH} but got ${typeof channelId}.`)
+
         log(this.node.peerInfo.id, `Listening to channel \x1b[33m${channelId.toString('hex')}\x1b[0m`)
 
         this.contract.once('ClosedChannel', {
-            topics: [bytesToHex(channelId)]
+            topics: [`0x${channelId.toString('hex')}`]
         }, listener)
     }
 
-    getEmbeddedMoney(from, receivedTx, cb) {
-        const self = pubKeyToEthereumAddress(this.node.peerInfo.id.pubKey.marshal())
-        const otherParty = pubKeyToEthereumAddress(from.pubKey.marshal())
-
-        this.getChannel(getId(
-            pubKeyToEthereumAddress(this.node.peerInfo.id.pubKey.marshal()),
-            pubKeyToEthereumAddress(from.pubKey.marshal())
-        ), (err, { tx, restoreTx }) => {
+    getEmbeddedMoney(channelId, receivedTx, cb) {
+        this.getChannel(channelId, (err, { restoreTx, currentValue }) => {
             if (err)
                 throw err
 
-            const lastValue = new BN(tx.value)
-            const currentValue = new BN(receivedTx.value)
+            currentValue = new BN(currentValue)
+            const newValue = new BN(receivedTx.value)
+
+            const self = pubKeyToEthereumAddress(this.node.peerInfo.id.pubKey.marshal())
+            const otherParty = pubKeyToEthereumAddress(restoreTx.counterparty)
 
             if (isPartyA(self, otherParty)) {
-                cb(null, currentValue.isub(lastValue))
+                cb(null, newValue.isub(currentValue))
             } else {
-                cb(null, lastValue.isub(currentValue))
+                cb(null, currentValue.isub(newValue))
             }
         })
     }
 
     setChannel(newRecord, channelId, cb) {
         if (typeof channelId === 'function') {
-            if (!newRecord.tx)
+            if (!newRecord.restoreTx)
                 throw Error('Unable to compute channelId.')
 
             cb = channelId
             channelId = newRecord.tx.getChannelId(this.node.peerInfo.id)
         }
 
+        if (!channelId || !Buffer.isBuffer(channelId) || channelId.length !== 32)
+            throw Error('Unable to determine channelId.')
+
         const key = this.getKey(channelId)
-        
+
         this.getChannel(channelId, (err, record = {}) => {
             if (err)
                 throw err
@@ -103,14 +104,18 @@ class PaymentChannel extends EventEmitter {
         return Buffer.concat([
             record.tx ? record.tx.toBuffer() : Buffer.alloc(Transaction.SIZE, 0),
             record.restoreTx ? record.restoreTx.toBuffer() : Buffer.alloc(Transaction.SIZE, 0),
-            record.index ? record.index : Buffer.alloc(Transaction.INDEX_LENGTH, 0)
-        ], Transaction.SIZE + Transaction.SIZE + Transaction.INDEX_LENGTH)
+            record.index ? record.index : Buffer.alloc(Transaction.INDEX_LENGTH, 0),
+            record.currentValue ? record.currentValue : Buffer.alloc(Transaction.VALUE_LENGTH, 0),
+            record.totalBalance ? record.totalBalance : Buffer.alloc(Transaction.VALUE_LENGTH, 0)
+        ], Transaction.SIZE + Transaction.SIZE + Transaction.INDEX_LENGTH + Transaction.VALUE_LENGTH + Transaction.VALUE_LENGTH)
     }
     fromBuffer(buf) {
         return {
             tx: Transaction.fromBuffer(buf.slice(0, Transaction.SIZE)),
             restoreTx: Transaction.fromBuffer(buf.slice(Transaction.SIZE, Transaction.SIZE + Transaction.SIZE)),
-            index: buf.slice(Transaction.SIZE + Transaction.SIZE,  Transaction.SIZE + Transaction.SIZE + Transaction.INDEX_LENGTH)
+            index: buf.slice(Transaction.SIZE + Transaction.SIZE, Transaction.SIZE + Transaction.SIZE + Transaction.INDEX_LENGTH),
+            currentValue: buf.slice(Transaction.SIZE + Transaction.SIZE + Transaction.INDEX_LENGTH, Transaction.SIZE + Transaction.SIZE + Transaction.INDEX_LENGTH + Transaction.VALUE_LENGTH),
+            totalBalance: buf.slice(Transaction.SIZE + Transaction.SIZE + Transaction.INDEX_LENGTH + Transaction.VALUE_LENGTH, Transaction.SIZE + Transaction.SIZE + Transaction.INDEX_LENGTH + Transaction.VALUE_LENGTH + Transaction.VALUE_LENGTH)
         }
     }
 
@@ -144,30 +149,11 @@ class PaymentChannel extends EventEmitter {
                 // payments-channel-\255...\255
                 lt: this.getKey(Buffer.alloc(46, 255))
             })),
-            pull.map(record => {
-
-            
-                
-                return Object.assign(record, {
+            pull.map(record => Object.assign(record, {
                 value: this.fromBuffer(record.value)
-            })})
+            }))
         )
     }
-
-    // getRestoreTransaction(channelId) {
-    //     if (!this.has(channelId))
-    //         return null
-
-    //     return this.openPaymentChannels.get(channelId.toString('base64')).restoreTx
-    // }
-
-    // has(channelId) {
-    //     return this.openPaymentChannels.has(channelId.toString('base64'))
-    // }
-
-    // delete(channelId) {
-    //     this.openPaymentChannels.delete(channelId.toString('base64'))
-    // }
 
     /**
      * Takes a transaction object generetad by web3.js and publishes it in the
@@ -200,14 +186,6 @@ class PaymentChannel extends EventEmitter {
 
             cb(null, receipt)
         })
-    }
-
-    import() {
-
-    }
-
-    export() {
-
     }
 }
 

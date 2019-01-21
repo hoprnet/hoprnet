@@ -33,6 +33,8 @@ class Packet {
             .slice(0, Math.max(0, path.length - 1))
             .forEach((peerId, index) => log(node.peerInfo.id, `Intermediate ${index} : \x1b[34m${peerId.toB58String()}\x1b[0m`))
         log(node.peerInfo.id, `Destination    : \x1b[34m${path[path.length - 1].toB58String()}\x1b[0m`)
+        log(node.peerInfo.id, '--------------------------------')
+
 
         const fee = (new BN(secrets.length - 1, 10)).imul(new BN(RELAY_FEE, 10))
 
@@ -43,7 +45,7 @@ class Packet {
         }, (err, results) => {
             if (err) { throw err }
 
-            log(node.peerInfo.id, `Encrypting with  \'${hash(bufferXOR(Header.deriveTransactionKey(secrets[0]), Header.deriveTransactionKey(secrets[1]))).toString('base64')}\'.`)
+            log(node.peerInfo.id, `Encrypting with ${hash(bufferXOR(Header.deriveTransactionKey(secrets[0]), Header.deriveTransactionKey(secrets[1]))).toString('base64')}.`)
             const encryptedTx = results.transaction.encrypt(hash(bufferXOR(Header.deriveTransactionKey(secrets[0]), Header.deriveTransactionKey(secrets[1]))))
 
             node.pendingTransactions.addEncryptedTransaction(
@@ -61,8 +63,13 @@ class Packet {
     forwardTransform(node, previousPeerId, cb) {
         let receivedMoney
 
+        const channelId = getId(
+            pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()),
+            pubKeyToEthereumAddress(previousPeerId.pubKey.marshal())
+        )
+
         waterfall([
-            (cb) => node.paymentChannels.getEmbeddedMoney(previousPeerId, this.transaction, cb),
+            (cb) => node.paymentChannels.getEmbeddedMoney(channelId, this.transaction, cb),
             (_receivedMoney, cb) => {
                 receivedMoney = _receivedMoney
                 log(node.peerInfo.id, `Received \x1b[35m${receivedMoney.toString()} wei\x1b[0m.`)
@@ -106,11 +113,9 @@ class Packet {
                     )
 
                     node.paymentChannels.setChannel({
-                        index: this.transaction.index
-                    }, getId(
-                        pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()),
-                        pubKeyToEthereumAddress(previousPeerId.pubKey.marshal())
-                    ), (err) => {
+                        index: this.transaction.index,
+                        currentValue: this.transaction.value
+                    }, channelId, (err) => {
                         if (err)
                             throw err
 

@@ -56,21 +56,23 @@ module.exports = (self) => (to, cb) => waterfall([
                     if (err)
                         throw err
 
-                    self.setSettlementListener(restoreTx)
+                    self.setSettlementListener(restoreTx.getChannelId(self.node.peerInfo.id))
 
-                    const tx = deepCopy(restoreTx, Transaction)
-
-                    self.setChannel({
+                    const newRecord = {
                         restoreTx: restoreTx,
-                        tx: tx,
-                        index: restoreTx.index
-                    }, (err) => {
+                        tx: deepCopy(restoreTx, Transaction),
+                        index: restoreTx.index,
+                        currentValue: restoreTx.value,
+                        totalBalance: (new BN(restoreTx.value)).imuln(2).toBuffer('be', Transaction.VALUE_LENGTH)
+                    }
+
+                    self.setChannel(newRecord, (err) => {
                         if (err)
                             throw err
 
                         log(self.node.peerInfo.id, `Opened payment channel \x1b[33m${restoreTx.getChannelId(self.node.peerInfo.id).toString('hex')}\x1b[0m with txHash \x1b[32m${receipt.transactionHash}\x1b[0m. Nonce is now \x1b[31m${self.nonce - 1}\x1b[0m.`)
 
-                        cb(null, tx)
+                        cb(null, newRecord)
                     })
                 })
             })

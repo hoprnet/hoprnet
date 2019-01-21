@@ -18,7 +18,7 @@ module.exports = (self) => (err, event) => {
         if (!record)
             log(self.node.peerInfo.id, `Listening to wrong channel. ${channelId.toString('hex')}.`)
 
-        const { tx, restoreTx, index } = record
+        const { tx, restoreTx } = record
         const amountA = new BN(event.returnValues.amountA)
         const counterparty = record.restoreTx.counterparty
 
@@ -32,7 +32,7 @@ module.exports = (self) => (err, event) => {
         waterfall([
             (cb) => {
                 if (
-                    Buffer.from(event.returnValues.index.replace('0x', ''), 'hex').compare(tx.index) === -1 &&
+                    Buffer.from(event.returnValues.index.replace(/0x/, ''), 'hex').compare(tx.index) === -1 &&
                     (partyA ? new BN(tx.value).gt(amountA) : amountA.gt(new BN(tx.value)))
                 ) {
                     log(self.node.peerInfo.id, `Found better transaction for payment channel ${channelId.toString('hex')}.`)

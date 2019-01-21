@@ -5,7 +5,7 @@ const Transaction = require('../../transaction')
 const { PROTOCOL_PAYMENT_CHANNEL } = require('../../constants')
 const pull = require('pull-stream')
 const lp = require('pull-length-prefixed')
-const secp256k1 = require('secp256k1')
+const { sign } = require('secp256k1')
 const { deepCopy, pubKeyToEthereumAddress, numberToBuffer, bufferToNumber, pubKeyToPeerId } = require('../../utils')
 const { waterfall } = require('neo-async')
 const { BN } = require('web3').utils
@@ -68,14 +68,16 @@ module.exports = (node) => node.handle(PROTOCOL_PAYMENT_CHANNEL, (protocol, conn
         (restoreTx, cb) => node.paymentChannels.setChannel({
             restoreTx: restoreTx,
             tx: deepCopy(restoreTx, Transaction),
-            index: restoreTx.index
+            index: restoreTx.index,
+            currentValue: restoreTx.value,
+            totalBalance: (new BN(restoreTx.value)).imuln(2).toBuffer('be', Transaction.VALUE_LENGTH)
         }, (err) => {
             if (err)
                 throw err
 
-            node.paymentChannels.setSettlementListener(restoreTx)
+            node.paymentChannels.setSettlementListener(restoreTx.getChannelId(node.peerInfo.id))
 
-            const sigRestore = secp256k1.sign(restoreTx.hash, node.peerInfo.id.privKey.marshal())
+            const sigRestore = sign(restoreTx.hash, node.peerInfo.id.privKey.marshal())
             cb(null, Buffer.concat([sigRestore.signature, numberToBuffer(sigRestore.recovery, 1)], SIGNATURE_LENGTH + 1))
         })
     ], reply),
