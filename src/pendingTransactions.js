@@ -11,13 +11,13 @@ class PendingTransactions {
         this.db = db
     }
 
-    addEncryptedTransaction(hashedKeyHalf, ownKeyHalf, transaction, nextPeerId) {
+    addEncryptedTransaction(hashedKeyHalf, ownKeyHalf, tx, nextPeerId) {
         const key = `pending-${hashedKeyHalf.toString('base64')}`
 
         const record = arguments.length === 4 ?
             Buffer.concat(
                 [
-                    transaction.toBuffer(),
+                    tx.toBuffer(),
                     ownKeyHalf,
                     decode(nextPeerId.toBytes()).digest
                 ], Transaction.SIZE + Transaction.KEY_LENGTH + HASH_LENGTH) : ''
@@ -37,7 +37,7 @@ class PendingTransactions {
             if (record.length === 0)
                 return
 
-            const transaction = Transaction.fromBuffer(record.slice(0, Transaction.SIZE), true)
+            const tx = Transaction.fromBuffer(record.slice(0, Transaction.SIZE), true)
             const ownKeyHalf = record.slice(Transaction.SIZE, Transaction.SIZE + Transaction.KEY_LENGTH)
             const hashedPubKey = record.slice(Transaction.SIZE + Transaction.KEY_LENGTH, Transaction.SIZE + Transaction.KEY_LENGTH + HASH_LENGTH)
 
@@ -45,7 +45,7 @@ class PendingTransactions {
                 cb(null)
             } else {
                 cb(null, {
-                    transaction: transaction,
+                    tx: tx,
                     ownKeyHalf: ownKeyHalf,
                     hashedPubKey: hashedPubKey
                 })

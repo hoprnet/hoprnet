@@ -1,6 +1,6 @@
 'use strict'
 
-const { sha3, hexToBytes, toChecksumAddress } = require('web3').utils
+const { sha3, toChecksumAddress } = require('web3').utils
 const { randomBytes } = require('crypto')
 
 const { waterfall } = require('neo-async')
@@ -14,7 +14,7 @@ module.exports.hash = (buf) => {
     if (!Buffer.isBuffer(buf))
         throw Error('Invalid input. Please use a Buffer')
 
-    return Buffer.from(sha3(buf).slice(2), 'hex')
+    return Buffer.from(sha3(buf).replace(/0x/, ''), 'hex')
 }
 /**
  * Generate deep Copy of an instance
@@ -23,7 +23,7 @@ module.exports.hash = (buf) => {
  */
 module.exports.deepCopy = (instance, Class) => {
     if (typeof instance.toBuffer !== 'function' || !['function', 'number'].includes(typeof Class.SIZE) || typeof Class.fromBuffer !== 'function')
-        throw Error('Invalid object.')
+        throw Error('Incompatible class and / or invalid instance.')
 
     const buf = Buffer.alloc(Class.SIZE)
         .fill(instance.toBuffer(), 0, Class.SIZE)
@@ -235,6 +235,7 @@ module.exports.randomPermutation = (array) => {
 // Ethereum methods
 // ==========================
 const { publicKeyConvert } = require('secp256k1')
+const COMPRESSED_PUBLIC_KEY_LENGTH = 33
 /**
  * Derives an Ethereum address from the given public key.
  * 
@@ -243,9 +244,12 @@ const { publicKeyConvert } = require('secp256k1')
  * @returns {String} e.g. 0xc1912fEE45d61C87Cc5EA59DaE31190FFFFf232d
  */
 module.exports.pubKeyToEthereumAddress = (pubKey) => {
+    if (!Buffer.isBuffer(pubKey) || pubKey.length !== COMPRESSED_PUBLIC_KEY_LENGTH)
+        throw Error(`Invalid input parameter. Expected a Buffer of size ${COMPRESSED_PUBLIC_KEY_LENGTH}.`)
+
     const hash = sha3(publicKeyConvert(pubKey, false).slice(1))
 
-    return toChecksumAddress(hash.slice(0, 2).concat(hash.slice(26)))
+    return toChecksumAddress(hash.replace(/(0x)[0-9a-fA-F]{24}([0-9a-fA-F]{20})/, '$1$2'))
 }
 
 /**
@@ -260,20 +264,20 @@ module.exports.isPartyA = (sender, otherParty) => {
         if (sender.length !== 42)
             throw Error('Invalid input parameters')
 
-        sender = Buffer.from(sender.slice(2), 'hex')
+        sender = Buffer.from(sender.replace(/0x/, ''), 'hex')
     }
 
     if (typeof otherParty === 'string') {
         if (otherParty.length !== 42) {
             throw Error('Invalid input parameters')
         }
-        otherParty = Buffer.from(otherParty.slice(2), 'hex')
+        otherParty = Buffer.from(otherParty.replace(/0x/, ''), 'hex')
     }
 
-    if (!Buffer.isBuffer(sender, otherParty))
+    if (!Buffer.isBuffer(sender) || !Buffer.isBuffer(otherParty))
         throw Error('Invalid input parameters')
 
-    if (sender.length !== 20 || otherParty.length !== 20)
+    if (sender.length != 20 || otherParty.length != 20)
         throw Error('Invalid input parameters')
 
     return Buffer.compare(sender, otherParty) < 0
@@ -283,20 +287,31 @@ const ETHEUREUM_ADDRESS_SIZE = 20 // Bytes
 
 /**
  * Computes the ID that is used by the smart contract to 
- * identify the payment channels.
+ * store payment channels.
  * 
- * @param {String} sender an ethereum address
- * @param {String} otherParty another ethereum address
+ * @param {String | Buffer} sender an ethereum address or the corresponding public key
+ * @param {String | Buffer} counterparty another ethereum address or the corresponding public key
  * @returns {Buffer} the Id
  */
-module.exports.getId = (sender, otherParty) => {
-    sender = Buffer.from(hexToBytes(sender), 0, ETHEUREUM_ADDRESS_SIZE)
-    otherParty = Buffer.from(hexToBytes(otherParty), 0, ETHEUREUM_ADDRESS_SIZE)
+module.exports.getId = (sender, counterparty) => {
+    if (Buffer.isBuffer(sender) && sender.length == COMPRESSED_PUBLIC_KEY_LENGTH) {
+        sender = this.pubKeyToEthereumAddress(sender)
+    }
 
-    if (module.exports.isPartyA(sender, otherParty)) {
-        return module.exports.hash(Buffer.concat([sender, otherParty], 2 * ETHEUREUM_ADDRESS_SIZE))
+    if (Buffer.isBuffer(counterparty) && counterparty.length == COMPRESSED_PUBLIC_KEY_LENGTH) {
+        counterparty = this.pubKeyToEthereumAddress(counterparty)
+    }
+
+    if (typeof sender !== 'string' || typeof counterparty !== 'string')
+        throw Error(`Invalid input parameters. Unable to convert ${typeof sender} and / or ${typeof counterparty} to an Ethereum address.`)
+
+    sender = Buffer.from(sender.replace(/0x/, ''), 'hex')
+    counterparty = Buffer.from(counterparty.replace(/0x/, ''), 'hex')
+
+    if (module.exports.isPartyA(sender, counterparty)) {
+        return module.exports.hash(Buffer.concat([sender, counterparty], 2 * ETHEUREUM_ADDRESS_SIZE))
     } else {
-        return module.exports.hash(Buffer.concat([otherParty, sender], 2 * ETHEUREUM_ADDRESS_SIZE))
+        return module.exports.hash(Buffer.concat([counterparty, sender], 2 * ETHEUREUM_ADDRESS_SIZE))
     }
 }
 
@@ -312,10 +327,7 @@ module.exports.pubKeyToPeerId = (pubKey, cb) =>
 
 module.exports.privKeyToPeerId = (privKey, cb) => {
     if (!Buffer.isBuffer(privKey)) {
-        if (privKey.startsWith('0x')) {
-            privKey = privKey.slice(2)
-        }
-        privKey = Buffer.from(privKey, 'hex')
+        privKey = Buffer.from(privKey.replace(/0x/, ''), 'hex')
     }
 
     privKey = new libp2p_crypto.supportedKeys.secp256k1.Secp256k1PrivateKey(privKey)

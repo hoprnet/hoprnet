@@ -20,6 +20,11 @@ const RECOVERY_LENGTH = 1
 
 class Transaction {
     constructor(buf = Buffer.alloc(Transaction.SIZE), encrypted = false) {
+        if (typeof buf === 'boolean') {
+            encrypted = buf
+            buf = Buffer.alloc(Transaction.SIZE)
+        }
+        
         this.buffer = buf
         this.encrypted = encrypted
     }
@@ -59,6 +64,9 @@ class Transaction {
      * @returns {Buffer} signature of the transaction
      */
     get signature() {
+        if (this.encrypted)
+            throw Error(`Can't read signature from encrypted transaction.`)
+
         return this.buffer.slice(0, SIGNATURE_LENGTH)
     }
 
@@ -103,6 +111,9 @@ class Transaction {
      * @param {Buffer} newSignature the signature of the transaction
      */
     set signature(newSignature) {
+        if (this.encrypted)
+            throw Error(`Can't set signature of encrypted transaction.`)
+
         this.signature.fill(newSignature, 0, SIGNATURE_LENGTH)
     }
     /**
@@ -160,6 +171,9 @@ class Transaction {
      * @returns {Buffer} the channelId
      */
     getChannelId(peerId) {
+        if (this.encrypted)
+            throw Error(`Can't derive channelId from encrypted transaction.`)
+
         return getId(
             pubKeyToEthereumAddress(peerId.pubKey.marshal()),
             pubKeyToEthereumAddress(this.counterparty)
@@ -170,6 +184,9 @@ class Transaction {
      * @returns {Buffer} the public key as a compressed curve point
      */
     get counterparty() {
+        if (this.encrypted)
+            throw Error(`Can't derive counterparty from encrypted transaction.`)
+
         return recover(this.hash, this.signature, bufferToNumber(this.recovery))
     }
 
@@ -197,9 +214,9 @@ class Transaction {
      * party that signed the transaction.
      * @returns {Boolean} whether the signature is valid 
      */
-    verify(peerId) {
-        return this.counterparty.compare(peerId.pubKey.marshal()) === 0
-    }
+    // verify(peerId) {
+    //     return this.counterparty.compare(peerId.pubKey.marshal()) === 0
+    // }
 
     /**
      * Creates a Transaction instance from a Buffer.
@@ -235,8 +252,8 @@ class Transaction {
         if (this.encrypted)
             throw Error('Cannot encrypt an already encrypted transaction.')
 
-        this.encrypted = true
         this.signature.fill(bufferXOR(Buffer.concat([key, key], 2 * KEY_LENGTH), this.signature), 0, SIGNATURE_LENGTH)
+        this.encrypted = true
 
         return this
     }
