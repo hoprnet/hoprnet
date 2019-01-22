@@ -65,12 +65,10 @@ class Message {
         return this
     }
 
-    decrypt(secret, cb) {
+    decrypt(secret) {
         const { key, iv } = Header.deriveCipherParameters(secret)
 
         PRP.createPRP(key, iv).inverse(this.buffer)
-
-        cb(null, this)
     }
 }
 

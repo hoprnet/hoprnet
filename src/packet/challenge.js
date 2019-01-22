@@ -1,8 +1,8 @@
 'use strict'
 
-const { sign, verify } = require('secp256k1')
+const { sign, recover } = require('secp256k1')
 
-const { hash, numberToBuffer } = require('../utils')
+const { hash, numberToBuffer, bufferToNumber } = require('../utils')
 
 const SIGNATURE_LENGTH = 64
 const KEY_LENGTH = 32
@@ -40,7 +40,7 @@ class Challenge {
         return new Challenge(buf)
     }
 
-    signChallenge(hashedKey, peerId) {
+    sign(hashedKey, peerId) {
         const signature = sign(hashedKey, peerId.privKey.marshal())
 
         this.challengeSignature
@@ -62,7 +62,7 @@ class Challenge {
 
         const challenge = new Challenge(buffer)
         
-        challenge.signChallenge(Challenge.deriveHashedKey(secret), peerId)
+        challenge.sign(Challenge.deriveHashedKey(secret), peerId)
 
         return challenge
     }
@@ -71,26 +71,27 @@ class Challenge {
      * 
      * @param {*} hashedKey 
      * @param {*} peerId contains the secret key
-     * @param {*} cb 
      */
-    updateChallenge(hashedKey, peerId, cb) {
+    updateChallenge(hashedKey, peerId) {
         if (!Buffer.isBuffer(hashedKey) || hashedKey.length !== HASH_LENGTH)
             throw Error(`Wrong input value. Expected a hashed key of size ${HASH_LENGTH} bytes.`)
 
-        this.signChallenge(hashedKey, peerId)
-        
-        cb(null, this)
+        this.sign(hashedKey, peerId)
     }
 
     static deriveHashedKey(secret) {
         return hash(secret)
     }
 
+    getCounterparty(secret) {
+        return recover(Challenge.deriveHashedKey(secret), this.challengeSignature, bufferToNumber(this.challengeSignatureRecovery))
+    }
+
     verify(peerId, secret) {
         if (!peerId.pubKey)
             throw Error('Unable to verify challenge without a public key.')
 
-        return verify(Challenge.deriveHashedKey(secret), this.challengeSignature, peerId.pubKey.marshal())
+        return this.getCounterparty(secret).compare(peerId.pubKey.marshal()) === 0
     }
 }
 

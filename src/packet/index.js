@@ -10,7 +10,7 @@ const Message = require('./message')
 const { parallel, waterfall } = require('neo-async')
 
 const { RELAY_FEE } = require('../constants')
-const { hash, bufferXOR, deepCopy, log, pubKeyToEthereumAddress, getId } = require('../utils')
+const { hash, bufferXOR, deepCopy, log, pubKeyToEthereumAddress, getId, bufferToNumber } = require('../utils')
 const { BN } = require('web3').utils
 
 class Packet {
@@ -38,15 +38,16 @@ class Packet {
 
         const fee = (new BN(secrets.length - 1, 10)).imul(new BN(RELAY_FEE, 10))
 
-        parallel({
-            challenge: (cb) => cb(null, Challenge.createChallenge(Header.deriveTransactionKey(secrets[0]), node.peerInfo.id)),
-            message: (cb) => cb(null, Message.createMessage(msg).onionEncrypt(secrets)),
-            transaction: (cb) => node.paymentChannels.transfer(fee, path[0], cb)
-        }, (err, results) => {
-            if (err) { throw err }
+        const challenge = Challenge.createChallenge(Header.deriveTransactionKey(secrets[0]), node.peerInfo.id)
+        const message = Message.createMessage(msg).onionEncrypt(secrets)
+
+        node.paymentChannels.transfer(fee, path[0], (err, tx) => {
+            if (err)
+                cb(err)
 
             log(node.peerInfo.id, `Encrypting with ${hash(bufferXOR(Header.deriveTransactionKey(secrets[0]), Header.deriveTransactionKey(secrets[1]))).toString('base64')}.`)
-            const encryptedTx = results.transaction.encrypt(hash(bufferXOR(Header.deriveTransactionKey(secrets[0]), Header.deriveTransactionKey(secrets[1]))))
+            const encryptedTx = tx.encrypt(hash(bufferXOR(Header.deriveTransactionKey(secrets[0]), Header.deriveTransactionKey(secrets[1]))))
+
 
             node.pendingTransactions.addEncryptedTransaction(
                 hash(Header.deriveTransactionKey(secrets[0]))
@@ -55,88 +56,94 @@ class Packet {
             cb(null, new Packet(
                 header,
                 encryptedTx,
-                results.challenge,
-                results.message))
+                challenge,
+                message)
+            )
+
         })
     }
 
-    forwardTransform(node, previousPeerId, cb) {
-        let receivedMoney
+    forwardTransform(node, cb) {
+        this.header.deriveSecret(node.peerInfo.id.privKey.marshal())
 
-        const channelId = getId(
-            pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()),
-            pubKeyToEthereumAddress(previousPeerId.pubKey.marshal())
-        )
+        let sender, receivedMoney, channelId
 
         waterfall([
-            (cb) => node.paymentChannels.getEmbeddedMoney(channelId, this.transaction, cb),
-            (_receivedMoney, cb) => {
-                receivedMoney = _receivedMoney
-                log(node.peerInfo.id, `Received \x1b[35m${receivedMoney.toString()} wei\x1b[0m.`)
-
-                this.header.deriveSecret(node.peerInfo.id.privKey.marshal())
-
-                this.hasTag(node, cb)
-            },
+            (cb) => this.hasTag(node.db, cb),
             (alreadyReceived, cb) => {
                 if (alreadyReceived) {
-                    throw Error('General error.')
-                }
 
-                if (!this.header.verify())
-                    throw Error('General error.')
+                    cb(Error('General error.'))
+                } else if (!this.header.verify()) {
 
-                this.header.extractHeaderInformation()
-
-                if (!this.challenge.verify(previousPeerId, Header.deriveTransactionKey(this.header.derivedSecret)))
-                    throw Error('General error.')
-
-                log(node.peerInfo.id, `Challenge is valid. Requested SHA256 pre-image of '${Challenge.deriveHashedKey(this.header.derivedSecret).toString('base64')}' is derivable.`)
-
-                this.oldChallenge = deepCopy(this.challenge, Challenge)
-
-                if (this.header.address.equals(node.peerInfo.id.toBytes())) {
-                    this.message.decrypt(this.header.derivedSecret, (err, message) => {
-                        this.message = message
-
-                        cb(null, this)
-                    })
+                    cb(Error('General error.'))
                 } else {
-                    if (receivedMoney.lt(RELAY_FEE))
-                        throw Error('Bad transaction.')
+                    this.header.extractHeaderInformation()
+
+                    sender = this.challenge.getCounterparty(Header.deriveTransactionKey(this.header.derivedSecret))
+
+                    channelId = getId(
+                        pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()),
+                        pubKeyToEthereumAddress(sender)
+                    )
 
                     node.pendingTransactions.addEncryptedTransaction(
+                        // channelId
                         this.header.hashedKeyHalf,
                         Header.deriveTransactionKey(this.header.derivedSecret),
                         deepCopy(this.transaction, Transaction),
                         this.getTargetPeerId()
                     )
 
-                    node.paymentChannels.setChannel({
-                        index: this.transaction.index,
-                        currentValue: this.transaction.value
-                    }, channelId, (err) => {
+                    node.paymentChannels.getChannel(channelId, cb)
+                }
+            },
+            (record, cb) => {
+                if (typeof record === 'function') {
+                    // No record => no payment channel => something went wrong
+                    cb(Error('General error.'))
+
+                } else {
+                    receivedMoney = node.paymentChannels.getEmbeddedMoney(this.transaction, sender, record.currentValue)
+                    log(node.peerInfo.id, `Received \x1b[35m${receivedMoney.toString()} wei\x1b[0m.`)
+
+                    if (receivedMoney.lt(RELAY_FEE)) {
+
+                        cb(Error('Bad transaction.'))
+                    } else if (bufferToNumber(record.index) + 1 != bufferToNumber(this.transaction.index)) {
+
+                        cb(Error('General error.'))
+                    } else {
+
+                        node.paymentChannels.setChannel({
+                            currentValue: this.transaction.value,
+                            index: this.transaction.index
+                        }, channelId, cb)
+                    }
+                }
+            },
+            (cb) => {
+                log(node.peerInfo.id, `Payment channel exists. Requested SHA256 pre-image of '${Challenge.deriveHashedKey(this.header.derivedSecret).toString('base64')}' is derivable.`)
+
+                this.oldChallenge = deepCopy(this.challenge, Challenge)
+                this.message.decrypt(this.header.derivedSecret)
+
+
+                if (this.header.address.equals(node.peerInfo.id.toBytes())) {
+                    cb(null, this)
+                } else {
+                    this.challenge.updateChallenge(this.header.hashedKeyHalf, node.peerInfo.id)
+                    this.header.transformForNextNode()
+                    const forwardedFee = receivedMoney.isub(new BN(RELAY_FEE, 10))
+
+                    node.paymentChannels.transfer(forwardedFee, this.getTargetPeerId(), (err, tx) => {
                         if (err)
-                            throw err
+                            cb(err)
 
-                        const forwardedFee = receivedMoney.isub(new BN(RELAY_FEE, 10))
+                        this.transaction = tx.encrypt(this.header.encryptionKey)
+                        log(node.peerInfo.id, `Encrypting with ${this.header.encryptionKey.toString('base64')}.`)
 
-                        parallel({
-                            transaction: (cb) => node.paymentChannels.transfer(forwardedFee, this.getTargetPeerId(), (err, tx) => {
-                                if (err)
-                                    throw err
-
-                                log(node.peerInfo.id, `Encrypting with  '${this.header.encryptionKey.toString('base64')}'.`)
-                                cb(null, tx.encrypt(this.header.encryptionKey))
-                            }),
-                            message: (cb) => this.message.decrypt(this.header.derivedSecret, cb),
-                            challenge: (cb) => this.challenge.updateChallenge(this.header.hashedKeyHalf, node.peerInfo.id, cb),
-                            header: (cb) => this.header.transformForNextNode(cb)
-                        }, (err, results) => {
-                            if (err) { throw err }
-
-                            cb(null, Object.assign(this, results))
-                        })
+                        cb(null, this)
                     })
                 }
             }
@@ -156,20 +163,18 @@ class Packet {
         ], Packet.SIZE)
     }
 
-    hasTag(node, cb) {
+    hasTag(db, cb) {
         const tag = Header.deriveTagParameters(this.header.derivedSecret)
 
-        const key = `packet-tag-${tag.toString('base64')}`
+        const key = Buffer.concat([Buffer.from('packet-tag-'), tag], 11 + 16)
 
-        node.db.get(key, (err, result) => {
-            if (err) {
-                if (err.notFound) {
-                    node.db.put(key, '', (err) => cb(null, false))
-                } else {
-                    throw err
-                }
+        db.get(key, (err) => {
+            if (err && !err.notFound) {
+                cb(err)
+            } else if(err.notFound) {
+                db.put(key, '', (err) => cb(err, false))
             } else {
-                cb(null, true)
+                cb(null, err.notFound)
             }
         })
     }

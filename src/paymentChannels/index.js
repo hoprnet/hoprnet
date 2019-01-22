@@ -53,23 +53,18 @@ class PaymentChannel extends EventEmitter {
         }, listener)
     }
 
-    getEmbeddedMoney(channelId, receivedTx, cb) {
-        this.getChannel(channelId, (err, { restoreTx, currentValue }) => {
-            if (err)
-                throw err
+    getEmbeddedMoney(receivedTx, counterparty, currentValue) {
+        currentValue = new BN(currentValue)
+        const newValue = new BN(receivedTx.value)
 
-            currentValue = new BN(currentValue)
-            const newValue = new BN(receivedTx.value)
+        const self = pubKeyToEthereumAddress(this.node.peerInfo.id.pubKey.marshal())
+        const otherParty = pubKeyToEthereumAddress(counterparty)
 
-            const self = pubKeyToEthereumAddress(this.node.peerInfo.id.pubKey.marshal())
-            const otherParty = pubKeyToEthereumAddress(restoreTx.counterparty)
-
-            if (isPartyA(self, otherParty)) {
-                cb(null, newValue.isub(currentValue))
-            } else {
-                cb(null, currentValue.isub(newValue))
-            }
-        })
+        if (isPartyA(self, otherParty)) {
+            return newValue.isub(currentValue)
+        } else {
+            return currentValue.isub(newValue)
+        }
     }
 
     setChannel(newRecord, channelId, cb) {
