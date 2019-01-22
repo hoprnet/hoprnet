@@ -45,35 +45,29 @@ module.exports = (self) => (err, event) => {
             (cb) => self.contract.methods.channels(channelId).call({
                 from: pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal())
             }, cb),
-            (channel, cb) => self.node.web3.eth.getBlock((err, block) => cb(err, block, channel)),
-            (block, channel, cb) => {
-                if (block.timestamp < parseInt(channel.settleTimestamp)) {
-                    const subscription = self.node.web3.eth.subscribe('newBlockHeaders')
-                        .on('data', (block) => {
-                            log(self.node.peerInfo.id, `Waiting ... Block ${block.number}.`)
+            (channel, cb) => {
+                const subscription = self.node.web3.eth.subscribe('newBlockHeaders')
+                    .on('data', (block) => {
+                        log(self.node.peerInfo.id, `Waiting ... Block ${block.number}.`)
 
-                            if (block.timestamp > parseInt(channel.settleTimestamp)) {
-                                subscription.unsubscribe((err, ok) => {
-                                    if (ok)
-                                        cb(err)
-                                })
-                            } else if (NET === 'ganache') {
-                                // ================ Only for testing ================
-                                mineBlock(self.contract.currentProvider)
-                                // ==================================================
+                        if (block.timestamp > parseInt(channel.settleTimestamp)) {
+                            subscription.unsubscribe((err, ok) => {
+                                if (ok)
+                                    cb(err)
+                            })
+                        } else if (NET === 'ganache') {
+                            // ================ Only for testing ================
+                            mineBlock(self.contract.currentProvider)
+                            // ==================================================
+                        }
+                    })
 
-                            }
-                        })
-
-                    if (NET === 'ganache') {
-                        // ================ Only for testing ================
-                        mineBlock(self.contract.currentProvider)
-                        // ==================================================
-                    }
-
-                } else {
-                    cb()
+                if (NET === 'ganache') {
+                    // ================ Only for testing ================
+                    mineBlock(self.contract.currentProvider, )
+                    // ==================================================
                 }
+
             },
             (cb) => {
                 if (self.eventNames().some((name) =>

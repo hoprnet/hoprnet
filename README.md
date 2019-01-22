@@ -49,7 +49,7 @@ Then go to `config/` and create a `.secrets.json` similar to the following one.
 ```
 
 Please make sure that you have:
-- whitelisted the contract `0xA2AAC5A8A1776e9c8Ef8F70C82B4e5a56Eb08605` in your Infura account
+- whitelisted the contract `0x69fc313b19afab7D925E7e05C783E7B36327255b` in your Infura account
 - got some funds on your Ropsten testnet account, if you don't you may want to use the [faucet](https://faucet.ropsten.be/) to receive test ether.
 
 ### Demo Script

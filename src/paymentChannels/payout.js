@@ -2,6 +2,8 @@
 
 const pull = require('pull-stream')
 const lp = require('pull-length-prefixed')
+const paramap = require('pull-paramap')
+
 
 const { waterfall } = require('neo-async')
 const { pubKeyToPeerId, log } = require('../utils')
@@ -11,68 +13,64 @@ const c = require('../constants')
 
 const SETTLEMENT_TIMEOUT = 40000
 
-module.exports = (self) => (cb) => {
-    // console.log('[\'' + self.node.peerInfo.id.toB58String() + '\']: Closing channels ' + Array.from(self.openPaymentChannels.keys()).map(ch => `\x1b[33m${Buffer.from(ch, 'base64').toString('hex')}\x1b[0m`).join(', ') + '.')
+module.exports = (self) => (cb) => pull(
+    self.getChannels(),
+    paramap((data, cb) => {
+        const channelId = data.key.slice(17)
+        const { tx, restoreTx, index } = data.value
 
-    pull(
-        self.getChannels(),
-        pull.asyncMap((data, cb) => {
-            const channelId = data.key.slice(17)
-            const { tx, restoreTx, index } = data.value
+        if (index.compare(tx.index) === 1) { // index > tx.index ?
+            waterfall([
+                (cb) => pubKeyToPeerId(restoreTx.counterparty, cb),
+                (peerId, cb) => self.node.peerRouting.findPeer(peerId, cb),
+            ], (err, peerInfo) => {
+                if (err)
+                    throw err
 
-            if (index.compare(tx.index) === 1) { // index > tx.index ?
-                waterfall([
-                    (cb) => pubKeyToPeerId(restoreTx.counterparty, cb),
-                    (peerId, cb) => self.node.peerRouting.findPeer(peerId, cb),
-                ], (err, peerInfo) => {
+                self.node.dialProtocol(peerInfo, c.PROTOCOL_SETTLE_CHANNEL, (err, conn) => {
                     if (err)
                         throw err
 
-                    self.node.dialProtocol(peerInfo, c.PROTOCOL_SETTLE_CHANNEL, (err, conn) => {
+                    const now = Date.now()
+
+                    // TODO: Implement proper transaction handling
+                    const timeout = setTimeout(self.settle, SETTLEMENT_TIMEOUT, channelId, true)
+
+                    self.contract.once('ClosedChannel', {
+                        topics: [`0x${channelId.toString('hex')}`]
+                    }, (err) => {
                         if (err)
                             throw err
 
-                        const now = Date.now()
-
-                        // TODO: Implement proper transaction handling
-                        const timeout = setTimeout(self.settle, SETTLEMENT_TIMEOUT, channelId, true)
-
-                        self.contract.once('ClosedChannel', {
-                            topics: [`0x${channelId.toString('hex')}`]
-                        }, (err) => {
-                            if (err)
-                                throw err
-
-                            if (Date.now() - now < SETTLEMENT_TIMEOUT) {
-                                // Prevent node from settling channel itself with a probably
-                                // outdated transaction
-                                clearTimeout(timeout)
-                            }
-                        })
-
-                        pull(
-                            pull.once(channelId),
-                            lp.encode(),
-                            conn
-                        )
+                        if (Date.now() - now < SETTLEMENT_TIMEOUT) {
+                            // Prevent node from settling channel itself with a probably
+                            // outdated transaction
+                            clearTimeout(timeout)
+                        }
                     })
+
+                    pull(
+                        pull.once(channelId),
+                        lp.encode(),
+                        conn
+                    )
                 })
-            } else {
-                self.settle(channelId)
-            }
-
-            self.on(`closed ${channelId.toString('base64')}`, (receivedMoney) => {
-                // Callback just when the channel is settled, i.e. the closing listener
-                // emits the 'closed <channelId>' event.
-
-                cb(null, receivedMoney)
             })
-        }),
-        pull.collect((err, values) => {
-            if (err)
-                throw err
+        } else {
+            self.settle(channelId)
+        }
 
-            cb(null, values.reduce((acc, receivedMoney) => acc.iadd(receivedMoney), new BN('0')))
+        self.on(`closed ${channelId.toString('base64')}`, (receivedMoney) => {
+            // Callback just when the channel is settled, i.e. the closing listener
+            // emits the 'closed <channelId>' event.
+
+            cb(null, receivedMoney)
         })
-    )
-}
+    }),
+    pull.collect((err, values) => {
+        if (err)
+            throw err
+
+        cb(null, values.reduce((acc, receivedMoney) => acc.iadd(receivedMoney), new BN('0')))
+    })
+)

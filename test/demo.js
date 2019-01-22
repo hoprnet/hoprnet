@@ -39,7 +39,7 @@ console.log(
     'Welcome to \x1b[1m\x1b[5mHOPR\x1b[0m!\n' +
     'Please wait some time until the node is set up.\n' +
     '\x1b[2mThis may take some time ...\n' + 
-    'Meanwhile you can start reading the wiki https://github.com/validitylabs/messagingProtocol/wiki\x1b[0m\n')
+    'Meanwhile you can start reading the wiki at https://github.com/validitylabs/messagingProtocol/wiki\x1b[0m\n')
 
 waterfall([
     (cb) => web3.eth.getTransactionCount(FUNDING_ACCOUNT, cb),
