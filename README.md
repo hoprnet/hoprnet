@@ -9,18 +9,31 @@ A privacy-preserving messaging protocol that incentivizes users to participate i
 ## Technical Demo
 There is a standalone demo to showcase the functionality:
 
-### Requirements
+### Software Requirements
 - `solc` >= 0.5
 - `Node.js` >= 11.0
 - `npx` 
 
 Please make sure that `solc`, the Solidity compiler, is available in your environment path, see [here](https://solidity.readthedocs.io/en/latest/installing-solidity.html#binary-packages) how to install `solc` on your platform.
 
+
+On Windows? 👀 here: [Windows Setup](../../wiki/Setup#Windows)
+
+### Account Requirements
+- [`Ethereum Key Pair`](../../wiki/Setup/#PrivateKeyGeneration)
+- [`Infura API Key`](../../wiki/Setup/#Infura) (Infura calls this a `Product ID`)
+
 ### Executing
+
 ```sh
 git clone https://github.com/validitylabs/messagingProtocol.git
 cd messagingProtocol
 yarn install
+
+// Do configuration steps below first before preceding! 
+
+yarn compile
+yarn demo
 ```
 
 Then go to `config/` and create a `.secrets.json` similar to the following one.
@@ -28,7 +41,7 @@ Then go to `config/` and create a `.secrets.json` similar to the following one.
 ```json
 {
     "infuraRopstenURL": "https://ropsten.infura.io/v3/",
-    "infuraApiKey": "YOUR_API_KEY",
+    "infuraApiKey": "INFURA_PRODUCT_ID",
     "infuraRopstenWssURL": "wss://ropsten.infura.io/ws/v3/",
     "fundAccountEthAddress": "YOUR_ETHEREUM_ADDRESS",
     "fundAccountPrivateKey": "YOUR_PRIVATE_KEY"
@@ -36,7 +49,7 @@ Then go to `config/` and create a `.secrets.json` similar to the following one.
 ```
 
 Please make sure that you have:
-- whitelisted the contract `0x35e7B26883D2b24170A254642fE13ABF573B7987` in your Infura account
+- whitelisted the contract `0xA2AAC5A8A1776e9c8Ef8F70C82B4e5a56Eb08605` in your Infura account
 - got some funds on your Ropsten testnet account, if you don't you may want to use the [faucet](https://faucet.ropsten.be/) to receive test ether.
 
 ### Demo Script
@@ -54,6 +67,6 @@ The demo will
     - wait for an acknowledgement to be able to decrypt the encrypted transactions that they've received during the protocol execution
     - open a payment channel to the next hop in the case there is no one yet
 - let one party initiate a payout which will
-    - settle & close the payment channels of that party
-    - let the nodes listen to the on-chain ClosedChannel event and post a better transaction in case that a malicious party tries to close the channel with an unprofitable transaction
+    - settle the payment channels of that party
+    - let the nodes listen to the on-chain Settle event and post a better transaction in case that a malicious party tries to close the channel with an unprofitable transaction
     - withdraw the money
