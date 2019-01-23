@@ -3,6 +3,7 @@
 const defaultsDeep = require('@nodeutils/defaults-deep')
 const { waterfall } = require('neo-async')
 const { generateKeyPair } = require('libp2p-crypto').keys
+const { deserializeKeyPair } = require('./utils')
 
 const PeerInfo = require('peer-info')
 const PeerId = require('peer-id')
@@ -12,10 +13,32 @@ const c = require('./constants')
 
 const BOOTSTRAP_NODE = Multiaddr('/ip4/127.0.0.1/tcp/9090/')
 
-module.exports = (options = {}, cb) => {
+module.exports = (options = {}, db, cb) => {
     options = defaultsDeep(options, {
         addrs: [],
         signallingServer: null // BOOTSTRAP_NODE
+    })
+
+    db.get('key-pair', (err, serializedKeyPair) => {
+        if (err && !err.notFound) {
+            throw err
+        } else if (err && err.notFound) {
+            generateKeyPair('secp256k1', 256, (err, key) => waterfall([
+                (cb) => key.public.hash(cb),
+                (id, cb) => 
+                
+                PeerInfo.create(new PeerId(id, key, key.public), cb),
+                (peerInfo, cb) => {
+
+                }
+            ]))
+
+            generateKeyPair('secp256k1', 256, cb)
+        } else {
+            cb(null, deserializeKeyPair(serializedKeyPair))
+        }
+
+
     })
 
     waterfall([

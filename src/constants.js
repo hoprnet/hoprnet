@@ -23,7 +23,7 @@ module.exports.RELAY_FEE = '100' // Wei
 
 module.exports.DEMO = false
 
-module.exports.NET = 'ropsten'
+module.exports.NET = 'ganache'
 
 // HoprChannel Contract Configuration TODO: detect ENV variable to decide between mainnet or testnet
 const contract = require('../config/contract-hopr.json');

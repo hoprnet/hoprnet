@@ -6,8 +6,9 @@ const MPLEX = require('libp2p-mplex')
 const KadDHT = require('libp2p-kad-dht')
 const SECIO = require('libp2p-secio')
 const defaultsDeep = require('@nodeutils/defaults-deep')
-const rlp = require('rlp')
-const libp2pCrypto = require('libp2p-crypto')
+
+const Keychain = require('libp2p-keychain')
+const FsStore = require('datastore-fs')
 
 const { createPacket } = require('./packet')
 const registerHandlers = require('./handlers')
@@ -129,7 +130,7 @@ class Hopr extends libp2p {
                         mode: 0o777
                     })
                 }
-                
+
                 if (options.id) {
                     // Only for unit testing !!!
                     const dir = resolve(__dirname, `../db/${options.id}`)
@@ -141,11 +142,11 @@ class Hopr extends libp2p {
                             fs.mkdirSync(dir, {
                                 mode: 0o777
                             })
-                        } 
+                        }
                         else {
                             clearDirectory(dir)
                             fs.mkdirSync(dir, {
-                                    mode: 0o777
+                                mode: 0o777
                             })
                         }
                         levelup(leveldown(dir), cb)
@@ -180,30 +181,31 @@ class Hopr extends libp2p {
      * @param {Function} cb callback when node is ready
      */
     start(options, cb) {
-        parallel({
-            node: (cb) => super.start(cb),
-            paymentChannels: (cb) => PaymentChannels.create({
-                node: this,
-                provider: options.provider,
-                contractAddress: options.contractAddress
-            }, cb)
-        }, (err, results) => {
-            if (err)
-                cb(err)
+        this.exportKeyPair()
+        // parallel({
+        //     node: (cb) => super.start(cb),
+        //     paymentChannels: (cb) => PaymentChannels.create({
+        //         node: this,
+        //         provider: options.provider,
+        //         contractAddress: options.contractAddress
+        //     }, cb)
+        // }, (err, results) => {
+        //     if (err)
+        //         cb(err)
 
-            registerHandlers(this, options.output)
+        //     registerHandlers(this, options.output)
 
-            this.paymentChannels = results.paymentChannels
+        //     this.paymentChannels = results.paymentChannels
 
-            cb(null, this)
-        })
+        //     cb(null, this)
+        // })
     }
 
     /**
      * Shutdown the node and saves keys and peerBook in the database
      * @param {Function} cb 
      */
-    stop(cb = () => {}) {
+    stop(cb = () => { }) {
         waterfall([
             (cb) => this.exportPeerBook(cb),
             (cb) => super.stop(cb),
@@ -297,7 +299,7 @@ class Hopr extends libp2p {
             } else if (err.notFound) {
                 cb(null, peerBook)
             } else {
-                cb(null, deserializePeerBook(value))
+                deserializePeerBook(value, peerBook, cb)
             }
         })
     }
@@ -306,6 +308,13 @@ class Hopr extends libp2p {
         const key = 'peer-book'
 
         this.db.put(key, serializePeerBook(this.peerBook), cb)
+    }
+
+    exportKeyPair() {
+        const exportedKey = Buffer.concat([
+            this.peerInfo
+        ])
+        this.db
     }
 }
 

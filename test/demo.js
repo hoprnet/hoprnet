@@ -14,7 +14,7 @@ const FUNDING_KEY = HARDCODED_PRIV_KEY
 const Ganache = require('ganache-core')
 
 const AMOUUNT_OF_NODES = 4
-const AMOUNT_OF_MESSAGES = 3
+const AMOUNT_OF_MESSAGES = 2
 
 let index, compiledContract
 

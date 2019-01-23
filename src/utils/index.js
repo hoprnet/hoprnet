@@ -476,7 +476,7 @@ module.exports.compileIfNecessary = (srcFiles, artifacts, cb) => {
 
 const rlp = require('rlp')
 
-module.exports.deserializePeerBook = (serializedPeerBook, cb) =>
+module.exports.deserializePeerBook = (serializedPeerBook, peerBook, cb) =>
     each(rlp.decode(serializedPeerBook), (serializedPeerInfo, cb) => {
         const peerId = PeerId.createFromBytes(serializedPeerInfo[0])
 
@@ -515,13 +515,32 @@ module.exports.serializePeerBook = (peerBook) => {
     return rlp.encode(peerInfos)
 }
 
+module.exports.deserializeKeyPair = (serializedKeyPair) => {
+    const decoded = rlp.decode(serializedKeyPair)
+
+    const peerId = PeerId.createFromBytes(decoded[0])
+
+    peerId.privKey = libp2pCrypto.keys.unmarshalPrivKey(decoded[1])
+    peerId.pubKey = libp2pCrypto.keys.unmarshalPublicKey(decoded[2])
+
+    return peerId
+}
+
+module.exports.serializeKeyPair = (peerId) => {
+    return rlp.encode([
+        peerId.toBytes(),
+        peerId.privKey.bytes,
+        peerId.pubKey.bytes
+    ])
+}
+
 module.exports.clearDirectory = (path) => {
-    var files = [];
-    if( fs.existsSync(path) ) {
+    const files = [];
+    if (fs.existsSync(path)) {
         files = fs.readdirSync(path);
-        files.forEach(function(file,index){
-            var curPath = path + "/" + file;
-            if(fs.lstatSync(curPath).isDirectory()) { // recurse
+        files.forEach(function (file, index) {
+            const curPath = path + "/" + file;
+            if (fs.lstatSync(curPath).isDirectory()) { // recurse
                 deleteFolderRecursive(curPath);
             } else { // delete file
                 fs.unlinkSync(curPath);
