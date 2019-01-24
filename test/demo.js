@@ -1,6 +1,6 @@
 'use strict'
 
-const { waterfall, timesSeries } = require('neo-async')
+const { waterfall, timesSeries, series, eachSeries } = require('neo-async')
 const { resolve } = require('path');
 
 const { sendTransaction, privKeyToPeerId, log, compileIfNecessary } = require('../src/utils')
@@ -14,7 +14,7 @@ const FUNDING_KEY = HARDCODED_PRIV_KEY
 const Ganache = require('ganache-core')
 
 const AMOUUNT_OF_NODES = 4
-const AMOUNT_OF_MESSAGES = 2
+const AMOUNT_OF_MESSAGES = 4
 
 let index, compiledContract
 
@@ -76,21 +76,21 @@ waterfall([
         provider: provider,
         contractAddress: contractAddress
     }, fundingPeer, index, cb),
-    (nodes, cb) => timesSeries(AMOUNT_OF_MESSAGES, (n, cb) => {
-        nodes[0].sendMessage('test_test_test ' + Date.now().toString(), nodes[3].peerInfo.id)
-
-        if (NET === 'ganache') {
-            setTimeout(cb, 2000)
-        } else {
-            setTimeout(cb, 80 * 1000)
-        }
-    }, (err) => cb(err, nodes)),
-    (nodes, cb) => nodes[1].paymentChannels.payout((err, result) => cb(err, nodes, result))
-], (err, nodes, result) => {
-    if (err)
-        throw err
-
-    log(nodes[1].peerInfo.id, `Finally received \x1b[35m\x1b[1m${result} wei\x1b[0m.`)
-
-    nodes[1].stop()
-})
+    (nodes, cb) => series([
+        (cb) => timesSeries(AMOUNT_OF_MESSAGES, (n, cb) => {
+            nodes[0].sendMessage('Psst ... secret message from Validity Labs!@' + Date.now().toString(), nodes[3].peerInfo.id)
+    
+            if (NET === 'ganache') {
+                setTimeout(cb, 2000)
+            } else {
+                setTimeout(cb, 80 * 1000)
+            }
+        }, cb),
+        //(cb) => eachSeries(nodes, (node, cb) => {
+            (cb) => nodes[1].paymentChannels.payout((err, result) => {
+                log(nodes[1].peerInfo.id, `Finally received \x1b[35m\x1b[1m${result} wei\x1b[0m.`)
+                nodes[1].stop(cb)
+            })
+        //}, cb)
+    ], cb)
+])

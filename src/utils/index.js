@@ -475,13 +475,17 @@ module.exports.compileIfNecessary = (srcFiles, artifacts, cb) => {
 }
 
 const rlp = require('rlp')
+const { each } = require('neo-async')
+const PeerInfo = require('peer-info')
+const Multiaddr = require('multiaddr')
+
 
 module.exports.deserializePeerBook = (serializedPeerBook, peerBook, cb) =>
     each(rlp.decode(serializedPeerBook), (serializedPeerInfo, cb) => {
         const peerId = PeerId.createFromBytes(serializedPeerInfo[0])
 
         if (serializedPeerInfo.length === 3) {
-            peerId.pubKey = libp2pCrypto.keys.unmarshalPublicKey(serializedPeerInfo[2])
+            peerId.pubKey = libp2p_crypto.unmarshalPublicKey(serializedPeerInfo[2])
         }
 
         PeerInfo.create(peerId, (err, peerInfo) => {
@@ -515,27 +519,96 @@ module.exports.serializePeerBook = (peerBook) => {
     return rlp.encode(peerInfos)
 }
 
-module.exports.deserializeKeyPair = (serializedKeyPair) => {
-    const decoded = rlp.decode(serializedKeyPair)
 
-    const peerId = PeerId.createFromBytes(decoded[0])
+const scrypt = require('scrypt')
+const chacha = require('chacha')
+const SALT_LENGTH = 32
+const read = require('read')
 
-    peerId.privKey = libp2pCrypto.keys.unmarshalPrivKey(decoded[1])
-    peerId.pubKey = libp2pCrypto.keys.unmarshalPublicKey(decoded[2])
+module.exports.serializeKeyPair = (peerId, cb) => {
+    const salt = randomBytes(SALT_LENGTH)
+    const scryptParams = { N: 8192, r: 8, p: 16 }
 
-    return peerId
+    console.log('Please type in the password that is used to encrypt the generated key.')
+
+    waterfall([
+        this.askForPassword,
+        (pw, isDefault, cb) => {
+            console.log(`Done. Using peerId \x1b[34m${peerId.toB58String()}\x1b[0m\n`)
+
+            const key = scrypt.hashSync(pw, scryptParams, 44, salt)
+
+            const serializedPeerId = rlp.encode([
+                peerId.toBytes(),
+                peerId.privKey.bytes,
+                peerId.pubKey.bytes
+            ])
+
+            const ciphertext = chacha
+                .chacha20(key.slice(0, 32), key.slice(32, 32 + 12))
+                .update(serializedPeerId)
+
+            cb(null, rlp.encode([
+                salt,
+                ciphertext
+            ]))
+        }
+    ], cb)
 }
 
-module.exports.serializeKeyPair = (peerId) => {
-    return rlp.encode([
-        peerId.toBytes(),
-        peerId.privKey.bytes,
-        peerId.pubKey.bytes
-    ])
+module.exports.deserializeKeyPair = (encryptedSerializedKeyPair, cb) => {
+    const encrypted = rlp.decode(encryptedSerializedKeyPair)
+
+    const salt = encrypted[0]
+    const ciphertext = encrypted[1]
+
+    const scryptParams = { N: 8192, r: 8, p: 16 }
+
+    console.log('Please type in the password that was used to encrypt the generated key.')
+    waterfall([
+        this.askForPassword,
+        (pw, isDefault, cb) => {
+            const key = scrypt.hashSync(pw, scryptParams, 44, salt)
+
+            const plaintext = chacha
+                .chacha20(key.slice(0, 32), key.slice(32, 32 + 12))
+                .update(ciphertext)
+
+            const decoded = rlp.decode(plaintext)
+
+            const peerId = PeerId.createFromBytes(decoded[0])
+            console.log(`Done. Using peerId \x1b[34m${peerId.toB58String()}\x1b[0m`)
+
+            libp2p_crypto.unmarshalPrivateKey(decoded[1], (err, privKey) => {
+                peerId.privKey = privKey
+                peerId.pubKey = libp2p_crypto.unmarshalPublicKey(decoded[2])
+
+                console.log(`Successfully recovered ID ${peerId.toB58String()}.`)
+
+                cb(null, peerId)
+            })
+
+        }
+    ], cb)
+}
+
+const { DEBUG } = require('../constants')
+
+module.exports.askForPassword = (cb) => {
+    if (DEBUG) {
+        console.log('Debug mode: using password Epo5kZTFidOCHrnL0MzsXNwN9St')
+        cb(null, 'Epo5kZTFidOCHrnL0MzsXNwN9St', false)
+    } else {
+        read({
+            silent: true,
+            edit: true,
+            replace: '*'
+        }, cb)
+    }
 }
 
 module.exports.clearDirectory = (path) => {
-    const files = [];
+    let files = [];
     if (fs.existsSync(path)) {
         files = fs.readdirSync(path);
         files.forEach(function (file, index) {

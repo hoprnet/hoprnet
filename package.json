@@ -19,6 +19,7 @@
         "test": "yarn lint && npx cross-env NODE_ENV=develop cross-env TASK=test node ./tools/server/index",
         "coverage": "npx cross-env NODE_ENV=develop cross-env TASK=coverage node ./tools/server/index",
         "demo": "node test/demo.js",
+        "cli": "node test/test_cli.js",
         "clean": "npx shx rm -fr docs db dist build bin coverage",
         "reset": "npx yarn run clean && npx shx rm -fr node_modules",
         "update": "yarn run reset && yarn upgrade"
@@ -66,6 +67,8 @@
         "prompt": "^1.0.0",
         "pull-length-prefixed": "^1.3.1",
         "pull-paramap": "^1.2.2",
+        "read": "^1.0.7",
+        "rlp": "^2.2.2",
         "secp256k1": "^3.6.1",
         "socket.io": "^2.2.0",
         "solhint": "^1.5.0",
