@@ -15,10 +15,10 @@ const { resolve } = require('path')
 const { isPartyA, pubKeyToEthereumAddress, sendTransaction, log, compileIfNecessary } = require('../utils')
 
 const open = require('./open')
-const close = require('./close')
+const close = require('./eventListeners/close')
 const transfer = require('./transfer')
-const settle = require('./settle')
-const payout = require('./payout')
+const requestClose = require('./requestClose')
+const closeChannels = require('./closeChannels')
 const registerHandlers = require('./handlers')
 
 const HASH_LENGTH = 32
@@ -35,8 +35,8 @@ class PaymentChannel extends EventEmitter {
         this.open = open(this)
         this.close = close(this)
         this.transfer = transfer(this)
-        this.settle = settle(this)
-        this.payout = payout(this)
+        this.requestClose = requestClose(this)
+        this.closeChannels = closeChannels(this)
     }
 
     /**
@@ -160,9 +160,11 @@ class PaymentChannel extends EventEmitter {
     }
 
     deleteChannel(channelId, cb) {
-        const key = `payments-channel-${channelId.toString('base64')}`
+        const key = this.getKey(channelId)
 
-        this.node.db.del(key, cb)
+        this.node.db.del(key, {
+            sync: true
+        }, cb)
     }
 
     getChannels() {

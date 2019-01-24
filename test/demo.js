@@ -1,6 +1,6 @@
 'use strict'
 
-const { waterfall, timesSeries, series, eachSeries } = require('neo-async')
+const { waterfall, timesSeries, series, each } = require('neo-async')
 const { resolve } = require('path');
 
 const { sendTransaction, privKeyToPeerId, log, compileIfNecessary } = require('../src/utils')
@@ -86,11 +86,11 @@ waterfall([
                 setTimeout(cb, 80 * 1000)
             }
         }, cb),
-        //(cb) => eachSeries(nodes, (node, cb) => {
-            (cb) => nodes[1].paymentChannels.payout((err, result) => {
-                log(nodes[1].peerInfo.id, `Finally received \x1b[35m\x1b[1m${result} wei\x1b[0m.`)
-                nodes[1].stop(cb)
+        (cb) => each(nodes, (node, cb) => {
+            node.paymentChannels.closeChannels((err, result) => {
+                log(node.peerInfo.id, `Finally ${result.isNeg() ? 'spent' : 'received'} \x1b[35m\x1b[1m${result.abs()} wei\x1b[0m.`)
+                node.stop(cb)
             })
-        //}, cb)
+        }, cb)
     ], cb)
-])
+], () => {})

@@ -24,8 +24,7 @@ contract HoprChannel {
         PARTYA_FUNDED, // 1
         PARTYB_FUNDED, // 2
         ACTIVE, // 3
-        PENDING_SETTLEMENT, // 4
-        WITHDRAWN // 5
+        PENDING_SETTLEMENT // 4
     }
 
     struct Channel {
@@ -63,7 +62,7 @@ contract HoprChannel {
         bytes32 channelId = getId(counterParty);
         Channel memory channel = channels[channelId];
         
-        require(channel.state > ChannelState.UNINITIALIZED && channel.state < ChannelState.WITHDRAWN, "Channel does not exist.");
+        require(channel.state > ChannelState.UNINITIALIZED, "Channel does not exist.");
         _;
     }
 
@@ -233,38 +232,33 @@ contract HoprChannel {
     * @notice withdrawal pending balance from payment channel
     * @param counterParty address of the counter party
     */
-    function withdraw(address counterParty) public channelExists(counterParty) {
+    function withdraw(address counterParty) public  {
         bytes32 channelId = getId(counterParty);
         Channel storage channel = channels[channelId];
         
-        require(
-            channel.state == ChannelState.PENDING_SETTLEMENT && 
-            channel.balanceA <= channel.balance, 
-            "Invalid channel.");
+        if (channel.state == ChannelState.PENDING_SETTLEMENT) {
+            require(channel.settleTimestamp <= block.timestamp, "Channel not withdrawable yet.");
+                        
+            require(
+                states[msg.sender].openChannels > 0 &&
+                states[counterParty].openChannels > 0, 
+                "Something went wrong. Double spend?");
 
-        require(channel.settleTimestamp <= block.timestamp, "Channel not withdrawable yet.");
-        
-        channel.state = ChannelState.WITHDRAWN;
-        
-        require(
-            states[msg.sender].openChannels > 0 &&
-            states[counterParty].openChannels > 0, 
-            "Something went wrong. Double spend?");
+            states[msg.sender].openChannels = states[msg.sender].openChannels.sub(1);
+            states[counterParty].openChannels = states[counterParty].openChannels.sub(1);
+            
+            if (isPartyA(counterParty)) {
+                // msg.sender == partyB
+                states[msg.sender].stakedEther = states[msg.sender].stakedEther.add((channel.balance.sub(channel.balanceA)));
+                states[counterParty].stakedEther = states[counterParty].stakedEther.add(channel.balanceA);
+            } else {
+                // msg.sender == partyA
+                states[counterParty].stakedEther = states[counterParty].stakedEther.add((channel.balance.sub(channel.balanceA)));
+                states[msg.sender].stakedEther = states[msg.sender].stakedEther.add(channel.balanceA); 
+            }
 
-        states[msg.sender].openChannels = states[msg.sender].openChannels.sub(1);
-        states[counterParty].openChannels = states[counterParty].openChannels.sub(1);
-        
-        if (isPartyA(counterParty)) {
-            // msg.sender == partyB
-            states[msg.sender].stakedEther = states[msg.sender].stakedEther.add((channel.balance.sub(channel.balanceA)));
-            states[counterParty].stakedEther = states[counterParty].stakedEther.add(channel.balanceA);
-        } else {
-            // msg.sender == partyA
-            states[counterParty].stakedEther = states[counterParty].stakedEther.add((channel.balance.sub(channel.balanceA)));
-            states[msg.sender].stakedEther = states[msg.sender].stakedEther.add(channel.balanceA); 
+            delete channels[channelId];
         }
-
-        delete channels[channelId];
     }
 
     /*** PRIVATE | INTERNAL ***/

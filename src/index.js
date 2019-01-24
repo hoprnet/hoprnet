@@ -148,12 +148,12 @@ class Hopr extends libp2p {
                                 mode: 0o777
                             })
                         }
-                        else {
-                            clearDirectory(db_dir)
-                            fs.mkdirSync(db_dir, {
-                                mode: 0o777
-                            })
-                        }
+                        // else {
+                        //     clearDirectory(db_dir)
+                        //     fs.mkdirSync(db_dir, {
+                        //         mode: 0o777
+                        //     })
+                        // }
                         levelup(leveldown(db_dir), cb)
                     })
                     // --------------------------

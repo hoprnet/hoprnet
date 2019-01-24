@@ -1,8 +1,8 @@
 'use strict'
 
 const { waterfall } = require('neo-async')
-const { isPartyA, pubKeyToEthereumAddress, mineBlock, log } = require('../utils')
-const { NET } = require('../constants')
+const { isPartyA, pubKeyToEthereumAddress, mineBlock, log } = require('../../utils')
+const { NET } = require('../../constants')
 const { BN } = require('web3-utils')
 
 module.exports = (self) => (err, event) => {
@@ -37,7 +37,7 @@ module.exports = (self) => (err, event) => {
                 ) {
                     log(self.node.peerInfo.id, `Found better transaction for payment channel ${channelId.toString('hex')}.`)
 
-                    self.settle(channelId, cb)
+                    self.requestClose(channelId, cb)
                 } else {
                     cb(null)
                 }
@@ -74,7 +74,7 @@ module.exports = (self) => (err, event) => {
                     name === `closed ${channelId.toString('base64')}`
                 )) {
                     interested = true
-
+                    
                     self.contractCall(self.contract.methods.withdraw(pubKeyToEthereumAddress(counterparty)), cb)
                 } else {
                     cb()

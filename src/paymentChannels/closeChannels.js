@@ -34,7 +34,7 @@ module.exports = (self) => (cb) => pull(
                     const now = Date.now()
 
                     // TODO: Implement proper transaction handling
-                    const timeout = setTimeout(self.settle, SETTLEMENT_TIMEOUT, channelId, true)
+                    const timeout = setTimeout(self.requestClose, SETTLEMENT_TIMEOUT, channelId, true)
 
                     self.contract.once('ClosedChannel', {
                         topics: [`0x${channelId.toString('hex')}`]
@@ -57,7 +57,7 @@ module.exports = (self) => (cb) => pull(
                 })
             })
         } else {
-            self.settle(channelId)
+            self.requestClose(channelId)
         }
 
         self.on(`closed ${channelId.toString('base64')}`, (receivedMoney) => {

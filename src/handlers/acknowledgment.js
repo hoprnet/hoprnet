@@ -40,11 +40,10 @@ module.exports = (node) => node.handle(PROTOCOL_ACKNOWLEDGEMENT, (protocol, conn
                         throw Error('General error.')
 
                     node.paymentChannels.setChannel({
-                        // index: tx.index, TODO
+                        currentValue: tx.value,
+                        index: tx.index,
                         tx: tx
-                    }, channelId, (err) => node.paymentChannels.getChannel(channelId, (err, record) => {
-                        // log(node.peerInfo.id, `Acknowledged ${(new BN(record.tx.value)).toString()}`)
-                    }))
+                    }, channelId)
                 })
             })
         })
