@@ -74,7 +74,7 @@ module.exports = (node, output) => node.handle(c.PROTOCOL_STRING, (protocol, con
 })
 
 function demo(str) {
-    const chunks = str.split(' ')
+    const chunks = str.split('@')
 
     return '\n\n---------- New Message ----------\nMessage \"' + chunks[0] + '\" latency ' + (Date.now() - Number(chunks[1])) + ' ms.\n---------------------------------\n\n'
 }
