@@ -7,24 +7,31 @@ const { BN } = require('web3').utils
 const toPull = require('stream-to-pull-stream')
 const pull = require('pull-stream')
 
-const { isPartyA, pubKeyToEthereumAddress, sendTransaction, log } = require('../utils')
+const { CONTRACT_ADDRESS } = require('../constants')
+const Web3 = require('web3-eth')
+const { parallel } = require('neo-async')
+const { resolve } = require('path')
+
+const { isPartyA, pubKeyToEthereumAddress, sendTransaction, log, compileIfNecessary } = require('../utils')
 
 const open = require('./open')
 const close = require('./close')
 const transfer = require('./transfer')
 const settle = require('./settle')
 const payout = require('./payout')
+const registerHandlers = require('./handlers')
 
 const HASH_LENGTH = 32
 
 class PaymentChannel extends EventEmitter {
-    constructor(node, contract, nonce) {
+    constructor(options) {
         super()
 
-        this.nonce = nonce
-        this.contract = contract
+        this.nonce = options.nonce
+        this.contract = options.contract
+        this.node = options.node
+        this.web3 = options.web3
 
-        this.node = node
         this.open = open(this)
         this.close = close(this)
         this.transfer = transfer(this)
@@ -32,13 +39,35 @@ class PaymentChannel extends EventEmitter {
         this.payout = payout(this)
     }
 
-    static createPaymentChannels(node, contract, cb) {
-        node.web3.eth.getTransactionCount(pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()), (err, nonce) => {
-            if (err) { throw err }
+    /**
+     * Creates and initializes a new PaymentChannel instance.
+     * It will check whether there is a up-to-date ABI of the contract
+     * and compiles the contract if that isn't the case.
+     * 
+     * @param {Object} options.node a libp2p node instance
+     * @param {Object} options.provider a web3.js provider instance, otherwise if will use `http://localhost:8545`
+     * @param {Function} cb a function the is called with `(err, this)` afterwards
+     */
+    static create(options, cb) {
+        const web3 = new Web3(options.provider || 'http://localhost:8545')
 
-            node.paymentChannels = new PaymentChannel(node, contract, nonce)
+        parallel({
+            nonce: (cb) => web3.getTransactionCount(pubKeyToEthereumAddress(options.node.peerInfo.id.pubKey.marshal()), cb),
+            compiledContract: (cb) => compileIfNecessary([resolve(__dirname, '../../contracts/HoprChannel.sol')], [resolve(__dirname, '../../build/contracts/HoprChannel.json')], cb)
+        }, (err, results) => {
+            if (err)
+                cb(err)
 
-            cb()
+            registerHandlers(options.node)
+
+            const abi = require('../../build/contracts/HoprChannel.json').abi
+
+            cb(null, new PaymentChannel({
+                node: options.node,
+                nonce: results.nonce,
+                contract: new web3.Contract(abi, options.contractAddress || CONTRACT_ADDRESS),
+                web3: web3
+            }))
         })
     }
 
@@ -175,7 +204,7 @@ class PaymentChannel extends EventEmitter {
             nonce: this.nonce - 1,
             gas: estimatedGas,
             data: txObject.encodeABI()
-        }, this.node.peerInfo.id, this.node.web3, (err, receipt) => {
+        }, this.node.peerInfo.id, this.web3, (err, receipt) => {
             if (err)
                 throw err
 

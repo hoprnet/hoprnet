@@ -44,7 +44,7 @@ module.exports.parseJSON = (str) =>
         return value
     })
 
-module.exports.log = (peerId, msg) => 
+module.exports.log = (peerId, msg) =>
     console.log(`['\x1b[34m${peerId.toB58String()}\x1b[0m']: ${msg}`)
 // ==========================
 // Buffer methods
@@ -374,7 +374,6 @@ module.exports.mineBlock = (provider, amountOfTime = ONE_MINUTE) => waterfall([
 // ==========================
 // Web3.js methods
 // ==========================
-const defaultsDeep = require('@nodeutils/defaults-deep')
 const { GAS_PRICE } = require('../constants')
 /**
  * Creates a web3 account from a peerId instance
@@ -383,7 +382,7 @@ const { GAS_PRICE } = require('../constants')
  * @param {Object} web3 a web3.js instance
  */
 module.exports.peerIdToWeb3Account = (peerId, web3) =>
-    web3.eth.accounts.privateKeyToAccount('0x'.concat(peerId.privKey.marshal().toString('hex')))
+    web3.accounts.privateKeyToAccount('0x'.concat(peerId.privKey.marshal().toString('hex')))
 
 /**
  * Signs a transaction with the private key that is given by 
@@ -396,18 +395,230 @@ module.exports.peerIdToWeb3Account = (peerId, web3) =>
  * @param {Function} cb the function that is called when finished
  */
 module.exports.sendTransaction = async (tx, peerId, web3, cb = () => { }) => {
-    const signedTx = await this.peerIdToWeb3Account(peerId, web3).signTransaction(defaultsDeep(tx, {
+    const signedTx = await this.peerIdToWeb3Account(peerId, web3).signTransaction(Object.assign(tx, {
         gasPrice: GAS_PRICE
     }))
 
-    web3.eth.sendSignedTransaction(signedTx.rawTransaction)
+    web3.sendSignedTransaction(signedTx.rawTransaction)
         .on('error', cb)
         .on('receipt', (receipt) => {
             if (!receipt.status)
                 throw Error('Reverted tx')
 
-            // console.log('[\'%s\']: Published tx with TxHash %s', peerId.toB58String(), receipt.transactionHash)
-
             cb(null, receipt)
         })
+}
+
+const { parallel, map, some } = require('neo-async')
+const { execFile } = require('child_process')
+const fs = require('fs')
+/**
+ * Checks whether one of the src files is newer than one of
+ * the artifacts.
+ * 
+ * @notice the method utilizes Truffle to compile the smart contracts.
+ * Please make sure that Truffle is accessible by `npx`.
+ * 
+ * @param {Array} srcFiles the absolute paths of the source files
+ * @param {Array} artifacts the absolute paths of the artifacts
+ * @param {Function} cb the function that is called when finished
+ */
+module.exports.compileIfNecessary = (srcFiles, artifacts, cb) => {
+    function compile(cb) {
+        console.log('Compiling smart contract ...')
+        execFile('npx', ['truffle', 'compile'], (err, stdout, stderr) => {
+            if (err) {
+                cb(err)
+            } else if (stderr) {
+                console.log(`\x1b[31m${stderr}\x1b[0m`)
+            } else {
+                console.log(stdout)
+                cb()
+            }
+        })
+    }
+
+    waterfall([
+        (cb) => some(artifacts, (file, cb) => fs.access(file, (err) => {
+            cb(null, !err)
+        }), cb),
+        (filesExist, cb) => {
+            if (!filesExist) {
+                compile(cb)
+            } else {
+                parallel({
+                    srcTime: (cb) => map(srcFiles, fs.stat, (err, stats) => {
+                        if (err)
+                            throw err
+
+                        cb(null, stats.reduce((acc, current) => Math.max(acc, current.mtimeMs), 0))
+                    }),
+                    artifactTime: (cb) => map(artifacts, fs.stat, (err, stats) => {
+                        if (err)
+                            throw err
+
+                        cb(null, stats.reduce((acc, current) => Math.min(acc, current.mtimeMs), Date.now()))
+                    })
+                }, (err, { srcTime, artifactTime }) => {
+                    if (err)
+                        cb(err)
+
+                    if (srcTime > artifactTime) {
+                        compile(cb)
+                    } else {
+                        cb()
+                    }
+                })
+            }
+        }
+    ], cb)
+}
+
+const rlp = require('rlp')
+const { each } = require('neo-async')
+const PeerInfo = require('peer-info')
+const Multiaddr = require('multiaddr')
+
+
+module.exports.deserializePeerBook = (serializedPeerBook, peerBook, cb) =>
+    each(rlp.decode(serializedPeerBook), (serializedPeerInfo, cb) => {
+        const peerId = PeerId.createFromBytes(serializedPeerInfo[0])
+
+        if (serializedPeerInfo.length === 3) {
+            peerId.pubKey = libp2p_crypto.unmarshalPublicKey(serializedPeerInfo[2])
+        }
+
+        PeerInfo.create(peerId, (err, peerInfo) => {
+            if (err)
+                cb(err)
+
+            serializedPeerInfo[1].forEach((multiaddr) => peerInfo.multiaddrs.add(Multiaddr(multiaddr)))
+            peerBook.put(peerInfo)
+
+            cb()
+        })
+    }, cb)
+
+module.exports.serializePeerBook = (peerBook) => {
+    function serializePeerInfo(peerInfo) {
+        const result = [
+            peerInfo.id.toBytes(),
+            peerInfo.multiaddrs.toArray().map(multiaddr => multiaddr.buffer)
+        ]
+
+        if (peerInfo.id.pubKey) {
+            result.push(peerInfo.id.pubKey.bytes)
+        }
+
+        return result
+    }
+
+    const peerInfos = []
+    peerBook.getAllArray().forEach(peerInfo => peerInfos.push(serializePeerInfo(peerInfo)))
+
+    return rlp.encode(peerInfos)
+}
+
+
+const scrypt = require('scrypt')
+const chacha = require('chacha')
+const SALT_LENGTH = 32
+const read = require('read')
+
+module.exports.serializeKeyPair = (peerId, cb) => {
+    const salt = randomBytes(SALT_LENGTH)
+    const scryptParams = { N: 8192, r: 8, p: 16 }
+
+    console.log('Please type in the password that is used to encrypt the generated key.')
+
+    waterfall([
+        this.askForPassword,
+        (pw, isDefault, cb) => {
+            console.log(`Done. Using peerId \x1b[34m${peerId.toB58String()}\x1b[0m\n`)
+
+            const key = scrypt.hashSync(pw, scryptParams, 44, salt)
+
+            const serializedPeerId = rlp.encode([
+                peerId.toBytes(),
+                peerId.privKey.bytes,
+                peerId.pubKey.bytes
+            ])
+
+            const ciphertext = chacha
+                .chacha20(key.slice(0, 32), key.slice(32, 32 + 12))
+                .update(serializedPeerId)
+
+            cb(null, rlp.encode([
+                salt,
+                ciphertext
+            ]))
+        }
+    ], cb)
+}
+
+module.exports.deserializeKeyPair = (encryptedSerializedKeyPair, cb) => {
+    const encrypted = rlp.decode(encryptedSerializedKeyPair)
+
+    const salt = encrypted[0]
+    const ciphertext = encrypted[1]
+
+    const scryptParams = { N: 8192, r: 8, p: 16 }
+
+    console.log('Please type in the password that was used to encrypt the generated key.')
+    waterfall([
+        this.askForPassword,
+        (pw, isDefault, cb) => {
+            const key = scrypt.hashSync(pw, scryptParams, 44, salt)
+
+            const plaintext = chacha
+                .chacha20(key.slice(0, 32), key.slice(32, 32 + 12))
+                .update(ciphertext)
+
+            const decoded = rlp.decode(plaintext)
+
+            const peerId = PeerId.createFromBytes(decoded[0])
+            console.log(`Done. Using peerId \x1b[34m${peerId.toB58String()}\x1b[0m`)
+
+            libp2p_crypto.unmarshalPrivateKey(decoded[1], (err, privKey) => {
+                peerId.privKey = privKey
+                peerId.pubKey = libp2p_crypto.unmarshalPublicKey(decoded[2])
+
+                console.log(`Successfully recovered ID ${peerId.toB58String()}.`)
+
+                cb(null, peerId)
+            })
+
+        }
+    ], cb)
+}
+
+const { DEBUG } = require('../constants')
+
+module.exports.askForPassword = (cb) => {
+    if (DEBUG) {
+        console.log('Debug mode: using password Epo5kZTFidOCHrnL0MzsXNwN9St')
+        cb(null, 'Epo5kZTFidOCHrnL0MzsXNwN9St', false)
+    } else {
+        read({
+            silent: true,
+            edit: true,
+            replace: '*'
+        }, cb)
+    }
+}
+
+module.exports.clearDirectory = (path) => {
+    let files = [];
+    if (fs.existsSync(path)) {
+        files = fs.readdirSync(path);
+        files.forEach(function (file, index) {
+            const curPath = path + "/" + file;
+            if (fs.lstatSync(curPath).isDirectory()) { // recurse
+                deleteFolderRecursive(curPath);
+            } else { // delete file
+                fs.unlinkSync(curPath);
+            }
+        });
+        fs.rmdirSync(path);
+    }
 }

@@ -7,9 +7,8 @@ const KadDHT = require('libp2p-kad-dht')
 const SECIO = require('libp2p-secio')
 const defaultsDeep = require('@nodeutils/defaults-deep')
 
-const { isPeerInfo } = require('peer-info')
-
-const Web3 = require('web3')
+const Keychain = require('libp2p-keychain')
+const FsStore = require('datastore-fs')
 
 const { createPacket } = require('./packet')
 const registerHandlers = require('./handlers')
@@ -17,7 +16,7 @@ const c = require('./constants')
 const crawlNetwork = require('./crawlNetwork')
 const getPubKey = require('./getPubKey')
 const getPeerInfo = require('./getPeerInfo')
-const { randomSubset } = require('./utils')
+const { randomSubset, serializePeerBook, deserializePeerBook, log, clearDirectory } = require('./utils')
 const PendingTransactions = require('./pendingTransactions')
 
 // const wrtc = require('wrtc')
@@ -26,26 +25,34 @@ const WStar = require('libp2p-webrtc-star')
 //     wrtc: wrtc
 // })
 
+const fs = require('fs')
 const levelup = require('levelup')
 const leveldown = require('leveldown')
+
+const PeerId = require('peer-id')
+const PeerInfo = require('peer-info')
+const PeerBook = require('peer-book')
+const Multiaddr = require('multiaddr')
+const { resolve } = require('path')
+
 
 const PaymentChannels = require('./paymentChannels')
 
 const pull = require('pull-stream')
 const lp = require('pull-length-prefixed')
-const { waterfall, times, parallel } = require('neo-async')
+const { waterfall, times, parallel, map } = require('neo-async')
 
 // const BOOTSTRAP_NODE = Multiaddr('/ip4/127.0.0.1/tcp/9090/')
 
-class Hopper extends libp2p {
+class Hopr extends libp2p {
     /**
      * @constructor
      * 
      * @param {Object} _options 
      * @param {Object} provider 
      */
-    constructor(_options, web3) {
-        if (!_options || !_options.peerInfo || !isPeerInfo(_options.peerInfo))
+    constructor(_options, db) {
+        if (!_options || !_options.peerInfo || !PeerInfo.isPeerInfo(_options.peerInfo))
             throw Error('Invalid input parameters. Expected a valid PeerInfo, but got \'' + typeof _options.peerInfo + '\' instead.')
 
         const defaults = {
@@ -88,37 +95,86 @@ class Hopper extends libp2p {
         }
         super(defaultsDeep(_options, defaults))
 
-        // Maybe this is not necessary
-        this.web3 = web3
-
+        this.db = db
         this.seenTags = new Set()
         this.crawlNetwork = crawlNetwork(this)
         this.getPubKey = getPubKey(this)
-        this.db = levelup(leveldown(`db/${this.peerInfo.id.toB58String()}`))
         this.pendingTransactions = new PendingTransactions(this.db)
     }
 
     /**
      * Creates a new node and invokes @param cb with `(err, node)` when finished.
      * 
-     * @param {Object} options 
+     * @param {Object} options the parameters
+     * @param {Object} options.web3provider a web3 provider, default `http://localhost:8545`
+     * @param {String} options.contractAddress the Ethereum address of the contract
+     * @param {Object} options.peerInfo 
+     * @param {Object} options.peerBook a PeerBook instance, otherwise try to retrieve peerBook from database, otherwise create a new one
      * @param {Function} cb callback when node is ready
      */
-    static createNode(options = {}, cb = () => { }) {
-        if (arguments.length < 2 && typeof options === 'function') {
+    static createNode(options, cb) {
+        if (typeof options === 'function') {
             cb = options
             options = {}
         }
 
-        options.web3 = options.web3 || new Web3('http://localhost:8545')
         options.output = options.output || console.log
-        // options.contract = options.contract || new options.web3.eth.Contract(JSON.parse(readFileSync(resolve('./contracts/HoprChannel.abi'))))
 
+        let db_dir = resolve(__dirname, '../db')
         waterfall([
-            (cb) =>
-                isPeerInfo(options.peerInfo) ? cb(null, options.peerInfo) : getPeerInfo(null, cb),
-            (peerInfo, cb) =>
-                (new Hopper({ peerInfo: peerInfo }, options.web3, options.contract)).start(options.output, options.contract, cb),
+            (cb) => fs.access(db_dir, (err) => {
+                if (err && !err.code === 'ENOENT' && !err.code === 'EEXIST') {
+                    throw er
+                } else if (err && err.code === 'ENOENT') {
+                    try {
+                        fs.mkdirSync(db_dir, {
+                            mode: 0o777
+                        })
+                    } catch (err) {
+                        
+                    }
+                    
+                }
+
+                if (options.id) {
+                    // Only for unit testing !!!
+                    db_dir = resolve(db_dir, `./${options.id}`)
+                    delete options.id
+                    fs.access(db_dir, (err) => {
+                        if (err && !err.code === 'ENOENT') {
+                            throw err
+                        } else if (err && err.code === 'ENOENT') {
+                            fs.mkdirSync(db_dir, {
+                                mode: 0o777
+                            })
+                        }
+                        else {
+                            clearDirectory(db_dir)
+                            fs.mkdirSync(db_dir, {
+                                mode: 0o777
+                            })
+                        }
+                        levelup(leveldown(db_dir), cb)
+                    })
+                    // --------------------------
+                } else {
+                    levelup(leveldown(db_dir), cb)
+                }
+            }),
+            (db, cb) => parallel({
+                peerBook: (cb) => Hopr.importPeerBook(db, cb),
+                peerInfo: (cb) => PeerInfo.isPeerInfo(options.peerInfo) ? cb(null, options.peerInfo) : getPeerInfo(db, cb)
+            }, (err, { peerBook, peerInfo }) => {
+                if (err)
+                    cb(err)
+
+                const hopr = new Hopr({
+                    peerBook: peerBook,
+                    peerInfo: peerInfo
+                }, db)
+
+                hopr.start(options, cb)
+            })
         ], cb)
     }
 
@@ -129,11 +185,36 @@ class Hopper extends libp2p {
      * @param {Function} output function to which the plaintext of the received message is passed
      * @param {Function} cb callback when node is ready
      */
-    start(output, contract, cb) {
+    start(options, cb) {
+        parallel({
+            node: (cb) => super.start(cb),
+            paymentChannels: (cb) => PaymentChannels.create({
+                node: this,
+                provider: options.provider,
+                contractAddress: options.contractAddress
+            }, cb)
+        }, (err, results) => {
+            if (err)
+                cb(err)
+
+            registerHandlers(this, options.output)
+
+            this.paymentChannels = results.paymentChannels
+
+            cb(null, this)
+        })
+    }
+
+    /**
+     * Shutdown the node and saves keys and peerBook in the database
+     * @param {Function} cb 
+     */
+    stop(cb = () => { }) {
+        log(this.peerInfo.id, `Shutting down...`)
         waterfall([
-            (cb) => super.start((err, _) => cb(err)),
-            (cb) => PaymentChannels.createPaymentChannels(this, contract, cb),
-            (cb) => registerHandlers(this, output, cb),
+            (cb) => this.exportPeerBook(cb),
+            (cb) => super.stop(cb),
+            (cb) => this.db.close(cb)
         ], cb)
     }
 
@@ -211,6 +292,28 @@ class Hopper extends libp2p {
                 this.peerBook.getAllArray(), c.MAX_HOPS - 1, comparator))
         }, comparator)
     }
+
+    static importPeerBook(db, cb) {
+        const key = 'peer-book'
+
+        const peerBook = new PeerBook()
+
+        db.get(key, (err, value) => {
+            if (err && !err.notFound) {
+                cb(err)
+            } else if (err && err.notFound) {
+                cb(null, peerBook)
+            } else {
+                deserializePeerBook(value, peerBook, cb)
+            }
+        })
+    }
+
+    exportPeerBook(cb) {
+        const key = 'peer-book'
+
+        this.db.put(key, serializePeerBook(this.peerBook), cb)
+    }
 }
 
-module.exports = Hopper
+module.exports = Hopr

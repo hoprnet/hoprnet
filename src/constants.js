@@ -22,6 +22,7 @@ module.exports.CRAWLING_RESPONSE_NODES = 10
 module.exports.RELAY_FEE = '100' // Wei
 
 module.exports.DEMO = false
+module.exports.DEBUG = true
 
 module.exports.NET = 'ropsten'
 

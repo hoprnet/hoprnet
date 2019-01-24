@@ -1,6 +1,6 @@
 'use stric'
 
-const { map, parallel, times, series, each, waterfall } = require('neo-async')
+const { parallel, times, series, each, waterfall } = require('neo-async')
 
 /**
  * Allow nodes to find each other by establishing connections
@@ -21,59 +21,13 @@ module.exports.warmUpNodes = (nodes, cb) =>
 const { existsSync, stat } = require('fs')
 const { execFile } = require('child_process')
 
-/**
- * Checks whether one of the src files is newer than one of
- * the artifacts.
- * 
- * @notice the method utilizes Truffle to compile the smart contracts.
- * Please make sure that Truffle is accessible by `npx`.
- * 
- * @param {Array} srcFiles the absolute paths of the source files
- * @param {Array} artifacts the absolute paths of the artifacts
- * @param {Function} cb the function that is called when finished
- */
-module.exports.compileIfNecessary = (srcFiles, artifacts, cb) => {
-    function compile() {
-        console.log('Compiling smart contract ...')
-        execFile('npx', ['truffle', 'compile'], (err, stdout, stderr) => {
-            console.log(stdout)
-            cb()
-        })
-    }
 
-    if (artifacts.some((file) => !existsSync(file))) {
-        compile()
-    }
-
-    parallel({
-        srcTime: (cb) => map(srcFiles, stat, (err, stats) => {
-            if (err)
-                throw err
-
-            cb(null, stats.reduce((acc, current) => Math.max(acc, current.mtimeMs), 0))
-        }),
-        artifactTime: (cb) => map(artifacts, stat, (err, stats) => {
-            if (err)
-                throw err
-
-            cb(null, stats.reduce((acc, current) => Math.min(acc, current.mtimeMs), Date.now()))
-        })
-    }, (err, { srcTime, artifactTime }) => {
-        if (err)
-            throw err
-
-        if (srcTime > artifactTime) {
-            compile()
-        } else {
-            cb()
-        }
-    })
-}
 
 const { createNode } = require('../../src')
 const { pubKeyToEthereumAddress, sendTransaction } = require('../../src/utils')
 const { GAS_PRICE, STAKE_GAS_AMOUNT } = require('../../src/constants')
-const { toWei } = require('web3').utils
+const { toWei } = require('web3-utils')
+const Web3 = require('web3-eth')
 
 /**
  * Create HOPR nodes, establish a connection between them and fund their corresponding
@@ -86,13 +40,12 @@ const { toWei } = require('web3').utils
  * @param {Number} nonce the current nonce
  * @param {Function} cb the function that gets called afterwards with (err, nodes)
  */
-module.exports.createFundedNodes = (amountOfNodes, contract, web3, peerId, nonce, cb) => {
+module.exports.createFundedNodes = (amountOfNodes, options, peerId, nonce, cb) => {
     waterfall([
-        (cb) => times(amountOfNodes, (_, cb) =>
-            createNode({
-                contract: contract,
-                web3: web3
-            }, cb), cb),
+        (cb) => times(amountOfNodes, (n, cb) =>
+            createNode(Object.assign({
+                id: `temp ${n}`
+            }, options), cb), cb),
         (nodes, cb) => parallel([
             (cb) => this.warmUpNodes(nodes, cb),
             (cb) => series([
@@ -103,14 +56,14 @@ module.exports.createFundedNodes = (amountOfNodes, contract, web3, peerId, nonce
                         gas: STAKE_GAS_AMOUNT,
                         gasPrice: GAS_PRICE,
                         nonce: nonce + n
-                    }, peerId, web3, cb), cb),
+                    }, peerId, new Web3(options.provider), cb), cb),
                 (cb) => each(nodes, (node, cb) => {
                     sendTransaction({
                         to: node.paymentChannels.contract._address,
                         value: toWei('0.000001', 'ether'),
                         gas: STAKE_GAS_AMOUNT,
                         gasPrice: GAS_PRICE
-                    }, node.peerInfo.id, node.web3, (err) => {
+                    }, node.peerInfo.id, new Web3(options.provider), (err) => {
                         if (err)
                             throw err
             
