@@ -1,8 +1,5 @@
-# HOPR (working title)
-
-> Encryption is for free, but you have to pay for anonymity
-
-A privacy-preserving messaging protocol that incentivizes users to participate in the network.
+# HOPR
+HOPR is a privacy-preserving messaging protocol that incentivizes users to participate in the network. It provides privacy by relaying messages via several relay nodes to the recipient. Relay nodes are getting paid via payment channels for their services.
 
 ### For further details, see the full [protocol specification on the wiki](../../wiki)
 
@@ -10,12 +7,7 @@ A privacy-preserving messaging protocol that incentivizes users to participate i
 There is a standalone demo to showcase the functionality:
 
 ### Software Requirements
-- `solc` >= 0.5
-- `Node.js` >= 11.0
-- `npx` 
-
-Please make sure that `solc`, the Solidity compiler, is available in your environment path, see [here](https://solidity.readthedocs.io/en/latest/installing-solidity.html#binary-packages) how to install `solc` on your platform.
-
+- `Node.js` >= 10 (this already ships with `npx`)
 
 On Windows? 👀 here: [Windows Setup](../../wiki/Setup#Windows)
 
@@ -29,14 +21,9 @@ On Windows? 👀 here: [Windows Setup](../../wiki/Setup#Windows)
 git clone https://github.com/validitylabs/messagingProtocol.git
 cd messagingProtocol
 yarn install
-
-// Do configuration steps below first before preceding! 
-
-yarn compile
-yarn demo
 ```
 
-Then go to `config/` and create a `.secrets.json` similar to the following one.
+Setup the configuration file below before preceding. Navigate to the `config/` folder and change the `.secrets.json` similar to the following one:
 
 ```json
 {
@@ -48,9 +35,14 @@ Then go to `config/` and create a `.secrets.json` similar to the following one.
 }
 ```
 
-Please make sure that you have:
-- whitelisted the contract `0x69fc313b19afab7D925E7e05C783E7B36327255b` in your Infura account
-- got some funds on your Ropsten testnet account, if you don't you may want to use the [faucet](https://faucet.ropsten.be/) to receive test ether.
+Please make sure that you:
+- have whitelisted the contract `0x69fc313b19afab7D925E7e05C783E7B36327255b` in your Infura account
+- got some funds on your Ropsten testnet account, you may want to use the [faucet](https://faucet.ropsten.be/) to receive test ether.
+
+Now you can run the demo script via:
+```
+yarn demo
+```
 
 ### Demo Script
 The demo will
