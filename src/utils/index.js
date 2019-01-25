@@ -561,7 +561,7 @@ module.exports.deserializeKeyPair = (encryptedSerializedKeyPair, cb) => {
 
     const scryptParams = { N: 8192, r: 8, p: 16 }
 
-    console.log('Please type in the password that was used to encrypt the generated key.')
+    console.log('Please type in the password that was used to encrypt the key.')
     waterfall([
         this.askForPassword,
         (pw, isDefault, cb) => {
@@ -574,13 +574,12 @@ module.exports.deserializeKeyPair = (encryptedSerializedKeyPair, cb) => {
             const decoded = rlp.decode(plaintext)
 
             const peerId = PeerId.createFromBytes(decoded[0])
-            console.log(`Done. Using peerId \x1b[34m${peerId.toB58String()}\x1b[0m`)
 
             libp2p_crypto.unmarshalPrivateKey(decoded[1], (err, privKey) => {
                 peerId.privKey = privKey
                 peerId.pubKey = libp2p_crypto.unmarshalPublicKey(decoded[2])
 
-                console.log(`Successfully recovered ID ${peerId.toB58String()}.`)
+                console.log(`Successfully restored ID \x1b[34m${peerId.toB58String()}\x1b[0m.`)
 
                 cb(null, peerId)
             })

@@ -132,9 +132,9 @@ class Hopr extends libp2p {
                             mode: 0o777
                         })
                     } catch (err) {
-                        
+
                     }
-                    
+
                 }
 
                 if (options.id) {
@@ -195,14 +195,15 @@ class Hopr extends libp2p {
                 contractAddress: options.contractAddress
             }, cb)
         }, (err, results) => {
-            if (err)
+            if (err) {
                 cb(err)
+            } else {
+                registerHandlers(this, options.output)
 
-            registerHandlers(this, options.output)
+                this.paymentChannels = results.paymentChannels
 
-            this.paymentChannels = results.paymentChannels
-
-            cb(null, this)
+                cb(null, this)
+            }
         })
     }
 
@@ -299,13 +300,20 @@ class Hopr extends libp2p {
 
         const peerBook = new PeerBook()
 
+
         db.get(key, (err, value) => {
             if (err && !err.notFound) {
                 cb(err)
             } else if (err && err.notFound) {
                 cb(null, peerBook)
             } else {
-                deserializePeerBook(value, peerBook, cb)
+                deserializePeerBook(value, peerBook, (err) => {
+                    if (err) {
+                        cb(err)
+                    } else {
+                        cb(null, peerBook)
+                    }
+                })
             }
         })
     }
