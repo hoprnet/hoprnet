@@ -3,7 +3,7 @@
 const EventEmitter = require('events');
 const Transaction = require('../transaction')
 
-const { BN } = require('web3').utils
+const { BN } = require('web3-utils')
 const toPull = require('stream-to-pull-stream')
 const pull = require('pull-stream')
 

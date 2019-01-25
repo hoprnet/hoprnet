@@ -1,10 +1,20 @@
 'use strict'
 
-const { sha3, toChecksumAddress } = require('web3').utils
+const { sha3, toChecksumAddress } = require('web3-utils')
 const { randomBytes } = require('crypto')
-
-const { waterfall } = require('neo-async')
-
+const { waterfall, parallel, map, some, each } = require('neo-async')
+const { execFile } = require('child_process')
+const fs = require('fs')
+const libp2p_crypto = require('libp2p-crypto').keys
+const PeerId = require('peer-id')
+const Multihash = require('multihashes')
+const rlp = require('rlp')
+const PeerInfo = require('peer-info')
+const Multiaddr = require('multiaddr')
+const { publicKeyConvert } = require('secp256k1')
+const scrypt = require('scrypt')
+const chacha = require('chacha')
+const read = require('read')
 
 // ==========================
 // General methods
@@ -54,27 +64,27 @@ module.exports.log = (peerId, msg) =>
  * @param  {Buffer} buf1
  * @param  {Buffer} buf2
  */
-module.exports.bufferADD = (buf1, buf2) => {
-    if (!Buffer.isBuffer(buf1))
-        throw Error('Expected a buffer. Got \"' + typeof buf1 + '\" instead.')
+// module.exports.bufferADD = (buf1, buf2) => {
+//     if (!Buffer.isBuffer(buf1))
+//         throw Error('Expected a buffer. Got \"' + typeof buf1 + '\" instead.')
 
-    const a = Number.parseInt(buf1.toString('hex'))
-    let b, length
+//     const a = Number.parseInt(buf1.toString('hex'))
+//     let b, length
 
-    if (Buffer.isBuffer(buf2)) {
-        // Incorrect hex format ?
-        b = Number.parseInt(buf2.toString('hex'))
-        length = Math.max(buf1.length, buf2.length)
+//     if (Buffer.isBuffer(buf2)) {
+//         // Incorrect hex format ?
+//         b = Number.parseInt(buf2.toString('hex'))
+//         length = Math.max(buf1.length, buf2.length)
 
-    } else if (Number.isInteger(buf2)) {
-        b = buf2
-        length = buf1.length
-    } else {
-        throw Error('Invalid input values. Got \"' + typeof buf1 + '\" and \"' + typeof buf2 + '\".')
-    }
+//     } else if (Number.isInteger(buf2)) {
+//         b = buf2
+//         length = buf1.length
+//     } else {
+//         throw Error('Invalid input values. Got \"' + typeof buf1 + '\" and \"' + typeof buf2 + '\".')
+//     }
 
-    return module.exports.numberToBuffer(a + b, length)
-}
+//     return module.exports.numberToBuffer(a + b, length)
+// }
 /**
  * Bitwise XOR of two Buffers.
  * 
@@ -234,7 +244,6 @@ module.exports.randomPermutation = (array) => {
 // ==========================
 // Ethereum methods
 // ==========================
-const { publicKeyConvert } = require('secp256k1')
 const COMPRESSED_PUBLIC_KEY_LENGTH = 33
 /**
  * Derives an Ethereum address from the given public key.
@@ -318,10 +327,6 @@ module.exports.getId = (sender, counterparty) => {
 // ==========================
 // libp2p methods
 // ==========================
-const libp2p_crypto = require('libp2p-crypto').keys
-const PeerId = require('peer-id')
-const Multihash = require('multihashes')
-
 module.exports.pubKeyToPeerId = (pubKey, cb) =>
     PeerId.createFromPubKey(new libp2p_crypto.supportedKeys.secp256k1.Secp256k1PublicKey(pubKey).bytes, cb)
 
@@ -409,9 +414,6 @@ module.exports.sendTransaction = async (tx, peerId, web3, cb = () => { }) => {
         })
 }
 
-const { parallel, map, some } = require('neo-async')
-const { execFile } = require('child_process')
-const fs = require('fs')
 /**
  * Checks whether one of the src files is newer than one of
  * the artifacts.
@@ -474,12 +476,6 @@ module.exports.compileIfNecessary = (srcFiles, artifacts, cb) => {
     ], cb)
 }
 
-const rlp = require('rlp')
-const { each } = require('neo-async')
-const PeerInfo = require('peer-info')
-const Multiaddr = require('multiaddr')
-
-
 module.exports.deserializePeerBook = (serializedPeerBook, peerBook, cb) =>
     each(rlp.decode(serializedPeerBook), (serializedPeerInfo, cb) => {
         const peerId = PeerId.createFromBytes(serializedPeerInfo[0])
@@ -519,11 +515,7 @@ module.exports.serializePeerBook = (peerBook) => {
     return rlp.encode(peerInfos)
 }
 
-
-const scrypt = require('scrypt')
-const chacha = require('chacha')
 const SALT_LENGTH = 32
-const read = require('read')
 
 module.exports.serializeKeyPair = (peerId, cb) => {
     const salt = randomBytes(SALT_LENGTH)

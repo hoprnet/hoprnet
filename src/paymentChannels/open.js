@@ -5,7 +5,7 @@ const lp = require('pull-length-prefixed')
 
 const { waterfall } = require('neo-async')
 const { randomBytes } = require('crypto')
-const { toWei, BN } = require('web3').utils
+const { toWei, BN } = require('web3-utils')
 const { deepCopy, bufferToNumber, numberToBuffer, log } = require('../utils')
 const { recover } = require('secp256k1')
 

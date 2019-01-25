@@ -1,8 +1,6 @@
 'use strict'
 
 const secp256k1 = require('secp256k1')
-const withIs = require('class-is')
-
 
 const { hash, bufferXOR } = require('../utils')
 const Header = require('../packet/header')
@@ -69,4 +67,4 @@ class KeyDerivation {
     }
 }
 
-module.exports = withIs(KeyDerivation, { className: 'KeyDerivation', symbolName: '@validitylabs/hopper/KeyDerivation' })
+module.exports = KeyDerivation
