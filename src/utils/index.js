@@ -95,12 +95,17 @@ module.exports.log = (peerId, msg) =>
  */
 module.exports.bufferXOR = (buf1, buf2) => {
     if (!Buffer.isBuffer(buf1) || !Buffer.isBuffer(buf2))
-        throw Error('Input values have to be provided as Buffers. Got ' + typeof buf1 + ' and ' + typeof buf2)
+        throw Error(`Input values have to be provided as Buffers. Got ${typeof buf1} and ${typeof buf2}`)
 
     if (buf1.length !== buf2.length)
-        throw Error('Buffer must have the same length. Got buffers of length ' + buf1.length + ' and ' + buf2.length)
+        throw Error(`Buffer must have the same length. Got buffers of length ${buf1.length} and ${buf2.length}.`)
 
-    return buf1.map((elem, index) => (elem ^ buf2[index]))
+    const result = Buffer.alloc(buf1.length)
+
+    for (let i = 0; i < buf1.length; i = i + 1) {
+        result[i] = buf1[i] ^ buf2[i]
+    }
+    return result
 }
 
 module.exports.numberToBuffer = (i, length) => {
