@@ -11,25 +11,26 @@ const Acknowledgement = require('../acknowledgement')
 
 module.exports = (node, output) => node.handle(c.PROTOCOL_STRING, (protocol, conn) => {
     function forwardPacket(packet, cb) {
-        const targetPeerId = packet.getTargetPeerId()
-        if (node.peerInfo.id.toBytes().compare(targetPeerId.toBytes()) === 0) {
-            output(demo(packet.message.plaintext.toString()))
-        } else {
-            log(node.peerInfo.id, `Forwarding to node \x1b[34m${targetPeerId.toB58String()}\x1b[0m.`)
-
-            waterfall([
-                (cb) => node.peerRouting.findPeer(targetPeerId, cb),
-                (targetPeerInfo, cb) => node.dialProtocol(targetPeerInfo, c.PROTOCOL_STRING, cb),
-                (conn, cb) => {
-                    pull(
-                        pull.once(packet.toBuffer()),
-                        lp.encode(),
-                        conn
-                    )
-                    cb(null)
-                }
-            ], cb)
-        }
+        packet.getTargetPeerId((err, targetPeerId) => {
+            if (node.peerInfo.id.pubKey.marshal().compare(targetPeerId.pubKey.marshal()) === 0) {
+                output(demo(packet.message.plaintext.toString()))
+            } else {
+                log(node.peerInfo.id, `Forwarding to node \x1b[34m${targetPeerId.toB58String()}\x1b[0m.`)
+    
+                waterfall([
+                    (cb) => node.peerRouting.findPeer(targetPeerId, cb),
+                    (targetPeerInfo, cb) => node.dialProtocol(targetPeerInfo, c.PROTOCOL_STRING, cb),
+                    (conn, cb) => {
+                        pull(
+                            pull.once(packet.toBuffer()),
+                            lp.encode(),
+                            conn
+                        )
+                        cb(null)
+                    }
+                ], cb)
+            }
+        })
     }
 
     function sendAcknowledgement(packet, peerInfo, cb) {

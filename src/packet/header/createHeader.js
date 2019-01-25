@@ -83,17 +83,20 @@ module.exports = (Header, header, peerIds) => {
     }
 
     function generateFiller(secrets) {
-        const filler = Buffer.alloc(p.PER_HOP_SIZE * (c.MAX_HOPS - 1)).fill(0)
-        let length
+        const filler = Buffer.alloc(p.PER_HOP_SIZE * (c.MAX_HOPS - 1), 0)
+        let length, start, end
 
         for (let index = 0; index < (c.MAX_HOPS - 1); index++) {
-            let { key, iv } = Header.derivePRGParameters(secrets[index], p.LAST_HOP_SIZE + (c.MAX_HOPS - 1 - index) * p.PER_HOP_SIZE)
+            let { key, iv } = Header.derivePRGParameters(secrets[index])
+
+            start = p.LAST_HOP_SIZE + (c.MAX_HOPS - 1 - index) * p.PER_HOP_SIZE
+            end = p.LAST_HOP_SIZE + c.MAX_HOPS * p.PER_HOP_SIZE
 
             length = (index + 1) * p.PER_HOP_SIZE
 
             bufferXOR(
                 filler.slice(0, length),
-                prg.createPRG(key, iv).digest(length)
+                prg.createPRG(key, iv).digest(start, end)
             ).copy(filler, 0, 0, length)
         }
 
@@ -110,7 +113,7 @@ module.exports = (Header, header, peerIds) => {
 
             if (index === secrets.length - 1) {
                 header.beta
-                    .fill(Multihash.decode(peerIds[index].id).digest, 0, p.DESINATION_SIZE)
+                    .fill(peerIds[index].pubKey.marshal(), 0, p.DESINATION_SIZE)
                     .fill(identifier, p.DESINATION_SIZE, p.DESINATION_SIZE + p.IDENTIFIER_SIZE)
 
                 if (paddingLength > 0) {
@@ -121,7 +124,7 @@ module.exports = (Header, header, peerIds) => {
                     .fill(
                         bufferXOR(
                             header.beta.slice(0, p.LAST_HOP_SIZE),
-                            prg.createPRG(key, iv).digest(p.LAST_HOP_SIZE)
+                            prg.createPRG(key, iv).digest(0, p.LAST_HOP_SIZE)
                         ),
                         0, p.LAST_HOP_SIZE)
                     .fill(filler, p.LAST_HOP_SIZE + paddingLength, Header.BETA_LENGTH)
@@ -131,7 +134,7 @@ module.exports = (Header, header, peerIds) => {
                     .fill(header.beta, 0, Header.BETA_LENGTH - p.PER_HOP_SIZE)
 
                 header.beta
-                    .fill(Multihash.decode(peerIds[index + 1].id).digest, 0, p.ADDRESS_SIZE)
+                    .fill(peerIds[index + 1].pubKey.marshal(), 0, p.ADDRESS_SIZE)
                     .fill(header.gamma, p.ADDRESS_SIZE, p.ADDRESS_SIZE + p.MAC_SIZE)
                     .fill(hash(Header.deriveTransactionKey(secrets[index + 1])), p.ADDRESS_SIZE + p.MAC_SIZE, p.ADDRESS_SIZE + p.MAC_SIZE + p.HASH_LENGTH)
                     .fill(tmp, p.PER_HOP_SIZE, Header.BETA_LENGTH)
@@ -145,7 +148,7 @@ module.exports = (Header, header, peerIds) => {
                     .fill(
                         bufferXOR(
                             header.beta,
-                            prg.createPRG(key, iv).digest(Header.BETA_LENGTH)
+                            prg.createPRG(key, iv).digest(0, Header.BETA_LENGTH)
                         ), 0, Header.BETA_LENGTH)
             }
 

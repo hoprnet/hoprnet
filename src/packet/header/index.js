@@ -2,15 +2,13 @@
 
 const secp256k1 = require('secp256k1')
 const hkdf = require('futoin-hkdf')
-const withIs = require('class-is')
 const crypto = require('crypto')
 const bs58 = require('bs58')
-const multihashes = require('multihashes')
 
 const createHeader = require('./createHeader')
 const prp = require('../../crypto/prp')
 const prg = require('../../crypto/prg')
-const { bufferXOR, bufferADD } = require('../../utils')
+const { bufferXOR } = require('../../utils')
 const constants = require('../../constants')
 const p = require('./parameters')
 
@@ -52,7 +50,7 @@ class Header {
     }
 
     get address() {
-        return this.data ? multihashes.encode(this.data.slice(0, p.ADDRESS_SIZE), 'sha2-256') : null
+        return this.data ? this.data.slice(0, p.ADDRESS_SIZE) : null
     }
 
     get hashedKeyHalf() {
@@ -122,7 +120,7 @@ class Header {
             .fill(
                 bufferXOR(
                     tmp,
-                    prg.createPRG(key, iv).digest(Header.BETA_LENGTH + p.PER_HOP_SIZE)
+                    prg.createPRG(key, iv).digest(0, Header.BETA_LENGTH + p.PER_HOP_SIZE)
                 ), 0, Header.BETA_LENGTH + p.PER_HOP_SIZE)
 
         this.data = this.data || Buffer.alloc(p.ADDRESS_SIZE + p.PROVING_VALUES_SIZE + p.COMPRESSED_PUBLIC_KEY_LENGTH)
@@ -162,25 +160,14 @@ class Header {
         return { key, iv }
     }
 
-    static derivePRGParameters(secret, byteOffset = 0) {
+    static derivePRGParameters(secret) {
         if (!secret || !secp256k1.publicKeyVerify(secret))
             throw Error('General error.')
 
         const keyAndIV = hkdf(secret, prg.KEY_LENGTH + prg.IV_LENGTH, { salt: HASH_KEY_PRG })
 
         const key = keyAndIV.slice(0, prg.KEY_LENGTH)
-        const iv = {
-            iv: Buffer.concat(
-                [
-                    keyAndIV.slice(prg.KEY_LENGTH, prg.KEY_LENGTH + prg.IV_LENGTH),
-                    bufferADD(
-                        Buffer.alloc(4).fill(0),
-                        Math.floor(byteOffset / prg.BLOCK_LENGTH)
-                    )
-                ], prg.BLOCK_LENGTH
-            ),
-            byteOffset: byteOffset % prg.BLOCK_LENGTH
-        }
+        const iv = keyAndIV.slice(prg.KEY_LENGTH, prg.KEY_LENGTH + prg.IV_LENGTH)
 
         return { key, iv }
     }
@@ -238,4 +225,4 @@ class Header {
     }
 }
 
-module.exports = withIs(Header, { className: 'Header', symbolName: '@validitylabs/hopper/Header' })
+module.exports = Header

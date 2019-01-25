@@ -9,5 +9,5 @@ module.exports = (node, output) => {
     AcknowledgementHandler(node)
     ForwardMessageHandler(node, output)
     Crawling(node)
-    DeliverPubKey(node)
+    // DeliverPubKey(node)
 }

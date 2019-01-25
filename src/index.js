@@ -7,16 +7,13 @@ const KadDHT = require('libp2p-kad-dht')
 const SECIO = require('libp2p-secio')
 const defaultsDeep = require('@nodeutils/defaults-deep')
 
-const Keychain = require('libp2p-keychain')
-const FsStore = require('datastore-fs')
-
 const { createPacket } = require('./packet')
 const registerHandlers = require('./handlers')
 const c = require('./constants')
 const crawlNetwork = require('./crawlNetwork')
 const getPubKey = require('./getPubKey')
 const getPeerInfo = require('./getPeerInfo')
-const { randomSubset, serializePeerBook, deserializePeerBook, log, clearDirectory } = require('./utils')
+const { randomSubset, serializePeerBook, deserializePeerBook, log } = require('./utils')
 const PendingTransactions = require('./pendingTransactions')
 
 // const wrtc = require('wrtc')
@@ -29,10 +26,8 @@ const fs = require('fs')
 const levelup = require('levelup')
 const leveldown = require('leveldown')
 
-const PeerId = require('peer-id')
 const PeerInfo = require('peer-info')
 const PeerBook = require('peer-book')
-const Multiaddr = require('multiaddr')
 const { resolve } = require('path')
 
 
@@ -98,7 +93,13 @@ class Hopr extends libp2p {
         this.db = db
         this.seenTags = new Set()
         this.crawlNetwork = crawlNetwork(this)
-        this.getPubKey = getPubKey(this)
+
+        // Functionality to ask another node for its public key in case that the
+        // public key is not available which is not necessary anymore.
+        //
+        // Notice: don't forget to activate the corresponding handler in `handlers/index.js`
+        //
+        // this.getPubKey = getPubKey(this)
         this.pendingTransactions = new PendingTransactions(this.db)
     }
 

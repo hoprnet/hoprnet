@@ -1,17 +1,15 @@
 'use strict'
 
-const PeerId = require('peer-id')
-
 const Header = require('./header')
 const Transaction = require('../transaction')
 const Challenge = require('./challenge')
 const Message = require('./message')
 
-const { parallel, waterfall } = require('neo-async')
+const { waterfall } = require('neo-async')
 
 const { RELAY_FEE } = require('../constants')
-const { hash, bufferXOR, deepCopy, log, pubKeyToEthereumAddress, getId, bufferToNumber } = require('../utils')
-const { BN } = require('web3').utils
+const { hash, bufferXOR, deepCopy, log, pubKeyToEthereumAddress, getId, bufferToNumber, pubKeyToPeerId } = require('../utils')
+const { BN } = require('web3-utils')
 
 class Packet {
     constructor(header, transaction, challenge, message) {
@@ -66,7 +64,7 @@ class Packet {
     forwardTransform(node, cb) {
         this.header.deriveSecret(node.peerInfo.id.privKey.marshal())
 
-        let sender, receivedMoney, channelId
+        let sender, receivedMoney, channelId, nextPeerId
 
         waterfall([
             (cb) => this.hasTag(node.db, cb),
@@ -87,16 +85,21 @@ class Packet {
                         pubKeyToEthereumAddress(sender)
                     )
 
-                    node.pendingTransactions.addEncryptedTransaction(
-                        // channelId
-                        this.header.hashedKeyHalf,
-                        Header.deriveTransactionKey(this.header.derivedSecret),
-                        deepCopy(this.transaction, Transaction),
-                        this.getTargetPeerId()
-                    )
-
-                    node.paymentChannels.getChannel(channelId, cb)
+                    pubKeyToPeerId(this.header.address, cb)
                 }
+            },
+            (_nextPeerId, cb) => {
+                nextPeerId = _nextPeerId
+
+                node.pendingTransactions.addEncryptedTransaction(
+                    // channelId
+                    this.header.hashedKeyHalf,
+                    Header.deriveTransactionKey(this.header.derivedSecret),
+                    deepCopy(this.transaction, Transaction),
+                    nextPeerId
+                )
+
+                node.paymentChannels.getChannel(channelId, cb)
             },
             (record, cb) => {
                 if (typeof record === 'function') {
@@ -129,14 +132,14 @@ class Packet {
                 this.message.decrypt(this.header.derivedSecret)
 
 
-                if (this.header.address.equals(node.peerInfo.id.toBytes())) {
+                if (this.header.address.compare(node.peerInfo.id.pubKey.marshal()) === 0) {
                     cb(null, this)
                 } else {
                     this.challenge.updateChallenge(this.header.hashedKeyHalf, node.peerInfo.id)
                     this.header.transformForNextNode()
                     const forwardedFee = receivedMoney.isub(new BN(RELAY_FEE, 10))
 
-                    node.paymentChannels.transfer(forwardedFee, this.getTargetPeerId(), (err, tx) => {
+                    node.paymentChannels.transfer(forwardedFee, nextPeerId, (err, tx) => {
                         if (err)
                             cb(err)
 
@@ -147,11 +150,16 @@ class Packet {
                     })
                 }
             }
-        ], cb)
+        ], (err) => {
+            if (err)
+                throw err
+
+            cb(null, this)
+        })
     }
 
-    getTargetPeerId() {
-        return PeerId.createFromBytes(this.header.address)
+    getTargetPeerId(cb) {
+        pubKeyToPeerId(this.header.address, cb)
     }
 
     toBuffer() {
@@ -171,7 +179,7 @@ class Packet {
         db.get(key, (err) => {
             if (err && !err.notFound) {
                 cb(err)
-            } else if(err.notFound) {
+            } else if (err.notFound) {
                 db.put(key, '', (err) => cb(err, false))
             } else {
                 cb(null, err.notFound)

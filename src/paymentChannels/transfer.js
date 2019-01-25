@@ -1,8 +1,7 @@
 'use strict'
 
 const { waterfall } = require('neo-async')
-const PeerInfo = require('peer-info')
-const { BN } = require('web3').utils
+const { BN } = require('web3-utils')
 
 const { isPartyA, getId, pubKeyToEthereumAddress, bufferToNumber, numberToBuffer, deepCopy } = require('../utils')
 
@@ -11,11 +10,7 @@ const Transaction = require('../transaction')
 module.exports = (self) => (amount, to, cb) => {
     let channelId
     waterfall([
-        (cb) => PeerInfo.create(to, cb),
-        (toPeerInfo, cb) => self.node.getPubKey(toPeerInfo, cb),
-        (toPeerInfo, cb) => {
-            to = toPeerInfo.id
-
+        (cb) => {
             channelId = getId(
                 pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal()),
                 pubKeyToEthereumAddress(to.pubKey.marshal()))

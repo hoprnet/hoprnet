@@ -1,35 +1,21 @@
 'use strict'
 
 const crypto = require('crypto')
+const { numberToBuffer } = require('../utils')
 
 const BLOCK_LENGTH = 16
 const KEY_LENGTH = BLOCK_LENGTH
 const IV_LENGTH = 12
+const COUNTER_LENGTH = 4
 
 const PRG_ALGORITHM = 'aes-128-ctr'
 
 class PRG {
-    constructor(key, iv, byteOffset) {
+    constructor(key, iv) {
         this.key = key
         this.iv = iv
-        this.byteOffset = byteOffset
 
         this.initialised = true
-    }
-
-    digest(size) {
-        if (!this.initialised)
-            throw Error('Uninitialised module.')
-
-        if (size <= 0)
-            throw Error('Expected a size strictly greater than 0. Got ' + size)
-
-        return crypto
-            .createCipheriv(PRG_ALGORITHM, this.key, this.iv)
-            .update(
-                Buffer.alloc(size).fill(0)
-            )
-            .slice(this.byteOffset || 0, size)
     }
 
     static get IV_LENGTH() {
@@ -40,24 +26,34 @@ class PRG {
         return KEY_LENGTH
     }
 
-    static get BLOCK_LENGTH() {
-        return BLOCK_LENGTH
+    static createPRG(key, iv) {
+        if (!Buffer.isBuffer(key) || !Buffer.isBuffer(iv))
+            throw Error(`Invalid input parameters. Got (${typeof key},${typeof iv}) instead of (Buffer, Buffer).`)
+
+        if (key.length != KEY_LENGTH || iv.length != IV_LENGTH)
+            throw Error(`Invalid input parameters. Expected a key of ${KEY_LENGTH} bytes and an initialization vector of ${IV_LENGTH} bytes.`)
+
+        return new PRG(key, iv)
     }
 
-    static createPRG(key, iv) {
-        if (!Buffer.isBuffer(key) || key.length != KEY_LENGTH)
-            throw Error('Invalid key. Expected a Buffer of size ' + KEY_LENGTH + '.')
+    digest(start, end) {
+        if (!this.initialised)
+            throw Error('Module not initialized. Please do that first.')
 
-        if (!iv.hasOwnProperty('iv'))
-            throw Error('Missing initialisation vector.')
+        const firstBlock = Math.floor(start / BLOCK_LENGTH)
+        const startOffset = start % BLOCK_LENGTH
 
-        if (!Buffer.isBuffer(iv.iv) || (iv.iv.length != IV_LENGTH && iv.iv.length != BLOCK_LENGTH))
-            throw Error('Invalid initialisation vector. Expected a Buffer of size ' + IV_LENGTH + '.')
+        const lastBlock = Math.ceil(end / BLOCK_LENGTH)
+        const lastBlockSize = end % BLOCK_LENGTH
 
-        if (iv.iv.length === IV_LENGTH)
-            iv.iv = Buffer.concat([iv, Buffer.alloc(BLOCK_LENGTH - IV_LENGTH).fill(0)], BLOCK_LENGTH)
+        const amountOfBlocks = lastBlock - firstBlock
 
-        return new PRG(key, iv.iv, iv.byteOffset)
+        const iv = Buffer.concat([this.iv, numberToBuffer(firstBlock, COUNTER_LENGTH)], IV_LENGTH + COUNTER_LENGTH)
+
+        return crypto
+            .createCipheriv(PRG_ALGORITHM, this.key, iv)
+            .update(Buffer.alloc(amountOfBlocks * BLOCK_LENGTH, 0))
+            .slice(startOffset, amountOfBlocks * BLOCK_LENGTH - (lastBlockSize > 0 ? BLOCK_LENGTH - lastBlockSize : 0))
     }
 }
 
