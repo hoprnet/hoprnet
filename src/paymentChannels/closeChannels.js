@@ -19,15 +19,19 @@ module.exports = (self) => (cb) => pull(
         const channelId = data.key.slice(17)
         const { tx, restoreTx, index } = data.value
 
-        if (index.compare(tx.index) === 1) { // index > tx.index ?
-            waterfall([
-                (cb) => pubKeyToPeerId(restoreTx.counterparty, cb),
-                (peerId, cb) => self.node.peerRouting.findPeer(peerId, cb),
-            ], (err, peerInfo) => {
-                if (err)
-                    throw err
+        self.contract.methods.channels(channelId).call((err, channel) => {
+            // check whether the channel exists
+            if (channel.state === 0) {
+                log(self.node.peerInfo.id, `Found orphaned payment channel ${channelId.toString('hex')} inside database. Was the node shut down inappropriately?`)
+                return self.deleteChannel(channelId, cb)
+            }
 
-                self.node.dialProtocol(peerInfo, c.PROTOCOL_SETTLE_CHANNEL, (err, conn) => {
+            if (index.compare(tx.index) === 1) { // index > tx.index ?
+                waterfall([
+                    (cb) => pubKeyToPeerId(restoreTx.counterparty, cb),
+                    (peerId, cb) => self.node.peerRouting.findPeer(peerId, cb),
+                    (peerInfo, cb) => self.node.dialProtocol(peerInfo, c.PROTOCOL_SETTLE_CHANNEL, cb),
+                ], (err, conn) => {
                     if (err)
                         throw err
 
@@ -55,18 +59,20 @@ module.exports = (self) => (cb) => pull(
                         conn
                     )
                 })
+            } else {
+                self.requestClose(channelId)
+            }
+
+            self.on(`closed ${channelId.toString('base64')}`, (receivedMoney) => {
+                // Callback just when the channel is settled, i.e. the closing listener
+                // emits the 'closed <channelId>' event.
+    
+                cb(null, receivedMoney)
             })
-        } else {
-            self.requestClose(channelId)
-        }
-
-        self.on(`closed ${channelId.toString('base64')}`, (receivedMoney) => {
-            // Callback just when the channel is settled, i.e. the closing listener
-            // emits the 'closed <channelId>' event.
-
-            cb(null, receivedMoney)
         })
     }),
+    // filter orphaned payment channels
+    pull.filter(data => data)
     pull.collect((err, values) => {
         if (err)
             throw err
