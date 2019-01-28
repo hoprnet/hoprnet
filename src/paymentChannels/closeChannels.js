@@ -72,7 +72,7 @@ module.exports = (self) => (cb) => pull(
         })
     }),
     // filter orphaned payment channels
-    pull.filter(data => data)
+    pull.filter(data => data),
     pull.collect((err, values) => {
         if (err)
             throw err
