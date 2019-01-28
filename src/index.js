@@ -11,6 +11,7 @@ const { createPacket } = require('./packet')
 const registerHandlers = require('./handlers')
 const c = require('./constants')
 const crawlNetwork = require('./crawlNetwork')
+const heartbeat = require('./heartbeat')
 const getPubKey = require('./getPubKey')
 const getPeerInfo = require('./getPeerInfo')
 const { randomSubset, serializePeerBook, deserializePeerBook, log } = require('./utils')
@@ -35,7 +36,7 @@ const PaymentChannels = require('./paymentChannels')
 
 const pull = require('pull-stream')
 const lp = require('pull-length-prefixed')
-const { waterfall, times, parallel, map } = require('neo-async')
+const { waterfall, times, parallel } = require('neo-async')
 
 // const BOOTSTRAP_NODE = Multiaddr('/ip4/127.0.0.1/tcp/9090/')
 
@@ -100,6 +101,7 @@ class Hopr extends libp2p {
         // Notice: don't forget to activate the corresponding handler in `handlers/index.js`
         //
         // this.getPubKey = getPubKey(this)
+
         this.pendingTransactions = new PendingTransactions(this.db)
     }
 
@@ -201,6 +203,7 @@ class Hopr extends libp2p {
                 registerHandlers(this, options.output)
 
                 this.paymentChannels = results.paymentChannels
+                this.heartbeat = heartbeat(this)
 
                 cb(null, this)
             }
@@ -213,6 +216,9 @@ class Hopr extends libp2p {
      */
     stop(cb = () => { }) {
         log(this.peerInfo.id, `Shutting down...`)
+
+        clearInterval(this.heartbeat)
+
         waterfall([
             (cb) => this.exportPeerBook(cb),
             (cb) => super.stop(cb),
