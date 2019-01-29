@@ -8,7 +8,7 @@ const toPull = require('stream-to-pull-stream')
 const pull = require('pull-stream')
 
 const { CONTRACT_ADDRESS } = require('../constants')
-const Web3 = require('web3-eth')
+const Web3 = require('web3')
 const { parallel } = require('neo-async')
 const { resolve } = require('path')
 
@@ -49,10 +49,10 @@ class PaymentChannel extends EventEmitter {
      * @param {Function} cb a function the is called with `(err, this)` afterwards
      */
     static create(options, cb) {
-        const web3 = new Web3.Eth(options.provider || 'ws://localhost:8545')
+        const web3 = new Web3(options.provider || 'ws://localhost:8545')
 
         parallel({
-            nonce: (cb) => web3.getTransactionCount(pubKeyToEthereumAddress(options.node.peerInfo.id.pubKey.marshal()), cb),
+            nonce: (cb) => web3.eth.getTransactionCount(pubKeyToEthereumAddress(options.node.peerInfo.id.pubKey.marshal()), cb),
             compiledContract: (cb) => compileIfNecessary([resolve(__dirname, '../../contracts/HoprChannel.sol')], [resolve(__dirname, '../../build/contracts/HoprChannel.json')], cb)
         }, (err, results) => {
             if (err)
@@ -65,7 +65,7 @@ class PaymentChannel extends EventEmitter {
             cb(null, new PaymentChannel({
                 node: options.node,
                 nonce: results.nonce,
-                contract: new web3.Contract(abi, options.contractAddress || CONTRACT_ADDRESS),
+                contract: new web3.eth.Contract(abi, options.contractAddress || CONTRACT_ADDRESS),
                 web3: web3
             }))
 

@@ -46,7 +46,7 @@ module.exports = (self) => (err, event) => {
                 from: pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal())
             }, cb),
             (channel, cb) => {
-                const subscription = self.web3.subscribe('newBlockHeaders')
+                const subscription = self.web3.eth.subscribe('newBlockHeaders')
                     .on('data', (block) => {
                         log(self.node.peerInfo.id, `Waiting ... Block ${block.number}.`)
 

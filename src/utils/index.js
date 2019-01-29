@@ -392,7 +392,7 @@ const { GAS_PRICE } = require('../constants')
  * @param {Object} web3 a web3.js instance
  */
 module.exports.peerIdToWeb3Account = (peerId, web3) =>
-    web3.accounts.privateKeyToAccount('0x'.concat(peerId.privKey.marshal().toString('hex')))
+    web3.eth.accounts.privateKeyToAccount('0x'.concat(peerId.privKey.marshal().toString('hex')))
 
 /**
  * Signs a transaction with the private key that is given by 
@@ -409,7 +409,7 @@ module.exports.sendTransaction = async (tx, peerId, web3, cb = () => { }) => {
         gasPrice: GAS_PRICE
     }))
 
-    web3.sendSignedTransaction(signedTx.rawTransaction)
+    web3.eth.sendSignedTransaction(signedTx.rawTransaction)
         .on('error', cb)
         .on('receipt', (receipt) => {
             if (!receipt.status)

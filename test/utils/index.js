@@ -27,7 +27,7 @@ const { createNode } = require('../../src')
 const { pubKeyToEthereumAddress, sendTransaction } = require('../../src/utils')
 const { GAS_PRICE, STAKE_GAS_AMOUNT } = require('../../src/constants')
 const { toWei } = require('web3-utils')
-const Web3 = require('web3-eth')
+const Web3 = require('web3')
 
 /**
  * Create HOPR nodes, establish a connection between them and fund their corresponding

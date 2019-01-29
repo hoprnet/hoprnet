@@ -18,17 +18,7 @@ const AMOUNT_OF_MESSAGES = 4
 
 let index, compiledContract
 
-const server = Ganache.server({
-    accounts: [
-        {
-            balance: '0xd3c21bcecceda0000000',
-            secretKey: FUNDING_KEY
-        }
-    ]
-})
-server.listen(8545, 'localhost')
-
-const Web3 = require('web3-eth')
+const Web3 = require('web3')
 let provider
 if (NET === 'ropsten') {
     provider = ROPSTEN_WSS_URL
@@ -41,9 +31,9 @@ if (NET === 'ropsten') {
             }
         ]
     })
-    server.listen()
+    server.listen(8546, 'localhost')
 
-    provider = `ws://localhost:${server.address().port}`
+    provider = `ws://localhost:8545`
 }
 
 const fundingPeer = privKeyToPeerId(FUNDING_KEY)
@@ -67,7 +57,7 @@ const lp = require('pull-length-prefixed')
 // )
 
 waterfall([
-    (cb) => (new Web3.Eth('ws://localhost:8545')).getTransactionCount(FUNDING_ACCOUNT, cb),
+    (cb) => (new Web3('ws://localhost:8545')).eth.getTransactionCount(FUNDING_ACCOUNT, cb),
     (_index, cb) => {
         index = _index
 
@@ -83,7 +73,7 @@ waterfall([
                 gasPrice: GAS_PRICE,
                 nonce: index,
                 data: compiledContract.bytecode
-            }, fundingPeer, new Web3.Eth(provider), (err, receipt) => {
+            }, fundingPeer, new Web3(provider), (err, receipt) => {
                 if (err)
                     throw err
 
