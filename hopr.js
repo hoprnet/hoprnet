@@ -24,10 +24,9 @@ if (options['bootstrap-node']) {
         options['bootstrap-node'] = DEFAULT_BOOTSTRAP_ADDRESS
     }
     console.log(`... running as bootstrap node at ${options['bootstrap-node']}.`)
-    config.addrs = [options['bootstrap-node']]
 }
 
-config.provider = 'ws://localhost:8545'
+config.provider = 'ws://hopr.validity.io:8545'
 if (Array.isArray(options._) && options._.length > 0) {
     config.id = `temp ${options._[0]}`
 }

@@ -61,8 +61,6 @@ module.exports = (options, db, cb) => {
             // TCP
             options.addrs.push(Multiaddr('/ip4/0.0.0.0/tcp/0'))
 
-
-
             // WebRTC
             if (options.signallingServer) {
                 options.addrs.push(

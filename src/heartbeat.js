@@ -33,4 +33,4 @@ module.exports = (node) =>
                 node.peerBook.remove(peer)
             }
         }))
-    }, 30 * 1000)
+    }, 60 * 1000)

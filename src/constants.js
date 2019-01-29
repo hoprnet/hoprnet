@@ -15,6 +15,8 @@ module.exports.PROTOCOL_PAYMENT_CHANNEL = '/'.concat(this.PROTOCOL_NAME.toLowerC
 module.exports.PROTOCOL_DELIVER_PUBKEY = '/'.concat(this.PROTOCOL_NAME.toLowerCase()).concat('/pubKey').concat(this.PROTOCOL_VERSION)
 module.exports.PROTOCOL_SETTLE_CHANNEL = '/'.concat(this.PROTOCOL_NAME.toLowerCase()).concat('/settleChannel').concat(this.PROTOCOL_VERSION)
 
+module.exports.PROTOCOL_HEARTBEAT = '/'.concat(this.PROTOCOL_NAME.toLowerCase()).concat('/heartbeat').concat(this.PROTOCOL_VERSION)
+
 module.exports.MARSHALLED_PUBLIC_KEY_SIZE = 37
 
 module.exports.CRAWLING_RESPONSE_NODES = 10

@@ -55,20 +55,20 @@ class PaymentChannel extends EventEmitter {
             nonce: (cb) => web3.getTransactionCount(pubKeyToEthereumAddress(options.node.peerInfo.id.pubKey.marshal()), cb),
             compiledContract: (cb) => compileIfNecessary([resolve(__dirname, '../../contracts/HoprChannel.sol')], [resolve(__dirname, '../../build/contracts/HoprChannel.json')], cb)
         }, (err, results) => {
-            if (err) {
-                cb(err)
-            } else {
-                registerHandlers(options.node)
+            if (err)
+                return cb(err)
 
-                const abi = require('../../build/contracts/HoprChannel.json').abi
+            registerHandlers(options.node)
 
-                cb(null, new PaymentChannel({
-                    node: options.node,
-                    nonce: results.nonce,
-                    contract: new web3.Contract(abi, options.contractAddress || CONTRACT_ADDRESS),
-                    web3: web3
-                }))
-            }
+            const abi = require('../../build/contracts/HoprChannel.json').abi
+
+            cb(null, new PaymentChannel({
+                node: options.node,
+                nonce: results.nonce,
+                contract: new web3.Contract(abi, options.contractAddress || CONTRACT_ADDRESS),
+                web3: web3
+            }))
+
         })
     }
 
