@@ -18,12 +18,22 @@ const AMOUNT_OF_MESSAGES = 4
 
 let index, compiledContract
 
+const server = Ganache.server({
+    accounts: [
+        {
+            balance: '0xd3c21bcecceda0000000',
+            secretKey: FUNDING_KEY
+        }
+    ]
+})
+server.listen(8545, 'localhost')
+
 const Web3 = require('web3-eth')
 let provider
 if (NET === 'ropsten') {
     provider = ROPSTEN_WSS_URL
 } else if (NET === 'ganache') {
-    provider = Ganache.provider({
+    const server = Ganache.server({
         accounts: [
             {
                 balance: '0xd3c21bcecceda0000000',
@@ -31,6 +41,9 @@ if (NET === 'ropsten') {
             }
         ]
     })
+    server.listen()
+
+    provider = `ws://localhost:${server.address().port}`
 }
 
 const fundingPeer = privKeyToPeerId(FUNDING_KEY)
@@ -41,8 +54,20 @@ console.log(
     '\x1b[2mThis may take some time ...\n' +
     'Meanwhile you can start reading the wiki at https://github.com/validitylabs/messagingProtocol/wiki\x1b[0m\n')
 
+const pull = require('pull-stream')
+const lp = require('pull-length-prefixed')
+
+// pull(
+//     pull.values([]),
+//     lp.encode(),
+//     lp.decode(),
+//     pull.collect((err, data) => {
+//         console.log(err, data)
+//     })
+// )
+
 waterfall([
-    (cb) => (new Web3(provider)).getTransactionCount(FUNDING_ACCOUNT, cb),
+    (cb) => (new Web3.Eth('ws://localhost:8545')).getTransactionCount(FUNDING_ACCOUNT, cb),
     (_index, cb) => {
         index = _index
 
@@ -58,7 +83,7 @@ waterfall([
                 gasPrice: GAS_PRICE,
                 nonce: index,
                 data: compiledContract.bytecode
-            }, fundingPeer, new Web3(provider), (err, receipt) => {
+            }, fundingPeer, new Web3.Eth(provider), (err, receipt) => {
                 if (err)
                     throw err
 

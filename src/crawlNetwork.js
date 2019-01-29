@@ -25,13 +25,15 @@ module.exports = (node) =>
 
         doWhilst(
             (cbWhilst) => {
-                if (nodes.size === 0)
-                    throw Error('Unable to find enough other nodes in the network.')
+                if (nodes.length === 0)
+                    //console.log('Error')
+                    return cb(Error('Unable to find enough other nodes in the network.'))
 
+                console.log(`Crawling ... ${nodes.length}`)
                 selected = randomSubset(nodes, Math.min(nodes.length, MAX_HOPS))
                 nodes = remove(nodes, selected)
 
-                map(selected, (currentNode, cb) => waterfall([
+                map(selected.slice(0, 1), (currentNode, cb) => waterfall([
                     (cb) => {
                         currentPeerInfo = node.peerBook.get(currentNode)
                         if (currentPeerInfo.multiaddrs.size === 0) {
@@ -43,6 +45,7 @@ module.exports = (node) =>
                     (peerInfo, cb) => node.dialProtocol(peerInfo, PROTOCOL_CRAWLING, cb),
                     (conn, cb) => pull(
                         conn,
+                        pull.filter(data => data),
                         lp.decode(),
                         pull.filter(data =>
                             data.length > 0 &&
@@ -59,9 +62,10 @@ module.exports = (node) =>
                         ),
                         pull.collect(cb))
                 ], cb), (err, newNodes) => {
-                    if (err) { throw err }
+                    if (err)
+                        return cbWhilst(err)
 
-                    newNodes = uniqWith(flatten(newNodes), (a, b) => 
+                    newNodes = uniqWith(flatten(newNodes), (a, b) =>
                         a.id.toBytes().compare(b.id.toBytes())
                     )
 
@@ -73,7 +77,7 @@ module.exports = (node) =>
                     log(node.peerInfo.id, `Received ${newNodes.length} new node${newNodes.length === 1 ? '' : 's'}.`)
                     log(node.peerInfo.id, `Now holding peer information of ${node.peerBook.getAllArray().length} node${node.peerBook.getAllArray().length === 1 ? '' : 's'} in the network.`)
 
-                    cbWhilst()
+                    return cbWhilst()
                 })
             }, () => node.peerBook.getAllArray().filter(comparator).length < MAX_HOPS - 1, cb)
     }

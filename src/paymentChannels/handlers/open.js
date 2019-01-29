@@ -8,7 +8,7 @@ const lp = require('pull-length-prefixed')
 const { sign } = require('secp256k1')
 const { deepCopy, pubKeyToEthereumAddress, numberToBuffer, bufferToNumber, pubKeyToPeerId, log } = require('../../utils')
 const { waterfall } = require('neo-async')
-const { BN } = require('web3').utils
+const { BN } = require('web3-utils')
 
 const { SIGNATURE_LENGTH } = require('../../transaction')
 
