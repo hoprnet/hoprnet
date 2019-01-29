@@ -92,7 +92,6 @@ class Hopr extends libp2p {
         super(defaultsDeep(_options, defaults))
 
         this.db = db
-        this.seenTags = new Set()
         this.crawlNetwork = crawlNetwork(this)
 
         // Functionality to ask another node for its public key in case that the
@@ -101,6 +100,7 @@ class Hopr extends libp2p {
         // Notice: don't forget to activate the corresponding handler in `handlers/index.js`
         //
         // this.getPubKey = getPubKey(this)
+        // this.getPubKey = this._dht.getPublicKey
 
         this.pendingTransactions = new PendingTransactions(this.db)
     }
@@ -125,48 +125,24 @@ class Hopr extends libp2p {
 
         let db_dir = resolve(__dirname, '../db')
         waterfall([
-            (cb) => fs.access(db_dir, (err) => {
-                if (err && !err.code === 'ENOENT' && !err.code === 'EEXIST') {
-                    throw er
-                } else if (err && err.code === 'ENOENT') {
-                    try {
-                        fs.mkdirSync(db_dir, {
-                            mode: 0o777
-                        })
-                    } catch (err) {
-
-                    }
-
-                }
-
-                if (options.id) {
-                    // Only for unit testing !!!
-                    db_dir = resolve(db_dir, `./${options.id}`)
-                    delete options.id
-                    fs.access(db_dir, (err) => {
-                        if (err && !err.code === 'ENOENT') {
-                            throw err
-                        } else if (err && err.code === 'ENOENT') {
-                            fs.mkdirSync(db_dir, {
-                                mode: 0o777
-                            })
-                        }
-                        // else {
-                        //     clearDirectory(db_dir)
-                        //     fs.mkdirSync(db_dir, {
-                        //         mode: 0o777
-                        //     })
-                        // }
-                        levelup(leveldown(db_dir), cb)
-                    })
-                    // --------------------------
-                } else {
-                    levelup(leveldown(db_dir), cb)
-                }
-            }),
+            (cb) => options.id ? Hopr.openDatabase(db_dir, { id: options.id }, cb) : Hopr.openDatabase(db_dir, cb),
             (db, cb) => parallel({
-                peerBook: (cb) => Hopr.importPeerBook(db, cb),
-                peerInfo: (cb) => PeerInfo.isPeerInfo(options.peerInfo) ? cb(null, options.peerInfo) : getPeerInfo(db, cb)
+                peerBook: (cb) => {
+                    if (options.peerBook) {
+                        cb(null, options.peerBook)
+                    } else {
+                        Hopr.importPeerBook(db, cb)
+                    }
+                },
+                peerInfo: (cb) => {
+                    if (PeerInfo.isPeerInfo(options.peerInfo)) {
+                        cb(null, options.peerInfo)
+                    } else if (options.addrs) {
+                        getPeerInfo({ addrs: options.addrs }, db, cb)
+                    } else {
+                        getPeerInfo(db, cb)
+                    }
+                }
             }, (err, { peerBook, peerInfo }) => {
                 if (err)
                     cb(err)
@@ -191,22 +167,19 @@ class Hopr extends libp2p {
     start(options, cb) {
         parallel({
             node: (cb) => super.start(cb),
-            paymentChannels: (cb) => PaymentChannels.create({
-                node: this,
-                provider: options.provider,
-                contractAddress: options.contractAddress
-            }, cb)
+            paymentChannels: (cb) => PaymentChannels.create(Object.assign({
+                node: this
+            }, options), cb)
         }, (err, results) => {
-            if (err) {
-                cb(err)
-            } else {
-                registerHandlers(this, options.output)
+            if (err)
+                return cb(err)
 
-                this.paymentChannels = results.paymentChannels
-                this.heartbeat = heartbeat(this)
+            registerHandlers(this, options.output)
 
-                cb(null, this)
-            }
+            this.paymentChannels = results.paymentChannels
+            this.heartbeat = heartbeat(this)
+
+            return cb(null, this)
         })
     }
 
@@ -295,10 +268,12 @@ class Hopr extends libp2p {
             this.peerInfo.id.id.compare(peerInfo.id.id) !== 0 &&
             destination.id.compare(peerInfo.id.id) !== 0
 
-        this.crawlNetwork(() => {
-            cb(null, randomSubset(
-                this.peerBook.getAllArray(), c.MAX_HOPS - 1, comparator))
-        }, comparator)
+        return this.crawlNetwork(() => {
+            const path = randomSubset(
+                this.peerBook.getAllArray(), c.MAX_HOPS - 1, comparator)
+
+            return cb(null, path)
+        })
     }
 
     static importPeerBook(db, cb) {
@@ -328,6 +303,54 @@ class Hopr extends libp2p {
         const key = 'peer-book'
 
         this.db.put(key, serializePeerBook(this.peerBook), cb)
+    }
+
+    static openDatabase(db_dir, options, cb) {
+        if (typeof options === 'function') {
+            cb = options
+            options = {}
+        }
+
+        fs.access(db_dir, (err) => {
+            if (err && !err.code === 'ENOENT' && !err.code === 'EEXIST') {
+                throw er
+            } else if (err && err.code === 'ENOENT') {
+                try {
+                    fs.mkdirSync(db_dir, {
+                        mode: 0o777
+                    })
+                } catch (err) {
+
+                }
+
+            }
+
+            if (options.id) {
+                // Only for unit testing !!!
+                db_dir = resolve(db_dir, `./${options.id}`)
+                delete options.id
+                fs.access(db_dir, (err) => {
+                    if (err && !err.code === 'ENOENT') {
+                        throw err
+                    } else if (err && err.code === 'ENOENT') {
+                        fs.mkdirSync(db_dir, {
+                            mode: 0o777
+                        })
+                    }
+                    // else {
+                    //     clearDirectory(db_dir)
+                    //     fs.mkdirSync(db_dir, {
+                    //         mode: 0o777
+                    //     })
+                    // }
+                    levelup(leveldown(db_dir), cb)
+                })
+                // --------------------------
+            } else {
+                levelup(leveldown(db_dir), cb)
+            }
+
+        })
     }
 }
 

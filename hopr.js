@@ -4,8 +4,8 @@ const { waterfall, forever } = require('async')
 const { createNode } = require('./src')
 const read = require('read')
 const getopts = require('getopts')
-const { NET, FUNDING_KEY } = require('./src/constants')
 const Multiaddr = require('multiaddr')
+const { pubKeyToEthereumAddress } = require('./src/utils')
 
 const options = getopts(process.argv.slice(2), {
     alias: {
@@ -13,34 +13,28 @@ const options = getopts(process.argv.slice(2), {
     }
 })
 
-const bootStrap = "/dns4/hopr.validity.io/tcp/9090"
+const DEFAULT_BOOTSTRAP_ADDRESS = "/dns4/hopr.validity.io/tcp/9090"
 
 console.log('Welcome to \x1b[1m\x1b[5mHOPR\x1b[0m!\n')
+
+const config = {}
+
 if (options['bootstrap-node']) {
-    console.log('... running as bootstrap node')
+    if (typeof options['bootstrap-node'] === 'boolean') {
+        options['bootstrap-node'] = DEFAULT_BOOTSTRAP_ADDRESS
+    }
+    console.log(`... running as bootstrap node at ${options['bootstrap-node']}.`)
+    config.addrs = [options['bootstrap-node']]
 }
 
-const Ganache = require('ganache-core')
-const Web3 = require('web3-eth')
-let provider
-if (NET === 'ropsten') {
-    provider = ROPSTEN_WSS_URL
-} else if (NET === 'ganache') {
-    provider = Ganache.provider({
-        accounts: [
-            {
-                balance: '0xd3c21bcecceda0000000',
-                secretKey: FUNDING_KEY
-            }
-        ]
-    })
+config.provider = 'ws://localhost:8545'
+if (Array.isArray(options._) && options._.length > 0) {
+    config.id = `temp ${options._[0]}`
 }
+
 let node, connected
 waterfall([
-    (cb) => createNode({
-        provider: provider,
-        id: `temp ${options._[0]}`
-    }, cb),
+    (cb) => createNode(config, cb),
     (_node, cb) => {
         node = _node
         node.once('peer:connect', (peer) => {
@@ -48,11 +42,12 @@ waterfall([
             connected = true
         })
         console.log(`\nAvailable under the following addresses:\n ${node.peerInfo.multiaddrs.toArray().join('\n ')}\n`)
+        console.log(`Own Ethereum address:\n ${pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal())}`)
         connectToBootstrapNode(cb)
     },
-    (cb) => {
-        sendMessages(node, cb)
-    }
+    (cb) => crawlNetwork(node, cb),
+    (cb) => sendMessages(node, cb)
+
 ], (err) => {
     if (err)
         throw err
@@ -96,7 +91,7 @@ function connectToBootstrapNode(cb) {
         console.log(`Please type in the Multiaddr of the node you want to connect to.`)
         read({
             edit: true
-        }, (err, result, isDefault) => {
+        }, (err, result) => {
             if (err)
                 process.exit(0)
 
@@ -120,7 +115,7 @@ function connectToBootstrapNode(cb) {
                 cb(true)
             }
         })
-    }, (addr) => cb(null))
+    }, () => cb())
 }
 
 function sendMessages(node, cb) {
@@ -130,49 +125,35 @@ function sendMessages(node, cb) {
             console.log('Type in your message')
             read({
                 edit: true
-            }, (err, result, isDefault) => {
+            }, (err, result) => {
                 if (err)
                     process.exit(0)
                 //node.sendMessage()
 
                 console.log(`Sending "${result}" to \x1b[34m${destination.id.toB58String()}\x1b[0m.\n`)
-                cb(null)
+                cb()
             })
         }
     ], cb))
 }
 
-// waterfall([
-//     (cb) => createNode((err, node) => {
-//         if (err) { cb(err) }
+function crawlNetwork(node, cb) {
+    forever((cb) => {
+        console.log('Crawl network. Enter Y to crawl network, and N to proceed')
+        read({}, (err, result) => {
+            if (err)
+                process.exit(0)
 
-//         // TODO
-//         if (process.argv.length == 3) {
-//             node.dial(process.argv[2], (err, conn) => cb(err, node))
-//         } else {
-//             console.log(renderString(node))
-//             cb(err, node)
-//         }
-//     }, console.log)
-// ], (err, node) => {
-//     if (err) { throw err }
+            if (result.toLowerCase() === 'y') {
+                node.crawlNetwork((err) => {
+                    if (err)
+                        console.log(err.message)
 
-//     process.stdin.on('data', function (chunk) {
-//         chunk = chunk.toString()
-
-//         const chunks = chunk.split(' ')
-//         console.log('Sending \"' + chunks[0] + '\" to ' + chunks[1])
-
-//         node.sendMessage(chunks[0], PeerId.createFromB58String(chunks[1].trim()))
-//     });
-// })
-
-// function renderString(node) {
-//     let str = 'Started node ' + node.peerInfo.id.toB58String() + ' on IP address/port\n'
-
-//     node.peerInfo.multiaddrs.forEach(addr => {
-//         str = str.concat('Run \'node test_cli.js ').concat(addr.toString()).concat('\' to connect.\n')
-//     })
-
-//     return str
-// }
+                    return cb()
+                })
+            } else {
+                return cb(true)
+            }
+        })
+    }, (err) => cb())
+}

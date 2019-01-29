@@ -27,6 +27,8 @@ module.exports = (options, db, cb) => {
         signallingServer: null // BOOTSTRAP_NODE
     })
 
+    options.addrs = options.addrs.map(addr => Multiaddr(addr))
+
     waterfall([
         (cb) => db.get('key-pair', (err, serializedKeyPair) => {
             if (err && !err.notFound) {
@@ -58,6 +60,8 @@ module.exports = (options, db, cb) => {
         (peerInfo, cb) => {
             // TCP
             options.addrs.push(Multiaddr('/ip4/0.0.0.0/tcp/0'))
+
+
 
             // WebRTC
             if (options.signallingServer) {

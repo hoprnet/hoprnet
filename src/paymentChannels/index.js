@@ -45,11 +45,11 @@ class PaymentChannel extends EventEmitter {
      * and compiles the contract if that isn't the case.
      * 
      * @param {Object} options.node a libp2p node instance
-     * @param {Object} options.provider a web3.js provider instance, otherwise if will use `http://localhost:8545`
+     * @param {Object} options.provider a web3.js provider instance, otherwise if will use `ws://localhost:8545`
      * @param {Function} cb a function the is called with `(err, this)` afterwards
      */
     static create(options, cb) {
-        const web3 = new Web3(options.provider || 'http://localhost:8545')
+        const web3 = new Web3.Eth(options.provider || 'ws://localhost:8545')
 
         parallel({
             nonce: (cb) => web3.getTransactionCount(pubKeyToEthereumAddress(options.node.peerInfo.id.pubKey.marshal()), cb),
@@ -150,7 +150,7 @@ class PaymentChannel extends EventEmitter {
         this.node.db.get(key, (err, record) => {
             if (err) {
                 if (err.notFound) {
-                    cb(null)
+                    cb()
                 } else {
                     cb(err)
                 }
