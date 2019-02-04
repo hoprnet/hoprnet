@@ -3,13 +3,13 @@
 const { waterfall } = require('neo-async')
 const { isPartyA, pubKeyToEthereumAddress, mineBlock, log } = require('../../utils')
 const { NET } = require('../../constants')
-const { BN } = require('web3-utils')
+const BN = require('bn.js')
 
 module.exports = (self) => (err, event) => {
     if (err)
         throw err
 
-    const channelId = Buffer.from(event.returnValues.channelId.slice(2), 'hex')
+    const channelId = Buffer.from(event.raw.topics[0].slice(2), 'hex')
 
     self.getChannel(channelId, (err, record) => {
         if (err)
@@ -44,7 +44,7 @@ module.exports = (self) => (err, event) => {
             },
             (cb) => self.contract.methods.channels(channelId).call({
                 from: pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal())
-            }, cb),
+            }, 'latest', cb),
             (channel, cb) => {
                 const subscription = self.web3.eth.subscribe('newBlockHeaders')
                     .on('data', (block) => {
@@ -64,7 +64,7 @@ module.exports = (self) => (err, event) => {
 
                 if (NET === 'ganache') {
                     // ================ Only for testing ================
-                    mineBlock(self.contract.currentProvider, )
+                    mineBlock(self.contract.currentProvider)
                     // ==================================================
                 }
 

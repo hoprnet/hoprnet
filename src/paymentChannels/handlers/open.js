@@ -8,7 +8,7 @@ const lp = require('pull-length-prefixed')
 const { sign } = require('secp256k1')
 const { deepCopy, pubKeyToEthereumAddress, numberToBuffer, bufferToNumber, pubKeyToPeerId, log } = require('../../utils')
 const { waterfall } = require('neo-async')
-const { BN } = require('web3-utils')
+const BN = require('bn.js')
 
 const { SIGNATURE_LENGTH } = require('../../transaction')
 
@@ -47,7 +47,9 @@ module.exports = (node) => node.handle(PROTOCOL_PAYMENT_CHANNEL, (protocol, conn
             },
             // Check whether the counterparty has staked enough money to open
             // the payment channel
-            (cb) => node.paymentChannels.contract.methods.states(pubKeyToEthereumAddress(counterparty)).call(cb),
+            (cb) => node.paymentChannels.contract.methods.states(pubKeyToEthereumAddress(counterparty)).call({
+                from: pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal())
+            }, 'latest', cb),
             (state, cb) => {
                 if ((new BN(state.stakedEther)).lt(new BN(restoreTx.value)))
                     return cb(Error('Too less staked money.'))

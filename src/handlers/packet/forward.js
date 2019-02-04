@@ -3,11 +3,11 @@
 const pull = require('pull-stream')
 const lp = require('pull-length-prefixed')
 const { waterfall, parallel } = require('neo-async')
-const { log } = require('../utils')
+const { log } = require('../../utils')
 
-const c = require('../constants')
-const Packet = require('../packet')
-const Acknowledgement = require('../acknowledgement')
+const c = require('../../constants')
+const Packet = require('../../packet')
+const Acknowledgement = require('../../acknowledgement')
 
 module.exports = (node, output) => node.handle(c.PROTOCOL_STRING, (protocol, conn) => {
     function forwardPacket(packet, cb) {

@@ -1,7 +1,7 @@
 'use strict'
 
 const { isPartyA, pubKeyToEthereumAddress, log, bufferToNumber } = require('../utils')
-const { BN } = require('web3-utils')
+const BN = require('bn.js')
 
 module.exports = (self) => (channelId, useRestoreTx = false, cb = () => { }) => {
     if (typeof useRestoreTx === 'function') {

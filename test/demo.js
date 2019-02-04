@@ -11,19 +11,18 @@ const { NET, GAS_PRICE, ROPSTEN_WSS_URL, HARDCODED_ETH_ADDRESS, HARDCODED_PRIV_K
 const FUNDING_ACCOUNT = HARDCODED_ETH_ADDRESS
 const FUNDING_KEY = HARDCODED_PRIV_KEY
 
-const Ganache = require('ganache-core')
-
 const AMOUUNT_OF_NODES = 4
-const AMOUNT_OF_MESSAGES = 4
+const AMOUNT_OF_MESSAGES = 3
 
 let index, compiledContract
 
-const Web3 = require('web3')
 let provider
 if (NET === 'ropsten') {
     provider = ROPSTEN_WSS_URL
 } else if (NET === 'ganache') {
-    const server = Ganache.server({
+    const GANACHE_PORT = 8545
+    const GANACHE_HOSTNAME = 'localhost'
+    const server = require('ganache-core').server({
         accounts: [
             {
                 balance: '0xd3c21bcecceda0000000',
@@ -31,10 +30,14 @@ if (NET === 'ropsten') {
             }
         ]
     })
-    server.listen(8546, 'localhost')
+    server.listen(GANACHE_PORT, GANACHE_HOSTNAME)
 
-    provider = `ws://localhost:8545`
+    provider = `ws://${GANACHE_HOSTNAME}:${GANACHE_PORT}`
+
+    console.log(`Successfully started local Ganache instance at 'ws://${GANACHE_HOSTNAME}:${GANACHE_PORT}'.`)
 }
+const Web3 = require('Web3')
+const web3 = new Web3(provider)
 
 const fundingPeer = privKeyToPeerId(FUNDING_KEY)
 
@@ -44,20 +47,8 @@ console.log(
     '\x1b[2mThis may take some time ...\n' +
     'Meanwhile you can start reading the wiki at https://github.com/validitylabs/messagingProtocol/wiki\x1b[0m\n')
 
-const pull = require('pull-stream')
-const lp = require('pull-length-prefixed')
-
-// pull(
-//     pull.values([]),
-//     lp.encode(),
-//     lp.decode(),
-//     pull.collect((err, data) => {
-//         console.log(err, data)
-//     })
-// )
-
 waterfall([
-    (cb) => (new Web3('ws://localhost:8545')).eth.getTransactionCount(FUNDING_ACCOUNT, cb),
+    (cb) => web3.eth.getTransactionCount(FUNDING_ACCOUNT, cb),
     (_index, cb) => {
         index = _index
 
@@ -73,7 +64,7 @@ waterfall([
                 gasPrice: GAS_PRICE,
                 nonce: index,
                 data: compiledContract.bytecode
-            }, fundingPeer, new Web3(provider), (err, receipt) => {
+            }, fundingPeer, web3, (err, receipt) => {
                 if (err)
                     throw err
 

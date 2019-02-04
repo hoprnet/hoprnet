@@ -9,7 +9,7 @@ const { waterfall } = require('neo-async')
 
 const { RELAY_FEE } = require('../constants')
 const { hash, bufferXOR, deepCopy, log, pubKeyToEthereumAddress, getId, bufferToNumber, pubKeyToPeerId } = require('../utils')
-const { BN } = require('web3-utils')
+const BN = require('bn.js')
 
 class Packet {
     constructor(header, transaction, challenge, message) {
@@ -104,6 +104,8 @@ class Packet {
             (record, cb) => {
                 if (typeof record === 'function') {
                     // No record => no payment channel => something went wrong
+                    cb = record
+
                     cb(Error('General error.'))
 
                 } else {

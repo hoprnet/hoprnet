@@ -6,8 +6,8 @@ const paramap = require('pull-paramap')
 
 
 const { waterfall } = require('neo-async')
-const { pubKeyToPeerId, log } = require('../utils')
-const { BN } = require('web3-utils')
+const { pubKeyToPeerId, pubKeyToEthereumAddress, log } = require('../utils')
+const BN = require('bn.js')
 
 const c = require('../constants')
 
@@ -19,9 +19,11 @@ module.exports = (self) => (cb) => pull(
         const channelId = data.key.slice(17)
         const { tx, restoreTx, index } = data.value
 
-        self.contract.methods.channels(channelId).call((err, channel) => {
+        self.contract.methods.channels(channelId).call({
+            from: pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal())
+        }, 'latest', (err, channel) => {
             // check whether the channel exists
-            if (channel.state === 0) {
+            if (parseInt(channel.state) == 0) {
                 log(self.node.peerInfo.id, `Found orphaned payment channel ${channelId.toString('hex')} inside database. Was the node shut down inappropriately?`)
                 return self.deleteChannel(channelId, cb)
             }
@@ -71,12 +73,10 @@ module.exports = (self) => (cb) => pull(
             })
         })
     }),
-    // filter orphaned payment channels
-    pull.filter(data => data),
     pull.collect((err, values) => {
         if (err)
             throw err
 
-        cb(null, values.reduce((acc, receivedMoney) => acc.iadd(receivedMoney), new BN('0')))
+        cb(null, values.reduce((acc, receivedMoney) => acc.iadd(receivedMoney), new BN(0)))
     })
 )

@@ -1,7 +1,7 @@
 'use strict'
 
 const { waterfall } = require('neo-async')
-const { BN } = require('web3-utils')
+const BN = require('bn.js')
 
 const { isPartyA, getId, pubKeyToEthereumAddress, bufferToNumber, numberToBuffer, deepCopy } = require('../utils')
 

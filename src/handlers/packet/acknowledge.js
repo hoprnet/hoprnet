@@ -2,13 +2,13 @@
 
 const pull = require('pull-stream')
 const lp = require('pull-length-prefixed')
-const { pubKeyToPeerId } = require('../utils')
+const { pubKeyToPeerId } = require('../../utils')
 const { decode } = require('multihashes')
 const { BN } = require('web3-utils')
 
-const { PROTOCOL_ACKNOWLEDGEMENT } = require('../constants')
-const { bufferXOR, hash, log } = require('../utils')
-const Acknowledgement = require('../acknowledgement')
+const { PROTOCOL_ACKNOWLEDGEMENT } = require('../../constants')
+const { bufferXOR, hash, log } = require('../../utils')
+const Acknowledgement = require('../../acknowledgement')
 
 module.exports = (node) => node.handle(PROTOCOL_ACKNOWLEDGEMENT, (protocol, conn) => pull(
     conn,
@@ -41,7 +41,7 @@ module.exports = (node) => node.handle(PROTOCOL_ACKNOWLEDGEMENT, (protocol, conn
 
                     node.paymentChannels.setChannel({
                         currentValue: tx.value,
-                        index: tx.index,
+                        //index: tx.index,
                         tx: tx
                     }, channelId)
                 })

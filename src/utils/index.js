@@ -142,10 +142,10 @@ module.exports.bufferToNumber = (buf) => {
  */
 module.exports.randomSubset = (array, subsetSize, filter = _ => true) => {
     if (!Number.isInteger(subsetSize) || subsetSize < 0)
-        throw Error('Invalid input arguments. Please provide a positive subset size. Got \"' + subsetSize + '\" instead.')
+        throw Error(`Invalid input arguments. Please provide a positive subset size. Got '${subsetSize}' instead.`)
 
     if (!array || !Array.isArray(array))
-        throw Error('Invalid input parameters. Expected an Array. Got \"' + typeof array + '\" instead.')
+        throw Error(`Invalid input parameters. Expected an Array. Got '${typeof array}' instead.`)
 
     if (subsetSize > array.length)
         throw Error('Invalid subset size. Subset size must not be greater than set size.')
@@ -155,7 +155,7 @@ module.exports.randomSubset = (array, subsetSize, filter = _ => true) => {
 
     if (subsetSize === array.length)
         // Returns a random permutation of all elements that pass
-        // the test
+        // the test.
         return module.exports.randomPermutation(array.filter(filter))
 
     const byteAmount = Math.max(Math.ceil(Math.log2(array.length)) / 8, 1)
@@ -406,16 +406,25 @@ module.exports.peerIdToWeb3Account = (peerId, web3) =>
  */
 module.exports.sendTransaction = async (tx, peerId, web3, cb = () => { }) => {
     const signedTx = await this.peerIdToWeb3Account(peerId, web3).signTransaction(Object.assign(tx, {
+        from: this.pubKeyToEthereumAddress(peerId.pubKey.marshal()),
         gasPrice: GAS_PRICE
     }))
 
     web3.eth.sendSignedTransaction(signedTx.rawTransaction)
         .on('error', cb)
         .on('receipt', (receipt) => {
-            if (!receipt.status)
-                throw Error('Reverted tx')
+            if (typeof receipt.status === 'string') {
+                receipt.status = parseInt(receipt.status, 16)
+            }
 
-            cb(null, receipt)
+            if (typeof receipt.status === 'number') {
+                receipt.status === Boolean(receipt.status)
+            }
+
+            if (!receipt.status)
+                return cb(Error('Reverted tx.'))
+
+            return cb(null, receipt)
         })
 }
 

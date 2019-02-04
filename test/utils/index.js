@@ -18,11 +18,6 @@ module.exports.warmUpNodes = (nodes, cb) =>
         (err, _) => cb(err, nodes)
     )
 
-const { existsSync, stat } = require('fs')
-const { execFile } = require('child_process')
-
-
-
 const { createNode } = require('../../src')
 const { pubKeyToEthereumAddress, sendTransaction } = require('../../src/utils')
 const { GAS_PRICE, STAKE_GAS_AMOUNT } = require('../../src/constants')
@@ -51,6 +46,7 @@ module.exports.createFundedNodes = (amountOfNodes, options, peerId, nonce, cb) =
             (cb) => series([
                 (cb) => times(amountOfNodes, (n, cb) =>
                     sendTransaction({
+                        from: pubKeyToEthereumAddress(peerId.pubKey.marshal()),
                         to: pubKeyToEthereumAddress(nodes[n].peerInfo.id.pubKey.marshal()),
                         value: toWei('0.05', 'ether'),
                         gas: STAKE_GAS_AMOUNT,
@@ -59,16 +55,16 @@ module.exports.createFundedNodes = (amountOfNodes, options, peerId, nonce, cb) =
                     }, peerId, new Web3(options.provider), cb), cb),
                 (cb) => each(nodes, (node, cb) => {
                     sendTransaction({
-                        to: node.paymentChannels.contract._address,
+                        to: options.contractAddress,
                         value: toWei('0.000001', 'ether'),
                         gas: STAKE_GAS_AMOUNT,
                         gasPrice: GAS_PRICE
                     }, node.peerInfo.id, new Web3(options.provider), (err) => {
                         if (err)
                             throw err
-            
+
                         node.paymentChannels.nonce = node.paymentChannels.nonce + 1
-            
+
                         cb()
                     })
                 }, cb)

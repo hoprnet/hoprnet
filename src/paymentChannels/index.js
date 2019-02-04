@@ -3,7 +3,7 @@
 const EventEmitter = require('events');
 const Transaction = require('../transaction')
 
-const { BN } = require('web3-utils')
+const BN = require('bn.js')
 const toPull = require('stream-to-pull-stream')
 const pull = require('pull-stream')
 
@@ -29,6 +29,7 @@ class PaymentChannel extends EventEmitter {
 
         this.nonce = options.nonce
         this.contract = options.contract
+        this.contractAddress = options.contractAddress
         this.node = options.node
         this.web3 = options.web3
 
@@ -52,7 +53,7 @@ class PaymentChannel extends EventEmitter {
         const web3 = new Web3(options.provider || 'ws://localhost:8545')
 
         parallel({
-            nonce: (cb) => web3.eth.getTransactionCount(pubKeyToEthereumAddress(options.node.peerInfo.id.pubKey.marshal()), cb),
+            nonce: (cb) => web3.eth.getTransactionCount(pubKeyToEthereumAddress(options.node.peerInfo.id.pubKey.marshal()), 'latest', cb),
             compiledContract: (cb) => compileIfNecessary([resolve(__dirname, '../../contracts/HoprChannel.sol')], [resolve(__dirname, '../../build/contracts/HoprChannel.json')], cb)
         }, (err, results) => {
             if (err)
@@ -62,11 +63,14 @@ class PaymentChannel extends EventEmitter {
 
             const abi = require('../../build/contracts/HoprChannel.json').abi
 
-            cb(null, new PaymentChannel({
+            return cb(null, new PaymentChannel({
                 node: options.node,
                 nonce: results.nonce,
-                contract: new web3.eth.Contract(abi, options.contractAddress || CONTRACT_ADDRESS),
-                web3: web3
+                contract: new web3.eth.Contract(abi, options.contractAddress || CONTRACT_ADDRESS, {
+                    from: pubKeyToEthereumAddress(options.node.peerInfo.id.pubKey.marshal())
+                }),
+                web3: web3,
+                contractAddress: options.contractAddress
             }))
 
         })
@@ -203,7 +207,7 @@ class PaymentChannel extends EventEmitter {
         this.nonce = this.nonce + 1
 
         sendTransaction({
-            to: this.contract._address,
+            to: this.contractAddress,
             nonce: this.nonce - 1,
             gas: estimatedGas,
             data: txObject.encodeABI()

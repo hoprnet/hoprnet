@@ -5,8 +5,9 @@ const lp = require('pull-length-prefixed')
 
 const { waterfall } = require('neo-async')
 const { randomBytes } = require('crypto')
-const { toWei, BN } = require('web3-utils')
-const { deepCopy, bufferToNumber, numberToBuffer, log } = require('../utils')
+const { toWei } = require('web3-utils')
+const BN = require('bn.js')
+const { deepCopy, bufferToNumber, numberToBuffer, log, pubKeyToEthereumAddress } = require('../utils')
 const { recover } = require('secp256k1')
 
 const { PROTOCOL_PAYMENT_CHANNEL } = require('../constants')
