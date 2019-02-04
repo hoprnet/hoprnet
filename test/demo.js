@@ -14,15 +14,13 @@ const FUNDING_KEY = HARDCODED_PRIV_KEY
 const AMOUUNT_OF_NODES = 4
 const AMOUNT_OF_MESSAGES = 3
 
-let index, compiledContract
-
-let provider
+let provider, server
 if (NET === 'ropsten') {
     provider = ROPSTEN_WSS_URL
 } else if (NET === 'ganache') {
     const GANACHE_PORT = 8545
     const GANACHE_HOSTNAME = 'localhost'
-    const server = require('ganache-core').server({
+    server = require('ganache-core').server({
         accounts: [
             {
                 balance: '0xd3c21bcecceda0000000',
@@ -36,7 +34,7 @@ if (NET === 'ropsten') {
 
     console.log(`Successfully started local Ganache instance at 'ws://${GANACHE_HOSTNAME}:${GANACHE_PORT}'.`)
 }
-const Web3 = require('Web3')
+const Web3 = require('web3')
 const web3 = new Web3(provider)
 
 const fundingPeer = privKeyToPeerId(FUNDING_KEY)
@@ -47,6 +45,7 @@ console.log(
     '\x1b[2mThis may take some time ...\n' +
     'Meanwhile you can start reading the wiki at https://github.com/validitylabs/messagingProtocol/wiki\x1b[0m\n')
 
+let index, compiledContract
 waterfall([
     (cb) => web3.eth.getTransactionCount(FUNDING_ACCOUNT, cb),
     (_index, cb) => {
@@ -98,5 +97,6 @@ waterfall([
                 node.stop(cb)
             })
         }, cb)
-    ], cb)
+    ], cb),
+    (cb) => server.close(cb)
 ], () => {})
