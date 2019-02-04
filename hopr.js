@@ -20,10 +20,8 @@ console.log('Welcome to \x1b[1m\x1b[5mHOPR\x1b[0m!\n')
 const config = {}
 
 if (options['bootstrap-node']) {
-    if (typeof options['bootstrap-node'] === 'boolean') {
-        options['bootstrap-node'] = DEFAULT_BOOTSTRAP_ADDRESS
-    }
-    console.log(`... running as bootstrap node at ${options['bootstrap-node']}.`)
+    // console.log(`... running as bootstrap node at ${DEFAULT_BOOTSTRAP_ADDRESS}.`)
+    config.peerInfo = 'BOOTSTRAP_NODE'
 }
 
 config.provider = 'ws://hopr.validity.io:8545'
@@ -41,12 +39,17 @@ waterfall([
             connected = true
         })
         console.log(`\nAvailable under the following addresses:\n ${node.peerInfo.multiaddrs.toArray().join('\n ')}\n`)
-        console.log(`Own Ethereum address:\n ${pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal())}`)
-        connectToBootstrapNode(cb)
+        if (!options['bootstrap-node']) {
+            console.log(`Own Ethereum address:\n ${pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal())}`)
+            connectToBootstrapNode(cb)
+        }
     },
     (cb) => crawlNetwork(node, cb),
-    (cb) => sendMessages(node, cb)
-
+    (cb) => {
+        if (!options['bootstrap-node']) {
+            sendMessages(node, cb)
+        }
+    }
 ], (err) => {
     if (err)
         throw err
@@ -89,7 +92,8 @@ function connectToBootstrapNode(cb) {
     forever((cb) => {
         console.log(`Please type in the Multiaddr of the node you want to connect to.`)
         read({
-            edit: true
+            edit: true,
+            default: DEFAULT_BOOTSTRAP_ADDRESS
         }, (err, result) => {
             if (err)
                 process.exit(0)

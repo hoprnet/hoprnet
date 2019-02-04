@@ -134,25 +134,17 @@ class Hopr extends libp2p {
                         Hopr.importPeerBook(db, cb)
                     }
                 },
-                peerInfo: (cb) => {
-                    if (PeerInfo.isPeerInfo(options.peerInfo)) {
-                        cb(null, options.peerInfo)
-                    } else if (options.addrs) {
-                        getPeerInfo({ addrs: options.addrs }, db, cb)
-                    } else {
-                        getPeerInfo(db, cb)
-                    }
-                }
+                peerInfo: (cb) => getPeerInfo(options, db, cb)
             }, (err, { peerBook, peerInfo }) => {
                 if (err)
-                    cb(err)
+                    return cb(err)
 
                 const hopr = new Hopr({
                     peerBook: peerBook,
                     peerInfo: peerInfo
                 }, db)
 
-                hopr.start(options, cb)
+                return hopr.start(options, cb)
             })
         ], cb)
     }
@@ -167,16 +159,25 @@ class Hopr extends libp2p {
     start(options, cb) {
         parallel({
             node: (cb) => super.start(cb),
-            paymentChannels: (cb) => PaymentChannels.create(Object.assign({
-                node: this
-            }, options), cb)
+            paymentChannels: (cb) => {
+                if (this.peerInfo.id.pubKey) {
+                    PaymentChannels.create(Object.assign({
+                        node: this
+                    }, options), cb)
+                } else {
+                    cb()
+                }
+            }
         }, (err, results) => {
             if (err)
                 return cb(err)
 
             registerHandlers(this, options.output)
 
-            this.paymentChannels = results.paymentChannels
+            if (this.peerInfo.id.pubKey) {
+                this.paymentChannels = results.paymentChannels
+            }
+            
             this.heartbeat = heartbeat(this)
 
             return cb(null, this)
