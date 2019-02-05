@@ -32,13 +32,13 @@ waterfall([
     (cb) => createNode(options, cb),
     (_node, cb) => {
         node = _node
-        if (options['bootstrap-node']) {
+        if (!options['bootstrap-node']) {
             node.once('peer:connect', (peer) => {
                 console.log(`Incoming connection from ${peer.id.toB58String()}. Press enter to continue.`)
                 connected = true
             })
         } else {
-            node.once('peer:connect', (peer) => {
+            node.on('peer:connect', (peer) => {
                 console.log(`Incoming connection from ${peer.id.toB58String()}.`)
             })
         }

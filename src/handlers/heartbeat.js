@@ -12,7 +12,16 @@ module.exports = (node) => node.handle(PROTOCOL_HEARTBEAT, (protocol, conn) => {
         conn,
         lp.decode(),
         pull.filter(data => data.length === HASH_LENGTH),
-        pull.map(data => createHash('sha256').update(data).digest().slice(0, 16)),
+        pull.asyncMap((data, cb) => {
+            conn.getPeerInfo((err, peerInfo) => {
+                if (err)
+                    return cb(err)
+                node.peerBook[peerInfo.id].lastSeen = Date.now()
+
+                return cb(null, createHash('sha256').update(data).digest().slice(0, 16))
+
+            })
+        }),
         lp.encode(),
         conn
     )
