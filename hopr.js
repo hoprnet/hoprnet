@@ -27,6 +27,20 @@ if (Array.isArray(options._) && options._.length > 0) {
     options.id = `temp ${options._[0]}`
 }
 
+const config = require('./config.json')
+const isIPv4 = config.host.match(/[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}/)
+const isIPv6 = config.host.match(/([0-9a-fA-f]{1,4}:){1,7}[0-9a-fA-f]{1,4}/)
+
+let addr
+if (isIPv4) {
+    addr = `/ip4/${config.host}/tcp/${config.port}`
+} else if(isIPv6) {
+    addr = `/ip6/${config.host}/tcp/${config.port}`
+} else {
+    throw Error(`Invalid address. Got ${config.host}:${config.port}.`)
+}
+options.addrs = [Multiaddr(addr)]
+
 let node, connected
 waterfall([
     (cb) => createNode(options, cb),

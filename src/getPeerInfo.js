@@ -1,67 +1,35 @@
 'use strict'
 
-const defaultsDeep = require('@nodeutils/defaults-deep')
 const { waterfall } = require('neo-async')
 const { generateKeyPair } = require('libp2p-crypto').keys
-const { deserializeKeyPair, serializeKeyPair, privKeyToPeerId} = require('./utils')
+const { deserializeKeyPair, serializeKeyPair, privKeyToPeerId } = require('./utils')
 
 const PeerInfo = require('peer-info')
 const PeerId = require('peer-id')
-const Multihash = require('multihashes')
-const { createHash } = require('crypto')
 const Multiaddr = require('multiaddr')
-const c = require('./constants')
+const { PROTOCOL_NAME } = require('./constants')
 
 const BOOTSTRAP_NODE = Multiaddr('/ip4/127.0.0.1/tcp/9090/')
 
 module.exports = (options, db, cb) => {
     if (typeof db === 'function') {
-        if (!options.peerInfo) {
+        if (!options.peerInfo)
             return cb(Error('Invalid input parameter. Please set a valid peerInfo.'))
-        }
+
         cb = db
     }
 
-    if (PeerInfo.isPeerInfo(options.peerInfo)) {
+    if (PeerInfo.isPeerInfo(options.peerInfo))
         return cb(null, options.peerInfo)
-    }
 
-    if (options.addrs && Array.isArray(options.addrs)) {
-        options.addrs = options.addrs.map(addr => Multiaddr(addr))
-    }
-    
-    options = defaultsDeep(options, {
-        addrs: [],
-        signallingServer: null // BOOTSTRAP_NODE
-    })
-    
-    const addAddrs = (peerInfo, cb) => {
-        // TCP
-        options.addrs.push(Multiaddr('/ip4/0.0.0.0/tcp/0'))
+    if (!options.addrs || !Array.isArray(options.addrs))
+        return cb(Error('Unable to start node without an address. Please provide at least one.'))
 
-        // WebRTC
-        if (options.signallingServer) {
-            options.addrs.push(
-                options.signallingServer
-                    .encapsulate(Multiaddr('/ws/p2p-webrtc-star/'))
-            )
-        }
-
-        options.addrs.forEach(addr => {
-            addr.encapsulate('/'.concat(c.PROTOCOL_NAME).concat('/').concat(peerInfo.id.toB58String()))
-            peerInfo.multiaddrs.add(addr)
-        })
-
-        // Delete properties that has now become unnecessary
-        delete options.addrs
-        delete options.signallingServer
-
-        cb(null, peerInfo)
-    }
+    options.addrs = options.addrs.map(addr => Multiaddr(addr))
 
     const getFromDatabase = (cb) => db.get('key-pair', (err, serializedKeyPair) => {
         if (err && !err.notFound) {
-            throw err
+            cb(err)
         } else if (err && err.notFound) {
             generateKeyPair('secp256k1', 256, (err, key) => waterfall([
                 (cb) => key.public.hash(cb),
@@ -97,7 +65,14 @@ module.exports = (options, db, cb) => {
             }
         },
         (peerId, cb) => PeerInfo.create(peerId, cb),
-        addAddrs
+        (peerInfo, cb) => {
+            options.addrs.forEach((addr) => {
+                addr = addr.encapsulate(`/${PROTOCOL_NAME}/${peerInfo.id.toB58String()}`)
+                peerInfo.multiaddrs.add(addr)
+            })
+
+            cb(null, peerInfo)
+        }
     ], cb)
 
 }
