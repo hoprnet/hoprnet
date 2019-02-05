@@ -11,9 +11,9 @@ const uniqWith = require('lodash.uniqwith')
 const remove = require('lodash.remove')
 const { doWhilst, map, waterfall } = require('neo-async')
 
-const { randomSubset, log } = require('./utils')
+const { randomSubset, log } = require('../utils')
 
-const { MAX_HOPS, PROTOCOL_CRAWLING, MARSHALLED_PUBLIC_KEY_SIZE } = require('./constants')
+const { MAX_HOPS, PROTOCOL_CRAWLING, MARSHALLED_PUBLIC_KEY_SIZE } = require('../constants')
 
 module.exports = (node) =>
     (cb, comparator = _ => true) => {

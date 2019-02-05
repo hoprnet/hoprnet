@@ -1,9 +1,9 @@
 'use strict'
 
-const { PROTOCOL_HEARTBEAT } = require('./constants')
+const { PROTOCOL_HEARTBEAT } = require('../constants')
 const lp = require('pull-length-prefixed')
 const { randomBytes, createHash } = require('crypto')
-const { log } = require('./utils')
+const { log } = require('../utils')
 const { waterfall, each } = require('neo-async')
 const pull = require('pull-stream')
 
@@ -13,6 +13,7 @@ module.exports = (node) =>
     setInterval(() => {
         each(node.peerBook.getAllArray(), (peer, cb) => {
             if (Date.now() - (node.peerBook.getAll()[peer.id.toB58String()].lastSeen || 0) > THIRTY_ONE_SECONDS) {
+                console.log(`Last seen ${peer.id.toB58String()} at ${node.peerBook.getAll()[peer.id.toB58String()].lastSeen}.`)
                 return waterfall([
                     (cb) => node.peerRouting.findPeer(peer.id, cb),
                     (peerInfo, cb) => node.dialProtocol(peerInfo, PROTOCOL_HEARTBEAT, cb),
