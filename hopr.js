@@ -6,6 +6,7 @@ const read = require('read')
 const getopts = require('getopts')
 const Multiaddr = require('multiaddr')
 const { pubKeyToEthereumAddress } = require('./src/utils')
+const { ROPSTEN_WSS_URL } = require('./src/constants')
 
 const options = getopts(process.argv.slice(2), {
     alias: {
@@ -17,27 +18,31 @@ const DEFAULT_BOOTSTRAP_ADDRESS = "/dns4/hopr.validity.io/tcp/9090"
 
 console.log('Welcome to \x1b[1m\x1b[5mHOPR\x1b[0m!\n')
 
-const config = {}
-
 if (options['bootstrap-node']) {
-    // console.log(`... running as bootstrap node at ${DEFAULT_BOOTSTRAP_ADDRESS}.`)
-    config.peerInfo = 'BOOTSTRAP_NODE'
+    console.log(`... running as bootstrap node at ${DEFAULT_BOOTSTRAP_ADDRESS}.`)
 }
 
-config.provider = 'ws://hopr.validity.io:8545'
+options.provider = ROPSTEN_WSS_URL
 if (Array.isArray(options._) && options._.length > 0) {
-    config.id = `temp ${options._[0]}`
+    options.id = `temp ${options._[0]}`
 }
 
 let node, connected
 waterfall([
-    (cb) => createNode(config, cb),
+    (cb) => createNode(options, cb),
     (_node, cb) => {
         node = _node
-        node.once('peer:connect', (peer) => {
-            console.log(`Incoming connection from ${peer.id.toB58String()}. Press enter to continue.`)
-            connected = true
-        })
+        if (options['bootstrap-node']) {
+            node.once('peer:connect', (peer) => {
+                console.log(`Incoming connection from ${peer.id.toB58String()}. Press enter to continue.`)
+                connected = true
+            })
+        } else {
+            node.once('peer:connect', (peer) => {
+                console.log(`Incoming connection from ${peer.id.toB58String()}.`)
+            })
+        }
+
         console.log(`\nAvailable under the following addresses:\n ${node.peerInfo.multiaddrs.toArray().join('\n ')}\n`)
         if (!options['bootstrap-node']) {
             console.log(`Own Ethereum address:\n ${pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal())}`)

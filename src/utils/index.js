@@ -7,7 +7,6 @@ const { execFile } = require('child_process')
 const fs = require('fs')
 const libp2p_crypto = require('libp2p-crypto').keys
 const PeerId = require('peer-id')
-const Multihash = require('multihashes')
 const rlp = require('rlp')
 const PeerInfo = require('peer-info')
 const Multiaddr = require('multiaddr')
@@ -15,6 +14,9 @@ const { publicKeyConvert } = require('secp256k1')
 const scrypt = require('scrypt')
 const chacha = require('chacha')
 const read = require('read')
+
+const COMPRESSED_PUBLIC_KEY_LENGTH = 33
+const PRIVKEY_LENGTH = 32
 
 // ==========================
 // General methods
@@ -249,9 +251,8 @@ module.exports.randomPermutation = (array) => {
 // ==========================
 // Ethereum methods
 // ==========================
-const COMPRESSED_PUBLIC_KEY_LENGTH = 33
 /**
- * Derives an Ethereum address from the given public key.
+ * Derives an Ethereum address from a given public key.
  * 
  * @param  {Buffer} pubKey given as compressed elliptic curve point.
  * 
@@ -332,17 +333,57 @@ module.exports.getId = (sender, counterparty) => {
 // ==========================
 // libp2p methods
 // ==========================
-module.exports.pubKeyToPeerId = (pubKey, cb) =>
-    PeerId.createFromPubKey(new libp2p_crypto.supportedKeys.secp256k1.Secp256k1PublicKey(pubKey).bytes, cb)
+/**
+ * Converts a plain compressed ECDSA public key over the curve `secp256k1`
+ * to a peerId in order to use it with libp2p.
+ * 
+ * @notice Libp2p stores the keys in format that is derived from `protobuf`.
+ * Using `libsecp256k1` directly does not work.
+ * 
+ * @param {Buffer | string} pubKey the plain public key
+ * @param {function} cb callback called with `(err, peerId)`
+ */
+module.exports.pubKeyToPeerId = (pubKey, cb) => {
+    if (typeof pubKey === 'string') {
+        pubKey = Buffer.from(pubKey.replace(/0x/, ''), 'hex')
+    }
 
+    if (!Buffer.isBuffer(pubKey))
+        return cb(Error(`Unable to parse public key to desired representation. Got ${pubKey.toString()}.`))
+
+    if (pubKey.length != COMPRESSED_PUBLIC_KEY_LENGTH)
+        return cb(Error(`Invalid public key. Expected a buffer of size ${COMPRESSED_PUBLIC_KEY_LENGTH} bytes. Got one of ${pubKey.length} bytes.`))
+
+    return PeerId.createFromPubKey(new libp2p_crypto.supportedKeys.secp256k1.Secp256k1PublicKey(pubKey).bytes, cb)
+}
+
+/**
+ * Converts a plain compressed ECDSA private key over the curve `secp256k1`
+ * to a peerId in order to use it with libp2p.
+ * It equips the generated peerId with private key and public key.
+ * 
+ * @param {Buffer | string} privKey the plain private key
+ * @param {function} cb callback called with `(err, peerId)`
+ */
 module.exports.privKeyToPeerId = (privKey, cb) => {
-    if (!Buffer.isBuffer(privKey)) {
+    if (typeof privKey === 'string') {
         privKey = Buffer.from(privKey.replace(/0x/, ''), 'hex')
     }
 
+    if (!Buffer.isBuffer(privKey))
+        return cb(Error(`Unable to parse private key to desired representation. Got type '${typeof privKey}'.`))
+
+    if (privKey.length != PRIVKEY_LENGTH)
+        return cb(Error(`Invalid private key. Expected a buffer of size ${PRIVKEY_LENGTH} bytes. Got one of ${privKey.length} bytes.`))
+
     privKey = new libp2p_crypto.supportedKeys.secp256k1.Secp256k1PrivateKey(privKey)
 
-    return new PeerId(Multihash.encode(privKey.public.bytes, 'sha2-256'), privKey, privKey.public)
+    return privKey.public.hash((err, hash) => {
+        if (err)
+            return cb(err)
+
+        return cb(null, new PeerId(hash, privKey, privKey.public))
+    })
 }
 
 // module.exports.privKeyToPeerId = (privKey, cb) =>
@@ -354,6 +395,9 @@ module.exports.privKeyToPeerId = (privKey, cb) => {
 const ONE_MINUTE = 60 * 1000
 /**
  * Mine a single block and increase the timestamp by the given amount.
+ * 
+ * @notice The purpose of this method is to use for testing with a local
+ * testnet, i. e. Ganache.
  * 
  * @param {Object} provider a valid Web3 provider
  * @param {Number} amountOfTime increase the timestamp by that amount of time, default 1 minute
@@ -386,13 +430,17 @@ module.exports.mineBlock = (provider, amountOfTime = ONE_MINUTE) => waterfall([
 // ==========================
 const { GAS_PRICE } = require('../constants')
 /**
- * Creates a web3 account from a peerId instance
+ * Creates a web3 account from a peerId instance.
  * 
- * @param {Object} peerId a peerId instance
- * @param {Object} web3 a web3.js instance
+ * @param {PeerId} peerId a peerId instance
+ * @param {Web3} web3 a web3.js instance
  */
-module.exports.peerIdToWeb3Account = (peerId, web3) =>
+module.exports.peerIdToWeb3Account = (peerId, web3) => {
+    if (!peerId.privKey)
+        throw Error(`Unable to find private key. Please insert a peerId that is equipped with a private key.`)
+
     web3.eth.accounts.privateKeyToAccount('0x'.concat(peerId.privKey.marshal().toString('hex')))
+}
 
 /**
  * Signs a transaction with the private key that is given by 
@@ -402,7 +450,7 @@ module.exports.peerIdToWeb3Account = (peerId, web3) =>
  * @param {Object} tx an Ethereum transaction
  * @param {Object} peerId a peerId
  * @param {Object} web3 a web3.js instance
- * @param {Function} cb the function that is called when finished
+ * @param {function} cb the function that is called when finished
  */
 module.exports.sendTransaction = async (tx, peerId, web3, cb = () => { }) => {
     const signedTx = await this.peerIdToWeb3Account(peerId, web3).signTransaction(Object.assign(tx, {
@@ -437,7 +485,7 @@ module.exports.sendTransaction = async (tx, peerId, web3, cb = () => { }) => {
  * 
  * @param {Array} srcFiles the absolute paths of the source files
  * @param {Array} artifacts the absolute paths of the artifacts
- * @param {Function} cb the function that is called when finished
+ * @param {function} cb called afterward with `(err)`
  */
 module.exports.compileIfNecessary = (srcFiles, artifacts, cb) => {
     function compile(cb) {
@@ -446,7 +494,7 @@ module.exports.compileIfNecessary = (srcFiles, artifacts, cb) => {
             if (err) {
                 cb(err)
             } else if (stderr) {
-                console.log(`\x1b[31m${stderr}\x1b[0m`)
+                console.log(`${stdout}\n\x1b[31m${stderr}\x1b[0m`)
             } else {
                 console.log(stdout)
                 cb()
@@ -465,31 +513,38 @@ module.exports.compileIfNecessary = (srcFiles, artifacts, cb) => {
                 parallel({
                     srcTime: (cb) => map(srcFiles, fs.stat, (err, stats) => {
                         if (err)
-                            throw err
+                            return cb(err)
 
-                        cb(null, stats.reduce((acc, current) => Math.max(acc, current.mtimeMs), 0))
+                        return cb(null, stats.reduce((acc, current) => Math.max(acc, current.mtimeMs), 0))
                     }),
                     artifactTime: (cb) => map(artifacts, fs.stat, (err, stats) => {
                         if (err)
-                            throw err
+                            return cb(err)
 
-                        cb(null, stats.reduce((acc, current) => Math.min(acc, current.mtimeMs), Date.now()))
+                        return cb(null, stats.reduce((acc, current) => Math.min(acc, current.mtimeMs), Date.now()))
                     })
                 }, (err, { srcTime, artifactTime }) => {
                     if (err)
-                        cb(err)
+                        return cb(err)
 
-                    if (srcTime > artifactTime) {
-                        compile(cb)
-                    } else {
-                        cb()
-                    }
+                    if (srcTime > artifactTime)
+                        return compile(cb)
+
+                    return cb()
                 })
             }
         }
     ], cb)
 }
 
+/**
+ * Decodes the serialized peerBook and inserts the peerInfos in the given
+ * peerBook instance.
+ * 
+ * @param {Buffer} serializePeerBook the encodes serialized peerBook
+ * @param {PeerBook} peerBook a peerBook instance to store the peerInfo instances
+ * @param {function} cb called when finished with `(err)`
+ */
 module.exports.deserializePeerBook = (serializedPeerBook, peerBook, cb) =>
     each(rlp.decode(serializedPeerBook), (serializedPeerInfo, cb) => {
         const peerId = PeerId.createFromBytes(serializedPeerInfo[0])
@@ -500,15 +555,21 @@ module.exports.deserializePeerBook = (serializedPeerBook, peerBook, cb) =>
 
         PeerInfo.create(peerId, (err, peerInfo) => {
             if (err)
-                cb(err)
+                return cb(err)
 
             serializedPeerInfo[1].forEach((multiaddr) => peerInfo.multiaddrs.add(Multiaddr(multiaddr)))
             peerBook.put(peerInfo)
 
-            cb()
+            return cb()
         })
     }, cb)
 
+/**
+ * Serializes a given peerBook by serializing the included peerInfo instances.
+ * 
+ * @param {PeerBook} peerBook the peerBook instance
+ * @returns the encoded peerBook
+ */
 module.exports.serializePeerBook = (peerBook) => {
     function serializePeerInfo(peerInfo) {
         const result = [
@@ -531,14 +592,20 @@ module.exports.serializePeerBook = (peerBook) => {
 
 const SALT_LENGTH = 32
 
+/**
+ * Serializes a given peerId by serializing the included private key and public key.
+ * 
+ * @param {PeerId} peerId the peerId that should be serialized
+ * @param {function} cb called afterwards with `(err, encodedKeyPair)`
+ */
 module.exports.serializeKeyPair = (peerId, cb) => {
     const salt = randomBytes(SALT_LENGTH)
     const scryptParams = { N: 8192, r: 8, p: 16 }
 
-    console.log('Please type in the password that is used to encrypt the generated key.')
+    const question = 'Please type in the password that will be used to encrypt the generated key.'
 
     waterfall([
-        this.askForPassword,
+        (cb) => this.askForPassword(question, cb),
         (pw, isDefault, cb) => {
             console.log(`Done. Using peerId \x1b[34m${peerId.toB58String()}\x1b[0m\n`)
 
@@ -562,6 +629,17 @@ module.exports.serializeKeyPair = (peerId, cb) => {
     ], cb)
 }
 
+/**
+ * Deserializes a serialized key pair and returns a peerId.
+ * 
+ * @notice This method will ask for a password to decrypt the encrypted
+ * private key.
+ * @notice The decryption of the private key makes use of a memory-hard
+ * hash function and consumes therefore a lot of memory.
+ * 
+ * @param {Buffer} encryptedSerializedKeyPair the encoded and encrypted key pair
+ * @param {function} cb called afterward with `(err, peerId)`
+ */
 module.exports.deserializeKeyPair = (encryptedSerializedKeyPair, cb) => {
     const encrypted = rlp.decode(encryptedSerializedKeyPair)
 
@@ -570,9 +648,10 @@ module.exports.deserializeKeyPair = (encryptedSerializedKeyPair, cb) => {
 
     const scryptParams = { N: 8192, r: 8, p: 16 }
 
-    console.log('Please type in the password that was used to encrypt the key.')
+    const question = 'Please type in the password that was used to encrypt the key.'
+
     waterfall([
-        this.askForPassword,
+        (cb) => this.askForPassword(question, cb),
         (pw, isDefault, cb) => {
             const key = scrypt.hashSync(pw, scryptParams, 44, salt)
 
@@ -585,12 +664,15 @@ module.exports.deserializeKeyPair = (encryptedSerializedKeyPair, cb) => {
             const peerId = PeerId.createFromBytes(decoded[0])
 
             libp2p_crypto.unmarshalPrivateKey(decoded[1], (err, privKey) => {
+                if (err)
+                    return cb(err)
+
                 peerId.privKey = privKey
                 peerId.pubKey = libp2p_crypto.unmarshalPublicKey(decoded[2])
 
                 console.log(`Successfully restored ID \x1b[34m${peerId.toB58String()}\x1b[0m.`)
 
-                cb(null, peerId)
+                return cb(null, peerId)
             })
 
         }
@@ -599,12 +681,19 @@ module.exports.deserializeKeyPair = (encryptedSerializedKeyPair, cb) => {
 
 const { DEBUG } = require('../constants')
 
-module.exports.askForPassword = (cb) => {
+/**
+ * Asks the user for a password. Does not echo the password.
+ * 
+ * @param {string} question string that is displayed before the user input
+ * @param {function} cb called afterwards with `(err, password)`
+ */
+module.exports.askForPassword = (question, cb) => {
     if (DEBUG) {
         console.log('Debug mode: using password Epo5kZTFidOCHrnL0MzsXNwN9St')
         cb(null, 'Epo5kZTFidOCHrnL0MzsXNwN9St', false)
     } else {
         read({
+            prompt: question,
             silent: true,
             edit: true,
             replace: '*'
@@ -612,6 +701,11 @@ module.exports.askForPassword = (cb) => {
     }
 }
 
+/**
+ * Deletes recursively (and synchronously) all files in a directory.
+ * 
+ * @param {string} path the path to the directory
+ */
 module.exports.clearDirectory = (path) => {
     let files = [];
     if (fs.existsSync(path)) {

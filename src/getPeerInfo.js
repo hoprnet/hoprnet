@@ -3,7 +3,7 @@
 const defaultsDeep = require('@nodeutils/defaults-deep')
 const { waterfall } = require('neo-async')
 const { generateKeyPair } = require('libp2p-crypto').keys
-const { deserializeKeyPair, serializeKeyPair } = require('./utils')
+const { deserializeKeyPair, serializeKeyPair, privKeyToPeerId} = require('./utils')
 
 const PeerInfo = require('peer-info')
 const PeerId = require('peer-id')
@@ -24,10 +24,6 @@ module.exports = (options, db, cb) => {
 
     if (PeerInfo.isPeerInfo(options.peerInfo)) {
         return cb(null, options.peerInfo)
-    }
-
-    if (typeof options.peerInfo === 'string') {
-        options.peerInfo = new PeerId(Multihash.encode(createHash('sha256').update(options.peerInfo).digest(), 'sha2-256'))
     }
 
     if (options.addrs && Array.isArray(options.addrs)) {
@@ -92,8 +88,10 @@ module.exports = (options, db, cb) => {
 
     return waterfall([
         (cb) => {
-            if (PeerId.isPeerId(options.peerInfo)) {
-                cb(null, options.peerInfo)
+            if (PeerId.isPeerId(options.peerId)) {
+                cb(null, options.peerId)
+            } else if (options['bootstrap-node']) {
+                privKeyToPeerId(require('../config/.secrets.json').fundAccountPrivateKey, cb)
             } else {
                 getFromDatabase(cb)
             }

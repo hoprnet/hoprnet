@@ -160,7 +160,7 @@ class Hopr extends libp2p {
         parallel({
             node: (cb) => super.start(cb),
             paymentChannels: (cb) => {
-                if (this.peerInfo.id.pubKey) {
+                if (!options['bootstrap-node']) {
                     PaymentChannels.create(Object.assign({
                         node: this
                     }, options), cb)
@@ -172,12 +172,12 @@ class Hopr extends libp2p {
             if (err)
                 return cb(err)
 
-            registerHandlers(this, options.output)
+            registerHandlers(this, options)
 
             if (this.peerInfo.id.pubKey) {
                 this.paymentChannels = results.paymentChannels
             }
-            
+
             this.heartbeat = heartbeat(this)
 
             return cb(null, this)
