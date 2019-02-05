@@ -14,7 +14,7 @@ const options = getopts(process.argv.slice(2), {
     }
 })
 
-const DEFAULT_BOOTSTRAP_ADDRESS = "/dns4/hopr.validity.io/tcp/9090"
+const DEFAULT_BOOTSTRAP_ADDRESS = "/dns4/hopr.validity.io/tcp/9091/ipfs/QmRhtaT1RMJtCzw8yGREizh7viBgGZMP3CpV8J5rRQWMGC"
 
 console.log('Welcome to \x1b[1m\x1b[5mHOPR\x1b[0m!\n')
 
@@ -23,11 +23,14 @@ if (options['bootstrap-node']) {
 }
 
 options.provider = ROPSTEN_WSS_URL
-if (Array.isArray(options._) && options._.length > 0) {
-    options.id = `temp ${options._[0]}`
-}
 
 const config = require('./config.json')
+
+if (Array.isArray(options._) && options._.length > 0) {
+    options.id = `temp ${options._[0]}`
+    config.port = parseInt(config.port) + parseInt(options._[0])
+}
+
 const isIPv4 = config.host.match(/[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}/)
 const isIPv6 = config.host.match(/([0-9a-fA-f]{1,4}:){1,7}[0-9a-fA-f]{1,4}/)
 
