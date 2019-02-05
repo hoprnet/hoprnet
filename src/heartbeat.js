@@ -12,7 +12,8 @@ const THIRTY_ONE_SECONDS = 31 * 1000
 module.exports = (node) =>
     setInterval(() => {
         each(node.peerBook.getAllArray(), (peer, cb) => {
-            if (Date.now() - node.peerBook[peer.id.toB58String()].lastSeen > THIRTY_ONE_SECONDS) {
+            if (Date.now() - node.peerBook.getAll()[peer.id.toB58String()].lastSeen > THIRTY_ONE_SECONDS) {
+                console.log(node.peerBook.getAll()[peer.id.toB58String()].lastSeen)
                 return waterfall([
                     (cb) => node.peerRouting.findPeer(peer.id, cb),
                     (peerInfo, cb) => node.dialProtocol(peerInfo, PROTOCOL_HEARTBEAT, cb),
@@ -29,7 +30,7 @@ module.exports = (node) =>
                                     return cb(err)
                                     
                                 const response = createHash('sha256').update(challenge).digest().slice(0, 16)
-                                node.peerBook[peer.id.toB58String()].lastSeen = Date.now()
+                                node.peerBook.getAll()[peer.id.toB58String()].lastSeen = Date.now()
     
                                 if (hashValues.length != 1 || hashValues[0].compare(response) !== 0)
                                     return cb(Error(`Invalid response. Got ${typeof hashValues} instead of ${response.toString('hex')}`))

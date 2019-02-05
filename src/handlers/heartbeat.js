@@ -16,7 +16,8 @@ module.exports = (node) => node.handle(PROTOCOL_HEARTBEAT, (protocol, conn) => {
             conn.getPeerInfo((err, peerInfo) => {
                 if (err)
                     return cb(err)
-                node.peerBook[peerInfo.id].lastSeen = Date.now()
+                    
+                node.peerBook.getAll()[peerInfo.id].lastSeen = Date.now()
 
                 return cb(null, createHash('sha256').update(data).digest().slice(0, 16))
 
