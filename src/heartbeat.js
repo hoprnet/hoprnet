@@ -12,8 +12,7 @@ const THIRTY_ONE_SECONDS = 31 * 1000
 module.exports = (node) =>
     setInterval(() => {
         each(node.peerBook.getAllArray(), (peer, cb) => {
-            if (Date.now() - node.peerBook.getAll()[peer.id.toB58String()].lastSeen > THIRTY_ONE_SECONDS) {
-                console.log(node.peerBook.getAll()[peer.id.toB58String()].lastSeen)
+            if (Date.now() - (node.peerBook.getAll()[peer.id.toB58String()].lastSeen || 0) > THIRTY_ONE_SECONDS) {
                 return waterfall([
                     (cb) => node.peerRouting.findPeer(peer.id, cb),
                     (peerInfo, cb) => node.dialProtocol(peerInfo, PROTOCOL_HEARTBEAT, cb),
