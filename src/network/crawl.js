@@ -76,6 +76,9 @@ module.exports = (node) =>
 
                     log(node.peerInfo.id, `Received ${newNodes.length} new node${newNodes.length === 1 ? '' : 's'}.`)
                     log(node.peerInfo.id, `Now holding peer information of ${node.peerBook.getAllArray().length} node${node.peerBook.getAllArray().length === 1 ? '' : 's'} in the network.`)
+                    log(node.peerInfo.id, node.peerBook.getAllArray().reduce((acc, peerInfo) => {
+                        return acc.concat(`PeerId ${peerInfo.id.toB58String()}, available under ${peerInfo.multiaddrs.toArray().join(', ')}`)
+                    }, ''))
 
                     return cbWhilst()
                 })

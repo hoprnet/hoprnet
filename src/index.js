@@ -5,6 +5,8 @@ const TCP = require('libp2p-tcp')
 const MPLEX = require('libp2p-mplex')
 const KadDHT = require('libp2p-kad-dht')
 const SECIO = require('libp2p-secio')
+const WS = require('libp2p-websockets')
+
 const defaultsDeep = require('@nodeutils/defaults-deep')
 
 const { createPacket } = require('./packet')
@@ -59,7 +61,7 @@ class Hopr extends libp2p {
                  * The transport modules to use.
                  */
                 transport: [
-                    TCP // WebRTC
+                    TCP, WS, WebRTC
                 ],
                 /**
                  * To support bidirectional connection, we need a stream muxer.
@@ -218,15 +220,18 @@ class Hopr extends libp2p {
             // convertPeerId(peer.id, (err, dht_id) => {
             // const peers = this._dht.routingTable.closestPeers(dht_id, 1)
             // console.log(err, peers)
-            const peerOptions = peer._connectedMultiaddr.toOptions()
-            const addr = peer._connectedMultiaddr
-                .decapsulate('ipfs')
-                .decapsulate('tcp')
-                .encapsulate(`/tcp/${parseInt(peerOptions.port) + 1}/wss/p2p-webrtc-star`)
-                .encapsulate(`/${c.PROTOCOL_NAME}/${this.peerInfo.id.toB58String()}`)
+            // this.dial('/dns4/hopr.validity.io/tcp/9092/wss/p2p-webrtc-star/ipfs/QmS7Wtck9aFHUu2zEzqzEdnzaG5jvp9wxjGYL7JJ15WBJD', (err, conn) => {
+            //     console.log(err, conn)
+            // })
+            // const peerOptions = peer._connectedMultiaddr.toOptions()
+            // const addr = peer._connectedMultiaddr
+            //     .decapsulate('ipfs')
+            //     .decapsulate('tcp')
+            //     .encapsulate(`/tcp/${parseInt(peerOptions.port) + 1}/wss/p2p-webrtc-star`)
+            //     .encapsulate(`/${c.PROTOCOL_NAME}/${this.peerInfo.id.toB58String()}`)
 
-            this.peerInfo.multiaddrs.add(addr)
-            console.log(`now available under ${addr.toString()}`)
+            // this.peerInfo.multiaddrs.add(addr)
+            // console.log(`now available under ${addr.toString()}`)
             // })
         }
         this.on('peer:connect', (peer) => setImmediate(handleEvent.bind(this), peer))
