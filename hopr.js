@@ -35,7 +35,6 @@ options.signallingAddrs = []
 config.interfaces.forEach((iface, index) => {
     // TODO: implement proper dual-stack
     if (Array.isArray(options._) && options._.length > 0) {
-        iface.signallingPort = parseInt(iface.port) + (config.interfaces.length + 1) * parseInt(options._[0]) + 1
         iface.port = parseInt(iface.port) + (config.interfaces.length + 1) * parseInt(options._[0])
     }
     options.addrs.push(
