@@ -1,6 +1,6 @@
 'use strict'
 
-const { waterfall, forever } = require('async')
+const { waterfall, forever, each } = require('async')
 const { createNode } = require('./src')
 const read = require('read')
 const getopts = require('getopts')
@@ -14,47 +14,52 @@ const options = getopts(process.argv.slice(2), {
     }
 })
 
-const DEFAULT_BOOTSTRAP_ADDRESS = "/dns4/hopr.validity.io/tcp/9091/ipfs/QmRhtaT1RMJtCzw8yGREizh7viBgGZMP3CpV8J5rRQWMGC"
-
 console.log('Welcome to \x1b[1m\x1b[5mHOPR\x1b[0m!\n')
 
 if (options['bootstrap-node']) {
-    console.log(`... running as bootstrap node at ${DEFAULT_BOOTSTRAP_ADDRESS}.`)
+    console.log(`... running as bootstrap node!.`)
 }
 
 options.provider = ROPSTEN_WSS_URL
 
 const config = require('./config.json')
+options.signallingPort = config.signallingPort
 
 if (Array.isArray(options._) && options._.length > 0) {
     options.id = `temp ${options._[0]}`
-    config.port = parseInt(config.port) + parseInt(options._[0])
 }
 
-const isIPv4 = config.host.match(/[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}/)
-const isIPv6 = config.host.match(/([0-9a-fA-f]{1,4}:){1,7}[0-9a-fA-f]{1,4}/)
+options.addrs = []
+options.signallingAddrs = []
 
-let addr
-if (isIPv4) {
-    addr = `/ip4/${config.host}/tcp/${config.port}`
-} else if(isIPv6) {
-    addr = `/ip6/${config.host}/tcp/${config.port}`
-} else {
-    throw Error(`Invalid address. Got ${config.host}:${config.port}.`)
-}
-options.addrs = [Multiaddr(addr)]
+config.interfaces.forEach((iface, index) => {
+    // TODO: implement proper dual-stack
+    if (Array.isArray(options._) && options._.length > 0) {
+        iface.signallingPort = parseInt(iface.port) + (config.interfaces.length + 1) * parseInt(options._[0]) + 1
+        iface.port = parseInt(iface.port) + (config.interfaces.length + 1) * parseInt(options._[0])
+    }
+    options.addrs.push(
+        Multiaddr.fromNodeAddress({
+            address: iface.host,
+            port: iface.port,
+        }, 'tcp')
+    )
+    options.signallingAddrs.push(
+        Multiaddr.fromNodeAddress({
+            address: iface.host,
+            port: iface.signallingPort,
+        }, 'tcp')
+    )
+    
+})
+
 
 let node, connected
 waterfall([
     (cb) => createNode(options, cb),
     (_node, cb) => {
         node = _node
-        if (!options['bootstrap-node']) {
-            node.once('peer:connect', (peer) => {
-                console.log(`Incoming connection from ${peer.id.toB58String()}. Press enter to continue.`)
-                connected = true
-            })
-        } else {
+        if (options['bootstrap-node']) {
             node.on('peer:connect', (peer) => {
                 console.log(`Incoming connection from ${peer.id.toB58String()}.`)
             })
@@ -63,6 +68,7 @@ waterfall([
         console.log(`\nAvailable under the following addresses:\n ${node.peerInfo.multiaddrs.toArray().join('\n ')}\n`)
         if (!options['bootstrap-node']) {
             console.log(`Own Ethereum address:\n ${pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal())}`)
+            console.log('Connecting to Bootstrap node(s)...')
             connectToBootstrapNode(cb)
         }
     },
@@ -111,36 +117,46 @@ function selectRecipient(node, cb) {
 }
 
 function connectToBootstrapNode(cb) {
-    forever((cb) => {
-        console.log(`Please type in the Multiaddr of the node you want to connect to.`)
-        read({
-            edit: true,
-            default: DEFAULT_BOOTSTRAP_ADDRESS
-        }, (err, result) => {
-            if (err)
-                process.exit(0)
+    if (!config.bootstrapServers || !Array.isArray(config.bootstrapServers))
+        return cb(Error(`Unable to connect to bootstrap server. Please specify one in 'config.json'`))
+    
+    each(config.bootstrapServers, (addr, cb) => {
+        try {
+            node.dial(Multiaddr(addr), cb)
+        } catch(err) {
+            console.log(err)
+        }
+    }, cb)
+    // forever((cb) => {
+    //     console.log(`Please type in the Multiaddr of the node you want to connect to.`)
+    //     read({
+    //         edit: true,
+    //         default: DEFAULT_BOOTSTRAP_ADDRESS
+    //     }, (err, result) => {
+    //         if (err)
+    //             process.exit(0)
 
-            if (!connected) {
-                try {
-                    const addr = new Multiaddr(result)
-                    node.dial(addr, (err) => {
-                        if (err) {
-                            console.log(`\nUnable to connect to ${addr}. Please try again!`)
-                            cb()
-                        } else {
-                            console.log(`\nSuccessfully connected to ${addr}.`)
-                            cb(addr)
-                        }
-                    })
-                } catch (err) {
-                    console.log(err.message)
-                    cb()
-                }
-            } else {
-                cb(true)
-            }
-        })
-    }, () => cb())
+    //         if (!connected) {
+    //             try {
+    //                 const addr = new Multiaddr(result)
+    //                 node.dial(addr, (err) => {
+    //                     if (err) {
+    //                         console.log(`\nUnable to connect to ${addr}. Please try again!`)
+    //                         cb()
+    //                     } else {
+    //                         console.log(`\nSuccessfully connected to ${addr}.`)
+    //                         cb(addr)
+    //                     }
+    //                 })
+    //             } catch (err) {
+    //                 console.log(err.message)
+    //                 cb()
+    //             }
+    //         } else {
+    //             cb(true)
+    //         }
+    //     })
+    // }, () => cb())
 }
 
 function sendMessages(node, cb) {

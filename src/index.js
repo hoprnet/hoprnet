@@ -17,11 +17,12 @@ const getPeerInfo = require('./getPeerInfo')
 const { randomSubset, serializePeerBook, deserializePeerBook, log } = require('./utils')
 const PendingTransactions = require('./pendingTransactions')
 
-// const wrtc = require('wrtc')
+const wrtc = require('wrtc')
 const WStar = require('libp2p-webrtc-star')
-// const WebRTC = new WStar({
-//     wrtc: wrtc
-// })
+const WebRTC = new WStar({
+    wrtc: wrtc
+})
+const sigServer = require('libp2p-webrtc-star/src/sig-server')
 
 const fs = require('fs')
 const levelup = require('levelup')
@@ -36,7 +37,7 @@ const PaymentChannels = require('./paymentChannels')
 
 const pull = require('pull-stream')
 const lp = require('pull-length-prefixed')
-const { waterfall, times, parallel } = require('neo-async')
+const { waterfall, times, parallel, map } = require('neo-async')
 
 // const BOOTSTRAP_NODE = Multiaddr('/ip4/127.0.0.1/tcp/9090/')
 
@@ -167,18 +168,28 @@ class Hopr extends libp2p {
                 } else {
                     cb()
                 }
-            }
+            },
+            signallingServers: (cb) => map(options.signallingAddrs, (addr, cb) => {
+                const signallingOptions = addr.toOptions()
+                sigServer.start({
+                    host: signallingOptions.host,
+                    port: signallingOptions.port
+                }, cb)
+            }, cb)
         }, (err, results) => {
             if (err)
                 return cb(err)
 
             registerHandlers(this, options)
 
-            if (this.peerInfo.id.pubKey) {
+            if (!options['bootstrap-node']) {
                 this.paymentChannels = results.paymentChannels
             }
 
+            this.registerSignallingServers()
+
             this.heartbeat = heartbeat(this)
+            this.signallingServers = results.signallingServers
 
             return cb(null, this)
         })
@@ -193,11 +204,32 @@ class Hopr extends libp2p {
 
         clearInterval(this.heartbeat)
 
+        this.signallingServers.forEach((server) => server.stop())
+
         waterfall([
             (cb) => this.exportPeerBook(cb),
             (cb) => super.stop(cb),
             (cb) => this.db.close(cb)
         ], cb)
+    }
+
+    registerSignallingServers() {
+        function handleEvent(peer) {
+            // convertPeerId(peer.id, (err, dht_id) => {
+            // const peers = this._dht.routingTable.closestPeers(dht_id, 1)
+            // console.log(err, peers)
+            const peerOptions = peer._connectedMultiaddr.toOptions()
+            const addr = peer._connectedMultiaddr
+                .decapsulate('ipfs')
+                .decapsulate('tcp')
+                .encapsulate(`/tcp/${parseInt(peerOptions.port) + 1}/wss/p2p-webrtc-star`)
+                .encapsulate(`/${c.PROTOCOL_NAME}/${this.peerInfo.id.toB58String()}`)
+
+            this.peerInfo.multiaddrs.add(addr)
+            console.log(`now available under ${addr.toString()}`)
+            // })
+        }
+        this.on('peer:connect', (peer) => setImmediate(handleEvent.bind(this), peer))
     }
 
     /**

@@ -1,4 +1,12 @@
 {
-    "host": "0.0.0.0",
-    "port": "9091"
+    "bootstrapServers": [
+        "/dns4/hopr.validity.io/tcp/9091/ipfs/QmRhtaT1RMJtCzw8yGREizh7viBgGZMP3CpV8J5rRQWMGC"
+    ],
+    "interfaces": [
+        {
+            "host": "0.0.0.0",
+            "port": "9091"
+        }
+    ],
+    "signallingPort": "9102"
 }
