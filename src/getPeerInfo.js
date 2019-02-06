@@ -67,8 +67,8 @@ module.exports = (options, db, cb) => {
         (peerId, cb) => PeerInfo.create(peerId, cb),
         (peerInfo, cb) => {
             options.addrs.forEach((addr) => {
-                addr = addr.encapsulate(`/${PROTOCOL_NAME}/${peerInfo.id.toB58String()}`)
-                peerInfo.multiaddrs.add(addr)
+                peerInfo.multiaddrs.add(addr.encapsulate(`/${PROTOCOL_NAME}/${peerInfo.id.toB58String()}`))
+                peerInfo.multiaddrs.add(addr.encapsulate(`/ws/${PROTOCOL_NAME}/${peerInfo.id.toB58String()}`))
             })
 
             cb(null, peerInfo)
