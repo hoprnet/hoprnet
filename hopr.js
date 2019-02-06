@@ -47,7 +47,7 @@ config.interfaces.forEach((iface, index) => {
     options.signallingAddrs.push(
         Multiaddr.fromNodeAddress({
             address: iface.host,
-            port: iface.signallingPort,
+            port: parseInt(iface.port) + 1,
         }, 'tcp')
     )
     
