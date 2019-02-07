@@ -5,7 +5,7 @@ const TCP = require('libp2p-tcp')
 const MPLEX = require('libp2p-mplex')
 const KadDHT = require('libp2p-kad-dht')
 const SECIO = require('libp2p-secio')
-const WS = require('libp2p-websockets')
+const WebSockets = require('libp2p-websockets')
 
 const defaultsDeep = require('@nodeutils/defaults-deep')
 
@@ -14,6 +14,7 @@ const registerHandlers = require('./handlers')
 const c = require('./constants')
 const crawlNetwork = require('./network/crawl')
 const heartbeat = require('./network/heartbeat')
+const registerSignallingServers = require('./network/signallingServers')
 const getPubKey = require('./getPubKey')
 const getPeerInfo = require('./getPeerInfo')
 const { randomSubset, serializePeerBook, deserializePeerBook, log } = require('./utils')
@@ -61,7 +62,9 @@ class Hopr extends libp2p {
                  * The transport modules to use.
                  */
                 transport: [
-                    TCP, WS, WebRTC
+                    TCP,
+                    WebSockets,
+                    WebRTC
                 ],
                 /**
                  * To support bidirectional connection, we need a stream muxer.
@@ -78,16 +81,23 @@ class Hopr extends libp2p {
                 /**
                  * Necessary to have DHT lookups
                  */
-                dht: KadDHT
+                dht: KadDHT,
                 /**
                  * Necessary to use WebRTC (and to support proper NAT traversal)
                  */
-                // peerDiscovery: [WebRTC.discovery]
+                peerDiscovery: [
+                    WebRTC.discovery
+                ]
             },
             config: {
                 EXPERIMENTAL: {
                     // libp2p DHT implementation is still hidden behind a flag
                     dht: true
+                },
+                peerDiscovery: {
+                    webRTCStar: {
+                        enabled: true
+                    }
                 }
             }
 
@@ -102,7 +112,7 @@ class Hopr extends libp2p {
         //
         // Notice: don't forget to activate the corresponding handler in `handlers/index.js`
         //
-        // this.getPubKey = getPubKey(this)
+        this.getPubKey = getPubKey(this)
         // this.getPubKey = this._dht.getPublicKey
 
         this.pendingTransactions = new PendingTransactions(this.db)
@@ -188,7 +198,9 @@ class Hopr extends libp2p {
                 this.paymentChannels = results.paymentChannels
             }
 
-            this.registerSignallingServers()
+            this.registerSignallingServers = registerSignallingServers(this, options, WebRTC)
+
+            // this.on('peer:connect', this.registerSignallingServers)
 
             this.heartbeat = heartbeat(this)
             this.signallingServers = results.signallingServers
@@ -213,28 +225,6 @@ class Hopr extends libp2p {
             (cb) => super.stop(cb),
             (cb) => this.db.close(cb)
         ], cb)
-    }
-
-    registerSignallingServers() {
-        function handleEvent(peer) {
-            // convertPeerId(peer.id, (err, dht_id) => {
-            // const peers = this._dht.routingTable.closestPeers(dht_id, 1)
-            // console.log(err, peers)
-            // this.dial('/dns4/hopr.validity.io/tcp/9092/wss/p2p-webrtc-star/ipfs/QmS7Wtck9aFHUu2zEzqzEdnzaG5jvp9wxjGYL7JJ15WBJD', (err, conn) => {
-            //     console.log(err, conn)
-            // })
-            // const peerOptions = peer._connectedMultiaddr.toOptions()
-            // const addr = peer._connectedMultiaddr
-            //     .decapsulate('ipfs')
-            //     .decapsulate('tcp')
-            //     .encapsulate(`/tcp/${parseInt(peerOptions.port) + 1}/wss/p2p-webrtc-star`)
-            //     .encapsulate(`/${c.PROTOCOL_NAME}/${this.peerInfo.id.toB58String()}`)
-
-            // this.peerInfo.multiaddrs.add(addr)
-            // console.log(`now available under ${addr.toString()}`)
-            // })
-        }
-        this.on('peer:connect', (peer) => setImmediate(handleEvent.bind(this), peer))
     }
 
     /**
@@ -268,6 +258,7 @@ class Hopr extends libp2p {
 
             waterfall([
                 (cb) => this.getIntermediateNodes(destination, cb),
+                (intermediateNodes, cb) => map(intermediateNodes, this.getPubKey, cb),
                 (intermediateNodes, cb) => {
                     path = intermediateNodes.map(peerInfo => peerInfo.id).concat(destination)
 
@@ -355,6 +346,7 @@ class Hopr extends libp2p {
             } else if (err && err.code === 'ENOENT') {
                 try {
                     fs.mkdirSync(db_dir, {
+                        // TODO: Change to something better
                         mode: 0o777
                     })
                 } catch (err) {
@@ -372,6 +364,7 @@ class Hopr extends libp2p {
                         throw err
                     } else if (err && err.code === 'ENOENT') {
                         fs.mkdirSync(db_dir, {
+                            // TODO: Change to something better
                             mode: 0o777
                         })
                     }

@@ -55,6 +55,7 @@
         "libp2p-tcp": "^0.13.0",
         "libp2p-webrtc-star": "^0.15.8",
         "libp2p-websockets": "^0.12.2",
+        "lodash.differencewith": "^4.5.0",
         "lodash.flatten": "^4.4.0",
         "lodash.foreachright": "^4.4.0",
         "lodash.remove": "^4.7.0",

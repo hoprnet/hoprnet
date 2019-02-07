@@ -10,5 +10,5 @@ module.exports = (node, options) => {
     Crawling(node)
     Heartbeat(node)
 
-    // DeliverPubKey(node)
+    DeliverPubKey(node)
 }

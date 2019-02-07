@@ -37,17 +37,19 @@ if (NET === 'ropsten') {
 const Web3 = require('web3')
 const web3 = new Web3(provider)
 
-const fundingPeer = privKeyToPeerId(FUNDING_KEY)
-
 console.log(
     'Welcome to \x1b[1m\x1b[5mHOPR\x1b[0m!\n' +
     'Please wait some time until the node is set up.\n' +
     '\x1b[2mThis may take some time ...\n' +
     'Meanwhile you can start reading the wiki at https://github.com/validitylabs/messagingProtocol/wiki\x1b[0m\n')
 
-let index, compiledContract
+let index, compiledContract, fundingPeer
 waterfall([
-    (cb) => web3.eth.getTransactionCount(FUNDING_ACCOUNT, cb),
+    (cb) => privKeyToPeerId(FUNDING_KEY, cb),
+    (_fundingPeer, cb) => {
+        fundingPeer = _fundingPeer
+        web3.eth.getTransactionCount(FUNDING_ACCOUNT, cb)
+    },
     (_index, cb) => {
         index = _index
 

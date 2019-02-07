@@ -1,6 +1,12 @@
 'use stric'
 
 const { parallel, times, series, each, waterfall } = require('neo-async')
+const { createNode } = require('../../src')
+const { pubKeyToEthereumAddress, sendTransaction } = require('../../src/utils')
+const { GAS_PRICE, STAKE_GAS_AMOUNT } = require('../../src/constants')
+const { toWei } = require('web3-utils')
+const Web3 = require('web3')
+const Multiaddr = require('multiaddr')
 
 /**
  * Allow nodes to find each other by establishing connections
@@ -18,28 +24,40 @@ module.exports.warmUpNodes = (nodes, cb) =>
         (err, _) => cb(err, nodes)
     )
 
-const { createNode } = require('../../src')
-const { pubKeyToEthereumAddress, sendTransaction } = require('../../src/utils')
-const { GAS_PRICE, STAKE_GAS_AMOUNT } = require('../../src/constants')
-const { toWei } = require('web3-utils')
-const Web3 = require('web3')
-
 /**
  * Create HOPR nodes, establish a connection between them and fund their corresponding
  * Ethereum account with some ether. And finally stake a fraction of that ether in order
  * open payment channel inside the HOPR contract.
  * 
- * @param {Number} amountOfNodes number of nodes that should be generated
- * @param {Object} contract an instance of Web3.js' contract interface
- * @param {Object} web3 an instance of Web3.js
- * @param {Number} nonce the current nonce
- * @param {Function} cb the function that gets called afterwards with (err, nodes)
+ * @param {number} amountOfNodes number of nodes that should be generated
+ * @param {object} options
+ * @param {string} options.provider web3.js provider, e. g. `ws://localhost:8545`
+ * @param {PeerId} peerId a peerId that contains public key and private key
+ * @param {number} nonce the current nonce
+ * @param {function} cb the function that will be called afterwards with `(err, nodes)`
  */
 module.exports.createFundedNodes = (amountOfNodes, options, peerId, nonce, cb) => {
+    const config = require('../../config.json')
     waterfall([
         (cb) => times(amountOfNodes, (n, cb) =>
             createNode(Object.assign({
-                id: `temp ${n}`
+                id: `temp ${n}`,
+                addrs: [
+                    Multiaddr.fromNodeAddress({
+                        address: "0.0.0.0",
+                        port: parseInt("9091") + 2 * n
+                    }, 'tcp')
+                ],
+                signallingServers: [
+                    Multiaddr.fromNodeAddress({
+                        address: "0.0.0.0",
+                        port: parseInt("9091") + 2 * n + 1
+                    }, 'tcp')
+                ],
+                bootstrapServers: [],
+                WebRTC: {
+                    signallingServers: 3
+                }
             }, options), cb), cb),
         (nodes, cb) => parallel([
             (cb) => this.warmUpNodes(nodes, cb),

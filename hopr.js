@@ -23,7 +23,6 @@ if (options['bootstrap-node']) {
 options.provider = ROPSTEN_WSS_URL
 
 const config = require('./config.json')
-options.signallingPort = config.signallingPort
 
 if (Array.isArray(options._) && options._.length > 0) {
     options.id = `temp ${options._[0]}`
@@ -32,10 +31,10 @@ if (Array.isArray(options._) && options._.length > 0) {
 options.addrs = []
 options.signallingAddrs = []
 
-config.interfaces.forEach((iface, index) => {
+config.interfaces.forEach((iface) => {
     // TODO: implement proper dual-stack
     if (Array.isArray(options._) && options._.length > 0) {
-        iface.port = parseInt(iface.port) + (config.interfaces.length + 1) * parseInt(options._[0])
+        iface.port = parseInt(iface.port) + 2 * parseInt(options._[0])
     }
     options.addrs.push(
         Multiaddr.fromNodeAddress({
@@ -49,9 +48,15 @@ config.interfaces.forEach((iface, index) => {
             port: parseInt(iface.port) + 1,
         }, 'tcp')
     )
-    
 })
 
+options.bootstrapServers = []
+
+config.bootstrapServers.forEach((addr) => {
+    options.bootstrapServers.push(Multiaddr(addr))
+})
+
+options.WebRTC = config.WebRTC
 
 let node, connected
 waterfall([
@@ -118,11 +123,11 @@ function selectRecipient(node, cb) {
 function connectToBootstrapNode(cb) {
     if (!config.bootstrapServers || !Array.isArray(config.bootstrapServers))
         return cb(Error(`Unable to connect to bootstrap server. Please specify one in 'config.json'`))
-    
+
     each(config.bootstrapServers, (addr, cb) => {
         try {
             node.dial(Multiaddr(addr), cb)
-        } catch(err) {
+        } catch (err) {
             console.log(err)
         }
     }, cb)

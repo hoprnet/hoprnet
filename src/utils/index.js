@@ -134,7 +134,8 @@ module.exports.bufferToNumber = (buf) => {
  * 
  * @param  {Array} array the array to pick the elements from
  * @param  {Number} subsetSize the requested size of the subset
- * @param  {Function} filter
+ * @param  {Function} filter called with `(peerInfo)` and should return `true`
+ * for every node that should be in the subset
  * 
  * @returns {Array} array with at most @param subsetSize elements
  * that pass the test.
@@ -152,7 +153,7 @@ module.exports.randomSubset = (array, subsetSize, filter = _ => true) => {
     if (subsetSize > array.length)
         throw Error('Invalid subset size. Subset size must not be greater than set size.')
 
-    if (subsetSize == 0)
+    if (subsetSize <= 0)
         return []
 
     if (subsetSize === array.length)
@@ -439,7 +440,7 @@ module.exports.peerIdToWeb3Account = (peerId, web3) => {
     if (!peerId.privKey)
         throw Error(`Unable to find private key. Please insert a peerId that is equipped with a private key.`)
 
-    web3.eth.accounts.privateKeyToAccount('0x'.concat(peerId.privKey.marshal().toString('hex')))
+    return web3.eth.accounts.privateKeyToAccount('0x'.concat(peerId.privKey.marshal().toString('hex')))
 }
 
 /**
