@@ -152,7 +152,6 @@ waterfall([
     (cb) => crawlNetwork(node, cb),
     (cb) => {
         if (options['send-messages']) {
-            setInterval()
             const sendMessage = () => {
                 const recipient = randomSubset(node.peerBook.getAllArray(), 1, (peerInfo) =>
                     !options.bootstrapServers.some((multiaddr) => PeerId.createFromB58String(multiaddr.getPeerId()).isEqual(peerInfo.id))
