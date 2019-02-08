@@ -30,6 +30,7 @@ module.exports = (node) => node.handle(PROTOCOL_PAYMENT_CHANNEL, (protocol, conn
             // checking whether the information provided by libp2p network
             // stack is plausible
             (cb) => conn.getPeerInfo(cb),
+            (peerInfo, cb) => node.getPubKey(peerInfo, cb),
             (peerInfo, cb) => {
                 if (peerInfo.id.pubKey) {
                     if (peerInfo.id.pubKey.marshal().compare(counterparty) !== 0)
