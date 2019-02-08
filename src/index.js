@@ -294,7 +294,7 @@ class Hopr extends libp2p {
                         lp.encode(),
                         conn
                     )
-                    cb()
+                    //cb()
                 }
             ], cb)
         }, cb)
