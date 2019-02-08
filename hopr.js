@@ -184,7 +184,8 @@ function selectRecipient(node, cb) {
     let peers
 
     forever((cb) => {
-        peers = node.peerBook.getAllArray()
+        peers = node.peerBook.getAllArray().filter((peerInfo) => !options.bootstrapServers.some((multiaddr) => PeerId.createFromB58String(multiaddr.getPeerId()).isEqual(peerInfo.id))
+        )
         console.log(
             peers.reduce((acc, peerInfo, index) => {
                 return acc.concat(`[${index + 1}] \x1b[34m${peerInfo.id.toB58String()}\x1b[0m\n`)
