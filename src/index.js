@@ -200,6 +200,7 @@ class Hopr extends libp2p {
             }
 
             this.registerSignallingServers = registerSignallingServers(this, options, WebRTC)
+            this.bootstrapServers = options.bootstrapServers
 
             // this.on('peer:connect', this.registerSignallingServers)
 
@@ -309,7 +310,8 @@ class Hopr extends libp2p {
     getIntermediateNodes(destination, cb) {
         const comparator = (peerInfo) =>
             this.peerInfo.id.id.compare(peerInfo.id.id) !== 0 &&
-            destination.id.compare(peerInfo.id.id) !== 0
+            destination.id.compare(peerInfo.id.id) !== 0 &&
+            !this.bootstrapServers.some((multiaddr) => PeerId.createFromB58String(multiaddr.getPeerId()).isEqual(peerInfo.id))
 
         return this.crawlNetwork(() => {
             const path = randomSubset(
