@@ -16,14 +16,14 @@ const p = require('./parameters')
 module.exports = (Header, header, peerIds) => {
     function checkPeerIds() {
         if (!Array.isArray(peerIds))
-            throw Error('Expected array of peerIds. Got \"' + typeof publicKeys + '\" instead.')
+            throw Error(`Expected array of peerIds. Got '${typeof publicKeys}' instead.`)
 
         if (peerIds.length > c.MAX_HOPS)
             peerIds = peerIds.slice(0, c.MAX_HOPS)
 
         peerIds.forEach((peerId, index) => {
             if (peerId === undefined || peerId.id === undefined || peerId.pubKey === undefined)
-                throw Error('Invalid peerId at index ' + index + '.')
+                throw Error(`Invalid peerId at index ${index}.`)
         })
     }
 

@@ -37,7 +37,6 @@ module.exports.warmUpNodes = (nodes, cb) =>
  * @param {function} cb the function that will be called afterwards with `(err, nodes)`
  */
 module.exports.createFundedNodes = (amountOfNodes, options, peerId, nonce, cb) => {
-    const config = require('../../config.json')
     waterfall([
         (cb) => times(amountOfNodes, (n, cb) =>
             createNode(Object.assign({

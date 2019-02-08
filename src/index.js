@@ -31,6 +31,7 @@ const fs = require('fs')
 const levelup = require('levelup')
 const leveldown = require('leveldown')
 
+const PeerId = require('peer-id')
 const PeerInfo = require('peer-info')
 const PeerBook = require('peer-book')
 const { resolve } = require('path')
@@ -236,18 +237,31 @@ class Hopr extends libp2p {
      * funds controlled by the given key pair.
      * 
      * @param {Number | String | Buffer} msg message to send
-     * @param {Object} destination PeerId of the destination
-     * @param {Function} cb function to call when finished
+     * @param {PeerId | PeerInfo | String} destination PeerId of the destination
+     * @param {Function} cb called with `(err)` in case of an error, or when receiving 
+     * the acknowledgement of the first hop
      */
     sendMessage(msg, destination, cb) {
         if (!msg)
-            throw Error('Expecting non-empty message.')
+            throw Error(`Expecting a non-empty message.`)
+
+        if (!destination)
+            throw Error(`Expecting a non-empty destination.`)
+
+        if (PeerInfo.isPeerInfo(destination))
+            destination = destination.id
+
+        if (typeof destination === 'string')
+            destination = PeerId.createFromB58String(destination)
+
+        if (!PeerId.isPeerId(destination))
+            throw Error(`Unable to parse given destination to a PeerId instance. Got type ${typeof destination} with value ${destination}.`)
 
         // Let's try to convert input msg to a Buffer in case it isn't already a Buffer
         if (!Buffer.isBuffer(msg)) {
             switch (typeof msg) {
                 default:
-                    throw Error('Invalid input value. Got \"' + typeof msg + '\".')
+                    throw Error(`Invalid input value. Got '${typeof msg}'.`)
                 case 'number': msg = msg.toString()
                 case 'string': msg = Buffer.from(msg)
             }

@@ -5,12 +5,16 @@ const { createNode } = require('./src')
 const read = require('read')
 const getopts = require('getopts')
 const Multiaddr = require('multiaddr')
-const { pubKeyToEthereumAddress } = require('./src/utils')
-const { ROPSTEN_WSS_URL } = require('./src/constants')
+const { pubKeyToEthereumAddress, randomSubset, privKeyToPeerId, sendTransaction } = require('./src/utils')
+const { ROPSTEN_WSS_URL, CONTRACT_ADDRESS, STAKE_GAS_AMOUNT } = require('./src/constants')
+const PeerId = require('peer-id')
+const BN = require('bn.js')
+const { toWei, fromWei } = require('web3-utils')
 
 const options = getopts(process.argv.slice(2), {
     alias: {
-        b: "bootstrap-node"
+        b: "bootstrap-node",
+        m: "send-messages",
     }
 })
 
@@ -60,9 +64,77 @@ options.WebRTC = config.WebRTC
 
 let node, connected
 waterfall([
+    (cb) => {
+        if (options.id) {
+            const secrets = require('./config/.secrets.json')
+            privKeyToPeerId(secrets.demoAccounts[options._[0]].privateKey, (err, peerId) => {
+                if (err)
+                    return cb(err)
+
+                options.peerId = peerId
+                return cb()
+            })
+        } else {
+            return cb()
+        }
+    },
     (cb) => createNode(options, cb),
     (_node, cb) => {
         node = _node
+        console.log(node.peerInfo.id.privKey.marshal().toString('hex'))
+        if (!options['bootstrap-node']) {
+            node.paymentChannels.web3.eth.getBalance(pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()), (err, funds) => {
+                if (err)
+                    return cb(err)
+
+                console.log(`Own Ethereum address:\n ${pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal())}.\n Funds: ${fromWei(funds, 'ether')} ETH`)
+
+                funds = new BN(funds)
+                const minimalFunds = new BN(toWei('0.15', 'ether'))
+
+                if (funds.lt(minimalFunds))
+                    return cb(Error(`Insufficient funds. Got only ${fromWei(funds.toString(), 'ether')} ETH. Please fund the account with at least ${fromWei((minimalFunds).sub(funds), 'Ether')} ETH.`))
+
+                return cb()
+            })
+        } else {
+            return cb()
+        }
+    },
+    (cb) => {
+        const ownAddress = pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal())
+        if (!options['bootstrap-node']) {
+            node.paymentChannels.contract.methods
+                .states(ownAddress)
+                .call({
+                    from: ownAddress
+                }, (err, state) => {
+                    if (err)
+                        return cb(err)
+
+                    console.log(` Stake: ${fromWei(state.stakedEther, 'ether')} ETH`)
+                    const stakedEther = new BN(state.stakedEther)
+                    if (stakedEther.lt(new BN(toWei('0.1', 'ether')))) {
+                        sendTransaction({
+                            from: ownAddress,
+                            to: CONTRACT_ADDRESS,
+                            value: toWei('0.11', 'ether'),
+                            gas: STAKE_GAS_AMOUNT
+                        }, node.peerInfo.id, node.paymentChannels.web3, (err, receipt) => {
+                            if (err)
+                                return cb(err)
+
+                            return cb()
+                        })
+                    } else {
+                        return cb()
+                    }
+                })
+        } else {
+            return cb()
+        }
+    },
+    (cb) => {
         if (options['bootstrap-node']) {
             node.on('peer:connect', (peer) => {
                 console.log(`Incoming connection from ${peer.id.toB58String()}.`)
@@ -71,20 +143,41 @@ waterfall([
 
         console.log(`\nAvailable under the following addresses:\n ${node.peerInfo.multiaddrs.toArray().join('\n ')}\n`)
         if (!options['bootstrap-node']) {
-            console.log(`Own Ethereum address:\n ${pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal())}`)
             console.log('Connecting to Bootstrap node(s)...')
             connectToBootstrapNode(cb)
         }
     },
-    (cb) => crawlNetwork(node, cb),
+    // (cb) => node.crawlNetwork(cb),
+    // (cb) => node.sendMessage('123', node.peerBook.getAllArray()[0].id, cb),
     (cb) => {
-        if (!options['bootstrap-node']) {
-            sendMessages(node, cb)
+        if (options['send-messages']) {
+            node.crawlNetwork(cb)
+        } else {
+            crawlNetwork(node, cb)
         }
+    },
+    (cb) => {
+        if (options['send-messages']) {
+            const recipient = randomSubset(node.peerBook.getAllArray(), 1, (peerInfo) =>
+                !options.bootstrapServers.some((multiaddr) => PeerId.createFromB58String(multiaddr.getPeerId()).isEqual(peerInfo.id))
+            )
+            return node.sendMessage('Test test', recipient[0].id, cb)
+        } else if (options['bootstrap-node']) {
+            return cb()
+        } else {
+            return sendMessages(node, cb)
+        }
+    },
+    (cb) => {
+        if (options['bootstrap-node'])
+            return cb()
+
+
+        sendMessages(node, cb)
     }
 ], (err) => {
     if (err)
-        throw err
+        console.log(err.message)
 })
 
 function selectRecipient(node, cb) {
@@ -173,9 +266,11 @@ function sendMessages(node, cb) {
             }, (err, result) => {
                 if (err)
                     process.exit(0)
-                //node.sendMessage()
 
                 console.log(`Sending "${result}" to \x1b[34m${destination.id.toB58String()}\x1b[0m.\n`)
+
+                node.sendMessage(result, destination.id, cb)
+
                 cb()
             })
         }

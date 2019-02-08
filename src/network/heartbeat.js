@@ -18,7 +18,7 @@ module.exports = (node) => setInterval(() => {
             // check whether node was seen recently
             Date.now() - (node.peerBook.getAll()[peer.id.toB58String()].lastSeen || 0) > THIRTY_ONE_SECONDS
         ) {
-            console.log(`Last seen ${peer.id.toB58String()} at ${node.peerBook.getAll()[peer.id.toB58String()].lastSeen}.`)
+            // console.log(`Last seen ${peer.id.toB58String()} at ${node.peerBook.getAll()[peer.id.toB58String()].lastSeen}.`)
             return waterfall([
                 (cb) => node.peerRouting.findPeer(peer.id, cb),
                 (peerInfo, cb) => node.dialProtocol(peerInfo, PROTOCOL_HEARTBEAT, cb),
