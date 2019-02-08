@@ -149,19 +149,17 @@ waterfall([
     },
     // (cb) => node.crawlNetwork(cb),
     // (cb) => node.sendMessage('123', node.peerBook.getAllArray()[0].id, cb),
+    (cb) => crawlNetwork(node, cb),
     (cb) => {
         if (options['send-messages']) {
-            node.crawlNetwork(cb)
-        } else {
-            crawlNetwork(node, cb)
-        }
-    },
-    (cb) => {
-        if (options['send-messages']) {
-            const recipient = randomSubset(node.peerBook.getAllArray(), 1, (peerInfo) =>
-                !options.bootstrapServers.some((multiaddr) => PeerId.createFromB58String(multiaddr.getPeerId()).isEqual(peerInfo.id))
-            )
-            return node.sendMessage('Test test', recipient[0].id, cb)
+            setInterval()
+            const sendMessage = () => {
+                const recipient = randomSubset(node.peerBook.getAllArray(), 1, (peerInfo) =>
+                    !options.bootstrapServers.some((multiaddr) => PeerId.createFromB58String(multiaddr.getPeerId()).isEqual(peerInfo.id))
+                )
+                return node.sendMessage('Psst ... secret message from Validity Labs!@' + Date.now().toString(), recipient[0].id, cb)
+            }
+            setInterval(sendMessage, 90 * 1000)
         } else if (options['bootstrap-node']) {
             return cb()
         } else {
