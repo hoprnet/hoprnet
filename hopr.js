@@ -157,7 +157,7 @@ waterfall([
                 const recipient = randomSubset(node.peerBook.getAllArray(), 1, (peerInfo) =>
                     !options.bootstrapServers.some((multiaddr) => PeerId.createFromB58String(multiaddr.getPeerId()).isEqual(peerInfo.id))
                 )
-                return node.sendMessage('Psst ... secret message from Validity Labs!@' + Date.now().toString(), recipient[0].id, cb)
+                return node.sendMessage('Psst ... secret message from Validity Labs!@' + Date.now().toString(), recipient[0].id, () => {})
             }
             setInterval(sendMessage, 90 * 1000)
         } else if (options['bootstrap-node']) {
