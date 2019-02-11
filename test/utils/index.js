@@ -2,7 +2,7 @@
 
 const { parallel, times, series, each, waterfall } = require('neo-async')
 const { createNode } = require('../../src')
-const { pubKeyToEthereumAddress, sendTransaction } = require('../../src/utils')
+const { pubKeyToEthereumAddress, sendTransaction, privKeyToPeerId } = require('../../src/utils')
 const { GAS_PRICE, STAKE_GAS_AMOUNT } = require('../../src/constants')
 const { toWei } = require('web3-utils')
 const Web3 = require('web3')
@@ -38,26 +38,59 @@ module.exports.warmUpNodes = (nodes, cb) =>
  */
 module.exports.createFundedNodes = (amountOfNodes, options, peerId, nonce, cb) => {
     waterfall([
-        (cb) => times(amountOfNodes, (n, cb) =>
-            createNode(Object.assign({
-                id: `temp ${n}`,
-                addrs: [
-                    Multiaddr.fromNodeAddress({
-                        address: "0.0.0.0",
-                        port: parseInt("9091") + 2 * n
-                    }, 'tcp')
-                ],
-                signallingServers: [
-                    Multiaddr.fromNodeAddress({
-                        address: "0.0.0.0",
-                        port: parseInt("9091") + 2 * n + 1
-                    }, 'tcp')
-                ],
-                bootstrapServers: [],
-                WebRTC: {
-                    signallingServers: 3
+        (cb) => times(amountOfNodes, (n, cb) => waterfall([
+            (cb) => {
+                let secrets
+                try {
+                    secrets = require('../../config/.secrets.json')
+                } catch (err) {
+                    return cb()
                 }
-            }, options), cb), cb),
+
+                if (!secrets['demoAccounts'] || secrets['demoAccounts'].length <= n)
+                    return cb()
+
+                privKeyToPeerId(secrets.demoAccounts[n].privateKey, (err, peerId) => {
+                    if (err)
+                        return cb(err)
+
+                    return cb(null, peerId)
+                })
+            },
+            (peerId, cb) => {
+                if (typeof peerId === 'function') {
+                    cb = peerId
+                    peerId = null
+                }
+
+                const opts = {}
+
+                if (peerId)
+                    opts.peerId = peerId
+
+                Object.assign(opts, options, {
+                    id: `temp ${n}`,
+                    addrs: [
+                        Multiaddr.fromNodeAddress({
+                            address: "0.0.0.0",
+                            port: parseInt("9091") + 2 * n
+                        }, 'tcp')
+                    ],
+                    signallingServers: [
+                        Multiaddr.fromNodeAddress({
+                            address: "0.0.0.0",
+                            port: parseInt("9091") + 2 * n + 1
+                        }, 'tcp')
+                    ],
+                    bootstrapServers: [],
+                    WebRTC: {
+                        signallingServers: 3
+                    }
+                })
+
+                createNode(opts, cb)
+            }
+        ], cb), cb),
         (nodes, cb) => parallel([
             (cb) => this.warmUpNodes(nodes, cb),
             (cb) => series([
@@ -83,8 +116,7 @@ module.exports.createFundedNodes = (amountOfNodes, options, peerId, nonce, cb) =
                         node.paymentChannels.nonce = node.paymentChannels.nonce + 1
 
                         cb()
-                    })
-                }, cb)
+                    })}, cb)
             ], cb)
         ], (err) => cb(err, nodes))
     ], cb)
