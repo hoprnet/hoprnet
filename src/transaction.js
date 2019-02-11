@@ -24,7 +24,7 @@ class Transaction {
             encrypted = buf
             buf = Buffer.alloc(Transaction.SIZE)
         }
-        
+
         this.buffer = buf
         this.encrypted = encrypted
     }
@@ -104,6 +104,9 @@ class Transaction {
      * @param {Buffer} newValue the balance of the transaction
      */
     set value(newValue) {
+        delete this._counterparty
+        delete this._hash
+
         this.value.fill(newValue, 0, VALUE_LENGTH)
     }
 
@@ -113,6 +116,9 @@ class Transaction {
     set signature(newSignature) {
         if (this.encrypted)
             throw Error(`Can't set signature of encrypted transaction.`)
+
+        delete this._counterparty
+        delete this._hash
 
         this.signature.fill(newSignature, 0, SIGNATURE_LENGTH)
     }
@@ -126,18 +132,18 @@ class Transaction {
         if (!Buffer.isBuffer(newIndex))
             throw Error(`Invalid input value. Expected a number or a buffer but got ${typeof newIndex}.`)
 
+        delete this._counterparty
+        delete this._hash
+
         this.index.fill(newIndex, 0, INDEX_LENGTH)
     }
-    // set index(newIndex) {
-    //     this.buffer
-    //         .slice(SIGNATURE_LENGTH + NONCE_LENGTH, SIGNATURE_LENGTH + NONCE_LENGTH + INDEX_LENGTH)
-    //         .fill(numberToBuffer(newIndex, INDEX_LENGTH), 0, INDEX_LENGTH)
-    // }
 
     /**
      * @param {Buffer} nonce the nonce of the transaction
      */
     set nonce(nonce) {
+        delete this._counterparty
+
         this.nonce.fill(nonce, 0, NONCE_LENGTH)
     }
 
@@ -151,6 +157,9 @@ class Transaction {
         if (!Buffer.isBuffer(newRecovery))
             throw Error('Unable to parse input to Buffer.')
 
+        delete this._counterparty
+        delete this._hash
+
         this.recovery.fill(newRecovery, 0, RECOVERY_LENGTH)
     }
 
@@ -160,12 +169,18 @@ class Transaction {
      * will be computed
      */
     get hash() {
-        return hash(this.buffer.slice(SIGNATURE_LENGTH, SIGNATURE_LENGTH + NONCE_LENGTH + INDEX_LENGTH + VALUE_LENGTH))
+        if (this._hash)
+            return this._hash
+
+        this._hash = hash(this.buffer.slice(SIGNATURE_LENGTH, SIGNATURE_LENGTH + NONCE_LENGTH + INDEX_LENGTH + VALUE_LENGTH))
+
+        return this._hash
     }
 
     /**
-     * Returns by using the peerId of that node the channelId of that payment
-     * channel.
+     * Returns the channelId. It tries to derive the public key from the embedded
+     * signature and uses that key in combination with the given `peerId` to derive
+     * the `channelId`
      * 
      * @param {PeerId} peerId peerId of the node
      * @returns {Buffer} the channelId
@@ -187,7 +202,12 @@ class Transaction {
         if (this.encrypted)
             throw Error(`Can't derive counterparty from encrypted transaction.`)
 
-        return recover(this.hash, this.signature, bufferToNumber(this.recovery))
+        if (this._counterparty)
+            return this._counterparty
+
+        this._counterparty = recover(this.hash, this.signature, bufferToNumber(this.recovery))
+
+        return this._counterparty
     }
 
     // ========= Methods =========
