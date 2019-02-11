@@ -67,16 +67,19 @@ waterfall([
     (cb) => {
         if (options.id) {
             const secrets = require('./config/.secrets.json')
-            privKeyToPeerId(secrets.demoAccounts[options._[0]].privateKey, (err, peerId) => {
-                if (err)
-                    return cb(err)
 
-                options.peerId = peerId
-                return cb()
-            })
-        } else {
-            return cb()
+            if (secrets['demoAccounts'] && secrets['demoAccounts'].length > parseInt(options._[0])) {
+                privKeyToPeerId(secrets.demoAccounts[options._[0]].privateKey, (err, peerId) => {
+                    if (err)
+                        return cb(err)
+    
+                    options.peerId = peerId
+                    return cb()
+                })
+            }
         }
+        
+        cb()
     },
     (cb) => createNode(options, cb),
     (_node, cb) => {
