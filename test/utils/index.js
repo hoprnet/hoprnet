@@ -1,6 +1,6 @@
 'use stric'
 
-const { parallel, times, series, each, waterfall } = require('neo-async')
+const { applyEach, times, series, each, waterfall } = require('neo-async')
 const { createNode } = require('../../src')
 const { pubKeyToEthereumAddress, sendTransaction, privKeyToPeerId } = require('../../src/utils')
 const { GAS_PRICE, STAKE_GAS_AMOUNT } = require('../../src/constants')
@@ -50,7 +50,7 @@ module.exports.createFundedNodes = (amountOfNodes, options, peerId, nonce, cb) =
                 if (!secrets['demoAccounts'] || secrets['demoAccounts'].length <= n)
                     return cb()
 
-                privKeyToPeerId(secrets.demoAccounts[n].privateKey, (err, peerId) => {
+                return privKeyToPeerId(secrets.demoAccounts[n].privateKey, (err, peerId) => {
                     if (err)
                         return cb(err)
 
@@ -88,36 +88,34 @@ module.exports.createFundedNodes = (amountOfNodes, options, peerId, nonce, cb) =
                     }
                 })
 
-                createNode(opts, cb)
+                return createNode(opts, cb)
             }
         ], cb), cb),
-        (nodes, cb) => parallel([
+        (nodes, cb) => applyEach([
             (cb) => this.warmUpNodes(nodes, cb),
-            (cb) => series([
-                (cb) => times(amountOfNodes, (n, cb) =>
-                    sendTransaction({
-                        from: pubKeyToEthereumAddress(peerId.pubKey.marshal()),
-                        to: pubKeyToEthereumAddress(nodes[n].peerInfo.id.pubKey.marshal()),
-                        value: toWei('0.05', 'ether'),
-                        gas: STAKE_GAS_AMOUNT,
-                        gasPrice: GAS_PRICE,
-                        nonce: nonce + n
-                    }, peerId, new Web3(options.provider), cb), cb),
-                (cb) => each(nodes, (node, cb) => {
-                    sendTransaction({
-                        to: options.contractAddress,
-                        value: toWei('0.000001', 'ether'),
-                        gas: STAKE_GAS_AMOUNT,
-                        gasPrice: GAS_PRICE
-                    }, node.peerInfo.id, new Web3(options.provider), (err) => {
-                        if (err)
-                            throw err
+            (cb) => times(amountOfNodes, (n, cb) =>
+                sendTransaction({
+                    from: pubKeyToEthereumAddress(peerId.pubKey.marshal()),
+                    to: pubKeyToEthereumAddress(nodes[n].peerInfo.id.pubKey.marshal()),
+                    value: toWei('0.05', 'ether'),
+                    gas: STAKE_GAS_AMOUNT,
+                    gasPrice: GAS_PRICE,
+                    nonce: nonce + n
+                }, peerId, new Web3(options.provider), cb), cb),
+            (cb) => each(nodes, (node, cb) =>
+                sendTransaction({
+                    to: options.contractAddress,
+                    value: toWei('0.000001', 'ether'),
+                    gas: STAKE_GAS_AMOUNT,
+                    gasPrice: GAS_PRICE
+                }, node.peerInfo.id, new Web3(options.provider), (err) => {
+                    if (err)
+                        return cb(err)
 
-                        node.paymentChannels.nonce = node.paymentChannels.nonce + 1
+                    node.paymentChannels.nonce = node.paymentChannels.nonce + 1
 
-                        cb()
-                    })}, cb)
-            ], cb)
+                    cb()
+                }), cb)
         ], (err) => cb(err, nodes))
     ], cb)
 }

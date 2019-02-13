@@ -139,7 +139,7 @@ class Hopr extends libp2p {
 
         let db_dir = resolve(__dirname, '../db')
         waterfall([
-            (cb) => options.id ? Hopr.openDatabase(db_dir, { id: options.id }, cb) : Hopr.openDatabase(db_dir, cb),
+            (cb) => Hopr.openDatabase(db_dir, options, cb),
             (db, cb) => parallel({
                 peerBook: (cb) => {
                     if (options.peerBook) {
@@ -292,9 +292,15 @@ class Hopr extends libp2p {
                     pull(
                         pull.once(packet.toBuffer()),
                         lp.encode(),
-                        conn
+                        conn,
+                        lp.decode(),
+                        pull.collect((err, data) => {
+                            if (err)
+                                return cb(err)
+
+                            return cb()
+                        })
                     )
-                    //cb()
                 }
             ], cb)
         }, cb)

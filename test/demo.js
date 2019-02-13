@@ -14,28 +14,9 @@ const FUNDING_KEY = HARDCODED_PRIV_KEY
 const AMOUUNT_OF_NODES = 4
 const AMOUNT_OF_MESSAGES = 3
 
-let provider, server
-if (NET === 'ropsten') {
-    provider = ROPSTEN_WSS_URL
-} else if (NET === 'ganache') {
-    const GANACHE_PORT = 8545
-    const GANACHE_HOSTNAME = 'localhost'
-    server = require('ganache-core').server({
-        accounts: [
-            {
-                balance: '0xd3c21bcecceda0000000',
-                secretKey: FUNDING_KEY
-            }
-        ]
-    })
-    server.listen(GANACHE_PORT, GANACHE_HOSTNAME)
 
-    provider = `ws://${GANACHE_HOSTNAME}:${GANACHE_PORT}`
-
-    console.log(`Successfully started local Ganache instance at 'ws://${GANACHE_HOSTNAME}:${GANACHE_PORT}'.`)
-}
 const Web3 = require('web3')
-const web3 = new Web3(provider)
+let provider, server, web3
 
 console.log(
     'Welcome to \x1b[1m\x1b[5mHOPR\x1b[0m!\n' +
@@ -45,15 +26,44 @@ console.log(
 
 let index, compiledContract, fundingPeer
 waterfall([
+    (cb) => {
+        if (NET === 'ropsten') {
+            provider = ROPSTEN_WSS_URL
+
+            return cb()
+        } else if (NET === 'ganache') {
+            const GANACHE_PORT = 8545
+            const GANACHE_HOSTNAME = 'localhost'
+            server = require('ganache-core').server({
+                accounts: [
+                    {
+                        balance: '0xd3c21bcecceda0000000',
+                        secretKey: FUNDING_KEY
+                    }
+                ]
+            })
+            server.listen(GANACHE_PORT, GANACHE_HOSTNAME, (err) => {
+                if (err)
+                    return cb(err)
+
+                console.log(`Successfully started local Ganache instance at 'ws://${GANACHE_HOSTNAME}:${GANACHE_PORT}'.`)
+
+                provider = `ws://${GANACHE_HOSTNAME}:${GANACHE_PORT}`
+                
+                return cb()
+            })
+        }
+    },
     (cb) => privKeyToPeerId(FUNDING_KEY, cb),
     (_fundingPeer, cb) => {
+        web3 = new Web3(provider)
         fundingPeer = _fundingPeer
         web3.eth.getTransactionCount(FUNDING_ACCOUNT, cb)
     },
     (_index, cb) => {
         index = _index
 
-        compileIfNecessary([resolve(__dirname, '../contracts/HoprChannel.sol')], [resolve(__dirname, '../build/contracts/HoprChannel.json')], cb)
+        return compileIfNecessary([resolve(__dirname, '../contracts/HoprChannel.sol')], [resolve(__dirname, '../build/contracts/HoprChannel.json')], cb)
     },
     (_, cb) => {
         compiledContract = require('../build/contracts/HoprChannel.json')
@@ -73,10 +83,10 @@ waterfall([
 
                 console.log(`\nDeployed contract at \x1b[32m${receipt.contractAddress}\x1b[0m.\nNonce is now \x1b[31m${index}\x1b[0m.\n`)
 
-                cb(null, receipt.contractAddress)
+                return cb(null, receipt.contractAddress)
             })
         } else {
-            cb(null, CONTRACT_ADDRESS)
+           return cb(null, CONTRACT_ADDRESS)
         }
     },
     (contractAddress, cb) => createFundedNodes(AMOUUNT_OF_NODES, {
@@ -86,7 +96,7 @@ waterfall([
     (nodes, cb) => series([
         (cb) => timesSeries(AMOUNT_OF_MESSAGES, (n, cb) => {
             nodes[0].sendMessage('Psst ... secret message from Validity Labs!@' + Date.now().toString(), nodes[3].peerInfo.id)
-    
+
             if (NET === 'ganache') {
                 setTimeout(cb, 2000)
             } else {
@@ -101,4 +111,4 @@ waterfall([
         }, cb)
     ], cb),
     (cb) => server.close(cb)
-], () => {})
+], () => { })

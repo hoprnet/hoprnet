@@ -92,7 +92,7 @@ class PaymentChannel extends EventEmitter {
         const newValue = new BN(receivedTx.value)
 
         const self = pubKeyToEthereumAddress(this.node.peerInfo.id.pubKey.marshal())
-        const otherParty = pubKeyToEthereumAddress(counterparty)
+        const otherParty = pubKeyToEthereumAddress(counterparty.pubKey.marshal())
 
         if (isPartyA(self, otherParty)) {
             return newValue.isub(currentValue)

@@ -8,15 +8,13 @@ const { isPartyA, getId, pubKeyToEthereumAddress, bufferToNumber, numberToBuffer
 const Transaction = require('../transaction')
 
 module.exports = (self) => (amount, to, cb) => {
-    let channelId
-    waterfall([
-        (cb) => {
-            channelId = getId(
-                pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal()),
-                pubKeyToEthereumAddress(to.pubKey.marshal()))
+    const channelId = getId(
+        pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal()),
+        pubKeyToEthereumAddress(to.pubKey.marshal())
+    )
 
-            self.getChannel(channelId, cb)
-        },
+    waterfall([
+        (cb) => self.getChannel(channelId, cb),
         (record, cb) => {
             if (typeof record === 'function') {
                 cb = record
@@ -39,13 +37,13 @@ module.exports = (self) => (amount, to, cb) => {
             if (partyA) {
                 currentValue.isub(amount)
                 if (currentValue.isNeg())
-                    cb(Error(`Insufficient funds. Please equip the payment channel with at least ${currentValue.abs().toString()} additional wei`))
+                    return cb(Error(`Insufficient funds. Please equip the payment channel with at least ${currentValue.abs().toString()} additional wei.`))
             } else {
                 currentValue.iadd(amount)
 
                 const totalBalance = new BN(record.totalBalance)
                 if (currentValue.gt(totalBalance))
-                    cb(Error(`Insufficient funds. Please equip the payment channel with at least ${currentValue.sub(totalBalance).toString()} additional wei.`))
+                    return cb(Error(`Insufficient funds. Please equip the payment channel with at least ${currentValue.sub(totalBalance).toString()} additional wei.`))
             }
 
             const newTx = deepCopy(record.tx, Transaction)
@@ -60,9 +58,9 @@ module.exports = (self) => (amount, to, cb) => {
                 currentValue: newTx.value
             }, channelId, (err) => {
                 if (err)
-                    throw err
+                    return cb(err)
 
-                cb(null, newTx)
+                return cb(null, newTx)
             })
         }
     ], cb)

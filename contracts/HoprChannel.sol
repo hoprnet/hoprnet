@@ -46,23 +46,18 @@ contract HoprChannel {
         //       there are.
         uint256 openChannels;
         uint256 stakedEther;
-        int32 counter;
     }
 
     // Keeps track of the states of the
     // participating parties.
     mapping(address => State) public states;
 
+    // Keeps track of the nonces that have
+    // been used to open payment channels
+    mapping(bytes16 => bool) public nonces;
+
     modifier enoughFunds(uint256 amount) {
         require(amount <= states[msg.sender].stakedEther, "Insufficient funds.");
-        _;
-    }
-
-    modifier channelExists(address counterParty) {
-        bytes32 channelId = getId(counterParty);
-        Channel memory channel = channels[channelId];
-        
-        require(channel.state > ChannelState.UNINITIALIZED, "Channel does not exist.");
         _;
     }
 
@@ -71,7 +66,9 @@ contract HoprChannel {
     */
     function() external payable {
         if (msg.value > 0) {
-            states[msg.sender].isSet = true;
+            if (!states[msg.sender].isSet) {
+                states[msg.sender].isSet = true;
+            }
             states[msg.sender].stakedEther = states[msg.sender].stakedEther.add(uint256(msg.value));
         }
     }
@@ -91,58 +88,54 @@ contract HoprChannel {
 
         msg.sender.transfer(amount);
     }
-
-    function getStakedAmount(address _address) public view returns (uint256) {
-        return states[_address].stakedEther;
-    }
     
     /**
     * @notice create payment channel TODO: finish desc
     * @param counterParty address of the counter party
     * @param amount uint256
     */
-    function create(address counterParty, uint256 amount) public enoughFunds(amount) {
-        require(channels[getId(counterParty)].state == ChannelState.UNINITIALIZED, "Channel already exists.");
+    // function create(address counterParty, uint256 amount) public enoughFunds(amount) {
+    //     require(channels[getId(counterParty)].state == ChannelState.UNINITIALIZED, "Channel already exists.");
         
-        states[msg.sender].stakedEther = states[msg.sender].stakedEther.sub(amount);
+    //     states[msg.sender].stakedEther = states[msg.sender].stakedEther.sub(amount);
         
-        // Register the channels at both participants' state
-        states[msg.sender].openChannels = states[msg.sender].openChannels.add(1);
-        states[counterParty].openChannels = states[counterParty].openChannels.add(1);
+    //     // Register the channels at both participants' state
+    //     states[msg.sender].openChannels = states[msg.sender].openChannels.add(1);
+    //     states[counterParty].openChannels = states[counterParty].openChannels.add(1);
         
-        if (isPartyA(counterParty)) {
-            // msg.sender == partyB
-            channels[getId(counterParty)] = Channel(ChannelState.PARTYB_FUNDED, amount, 0, 0, 0);
-        } else {
-            // msg.sender == partyA
-            channels[getId(counterParty)] = Channel(ChannelState.PARTYA_FUNDED, amount, amount, 0, 0);
-        }
-    }
+    //     if (isPartyA(counterParty)) {
+    //         // msg.sender == partyB
+    //         channels[getId(counterParty)] = Channel(ChannelState.PARTYB_FUNDED, amount, 0, 0, 0);
+    //     } else {
+    //         // msg.sender == partyA
+    //         channels[getId(counterParty)] = Channel(ChannelState.PARTYA_FUNDED, amount, amount, 0, 0);
+    //     }
+    // }
     
     /**
     * @notice fund payment channel TODO: finish desc
     * @param counterParty address of the counter party
     * @param amount uint256
     */
-    function fund(address counterParty, uint256 amount) public enoughFunds(amount) channelExists(counterParty) {
-        states[msg.sender].stakedEther = states[msg.sender].stakedEther.sub(amount);
+    // function fund(address counterParty, uint256 amount) public enoughFunds(amount) channelExists(counterParty) {
+    //     states[msg.sender].stakedEther = states[msg.sender].stakedEther.sub(amount);
 
-        Channel storage channel = channels[getId(counterParty)];
+    //     Channel storage channel = channels[getId(counterParty)];
 
-        if (isPartyA(counterParty)) {
-            // msg.sender == partyB
-            require(channel.state == ChannelState.PARTYA_FUNDED, "Channel already exists.");
+    //     if (isPartyA(counterParty)) {
+    //         // msg.sender == partyB
+    //         require(channel.state == ChannelState.PARTYA_FUNDED, "Channel already exists.");
             
-            channel.balance = channel.balance.add(amount);
-        } else {
-            // msg.sender == partyA
-            require(channel.state == ChannelState.PARTYB_FUNDED, "Channel already exists.");
+    //         channel.balance = channel.balance.add(amount);
+    //     } else {
+    //         // msg.sender == partyA
+    //         require(channel.state == ChannelState.PARTYB_FUNDED, "Channel already exists.");
             
-            channel.balance = channel.balance.add(amount);
-            channel.balanceA = channel.balanceA.add(amount);
-        }
-        channel.state = ChannelState.ACTIVE;
-    }
+    //         channel.balance = channel.balance.add(amount);
+    //         channel.balanceA = channel.balanceA.add(amount);
+    //     }
+    //     channel.state = ChannelState.ACTIVE;
+    // }
     
     /**
     * @notice pre-fund channel by with staked Ether of both parties
@@ -153,10 +146,13 @@ contract HoprChannel {
     * @param v uint8 version
      */
     function createFunded(bytes16 nonce, uint256 amount, bytes32 r, bytes32 s, uint8 v) public enoughFunds(amount) {
+        require(!nonces[nonce], "Nonce was already used.");
+        nonces[nonce] = true;
+
         bytes32 hashedMessage = keccak256(abi.encodePacked(nonce, uint128(1), amount));
         address counterparty = ecrecover(hashedMessage, v, r, s);
-
-        require(states[counterparty].stakedEther >= amount, "Insufficient funds");
+        
+        require(states[counterparty].stakedEther >= amount, "Insufficient funds.");
 
         bytes32 channelId = getId(counterparty);
 

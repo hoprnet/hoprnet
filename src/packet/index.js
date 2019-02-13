@@ -39,19 +39,14 @@ class Packet {
         const challenge = Challenge.createChallenge(Header.deriveTransactionKey(secrets[0]), node.peerInfo.id)
         const message = Message.createMessage(msg).onionEncrypt(secrets)
 
-        node.paymentChannels.transfer(fee, path[0], (err, tx) => {
+        return node.paymentChannels.transfer(fee, path[0], (err, tx) => {
             if (err)
-                cb(err)
+                return cb(err)
 
             log(node.peerInfo.id, `Encrypting with ${hash(bufferXOR(Header.deriveTransactionKey(secrets[0]), Header.deriveTransactionKey(secrets[1]))).toString('base64')}.`)
             const encryptedTx = tx.encrypt(hash(bufferXOR(Header.deriveTransactionKey(secrets[0]), Header.deriveTransactionKey(secrets[1]))))
 
-
-            node.pendingTransactions.addEncryptedTransaction(
-                hash(Header.deriveTransactionKey(secrets[0]))
-            )
-
-            cb(null, new Packet(
+            return cb(null, new Packet(
                 header,
                 encryptedTx,
                 challenge,
@@ -64,33 +59,31 @@ class Packet {
     forwardTransform(node, cb) {
         this.header.deriveSecret(node.peerInfo.id.privKey.marshal())
 
-        let sender, receivedMoney, channelId, nextPeerId
+        let receivedMoney, channelId
 
         waterfall([
             (cb) => this.hasTag(node.db, cb),
             (alreadyReceived, cb) => {
-                if (alreadyReceived) {
+                if (alreadyReceived)
+                    return cb(Error('General error.'))
 
-                    cb(Error('General error.'))
-                } else if (!this.header.verify()) {
+                if (!this.header.verify())
+                    return cb(Error('General error.'))
 
-                    cb(Error('General error.'))
-                } else {
-                    this.header.extractHeaderInformation()
+                this.header.extractHeaderInformation()
 
-                    sender = this.challenge.getCounterparty(Header.deriveTransactionKey(this.header.derivedSecret))
-
-                    channelId = getId(
-                        pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()),
-                        pubKeyToEthereumAddress(sender)
-                    )
-
-                    pubKeyToPeerId(this.header.address, cb)
-                }
+                return this.getSenderPeerId(cb)
             },
-            (_nextPeerId, cb) => {
-                nextPeerId = _nextPeerId
+            (sender, cb) => {
 
+                channelId = getId(
+                    pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()),
+                    pubKeyToEthereumAddress(sender.pubKey.marshal())
+                )
+
+                return this.getTargetPeerId(cb)
+            },
+            (nextPeerId, cb) => {
                 node.pendingTransactions.addEncryptedTransaction(
                     // channelId
                     this.header.hashedKeyHalf,
@@ -99,33 +92,29 @@ class Packet {
                     nextPeerId
                 )
 
-                node.paymentChannels.getChannel(channelId, cb)
+                return node.paymentChannels.getChannel(channelId, cb)
             },
             (record, cb) => {
                 if (typeof record === 'function') {
                     // No record => no payment channel => something went wrong
                     cb = record
 
-                    cb(Error('General error.'))
-
-                } else {
-                    receivedMoney = node.paymentChannels.getEmbeddedMoney(this.transaction, sender, record.currentValue)
-                    log(node.peerInfo.id, `Received \x1b[35m${receivedMoney.toString()} wei\x1b[0m.`)
-
-                    if (receivedMoney.lt(RELAY_FEE)) {
-
-                        cb(Error('Bad transaction.'))
-                    } else if (bufferToNumber(record.index) + 1 != bufferToNumber(this.transaction.index)) {
-
-                        cb(Error('General error.'))
-                    } else {
-
-                        node.paymentChannels.setChannel({
-                            currentValue: this.transaction.value,
-                            index: this.transaction.index
-                        }, channelId, cb)
-                    }
+                    return cb(Error('General error.'))
                 }
+
+                receivedMoney = node.paymentChannels.getEmbeddedMoney(this.transaction, this._senderPeerId, record.currentValue)
+                log(node.peerInfo.id, `Received \x1b[35m${receivedMoney.toString()} wei\x1b[0m.`)
+
+                if (receivedMoney.lt(RELAY_FEE))
+                    return cb(Error('Bad transaction.'))
+
+                if (bufferToNumber(record.index) + 1 != bufferToNumber(this.transaction.index))
+                    return cb(Error('General error.'))
+
+                return node.paymentChannels.setChannel({
+                    currentValue: this.transaction.value,
+                    index: this.transaction.index
+                }, channelId, cb)
             },
             (cb) => {
                 log(node.peerInfo.id, `Payment channel exists. Requested SHA256 pre-image of '${Challenge.deriveHashedKey(this.header.derivedSecret).toString('base64')}' is derivable.`)
@@ -134,34 +123,60 @@ class Packet {
                 this.message.decrypt(this.header.derivedSecret)
 
 
-                if (this.header.address.compare(node.peerInfo.id.pubKey.marshal()) === 0) {
-                    cb(null, this)
-                } else {
-                    this.challenge.updateChallenge(this.header.hashedKeyHalf, node.peerInfo.id)
-                    this.header.transformForNextNode()
-                    const forwardedFee = receivedMoney.isub(new BN(RELAY_FEE, 10))
+                if (this.header.address.equals(node.peerInfo.id.pubKey.marshal()))
+                    return cb()
 
-                    node.paymentChannels.transfer(forwardedFee, nextPeerId, (err, tx) => {
-                        if (err)
-                            cb(err)
+                this.challenge.updateChallenge(this.header.hashedKeyHalf, node.peerInfo.id)
+                this.header.transformForNextNode()
+                const forwardedFee = receivedMoney.isub(new BN(RELAY_FEE, 10))
 
-                        this.transaction = tx.encrypt(this.header.encryptionKey)
-                        log(node.peerInfo.id, `Encrypting with ${this.header.encryptionKey.toString('base64')}.`)
+                return node.paymentChannels.transfer(forwardedFee, this._targetPeerId, cb)
+            },
+            (tx, cb) => {
+                if (this.header.address.equals(node.peerInfo.id.pubKey.marshal())) {
+                    cb = tx
 
-                        cb(null, this)
-                    })
+                    return cb()
                 }
-            }
-        ], (err) => {
-            if (err)
-                throw err
 
-            cb(null, this)
-        })
+                this.transaction = tx.encrypt(this.header.encryptionKey)
+                log(node.peerInfo.id, `Encrypting with ${this.header.encryptionKey.toString('base64')}.`)
+
+                return cb()
+            }
+        ], cb)
     }
 
     getTargetPeerId(cb) {
-        pubKeyToPeerId(this.header.address, cb)
+        if (this._targetPeerId)
+            return cb(null, this._targetPeerId)
+
+        pubKeyToPeerId(this.header.address, (err, peerId) => {
+            if (err)
+                return cb(err)
+
+            this._targetPeerId = peerId
+
+            cb(null, peerId)
+        })
+    }
+
+    getSenderPeerId(cb) {
+        if (!this.header.derivedSecret)
+            return cb(Error('Unable to compute the senders public key.'))
+
+        if (this._previousPeerId)
+            return cb(null, this._previousPeerId)
+
+        const senderPubKey = this.challenge.getCounterparty(Header.deriveTransactionKey(this.header.derivedSecret))
+        pubKeyToPeerId(senderPubKey, (err, peerId) => {
+            if (err)
+                return cb(err)
+
+            this._senderPeerId = peerId
+
+            cb(null, peerId)
+        })
     }
 
     toBuffer() {
@@ -179,13 +194,13 @@ class Packet {
         const key = Buffer.concat([Buffer.from('packet-tag-'), tag], 11 + 16)
 
         db.get(key, (err) => {
-            if (err && !err.notFound) {
-                cb(err)
-            } else if (err.notFound) {
-                db.put(key, '', (err) => cb(err, false))
-            } else {
-                cb(null, err.notFound)
-            }
+            if (err && !err.notFound)
+                return cb(err)
+
+            if (err.notFound)
+                return db.put(key, '', (err) => cb(err, false))
+
+            cb(null, true)
         })
     }
 
