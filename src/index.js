@@ -277,7 +277,7 @@ class Hopr extends libp2p {
                 (intermediateNodes, cb) => {
                     path = intermediateNodes.map(peerInfo => peerInfo.id).concat(destination)
 
-                    this.peerRouting.findPeer(path[0], cb)
+                    return this.peerRouting.findPeer(path[0], cb)
                 },
                 (peerInfo, cb) => parallel({
                     conn: (cb) => this.dialProtocol(peerInfo, c.PROTOCOL_STRING, cb),
@@ -293,13 +293,13 @@ class Hopr extends libp2p {
                         pull.once(packet.toBuffer()),
                         lp.encode(),
                         conn,
-                        lp.decode(),
-                        pull.collect((err, data) => {
-                            if (err)
-                                return cb(err)
+                        lp.decode()
+                        // pull.collect((err, data) => {
+                        //     if (err)
+                        //         return cb(err)
 
-                            return cb()
-                        })
+                        //     return cb()
+                        // })
                     )
                 }
             ], cb)
