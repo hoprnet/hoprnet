@@ -202,7 +202,7 @@ class Hopr extends libp2p {
             this.registerSignallingServers = registerSignallingServers(this, options, WebRTC)
             this.bootstrapServers = options.bootstrapServers
 
-            // this.on('peer:connect', this.registerSignallingServers)
+            this.on('peer:connect', this.registerSignallingServers)
 
             this.heartbeat = heartbeat(this)
             this.signallingServers = results.signallingServers
