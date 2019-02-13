@@ -72,14 +72,14 @@ waterfall([
                 privKeyToPeerId(secrets.demoAccounts[options._[0]].privateKey, (err, peerId) => {
                     if (err)
                         return cb(err)
-    
+
                     options.peerId = peerId
                     return cb()
                 })
             }
+        } else {
+            cb()
         }
-        
-        cb()
     },
     (cb) => createNode(options, cb),
     (_node, cb) => {
@@ -159,7 +159,7 @@ waterfall([
                 const recipient = randomSubset(node.peerBook.getAllArray(), 1, (peerInfo) =>
                     !options.bootstrapServers.some((multiaddr) => PeerId.createFromB58String(multiaddr.getPeerId()).isEqual(peerInfo.id))
                 )
-                return node.sendMessage('Psst ... secret message from Validity Labs!@' + Date.now().toString(), recipient[0].id, () => {})
+                return node.sendMessage('Psst ... secret message from Validity Labs!@' + Date.now().toString(), recipient[0].id, () => { })
             }
             setInterval(sendMessage, 90 * 1000)
         } else if (options['bootstrap-node']) {
