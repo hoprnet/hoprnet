@@ -1,6 +1,6 @@
-'use stric'
+'use strict'
 
-const { applyEach, times, series, each, waterfall } = require('neo-async')
+const { applyEach, times, each, waterfall } = require('neo-async')
 const { createNode } = require('../../src')
 const { pubKeyToEthereumAddress, sendTransaction, privKeyToPeerId } = require('../../src/utils')
 const { GAS_PRICE, STAKE_GAS_AMOUNT } = require('../../src/constants')
