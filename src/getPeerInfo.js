@@ -9,8 +9,6 @@ const PeerId = require('peer-id')
 const Multiaddr = require('multiaddr')
 const { PROTOCOL_NAME } = require('./constants')
 
-const BOOTSTRAP_NODE = Multiaddr('/ip4/127.0.0.1/tcp/9090/')
-
 module.exports = (options, db, cb) => {
     if (typeof db === 'function') {
         if (!options.peerInfo)

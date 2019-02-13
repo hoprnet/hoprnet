@@ -7,11 +7,12 @@ const lp = require('pull-length-prefixed')
 const { waterfall } = require('neo-async')
 const { log, pubKeyToPeerId, hash, bufferXOR } = require('../utils')
 
-const c = require('../constants')
+const { PROTOCOL_STRING } = require('../constants')
 const Packet = require('../packet')
 const Acknowledgement = require('../acknowledgement')
 
 const Multihash = require('multihashes')
+const rlp = require('rlp')
 
 module.exports = (node, options) => {
     // Registers the packet handlers if the node started as a
@@ -23,13 +24,13 @@ module.exports = (node, options) => {
 
     function forwardPacket(packet) {
         if (node.peerInfo.id.isEqual(packet._targetPeerId))
-            return options.output(demo(packet.message.plaintext.toString()))
+            return options.output(demo(packet.message.plaintext))
 
         log(node.peerInfo.id, `Forwarding to node \x1b[34m${packet._targetPeerId.toB58String()}\x1b[0m.`)
 
         waterfall([
             (cb) => node.peerRouting.findPeer(packet._targetPeerId, cb),
-            (targetPeerInfo, cb) => node.dialProtocol(targetPeerInfo, c.PROTOCOL_STRING, cb),
+            (targetPeerInfo, cb) => node.dialProtocol(targetPeerInfo, PROTOCOL_STRING, cb),
             (conn, cb) => pull(
                 pull.once(packet.toBuffer()),
                 lp.encode(),
@@ -87,7 +88,7 @@ module.exports = (node, options) => {
         ], cb)
     }
 
-    node.handle(c.PROTOCOL_STRING, (protocol, conn) => {
+    node.handle(PROTOCOL_STRING, (protocol, conn) => {
         pull(
             conn,
             lp.decode(),
@@ -116,9 +117,9 @@ module.exports = (node, options) => {
         )
     })
 
-    function demo(str) {
-        const chunks = str.split('@')
+    function demo(plaintext) {
+        const message = rlp.decode(plaintext)
 
-        return '\n\n---------- New Message ----------\nMessage \"' + chunks[0] + '\" latency ' + (Date.now() - Number(chunks[1])) + ' ms.\n---------------------------------\n\n'
+        return `\n\n---------- New Message ----------\nMessage "${message[0].toString()}" latency ${Date.now() - Number(message[1].toString())} ms.\n---------------------------------\n\n`
     }
 }

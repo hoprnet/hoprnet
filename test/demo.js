@@ -5,6 +5,7 @@ const { resolve } = require('path');
 
 const { sendTransaction, privKeyToPeerId, log, compileIfNecessary } = require('../src/utils')
 const { createFundedNodes } = require('./utils')
+const rlp = require('rlp')
 
 const { NET, GAS_PRICE, ROPSTEN_WSS_URL, HARDCODED_ETH_ADDRESS, HARDCODED_PRIV_KEY, CONTRACT_ADDRESS } = require('../src/constants')
 
@@ -12,7 +13,7 @@ const FUNDING_ACCOUNT = HARDCODED_ETH_ADDRESS
 const FUNDING_KEY = HARDCODED_PRIV_KEY
 
 const AMOUUNT_OF_NODES = 4
-const AMOUNT_OF_MESSAGES = 3
+const AMOUNT_OF_MESSAGES = 4
 
 
 const Web3 = require('web3')
@@ -95,7 +96,7 @@ waterfall([
     }, fundingPeer, index, cb),
     (nodes, cb) => series([
         (cb) => timesSeries(AMOUNT_OF_MESSAGES, (n, cb) => {
-            nodes[0].sendMessage('Psst ... secret message from Validity Labs!@' + Date.now().toString(), nodes[3].peerInfo.id)
+            nodes[0].sendMessage(rlp.encode(['Psst ... secret message from Validity Labs!', Date.now().toString()]), nodes[3].peerInfo.id)
 
             if (NET === 'ganache') {
                 setTimeout(cb, 2000)

@@ -10,6 +10,7 @@ const { ROPSTEN_WSS_URL, CONTRACT_ADDRESS, STAKE_GAS_AMOUNT } = require('./src/c
 const PeerId = require('peer-id')
 const BN = require('bn.js')
 const { toWei, fromWei } = require('web3-utils')
+const rlp = require('rlp')
 
 const options = getopts(process.argv.slice(2), {
     alias: {
@@ -264,13 +265,14 @@ function sendMessages(node, cb) {
             console.log('Type in your message')
             read({
                 edit: true
-            }, (err, result) => {
+            }, (err, message) => {
                 if (err)
                     process.exit(0)
 
-                console.log(`Sending "${result}" to \x1b[34m${destination.id.toB58String()}\x1b[0m.\n`)
+                console.log(`Sending "${message}" to \x1b[34m${destination.id.toB58String()}\x1b[0m.\n`)
 
-                node.sendMessage(result, destination.id, cb)
+                const encodedMessage = rlp.encode([message, Date.now().toString()])
+                node.sendMessage(encodedMessage, destination.id, cb)
 
                 cb()
             })
