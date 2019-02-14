@@ -45,11 +45,12 @@ module.exports = (self) => (to, cb) => {
         },
         (signatures, cb) => {
             if (signatures.length !== 1)
-                return cb(Error('Invalid response'))
+                return cb(Error(`Invalid response. To: ${to.toB58String()}`))
 
             restoreTx.signature = signatures[0].slice(0, Transaction.SIGNATURE_LENGTH)
             restoreTx.recovery = signatures[0].slice(Transaction.SIGNATURE_LENGTH)
 
+            console.log(restoreTx.getChannelId(self.node.peerInfo.id).toString('hex'))
             return self.contractCall(self.contract.methods.createFunded(
                 restoreTx.nonce,
                 (new BN(restoreTx.value)).toString(),
@@ -71,7 +72,7 @@ module.exports = (self) => (to, cb) => {
 
             return self.setChannel(newRecord, (err) => {
                 if (err)
-                    throw err
+                    return cb(err)
 
                 log(self.node.peerInfo.id, `Opened payment channel \x1b[33m${restoreTx.getChannelId(self.node.peerInfo.id).toString('hex')}\x1b[0m with txHash \x1b[32m${receipt.transactionHash}\x1b[0m. Nonce is now \x1b[31m${self.nonce - 1}\x1b[0m.`)
 

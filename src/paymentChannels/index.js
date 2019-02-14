@@ -104,20 +104,20 @@ class PaymentChannel extends EventEmitter {
     setChannel(newRecord, channelId, cb) {
         if (typeof channelId === 'function') {
             if (!newRecord.restoreTx)
-                throw Error('Unable to compute channelId.')
+                return cb(Error('Unable to compute channelId.'))
 
             cb = channelId
             channelId = newRecord.tx.getChannelId(this.node.peerInfo.id)
         }
 
         if (!channelId || !Buffer.isBuffer(channelId) || channelId.length !== 32)
-            throw Error('Unable to determine channelId.')
+            return cb(Error('Unable to determine channelId.'))
 
         const key = this.getKey(channelId)
 
         this.getChannel(channelId, (err, record = {}) => {
             if (err)
-                throw err
+                return cb(err)
 
             Object.assign(record, newRecord)
 
@@ -153,14 +153,13 @@ class PaymentChannel extends EventEmitter {
 
         this.node.db.get(key, (err, record) => {
             if (err) {
-                if (err.notFound) {
-                    cb()
-                } else {
-                    cb(err)
-                }
-            } else {
-                cb(null, this.fromBuffer(record))
+                if (err.notFound) 
+                    return cb()
+
+                return cb(err)
             }
+                
+            cb(null, this.fromBuffer(record))
         })
     }
 
@@ -215,7 +214,7 @@ class PaymentChannel extends EventEmitter {
             if (err)
                 return cb(err)
 
-            cb(null, receipt)
+            return cb(null, receipt)
         })
     }
 }
