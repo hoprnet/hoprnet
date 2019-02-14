@@ -64,11 +64,22 @@ module.exports = (node, options, WebRTC) => (peer) => {
                 },
                 (multiaddr, cb) => {
                     const peerOptions = multiaddr.toOptions()
-                    const addr = peer._connectedMultiaddr
-                        .decapsulate(`${PROTOCOL_NAME}`)
-                        .decapsulate('tcp')
-                        .encapsulate(`/tcp/${parseInt(peerOptions.port) + 1}/ws/p2p-webrtc-star`)
-                        .encapsulate(`/${PROTOCOL_NAME}/${node.peerInfo.id.toB58String()}`)
+
+                    let addr
+
+                    if (WebRTC.filter([multiaddr]).length > 0) {
+                        // already connected via WebRTCStar
+                        addr = peer._connectedMultiaddr
+                            .decapsulate(`${PROTOCOL_NAME}`)
+                            .encapsulate(`/${PROTOCOL_NAME}/${node.peerInfo.id.toB58String()}`)
+                    } else {
+                        // connected via TCP
+                        addr = peer._connectedMultiaddr
+                            .decapsulate(`${PROTOCOL_NAME}`)
+                            .decapsulate('tcp')
+                            .encapsulate(`/tcp/${parseInt(peerOptions.port) + 1}/ws/p2p-webrtc-star`)
+                            .encapsulate(`/${PROTOCOL_NAME}/${node.peerInfo.id.toB58String()}`)
+                    }
 
                     console.log(`now available under ${addr.toString()}\n`)
 
