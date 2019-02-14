@@ -3,11 +3,12 @@
 const pull = require('pull-stream')
 const { createHash } = require('crypto')
 const lp = require('pull-length-prefixed')
+const { log } = require('../utils')
 
 const HASH_LENGTH = 16
 const { PROTOCOL_HEARTBEAT } = require('../constants')
 
-module.exports = (node) => node.handle(PROTOCOL_HEARTBEAT, (protocol, conn) => {
+module.exports = (node) => node.handle(PROTOCOL_HEARTBEAT, (protocol, conn) =>
     pull(
         conn,
         lp.decode(),
@@ -16,6 +17,11 @@ module.exports = (node) => node.handle(PROTOCOL_HEARTBEAT, (protocol, conn) => {
             conn.getPeerInfo((err, peerInfo) => {
                 if (err)
                     return cb(err)
+
+                if (!node.peerBook.has(peerInfo.id.toB58String())) {
+                    log(node.peerInfo.id, `Heartbeat handler: Accidentially storing peerId ${peerInfo.id.toB58String()} in peerBook.`)
+                    node.peerBook.put(peerInfo)
+                }
 
                 node.peerBook.getAll()[peerInfo.id.toB58String()].lastSeen = Date.now()
 
@@ -26,4 +32,4 @@ module.exports = (node) => node.handle(PROTOCOL_HEARTBEAT, (protocol, conn) => {
         lp.encode(),
         conn
     )
-})
+)

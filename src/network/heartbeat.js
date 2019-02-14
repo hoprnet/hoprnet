@@ -35,7 +35,12 @@ module.exports = (node) => setInterval(() => {
                                 return cb(err)
 
                             const response = createHash('sha256').update(challenge).digest().slice(0, 16)
-                            node.peerBook.getAll()[peer.id.toB58String()].lastSeen = Date.now()
+                            if (node.peerBook.has(peer.id.toB58String())) {
+                                node.peerBook.getAll()[peer.id.toB58String()].lastSeen = Date.now()
+                            } else {
+                                log(node.peerInfo.id, `Heartbeat: Accidentially storing peerId ${peer.id.toB58String()} in peerBook.`)
+                                node.peerBook.put(peer)
+                            }
 
                             if (hashValues.length != 1 || hashValues[0].compare(response) !== 0)
                                 return cb(Error(`Invalid response. Got ${typeof hashValues} instead of ${response.toString('hex')}`))
