@@ -213,7 +213,7 @@ class PaymentChannel extends EventEmitter {
             data: txObject.encodeABI()
         }, this.node.peerInfo.id, this.web3, (err, receipt) => {
             if (err)
-                throw err
+                return cb(err)
 
             cb(null, receipt)
         })

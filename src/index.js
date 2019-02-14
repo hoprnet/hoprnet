@@ -97,8 +97,11 @@ class Hopr extends libp2p {
                 },
                 peerDiscovery: {
                     webRTCStar: {
-                        enabled: true
+                        enabled: false
                     }
+                },
+                relay: {
+                    enabled: false
                 }
             }
 

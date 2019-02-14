@@ -76,7 +76,7 @@ module.exports.createFundedNodes = (amountOfNodes, options, peerId, nonce, cb) =
                             port: parseInt("9091") + 2 * n
                         }, 'tcp')
                     ],
-                    signallingServers: [
+                    signallingAddrs: [
                         Multiaddr.fromNodeAddress({
                             address: "0.0.0.0",
                             port: parseInt("9091") + 2 * n + 1

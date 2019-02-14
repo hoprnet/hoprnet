@@ -9,7 +9,6 @@ const differenceWith = require('lodash.differencewith')
 
 
 module.exports = (node, options, WebRTC) => (peer) => {
-    console.log
     const current = WebRTC.filter(node.peerInfo.multiaddrs.toArray()).map((multiaddr) => PeerId.createFromB58String(multiaddr.getPeerId()))
 
     const peers = node.peerBook.getAllArray()
@@ -22,15 +21,13 @@ module.exports = (node, options, WebRTC) => (peer) => {
         !options.bootstrapServers.some((multiaddr) => PeerId.createFromB58String(multiaddr.getPeerId()).isEqual(peerInfo.id))
     ).map((peerInfo) => peerInfo.id)
 
-    console.log('here')
     if (selected.length <= 0)
         return
 
-    console.log(selected.length)
     const isEqual = (a, b) => a.isEqual(b)
     const toDelete = differenceWith(current, selected, isEqual)
     const toAdd = differenceWith(selected, current, isEqual)
-    console.log(toAdd.length)
+    console.log(`To add ${toAdd.length}. To remove ${toDelete.length}.`)
 
     waterfall([
         (cb) => {

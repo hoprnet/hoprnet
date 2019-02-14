@@ -63,6 +63,7 @@
         "neo-async": "^2.6.0",
         "openzeppelin-solidity": "^2.1.2",
         "prompt": "^1.0.0",
+        "peer-info": "git+https://robertkiel@github.com/robertkiel/peer-info.git",
         "pull-length-prefixed": "git+https://robertkiel@github.com/robertkiel/pull-length-prefixed.git",
         "pull-paramap": "^1.2.2",
         "read": "^1.0.7",

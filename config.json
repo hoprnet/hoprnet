@@ -8,8 +8,7 @@
             "port": "9091"
         }
     ],
-    "signallingPort": "9102",
     "WebRTC": {
-        "signallingServers": "3"
+        "signallingServers": "2"
     }
 }
