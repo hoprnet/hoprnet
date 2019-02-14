@@ -128,6 +128,8 @@ waterfall([
                             if (err)
                                 return cb(err)
 
+                            node.paymentChannels.nonce = node.paymentChannels.nonce + 1
+
                             return cb()
                         })
                     } else {

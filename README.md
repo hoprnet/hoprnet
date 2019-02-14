@@ -36,7 +36,7 @@ Setup the configuration file below before preceding. Navigate to the `config/` f
 ```
 
 Please make sure that you:
-- have whitelisted the contract `0x69fc313b19afab7D925E7e05C783E7B36327255b` in your Infura account
+- have whitelisted the contract ~~`0x69fc313b19afab7D925E7e05C783E7B36327255b`~~ `0xd215A90a15Fede2C126352E200999fFE7D32A614` in your Infura account
 - got some funds on your Ropsten testnet account, you may want to use the [faucet](https://faucet.ropsten.be/) to receive test ether.
 
 Now you can run the demo script via:
