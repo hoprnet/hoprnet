@@ -43,6 +43,8 @@ module.exports = (node, options, WebRTC) => (newPeerInfo) => {
 
             const connectedMultiaddr = newPeerInfo.isConnected()
 
+            const options = connectedMultiaddr.toOptions()
+
             node.peerInfo.multiaddrs.add(
                 connectedMultiaddr
                     .decapsulate(`${options.transport}`)
