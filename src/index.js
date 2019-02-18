@@ -64,7 +64,7 @@ class Hopr extends libp2p {
                  */
                 transport: [
                     TCP,
-                    WebSockets,
+                    // WebSockets,
                     WebRTC
                 ],
                 /**

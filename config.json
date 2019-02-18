@@ -1,6 +1,6 @@
 {
     "bootstrapServers": [
-        "/dns4/hopr.validity.io/tcp/9091/ws/ipfs/QmRhtaT1RMJtCzw8yGREizh7viBgGZMP3CpV8J5rRQWMGC"
+        "/dns4/hopr.validity.io/tcp/9091/ipfs/QmRhtaT1RMJtCzw8yGREizh7viBgGZMP3CpV8J5rRQWMGC"
     ],
     "interfaces": [
         {
@@ -10,5 +10,9 @@
     ],
     "WebRTC": {
         "signallingServers": "2"
+    },
+    "Crawler": {
+        "simultaneousConnections": 0,
+        "minNodes": 3
     }
 }
