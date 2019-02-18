@@ -4,9 +4,11 @@ const { series } = require('async')
 const { randomNumber } = require('../utils')
 const { PROTOCOL_NAME } = require('../constants')
 const mafmt = require('mafmt')
-const Multiaddr = require('multiaddr')
 
 module.exports = (node, options, WebRTC) => (newPeerInfo) => {
+    if (!newPeerInfo.isConnected())
+        return
+
     const peerIdStrings = WebRTC.filter(node.peerInfo.multiaddrs.toArray())
         .map((multiaddr) => multiaddr.getPeerId())
         .concat(newPeerInfo.id.toB58String())
@@ -18,6 +20,7 @@ module.exports = (node, options, WebRTC) => (newPeerInfo) => {
 
     if (toDelete == peerIdStrings.length - 1)
         return
+
 
     series([
         (cb) => {
@@ -38,30 +41,13 @@ module.exports = (node, options, WebRTC) => (newPeerInfo) => {
                         node.peerInfo.multiaddrs.delete(multiaddr))
             }
 
-            const addrs = newPeerInfo.multiaddrs.toArray().filter((multiaddr) =>
-                (
-                    mafmt.WebSockets.matches(multiaddr.decapsulate(`/${PROTOCOL_NAME}`)) ||
-                    mafmt.WebSocketsSecure.matches(multiaddr.decapsulate(`/${PROTOCOL_NAME}`))
-                ) &&
-                !['0.0.0.0', '127.0.0.1'].includes(multiaddr.toOptions().host)
+            const connectedMultiaddr = newPeerInfo.isConnected()
+
+            node.peerInfo.multiaddrs.add(
+                connectedMultiaddr
+                    .decapsulate(`${options.transport}`)
+                    .encapsulate(`/${options.transport}/${parseInt(options.port) + 1}/ws/p2p-webrtc-star/${PROTOCOL_NAME}/${node.peerInfo.id.toB58String()}`)
             )
-
-            if (addrs.length == 0)
-                return cb(Error(`Unable to detect address of signalling server. Given multiaddress are ${newPeerInfo.multiaddrs.toArray().join(', ')}.`))
-
-            addrs.forEach((multiaddr) => {
-                const options = multiaddr.toOptions()
-
-                console.log(`Signalling: Trying to connect to: ${multiaddr
-                    .decapsulate('tcp')
-                    .encapsulate(`/${options.transport}/${parseInt(options.port) + 1}/ws/p2p-webrtc-star/${PROTOCOL_NAME}/${node.peerInfo.id.toB58String()}`).toString()}`)
-                    
-                node.peerInfo.multiaddrs.add(
-                    multiaddr
-                        .decapsulate('tcp')
-                        .encapsulate(`/${options.transport}/${parseInt(options.port) + 1}/ws/p2p-webrtc-star/${PROTOCOL_NAME}/${node.peerInfo.id.toB58String()}`)
-                )
-            })
 
             node._switch.transport.listen('WebRTCStar', {}, null, cb)
         }
