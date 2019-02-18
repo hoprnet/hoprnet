@@ -21,7 +21,17 @@ module.exports = (node) => setInterval(() =>
             return cb()
 
         waterfall([
-            (cb) => node.dialProtocol(peerInfo, PROTOCOL_HEARTBEAT, cb),
+            (cb) => {
+                if (!peerInfo.isConnected() || peerInfo.multiaddrs.size < 1)
+                    return node.peerRouting.findPeer(peerInfo.id, cb)
+
+                cb(null, peerInfo)
+            },
+            (peerInfo, cb) => {
+                console.log(`Heartbeat dialing ${peerInfo.multiaddrs.toArray().join(', ')}.`)
+
+                node.dialProtocol(peerInfo, PROTOCOL_HEARTBEAT, cb)
+            },
             (conn, cb) => {
                 const challenge = randomBytes(16)
 

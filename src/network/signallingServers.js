@@ -52,6 +52,10 @@ module.exports = (node, options, WebRTC) => (newPeerInfo) => {
             addrs.forEach((multiaddr) => {
                 const options = multiaddr.toOptions()
 
+                console.log(`Signalling: Trying to connect to: ${multiaddr
+                    .decapsulate('tcp')
+                    .encapsulate(`/${options.transport}/${parseInt(options.port) + 1}/ws/p2p-webrtc-star/${PROTOCOL_NAME}/${node.peerInfo.id.toB58String()}`).toString()}`)
+                    
                 node.peerInfo.multiaddrs.add(
                     multiaddr
                         .decapsulate('tcp')
