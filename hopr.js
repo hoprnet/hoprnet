@@ -19,7 +19,7 @@ const options = getopts(process.argv.slice(2), {
     }
 })
 
-console.log('Welcome to \x1b[1m\x1b[5mHOPR\x1b[0m!\n')
+console.log('Welcome to \x1b[1mHOPR\x1b[0m!\n')
 
 if (options['bootstrap-node']) {
     console.log(`... running as bootstrap node!.`)
