@@ -6,6 +6,7 @@ const { PROTOCOL_NAME } = require('../constants')
 const mafmt = require('mafmt')
 
 module.exports = (node, options, WebRTC) => (newPeerInfo) => {
+    console.log(`incoming connection from ${newPeerInfo.isConnected()}`)
     if (!newPeerInfo.isConnected())
         return
 
