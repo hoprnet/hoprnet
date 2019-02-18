@@ -97,7 +97,7 @@ class Hopr extends libp2p {
                 },
                 peerDiscovery: {
                     webRTCStar: {
-                        enabled: false
+                        enabled: true
                     }
                 },
                 relay: {
@@ -261,6 +261,7 @@ class Hopr extends libp2p {
         if (!PeerId.isPeerId(destination))
             throw Error(`Unable to parse given destination to a PeerId instance. Got type ${typeof destination} with value ${destination}.`)
 
+        console.log(this.peerInfo.multiaddrs.toArray().join(', '))
         // Let's try to convert input msg to a Buffer in case it isn't already a Buffer
         if (!Buffer.isBuffer(msg)) {
             switch (typeof msg) {
@@ -282,7 +283,13 @@ class Hopr extends libp2p {
 
                     return this.peerRouting.findPeer(path[0], cb)
                 },
-                (peerInfo, cb) => parallel({
+                (peerInfo, cb) => {
+                    // const WebRTCAddresses = WebRTC.filter(peerInfo.multiaddrs.toArray())
+                    // peerInfo.multiaddrs.clear()
+                    // WebRTCAddresses.forEach((addr) => peerInfo.multiaddrs.add(addr))
+                    // console.log(peerInfo.multiaddrs.toArray().join(', '))
+
+                    parallel({
                     conn: (cb) => this.dialProtocol(peerInfo, c.PROTOCOL_STRING, cb),
                     packet: (cb) => createPacket(
                         this,
@@ -290,19 +297,19 @@ class Hopr extends libp2p {
                         path,
                         cb
                     )
-                }, cb),
+                }, cb)},
                 ({ conn, packet }, cb) => {
                     pull(
                         pull.once(packet.toBuffer()),
                         lp.encode(),
                         conn,
-                        lp.decode()
-                        // pull.collect((err, data) => {
-                        //     if (err)
-                        //         return cb(err)
+                        lp.decode(),
+                        pull.collect((err, data) => {
+                            if (err)
+                                return cb(err)
 
-                        //     return cb()
-                        // })
+                            return cb()
+                        })
                     )
                 }
             ], cb)

@@ -246,8 +246,27 @@ module.exports.randomPermutation = (array) => {
     return array
 }
 
-// TODO: Proper random number generation
-// module.exports.randomNumber(start, end)
+/**
+ * @param {Number} start
+ * @param {Number} end
+ * @returns {Number} random number between @param start and @param end
+ */
+module.exports.randomNumber = (start, end) => {
+    if (!end) {
+        end = start
+        start = 0
+    }
+
+    if (start >= end)
+        throw Error('Invalid interval.')
+
+    if (start + 1 == end)
+        return start
+
+    const byteAmount = Math.max(Math.ceil(Math.log2(end - start)) / 8, 1)
+
+    return start + (this.bufferToNumber(randomBytes(byteAmount)) % end)
+}
 
 // ==========================
 // Ethereum methods
