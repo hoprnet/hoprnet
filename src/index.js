@@ -144,13 +144,13 @@ class Hopr extends libp2p {
         waterfall([
             (cb) => Hopr.openDatabase(db_dir, options, cb),
             (db, cb) => parallel({
-                peerBook: (cb) => {
-                    if (options.peerBook) {
-                        cb(null, options.peerBook)
-                    } else {
-                        Hopr.importPeerBook(db, cb)
-                    }
-                },
+                // peerBook: (cb) => {
+                //     if (options.peerBook) {
+                //         cb(null, options.peerBook)
+                //     } else {
+                //         Hopr.importPeerBook(db, cb)
+                //     }
+                // },
                 peerInfo: (cb) => getPeerInfo(options, db, cb)
             }, (err, { peerBook, peerInfo }) => {
                 if (err)
