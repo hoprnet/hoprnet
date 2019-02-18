@@ -50,12 +50,12 @@ module.exports = (node, options, WebRTC) => (newPeerInfo) => {
                 return cb(Error(`Unable to detect address of signalling server. Given multiaddress are ${newPeerInfo.multiaddrs.toArray().join(', ')}.`))
 
             addrs.forEach((multiaddr) => {
-                const options = multiaddr.nodeAddress()
-
-                options.port = parseInt(options.port) + 1
+                const options = multiaddr.toOptions()
 
                 node.peerInfo.multiaddrs.add(
-                    Multiaddr.fromNodeAddress(options, 'tcp').encapsulate('/ws').encapsulate(`/p2p-webrtc-star/${PROTOCOL_NAME}/${node.peerInfo.id.toB58String()}`)
+                    multiaddr
+                        .decapsulate('tcp')
+                        .encapsulate(`/${options.transport}/${parseInt(options.port) + 1}/ws/p2p-webrtc-star/${PROTOCOL_NAME}/${node.peerInfo.id.toB58String()}`)
                 )
             })
 
