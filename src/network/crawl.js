@@ -16,70 +16,85 @@ const { randomSubset, log } = require('../utils')
 const { MAX_HOPS, PROTOCOL_CRAWLING, MARSHALLED_PUBLIC_KEY_SIZE } = require('../constants')
 
 module.exports = (node) => (cb, comparator = _ => true) => {
-    let nodes = [], selected, currentPeerInfo
+    let nodes = [], selected
 
     node.peerBook.getAllArray().forEach((peerInfo) => {
         nodes.push(peerInfo.id.toB58String())
     })
 
-    doWhilst(
-        (cbWhilst) => {
-            if (nodes.length === 0)
-                //console.log('Error')
-                return cb(Error('Unable to find enough other nodes in the network.'))
+    function queryNode(peerId, cb) {
+        waterfall([
+            (cb) => {
+                const connectedMultiaddr = node.peerBook.get(peerId).isConnected()
 
-            console.log(`Crawling ... ${nodes.length}`)
-            selected = randomSubset(nodes, Math.min(nodes.length, MAX_HOPS))
-            nodes = remove(nodes, selected)
+                if (connectedMultiaddr) {
+                    console.log(`Trying to connect to ${connectedMultiaddr.toString()}.`)
+                    return cb(null, connectedMultiaddr)
+                }
 
-            map(selected.slice(0, 1), (currentNode, cb) => waterfall([
-                (cb) => {
-                    currentPeerInfo = node.peerBook.get(currentNode)
-                    if (currentPeerInfo.multiaddrs.size === 0) {
-                        node.peerRouting.findPeer(currentPeerInfo.id, cb)
-                    } else {
-                        cb(null, currentPeerInfo)
-                    }
-                },
-                (peerInfo, cb) => node.dialProtocol(peerInfo, PROTOCOL_CRAWLING, cb),
-                (conn, cb) => pull(
-                    conn,
-                    pull.filter(data => data),
-                    lp.decode(),
-                    pull.filter(data =>
-                        data.length > 0 &&
-                        data.length % MARSHALLED_PUBLIC_KEY_SIZE === 0),
-                    pull.asyncMap((pubKey, cb) => waterfall([
-                        (cb) => PeerId.createFromPubKey(pubKey, cb),
-                        (peerId, cb) => PeerInfo.create(peerId, cb)
-                    ], cb)),
-                    pull.filter(peerInfo =>
-                        // received node != known nodes
-                        !node.peerBook.has(peerInfo.id.toB58String()) &&
-                        // received node != self
-                        node.peerInfo.id.toBytes().compare(peerInfo.id.toBytes()) !== 0
-                    ),
-                    pull.collect(cb))
-            ], cb), (err, newNodes) => {
-                if (err)
-                    return cbWhilst(err)
+                node.peerRouting.findPeer(PeerId.createFromB58String(peerId), cb)
+            },
+            (peerInfo, cb) => node.dialProtocol(peerInfo, PROTOCOL_CRAWLING, cb),
+            (conn, cb) => pull(
+                conn,
+                lp.decode(),
+                pull.filter(data =>
+                    data.length > 0 &&
+                    data.length === MARSHALLED_PUBLIC_KEY_SIZE),
+                pull.asyncMap((pubKey, cb) =>
+                    PeerId.createFromPubKey(pubKey, (err, peerId) => {
+                        if (err)
+                            return cb(err)
 
-                newNodes = uniqWith(flatten(newNodes), (a, b) =>
-                    a.id.toBytes().compare(b.id.toBytes())
-                )
+                        cb(null, new PeerInfo(peerId))
+                    })),
+                pull.filter(peerInfo =>
+                    // received node != known nodes
+                    !node.peerBook.has(peerInfo.id.toB58String()) &&
+                    // received node != self
+                    node.peerInfo.id.toBytes().compare(peerInfo.id.toBytes()) !== 0
+                ),
+                pull.collect(cb))
+        ], cb)
+    }
 
-                newNodes.forEach(peerInfo => {
-                    node.peerBook.put(peerInfo)
-                    nodes.push(peerInfo.id.toB58String())
-                })
+    doWhilst((cb) => {
+        if (nodes.length === 0)
+            //console.log('Error')
+            return cb(Error('Unable to find enough other nodes in the network.'))
 
-                log(node.peerInfo.id, `Received ${newNodes.length} new node${newNodes.length === 1 ? '' : 's'}.`)
-                log(node.peerInfo.id, `Now holding peer information of ${node.peerBook.getAllArray().length} node${node.peerBook.getAllArray().length === 1 ? '' : 's'} in the network.`)
-                // log(node.peerInfo.id, node.peerBook.getAllArray().reduce((acc, peerInfo) => {
-                //     return acc.concat(`PeerId ${peerInfo.id.toB58String()}, available under ${peerInfo.multiaddrs.toArray().join(', ')}`)
-                // }, ''))
+        selected = randomSubset(nodes, Math.min(nodes.length, MAX_HOPS))
+        console.log(`selected ${selected.join(', ')}`)
+        nodes = remove(nodes, selected)
 
-                return cbWhilst()
+        map(selected, queryNode, (err, newNodes) => {
+            if (err) {
+                console.log(err)
+                return cb(err)
+            }
+
+            newNodes = uniqWith(flatten(newNodes), (a, b) =>
+                a.id.toBytes().compare(b.id.toBytes())
+            )
+
+            newNodes.forEach(peerInfo => {
+                node.peerBook.put(peerInfo)
+                nodes.push(peerInfo.id.toB58String())
             })
-        }, () => node.peerBook.getAllArray().filter(comparator).length < MAX_HOPS - 1, cb)
+
+            log(node.peerInfo.id, `Received ${newNodes.length} new node${newNodes.length === 1 ? '' : 's'}.`)
+            log(node.peerInfo.id, `Now holding peer information of ${node.peerBook.getAllArray().length} node${node.peerBook.getAllArray().length === 1 ? '' : 's'} in the network.`)
+            // log(node.peerInfo.id, node.peerBook.getAllArray().reduce((acc, peerInfo) => {
+            //     return acc.concat(`PeerId ${peerInfo.id.toB58String()}, available under ${peerInfo.multiaddrs.toArray().join(', ')}`)
+            // }, ''))
+
+            return cb()
+        })
+    }, () => {
+        const length = node.peerBook.getAllArray().filter(comparator).length
+
+        console.log(node.peerBook.getAllArray().map(pInfo => pInfo.id.toB58String()).join(', '))
+        console.log(length < MAX_HOPS)
+        return length < MAX_HOPS
+    }, cb)
 }

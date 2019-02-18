@@ -63,6 +63,6 @@ module.exports = (node, options, WebRTC) => (newPeerInfo) => {
         }
     ], (err) => {
         if (err)
-            console.log(`SignallingServers: ${err.message}`)
+            console.log(`SignallingServers: ${err.message}. ${err.stack}. ${err.toString()}`)
     })
 }

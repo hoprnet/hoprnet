@@ -9,56 +9,58 @@ const pull = require('pull-stream')
 
 const THIRTY_ONE_SECONDS = 31 * 1000
 
-module.exports = (node) => setInterval(() => {
-    each(node.peerBook.getAllArray(), (peer, cb) => {
+module.exports = (node) => setInterval(() => 
+    each(node.peerBook.getAllArray(), (peerInfo, cb) => {
         if (
             // node was in the list when last round of heartbeat started
             // make sure that it is still here
-            node.peerBook.getAll()[peer.id.toB58String()] &&
+            !node.peerBook.getAll()[peerInfo.id.toB58String()] ||
             // check whether node was seen recently
-            Date.now() - (node.peerBook.getAll()[peer.id.toB58String()].lastSeen || 0) > THIRTY_ONE_SECONDS
-        ) {
-            // console.log(`Last seen ${peer.id.toB58String()} at ${node.peerBook.getAll()[peer.id.toB58String()].lastSeen}.`)
-            return waterfall([
-                (cb) => node.peerRouting.findPeer(peer.id, cb),
-                (peerInfo, cb) => node.dialProtocol(peerInfo, PROTOCOL_HEARTBEAT, cb),
-                (conn, cb) => {
-                    const challenge = randomBytes(16)
-
-                    pull(
-                        pull.once(challenge),
-                        lp.encode(),
-                        conn,
-                        lp.decode(),
-                        pull.collect((err, hashValues) => {
-                            if (err)
-                                return cb(err)
-
-                            const response = createHash('sha256').update(challenge).digest().slice(0, 16)
-                            if (node.peerBook.has(peer.id.toB58String())) {
-                                node.peerBook.getAll()[peer.id.toB58String()].lastSeen = Date.now()
-                            } else {
-                                log(node.peerInfo.id, `Heartbeat: Accidentially storing peerId ${peer.id.toB58String()} in peerBook.`)
-                                node.peerBook.put(peer)
-                            }
-
-                            if (hashValues.length != 1 || hashValues[0].compare(response) !== 0)
-                                return cb(Error(`Invalid response. Got ${typeof hashValues} instead of ${response.toString('hex')}`))
-                        })
-                    )
-                }
-            ], (err) => {
-                if (err) {
-                    log(node.peerInfo.id, `Removing ${peer.id.toB58String()} from peerBook due to "${err.message}".`)
-                    node._dht.routingTable.remove(peer.id, () => {
-
-                        node.peerBook.remove(peer)
-                    })
-                }
-                cb()
-            })
-        } else {
+            Date.now() - (node.peerBook.getAll()[peerInfo.id.toB58String()].lastSeen || 0) <= THIRTY_ONE_SECONDS
+        )
             return cb()
-        }
-    })
-}, THIRTY_ONE_SECONDS)
+
+        waterfall([
+            (cb) => node.dialProtocol(peerInfo, PROTOCOL_HEARTBEAT, cb),
+            (conn, cb) => {
+                const challenge = randomBytes(16)
+
+                pull(
+                    pull.once(challenge),
+                    lp.encode(),
+                    conn,
+                    lp.decode(),
+                    pull.collect((err, hashValues) => {
+                        if (err)
+                            return cb(err)
+
+                        const response = createHash('sha256').update(challenge).digest().slice(0, 16)
+                        if (node.peerBook.has(peerInfo.id.toB58String())) {
+                            node.peerBook.getAll()[peerInfo.id.toB58String()].lastSeen = Date.now()
+                        } else {
+                            log(node.peerInfo.id, `Heartbeat: Accidentially storing peerId ${peerInfo.id.toB58String()} in peerBook.`)
+                            node.peerBook.put(peerInfo)
+                        }
+
+                        if (hashValues.length != 1 || hashValues[0].compare(response) !== 0)
+                            return cb(Error(`Invalid response. Got ${typeof hashValues} instead of ${response.toString('hex')}`))
+
+                        return cb()
+                    })
+                )
+            }
+        ], (err) => {
+            if (err) {
+                log(node.peerInfo.id, `Removing ${peerInfo.id.toB58String()} from peerBook due to "${err.message}". ${err.stack}`)
+
+                return node.hangUp(peerInfo, cb)
+
+                // node._dht.routingTable.remove(peer.id, () => {
+
+                //     node.peerBook.remove(peer)
+                // })
+            }
+
+            return cb()
+        })
+    }), THIRTY_ONE_SECONDS)
