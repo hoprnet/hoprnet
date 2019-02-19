@@ -28,7 +28,7 @@ module.exports = (node) => setInterval(() =>
                 cb(null, peerInfo)
             },
             (peerInfo, cb) => {
-                console.log(`Heartbeat dialing ${peerInfo.multiaddrs.toArray().join(', ')}.`)
+                // console.log(`Heartbeat dialing ${peerInfo.multiaddrs.toArray().join(', ')}.`)
 
                 node.dialProtocol(peerInfo, PROTOCOL_HEARTBEAT, cb)
             },
