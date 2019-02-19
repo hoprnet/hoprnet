@@ -304,12 +304,7 @@ class Hopr extends libp2p {
                         lp.encode(),
                         conn,
                         lp.decode(),
-                        // pull.collect((err, data) => {
-                        //     if (err)
-                        //         return cb(err)
-
-                        //     return cb()
-                        // })
+                        pull.onEnd(cb)
                     )
                 }
             ], cb)

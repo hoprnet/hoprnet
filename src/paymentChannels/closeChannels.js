@@ -77,6 +77,6 @@ module.exports = (self) => (cb) => pull(
         if (err)
             throw err
 
-        cb(null, values.reduce((acc, receivedMoney) => acc.iadd(receivedMoney), new BN(0)))
+        cb(null, values.reduce((acc, receivedMoney) => acc.iadd(receivedMoney || new BN(0)), new BN(0)))
     })
 )
