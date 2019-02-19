@@ -64,7 +64,7 @@ class Hopr extends libp2p {
                  */
                 transport: [
                     TCP,
-                    // WebSockets,
+                    //WebSockets,
                     WebRTC
                 ],
                 /**
@@ -304,12 +304,12 @@ class Hopr extends libp2p {
                         lp.encode(),
                         conn,
                         lp.decode(),
-                        pull.collect((err, data) => {
-                            if (err)
-                                return cb(err)
+                        // pull.collect((err, data) => {
+                        //     if (err)
+                        //         return cb(err)
 
-                            return cb()
-                        })
+                        //     return cb()
+                        // })
                     )
                 }
             ], cb)
