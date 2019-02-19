@@ -61,7 +61,7 @@ module.exports = (node) => setInterval(() =>
             }
         ], (err) => {
             if (err) {
-                log(node.peerInfo.id, `Removing ${peerInfo.id.toB58String()} from peerBook due to "${err.message}". ${err.stack}`)
+                log(node.peerInfo.id, `Removing ${peerInfo.id.toB58String()} from peerBook due to "${err.message}".`)
 
                 return node.hangUp(peerInfo, cb)
 
