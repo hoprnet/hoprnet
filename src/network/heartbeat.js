@@ -63,7 +63,12 @@ module.exports = (node) => setInterval(() =>
             if (err) {
                 log(node.peerInfo.id, `Removing ${peerInfo.id.toB58String()} from peerBook due to "${err.message}".`)
 
-                return node.hangUp(peerInfo, cb)
+                return node.hangUp(peerInfo, (err) => {
+                    if (err)
+                        return cb(err)
+                    
+                    node.peerBook.remove(peerInfo.id)
+                })
             }
 
             return cb()

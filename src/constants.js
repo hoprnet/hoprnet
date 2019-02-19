@@ -7,15 +7,16 @@ module.exports.MAX_HOPS = 3
 module.exports.PROTOCOL_VERSION = '0.0.1'
 
 module.exports.PROTOCOL_NAME = 'ipfs'
-module.exports.PROTOCOL_STRING = '/'.concat(this.PROTOCOL_NAME.toLowerCase()).concat('/msg').concat(this.PROTOCOL_VERSION)
+module.exports.PROTOCOL_STRING = '/'.concat(this.PROTOCOL_NAME.toLowerCase()).concat('/msg/').concat(this.PROTOCOL_VERSION)
 module.exports.PROTOCOL_ACKNOWLEDGEMENT = '/'.concat(this.PROTOCOL_NAME.toLowerCase()).concat('/acknowledgement/').concat(this.PROTOCOL_VERSION)
-module.exports.PROTOCOL_CRAWLING = '/'.concat(this.PROTOCOL_NAME.toLowerCase()).concat('/crawl').concat(this.PROTOCOL_VERSION)
-module.exports.PROTOCOL_PAYMENT_CHANNEL = '/'.concat(this.PROTOCOL_NAME.toLowerCase()).concat('/paymentChannel').concat(this.PROTOCOL_VERSION)
+module.exports.PROTOCOL_CRAWLING = '/'.concat(this.PROTOCOL_NAME.toLowerCase()).concat('/crawl/').concat(this.PROTOCOL_VERSION)
+module.exports.PROTOCOL_PAYMENT_CHANNEL = '/'.concat(this.PROTOCOL_NAME.toLowerCase()).concat('/paymentChannel/').concat(this.PROTOCOL_VERSION)
 
-module.exports.PROTOCOL_DELIVER_PUBKEY = '/'.concat(this.PROTOCOL_NAME.toLowerCase()).concat('/pubKey').concat(this.PROTOCOL_VERSION)
-module.exports.PROTOCOL_SETTLE_CHANNEL = '/'.concat(this.PROTOCOL_NAME.toLowerCase()).concat('/settleChannel').concat(this.PROTOCOL_VERSION)
+module.exports.PROTOCOL_DELIVER_PUBKEY = '/'.concat(this.PROTOCOL_NAME.toLowerCase()).concat('/pubKey/').concat(this.PROTOCOL_VERSION)
+module.exports.PROTOCOL_SETTLE_CHANNEL = '/'.concat(this.PROTOCOL_NAME.toLowerCase()).concat('/settleChannel/').concat(this.PROTOCOL_VERSION)
+module.exports.PROTOCOL_STUN = '/'.concat(this.PROTOCOL_NAME.toLowerCase()).concat('/stun/').concat(this.PROTOCOL_VERSION)
 
-module.exports.PROTOCOL_HEARTBEAT = '/'.concat(this.PROTOCOL_NAME.toLowerCase()).concat('/heartbeat').concat(this.PROTOCOL_VERSION)
+module.exports.PROTOCOL_HEARTBEAT = '/'.concat(this.PROTOCOL_NAME.toLowerCase()).concat('/heartbeat/').concat(this.PROTOCOL_VERSION)
 
 module.exports.MARSHALLED_PUBLIC_KEY_SIZE = 37
 

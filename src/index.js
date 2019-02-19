@@ -38,6 +38,7 @@ const { resolve } = require('path')
 
 
 const PaymentChannels = require('./paymentChannels')
+const STUN = require('./network/stun')
 
 const pull = require('pull-stream')
 const lp = require('pull-length-prefixed')
@@ -172,44 +173,60 @@ class Hopr extends libp2p {
      * @param {Function} cb callback when node is ready
      */
     start(options, cb) {
-        parallel({
-            node: (cb) => super.start(cb),
-            paymentChannels: (cb) => {
-                if (!options['bootstrap-node']) {
-                    PaymentChannels.create(Object.assign({
-                        node: this
-                    }, options), cb)
-                } else {
-                    cb()
-                }
-            },
-            signallingServers: (cb) => map(options.signallingAddrs, (addr, cb) => {
-                const signallingOptions = addr.toOptions()
-                sigServer.start({
-                    host: signallingOptions.host,
-                    port: signallingOptions.port
+        waterfall([
+            (cb) => parallel({
+                node: (cb) => super.start(cb),
+                paymentChannels: (cb) => {
+                    if (!options['bootstrap-node']) {
+                        PaymentChannels.create(Object.assign({
+                            node: this
+                        }, options), cb)
+                    } else {
+                        cb()
+                    }
+                },
+                signallingServers: (cb) => map(options.signallingAddrs, (addr, cb) => {
+                    const signallingOptions = addr.toOptions()
+                    sigServer.start({
+                        host: signallingOptions.host,
+                        port: signallingOptions.port
+                    }, cb)
                 }, cb)
-            }, cb)
-        }, (err, results) => {
-            if (err)
-                return cb(err)
+            }, cb),
+            ({ signallingServers, paymentChannels }, cb) => {
+                this.signallingServers = signallingServers
+                this.paymentChannels = paymentChannels
+                this.bootstrapServers = options.bootstrapServers
+                this.stun = STUN(this, options)
 
-            registerHandlers(this, options)
+                registerHandlers(this, options)
 
-            if (!options['bootstrap-node']) {
-                this.paymentChannels = results.paymentChannels
+                this.stun(cb)
+            },
+            (addrs, cb) => {
+                console.log(addrs, cb)
             }
+        ])
+        // , (err, results) => {
+        //     if (err)
+        //         return cb(err)
 
-            this.registerSignallingServers = registerSignallingServers(this, options, WebRTC)
-            this.bootstrapServers = options.bootstrapServers
+        //     registerHandlers(this, options)
 
-            this.on('peer:connect', this.registerSignallingServers)
+        //     if (!options['bootstrap-node']) {
+        //         this.paymentChannels = results.paymentChannels
+        //     }
 
-            this.heartbeat = heartbeat(this)
-            this.signallingServers = results.signallingServers
+        //     this.registerSignallingServers = registerSignallingServers(this, options, WebRTC)
+        //     this.bootstrapServers = options.bootstrapServers
 
-            return cb(null, this)
-        })
+        //     this.on('peer:connect', this.registerSignallingServers)
+
+        //     this.heartbeat = heartbeat(this)
+        //     this.signallingServers = results.signallingServers
+
+        //     return cb(null, this)
+        // })
     }
 
     /**
