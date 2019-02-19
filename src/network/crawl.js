@@ -28,7 +28,6 @@ module.exports = (node) => (cb, comparator = _ => true) => {
                 const connectedMultiaddr = node.peerBook.get(peerId).isConnected()
 
                 if (connectedMultiaddr) {
-                    console.log(`Trying to connect to ${connectedMultiaddr.toString()}.`)
                     return cb(null, connectedMultiaddr)
                 }
 
@@ -60,11 +59,9 @@ module.exports = (node) => (cb, comparator = _ => true) => {
 
     doWhilst((cb) => {
         if (nodes.length === 0)
-            //console.log('Error')
             return cb(Error('Unable to find enough other nodes in the network.'))
 
         selected = randomSubset(nodes, Math.min(nodes.length, MAX_HOPS))
-        console.log(`selected ${selected.join(', ')}`)
         nodes = remove(nodes, selected)
 
         map(selected, queryNode, (err, newNodes) => {
@@ -93,8 +90,6 @@ module.exports = (node) => (cb, comparator = _ => true) => {
     }, () => {
         const length = node.peerBook.getAllArray().filter(comparator).length
 
-        console.log(node.peerBook.getAllArray().map(pInfo => pInfo.id.toB58String()).join(', '))
-        console.log(length < MAX_HOPS)
         return length < MAX_HOPS
     }, cb)
 }

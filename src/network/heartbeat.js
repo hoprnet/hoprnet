@@ -64,11 +64,6 @@ module.exports = (node) => setInterval(() =>
                 log(node.peerInfo.id, `Removing ${peerInfo.id.toB58String()} from peerBook due to "${err.message}".`)
 
                 return node.hangUp(peerInfo, cb)
-
-                // node._dht.routingTable.remove(peer.id, () => {
-
-                //     node.peerBook.remove(peer)
-                // })
             }
 
             return cb()

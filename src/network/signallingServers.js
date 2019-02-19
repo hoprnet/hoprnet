@@ -9,6 +9,9 @@ module.exports = (node, options, WebRTC) => (newPeerInfo) => {
     if (!newPeerInfo.isConnected())
         return
 
+    if (mafmt.WebRTCStar.matches(newPeerInfo.isConnected()))
+        return
+
     const peerIdStrings = WebRTC.filter(node.peerInfo.multiaddrs.toArray())
         .map((multiaddr) => multiaddr.getPeerId())
         .concat(newPeerInfo.id.toB58String())
