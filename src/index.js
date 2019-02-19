@@ -43,8 +43,6 @@ const pull = require('pull-stream')
 const lp = require('pull-length-prefixed')
 const { waterfall, times, parallel, map } = require('neo-async')
 
-// const BOOTSTRAP_NODE = Multiaddr('/ip4/127.0.0.1/tcp/9090/')
-
 class Hopr extends libp2p {
     /**
      * @constructor
@@ -283,13 +281,7 @@ class Hopr extends libp2p {
 
                     return this.peerRouting.findPeer(path[0], cb)
                 },
-                (peerInfo, cb) => {
-                    // const WebRTCAddresses = WebRTC.filter(peerInfo.multiaddrs.toArray())
-                    // peerInfo.multiaddrs.clear()
-                    // WebRTCAddresses.forEach((addr) => peerInfo.multiaddrs.add(addr))
-                    // console.log(peerInfo.multiaddrs.toArray().join(', '))
-
-                    parallel({
+                (peerInfo, cb) => parallel({
                     conn: (cb) => this.dialProtocol(peerInfo, c.PROTOCOL_STRING, cb),
                     packet: (cb) => createPacket(
                         this,
@@ -297,22 +289,21 @@ class Hopr extends libp2p {
                         path,
                         cb
                     )
-                }, cb)},
-                ({ conn, packet }, cb) => {
-                    pull(
-                        pull.once(packet.toBuffer()),
-                        lp.encode(),
-                        conn,
-                        lp.decode(),
-                        pull.collect((err, data) => {
-                            console.log(data)
-                            if (err)
-                                return cb(err)
+                }, cb),
+                (results, cb) => pull(
+                    pull.once(results.packet.toBuffer()),
+                    lp.encode(),
+                    results.conn,
+                    lp.decode(),
+                    pull.collect((err, data) => {
+                        if (err)
+                            return cb(err)
 
-                            return cb()
-                        })
-                    )
-                }
+                        log(this.peerInfo.id, 'Received acknowledgement.')
+
+                        return cb()
+                    })
+                )
             ], cb)
         }, cb)
     }
