@@ -12,7 +12,7 @@
         "signallingServers": "2"
     },
     "Crawler": {
-        "simultaneousConnections": 0,
-        "minNodes": 3
+        "simultaneousConnections": "0",
+        "minNodes": "3"
     }
 }

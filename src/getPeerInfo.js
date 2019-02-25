@@ -7,7 +7,7 @@ const { deserializeKeyPair, serializeKeyPair, privKeyToPeerId } = require('./uti
 const PeerInfo = require('peer-info')
 const PeerId = require('peer-id')
 const Multiaddr = require('multiaddr')
-const { PROTOCOL_NAME } = require('./constants')
+const { NAME } = require('./constants')
 
 module.exports = (options, db, cb) => {
     if (typeof db === 'function') {
@@ -54,24 +54,24 @@ module.exports = (options, db, cb) => {
 
     return waterfall([
         (cb) => {
-            if (PeerId.isPeerId(options.peerId)) {
-                cb(null, options.peerId)
-            } else if (options['bootstrap-node']) {
-                privKeyToPeerId(require('../config/.secrets.json').fundAccountPrivateKey, cb)
-            } else {
-                getFromDatabase(cb)
-            }
+            if (PeerId.isPeerId(options.peerId))
+                return cb(null, options.peerId)
+
+            if (options['bootstrap-node'])
+                return privKeyToPeerId(require('../config/.secrets.json').fundAccountPrivateKey, cb)
+
+            getFromDatabase(cb)
         },
         (peerId, cb) => PeerInfo.create(peerId, cb),
         (peerInfo, cb) => {
             options.addrs.forEach((addr) => {
                 // peerInfo.multiaddrs.add(addr.encapsulate(`/${PROTOCOL_NAME}/${peerInfo.id.toB58String()}`))
-                peerInfo.multiaddrs.add(addr.encapsulate(`/${PROTOCOL_NAME}/${peerInfo.id.toB58String()}`))
+                peerInfo.multiaddrs.add(addr.encapsulate(`/${NAME}/${peerInfo.id.toB58String()}`))
                 // peerInfo.multiaddrs.add(`/dns4/hopr.validity.io/tcp/9092/ws/p2p-webrtc-star/${PROTOCOL_NAME}/${peerInfo.id.toB58String()}`)
 
             })
 
-            cb(null, peerInfo)
+            return cb(null, peerInfo)
         }
     ], cb)
 

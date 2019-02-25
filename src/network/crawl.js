@@ -27,9 +27,8 @@ module.exports = (node) => (cb, comparator = _ => true) => {
             (cb) => {
                 const connectedMultiaddr = node.peerBook.get(peerId).isConnected()
 
-                if (connectedMultiaddr) {
+                if (connectedMultiaddr)
                     return cb(null, connectedMultiaddr)
-                }
 
                 node.peerRouting.findPeer(PeerId.createFromB58String(peerId), cb)
             },

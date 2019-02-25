@@ -6,6 +6,7 @@ const MPLEX = require('libp2p-mplex')
 const KadDHT = require('libp2p-kad-dht')
 const SECIO = require('libp2p-secio')
 const WebSockets = require('libp2p-websockets')
+const WebRTC = require('./network/natTraversal')
 
 const defaultsDeep = require('@nodeutils/defaults-deep')
 
@@ -14,18 +15,10 @@ const registerHandlers = require('./handlers')
 const c = require('./constants')
 const crawlNetwork = require('./network/crawl')
 const heartbeat = require('./network/heartbeat')
-const registerSignallingServers = require('./network/signallingServers')
 const getPubKey = require('./getPubKey')
 const getPeerInfo = require('./getPeerInfo')
-const { randomSubset, serializePeerBook, deserializePeerBook, log } = require('./utils')
+const { randomSubset, serializePeerBook, deserializePeerBook, log, match } = require('./utils')
 const PendingTransactions = require('./pendingTransactions')
-
-const wrtc = require('wrtc')
-const WStar = require('libp2p-webrtc-star')
-const WebRTC = new WStar({
-    wrtc: wrtc
-})
-const sigServer = require('libp2p-webrtc-star/src/sig-server')
 
 const fs = require('fs')
 const levelup = require('levelup')
@@ -38,7 +31,7 @@ const { resolve } = require('path')
 
 
 const PaymentChannels = require('./paymentChannels')
-const STUN = require('./network/stun')
+const PublicIp = require('./network/natTraversal/stun')
 
 const pull = require('pull-stream')
 const lp = require('pull-length-prefixed')
@@ -63,7 +56,7 @@ class Hopr extends libp2p {
                  */
                 transport: [
                     TCP,
-                    //WebSockets,
+                    WebSockets,
                     WebRTC
                 ],
                 /**
@@ -85,19 +78,23 @@ class Hopr extends libp2p {
                 /**
                  * Necessary to use WebRTC (and to support proper NAT traversal)
                  */
-                peerDiscovery: [
-                    WebRTC.discovery
-                ]
+                // peerDiscovery: [
+                //     WebRTC.discovery
+                // ]
             },
             config: {
                 EXPERIMENTAL: {
                     // libp2p DHT implementation is still hidden behind a flag
-                    dht: true
+                    dht: true,
+
                 },
                 peerDiscovery: {
                     webRTCStar: {
                         enabled: true
                     }
+                },
+                dht: {
+                    enabled: true
                 },
                 relay: {
                     enabled: false
@@ -108,7 +105,6 @@ class Hopr extends libp2p {
         super(defaultsDeep(_options, defaults))
 
         this.db = db
-        this.crawlNetwork = crawlNetwork(this)
 
         // Functionality to ask another node for its public key in case that the
         // public key is not available which is not necessary anymore.
@@ -156,6 +152,9 @@ class Hopr extends libp2p {
                     return cb(err)
 
                 const hopr = new Hopr({
+                    config: {
+                        WebRTC: options.WebRTC
+                    },
                     peerBook: peerBook,
                     peerInfo: peerInfo
                 }, db)
@@ -174,59 +173,53 @@ class Hopr extends libp2p {
      */
     start(options, cb) {
         waterfall([
-            (cb) => parallel({
-                node: (cb) => super.start(cb),
-                paymentChannels: (cb) => {
-                    if (!options['bootstrap-node']) {
-                        PaymentChannels.create(Object.assign({
-                            node: this
-                        }, options), cb)
-                    } else {
-                        cb()
-                    }
-                },
-                signallingServers: (cb) => map(options.signallingAddrs, (addr, cb) => {
-                    const signallingOptions = addr.toOptions()
-                    sigServer.start({
-                        host: signallingOptions.host,
-                        port: signallingOptions.port
-                    }, cb)
-                }, cb)
-            }, cb),
-            ({ signallingServers, paymentChannels }, cb) => {
-                this.signallingServers = signallingServers
-                this.paymentChannels = paymentChannels
-                this.bootstrapServers = options.bootstrapServers
-                this.stun = STUN(this, options)
-
+            (cb) => super.start(cb),
+            (cb) => {
                 registerHandlers(this, options)
 
-                this.stun(cb)
+                this.bootstrapServers = options.bootstrapServers
+                this.heartbeat = heartbeat(this)
+                this.getPublicIp = PublicIp(this, options)
+                this.crawlNetwork = crawlNetwork(this, options.Crawler || {})
+
+
+                this.peerInfo.multiaddrs.forEach((addr) => {
+                    if (match.LOCALHOST(addr)) {
+                        this.peerInfo.multiaddrs.delete(addr)
+                    }
+                })
+
+                return cb()
             },
-            (addrs, cb) => {
-                console.log(addrs, cb)
+            (cb) => parallel({
+                publicAddrs: (cb) => {
+                    if (!this.bootstrapServers || this.bootstrapServers.length == 0)
+                        return cb()
+
+                    this.getPublicIp(cb)
+
+                },
+                paymentChannels: (cb) => {
+                    if (options['bootstrap-node'])
+                        return cb()
+
+                    PaymentChannels.create(Object.assign({
+                        node: this
+                    }, options), cb)
+                }
+            }, cb),
+            ({ paymentChannels, publicAddrs }, cb) => {
+                this.paymentChannels = paymentChannels
+
+                if (publicAddrs)
+                    publicAddrs.forEach((addr) => this.peerInfo.multiaddrs.add(addr.encapsulate(`/${c.PROTOCOL_NAME}/${this.peerInfo.id.toB58String()}`)))
+
+                if (!options['bootstrap-node'])
+                    this.paymentChannels = paymentChannels
+
+                return cb(null, this)
             }
-        ])
-        // , (err, results) => {
-        //     if (err)
-        //         return cb(err)
-
-        //     registerHandlers(this, options)
-
-        //     if (!options['bootstrap-node']) {
-        //         this.paymentChannels = results.paymentChannels
-        //     }
-
-        //     this.registerSignallingServers = registerSignallingServers(this, options, WebRTC)
-        //     this.bootstrapServers = options.bootstrapServers
-
-        //     this.on('peer:connect', this.registerSignallingServers)
-
-        //     this.heartbeat = heartbeat(this)
-        //     this.signallingServers = results.signallingServers
-
-        //     return cb(null, this)
-        // })
+        ], cb)
     }
 
     /**
@@ -237,8 +230,6 @@ class Hopr extends libp2p {
         log(this.peerInfo.id, `Shutting down...`)
 
         clearInterval(this.heartbeat)
-
-        this.signallingServers.forEach((server) => server.stop())
 
         waterfall([
             (cb) => this.exportPeerBook(cb),
