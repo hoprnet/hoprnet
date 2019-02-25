@@ -7,7 +7,7 @@ const { sendTransaction, privKeyToPeerId, log, compileIfNecessary } = require('.
 const { createFundedNodes } = require('./utils')
 const rlp = require('rlp')
 
-const { NET, GAS_PRICE, ROPSTEN_WSS_URL, HARDCODED_ETH_ADDRESS, HARDCODED_PRIV_KEY, CONTRACT_ADDRESS } = require('../src/constants')
+const { NETWORK, GAS_PRICE, INFURA_WSS_URL, HARDCODED_ETH_ADDRESS, HARDCODED_PRIV_KEY, CONTRACT_ADDRESS } = require('../src/constants')
 
 const FUNDING_ACCOUNT = HARDCODED_ETH_ADDRESS
 const FUNDING_KEY = HARDCODED_PRIV_KEY
@@ -28,11 +28,11 @@ console.log(
 let index, compiledContract, fundingPeer
 waterfall([
     (cb) => {
-        if (NET === 'ropsten') {
-            provider = ROPSTEN_WSS_URL
+        if (NETWORK === 'ropsten') {
+            provider = INFURA_WSS_URL
 
             return cb()
-        } else if (NET === 'ganache') {
+        } else if (NETWORK === 'ganache') {
             const GANACHE_PORT = 8545
             const GANACHE_HOSTNAME = 'localhost'
             server = require('ganache-core').server({
@@ -50,7 +50,7 @@ waterfall([
                 console.log(`Successfully started local Ganache instance at 'ws://${GANACHE_HOSTNAME}:${GANACHE_PORT}'.`)
 
                 provider = `ws://${GANACHE_HOSTNAME}:${GANACHE_PORT}`
-                
+
                 return cb()
             })
         }
@@ -69,7 +69,7 @@ waterfall([
     (_, cb) => {
         compiledContract = require('../build/contracts/HoprChannel.json')
 
-        if (NET === 'ganache') {
+        if (NETWORK === 'ganache') {
             sendTransaction({
                 to: 0,
                 gas: 3000333, // 2370333
@@ -87,7 +87,7 @@ waterfall([
                 return cb(null, receipt.contractAddress)
             })
         } else {
-           return cb(null, CONTRACT_ADDRESS)
+            return cb(null, CONTRACT_ADDRESS)
         }
     },
     (contractAddress, cb) => createFundedNodes(AMOUUNT_OF_NODES, {
@@ -98,7 +98,7 @@ waterfall([
         (cb) => timesSeries(AMOUNT_OF_MESSAGES, (n, cb) => {
             nodes[0].sendMessage(rlp.encode(['Psst ... secret message from Validity Labs!', Date.now().toString()]), nodes[3].peerInfo.id)
 
-            if (NET === 'ganache') {
+            if (NETWORK === 'ganache') {
                 setTimeout(cb, 2000)
             } else {
                 setTimeout(cb, 80 * 1000)
@@ -112,4 +112,7 @@ waterfall([
         }, cb)
     ], cb),
     (cb) => server.close(cb)
-], () => { })
+], (err) => {
+    if (err)
+        throw err
+})

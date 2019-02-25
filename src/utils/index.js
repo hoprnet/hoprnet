@@ -2,7 +2,7 @@
 
 const { sha3, toChecksumAddress } = require('web3-utils')
 const { randomBytes } = require('crypto')
-const { waterfall, parallel, map, some, each } = require('neo-async')
+const { waterfall, parallel, map, some, each, tryEach } = require('neo-async')
 const { execFile } = require('child_process')
 const fs = require('fs')
 const libp2p_crypto = require('libp2p-crypto').keys
@@ -406,8 +406,49 @@ module.exports.privKeyToPeerId = (privKey, cb) => {
     })
 }
 
-// module.exports.privKeyToPeerId = (privKey, cb) =>
-//     PeerId.createFromPrivKey(new libp2p_crypto.supportedKeys.secp256k1.Secp256k1PrivateKey(privKey).bytes, cb)
+/**
+ * Tries to establish a connection to `peerId`.
+ * If the node already knows that peer, take the address from its peerBook
+ * and calls the node. In case that this fails, try to lookup the peer in
+ * the DHT.
+ * If the node is unknown, do a DHT lookup and connect afterwards to that node.
+ * 
+ * @param {libp2p-switch} sw a libp2p-switch instance
+ * @param {Object} options
+ * @param {String} options.protocol the protocol to use, default `null`
+ * @param {Object} options.peerRouting if present, use peerRouting to determine 
+ * fresh addresses
+ * @param {PeerId} peerId the peerId of the peer that should be called
+ * @param {Function(Error, Connection)} cb the function that gets called afterwards
+ */
+module.exports.establishConnection = (sw, peerId, options, cb) => {
+    if (typeof options === 'function') {
+        cb = options
+        options = {}
+    }
+
+    if (sw._peerBook.has(peerId)) {
+        tryEach([
+            (cb) => sw.dial(sw._peerBook.get(peerId), options.protocol, cb),
+            (cb) => {
+                if (!options.peerRouting)
+                    return cb(Error('TODO'))
+
+                waterfall([
+                    (cb) => options.peerRouting.findPeer(peerId, cb),
+                    (cb, peerInfo) => sw.dial(peerInfo, protocol, cb)
+                ], cb)
+            }
+        ], cb)
+    } else if (options.peerRouting) {
+        waterfall([
+            (cb) => sw.peerRouting.findPeer(peerId, cb),
+            (cb, peerInfo) => sw.dialProtocol(peerInfo, protocol, cb)
+        ], cb)
+    } else {
+        return cb(Error('TODO'))
+    }
+}
 
 // ==========================
 // Ganache-core methods   <-- ONLY FOR TESTING
@@ -741,3 +782,19 @@ module.exports.clearDirectory = (path) => {
         fs.rmdirSync(path);
     }
 }
+
+// ==========================
+// multiaddr methods
+// ==========================
+const HOPR_ADDRESS = '\/ipfs\/[a-zA-Z0-9]+' 
+const WEBRTC_STRING = '\/p2p-webrtc-star'
+
+module.exports.match = {}
+
+const WEBRTC_ADDRESS_REGEXP = new RegExp(`/${HOPR_ADDRESS}${WEBRTC_STRING}${HOPR_ADDRESS}/`)
+module.exports.match.WebRTC = (addr) => Boolean(addr.toString().match(WEBRTC_ADDRESS_REGEXP))
+
+const LOCALHOST_IPv6_REGEXP = '\/ip6\/::1'
+const LOCALHOST_IPv4_REGEXP = '\/ip4\/127.0.0.1'
+const LOCALHOST_REGEXP = new RegExp(`/(${LOCALHOST_IPv4_REGEXP})|(${LOCALHOST_IPv6_REGEXP})/`)
+module.exports.match.LOCALHOST = (addr) => Boolean(addr.toString().match(LOCALHOST_REGEXP))

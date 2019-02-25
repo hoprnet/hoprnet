@@ -2,7 +2,7 @@
 
 const { waterfall } = require('neo-async')
 const { isPartyA, pubKeyToEthereumAddress, mineBlock, log } = require('../../utils')
-const { NET } = require('../../constants')
+const { NETWORK } = require('../../constants')
 const BN = require('bn.js')
 
 module.exports = (self) => (err, event) => {
@@ -55,14 +55,14 @@ module.exports = (self) => (err, event) => {
                                 if (ok)
                                     cb(err)
                             })
-                        } else if (NET === 'ganache') {
+                        } else if (NETWORK === 'ganache') {
                             // ================ Only for testing ================
                             mineBlock(self.contract.currentProvider)
                             // ==================================================
                         }
                     })
 
-                if (NET === 'ganache') {
+                if (NETWORK === 'ganache') {
                     // ================ Only for testing ================
                     mineBlock(self.contract.currentProvider)
                     // ==================================================
