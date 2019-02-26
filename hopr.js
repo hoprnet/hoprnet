@@ -63,7 +63,7 @@ config.bootstrapServers.forEach((addr) => {
 
 options.WebRTC = config.WebRTC
 
-let node, connected
+let node
 waterfall([
     (cb) => {
         if (options.id) {
@@ -228,36 +228,6 @@ function connectToBootstrapNode(cb) {
             console.log(err)
         }
     }, cb)
-    // forever((cb) => {
-    //     console.log(`Please type in the Multiaddr of the node you want to connect to.`)
-    //     read({
-    //         edit: true,
-    //         default: DEFAULT_BOOTSTRAP_ADDRESS
-    //     }, (err, result) => {
-    //         if (err)
-    //             process.exit(0)
-
-    //         if (!connected) {
-    //             try {
-    //                 const addr = new Multiaddr(result)
-    //                 node.dial(addr, (err) => {
-    //                     if (err) {
-    //                         console.log(`\nUnable to connect to ${addr}. Please try again!`)
-    //                         cb()
-    //                     } else {
-    //                         console.log(`\nSuccessfully connected to ${addr}.`)
-    //                         cb(addr)
-    //                     }
-    //                 })
-    //             } catch (err) {
-    //                 console.log(err.message)
-    //                 cb()
-    //             }
-    //         } else {
-    //             cb(true)
-    //         }
-    //     })
-    // }, () => cb())
 }
 
 function sendMessages(node, cb) {

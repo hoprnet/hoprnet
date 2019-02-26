@@ -193,11 +193,10 @@ class Hopr extends libp2p {
             },
             (cb) => parallel({
                 publicAddrs: (cb) => {
-                    if (!this.bootstrapServers || this.bootstrapServers.length == 0)
+                    if (options['bootstrap-node'] || !this.bootstrapServers || this.bootstrapServers.length == 0)
                         return cb()
 
                     this.getPublicIp(cb)
-
                 },
                 paymentChannels: (cb) => {
                     if (options['bootstrap-node'])

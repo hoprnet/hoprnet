@@ -1,6 +1,6 @@
 'use strict'
 
-const { PROTOCOL_STUN, PROTOCOL_NAME } = require('../constants')
+const { PROTOCOL_STUN, NAME } = require('../constants')
 const { parallel } = require('neo-async')
 
 const pull = require('pull-stream')
@@ -20,7 +20,7 @@ module.exports = (node) => node.handle(PROTOCOL_STUN, (protocol, conn) =>
         //     }
         // })
         
-        addrs.forEach((addr) => peerInfo.multiaddrs.add(addr.encapsulate(`/${PROTOCOL_NAME}/${peerInfo.id.toB58String()}`)))
+        addrs.forEach((addr) => peerInfo.multiaddrs.add(addr.encapsulate(`/${NAME}/${peerInfo.id.toB58String()}`)))
 
         node.peerBook.put(peerInfo)
 
