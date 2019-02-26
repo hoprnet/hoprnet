@@ -121,7 +121,7 @@ class WebRTC {
         channel.on('signal', (signalingData) =>
             p.push(
                 rlp.encode([
-                    Buffer.from(match.WebRTC_DESTINATION.match(multiaddr)),
+                    Buffer.from(match.WebRTC_DESTINATION(multiaddr)),
                     JSON.stringify(signalingData)
                 ])
             )
