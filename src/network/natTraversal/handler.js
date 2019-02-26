@@ -9,6 +9,8 @@ const PeerId = require('peer-id')
 const paramap = require('pull-paramap')
 const pull = require('pull-stream')
 const lp = require('pull-length-prefixed')
+const wrtc = require('wrtc')
+
 
 module.exports = (self) => (protocol, conn) => pull(
     conn,
