@@ -18,7 +18,8 @@ module.exports = (self) => (protocol, conn) => pull(
         if (decoded.length < 2)
             return cb()
 
-        if (decoded[0].toString() == this.sw.peerInfo.id.toB58String()) {
+        console.log(`Relaying traffic to ${decoded[0].toString()}.`)
+        if (decoded[0].toString() == this.sw._peerInfo.id.toB58String()) {
             const channel = SimplePeer({
                 initiator: false,
                 //channelConfig: {},
