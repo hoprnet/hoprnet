@@ -1,7 +1,6 @@
 'use strict'
 
 const libp2p = require('libp2p')
-const TCP = require('libp2p-tcp')
 const MPLEX = require('libp2p-mplex')
 const KadDHT = require('libp2p-kad-dht')
 const SECIO = require('libp2p-secio')
@@ -55,7 +54,6 @@ class Hopr extends libp2p {
                  * The transport modules to use.
                  */
                 transport: [
-                    TCP,
                     WebSockets,
                     WebRTC
                 ],
