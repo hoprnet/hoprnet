@@ -50,7 +50,7 @@
         "libp2p": "robertkiel/js-libp2p",
         "libp2p-crypto": "^0.16.0",
         "libp2p-crypto-secp256k1": "^0.3.0",
-        "libp2p-kad-dht": "^0.14.4",
+        "libp2p-kad-dht": "^0.14.6",
         "libp2p-mplex": "^0.8.3",
         "libp2p-secio": "^0.11.1",
         "libp2p-spdy": "^0.13.1",
