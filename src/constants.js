@@ -6,7 +6,7 @@ const VERSION = '0.0.1'
 const NAME = 'ipfs' // 'hopr'
 const BASESTRING = `/${NAME}/${VERSION}`
 
-const NETWORK = 'ganache'
+const NETWORK = 'ropsten'
 const contract = require('../config/contract-hopr.json');
 const secrets = require('../config/.secrets.json')
 const gas = require('../config/gasUnits.json');

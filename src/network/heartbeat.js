@@ -4,10 +4,11 @@ const { PROTOCOL_HEARTBEAT } = require('../constants')
 const lp = require('pull-length-prefixed')
 const { randomBytes, createHash } = require('crypto')
 const { log } = require('../utils')
-const { waterfall, each } = require('neo-async')
+const { waterfall, each, series } = require('neo-async')
 const pull = require('pull-stream')
 
 const THIRTY_ONE_SECONDS = 31 * 1000
+const HASH_SIZE = 32
 
 module.exports = (node) => setInterval(() => 
     each(node.peerBook.getAllArray(), (peerInfo, cb) => {
@@ -27,11 +28,11 @@ module.exports = (node) => setInterval(() =>
 
                 cb(null, peerInfo)
             },
-            (peerInfo, cb) => {
+            (peerInfo, cb) => 
                 // console.log(`Heartbeat dialing ${peerInfo.multiaddrs.toArray().join(', ')}.`)
 
                 node.dialProtocol(peerInfo, PROTOCOL_HEARTBEAT, cb)
-            },
+            ,
             (conn, cb) => {
                 const challenge = randomBytes(16)
 
@@ -39,7 +40,9 @@ module.exports = (node) => setInterval(() =>
                     pull.once(challenge),
                     lp.encode(),
                     conn,
-                    lp.decode(),
+                    lp.decode({
+                        maxLength: HASH_SIZE
+                    }),
                     pull.collect((err, hashValues) => {
                         if (err)
                             return cb(err)
@@ -63,10 +66,10 @@ module.exports = (node) => setInterval(() =>
             if (err) {
                 log(node.peerInfo.id, `Removing ${peerInfo.id.toB58String()} from peerBook due to "${err.message}".`)
 
-                return node.hangUp(peerInfo, (err) => {
-                    if (err)
-                        return cb(err)
-                    
+                return series([
+                    (cb) => node.hangUp(peerInfo, cb),
+                    (cb) => node._dht.routingTable.remove(peerInfo.id, cb),
+                ], (err) => {
                     node.peerBook.remove(peerInfo.id)
                 })
             }

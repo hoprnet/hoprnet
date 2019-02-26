@@ -6,7 +6,7 @@ const read = require('read')
 const getopts = require('getopts')
 const Multiaddr = require('multiaddr')
 const { pubKeyToEthereumAddress, randomSubset, privKeyToPeerId, sendTransaction } = require('./src/utils')
-const { ROPSTEN_WSS_URL, CONTRACT_ADDRESS, STAKE_GAS_AMOUNT } = require('./src/constants')
+const { INFURA_WSS_URL, CONTRACT_ADDRESS, STAKE_GAS_AMOUNT } = require('./src/constants')
 const PeerId = require('peer-id')
 const BN = require('bn.js')
 const { toWei, fromWei } = require('web3-utils')
@@ -25,7 +25,7 @@ if (options['bootstrap-node']) {
     console.log(`... running as bootstrap node!.`)
 }
 
-options.provider = ROPSTEN_WSS_URL
+options.provider = INFURA_WSS_URL
 
 const config = require('./config.json')
 
@@ -85,13 +85,13 @@ waterfall([
     (cb) => createNode(options, cb),
     (_node, cb) => {
         node = _node
-        console.log(node.peerInfo.id.privKey.marshal().toString('hex'))
+        console.log()
         if (!options['bootstrap-node']) {
             node.paymentChannels.web3.eth.getBalance(pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()), (err, funds) => {
                 if (err)
                     return cb(err)
 
-                console.log(`Own Ethereum address:\n ${pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal())}.\n Funds: ${fromWei(funds, 'ether')} ETH`)
+                console.log(`Own Ethereum address:\n ${pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal())}\n Private key: ${node.peerInfo.id.privKey.marshal().toString('hex')}\n Funds: ${fromWei(funds, 'ether')} ETH`)
 
                 funds = new BN(funds)
                 const minimalFunds = new BN(toWei('0.15', 'ether'))

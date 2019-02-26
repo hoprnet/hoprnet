@@ -5,15 +5,16 @@ const { createHash } = require('crypto')
 const lp = require('pull-length-prefixed')
 const { log } = require('../utils')
 
-const HASH_LENGTH = 16
+const CHALLENGE_LENGTH = 16
 const { PROTOCOL_HEARTBEAT } = require('../constants')
 
 module.exports = (node) => node.handle(PROTOCOL_HEARTBEAT, (protocol, conn) =>
     pull(
         conn,
-        lp.decode(),
-        pull.filter(data => data.length === HASH_LENGTH),
-        pull.asyncMap((data, cb) => {
+        lp.decode({
+            maxLength: CHALLENGE_LENGTH
+        }),
+        pull.asyncMap((data, cb) =>
             conn.getPeerInfo((err, peerInfo) => {
                 if (err)
                     return cb(err)
@@ -28,7 +29,7 @@ module.exports = (node) => node.handle(PROTOCOL_HEARTBEAT, (protocol, conn) =>
                 return cb(null, createHash('sha256').update(data).digest().slice(0, 16))
 
             })
-        }),
+        ),
         lp.encode(),
         conn
     )

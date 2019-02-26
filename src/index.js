@@ -12,7 +12,7 @@ const defaultsDeep = require('@nodeutils/defaults-deep')
 
 const { createPacket } = require('./packet')
 const registerHandlers = require('./handlers')
-const c = require('./constants')
+const { NAME, PACKET_SIZE, PROTOCOL_STRING, MAX_HOPS} = require('./constants')
 const crawlNetwork = require('./network/crawl')
 const heartbeat = require('./network/heartbeat')
 const getPubKey = require('./getPubKey')
@@ -211,7 +211,7 @@ class Hopr extends libp2p {
                 this.paymentChannels = paymentChannels
 
                 if (publicAddrs)
-                    publicAddrs.forEach((addr) => this.peerInfo.multiaddrs.add(addr.encapsulate(`/${c.PROTOCOL_NAME}/${this.peerInfo.id.toB58String()}`)))
+                    publicAddrs.forEach((addr) => this.peerInfo.multiaddrs.add(addr.encapsulate(`/${NAME}/${this.peerInfo.id.toB58String()}`)))
 
                 if (!options['bootstrap-node'])
                     this.paymentChannels = paymentChannels
@@ -277,7 +277,7 @@ class Hopr extends libp2p {
             }
         }
 
-        times(Math.ceil(msg.length / c.PACKET_SIZE), (n, cb) => {
+        times(Math.ceil(msg.length / PACKET_SIZE), (n, cb) => {
             let path
 
             waterfall([
@@ -289,10 +289,10 @@ class Hopr extends libp2p {
                     return this.peerRouting.findPeer(path[0], cb)
                 },
                 (peerInfo, cb) => parallel({
-                    conn: (cb) => this.dialProtocol(peerInfo, c.PROTOCOL_STRING, cb),
+                    conn: (cb) => this.dialProtocol(peerInfo, PROTOCOL_STRING, cb),
                     packet: (cb) => createPacket(
                         this,
-                        msg.slice(n * c.PACKET_SIZE, Math.min(msg.length, (n + 1) * c.PACKET_SIZE)),
+                        msg.slice(n * PACKET_SIZE, Math.min(msg.length, (n + 1) * PACKET_SIZE)),
                         path,
                         cb
                     )
@@ -330,7 +330,7 @@ class Hopr extends libp2p {
 
         return this.crawlNetwork(() => {
             const path = randomSubset(
-                this.peerBook.getAllArray(), c.MAX_HOPS - 1, comparator)
+                this.peerBook.getAllArray(), MAX_HOPS - 1, comparator)
 
             return cb(null, path)
         })
