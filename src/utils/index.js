@@ -791,10 +791,10 @@ const WEBRTC_STRING = '\/p2p-webrtc-star'
 
 module.exports.match = {}
 
-const WEBRTC_ADDRESS_REGEXP = new RegExp(`/${HOPR_ADDRESS}${WEBRTC_STRING}${HOPR_ADDRESS}/`)
+const WEBRTC_ADDRESS_REGEXP = new RegExp(`${HOPR_ADDRESS}${WEBRTC_STRING}${HOPR_ADDRESS}`)
 module.exports.match.WebRTC = (addr) => Boolean(addr.toString().match(WEBRTC_ADDRESS_REGEXP))
 
 const LOCALHOST_IPv6_REGEXP = '\/ip6\/::1'
 const LOCALHOST_IPv4_REGEXP = '\/ip4\/127.0.0.1'
-const LOCALHOST_REGEXP = new RegExp(`/(${LOCALHOST_IPv4_REGEXP})|(${LOCALHOST_IPv6_REGEXP})/`)
+const LOCALHOST_REGEXP = new RegExp(`(${LOCALHOST_IPv4_REGEXP})|(${LOCALHOST_IPv6_REGEXP})`)
 module.exports.match.LOCALHOST = (addr) => Boolean(addr.toString().match(LOCALHOST_REGEXP))
