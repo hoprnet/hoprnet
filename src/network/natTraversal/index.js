@@ -118,14 +118,14 @@ class WebRTC {
 
         const p = Pushable()
 
-        channel.on('signal', (signalingData) =>
+        channel.on('signal', (signalingData) => {
             p.push(
                 rlp.encode([
-                    Buffer.from(match.WebRTC_DESTINATION(multiaddr)),
+                    Buffer.from(match.WebRTC_DESTINATION(multiaddr).getPeerId()),
                     JSON.stringify(signalingData)
                 ])
             )
-        )
+            })
 
         channel.once('error', (err) => {
             p.end(err)
