@@ -30,6 +30,5 @@ module.exports = (node) => node.handle(PROTOCOL_STUN, (protocol, conn) =>
             lp.encode(),
             conn
         )
-        console.log(`PeerBook`, node.peerBook.get(peerInfo))
     })
 )

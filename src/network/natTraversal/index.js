@@ -111,8 +111,8 @@ class WebRTC {
             //sdpTransform: function (sdp) { return sdp },
             //stream: false,
             //streams: [],
-            trickle: false,
-            allowHalfTrickle: false,
+            trickle: true,
+            // allowHalfTrickle: false,
             wrtc: wrtc,
         })
 
@@ -164,7 +164,7 @@ class WebRTC {
                     conn,
                     lp.decode(),
                     pull.drain((data) => {
-                        console.log(data)
+                        console.log(JSON.parse(data))
                         channel.signal(JSON.parse(data))
 
                         return !connected

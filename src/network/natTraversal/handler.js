@@ -3,7 +3,7 @@
 const SimplePeer = require('simple-peer')
 const rlp = require('rlp')
 const toPull = require('stream-to-pull-stream')
-const { establishConnection } = require('../../utils')
+const { establishConnection, log } = require('../../utils')
 const { PROTOCOL_WEBRTC_SIGNALING } = require('../../constants')
 const PeerId = require('peer-id')
 const paramap = require('pull-paramap')
@@ -32,8 +32,8 @@ module.exports = (self) => (protocol, conn) => pull(
                 //sdpTransform: function (sdp) { return sdp },
                 //stream: false,
                 //streams: [],
-                trickle: false,
-                allowHalfTrickle: false,
+                trickle: true,
+                // allowHalfTrickle: false,
                 wrtc: wrtc,
             })
 
@@ -60,14 +60,18 @@ module.exports = (self) => (protocol, conn) => pull(
 
         } else {
             const recipient = new PeerId(decoded[0])
-            console.log(`Relaying traffic to ${recipient.toB58String()}.`)
+            log(self.sw._peerInfo.id, `Relaying signaling message to ${recipient.toB58String()}.`)
 
             establishConnection(self.sw, recipient, {
                 protocol: PROTOCOL_WEBRTC_SIGNALING,
                 // big TODO!!!
                 peerRouting: self.peerRouting
             }, (err, conn) => {
-                console.log(err, conn)
+                if (err) {
+                    log(self.sw._peerInfo.id, `Error ${err.message} while relaying signaling message ${JSON.parse(decoded[1])} to ${recipient.toB58String()}.`)
+                    return
+                }
+
                 pull(
                     pull.once(data),
                     lp.encode(),
