@@ -111,8 +111,8 @@ class WebRTC {
             //sdpTransform: function (sdp) { return sdp },
             //stream: false,
             //streams: [],
-            trickle: true,
-            // allowHalfTrickle: false,
+            trickle: false,
+            allowHalfTrickle: true,
             wrtc: wrtc,
         })
 
