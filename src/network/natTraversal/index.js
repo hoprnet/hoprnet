@@ -112,7 +112,7 @@ class WebRTC {
             //stream: false,
             //streams: [],
             trickle: false,
-            allowHalfTrickle: true,
+            allowHalfTrickle: false,
             wrtc: wrtc,
         })
 

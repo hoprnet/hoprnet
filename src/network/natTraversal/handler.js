@@ -33,7 +33,7 @@ module.exports = (self) => (protocol, conn) => pull(
                 //stream: false,
                 //streams: [],
                 trickle: false,
-                allowHalfTrickle: true,
+                allowHalfTrickle: false,
                 wrtc: wrtc,
             })
 
