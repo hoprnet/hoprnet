@@ -12,6 +12,7 @@ const pull = require('pull-stream')
 const lp = require('pull-length-prefixed')
 const Pushable = require('pull-pushable')
 const once = require('once')
+const bs58 = require('bs58')
 
 const register = require('./register')
 const handler = require('./handler')
@@ -121,7 +122,7 @@ class WebRTC {
         channel.on('signal', (signalingData) => {
             p.push(
                 rlp.encode([
-                    Buffer.from(match.WebRTC_DESTINATION(multiaddr).getPeerId()),
+                    Buffer.from(bs58.decode(match.WebRTC_DESTINATION(multiaddr).getPeerId())),
                     JSON.stringify(signalingData)
                 ])
             )
