@@ -795,7 +795,7 @@ const WEBRTC_ADDRESS_REGEXP = new RegExp(`${HOPR_ADDRESS}${WEBRTC_STRING}${HOPR_
 module.exports.match.WebRTC = (addr) => Boolean(addr.toString().match(WEBRTC_ADDRESS_REGEXP))
 
 const WEBRTC_ADDRESS_DESTINATION_REGEXP = new RegExp(`(?<=${HOPR_ADDRESS}${WEBRTC_STRING})${HOPR_ADDRESS}`)
-module.exports.match.WebRTC_DESTINATION = (addr) => Boolean(addr.toString().match(WEBRTC_ADDRESS_DESTINATION_REGEXP))
+module.exports.match.WebRTC_DESTINATION = (addr) => Multiaddr(addr.toString().match(WEBRTC_ADDRESS_DESTINATION_REGEXP)[0])
 
 const LOCALHOST_IPv6_REGEXP = '\/ip6\/::1'
 const LOCALHOST_IPv4_REGEXP = '\/ip4\/127.0.0.1'
