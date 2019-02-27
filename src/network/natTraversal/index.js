@@ -13,6 +13,7 @@ const lp = require('pull-length-prefixed')
 const Pushable = require('pull-pushable')
 const once = require('once')
 const bs58 = require('bs58')
+const Connection = require('interface-connection').Connection
 
 const register = require('./register')
 const handler = require('./handler')

@@ -10,8 +10,7 @@ const paramap = require('pull-paramap')
 const pull = require('pull-stream')
 const lp = require('pull-length-prefixed')
 const wrtc = require('wrtc')
-
-
+const Connection = require('interface-connection').Connection
 
 module.exports = (self) => (protocol, conn) => pull(
     conn,
