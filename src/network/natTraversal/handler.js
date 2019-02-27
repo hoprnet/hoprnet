@@ -63,13 +63,22 @@ module.exports = (self) => (protocol, conn) => pull(
             const recipient = new PeerId(decoded[0])
             console.log(`Relaying traffic to ${recipient.toB58String()}.`)
 
-            establishConnection(self.sw, recipient, PROTOCOL_WEBRTC_SIGNALING, (err, conn) => pull(
-                pull.once(data),
-                lp.encode(),
-                conn,
-                lp.decode(),
-                pull.collect(cb)
-            ))
+            establishConnection(self.sw, recipient, {
+                protocol: PROTOCOL_WEBRTC_SIGNALING,
+                // big TODO
+                peerRouting: self.peerRouting
+            }, (err, conn) => {
+                console.log(err, conn)
+                pull(
+                    pull.once(data),
+                    lp.encode(),
+                    conn,
+                    lp.decode(),
+                    pull.collect((err, data) => {
+                        console.log(err, data)
+                    })
+                )
+            })
         }
     }),
     lp.encode(),
