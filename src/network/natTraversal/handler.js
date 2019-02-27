@@ -12,6 +12,7 @@ const lp = require('pull-length-prefixed')
 const wrtc = require('wrtc')
 
 
+
 module.exports = (self) => (protocol, conn) => pull(
     conn,
     lp.decode(),
@@ -20,7 +21,7 @@ module.exports = (self) => (protocol, conn) => pull(
         if (decoded.length < 2)
             return cb()
 
-        if (decoded[0].toString() == self.sw._peerInfo.id.toB58String()) {
+        if (self.sw._peerInfo.id.isEqual(decoded[0])) {
             const channel = SimplePeer({
                 initiator: false,
                 //channelConfig: {},
@@ -41,7 +42,7 @@ module.exports = (self) => (protocol, conn) => pull(
 
             channel.on('signal', (data) => {
                 console.log(data)
-                cb(null, JSON.stringify(data))
+                cb(null, Buffer.from(JSON.stringify(data)))
             })
 
             channel.once('connect', () => {
@@ -65,7 +66,7 @@ module.exports = (self) => (protocol, conn) => pull(
 
             establishConnection(self.sw, recipient, {
                 protocol: PROTOCOL_WEBRTC_SIGNALING,
-                // big TODO
+                // big TODO!!!
                 peerRouting: self.peerRouting
             }, (err, conn) => {
                 console.log(err, conn)
@@ -74,8 +75,10 @@ module.exports = (self) => (protocol, conn) => pull(
                     lp.encode(),
                     conn,
                     lp.decode(),
-                    pull.collect((err, data) => {
-                        console.log(err, data)
+                    pull.drain((data) => {
+                        cb(null, data)
+                    }, (err) => {
+                        cb(err || true)
                     })
                 )
             })
