@@ -116,6 +116,8 @@ class WebRTC {
             wrtc: wrtc,
         })
 
+        const conn = new Connection(toPull.duplex(channel))
+
         const peerId = PeerId.createFromB58String(multiaddr.decapsulate('p2p-webrtc-star').getPeerId())
 
         const p = Pushable()
@@ -174,11 +176,12 @@ class WebRTC {
 
             p.end()
 
-            const conn = new Connection(toPull.duplex(channel))
             conn.getObservedAddrs = () => { }
 
-            callback(null, conn)
+            callback(null)
         })
+
+        return conn
     }
 
     createListener(options, handler) {
