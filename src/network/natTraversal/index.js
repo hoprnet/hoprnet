@@ -187,7 +187,9 @@ class WebRTC {
             options = {}
         }
 
-        this.listener.on('connection', handler)
+        this.listener.on('connection', (err, conn) => {
+            handler(err, conn)
+        })
 
         return this.listener
     }

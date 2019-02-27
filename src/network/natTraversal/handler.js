@@ -51,10 +51,7 @@ module.exports = (self) => (protocol, conn) => pull(
 
                 cb(true)
 
-                setImmediate(() => {
-                    self.listener.emit('connection')
-                    handler(null, conn)
-                })
+                setImmediate(self.listener.emit, 'connection', null, conn)
             })
 
             channel.signal(JSON.parse(decoded[1]))
