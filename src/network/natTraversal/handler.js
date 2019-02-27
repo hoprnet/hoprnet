@@ -20,7 +20,6 @@ module.exports = (self) => (protocol, conn) => pull(
         if (decoded.length < 2)
             return cb()
 
-        console.log(`Relaying traffic to ${decoded[0].toString()}.`)
         if (decoded[0].toString() == self.sw._peerInfo.id.toB58String()) {
             const channel = SimplePeer({
                 initiator: false,
@@ -62,6 +61,7 @@ module.exports = (self) => (protocol, conn) => pull(
 
         } else {
             const recipient = new PeerId(decoded[0])
+            console.log(`Relaying traffic to ${recipient.toB58String()}.`)
 
             establishConnection(self.sw, recipient, PROTOCOL_WEBRTC_SIGNALING, (err, conn) => pull(
                 pull.once(data),
