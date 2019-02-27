@@ -164,6 +164,7 @@ class WebRTC {
                     conn,
                     lp.decode(),
                     pull.drain((data) => {
+                        console.log(data)
                         channel.signal(JSON.parse(data))
 
                         return !connected

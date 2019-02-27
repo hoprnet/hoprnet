@@ -39,6 +39,9 @@ module.exports = (self) => (protocol, conn) => pull(
 
             self.channels.push(channel)
 
+            channel.on('error', (err) => setImmediate(self.listener.emit, 'error', err))
+            channel.on('close', () => setImmediate(self.listener.emit, 'close'))
+
             channel.on('signal', (data) => {
                 console.log(data)
                 cb(null, Buffer.from(JSON.stringify(data)))
@@ -48,10 +51,9 @@ module.exports = (self) => (protocol, conn) => pull(
                 const conn = new Connection(toPull.duplex(channel))
 
                 conn.getObservedAddrs = (cb) => cb(null, [])
+                setImmediate(self.listener.emit, 'connection', null, conn)
 
                 cb(true)
-
-                setImmediate(self.listener.emit, 'connection', null, conn)
             })
 
             channel.signal(JSON.parse(decoded[1]))
