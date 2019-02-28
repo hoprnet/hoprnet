@@ -192,9 +192,7 @@ class WebRTC {
             options = {}
         }
 
-        this.listener.on('connection', (conn) => {
-            connHandler(conn)
-        })
+        this.listener.on('connection', connHandler)
 
         return this.listener
     }
