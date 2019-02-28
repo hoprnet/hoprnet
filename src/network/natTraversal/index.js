@@ -120,29 +120,6 @@ class WebRTC {
 
         const peerId = PeerId.createFromB58String(multiaddr.decapsulate('p2p-webrtc-star').getPeerId())
 
-        const p = Pushable()
-
-        channel.on('signal', (signalingData) => {
-            p.push(
-                rlp.encode([
-                    Buffer.from(bs58.decode(match.WebRTC_DESTINATION(multiaddr).getPeerId())),
-                    JSON.stringify(signalingData)
-                ])
-            )
-            })
-
-        channel.once('error', (err) => {
-            p.end(err)
-            channel.removeAllListeners()
-            callback(err)
-        })
-
-        channel.once('timeout', () => {
-            p.end()
-            channel.removeAllListeners()
-            callback(Error(`Timed out while trying to connect to peer ${peerId.toB58String()} through WebRTC.`))
-        })
-
         waterfall([
             (cb) => establishConnection(this.sw, peerId, {
                 protocol: PROTOCOL_WEBRTC_SIGNALING,
@@ -150,24 +127,48 @@ class WebRTC {
                 peerRouting: this.peerRouting
             }, cb),
             (conn, cb) => {
-                let connected = false
+                function foo() {
+                    let ended = false
+                    let next = () => { }
 
-                channel.once('connect', () => {
-                    connected = true
+                    const end = (err) => {
+                        ended = true
+                        if (!next.called)
+                            return next(err ? err : true)
+                    }
 
-                    return cb()
-                })
+                    channel.on('close', end)
+                    channel.on('connect', () => {
+                        end()
+                        cb()
+                    })
+                    channel.on('error', end)
+
+                    return (end, cb) => {
+                        if (ended || end)
+                            return cb(end ? end : true)
+
+                        channel.once('signal', (signalingData) => {
+                            console.log(signalingData)
+                            cb(null,
+                                rlp.encode([
+                                    Buffer.from(bs58.decode(match.WebRTC_DESTINATION(multiaddr).getPeerId())),
+                                    JSON.stringify(signalingData)
+                                ]))
+                        })
+
+                        next = cb
+                    }
+                }
 
                 pull(
-                    p,
+                    foo(),
                     lp.encode(),
                     conn,
                     lp.decode(),
                     pull.drain((data) => {
                         console.log(JSON.parse(data))
                         channel.signal(JSON.parse(data))
-
-                        return !connected
                     })
                 )
             }
@@ -175,7 +176,7 @@ class WebRTC {
             if (err)
                 return callback(err)
 
-            p.end()
+            console.log('finally connected')
 
             conn.getObservedAddrs = () => { }
 
