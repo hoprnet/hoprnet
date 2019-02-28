@@ -29,17 +29,17 @@ module.exports = (self) => (newPeerInfo) => {
         toDelete = addrs[choice]
     }
 
+    const toAdd = Multiaddr(`/${NAME}/${newPeerInfo.id.toB58String()}/p2p-webrtc-star/${NAME}/${self.sw._peerInfo.id.toB58String()}`)
+    
+    self.sw._peerInfo.multiaddrs.replace(toDelete, toAdd)
+
     if (!self.sw.transports['WebRTCStar']) {
         self.sw.transport.add('WebRTCStar', self)
-    }
-
-    const toAdd = Multiaddr(`/${NAME}/${newPeerInfo.id.toB58String()}/p2p-webrtc-star/${NAME}/${self.sw._peerInfo.id.toB58String()}`)
+        self.sw.transport.listen('WebRTCStar', null, null, () => {})
+    } 
 
     self.listener.listen([toAdd], (err) => {
-        if (err) {
+        if (err)
             console.log(`SignallingServers: ${err.message}. ${err.stack}`, err)
-        } else {
-            self.sw._peerInfo.multiaddrs.replace(toDelete, toAdd)
-        }
     })
 }

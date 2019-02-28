@@ -45,7 +45,7 @@ class WebRTC {
                 this.addrs.push(multiaddrs)
             }
 
-            groupBy(multiaddrs, (addr, cb) => {
+            groupBy(this.addrs, (addr, cb) => {
                 const toDial = addr.decapsulate('p2p-webrtc-star').getPeerId()
 
                 // Big TODO!!!
@@ -73,7 +73,7 @@ class WebRTC {
             })
         }
 
-        this.listener.getAddrs = (cb) => cb(null, addrs)
+        this.listener.getAddrs = (cb) => cb(null, this.addrs)
         this.listener.close = (options, cb) => {
             if (typeof options === 'function') {
                 cb = options
@@ -186,14 +186,14 @@ class WebRTC {
         return conn
     }
 
-    createListener(options, handler) {
+    createListener(options, connHandler) {
         if (typeof options === 'function') {
-            handler = options
+            connHandler = options
             options = {}
         }
 
-        this.listener.on('connection', (err, conn) => {
-            handler(err, conn)
+        this.listener.on('connection', (conn) => {
+            connHandler(conn)
         })
 
         return this.listener
