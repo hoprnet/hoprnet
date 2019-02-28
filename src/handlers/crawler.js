@@ -14,7 +14,7 @@ module.exports = (node) => node.handle(PROTOCOL_CRAWLING, (protocol, conn) => {
 
     const filter = (peerInfo) =>
         peerInfo.id.pubKey &&
-        peerInfo.id.toBytes().compare(connectedPeerInfo.id.toBytes()) !== 0 &&
+        // peerInfo.id.toBytes().compare(connectedPeerInfo.id.toBytes()) !== 0 &&
         peerInfo.id.toBytes().compare(node.peerInfo.id.toBytes()) !== 0
 
     const amountOfNodes = Math.min(CRAWLING_RESPONSE_NODES, peers.length - 1)
