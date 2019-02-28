@@ -18,6 +18,7 @@ module.exports = (self) => (protocol, conn) => pull(
         let conns = new Map()
         let first
         let channel
+        const messages = []
         let ended = false
 
         let next = () => { }
@@ -72,7 +73,7 @@ module.exports = (self) => (protocol, conn) => pull(
                             //stream: false,
                             //streams: [],
                             trickle: false,
-                            allowHalfTrickle: false,
+                            allowHalfTrickle: true,
                             wrtc: wrtc,
                         })
 
@@ -94,19 +95,26 @@ module.exports = (self) => (protocol, conn) => pull(
                         })
                         channel.on('error', end)
                         channel.on('close', end)
+                        channel.on('signal', (signalingData) => {
+                            if (ended)
+                                return
+
+                            if (!next.called)
+                                return cb(null, Buffer.from(JSON.stringify(signalingData)))
+
+                            messages.push(signalingData)
+                        })
                     }
 
                     if (ended)
                         return cb(end ? end : true)
 
-                    channel.once('signal', (signalingData) => {
-                        console.log(signalingData, JSON.stringify(signalingData))
-                        cb(null, Buffer.from(JSON.stringify(signalingData)))
-                    })
+                    next = cb
 
                     channel.signal(signalingData)
 
-                    next = cb
+                    if (messages.length > 0)
+                        return cb(null, Buffer.from(JSON.stringify(signalingData)))
                 }
             })
         }

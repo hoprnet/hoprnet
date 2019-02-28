@@ -112,7 +112,7 @@ class WebRTC {
             //stream: false,
             //streams: [],
             trickle: false,
-            allowHalfTrickle: false,
+            allowHalfTrickle: true,
             wrtc: wrtc,
         })
 
@@ -129,6 +129,7 @@ class WebRTC {
             (conn, cb) => {
                 function foo() {
                     let ended = false
+                    const messages = []
                     let next = () => { }
 
                     const end = (err) => {
@@ -139,25 +140,41 @@ class WebRTC {
 
                     channel.on('close', end)
                     channel.on('connect', () => {
+                        console.log('here')
                         end()
                         cb()
                     })
-                    channel.on('error', end)
+                    channel.on('error', (err) => {
+                        console.log(err)
+                        end()
+                    })
+
+                    channel.on('signal', (signalingData) => {
+                        console.log(JSON.stringify(signalingData))
+                        if (ended)
+                            return
+
+                        if (!next.called)
+                            return next(null, rlp.encode([
+                                Buffer.from(bs58.decode(match.WebRTC_DESTINATION(multiaddr).getPeerId())),
+                                JSON.stringify(signalingData)
+                            ]))
+
+                        messages.push(signalingData)
+                    })
 
                     return (end, cb) => {
+                        console.log('here!!!')
                         if (ended || end)
                             return cb(end ? end : true)
 
-                        channel.once('signal', (signalingData) => {
-                            console.log(signalingData)
-                            cb(null,
-                                rlp.encode([
-                                    Buffer.from(bs58.decode(match.WebRTC_DESTINATION(multiaddr).getPeerId())),
-                                    JSON.stringify(signalingData)
-                                ]))
-                        })
-
                         next = cb
+
+                        if (messages.length > 0)
+                            return cb(null, rlp.encode([
+                                Buffer.from(bs58.decode(match.WebRTC_DESTINATION(multiaddr).getPeerId())),
+                                JSON.stringify(messages.shift())
+                            ]))
                     }
                 }
 
