@@ -96,6 +96,8 @@ module.exports = (self) => (protocol, conn) => pull(
                         channel.on('error', end)
                         channel.on('close', end)
                         channel.on('signal', (signalingData) => {
+                            console.log('emitting', signalingData)
+
                             if (ended)
                                 return
 
@@ -110,6 +112,8 @@ module.exports = (self) => (protocol, conn) => pull(
                         return cb(end ? end : true)
 
                     next = cb
+
+                    console.log('receiving', signalingData)
 
                     channel.signal(signalingData)
 

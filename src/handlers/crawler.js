@@ -1,15 +1,12 @@
 'use strict'
 
 const pull = require('pull-stream')
-const { waterfall } = require('neo-async')
 const lp = require('pull-length-prefixed')
-
 
 const { PROTOCOL_CRAWLING, CRAWLING_RESPONSE_NODES } = require('../constants')
 const { randomSubset } = require('../utils')
 
 module.exports = (node) => node.handle(PROTOCOL_CRAWLING, (protocol, conn) => {
-
     const peers = node.peerBook.getAllArray()
 
     const filter = (peerInfo) =>
@@ -27,5 +24,4 @@ module.exports = (node) => node.handle(PROTOCOL_CRAWLING, (protocol, conn) => {
         lp.encode(),
         conn
     )
-
 })

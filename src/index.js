@@ -86,11 +86,11 @@ class Hopr extends libp2p {
                     dht: true,
 
                 },
-                peerDiscovery: {
-                    webRTCStar: {
-                        enabled: true
-                    }
-                },
+                // peerDiscovery: {
+                //     webRTCStar: {
+                //         enabled: true
+                //     }
+                // },
                 dht: {
                     enabled: true
                 },
@@ -179,7 +179,6 @@ class Hopr extends libp2p {
                 this.heartbeat = heartbeat(this)
                 this.getPublicIp = PublicIp(this, options)
                 this.crawlNetwork = crawlNetwork(this, options.Crawler || {})
-
 
                 this.peerInfo.multiaddrs.forEach((addr) => {
                     if (match.LOCALHOST(addr)) {
