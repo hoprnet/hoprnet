@@ -66,7 +66,7 @@ module.exports = (options, db, cb) => {
         (peerInfo, cb) => {
             options.addrs.forEach((addr) => {
                 // peerInfo.multiaddrs.add(addr.encapsulate(`/${PROTOCOL_NAME}/${peerInfo.id.toB58String()}`))
-                peerInfo.multiaddrs.add(addr.encapsulate(`/ws/${NAME}/${peerInfo.id.toB58String()}`))
+                peerInfo.multiaddrs.add(addr.encapsulate(`/${NAME}/${peerInfo.id.toB58String()}`))
                 // peerInfo.multiaddrs.add(`/dns4/hopr.validity.io/tcp/9092/ws/p2p-webrtc-star/${PROTOCOL_NAME}/${peerInfo.id.toB58String()}`)
 
             })

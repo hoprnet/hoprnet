@@ -4,7 +4,7 @@ const libp2p = require('libp2p')
 const MPLEX = require('libp2p-mplex')
 const KadDHT = require('libp2p-kad-dht')
 const SECIO = require('libp2p-secio')
-const WebSockets = require('libp2p-websockets')
+const TCP = require('libp2p-tcp')
 const WebRTC = require('./network/natTraversal')
 
 const defaultsDeep = require('@nodeutils/defaults-deep')
@@ -54,7 +54,7 @@ class Hopr extends libp2p {
                  * The transport modules to use.
                  */
                 transport: [
-                    WebSockets,
+                    TCP,
                     WebRTC
                 ],
                 /**
@@ -300,12 +300,11 @@ class Hopr extends libp2p {
                     results.conn,
                     lp.decode(),
                     pull.collect((err, data) => {
+                        log(this.peerInfo.id, 'Received acknowledgement.')
                         if (err)
                             return cb(err)
 
-                        log(this.peerInfo.id, 'Received acknowledgement.')
-
-                        return cb()
+                        // return cb()
                     })
                 )
             ], cb)
