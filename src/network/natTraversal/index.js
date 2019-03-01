@@ -81,12 +81,12 @@ class WebRTC {
 
             cb = cb ? once(cb) : noop
 
-            this.channels.forEach(channel.destroy)
+            this.channels.forEach((channel) => channel.destroy())
 
             this.sw.unhandle(PROTOCOL_WEBRTC_SIGNALING)
 
             setImmediate(() => {
-                listener.emit('close')
+                this.listener.emit('close')
                 cb()
             })
         }

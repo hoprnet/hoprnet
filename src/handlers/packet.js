@@ -35,11 +35,14 @@ module.exports = (node, options) => {
                 pull.once(packet.toBuffer()),
                 lp.encode(),
                 conn,
-                lp.decode(),
+                lp.decode({
+                    maxLength: Acknowledgement.SIZE
+                }),
+                pull.take(1),
                 pull.map(data => Acknowledgement.fromBuffer(data)),
-                pull.collect(cb)
+                pull.drain((data) => cb(null, data))
             ),
-            (ack, cb) => handleAcknowledgement(ack[0], cb)
+            (ack, cb) => handleAcknowledgement(ack, cb)
         ], (err) => {
             if (err)
                 log(node.peerInfo.id, `Error: ${err.message}`)

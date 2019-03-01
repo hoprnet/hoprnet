@@ -8,10 +8,11 @@ const TCP = require('libp2p-tcp')
 const WebRTC = require('./network/natTraversal')
 
 const defaultsDeep = require('@nodeutils/defaults-deep')
+const once = require('once')
 
 const { createPacket } = require('./packet')
 const registerHandlers = require('./handlers')
-const { NAME, PACKET_SIZE, PROTOCOL_STRING, MAX_HOPS} = require('./constants')
+const { NAME, PACKET_SIZE, PROTOCOL_STRING, MAX_HOPS } = require('./constants')
 const crawlNetwork = require('./network/crawl')
 const heartbeat = require('./network/heartbeat')
 const getPubKey = require('./getPubKey')
@@ -35,6 +36,7 @@ const PublicIp = require('./network/natTraversal/stun')
 const pull = require('pull-stream')
 const lp = require('pull-length-prefixed')
 const { waterfall, times, parallel, map } = require('neo-async')
+const Acknowledgement = require('./acknowledgement')
 
 class Hopr extends libp2p {
     /**
@@ -249,10 +251,10 @@ class Hopr extends libp2p {
      */
     sendMessage(msg, destination, cb) {
         if (!msg)
-            throw Error(`Expecting a non-empty message.`)
+            return cb(Error(`Expecting a non-empty message.`))
 
         if (!destination)
-            throw Error(`Expecting a non-empty destination.`)
+            return cb(Error(`Expecting a non-empty destination.`))
 
         if (PeerInfo.isPeerInfo(destination))
             destination = destination.id
@@ -261,54 +263,46 @@ class Hopr extends libp2p {
             destination = PeerId.createFromB58String(destination)
 
         if (!PeerId.isPeerId(destination))
-            throw Error(`Unable to parse given destination to a PeerId instance. Got type ${typeof destination} with value ${destination}.`)
+            return cb(Error(`Unable to parse given destination to a PeerId instance. Got type ${typeof destination} with value ${destination}.`))
 
-        console.log(this.peerInfo.multiaddrs.toArray().join(', '))
         // Let's try to convert input msg to a Buffer in case it isn't already a Buffer
         if (!Buffer.isBuffer(msg)) {
             switch (typeof msg) {
                 default:
-                    throw Error(`Invalid input value. Got '${typeof msg}'.`)
+                    return cb(Error(`Invalid input value. Got '${typeof msg}'.`))
                 case 'number': msg = msg.toString()
                 case 'string': msg = Buffer.from(msg)
             }
         }
 
-        times(Math.ceil(msg.length / PACKET_SIZE), (n, cb) => {
-            let path
+        cb = cb ? once(cb) : () => { }
 
-            waterfall([
-                (cb) => this.getIntermediateNodes(destination, cb),
-                (intermediateNodes, cb) => map(intermediateNodes, this.getPubKey, cb),
-                (intermediateNodes, cb) => {
-                    path = intermediateNodes.map(peerInfo => peerInfo.id).concat(destination)
-
-                    return this.peerRouting.findPeer(path[0], cb)
-                },
-                (peerInfo, cb) => parallel({
-                    conn: (cb) => this.dialProtocol(peerInfo, PROTOCOL_STRING, cb),
-                    packet: (cb) => createPacket(
-                        this,
-                        msg.slice(n * PACKET_SIZE, Math.min(msg.length, (n + 1) * PACKET_SIZE)),
-                        path,
-                        cb
-                    )
-                }, cb),
-                (results, cb) => pull(
-                    pull.once(results.packet.toBuffer()),
-                    lp.encode(),
-                    results.conn,
-                    lp.decode(),
-                    pull.collect((err, data) => {
-                        log(this.peerInfo.id, 'Received acknowledgement.')
-                        if (err)
-                            return cb(err)
-
-                        // return cb()
-                    })
+        times(Math.ceil(msg.length / PACKET_SIZE), (n, cb) => waterfall([
+            (cb) => this.getIntermediateNodes(destination, cb),
+            (intermediateNodes, cb) => map(intermediateNodes.concat(destination), this.getPubKey, cb),
+            (intermediateNodes, cb) => parallel({
+                conn: (cb) => waterfall([
+                    (cb) => this.peerRouting.findPeer(intermediateNodes[0].id, cb),
+                    (peerInfo, cb) => this.dialProtocol(peerInfo, PROTOCOL_STRING, cb),
+                ], cb),
+                packet: (cb) => createPacket(
+                    this,
+                    msg.slice(n * PACKET_SIZE, Math.min(msg.length, (n + 1) * PACKET_SIZE)),
+                    intermediateNodes.map(peerInfo => peerInfo.id),
+                    cb
                 )
-            ], cb)
-        }, cb)
+            }, cb),
+            (results, cb) => pull(
+                pull.once(results.packet.toBuffer()),
+                lp.encode(),
+                results.conn,
+                lp.decode({
+                    maxLength: Acknowledgement.SIZE
+                }),
+                pull.take(1),
+                pull.drain((data) => cb(null))
+            )
+        ], cb), cb)
     }
 
     /**
@@ -319,25 +313,22 @@ class Hopr extends libp2p {
      * @param {Function} cb the function that called afterwards
      */
     getIntermediateNodes(destination, cb) {
-        const comparator = (peerInfo) =>
-            this.peerInfo.id.id.compare(peerInfo.id.id) !== 0 &&
-            destination.id.compare(peerInfo.id.id) !== 0 &&
+        const filter = (peerInfo) =>
+            !peerInfo.id.isEqual(this.peerInfo.id) &&
+            !peerInfo.id.isEqual(destination) &&
             !this.bootstrapServers.some((multiaddr) => PeerId.createFromB58String(multiaddr.getPeerId()).isEqual(peerInfo.id))
 
-        return this.crawlNetwork(() => {
-            const path = randomSubset(
-                this.peerBook.getAllArray(), MAX_HOPS - 1, comparator)
-
-            return cb(null, path)
-        })
+        return this.crawlNetwork(() =>
+            cb(null, randomSubset(
+                this.peerBook.getAllArray(), MAX_HOPS - 1, filter).map((peerInfo) => peerInfo.id)
+            )
+        )
     }
 
     static importPeerBook(db, cb) {
         const key = 'peer-book'
 
         const peerBook = new PeerBook()
-
-
         db.get(key, (err, value) => {
             if (err && !err.notFound) {
                 cb(err)

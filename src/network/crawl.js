@@ -12,33 +12,20 @@ const remove = require('lodash.remove')
 const { doWhilst, map, waterfall } = require('neo-async')
 
 const { randomSubset, log } = require('../utils')
-
 const { MAX_HOPS, PROTOCOL_CRAWLING, MARSHALLED_PUBLIC_KEY_SIZE } = require('../constants')
 
 module.exports = (node) => (cb, comparator = _ => true) => {
-    let nodes = [], selected
-
-    node.peerBook.getAllArray().forEach((peerInfo) => {
-        nodes.push(peerInfo.id.toB58String())
-    })
+    let nodes = [...node.peerBook.getAllArray().map((peerInfo) => peerInfo.id.toB58String())], selected
 
     function queryNode(peerId, cb) {
         waterfall([
-            (cb) => {
-                const connectedMultiaddr = node.peerBook.get(peerId).isConnected()
-
-                if (connectedMultiaddr)
-                    return cb(null, connectedMultiaddr)
-
-                node.peerRouting.findPeer(PeerId.createFromB58String(peerId), cb)
-            },
+            (cb) => node.peerRouting.findPeer(PeerId.createFromB58String(peerId), cb),
             (peerInfo, cb) => node.dialProtocol(peerInfo, PROTOCOL_CRAWLING, cb),
             (conn, cb) => pull(
                 conn,
-                lp.decode(),
-                pull.filter(data =>
-                    data.length > 0 &&
-                    data.length === MARSHALLED_PUBLIC_KEY_SIZE),
+                lp.decode({
+                    maxLength: MARSHALLED_PUBLIC_KEY_SIZE
+                }),
                 pull.asyncMap((pubKey, cb) =>
                     PeerId.createFromPubKey(pubKey, (err, peerId) => {
                         if (err)
@@ -50,7 +37,7 @@ module.exports = (node) => (cb, comparator = _ => true) => {
                     // received node != known nodes
                     !node.peerBook.has(peerInfo.id.toB58String()) &&
                     // received node != self
-                    node.peerInfo.id.toBytes().compare(peerInfo.id.toBytes()) !== 0
+                    !node.peerInfo.id.isEqual(peerInfo.id)
                 ),
                 pull.collect(cb))
         ], cb)
@@ -86,9 +73,5 @@ module.exports = (node) => (cb, comparator = _ => true) => {
 
             return cb()
         })
-    }, () => {
-        const length = node.peerBook.getAllArray().filter(comparator).length
-
-        return length < MAX_HOPS
-    }, cb)
+    }, () => node.peerBook.getAllArray().filter(comparator).length < MAX_HOPS, cb)
 }

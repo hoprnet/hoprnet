@@ -3,14 +3,14 @@
 const { randomNumber, match } = require('../../utils')
 const { NAME } = require('../../constants')
 const Multiaddr = require('multiaddr')
-const lodash = require('lodash')
+const unionWith = require('lodash.unionwith')
 
 module.exports = (self) => (newPeerInfo) => {
     let addrs = self.sw._peerInfo.multiaddrs.toArray()
         .filter((addr) => match.WebRTC(addr))
 
     const addrsLength = addrs.length
-    addrs = lodash.unionWith(addrs, [Multiaddr(`/${NAME}/${newPeerInfo.id.toB58String()}/p2p-webrtc-star/${NAME}/${self.sw._peerInfo.id.toB58String()}`)], (a, b) => a.equals(b))
+    addrs = unionWith(addrs, [Multiaddr(`/${NAME}/${newPeerInfo.id.toB58String()}/p2p-webrtc-star/${NAME}/${self.sw._peerInfo.id.toB58String()}`)], (a, b) => a.equals(b))
 
     if (addrs.length == addrsLength)
         // Nothing to do since peer is already registered as a

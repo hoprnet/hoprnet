@@ -19,8 +19,8 @@ const Multiaddr = require('multiaddr')
  */
 module.exports.warmUpNodes = (nodes, cb) =>
     times(
-        nodes.length - 1,
-        (n, cb) => nodes[n].dial(nodes[n + 1].peerInfo, cb),
+        nodes.length,
+        (n, cb) => nodes[n].dial(nodes[(n + 1) % nodes.length].peerInfo, cb),
         (err, _) => cb(err, nodes)
     )
 
