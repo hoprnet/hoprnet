@@ -72,7 +72,7 @@ module.exports = (node) => node.handle(PROTOCOL_PAYMENT_CHANNEL, (protocol, conn
                 index: restoreTx.index,
                 currentValue: restoreTx.value,
                 totalBalance: (new BN(restoreTx.value)).imuln(2).toBuffer('be', Transaction.VALUE_LENGTH)
-            }, cb),
+            }, { sync: true }, cb),
         ], (err) => {
             if (err) {
                 log(node.peerInfo.id, err.message)
