@@ -140,7 +140,6 @@ class WebRTC {
 
                     channel.on('close', end)
                     channel.on('connect', () => {
-                        console.log('here')
                         end()
                         cb()
                     })
@@ -164,7 +163,6 @@ class WebRTC {
                     })
 
                     return (end, cb) => {
-                        console.log('here!!!')
                         if (ended || end)
                             return cb(end ? end : true)
 

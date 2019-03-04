@@ -39,7 +39,7 @@ module.exports = (self) => (err, event) => {
 
                     self.requestClose(channelId, cb)
                 } else {
-                    cb(null)
+                    cb()
                 }
             },
             (cb) => self.contract.methods.channels(channelId).call({
@@ -70,14 +70,15 @@ module.exports = (self) => (err, event) => {
 
             },
             (cb) => {
-                if (self.eventNames().some((name) =>
-                    name === `closed ${channelId.toString('base64')}`
-                )) {
-                    interested = true
-                    
+                interested = self.closingRequests.has(channelId.toString('base64'))
+
+                if (!interested)
+                    return cb()
+
+                if (interested) {
+                    self.closingRequests.delete(channelId.toString('base64'))
+
                     self.contractCall(self.contract.methods.withdraw(pubKeyToEthereumAddress(counterparty)), cb)
-                } else {
-                    cb()
                 }
             }
         ], (err, receipt) => {
@@ -94,9 +95,7 @@ module.exports = (self) => (err, event) => {
                 if (err)
                     throw err
 
-                if (interested) {
-                    self.emit(`closed ${channelId.toString('base64')}`, receivedMoney)
-                }
+                self.emit(`closed ${channelId.toString('base64')}`, receivedMoney)
             })
         })
     })

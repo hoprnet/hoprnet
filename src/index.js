@@ -300,7 +300,7 @@ class Hopr extends libp2p {
                     maxLength: Acknowledgement.SIZE
                 }),
                 pull.take(1),
-                pull.drain((data) => cb(null))
+                pull.drain((data) => setImmediate(cb))
             )
         ], cb), cb)
     }

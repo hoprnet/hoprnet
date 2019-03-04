@@ -25,34 +25,36 @@ module.exports = (options, db, cb) => {
 
     options.addrs = options.addrs.map(addr => Multiaddr(addr))
 
-    const getFromDatabase = (cb) => db.get('key-pair', (err, serializedKeyPair) => {
-        if (err && !err.notFound) {
-            cb(err)
-        } else if (err && err.notFound) {
-            generateKeyPair('secp256k1', 256, (err, key) => waterfall([
-                (cb) => key.public.hash(cb),
+    const getFromDatabase = (cb) =>
+        db.get('key-pair', (err, serializedKeyPair) => {
+            if (err && !err.notFound)
+                return cb(err)
+
+            if (!err)
+                return deserializeKeyPair(serializedKeyPair, cb)
+
+            let key, peerId
+            waterfall([
+                (cb) => generateKeyPair('secp256k1', 256, cb),
+                (_key, cb) => {
+                    key = _key
+                    key.public.hash(cb)
+                },
                 (id, cb) => {
-                    const peerId = new PeerId(id, key, key.public)
+                    peerId = new PeerId(id, key, key.public)
 
-                    serializeKeyPair(peerId, (err, serializedKeyPair) => {
-                        if (err)
-                            throw err
+                    serializeKeyPair(peerId, cb)
+                },
+                (cb) => db.put('key-pair', serializedKeyPair, cb)
+            ], (err) => {
+                if (err)
+                    throw err
 
-                        db.put('key-pair', serializedKeyPair, (err) => {
-                            if (err)
-                                throw err
+                cb(null, peerId)
+            })
+        })
 
-                            cb(null, peerId)
-                        })
-                    })
-                }
-            ], cb))
-        } else {
-            deserializeKeyPair(serializedKeyPair, cb)
-        }
-    })
-
-    return waterfall([
+    waterfall([
         (cb) => {
             if (PeerId.isPeerId(options.peerId))
                 return cb(null, options.peerId)
@@ -62,8 +64,8 @@ module.exports = (options, db, cb) => {
 
             getFromDatabase(cb)
         },
-        (peerId, cb) => PeerInfo.create(peerId, cb),
-        (peerInfo, cb) => {
+        (peerId, cb) => {
+            const peerInfo = new PeerInfo(peerId)
             options.addrs.forEach((addr) => {
                 // peerInfo.multiaddrs.add(addr.encapsulate(`/${PROTOCOL_NAME}/${peerInfo.id.toB58String()}`))
                 peerInfo.multiaddrs.add(addr.encapsulate(`/${NAME}/${peerInfo.id.toB58String()}`))
