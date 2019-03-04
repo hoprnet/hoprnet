@@ -26,19 +26,16 @@ module.exports = (node) => (cb, comparator = _ => true) => {
                 lp.decode({
                     maxLength: MARSHALLED_PUBLIC_KEY_SIZE
                 }),
-                pull.asyncMap((pubKey, cb) =>
-                    PeerId.createFromPubKey(pubKey, (err, peerId) => {
-                        if (err)
-                            return cb(err)
+                pull.asyncMap((pubKey, cb) => PeerId.createFromPubKey(pubKey, cb)),
+                pull.filter(peerId => {
+                    if (peerId.isEqual(node.peerInfo.id))
+                        return false
 
-                        cb(null, new PeerInfo(peerId))
-                    })),
-                pull.filter(peerInfo =>
-                    // received node != known nodes
-                    !node.peerBook.has(peerInfo.id.toB58String()) &&
-                    // received node != self
-                    !node.peerInfo.id.isEqual(peerInfo.id)
-                ),
+                    const found = node.peerBook.has(peerId.toB58String())
+                    node.peerBook.put(new PeerInfo(peerId))
+
+                    return !found
+                }),
                 pull.collect(cb))
         ], cb)
     }
@@ -56,14 +53,9 @@ module.exports = (node) => (cb, comparator = _ => true) => {
                 return cb(err)
             }
 
-            newNodes = uniqWith(flatten(newNodes), (a, b) =>
-                a.id.toBytes().compare(b.id.toBytes())
-            )
+            newNodes = uniqWith(flatten(newNodes), (a, b) => a.isEqual(b))
 
-            newNodes.forEach(peerInfo => {
-                node.peerBook.put(peerInfo)
-                nodes.push(peerInfo.id.toB58String())
-            })
+            nodes.push(...newNodes.map((peerId) => peerId.toB58String()))
 
             log(node.peerInfo.id, `Received ${newNodes.length} new node${newNodes.length === 1 ? '' : 's'}.`)
             log(node.peerInfo.id, `Now holding peer information of ${node.peerBook.getAllArray().length} node${node.peerBook.getAllArray().length === 1 ? '' : 's'} in the network.`)
