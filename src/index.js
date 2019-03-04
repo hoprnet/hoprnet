@@ -300,7 +300,12 @@ class Hopr extends libp2p {
                     maxLength: Acknowledgement.SIZE
                 }),
                 pull.take(1),
-                pull.drain((data) => setImmediate(cb))
+                pull.drain((data) => {
+                    log(this.peerInfo.id, `Received acknowledgement.`)
+                    if (!cb.called) {
+                        return cb()
+                    }
+                })
             )
         ], cb), cb)
     }
