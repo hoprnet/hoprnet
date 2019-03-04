@@ -114,7 +114,7 @@ class Packet {
                 return node.paymentChannels.setChannel({
                     currentValue: this.transaction.value,
                     index: this.transaction.index
-                }, channelId, cb)
+                }, { channelId: channelId }, cb)
             },
             (cb) => {
                 log(node.peerInfo.id, `Payment channel exists. Requested SHA256 pre-image of '${Challenge.deriveHashedKey(this.header.derivedSecret).toString('base64')}' is derivable.`)

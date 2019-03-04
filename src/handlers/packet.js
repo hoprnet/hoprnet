@@ -35,9 +35,8 @@ module.exports = (node, options) => {
                 pull.once(packet.toBuffer()),
                 lp.encode(),
                 conn,
-                lp.decode({
-                    maxLength: Acknowledgement.SIZE
-                }),
+                lp.decode({ maxLength: Acknowledgement.SIZE }),
+                pull.filter((data) => data.length === Acknowledgement.SIZE),
                 pull.take(1),
                 pull.map(data => Acknowledgement.fromBuffer(data)),
                 pull.drain((data) => cb(null, data))
@@ -86,7 +85,7 @@ module.exports = (node, options) => {
                     currentValue: record.tx.value,
                     //index: tx.index,
                     tx: record.tx
-                }, channelId)
+                }, { channelId: channelId })
             }
         ], cb)
     }
@@ -94,7 +93,9 @@ module.exports = (node, options) => {
     node.handle(PROTOCOL_STRING, (protocol, conn) => {
         pull(
             conn,
-            lp.decode(),
+            lp.decode({
+                maxLength: Packet.SIZE
+            }),
             pull.filter(data => data.length == Packet.SIZE),
             paramap((data, cb) => {
                 const packet = Packet.fromBuffer(data)

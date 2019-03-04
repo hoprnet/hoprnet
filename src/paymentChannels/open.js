@@ -70,7 +70,7 @@ module.exports = (self) => (to, cb) => {
                 totalBalance: (new BN(restoreTx.value)).imuln(2).toBuffer('be', Transaction.VALUE_LENGTH)
             }
 
-            return self.setChannel(newRecord, (err) => {
+            return self.setChannel(newRecord, { sync: true }, (err) => {
                 if (err)
                     return cb(err)
 
