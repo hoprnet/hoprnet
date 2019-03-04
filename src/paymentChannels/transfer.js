@@ -52,7 +52,7 @@ module.exports = (self) => {
             self.setChannel({
                 index: newTx.index,
                 currentValue: newTx.value
-            }, { channelId: options.channelId }, (err) => {
+            }, { channelId: options.channelId, sync: true }, (err) => {
                 if (err)
                     return cb(err)
 
@@ -69,23 +69,30 @@ module.exports = (self) => {
             pubKeyToEthereumAddress(to.pubKey.marshal())
         )
 
-        let pendingJobs = queues.get(channelId.toString('base64'))
-        if (!pendingJobs) {
-            pendingJobs = queue(foo)
-            pendingJobs.push({
-                amount: amount,
-                to: to,
-                channelId: channelId,
-                done: cb
-            })
-            queues.set(channelId, pendingJobs)
-        } else {
-            pendingJobs.push({
-                amount: amount,
-                to: to,
-                channelId: channelId,
-                done: cb
-            })
-        }
+        // let pendingJobs = queues.get(channelId.toString('base64'))
+        // if (!pendingJobs) {
+        //     pendingJobs = queue(foo)
+        //     pendingJobs.push({
+        //         amount: amount,
+        //         to: to,
+        //         channelId: channelId,
+        //         done: cb
+        //     })
+        //     queues.set(channelId, pendingJobs)
+        // } else {
+        //     pendingJobs.push({
+        //         amount: amount,
+        //         to: to,
+        //         channelId: channelId,
+        //         done: cb
+        //     })
+        // }
+
+        foo({
+            amount: amount,
+            to: to,
+            channelId: channelId,
+            done: cb
+        }, () => {})
     }
 }

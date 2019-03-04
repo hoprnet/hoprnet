@@ -12,7 +12,7 @@ const { NETWORK, GAS_PRICE, INFURA_WSS_URL, HARDCODED_ETH_ADDRESS, HARDCODED_PRI
 const FUNDING_ACCOUNT = HARDCODED_ETH_ADDRESS
 const FUNDING_KEY = HARDCODED_PRIV_KEY
 
-const AMOUUNT_OF_NODES = 4
+const AMOUNT_OF_NODES = 4
 const AMOUNT_OF_MESSAGES = 4
 
 
@@ -51,7 +51,7 @@ waterfall([
 
                 provider = `ws://${GANACHE_HOSTNAME}:${GANACHE_PORT}`
 
-                return cb()
+                return setImmediate(cb)
             })
         }
     },
@@ -90,7 +90,7 @@ waterfall([
             return cb(null, CONTRACT_ADDRESS)
         }
     },
-    (contractAddress, cb) => createFundedNodes(AMOUUNT_OF_NODES, {
+    (contractAddress, cb) => createFundedNodes(AMOUNT_OF_NODES, {
         provider: provider,
         contractAddress: contractAddress
     }, fundingPeer, index, cb),
@@ -101,17 +101,25 @@ waterfall([
             if (NETWORK === 'ganache') {
                 setTimeout(cb, 2000)
             } else {
-                setTimeout(cb, 80 * 1000)
+                setTimeout(cb, 60 * 1000)
             }
-        }, cb),
+        }, (err) => {
+            setTimeout(cb, 20000)
+        }),
         (cb) => each(nodes, (node, cb) => {
             node.paymentChannels.closeChannels((err, result) => {
                 log(node.peerInfo.id, `Finally ${result.isNeg() ? 'spent' : 'received'} \x1b[35m\x1b[1m${result.abs()} wei\x1b[0m.`)
                 node.stop(cb)
             })
         }, cb)
-    ], cb),
-    (cb) => server.close(cb)
+    ], (err, _) => cb(err)),
+    (cb) => {
+        if (NETWORK === 'ganache') {
+            return server.close(cb)
+        } else {
+            return cb()
+        }
+    }
 ], (err) => {
     if (err)
         throw err
