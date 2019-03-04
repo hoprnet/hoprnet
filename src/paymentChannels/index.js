@@ -22,6 +22,7 @@ const closeChannels = require('./closeChannels')
 const registerHandlers = require('./handlers')
 
 const HASH_LENGTH = 32
+const CHANNEL_ID_BYTES = HASH_LENGTH
 
 class PaymentChannel extends EventEmitter {
     constructor(options) {
@@ -38,6 +39,8 @@ class PaymentChannel extends EventEmitter {
         this.transfer = transfer(this)
         this.requestClose = requestClose(this)
         this.closeChannels = closeChannels(this)
+
+        this.closingRequests = new Set()
     }
 
     /**
@@ -101,27 +104,35 @@ class PaymentChannel extends EventEmitter {
         }
     }
 
-    setChannel(newRecord, channelId, cb) {
-        if (typeof channelId === 'function') {
+    setChannel(newRecord, options, cb) {
+        if (typeof options === 'function') {
+            cb = options
+            options = {}
+        }
+
+        if (!options.channelId || !Buffer.isBuffer(options.channelId)) {
             if (!newRecord.restoreTx)
                 return cb(Error('Unable to compute channelId.'))
 
-            cb = channelId
-            channelId = newRecord.tx.getChannelId(this.node.peerInfo.id)
+            options.channelId = newRecord.tx.getChannelId(this.node.peerInfo.id)
         }
 
-        if (!channelId || !Buffer.isBuffer(channelId) || channelId.length !== 32)
+        if (!options.channelId || !Buffer.isBuffer(options.channelId) || options.channelId.length !== CHANNEL_ID_BYTES)
             return cb(Error('Unable to determine channelId.'))
 
-        const key = this.getKey(channelId)
+        const key = this.getKey(options.channelId)
 
-        this.getChannel(channelId, (err, record = {}) => {
-            if (err)
-                return cb(err)
+        this.node.db.get(key, (err, record) => {
+            if (err && !err.notFound)
+                return cb()
 
-            Object.assign(record, newRecord)
+            if (err && err.notFound) {
+                record = {}
+            } else {
+                record = this.fromBuffer(record)
+            }
 
-            this.node.db.put(key, this.toBuffer(record), cb)
+            this.node.db.put(key, this.toBuffer(Object.assign(record, newRecord)), options, cb)
         })
     }
 
@@ -152,13 +163,9 @@ class PaymentChannel extends EventEmitter {
         const key = this.getKey(channelId)
 
         this.node.db.get(key, (err, record) => {
-            if (err) {
-                if (err.notFound) 
-                    return cb()
+            if (err)
+                return cb(err.notFound ? null : err)
 
-                return cb(err)
-            }
-                
             cb(null, this.fromBuffer(record))
         })
     }
