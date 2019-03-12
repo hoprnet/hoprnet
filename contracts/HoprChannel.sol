@@ -1,22 +1,19 @@
 pragma solidity ^0.5.0;
 
-// import "openzeppelin-solidity/contracts/cryptography/ECDSA.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
-
 
 /* solhint-disable max-line-length */
 contract HoprChannel {
     using SafeMath for uint256;
-    // using ECDSA for bytes32;
     
     // constant RELAY_FEE = 1
     uint256 constant private TIME_CONFIRMATION = 1 minutes; // testnet value TODO: adjust for mainnet use
     
     // Tell payment channel partners that the channel has been settled and closed
-    event ClosedChannel(bytes32 indexed channelId, bytes16 index, uint256 amountA) anonymous;
+    event ClosedChannel(bytes32 indexed channelId, bytes16 index, uint256 amountA);
 
     // Tell payment channel partners that the channel has been opened
-    event OpenedChannel(bytes32 channelId, uint256 amount);
+    event OpenedChannel(bytes32 indexed channelId, uint256 amountA, uint256 amount);
 
     // Track the state of the channels
     enum ChannelState {
@@ -140,31 +137,34 @@ contract HoprChannel {
     /**
     * @notice pre-fund channel by with staked Ether of both parties
     * @param nonce nonce to prevent against replay attacks
-    * @param amount uint256 how much money both parties put into the channel
+    * @param funds uint256 how much money both parties put into the channel
     * @param r bytes32 signature first part
     * @param s bytes32 signature second part
     * @param v uint8 version
      */
-    function createFunded(bytes16 nonce, uint256 amount, bytes32 r, bytes32 s, uint8 v) public enoughFunds(amount) {
+    function createFunded(bytes16 nonce, uint256 funds, bytes32 r, bytes32 s, uint8 v) public enoughFunds(funds) {
         require(!nonces[nonce], "Nonce was already used.");
         nonces[nonce] = true;
 
-        bytes32 hashedMessage = keccak256(abi.encodePacked(nonce, uint128(1), amount));
+        bytes32 hashedMessage = keccak256(abi.encodePacked(nonce, uint128(1), funds));
         address counterparty = ecrecover(hashedMessage, v, r, s);
         
-        require(states[counterparty].stakedEther >= amount, "Insufficient funds.");
+        require(states[counterparty].stakedEther >= funds, "Insufficient funds.");
 
         bytes32 channelId = getId(counterparty);
 
         require(channels[channelId].state == ChannelState.UNINITIALIZED, "Channel already exists.");
 
-        states[msg.sender].stakedEther = states[msg.sender].stakedEther.sub(amount);
-        states[counterparty].stakedEther = states[counterparty].stakedEther.sub(amount);
+        states[msg.sender].stakedEther = states[msg.sender].stakedEther.sub(funds);
+        states[counterparty].stakedEther = states[counterparty].stakedEther.sub(funds);
 
         states[msg.sender].openChannels = states[msg.sender].openChannels.add(1);
         states[counterparty].openChannels = states[counterparty].openChannels.add(1);
         
-        channels[channelId] = Channel(ChannelState.ACTIVE, uint256(2).mul(amount), amount, 0, 0);        
+        uint256 totalBalance = uint256(2).mul(funds);
+        channels[channelId] = Channel(ChannelState.ACTIVE, totalBalance, funds, 0, 0);
+
+        emit OpenedChannel(channelId, totalBalance, funds);        
     }
 
     /**

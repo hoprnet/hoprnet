@@ -111,10 +111,10 @@ class Packet {
                 if (bufferToNumber(record.index) + 1 != bufferToNumber(this.transaction.index))
                     return cb(Error('General error.'))
 
-                return node.paymentChannels.setChannel({
-                    currentValue: this.transaction.value,
-                    index: this.transaction.index
-                }, { channelId: channelId }, cb)
+                record.currentValue = this.transaction.value
+                record.index = this.transaction.index
+                
+                return node.paymentChannels.setChannel(record, { channelId: channelId }, cb)
             },
             (cb) => {
                 log(node.peerInfo.id, `Payment channel exists. Requested SHA256 pre-image of '${Challenge.deriveHashedKey(this.header.derivedSecret).toString('base64')}' is derivable.`)

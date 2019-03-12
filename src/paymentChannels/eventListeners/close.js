@@ -9,94 +9,90 @@ module.exports = (self) => (err, event) => {
     if (err)
         throw err
 
-    const channelId = Buffer.from(event.raw.topics[0].slice(2), 'hex')
+    const channelId = Buffer.from(event.raw.topics[1].slice(2), 'hex')
+    const amountA = new BN(event.returnValues.amountA)
 
-    self.getChannel(channelId, (err, record) => {
-        if (err)
-            throw err
+    let receivedMoney = new BN(0), record, counterparty, partyA
 
-        if (!record)
-            log(self.node.peerInfo.id, `Listening to wrong channel. ${channelId.toString('hex')}.`)
+    waterfall([
+        (cb) => self.getChannel(channelId, cb),
+        (_record, cb) => {
+            if (typeof _record === 'function') {
+                cb = _record
+                return cb(Error(`Listening to wrong channel. ${channelId.toString('hex')}.`))
+            }
 
-        const { tx, restoreTx } = record
-        const amountA = new BN(event.returnValues.amountA)
-        const counterparty = record.restoreTx.counterparty
+            record = _record
+            counterparty = record.restoreTx.counterparty
 
-        let interested = false
+            const partyA = isPartyA(
+                pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal()),
+                pubKeyToEthereumAddress(counterparty)
+            )
 
-        const partyA = isPartyA(
-            pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal()),
-            pubKeyToEthereumAddress(counterparty)
-        )
+            if (
+                Buffer.from(event.returnValues.index.replace(/0x/, ''), 'hex').compare(record.tx.index) === -1 &&
+                (partyA ? new BN(record.tx.value).gt(amountA) : amountA.gt(new BN(record.tx.value)))
+            ) {
+                log(self.node.peerInfo.id, `Found better transaction for payment channel ${channelId.toString('hex')}.`)
 
-        waterfall([
-            (cb) => {
-                if (
-                    Buffer.from(event.returnValues.index.replace(/0x/, ''), 'hex').compare(tx.index) === -1 &&
-                    (partyA ? new BN(tx.value).gt(amountA) : amountA.gt(new BN(tx.value)))
-                ) {
-                    log(self.node.peerInfo.id, `Found better transaction for payment channel ${channelId.toString('hex')}.`)
+                self.requestClose(channelId, cb)
+            } else {
+                cb()
+            }
+        },
+        (cb) => self.contract.methods.channels(channelId).call({
+            from: pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal())
+        }, 'latest', cb),
+        (channel, cb) => {
+            const subscription = self.web3.eth.subscribe('newBlockHeaders').on('data', (block) => {
+                log(self.node.peerInfo.id, `Waiting ... Block ${block.number}.`)
 
-                    self.requestClose(channelId, cb)
-                } else {
-                    cb()
-                }
-            },
-            (cb) => self.contract.methods.channels(channelId).call({
-                from: pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal())
-            }, 'latest', cb),
-            (channel, cb) => {
-                const subscription = self.web3.eth.subscribe('newBlockHeaders')
-                    .on('data', (block) => {
-                        log(self.node.peerInfo.id, `Waiting ... Block ${block.number}.`)
+                if (block.timestamp > parseInt(channel.settleTimestamp)) {
+                    subscription.unsubscribe((err, ok) => {
+                        if (err)
+                            return cb(err)
 
-                        if (block.timestamp > parseInt(channel.settleTimestamp)) {
-                            subscription.unsubscribe((err, ok) => {
-                                if (ok)
-                                    cb(err)
-                            })
-                        } else if (NETWORK === 'ganache') {
-                            // ================ Only for testing ================
-                            mineBlock(self.contract.currentProvider)
-                            // ==================================================
-                        }
+                        if (ok)
+                            cb()
                     })
-
-                if (NETWORK === 'ganache') {
+                } else if (NETWORK === 'ganache') {
                     // ================ Only for testing ================
                     mineBlock(self.contract.currentProvider)
                     // ==================================================
                 }
+            })
 
-            },
-            (cb) => {
-                interested = self.closingRequests.has(channelId.toString('base64'))
-
-                if (!interested)
-                    return cb()
-
-                if (interested) {
-                    self.closingRequests.delete(channelId.toString('base64'))
-
-                    self.contractCall(self.contract.methods.withdraw(pubKeyToEthereumAddress(counterparty)), cb)
-                }
+            if (NETWORK === 'ganache') {
+                // ================ Only for testing ================
+                mineBlock(self.contract.currentProvider)
+                // ==================================================
             }
-        ], (err, receipt) => {
-            if (err)
-                throw err
+        },
+        (cb) => {
+            if (!self.closingRequests.has(channelId.toString('base64')))
+                return cb()
 
-            const initialValue = new BN(restoreTx.value)
-
-            const receivedMoney = partyA ? amountA.isub(initialValue) : initialValue.isub(amountA)
+            self.closingRequests.delete(channelId.toString('base64'))
+            self.contractCall(self.contract.methods.withdraw(pubKeyToEthereumAddress(counterparty)), cb)
+        },
+        (receipt, cb) => {
+            if (typeof receipt === 'function') {
+                cb = receipt
+                receipt = null
+            }
+            
+            const initialValue = new BN(record.restoreTx.value)
+            receivedMoney = partyA ? amountA.isub(initialValue) : initialValue.isub(amountA)
 
             log(self.node.peerInfo.id, `Closed payment channel \x1b[33m${channelId.toString('hex')}\x1b[0m and ${receivedMoney.isNeg() ? 'spent' : 'received'} \x1b[35m${receivedMoney.abs().toString()} wei\x1b[0m. ${receipt ? ` TxHash \x1b[32m${receipt.transactionHash}\x1b[0m.` : ''}`)
 
-            self.deleteChannel(channelId, (err) => {
-                if (err)
-                    throw err
+            self.deleteChannel(channelId, cb)
+        }
+    ], (err) => {
+        if (err)
+            console.log(err)
 
-                self.emit(`closed ${channelId.toString('base64')}`, receivedMoney)
-            })
-        })
+        self.emit(`closed ${channelId.toString('base64')}`, receivedMoney)
     })
-} 
+}

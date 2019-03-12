@@ -4,7 +4,6 @@ const { waterfall, queue } = require('neo-async')
 const BN = require('bn.js')
 
 const { isPartyA, getId, pubKeyToEthereumAddress, bufferToNumber, numberToBuffer, deepCopy } = require('../utils')
-
 const Transaction = require('../transaction')
 
 module.exports = (self) => {
@@ -49,10 +48,10 @@ module.exports = (self) => {
             newTx.index = numberToBuffer(bufferToNumber(record.index) + 1, Transaction.INDEX_LENGTH)
             newTx.sign(self.node.peerInfo.id)
 
-            self.setChannel({
-                index: newTx.index,
-                currentValue: newTx.value
-            }, { channelId: options.channelId, sync: true }, (err) => {
+            record.currentValue = currentValue.toBuffer('be', Transaction.VALUE_LENGTH)
+            record.index = numberToBuffer(bufferToNumber(record.index) + 1, Transaction.INDEX_LENGTH)
+
+            self.setChannel(record, { channelId: options.channelId, sync: true }, (err) => {
                 if (err)
                     return cb(err)
 

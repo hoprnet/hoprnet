@@ -81,11 +81,10 @@ module.exports = (node, options) => {
                     return cb(Error('General error.'))
                 }
 
-                node.paymentChannels.setChannel({
-                    currentValue: record.tx.value,
-                    //index: tx.index,
-                    tx: record.tx
-                }, { channelId: channelId })
+                channelRecord.tx = record.tx
+                channelRecord.currentValue = record.tx.value
+
+                node.paymentChannels.setChannel(channelRecord, { channelId: channelId })
             }
         ], cb)
     }

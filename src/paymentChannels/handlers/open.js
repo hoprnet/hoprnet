@@ -10,6 +10,7 @@ const { deepCopy, pubKeyToEthereumAddress, numberToBuffer, bufferToNumber, log }
 const { applyEachSeries, applyEach } = require('neo-async')
 const { fromWei } = require('web3-utils')
 const BN = require('bn.js')
+const Record = require('../record')
 
 const { SIGNATURE_LENGTH } = require('../../transaction')
 
@@ -39,7 +40,7 @@ module.exports = (node) => node.handle(PROTOCOL_PAYMENT_CHANNEL, (protocol, conn
 
                     if (!state.isSet)
                         return cb(Error(`Rejecting payment channel opening request because counterparty hasn't staked any funds.`))
-                
+
                     const stakedEther = new BN(state.stakedEther)
                     const claimedFunds = new BN(restoreTx.value)
                     if (stakedEther.lt(claimedFunds))
@@ -66,20 +67,21 @@ module.exports = (node) => node.handle(PROTOCOL_PAYMENT_CHANNEL, (protocol, conn
                 }
             ], cb),
             // Save channel information
-            (cb) => node.paymentChannels.setChannel({
-                restoreTx: restoreTx,
-                tx: deepCopy(restoreTx, Transaction),
-                index: restoreTx.index,
-                currentValue: restoreTx.value,
-                totalBalance: (new BN(restoreTx.value)).imuln(2).toBuffer('be', Transaction.VALUE_LENGTH)
-            }, { sync: true }, cb),
+            (cb) => node.paymentChannels.setChannel(
+                Record.create(
+                    restoreTx,
+                    deepCopy(restoreTx, Transaction),
+                    restoreTx.index, 
+                    restoreTx.value,
+                    (new BN(restoreTx.value)).imuln(2).toBuffer('be', Transaction.VALUE_LENGTH)),
+                { sync: true }, cb),
         ], (err) => {
             if (err) {
                 log(node.peerInfo.id, err.message)
                 return cb()
             }
 
-            node.paymentChannels.setSettlementListener(restoreTx.getChannelId(node.peerInfo.id))
+            node.paymentChannels.registerSettlementListener(restoreTx.getChannelId(node.peerInfo.id))
 
             const sigRestore = sign(restoreTx.hash, node.peerInfo.id.privKey.marshal())
             return cb(null, Buffer.concat([sigRestore.signature, numberToBuffer(sigRestore.recovery, 1)], SIGNATURE_LENGTH + 1))

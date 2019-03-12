@@ -1,6 +1,6 @@
 'use strict'
 
-const { waterfall, timesSeries, series, each } = require('neo-async')
+const { waterfall, timesSeries, times, map } = require('neo-async')
 const { resolve } = require('path');
 
 const { sendTransaction, privKeyToPeerId, log, compileIfNecessary } = require('../src/utils')
@@ -94,7 +94,7 @@ waterfall([
         provider: provider,
         contractAddress: contractAddress
     }, fundingPeer, index, cb),
-    (nodes, cb) => series([
+    (nodes, cb) => waterfall([
         (cb) => timesSeries(AMOUNT_OF_MESSAGES, (n, cb) => {
             nodes[0].sendMessage(rlp.encode(['Psst ... secret message from Validity Labs!', Date.now().toString()]), nodes[3].peerInfo.id)
 
@@ -103,19 +103,16 @@ waterfall([
             } else {
                 setTimeout(cb, 60 * 1000)
             }
-        }, (err) => {
-            setTimeout(cb, 20000)
-        }),
-        (cb) => each(nodes, (node, cb) => {
-            node.paymentChannels.closeChannels((err, result) => {
-                log(node.peerInfo.id, `Finally ${result.isNeg() ? 'spent' : 'received'} \x1b[35m\x1b[1m${result.abs()} wei\x1b[0m.`)
-                node.stop(cb)
-            })
+        }, cb),
+        (_, cb) => map(nodes.slice(0, 1), (node, cb) => node.paymentChannels.closeChannels(cb), cb),
+        (results, cb) => times(1, (n, cb) => {
+            log(nodes[n].peerInfo.id, `Finally ${results[0].isNeg() ? 'spent' : 'received'} \x1b[35m\x1b[1m${results[n].abs()} wei\x1b[0m.`)
+            nodes[n].stop(cb)
         }, cb)
     ], (err, _) => cb(err)),
     (cb) => {
         if (NETWORK === 'ganache') {
-            return server.close(cb)
+            setTimeout(server.close, 2000, cb)
         } else {
             return cb()
         }

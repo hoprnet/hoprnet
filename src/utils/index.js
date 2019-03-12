@@ -457,7 +457,7 @@ const ONE_MINUTE = 60 * 1000
 /**
  * Mine a single block and increase the timestamp by the given amount.
  * 
- * @notice The purpose of this method is to use for testing with a local
+ * @notice The purpose of this method is to use it for testing with a local
  * testnet, i. e. Ganache.
  * 
  * @param {Object} provider a valid Web3 provider

@@ -5,10 +5,10 @@ const lp = require('pull-length-prefixed')
 const paramap = require('pull-paramap')
 
 const { waterfall } = require('neo-async')
-const { pubKeyToPeerId, pubKeyToEthereumAddress, log } = require('../utils')
+const { pubKeyToPeerId, pubKeyToEthereumAddress, log } = require('../../utils')
 const BN = require('bn.js')
 
-const c = require('../constants')
+const c = require('../../constants')
 
 const SETTLEMENT_TIMEOUT = 40000
 
@@ -29,6 +29,13 @@ module.exports = (self) => (cb) => pull(
                     return self.deleteChannel(channelId, cb)
                 }
 
+                self.once(`closed ${channelId.toString('base64')}`, (receivedMoney) => {
+                    // Callback just when the channel is settled, i.e. the closing listener
+                    // emits the 'closed <channelId>' event.
+
+                    cb(null, receivedMoney)
+                })
+
                 if (index.compare(tx.index) === 1) { // index > tx.index ?
                     // Ask counterparty to settle payment channel because
                     // last payment went to that party which means that we
@@ -43,9 +50,7 @@ module.exports = (self) => (cb) => pull(
                             // TODO: Implement proper transaction handling
                             const timeout = setTimeout(self.requestClose, SETTLEMENT_TIMEOUT, channelId, true)
 
-                            self.contract.once('ClosedChannel', {
-                                topics: [`0x${channelId.toString('hex')}`]
-                            }, (err) => {
+                            self.registerSettlementListener(channelId, (err) => {
                                 if (err)
                                     throw err
 
@@ -69,13 +74,6 @@ module.exports = (self) => (cb) => pull(
                 } else {
                     self.requestClose(channelId)
                 }
-
-                self.once(`closed ${channelId.toString('base64')}`, (receivedMoney) => {
-                    // Callback just when the channel is settled, i.e. the closing listener
-                    // emits the 'closed <channelId>' event.
-
-                    cb(null, receivedMoney)
-                })
             }
         ], cb)
     }),
