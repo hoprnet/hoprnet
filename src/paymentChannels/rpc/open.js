@@ -50,34 +50,28 @@ module.exports = (self) => (to, cb) => {
             restoreTx.signature = signatures[0].slice(0, Transaction.SIGNATURE_LENGTH)
             restoreTx.recovery = signatures[0].slice(Transaction.SIGNATURE_LENGTH)
 
-            console.log(restoreTx.getChannelId(self.node.peerInfo.id).toString('hex'))
-            return self.contractCall(self.contract.methods.createFunded(
-                restoreTx.nonce,
-                (new BN(restoreTx.value)).toString(),
-                restoreTx.signature.slice(0, 32),
-                restoreTx.signature.slice(32, 64),
-                bufferToNumber(restoreTx.recovery) + 27
-            ), cb)
-        },
-        (receipt, cb) => {
-            self.registerSettlementListener(restoreTx.getChannelId(self.node.peerInfo.id))
+            const channelId = restoreTx.getChannelId(self.node.peerInfo.id)
 
-            const newRecord = Record.create(
+            self.openingRequests.set(channelId.toString('base64'), Record.create(
                 restoreTx,
                 deepCopy(restoreTx, Transaction),
                 restoreTx.index,
                 restoreTx.value,
                 (new BN(restoreTx.value)).imuln(2).toBuffer('be', Transaction.VALUE_LENGTH)
-            )
+            ))
 
-            return self.setChannel(newRecord, { sync: true }, (err) => {
-                if (err)
-                    return cb(err)
+            self.registerSettlementListener(channelId)
+            self.registerOpeningListener(channelId)
 
-                log(self.node.peerInfo.id, `Opened payment channel \x1b[33m${restoreTx.getChannelId(self.node.peerInfo.id).toString('hex')}\x1b[0m with txHash \x1b[32m${receipt.transactionHash}\x1b[0m. Nonce is now \x1b[31m${self.nonce - 1}\x1b[0m.`)
+            self.once(`opened ${channelId.toString('base64')}`, cb)
 
-                return cb(null, newRecord)
-            })
-        }
+            self.contractCall(self.contract.methods.createFunded(
+                restoreTx.nonce,
+                (new BN(restoreTx.value)).toString(),
+                restoreTx.signature.slice(0, 32),
+                restoreTx.signature.slice(32, 64),
+                bufferToNumber(restoreTx.recovery) + 27
+            ))
+        },
     ], cb)
 }

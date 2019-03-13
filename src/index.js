@@ -277,37 +277,45 @@ class Hopr extends libp2p {
 
         cb = cb ? once(cb) : () => { }
 
-        times(Math.ceil(msg.length / PACKET_SIZE), (n, cb) => waterfall([
-            (cb) => this.getIntermediateNodes(destination, cb),
-            (intermediateNodes, cb) => map(intermediateNodes.concat(destination), this.getPubKey, cb),
-            (intermediateNodes, cb) => parallel({
-                conn: (cb) => waterfall([
-                    (cb) => this.peerRouting.findPeer(intermediateNodes[0].id, cb),
-                    (peerInfo, cb) => this.dialProtocol(peerInfo, PROTOCOL_STRING, cb),
-                ], cb),
-                packet: (cb) => createPacket(
-                    this,
-                    msg.slice(n * PACKET_SIZE, Math.min(msg.length, (n + 1) * PACKET_SIZE)),
-                    intermediateNodes.map(peerInfo => peerInfo.id),
-                    cb
+        times(Math.ceil(msg.length / PACKET_SIZE), (n, cb) =>
+            waterfall([
+                (cb) => this.getIntermediateNodes(destination, cb),
+                (intermediateNodes, cb) => map(intermediateNodes.concat(destination), this.getPubKey, cb),
+                (intermediateNodes, cb) => parallel({
+                    conn: (cb) => waterfall([
+                        (cb) => this.peerRouting.findPeer(intermediateNodes[0].id, cb),
+                        (peerInfo, cb) => this.dialProtocol(peerInfo, PROTOCOL_STRING, cb),
+                    ], cb),
+                    packet: (cb) => createPacket(
+                        this,
+                        msg.slice(n * PACKET_SIZE, Math.min(msg.length, (n + 1) * PACKET_SIZE)),
+                        intermediateNodes.map(peerInfo => peerInfo.id),
+                        cb
+                    )
+                }, cb),
+                (results, cb) => pull(
+                    pull.once(results.packet.toBuffer()),
+                    lp.encode(),
+                    results.conn,
+                    lp.decode({
+                        maxLength: Acknowledgement.SIZE
+                    }),
+                    pull.take(1),
+                    pull.drain((data) => {
+                        log(this.peerInfo.id, `Received acknowledgement.`)
+                        return cb()
+                        // if (!cb.called) {
+                        //     return cb()
+                        // }
+                    })
                 )
-            }, cb),
-            (results, cb) => pull(
-                pull.once(results.packet.toBuffer()),
-                lp.encode(),
-                results.conn,
-                lp.decode({
-                    maxLength: Acknowledgement.SIZE
-                }),
-                pull.take(1),
-                pull.drain((data) => {
-                    log(this.peerInfo.id, `Received acknowledgement.`)
-                    // if (!cb.called) {
-                    //     return cb()
-                    // }
-                })
-            )
-        ], cb), cb)
+            ], cb),
+            (err) => {
+                if (err)
+                    console.log(err)
+
+                return cb(err)
+            })
     }
 
     /**
@@ -323,11 +331,14 @@ class Hopr extends libp2p {
             !peerInfo.id.isEqual(destination) &&
             !this.bootstrapServers.some((multiaddr) => PeerId.createFromB58String(multiaddr.getPeerId()).isEqual(peerInfo.id))
 
-        return this.crawlNetwork(() =>
+        this.crawlNetwork((err) => {
+            if (err)
+                return cb(err)
+
             cb(null, randomSubset(
                 this.peerBook.getAllArray(), MAX_HOPS - 1, filter).map((peerInfo) => peerInfo.id)
             )
-        )
+        })
     }
 
     static importPeerBook(db, cb) {

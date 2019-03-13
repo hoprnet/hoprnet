@@ -3,7 +3,7 @@
 const { waterfall, queue } = require('neo-async')
 const BN = require('bn.js')
 
-const { isPartyA, getId, pubKeyToEthereumAddress, bufferToNumber, numberToBuffer, deepCopy } = require('../utils')
+const { isPartyA, getId, pubKeyToEthereumAddress, bufferToNumber, numberToBuffer, deepCopy, log } = require('../utils')
 const Transaction = require('../transaction')
 
 module.exports = (self) => {
@@ -17,13 +17,19 @@ module.exports = (self) => {
                 record = null
             }
 
+            log(self.node.peerInfo.id, `here ${options.channelId.toString('hex')}`)
             if (record)
                 return cb(null, record)
 
+            if (self.openingRequests.has(options.channelId.toString('base64')))
+                console.log('found')
+            log(self.node.peerInfo.id, `after first callback ${options.channelId.toString('hex')}`)
+            
             self.open(options.to, cb)
 
         },
         (record, cb) => {
+            console.log(`opened ${options.channelId.toString('hex')}`)
             const currentValue = new BN(record.currentValue)
 
             const partyA = isPartyA(
@@ -68,30 +74,18 @@ module.exports = (self) => {
             pubKeyToEthereumAddress(to.pubKey.marshal())
         )
 
-        // let pendingJobs = queues.get(channelId.toString('base64'))
-        // if (!pendingJobs) {
-        //     pendingJobs = queue(foo)
-        //     pendingJobs.push({
-        //         amount: amount,
-        //         to: to,
-        //         channelId: channelId,
-        //         done: cb
-        //     })
-        //     queues.set(channelId, pendingJobs)
-        // } else {
-        //     pendingJobs.push({
-        //         amount: amount,
-        //         to: to,
-        //         channelId: channelId,
-        //         done: cb
-        //     })
-        // }
+        let pendingJobs = queues.get(channelId.toString('base64'))
+        if (!pendingJobs) {
+            pendingJobs = queue(foo, 1)
+        }
 
-        foo({
+        pendingJobs.push({
             amount: amount,
             to: to,
             channelId: channelId,
             done: cb
-        }, () => {})
+        })
+
+        queues.set(channelId.toString('base64'), pendingJobs)
     }
 }

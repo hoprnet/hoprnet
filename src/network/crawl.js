@@ -14,7 +14,15 @@ const { doWhilst, map, waterfall } = require('neo-async')
 const { randomSubset, log } = require('../utils')
 const { MAX_HOPS, PROTOCOL_CRAWLING, MARSHALLED_PUBLIC_KEY_SIZE } = require('../constants')
 
-module.exports = (node) => (cb, comparator = _ => true) => {
+module.exports = (node) => (comparator, cb) => {
+    if (!cb) {
+        if (!comparator)
+            throw Error('Invalid input parameter.')
+
+        cb = comparator
+        comparator = () => true
+    }
+
     let nodes = [...node.peerBook.getAllArray().map((peerInfo) => peerInfo.id.toB58String())], selected
 
     function queryNode(peerId, cb) {

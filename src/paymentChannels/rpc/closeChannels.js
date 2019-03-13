@@ -72,15 +72,15 @@ module.exports = (self) => (cb) => pull(
                             console.log(err)
                     })
                 } else {
-                    self.requestClose(channelId)
+                    return self.requestClose(channelId)
                 }
             }
         ], cb)
     }),
     pull.collect((err, values) => {
         if (err)
-            throw err
+            return cb(err)
 
-        cb(null, values.reduce((acc, receivedMoney) => acc.iadd(receivedMoney || new BN(0)), new BN(0)))
+        return cb(null, values.reduce((acc, receivedMoney) => acc.iadd(receivedMoney), new BN(0)))
     })
 )

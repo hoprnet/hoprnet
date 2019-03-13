@@ -27,6 +27,10 @@ module.exports = (node) => node.handle(PROTOCOL_PAYMENT_CHANNEL, (protocol, conn
             return cb()
 
         const counterparty = restoreTx.counterparty
+        const channelId = restoreTx.getChannelId(node.peerInfo.id)
+
+        if (node.paymentChannels.openingRequests.has(channelId.toString('base64')))
+            return cb()
 
         applyEachSeries([
             (cb) => applyEach([
@@ -51,7 +55,6 @@ module.exports = (node) => node.handle(PROTOCOL_PAYMENT_CHANNEL, (protocol, conn
                 // Check whether there is already such a channel registered in the
                 // smart contract
                 (cb) => {
-                    const channelId = restoreTx.getChannelId(node.peerInfo.id)
                     node.paymentChannels.contract.methods.channels(channelId).call({
                         from: pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal())
                     }, (err, channel) => {
@@ -62,30 +65,31 @@ module.exports = (node) => node.handle(PROTOCOL_PAYMENT_CHANNEL, (protocol, conn
                         if (!Number.isInteger(state) || state < 0)
                             return cb(Error(`Invalid state. Got ${state.toString()} instead.`))
 
+                        node.paymentChannels.openingRequests.set(channelId.toString('base64'), Record.create(
+                            restoreTx,
+                            deepCopy(restoreTx, Transaction),
+                            restoreTx.index,
+                            restoreTx.value,
+                            (new BN(restoreTx.value)).imuln(2).toBuffer('be', Transaction.VALUE_LENGTH))
+                        )
+
+                        node.paymentChannels.registerOpeningListener(channelId)
+
                         return cb()
                     })
                 }
-            ], cb),
-            // Save channel information
-            (cb) => node.paymentChannels.setChannel(
-                Record.create(
-                    restoreTx,
-                    deepCopy(restoreTx, Transaction),
-                    restoreTx.index, 
-                    restoreTx.value,
-                    (new BN(restoreTx.value)).imuln(2).toBuffer('be', Transaction.VALUE_LENGTH)),
-                { sync: true }, cb),
+            ], cb)
         ], (err) => {
-            if (err) {
-                log(node.peerInfo.id, err.message)
-                return cb()
-            }
+                if (err) {
+                    log(node.peerInfo.id, err.message)
+                    return cb()
+                }
 
-            node.paymentChannels.registerSettlementListener(restoreTx.getChannelId(node.peerInfo.id))
+                node.paymentChannels.registerSettlementListener(restoreTx.getChannelId(node.peerInfo.id))
 
-            const sigRestore = sign(restoreTx.hash, node.peerInfo.id.privKey.marshal())
-            return cb(null, Buffer.concat([sigRestore.signature, numberToBuffer(sigRestore.recovery, 1)], SIGNATURE_LENGTH + 1))
-        })
+                const sigRestore = sign(restoreTx.hash, node.peerInfo.id.privKey.marshal())
+                return cb(null, Buffer.concat([sigRestore.signature, numberToBuffer(sigRestore.recovery, 1)], SIGNATURE_LENGTH + 1))
+            })
     }),
     pull.filter(data => Buffer.isBuffer(data)),
     lp.encode(),

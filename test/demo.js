@@ -96,17 +96,18 @@ waterfall([
     }, fundingPeer, index, cb),
     (nodes, cb) => waterfall([
         (cb) => timesSeries(AMOUNT_OF_MESSAGES, (n, cb) => {
-            nodes[0].sendMessage(rlp.encode(['Psst ... secret message from Validity Labs!', Date.now().toString()]), nodes[3].peerInfo.id)
+            nodes[0].sendMessage(rlp.encode(['Psst ... secret message from Validity Labs!', Date.now().toString()]), nodes[2].peerInfo.id, cb)
 
             if (NETWORK === 'ganache') {
-                setTimeout(cb, 2000)
+                //return cb()
             } else {
+                throw Error('TODO')
                 setTimeout(cb, 60 * 1000)
             }
-        }, cb),
-        (_, cb) => map(nodes.slice(0, 1), (node, cb) => node.paymentChannels.closeChannels(cb), cb),
-        (results, cb) => times(1, (n, cb) => {
-            log(nodes[n].peerInfo.id, `Finally ${results[0].isNeg() ? 'spent' : 'received'} \x1b[35m\x1b[1m${results[n].abs()} wei\x1b[0m.`)
+        }, () => setTimeout(cb, 2000)),
+        (cb) => map(nodes, (node, cb) => node.paymentChannels.closeChannels(cb), cb),
+        (results, cb) => times(AMOUNT_OF_NODES, (n, cb) => {
+            log(nodes[n].peerInfo.id, `Finally ${results[n].isNeg() ? 'spent' : 'received'} \x1b[35m\x1b[1m${results[n].abs()} wei\x1b[0m.`)
             nodes[n].stop(cb)
         }, cb)
     ], (err, _) => cb(err)),
