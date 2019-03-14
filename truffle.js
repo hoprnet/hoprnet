@@ -1,7 +1,7 @@
 /**
  * Truffle configuration
  */
-
+require('dotenv').config()
 const cnf               = require('./config/networks.json');
 const HDWalletProvider  = require('truffle-hdwallet-provider');
 
@@ -9,12 +9,6 @@ require('babel-register');
 require('babel-polyfill');
 
 const network   = process.env.NETWORK;
-let secrets     = '';
-
-if (network === 'rinkebyInfura' || network === 'ropstenInfura') {
-    secrets = require('./config/.secrets.json');
-}
-
 const path      = require('path');
 const basePath  = process.cwd();
 
@@ -68,7 +62,7 @@ function getRinkebyConfig() {
     let rinkebyProvider = '';
 
     if (network === 'rinkebyInfura') {
-        rinkebyProvider = new HDWalletProvider(secrets.rinkeby.mnemonic, secrets.rinkeby.host);
+        rinkebyProvider = new HDWalletProvider(process.env.ROPSTEN_MNEMONIC, process.env.ROPSTEN_HOST);
 
         return {
             network_id: cnf.networks.rinkeby.chainId, // eslint-disable-line
@@ -84,7 +78,7 @@ function getRopstenConfig() {
     let ropstenProvider = '';
 
     if (network === 'ropstenInfura') {
-        ropstenProvider = new HDWalletProvider(secrets.ropsten.mnemonic, secrets.ropsten.host);
+        ropstenProvider = new HDWalletProvider(process.env.RINKEBY_MNEMONIC, process.env.RINKEBY_HOST);
 
         return {
             network_id: cnf.networks.ropsten.chainId, // eslint-disable-line

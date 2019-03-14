@@ -33,5 +33,6 @@ db
 coverage
 coverage.json
 
-# Exclude .secrets.json file
+# Exclude .secrets.json and .env file
 .secrets.json
+.env

@@ -1,5 +1,5 @@
 'use strict'
-
+require('dotenv').config()
 const { waterfall } = require('neo-async')
 const { generateKeyPair } = require('libp2p-crypto').keys
 const { deserializeKeyPair, serializeKeyPair, privKeyToPeerId } = require('./utils')
@@ -60,7 +60,7 @@ module.exports = (options, db, cb) => {
                 return cb(null, options.peerId)
 
             if (options['bootstrap-node'])
-                return privKeyToPeerId(require('../config/.secrets.json').fundAccountPrivateKey, cb)
+                return privKeyToPeerId(process.env.FUND_ACCOUNT_PRIVATE_KEY, cb)
 
             getFromDatabase(cb)
         },
