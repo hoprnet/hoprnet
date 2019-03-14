@@ -1,11 +1,15 @@
 'use strict'
 
-const { waterfall, timesSeries, times, map } = require('neo-async')
+const { waterfall, timesSeries, times, map, parallel } = require('neo-async')
+const rlp = require('rlp')
 const { resolve } = require('path');
+
+const Web3 = require('web3')
+const { toWei } = require('web3-utils')
+const BN = require('bn.js')
 
 const { sendTransaction, privKeyToPeerId, log, compileIfNecessary } = require('../src/utils')
 const { createFundedNodes } = require('./utils')
-const rlp = require('rlp')
 
 const { NETWORK, GAS_PRICE, INFURA_WSS_URL, HARDCODED_ETH_ADDRESS, HARDCODED_PRIV_KEY, CONTRACT_ADDRESS } = require('../src/constants')
 
@@ -13,10 +17,8 @@ const FUNDING_ACCOUNT = HARDCODED_ETH_ADDRESS
 const FUNDING_KEY = HARDCODED_PRIV_KEY
 
 const AMOUNT_OF_NODES = 4
-const AMOUNT_OF_MESSAGES = 4
+const AMOUNT_OF_MESSAGES = 8
 
-
-const Web3 = require('web3')
 let provider, server, web3
 
 console.log(
@@ -38,7 +40,7 @@ waterfall([
             server = require('ganache-core').server({
                 accounts: [
                     {
-                        balance: '0xd3c21bcecceda0000000',
+                        balance: `0x${toWei(new BN(100), 'ether').toString('hex')}`,
                         secretKey: FUNDING_KEY
                     }
                 ]
@@ -55,23 +57,22 @@ waterfall([
             })
         }
     },
-    (cb) => privKeyToPeerId(FUNDING_KEY, cb),
-    (_fundingPeer, cb) => {
+    (cb) => {
         web3 = new Web3(provider)
-        fundingPeer = _fundingPeer
-        web3.eth.getTransactionCount(FUNDING_ACCOUNT, cb)
-    },
-    (_index, cb) => {
-        index = _index
 
-        return compileIfNecessary([resolve(__dirname, '../contracts/HoprChannel.sol')], [resolve(__dirname, '../build/contracts/HoprChannel.json')], cb)
+        parallel({
+            fundingPeer: (cb) => privKeyToPeerId(FUNDING_KEY, cb),
+            index: (cb) => web3.eth.getTransactionCount(FUNDING_ACCOUNT, cb),
+            compiledContract: (cb) => compileIfNecessary([resolve(__dirname, '../contracts/HoprChannel.sol')], [resolve(__dirname, '../build/contracts/HoprChannel.json')], cb)
+        }, cb)
     },
-    (_, cb) => {
+    (results, cb) => {
+        fundingPeer = results.fundingPeer
+        index = results.index
         compiledContract = require('../build/contracts/HoprChannel.json')
 
         if (NETWORK === 'ganache') {
             sendTransaction({
-                to: 0,
                 gas: 3000333, // 2370333
                 gasPrice: GAS_PRICE,
                 nonce: index,

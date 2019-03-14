@@ -1,6 +1,6 @@
 'use strict'
 
-const { applyEach, times, each, waterfall } = require('neo-async')
+const { applyEachSeries, timesSeries, times, each, waterfall } = require('neo-async')
 const { createNode } = require('../../src')
 const { pubKeyToEthereumAddress, sendTransaction, privKeyToPeerId } = require('../../src/utils')
 const { GAS_PRICE, STAKE_GAS_AMOUNT } = require('../../src/constants')
@@ -91,9 +91,9 @@ module.exports.createFundedNodes = (amountOfNodes, options, peerId, nonce, cb) =
                 return createNode(opts, cb)
             }
         ], cb), cb),
-        (nodes, cb) => applyEach([
+        (nodes, cb) => applyEachSeries([
             (cb) => this.warmUpNodes(nodes, cb),
-            (cb) => times(amountOfNodes, (n, cb) =>
+            (cb) => timesSeries(amountOfNodes, (n, cb) =>
                 sendTransaction({
                     from: pubKeyToEthereumAddress(peerId.pubKey.marshal()),
                     to: pubKeyToEthereumAddress(nodes[n].peerInfo.id.pubKey.marshal()),
@@ -114,7 +114,7 @@ module.exports.createFundedNodes = (amountOfNodes, options, peerId, nonce, cb) =
 
                     node.paymentChannels.nonce = node.paymentChannels.nonce + 1
 
-                    cb()
+                    return cb()
                 }), cb)
         ], (err) => cb(err, nodes))
     ], cb)

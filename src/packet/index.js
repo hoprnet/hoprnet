@@ -52,7 +52,6 @@ class Packet {
                 challenge,
                 message)
             )
-
         })
     }
 
@@ -112,6 +111,8 @@ class Packet {
                     return cb(Error('General error.'))
 
                 record.currentValue = this.transaction.value
+                log(node.peerInfo.id, `currentValue ${(new BN(record.currentValue)).toString()}`)
+
                 record.index = this.transaction.index
                 
                 return node.paymentChannels.setChannel(record, { channelId: channelId }, cb)

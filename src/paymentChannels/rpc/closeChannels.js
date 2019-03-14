@@ -26,7 +26,12 @@ module.exports = (self) => (cb) => pull(
             (channel, cb) => {
                 if (parseInt(channel.state) == 0) {
                     log(self.node.peerInfo.id, `Found orphaned payment channel ${channelId.toString('hex')} inside database. Was the node shut down inappropriately?`)
-                    return self.deleteChannel(channelId, cb)
+                    self.deleteChannel(channelId, (err) => {
+                        if (err)
+                            return cb(err)
+
+                        return cb(null, new BN(0))
+                    })
                 }
 
                 self.once(`closed ${channelId.toString('base64')}`, (receivedMoney) => {

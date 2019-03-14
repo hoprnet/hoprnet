@@ -1,21 +1,13 @@
 'use strict'
 
-const { isPartyA, pubKeyToEthereumAddress, log, bufferToNumber } = require('../../utils')
+const { log, bufferToNumber } = require('../../utils')
 const { waterfall } = require('neo-async')
 const BN = require('bn.js')
 
-module.exports = (self) => (channelId, useRestoreTx = false) => {
-    if (typeof useRestoreTx === 'function') {
-        cb = useRestoreTx
-        useRestoreTx = false
-    }
-
-    let record, lastValue
-
+module.exports = (self) => (channelId, useRestoreTx = false) => 
     waterfall([
         (cb) => self.getChannel(channelId, cb),
-        (_record, cb) => {
-            record = _record
+        (record, cb) => {
             if (typeof record === 'function')
                 return cb(null, new BN('0'))
 
@@ -23,7 +15,7 @@ module.exports = (self) => (channelId, useRestoreTx = false) => {
 
             log(self.node.peerInfo.id, `Trying to close payment channel \x1b[33m${channelId.toString('hex')}\x1b[0m. Nonce is ${self.nonce}`)
 
-            lastValue = new BN(lastTx.value)
+            const lastValue = new BN(lastTx.value)
 
             self.contractCall(self.contract.methods.closeChannel(
                 lastTx.index,
@@ -43,4 +35,3 @@ module.exports = (self) => (channelId, useRestoreTx = false) => {
         self.closingRequests.add(channelId.toString('base64'))
         log(self.node.peerInfo.id, `Settled channel \x1b[33m${channelId.toString('hex')}\x1b[0m with txHash \x1b[32m${receipt.transactionHash}\x1b[0m. Nonce is now \x1b[31m${self.nonce}\x1b[0m`)
     })
-}
