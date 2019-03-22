@@ -23,16 +23,29 @@ cd messagingProtocol
 yarn install
 ```
 
-Setup the configuration file below before preceding. Navigate to the `config/` folder and change the `.secrets.json` similar to the following one:
+Setup the configuration file below before preceding. Copy and paste the sample `.env.example` 
+into an `.env` file and update the setting values in the .env with your own. For more information
+on how to generate some of those, see the Account Requirements section before:
 
-```json
-{
-    "infuraRopstenURL": "https://ropsten.infura.io/v3/",
-    "infuraApiKey": "INFURA_PRODUCT_ID",
-    "infuraRopstenWssURL": "wss://ropsten.infura.io/ws/v3/",
-    "fundAccountEthAddress": "YOUR_ETHEREUM_ADDRESS",
-    "fundAccountPrivateKey": "YOUR_PRIVATE_KEY"
-}
+```sh
+$ cp .env.example .env // Then update the valid setting values in the .env file
+```
+
+```sh
+INFURA_ROPSTEN_URL=https://ropsten.infura.io/v3/
+INFURA_API_KEY=
+INFURA_ROPSTEN_WSS_URL=wss://ropsten.infura.io/ws/v3/
+FUND_ACCOUNT_ETH_ADDRESS=
+FUND_ACCOUNT_PRIVATE_KEY=
+ROPSTEN_MNEMONIC=
+ROPSTEN_HOST=127.0.0.1
+RINKEBY_MNEMONIC=
+RINKEBY_HOST=127.0.0.1
+DEMO_ACCOUNTS=3
+DEMO_ACCOUNT_0_PRIVATE_KEY=
+DEMO_ACCOUNT_1_PRIVATE_KEY=
+DEMO_ACCOUNT_2_PRIVATE_KEY=
+DEMO_ACCOUNT_3_PRIVATE_KEY=
 ```
 
 Please make sure that you:
