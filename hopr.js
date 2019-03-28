@@ -1,5 +1,5 @@
 'use strict'
-
+require('dotenv').config()
 const { waterfall, forever, each } = require('async')
 const { createNode } = require('./src')
 const read = require('read')
@@ -67,10 +67,8 @@ let node
 waterfall([
     (cb) => {
         if (options.id) {
-            const secrets = require('./config/.secrets.json')
-
-            if (secrets['demoAccounts'] && secrets['demoAccounts'].length > parseInt(options._[0])) {
-                privKeyToPeerId(secrets.demoAccounts[options._[0]].privateKey, (err, peerId) => {
+            if (process.env.DEMO_ACCOUNTS && process.env.DEMO_ACCOUNTS > ~~(options._[0])) {
+                privKeyToPeerId(process.env[`DEMO_ACCOUNT_${~~options._[0]}_PRIVATE_KEY`], (err, peerId) => {
                     if (err)
                         return cb(err)
 

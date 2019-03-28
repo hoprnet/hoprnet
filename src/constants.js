@@ -1,5 +1,5 @@
 'use strict'
-
+require('dotenv').config()
 const { toWei } = require('web3-utils')
 
 const VERSION = '0.0.1'
@@ -8,7 +8,6 @@ const BASESTRING = `/${NAME}/${VERSION}`
 
 const NETWORK = 'ropsten'
 const contract = require('../config/contract-hopr.json');
-const secrets = require('../config/.secrets.json')
 const gas = require('../config/gasUnits.json');
 
 module.exports = {
@@ -46,8 +45,8 @@ module.exports = {
     PROTOCOL_WEBRTC_DATA: `${BASESTRING}/webrtc/data`,
 
 
-    INFURA_URL: `https://${NETWORK}.infura.io/v3/${secrets.infuraApiKey}`,
-    INFURA_WSS_URL: `wss://${NETWORK}.infura.io/ws/v3/${secrets.infuraApiKey}`,
+    INFURA_URL: `https://${NETWORK}.infura.io/v3/${process.env.INFURA_API_KEY}`,
+    INFURA_WSS_URL: `wss://${NETWORK}.infura.io/ws/v3/${process.env.INFURA_API_KEY}`,
 
     STAKE_GAS_AMOUNT: gas.stakeAmount,
     UNSTAKE_GAS_AMOUNT: gas.unstakeAmount,
@@ -57,6 +56,6 @@ module.exports = {
     ETH_SEND_GAS_AMOUNT: gas.simpleTxAmount,
     GAS_PRICE: gas.gasPrice,
 
-    HARDCODED_ETH_ADDRESS: secrets.fundAccountEthAddress,
-    HARDCODED_PRIV_KEY: secrets.fundAccountPrivateKey
+    HARDCODED_ETH_ADDRESS: process.env.FUND_ACCOUNT_ETH_ADDRESS,
+    HARDCODED_PRIV_KEY: process.env.FUND_ACCOUNT_PRIVATE_KEY
 }

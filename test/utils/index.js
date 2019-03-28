@@ -1,5 +1,5 @@
 'use strict'
-
+require('dotenv').config()
 const { applyEachSeries, timesSeries, times, each, waterfall } = require('neo-async')
 const { createNode } = require('../../src')
 const { pubKeyToEthereumAddress, sendTransaction, privKeyToPeerId } = require('../../src/utils')
@@ -40,17 +40,10 @@ module.exports.createFundedNodes = (amountOfNodes, options, peerId, nonce, cb) =
     waterfall([
         (cb) => times(amountOfNodes, (n, cb) => waterfall([
             (cb) => {
-                let secrets
-                try {
-                    secrets = require('../../config/.secrets.json')
-                } catch (err) {
-                    return cb()
-                }
-
-                if (!secrets['demoAccounts'] || secrets['demoAccounts'].length <= n)
+                if (!process.env.DEMO_ACCOUNTS || process.env.DEMO_ACCOUNTS <= n)
                     return cb()
 
-                return privKeyToPeerId(secrets.demoAccounts[n].privateKey, (err, peerId) => {
+                return privKeyToPeerId(process.env[`DEMO_ACCOUNT_${n}_PRIVATE_KEY`], (err, peerId) => {
                     if (err)
                         return cb(err)
 

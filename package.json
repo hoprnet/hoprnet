@@ -42,6 +42,8 @@
         "chalk-animation": "^1.6.0",
         "class-is": "^1.1.0",
         "eslint": "^5.15.3",
+        "dotenv": "^7.0.0",
+        "eslint": "^5.15.1",
         "futoin-hkdf": "^1.0.3",
         "ganache-core": "^2.5.3",
         "getopts": "^2.2.4",

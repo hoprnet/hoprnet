@@ -41,7 +41,7 @@ waterfall([
                 accounts: [
                     {
                         balance: `0x${toWei(new BN(100), 'ether').toString('hex')}`,
-                        secretKey: FUNDING_KEY
+                        secretKey: `0x${FUNDING_KEY}`
                     }
                 ]
             })
