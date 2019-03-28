@@ -1,3 +1,12 @@
+body {
+    font-size: 20;
+}
+
+@media (min-resolution: 300dpi) {
+    body {
+        font-size: 40;
+    }
+}
 .size1 {
     color: "#000000";
     font-family: 'Courier New', Courier, monospace;
@@ -12,7 +21,6 @@
     color: "#000000";
     font-family: 'Courier New', Courier, monospace;
     text-align: center;
-    font-size: 25;
     font-weight: 700;
     line-height: 30px;
     width: 500px;
@@ -22,7 +30,6 @@
     color: "#000000";
     font-family: 'Courier New', Courier, monospace;
     text-align: center;
-    font-size: 25px;
     font-weight: 200;
     line-height: 30px;
     width: 500px;
