@@ -18,7 +18,6 @@ const heartbeat = require('./network/heartbeat')
 const getPubKey = require('./getPubKey')
 const getPeerInfo = require('./getPeerInfo')
 const { randomSubset, serializePeerBook, deserializePeerBook, log, match } = require('./utils')
-const PendingTransactions = require('./pendingTransactions')
 
 const fs = require('fs')
 const levelup = require('levelup')
@@ -113,8 +112,6 @@ class Hopr extends libp2p {
         //
         this.getPubKey = getPubKey(this)
         // this.getPubKey = this._dht.getPublicKey
-
-        this.pendingTransactions = new PendingTransactions(this.db)
     }
 
     /**

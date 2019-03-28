@@ -2,7 +2,7 @@ pragma solidity ^0.5.0;
 
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 
-/* solhint-disable max-line-length */
+
 contract HoprChannel {
     using SafeMath for uint256;
     
@@ -14,6 +14,9 @@ contract HoprChannel {
 
     // Tell payment channel partners that the channel has been opened
     event OpenedChannel(bytes32 indexed channelId, uint256 amountA, uint256 amount);
+
+    // Tell a party that it should send its acknowledgement
+    event Challenge(bytes32 indexed challenge) anonymous;
 
     // Track the state of the channels
     enum ChannelState {
@@ -34,7 +37,7 @@ contract HoprChannel {
 
     // Open channels
     mapping(bytes32 => Channel) public channels;
-    
+
     struct State {
         bool isSet;
         // number of open channels
@@ -133,7 +136,7 @@ contract HoprChannel {
     //     }
     //     channel.state = ChannelState.ACTIVE;
     // }
-    
+
     /**
     * @notice pre-fund channel by with staked Ether of both parties
     * @param nonce nonce to prevent against replay attacks
@@ -142,7 +145,7 @@ contract HoprChannel {
     * @param s bytes32 signature second part
     * @param v uint8 version
      */
-    function createFunded(bytes16 nonce, uint256 funds, bytes32 r, bytes32 s, uint8 v) public enoughFunds(funds) {
+    function createFunded(bytes16 nonce, uint256 funds, bytes32 r, bytes32 s, uint8 v) external enoughFunds(funds) {
         require(!nonces[nonce], "Nonce was already used.");
         nonces[nonce] = true;
 
@@ -195,6 +198,13 @@ contract HoprChannel {
     // }
 
     /**
+    * Initiates the closing procedure of a payment channel. The sender of the transaction
+    * proposes a possible settlement transaction and opens a time interval that the
+    * counterparty can use to propose a more recent update transaction which leads to a reset
+    * of the time interval.
+    * Once the time interval is over, any of the parties can call the `withdraw` function
+    * which finally payout the money.
+    *
     * @notice settle & close payment channel
     * @param index bytes16
     * @param nonce bytes16
@@ -203,7 +213,6 @@ contract HoprChannel {
     * @param s bytes32
     * @param v bytes1
     */
-
     function closeChannel(bytes16 index, bytes16 nonce, uint256 balanceA, bytes32 r, bytes32 s, uint8 v) public {
         bytes32 hashedMessage = keccak256(abi.encodePacked(nonce, index, balanceA));
         address counterparty = ecrecover(hashedMessage, v, r, s);
@@ -223,12 +232,69 @@ contract HoprChannel {
         
         emit ClosedChannel(channelId, index, balanceA);
     }
+
+    /**
+     * The purpose of this method is to give the relayer the opportunity to claim the funds
+     * in case the next downstream node responds with an invalid acknowledgement.
+     *
+     * @param rChallenge bytes32 first part of challenge signature
+     * @param sChallenge bytes32 second part of challenge signature
+     * @param rResponse bytes32 first part of response signature
+     * @param sResponse bytes32 second part of response signature
+     * @param keyHalf bytes32 
+     * @param vChallenge uint8 version (either 27 or 28)
+     * @param vResponse uint8 version (either 27 or 28)
+     */
+    function wrongAcknowledgement(
+        bytes32 rChallenge,
+        bytes32 sChallenge,
+        bytes32 rResponse, 
+        bytes32 sResponse,
+        bytes32 keyHalf,
+        // uint256 amount,
+        uint8 vChallenge,
+        uint8 vResponse
+    ) external {
+        // solhint-disable-next-line max-line-length
+        bytes32 hashedAcknowledgement = keccak256(abi.encodePacked(rChallenge, sChallenge, vChallenge, keyHalf));
+
+        address counterparty = ecrecover(hashedAcknowledgement, vResponse, rResponse, sResponse);
+        Channel storage channel = channels[getId(counterparty)];
+
+        require(channel.state != ChannelState.UNINITIALIZED, "Invalid channel.");
+
+        bytes32 hashedKeyHalf = keccak256(abi.encodePacked(keyHalf));
+
+        // solhint-disable-next-line max-line-length
+        require(msg.sender != ecrecover(hashedKeyHalf, vChallenge, rChallenge, sChallenge), "Trying to claim funds with a valid acknowledgement.");
+
+        // states[counterparty].stakedEther = states[counterparty].stakedEther.sub(amount);
+        // states[msg.sender].stakedEther = states[msg.sender].stakedEther.add(amount);
+    }
+
+    // function addChallenge(address counterparty, bytes32 challenge) external {
+    //     bytes32 channelId = getId(counterparty);
+    //     Channel storage channel = channels[channelId];
+
+    //     require(channel.state != ChannelState.ACTIVE, "Invalid channel.");
+
+    //     channel.challengeCounter = channel.challengeCounter;
+    //     Party storage party = channel.challenges[challenge];
+
+    //     require(party == Party.UNINITIALIZED, "Overwriting of challenges is not allowed.");
+
+    //     if (isPartyA(counterparty)) {
+    //         party = PARTY_A;
+    //     } else {
+    //         party = PARTY_B;
+    //     }
+    // }
     
     /**
     * @notice withdrawal pending balance from payment channel
     * @param counterParty address of the counter party
     */
-    function withdraw(address counterParty) public  {
+    function withdraw(address counterParty) external {
         bytes32 channelId = getId(counterParty);
         Channel storage channel = channels[channelId];
         
@@ -245,10 +311,12 @@ contract HoprChannel {
             
             if (isPartyA(counterParty)) {
                 // msg.sender == partyB
+                // solhint-disable-next-line max-line-length
                 states[msg.sender].stakedEther = states[msg.sender].stakedEther.add((channel.balance.sub(channel.balanceA)));
                 states[counterParty].stakedEther = states[counterParty].stakedEther.add(channel.balanceA);
             } else {
                 // msg.sender == partyA
+                // solhint-disable-next-line max-line-length
                 states[counterParty].stakedEther = states[counterParty].stakedEther.add((channel.balance.sub(channel.balanceA)));
                 states[msg.sender].stakedEther = states[msg.sender].stakedEther.add(channel.balanceA); 
             }
@@ -282,4 +350,14 @@ contract HoprChannel {
             return keccak256(abi.encodePacked(counterParty, msg.sender));
         }
     }
+
+    /**
+     * Adds two secp256k1 points together
+     */
+    // function ecadd
+
+    /**
+     * Multiplies a secp256k1 point by a cofactor
+     */
+    // function ecmul
 }

@@ -83,7 +83,7 @@ module.exports = class Record {
 
     static fromBuffer(buf) {
         if (!Buffer.isBuffer(buf) || buf.length != Record.SIZE)
-            throw Error(`Expected Buffer of size ${Record.SIZE}.`)
+            throw Error(`Expected Buffer of size ${Record.SIZE}. Got ${typeof buf}${Buffer.isBuffer(buf) ? ` of size ${buf.length}` : ''}.`)
 
         return new Record(buf)
     }

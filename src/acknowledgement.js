@@ -1,7 +1,6 @@
 'use strict'
 
-const { sign, verify, publicKeyVerify, recover } = require('secp256k1')
-const { parallel } = require('async')
+const secp256k1 = require('secp256k1')
 
 const { hash, bufferToNumber, numberToBuffer } = require('./utils')
 const Header = require('./packet/header')
@@ -15,6 +14,11 @@ const SIGNATURE_LENGTH = 64
 // 64 byte signature (reponse)
 // 1  byte signature recovery (challenge + response)
 
+/**
+ * This class encapsulates the message that is sent back to the relayer
+ * and allows that party to compute the key that is necessary to redeem
+ * the previously received transaction.
+ */
 class Acknowledgement {
     constructor(buf) {
         this.buffer = buf
@@ -35,11 +39,15 @@ class Acknowledgement {
     get hash() {
         return hash(
             Buffer.concat(
-                [this.key, this.challengeSignature], KEY_LENGTH + SIGNATURE_LENGTH))
+                [this.challengeSignature, numberToBuffer(this.challengeSignatureRecovery, 1), this.key], KEY_LENGTH + SIGNATURE_LENGTH))
     }
 
     get challengeSignature() {
         return this.buffer.slice(KEY_LENGTH, KEY_LENGTH + SIGNATURE_LENGTH)
+    }
+
+    get challengeSignatureHash() {
+        return hash(Buffer.concat([this.challengeSignature, numberToBuffer(this.challengeSignatureRecovery, 1)], SIGNATURE_LENGTH + 1))
     }
 
     set challengeSignature(newSignature) {
@@ -47,11 +55,19 @@ class Acknowledgement {
     }
 
     get challengeSigningParty() {
-        return recover(this.hashedKey, this.challengeSignature, this.challengeSignatureRecovery)
+        if (this._challengeSigningParty)
+            return this._challengeSigningParty
+
+        this._challengeSigningParty = secp256k1.recover(this.hashedKey, this.challengeSignature, this.challengeSignatureRecovery)
+        return this._challengeSigningParty
     }
 
     get responseSigningParty() {
-        return recover(this.hash, this.responseSignature, this.responseSignatureRecovery)
+        if (this._responseSigningParty)
+            return this._responseSigningParty
+
+        this._responseSigningParty = secp256k1.recover(this.hash, this.responseSignature, this.responseSignatureRecovery)
+        return this._responseSigningParty
     }
 
     get challengeSignatureRecovery() {
@@ -116,41 +132,33 @@ class Acknowledgement {
         return new Acknowledgement(buf)
     }
 
-    signResponse(peerId) {
-        const signature = sign(this.hash, peerId.privKey.marshal())
+    sign(peerId) {
+        const signature = secp256k1.sign(this.hash, peerId.privKey.marshal())
 
         this.responseSignature = signature.signature
         this.responseSignatureRecovery = signature.recovery
     }
 
     /**
+     * Takes a challenge from a relayer and returns an acknowledgement that includes a
+     * signature over the requested key half.
      * 
-     * @param {*} challenge 
-     * @param {*} derivedSecret 
+     * @param {Challenge} challenge the signed challenge of the relayer
+     * @param {Buffer} derivedSecret the secret that is used to create the second key half
      * @param {PeerId} peerId contains private key 
      * @param {Buffer} buffer (optional) specify a buffer which is used to create the instance
      */
     static create(challenge, derivedSecret, peerId, buffer = Buffer.alloc(Acknowledgement.SIZE)) {
-        const ack = new Acknowledgement(buffer)
+        const ack = new Acknowledgement(Buffer.alloc(Acknowledgement.SIZE))
 
         ack.key = Header.deriveTransactionKey(derivedSecret)
 
         ack.challengeSignature = challenge.challengeSignature
         ack.challengeSignatureRecovery = bufferToNumber(challenge.challengeSignatureRecovery)
 
-        ack.signResponse(peerId)
+        ack.sign(peerId)
 
         return ack
-    }
-
-    verify(pubKeyNext, ownPubkey, cb) {
-        if (!Buffer.isBuffer(pubKeyNext) || !publicKeyVerify(pubKeyNext))
-            throw Error('Invalid public key.')
-
-        parallel([
-            (cb) => cb(null, verify(hash(this.key), this.challengeSignature, ownPubkey)),
-            (cb) => cb(null, verify(this.hash, this.responseSignature, pubKeyNext))
-        ], (err, results) => cb(err, results.every(x => x)))
     }
 }
 

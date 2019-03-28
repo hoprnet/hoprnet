@@ -2,17 +2,15 @@
 
 const pull = require('pull-stream')
 const paramap = require('pull-paramap')
+const rlp = require('rlp')
+const { waterfall } = require('neo-async')
 
 const lp = require('pull-length-prefixed')
-const { waterfall } = require('neo-async')
-const { log, pubKeyToPeerId, hash, bufferXOR } = require('../utils')
+const { log, getId, pubKeyToEthereumAddress } = require('../utils')
 
 const { PROTOCOL_STRING } = require('../constants')
 const Packet = require('../packet')
 const Acknowledgement = require('../acknowledgement')
-
-const Multihash = require('multihashes')
-const rlp = require('rlp')
 
 module.exports = (node, options) => {
     // Registers the packet handlers if the node started as a
@@ -23,79 +21,66 @@ module.exports = (node, options) => {
         return
 
     function forwardPacket(packet) {
-        if (node.peerInfo.id.isEqual(packet._targetPeerId))
-            return options.output(demo(packet.message.plaintext))
-
         log(node.peerInfo.id, `Forwarding to node \x1b[34m${packet._targetPeerId.toB58String()}\x1b[0m.`)
 
         waterfall([
             (cb) => node.peerRouting.findPeer(packet._targetPeerId, cb),
-            (targetPeerInfo, cb) => node.dialProtocol(targetPeerInfo, PROTOCOL_STRING, cb),
-            (conn, cb) => pull(
+            (targetPeerInfo, cb) => node.dialProtocol(targetPeerInfo, PROTOCOL_STRING, cb)
+        ], (err, conn) => {
+            if (err) {
+                console.log(err)
+                return
+            }
+
+            pull(
                 pull.once(packet.toBuffer()),
                 lp.encode(),
                 conn,
                 lp.decode({ maxLength: Acknowledgement.SIZE }),
-                pull.filter((data) => data.length === Acknowledgement.SIZE),
-                pull.take(1),
-                pull.map(data => Acknowledgement.fromBuffer(data)),
-                pull.drain((data) => cb(null, data))
-            ),
-            (ack, cb) => handleAcknowledgement(ack, cb)
-        ], (err) => {
-            if (err)
-                log(node.peerInfo.id, `Error: ${err.message}`)
+                pull.drain((data) => {
+                    if (data.length != Acknowledgement.SIZE)
+                        return
+
+                    handleAcknowledgement(Acknowledgement.fromBuffer(data))
+                })
+            )
         })
     }
 
-    function handleAcknowledgement(ack, cb) {
-        if (!ack.challengeSigningParty.equals(node.peerInfo.id.pubKey.marshal()))
-            throw Error('General error.')
+    function handleAcknowledgement(ack) {
+        if (!ack.challengeSigningParty.equals(node.peerInfo.id.pubKey.marshal())) {
+            console.log(`channelId ${getId(
+                pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()),
+                pubKeyToEthereumAddress(ack.responseSigningParty)
+            ).toString('hex')}`)
+            return node.paymentChannels.contractCall(node.paymentChannels.contract.methods.wrongAcknowledgement(
+                ack.challengeSignature.slice(0, 32),
+                ack.challengeSignature.slice(32, 64),
+                ack.responseSignature.slice(0, 32),
+                ack.responseSignature.slice(32, 64),
+                ack.key,
+                ack.challengeSignatureRecovery,
+                ack.responseSignatureRecovery
+            ), (err, receipt) => {
+                console.log(err, receipt)
+            })
+        }
 
-        let record, channelId
         waterfall([
-            (cb) => node.pendingTransactions.getEncryptedTransaction(ack.hashedKey, cb),
-            (_record, cb) => {
-                if (typeof record === 'function') {
-                    cb = record
-                    return cb(Error('General error.'))
-                }
-
-                record = _record
-
-                pubKeyToPeerId(ack.responseSigningParty, cb)
-            },
-            (peerId, cb) => {
-                if (!Multihash.decode(peerId.toBytes()).digest.equals(record.hashedPubKey))
-                    return cb(Error('General error.'))
-
-                record.tx.decrypt(hash(bufferXOR(record.ownKeyHalf, ack.key)))
-
-                channelId = record.tx.getChannelId(node.peerInfo.id)
-
-                node.paymentChannels.getChannel(channelId, cb)
-            },
-            (channelRecord, cb) => {
-                if (typeof channelRecord === 'function') {
-                    cb = channelRecord
-                    return cb(Error('General error.'))
-                }
-
-                channelRecord.tx = record.tx
-                channelRecord.currentValue = record.tx.value
-
-                node.paymentChannels.setChannel(channelRecord, { channelId: channelId })
-            }
-        ], cb)
+            (cb) => node.paymentChannels.getChannelIdFromSignatureHash(ack.challengeSignatureHash, cb),
+            (channelId, cb) => node.paymentChannels.solveChallenge(channelId, ack.key, cb)
+        ], (err) => {
+            if (err)
+                throw err
+        })
     }
 
-    node.handle(PROTOCOL_STRING, (protocol, conn) => {
+    node.handle(PROTOCOL_STRING, (protocol, conn) =>
         pull(
             conn,
             lp.decode({
                 maxLength: Packet.SIZE
             }),
-            pull.filter(data => data.length == Packet.SIZE),
             paramap((data, cb) => {
                 const packet = Packet.fromBuffer(data)
 
@@ -105,12 +90,16 @@ module.exports = (node, options) => {
                         return cb(null, Buffer.alloc(0))
                     }
 
-                    forwardPacket(packet)
+                    if (node.peerInfo.id.isEqual(packet._targetPeerId)) {
+                        options.output(demo(packet.message.plaintext))
+                    } else {
+                        forwardPacket(packet)
+                    }
 
                     return cb(null, Acknowledgement.create(
                         packet.oldChallenge,
                         packet.header.derivedSecret,
-                        node.peerInfo.id
+                        node.peerInfo.id,
                     ).toBuffer())
                 })
 
@@ -118,7 +107,7 @@ module.exports = (node, options) => {
             lp.encode(),
             conn
         )
-    })
+    )
 
     function demo(plaintext) {
         const message = rlp.decode(plaintext)

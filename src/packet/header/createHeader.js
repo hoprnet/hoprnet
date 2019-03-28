@@ -2,11 +2,9 @@
 
 const secp256k1 = require('secp256k1')
 const crypto = require('crypto')
-const Multihash = require('multihashes')
 const bs58 = require('bs58')
 const forEachRight = require('lodash.foreachright');
 
-const { deriveKey } = require('../../paymentChannels/keyDerivation')
 const prg = require('../../crypto/prg')
 const { hash, bufferXOR } = require('../../utils')
 const c = require('../../constants')
@@ -47,7 +45,7 @@ module.exports = (Header, header, peerIds) => {
             do {
                 privKey = crypto.randomBytes(p.PRIVATE_KEY_LENGTH)
             } while (!secp256k1.privateKeyVerify(privKey))
-            
+
             header.alpha
                 .fill(secp256k1.publicKeyCreate(privKey), 0, p.COMPRESSED_PUBLIC_KEY_LENGTH)
 
@@ -139,10 +137,19 @@ module.exports = (Header, header, peerIds) => {
                     .fill(hash(Header.deriveTransactionKey(secrets[index + 1])), p.ADDRESS_SIZE + p.MAC_SIZE, p.ADDRESS_SIZE + p.MAC_SIZE + p.HASH_LENGTH)
                     .fill(tmp, p.PER_HOP_SIZE, Header.BETA_LENGTH)
 
-                if (secrets.length > 2 && index < secrets.length - 2) {
-                    header.beta
-                        .fill(hash(deriveKey(Header, secrets.slice(index, index + 2))), p.ADDRESS_SIZE + p.MAC_SIZE + p.HASH_LENGTH, p.ADDRESS_SIZE + p.MAC_SIZE + p.HASH_LENGTH + p.HASH_LENGTH)
-                        .fill(deriveKey(Header, secrets.slice(index + 1, index + 3)), p.ADDRESS_SIZE + p.MAC_SIZE + p.HASH_LENGTH + p.HASH_LENGTH, p.ADDRESS_SIZE + p.MAC_SIZE + p.HASH_LENGTH + p.HASH_LENGTH + p.KEY_LENGTH)
+                if (secrets.length > 2) {
+                    if (index < secrets.length - 2) {
+                        header.beta
+                            .fill(secp256k1.privateKeyTweakAdd(
+                                Header.deriveTransactionKey(secrets[index + 1]),
+                                Header.deriveTransactionKey(secrets[index + 2])
+                            ), p.ADDRESS_SIZE + p.MAC_SIZE + p.HASH_LENGTH, p.ADDRESS_SIZE + p.MAC_SIZE + p.HASH_LENGTH + p.KEY_LENGTH)
+                    } else if (index == secrets.length - 2) {
+                        header.beta
+                            .fill(
+                                Header.deriveTransactionKey(secrets[index + 1]),
+                            p.ADDRESS_SIZE + p.MAC_SIZE + p.HASH_LENGTH, p.ADDRESS_SIZE + p.MAC_SIZE + p.HASH_LENGTH + p.KEY_LENGTH)
+                    }
                 }
                 header.beta
                     .fill(
@@ -155,6 +162,13 @@ module.exports = (Header, header, peerIds) => {
             header.gamma
                 .fill(Header.createMAC(secret, header.beta), 0, p.MAC_SIZE)
         })
+    }
+
+    function deriveKey(a, b) {
+        return secp256k1.privateKeyTweakAdd(
+            Header.deriveTransactionKey(a),
+            Header.deriveTransactionKey(b)
+        )
     }
 
     function printValues(header, secrets) {

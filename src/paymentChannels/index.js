@@ -8,11 +8,12 @@ const pull = require('pull-stream')
 
 const { CONTRACT_ADDRESS } = require('../constants')
 const Web3 = require('web3')
-const { parallel } = require('neo-async')
+const { parallel, waterfall } = require('neo-async')
 const { resolve } = require('path')
 const BN = require('bn.js')
+const secp256k1 = require('secp256k1')
 
-const { pubKeyToEthereumAddress, sendTransaction, log, compileIfNecessary, isPartyA } = require('../utils')
+const { pubKeyToEthereumAddress, sendTransaction, log, compileIfNecessary, isPartyA, hash } = require('../utils')
 
 const open = require('./rpc/open')
 const closingListener = require('./eventListeners/close')
@@ -24,6 +25,25 @@ const registerHandlers = require('./handlers')
 
 const HASH_LENGTH = 32
 const CHANNEL_ID_BYTES = HASH_LENGTH
+const CHALLENGE_BYTES = HASH_LENGTH
+const COMPRESSED_PUBLIC_KEY_LENGTH = 33
+const PRIVATE_KEY_LENGTH = 32
+
+function getChannelKey(channelId) {
+    return Buffer.concat([Buffer.from('payments-channel-'), channelId], 17 + CHANNEL_ID_BYTES)
+}
+
+function getOwnKeyHalfKey(hashedKeyHalf, channelId) {
+    return Buffer.concat([Buffer.from('payments-challenge-'), channelId, hashedKeyHalf], 19 + CHANNEL_ID_BYTES + CHALLENGE_BYTES)
+}
+
+function getSignatureChannelIdKey(signatureHash) {
+    return Buffer.concat([Buffer.from('payments-signature-'), signatureHash], 19 + HASH_LENGTH)
+}
+
+function getKeyKey(channelId) {
+    return Buffer.concat([Buffer.from('payments-channelkey-'), channelId], 21 + CHALLENGE_BYTES)
+}
 
 class PaymentChannel extends EventEmitter {
     constructor(options) {
@@ -150,7 +170,7 @@ class PaymentChannel extends EventEmitter {
         if (!options.channelId || !Buffer.isBuffer(options.channelId) || options.channelId.length !== CHANNEL_ID_BYTES)
             return cb(Error('Unable to determine channelId.'))
 
-        const key = getKey(options.channelId)
+        const key = getChannelKey(options.channelId)
 
         this.node.db.get(key, (err, record) => {
             if (err && !err.notFound)
@@ -181,7 +201,7 @@ class PaymentChannel extends EventEmitter {
      * @param {Function} cb called when finished with `(err, record)`
      */
     getChannel(channelId, cb) {
-        const key = getKey(channelId)
+        const key = getChannelKey(channelId)
 
         this.node.db.get(key, (err, record) => {
             if (err)
@@ -198,7 +218,7 @@ class PaymentChannel extends EventEmitter {
      * @param {Function} cb called when finished with `(err)`
      */
     deleteChannel(channelId, cb) {
-        const key = getKey(channelId)
+        const key = getChannelKey(channelId)
 
         this.node.db.del(key, {
             sync: true
@@ -215,9 +235,9 @@ class PaymentChannel extends EventEmitter {
         return pull(
             toPull(this.node.db.createReadStream({
                 // payments-channel-\000...\000
-                gt: getKey(Buffer.alloc(32, 0)),
+                gt: getChannelKey(Buffer.alloc(32, 0)),
                 // payments-channel-\255...\255
-                lt: getKey(Buffer.alloc(46, 255))
+                lt: getChannelKey(Buffer.alloc(46, 255))
             })),
             pull.map(record => Object.assign(record, {
                 value: Record.fromBuffer(record.value)
@@ -225,6 +245,153 @@ class PaymentChannel extends EventEmitter {
         )
     }
 
+    /**
+     * Takes the result of the one-way function and return the pre-image that is required
+     * to compute the key to claim the funds.
+     * 
+     * @param {Buffer} channelId ID of the channel
+     * @param {Buffer} hashedKeyHalf Challenge given as pre-image of the one-way function
+     * @param {Function(Error, Buffer)} cb called when finished with either `(err)` or `(err, ownKeyHalf)`
+     */
+    getOwnKeyHalf(channelId, hashedKeyHalf, cb) {
+        const key = getOwnKeyHalfKey(hashedKeyHalf, channelId)
+
+        this.node.db.get(key, (err, record) => {
+            if (err)
+                return cb(err.notFound ? null : err)
+
+            cb(null, record)
+        })
+    }
+
+    /**
+     * Takes the result of the one-way function as an identifier to store the own key half
+     * in the database.
+     * 
+     * @param {Buffer} channelId ID of the channel
+     * @param {Buffer} challenge result of the one-way function
+     * @param {Buffer} ownKeyHalf own key half as derived from the packet header
+     * @param {Function(Error)} cb called when finished with `(err)`
+     */
+    setOwnKeyHalf(channelId, challenge, ownKeyHalf, cb) {
+        const key = getOwnKeyHalfKey(channelId, challenge)
+
+        this.node.db.put(key, ownKeyHalf, cb)
+    }
+
+    /**
+     * Adds a new key to the sum of the previous keys that previously occured in the payment channel.
+     * 
+     * @param {Buffer} channelId ID of the channel
+     * @param {Buffer} key the key that will later be used to redeem the money
+     * @param {Function(Error)} cb called when finished with `(err)` 
+     */
+    addKey(channelId, key, cb) {
+        const k = getKeyKey(channelId)
+
+        this.node.db.get(key, (err, oldKey) => {
+            if (err && !err.notFound)
+                return cb(err)
+
+            if (err && err.notFound)
+                oldKey = Buffer.alloc(PRIVATE_KEY_LENGTH, 0)
+            
+            this.node.db.put(k, secp256k1.privateKeyTweakAdd(oldKey, key), cb)
+        })
+    }
+
+    getChannelKey(channelId, cb) {
+        const k = getKeyKey(channelId)
+        
+        this.node.db.get(k, (err, key) => {
+            if (err)
+                return cb(err.notFound ? null : err)
+
+            cb(null, key)
+        })
+    }
+
+    /**
+     * Takes a received key half and checks whether it fits to a previously stored challenge. Then it
+     * adds the corresponding own key half and adds it to the new one. Afterwards, it add the key to the
+     * sum of the previous keys.
+     * 
+     * @param {Buffer} channelId ID of the channel
+     * @param {Buffer} keyHalf the received key half that is used to solve the challenge
+     * @param {Function(Error)} cb called when finished with `(err)`
+     */
+    solveChallenge(channelId, keyHalf, cb) {
+        waterfall([
+            (cb) => this.getOwnKeyHalf(hash(keyHalf), channelId, cb),
+            (ownKeyHalf, cb) => this.addKey(channelId, secp256k1.privateKeyTweakAdd(ownKeyHalf, keyHalf), cb),
+            (cb) => this.node.db.del(hash(keyHalf), { sync: true }, cb)
+        ], cb)
+    }
+
+    /**
+     * Returns all challenges assigned to that channel.
+     * 
+     * @notice The main purpose of that method is to get all unsolved challenge when closing a channel.
+     * 
+     * @param {Buffer} channelId ID of the channel
+     * @returns {PullStream} a stream of all challenge
+     */
+    getOwnKeyHalves(channelId) {
+        return pull(
+            toPull(this.node.db.createReadStream({
+                // payments-channel-\000...\000
+                gt: getOwnKeyHalfKey(channelId, Buffer.alloc(32, 0)),
+                // payments-channel-\255...\255
+                lt: getOwnKeyHalfKey(channelId, Buffer.alloc(32, 255))
+            }))
+        )
+    }
+
+    /**
+     * Stores the channelId in the database by using the hash of the signature as identifier.
+     * 
+     * @notice The main purpose of this method is to link a received acknowledgement to an open
+     * payment channel.
+     * 
+     * @param {Buffer} signatureHash hash of the signature that is used as identifier for the channelId
+     * @param {Buffer} channelId ID of the channel
+     * @param {Function(Error)} cb called when finished with `(err)`
+     */
+    setChannelIdFromSignatureHash(signatureHash, channelId, cb) {
+        const key = getSignatureChannelIdKey(signatureHash)
+
+        this.node.db.put(key, channelId, cb)
+    }
+
+    /**
+     * Maps a signature hash to a channelId.
+     * 
+     * @notice The main purpose of this method is to link a received acknowledgement to an open
+     * payment channel.
+     * 
+     * @param {Buffer} signatureHash hash of the signature that is used as identifier
+     * @param {Function(Error, Buffer)} cb called when finished with `(err, channelId)`
+     */
+    getChannelIdFromSignatureHash(signatureHash, cb) {
+        const key = getSignatureChannelIdKey(signatureHash)
+
+        this.node.db.get(key, (err, record) => {
+            if (err)
+                return cb(err.notFound ? null : err)
+
+            cb(null, record)
+        })
+    }
+
+    /**
+     * Computes the delta of funds that were received with the given transaction in relation to the
+     * initial balance.
+     * 
+     * @param {Transaction} receivedTx the transaction upon which the delta funds is computed
+     * @param {PeerId} counterparty peerId of the counterparty that is used to decide which side of
+     * payment channel we are, i. e. party A or party B.
+     * @param {Buffer} currentValue the currentValue of the payment channel.
+     */
     getEmbeddedMoney(receivedTx, counterparty, currentValue) {
         currentValue = new BN(currentValue)
         const newValue = new BN(receivedTx.value)
@@ -279,10 +446,6 @@ class PaymentChannel extends EventEmitter {
             }
         })
     }
-}
-
-function getKey(channelId) {
-    return Buffer.concat([Buffer.from('payments-channel-'), channelId], 17 + CHANNEL_ID_BYTES)
 }
 
 module.exports = PaymentChannel

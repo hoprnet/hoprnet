@@ -8,8 +8,11 @@ module.exports = (self) => (channelId, useRestoreTx = false) =>
     waterfall([
         (cb) => self.getChannel(channelId, cb),
         (record, cb) => {
-            if (typeof record === 'function')
+            if (typeof record === 'function') {
+                cb = record
+
                 return cb(null, new BN('0'))
+            }
 
             const lastTx = useRestoreTx ? record.restoreTx : record.tx
 
@@ -26,7 +29,7 @@ module.exports = (self) => (channelId, useRestoreTx = false) =>
                 bufferToNumber(lastTx.recovery) + 27
             ), cb)
         }
-    ], (err) => {
+    ], (err, receipt) => {
         if (err) {
             console.log(err)
             return

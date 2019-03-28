@@ -19,14 +19,8 @@ const RECOVERY_LENGTH = 1
 // 1  byte signature recovery
 
 class Transaction {
-    constructor(buf = Buffer.alloc(Transaction.SIZE), encrypted = false) {
-        if (typeof buf === 'boolean') {
-            encrypted = buf
-            buf = Buffer.alloc(Transaction.SIZE)
-        }
-
+    constructor(buf = Buffer.alloc(Transaction.SIZE)) {
         this.buffer = buf
-        this.encrypted = encrypted
     }
 
     static get SIGNATURE_LENGTH() {
@@ -199,8 +193,8 @@ class Transaction {
      * @returns {Buffer} the public key as a compressed curve point
      */
     get counterparty() {
-        if (this.encrypted)
-            throw Error(`Can't derive counterparty from encrypted transaction.`)
+        // if (this.encrypted)
+        //     throw Error(`Can't derive counterparty from encrypted transaction.`)
 
         if (this._counterparty)
             return this._counterparty
@@ -242,14 +236,13 @@ class Transaction {
      * Creates a Transaction instance from a Buffer.
      * 
      * @param {Buffer} buf the buffer representation
-     * @param {Boolean} encrypted 'true' if transaction is encrypted, default 'false'
      * @returns {Transaction} Transaction instance
      */
-    static fromBuffer(buf, encrypted = false) {
+    static fromBuffer(buf) {
         if (!Buffer.isBuffer(buf) || buf.length !== Transaction.SIZE)
             throw Error(`Invalid input argument. Expected a buffer of size ${Transaction.SIZE}.`)
 
-        return new Transaction(buf, encrypted)
+        return new Transaction(buf)
     }
 
     /**
@@ -272,7 +265,8 @@ class Transaction {
         if (this.encrypted)
             throw Error('Cannot encrypt an already encrypted transaction.')
 
-        this.signature.fill(bufferXOR(Buffer.concat([key, key], 2 * KEY_LENGTH), this.signature), 0, SIGNATURE_LENGTH)
+        // TODO
+        // this.signature.fill(bufferXOR(Buffer.concat([key, key], 2 * KEY_LENGTH), this.signature), 0, SIGNATURE_LENGTH)
         this.encrypted = true
 
         return this
@@ -290,8 +284,9 @@ class Transaction {
         if (!this.encrypted)
             throw Error('Cannot decrypt a transaction more than once.')
 
+        // TODO
         this.encrypted = false
-        this.signature.fill(bufferXOR(Buffer.concat([key, key], 2 * KEY_LENGTH), this.signature), 0, SIGNATURE_LENGTH)
+        // this.signature.fill(bufferXOR(Buffer.concat([key, key], 2 * KEY_LENGTH), this.signature), 0, SIGNATURE_LENGTH)
 
         return this
     }

@@ -17,19 +17,16 @@ module.exports = (self) => {
                 record = null
             }
 
-            log(self.node.peerInfo.id, `here ${options.channelId.toString('hex')}`)
             if (record)
                 return cb(null, record)
 
             if (self.openingRequests.has(options.channelId.toString('base64')))
                 console.log('found')
-            log(self.node.peerInfo.id, `after first callback ${options.channelId.toString('hex')}`)
             
             self.open(options.to, cb)
 
         },
         (record, cb) => {
-            console.log(`opened ${options.channelId.toString('hex')}`)
             const currentValue = new BN(record.currentValue)
 
             const partyA = isPartyA(
