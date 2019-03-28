@@ -4,7 +4,7 @@ const app = new Koa();
 
 app.use(serve('assets'));
 
-const port = 3000;
+const port = 80;
 
 app.listen(port);
 
