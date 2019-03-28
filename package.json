@@ -15,5 +15,9 @@
   "bugs": {
     "url": "https://github.com/validitylabs/hopr-website/issues"
   },
-  "homepage": "https://github.com/validitylabs/hopr-website#readme"
+  "homepage": "https://github.com/validitylabs/hopr-website#readme",
+  "dependencies": {
+    "koa": "^2.7.0",
+    "koa-static": "^5.0.0"
+  }
 }
