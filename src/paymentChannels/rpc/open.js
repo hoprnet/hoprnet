@@ -7,9 +7,9 @@ const { waterfall } = require('neo-async')
 const { randomBytes } = require('crypto')
 const { toWei } = require('web3-utils')
 const BN = require('bn.js')
-const { recover } = require('secp256k1')
+const secp256k1 = require('secp256k1')
 
-const { deepCopy, bufferToNumber, numberToBuffer, log } = require('../../utils')
+const { deepCopy, bufferToNumber, numberToBuffer } = require('../../utils')
 const { PROTOCOL_PAYMENT_CHANNEL } = require('../../constants')
 const Transaction = require('../../transaction')
 const Record = require('../record')
@@ -27,6 +27,9 @@ module.exports = (self) => (to, cb) => {
             restoreTx.value = (new BN(toWei('1', 'shannon'))).toBuffer('be', Transaction.VALUE_LENGTH)
             restoreTx.index = numberToBuffer(1, Transaction.INDEX_LENGTH)
 
+            // 0 is considered as infinity point / neutral element
+            restoreTx.curvePoint = Buffer.alloc(33, 0)
+
             restoreTx.sign(self.node.peerInfo.id)
 
             pull(
@@ -37,7 +40,7 @@ module.exports = (self) => (to, cb) => {
                 pull.filter((data) =>
                     Buffer.isBuffer(data) &&
                     data.length === Transaction.SIGNATURE_LENGTH + Transaction.RECOVERY_LENGTH &&
-                    recover(restoreTx.hash, data.slice(0, Transaction.SIGNATURE_LENGTH), bufferToNumber(data.slice(Transaction.SIGNATURE_LENGTH)))
+                    secp256k1.recover(restoreTx.hash, data.slice(0, Transaction.SIGNATURE_LENGTH), bufferToNumber(data.slice(Transaction.SIGNATURE_LENGTH)))
                         .compare(to.pubKey.marshal()) === 0
                 ),
                 pull.collect(cb)

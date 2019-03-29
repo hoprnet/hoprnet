@@ -56,24 +56,24 @@ class Packet {
 
         const message = Message.createMessage(msg).onionEncrypt(secrets)
 
-        return node.paymentChannels.transfer(fee, path[0], (err, tx) => {
-            if (err)
-                return cb(err)
+        const key = secp256k1.privateKeyTweakAdd(Header.deriveTransactionKey(secrets[0]), Header.deriveTransactionKey(secrets[1]))
 
-            log(node.peerInfo.id, `Encrypting with ${hash(bufferXOR(Header.deriveTransactionKey(secrets[0]), Header.deriveTransactionKey(secrets[1]))).toString('base64')}.`)
+        const channelId = getId(
+            pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()),
+            pubKeyToEthereumAddress(path[0].pubKey.marshal())
+        )
 
-            const key = secp256k1.privateKeyTweakAdd(Header.deriveTransactionKey(secrets[0]), Header.deriveTransactionKey(secrets[1]))
+        node.paymentChannels.addKey(channelId, key, (err) => {
+            if (err) {
+                console.log(err)
+                return
+            }
 
-            const channelId = getId(
-                pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()),
-                pubKeyToEthereumAddress(path[0].pubKey.marshal())
-            )
+            return node.paymentChannels.transfer(fee, path[0], (err, tx) => {
+                if (err)
+                    return cb(err)
 
-            node.paymentChannels.addKey(channelId, key, (err) => {
-                if (err) {
-                    console.log(err)
-                    return
-                }
+                log(node.peerInfo.id, `Encrypting with ${hash(bufferXOR(Header.deriveTransactionKey(secrets[0]), Header.deriveTransactionKey(secrets[1]))).toString('base64')}.`)
 
                 return cb(null, new Packet(
                     header,
@@ -83,6 +83,7 @@ class Packet {
                 )
             })
         })
+
     }
 
     /**
@@ -115,9 +116,19 @@ class Packet {
                     pubKeyToEthereumAddress(sender.pubKey.marshal())
                 )
 
+                // check transaction
+                // probably fine
                 if (this.header.address.equals(node.peerInfo.id.pubKey.marshal())) {
+                    if (!this.transaction.curvePoint.equals(secp256k1.publicKeyCreate(Header.deriveTransactionKey(this.header.derivedSecret)))) {
+                        return cb('General error.')
+                    }
+
                     node.paymentChannels.addKey(channelId, Header.deriveTransactionKey(this.header.derivedSecret), cb)
                 } else {
+                    if (!this.transaction.curvePoint.equals(secp256k1.publicKeyCombine([secp256k1.publicKeyCreate(Header.deriveTransactionKey(this.header.derivedSecret)), this.header.hashedKeyHalf]))) {
+                        return cb('General error.')
+                    }
+
                     node.paymentChannels.setOwnKeyHalf(channelId, this.header.hashedKeyHalf, Header.deriveTransactionKey(this.header.derivedSecret), cb)
                 }
             },
@@ -140,9 +151,8 @@ class Packet {
                     return cb(Error('General error.'))
 
                 record.currentValue = this.transaction.value
-                log(node.peerInfo.id, `currentValue ${(new BN(record.currentValue)).toString()}`)
-
                 record.index = this.transaction.index
+                record.tx = this.transaction
 
                 return node.paymentChannels.setChannel(record, { channelId: channelId }, cb)
             },

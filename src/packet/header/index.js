@@ -54,11 +54,11 @@ class Header {
     }
 
     get hashedKeyHalf() {
-        return this.data ? this.data.slice(p.ADDRESS_SIZE, p.ADDRESS_SIZE + p.HASH_LENGTH) : null
+        return this.data ? this.data.slice(p.ADDRESS_SIZE, p.ADDRESS_SIZE + p.COMPRESSED_PUBLIC_KEY_LENGTH) : null
     }
 
     get encryptionKey() {
-        return this.data ? this.data.slice(p.ADDRESS_SIZE + p.HASH_LENGTH, p.ADDRESS_SIZE + p.PROVING_VALUES_SIZE) : null
+        return this.data ? this.data.slice(p.ADDRESS_SIZE + p.COMPRESSED_PUBLIC_KEY_LENGTH, p.ADDRESS_SIZE + p.PROVING_VALUES_SIZE) : null
     }
 
     get derivedSecret() {

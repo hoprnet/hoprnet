@@ -33,7 +33,7 @@ class Acknowledgement {
     }
 
     get hashedKey() {
-        return hash(this.key)
+        return secp256k1.publicKeyCreate(this.key)
     }
 
     get hash() {
@@ -58,7 +58,7 @@ class Acknowledgement {
         if (this._challengeSigningParty)
             return this._challengeSigningParty
 
-        this._challengeSigningParty = secp256k1.recover(this.hashedKey, this.challengeSignature, this.challengeSignatureRecovery)
+        this._challengeSigningParty = secp256k1.recover(hash(this.hashedKey), this.challengeSignature, this.challengeSignatureRecovery)
         return this._challengeSigningParty
     }
 

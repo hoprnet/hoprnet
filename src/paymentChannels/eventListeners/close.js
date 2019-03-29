@@ -87,7 +87,6 @@ module.exports = (self) => (err, event) => {
             receivedMoney = partyA ? amountA.isub(initialValue) : initialValue.isub(amountA)
 
             log(self.node.peerInfo.id, `Closed payment channel \x1b[33m${channelId.toString('hex')}\x1b[0m and ${receivedMoney.isNeg() ? 'spent' : 'received'} \x1b[35m${receivedMoney.abs().toString()} wei\x1b[0m. ${receipt ? ` TxHash \x1b[32m${receipt.transactionHash}\x1b[0m.` : ''}`)
-            log(self.node.peerInfo.id, `currentValue ${(new BN(record.currentValue)).toString()}`)
 
             self.deleteChannel(channelId, cb)
         }

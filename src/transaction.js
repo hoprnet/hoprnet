@@ -1,15 +1,15 @@
 'use strict'
 
-const { recover, sign } = require('secp256k1')
+const secp256k1 = require('secp256k1')
 
-const { hash, numberToBuffer, bufferToNumber, bufferXOR, getId, pubKeyToEthereumAddress } = require('./utils')
+const { hash, numberToBuffer, bufferToNumber, getId, pubKeyToEthereumAddress } = require('./utils')
 
 const SIGNATURE_LENGTH = 64
-const KEY_LENGTH = 32
 const VALUE_LENGTH = 32
 const INDEX_LENGTH = 16
 const NONCE_LENGTH = 16
 const RECOVERY_LENGTH = 1
+const CURVE_POINT_LENGTH = 33
 
 // Format:
 // 64 byte signature
@@ -25,10 +25,6 @@ class Transaction {
 
     static get SIGNATURE_LENGTH() {
         return SIGNATURE_LENGTH
-    }
-
-    static get KEY_LENGTH() {
-        return KEY_LENGTH
     }
 
     static get VALUE_LENGTH() {
@@ -50,7 +46,7 @@ class Transaction {
      * @returns {Number} size of a transaction
      */
     static get SIZE() {
-        return SIGNATURE_LENGTH + NONCE_LENGTH + INDEX_LENGTH + VALUE_LENGTH + RECOVERY_LENGTH
+        return SIGNATURE_LENGTH + NONCE_LENGTH + INDEX_LENGTH + VALUE_LENGTH + RECOVERY_LENGTH + CURVE_POINT_LENGTH
     }
 
     // ========= Getters =========
@@ -58,9 +54,6 @@ class Transaction {
      * @returns {Buffer} signature of the transaction
      */
     get signature() {
-        if (this.encrypted)
-            throw Error(`Can't read signature from encrypted transaction.`)
-
         return this.buffer.slice(0, SIGNATURE_LENGTH)
     }
 
@@ -85,12 +78,15 @@ class Transaction {
         return this.buffer.slice(SIGNATURE_LENGTH + NONCE_LENGTH + INDEX_LENGTH, SIGNATURE_LENGTH + NONCE_LENGTH + INDEX_LENGTH + VALUE_LENGTH)
     }
 
+    get curvePoint() {
+        return this.buffer.slice(SIGNATURE_LENGTH + NONCE_LENGTH + INDEX_LENGTH + VALUE_LENGTH, SIGNATURE_LENGTH + NONCE_LENGTH + INDEX_LENGTH + VALUE_LENGTH + CURVE_POINT_LENGTH)
+    }
     /**
      * @returns {Buffer} recovery value that is necessary to recover the public key
      * that was used to create the signature
      */
     get recovery() {
-        return this.buffer.slice(SIGNATURE_LENGTH + NONCE_LENGTH + INDEX_LENGTH + VALUE_LENGTH, SIGNATURE_LENGTH + NONCE_LENGTH + INDEX_LENGTH + VALUE_LENGTH + RECOVERY_LENGTH)
+        return this.buffer.slice(SIGNATURE_LENGTH + NONCE_LENGTH + INDEX_LENGTH + VALUE_LENGTH + CURVE_POINT_LENGTH, SIGNATURE_LENGTH + NONCE_LENGTH + INDEX_LENGTH + VALUE_LENGTH + CURVE_POINT_LENGTH + RECOVERY_LENGTH)
     }
 
     // ========= Setters =========
@@ -108,9 +104,6 @@ class Transaction {
      * @param {Buffer} newSignature the signature of the transaction
      */
     set signature(newSignature) {
-        if (this.encrypted)
-            throw Error(`Can't set signature of encrypted transaction.`)
-
         delete this._counterparty
         delete this._hash
 
@@ -157,6 +150,10 @@ class Transaction {
         this.recovery.fill(newRecovery, 0, RECOVERY_LENGTH)
     }
 
+    set curvePoint(curvePoint) {
+        this.curvePoint.fill(curvePoint, 0, CURVE_POINT_LENGTH)
+    }
+
     // ==== Derived properties ===
     /**
      * @returns {Buffer} the hash of the transaction upon which the signature
@@ -166,7 +163,7 @@ class Transaction {
         if (this._hash)
             return this._hash
 
-        this._hash = hash(this.buffer.slice(SIGNATURE_LENGTH, SIGNATURE_LENGTH + NONCE_LENGTH + INDEX_LENGTH + VALUE_LENGTH))
+        this._hash = hash(this.buffer.slice(SIGNATURE_LENGTH, SIGNATURE_LENGTH + NONCE_LENGTH + INDEX_LENGTH + VALUE_LENGTH + CURVE_POINT_LENGTH))
 
         return this._hash
     }
@@ -180,9 +177,6 @@ class Transaction {
      * @returns {Buffer} the channelId
      */
     getChannelId(peerId) {
-        if (this.encrypted)
-            throw Error(`Can't derive channelId from encrypted transaction.`)
-
         return getId(
             pubKeyToEthereumAddress(peerId.pubKey.marshal()),
             pubKeyToEthereumAddress(this.counterparty)
@@ -193,13 +187,10 @@ class Transaction {
      * @returns {Buffer} the public key as a compressed curve point
      */
     get counterparty() {
-        // if (this.encrypted)
-        //     throw Error(`Can't derive counterparty from encrypted transaction.`)
-
         if (this._counterparty)
             return this._counterparty
 
-        this._counterparty = recover(this.hash, this.signature, bufferToNumber(this.recovery))
+        this._counterparty = secp256k1.recover(this.hash, this.signature, bufferToNumber(this.recovery))
 
         return this._counterparty
     }
@@ -215,10 +206,12 @@ class Transaction {
         if (!peerId.privKey)
             throw Error('No private key found. Please provide one to sign the transaction.')
 
-        const signature = sign(this.hash, peerId.privKey.marshal())
+        const signature = secp256k1.sign(this.hash, peerId.privKey.marshal())
 
         this.signature = signature.signature
         this.recovery = numberToBuffer(signature.recovery, RECOVERY_LENGTH)
+
+        return this
     }
 
     /**
@@ -251,44 +244,6 @@ class Transaction {
      */
     toBuffer() {
         return this.buffer
-    }
-
-    /**
-     * Encrypts the signature of the transaction.
-     * 
-     * @param {Buffer} key the key that is used to encrypt the transaction
-     */
-    encrypt(key) {
-        if (!Buffer.isBuffer(key) || key.length !== KEY_LENGTH)
-            throw Error('Invalid key.')
-
-        if (this.encrypted)
-            throw Error('Cannot encrypt an already encrypted transaction.')
-
-        // TODO
-        // this.signature.fill(bufferXOR(Buffer.concat([key, key], 2 * KEY_LENGTH), this.signature), 0, SIGNATURE_LENGTH)
-        this.encrypted = true
-
-        return this
-    }
-
-    /**
-     * Decrypts the signature of the transaction
-     * 
-     * @param {Buffer} key the key that is used to decrypt the transaction
-     */
-    decrypt(key) {
-        if (!Buffer.isBuffer(key) || key.length !== KEY_LENGTH)
-            throw Error('Invalid key.')
-
-        if (!this.encrypted)
-            throw Error('Cannot decrypt a transaction more than once.')
-
-        // TODO
-        this.encrypted = false
-        // this.signature.fill(bufferXOR(Buffer.concat([key, key], 2 * KEY_LENGTH), this.signature), 0, SIGNATURE_LENGTH)
-
-        return this
     }
 }
 

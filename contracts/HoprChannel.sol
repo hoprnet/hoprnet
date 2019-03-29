@@ -149,7 +149,7 @@ contract HoprChannel {
         require(!nonces[nonce], "Nonce was already used.");
         nonces[nonce] = true;
 
-        bytes32 hashedMessage = keccak256(abi.encodePacked(nonce, uint128(1), funds));
+        bytes32 hashedMessage = keccak256(abi.encodePacked(nonce, uint128(1), funds, bytes32(0), bytes1(0)));
         address counterparty = ecrecover(hashedMessage, v, r, s);
         
         require(states[counterparty].stakedEther >= funds, "Insufficient funds.");
@@ -213,8 +213,8 @@ contract HoprChannel {
     * @param s bytes32
     * @param v bytes1
     */
-    function closeChannel(bytes16 index, bytes16 nonce, uint256 balanceA, bytes32 r, bytes32 s, uint8 v) public {
-        bytes32 hashedMessage = keccak256(abi.encodePacked(nonce, index, balanceA));
+    function closeChannel(bytes16 index, bytes16 nonce, uint256 balanceA, bytes32 curvePointFirst, bytes1 curvePointSecond, bytes32 r, bytes32 s, uint8 v) public {
+        bytes32 hashedMessage = keccak256(abi.encodePacked(nonce, index, balanceA, curvePointFirst, curvePointSecond));
         address counterparty = ecrecover(hashedMessage, v, r, s);
 
         bytes32 channelId = getId(counterparty);
@@ -223,7 +223,7 @@ contract HoprChannel {
         require(
             channel.index < index &&
             channel.state == ChannelState.ACTIVE || channel.state == ChannelState.PENDING_SETTLEMENT,
-            "Invalid channel.");
+            "Unable to close payment channel due to probably invalid signature.");
         
         channel.balanceA = balanceA;
         channel.index = index;
@@ -261,7 +261,7 @@ contract HoprChannel {
         address counterparty = ecrecover(hashedAcknowledgement, vResponse, rResponse, sResponse);
         Channel storage channel = channels[getId(counterparty)];
 
-        require(channel.state != ChannelState.UNINITIALIZED, "Invalid channel.");
+        require(channel.state != ChannelState.UNINITIALIZED, "Invalid channel 123.");
 
         bytes32 hashedKeyHalf = keccak256(abi.encodePacked(keyHalf));
 

@@ -25,7 +25,7 @@ const registerHandlers = require('./handlers')
 
 const HASH_LENGTH = 32
 const CHANNEL_ID_BYTES = HASH_LENGTH
-const CHALLENGE_BYTES = HASH_LENGTH
+const KEY_LENGTH = HASH_LENGTH
 const COMPRESSED_PUBLIC_KEY_LENGTH = 33
 const PRIVATE_KEY_LENGTH = 32
 
@@ -34,7 +34,7 @@ function getChannelKey(channelId) {
 }
 
 function getOwnKeyHalfKey(hashedKeyHalf, channelId) {
-    return Buffer.concat([Buffer.from('payments-challenge-'), channelId, hashedKeyHalf], 19 + CHANNEL_ID_BYTES + CHALLENGE_BYTES)
+    return Buffer.concat([Buffer.from('payments-challenge-'), channelId, hashedKeyHalf], 19 + CHANNEL_ID_BYTES + COMPRESSED_PUBLIC_KEY_LENGTH)
 }
 
 function getSignatureChannelIdKey(signatureHash) {
@@ -42,7 +42,7 @@ function getSignatureChannelIdKey(signatureHash) {
 }
 
 function getKeyKey(channelId) {
-    return Buffer.concat([Buffer.from('payments-channelkey-'), channelId], 21 + CHALLENGE_BYTES)
+    return Buffer.concat([Buffer.from('payments-channelkey-'), channelId], 21 + KEY_LENGTH)
 }
 
 class PaymentChannel extends EventEmitter {
@@ -295,14 +295,14 @@ class PaymentChannel extends EventEmitter {
 
             if (err && err.notFound)
                 oldKey = Buffer.alloc(PRIVATE_KEY_LENGTH, 0)
-            
+
             this.node.db.put(k, secp256k1.privateKeyTweakAdd(oldKey, key), cb)
         })
     }
 
     getChannelKey(channelId, cb) {
         const k = getKeyKey(channelId)
-        
+
         this.node.db.get(k, (err, key) => {
             if (err)
                 return cb(err.notFound ? null : err)
@@ -322,7 +322,7 @@ class PaymentChannel extends EventEmitter {
      */
     solveChallenge(channelId, keyHalf, cb) {
         waterfall([
-            (cb) => this.getOwnKeyHalf(hash(keyHalf), channelId, cb),
+            (cb) => this.getOwnKeyHalf(secp256k1.publicKeyCreate(keyHalf), channelId, cb),
             (ownKeyHalf, cb) => this.addKey(channelId, secp256k1.privateKeyTweakAdd(ownKeyHalf, keyHalf), cb),
             (cb) => this.node.db.del(hash(keyHalf), { sync: true }, cb)
         ], cb)
@@ -434,17 +434,16 @@ class PaymentChannel extends EventEmitter {
             nonce: this.nonce - 1,
             gas: estimatedGas,
             data: txObject.encodeABI()
-        }, this.node.peerInfo.id, this.web3, (err, receipt) => {
-            if (cb) {
-                if (err)
-                    return cb(err)
-
-                return cb(null, receipt)
-            } else {
-                if (err)
-                    console.log(err)
-            }
-        })
+        }, this.node.peerInfo.id, this.web3)
+            .then((receipt) => {
+                if (cb) {
+                    cb(null, receipt)
+                } else {
+                    return receipt
+                }
+            }, (err) => {
+                console.log(err)
+            })
     }
 }
 

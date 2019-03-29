@@ -134,22 +134,21 @@ module.exports = (Header, header, peerIds) => {
                 header.beta
                     .fill(peerIds[index + 1].pubKey.marshal(), 0, p.ADDRESS_SIZE)
                     .fill(header.gamma, p.ADDRESS_SIZE, p.ADDRESS_SIZE + p.MAC_SIZE)
-                    .fill(hash(Header.deriveTransactionKey(secrets[index + 1])), p.ADDRESS_SIZE + p.MAC_SIZE, p.ADDRESS_SIZE + p.MAC_SIZE + p.HASH_LENGTH)
+                    .fill(secp256k1.publicKeyCreate(Header.deriveTransactionKey(secrets[index + 1])), p.ADDRESS_SIZE + p.MAC_SIZE, p.ADDRESS_SIZE + p.MAC_SIZE + p.COMPRESSED_PUBLIC_KEY_LENGTH)
                     .fill(tmp, p.PER_HOP_SIZE, Header.BETA_LENGTH)
 
                 if (secrets.length > 2) {
+                    let key
                     if (index < secrets.length - 2) {
-                        header.beta
-                            .fill(secp256k1.privateKeyTweakAdd(
-                                Header.deriveTransactionKey(secrets[index + 1]),
-                                Header.deriveTransactionKey(secrets[index + 2])
-                            ), p.ADDRESS_SIZE + p.MAC_SIZE + p.HASH_LENGTH, p.ADDRESS_SIZE + p.MAC_SIZE + p.HASH_LENGTH + p.KEY_LENGTH)
+                        key = secp256k1.privateKeyTweakAdd(
+                            Header.deriveTransactionKey(secrets[index + 1]),
+                            Header.deriveTransactionKey(secrets[index + 2])
+                        )
                     } else if (index == secrets.length - 2) {
-                        header.beta
-                            .fill(
-                                Header.deriveTransactionKey(secrets[index + 1]),
-                            p.ADDRESS_SIZE + p.MAC_SIZE + p.HASH_LENGTH, p.ADDRESS_SIZE + p.MAC_SIZE + p.HASH_LENGTH + p.KEY_LENGTH)
+                        key = Header.deriveTransactionKey(secrets[index + 1])
                     }
+                    header.beta
+                        .fill(key, p.ADDRESS_SIZE + p.MAC_SIZE + p.COMPRESSED_PUBLIC_KEY_LENGTH, p.ADDRESS_SIZE + p.MAC_SIZE + p.COMPRESSED_PUBLIC_KEY_LENGTH + p.KEY_LENGTH)
                 }
                 header.beta
                     .fill(

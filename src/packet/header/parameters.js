@@ -7,7 +7,7 @@ module.exports.COMPRESSED_PUBLIC_KEY_LENGTH = 33
 module.exports.ADDRESS_SIZE = this.COMPRESSED_PUBLIC_KEY_LENGTH
 module.exports.DESINATION_SIZE = this.ADDRESS_SIZE
 module.exports.MAC_SIZE = 32
-module.exports.PROVING_VALUES_SIZE = this.HASH_LENGTH + this.KEY_LENGTH
+module.exports.PROVING_VALUES_SIZE = this.COMPRESSED_PUBLIC_KEY_LENGTH + this.KEY_LENGTH
 module.exports.IDENTIFIER_SIZE = 16
 
 

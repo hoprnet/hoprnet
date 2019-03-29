@@ -49,7 +49,7 @@ module.exports = (node, options) => {
 
     function handleAcknowledgement(ack) {
         if (!ack.challengeSigningParty.equals(node.peerInfo.id.pubKey.marshal())) {
-            console.log(`channelId ${getId(
+            console.log(`peer ${node.peerInfo.id.toB58String()} channelId ${getId(
                 pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()),
                 pubKeyToEthereumAddress(ack.responseSigningParty)
             ).toString('hex')}`)

@@ -5,8 +5,7 @@ const secp256k1 = require('secp256k1')
 const { hash, numberToBuffer, bufferToNumber } = require('../utils')
 
 const SIGNATURE_LENGTH = 64
-const HASH_LENGTH = 32
-const VALUE_LENGTH = 32
+const COMPRESSED_PUBLIC_KEY_LENGTH = 33
 
 /**
  * The purpose of this class is to give the relayer the opportunity to claim
@@ -38,7 +37,10 @@ class Challenge {
         if (this._counterparty)
             return this._counterparty
 
-        this._counterparty = secp256k1.recover(this._hashedKey, this.challengeSignature, bufferToNumber(this.challengeSignatureRecovery))
+        if (!this._hashedKey)
+            throw Error(`Can't recover public key without challenge.`)
+
+        this._counterparty = secp256k1.recover(hash(this._hashedKey), this.challengeSignature, bufferToNumber(this.challengeSignatureRecovery))
         return this._counterparty
     }
 
@@ -73,8 +75,7 @@ class Challenge {
      */
     sign(peerId) {
         // const hashedChallenge = hash(Buffer.concat([this._hashedKey, this._fee.toBuffer('be', VALUE_LENGTH)], HASH_LENGTH + VALUE_LENGTH))
-        const hashedChallenge = Buffer.concat([this._hashedKey], HASH_LENGTH)
-        const signature = secp256k1.sign(hashedChallenge, peerId.privKey.marshal())
+        const signature = secp256k1.sign(hash(this._hashedKey), peerId.privKey.marshal())
 
         this.challengeSignature
             .fill(signature.signature, 0, SIGNATURE_LENGTH)
@@ -92,7 +93,7 @@ class Challenge {
      * @param {BN} fee 
      */
     static create(hashedKey, fee) {
-        if (!Buffer.isBuffer(hashedKey))
+        if (!Buffer.isBuffer(hashedKey) && !hashedKey.length != COMPRESSED_PUBLIC_KEY_LENGTH)
             throw Error('Invalid secret format.')
 
         const challenge = new Challenge(Buffer.alloc(Challenge.SIZE))
