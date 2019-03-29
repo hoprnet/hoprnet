@@ -2,11 +2,14 @@
 require('dotenv').config()
 const { applyEachSeries, timesSeries, times, each, waterfall } = require('neo-async')
 const { createNode } = require('../../src')
-const { pubKeyToEthereumAddress, sendTransaction, privKeyToPeerId } = require('../../src/utils')
+const { pubKeyToEthereumAddress, sendTransaction, privKeyToPeerId, log } = require('../../src/utils')
 const { GAS_PRICE, STAKE_GAS_AMOUNT } = require('../../src/constants')
-const { toWei } = require('web3-utils')
+const { toWei, fromWei } = require('web3-utils')
 const Web3 = require('web3')
 const Multiaddr = require('multiaddr')
+
+const DEFAULT_STAKE = toWei('0.000001', 'ether')
+const DEFAULT_FUND = toWei('0.05', 'ether')
 
 /**
  * Allow nodes to find each other by establishing connections
@@ -90,25 +93,34 @@ module.exports.createFundedNodes = (amountOfNodes, options, peerId, nonce, cb) =
                 sendTransaction({
                     from: pubKeyToEthereumAddress(peerId.pubKey.marshal()),
                     to: pubKeyToEthereumAddress(nodes[n].peerInfo.id.pubKey.marshal()),
-                    value: toWei('0.05', 'ether'),
+                    value: DEFAULT_FUND,
                     gas: STAKE_GAS_AMOUNT,
                     gasPrice: GAS_PRICE,
                     nonce: nonce + n
-                }, peerId, new Web3(options.provider), cb), cb),
-            (cb) => each(nodes, (node, cb) =>
-                sendTransaction({
-                    to: options.contractAddress,
-                    value: toWei('0.000001', 'ether'),
-                    gas: STAKE_GAS_AMOUNT,
-                    gasPrice: GAS_PRICE
-                }, node.peerInfo.id, new Web3(options.provider), (err) => {
-                    if (err)
-                        return cb(err)
+                }, peerId, new Web3(options.provider), cb)
+                    .then((receipt) => {
+                        log(nodes[n].peerInfo.id, `Received ${fromWei(DEFAULT_FUND)} ETH from \x1b[32m${pubKeyToEthereumAddress(peerId.pubKey.marshal())}\x1b[0m.`)
+                        cb()
+                    })
+                    .catch((err) => {
+                        console.log(err)
+                    }), cb),
+                (cb) => each(nodes, (node, cb) =>
+                    sendTransaction({
+                        to: options.contractAddress,
+                        value: DEFAULT_STAKE,
+                        gas: STAKE_GAS_AMOUNT,
+                        gasPrice: GAS_PRICE
+                    }, node.peerInfo.id, new Web3(options.provider))
+                        .then((receipt) => {
+                            node.paymentChannels.nonce = node.paymentChannels.nonce + 1
 
-                    node.paymentChannels.nonce = node.paymentChannels.nonce + 1
+                            log(node.peerInfo.id, `Funded contract \x1b[32m${options.contractAddress}\x1b[0m with ${fromWei(DEFAULT_STAKE)} ETH.`)
 
-                    return cb()
-                }), cb)
+                            cb()
+                        })
+                        .catch(cb)
+                , cb)
         ], (err) => cb(err, nodes))
     ], cb)
 }

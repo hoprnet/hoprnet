@@ -513,15 +513,15 @@ module.exports.peerIdToWeb3Account = (peerId, web3) => {
  * @param {Object} web3 a web3.js instance
  * @param {function} cb the function that is called when finished
  */
-module.exports.sendTransaction = async (tx, peerId, web3, cb = () => { }) => {
+module.exports.sendTransaction = async (tx, peerId, web3) => {
     const signedTx = await this.peerIdToWeb3Account(peerId, web3).signTransaction(Object.assign(tx, {
         from: this.pubKeyToEthereumAddress(peerId.pubKey.marshal()),
         gasPrice: GAS_PRICE
     }))
 
-    web3.eth.sendSignedTransaction(signedTx.rawTransaction)
-        .on('error', cb)
-        .on('receipt', (receipt) => {
+
+    return web3.eth.sendSignedTransaction(signedTx.rawTransaction)
+        .then((receipt) => {
             if (typeof receipt.status === 'string') {
                 receipt.status = parseInt(receipt.status, 16)
             }
@@ -533,7 +533,7 @@ module.exports.sendTransaction = async (tx, peerId, web3, cb = () => { }) => {
             if (!receipt.status)
                 return cb(Error('Reverted tx.'))
 
-            return cb(null, receipt)
+            return receipt
         })
 }
 
@@ -786,7 +786,7 @@ module.exports.clearDirectory = (path) => {
 // ==========================
 // multiaddr methods
 // ==========================
-const HOPR_ADDRESS = '\/ipfs\/[a-zA-Z0-9]+' 
+const HOPR_ADDRESS = '\/ipfs\/[a-zA-Z0-9]+'
 const WEBRTC_STRING = '\/p2p-webrtc-star'
 
 module.exports.match = {}

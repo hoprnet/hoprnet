@@ -77,16 +77,16 @@ waterfall([
                 gasPrice: GAS_PRICE,
                 nonce: index,
                 data: compiledContract.bytecode
-            }, fundingPeer, web3, (err, receipt) => {
-                if (err)
-                    throw err
+            }, fundingPeer, web3)
+                .then((receipt) => {
+                    console.log(`\nDeployed contract at \x1b[32m${receipt.contractAddress}\x1b[0m.\nNonce is now \x1b[31m${index}\x1b[0m.\n`)
 
-                index = index + 1
+                    index = index + 1
 
-                console.log(`\nDeployed contract at \x1b[32m${receipt.contractAddress}\x1b[0m.\nNonce is now \x1b[31m${index}\x1b[0m.\n`)
-
-                return cb(null, receipt.contractAddress)
-            })
+                    cb(null, receipt.contractAddress)
+                }, (err) => {
+                    console.log(err)
+                })
         } else {
             return cb(null, CONTRACT_ADDRESS)
         }
