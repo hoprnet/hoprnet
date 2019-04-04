@@ -146,9 +146,8 @@ class Acknowledgement {
      * @param {Challenge} challenge the signed challenge of the relayer
      * @param {Buffer} derivedSecret the secret that is used to create the second key half
      * @param {PeerId} peerId contains private key 
-     * @param {Buffer} buffer (optional) specify a buffer which is used to create the instance
      */
-    static create(challenge, derivedSecret, peerId, buffer = Buffer.alloc(Acknowledgement.SIZE)) {
+    static create(challenge, derivedSecret, peerId) {
         const ack = new Acknowledgement(Buffer.alloc(Acknowledgement.SIZE))
 
         ack.key = Header.deriveTransactionKey(derivedSecret)

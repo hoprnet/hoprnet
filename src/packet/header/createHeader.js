@@ -145,6 +145,7 @@ module.exports = (Header, header, peerIds) => {
                             Header.deriveTransactionKey(secrets[index + 2])
                         )
                     } else if (index == secrets.length - 2) {
+                        console.log(`created key half ${Header.deriveTransactionKey(secrets[index + 1]).toString('hex')}`)
                         key = Header.deriveTransactionKey(secrets[index + 1])
                     }
                     header.beta

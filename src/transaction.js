@@ -245,6 +245,26 @@ class Transaction {
     toBuffer() {
         return this.buffer
     }
+
+    /**
+     * Creates a transaction object.
+     * 
+     * @param {Buffer} nonce nonce of the payment channel
+     * @param {Buffer} index index of the transaction
+     * @param {Buffer} value balance of the transaction
+     * @param {Buffer} curvePoint challenge of the transaction
+     * @returns {Transaction}
+     */
+    static create(nonce, index, value, curvePoint) {
+        const tx = new Transaction()
+
+        tx.nonce = nonce
+        tx.index = index
+        tx.value = value
+        tx.curvePoint = curvePoint
+
+        return tx
+    }
 }
 
 module.exports = Transaction

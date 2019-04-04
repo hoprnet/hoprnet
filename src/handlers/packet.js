@@ -36,7 +36,9 @@ module.exports = (node, options) => {
                 pull.once(packet.toBuffer()),
                 lp.encode(),
                 conn,
-                lp.decode({ maxLength: Acknowledgement.SIZE }),
+                lp.decode({
+                    maxLength: Acknowledgement.SIZE
+                }),
                 pull.drain((data) => {
                     if (data.length != Acknowledgement.SIZE)
                         return
@@ -47,7 +49,7 @@ module.exports = (node, options) => {
         })
     }
 
-    function handleAcknowledgement(ack) {
+    async function handleAcknowledgement(ack) {
         if (!ack.challengeSigningParty.equals(node.peerInfo.id.pubKey.marshal())) {
             console.log(`peer ${node.peerInfo.id.toB58String()} channelId ${getId(
                 pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()),
@@ -66,13 +68,23 @@ module.exports = (node, options) => {
             })
         }
 
-        waterfall([
-            (cb) => node.paymentChannels.getChannelIdFromSignatureHash(ack.challengeSignatureHash, cb),
-            (channelId, cb) => node.paymentChannels.solveChallenge(channelId, ack.key, cb)
-        ], (err) => {
-            if (err)
-                throw err
-        })
+        let channelId
+        try {
+            channelId = await node.db.get(node.paymentChannels.ChannelId(ack.challengeSignatureHash))
+        } catch (err) {
+            if (err.notFound) {
+                return
+            }
+            throw err
+        }
+
+        const ownKeyHalf = await node.db.get(node.paymentChannels.Challenge(channelId, secp256k1.publicKeyCreate(ack.key)))
+        const channelKey = await node.db.get(node.paymentChannels.ChannelKey(channelId))
+
+        node.db.batch()
+            .put(node.paymentChannels.CHannelKey(channelId), secp256k1.privateKeyTweakAdd(channelKey, secp256k1.privateKeyTweakAdd(ack.key, ownKeyHalf)))
+            .del(secp256k1.privateKeyTweakAdd(oldKey, key))
+            .write()
     }
 
     node.handle(PROTOCOL_STRING, (protocol, conn) =>
@@ -81,28 +93,26 @@ module.exports = (node, options) => {
             lp.decode({
                 maxLength: Packet.SIZE
             }),
-            paramap((data, cb) => {
-                const packet = Packet.fromBuffer(data)
+            paramap(async (data, cb) => {
+                let packet
+                try {
+                    packet = await Packet.fromBuffer(data).forwardTransform(node)
+                } catch (err) {
+                    console.log(err)
+                    return cb(null, Buffer.alloc(0))
+                }
+                
+                if (node.peerInfo.id.isEqual(packet._targetPeerId)) {
+                    options.output(demo(packet.message.plaintext))
+                } else {
+                    forwardPacket(packet)
+                }
 
-                packet.forwardTransform(node, (err) => {
-                    if (err) {
-                        log(node.peerInfo.id, err.message)
-                        return cb(null, Buffer.alloc(0))
-                    }
-
-                    if (node.peerInfo.id.isEqual(packet._targetPeerId)) {
-                        options.output(demo(packet.message.plaintext))
-                    } else {
-                        forwardPacket(packet)
-                    }
-
-                    return cb(null, Acknowledgement.create(
-                        packet.oldChallenge,
-                        packet.header.derivedSecret,
-                        node.peerInfo.id,
-                    ).toBuffer())
-                })
-
+                return cb(null, Acknowledgement.create(
+                    packet.oldChallenge,
+                    packet.header.derivedSecret,
+                    node.peerInfo.id,
+                ).toBuffer())
             }),
             lp.encode(),
             conn
