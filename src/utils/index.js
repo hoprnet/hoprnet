@@ -14,6 +14,8 @@ const { publicKeyConvert } = require('secp256k1')
 const scrypt = require('scrypt')
 const chacha = require('chacha')
 const read = require('read')
+const solc = require("solc")
+
 
 const COMPRESSED_PUBLIC_KEY_LENGTH = 33
 const PRIVKEY_LENGTH = 32
@@ -549,17 +551,65 @@ module.exports.sendTransaction = async (tx, peerId, web3) => {
  * @param {function} cb called afterward with `(err)`
  */
 module.exports.compileIfNecessary = (srcFiles, artifacts, cb) => {
+    function findImports(path) {
+        return {
+            contents: fs.readFileSync(`${process.cwd()}/node_modules/${path}`).toString()
+        }
+    }
+
     function compile(cb) {
-        console.log('Compiling smart contract ...')
-        execFile('npx', ['truffle', 'compile'], (err, stdout, stderr) => {
-            if (err) {
-                cb(err)
-            } else if (stderr) {
-                console.log(`${stdout}\n\x1b[31m${stderr}\x1b[0m`)
-            } else {
-                console.log(stdout)
-                cb()
+        return new Promise((resolve, reject) => {
+            const srcObject = {}
+            srcFiles.forEach((file) => {
+                srcObject[file] = {
+                    content: fs.readFileSync(file).toString()
+                }
+            })
+
+            const input = {
+                language: 'Solidity',
+                sources: srcObject,
+                settings: {
+                    optimizer: {
+                        // disabled by default
+                        enabled: true,
+                        // Optimize for how many times you intend to run the code.
+                        // Lower values will optimize more for initial deployment cost, higher values will optimize more for high-frequency usage.
+                        runs: 200
+                    },
+                    outputSelection: {
+                        '*': {
+                            '*': ['*']
+                        }
+                    }
+                }
+
             }
+            const compiledContracts = JSON.parse(solc.compile(JSON.stringify(input), findImports))
+
+            if (compiledContracts.errors) {
+                return reject(compiledContracts.errors.map(err => err.formattedMessage).join('\n'))
+            }
+
+            try {
+                fs.accessSync(`${process.cwd()}/build`)
+            } catch (err) {
+                fs.mkdirSync(`${process.cwd()}/build`)
+            }
+
+            try {
+                fs.accessSync(`${process.cwd()}/build/contracts`)
+            } catch (err) {
+                fs.mkdirSync(`${process.cwd()}/build/contracts`)
+            }
+
+            Object.entries(compiledContracts.contracts).forEach((array) =>
+                Object.entries(array[1]).forEach(([contractName, value]) => {
+                    fs.writeFileSync(`${process.cwd()}/build/contracts/${contractName}.json`, JSON.stringify(value, null, '\t'))
+                })
+            )
+
+            resolve()
         })
     }
 
@@ -569,7 +619,7 @@ module.exports.compileIfNecessary = (srcFiles, artifacts, cb) => {
         }), cb),
         (filesExist, cb) => {
             if (!filesExist) {
-                compile(cb)
+                compile().then(cb, cb)
             } else {
                 parallel({
                     srcTime: (cb) => map(srcFiles, fs.stat, (err, stats) => {
@@ -589,7 +639,7 @@ module.exports.compileIfNecessary = (srcFiles, artifacts, cb) => {
                         return cb(err)
 
                     if (srcTime > artifactTime)
-                        return compile(cb)
+                        return compile().then(cb, cb)
 
                     return cb()
                 })

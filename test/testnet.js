@@ -1,17 +1,11 @@
 'use strict'
 
-const { privKeyToPeerId, compileIfNecessary } = require('../src/utils')
+const { privKeyToPeerId } = require('../src/utils')
+const {HARDCODED_PRIV_KEY } = require('../src/constants')
 
-const { NET, GAS_PRICE, ROPSTEN_WSS_URL, HARDCODED_ETH_ADDRESS, HARDCODED_PRIV_KEY, CONTRACT_ADDRESS } = require('../src/constants')
-
-const FUNDING_ACCOUNT = HARDCODED_ETH_ADDRESS
 const FUNDING_KEY = HARDCODED_PRIV_KEY
 
 const Ganache = require('ganache-core')
-
-
-let index, compiledContract
-
 
 const server = Ganache.server({
     accounts: [
@@ -23,7 +17,3 @@ const server = Ganache.server({
 })
 
 server.listen(8545, 'localhost')
-
-
-
-const fundingPeer = privKeyToPeerId(FUNDING_KEY)
