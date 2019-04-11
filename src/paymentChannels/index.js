@@ -7,6 +7,7 @@ const Web3 = require('web3')
 const { parallel } = require('neo-async')
 const { resolve } = require('path')
 const BN = require('bn.js')
+const secp256k1 = require('secp256k1')
 
 const { pubKeyToEthereumAddress, sendTransaction, log, compileIfNecessary, isPartyA } = require('../utils')
 
@@ -20,7 +21,9 @@ const registerHandlers = require('./handlers')
 
 const HASH_LENGTH = 32
 const CHANNEL_ID_LENGTH = HASH_LENGTH
-const CHALLENGE_LENGTH = 32
+const CHALLENGE_LENGTH = 33
+const PRIVATE_KEY_LENGTH = 32
+const COMPRESSED_PUBLIC_KEY_LENGTH = 33
 
 const PREFIX = Buffer.from('payments-')
 const PREFIX_LENGTH = PREFIX.length
@@ -142,7 +145,7 @@ class PaymentChannel extends EventEmitter {
     }
 
     RestoreTransaction(channelId) {
-        return Buffer.concat([PREFIX, Buffer.from('restoreTx-'), channelId ], PREFIX_LENGTH + 10 + CHANNEL_ID_LENGTH)
+        return Buffer.concat([PREFIX, Buffer.from('restoreTx-'), channelId], PREFIX_LENGTH + 10 + CHANNEL_ID_LENGTH)
     }
 
     StashedRestoreTransaction(channelId) {
@@ -157,8 +160,12 @@ class PaymentChannel extends EventEmitter {
         return Buffer.concat([PREFIX, Buffer.from('currentValue-'), channelId], PREFIX_LENGTH + 13 + CHANNEL_ID_LENGTH)
     }
 
+    InitialValue(channelId) {
+        return Buffer.concat([PREFIX, Buffer.from('initialBalance-'), channelId], PREFIX_LENGTH + 15 + CHANNEL_ID_LENGTH)
+    }
+
     TotalBalance(channelId) {
-        return Buffer.concat([PREFIX, Buffer.from('totalBalance-'), channelId ], PREFIX_LENGTH + 13 + CHANNEL_ID_LENGTH)
+        return Buffer.concat([PREFIX, Buffer.from('totalBalance-'), channelId], PREFIX_LENGTH + 13 + CHANNEL_ID_LENGTH)
     }
 
     Challenge(channelId, challenge) {
@@ -167,6 +174,75 @@ class PaymentChannel extends EventEmitter {
 
     ChannelId(signatureHash) {
         return Buffer.concat([PREFIX, Buffer.from('channelId-'), signatureHash], PREFIX_LENGTH, PREFIX_LENGTH + 10 + HASH_LENGTH)
+    }
+
+    /**
+     * Fetches the previous challenges from the database and add them together.
+     * 
+     * @param {Buffer} channelId ID of the payment channel
+     */
+    getPreviousChallenges(channelId) {
+        return new Promise(async (resolve, reject) => {
+            let buf
+            try {
+                buf = secp256k1.publicKeyCreate(await this.node.db.get(this.ChannelKey(channelId)))
+            } catch (err) {
+                if (!err.notFound)
+                    throw err
+            }
+
+            this.node.db.createReadStream({
+                gt: this.Challenge(channelId, Buffer.alloc(PRIVATE_KEY_LENGTH, 0)),
+                lt: this.Challenge(channelId, Buffer.alloc(PRIVATE_KEY_LENGTH, 255))
+            })
+                .on('data', (obj) => {
+                    const challenge = obj.key.slice(PREFIX_LENGTH + 10 + CHANNEL_ID_LENGTH, PREFIX_LENGTH + 10 + CHANNEL_ID_LENGTH + COMPRESSED_PUBLIC_KEY_LENGTH)
+                    const ownKeyHalf = obj.value
+
+                    const pubKeys = [
+                        challenge,
+                        secp256k1.publicKeyCreate(ownKeyHalf)
+                    ]
+
+                    if (buf) {
+                        pubKeys.push(buf)
+                    }
+
+                    buf = secp256k1.publicKeyCombine(pubKeys)
+                })
+                .on('error', reject)
+                .on('end', () => resolve(buf))
+        })
+    }
+
+    /**
+     * Deletes all records that belong to a given channel.
+     * 
+     * @param {Buffer} channelId ID of the payment channel
+     */
+    deleteChannel(channelId) {
+        return new Promise((resolve, reject) => {
+            let batch = this.node.db.batch()
+                .del(this.ChannelKey(channelId))
+                .del(this.Transaction(channelId))
+                .del(this.RestoreTransaction(channelId))
+                .del(this.StashedRestoreTransaction(channelId))
+                .del(this.Index(channelId))
+                .del(this.CurrentValue(channelId))
+                .del(this.InitialValue(channelId))
+                .del(this.TotalBalance(channelId))
+
+            this.node.db.createKeyStream({
+                gt: this.Challenge(channelId, Buffer.alloc(COMPRESSED_PUBLIC_KEY_LENGTH, 0)),
+                lt: this.Challenge(channelId, Buffer.alloc(COMPRESSED_PUBLIC_KEY_LENGTH, 255))
+            })
+                .on('data', (key) => {
+                    console.log(key.toString())
+                    batch = batch.del(key)
+                })
+                .on('end', () => resolve(batch.write()))
+                .on('err', reject)
+        })
     }
 
     /**

@@ -3,7 +3,6 @@
 const { sha3, toChecksumAddress } = require('web3-utils')
 const { randomBytes } = require('crypto')
 const { waterfall, parallel, map, some, each, tryEach } = require('neo-async')
-const { execFile } = require('child_process')
 const fs = require('fs')
 const libp2p_crypto = require('libp2p-crypto').keys
 const PeerId = require('peer-id')
@@ -15,7 +14,6 @@ const scrypt = require('scrypt')
 const chacha = require('chacha')
 const read = require('read')
 const solc = require("solc")
-
 
 const COMPRESSED_PUBLIC_KEY_LENGTH = 33
 const PRIVKEY_LENGTH = 32

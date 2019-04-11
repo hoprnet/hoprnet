@@ -4,6 +4,7 @@ const pull = require('pull-stream')
 const paramap = require('pull-paramap')
 const rlp = require('rlp')
 const { waterfall } = require('neo-async')
+const secp256k1 = require('secp256k1')
 
 const lp = require('pull-length-prefixed')
 const { log, getId, pubKeyToEthereumAddress } = require('../utils')
@@ -11,6 +12,8 @@ const { log, getId, pubKeyToEthereumAddress } = require('../utils')
 const { PROTOCOL_STRING } = require('../constants')
 const Packet = require('../packet')
 const Acknowledgement = require('../acknowledgement')
+
+const PRIVATE_KEY_LENGTH = 32
 
 module.exports = (node, options) => {
     // Registers the packet handlers if the node started as a
@@ -78,12 +81,23 @@ module.exports = (node, options) => {
             throw err
         }
 
-        const ownKeyHalf = await node.db.get(node.paymentChannels.Challenge(channelId, secp256k1.publicKeyCreate(ack.key)))
-        const channelKey = await node.db.get(node.paymentChannels.ChannelKey(channelId))
+        const challenge = secp256k1.publicKeyCreate(ack.key)
+        const ownKeyHalf = await node.db.get(node.paymentChannels.Challenge(channelId, challenge))
+
+        let channelKey
+        try {
+            channelKey = await node.db.get(node.paymentChannels.ChannelKey(channelId))
+        } catch (err) {
+            if (err.notFound) {
+                channelKey = Buffer.alloc(PRIVATE_KEY_LENGTH, 0)
+            } else {
+                throw err
+            }
+        }
 
         node.db.batch()
-            .put(node.paymentChannels.CHannelKey(channelId), secp256k1.privateKeyTweakAdd(channelKey, secp256k1.privateKeyTweakAdd(ack.key, ownKeyHalf)))
-            .del(secp256k1.privateKeyTweakAdd(oldKey, key))
+            .put(node.paymentChannels.ChannelKey(channelId), secp256k1.privateKeyTweakAdd(channelKey, secp256k1.privateKeyTweakAdd(ack.key, ownKeyHalf)))
+            .del(node.paymentChannels.Challenge(channelId, challenge))
             .write()
     }
 
@@ -101,7 +115,7 @@ module.exports = (node, options) => {
                     console.log(err)
                     return cb(null, Buffer.alloc(0))
                 }
-                
+
                 if (node.peerInfo.id.isEqual(packet._targetPeerId)) {
                     options.output(demo(packet.message.plaintext))
                 } else {

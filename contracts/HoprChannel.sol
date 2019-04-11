@@ -138,12 +138,12 @@ contract HoprChannel {
     // }
 
     /**
-    * @notice pre-fund channel by with staked Ether of both parties
-    * @param nonce nonce to prevent against replay attacks
-    * @param funds uint256 how much money both parties put into the channel
-    * @param r bytes32 signature first part
-    * @param s bytes32 signature second part
-    * @param v uint8 version
+     * @notice pre-fund channel by with staked Ether of both parties
+     * @param nonce nonce to prevent against replay attacks
+     * @param funds uint256 how much money both parties put into the channel
+     * @param r bytes32 signature first part
+     * @param s bytes32 signature second part
+     * @param v uint8 version
      */
     function createFunded(bytes16 nonce, uint256 funds, bytes32 r, bytes32 s, uint8 v) external enoughFunds(funds) {
         require(!nonces[nonce], "Nonce was already used.");
@@ -254,7 +254,7 @@ contract HoprChannel {
         // uint256 amount,
         uint8 vChallenge,
         uint8 vResponse
-    ) external {
+    ) view external {
         // solhint-disable-next-line max-line-length
         bytes32 hashedAcknowledgement = keccak256(abi.encodePacked(rChallenge, sChallenge, vChallenge, keyHalf));
 

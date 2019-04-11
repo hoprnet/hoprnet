@@ -33,6 +33,7 @@ module.exports = (self) => async (err, event) => {
         .put(self.RestoreTransaction(channelId), restoreTx.toBuffer())
         .put(self.Index(channelId), restoreTx.index)
         .put(self.CurrentValue(channelId), (new BN(channel.balanceA)).toBuffer('be', VALUE_LENGTH))
+        .put(self.InitialValue(channelId), restoreTx.value)
         .put(self.TotalBalance(channelId), (new BN(channel.balance)).toBuffer('be', VALUE_LENGTH))
         .del(self.StashedRestoreTransaction(channelId))
         .write({ sync: true })

@@ -20,33 +20,23 @@ const PREFIX_LENGTH = PREFIX.length
 module.exports = (self) => (cb) => pull(
     toPull(
         self.node.db.createReadStream({
-            gt: self.Transaction(Buffer.alloc(CHANNEL_ID_LENGTH, 0)),
-            lt: self.Transaction(Buffer.alloc(CHANNEL_ID_LENGTH, 255))
+            gt: self.RestoreTransaction(Buffer.alloc(CHANNEL_ID_LENGTH, 0)),
+            lt: self.RestoreTransaction(Buffer.alloc(CHANNEL_ID_LENGTH, 255))
         })
     ),
     paramap(async (data, cb) => {
-        const channelId = data.key.slice(PREFIX_LENGTH + 3, PREFIX_LENGTH + 3 + CHANNEL_ID_LENGTH)
-        const tx = Transaction.fromBuffer(data.value)
+        const channelId = data.key.slice(PREFIX_LENGTH + 10, PREFIX_LENGTH + 10 + CHANNEL_ID_LENGTH)
 
         const channel = await self.contract.methods.channels(channelId).call({
             from: pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal())
         }, 'latest')
 
-
+        // Delete the channel in case there is no entry of it in the blockchain.
+        // -> the database entry is therefore useless
         if (parseInt(channel.state) == 0) {
             log(self.node.peerInfo.id, `Found orphaned payment channel ${channelId.toString('hex')} inside database. Was the node shut down inappropriately?`)
 
-            self.node.db.batch()
-                .del(self.Transaction(channelId))
-                .del(self.RestoreTransaction(channelId))
-                .del(self.Index(channelId))
-                .del(self.ChannelKey(channelId))
-                .del(self.CurrentValue(channelId))
-                .del(self.TotalBalance(channelId))
-                .write()
-                .then(() => cb(null, new BN(0)))
-                .catch(cb)
-
+            await self.deleteChannel(channelId)
             return
         }
 
@@ -57,8 +47,17 @@ module.exports = (self) => (cb) => pull(
             cb(null, receivedMoney)
         })
 
+        let tx
+        try {
+            tx = Transaction.fromBuffer(await self.node.db.get(self.Transaction(channelId)))
+        } catch (err) {
+            if (!err.notFound)
+                console.log(err)
+
+            return
+        }
+
         const index = new BN(await self.node.db.get(self.Index(channelId)))
-        
         if (index.gt(new BN(tx.index))) { // index > tx.index ?
             // Ask counterparty to settle payment channel because
             // last payment went to that party which means that we
