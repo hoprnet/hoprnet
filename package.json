@@ -43,7 +43,7 @@
         "libp2p-tcp": "~0.13.0",
         "lodash.flatten": "~4.4.0",
         "lodash.foreachright": "~4.4.0",
-        "lodash.remove": "~4.7.0",
+        "lodash.pullall": "~4.2.0",
         "lodash.unionwith": "~4.6.0",
         "lodash.uniqwith": "~4.5.0",
         "neo-async": "~2.6.0",

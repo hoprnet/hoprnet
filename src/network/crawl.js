@@ -8,7 +8,7 @@ const lp = require('pull-length-prefixed')
 
 const flatten = require('lodash.flatten');
 const uniqWith = require('lodash.uniqwith')
-const remove = require('lodash.remove')
+const pullAll = require('lodash.pullall')
 const { doWhilst, map, waterfall } = require('neo-async')
 
 const { randomSubset, log } = require('../utils')
@@ -53,7 +53,7 @@ module.exports = (node) => (comparator, cb) => {
             return cb(Error('Unable to find enough other nodes in the network.'))
 
         selected = randomSubset(nodes, Math.min(nodes.length, MAX_HOPS))
-        nodes = remove(nodes, selected)
+        nodes = pullAll(nodes, selected)
 
         map(selected, queryNode, (err, newNodes) => {
             if (err) {

@@ -12,10 +12,9 @@ module.exports = (node) => {
 
         const filter = (peerInfo) =>
             peerInfo.id.pubKey &&
-            // peerInfo.id.toBytes().compare(connectedPeerInfo.id.toBytes()) !== 0 &&
-            peerInfo.id.toBytes().compare(node.peerInfo.id.toBytes()) !== 0
+            !peerInfo.id.isEqual(node.peerInfo.id)
 
-        const amountOfNodes = Math.min(CRAWLING_RESPONSE_NODES, peers.length - 1)
+        const amountOfNodes = Math.min(CRAWLING_RESPONSE_NODES, peers.length)
 
         const selectedNodes = randomSubset(peers, amountOfNodes, filter)
             .map((peerInfo) => peerInfo.id.pubKey.bytes)
@@ -27,5 +26,5 @@ module.exports = (node) => {
         )
     }
     
-    node.handle(PROTOCOL_CRAWLING, (protocol, conn) => setImmediate(handler, protocol, conn))
+    node.handle(PROTOCOL_CRAWLING, handler)
 }
