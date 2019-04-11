@@ -76,7 +76,7 @@ waterfall([
                 gas: 3000333, // 2370333
                 gasPrice: GAS_PRICE,
                 nonce: index,
-                data: compiledContract.bytecode
+                data: '0x'.concat(compiledContract.evm.bytecode.object)
             }, fundingPeer, web3)
                 .then((receipt) => {
                     console.log(`\nDeployed contract at \x1b[32m${receipt.contractAddress}\x1b[0m.\nNonce is now \x1b[31m${index}\x1b[0m.\n`)
@@ -97,10 +97,10 @@ waterfall([
     }, fundingPeer, index, cb),
     (nodes, cb) => waterfall([
         (cb) => timesSeries(AMOUNT_OF_MESSAGES, (n, cb) => {
-            nodes[0].sendMessage(rlp.encode(['Psst ... secret message from Validity Labs!', Date.now().toString()]), nodes[2].peerInfo.id, cb)
+            nodes[0].sendMessage(rlp.encode(['Psst ... secret message from Validity Labs!', Date.now().toString()]), nodes[2].peerInfo.id)
 
             if (NETWORK === 'ganache') {
-                //return cb()
+                setTimeout(cb, 2000)
             } else {
                 throw Error('TODO')
                 setTimeout(cb, 60 * 1000)
