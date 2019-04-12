@@ -59,25 +59,28 @@ module.exports = (self) => {
             }
         }
 
-        const newBalance = await getNewChannelBalance(options.channelId, options.to, options.amount)
+        const [newBalance, previousChallenges, index] = await Promise.all([
+            getNewChannelBalance(options.channelId, options.to, options.amount),
+            self.getPreviousChallenges(options.channelId),
+            self.node.db.get(self.Index(options.channelId))
+        ])
 
         const pubKeys = [
             secp256k1.publicKeyCreate(options.key)
         ]
 
-        const previousChallenges = await self.getPreviousChallenges(options.channelId)
         if (previousChallenges) {
             pubKeys.push(previousChallenges)
         }
 
         const newTx = Transaction.create(
             tx.nonce,
-            numberToBuffer(bufferToNumber(await self.node.db.get(self.Index(options.channelId))) + 1, Transaction.INDEX_LENGTH),
+            numberToBuffer(bufferToNumber(index) + 1, Transaction.INDEX_LENGTH),
             newBalance.toBuffer('be', Transaction.VALUE_LENGTH),
             secp256k1.publicKeyCombine(pubKeys)
         ).sign(self.node.peerInfo.id)
 
-        log(self.node.peerInfo.id, `Created tx with index ${numberToBuffer(bufferToNumber(await self.node.db.get(self.Index(options.channelId))) + 1, Transaction.INDEX_LENGTH).toString('hex')} on channel ${options.channelId.toString('hex')}.`)
+        log(self.node.peerInfo.id, `Created tx with index ${numberToBuffer(bufferToNumber(index) + 1, Transaction.INDEX_LENGTH).toString('hex')} on channel ${options.channelId.toString('hex')}.`)
 
         try {
             channelKey = secp256k1.privateKeyTweakAdd(channelKey, await self.node.db.get(self.ChannelKey(options.channelId)))
@@ -90,7 +93,7 @@ module.exports = (self) => {
             .put(self.CurrentValue(options.channelId), newBalance.toBuffer('be', Transaction.VALUE_LENGTH))
             .put(self.Index(options.channelId), newTx.index)
             .put(self.ChannelKey(options.channelId), channelKey)
-            .write()
+            .write({ sync: true })
 
         return newTx
     }

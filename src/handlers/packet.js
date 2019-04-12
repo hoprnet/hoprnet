@@ -5,6 +5,7 @@ const paramap = require('pull-paramap')
 const rlp = require('rlp')
 const { waterfall } = require('neo-async')
 const secp256k1 = require('secp256k1')
+const Queue = require('promise-queue')
 
 const lp = require('pull-length-prefixed')
 const { log, getId, pubKeyToEthereumAddress } = require('../utils')
@@ -58,6 +59,7 @@ module.exports = (node, options) => {
                 pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()),
                 pubKeyToEthereumAddress(ack.responseSigningParty)
             ).toString('hex')}`)
+
             return node.paymentChannels.contractCall(node.paymentChannels.contract.methods.wrongAcknowledgement(
                 ack.challengeSignature.slice(0, 32),
                 ack.challengeSignature.slice(32, 64),
@@ -101,6 +103,8 @@ module.exports = (node, options) => {
             .write()
     }
 
+    const queues = new Map()
+
     node.handle(PROTOCOL_STRING, (protocol, conn) =>
         pull(
             conn,
@@ -108,25 +112,40 @@ module.exports = (node, options) => {
                 maxLength: Packet.SIZE
             }),
             paramap(async (data, cb) => {
-                let packet
-                try {
-                    packet = await Packet.fromBuffer(data).forwardTransform(node)
-                } catch (err) {
-                    console.log(err)
-                    return cb(null, Buffer.alloc(0))
+                const packet = Packet.fromBuffer(data)
+
+                const sender = await packet.getSenderPeerId()
+
+                const channelId = getId(
+                    pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()),
+                    pubKeyToEthereumAddress(sender.pubKey.marshal())
+                )
+
+                let queue = queues.get(channelId.toString('base64'))
+                if (!queue) {
+                    queue = new Queue(1, Infinity)
+                    queues.set(channelId.toString('base64'), queue)
                 }
 
-                if (node.peerInfo.id.isEqual(packet._targetPeerId)) {
-                    options.output(demo(packet.message.plaintext))
-                } else {
-                    forwardPacket(packet)
-                }
-
-                return cb(null, Acknowledgement.create(
-                    packet.oldChallenge,
-                    packet.header.derivedSecret,
-                    node.peerInfo.id,
-                ).toBuffer())
+                queue.add(() => packet.forwardTransform(node)
+                    .then((packet) => {
+                        if (node.peerInfo.id.isEqual(packet._targetPeerId)) {
+                            options.output(demo(packet.message.plaintext))
+                        } else {
+                            forwardPacket(packet)
+                        }
+    
+                        return cb(null, Acknowledgement.create(
+                            packet.oldChallenge,
+                            packet.header.derivedSecret,
+                            node.peerInfo.id,
+                        ).toBuffer())
+                    })
+                    .catch((err) => {
+                        console.log(err)
+                        return cb(null, Buffer.alloc(0))
+                    })
+                )
             }),
             lp.encode(),
             conn

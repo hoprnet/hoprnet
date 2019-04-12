@@ -116,19 +116,23 @@ class Packet {
 
         this.header.extractHeaderInformation()
 
-        const sender = await this.getSenderPeerId()
-        const target = await this.getTargetPeerId()
+        const [sender, target] = await Promise.all([
+            this.getSenderPeerId(),
+            this.getTargetPeerId()
+        ])
 
         const channelId = getId(
             pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()),
             pubKeyToEthereumAddress(sender.pubKey.marshal())
         )
 
-        await this.getPreviousTransaction(channelId, node)
+        await this.getPreviousTransaction(channelId, node);
 
-        // TODO:
-        // What about reordering of incoming messages?
-        const index = await node.db.get(node.paymentChannels.Index(channelId))
+        const [index, currentChallenge] = await Promise.all([
+            node.db.get(node.paymentChannels.Index(channelId)),
+            node.paymentChannels.getPreviousChallenges(channelId)
+        ])
+
         log(node.peerInfo.id, `Database index ${index.toString('hex')} on channnel ${channelId.toString('hex')}.`)
         log(node.peerInfo.id, `Transaction index ${this.transaction.index.toString('hex')} on channnel ${channelId.toString('hex')}.`)
 
@@ -145,23 +149,17 @@ class Packet {
         this.message.decrypt(this.header.derivedSecret)
         this.oldChallenge = this.challenge
 
-        // TODO
-        const currentChallenge = await node.paymentChannels.getPreviousChallenges(channelId)
-
-        try {
-            if (this.header.address.equals(node.peerInfo.id.pubKey.marshal())) {
-                await this.prepareDelivery(node, channelId, currentChallenge)
-            } else {
-                await this.prepareForward(node, channelId, currentChallenge, nextChannelId, target)
-            }
-        } catch (err) {
-            throw err
+        if (this.header.address.equals(node.peerInfo.id.pubKey.marshal())) {
+            await this.prepareDelivery(node, channelId, currentChallenge)
+        } else {
+            await this.prepareForward(node, channelId, currentChallenge, nextChannelId, target)
         }
 
+        console.log('Finished transformation')
         return this
     }
 
-    
+
     /**
      * Prepares the packet to deliver it.
      * 
@@ -190,7 +188,7 @@ class Packet {
             channelKey = Buffer.alloc(PRIVATE_KEY_LENGTH, 0)
         }
 
-        node.db.batch()
+        await node.db.batch()
             .put(node.paymentChannels.Transaction(channelId), this.transaction.toBuffer())
             .put(node.paymentChannels.Index(channelId), this.transaction.index)
             .put(node.paymentChannels.CurrentValue(channelId), this.transaction.value)
@@ -223,7 +221,7 @@ class Packet {
         log(node.peerInfo.id, `Received \x1b[35m${receivedMoney.toString()} wei\x1b[0m in channel \x1b[33m${channelId.toString('hex')}\x1b[0m.`)
 
         if (receivedMoney.lt(RELAY_FEE))
-            return cb(Error('Bad transaction.'))
+            throw Error('Bad transaction.')
 
         this.header.transformForNextNode()
 
@@ -240,7 +238,7 @@ class Packet {
             key: this.header.encryptionKey
         })
 
-        node.db.batch()
+        await node.db.batch()
             .put(node.paymentChannels.Transaction(channelId), this.transaction.toBuffer())
             .put(node.paymentChannels.Index(channelId), this.transaction.index)
             .put(node.paymentChannels.CurrentValue(channelId), this.transaction.value)
@@ -272,9 +270,6 @@ class Packet {
      * Computes the peerId if the preceeding node and caches it for later use.
      */
     getSenderPeerId() {
-        if (!this.header.derivedSecret)
-            throw Error('Unable to compute the senders public key.')
-
         if (this._previousPeerId)
             return this._previousPeerId
 
