@@ -98,13 +98,12 @@ async function main() {
             return
         }
 
-        console.log(`\tStake: ${fromWei(state.stakedEther, 'ether')} ETH`)
         const stakedEther = new BN(state.stakedEther)
 
         if (stakedEther.lt(new BN(toWei('0.1', 'ether')))) {
             let receipt
             try {
-                receipt = sendTransaction({
+                receipt = await sendTransaction({
                     from: ownAddress,
                     to: process.env.CONTRACT_ADDRESS,
                     value: toWei('0.11', 'ether'),
@@ -118,11 +117,14 @@ async function main() {
             node.paymentChannels.nonce = node.paymentChannels.nonce + 1
         }
 
+        console.log(`\tStake: ${fromWei(state.stakedEther, 'ether')} ETH`)
+
         console.log('Connecting to Bootstrap node(s)...')
         try {
             await connectToBootstrapNode(node)
         } catch (err) {
             console.log(err)
+            return
         }
 
         await new Promise((resolve, reject) => crawlNetwork(node, (err) => {
@@ -141,7 +143,7 @@ async function main() {
             }
             setInterval(sendMessage, 90 * 1000)
         } else if (options['bootstrap-node']) {
-            return cb()
+            return
         } else {
             return sendMessages(node, () => {})
         }
