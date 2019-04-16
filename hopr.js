@@ -55,7 +55,6 @@ waterfall([
     (cb) => createNode(options, cb),
     (_node, cb) => {
         node = _node
-        console.log()
         if (!options['bootstrap-node']) {
             node.paymentChannels.web3.eth.getBalance(pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()), (err, funds) => {
                 if (err)

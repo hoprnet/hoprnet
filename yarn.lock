@@ -1723,7 +1723,7 @@ domexception@^1.0.1:
   dependencies:
     webidl-conversions "^4.0.2"
 
-dotenv-expand@^5.1.0:
+dotenv-expand@~5.1.0:
   version "5.1.0"
   resolved "https://registry.yarnpkg.com/dotenv-expand/-/dotenv-expand-5.1.0.tgz#3fbaf020bfd794884072ea26b1e9791d45a629f0"
   integrity sha512-YXQl1DSa4/PQyRfgrv6aoNjhasp/p4qs9FjJ4q4cQk+8m4r6k4ZSiEyytKG8f8W9gi8WsQtIObNmKd+tMzNTmA==
@@ -2654,10 +2654,10 @@ futoin-hkdf@~1.0.3:
   resolved "https://registry.yarnpkg.com/futoin-hkdf/-/futoin-hkdf-1.0.3.tgz#c62f0279503e01545d64925c2752b482ed78485c"
   integrity sha512-z/zwCHxtjKJfPGaebSmA5B/tfEB6uw5C4Fwgc68XculpqKp9fRE2nVY2D7Mcx6V3s3AQOHz9OAx28DNUlWGokg==
 
-ganache-core@~2.5.4:
-  version "2.5.4"
-  resolved "https://registry.yarnpkg.com/ganache-core/-/ganache-core-2.5.4.tgz#f068c49ab7a2435a1ab50eb3797663c0b519cf61"
-  integrity sha512-h/AYUOzUiuZMto5f+yEABv0bVRTqJnPatil3rP1rRCBeIDkXH0mlyrW34bbU2jNFPLD4dF8ZP1vMWnpkgS9ZKQ==
+ganache-core@~2.5.5:
+  version "2.5.5"
+  resolved "https://registry.yarnpkg.com/ganache-core/-/ganache-core-2.5.5.tgz#84da56de1957b6200a2d02934853fe7af89d260b"
+  integrity sha512-mrvPCtDjFLWmqygCx6LngWfA1hv6DH+iisEVYxRmCujstcMgzqi5UQdcKprxoO2Jx9st1fWVvDLi/tc6WHPGoA==
   dependencies:
     abstract-leveldown "3.0.0"
     async "2.6.1"
