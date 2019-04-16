@@ -2,10 +2,8 @@
 
 const EventEmitter = require('events');
 
-const { CONTRACT_ADDRESS } = require('../constants')
 const Web3 = require('web3')
 const { parallel } = require('neo-async')
-const { resolve } = require('path')
 const BN = require('bn.js')
 const secp256k1 = require('secp256k1')
 
@@ -46,7 +44,7 @@ class PaymentChannel extends EventEmitter {
 
         this.nonce = options.nonce
         this.contract = options.contract
-        this.contractAddress = options.contractAddress
+        this.contractAddress = process.env.CONTRACT_ADDRESS
         this.node = options.node
         this.web3 = options.web3
 
@@ -65,34 +63,31 @@ class PaymentChannel extends EventEmitter {
      * It will check whether there is an up-to-date ABI of the contract
      * and compiles the contract if that isn't the case.
      * 
-     * @param {Object} options.node a libp2p node instance
-     * @param {Object} options.provider a web3.js provider instance, otherwise if will use `ws://localhost:8545`
+     * @param {Hopr} node a libp2p node instance
      * @param {Function} cb a function the is called with `(err, this)` afterwards
      */
-    static create(options, cb) {
-        const web3 = new Web3(options.provider || 'ws://localhost:8545')
+    static create(self, cb) {
+        const web3 = new Web3(process.env.PROVIDER)
 
         parallel({
-            nonce: (cb) => web3.eth.getTransactionCount(pubKeyToEthereumAddress(options.node.peerInfo.id.pubKey.marshal()), 'latest', cb),
-            compiledContract: (cb) => compileIfNecessary([resolve(__dirname, '../../contracts/HoprChannel.sol')], [resolve(__dirname, '../../build/contracts/HoprChannel.json')], cb)
+            nonce: (cb) => web3.eth.getTransactionCount(pubKeyToEthereumAddress(self.peerInfo.id.pubKey.marshal()), 'latest', cb),
+            compiledContract: (cb) => compileIfNecessary([`${process.cwd()}/contracts/HoprChannel.sol`], [`${process.cwd()}/build/contracts/HoprChannel.json`], cb)
         }, (err, results) => {
             if (err)
                 return cb(err)
 
-            registerHandlers(options.node)
+            registerHandlers(self)
 
             const abi = require('../../build/contracts/HoprChannel.json').abi
 
             return cb(null, new PaymentChannel({
-                node: options.node,
+                node: self,
                 nonce: results.nonce,
-                contract: new web3.eth.Contract(abi, options.contractAddress || CONTRACT_ADDRESS, {
-                    from: pubKeyToEthereumAddress(options.node.peerInfo.id.pubKey.marshal())
+                contract: new web3.eth.Contract(abi, process.env.CONTRACT_ADDRESS, {
+                    from: pubKeyToEthereumAddress(self.peerInfo.id.pubKey.marshal())
                 }),
                 web3: web3,
-                contractAddress: options.contractAddress
             }))
-
         })
     }
 

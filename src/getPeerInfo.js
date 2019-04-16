@@ -1,5 +1,5 @@
 'use strict'
-require('dotenv').config()
+
 const { waterfall } = require('neo-async')
 const { generateKeyPair } = require('libp2p-crypto').keys
 const { deserializeKeyPair, serializeKeyPair, privKeyToPeerId } = require('./utils')
@@ -9,22 +9,7 @@ const PeerId = require('peer-id')
 const Multiaddr = require('multiaddr')
 const { NAME } = require('./constants')
 
-module.exports = (options, db, cb) => {
-    if (typeof db === 'function') {
-        if (!options.peerInfo)
-            return cb(Error('Invalid input parameter. Please set a valid peerInfo.'))
-
-        cb = db
-    }
-
-    if (PeerInfo.isPeerInfo(options.peerInfo))
-        return cb(null, options.peerInfo)
-
-    if (!options.addrs || !Array.isArray(options.addrs))
-        return cb(Error('Unable to start node without an address. Please provide at least one.'))
-
-    options.addrs = options.addrs.map(addr => Multiaddr(addr))
-
+module.exports = (options, db) => new Promise(async (resolve, reject) => {
     const getFromDatabase = (cb) =>
         db.get('key-pair', (err, serializedKeyPair) => {
             if (err && !err.notFound)
@@ -54,27 +39,42 @@ module.exports = (options, db, cb) => {
             })
         })
 
-    waterfall([
-        (cb) => {
-            if (PeerId.isPeerId(options.peerId))
-                return cb(null, options.peerId)
+    if (!db) {
+        if (!options.peerInfo)
+            return reject(Error('Invalid input parameter. Please set a valid peerInfo.'))
+    }
 
-            if (options['bootstrap-node'])
-                return privKeyToPeerId(process.env.FUND_ACCOUNT_PRIVATE_KEY, cb)
+    if (PeerInfo.isPeerInfo(options.peerInfo))
+        return resolve(options.peerInfo)
 
-            getFromDatabase(cb)
-        },
-        (peerId, cb) => {
-            const peerInfo = new PeerInfo(peerId)
-            options.addrs.forEach((addr) => {
-                // peerInfo.multiaddrs.add(addr.encapsulate(`/${PROTOCOL_NAME}/${peerInfo.id.toB58String()}`))
-                peerInfo.multiaddrs.add(addr.encapsulate(`/${NAME}/${peerInfo.id.toB58String()}`))
-                // peerInfo.multiaddrs.add(`/dns4/hopr.validity.io/tcp/9092/ws/p2p-webrtc-star/${PROTOCOL_NAME}/${peerInfo.id.toB58String()}`)
+    if (!options.addrs || !Array.isArray(options.addrs))
+        return reject(Error('Unable to start node without an address. Please provide at least one.'))
 
-            })
+    options.addrs = options.addrs.map(addr => Multiaddr(addr))
 
-            return cb(null, peerInfo)
-        }
-    ], cb)
+    let peerId
+    if (PeerId.isPeerId(options.peerId)) {
+        peerId = options.peerId
+    } else if (options['bootstrap-node']) {
+        peerId = await new Promise((resolve, reject) => privKeyToPeerId(process.env.FUND_ACCOUNT_PRIVATE_KEY, (err, peerId) => {
+            if (err)
+                return reject(err)
 
-}
+            resolve(peerId)
+        }))
+    } else {
+        peerId = await new Promise((resolve, reject) => getFromDatabase((err, peerId) => {
+            if (err)
+                return reject(err)
+
+            resolve(peerId)
+        }))
+    }
+
+    const peerInfo = new PeerInfo(peerId)
+    options.addrs.forEach((addr) =>
+        peerInfo.multiaddrs.add(addr.encapsulate(`/${NAME}/${peerInfo.id.toB58String()}`))
+    )
+
+    resolve(peerInfo)
+})

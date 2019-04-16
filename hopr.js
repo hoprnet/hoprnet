@@ -1,12 +1,19 @@
 'use strict'
-require('dotenv').config()
-const { waterfall, forever, each } = require('async')
+
+const dotenv = require('dotenv')
+const dotenvExpand = require('dotenv-expand')
+
+var myEnv = dotenv.config()
+dotenvExpand(myEnv)
+
+const chalk = require('chalk')
+const { waterfall, forever, each } = require('neo-async')
 const { createNode } = require('./src')
 const read = require('read')
 const getopts = require('getopts')
 const Multiaddr = require('multiaddr')
 const { pubKeyToEthereumAddress, randomSubset, privKeyToPeerId, sendTransaction } = require('./src/utils')
-const { INFURA_WSS_URL, CONTRACT_ADDRESS, STAKE_GAS_AMOUNT } = require('./src/constants')
+const { STAKE_GAS_AMOUNT } = require('./src/constants')
 const PeerId = require('peer-id')
 const BN = require('bn.js')
 const { toWei, fromWei } = require('web3-utils')
@@ -19,49 +26,14 @@ const options = getopts(process.argv.slice(2), {
     }
 })
 
-console.log('Welcome to \x1b[1mHOPR\x1b[0m!\n')
+console.log(`Welcome to ${chalk.bold('HOPR')}!\n`)
 
-if (options['bootstrap-node']) {
+if (options['bootstrap-node']) 
     console.log(`... running as bootstrap node!.`)
-}
-
-options.provider = INFURA_WSS_URL
-
-const config = require('./config.json')
 
 if (Array.isArray(options._) && options._.length > 0) {
     options.id = `temp ${options._[0]}`
 }
-
-options.addrs = []
-options.signallingAddrs = []
-
-config.interfaces.forEach((iface) => {
-    // TODO: implement proper dual-stack
-    if (Array.isArray(options._) && options._.length > 0) {
-        iface.port = parseInt(iface.port) + 2 * parseInt(options._[0])
-    }
-    options.addrs.push(
-        Multiaddr.fromNodeAddress({
-            address: iface.host,
-            port: iface.port,
-        }, 'tcp')
-    )
-    options.signallingAddrs.push(
-        Multiaddr.fromNodeAddress({
-            address: iface.host,
-            port: parseInt(iface.port) + 1,
-        }, 'tcp')
-    )
-})
-
-options.bootstrapServers = []
-
-config.bootstrapServers.forEach((addr) => {
-    options.bootstrapServers.push(Multiaddr(addr))
-})
-
-options.WebRTC = config.WebRTC
 
 let node
 waterfall([
@@ -119,7 +91,7 @@ waterfall([
                     if (stakedEther.lt(new BN(toWei('0.1', 'ether')))) {
                         sendTransaction({
                             from: ownAddress,
-                            to: CONTRACT_ADDRESS,
+                            to: process.env.CONTRACT_ADDRESS,
                             value: toWei('0.11', 'ether'),
                             gas: STAKE_GAS_AMOUNT
                         }, node.peerInfo.id, node.paymentChannels.web3, (err, receipt) => {

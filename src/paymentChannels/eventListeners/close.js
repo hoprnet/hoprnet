@@ -3,7 +3,6 @@
 const BN = require('bn.js')
 
 const { isPartyA, pubKeyToEthereumAddress, mineBlock, log } = require('../../utils')
-const { NETWORK } = require('../../constants')
 const Transaction = require('../../transaction')
 
 module.exports = (self) => {
@@ -66,14 +65,14 @@ module.exports = (self) => {
                         if (ok)
                             resolve()
                     })
-                } else if (NETWORK === 'ganache') {
+                } else if (process.env.NETWORK === 'ganache') {
                     // ================ Only for testing ================
                     mineBlock(self.contract.currentProvider)
                     // ==================================================
                 }
             })
 
-            if (NETWORK === 'ganache') {
+            if (process.env.NETWORK === 'ganache') {
                 // ================ Only for testing ================
                 mineBlock(self.contract.currentProvider)
                 // ==================================================

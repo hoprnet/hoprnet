@@ -26,8 +26,7 @@ const leveldown = require('leveldown')
 const PeerId = require('peer-id')
 const PeerInfo = require('peer-info')
 const PeerBook = require('peer-book')
-const { resolve } = require('path')
-
+const Multiaddr = require('multiaddr')
 
 const PaymentChannels = require('./paymentChannels')
 const PublicIp = require('./network/natTraversal/stun')
@@ -124,7 +123,7 @@ class Hopr extends libp2p {
      * @param {Object} options.peerBook a PeerBook instance, otherwise try to retrieve peerBook from database, otherwise create a new one
      * @param {Function} cb callback when node is ready
      */
-    static createNode(options, cb) {
+    static async createNode(options, cb) {
         if (typeof options === 'function') {
             cb = options
             options = {}
@@ -132,33 +131,25 @@ class Hopr extends libp2p {
 
         options.output = options.output || console.log
 
-        let db_dir = resolve(__dirname, '../db')
-        waterfall([
-            (cb) => Hopr.openDatabase(db_dir, options, cb),
-            (db, cb) => parallel({
-                // peerBook: (cb) => {
-                //     if (options.peerBook) {
-                //         cb(null, options.peerBook)
-                //     } else {
-                //         Hopr.importPeerBook(db, cb)
-                //     }
-                // },
-                peerInfo: (cb) => getPeerInfo(options, db, cb)
-            }, (err, { peerBook, peerInfo }) => {
-                if (err)
-                    return cb(err)
+        const db = Hopr.openDatabase(`${process.cwd()}/db`, options)
 
-                const hopr = new Hopr({
-                    config: {
-                        WebRTC: options.WebRTC
-                    },
-                    peerBook: peerBook,
-                    peerInfo: peerInfo
-                }, db)
+        // peerBook: (cb) => {
+        //     if (options.peerBook) {
+        //         cb(null, options.peerBook)
+        //     } else {
+        //         Hopr.importPeerBook(db, cb)
+        //     }
+        // }
 
-                return hopr.start(options, cb)
-            })
-        ], cb)
+        const hopr = new Hopr({
+            config: {
+                WebRTC: options.WebRTC
+            },
+            // peerBook: peerBook,
+            peerInfo: await getPeerInfo(options, db)
+        }, db)
+
+        return hopr.start(options, cb)
     }
 
     /**
@@ -174,7 +165,7 @@ class Hopr extends libp2p {
             (cb) => {
                 registerHandlers(this, options)
 
-                this.bootstrapServers = options.bootstrapServers
+                this.bootstrapServers = process.env.BOOTSTRAP_SERVERS.split(',').map(addr => Multiaddr(addr))
                 this.heartbeat = heartbeat(this)
                 this.getPublicIp = PublicIp(this, options)
                 this.crawlNetwork = crawlNetwork(this, options.Crawler || {})
@@ -189,7 +180,7 @@ class Hopr extends libp2p {
             },
             (cb) => parallel({
                 publicAddrs: (cb) => {
-                    if (options['bootstrap-node'] || !this.bootstrapServers || this.bootstrapServers.length == 0)
+                    if (options['bootstrap-node'] || process.env.DEMO || !this.bootstrapServers || this.bootstrapServers.length == 0)
                         return cb()
 
                     this.getPublicIp(cb)
@@ -198,9 +189,7 @@ class Hopr extends libp2p {
                     if (options['bootstrap-node'])
                         return cb()
 
-                    PaymentChannels.create(Object.assign({
-                        node: this
-                    }, options), cb)
+                    PaymentChannels.create(this, cb)
                 }
             }, cb),
             ({ paymentChannels, publicAddrs }, cb) => {
@@ -365,54 +354,42 @@ class Hopr extends libp2p {
         this.db.put(key, serializePeerBook(this.peerBook), cb)
     }
 
-    static openDatabase(db_dir, options, cb) {
-        if (typeof options === 'function') {
-            cb = options
-            options = {}
+    static openDatabase(db_dir, options) {
+        try {
+            fs.accessSync(db_dir)
+        } catch (err) {
+            if (!err.code === 'ENOENT' && !err.code === 'EEXIST')
+                throw err
+
+            fs.mkdirSync(db_dir, {
+                // TODO: Change to something better
+                mode: 0o777
+            })
         }
 
-        fs.access(db_dir, (err) => {
-            if (err && !err.code === 'ENOENT' && !err.code === 'EEXIST') {
-                throw er
-            } else if (err && err.code === 'ENOENT') {
-                try {
-                    fs.mkdirSync(db_dir, {
-                        // TODO: Change to something better
-                        mode: 0o777
-                    })
-                } catch (err) {
+        if (options && options.id) {
+            // Only for unit testing !!!
+            db_dir = `${db_dir}/${options.id}`
 
-                }
+            try {
+                fs.accessSync(db_dir)
+            } catch (err) {
+                if (!err.code === 'ENOENT' && !err.code === 'EEXIST')
+                    throw err
 
-            }
-
-            if (options.id) {
-                // Only for unit testing !!!
-                db_dir = resolve(db_dir, `./${options.id}`)
-                delete options.id
-                fs.access(db_dir, (err) => {
-                    if (err && !err.code === 'ENOENT') {
-                        throw err
-                    } else if (err && err.code === 'ENOENT') {
-                        fs.mkdirSync(db_dir, {
-                            // TODO: Change to something better
-                            mode: 0o777
-                        })
-                    }
-                    // else {
-                    //     clearDirectory(db_dir)
-                    //     fs.mkdirSync(db_dir, {
-                    //         mode: 0o777
-                    //     })
-                    // }
-                    levelup(leveldown(db_dir), cb)
+                fs.mkdirSync(db_dir, {
+                    // TODO: Change to something better
+                    mode: 0o777
                 })
-                // --------------------------
-            } else {
-                levelup(leveldown(db_dir), cb)
             }
+            //     clearDirectory(db_dir)
+            //     fs.mkdirSync(db_dir, {
+            //         mode: 0o777
+            //     })
+            // --------------------------
+        }
 
-        })
+        return levelup(leveldown(db_dir))
     }
 }
 

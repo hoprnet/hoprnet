@@ -1,27 +1,12 @@
 'use strict'
-require('dotenv').config()
+
 const { toWei } = require('web3-utils')
 
 const VERSION = '0.0.1'
 const NAME = 'ipfs' // 'hopr'
 const BASESTRING = `/${NAME}/${VERSION}`
 
-const NETWORK = 'ropsten'
-const contract = require('../config/contract-hopr.json');
-const gas = require('../config/gasUnits.json');
-
 module.exports = {
-    DEMO: false,
-    DEBUG: true,
-
-    // possible options:
-    // `ganache` => local Ganache testnet
-    // `ropsten` => ropsten testnet
-    // `rinkeby` => rinkeby testnet
-    // `mainnet` => mainnet
-    NETWORK: NETWORK,
-    CONTRACT_ADDRESS: contract.contractAddress[NETWORK],
-
     CRAWLING_RESPONSE_NODES: 10,
 
     RELAY_FEE: toWei('100', 'wei'),
@@ -44,17 +29,12 @@ module.exports = {
     PROTOCOL_WEBRTC_SIGNALING: `${BASESTRING}/webrtc/signaling`,
     PROTOCOL_WEBRTC_DATA: `${BASESTRING}/webrtc/data`,
 
-
-    INFURA_URL: `https://${NETWORK}.infura.io/v3/${process.env.INFURA_API_KEY}`,
-    INFURA_WSS_URL: `wss://${NETWORK}.infura.io/ws/v3/${process.env.INFURA_API_KEY}`,
-
-    STAKE_GAS_AMOUNT: gas.stakeAmount,
-    UNSTAKE_GAS_AMOUNT: gas.unstakeAmount,
-    CREATE_GAS_AMOUNT: gas.createAmount,
-    FUND_GAS_AMOUNT: gas.fundAmount,
-    DEFAULT_GAS_AMOUNT: gas.defaultAmount,
-    ETH_SEND_GAS_AMOUNT: gas.simpleTxAmount,
-    GAS_PRICE: gas.gasPrice,
+    STAKE_GAS_AMOUNT: "70000",
+    UNSTAKE_GAS_AMOUNT: "40000",
+    CREATE_GAS_AMOUNT: "150000",
+    FUND_GAS_AMOUNT: "50000",
+    DEFAULT_GAS_AMOUNT: "600000",
+    ETH_SEND_GAS_AMOUNT: "21000",
 
     HARDCODED_ETH_ADDRESS: process.env.FUND_ACCOUNT_ETH_ADDRESS,
     HARDCODED_PRIV_KEY: process.env.FUND_ACCOUNT_PRIVATE_KEY

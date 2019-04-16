@@ -1,5 +1,5 @@
 'use strict'
-require('dotenv').config()
+
 const { applyEachSeries, timesSeries, times, each, waterfall } = require('neo-async')
 const { createNode } = require('../../src')
 const { pubKeyToEthereumAddress, sendTransaction, privKeyToPeerId, log } = require('../../src/utils')
@@ -7,6 +7,8 @@ const { GAS_PRICE, STAKE_GAS_AMOUNT } = require('../../src/constants')
 const { toWei, fromWei } = require('web3-utils')
 const Web3 = require('web3')
 const Multiaddr = require('multiaddr')
+const Ganache = require('ganache-core')
+const BN = require('bn.js')
 
 const DEFAULT_STAKE = toWei('0.000001', 'ether')
 const DEFAULT_FUND = toWei('0.05', 'ether')
@@ -40,6 +42,7 @@ module.exports.warmUpNodes = (nodes, cb) =>
  * @param {function} cb the function that will be called afterwards with `(err, nodes)`
  */
 module.exports.createFundedNodes = (amountOfNodes, options, peerId, nonce, cb) => {
+    const web3 = new Web3(process.env.PROVIDER)
     waterfall([
         (cb) => times(amountOfNodes, (n, cb) => waterfall([
             (cb) => {
@@ -97,7 +100,7 @@ module.exports.createFundedNodes = (amountOfNodes, options, peerId, nonce, cb) =
                     gas: STAKE_GAS_AMOUNT,
                     gasPrice: GAS_PRICE,
                     nonce: nonce + n
-                }, peerId, new Web3(options.provider), cb)
+                }, peerId, web3, cb)
                     .then((receipt) => {
                         log(nodes[n].peerInfo.id, `Received ${fromWei(DEFAULT_FUND)} ETH from \x1b[32m${pubKeyToEthereumAddress(peerId.pubKey.marshal())}\x1b[0m.`)
                         cb()
@@ -110,8 +113,8 @@ module.exports.createFundedNodes = (amountOfNodes, options, peerId, nonce, cb) =
                         to: options.contractAddress,
                         value: DEFAULT_STAKE,
                         gas: STAKE_GAS_AMOUNT,
-                        gasPrice: GAS_PRICE
-                    }, node.peerInfo.id, new Web3(options.provider))
+                        gasPrice: process.env.GAS_PRICE
+                    }, node.peerInfo.id, web3)
                         .then((receipt) => {
                             node.paymentChannels.nonce = node.paymentChannels.nonce + 1
 
@@ -124,3 +127,28 @@ module.exports.createFundedNodes = (amountOfNodes, options, peerId, nonce, cb) =
         ], (err) => cb(err, nodes))
     ], cb)
 }
+
+/**
+ * Starts a local ganache testnet.
+ * 
+ * @returns {Promise} a promise that resolves once the ganache instance has been started,
+ * otherwise it rejects.
+ */
+module.exports.startTestnet = () => new Promise(async (resolve, reject) => {
+    const server = Ganache.server({
+        accounts: [
+            {
+                balance: `0x${toWei(new BN(100), 'ether').toString('hex')}`,
+                secretKey: process.env.FUND_ACCOUNT_PRIVATE_KEY
+            }
+        ]
+    })
+    server.listen(process.env.GANACHE_PORT, process.env.GANACHE_HOSTNAME, (err) => {
+        if (err)
+            return reject(err)
+
+        console.log(`Successfully started local Ganache instance at 'ws://${process.env.GANACHE_HOSTNAME}:${process.env.GANACHE_PORT}'.`)
+
+        resolve(server)
+    })
+})

@@ -20,7 +20,8 @@
     },
     "scripts": {
         "demo": "node test/demo.js",
-        "hopr": "node hopr.js"
+        "hopr": "node hopr.js",
+        "deployContract": "node test/deployContract"
     },
     "dependencies": {
         "@nodeutils/defaults-deep": "~1.1.0",
@@ -29,6 +30,7 @@
         "chalk": "~2.4.2",
         "class-is": "~1.1.0",
         "dotenv": "~7.0.0",
+        "dotenv-expand": "~5.1.0",
         "futoin-hkdf": "~1.0.3",
         "getopts": "~2.2.4",
         "leveldown": "~5.0.1",

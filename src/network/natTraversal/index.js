@@ -10,7 +10,6 @@ const rlp = require('rlp')
 const PeerId = require('peer-id')
 const pull = require('pull-stream')
 const lp = require('pull-length-prefixed')
-const Pushable = require('pull-pushable')
 const once = require('once')
 const bs58 = require('bs58')
 const Connection = require('interface-connection').Connection

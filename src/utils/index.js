@@ -14,6 +14,7 @@ const scrypt = require('scrypt')
 const chacha = require('chacha')
 const read = require('read')
 const solc = require("solc")
+const chalk = require('chalk')
 
 const COMPRESSED_PUBLIC_KEY_LENGTH = 33
 const PRIVKEY_LENGTH = 32
@@ -489,7 +490,6 @@ module.exports.mineBlock = (provider, amountOfTime = ONE_MINUTE) => waterfall([
 // ==========================
 // Web3.js methods
 // ==========================
-const { GAS_PRICE } = require('../constants')
 /**
  * Creates a web3 account from a peerId instance.
  * 
@@ -516,9 +516,8 @@ module.exports.peerIdToWeb3Account = (peerId, web3) => {
 module.exports.sendTransaction = async (tx, peerId, web3) => {
     const signedTx = await this.peerIdToWeb3Account(peerId, web3).signTransaction(Object.assign(tx, {
         from: this.pubKeyToEthereumAddress(peerId.pubKey.marshal()),
-        gasPrice: GAS_PRICE
+        gasPrice: process.env.GAS_PRICE
     }))
-
 
     return web3.eth.sendSignedTransaction(signedTx.rawTransaction)
         .then((receipt) => {
@@ -646,6 +645,58 @@ module.exports.compileIfNecessary = (srcFiles, artifacts, cb) => {
     ], cb)
 }
 
+/**
+ * Deploys the smart contract.
+ * 
+ * @param {Number} index current index of the account of `FUNDING_PEER`
+ * @param {Web3} web3 instance of web3.js
+ * @returns {Promise} promise that resolve once the contract is compiled and deployed, otherwise
+ * it rejects.
+ */
+module.exports.deployContract = (index, web3) => new Promise((resolve, reject) =>
+    parallel({
+        fundingPeer: (cb) => this.privKeyToPeerId(process.env.FUND_ACCOUNT_PRIVATE_KEY, cb),
+        compiledContract: (cb) => this.compileIfNecessary([`${process.cwd()}/contracts/HoprChannel.sol`], [`${process.cwd()}/build/contracts/HoprChannel.json`], cb)
+    }, (err, { fundingPeer, compiledContract }) => {
+        if (err)
+            return reject(err)
+
+        if (!compiledContract)
+            compiledContract = require(`${process.cwd()}/build/contracts/HoprChannel.json`)
+
+        this.sendTransaction({
+            gas: 3000333, // 2370333
+            gasPrice: process.env.GAS_PRICE,
+            nonce: index,
+            data: '0x'.concat(compiledContract.evm.bytecode.object)
+        }, fundingPeer, web3)
+            .then((receipt) => {
+                console.log(`\nDeployed contract on ${chalk.magenta(process.env.NETWORK)} at ${chalk.green(receipt.contractAddress.toString('hex'))}.\nNonce is now ${chalk.red(index)}.\n`)
+
+                updateContractAddress([`${process.cwd()}/.env`, `${process.cwd()}/.env.example`], receipt.contractAddress)
+                process.env.CONTRACT_ADDRESS = receipt.contractAddress
+
+                resolve(receipt.contractAddress)
+            })
+            .catch((err) => {
+                console.log(err.message)
+            })
+    })
+)
+
+function updateContractAddress(files, contractAddress) {
+    if (!Array.isArray(files))
+        files = [files]
+
+    files.forEach((filename) => {
+        let file = fs.readFileSync(filename).toString()
+        const regex = new RegExp(`CONTRACT_ADDRESS_${process.env.NETWORK.toUpperCase()}\\s{0,}=(\\s{0,}0x[0-9a-fA-F]{0,})?`, 'g')
+
+        file = file.replace(regex, `CONTRACT_ADDRESS_${process.env.NETWORK.toUpperCase()} = ${contractAddress}`)
+
+        fs.writeFileSync(filename, Buffer.from(file))
+    })
+}
 /**
  * Decodes the serialized peerBook and inserts the peerInfos in the given
  * peerBook instance.
@@ -788,8 +839,6 @@ module.exports.deserializeKeyPair = (encryptedSerializedKeyPair, cb) => {
     ], cb)
 }
 
-const { DEBUG } = require('../constants')
-
 /**
  * Asks the user for a password. Does not echo the password.
  * 
@@ -797,7 +846,7 @@ const { DEBUG } = require('../constants')
  * @param {function} cb called afterwards with `(err, password)`
  */
 module.exports.askForPassword = (question, cb) => {
-    if (DEBUG) {
+    if (process.env.DEBUG === 'true') {
         console.log('Debug mode: using password Epo5kZTFidOCHrnL0MzsXNwN9St')
         cb(null, 'Epo5kZTFidOCHrnL0MzsXNwN9St', false)
     } else {
