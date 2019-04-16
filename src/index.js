@@ -120,7 +120,6 @@ class Hopr extends libp2p {
      * @param {Object} options.web3provider a web3 provider, default `http://localhost:8545`
      * @param {String} options.contractAddress the Ethereum address of the contract
      * @param {Object} options.peerInfo 
-     * @param {Object} options.peerBook a PeerBook instance, otherwise try to retrieve peerBook from database, otherwise create a new one
      * @param {Function} cb callback when node is ready
      */
     static async createNode(options, cb) {
@@ -367,9 +366,9 @@ class Hopr extends libp2p {
             })
         }
 
-        if (options && options.id) {
+        if (options && Number.isInteger(options.id)) {
             // Only for unit testing !!!
-            db_dir = `${db_dir}/${options.id}`
+            db_dir = `${db_dir}/node ${options.id}`
 
             try {
                 fs.accessSync(db_dir)

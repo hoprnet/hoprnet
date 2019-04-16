@@ -1,12 +1,11 @@
 'use strict'
 
-const { applyEachSeries, timesSeries, times, each, waterfall } = require('neo-async')
+const { times, waterfall } = require('neo-async')
 const { createNode } = require('../../src')
-const { pubKeyToEthereumAddress, sendTransaction, privKeyToPeerId, log } = require('../../src/utils')
-const { GAS_PRICE, STAKE_GAS_AMOUNT } = require('../../src/constants')
+const { pubKeyToEthereumAddress, sendTransaction, log } = require('../../src/utils')
+const { STAKE_GAS_AMOUNT } = require('../../src/constants')
 const { toWei, fromWei } = require('web3-utils')
 const Web3 = require('web3')
-const Multiaddr = require('multiaddr')
 const Ganache = require('ganache-core')
 const BN = require('bn.js')
 
@@ -43,88 +42,60 @@ module.exports.warmUpNodes = (nodes, cb) =>
  */
 module.exports.createFundedNodes = (amountOfNodes, options, peerId, nonce, cb) => {
     const web3 = new Web3(process.env.PROVIDER)
+
     waterfall([
-        (cb) => times(amountOfNodes, (n, cb) => waterfall([
-            (cb) => {
-                if (!process.env.DEMO_ACCOUNTS || process.env.DEMO_ACCOUNTS <= n)
-                    return cb()
+        (cb) => times(amountOfNodes, (n, cb) => createNode({
+            id: n
+        }, cb), cb),
+        (nodes, cb) => this.warmUpNodes(nodes, cb),
+        async (nodes, cb) => {
+            const fundBatch = []
 
-                return privKeyToPeerId(process.env[`DEMO_ACCOUNT_${n}_PRIVATE_KEY`], (err, peerId) => {
-                    if (err)
-                        return cb(err)
-
-                    return cb(null, peerId)
-                })
-            },
-            (peerId, cb) => {
-                if (typeof peerId === 'function') {
-                    cb = peerId
-                    peerId = null
-                }
-
-                const opts = {}
-
-                if (peerId)
-                    opts.peerId = peerId
-
-                Object.assign(opts, options, {
-                    id: `temp ${n}`,
-                    addrs: [
-                        Multiaddr.fromNodeAddress({
-                            address: "0.0.0.0",
-                            port: parseInt("9091") + 2 * n
-                        }, 'tcp')
-                    ],
-                    signallingAddrs: [
-                        Multiaddr.fromNodeAddress({
-                            address: "0.0.0.0",
-                            port: parseInt("9091") + 2 * n + 1
-                        }, 'tcp')
-                    ],
-                    bootstrapServers: [],
-                    WebRTC: {
-                        signallingServers: 3
-                    }
-                })
-
-                return createNode(opts, cb)
-            }
-        ], cb), cb),
-        (nodes, cb) => applyEachSeries([
-            (cb) => this.warmUpNodes(nodes, cb),
-            (cb) => timesSeries(amountOfNodes, (n, cb) =>
-                sendTransaction({
+            nodes.forEach((node, n) => 
+                fundBatch.push(sendTransaction({
                     from: pubKeyToEthereumAddress(peerId.pubKey.marshal()),
-                    to: pubKeyToEthereumAddress(nodes[n].peerInfo.id.pubKey.marshal()),
+                    to: pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()),
                     value: DEFAULT_FUND,
                     gas: STAKE_GAS_AMOUNT,
-                    gasPrice: GAS_PRICE,
+                    gasPrice: process.env.GAS_PRICE,
                     nonce: nonce + n
-                }, peerId, web3, cb)
-                    .then((receipt) => {
-                        log(nodes[n].peerInfo.id, `Received ${fromWei(DEFAULT_FUND)} ETH from \x1b[32m${pubKeyToEthereumAddress(peerId.pubKey.marshal())}\x1b[0m.`)
-                        cb()
-                    })
-                    .catch((err) => {
-                        console.log(err)
-                    }), cb),
-                (cb) => each(nodes, (node, cb) =>
-                    sendTransaction({
-                        to: options.contractAddress,
-                        value: DEFAULT_STAKE,
-                        gas: STAKE_GAS_AMOUNT,
-                        gasPrice: process.env.GAS_PRICE
-                    }, node.peerInfo.id, web3)
-                        .then((receipt) => {
-                            node.paymentChannels.nonce = node.paymentChannels.nonce + 1
+                }, peerId, web3))
+            )
 
-                            log(node.peerInfo.id, `Funded contract \x1b[32m${options.contractAddress}\x1b[0m with ${fromWei(DEFAULT_STAKE)} ETH.`)
 
-                            cb()
-                        })
-                        .catch(cb)
-                , cb)
-        ], (err) => cb(err, nodes))
+            try {
+                await Promise.all(fundBatch)
+            } catch (err) {
+                return cb(err)
+            }
+
+            const stakeBatch = []
+
+            nodes.forEach((node) => {
+                log(node.peerInfo.id, `Received ${fromWei(DEFAULT_FUND)} ETH from \x1b[32m${pubKeyToEthereumAddress(peerId.pubKey.marshal())}\x1b[0m.`)
+
+                stakeBatch.push(sendTransaction({
+                    to: process.env.CONTRACT_ADDRESS,
+                    value: DEFAULT_STAKE,
+                    gas: STAKE_GAS_AMOUNT,
+                    gasPrice: process.env.GAS_PRICE,
+                    nonce: node.paymentChannels.nonce
+                }, node.peerInfo.id, web3))
+            })
+
+            try {
+                await Promise.all(stakeBatch)
+            } catch (err) {
+                return cb(err)
+            }
+
+            nodes.forEach((node) => {
+                log(node.peerInfo.id, `Funded contract \x1b[32m${options.contractAddress}\x1b[0m with ${fromWei(DEFAULT_STAKE)} ETH.`)
+                node.paymentChannels.nonce = node.paymentChannels.nonce + 1
+            })
+
+            return cb(null, nodes)
+        }
     ], cb)
 }
 

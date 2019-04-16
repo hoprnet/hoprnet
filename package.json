@@ -47,6 +47,7 @@
         "lodash.pullall": "~4.2.0",
         "lodash.unionwith": "~4.6.0",
         "lodash.uniqwith": "~4.5.0",
+        "multihashes": "~0.4.14",
         "neo-async": "~2.6.0",
         "openzeppelin-solidity": "~2.2.0",
         "peer-info": "robertkiel/js-peer-info",

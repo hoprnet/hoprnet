@@ -53,9 +53,8 @@ module.exports = (options, db) => new Promise(async (resolve, reject) => {
     let port = process.env.PORT
     let host = process.env.HOST
 
-    if (options.id) {
-        port = (Number.parseInt(port) + 2 * Number.parseInt(options.id.split(' ')[1])).toString()
-    }
+    if (Number.isInteger(options.id)) 
+        port = (Number.parseInt(port) + 2 * options.id).toString()
 
     options.addrs = [Multiaddr.fromNodeAddress({
         address: host,
@@ -63,15 +62,15 @@ module.exports = (options, db) => new Promise(async (resolve, reject) => {
     }, 'tcp')]
 
     let peerId
-    if (PeerId.isPeerId(options.peerId)) {
+    if (Number.isInteger(options.id)) {
+        if (Number.parseInt(process.env.DEMO_ACCOUNTS) < options.id)
+            return reject(Error(`Failed while trying to access demo account number ${options.id}. Please ensure that there are enough demo account specified in '.env'.`))
+
+        peerId = privKeyToPeerId(process.env[`DEMO_ACCOUNT_${options.id}_PRIVATE_KEY`])
+    } else if (PeerId.isPeerId(options.peerId)) {
         peerId = options.peerId
     } else if (options['bootstrap-node']) {
-        peerId = await new Promise((resolve, reject) => privKeyToPeerId(process.env.FUND_ACCOUNT_PRIVATE_KEY, (err, peerId) => {
-            if (err)
-                return reject(err)
-
-            resolve(peerId)
-        }))
+        peerId = privKeyToPeerId(process.env.FUND_ACCOUNT_PRIVATE_KEY)
     } else {
         peerId = await new Promise((resolve, reject) => getFromDatabase((err, peerId) => {
             if (err)
@@ -86,5 +85,5 @@ module.exports = (options, db) => new Promise(async (resolve, reject) => {
         peerInfo.multiaddrs.add(addr.encapsulate(`/${NAME}/${peerInfo.id.toB58String()}`))
     )
 
-    resolve(peerInfo)
+    return resolve(peerInfo)
 })

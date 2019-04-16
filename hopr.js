@@ -8,7 +8,7 @@ dotenvExpand(myEnv)
 
 const chalk = require('chalk')
 const { waterfall, forever, each } = require('neo-async')
-const { createNode } = require('./src')
+const Hopr = require('./src')
 const read = require('read')
 const getopts = require('getopts')
 const { pubKeyToEthereumAddress, randomSubset, privKeyToPeerId, sendTransaction } = require('./src/utils')
@@ -17,6 +17,8 @@ const PeerId = require('peer-id')
 const BN = require('bn.js')
 const { toWei, fromWei } = require('web3-utils')
 const rlp = require('rlp')
+
+const MINIMAL_FUNDS = new BN(toWei('0.15', 'ether'))
 
 const options = getopts(process.argv.slice(2), {
     alias: {
@@ -27,104 +29,109 @@ const options = getopts(process.argv.slice(2), {
 
 console.log(`Welcome to ${chalk.bold('HOPR')}!\n`)
 
-if (options['bootstrap-node']) 
+if (options['bootstrap-node'])
     console.log(`... running as bootstrap node!.`)
 
 if (Array.isArray(options._) && options._.length > 0) {
-    options.id = `temp ${options._[0]}`
+    options.id = Number.parseInt(options._[0])
 }
 
-let node
-waterfall([
-    (cb) => {
-        if (options.id) {
-            if (process.env.DEMO_ACCOUNTS && process.env.DEMO_ACCOUNTS > ~~(options._[0])) {
-                privKeyToPeerId(process.env[`DEMO_ACCOUNT_${~~options._[0]}_PRIVATE_KEY`], (err, peerId) => {
-                    if (err)
-                        return cb(err)
-
-                    options.peerId = peerId
-                    return cb()
-                })
-            }
-        } else {
-            cb()
-        }
-    },
-    (cb) => createNode(options, cb),
-    (_node, cb) => {
-        node = _node
-        if (!options['bootstrap-node']) {
-            node.paymentChannels.web3.eth.getBalance(pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()), (err, funds) => {
+function connectToBootstrapNode(node) {
+    return Promise.all([
+        node.bootstrapServers.forEach((addr) => new Promise((resolve, reject) => {
+            node.dial(addr, (err, conn) => {
                 if (err)
-                    return cb(err)
+                    return reject(conn)
 
-                console.log(`Own Ethereum address:\n ${pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal())}\n Private key: ${node.peerInfo.id.privKey.marshal().toString('hex')}\n Funds: ${fromWei(funds, 'ether')} ETH`)
-
-                funds = new BN(funds)
-                const minimalFunds = new BN(toWei('0.15', 'ether'))
-
-                if (funds.lt(minimalFunds))
-                    return cb(Error(`Insufficient funds. Got only ${fromWei(funds.toString(), 'ether')} ETH. Please fund the account with at least ${fromWei((minimalFunds).sub(funds), 'Ether')} ETH.`))
-
-                return cb()
+                resolve()
             })
-        } else {
-            return cb()
-        }
-    },
-    (cb) => {
-        const ownAddress = pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal())
-        if (!options['bootstrap-node']) {
-            node.paymentChannels.contract.methods
-                .states(ownAddress)
-                .call({
-                    from: ownAddress
-                }, (err, state) => {
-                    if (err)
-                        return cb(err)
+        }))
+    ])
+}
 
-                    console.log(` Stake: ${fromWei(state.stakedEther, 'ether')} ETH`)
-                    const stakedEther = new BN(state.stakedEther)
-                    if (stakedEther.lt(new BN(toWei('0.1', 'ether')))) {
-                        sendTransaction({
-                            from: ownAddress,
-                            to: process.env.CONTRACT_ADDRESS,
-                            value: toWei('0.11', 'ether'),
-                            gas: STAKE_GAS_AMOUNT
-                        }, node.peerInfo.id, node.paymentChannels.web3, (err, receipt) => {
-                            if (err)
-                                return cb(err)
+async function main() {
+    let node = await new Promise((resolve, reject) => {
+        Hopr.createNode(options, (err, node) => {
+            if (err)
+                return reject(err)
 
-                            node.paymentChannels.nonce = node.paymentChannels.nonce + 1
+            resolve(node)
+        })
+    })
+    
+    const ownAddress = pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal())
 
-                            return cb()
-                        })
-                    } else {
-                        return cb()
-                    }
-                })
-        } else {
-            return cb()
-        }
-    },
-    (cb) => {
-        if (options['bootstrap-node']) {
-            node.on('peer:connect', (peer) => {
-                console.log(`Incoming connection from ${peer.id.toB58String()}.`)
-            })
+    console.log(`\nAvailable under the following addresses:\n ${node.peerInfo.multiaddrs.toArray().join('\n ')}\n`)
+
+    if (options['bootstrap-node']) {
+        node.on('peer:connect', (peer) => {
+            console.log(`Incoming connection from ${peer.id.toB58String()}.`)
+        })
+    }
+
+    if (!options['bootstrap-node']) {
+        let funds
+        try {
+            funds = await node.paymentChannels.web3.eth.getBalance(ownAddress)
+        } catch (err) {
+            console.log(err)
+            return
         }
 
-        console.log(`\nAvailable under the following addresses:\n ${node.peerInfo.multiaddrs.toArray().join('\n ')}\n`)
-        if (!options['bootstrap-node']) {
-            console.log('Connecting to Bootstrap node(s)...')
-            connectToBootstrapNode(cb)
+        console.log(
+            `Own Ethereum address:\n` +
+            `\t${pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal())}\n` +
+            `\tPrivate key: ${node.peerInfo.id.privKey.marshal().toString('hex')}\n` +
+            `\tFunds: ${fromWei(funds, 'ether')} ETH`
+        )
+
+        funds = new BN(funds)
+
+        if (funds.lt(MINIMAL_FUNDS))
+            throw Error(`Insufficient funds. Got only ${fromWei(funds.toString(), 'ether')} ETH. Please fund the account with at least ${fromWei((MINIMAL_FUNDS).sub(funds), 'Ether')} ETH.`)
+
+        let state
+        try {
+            state = await node.paymentChannels.contract.methods.states(ownAddress).call({ from: ownAddress })
+        } catch (err) {
+            console.log(err)
+            return
         }
-    },
-    // (cb) => node.crawlNetwork(cb),
-    // (cb) => node.sendMessage('123', node.peerBook.getAllArray()[0].id, cb),
-    (_, cb) => crawlNetwork(node, cb),
-    (cb) => {
+
+        console.log(`\tStake: ${fromWei(state.stakedEther, 'ether')} ETH`)
+        const stakedEther = new BN(state.stakedEther)
+
+        if (stakedEther.lt(new BN(toWei('0.1', 'ether')))) {
+            let receipt
+            try {
+                receipt = sendTransaction({
+                    from: ownAddress,
+                    to: process.env.CONTRACT_ADDRESS,
+                    value: toWei('0.11', 'ether'),
+                    gas: STAKE_GAS_AMOUNT
+                }, node.peerInfo.id, node.paymentChannels.web3)
+            } catch (err) {
+                console.log(err)
+                return
+            }
+
+            node.paymentChannels.nonce = node.paymentChannels.nonce + 1
+        }
+
+        console.log('Connecting to Bootstrap node(s)...')
+        try {
+            await connectToBootstrapNode(node)
+        } catch (err) {
+            console.log(err)
+        }
+
+        await new Promise((resolve, reject) => crawlNetwork(node, (err) => {
+            if (err)
+                return reject(err)
+
+            return resolve()
+        }))
+
         if (options['send-messages']) {
             const sendMessage = () => {
                 const recipient = randomSubset(node.peerBook.getAllArray(), 1, (peerInfo) =>
@@ -136,20 +143,13 @@ waterfall([
         } else if (options['bootstrap-node']) {
             return cb()
         } else {
-            return sendMessages(node, cb)
+            return sendMessages(node, () => {})
         }
-    },
-    (cb) => {
-        if (options['bootstrap-node'])
-            return cb()
-
-
-        sendMessages(node, cb)
     }
-], (err) => {
-    if (err)
-        console.log(err.message)
-})
+}
+
+main()
+
 
 function selectRecipient(node, cb) {
     let peers
@@ -185,12 +185,6 @@ function selectRecipient(node, cb) {
     })
 }
 
-function connectToBootstrapNode(cb) {
-    if (node.bootstrapServers.length < 1)
-        return cb(Error(`Unable to connect to bootstrap server. Please specify at least one in '.env'`))
-
-    each(node.bootstrapServers, (addr, cb) => node.dial(addr, cb), cb)
-}
 
 function sendMessages(node, cb) {
     forever((cb) => waterfall([
@@ -203,7 +197,7 @@ function sendMessages(node, cb) {
                 if (err)
                     process.exit(0)
 
-                console.log(`Sending "${message}" to \x1b[34m${destination.id.toB58String()}\x1b[0m.\n`)
+                console.log(`Sending "${message}" to \x1b[34m${destination.id.toB58String()} \x1b[0m.\n`)
 
                 const encodedMessage = rlp.encode([message, Date.now().toString()])
                 node.sendMessage(encodedMessage, destination.id, cb)

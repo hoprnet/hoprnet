@@ -62,10 +62,15 @@ waterfall([
             if (process.env.NETWORK === 'ganache') {
                 setTimeout(cb, 2000)
             } else {
-                throw Error('TODO')
                 setTimeout(cb, 60 * 1000)
             }
-        }, () => setTimeout(cb, 5000)),
+        }, () => {
+            if (process.env.NETWORK === 'ganache') {
+                setTimeout(cb, 2000)
+            } else {
+                setTimeout(cb, 60 * 1000)
+            }
+        }),
         (cb) => map(nodes, (node, cb) => node.paymentChannels.closeChannels(cb), cb),
         (results, cb) => times(AMOUNT_OF_NODES, (n, cb) => {
             log(nodes[n].peerInfo.id, `Finally ${results[n].isNeg() ? 'spent' : 'received'} \x1b[35m\x1b[1m${results[n].abs()} wei\x1b[0m.`)

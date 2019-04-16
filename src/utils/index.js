@@ -9,12 +9,14 @@ const PeerId = require('peer-id')
 const rlp = require('rlp')
 const PeerInfo = require('peer-info')
 const Multiaddr = require('multiaddr')
+const Multihash = require('multihashes')
 const { publicKeyConvert } = require('secp256k1')
 const scrypt = require('scrypt')
 const chacha = require('chacha')
 const read = require('read')
 const solc = require("solc")
 const chalk = require('chalk')
+const crypto = require('crypto')
 
 const COMPRESSED_PUBLIC_KEY_LENGTH = 33
 const PRIVKEY_LENGTH = 32
@@ -399,12 +401,14 @@ module.exports.privKeyToPeerId = (privKey, cb) => {
 
     privKey = new libp2p_crypto.supportedKeys.secp256k1.Secp256k1PrivateKey(privKey)
 
-    return privKey.public.hash((err, hash) => {
-        if (err)
-            return cb(err)
+    const hash = crypto.createHash('sha256').update(privKey.public.bytes).digest()
+    const id = Multihash.encode(hash, 'sha2-256')
 
-        return cb(null, new PeerId(hash, privKey, privKey.public))
-    })
+    const peerId = new PeerId(id, privKey, privKey.public)
+    if (cb)
+        return cb(null, peerId)
+
+    return peerId
 }
 
 /**
@@ -503,6 +507,12 @@ module.exports.peerIdToWeb3Account = (peerId, web3) => {
     return web3.eth.accounts.privateKeyToAccount('0x'.concat(peerId.privKey.marshal().toString('hex')))
 }
 
+module.exports.signTransaction = (tx, peerId, web3) =>
+    this.peerIdToWeb3Account(peerId, web3).signTransaction(Object.assign(tx, {
+        from: this.pubKeyToEthereumAddress(peerId.pubKey.marshal()),
+        gasPrice: process.env.GAS_PRICE
+    }))
+
 /**
  * Signs a transaction with the private key that is given by 
  * the peerId instance and publishes it to the network given by
@@ -513,13 +523,8 @@ module.exports.peerIdToWeb3Account = (peerId, web3) => {
  * @param {Object} web3 a web3.js instance
  * @param {function} cb the function that is called when finished
  */
-module.exports.sendTransaction = async (tx, peerId, web3) => {
-    const signedTx = await this.peerIdToWeb3Account(peerId, web3).signTransaction(Object.assign(tx, {
-        from: this.pubKeyToEthereumAddress(peerId.pubKey.marshal()),
-        gasPrice: process.env.GAS_PRICE
-    }))
-
-    return web3.eth.sendSignedTransaction(signedTx.rawTransaction)
+module.exports.sendTransaction = async (tx, peerId, web3) =>
+    web3.eth.sendSignedTransaction((await this.signTransaction(tx, peerId, web3)).rawTransaction)
         .then((receipt) => {
             if (typeof receipt.status === 'string') {
                 receipt.status = parseInt(receipt.status, 16)
@@ -534,7 +539,7 @@ module.exports.sendTransaction = async (tx, peerId, web3) => {
 
             return receipt
         })
-}
+
 
 /**
  * Checks whether one of the src files is newer than one of
