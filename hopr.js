@@ -11,7 +11,6 @@ const { waterfall, forever, each } = require('neo-async')
 const { createNode } = require('./src')
 const read = require('read')
 const getopts = require('getopts')
-const Multiaddr = require('multiaddr')
 const { pubKeyToEthereumAddress, randomSubset, privKeyToPeerId, sendTransaction } = require('./src/utils')
 const { STAKE_GAS_AMOUNT } = require('./src/constants')
 const PeerId = require('peer-id')
@@ -124,7 +123,7 @@ waterfall([
     },
     // (cb) => node.crawlNetwork(cb),
     // (cb) => node.sendMessage('123', node.peerBook.getAllArray()[0].id, cb),
-    (cb) => crawlNetwork(node, cb),
+    (_, cb) => crawlNetwork(node, cb),
     (cb) => {
         if (options['send-messages']) {
             const sendMessage = () => {
@@ -156,7 +155,7 @@ function selectRecipient(node, cb) {
     let peers
 
     forever((cb) => {
-        peers = node.peerBook.getAllArray().filter((peerInfo) => !options.bootstrapServers.some((multiaddr) => PeerId.createFromB58String(multiaddr.getPeerId()).isEqual(peerInfo.id))
+        peers = node.peerBook.getAllArray().filter((peerInfo) => !node.bootstrapServers.some((multiaddr) => PeerId.createFromB58String(multiaddr.getPeerId()).isEqual(peerInfo.id))
         )
         console.log(
             peers.reduce((acc, peerInfo, index) => {
@@ -187,16 +186,10 @@ function selectRecipient(node, cb) {
 }
 
 function connectToBootstrapNode(cb) {
-    if (!config.bootstrapServers || !Array.isArray(config.bootstrapServers))
-        return cb(Error(`Unable to connect to bootstrap server. Please specify one in 'config.json'`))
+    if (node.bootstrapServers.length < 1)
+        return cb(Error(`Unable to connect to bootstrap server. Please specify at least one in '.env'`))
 
-    each(config.bootstrapServers, (addr, cb) => {
-        try {
-            node.dial(Multiaddr(addr), cb)
-        } catch (err) {
-            console.log(err)
-        }
-    }, cb)
+    each(node.bootstrapServers, (addr, cb) => node.dial(addr, cb), cb)
 }
 
 function sendMessages(node, cb) {

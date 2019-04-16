@@ -50,12 +50,17 @@ module.exports = (options, db) => new Promise(async (resolve, reject) => {
     if (!process.env.PORT || !process.env.HOST)
         return reject(Error('Unable to start node without an address. Please provide at least one.'))
 
-    if (process.env.DEMO !== 'true')
-        options.addrs = [Multiaddr.fromNodeAddress({
-            address: process.env.HOST,
-            port: process.env.PORT
-        }, 'tcp')]
+    let port = process.env.PORT
+    let host = process.env.HOST
 
+    if (options.id) {
+        port = (Number.parseInt(port) + 2 * Number.parseInt(options.id.split(' ')[1])).toString()
+    }
+
+    options.addrs = [Multiaddr.fromNodeAddress({
+        address: host,
+        port: port
+    }, 'tcp')]
 
     let peerId
     if (PeerId.isPeerId(options.peerId)) {
