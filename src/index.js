@@ -288,7 +288,7 @@ class Hopr extends libp2p {
                     pull.take(1),
                     pull.drain((data) => {
                         log(this.peerInfo.id, `Received acknowledgement.`)
-                        return cb()
+                        // return cb()
                         // if (!cb.called) {
                         //     return cb()
                         // }

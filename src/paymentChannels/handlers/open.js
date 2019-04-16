@@ -16,13 +16,17 @@ const { SIGNATURE_LENGTH } = require('../../transaction')
 
 module.exports = (node) => {
     async function handleOpeningRequest(data, cb) {
-        if (data.length !== Transaction.SIZE)
+        if (data.length !== Transaction.SIZE) {
+            log(node.peerInfo.id, 'Invalid size of payment channel opening request.')
             return cb()
+        }
 
         const restoreTx = Transaction.fromBuffer(data)
 
-        if (bufferToNumber(restoreTx.index) !== 1)
+        if (bufferToNumber(restoreTx.index) !== 1) {
+            log(node.peerInfo.id, 'Invalid payment channel opening request.')
             return cb()
+        }
 
         const counterparty = restoreTx.counterparty
         const channelId = restoreTx.getChannelId(node.peerInfo.id)
@@ -49,15 +53,15 @@ module.exports = (node) => {
                 return cb(err)
 
             if (!state.isSet)
-                return cb(Error(`Rejecting payment channel opening request because counterparty hasn't staked any funds.`))
+                log(node.peerInfo.id, Error(`Rejecting payment channel opening request because counterparty hasn't staked any funds.`))
 
             const stakedEther = new BN(state.stakedEther)
             const claimedFunds = new BN(restoreTx.value)
 
             // Check whether the counterparty has staked enough money to open
             // the payment channel
-            if (stakedEther.lt(claimedFunds))
-                return cb(Error(`Rejecting payment channel opening request due to ${fromWei(claimedFunds.sub(stakedEther), 'ether')} ETH too less staked funds.`))
+            if (stakedEther.lt(claimedFunds)) 
+                log(node.peerInfo.id, `Rejecting payment channel opening request due to ${fromWei(claimedFunds.sub(stakedEther), 'ether')} ETH too less staked funds.`)
 
             // Check whether there is already such a channel registered in the
             // smart contract
