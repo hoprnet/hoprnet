@@ -8,7 +8,7 @@ There is a standalone demo to showcase the functionality:
 
 ### Software Requirements
 - [`Node.js`](https://nodejs.org/en/download/) >= 10
-- [`install`](https://yarnpkg.com/en/docs/install)
+- [`yarn`](https://yarnpkg.com/en/docs/install)
 
 On Windows? 👀 here: [Windows Setup](../../wiki/Setup#Windows)
 
