@@ -54,6 +54,8 @@ DEMO_ACCOUNT_3_PRIVATE_KEY = 0x0123456789abcdef0123456789abcdef0123456789abcdef0
 DEMO_ACCOUNT_4_PRIVATE_KEY = 0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 DEMO_ACCOUNT_5_PRIVATE_KEY = 0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 DEMO_ACCOUNT_6_PRIVATE_KEY = 0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+
+...
 ```
 
 Please make sure that you:
@@ -65,22 +67,3 @@ Now you can run the demo script via:
 ```sh
 yarn demo
 ```
-
-### Demo Script
-The demo will
-- generate four key pairs
-- create four test nodes and equip them with the previously generated key pairs
-- start all four nodes such that they listen to some port on your machine
-- establish connections between the nodes such that all nodes are transitively connected to each other and DHT lookup is working
-- fund the corresponding ropsten testnet account of each node with some test ether
-- crawl the network to find enough nodes in order to create a path of the desired length
-- create 4 messages and send them through the network
-- the nodes will 
-    - decrypt the message, process the SPHINX header, extract the embedded information
-    - forward the messages and the embedded money
-    - wait for an acknowledgement to be able to decrypt the encrypted transactions that they've received during the protocol execution
-    - open a payment channel to the next hop in the case there is no one yet
-- let one party initiate a payout which will
-    - settle the payment channels of that party
-    - let the nodes listen to the on-chain Settle event and post a better transaction in case that a malicious party tries to close the channel with an unprofitable transaction
-    - withdraw the money
