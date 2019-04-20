@@ -16,7 +16,7 @@
     "homepage": "https://hopr.network",
     "repository": {
         "type": "git",
-        "url": "https://github.com/validitylabs/messagingProtocol.git"
+        "url": "https://github.com/validitylabs/hopr.git"
     },
     "scripts": {
         "demo": "node test/demo.js",
