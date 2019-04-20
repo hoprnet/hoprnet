@@ -5,7 +5,7 @@
         "email": "info@validitylabs.org",
         "url": "https://validitylabs.org"
     },
-    "version": "0.0.1",
+    "version": "0.2",
     "description": "Privacy-preserving messaging protocol with incentivations for relay operators",
     "license": "GPL-3.0-only",
     "keywords": [

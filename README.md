@@ -7,7 +7,8 @@ HOPR is a privacy-preserving messaging protocol that incentivizes users to parti
 There is a standalone demo to showcase the functionality:
 
 ### Software Requirements
-- `Node.js` >= 10 (this already ships with `npx`)
+- [`Node.js`](https://nodejs.org/en/download/) >= 10
+- [`install`](https://yarnpkg.com/en/docs/install)
 
 On Windows? 👀 here: [Windows Setup](../../wiki/Setup#Windows)
 
@@ -18,7 +19,7 @@ On Windows? 👀 here: [Windows Setup](../../wiki/Setup#Windows)
 ### Executing
 
 ```sh
-git clone https://github.com/validitylabs/messagingProtocol.git
+git clone https://github.com/validitylabs/hopr.git
 cd messagingProtocol
 yarn install
 ```
@@ -28,32 +29,40 @@ into an `.env` file and update the setting values in the .env with your own. For
 on how to generate some of those, see the Account Requirements section before:
 
 ```sh
-$ cp .env.example .env // Then update the valid setting values in the .env file
+$ cp .env.example .env
 ```
 
-```sh
-INFURA_ROPSTEN_URL=https://ropsten.infura.io/v3/
-INFURA_API_KEY=
-INFURA_ROPSTEN_WSS_URL=wss://ropsten.infura.io/ws/v3/
-FUND_ACCOUNT_ETH_ADDRESS=
-FUND_ACCOUNT_PRIVATE_KEY=
-ROPSTEN_MNEMONIC=
-ROPSTEN_HOST=127.0.0.1
-RINKEBY_MNEMONIC=
-RINKEBY_HOST=127.0.0.1
-DEMO_ACCOUNTS=3
-DEMO_ACCOUNT_0_PRIVATE_KEY=
-DEMO_ACCOUNT_1_PRIVATE_KEY=
-DEMO_ACCOUNT_2_PRIVATE_KEY=
-DEMO_ACCOUNT_3_PRIVATE_KEY=
+Then update the following values in your `.env` file.
+
+```markdown
+...
+
+# Infura config
+INFURA_PROJECT_ID = 0123456789abcdef0123456789abcbde
+
+...
+
+# Demo accounts
+FUND_ACCOUNT_ETH_ADDRESS = 0x0123456789abcdef0123456789abcdef01234567
+FUND_ACCOUNT_PRIVATE_KEY = 0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+
+DEMO_ACCOUNTS = 6
+DEMO_ACCOUNT_0_PRIVATE_KEY = 0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+DEMO_ACCOUNT_1_PRIVATE_KEY = 0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+DEMO_ACCOUNT_2_PRIVATE_KEY = 0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+DEMO_ACCOUNT_3_PRIVATE_KEY = 0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+DEMO_ACCOUNT_4_PRIVATE_KEY = 0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+DEMO_ACCOUNT_5_PRIVATE_KEY = 0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+DEMO_ACCOUNT_6_PRIVATE_KEY = 0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 ```
 
 Please make sure that you:
-- have whitelisted the contract ~~`0xd215A90a15Fede2C126352E200999fFE7D32A614`~~ `0x8AB0452dc88EE3BabC9ba40E47eF963000C4bEbb` in your Infura account
-- got some funds on your Ropsten testnet account, you may want to use the [faucet](https://faucet.ropsten.be/) to receive test ether.
+- have whitelisted the contract ~~`0x8AB0452dc88EE3BabC9ba40E47eF963000C4bEbb`~~ `0xCB40a1710a9DDA88d5f1399E27692F1266a03462` in your Infura account
+- got at more than 0.15 ETH on each account. You may want to use the [faucet](https://faucet.ropsten.be/) to receive some test ether and transfer it to the accounts.
 
 Now you can run the demo script via:
-```
+
+```sh
 yarn demo
 ```
 
