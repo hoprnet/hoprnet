@@ -378,7 +378,19 @@ async function main() {
                     }
                     break
                 case 'send':
+                    if (operands.length != 2) {
+                        console.log(chalk.red(`Invalid arguments. Expected 'open <peerId>'. Received '${input}'`))
+                        rl.prompt()
+                        break
+                    }
 
+                    rl.question(`Sending message to ${chalk.blue(operands[1])}\nType in your message and press ENTER to send:\n`, (message) => 
+                        node.sendMessage(message, operands[1], (err) => {
+                            if (err)
+                                console.log(chalk.red(err.message))
+                        })
+                    )
+                    break
                 case 'closeAll':
                     node.paymentChannels.closeChannels((err) => {
                         if (err)

@@ -59,8 +59,7 @@ DEMO_ACCOUNT_6_PRIVATE_KEY = 0x0123456789abcdef0123456789abcdef0123456789abcdef0
 ```
 
 Please make sure that you:
-- have whitelisted the contract ~~`0x8AB0452dc88EE3BabC9ba40E47eF963000C4bEbb`~~ `0xCB40a1710a9DDA88d5f1399E27692F1266a03462` in your Infura account
-- got at more than 0.15 ETH on each account. You may want to use the [faucet](https://faucet.ropsten.be/) to receive some test ether and transfer it to the accounts.
+- got more than 0.15 ETH on each account. You may want to use the [faucet](https://faucet.ropsten.be/) to receive some test ether and transfer it to the accounts.
 
 Now you can run the demo script via:
 
