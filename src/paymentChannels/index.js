@@ -64,35 +64,68 @@ class PaymentChannel extends EventEmitter {
      * and compiles the contract if that isn't the case.
      * 
      * @param {Hopr} node a libp2p node instance
-     * @param {Function} cb a function the is called with `(err, this)` afterwards
+     * @param {Function} cb a function the is called with `(err, self)` afterwards
      */
-    static create(self, cb) {
+    static create(node, cb) {
         const web3 = new Web3(process.env.PROVIDER)
 
         parallel({
-            nonce: (cb) => web3.eth.getTransactionCount(pubKeyToEthereumAddress(self.peerInfo.id.pubKey.marshal()), 'latest', cb),
+            nonce: (cb) => web3.eth.getTransactionCount(pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()), 'latest', cb),
             compiledContract: (cb) => compileIfNecessary([`${process.cwd()}/contracts/HoprChannel.sol`], [`${process.cwd()}/build/contracts/HoprChannel.json`], cb)
         }, (err, results) => {
             if (err)
                 return cb(err)
 
-            registerHandlers(self)
+            registerHandlers(node)
 
             const abi = require('../../build/contracts/HoprChannel.json').abi
 
-            return cb(null, new PaymentChannel({
-                node: self,
+            const self = new PaymentChannel({
+                node: node,
                 nonce: results.nonce,
                 contract: new web3.eth.Contract(abi, process.env.CONTRACT_ADDRESS, {
-                    from: pubKeyToEthereumAddress(self.peerInfo.id.pubKey.marshal())
+                    from: pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal())
                 }),
                 web3: web3,
-            }))
+            })
+
+            self.registerEventListeners((err) => {
+                if (err)    
+                    return cb(err)
+
+                cb(null, self)
+            })
         })
     }
 
     /**
-     * Registers a listener to the ClosedChannel event of a payment channel.
+     * Registers listeners on-chain opening events and the closing events of all
+     * payment channels found in the database.
+     * 
+     * @param {Function} cb called with `(err)` when finished
+     */
+    registerEventListeners(cb) {
+        const register = (query, fn, cb) => {
+            this.node.db.createKeyStream(query)
+                .on('data', fn)
+                .on('error', (err) => cb(err))
+                .on('end', () => cb())
+        }
+
+        parallel([
+            (cb) => register({
+                gt: this.RestoreTransaction(Buffer.alloc(32, 0)),
+                lt: this.RestoreTransaction(Buffer.alloc(32, 255))
+            }, (key) => this.registerSettlementListener(key.slice(key.length - 32)), cb),
+            (cb) => register({
+                gt: this.StashedRestoreTransaction(Buffer.alloc(32, 0)),
+                lt: this.StashedRestoreTransaction(Buffer.alloc(32, 255))
+            }, (key) => this.registerOpeningListener(key.slice(key.length - 32)), cb)
+        ], cb)
+    }
+
+    /**
+     * Registers a listener to the on-chain ClosedChannel event of a payment channel.
      * 
      * @param {Buffer} channelId ID of the channel
      * @param {Function} listener function that is called whenever the `ClosedChannel` event
@@ -110,7 +143,7 @@ class PaymentChannel extends EventEmitter {
     }
 
     /**
-     * Registers a listener to the OpenedChannel event of a payment channel.
+     * Registers a listener to the on-chain OpenedChannel event of a payment channel.
      * 
      * @param {Buffer} channelId ID of the channel
      * @param {Function} listener function that is called whenever the `OpenedChannel` event
@@ -130,6 +163,13 @@ class PaymentChannel extends EventEmitter {
         }, listener)
     }
 
+    onceClosed(channelId, fn) {
+        this.once(`closed ${channelId.toString('base64')}`, fn)
+    }
+
+    emitClosed(channelId, receivedMoney) {
+        this.emit(`closed ${channelId.toString('base64')}`, receivedMoney)
+    }
 
     ChannelKey(channelId) {
         return Buffer.concat([PREFIX, Buffer.from('key-'), channelId], PREFIX_LENGTH + 4 + CHANNEL_ID_LENGTH)
@@ -295,13 +335,7 @@ class PaymentChannel extends EventEmitter {
 
         if (typeof cb === 'function') {
             promise
-                .then((receipt) => {
-                    if (cb) {
-                        cb(null, receipt)
-                    } else {
-                        return receipt
-                    }
-                })
+                .then((receipt) => cb(null, receipt))
                 .catch(cb)
         } else {
             return promise

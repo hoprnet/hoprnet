@@ -1,6 +1,7 @@
 'use strict'
 
 const BN = require('bn.js')
+const chalk = require('chalk')
 
 const { log, bufferToNumber } = require('../../utils')
 const Transaction = require('../../transaction')
@@ -9,13 +10,15 @@ module.exports = (self) => async (channelId, useRestoreTx = false) => {
     let lastTx, channelKey
 
     try {
-        if (useRestoreTx) {
-            lastTx = Transaction.fromBuffer(await self.node.db.get(self.RestoreTransaction(channelId)))
-        } else {
-            lastTx = Transaction.fromBuffer(await self.node.db.get(self.Transaction(channelId)))
-        }
-        channelKey = await self.node.db.get(self.ChannelKey(channelId))
+        lastTx = Transaction.fromBuffer(await self.node.db.get(self.Transaction(channelId))
+            .catch((err) => {
+                if (!err.notFound)
+                    throw err
+
+                return self.node.db.get(self.RestoreTransaction(channelId))
+            }))
     } catch (err) {
+        console.log(chalk.red(err.message))
         return
     }
     

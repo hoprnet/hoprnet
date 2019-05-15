@@ -1,6 +1,7 @@
 'use strict'
 
 const BN = require('bn.js')
+const chalk = require('chalk')
 
 const { isPartyA, pubKeyToEthereumAddress, mineBlock, log } = require('../../utils')
 const Transaction = require('../../transaction')
@@ -13,34 +14,28 @@ module.exports = (self) => {
      * @param {Buffer} channelId ID of the payment channel
      */
     function getRestoreTransaction(channelId) {
-        return new Promise((resolve, reject) =>
-            self.node.db.get(self.RestoreTransaction(channelId))
-                .then((tx) => resolve(Transaction.fromBuffer(tx)))
-                .catch((err) => {
-                    if (!err.notFound)
-                        return reject(err)
+        return self.node.db.get(self.RestoreTransaction(channelId))
+            .then((tx) => Transaction.fromBuffer(tx))
+            .catch((err) => {
+                if (!err.notFound)
+                    throw err
 
-                    self.node.db.get(self.StashedRestoreTransaction(channelId))
-                        .then((tx) => resolve(Transaction.fromBuffer(tx)))
-                        .catch(reject)
-                })
+                return self.node.db.get(self.StashedRestoreTransaction(channelId))
+                    .then((tx) => Transaction.fromBuffer(tx))
+            })
 
-        )
     }
 
     function recoverCounterparty(transactionHash, channelId) {
-        return new Promise((resolve, reject) => {
-            getRestoreTransaction(channelId)
-                .then((tx) => resolve(tx.counterparty))
-                .catch((err) => {
-                    if (!err.notFound)
-                        console.log(err.message)
+        return getRestoreTransaction(channelId)
+            .then((tx) => tx.counterparty)
+            .catch((err) => {
+                if (!err.notFound)
+                    console.log(err.message)
 
-                    self.web3.getTransaction(transactionHash)
-                        .then((closingTx) => resolve(closingTx.from))
-                        .catch(reject)
-                })
-        })
+                self.web3.getTransaction(transactionHash)
+                    .then((closingTx) => closingTx.from)
+            })
     }
 
     /**
@@ -80,12 +75,30 @@ module.exports = (self) => {
         })
     }
 
+    /**
+     * Withdraws funds from a payment channel.
+     * 
+     * @param {Buffer} channelId ID of the channel
+     * @param {Buffer} counterparty public key of the counterparty
+     */
+    async function withdrawFunds(channelId, counterparty) {
+        const channel = await self.contract.methods.channels(channelId).call({
+            from: pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal())
+        }, 'latest')
+
+        await waitUntilChannelIsWithdrawable(channel.settleTimestamp)
+
+        self.closingRequests.delete(channelId.toString('base64'))
+
+        return self.contractCall(self.contract.methods.withdraw(pubKeyToEthereumAddress(counterparty)))
+    }
+
     async function emitEvent(channelId, receivedMoney, receipt = null) {
-        log(self.node.peerInfo.id, `Closed payment channel \x1b[33m${channelId.toString('hex')}\x1b[0m and ${receivedMoney.isNeg() ? 'spent' : 'received'} \x1b[35m${receivedMoney.abs().toString()} wei\x1b[0m. ${receipt ? ` TxHash \x1b[32m${receipt.transactionHash}\x1b[0m.` : ''}`)
+        log(self.node.peerInfo.id, `Closed payment channel ${chalk.yellow(channelId.toString('hex'))} and ${receivedMoney.isNeg() ? 'spent' : 'received'} ${chalk.magenta(receivedMoney.abs().toString())} wei\x1b[0m. ${receipt ? ` TxHash \x1b[32m${receipt.transactionHash}\x1b[0m.` : ''}`)
 
         await self.deleteChannel(channelId)
 
-        self.emit(`closed ${channelId.toString('base64')}`, receivedMoney)
+        self.emitClosed(channelId, receivedMoney)
     }
 
     async function getReceivedMoney(amountA, channelId, isPartyA) {
@@ -109,44 +122,33 @@ module.exports = (self) => {
             pubKeyToEthereumAddress(counterparty)
         )
 
-        let tx
         try {
-            tx = Transaction.fromBuffer(await self.node.db.get(self.Transaction(channelId)))
+            const tx = Transaction.fromBuffer(await self.node.db.get(self.Transaction(channelId)))
+
+            const eventIndex = new BN(event.returnValues.index.replace(/0x/, ''), 16)
+            const txIndex = new BN(tx.index)
+
+            if (eventIndex.lt(txIndex) && (partyA ? new BN(tx.value).gt(amountA) : amountA.gt(new BN(tx.value)))) {
+                log(self.node.peerInfo.id, `Found better transaction for payment channel ${channelId.toString('hex')}.`)
+
+                self.registerSettlementListener(channelId)
+                self.requestClose(channelId)
+
+                return
+            }
         } catch (err) {
-            if (!err.notFound) 
+            if (!err.notFound) {
                 console.log(err)
-
-            const receivedMoney = await getReceivedMoney(amountA, channelId, partyA) 
-            emitEvent(channelId, receivedMoney)
-            return
-        } 
-
-        const eventIndex = new BN(event.returnValues.index.replace(/0x/, ''), 16)
-        const txIndex = new BN(tx.index)
-
-        if (eventIndex.lt(txIndex) && (partyA ? new BN(tx.value).gt(amountA) : amountA.gt(new BN(tx.value)))) {
-            log(self.node.peerInfo.id, `Found better transaction for payment channel ${channelId.toString('hex')}.`)
-
-            self.registerSettlementListener(channelId)
-            self.requestClose(channelId)
-
-            return
+                return
+            }
         }
 
         let receipt
         if (!self.closingRequests.has(channelId.toString('base64'))) {
-            const channel = await self.contract.methods.channels(channelId).call({
-                from: pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal())
-            }, 'latest')
-
-            await waitUntilChannelIsWithdrawable(channel.settleTimestamp)
-
-            self.closingRequests.delete(channelId.toString('base64'))
-
             try {
-                receipt = await self.contractCall(self.contract.methods.withdraw(pubKeyToEthereumAddress(counterparty)))
+                receipt = await withdrawFunds(channelId, counterparty)
             } catch (err) {
-                console.log(err)
+                console.log(err.message)
                 return
             }
         }

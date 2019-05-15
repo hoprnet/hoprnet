@@ -39,47 +39,48 @@ module.exports = (node) => {
                 return cb(err)
         }
 
-        const batch = new node.paymentChannels.web3.BatchRequest()
+        let state, channel
+        try {
+            [ state, channel ] = await Promise.all([
+                node.paymentChannels.contract.methods.states(pubKeyToEthereumAddress(counterparty)).call({
+                    from: pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal())
+                }, 'latest'),
+                node.paymentChannels.contract.methods.channels(channelId).call({
+                    from: pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal())
+                }, 'latest')
+            ])
+        } catch (err) {
+            return cb(err)
+        }
 
-        parallel({
-            state: (cb) => batch.add(node.paymentChannels.contract.methods.states(pubKeyToEthereumAddress(counterparty)).call.request({
-                from: pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal())
-            }, 'latest', cb)),
-            channel: (cb) => batch.add(node.paymentChannels.contract.methods.channels(channelId).call.request({
-                from: pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal())
-            }, 'latest', cb))
-        }, async (err, { state, channel }) => {
-            if (err)
-                return cb(err)
+        if (!state.isSet) {
+            log(node.peerInfo.id, Error(`Rejecting payment channel opening request because counterparty hasn't staked any funds.`))
+            return cb()
+        }
 
-            if (!state.isSet)
-                log(node.peerInfo.id, Error(`Rejecting payment channel opening request because counterparty hasn't staked any funds.`))
+        const stakedEther = new BN(state.stakedEther)
+        const claimedFunds = new BN(restoreTx.value)
 
-            const stakedEther = new BN(state.stakedEther)
-            const claimedFunds = new BN(restoreTx.value)
+        // Check whether the counterparty has staked enough money to open
+        // the payment channel
+        if (stakedEther.lt(claimedFunds)) {
+            log(node.peerInfo.id, `Rejecting payment channel opening request due to ${fromWei(claimedFunds.sub(stakedEther), 'ether')} ETH too less staked funds.`)
+            return cb()
+        }
+        // Check whether there is already such a channel registered in the
+        // smart contract
+        state = parseInt(channel.state)
+        if (!Number.isInteger(state) || state < 0)
+            return cb(Error(`Invalid state. Got ${state.toString()} instead.`))
 
-            // Check whether the counterparty has staked enough money to open
-            // the payment channel
-            if (stakedEther.lt(claimedFunds)) 
-                log(node.peerInfo.id, `Rejecting payment channel opening request due to ${fromWei(claimedFunds.sub(stakedEther), 'ether')} ETH too less staked funds.`)
+        await node.db.put(node.paymentChannels.StashedRestoreTransaction(channelId), restoreTx.toBuffer(), { sync: true })
 
-            // Check whether there is already such a channel registered in the
-            // smart contract
-            state = parseInt(channel.state)
-            if (!Number.isInteger(state) || state < 0)
-                return cb(Error(`Invalid state. Got ${state.toString()} instead.`))
+        node.paymentChannels.registerOpeningListener(channelId)
+        node.paymentChannels.registerSettlementListener(channelId)
 
-            await node.db.put(node.paymentChannels.StashedRestoreTransaction(channelId), restoreTx.toBuffer(), { sync: true })
+        const sigRestore = sign(restoreTx.hash, node.peerInfo.id.privKey.marshal())
 
-            node.paymentChannels.registerOpeningListener(channelId)
-            node.paymentChannels.registerSettlementListener(channelId)
-
-            const sigRestore = sign(restoreTx.hash, node.peerInfo.id.privKey.marshal())
-
-            return cb(null, Buffer.concat([sigRestore.signature, numberToBuffer(sigRestore.recovery, 1)], SIGNATURE_LENGTH + 1))
-        })
-
-        batch.execute()
+        return cb(null, Buffer.concat([sigRestore.signature, numberToBuffer(sigRestore.recovery, 1)], SIGNATURE_LENGTH + 1))
     }
 
     node.handle(PROTOCOL_PAYMENT_CHANNEL, (protocol, conn) => pull(

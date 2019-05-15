@@ -21,8 +21,8 @@ const { waterfall, groupBy } = require('neo-async')
 const wrtc = require('wrtc')
 
 class WebRTC {
-    constructor(options, sw, peerRouting) {
-        this.sw = sw
+    constructor(options, peerRouting) {
+        this.sw = options.switch
         this.options = options
 
         if (peerRouting)

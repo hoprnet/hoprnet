@@ -81,11 +81,6 @@ class Hopr extends libp2p {
                 // ]
             },
             config: {
-                EXPERIMENTAL: {
-                    // libp2p DHT implementation is still hidden behind a flag
-                    dht: true,
-
-                },
                 // peerDiscovery: {
                 //     webRTCStar: {
                 //         enabled: true
@@ -98,7 +93,6 @@ class Hopr extends libp2p {
                     enabled: false
                 }
             }
-
         }
         super(defaultsDeep(_options, defaults))
 
@@ -123,32 +117,42 @@ class Hopr extends libp2p {
      * @param {Function} cb callback when node is ready
      */
     static async createNode(options, cb) {
-        if (typeof options === 'function') {
-            cb = options
-            options = {}
-        }
+        return new Promise(async (resolve, reject) => {
+            if (typeof options === 'function') {
+                cb = options
+                options = {}
+            }
 
-        options.output = options.output || console.log
+            options.output = options.output || console.log
 
-        const db = Hopr.openDatabase(`${process.cwd()}/db`, options)
+            const db = Hopr.openDatabase(`${process.cwd()}/db`, options)
 
-        // peerBook: (cb) => {
-        //     if (options.peerBook) {
-        //         cb(null, options.peerBook)
-        //     } else {
-        //         Hopr.importPeerBook(db, cb)
-        //     }
-        // }
+            // peerBook: (cb) => {
+            //     if (options.peerBook) {
+            //         cb(null, options.peerBook)
+            //     } else {
+            //         Hopr.importPeerBook(db, cb)
+            //     }
+            // }
 
-        const hopr = new Hopr({
-            config: {
-                WebRTC: options.WebRTC
-            },
-            // peerBook: peerBook,
-            peerInfo: await getPeerInfo(options, db)
-        }, db)
+            const hopr = new Hopr({
+                config: {
+                    // WebRTC: options.WebRTC
+                },
+                // peerBook: peerBook,
+                peerInfo: await getPeerInfo(options, db)
+            }, db)
 
-        return hopr.start(options, cb)
+            hopr.start(options, (err) => {
+                if (err)
+                    return reject(err)
+
+                resolve(hopr)
+            })
+        })
+
+
+
     }
 
     /**

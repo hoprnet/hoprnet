@@ -377,7 +377,16 @@ module.exports.pubKeyToPeerId = (pubKey, cb) => {
     if (pubKey.length != COMPRESSED_PUBLIC_KEY_LENGTH)
         return cb(Error(`Invalid public key. Expected a buffer of size ${COMPRESSED_PUBLIC_KEY_LENGTH} bytes. Got one of ${pubKey.length} bytes.`))
 
-    return PeerId.createFromPubKey(new libp2p_crypto.supportedKeys.secp256k1.Secp256k1PublicKey(pubKey).bytes, cb)
+    pubKey = new libp2p_crypto.supportedKeys.secp256k1.Secp256k1PublicKey(pubKey)
+
+    const hash = crypto.createHash('sha256').update(pubKey.bytes).digest()
+    const id = Multihash.encode(hash, 'sha2-256')
+
+    const peerId = new PeerId(id, null, pubKey)
+    if (cb)
+        return cb(null, peerId)
+    
+    return peerId
 }
 
 /**
@@ -521,7 +530,6 @@ module.exports.signTransaction = (tx, peerId, web3) =>
  * @param {Object} tx an Ethereum transaction
  * @param {Object} peerId a peerId
  * @param {Object} web3 a web3.js instance
- * @param {function} cb the function that is called when finished
  */
 module.exports.sendTransaction = async (tx, peerId, web3) =>
     web3.eth.sendSignedTransaction((await this.signTransaction(tx, peerId, web3)).rawTransaction)
@@ -539,7 +547,6 @@ module.exports.sendTransaction = async (tx, peerId, web3) =>
 
             return receipt
         })
-
 
 /**
  * Checks whether one of the src files is newer than one of
