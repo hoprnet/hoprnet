@@ -10,13 +10,22 @@ const Multiaddr = require('multiaddr')
 const { NAME } = require('./constants')
 
 module.exports = (options, db) => new Promise(async (resolve, reject) => {
-    const getFromDatabase = (cb) =>
-        db.get('key-pair', (err, serializedKeyPair) => {
-            if (err && !err.notFound)
-                return cb(err)
+    const getFromDatabase = () => new Promise(async (resolve, reject) => {
+        let serializedKeyPair
+        try {
+            serializedKeyPair = await db.get('key-pair')
 
-            if (!err)
-                return deserializeKeyPair(serializedKeyPair, cb)
+            resolve(new Promise((resolve, reject) =>
+                deserializeKeyPair(serializedKeyPair, (err, peerId) => {
+                    if (err)
+                        return reject(err)
+
+                    resolve(peerId)
+                })
+            ))
+        } catch (err) {
+            if (!err.notFound)
+                return reject(err)
 
             let key, peerId
             waterfall([
@@ -30,14 +39,15 @@ module.exports = (options, db) => new Promise(async (resolve, reject) => {
 
                     serializeKeyPair(peerId, cb)
                 },
-                (cb) => db.put('key-pair', serializedKeyPair, cb)
+                (serializedKeyPair, cb) => db.put('key-pair', serializedKeyPair, cb)
             ], (err) => {
                 if (err)
-                    throw err
+                    return reject(err)
 
-                cb(null, peerId)
+                resolve(peerId)
             })
-        })
+        }
+    })
 
     if (!db) {
         if (!options.peerInfo)
@@ -53,7 +63,7 @@ module.exports = (options, db) => new Promise(async (resolve, reject) => {
     let port = process.env.PORT
     let host = process.env.HOST
 
-    if (Number.isInteger(options.id)) 
+    if (Number.isInteger(options.id))
         port = (Number.parseInt(port) + 2 * options.id).toString()
 
     options.addrs = [Multiaddr.fromNodeAddress({
@@ -72,12 +82,7 @@ module.exports = (options, db) => new Promise(async (resolve, reject) => {
     } else if (options['bootstrap-node']) {
         peerId = privKeyToPeerId(process.env.FUND_ACCOUNT_PRIVATE_KEY)
     } else {
-        peerId = await new Promise((resolve, reject) => getFromDatabase((err, peerId) => {
-            if (err)
-                return reject(err)
-
-            resolve(peerId)
-        }))
+        peerId = await getFromDatabase()
     }
 
     const peerInfo = new PeerInfo(peerId)
