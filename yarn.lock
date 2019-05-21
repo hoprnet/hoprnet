@@ -3618,15 +3618,15 @@ level-ws@0.0.0:
     readable-stream "~1.0.15"
     xtend "~2.1.1"
 
-leveldown@~5.0.3:
-  version "5.0.3"
-  resolved "https://registry.yarnpkg.com/leveldown/-/leveldown-5.0.3.tgz#66880478e956528ed35d47e30f6609e1201bf79c"
-  integrity sha512-isfWtOQIXbGbQRI8nmU9FqCZM0klmqTAOFi0vF6G/D0O1ZgxLrSh6Xd4Zj9iVQfGt6+8jpYwkRbN07VLrxRM8w==
+leveldown@~5.1.0:
+  version "5.1.0"
+  resolved "https://registry.yarnpkg.com/leveldown/-/leveldown-5.1.0.tgz#89f8a4fd4eb51793988368fc7f91e6d4db5f6d53"
+  integrity sha512-+Ws1IDVSbJRJl/cP/JlapGSmt8xPSvZQpTlYGpyaMQiXtlx/fdMX30K2aHiTLxhLcnAg74D8odBG1Fk12/8SRA==
   dependencies:
     abstract-leveldown "~6.0.3"
     fast-future "~1.0.2"
     napi-macros "~1.8.1"
-    node-gyp-build "~3.8.0"
+    node-gyp-build "~4.1.0"
 
 levelup@3.1.1:
   version "3.1.1"
@@ -4550,10 +4550,10 @@ node-forge@~0.7.6:
   resolved "https://registry.yarnpkg.com/node-forge/-/node-forge-0.7.6.tgz#fdf3b418aee1f94f0ef642cd63486c77ca9724ac"
   integrity sha512-sol30LUpz1jQFBjOKwbjxijiE3b6pjd74YwfD0fJOKPjF+fONKb2Yg8rYgS6+bK6VDl+/wfr4IYpC7jDzLUIfw==
 
-node-gyp-build@~3.8.0:
-  version "3.8.0"
-  resolved "https://registry.yarnpkg.com/node-gyp-build/-/node-gyp-build-3.8.0.tgz#0f57efeb1971f404dfcbfab975c284de7c70f14a"
-  integrity sha512-bYbpIHyRqZ7sVWXxGpz8QIRug5JZc/hzZH4GbdT9HTZi6WmKCZ8GLvP8OZ9TTiIBvwPFKgtGrlWQSXDAvYdsPw==
+node-gyp-build@~4.1.0:
+  version "4.1.0"
+  resolved "https://registry.yarnpkg.com/node-gyp-build/-/node-gyp-build-4.1.0.tgz#3bc3dd7dd4aafecaf64a2e3729e785bc3cdea565"
+  integrity sha512-rGLv++nK20BG8gc0MzzcYe1Nl3p3mtwJ74Q2QD0HTEDKZ6NvOFSelY6s2QBPWIHRR8h7hpad0LiwajfClBJfNg==
 
 node-pre-gyp@^0.13.0:
   version "0.13.0"

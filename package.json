@@ -1,11 +1,11 @@
 {
-    "name": "messaging-protocol",
+    "name": "hopr",
     "author": {
         "name": "Validity Labs AG",
         "email": "info@validitylabs.org",
         "url": "https://validitylabs.org"
     },
-    "version": "0.2",
+    "version": "0.2.0",
     "description": "Privacy-preserving messaging protocol with incentivations for relay operators",
     "license": "GPL-3.0-only",
     "keywords": [
@@ -16,7 +16,7 @@
     "homepage": "https://hopr.network",
     "repository": {
         "type": "git",
-        "url": "https://github.com/validitylabs/messagingProtocol.git"
+        "url": "https://github.com/validitylabs/hopr.git"
     },
     "scripts": {
         "demo": "node test/demo.js",
@@ -34,7 +34,7 @@
         "dotenv-expand": "~5.1.0",
         "futoin-hkdf": "~1.0.3",
         "getopts": "~2.2.4",
-        "leveldown": "~5.0.3",
+        "leveldown": "~5.1.0",
         "levelup": "~4.0.0",
         "libp2p": "robertkiel/js-libp2p",
         "libp2p-crypto": "~0.16.1",
