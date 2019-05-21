@@ -15,6 +15,6 @@ module.exports = (node) => node.handle(PROTOCOL_SETTLE_CHANNEL, (protocol, conn)
     }),
     pull.drain((channelId) => {
         log(node.peerInfo.id, `Asked to settle channel \x1b[33m${channelId.toString('hex')}\x1b[0m.`)
-        node.paymentChannels.requestClose(channelId)
+        node.paymentChannels.closeChannel(channelId)
     })
 ))

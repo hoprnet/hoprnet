@@ -3,19 +3,22 @@
 const EventEmitter = require('events');
 
 const Web3 = require('web3')
-const { parallel } = require('neo-async')
+const { parallel, waterfall } = require('neo-async')
 const BN = require('bn.js')
 const secp256k1 = require('secp256k1')
+const pull = require('pull-stream')
+const lp = require('pull-length-prefixed')
+const chalk = require('chalk')
 
-const { pubKeyToEthereumAddress, sendTransaction, log, compileIfNecessary, isPartyA } = require('../utils')
+const { pubKeyToEthereumAddress, pubKeyToPeerId, sendTransaction, log, compileIfNecessary, isPartyA, mineBlock, bufferToNumber } = require('../utils')
 
 const open = require('./rpc/open')
 const closingListener = require('./eventListeners/close')
 const openingListener = require('./eventListeners/open')
 const transfer = require('./transfer')
-const requestClose = require('./rpc/requestClose')
-const closeChannels = require('./rpc/closeChannels')
 const registerHandlers = require('./handlers')
+const Transaction = require('../transaction')
+
 
 const HASH_LENGTH = 32
 const CHANNEL_ID_LENGTH = HASH_LENGTH
@@ -25,6 +28,14 @@ const COMPRESSED_PUBLIC_KEY_LENGTH = 33
 
 const PREFIX = Buffer.from('payments-')
 const PREFIX_LENGTH = PREFIX.length
+
+const { PROTOCOL_SETTLE_CHANNEL } = require('../constants')
+
+const SETTLEMENT_TIMEOUT = 40000
+
+const CHANNEL_STATE_UNINITIALIZED = 0
+const CHANNEL_STATE_FUNDED = 3
+const CHANNEL_STATE_WITHDRAWABLE = 4
 
 // payments
 // -> channelId
@@ -52,10 +63,10 @@ class PaymentChannel extends EventEmitter {
         this.closingListener = closingListener(this)
         this.openingListener = openingListener(this)
         this.transfer = transfer(this)
-        this.requestClose = requestClose(this)
-        this.closeChannels = closeChannels(this)
 
-        this.closingRequests = new Set()
+        this.subscriptions = new Map()
+        this.closingSubscriptions = new Map()
+        this.settleTimestamps = new Map()
     }
 
     /**
@@ -90,7 +101,7 @@ class PaymentChannel extends EventEmitter {
             })
 
             self.registerEventListeners((err) => {
-                if (err)    
+                if (err)
                     return cb(err)
 
                 cb(null, self)
@@ -137,9 +148,11 @@ class PaymentChannel extends EventEmitter {
 
         log(this.node.peerInfo.id, `Listening to close event of channel \x1b[33m${channelId.toString('hex')}\x1b[0m`)
 
-        this.contract.once('ClosedChannel', {
-            topics: [this.web3.utils.sha3(`ClosedChannel(bytes32,bytes16,uint256)`), `0x${channelId.toString('hex')}`]
-        }, listener)
+        this.closingSubscriptions.set(channelId.toString('hex'),
+            this.web3.eth.subscribe('logs', {
+                topics: [this.web3.utils.sha3(`ClosedChannel(bytes32,bytes16,uint256)`), `0x${channelId.toString('hex')}`]
+            }, listener)
+        )
     }
 
     /**
@@ -164,11 +177,11 @@ class PaymentChannel extends EventEmitter {
     }
 
     onceClosed(channelId, fn) {
-        this.once(`closed ${channelId.toString('base64')}`, fn)
+        this.once(`closed ${channelId.toString('hex')}`, fn)
     }
 
     emitClosed(channelId, receivedMoney) {
-        this.emit(`closed ${channelId.toString('base64')}`, receivedMoney)
+        this.emit(`closed ${channelId.toString('hex')}`, receivedMoney)
     }
 
     ChannelKey(channelId) {
@@ -197,6 +210,10 @@ class PaymentChannel extends EventEmitter {
 
     InitialValue(channelId) {
         return Buffer.concat([PREFIX, Buffer.from('initialBalance-'), channelId], PREFIX_LENGTH + 15 + CHANNEL_ID_LENGTH)
+    }
+
+    CurrentOnChainBalance(channelId) {
+        return Buffer.concat([PREFIX, Buffer.from('onChainBalance-'), channelId], PREFIX_LENGTH + 15 + CHANNEL_ID_LENGTH)
     }
 
     TotalBalance(channelId) {
@@ -251,7 +268,166 @@ class PaymentChannel extends EventEmitter {
     }
 
     /**
-     * Deletes all records that belong to a given channel.
+     * Returns a promise that resolves just when the funds from the channel are withdrawn.
+     * 
+     * @notice When using this method with `process.env.NETWORK === 'ganache'`, this method 
+     * will ask Ganache to mine blocks and increase the block time until the payment channel 
+     * becomes withdrawable.
+     *  
+     * @param {Buffer} channelId ID of the channel
+     */
+    withdraw(channelId) {
+        const self = this
+
+        /**
+         * Submits a withdraw transaction and cleans up attached event listeners.
+         */
+        const withdraw = async () => {
+            const restoreTx = Transaction.fromBuffer(await this.node.db.get(this.RestoreTransaction(channelId)))
+
+            return self.contractCall(self.contract.methods.withdraw(pubKeyToEthereumAddress(restoreTx.counterparty))).then((receipt) => {
+                const subscription = self.subscriptions.get(channelId.toString('hex'))
+                if (subscription) {
+                    subscription.unsubscribe()
+                    self.subscriptions.delete(channelId.toString('hex'))
+                }
+
+                const closingSubscription = self.closingSubscriptions.get(channelId.toString('hex'))
+                if (closingSubscription) {
+                    closingSubscription.unsubscribe()
+                    self.closingSubscriptions.delete(channelId.toString())
+                }
+
+                self.deleteChannel(channelId)
+
+                return receipt
+            })
+        }
+
+        /**
+         * Returns a promise that returns just when the channel is withdrawable.
+         */
+        const waitUntilChannelIsWithdrawable = () => {
+            return new Promise(async (resolve, reject) => {
+                const [channel, blockTimestamp] = await Promise.all([
+                    self.contract.methods.channels(channelId).call({
+                        from: pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal())
+                    }, 'latest'),
+                    self.web3.eth.getBlock('latest', false).then((block) => new BN(block.timestamp))
+                ])
+
+                if (channel.state == CHANNEL_STATE_WITHDRAWABLE && blockTimestamp.gt(new BN(channel.settleTimestamp)))
+                    return resolve()
+
+                self.settleTimestamps.set(channelId.toString('hex'), new BN(channel.settleTimestamp))
+                const subscription = self.web3.eth.subscribe('newBlockHeaders')
+                    .on('error', (err) => reject(err))
+                    .on('data', (block) => {
+                        const blockTimestamp = new BN(block.timestamp)
+                        log(self.node.peerInfo.id, `Waiting ... Block ${block.number}.`)
+
+                        if (blockTimestamp.gt(self.settleTimestamps.get(channelId.toString('hex')))) {
+                            subscription.unsubscribe((err, ok) => {
+                                if (err)
+                                    return reject(err)
+
+                                if (ok)
+                                    resolve()
+                            })
+                        } else if (process.env.NETWORK === 'ganache') {
+                            // ================ Only for testing ================
+                            mineBlock(self.contract.currentProvider)
+                            // ==================================================
+                        }
+                    })
+
+                self.subscriptions.set(channelId.toString('hex'), subscription)
+                if (process.env.NETWORK === 'ganache') {
+                    // ================ Only for testing ================
+                    mineBlock(self.contract.currentProvider)
+                    // ==================================================
+                }
+            })
+        }
+
+        return waitUntilChannelIsWithdrawable().then(() => withdraw())
+            .then(() => self.node.db.get(self.CurrentOnChainBalance(channelId)))
+            .then((balance) => new BN(balance))
+    }
+
+    /**
+     * Returns a promise that resolves just when a settlement transaction were successfully
+     * submitted to the Ethereum network.
+     * 
+     * @param {Buffer} channelId ID of the payment channel
+     */
+    submitSettlementTransaction(channelId) {
+        return new Promise(async (resolve, reject) => {
+            let lastTx, channelKey
+
+            try {
+                lastTx = await this.getLastTransaction(channelId)
+            } catch (err) {
+                reject(err)
+            }
+
+            log(this.node.peerInfo.id, `Trying to close payment channel \x1b[33m${channelId.toString('hex')}\x1b[0m. Nonce is ${this.nonce}`)
+
+            this.contractCall(this.contract.methods.closeChannel(
+                lastTx.index,
+                lastTx.nonce,
+                (new BN(lastTx.value)).toString(),
+                lastTx.curvePoint.slice(0, 32),
+                lastTx.curvePoint.slice(32, 33),
+                lastTx.signature.slice(0, 32),
+                lastTx.signature.slice(32, 64),
+                bufferToNumber(lastTx.recovery) + 27
+            ))
+                .then((receipt) => {
+                    log(this.node.peerInfo.id, `Settled channel \x1b[33m${channelId.toString('hex')}\x1b[0m with txHash \x1b[32m${receipt.transactionHash}\x1b[0m. Nonce is now \x1b[31m${this.nonce}\x1b[0m`)
+                    return resolve(receipt)
+                })
+                .catch((err) => reject(err))
+        })
+    }
+
+    /**
+     * Returns a promise that resolves with the latest transaction that exists in the database.
+     * Search order:
+     *  1. latest update transaction
+     *  2. restore transaction
+     *  3. stashed restore transaction (in case there is one)
+     * 
+     * @param {Bufer} channelId ID of the payment channel
+     */
+    getLastTransaction(channelId) {
+        return this.node.db.get(this.Transaction(channelId)).catch((err) => {
+            if (!err.notFound)
+                throw err
+
+            return this.node.db.get(this.RestoreTransaction(channelId)).catch((err) => {
+                if (!err.notFound)
+                    throw err
+
+                return this.node.db.get(this.StashedRestoreTransaction(channelId)).catch((err) => {
+                    if (!err.notFound)
+                        throw err
+                })
+            })
+        })
+            .then((txBuffer) => Transaction.fromBuffer(txBuffer))
+            .catch((err) => {
+                if (err.notFound) {
+                    throw Error(`Haven't found any transaction for channel ${chalk.yellow(channelId.toString('hex'))}.`)
+                } else {
+                    throw err
+                }
+            })
+    }
+
+    /**
+     * Returns a promise that resolves just when all database entries related to the
+     * given channelId are deleted.
      * 
      * @param {Buffer} channelId ID of the payment channel
      */
@@ -264,6 +440,7 @@ class PaymentChannel extends EventEmitter {
                 .del(this.StashedRestoreTransaction(channelId))
                 .del(this.Index(channelId))
                 .del(this.CurrentValue(channelId))
+                .del(this.CurrentOnChainBalance(channelId))
                 .del(this.InitialValue(channelId))
                 .del(this.TotalBalance(channelId))
 
@@ -301,6 +478,99 @@ class PaymentChannel extends EventEmitter {
         } else {
             return currentValue.isub(newValue)
         }
+    }
+
+    async counterpartyHasMoreRecentTransaction(channelId) {
+        const [tx, channelIndex] = await Promise.all([
+            this.getLastTransaction(channelId),
+            this.node.db.get(this.Index(channelId))
+                .then((index) => new BN(index))
+        ])
+        return channelIndex.gt(new BN(tx.index))
+    }
+
+    async askCounterpartyToCloseChannel(channelId) {
+        // Ask counterparty to settle payment channel because
+        // last payment went to that party which means that we
+        // have only one signature of the last transaction.
+        const restoreTx = Transaction.fromBuffer(await this.node.db.get(this.RestoreTransaction(channelId)))
+        const peerId = pubKeyToPeerId(restoreTx.counterparty)
+
+        waterfall([
+            (cb) => this.node.peerRouting.findPeer(peerId, cb),
+            (peerInfo, cb) => this.node.dialProtocol(peerInfo, PROTOCOL_SETTLE_CHANNEL, cb)
+        ], (err, conn) => {
+            if (err) {
+                log(this.node.peerInfo.id, chalk.red(err.message))
+                return
+            }
+
+            pull(
+                pull.once(channelId),
+                lp.encode(),
+                conn
+            )
+        })
+    }
+
+    closeChannel(channelId) {
+        return new Promise(async (resolve, reject) => {
+            const channel = await this.contract.methods.channels(channelId).call({
+                from: pubKeyToEthereumAddress(this.node.peerInfo.id.pubKey.marshal())
+            }, 'latest')
+
+            switch (parseInt(channel.state)) {
+                case CHANNEL_STATE_UNINITIALIZED:
+                    await this.deleteChannel(channelId)
+
+                    return reject(Error(`Channel ${chalk.yellow(channelId.toString('hex'))} doesn't exist.`))
+                case CHANNEL_STATE_FUNDED:
+                    if (await this.counterpartyHasMoreRecentTransaction(channelId)) {
+                        const now = Date.now()
+
+                        const timeout = setTimeout(this.submitSettlementTransaction, SETTLEMENT_TIMEOUT, channelId)
+
+                        this.onceClosed(channelId, () => {
+                            if (Date.now() - now < SETTLEMENT_TIMEOUT) {
+                                // Prevent node from settling channel itself with a probably
+                                // outdated transaction
+                                clearTimeout(timeout)
+                            }
+                            resolve(this.withdraw(channelId))
+                        })
+                        this.askCounterpartyToCloseChannel(channelId)
+                    } else {
+                        this.onceClosed(channelId, () => resolve(this.withdraw(channelId)))
+                        this.submitSettlementTransaction(channelId)
+                    }
+                    break
+                case CHANNEL_STATE_WITHDRAWABLE:
+                    resolve(this.withdraw(channelId))
+                    break
+                default:
+                    log(this.node.peerInfo.id, `Channel in unknown state: channel.state = ${chalk.red(channel.state)}.`)
+
+                    reject(new BN(0))
+            }
+        })
+    }
+
+    closeChannels() {
+        return new Promise((resolve, reject) => {
+            const promises = []
+            this.node.db.createKeyStream({
+                gt: this.RestoreTransaction(Buffer.alloc(CHANNEL_ID_LENGTH, 0)),
+                lt: this.RestoreTransaction(Buffer.alloc(CHANNEL_ID_LENGTH, 255))
+            })
+                .on('error', (err) => reject(err))
+                .on('data', (key) => promises.push(this.closeChannel(key.slice(key.length - CHANNEL_ID_LENGTH))))
+                .on('end', () =>
+                    Promise.all([promises])
+                        .then((results) =>
+                            resolve(results.reduce((acc, value) => acc.iadd(value)))
+                        )
+                )
+        })
     }
 
     /**

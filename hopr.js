@@ -122,12 +122,9 @@ function tabCompletion(line, cb) {
                     return cb(null, [[''], line])
                 }
 
-                hits = peers.filter((peerId) => peerId.startsWith(operands[1]))
+                hits = operands.length > 1 ? peers.filter((peerId) => peerId.startsWith(operands[1])) : peers
 
-                if (hits.length == 0)
-                    hits = peers
-
-                return cb(null, [hits.map((str) => `open ${str}`), line])
+                return cb(null, [hits.length ? hits.map((str) => `open ${str}`) : ['open'], line])
             })
             break
         case 'close':
@@ -142,12 +139,9 @@ function tabCompletion(line, cb) {
                     return cb(null, [[''], line])
                 }
 
-                hits = existingChannels.filter((peerId) => peerId.startsWith(operands[1]))
+                hits = operands.length > 1 ? existingChannels.filter((peerId) => peerId.startsWith(operands[1])) : existingChannels
 
-                if (hits.length == 0)
-                    hits = existingChannels
-
-                return cb(null, [hits.map((str) => `close ${str}`), line])
+                return cb(null, [hits.length ? hits.map((str) => `close ${str}`) : ['close'], line])
             })
             break
         default:
@@ -380,18 +374,17 @@ async function main() {
                         pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()),
                         pubKeyToEthereumAddress(peerInfo.id.pubKey.marshal())
                     )
+
                     let interval
-                    node.paymentChannels.registerOpeningListener(channelId, () => {
-                        console.log(chalk.green(`Successfully opened channel ${channelId.toString('hex')}.`))
+                    node.paymentChannels.open(peerInfo.id).then(() => {
+                        console.log(`${chalk.green(`Successfully opened channel`)} ${chalk.yellow(channelId.toString('hex'))}`)
                         clearInterval(interval)
                         setTimeout(() => {
                             readline.clearLine(process.stdin, 0)
                             rl.prompt()
                         })
                     })
-
-                    node.paymentChannels.open(peerInfo.id)
-                    console.log(`Submitted transaction. Waiting for confirmation .`)
+                    process.stdout.write(`Submitted transaction. Waiting for confirmation .`)
                     interval = setInterval(() => process.stdout.write('.'), 1000)
                 } catch (err) {
                     console.log(chalk.red('Unable to open payment channel.'))
@@ -435,19 +428,23 @@ async function main() {
                         pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()),
                         pubKeyToEthereumAddress(peerInfo.id.pubKey.marshal())
                     )
+
                     let interval
-                    node.paymentChannels.onceClosed(channelId, (err, receivedMoney) => {
-                        console.log(`${chalk.green(`Successfully closed channel`)} ${chalk.yellow(channelId.toString('hex'))}`)
-                        clearInterval(interval)
-                        node.paymentChannels.deleteChannel(channelId).then(() =>
+                    node.paymentChannels.closeChannel(channelId)
+                        .then((receivedMoney) => {
+                            console.log(`${chalk.green(`Successfully closed channel`)} ${chalk.yellow(channelId.toString('hex'))}. Received ${chalk.magenta(fromWei(receivedMoney, 'ether'))} ETH.`)
+                            clearInterval(interval)
                             setTimeout(() => {
                                 readline.clearLine(process.stdin, 0)
                                 rl.prompt()
                             })
-                        )
-                    })
-
-                    node.paymentChannels.requestClose(channelId)
+                        })
+                        .catch((err) => {
+                            console.log(err.message)
+                            clearInterval(interval)
+                            readline.clearLine(process.stdin, 0)
+                            rl.prompt()
+                        })
                     console.log(`Submitted transaction. Waiting for confirmation .`)
                     interval = setInterval(() => process.stdout.write('.'), 1000)
                 } catch (err) {
