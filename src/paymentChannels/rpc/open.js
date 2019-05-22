@@ -25,8 +25,8 @@ module.exports = (self) => (to) =>
                     randomBytes(Transaction.NONCE_LENGTH),
                     numberToBuffer(1, Transaction.INDEX_LENGTH),
                     (new BN(toWei('1', 'shannon'))).toBuffer('be', Transaction.VALUE_LENGTH),
+                    
                     // 0 is considered as infinity point / neutral element
-
                     Buffer.alloc(33, 0)
                 ).sign(self.node.peerInfo.id)
 
@@ -34,7 +34,9 @@ module.exports = (self) => (to) =>
                     pull.once(restoreTx.toBuffer()),
                     lp.encode(),
                     conn,
-                    lp.decode(),
+                    lp.decode({
+                        maxLength: Transaction.SIGNATURE_LENGTH + Transaction.RECOVERY_LENGTH
+                    }),
                     pull.filter((data) =>
                         Buffer.isBuffer(data) &&
                         data.length === Transaction.SIGNATURE_LENGTH + Transaction.RECOVERY_LENGTH &&

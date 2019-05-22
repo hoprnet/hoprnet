@@ -2,7 +2,7 @@
 
 const { sha3, toChecksumAddress } = require('web3-utils')
 const { randomBytes } = require('crypto')
-const { waterfall, parallel, map, some, each, tryEach } = require('neo-async')
+const { waterfall, parallel, map, some, each, tryEach, doUntil } = require('neo-async')
 const fs = require('fs')
 const libp2p_crypto = require('libp2p-crypto').keys
 const PeerId = require('peer-id')
@@ -377,7 +377,16 @@ module.exports.pubKeyToPeerId = (pubKey, cb) => {
     if (pubKey.length != COMPRESSED_PUBLIC_KEY_LENGTH)
         return cb(Error(`Invalid public key. Expected a buffer of size ${COMPRESSED_PUBLIC_KEY_LENGTH} bytes. Got one of ${pubKey.length} bytes.`))
 
-    return PeerId.createFromPubKey(new libp2p_crypto.supportedKeys.secp256k1.Secp256k1PublicKey(pubKey).bytes, cb)
+    pubKey = new libp2p_crypto.supportedKeys.secp256k1.Secp256k1PublicKey(pubKey)
+
+    const hash = crypto.createHash('sha256').update(pubKey.bytes).digest()
+    const id = Multihash.encode(hash, 'sha2-256')
+
+    const peerId = new PeerId(id, null, pubKey)
+    if (cb)
+        return cb(null, peerId)
+
+    return peerId
 }
 
 /**
@@ -521,7 +530,6 @@ module.exports.signTransaction = (tx, peerId, web3) =>
  * @param {Object} tx an Ethereum transaction
  * @param {Object} peerId a peerId
  * @param {Object} web3 a web3.js instance
- * @param {function} cb the function that is called when finished
  */
 module.exports.sendTransaction = async (tx, peerId, web3) =>
     web3.eth.sendSignedTransaction((await this.signTransaction(tx, peerId, web3)).rawTransaction)
@@ -539,7 +547,6 @@ module.exports.sendTransaction = async (tx, peerId, web3) =>
 
             return receipt
         })
-
 
 /**
  * Checks whether one of the src files is newer than one of
@@ -559,7 +566,7 @@ module.exports.compileIfNecessary = (srcFiles, artifacts, cb) => {
         }
     }
 
-    function compile(cb) {
+    function compile() {
         return new Promise((resolve, reject) => {
             const srcObject = {}
             srcFiles.forEach((file) => {
@@ -606,8 +613,8 @@ module.exports.compileIfNecessary = (srcFiles, artifacts, cb) => {
             }
 
             Object.entries(compiledContracts.contracts).forEach((array) =>
-                Object.entries(array[1]).forEach(([contractName, value]) => {
-                    fs.writeFileSync(`${process.cwd()}/build/contracts/${contractName}.json`, JSON.stringify(value, null, '\t'))
+                Object.entries(array[1]).forEach(([contractName, jsonObject]) => {
+                    fs.writeFileSync(`${process.cwd()}/build/contracts/${contractName}.json`, JSON.stringify(jsonObject, null, '\t'))
                 })
             )
 
@@ -774,20 +781,23 @@ module.exports.serializeKeyPair = (peerId, cb) => {
         (pw, isDefault, cb) => {
             console.log(`Done. Using peerId \x1b[34m${peerId.toB58String()}\x1b[0m\n`)
 
-            const key = scrypt.hashSync(pw, scryptParams, 44, salt)
+            const key = scrypt.hashSync(pw, scryptParams, 32, salt)
+            const iv = crypto.randomBytes(12)
 
             const serializedPeerId = rlp.encode([
+                Buffer.alloc(16, 0),
                 peerId.toBytes(),
                 peerId.privKey.bytes,
                 peerId.pubKey.bytes
             ])
 
             const ciphertext = chacha
-                .chacha20(key.slice(0, 32), key.slice(32, 32 + 12))
+                .chacha20(key, iv)
                 .update(serializedPeerId)
 
             cb(null, rlp.encode([
                 salt,
+                iv,
                 ciphertext
             ]))
         }
@@ -806,42 +816,46 @@ module.exports.serializeKeyPair = (peerId, cb) => {
  * @param {function} cb called afterward with `(err, peerId)`
  */
 module.exports.deserializeKeyPair = (encryptedSerializedKeyPair, cb) => {
-    const encrypted = rlp.decode(encryptedSerializedKeyPair)
-
-    const salt = encrypted[0]
-    const ciphertext = encrypted[1]
+    const [salt, iv, ciphertext] = rlp.decode(encryptedSerializedKeyPair)
 
     const scryptParams = { N: 8192, r: 8, p: 16 }
 
     const question = 'Please type in the password that was used to encrypt the key.'
 
-    waterfall([
-        (cb) => this.askForPassword(question, cb),
-        (pw, isDefault, cb) => {
-            const key = scrypt.hashSync(pw, scryptParams, 44, salt)
+    doUntil((cb) => this.askForPassword(question, (err, pw, _) => {
+        if (err)
+            return cb(err)
 
-            const plaintext = chacha
-                .chacha20(key.slice(0, 32), key.slice(32, 32 + 12))
-                .update(ciphertext)
+        const key = scrypt.hashSync(pw, scryptParams, 32, salt)
+        const plaintext = chacha
+            .chacha20(key, iv)
+            .update(ciphertext)
 
-            const decoded = rlp.decode(plaintext)
-
-            const peerId = PeerId.createFromBytes(decoded[0])
-
-            libp2p_crypto.unmarshalPrivateKey(decoded[1], (err, privKey) => {
-                if (err)
-                    return cb(err)
-
-                peerId.privKey = privKey
-                peerId.pubKey = libp2p_crypto.unmarshalPublicKey(decoded[2])
-
-                console.log(`Successfully restored ID \x1b[34m${peerId.toB58String()}\x1b[0m.`)
-
-                return cb(null, peerId)
-            })
-
+        let decoded
+        try {
+            decoded = rlp.decode(plaintext)
+        } catch (err) {
+            return cb(null, [Buffer.alloc(0)])
         }
-    ], cb)
+        cb(null, decoded)
+    }), (decoded) => Buffer.alloc(16, 0).equals(decoded[0]), (err, [ok, id, privKey, pubKey]) => {
+        if (err)
+            return cb(err)
+
+        const peerId = PeerId.createFromBytes(id)
+
+        libp2p_crypto.unmarshalPrivateKey(privKey, (err, privKey) => {
+            if (err)
+                return cb(err)
+
+            peerId.privKey = privKey
+            peerId.pubKey = libp2p_crypto.unmarshalPublicKey(pubKey)
+
+            console.log(`Successfully restored ID \x1b[34m${peerId.toB58String()}\x1b[0m.`)
+
+            return cb(null, peerId)
+        })
+    })
 }
 
 /**
