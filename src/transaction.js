@@ -221,9 +221,9 @@ class Transaction {
      * party that signed the transaction.
      * @returns {Boolean} whether the signature is valid 
      */
-    // verify(peerId) {
-    //     return this.counterparty.compare(peerId.pubKey.marshal()) === 0
-    // }
+    verify(peerId) {
+        return this.counterparty.equals(peerId.pubKey.marshal())
+    }
 
     /**
      * Creates a Transaction instance from a Buffer.

@@ -2,8 +2,6 @@
 
 const Transaction = require('../../transaction')
 
-const { parallel } = require('neo-async')
-
 const { PROTOCOL_PAYMENT_CHANNEL } = require('../../constants')
 const pull = require('pull-stream')
 const lp = require('pull-length-prefixed')
@@ -15,17 +13,17 @@ const BN = require('bn.js')
 const { SIGNATURE_LENGTH } = require('../../transaction')
 
 module.exports = (node) => {
-    async function handleOpeningRequest(data, cb) {
+    const handleOpeningRequest = async (data, cb) => {
         if (data.length !== Transaction.SIZE) {
             log(node.peerInfo.id, 'Invalid size of payment channel opening request.')
-            return cb()
+            return cb(null, Buffer.alloc(0))
         }
 
         const restoreTx = Transaction.fromBuffer(data)
 
         if (bufferToNumber(restoreTx.index) !== 1) {
             log(node.peerInfo.id, 'Invalid payment channel opening request.')
-            return cb()
+            return cb(null, Buffer.alloc(0))
         }
 
         const counterparty = restoreTx.counterparty
@@ -35,13 +33,15 @@ module.exports = (node) => {
             await node.db.get(node.paymentChannels.StashedRestoreTransaction(channelId))
             return
         } catch (err) {
-            if (!err.notFound)
-                return cb(err)
+            if (!err.notFound) {
+                log(node.peerInfo.id, err.message)
+                return cb(null, Buffer.alloc(0))
+            }
         }
 
         let state, channel
         try {
-            [ state, channel ] = await Promise.all([
+            [state, channel] = await Promise.all([
                 node.paymentChannels.contract.methods.states(pubKeyToEthereumAddress(counterparty)).call({
                     from: pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal())
                 }, 'latest'),
@@ -50,12 +50,13 @@ module.exports = (node) => {
                 }, 'latest')
             ])
         } catch (err) {
-            return cb(err)
+            log(node.peerInfo.id, err.message)
+            return cb(null, Buffer.alloc(0))
         }
 
         if (!state.isSet) {
             log(node.peerInfo.id, Error(`Rejecting payment channel opening request because counterparty hasn't staked any funds.`))
-            return cb()
+            return cb(null, Buffer.alloc(0))
         }
 
         const stakedEther = new BN(state.stakedEther)
@@ -65,13 +66,15 @@ module.exports = (node) => {
         // the payment channel
         if (stakedEther.lt(claimedFunds)) {
             log(node.peerInfo.id, `Rejecting payment channel opening request due to ${fromWei(claimedFunds.sub(stakedEther), 'ether')} ETH too less staked funds.`)
-            return cb()
+            return cb(null, Buffer.alloc(0))
         }
         // Check whether there is already such a channel registered in the
         // smart contract
         state = parseInt(channel.state)
-        if (!Number.isInteger(state) || state < 0)
-            return cb(Error(`Invalid state. Got ${state.toString()} instead.`))
+        if (!Number.isInteger(state) || state < 0) {
+            log(node.peerInfo.id, `Invalid state. Got ${state.toString()}.`)
+            return cb(null, Buffer.alloc(0))
+        }
 
         await node.db.put(node.paymentChannels.StashedRestoreTransaction(channelId), restoreTx.toBuffer(), { sync: true })
 
@@ -89,7 +92,6 @@ module.exports = (node) => {
             maxLength: Transaction.SIZE
         }),
         pull.asyncMap(handleOpeningRequest),
-        pull.filter(data => Buffer.isBuffer(data)),
         lp.encode(),
         conn
     ))

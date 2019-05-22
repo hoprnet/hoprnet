@@ -1,6 +1,7 @@
 'use strict'
 
 const BN = require('bn.js')
+const chalk = require('chalk')
 
 const { log, pubKeyToEthereumAddress } = require('../../utils')
 const Transaction = require('../../transaction')
@@ -20,7 +21,7 @@ module.exports = (self) => async (err, event) => {
         restoreTx = Transaction.fromBuffer(await self.node.db.get(self.StashedRestoreTransaction(channelId)))
     } catch (err) {
         if (err.notFound) 
-            throw Error(`${self.node.peerInfo.id.toB58String()} Opening request of channel ${channelId.toString('hex')} not found.`)
+            throw Error(`${chalk.blue(self.node.peerInfo.id.toB58String())}: Opening request of channel ${chalk.yellow(channelId.toString('hex'))} not found.`)
 
         throw err
     }
@@ -38,7 +39,7 @@ module.exports = (self) => async (err, event) => {
         .del(self.StashedRestoreTransaction(channelId))
         .write({ sync: true })
         .then(() => {
-            log(self.node.peerInfo.id, `Opened payment channel \x1b[33m${channelId.toString('hex')}\x1b[0m with txHash \x1b[32m${event.transactionHash}\x1b[0m. Nonce is now \x1b[31m${self.nonce - 1}\x1b[0m.`)
+            log(self.node.peerInfo.id, `Opened payment channel ${chalk.yellow(channelId.toString('hex'))} with txHash ${chalk.green(event.transactionHash)}. Nonce is now ${chalk.red(self.nonce - 1)}.`)
             self.emit(`opened ${channelId.toString('base64')}`, restoreTx)
         })
         .catch((err) => {

@@ -368,28 +368,37 @@ async function main() {
                     break
                 }
 
+                let peerInfo
                 try {
-                    const peerInfo = node.peerBook.get(new PeerId(bs58.decode(operands[1])))
-                    const channelId = getId(
-                        pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()),
-                        pubKeyToEthereumAddress(peerInfo.id.pubKey.marshal())
-                    )
+                    peerInfo = node.peerBook.get(new PeerId(bs58.decode(operands[1])))
+                } catch (err) {
+                    console.log(chalk.red('Unable to open payment channel.'))
+                    rl.prompt()
+                }
 
-                    let interval
-                    node.paymentChannels.open(peerInfo.id).then(() => {
+                const channelId = getId(
+                    pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()),
+                    pubKeyToEthereumAddress(peerInfo.id.pubKey.marshal())
+                )
+
+                let interval
+                node.paymentChannels.open(peerInfo.id)
+                    .then(() => {
                         console.log(`${chalk.green(`Successfully opened channel`)} ${chalk.yellow(channelId.toString('hex'))}`)
+                    })
+                    .catch((err) => {
+                        console.log(chalk.red(err.message))
+                    })
+                    .finally(() => {
                         clearInterval(interval)
                         setTimeout(() => {
                             readline.clearLine(process.stdin, 0)
                             rl.prompt()
                         })
                     })
-                    process.stdout.write(`Submitted transaction. Waiting for confirmation .`)
-                    interval = setInterval(() => process.stdout.write('.'), 1000)
-                } catch (err) {
-                    console.log(chalk.red('Unable to open payment channel.'))
-                    rl.prompt()
-                }
+                    
+                process.stdout.write(`Submitted transaction. Waiting for confirmation .`)
+                interval = setInterval(() => process.stdout.write('.'), 1000)
                 break
             case 'send':
                 if (operands.length != 2) {
@@ -408,12 +417,15 @@ async function main() {
                 )
                 break
             case 'closeAll':
-                node.paymentChannels.closeChannels((err) => {
-                    if (err)
-                        console.log(chalk.red(err.message))
-
-                    rl.prompt()
-                })
+                node.paymentChannels.closeChannels()
+                    .then((receivedMoney) => {
+                        console.log(`${chalk.green(`Closed all channels and received`)} ${chalk.magenta(fromWei(receivedMoney.toString(), 'ether'))} ETH.`)
+                        rl.prompt()
+                    })
+                    .catch((err) => {
+                        console.log(err)
+                        rl.prompt()
+                    })
                 break
             case 'close':
                 if (operands.length != 2) {
