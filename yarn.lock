@@ -1239,14 +1239,14 @@ chunky@0.0.0:
   resolved "https://registry.yarnpkg.com/chunky/-/chunky-0.0.0.tgz#1e7580a23c083897d2ad662459e7efd8465f608a"
   integrity sha1-HnWAojwIOJfSrWYkWefv2EZfYIo=
 
-cids@~0.6.0:
-  version "0.6.0"
-  resolved "https://registry.yarnpkg.com/cids/-/cids-0.6.0.tgz#0de7056a5246a7c7ebf3134eb4d83b3b8b841a06"
-  integrity sha512-34wuIeiBZOuvBwUuYR4XooVuXUQI2PYU9VmgM2eB3xkSmQYRlv2kh/dIbmGiLY2GuONlGR3lLtYdVkx1G9yXUg==
+cids@~0.7.0:
+  version "0.7.1"
+  resolved "https://registry.yarnpkg.com/cids/-/cids-0.7.1.tgz#d8bba49a35a0e82110879b5001abf1039c62347f"
+  integrity sha512-qEM4j2GKE/BiT6WdUi6cfW8dairhSLTUE8tIdxJG6SvY33Mp/UPjw+xcO0n1zsllgo72BupzKF/44v+Bg8YPPg==
   dependencies:
     class-is "^1.1.0"
     multibase "~0.6.0"
-    multicodec "~0.5.0"
+    multicodec "~0.5.1"
     multihashes "~0.4.14"
 
 cipher-base@^1.0.0, cipher-base@^1.0.1, cipher-base@^1.0.3:
@@ -3789,16 +3789,16 @@ libp2p-identify@~0.7.6:
     pull-length-prefixed "^1.3.1"
     pull-stream "^3.6.9"
 
-libp2p-kad-dht@~0.14.15:
-  version "0.14.15"
-  resolved "https://registry.yarnpkg.com/libp2p-kad-dht/-/libp2p-kad-dht-0.14.15.tgz#8f55a4d8cea447a371dd9e01878e6aae92c3c1ba"
-  integrity sha512-3bvTvOUxWqA2WNIRqct9uivHp7b3FpWivShfQKNojn7Fuz+2ern7+su0TZEgWTq2BTsQ9lfHA3OYsSh7EGg/Pw==
+libp2p-kad-dht@~0.15.0:
+  version "0.15.0"
+  resolved "https://registry.yarnpkg.com/libp2p-kad-dht/-/libp2p-kad-dht-0.15.0.tgz#a5c1007d358dc54f66a412c92f722922d063d568"
+  integrity sha512-JyySI8rbEsVkh7snohbxDEduV8gnG0g16f3d2XvHS7S51ziuIjPkmHEnvmVUTvmJbf/ue7UZXcGiXXOCqQMSBg==
   dependencies:
     abort-controller "^3.0.0"
     async "^2.6.2"
     base32.js "~0.1.0"
     chai-checkmark "^1.0.1"
-    cids "~0.6.0"
+    cids "~0.7.0"
     debug "^4.1.1"
     err-code "^1.1.2"
     hashlru "^2.3.0"
@@ -4408,7 +4408,7 @@ multibase@~0.6.0:
   dependencies:
     base-x "3.0.4"
 
-multicodec@~0.5.0:
+multicodec@~0.5.1:
   version "0.5.1"
   resolved "https://registry.yarnpkg.com/multicodec/-/multicodec-0.5.1.tgz#fa4d6fbb99abdf3cec0f207a022ce20ad3813fd5"
   integrity sha512-Q5glyZLdXVbbBxvRYHLQHpu8ydVf1422Z+v9fU47v2JCkiue7n+JcFS7uRv0cQW8hbVtgdtIDgYWPWaIKEXuXA==
