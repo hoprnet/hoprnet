@@ -1,77 +1,128 @@
 'use strict'
-
+const chalk = require('chalk')
 const PeerId = require('peer-id')
 const PeerInfo = require('peer-info')
 
 const pull = require('pull-stream')
 const lp = require('pull-length-prefixed')
 
-const flatten = require('lodash.flatten');
-const uniqWith = require('lodash.uniqwith')
-const pullAll = require('lodash.pullall')
-const { doWhilst, map, waterfall } = require('neo-async')
+const Queue = require('promise-queue')
+const { waterfall, tryEach } = require('neo-async')
 
-const { randomSubset, log } = require('../utils')
-const { MAX_HOPS, PROTOCOL_CRAWLING, MARSHALLED_PUBLIC_KEY_SIZE } = require('../constants')
+const { randomSubset, log, pubKeyToPeerId } = require('../utils')
+const { MAX_HOPS, PROTOCOL_CRAWLING } = require('../constants')
+const COMPRESSED_PUBLIC_KEY_SIZE = 33
 
-module.exports = (node) => (comparator, cb) => {
-    if (!cb) {
-        if (!comparator)
-            throw Error('Invalid input parameter.')
+const MAX_PARALLEL_REQUESTS = 4
+const QUEUE_MAX_SIZE = Infinity
 
-        cb = comparator
+module.exports = (node) => (comparator) => new Promise((resolve, reject) => {
+    if (!comparator)
         comparator = () => true
-    }
 
-    let nodes = [...node.peerBook.getAllArray().map((peerInfo) => peerInfo.id.toB58String())], selected
+    const queue = new Queue(MAX_PARALLEL_REQUESTS, QUEUE_MAX_SIZE)
+    let finished = false, first = true
 
-    function queryNode(peerId, cb) {
-        waterfall([
-            (cb) => node.peerRouting.findPeer(PeerId.createFromB58String(peerId), cb),
-            (peerInfo, cb) => node.dialProtocol(peerInfo, PROTOCOL_CRAWLING, cb),
-            (conn, cb) => pull(
+    const errors = []
+
+    /**
+     * Connect to another peer and returns a promise that resolves to all received nodes
+     * that were previously unknown.
+     * 
+     * @param {PeerId} peerId PeerId of the peer that is queried
+     */
+    const queryNode = (peerId) => new Promise((resolve, reject) =>
+        tryEach([
+            (cb) => node.dialProtocol(peerId, PROTOCOL_CRAWLING, cb),
+            (cb) => waterfall([
+                (cb) => node.peerRouting.findPeer(peerId, cb),
+                (peerInfo, cb) => node.dialProtocol(peerInfo, PROTOCOL_CRAWLING, cb)
+            ], cb)
+        ], (err, conn) => {
+            if (err)
+                return reject(err)
+
+            pull(
                 conn,
                 lp.decode({
-                    maxLength: MARSHALLED_PUBLIC_KEY_SIZE
+                    maxLength: COMPRESSED_PUBLIC_KEY_SIZE
                 }),
-                pull.asyncMap((pubKey, cb) => PeerId.createFromPubKey(pubKey, cb)),
-                pull.filter(peerId => {
-                    if (peerId.isEqual(node.peerInfo.id))
-                        return false
+                pull.collect((err, pubKeys) => {
+                    if (err)
+                        return cb(err)
 
-                    const found = node.peerBook.has(peerId.toB58String())
-                    node.peerBook.put(new PeerInfo(peerId))
+                    let peerIds = pubKeys
+                        .filter((pubKey) => pubKey.length == COMPRESSED_PUBLIC_KEY_SIZE)
+                        .map((pubKey) => pubKeyToPeerId(pubKey))
+                        .filter((peerId) => {
+                            if (peerId.isEqual(node.peerInfo.id))
+                                return false
 
-                    return !found
-                }),
-                pull.collect(cb))
-        ], cb)
+                            const found = node.peerBook.has(peerId.toB58String())
+                            node.peerBook.put(new PeerInfo(peerId))
+
+                            return !found
+                        })
+
+                    resolve(peerIds)
+                })
+            )
+        })
+    )
+
+    /**
+     * Decides whether we have enough peers to build a path and initiates some queries
+     * if that's not the case.
+     * 
+     * @param {PeerId[]} peerIds array of peerIds
+     */
+    const processResults = (peerIds) => {
+        const now = node.peerBook.getAllArray().filter(comparator).length
+        const enoughPeers = now >= MAX_HOPS
+
+        if (finished)
+            return
+
+        if (!first && enoughPeers) {
+            if (errors.length > 0)
+                log(node.peerInfo.id, `Errors while crawling:${errors.reduce((acc, err) => `\n${chalk.red(err.message)}`, '')}`)
+
+            finished = true
+
+            log(node.peerInfo.id, `Received ${now - before} new node${now - before > 1 ? '' : 's'}.`)
+            log(node.peerInfo.id, `Now holding peer information of ${now} node${now == 1 ? '' : 's'} in the network.`)
+
+            return resolve()
+        }
+
+        first = false
+
+        if (peerIds.length > 0)
+            return randomSubset(peerIds, Math.min(peerIds.length, MAX_PARALLEL_REQUESTS)).forEach((peerId) =>
+                queue.add(() => queryNode(peerId))
+                    .then((peerIds) => {
+                        processResults(peerIds)
+                    })
+                    .catch((err) => {
+                        errors.push(err)
+                        return processResults([])
+                    })
+            )
+
+        if (queue.getPendingLength() == 0) {
+            if (errors.length > 0)
+                log(node.peerInfo.id, `Errors while crawling:${errors.reduce((acc, err) => `\n${chalk.red(err.message)}`, '')}`)
+
+            log(node.peerInfo.id, `Received ${now - before} new node${now - before > 1 ? '' : 's'}.`)
+            log(node.peerInfo.id, `Now holding peer information of ${now} node${now == 1 ? '' : 's'} in the network.`)
+
+            reject(Error('Unable to find enough other nodes in the network.'))
+        }
     }
 
-    doWhilst((cb) => {
-        if (nodes.length === 0)
-            return cb(Error('Unable to find enough other nodes in the network.'))
+    const before = node.peerBook.getAllArray().filter(comparator).length
 
-        selected = randomSubset(nodes, Math.min(nodes.length, MAX_HOPS))
-        nodes = pullAll(nodes, selected)
+    let nodes = node.peerBook.getAllArray().map((peerInfo) => peerInfo.id)
 
-        map(selected, queryNode, (err, newNodes) => {
-            if (err) {
-                console.log(err)
-                return cb(err)
-            }
-
-            newNodes = uniqWith(flatten(newNodes), (a, b) => a.isEqual(b))
-
-            nodes.push(...newNodes.map((peerId) => peerId.toB58String()))
-
-            log(node.peerInfo.id, `Received ${newNodes.length} new node${newNodes.length === 1 ? '' : 's'}.`)
-            log(node.peerInfo.id, `Now holding peer information of ${node.peerBook.getAllArray().length} node${node.peerBook.getAllArray().length === 1 ? '' : 's'} in the network.`)
-            // log(node.peerInfo.id, node.peerBook.getAllArray().reduce((acc, peerInfo) => {
-            //     return acc.concat(`PeerId ${peerInfo.id.toB58String()}, available under ${peerInfo.multiaddrs.toArray().join(', ')}`)
-            // }, ''))
-
-            return cb()
-        })
-    }, () => node.peerBook.getAllArray().filter(comparator).length < MAX_HOPS, cb)
-}
+    processResults(nodes)
+})

@@ -281,12 +281,14 @@ async function main() {
         let amount
         switch (operands[0]) {
             case 'crawl':
-                node.crawlNetwork((err) => {
-                    if (err)
-                        console.log(chalk.red(err.message))
-
-                    rl.prompt()
-                })
+                node.crawlNetwork()
+                    .catch((err) => console.log(chalk.red(err.message)))
+                    .finally(() => {
+                        setTimeout(() => {
+                            readline.clearLine(process.stdin, 0)
+                            rl.prompt()
+                        })
+                    })
                 break
             case 'quit':
                 stopNode()
@@ -396,7 +398,7 @@ async function main() {
                             rl.prompt()
                         })
                     })
-                    
+
                 process.stdout.write(`Submitted transaction. Waiting for confirmation .`)
                 interval = setInterval(() => process.stdout.write('.'), 1000)
                 break

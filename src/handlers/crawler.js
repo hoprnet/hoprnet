@@ -17,14 +17,14 @@ module.exports = (node) => {
         const amountOfNodes = Math.min(CRAWLING_RESPONSE_NODES, peers.length)
 
         const selectedNodes = randomSubset(peers, amountOfNodes, filter)
-            .map((peerInfo) => peerInfo.id.pubKey.bytes)
+            .map((peerInfo) => peerInfo.id.pubKey.marshal())
 
         pull(
-            pull.values(selectedNodes),
+            pull.values(selectedNodes.length > 1 ? selectedNodes : [Buffer.alloc(0)]),
             lp.encode(),
             conn
         )
     }
-    
+
     node.handle(PROTOCOL_CRAWLING, handler)
 }

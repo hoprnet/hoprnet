@@ -171,7 +171,7 @@ class Hopr extends libp2p {
                 this.bootstrapServers = process.env.BOOTSTRAP_SERVERS.split(',').map(addr => Multiaddr(addr))
                 this.heartbeat = heartbeat(this)
                 this.getPublicIp = PublicIp(this, options)
-                this.crawlNetwork = crawlNetwork(this, options.Crawler || {})
+                this.crawlNetwork = crawlNetwork(this)
 
                 this.peerInfo.multiaddrs.forEach((addr) => {
                     if (match.LOCALHOST(addr)) {
@@ -320,14 +320,11 @@ class Hopr extends libp2p {
             !peerInfo.id.isEqual(destination) &&
             !this.bootstrapServers.some((multiaddr) => PeerId.createFromB58String(multiaddr.getPeerId()).isEqual(peerInfo.id))
 
-        this.crawlNetwork((err) => {
-            if (err)
-                return cb(err)
-
-            cb(null, randomSubset(
+        this.crawlNetwork()
+            .then(() => cb(null, randomSubset(
                 this.peerBook.getAllArray(), MAX_HOPS - 1, filter).map((peerInfo) => peerInfo.id)
-            )
-        })
+            ))
+            .catch((err) => cb(err))
     }
 
     static importPeerBook(db, cb) {
