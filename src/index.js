@@ -97,6 +97,7 @@ class Hopr extends libp2p {
         super(defaultsDeep(_options, defaults))
 
         this.db = db
+        this.heartbeat = heartbeat(this)
 
         // Functionality to ask another node for its public key in case that the
         // public key is not available which is not necessary anymore.
@@ -169,7 +170,7 @@ class Hopr extends libp2p {
                 registerHandlers(this, options)
 
                 this.bootstrapServers = process.env.BOOTSTRAP_SERVERS.split(',').map(addr => Multiaddr(addr))
-                this.heartbeat = heartbeat(this)
+                this.heartbeat.start()
                 this.getPublicIp = PublicIp(this, options)
                 this.crawlNetwork = crawlNetwork(this)
 
@@ -216,7 +217,7 @@ class Hopr extends libp2p {
     stop(cb = () => { }) {
         log(this.peerInfo.id, `Shutting down...`)
 
-        clearInterval(this.heartbeat)
+        this.heartbeat.stop()
 
         waterfall([
             (cb) => this.exportPeerBook(cb),
