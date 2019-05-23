@@ -105,7 +105,6 @@ class Hopr extends libp2p {
         // Notice: don't forget to activate the corresponding handler in `handlers/index.js`
         //
         this.getPubKey = getPubKey(this)
-        // this.getPubKey = this._dht.getPublicKey
     }
 
     /**

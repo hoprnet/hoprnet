@@ -281,7 +281,7 @@ async function main() {
         let amount
         switch (operands[0]) {
             case 'crawl':
-                node.crawlNetwork()
+                node.crawlNetwork((peerInfo) => !node.bootstrapServers.some((multiaddr) => PeerId.createFromB58String(multiaddr.getPeerId()).isEqual(peerInfo.id))                )
                     .catch((err) => console.log(chalk.red(err.message)))
                     .finally(() => {
                         setTimeout(() => {

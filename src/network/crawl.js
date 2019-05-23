@@ -89,7 +89,7 @@ module.exports = (node) => (comparator) => new Promise((resolve, reject) => {
 
             finished = true
 
-            log(node.peerInfo.id, `Received ${now - before} new node${now - before > 1 ? '' : 's'}.`)
+            log(node.peerInfo.id, `Received ${now - before} new node${now - before == 1 ? '' : 's'}.`)
             log(node.peerInfo.id, `Now holding peer information of ${now} node${now == 1 ? '' : 's'} in the network.`)
 
             return resolve()
