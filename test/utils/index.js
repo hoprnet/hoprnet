@@ -5,7 +5,6 @@ const { createNode } = require('../../src')
 const { privKeyToPeerId, pubKeyToEthereumAddress, sendTransaction, log, createDirectoryIfNotExists } = require('../../src/utils')
 const { STAKE_GAS_AMOUNT, GAS_PRICE } = require('../../src/constants')
 const { toWei, fromWei } = require('web3-utils')
-const Web3 = require('web3')
 const Ganache = require('ganache-core')
 const BN = require('bn.js')
 const LevelDown = require('leveldown')
@@ -45,20 +44,17 @@ module.exports.warmUpNodes = async (nodes) => {
  * 
  * @param {number} amountOfNodes number of nodes that should be generated
  * @param {object} options
- * @param {string} options.provider web3.js provider, e. g. `ws://localhost:8545`
  * @param {PeerId} peerId a peerId that contains public key and private key
  * @param {number} nonce the current nonce
  * @param {function} cb the function that will be called afterwards with `(err, nodes)`
  */
 module.exports.createFundedNodes = async (amountOfNodes, options, peerId, nonce) => {
-    const web3 = new Web3(process.env.PROVIDER)
-
     const promises = []
 
     for (let n = 0; n < amountOfNodes; n++) {
-        promises.push(createNode({
+        promises.push(createNode(Object.assign({
             id: n
-        }))
+        }, options)))
     }
 
     const nodes = await Promise.all(promises)
@@ -162,6 +158,11 @@ module.exports.startBootstrapServers = async (amountOfNodes) => {
                 createHash('sha256').update(i.toString()).digest()
             ),
             'bootstrap-node': true
+        }).then((node) => {
+            node.on('peer:connect', (peer) => {
+                console.log(`Incoming connection from ${chalk.blue(peer.id.toB58String())}.`)
+            })
+            return node
         }))
     }
 

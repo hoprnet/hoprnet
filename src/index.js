@@ -4,10 +4,10 @@ const libp2p = require('libp2p')
 const MPLEX = require('libp2p-mplex')
 const KadDHT = require('libp2p-kad-dht')
 const SECIO = require('libp2p-secio')
-const TCP = require('libp2p-tcp')
 const WebRTC = require('./network/natTraversal')
 
 const defaultsDeep = require('@nodeutils/defaults-deep')
+const groupBy = require('lodash.groupby')
 const once = require('once')
 
 const { createPacket } = require('./packet')
@@ -19,7 +19,6 @@ const getPubKey = require('./getPubKey')
 const getPeerInfo = require('./getPeerInfo')
 const { randomSubset, serializePeerBook, deserializePeerBook, log, match, createDirectoryIfNotExists } = require('./utils')
 
-const fs = require('fs')
 const levelup = require('levelup')
 const leveldown = require('leveldown')
 
@@ -114,9 +113,8 @@ class Hopr extends libp2p {
      * @param {Object} options.web3provider a web3 provider, default `http://localhost:8545`
      * @param {String} options.contractAddress the Ethereum address of the contract
      * @param {Object} options.peerInfo 
-     * @param {Function} cb callback when node is ready
      */
-    static async createNode(options, cb) {
+    static async createNode(options) {
         return new Promise(async (resolve, reject) => {
             if (typeof options === 'function') {
                 cb = options
@@ -153,6 +151,41 @@ class Hopr extends libp2p {
     }
 
     /**
+     * Parses the bootstrap servers given in `.env` and tries to connect to each of them.
+     * 
+     * @throws will throw an error if none of the bootstrapservers is online
+     * 
+     * @param {PeerInfo[]} [bootstrapServers] peerInfos that are used instead of those
+     * from `.env`.
+     */
+    async initBootstapServers(bootstrapServers) {
+        if (bootstrapServers) {
+            this.bootstrapServers = bootstrapServers
+        } else {
+            const tmp = groupBy(process.env.BOOTSTRAP_SERVERS.split(',').map(addr => Multiaddr(addr)), (ma) => ma.getPeerId())
+            this.bootstrapServers = Object.keys(tmp).reduce((peerId) => {
+                const peerInfo = new PeerInfo(PeerId.createFromB58String(peerId))
+
+                tmp[peerId].forEach((ma) => peerInfo.multiaddrs.add(ma))
+            }, [])
+        }
+
+        const results = await Promise.all(
+            this.bootstrapServers.map((addr) => new Promise((resolve, reject) =>
+                this.dial(addr, (err, conn) => {
+                    if (err)
+                        return resolve(false)
+
+                    resolve(true)
+                })
+            ))
+        )
+
+        if (!results.some((online) => online))
+            throw Error('Unable to connect to any bootstrap server.')
+    }
+
+    /**
      * This method starts the node and registers all necessary handlers. It will
      * also open the database and creates one if it doesn't exists.
      * 
@@ -165,7 +198,9 @@ class Hopr extends libp2p {
             (cb) => {
                 registerHandlers(this, options)
 
-                this.bootstrapServers = options.bootstrapServers || process.env.BOOTSTRAP_SERVERS.split(',').map(addr => Multiaddr(addr))
+                if (!options['bootstrap-node'])
+                    this.initBootstapServers(options.bootstrapServers)
+
                 this.heartbeat.start()
                 this.getPublicIp = PublicIp(this, options)
                 this.crawlNetwork = crawlNetwork(this)
@@ -190,9 +225,15 @@ class Hopr extends libp2p {
                         return cb()
 
                     PaymentChannels.create(this, cb)
+                },
+                bootstrapServers: (cb) => {
+                    if (options['bootstrap-node'])
+                        return cb()
+                        
+                    this.initBootstapServers(options.bootstrapServers).then(cb)
                 }
             }, cb),
-            ({ paymentChannels, publicAddrs }, cb) => {
+            ({ paymentChannels, publicAddrs, bootstrapServers }, cb) => {
                 this.paymentChannels = paymentChannels
 
                 if (publicAddrs)
@@ -286,7 +327,6 @@ class Hopr extends libp2p {
                     lp.decode({
                         maxLength: Acknowledgement.SIZE
                     }),
-                    pull.take(1),
                     pull.drain((data) => {
                         log(this.peerInfo.id, `Received acknowledgement.`)
                         // return cb()
@@ -315,7 +355,7 @@ class Hopr extends libp2p {
         const filter = (peerInfo) =>
             !peerInfo.id.isEqual(this.peerInfo.id) &&
             !peerInfo.id.isEqual(destination) &&
-            !this.bootstrapServers.some((multiaddr) => PeerId.createFromB58String(multiaddr.getPeerId()).isEqual(peerInfo.id))
+            !this.bootstrapServers.some((pInfo) => pInfo.id.isEqual(peerInfo.id))
 
         this.crawlNetwork()
             .then(() => cb(null, randomSubset(

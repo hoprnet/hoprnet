@@ -57,10 +57,7 @@ const main = async () => {
     const nodes = await createFundedNodes(AMOUNT_OF_NODES, {
         provider: provider,
         contractAddress: contractAddress,
-        bootstrapServers: bootstrapServers.reduce((acc, node) => {
-            acc.push(...node.peerInfo.multiaddrs.toArray())
-            return acc
-        }, [])
+        bootstrapServers: bootstrapServers.map((node) => node.peerInfo)
     }, fundingPeer, nonce)
 
     let timeout
