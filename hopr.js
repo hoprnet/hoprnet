@@ -3,7 +3,7 @@
 const dotenv = require('dotenv')
 const dotenvExpand = require('dotenv-expand')
 
-var myEnv = dotenv.config()
+const myEnv = dotenv.config()
 dotenvExpand(myEnv)
 
 const readline = require('readline')
@@ -199,6 +199,7 @@ function runAsBootstrapNode() {
     })
 }
 
+process.title = 'hopr'
 
 async function main() {
     console.log(`Welcome to ${chalk.bold('HOPR')}!\n`)
@@ -219,6 +220,8 @@ async function main() {
         output: process.stdout,
         completer: tabCompletion
     })
+
+    rl.on('close', stopNode)
 
     if (options['bootstrap-node'])
         return runAsBootstrapNode()

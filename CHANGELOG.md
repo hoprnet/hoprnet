@@ -1,3 +1,15 @@
+New:
+- Listening on IPv6 sockets is supported 
+- Use WebRTC by default and let WebRTC decide which transport protocol will be used
+- `yarn demo` spawns its own mini-testnet, including bootstrap server and persistent blockchain
+
+Changed:
+- crawling: crawling is not block anymore, leads to faster crawling
+- heartbeat: every connection uses its own timer now
+
+Fixed:
+- catching various previously uncatched errors
+
 ### Version 0.3
 
 New:

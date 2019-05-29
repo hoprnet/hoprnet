@@ -7,7 +7,7 @@ HOPR is a privacy-preserving messaging protocol that incentivizes users to parti
 There is a standalone demo to showcase the functionality:
 
 ### Software Requirements
-- [`Node.js`](https://nodejs.org/en/download/) >= 10
+- [`Node.js`](https://nodejs.org/en/download/) 10.x or 11.x
 - [`yarn`](https://yarnpkg.com/en/docs/install)
 
 On Windows? 👀 here: [Windows Setup](../../wiki/Setup#Windows)

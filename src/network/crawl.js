@@ -109,14 +109,14 @@ module.exports = (node) => (comparator) => new Promise((resolve, reject) => {
                     })
             )
 
-        if (queue.getPendingLength() == 0) {
+        if (queue.getPendingLength() == 0 && queue.getQueueLength() == 0) {
             if (errors.length > 0)
                 log(node.peerInfo.id, `Errors while crawling:${errors.reduce((acc, err) => `\n${chalk.red(err.message)}`, '')}`)
 
             log(node.peerInfo.id, `Received ${now - before} new node${now - before > 1 ? '' : 's'}.`)
             log(node.peerInfo.id, `Now holding peer information of ${now} node${now == 1 ? '' : 's'} in the network.`)
 
-            reject(Error('Unable to find enough other nodes in the network.'))
+            return reject(Error('Unable to find enough other nodes in the network.'))
         }
     }
 
