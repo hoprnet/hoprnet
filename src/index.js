@@ -17,7 +17,7 @@ const crawlNetwork = require('./network/crawl')
 const heartbeat = require('./network/heartbeat')
 const getPubKey = require('./getPubKey')
 const getPeerInfo = require('./getPeerInfo')
-const { randomSubset, serializePeerBook, deserializePeerBook, log, match } = require('./utils')
+const { randomSubset, serializePeerBook, deserializePeerBook, log, match, createDirectoryIfNotExists } = require('./utils')
 
 const fs = require('fs')
 const levelup = require('levelup')
@@ -33,7 +33,7 @@ const PublicIp = require('./network/natTraversal/stun')
 
 const pull = require('pull-stream')
 const lp = require('pull-length-prefixed')
-const { waterfall, times, parallel, map } = require('neo-async')
+const { series, waterfall, times, parallel, map } = require('neo-async')
 const Acknowledgement = require('./acknowledgement')
 
 class Hopr extends libp2p {
@@ -54,7 +54,7 @@ class Hopr extends libp2p {
                  * The transport modules to use.
                  */
                 transport: [
-                    TCP,
+                    // TCP,
                     WebRTC
                 ],
                 /**
@@ -125,7 +125,7 @@ class Hopr extends libp2p {
 
             options.output = options.output || console.log
 
-            const db = Hopr.openDatabase(`${process.cwd()}/db`, options)
+            const db = Hopr.openDatabase(`db`, options)
 
             // peerBook: (cb) => {
             //     if (options.peerBook) {
@@ -150,9 +150,6 @@ class Hopr extends libp2p {
                 resolve(hopr)
             })
         })
-
-
-
     }
 
     /**
@@ -168,7 +165,7 @@ class Hopr extends libp2p {
             (cb) => {
                 registerHandlers(this, options)
 
-                this.bootstrapServers = process.env.BOOTSTRAP_SERVERS.split(',').map(addr => Multiaddr(addr))
+                this.bootstrapServers = options.bootstrapServers || process.env.BOOTSTRAP_SERVERS.split(',').map(addr => Multiaddr(addr))
                 this.heartbeat.start()
                 this.getPublicIp = PublicIp(this, options)
                 this.crawlNetwork = crawlNetwork(this)
@@ -213,12 +210,12 @@ class Hopr extends libp2p {
      * Shutdown the node and saves keys and peerBook in the database
      * @param {Function} cb 
      */
-    stop(cb = () => { }) {
+    stop(cb) {
         log(this.peerInfo.id, `Shutting down...`)
 
         this.heartbeat.stop()
 
-        waterfall([
+        series([
             (cb) => this.exportPeerBook(cb),
             (cb) => super.stop(cb),
             (cb) => this.db.close(cb)
@@ -355,39 +352,20 @@ class Hopr extends libp2p {
     }
 
     static openDatabase(db_dir, options) {
-        try {
-            fs.accessSync(db_dir)
-        } catch (err) {
-            if (!err.code === 'ENOENT' && !err.code === 'EEXIST')
-                throw err
-
-            fs.mkdirSync(db_dir, {
-                // TODO: Change to something better
-                mode: 0o777
-            })
-        }
-
         if (options && Number.isInteger(options.id)) {
             // Only for unit testing !!!
             db_dir = `${db_dir}/node ${options.id}`
-
-            try {
-                fs.accessSync(db_dir)
-            } catch (err) {
-                if (!err.code === 'ENOENT' && !err.code === 'EEXIST')
-                    throw err
-
-                fs.mkdirSync(db_dir, {
-                    // TODO: Change to something better
-                    mode: 0o777
-                })
-            }
-            //     clearDirectory(db_dir)
-            //     fs.mkdirSync(db_dir, {
-            //         mode: 0o777
-            //     })
-            // --------------------------
+        } else if (options && options['bootstap-node']) {
+            db_dir = `${db_dir}/bootstrap ${options.id}`
         }
+
+        createDirectoryIfNotExists(db_dir)
+
+        //     clearDirectory(db_dir)
+        //     fs.mkdirSync(db_dir, {
+        //         mode: 0o777
+        //     })
+        // --------------------------
 
         return levelup(leveldown(db_dir))
     }

@@ -26,22 +26,26 @@ module.exports = (node) => {
             if (err || !conn)
                 return cb(err)
 
-            pull(
-                conn,
-                lp.decode({
-                    maxLength: COMPRESSED_PUBLIC_KEY_SIZE
-                }),
-                pull.collect((err, pubKeys) => {
-                    if (err || pubKeys.length != 1 || pubKeys[0].length != COMPRESSED_PUBLIC_KEY_SIZE)
-                        return cb(Error(`Invalid response from ${peerId.toB58String()}`))
+            try {
+                pull(
+                    conn,
+                    lp.decode({
+                        maxLength: COMPRESSED_PUBLIC_KEY_SIZE
+                    }),
+                    pull.collect((err, pubKeys) => {
+                        if (err || pubKeys.length != 1 || pubKeys[0].length != COMPRESSED_PUBLIC_KEY_SIZE)
+                            return cb(Error(`Invalid response from ${peerId.toB58String()}`))
 
-                    const peerInfo = new PeerInfo(pubKeyToPeerId(pubKeys[0]))
-                    peerInfo.multiaddrs.replace([], targetPeerInfo.multiaddrs.toArray())
-                    node.peerBook.put(peerInfo)
+                        const peerInfo = new PeerInfo(pubKeyToPeerId(pubKeys[0]))
+                        peerInfo.multiaddrs.replace([], targetPeerInfo.multiaddrs.toArray())
+                        node.peerBook.put(peerInfo)
 
-                    cb(null, peerInfo)
-                })
-            )
+                        cb(null, peerInfo)
+                    })
+                )
+            } catch (err) {
+                return cb(err)
+            }
         })
 
     return (peer, callback) => {

@@ -26,8 +26,7 @@ module.exports = {
     PROTOCOL_SETTLE_CHANNEL: `${BASESTRING}/payment/settle`,
     PROTOCOL_STUN: `${BASESTRING}/stun`,
     PROTOCOL_HEARTBEAT: `${BASESTRING}/heartbeat`,
-    PROTOCOL_WEBRTC_SIGNALING: `${BASESTRING}/webrtc/signaling`,
-    PROTOCOL_WEBRTC_DATA: `${BASESTRING}/webrtc/data`,
+    PROTOCOL_WEBRTC_TURN: `${BASESTRING}/webrtc_turn`,
 
     STAKE_GAS_AMOUNT: "70000",
     UNSTAKE_GAS_AMOUNT: "40000",
