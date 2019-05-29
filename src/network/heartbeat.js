@@ -62,7 +62,6 @@ module.exports = (node) => {
         const timer = timers.get(peerInfo.id.toB58String())
         
         if (!timer) 
-            console.log('here')
             timers.set(peerInfo.id.toB58String(), setInterval(() => queryNode(peerInfo, (available, reason) => {
                 if (!available) {
                     log(node.peerInfo.id, `Removing ${peerInfo.id.toB58String()} from peerBook due to "${reason}".`)

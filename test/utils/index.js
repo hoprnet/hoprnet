@@ -1,16 +1,18 @@
 'use strict'
 
-const { times, waterfall } = require('neo-async')
+const { createHash } = require('crypto')
 const { createNode } = require('../../src')
-const { pubKeyToEthereumAddress, sendTransaction, log } = require('../../src/utils')
-const { STAKE_GAS_AMOUNT } = require('../../src/constants')
+const { privKeyToPeerId, pubKeyToEthereumAddress, sendTransaction, log, createDirectoryIfNotExists } = require('../../src/utils')
+const { STAKE_GAS_AMOUNT, GAS_PRICE } = require('../../src/constants')
 const { toWei, fromWei } = require('web3-utils')
 const Web3 = require('web3')
 const Ganache = require('ganache-core')
 const BN = require('bn.js')
+const LevelDown = require('leveldown')
+const chalk = require('chalk')
 
-const DEFAULT_STAKE = toWei('0.000001', 'ether')
-const DEFAULT_FUND = toWei('0.05', 'ether')
+const MINIMAL_FUND = new BN(toWei('0.1', 'ether'))
+const MINIMAL_STAKE = new BN(toWei('0.09', 'ether'))
 
 /**
  * Allow nodes to find each other by establishing connections
@@ -18,15 +20,23 @@ const DEFAULT_FUND = toWei('0.05', 'ether')
  * 
  * Connection from A -> B, B -> C, C -> D, ...
  * 
- * @param {Hopper} nodes nodes that will have open connections afterwards
- * @param {Function} cb callback that is called when finished
+ * @async
+ * @param {Hopr} nodes nodes that will have open connections afterwards
  */
-module.exports.warmUpNodes = (nodes, cb) =>
-    times(
-        nodes.length,
-        (n, cb) => nodes[n].dial(nodes[(n + 1) % nodes.length].peerInfo, cb),
-        (err, _) => cb(err, nodes)
-    )
+module.exports.warmUpNodes = async (nodes) => {
+    const promises = []
+
+    nodes.forEach((node, n) => promises.push(new Promise((resolve, reject) => {
+        node.dial(nodes[(n + 1) % nodes.length].peerInfo, (err, conn) => {
+            if (err)
+                reject(err)
+
+            resolve()
+        })
+    })))
+
+    return Promise.all(promises)
+}
 
 /**
  * Create HOPR nodes, establish a connection between them and fund their corresponding
@@ -40,63 +50,72 @@ module.exports.warmUpNodes = (nodes, cb) =>
  * @param {number} nonce the current nonce
  * @param {function} cb the function that will be called afterwards with `(err, nodes)`
  */
-module.exports.createFundedNodes = (amountOfNodes, options, peerId, nonce, cb) => {
+module.exports.createFundedNodes = async (amountOfNodes, options, peerId, nonce) => {
     const web3 = new Web3(process.env.PROVIDER)
 
-    waterfall([
-        (cb) => times(amountOfNodes, (n, cb) => createNode({
+    const promises = []
+
+    for (let n = 0; n < amountOfNodes; n++) {
+        promises.push(createNode({
             id: n
-        }, cb), cb),
-        (nodes, cb) => this.warmUpNodes(nodes, cb),
-        async (nodes, cb) => {
-            const fundBatch = []
+        }))
+    }
 
-            nodes.forEach((node, n) => 
-                fundBatch.push(sendTransaction({
-                    from: pubKeyToEthereumAddress(peerId.pubKey.marshal()),
-                    to: pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()),
-                    value: DEFAULT_FUND,
-                    gas: STAKE_GAS_AMOUNT,
-                    gasPrice: process.env.GAS_PRICE,
-                    nonce: nonce + n
-                }, peerId, web3))
-            )
+    const nodes = await Promise.all(promises)
 
+    await this.warmUpNodes(nodes)
 
-            try {
-                await Promise.all(fundBatch)
-            } catch (err) {
-                return cb(err)
-            }
+    const fundBatch = []
 
-            const stakeBatch = []
+    nodes.forEach((node, n) => fundBatch.push(this.fundNode(node, peerId, nonce + n)))
 
-            nodes.forEach((node) => {
-                log(node.peerInfo.id, `Received ${fromWei(DEFAULT_FUND)} ETH from \x1b[32m${pubKeyToEthereumAddress(peerId.pubKey.marshal())}\x1b[0m.`)
+    await Promise.all(fundBatch)
 
-                stakeBatch.push(sendTransaction({
-                    to: process.env.CONTRACT_ADDRESS,
-                    value: DEFAULT_STAKE,
-                    gas: STAKE_GAS_AMOUNT,
-                    gasPrice: process.env.GAS_PRICE,
-                    nonce: node.paymentChannels.nonce
-                }, node.peerInfo.id, web3))
+    await Promise.all(nodes.map((node) => this.stakeEther(node)))
+
+    return nodes
+}
+
+module.exports.fundNode = async (node, fundingNode, nonce) => {
+    const currentBalance = new BN(await node.paymentChannels.web3.eth.getBalance(pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal())))
+
+    if (!nonce)
+        nonce = await node.paymentChannels.web3.eth.getTransactionCount(pubKeyToEthereumAddress(fundingNode.pubKey.marshal()))
+
+    if (currentBalance.lt(MINIMAL_FUND)) {
+        return sendTransaction({
+            from: pubKeyToEthereumAddress(fundingNode.pubKey.marshal()),
+            to: pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()),
+            value: MINIMAL_FUND.sub(currentBalance).toString(),
+            gas: STAKE_GAS_AMOUNT,
+            gasPrice: process.env.GAS_PRICE,
+            nonce: nonce
+        }, fundingNode, node.paymentChannels.web3)
+            .then(() => {
+                log(node.peerInfo.id, `Received ${chalk.magenta(fromWei(MINIMAL_FUND.sub(currentBalance), 'ether'))} ETH from ${chalk.green(pubKeyToEthereumAddress(fundingNode.pubKey.marshal()))}.`)
             })
+    }
+}
 
-            try {
-                await Promise.all(stakeBatch)
-            } catch (err) {
-                return cb(err)
-            }
+module.exports.stakeEther = async (node) => {
+    const stakedEther = await node.paymentChannels.contract.methods.states(pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()))
+        .call({
+            from: pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal())
+        }).then((result) => new BN(result.stakedEther))
 
-            nodes.forEach((node) => {
-                log(node.peerInfo.id, `Funded contract \x1b[32m${options.contractAddress}\x1b[0m with ${fromWei(DEFAULT_STAKE)} ETH.`)
+    if (stakedEther.lt(MINIMAL_STAKE)) {
+        return sendTransaction({
+            to: process.env.CONTRACT_ADDRESS,
+            value: MINIMAL_STAKE.sub(stakedEther).toString(),
+            gas: STAKE_GAS_AMOUNT,
+            gasPrice: process.env.GAS_PRICE,
+            nonce: node.paymentChannels.nonce
+        }, node.peerInfo.id, node.paymentChannels.web3)
+            .then(() => {
                 node.paymentChannels.nonce = node.paymentChannels.nonce + 1
+                log(node.peerInfo.id, `Funded contract ${chalk.green(process.env.CONTRACT_ADDRESS)} with ${chalk.magenta(fromWei(MINIMAL_STAKE.sub(stakedEther), 'ether'))} ETH.`)
             })
-
-            return cb(null, nodes)
-        }
-    ], cb)
+    }
 }
 
 /**
@@ -105,21 +124,46 @@ module.exports.createFundedNodes = (amountOfNodes, options, peerId, nonce, cb) =
  * @returns {Promise} a promise that resolves once the ganache instance has been started,
  * otherwise it rejects.
  */
-module.exports.startTestnet = () => new Promise(async (resolve, reject) => {
+module.exports.startBlockchain = () => new Promise(async (resolve, reject) => {
+    createDirectoryIfNotExists('db/testnet')
     const server = Ganache.server({
         accounts: [
             {
                 balance: `0x${toWei(new BN(100), 'ether').toString('hex')}`,
                 secretKey: process.env.FUND_ACCOUNT_PRIVATE_KEY
             }
-        ]
+        ],
+        gasPrice: GAS_PRICE,
+        db: LevelDown(`${process.cwd()}/db/testnet`),
+        ws: true
     })
     server.listen(process.env.GANACHE_PORT, process.env.GANACHE_HOSTNAME, (err) => {
         if (err)
             return reject(err)
 
-        console.log(`Successfully started local Ganache instance at 'ws://${process.env.GANACHE_HOSTNAME}:${process.env.GANACHE_PORT}'.`)
+        const addr = server.address()
+        console.log(`Successfully started local Ganache instance at 'ws://${addr.family === 'IPv6' ? '[' : ''}${addr.address}${addr.family === 'IPv6' ? ']' : ''}:${addr.port}'.`)
 
         resolve(server)
     })
 })
+
+/**
+ * Starts a given amount of bootstrap servers.
+ * 
+ * @param {number} amountOfNodes how much bootstrap nodes
+ */
+module.exports.startBootstrapServers = async (amountOfNodes) => {
+    const promises = []
+
+    for (let i = 0; i < amountOfNodes; i++) {
+        promises.push(createNode({
+            peerId: privKeyToPeerId(
+                createHash('sha256').update(i.toString()).digest()
+            ),
+            'bootstrap-node': true
+        }))
+    }
+
+    return Promise.all(promises)
+}

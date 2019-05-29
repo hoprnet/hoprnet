@@ -596,21 +596,10 @@ module.exports.compileIfNecessary = (srcFiles, artifacts, cb) => {
             }
             const compiledContracts = JSON.parse(solc.compile(JSON.stringify(input), findImports))
 
-            if (compiledContracts.errors) {
+            if (compiledContracts.errors)
                 return reject(compiledContracts.errors.map(err => err.formattedMessage).join('\n'))
-            }
 
-            try {
-                fs.accessSync(`${process.cwd()}/build`)
-            } catch (err) {
-                fs.mkdirSync(`${process.cwd()}/build`)
-            }
-
-            try {
-                fs.accessSync(`${process.cwd()}/build/contracts`)
-            } catch (err) {
-                fs.mkdirSync(`${process.cwd()}/build/contracts`)
-            }
+            this.createDirectoryIfNotExists('build/contracts')
 
             Object.entries(compiledContracts.contracts).forEach((array) =>
                 Object.entries(array[1]).forEach(([contractName, jsonObject]) => {
@@ -683,7 +672,7 @@ module.exports.deployContract = (index, web3) => new Promise((resolve, reject) =
             data: '0x'.concat(compiledContract.evm.bytecode.object)
         }, fundingPeer, web3)
             .then((receipt) => {
-                console.log(`\nDeployed contract on ${chalk.magenta(process.env.NETWORK)} at ${chalk.green(receipt.contractAddress.toString('hex'))}.\nNonce is now ${chalk.red(index)}.\n`)
+                console.log(`Deployed contract on ${chalk.magenta(process.env.NETWORK)} at ${chalk.green(receipt.contractAddress.toString('hex'))}.\nNonce is now ${chalk.red(index)}.\n`)
 
                 updateContractAddress([`${process.cwd()}/.env`, `${process.cwd()}/.env.example`], receipt.contractAddress)
                 process.env.CONTRACT_ADDRESS = receipt.contractAddress
@@ -897,6 +886,28 @@ module.exports.clearDirectory = (path) => {
         });
         fs.rmdirSync(path);
     }
+}
+
+/**
+ * Creates a directory if it doesn't exist.
+ * 
+ * @example 
+ * createDirectoryIfNotExists('db/testnet') // creates `./db` and `./db/testnet`
+ * @param {string} path 
+ */
+module.exports.createDirectoryIfNotExists = (path) => {
+    const chunks = path.split('/')
+
+    chunks.reduce((searchPath, chunk) => {
+        searchPath += '/'
+        searchPath += chunk
+        try {
+            fs.accessSync(`${process.cwd()}${searchPath}`)
+        } catch (err) {
+            fs.mkdirSync(`${process.cwd()}${searchPath}`)
+        }
+        return searchPath
+    }, '')
 }
 
 // ==========================

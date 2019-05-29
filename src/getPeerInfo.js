@@ -57,14 +57,27 @@ module.exports = (options, db) => new Promise(async (resolve, reject) => {
     if (PeerInfo.isPeerInfo(options.peerInfo))
         return resolve(options.peerInfo)
 
-    if (!process.env.PORT || !process.env.HOST)
+    if (!process.env.HOST)
         return reject(Error('Unable to start node without an address. Please provide at least one.'))
 
-    let port = process.env.PORT
     let host = process.env.HOST
 
+    let port
+    if (options['bootstrap-node']) {
+        if (!process.env.BOOTSTRAP_PORT)
+            return reject(Error('Unable to start bootstrap node without a port. Please provide at least one.'))
+
+        port = process.env.BOOTSTRAP_PORT
+    } else if (!process.env.PORT) {
+        return reject(Error('Unable to start node without a port. Please provide at least one.'))
+    } else {
+        port = process.env.PORT
+    }
+
+    // Only for testing ==========================================
     if (Number.isInteger(options.id))
         port = (Number.parseInt(port) + 2 * options.id).toString()
+    // ===========================================================
 
     options.addrs = [Multiaddr.fromNodeAddress({
         address: host,
