@@ -32,15 +32,15 @@
         "class-is": "~1.1.0",
         "dotenv": "~8.0.0",
         "dotenv-expand": "~5.1.0",
-        "futoin-hkdf": "~1.0.3",
+        "futoin-hkdf": "~1.1.0",
         "getopts": "~2.2.4",
         "heap": "~0.2.6",
         "ip": "~1.1.5",
         "leveldown": "~5.1.0",
-        "levelup": "~4.0.0",
-        "libp2p": "robertkiel/js-libp2p",
-        "libp2p-crypto": "~0.16.1",
-        "libp2p-crypto-secp256k1": "~0.3.0",
+        "levelup": "~4.1.0",
+        "libp2p": "0.25.5",
+        "libp2p-crypto": "~0.17.0",
+        "libp2p-crypto-secp256k1": "~0.4.0",
         "libp2p-kad-dht": "~0.15.0",
         "libp2p-mplex": "~0.8.5",
         "libp2p-secio": "~0.11.1",
@@ -49,7 +49,7 @@
         "lodash.groupby": "~4.6.0",
         "lodash.pullall": "~4.2.0",
         "lodash.unionwith": "~4.6.0",
-        "multihashes": "~0.4.14",
+        "multihashes": "~0.4.15",
         "neo-async": "~2.6.0",
         "openzeppelin-solidity": "~2.3.0",
         "peer-info": "robertkiel/js-peer-info",
@@ -63,14 +63,14 @@
         "rlp": "~2.2.3",
         "scrypt": "~6.0.3",
         "secp256k1": "~3.7.0",
-        "simple-peer": "~9.3.0",
+        "simple-peer": "~9.4.0",
         "solc": "~0.5.9",
-        "web3": "1.0.0-beta.37",
+        "web3": "1.2.0",
         "wrtc": "~0.4.0",
         "xor-distance": "~2.0.0"
     },
     "devDependencies": {
         "eslint": "~5.16.0",
-        "ganache-core": "~2.5.5"
+        "ganache-core": "~2.6.0"
     }
 }
