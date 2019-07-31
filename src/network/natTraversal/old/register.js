@@ -1,7 +1,7 @@
 'use strict'
 
-const { randomNumber, match } = require('../../utils')
-const { NAME } = require('../../constants')
+const { randomNumber, match } = require('../../../utils')
+const { NAME } = require('../../../constants')
 const Multiaddr = require('multiaddr')
 const unionWith = require('lodash.unionwith')
 
@@ -30,13 +30,13 @@ module.exports = (self) => (newPeerInfo) => {
     }
 
     const toAdd = Multiaddr(`/${NAME}/${newPeerInfo.id.toB58String()}/p2p-webrtc-star/${NAME}/${self.sw._peerInfo.id.toB58String()}`)
-    
+
     self.sw._peerInfo.multiaddrs.replace(toDelete, toAdd)
 
     if (!self.sw.transports['WebRTCStar']) {
         self.sw.transport.add('WebRTCStar', self)
         self.sw.transport.listen('WebRTCStar', null, null, () => {})
-    } 
+    }
 
     self.listener.listen([toAdd], (err) => {
         if (err)

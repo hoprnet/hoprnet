@@ -39,3 +39,7 @@ Summarising votes can be done logarithmically such that counter overflows occur 
 TODO: Combine this with some time degradation such that new connections have a chance to stay open for a while.
 
 This effectively implements a heat map.
+
+# Config:
+HOPR IPv4 9091
+HOPR IPv6 9092

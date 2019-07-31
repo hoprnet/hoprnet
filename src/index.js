@@ -4,7 +4,7 @@ const libp2p = require('libp2p')
 const MPLEX = require('libp2p-mplex')
 const KadDHT = require('libp2p-kad-dht')
 const SECIO = require('libp2p-secio')
-const WebRTC = require('./network/natTraversal')
+const {WebRTCv4, WebRTCv6} = require('./network/natTraversal')
 
 const defaultsDeep = require('@nodeutils/defaults-deep')
 const groupBy = require('lodash.groupby')
@@ -38,9 +38,9 @@ const Acknowledgement = require('./acknowledgement')
 class Hopr extends libp2p {
     /**
      * @constructor
-     * 
-     * @param {Object} _options 
-     * @param {Object} provider 
+     *
+     * @param {Object} _options
+     * @param {Object} provider
      */
     constructor(_options, db) {
         if (!_options || !_options.peerInfo || !PeerInfo.isPeerInfo(_options.peerInfo))
@@ -54,7 +54,8 @@ class Hopr extends libp2p {
                  */
                 transport: [
                     // TCP,
-                    WebRTC
+                    WebRTCv4,
+                    WebRTCv6
                 ],
                 /**
                  * To support bidirectional connection, we need a stream muxer.
@@ -108,11 +109,11 @@ class Hopr extends libp2p {
 
     /**
      * Creates a new node and invokes @param cb with `(err, node)` when finished.
-     * 
+     *
      * @param {Object} options the parameters
      * @param {Object} options.web3provider a web3 provider, default `http://localhost:8545`
      * @param {String} options.contractAddress the Ethereum address of the contract
-     * @param {Object} options.peerInfo 
+     * @param {Object} options.peerInfo
      */
     static async createNode(options) {
         return new Promise(async (resolve, reject) => {
@@ -152,9 +153,9 @@ class Hopr extends libp2p {
 
     /**
      * Parses the bootstrap servers given in `.env` and tries to connect to each of them.
-     * 
+     *
      * @throws will throw an error if none of the bootstrapservers is online
-     * 
+     *
      * @param {PeerInfo[]} [bootstrapServers] peerInfos that are used instead of those
      * from `.env`.
      */
@@ -188,7 +189,7 @@ class Hopr extends libp2p {
     /**
      * This method starts the node and registers all necessary handlers. It will
      * also open the database and creates one if it doesn't exists.
-     * 
+     *
      * @param {Function} output function to which the plaintext of the received message is passed
      * @param {Function} cb callback when node is ready
      */
@@ -229,7 +230,7 @@ class Hopr extends libp2p {
                 bootstrapServers: (cb) => {
                     if (options['bootstrap-node'])
                         return cb()
-                        
+
                     this.initBootstapServers(options.bootstrapServers).then(cb)
                 }
             }, cb),
@@ -249,7 +250,7 @@ class Hopr extends libp2p {
 
     /**
      * Shutdown the node and saves keys and peerBook in the database
-     * @param {Function} cb 
+     * @param {Function} cb
      */
     stop(cb) {
         log(this.peerInfo.id, `Shutting down...`)
@@ -265,15 +266,15 @@ class Hopr extends libp2p {
 
     /**
      * Sends a message.
-     * 
+     *
      * @notice THIS METHOD WILL SPEND YOUR ETHER.
      * @notice This method will fail if there are not enough funds to open
      * the required payment channels. Please make sure that there are enough
      * funds controlled by the given key pair.
-     * 
+     *
      * @param {Number | String | Buffer} msg message to send
      * @param {PeerId | PeerInfo | String} destination PeerId of the destination
-     * @param {Function} cb called with `(err)` in case of an error, or when receiving 
+     * @param {Function} cb called with `(err)` in case of an error, or when receiving
      * the acknowledgement of the first hop
      */
     sendMessage(msg, destination, cb) {
@@ -347,8 +348,8 @@ class Hopr extends libp2p {
     /**
      * Takes a destination and samples randomly intermediate nodes
      * that will relay that message before it reaches its destination.
-     * 
-     * @param {Object} destination instance of peerInfo that contains the peerId of the destination 
+     *
+     * @param {Object} destination instance of peerInfo that contains the peerId of the destination
      * @param {Function} cb the function that called afterwards
      */
     getIntermediateNodes(destination, cb) {
