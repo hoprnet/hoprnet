@@ -73,7 +73,7 @@ class PaymentChannel extends EventEmitter {
      * Creates and initializes a new PaymentChannel instance.
      * It will check whether there is an up-to-date ABI of the contract
      * and compiles the contract if that isn't the case.
-     * 
+     *
      * @param {Hopr} node a libp2p node instance
      * @param {Function} cb a function the is called with `(err, self)` afterwards
      */
@@ -112,7 +112,7 @@ class PaymentChannel extends EventEmitter {
     /**
      * Registers listeners on-chain opening events and the closing events of all
      * payment channels found in the database.
-     * 
+     *
      * @param {Function} cb called with `(err)` when finished
      */
     registerEventListeners(cb) {
@@ -137,7 +137,7 @@ class PaymentChannel extends EventEmitter {
 
     /**
      * Registers a listener to the on-chain ClosedChannel event of a payment channel.
-     * 
+     *
      * @param {Buffer} channelId ID of the channel
      * @param {Function} listener function that is called whenever the `ClosedChannel` event
      * is fired.
@@ -157,7 +157,7 @@ class PaymentChannel extends EventEmitter {
 
     /**
      * Registers a listener to the on-chain OpenedChannel event of a payment channel.
-     * 
+     *
      * @param {Buffer} channelId ID of the channel
      * @param {Function} listener function that is called whenever the `OpenedChannel` event
      * is fired.
@@ -230,7 +230,7 @@ class PaymentChannel extends EventEmitter {
 
     /**
      * Fetches the previous challenges from the database and add them together.
-     * 
+     *
      * @param {Buffer} channelId ID of the payment channel
      */
     getPreviousChallenges(channelId) {
@@ -269,11 +269,11 @@ class PaymentChannel extends EventEmitter {
 
     /**
      * Returns a promise that resolves just when the funds from the channel are withdrawn.
-     * 
-     * @notice When using this method with `process.env.NETWORK === 'ganache'`, this method 
-     * will ask Ganache to mine blocks and increase the block time until the payment channel 
+     *
+     * @notice When using this method with `process.env.NETWORK === 'ganache'`, this method
+     * will ask Ganache to mine blocks and increase the block time until the payment channel
      * becomes withdrawable.
-     *  
+     *
      * @param {Buffer} channelId ID of the channel
      */
     withdraw(channelId) {
@@ -359,7 +359,7 @@ class PaymentChannel extends EventEmitter {
     /**
      * Returns a promise that resolves just when a settlement transaction were successfully
      * submitted to the Ethereum network.
-     * 
+     *
      * @param {Buffer} channelId ID of the payment channel
      * @param {Transaction} [tx] tx that is used to close the payment channel
      */
@@ -401,7 +401,7 @@ class PaymentChannel extends EventEmitter {
      *  1. latest update transaction
      *  2. restore transaction
      *  3. stashed restore transaction (in case there is one)
-     * 
+     *
      * @param {Bufer} channelId ID of the payment channel
      */
     getLastTransaction(channelId) {
@@ -432,7 +432,7 @@ class PaymentChannel extends EventEmitter {
     /**
      * Returns a promise that resolves just when all database entries related to the
      * given channelId are deleted.
-     * 
+     *
      * @param {Buffer} channelId ID of the payment channel
      */
     deleteChannel(channelId) {
@@ -464,7 +464,7 @@ class PaymentChannel extends EventEmitter {
     /**
      * Computes the delta of funds that were received with the given transaction in relation to the
      * initial balance.
-     * 
+     *
      * @param {Transaction} receivedTx the transaction upon which the delta funds is computed
      * @param {PeerId} counterparty peerId of the counterparty that is used to decide which side of
      * payment channel we are, i. e. party A or party B.
@@ -495,15 +495,15 @@ class PaymentChannel extends EventEmitter {
 
     /**
      * Asks the counterparty of the given channelId to provide the latest transaction.
-     * 
+     *
      * @param {Buffer} channelId ID of the payment channel
-     * @return {Promise} a promise that resolves with the latest transaction of the 
+     * @return {Promise} a promise that resolves with the latest transaction of the
      * counterparty and rejects if it is invalid and/or outdated.
      */
     getLatestTransactionFromCounterparty(channelId) {
         return new Promise(async (resolve, reject) => {
             const restoreTx = Transaction.fromBuffer(await this.node.db.get(this.RestoreTransaction(channelId)))
-            const counterparty = pubKeyToPeerId(restoreTx.counterparty)
+            const counterparty = await pubKeyToPeerId(restoreTx.counterparty)
 
             log(this.node.peerInfo.id, `Asking node ${counterparty.toB58String()} to send latest update transaction.`)
             waterfall([
@@ -620,7 +620,7 @@ class PaymentChannel extends EventEmitter {
     /**
      * Takes a transaction object generetad by web3.js and publishes it in the
      * network. It automatically determines the necessary amount of gas i
-     * 
+     *
      * @param {Object} txObject the txObject generated by web3.js
      * @param {String} value amount of Ether that is sent along with the transaction
      * @param {Function} cb the function to be called afterwards
