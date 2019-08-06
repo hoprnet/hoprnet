@@ -14,12 +14,7 @@ module.exports = (options, db) =>
         const checkConfig = () => {
             if (!process.env.HOST_IPV4 && !process.env.HOST_IPV6) return reject(Error('Unable to start node without an address. Please provide at least one.'))
 
-            if (process.env.HOST_IPV4 && !process.env.PORT_IPV4) return reject(Error('Got an IPv4 address but no port. Please specify a port.'))
-
-            if (process.env.HOST_IPV6 && !process.env.PORT_IPV6) return reject(Error('Got an IPv6 address but no port. Please specify a port.'))
-
-            // if (process.env.PORT_IPV4 && process.env.PORT_IPV6 && process.env.PORT_IPV4 === process.env.PORT_IPV6)
-            //     return reject(Error('IPv4 port and IPv6 port must not be the same.'))
+            if (!process.env.PORT) return reject(Error('Got no port to listen on. Please specify one.'))
         }
 
         const getFromDatabase = () =>
@@ -67,20 +62,17 @@ module.exports = (options, db) =>
         const getAddrs = () => {
             const addrs = []
 
-            let port
+            let port = process.env.PORT
+
+            // ============================= Only for testing ================================================
+            if (Number.isInteger(options.id)) port = (Number.parseInt(port) + 2 * (options.id + 1)).toString()
+            // ===============================================================================================
+
             if (process.env.HOST_IPV4) {
-                port = process.env.PORT_IPV4
-                // ============================= Only for testing ================================================
-                if (Number.isInteger(options.id)) port = (Number.parseInt(port) + 2 * (options.id + 1)).toString()
-                // ===============================================================================================
                 addrs.push(Multiaddr(`/ip4/${process.env.HOST_IPV4}/udp/${port}`))
             }
 
             if (process.env.HOST_IPV6) {
-                port = process.env.PORT_IPV6
-                // ============================= Only for testing ====================================================
-                if (Number.isInteger(options.id)) port = (Number.parseInt(port) + 2 * (options.id + 1) + 1).toString()
-                // ===================================================================================================
                 addrs.push(Multiaddr(`/ip6/${process.env.HOST_IPV6}/udp/${port}`))
             }
 
