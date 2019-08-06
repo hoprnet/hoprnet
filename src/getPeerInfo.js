@@ -18,8 +18,8 @@ module.exports = (options, db) =>
 
             if (process.env.HOST_IPV6 && !process.env.PORT_IPV6) return reject(Error('Got an IPv6 address but no port. Please specify a port.'))
 
-            if (process.env.PORT_IPV4 && process.env.PORT_IPV6 && process.env.PORT_IPV4 === process.env.PORT_IPV6)
-                return reject(Error('IPv4 port and IPv6 port must not be the same.'))
+            // if (process.env.PORT_IPV4 && process.env.PORT_IPV6 && process.env.PORT_IPV4 === process.env.PORT_IPV6)
+            //     return reject(Error('IPv4 port and IPv6 port must not be the same.'))
         }
 
         const getFromDatabase = () =>
@@ -99,11 +99,11 @@ module.exports = (options, db) =>
                         )
                     )
 
-                peerId = privKeyToPeerId(process.env[`DEMO_ACCOUNT_${options.id}_PRIVATE_KEY`])
-            } else if (PeerId.isPeerId(options.peerId)) {
+                peerId = await privKeyToPeerId(process.env[`DEMO_ACCOUNT_${options.id}_PRIVATE_KEY`])
+            } else if (await PeerId.isPeerId(options.peerId)) {
                 peerId = options.peerId
             } else if (options['bootstrap-node']) {
-                peerId = privKeyToPeerId(process.env.FUND_ACCOUNT_PRIVATE_KEY)
+                peerId = await privKeyToPeerId(process.env.FUND_ACCOUNT_PRIVATE_KEY)
             } else {
                 peerId = await getFromDatabase()
             }

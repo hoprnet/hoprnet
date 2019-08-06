@@ -31,7 +31,7 @@ class Packet {
 
     /**
      * Creates a new packet.
-     * 
+     *
      * @param {Hop} node the node itself
      * @param {Buffer} msg the message that is sent through the network
      * @param {PeerId[]} path array of peerId that determines the route that
@@ -102,7 +102,7 @@ class Packet {
 
     /**
      * Checks the packet and transforms it such that it can be send to the next node.
-     * 
+     *
      * @param {Hopr} node the node itself
      */
     async forwardTransform(node) {
@@ -162,7 +162,7 @@ class Packet {
 
     /**
      * Prepares the packet to deliver it.
-     * 
+     *
      * @param {Hopr} node the node itself
      * @param {Buffer} channelId the ID of the payment channel
      * @param {Buffer} curvePoint sum of the previous channel keys and pending challenges
@@ -198,7 +198,7 @@ class Packet {
 
     /**
      * Prepares the packet in order to forward it to the next node.
-     * 
+     *
      * @param {Hopr} node the node itself
      * @param {Buffer} channelId the ID of the payment channel
      * @param {Buffer} curvePoint sum of the previous channel keys and the pending challenges
@@ -252,35 +252,25 @@ class Packet {
     /**
      * Computes the peerId of the next downstream node and caches it for later use.
      */
-    getTargetPeerId() {
+    async getTargetPeerId() {
         if (this._targetPeerId)
             return this._targetPeerId
 
-        return new Promise((resolve, reject) => pubKeyToPeerId(this.header.address, (err, peerId) => {
-            if (err)
-                return reject(err)
+        this._targetPeerId = await pubKeyToPeerId(this.header.address)
 
-            this._targetPeerId = peerId
-
-            resolve(peerId)
-        }))
+        return this._targetPeerId
     }
 
     /**
      * Computes the peerId if the preceeding node and caches it for later use.
      */
-    getSenderPeerId() {
+    async getSenderPeerId() {
         if (this._previousPeerId)
             return this._previousPeerId
 
-        return new Promise((resolve, reject) => pubKeyToPeerId(this.transaction.counterparty, (err, peerId) => {
-            if (err)
-                return reject(err)
+        this._senderPeerId = await pubKeyToPeerId(this.transaction.counterparty)
 
-            this._senderPeerId = peerId
-
-            resolve(peerId)
-        }))
+        return this._senderPeerId
     }
 
     /**

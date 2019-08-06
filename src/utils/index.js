@@ -14,7 +14,7 @@ const { publicKeyConvert } = require('secp256k1')
 const scrypt = require('scrypt')
 const chacha = require('chacha')
 const read = require('read')
-const solc = require("solc")
+const solc = require('solc')
 const chalk = require('chalk')
 const crypto = require('crypto')
 
@@ -25,9 +25,8 @@ const PRIVKEY_LENGTH = 32
 // General methods
 // ==========================
 
-module.exports.hash = (buf) => {
-    if (!Buffer.isBuffer(buf))
-        throw Error('Invalid input. Please use a Buffer')
+module.exports.hash = buf => {
+    if (!Buffer.isBuffer(buf)) throw Error('Invalid input. Please use a Buffer')
 
     return Buffer.from(sha3(buf).replace(/0x/, ''), 'hex')
 }
@@ -40,8 +39,7 @@ module.exports.deepCopy = (instance, Class) => {
     if (typeof instance.toBuffer !== 'function' || !['function', 'number'].includes(typeof Class.SIZE) || typeof Class.fromBuffer !== 'function')
         throw Error('Incompatible class and / or invalid instance.')
 
-    const buf = Buffer.alloc(Class.SIZE)
-        .fill(instance.toBuffer(), 0, Class.SIZE)
+    const buf = Buffer.alloc(Class.SIZE).fill(instance.toBuffer(), 0, Class.SIZE)
 
     return Class.fromBuffer(buf)
 }
@@ -50,7 +48,7 @@ module.exports.deepCopy = (instance, Class) => {
  * Parse JSON while recovering all Buffer elements
  * @param  {String} str JSON string
  */
-module.exports.parseJSON = (str) =>
+module.exports.parseJSON = str =>
     JSON.parse(str || '', (key, value) => {
         if (value && value.type === 'Buffer') {
             return Buffer.from(value.data)
@@ -59,8 +57,7 @@ module.exports.parseJSON = (str) =>
         return value
     })
 
-module.exports.log = (peerId, msg) =>
-    console.log(`['\x1b[34m${peerId.toB58String()}\x1b[0m']: ${msg}`)
+module.exports.log = (peerId, msg) => console.log(`['\x1b[34m${peerId.toB58String()}\x1b[0m']: ${msg}`)
 // ==========================
 // Buffer methods
 // ==========================
@@ -92,18 +89,16 @@ module.exports.log = (peerId, msg) =>
 // }
 /**
  * Bitwise XOR of two Buffers.
- * 
+ *
  * @param  {Buffer} buf1 first Buffer
  * @param  {Buffer} buf2 second Buffer
- * 
+ *
  * @returns {Buffer} @param buf1 ^ @param buf2
  */
 module.exports.bufferXOR = (buf1, buf2) => {
-    if (!Buffer.isBuffer(buf1) || !Buffer.isBuffer(buf2))
-        throw Error(`Input values have to be provided as Buffers. Got ${typeof buf1} and ${typeof buf2}`)
+    if (!Buffer.isBuffer(buf1) || !Buffer.isBuffer(buf2)) throw Error(`Input values have to be provided as Buffers. Got ${typeof buf1} and ${typeof buf2}`)
 
-    if (buf1.length !== buf2.length)
-        throw Error(`Buffer must have the same length. Got buffers of length ${buf1.length} and ${buf2.length}.`)
+    if (buf1.length !== buf2.length) throw Error(`Buffer must have the same length. Got buffers of length ${buf1.length} and ${buf2.length}.`)
 
     const result = Buffer.alloc(buf1.length)
 
@@ -114,15 +109,13 @@ module.exports.bufferXOR = (buf1, buf2) => {
 }
 
 module.exports.numberToBuffer = (i, length) => {
-    if (i < 0)
-        throw Error('Not implemented!')
+    if (i < 0) throw Error('Not implemented!')
 
     return Buffer.from(i.toString(16).padStart(length * 2, '0'), 'hex')
 }
 
-module.exports.bufferToNumber = (buf) => {
-    if (!Buffer.isBuffer(buf) || buf.length === 0)
-        throw Error('Invalid input value. Expected a non-empty buffer.')
+module.exports.bufferToNumber = buf => {
+    if (!Buffer.isBuffer(buf) || buf.length === 0) throw Error('Invalid input value. Expected a non-empty buffer.')
 
     return parseInt(buf.toString('hex'), 16)
 }
@@ -134,30 +127,27 @@ module.exports.bufferToNumber = (buf) => {
  * Picks @param subsetSize elements at random from @param array .
  * The order of the picked elements does not coincide with their
  * order in @param array
- * 
+ *
  * @param  {Array} array the array to pick the elements from
  * @param  {Number} subsetSize the requested size of the subset
  * @param  {Function} filter called with `(peerInfo)` and should return `true`
  * for every node that should be in the subset
- * 
+ *
  * @returns {Array} array with at most @param subsetSize elements
  * that pass the test.
- * 
+ *
  * @notice If less than @param subsetSize elements pass the test,
- * the result will contain less than @param subsetSize elements. 
+ * the result will contain less than @param subsetSize elements.
  */
 module.exports.randomSubset = (array, subsetSize, filter = _ => true) => {
     if (!Number.isInteger(subsetSize) || subsetSize < 0)
         throw Error(`Invalid input arguments. Please provide a positive subset size. Got '${subsetSize}' instead.`)
 
-    if (!array || !Array.isArray(array))
-        throw Error(`Invalid input parameters. Expected an Array. Got '${typeof array}' instead.`)
+    if (!array || !Array.isArray(array)) throw Error(`Invalid input parameters. Expected an Array. Got '${typeof array}' instead.`)
 
-    if (subsetSize > array.length)
-        throw Error('Invalid subset size. Subset size must not be greater than set size.')
+    if (subsetSize > array.length) throw Error('Invalid subset size. Subset size must not be greater than set size.')
 
-    if (subsetSize <= 0)
-        return []
+    if (subsetSize <= 0) return []
 
     if (subsetSize === array.length)
         // Returns a random permutation of all elements that pass
@@ -183,7 +173,8 @@ module.exports.randomSubset = (array, subsetSize, filter = _ => true) => {
 
     let notChosen = new Set()
     let chosen = new Set()
-    let found, breakUp = false
+    let found,
+        breakUp = false
 
     let index = 0
     for (let i = 0; i < subsetSize && !breakUp; i++) {
@@ -209,8 +200,6 @@ module.exports.randomSubset = (array, subsetSize, filter = _ => true) => {
                 breakUp = true
                 break
             }
-
-
         } while (!found)
     }
 
@@ -225,15 +214,13 @@ module.exports.randomSubset = (array, subsetSize, filter = _ => true) => {
 /**
  * Return a random permutation of the given @param array
  * by using the (optimized) Fisher-Yates shuffling algorithm.
- * 
+ *
  * @param  {Array} array the array to permutate
  */
-module.exports.randomPermutation = (array) => {
-    if (!Array.isArray(array))
-        throw Error('Invalid input parameters. Got \'' + typeof array + '\' instead of Buffer.')
+module.exports.randomPermutation = array => {
+    if (!Array.isArray(array)) throw Error("Invalid input parameters. Got '" + typeof array + "' instead of Buffer.")
 
-    if (array.length <= 1)
-        return array
+    if (array.length <= 1) return array
 
     let i, j, tmp
 
@@ -260,11 +247,9 @@ module.exports.randomNumber = (start, end) => {
         start = 0
     }
 
-    if (start >= end)
-        throw Error('Invalid interval.')
+    if (start >= end) throw Error('Invalid interval.')
 
-    if (start + 1 == end)
-        return start
+    if (start + 1 == end) return start
 
     const byteAmount = Math.max(Math.ceil(Math.log2(end - start)) / 8, 1)
 
@@ -276,12 +261,12 @@ module.exports.randomNumber = (start, end) => {
 // ==========================
 /**
  * Derives an Ethereum address from a given public key.
- * 
+ *
  * @param  {Buffer} pubKey given as compressed elliptic curve point.
- * 
+ *
  * @returns {String} e.g. 0xc1912fEE45d61C87Cc5EA59DaE31190FFFFf232d
  */
-module.exports.pubKeyToEthereumAddress = (pubKey) => {
+module.exports.pubKeyToEthereumAddress = pubKey => {
     if (!Buffer.isBuffer(pubKey) || pubKey.length !== COMPRESSED_PUBLIC_KEY_LENGTH)
         throw Error(`Invalid input parameter. Expected a Buffer of size ${COMPRESSED_PUBLIC_KEY_LENGTH}.`)
 
@@ -293,14 +278,13 @@ module.exports.pubKeyToEthereumAddress = (pubKey) => {
 /**
  * Checks whether the ethereum address of the @param sender is
  * smaller than the ethereum address of the @param otherParty
- * 
+ *
  * @param {String | Buffer} sender an ethereum address
  * @param {String | Buffer} otherParty another ethereum address
  */
 module.exports.isPartyA = (sender, otherParty) => {
     if (typeof sender === 'string') {
-        if (sender.length !== 42)
-            throw Error('Invalid input parameters')
+        if (sender.length !== 42) throw Error('Invalid input parameters')
 
         sender = Buffer.from(sender.replace(/0x/, ''), 'hex')
     }
@@ -312,11 +296,9 @@ module.exports.isPartyA = (sender, otherParty) => {
         otherParty = Buffer.from(otherParty.replace(/0x/, ''), 'hex')
     }
 
-    if (!Buffer.isBuffer(sender) || !Buffer.isBuffer(otherParty))
-        throw Error('Invalid input parameters')
+    if (!Buffer.isBuffer(sender) || !Buffer.isBuffer(otherParty)) throw Error('Invalid input parameters')
 
-    if (sender.length != 20 || otherParty.length != 20)
-        throw Error('Invalid input parameters')
+    if (sender.length != 20 || otherParty.length != 20) throw Error('Invalid input parameters')
 
     return Buffer.compare(sender, otherParty) < 0
 }
@@ -324,9 +306,9 @@ module.exports.isPartyA = (sender, otherParty) => {
 const ETHEUREUM_ADDRESS_SIZE = 20 // Bytes
 
 /**
- * Computes the ID that is used by the smart contract to 
+ * Computes the ID that is used by the smart contract to
  * store payment channels.
- * 
+ *
  * @param {String | Buffer} sender an ethereum address or the corresponding public key
  * @param {String | Buffer} counterparty another ethereum address or the corresponding public key
  * @returns {Buffer} the Id
@@ -359,65 +341,52 @@ module.exports.getId = (sender, counterparty) => {
 /**
  * Converts a plain compressed ECDSA public key over the curve `secp256k1`
  * to a peerId in order to use it with libp2p.
- * 
+ *
  * @notice Libp2p stores the keys in format that is derived from `protobuf`.
  * Using `libsecp256k1` directly does not work.
- * 
+ *
  * @param {Buffer | string} pubKey the plain public key
  * @param {function} cb callback called with `(err, peerId)`
  */
 module.exports.pubKeyToPeerId = (pubKey, cb) => {
+    if (cb) throw Error('TODO -> promisify')
+
     if (typeof pubKey === 'string') {
         pubKey = Buffer.from(pubKey.replace(/0x/, ''), 'hex')
     }
 
-    if (!Buffer.isBuffer(pubKey))
-        return cb(Error(`Unable to parse public key to desired representation. Got ${pubKey.toString()}.`))
+    if (!Buffer.isBuffer(pubKey)) return cb(Error(`Unable to parse public key to desired representation. Got ${pubKey.toString()}.`))
 
     if (pubKey.length != COMPRESSED_PUBLIC_KEY_LENGTH)
         return cb(Error(`Invalid public key. Expected a buffer of size ${COMPRESSED_PUBLIC_KEY_LENGTH} bytes. Got one of ${pubKey.length} bytes.`))
 
     pubKey = new libp2p_crypto.supportedKeys.secp256k1.Secp256k1PublicKey(pubKey)
 
-    const hash = crypto.createHash('sha256').update(pubKey.bytes).digest()
-    const id = Multihash.encode(hash, 'sha2-256')
-
-    const peerId = new PeerId(id, null, pubKey)
-    if (cb)
-        return cb(null, peerId)
-
-    return peerId
+    return PeerId.createFromPubKey(pubKey.bytes)
 }
 
 /**
  * Converts a plain compressed ECDSA private key over the curve `secp256k1`
  * to a peerId in order to use it with libp2p.
  * It equips the generated peerId with private key and public key.
- * 
+ *
  * @param {Buffer | string} privKey the plain private key
- * @param {function} cb callback called with `(err, peerId)`
  */
 module.exports.privKeyToPeerId = (privKey, cb) => {
+    if (cb) throw Error('TODO -> promisify')
+
     if (typeof privKey === 'string') {
         privKey = Buffer.from(privKey.replace(/0x/, ''), 'hex')
     }
 
-    if (!Buffer.isBuffer(privKey))
-        return cb(Error(`Unable to parse private key to desired representation. Got type '${typeof privKey}'.`))
+    if (!Buffer.isBuffer(privKey)) return cb(Error(`Unable to parse private key to desired representation. Got type '${typeof privKey}'.`))
 
     if (privKey.length != PRIVKEY_LENGTH)
         return cb(Error(`Invalid private key. Expected a buffer of size ${PRIVKEY_LENGTH} bytes. Got one of ${privKey.length} bytes.`))
 
     privKey = new libp2p_crypto.supportedKeys.secp256k1.Secp256k1PrivateKey(privKey)
 
-    const hash = crypto.createHash('sha256').update(privKey.public.bytes).digest()
-    const id = Multihash.encode(hash, 'sha2-256')
-
-    const peerId = new PeerId(id, privKey, privKey.public)
-    if (cb)
-        return cb(null, peerId)
-
-    return peerId
+    return PeerId.createFromPrivKey(privKey.bytes)
 }
 
 /**
@@ -426,11 +395,11 @@ module.exports.privKeyToPeerId = (privKey, cb) => {
  * and calls the node. In case that this fails, try to lookup the peer in
  * the DHT.
  * If the node is unknown, do a DHT lookup and connect afterwards to that node.
- * 
+ *
  * @param {libp2p-switch} sw a libp2p-switch instance
  * @param {Object} options
  * @param {String} options.protocol the protocol to use, default `null`
- * @param {Object} options.peerRouting if present, use peerRouting to determine 
+ * @param {Object} options.peerRouting if present, use peerRouting to determine
  * fresh addresses
  * @param {PeerId} peerId the peerId of the peer that should be called
  * @param {Function(Error, Connection)} cb the function that gets called afterwards
@@ -442,23 +411,19 @@ module.exports.establishConnection = (sw, peerId, options, cb) => {
     }
 
     if (sw._peerBook.has(peerId)) {
-        tryEach([
-            (cb) => sw.dial(sw._peerBook.get(peerId), options.protocol, cb),
-            (cb) => {
-                if (!options.peerRouting)
-                    return cb(Error('TODO'))
+        tryEach(
+            [
+                cb => sw.dial(sw._peerBook.get(peerId), options.protocol, cb),
+                cb => {
+                    if (!options.peerRouting) return cb(Error('TODO'))
 
-                waterfall([
-                    (cb) => options.peerRouting.findPeer(peerId, cb),
-                    (cb, peerInfo) => sw.dial(peerInfo, protocol, cb)
-                ], cb)
-            }
-        ], cb)
+                    waterfall([cb => options.peerRouting.findPeer(peerId, cb), (cb, peerInfo) => sw.dial(peerInfo, protocol, cb)], cb)
+                }
+            ],
+            cb
+        )
     } else if (options.peerRouting) {
-        waterfall([
-            (cb) => sw.peerRouting.findPeer(peerId, cb),
-            (cb, peerInfo) => sw.dialProtocol(peerInfo, protocol, cb)
-        ], cb)
+        waterfall([cb => sw.peerRouting.findPeer(peerId, cb), (cb, peerInfo) => sw.dialProtocol(peerInfo, protocol, cb)], cb)
     } else {
         return cb(Error('TODO'))
     }
@@ -470,91 +435,105 @@ module.exports.establishConnection = (sw, peerId, options, cb) => {
 const ONE_MINUTE = 60 * 1000
 /**
  * Mine a single block and increase the timestamp by the given amount.
- * 
+ *
  * @notice The purpose of this method is to use it for testing with a local
  * testnet, i. e. Ganache.
- * 
+ *
  * @param {Object} provider a valid Web3 provider
  * @param {Number} amountOfTime increase the timestamp by that amount of time, default 1 minute
  */
-module.exports.mineBlock = (provider, amountOfTime = ONE_MINUTE) => waterfall([
-    (cb) => provider.send({
-        jsonrpc: '2.0',
-        method: 'evm_increaseTime',
-        params: [amountOfTime],
-        id: Date.now(),
-    }, (err, result) => cb(err)),
-    (cb) => provider.send({
-        jsonrpc: '2.0',
-        method: 'evm_mine',
-        id: Date.now(),
-    }, (err, result) => cb(err)),
-    () => provider.send({
-        jsonrpc: '2.0',
-        method: 'eth_blockNumber',
-        id: Date.now()
-    }, (err, response) => {
-        if (err) { throw err }
+module.exports.mineBlock = (provider, amountOfTime = ONE_MINUTE) =>
+    waterfall([
+        cb =>
+            provider.send(
+                {
+                    jsonrpc: '2.0',
+                    method: 'evm_increaseTime',
+                    params: [amountOfTime],
+                    id: Date.now()
+                },
+                (err, result) => cb(err)
+            ),
+        cb =>
+            provider.send(
+                {
+                    jsonrpc: '2.0',
+                    method: 'evm_mine',
+                    id: Date.now()
+                },
+                (err, result) => cb(err)
+            ),
+        () =>
+            provider.send(
+                {
+                    jsonrpc: '2.0',
+                    method: 'eth_blockNumber',
+                    id: Date.now()
+                },
+                (err, response) => {
+                    if (err) {
+                        throw err
+                    }
 
-        console.log(`\x1b[34mNow on block ${parseInt(response.result, 16)}.\x1b[0m`)
-    })
-])
+                    console.log(`\x1b[34mNow on block ${parseInt(response.result, 16)}.\x1b[0m`)
+                }
+            )
+    ])
 
 // ==========================
 // Web3.js methods
 // ==========================
 /**
  * Creates a web3 account from a peerId instance.
- * 
+ *
  * @param {PeerId} peerId a peerId instance
  * @param {Web3} web3 a web3.js instance
  */
 module.exports.peerIdToWeb3Account = (peerId, web3) => {
-    if (!peerId.privKey)
-        throw Error(`Unable to find private key. Please insert a peerId that is equipped with a private key.`)
+    if (!peerId.privKey) throw Error(`Unable to find private key. Please insert a peerId that is equipped with a private key.`)
 
     return web3.eth.accounts.privateKeyToAccount('0x'.concat(peerId.privKey.marshal().toString('hex')))
 }
 
 module.exports.signTransaction = (tx, peerId, web3) =>
-    this.peerIdToWeb3Account(peerId, web3).signTransaction(Object.assign(tx, {
-        from: this.pubKeyToEthereumAddress(peerId.pubKey.marshal()),
-        gasPrice: process.env.GAS_PRICE
-    }))
+    this.peerIdToWeb3Account(peerId, web3).signTransaction(
+        Object.assign(tx, {
+            from: this.pubKeyToEthereumAddress(peerId.pubKey.marshal()),
+            gasPrice: process.env.GAS_PRICE
+        })
+    )
 
 /**
- * Signs a transaction with the private key that is given by 
+ * Signs a transaction with the private key that is given by
  * the peerId instance and publishes it to the network given by
  * the web3.js instance
- * 
+ *
  * @param {Object} tx an Ethereum transaction
  * @param {Object} peerId a peerId
  * @param {Object} web3 a web3.js instance
  */
 module.exports.sendTransaction = async (tx, peerId, web3) =>
-    web3.eth.sendSignedTransaction((await this.signTransaction(tx, peerId, web3)).rawTransaction)
-        .then((receipt) => {
-            if (typeof receipt.status === 'string') {
-                receipt.status = parseInt(receipt.status, 16)
-            }
+    web3.eth.sendSignedTransaction((await this.signTransaction(tx, peerId, web3)).rawTransaction).then(receipt => {
+        if (typeof receipt.status === 'string') {
+            receipt.status = parseInt(receipt.status, 16)
+        }
 
-            if (typeof receipt.status === 'number') {
-                receipt.status === Boolean(receipt.status)
-            }
+        if (typeof receipt.status === 'number') {
+            receipt.status === Boolean(receipt.status)
+        }
 
-            if (!receipt.status)
-                return cb(Error('Reverted tx.'))
+        if (!receipt.status) return cb(Error('Reverted tx.'))
 
-            return receipt
-        })
+        return receipt
+    })
 
 /**
  * Checks whether one of the src files is newer than one of
  * the artifacts.
- * 
+ *
  * @notice the method utilizes Truffle to compile the smart contracts.
  * Please make sure that Truffle is accessible by `npx`.
- * 
+ *
  * @param {Array} srcFiles the absolute paths of the source files
  * @param {Array} artifacts the absolute paths of the artifacts
  * @param {function} cb called afterward with `(err)`
@@ -569,7 +548,7 @@ module.exports.compileIfNecessary = (srcFiles, artifacts, cb) => {
     function compile() {
         return new Promise((resolve, reject) => {
             const srcObject = {}
-            srcFiles.forEach((file) => {
+            srcFiles.forEach(file => {
                 srcObject[file] = {
                     content: fs.readFileSync(file).toString()
                 }
@@ -592,16 +571,14 @@ module.exports.compileIfNecessary = (srcFiles, artifacts, cb) => {
                         }
                     }
                 }
-
             }
             const compiledContracts = JSON.parse(solc.compile(JSON.stringify(input), findImports))
 
-            if (compiledContracts.errors)
-                return reject(compiledContracts.errors.map(err => err.formattedMessage).join('\n'))
+            if (compiledContracts.errors) return reject(compiledContracts.errors.map(err => err.formattedMessage).join('\n'))
 
             this.createDirectoryIfNotExists('build/contracts')
 
-            Object.entries(compiledContracts.contracts).forEach((array) =>
+            Object.entries(compiledContracts.contracts).forEach(array =>
                 Object.entries(array[1]).forEach(([contractName, jsonObject]) => {
                     fs.writeFileSync(`${process.cwd()}/build/contracts/${contractName}.json`, JSON.stringify(jsonObject, null, '\t'))
                 })
@@ -611,85 +588,105 @@ module.exports.compileIfNecessary = (srcFiles, artifacts, cb) => {
         })
     }
 
-    waterfall([
-        (cb) => some(artifacts, (file, cb) => fs.access(file, (err) => {
-            cb(null, !err)
-        }), cb),
-        (filesExist, cb) => {
-            if (!filesExist) {
-                compile().then(cb, cb)
-            } else {
-                parallel({
-                    srcTime: (cb) => map(srcFiles, fs.stat, (err, stats) => {
-                        if (err)
-                            return cb(err)
+    waterfall(
+        [
+            cb =>
+                some(
+                    artifacts,
+                    (file, cb) =>
+                        fs.access(file, err => {
+                            cb(null, !err)
+                        }),
+                    cb
+                ),
+            (filesExist, cb) => {
+                if (!filesExist) {
+                    compile().then(cb, cb)
+                } else {
+                    parallel(
+                        {
+                            srcTime: cb =>
+                                map(srcFiles, fs.stat, (err, stats) => {
+                                    if (err) return cb(err)
 
-                        return cb(null, stats.reduce((acc, current) => Math.max(acc, current.mtimeMs), 0))
-                    }),
-                    artifactTime: (cb) => map(artifacts, fs.stat, (err, stats) => {
-                        if (err)
-                            return cb(err)
+                                    return cb(null, stats.reduce((acc, current) => Math.max(acc, current.mtimeMs), 0))
+                                }),
+                            artifactTime: cb =>
+                                map(artifacts, fs.stat, (err, stats) => {
+                                    if (err) return cb(err)
 
-                        return cb(null, stats.reduce((acc, current) => Math.min(acc, current.mtimeMs), Date.now()))
-                    })
-                }, (err, { srcTime, artifactTime }) => {
-                    if (err)
-                        return cb(err)
+                                    return cb(null, stats.reduce((acc, current) => Math.min(acc, current.mtimeMs), Date.now()))
+                                })
+                        },
+                        (err, { srcTime, artifactTime }) => {
+                            if (err) return cb(err)
 
-                    if (srcTime > artifactTime)
-                        return compile().then(cb, cb)
+                            if (srcTime > artifactTime) return compile().then(cb, cb)
 
-                    return cb()
-                })
+                            return cb()
+                        }
+                    )
+                }
             }
-        }
-    ], cb)
+        ],
+        cb
+    )
 }
 
 /**
  * Deploys the smart contract.
- * 
+ *
  * @param {Number} index current index of the account of `FUNDING_PEER`
  * @param {Web3} web3 instance of web3.js
  * @returns {Promise} promise that resolve once the contract is compiled and deployed, otherwise
  * it rejects.
  */
-module.exports.deployContract = (index, web3) => new Promise((resolve, reject) =>
-    parallel({
-        fundingPeer: (cb) => this.privKeyToPeerId(process.env.FUND_ACCOUNT_PRIVATE_KEY, cb),
-        compiledContract: (cb) => this.compileIfNecessary([`${process.cwd()}/contracts/HoprChannel.sol`], [`${process.cwd()}/build/contracts/HoprChannel.json`], cb)
-    }, (err, { fundingPeer, compiledContract }) => {
-        if (err)
-            return reject(err)
+module.exports.deployContract = (index, web3) =>
+    new Promise((resolve, reject) =>
+        parallel(
+            {
+                fundingPeer: (cb) => this.privKeyToPeerId(process.env.FUND_ACCOUNT_PRIVATE_KEY).then(peerId => cb(null, peerId)),
+                compiledContract: cb =>
+                    this.compileIfNecessary([`${process.cwd()}/contracts/HoprChannel.sol`], [`${process.cwd()}/build/contracts/HoprChannel.json`], cb)
+            },
+            (err, { fundingPeer, compiledContract }) => {
+                if (err) return reject(err)
 
-        if (!compiledContract)
-            compiledContract = require(`${process.cwd()}/build/contracts/HoprChannel.json`)
+                if (!compiledContract) compiledContract = require(`${process.cwd()}/build/contracts/HoprChannel.json`)
 
-        this.sendTransaction({
-            gas: 3000333, // 2370333
-            gasPrice: process.env.GAS_PRICE,
-            nonce: index,
-            data: '0x'.concat(compiledContract.evm.bytecode.object)
-        }, fundingPeer, web3)
-            .then((receipt) => {
-                console.log(`Deployed contract on ${chalk.magenta(process.env.NETWORK)} at ${chalk.green(receipt.contractAddress.toString('hex'))}.\nNonce is now ${chalk.red(index)}.\n`)
+                this.sendTransaction(
+                    {
+                        gas: 3000333, // 2370333
+                        gasPrice: process.env.GAS_PRICE,
+                        nonce: index,
+                        data: '0x'.concat(compiledContract.evm.bytecode.object)
+                    },
+                    fundingPeer,
+                    web3
+                )
+                    .then(receipt => {
+                        console.log(
+                            `Deployed contract on ${chalk.magenta(process.env.NETWORK)} at ${chalk.green(
+                                receipt.contractAddress.toString('hex')
+                            )}.\nNonce is now ${chalk.red(index)}.\n`
+                        )
 
-                updateContractAddress([`${process.cwd()}/.env`, `${process.cwd()}/.env.example`], receipt.contractAddress)
-                process.env.CONTRACT_ADDRESS = receipt.contractAddress
+                        updateContractAddress([`${process.cwd()}/.env`, `${process.cwd()}/.env.example`], receipt.contractAddress)
+                        process.env.CONTRACT_ADDRESS = receipt.contractAddress
 
-                resolve(receipt.contractAddress)
-            })
-            .catch((err) => {
-                console.log(err.message)
-            })
-    })
-)
+                        resolve(receipt.contractAddress)
+                    })
+                    .catch(err => {
+                        console.log(err.message)
+                    })
+            }
+        )
+    )
 
 function updateContractAddress(files, contractAddress) {
-    if (!Array.isArray(files))
-        files = [files]
+    if (!Array.isArray(files)) files = [files]
 
-    files.forEach((filename) => {
+    files.forEach(filename => {
         let file = fs.readFileSync(filename).toString()
         const regex = new RegExp(`CONTRACT_ADDRESS_${process.env.NETWORK.toUpperCase()}\\s{0,}=(\\s{0,}0x[0-9a-fA-F]{0,})?`, 'g')
 
@@ -701,42 +698,42 @@ function updateContractAddress(files, contractAddress) {
 /**
  * Decodes the serialized peerBook and inserts the peerInfos in the given
  * peerBook instance.
- * 
+ *
  * @param {Buffer} serializePeerBook the encodes serialized peerBook
  * @param {PeerBook} peerBook a peerBook instance to store the peerInfo instances
  * @param {function} cb called when finished with `(err)`
  */
 module.exports.deserializePeerBook = (serializedPeerBook, peerBook, cb) =>
-    each(rlp.decode(serializedPeerBook), (serializedPeerInfo, cb) => {
-        const peerId = PeerId.createFromBytes(serializedPeerInfo[0])
+    each(
+        rlp.decode(serializedPeerBook),
+        (serializedPeerInfo, cb) => {
+            const peerId = PeerId.createFromBytes(serializedPeerInfo[0])
 
-        if (serializedPeerInfo.length === 3) {
-            peerId.pubKey = libp2p_crypto.unmarshalPublicKey(serializedPeerInfo[2])
-        }
+            if (serializedPeerInfo.length === 3) {
+                peerId.pubKey = libp2p_crypto.unmarshalPublicKey(serializedPeerInfo[2])
+            }
 
-        PeerInfo.create(peerId, (err, peerInfo) => {
-            if (err)
-                return cb(err)
+            PeerInfo.create(peerId, (err, peerInfo) => {
+                if (err) return cb(err)
 
-            serializedPeerInfo[1].forEach((multiaddr) => peerInfo.multiaddrs.add(Multiaddr(multiaddr)))
-            peerBook.put(peerInfo)
+                serializedPeerInfo[1].forEach(multiaddr => peerInfo.multiaddrs.add(Multiaddr(multiaddr)))
+                peerBook.put(peerInfo)
 
-            return cb()
-        })
-    }, cb)
+                return cb()
+            })
+        },
+        cb
+    )
 
 /**
  * Serializes a given peerBook by serializing the included peerInfo instances.
- * 
+ *
  * @param {PeerBook} peerBook the peerBook instance
  * @returns the encoded peerBook
  */
-module.exports.serializePeerBook = (peerBook) => {
+module.exports.serializePeerBook = peerBook => {
     function serializePeerInfo(peerInfo) {
-        const result = [
-            peerInfo.id.toBytes(),
-            peerInfo.multiaddrs.toArray().map(multiaddr => multiaddr.buffer)
-        ]
+        const result = [peerInfo.id.toBytes(), peerInfo.multiaddrs.toArray().map(multiaddr => multiaddr.buffer)]
 
         if (peerInfo.id.pubKey) {
             result.push(peerInfo.id.pubKey.bytes)
@@ -755,7 +752,7 @@ const SALT_LENGTH = 32
 
 /**
  * Serializes a given peerId by serializing the included private key and public key.
- * 
+ *
  * @param {PeerId} peerId the peerId that should be serialized
  * @param {function} cb called afterwards with `(err, encodedKeyPair)`
  */
@@ -765,42 +762,34 @@ module.exports.serializeKeyPair = (peerId, cb) => {
 
     const question = 'Please type in the password that will be used to encrypt the generated key.'
 
-    waterfall([
-        (cb) => this.askForPassword(question, cb),
-        (pw, isDefault, cb) => {
-            console.log(`Done. Using peerId \x1b[34m${peerId.toB58String()}\x1b[0m\n`)
+    waterfall(
+        [
+            cb => this.askForPassword(question, cb),
+            (pw, isDefault, cb) => {
+                console.log(`Done. Using peerId \x1b[34m${peerId.toB58String()}\x1b[0m\n`)
 
-            const key = scrypt.hashSync(pw, scryptParams, 32, salt)
-            const iv = crypto.randomBytes(12)
+                const key = scrypt.hashSync(pw, scryptParams, 32, salt)
+                const iv = crypto.randomBytes(12)
 
-            const serializedPeerId = rlp.encode([
-                Buffer.alloc(16, 0),
-                peerId.toBytes(),
-                peerId.privKey.bytes,
-                peerId.pubKey.bytes
-            ])
+                const serializedPeerId = rlp.encode([Buffer.alloc(16, 0), peerId.toBytes(), peerId.privKey.bytes, peerId.pubKey.bytes])
 
-            const ciphertext = chacha
-                .chacha20(key, iv)
-                .update(serializedPeerId)
+                const ciphertext = chacha.chacha20(key, iv).update(serializedPeerId)
 
-            cb(null, rlp.encode([
-                salt,
-                iv,
-                ciphertext
-            ]))
-        }
-    ], cb)
+                cb(null, rlp.encode([salt, iv, ciphertext]))
+            }
+        ],
+        cb
+    )
 }
 
 /**
  * Deserializes a serialized key pair and returns a peerId.
- * 
+ *
  * @notice This method will ask for a password to decrypt the encrypted
  * private key.
  * @notice The decryption of the private key makes use of a memory-hard
  * hash function and consumes therefore a lot of memory.
- * 
+ *
  * @param {Buffer} encryptedSerializedKeyPair the encoded and encrypted key pair
  * @param {function} cb called afterward with `(err, peerId)`
  */
@@ -811,45 +800,45 @@ module.exports.deserializeKeyPair = (encryptedSerializedKeyPair, cb) => {
 
     const question = 'Please type in the password that was used to encrypt the key.'
 
-    doUntil((cb) => this.askForPassword(question, (err, pw, _) => {
-        if (err)
-            return cb(err)
+    doUntil(
+        cb =>
+            this.askForPassword(question, (err, pw, _) => {
+                if (err) return cb(err)
 
-        const key = scrypt.hashSync(pw, scryptParams, 32, salt)
-        const plaintext = chacha
-            .chacha20(key, iv)
-            .update(ciphertext)
+                const key = scrypt.hashSync(pw, scryptParams, 32, salt)
+                const plaintext = chacha.chacha20(key, iv).update(ciphertext)
 
-        let decoded
-        try {
-            decoded = rlp.decode(plaintext)
-        } catch (err) {
-            return cb(null, [Buffer.alloc(0)])
+                let decoded
+                try {
+                    decoded = rlp.decode(plaintext)
+                } catch (err) {
+                    return cb(null, [Buffer.alloc(0)])
+                }
+                cb(null, decoded)
+            }),
+        decoded => Buffer.alloc(16, 0).equals(decoded[0]),
+        (err, [ok, id, privKey, pubKey]) => {
+            if (err) return cb(err)
+
+            const peerId = PeerId.createFromBytes(id)
+
+            libp2p_crypto.unmarshalPrivateKey(privKey, (err, privKey) => {
+                if (err) return cb(err)
+
+                peerId.privKey = privKey
+                peerId.pubKey = libp2p_crypto.unmarshalPublicKey(pubKey)
+
+                console.log(`Successfully restored ID \x1b[34m${peerId.toB58String()}\x1b[0m.`)
+
+                return cb(null, peerId)
+            })
         }
-        cb(null, decoded)
-    }), (decoded) => Buffer.alloc(16, 0).equals(decoded[0]), (err, [ok, id, privKey, pubKey]) => {
-        if (err)
-            return cb(err)
-
-        const peerId = PeerId.createFromBytes(id)
-
-        libp2p_crypto.unmarshalPrivateKey(privKey, (err, privKey) => {
-            if (err)
-                return cb(err)
-
-            peerId.privKey = privKey
-            peerId.pubKey = libp2p_crypto.unmarshalPublicKey(pubKey)
-
-            console.log(`Successfully restored ID \x1b[34m${peerId.toB58String()}\x1b[0m.`)
-
-            return cb(null, peerId)
-        })
-    })
+    )
 }
 
 /**
  * Asks the user for a password. Does not echo the password.
- * 
+ *
  * @param {string} question string that is displayed before the user input
  * @param {function} cb called afterwards with `(err, password)`
  */
@@ -858,44 +847,49 @@ module.exports.askForPassword = (question, cb) => {
         console.log('Debug mode: using password Epo5kZTFidOCHrnL0MzsXNwN9St')
         cb(null, 'Epo5kZTFidOCHrnL0MzsXNwN9St', false)
     } else {
-        read({
-            prompt: question,
-            silent: true,
-            edit: true,
-            replace: '*'
-        }, cb)
+        read(
+            {
+                prompt: question,
+                silent: true,
+                edit: true,
+                replace: '*'
+            },
+            cb
+        )
     }
 }
 
 /**
  * Deletes recursively (and synchronously) all files in a directory.
- * 
+ *
  * @param {string} path the path to the directory
  */
-module.exports.clearDirectory = (path) => {
-    let files = [];
+module.exports.clearDirectory = path => {
+    let files = []
     if (fs.existsSync(path)) {
-        files = fs.readdirSync(path);
-        files.forEach(function (file, index) {
-            const curPath = path + "/" + file;
-            if (fs.lstatSync(curPath).isDirectory()) { // recurse
-                deleteFolderRecursive(curPath);
-            } else { // delete file
-                fs.unlinkSync(curPath);
+        files = fs.readdirSync(path)
+        files.forEach(function(file, index) {
+            const curPath = path + '/' + file
+            if (fs.lstatSync(curPath).isDirectory()) {
+                // recurse
+                deleteFolderRecursive(curPath)
+            } else {
+                // delete file
+                fs.unlinkSync(curPath)
             }
-        });
-        fs.rmdirSync(path);
+        })
+        fs.rmdirSync(path)
     }
 }
 
 /**
  * Creates a directory if it doesn't exist.
- * 
- * @example 
+ *
+ * @example
  * createDirectoryIfNotExists('db/testnet') // creates `./db` and `./db/testnet`
- * @param {string} path 
+ * @param {string} path
  */
-module.exports.createDirectoryIfNotExists = (path) => {
+module.exports.createDirectoryIfNotExists = path => {
     const chunks = path.split('/')
 
     chunks.reduce((searchPath, chunk) => {
@@ -913,18 +907,18 @@ module.exports.createDirectoryIfNotExists = (path) => {
 // ==========================
 // multiaddr methods
 // ==========================
-const HOPR_ADDRESS = '\/ipfs\/[a-zA-Z0-9]+'
-const WEBRTC_STRING = '\/p2p-webrtc-star'
+const HOPR_ADDRESS = '/ipfs/[a-zA-Z0-9]+'
+const WEBRTC_STRING = '/p2p-webrtc-star'
 
 module.exports.match = {}
 
 const WEBRTC_ADDRESS_REGEXP = new RegExp(`${HOPR_ADDRESS}${WEBRTC_STRING}${HOPR_ADDRESS}`)
-module.exports.match.WebRTC = (addr) => Boolean(addr.toString().match(WEBRTC_ADDRESS_REGEXP))
+module.exports.match.WebRTC = addr => Boolean(addr.toString().match(WEBRTC_ADDRESS_REGEXP))
 
 const WEBRTC_ADDRESS_DESTINATION_REGEXP = new RegExp(`(?<=${HOPR_ADDRESS}${WEBRTC_STRING})${HOPR_ADDRESS}`)
-module.exports.match.WebRTC_DESTINATION = (addr) => Multiaddr(addr.toString().match(WEBRTC_ADDRESS_DESTINATION_REGEXP)[0])
+module.exports.match.WebRTC_DESTINATION = addr => Multiaddr(addr.toString().match(WEBRTC_ADDRESS_DESTINATION_REGEXP)[0])
 
-const LOCALHOST_IPv6_REGEXP = '\/ip6\/::1'
-const LOCALHOST_IPv4_REGEXP = '\/ip4\/127.0.0.1'
+const LOCALHOST_IPv6_REGEXP = '/ip6/::1'
+const LOCALHOST_IPv4_REGEXP = '/ip4/127.0.0.1'
 const LOCALHOST_REGEXP = new RegExp(`(${LOCALHOST_IPv4_REGEXP})|(${LOCALHOST_IPv6_REGEXP})`)
-module.exports.match.LOCALHOST = (addr) => Boolean(addr.toString().match(LOCALHOST_REGEXP))
+module.exports.match.LOCALHOST = addr => Boolean(addr.toString().match(LOCALHOST_REGEXP))

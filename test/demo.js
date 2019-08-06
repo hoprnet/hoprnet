@@ -42,7 +42,7 @@ const main = async () => {
 
     const web3 = new Web3(process.env.PROVIDER)
 
-    fundingPeer = privKeyToPeerId(process.env.FUND_ACCOUNT_PRIVATE_KEY)
+    fundingPeer = await privKeyToPeerId(process.env.FUND_ACCOUNT_PRIVATE_KEY)
     nonce = await web3.eth.getTransactionCount(process.env.FUND_ACCOUNT_ETH_ADDRESS)
 
     if (process.env.NETWORK === 'ganache') {
