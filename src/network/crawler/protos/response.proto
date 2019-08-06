@@ -1,0 +1,9 @@
+enum Status {
+    OK = 1;
+    FAIL = 2;
+}
+
+message CrawlResponse {
+    required Status status = 1;
+    repeated bytes pubKeys = 2;
+}
