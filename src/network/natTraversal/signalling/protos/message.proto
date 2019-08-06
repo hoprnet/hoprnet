@@ -1,0 +1,4 @@
+message Message {
+    required bytes destination = 1;
+    required bytes payload = 2;
+}

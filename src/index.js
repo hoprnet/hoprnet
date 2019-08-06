@@ -3,8 +3,8 @@
 const libp2p = require('libp2p')
 const MPLEX = require('libp2p-mplex')
 const KadDHT = require('libp2p-kad-dht')
-const SECIO = require('libp2p-secio')
-const {WebRTCv4, WebRTCv6} = require('./network/natTraversal')
+// const SECIO = require('libp2p-secio')
+const { WebRTCv4, WebRTCv6 } = require('./network/natTraversal')
 
 const defaultsDeep = require('@nodeutils/defaults-deep')
 const groupBy = require('lodash.groupby')
@@ -13,7 +13,7 @@ const once = require('once')
 const { createPacket } = require('./packet')
 const registerHandlers = require('./handlers')
 const { NAME, PACKET_SIZE, PROTOCOL_STRING, MAX_HOPS } = require('./constants')
-const crawlNetwork = require('./network/crawl')
+const crawler = require('./network/crawler')
 const heartbeat = require('./network/heartbeat')
 const getPubKey = require('./getPubKey')
 const getPeerInfo = require('./getPeerInfo')
@@ -44,7 +44,7 @@ class Hopr extends libp2p {
      */
     constructor(_options, db) {
         if (!_options || !_options.peerInfo || !PeerInfo.isPeerInfo(_options.peerInfo))
-            throw Error('Invalid input parameters. Expected a valid PeerInfo, but got \'' + typeof _options.peerInfo + '\' instead.')
+            throw Error("Invalid input parameters. Expected a valid PeerInfo, but got '" + typeof _options.peerInfo + "' instead.")
 
         const defaults = {
             // The libp2p modules for this libp2p bundle
@@ -60,19 +60,15 @@ class Hopr extends libp2p {
                 /**
                  * To support bidirectional connection, we need a stream muxer.
                  */
-                streamMuxer: [
-                    MPLEX
-                ],
+                streamMuxer: [MPLEX],
                 /**
                  * Let's have TLS-alike encrypted connections between the nodes.
                  */
-                connEncryption: [
-                    SECIO
-                ],
+                connEncryption: [], //  [SECIO],
                 /**
                  * Necessary to have DHT lookups
                  */
-                dht: KadDHT,
+                dht: KadDHT
                 /**
                  * Necessary to use WebRTC (and to support proper NAT traversal)
                  */
@@ -134,17 +130,19 @@ class Hopr extends libp2p {
             //     }
             // }
 
-            const hopr = new Hopr({
-                config: {
-                    // WebRTC: options.WebRTC
+            const hopr = new Hopr(
+                {
+                    config: {
+                        // WebRTC: options.WebRTC
+                    },
+                    // peerBook: peerBook,
+                    peerInfo: await getPeerInfo(options, db)
                 },
-                // peerBook: peerBook,
-                peerInfo: await getPeerInfo(options, db)
-            }, db)
+                db
+            )
 
-            hopr.start(options, (err) => {
-                if (err)
-                    return reject(err)
+            hopr.start(options, err => {
+                if (err) return reject(err)
 
                 resolve(hopr)
             })
@@ -159,31 +157,23 @@ class Hopr extends libp2p {
      * @param {PeerInfo[]} [bootstrapServers] peerInfos that are used instead of those
      * from `.env`.
      */
-    async initBootstapServers(bootstrapServers) {
+    async connectToBootstapServers(bootstrapServers) {
         if (bootstrapServers) {
             this.bootstrapServers = bootstrapServers
         } else {
-            const tmp = groupBy(process.env.BOOTSTRAP_SERVERS.split(',').map(addr => Multiaddr(addr)), (ma) => ma.getPeerId())
-            this.bootstrapServers = Object.keys(tmp).reduce((peerId) => {
+            const tmp = groupBy(process.env.BOOTSTRAP_SERVERS.split(',').map(addr => Multiaddr(addr)), ma => ma.getPeerId())
+            this.bootstrapServers = Object.keys(tmp).reduce((acc, peerId) => {
                 const peerInfo = new PeerInfo(PeerId.createFromB58String(peerId))
 
-                tmp[peerId].forEach((ma) => peerInfo.multiaddrs.add(ma))
+                tmp[peerId].forEach(ma => peerInfo.multiaddrs.add(ma))
+                acc.push(peerInfo)
+                return acc
             }, [])
         }
 
-        const results = await Promise.all(
-            this.bootstrapServers.map((addr) => new Promise((resolve, reject) =>
-                this.dial(addr, (err, conn) => {
-                    if (err)
-                        return resolve(false)
+        const results = await Promise.all(this.bootstrapServers.map(addr => this.dial(addr).then(() => true, () => false)))
 
-                    resolve(true)
-                })
-            ))
-        )
-
-        if (!results.some((online) => online))
-            throw Error('Unable to connect to any bootstrap server.')
+        if (!results.some(online => online)) throw Error('Unable to connect to any bootstrap server.')
     }
 
     /**
@@ -194,58 +184,60 @@ class Hopr extends libp2p {
      * @param {Function} cb callback when node is ready
      */
     start(options, cb) {
-        waterfall([
-            (cb) => super.start(cb),
-            (cb) => {
-                registerHandlers(this, options)
+        waterfall(
+            [
+                cb => super.start(cb),
+                cb => {
+                    registerHandlers(this, options)
 
-                if (!options['bootstrap-node'])
-                    this.initBootstapServers(options.bootstrapServers)
-
-                this.heartbeat.start()
-                this.getPublicIp = PublicIp(this, options)
-                this.crawlNetwork = crawlNetwork(this)
-
-                this.peerInfo.multiaddrs.forEach((addr) => {
-                    if (match.LOCALHOST(addr)) {
-                        this.peerInfo.multiaddrs.delete(addr)
+                    if (options['bootstrap-node']) {
+                        return cb()
+                    } else {
+                        this.connectToBootstapServers(options.bootstrapServers).then(err => cb(null))
                     }
-                })
-
-                return cb()
-            },
-            (cb) => parallel({
-                publicAddrs: (cb) => {
-                    if (options['bootstrap-node'] || process.env.DEMO || !this.bootstrapServers || this.bootstrapServers.length == 0)
-                        return cb()
-
-                    this.getPublicIp(cb)
                 },
-                paymentChannels: (cb) => {
-                    if (options['bootstrap-node'])
-                        return cb()
+                cb => {
+                    this.heartbeat.start()
+                    this.getPublicIp = PublicIp(this, options)
 
-                    PaymentChannels.create(this, cb)
+                    this.crawler = new crawler({libp2p: this})
+
+                    this.peerInfo.multiaddrs.forEach(addr => {
+                        if (match.LOCALHOST(addr)) {
+                            this.peerInfo.multiaddrs.delete(addr)
+                        }
+                    })
+
+                    return cb()
                 },
-                bootstrapServers: (cb) => {
-                    if (options['bootstrap-node'])
-                        return cb()
+                cb =>
+                    parallel(
+                        {
+                            publicAddrs: cb => {
+                                if (options['bootstrap-node'] || process.env.DEMO || !this.bootstrapServers || this.bootstrapServers.length == 0) return cb()
 
-                    this.initBootstapServers(options.bootstrapServers).then(cb)
-                }
-            }, cb),
-            ({ paymentChannels, publicAddrs, bootstrapServers }, cb) => {
-                this.paymentChannels = paymentChannels
+                                this.getPublicIp(cb)
+                            },
+                            paymentChannels: cb => {
+                                if (options['bootstrap-node']) return cb()
 
-                if (publicAddrs)
-                    publicAddrs.forEach((addr) => this.peerInfo.multiaddrs.add(addr.encapsulate(`/${NAME}/${this.peerInfo.id.toB58String()}`)))
-
-                if (!options['bootstrap-node'])
+                                PaymentChannels.create(this, cb)
+                            }
+                        },
+                        cb
+                    ),
+                ({ paymentChannels, publicAddrs }, cb) => {
                     this.paymentChannels = paymentChannels
 
-                return cb(null, this)
-            }
-        ], cb)
+                    if (publicAddrs) publicAddrs.forEach(addr => this.peerInfo.multiaddrs.add(addr.encapsulate(`/${NAME}/${this.peerInfo.id.toB58String()}`)))
+
+                    if (!options['bootstrap-node']) this.paymentChannels = paymentChannels
+
+                    return cb(null, this)
+                }
+            ],
+            cb
+        )
     }
 
     /**
@@ -257,11 +249,7 @@ class Hopr extends libp2p {
 
         this.heartbeat.stop()
 
-        series([
-            (cb) => this.exportPeerBook(cb),
-            (cb) => super.stop(cb),
-            (cb) => this.db.close(cb)
-        ], cb)
+        series([cb => this.exportPeerBook(cb), cb => super.stop(cb), cb => this.db.close(cb)], cb)
     }
 
     /**
@@ -278,17 +266,13 @@ class Hopr extends libp2p {
      * the acknowledgement of the first hop
      */
     sendMessage(msg, destination, cb) {
-        if (!msg)
-            return cb(Error(`Expecting a non-empty message.`))
+        if (!msg) return cb(Error(`Expecting a non-empty message.`))
 
-        if (!destination)
-            return cb(Error(`Expecting a non-empty destination.`))
+        if (!destination) return cb(Error(`Expecting a non-empty destination.`))
 
-        if (PeerInfo.isPeerInfo(destination))
-            destination = destination.id
+        if (PeerInfo.isPeerInfo(destination)) destination = destination.id
 
-        if (typeof destination === 'string')
-            destination = PeerId.createFromB58String(destination)
+        if (typeof destination === 'string') destination = PeerId.createFromB58String(destination)
 
         if (!PeerId.isPeerId(destination))
             return cb(Error(`Unable to parse given destination to a PeerId instance. Got type ${typeof destination} with value ${destination}.`))
@@ -298,51 +282,68 @@ class Hopr extends libp2p {
             switch (typeof msg) {
                 default:
                     return cb(Error(`Invalid input value. Got '${typeof msg}'.`))
-                case 'number': msg = msg.toString()
-                case 'string': msg = Buffer.from(msg)
+                case 'number':
+                    msg = msg.toString()
+                case 'string':
+                    msg = Buffer.from(msg)
             }
         }
 
-        cb = cb ? once(cb) : () => { }
+        cb = cb ? once(cb) : () => {}
 
-        times(Math.ceil(msg.length / PACKET_SIZE), (n, cb) =>
-            waterfall([
-                (cb) => this.getIntermediateNodes(destination, cb),
-                (intermediateNodes, cb) => map(intermediateNodes.concat(destination), this.getPubKey, cb),
-                (intermediateNodes, cb) => parallel({
-                    conn: (cb) => waterfall([
-                        (cb) => this.peerRouting.findPeer(intermediateNodes[0].id, cb),
-                        (peerInfo, cb) => this.dialProtocol(peerInfo, PROTOCOL_STRING, cb),
-                    ], cb),
-                    packet: (cb) => createPacket(
-                        this,
-                        msg.slice(n * PACKET_SIZE, Math.min(msg.length, (n + 1) * PACKET_SIZE)),
-                        intermediateNodes.map(peerInfo => peerInfo.id),
-                        cb
-                    )
-                }, cb),
-                (results, cb) => pull(
-                    pull.once(results.packet.toBuffer()),
-                    lp.encode(),
-                    results.conn,
-                    lp.decode({
-                        maxLength: Acknowledgement.SIZE
-                    }),
-                    pull.drain((data) => {
-                        log(this.peerInfo.id, `Received acknowledgement.`)
-                        // return cb()
-                        // if (!cb.called) {
-                        //     return cb()
-                        // }
-                    })
-                )
-            ], cb),
-            (err) => {
-                if (err)
-                    console.log(err)
+        times(
+            Math.ceil(msg.length / PACKET_SIZE),
+            (n, cb) =>
+                waterfall(
+                    [
+                        cb => this.getIntermediateNodes(destination, cb),
+                        (intermediateNodes, cb) => map(intermediateNodes.concat(destination), this.getPubKey, cb),
+                        (intermediateNodes, cb) =>
+                            parallel(
+                                {
+                                    conn: cb =>
+                                        waterfall(
+                                            [
+                                                cb => this.peerRouting.findPeer(intermediateNodes[0].id, cb),
+                                                (peerInfo, cb) => this.dialProtocol(peerInfo, PROTOCOL_STRING, cb)
+                                            ],
+                                            cb
+                                        ),
+                                    packet: cb =>
+                                        createPacket(
+                                            this,
+                                            msg.slice(n * PACKET_SIZE, Math.min(msg.length, (n + 1) * PACKET_SIZE)),
+                                            intermediateNodes.map(peerInfo => peerInfo.id),
+                                            cb
+                                        )
+                                },
+                                cb
+                            ),
+                        (results, cb) =>
+                            pull(
+                                pull.once(results.packet.toBuffer()),
+                                lp.encode(),
+                                results.conn,
+                                lp.decode({
+                                    maxLength: Acknowledgement.SIZE
+                                }),
+                                pull.drain(data => {
+                                    log(this.peerInfo.id, `Received acknowledgement.`)
+                                    // return cb()
+                                    // if (!cb.called) {
+                                    //     return cb()
+                                    // }
+                                })
+                            )
+                    ],
+                    cb
+                ),
+            err => {
+                if (err) console.log(err)
 
                 return cb(err)
-            })
+            }
+        )
     }
 
     /**
@@ -353,16 +354,12 @@ class Hopr extends libp2p {
      * @param {Function} cb the function that called afterwards
      */
     getIntermediateNodes(destination, cb) {
-        const filter = (peerInfo) =>
-            !peerInfo.id.isEqual(this.peerInfo.id) &&
-            !peerInfo.id.isEqual(destination) &&
-            !this.bootstrapServers.some((pInfo) => pInfo.id.isEqual(peerInfo.id))
+        const filter = peerInfo =>
+            !peerInfo.id.isEqual(this.peerInfo.id) && !peerInfo.id.isEqual(destination) && !this.bootstrapServers.some(pInfo => pInfo.id.isEqual(peerInfo.id))
 
-        this.crawlNetwork()
-            .then(() => cb(null, randomSubset(
-                this.peerBook.getAllArray(), MAX_HOPS - 1, filter).map((peerInfo) => peerInfo.id)
-            ))
-            .catch((err) => cb(err))
+        this.crawler.crawl()
+            .then(() => cb(null, randomSubset(this.peerBook.getAllArray(), MAX_HOPS - 1, filter).map(peerInfo => peerInfo.id)))
+            .catch(err => cb(err))
     }
 
     static importPeerBook(db, cb) {
@@ -375,7 +372,7 @@ class Hopr extends libp2p {
             } else if (err && err.notFound) {
                 cb(null, peerBook)
             } else {
-                deserializePeerBook(value, peerBook, (err) => {
+                deserializePeerBook(value, peerBook, err => {
                     if (err) {
                         cb(err)
                     } else {

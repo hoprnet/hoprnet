@@ -1,0 +1,8 @@
+enum Status {
+    OK = 1;
+    FAIL = 2;
+}
+
+message Response {
+    required Status status = 1;
+}

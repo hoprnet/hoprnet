@@ -10,10 +10,18 @@ const wrtc = require('wrtc')
 const Connection = require('interface-connection').Connection
 const Multiaddr = require('multiaddr')
 
+const PeerInfo = require('peer-info')
+const PeerId = require('peer-id')
+
 const dgram = require('dgram')
 
 module.exports = class WebRTC {
+    constructor() {
+        this.channels = new Map()
+    }
+
     dial(multiaddr, options, cb) {
+        console.log(`calling ${multiaddr.toString()}`)
         if (typeof options === 'function') {
             cb = options
             options = {}
@@ -21,31 +29,36 @@ module.exports = class WebRTC {
 
         const opts = multiaddr.toOptions()
 
-        const conn = new Connection()
+        // TODO: use HOPR nodes instead of Google servers
+        const channel = SimplePeer({
+            initiator: true,
+            config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:global.stun.twilio.com:3478?transport=udp' }] },
+            trickle: true,
+            wrtc
+        })
+
+        const conn = new Connection(toPull.duplex(channel))
+
         new Promise((resolve, reject) => {
             const socket = dgram.createSocket(this.socketType)
 
-            // TODO: use HOPR nodes instead of Google servers
-            const channel = SimplePeer({
-                initiator: true,
-                config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:global.stun.twilio.com:3478?transport=udp' }] },
-                stream: false,
-                trickle: true,
-                wrtc: wrtc
-            })
-
             channel
                 .on('signal', data => {
-                    console.log(data, opts.port, opts.host)
                     socket.send(Buffer.from(JSON.stringify(data)), opts.port, opts.host, (err, bytes) => {
-                        console.log(err, bytes)
+                        if (err) console.log(err)
                     })
                 })
 
-                .on('connect', () => {
+                .on('connect', async () => {
                     console.log('[initiator] connected')
-                    conn.setInnerConn(toPull.duplex(channel))
-                    resolve()
+
+                    const peerInfo = await PeerInfo.create(await PeerId.createFromB58String(multiaddr.getPeerId()))
+
+                    peerInfo.multiaddrs.add(multiaddr)
+                    peerInfo.connect(multiaddr)
+
+                    conn.setPeerInfo(peerInfo)
+                    resolve(conn)
                 })
 
                 .on('error', err => {
@@ -54,11 +67,13 @@ module.exports = class WebRTC {
                 })
 
                 .on('close', () => {
-                    console.log('closed. TODO!')
+                    // console.log('closed. TODO!')
                 })
 
-            socket.on('message', data => channel.signal(JSON.parse(data)))
-        }).then(cb, cb)
+            socket.on('message', data => {
+                channel.signal(JSON.parse(data))
+            })
+        }).then(conn => cb(null, conn), cb)
 
         return conn
     }
@@ -69,48 +84,54 @@ module.exports = class WebRTC {
             options = {}
         }
 
-        const channels = new Map()
-
         const listener = new EventEmitter()
 
         const server = dgram.createSocket(this.socketType)
 
+        server.on('listening', () => listener.emit('listening'))
+        server.on('error', err => listener.emit('error', err))
+        server.on('close', () => listener.emit('close'))
+
         server.on('message', (msg, rinfo) => {
             const id = `${rinfo.address} ${rinfo.port}`
 
-            let channel = channels.get(id)
+            let channel = this.channels.get(id)
 
             if (!channel) {
                 // TODO: use HOPR nodes instead of Google servers
                 channel = SimplePeer({
                     initiator: false,
                     config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:global.stun.twilio.com:3478?transport=udp' }] },
-                    stream: false,
                     trickle: true,
-                    wrtc: wrtc
+                    wrtc
                 })
+
+                let conn = new Connection(toPull.duplex(channel))
 
                 channel.on('signal', data => {
                     server.send(Buffer.from(JSON.stringify(data)), rinfo.port, rinfo.address, (err, bytes) => {
-                        console.log(err, bytes)
+                        if (err) console.log(err)
+                        // console.log(err, bytes)
                     })
                 })
 
                 channel.on('connect', () => {
                     console.log('[responder] connected')
-                    connHandler(new Connection(toPull.duplex(channel)))
+                    conn.getObservedAddrs = callback => callback(null, [])
+                    listener.emit('connection', conn)
+                    connHandler(conn)
                 })
 
                 channel.on('close', () => {
-                    channels.delete(id)
+                    this.channels.delete(id)
                 })
 
                 channel.on('err', err => {
                     console.log(err)
-                    channels.delete(id)
+                    this.channels.delete(id)
                 })
 
-                channels.set(id, channel)
+                this.channels.set(id, channel)
             }
 
             channel.signal(JSON.parse(msg))
@@ -163,10 +184,6 @@ module.exports = class WebRTC {
                     resolve()
                 })
             })
-
-        server.on('listening', () => listener.emit('listening'))
-        server.on('error', err => listener.emit('error', err))
-        server.on('close', () => listener.emit('close'))
 
         return listener
     }

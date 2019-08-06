@@ -3,9 +3,25 @@
 const Basev4 = require('./base/udp4')
 const Basev6 = require('./base/udp6')
 
-const mixin = Base => class extends Base {
+const Signalling = require('./signalling')
 
-}
+const { PROTOCOL_WEBRTC_TURN } = require('../../constants')
+
+const mixin = Base =>
+    class extends Base {
+        constructor(opts) {
+            super(opts)
+
+            this.signalling = new Signalling(opts)
+        }
+
+        // dial(multiaddr, options, cb) {
+        //     const conn = super.dial(multiaddr, options, err => {
+        //         if (err) {
+        //         }
+        //     })
+        // }
+    }
 
 module.exports.WebRTCv4 = class WebRTCv4 extends mixin(Basev4) {}
 
