@@ -4002,7 +4002,7 @@ ip-regex@^2.0.0:
   resolved "https://registry.yarnpkg.com/ip-regex/-/ip-regex-2.1.0.tgz#fa78bf5d2e6913c911ce9f819ee5146bb6d844e9"
   integrity sha1-+ni/XS5pE8kRzp+BnuUUa7bYROk=
 
-ip@^1.1.5, ip@~1.1.5:
+ip@^1.1.5:
   version "1.1.5"
   resolved "https://registry.yarnpkg.com/ip/-/ip-1.1.5.tgz#bdded70114290828c0a039e72ef25f5aaec4354a"
   integrity sha1-vd7XARQpCCjAoDnnLvJfWq7ENUo=
@@ -5109,11 +5109,6 @@ lodash.padstart@^4.6.1:
   version "4.6.1"
   resolved "https://registry.yarnpkg.com/lodash.padstart/-/lodash.padstart-4.6.1.tgz#d2e3eebff0d9d39ad50f5cbd1b52a7bce6bb611b"
   integrity sha1-0uPuv/DZ05rVD1y9G1KnvOa7YRs=
-
-lodash.pullall@~4.2.0:
-  version "4.2.0"
-  resolved "https://registry.yarnpkg.com/lodash.pullall/-/lodash.pullall-4.2.0.tgz#9d98b8518b7c965b0fae4099bd9fb7df8bbf38ba"
-  integrity sha1-nZi4UYt8llsPrkCZvZ+334u/OLo=
 
 lodash.repeat@^4.1.0:
   version "4.1.0"
@@ -6610,7 +6605,7 @@ pull-window@^2.1.4:
   dependencies:
     looper "^2.0.0"
 
-"pull-ws@github:hugomrdias/pull-ws#fix/bundle-size":
+pull-ws@hugomrdias/pull-ws#fix/bundle-size:
   version "3.3.1"
   resolved "https://codeload.github.com/hugomrdias/pull-ws/tar.gz/8e2ce0bb3b1cd6804828316e937fff8e0bef6225"
   dependencies:
