@@ -191,7 +191,7 @@ function stopNode() {
     const timeout = setTimeout(() => {
         console.log(`Ungracefully stopping node after timeout.`)
         process.exit(0)
-    }, 10)
+    }, 10 * 1000)
 
     node.stop(err => {
         clearTimeout(timeout)

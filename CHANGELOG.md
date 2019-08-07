@@ -6,11 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
-- Listening on IPv6 sockets is supported 
-- Use WebRTC by default and let WebRTC decide which transport protocol will be used
+- Use WebRTC over UDP by default and let WebRTC decide which transport protocol will be used
 - `yarn demo` spawns its own mini-testnet, including bootstrap server and persistent blockchain
 
 ### Changed
+- HOPR uses public keys as addresses instead of hashed public keys
+- `node hopr <id>` spawns a HOPR node at port *9091 + <id>*
 - crawling: crawling is not block anymore, leads to faster crawling
 - heartbeat: every connection uses its own timer now
 
