@@ -64,15 +64,17 @@ module.exports = (options, db) =>
 
             let port = process.env.PORT
 
-            // ============================= Only for testing ============================================
-            if (Number.isInteger(options.id)) port = (Number.parseInt(port) + (options.id + 1)).toString()
-            // ===========================================================================================
-
             if (process.env.HOST_IPV4) {
+                // ============================= Only for testing ================================================
+                if (Number.isInteger(options.id)) port = (Number.parseInt(port) + (options.id + 1) * 2).toString()
+                // ===============================================================================================
                 addrs.push(Multiaddr(`/ip4/${process.env.HOST_IPV4}/udp/${port}`))
             }
 
             if (process.env.HOST_IPV6) {
+                // ============================= Only for testing ====================================================
+                if (Number.isInteger(options.id)) port = (Number.parseInt(port) + (options.id + 1) * 2 + 1).toString()
+                // ===================================================================================================
                 addrs.push(Multiaddr(`/ip6/${process.env.HOST_IPV6}/udp/${port}`))
             }
 
