@@ -97,9 +97,7 @@ function tabCompletion(line, cb) {
             hits = node.peerBook.getAllArray().filter(peerInfo => {
                 if (operands.length > 1 && !peerInfo.id.toB58String().startsWith(operands[1])) return false
 
-                if (isNotBootstrapNode(peerInfo.id)) return false
-
-                return true
+                return isNotBootstrapNode(peerInfo.id)
             })
 
             if (!hits.length) {
