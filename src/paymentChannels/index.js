@@ -1,6 +1,6 @@
 'use strict'
 
-const EventEmitter = require('events');
+const EventEmitter = require('events')
 
 const Web3 = require('web3')
 const { parallel, waterfall } = require('neo-async')
@@ -18,7 +18,6 @@ const openingListener = require('./eventListeners/open')
 const transfer = require('./transfer')
 const registerHandlers = require('./handlers')
 const Transaction = require('../transaction')
-
 
 const HASH_LENGTH = 32
 const CHANNEL_ID_LENGTH = HASH_LENGTH
@@ -80,33 +79,35 @@ class PaymentChannel extends EventEmitter {
     static create(node, cb) {
         const web3 = new Web3(process.env.PROVIDER)
 
-        parallel({
-            nonce: (cb) => web3.eth.getTransactionCount(pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()), 'latest', cb),
-            compiledContract: (cb) => compileIfNecessary([`${process.cwd()}/contracts/HoprChannel.sol`], [`${process.cwd()}/build/contracts/HoprChannel.json`], cb)
-        }, (err, results) => {
-            if (err)
-                return cb(err)
+        parallel(
+            {
+                nonce: cb => web3.eth.getTransactionCount(pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()), 'latest', cb),
+                compiledContract: cb =>
+                    compileIfNecessary([`${process.cwd()}/contracts/HoprChannel.sol`], [`${process.cwd()}/build/contracts/HoprChannel.json`], cb)
+            },
+            (err, results) => {
+                if (err) return cb(err)
 
-            registerHandlers(node)
+                registerHandlers(node)
 
-            const abi = require('../../build/contracts/HoprChannel.json').abi
+                const abi = require('../../build/contracts/HoprChannel.json').abi
 
-            const self = new PaymentChannel({
-                node: node,
-                nonce: results.nonce,
-                contract: new web3.eth.Contract(abi, process.env.CONTRACT_ADDRESS, {
-                    from: pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal())
-                }),
-                web3: web3,
-            })
+                const self = new PaymentChannel({
+                    node: node,
+                    nonce: results.nonce,
+                    contract: new web3.eth.Contract(abi, process.env.CONTRACT_ADDRESS, {
+                        from: pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal())
+                    }),
+                    web3
+                })
 
-            self.registerEventListeners((err) => {
-                if (err)
-                    return cb(err)
+                self.registerEventListeners(err => {
+                    if (err) return cb(err)
 
-                cb(null, self)
-            })
-        })
+                    cb(null, self)
+                })
+            }
+        )
     }
 
     /**
@@ -117,22 +118,36 @@ class PaymentChannel extends EventEmitter {
      */
     registerEventListeners(cb) {
         const register = (query, fn, cb) => {
-            this.node.db.createKeyStream(query)
+            this.node.db
+                .createKeyStream(query)
                 .on('data', fn)
-                .on('error', (err) => cb(err))
+                .on('error', err => cb(err))
                 .on('end', () => cb())
         }
 
-        parallel([
-            (cb) => register({
-                gt: this.RestoreTransaction(Buffer.alloc(32, 0)),
-                lt: this.RestoreTransaction(Buffer.alloc(32, 255))
-            }, (key) => this.registerSettlementListener(key.slice(key.length - 32)), cb),
-            (cb) => register({
-                gt: this.StashedRestoreTransaction(Buffer.alloc(32, 0)),
-                lt: this.StashedRestoreTransaction(Buffer.alloc(32, 255))
-            }, (key) => this.registerOpeningListener(key.slice(key.length - 32)), cb)
-        ], cb)
+        parallel(
+            [
+                cb =>
+                    register(
+                        {
+                            gt: this.RestoreTransaction(Buffer.alloc(32, 0)),
+                            lt: this.RestoreTransaction(Buffer.alloc(32, 255))
+                        },
+                        key => this.registerSettlementListener(key.slice(key.length - 32)),
+                        cb
+                    ),
+                cb =>
+                    register(
+                        {
+                            gt: this.StashedRestoreTransaction(Buffer.alloc(32, 0)),
+                            lt: this.StashedRestoreTransaction(Buffer.alloc(32, 255))
+                        },
+                        key => this.registerOpeningListener(key.slice(key.length - 32)),
+                        cb
+                    )
+            ],
+            cb
+        )
     }
 
     /**
@@ -148,10 +163,15 @@ class PaymentChannel extends EventEmitter {
 
         log(this.node.peerInfo.id, `Listening to close event of channel \x1b[33m${channelId.toString('hex')}\x1b[0m`)
 
-        this.closingSubscriptions.set(channelId.toString('hex'),
-            this.web3.eth.subscribe('logs', {
-                topics: [this.web3.utils.sha3(`ClosedChannel(bytes32,bytes16,uint256)`), `0x${channelId.toString('hex')}`]
-            }, listener)
+        this.closingSubscriptions.set(
+            channelId.toString('hex'),
+            this.web3.eth.subscribe(
+                'logs',
+                {
+                    topics: [this.web3.utils.sha3(`ClosedChannel(bytes32,bytes16,uint256)`), `0x${channelId.toString('hex')}`]
+                },
+                listener
+            )
         )
     }
 
@@ -171,9 +191,13 @@ class PaymentChannel extends EventEmitter {
 
         log(this.node.peerInfo.id, `Listening to opening event of channel \x1b[33m${channelId.toString('hex')}\x1b[0m`)
 
-        this.contract.once('OpenedChannel', {
-            topics: [this.web3.utils.sha3(`OpenedChannel(bytes32,uint256,uint256)`), `0x${channelId.toString('hex')}`]
-        }, listener)
+        this.contract.once(
+            'OpenedChannel',
+            {
+                topics: [this.web3.utils.sha3(`OpenedChannel(bytes32,uint256,uint256)`), `0x${channelId.toString('hex')}`]
+            },
+            listener
+        )
     }
 
     onceClosed(channelId, fn) {
@@ -239,22 +263,22 @@ class PaymentChannel extends EventEmitter {
             try {
                 buf = secp256k1.publicKeyCreate(await this.node.db.get(this.ChannelKey(channelId)))
             } catch (err) {
-                if (!err.notFound)
-                    throw err
+                if (!err.notFound) throw err
             }
 
-            this.node.db.createReadStream({
-                gt: this.Challenge(channelId, Buffer.alloc(PRIVATE_KEY_LENGTH, 0)),
-                lt: this.Challenge(channelId, Buffer.alloc(PRIVATE_KEY_LENGTH, 255))
-            })
-                .on('data', (obj) => {
-                    const challenge = obj.key.slice(PREFIX_LENGTH + 10 + CHANNEL_ID_LENGTH, PREFIX_LENGTH + 10 + CHANNEL_ID_LENGTH + COMPRESSED_PUBLIC_KEY_LENGTH)
+            this.node.db
+                .createReadStream({
+                    gt: this.Challenge(channelId, Buffer.alloc(PRIVATE_KEY_LENGTH, 0)),
+                    lt: this.Challenge(channelId, Buffer.alloc(PRIVATE_KEY_LENGTH, 255))
+                })
+                .on('data', obj => {
+                    const challenge = obj.key.slice(
+                        PREFIX_LENGTH + 10 + CHANNEL_ID_LENGTH,
+                        PREFIX_LENGTH + 10 + CHANNEL_ID_LENGTH + COMPRESSED_PUBLIC_KEY_LENGTH
+                    )
                     const ownKeyHalf = obj.value
 
-                    const pubKeys = [
-                        challenge,
-                        secp256k1.publicKeyCreate(ownKeyHalf)
-                    ]
+                    const pubKeys = [challenge, secp256k1.publicKeyCreate(ownKeyHalf)]
 
                     if (buf) {
                         pubKeys.push(buf)
@@ -285,7 +309,7 @@ class PaymentChannel extends EventEmitter {
         const withdraw = async () => {
             const restoreTx = Transaction.fromBuffer(await this.node.db.get(this.RestoreTransaction(channelId)))
 
-            return self.contractCall(self.contract.methods.withdraw(pubKeyToEthereumAddress(restoreTx.counterparty))).then((receipt) => {
+            return self.contractCall(self.contract.methods.withdraw(pubKeyToEthereumAddress(restoreTx.counterparty))).then(receipt => {
                 const subscription = self.subscriptions.get(channelId.toString('hex'))
                 if (subscription) {
                     subscription.unsubscribe()
@@ -310,29 +334,30 @@ class PaymentChannel extends EventEmitter {
         const waitUntilChannelIsWithdrawable = () => {
             return new Promise(async (resolve, reject) => {
                 const [channel, blockTimestamp] = await Promise.all([
-                    self.contract.methods.channels(channelId).call({
-                        from: pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal())
-                    }, 'latest'),
-                    self.web3.eth.getBlock('latest', false).then((block) => new BN(block.timestamp))
+                    self.contract.methods.channels(channelId).call(
+                        {
+                            from: pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal())
+                        },
+                        'latest'
+                    ),
+                    self.web3.eth.getBlock('latest', false).then(block => new BN(block.timestamp))
                 ])
 
-                if (channel.state == CHANNEL_STATE_WITHDRAWABLE && blockTimestamp.gt(new BN(channel.settleTimestamp)))
-                    return resolve()
+                if (channel.state == CHANNEL_STATE_WITHDRAWABLE && blockTimestamp.gt(new BN(channel.settleTimestamp))) return resolve()
 
                 self.settleTimestamps.set(channelId.toString('hex'), new BN(channel.settleTimestamp))
-                const subscription = self.web3.eth.subscribe('newBlockHeaders')
-                    .on('error', (err) => reject(err))
-                    .on('data', (block) => {
+                const subscription = self.web3.eth
+                    .subscribe('newBlockHeaders')
+                    .on('error', err => reject(err))
+                    .on('data', block => {
                         const blockTimestamp = new BN(block.timestamp)
                         log(self.node.peerInfo.id, `Waiting ... Block ${block.number}.`)
 
                         if (blockTimestamp.gt(self.settleTimestamps.get(channelId.toString('hex')))) {
                             subscription.unsubscribe((err, ok) => {
-                                if (err)
-                                    return reject(err)
+                                if (err) return reject(err)
 
-                                if (ok)
-                                    resolve()
+                                if (ok) resolve()
                             })
                         } else if (process.env.NETWORK === 'ganache') {
                             // ================ Only for testing ================
@@ -353,7 +378,7 @@ class PaymentChannel extends EventEmitter {
         return waitUntilChannelIsWithdrawable()
             .then(() => withdraw())
             .then(() => self.node.db.get(self.CurrentOnChainBalance(channelId)))
-            .then((balance) => new BN(balance))
+            .then(balance => new BN(balance))
     }
 
     /**
@@ -377,21 +402,28 @@ class PaymentChannel extends EventEmitter {
 
             log(this.node.peerInfo.id, `Trying to close payment channel \x1b[33m${channelId.toString('hex')}\x1b[0m. Nonce is ${this.nonce}`)
 
-            this.contractCall(this.contract.methods.closeChannel(
-                tx.index,
-                tx.nonce,
-                (new BN(tx.value)).toString(),
-                tx.curvePoint.slice(0, 32),
-                tx.curvePoint.slice(32, 33),
-                tx.signature.slice(0, 32),
-                tx.signature.slice(32, 64),
-                bufferToNumber(tx.recovery) + 27
-            ))
-                .then((receipt) => {
-                    log(this.node.peerInfo.id, `Settled channel \x1b[33m${channelId.toString('hex')}\x1b[0m with txHash \x1b[32m${receipt.transactionHash}\x1b[0m. Nonce is now \x1b[31m${this.nonce}\x1b[0m`)
+            this.contractCall(
+                this.contract.methods.closeChannel(
+                    tx.index,
+                    tx.nonce,
+                    new BN(tx.value).toString(),
+                    tx.curvePoint.slice(0, 32),
+                    tx.curvePoint.slice(32, 33),
+                    tx.signature.slice(0, 32),
+                    tx.signature.slice(32, 64),
+                    bufferToNumber(tx.recovery) + 27
+                )
+            )
+                .then(receipt => {
+                    log(
+                        this.node.peerInfo.id,
+                        `Settled channel \x1b[33m${channelId.toString('hex')}\x1b[0m with txHash \x1b[32m${
+                            receipt.transactionHash
+                        }\x1b[0m. Nonce is now \x1b[31m${this.nonce}\x1b[0m`
+                    )
                     return resolve(receipt)
                 })
-                .catch((err) => reject(err))
+                .catch(err => reject(err))
         })
     }
 
@@ -405,22 +437,21 @@ class PaymentChannel extends EventEmitter {
      * @param {Bufer} channelId ID of the payment channel
      */
     getLastTransaction(channelId) {
-        return this.node.db.get(this.Transaction(channelId)).catch((err) => {
-            if (!err.notFound)
-                throw err
+        return this.node.db
+            .get(this.Transaction(channelId))
+            .catch(err => {
+                if (!err.notFound) throw err
 
-            return this.node.db.get(this.RestoreTransaction(channelId)).catch((err) => {
-                if (!err.notFound)
-                    throw err
+                return this.node.db.get(this.RestoreTransaction(channelId)).catch(err => {
+                    if (!err.notFound) throw err
 
-                return this.node.db.get(this.StashedRestoreTransaction(channelId)).catch((err) => {
-                    if (!err.notFound)
-                        throw err
+                    return this.node.db.get(this.StashedRestoreTransaction(channelId)).catch(err => {
+                        if (!err.notFound) throw err
+                    })
                 })
             })
-        })
-            .then((txBuffer) => Transaction.fromBuffer(txBuffer))
-            .catch((err) => {
+            .then(txBuffer => Transaction.fromBuffer(txBuffer))
+            .catch(err => {
                 if (err.notFound) {
                     throw Error(`Haven't found any transaction for channel ${chalk.yellow(channelId.toString('hex'))}.`)
                 } else {
@@ -437,7 +468,8 @@ class PaymentChannel extends EventEmitter {
      */
     deleteChannel(channelId) {
         return new Promise((resolve, reject) => {
-            let batch = this.node.db.batch()
+            let batch = this.node.db
+                .batch()
                 .del(this.ChannelKey(channelId))
                 .del(this.Transaction(channelId))
                 .del(this.RestoreTransaction(channelId))
@@ -448,11 +480,12 @@ class PaymentChannel extends EventEmitter {
                 .del(this.InitialValue(channelId))
                 .del(this.TotalBalance(channelId))
 
-            this.node.db.createKeyStream({
-                gt: this.Challenge(channelId, Buffer.alloc(COMPRESSED_PUBLIC_KEY_LENGTH, 0)),
-                lt: this.Challenge(channelId, Buffer.alloc(COMPRESSED_PUBLIC_KEY_LENGTH, 255))
-            })
-                .on('data', (key) => {
+            this.node.db
+                .createKeyStream({
+                    gt: this.Challenge(channelId, Buffer.alloc(COMPRESSED_PUBLIC_KEY_LENGTH, 0)),
+                    lt: this.Challenge(channelId, Buffer.alloc(COMPRESSED_PUBLIC_KEY_LENGTH, 255))
+                })
+                .on('data', key => {
                     console.log(key.toString())
                     batch = batch.del(key)
                 })
@@ -485,11 +518,7 @@ class PaymentChannel extends EventEmitter {
     }
 
     async counterpartyHasMoreRecentTransaction(channelId) {
-        const [tx, channelIndex] = await Promise.all([
-            this.getLastTransaction(channelId),
-            this.node.db.get(this.Index(channelId))
-                .then((index) => new BN(index))
-        ])
+        const [tx, channelIndex] = await Promise.all([this.getLastTransaction(channelId), this.node.db.get(this.Index(channelId)).then(index => new BN(index))])
         return channelIndex.gt(new BN(tx.index))
     }
 
@@ -506,42 +535,50 @@ class PaymentChannel extends EventEmitter {
             const counterparty = await pubKeyToPeerId(restoreTx.counterparty)
 
             log(this.node.peerInfo.id, `Asking node ${counterparty.toB58String()} to send latest update transaction.`)
-            waterfall([
-                (cb) => this.node.peerRouting.findPeer(counterparty, cb),
-                (peerInfo, cb) => this.node.dialProtocol(peerInfo, PROTOCOL_SETTLE_CHANNEL, cb)
-            ], (err, conn) => {
-                if (err)
-                    return reject(chalk.red(err.message))
+            waterfall(
+                [cb => this.node.peerRouting.findPeer(counterparty, cb), (peerInfo, cb) => this.node.dialProtocol(peerInfo, PROTOCOL_SETTLE_CHANNEL, cb)],
+                (err, conn) => {
+                    if (err) return reject(chalk.red(err.message))
 
-                pull(
-                    pull.once(channelId),
-                    lp.encode(),
-                    conn,
-                    lp.decode({
-                        maxLength: Transaction.SIZE + Transaction.SIGNATURE_LENGTH + Transaction.RECOVERY_LENGTH
-                    }),
-                    pull.collect((err, data) => {
-                        if (err)
-                            return reject(err)
+                    pull(
+                        pull.once(channelId),
+                        lp.encode(),
+                        conn,
+                        lp.decode({
+                            maxLength: Transaction.SIZE + Transaction.SIGNATURE_LENGTH + Transaction.RECOVERY_LENGTH
+                        }),
+                        pull.collect((err, data) => {
+                            if (err) return reject(err)
 
-                        if (data.length < 1 || data[0].length != Transaction.SIZE + Transaction.SIGNATURE_LENGTH + Transaction.RECOVERY_LENGTH)
-                            return reject(Error(`Counterparty ${chalk.blue(counterparty.toB58String())} didn't send a valid response to close channel ${chalk.yellow(channelId.toString('hex'))}.`))
+                            if (data.length < 1 || data[0].length != Transaction.SIZE + Transaction.SIGNATURE_LENGTH + Transaction.RECOVERY_LENGTH)
+                                return reject(
+                                    Error(
+                                        `Counterparty ${chalk.blue(counterparty.toB58String())} didn't send a valid response to close channel ${chalk.yellow(
+                                            channelId.toString('hex')
+                                        )}.`
+                                    )
+                                )
 
-                        const tx = Transaction.fromBuffer(data[0].slice(0, Transaction.SIZE))
+                            const tx = Transaction.fromBuffer(data[0].slice(0, Transaction.SIZE))
 
-                        if (!tx.verify(counterparty))
-                            return reject(Error(`Invalid transaction on channel ${chalk.yellow(channelId.toString('hex'))}.`))
+                            if (!tx.verify(counterparty)) return reject(Error(`Invalid transaction on channel ${chalk.yellow(channelId.toString('hex'))}.`))
 
-                        const signature = data[0].slice(Transaction.SIZE, Transaction.SIZE + Transaction.SIGNATURE_LENGTH)
-                        const recovery = bufferToNumber(data[0].slice(Transaction.SIZE + Transaction.SIGNATURE_LENGTH, Transaction.SIZE + Transaction.SIGNATURE_LENGTH + Transaction.RECOVERY_LENGTH))
+                            const signature = data[0].slice(Transaction.SIZE, Transaction.SIZE + Transaction.SIGNATURE_LENGTH)
+                            const recovery = bufferToNumber(
+                                data[0].slice(
+                                    Transaction.SIZE + Transaction.SIGNATURE_LENGTH,
+                                    Transaction.SIZE + Transaction.SIGNATURE_LENGTH + Transaction.RECOVERY_LENGTH
+                                )
+                            )
 
-                        if (!this.node.peerInfo.id.pubKey.marshal().equals(secp256k1.recover(tx.hash, signature, recovery)))
-                            return reject(Error(`Invalid transaction on channel ${chalk.yellow(channelId.toString('hex'))}.`))
+                            if (!this.node.peerInfo.id.pubKey.marshal().equals(secp256k1.recover(tx.hash, signature, recovery)))
+                                return reject(Error(`Invalid transaction on channel ${chalk.yellow(channelId.toString('hex'))}.`))
 
-                        resolve(tx)
-                    })
-                )
-            })
+                            resolve(tx)
+                        })
+                    )
+                }
+            )
         })
         // Ask counterparty to settle payment channel because
         // last payment went to that party which means that we
@@ -550,9 +587,12 @@ class PaymentChannel extends EventEmitter {
 
     closeChannel(channelId) {
         return new Promise(async (resolve, reject) => {
-            const channel = await this.contract.methods.channels(channelId).call({
-                from: pubKeyToEthereumAddress(this.node.peerInfo.id.pubKey.marshal())
-            }, 'latest')
+            const channel = await this.contract.methods.channels(channelId).call(
+                {
+                    from: pubKeyToEthereumAddress(this.node.peerInfo.id.pubKey.marshal())
+                },
+                'latest'
+            )
 
             switch (parseInt(channel.state)) {
                 case CHANNEL_STATE_UNINITIALIZED:
@@ -565,11 +605,11 @@ class PaymentChannel extends EventEmitter {
                         lastTx = await new Promise((resolve, reject) => {
                             const timeout = setTimeout(resolve, SETTLEMENT_TIMEOUT)
                             this.getLatestTransactionFromCounterparty(channelId)
-                                .then((tx) => {
+                                .then(tx => {
                                     clearTimeout(timeout)
                                     resolve(tx)
                                 })
-                                .catch((err) => {
+                                .catch(err => {
                                     clearTimeout(timeout)
                                     console.log(chalk.red(err.message))
                                     resolve()
@@ -594,22 +634,18 @@ class PaymentChannel extends EventEmitter {
     closeChannels() {
         return new Promise((resolve, reject) => {
             const promises = []
-            this.node.db.createKeyStream({
-                gt: this.RestoreTransaction(Buffer.alloc(CHANNEL_ID_LENGTH, 0)),
-                lt: this.RestoreTransaction(Buffer.alloc(CHANNEL_ID_LENGTH, 255))
-            })
-                .on('error', (err) => reject(err))
-                .on('data', (key) => {
-                    promises.push(
-                        this.closeChannel(key.slice(key.length - CHANNEL_ID_LENGTH))
-                            .catch((err) => new BN(0))
-                    )
+            this.node.db
+                .createKeyStream({
+                    gt: this.RestoreTransaction(Buffer.alloc(CHANNEL_ID_LENGTH, 0)),
+                    lt: this.RestoreTransaction(Buffer.alloc(CHANNEL_ID_LENGTH, 255))
+                })
+                .on('error', err => reject(err))
+                .on('data', key => {
+                    promises.push(this.closeChannel(key.slice(key.length - CHANNEL_ID_LENGTH)).catch(err => new BN(0)))
                 })
                 .on('end', () => {
                     if (promises.length > 0) {
-                        resolve(Promise.all(promises)
-                            .then((results) => results.reduce((acc, value) => acc.iadd(value))))
-
+                        resolve(Promise.all(promises).then(results => results.reduce((acc, value) => acc.iadd(value))))
                     } else {
                         resolve(new BN(0))
                     }
@@ -631,8 +667,7 @@ class PaymentChannel extends EventEmitter {
             value = '0'
         }
 
-        if (!value)
-            value = '0'
+        if (!value) value = '0'
 
         const estimatedGas = await txObject.estimateGas({
             from: pubKeyToEthereumAddress(this.node.peerInfo.id.pubKey.marshal())
@@ -640,17 +675,19 @@ class PaymentChannel extends EventEmitter {
 
         this.nonce = this.nonce + 1
 
-        const promise = sendTransaction({
-            to: this.contractAddress,
-            nonce: this.nonce - 1,
-            gas: estimatedGas,
-            data: txObject.encodeABI()
-        }, this.node.peerInfo.id, this.web3)
+        const promise = sendTransaction(
+            {
+                to: this.contractAddress,
+                nonce: this.nonce - 1,
+                gas: estimatedGas,
+                data: txObject.encodeABI()
+            },
+            this.node.peerInfo.id,
+            this.web3
+        )
 
         if (typeof cb === 'function') {
-            promise
-                .then((receipt) => cb(null, receipt))
-                .catch(cb)
+            promise.then(receipt => cb(null, receipt)).catch(cb)
         } else {
             return promise
         }

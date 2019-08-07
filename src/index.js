@@ -157,7 +157,7 @@ class Hopr extends libp2p {
      * @param {PeerInfo[]} [bootstrapServers] peerInfos that are used instead of those
      * from `.env`.
      */
-    async connectToBootstapServers(bootstrapServers) {
+    async connectToBootstrapServers(bootstrapServers) {
         if (bootstrapServers) {
             this.bootstrapServers = bootstrapServers
         } else {
@@ -193,7 +193,7 @@ class Hopr extends libp2p {
                     if (options['bootstrap-node']) {
                         return cb()
                     } else {
-                        this.connectToBootstapServers(options.bootstrapServers).then(err => cb(null))
+                        this.connectToBootstrapServers(options.bootstrapServers).then(err => cb(null))
                     }
                 },
                 cb => {
@@ -232,6 +232,12 @@ class Hopr extends libp2p {
                     if (publicAddrs) publicAddrs.forEach(addr => this.peerInfo.multiaddrs.add(addr.encapsulate(`/${NAME}/${this.peerInfo.id.toB58String()}`)))
 
                     if (!options['bootstrap-node']) this.paymentChannels = paymentChannels
+
+                    // if (!options['bootstrap-node']) {
+                    //     this.bootstrapServers.forEach(peerInfo => {
+                    //         this._switch.transports.WebRTCv4.signalling.requestRelaying(peerInfo)
+                    //     })
+                    // }
 
                     return cb(null, this)
                 }

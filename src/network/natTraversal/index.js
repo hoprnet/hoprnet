@@ -12,10 +12,14 @@ const mixin = Base =>
         constructor(opts) {
             super(opts)
 
+            this.node = opts.libp2p
+
             this.signalling = new Signalling(opts)
         }
 
         // dial(multiaddr, options, cb) {
+        //     // ==== only for testing ==============
+
         //     const conn = super.dial(multiaddr, options, err => {
         //         if (err) {
         //         }
