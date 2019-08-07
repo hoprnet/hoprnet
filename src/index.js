@@ -47,6 +47,11 @@ class Hopr extends libp2p {
             throw Error("Invalid input parameters. Expected a valid PeerInfo, but got '" + typeof _options.peerInfo + "' instead.")
 
         const defaults = {
+            // Disable libp2p-switch protections for the moment
+            switch: {
+                denyTTL: 1,
+                denyAttempts: Infinity
+            },
             // The libp2p modules for this libp2p bundle
             modules: {
                 /**
@@ -200,7 +205,7 @@ class Hopr extends libp2p {
                     this.heartbeat.start()
                     this.getPublicIp = PublicIp(this, options)
 
-                    this.crawler = new crawler({libp2p: this})
+                    this.crawler = new crawler({ libp2p: this })
 
                     this.peerInfo.multiaddrs.forEach(addr => {
                         if (match.LOCALHOST(addr)) {
@@ -363,7 +368,8 @@ class Hopr extends libp2p {
         const filter = peerInfo =>
             !peerInfo.id.isEqual(this.peerInfo.id) && !peerInfo.id.isEqual(destination) && !this.bootstrapServers.some(pInfo => pInfo.id.isEqual(peerInfo.id))
 
-        this.crawler.crawl()
+        this.crawler
+            .crawl()
             .then(() => cb(null, randomSubset(this.peerBook.getAllArray(), MAX_HOPS - 1, filter).map(peerInfo => peerInfo.id)))
             .catch(err => cb(err))
     }
