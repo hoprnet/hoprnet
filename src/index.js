@@ -202,7 +202,7 @@ class Hopr extends libp2p {
                     }
                 },
                 cb => {
-                    this.heartbeat.start()
+                    // this.heartbeat.start()
                     this.getPublicIp = PublicIp(this, options)
 
                     this.crawler = new crawler({ libp2p: this })
