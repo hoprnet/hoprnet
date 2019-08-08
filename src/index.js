@@ -42,7 +42,7 @@ class Hopr extends libp2p {
      * @param {Object} _options
      * @param {Object} provider
      */
-    constructor(_options, db) {
+    constructor(_options, db, bootstrapServers) {
         if (!_options || !_options.peerInfo || !PeerInfo.isPeerInfo(_options.peerInfo))
             throw Error("Invalid input parameters. Expected a valid PeerInfo, but got '" + typeof _options.peerInfo + "' instead.")
 
@@ -97,6 +97,7 @@ class Hopr extends libp2p {
         }
         super(defaultsDeep(_options, defaults))
 
+        this.bootstrapServers = bootstrapServers
         this.db = db
         this.heartbeat = heartbeat(this)
 
@@ -141,9 +142,10 @@ class Hopr extends libp2p {
                         // WebRTC: options.WebRTC
                     },
                     // peerBook: peerBook,
-                    peerInfo: await getPeerInfo(options, db)
+                    peerInfo: await getPeerInfo(options, db),
                 },
-                db
+                db,
+                options.bootstrapServers
             )
 
             hopr.start(options, err => {
@@ -163,19 +165,6 @@ class Hopr extends libp2p {
      * from `.env`.
      */
     async connectToBootstrapServers(bootstrapServers) {
-        if (bootstrapServers) {
-            this.bootstrapServers = bootstrapServers
-        } else {
-            const tmp = groupBy(process.env.BOOTSTRAP_SERVERS.split(',').map(addr => Multiaddr(addr)), ma => ma.getPeerId())
-            this.bootstrapServers = Object.keys(tmp).reduce((acc, peerId) => {
-                const peerInfo = new PeerInfo(PeerId.createFromB58String(peerId))
-
-                tmp[peerId].forEach(ma => peerInfo.multiaddrs.add(ma))
-                acc.push(peerInfo)
-                return acc
-            }, [])
-        }
-
         const results = await Promise.all(this.bootstrapServers.map(addr => this.dial(addr).then(() => true, () => false)))
 
         if (!results.some(online => online)) throw Error('Unable to connect to any bootstrap server.')
@@ -203,7 +192,7 @@ class Hopr extends libp2p {
                 },
                 cb => {
                     // this.heartbeat.start()
-                    this.getPublicIp = PublicIp(this, options)
+                    // this.getPublicIp = PublicIp(this, options)
 
                     this.crawler = new crawler({ libp2p: this })
 
@@ -218,11 +207,11 @@ class Hopr extends libp2p {
                 cb =>
                     parallel(
                         {
-                            publicAddrs: cb => {
-                                if (options['bootstrap-node'] || process.env.DEMO || !this.bootstrapServers || this.bootstrapServers.length == 0) return cb()
+                            // publicAddrs: cb => {
+                            //     if (options['bootstrap-node'] || process.env.DEMO || !this.bootstrapServers || this.bootstrapServers.length == 0) return cb()
 
-                                this.getPublicIp(cb)
-                            },
+                            //     this.getPublicIp(cb)
+                            // },
                             paymentChannels: cb => {
                                 if (options['bootstrap-node']) return cb()
 

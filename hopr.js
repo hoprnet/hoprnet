@@ -11,8 +11,12 @@ const readline = require('readline')
 const chalk = require('chalk')
 const rlp = require('rlp')
 
+const groupBy = require('lodash.groupby')
+
 const BN = require('bn.js')
+const PeerInfo = require('peer-info')
 const PeerId = require('peer-id')
+const Multiaddr = require('multiaddr')
 const { toWei, fromWei } = require('web3-utils')
 
 const Hopr = require('./src')
@@ -41,6 +45,15 @@ function parseOptions() {
     if (Array.isArray(options._) && options._.length > 0) {
         options.id = Number.parseInt(options._[0])
     }
+
+    const tmp = groupBy(process.env.BOOTSTRAP_SERVERS.split(',').map(addr => Multiaddr(addr)), ma => ma.getPeerId())
+    options.bootstrapServers = Object.keys(tmp).reduce((acc, peerId) => {
+        const peerInfo = new PeerInfo(PeerId.createFromB58String(peerId))
+
+        tmp[peerId].forEach(ma => peerInfo.multiaddrs.add(ma))
+        acc.push(peerInfo)
+        return acc
+    }, [])
 
     return options
 }
