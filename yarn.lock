@@ -1283,7 +1283,7 @@ buffer-alloc@^1.2.0:
     buffer-alloc-unsafe "^1.1.0"
     buffer-fill "^1.0.0"
 
-buffer-crc32@~0.2.3:
+buffer-crc32@^0.2.13, buffer-crc32@~0.2.3:
   version "0.2.13"
   resolved "https://registry.yarnpkg.com/buffer-crc32/-/buffer-crc32-0.2.13.tgz#0d333e3f00eac50aa1454abd30ef8c2a5d9a7242"
   integrity sha1-DTM+PwDqxQqhRUq9MO+MKl2ackI=
@@ -4855,10 +4855,9 @@ libp2p-identify@~0.7.6:
     pull-length-prefixed "^1.3.1"
     pull-stream "^3.6.9"
 
-libp2p-kad-dht@~0.15.0:
+libp2p-kad-dht@robertkiel/js-libp2p-kad-dht:
   version "0.15.3"
-  resolved "https://registry.yarnpkg.com/libp2p-kad-dht/-/libp2p-kad-dht-0.15.3.tgz#3d7057c5c17742747cd3139cf3b4395f4a64f405"
-  integrity sha512-CasmSH+/zwlsk6q4wigmVioa3l2H1q2QZCwHPJ85ox2KKQS58mbVgXuBL2I300G2lMg0RPQRojvY43yynHhn4A==
+  resolved "https://codeload.github.com/robertkiel/js-libp2p-kad-dht/tar.gz/b98bc9771262bb8b6d7ee781c6bafa4a93eb67ee"
   dependencies:
     abort-controller "^3.0.0"
     async "^2.6.2"
@@ -4872,15 +4871,15 @@ libp2p-kad-dht@~0.15.0:
     heap "~0.2.6"
     interface-datastore "~0.6.0"
     k-bucket "^5.0.0"
-    libp2p-crypto "~0.16.1"
+    libp2p-crypto "~0.17.0"
     libp2p-record "~0.6.2"
     merge-options "^1.0.1"
-    multihashes "~0.4.14"
-    multihashing-async "~0.5.2"
+    multihashes "~0.4.15"
+    multihashing-async "~0.6.0"
     p-queue "^5.0.0"
     p-times "^2.1.0"
-    peer-id "~0.12.2"
-    peer-info "~0.15.1"
+    peer-id "~0.12.3"
+    peer-info "~0.16.0"
     priorityqueue "~0.2.1"
     promise-to-callback "^1.0.0"
     promisify-es6 "^1.0.3"
@@ -4949,10 +4948,9 @@ libp2p-secio@~0.11.1:
     pull-length-prefixed "^1.3.1"
     pull-stream "^3.6.9"
 
-libp2p-switch@^0.43.0:
+libp2p-switch@robertkiel/js-libp2p-switch:
   version "0.43.0"
-  resolved "https://registry.yarnpkg.com/libp2p-switch/-/libp2p-switch-0.43.0.tgz#319cf2c2359548272b2dc66b28056d81bdd77f67"
-  integrity sha512-K9R/4vaHetUznxQvrIKA1dKxExqdfeQXJrYcG7FlSBevZTuOeUmhCO1hguNVKs/MKC1t/L119oci2E8GiIuB4w==
+  resolved "https://codeload.github.com/robertkiel/js-libp2p-switch/tar.gz/06a6be2c3d687687ce92d5f2ed96f5c9ba37501f"
   dependencies:
     async "^2.6.2"
     bignumber.js "^8.1.1"
@@ -4968,7 +4966,7 @@ libp2p-switch@^0.43.0:
     multiaddr "^6.1.0"
     multistream-select "~0.14.6"
     once "^1.4.0"
-    peer-id "~0.12.2"
+    peer-id "~0.12.3"
     peer-info "~0.15.1"
     pull-stream "^3.6.13"
     retimer "^2.0.0"
@@ -5001,9 +4999,9 @@ libp2p-websockets@^0.12.2:
     multiaddr-to-uri "^4.0.1"
     pull-ws hugomrdias/pull-ws#fix/bundle-size
 
-libp2p@libp2p/js-libp2p:
-  version "0.26.0-rc.3"
-  resolved "https://codeload.github.com/libp2p/js-libp2p/tar.gz/0489972b4b0fba30c2348ff1a6035151f48a0748"
+libp2p@robertkiel/js-libp2p:
+  version "0.26.0"
+  resolved "https://codeload.github.com/robertkiel/js-libp2p/tar.gz/35280422bb2a68e6dff4af531906d6a302dae34d"
   dependencies:
     async "^2.6.2"
     debug "^4.1.1"
@@ -5011,13 +5009,13 @@ libp2p@libp2p/js-libp2p:
     fsm-event "^2.1.0"
     libp2p-connection-manager "^0.1.0"
     libp2p-ping "^0.8.5"
-    libp2p-switch "^0.43.0"
+    libp2p-switch robertkiel/js-libp2p-switch
     libp2p-websockets "^0.12.2"
     mafmt "^6.0.7"
     multiaddr "^6.1.0"
     once "^1.4.0"
     peer-book "^0.9.1"
-    peer-id "^0.12.2"
+    peer-id "^0.12.3"
     peer-info "^0.15.1"
     promisify-es6 "^1.0.3"
     superstruct "^0.6.0"
@@ -6262,7 +6260,7 @@ peer-book@^0.9.1:
     peer-id "~0.12.2"
     peer-info "~0.15.1"
 
-peer-id@^0.12.2, peer-id@~0.12.2:
+peer-id@^0.12.3, peer-id@~0.12.2, peer-id@~0.12.3:
   version "0.12.4"
   resolved "https://registry.yarnpkg.com/peer-id/-/peer-id-0.12.4.tgz#25708b0676ee0a8b0ce32d73fe9c68163ed747c2"
   integrity sha512-AIAwL/6CmVc/VKbUhpA1rY3A/VJ3Z9ELvtvDQfl5cIi0A74L7lvsJ6LxQn5JSJVHM5Us2Ng9zMO523dO3FFnnw==
@@ -6292,7 +6290,7 @@ peer-info@^0.15.1, peer-info@~0.15.1:
     peer-id "~0.12.2"
     unique-by "^1.0.0"
 
-peer-info@^0.16.0:
+peer-info@^0.16.0, peer-info@~0.16.0:
   version "0.16.0"
   resolved "https://registry.yarnpkg.com/peer-info/-/peer-info-0.16.0.tgz#85bd71b8e3dc29ef1465ecb1583fd02e1cc6d8e1"
   integrity sha512-iAO5MwxTkQc/firllszoReS6XxOD232TNmOITNgP4K6IOUPNNKHvCIyFDh6W3j49abwyxHM89qJ6NqgMR0YmUQ==
@@ -8915,6 +8913,14 @@ webidl-conversions@^4.0.2:
   version "4.0.2"
   resolved "https://registry.yarnpkg.com/webidl-conversions/-/webidl-conversions-4.0.2.tgz#a855980b1f0b6b359ba1d5d9fb39ae941faa63ad"
   integrity sha512-YQ+BmxuTgd6UXZW3+ICGfyqRyHXVlD5GtQr5+qjiNW7bF0cqrzX500HVXPBOvgXb5YnzDd+h0zqyv61KUD7+Sg==
+
+webrtc-stun@^3.0.0:
+  version "3.0.0"
+  resolved "https://registry.yarnpkg.com/webrtc-stun/-/webrtc-stun-3.0.0.tgz#2c06bbd5dbf5ef4a0ec6bafbc1d51ea350a30306"
+  integrity sha512-9nthdoT9mKbNq7ZqOHAglPDkFcboxPgLHycyjCp53xcNAMYqZE89tskxjSFH1MJX8JC8gLxHSI/XnAvDiWXhAA==
+  dependencies:
+    buffer-crc32 "^0.2.13"
+    ip "^1.1.5"
 
 websocket@1.0.29:
   version "1.0.29"
