@@ -37,7 +37,7 @@
         "heap": "~0.2.6",
         "leveldown": "~5.1.0",
         "levelup": "~4.1.0",
-        "libp2p": "robertkiel/js-libp2p",
+        "libp2p": "^0.26.0",
         "libp2p-crypto": "~0.17.0",
         "libp2p-crypto-secp256k1": "~0.4.0",
         "libp2p-kad-dht": "robertkiel/js-libp2p-kad-dht",
