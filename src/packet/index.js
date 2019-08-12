@@ -37,7 +37,7 @@ class Packet {
      * @param {PeerId[]} path array of peerId that determines the route that
      * the packet takes
      */
-    async static createPacket(node, msg, path) {
+    static async createPacket(node, msg, path) {
         const { header, secrets, identifier } = Header.createHeader(path)
 
         log(node.peerInfo.id, '---------- New Packet ----------')

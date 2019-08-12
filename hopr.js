@@ -426,11 +426,9 @@ async function runAsRegularNode() {
                 }
 
                 rl.question(`Sending message to ${chalk.blue(operands[1])}\nType in your message and press ENTER to send:\n`, message =>
-                    node.sendMessage(rlp.encode([message, Date.now().toString()]), operands[1], err => {
-                        if (err) console.log(chalk.red(err.message))
-
-                        rl.prompt()
-                    })
+                    node.sendMessage(rlp.encode([message, Date.now().toString()]), operands[1])
+                        .catch(err => console.log(chalk.red(err.message)))
+                        .finally(rl.prompt)
                 )
                 break
             case 'closeAll':

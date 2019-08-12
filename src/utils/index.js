@@ -705,7 +705,7 @@ function updateContractAddress(files, contractAddress) {
 module.exports.deserializePeerBook = async (serializedPeerBook, peerBook) => {
     const serializedPeerInfos = rlp.decode(serializedPeerBook)
 
-    await Promise.all(serializedPeerInfos.map(serializedPeerInfo => {
+    await Promise.all(serializedPeerInfos.map(async serializedPeerInfo => {
         const peerId = PeerId.createFromBytes(serializedPeerInfo[0])
 
         if (serializedPeerInfo.length === 3) {

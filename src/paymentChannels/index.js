@@ -75,7 +75,7 @@ class PaymentChannel extends EventEmitter {
      *
      * @param {Hopr} node a libp2p node instance
      */
-    async static create(node) {
+    static async create(node) {
         const web3 = new Web3(process.env.PROVIDER)
 
         const [nonce, compiledContract] = await Promise.all([

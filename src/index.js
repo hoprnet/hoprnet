@@ -138,7 +138,7 @@ class Hopr extends libp2p {
             options.bootstrapServers
         )
 
-        return hopr.start(options)
+        return hopr.up(options)
     }
 
     /**
@@ -159,8 +159,14 @@ class Hopr extends libp2p {
      * @param {Object} options
      * @param {Function} options.output function to which the plaintext of the received message is passed
      */
-    async start(options) {
-        await super.start()
+    async up(options) {
+        await new Promise((resolve, reject) =>
+            super.start(err => {
+                if (err) return reject(err)
+
+                resolve()
+            })
+        )
 
         registerHandlers(this, options)
 
@@ -184,6 +190,8 @@ class Hopr extends libp2p {
         }
 
         // if (publicAddrs) publicAddrs.forEach(addr => this.peerInfo.multiaddrs.add(addr.encapsulate(`/${NAME}/${this.peerInfo.id.toB58String()}`)))
+
+        return this
     }
 
     /**
@@ -194,11 +202,7 @@ class Hopr extends libp2p {
 
         // this.heartbeat.stop()
 
-        await Promise.all([
-            this.exportPeerBook(),
-            super.stop(),
-            this.db.close()
-        ])
+        await Promise.all([this.exportPeerBook(), super.stop(), this.db.close()])
     }
 
     /**
@@ -240,48 +244,55 @@ class Hopr extends libp2p {
         const promises = []
 
         for (let n = 0; n < msg.length / PACKET_SIZE; n++) {
-            promises.push(new Promise(async (resolve, reject) => {
-                const intermediateNodes = await this.getIntermediateNodes(destination)
+            promises.push(
+                new Promise(async (resolve, reject) => {
+                    const intermediateNodes = await this.getIntermediateNodes(destination)
 
-                await Promise.all(intermediateNodes.concat(destination).map(node => new Promise((resolve, reject) => {
-                    this.getPubKey(node, (err, node) => {
-                        if (err) return reject(err)
+                    await Promise.all(
+                        intermediateNodes.concat(destination).map(
+                            node =>
+                                new Promise((resolve, reject) => {
+                                    this.getPubKey(node, (err, node) => {
+                                        if (err) return reject(err)
 
-                        resolve(node)
-                    })
-                })))
-
-                const [conn, packet] = await Promise.all([
-                    new Promise((resolve, reject) =>
-                        this.peerRouting.findPeer(intermediateNodes[0].id, async (err, peerInfo) => {
-                            if (err) reject(err)
-
-                            resolve(this.dialProtocol(peerInfo, PROTOCOL_STRING))
-                        })
-                    ),
-                    createPacket(
-                        this,
-                        msg.slice(n * PACKET_SIZE, Math.min(msg.length, (n + 1) * PACKET_SIZE)),
-                        intermediateNodes.map(peerInfo => peerInfo.id)
+                                        resolve(node)
+                                    })
+                                })
+                        )
                     )
-                ])
 
-                pull(
-                    pull.once(packet.toBuffer()),
-                    lp.encode(),
-                    conn,
-                    lp.decode({
-                        maxLength: Acknowledgement.SIZE
-                    }),
-                    pull.drain(data => {
-                        log(this.peerInfo.id, `Received acknowledgement.`)
-                        // return cb()
-                        // if (!cb.called) {
-                        //     return cb()
-                        // }
-                    }, resolve)
-                )
-            }))
+                    const [conn, packet] = await Promise.all([
+                        new Promise((resolve, reject) =>
+                            this.peerRouting.findPeer(intermediateNodes[0].id, async (err, peerInfo) => {
+                                if (err) reject(err)
+
+                                resolve(this.dialProtocol(peerInfo, PROTOCOL_STRING))
+                            })
+                        ),
+                        createPacket(
+                            this,
+                            msg.slice(n * PACKET_SIZE, Math.min(msg.length, (n + 1) * PACKET_SIZE)),
+                            intermediateNodes.map(peerInfo => peerInfo.id)
+                        )
+                    ])
+
+                    pull(
+                        pull.once(packet.toBuffer()),
+                        lp.encode(),
+                        conn,
+                        lp.decode({
+                            maxLength: Acknowledgement.SIZE
+                        }),
+                        pull.drain(data => {
+                            log(this.peerInfo.id, `Received acknowledgement.`)
+                            // return cb()
+                            // if (!cb.called) {
+                            //     return cb()
+                            // }
+                        }, resolve)
+                    )
+                })
+            )
         }
 
         try {
@@ -306,7 +317,7 @@ class Hopr extends libp2p {
         return randomSubset(this.peerBook.getAllArray(), MAX_HOPS - 1, filter).map(peerInfo => peerInfo.id)
     }
 
-    async static importPeerBook(db) {
+    static async importPeerBook(db) {
         const key = 'peer-book'
 
         const peerBook = new PeerBook()
