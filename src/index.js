@@ -7,8 +7,6 @@ const KadDHT = require('libp2p-kad-dht')
 const { WebRTCv4, WebRTCv6 } = require('./network/natTraversal')
 
 const defaultsDeep = require('@nodeutils/defaults-deep')
-const groupBy = require('lodash.groupby')
-const once = require('once')
 
 const { createPacket } = require('./packet')
 const registerHandlers = require('./handlers')
@@ -25,14 +23,12 @@ const leveldown = require('leveldown')
 const PeerId = require('peer-id')
 const PeerInfo = require('peer-info')
 const PeerBook = require('peer-book')
-const Multiaddr = require('multiaddr')
 
 const PaymentChannels = require('./paymentChannels')
 const PublicIp = require('./network/natTraversal/stun')
 
 const pull = require('pull-stream')
 const lp = require('pull-length-prefixed')
-const { series, waterfall, times, parallel, map } = require('neo-async')
 const Acknowledgement = require('./acknowledgement')
 
 class Hopr extends libp2p {
@@ -117,54 +113,40 @@ class Hopr extends libp2p {
      * @param {String} options.contractAddress the Ethereum address of the contract
      * @param {Object} options.peerInfo
      */
-    static async createNode(options) {
-        return new Promise(async (resolve, reject) => {
-            if (typeof options === 'function') {
-                cb = options
-                options = {}
-            }
+    static async createNode(options = {}) {
+        options.output = options.output || console.log
 
-            options.output = options.output || console.log
+        const db = Hopr.openDatabase(`db`, options)
 
-            const db = Hopr.openDatabase(`db`, options)
+        // peerBook: (cb) => {
+        //     if (options.peerBook) {
+        //         cb(null, options.peerBook)
+        //     } else {
+        //         Hopr.importPeerBook(db, cb)
+        //     }
+        // }
 
-            // peerBook: (cb) => {
-            //     if (options.peerBook) {
-            //         cb(null, options.peerBook)
-            //     } else {
-            //         Hopr.importPeerBook(db, cb)
-            //     }
-            // }
-
-            const hopr = new Hopr(
-                {
-                    config: {
-                        // WebRTC: options.WebRTC
-                    },
-                    // peerBook: peerBook,
-                    peerInfo: await getPeerInfo(options, db),
+        const hopr = new Hopr(
+            {
+                config: {
+                    // WebRTC: options.WebRTC
                 },
-                db,
-                options.bootstrapServers
-            )
+                // peerBook: peerBook,
+                peerInfo: await getPeerInfo(options, db)
+            },
+            db,
+            options.bootstrapServers
+        )
 
-            hopr.start(options, err => {
-                if (err) return reject(err)
-
-                resolve(hopr)
-            })
-        })
+        return hopr.start(options)
     }
 
     /**
      * Parses the bootstrap servers given in `.env` and tries to connect to each of them.
      *
-     * @throws will throw an error if none of the bootstrapservers is online
-     *
-     * @param {PeerInfo[]} [bootstrapServers] peerInfos that are used instead of those
-     * from `.env`.
+     * @throws an error if none of the bootstrapservers is online
      */
-    async connectToBootstrapServers(bootstrapServers) {
+    async connectToBootstrapServers() {
         const results = await Promise.all(this.bootstrapServers.map(addr => this.dial(addr).then(() => true, () => false)))
 
         if (!results.some(online => online)) throw Error('Unable to connect to any bootstrap server.')
@@ -174,82 +156,49 @@ class Hopr extends libp2p {
      * This method starts the node and registers all necessary handlers. It will
      * also open the database and creates one if it doesn't exists.
      *
-     * @param {Function} output function to which the plaintext of the received message is passed
-     * @param {Function} cb callback when node is ready
+     * @param {Object} options
+     * @param {Function} options.output function to which the plaintext of the received message is passed
      */
-    start(options, cb) {
-        waterfall(
-            [
-                cb => super.start(cb),
-                cb => {
-                    registerHandlers(this, options)
+    async start(options) {
+        await super.start()
 
-                    if (options['bootstrap-node']) {
-                        return cb()
-                    } else {
-                        this.connectToBootstrapServers(options.bootstrapServers).then(err => cb(null))
-                    }
-                },
-                cb => {
-                    // this.heartbeat.start()
-                    // this.getPublicIp = PublicIp(this, options)
+        registerHandlers(this, options)
 
-                    this.crawler = new crawler({ libp2p: this })
+        if (!options['bootstrap-node']) {
+            await this.connectToBootstrapServers(options.bootstrapServers)
+        }
 
-                    this.peerInfo.multiaddrs.forEach(addr => {
-                        if (match.LOCALHOST(addr)) {
-                            this.peerInfo.multiaddrs.delete(addr)
-                        }
-                    })
+        // this.heartbeat.start()
+        // this.getPublicIp = PublicIp(this, options)
 
-                    return cb()
-                },
-                cb =>
-                    parallel(
-                        {
-                            // publicAddrs: cb => {
-                            //     if (options['bootstrap-node'] || process.env.DEMO || !this.bootstrapServers || this.bootstrapServers.length == 0) return cb()
+        this.crawler = new crawler({ libp2p: this })
 
-                            //     this.getPublicIp(cb)
-                            // },
-                            paymentChannels: cb => {
-                                if (options['bootstrap-node']) return cb()
+        this.peerInfo.multiaddrs.forEach(addr => {
+            if (match.LOCALHOST(addr)) {
+                this.peerInfo.multiaddrs.delete(addr)
+            }
+        })
 
-                                PaymentChannels.create(this, cb)
-                            }
-                        },
-                        cb
-                    ),
-                ({ paymentChannels, publicAddrs }, cb) => {
-                    this.paymentChannels = paymentChannels
+        if (!options['bootstrap-node']) {
+            this.paymentChannels = await PaymentChannels.create(this)
+        }
 
-                    if (publicAddrs) publicAddrs.forEach(addr => this.peerInfo.multiaddrs.add(addr.encapsulate(`/${NAME}/${this.peerInfo.id.toB58String()}`)))
-
-                    if (!options['bootstrap-node']) this.paymentChannels = paymentChannels
-
-                    // if (!options['bootstrap-node']) {
-                    //     this.bootstrapServers.forEach(peerInfo => {
-                    //         this._switch.transports.WebRTCv4.signalling.requestRelaying(peerInfo)
-                    //     })
-                    // }
-
-                    return cb(null, this)
-                }
-            ],
-            cb
-        )
+        // if (publicAddrs) publicAddrs.forEach(addr => this.peerInfo.multiaddrs.add(addr.encapsulate(`/${NAME}/${this.peerInfo.id.toB58String()}`)))
     }
 
     /**
-     * Shutdown the node and saves keys and peerBook in the database
-     * @param {Function} cb
+     * Shuts down the node and saves keys and peerBook in the database
      */
-    stop(cb) {
+    async stop() {
         log(this.peerInfo.id, `Shutting down...`)
 
-        this.heartbeat.stop()
+        // this.heartbeat.stop()
 
-        series([cb => this.exportPeerBook(cb), cb => super.stop(cb), cb => this.db.close(cb)], cb)
+        await Promise.all([
+            this.exportPeerBook(),
+            super.stop(),
+            this.db.close()
+        ])
     }
 
     /**
@@ -262,10 +211,9 @@ class Hopr extends libp2p {
      *
      * @param {Number | String | Buffer} msg message to send
      * @param {PeerId | PeerInfo | String} destination PeerId of the destination
-     * @param {Function} cb called with `(err)` in case of an error, or when receiving
      * the acknowledgement of the first hop
      */
-    sendMessage(msg, destination, cb) {
+    async sendMessage(msg, destination) {
         if (!msg) return cb(Error(`Expecting a non-empty message.`))
 
         if (!destination) return cb(Error(`Expecting a non-empty destination.`))
@@ -289,61 +237,58 @@ class Hopr extends libp2p {
             }
         }
 
-        cb = cb ? once(cb) : () => {}
+        const promises = []
 
-        times(
-            Math.ceil(msg.length / PACKET_SIZE),
-            (n, cb) =>
-                waterfall(
-                    [
-                        cb => this.getIntermediateNodes(destination, cb),
-                        (intermediateNodes, cb) => map(intermediateNodes.concat(destination), this.getPubKey, cb),
-                        (intermediateNodes, cb) =>
-                            parallel(
-                                {
-                                    conn: cb =>
-                                        waterfall(
-                                            [
-                                                cb => this.peerRouting.findPeer(intermediateNodes[0].id, cb),
-                                                (peerInfo, cb) => this.dialProtocol(peerInfo, PROTOCOL_STRING, cb)
-                                            ],
-                                            cb
-                                        ),
-                                    packet: cb =>
-                                        createPacket(
-                                            this,
-                                            msg.slice(n * PACKET_SIZE, Math.min(msg.length, (n + 1) * PACKET_SIZE)),
-                                            intermediateNodes.map(peerInfo => peerInfo.id),
-                                            cb
-                                        )
-                                },
-                                cb
-                            ),
-                        (results, cb) =>
-                            pull(
-                                pull.once(results.packet.toBuffer()),
-                                lp.encode(),
-                                results.conn,
-                                lp.decode({
-                                    maxLength: Acknowledgement.SIZE
-                                }),
-                                pull.drain(data => {
-                                    log(this.peerInfo.id, `Received acknowledgement.`)
-                                    // return cb()
-                                    // if (!cb.called) {
-                                    //     return cb()
-                                    // }
-                                })
-                            )
-                    ],
-                    cb
-                ),
-            err => {
-                if (err) console.log(err)
+        for (let n = 0; n < msg.length / PACKET_SIZE; n++) {
+            promises.push(new Promise(async (resolve, reject) => {
+                const intermediateNodes = await this.getIntermediateNodes(destination)
 
-                return cb(err)
-            }
-        )
+                await Promise.all(intermediateNodes.concat(destination).map(node => new Promise((resolve, reject) => {
+                    this.getPubKey(node, (err, node) => {
+                        if (err) return reject(err)
+
+                        resolve(node)
+                    })
+                })))
+
+                const [conn, packet] = await Promise.all([
+                    new Promise((resolve, reject) =>
+                        this.peerRouting.findPeer(intermediateNodes[0].id, async (err, peerInfo) => {
+                            if (err) reject(err)
+
+                            resolve(this.dialProtocol(peerInfo, PROTOCOL_STRING))
+                        })
+                    ),
+                    createPacket(
+                        this,
+                        msg.slice(n * PACKET_SIZE, Math.min(msg.length, (n + 1) * PACKET_SIZE)),
+                        intermediateNodes.map(peerInfo => peerInfo.id)
+                    )
+                ])
+
+                pull(
+                    pull.once(packet.toBuffer()),
+                    lp.encode(),
+                    conn,
+                    lp.decode({
+                        maxLength: Acknowledgement.SIZE
+                    }),
+                    pull.drain(data => {
+                        log(this.peerInfo.id, `Received acknowledgement.`)
+                        // return cb()
+                        // if (!cb.called) {
+                        //     return cb()
+                        // }
+                    }, resolve)
+                )
+            }))
+        }
+
+        try {
+            await Promise.all(promises)
+        } catch (err) {
+            console.log(err)
+        }
     }
 
     /**
@@ -351,43 +296,39 @@ class Hopr extends libp2p {
      * that will relay that message before it reaches its destination.
      *
      * @param {Object} destination instance of peerInfo that contains the peerId of the destination
-     * @param {Function} cb the function that called afterwards
      */
-    getIntermediateNodes(destination, cb) {
+    async getIntermediateNodes(destination) {
         const filter = peerInfo =>
             !peerInfo.id.isEqual(this.peerInfo.id) && !peerInfo.id.isEqual(destination) && !this.bootstrapServers.some(pInfo => pInfo.id.isEqual(peerInfo.id))
 
-        this.crawler
-            .crawl()
-            .then(() => cb(null, randomSubset(this.peerBook.getAllArray(), MAX_HOPS - 1, filter).map(peerInfo => peerInfo.id)))
-            .catch(err => cb(err))
+        await this.crawler.crawl()
+
+        return randomSubset(this.peerBook.getAllArray(), MAX_HOPS - 1, filter).map(peerInfo => peerInfo.id)
     }
 
-    static importPeerBook(db, cb) {
+    async static importPeerBook(db) {
         const key = 'peer-book'
 
         const peerBook = new PeerBook()
-        db.get(key, (err, value) => {
-            if (err && !err.notFound) {
-                cb(err)
-            } else if (err && err.notFound) {
-                cb(null, peerBook)
+
+        let serializedPeerBook
+        try {
+            serializedPeerbook = await db.get(key)
+        } catch (err) {
+            if (err.notFound) {
+                return peerBook
             } else {
-                deserializePeerBook(value, peerBook, err => {
-                    if (err) {
-                        cb(err)
-                    } else {
-                        cb(null, peerBook)
-                    }
-                })
+                throw err
             }
-        })
+        }
+
+        return deserializePeerBook(serializedPeerbook, peerBook)
     }
 
-    exportPeerBook(cb) {
+    async exportPeerBook() {
         const key = 'peer-book'
 
-        this.db.put(key, serializePeerBook(this.peerBook), cb)
+        await this.db.put(key, serializePeerBook(this.peerBook))
     }
 
     static openDatabase(db_dir, options) {

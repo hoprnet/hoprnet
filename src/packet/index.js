@@ -36,10 +36,8 @@ class Packet {
      * @param {Buffer} msg the message that is sent through the network
      * @param {PeerId[]} path array of peerId that determines the route that
      * the packet takes
-     * @param {Function(Error, Packet)} cb called afterward with `(err, packet)` if execution was successful,
-     * otherwise with `(err)`
      */
-    static createPacket(node, msg, path, cb) {
+    async static createPacket(node, msg, path) {
         const { header, secrets, identifier } = Header.createHeader(path)
 
         log(node.peerInfo.id, '---------- New Packet ----------')
@@ -60,7 +58,7 @@ class Packet {
 
         log(node.peerInfo.id, `Encrypting with ${hash(bufferXOR(Header.deriveTransactionKey(secrets[0]), Header.deriveTransactionKey(secrets[1]))).toString('base64')}.`)
 
-        node.paymentChannels.transfer({
+        const tx = await node.paymentChannels.transfer({
             amount: fee,
             to: path[0],
             channelId: getId(
@@ -69,10 +67,8 @@ class Packet {
             ),
             key: secp256k1.privateKeyTweakAdd(Header.deriveTransactionKey(secrets[0]), Header.deriveTransactionKey(secrets[1]))
         })
-            .then((tx) =>
-                cb(null, new Packet(header, tx, challenge, message))
-            )
-            .catch(cb)
+
+        return new Packet(header, tx, challenge, message)
     }
 
     /**

@@ -3,7 +3,7 @@
 const EventEmitter = require('events')
 
 const Web3 = require('web3')
-const { parallel, waterfall } = require('neo-async')
+const { waterfall } = require('neo-async')
 const BN = require('bn.js')
 const secp256k1 = require('secp256k1')
 const pull = require('pull-stream')
@@ -74,80 +74,68 @@ class PaymentChannel extends EventEmitter {
      * and compiles the contract if that isn't the case.
      *
      * @param {Hopr} node a libp2p node instance
-     * @param {Function} cb a function the is called with `(err, self)` afterwards
      */
-    static create(node, cb) {
+    async static create(node) {
         const web3 = new Web3(process.env.PROVIDER)
 
-        parallel(
-            {
-                nonce: cb => web3.eth.getTransactionCount(pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()), 'latest', cb),
-                compiledContract: cb =>
-                    compileIfNecessary([`${process.cwd()}/contracts/HoprChannel.sol`], [`${process.cwd()}/build/contracts/HoprChannel.json`], cb)
-            },
-            (err, results) => {
-                if (err) return cb(err)
+        const [nonce, compiledContract] = await Promise.all([
+            web3.eth.getTransactionCount(pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()), 'latest'),
+            new Promise((resolve, reject) =>
+                compileIfNecessary([`${process.cwd()}/contracts/HoprChannel.sol`], [`${process.cwd()}/build/contracts/HoprChannel.json`], (err) => {
+                    if (err) return reject(err)
 
-                registerHandlers(node)
-
-                const abi = require('../../build/contracts/HoprChannel.json').abi
-
-                const self = new PaymentChannel({
-                    node: node,
-                    nonce: results.nonce,
-                    contract: new web3.eth.Contract(abi, process.env.CONTRACT_ADDRESS, {
-                        from: pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal())
-                    }),
-                    web3
+                    resolve()
                 })
+            )
+        ])
 
-                self.registerEventListeners(err => {
-                    if (err) return cb(err)
+        registerHandlers(node)
 
-                    cb(null, self)
-                })
-            }
-        )
+        const abi = require('../../build/contracts/HoprChannel.json').abi
+
+        const paymentChannel = new PaymentChannel({
+            node,
+            nonce,
+            contract: new web3.eth.Contract(abi, process.env.CONTRACT_ADDRESS, {
+                from: pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal())
+            }),
+            web3
+        })
+
+        await paymentChannel.registerEventListeners()
+
+        return paymentChannel
     }
 
     /**
      * Registers listeners on-chain opening events and the closing events of all
      * payment channels found in the database.
-     *
-     * @param {Function} cb called with `(err)` when finished
      */
-    registerEventListeners(cb) {
-        const register = (query, fn, cb) => {
+    async registerEventListeners() {
+        const register = (query, fn) => new Promise((resolve, reject) =>
             this.node.db
                 .createKeyStream(query)
                 .on('data', fn)
-                .on('error', err => cb(err))
-                .on('end', () => cb())
-        }
-
-        parallel(
-            [
-                cb =>
-                    register(
-                        {
-                            gt: this.RestoreTransaction(Buffer.alloc(32, 0)),
-                            lt: this.RestoreTransaction(Buffer.alloc(32, 255))
-                        },
-                        key => this.registerSettlementListener(key.slice(key.length - 32)),
-                        cb
-                    ),
-                cb =>
-                    register(
-                        {
-                            gt: this.StashedRestoreTransaction(Buffer.alloc(32, 0)),
-                            lt: this.StashedRestoreTransaction(Buffer.alloc(32, 255))
-                        },
-                        key => this.registerOpeningListener(key.slice(key.length - 32)),
-                        cb
-                    )
-            ],
-            cb
+                .on('error', reject)
+                .on('end', resolve)
         )
+
+        await Promise.all([
+            register(
+                {
+                    gt: this.RestoreTransaction(Buffer.alloc(32, 0)),
+                    lt: this.RestoreTransaction(Buffer.alloc(32, 255))
+                },
+                key => this.registerSettlementListener(key.slice(key.length - 32))
+            ),
+            register(
+                {
+                    gt: this.StashedRestoreTransaction(Buffer.alloc(32, 0)),
+                    lt: this.StashedRestoreTransaction(Buffer.alloc(32, 255))
+                },
+                key => this.registerOpeningListener(key.slice(key.length - 32))
+            )
+        ])
     }
 
     /**

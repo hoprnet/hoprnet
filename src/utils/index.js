@@ -701,29 +701,24 @@ function updateContractAddress(files, contractAddress) {
  *
  * @param {Buffer} serializePeerBook the encodes serialized peerBook
  * @param {PeerBook} peerBook a peerBook instance to store the peerInfo instances
- * @param {function} cb called when finished with `(err)`
  */
-module.exports.deserializePeerBook = (serializedPeerBook, peerBook, cb) =>
-    each(
-        rlp.decode(serializedPeerBook),
-        (serializedPeerInfo, cb) => {
-            const peerId = PeerId.createFromBytes(serializedPeerInfo[0])
+module.exports.deserializePeerBook = async (serializedPeerBook, peerBook) => {
+    const serializedPeerInfos = rlp.decode(serializedPeerBook)
 
-            if (serializedPeerInfo.length === 3) {
-                peerId.pubKey = libp2p_crypto.unmarshalPublicKey(serializedPeerInfo[2])
-            }
+    await Promise.all(serializedPeerInfos.map(serializedPeerInfo => {
+        const peerId = PeerId.createFromBytes(serializedPeerInfo[0])
 
-            PeerInfo.create(peerId, (err, peerInfo) => {
-                if (err) return cb(err)
+        if (serializedPeerInfo.length === 3) {
+            peerId.pubKey = libp2p_crypto.unmarshalPublicKey(serializedPeerInfo[2])
+        }
 
-                serializedPeerInfo[1].forEach(multiaddr => peerInfo.multiaddrs.add(Multiaddr(multiaddr)))
-                peerBook.put(peerInfo)
+        const peerInfo = await PeerInfo.create(peerId)
+        serializedPeerInfo[1].forEach(multiaddr => peerInfo.multiaddrs.add(Multiaddr(multiaddr)))
+        peerBook.put(peerInfo)
+    }))
 
-                return cb()
-            })
-        },
-        cb
-    )
+    return peerBook
+}
 
 /**
  * Serializes a given peerBook by serializing the included peerInfo instances.

@@ -5,4 +5,4 @@
     "singleQuote": true,
     "quoteProps": "consistent",
     "arrowParens": "avoid"
-  }
+}
