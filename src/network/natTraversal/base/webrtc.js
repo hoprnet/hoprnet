@@ -34,7 +34,7 @@ module.exports = class WebRTC {
         // TODO: use HOPR nodes instead of Google servers
         const channel = SimplePeer({
             initiator: true,
-            config: { iceServers: prepareBootstrapServers(this.node.bootstrapServers) },
+            config: { iceServers: getSTUNServers(this.node.bootstrapServers) },
             trickle: true,
             allowHalfTrickle: true,
             wrtc
@@ -46,11 +46,11 @@ module.exports = class WebRTC {
             const socket = dgram.createSocket(this.socketType)
 
             channel
-                .on('signal', data => {
+                .on('signal', data =>
                     socket.send(Buffer.from(JSON.stringify(data)), opts.port, opts.host, (err, bytes) => {
                         if (err) console.log(err)
                     })
-                })
+                )
 
                 .on('connect', async () => {
                     console.log('[initiator] connected')
@@ -99,10 +99,9 @@ module.exports = class WebRTC {
             let channel = this.channels.get(id)
 
             if (!channel) {
-                // TODO: use HOPR nodes instead of Google servers
                 channel = SimplePeer({
                     initiator: false,
-                    config: { iceServers: prepareBootstrapServers(this.node.bootstrapServers) },
+                    config: { iceServers: getSTUNServers(this.node.bootstrapServers) },
                     trickle: true,
                     allowHalfTrickle: true,
                     wrtc
@@ -129,7 +128,7 @@ module.exports = class WebRTC {
                 })
 
                 channel.on('err', err => {
-                    console.log(err)
+                    listener.emit('err', err)
                     this.channels.delete(id)
                 })
 
@@ -162,12 +161,14 @@ module.exports = class WebRTC {
         server.on('message', (msg, rinfo) => {
             if (msg[0] === '{'.charCodeAt(0)) {
                 // WebRTC requests come as JSON encoded messages
-                // thus, the msg starts with `{`
+                // thus, the msgs start with `{`
                 establishWebRTCConnection(msg, rinfo)
             } else if (msg[0] >> 6 == 0) {
                 // STUN requests have, as stated in RFC5389, their
                 // two most significant bits set to `0`
                 answerStunRequest(msg, rinfo)
+            } else {
+                console.log(`Discarding message "${msg.toString()}" from ${rinfo.address}:${rinfo.port}`)
             }
         })
 
@@ -229,14 +230,31 @@ module.exports = class WebRTC {
     }
 }
 
-function prepareBootstrapServers(peerInfos) {
+function getSTUNServers(peerInfos) {
     const result = []
+
+    /**
+     * If there are no known STUN server, use the ones from Google and Twilio (default configuration for simple-peer)
+     */
+    if (!peerInfos) {
+        return [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:global.stun.twilio.com:3478?transport=udp' }]
+    }
+
+    if (!Array.isArray(peerInfos) && PeerInfo.isPeerInfo(peerInfos)) peerInfos = [peerInfos]
+
     peerInfos.forEach(peerInfo => {
         peerInfo.multiaddrs.forEach(ma => {
             const opts = ma.toOptions()
-            result.push({
-                urls: `stun:${opts.host}:${opts.port}`
-            })
+
+            if (opts.family.toLowerCase() === 'ipv4') {
+                result.push({
+                    urls: `stun:${opts.host}:${opts.port}`
+                })
+            } else if (opts.family.toLowerCase() === 'ipv6') {
+                result.push({
+                    urls: `stun:[${opts.host}]:${opts.port}`
+                })
+            }
         })
     })
 

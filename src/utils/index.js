@@ -645,7 +645,7 @@ module.exports.deployContract = (index, web3) =>
     new Promise((resolve, reject) =>
         parallel(
             {
-                fundingPeer: (cb) => this.privKeyToPeerId(process.env.FUND_ACCOUNT_PRIVATE_KEY).then(peerId => cb(null, peerId)),
+                fundingPeer: cb => this.privKeyToPeerId(process.env.FUND_ACCOUNT_PRIVATE_KEY).then(peerId => cb(null, peerId)),
                 compiledContract: cb =>
                     this.compileIfNecessary([`${process.cwd()}/contracts/HoprChannel.sol`], [`${process.cwd()}/build/contracts/HoprChannel.json`], cb)
             },
@@ -703,19 +703,23 @@ function updateContractAddress(files, contractAddress) {
  * @param {PeerBook} peerBook a peerBook instance to store the peerInfo instances
  */
 module.exports.deserializePeerBook = async (serializedPeerBook, peerBook) => {
+    if (!serializedPeerBook) return peerBook
+
     const serializedPeerInfos = rlp.decode(serializedPeerBook)
 
-    await Promise.all(serializedPeerInfos.map(async serializedPeerInfo => {
-        const peerId = PeerId.createFromBytes(serializedPeerInfo[0])
+    await Promise.all(
+        serializedPeerInfos.map(async serializedPeerInfo => {
+            const peerId = PeerId.createFromBytes(serializedPeerInfo[0])
 
-        if (serializedPeerInfo.length === 3) {
-            peerId.pubKey = libp2p_crypto.unmarshalPublicKey(serializedPeerInfo[2])
-        }
+            if (serializedPeerInfo.length === 3) {
+                peerId.pubKey = libp2p_crypto.unmarshalPublicKey(serializedPeerInfo[2])
+            }
 
-        const peerInfo = await PeerInfo.create(peerId)
-        serializedPeerInfo[1].forEach(multiaddr => peerInfo.multiaddrs.add(Multiaddr(multiaddr)))
-        peerBook.put(peerInfo)
-    }))
+            const peerInfo = await PeerInfo.create(peerId)
+            serializedPeerInfo[1].forEach(multiaddr => peerInfo.multiaddrs.add(Multiaddr(multiaddr)))
+            peerBook.put(peerInfo)
+        })
+    )
 
     return peerBook
 }

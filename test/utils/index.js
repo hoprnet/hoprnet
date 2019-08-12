@@ -61,7 +61,8 @@ module.exports.createFundedNodes = async (amountOfNodes, options, peerId, nonce)
                     {
                         id: n
                     },
-                    options
+                    options,
+                    options.bootstrapServers
                 )
             )
         )
@@ -189,7 +190,7 @@ module.exports.startBootstrapServers = async amountOfNodes => {
         )
 
         promises.push(
-            createNode({ peerId }).then(node => {
+            createNode({ peerId, "bootstrap-node": true }).then(node => {
                 node.on('peer:connect', peer => {
                     console.log(`Incoming connection from ${chalk.blue(peer.id.toB58String())}.`)
                 })

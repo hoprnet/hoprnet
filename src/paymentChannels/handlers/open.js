@@ -12,7 +12,7 @@ const BN = require('bn.js')
 
 const { SIGNATURE_LENGTH } = require('../../transaction')
 
-module.exports = (node) => {
+module.exports = node => {
     const handleOpeningRequest = async (data, cb) => {
         if (data.length !== Transaction.SIZE) {
             log(node.peerInfo.id, 'Invalid size of payment channel opening request.')
@@ -41,13 +41,19 @@ module.exports = (node) => {
 
         let state, channel
         try {
-            [state, channel] = await Promise.all([
-                node.paymentChannels.contract.methods.states(pubKeyToEthereumAddress(counterparty)).call({
-                    from: pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal())
-                }, 'latest'),
-                node.paymentChannels.contract.methods.channels(channelId).call({
-                    from: pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal())
-                }, 'latest')
+            ;[state, channel] = await Promise.all([
+                node.paymentChannels.contract.methods.states(pubKeyToEthereumAddress(counterparty)).call(
+                    {
+                        from: pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal())
+                    },
+                    'latest'
+                ),
+                node.paymentChannels.contract.methods.channels(channelId).call(
+                    {
+                        from: pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal())
+                    },
+                    'latest'
+                )
             ])
         } catch (err) {
             log(node.peerInfo.id, err.message)
@@ -65,7 +71,10 @@ module.exports = (node) => {
         // Check whether the counterparty has staked enough money to open
         // the payment channel
         if (stakedEther.lt(claimedFunds)) {
-            log(node.peerInfo.id, `Rejecting payment channel opening request due to ${fromWei(claimedFunds.sub(stakedEther), 'ether')} ETH too less staked funds.`)
+            log(
+                node.peerInfo.id,
+                `Rejecting payment channel opening request due to ${fromWei(claimedFunds.sub(stakedEther), 'ether')} ETH too less staked funds.`
+            )
             return cb(null, Buffer.alloc(0))
         }
         // Check whether there is already such a channel registered in the
@@ -86,13 +95,15 @@ module.exports = (node) => {
         return cb(null, Buffer.concat([sigRestore.signature, numberToBuffer(sigRestore.recovery, 1)], SIGNATURE_LENGTH + 1))
     }
 
-    node.handle(PROTOCOL_PAYMENT_CHANNEL, (protocol, conn) => pull(
-        conn,
-        lp.decode({
-            maxLength: Transaction.SIZE
-        }),
-        pull.asyncMap(handleOpeningRequest),
-        lp.encode(),
-        conn
-    ))
+    node.handle(PROTOCOL_PAYMENT_CHANNEL, (protocol, conn) =>
+        pull(
+            conn,
+            lp.decode({
+                maxLength: Transaction.SIZE
+            }),
+            pull.asyncMap(handleOpeningRequest),
+            lp.encode(),
+            conn
+        )
+    )
 }

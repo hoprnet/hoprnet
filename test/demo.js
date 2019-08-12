@@ -20,9 +20,10 @@ const AMOUNT_OF_MESSAGES = 1
 
 console.log(
     'Welcome to \x1b[1m\x1b[5mHOPR\x1b[0m!\n' +
-    'Please wait some time until the node is set up.\n' +
-    '\x1b[2mThis may take some time ...\n' +
-    'Meanwhile you can start reading the wiki at https://github.com/validitylabs/hopr/wiki\x1b[0m\n')
+        'Please wait some time until the node is set up.\n' +
+        '\x1b[2mThis may take some time ...\n' +
+        'Meanwhile you can start reading the wiki at https://github.com/validitylabs/hopr/wiki\x1b[0m\n'
+)
 
 let nonce, fundingPeer, provider, server, contractAddress
 
@@ -52,13 +53,18 @@ const main = async () => {
         contractAddress = process.env[`CONTRACT_ADDRESS_${process.env.NETWORK}`]
     }
 
-    const bootstrapServers = await startBootstrapServers(1)
+    const bootstrapServers = (await startBootstrapServers(1)).map(node => node.peerInfo)
 
-    const nodes = await createFundedNodes(AMOUNT_OF_NODES, {
-        provider: provider,
-        contractAddress: contractAddress,
-        bootstrapServers: bootstrapServers.map((node) => node.peerInfo)
-    }, fundingPeer, nonce)
+    const nodes = await createFundedNodes(
+        AMOUNT_OF_NODES,
+        {
+            provider,
+            contractAddress,
+            bootstrapServers
+        },
+        fundingPeer,
+        nonce
+    )
 
     let timeout
     if (process.env.NETWORK === 'ganache') {
@@ -70,25 +76,28 @@ const main = async () => {
     for (let n = 0; n < AMOUNT_OF_MESSAGES; n++) {
         nodes[0].sendMessage(rlp.encode(['Psst ... secret message from Validity Labs!', Date.now().toString()]), nodes[2].peerInfo.id)
 
-        await new Promise((resolve) => setTimeout(resolve, timeout))
+        await new Promise(resolve => setTimeout(resolve, timeout))
     }
 
-    await new Promise((resolve) => setTimeout(resolve, timeout))
+    await new Promise(resolve => setTimeout(resolve, timeout))
 
     const closeBatch = []
-    nodes.forEach((node) => {
-        closeBatch.push(node.paymentChannels.closeChannels()
-            .then((receivedMoney) => {
-                log(node.peerInfo.id, `Finally ${receivedMoney.isNeg() ? 'spent' : 'received'} ${chalk.magenta(`${fromWei(receivedMoney.abs(), 'ether')} ETH`)}.`)
-            }))
-    })
+    nodes.forEach(node =>
+        closeBatch.push(
+            node.paymentChannels.closeChannels().then(receivedMoney => {
+                log(
+                    node.peerInfo.id,
+                    `Finally ${receivedMoney.isNeg() ? 'spent' : 'received'} ${chalk.magenta(`${fromWei(receivedMoney.abs(), 'ether')} ETH`)}.`
+                )
+            })
+        )
+    )
 
     await Promise.all(closeBatch)
 
-    nodes.forEach((node) => node.stop())
+    nodes.forEach(node => node.stop())
 
-    if (process.env.NETWORK === 'ganache')
-        setTimeout(server.close, 2000)
+    if (process.env.NETWORK === 'ganache') setTimeout(server.close, 2000)
 }
 
 main()

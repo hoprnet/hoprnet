@@ -246,16 +246,16 @@ class Hopr extends libp2p {
         for (let n = 0; n < msg.length / PACKET_SIZE; n++) {
             promises.push(
                 new Promise(async (resolve, reject) => {
-                    const intermediateNodes = await this.getIntermediateNodes(destination)
+                    let intermediateNodes = await this.getIntermediateNodes(destination)
 
-                    await Promise.all(
+                    intermediateNodes = await Promise.all(
                         intermediateNodes.concat(destination).map(
-                            node =>
+                            peerId =>
                                 new Promise((resolve, reject) => {
-                                    this.getPubKey(node, (err, node) => {
+                                    this.getPubKey(peerId, (err, peerInfo) => {
                                         if (err) return reject(err)
 
-                                        resolve(node)
+                                        resolve(peerInfo.id)
                                     })
                                 })
                         )
@@ -263,17 +263,18 @@ class Hopr extends libp2p {
 
                     const [conn, packet] = await Promise.all([
                         new Promise((resolve, reject) =>
-                            this.peerRouting.findPeer(intermediateNodes[0].id, async (err, peerInfo) => {
+                            this.peerRouting.findPeer(intermediateNodes[0], async (err, peerInfo) => {
                                 if (err) reject(err)
 
                                 resolve(this.dialProtocol(peerInfo, PROTOCOL_STRING))
                             })
                         ),
+                        // prettier-ignore
                         createPacket(
                             this,
                             msg.slice(n * PACKET_SIZE, Math.min(msg.length, (n + 1) * PACKET_SIZE)),
-                            intermediateNodes.map(peerInfo => peerInfo.id)
-                        )
+                            intermediateNodes
+                        7)
                     ])
 
                     pull(

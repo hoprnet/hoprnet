@@ -12,7 +12,7 @@ module.exports = (self) => {
 
     /**
      * Computes the new balance of the channel.
-     * 
+     *
      * @param {Buffer} channelId ID of the channel
      * @param {PeerId} to peerId of the recipient
      * @param {BN} amount of funds to transfer
@@ -66,7 +66,7 @@ module.exports = (self) => {
         ])
 
         const pubKeys = [
-            secp256k1.publicKeyCreate(options.key)
+            secp256k1.publicKeyCreate(channelKey)
         ]
 
         if (previousChallenges) {
