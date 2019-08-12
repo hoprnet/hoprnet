@@ -7,6 +7,7 @@
 
 # Exclude node stuff
 **/node_modules
+.packages-cache/
 
 # Exclude build dir
 build/
