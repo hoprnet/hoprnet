@@ -274,7 +274,7 @@ class Hopr extends libp2p {
                             this,
                             msg.slice(n * PACKET_SIZE, Math.min(msg.length, (n + 1) * PACKET_SIZE)),
                             intermediateNodes
-                        7)
+                        )
                     ])
 
                     pull(
