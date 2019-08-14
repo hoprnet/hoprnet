@@ -22,6 +22,48 @@ module.exports = class WebRTC {
         this.channels = new Map()
     }
 
+    establishWebRTCConnection(msg, id, send, connHandler) {
+        let channel = this.channels.get(id)
+
+        if (!channel) {
+            channel = SimplePeer({
+                initiator: false,
+                config: { iceServers: getSTUNServers(this.node.bootstrapServers) },
+                trickle: true,
+                allowHalfTrickle: true,
+                wrtc
+            })
+
+            channel.on('signal', data =>
+                send(Buffer.from(JSON.stringify(data)), (err, bytes) => {
+                    if (err) console.log(err)
+                    // console.log(err, bytes)
+                })
+            )
+
+            channel.on('connect', () => {
+                console.log('[responder] connected')
+                let conn = new Connection(toPull.duplex(channel))
+
+                conn.getObservedAddrs = callback => callback(null, [])
+                connHandler(conn)
+            })
+
+            channel.on('close', () => {
+                this.channels.delete(id)
+            })
+
+            channel.on('err', err => {
+                listener.emit('err', err)
+                this.channels.delete(id)
+            })
+
+            this.channels.set(id, channel)
+        }
+
+        channel.signal(JSON.parse(msg))
+    }
+
     dial(multiaddr, options, cb) {
         console.log(`calling ${multiaddr.toString()}`)
         if (typeof options === 'function') {
@@ -42,7 +84,7 @@ module.exports = class WebRTC {
 
         const conn = new Connection(toPull.duplex(channel))
 
-        new Promise((resolve, reject) => {
+        const promise = new Promise((resolve, reject) => {
             const socket = dgram.createSocket(this.socketType)
 
             channel
@@ -74,9 +116,14 @@ module.exports = class WebRTC {
                 })
 
             socket.on('message', data => channel.signal(JSON.parse(data)))
-        }).then(conn => cb(null, conn), cb)
+        })
 
-        return conn
+        if (cb) {
+            promise.then(conn => cb(null, conn), cb)
+            return conn
+        } else {
+            return promise
+        }
     }
 
     createListener(options, connHandler) {
@@ -93,80 +140,25 @@ module.exports = class WebRTC {
         server.on('error', err => listener.emit('error', err))
         server.on('close', () => listener.emit('close'))
 
-        const establishWebRTCConnection = (msg, rinfo) => {
-            const id = `${rinfo.address} ${rinfo.port}`
-
-            let channel = this.channels.get(id)
-
-            if (!channel) {
-                channel = SimplePeer({
-                    initiator: false,
-                    config: { iceServers: getSTUNServers(this.node.bootstrapServers) },
-                    trickle: true,
-                    allowHalfTrickle: true,
-                    wrtc
-                })
-
-                let conn = new Connection(toPull.duplex(channel))
-
-                channel.on('signal', data => {
-                    server.send(Buffer.from(JSON.stringify(data)), rinfo.port, rinfo.address, (err, bytes) => {
-                        if (err) console.log(err)
-                        // console.log(err, bytes)
-                    })
-                })
-
-                channel.on('connect', () => {
-                    console.log('[responder] connected')
-                    conn.getObservedAddrs = callback => callback(null, [])
-                    listener.emit('connection', conn)
-                    connHandler(conn)
-                })
-
-                channel.on('close', () => {
-                    this.channels.delete(id)
-                })
-
-                channel.on('err', err => {
-                    listener.emit('err', err)
-                    this.channels.delete(id)
-                })
-
-                this.channels.set(id, channel)
-            }
-
-            channel.signal(JSON.parse(msg))
-        }
-
-        const answerStunRequest = (msg, rinfo) => {
-            const req = stun.createBlank()
-
-            // if msg is valid STUN message
-            if (req.loadBuffer(msg)) {
-                // if STUN message is BINDING_REQUEST and valid content
-                if (req.isBindingRequest({ fingerprint: true })) {
-                    // console.log('REQUEST', req)
-
-                    const res = req
-                        .createBindingResponse(true)
-                        .setXorMappedAddressAttribute(rinfo)
-                        .setFingerprintAttribute()
-
-                    // console.log('RESPONSE', res)
-                    server.send(res.toBuffer(), rinfo.port, rinfo.address)
-                }
-            }
-        }
-
         server.on('message', (msg, rinfo) => {
             if (msg[0] === '{'.charCodeAt(0)) {
                 // WebRTC requests come as JSON encoded messages
                 // thus, the msgs start with `{`
-                establishWebRTCConnection(msg, rinfo)
+                const id = `${rinfo.address} ${rinfo.port}`
+
+                this.establishWebRTCConnection(
+                    msg,
+                    id,
+                    (msg, cb) => server.send(msg, rinfo.port, rinfo.address, cb),
+                    conn => {
+                        listener.emit('connection', conn)
+                        connHandler(conn)
+                    }
+                )
             } else if (msg[0] >> 6 == 0) {
                 // STUN requests have, as stated in RFC5389, their
                 // two most significant bits set to `0`
-                answerStunRequest(msg, rinfo)
+                answerStunRequest(msg, rinfo, (msg, cb) => server.send(msg, rinfo.port, rinfo.address, cb))
             } else {
                 console.log(`Discarding message "${msg.toString()}" from ${rinfo.address}:${rinfo.port}`)
             }
@@ -259,4 +251,24 @@ function getSTUNServers(peerInfos) {
     })
 
     return result
+}
+
+function answerStunRequest(msg, rinfo, send) {
+    const req = stun.createBlank()
+
+    // if msg is valid STUN message
+    if (req.loadBuffer(msg)) {
+        // if STUN message is BINDING_REQUEST and valid content
+        if (req.isBindingRequest({ fingerprint: true })) {
+            // console.log('REQUEST', req)
+
+            const res = req
+                .createBindingResponse(true)
+                .setXorMappedAddressAttribute(rinfo)
+                .setFingerprintAttribute()
+
+            // console.log('RESPONSE', res)
+            send(res.toBuffer())
+        }
+    }
 }
