@@ -37,8 +37,8 @@ module.exports = class Signalling extends EventEmitter {
         this.node = opts.libp2p
     }
 
-    async requestRelaying(peerId) {
-        const conn = await this.node.dialProtocol(peerId, PROTOCOL_WEBRTC_TURN)
+    async requestRelaying(peerInfo) {
+        const conn = await this.node.dialProtocol(peerInfo, PROTOCOL_WEBRTC_TURN)
 
         const send = Pushable()
         pull(send, lp.encode(), conn)
@@ -50,7 +50,7 @@ module.exports = class Signalling extends EventEmitter {
             })
         )
 
-        this.relayers.set(peerId.toBytes().toString('base64'), {
+        this.relayers.set(peerInfo.id.toBytes().toString('base64'), {
             send
         })
 
@@ -80,7 +80,7 @@ module.exports = class Signalling extends EventEmitter {
                             conn
                         )
 
-                        this.destinations.set(message.origin, {
+                        this.destinations.set(message.origin.toString('base64'), {
                             send
                         })
 
@@ -138,6 +138,16 @@ module.exports = class Signalling extends EventEmitter {
                         if (found) found.send.end()
 
                         this.destinations.delete(message.destination.toString('base64'))
+                        break
+                    case Type.RESPONSE:
+                        switch (message.status) {
+                            case Status.OK:
+                                console.log('OK')
+                                break
+                            case Status.FAIL:
+                                console.log('FAIL!!!')
+                                break
+                        }
                         break
                     default:
                         this.returnFail(conn)

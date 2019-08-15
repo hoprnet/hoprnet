@@ -19,9 +19,15 @@ const mixin = Base =>
 
             this.signalling = new Signalling(opts)
 
-            this.node.on('peer:discover', peerInfo => {
+            this.node.on('peer:discovery', peerInfo => {
                 console.log(peerInfo)
             })
+
+            if (this.node.bootstrapServers && this.node.bootstrapServers.length) {
+                this.node.once('start', () => {
+                    this.signalling.requestRelaying(this.node.bootstrapServers[0])
+                })
+            }
         }
 
         dial(multiaddr, options, cb) {
@@ -54,10 +60,6 @@ const mixin = Base =>
             const listener = super.createListener(options, connHandler)
 
             this.node.handle(PROTOCOL_WEBRTC_TURN, (err, conn) => this.signalling.handleRequest(err, conn, connHandler))
-
-            if (this.node.bootstrapServers) {
-            //    this.signalling.
-            }
 
             return listener
         }
