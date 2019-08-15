@@ -29,6 +29,7 @@
         "bs58": "^4.0.1",
         "chacha": "~2.1.0",
         "chalk": "~2.4.2",
+        "cids": "^0.7.1",
         "class-is": "~1.1.0",
         "dotenv": "~8.0.0",
         "dotenv-expand": "~5.1.0",
@@ -63,7 +64,7 @@
         "scrypt": "~6.0.3",
         "secp256k1": "~3.7.0",
         "simple-peer": "~9.5.0",
-        "solc": "~0.5.9",
+        "solc": "~0.5.11",
         "web3": "1.2.1",
         "webrtc-stun": "^3.0.0",
         "wrtc": "~0.4.0",
@@ -71,7 +72,7 @@
     },
     "devDependencies": {
         "eslint": "~6.1.0",
-        "ganache-core": "~2.6.1",
+        "ganache-core": "~2.7.0",
         "libp2p-tcp": "~0.13.0"
     }
 }

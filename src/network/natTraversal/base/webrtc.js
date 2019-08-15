@@ -141,7 +141,6 @@ module.exports = class WebRTC {
         server.on('close', () => listener.emit('close'))
 
         server.on('message', (msg, rinfo) => {
-            console.lot(msg + " ---- " + msg.toString())
             if (msg[0] === '{'.charCodeAt(0)) {
                 // WebRTC requests come as JSON encoded messages
                 // thus, the msgs start with `{`

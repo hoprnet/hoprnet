@@ -1,3 +1,0 @@
-message Request {
-    required bytes peerId = 1;
-}
