@@ -41,7 +41,22 @@ module.exports = class Signalling extends EventEmitter {
         const conn = await this.node.dialProtocol(peerInfo, PROTOCOL_WEBRTC_TURN)
 
         const send = Pushable()
-        pull(send, lp.encode(), conn)
+        pull(
+            /* prettier-ignore */
+            send,
+            lp.encode(),
+            conn,
+            lp.decode(),
+            pull.map(Message.decode),
+            pull.drain(message =>
+                /* prettier-ignore */
+                this.processMessage(conn, message)
+            )
+        )
+
+        this.relayers.set(peerInfo.id.toBytes().toString('base64'), {
+            send
+        })
 
         send.push(
             Message.encode({
@@ -49,118 +64,130 @@ module.exports = class Signalling extends EventEmitter {
                 origin: this.node.peerInfo.id.toBytes()
             })
         )
+    }
 
-        this.relayers.set(peerInfo.id.toBytes().toString('base64'), {
-            send
-        })
+    async processMessage(conn, message) {
+        switch (message.type) {
+            case Type.ALLOCATION_REQUEST:
+                // try {
+                //     await this.node.contentRouting.provide(await peerIdBytesToCID(message.origin))
+                // } catch (err) {
+                //     return this.returnFail(conn)
+                // }
 
-        this.handleRequest(null, conn)
+                let send = Pushable()
+
+                pull(
+                    send,
+                    pull.map(message => {
+                        console.log(message)
+                        return message
+                    }),
+                    lp.encode(),
+                    conn
+                )
+
+                this.destinations.set(message.origin.toString('base64'), {
+                    send
+                })
+
+                send.push(
+                    Message.encode({
+                        type: Type.RESPONSE,
+                        status: Status.OK
+                    })
+                )
+
+                break
+            case Type.PACKET:
+                if (message.destination.equals(this.node.peerInfo.id.toBytes())) {
+                    let found = this.relayedConnections.get(getId(message.origin, message.destination))
+
+                    if (found) {
+                        found.send.push(message.payload)
+                    } else {
+                        let send = Pushable()
+
+                        const newConn = new Connection({
+                            sink: pull(
+                                pull.map(data => {
+                                    console.log(`Send back ${data.toString()}`)
+                                    return data
+                                }),
+                                pull.map(payload =>
+                                    Message.encode({
+                                        type: Type.Message,
+                                        destination: message.origin,
+                                        origin: message.destination,
+                                        payload
+                                    })
+                                ),
+                                lp.encode(),
+                                pull.drain(data => console.log(data))
+                            ),
+                            source: pull(
+                                send,
+                                pull.map(message => {
+                                    console.log(message)
+                                    return message
+                                })
+                            )
+                        })
+
+                        this.relayedConnections.set(getId(message.origin, message.destination), {
+                            send
+                        })
+                        this.emit('connection', newConn)
+
+                        console.log(`payload ${message.payload}`)
+                        send.push(message.payload)
+                    }
+                } else {
+                    let found = this.destinations.get(message.destination.toString('base64'))
+
+                    if (found) {
+                        found.send.push(Message.encode(message))
+                    } else {
+                        this.returnFail(conn)
+                    }
+                }
+                break
+            case Type.CLOSING_REQUEST:
+                if (found) found.send.end()
+
+                this.destinations.delete(message.destination.toString('base64'))
+                break
+            case Type.RESPONSE:
+                switch (message.status) {
+                    case Status.OK:
+                        console.log('OK')
+                        break
+                    case Status.FAIL:
+                        console.log('FAIL!!!')
+                        break
+                }
+                break
+            default:
+                this.returnFail(conn)
+
+                // Cancel stream by returning false
+                return false
+        }
     }
 
     handleRequest(protocol, conn) {
         pull(
+            /* prettier-ignore */
             conn,
             lp.decode(),
             pull.map(Message.decode),
-            pull.drain(async message => {
-                switch (message.type) {
-                    case Type.ALLOCATION_REQUEST:
-                        try {
-                            await this.node.contentRouting.provide(await peerIdBytesToCID(message.origin))
-                        } catch (err) {
-                            return this.returnFail(conn)
-                        }
-
-                        let send = Pushable()
-
-                        // prettier-ignore
-                        pull(
-                            send,
-                            lp.encode(),
-                            conn
-                        )
-
-                        this.destinations.set(message.origin.toString('base64'), {
-                            send
-                        })
-
-                        send.push(
-                            Message.encode({
-                                type: Type.RESPONSE,
-                                status: Status.OK
-                            })
-                        )
-
-                        break
-                    case Type.PACKET:
-                        if (message.destination.equals(this.node.peerInfo.id.toBytes())) {
-                            let found = this.relayedConnections.get(getId(message.origin, message.destination))
-
-                            if (found) {
-                                found.send.push(message.payload)
-                            } else {
-                                let send = Pushable()
-
-                                const newConn = new Connection({
-                                    sink: pull(
-                                        pull.map(payload =>
-                                            Message.encode({
-                                                type: Type.Message,
-                                                destination: message.origin,
-                                                origin: message.destination,
-                                                payload
-                                            })
-                                        ),
-                                        lp.encode(),
-                                        conn
-                                    ),
-                                    source: send
-                                })
-
-                                this.relayedConnections.set(getId(message.origin, message.destination), {
-                                    send
-                                })
-
-                                send.push(message.payload)
-                                this.emit('connection', newConn)
-                            }
-                        } else {
-                            let found = this.destinations.get(message.destination.toString('base64'))
-
-                            if (found) {
-                                found.send.push(message)
-                            } else {
-                                this.returnFail(conn)
-                            }
-                        }
-                        break
-                    case Type.CLOSING_REQUEST:
-                        if (found) found.send.end()
-
-                        this.destinations.delete(message.destination.toString('base64'))
-                        break
-                    case Type.RESPONSE:
-                        switch (message.status) {
-                            case Status.OK:
-                                console.log('OK')
-                                break
-                            case Status.FAIL:
-                                console.log('FAIL!!!')
-                                break
-                        }
-                        break
-                    default:
-                        this.returnFail(conn)
-
-                        // Cancel stream by returning false
-                        return false
-                }
-            })
+            pull.drain(message => this.processMessage(conn, message))
         )
     }
 
     returnFail(conn) {
         pull(
+            /* prettier-ignore */
             pull.once(
                 Message.encode({
                     type: Type.RESPONSE,

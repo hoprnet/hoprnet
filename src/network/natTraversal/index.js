@@ -56,10 +56,22 @@ const mixin = Base =>
         }
 
         createListener(options, connHandler) {
+            if (typeof options === 'function') {
+                connHandler = options
+                options = {}
+            }
             // Creates a UDP listener listening for incoming WebRTC signalling messages
             const listener = super.createListener(options, connHandler)
 
-            this.node.handle(PROTOCOL_WEBRTC_TURN, (err, conn) => this.signalling.handleRequest(err, conn, connHandler))
+            this.node.handle(PROTOCOL_WEBRTC_TURN, this.signalling.handleRequest.bind(this.signalling))
+
+            this.signalling.on(
+                'connection',
+                conn => {
+                    listener.emit('connection', conn)
+                    connHandler(conn)
+                }
+            )
 
             return listener
         }
