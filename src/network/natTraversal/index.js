@@ -33,12 +33,24 @@ const mixin = (Base) =>
                 options = {}
             }
 
-            let connPromise
-            if (multiaddr.getPeerId() !== '16Uiu2HAmSyrYVycqBCWcHyNVQS6zYQcdQbwyov1CDijboVRsQS37') {
-                connPromise = this.signalling.relay(PeerId.createFromB58String(multiaddr.getPeerId()))
-            } else {
-                connPromise = super.dial(multiaddr, options)
-            }
+            let connected = false
+
+            let connPromise = Promise.race([
+                super.dial(multiaddr, options).then(conn => {
+                    connected = true
+                    return conn
+                }),
+                new Promise((resolve) => setTimeout(() => {
+                    if (!connected)
+                        return resolve(this.signalling.relay(PeerId.createFromB58String(multiaddr.getPeerId())))
+                }, 5 * 1000))
+            ])
+
+            // if (multiaddr.getPeerId() !== '16Uiu2HAmSyrYVycqBCWcHyNVQS6zYQcdQbwyov1CDijboVRsQS37') {
+            //     connPromise = this.signalling.relay(PeerId.createFromB58String(multiaddr.getPeerId()))
+            // } else {
+            //     connPromise = super.dial(multiaddr, options)
+            // }
 
             if (cb) {
                 const result = new Connection()
