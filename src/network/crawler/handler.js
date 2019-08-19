@@ -21,8 +21,8 @@ module.exports = node => (protocol, conn) => {
     const selectedNodes = randomSubset(peers, amountOfNodes, filter).map(peerInfo => peerInfo.id.pubKey.marshal())
 
     if (selectedNodes.length > 0) {
-        // prettier-ignore
         pull(
+            /* prettier-ignore */
             pull.once(CrawlResponse.encode({
                 status: Status.OK,
                 pubKeys: selectedNodes
@@ -31,8 +31,8 @@ module.exports = node => (protocol, conn) => {
             conn
         )
     } else {
-        // prettier-ignore
         pull(
+            /* prettier-ignore */
             pull.once(CrawlResponse.encode({
                 status: Status.FAIL
             })),

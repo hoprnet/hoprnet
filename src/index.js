@@ -197,12 +197,17 @@ class Hopr extends libp2p {
     /**
      * Shuts down the node and saves keys and peerBook in the database
      */
-    async stop() {
+    stop() {
         log(this.peerInfo.id, `Shutting down...`)
 
         // this.heartbeat.stop()
 
-        await Promise.all([this.exportPeerBook(), super.stop(), this.db.close()])
+        return Promise.all([
+            /* prettier-ignore */
+            // this.exportPeerBook(),
+            super.stop(),
+            this.db.close()
+        ])
     }
 
     /**
@@ -269,8 +274,9 @@ class Hopr extends libp2p {
                                 resolve(this.dialProtocol(peerInfo, PROTOCOL_STRING))
                             })
                         ),
-                        // prettier-ignore
+
                         createPacket(
+                            /* prettier-ignore */
                             this,
                             msg.slice(n * PACKET_SIZE, Math.min(msg.length, (n + 1) * PACKET_SIZE)),
                             intermediateNodes

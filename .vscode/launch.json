@@ -22,11 +22,17 @@
         {
             "type": "node",
             "request": "launch",
-            "name": "CLI Node",
+            "name": "CLI Node (with number)",
             "program": "${workspaceFolder}/hopr.js",
             "args": [
                 "1"
             ]
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "CLI Node (without number)",
+            "program": "${workspaceFolder}/hopr.js"
         },
         {
             "type": "node",

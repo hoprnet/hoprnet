@@ -53,14 +53,14 @@ const main = async () => {
         contractAddress = process.env[`CONTRACT_ADDRESS_${process.env.NETWORK}`]
     }
 
-    const bootstrapServers = (await startBootstrapServers(1)).map(node => node.peerInfo)
+    const bootstrapServers = await startBootstrapServers(1)
 
     const nodes = await createFundedNodes(
         AMOUNT_OF_NODES,
         {
             provider,
             contractAddress,
-            bootstrapServers
+            bootstrapServers: bootstrapServers.map(node => node.peerInfo)
         },
         fundingPeer,
         nonce
@@ -95,9 +95,9 @@ const main = async () => {
 
     await Promise.all(closeBatch)
 
-    nodes.forEach(node => node.stop())
+    await Promise.all(nodes.concat(bootstrapServers).map(node => node.stop()))
 
-    if (process.env.NETWORK === 'ganache') setTimeout(server.close, 2000)
+    if (process.env.NETWORK === 'ganache') server.close
 }
 
 main()
