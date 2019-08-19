@@ -1,7 +1,6 @@
 'use strict'
 
-const Basev4 = require('./base/udp4')
-const Basev6 = require('./base/udp6')
+const { Basev4, Basev6 } = require('./base')
 
 const Connection = require('interface-connection').Connection
 const PeerId = require('peer-id')
@@ -10,18 +9,16 @@ const Signalling = require('./signalling')
 
 const { PROTOCOL_WEBRTC_TURN } = require('../../constants')
 
-const mixin = Base =>
+const mixin = (Base) =>
     class extends Base {
         constructor(opts) {
             super(opts)
 
-            this.node = opts.libp2p
-
             this.signalling = new Signalling(opts)
 
-            this.node.on('peer:discovery', peerInfo => {
-                console.log(peerInfo)
-            })
+            // this.node.on('peer:discovery', peerInfo => {
+            //     console.log(peerInfo)
+            // })
 
             if (this.node.bootstrapServers && this.node.bootstrapServers.length) {
                 this.node.once('start', () => {
@@ -86,6 +83,6 @@ const mixin = Base =>
         // }
     }
 
-module.exports.WebRTCv4 = class WebRTCv4 extends mixin(Basev4) {}
+module.exports.WebRTCv4 = mixin(Basev4)
 
-module.exports.WebRTCv6 = class WebRTCv6 extends mixin(Basev6) {}
+module.exports.WebRTCv6 = mixin(Basev6)

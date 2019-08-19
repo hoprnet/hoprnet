@@ -2,9 +2,14 @@
 
 const secp256k1 = require('secp256k1')
 
-const { hash, bufferToNumber, numberToBuffer } = require('./utils')
-const Header = require('./packet/header')
-const { KEY_LENGTH } = require('./packet/header/parameters')
+const { hash, bufferToNumber, numberToBuffer } = require('../utils')
+const Header = require('../packet/header')
+const { KEY_LENGTH } = require('../packet/header/parameters')
+
+const fs = require('fs')
+const protons = require('protons')
+
+// const { Acknowledgement } = protons(fs.readFileSync(`${__dirname}/protos/acknowledgement.proto`))
 
 const SIGNATURE_LENGTH = 64
 
@@ -142,10 +147,10 @@ class Acknowledgement {
     /**
      * Takes a challenge from a relayer and returns an acknowledgement that includes a
      * signature over the requested key half.
-     * 
+     *
      * @param {Challenge} challenge the signed challenge of the relayer
      * @param {Buffer} derivedSecret the secret that is used to create the second key half
-     * @param {PeerId} peerId contains private key 
+     * @param {PeerId} peerId contains private key
      */
     static create(challenge, derivedSecret, peerId) {
         const ack = new Acknowledgement(Buffer.alloc(Acknowledgement.SIZE))

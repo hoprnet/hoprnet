@@ -31,7 +31,7 @@
         "chalk": "~2.4.2",
         "cids": "^0.7.1",
         "class-is": "~1.1.0",
-        "dotenv": "~8.0.0",
+        "dotenv": "~8.1.0",
         "dotenv-expand": "~5.1.0",
         "futoin-hkdf": "~1.2.0",
         "getopts": "~2.2.4",

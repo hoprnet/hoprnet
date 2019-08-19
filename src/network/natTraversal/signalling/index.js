@@ -12,6 +12,7 @@ const Pushable = require('pull-pushable')
 const CID = require('cids')
 const Multihash = require('multihashes')
 const Connection = require('interface-connection').Connection
+const PeerId = require('peer-id')
 
 const libp2pCrypto = require('libp2p-crypto')
 
@@ -30,8 +31,6 @@ module.exports = class Signalling extends EventEmitter {
         super()
 
         this.relayedConnections = new Map()
-
-        this.relayers = new Map()
         this.destinations = new Map()
 
         this.node = opts.libp2p
@@ -41,22 +40,8 @@ module.exports = class Signalling extends EventEmitter {
         const conn = await this.node.dialProtocol(peerInfo, PROTOCOL_WEBRTC_TURN)
 
         const send = Pushable()
-        pull(
-            /* prettier-ignore */
-            send,
-            lp.encode(),
-            conn,
-            lp.decode(),
-            pull.map(Message.decode),
-            pull.drain(message =>
-                /* prettier-ignore */
-                this.processMessage(conn, message)
-            )
-        )
 
-        this.relayers.set(peerInfo.id.toBytes().toString('base64'), {
-            send
-        })
+        this.initialiseStream(send, conn, peerInfo.id.toBytes())
 
         send.push(
             Message.encode({
@@ -64,34 +49,54 @@ module.exports = class Signalling extends EventEmitter {
                 origin: this.node.peerInfo.id.toBytes()
             })
         )
+
+        this.handleRequest(null, conn)
+    }
+
+    initialiseStream(send, conn, to) {
+        this.destinations.set(to.toString('base64'), {
+            send
+        })
+
+        pull(
+            send,
+            // pull.map(message => {
+            //     const decoded = Message.decode(message)
+            //     if (decoded.destination)
+            //         console.log(
+            //             `self ${this.node.peerInfo.id.toB58String()} to ${PeerId.createFromBytes(
+            //                 decoded.destination
+            //             ).toB58String()} content ${decoded.payload.toString()}`
+            //         )
+            //     return message
+            // }),
+            lp.encode(),
+            conn
+        )
     }
 
     async processMessage(conn, message) {
+        let send
+
         switch (message.type) {
             case Type.ALLOCATION_REQUEST:
                 // try {
                 //     await this.node.contentRouting.provide(await peerIdBytesToCID(message.origin))
                 // } catch (err) {
-                //     return this.returnFail(conn)
+                //     return this.returnFail(send)
                 // }
 
-                let send = Pushable()
+                let found = this.destinations.get(message.origin.toString('base64'))
 
-                pull(
-                    send,
-                    pull.map(message => {
-                        console.log(message)
-                        return message
-                    }),
-                    lp.encode(),
-                    conn
-                )
+                if (!found) {
+                    found = {
+                        send: Pushable()
+                    }
 
-                this.destinations.set(message.origin.toString('base64'), {
-                    send
-                })
+                    this.initialiseStream(found.send, conn, message.origin)
+                }
 
-                send.push(
+                found.send.push(
                     Message.encode({
                         type: Type.RESPONSE,
                         status: Status.OK
@@ -103,59 +108,67 @@ module.exports = class Signalling extends EventEmitter {
                 if (message.destination.equals(this.node.peerInfo.id.toBytes())) {
                     let found = this.relayedConnections.get(getId(message.origin, message.destination))
 
-                    if (found) {
-                        found.send.push(message.payload)
-                    } else {
-                        let send = Pushable()
+                    if (!found) {
+                        let destFound = this.destinations.get(message.relayer.toString('base64'))
+
+                        if (!destFound) {
+                            destFound = {
+                                send: Pushable()
+                            }
+
+                            this.initialiseStream(destFound.send, conn, message.relayer)
+                        }
+
+                        found = {
+                            receive: Pushable()
+                        }
 
                         const newConn = new Connection({
-                            sink: pull(
-                                pull.map(data => {
-                                    console.log(`Send back ${data.toString()}`)
-                                    return data
-                                }),
-                                pull.map(payload =>
+                            sink: pull.drain(msg => {
+                                destFound.send.push(
                                     Message.encode({
-                                        type: Type.Message,
+                                        type: Type.PACKET,
                                         destination: message.origin,
                                         origin: message.destination,
-                                        payload
+                                        payload: msg
                                     })
-                                ),
-                                lp.encode(),
-                                pull.drain(data => console.log(data))
-                            ),
-                            source: pull(
-                                send,
-                                pull.map(message => {
-                                    console.log(message)
-                                    return message
-                                })
-                            )
+                                )
+                            }),
+                            source: found.receive
                         })
+                        found.receive.push(message.payload)
 
-                        this.relayedConnections.set(getId(message.origin, message.destination), {
-                            send
-                        })
+                        this.relayedConnections.set(getId(message.origin, message.destination), found)
                         this.emit('connection', newConn)
-
-                        console.log(`payload ${message.payload}`)
-                        send.push(message.payload)
+                    } else {
+                        found.receive.push(message.payload)
                     }
                 } else {
                     let found = this.destinations.get(message.destination.toString('base64'))
 
                     if (found) {
+                        message.relayer = this.node.peerInfo.id.toBytes()
                         found.send.push(Message.encode(message))
                     } else {
-                        this.returnFail(conn)
+                        pull(
+                            pull.once(
+                                Message.encode({
+                                    type: Type.RESPONSE,
+                                    status: Status.FAIL
+                                })
+                            ),
+                            lp.encode(),
+                            conn
+                        )
+
+                        return false
                     }
                 }
                 break
             case Type.CLOSING_REQUEST:
                 if (found) found.send.end()
 
-                this.destinations.delete(message.destination.toString('base64'))
+                this.destinations.delete(message.origin.toString('base64'))
                 break
             case Type.RESPONSE:
                 switch (message.status) {
@@ -168,7 +181,30 @@ module.exports = class Signalling extends EventEmitter {
                 }
                 break
             default:
-                this.returnFail(conn)
+                if (message.origin) {
+                    const found = this.destinations.get(message.origin.toString('base64'))
+
+                    if (found) {
+                        found.send.push(
+                            Message.encode({
+                                type: Type.RESPONSE,
+                                status: Status.FAIL
+                            })
+                        )
+                        return false
+                    }
+                }
+
+                pull(
+                    pull.once(
+                        Message.encode({
+                            type: Type.RESPONSE,
+                            status: Status.FAIL
+                        })
+                    ),
+                    lp.encode(),
+                    conn
+                )
 
                 // Cancel stream by returning false
                 return false
@@ -185,20 +221,6 @@ module.exports = class Signalling extends EventEmitter {
         )
     }
 
-    returnFail(conn) {
-        pull(
-            /* prettier-ignore */
-            pull.once(
-                Message.encode({
-                    type: Type.RESPONSE,
-                    status: Status.FAIL
-                })
-            ),
-            lp.encode(),
-            conn
-        )
-    }
-
     /**
      * @TODO
      * @param {PeerId} destination
@@ -208,12 +230,16 @@ module.exports = class Signalling extends EventEmitter {
         //const peerInfos = await this.node.contentRouting.findProviders(cid, { maxNumProviders: MAX_PROVIDERS })
 
         const peerInfos = this.node.bootstrapServers
-        const innerConn = await Promise.race(peerInfos.map(peerInfo => this.node.dialProtocol(peerInfo, PROTOCOL_WEBRTC_TURN)))
+        const innerConn = await Promise.race(
+            /* prettier-ignore */
+            peerInfos.map(peerInfo =>
+                this.node.dialProtocol(peerInfo, PROTOCOL_WEBRTC_TURN))
+        )
 
-        const send = Pushable()
+        const receive = Pushable()
 
         this.relayedConnections.set(getId(this.node.peerInfo.id.toBytes(), destination.toBytes()), {
-            send
+            receive
         })
 
         return new Connection({
@@ -229,7 +255,7 @@ module.exports = class Signalling extends EventEmitter {
                 lp.encode(),
                 innerConn
             ),
-            source: send
+            source: receive
         })
     }
 }

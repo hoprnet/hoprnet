@@ -18,5 +18,6 @@ message Message {
     optional bytes destination = 3;
     optional bytes payload = 4;
     optional Status status = 5;
+    optional bytes relayer = 6;
 }
 
