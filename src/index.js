@@ -179,11 +179,11 @@ class Hopr extends libp2p {
 
         this.crawler = new crawler({ libp2p: this })
 
-        this.peerInfo.multiaddrs.forEach(addr => {
-            if (match.LOCALHOST(addr)) {
-                this.peerInfo.multiaddrs.delete(addr)
-            }
-        })
+        // this.peerInfo.multiaddrs.forEach(addr => {
+        //     if (match.LOCALHOST(addr)) {
+        //         this.peerInfo.multiaddrs.delete(addr)
+        //     }
+        // })
 
         if (!options['bootstrap-node']) {
             this.paymentChannels = await PaymentChannels.create(this)
