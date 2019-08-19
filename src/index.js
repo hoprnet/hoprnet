@@ -135,7 +135,7 @@ class Hopr extends libp2p {
                 peerInfo: await getPeerInfo(options, db)
             },
             db,
-            options.bootstrapServers
+            options['bootstrap-node'] ? null : options.bootstrapServers
         )
 
         return hopr.up(options)
