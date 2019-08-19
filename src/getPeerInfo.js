@@ -1,6 +1,5 @@
 'use strict'
 
-const { waterfall } = require('neo-async')
 const { generateKeyPair } = require('libp2p-crypto').keys
 const { deserializeKeyPair, serializeKeyPair, privKeyToPeerId } = require('./utils')
 
@@ -23,39 +22,18 @@ module.exports = (options, db) =>
                 try {
                     serializedKeyPair = await db.get('key-pair')
 
-                    resolve(
-                        new Promise((resolve, reject) =>
-                            deserializeKeyPair(serializedKeyPair, (err, peerId) => {
-                                if (err) return reject(err)
-
-                                resolve(peerId)
-                            })
-                        )
-                    )
+                    resolve(deserializeKeyPair(serializedKeyPair))
                 } catch (err) {
                     if (!err.notFound) return reject(err)
 
-                    let key, peerId
-                    waterfall(
-                        [
-                            cb => generateKeyPair('secp256k1', 256, cb),
-                            (_key, cb) => {
-                                key = _key
-                                key.public.hash(cb)
-                            },
-                            (id, cb) => {
-                                peerId = new PeerId(id, key, key.public)
+                    const key = await generateKeyPair('secp256k1', 256)
+                    const peerId = await PeerId.createFromPrivKey(key.bytes)
 
-                                serializeKeyPair(peerId, cb)
-                            },
-                            (serializedKeyPair, cb) => db.put('key-pair', serializedKeyPair, cb)
-                        ],
-                        err => {
-                            if (err) return reject(err)
+                    const serializedKeyPair = await serializeKeyPair(peerId)
+                    console.log(serializedKeyPair)
+                    await db.put('key-pair', serializedKeyPair)
 
-                            resolve(peerId)
-                        }
-                    )
+                    resolve(peerId)
                 }
             })
 

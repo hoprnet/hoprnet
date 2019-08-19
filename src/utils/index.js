@@ -2,14 +2,13 @@
 
 const { sha3, toChecksumAddress } = require('web3-utils')
 const { randomBytes } = require('crypto')
-const { waterfall, parallel, map, some, each, tryEach, doUntil } = require('neo-async')
+const { waterfall, parallel, map, some, tryEach } = require('neo-async')
 const fs = require('fs')
 const libp2p_crypto = require('libp2p-crypto').keys
 const PeerId = require('peer-id')
 const rlp = require('rlp')
 const PeerInfo = require('peer-info')
 const Multiaddr = require('multiaddr')
-const Multihash = require('multihashes')
 const { publicKeyConvert } = require('secp256k1')
 const scrypt = require('scrypt')
 const chacha = require('chacha')
@@ -755,30 +754,25 @@ const SALT_LENGTH = 32
  * @param {PeerId} peerId the peerId that should be serialized
  * @param {function} cb called afterwards with `(err, encodedKeyPair)`
  */
-module.exports.serializeKeyPair = (peerId, cb) => {
+module.exports.serializeKeyPair = async (peerId) => {
     const salt = randomBytes(SALT_LENGTH)
     const scryptParams = { N: 8192, r: 8, p: 16 }
 
     const question = 'Please type in the password that will be used to encrypt the generated key.'
 
-    waterfall(
-        [
-            cb => this.askForPassword(question, cb),
-            (pw, isDefault, cb) => {
-                console.log(`Done. Using peerId \x1b[34m${peerId.toB58String()}\x1b[0m\n`)
+    const pw = await this.askForPassword(question)
+    console.log(pw)
 
-                const key = scrypt.hashSync(pw, scryptParams, 32, salt)
-                const iv = crypto.randomBytes(12)
+    console.log(`Done. Using peerId \x1b[34m${peerId.toB58String()}\x1b[0m\n`)
 
-                const serializedPeerId = rlp.encode([Buffer.alloc(16, 0), peerId.toBytes(), peerId.privKey.bytes, peerId.pubKey.bytes])
+    const key = scrypt.hashSync(pw, scryptParams, 32, salt)
+    const iv = crypto.randomBytes(12)
 
-                const ciphertext = chacha.chacha20(key, iv).update(serializedPeerId)
+    const serializedPeerId = Buffer.concat([Buffer.alloc(16, 0), peerId.marshal()])
 
-                cb(null, rlp.encode([salt, iv, ciphertext]))
-            }
-        ],
-        cb
-    )
+    const ciphertext = chacha.chacha20(key, iv).update(serializedPeerId)
+
+    return rlp.encode([salt, iv, ciphertext])
 }
 
 /**
@@ -792,47 +786,27 @@ module.exports.serializeKeyPair = (peerId, cb) => {
  * @param {Buffer} encryptedSerializedKeyPair the encoded and encrypted key pair
  * @param {function} cb called afterward with `(err, peerId)`
  */
-module.exports.deserializeKeyPair = (encryptedSerializedKeyPair, cb) => {
+module.exports.deserializeKeyPair = async (encryptedSerializedKeyPair) => {
     const [salt, iv, ciphertext] = rlp.decode(encryptedSerializedKeyPair)
 
     const scryptParams = { N: 8192, r: 8, p: 16 }
 
     const question = 'Please type in the password that was used to encrypt the key.'
 
-    doUntil(
-        cb =>
-            this.askForPassword(question, (err, pw, _) => {
-                if (err) return cb(err)
+    let plaintext
+    do {
+        const pw = await this.askForPassword(question)
+        console.log(pw)
 
-                const key = scrypt.hashSync(pw, scryptParams, 32, salt)
-                const plaintext = chacha.chacha20(key, iv).update(ciphertext)
+        const key = scrypt.hashSync(pw, scryptParams, 32, salt)
 
-                let decoded
-                try {
-                    decoded = rlp.decode(plaintext)
-                } catch (err) {
-                    return cb(null, [Buffer.alloc(0)])
-                }
-                cb(null, decoded)
-            }),
-        decoded => Buffer.alloc(16, 0).equals(decoded[0]),
-        (err, [ok, id, privKey, pubKey]) => {
-            if (err) return cb(err)
+        plaintext = chacha.chacha20(key, iv).update(ciphertext)
+    } while (!plaintext.slice(0, 16).equals(Buffer.alloc(16, 0)))
 
-            const peerId = PeerId.createFromBytes(id)
+    const peerId = await PeerId.createFromProtobuf(plaintext)
+    console.log(`Successfully restored ID \x1b[34m${peerId.toB58String()}\x1b[0m.`)
 
-            libp2p_crypto.unmarshalPrivateKey(privKey, (err, privKey) => {
-                if (err) return cb(err)
-
-                peerId.privKey = privKey
-                peerId.pubKey = libp2p_crypto.unmarshalPublicKey(pubKey)
-
-                console.log(`Successfully restored ID \x1b[34m${peerId.toB58String()}\x1b[0m.`)
-
-                return cb(null, peerId)
-            })
-        }
-    )
+    return peerId
 }
 
 /**
@@ -841,10 +815,10 @@ module.exports.deserializeKeyPair = (encryptedSerializedKeyPair, cb) => {
  * @param {string} question string that is displayed before the user input
  * @param {function} cb called afterwards with `(err, password)`
  */
-module.exports.askForPassword = (question, cb) => {
+module.exports.askForPassword = (question, cb) => new Promise((resolve, reject) => {
     if (process.env.DEBUG === 'true') {
         console.log('Debug mode: using password Epo5kZTFidOCHrnL0MzsXNwN9St')
-        cb(null, 'Epo5kZTFidOCHrnL0MzsXNwN9St', false)
+        resolve('Epo5kZTFidOCHrnL0MzsXNwN9St')
     } else {
         read(
             {
@@ -853,9 +827,17 @@ module.exports.askForPassword = (question, cb) => {
                 edit: true,
                 replace: '*'
             },
-            cb
+            (err, pw, isDefault) => {
+                if (err) return reject(err)
+
+                resolve(pw)
+            }
         )
     }
+})
+
+{
+
 }
 
 /**
@@ -867,7 +849,7 @@ module.exports.clearDirectory = path => {
     let files = []
     if (fs.existsSync(path)) {
         files = fs.readdirSync(path)
-        files.forEach(function(file, index) {
+        files.forEach(function (file, index) {
             const curPath = path + '/' + file
             if (fs.lstatSync(curPath).isDirectory()) {
                 // recurse
