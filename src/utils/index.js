@@ -761,7 +761,6 @@ module.exports.serializeKeyPair = async (peerId) => {
     const question = 'Please type in the password that will be used to encrypt the generated key.'
 
     const pw = await this.askForPassword(question)
-    console.log(pw)
 
     console.log(`Done. Using peerId \x1b[34m${peerId.toB58String()}\x1b[0m\n`)
 
@@ -796,7 +795,6 @@ module.exports.deserializeKeyPair = async (encryptedSerializedKeyPair) => {
     let plaintext
     do {
         const pw = await this.askForPassword(question)
-        console.log(pw)
 
         const key = scrypt.hashSync(pw, scryptParams, 32, salt)
 
