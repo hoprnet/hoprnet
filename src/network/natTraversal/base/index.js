@@ -73,7 +73,7 @@ const mixin = Base =>
         }
 
         dial(multiaddr, options, cb) {
-            console.log(`calling ${multiaddr.toString()}`)
+            // console.log(`calling ${multiaddr.toString()}`)
             if (typeof options === 'function') {
                 cb = options
                 options = {}
@@ -103,7 +103,7 @@ const mixin = Base =>
                     )
 
                     .on('connect', async () => {
-                        console.log('[initiator] connected')
+                        // console.log('[initiator] connected')
 
                         const peerInfo = await PeerInfo.create(await PeerId.createFromB58String(multiaddr.getPeerId()))
 

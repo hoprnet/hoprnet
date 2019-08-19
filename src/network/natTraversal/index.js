@@ -36,9 +36,14 @@ const mixin = (Base) =>
             let connected = false
 
             let connPromise = Promise.race([
-                super.dial(multiaddr, options).then(conn => {
+                super.dial(multiaddr, options)
+                .then(conn => {
                     connected = true
                     return conn
+                })
+                .catch(err => {
+                    // @TODO proper error catching
+                    console.log(err)
                 }),
                 new Promise((resolve) => setTimeout(() => {
                     if (!connected)
