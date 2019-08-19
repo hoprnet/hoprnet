@@ -15,5 +15,9 @@ build/
 # Exclude db dir
 db/
 
+# Exclude configuration(s)
+config/
+
 # Exclude .env file
 .env
+.env.save
