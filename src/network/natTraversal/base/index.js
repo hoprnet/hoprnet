@@ -62,7 +62,8 @@ const mixin = Base =>
 
                 channel.on('err', err => {
                     // @TODO add proper handling
-                    listener.emit('err', err)
+                    console.log(err.message)
+                    // listener.emit('err', err)
                     this.channels.delete(id)
                 })
 
@@ -115,7 +116,7 @@ const mixin = Base =>
                     })
 
                     .on('error', err => {
-                        console.log(err)
+                        console.log(err.message)
                         reject(err)
                     })
 
@@ -198,7 +199,7 @@ const mixin = Base =>
 
                 const netInterfaces = os.networkInterfaces()
 
-                const addrs = Object.values(netInterfaces).reduce((acc, netInterface) => {
+                let addrs = Object.values(netInterfaces).reduce((acc, netInterface) => {
                     const externalAddrs = netInterface
                         .filter(iface => !iface.internal && iface.family.toLowerCase() === this.family)
                         .map(addr => Multiaddr.fromNodeAddress({ port: serverAddr.port, ...addr }, 'udp').encapsulate(`/ipfs/${this.node.peerInfo.id.toB58String()}`))
@@ -207,6 +208,8 @@ const mixin = Base =>
 
                     return acc
                 }, [this.getLocalhost(serverAddr)])
+
+                addrs = super.sortAddrs(addrs)
 
                 return cb ? cb(null, addrs) : addrs
             }
