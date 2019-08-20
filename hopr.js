@@ -444,7 +444,7 @@ async function runAsRegularNode() {
                     node
                         .sendMessage(rlp.encode([message, Date.now().toString()]), operands[1])
                         .catch(err => console.log(chalk.red(err.message)))
-                        .finally(rl.prompt)
+                        .finally(() => rl.prompt())
                 )
                 break
             case 'closeAll':
