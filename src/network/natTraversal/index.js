@@ -33,28 +33,30 @@ const mixin = (Base) =>
                 options = {}
             }
 
-            let connected = false
 
-            let connPromise = Promise.race([
-                super.dial(multiaddr, options)
-                .then(conn => {
-                    connected = true
-                    return conn
-                })
-                .catch(err => {
-                    // @TODO proper error catching
-                    console.log(err)
-                }),
-                new Promise((resolve) => setTimeout(() => {
-                    if (!connected)
-                        return resolve(this.signalling.relay(PeerId.createFromB58String(multiaddr.getPeerId())))
-                }, 5 * 1000))
-            ])
+            let connPromise
+
+            // let connected = false
+            // let connPromise = Promise.race([
+            //     super.dial(multiaddr, options)
+            //     .then(conn => {
+            //         connected = true
+            //         return conn
+            //     })
+            //     .catch(err => {
+            //         // @TODO proper error catching
+            //         console.log(err)
+            //     }),
+            //     new Promise((resolve) => setTimeout(() => {
+            //         if (!connected)
+            //             return resolve(this.signalling.relay(PeerId.createFromB58String(multiaddr.getPeerId())))
+            //     }, 5 * 1000))
+            // ])
 
             // if (multiaddr.getPeerId() !== '16Uiu2HAmSyrYVycqBCWcHyNVQS6zYQcdQbwyov1CDijboVRsQS37') {
             //     connPromise = this.signalling.relay(PeerId.createFromB58String(multiaddr.getPeerId()))
             // } else {
-            //     connPromise = super.dial(multiaddr, options)
+                 connPromise = super.dial(multiaddr, options)
             // }
 
             if (cb) {
@@ -74,18 +76,19 @@ const mixin = (Base) =>
                 connHandler = options
                 options = {}
             }
+
             // Creates a UDP listener listening for incoming WebRTC signalling messages
             const listener = super.createListener(options, connHandler)
 
-            this.node.handle(PROTOCOL_WEBRTC_TURN, this.signalling.handleRequest.bind(this.signalling))
+            // this.node.handle(PROTOCOL_WEBRTC_TURN, this.signalling.handleRequest.bind(this.signalling))
 
-            this.signalling.on(
-                'connection',
-                conn => {
-                    listener.emit('connection', conn)
-                    connHandler(conn)
-                }
-            )
+            // this.signalling.on(
+            //     'connection',
+            //     conn => {
+            //         listener.emit('connection', conn)
+            //         connHandler(conn)
+            //     }
+            // )
 
             return listener
         }
