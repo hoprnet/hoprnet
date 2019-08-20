@@ -9,7 +9,7 @@ const Signalling = require('./signalling')
 
 const { PROTOCOL_WEBRTC_TURN } = require('../../constants')
 
-const mixin = (Base) =>
+const mixin = Base =>
     class extends Base {
         constructor(opts) {
             super(opts)
@@ -21,9 +21,10 @@ const mixin = (Base) =>
             // })
 
             if (this.node.bootstrapServers && this.node.bootstrapServers.length) {
-                this.node.once('start', () => {
-                    this.signalling.requestRelaying(this.node.bootstrapServers[0])
-                })
+                this.node.once('start', () =>
+                    /* prettier-ignore */
+                    this.node.bootstrapServers.forEach(peerInfo => this.signalling.requestRelaying(peerInfo))
+                )
             }
         }
 
@@ -32,7 +33,6 @@ const mixin = (Base) =>
                 cb = options
                 options = {}
             }
-
 
             let connPromise
 
@@ -53,11 +53,11 @@ const mixin = (Base) =>
             //     }, 5 * 1000))
             // ])
 
-            // if (multiaddr.getPeerId() !== '16Uiu2HAmSyrYVycqBCWcHyNVQS6zYQcdQbwyov1CDijboVRsQS37') {
-            //     connPromise = this.signalling.relay(PeerId.createFromB58String(multiaddr.getPeerId()))
-            // } else {
-                 connPromise = super.dial(multiaddr, options)
-            // }
+            if (this.node.bootstrapServers.some(peerInfo => peerInfo.id.isEqual(PeerId.createFromB58String(multiaddr.getPeerId())))) {
+                connPromise = super.dial(multiaddr, options)
+            } else {
+                connPromise = this.signalling.relay(PeerId.createFromB58String(multiaddr.getPeerId()))
+            }
 
             if (cb) {
                 const result = new Connection()
@@ -80,15 +80,12 @@ const mixin = (Base) =>
             // Creates a UDP listener listening for incoming WebRTC signalling messages
             const listener = super.createListener(options, connHandler)
 
-            // this.node.handle(PROTOCOL_WEBRTC_TURN, this.signalling.handleRequest.bind(this.signalling))
+            this.node.handle(PROTOCOL_WEBRTC_TURN, this.signalling.handleRequest.bind(this.signalling))
 
-            // this.signalling.on(
-            //     'connection',
-            //     conn => {
-            //         listener.emit('connection', conn)
-            //         connHandler(conn)
-            //     }
-            // )
+            this.signalling.on('connection', conn => {
+                listener.emit('connection', conn)
+                connHandler(conn)
+            })
 
             return listener
         }

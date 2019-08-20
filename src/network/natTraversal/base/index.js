@@ -117,7 +117,7 @@ const mixin = Base =>
 
                     .on('error', err => {
                         console.log(err.message)
-                        reject(err)
+                        // reject(err)
                     })
 
                     .on('close', () => {

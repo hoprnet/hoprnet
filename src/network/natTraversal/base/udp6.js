@@ -37,7 +37,7 @@ module.exports = class UDP6 {
         // 2. locals
         // 3. localhost
         if (addrs.global) result.push(...addrs.global)
-        if (addrs['link-local']) result.push(...addrs['link-local'])
+        // if (addrs['link-local']) result.push(...addrs['link-local'])
         if (addrs.loopback) result.push(...addrs.loopback)
 
         return result
