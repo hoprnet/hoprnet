@@ -173,10 +173,10 @@ module.exports = class Signalling extends EventEmitter {
             case Type.RESPONSE:
                 switch (message.status) {
                     case Status.OK:
-                        console.log('OK')
+                        // console.log('OK')
                         break
                     case Status.FAIL:
-                        console.log('FAIL!!!')
+                        // console.log('FAIL!!!')
                         break
                 }
                 break

@@ -48,7 +48,7 @@ const mixin = Base =>
                 )
 
                 channel.on('connect', () => {
-                    console.log('[responder] connected')
+                    // console.log('[responder] connected')
                     let conn = new Connection(toPull.duplex(channel))
 
                     conn.getObservedAddrs = callback => callback(null, [])
