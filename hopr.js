@@ -38,7 +38,7 @@ let node, funds, ownAddress, stakedEther, rl, options
 function parseOptions() {
     const options = require('getopts')(process.argv.slice(2), {
         alias: {
-            b: 'bootstrap-node',
+            b: 'bootstrap-node'
         }
     })
 
@@ -71,25 +71,35 @@ function isNotBootstrapNode(peerId) {
 /**
  * Get existing channels from the database
  *
- * @param {Function(Error, PeerId[])} callback called with `(err, peerIds)`
+ * @returns {Promise<PeerId[]>}
  */
-function getExistingChannels(callback) {
-    let existingChannels = []
+function getExistingChannels() {
+    return new Promise((resolve, reject) => {
+        let promises = []
 
-    let promises = []
+        node.db
+            .createValueStream({
+                gt: node.paymentChannels.RestoreTransaction(Buffer.alloc(32, 0)),
+                lt: node.paymentChannels.RestoreTransaction(Buffer.alloc(32, 255))
+            })
+            .on('data', serializedTransaction => {
+                const restoreTx = Transaction.fromBuffer(serializedTransaction)
 
-    node.db
-        .createValueStream({
-            gt: node.paymentChannels.RestoreTransaction(Buffer.alloc(32, 0)),
-            lt: node.paymentChannels.RestoreTransaction(Buffer.alloc(32, 255))
-        })
-        .on('data', value => {
-            const restoreTx = Transaction.fromBuffer(value)
+                promises.push(pubKeyToPeerId(restoreTx.counterparty))
+            })
+            .on('end', () =>
+                resolve(
+                    Promise.all(promises).then(peerIds =>
+                        peerIds.reduce((result, peerId) => {
+                            if (isNotBootstrapNode) result.push(peerId)
 
-            promises.push(pubKeyToPeerId(restoreTx.counterparty).then(peerId => existingChannels.push(peerId)))
-        })
-        .on('end', () => Promise.all(promises).then(() => callback(null, existingChannels.filter(isNotBootstrapNode).map(peerId => peerId.toB58String()))))
-        .on('error', err => cb(err))
+                            return result
+                        }, [])
+                    )
+                )
+            )
+            .on('error', reject)
+    })
 }
 
 // Allowed keywords
@@ -130,44 +140,49 @@ function tabCompletion(line, cb) {
         case 'unstake':
             return cb(null, [[`unstake ${fromWei(stakedEther, 'ether')}`], line])
         case 'open':
-            getExistingChannels((err, existingChannels) => {
-                if (err) {
-                    console.log(err.message)
+            getExistingChannels()
+                .then(peerIds => {
+                    const peers = node.peerBook.getAllArray().reduce((result, peerInfo) => {
+                        if (isNotBootstrapNode(peerInfo.id) && !peerIds.some(peerId => peerId.isEqual(peerInfo.id)))
+                            result.push(peerInfo.id.toB58String())
+
+                        return result
+                    }, [])
+
+                    if (peers.length < 1) {
+                        console.log(chalk.red(`\nDoesn't know any node to open a payment channel with.`))
+                        return cb(null, [[''], line])
+                    }
+
+                    hits = operands.length > 1 ? peers.filter(peerId => peerId.startsWith(operands[1])) : peers
+
+                    return cb(null, [hits.length ? hits.map(str => `open ${str}`) : ['open'], line])
+                })
+                .catch(err => {
+                    console.log(chalk.red(err.message))
                     return cb(null, [[''], line])
-                }
-
-                const peers = node.peerBook.getAllArray().reduce((acc, peerInfo) => {
-                    if (isNotBootstrapNode(peerInfo.id) && !existingChannels.some(peerId => peerId.isEqual(peerInfo.id))) acc.push(peerInfo.id.toB58String())
-
-                    return acc
-                }, [])
-
-                if (peers.length < 1) {
-                    console.log(chalk.red(`\nDoesn't know any node to open a payment channel with.`))
-                    return cb(null, [[''], line])
-                }
-
-                hits = operands.length > 1 ? peers.filter(peerId => peerId.startsWith(operands[1])) : peers
-
-                return cb(null, [hits.length ? hits.map(str => `open ${str}`) : ['open'], line])
-            })
+                })
             break
         case 'close':
-            getExistingChannels((err, existingChannels) => {
-                if (err) {
-                    console.log(err.message)
+            getExistingChannels()
+                .then(peerIds => {
+                    if (peerIds.length < 1) {
+                        console.log(chalk.red(`\nCan't close a payment channel as there aren't any open ones!`))
+                        return cb(null, [[''], line])
+                    }
+
+                    hits = peerIds.reduce((result, peerId) => {
+                        if (peerId.toB58String().startsWith(operands[1])) result.push(peerId.toB58String())
+
+                        return result
+                    }, [])
+
+                    return cb(null, [hits.length ? hits.map(str => `close ${str}`) : ['close'], line])
+                })
+                .catch(err => {
+                    console.log(chalk.red(err.message))
                     return cb(null, [[''], line])
-                }
-
-                if (existingChannels.length < 1) {
-                    console.log(chalk.red(`\nCan't close a payment channel as there aren't any open ones!`))
-                    return cb(null, [[''], line])
-                }
-
-                hits = operands.length > 1 ? existingChannels.filter(peerId => peerId.startsWith(operands[1])) : existingChannels
-
-                return cb(null, [hits.length ? hits.map(str => `close ${str}`) : ['close'], line])
-            })
+                })
             break
         default:
             hits = keywords.filter(keyword => keyword.startsWith(line))
@@ -224,7 +239,7 @@ async function runAsRegularNode() {
     ownAddress = pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal())
 
     try {
-        [funds, stakedEther] = await Promise.all([
+        ;[funds, stakedEther] = await Promise.all([
             node.paymentChannels.web3.eth.getBalance(ownAddress).then(result => new BN(result)),
             node.paymentChannels.contract.methods
                 .states(ownAddress)
@@ -426,7 +441,8 @@ async function runAsRegularNode() {
                 }
 
                 rl.question(`Sending message to ${chalk.blue(operands[1])}\nType in your message and press ENTER to send:\n`, message =>
-                    node.sendMessage(rlp.encode([message, Date.now().toString()]), operands[1])
+                    node
+                        .sendMessage(rlp.encode([message, Date.now().toString()]), operands[1])
                         .catch(err => console.log(chalk.red(err.message)))
                         .finally(rl.prompt)
                 )
