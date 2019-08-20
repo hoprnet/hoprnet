@@ -474,7 +474,7 @@ class PaymentChannel extends EventEmitter {
                     lt: this.Challenge(channelId, Buffer.alloc(COMPRESSED_PUBLIC_KEY_LENGTH, 255))
                 })
                 .on('data', key => {
-                    console.log(key.toString())
+                    // console.log(key.toString())
                     batch = batch.del(key)
                 })
                 .on('end', () => resolve(batch.write()))
