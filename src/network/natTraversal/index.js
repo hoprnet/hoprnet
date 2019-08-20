@@ -53,7 +53,7 @@ const mixin = Base =>
             //     }, 5 * 1000))
             // ])
 
-            if (this.node.bootstrapServers.some(peerInfo => peerInfo.id.isEqual(PeerId.createFromB58String(multiaddr.getPeerId())))) {
+            if (!this.node.bootstrapServers || this.node.bootstrapServers.some(peerInfo => peerInfo.id.isEqual(PeerId.createFromB58String(multiaddr.getPeerId())))) {
                 connPromise = super.dial(multiaddr, options)
             } else {
                 connPromise = this.signalling.relay(PeerId.createFromB58String(multiaddr.getPeerId()))
