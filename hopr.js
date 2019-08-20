@@ -171,11 +171,11 @@ function tabCompletion(line, cb) {
                         return cb(null, [[''], line])
                     }
 
-                    hits = peerIds.reduce((result, peerId) => {
+                    hits = operands > 1 ? peerIds.reduce((result, peerId) => {
                         if (peerId.toB58String().startsWith(operands[1])) result.push(peerId.toB58String())
 
                         return result
-                    }, [])
+                    }, []) : peerIds.map(peerId => peerId.toB58String())
 
                     return cb(null, [hits.length ? hits.map(str => `close ${str}`) : ['close'], line])
                 })
