@@ -40,6 +40,7 @@
         "futoin-hkdf": "~1.2.0",
         "getopts": "~2.2.4",
         "heap": "~0.2.6",
+        "ip-address": "^6.1.0",
         "leveldown": "~5.1.0",
         "levelup": "~4.1.0",
         "libp2p": "^0.26.0",
