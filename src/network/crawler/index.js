@@ -7,7 +7,6 @@ const pull = require('pull-stream')
 const lp = require('pull-length-prefixed')
 
 const Queue = require('promise-queue')
-const { waterfall, tryEach } = require('neo-async')
 
 const fs = require('fs')
 const protons = require('protons')
@@ -46,46 +45,43 @@ module.exports = class Crawler {
              * @param {PeerId} peerId PeerId of the peer that is queried
              */
             const queryNode = peerId =>
-                new Promise((resolve, reject) =>
-                    tryEach(
-                        [
-                            cb => this.node.dialProtocol(peerId, PROTOCOL_CRAWLING, cb),
-                            cb =>
-                                waterfall(
-                                    [cb => this.node.peerRouting.findPeer(peerId, cb), (peerInfo, cb) => this.node.dialProtocol(peerInfo, PROTOCOL_CRAWLING, cb)],
-                                    cb
-                                )
-                        ],
-                        (err, conn) => {
+                new Promise(async (resolve, reject) => {
+                    let conn
+                    try {
+                        conn = await this.node.dialProtocol(peerId, PROTOCOL_CRAWLING)
+                    } catch (err) {
+                        try {
+                            conn = await this.node.peerRouting.findPeer(peerId).then(peerInfo => this.node.dialProtocol(peerInfo, PROTOCOL_CRAWLING))
+                        } catch (err) {
+                            reject(err)
+                        }
+                    }
+
+                    pull(
+                        conn,
+                        lp.decode(),
+                        pull.map(CrawlResponse.decode),
+                        pull.filter(response => response.status === Status.OK),
+                        pull.collect(async (err, responses) => {
                             if (err) return reject(err)
 
-                            pull(
-                                conn,
-                                lp.decode(),
-                                pull.map(buf => CrawlResponse.decode(buf)),
-                                pull.filter(response => response.status === Status.OK),
-                                pull.collect(async (err, responses) => {
-                                    if (err) return reject(err)
+                            if (responses.length < 1) reject(Error('Empty response'))
 
-                                    if (responses.length < 1) reject(Error('Empty response'))
+                            resolve(
+                                Promise.all(responses[0].pubKeys.map(pubKey => pubKeyToPeerId(pubKey))).then(peerIds =>
+                                    peerIds.filter(peerId => {
+                                        if (peerId.isEqual(this.node.peerInfo.id)) return false
 
-                                    resolve(
-                                        Promise.all(responses[0].pubKeys.map(pubKey => pubKeyToPeerId(pubKey))).then(peerIds =>
-                                            peerIds.filter(peerId => {
-                                                if (peerId.isEqual(this.node.peerInfo.id)) return false
+                                        const found = this.node.peerBook.has(peerId.toB58String())
+                                        this.node.peerBook.put(new PeerInfo(peerId))
 
-                                                const found = this.node.peerBook.has(peerId.toB58String())
-                                                this.node.peerBook.put(new PeerInfo(peerId))
-
-                                                return !found
-                                            })
-                                        )
-                                    )
-                                })
+                                        return !found
+                                    })
+                                )
                             )
-                        }
+                        })
                     )
-                )
+                })
 
             /**
              * Decides whether we have enough peers to build a path and initiates some queries

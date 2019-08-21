@@ -13,9 +13,8 @@ const registerHandlers = require('./handlers')
 const { NAME, PACKET_SIZE, PROTOCOL_STRING, MAX_HOPS } = require('./constants')
 const crawler = require('./network/crawler')
 const heartbeat = require('./network/heartbeat')
-const getPubKey = require('./getPubKey')
 const getPeerInfo = require('./getPeerInfo')
-const { randomSubset, serializePeerBook, deserializePeerBook, log, match, createDirectoryIfNotExists } = require('./utils')
+const { randomSubset, serializePeerBook, deserializePeerBook, log, addPubKey, createDirectoryIfNotExists } = require('./utils')
 
 const levelup = require('levelup')
 const leveldown = require('leveldown')
@@ -96,13 +95,6 @@ class Hopr extends libp2p {
         this.bootstrapServers = bootstrapServers
         this.db = db
         this.heartbeat = heartbeat(this)
-
-        // Functionality to ask another node for its public key in case that the
-        // public key is not available which is not necessary anymore.
-        //
-        // Notice: don't forget to activate the corresponding handler in `handlers/index.js`
-        //
-        this.getPubKey = getPubKey(this)
     }
 
     /**
@@ -201,12 +193,12 @@ class Hopr extends libp2p {
         log(this.peerInfo.id, `Shutting down...`)
 
         // this.heartbeat.stop()
+        this.db.close()
 
         return Promise.all([
             /* prettier-ignore */
             // this.exportPeerBook(),
-            super.stop(),
-            this.db.close()
+            super.stop()
         ])
     }
 
@@ -253,18 +245,7 @@ class Hopr extends libp2p {
                 new Promise(async (resolve, reject) => {
                     let intermediateNodes = await this.getIntermediateNodes(destination)
 
-                    intermediateNodes = await Promise.all(
-                        intermediateNodes.concat(destination).map(
-                            peerId =>
-                                new Promise((resolve, reject) => {
-                                    this.getPubKey(peerId, (err, peerInfo) => {
-                                        if (err) return reject(err)
-
-                                        resolve(peerInfo.id)
-                                    })
-                                })
-                        )
-                    )
+                    intermediateNodes = await Promise.all(intermediateNodes.concat(destination).map(addPubKey))
 
                     const [conn, packet] = await Promise.all([
                         new Promise((resolve, reject) =>

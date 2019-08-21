@@ -143,8 +143,7 @@ function tabCompletion(line, cb) {
             getExistingChannels()
                 .then(peerIds => {
                     const peers = node.peerBook.getAllArray().reduce((result, peerInfo) => {
-                        if (isNotBootstrapNode(peerInfo.id) && !peerIds.some(peerId => peerId.isEqual(peerInfo.id)))
-                            result.push(peerInfo.id.toB58String())
+                        if (isNotBootstrapNode(peerInfo.id) && !peerIds.some(peerId => peerId.isEqual(peerInfo.id))) result.push(peerInfo.id.toB58String())
 
                         return result
                     }, [])
@@ -171,11 +170,14 @@ function tabCompletion(line, cb) {
                         return cb(null, [[''], line])
                     }
 
-                    hits = operands > 1 ? peerIds.reduce((result, peerId) => {
-                        if (peerId.toB58String().startsWith(operands[1])) result.push(peerId.toB58String())
+                    hits =
+                        operands > 1
+                            ? peerIds.reduce((result, peerId) => {
+                                  if (peerId.toB58String().startsWith(operands[1])) result.push(peerId.toB58String())
 
-                        return result
-                    }, []) : peerIds.map(peerId => peerId.toB58String())
+                                  return result
+                              }, [])
+                            : peerIds.map(peerId => peerId.toB58String())
 
                     return cb(null, [hits.length ? hits.map(str => `close ${str}`) : ['close'], line])
                 })
@@ -219,12 +221,10 @@ function stopNode() {
         process.exit(0)
     }, 10 * 1000)
 
-    node.stop(err => {
-        clearTimeout(timeout)
-        if (err) process.exit(1)
-
-        process.exit(0)
-    })
+    node.stop()
+        /* prettier-ignore */
+        .then(() => clearTimeout(timeout))
+        .catch(() => process.exit(0))
 }
 
 function runAsBootstrapNode() {

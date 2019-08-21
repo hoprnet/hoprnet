@@ -3,7 +3,6 @@
 const EventEmitter = require('events')
 
 const Web3 = require('web3')
-const { waterfall } = require('neo-async')
 const BN = require('bn.js')
 const secp256k1 = require('secp256k1')
 const pull = require('pull-stream')
@@ -523,49 +522,50 @@ class PaymentChannel extends EventEmitter {
             const counterparty = await pubKeyToPeerId(restoreTx.counterparty)
 
             log(this.node.peerInfo.id, `Asking node ${counterparty.toB58String()} to send latest update transaction.`)
-            waterfall(
-                [cb => this.node.peerRouting.findPeer(counterparty, cb), (peerInfo, cb) => this.node.dialProtocol(peerInfo, PROTOCOL_SETTLE_CHANNEL, cb)],
-                (err, conn) => {
-                    if (err) return reject(chalk.red(err.message))
 
-                    pull(
-                        pull.once(channelId),
-                        lp.encode(),
-                        conn,
-                        lp.decode({
-                            maxLength: Transaction.SIZE + Transaction.SIGNATURE_LENGTH + Transaction.RECOVERY_LENGTH
-                        }),
-                        pull.collect((err, data) => {
-                            if (err) return reject(err)
+            let conn
+            try {
+                conn = await this.node.peerRouting.findPeer(counterparty).then(peerInfo => this.node.dialProtocol(peerInfo, PROTOCOL_SETTLE_CHANNEL))
+            } catch (err) {
+                return reject(chalk.red(err.message))
+            }
 
-                            if (data.length < 1 || data[0].length != Transaction.SIZE + Transaction.SIGNATURE_LENGTH + Transaction.RECOVERY_LENGTH)
-                                return reject(
-                                    Error(
-                                        `Counterparty ${chalk.blue(counterparty.toB58String())} didn't send a valid response to close channel ${chalk.yellow(
-                                            channelId.toString('hex')
-                                        )}.`
-                                    )
-                                )
+            pull(
+                pull.once(channelId),
+                lp.encode(),
+                conn,
+                lp.decode({
+                    maxLength: Transaction.SIZE + Transaction.SIGNATURE_LENGTH + Transaction.RECOVERY_LENGTH
+                }),
+                pull.collect((err, data) => {
+                    if (err) return reject(err)
 
-                            const tx = Transaction.fromBuffer(data[0].slice(0, Transaction.SIZE))
-
-                            if (!tx.verify(counterparty)) return reject(Error(`Invalid transaction on channel ${chalk.yellow(channelId.toString('hex'))}.`))
-
-                            const signature = data[0].slice(Transaction.SIZE, Transaction.SIZE + Transaction.SIGNATURE_LENGTH)
-                            const recovery = bufferToNumber(
-                                data[0].slice(
-                                    Transaction.SIZE + Transaction.SIGNATURE_LENGTH,
-                                    Transaction.SIZE + Transaction.SIGNATURE_LENGTH + Transaction.RECOVERY_LENGTH
-                                )
+                    if (data.length < 1 || data[0].length != Transaction.SIZE + Transaction.SIGNATURE_LENGTH + Transaction.RECOVERY_LENGTH)
+                        return reject(
+                            Error(
+                                `Counterparty ${chalk.blue(counterparty.toB58String())} didn't send a valid response to close channel ${chalk.yellow(
+                                    channelId.toString('hex')
+                                )}.`
                             )
+                        )
 
-                            if (!this.node.peerInfo.id.pubKey.marshal().equals(secp256k1.recover(tx.hash, signature, recovery)))
-                                return reject(Error(`Invalid transaction on channel ${chalk.yellow(channelId.toString('hex'))}.`))
+                    const tx = Transaction.fromBuffer(data[0].slice(0, Transaction.SIZE))
 
-                            resolve(tx)
-                        })
+                    if (!tx.verify(counterparty)) return reject(Error(`Invalid transaction on channel ${chalk.yellow(channelId.toString('hex'))}.`))
+
+                    const signature = data[0].slice(Transaction.SIZE, Transaction.SIZE + Transaction.SIGNATURE_LENGTH)
+                    const recovery = bufferToNumber(
+                        data[0].slice(
+                            Transaction.SIZE + Transaction.SIGNATURE_LENGTH,
+                            Transaction.SIZE + Transaction.SIGNATURE_LENGTH + Transaction.RECOVERY_LENGTH
+                        )
                     )
-                }
+
+                    if (!this.node.peerInfo.id.pubKey.marshal().equals(secp256k1.recover(tx.hash, signature, recovery)))
+                        return reject(Error(`Invalid transaction on channel ${chalk.yellow(channelId.toString('hex'))}.`))
+
+                    resolve(tx)
+                })
             )
         })
         // Ask counterparty to settle payment channel because
@@ -629,7 +629,9 @@ class PaymentChannel extends EventEmitter {
                 })
                 .on('error', err => reject(err))
                 .on('data', key => {
-                    promises.push(this.closeChannel(key.slice(key.length - CHANNEL_ID_LENGTH)).catch(err => new BN(0)))
+                    promises.push(
+                        /* prettier-ignore */
+                        this.closeChannel(key.slice(key.length - CHANNEL_ID_LENGTH)).catch(err => new BN(0)))
                 })
                 .on('end', () => {
                     if (promises.length > 0) {
