@@ -24,7 +24,6 @@ const PeerInfo = require('peer-info')
 const PeerBook = require('peer-book')
 
 const PaymentChannels = require('./paymentChannels')
-const PublicIp = require('./network/natTraversal/stun')
 
 const pull = require('pull-stream')
 const lp = require('pull-length-prefixed')
@@ -167,7 +166,6 @@ class Hopr extends libp2p {
         }
 
         // this.heartbeat.start()
-        // this.getPublicIp = PublicIp(this, options)
 
         this.crawler = new crawler({ libp2p: this })
 

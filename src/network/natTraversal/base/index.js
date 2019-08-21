@@ -6,7 +6,9 @@ const UDP6 = require('./udp6')
 const EventEmitter = require('events').EventEmitter
 const SimplePeer = require('simple-peer')
 const toPull = require('stream-to-pull-stream')
+
 const os = require('os')
+const dgram = require('dgram')
 
 const wrtc = require('wrtc')
 
@@ -16,9 +18,7 @@ const Multiaddr = require('multiaddr')
 const PeerInfo = require('peer-info')
 const PeerId = require('peer-id')
 
-const dgram = require('dgram')
-
-const stun = require('webrtc-stun')
+const { answerStunRequest, getPublicIp, getSTUNServers } = require('./stun')
 
 const mixin = Base =>
     class extends Base {
@@ -185,7 +185,7 @@ const mixin = Base =>
                     })
                 })
 
-            listener.getAddrs = cb => {
+            listener.getAddrs = async cb => {
                 const serverAddr = server.address()
 
                 if (!serverAddr) {
@@ -199,15 +199,23 @@ const mixin = Base =>
 
                 const netInterfaces = os.networkInterfaces()
 
-                let addrs = Object.values(netInterfaces).reduce((acc, netInterface) => {
-                    const externalAddrs = netInterface
-                        .filter(iface => !iface.internal && iface.family.toLowerCase() === this.family)
-                        .map(addr => Multiaddr.fromNodeAddress({ port: serverAddr.port, ...addr }, 'udp').encapsulate(`/ipfs/${this.node.peerInfo.id.toB58String()}`))
+                let addrs = []
 
-                    acc.push(...externalAddrs)
+                Object.values(netInterfaces).forEach(netInterface => {
+                    addrs.push(
+                        ...netInterface
+                            .filter(iface => !iface.internal && iface.family.toLowerCase() === this.family)
+                            .map(addr =>
+                                Multiaddr.fromNodeAddress({ port: serverAddr.port, ...addr }, 'udp').encapsulate(`/ipfs/${this.node.peerInfo.id.toB58String()}`)
+                            )
+                    )
+                })
 
-                    return acc
-                }, [this.getLocalhost(serverAddr)])
+                addrs.push(this.getLocalhost(serverAddr))
+
+                if (this.node.bootstrapServers && this.family.toLowerCase() === 'ipv4') {
+                    addrs.push(await getPublicIp(this.node.bootstrapServers, this.node.peerInfo.id))
+                }
 
                 addrs = super.sortAddrs(addrs)
 
@@ -232,57 +240,6 @@ const mixin = Base =>
             return multiaddrs.filter(ma => ma.toOptions().family === this.family)
         }
     }
-
-function getSTUNServers(peerInfos) {
-    const result = []
-
-    /**
-     * If there are no known STUN server, use the ones from Google and Twilio (default configuration for simple-peer)
-     */
-    if (!peerInfos) {
-        return [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:global.stun.twilio.com:3478?transport=udp' }]
-    }
-
-    if (!Array.isArray(peerInfos) && PeerInfo.isPeerInfo(peerInfos)) peerInfos = [peerInfos]
-
-    peerInfos.forEach(peerInfo => {
-        peerInfo.multiaddrs.forEach(ma => {
-            const opts = ma.toOptions()
-
-            if (opts.family.toLowerCase() === 'ipv4') {
-                result.push({
-                    urls: `stun:${opts.host}:${opts.port}`
-                })
-            } else if (opts.family.toLowerCase() === 'ipv6') {
-                result.push({
-                    urls: `stun:[${opts.host}]:${opts.port}`
-                })
-            }
-        })
-    })
-
-    return result
-}
-
-function answerStunRequest(msg, rinfo, send) {
-    const req = stun.createBlank()
-
-    // if msg is valid STUN message
-    if (req.loadBuffer(msg)) {
-        // if STUN message is BINDING_REQUEST and valid content
-        if (req.isBindingRequest({ fingerprint: true })) {
-            // console.log('REQUEST', req)
-
-            const res = req
-                .createBindingResponse(true)
-                .setXorMappedAddressAttribute(rinfo)
-                .setFingerprintAttribute()
-
-            // console.log('RESPONSE', res)
-            send(res.toBuffer())
-        }
-    }
-}
 
 module.exports.Basev4 = mixin(UDP4)
 
