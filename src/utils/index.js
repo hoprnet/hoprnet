@@ -374,9 +374,7 @@ module.exports.pubKeyToPeerId = (pubKey, cb) => {
 module.exports.privKeyToPeerId = (privKey, cb) => {
     if (cb) throw Error('TODO -> promisify')
 
-    if (typeof privKey === 'string') {
-        privKey = Buffer.from(privKey.replace(/0x/, ''), 'hex')
-    }
+    if (typeof privKey === 'string') privKey = Buffer.from(privKey.replace(/0x/, ''), 'hex')
 
     if (!Buffer.isBuffer(privKey)) return cb(Error(`Unable to parse private key to desired representation. Got type '${typeof privKey}'.`))
 
@@ -502,13 +500,16 @@ module.exports.peerIdToWeb3Account = (peerId, web3) => {
     return web3.eth.accounts.privateKeyToAccount('0x'.concat(peerId.privKey.marshal().toString('hex')))
 }
 
-module.exports.signTransaction = (tx, peerId, web3) =>
-    this.peerIdToWeb3Account(peerId, web3).signTransaction(
+module.exports.signTransaction = async (tx, peerId, web3) => {
+    const account = this.peerIdToWeb3Account(peerId, web3)
+
+    return account.signTransaction(
         Object.assign(tx, {
             from: this.pubKeyToEthereumAddress(peerId.pubKey.marshal()),
-            gasPrice: process.env.GAS_PRICE
+            gasPrice: await web3.eth.getGasPrice()
         })
     )
+}
 
 /**
  * Signs a transaction with the private key that is given by
