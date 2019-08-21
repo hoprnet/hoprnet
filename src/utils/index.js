@@ -388,6 +388,14 @@ module.exports.privKeyToPeerId = (privKey, cb) => {
     return PeerId.createFromPrivKey(privKey.bytes)
 }
 
+module.exports.addPubKey = async peerId => {
+    if (PeerId.isPeerId(peerId) && peerId.pubKey) return peerId
+
+    const pubKey = Multihash.decode(peerId.toBytes()).digest
+
+    return PeerId.createFromPubKey(pubKey)
+}
+
 /**
  * Tries to establish a connection to `peerId`.
  * If the node already knows that peer, take the address from its peerBook
@@ -754,7 +762,7 @@ const SALT_LENGTH = 32
  * @param {PeerId} peerId the peerId that should be serialized
  * @param {function} cb called afterwards with `(err, encodedKeyPair)`
  */
-module.exports.serializeKeyPair = async (peerId) => {
+module.exports.serializeKeyPair = async peerId => {
     const salt = randomBytes(SALT_LENGTH)
     const scryptParams = { N: 8192, r: 8, p: 16 }
 
@@ -785,7 +793,7 @@ module.exports.serializeKeyPair = async (peerId) => {
  * @param {Buffer} encryptedSerializedKeyPair the encoded and encrypted key pair
  * @param {function} cb called afterward with `(err, peerId)`
  */
-module.exports.deserializeKeyPair = async (encryptedSerializedKeyPair) => {
+module.exports.deserializeKeyPair = async encryptedSerializedKeyPair => {
     const [salt, iv, ciphertext] = rlp.decode(encryptedSerializedKeyPair)
 
     const scryptParams = { N: 8192, r: 8, p: 16 }
@@ -813,29 +821,29 @@ module.exports.deserializeKeyPair = async (encryptedSerializedKeyPair) => {
  * @param {string} question string that is displayed before the user input
  * @param {function} cb called afterwards with `(err, password)`
  */
-module.exports.askForPassword = (question, cb) => new Promise((resolve, reject) => {
-    if (process.env.DEBUG === 'true') {
-        console.log('Debug mode: using password Epo5kZTFidOCHrnL0MzsXNwN9St')
-        resolve('Epo5kZTFidOCHrnL0MzsXNwN9St')
-    } else {
-        read(
-            {
-                prompt: question,
-                silent: true,
-                edit: true,
-                replace: '*'
-            },
-            (err, pw, isDefault) => {
-                if (err) return reject(err)
+module.exports.askForPassword = (question, cb) =>
+    new Promise((resolve, reject) => {
+        if (process.env.DEBUG === 'true') {
+            console.log('Debug mode: using password Epo5kZTFidOCHrnL0MzsXNwN9St')
+            resolve('Epo5kZTFidOCHrnL0MzsXNwN9St')
+        } else {
+            read(
+                {
+                    prompt: question,
+                    silent: true,
+                    edit: true,
+                    replace: '*'
+                },
+                (err, pw, isDefault) => {
+                    if (err) return reject(err)
 
-                resolve(pw)
-            }
-        )
-    }
-})
+                    resolve(pw)
+                }
+            )
+        }
+    })
 
 {
-
 }
 
 /**
@@ -847,7 +855,7 @@ module.exports.clearDirectory = path => {
     let files = []
     if (fs.existsSync(path)) {
         files = fs.readdirSync(path)
-        files.forEach(function (file, index) {
+        files.forEach(function(file, index) {
             const curPath = path + '/' + file
             if (fs.lstatSync(curPath).isDirectory()) {
                 // recurse
