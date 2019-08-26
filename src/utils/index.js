@@ -2,8 +2,9 @@
 
 const { sha3, toChecksumAddress } = require('web3-utils')
 const { randomBytes } = require('crypto')
-const { waterfall, parallel, map, some, tryEach } = require('neo-async')
+const { promisify } = require('util')
 const fs = require('fs')
+const fsPromise = require('fs').promises
 const libp2p_crypto = require('libp2p-crypto').keys
 const PeerId = require('peer-id')
 const rlp = require('rlp')
@@ -386,52 +387,18 @@ module.exports.privKeyToPeerId = (privKey, cb) => {
     return PeerId.createFromPrivKey(privKey.bytes)
 }
 
+/**
+ * Takes a peerId and returns a peerId with the public key set to the corresponding
+ * public key.
+ *
+ * @param {PeerId} peerId the PeerId instance that has probably no pubKey set
+ */
 module.exports.addPubKey = async peerId => {
     if (PeerId.isPeerId(peerId) && peerId.pubKey) return peerId
 
     const pubKey = Multihash.decode(peerId.toBytes()).digest
 
     return PeerId.createFromPubKey(pubKey)
-}
-
-/**
- * Tries to establish a connection to `peerId`.
- * If the node already knows that peer, take the address from its peerBook
- * and calls the node. In case that this fails, try to lookup the peer in
- * the DHT.
- * If the node is unknown, do a DHT lookup and connect afterwards to that node.
- *
- * @param {libp2p-switch} sw a libp2p-switch instance
- * @param {Object} options
- * @param {String} options.protocol the protocol to use, default `null`
- * @param {Object} options.peerRouting if present, use peerRouting to determine
- * fresh addresses
- * @param {PeerId} peerId the peerId of the peer that should be called
- * @param {Function(Error, Connection)} cb the function that gets called afterwards
- */
-module.exports.establishConnection = (sw, peerId, options, cb) => {
-    if (typeof options === 'function') {
-        cb = options
-        options = {}
-    }
-
-    if (sw._peerBook.has(peerId)) {
-        tryEach(
-            [
-                cb => sw.dial(sw._peerBook.get(peerId), options.protocol, cb),
-                cb => {
-                    if (!options.peerRouting) return cb(Error('TODO'))
-
-                    waterfall([cb => options.peerRouting.findPeer(peerId, cb), (cb, peerInfo) => sw.dial(peerInfo, protocol, cb)], cb)
-                }
-            ],
-            cb
-        )
-    } else if (options.peerRouting) {
-        waterfall([cb => sw.peerRouting.findPeer(peerId, cb), (cb, peerInfo) => sw.dialProtocol(peerInfo, protocol, cb)], cb)
-    } else {
-        return cb(Error('TODO'))
-    }
 }
 
 // ==========================
@@ -447,43 +414,30 @@ const ONE_MINUTE = 60 * 1000
  * @param {Object} provider a valid Web3 provider
  * @param {Number} amountOfTime increase the timestamp by that amount of time, default 1 minute
  */
-module.exports.mineBlock = (provider, amountOfTime = ONE_MINUTE) =>
-    waterfall([
-        cb =>
-            provider.send(
-                {
-                    jsonrpc: '2.0',
-                    method: 'evm_increaseTime',
-                    params: [amountOfTime],
-                    id: Date.now()
-                },
-                (err, result) => cb(err)
-            ),
-        cb =>
-            provider.send(
-                {
-                    jsonrpc: '2.0',
-                    method: 'evm_mine',
-                    id: Date.now()
-                },
-                (err, result) => cb(err)
-            ),
-        () =>
-            provider.send(
-                {
-                    jsonrpc: '2.0',
-                    method: 'eth_blockNumber',
-                    id: Date.now()
-                },
-                (err, response) => {
-                    if (err) {
-                        throw err
-                    }
+module.exports.mineBlock = async (provider, amountOfTime = ONE_MINUTE) => {
+    const send = promisify(provider.send.bind(provider))
 
-                    console.log(`\x1b[34mNow on block ${parseInt(response.result, 16)}.\x1b[0m`)
-                }
-            )
-    ])
+    await send({
+        jsonrpc: '2.0',
+        method: 'evm_increaseTime',
+        params: [amountOfTime],
+        id: Date.now()
+    })
+
+    await send({
+        jsonrpc: '2.0',
+        method: 'evm_mine',
+        id: Date.now()
+    })
+
+    const blockNumber = await send({
+        jsonrpc: '2.0',
+        method: 'eth_blockNumber',
+        id: Date.now()
+    })
+
+    console.log(`\x1b[34mNow on block ${parseInt(blockNumber, 16)}.\x1b[0m`)
+}
 
 // ==========================
 // Web3.js methods
@@ -544,101 +498,61 @@ module.exports.sendTransaction = async (tx, peerId, web3) =>
  *
  * @param {Array} srcFiles the absolute paths of the source files
  * @param {Array} artifacts the absolute paths of the artifacts
- * @param {function} cb called afterward with `(err)`
  */
-module.exports.compileIfNecessary = (srcFiles, artifacts, cb) => {
+module.exports.compileIfNecessary = async (srcFiles, artifacts) => {
     function findImports(path) {
         return {
             contents: fs.readFileSync(`${process.cwd()}/node_modules/${path}`).toString()
         }
     }
 
-    function compile() {
-        return new Promise((resolve, reject) => {
-            const srcObject = {}
-            srcFiles.forEach(file => {
-                srcObject[file] = {
-                    content: fs.readFileSync(file).toString()
-                }
-            })
+    const compile = async () => {
+        const sources = await Promise.all(srcFiles.map(srcFile => fsPromise.readFile(srcFile).then(file => [srcFile, file.toString()])))
 
-            const input = {
-                language: 'Solidity',
-                sources: srcObject,
-                settings: {
-                    optimizer: {
-                        // disabled by default
-                        enabled: true,
-                        // Optimize for how many times you intend to run the code.
-                        // Lower values will optimize more for initial deployment cost, higher values will optimize more for high-frequency usage.
-                        runs: 200
-                    },
-                    outputSelection: {
-                        '*': {
-                            '*': ['*']
-                        }
+        const srcObject = {}
+        sources.forEach(([file, content]) => {
+            srcObject[file] = { content }
+        })
+
+        const input = {
+            language: 'Solidity',
+            sources: srcObject,
+            settings: {
+                optimizer: {
+                    enabled: true,
+                    runs: 200
+                },
+                outputSelection: {
+                    '*': {
+                        '*': ['*']
                     }
                 }
             }
-            const compiledContracts = JSON.parse(solc.compile(JSON.stringify(input), findImports))
+        }
+        const compiledContracts = JSON.parse(solc.compile(JSON.stringify(input), findImports))
 
-            if (compiledContracts.errors) return reject(compiledContracts.errors.map(err => err.formattedMessage).join('\n'))
+        if (compiledContracts.errors) throw compiledContracts.errors.map(err => err.formattedMessage).join('\n')
 
-            this.createDirectoryIfNotExists('build/contracts')
+        this.createDirectoryIfNotExists('build/contracts')
 
-            Object.entries(compiledContracts.contracts).forEach(array =>
-                Object.entries(array[1]).forEach(([contractName, jsonObject]) => {
-                    fs.writeFileSync(`${process.cwd()}/build/contracts/${contractName}.json`, JSON.stringify(jsonObject, null, '\t'))
-                })
-            )
-
-            resolve()
-        })
+        await Promise.all(Object.entries(compiledContracts.contracts).map(array => Promise.all(Object.entries(array[1]).map(([contractName, jsonObject]) =>
+            fsPromise.writeFile(`${process.cwd()}/build/contracts/${contractName}.json`, JSON.stringify(jsonObject, null, '\t'))
+        ))
+        ))
     }
 
-    waterfall(
-        [
-            cb =>
-                some(
-                    artifacts,
-                    (file, cb) =>
-                        fs.access(file, err => {
-                            cb(null, !err)
-                        }),
-                    cb
-                ),
-            (filesExist, cb) => {
-                if (!filesExist) {
-                    compile().then(cb, cb)
-                } else {
-                    parallel(
-                        {
-                            srcTime: cb =>
-                                map(srcFiles, fs.stat, (err, stats) => {
-                                    if (err) return cb(err)
+    try {
+        await Promise.all(artifacts.map(artifact => fsPromise.access(artifact)))
+    } catch (err) {
+        return compile()
+    }
 
-                                    return cb(null, stats.reduce((acc, current) => Math.max(acc, current.mtimeMs), 0))
-                                }),
-                            artifactTime: cb =>
-                                map(artifacts, fs.stat, (err, stats) => {
-                                    if (err) return cb(err)
+    const srcTimes = await Promise.all(srcFiles.map(srcFile => fsPromise.stat(srcFile).mtimeMs))
+    const artifactTimes = await Promise.all(artifacts.map(artifact => fsPromise.stat(artifact).mtimeMs))
 
-                                    return cb(null, stats.reduce((acc, current) => Math.min(acc, current.mtimeMs), Date.now()))
-                                })
-                        },
-                        (err, { srcTime, artifactTime }) => {
-                            if (err) return cb(err)
-
-                            if (srcTime > artifactTime) return compile().then(cb, cb)
-
-                            return cb()
-                        }
-                    )
-                }
-            }
-        ],
-        cb
-    )
+    if (Math.max(srcTimes) > Math.min(artifactTimes)) {
+        return compile()
+    }
 }
 
 /**
@@ -649,59 +563,53 @@ module.exports.compileIfNecessary = (srcFiles, artifacts, cb) => {
  * @returns {Promise} promise that resolve once the contract is compiled and deployed, otherwise
  * it rejects.
  */
-module.exports.deployContract = (index, web3) =>
-    new Promise((resolve, reject) =>
-        parallel(
-            {
-                fundingPeer: cb => this.privKeyToPeerId(process.env.FUND_ACCOUNT_PRIVATE_KEY).then(peerId => cb(null, peerId)),
-                compiledContract: cb =>
-                    this.compileIfNecessary([`${process.cwd()}/contracts/HoprChannel.sol`], [`${process.cwd()}/build/contracts/HoprChannel.json`], cb)
-            },
-            (err, { fundingPeer, compiledContract }) => {
-                if (err) return reject(err)
+module.exports.deployContract = async (index, web3) => {
+    const fundingPeer = await this.privKeyToPeerId(process.env.FUND_ACCOUNT_PRIVATE_KEY)
 
-                if (!compiledContract) compiledContract = require(`${process.cwd()}/build/contracts/HoprChannel.json`)
+    let compiledContract = await this.compileIfNecessary([`${process.cwd()}/contracts/HoprChannel.sol`], [`${process.cwd()}/build/contracts/HoprChannel.json`])
 
-                this.sendTransaction(
-                    {
-                        gas: 3000333, // 2370333
-                        gasPrice: process.env.GAS_PRICE,
-                        nonce: index,
-                        data: '0x'.concat(compiledContract.evm.bytecode.object)
-                    },
-                    fundingPeer,
-                    web3
-                )
-                    .then(receipt => {
-                        console.log(
-                            `Deployed contract on ${chalk.magenta(process.env.NETWORK)} at ${chalk.green(
-                                receipt.contractAddress.toString('hex')
-                            )}.\nNonce is now ${chalk.red(index)}.\n`
-                        )
+    if (!compiledContract) compiledContract = require(`${process.cwd()}/build/contracts/HoprChannel.json`)
 
-                        updateContractAddress([`${process.cwd()}/.env`, `${process.cwd()}/.env.example`], receipt.contractAddress)
-                        process.env.CONTRACT_ADDRESS = receipt.contractAddress
-
-                        resolve(receipt.contractAddress)
-                    })
-                    .catch(err => {
-                        console.log(err.message)
-                    })
-            }
-        )
+    const receipt = await this.sendTransaction(
+        {
+            gas: 3000333, // 2370333
+            gasPrice: process.env.GAS_PRICE,
+            nonce: index,
+            data: '0x'.concat(compiledContract.evm.bytecode.object)
+        },
+        fundingPeer,
+        web3
     )
 
-function updateContractAddress(files, contractAddress) {
-    if (!Array.isArray(files)) files = [files]
+    console.log(
+        `Deployed contract on ${chalk.magenta(process.env.NETWORK)} at ${chalk.green(
+            receipt.contractAddress.toString('hex')
+        )}.\nNonce is now ${chalk.red(index)}.\n`
+    )
 
-    files.forEach(filename => {
-        let file = fs.readFileSync(filename).toString()
+    await updateContractAddress([`${process.cwd()}/.env`, `${process.cwd()}/.env.example`], receipt.contractAddress)
+    process.env.CONTRACT_ADDRESS = receipt.contractAddress
+
+    return receipt.contractAddress
+}
+
+/**
+ * Takes a contract address and changes every occurence of `CONTRACT_ADDRESS = //...` to
+ * the given contract address
+ * @param {string[]} fileNames the files whose CONTRACT_ADDRESS should be changed
+ * @param {string} contractAddress the new contract address
+ */
+function updateContractAddress(fileNames, contractAddress) {
+    if (!Array.isArray(fileNames)) fileNames = [fileNames]
+
+    return Promise.all(fileNames.map(async filename => {
+        let file = (await fsPromise.readFile(filename)).toString()
         const regex = new RegExp(`CONTRACT_ADDRESS_${process.env.NETWORK.toUpperCase()}\\s{0,}=(\\s{0,}0x[0-9a-fA-F]{0,})?`, 'g')
 
         file = file.replace(regex, `CONTRACT_ADDRESS_${process.env.NETWORK.toUpperCase()} = ${contractAddress}`)
 
-        fs.writeFileSync(filename, Buffer.from(file))
-    })
+        await fsPromise.writeFile(filename, Buffer.from(file))
+    }))
 }
 /**
  * Decodes the serialized peerBook and inserts the peerInfos in the given
@@ -844,9 +752,6 @@ module.exports.askForPassword = (question, cb) =>
         }
     })
 
-{
-}
-
 /**
  * Deletes recursively (and synchronously) all files in a directory.
  *
@@ -856,7 +761,7 @@ module.exports.clearDirectory = path => {
     let files = []
     if (fs.existsSync(path)) {
         files = fs.readdirSync(path)
-        files.forEach(function(file, index) {
+        files.forEach(function (file, index) {
             const curPath = path + '/' + file
             if (fs.lstatSync(curPath).isDirectory()) {
                 // recurse
@@ -891,22 +796,3 @@ module.exports.createDirectoryIfNotExists = path => {
         return searchPath
     }, '')
 }
-
-// ==========================
-// multiaddr methods
-// ==========================
-const HOPR_ADDRESS = '/ipfs/[a-zA-Z0-9]+'
-const WEBRTC_STRING = '/p2p-webrtc-star'
-
-module.exports.match = {}
-
-const WEBRTC_ADDRESS_REGEXP = new RegExp(`${HOPR_ADDRESS}${WEBRTC_STRING}${HOPR_ADDRESS}`)
-module.exports.match.WebRTC = addr => Boolean(addr.toString().match(WEBRTC_ADDRESS_REGEXP))
-
-const WEBRTC_ADDRESS_DESTINATION_REGEXP = new RegExp(`(?<=${HOPR_ADDRESS}${WEBRTC_STRING})${HOPR_ADDRESS}`)
-module.exports.match.WebRTC_DESTINATION = addr => Multiaddr(addr.toString().match(WEBRTC_ADDRESS_DESTINATION_REGEXP)[0])
-
-const LOCALHOST_IPv6_REGEXP = '/ip6/::1'
-const LOCALHOST_IPv4_REGEXP = '/ip4/127.0.0.1'
-const LOCALHOST_REGEXP = new RegExp(`(${LOCALHOST_IPv4_REGEXP})|(${LOCALHOST_IPv6_REGEXP})`)
-module.exports.match.LOCALHOST = addr => Boolean(addr.toString().match(LOCALHOST_REGEXP))

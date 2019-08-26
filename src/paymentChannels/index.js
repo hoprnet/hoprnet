@@ -79,13 +79,7 @@ class PaymentChannel extends EventEmitter {
 
         const [nonce, compiledContract] = await Promise.all([
             web3.eth.getTransactionCount(pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()), 'latest'),
-            new Promise((resolve, reject) =>
-                compileIfNecessary([`${process.cwd()}/contracts/HoprChannel.sol`], [`${process.cwd()}/build/contracts/HoprChannel.json`], (err) => {
-                    if (err) return reject(err)
-
-                    resolve()
-                })
-            )
+            compileIfNecessary([`${process.cwd()}/contracts/HoprChannel.sol`], [`${process.cwd()}/build/contracts/HoprChannel.json`])
         ])
 
         registerHandlers(node)
@@ -111,13 +105,14 @@ class PaymentChannel extends EventEmitter {
      * payment channels found in the database.
      */
     async registerEventListeners() {
-        const register = (query, fn) => new Promise((resolve, reject) =>
-            this.node.db
-                .createKeyStream(query)
-                .on('data', fn)
-                .on('error', reject)
-                .on('end', resolve)
-        )
+        const register = (query, fn) =>
+            new Promise((resolve, reject) =>
+                this.node.db
+                    .createKeyStream(query)
+                    .on('data', fn)
+                    .on('error', reject)
+                    .on('end', resolve)
+            )
 
         await Promise.all([
             register(
@@ -631,7 +626,8 @@ class PaymentChannel extends EventEmitter {
                 .on('data', key => {
                     promises.push(
                         /* prettier-ignore */
-                        this.closeChannel(key.slice(key.length - CHANNEL_ID_LENGTH)).catch(err => new BN(0)))
+                        this.closeChannel(key.slice(key.length - CHANNEL_ID_LENGTH)).catch(err => new BN(0))
+                    )
                 })
                 .on('end', () => {
                     if (promises.length > 0) {

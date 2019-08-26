@@ -6,7 +6,6 @@ const pull = require('pull-stream')
 const chalk = require('chalk')
 
 const { randomBytes, createHash } = require('crypto')
-const { waterfall, series, tryEach } = require('neo-async')
 
 const { PROTOCOL_HEARTBEAT } = require('../constants')
 const { log } = require('../utils')
@@ -17,66 +16,71 @@ const HASH_SIZE = 32
 module.exports = (node) => {
     let timers
 
-    const queryNode = (peerInfo, cb) =>
-        tryEach([
-            (cb) => node.dialProtocol(peerInfo, PROTOCOL_HEARTBEAT, cb),
-            (cb) => waterfall([
-                (cb) => node.peerRouting.findPeer(peerInfo.id, cb),
-                (peerInfo, cb) => node.dialProtocol(peerInfo, PROTOCOL_HEARTBEAT, cb)
-            ], cb)
-        ], (err, conn) => {
-            if (err || !conn)
-                return cb(false, err ? err.message : `Unable to connect to ${chalk.blue(peerInfo.id.toB58String())}.`)
+    const queryNode = (peerInfo, cb) => new Promise((resolve, reject) => {
+        const conn = await Promise.race([
+            node.dialProtocol(peerInfo, PROTOCOL_HEARTBEAT),
+            node.peerRouting.findPeer(peerInfo.id).then(peerInfo => node.dialProtocol(peerInfo, PROTOCOL_HEARTBEAT))
+        ])
 
-            const challenge = randomBytes(16)
+        if (!conn) {
+            return reject(Error(`Unable to connect to ${chalk.blue(peerInfo.id.toB58String())}.`))
+        }
 
-            try {
-                pull(
-                    pull.once(challenge),
-                    lp.encode(),
-                    conn,
-                    lp.decode({
-                        maxLength: HASH_SIZE
-                    }),
-                    pull.collect((err, response) => {
-                        if (err || response.length != 1)
-                            return cb(false, `foo .Invalid response from ${chalk.blue(peerInfo.id.toB58String())}.`)
-    
-                        const correctResponse = createHash('sha256').update(challenge).digest().slice(0, 16)
-                        if (!response[0].equals(correctResponse))
-                            return cb(false, `Invalid response from ${chalk.blue(peerInfo.id.toB58String())}.`)
-    
-                        if (!node.peerBook.has(peerInfo.id.toB58String()))
-                            node.peerBook.put(peerInfo)
-    
-                        cb(true)
-                    })
-                )
-            } catch (err) {
-                cb(false, `Connection to ${chalk.blue(peerInfo.id.toB58String())} broke up.`)
-            }
-            
-        })
+        const challenge = randomBytes(16)
+
+        try {
+            pull(
+                pull.once(challenge),
+                lp.encode(),
+                conn,
+                lp.decode({
+                    maxLength: HASH_SIZE
+                }),
+                pull.collect((err, response) => {
+                    if (err || response.length != 1)
+                        return reject(Error(`Invalid response from ${chalk.blue(peerInfo.id.toB58String())}.`))
+
+                    const correctResponse = createHash('sha256').update(challenge).digest().slice(0, 16)
+
+                    if (!response[0].equals(correctResponse))
+                        return reject(`Invalid response from ${chalk.blue(peerInfo.id.toB58String())}.`)
+
+                    if (!node.peerBook.has(peerInfo.id.toB58String()))
+                        node.peerBook.put(peerInfo)
+
+                    resolve()
+                })
+            )
+        } catch (err) {
+            return reject(Error(`Connection to ${chalk.blue(peerInfo.id.toB58String())} broke up due to '${err.message}'`))
+        }
+    })
 
     const startTimer = (peerInfo) => {
         const timer = timers.get(peerInfo.id.toB58String())
-        
-        if (!timer) 
-            timers.set(peerInfo.id.toB58String(), setInterval(() => queryNode(peerInfo, (available, reason) => {
-                if (!available) {
+
+        if (!timer)
+            timers.set(peerInfo.id.toB58String(), setInterval(async () => {
+                try {
+                    availabe = await queryNode(peerInfo)
+                } catch (err) {
                     log(node.peerInfo.id, `Removing ${peerInfo.id.toB58String()} from peerBook due to "${reason}".`)
 
                     clearInterval(timers.get(peerInfo.id.toB58String()))
                     timers.delete(peerInfo.id.toB58String())
 
-                    series([
-                        (cb) => node.hangUp(peerInfo, cb),
-                        (cb) => node._dht.routingTable.remove(peerInfo.id, cb),
-                    ], (err) => {
+                    try {
+                        await node.hangUp(peerInfo)
+                        await new Promise((resolve, reject) => node._dht.routingTable.remove(peerInfo.id, (err) => {
+                            if (err) return reject(err)
+
+                            resolve()
+                        }))
+                    } catch (err) {
                         node.peerBook.remove(peerInfo.id)
-                    })
+                    }
                 }
-            }), THIRTY_ONE_SECONDS))
+            }, THIRTY_ONE_SECONDS))
     }
 
     const start = () => {
