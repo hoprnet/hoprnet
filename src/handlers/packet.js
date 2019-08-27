@@ -74,13 +74,21 @@ module.exports = (node, options) => {
         try {
             channelId = await node.db.get(node.paymentChannels.ChannelId(ack.challengeSignatureHash))
         } catch (err) {
-            if (err.notFound) return
+            if (err.notFound) {
+                console.log(`Dropping packet because there is no open challenge - channelId ${channelId.toString('hex')}`)
+                return
+            }
 
-            throw err
+            throw Error(`Unable to get challenge signature hash - channelId ${channelId.toString('hex')}`)
         }
 
         const challenge = secp256k1.publicKeyCreate(ack.key)
-        const ownKeyHalf = await node.db.get(node.paymentChannels.Challenge(channelId, challenge))
+        let ownKeyHalf
+        try {
+            ownKeyHalf = await node.db.get(node.paymentChannels.Challenge(channelId, challenge))
+        } catch (err) {
+            throw Error(`Didn't find any challenge for channel ${channelId.toString('hex')}`)
+        }
 
         let channelKey
         try {
