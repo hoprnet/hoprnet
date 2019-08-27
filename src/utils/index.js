@@ -535,10 +535,15 @@ module.exports.compileIfNecessary = async (srcFiles, artifacts) => {
 
         this.createDirectoryIfNotExists('build/contracts')
 
-        await Promise.all(Object.entries(compiledContracts.contracts).map(array => Promise.all(Object.entries(array[1]).map(([contractName, jsonObject]) =>
-            fsPromise.writeFile(`${process.cwd()}/build/contracts/${contractName}.json`, JSON.stringify(jsonObject, null, '\t'))
-        ))
-        ))
+        await Promise.all(
+            Object.entries(compiledContracts.contracts).map(array =>
+                Promise.all(
+                    Object.entries(array[1]).map(([contractName, jsonObject]) =>
+                        fsPromise.writeFile(`${process.cwd()}/build/contracts/${contractName}.json`, JSON.stringify(jsonObject, null, '\t'))
+                    )
+                )
+            )
+        )
     }
 
     try {
@@ -547,8 +552,8 @@ module.exports.compileIfNecessary = async (srcFiles, artifacts) => {
         return compile()
     }
 
-    const srcTimes = await Promise.all(srcFiles.map(srcFile => fsPromise.stat(srcFile).mtimeMs))
-    const artifactTimes = await Promise.all(artifacts.map(artifact => fsPromise.stat(artifact).mtimeMs))
+    const srcTimes = (await Promise.all(srcFiles.map(srcFile => fsPromise.stat(srcFile)))).map(stat => stat.mtimeMs)
+    const artifactTimes = (await Promise.all(artifacts.map(artifact => fsPromise.stat(artifact)))).map(stat => stat.mtimeMs)
 
     if (Math.max(srcTimes) > Math.min(artifactTimes)) {
         return compile()
@@ -582,9 +587,9 @@ module.exports.deployContract = async (index, web3) => {
     )
 
     console.log(
-        `Deployed contract on ${chalk.magenta(process.env.NETWORK)} at ${chalk.green(
-            receipt.contractAddress.toString('hex')
-        )}.\nNonce is now ${chalk.red(index)}.\n`
+        `Deployed contract on ${chalk.magenta(process.env.NETWORK)} at ${chalk.green(receipt.contractAddress.toString('hex'))}.\nNonce is now ${chalk.red(
+            index
+        )}.\n`
     )
 
     await updateContractAddress([`${process.cwd()}/.env`, `${process.cwd()}/.env.example`], receipt.contractAddress)
@@ -602,14 +607,18 @@ module.exports.deployContract = async (index, web3) => {
 function updateContractAddress(fileNames, contractAddress) {
     if (!Array.isArray(fileNames)) fileNames = [fileNames]
 
-    return Promise.all(fileNames.map(async filename => {
-        let file = (await fsPromise.readFile(filename)).toString()
-        const regex = new RegExp(`CONTRACT_ADDRESS_${process.env.NETWORK.toUpperCase()}\\s{0,}=(\\s{0,}0x[0-9a-fA-F]{0,})?`, 'g')
+    process.env[`CONTRACT_ADDRESS`] = contractAddress
 
-        file = file.replace(regex, `CONTRACT_ADDRESS_${process.env.NETWORK.toUpperCase()} = ${contractAddress}`)
+    return Promise.all(
+        fileNames.map(async filename => {
+            let file = (await fsPromise.readFile(filename)).toString()
+            const regex = new RegExp(`CONTRACT_ADDRESS_${process.env.NETWORK.toUpperCase()}\\s{0,}=(\\s{0,}0x[0-9a-fA-F]{0,})?`, 'g')
 
-        await fsPromise.writeFile(filename, Buffer.from(file))
-    }))
+            file = file.replace(regex, `CONTRACT_ADDRESS_${process.env.NETWORK.toUpperCase()} = ${contractAddress}`)
+
+            await fsPromise.writeFile(filename, Buffer.from(file))
+        })
+    )
 }
 /**
  * Decodes the serialized peerBook and inserts the peerInfos in the given
@@ -761,7 +770,7 @@ module.exports.clearDirectory = path => {
     let files = []
     if (fs.existsSync(path)) {
         files = fs.readdirSync(path)
-        files.forEach(function (file, index) {
+        files.forEach(function(file, index) {
             const curPath = path + '/' + file
             if (fs.lstatSync(curPath).isDirectory()) {
                 // recurse
