@@ -23,11 +23,11 @@ module.exports = (node, options) => {
     if (options['bootstrap-node']) return
 
     async function forwardPacket(packet) {
-        log(node.peerInfo.id, `Forwarding to node \x1b[34m${packet._targetPeerId.toB58String()}\x1b[0m.`)
+        log(node.peerInfo.id, `Forwarding to node \x1b[34m${(await packet.getTargetPeerId()).toB58String()}\x1b[0m.`)
 
         const conn = await Promise.race([
-            node.peerRouting.findPeer(packet._targetPeerId).then(peerInfo => node.dialProtocol(peerInfo, PROTOCOL_STRING)),
-            node.dialProtocol(packet._targetPeerId, PROTOCOL_STRING)
+            node.peerRouting.findPeer(await packet.getTargetPeerId()).then(peerInfo => node.dialProtocol(peerInfo, PROTOCOL_STRING)),
+            node.dialProtocol(await packet.getTargetPeerId(), PROTOCOL_STRING)
         ])
 
         pull(
@@ -124,8 +124,8 @@ module.exports = (node, options) => {
                 queue.add(() =>
                     packet
                         .forwardTransform(node)
-                        .then(packet => {
-                            if (node.peerInfo.id.isEqual(packet._targetPeerId)) {
+                        .then(async packet => {
+                            if (node.peerInfo.id.isEqual(await packet.getTargetPeerId())) {
                                 options.output(demo(packet.message.plaintext))
                             } else {
                                 forwardPacket(packet)

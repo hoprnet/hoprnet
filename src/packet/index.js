@@ -212,7 +212,7 @@ class Packet {
         if (!this.transaction.curvePoint.equals(secp256k1.publicKeyCombine(pubKeys)))
             throw Error('General error.')
 
-        const receivedMoney = node.paymentChannels.getEmbeddedMoney(this.transaction, this._senderPeerId, await node.db.get(node.paymentChannels.CurrentValue(channelId)))
+        const receivedMoney = node.paymentChannels.getEmbeddedMoney(this.transaction, await this.getSenderPeerId(), await node.db.get(node.paymentChannels.CurrentValue(channelId)))
 
         log(node.peerInfo.id, `Received \x1b[35m${receivedMoney.toString()} wei\x1b[0m in channel \x1b[33m${channelId.toString('hex')}\x1b[0m.`)
 

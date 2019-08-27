@@ -33,8 +33,8 @@ module.exports.hash = buf => {
 }
 /**
  * Generate deep Copy of an instance
- * @param  {} instance instance of T
- * @param  {} Class T
+ * @param {} instance instance of T
+ * @param {} Class T
  */
 module.exports.deepCopy = (instance, Class) => {
     if (typeof instance.toBuffer !== 'function' || !['function', 'number'].includes(typeof Class.SIZE) || typeof Class.fromBuffer !== 'function')
@@ -62,32 +62,6 @@ module.exports.log = (peerId, msg) => console.log(`['\x1b[34m${peerId.toB58Strin
 // ==========================
 // Buffer methods
 // ==========================
-/**
- * result = buf1 + buf2
- * @param  {Buffer} buf1
- * @param  {Buffer} buf2
- */
-// module.exports.bufferADD = (buf1, buf2) => {
-//     if (!Buffer.isBuffer(buf1))
-//         throw Error('Expected a buffer. Got \"' + typeof buf1 + '\" instead.')
-
-//     const a = Number.parseInt(buf1.toString('hex'))
-//     let b, length
-
-//     if (Buffer.isBuffer(buf2)) {
-//         // Incorrect hex format ?
-//         b = Number.parseInt(buf2.toString('hex'))
-//         length = Math.max(buf1.length, buf2.length)
-
-//     } else if (Number.isInteger(buf2)) {
-//         b = buf2
-//         length = buf1.length
-//     } else {
-//         throw Error('Invalid input values. Got \"' + typeof buf1 + '\" and \"' + typeof buf2 + '\".')
-//     }
-
-//     return module.exports.numberToBuffer(a + b, length)
-// }
 /**
  * Bitwise XOR of two Buffers.
  *
