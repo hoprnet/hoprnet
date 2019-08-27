@@ -38,6 +38,21 @@ body {
     font-size: 3px;
     white-space: pre;
   }
+  .button {
+    color: "#000000";
+    font-family: 'Courier New', Courier, monospace;
+    display: inline-block;
+    line-height: 1;
+    margin: 10 10;
+  }
+  .blink {
+    animation: blinker 3s linear infinite;
+  }
+  @keyframes blinker {
+    50% {
+      opacity: 0;
+    }
+  }
 
   @media (min-resolution: 300dpi) {
     body {
