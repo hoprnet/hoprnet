@@ -2,8 +2,6 @@
 
 require('../config')
 
-const chalk = require('chalk')
-
 const fsPromise = require('fs').promises
 
 const Web3 = require('web3')
@@ -16,24 +14,24 @@ const COMPILED_CONTRACTS_BASE_PATH = `${process.cwd()}/build/contracts`
 
 const { deployContract } = require('../src/utils')
 
+// used to remove `import 'xyz'` statements from Solidity src code
 const IMPORT_SOLIDITY_REGEX = /^\s*import(\s+).*$/gm
 
 async function main() {
-    const index = await web3.eth.getTransactionCount(process.env.FUND_ACCOUNT_ETH_ADDRESS)
-    await deployContract(index, web3)
+    const nonce = await web3.eth.getTransactionCount(process.env.FUND_ACCOUNT_ETH_ADDRESS)
+    await deployContract(nonce, web3)
 
-    const contents = await fsPromise.readdir(COMPILED_CONTRACTS_BASE_PATH)
+    const srcFileNames = await fsPromise.readdir(COMPILED_CONTRACTS_BASE_PATH)
 
-    const set = new Set()
-    const paths = await Promise.all(
-        contents.map(source => {
-            const compiledContract = require(`${COMPILED_CONTRACTS_BASE_PATH}/${source}`)
-            compiledContract.metadata = JSON.parse(compiledContract.metadata)
+    const distinctPaths = new Set()
 
-            const srcPaths = Object.keys(compiledContract.metadata.sources)
+    const srcFilePaths = await Promise.all(
+        srcFileNames.map(source => {
+            const compilerOutput = require(`${COMPILED_CONTRACTS_BASE_PATH}/${source}`)
+            compilerOutput.metadata = JSON.parse(compilerOutput.metadata)
 
             return Promise.all(
-                srcPaths.map(async srcPath => {
+                Object.keys(compilerOutput.metadata.sources).map(async srcPath => {
                     try {
                         await fsPromise.stat(srcPath)
                         return srcPath
@@ -50,41 +48,41 @@ async function main() {
         })
     )
 
-    paths.flat().forEach(path => set.add(path))
+    srcFilePaths.flat().forEach(path => distinctPaths.add(path))
 
     const promises = []
 
-    set.forEach(path => promises.push(fsPromise.readFile(path)))
+    distinctPaths.forEach(path => promises.push(fsPromise.readFile(path)))
 
-    const sourceCode = (await Promise.all(promises)).map(source => source.toString().replace(IMPORT_SOLIDITY_REGEX, '')).join('\n')
+    const concatenatedSourceCode = (await Promise.all(promises)).map(source => source.toString().replace(IMPORT_SOLIDITY_REGEX, '')).join('\n')
 
-    const metadata = require(`${process.cwd()}/build/contracts/HoprChannel.json`).metadata
+    const compilerMetadata = require(`${process.cwd()}/build/contracts/HoprChannel.json`).metadata
 
-    let subdomain = 'api'
+    let apiSubdomain = 'api'
     switch (process.env['NETWORK'].toLowerCase()) {
         case 'ropsten':
-            subdomain += '-ropsten'
+            apiSubdomain += '-ropsten'
             break
         case 'rinkeby':
-            subdomain += '-rinkeby'
+            apiSubdomain += '-rinkeby'
             break
         default:
     }
 
     axios
         .post(
-            `https://${subdomain}.etherscan.io/api`,
+            `https://${apiSubdomain}.etherscan.io/api`,
             querystring.stringify({
                 apikey: process.env['ETHERSCAN_API_KEY'],
                 module: 'contract',
                 action: 'verifysourcecode',
                 contractaddress: process.env[`CONTRACT_ADDRESS`],
-                sourceCode,
+                sourceCode: concatenatedSourceCode,
                 contractname: 'HoprChannel',
-                compilerVersion: `v${metadata.compiler.version}`,
+                compilerVersion: `v${compilerMetadata.compiler.version}`,
                 constructorArguements: '',
-                optimizationUsed: metadata.settings.optimizer.enabled ? '1' : '0',
-                runs: metadata.settings.optimizer.runs.toString()
+                optimizationUsed: compilerMetadata.settings.optimizer.enabled ? '1' : '0',
+                runs: compilerMetadata.settings.optimizer.runs.toString()
             })
         )
         .then(function(response) {
