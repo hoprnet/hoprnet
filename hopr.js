@@ -528,9 +528,9 @@ async function main() {
     rl.on('close', stopNode)
 
     if (options['bootstrap-node']) {
-        runAsBootstrapNode()
+        return runAsBootstrapNode()
     } else {
-        runAsRegularNode()
+        return runAsRegularNode()
     }
 }
 
