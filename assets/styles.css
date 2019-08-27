@@ -18,6 +18,7 @@ body {
     text-align: center;
     font-weight: 700;
     line-height: 30px;
+    font-size: 25px;
     width: 500px;
     margin: 0 auto 0 auto;
   }
@@ -34,8 +35,9 @@ body {
     color: "#000000";
     font-family: 'Courier New', Courier, monospace;
     text-align: center;
-    font-weight: 200;
-    font-size: 3px;
+    font-weight: 600;
+    font-size: 4px;
+    line-height: 1;
     white-space: pre;
   }
   .button {
@@ -45,6 +47,9 @@ body {
     line-height: 1;
     margin: 10 10;
   }
+  .button:hover {
+    background-color: #f0f0f0;
+  }
   .blink {
     animation: blinker 3s linear infinite;
   }
@@ -52,6 +57,23 @@ body {
     50% {
       opacity: 0;
     }
+  }
+
+  a:hover, a:visited, a:link, a:active
+  {
+    text-decoration: none;
+    color: #000000;
+  }
+
+  .flex-container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  
+  .flex-container > div {
+    margin: 10px;
+    padding: 20px;
   }
 
   @media (min-resolution: 300dpi) {
