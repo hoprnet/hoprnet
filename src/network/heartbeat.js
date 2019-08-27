@@ -16,7 +16,7 @@ const HASH_SIZE = 32
 module.exports = (node) => {
     let timers
 
-    const queryNode = (peerInfo, cb) => new Promise((resolve, reject) => {
+    const queryNode = (peerInfo) => new Promise(async (resolve, reject) => {
         const conn = await Promise.race([
             node.dialProtocol(peerInfo, PROTOCOL_HEARTBEAT),
             node.peerRouting.findPeer(peerInfo.id).then(peerInfo => node.dialProtocol(peerInfo, PROTOCOL_HEARTBEAT))
