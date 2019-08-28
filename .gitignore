@@ -3,11 +3,14 @@
 
 # Exclude OSX stuff
 **/.DS_Store
-**/yarn-error.log
 
 # Exclude node stuff
 **/node_modules
+
+# Exclude yarn stuff
 .packages-cache/
+**/yarn-error.log
+
 
 # Exclude build dir
 build/
@@ -15,9 +18,6 @@ build/
 # Exclude db dir
 db/
 
-# Exclude configuration(s)
-config/
-
-# Exclude .env file
+# Exclude .env files
 .env
 .env.save
