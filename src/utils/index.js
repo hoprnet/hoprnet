@@ -405,13 +405,13 @@ module.exports.mineBlock = async (provider, amountOfTime = ONE_MINUTE) => {
         id: Date.now()
     })
 
-    const blockNumber = await send({
+    const {result} = await send({
         jsonrpc: '2.0',
         method: 'eth_blockNumber',
         id: Date.now()
     })
 
-    console.log(`\x1b[34mNow on block ${parseInt(blockNumber, 16)}.\x1b[0m`)
+    console.log(`\x1b[34mNow on block ${parseInt(result, 16)}.\x1b[0m`)
 }
 
 // ==========================
