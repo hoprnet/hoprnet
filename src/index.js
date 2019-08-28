@@ -243,11 +243,13 @@ class Hopr extends libp2p {
                 new Promise(async (resolve, reject) => {
                     let intermediateNodes = await this.getIntermediateNodes(destination)
 
-                    intermediateNodes = await Promise.all(intermediateNodes.concat(destination).map(addPubKey))
+                    let path = intermediateNodes.concat(destination)
+
+                    await Promise.all(path.map(addPubKey))
 
                     const [conn, packet] = await Promise.all([
                         new Promise((resolve, reject) =>
-                            this.peerRouting.findPeer(intermediateNodes[0], async (err, peerInfo) => {
+                            this.peerRouting.findPeer(path[0], async (err, peerInfo) => {
                                 if (err) reject(err)
 
                                 resolve(this.dialProtocol(peerInfo, PROTOCOL_STRING))
@@ -258,7 +260,7 @@ class Hopr extends libp2p {
                             /* prettier-ignore */
                             this,
                             msg.slice(n * PACKET_SIZE, Math.min(msg.length, (n + 1) * PACKET_SIZE)),
-                            intermediateNodes
+                            path
                         )
                     ])
 

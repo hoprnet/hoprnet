@@ -371,9 +371,9 @@ module.exports.privKeyToPeerId = (privKey, cb) => {
 module.exports.addPubKey = async peerId => {
     if (PeerId.isPeerId(peerId) && peerId.pubKey) return peerId
 
-    const pubKey = Multihash.decode(peerId.toBytes()).digest
+    peerId.pubKey = await libp2p_crypto.unmarshalPublicKey(Multihash.decode(peerId.toBytes()).digest)
 
-    return PeerId.createFromPubKey(pubKey)
+    return peerId
 }
 
 // ==========================
