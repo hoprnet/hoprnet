@@ -3,7 +3,7 @@
 const BN = require('bn.js')
 const chalk = require('chalk')
 
-const { log, pubKeyToEthereumAddress } = require('../../utils')
+const { log } = require('../../utils')
 const Transaction = require('../../transaction')
 
 const VALUE_LENGTH = 32
@@ -20,22 +20,20 @@ module.exports = (self) => async (err, event) => {
     try {
         restoreTx = Transaction.fromBuffer(await self.node.db.get(self.StashedRestoreTransaction(channelId)))
     } catch (err) {
-        if (err.notFound) 
+        if (err.notFound)
             throw Error(`${chalk.blue(self.node.peerInfo.id.toB58String())}: Opening request of channel ${chalk.yellow(channelId.toString('hex'))} not found.`)
 
         throw err
     }
 
-    const channel = await self.contract.methods.channels(channelId).call({
-        from: pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal())
-    })
+    // @TODO check incoming event for plausibility
 
     self.node.db.batch()
         .put(self.RestoreTransaction(channelId), restoreTx.toBuffer())
         .put(self.Index(channelId), restoreTx.index)
-        .put(self.CurrentValue(channelId), (new BN(channel.balanceA)).toBuffer('be', VALUE_LENGTH))
+        .put(self.CurrentValue(channelId), (new BN(event.returnValues.amountA)).toBuffer('be', VALUE_LENGTH))
         .put(self.InitialValue(channelId), restoreTx.value)
-        .put(self.TotalBalance(channelId), (new BN(channel.balance)).toBuffer('be', VALUE_LENGTH))
+        .put(self.TotalBalance(channelId), (new BN(event.returnValues.amount)).toBuffer('be', VALUE_LENGTH))
         .del(self.StashedRestoreTransaction(channelId))
         .write({ sync: true })
         .then(() => {

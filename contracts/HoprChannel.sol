@@ -166,7 +166,7 @@ contract HoprChannel {
         uint256 totalBalance = uint256(2).mul(funds);
         channels[channelId] = Channel(ChannelState.ACTIVE, totalBalance, funds, 0, 0);
 
-        emit OpenedChannel(channelId, totalBalance, funds);        
+        emit OpenedChannel(channelId, funds, totalBalance);        
     }
 
     /**
