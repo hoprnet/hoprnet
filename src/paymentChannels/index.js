@@ -35,6 +35,12 @@ const CHANNEL_STATE_UNINITIALIZED = 0
 const CHANNEL_STATE_FUNDED = 3
 const CHANNEL_STATE_WITHDRAWABLE = 4
 
+const fs = require('fs')
+const path = require('path')
+const protons = require('protons')
+
+const { SettlementRequest, SettlementResponse } = protons(fs.readFileSync(path.resolve(__dirname, 'protos/messages.proto')))
+
 // payments
 // -> channelId
 // ---> tx
@@ -507,16 +513,18 @@ class PaymentChannel extends EventEmitter {
     /**
      * Asks the counterparty of the given channelId to provide the latest transaction.
      *
-     * @param {Buffer} channelId ID of the payment channel
+     * @param {Buffer[]} channelIds ID of the payment channel
      * @return {Promise} a promise that resolves with the latest transaction of the
      * counterparty and rejects if it is invalid and/or outdated.
      */
-    getLatestTransactionFromCounterparty(channelId) {
-        return new Promise(async (resolve, reject) => {
+    getLatestTransactionFromCounterparty(channelIds) {
+        if (!Array.isArray(channelIds)) channelIds = [channelIds]
+
+        const queryNode = channelId => new Promise(async (resolve, reject) => {
             const restoreTx = Transaction.fromBuffer(await this.node.db.get(this.RestoreTransaction(channelId)))
             const counterparty = await pubKeyToPeerId(restoreTx.counterparty)
 
-            log(this.node.peerInfo.id, `Asking node ${counterparty.toB58String()} to send latest update transaction.`)
+            log(this.node.peerInfo.id, `Asking node ${chalk.blue(counterparty.toB58String())} to send latest update transaction.`)
 
             let conn
             try {
@@ -526,46 +534,39 @@ class PaymentChannel extends EventEmitter {
             }
 
             pull(
-                pull.once(channelId),
+                pull.once(SettlementRequest.encode({
+                    channelId
+                })),
                 lp.encode(),
                 conn,
-                lp.decode({
-                    maxLength: Transaction.SIZE + Transaction.SIGNATURE_LENGTH + Transaction.RECOVERY_LENGTH
-                }),
-                pull.collect((err, data) => {
-                    if (err) return reject(err)
+                lp.decode(),
+                pull.drain(buf => {
+                    let response
 
-                    if (data.length < 1 || data[0].length != Transaction.SIZE + Transaction.SIGNATURE_LENGTH + Transaction.RECOVERY_LENGTH)
-                        return reject(
-                            Error(
-                                `Counterparty ${chalk.blue(counterparty.toB58String())} didn't send a valid response to close channel ${chalk.yellow(
-                                    channelId.toString('hex')
-                                )}.`
-                            )
-                        )
+                    try {
+                        response = SettlementResponse.decode(buf)
+                    } catch (err) {
+                        reject(Error(
+                            `Counterparty ${chalk.blue(counterparty.toB58String())} didn't send a valid response to close channel ${chalk.yellow(
+                                channelId.toString('hex')
+                            )}.`
+                        ))
+                    }
 
-                    const tx = Transaction.fromBuffer(data[0].slice(0, Transaction.SIZE))
+                    const tx = Transaction.fromBuffer(response.transaction)
 
                     if (!tx.verify(counterparty)) return reject(Error(`Invalid transaction on channel ${chalk.yellow(channelId.toString('hex'))}.`))
 
-                    const signature = data[0].slice(Transaction.SIZE, Transaction.SIZE + Transaction.SIGNATURE_LENGTH)
-                    const recovery = bufferToNumber(
-                        data[0].slice(
-                            Transaction.SIZE + Transaction.SIGNATURE_LENGTH,
-                            Transaction.SIZE + Transaction.SIGNATURE_LENGTH + Transaction.RECOVERY_LENGTH
-                        )
-                    )
-
-                    if (!this.node.peerInfo.id.pubKey.marshal().equals(secp256k1.recover(tx.hash, signature, recovery)))
-                        return reject(Error(`Invalid transaction on channel ${chalk.yellow(channelId.toString('hex'))}.`))
+                    // @TODO do plausibility checks
 
                     resolve(tx)
+                    return false
                 })
             )
+
         })
-        // Ask counterparty to settle payment channel because
-        // last payment went to that party which means that we
-        // have only one signature of the last transaction.
+
+        return Promise.all(channelIds.map(channelId => queryNode(channelId)))
     }
 
     closeChannel(channelId) {
@@ -587,10 +588,10 @@ class PaymentChannel extends EventEmitter {
                     if (await this.counterpartyHasMoreRecentTransaction(channelId)) {
                         lastTx = await new Promise((resolve, reject) => {
                             const timeout = setTimeout(resolve, SETTLEMENT_TIMEOUT)
-                            this.getLatestTransactionFromCounterparty(channelId)
-                                .then(tx => {
+                            this.getLatestTransactionFromCounterparty([channelId])
+                                .then(txs => {
                                     clearTimeout(timeout)
-                                    resolve(tx)
+                                    resolve(txs[0])
                                 })
                                 .catch(err => {
                                     clearTimeout(timeout)
