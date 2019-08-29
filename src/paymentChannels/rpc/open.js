@@ -20,10 +20,14 @@ module.exports = self => to =>
     new Promise(async (resolve, reject) => {
         let restoreTx, conn
 
-        const timeout = setTimeout(() =>
-            reject(
-                Error(`Unable to open a payment channel because counterparty ${chalk.blue(to.toB58String())} is not answering with an appropriate response.`)
-            ), TWO_MINUTES
+        const timeout = setTimeout(
+            () =>
+                reject(
+                    Error(
+                        `Unable to open a payment channel because counterparty ${chalk.blue(to.toB58String())} is not answering with an appropriate response.`
+                    )
+                ),
+            TWO_MINUTES
         )
         try {
             conn = await self.node.peerRouting.findPeer(to).then(peerInfo => self.node.dialProtocol(peerInfo, PROTOCOL_PAYMENT_CHANNEL))
@@ -64,25 +68,26 @@ module.exports = self => to =>
                 self.registerSettlementListener(channelId)
                 self.registerOpeningListener(channelId)
 
-                let promise
-
-                self.once(`opened ${channelId.toString('base64')}`, () => {
-                    clearTimeout(timeout)
-                    resolve(promise)
-                })
-
-                promise = Promise.all([
-                    self.node.db.put(self.node.paymentChannels.StashedRestoreTransaction(channelId), restoreTx.toBuffer(), { sync: true }),
-                    self.contractCall(
-                        self.contract.methods.createFunded(
-                            restoreTx.nonce,
-                            new BN(restoreTx.value).toString(),
-                            restoreTx.signature.slice(0, 32),
-                            restoreTx.signature.slice(32, 64),
-                            bufferToNumber(restoreTx.recovery) + 27
+                const openingListener = () => {
+                    const promise = Promise.all([
+                        self.node.db.put(self.node.paymentChannels.StashedRestoreTransaction(channelId), restoreTx.toBuffer(), { sync: true }),
+                        self.contractCall(
+                            self.contract.methods.createFunded(
+                                restoreTx.nonce,
+                                new BN(restoreTx.value).toString(),
+                                restoreTx.signature.slice(0, 32),
+                                restoreTx.signature.slice(32, 64),
+                                bufferToNumber(restoreTx.recovery) + 27
+                            )
                         )
-                    )
-                ])
+                    ])
+                    return () => {
+                        clearTimeout(timeout)
+                        resolve(promise)
+                    }
+                }
+
+                self.once(`opened ${channelId.toString('base64')}`, openingListener())
 
                 // Closes the stream
                 return false

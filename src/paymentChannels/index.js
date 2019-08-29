@@ -477,7 +477,7 @@ class PaymentChannel extends EventEmitter {
                     // console.log(key.toString())
                     batch = batch.del(key)
                 })
-                .on('end', () => resolve(batch.write()))
+                .on('end', () => resolve(batch.write({ sync: true })))
                 .on('err', reject)
         })
     }
@@ -520,51 +520,55 @@ class PaymentChannel extends EventEmitter {
     getLatestTransactionFromCounterparty(channelIds) {
         if (!Array.isArray(channelIds)) channelIds = [channelIds]
 
-        const queryNode = channelId => new Promise(async (resolve, reject) => {
-            const restoreTx = Transaction.fromBuffer(await this.node.db.get(this.RestoreTransaction(channelId)))
-            const counterparty = await pubKeyToPeerId(restoreTx.counterparty)
+        const queryNode = channelId =>
+            new Promise(async (resolve, reject) => {
+                const restoreTx = Transaction.fromBuffer(await this.node.db.get(this.RestoreTransaction(channelId)))
+                const counterparty = await pubKeyToPeerId(restoreTx.counterparty)
 
-            log(this.node.peerInfo.id, `Asking node ${chalk.blue(counterparty.toB58String())} to send latest update transaction.`)
+                log(this.node.peerInfo.id, `Asking node ${chalk.blue(counterparty.toB58String())} to send latest update transaction.`)
 
-            let conn
-            try {
-                conn = await this.node.peerRouting.findPeer(counterparty).then(peerInfo => this.node.dialProtocol(peerInfo, PROTOCOL_SETTLE_CHANNEL))
-            } catch (err) {
-                return reject(chalk.red(err.message))
-            }
+                let conn
+                try {
+                    conn = await this.node.peerRouting.findPeer(counterparty).then(peerInfo => this.node.dialProtocol(peerInfo, PROTOCOL_SETTLE_CHANNEL))
+                } catch (err) {
+                    return reject(chalk.red(err.message))
+                }
 
-            pull(
-                pull.once(SettlementRequest.encode({
-                    channelId
-                })),
-                lp.encode(),
-                conn,
-                lp.decode(),
-                pull.drain(buf => {
-                    let response
+                pull(
+                    pull.once(
+                        SettlementRequest.encode({
+                            channelId
+                        })
+                    ),
+                    lp.encode(),
+                    conn,
+                    lp.decode(),
+                    pull.drain(buf => {
+                        let response
 
-                    try {
-                        response = SettlementResponse.decode(buf)
-                    } catch (err) {
-                        reject(Error(
-                            `Counterparty ${chalk.blue(counterparty.toB58String())} didn't send a valid response to close channel ${chalk.yellow(
-                                channelId.toString('hex')
-                            )}.`
-                        ))
-                    }
+                        try {
+                            response = SettlementResponse.decode(buf)
+                        } catch (err) {
+                            reject(
+                                Error(
+                                    `Counterparty ${chalk.blue(counterparty.toB58String())} didn't send a valid response to close channel ${chalk.yellow(
+                                        channelId.toString('hex')
+                                    )}.`
+                                )
+                            )
+                        }
 
-                    const tx = Transaction.fromBuffer(response.transaction)
+                        const tx = Transaction.fromBuffer(response.transaction)
 
-                    if (!tx.verify(counterparty)) return reject(Error(`Invalid transaction on channel ${chalk.yellow(channelId.toString('hex'))}.`))
+                        if (!tx.verify(counterparty)) return reject(Error(`Invalid transaction on channel ${chalk.yellow(channelId.toString('hex'))}.`))
 
-                    // @TODO do plausibility checks
+                        // @TODO do plausibility checks
 
-                    resolve(tx)
-                    return false
-                })
-            )
-
-        })
+                        resolve(tx)
+                        return false
+                    })
+                )
+            })
 
         return Promise.all(channelIds.map(channelId => queryNode(channelId)))
     }
