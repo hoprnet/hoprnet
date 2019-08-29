@@ -14,7 +14,7 @@ const { bufferToNumber, numberToBuffer } = require('../../utils')
 const { PROTOCOL_PAYMENT_CHANNEL } = require('../../constants')
 const Transaction = require('../../transaction')
 
-const TWENTY_SECONDS = 20 * 1000
+const ONE_MINUTE = 60 * 1000
 
 module.exports = self => to =>
     new Promise(async (resolve, reject) => {
@@ -23,7 +23,7 @@ module.exports = self => to =>
         const timeout = setTimeout(() =>
             reject(
                 Error(`Unable to open a payment channel because counterparty ${chalk.blue(to.toB58String())} is not answering with an appropriate response.`)
-            ), TWENTY_SECONDS
+            ), FORTY_SECONDS
         )
         try {
             conn = await self.node.peerRouting.findPeer(to).then(peerInfo => self.node.dialProtocol(peerInfo, PROTOCOL_PAYMENT_CHANNEL))
