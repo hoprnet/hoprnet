@@ -4,8 +4,7 @@ require('../config')
 
 const fsPromise = require('fs').promises
 
-const Web3 = require('web3')
-const web3 = new Web3(process.env.PROVIDER)
+const chalk = require('chalk')
 
 const querystring = require('querystring')
 const axios = require('axios')
@@ -19,7 +18,7 @@ const IMPORT_SOLIDITY_REGEX = /^\s*import(\s+).*$/gm
 
 async function main() {
     const nonce = await web3.eth.getTransactionCount(process.env.FUND_ACCOUNT_ETH_ADDRESS)
-    await deployContract(nonce, web3)
+    const contractAddress = await deployContract(nonce, web3)
 
     const srcFileNames = await fsPromise.readdir(COMPILED_CONTRACTS_BASE_PATH)
 
@@ -76,7 +75,7 @@ async function main() {
                 apikey: process.env['ETHERSCAN_API_KEY'],
                 module: 'contract',
                 action: 'verifysourcecode',
-                contractaddress: process.env[`CONTRACT_ADDRESS`],
+                contractaddress: contractAddress,
                 sourceCode: concatenatedSourceCode,
                 contractname: 'HoprChannel',
                 compilerVersion: `v${compilerMetadata.compiler.version}`,
@@ -86,10 +85,23 @@ async function main() {
             })
         )
         .then(function(response) {
-            console.log(response.statusText)
+            const [_, status, statusText] = response.statusText.split(/([A-Z]+)/)
+
+            if (status) {
+                switch (status) {
+                    case 'OK':
+                        console.log(`Successfully verified contract ${chalk.green(contractAddress)} on ${chalk.magenta(process.env['NETWORK'].toLowerCase())}`)
+                        break
+                    case 'NOTOK':
+                        console.log(`Failed to verify contract due to '${statusText}'.`)
+                        break
+                    default:
+                        console.log(response.statusText)
+                }
+            }
         })
         .catch(function(error) {
-            console.log(error)
+            console.log(error.message)
         })
 }
 
