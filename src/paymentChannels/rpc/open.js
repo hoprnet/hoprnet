@@ -23,7 +23,7 @@ module.exports = self => to =>
         const timeout = setTimeout(() =>
             reject(
                 Error(`Unable to open a payment channel because counterparty ${chalk.blue(to.toB58String())} is not answering with an appropriate response.`)
-            ), FORTY_SECONDS
+            ), ONE_MINUTE
         )
         try {
             conn = await self.node.peerRouting.findPeer(to).then(peerInfo => self.node.dialProtocol(peerInfo, PROTOCOL_PAYMENT_CHANNEL))
