@@ -13,16 +13,21 @@ const BN = require('bn.js')
 const PeerInfo = require('peer-info')
 const PeerId = require('peer-id')
 const Multiaddr = require('multiaddr')
+const Multihash = require('multihashes')
+const bs58 = require('bs58')
+
 const { toWei, fromWei } = require('web3-utils')
 
 const Hopr = require('./src')
-const { getId, pubKeyToEthereumAddress, pubKeyToPeerId, sendTransaction } = require('./src/utils')
+const { getId, pubKeyToEthereumAddress, pubKeyToPeerId, sendTransaction, addPubKey } = require('./src/utils')
 const { STAKE_GAS_AMOUNT } = require('./src/constants')
 
 const Transaction = require('./src/transaction')
 
 const MINIMAL_STAKE = new BN(toWei('0.10', 'ether'))
 const DEFAULT_STAKE = new BN(toWei('0.11', 'ether'))
+
+const SPLIT_OPERAND_QUERY_REGEX = /([\w\-]+)(?:\s+)?([\w\s\-]+)?/
 
 let node, funds, ownAddress, stakedEther, rl, options
 
@@ -71,7 +76,7 @@ function isNotBootstrapNode(peerId) {
  */
 function getExistingChannels() {
     return new Promise((resolve, reject) => {
-        let promises = []
+        let counterparties = []
 
         node.db
             .createValueStream({
@@ -81,11 +86,11 @@ function getExistingChannels() {
             .on('data', serializedTransaction => {
                 const restoreTx = Transaction.fromBuffer(serializedTransaction)
 
-                promises.push(pubKeyToPeerId(restoreTx.counterparty))
+                counterparties.push(restoreTx.counterparty)
             })
             .on('end', () =>
                 resolve(
-                    Promise.all(promises).then(peerIds =>
+                    Promise.all(counterparties.map(counterparty => pubKeyToPeerId(counterparty))).then(peerIds =>
                         peerIds.reduce((result, peerId) => {
                             if (isNotBootstrapNode) result.push(peerId)
 
@@ -108,13 +113,16 @@ const keywords = ['open', 'stake', 'stakedEther', 'unstake', 'send', 'quit', 'cr
  * @param {Function(Error, [String[], String])} cb called with `(err, [possibleCompletions, currentLine])`
  */
 function tabCompletion(line, cb) {
-    const operands = line.trim().split(' ')
+    const [command, query] = line
+        .trim()
+        .split(SPLIT_OPERAND_QUERY_REGEX)
+        .slice(1)
 
     let hits
-    switch (operands[0].toLowerCase()) {
+    switch (command) {
         case 'send':
             hits = node.peerBook.getAllArray().filter(peerInfo => {
-                if (operands.length > 1 && !peerInfo.id.toB58String().startsWith(operands[1])) return false
+                if (query && !peerInfo.id.toB58String().startsWith(query)) return false
 
                 return isNotBootstrapNode(peerInfo.id)
             })
@@ -149,7 +157,7 @@ function tabCompletion(line, cb) {
                         return cb(null, [[''], line])
                     }
 
-                    hits = operands.length > 1 ? peers.filter(peerId => peerId.startsWith(operands[1])) : peers
+                    hits = query ? peers.filter(peerId => peerId.startsWith(query)) : peers
 
                     return cb(null, [hits.length ? hits.map(str => `open ${str}`) : ['open'], line])
                 })
@@ -161,19 +169,18 @@ function tabCompletion(line, cb) {
         case 'close':
             getExistingChannels()
                 .then(peerIds => {
-                    if (peerIds.length < 1) {
+                    if (peerIds && peerIds.length < 1) {
                         console.log(chalk.red(`\nCan't close a payment channel as there aren't any open ones!`))
                         return cb(null, [[''], line])
                     }
 
-                    hits =
-                        operands > 1
-                            ? peerIds.reduce((result, peerId) => {
-                                  if (peerId.toB58String().startsWith(operands[1])) result.push(peerId.toB58String())
+                    hits = query
+                        ? peerIds.reduce((result, peerId) => {
+                              if (peerId.toB58String().startsWith(query)) result.push(peerId.toB58String())
 
-                                  return result
-                              }, [])
-                            : peerIds.map(peerId => peerId.toB58String())
+                              return result
+                          }, [])
+                        : peerIds.map(peerId => peerId.toB58String())
 
                     return cb(null, [hits.length ? hits.map(str => `close ${str}`) : ['close'], line])
                 })
@@ -206,9 +213,22 @@ function stakeEther(amount) {
         },
         node.peerInfo.id,
         node.paymentChannels.web3
-    ).then(() => {
+    ).then(receipt => {
         node.paymentChannels.nonce = node.paymentChannels.nonce + 1
+        return receipt
     })
+}
+
+async function checkPeerIdInput() {
+    try {
+        // Throws an error if the Id is invalid
+        Multihash.decode(bs58.decode(query))
+
+        peerId = await addPubKey(PeerId.createFromB58String(query))
+    } catch (err) {
+        throw Error(chalk.red(`Invalid peerId. ${err.message}`))
+    }
+    return peerId
 }
 
 function stopNode() {
@@ -272,9 +292,7 @@ async function runAsRegularNode() {
                     switch (answer.toLowerCase()) {
                         case '':
                         case 'y':
-                            rl.question(`Amount? : `, answer => {
-                                resolve(stakeEther(toWei(answer)))
-                            })
+                            rl.question(`Amount? : `, answer => resolve(stakeEther(toWei(answer))))
                             rl.write(fromWei(MINIMAL_STAKE.sub(stakedEther), 'ether'))
                             break
                         default:
@@ -289,75 +307,93 @@ async function runAsRegularNode() {
 
     // Scan restore transactions and detect whether they're on-chain available
 
-    rl.on('line', input => {
+    rl.on('line', async input => {
         rl.pause()
-        const operands = input.trim().split(' ')
-        let amount
-        switch (operands[0]) {
+        const [command, query] = input
+            .trim()
+            .split(SPLIT_OPERAND_QUERY_REGEX)
+            .slice(1)
+
+        let amount, peerId
+        switch (command) {
             case 'crawl':
-                node.crawler
-                    .crawl(peerInfo => isNotBootstrapNode(peerInfo.id))
-                    .catch(err => console.log(chalk.red(err.message)))
-                    .finally(() => {
-                        setTimeout(() => {
-                            readline.clearLine(process.stdin, 0)
-                            rl.prompt()
-                        })
+                try {
+                    await node.crawler.crawl(peerInfo => isNotBootstrapNode(peerInfo.id))
+                } catch (err) {
+                    console.log(chalk.red(err.message))
+                } finally {
+                    setTimeout(() => {
+                        readline.clearLine(process.stdin, 0)
+                        rl.prompt()
                     })
+                }
                 break
             case 'quit':
                 stopNode()
                 break
             case 'stake':
-                if (operands.length != 2) {
+                if (!query) {
                     console.log(chalk.red(`Invalid arguments. Expected 'stake <amount of ETH>'. Received '${input}'`))
                     rl.prompt()
                     break
                 }
-                amount = new BN(toWei(operands[1], 'ether'))
+
+                amount = new BN(toWei(query, 'ether'))
                 if (funds.lt(new BN(amount))) {
                     console.log(chalk.red('Insufficient funds.'))
                     rl.prompt()
                     break
                 }
 
-                stakeEther(amount).then(() => {
+                try {
+                    await stakeEther(amount)
+
                     stakedEther.iadd(amount)
                     funds.isub(amount)
-
-                    rl.prompt()
-                })
-                break
-            case 'stakedEther':
-                node.paymentChannels.contract.methods
-                    .states(ownAddress)
-                    .call({ from: ownAddress })
-                    .then(state => {
-                        stakedEther = new BN(state.stakedEther)
-                        console.log(`Current stake: ${chalk.green(fromWei(state.stakedEther, 'ether'))} ETH`)
+                } catch (err) {
+                    console.log(chalk.red(err.message))
+                } finally {
+                    setTimeout(() => {
                         rl.prompt()
                     })
+                }
+                break
+            case 'stakedEther':
+                try {
+                    let state = await node.paymentChannels.contract.methods.states(ownAddress).call({ from: ownAddress })
+                    stakedEther = new BN(state.stakedEther)
+                    console.log(`Current stake: ${chalk.green(fromWei(state.stakedEther, 'ether'))} ETH`)
+                } catch (err) {
+                    console.log(chalk.red(err.message))
+                } finally {
+                    setTimeout(() => {
+                        rl.prompt()
+                    })
+                }
                 break
             case 'unstake':
-                if (operands.length != 2) {
+                if (!query) {
                     console.log(chalk.red(`Invalid arguments. Expected 'unstake <amount of ETH>'. Received '${input}'`))
                     rl.prompt()
                     break
                 }
-                amount = new BN(toWei(operands[1], 'ether'))
+
+                amount = new BN(toWei(query, 'ether'))
                 if (stakedEther.lt(amount)) {
                     console.log(chalk.red('Amount must not be higher than current stake.'))
                     rl.prompt()
                     break
                 }
 
-                node.paymentChannels
-                    .contractCall(node.paymentChannels.contract.methods.unstakeEther(amount.toString()))
-                    .then(() => rl.prompt())
-                    .catch(err => {
-                        console.log(err)
+                try {
+                    await node.paymentChannels.contractCall(node.paymentChannels.contract.methods.unstakeEther(amount))
+                } catch (err) {
+                    console.log(chalk.red(err.message))
+                } finally {
+                    setTimeout(() => {
                         rl.prompt()
                     })
+                }
                 break
             case 'openChannels':
                 let str = `${chalk.yellow('ChannelId:'.padEnd(64, ' '))} - ${chalk.blue('PeerId:')}`
@@ -379,39 +415,45 @@ async function runAsRegularNode() {
                             })
                         )
                     })
-                    .on('end', () => {
-                        if (index == 0) {
-                            str += `\n  No open channels.`
+                    .on('end', async () => {
+                        try {
+                            if (index == 0) {
+                                str += `\n  No open channels.`
+                            } else {
+                                await Promise.all(promises)
+                            }
                             console.log(str)
-                            rl.prompt()
-                        } else {
-                            Promise.all(promises).then(() => {
-                                console.log(str)
+                        } catch (err) {
+                            console.log(chalk.red(err.message))
+                        } finally {
+                            setTimeout(() => {
                                 rl.prompt()
                             })
                         }
                     })
                 break
             case 'open':
-                if (operands.length != 2) {
+                if (!query) {
                     console.log(chalk.red(`Invalid arguments. Expected 'open <peerId>'. Received '${input}'`))
                     rl.prompt()
                     break
                 }
 
-                let peerInfo
                 try {
-                    peerInfo = node.peerBook.get(PeerId.createFromB58String(operands[1]))
+                    peerId = await checkPeerIdInput(query)
                 } catch (err) {
-                    console.log(chalk.red('Unable to open payment channel.'))
-                    rl.prompt()
+                    console.log(err.message)
+                    setTimeout(() => {
+                        rl.prompt()
+                    })
+                    break
                 }
 
-                const channelId = getId(pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()), pubKeyToEthereumAddress(peerInfo.id.pubKey.marshal()))
+                const channelId = getId(pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()), pubKeyToEthereumAddress(peerId.pubKey.marshal()))
 
                 let interval
                 node.paymentChannels
-                    .open(peerInfo.id)
+                    .open(peerId)
                     .then(() => {
                         console.log(`${chalk.green(`Successfully opened channel`)} ${chalk.yellow(channelId.toString('hex'))}`)
                     })
@@ -430,40 +472,50 @@ async function runAsRegularNode() {
                 interval = setInterval(() => process.stdout.write('.'), 1000)
                 break
             case 'send':
-                if (operands.length != 2) {
+                if (!query) {
                     console.log(chalk.red(`Invalid arguments. Expected 'open <peerId>'. Received '${input}'`))
                     rl.prompt()
                     break
                 }
 
-                rl.question(`Sending message to ${chalk.blue(operands[1])}\nType in your message and press ENTER to send:\n`, message =>
+                try {
+                    peerId = await checkPeerIdInput(query)
+                } catch (err) {
+                    console.log(err.message)
+                    setTimeout(() => {
+                        rl.prompt()
+                    })
+                    break
+                }
+
+                rl.question(`Sending message to ${chalk.blue(peerId.toB58String())}\nType in your message and press ENTER to send:\n`, message =>
                     node
-                        .sendMessage(rlp.encode([message, Date.now().toString()]), operands[1])
+                        .sendMessage(rlp.encode([message, Date.now().toString()]), peerId)
                         .catch(err => console.log(chalk.red(err.message)))
                         .finally(() => rl.prompt())
                 )
                 break
             case 'closeAll':
-                node.paymentChannels
-                    .closeChannels()
-                    .then(receivedMoney => {
-                        console.log(`${chalk.green(`Closed all channels and received`)} ${chalk.magenta(fromWei(receivedMoney.toString(), 'ether'))} ETH.`)
+                try {
+                    await node.paymentChannels.closeChannels()
+                    console.log(`${chalk.green(`Closed all channels and received`)} ${chalk.magenta(fromWei(receivedMoney.toString(), 'ether'))} ETH.`)
+                } catch (err) {
+                    console.log(chalk.red(err.message))
+                } finally {
+                    setTimeout(() => {
                         rl.prompt()
                     })
-                    .catch(err => {
-                        console.log(err)
-                        rl.prompt()
-                    })
+                }
                 break
             case 'close':
-                if (operands.length != 2) {
+                if (!query) {
                     console.log(chalk.red(`Invalid arguments. Expected 'close <peerId>'. Received '${input}'`))
                     rl.prompt()
                     break
                 }
 
                 try {
-                    const peerInfo = node.peerBook.get(PeerId.createFromB58String(operands[1]))
+                    const peerInfo = node.peerBook.get(PeerId.createFromB58String(query))
                     const channelId = getId(pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()), pubKeyToEthereumAddress(peerInfo.id.pubKey.marshal()))
 
                     let interval
