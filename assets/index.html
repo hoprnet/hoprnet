@@ -8,7 +8,7 @@
         <script src="tmp/animascii.js"></script>
     </head>
     <body>
-        <div id="animascii-container" style="opacity: 0.2; height: 100vh; top: 50vh; width: 100%; position: absolute; text-align: center; font-size: 5vmin;"></div>
+        <div id="animascii-container" style="opacity: 0.1; height: 100vh; top: 50vh; max-width: 100%; position: absolute; text-align: center; font-size: 5vmin;"></div>
         <script>
             var animation = new animascii({src: "tmp/animation.json", display: document.getElementById("animascii-container"), repeat: -1}, function() {
                     console.log("finished!");
