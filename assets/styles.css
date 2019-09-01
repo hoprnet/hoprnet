@@ -11,7 +11,7 @@ body {
     line-height: 70px;
     width: 500px;
     max-width: 100%;
-    margin: 0 auto 0 auto;
+    margin: 10 auto 0 auto;
   }
   .size2 {
     color: "#000000";
@@ -22,7 +22,7 @@ body {
     font-size: 25px;
     width: 500px;
     max-width: 100%;
-    margin: 0 auto 0 auto;
+    margin: 20 auto 10 auto;
   }
 .size3 {
     color: "#000000";
@@ -32,14 +32,14 @@ body {
     line-height: 30px;
     width: 500px;
     max-width: 100%;
-    margin: 0 auto 0 auto;
+    margin: 0 auto 50 auto;
   }
   .ascii-art{
     color: "#000000";
     font-family: 'Courier New', Courier, monospace;
     text-align: center;
-    font-weight: 600;
-    font-size: 4px;
+    font-weight: 900;
+    font-size: 6px;
     line-height: 1;
     white-space: pre;
   }
