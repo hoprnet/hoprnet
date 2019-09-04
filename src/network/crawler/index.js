@@ -46,7 +46,7 @@ module.exports = class Crawler {
              */
             const queryNode = peerId =>
                 new Promise(async (resolve, reject) => {
-                    let conn
+                    let conn, resolved = false
                     try {
                         conn = await this.node.dialProtocol(peerId, PROTOCOL_CRAWLING)
                     } catch (err) {
@@ -63,6 +63,8 @@ module.exports = class Crawler {
                         pull.map(CrawlResponse.decode),
                         pull.filter(response => response.status === Status.OK),
                         pull.drain(async response => {
+                            if (resolved) return
+
                             if (response.length < 1) reject(Error('Empty response'))
 
                             resolve(
@@ -77,6 +79,11 @@ module.exports = class Crawler {
                                     })
                                 )
                             )
+
+                            resolved = true
+
+                            // closes the stream
+                            return false
                         })
                     )
                 })
