@@ -321,11 +321,9 @@ module.exports.getId = (sender, counterparty) => {
  * Using `libsecp256k1` directly does not work.
  *
  * @param {Buffer | string} pubKey the plain public key
- * @param {function} cb callback called with `(err, peerId)`
+ * @returns {Promise<PeerId>}
  */
-module.exports.pubKeyToPeerId = (pubKey, cb) => {
-    if (cb) throw Error('TODO -> promisify')
-
+module.exports.pubKeyToPeerId = (pubKey) => {
     if (typeof pubKey === 'string') {
         pubKey = Buffer.from(pubKey.replace(/0x/, ''), 'hex')
     }

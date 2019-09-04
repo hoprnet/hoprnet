@@ -62,13 +62,11 @@ module.exports = class Crawler {
                         lp.decode(),
                         pull.map(CrawlResponse.decode),
                         pull.filter(response => response.status === Status.OK),
-                        pull.collect(async (err, responses) => {
-                            if (err) return reject(err)
-
-                            if (responses.length < 1) reject(Error('Empty response'))
+                        pull.drain(async response => {
+                            if (response.length < 1) reject(Error('Empty response'))
 
                             resolve(
-                                Promise.all(responses[0].pubKeys.map(pubKey => pubKeyToPeerId(pubKey))).then(peerIds =>
+                                Promise.all(response.pubKeys.map(pubKey => pubKeyToPeerId(pubKey))).then(peerIds =>
                                     peerIds.filter(peerId => {
                                         if (peerId.isEqual(this.node.peerInfo.id)) return false
 

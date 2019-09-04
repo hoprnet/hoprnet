@@ -11,12 +11,16 @@ const axios = require('axios')
 
 const COMPILED_CONTRACTS_BASE_PATH = `${process.cwd()}/build/contracts`
 
+const Web3 = require('web3')
+
+
 const { deployContract } = require('../src/utils')
 
 // used to remove `import 'xyz'` statements from Solidity src code
 const IMPORT_SOLIDITY_REGEX = /^\s*import(\s+).*$/gm
 
 async function main() {
+    const web3 = new Web3(process.env.PROVIDER)
     const nonce = await web3.eth.getTransactionCount(process.env.FUND_ACCOUNT_ETH_ADDRESS)
     const contractAddress = await deployContract(nonce, web3)
 
