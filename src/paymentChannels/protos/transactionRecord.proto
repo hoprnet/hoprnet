@@ -1,0 +1,20 @@
+enum TransactionRecordState {
+    INITIALIZED = 1;
+    OPENING = 2;
+    OPEN = 3;
+    SETTLING = 4;
+    SETTLED = 5;
+    WITHDAWING = 6;
+}
+
+message TransactionRecord {
+    required TransactionRecordState state = 1;
+    optional bytes totalBalance = 2;
+    optional bytes currentOffchainBalance = 3;
+    optional bytes currentOnchainBalance = 4;
+    optional bytes initialBalance = 5;
+    optional bytes currentIndex = 6;
+    optional bytes channelKey = 7;
+    optional bytes lastTransaction = 8;
+    required bytes restoreTransaction = 9;
+}

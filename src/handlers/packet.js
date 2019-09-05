@@ -26,8 +26,8 @@ module.exports = (node, options) => {
         log(node.peerInfo.id, `Forwarding to node \x1b[34m${(await packet.getTargetPeerId()).toB58String()}\x1b[0m.`)
 
         const conn = await Promise.race([
-            node.peerRouting.findPeer(await packet.getTargetPeerId()).then(peerInfo => node.dialProtocol(peerInfo, PROTOCOL_STRING)),
-            node.dialProtocol(await packet.getTargetPeerId(), PROTOCOL_STRING)
+            node.dialProtocol(await packet.getTargetPeerId(), PROTOCOL_STRING).catch(),
+            node.peerRouting.findPeer(await packet.getTargetPeerId()).then(peerInfo => node.dialProtocol(peerInfo, PROTOCOL_STRING))
         ])
 
         pull(
@@ -90,22 +90,16 @@ module.exports = (node, options) => {
             throw Error(`Didn't find any challenge for channel ${channelId.toString('hex')}`)
         }
 
-        let channelKey
-        try {
-            channelKey = await node.db.get(node.paymentChannels.ChannelKey(channelId))
-        } catch (err) {
-            if (err.notFound) {
-                channelKey = Buffer.alloc(PRIVATE_KEY_LENGTH, 0)
-            } else {
-                throw err
-            }
-        }
+        const channelKey = (await node.paymentChannels.state(channelId)).channelKey || Buffer.alloc(PRIVATE_KEY_LENGTH, 0)
 
-        node.db
-            .batch()
-            .put(node.paymentChannels.ChannelKey(channelId), secp256k1.privateKeyTweakAdd(channelKey, secp256k1.privateKeyTweakAdd(ack.key, ownKeyHalf)))
-            .del(node.paymentChannels.Challenge(channelId, challenge))
-            .write()
+        // @TODO serialize this with update transactions
+
+        await Promise.all([
+            node.paymentChannels.setState(channelId, {
+                channelKey: secp256k1.privateKeyTweakAdd(channelKey, secp256k1.privateKeyTweakAdd(ack.key, ownKeyHalf))
+            }),
+            node.db.del(node.paymentChannels.Challenge(channelId, challenge))
+        ])
     }
 
     const queues = new Map()

@@ -40,6 +40,7 @@ const path = require('path')
 const protons = require('protons')
 
 const { SettlementRequest, SettlementResponse } = protons(fs.readFileSync(path.resolve(__dirname, 'protos/messages.proto')))
+const { TransactionRecord, TransactionRecordState } = protons(fs.readFileSync(path.resolve(__dirname, 'protos/transactionRecord.proto')))
 
 // payments
 // -> channelId
@@ -71,6 +72,10 @@ class PaymentChannel extends EventEmitter {
         this.subscriptions = new Map()
         this.closingSubscriptions = new Map()
         this.settleTimestamps = new Map()
+    }
+
+    get TransactionRecordState() {
+        return TransactionRecordState
     }
 
     /**
@@ -106,36 +111,79 @@ class PaymentChannel extends EventEmitter {
         return paymentChannel
     }
 
+    async setState(channelId, newState) {
+        let record = {}
+        try {
+            record = await this.state(channelId)
+        } catch (err) {
+            if (!err.notFound) throw err
+        }
+
+        Object.assign(record, newState)
+
+        if (record.restoreTransaction) record.restoreTransaction = record.restoreTransaction.toBuffer()
+
+        if (record.lastTransaction) record.lastTransaction = record.lastTransaction.toBuffer()
+
+        console.log(this.node.peerInfo.id.toB58String(), record)
+        return this.node.db.put(this.State(channelId), TransactionRecord.encode(record))
+    }
+
+    async state(channelId) {
+        let record
+        try {
+            record = TransactionRecord.decode(await this.node.db.get(this.State(channelId)))
+
+            if (record.restoreTransaction) record.restoreTransaction = Transaction.fromBuffer(record.restoreTransaction)
+
+            if (record.lastTransaction) record.lastTransaction = Transaction.fromBuffer(record.lastTransaction)
+        } catch (err) {
+            if (err.notFound) {
+                let err = Error(`Couldn't find any record for channel ${chalk.yellow(channelId.toString('hex'))}`)
+
+                err.notFound = true
+
+                throw err
+            }
+
+            throw err
+        }
+        return record
+    }
+
+    State(channelId) {
+        return Buffer.concat([PREFIX, Buffer.from('record-'), channelId], PREFIX_LENGTH + 7 + CHANNEL_ID_LENGTH)
+    }
+
     /**
      * Registers listeners on-chain opening events and the closing events of all
      * payment channels found in the database.
      */
     async registerEventListeners() {
-        const register = (query, fn) =>
-            new Promise((resolve, reject) =>
-                this.node.db
-                    .createKeyStream(query)
-                    .on('data', fn)
-                    .on('error', reject)
-                    .on('end', resolve)
-            )
+        return new Promise((resolve, reject) =>
+            this.node.db
+                .createReadStream({
+                    gt: this.State(Buffer.alloc(CHANNEL_ID_LENGTH, 0x00)),
+                    lt: this.State(Buffer.alloc(CHANNEL_ID_LENGTH, 0xff))
+                })
+                .on('data', ({ key, value }) => {
+                    const record = TransactionRecord.decode(value)
+                    const channelId = key.slice(key.length - CHANNEL_ID_LENGTH)
 
-        await Promise.all([
-            register(
-                {
-                    gt: this.RestoreTransaction(Buffer.alloc(32, 0)),
-                    lt: this.RestoreTransaction(Buffer.alloc(32, 255))
-                },
-                key => this.registerSettlementListener(key.slice(key.length - 32))
-            ),
-            register(
-                {
-                    gt: this.StashedRestoreTransaction(Buffer.alloc(32, 0)),
-                    lt: this.StashedRestoreTransaction(Buffer.alloc(32, 255))
-                },
-                key => this.registerOpeningListener(key.slice(key.length - 32))
-            )
-        ])
+                    switch (record.state) {
+                        case this.TransactionRecordState.OPENING:
+                            this.registerOpeningListener(channelId)
+                            break
+                        case this.TransactionRecordState.OPEN:
+                            this.registerSettlementListener(channelId)
+                            break
+                        default:
+                            throw Error(`Found state entry with state set to '${value.state}'.`)
+                    }
+                })
+                .on('error', reject)
+                .on('end', resolve)
+        )
     }
 
     /**
@@ -196,42 +244,6 @@ class PaymentChannel extends EventEmitter {
         this.emit(`closed ${channelId.toString('hex')}`, receivedMoney)
     }
 
-    ChannelKey(channelId) {
-        return Buffer.concat([PREFIX, Buffer.from('key-'), channelId], PREFIX_LENGTH + 4 + CHANNEL_ID_LENGTH)
-    }
-
-    Transaction(channelId) {
-        return Buffer.concat([PREFIX, Buffer.from('tx-'), channelId], PREFIX_LENGTH + 3 + CHANNEL_ID_LENGTH)
-    }
-
-    RestoreTransaction(channelId) {
-        return Buffer.concat([PREFIX, Buffer.from('restoreTx-'), channelId], PREFIX_LENGTH + 10 + CHANNEL_ID_LENGTH)
-    }
-
-    StashedRestoreTransaction(channelId) {
-        return Buffer.concat([PREFIX, Buffer.from('stashedRestoreTx-'), channelId], PREFIX_LENGTH + 17 + CHANNEL_ID_LENGTH)
-    }
-
-    Index(channelId) {
-        return Buffer.concat([PREFIX, Buffer.from('index-'), channelId], PREFIX_LENGTH + 6 + CHANNEL_ID_LENGTH)
-    }
-
-    CurrentValue(channelId) {
-        return Buffer.concat([PREFIX, Buffer.from('currentValue-'), channelId], PREFIX_LENGTH + 13 + CHANNEL_ID_LENGTH)
-    }
-
-    InitialValue(channelId) {
-        return Buffer.concat([PREFIX, Buffer.from('initialBalance-'), channelId], PREFIX_LENGTH + 15 + CHANNEL_ID_LENGTH)
-    }
-
-    CurrentOnChainBalance(channelId) {
-        return Buffer.concat([PREFIX, Buffer.from('onChainBalance-'), channelId], PREFIX_LENGTH + 15 + CHANNEL_ID_LENGTH)
-    }
-
-    TotalBalance(channelId) {
-        return Buffer.concat([PREFIX, Buffer.from('totalBalance-'), channelId], PREFIX_LENGTH + 13 + CHANNEL_ID_LENGTH)
-    }
-
     Challenge(channelId, challenge) {
         return Buffer.concat([PREFIX, Buffer.from('challenge-'), channelId, challenge], PREFIX_LENGTH + 10 + CHANNEL_ID_LENGTH + CHALLENGE_LENGTH)
     }
@@ -241,42 +253,45 @@ class PaymentChannel extends EventEmitter {
     }
 
     /**
-     * Fetches the previous challenges from the database and add them together.
+     * Fetches the previous challenges from the database and sum them up.
      *
      * @param {Buffer} channelId ID of the payment channel
      */
-    getPreviousChallenges(channelId) {
-        return new Promise(async (resolve, reject) => {
-            let buf
-            try {
-                buf = secp256k1.publicKeyCreate(await this.node.db.get(this.ChannelKey(channelId)))
-            } catch (err) {
-                if (!err.notFound) throw err
-            }
+    async getPreviousChallenges(channelId) {
+        let buf,
+            pubKeys = []
 
+        try {
+            const { channelKey } = await this.state(channelId)
+
+            if (channelKey) buf = secp256k1.publicKeyCreate(channelKey)
+        } catch (err) {
+            if (!err.notFound) throw err
+        }
+
+        return new Promise((resolve, reject) =>
             this.node.db
                 .createReadStream({
-                    gt: this.Challenge(channelId, Buffer.alloc(PRIVATE_KEY_LENGTH, 0)),
-                    lt: this.Challenge(channelId, Buffer.alloc(PRIVATE_KEY_LENGTH, 255))
+                    gt: this.Challenge(channelId, Buffer.alloc(PRIVATE_KEY_LENGTH, 0x00)),
+                    lt: this.Challenge(channelId, Buffer.alloc(PRIVATE_KEY_LENGTH, 0xff))
                 })
-                .on('data', obj => {
-                    const challenge = obj.key.slice(
-                        PREFIX_LENGTH + 10 + CHANNEL_ID_LENGTH,
-                        PREFIX_LENGTH + 10 + CHANNEL_ID_LENGTH + COMPRESSED_PUBLIC_KEY_LENGTH
-                    )
-                    const ownKeyHalf = obj.value
+                .on('data', ({ key, value }) => {
+                    const challenge = key.slice(PREFIX_LENGTH + 10 + CHANNEL_ID_LENGTH, PREFIX_LENGTH + 10 + CHANNEL_ID_LENGTH + COMPRESSED_PUBLIC_KEY_LENGTH)
+                    const ownKeyHalf = value
 
-                    const pubKeys = [challenge, secp256k1.publicKeyCreate(ownKeyHalf)]
-
-                    if (buf) {
-                        pubKeys.push(buf)
-                    }
-
-                    buf = secp256k1.publicKeyCombine(pubKeys)
+                    pubKeys.push(challenge, secp256k1.publicKeyCreate(ownKeyHalf))
                 })
                 .on('error', reject)
-                .on('end', () => resolve(buf))
-        })
+                .on('end', () => {
+                    if (pubKeys.length > 0) {
+                        if (buf) pubKeys.push(buf)
+
+                        return resolve(secp256k1.publicKeyCombine(pubKeys))
+                    }
+
+                    resolve()
+                })
+        )
     }
 
     /**
