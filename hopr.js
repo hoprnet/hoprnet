@@ -287,7 +287,7 @@ async function runAsRegularNode() {
     if (stakedEther.lt(MINIMAL_STAKE)) {
         await new Promise((resolve, reject) =>
             rl.question(
-                `Staked Ether is less than ${fromWei(MINIMAL_STAKE, 'ether')} ETH. Do you want to refund now? (${chalk.green('Y')}/${chalk.red('n')}): `,
+                `Staked Ether is less than ${fromWei(MINIMAL_STAKE, 'ether')} ETH. Do you want to increase the stake now? (${chalk.green('Y')}/${chalk.red('n')}): `,
                 answer => {
                     switch (answer.toLowerCase()) {
                         case '':
