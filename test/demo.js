@@ -26,12 +26,12 @@ let nonce, fundingPeer, provider, server, contractAddress
 const GANACHE_SEND_TIMEOUT = 1000
 const ROPSTEN_SEND_TIMEOUT = 60 * 1000
 
-const main = async () => {
+;(async () => {
     // Only for testing ===========
-    process.env.NETWORK = 'ganache'
+    process.env['NETWORK'] = 'ganache'
     // ============================
 
-    if (process.env.NETWORK === 'ganache') {
+    if (process.env['NETWORK'] === 'ganache') {
         server = await startBlockchain()
         let addr = server.address()
         process.env.PROVIDER = `ws://${addr.family === 'IPv6' ? '[' : ''}${addr.address}${addr.family === 'IPv6' ? ']' : ''}:${addr.port}`
@@ -42,11 +42,11 @@ const main = async () => {
     fundingPeer = await privKeyToPeerId(process.env.FUND_ACCOUNT_PRIVATE_KEY)
     nonce = await web3.eth.getTransactionCount(process.env.FUND_ACCOUNT_ETH_ADDRESS)
 
-    if (process.env.NETWORK === 'ganache') {
+    if (process.env['NETWORK'] === 'ganache') {
         contractAddress = await deployContract(nonce, web3)
         nonce = nonce + 1
     } else {
-        contractAddress = process.env[`CONTRACT_ADDRESS_${process.env.NETWORK}`]
+        contractAddress = process.env[`CONTRACT_ADDRESS_${process.env['NETWORK']}`]
     }
 
     const bootstrapServers = await startBootstrapServers(1)
@@ -63,7 +63,7 @@ const main = async () => {
     )
 
     let timeout
-    if (process.env.NETWORK === 'ganache') {
+    if (process.env['NETWORK'] === 'ganache') {
         timeout = GANACHE_SEND_TIMEOUT
     } else {
         timeout = ROPSTEN_SEND_TIMEOUT
@@ -89,9 +89,7 @@ const main = async () => {
 
     await Promise.all(closeBatch)
 
-    if (process.env.NETWORK === 'ganache') server.close()
+    if (process.env['NETWORK'] === 'ganache') server.close()
 
     await Promise.all(nodes.concat(bootstrapServers).map(node => node.down()))
-}
-
-main()
+})()

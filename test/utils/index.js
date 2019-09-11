@@ -10,7 +10,7 @@ const BN = require('bn.js')
 const LevelDown = require('leveldown')
 const chalk = require('chalk')
 
-const MINIMAL_FUND = new BN(toWei('0.1', 'ether'))
+const MINIMAL_FUND = new BN(toWei('1.0', 'ether'))
 const MINIMAL_STAKE = new BN(toWei('0.09', 'ether'))
 
 /**
@@ -190,7 +190,7 @@ module.exports.startBootstrapServers = async amountOfNodes => {
         )
 
         promises.push(
-            createNode({ peerId, "bootstrap-node": true }).then(node => {
+            createNode({ peerId, 'bootstrap-node': true }).then(node => {
                 node.on('peer:connect', peer => {
                     console.log(`Incoming connection from ${chalk.blue(peer.id.toB58String())}.`)
                 })

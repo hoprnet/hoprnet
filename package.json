@@ -25,7 +25,8 @@
     "scripts": {
         "demo": "node test/demo.js",
         "hopr": "node hopr.js",
-        "deployContract": "node test/deployContract"
+        "deployContract": "node test/deployContract",
+        "startTestnet": "node test/startBlockchain"
     },
     "dependencies": {
         "@nodeutils/defaults-deep": "~1.1.0",

@@ -219,7 +219,16 @@ function stakeEther(amount) {
     })
 }
 
-async function checkPeerIdInput() {
+/**
+ * Takes the string representation of a peerId and checks whether it is a valid
+ * peerId, i. e. it is a valid base58 encoding.
+ * It then generates a PeerId instance and returns it.
+ *
+ * @param {string} query query that contains the peerId
+ */
+async function checkPeerIdInput(query) {
+    let peerId
+
     try {
         // Throws an error if the Id is invalid
         Multihash.decode(bs58.decode(query))
@@ -231,6 +240,9 @@ async function checkPeerIdInput() {
     return peerId
 }
 
+/**
+ * Stops the node and kills the process in case it does not quit by itself.
+ */
 function stopNode() {
     const timeout = setTimeout(() => {
         console.log(`Ungracefully stopping node after timeout.`)
@@ -287,7 +299,9 @@ async function runAsRegularNode() {
     if (stakedEther.lt(MINIMAL_STAKE)) {
         await new Promise((resolve, reject) =>
             rl.question(
-                `Staked Ether is less than ${fromWei(MINIMAL_STAKE, 'ether')} ETH. Do you want to increase the stake now? (${chalk.green('Y')}/${chalk.red('n')}): `,
+                `Staked Ether is less than ${fromWei(MINIMAL_STAKE, 'ether')} ETH. Do you want to increase the stake now? (${chalk.green('Y')}/${chalk.red(
+                    'n'
+                )}): `,
                 answer => {
                     switch (answer.toLowerCase()) {
                         case '':
@@ -314,8 +328,10 @@ async function runAsRegularNode() {
             .split(SPLIT_OPERAND_QUERY_REGEX)
             .slice(1)
 
+        console.log(`command '${command}' query '${query}'`)
+
         let amount, peerId
-        switch (command) {
+        switch (command.trim()) {
             case 'crawl':
                 try {
                     await node.crawler.crawl(peerInfo => isNotBootstrapNode(peerInfo.id))
@@ -557,7 +573,8 @@ async function runAsRegularNode() {
 
 process.title = 'hopr'
 
-async function main() {
+/* prettier-ignore */
+;(async function main() {
     console.log(`Welcome to ${chalk.bold('HOPR')}!\n`)
 
     options = parseOptions()
@@ -584,6 +601,4 @@ async function main() {
     } else {
         return runAsRegularNode()
     }
-}
-
-main()
+})()
