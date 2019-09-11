@@ -37,28 +37,33 @@ module.exports = self => {
             }
         }
 
-        const newBalance = getNewChannelBalance(record, to, amount)
-
-        const previousChallenges = await self.getPreviousChallenges(channelId)
-
-        const pubKeys = [secp256k1.publicKeyCreate(channelKey)]
-
-        if (previousChallenges) {
-            pubKeys.push(previousChallenges)
+        switch (record.state) {
+            case self.TransactionRecordState.SETTLING:
+            case self.TransactionRecordState.SETTLED:
+                await self.handleClosedChannel(channelId, true)
+                await self.open(to)
+                record = await self.state(channelId)
         }
+
+        const challenges = [secp256k1.publicKeyCreate(channelKey)]
+        const previousChallenges = await self.node.paymentChannels.getPreviousChallenges(channelId)
+
+        if (previousChallenges) challenges.push(previousChallenges)
+        if (record.channelKey) challenges.push(secp256k1.publicKeyCreate(record.channelKey))
 
         const newTx = Transaction.create(
             record.lastTransaction.nonce,
             numberToBuffer(bufferToNumber(record.currentIndex) + 1, Transaction.INDEX_LENGTH),
-            newBalance.toBuffer('be', Transaction.VALUE_LENGTH),
-            secp256k1.publicKeyCombine(pubKeys)
+            getNewChannelBalance(record, to, amount).toBuffer('be', Transaction.VALUE_LENGTH),
+            // @TODO nach dem Initialisieren müsste das leer sein
+            secp256k1.publicKeyCombine(challenges)
         ).sign(self.node.peerInfo.id)
 
         log(
             self.node.peerInfo.id,
-            `Created tx with index ${chalk.cyan(numberToBuffer(bufferToNumber(record.currentIndex) + 1, Transaction.INDEX_LENGTH).toString(
-                'hex'
-            ))} on channel ${chalk.yellow(channelId.toString('hex'))}.`
+            `Created tx with index ${chalk.cyan(
+                numberToBuffer(bufferToNumber(record.currentIndex) + 1, Transaction.INDEX_LENGTH).toString('hex')
+            )} on channel ${chalk.yellow(channelId.toString('hex'))}.`
         )
 
         try {
@@ -68,11 +73,9 @@ module.exports = self => {
         }
 
         await self.setState(channelId, {
-            currentOffchainBalance: newBalance.toBuffer('be', Transaction.VALUE_LENGTH),
+            currentOffchainBalance: newTx.value,
             currentIndex: newTx.index,
-            channelKey,
-            lastTransaction: newTx,
-            currentOffchainBalance: newTx.value
+            channelKey
         })
 
         return newTx
@@ -81,25 +84,37 @@ module.exports = self => {
     /**
      * Computes the new balance of the channel.
      *
-     * @param {Buffer} channelId ID of the channel
+     * @param {Object} record current off-chain state
      * @param {PeerId} to peerId of the recipient
      * @param {BN} amount of funds to transfer
      */
     function getNewChannelBalance(record, to, amount) {
         const currentValue = new BN(record.currentOffchainBalance)
 
-        const partyA = isPartyA(pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal()), pubKeyToEthereumAddress(to.pubKey.marshal()))
+        const partyA = isPartyA(
+            /* prettier-ignore */
+            pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal()),
+            pubKeyToEthereumAddress(to.pubKey.marshal())
+        )
 
         if (partyA) {
             currentValue.isub(amount)
             if (currentValue.isNeg())
-                throw Error(`Insufficient funds. Please equip the payment channel with at least ${chalk.magenta(`${fromWei(currentValue.abs(), 'ether').toString()} ETH`)} additionally.`)
+                throw Error(
+                    `Insufficient funds. Please equip the payment channel with at least ${chalk.magenta(
+                        `${fromWei(currentValue.abs(), 'ether').toString()} ETH`
+                    )} additionally.`
+                )
         } else {
             currentValue.iadd(amount)
 
             const totalBalance = new BN(record.totalBalance)
             if (currentValue.gt(totalBalance))
-                throw Error(`Insufficient funds. Please equip the payment channel with at least ${chalk.magenta(`${fromWei(currentValue.sub(totalBalance), 'ether').toString()} ETH`)} additionally.`)
+                throw Error(
+                    `Insufficient funds. Please equip the payment channel with at least ${chalk.magenta(
+                        `${fromWei(currentValue.sub(totalBalance), 'ether').toString()} ETH`
+                    )} additionally.`
+                )
         }
 
         return currentValue

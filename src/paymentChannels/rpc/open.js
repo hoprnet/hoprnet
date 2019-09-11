@@ -113,8 +113,8 @@ module.exports = self => async to => {
         })
 
         return new Promise(resolve =>
-            self.once(
-                `opened ${channelId.toString('base64')}`,
+            self.onceOpened(
+                channelId,
                 (() => {
                     const promise = self.contractCall(
                         self.contract.methods.createFunded(

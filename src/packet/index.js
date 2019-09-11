@@ -84,7 +84,7 @@ class Packet {
                 return new Promise((resolve, reject) =>
                     setTimeout(
                         (() => {
-                            const eventListener = node.paymentChannels.once(`opened ${channelId.toString('base64')}`, resolve)
+                            const eventListener = node.paymentChannels.onceOpened(channelId, resolve)
 
                             return () => {
                                 eventListener.removeListener(resolve)
@@ -122,32 +122,33 @@ class Packet {
 
         const channelId = getId(pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()), pubKeyToEthereumAddress(sender.pubKey.marshal()))
 
-        const state = await node.paymentChannels.state(channelId)
-        await this.getPreviousTransaction(node, channelId, state)
+        const currentState = await node.paymentChannels.state(channelId)
+        await this.getPreviousTransaction(node, channelId, currentState)
 
-        const currentChallenge = await node.paymentChannels.getPreviousChallenges(channelId)
-
-        log(node.peerInfo.id, `Database index ${chalk.cyan(state.currentIndex.toString('hex'))} on channnel ${chalk.yellow(channelId.toString('hex'))}.`)
+        log(node.peerInfo.id, `Database index ${chalk.cyan(currentState.currentIndex.toString('hex'))} on channnel ${chalk.yellow(channelId.toString('hex'))}.`)
         log(node.peerInfo.id, `Transaction index ${chalk.cyan(this.transaction.index.toString('hex'))} on channnel ${chalk.yellow(channelId.toString('hex'))}.`)
 
-        if (bufferToNumber(state.currentIndex) + 1 != bufferToNumber(this.transaction.index)) throw Error('General error.')
+        if (bufferToNumber(currentState.currentIndex) + 1 != bufferToNumber(this.transaction.index)) throw Error('General error.')
 
-        log(node.peerInfo.id, `Payment channel exists. Requested SHA256 pre-image of ${chalk.green(hash(this.header.derivedSecret).toString('hex'))} is derivable.`)
+        log(
+            node.peerInfo.id,
+            `Payment channel exists. Requested SHA256 pre-image of ${chalk.green(hash(this.header.derivedSecret).toString('hex'))} is derivable.`
+        )
 
         this.message.decrypt(this.header.derivedSecret)
         this.oldChallenge = this.challenge
 
         // Update incoming payment channel
-        node.paymentChannels.setState(channelId, {
+        const newState = {
             currentOffchainBalance: this.transaction.value,
             currentIndex: this.transaction.index,
             lastTransaction: this.transaction
-        })
+        }
 
         if (this.header.address.equals(node.peerInfo.id.pubKey.marshal())) {
-            await this.prepareDelivery(node, channelId, currentChallenge)
+            await this.prepareDelivery(node, currentState, newState, channelId)
         } else {
-            await this.prepareForward(node, channelId, currentChallenge, target)
+            await this.prepareForward(node, currentState, newState, channelId, target)
         }
 
         console.log('Finished transformation')
@@ -155,45 +156,55 @@ class Packet {
     }
 
     /**
-     * Prepares the packet to deliver it.
+     * Prepares the delivery of the packet.
      *
      * @param {Hopr} node the node itself
+     * @param {Object} state current off-chain state
+     * @param {Object} newState future off-chain state
      * @param {Buffer} channelId the ID of the payment channel
-     * @param {Buffer} curvePoint sum of the previous channel keys and pending challenges
      */
-    async prepareDelivery(node, channelId, curvePoint) {
-        const pubKeys = [secp256k1.publicKeyCreate(Header.deriveTransactionKey(this.header.derivedSecret))]
+    async prepareDelivery(node, state, newState, channelId) {
+        const challenges = [secp256k1.publicKeyCreate(Header.deriveTransactionKey(this.header.derivedSecret))]
 
-        if (curvePoint) pubKeys.push(curvePoint)
+        const previousChallenges = await node.paymentChannels.getPreviousChallenges(channelId)
 
-        if (!this.transaction.curvePoint.equals(secp256k1.publicKeyCombine(pubKeys))) throw Error('General error.')
+        if (previousChallenges) challenges.push(previousChallenges)
+        if (state.channelKey) challenges.push(secp256k1.publicKeyCreate(state.channelKey))
 
-        const channelKey = (await node.paymentChannels.state(channelId)).channelKey || Buffer.alloc(PRIVATE_KEY_LENGTH, 0)
+        if (!this.transaction.curvePoint.equals(secp256k1.publicKeyCombine(challenges))) throw Error('General error.')
 
-        node.paymentChannels.setState(channelId, {
-            channelKey: secp256k1.privateKeyTweakAdd(channelKey, Header.deriveTransactionKey(this.header.derivedSecret))
-        })
+        newState.channelKey = secp256k1.privateKeyTweakAdd(
+            state.channelKey || Buffer.alloc(PRIVATE_KEY_LENGTH, 0),
+            Header.deriveTransactionKey(this.header.derivedSecret)
+        )
+
+        await node.paymentChannels.setState(channelId, newState)
     }
 
     /**
      * Prepares the packet in order to forward it to the next node.
      *
      * @param {Hopr} node the node itself
+     * @param {Object} state current off-chain state
+     * @param {Object} newState future off-chain state
      * @param {Buffer} channelId the ID of the payment channel
-     * @param {Buffer} curvePoint sum of the previous channel keys and the pending challenges
      * @param {PeerId} target peer Id of the next node
      */
-    async prepareForward(node, channelId, curvePoint, target) {
-        const pubKeys = [secp256k1.publicKeyCreate(Header.deriveTransactionKey(this.header.derivedSecret)), this.header.hashedKeyHalf]
-        if (curvePoint) pubKeys.push(curvePoint)
+    async prepareForward(node, state, newState, channelId, target) {
+        const challenges = [secp256k1.publicKeyCreate(Header.deriveTransactionKey(this.header.derivedSecret)), this.header.hashedKeyHalf]
+        let previousChallenges = await node.paymentChannels.getPreviousChallenges(channelId)
 
-        if (!this.transaction.curvePoint.equals(secp256k1.publicKeyCombine(pubKeys))) throw Error('General error.')
+        if (previousChallenges) challenges.push(previousChallenges)
+        if (state.channelKey) challenges.push(secp256k1.publicKeyCreate(state.channelKey))
 
-        const state = await node.paymentChannels.state(channelId)
+        if (!this.transaction.curvePoint.equals(secp256k1.publicKeyCombine(challenges))) throw Error('General error.')
 
         const receivedMoney = node.paymentChannels.getEmbeddedMoney(this.transaction, await this.getSenderPeerId(), state.currentOffchainBalance)
 
-        log(node.peerInfo.id, `Received ${chalk.magenta(`${fromWei(receivedMoney, 'ether').toString()} ETH`)} on channel ${chalk.yellow(channelId.toString('hex'))}.`)
+        log(
+            node.peerInfo.id,
+            `Received ${chalk.magenta(`${fromWei(receivedMoney, 'ether').toString()} ETH`)} on channel ${chalk.yellow(channelId.toString('hex'))}.`
+        )
 
         if (receivedMoney.lt(RELAY_FEE)) throw Error('Bad transaction.')
 
@@ -203,13 +214,15 @@ class Packet {
 
         this.challenge = Challenge.create(this.header.hashedKeyHalf, forwardedFunds).sign(node.peerInfo.id)
 
-        const tx = await node.paymentChannels.transfer(target, forwardedFunds, this.header.encryptionKey)
-
-        await node.db
-            .batch()
-            .put(node.paymentChannels.ChannelId(this.challenge.signatureHash), channelId)
-            .put(node.paymentChannels.Challenge(channelId, this.header.hashedKeyHalf), Header.deriveTransactionKey(this.header.derivedSecret))
-            .write()
+        const [tx] = await Promise.all([
+            node.paymentChannels.transfer(target, forwardedFunds, this.header.encryptionKey),
+            node.paymentChannels.setState(channelId, newState),
+            node.db
+                .batch()
+                .put(node.paymentChannels.ChannelId(this.challenge.signatureHash), channelId)
+                .put(node.paymentChannels.Challenge(channelId, this.header.hashedKeyHalf), Header.deriveTransactionKey(this.header.derivedSecret))
+                .write()
+        ])
 
         this.transaction = tx
     }
@@ -220,7 +233,7 @@ class Packet {
     async getTargetPeerId() {
         if (this._targetPeerId) return this._targetPeerId
 
-        return this._targetPeerId = await pubKeyToPeerId(this.header.address)
+        return (this._targetPeerId = await pubKeyToPeerId(this.header.address))
     }
 
     /**
@@ -229,7 +242,7 @@ class Packet {
     async getSenderPeerId() {
         if (this._previousPeerId) return this._previousPeerId
 
-        return this._senderPeerId = await pubKeyToPeerId(this.transaction.counterparty)
+        return (this._senderPeerId = await pubKeyToPeerId(this.transaction.counterparty))
     }
 
     /**

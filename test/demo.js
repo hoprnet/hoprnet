@@ -70,12 +70,10 @@ const main = async () => {
     }
 
     for (let n = 0; n < AMOUNT_OF_MESSAGES; n++) {
-        nodes[0].sendMessage(rlp.encode(['Psst ... secret message from Validity Labs!', Date.now().toString()]), nodes[2].peerInfo.id)
+        await nodes[0].sendMessage(rlp.encode(['Psst ... secret message from Validity Labs!', Date.now().toString()]), nodes[2].peerInfo.id)
 
         await new Promise(resolve => setTimeout(resolve, timeout))
     }
-
-    await new Promise(resolve => setTimeout(resolve, timeout))
 
     const closeBatch = []
     nodes.forEach(node =>
@@ -91,9 +89,9 @@ const main = async () => {
 
     await Promise.all(closeBatch)
 
-    await Promise.all(nodes.concat(bootstrapServers).map(node => node.stop()))
+    if (process.env.NETWORK === 'ganache') server.close()
 
-    if (process.env.NETWORK === 'ganache') server.close
+    await Promise.all(nodes.concat(bootstrapServers).map(node => node.down()))
 }
 
 main()

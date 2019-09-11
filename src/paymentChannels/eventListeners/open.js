@@ -44,5 +44,5 @@ module.exports = self => async (err, event) => {
         )}.`
     )
 
-    self.emit(`opened ${channelId.toString('base64')}`)
+    self.emitOpened(channelId)
 }
