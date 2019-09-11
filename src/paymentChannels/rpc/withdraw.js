@@ -104,6 +104,8 @@ module.exports = self => {
             )}.`
         )
 
+        await self.deleteState(channelId)
+
         return new BN(localState.currentOnchainBalance)
     }
 
