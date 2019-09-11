@@ -4054,7 +4054,7 @@ ltgt@~2.1.1:
   resolved "https://registry.yarnpkg.com/ltgt/-/ltgt-2.1.3.tgz#10851a06d9964b971178441c23c9e52698eece34"
   integrity sha1-EIUaBtmWS5cReEQcI8nlJpjuzjQ=
 
-mafmt@^6.0.2, mafmt@^6.0.7:
+mafmt@^6.0.2, mafmt@^6.0.7, mafmt@^6.0.9:
   version "6.0.9"
   resolved "https://registry.yarnpkg.com/mafmt/-/mafmt-6.0.9.tgz#bc6c694fcdf264713b50fc2d54d39ac00e43749e"
   integrity sha512-JqNCxmtOvJGBAtkIZtUwJSkJG0hOu9MqD9TctXcazNo1hpqNiEWxHuRCa4AU69v6prHMt25NJ2xy4qjIGvOyyg==
@@ -4292,7 +4292,7 @@ multiaddr@^6.0.3, multiaddr@^6.0.6, multiaddr@^6.1.0:
     is-ip "^2.0.0"
     varint "^5.0.0"
 
-multiaddr@^7.0.0:
+multiaddr@^7.0.0, multiaddr@^7.1.0:
   version "7.1.0"
   resolved "https://registry.yarnpkg.com/multiaddr/-/multiaddr-7.1.0.tgz#e74d69b10cff2840c4c36eb2ecef94a6b933a977"
   integrity sha512-XQS/KsvlsnlTs2krhSYP8Nzin3S8vKBBQcaQO2K4gd/4Oq56kfxiPeAOWEvloB5gY8iv9wSorZ3WOA9yYqf9+A==
@@ -4803,7 +4803,7 @@ peer-id@^0.12.2, peer-id@~0.12.2, peer-id@~0.12.3:
     libp2p-crypto "~0.16.1"
     multihashes "~0.4.15"
 
-peer-id@^0.13.2, peer-id@~0.13.1:
+peer-id@^0.13.2, peer-id@~0.13.1, peer-id@~0.13.2:
   version "0.13.2"
   resolved "https://registry.yarnpkg.com/peer-id/-/peer-id-0.13.2.tgz#1e1305b1f52ba1484809a66de9a73dac489620dc"
   integrity sha512-3/yotFpKJn8EnATX9g4qchMqZXWpTAO2cH/Dlo7UH7arW46yK8QFvx/RG4dngqUET8xPj4vYn7vSj7rPTTIkSw==
@@ -4813,14 +4813,14 @@ peer-id@^0.13.2, peer-id@~0.13.1:
     multihashes "~0.4.15"
     protons "^1.0.1"
 
-peer-info@^0.16.0, peer-info@~0.16.0:
-  version "0.16.0"
-  resolved "https://registry.yarnpkg.com/peer-info/-/peer-info-0.16.0.tgz#85bd71b8e3dc29ef1465ecb1583fd02e1cc6d8e1"
-  integrity sha512-iAO5MwxTkQc/firllszoReS6XxOD232TNmOITNgP4K6IOUPNNKHvCIyFDh6W3j49abwyxHM89qJ6NqgMR0YmUQ==
+peer-info@^0.16.1:
+  version "0.16.1"
+  resolved "https://registry.yarnpkg.com/peer-info/-/peer-info-0.16.1.tgz#323546700c0970dc1b4b8e9e4e9d50ecc9b62b1d"
+  integrity sha512-+DrR8Hkx/Q4Nxa1HUoGT/9T0dKuRbKJ28ShK6MUZFVy4SjEw9PIHfUqZOtKpbEoMCOV3n5gzo0Dw4qefUj8v0g==
   dependencies:
-    mafmt "^6.0.7"
-    multiaddr "^6.0.6"
-    peer-id "~0.13.1"
+    mafmt "^6.0.9"
+    multiaddr "^7.1.0"
+    peer-id "~0.13.2"
     unique-by "^1.0.0"
 
 peer-info@~0.15.1:
@@ -4831,6 +4831,16 @@ peer-info@~0.15.1:
     mafmt "^6.0.2"
     multiaddr "^6.0.3"
     peer-id "~0.12.2"
+    unique-by "^1.0.0"
+
+peer-info@~0.16.0:
+  version "0.16.0"
+  resolved "https://registry.yarnpkg.com/peer-info/-/peer-info-0.16.0.tgz#85bd71b8e3dc29ef1465ecb1583fd02e1cc6d8e1"
+  integrity sha512-iAO5MwxTkQc/firllszoReS6XxOD232TNmOITNgP4K6IOUPNNKHvCIyFDh6W3j49abwyxHM89qJ6NqgMR0YmUQ==
+  dependencies:
+    mafmt "^6.0.7"
+    multiaddr "^6.0.6"
+    peer-id "~0.13.1"
     unique-by "^1.0.0"
 
 pem-jwk@^2.0.0:
@@ -5109,7 +5119,7 @@ pull-window@^2.1.4:
   dependencies:
     looper "^2.0.0"
 
-"pull-ws@github:hugomrdias/pull-ws#fix/bundle-size":
+pull-ws@hugomrdias/pull-ws#fix/bundle-size:
   version "3.3.1"
   resolved "https://codeload.github.com/hugomrdias/pull-ws/tar.gz/8e2ce0bb3b1cd6804828316e937fff8e0bef6225"
   dependencies:
@@ -6611,6 +6621,7 @@ websocket@1.0.29, "websocket@github:web3-js/WebSocket-Node#polyfill/globalThis":
   dependencies:
     debug "^2.2.0"
     es5-ext "^0.10.50"
+    gulp "^4.0.2"
     nan "^2.14.0"
     typedarray-to-buffer "^3.1.5"
     yaeti "^0.0.6"
