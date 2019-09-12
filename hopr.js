@@ -471,7 +471,11 @@ async function runAsRegularNode() {
                 node.paymentChannels
                     .open(peerId)
                     .then(() => {
-                        const channelId = getId(pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()), pubKeyToEthereumAddress(peerId.pubKey.marshal()))
+                        const channelId = getId(
+                            /* prettier-ignore */
+                            pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()),
+                            pubKeyToEthereumAddress(peerId.pubKey.marshal())
+                            )
 
                         console.log(`${chalk.green(`Successfully opened channel`)} ${chalk.yellow(channelId.toString('hex'))}`)
                     })

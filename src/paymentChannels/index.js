@@ -452,9 +452,10 @@ class PaymentChannel extends EventEmitter {
         return Promise.all(channels.map(queryNode))
     }
 
-    closeChannels() {
+    getAllChannels(onData, onEnd) {
         return new Promise((resolve, reject) => {
             const promises = []
+
             this.node.db
                 .createReadStream({
                     gt: this.State(Buffer.alloc(CHANNEL_ID_LENGTH, 0x00)),
@@ -463,20 +464,31 @@ class PaymentChannel extends EventEmitter {
                 .on('error', err => reject(err))
                 .on('data', ({ key, value }) => {
                     const channelId = key.slice(key.length - CHANNEL_ID_LENGTH)
+
                     promises.push(
-                        this.state(channelId, value)
-                            .then(state => this.closeChannel(channelId, state))
-                            .catch(_ => new BN(0))
+                        this.state(channelId, value).then(state =>
+                            onData({
+                                channelId,
+                                state
+                            })
+                        )
                     )
                 })
-                .on('end', () => {
-                    if (promises.length > 0) {
-                        return resolve(Promise.all(promises).then(results => results.reduce((acc, value) => acc.iadd(value))))
-                    }
-
-                    return resolve(new BN(0))
-                })
+                .on('end', () => resolve(onEnd(promises)))
         })
+    }
+
+    closeChannels() {
+        return this.getAllChannels(
+            channel => this.closeChannel(channel.channelId, channel.state),
+            promises => {
+                if (promises.length > 0) {
+                    return Promise.all(promises).then(results => results.reduce((acc, value) => acc.iadd(value)))
+                }
+
+                return new BN(0)
+            }
+        )
     }
 
     /**
