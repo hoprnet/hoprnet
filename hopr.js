@@ -37,14 +37,51 @@ let node, funds, ownAddress, stakedEther, rl, options
  * @returns {Object}
  */
 function parseOptions() {
+    const displayHelp = () => {
+        console.log(
+            /* prettier-ignore */
+            `\nStart HOPR with:\n` +
+            `-b [--bootstrap-node, bootstrap]\tstarts HOPR as a bootstrap node\n` +
+            `<ID>\t\t\t\t\tstarts HOPR with ID <ID> specified .env\n`
+        )
+        process.exit(0)
+    }
+
+    const unknownOptions = []
+
     const options = require('getopts')(process.argv.slice(2), {
+        boolean: ['bootstrap-node'],
         alias: {
             b: 'bootstrap-node'
-        }
+        },
+        unknown: option => unknownOptions.push(option)
     })
 
-    if (Array.isArray(options._) && options._.length > 0) {
-        options.id = Number.parseInt(options._[0])
+    if (Array.isArray(options._)) {
+        options._.forEach(option => {
+            if (option.toLowerCase() === 'bootstrap') {
+                options['bootstrap-node'] = true
+                return
+            }
+
+            const int = parseInt(option)
+            if (isFinite(int)) {
+                if (options.id) {
+                    console.log(`Cannot set ID twice.`)
+                    return
+                }
+
+                options.id = int
+                return
+            }
+
+            unknownOptions.push(option)
+        })
+    }
+
+    if (unknownOptions.length) {
+        console.log(`Got unknown option${unknownOptions.length == 1 ? '' : 's'} [${unknownOptions.join(', ')}]`)
+        return displayHelp()
     }
 
     const tmp = groupBy(process.env.BOOTSTRAP_SERVERS.split(',').map(addr => Multiaddr(addr)), ma => ma.getPeerId())
