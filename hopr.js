@@ -339,13 +339,13 @@ async function runAsRegularNode() {
 
     rl.on('line', async input => {
         rl.pause()
-        const [command, query] = input
+        const [command, query] = (input || '')
             .trim()
             .split(SPLIT_OPERAND_QUERY_REGEX)
             .slice(1)
 
         let amount, peerId
-        switch (command.trim()) {
+        switch ((command || '').trim()) {
             case 'crawl':
                 try {
                     await node.crawler.crawl(peerInfo => isNotBootstrapNode(peerInfo.id))
@@ -429,7 +429,7 @@ async function runAsRegularNode() {
                 let str = `${chalk.yellow('ChannelId:'.padEnd(64, ' '))} - ${chalk.blue('PeerId:')}\n`
 
                 try {
-                    str += await node.db.getAllChannels(
+                    str += await node.paymentChannels.getAllChannels(
                         channel =>
                             pubKeyToPeerId(channel.state.restoreTransaction.counterparty).then(
                                 peerId => `${chalk.yellow(channelId.toString('hex'))} - ${chalk.blue(peerId.toB58String())}`

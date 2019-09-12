@@ -187,17 +187,21 @@ class Hopr extends libp2p {
     /**
      * Shuts down the node and saves keys and peerBook in the database
      */
-    stop() {
-        log(this.peerInfo.id, `Shutting down...`)
+    async down() {
+        if (this.db) await this.db.close()
 
+        log(this.peerInfo.id, `Database closed.`)
+
+        await new Promise((resolve, reject) =>
+            super.stop(err => {
+                if (err) return reject(err)
+
+                log(this.peerInfo.id, `Node shut down.`)
+
+                resolve()
+            })
+        )
         // this.heartbeat.stop()
-        this.db.close()
-
-        return Promise.all([
-            /* prettier-ignore */
-            // this.exportPeerBook(),
-            super.stop()
-        ])
     }
 
     /**

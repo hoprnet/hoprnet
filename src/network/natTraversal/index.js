@@ -31,8 +31,6 @@ const mixin = Base =>
                 options = {}
             }
 
-            log(this.node.peerInfo.id, `Calling ${multiaddr.toString()}`)
-
             let connPromise
 
             // let connected = false
@@ -52,10 +50,17 @@ const mixin = Base =>
             //     }, 5 * 1000))
             // ])
 
-            if (!this.node.bootstrapServers || this.node.bootstrapServers.some(peerInfo => peerInfo.id.isEqual(PeerId.createFromB58String(multiaddr.getPeerId())))) {
-               connPromise = super.dial(multiaddr, options)
+            if (
+                !this.node.bootstrapServers ||
+                this.node.bootstrapServers.some(peerInfo => peerInfo.id.isEqual(PeerId.createFromB58String(multiaddr.getPeerId())))
+            ) {
+                log(this.node.peerInfo.id, `Calling ${multiaddr.toString()} directly`)
+
+                connPromise = super.dial(multiaddr, options)
             } else {
-               connPromise = this.signalling.relay(PeerId.createFromB58String(multiaddr.getPeerId()))
+                log(this.node.peerInfo.id, `Calling ${multiaddr.toString()} over bootstrap node`)
+
+                connPromise = this.signalling.relay(PeerId.createFromB58String(multiaddr.getPeerId()))
             }
 
             if (cb) {
