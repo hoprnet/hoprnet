@@ -7,6 +7,7 @@ const PeerId = require('peer-id')
 
 const Signalling = require('./signalling')
 
+const { log } = require('../../utils')
 const { PROTOCOL_WEBRTC_TURN } = require('../../constants')
 
 const mixin = Base =>
@@ -15,10 +16,6 @@ const mixin = Base =>
             super(opts)
 
             this.signalling = new Signalling(opts)
-
-            // this.node.on('peer:discovery', peerInfo => {
-            //     console.log(peerInfo)
-            // })
 
             if (this.node.bootstrapServers && this.node.bootstrapServers.length) {
                 this.node.once('start', () =>
@@ -33,6 +30,8 @@ const mixin = Base =>
                 cb = options
                 options = {}
             }
+
+            log(this.node.peerInfo.id, `Calling ${multiaddr.toString()}`)
 
             let connPromise
 

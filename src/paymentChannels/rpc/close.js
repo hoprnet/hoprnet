@@ -134,7 +134,7 @@ module.exports = self => {
         switch (state.state) {
             case self.TransactionRecordState.OPENING:
                 const timeout = setTimeout(() => {
-                    throw Error(`Could not close channel ${chalk.yellow(channel.toString('hex'))} because no one opened it within the timeout.`)
+                    throw Error(`Could not close channel ${chalk.yellow(channelId.toString('hex'))} because no one opened it within the timeout.`)
                 })
 
                 return new Promise(resolve => {

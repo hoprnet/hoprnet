@@ -319,16 +319,12 @@ async function runAsRegularNode() {
 
     console.log(`Connecting to bootstrap node${node.bootstrapServers.length == 1 ? '' : 's'}...`)
 
-    // Scan restore transactions and detect whether they're on-chain available
-
     rl.on('line', async input => {
         rl.pause()
         const [command, query] = input
             .trim()
             .split(SPLIT_OPERAND_QUERY_REGEX)
             .slice(1)
-
-        console.log(`command '${command}' query '${query}'`)
 
         let amount, peerId
         switch (command.trim()) {

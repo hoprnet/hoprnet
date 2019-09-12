@@ -116,6 +116,8 @@ class PaymentChannel extends EventEmitter {
     }
 
     async setState(channelId, newState) {
+        console.log(chalk.blue(this.node.peerInfo.id.toB58String()), newState)
+
         let record = {}
         try {
             record = await this.state(channelId)
@@ -129,7 +131,6 @@ class PaymentChannel extends EventEmitter {
 
         if (record.lastTransaction) record.lastTransaction = record.lastTransaction.toBuffer()
 
-        console.log(chalk.blue(this.node.peerInfo.id.toB58String()), record)
         return this.node.db.put(this.State(channelId), TransactionRecord.encode(record))
     }
 
