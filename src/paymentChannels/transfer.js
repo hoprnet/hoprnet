@@ -38,11 +38,17 @@ module.exports = self => {
         }
 
         switch (record.state) {
+            case self.TransactionRecordState.INITIALIZED:
+                console.log(`Opening channel ${chalk.yellow(channelId.toString('hex'))} with a previously signed restore transaction.`)
+                await self.open(to, record.restoreTransaction)
+                record = await self.state(channelId)
+                break
             case self.TransactionRecordState.SETTLING:
             case self.TransactionRecordState.SETTLED:
                 await self.handleClosedChannel(channelId, true)
                 await self.open(to)
                 record = await self.state(channelId)
+                break
         }
 
         const challenges = [secp256k1.publicKeyCreate(channelKey)]

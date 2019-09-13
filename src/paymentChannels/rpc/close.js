@@ -78,7 +78,7 @@ module.exports = self => {
 
                                         if (!results) throw Error('Got no response from counterparty')
 
-                                        return results.transaction
+                                        return results[0].transaction
                                     })
                             )
                         } catch (err) {
@@ -133,8 +133,11 @@ module.exports = self => {
 
         switch (state.state) {
             case self.TransactionRecordState.OPENING:
+                // This can only happen if the node which initiated the opening procedure
+                // failed while doing that
                 const timeout = setTimeout(() => {
-                    throw Error(`Could not close channel ${chalk.yellow(channelId.toString('hex'))} because no one opened it within the timeout.`)
+                    console.log(`Could not close channel ${chalk.yellow(channelId.toString('hex'))} because no one opened it within the timeout.`)
+                    return self.deleteState(channelId).then(() => new BN(0))
                 })
 
                 return new Promise(resolve => {
@@ -147,7 +150,7 @@ module.exports = self => {
             case self.TransactionRecordState.OPEN:
                 return initiateClosing(channelId, state, networkState)
             default:
-                throw Error('TODO')
+                throw Error(`Channel is in state ${state.state}`)
         }
     }
 

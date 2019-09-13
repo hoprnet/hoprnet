@@ -432,12 +432,12 @@ async function runAsRegularNode() {
                     str += await node.paymentChannels.getAllChannels(
                         channel =>
                             pubKeyToPeerId(channel.state.restoreTransaction.counterparty).then(
-                                peerId => `${chalk.yellow(channelId.toString('hex'))} - ${chalk.blue(peerId.toB58String())}`
+                                peerId => `${chalk.yellow(channel.channelId.toString('hex'))} - ${chalk.blue(peerId.toB58String())}`
                             ),
                         promises => {
                             if (promises.length == 0) return `\n  No open channels.`
 
-                            return Promise.all(promises).then(results.join('\n'))
+                            return Promise.all(promises).then(results => results.join('\n'))
                         }
                     )
                 } catch (err) {
