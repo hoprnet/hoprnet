@@ -102,6 +102,10 @@ a:hover, a:visited, a:link, a:active
   vertical-align: bottom;
 }
 
+.bg-gray{
+   background-color: #f0f0f0;
+}
+
 .how-hopr-work{
   height: auto; min-height: 100vh; position: relative;
 }
@@ -120,7 +124,7 @@ a:hover, a:visited, a:link, a:active
 }
 
 .why-hopr{
-  height: auto; min-height: 100vh; position: relative; background-color: #f0f0f0
+  height: auto; min-height: 100vh; position: relative; 
 }
 
 .why-hopr > .size2{
@@ -135,7 +139,7 @@ a:hover, a:visited, a:link, a:active
   height: 100vh; position: relative; text-align: center;
 }
 .who-is-hopr-container > .who-is-hopr{
-  height: auto; min-height: 100vh; position: relative; background-color: #f0f0f0
+  height: auto; min-height: 100vh; position: relative;
 }
 
 .who-is-hopr > .size2{
@@ -146,7 +150,7 @@ a:hover, a:visited, a:link, a:active
   height: 100vh; position: relative;
 }
 
-#MoreHopr > .size2 {
+.more-hopr > .size2 {
   padding: 5vh 0 5vh 0
 }
 
