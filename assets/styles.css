@@ -12,8 +12,9 @@ body {
     width: 500px;
     max-width: 100%;
     margin: 10 auto 0 auto;
-  }
-  .size2 {
+}
+
+.size2 {
     color: "#000000";
     font-family: 'Courier New', Courier, monospace;
     text-align: center;
@@ -23,7 +24,8 @@ body {
     width: 500px;
     max-width: 100%;
     margin: 20 auto 10 auto;
-  }
+}
+
 .size3 {
     color: "#000000";
     font-family: 'Courier New', Courier, monospace;
@@ -33,8 +35,9 @@ body {
     width: 500px;
     max-width: 100%;
     margin: 0 auto 50 auto;
-  }
-  .ascii-art{
+}
+
+.ascii-art {
     color: "#000000";
     font-family: 'Courier New', Courier, monospace;
     text-align: center;
@@ -42,114 +45,117 @@ body {
     font-size: 6px;
     line-height: 1;
     white-space: pre;
-  }
-  .button {
+}
+
+.button {
     color: "#000000";
     font-family: 'Courier New', Courier, monospace;
     display: inline-block;
     line-height: 1;
     margin: 10 10;
-  }
-  .button:hover {
-    background-color: #f0f0f0;
-  }
-  .blink {
-    animation: blinker 3s linear infinite;
-  }
-  @keyframes blinker {
-    50% {
-      opacity: 0;
-    }
-  }
+}
 
-  a:hover, a:visited, a:link, a:active
-  {
+.button:hover {
+    background-color: #f0f0f0;
+}
+
+.blink {
+    animation: blinker 3s linear infinite;
+}
+
+@keyframes blinker {
+    50% {
+        opacity: 0;
+    }
+}
+
+a:hover,
+a:visited,
+a:link,
+a:active {
     text-decoration: none;
     color: #000000;
-  }
+}
 
-  .flex-container {
+.flex-container {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
-  }
-  
-  .flex-container > div {
+}
+
+.flex-container>div {
     margin: 10px;
     padding: 20px;
-  }
+}
 
-  @media (min-resolution: 300dpi) {
+@media (min-resolution: 300dpi) {
     body {
         font-size: 40px;
     }
-    .ascii-art{
+    .ascii-art {
         font-size: 4px;
-      }
+    }
 }
 
-.center{
-  text-align: center;
+.center {
+    text-align: center;
 }
 
-.px250{
-  width: 250px; 
+.px250 {
+    width: 250px;
 }
 
-.bottom{
-  vertical-align: bottom;
+.bottom {
+    vertical-align: bottom;
 }
 
-#HowDoesHoprWork{
-  height: auto; min-height: 100vh; position: relative;
+.bg-gray {
+    background-color: #f0f0f0;
 }
 
-#HowDoesHoprWork > .size2{
-  padding: 5vh 0 5vh 0
+.animascii-container {
+    opacity: 0.1;
+    padding-top: 50vh;
+    height: 100vh;
+    width: 100%;
+    position: absolute;
+    text-align: center;
 }
 
-
-#animascii-container{
-  opacity: 0.1; padding-top: 50vh; height: 100vh; width: 100%; position: absolute; text-align: center;
+.header {
+    height: auto;
+    min-height: 100vh;
+    position: relative;
+    text-align: center;
+    top: 0px;
+    z-index: 10;
+    resize: none;
+    float: inline-start;
 }
 
-.header{
-  height: auto; min-height: 100vh; position: relative; text-align: center; top: 0px; z-index: 10; resize:none;float:inline-start;
+/* section class  */
+.slice {
+    height: auto;
+    min-height: 100vh;
+    position: relative;
 }
 
-#WhyHopr{
-  height: auto; min-height: 100vh; position: relative; background-color: #f0f0f0
+.slice>.size2 {
+    padding: 5vh 0 5vh 0
 }
 
-#WhyHopr > .size2{
-  padding: 5vh 0 5vh 0
+.slice>.size3 {
+    padding: 0 0 5vh 0
 }
 
-#WhyHopr > .size3{
- padding: 0 0 5vh 0
+.underline {
+    text-decoration: underline
 }
 
-.WhoIsHopr-container{
-  height: 100vh; position: relative; text-align: center;
-}
-.WhoIsHopr-container > #WhoIsHopr{
-  height: auto; min-height: 100vh; position: relative; background-color: #f0f0f0
+.pb-2 {
+    margin-bottom: 45px;
 }
 
-
-#WhoIsHopr > .size2{
-  padding: 5vh 0 5vh 0
+.pb-4 {
+    margin-bottom: 140px;
 }
-
-#MoreHopr {
-  height: 100vh; position: relative;
-}
-
-#MoreHopr > .size2 {
-  padding: 5vh 0 5vh 0
-}
-
-.underline{
-  text-decoration: underline
-}
-
