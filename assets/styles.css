@@ -1,7 +1,6 @@
 body {
     font-size: 20px;
 }
-
 .size1 {
     color: "#000000";
     font-family: 'Courier New', Courier, monospace;
@@ -24,6 +23,8 @@ body {
     max-width: 100%;
     margin: 20 auto 10 auto;
   }
+  
+
 .size3 {
     color: "#000000";
     font-family: 'Courier New', Courier, monospace;
@@ -34,6 +35,7 @@ body {
     max-width: 100%;
     margin: 0 auto 50 auto;
   }
+ 
   .ascii-art{
     color: "#000000";
     font-family: 'Courier New', Courier, monospace;
@@ -86,7 +88,7 @@ body {
     .ascii-art{
         font-size: 4px;
       }
-}
+} 
 
 .center{
   text-align: center;
@@ -100,11 +102,11 @@ body {
   vertical-align: bottom;
 }
 
-#HowDoesHoprWork{
+.how-hopr-work{
   height: auto; min-height: 100vh; position: relative;
 }
 
-#HowDoesHoprWork > .size2{
+.how-hopr-work > .size2{
   padding: 5vh 0 5vh 0
 }
 
@@ -117,31 +119,30 @@ body {
   height: auto; min-height: 100vh; position: relative; text-align: center; top: 0px; z-index: 10; resize:none;float:inline-start;
 }
 
-#WhyHopr{
+.why-hopr{
   height: auto; min-height: 100vh; position: relative; background-color: #f0f0f0
 }
 
-#WhyHopr > .size2{
+.why-hopr > .size2{
   padding: 5vh 0 5vh 0
 }
 
-#WhyHopr > .size3{
+.why-hopr > .size3{
  padding: 0 0 5vh 0
 }
 
-.WhoIsHopr-container{
+.who-is-hopr-container{
   height: 100vh; position: relative; text-align: center;
 }
-.WhoIsHopr-container > #WhoIsHopr{
+.who-is-hopr-container > .who-is-hopr{
   height: auto; min-height: 100vh; position: relative; background-color: #f0f0f0
 }
 
-
-#WhoIsHopr > .size2{
+.who-is-hopr > .size2{
   padding: 5vh 0 5vh 0
 }
 
-#MoreHopr {
+.more-hopr {
   height: 100vh; position: relative;
 }
 
@@ -151,5 +152,9 @@ body {
 
 .underline{
   text-decoration: underline
+}
+
+.pb-2{
+  margin-bottom: 45px;
 }
 

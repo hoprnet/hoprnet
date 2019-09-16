@@ -1,0 +1,15 @@
+<html>
+	<head>
+    		<script src="rot.js"></script>
+        	<script src="animascii.js"></script>
+	</head>
+	<body>
+    	<!-- Do whatever you want here -->
+        	<div id="container"></div>
+        	<script>
+        		var animation = new animascii({src: "animation.json", display: document.getElementById("container"), repeat: -1}, function() {
+            			console.log("finished!");
+            		});
+        	</script>
+	</body>
+</html>

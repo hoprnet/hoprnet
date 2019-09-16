@@ -4,40 +4,25 @@
         <title>HOPR - privacy for the web2 and web3</title>
         <link rel="stylesheet" type="text/css" href="styles.css">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <script src="tmp/ROT.js"></script>
-        <script src="tmp/animascii.js"></script>
+        <script src="js/rot.js"></script>
+        <script src="js/animascii.js"></script>
     </head>
     <body>
         <div id="animascii-container"></div>
         <script>
-            var animation = new animascii({src: "tmp/animation.json", display: document.getElementById("animascii-container"), repeat: -1}, function() {
-                    console.log("finished!");
-                });
+            var animation = new animascii({ src: "tmp/animation.json", display: document.getElementById("animascii-container"), repeat: -1 }, function () {
+                console.log("finished!");
+            });
         </script>
         <div class="header">
-            <div class="size1"><br />HOPR</div>
-            <br />
-            <div class="size2"><br />Protecting your privacy<br />online & on-chain</div>
-            <br />
-            <br />
-            <div class="size3">
+            <div class="size1 pb-2"><br />HOPR</div>
+        
+            <div class="size2 pb-2"><br />Protecting your privacy<br />online & on-chain</div>
+            
+            <div class="size3 pb-3">
                     HOPR is a decentralized & metadata-private point-to-point messaging protocol with incentives.
                 
-                    <br />
-                    <br />
-                    <!--
-                Use HOPR to stop leaking your users' metadata, protect their identity, interests 
-                
-                - take control over your own data
-                - protect user's privacy
-                - new business opportunities because of privacy
-                - derive commercial value from dataset that you couldnt access before because of privacy concerns (e.g. machine learning of medical data) 
-
-
-
-                A privacy layer on top of which you can build 
-                -->
-                <br /><br />
+                    
             </div>
             <div class="center">
                 <div class="button">
@@ -57,9 +42,7 @@
             </div>
         
         </div>
-
-
-        <div id="WhyHopr">
+        <div id="WhyHopr" class="why-hopr">
             <div class="size2">WHY HOPR?</div>
             <div class="size3">
                 HOPR enables a wealth of new opportunities as a foundational privacy layer for the web of today and tomorrow:
@@ -72,27 +55,27 @@
 
 
                         /\\|//\    /¯¯¯¯¯\    
-                       /|-O_O-|\   |-o-o-|    
+                        /|-O_O-|\   |-o-o-|    
                         d  ^  b    C  V  D    
             ///'\       O\-=-/O    | ___ |    
             |6 6|         \_/       \___/     
-       @    \ - /       __| |__   _/<|_|>\_   
-     .@@@. __) (__     /  \_/  \ / |/\_/\| \  
+        @    \ - /       __| |__   _/<|_|>\_   
+        .@@@. __) (__     /  \_/  \ / |/\_/\| \  
     @@6 6@/  \./  \   /  o   o  |    |\|    | 
-     @ = @ :  :  : \  |/ __o__ \| |  |\|  | | 
-     _) (_'|  :  |) ) |\ o   o /| |  |\|  | | 
-   /' \./ '\  :  |_/  ||)=====( \ \\ |\|  | | 
-  / /\ # /\ \=o==|)   (( o   o \ (())\_/__| | 
-  \ \ )  (/ /%|%%'     | o   o |  |   Y   |))\
-   '7/    \7%%|%%'     |   o   |  |   |   | ||
-     |    |`%%|%%'     |_______|  |   |   | ||
-     |    |`%%|%%'       |_|_|    |___|___| ||
-     |    | %%|%%        /X|X\    /qp| |qp\ ||
-     |_.._| /_|_\       (__|__)  (___/ \___)||
+        @ = @ :  :  : \  |/ __o__ \| |  |\|  | | 
+        _) (_'|  :  |) ) |\ o   o /| |  |\|  | | 
+    /' \./ '\  :  |_/  ||)=====( \ \\ |\|  | | 
+    / /\ # /\ \=o==|)   (( o   o \ (())\_/__| | 
+    \ \ )  (/ /%|%%'     | o   o |  |   Y   |))\
+    '7/    \7%%|%%'     |   o   |  |   |   | ||
+        |    |`%%|%%'     |_______|  |   |   | ||
+        |    |`%%|%%'       |_|_|    |___|___| ||
+        |    | %%|%%        /X|X\    /qp| |qp\ ||
+        |_.._| /_|_\       (__|__)  (___/ \___)||
 
 
 
-    </div>
+                    </div>
                     <b>Tap into a growing privacy-aware user base</b><br />
                     Protect them from data-hungry third parties
                 </div>
@@ -101,239 +84,218 @@
 
                 !OOO!            
                 !OOO!            
-              ,"000OOO",         
+                ,"000OOO",         
             "OOOOOOO0OOOO"!      
-         "OOOOOOO000OOOOOOOO     
+            "OOOOOOO000OOOOOOOO     
         OOOOOOO/""""'\OOOOOOO    
         OOOOOOOOO"    !OOOOOO    
-         OOOOOOOOO!   ",OOOOO    
-          OOOOOOOOOO             
-           ,OOOOOOOOOO           
-             OOOOOOOOOO          
-             "!OOOOOOOOOOO       
-               "==OOOOOOOOOO,    
+            OOOOOOOOO!   ",OOOOO    
+            OOOOOOOOOO             
+            ,OOOOOOOOOO           
+                OOOOOOOOOO          
+                "!OOOOOOOOOOO       
+                "==OOOOOOOOOO,    
         ,,,,,,    ",OOOOOOOOO",  
-       "OOOOOO',    ",OOOOOOOO!  
-       OOOOOOOO."~~~"OOOOOOOOO!  
-       ,OOOOOOOOOOOOOOOOOOOO,"   
-         1OOOOOOOOOOOOOOOO0      
+        "OOOOOO',    ",OOOOOOOO!  
+        OOOOOOOO."~~~"OOOOOOOOO!  
+        ,OOOOOOOOOOOOOOOOOOOO,"   
+            1OOOOOOOOOOOOOOOO0      
             """1O000OO1"'        
-               !OOO!             
-               !OOO!             
+                !OOO!             
+                !OOO!             
 
- </div>
-<b>Controlling data is saving money</b><br />
-Defend your right to commercially exploit the data produced by your business
                     </div>
-                    <div class="size3 px250">
-<div class="ascii-art">
-       \                           
-       \                           
-        \\                         
-         \\                        
-          >\/7                     
-      _.-(6'  \                    
-     (=___._/` \                   
-          )  \ |                   
-         /   / |                   
-        /    > /                   
-       j    < _\                   
-   _.-i :      `\.                 
-   \ r=._\       '\.               
-  <`\\_  \i        .\-.            
-   \ r-7  iii ._  ' .  '\          
-    \`,     iiii`7  7)   )         
-     \/         \|  \'  / `-._     
-                ||    ii           
-                 \\  (             
-                 >\  >             
-              ,.-' >.'             
-             <.'_.''               
-               <'                  
-    </div>
-<b>Unlock new businesses opportunities</b><br />
-Use datasets that were previously not accessible to you due to privacy concerns
+                    <b>Controlling data is saving money</b><br /> Defend your right to commercially exploit the data produced by your business
+                </div>
+                <div class="size3 px250">
+                    <div class="ascii-art">
+                        \                           
+                        \                           
+                            \\                         
+                            \\                        
+                            >\/7                     
+                        _.-(6'  \                    
+                        (=___._/` \                   
+                            )  \ |                   
+                            /   / |                   
+                            /    > /                   
+                        j    < _\                   
+                    _.-i :      `\.                 
+                    \ r=._\       '\.               
+                    <`\\_  \i        .\-.            
+                    \ r-7  iii ._  ' .  '\          
+                        \`,     iiii`7  7)   )         
+                        \/         \|  \'  / `-._     
+                                    ||    ii           
+                                    \\  (             
+                                    >\  >             
+                                ,.-' >.'             
+                                <.'_.''               
+                                <'                  
+                        </div>
+                            <b>Unlock new businesses opportunities</b><br /> Use datasets that were previously not accessible to you due to privacy concerns
                     </div>
+                </div>
             </div>
+                
+        </div>
+        <div id="HowDoesHoprWork" class="how-hopr-work">
+            <div class="size2">WHAT IS HOPR?</div>
+            <p class="size2">For cryptographers:</p>
+            <p class="size3">
+                HOPR is a 
+                <a href="https://www.freehaven.net/anonbib/cache/chaum-mix.pdf" target="_blank" class="underline">Chaumian mixnet</a>. On the message layer HOPR is implementing a modified version of the
+                <a href="https://cypherpunks.ca/~iang/pubs/Sphinx_Oakland09.pdf" target="_blank" class="underline">Sphinx package format</a>.
+            </p>
+
+
+            <p class="size2">For developers:</p>
+            <p class="size3">
+                Check out HOPR and contribute on <a class="underline" href="https://github.com/validitylabs/hopr" target="_blank" >GitHub</a> we ♥ open source
+            </p>
+
+            <p class="size2">For miners:</p>
+            <p class="size3">
+                Earn money by running a HOPR relay node relaying messages of other participants (for now testnet money only ;-)
+            </p>
+
+
+            <p class="size2">For investors:</p>
+            <p class="size3">
+                Join the journey of HOPR towards a decentralized & privacy-preserving web 3.0. Get in touch with <a href="mailto:sebastian.buergel@validitylabs.org" target="_blank" class="underline">Sebastian</a> to find out more.
+            </p>
+        </div>
+        <div id="WhoIsHopr" class="who-is-hopr">
+                <div class="size2">WHO IS HOPR?</div>
+            <p class="ascii-art">
+                                .((#%%%%%%%%%%#,                                 
+                                /###%%#%%%&&&&&%%%%/                               
+                            %/(&&%#((((#%%&&&%&%%%%                              
+                            //#(&*.,,,,,,,*/(##%%%%%%                             
+                            *,%%#/.....,,,.,.,,,****/&&                            
+                        **%%##................,,,,/%                            
+                            ((%#/,................,,,.#/                           
+                            #%&%(,.......,.......,.,..#%                           
+                            ##%##,.......,,...........*%                           
+                            *%&%...,#%%%%%#(*,**#%%%%#/(                           
+                        * ,%/.../%(&% %%*...(/&%,(/*                            
+                        .*#.#..,,,**/(#,....*(((*,.,                            
+                            .*  ........,,.....,,,,,..                             
+                            ... ........*(... .,,,....                             
+                            ...*,,*#(**&/**#,//,,                               
+                            .../.,***,,//(*****,.                               
+                            ..,,***,,*/((**,**,                                 
+                            ,,,***..,(##(*.,**                                  
+                            .****,,,,.,,,,*,/                                   
+                            *&@ ..,**/**,***/*,*,                                 
+                            #&@. ...,,*((((#((((..@%                               
+                        *(&%%......,,,,*****,,..%&%#%.                            
+                    /(##&%,......,,,,*,,....*&&%%%&&%*                          
+                    /%%#%%%%&%&%(*,.....,,,,...,,(&%&%%%&&&&%\,                    
+            /((%%%%%%%%%&&&&&&(/*,..,,,,,..,*%%#(%&&&%%&&&%%%%%\                 
+        ,/(##%%&&&&&/%%%&@&&&&&%&(*.........(%#(/@%&%#%&&&&&%%%%\               
+        */(#%%%%%%%&%&%%%%%%%&@&&&&&@/#.      .*((%&&&%%%&&&&&&%%%%%.              
+    /((%%%%%%%%%%&&&%%%%%%%%%&&@&&&&@&&/    .(&&&*%%%%%%%%%&&&%%%%%%              
+    /%%%%%%%%&&%%%%&&&/%%%%%%%&&&&&&&&(#/   .#&&&&@&%%%&%&%%%&&&%%%%&%             
+    %%%%%%%%%%%%%%%&&@%%%%%%%%%@&&&@&&&&&/ (##&%%&@@%%%%%%&%%%%%&%%%%#             
+    %%%&%%%%%%%%&%&&&@&%%%%%%%%@&&&&&&&/(#%&%&&&@@%%%%%%&%%%%%%&%%%%%%             
+    %%%%%%%%%%%%%&&&&&&%(%%%%%%%@&&&&&&&&%#%&%&&&&&&%%%%%%&%%%%%#%%%%%\            
+    %%%%%&%%%%%%&&&&&&&%%%%%%%%%@@%&&&&&&&/%%&&&&&&&%%%%%%&%%%%%%%%%%%%            
+    %%&&&&%&%%%%&&&&&&%%&%%%%%%%@@&%&&&&&&&%%%&&&&&&%%%%%%&%%%%%%%%&&%%*           
+    %&&&&%&%%%%&&&&&&&%%%%%%%%%@@&&&&&&&&&&&&&&&@&%%%%%%%%%%%&&%%(&&%%&%           
+    &%&%&%&%%%%&&&&&&&%%&@%%%%%%%@@&&&&&&&&&&&&&&&@&%%%%%%%%#%%%%%%%&&%%&          
+    %%%%%&&%%%%&&&&&&%%%&@#&%%%%%&@@&&&&&&&%%&&&&&@&%%%%%%%%%%%&%&&%&&&&&          
+    %%&&&&&&&%&&&&&&&%%%%&&%%%%%%%@@&&&&&&&&%&&&&&@&%%%%%&%%%%%%&&&%&&&&&&\        
+    &&&&&&&&@&&&&&&&%%%%&%&%&%%%%%&@@&&&&&&&&&&&&@@&%%%%%&%%%&&%%%%%&&&&&&%        
+    &&&&&%%&@&&&&&&%%%%%&&%&&%%%%%@&@&&&&&&&&&&&@@@%%%%%%&&&%%&&%&%&&&&&&&&\       
+    &&&&&&&&@&&&&&&%%%%&%%%&&&&&%%%&@@&&&&&&&&&&@@@%%%%%%&%&%&%%&%%&&&&&&&&%       
+    &&&&&&%&@&&&&&%%%%&%%&&@&&&&&&%@@@&&&&&&&&&&@@@%%%%%%&&%&&&%%%@&&&&&&&&%       
+    &&&&&%%&@&&&&%%&%&&&&&@&&%&&&%%@@@&&&&&&&&&&@@@%%%%%&&&%%&&&%%@&&&&&&&&%       
+    &&&&%%&&@&&&%%%%%&&&&@@&&&&&%%%@@@&&&&&&&&&&@@@&%%%%&&&&%%%%%%@&&&&&&&&%%      
+            </p>
+            <p class="size2"><a href="https://www.linkedin.com/in/SCBuergel/" class="underline">Dr. Sebastian Bürgel</a> (Lead)</p>
+            <div class="size3">
+                Co-Founder & CTO <a href="https://validitylabs.org" target="_blank">Validity Labs</a>, Previously: Co-founder <a href="https://sonect.net" target="_blank">SONECT</a> (award-winning Swiss fintech)
+                <br />
+                <a href="https://www.linkedin.com/in/scbuergel/" target="_blank">[LinkedIn]</a>
+                <a href="https://github.com/SCBuergel" target="_blank">[GitHub]</a>
             </div>
-         
+
+            <p class="ascii-art">
+    ...............,,,,,,,,,,,,,,...,,,,,,,.......,..,,,,,,,,,,,,,,,,,,,,,,,,,,,,,.
+    ....,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,*(((/*/*,,,,.,,,,,,,,,,,,,,,,,,,,,,,,,,,..
+    ,,,,,,,,,,,,,,,,,,,,,,,,,,,,,//#%%%%%#%%&@@@&(#*,...........,,,,,,,,,,,,,,,..  
+    ,,,,,,,,,,,,,,,,,,,,,,,,,,*%%%%%%%#%%%#%@%&%&@&&%%%%/,......,,,,,,,,,,,,,,,,...
+    .,,,,,,,,,,,...........,%%%%%#%%%%%#&%#&@%%%#&&@%&&&&&%,,,,,,,,,,,,,,,,,,,,,,,.
+    .....................,%%%%%%%&%%@@#%#%((###&@@@&&@&%%%%%,.,,,,,,,,,,,,,,,,,.   
+    ..................../#%%%&%%%&%&@%##&&&####(%%%&@&%@&&%%%%,...,,,,.,,,,,,,,,.  
+    ...................*%%%%%%&%&&&&%##%%%%%#&&%&&&%@&&@&@%@%%%............,,,,,.  
+    .................,*##%%#%%%%%%%#####(#(((//////((%&@@@&%@%%%.............,,,,..
+    .................,%%%&%%%#######(((/*,,,,,,,*****(%%&@&&&%#%#*.............,...
+    ................,%%%&%#######/*,,,,,,,,,,,,,****//(#%%%&&%#***...............  
+    .,.,,,,,,,,,,,,,,/%%###((/*,,,,,,,,,,,,,,,,******/####&%%(###(................ 
+    .,,,,,,,,,,,,.,,,&&(%#///*,,,,,,,,,,,,,,,,*****///(##%#&%#%##..,,,,..........  
+    ..,,,,,,,,,,,.,,,&&&%%#(/****,,,,,,,,,,,,,,*****////(#%%#&%#,...,,.......,...  
+    .,,,,,,,,,,,,.,,,%%%#/*******,,,,,,,,,,,,,,***////#%%&&%&&&&*...,,....,,,....  
+    .,,,,,,,,,......./%%///*/**,,,,,,,,,,,**///////////#&&&&&&/,,,,,,,,,,,,,...    
+    ....,,,,.........,%&&%%%(/(((//%%**,,,(#/********/&&%%%@&%(/**....,,,,,,,,,....
+    ....,,,,.........,(#//***(##/***/*,/**//(/&%(%#((/**(#%/**#.....,,,,,,,,,,,..  
+    ..,.,,,,,,,......//*%/**(/*/((/(#(/**/&*/*/***********/#(,,*(*......,,,,,,,,,..
+    .................//*//******,,**///**//%*,*,,,,,******/(*/**/.......,,,,,,,,,..
+    ................../*/***/*****#////**///**(#//(#********,,(**......,,,,,,,,,...
+    ..................*/(****,,,,**/(/***//*//*,,,,,,*******/(,/,.....,.,,.........
+    .................../******,***/******/**//****************/,,,,,,,,,,..........
+    .....................********/////*********************,,,,,,,,,,,,,,,,,,,,,,..
+    .................,.,.,*****/*****,,,,,,,,************//....,,,,,,,,,,,,,,,,,,..
+    ................,,,,,,,***,*/#%,*,////(,(,/(***,***///,........................
+    .................,,,,,,,***,**/(((//(//((/****,****///.........................
+    .................,,,,,,,,*******///*//**,,***,****///*.....................,...
+    ....,,,,,,,,,,,,,,,,,,,,,.***********,*,,,*******/(/**.........................
+    ,,,,,,,,,,,,,,,,,,,,,,.....*********,,,,,******///****....................,,,,.
+    ,,,,,,,,,,,,,,,,,..........,*/*****,,,,,,***//(/******...............,,,,,,,,,,
+    ............................***///******//((//*********,,,,,,,,,,,,,,,,,,,,,,.,
+    ............................**/*****/////**,,,,,,,,*****,,,,,,,,,,,,,,,,.....,,
+    .......................,,,,,******,,,,,,,,,,,,,,,,,*******/@%,,,,,............,
+    .............,,,,,,,,,,,,,,.,****,,,..,,,,,,,,,,,,,*******/&&&&/.....,,,,,,,,,,
+    .........,,,,,,,,,,,,,,......*****,,,,,,,,,,,,,,,,,******@@@@@@@&&,,,,,,,,.....
+    ......,,,,,,,,,,,,,,,....*&@&/*****,,,,,,,,,,,,,,,,,***&@@@@@@@@@@@&&%,........
+    ,,,,,,,,,,,,,,,,,,..,%@@@@@@//******,,,,,,,,,,,,,,,,*@@@@@@@@@@@@@@@&@&&&,...  
+    ,,,,,,,,,,,,,,,,/@@@@@@@@@@@*******,,,,,,,,,,,,,,,*@@@@@@@@@@@@@@@@@@@@@@&&&%,,
+    ,,,,,,,,,,,(@@@@@@@@@@@@@@@@#*******,,,,,,,,,,,*&@@@@@@@@@@@@@@&@@@@@@@@@@@@&&&
+    ,,,,,,,*%@@@@@@@@@@@@@@@@@@@@&/*****,,,,,,,,*@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@&&
+    ,,,,,*@@@@@@@@@@@@@@@@@@&@@@@@@&/*******#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@&@
+    ,,,,@@@@@@@@@@@@@@@@&@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+    ,,,@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+    ,*@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@&@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+    *@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@&@@@@@@@@@@@@@@@@@@@@@@@
+            </p>
+            <p class="size2"><a href="https://www.linkedin.com/in/robert-kiel-176878161/" class="underline">Robert Kiel</a> (Crypto)</p>
+            <div class="size3 pb-2">
+                MSc from TU Darmstadt in IT Security, specialization in provable security
+                <br>
+                <a href="https://www.linkedin.com/in/robert-kiel-176878161/" target="_blank">[LinkedIn]</a>
+                <a href="https://github.com/robertkiel" target="_blank">[GitHub]</a>
+            </div>
         </div>
-
-
-    <div id="HowDoesHoprWork">
-        <div class="size2">WHAT IS HOPR?</div>
-        <p class="size2">For cryptographers:</p>
-        <p class="size3">
-            HOPR is a 
-            <a href="https://www.freehaven.net/anonbib/cache/chaum-mix.pdf" target="_blank" class="underline">Chaumian mixnet</a>. On the message layer HOPR is implementing a modified version of the
-            <a href="https://cypherpunks.ca/~iang/pubs/Sphinx_Oakland09.pdf" target="_blank" class="underline">Sphinx package format</a>.
-        </p>
-
-
-        <p class="size2">For developers:</p>
-        <p class="size3">
-            Check out HOPR and contribute on <a class="underline" href="https://github.com/validitylabs/hopr" target="_blank" >GitHub</a> we ♥ open source
-        </p>
-
-        <p class="size2">For miners:</p>
-        <p class="size3">
-            Earn money by running a HOPR relay node relaying messages of other participants (for now testnet money only ;-)
-        </p>
-
-
-        <p class="size2">For investors:</p>
-        <p class="size3">
-            Join the journey of HOPR towards a decentralized & privacy-preserving web 3.0. Get in touch with <a href="mailto:sebastian.buergel@validitylabs.org" target="_blank" class="underline">Sebastian</a> to find out more.
-        </p>
-    </div>
-
-
-
-    <div class="WhoIsHopr-container">
-    <div id="WhoIsHopr">
-            <div class="size2">WHO IS HOPR?</div>
-        <p class="ascii-art">
-                              .((#%%%%%%%%%%#,                                 
-                            /###%%#%%%&&&&&%%%%/                               
-                          %/(&&%#((((#%%&&&%&%%%%                              
-                         //#(&*.,,,,,,,*/(##%%%%%%                             
-                        *,%%#/.....,,,.,.,,,****/&&                            
-                       **%%##................,,,,/%                            
-                        ((%#/,................,,,.#/                           
-                        #%&%(,.......,.......,.,..#%                           
-                        ##%##,.......,,...........*%                           
-                        *%&%...,#%%%%%#(*,**#%%%%#/(                           
-                       * ,%/.../%(&% %%*...(/&%,(/*                            
-                       .*#.#..,,,**/(#,....*(((*,.,                            
-                        .*  ........,,.....,,,,,..                             
-                        ... ........*(... .,,,....                             
-                           ...*,,*#(**&/**#,//,,                               
-                           .../.,***,,//(*****,.                               
-                           ..,,***,,*/((**,**,                                 
-                           ,,,***..,(##(*.,**                                  
-                           .****,,,,.,,,,*,/                                   
-                         *&@ ..,**/**,***/*,*,                                 
-                        #&@. ...,,*((((#((((..@%                               
-                     *(&%%......,,,,*****,,..%&%#%.                            
-                   /(##&%,......,,,,*,,....*&&%%%&&%*                          
-                /%%#%%%%&%&%(*,.....,,,,...,,(&%&%%%&&&&%\,                    
-          /((%%%%%%%%%&&&&&&(/*,..,,,,,..,*%%#(%&&&%%&&&%%%%%\                 
-       ,/(##%%&&&&&/%%%&@&&&&&%&(*.........(%#(/@%&%#%&&&&&%%%%\               
-    */(#%%%%%%%&%&%%%%%%%&@&&&&&@/#.      .*((%&&&%%%&&&&&&%%%%%.              
- /((%%%%%%%%%%&&&%%%%%%%%%&&@&&&&@&&/    .(&&&*%%%%%%%%%&&&%%%%%%              
-/%%%%%%%%&&%%%%&&&/%%%%%%%&&&&&&&&(#/   .#&&&&@&%%%&%&%%%&&&%%%%&%             
-%%%%%%%%%%%%%%%&&@%%%%%%%%%@&&&@&&&&&/ (##&%%&@@%%%%%%&%%%%%&%%%%#             
-%%%&%%%%%%%%&%&&&@&%%%%%%%%@&&&&&&&/(#%&%&&&@@%%%%%%&%%%%%%&%%%%%%             
-%%%%%%%%%%%%%&&&&&&%(%%%%%%%@&&&&&&&&%#%&%&&&&&&%%%%%%&%%%%%#%%%%%\            
-%%%%%&%%%%%%&&&&&&&%%%%%%%%%@@%&&&&&&&/%%&&&&&&&%%%%%%&%%%%%%%%%%%%            
-%%&&&&%&%%%%&&&&&&%%&%%%%%%%@@&%&&&&&&&%%%&&&&&&%%%%%%&%%%%%%%%&&%%*           
-%&&&&%&%%%%&&&&&&&%%%%%%%%%@@&&&&&&&&&&&&&&&@&%%%%%%%%%%%&&%%(&&%%&%           
-&%&%&%&%%%%&&&&&&&%%&@%%%%%%%@@&&&&&&&&&&&&&&&@&%%%%%%%%#%%%%%%%&&%%&          
-%%%%%&&%%%%&&&&&&%%%&@#&%%%%%&@@&&&&&&&%%&&&&&@&%%%%%%%%%%%&%&&%&&&&&          
-%%&&&&&&&%&&&&&&&%%%%&&%%%%%%%@@&&&&&&&&%&&&&&@&%%%%%&%%%%%%&&&%&&&&&&\        
-&&&&&&&&@&&&&&&&%%%%&%&%&%%%%%&@@&&&&&&&&&&&&@@&%%%%%&%%%&&%%%%%&&&&&&%        
-&&&&&%%&@&&&&&&%%%%%&&%&&%%%%%@&@&&&&&&&&&&&@@@%%%%%%&&&%%&&%&%&&&&&&&&\       
-&&&&&&&&@&&&&&&%%%%&%%%&&&&&%%%&@@&&&&&&&&&&@@@%%%%%%&%&%&%%&%%&&&&&&&&%       
-&&&&&&%&@&&&&&%%%%&%%&&@&&&&&&%@@@&&&&&&&&&&@@@%%%%%%&&%&&&%%%@&&&&&&&&%       
-&&&&&%%&@&&&&%%&%&&&&&@&&%&&&%%@@@&&&&&&&&&&@@@%%%%%&&&%%&&&%%@&&&&&&&&%       
-&&&&%%&&@&&&%%%%%&&&&@@&&&&&%%%@@@&&&&&&&&&&@@@&%%%%&&&&%%%%%%@&&&&&&&&%%      
-        </p>
-        <p class="size2"><a href="https://www.linkedin.com/in/SCBuergel/" class="underline">Dr. Sebastian Bürgel</a> (Lead)</p>
-        <div class="size3">
-            Co-Founder & CTO <a href="https://validitylabs.org" target="_blank">Validity Labs</a>, Previously: Co-founder <a href="https://sonect.net" target="_blank">SONECT</a> (award-winning Swiss fintech)
-            <br />
-            <a href="https://www.linkedin.com/in/scbuergel/" target="_blank">[LinkedIn]</a>
-            <a href="https://github.com/SCBuergel" target="_blank">[GitHub]</a>
+        <div id="MoreHopr" >
+            <div class="size2 pb-2">MORE HOPR?!</div>
+            <p class="size2">How does it work?</p>
+            <p class="size3 pb-2">
+                We had the honor of presenting and demoing HOPR at EthCC2019 in Paris. If you missed it check out the video
+                <a href="https://www.youtube.com/watch?v=mcnezYJXuXw" target="_blank" class="underline">here</a>.
+            </p>
+            <p class="size2">TLDR pls?</p>
+            <p class="size3 pb-2">
+                HOPR is a privacy-preserving messaging protocol that incentivizes users to participate in the network. It provides privacy by relaying messages via several relay nodes to the recipient. Relay nodes are getting paid via payment channels for their services.
+            </p>
+            <p class="size2">Where does it live?</p>
+            <p class="size3">
+                HOPR loves GitHub, check out our
+                <a href="https://github.com/validitylabs/hopr" target="_blank" class="underline">repository</a>.
+                The bootstrap node is running at hopr.network (just like this website).
+                HOPR is the brain child of Validity Labs AG and can be found at Technoparkstrasse 1, 8005 Zürich, Switzerland.
+            </p>
         </div>
-
-        <p class="ascii-art">
-...............,,,,,,,,,,,,,,...,,,,,,,.......,..,,,,,,,,,,,,,,,,,,,,,,,,,,,,,.
-....,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,*(((/*/*,,,,.,,,,,,,,,,,,,,,,,,,,,,,,,,,..
-,,,,,,,,,,,,,,,,,,,,,,,,,,,,,//#%%%%%#%%&@@@&(#*,...........,,,,,,,,,,,,,,,..  
-,,,,,,,,,,,,,,,,,,,,,,,,,,*%%%%%%%#%%%#%@%&%&@&&%%%%/,......,,,,,,,,,,,,,,,,...
-.,,,,,,,,,,,...........,%%%%%#%%%%%#&%#&@%%%#&&@%&&&&&%,,,,,,,,,,,,,,,,,,,,,,,.
-.....................,%%%%%%%&%%@@#%#%((###&@@@&&@&%%%%%,.,,,,,,,,,,,,,,,,,.   
-..................../#%%%&%%%&%&@%##&&&####(%%%&@&%@&&%%%%,...,,,,.,,,,,,,,,.  
-...................*%%%%%%&%&&&&%##%%%%%#&&%&&&%@&&@&@%@%%%............,,,,,.  
-.................,*##%%#%%%%%%%#####(#(((//////((%&@@@&%@%%%.............,,,,..
-.................,%%%&%%%#######(((/*,,,,,,,*****(%%&@&&&%#%#*.............,...
-................,%%%&%#######/*,,,,,,,,,,,,,****//(#%%%&&%#***...............  
-.,.,,,,,,,,,,,,,,/%%###((/*,,,,,,,,,,,,,,,,******/####&%%(###(................ 
-.,,,,,,,,,,,,.,,,&&(%#///*,,,,,,,,,,,,,,,,*****///(##%#&%#%##..,,,,..........  
-..,,,,,,,,,,,.,,,&&&%%#(/****,,,,,,,,,,,,,,*****////(#%%#&%#,...,,.......,...  
-.,,,,,,,,,,,,.,,,%%%#/*******,,,,,,,,,,,,,,***////#%%&&%&&&&*...,,....,,,....  
-.,,,,,,,,,......./%%///*/**,,,,,,,,,,,**///////////#&&&&&&/,,,,,,,,,,,,,...    
-....,,,,.........,%&&%%%(/(((//%%**,,,(#/********/&&%%%@&%(/**....,,,,,,,,,....
-....,,,,.........,(#//***(##/***/*,/**//(/&%(%#((/**(#%/**#.....,,,,,,,,,,,..  
-..,.,,,,,,,......//*%/**(/*/((/(#(/**/&*/*/***********/#(,,*(*......,,,,,,,,,..
-.................//*//******,,**///**//%*,*,,,,,******/(*/**/.......,,,,,,,,,..
-................../*/***/*****#////**///**(#//(#********,,(**......,,,,,,,,,...
-..................*/(****,,,,**/(/***//*//*,,,,,,*******/(,/,.....,.,,.........
-.................../******,***/******/**//****************/,,,,,,,,,,..........
-.....................********/////*********************,,,,,,,,,,,,,,,,,,,,,,..
-.................,.,.,*****/*****,,,,,,,,************//....,,,,,,,,,,,,,,,,,,..
-................,,,,,,,***,*/#%,*,////(,(,/(***,***///,........................
-.................,,,,,,,***,**/(((//(//((/****,****///.........................
-.................,,,,,,,,*******///*//**,,***,****///*.....................,...
-....,,,,,,,,,,,,,,,,,,,,,.***********,*,,,*******/(/**.........................
-,,,,,,,,,,,,,,,,,,,,,,.....*********,,,,,******///****....................,,,,.
-,,,,,,,,,,,,,,,,,..........,*/*****,,,,,,***//(/******...............,,,,,,,,,,
-............................***///******//((//*********,,,,,,,,,,,,,,,,,,,,,,.,
-............................**/*****/////**,,,,,,,,*****,,,,,,,,,,,,,,,,.....,,
-.......................,,,,,******,,,,,,,,,,,,,,,,,*******/@%,,,,,............,
-.............,,,,,,,,,,,,,,.,****,,,..,,,,,,,,,,,,,*******/&&&&/.....,,,,,,,,,,
-.........,,,,,,,,,,,,,,......*****,,,,,,,,,,,,,,,,,******@@@@@@@&&,,,,,,,,.....
-......,,,,,,,,,,,,,,,....*&@&/*****,,,,,,,,,,,,,,,,,***&@@@@@@@@@@@&&%,........
-,,,,,,,,,,,,,,,,,,..,%@@@@@@//******,,,,,,,,,,,,,,,,*@@@@@@@@@@@@@@@&@&&&,...  
-,,,,,,,,,,,,,,,,/@@@@@@@@@@@*******,,,,,,,,,,,,,,,*@@@@@@@@@@@@@@@@@@@@@@&&&%,,
-,,,,,,,,,,,(@@@@@@@@@@@@@@@@#*******,,,,,,,,,,,*&@@@@@@@@@@@@@@&@@@@@@@@@@@@&&&
-,,,,,,,*%@@@@@@@@@@@@@@@@@@@@&/*****,,,,,,,,*@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@&&
-,,,,,*@@@@@@@@@@@@@@@@@@&@@@@@@&/*******#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@&@
-,,,,@@@@@@@@@@@@@@@@&@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-,,,@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-,*@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@&@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-*@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@&@@@@@@@@@@@@@@@@@@@@@@@
-        </p>
-        <p class="size2"><a href="https://www.linkedin.com/in/robert-kiel-176878161/" class="underline">Robert Kiel</a> (Crypto)</p>
-        <div class="size3">
-            MSc from TU Darmstadt in IT Security, specialization in provable security
-            <br>
-            <a href="https://www.linkedin.com/in/robert-kiel-176878161/" target="_blank">[LinkedIn]</a>
-            <a href="https://github.com/robertkiel" target="_blank">[GitHub]</a>
-        </div>
-        <br />
-    </div>
-
-
-
-    <div id="MoreHopr" >
-            <div class="size2">MORE HOPR?!</div>
-
-    <br />
-    <p class="size2">How does it work?</p>
-    <p class="size3">
-        We had the honor of presenting and demoing HOPR at EthCC2019 in Paris. If you missed it check out the video
-        <a href="https://www.youtube.com/watch?v=mcnezYJXuXw" target="_blank" class="underline">here</a>.
-    </p>
-
-
-    <br />
-    <br />
-    <p class="size2">TLDR pls?</p>
-    <p class="size3">
-        HOPR is a privacy-preserving messaging protocol that incentivizes users to participate in the network. It provides privacy by relaying messages via several relay nodes to the recipient. Relay nodes are getting paid via payment channels for their services.
-    </p>
-
-    <br />
-    <br />
-    <p class="size2">Where does it live?</p>
-    <p class="size3">
-        HOPR loves GitHub, check out our
-        <a href="https://github.com/validitylabs/hopr" target="_blank" class="underline">repository</a>.
-        The bootstrap node is running at hopr.network (just like this website).
-        HOPR is the brain child of Validity Labs AG and can be found at Technoparkstrasse 1, 8005 Zürich, Switzerland.
-    </p>
-    </div>
 
     </body>
 </html>
