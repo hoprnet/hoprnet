@@ -87,3 +87,69 @@ body {
         font-size: 4px;
       }
 }
+
+.center{
+  text-align: center;
+}
+
+.px250{
+  width: 250px; 
+}
+
+.bottom{
+  vertical-align: bottom;
+}
+
+#HowDoesHoprWork{
+  height: auto; min-height: 100vh; position: relative;
+}
+
+#HowDoesHoprWork > .size2{
+  padding: 5vh 0 5vh 0
+}
+
+
+#animascii-container{
+  opacity: 0.1; padding-top: 50vh; height: 100vh; width: 100%; position: absolute; text-align: center;
+}
+
+.header{
+  height: auto; min-height: 100vh; position: relative; text-align: center; top: 0px; z-index: 10; resize:none;float:inline-start;
+}
+
+#WhyHopr{
+  height: auto; min-height: 100vh; position: relative; background-color: #f0f0f0
+}
+
+#WhyHopr > .size2{
+  padding: 5vh 0 5vh 0
+}
+
+#WhyHopr > .size3{
+ padding: 0 0 5vh 0
+}
+
+.WhoIsHopr-container{
+  height: 100vh; position: relative; text-align: center;
+}
+.WhoIsHopr-container > #WhoIsHopr{
+  height: auto; min-height: 100vh; position: relative; background-color: #f0f0f0
+}
+
+
+#WhoIsHopr > .size2{
+  padding: 5vh 0 5vh 0
+}
+
+#MoreHopr {
+  height: 100vh; position: relative;
+}
+
+#MoreHopr > .size2 {
+  padding: 5vh 0 5vh 0
+}
+
+.underline{
+  text-decoration: underline
+}
+

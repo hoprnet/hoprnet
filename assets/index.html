@@ -8,13 +8,13 @@
         <script src="tmp/animascii.js"></script>
     </head>
     <body>
-        <div id="animascii-container" style="opacity: 0.1; padding-top: 50vh; height: 100vh; width: 100%; position: absolute; text-align: center;"></div>
+        <div id="animascii-container"></div>
         <script>
             var animation = new animascii({src: "tmp/animation.json", display: document.getElementById("animascii-container"), repeat: -1}, function() {
                     console.log("finished!");
                 });
         </script>
-        <div style="height: auto; min-height: 100vh; position: relative; text-align: center; top: 0px; z-index: 10; resize:none;float:inline-start;">
+        <div class="header">
             <div class="size1"><br />HOPR</div>
             <br />
             <div class="size2"><br />Protecting your privacy<br />online & on-chain</div>
@@ -39,7 +39,7 @@
                 -->
                 <br /><br />
             </div>
-            <div style="text-align: center;">
+            <div class="center">
                 <div class="button">
                     <a href="#WhyHopr">
                         |¯¯¯¯¯¯¯¯¯¯¯¯|<br />
@@ -55,22 +55,18 @@
                     </a>
                 </div>
             </div>
-            <!--
-            <div class="size3 blink" style="position: absolute; bottom: 50px; right: 50px; text-align: right; width: 100%; line-height: 1">
-                <a href="#WhatIsHopr">|<br />|<br />V</a>
-            </div>
-            -->
+        
         </div>
 
 
-        <div id="WhyHopr" style="height: auto; min-height: 100vh; position: relative; background-color: #f0f0f0">
-            <div class="size2" style="padding: 5vh 0 5vh 0">WHY HOPR?</div>
-            <div class="size3" style="padding: 0 0 5vh 0">
+        <div id="WhyHopr">
+            <div class="size2">WHY HOPR?</div>
+            <div class="size3">
                 HOPR enables a wealth of new opportunities as a foundational privacy layer for the web of today and tomorrow:
             </div>
 
             <div class="flex-container">
-                <div class="size3" style="width: 250px; vertical-align: bottom;">
+                <div class="size3 px250 bottom">
                     <div class="ascii-art">
 
 
@@ -100,7 +96,7 @@
                     <b>Tap into a growing privacy-aware user base</b><br />
                     Protect them from data-hungry third parties
                 </div>
-                <div class="size3" style="width: 250px;">
+                <div class="size3 px250">
                     <div class="ascii-art">
 
                 !OOO!            
@@ -129,7 +125,7 @@
 <b>Controlling data is saving money</b><br />
 Defend your right to commercially exploit the data produced by your business
                     </div>
-                    <div class="size3" style="width: 250px;">
+                    <div class="size3 px250">
 <div class="ascii-art">
        \                           
        \                           
@@ -160,27 +156,23 @@ Use datasets that were previously not accessible to you due to privacy concerns
                     </div>
             </div>
             </div>
-            <!--
-            <div class="size3 blink" style="position: absolute; bottom: 50px; right: 50px; text-align: right; width: 100%; line-height: 1">
-                    <a href="#HowDoesHoprWork">|<br />|<br />V</a>
-            </div>
-            -->
+         
         </div>
 
 
-    <div id="HowDoesHoprWork" style="height: auto; min-height: 100vh; position: relative;">
-        <div class="size2" style="padding: 5vh 0 5vh 0">WHAT IS HOPR?</div>
+    <div id="HowDoesHoprWork">
+        <div class="size2">WHAT IS HOPR?</div>
         <p class="size2">For cryptographers:</p>
         <p class="size3">
             HOPR is a 
-            <a href="https://www.freehaven.net/anonbib/cache/chaum-mix.pdf" target="_blank" style="text-decoration: underline">Chaumian mixnet</a>. On the message layer HOPR is implementing a modified version of the
-            <a href="https://cypherpunks.ca/~iang/pubs/Sphinx_Oakland09.pdf" target="_blank" style="text-decoration: underline">Sphinx package format</a>.
+            <a href="https://www.freehaven.net/anonbib/cache/chaum-mix.pdf" target="_blank" class="underline">Chaumian mixnet</a>. On the message layer HOPR is implementing a modified version of the
+            <a href="https://cypherpunks.ca/~iang/pubs/Sphinx_Oakland09.pdf" target="_blank" class="underline">Sphinx package format</a>.
         </p>
 
 
         <p class="size2">For developers:</p>
         <p class="size3">
-            Check out HOPR and contribute on <a href="https://github.com/validitylabs/hopr" target="_blank" style="text-decoration: underline">GitHub</a> we ♥ open source
+            Check out HOPR and contribute on <a class="underline" href="https://github.com/validitylabs/hopr" target="_blank" >GitHub</a> we ♥ open source
         </p>
 
         <p class="size2">For miners:</p>
@@ -191,15 +183,15 @@ Use datasets that were previously not accessible to you due to privacy concerns
 
         <p class="size2">For investors:</p>
         <p class="size3">
-            Join the journey of HOPR towards a decentralized & privacy-preserving web 3.0. Get in touch with <a href="mailto:sebastian.buergel@validitylabs.org" target="_blank" style="text-decoration: underline">Sebastian</a> to find out more.
+            Join the journey of HOPR towards a decentralized & privacy-preserving web 3.0. Get in touch with <a href="mailto:sebastian.buergel@validitylabs.org" target="_blank" class="underline">Sebastian</a> to find out more.
         </p>
     </div>
 
 
 
-    <div style="height: 100vh; position: relative; text-align: center;">
-    <div id="WhoIsHopr" style="height: auto; min-height: 100vh; position: relative; background-color: #f0f0f0">
-            <div class="size2" style="padding: 5vh 0 5vh 0">WHO IS HOPR?</div>
+    <div class="WhoIsHopr-container">
+    <div id="WhoIsHopr">
+            <div class="size2">WHO IS HOPR?</div>
         <p class="ascii-art">
                               .((#%%%%%%%%%%#,                                 
                             /###%%#%%%&&&&&%%%%/                               
@@ -246,7 +238,7 @@ Use datasets that were previously not accessible to you due to privacy concerns
 &&&&&%%&@&&&&%%&%&&&&&@&&%&&&%%@@@&&&&&&&&&&@@@%%%%%&&&%%&&&%%@&&&&&&&&%       
 &&&&%%&&@&&&%%%%%&&&&@@&&&&&%%%@@@&&&&&&&&&&@@@&%%%%&&&&%%%%%%@&&&&&&&&%%      
         </p>
-        <p class="size2"><a href="https://www.linkedin.com/in/SCBuergel/" style="text-decoration: underline">Dr. Sebastian Bürgel</a> (Lead)</p>
+        <p class="size2"><a href="https://www.linkedin.com/in/SCBuergel/" class="underline">Dr. Sebastian Bürgel</a> (Lead)</p>
         <div class="size3">
             Co-Founder & CTO <a href="https://validitylabs.org" target="_blank">Validity Labs</a>, Previously: Co-founder <a href="https://sonect.net" target="_blank">SONECT</a> (award-winning Swiss fintech)
             <br />
@@ -302,7 +294,7 @@ Use datasets that were previously not accessible to you due to privacy concerns
 ,*@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@&@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 *@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@&@@@@@@@@@@@@@@@@@@@@@@@
         </p>
-        <p class="size2"><a href="https://www.linkedin.com/in/robert-kiel-176878161/" style="text-decoration: underline">Robert Kiel</a> (Crypto)</p>
+        <p class="size2"><a href="https://www.linkedin.com/in/robert-kiel-176878161/" class="underline">Robert Kiel</a> (Crypto)</p>
         <div class="size3">
             MSc from TU Darmstadt in IT Security, specialization in provable security
             <br>
@@ -314,14 +306,14 @@ Use datasets that were previously not accessible to you due to privacy concerns
 
 
 
-    <div id="MoreHopr" style="height: 100vh; position: relative;">
-            <div class="size2" style="padding: 5vh 0 5vh 0">MORE HOPR?!</div>
+    <div id="MoreHopr" >
+            <div class="size2">MORE HOPR?!</div>
 
     <br />
     <p class="size2">How does it work?</p>
     <p class="size3">
         We had the honor of presenting and demoing HOPR at EthCC2019 in Paris. If you missed it check out the video
-        <a href="https://www.youtube.com/watch?v=mcnezYJXuXw" target="_blank" style="text-decoration: underline">here</a>.
+        <a href="https://www.youtube.com/watch?v=mcnezYJXuXw" target="_blank" class="underline">here</a>.
     </p>
 
 
@@ -337,7 +329,7 @@ Use datasets that were previously not accessible to you due to privacy concerns
     <p class="size2">Where does it live?</p>
     <p class="size3">
         HOPR loves GitHub, check out our
-        <a href="https://github.com/validitylabs/hopr" target="_blank" style="text-decoration: underline">repository</a>.
+        <a href="https://github.com/validitylabs/hopr" target="_blank" class="underline">repository</a>.
         The bootstrap node is running at hopr.network (just like this website).
         HOPR is the brain child of Validity Labs AG and can be found at Technoparkstrasse 1, 8005 Zürich, Switzerland.
     </p>
