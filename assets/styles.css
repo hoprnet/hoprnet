@@ -11,8 +11,8 @@ body {
     width: 500px;
     max-width: 100%;
     margin: 10 auto 0 auto;
-  }
-  .size2 {
+}
+.size2 {
     color: "#000000";
     font-family: 'Courier New', Courier, monospace;
     text-align: center;
@@ -22,72 +22,72 @@ body {
     width: 500px;
     max-width: 100%;
     margin: 20 auto 10 auto;
-  }
+}
   
 
 .size3 {
-    color: "#000000";
-    font-family: 'Courier New', Courier, monospace;
-    text-align: center;
-    font-weight: 200;
-    line-height: 30px;
-    width: 500px;
-    max-width: 100%;
-    margin: 0 auto 50 auto;
+  color: "#000000";
+  font-family: 'Courier New', Courier, monospace;
+  text-align: center;
+  font-weight: 200;
+  line-height: 30px;
+  width: 500px;
+  max-width: 100%;
+  margin: 0 auto 50 auto;
+}
+
+.ascii-art{
+  color: "#000000";
+  font-family: 'Courier New', Courier, monospace;
+  text-align: center;
+  font-weight: 900;
+  font-size: 6px;
+  line-height: 1;
+  white-space: pre;
+}
+.button {
+  color: "#000000";
+  font-family: 'Courier New', Courier, monospace;
+  display: inline-block;
+  line-height: 1;
+  margin: 10 10;
+}
+.button:hover {
+  background-color: #f0f0f0;
+}
+.blink {
+  animation: blinker 3s linear infinite;
+}
+@keyframes blinker {
+50% {
+  opacity: 0;
+}
+}
+
+a:hover, a:visited, a:link, a:active
+{
+  text-decoration: none;
+  color: #000000;
+}
+
+.flex-container {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.flex-container > div {
+  margin: 10px;
+  padding: 20px;
+}
+
+@media (min-resolution: 300dpi) {
+  body {
+      font-size: 40px;
   }
- 
   .ascii-art{
-    color: "#000000";
-    font-family: 'Courier New', Courier, monospace;
-    text-align: center;
-    font-weight: 900;
-    font-size: 6px;
-    line-height: 1;
-    white-space: pre;
-  }
-  .button {
-    color: "#000000";
-    font-family: 'Courier New', Courier, monospace;
-    display: inline-block;
-    line-height: 1;
-    margin: 10 10;
-  }
-  .button:hover {
-    background-color: #f0f0f0;
-  }
-  .blink {
-    animation: blinker 3s linear infinite;
-  }
-  @keyframes blinker {
-    50% {
-      opacity: 0;
+      font-size: 4px;
     }
-  }
-
-  a:hover, a:visited, a:link, a:active
-  {
-    text-decoration: none;
-    color: #000000;
-  }
-
-  .flex-container {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-  
-  .flex-container > div {
-    margin: 10px;
-    padding: 20px;
-  }
-
-  @media (min-resolution: 300dpi) {
-    body {
-        font-size: 40px;
-    }
-    .ascii-art{
-        font-size: 4px;
-      }
 } 
 
 .center{
@@ -156,5 +156,9 @@ body {
 
 .pb-2{
   margin-bottom: 45px;
+}
+
+.pb-4{
+  margin-bottom: 140px;
 }
 
