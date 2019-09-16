@@ -27,6 +27,7 @@ contract mockChannel {
         if (!Channels[channelId].isOpen) {
             Channels[channelId].partyA = msg.sender;
             Channels[channelId].partyB = partyB;
+            Channels[channelId].isOpen = true;
             numChannels++;
             emit openedChannel(channelId, amount, block.timestamp);
         }
@@ -37,6 +38,7 @@ contract mockChannel {
     function close(bytes32 channelId) public {
         if (Channels[channelId].isOpen) {
             emit closedChannel(channelId, Channels[channelId].amount, block.timestamp);
+            Channels[channelId].isOpen = false;
             totalAmount -= Channels[channelId].amount;
             numChannels--;
             Channels[channelId].isOpen = false;
