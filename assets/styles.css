@@ -164,7 +164,7 @@ a:active {
 }
 
 .hamheader {
-    background-color: #343a40;
+    background-color: #000000;
     font-family: "Courier New", Courier, monospace;
     font-size: 1.3rem;
     box-shadow: 1px 1px 4px 0 rgba(0, 0, 0, 0.1);
@@ -194,7 +194,7 @@ a:active {
     letter-spacing: 1.5px;
     display: block;
     padding: 20px 20px;
-    color: rgba(255, 255, 255, 0.5);
+    color: #aaaaaa;
     text-decoration: none;
     margin-left: 5px;
     margin-right: 5px;
@@ -202,8 +202,8 @@ a:active {
 
 .hamheader li a:hover,
 .hamheader .menu-btn:hover {
-    background-color: #1d2124da;
-    color: rgba(255, 255, 255, 0.75);
+    background-color: #555555;
+    color: #ffffff;
 }
 
 .hamheader .logo {
@@ -232,7 +232,7 @@ a:active {
 }
 
 .hamheader .menu-icon .navicon {
-    background: #fff;
+    background: #ffffff;
     display: block;
     height: 2px;
     position: relative;
@@ -242,7 +242,7 @@ a:active {
 
 .hamheader .menu-icon .navicon:before,
 .hamheader .menu-icon .navicon:after {
-    background: #fff;
+    background: #ffffff;
     content: "";
     display: block;
     height: 100%;
