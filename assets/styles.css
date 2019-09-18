@@ -1,5 +1,7 @@
 body {
     font-size: 20px;
+    margin-top: 50px;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .size1 {
@@ -138,6 +140,7 @@ a:active {
     height: auto;
     min-height: 100vh;
     position: relative;
+    padding-top: 50px;
 }
 
 .slice>.size2 {
@@ -158,4 +161,146 @@ a:active {
 
 .pb-4 {
     margin-bottom: 140px;
+}
+
+.hamheader {
+    background-color: #343a40;
+    font-family: "Courier New", Courier, monospace;
+    font-size: 1.3rem;
+    box-shadow: 1px 1px 4px 0 rgba(0, 0, 0, 0.1);
+    position: fixed;
+    width: 100%;
+    top: 0;
+    left: 0;
+    z-index: 25;
+    color: #fff;
+}
+
+.hamheader ul {
+    text-align: center;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    overflow: hidden;
+    height: 100%;
+}
+
+.hamheader a {
+    color: #fff;
+}
+
+.hamheader li a {
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    display: block;
+    padding: 20px 20px;
+    color: rgba(255, 255, 255, 0.5);
+    text-decoration: none;
+    margin-left: 5px;
+    margin-right: 5px;
+}
+
+.hamheader li a:hover,
+.hamheader .menu-btn:hover {
+    background-color: #1d2124da;
+    color: rgba(255, 255, 255, 0.75);
+}
+
+.hamheader .logo {
+    display: block;
+    float: left;
+    letter-spacing: 1.5px;
+    font-size: 1.5em;
+    font-weight: 600;
+    padding: 10px 20px;
+    text-decoration: none;
+}
+
+.hamheader .menu {
+    clear: both;
+    max-height: 0;
+    transition: max-height 0.2s ease-out;
+}
+
+.hamheader .menu-icon {
+    cursor: pointer;
+    display: inline-block;
+    float: right;
+    padding: 28px 20px;
+    position: relative;
+    user-select: none;
+}
+
+.hamheader .menu-icon .navicon {
+    background: #fff;
+    display: block;
+    height: 2px;
+    position: relative;
+    transition: background 0.2s ease-out;
+    width: 18px;
+}
+
+.hamheader .menu-icon .navicon:before,
+.hamheader .menu-icon .navicon:after {
+    background: #fff;
+    content: "";
+    display: block;
+    height: 100%;
+    position: absolute;
+    transition: all 0.2s ease-out;
+    width: 100%;
+}
+
+.hamheader .menu-icon .navicon:before {
+    top: 5px;
+}
+
+.hamheader .menu-icon .navicon:after {
+    top: -5px;
+}
+
+.hamheader .menu-btn {
+    display: none;
+}
+
+.hamheader .menu-btn:checked ~ .menu {
+    max-height: 300px;
+}
+
+.hamheader .menu-btn:checked ~ .menu-icon .navicon {
+    background: transparent;
+}
+
+.hamheader .menu-btn:checked ~ .menu-icon .navicon:before {
+    transform: rotate(-45deg);
+}
+
+.hamheader .menu-btn:checked ~ .menu-icon .navicon:after {
+    transform: rotate(45deg);
+}
+
+.hamheader .menu-btn:checked ~ .menu-icon:not(.steps) .navicon:before,
+.hamheader .menu-btn:checked ~ .menu-icon:not(.steps) .navicon:after {
+    top: 0;
+}
+
+@media (min-width: 48em) {
+    .hamheader li {
+        float: left;
+    }
+    .hamheader li a {
+        padding: 15px 10px;
+        font-weight: 600;
+    }
+    .hamheader .menu {
+        clear: none;
+        float: right;
+        max-height: none;
+    }
+    .hamheader .menu-icon {
+        display: none;
+    }
+    .hamheader .logo {
+        font-weight: 600;
+    }
 }
