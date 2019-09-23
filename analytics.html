@@ -1,0 +1,189 @@
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>HOPR Channels Analytics</title>
+  <style>
+    body { font: 12px Arial;}
+    #chart-container {
+      width: 60%;
+      height: 60%;
+      margin: 10% auto;
+    }
+
+    path { 
+      fill: none;
+    }
+
+    .axis path,
+    .axis line {
+        fill: none;
+        stroke: grey;
+        stroke-width: 1;
+        shape-rendering: crispEdges;
+    }
+  </style>
+</head>
+<body>
+  <div id="chart-container">
+
+  </div>
+  <script src="https://d3js.org/d3.v3.min.js"></script>
+  <script>
+      var contract;
+      var channelEventRecords = [];
+      var svg, timeScale, amountScale, countScale, width, height, margin;
+      var xAxis, yAxisAmount, yAxisCount, amountLine, countLine
+      var parseDate = d3.time.format("%Y-%m-%d %X").parse;
+
+      window.addEventListener('load', function() {
+        initChart();
+
+        if (typeof web3 !== 'undefined') {
+          window.web3 = new Web3(web3.currentProvider);
+          contract = web3.eth.contract(CONTRACT_ABI).at(CONTRACT_ADDRESS);
+          whatchChannel(contract.openedChannel, OPEN_CHANNEL_EVENT);
+          whatchChannel(contract.closedChannel, CLOSE_CHANNEL_EVENT);
+        } else {
+          console.log('No web3 provider')
+        }
+      })
+
+      function whatchChannel(event, eventType) {
+        var channelEvent = event({}, { fromBlock: 0, toBlock: 'latest' });
+        channelEvent.watch(function(error, result){
+          var amount = result.args.amount.c[0];
+          var time = result.args.time.c[0];
+          var eventRecord = { type: eventType, amount: amount, time: time };
+          channelEventRecords.push(eventRecord);
+          renderRecords();
+        });
+      }
+
+      function renderRecords() {
+        var orderedRecords = channelEventRecords.sort(function(a, b) {return a.time - b.time});
+        var aggregatedRecords = aggregateRecords(orderedRecords);
+        updateChart(aggregatedRecords);
+      }
+
+      function aggregateRecords(records) {
+        var channelAmmountBalance = 0;
+        var channelStatusCount = 0;
+        var aggregatedRecords = [];
+
+        for(var i = 0 ; i < records.length ; i++) {
+          var record = records[i];
+          var recordEventType = record.type;
+          var recordEventAmount = record.amount;
+          
+          if (recordEventType === OPEN_CHANNEL_EVENT) {
+            channelStatusCount += 1;
+            channelAmmountBalance += recordEventAmount;
+          } else {
+            channelStatusCount -= 1;
+            channelAmmountBalance -= recordEventAmount;
+          }
+
+          var recordDate = new Date(record.time * 1000);
+          var recordDateString = 
+          recordDate.getFullYear() + 
+          '-' + zeroFill(recordDate.getMonth()+1) + 
+          '-' + recordDate.getDate() +
+          ' ' + recordDate.getHours() +
+          ':' + recordDate.getMinutes() +
+          ':' + recordDate.getSeconds();
+          
+          aggregatedRecords.push(
+            Object.assign(
+              {}, 
+              records[i], 
+              { aggCount: channelStatusCount, aggAmount: channelAmmountBalance, date: parseDate(recordDateString) }
+            )
+          );
+        }
+
+        return aggregatedRecords;
+      }
+
+      function initChart() {
+        margin = {top: 30, right: 40, bottom: 30, left: 50},
+        width = document.getElementById('chart-container').offsetWidth - margin.left - margin.right;
+        height = document.getElementById('chart-container').offsetHeight - margin.top - margin.bottom;
+        timeScale = d3.time.scale().range([0, width]);
+        amountScale = d3.scale.linear().range([height, 0]);
+        countScale = d3.scale.linear().range([height, 0]);
+
+        xAxis = d3.svg.axis().scale(timeScale).orient("bottom").ticks(5);
+        yAxisAmount = d3.svg.axis().scale(amountScale).orient("left").ticks(5);
+        yAxisCount = d3.svg.axis().scale(countScale).orient("right").ticks(5); 
+
+        amountLine = d3.svg.line()
+            .x(function(d) { return timeScale(d.date); })
+            .y(function(d) { return amountScale(d.aggAmount); });
+            
+        countLine = d3.svg.line()
+            .x(function(d) { return timeScale(d.date); })
+            .y(function(d) { return countScale(d.aggCount); });
+
+        svg = d3.select("#chart-container")
+          .append("svg")
+          .attr("width", width + margin.left + margin.right)
+          .attr("height", height + margin.top + margin.bottom)
+          
+      }
+
+      function updateChart(data) {
+        d3.selectAll('.chart-content').remove();
+
+        timeScale.domain(d3.extent(data, function(d) { return d.date; }));
+        amountScale.domain([0, d3.max(data, function(d) { return Math.max(d.aggAmount); })]); 
+        countScale.domain([0, d3.max(data, function(d) { return Math.max(d.aggCount); })]);
+
+        var svgChart = svg.append("g")
+          .attr('class', 'chart-content')
+          .attr("transform", 
+              "translate(" + margin.left + "," + margin.top + ")");
+
+        svgChart.append("path")
+          .attr("class", "amount-line")
+          .style("stroke", "steelblue")
+          .attr("d", amountLine(data));
+
+        svgChart.append("path") 
+          .attr("class", "count-line")
+          .style("stroke", "red")
+          .attr("d", countLine(data));
+
+        svgChart.append("g") 
+            .attr("class", "xAxis axis")
+            .attr("transform", "translate(0," + height + ")")
+            .call(xAxis);
+
+        svgChart.append("g")
+            .attr("class", "yAxis axis")
+            .style("fill", "steelblue")
+            .call(yAxisAmount);	
+
+        svgChart.append("g")				
+            .attr("class", "yAxis axis")	
+            .attr("transform", "translate(" + width + " ,0)")	
+            .style("fill", "red")		
+            .call(yAxisCount);
+      }
+
+      function zeroFill(number) {
+        if(number < 10) {
+          return '0'+number;
+        } else {
+          return String(number);
+        }
+      }
+
+      var OPEN_CHANNEL_EVENT = 'openChannel';
+      var CLOSE_CHANNEL_EVENT = 'closeChannel';
+      var CONTRACT_ADDRESS = '0x9c9583fdd67648d539da325b3c9d8087d0b6bda2'
+      var CONTRACT_ABI = [{"constant":false,"inputs":[{"internalType":"address","name":"partyB","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"open","outputs":[],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[],"name":"totalAmount","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"internalType":"bytes32","name":"channelId","type":"bytes32"}],"name":"close","outputs":[],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[],"name":"numChannels","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"name":"Channels","outputs":[{"internalType":"address","name":"partyA","type":"address"},{"internalType":"address","name":"partyB","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"bool","name":"isOpen","type":"bool"}],"payable":false,"stateMutability":"view","type":"function"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"bytes32","name":"channelId","type":"bytes32"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"time","type":"uint256"}],"name":"openedChannel","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"bytes32","name":"channelId","type":"bytes32"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"time","type":"uint256"}],"name":"closedChannel","type":"event"}];
+  </script>
+</body>
+</html>
