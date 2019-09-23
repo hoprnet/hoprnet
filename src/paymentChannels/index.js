@@ -35,6 +35,8 @@ const CHANNEL_STATE_UNINITIALIZED = 0
 const CHANNEL_STATE_FUNDED = 3
 const CHANNEL_STATE_WITHDRAWABLE = 4
 
+const SETTLEMENT_TIMEOUT = 40000
+
 const { PROTOCOL_SETTLE_CHANNEL } = require('../constants')
 
 const fs = require('fs')
@@ -116,7 +118,7 @@ class PaymentChannel extends EventEmitter {
     }
 
     async setState(channelId, newState) {
-        console.log(chalk.blue(this.node.peerInfo.id.toB58String()), newState)
+        // console.log(chalk.blue(this.node.peerInfo.id.toB58String()), newState)
 
         let record = {}
         try {
@@ -128,7 +130,6 @@ class PaymentChannel extends EventEmitter {
         Object.assign(record, newState)
 
         if (record.restoreTransaction) record.restoreTransaction = record.restoreTransaction.toBuffer()
-
         if (record.lastTransaction) record.lastTransaction = record.lastTransaction.toBuffer()
 
         return this.node.db.put(this.State(channelId), TransactionRecord.encode(record))
@@ -152,7 +153,6 @@ class PaymentChannel extends EventEmitter {
         const record = TransactionRecord.decode(encodedRecord)
 
         if (record.restoreTransaction) record.restoreTransaction = Transaction.fromBuffer(record.restoreTransaction)
-
         if (record.lastTransaction) record.lastTransaction = Transaction.fromBuffer(record.lastTransaction)
 
         return record
@@ -306,19 +306,27 @@ class PaymentChannel extends EventEmitter {
     }
 
     onceOpened(channelId, fn) {
-        this.once(`opened ${channelId.toString('hex')}`, fn)
+        return this.once(OpenEvent(channelId), fn)
     }
 
-    emitOpened(channelId) {
-        this.emit(`opened ${channelId.toString('hex')}`)
+    emitOpened(channelId, state) {
+        if (this.listenerCount(OpenEvent(channelId)) == 0) {
+            this.setState(channelId, state)
+        } else {
+            this.emit(OpenEvent(channelId), state)
+        }
     }
 
     onceClosed(channelId, fn) {
-        this.once(`closed ${channelId.toString('hex')}`, fn)
+        return this.once(CloseEvent(channelId), fn)
     }
 
-    emitClosed(channelId, receivedMoney) {
-        this.emit(`closed ${channelId.toString('hex')}`, receivedMoney)
+    emitClosed(channelId, state) {
+        if (this.listenerCount(CloseEvent(channelId)) == 0) {
+            this.setState(channelId, state)
+        } else {
+            this.emit(CloseEvent(channelId), state)
+        }
     }
 
     Challenge(channelId, challenge) {
@@ -362,15 +370,14 @@ class PaymentChannel extends EventEmitter {
      * Computes the delta of funds that were received with the given transaction in relation to the
      * initial balance.
      *
-     * @param {Transaction} receivedTx the transaction upon which the delta funds is computed
+     * @param {Buffer} newValue the transaction upon which the delta funds is computed
+     * @param {Buffer} currentValue the currentValue of the payment channel.
      * @param {PeerId} counterparty peerId of the counterparty that is used to decide which side of
      * payment channel we are, i. e. party A or party B.
-     *
-     * @param {Buffer} currentValue the currentValue of the payment channel.
      */
-    getEmbeddedMoney(receivedTx, counterparty, currentValue) {
+    getEmbeddedMoney(newValue, currentValue, counterparty) {
         currentValue = new BN(currentValue)
-        const newValue = new BN(receivedTx.value)
+        newValue = new BN(newValue)
 
         const self = pubKeyToEthereumAddress(this.node.peerInfo.id.pubKey.marshal())
         const otherParty = pubKeyToEthereumAddress(counterparty.pubKey.marshal())
@@ -392,64 +399,66 @@ class PaymentChannel extends EventEmitter {
      * @returns {Promise} a promise that resolves with the latest transaction of the
      * counterparty and rejects if it is invalid and/or outdated.
      */
-    getLatestTransactionFromCounterparty(channels) {
-        if (!Array.isArray(channels)) channels = [channels]
+    getLatestTransactionFromCounterparty(channelId, state) {
+        return new Promise(async (resolve, reject) => {
+            const counterparty = await pubKeyToPeerId(state.restoreTransaction.counterparty)
 
-        const queryNode = ({ channelId, state }) =>
-            new Promise(async (resolve, reject) => {
-                const counterparty = await pubKeyToPeerId(state.restoreTransaction.counterparty)
+            log(this.node.peerInfo.id, `Asking node ${chalk.blue(counterparty.toB58String())} to send latest update transaction.`)
 
-                log(this.node.peerInfo.id, `Asking node ${chalk.blue(counterparty.toB58String())} to send latest update transaction.`)
+            let conn
+            try {
+                conn = await this.node.peerRouting.findPeer(counterparty).then(peerInfo => this.node.dialProtocol(peerInfo, PROTOCOL_SETTLE_CHANNEL))
+            } catch (err) {
+                return reject(chalk.red(err.message))
+            }
 
-                let conn
-                try {
-                    conn = await this.node.peerRouting.findPeer(counterparty).then(peerInfo => this.node.dialProtocol(peerInfo, PROTOCOL_SETTLE_CHANNEL))
-                } catch (err) {
-                    return reject(chalk.red(err.message))
-                }
+            const timeout = setTimeout(reject, SETTLEMENT_TIMEOUT)
 
-                pull(
-                    pull.once(
-                        SettlementRequest.encode({
-                            channelId
-                        })
-                    ),
-                    lp.encode(),
-                    conn,
-                    lp.decode(),
-                    pull.drain(buf => {
-                        let response
-
-                        try {
-                            response = SettlementResponse.decode(buf)
-                        } catch (err) {
-                            reject(
-                                Error(
-                                    `Counterparty ${chalk.blue(counterparty.toB58String())} didn't send a valid response to close channel ${chalk.yellow(
-                                        channelId.toString('hex')
-                                    )}.`
-                                )
-                            )
-                        }
-
-                        const tx = Transaction.fromBuffer(response.transaction)
-
-                        if (!tx.verify(counterparty)) return reject(Error(`Invalid transaction on channel ${chalk.yellow(channelId.toString('hex'))}.`))
-
-                        // @TODO add some plausibility checks here
-
-                        resolve({
-                            channelId,
-                            transaction: tx
-                        })
-
-                        // Closes the stream
-                        return false
+            pull(
+                pull.once(
+                    SettlementRequest.encode({
+                        channelId
                     })
-                )
-            })
+                ),
+                lp.encode(),
+                conn,
+                lp.decode(),
+                pull.drain(buf => {
+                    if (!buf || !Buffer.isBuffer(buf) || buf.length == 0) {
+                        clearTimeout(timeout)
+                        reject()
+                        return false
+                    }
 
-        return Promise.all(channels.map(queryNode))
+                    let response
+                    try {
+                        response = SettlementResponse.decode(buf)
+                    } catch (err) {
+                        clearTimeout(timeout)
+                        return reject(
+                            Error(
+                                `Counterparty ${chalk.blue(counterparty.toB58String())} didn't send a valid response to close channel ${chalk.yellow(
+                                    channelId.toString('hex')
+                                )}.`
+                            )
+                        )
+                    }
+
+                    clearTimeout(timeout)
+
+                    const tx = Transaction.fromBuffer(response.transaction)
+
+                    if (!tx.verify(counterparty)) return reject(Error(`Invalid transaction on channel ${chalk.yellow(channelId.toString('hex'))}.`))
+
+                    // @TODO add some plausibility checks here
+
+                    resolve(tx)
+
+                    // Closes the stream
+                    return false
+                })
+            )
+        })
     }
 
     getAllChannels(onData, onEnd) {
@@ -482,9 +491,12 @@ class PaymentChannel extends EventEmitter {
         return this.getAllChannels(
             channel => this.closeChannel(channel.channelId, channel.state),
             promises => {
-                if (promises.length > 0) {
-                    return Promise.all(promises).then(results => results.reduce((acc, value) => acc.iadd(value)))
-                }
+                if (promises.length > 0)
+                    /* prettier-ignore */
+                    return Promise.all(promises)
+                        .then(results =>
+                            results.reduce((acc, value) => acc.iadd(value), new BN(0))
+                        )
 
                 return new BN(0)
             }
@@ -530,6 +542,14 @@ class PaymentChannel extends EventEmitter {
             return promise
         }
     }
+}
+
+function OpenEvent(channelId) {
+    return `opened ${channelId.toString('hex')}`
+}
+
+function CloseEvent(channelId) {
+    return `closed ${channelId.toString('hex')}`
 }
 
 module.exports = PaymentChannel

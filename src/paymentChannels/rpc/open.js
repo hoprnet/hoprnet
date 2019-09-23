@@ -93,72 +93,76 @@ module.exports = self => {
      * @param {Transaction} [restoreTx] (optional) use that restore transaction instead
      * of creating a new one
      */
-    const open = async (to, restoreTx) => {
-        to = await addPubKey(to)
+    const open = (to, restoreTx) =>
+        new Promise(async (resolve, reject) => {
+            to = await addPubKey(to)
 
-        const channelId = getId(
-            /* prettier-ignore */
-            pubKeyToEthereumAddress(to.pubKey.marshal()),
-            pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal())
-        )
+            const channelId = getId(
+                /* prettier-ignore */
+                pubKeyToEthereumAddress(to.pubKey.marshal()),
+                pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal())
+            )
 
-        let conn
-        if (!restoreTx) {
-            try {
-                conn = await self.node.peerRouting.findPeer(to).then(peerInfo => self.node.dialProtocol(peerInfo, PROTOCOL_PAYMENT_CHANNEL))
-            } catch (err) {
-                throw Error(`Could not connect to peer ${chalk.blue(to.toB58String())} due to '${err.message}'.`)
-            }
+            if (!restoreTx) {
+                let conn
+                try {
+                    conn = await self.node.peerRouting.findPeer(to).then(peerInfo => self.node.dialProtocol(peerInfo, PROTOCOL_PAYMENT_CHANNEL))
+                } catch (err) {
+                    return reject(Error(`Could not connect to peer ${chalk.blue(to.toB58String())} due to '${err.message}'.`))
+                }
 
-            try {
-                restoreTx = await prepareOpening(channelId)
-            } catch (err) {
-                throw Error(
-                    `Could not open payment channel ${chalk.yellow(channelId.toString('hex'))} to peer ${chalk.blue(to.toB58String())} due to '${err.message}'.`
-                )
-            }
-
-            try {
-                restoreTx = await getSignatureFromCounterparty(to, conn, restoreTx)
-            } catch (err) {
-                throw Error(`Unable to open a payment channel because counterparty ${chalk.blue(to.toB58String())} because '${err.message}'.`)
-            }
-        }
-
-        const timeout = setTimeout(() => {
-            throw Error(`Unable to open a payment channel because counterparty ${chalk.blue(to.toB58String())} is not answering with an appropriate response.`)
-        }, OPENING_TIMEOUT)
-
-        self.registerSettlementListener(channelId)
-        self.registerOpeningListener(channelId)
-
-        await self.setState(channelId, {
-            restoreTransaction: restoreTx,
-            state: self.TransactionRecordState.OPENING
-        })
-
-        return new Promise(resolve =>
-            self.onceOpened(
-                channelId,
-                (() => {
-                    const promise = self.contractCall(
-                        self.contract.methods.createFunded(
-                            restoreTx.nonce,
-                            new BN(restoreTx.value).toString(),
-                            restoreTx.signature.slice(0, 32),
-                            restoreTx.signature.slice(32, 64),
-                            bufferToNumber(restoreTx.recovery) + 27
+                try {
+                    restoreTx = await prepareOpening(channelId)
+                } catch (err) {
+                    return reject(
+                        Error(
+                            `Could not open payment channel ${chalk.yellow(channelId.toString('hex'))} to peer ${chalk.blue(to.toB58String())} due to '${
+                                err.message
+                            }'.`
                         )
                     )
+                }
 
-                    return () => {
-                        clearTimeout(timeout)
-                        resolve(promise)
-                    }
-                })()
+                try {
+                    restoreTx = await getSignatureFromCounterparty(to, conn, restoreTx)
+                } catch (err) {
+                    return reject(Error(`Unable to open a payment channel because counterparty ${chalk.blue(to.toB58String())} because '${err.message}'.`))
+                }
+            } else {
+                console.log(`restoreTx is not null. Got ${typeof restoreTx}`)
+            }
+
+            const timeout = setTimeout(() => {
+                return reject(
+                    Error(
+                        `Unable to open a payment channel because counterparty ${chalk.blue(to.toB58String())} is not answering with an appropriate response.`
+                    )
+                )
+            }, OPENING_TIMEOUT)
+
+            self.registerSettlementListener(channelId)
+            self.registerOpeningListener(channelId)
+
+            await self.setState(channelId, {
+                restoreTransaction: restoreTx,
+                state: self.TransactionRecordState.OPENING
+            })
+
+            self.onceOpened(channelId, newState => {
+                clearTimeout(timeout)
+                resolve(newState)
+            })
+
+            self.contractCall(
+                self.contract.methods.createFunded(
+                    restoreTx.nonce,
+                    new BN(restoreTx.value).toString(),
+                    restoreTx.signature.slice(0, 32),
+                    restoreTx.signature.slice(32, 64),
+                    bufferToNumber(restoreTx.recovery) + 27
+                )
             )
-        )
-    }
+        })
 
     return open
 }

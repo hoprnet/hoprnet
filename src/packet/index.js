@@ -81,7 +81,7 @@ class Packet {
         const recordState = node.paymentChannels.TransactionRecordState
         switch (state.state) {
             case recordState.OPENING:
-                return new Promise((resolve, reject) =>
+                state = await new Promise((resolve, reject) =>
                     setTimeout(
                         (() => {
                             const eventListener = node.paymentChannels.onceOpened(channelId, resolve)
@@ -199,7 +199,7 @@ class Packet {
 
         if (!this.transaction.curvePoint.equals(secp256k1.publicKeyCombine(challenges))) throw Error('General error.')
 
-        const receivedMoney = node.paymentChannels.getEmbeddedMoney(this.transaction, await this.getSenderPeerId(), state.currentOffchainBalance)
+        const receivedMoney = node.paymentChannels.getEmbeddedMoney(this.transaction.value, state.currentOffchainBalance, await this.getSenderPeerId())
 
         log(
             node.peerInfo.id,
