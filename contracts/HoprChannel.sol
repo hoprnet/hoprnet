@@ -5,16 +5,18 @@ import "openzeppelin-solidity/contracts/math/SafeMath.sol" as openzeppelin;
 contract HoprChannel {
     using openzeppelin.SafeMath for uint256;
     
-    // constant RELAY_FEE = 1
     uint256 constant private TIME_CONFIRMATION = 1 minutes; // testnet value TODO: adjust for mainnet use
     
-    // Tell payment channel partners that the channel has been settled and closed
+    // To inform the payment channel partners that the channel has been settled and closed.
     event ClosedChannel(bytes32 indexed channelId, bytes16 index, uint256 amountA);
 
-    // Tell payment channel partners that the channel has been opened
+    // To inform the payment channel partners that the channel has been opened.
     event OpenedChannel(bytes32 indexed channelId, uint256 amountA, uint256 amount);
 
-    // Tell a party that it should send its acknowledgement
+    // To inform the payment channel partners that another party has opened a payment channel for them.
+    event OpenedChannelFor(address indexed partyA, address indexed partyB, uint256 amountA, uint256 amount);
+
+    // To inform a party that it should send its acknowledgement.
     event Challenge(bytes32 indexed challenge) anonymous;
 
     // Track the state of the channels
@@ -61,8 +63,8 @@ contract HoprChannel {
     }
 
     /**
-    * @notice desposit ether to stake
-    */
+     * @notice desposit ether to stake
+     */
     function() external payable {
         stakeFor(msg.sender);
     }
@@ -82,38 +84,48 @@ contract HoprChannel {
         }
     }   
 
-    function createFor(address beneficiary0, address beneficiary1) payable public {
-        bytes32 channelId = _getId(beneficiary0, beneficiary1);
+    /**
+     * Creates a payment channel record in behalf for two channel parties.
+     *
+     * @notice The initiator does not need to be among the two channel parties.
+     *
+     * @param partyA address first party
+     * @param partyB address second party
+     */
+    function createFor(address partyA, address partyB) payable public {
+        bytes32 channelId = getId(partyA, partyB);
 
         uint256 funds = msg.value;
 
-        if (funds < 2) {
-            return;
-        }
+        require(funds < 1, "Cannot spread one wei uniformly over two parties.");
 
         if (funds % 2 == 1) {
             funds = funds - 1;
         }
 
-        if (!states[beneficiary0].isSet) {
-            states[beneficiary0] = State(true, 1, 0);
+        require(channels[channelId].state == ChannelState.UNINITIALIZED, "Channel already exists.");
+
+        if (!states[partyA].isSet) {
+            states[partyA] = State(true, 1, 0);
         } else {
-            states[beneficiary0].openChannels = states[beneficiary0].openChannels + 1;
+            states[partyA].openChannels = states[partyA].openChannels + 1;
         }
 
-        if (!states[beneficiary1].isSet) {
-            states[beneficiary1] = State(true, 1, 0);
+        if (!states[partyB].isSet) {
+            states[partyB] = State(true, 1, 0);
         } else {
-            states[beneficiary1].openChannels = states[beneficiary0].openChannels + 1;
+            states[partyB].openChannels = states[partyB].openChannels + 1;
         }
 
         channels[channelId] = Channel(ChannelState.ACTIVE, funds, funds / 2, 0, 0);
+
+        emit OpenedChannelFor(partyA, partyB, funds, funds / 2);
     }
     
     /**
-    * @notice withdrawal staked ether
-    * @param amount uint256
-    */
+     * @notice withdrawal staked ether
+     * @param amount uint256
+     */
     function unstakeEther(uint256 amount) public enoughFunds(amount) {
         require(states[msg.sender].openChannels == 0, "Waiting for remaining channels to close.");
 
@@ -143,7 +155,7 @@ contract HoprChannel {
         
         require(states[counterparty].stakedEther >= funds, "Insufficient funds.");
 
-        bytes32 channelId = getId(counterparty);
+        bytes32 channelId = getId(msg.sender, counterparty);
 
         require(channels[channelId].state == ChannelState.UNINITIALIZED, "Channel already exists.");
 
@@ -160,26 +172,26 @@ contract HoprChannel {
     }
 
     /**
-    * Initiates the closing procedure of a payment channel. The sender of the transaction
-    * proposes a possible settlement transaction and opens a time interval that the
-    * counterparty can use to propose a more recent update transaction which leads to a reset
-    * of the time interval.
-    * Once the time interval is over, any of the parties can call the `withdraw` function
-    * which finally payout the money.
-    *
-    * @notice settle & close payment channel
-    * @param index bytes16
-    * @param nonce bytes16
-    * @param balanceA uint256
-    * @param r bytes32
-    * @param s bytes32
-    * @param v bytes1
-    */
+     * Initiates the closing procedure of a payment channel. The sender of the transaction
+     * proposes a possible settlement transaction and opens a time interval that the
+     * counterparty can use to propose a more recent update transaction which leads to a reset
+     * of the time interval.
+     * Once the time interval is over, any of the parties can call the `withdraw` function
+     * which finally payout the money.
+     *
+     * @notice settle & close payment channel
+     * @param index bytes16
+     * @param nonce bytes16
+     * @param balanceA uint256
+     * @param r bytes32
+     * @param s bytes32
+     * @param v bytes1
+     */
     function closeChannel(bytes16 index, bytes16 nonce, uint256 balanceA, bytes32 curvePointFirst, bytes1 curvePointSecond, bytes32 r, bytes32 s, uint8 v) public {
         bytes32 hashedMessage = keccak256(abi.encodePacked(nonce, index, balanceA, curvePointFirst, curvePointSecond));
         address counterparty = ecrecover(hashedMessage, v, r, s);
 
-        bytes32 channelId = getId(counterparty);
+        bytes32 channelId = getId(msg.sender, counterparty);
         Channel storage channel = channels[channelId];
         
         require(
@@ -221,7 +233,7 @@ contract HoprChannel {
         bytes32 hashedAcknowledgement = keccak256(abi.encodePacked(rChallenge, sChallenge, vChallenge, keyHalf));
 
         address counterparty = ecrecover(hashedAcknowledgement, vResponse, rResponse, sResponse);
-        Channel storage channel = channels[getId(counterparty)];
+        Channel storage channel = channels[getId(msg.sender, counterparty)];
 
         require(channel.state != ChannelState.UNINITIALIZED, "Invalid channel 123.");
 
@@ -235,11 +247,11 @@ contract HoprChannel {
     }
     
     /**
-    * @notice withdrawal pending balance from payment channel
-    * @param counterParty address of the counter party
-    */
+     * @notice withdrawal pending balance from payment channel
+     * @param counterParty address of the counter party
+     */
     function withdraw(address counterParty) external {
-        bytes32 channelId = getId(counterParty);
+        bytes32 channelId = getId(msg.sender, counterParty);
         Channel storage channel = channels[channelId];
         
         if (channel.state == ChannelState.PENDING_SETTLEMENT) {
@@ -253,7 +265,7 @@ contract HoprChannel {
             states[msg.sender].openChannels = states[msg.sender].openChannels.sub(1);
             states[counterParty].openChannels = states[counterParty].openChannels.sub(1);
             
-            if (isPartyA(counterParty)) {
+            if (isPartyA(msg.sender, counterParty)) {
                 // msg.sender == partyB
                 // solhint-disable-next-line max-line-length
                 states[msg.sender].stakedEther = states[msg.sender].stakedEther.add((channel.balance.sub(channel.balanceA)));
@@ -269,34 +281,15 @@ contract HoprChannel {
         }
     }
 
-    /*** PRIVATE | INTERNAL ***/
-    /**
-    * @notice compares addresses `msg.sender` vs `counterParty` 
-    * @param counterParty address of the counter party
-    * @return bool 
-    */
-    function isPartyA(address counterParty) private view returns (bool) {
-        require(msg.sender != counterParty, "Cannot open channel between one party.");
+    function isPartyA(address a, address b) private pure returns (bool) {
+        require(a != b, "Party 'a' and party 'b' must not be equal.");
 
-        return bytes20(msg.sender) < bytes20(counterParty);
+        return bytes20(a) < bytes20(b);
     }
+    function getId(address a, address b) private pure returns (bytes32) {
+        require(a != b, "Party 'a' and party 'b' must not be equal.");
 
-    /**
-    * @notice returns keccak256 hash of `counterParty` & `msg.sender` which is used as an id
-    * @dev order of arguements pending result of `isPartyA(counterParty)`
-    * @param counterParty address of the counter party
-    * @return bytes32 
-    */
-    function getId(address counterParty) private view returns (bytes32) {
-        if (isPartyA(counterParty)) {
-            return keccak256(abi.encodePacked(msg.sender, counterParty));
-        } else {
-            return keccak256(abi.encodePacked(counterParty, msg.sender));
-        }
-    }
-
-    function _getId(address a, address b) public pure returns (bytes32) {
-        if (bytes20(a) < bytes20(b)) {
+        if (isPartyA(a, b)) {
             return keccak256(abi.encodePacked(a, b));
         } else {
             return keccak256(abi.encodePacked(b, a));
