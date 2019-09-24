@@ -31,9 +31,7 @@ const COMPRESSED_PUBLIC_KEY_LENGTH = 33
 const PREFIX = Buffer.from('payments-')
 const PREFIX_LENGTH = PREFIX.length
 
-const CHANNEL_STATE_UNINITIALIZED = 0
-const CHANNEL_STATE_FUNDED = 3
-const CHANNEL_STATE_WITHDRAWABLE = 4
+const { ChannelState } = require('./enums.json')
 
 const SETTLEMENT_TIMEOUT = 40000
 
@@ -237,9 +235,9 @@ class PaymentChannel extends EventEmitter {
             )
             .then(channelState => {
                 switch (parseInt(channelState.state)) {
-                    case CHANNEL_STATE_UNINITIALIZED:
+                    case ChannelState.UNITIALIZED:
                         return this.deleteState(settledChannel.channelId)
-                    case CHANNEL_STATE_WITHDRAWABLE:
+                    case ChannelState.PENDING_SETTLEMENT:
                         if (autoWithdraw)
                             return this.withdraw(channelState, localState).then(() =>
                                 this.setState(settledChannel.channelId, {

@@ -3,15 +3,8 @@ const BN = require('bn.js')
 const chalk = require('chalk')
 
 const { pubKeyToPeerId, pubKeyToEthereumAddress, mineBlock, log } = require('../../utils')
+const { ChannelState } = require('../enums.json')
 
-const CHANNEL_STATE_WITHDRAWABLE = 4
-
-/**
- * Returns a promise that resolves just when the funds from the channel are withdrawn.
- *
- *
- * @param {Buffer} channelId ID of the channel
- */
 module.exports = self => {
     /**
      * Submits a withdraw transaction and cleans up attached event listeners.
@@ -26,7 +19,7 @@ module.exports = self => {
             state: self.TransactionRecordState.WITHDRAWING
         })
 
-        const receipt = await self.contractCall(self.contract.methods.withdraw(pubKeyToEthereumAddress(localState.restoreTransaction.counterparty)))
+        const receipt = await self.contractCall(self.contract.methods.withdraw(pubKeyToEthereumAddress(localState.counterparty)))
 
         const subscription = self.subscriptions.get(channelId.toString('hex'))
 
@@ -54,7 +47,7 @@ module.exports = self => {
         new Promise(async (resolve, reject) => {
             const blockTimestamp = await self.web3.eth.getBlock('latest', false).then(block => new BN(block.timestamp))
 
-            if (networkState.state == CHANNEL_STATE_WITHDRAWABLE && blockTimestamp.gt(new BN(networkState.settleTimestamp))) return resolve()
+            if (networkState.state == ChannelState.PENDING_SETTLEMENT && blockTimestamp.gt(new BN(networkState.settleTimestamp))) return resolve()
 
             self.settleTimestamps.set(channelId.toString('hex'), new BN(networkState.settleTimestamp))
 
@@ -107,10 +100,10 @@ module.exports = self => {
             self.node.peerInfo.id,
             `Successfully submitted withdrawal transaction of channel ${chalk.yellow(channelId.toString('hex'))} with transaction ${chalk.green(
                 receipt.transactionHash
-            )}.`
+            )}. Nonce is now ${chalk.cyan(self.node.paymentChannels.nonce)}`
         )
 
-        const receivedMoney = self.getEmbeddedMoney(localState.currentOnchainBalance, localState.initialBalance, await pubKeyToPeerId(localState.restoreTransaction.counterparty))
+        const receivedMoney = self.getEmbeddedMoney(localState.currentOnchainBalance, localState.initialBalance, await pubKeyToPeerId(localState.counterparty))
 
         await self.deleteState(channelId)
 

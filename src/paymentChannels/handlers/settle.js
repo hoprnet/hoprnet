@@ -17,7 +17,7 @@ const { log } = require('../../utils')
 const CHANNEL_ID_LENGTH = 32
 
 module.exports = node =>
-    node.handle(PROTOCOL_SETTLE_CHANNEL, (protocol, conn) =>
+    node.handle(PROTOCOL_SETTLE_CHANNEL, (_, conn) =>
         pull(
             conn,
             lp.decode(),
@@ -37,8 +37,8 @@ module.exports = node =>
                     }
 
                     node.paymentChannels.state(request.channelId).then(state => {
-                        if (state.state != node.paymentChannels.TransactionRecordState.OPEN) {
-                            log(node.peerInfo.id, `On-chain state for channel ${chalk.yellow(request.channelId.toString('hex'))} is not set to OPEN, dropping message.`)
+                        if (state.state != node.paymentChannels.TransactionRecordState.OPEN && state.state != node.paymentChannels.TransactionRecordState.SETTLING) {
+                            log(node.peerInfo.id, `On-chain state for channel ${chalk.yellow(request.channelId.toString('hex'))} is not set to OPEN, dropping message. Current state is '${state.state}'.`)
                             return cb(null, Buffer.alloc(0))
                         }
 
