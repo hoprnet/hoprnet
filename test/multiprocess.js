@@ -53,14 +53,18 @@ if (cluster.isMaster) {
                             })
                         )
 
-                        const tx = await signTransaction({
-                            from: pubKeyToEthereumAddress(fundingNode.pubKey.marshal()),
-                            to: pubKeyToEthereumAddress(peerId.pubKey.marshal()),
-                            gas: STAKE_GAS_AMOUNT,
-                            gasPrice: process.env.GAS_PRICE,
-                            value: MINIMAL_FUND,
-                            nonce: ++nonce
-                        }, fundingNode, web3)
+                        const tx = await signTransaction(
+                            {
+                                from: pubKeyToEthereumAddress(fundingNode.pubKey.marshal()),
+                                to: pubKeyToEthereumAddress(peerId.pubKey.marshal()),
+                                gas: STAKE_GAS_AMOUNT,
+                                gasPrice: process.env.GAS_PRICE,
+                                value: MINIMAL_FUND,
+                                nonce: ++nonce
+                            },
+                            fundingNode,
+                            web3
+                        )
 
                         batch.add(web3.eth.sendSignedTransaction.request(tx.rawTransaction))
                     }
@@ -138,7 +142,10 @@ if (cluster.isMaster) {
         }
 
         if (parseInt(process.env['id']) == 0) {
-            node.sendMessage(rlp.encode(['Psst ... secret message from Validity Labs!', Date.now().toString()]), await privKeyToPeerId(process.env[`DEMO_ACCOUNT_3_PRIVATE_KEY`]))
+            await node.sendMessage(
+                rlp.encode(['Psst ... secret message from Validity Labs!', Date.now().toString()]),
+                await privKeyToPeerId(process.env[`DEMO_ACCOUNT_3_PRIVATE_KEY`])
+            )
         }
     })()
 }
