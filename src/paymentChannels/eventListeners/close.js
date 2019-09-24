@@ -64,7 +64,7 @@ module.exports = self => {
         const partyA = isPartyA(
             /* prettier-ignore */
             pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal()),
-            pubKeyToEthereumAddress(state.restoreTransaction.counterparty)
+            pubKeyToEthereumAddress(state.counterparty)
         )
 
         state.currentOnchainBalance = amountA

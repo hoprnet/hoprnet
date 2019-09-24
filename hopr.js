@@ -22,13 +22,8 @@ const Hopr = require('./src')
 const { getId, pubKeyToEthereumAddress, pubKeyToPeerId, sendTransaction, addPubKey } = require('./src/utils')
 const { STAKE_GAS_AMOUNT } = require('./src/constants')
 
-const Transaction = require('./src/transaction')
-
 const MINIMAL_STAKE = new BN(toWei('0.10', 'ether'))
 const DEFAULT_STAKE = new BN(toWei('0.11', 'ether'))
-
-const HASH_LENGTH = 32
-const CHANNEL_ID_LENGTH = HASH_LENGTH
 
 const SPLIT_OPERAND_QUERY_REGEX = /([\w\-]+)(?:\s+)?([\w\s\-]+)?/
 
@@ -116,7 +111,7 @@ function isNotBootstrapNode(peerId) {
  */
 function getExistingChannels() {
     return node.paymentChannels.getAllChannels(
-        channel => pubKeyToPeerId(channel.state.restoreTransaction.counterparty),
+        channel => pubKeyToPeerId(channel.state.counterparty),
         promises => Promise.all(promises).then(peerIds => peerIds.filter(isNotBootstrapNode))
     )
 }
@@ -431,7 +426,7 @@ async function runAsRegularNode() {
                 try {
                     str += await node.paymentChannels.getAllChannels(
                         channel =>
-                            pubKeyToPeerId(channel.state.restoreTransaction.counterparty).then(
+                            pubKeyToPeerId(channel.state.counterparty).then(
                                 peerId => `${chalk.yellow(channel.channelId.toString('hex'))} - ${chalk.blue(peerId.toB58String())}`
                             ),
                         promises => {
@@ -519,7 +514,7 @@ async function runAsRegularNode() {
                 break
             case 'closeAll':
                 try {
-                    await node.paymentChannels.closeChannels()
+                    const receivedMoney = await node.paymentChannels.closeChannels()
                     console.log(`${chalk.green(`Closed all channels and received`)} ${chalk.magenta(fromWei(receivedMoney.toString(), 'ether'))} ETH.`)
                 } catch (err) {
                     console.log(chalk.red(err.message))

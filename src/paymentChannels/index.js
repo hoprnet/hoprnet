@@ -399,7 +399,7 @@ class PaymentChannel extends EventEmitter {
      */
     getLatestTransactionFromCounterparty(channelId, state) {
         return new Promise(async (resolve, reject) => {
-            const counterparty = await pubKeyToPeerId(state.restoreTransaction.counterparty)
+            const counterparty = await pubKeyToPeerId(state.counterparty)
 
             log(this.node.peerInfo.id, `Asking node ${chalk.blue(counterparty.toB58String())} to send latest update transaction for channel ${chalk.yellow(channelId.toString('hex'))}.`)
 

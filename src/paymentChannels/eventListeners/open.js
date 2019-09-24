@@ -5,7 +5,7 @@ const chalk = require('chalk')
 
 const { log } = require('../../utils')
 
-const VALUE_LENGTH = 32
+const Transaction = require('../../transaction')
 
 module.exports = self => async (err, event) => {
     if (err) {
@@ -31,16 +31,16 @@ module.exports = self => async (err, event) => {
         state: self.TransactionRecordState.OPEN,
         currentIndex: state.restoreTransaction.index,
         initialValue: state.restoreTransaction.value,
-        currentOffchainBalance: new BN(event.returnValues.amountA).toBuffer('be', VALUE_LENGTH),
-        currentOnchainBalance: new BN(event.returnValues.amountA).toBuffer('be', VALUE_LENGTH),
-        totalBalance: new BN(event.returnValues.amount).toBuffer('be', VALUE_LENGTH),
+        currentOffchainBalance: new BN(event.returnValues.amountA).toBuffer('be', Transaction.VALUE_LENGTH),
+        currentOnchainBalance: new BN(event.returnValues.amountA).toBuffer('be', Transaction.VALUE_LENGTH),
+        totalBalance: new BN(event.returnValues.amount).toBuffer('be', Transaction.VALUE_LENGTH),
         lastTransaction: state.restoreTransaction
     })
 
     log(
         self.node.peerInfo.id,
-        `Opened payment channel ${chalk.yellow(channelId.toString('hex'))} with txHash ${chalk.green(event.transactionHash)}. Nonce is now ${chalk.red(
-            self.nonce - 1
+        `Opened payment channel ${chalk.yellow(channelId.toString('hex'))} with txHash ${chalk.green(event.transactionHash)}. Nonce is now ${chalk.cyan(
+            self.nonce
         )}.`
     )
 

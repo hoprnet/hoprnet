@@ -14,8 +14,8 @@ module.exports = self => {
     const queues = new Map()
 
     /**
-     * Fetches the current state from database and updates it according to the amount
-     * transferred. In case there is no open channel, the method will initiate a
+     * Fetches the current state from the database and updates it according to the
+     * transferred amount. In case there is no open channel, the method will initiate a
      * payment channel opening.
      *
      * @param {PeerId} to receiver of the payment

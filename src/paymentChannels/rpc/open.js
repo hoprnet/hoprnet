@@ -10,9 +10,11 @@ const { toWei } = require('web3-utils')
 const BN = require('bn.js')
 const secp256k1 = require('secp256k1')
 
-const { bufferToNumber, numberToBuffer, getId, pubKeyToEthereumAddress, addPubKey } = require('../../utils')
+const { bufferToNumber, numberToBuffer, getId, pubKeyToEthereumAddress, addPubKey, log } = require('../../utils')
 const { PROTOCOL_PAYMENT_CHANNEL } = require('../../constants')
 const Transaction = require('../../transaction')
+
+const { ChannelState } = require('../enums.json')
 
 const OPENING_TIMEOUT = 6 * 60 * 1000
 
@@ -22,8 +24,8 @@ module.exports = self => {
      *
      * @param {Buffer} channelId ID of the payment channel
      */
-    const prepareOpening = async channelId => {
-        const restoreTx = Transaction.create(
+    const prepareOpening = async (channelId, to) => {
+        const restoreTransaction = Transaction.create(
             randomBytes(Transaction.NONCE_LENGTH),
             numberToBuffer(1, Transaction.INDEX_LENGTH),
             new BN(toWei('1', 'shannon')).toBuffer('be', Transaction.VALUE_LENGTH),
@@ -34,11 +36,12 @@ module.exports = self => {
 
         self.setState(channelId, {
             state: self.TransactionRecordState.INITIALIZED,
-            initialBalance: restoreTx.value,
-            restoreTransaction: restoreTx
+            initialBalance: restoreTransaction.value,
+            restoreTransaction,
+            counterparty: to.pubKey.marshal()
         })
 
-        return restoreTx
+        return restoreTransaction
     }
 
     /**
@@ -90,10 +93,10 @@ module.exports = self => {
      * @notice throws an exception in case the other party is not responding
      *
      * @param {PeerId | string} to peerId of multiaddr of the counterparty
-     * @param {Transaction} [restoreTx] (optional) use that restore transaction instead
+     * @param {Transaction} [restoreTransaction] (optional) use that restore transaction instead
      * of creating a new one
      */
-    const open = (to, restoreTx) =>
+    const open = (to, restoreTransaction) =>
         new Promise(async (resolve, reject) => {
             to = await addPubKey(to)
 
@@ -103,7 +106,7 @@ module.exports = self => {
                 pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal())
             )
 
-            if (!restoreTx) {
+            if (!restoreTransaction) {
                 let conn
                 try {
                     conn = await self.node.peerRouting.findPeer(to).then(peerInfo => self.node.dialProtocol(peerInfo, PROTOCOL_PAYMENT_CHANNEL))
@@ -112,7 +115,7 @@ module.exports = self => {
                 }
 
                 try {
-                    restoreTx = await prepareOpening(channelId)
+                    restoreTransaction = await prepareOpening(channelId, to)
                 } catch (err) {
                     return reject(
                         Error(
@@ -124,12 +127,12 @@ module.exports = self => {
                 }
 
                 try {
-                    restoreTx = await getSignatureFromCounterparty(to, conn, restoreTx)
+                    restoreTransaction = await getSignatureFromCounterparty(to, conn, restoreTransaction)
                 } catch (err) {
                     return reject(Error(`Unable to open a payment channel because counterparty ${chalk.blue(to.toB58String())} because '${err.message}'.`))
                 }
             } else {
-                console.log(`restoreTx is not null. Got ${typeof restoreTx}`)
+                console.log(`restoreTx is not null. Got ${typeof restoreTransaction}`)
             }
 
             const timeout = setTimeout(() => {
@@ -144,7 +147,7 @@ module.exports = self => {
             self.registerOpeningListener(channelId)
 
             await self.setState(channelId, {
-                restoreTransaction: restoreTx,
+                restoreTransaction,
                 state: self.TransactionRecordState.OPENING
             })
 
@@ -155,13 +158,33 @@ module.exports = self => {
 
             self.contractCall(
                 self.contract.methods.createFunded(
-                    restoreTx.nonce,
-                    new BN(restoreTx.value).toString(),
-                    restoreTx.signature.slice(0, 32),
-                    restoreTx.signature.slice(32, 64),
-                    bufferToNumber(restoreTx.recovery) + 27
+                    restoreTransaction.nonce,
+                    new BN(restoreTransaction.value).toString(),
+                    restoreTransaction.signature.slice(0, 32),
+                    restoreTransaction.signature.slice(32, 64),
+                    bufferToNumber(restoreTransaction.recovery) + 27
                 )
             )
+            // .catch(async err => {
+            //     const networkState = await self.contract.methods.channels(channelId).call({
+            //         from: pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal())
+            //     }, 'latest')
+
+            //     log(self.node.peerInfo.id, `Opening transaction failed due to '${err.message}'. On-chain state is ${networkState.state}. Recovering state...`)
+            //     switch (networkState.state) {
+            //         case ChannelState.ACTIVE:
+            //             return self.emitOpened(channelId, {
+            //                 state: self.TransactionRecordState.OPEN,
+            //                 currentIndex: numberToBuffer(1, Transaction.INDEX_LENGTH),
+            //                 initialValue: new BN(networkState.balanceA).toBuffer('be', Transaction.VALUE_LENGTH),
+            //                 currentOffchainBalance: new BN(networkState.balanceA).toBuffer('be', Transaction.VALUE_LENGTH),
+            //                 currentOnchainBalance: new BN(networkState.balanceA).toBuffer('be', Transaction.VALUE_LENGTH),
+            //                 totalBalance: new BN(event.returnValues.amount).toBuffer('be', Transaction.VALUE_LENGTH),
+            //             })
+            //         case ChannelState.PENDING_SETTLEMENT:
+            //             self.withdraw(channelId, )
+            //     }
+            // })
         })
 
     return open

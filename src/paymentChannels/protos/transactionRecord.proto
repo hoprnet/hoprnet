@@ -11,12 +11,13 @@ enum TransactionRecordState {
 
 message TransactionRecord {
     required TransactionRecordState state = 1;
-    optional bytes totalBalance = 2;
-    optional bytes currentOffchainBalance = 3;
-    optional bytes currentOnchainBalance = 4;
-    optional bytes initialBalance = 5;
-    optional bytes currentIndex = 6;
-    optional bytes channelKey = 7;
-    optional bytes lastTransaction = 8;
-    required bytes restoreTransaction = 9;
+    required bytes counterparty = 2;
+    optional bytes totalBalance = 3;
+    optional bytes currentOffchainBalance = 4;
+    optional bytes currentOnchainBalance = 5;
+    optional bytes initialBalance = 6;
+    optional bytes currentIndex = 7;
+    optional bytes channelKey = 8;
+    optional bytes lastTransaction = 9;
+    required bytes restoreTransaction = 10;
 }

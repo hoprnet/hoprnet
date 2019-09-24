@@ -69,15 +69,15 @@ module.exports = node => {
         if (!Number.isInteger(channelState) || channelState < 0) throw Error(`Invalid state. Got '${channelState.toString()}'.`)
     }
 
-    const handleOpeningRequest = async (data, cb) => {
-        if (data.length !== Transaction.SIZE) {
+    const handleOpeningRequest = async (encodedTransaction, cb) => {
+        if (encodedTransaction.length !== Transaction.SIZE) {
             log(node.peerInfo.id, 'Invalid size of payment channel opening request.')
             return cb(null, Buffer.alloc(0))
         }
 
-        const restoreTx = Transaction.fromBuffer(data)
+        const restoreTransaction = Transaction.fromBuffer(encodedTransaction)
 
-        const counterparty = restoreTx.counterparty
+        const counterparty = restoreTransaction.counterparty
         const channelId = getId(
             /* prettier-ignore */
             pubKeyToEthereumAddress(counterparty),
@@ -85,7 +85,7 @@ module.exports = node => {
         )
 
         try {
-            await checkRequest(channelId, counterparty, restoreTx)
+            await checkRequest(channelId, counterparty, restoreTransaction)
         } catch (err) {
             console.log(`${err.message}. Dropping request.`)
             return cb(null, Buffer.alloc(0))
@@ -93,14 +93,15 @@ module.exports = node => {
 
         node.paymentChannels.setState(channelId, {
             state: node.paymentChannels.TransactionRecordState.INITIALIZED,
-            initialBalance: restoreTx.value,
-            restoreTransaction: restoreTx
+            initialBalance: restoreTransaction.value,
+            restoreTransaction,
+            counterparty
         })
 
         node.paymentChannels.registerOpeningListener(channelId)
         node.paymentChannels.registerSettlementListener(channelId)
 
-        const sigRestore = sign(restoreTx.hash, node.peerInfo.id.privKey.marshal())
+        const sigRestore = sign(restoreTransaction.hash, node.peerInfo.id.privKey.marshal())
 
         return cb(null, Buffer.concat([sigRestore.signature, numberToBuffer(sigRestore.recovery, 1)], SIGNATURE_LENGTH + 1))
     }

@@ -7,10 +7,7 @@ const { pubKeyToEthereumAddress, log, bufferToNumber } = require('../../utils')
 
 const Transaction = require('../../transaction')
 
-
-const CHANNEL_STATE_UNINITIALIZED = 0
-const CHANNEL_STATE_FUNDED = 3
-const CHANNEL_STATE_WITHDRAWABLE = 4
+const { ChannelState } = require('../enums.json')
 
 module.exports = self => {
     /**
@@ -36,34 +33,39 @@ module.exports = self => {
             state: self.TransactionRecordState.SETTLING
         })
 
-        const receipt = await self.contractCall(
-            self.contract.methods.closeChannel(
-                localState.lastTransaction.index,
-                localState.lastTransaction.nonce,
-                new BN(localState.lastTransaction.value).toString(),
-                localState.lastTransaction.curvePoint.slice(0, 32),
-                localState.lastTransaction.curvePoint.slice(32, 33),
-                localState.lastTransaction.signature.slice(0, 32),
-                localState.lastTransaction.signature.slice(32, 64),
-                bufferToNumber(localState.lastTransaction.recovery) + 27
+        let receipt
+        try {
+            receipt = await self.contractCall(
+                self.contract.methods.closeChannel(
+                    localState.lastTransaction.index,
+                    localState.lastTransaction.nonce,
+                    new BN(localState.lastTransaction.value).toString(),
+                    localState.lastTransaction.curvePoint.slice(0, 32),
+                    localState.lastTransaction.curvePoint.slice(32, 33),
+                    localState.lastTransaction.signature.slice(0, 32),
+                    localState.lastTransaction.signature.slice(32, 64),
+                    bufferToNumber(localState.lastTransaction.recovery) + 27
+                )
             )
-        )
 
-        log(
-            self.node.peerInfo.id,
-            /* prettier-ignore */
-            `Settled channel ${chalk.yellow(channelId.toString('hex'))} with txHash ${chalk.green(receipt.transactionHash)}. Nonce is now ${chalk.cyan(self.nonce)}.`
-        )
-        return receipt
+            log(
+                self.node.peerInfo.id,
+                /* prettier-ignore */
+                `Settled channel ${chalk.yellow(channelId.toString('hex'))} with txHash ${chalk.green(receipt.transactionHash)}. Nonce is now ${chalk.cyan(self.nonce)}.`
+            )
+        } catch (err) {
+            const networkState = await self.contractCall(self.contractCall.methods.channels(channelId))
+            console.log(`Couldn't close channel ${chalk.yellow(channelId.toString('hex'))}. On-chain state is ${JSON.stringify(networkState)}`)
+        }
     }
 
     const initiateClosing = async (channelId, localState, networkState) => {
         switch (parseInt(networkState.state)) {
-            case CHANNEL_STATE_UNINITIALIZED:
+            case ChannelState.UNINITIALIZED:
                 log(self.node.peerInfo.id, `Channel ${chalk.yellow(channelId.toString('hex'))} doesn't exist.`)
                 await self.deleteState(channelId)
                 return new BN(0)
-            case CHANNEL_STATE_FUNDED:
+            case ChannelState.ACTIVE:
                 if (counterpartyHasMoreRecentTransaction(localState)) {
                     let lastTx
                     try {
@@ -87,7 +89,7 @@ module.exports = self => {
 
                     submitSettlementTransaction(channelId, localState)
                 })
-            case CHANNEL_STATE_WITHDRAWABLE:
+            case ChannelState.PENDING_SETTLEMENT:
                 return self.withdraw(channelId, localState, networkState)
             default:
                 log(self.node.peerInfo.id, `Channel in unknown state: channel.state = ${chalk.red(channel.state)}.`)
@@ -126,7 +128,7 @@ module.exports = self => {
                 return new Promise(resolve => {
                     self.onceOpened(channelId, newState => {
                         clearTimeout(timeout)
-                        networkState.state = CHANNEL_STATE_FUNDED
+                        networkState.state = ChannelState.ACTIVE
                         resolve(initiateClosing(channelId, newState, networkState))
                     })
                 })
