@@ -3,7 +3,7 @@
 const { createHash } = require('crypto')
 const { createNode } = require('../../src')
 const { privKeyToPeerId, pubKeyToEthereumAddress, sendTransaction, log, createDirectoryIfNotExists } = require('../../src/utils')
-const { STAKE_GAS_AMOUNT, GAS_PRICE } = require('../../src/constants')
+const { STAKE_GAS_AMOUNT } = require('../../src/constants')
 const { toWei, fromWei } = require('web3-utils')
 const Ganache = require('ganache-core')
 const BN = require('bn.js')
@@ -95,7 +95,7 @@ module.exports.fundNode = async (node, fundingNode, nonce) => {
                 to: pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()),
                 value: MINIMAL_FUND.sub(currentBalance).toString(),
                 gas: STAKE_GAS_AMOUNT,
-                gasPrice: process.env.GAS_PRICE,
+                gasPrice: process.env['GAS_PRICE'],
                 nonce: nonce
             },
             fundingNode,
@@ -122,10 +122,10 @@ module.exports.stakeEther = async node => {
     if (stakedEther.lt(MINIMAL_STAKE)) {
         return sendTransaction(
             {
-                to: process.env.CONTRACT_ADDRESS,
+                to: process.env['CONTRACT_ADDRESS'],
                 value: MINIMAL_STAKE.sub(stakedEther).toString(),
                 gas: STAKE_GAS_AMOUNT,
-                gasPrice: process.env.GAS_PRICE,
+                gasPrice: process.env['GAS_PRICE'],
                 nonce: node.paymentChannels.nonce
             },
             node.peerInfo.id,
@@ -134,7 +134,7 @@ module.exports.stakeEther = async node => {
             node.paymentChannels.nonce = node.paymentChannels.nonce + 1
             log(
                 node.peerInfo.id,
-                `Funded contract ${chalk.green(process.env.CONTRACT_ADDRESS)} with ${chalk.magenta(fromWei(MINIMAL_STAKE.sub(stakedEther), 'ether'))} ETH.`
+                `Funded contract ${chalk.green(process.env['CONTRACT_ADDRESS'])} with ${chalk.magenta(fromWei(MINIMAL_STAKE.sub(stakedEther), 'ether'))} ETH.`
             )
         })
     }
@@ -153,14 +153,14 @@ module.exports.startBlockchain = () =>
             accounts: [
                 {
                     balance: `0x${toWei(new BN(100), 'ether').toString('hex')}`,
-                    secretKey: process.env.FUND_ACCOUNT_PRIVATE_KEY
+                    secretKey: process.env['FUND_ACCOUNT_PRIVATE_KEY']
                 }
             ],
-            gasPrice: GAS_PRICE,
+            gasPrice: process.env['GAS_PRICE'],
             db: LevelDown(`${process.cwd()}/db/testnet`),
             ws: true
         })
-        server.listen(process.env.GANACHE_PORT, process.env.GANACHE_HOSTNAME, err => {
+        server.listen(process.env['GANACHE_PORT'], process.env['GANACHE_HOSTNAME'], err => {
             if (err) return reject(err)
 
             const addr = server.address()

@@ -24,6 +24,7 @@
     },
     "scripts": {
         "demo": "node test/demo.js",
+        "multiprocess": "node test/multiprocess.js",
         "hopr": "node hopr.js",
         "deployContract": "node test/deployContract",
         "startTestnet": "node test/startBlockchain"

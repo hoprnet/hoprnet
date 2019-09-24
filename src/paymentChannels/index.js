@@ -90,7 +90,7 @@ class PaymentChannel extends EventEmitter {
     static async create(node) {
         const web3 = new Web3(process.env.PROVIDER)
 
-        const [nonce, compiledContract] = await Promise.all([
+        const [nonce] = await Promise.all([
             web3.eth.getTransactionCount(pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()), 'latest'),
             compileIfNecessary([`${process.cwd()}/contracts/HoprChannel.sol`], [`${process.cwd()}/build/contracts/HoprChannel.json`])
         ])
@@ -403,7 +403,7 @@ class PaymentChannel extends EventEmitter {
         return new Promise(async (resolve, reject) => {
             const counterparty = await pubKeyToPeerId(state.restoreTransaction.counterparty)
 
-            log(this.node.peerInfo.id, `Asking node ${chalk.blue(counterparty.toB58String())} to send latest update transaction.`)
+            log(this.node.peerInfo.id, `Asking node ${chalk.blue(counterparty.toB58String())} to send latest update transaction for channel ${chalk.yellow(channelId.toString('hex'))}.`)
 
             let conn
             try {

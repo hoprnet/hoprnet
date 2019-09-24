@@ -5,7 +5,8 @@ enum TransactionRecordState {
     SETTLING = 4;
     SETTLED = 5;
     WITHDRAWABLE = 6;
-    WITHDAWING = 7;
+    WITHDRAWING = 7;
+    WITHDRAWN = 8;
 }
 
 message TransactionRecord {

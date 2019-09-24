@@ -5,6 +5,7 @@ const MPLEX = require('libp2p-mplex')
 const KadDHT = require('libp2p-kad-dht')
 // const SECIO = require('libp2p-secio')
 const { WebRTCv4, WebRTCv6 } = require('./network/natTraversal')
+// const TCP = require('libp2p-tcp')
 
 const defaultsDeep = require('@nodeutils/defaults-deep')
 
@@ -48,29 +49,15 @@ class Hopr extends libp2p {
             },
             // The libp2p modules for this libp2p bundle
             modules: {
-                /**
-                 * The transport modules to use.
-                 */
                 transport: [
                     // TCP,
                     WebRTCv4,
                     WebRTCv6
                 ],
-                /**
-                 * To support bidirectional connection, we need a stream muxer.
-                 */
+
                 streamMuxer: [MPLEX],
-                /**
-                 * Let's have TLS-alike encrypted connections between the nodes.
-                 */
                 connEncryption: [], //  [SECIO],
-                /**
-                 * Necessary to have DHT lookups
-                 */
                 dht: KadDHT
-                /**
-                 * Necessary to use WebRTC (and to support proper NAT traversal)
-                 */
                 // peerDiscovery: [
                 //     WebRTC.discovery
                 // ]
@@ -163,6 +150,11 @@ class Hopr extends libp2p {
 
         if (!options['bootstrap-node']) {
             await this.connectToBootstrapServers(options.bootstrapServers)
+        } else {
+            log(this.peerInfo.id, `Available under the following addresses:`)
+            this.peerInfo.multiaddrs.forEach(ma => {
+                log(this.peerInfo.id, ma.toString())
+            })
         }
 
         // this.heartbeat.start()
@@ -304,6 +296,7 @@ class Hopr extends libp2p {
         const filter = peerInfo =>
             !peerInfo.id.isEqual(this.peerInfo.id) && !peerInfo.id.isEqual(destination) && !this.bootstrapServers.some(pInfo => pInfo.id.isEqual(peerInfo.id))
 
+        // @TODO exclude bootstrap server(s) from crawling results
         await this.crawler.crawl()
 
         return randomSubset(this.peerBook.getAllArray(), MAX_HOPS - 1, filter).map(peerInfo => peerInfo.id)

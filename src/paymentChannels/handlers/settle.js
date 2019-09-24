@@ -38,7 +38,7 @@ module.exports = node =>
 
                     node.paymentChannels.state(request.channelId).then(state => {
                         if (state.state != node.paymentChannels.TransactionRecordState.OPEN) {
-                            log(node.peerInfo.id, `On-chain state is not set to OPEN, dropping message.`)
+                            log(node.peerInfo.id, `On-chain state for channel ${chalk.yellow(request.channelId.toString('hex'))} is not set to OPEN, dropping message.`)
                             return cb(null, Buffer.alloc(0))
                         }
 
