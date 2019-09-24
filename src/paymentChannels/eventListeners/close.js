@@ -4,18 +4,11 @@ const BN = require('bn.js')
 
 const { isPartyA, pubKeyToEthereumAddress, log } = require('../../utils')
 
-const Transaction = require('../../transaction')
-
 module.exports = self => {
-    const getCurrentOnchainBalance = (state, isPartyA, newBalance) => {
-        const initialBalance = new BN(state.initialBalance)
-        const currentBalance = isPartyA ? newBalance.sub(initialBalance) : initialBalance.sub(newBalance)
-
-        return currentBalance.toBuffer('be', Transaction.VALUE_LENGTH)
-    }
-
     /**
-     *
+     * Checks whether the previously published transaction is the most profitable transaction for
+     * this party.
+     * Returns `true` if there is a better on, otherwise `false`
      * @param {BN} newBalance current onchain balance of payment channel
      * @param {BN} newIndex current onchain index of payment channel
      * @param {Object} state current offchain state from database
@@ -74,7 +67,7 @@ module.exports = self => {
             pubKeyToEthereumAddress(state.restoreTransaction.counterparty)
         )
 
-        state.currentOnchainBalance = getCurrentOnchainBalance(channelId, partyA, new BN(amountA))
+        state.currentOnchainBalance = amountA
         state.currentIndex = onchainIndex
 
         if (hasBetterTransaction(new BN(amountA), new BN(onchainIndex, 'hex'), state, partyA)) {
@@ -84,23 +77,20 @@ module.exports = self => {
 
             state.state = self.TransactionRecordState.SETTLING
 
-            self.setState(channelId, state)
+            await self.setState(channelId, state)
             self.submitSettlementTransaction(channelId, state.lastTransaction)
         } else {
             state.state = self.TransactionRecordState.SETTLED
 
-            const [networkState] = await Promise.all([
-                self.contract.methods.channels(channelId).call(
-                    {
-                        from: pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal())
-                    },
-                    'latest'
-                ),
-                self.setState(channelId, state)
-            ])
+            const networkState = self.contract.methods.channels(channelId).call(
+                {
+                    from: pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal())
+                },
+                'latest'
+            )
 
             self.settleTimestamps.set(channelId.toString('hex'), new BN(networkState.settleTimestamp))
-            self.emitClosed(channelId)
+            self.emitClosed(channelId, state)
         }
     }
 }

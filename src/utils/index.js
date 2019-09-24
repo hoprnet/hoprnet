@@ -243,7 +243,7 @@ module.exports.randomNumber = (start, end) => {
  */
 module.exports.pubKeyToEthereumAddress = pubKey => {
     if (!Buffer.isBuffer(pubKey) || pubKey.length !== COMPRESSED_PUBLIC_KEY_LENGTH)
-        throw Error(`Invalid input parameter. Expected a Buffer of size ${COMPRESSED_PUBLIC_KEY_LENGTH}.`)
+        throw Error(`Invalid input parameter. Expected a Buffer of size ${COMPRESSED_PUBLIC_KEY_LENGTH}. Got '${typeof pubKey}'${pubKey.length ? ` of length ${pubKey.length}` : ''}.`)
 
     const hash = sha3(publicKeyConvert(pubKey, false).slice(1))
 
@@ -350,10 +350,10 @@ module.exports.privKeyToPeerId = (privKey, cb) => {
 
     if (typeof privKey === 'string') privKey = Buffer.from(privKey.replace(/0x/, ''), 'hex')
 
-    if (!Buffer.isBuffer(privKey)) return cb(Error(`Unable to parse private key to desired representation. Got type '${typeof privKey}'.`))
+    if (!Buffer.isBuffer(privKey)) throw Error(`Unable to parse private key to desired representation. Got type '${typeof privKey}'.`)
 
     if (privKey.length != PRIVKEY_LENGTH)
-        return cb(Error(`Invalid private key. Expected a buffer of size ${PRIVKEY_LENGTH} bytes. Got one of ${privKey.length} bytes.`))
+        throw Error(`Invalid private key. Expected a buffer of size ${PRIVKEY_LENGTH} bytes. Got one of ${privKey.length} bytes.`)
 
     privKey = new libp2p_crypto.supportedKeys.secp256k1.Secp256k1PrivateKey(privKey)
 

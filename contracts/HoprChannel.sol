@@ -64,12 +64,50 @@ contract HoprChannel {
     * @notice desposit ether to stake
     */
     function() external payable {
+        stakeFor(msg.sender);
+    }
+
+    /**
+     * Stake funds for another party.
+     *
+     * @param beneficiary address the benificiary who receives the stake
+     */
+    function stakeFor(address beneficiary) payable public {
         if (msg.value > 0) {
-            if (!states[msg.sender].isSet) {
-                states[msg.sender].isSet = true;
+            if (!states[beneficiary].isSet) {
+                states[beneficiary] = State(true, 0, msg.value);
+            } else {
+                states[beneficiary].stakedEther = states[beneficiary].stakedEther.add(uint256(msg.value));
             }
-            states[msg.sender].stakedEther = states[msg.sender].stakedEther.add(uint256(msg.value));
         }
+    }   
+
+    function createFor(address beneficiary0, address beneficiary1) payable public {
+        bytes32 channelId = _getId(beneficiary0, beneficiary1);
+
+        uint256 funds = msg.value;
+
+        if (funds < 2) {
+            return;
+        }
+
+        if (funds % 2 == 1) {
+            funds = funds - 1;
+        }
+
+        if (!states[beneficiary0].isSet) {
+            states[beneficiary0] = State(true, 1, 0);
+        } else {
+            states[beneficiary0].openChannels = states[beneficiary0].openChannels + 1;
+        }
+
+        if (!states[beneficiary1].isSet) {
+            states[beneficiary1] = State(true, 1, 0);
+        } else {
+            states[beneficiary1].openChannels = states[beneficiary0].openChannels + 1;
+        }
+
+        channels[channelId] = Channel(ChannelState.ACTIVE, funds, funds / 2, 0, 0);
     }
     
     /**
@@ -86,55 +124,7 @@ contract HoprChannel {
         }
 
         msg.sender.transfer(amount);
-    }
-    
-    /**
-    * @notice create payment channel TODO: finish desc
-    * @param counterParty address of the counter party
-    * @param amount uint256
-    */
-    // function create(address counterParty, uint256 amount) public enoughFunds(amount) {
-    //     require(channels[getId(counterParty)].state == ChannelState.UNINITIALIZED, "Channel already exists.");
-        
-    //     states[msg.sender].stakedEther = states[msg.sender].stakedEther.sub(amount);
-        
-    //     // Register the channels at both participants' state
-    //     states[msg.sender].openChannels = states[msg.sender].openChannels.add(1);
-    //     states[counterParty].openChannels = states[counterParty].openChannels.add(1);
-        
-    //     if (isPartyA(counterParty)) {
-    //         // msg.sender == partyB
-    //         channels[getId(counterParty)] = Channel(ChannelState.PARTYB_FUNDED, amount, 0, 0, 0);
-    //     } else {
-    //         // msg.sender == partyA
-    //         channels[getId(counterParty)] = Channel(ChannelState.PARTYA_FUNDED, amount, amount, 0, 0);
-    //     }
-    // }
-    
-    /**
-    * @notice fund payment channel TODO: finish desc
-    * @param counterParty address of the counter party
-    * @param amount uint256
-    */
-    // function fund(address counterParty, uint256 amount) public enoughFunds(amount) channelExists(counterParty) {
-    //     states[msg.sender].stakedEther = states[msg.sender].stakedEther.sub(amount);
-
-    //     Channel storage channel = channels[getId(counterParty)];
-
-    //     if (isPartyA(counterParty)) {
-    //         // msg.sender == partyB
-    //         require(channel.state == ChannelState.PARTYA_FUNDED, "Channel already exists.");
-            
-    //         channel.balance = channel.balance.add(amount);
-    //     } else {
-    //         // msg.sender == partyA
-    //         require(channel.state == ChannelState.PARTYB_FUNDED, "Channel already exists.");
-            
-    //         channel.balance = channel.balance.add(amount);
-    //         channel.balanceA = channel.balanceA.add(amount);
-    //     }
-    //     channel.state = ChannelState.ACTIVE;
-    // }
+    } 
 
     /**
      * @notice pre-fund channel by with staked Ether of both parties
@@ -168,33 +158,6 @@ contract HoprChannel {
 
         emit OpenedChannel(channelId, funds, totalBalance);        
     }
-
-    /**
-    * @notice settle & close multiple payment channels within 1 transaction
-    * @param counterParties address[] of the counter party
-    * @param indexes uint256[]
-    * @param balancesA uint256[]
-    * @param r bytes32[]
-    * @param s bytes32[]
-    * @param v bytes1[]
-    */
-    // function closeChannels(
-    //     address[] calldata counterParties, 
-    //     uint256[] calldata indexes, 
-    //     uint256[] calldata balancesA, 
-    //     bytes32[] calldata r, 
-    //     bytes32[] calldata s, 
-    //     bytes1[] calldata v) 
-    //     external {
-    //         uint256 length = counterParties.length;
-    //         require(
-    //             length == indexes.length && length == balancesA.length && length == r.length && length == s.length && length == v.length,
-    //             "array length mismatched");
-
-    //         for(uint256 i = 0; i < length; i.add(1)) {
-    //             closeChannel(counterParties[i], indexes[i], balancesA[i], r[i], s[i], v[i]);
-    //         }
-    // }
 
     /**
     * Initiates the closing procedure of a payment channel. The sender of the transaction
@@ -270,24 +233,6 @@ contract HoprChannel {
         // states[counterparty].stakedEther = states[counterparty].stakedEther.sub(amount);
         // states[msg.sender].stakedEther = states[msg.sender].stakedEther.add(amount);
     }
-
-    // function addChallenge(address counterparty, bytes32 challenge) external {
-    //     bytes32 channelId = getId(counterparty);
-    //     Channel storage channel = channels[channelId];
-
-    //     require(channel.state != ChannelState.ACTIVE, "Invalid channel.");
-
-    //     channel.challengeCounter = channel.challengeCounter;
-    //     Party storage party = channel.challenges[challenge];
-
-    //     require(party == Party.UNINITIALIZED, "Overwriting of challenges is not allowed.");
-
-    //     if (isPartyA(counterparty)) {
-    //         party = PARTY_A;
-    //     } else {
-    //         party = PARTY_B;
-    //     }
-    // }
     
     /**
     * @notice withdrawal pending balance from payment channel
@@ -347,6 +292,14 @@ contract HoprChannel {
             return keccak256(abi.encodePacked(msg.sender, counterParty));
         } else {
             return keccak256(abi.encodePacked(counterParty, msg.sender));
+        }
+    }
+
+    function _getId(address a, address b) public pure returns (bytes32) {
+        if (bytes20(a) < bytes20(b)) {
+            return keccak256(abi.encodePacked(a, b));
+        } else {
+            return keccak256(abi.encodePacked(b, a));
         }
     }
 

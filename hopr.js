@@ -27,6 +27,9 @@ const Transaction = require('./src/transaction')
 const MINIMAL_STAKE = new BN(toWei('0.10', 'ether'))
 const DEFAULT_STAKE = new BN(toWei('0.11', 'ether'))
 
+const HASH_LENGTH = 32
+const CHANNEL_ID_LENGTH = HASH_LENGTH
+
 const SPLIT_OPERAND_QUERY_REGEX = /([\w\-]+)(?:\s+)?([\w\s\-]+)?/
 
 let node, funds, ownAddress, stakedEther, rl, options
@@ -37,14 +40,51 @@ let node, funds, ownAddress, stakedEther, rl, options
  * @returns {Object}
  */
 function parseOptions() {
+    const displayHelp = () => {
+        console.log(
+            /* prettier-ignore */
+            `\nStart HOPR with:\n` +
+            `-b [--bootstrap-node, bootstrap]\tstarts HOPR as a bootstrap node\n` +
+            `<ID>\t\t\t\t\tstarts HOPR with ID <ID> specified .env\n`
+        )
+        process.exit(0)
+    }
+
+    const unknownOptions = []
+
     const options = require('getopts')(process.argv.slice(2), {
+        boolean: ['bootstrap-node'],
         alias: {
             b: 'bootstrap-node'
-        }
+        },
+        unknown: option => unknownOptions.push(option)
     })
 
-    if (Array.isArray(options._) && options._.length > 0) {
-        options.id = Number.parseInt(options._[0])
+    if (Array.isArray(options._)) {
+        options._.forEach(option => {
+            if (option.toLowerCase() === 'bootstrap') {
+                options['bootstrap-node'] = true
+                return
+            }
+
+            const int = parseInt(option)
+            if (isFinite(int)) {
+                if (options.id) {
+                    console.log(`Cannot set ID twice.`)
+                    return
+                }
+
+                options.id = int
+                return
+            }
+
+            unknownOptions.push(option)
+        })
+    }
+
+    if (unknownOptions.length) {
+        console.log(`Got unknown option${unknownOptions.length == 1 ? '' : 's'} [${unknownOptions.join(', ')}]`)
+        return displayHelp()
     }
 
     const tmp = groupBy(process.env.BOOTSTRAP_SERVERS.split(',').map(addr => Multiaddr(addr)), ma => ma.getPeerId())
@@ -75,32 +115,10 @@ function isNotBootstrapNode(peerId) {
  * @returns {Promise<PeerId[]>}
  */
 function getExistingChannels() {
-    return new Promise((resolve, reject) => {
-        let counterparties = []
-
-        node.db
-            .createValueStream({
-                gt: node.paymentChannels.RestoreTransaction(Buffer.alloc(32, 0)),
-                lt: node.paymentChannels.RestoreTransaction(Buffer.alloc(32, 255))
-            })
-            .on('data', serializedTransaction => {
-                const restoreTx = Transaction.fromBuffer(serializedTransaction)
-
-                counterparties.push(restoreTx.counterparty)
-            })
-            .on('end', () =>
-                resolve(
-                    Promise.all(counterparties.map(counterparty => pubKeyToPeerId(counterparty))).then(peerIds =>
-                        peerIds.reduce((result, peerId) => {
-                            if (isNotBootstrapNode) result.push(peerId)
-
-                            return result
-                        }, [])
-                    )
-                )
-            )
-            .on('error', reject)
-    })
+    return node.paymentChannels.getAllChannels(
+        channel => pubKeyToPeerId(channel.state.restoreTransaction.counterparty),
+        promises => Promise.all(promises).then(peerIds => peerIds.filter(isNotBootstrapNode))
+    )
 }
 
 // Allowed keywords
@@ -319,19 +337,15 @@ async function runAsRegularNode() {
 
     console.log(`Connecting to bootstrap node${node.bootstrapServers.length == 1 ? '' : 's'}...`)
 
-    // Scan restore transactions and detect whether they're on-chain available
-
     rl.on('line', async input => {
         rl.pause()
-        const [command, query] = input
+        const [command, query] = (input || '')
             .trim()
             .split(SPLIT_OPERAND_QUERY_REGEX)
             .slice(1)
 
-        console.log(`command '${command}' query '${query}'`)
-
         let amount, peerId
-        switch (command.trim()) {
+        switch ((command || '').trim()) {
             case 'crawl':
                 try {
                     await node.crawler.crawl(peerInfo => isNotBootstrapNode(peerInfo.id))
@@ -412,41 +426,29 @@ async function runAsRegularNode() {
                 }
                 break
             case 'openChannels':
-                let str = `${chalk.yellow('ChannelId:'.padEnd(64, ' '))} - ${chalk.blue('PeerId:')}`
-                let index = 0
-                let promises = []
-                node.db
-                    .createReadStream({
-                        gt: node.paymentChannels.RestoreTransaction(Buffer.alloc(32, 0)),
-                        lt: node.paymentChannels.RestoreTransaction(Buffer.alloc(32, 255))
-                    })
-                    .on('data', ({ key, value }) => {
-                        index++
-                        const channelId = key.slice(key.length - 32)
-                        const restoreTx = Transaction.fromBuffer(value)
+                let str = `${chalk.yellow('ChannelId:'.padEnd(64, ' '))} - ${chalk.blue('PeerId:')}\n`
 
-                        promises.push(
-                            pubKeyToPeerId(restoreTx.counterparty).then(peerId => {
-                                str += `\n${chalk.yellow(channelId.toString('hex'))} - ${chalk.blue(peerId.toB58String())}`
-                            })
-                        )
-                    })
-                    .on('end', async () => {
-                        try {
-                            if (index == 0) {
-                                str += `\n  No open channels.`
-                            } else {
-                                await Promise.all(promises)
-                            }
-                            console.log(str)
-                        } catch (err) {
-                            console.log(chalk.red(err.message))
-                        } finally {
-                            setTimeout(() => {
-                                rl.prompt()
-                            })
+                try {
+                    str += await node.paymentChannels.getAllChannels(
+                        channel =>
+                            pubKeyToPeerId(channel.state.restoreTransaction.counterparty).then(
+                                peerId => `${chalk.yellow(channel.channelId.toString('hex'))} - ${chalk.blue(peerId.toB58String())}`
+                            ),
+                        promises => {
+                            if (promises.length == 0) return `\n  No open channels.`
+
+                            return Promise.all(promises).then(results => results.join('\n'))
                         }
-                    })
+                    )
+                } catch (err) {
+                    return console.log(chalk.red(err.message))
+                }
+
+                console.log(str)
+
+                setTimeout(() => {
+                    rl.prompt()
+                })
                 break
             case 'open':
                 if (!query) {
@@ -465,12 +467,16 @@ async function runAsRegularNode() {
                     break
                 }
 
-                const channelId = getId(pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()), pubKeyToEthereumAddress(peerId.pubKey.marshal()))
-
                 let interval
                 node.paymentChannels
                     .open(peerId)
                     .then(() => {
+                        const channelId = getId(
+                            /* prettier-ignore */
+                            pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()),
+                            pubKeyToEthereumAddress(peerId.pubKey.marshal())
+                            )
+
                         console.log(`${chalk.green(`Successfully opened channel`)} ${chalk.yellow(channelId.toString('hex'))}`)
                     })
                     .catch(err => {

@@ -7,7 +7,6 @@ const { pubKeyToEthereumAddress, log, bufferToNumber } = require('../../utils')
 
 const Transaction = require('../../transaction')
 
-const SETTLEMENT_TIMEOUT = 40000
 
 const CHANNEL_STATE_UNINITIALIZED = 0
 const CHANNEL_STATE_FUNDED = 3
@@ -30,19 +29,23 @@ module.exports = self => {
      * @param {Buffer} channelId ID of the payment channel
      * @param {Transaction} [tx] tx that is used to close the payment channel
      */
-    const submitSettlementTransaction = async (channelId, tx, channelKey) => {
+    const submitSettlementTransaction = async (channelId, localState) => {
         log(self.node.peerInfo.id, `Trying to close payment channel ${chalk.yellow(channelId.toString('hex'))}. Nonce is ${chalk.cyan(self.nonce)}`)
+
+        await self.setState(channelId, {
+            state: self.TransactionRecordState.SETTLING
+        })
 
         const receipt = await self.contractCall(
             self.contract.methods.closeChannel(
-                tx.index,
-                tx.nonce,
-                new BN(tx.value).toString(),
-                tx.curvePoint.slice(0, 32),
-                tx.curvePoint.slice(32, 33),
-                tx.signature.slice(0, 32),
-                tx.signature.slice(32, 64),
-                bufferToNumber(tx.recovery) + 27
+                localState.lastTransaction.index,
+                localState.lastTransaction.nonce,
+                new BN(localState.lastTransaction.value).toString(),
+                localState.lastTransaction.curvePoint.slice(0, 32),
+                localState.lastTransaction.curvePoint.slice(32, 33),
+                localState.lastTransaction.signature.slice(0, 32),
+                localState.lastTransaction.signature.slice(32, 64),
+                bufferToNumber(localState.lastTransaction.recovery) + 27
             )
         )
 
@@ -61,48 +64,28 @@ module.exports = self => {
                 await self.deleteState(channelId)
                 return new BN(0)
             case CHANNEL_STATE_FUNDED:
-                let lastTx
                 if (counterpartyHasMoreRecentTransaction(localState)) {
-                    lastTx = await new Promise(async resolve => {
-                        const timeout = setTimeout(resolve, SETTLEMENT_TIMEOUT)
+                    let lastTx
+                    try {
+                        lastTx = await self.getLatestTransactionFromCounterparty(channelId, localState)
+                    } catch (err) {
+                        console.log(err)
+                    }
 
-                        try {
-                            resolve(
-                                self
-                                    .getLatestTransactionFromCounterparty({
-                                        channelId,
-                                        state: localState
-                                    })
-                                    .then(results => {
-                                        results = results.filter(result => result.channelId.equals(channelId))
-
-                                        if (!results) throw Error('Got no response from counterparty')
-
-                                        return results.transaction
-                                    })
-                            )
-                        } catch (err) {
-                            console.log(err.message)
-                            resolve()
-                        } finally {
-                            clearTimeout(timeout)
-                        }
-                    })
-                } else {
-                    lastTx = localState.lastTransaction
+                    // @TODO take the received transaction only if it is more profitable than the previous one
+                    if (new BN(lastTx.index).gt(new BN(localState.lastTransaction.index))) {
+                        localState.lastTransaction = lastTx
+                    }
                 }
 
                 return new Promise(resolve => {
-                    self.onceClosed(
-                        channelId,
-                        (() => {
-                            submitSettlementTransaction(channelId, lastTx)
+                    self.onceClosed(channelId, newState => {
+                        Object.assign(localState, newState)
 
-                            return () => {
-                                resolve(self.withdraw(channelId, localState, networkState))
-                            }
-                        })()
-                    )
+                        resolve(self.withdraw(channelId, localState, networkState))
+                    })
+
+                    submitSettlementTransaction(channelId, localState)
                 })
             case CHANNEL_STATE_WITHDRAWABLE:
                 return self.withdraw(channelId, localState, networkState)
@@ -133,21 +116,26 @@ module.exports = self => {
 
         switch (state.state) {
             case self.TransactionRecordState.OPENING:
+                // This can only happen if the node which initiated the opening procedure
+                // failed while doing that
                 const timeout = setTimeout(() => {
-                    throw Error(`Could not close channel ${chalk.yellow(channel.toString('hex'))} because no one opened it within the timeout.`)
+                    console.log(`Could not close channel ${chalk.yellow(channelId.toString('hex'))} because no one opened it within the timeout.`)
+                    return self.deleteState(channelId).then(() => new BN(0))
                 })
 
                 return new Promise(resolve => {
-                    self.onceOpened(channelId, () => {
+                    self.onceOpened(channelId, newState => {
                         clearTimeout(timeout)
                         networkState.state = CHANNEL_STATE_FUNDED
-                        resolve(initiateClosing(channelId, state, networkState))
+                        resolve(initiateClosing(channelId, newState, networkState))
                     })
                 })
             case self.TransactionRecordState.OPEN:
                 return initiateClosing(channelId, state, networkState)
+            case self.TransactionRecordState.WITHDRAWABLE:
+                return self.withdraw(channelId, state, networkState).then(_ => new BN(0))
             default:
-                throw Error('TODO')
+                throw Error(`Channel is in state ${state.state}`)
         }
     }
 

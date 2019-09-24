@@ -46,7 +46,8 @@ module.exports = class Crawler {
              */
             const queryNode = peerId =>
                 new Promise(async (resolve, reject) => {
-                    let conn, resolved = false
+                    let conn,
+                        resolved = false
                     try {
                         conn = await this.node.dialProtocol(peerId, PROTOCOL_CRAWLING)
                     } catch (err) {
@@ -129,7 +130,7 @@ module.exports = class Crawler {
                 if (queue.getPendingLength() == 0 && queue.getQueueLength() == 0) {
                     if (errors.length > 0) log(this.node.peerInfo.id, `Errors while crawling:${errors.reduce((acc, err) => `\n${chalk.red(err.message)}`, '')}`)
 
-                    log(this.node.peerInfo.id, `Received ${now - before} new node${now - before > 1 ? '' : 's'}.`)
+                    log(this.node.peerInfo.id, `Received ${now - before} new node${now - before == 1 ? '' : 's'}.`)
                     log(this.node.peerInfo.id, `Now holding peer information of ${now} node${now == 1 ? '' : 's'} in the network.`)
 
                     return reject(Error('Unable to find enough other nodes in the network.'))

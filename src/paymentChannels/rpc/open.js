@@ -16,16 +16,13 @@ const Transaction = require('../../transaction')
 
 const OPENING_TIMEOUT = 6 * 60 * 1000
 
-module.exports = self => async to => {
-    to = await addPubKey(to)
-
-    const channelId = getId(
-        /* prettier-ignore */
-        pubKeyToEthereumAddress(to.pubKey.marshal()),
-        pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal())
-    )
-
-    const prepareOpening = async () => {
+module.exports = self => {
+    /**
+     * Creates the restore transaction and stores it in the database.
+     *
+     * @param {Buffer} channelId ID of the payment channel
+     */
+    const prepareOpening = async channelId => {
         const restoreTx = Transaction.create(
             randomBytes(Transaction.NONCE_LENGTH),
             numberToBuffer(1, Transaction.INDEX_LENGTH),
@@ -44,7 +41,15 @@ module.exports = self => async to => {
         return restoreTx
     }
 
-    const getSignatureFromCounterparty = (conn, restoreTx) =>
+    /**
+     * Sends the signed restore transaction to the counterparty and wait for
+     * a signature from that party.
+     *
+     * @param {PeerId} to peerId of the counterparty
+     * @param {Connection} conn an open stream to the counterparty
+     * @param {Transaction} restoreTx the backup transaction
+     */
+    const getSignatureFromCounterparty = (to, conn, restoreTx) =>
         new Promise((resolve, reject) => {
             let resolved = false
             pull(
@@ -79,61 +84,85 @@ module.exports = self => async to => {
             )
         })
 
-    const open = async () => {
-        let conn, restoreTx
-        try {
-            conn = await self.node.peerRouting.findPeer(to).then(peerInfo => self.node.dialProtocol(peerInfo, PROTOCOL_PAYMENT_CHANNEL))
-        } catch (err) {
-            throw Error(`Could not connect to peer ${chalk.blue(to.toB58String())} due to '${err.message}'.`)
-        }
+    /**
+     * Opens a payment channel with the given party.
+     *
+     * @notice throws an exception in case the other party is not responding
+     *
+     * @param {PeerId | string} to peerId of multiaddr of the counterparty
+     * @param {Transaction} [restoreTx] (optional) use that restore transaction instead
+     * of creating a new one
+     */
+    const open = (to, restoreTx) =>
+        new Promise(async (resolve, reject) => {
+            to = await addPubKey(to)
 
-        try {
-            restoreTx = await prepareOpening()
-        } catch (err) {
-            throw Error(
-                `Could not open payment channel ${chalk.yellow(channelId.toString('hex'))} to peer ${chalk.blue(to.toB58String())} due to '${err.message}'.`
+            const channelId = getId(
+                /* prettier-ignore */
+                pubKeyToEthereumAddress(to.pubKey.marshal()),
+                pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal())
             )
-        }
 
-        const timeout = setTimeout(() => {
-            throw Error(`Unable to open a payment channel because counterparty ${chalk.blue(to.toB58String())} is not answering with an appropriate response.`)
-        }, OPENING_TIMEOUT)
+            if (!restoreTx) {
+                let conn
+                try {
+                    conn = await self.node.peerRouting.findPeer(to).then(peerInfo => self.node.dialProtocol(peerInfo, PROTOCOL_PAYMENT_CHANNEL))
+                } catch (err) {
+                    return reject(Error(`Could not connect to peer ${chalk.blue(to.toB58String())} due to '${err.message}'.`))
+                }
 
-        try {
-            restoreTx = await getSignatureFromCounterparty(conn, restoreTx)
-        } catch (err) {
-            throw Error(`Unable to open a payment channel because counterparty ${chalk.blue(to.toB58String())} because '${err.message}'.`)
-        }
-
-        self.registerSettlementListener(channelId)
-        self.registerOpeningListener(channelId)
-
-        await self.setState(channelId, {
-            state: self.TransactionRecordState.OPENING
-        })
-
-        return new Promise(resolve =>
-            self.onceOpened(
-                channelId,
-                (() => {
-                    const promise = self.contractCall(
-                        self.contract.methods.createFunded(
-                            restoreTx.nonce,
-                            new BN(restoreTx.value).toString(),
-                            restoreTx.signature.slice(0, 32),
-                            restoreTx.signature.slice(32, 64),
-                            bufferToNumber(restoreTx.recovery) + 27
+                try {
+                    restoreTx = await prepareOpening(channelId)
+                } catch (err) {
+                    return reject(
+                        Error(
+                            `Could not open payment channel ${chalk.yellow(channelId.toString('hex'))} to peer ${chalk.blue(to.toB58String())} due to '${
+                                err.message
+                            }'.`
                         )
                     )
+                }
 
-                    return () => {
-                        clearTimeout(timeout)
-                        resolve(promise)
-                    }
-                })()
+                try {
+                    restoreTx = await getSignatureFromCounterparty(to, conn, restoreTx)
+                } catch (err) {
+                    return reject(Error(`Unable to open a payment channel because counterparty ${chalk.blue(to.toB58String())} because '${err.message}'.`))
+                }
+            } else {
+                console.log(`restoreTx is not null. Got ${typeof restoreTx}`)
+            }
+
+            const timeout = setTimeout(() => {
+                return reject(
+                    Error(
+                        `Unable to open a payment channel because counterparty ${chalk.blue(to.toB58String())} is not answering with an appropriate response.`
+                    )
+                )
+            }, OPENING_TIMEOUT)
+
+            self.registerSettlementListener(channelId)
+            self.registerOpeningListener(channelId)
+
+            await self.setState(channelId, {
+                restoreTransaction: restoreTx,
+                state: self.TransactionRecordState.OPENING
+            })
+
+            self.onceOpened(channelId, newState => {
+                clearTimeout(timeout)
+                resolve(newState)
+            })
+
+            self.contractCall(
+                self.contract.methods.createFunded(
+                    restoreTx.nonce,
+                    new BN(restoreTx.value).toString(),
+                    restoreTx.signature.slice(0, 32),
+                    restoreTx.signature.slice(32, 64),
+                    bufferToNumber(restoreTx.recovery) + 27
+                )
             )
-        )
-    }
+        })
 
-    return open()
+    return open
 }

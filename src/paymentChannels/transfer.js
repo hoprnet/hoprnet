@@ -30,19 +30,22 @@ module.exports = self => {
             record = await self.state(channelId)
         } catch (err) {
             if (err.notFound) {
-                await self.open(to)
-                record = await self.state(channelId)
+                record = await self.open(to)
             } else {
                 throw err
             }
         }
 
         switch (record.state) {
+            case self.TransactionRecordState.INITIALIZED:
+                console.log(`Opening channel ${chalk.yellow(channelId.toString('hex'))} with a previously signed restore transaction.`)
+                record = await self.open(to, record.restoreTransaction)
+                break
             case self.TransactionRecordState.SETTLING:
             case self.TransactionRecordState.SETTLED:
                 await self.handleClosedChannel(channelId, true)
-                await self.open(to)
-                record = await self.state(channelId)
+                record = await self.open(to)
+                break
         }
 
         const challenges = [secp256k1.publicKeyCreate(channelKey)]
@@ -59,24 +62,17 @@ module.exports = self => {
             secp256k1.publicKeyCombine(challenges)
         ).sign(self.node.peerInfo.id)
 
+        record.currentIndex = newTx.index
+        record.currentOffchainBalance = newTx.value
+
         log(
             self.node.peerInfo.id,
-            `Created tx with index ${chalk.cyan(
-                numberToBuffer(bufferToNumber(record.currentIndex) + 1, Transaction.INDEX_LENGTH).toString('hex')
-            )} on channel ${chalk.yellow(channelId.toString('hex'))}.`
+            `Created tx with index ${chalk.cyan(record.currentIndex.toString('hex'))} on channel ${chalk.yellow(channelId.toString('hex'))}.`
         )
 
-        try {
-            channelKey = secp256k1.privateKeyTweakAdd(channelKey, record.channelKey || Buffer.alloc(32, 0))
-        } catch (err) {
-            if (!err.notFound) throw err
-        }
+        record.channelKey = secp256k1.privateKeyTweakAdd(channelKey, record.channelKey || Buffer.alloc(32, 0))
 
-        await self.setState(channelId, {
-            currentOffchainBalance: newTx.value,
-            currentIndex: newTx.index,
-            channelKey
-        })
+        await self.setState(channelId, record)
 
         return newTx
     }

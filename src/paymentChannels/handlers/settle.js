@@ -36,24 +36,20 @@ module.exports = node =>
                         return cb(null, Buffer.alloc(0))
                     }
 
-                    node.paymentChannels
-                        .getLastTransaction(request.channelId)
-                        .catch(err => {
-                            log(
-                                node.peerInfo.id,
-                                `Haven't found any previous transaction for channel ${chalk.yellow(request.channelId.toString('hex'))}, dropping message.`
-                            )
-                            cb(null, Buffer.alloc(0))
-                        })
-                        .then(lastTx =>
-                            cb(
-                                null,
-                                SettlementResponse.encode({
-                                    channelId: request.channelId,
-                                    transaction: lastTx.sign(node.peerInfo.id).toBuffer()
-                                })
-                            )
+                    node.paymentChannels.state(request.channelId).then(state => {
+                        if (state.state != node.paymentChannels.TransactionRecordState.OPEN) {
+                            log(node.peerInfo.id, `On-chain state for channel ${chalk.yellow(request.channelId.toString('hex'))} is not set to OPEN, dropping message.`)
+                            return cb(null, Buffer.alloc(0))
+                        }
+
+                        return cb(
+                            null,
+                            SettlementResponse.encode({
+                                channelId: request.channelId,
+                                transaction: state.lastTransaction.sign(node.peerInfo.id).toBuffer()
+                            })
                         )
+                    })
                 },
                 null,
                 false

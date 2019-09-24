@@ -32,7 +32,7 @@ const mixin = Base =>
             let channel = this.channels.get(id)
 
             if (!channel) {
-                channel = SimplePeer({
+                channel = new SimplePeer({
                     initiator: false,
                     config: { iceServers: getSTUNServers(this.node.bootstrapServers) },
                     trickle: true,
@@ -83,7 +83,7 @@ const mixin = Base =>
             const opts = multiaddr.toOptions()
 
             // TODO: use HOPR nodes instead of Google servers
-            const channel = SimplePeer({
+            const channel = new SimplePeer({
                 initiator: true,
                 config: { iceServers: getSTUNServers(this.node.bootstrapServers) },
                 trickle: true,

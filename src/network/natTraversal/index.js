@@ -7,6 +7,7 @@ const PeerId = require('peer-id')
 
 const Signalling = require('./signalling')
 
+const { log } = require('../../utils')
 const { PROTOCOL_WEBRTC_TURN } = require('../../constants')
 
 const mixin = Base =>
@@ -15,10 +16,6 @@ const mixin = Base =>
             super(opts)
 
             this.signalling = new Signalling(opts)
-
-            // this.node.on('peer:discovery', peerInfo => {
-            //     console.log(peerInfo)
-            // })
 
             if (this.node.bootstrapServers && this.node.bootstrapServers.length) {
                 this.node.once('start', () =>
@@ -53,10 +50,17 @@ const mixin = Base =>
             //     }, 5 * 1000))
             // ])
 
-            if (!this.node.bootstrapServers || this.node.bootstrapServers.some(peerInfo => peerInfo.id.isEqual(PeerId.createFromB58String(multiaddr.getPeerId())))) {
-               connPromise = super.dial(multiaddr, options)
+            if (
+                !this.node.bootstrapServers ||
+                this.node.bootstrapServers.some(peerInfo => peerInfo.id.isEqual(PeerId.createFromB58String(multiaddr.getPeerId())))
+            ) {
+                log(this.node.peerInfo.id, `Calling ${multiaddr.toString()} directly`)
+
+                connPromise = super.dial(multiaddr, options)
             } else {
-               connPromise = this.signalling.relay(PeerId.createFromB58String(multiaddr.getPeerId()))
+                log(this.node.peerInfo.id, `Calling ${multiaddr.toString()} over bootstrap node`)
+
+                connPromise = this.signalling.relay(PeerId.createFromB58String(multiaddr.getPeerId()))
             }
 
             if (cb) {

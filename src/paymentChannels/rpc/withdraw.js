@@ -2,7 +2,7 @@ const BN = require('bn.js')
 
 const chalk = require('chalk')
 
-const { pubKeyToEthereumAddress, mineBlock, log } = require('../../utils')
+const { pubKeyToPeerId, pubKeyToEthereumAddress, mineBlock, log } = require('../../utils')
 
 const CHANNEL_STATE_WITHDRAWABLE = 4
 
@@ -20,6 +20,12 @@ module.exports = self => {
      * @param {Object} localState current off-chain state from the database
      */
     const withdraw = async (channelId, localState) => {
+        localState.state = self.TransactionRecordState.WITHDRAWING
+
+        await self.setState(channelId, {
+            state: self.TransactionRecordState.WITHDRAWING
+        })
+
         const receipt = await self.contractCall(self.contract.methods.withdraw(pubKeyToEthereumAddress(localState.restoreTransaction.counterparty)))
 
         const subscription = self.subscriptions.get(channelId.toString('hex'))
@@ -104,9 +110,11 @@ module.exports = self => {
             )}.`
         )
 
+        const receivedMoney = self.getEmbeddedMoney(localState.currentOnchainBalance, localState.initialBalance, await pubKeyToPeerId(localState.restoreTransaction.counterparty))
+
         await self.deleteState(channelId)
 
-        return new BN(localState.currentOnchainBalance)
+        return new BN(receivedMoney)
     }
 
     return initiateWithdrawal

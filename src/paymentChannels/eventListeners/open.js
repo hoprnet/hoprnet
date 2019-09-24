@@ -27,7 +27,7 @@ module.exports = self => async (err, event) => {
 
     // @TODO check incoming event for plausibility
 
-    await self.setState(channelId, {
+    Object.assign(state, {
         state: self.TransactionRecordState.OPEN,
         currentIndex: state.restoreTransaction.index,
         initialValue: state.restoreTransaction.value,
@@ -44,5 +44,5 @@ module.exports = self => async (err, event) => {
         )}.`
     )
 
-    self.emitOpened(channelId)
+    self.emitOpened(channelId, state)
 }
