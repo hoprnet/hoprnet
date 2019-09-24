@@ -81,6 +81,34 @@ contract HoprChannel {
             }
         }
     }   
+
+    function createFor(address beneficiary0, address beneficiary1) payable public {
+        bytes32 channelId = _getId(beneficiary0, beneficiary1);
+
+        uint256 funds = msg.value;
+
+        if (funds < 2) {
+            return;
+        }
+
+        if (funds % 2 == 1) {
+            funds = funds - 1;
+        }
+
+        if (!states[beneficiary0].isSet) {
+            states[beneficiary0] = State(true, 1, 0);
+        } else {
+            states[beneficiary0].openChannels = states[beneficiary0].openChannels + 1;
+        }
+
+        if (!states[beneficiary1].isSet) {
+            states[beneficiary1] = State(true, 1, 0);
+        } else {
+            states[beneficiary1].openChannels = states[beneficiary0].openChannels + 1;
+        }
+
+        channels[channelId] = Channel(ChannelState.ACTIVE, funds, funds / 2, 0, 0);
+    }
     
     /**
     * @notice withdrawal staked ether
@@ -264,6 +292,14 @@ contract HoprChannel {
             return keccak256(abi.encodePacked(msg.sender, counterParty));
         } else {
             return keccak256(abi.encodePacked(counterParty, msg.sender));
+        }
+    }
+
+    function _getId(address a, address b) public pure returns (bytes32) {
+        if (bytes20(a) < bytes20(b)) {
+            return keccak256(abi.encodePacked(a, b));
+        } else {
+            return keccak256(abi.encodePacked(b, a));
         }
     }
 
