@@ -13,6 +13,12 @@
         {
             "type": "node",
             "request": "launch",
+            "name": "Multi-process unit test",
+            "program": "${workspaceFolder}/test/multiprocess.js"
+        },
+        {
+            "type": "node",
+            "request": "launch",
             "name": "CLI Bootstrap",
             "program": "${workspaceFolder}/hopr.js",
             "args": [
@@ -25,7 +31,7 @@
             "name": "CLI Node (with number)",
             "program": "${workspaceFolder}/hopr.js",
             "args": [
-                "1"
+                "5"
             ]
         },
         {
