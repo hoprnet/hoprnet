@@ -1,5 +1,6 @@
-<font face="courier new" size="20" color="black">HOPR</font><font face="courier new" size="11" color="black">.network</font>
+<!-- <font face="courier new" size="20" color="black">HOPR</font><font face="courier new" size="11" color="black">.network</font> -->
 
+# HOPR
 HOPR is a privacy-preserving messaging protocol that incentivizes users to participate in the network. It provides privacy by relaying messages via several relay nodes to the recipient. Relay nodes are getting paid via payment channels for their services.
 
 ### For further details, see the full [protocol specification on the wiki](../../wiki)
