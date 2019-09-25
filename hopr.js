@@ -117,7 +117,7 @@ function getExistingChannels() {
 }
 
 // Allowed keywords
-const keywords = ['open', 'stake', 'stakedEther', 'unstake', 'send', 'quit', 'crawl', 'openChannels', 'closeAll']
+const keywords = ['open', 'stake', 'stakedEther', 'unstake', 'send', 'quit', 'crawl', 'openChannels', 'closeAll', 'myAddress']
 
 /**
  * Completes a given input with possible endings. Used for convenience.
@@ -564,6 +564,11 @@ async function runAsRegularNode() {
                 }
                 break
 
+            case 'myAddress':
+                console.log(`Ethereum:\t${chalk.green(pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()))}`)
+                console.log(`HOPR:\t\t${chalk.green(node.peerInfo.id.toB58String())}`)
+                rl.prompt()
+                break
             default:
                 console.log(chalk.red('Unknown command!'))
                 rl.prompt()
