@@ -134,8 +134,12 @@ module.exports = self => {
                 })
             case self.TransactionRecordState.OPEN:
                 return initiateClosing(channelId, state, networkState)
+            case self.TransactionRecordState.SETTLED:
             case self.TransactionRecordState.WITHDRAWABLE:
                 return self.withdraw(channelId, state, networkState).then(_ => new BN(0))
+            case self.TransactionRecordState.SETTLING:
+                log(self.node.peerInfo.id, `Channel ${chalk.yellow(channelId.toString('hex'))} is already settling. No action required.`)
+                return new BN(0)
             default:
                 throw Error(`Channel is in state ${state.state}`)
         }

@@ -151,7 +151,6 @@ class Packet {
             await this.prepareForward(node, currentState, newState, channelId, target)
         }
 
-        console.log('Finished transformation')
         return this
     }
 

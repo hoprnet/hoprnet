@@ -163,7 +163,7 @@ class PaymentChannel extends EventEmitter {
      */
     deleteState(channelId) {
         return new Promise(async (resolve, reject) => {
-            console.log(`Deleting record for channel ${chalk.yellow(channelId.toString('hex'))}`)
+            log(this.node.peerInfo.id, `Deleting record for channel ${chalk.yellow(channelId.toString('hex'))}`)
 
             let batch = this.node.db.batch().del(this.State(channelId))
 
