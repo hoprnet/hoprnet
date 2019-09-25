@@ -34,6 +34,10 @@ module.exports = self => {
             Buffer.alloc(33, 0)
         ).sign(self.node.peerInfo.id)
 
+        if (!counterparty) {
+            throw Error(`RPC: counterparty is empty. Got '${counterparty ? counterparty.toString() : counterparty}'`)
+        }
+
         self.setState(channelId, {
             state: self.TransactionRecordState.INITIALIZED,
             initialBalance: restoreTransaction.value,

@@ -78,6 +78,11 @@ module.exports = node => {
         const restoreTransaction = Transaction.fromBuffer(encodedTransaction)
 
         const counterparty = restoreTransaction.counterparty
+
+        if (!counterparty) {
+            throw Error(`Handler: counterparty is empty. Got '${counterparty ? counterparty.toString() : counterparty}'`)
+        }
+
         const channelId = getId(
             /* prettier-ignore */
             pubKeyToEthereumAddress(counterparty),
