@@ -100,7 +100,7 @@ class Packet {
                 return state.lastTransaction
 
             default:
-                throw Error(`Invalid state of payment channel ${chalk.yellow(channelId.toString('hex'))}.`)
+                throw Error(`Invalid state of payment channel ${chalk.yellow(channelId.toString('hex'))}. Got '${state.state}'`)
         }
     }
 
@@ -132,6 +132,7 @@ class Packet {
         }
 
         if (currentState.state == node.paymentChannels.TransactionRecordState.PRE_OPENED) {
+            // @TODO da fehlt noch was
             log(node.peerInfo.id, `incoming payment over pre-opened channel ${chalk.yellow(channelId.toString('hex'))}`)
             newState.state = node.paymentChannels.TransactionRecordState.OPEN
             newState.nonce = this.transaction.nonce
