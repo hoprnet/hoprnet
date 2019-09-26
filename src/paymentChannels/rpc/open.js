@@ -39,7 +39,8 @@ module.exports = self => {
             state: self.TransactionRecordState.INITIALIZED,
             initialBalance: restoreTransaction.value,
             restoreTransaction,
-            counterparty: to.pubKey.marshal()
+            counterparty: to.pubKey.marshal(),
+            nonce: restoreTransaction.nonce
         })
 
         return restoreTransaction
