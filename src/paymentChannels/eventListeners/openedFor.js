@@ -30,9 +30,10 @@ module.exports = self => async (err, event) => {
     const state = {
         state: self.TransactionRecordState.PRE_OPENED,
         currentIndex: new BN(1).toBuffer('be', Transaction.INDEX_LENGTH),
-        initialValue: new BN(event.returnValues.amountA).toBuffer('be', Transaction.VALUE_LENGTH),
+        initialBalance: new BN(event.returnValues.amountA).toBuffer('be', Transaction.VALUE_LENGTH),
         currentOffchainBalance: new BN(event.returnValues.amountA).toBuffer('be', Transaction.VALUE_LENGTH),
         currentOnchainBalance: new BN(event.returnValues.amountA).toBuffer('be', Transaction.VALUE_LENGTH),
+        totalBalance: new BN(event.returnValues.amount).toBuffer('be', Transaction.VALUE_LENGTH)
     }
 
     self.emitOpened(channelId, state)

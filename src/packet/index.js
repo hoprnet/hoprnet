@@ -123,7 +123,23 @@ class Packet {
         const channelId = getId(pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()), pubKeyToEthereumAddress(sender.pubKey.marshal()))
 
         const currentState = await node.paymentChannels.state(channelId)
-        await this.getPreviousTransaction(node, channelId, currentState)
+
+        // Update incoming payment channel
+        const newState = {
+            currentOffchainBalance: this.transaction.value,
+            currentIndex: this.transaction.index,
+            lastTransaction: this.transaction
+        }
+
+        if (currentState.state == node.paymentChannels.TransactionRecordState.PRE_OPENED) {
+            log(node.peerInfo.id, `incoming payment over pre-opened channel ${chalk.yellow(channelId.toString('hex'))}`)
+            newState.state = node.paymentChannels.TransactionRecordState.OPEN
+            newState.nonce = this.transaction.nonce
+            newState.counterparty = sender.pubKey.marshal()
+        } else {
+            // Check whether we have an open channel in our database
+            await this.getPreviousTransaction(node, channelId, currentState)
+        }
 
         log(node.peerInfo.id, `Database index ${chalk.cyan(currentState.currentIndex.toString('hex'))} on channnel ${chalk.yellow(channelId.toString('hex'))}.`)
         log(node.peerInfo.id, `Transaction index ${chalk.cyan(this.transaction.index.toString('hex'))} on channnel ${chalk.yellow(channelId.toString('hex'))}.`)
@@ -137,13 +153,6 @@ class Packet {
 
         this.message.decrypt(this.header.derivedSecret)
         this.oldChallenge = this.challenge
-
-        // Update incoming payment channel
-        const newState = {
-            currentOffchainBalance: this.transaction.value,
-            currentIndex: this.transaction.index,
-            lastTransaction: this.transaction
-        }
 
         if (this.header.address.equals(node.peerInfo.id.pubKey.marshal())) {
             await this.prepareDelivery(node, currentState, newState, channelId)

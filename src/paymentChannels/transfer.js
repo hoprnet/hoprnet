@@ -28,7 +28,7 @@ module.exports = self => {
                 return self.open(to, record.restoreTransaction)
             case self.TransactionRecordState.PRE_OPENED:
                 record.nonce = randomBytes(Transaction.NONCE_LENGTH)
-                record.state = self.TransactionRecordState.open
+                record.state = self.TransactionRecordState.OPEN
 
                 return record
             case self.TransactionRecordState.SETTLING:

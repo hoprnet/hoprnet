@@ -1,16 +1,13 @@
 require('../config')
 
-const chalk = require('chalk')
-const { fromWei, toWei } = require('web3-utils')
 const rlp = require('rlp')
 
-const BN = require('bn.js')
 const Web3 = require('web3')
 
 const { createNode } = require('../src')
 
 const { pubKeyToEthereumAddress, privKeyToPeerId, log, deployContract } = require('../src/utils')
-const { startBootstrapServers, startBlockchain } = require('./utils')
+const { startBootstrapServers, startBlockchain, wait, openChannelFor, stakeFor, fundNode2 } = require('./utils')
 
 const AMOUNT_OF_NODES = 4
 
@@ -50,7 +47,10 @@ const AMOUNT_OF_NODES = 4
     let partyA, partyB
     for (let i = 0; i < AMOUNT_OF_NODES; i++) {
         partyA = pubKeyToEthereumAddress(nodes[i].peerInfo.id.pubKey.marshal())
-        for (let j = i + 1; j < AMOUNT_OF_NODES; j++) {
+
+        batch.add(stakeFor(fundingNode, contract, nonce++, partyA))
+        batch.add(fundNode2(fundingNode, web3, nonce++, partyA))
+        for (let j = i + 1; j < AMOUNT_OF_NODES - 1; j++) {
             partyB = pubKeyToEthereumAddress(nodes[j].peerInfo.id.pubKey.marshal())
 
             batch.add(openChannelFor(fundingNode, contract, nonce++, partyA, partyB))
@@ -58,14 +58,19 @@ const AMOUNT_OF_NODES = 4
     }
 
     await batch.execute()
-})()
 
-function openChannelFor(fundingNode, contract, nonce, partyA, partyB) {
-    return contract.methods.createFor(partyA, partyB).send.request({
-        from: pubKeyToEthereumAddress(fundingNode.pubKey.marshal()),
-        gas: 190000,
-        //gasPrice: process.env.GAS_PRICE,
-        value: toWei('0.2', 'ether'),
-        nonce: `0x${new BN(nonce).toBuffer('be').toString('hex')}`
-    })
-}
+    await wait(2 * 1000)
+
+    await nodes[0].sendMessage(rlp.encode(['Psst ... secret message from Validity Labs!', Date.now().toString()]), nodes[2].peerInfo.id)
+
+    await wait(2 * 1000)
+
+    await nodes[2].sendMessage(rlp.encode(['Psst ... secret message from Validity Labs!', Date.now().toString()]), nodes[1].peerInfo.id)
+
+    await wait(2 * 1000)
+
+    await nodes[0].sendMessage(rlp.encode(['Psst ... secret message from Validity Labs!', Date.now().toString()]), nodes[1].peerInfo.id)
+
+    await wait(2 * 1000)
+
+})()

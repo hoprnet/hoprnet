@@ -125,10 +125,10 @@ class PaymentChannel extends EventEmitter {
 
         Object.assign(record, newState)
 
-        if (!record.counterparty && record.state != this.TransactionRecordState.PRE_OPENED) throw Error(`no counterparty '${JSON.stringify(record)}'`)
+        // if (!record.counterparty && record.state != this.TransactionRecordState.PRE_OPENED) throw Error(`no counterparty '${JSON.stringify(record)}'`)
 
-        if (!record.restoreTransaction && record.state != this.TransactionRecordState.PRE_OPENED)
-            throw Error(`no restore transaction '${JSON.stringify(record)}'`)
+        // if (!record.restoreTransaction && record.state != this.TransactionRecordState.PRE_OPENED)
+        //     throw Error(`no restore transaction '${JSON.stringify(record)}'`)
 
         if (record.restoreTransaction) record.restoreTransaction = record.restoreTransaction.toBuffer()
         if (record.lastTransaction) record.lastTransaction = record.lastTransaction.toBuffer()

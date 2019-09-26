@@ -30,7 +30,7 @@ module.exports = self => async (err, event) => {
     Object.assign(state, {
         state: self.TransactionRecordState.OPEN,
         currentIndex: state.restoreTransaction.index,
-        initialValue: state.restoreTransaction.value,
+        initialBalance: state.restoreTransaction.value,
         currentOffchainBalance: new BN(event.returnValues.amountA).toBuffer('be', Transaction.VALUE_LENGTH),
         currentOnchainBalance: new BN(event.returnValues.amountA).toBuffer('be', Transaction.VALUE_LENGTH),
         totalBalance: new BN(event.returnValues.amount).toBuffer('be', Transaction.VALUE_LENGTH),

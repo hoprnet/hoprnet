@@ -179,7 +179,7 @@ module.exports = self => {
             //             return self.emitOpened(channelId, {
             //                 state: self.TransactionRecordState.OPEN,
             //                 currentIndex: numberToBuffer(1, Transaction.INDEX_LENGTH),
-            //                 initialValue: new BN(networkState.balanceA).toBuffer('be', Transaction.VALUE_LENGTH),
+            //                 initialBalance: new BN(networkState.balanceA).toBuffer('be', Transaction.VALUE_LENGTH),
             //                 currentOffchainBalance: new BN(networkState.balanceA).toBuffer('be', Transaction.VALUE_LENGTH),
             //                 currentOnchainBalance: new BN(networkState.balanceA).toBuffer('be', Transaction.VALUE_LENGTH),
             //                 totalBalance: new BN(event.returnValues.amount).toBuffer('be', Transaction.VALUE_LENGTH),

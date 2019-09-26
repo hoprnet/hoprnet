@@ -83,34 +83,6 @@ module.exports.createFundedNodes = async (amountOfNodes, options, peerId, nonce)
     return nodes
 }
 
-module.exports.fundNode = async (node, fundingNode, nonce) => {
-    const currentBalance = new BN(await node.paymentChannels.web3.eth.getBalance(pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal())))
-
-    if (!nonce) nonce = await node.paymentChannels.web3.eth.getTransactionCount(pubKeyToEthereumAddress(fundingNode.pubKey.marshal()))
-
-    if (currentBalance.lt(MINIMAL_FUND)) {
-        return sendTransaction(
-            {
-                from: pubKeyToEthereumAddress(fundingNode.pubKey.marshal()),
-                to: pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()),
-                value: MINIMAL_FUND.sub(currentBalance).toString(),
-                gas: STAKE_GAS_AMOUNT,
-                gasPrice: process.env['GAS_PRICE'],
-                nonce: nonce
-            },
-            fundingNode,
-            node.paymentChannels.web3
-        ).then(() => {
-            log(
-                node.peerInfo.id,
-                `Received ${chalk.magenta(fromWei(MINIMAL_FUND.sub(currentBalance), 'ether'))} ETH from ${chalk.green(
-                    pubKeyToEthereumAddress(fundingNode.pubKey.marshal())
-                )}.`
-            )
-        })
-    }
-}
-
 module.exports.stakeEther = async node => {
     const stakedEther = await node.paymentChannels.contract.methods
         .states(pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()))
@@ -200,4 +172,66 @@ module.exports.startBootstrapServers = async amountOfNodes => {
     }
 
     return Promise.all(promises)
+}
+
+module.exports.wait = (miliSeconds) => {
+    return new Promise(resolve => setTimeout(resolve, miliSeconds))
+}
+
+module.exports.openChannelFor = (fundingNode, contract, nonce, partyA, partyB) => {
+    return contract.methods.createFor(partyA, partyB).send.request({
+        from: pubKeyToEthereumAddress(fundingNode.pubKey.marshal()),
+        gas: 190000,
+        //gasPrice: process.env.GAS_PRICE,
+        value: toWei('0.2', 'ether'),
+        nonce: `0x${new BN(nonce).toBuffer('be').toString('hex')}`
+    })
+}
+
+module.exports.stakeFor = (fundingNode, contract, nonce, beneficiary) => {
+    return contract.methods.stakeFor(beneficiary).send.request({
+        from: pubKeyToEthereumAddress(fundingNode.pubKey.marshal()),
+        gas: 190000,
+        value: toWei('0.2', 'ether'),
+        nonce: `0x${new BN(nonce).toBuffer('be').toString('hex')}`
+    })
+}
+
+module.exports.fundNode2 = (fundingNode, web3, nonce, beneficiary) => {
+    // const currentBalance = new BN(await web3.eth.getBalance(beneficiary))
+    return web3.eth.sendTransaction.request({
+        from: pubKeyToEthereumAddress(fundingNode.pubKey.marshal()),
+        to: beneficiary,
+        gas: 190000,
+        value: toWei('0.2', 'ether'),
+        nonce: `0x${new BN(nonce).toBuffer('be').toString('hex')}`
+    })
+}
+
+module.exports.fundNode = async (node, fundingNode, nonce) => {
+    const currentBalance = new BN(await node.paymentChannels.web3.eth.getBalance(pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal())))
+
+    if (!nonce) nonce = await node.paymentChannels.web3.eth.getTransactionCount(pubKeyToEthereumAddress(fundingNode.pubKey.marshal()))
+
+    if (currentBalance.lt(MINIMAL_FUND)) {
+        return sendTransaction(
+            {
+                from: pubKeyToEthereumAddress(fundingNode.pubKey.marshal()),
+                to: pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()),
+                value: MINIMAL_FUND.sub(currentBalance).toString(),
+                gas: STAKE_GAS_AMOUNT,
+                gasPrice: process.env['GAS_PRICE'],
+                nonce: nonce
+            },
+            fundingNode,
+            node.paymentChannels.web3
+        ).then(() => {
+            log(
+                node.peerInfo.id,
+                `Received ${chalk.magenta(fromWei(MINIMAL_FUND.sub(currentBalance), 'ether'))} ETH from ${chalk.green(
+                    pubKeyToEthereumAddress(fundingNode.pubKey.marshal())
+                )}.`
+            )
+        })
+    }
 }

@@ -13,7 +13,7 @@ const { STAKE_GAS_AMOUNT } = require('../src/constants')
 const { deployContract, signTransaction, privKeyToPeerId, pubKeyToEthereumAddress, log } = require('../src/utils')
 
 const { createNode } = require('../src')
-const { startBlockchain } = require('./utils')
+const { startBlockchain, wait } = require('./utils')
 
 const PeerId = require('peer-id')
 const PeerInfo = require('peer-info')
@@ -194,10 +194,6 @@ async function sendMessageAndCloseChannels(node, sender, receiver) {
     const receivedMoney = await node.paymentChannels.closeChannels()
 
     log(node.peerInfo.id, `Closed all channels and received ${fromWei(receivedMoney, 'ether').toString()}.`)
-}
-
-function wait(miliSeconds) {
-    return new Promise(resolve => setTimeout(resolve, miliSeconds))
 }
 
 function isNotBootstrapNode(node, peerId) {
