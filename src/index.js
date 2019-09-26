@@ -84,7 +84,7 @@ class Hopr extends libp2p {
     }
 
     /**
-     * Creates a new node and invokes @param cb with `(err, node)` when finished.
+     * Creates a new node.
      *
      * @param {Object} options the parameters
      * @param {Object} options.web3provider a web3 provider, default `http://localhost:8545`
@@ -209,22 +209,22 @@ class Hopr extends libp2p {
      * the acknowledgement of the first hop
      */
     async sendMessage(msg, destination) {
-        if (!msg) return cb(Error(`Expecting a non-empty message.`))
+        if (!msg) throw Error(`Expecting a non-empty message.`)
 
-        if (!destination) return cb(Error(`Expecting a non-empty destination.`))
+        if (!destination) throw Error(`Expecting a non-empty destination.`)
 
         if (PeerInfo.isPeerInfo(destination)) destination = destination.id
 
         if (typeof destination === 'string') destination = PeerId.createFromB58String(destination)
 
         if (!PeerId.isPeerId(destination))
-            return cb(Error(`Unable to parse given destination to a PeerId instance. Got type ${typeof destination} with value ${destination}.`))
+            throw Error(`Unable to parse given destination to a PeerId instance. Got type ${typeof destination} with value ${destination}.`)
 
         // Let's try to convert input msg to a Buffer in case it isn't already a Buffer
         if (!Buffer.isBuffer(msg)) {
             switch (typeof msg) {
                 default:
-                    return cb(Error(`Invalid input value. Got '${typeof msg}'.`))
+                    throw Error(`Invalid input value. Got '${typeof msg}'.`)
                 case 'number':
                     msg = msg.toString()
                 case 'string':

@@ -243,7 +243,11 @@ module.exports.randomNumber = (start, end) => {
  */
 module.exports.pubKeyToEthereumAddress = pubKey => {
     if (!Buffer.isBuffer(pubKey) || pubKey.length !== COMPRESSED_PUBLIC_KEY_LENGTH)
-        throw Error(`Invalid input parameter. Expected a Buffer of size ${COMPRESSED_PUBLIC_KEY_LENGTH}. Got '${typeof pubKey}'${pubKey.length ? ` of length ${pubKey.length}` : ''}.`)
+        throw Error(
+            `Invalid input parameter. Expected a Buffer of size ${COMPRESSED_PUBLIC_KEY_LENGTH}. Got '${typeof pubKey}'${
+                pubKey.length ? ` of length ${pubKey.length}` : ''
+            }.`
+        )
 
     const hash = sha3(publicKeyConvert(pubKey, false).slice(1))
 
@@ -323,15 +327,15 @@ module.exports.getId = (sender, counterparty) => {
  * @param {Buffer | string} pubKey the plain public key
  * @returns {Promise<PeerId>}
  */
-module.exports.pubKeyToPeerId = (pubKey) => {
+module.exports.pubKeyToPeerId = pubKey => {
     if (typeof pubKey === 'string') {
         pubKey = Buffer.from(pubKey.replace(/0x/, ''), 'hex')
     }
 
-    if (!Buffer.isBuffer(pubKey)) return cb(Error(`Unable to parse public key to desired representation. Got ${pubKey.toString()}.`))
+    if (!Buffer.isBuffer(pubKey)) throw Error(`Unable to parse public key to desired representation. Got ${pubKey.toString()}.`)
 
     if (pubKey.length != COMPRESSED_PUBLIC_KEY_LENGTH)
-        return cb(Error(`Invalid public key. Expected a buffer of size ${COMPRESSED_PUBLIC_KEY_LENGTH} bytes. Got one of ${pubKey.length} bytes.`))
+        throw Error(`Invalid public key. Expected a buffer of size ${COMPRESSED_PUBLIC_KEY_LENGTH} bytes. Got one of ${pubKey.length} bytes.`)
 
     pubKey = new libp2p_crypto.supportedKeys.secp256k1.Secp256k1PublicKey(pubKey)
 
@@ -345,9 +349,7 @@ module.exports.pubKeyToPeerId = (pubKey) => {
  *
  * @param {Buffer | string} privKey the plain private key
  */
-module.exports.privKeyToPeerId = (privKey, cb) => {
-    if (cb) throw Error('TODO -> promisify')
-
+module.exports.privKeyToPeerId = privKey => {
     if (typeof privKey === 'string') privKey = Buffer.from(privKey.replace(/0x/, ''), 'hex')
 
     if (!Buffer.isBuffer(privKey)) throw Error(`Unable to parse private key to desired representation. Got type '${typeof privKey}'.`)
@@ -403,7 +405,7 @@ module.exports.mineBlock = async (provider, amountOfTime = ONE_MINUTE) => {
         id: Date.now()
     })
 
-    const {result} = await send({
+    const { result } = await send({
         jsonrpc: '2.0',
         method: 'eth_blockNumber',
         id: Date.now()
@@ -457,7 +459,7 @@ module.exports.sendTransaction = async (tx, peerId, web3) =>
             receipt.status === Boolean(receipt.status)
         }
 
-        if (!receipt.status) return cb(Error('Reverted tx.'))
+        if (!receipt.status) throw Error('Reverted tx.')
 
         return receipt
     })
@@ -651,7 +653,6 @@ const SALT_LENGTH = 32
  * Serializes a given peerId by serializing the included private key and public key.
  *
  * @param {PeerId} peerId the peerId that should be serialized
- * @param {function} cb called afterwards with `(err, encodedKeyPair)`
  */
 module.exports.serializeKeyPair = async peerId => {
     const salt = randomBytes(SALT_LENGTH)
@@ -682,7 +683,6 @@ module.exports.serializeKeyPair = async peerId => {
  * hash function and consumes therefore a lot of memory.
  *
  * @param {Buffer} encryptedSerializedKeyPair the encoded and encrypted key pair
- * @param {function} cb called afterward with `(err, peerId)`
  */
 module.exports.deserializeKeyPair = async encryptedSerializedKeyPair => {
     const [salt, iv, ciphertext] = rlp.decode(encryptedSerializedKeyPair)
@@ -710,9 +710,8 @@ module.exports.deserializeKeyPair = async encryptedSerializedKeyPair => {
  * Asks the user for a password. Does not echo the password.
  *
  * @param {string} question string that is displayed before the user input
- * @param {function} cb called afterwards with `(err, password)`
  */
-module.exports.askForPassword = (question, cb) =>
+module.exports.askForPassword = question =>
     new Promise((resolve, reject) => {
         if (process.env.DEBUG === 'true') {
             console.log('Debug mode: using password Epo5kZTFidOCHrnL0MzsXNwN9St')
