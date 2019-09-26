@@ -94,7 +94,6 @@ module.exports = node => {
 
         node.paymentChannels.setState(channelId, {
             state: node.paymentChannels.TransactionRecordState.INITIALIZED,
-            initialBalance: restoreTransaction.value,
             restoreTransaction,
             counterparty,
             nonce: restoreTransaction.nonce
