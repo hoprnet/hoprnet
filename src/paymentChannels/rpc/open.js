@@ -149,7 +149,9 @@ module.exports = self => {
             await self.setState(channelId, {
                 restoreTransaction,
                 state: self.TransactionRecordState.OPENING,
-                counterparty: to.pubKey.marshal()
+                counterparty: to.pubKey.marshal(),
+                initialBalance: restoreTransaction.value,
+                nonce: restoreTransaction.nonce
             })
 
             self.onceOpened(channelId, newState => {

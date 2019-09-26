@@ -15,15 +15,28 @@ const Transaction = require('../transaction')
 module.exports = self => {
     const queues = new Map()
 
+    /**
+     * Handles records of previously opened or half-opened channels.
+     *
+     * @param {Object} record record that is stored in the database
+     * @param {PeerId} to peerId of the counterparty
+     */
     async function handlePreviousRecord(record, to) {
         switch (record.state) {
             case self.TransactionRecordState.INITIALIZED:
                 console.log(`Opening channel ${chalk.yellow(channelId.toString('hex'))} with a previously signed restore transaction.`)
                 return self.open(to, record.restoreTransaction)
+            case self.TransactionRecordState.PRE_OPENED:
+                record.nonce = randomBytes(Transaction.NONCE_LENGTH)
+                record.state = self.TransactionRecordState.open
+
+                return record
             case self.TransactionRecordState.SETTLING:
             case self.TransactionRecordState.SETTLED:
                 await self.handleClosedChannel(channelId, true)
                 return self.open(to)
+            default:
+                return record
         }
     }
 
@@ -41,6 +54,7 @@ module.exports = self => {
     async function transfer(to, amount, channelId, channelKey) {
         let record,
             recordExists = false
+
         try {
             record = await self.state(channelId)
             recordExists = true
@@ -62,15 +76,8 @@ module.exports = self => {
         if (previousChallenges) challenges.push(previousChallenges)
         if (record.channelKey) challenges.push(secp256k1.publicKeyCreate(record.channelKey))
 
-        let nonce
-        if (recordExists && record.state == self.TransactionRecordState.OPEN && !record.lastTransaction) {
-            nonce = randomBytes(Transaction.NONCE_LENGTH)
-        } else {
-            nonce = record.lastTransaction.nonce
-        }
-
         const newTx = Transaction.create(
-            nonce,
+            record.nonce,
             numberToBuffer(bufferToNumber(record.currentIndex) + 1, Transaction.INDEX_LENGTH),
             getNewChannelBalance(record, to, amount).toBuffer('be', Transaction.VALUE_LENGTH),
             secp256k1.publicKeyCombine(challenges)

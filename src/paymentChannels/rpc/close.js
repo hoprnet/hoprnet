@@ -136,6 +136,10 @@ module.exports = self => {
                 return initiateClosing(channelId, state, networkState)
             case self.TransactionRecordState.SETTLED:
             case self.TransactionRecordState.WITHDRAWABLE:
+                state.currentOnchainBalance = new BN(networkState.balanceA, 'hex').toBuffer('be', Transaction.VALUE_LENGTH)
+                state.currentIndex = networkState.index
+
+                // @TODO insert currect receivedMoney
                 return self.withdraw(channelId, state, networkState).then(_ => new BN(0))
             case self.TransactionRecordState.SETTLING:
                 log(self.node.peerInfo.id, `Channel ${chalk.yellow(channelId.toString('hex'))} is already settling. No action required.`)
