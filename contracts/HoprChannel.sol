@@ -117,9 +117,12 @@ contract HoprChannel {
             states[partyB].openChannels = states[partyB].openChannels + 1;
         }
 
-        channels[channelId] = Channel(ChannelState.ACTIVE, funds, funds / 2, 0, 0);
+        uint256 amount = funds;
+        uint256 amountA = funds / 2;
 
-        emit OpenedChannelFor(partyA, partyB, funds, funds / 2);
+        channels[channelId] = Channel(ChannelState.ACTIVE, amount, amountA, 0, 0);
+
+        emit OpenedChannelFor(partyA, partyB, amountA, amount);
     }
     
     /**
