@@ -1,6 +1,7 @@
 'use strict'
 
 const BN = require('bn.js')
+const chalk = require('chalk')
 
 const { isPartyA, pubKeyToEthereumAddress, log } = require('../../utils')
 
@@ -17,13 +18,15 @@ module.exports = self => {
      * @param {boolean} partyA must be true iff this node is PartyA of the payment channel
      */
     const hasBetterTransaction = (newBalance, newIndex, state, partyA) => {
+        if (!state.lastTransaction) return false
+
         return (
             newIndex.lt(new BN(state.lastTransaction.index)) &&
             (partyA ? new BN(state.lastTransaction.value).gt(newBalance) : newBalance.gt(new BN(state.lastTransaction.value)))
         )
     }
 
-    return async (err, event) => {
+    const listener = async (err, event) => {
         if (err) {
             console.log(err)
             return
@@ -31,7 +34,17 @@ module.exports = self => {
 
         const channelId = Buffer.from(event.returnValues.channelId.replace(/0x/, ''), 'hex')
 
-        const state = await self.state(channelId)
+        let state
+        try {
+            state = await self.state(channelId)
+        } catch (err) {
+            if (err.notFound) {
+                log(self.node.peerInfo.id, `Listening to the closing event of channel ${chalk.yellow(channelId.toString('hex'))} but there is no record in the database.`)
+                return
+            }
+
+            throw err
+        }
 
         const partyA = isPartyA(
             /* prettier-ignore */
@@ -57,6 +70,8 @@ module.exports = self => {
         } else {
             state.state = self.TransactionRecordState.SETTLED
 
+            self.closingSubscriptions.get(channelId.toString('hex')).unsubscribe()
+
             const networkState = self.contract.methods.channels(channelId).call(
                 {
                     from: pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal())
@@ -68,4 +83,6 @@ module.exports = self => {
             self.emitClosed(channelId, state)
         }
     }
+
+    return listener
 }
