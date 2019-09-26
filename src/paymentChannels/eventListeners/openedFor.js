@@ -33,7 +33,8 @@ module.exports = self => async (err, event) => {
         initialBalance: new BN(event.returnValues.amountA).toBuffer('be', Transaction.VALUE_LENGTH),
         currentOffchainBalance: new BN(event.returnValues.amountA).toBuffer('be', Transaction.VALUE_LENGTH),
         currentOnchainBalance: new BN(event.returnValues.amountA).toBuffer('be', Transaction.VALUE_LENGTH),
-        totalBalance: new BN(event.returnValues.amount).toBuffer('be', Transaction.VALUE_LENGTH)
+        totalBalance: new BN(event.returnValues.amount).toBuffer('be', Transaction.VALUE_LENGTH),
+        preOpened: true
     }
 
     self.emitOpened(channelId, state)

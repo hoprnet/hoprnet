@@ -16,6 +16,8 @@ module.exports = self => {
      * @param {TransactionRecord}
      */
     const counterpartyHasMoreRecentTransaction = record => {
+        if (!record.lastTransaction) return true
+
         return new BN(record.currentIndex).gt(new BN(record.lastTransaction.index))
     }
 
@@ -116,6 +118,11 @@ module.exports = self => {
             'latest'
         )
 
+        if (state.preOpened && !state.lastTransaction && !state.restoreTransaction)
+            throw Error(
+                `Cannot close channel ${chalk.yellow(channelId.toString('hex'))} because it was opened by a third party and the counterparty is still unknown.`
+            )
+
         switch (state.state) {
             case self.TransactionRecordState.OPENING:
                 // This can only happen if the node which initiated the opening procedure
@@ -132,6 +139,7 @@ module.exports = self => {
                         resolve(initiateClosing(channelId, newState, networkState))
                     })
                 })
+            case self.TransactionRecordState.PRE_OPENED:
             case self.TransactionRecordState.OPEN:
                 return initiateClosing(channelId, state, networkState)
             case self.TransactionRecordState.SETTLED:

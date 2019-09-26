@@ -96,7 +96,8 @@ module.exports = node => {
             state: node.paymentChannels.TransactionRecordState.INITIALIZED,
             restoreTransaction,
             counterparty,
-            nonce: restoreTransaction.nonce
+            nonce: restoreTransaction.nonce,
+            preOpened: false
         })
 
         node.paymentChannels.registerOpeningListener(channelId)

@@ -278,9 +278,12 @@ class PaymentChannel extends EventEmitter {
 
         this.closingSubscriptions.set(
             channelId.toString('hex'),
-            this.contract.events.ClosedChannel({
-                topics: [eventABI.signature, `0x${channelId.toString('hex')}`]
-            }, listener)
+            this.contract.events.ClosedChannel(
+                {
+                    topics: [eventABI.signature, `0x${channelId.toString('hex')}`]
+                },
+                listener
+            )
         )
     }
 
@@ -522,13 +525,17 @@ class PaymentChannel extends EventEmitter {
 
     closeChannels() {
         return this.getAllChannels(
-            channel => this.closeChannel(channel.channelId, channel.state),
+            channel => {
+                if (channel.state.preOpened && !channel.state.lastTransaction && !channel.state.restoreTransaction) return
+
+                return this.closeChannel(channel.channelId, channel.state)
+            },
             promises => {
                 if (promises.length > 0)
                     /* prettier-ignore */
                     return Promise.all(promises)
                         .then(results =>
-                            results.reduce((acc, value) => acc.iadd(value), new BN(0))
+                            results.filter(BN.isBN).reduce((acc, value) => acc.iadd(value), new BN(0))
                         )
 
                 return new BN(0)

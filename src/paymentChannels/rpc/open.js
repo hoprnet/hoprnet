@@ -40,7 +40,8 @@ module.exports = self => {
             initialBalance: restoreTransaction.value,
             restoreTransaction,
             counterparty: to.pubKey.marshal(),
-            nonce: restoreTransaction.nonce
+            nonce: restoreTransaction.nonce,
+            preOpened: false
         })
 
         return restoreTransaction
@@ -151,7 +152,8 @@ module.exports = self => {
                 state: self.TransactionRecordState.OPENING,
                 counterparty: to.pubKey.marshal(),
                 initialBalance: restoreTransaction.value,
-                nonce: restoreTransaction.nonce
+                nonce: restoreTransaction.nonce,
+                preOpened: false
             })
 
             self.onceOpened(channelId, newState => {

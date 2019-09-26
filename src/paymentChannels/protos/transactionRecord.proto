@@ -21,4 +21,6 @@ message TransactionRecord {
     optional bytes channelKey = 8;
     optional bytes lastTransaction = 9;
     optional bytes restoreTransaction = 10;
+    optional bytes nonce = 11;
+    required bool preOpened = 12;
 }
