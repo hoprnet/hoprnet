@@ -28,12 +28,6 @@ module.exports = self => {
             self.subscriptions.delete(channelId.toString('hex'))
         }
 
-        const closingSubscription = self.closingSubscriptions.get(channelId.toString('hex'))
-        if (closingSubscription) {
-            closingSubscription.unsubscribe()
-            self.closingSubscriptions.delete(channelId.toString())
-        }
-
         return receipt
     }
 

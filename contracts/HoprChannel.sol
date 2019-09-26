@@ -1,9 +1,9 @@
 pragma solidity ^0.5.3;
 
-import "openzeppelin-solidity/contracts/math/SafeMath.sol" as openzeppelin;
+import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 
 contract HoprChannel {
-    using openzeppelin.SafeMath for uint256;
+    using SafeMath for uint256;
     
     uint256 constant private TIME_CONFIRMATION = 1 minutes; // testnet value TODO: adjust for mainnet use
     

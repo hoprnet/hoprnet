@@ -71,6 +71,7 @@ module.exports = self => {
             state.state = self.TransactionRecordState.SETTLED
 
             self.closingSubscriptions.get(channelId.toString('hex')).unsubscribe()
+            self.closingSubscriptions.delete(channelId.toString())
 
             const networkState = self.contract.methods.channels(channelId).call(
                 {
