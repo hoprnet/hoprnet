@@ -34,9 +34,6 @@ module.exports = self => {
             Buffer.alloc(33, 0)
         ).sign(self.node.peerInfo.id)
 
-        if (!counterparty) {
-            throw Error(`RPC: counterparty is empty. Got '${counterparty ? counterparty.toString() : counterparty}'`)
-        }
 
         self.setState(channelId, {
             state: self.TransactionRecordState.INITIALIZED,
@@ -135,8 +132,6 @@ module.exports = self => {
                 } catch (err) {
                     return reject(Error(`Unable to open a payment channel because counterparty ${chalk.blue(to.toB58String())} because '${err.message}'.`))
                 }
-            } else {
-                console.log(`restoreTx is not null. Got ${typeof restoreTransaction}`)
             }
 
             const timeout = setTimeout(() => {
@@ -152,7 +147,8 @@ module.exports = self => {
 
             await self.setState(channelId, {
                 restoreTransaction,
-                state: self.TransactionRecordState.OPENING
+                state: self.TransactionRecordState.OPENING,
+                counterparty: to.pubKey.marshal()
             })
 
             self.onceOpened(channelId, newState => {

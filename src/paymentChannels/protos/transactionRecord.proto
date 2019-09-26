@@ -1,17 +1,18 @@
 enum TransactionRecordState {
     INITIALIZED = 1;
     OPENING = 2;
-    OPEN = 3;
-    SETTLING = 4;
-    SETTLED = 5;
-    WITHDRAWABLE = 6;
-    WITHDRAWING = 7;
-    WITHDRAWN = 8;
+    PRE_OPENED = 3;
+    OPEN = 4;
+    SETTLING = 5;
+    SETTLED = 6;
+    WITHDRAWABLE = 7;
+    WITHDRAWING = 8;
+    WITHDRAWN = 9;
 }
 
 message TransactionRecord {
     required TransactionRecordState state = 1;
-    required bytes counterparty = 2;
+    optional bytes counterparty = 2;
     optional bytes totalBalance = 3;
     optional bytes currentOffchainBalance = 4;
     optional bytes currentOnchainBalance = 5;
@@ -19,5 +20,5 @@ message TransactionRecord {
     optional bytes currentIndex = 7;
     optional bytes channelKey = 8;
     optional bytes lastTransaction = 9;
-    required bytes restoreTransaction = 10;
+    optional bytes restoreTransaction = 10;
 }

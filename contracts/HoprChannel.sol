@@ -97,7 +97,7 @@ contract HoprChannel {
 
         uint256 funds = msg.value;
 
-        require(funds < 1, "Cannot spread one wei uniformly over two parties.");
+        require(funds > 1, "Cannot spread one wei uniformly over two parties.");
 
         if (funds % 2 == 1) {
             funds = funds - 1;

@@ -19,6 +19,12 @@
         {
             "type": "node",
             "request": "launch",
+            "name": "Create for",
+            "program": "${workspaceFolder}/test/createFor.js"
+        },
+        {
+            "type": "node",
+            "request": "launch",
             "name": "CLI Bootstrap",
             "program": "${workspaceFolder}/hopr.js",
             "args": [

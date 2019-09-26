@@ -27,7 +27,8 @@
         "multiprocess": "node test/multiprocess.js",
         "hopr": "node hopr.js",
         "deployContract": "node test/deployContract",
-        "startTestnet": "node test/startBlockchain"
+        "startTestnet": "node test/startBlockchain",
+        "createFor": "node test/createFor"
     },
     "dependencies": {
         "@nodeutils/defaults-deep": "~1.1.0",

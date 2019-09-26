@@ -15,9 +15,6 @@ const open = require('./rpc/open')
 const close = require('./rpc/close')
 const withdraw = require('./rpc/withdraw')
 
-const closingListener = require('./eventListeners/close')
-const openingListener = require('./eventListeners/open')
-
 const transfer = require('./transfer')
 const registerHandlers = require('./handlers')
 const Transaction = require('../transaction')
@@ -64,8 +61,7 @@ class PaymentChannel extends EventEmitter {
         this.closeChannel = close(this)
         this.withdraw = withdraw(this)
 
-        this.closingListener = closingListener(this)
-        this.openingListener = openingListener(this)
+        this.eventListeners = require('./eventListeners')(this)
 
         this.transfer = transfer(this)
 
@@ -106,6 +102,8 @@ class PaymentChannel extends EventEmitter {
             web3
         })
 
+        paymentChannel.registerOpenedForListener()
+
         await paymentChannel.registerEventListeners()
 
         return paymentChannel
@@ -126,6 +124,11 @@ class PaymentChannel extends EventEmitter {
         }
 
         Object.assign(record, newState)
+
+        if (!record.counterparty && record.state != this.TransactionRecordState.PRE_OPENED) throw Error(`no counterparty '${JSON.stringify(record)}'`)
+
+        if (!record.restoreTransaction && record.state != this.TransactionRecordState.PRE_OPENED)
+            throw Error(`no restore transaction '${JSON.stringify(record)}'`)
 
         if (record.restoreTransaction) record.restoreTransaction = record.restoreTransaction.toBuffer()
         if (record.lastTransaction) record.lastTransaction = record.lastTransaction.toBuffer()
@@ -185,7 +188,7 @@ class PaymentChannel extends EventEmitter {
      * Registers listeners on-chain opening events and the closing events of all
      * payment channels found in the database.
      */
-    async registerEventListeners() {
+    registerEventListeners() {
         return new Promise((resolve, reject) => {
             const settledChannels = []
             this.node.db
@@ -201,6 +204,7 @@ class PaymentChannel extends EventEmitter {
                         case this.TransactionRecordState.OPENING:
                             this.registerOpeningListener(channelId)
                             break
+                        case this.TransactionRecordState.PRE_OPENED:
                         case this.TransactionRecordState.OPEN:
                             this.registerSettlementListener(channelId)
                             break
@@ -260,21 +264,23 @@ class PaymentChannel extends EventEmitter {
      * @param {Function} listener function that is called whenever the `ClosedChannel` event
      * is fired.
      */
-    registerSettlementListener(channelId, listener = this.closingListener) {
+    registerSettlementListener(channelId, listener = this.eventListeners.closingListener) {
         if (!Buffer.isBuffer(channelId) || channelId.length !== CHANNEL_ID_LENGTH)
             throw Error(`Invalid input parameter. Expected a Buffer of size ${HASH_LENGTH} but got ${typeof channelId}.`)
 
         log(this.node.peerInfo.id, `Listening to close event of channel ${chalk.yellow(channelId.toString('hex'))}`)
 
+        const eventName = 'ClosedChannel'
+        const path = '../../build/contracts/HoprChannel.json'
+        const [eventABI] = require('../../build/contracts/HoprChannel.json').abi.filter(obj => obj.name == eventName)
+
+        if (!eventABI) throw Error(`Found no ABI definition for event '${eventName}' in '${require('path').resolve(__dirname, path)}'.`)
+
         this.closingSubscriptions.set(
             channelId.toString('hex'),
-            this.web3.eth.subscribe(
-                'logs',
-                {
-                    topics: [this.web3.utils.sha3(`ClosedChannel(bytes32,bytes16,uint256)`), `0x${channelId.toString('hex')}`]
-                },
-                listener
-            )
+            this.contract.events.ClosedChannel({
+                topics: [eventABI.signature, `0x${channelId.toString('hex')}`]
+            }, listener)
         )
     }
 
@@ -285,7 +291,7 @@ class PaymentChannel extends EventEmitter {
      * @param {Function} listener function that is called whenever the `OpenedChannel` event
      * is fired.
      */
-    registerOpeningListener(channelId, listener = this.openingListener) {
+    registerOpeningListener(channelId, listener = this.eventListeners.openingListener) {
         if (typeof listener !== 'function')
             throw Error(`Please specify a function that is called when the close event is triggered. Got ${typeof listener} instead.`)
 
@@ -298,6 +304,30 @@ class PaymentChannel extends EventEmitter {
             'OpenedChannel',
             {
                 topics: [this.web3.utils.sha3(`OpenedChannel(bytes32,uint256,uint256)`), `0x${channelId.toString('hex')}`]
+            },
+            listener
+        )
+    }
+
+    registerOpenedForListener(listener = this.eventListeners.openedForListener) {
+        const ownTopic = pubKeyToEthereumAddress(this.node.peerInfo.id.pubKey.marshal()).replace(/(0x)([0-9a-fA-F]{20})/, '$1000000000000000000000000$2')
+
+        const eventName = 'OpenedChannelFor'
+        const path = '../../build/contracts/HoprChannel.json'
+        const [eventABI] = require('../../build/contracts/HoprChannel.json').abi.filter(obj => obj.name == eventName)
+
+        if (!eventABI) throw Error(`Found no ABI definition for event '${eventName}' in '${require('path').resolve(__dirname, path)}'.`)
+
+        this.contract.events.OpenedChannelFor(
+            {
+                topics: [eventABI.signature, ownTopic, null]
+            },
+            listener
+        )
+
+        this.contract.events.OpenedChannelFor(
+            {
+                topics: [eventABI.signature, null, ownTopic]
             },
             listener
         )
@@ -401,7 +431,12 @@ class PaymentChannel extends EventEmitter {
         return new Promise(async (resolve, reject) => {
             const counterparty = await pubKeyToPeerId(state.counterparty)
 
-            log(this.node.peerInfo.id, `Asking node ${chalk.blue(counterparty.toB58String())} to send latest update transaction for channel ${chalk.yellow(channelId.toString('hex'))}.`)
+            log(
+                this.node.peerInfo.id,
+                `Asking node ${chalk.blue(counterparty.toB58String())} to send latest update transaction for channel ${chalk.yellow(
+                    channelId.toString('hex')
+                )}.`
+            )
 
             let conn
             try {

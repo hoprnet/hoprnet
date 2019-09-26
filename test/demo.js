@@ -14,13 +14,6 @@ const { createFundedNodes, startBlockchain, startBootstrapServers } = require('.
 const AMOUNT_OF_NODES = 4
 const AMOUNT_OF_MESSAGES = 1
 
-console.log(
-    'Welcome to \x1b[1m\x1b[5mHOPR\x1b[0m!\n' +
-        'Please wait some time until the node is set up.\n' +
-        '\x1b[2mThis may take some time ...\n' +
-        'Meanwhile you can start reading the wiki at https://github.com/validitylabs/hopr/wiki\x1b[0m\n'
-)
-
 let nonce, fundingPeer, provider, server, contractAddress
 
 const GANACHE_SEND_TIMEOUT = 1000

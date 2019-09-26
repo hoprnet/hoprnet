@@ -4,6 +4,8 @@ const BN = require('bn.js')
 
 const { isPartyA, pubKeyToEthereumAddress, log } = require('../../utils')
 
+const Transaction = require('../../transaction')
+
 module.exports = self => {
     /**
      * Checks whether the previously published transaction is the most profitable transaction for
@@ -21,43 +23,13 @@ module.exports = self => {
         )
     }
 
-    /**
-     * Derives the required information from the on-chain event
-     *
-     * @param {Event} event onchain event
-     */
-    const decodeEventData = event => {
-        const result = {
-            channelId: Buffer.from(event.topics[1].replace(/0x/, ''), 'hex')
-        }
-
-        Object.assign(
-            result,
-            self.web3.eth.abi.decodeParameters(
-                [
-                    {
-                        type: 'bytes16',
-                        name: 'onchainIndex'
-                    },
-                    {
-                        type: 'uint256',
-                        name: 'amountA'
-                    }
-                ],
-                event.data
-            )
-        )
-
-        return result
-    }
-
     return async (err, event) => {
         if (err) {
             console.log(err)
             return
         }
 
-        const { onchainIndex, channelId, amountA } = decodeEventData(event)
+        const channelId = Buffer.from(event.returnValues.channelId.replace(/0x/, ''), 'hex')
 
         const state = await self.state(channelId)
 
@@ -67,10 +39,10 @@ module.exports = self => {
             pubKeyToEthereumAddress(state.counterparty)
         )
 
-        state.currentOnchainBalance = amountA
-        state.currentIndex = onchainIndex
+        state.currentOnchainBalance = new BN(event.returnValues.amountA).toBuffer('be', Transaction.VALUE_LENGTH)
+        state.currentIndex = event.returnValues.index
 
-        if (hasBetterTransaction(new BN(amountA), new BN(onchainIndex, 'hex'), state, partyA)) {
+        if (hasBetterTransaction(new BN(event.returnValues.amountA), new BN(event.returnValues.index, 'hex'), state, partyA)) {
             log(self.node.peerInfo.id, `Found better transaction for payment channel ${channelId.toString('hex')}.`)
 
             // @TODO database might be outdated when the event comes back
@@ -78,6 +50,9 @@ module.exports = self => {
             state.state = self.TransactionRecordState.SETTLING
 
             await self.setState(channelId, state)
+
+            self.registerSettlementListener(channelId)
+
             self.submitSettlementTransaction(channelId, state.lastTransaction)
         } else {
             state.state = self.TransactionRecordState.SETTLED

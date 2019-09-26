@@ -4,6 +4,8 @@ const Queue = require('promise-queue')
 const BN = require('bn.js')
 const secp256k1 = require('secp256k1')
 
+const { randomBytes } = require('crypto')
+
 const chalk = require('chalk')
 
 const { fromWei } = require('web3-utils')
@@ -12,6 +14,18 @@ const Transaction = require('../transaction')
 
 module.exports = self => {
     const queues = new Map()
+
+    async function handlePreviousRecord(record, to) {
+        switch (record.state) {
+            case self.TransactionRecordState.INITIALIZED:
+                console.log(`Opening channel ${chalk.yellow(channelId.toString('hex'))} with a previously signed restore transaction.`)
+                return self.open(to, record.restoreTransaction)
+            case self.TransactionRecordState.SETTLING:
+            case self.TransactionRecordState.SETTLED:
+                await self.handleClosedChannel(channelId, true)
+                return self.open(to)
+        }
+    }
 
     /**
      * Fetches the current state from the database and updates it according to the
@@ -25,9 +39,11 @@ module.exports = self => {
      * @returns {Promise<Transaction>} an update transaction for the payment channel.
      */
     async function transfer(to, amount, channelId, channelKey) {
-        let record
+        let record,
+            recordExists = false
         try {
             record = await self.state(channelId)
+            recordExists = true
         } catch (err) {
             if (err.notFound) {
                 record = await self.open(to)
@@ -36,16 +52,8 @@ module.exports = self => {
             }
         }
 
-        switch (record.state) {
-            case self.TransactionRecordState.INITIALIZED:
-                console.log(`Opening channel ${chalk.yellow(channelId.toString('hex'))} with a previously signed restore transaction.`)
-                record = await self.open(to, record.restoreTransaction)
-                break
-            case self.TransactionRecordState.SETTLING:
-            case self.TransactionRecordState.SETTLED:
-                await self.handleClosedChannel(channelId, true)
-                record = await self.open(to)
-                break
+        if (recordExists) {
+            record = await handlePreviousRecord(record, to)
         }
 
         const challenges = [secp256k1.publicKeyCreate(channelKey)]
@@ -54,11 +62,17 @@ module.exports = self => {
         if (previousChallenges) challenges.push(previousChallenges)
         if (record.channelKey) challenges.push(secp256k1.publicKeyCreate(record.channelKey))
 
+        let nonce
+        if (recordExists && record.state == self.TransactionRecordState.OPEN && !record.lastTransaction) {
+            nonce = randomBytes(Transaction.NONCE_LENGTH)
+        } else {
+            nonce = record.lastTransaction.nonce
+        }
+
         const newTx = Transaction.create(
-            record.lastTransaction.nonce,
+            nonce,
             numberToBuffer(bufferToNumber(record.currentIndex) + 1, Transaction.INDEX_LENGTH),
             getNewChannelBalance(record, to, amount).toBuffer('be', Transaction.VALUE_LENGTH),
-            // @TODO nach dem Initialisieren müsste das leer sein
             secp256k1.publicKeyCombine(challenges)
         ).sign(self.node.peerInfo.id)
 
