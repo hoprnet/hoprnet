@@ -19,7 +19,7 @@ const { ChannnelState } = require('../enums.json')
 module.exports = node => {
     const handleExistingRecord = async (channelId) => {
         const networkState = await node.paymentChannels.contract.methods.channels(channelId).call({
-            from: pubKeyToEthereumAddress(node.peerInfo.id)
+            from: pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal())
         })
 
         switch (parseInt(networkState.state)) {
