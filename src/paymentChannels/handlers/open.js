@@ -14,10 +14,10 @@ const BN = require('bn.js')
 
 const { SIGNATURE_LENGTH } = require('../../transaction')
 
-const { ChannnelState } = require('../enums.json')
+const { ChannelState } = require('../enums.json')
 
 module.exports = node => {
-    const handleExistingRecord = async (channelId) => {
+    const handleExistingRecord = async channelId => {
         const networkState = await node.paymentChannels.contract.methods.channels(channelId).call({
             from: pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal())
         })
@@ -25,7 +25,7 @@ module.exports = node => {
         switch (parseInt(networkState.state)) {
             default:
                 throw Error(`Payment channel ${channelId.toString('hex')} is already open. Cannot open it twice. Got '${state.state}'`)
-            case ChannnelState.UNINITIALIZED:
+            case ChannelState.UNINITIALIZED:
                 break
         }
     }
@@ -43,7 +43,6 @@ module.exports = node => {
             const state = await node.paymentChannels.state(channelId)
 
             recordExists = true
-
         } catch (err) {
             if (!err.notFound) throw err
         }
