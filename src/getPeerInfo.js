@@ -46,15 +46,15 @@ module.exports = (options, db) =>
                 // ============================= Only for testing ============================================================
                 if (Number.isInteger(options.id)) port = (Number.parseInt(process.env.PORT) + (options.id + 1) * 2).toString()
                 // ===========================================================================================================
-                addrs.push(Multiaddr(`/ip4/${process.env.HOST_IPV4}/udp/${port}`))
+                addrs.push(Multiaddr(`/ip4/${process.env.HOST_IPV4}/tcp/${port}`))
             }
 
-            if (process.env.HOST_IPV6) {
-                // ============================= Only for testing ============================================================
-                if (Number.isInteger(options.id)) port = (Number.parseInt(process.env.PORT) + (options.id + 1) * 2).toString()
-                // ===========================================================================================================
-                addrs.push(Multiaddr(`/ip6/${process.env.HOST_IPV6}/udp/${Number.parseInt(port) + 1}`))
-            }
+            // if (process.env.HOST_IPV6) {
+            //     // ============================= Only for testing ============================================================
+            //     if (Number.isInteger(options.id)) port = (Number.parseInt(process.env.PORT) + (options.id + 1) * 2).toString()
+            //     // ===========================================================================================================
+            //     addrs.push(Multiaddr(`/ip6/${process.env.HOST_IPV6}/tcp/${Number.parseInt(port) + 1}`))
+            // }
 
             return addrs
         }

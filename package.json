@@ -40,7 +40,7 @@
         "class-is": "~1.1.0",
         "dotenv": "~8.1.0",
         "dotenv-expand": "~5.1.0",
-        "futoin-hkdf": "~1.2.0",
+        "futoin-hkdf": "~1.2.1",
         "getopts": "~2.2.4",
         "heap": "~0.2.6",
         "ip-address": "^6.1.0",
@@ -52,6 +52,7 @@
         "libp2p-kad-dht": "robertkiel/js-libp2p-kad-dht",
         "libp2p-mplex": "~0.8.5",
         "libp2p-secio": "~0.11.1",
+        "libp2p-tcp": "~0.13.0",
         "lodash.foreachright": "~4.4.0",
         "lodash.groupby": "~4.6.0",
         "lodash.unionwith": "~4.6.0",
@@ -80,7 +81,6 @@
     "devDependencies": {
         "axios": "^0.19.0",
         "eslint": "~6.1.0",
-        "ganache-core": "~2.8.0",
-        "libp2p-tcp": "~0.13.0"
+        "ganache-core": "~2.8.0"
     }
 }

@@ -5,7 +5,7 @@ const MPLEX = require('libp2p-mplex')
 const KadDHT = require('libp2p-kad-dht')
 // const SECIO = require('libp2p-secio')
 const { WebRTCv4, WebRTCv6 } = require('./network/natTraversal')
-// const TCP = require('libp2p-tcp')
+const TCP = require('libp2p-tcp')
 
 const defaultsDeep = require('@nodeutils/defaults-deep')
 
@@ -50,9 +50,9 @@ class Hopr extends libp2p {
             // The libp2p modules for this libp2p bundle
             modules: {
                 transport: [
-                    // TCP,
-                    WebRTCv4,
-                    WebRTCv6
+                    TCP,
+                    // WebRTCv4,
+                    // WebRTCv6
                 ],
 
                 streamMuxer: [MPLEX],

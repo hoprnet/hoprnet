@@ -113,7 +113,7 @@ const MINIMAL_FUND = new BN(toWei('0.11', 'ether'))
 
         const peerInfo = new PeerInfo(PeerId.createFromB58String(`16Uiu2HAm5xi9cMSE7rnW3wGtAbRR2oJDSJXbrzHYdgdJd7rNJtFf`))
 
-        peerInfo.multiaddrs.add(`/ip4/127.0.0.1/udp/${process.env['PORT']}/ipfs/16Uiu2HAm5xi9cMSE7rnW3wGtAbRR2oJDSJXbrzHYdgdJd7rNJtFf`)
+        peerInfo.multiaddrs.add(`/ip4/127.0.0.1/tcp/${process.env['PORT']}/ipfs/16Uiu2HAm5xi9cMSE7rnW3wGtAbRR2oJDSJXbrzHYdgdJd7rNJtFf`)
 
         const node = await createNode({
             id: parseInt(process.env['id']),
