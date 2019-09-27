@@ -470,7 +470,7 @@ async function runAsRegularNode() {
                             /* prettier-ignore */
                             pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()),
                             pubKeyToEthereumAddress(peerId.pubKey.marshal())
-                            )
+                        )
 
                         console.log(`${chalk.green(`Successfully opened channel`)} ${chalk.yellow(channelId.toString('hex'))}`)
                     })
@@ -531,10 +531,20 @@ async function runAsRegularNode() {
                     break
                 }
 
+                let peerId
                 try {
-                    const peerInfo = node.peerBook.get(PeerId.createFromB58String(query))
-                    const channelId = getId(pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()), pubKeyToEthereumAddress(peerInfo.id.pubKey.marshal()))
+                    peerId = await checkPeerIdInput(query)
+                } catch (err) {
+                    console.log(err.message)
+                    setTimeout(() => {
+                        rl.prompt()
+                    })
+                    break
+                }
 
+                const channelId = getId(pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()), pubKeyToEthereumAddress(peerId.pubKey.marshal()))
+
+                try {
                     let interval
                     node.paymentChannels
                         .closeChannel(channelId)
