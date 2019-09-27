@@ -419,7 +419,7 @@ process.title = 'hopr';
 
 async function close(query) {
     if (!query) {
-        console.log(chalk.red(`Invalid arguments. Expected 'close <peerId>'. Received '${input}'`))
+        console.log(chalk.red(`Invalid arguments. Expected 'close <peerId>'. Received '${query}'`))
         rl.prompt()
         return
     }
@@ -459,6 +459,7 @@ async function close(query) {
                 readline.clearLine(process.stdin, 0)
                 rl.prompt()
             })
+        // @TODO suppress the message in case of an error
         console.log(`Submitted transaction. Waiting for confirmation .`)
         interval = setInterval(() => process.stdout.write('.'), 1000)
     } catch (err) {
@@ -470,7 +471,7 @@ async function close(query) {
 
 async function send(query) {
     if (!query) {
-        console.log(chalk.red(`Invalid arguments. Expected 'open <peerId>'. Received '${input}'`))
+        console.log(chalk.red(`Invalid arguments. Expected 'open <peerId>'. Received '${query}'`))
         rl.prompt()
         return
     }
@@ -496,7 +497,7 @@ async function send(query) {
 
 async function open(query) {
     if (!query) {
-        console.log(chalk.red(`Invalid arguments. Expected 'open <peerId>'. Received '${input}'`))
+        console.log(chalk.red(`Invalid arguments. Expected 'open <peerId>'. Received '${query}'`))
         rl.prompt()
         return
     }
@@ -567,7 +568,7 @@ async function openChannels() {
 
 async function stake(query) {
     if (!query) {
-        console.log(chalk.red(`Invalid arguments. Expected 'stake <amount of ETH>'. Received '${input}'`))
+        console.log(chalk.red(`Invalid arguments. Expected 'stake <amount of ETH>'. Received '${query}'`))
         rl.prompt()
         break
     }
@@ -595,7 +596,7 @@ async function stake(query) {
 
 async function unstake(query) {
     if (!query) {
-        console.log(chalk.red(`Invalid arguments. Expected 'unstake <amount of ETH>'. Received '${input}'`))
+        console.log(chalk.red(`Invalid arguments. Expected 'unstake <amount of ETH>'. Received '${query}'`))
         rl.prompt()
         return
     }
@@ -657,5 +658,4 @@ async function getStakedEther() {
             rl.prompt()
         })
     }
-
 }

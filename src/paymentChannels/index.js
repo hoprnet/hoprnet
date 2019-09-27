@@ -191,6 +191,7 @@ class PaymentChannel extends EventEmitter {
     registerEventListeners() {
         return new Promise((resolve, reject) => {
             const settledChannels = []
+            const openingChannels = []
             this.node.db
                 .createReadStream({
                     gt: this.State(Buffer.alloc(CHANNEL_ID_LENGTH, 0x00)),
@@ -201,8 +202,30 @@ class PaymentChannel extends EventEmitter {
                     const channelId = key.slice(key.length - CHANNEL_ID_LENGTH)
 
                     switch (record.state) {
+                        case this.TransactionRecordState.UNITIALIZED:
                         case this.TransactionRecordState.OPENING:
-                            this.registerOpeningListener(channelId)
+                            openingChannels.push((async () => {
+                                const networkState = await this.contract.methods.channels(channelId).call({
+                                    from: pubKeyToEthereumAddress(this.node.peerInfo.id.pubKey.marshal())
+                                })
+
+                                switch (networkState.state) {
+                                    case ChannelState.ACTIVE:
+                                        record.state = this.TransactionRecordState.OPEN
+                                        record.currentIndex = networkState.index
+                                        record.initialBalance = state.restoreTransaction.value
+
+                                        record.currentOffchainBalance = new BN(state.balanceA).toBuffer('be', Transaction.VALUE_LENGTH)
+                                        record.currentOnchainBalance = new BN(state.balanceA).toBuffer('be', Transaction.VALUE_LENGTH)
+                                        record.totalBalance = new BN(event.returnValues.amount).toBuffer('be', Transaction.VALUE_LENGTH)
+
+                                        if (!record.lastTransaction) record.lastTransaction = state.restoreTransaction
+
+                                        await this.setState(channelId, record)
+                                    default:
+                                        this.registerOpeningListener(channelId)
+                                }
+                            })())
                             break
                         case this.TransactionRecordState.PRE_OPENED:
                         case this.TransactionRecordState.OPEN:
@@ -221,7 +244,12 @@ class PaymentChannel extends EventEmitter {
                 })
                 .on('error', reject)
                 .on('end', () => {
-                    if (settledChannels.length > 0) return resolve(Promise.all(settledChannels.map(this.handleClosedChannel.bind(this))))
+                    const promises = []
+
+                    if (openingChannels.length > 0) promises.push(openingChannels)
+                    if (settledChannels.length > 0) promises.push(settledChannels.map(this.handleClosedChannel.bind(this)))
+
+                    if (promises.length > 0) return resolve(Promise.all(promises))
 
                     resolve()
                 })
@@ -239,7 +267,7 @@ class PaymentChannel extends EventEmitter {
             )
             .then(channelState => {
                 switch (parseInt(channelState.state)) {
-                    case ChannelState.UNITIALIZED:
+                    case ChannelState.UNINITIALIZED:
                         return this.deleteState(settledChannel.channelId)
                     case ChannelState.PENDING_SETTLEMENT:
                         if (autoWithdraw)

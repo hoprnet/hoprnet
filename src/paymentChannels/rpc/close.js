@@ -111,7 +111,14 @@ module.exports = self => {
      * @param {Object} [state] current off-chain state
      */
     const close = (channelId, state) => new Promise(async (resolve, reject) => {
-        if (!state) state = await self.state(channelId)
+        if (!state) {
+            try {
+                state = await self.state(channelId)
+            } catch (err) {
+                return reject(err)
+            }
+
+        }
 
         const networkState = await self.contract.methods.channels(channelId).call(
             {

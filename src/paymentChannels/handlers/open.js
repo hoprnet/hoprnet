@@ -14,7 +14,21 @@ const BN = require('bn.js')
 
 const { SIGNATURE_LENGTH } = require('../../transaction')
 
+const { ChannnelState } = require('../enums.json')
+
 module.exports = node => {
+    const handleExistingRecord = async (channelId) => {
+        const networkState = await node.paymentChannels.contract.methods.channels(channelId).call({
+            from: pubKeyToEthereumAddress(node.peerInfo.id)
+        })
+
+        switch (parseInt(networkState.state)) {
+            default:
+                throw Error(`Payment channel ${channelId.toString('hex')} is already open. Cannot open it twice. Got '${state.state}'`)
+            case ChannnelState.UNINITIALIZED:
+                break
+        }
+    }
     /**
      * Checks whether the opening request is valid and whether it is plausible, i. e. the counterparty has enough
      * funds staked in the smart contract.
@@ -24,12 +38,17 @@ module.exports = node => {
      * @param {Transaction} restoreTx the backup transaction
      */
     const checkRequest = async (channelId, counterparty, restoreTx) => {
+        let recordExists = false
         try {
-            await node.paymentChannels.state(channelId)
-            throw Error(`Payment channel ${channelId.toString('hex')} is already open. Cannot open it twice.`)
+            const state = await node.paymentChannels.state(channelId)
+
+            recordExists = true
+
         } catch (err) {
             if (!err.notFound) throw err
         }
+
+        if (recordExists) handleExistingRecord(channelId)
 
         if (bufferToNumber(restoreTx.index) !== 1) throw Error('Invalid payment channel opening request.')
 
