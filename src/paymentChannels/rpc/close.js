@@ -144,6 +144,7 @@ module.exports = self => {
                 return initiateClosing(channelId, state, networkState)
             case self.TransactionRecordState.SETTLED:
             case self.TransactionRecordState.WITHDRAWABLE:
+            case self.TransactionRecordState.WITHDRAWING:
                 state.currentOnchainBalance = new BN(networkState.balanceA, 'hex').toBuffer('be', Transaction.VALUE_LENGTH)
                 state.currentIndex = networkState.index
 
