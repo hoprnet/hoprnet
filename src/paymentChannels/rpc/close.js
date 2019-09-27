@@ -9,6 +9,8 @@ const Transaction = require('../../transaction')
 
 const { ChannelState } = require('../enums.json')
 
+const OPENING_TIMEOUT = 60 * 1000
+
 module.exports = self => {
     /**
      * Checks whether the counterparty may has a more recent transaction.
@@ -108,7 +110,7 @@ module.exports = self => {
      * @param {Buffer} channelId ID of the payment channel
      * @param {Object} [state] current off-chain state
      */
-    const close = async (channelId, state) => {
+    const close = (channelId, state) => new Promise(async (resolve, reject) => {
         if (!state) state = await self.state(channelId)
 
         const networkState = await self.contract.methods.channels(channelId).call(
@@ -119,9 +121,9 @@ module.exports = self => {
         )
 
         if (state.preOpened && !state.lastTransaction && !state.restoreTransaction)
-            throw Error(
+            return reject(Error(
                 `Cannot close channel ${chalk.yellow(channelId.toString('hex'))} because it was opened by a third party and the counterparty is still unknown.`
-            )
+            ))
 
         switch (state.state) {
             case self.TransactionRecordState.OPENING:
@@ -129,19 +131,18 @@ module.exports = self => {
                 // failed while doing that
                 const timeout = setTimeout(() => {
                     console.log(`Could not close channel ${chalk.yellow(channelId.toString('hex'))} because no one opened it within the timeout.`)
-                    return self.deleteState(channelId).then(() => new BN(0))
-                })
+                    return resolve(self.deleteState(channelId).then(() => new BN(0)))
+                }, OPENING_TIMEOUT)
 
-                return new Promise(resolve => {
-                    self.onceOpened(channelId, newState => {
-                        clearTimeout(timeout)
-                        networkState.state = ChannelState.ACTIVE
-                        resolve(initiateClosing(channelId, newState, networkState))
-                    })
+                self.onceOpened(channelId, newState => {
+                    clearTimeout(timeout)
+                    networkState.state = ChannelState.ACTIVE
+                    resolve(initiateClosing(channelId, newState, networkState))
                 })
+                break
             case self.TransactionRecordState.PRE_OPENED:
             case self.TransactionRecordState.OPEN:
-                return initiateClosing(channelId, state, networkState)
+                return resolve(initiateClosing(channelId, state, networkState))
             case self.TransactionRecordState.SETTLED:
             case self.TransactionRecordState.WITHDRAWABLE:
             case self.TransactionRecordState.WITHDRAWING:
@@ -149,14 +150,14 @@ module.exports = self => {
                 state.currentIndex = networkState.index
 
                 // @TODO insert currect receivedMoney
-                return self.withdraw(channelId, state, networkState).then(_ => new BN(0))
+                return resolve(self.withdraw(channelId, state, networkState).then(_ => new BN(0)))
             case self.TransactionRecordState.SETTLING:
                 log(self.node.peerInfo.id, `Channel ${chalk.yellow(channelId.toString('hex'))} is already settling. No action required.`)
-                return new BN(0)
+                return resolve(new BN(0))
             default:
-                throw Error(`Channel is in state ${state.state}`)
+                return reject(Error(`Channel is in state ${state.state}`))
         }
-    }
+    })
 
     return close
 }

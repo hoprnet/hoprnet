@@ -341,9 +341,9 @@ class PaymentChannel extends EventEmitter {
     }
 
     emitOpened(channelId, state) {
-        if (this.listenerCount(OpenEvent(channelId)) == 0) {
-            this.setState(channelId, state)
-        } else {
+        this.setState(channelId, state)
+
+        if (this.listenerCount(OpenEvent(channelId)) > 0) {
             this.emit(OpenEvent(channelId), state)
         }
     }
@@ -353,9 +353,9 @@ class PaymentChannel extends EventEmitter {
     }
 
     emitClosed(channelId, state) {
-        if (this.listenerCount(CloseEvent(channelId)) == 0) {
-            this.setState(channelId, state)
-        } else {
+        this.setState(channelId, state)
+
+        if (this.listenerCount(CloseEvent(channelId)) > 0) {
             this.emit(CloseEvent(channelId), state)
         }
     }

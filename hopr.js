@@ -189,10 +189,10 @@ function tabCompletion(line, cb) {
 
                     hits = query
                         ? peerIds.reduce((result, peerId) => {
-                              if (peerId.toB58String().startsWith(query)) result.push(peerId.toB58String())
+                            if (peerId.toB58String().startsWith(query)) result.push(peerId.toB58String())
 
-                              return result
-                          }, [])
+                            return result
+                        }, [])
                         : peerIds.map(peerId => peerId.toB58String())
 
                     return cb(null, [hits.length ? hits.map(str => `close ${str}`) : ['close'], line])
@@ -294,8 +294,8 @@ async function runAsRegularNode() {
 
     console.log(
         `Own Ethereum address: ${chalk.green(pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()))}\n` +
-            `Funds: ${fromWei(funds, 'ether')} ETH\n` +
-            `Stake: ${fromWei(stakedEther, 'ether')} ETH\n`
+        `Funds: ${fromWei(funds, 'ether')} ETH\n` +
+        `Stake: ${fromWei(stakedEther, 'ether')} ETH\n`
     )
 
     if (stakedEther.add(funds).lt(MINIMAL_STAKE)) {
@@ -339,241 +339,39 @@ async function runAsRegularNode() {
             .split(SPLIT_OPERAND_QUERY_REGEX)
             .slice(1)
 
-        let amount, peerId
         switch ((command || '').trim()) {
             case 'crawl':
-                try {
-                    await node.crawler.crawl(peerInfo => isNotBootstrapNode(peerInfo.id))
-                } catch (err) {
-                    console.log(chalk.red(err.message))
-                } finally {
-                    setTimeout(() => {
-                        readline.clearLine(process.stdin, 0)
-                        rl.prompt()
-                    })
-                }
+                crawl()
                 break
             case 'quit':
                 stopNode()
                 break
             case 'stake':
-                if (!query) {
-                    console.log(chalk.red(`Invalid arguments. Expected 'stake <amount of ETH>'. Received '${input}'`))
-                    rl.prompt()
-                    break
-                }
-
-                amount = new BN(toWei(query, 'ether'))
-                if (funds.lt(new BN(amount))) {
-                    console.log(chalk.red('Insufficient funds.'))
-                    rl.prompt()
-                    break
-                }
-
-                try {
-                    await stakeEther(amount)
-
-                    stakedEther.iadd(amount)
-                    funds.isub(amount)
-                } catch (err) {
-                    console.log(chalk.red(err.message))
-                } finally {
-                    setTimeout(() => {
-                        rl.prompt()
-                    })
-                }
+                stake(query)
                 break
             case 'stakedEther':
-                try {
-                    let state = await node.paymentChannels.contract.methods.states(ownAddress).call({ from: ownAddress })
-                    stakedEther = new BN(state.stakedEther)
-                    console.log(`Current stake: ${chalk.green(fromWei(state.stakedEther, 'ether'))} ETH`)
-                } catch (err) {
-                    console.log(chalk.red(err.message))
-                } finally {
-                    setTimeout(() => {
-                        rl.prompt()
-                    })
-                }
+                let tmp = getStakedEther()
+
+                if (tmp) stakedEther = tmp
                 break
             case 'unstake':
-                if (!query) {
-                    console.log(chalk.red(`Invalid arguments. Expected 'unstake <amount of ETH>'. Received '${input}'`))
-                    rl.prompt()
-                    break
-                }
-
-                amount = new BN(toWei(query, 'ether'))
-                if (stakedEther.lt(amount)) {
-                    console.log(chalk.red('Amount must not be higher than current stake.'))
-                    rl.prompt()
-                    break
-                }
-
-                try {
-                    await node.paymentChannels.contractCall(node.paymentChannels.contract.methods.unstakeEther(amount))
-                } catch (err) {
-                    console.log(chalk.red(err.message))
-                } finally {
-                    setTimeout(() => {
-                        rl.prompt()
-                    })
-                }
+                unstake(query)
                 break
             case 'openChannels':
-                let str = `${chalk.yellow('ChannelId:'.padEnd(64, ' '))} - ${chalk.blue('PeerId:')}\n`
-
-                try {
-                    str += await node.paymentChannels.getAllChannels(
-                        channel =>
-                            pubKeyToPeerId(channel.state.counterparty).then(
-                                peerId => `${chalk.yellow(channel.channelId.toString('hex'))} - ${chalk.blue(peerId.toB58String())}`
-                            ),
-                        promises => {
-                            if (promises.length == 0) return `\n  No open channels.`
-
-                            return Promise.all(promises).then(results => results.join('\n'))
-                        }
-                    )
-                } catch (err) {
-                    return console.log(chalk.red(err.message))
-                }
-
-                console.log(str)
-
-                setTimeout(() => {
-                    rl.prompt()
-                })
+                openChannels()
                 break
             case 'open':
-                if (!query) {
-                    console.log(chalk.red(`Invalid arguments. Expected 'open <peerId>'. Received '${input}'`))
-                    rl.prompt()
-                    break
-                }
-
-                try {
-                    peerId = await checkPeerIdInput(query)
-                } catch (err) {
-                    console.log(err.message)
-                    setTimeout(() => {
-                        rl.prompt()
-                    })
-                    break
-                }
-
-                let interval
-                node.paymentChannels
-                    .open(peerId)
-                    .then(() => {
-                        const channelId = getId(
-                            /* prettier-ignore */
-                            pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()),
-                            pubKeyToEthereumAddress(peerId.pubKey.marshal())
-                        )
-
-                        console.log(`${chalk.green(`Successfully opened channel`)} ${chalk.yellow(channelId.toString('hex'))}`)
-                    })
-                    .catch(err => {
-                        console.log(chalk.red(err.message))
-                    })
-                    .finally(() => {
-                        clearInterval(interval)
-                        setTimeout(() => {
-                            readline.clearLine(process.stdin, 0)
-                            rl.prompt()
-                        })
-                    })
-
-                process.stdout.write(`Submitted transaction. Waiting for confirmation .`)
-                interval = setInterval(() => process.stdout.write('.'), 1000)
+                open(query)
                 break
             case 'send':
-                if (!query) {
-                    console.log(chalk.red(`Invalid arguments. Expected 'open <peerId>'. Received '${input}'`))
-                    rl.prompt()
-                    break
-                }
-
-                try {
-                    peerId = await checkPeerIdInput(query)
-                } catch (err) {
-                    console.log(err.message)
-                    setTimeout(() => {
-                        rl.prompt()
-                    })
-                    break
-                }
-
-                rl.question(`Sending message to ${chalk.blue(peerId.toB58String())}\nType in your message and press ENTER to send:\n`, message =>
-                    node
-                        .sendMessage(rlp.encode([message, Date.now().toString()]), peerId)
-                        .catch(err => console.log(chalk.red(err.message)))
-                        .finally(() => rl.prompt())
-                )
+                send(query)
                 break
             case 'closeAll':
-                try {
-                    const receivedMoney = await node.paymentChannels.closeChannels()
-                    console.log(`${chalk.green(`Closed all channels and received`)} ${chalk.magenta(fromWei(receivedMoney.toString(), 'ether'))} ETH.`)
-                } catch (err) {
-                    console.log(chalk.red(err.message))
-                } finally {
-                    setTimeout(() => {
-                        rl.prompt()
-                    })
-                }
+                closeAll()
                 break
             case 'close':
-                if (!query) {
-                    console.log(chalk.red(`Invalid arguments. Expected 'close <peerId>'. Received '${input}'`))
-                    rl.prompt()
-                    break
-                }
-
-                let peerId
-                try {
-                    peerId = await checkPeerIdInput(query)
-                } catch (err) {
-                    console.log(err.message)
-                    setTimeout(() => {
-                        rl.prompt()
-                    })
-                    break
-                }
-
-                const channelId = getId(pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()), pubKeyToEthereumAddress(peerId.pubKey.marshal()))
-
-                try {
-                    let interval
-                    node.paymentChannels
-                        .closeChannel(channelId)
-                        .then(receivedMoney => {
-                            console.log(
-                                `${chalk.green(`Successfully closed channel`)} ${chalk.yellow(channelId.toString('hex'))}. Received ${chalk.magenta(
-                                    fromWei(receivedMoney, 'ether')
-                                )} ETH.`
-                            )
-                            clearInterval(interval)
-                            setTimeout(() => {
-                                readline.clearLine(process.stdin, 0)
-                                rl.prompt()
-                            })
-                        })
-                        .catch(err => {
-                            console.log(err.message)
-                            clearInterval(interval)
-                            readline.clearLine(process.stdin, 0)
-                            rl.prompt()
-                        })
-                    console.log(`Submitted transaction. Waiting for confirmation .`)
-                    interval = setInterval(() => process.stdout.write('.'), 1000)
-                } catch (err) {
-                    console.log(chalk.red(err.message))
-                    rl.prompt()
-                }
+                close(query)
                 break
-
             case 'myAddress':
                 console.log(`Ethereum:\t${chalk.green(pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()))}`)
                 console.log(`HOPR:\t\t${chalk.green(node.peerInfo.id.toB58String())}`)
@@ -582,15 +380,15 @@ async function runAsRegularNode() {
             default:
                 console.log(chalk.red('Unknown command!'))
                 rl.prompt()
+                break
         }
     })
     rl.prompt()
 }
 
-process.title = 'hopr'
+process.title = 'hopr';
 
-/* prettier-ignore */
-;(async function main() {
+(async function main() {
     console.log(`Welcome to ${chalk.bold('HOPR')}!\n`)
 
     options = parseOptions()
@@ -618,3 +416,246 @@ process.title = 'hopr'
         return runAsRegularNode()
     }
 })()
+
+async function close(query) {
+    if (!query) {
+        console.log(chalk.red(`Invalid arguments. Expected 'close <peerId>'. Received '${input}'`))
+        rl.prompt()
+        return
+    }
+
+    let peerId
+    try {
+        peerId = await checkPeerIdInput(query)
+    } catch (err) {
+        console.log(err.message)
+        setTimeout(() => {
+            rl.prompt()
+        })
+        return
+    }
+
+    const channelId = getId(pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()), pubKeyToEthereumAddress(peerId.pubKey.marshal()))
+
+    try {
+        let interval
+        node.paymentChannels
+            .closeChannel(channelId)
+            .then(receivedMoney => {
+                console.log(
+                    `${chalk.green(`Successfully closed channel`)} ${chalk.yellow(channelId.toString('hex'))}. Received ${chalk.magenta(
+                        fromWei(receivedMoney, 'ether')
+                    )} ETH.`
+                )
+                clearInterval(interval)
+                setTimeout(() => {
+                    readline.clearLine(process.stdin, 0)
+                    rl.prompt()
+                })
+            })
+            .catch(err => {
+                console.log(err.message)
+                clearInterval(interval)
+                readline.clearLine(process.stdin, 0)
+                rl.prompt()
+            })
+        console.log(`Submitted transaction. Waiting for confirmation .`)
+        interval = setInterval(() => process.stdout.write('.'), 1000)
+    } catch (err) {
+        console.log(chalk.red(err.message))
+        rl.prompt()
+    }
+    return
+}
+
+async function send(query) {
+    if (!query) {
+        console.log(chalk.red(`Invalid arguments. Expected 'open <peerId>'. Received '${input}'`))
+        rl.prompt()
+        return
+    }
+
+    let peerId
+    try {
+        peerId = await checkPeerIdInput(query)
+    } catch (err) {
+        console.log(err.message)
+        setTimeout(() => {
+            rl.prompt()
+        })
+        return
+    }
+
+    rl.question(`Sending message to ${chalk.blue(peerId.toB58String())}\nType in your message and press ENTER to send:\n`, message =>
+        node
+            .sendMessage(rlp.encode([message, Date.now().toString()]), peerId)
+            .catch(err => console.log(chalk.red(err.message)))
+            .finally(() => rl.prompt())
+    )
+}
+
+async function open(query) {
+    if (!query) {
+        console.log(chalk.red(`Invalid arguments. Expected 'open <peerId>'. Received '${input}'`))
+        rl.prompt()
+        return
+    }
+
+    let peerId
+    try {
+        peerId = await checkPeerIdInput(query)
+    } catch (err) {
+        console.log(err.message)
+        setTimeout(() => {
+            rl.prompt()
+        })
+        return
+    }
+
+    const channelId = getId(
+        /* prettier-ignore */
+        pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()),
+        pubKeyToEthereumAddress(peerId.pubKey.marshal())
+    )
+
+    let interval
+    node.paymentChannels
+        .open(peerId)
+        .then(() => {
+            console.log(`${chalk.green(`Successfully opened channel`)} ${chalk.yellow(channelId.toString('hex'))}`)
+        })
+        .catch(err => {
+            console.log(chalk.red(err.message))
+        })
+        .finally(() => {
+            clearInterval(interval)
+            setTimeout(() => {
+                readline.clearLine(process.stdin, 0)
+                rl.prompt()
+            })
+        })
+
+    process.stdout.write(`Submitted transaction. Waiting for confirmation .`)
+    interval = setInterval(() => process.stdout.write('.'), 1000)
+}
+
+async function openChannels() {
+    let str = `${chalk.yellow('ChannelId:'.padEnd(64, ' '))} - ${chalk.blue('PeerId:')}\n`
+
+    try {
+        str += await node.paymentChannels.getAllChannels(
+            channel =>
+                pubKeyToPeerId(channel.state.counterparty).then(
+                    peerId => `${chalk.yellow(channel.channelId.toString('hex'))} - ${chalk.blue(peerId.toB58String())}`
+                ),
+            promises => {
+                if (promises.length == 0) return `\n  No open channels.`
+
+                return Promise.all(promises).then(results => results.join('\n'))
+            }
+        )
+    } catch (err) {
+        return console.log(chalk.red(err.message))
+    }
+
+    console.log(str)
+
+    setTimeout(() => {
+        rl.prompt()
+    })
+}
+
+async function stake(query) {
+    if (!query) {
+        console.log(chalk.red(`Invalid arguments. Expected 'stake <amount of ETH>'. Received '${input}'`))
+        rl.prompt()
+        break
+    }
+
+    let amount = new BN(toWei(query, 'ether'))
+    if (funds.lt(new BN(amount))) {
+        console.log(chalk.red('Insufficient funds.'))
+        rl.prompt()
+        break
+    }
+
+    try {
+        await stakeEther(amount)
+
+        stakedEther.iadd(amount)
+        funds.isub(amount)
+    } catch (err) {
+        console.log(chalk.red(err.message))
+    } finally {
+        setTimeout(() => {
+            rl.prompt()
+        })
+    }
+}
+
+async function unstake(query) {
+    if (!query) {
+        console.log(chalk.red(`Invalid arguments. Expected 'unstake <amount of ETH>'. Received '${input}'`))
+        rl.prompt()
+        return
+    }
+
+    let amount = new BN(toWei(query, 'ether'))
+    if (stakedEther.lt(amount)) {
+        console.log(chalk.red('Amount must not be higher than current stake.'))
+        rl.prompt()
+        return
+    }
+
+    try {
+        await node.paymentChannels.contractCall(node.paymentChannels.contract.methods.unstakeEther(amount))
+    } catch (err) {
+        console.log(chalk.red(err.message))
+    } finally {
+        setTimeout(() => {
+            rl.prompt()
+        })
+    }
+}
+
+async function crawl() {
+    try {
+        await node.crawler.crawl(peerInfo => isNotBootstrapNode(peerInfo.id))
+    } catch (err) {
+        console.log(chalk.red(err.message))
+    } finally {
+        setTimeout(() => {
+            readline.clearLine(process.stdin, 0)
+            rl.prompt()
+        })
+    }
+}
+
+async function closeAll() {
+    try {
+        const receivedMoney = await node.paymentChannels.closeChannels()
+        console.log(`${chalk.green(`Closed all channels and received`)} ${chalk.magenta(fromWei(receivedMoney.toString(), 'ether'))} ETH.`)
+    } catch (err) {
+        console.log(chalk.red(err.message))
+    } finally {
+        setTimeout(() => {
+            rl.prompt()
+        })
+    }
+}
+
+async function getStakedEther() {
+    try {
+        let state = await node.paymentChannels.contract.methods.states(ownAddress).call({ from: ownAddress })
+
+        console.log(`Current stake: ${chalk.green(fromWei(state.stakedEther, 'ether'))} ETH`)
+        return new BN(state.stakedEther)
+    } catch (err) {
+        console.log(chalk.red(err.message))
+    } finally {
+        setTimeout(() => {
+            rl.prompt()
+        })
+    }
+
+}
