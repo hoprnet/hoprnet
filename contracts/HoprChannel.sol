@@ -257,31 +257,31 @@ contract HoprChannel {
         bytes32 channelId = getId(msg.sender, counterParty);
         Channel storage channel = channels[channelId];
         
-        if (channel.state == ChannelState.PENDING_SETTLEMENT) {
-            require(channel.settleTimestamp <= block.timestamp, "Channel not withdrawable yet.");
+        require(channel.state == ChannelState.PENDING_SETTLEMENT, "Channel is not withdrawable.");
+
+        require(channel.settleTimestamp <= block.timestamp, "Channel not withdrawable yet.");
                         
-            require(
-                states[msg.sender].openChannels > 0 &&
-                states[counterParty].openChannels > 0, 
-                "Something went wrong. Double spend?");
+        require(
+            states[msg.sender].openChannels > 0 &&
+            states[counterParty].openChannels > 0, 
+            "Something went wrong. Double spend?");
 
-            states[msg.sender].openChannels = states[msg.sender].openChannels.sub(1);
-            states[counterParty].openChannels = states[counterParty].openChannels.sub(1);
-            
-            if (isPartyA(msg.sender, counterParty)) {
-                // msg.sender == partyB
-                // solhint-disable-next-line max-line-length
-                states[msg.sender].stakedEther = states[msg.sender].stakedEther.add((channel.balance.sub(channel.balanceA)));
-                states[counterParty].stakedEther = states[counterParty].stakedEther.add(channel.balanceA);
-            } else {
-                // msg.sender == partyA
-                // solhint-disable-next-line max-line-length
-                states[counterParty].stakedEther = states[counterParty].stakedEther.add((channel.balance.sub(channel.balanceA)));
-                states[msg.sender].stakedEther = states[msg.sender].stakedEther.add(channel.balanceA); 
-            }
-
-            delete channels[channelId];
+        states[msg.sender].openChannels = states[msg.sender].openChannels.sub(1);
+        states[counterParty].openChannels = states[counterParty].openChannels.sub(1);
+        
+        if (isPartyA(msg.sender, counterParty)) {
+            // msg.sender == partyB
+            // solhint-disable-next-line max-line-length
+            states[msg.sender].stakedEther = states[msg.sender].stakedEther.add((channel.balance.sub(channel.balanceA)));
+            states[counterParty].stakedEther = states[counterParty].stakedEther.add(channel.balanceA);
+        } else {
+            // msg.sender == partyA
+            // solhint-disable-next-line max-line-length
+            states[counterParty].stakedEther = states[counterParty].stakedEther.add((channel.balance.sub(channel.balanceA)));
+            states[msg.sender].stakedEther = states[msg.sender].stakedEther.add(channel.balanceA); 
         }
+
+        delete channels[channelId];
     }
 
     function isPartyA(address a, address b) private pure returns (bool) {

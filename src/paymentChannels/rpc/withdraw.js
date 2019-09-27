@@ -19,7 +19,21 @@ module.exports = self => {
             state: self.TransactionRecordState.WITHDRAWING
         })
 
-        const receipt = await self.contractCall(self.contract.methods.withdraw(pubKeyToEthereumAddress(localState.counterparty)))
+        let receipt
+        try {
+            receipt = await self.contractCall(self.contract.methods.withdraw(pubKeyToEthereumAddress(localState.counterparty)))
+        } catch (err) {
+            const networkState = await self.contract.methods.channels(channelId).call({
+                from: pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal())
+            })
+
+            switch (parseInt(networkState.state)) {
+                case ChannelState.UNINITIALIZED:
+                    return
+                default:
+                    throw Error(`Could not withdraw the channel because its state is '${networkState.state}'.`)
+            }
+        }
 
         const subscription = self.subscriptions.get(channelId.toString('hex'))
 
@@ -90,12 +104,14 @@ module.exports = self => {
 
         const receipt = await withdraw(channelId, localState)
 
-        log(
-            self.node.peerInfo.id,
-            `Successfully submitted withdrawal transaction of channel ${chalk.yellow(channelId.toString('hex'))} with transaction ${chalk.green(
-                receipt.transactionHash
-            )}. Nonce is now ${chalk.cyan(self.node.paymentChannels.nonce)}`
-        )
+        if (receipt) {
+            log(
+                self.node.peerInfo.id,
+                `Successfully submitted withdrawal transaction of channel ${chalk.yellow(channelId.toString('hex'))} with transaction ${chalk.green(
+                    receipt.transactionHash
+                )}. Nonce is now ${chalk.cyan(self.node.paymentChannels.nonce)}`
+            )
+        }
 
         const receivedMoney = self.getEmbeddedMoney(localState.currentOnchainBalance, localState.initialBalance, await pubKeyToPeerId(localState.counterparty))
 

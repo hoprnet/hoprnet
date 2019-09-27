@@ -75,7 +75,7 @@ const IMPORT_SOLIDITY_REGEX = /^\s*import(\s+).*$/gm
     console.log(`Giving the testnet 30 seconds to propagate the contract code before trying to verify the contract.`)
     await wait(30 * 1000)
 
-    axios
+    return axios
         .post(
             `https://${apiSubdomain}.etherscan.io/api`,
             querystring.stringify({
