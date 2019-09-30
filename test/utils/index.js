@@ -9,6 +9,9 @@ const Ganache = require('ganache-core')
 const BN = require('bn.js')
 const LevelDown = require('leveldown')
 const chalk = require('chalk')
+const axios = require('axios')
+const fsPromise = require('fs').promises
+const querystring = require('querystring')
 
 const MINIMAL_FUND = new BN(toWei('1.0', 'ether'))
 const MINIMAL_STAKE = new BN(toWei('0.09', 'ether'))
@@ -182,17 +185,17 @@ module.exports.openChannelFor = (fundingNode, contract, nonce, partyA, partyB) =
     return contract.methods.createFor(partyA, partyB).send.request({
         from: pubKeyToEthereumAddress(fundingNode.pubKey.marshal()),
         gas: 190000,
-        //gasPrice: process.env.GAS_PRICE,
+        gasPrice: process.env['GAS_PRICE'],
         value: toWei('0.2', 'ether'),
         nonce: `0x${new BN(nonce).toBuffer('be').toString('hex')}`
     })
 }
 
-module.exports.stakeFor = (fundingNode, contract, nonce, beneficiary) => {
+module.exports.stakeFor = (fundingNode, contract, nonce, beneficiary, amount = toWei('0.2', 'ether')) => {
     return contract.methods.stakeFor(beneficiary).send.request({
         from: pubKeyToEthereumAddress(fundingNode.pubKey.marshal()),
         gas: 190000,
-        value: toWei('0.2', 'ether'),
+        value: amount,
         nonce: `0x${new BN(nonce).toBuffer('be').toString('hex')}`
     })
 }
@@ -234,4 +237,96 @@ module.exports.fundNode = async (node, fundingNode, nonce) => {
             )
         })
     }
+}
+
+module.exports.verifyContractCode = async (contractPath, contractAddress) => {
+    // used to remove `import 'xyz'` statements from Solidity src code
+    const IMPORT_SOLIDITY_REGEX = /^\s*import(\s+).*$/gm
+
+    const srcFileNames = await fsPromise.readdir(contractPath)
+
+    const distinctPaths = new Set()
+
+    const srcFilePaths = await Promise.all(
+        srcFileNames.map(source => {
+            const compilerOutput = require(`${contractPath}/${source}`)
+            compilerOutput.metadata = JSON.parse(compilerOutput.metadata)
+
+            return Promise.all(
+                Object.keys(compilerOutput.metadata.sources).map(async srcPath => {
+                    try {
+                        await fsPromise.stat(srcPath)
+                        return srcPath
+                    } catch (err) {
+                        try {
+                            await fsPromise.stat(`${process.cwd()}/node_modules/${srcPath}`)
+                            return `${process.cwd()}/node_modules/${srcPath}`
+                        } catch (err) {
+                            console.log(`Couldn't find import '${srcPath}'.`)
+                        }
+                    }
+                })
+            )
+        })
+    )
+
+    srcFilePaths.flat().forEach(path => distinctPaths.add(path))
+
+    const promises = []
+
+    distinctPaths.forEach(path => promises.push(fsPromise.readFile(path)))
+
+    const concatenatedSourceCode = (await Promise.all(promises)).map(source => source.toString().replace(IMPORT_SOLIDITY_REGEX, '')).join('\n')
+
+    const compilerMetadata = require(`${process.cwd()}/build/contracts/HoprChannel.json`).metadata
+
+    let apiSubdomain = 'api'
+    switch (process.env['NETWORK'].toLowerCase()) {
+        case 'ropsten':
+            apiSubdomain += '-ropsten'
+            break
+        case 'rinkeby':
+            apiSubdomain += '-rinkeby'
+            break
+        default:
+    }
+
+
+    return axios
+        .post(
+            `https://${apiSubdomain}.etherscan.io/api`,
+            querystring.stringify({
+                apikey: process.env['ETHERSCAN_API_KEY'],
+                module: 'contract',
+                action: 'verifysourcecode',
+                contractaddress: contractAddress,
+                sourceCode: concatenatedSourceCode,
+                contractname: 'HoprChannel',
+                compilerVersion: `v${compilerMetadata.compiler.version}`,
+                optimizationUsed: compilerMetadata.settings.optimizer.enabled ? '1' : '0',
+                runs: compilerMetadata.settings.optimizer.runs.toString(),
+                licenseType: '1'
+            })
+        )
+        .then(response => {
+            if (response.statusText !== 'OK' || !response.data) {
+                console.log(`Failed to verify contract due to '${statusText}'.`)
+                console.log(`Got this response: `, response)
+                return
+            }
+
+            switch (parseInt(response.data.status)) {
+                case 1:
+                    console.log(`Successfully verified contract ${chalk.green(contractAddress)} on ${chalk.magenta(process.env['NETWORK'].toLowerCase())}`)
+                    break
+                case 0:
+                    console.log(`Failed to verify contract due to '${response.data.result}'.`)
+                    break
+                default:
+                    console.log(`${response.data.message} ${response.data.result}`)
+            }
+        })
+        .catch(error => {
+            console.log(error.message)
+        })
 }

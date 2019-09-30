@@ -4,6 +4,17 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "OpenFor",
+            "program": "${workspaceFolder}/test/stakeFor.js",
+            "args": [
+                "0xe1c9D64858f37a954C871bA702B3F27F6E195685",
+                "0xE1c9d64858F37A954c871Ba702b3F27F6e195681"
+            ]
+        },
         {
             "type": "node",
             "request": "launch",

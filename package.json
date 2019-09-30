@@ -28,7 +28,8 @@
         "hopr": "node hopr.js",
         "deployContract": "node test/deployContract",
         "startTestnet": "node test/startBlockchain",
-        "createFor": "node test/createFor"
+        "createForTest": "node test/createFor",
+        "createFor": "node test/stakeFor"
     },
     "dependencies": {
         "@nodeutils/defaults-deep": "~1.1.0",
