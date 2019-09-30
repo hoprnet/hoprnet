@@ -298,19 +298,8 @@ async function runAsRegularNode() {
         `Stake: ${fromWei(stakedEther, 'ether')} ETH\n`
     )
 
-    if (stakedEther.add(funds).lt(MINIMAL_STAKE)) {
-        console.log(
-            chalk.red(
-                `Insufficient funds. Got only ${fromWei(stakedEther.add(funds), 'ether')} ETH to stake. Please fund the account ${chalk.green(
-                    ownAddress.toString()
-                )} with at least ${fromWei(MINIMAL_STAKE.sub(funds).sub(stakedEther), 'Ether')} ETH.`
-            )
-        )
-        return stopNode()
-    }
-
     if (stakedEther.lt(MINIMAL_STAKE)) {
-        await new Promise((resolve, reject) =>
+        await new Promise(resolve =>
             rl.question(
                 `Staked Ether is less than ${fromWei(MINIMAL_STAKE, 'ether')} ETH. Do you want to increase the stake now? (${chalk.green('Y')}/${chalk.red(
                     'n'
@@ -322,6 +311,9 @@ async function runAsRegularNode() {
                             rl.question(`Amount? : `, answer => resolve(stakeEther(toWei(answer))))
                             rl.write(fromWei(MINIMAL_STAKE.sub(stakedEther), 'ether'))
                             break
+                        case 'n':
+                            console.log(`Running HOPR with ${chalk.magenta(`${fromWei(stakedEther, 'ether').toString()} ETH`)}.`)
+                            return resolve()
                         default:
                             return stopNode()
                     }
@@ -609,7 +601,7 @@ async function unstake(query) {
     }
 
     try {
-        await node.paymentChannels.contractCall(node.paymentChannels.contract.methods.unstakeEther(amount))
+        await node.paymentChannels.contractCall(node.paymentChannels.contract.methods.unstakeEther(amount.toString()))
     } catch (err) {
         console.log(chalk.red(err.message))
     } finally {
