@@ -243,22 +243,16 @@ class Hopr extends libp2p {
 
                     await Promise.all(path.map(addPubKey))
 
-                    const [conn, packet] = await Promise.all([
-                        new Promise((resolve, reject) =>
-                            this.peerRouting.findPeer(path[0], async (err, peerInfo) => {
-                                if (err) reject(err)
+                    const peerInfo = await this.peerRouting.findPeer(path[0])
 
-                                resolve(this.dialProtocol(peerInfo, PROTOCOL_STRING))
-                            })
-                        ),
+                    const conn = await this.dialProtocol(peerInfo, PROTOCOL_STRING)
 
-                        createPacket(
-                            /* prettier-ignore */
-                            this,
-                            msg.slice(n * PACKET_SIZE, Math.min(msg.length, (n + 1) * PACKET_SIZE)),
-                            path
-                        )
-                    ])
+                    const packet = await createPacket(
+                        /* prettier-ignore */
+                        this,
+                        msg.slice(n * PACKET_SIZE, Math.min(msg.length, (n + 1) * PACKET_SIZE)),
+                        path
+                    )
 
                     pull(
                         pull.once(packet.toBuffer()),
