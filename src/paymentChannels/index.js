@@ -343,7 +343,7 @@ class PaymentChannel extends EventEmitter {
     }
 
     registerOpenedForListener(listener = this.eventListeners.openedForListener) {
-        const ownTopic = pubKeyToEthereumAddress(this.node.peerInfo.id.pubKey.marshal()).replace(/(0x)([0-9a-fA-F]{20})/, '$1000000000000000000000000$2')
+        const ownTopic = pubKeyToEthereumAddress(this.node.peerInfo.id.pubKey.marshal()).replace(/(0x)([0-9a-fA-F]{20})/, '$1000000000000000000000000$2').toLowerCase()
 
         const eventName = 'OpenedChannelFor'
         const path = '../../build/contracts/HoprChannel.json'
