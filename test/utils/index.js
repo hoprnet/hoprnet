@@ -2,7 +2,7 @@
 
 const { createHash } = require('crypto')
 const { createNode } = require('../../src')
-const { privKeyToPeerId, pubKeyToEthereumAddress, sendTransaction, log, createDirectoryIfNotExists } = require('../../src/utils')
+const { privKeyToPeerId, pubKeyToEthereumAddress, sendTransaction, log, createDirectoryIfNotExists, signTransaction } = require('../../src/utils')
 const { STAKE_GAS_AMOUNT } = require('../../src/constants')
 const { toWei, fromWei } = require('web3-utils')
 const Ganache = require('ganache-core')
@@ -177,38 +177,53 @@ module.exports.startBootstrapServers = async amountOfNodes => {
     return Promise.all(promises)
 }
 
-module.exports.wait = (miliSeconds) => {
+module.exports.wait = miliSeconds => {
     return new Promise(resolve => setTimeout(resolve, miliSeconds))
 }
 
-module.exports.openChannelFor = (fundingNode, contract, nonce, partyA, partyB) => {
-    return contract.methods.createFor(partyA, partyB).send.request({
-        from: pubKeyToEthereumAddress(fundingNode.pubKey.marshal()),
-        gas: 190000,
-        gasPrice: process.env['GAS_PRICE'],
-        value: toWei('0.2', 'ether'),
-        nonce: `0x${new BN(nonce).toBuffer('be').toString('hex')}`
-    })
+module.exports.openChannelFor = (fundingNode, contract, web3, nonce, partyA, partyB) => {
+    return transactionHelper(
+        {
+            to: contract.options.address,
+            gas: 190000,
+            gasPrice: process.env['GAS_PRICE'],
+            value: toWei('0.2', 'ether'),
+            nonce: `0x${new BN(nonce).toBuffer('be').toString('hex')}`,
+            data: contract.methods.createFor(partyA, partyB).encodeABI()
+        },
+        fundingNode,
+        web3
+    )
 }
 
-module.exports.stakeFor = (fundingNode, contract, nonce, beneficiary, amount = toWei('0.2', 'ether')) => {
-    return contract.methods.stakeFor(beneficiary).send.request({
-        from: pubKeyToEthereumAddress(fundingNode.pubKey.marshal()),
-        gas: 190000,
-        value: amount,
-        nonce: `0x${new BN(nonce).toBuffer('be').toString('hex')}`
-    })
+module.exports.stakeFor = async (fundingNode, contract, web3, nonce, beneficiary, amount = toWei('0.2', 'ether')) => {
+    return transactionHelper(
+        {
+            to: contract.options.address,
+            gas: 190000,
+            gasPrice: process.env['GAS_PRICE'],
+            value: amount,
+            nonce: `0x${new BN(nonce).toBuffer('be').toString('hex')}`,
+            data: contract.methods.stakeFor(beneficiary).encodeABI()
+        },
+        fundingNode,
+        web3
+    )
 }
 
 module.exports.fundNode2 = (fundingNode, web3, nonce, beneficiary) => {
     // const currentBalance = new BN(await web3.eth.getBalance(beneficiary))
-    return web3.eth.sendTransaction.request({
-        from: pubKeyToEthereumAddress(fundingNode.pubKey.marshal()),
-        to: beneficiary,
-        gas: 190000,
-        value: toWei('0.2', 'ether'),
-        nonce: `0x${new BN(nonce).toBuffer('be').toString('hex')}`
-    })
+    return transactionHelper(
+        {
+            to: beneficiary,
+            gas: 190000,
+            gasPrice: process.env['GAS_PRICE'],
+            value: toWei('0.2', 'ether'),
+            nonce: `0x${new BN(nonce).toBuffer('be').toString('hex')}`
+        },
+        fundingNode,
+        web3
+    )
 }
 
 module.exports.fundNode = async (node, fundingNode, nonce) => {
@@ -291,7 +306,6 @@ module.exports.verifyContractCode = async (contractPath, contractAddress) => {
         default:
     }
 
-
     return axios
         .post(
             `https://${apiSubdomain}.etherscan.io/api`,
@@ -329,4 +343,10 @@ module.exports.verifyContractCode = async (contractPath, contractAddress) => {
         .catch(error => {
             console.log(error.message)
         })
+}
+
+async function transactionHelper(tx, fundingNode, web3) {
+    const signedTransaction = await signTransaction(tx, fundingNode, web3)
+
+    return web3.eth.sendSignedTransaction.request(signedTransaction.rawTransaction)
 }

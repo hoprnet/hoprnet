@@ -41,7 +41,7 @@ function parseOptions() {
 
     const fundingNode = await privKeyToPeerId(process.env['FUND_ACCOUNT_PRIVATE_KEY'])
 
-    const web3 = new Web3(process.env.PROVIDER)
+    const web3 = new Web3(process.env['PROVIDER'])
 
     const abi = require('../build/contracts/HoprChannel.json').abi
     const contract = new web3.eth.Contract(abi, process.env['CONTRACT_ADDRESS'], {
@@ -55,7 +55,7 @@ function parseOptions() {
         contract.methods.states(beneficiary1).call({
             from: pubKeyToEthereumAddress(fundingNode.pubKey.marshal())
         }),
-        web3.eth.getTransactionCount(process.env.FUND_ACCOUNT_ETH_ADDRESS)
+        web3.eth.getTransactionCount(pubKeyToEthereumAddress(fundingNode.pubKey.marshal()))
     ])
 
     const rl = readline.createInterface({
@@ -68,17 +68,18 @@ function parseOptions() {
     const handleStakeEther = (beneficiary, nonce) => {
         const promise = new Promise(resolve =>
             rl.question(
-                `The account ${chalk.green(beneficiary)} seems to have no stakedEther. Do you want to stake some Ether for that party?, (${chalk.green(
+                `The account ${chalk.green(beneficiary)} seems to have no Ether staked. Do you want to stake some Ether for that party?, (${chalk.green(
                     'Y'
                 )}/${chalk.red('n')}): `,
                 answer => {
                     switch (answer.toLowerCase()) {
                         case 'y':
                             rl.question(`Amount (in ETH)? `, answer => {
-                                batch.add(stakeFor(fundingNode, contract, nonce, beneficiary, toWei(answer, 'ether')))
-                                resolve()
+                                stakeFor(fundingNode, contract, web3, nonce, beneficiary, toWei(answer, 'ether')).then(txObject => {
+                                    batch.add(txObject)
+                                    resolve()
+                                })
                             })
-                            rl.write('0.1\n')
                             break
                         case 'n':
                         case '':
@@ -89,8 +90,6 @@ function parseOptions() {
             )
         )
 
-        rl.write('y\n')
-
         return promise
     }
 
@@ -98,7 +97,7 @@ function parseOptions() {
 
     if (new BN(state1.stakedEther).isZero()) await handleStakeEther(beneficiary1, nonce++)
 
-    const query = openChannelFor(fundingNode, contract, nonce++, beneficiary0, beneficiary1)
+    const query = await openChannelFor(fundingNode, contract, web3, nonce++, beneficiary0, beneficiary1)
     query.callback = (err) => {
         if (err) console.log(err.message)
     }

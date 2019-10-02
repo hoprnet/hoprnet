@@ -48,12 +48,12 @@ const AMOUNT_OF_NODES = 4
     for (let i = 0; i < AMOUNT_OF_NODES; i++) {
         partyA = pubKeyToEthereumAddress(nodes[i].peerInfo.id.pubKey.marshal())
 
-        batch.add(stakeFor(fundingNode, contract, nonce++, partyA))
-        batch.add(fundNode2(fundingNode, web3, nonce++, partyA))
+        batch.add(await stakeFor(fundingNode, contract, web3, nonce++, partyA))
+        batch.add(await fundNode2(fundingNode, web3, nonce++, partyA))
         for (let j = i + 1; j < AMOUNT_OF_NODES - 1; j++) {
             partyB = pubKeyToEthereumAddress(nodes[j].peerInfo.id.pubKey.marshal())
 
-            batch.add(openChannelFor(fundingNode, contract, nonce++, partyA, partyB))
+            batch.add(await openChannelFor(fundingNode, contract, web3, nonce++, partyA, partyB))
         }
     }
 
