@@ -104,18 +104,6 @@ function isNotBootstrapNode(peerId) {
     return !node.bootstrapServers.some(peerInfo => peerInfo.id.isEqual(peerId))
 }
 
-/**
- * Get existing channels from the database
- *
- * @returns {Promise<PeerId[]>}
- */
-function getExistingChannels() {
-    return node.paymentChannels.getAllChannels(
-        channel => pubKeyToPeerId(channel.state.counterparty),
-        promises => Promise.all(promises).then(peerIds => peerIds.filter(isNotBootstrapNode))
-    )
-}
-
 // Allowed keywords
 const keywords = ['open', 'stake', 'stakedEther', 'unstake', 'send', 'quit', 'crawl', 'openChannels', 'closeAll', 'myAddress']
 
@@ -157,50 +145,76 @@ function tabCompletion(line, cb) {
         case 'unstake':
             return cb(null, [[`unstake ${fromWei(stakedEther, 'ether')}`], line])
         case 'open':
-            getExistingChannels()
-                .then(peerIds => {
-                    const peers = node.peerBook.getAllArray().reduce((result, peerInfo) => {
-                        if (isNotBootstrapNode(peerInfo.id) && !peerIds.some(peerId => peerId.isEqual(peerInfo.id))) result.push(peerInfo.id.toB58String())
+            node.paymentChannels.getAllChannels(
+                channel => channel.channelId.toString('hex'),
+                channelIds => Promise.all(channelIds)
+                    .then(channelIds => {
+                        channelIds = new Set(channelIds)
+                        const peers = node.peerBook.getAllArray().reduce((acc, peerInfo) => {
+                            if (!isNotBootstrapNode(peerInfo.id)) return acc
 
-                        return result
-                    }, [])
+                            const channelId = getId(
+                                pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()),
+                                pubKeyToEthereumAddress(peerInfo.id.pubKey.marshal())
+                            ).toString('hex')
 
-                    if (peers.length < 1) {
-                        console.log(chalk.red(`\nDoesn't know any node to open a payment channel with.`))
+                            if (!channelIds.has(channelId))
+                                acc.push(peerInfo.id.toB58String())
+
+                            return acc
+                        }, [])
+
+                        channelIds.clear()
+
+                        if (peers.length < 1) {
+                            console.log(chalk.red(`\nDoesn't know any node to open a payment channel with.`))
+                            return cb(null, [[''], line])
+                        }
+
+                        hits = query ? peers.filter(peerId => peerId.startsWith(query)) : peers
+
+
+                        return cb(null, [hits.length ? hits.map(str => `open ${str}`) : ['open'], line])
+                    })
+                    .catch(err => {
+                        console.log(chalk.red(err.message))
                         return cb(null, [[''], line])
-                    }
-
-                    hits = query ? peers.filter(peerId => peerId.startsWith(query)) : peers
-
-                    return cb(null, [hits.length ? hits.map(str => `open ${str}`) : ['open'], line])
-                })
-                .catch(err => {
-                    console.log(chalk.red(err.message))
-                    return cb(null, [[''], line])
-                })
+                    })
+            )
             break
         case 'close':
-            getExistingChannels()
-                .then(peerIds => {
-                    if (peerIds && peerIds.length < 1) {
-                        console.log(chalk.red(`\nCan't close a payment channel as there aren't any open ones!`))
-                        return cb(null, [[''], line])
-                    }
+            node.paymentChannels.getAllChannels(
+                channel => {
+                    if (!channel.state.counterparty) return
 
-                    hits = query
-                        ? peerIds.reduce((result, peerId) => {
-                            if (peerId.toB58String().startsWith(query)) result.push(peerId.toB58String())
+                    return pubKeyToPeerId(channel.state.counterparty)
+                },
+                peerIds =>
+                    Promise.all(peerIds)
+                        .then(peerIds => {
+                            // Exclude all falsy entries
+                            peerIds = peerIds.filter(peerId => peerId)
 
-                            return result
-                        }, [])
-                        : peerIds.map(peerId => peerId.toB58String())
+                            if (peerIds && peerIds.length < 1) {
+                                console.log(chalk.red(`\nCannot close any channel because there are not any open ones and/or channels were opened by a third party.`))
+                                return cb(null, [[''], line])
+                            }
 
-                    return cb(null, [hits.length ? hits.map(str => `close ${str}`) : ['close'], line])
-                })
-                .catch(err => {
-                    console.log(chalk.red(err.message))
-                    return cb(null, [[''], line])
-                })
+                            hits = query
+                                ? peerIds.reduce((result, peerId) => {
+                                    if (peerId.toB58String().startsWith(query)) result.push(peerId.toB58String())
+
+                                    return result
+                                }, [])
+                                : peerIds.map(peerId => peerId.toB58String())
+
+                            return cb(null, [hits.length ? hits.map(str => `close ${str}`) : ['close'], line])
+                        })
+                        .catch(err => {
+                            console.log(chalk.red(err.message))
+                            return cb(null, [[''], line])
+                        })
+            )
             break
         default:
             hits = keywords.filter(keyword => keyword.startsWith(line))
@@ -537,10 +551,15 @@ async function openChannels() {
 
     try {
         str += await node.paymentChannels.getAllChannels(
-            channel =>
-                pubKeyToPeerId(channel.state.counterparty).then(
+            channel => {
+                if (!channel.state.counterparty)
+                    return `${chalk.yellow(channel.channelId.toString('hex'))} - ${chalk.gray('pre-opened')}`
+
+                return pubKeyToPeerId(channel.state.counterparty).then(
                     peerId => `${chalk.yellow(channel.channelId.toString('hex'))} - ${chalk.blue(peerId.toB58String())}`
-                ),
+                )
+
+            },
             promises => {
                 if (promises.length == 0) return `\n  No open channels.`
 
