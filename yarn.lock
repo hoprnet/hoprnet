@@ -3930,7 +3930,7 @@ libp2p-websockets@^0.12.2:
     multiaddr-to-uri "^5.0.0"
     pull-ws hugomrdias/pull-ws#fix/bundle-size
 
-libp2p@^0.26.2:
+libp2p@~0.26.1:
   version "0.26.2"
   resolved "https://registry.yarnpkg.com/libp2p/-/libp2p-0.26.2.tgz#bab90acef61b000648114b149ac3f40478d84f3b"
   integrity sha512-AaPSpROjrg17QBMood6tdxLj3yWH5qR/pnQ4gurz3byvYvD6Tw3yt7PQRdSyjOh6Oh+EX06yTrNCnoDTdgliKg==
@@ -5125,7 +5125,7 @@ pull-window@^2.1.4:
   dependencies:
     looper "^2.0.0"
 
-"pull-ws@github:hugomrdias/pull-ws#fix/bundle-size":
+pull-ws@hugomrdias/pull-ws#fix/bundle-size:
   version "3.3.1"
   resolved "https://codeload.github.com/hugomrdias/pull-ws/tar.gz/8e2ce0bb3b1cd6804828316e937fff8e0bef6225"
   dependencies:
@@ -6624,6 +6624,7 @@ websocket@1.0.29, "websocket@github:web3-js/WebSocket-Node#polyfill/globalThis":
   dependencies:
     debug "^2.2.0"
     es5-ext "^0.10.50"
+    gulp "^4.0.2"
     nan "^2.14.0"
     typedarray-to-buffer "^3.1.5"
     yaeti "^0.0.6"
