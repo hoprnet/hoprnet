@@ -9,7 +9,8 @@ const { randomSubset } = require('../../utils')
 const fs = require('fs')
 const protons = require('protons')
 
-const { CrawlResponse, Status } = protons(fs.readFileSync(`${__dirname}/protos/response.proto`))
+const path = require('path')
+const { CrawlResponse, Status } = protons(fs.readFileSync(path.resolve(__dirname, './protos/response.proto')))
 
 module.exports = node => (protocol, conn) => {
     const peers = node.peerBook.getAllArray()

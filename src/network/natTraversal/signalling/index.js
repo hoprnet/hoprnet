@@ -16,7 +16,8 @@ const PeerId = require('peer-id')
 
 const libp2pCrypto = require('libp2p-crypto')
 
-const { Type, Status, Message } = protons(fs.readFileSync(`${__dirname}/messages.proto`))
+const path = require('path')
+const { Type, Status, Message } = protons(fs.readFileSync(path.resolve(__dirname, './messages.proto')))
 
 const { PROTOCOL_WEBRTC_TURN } = require('../../../constants')
 

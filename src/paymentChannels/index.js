@@ -38,8 +38,8 @@ const fs = require('fs')
 const path = require('path')
 const protons = require('protons')
 
-const { SettlementRequest, SettlementResponse } = protons(fs.readFileSync(path.resolve(__dirname, 'protos/messages.proto')))
-const { TransactionRecord, TransactionRecordState } = protons(fs.readFileSync(path.resolve(__dirname, 'protos/transactionRecord.proto')))
+const { SettlementRequest, SettlementResponse } = protons(fs.readFileSync(path.resolve(__dirname, './protos/messages.proto')))
+const { TransactionRecord, TransactionRecordState } = protons(fs.readFileSync(path.resolve(__dirname, './protos/transactionRecord.proto')))
 
 // payments
 // -> channelId

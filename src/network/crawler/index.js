@@ -11,7 +11,8 @@ const Queue = require('promise-queue')
 const fs = require('fs')
 const protons = require('protons')
 
-const { CrawlResponse, Status } = protons(fs.readFileSync(`${__dirname}/protos/response.proto`))
+const path = require('path')
+const { CrawlResponse, Status } = protons(fs.readFileSync(path.resolve(__dirname, './protos/response.proto')))
 
 const crawlHandler = require('./handler')
 
