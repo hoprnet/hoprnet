@@ -63,7 +63,7 @@ const MINIMAL_FUND = new BN(toWei('0.11', 'ether'))
                     from: pubKeyToEthereumAddress(fundingNode.pubKey.marshal()),
                     to: pubKeyToEthereumAddress(peerId.pubKey.marshal()),
                     gas: STAKE_GAS_AMOUNT,
-                    gasPrice: process.env.GAS_PRICE,
+                    gasPrice: process.env['GAS_PRICE'],
                     value: MINIMAL_FUND,
                     nonce: ++nonce
                 },

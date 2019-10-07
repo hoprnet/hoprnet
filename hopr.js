@@ -25,7 +25,7 @@ const { STAKE_GAS_AMOUNT } = require('./src/constants')
 const MINIMAL_STAKE = new BN(toWei('0.10', 'ether'))
 const DEFAULT_STAKE = new BN(toWei('0.11', 'ether'))
 
-const SPLIT_OPERAND_QUERY_REGEX = /([\w\-]+)(?:\s+)?([\w\s\-]+)?/
+const SPLIT_OPERAND_QUERY_REGEX = /([\w\-]+)(?:\s+)?([\w\s\-.]+)?/
 
 let node, funds, ownAddress, stakedEther, rl, options
 
@@ -143,7 +143,7 @@ function tabCompletion(line, cb) {
             return cb(null, [[`stake ${fromWei(funds)}`], line])
 
         case 'unstake':
-            return cb(null, [[`unstake ${fromWei(stakedEther, 'ether')}`], line])
+            return cb(null, [[`unstake ${fromWei(stakedEther.toString(), 'ether')}`], line])
         case 'open':
             node.paymentChannels.getAllChannels(
                 channel => channel.channelId.toString('hex'),
@@ -224,29 +224,6 @@ function tabCompletion(line, cb) {
 }
 
 /**
- * Locks the given amount in the smart contract.
- *
- * @param {BN | string} amount
- */
-function stakeEther(amount) {
-    if (!amount) amount = DEFAULT_STAKE
-
-    return sendTransaction(
-        {
-            from: ownAddress,
-            to: process.env.CONTRACT_ADDRESS,
-            value: amount,
-            gas: STAKE_GAS_AMOUNT
-        },
-        node.peerInfo.id,
-        node.paymentChannels.web3
-    ).then(receipt => {
-        node.paymentChannels.nonce = node.paymentChannels.nonce + 1
-        return receipt
-    })
-}
-
-/**
  * Takes the string representation of a peerId and checks whether it is a valid
  * peerId, i. e. it is a valid base58 encoding.
  * It then generates a PeerId instance and returns it.
@@ -322,7 +299,7 @@ async function runAsRegularNode() {
                     switch (answer.toLowerCase()) {
                         case '':
                         case 'y':
-                            rl.question(`Amount? : `, answer => resolve(stakeEther(toWei(answer))))
+                            rl.question(`Amount? : `, answer => resolve(stake(answer)))
                             rl.write(fromWei(MINIMAL_STAKE.sub(stakedEther), 'ether'))
                             break
                         case 'n':
@@ -581,21 +558,30 @@ async function stake(query) {
     if (!query) {
         console.log(chalk.red(`Invalid arguments. Expected 'stake <amount of ETH>'. Received '${query}'`))
         rl.prompt()
-        break
+        return
     }
 
     let amount = new BN(toWei(query, 'ether'))
     if (funds.lt(new BN(amount))) {
         console.log(chalk.red('Insufficient funds.'))
         rl.prompt()
-        break
+        return
     }
 
     try {
-        await stakeEther(amount)
-
-        stakedEther.iadd(amount)
-        funds.isub(amount)
+        await sendTransaction(
+            {
+                from: ownAddress,
+                to: process.env['CONTRACT_ADDRESS'],
+                value: amount.toString(),
+                gas: STAKE_GAS_AMOUNT
+            },
+            node.peerInfo.id,
+            node.paymentChannels.web3
+        ).then(receipt => {
+            node.paymentChannels.nonce = node.paymentChannels.nonce + 1
+            return receipt
+        })
     } catch (err) {
         console.log(chalk.red(err.message))
     } finally {

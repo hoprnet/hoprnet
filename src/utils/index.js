@@ -449,8 +449,10 @@ module.exports.signTransaction = async (tx, peerId, web3) => {
  * @param {Object} peerId a peerId
  * @param {Object} web3 a web3.js instance
  */
-module.exports.sendTransaction = async (tx, peerId, web3) =>
-    web3.eth.sendSignedTransaction((await this.signTransaction(tx, peerId, web3)).rawTransaction).then(receipt => {
+module.exports.sendTransaction = async (tx, peerId, web3) => {
+    const signedTransaction = await this.signTransaction(tx, peerId, web3)
+
+    return web3.eth.sendSignedTransaction(signedTransaction.rawTransaction).then(receipt => {
         if (typeof receipt.status === 'string') {
             receipt.status = parseInt(receipt.status, 16)
         }
@@ -463,6 +465,7 @@ module.exports.sendTransaction = async (tx, peerId, web3) =>
 
         return receipt
     })
+}
 
 /**
  * Checks whether one of the src files is newer than one of
@@ -552,10 +555,10 @@ module.exports.deployContract = async (index, web3) => {
 
     const receipt = await this.sendTransaction(
         {
-            gas: 3000333, // 2370333
-            gasPrice: process.env.GAS_PRICE,
+            gas: 3000333,
+            gasPrice: process.env['GAS_PRICE'],
             nonce: index,
-            data: '0x'.concat(compiledContract.evm.bytecode.object)
+            data: `0x${compiledContract.evm.bytecode.object}`
         },
         fundingPeer,
         web3
