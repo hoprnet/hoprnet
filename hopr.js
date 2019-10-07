@@ -143,7 +143,7 @@ function tabCompletion(line, cb) {
             return cb(null, [[`stake ${fromWei(funds)}`], line])
 
         case 'unstake':
-            return cb(null, [[`unstake ${fromWei(stakedEther.toString(), 'ether')}`], line])
+            return cb(null, [[`unstake ${fromWei(stakedEther, 'ether')}`], line])
         case 'open':
             node.paymentChannels.getAllChannels(
                 channel => channel.channelId.toString('hex'),
@@ -333,7 +333,7 @@ async function runAsRegularNode() {
                 stake(query)
                 break
             case 'stakedEther':
-                let tmp = getStakedEther()
+                let tmp = await getStakedEther()
 
                 if (tmp) stakedEther = tmp
                 break
