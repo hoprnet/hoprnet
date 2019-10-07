@@ -26,6 +26,30 @@ module.exports = self => {
         )
     }
 
+    /**
+     * Sets the channel record to `SETTLED` and emits the closedChannel event.
+     *
+     * @param {Object} state current state of the payment channel
+     */
+    const setSettled = (channelId, state) => {
+        // @TODO check after settlement timeout again whether the channel has been closed
+
+        state.state = self.TransactionRecordState.SETTLED
+
+        self.closingSubscriptions.get(channelId.toString('hex')).unsubscribe()
+        self.closingSubscriptions.delete(channelId.toString())
+
+        const networkState = self.contract.methods.channels(channelId).call(
+            {
+                from: pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal())
+            },
+            'latest'
+        )
+
+        self.settleTimestamps.set(channelId.toString('hex'), new BN(networkState.settleTimestamp))
+        self.emitClosed(channelId, state)
+    }
+
     const listener = async (err, event) => {
         if (err) {
             console.log(err)
@@ -39,11 +63,19 @@ module.exports = self => {
             state = await self.state(channelId)
         } catch (err) {
             if (err.notFound) {
-                log(self.node.peerInfo.id, `Listening to the closing event of channel ${chalk.yellow(channelId.toString('hex'))} but there is no record in the database.`)
+                log(
+                    self.node.peerInfo.id,
+                    `Listening to the closing event of channel ${chalk.yellow(channelId.toString('hex'))} but there is no record in the database.`
+                )
                 return
             }
 
             throw err
+        }
+
+        if (state.preOpened && !state.counterparty) {
+            setSettled(channelId, state)
+            return
         }
 
         const partyA = isPartyA(
@@ -64,24 +96,9 @@ module.exports = self => {
 
             await self.setState(channelId, state)
 
-            self.registerSettlementListener(channelId)
-
             self.submitSettlementTransaction(channelId, state.lastTransaction)
         } else {
-            state.state = self.TransactionRecordState.SETTLED
-
-            self.closingSubscriptions.get(channelId.toString('hex')).unsubscribe()
-            self.closingSubscriptions.delete(channelId.toString())
-
-            const networkState = self.contract.methods.channels(channelId).call(
-                {
-                    from: pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal())
-                },
-                'latest'
-            )
-
-            self.settleTimestamps.set(channelId.toString('hex'), new BN(networkState.settleTimestamp))
-            self.emitClosed(channelId, state)
+            setSettled(channelId, state)
         }
     }
 
