@@ -2,6 +2,7 @@
 
 require('../config')
 
+const { pubKeyToEthereumAddress, privKeyToPeerId } = require('../src/utils')
 
 const COMPILED_CONTRACTS_BASE_PATH = `${process.cwd()}/build/contracts`
 
@@ -12,7 +13,11 @@ const { wait, verifyContractCode } = require('./utils')
 
 ;(async function main() {
     const web3 = new Web3(process.env['PROVIDER'])
-    const nonce = await web3.eth.getTransactionCount(process.env['FUND_ACCOUNT_ETH_ADDRESS'])
+
+    const fundingNode = await privKeyToPeerId(process.env['FUND_ACCOUNT_PRIVATE_KEY'])
+
+    const nonce = await web3.eth.getTransactionCount(pubKeyToEthereumAddress(fundingNode.pubKey.marshal()))
+
     const contractAddress = await deployContract(nonce, web3)
 
     if (process.env['NETWORK'] === 'ganache') return

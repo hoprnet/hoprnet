@@ -6,7 +6,7 @@ const Web3 = require('web3')
 
 const { createNode } = require('../src')
 
-const { pubKeyToEthereumAddress, privKeyToPeerId, log, deployContract } = require('../src/utils')
+const { pubKeyToEthereumAddress, privKeyToPeerId, deployContract } = require('../src/utils')
 const { startBootstrapServers, startBlockchain, wait, openChannelFor, stakeFor, fundNode2 } = require('./utils')
 
 const AMOUNT_OF_NODES = 4
@@ -18,7 +18,7 @@ const AMOUNT_OF_NODES = 4
 
     await startBlockchain()
 
-    const fundingNode = await privKeyToPeerId(process.env.FUND_ACCOUNT_PRIVATE_KEY)
+    const fundingNode = await privKeyToPeerId(process.env['FUND_ACCOUNT_PRIVATE_KEY'])
 
     let nonce = await web3.eth.getTransactionCount(pubKeyToEthereumAddress(fundingNode.pubKey.marshal()))
 
@@ -72,5 +72,7 @@ const AMOUNT_OF_NODES = 4
     await nodes[0].sendMessage(rlp.encode(['Psst ... secret message from Validity Labs!', Date.now().toString()]), nodes[1].peerInfo.id)
 
     await wait(2 * 1000)
+
+    await nodes[0].paymentChannels.closeChannels()
 
 })()

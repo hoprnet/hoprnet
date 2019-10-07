@@ -8,7 +8,7 @@ const rlp = require('rlp')
 
 const Web3 = require('web3')
 
-const { privKeyToPeerId, log, deployContract } = require('../src/utils')
+const { privKeyToPeerId, log, deployContract, pubKeyToEthereumAddress } = require('../src/utils')
 const { createFundedNodes, startBlockchain, startBootstrapServers } = require('./utils')
 
 const AMOUNT_OF_NODES = 4
@@ -33,7 +33,7 @@ const ROPSTEN_SEND_TIMEOUT = 60 * 1000
     const web3 = new Web3(process.env.PROVIDER)
 
     fundingPeer = await privKeyToPeerId(process.env.FUND_ACCOUNT_PRIVATE_KEY)
-    nonce = await web3.eth.getTransactionCount(process.env.FUND_ACCOUNT_ETH_ADDRESS)
+    nonce = await web3.eth.getTransactionCount(await pubKeyToEthereumAddress(fundingPeer.pubKey.marshal()))
 
     if (process.env['NETWORK'] === 'ganache') {
         contractAddress = await deployContract(nonce, web3)

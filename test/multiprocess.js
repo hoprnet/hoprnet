@@ -34,13 +34,13 @@ const MINIMAL_FUND = new BN(toWei('0.11', 'ether'))
 
         const web3 = new Web3(process.env['PROVIDER'])
 
-        let nonce = await web3.eth.getTransactionCount(process.env['FUND_ACCOUNT_ETH_ADDRESS'])
+        const fundingNode = await privKeyToPeerId(process.env['FUND_ACCOUNT_PRIVATE_KEY'])
+
+        let nonce = await web3.eth.getTransactionCount(pubKeyToEthereumAddress(fundingNode.pubKey.marshal()))
 
         const contractAddress = await deployContract(nonce, web3)
 
         const abi = require('../build/contracts/HoprChannel.json').abi
-
-        const fundingNode = await privKeyToPeerId(process.env['FUND_ACCOUNT_PRIVATE_KEY'])
 
         const contract = new web3.eth.Contract(abi, contractAddress, {
             from: pubKeyToEthereumAddress(fundingNode.pubKey.marshal())
