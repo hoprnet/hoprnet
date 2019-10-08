@@ -18,14 +18,18 @@ module.exports = self => async (err, event) => {
     log(self.node.peerInfo.id, `Received OpenedFor event for channel ${chalk.yellow(channelId.toString('hex'))}`)
 
     // Check that there is no record in the database
-    await self
-        .state(channelId)
-        .then(_ => {
-            throw Error(`Found record for channel ${chalk.yellow(channelId.toString())} but there should not be any record in the database.`)
-        })
-        .catch(err => {
-            if (!err.notFound) throw err
-        })
+    const record = await self.state(channelId).catch(err => {
+        if (!err.notFound) throw err
+    })
+
+    if (record) {
+        // There should be no entry in the database.
+        throw Error(
+            `Found record for channel ${chalk.yellow(
+                channelId.toString('hex')
+            )} but there should not be any record in the database. Channel seems to be in state '${record.state}'`
+        )
+    }
 
     const state = {
         state: self.TransactionRecordState.PRE_OPENED,
