@@ -271,9 +271,26 @@ class PaymentChannel extends EventEmitter {
                 switch (parseInt(channelState.state)) {
                     case ChannelState.UNINITIALIZED:
                         return this.deleteState(settledChannel.channelId)
+                    case ChannelState.ACTIVE:
+                        const state = {
+                            state: this.TransactionRecordState.PRE_OPENED,
+                            currentIndex: new BN(1).toBuffer('be', Transaction.INDEX_LENGTH),
+                            initialBalance: new BN(channelState.balanceA).toBuffer('be', Transaction.VALUE_LENGTH),
+                            currentOffchainBalance: new BN(channelState.balanceA).toBuffer('be', Transaction.VALUE_LENGTH),
+                            currentOnchainBalance: new BN(channelState.balanceA).toBuffer('be', Transaction.VALUE_LENGTH),
+                            totalBalance: new BN(channelState.balance).toBuffer('be', Transaction.VALUE_LENGTH),
+                            preOpened: true
+                        }
+
+                        self.registerSettlementListener(channelId)
+
+                        // self.emitOpened(channelId, state)
+
+                        return this.deleteState(settledChannel.channelId).then(() => this.setState(settledChannel.channelId, state))
                     case ChannelState.PENDING_SETTLEMENT:
                         if (autoWithdraw)
                             return this.withdraw(channelState, localState).then(() =>
+                                // @TODO this is probably not the intended functionality
                                 this.setState(settledChannel.channelId, {
                                     state: this.TransactionRecordState.WITHDRAWABLE
                                 })
