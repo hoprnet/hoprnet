@@ -282,9 +282,9 @@ class PaymentChannel extends EventEmitter {
                             preOpened: true
                         }
 
-                        self.registerSettlementListener(channelId)
+                        this.registerSettlementListener(channelId)
 
-                        // self.emitOpened(channelId, state)
+                        // this.emitOpened(channelId, state)
 
                         return this.deleteState(settledChannel.channelId).then(() => this.setState(settledChannel.channelId, state))
                     case ChannelState.PENDING_SETTLEMENT:
