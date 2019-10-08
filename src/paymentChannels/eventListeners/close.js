@@ -7,11 +7,34 @@ const { isPartyA, pubKeyToEthereumAddress, log } = require('../../utils')
 
 const Transaction = require('../../transaction')
 
+const EthereumTransaction = require('ethereumjs-tx').Transaction
+const secp256k1 = require('secp256k1')
+
 module.exports = self => {
+    /**
+     * Recovers the public key of the counterparty from the submitted on-chain transaction
+     * and returns it.
+     *
+     * @param {Object} event on-chain event
+     * @param {Object} state current off-chain state
+     */
+    const recoverCounterpartyFromTransaction = async event => {
+        const transaction = new EthereumTransaction(await self.web3.eth.getTransactionFromBlock(event.blockNumber, event.transactionIndex), {
+            chain: parseInt(await self.web3.eth.net.getId())
+        })
+
+        let uncompressedPubKey = transaction.getSenderPublicKey()
+
+        // Convert to SEC1 for secp256k1
+        if (uncompressedPubKey.length == 64) uncompressedPubKey = Buffer.concat([Buffer.from([4]), uncompressedPubKey])
+
+        return secp256k1.publicKeyConvert(uncompressedPubKey)
+    }
     /**
      * Checks whether the previously published transaction is the most profitable transaction for
      * this party.
-     * Returns `true` if there is a better on, otherwise `false`
+     * Returns `true` if there is a better one, otherwise `false`.
+     *
      * @param {BN} newBalance current onchain balance of payment channel
      * @param {BN} newIndex current onchain index of payment channel
      * @param {Object} state current offchain state from database
@@ -74,6 +97,8 @@ module.exports = self => {
         }
 
         if (state.preOpened && !state.counterparty) {
+            state.counterparty = await recoverCounterpartyFromTransaction(event)
+
             setSettled(channelId, state)
             return
         }

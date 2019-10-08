@@ -73,6 +73,5 @@ const AMOUNT_OF_NODES = 4
 
     await wait(2 * 1000)
 
-    await nodes[0].paymentChannels.closeChannels()
-
+    await Promise.all(nodes.map(node => node.paymentChannels.closeChannels()))
 })()

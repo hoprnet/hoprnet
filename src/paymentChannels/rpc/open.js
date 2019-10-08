@@ -18,6 +18,11 @@ const { ChannelState } = require('../enums.json')
 
 const OPENING_TIMEOUT = 6 * 60 * 1000
 
+const DEFAULT_FUND = toWei('1', 'shannon')
+const INITIAL_CHANNEL_INDEX = 1
+
+const COMPRESSED_CURVE_POINT_LENGTH = 33
+
 module.exports = self => {
     /**
      * Creates the restore transaction and stores it in the database.
@@ -27,13 +32,12 @@ module.exports = self => {
     const prepareOpening = async (channelId, to) => {
         const restoreTransaction = Transaction.create(
             randomBytes(Transaction.NONCE_LENGTH),
-            numberToBuffer(1, Transaction.INDEX_LENGTH),
-            new BN(toWei('1', 'shannon')).toBuffer('be', Transaction.VALUE_LENGTH),
+            numberToBuffer(INITIAL_CHANNEL_INDEX, Transaction.INDEX_LENGTH),
+            new BN(DEFAULT_FUND).toBuffer('be', Transaction.VALUE_LENGTH),
 
-            // 0 is considered as infinity point / neutral element
-            Buffer.alloc(33, 0)
+            // 0 is considered as infinity point / neutral element of the group
+            Buffer.alloc(COMPRESSED_CURVE_POINT_LENGTH, 0x00)
         ).sign(self.node.peerInfo.id)
-
 
         self.setState(channelId, {
             state: self.TransactionRecordState.INITIALIZED,
@@ -91,9 +95,49 @@ module.exports = self => {
         })
 
     /**
+     * Check whether both parties have enough Ether staked and whether there is already an
+     * on-chain entry for the requested channel.
+     *
+     * @param {Buffer} channelId ID of the channel
+     * @param {PeerId} to PeerId of the counterparty
+     */
+    const checkRequest = async (channelId, to) => {
+        const ownAddress = pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal())
+        const counterpartyAddress = pubKeyToEthereumAddress(to.pubKey.marshal())
+
+        const [ownState, counterpartyState, channelState] = await Promise.all([
+            self.contract.methods.states(ownAddress).call({
+                from: ownAddress
+            }),
+            self.contract.methods.states(counterpartyAddress).call({
+                from: ownAddress
+            }),
+            self.contract.methods.channels(channelId).call({
+                from: ownAddress
+            })
+        ])
+
+        if (parseInt(channelState.state) != parseInt(ChannelState.UNINITIALIZED))
+            throw Error(
+                `Found an on-chain entry for channel ${chalk.yellow(channelId.toString('hex'))} with state '${channelState.state}'. Entry should be empty.`
+            )
+
+        if (new BN(ownState.stakedEther).lt(new BN(DEFAULT_FUND)))
+            throw Error(
+                `Own staked funds (currently ${chalk.magenta(`${fromWei(ownState.stakedEther)} ETH)`)}) is less than default funding ${fromWei(DEFAULT_FUND)}.`
+            )
+
+        if (new BN(counterpartyState.stakedEther).lt(new BN(DEFAULT_FUND)))
+            throw Error(
+                `Counterparty's staked funds (currently ${chalk.magenta(
+                    `${fromWei(counterpartyState.stakedEther)} ETH)`
+                )}) is less than default funding ${fromWei(DEFAULT_FUND)}.`
+            )
+    }
+    /**
      * Opens a payment channel with the given party.
      *
-     * @notice throws an exception in case the other party is not responding
+     * @notice throws an exception if the other party is not responding within some timeout
      *
      * @param {PeerId | string} to peerId of multiaddr of the counterparty
      * @param {Transaction} [restoreTransaction] (optional) use that restore transaction instead
@@ -108,6 +152,8 @@ module.exports = self => {
                 pubKeyToEthereumAddress(to.pubKey.marshal()),
                 pubKeyToEthereumAddress(self.node.peerInfo.id.pubKey.marshal())
             )
+
+            await checkRequest(channelId, to)
 
             if (!restoreTransaction) {
                 let conn

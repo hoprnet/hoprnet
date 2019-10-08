@@ -24,11 +24,24 @@ module.exports = self => async (err, event) => {
 
     if (record) {
         // There should be no entry in the database.
-        throw Error(
-            `Found record for channel ${chalk.yellow(
-                channelId.toString('hex')
-            )} but there should not be any record in the database. Channel seems to be in state '${record.state}'`
-        )
+        // @TODO remove closed channels
+        switch (record.state) {
+            case self.TransactionRecordState.INITIALIZED:
+            case self.TransactionRecordState.OPENING:
+            case self.TransactionRecordState.PRE_OPENED:
+            case self.TransactionRecordState.OPEN:
+            case self.TransactionRecordState.SETTLING:
+            case self.TransactionRecordState.SETTLED:
+            case self.TransactionRecordState.WITHDRAWABLE:
+            case self.TransactionRecordState.WITHDRAWING:
+            case self.TransactionRecordState.WITHDRAWN:
+            default:
+                throw Error(
+                    `Found record for channel ${chalk.yellow(
+                        channelId.toString('hex')
+                    )} but there should not be any record in the database. Channel seems to be in state '${record.state}'`
+                )
+        }
     }
 
     const state = {
@@ -40,6 +53,8 @@ module.exports = self => async (err, event) => {
         totalBalance: new BN(event.returnValues.amount).toBuffer('be', Transaction.VALUE_LENGTH),
         preOpened: true
     }
+
+    self.registerSettlementListener(channelId)
 
     self.emitOpened(channelId, state)
 }

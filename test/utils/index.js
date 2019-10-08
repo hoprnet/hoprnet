@@ -131,6 +131,7 @@ module.exports.startBlockchain = () =>
                     secretKey: process.env['FUND_ACCOUNT_PRIVATE_KEY']
                 }
             ],
+            network_id: '1',
             gasPrice: process.env['GAS_PRICE'],
             db: LevelDown(`${process.cwd()}/db/testnet`),
             ws: true

@@ -565,7 +565,7 @@ module.exports.deployContract = async (index, web3) => {
     )
 
     console.log(
-        `Deployed contract on ${chalk.magenta(process.env.NETWORK)} at ${chalk.green(receipt.contractAddress.toString('hex'))}.\nNonce is now ${chalk.red(
+        `Deployed contract on ${chalk.magenta(process.env.NETWORK)} at ${chalk.green(receipt.contractAddress.toString('hex'))}\nNonce is now ${chalk.red(
             index
         )}.\n`
     )

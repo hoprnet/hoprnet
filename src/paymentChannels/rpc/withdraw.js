@@ -30,8 +30,12 @@ module.exports = self => {
             switch (parseInt(networkState.state)) {
                 case ChannelState.UNINITIALIZED:
                     return
+                // @TODO this is potentially useless
+                case ChannelState.PENDING_SETTLEMENT:
+                    receipt = await self.contractCall(self.contract.methods.withdraw(pubKeyToEthereumAddress(localState.counterparty)))
+                    break
                 default:
-                    throw Error(`Could not withdraw the channel because its state is '${networkState.state}'.`)
+                    throw Error(`Could not withdraw channel ${chalk.yellow(channelId.toString('hex'))} because its state is '${networkState.state}'.`)
             }
         }
 
@@ -64,7 +68,12 @@ module.exports = self => {
                 .on('error', err => reject(err))
                 .on('data', block => {
                     const blockTimestamp = new BN(block.timestamp)
-                    log(self.node.peerInfo.id, `Waiting ... ${chalk.cyan(`Block ${block.number}`)}.`)
+                    log(
+                        self.node.peerInfo.id,
+                        `Waiting for timestamp ${self.settleTimestamps.get(channelId.toString('hex')).toString()} ... ${chalk.cyan(
+                            `Block ${block.number}, timestamp ${blockTimestamp.toString()}`
+                        )}.`
+                    )
 
                     if (blockTimestamp.gt(self.settleTimestamps.get(channelId.toString('hex')))) {
                         subscription.unsubscribe((err, ok) => {
@@ -100,6 +109,10 @@ module.exports = self => {
      * @param {Object} networkState current on-chain state of the payment channel
      */
     const initiateWithdrawal = async (channelId, localState, networkState) => {
+        if (networkState.settleTimestamp === '0') throw Error('here')
+
+        if (!localState.counterparty) throw Error('here')
+
         await waitUntilChannelIsWithdrawable(channelId, networkState)
 
         const receipt = await withdraw(channelId, localState)

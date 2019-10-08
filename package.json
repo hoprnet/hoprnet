@@ -41,6 +41,7 @@
         "class-is": "~1.1.0",
         "dotenv": "~8.1.0",
         "dotenv-expand": "~5.1.0",
+        "ethereumjs-tx": "~2.1.1",
         "futoin-hkdf": "~1.2.1",
         "getopts": "~2.2.4",
         "heap": "~0.2.6",
