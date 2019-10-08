@@ -109,9 +109,9 @@ module.exports = self => {
      * @param {Object} networkState current on-chain state of the payment channel
      */
     const initiateWithdrawal = async (channelId, localState, networkState) => {
-        if (networkState.settleTimestamp === '0') throw Error('here')
+        if (networkState.settleTimestamp === '0') throw Error('wrong timestamp')
 
-        if (!localState.counterparty) throw Error('here')
+        if (!localState.counterparty) throw Error('no counterparty')
 
         await waitUntilChannelIsWithdrawable(channelId, networkState)
 
