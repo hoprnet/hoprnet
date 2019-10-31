@@ -1,0 +1,29 @@
+body {
+    background-color:#fff;
+    padding: 2em;
+    font-family: 'Raleway','Source Sans Pro', 'Arial';
+}
+.container {
+    width: 50%;
+    margin: 0 auto;
+}
+label {
+    display:block;
+    margin-bottom:10px;
+}
+input {
+    padding:10px;
+    width: 50%;
+    margin-bottom: 1em;
+}
+button {
+    margin: 2em 0;
+    padding: 1em 4em;
+    display:block;
+}
+
+#instructor {
+    padding:1em;
+    background-color:#F0F0F0;
+    margin: 1em 0;
+}

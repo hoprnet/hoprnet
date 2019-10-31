@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Validity Labs</title>
+
+    <link rel="stylesheet" type="text/css" href="main.css">
+
+    <script src="https://cdn.jsdelivr.net/gh/ethereum/web3.js@1.0.0-beta.37/dist/web3.min.js"></script>
+
+</head>
+<body>
+<div class="container">
+
+    <h1>Contract Integration Demo</h1>
+
+    <label for="for" class="col-lg-2 control-label">For</label>
+    <input id="for" type="text" placeholder="Ethereum address for whom to open channel">
+
+    <label for="to" class="col-lg-2 control-label">To</label>
+    <input id="to" type="text" placeholder="Ethereum address of channel counterparty">
+
+    <label for="amount" class="col-lg-2 control-label">Amount</label>
+    <input id="amount" type="text" placeholder="ETH funding of channel">
+
+
+    <div id="instructor" style="display: none"></div>
+    <button id="button">Submit</button>
+
+
+</div>
+
+<script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"></script>
+<script>
+    if (window.ethereum) {
+        try {
+            web3 = new Web3(window.ethereum);
+            window.ethereum.autoRefreshOnNetworkChange().then(response => console);
+            window.ethereum.enable().then(response => console);
+        } catch (error) {
+            // User denied account access...
+        }
+    }
+    else if (typeof window.web3 !== 'undefined') {
+        console.log('web3 is enabled');
+        if (window.web3.currentProvider.isMetaMask === true) {
+            web3 = new Web3(window.web3.currentProvider);
+            console.log('MetaMask is active')
+        } else {
+            console.log('Please login into your Metamask')
+        }
+    } // Non-dapp browsers...
+    else {
+        console.log('Non-Ethereum browser detected. You should consider trying MetaMask!');
+    }
+    console.log(web3);
+
+    //TODO Replace CONTRACT_ADDRESS and CONTRACT_ABI with actual values
+    const CONTRACT_ADDRESS = "0x36cc95d94c288ffbcd01b8d2090cd75148b70a98";
+    const CONTRACT_ABI = [
+        {
+            "constant": false,
+            "inputs": [
+                {
+                    "internalType": "string",
+                    "name": "newMessage",
+                    "type": "string"
+                }
+            ],
+            "name": "changeMsg",
+            "outputs": [],
+            "payable": false,
+            "stateMutability": "nonpayable",
+            "type": "function"
+        },
+        {
+            "constant": true,
+            "inputs": [],
+            "name": "msg",
+            "outputs": [
+                {
+                    "internalType": "string",
+                    "name": "",
+                    "type": "string"
+                }
+            ],
+            "payable": false,
+            "stateMutability": "view",
+            "type": "function"
+        }
+    ];
+
+    const VLContract = new web3.eth.Contract(CONTRACT_ABI, CONTRACT_ADDRESS);
+
+    document.getElementById("button").onclick = function () {
+        const forAddress = document.getElementById("for").value;
+        const toAddress = document.getElementById("to").value;
+        const amount = document.getElementById("amount").value;
+
+        console.log(forAddress, toAddress, amount);
+
+        web3.eth.getAccounts().then(accounts => {
+            VLContract.methods.createFor(forAddress, toAddress).send(
+                {
+                    from: accounts[0],
+                    gasPrice: web3.utils.toHex(web3.utils.toWei('1', 'gwei')),
+                    gasLimit: 300000,
+                    value: web3.utils.toHex(web3.utils.toWei(amount.toString(), 'ether')),
+                }
+            )
+                .once('transactionHash', function (hash) {
+                    console.log(hash);
+                    document.getElementById("instructor").style.display = "block";
+                    document.getElementById("instructor").innerHTML =
+                        "Waiting for transaction to be mined...<br>"
+                            +"<a href='https://rinkeby.etherscan.io/tx/" +hash+"'>"+hash+"</a>"
+                })
+                .once('confirmation', (confirmationNumber, receipt) => {
+                    console.log(receipt);
+                    const hash = receipt.transactionHash;
+                    document.getElementById("instructor").style.display = "block";
+                    document.getElementById("instructor").innerHTML =
+                        "Transaction has been mined!<br>"
+                        +"<a href='https://rinkeby.etherscan.io/tx/" +hash+"'>"+hash+"</a>"
+                });
+        })
+    }
+
+</script>
+
+</body>
+</html>
