@@ -1,0 +1,33 @@
+\section{Proof-of-Relay} \label{ProofOfRelay}
+
+Alice employs a secret sharing mechanism so that Bob will only get Alice's payment when he delivered the message to Charlie. Charlie, in turn, only receives her payment from Bob with the cooperation of Dave. The mechanism relies on a secret sharing and elliptic curve multiplications as a cryptographic one-way function. Bob receives the curve point $S$ which Alice (sender of a message) computed as $S = s * G$ where $*$ denotes an elliptic curve multiplication and $G$ is the base point of the curve. Bob also receives the public key half $S_b$ from Alice. He can then obtain the message secret key half $s_a$ from intermediate key material in the SPHINX message header. Bob will relay the entire packet to Charlie and in return he will receive the second half of the message secret key $s_b$ back from Charlie. After Charlie passes the second key-half $s_b$ to Bob, Bob can compute the message secret key $s = s_a + s_b$ where $+$ denotes addition over a finite field of the elliptic curve. After Bob relayed $N$ transactions from Alice and also got all the key-halves from the next downstream node, he can thus submit the sum of all secrets $s_{total} = \sum_{i=0}^{N} s_{i,a} + s_{i,b} = \sum_{i=0}^{N} s_i$ to release his payments.
+
+In order to prevent Bob from faking $s_{total}$ and thereby extracting a larger amount from a payment channel than he should, a signature is required from Alice, similar to traditional payment channel implementations. Therefore, every update transaction from Alice contains a signature over $S_{total} = s_{total} * G$. Now the smart contract
+
+\begin{itemize}
+    \item ensures validity of the signature of $S_{total}$ from Alice $sig(S_{total}, Alice)$
+    \item ensures validity of the pre-image $S_{total} = s_{total} * G$ and
+    \item facilitates the payout for the successfully delivered packages.
+\end{itemize}
+
+\subsection{Partial Payout and Efficient Settlement}
+\noindent In reality, not all packages are successfully delivered. As a consequence, Bob misses some $s_b$ from the packet that got lost or for which the downstream relay node was not responsive. In turn, Bob is not able to submit a correct $s_{total}$ matching the corresponding $S_{total}$ for which he has a valid signature from Alice.
+
+For settlement of payment channels for which not all packages have been successfully delivered, a partial settlement needs to be available. Assume that for a total of $N$ packages, the first $X$ were successfully delivered and the last $Y$ failed so that $N = X + Y$, ordering of successful and unsuccessful messages is irrelevant and only serves as a simple example. In analogy to the above we then have
+
+$s_{success} = \sum_{i=0}^{Y} s_{i,a} + s_{i,b} = \sum_{i=0}^{Y} s_i$,
+
+$s_{fail} = \sum_{i=Y}^{Y+X} s_{i,a} + s_{i,b} = \sum_{i=Y}^{Y+X} s_i$,
+
+$S_{success} = s_{success} * G$,
+
+$S_{fail} = s_{fail} * G$
+
+Bob can calculate $s_{success}$ in order to get the corresponding payout for each of those $X$ successfully delivered packages. He then needs to submit the remainder $S_{fail}$ for which he will not receive a payout such that Alice's signature can be validated.
+
+Then the smart contract:
+\begin{itemize}
+    \item ensures validity of the signature of $S_{total}$ from Alice $sig(S_{total}, Alice)$
+    \item ensures validity of the pre-image $S_{total} = s_{success} * G + S_{fail}$
+    \item facilitates a payout for successfully delivered packages corresponding to $s_{success}$
+\end{itemize}
