@@ -16,13 +16,13 @@
 
     <h1>Contract Integration Demo</h1>
 
-    <label for="for" class="col-lg-2 control-label">For</label>
+    <label for="for">For</label>
     <input id="for" type="text" placeholder="Ethereum address for whom to open channel">
 
-    <label for="to" class="col-lg-2 control-label">To</label>
+    <label for="to">To</label>
     <input id="to" type="text" placeholder="Ethereum address of channel counterparty">
 
-    <label for="amount" class="col-lg-2 control-label">Amount</label>
+    <label for="amount">Amount</label>
     <input id="amount" type="text" placeholder="ETH funding of channel">
 
 
@@ -32,7 +32,6 @@
 
 </div>
 
-<script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"></script>
 <script>
     if (window.ethereum) {
         try {
@@ -58,8 +57,29 @@
     console.log(web3);
 
     //TODO Replace CONTRACT_ADDRESS and CONTRACT_ABI with actual values
-    const CONTRACT_ADDRESS = "0x36cc95d94c288ffbcd01b8d2090cd75148b70a98";
+    const CONTRACT_ADDRESS = "0x12dea3d09003799948c8d400318fdb8980e2c864";
     const CONTRACT_ABI = [
+        {
+            "constant": true,
+            "inputs": [
+                {
+                    "internalType": "address",
+                    "name": "",
+                    "type": "address"
+                }
+            ],
+            "name": "forTo",
+            "outputs": [
+                {
+                    "internalType": "address",
+                    "name": "",
+                    "type": "address"
+                }
+            ],
+            "payable": false,
+            "stateMutability": "view",
+            "type": "function"
+        },
         {
             "constant": false,
             "inputs": [
@@ -78,7 +98,7 @@
         {
             "constant": true,
             "inputs": [],
-            "name": "msg",
+            "name": "mesg",
             "outputs": [
                 {
                     "internalType": "string",
@@ -88,6 +108,26 @@
             ],
             "payable": false,
             "stateMutability": "view",
+            "type": "function"
+        },
+        {
+            "constant": false,
+            "inputs": [
+                {
+                    "internalType": "address",
+                    "name": "forAd",
+                    "type": "address"
+                },
+                {
+                    "internalType": "address",
+                    "name": "toAd",
+                    "type": "address"
+                }
+            ],
+            "name": "createFor",
+            "outputs": [],
+            "payable": true,
+            "stateMutability": "payable",
             "type": "function"
         }
     ];
@@ -124,6 +164,10 @@
                     document.getElementById("instructor").innerHTML =
                         "Transaction has been mined!<br>"
                         +"<a href='https://rinkeby.etherscan.io/tx/" +hash+"'>"+hash+"</a>"
+
+                    document.getElementById("for").value  = "";
+                    document.getElementById("to").value = "";
+                    document.getElementById("amount").value = "";
                 });
         })
     }
