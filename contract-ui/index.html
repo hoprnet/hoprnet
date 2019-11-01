@@ -26,7 +26,12 @@
     <input id="amount" type="text" placeholder="ETH funding of channel">
 
 
-    <div id="instructor" style="display: none"></div>
+    <div id="instructor" style="display: none">
+        <span id="close"
+              style="display: inline-block;float: right;padding:0px 0px;background: #ccc"
+              title="Close">x</span>
+        <div id="instructor-msg"></div>
+    </div>
     <button id="button">Submit</button>
 
 
@@ -37,7 +42,6 @@
         try {
             web3 = new Web3(window.ethereum);
             window.ethereum.autoRefreshOnNetworkChange().then(response => console);
-            window.ethereum.enable().then(response => console);
         } catch (error) {
             // User denied account access...
         }
@@ -54,6 +58,7 @@
     else {
         console.log('Non-Ethereum browser detected. You should consider trying MetaMask!');
     }
+    window.ethereum.enable();
     console.log(web3);
 
     //TODO Replace CONTRACT_ADDRESS and CONTRACT_ABI with actual values
@@ -152,16 +157,16 @@
             )
                 .once('transactionHash', function (hash) {
                     console.log(hash);
-                    document.getElementById("instructor").style.display = "block";
-                    document.getElementById("instructor").innerHTML =
+                    document.getElementById("instructor").style.display = "inline-block";
+                    document.getElementById("instructor-msg").innerHTML =
                         "Waiting for transaction to be mined...<br>"
                             +"<a href='https://rinkeby.etherscan.io/tx/" +hash+"'>"+hash+"</a>"
                 })
                 .once('confirmation', (confirmationNumber, receipt) => {
                     console.log(receipt);
                     const hash = receipt.transactionHash;
-                    document.getElementById("instructor").style.display = "block";
-                    document.getElementById("instructor").innerHTML =
+                    document.getElementById("instructor").style.display = "inline-block";
+                    document.getElementById("instructor-msg").innerHTML =
                         "Transaction has been mined!<br>"
                         +"<a href='https://rinkeby.etherscan.io/tx/" +hash+"'>"+hash+"</a>"
 
@@ -170,6 +175,11 @@
                     document.getElementById("amount").value = "";
                 });
         })
+    }
+
+    document.getElementById("close").onclick = function () {
+        document.getElementById("instructor").style.display = "none";
+        document.getElementById("instructor-msg").innerHTML = ""
     }
 
 </script>
