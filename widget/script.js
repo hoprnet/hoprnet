@@ -34,3 +34,14 @@ const changeTab = name => {
 };
 
 const onTabClick = changeTab;
+
+function toggleTheme() {
+  document.getElementById("html").classList.toggle("theme-light");
+  document.getElementById("html").classList.toggle("theme-dark");
+  toggleIcon();
+}
+
+function toggleIcon() {
+  document.getElementById("sun").classList.toggle("do-not-display");
+  document.getElementById("moon").classList.toggle("do-not-display");
+}
