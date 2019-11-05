@@ -1,5 +1,5 @@
 <!DOCTYPE html />
-<html lang="en">
+<html lang="en" class="theme-light" id="html">
   <head>
     <meta charset="utf8" />
     <meta name="viewport" content="width=device-width" />
@@ -8,6 +8,11 @@
     <link
       href="https://fonts.googleapis.com/css?family=Roboto&display=swap"
       rel="stylesheet"
+    />
+    <script src="https://kit.fontawesome.com/a076d05399.js"></script>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/icon?family=Material+Icons"
     />
     <script src="script.js"></script>
   </head>
@@ -27,10 +32,13 @@
         <div id="votes-tab" class="tab" onclick="onTabClick('votes')">Vote</div>
       </div>
       <div class="toggle-container">
-        <div class="toggle">
+        <div class="toggle" onclick="toggleTheme()">
           <div class="square"></div>
           <div class="icon">
-            &#9728;
+            <i class="material-icons" id="sun" style="font-size: 27px;"
+              >wb_sunny</i
+            >
+            <i class="fas fa-moon do-not-display" id="moon"></i>
           </div>
         </div>
       </div>
@@ -203,20 +211,20 @@
 
         <div class="align-inputs">
           <div class="input-and-label">
-            TO:
-            <input type="text" />
-          </div>
-          <div class="font-12">(THAT’S USUALLY YOUR ADDRESS!)</div>
-          <div class="input-and-label">
             FROM:
             <input type="text" />
           </div>
-          <div class="font-12">(SOME OTHER RELAYER’S ADDRESS)</div>
+          <div class="font-12">(That's usually your address)</div>
+          <div class="input-and-label">
+            TO:
+            <input type="text" />
+          </div>
+          <div class="font-12">(Some other relayer's address)</div>
           <div class="input-and-label">
             AMOUNT:
             <input type="number" />
           </div>
-          <div class="font-12">(IN HOPR TOKENS)</div>
+          <div class="font-12">(In HOPR tokens)</div>
         </div>
         <div class="button">STAKE</div>
         <div class="table">
