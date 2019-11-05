@@ -1,23 +1,31 @@
-let views = null;
+// store elements and avoid multiple calls to dom
+const elements = new Map();
+
+// get element and update cache
+const getElementById = id => {
+  if (elements.has(id)) return elements.get(id);
+
+  const element = document.getElementById(id);
+  elements.set(id, element);
+
+  return element;
+};
 
 const changeTab = name => {
-  // if views object doesn't exist create it
-  if (!views) {
-    views = {
-      stats: {
-        container: document.getElementById("stats-container"),
-        tab: document.getElementById("stats-tab")
-      },
-      stake: {
-        container: document.getElementById("stake-container"),
-        tab: document.getElementById("stake-tab")
-      },
-      votes: {
-        container: document.getElementById("votes-container"),
-        tab: document.getElementById("votes-tab")
-      }
-    };
-  }
+  const views = {
+    stats: {
+      container: getElementById("stats-container"),
+      tab: getElementById("stats-tab")
+    },
+    stake: {
+      container: getElementById("stake-container"),
+      tab: getElementById("stake-tab")
+    },
+    votes: {
+      container: getElementById("votes-container"),
+      tab: getElementById("votes-tab")
+    }
+  };
 
   // loop through views and update the styles
   for (const tabName in views) {
@@ -33,15 +41,15 @@ const changeTab = name => {
   }
 };
 
-const onTabClick = changeTab;
-
 function toggleTheme() {
-  document.getElementById("html").classList.toggle("theme-light");
-  document.getElementById("html").classList.toggle("theme-dark");
-  toggleIcon();
+  // swap colors
+  getElementById("html").classList.toggle("theme-light");
+  getElementById("html").classList.toggle("theme-dark");
+
+  // swap visibility
+  getElementById("sun").classList.toggle("hidden");
+  getElementById("moon").classList.toggle("hidden");
 }
 
-function toggleIcon() {
-  document.getElementById("sun").classList.toggle("do-not-display");
-  document.getElementById("moon").classList.toggle("do-not-display");
-}
+const onTabClick = changeTab;
+const onToggleTheme = toggleTheme;

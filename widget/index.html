@@ -1,5 +1,5 @@
 <!DOCTYPE html />
-<html lang="en" class="theme-light" id="html">
+<html lang="en" class="theme-dark" id="html">
   <head>
     <meta charset="utf8" />
     <meta name="viewport" content="width=device-width" />
@@ -32,13 +32,17 @@
         <div id="votes-tab" class="tab" onclick="onTabClick('votes')">Vote</div>
       </div>
       <div class="toggle-container">
-        <div class="toggle" onclick="toggleTheme()">
+        <div class="toggle" onclick="onToggleTheme()">
           <div class="square"></div>
           <div class="icon">
-            <i class="material-icons" id="sun" style="font-size: 27px;"
-              >wb_sunny</i
-            >
-            <i class="fas fa-moon do-not-display" id="moon"></i>
+            <div id="sun" class="hidden">
+              <i class="material-icons" id="sun" style="font-size: 27px;"
+                >wb_sunny</i
+              >
+            </div>
+            <div id="moon">
+              <i class="fas fa-moon"></i>
+            </div>
           </div>
         </div>
       </div>

@@ -12,6 +12,7 @@
   --input-border-color: #5a5454;
   --hopr-amount-color: #828282;
   --input-focused: white;
+  --toggle-flex-direction: row;
 }
 
 .theme-light {
@@ -28,6 +29,7 @@
   --input-border-color: #cccccc;
   --hopr-amount-color: #828282;
   --input-focused: #2f2e2e;
+  --toggle-flex-direction: row-reverse;
 }
 
 * {
@@ -77,13 +79,6 @@ a:hover {
   flex-direction: column;
   width: 620px;
   height: 630px;
-}
-
-.do-not-display {
-  opacity: 0%;
-  width: 0px;
-  height: 0px;
-  margin: 0px !important;
 }
 
 i {
@@ -169,6 +164,7 @@ td {
   background: var(--secondary-color);
   display: flex;
   cursor: pointer;
+  flex-direction: var(--toggle-flex-direction);
 }
 .square {
   background: var(--primary-color);
@@ -363,4 +359,11 @@ input:focus {
 
 .hidden {
   display: none;
+}
+
+.hidden-icons {
+  opacity: 0%;
+  width: 0px;
+  height: 0px;
+  margin: 0px !important;
 }
