@@ -1,0 +1,425 @@
+<!DOCTYPE html />
+<html lang="en" class="theme-dark" id="html">
+  <head>
+    <meta charset="utf8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>hopr-widget</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link
+      href="https://fonts.googleapis.com/css?family=Roboto&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://kit.fontawesome.com/a076d05399.js"></script>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/icon?family=Material+Icons"
+    />
+    <script src="script.js"></script>
+  </head>
+  <body>
+    <div class="background">
+      <div class="tab-bar">
+        <div
+          id="stats-tab"
+          class="tab tab-active"
+          onclick="onTabClick('stats')"
+        >
+          Stats
+        </div>
+        <div id="stake-tab" class="tab" onclick="onTabClick('stake')">
+          Stake
+        </div>
+        <div id="votes-tab" class="tab" onclick="onTabClick('votes')">Vote</div>
+      </div>
+      <div class="toggle-container">
+        <div class="toggle" onclick="onToggleTheme()">
+          <div class="square"></div>
+          <div class="icon">
+            <div id="sun" class="hidden">
+              <i class="material-icons" id="sun" style="font-size: 27px;"
+                >wb_sunny</i
+              >
+            </div>
+            <div id="moon">
+              <i class="fas fa-moon"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STATS -->
+      <div id="stats-container" class="content-container">
+        <div class="title">
+          <h2 class="h2-alt-margin">HOPR Staking Statistics</h2>
+          <div class="font-12">
+            The chart below shows the amount of HOPR tokens staked by relay
+            nodes (solid line) and the number of open payment channels
+          </div>
+        </div>
+
+        <div class="chart font-12">[coming soon...]</div>
+        <div class="title">
+          <h2 class="h2-alt-margin">List of HOPR Payment Channels</h2>
+          <div class="font-12">
+            The table below shows all HOPR payment channels (past, present and
+            pending)
+          </div>
+        </div>
+        <div class="table">
+          <table>
+            <tr>
+              <th>From</th>
+              <th>To</th>
+              <th>Amount</th>
+              <th>Opened</th>
+              <th>Status</th>
+            </tr>
+            <tr>
+              <td>
+                <a
+                  href="https://etherscan.io/address/0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >0xde0...</a
+                >
+              </td>
+              <td>
+                <a
+                  href="https://etherscan.io/address/0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >0xde0...</a
+                >
+              </td>
+              <td>12345.23</td>
+              <td>Aug 1 '19</td>
+              <td>CLOSED</td>
+            </tr>
+            <tr>
+              <td>
+                <a
+                  href="https://etherscan.io/address/0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >0xde0...</a
+                >
+              </td>
+              <td>
+                <a
+                  href="https://etherscan.io/address/0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >0xde0...</a
+                >
+              </td>
+              <td>12345.23</td>
+              <td>Aug 2 '19</td>
+              <td>PENDING</td>
+            </tr>
+            <tr>
+              <td>
+                <a
+                  href="https://etherscan.io/address/0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >0xde0...</a
+                >
+              </td>
+              <td>
+                <a
+                  href="https://etherscan.io/address/0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >0xde0...</a
+                >
+              </td>
+              <td>12345.23</td>
+              <td>Aug 3 '19</td>
+              <td>OPEN</td>
+            </tr>
+            <tr>
+              <td>
+                <a
+                  href="https://etherscan.io/address/0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >0xde0...</a
+                >
+              </td>
+              <td>
+                <a
+                  href="https://etherscan.io/address/0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >0xde0...</a
+                >
+              </td>
+              <td>12345.23</td>
+              <td>Aug 4 '19</td>
+              <td>CLOSED</td>
+            </tr>
+            <tr>
+              <td>
+                <a
+                  href="https://etherscan.io/address/0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >0xde0...</a
+                >
+              </td>
+              <td>
+                <a
+                  href="https://etherscan.io/address/0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >0xde0...</a
+                >
+              </td>
+              <td>12345.23</td>
+              <td>Aug 5 '19</td>
+              <td>PENDING</td>
+            </tr>
+            <tr>
+              <td>
+                <a
+                  href="https://etherscan.io/address/0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >0xde0...</a
+                >
+              </td>
+              <td>
+                <a
+                  href="https://etherscan.io/address/0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >0xde0...</a
+                >
+              </td>
+              <td>12345.23</td>
+              <td>Aug 6 '19</td>
+              <td>OPEN</td>
+            </tr>
+          </table>
+        </div>
+      </div>
+
+      <!-- STAKES -->
+      <div id="stake-container" class="content-container hidden">
+        <div class="top">
+          <h2>Open New Channel</h2>
+
+          <div class="wallet-info">Your Wallet Address: 0xaBc123...</div>
+          <div class="wallet-info">Balance: 123.45 HOPR</div>
+        </div>
+
+        <div class="align-inputs">
+          <div class="input-and-label">
+            FROM:
+            <input type="text" />
+          </div>
+          <div class="font-12">(That's usually your address)</div>
+          <div class="input-and-label">
+            TO:
+            <input type="text" />
+          </div>
+          <div class="font-12">(Some other relayer's address)</div>
+          <div class="input-and-label">
+            AMOUNT:
+            <input type="number" />
+          </div>
+          <div class="font-12">(In HOPR tokens)</div>
+        </div>
+        <div class="button">STAKE</div>
+        <div class="table">
+          <h2>You Staked</h2>
+          <table>
+            <tr>
+              <th>From</th>
+              <th>To</th>
+              <th>Amount</th>
+              <th>Opened</th>
+              <th>Status</th>
+            </tr>
+            <tr>
+              <td>
+                <a
+                  href="https://etherscan.io/address/0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >0xde0...</a
+                >
+              </td>
+              <td>
+                <a
+                  href="https://etherscan.io/address/0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >0xde0...</a
+                >
+              </td>
+              <td>12345.23</td>
+              <td>Aug 1 '19</td>
+              <td class="table-button">WITHDRAW</td>
+            </tr>
+            <tr>
+              <td>
+                <a
+                  href="https://etherscan.io/address/0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >0xde0...</a
+                >
+              </td>
+              <td>
+                <a
+                  href="https://etherscan.io/address/0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >0xde0...</a
+                >
+              </td>
+              <td>12345.23</td>
+              <td>Aug 2 '19</td>
+              <td>PENDING</td>
+            </tr>
+            <tr>
+              <td>
+                <a
+                  href="https://etherscan.io/address/0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >0xde0...</a
+                >
+              </td>
+              <td>
+                <a
+                  href="https://etherscan.io/address/0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >0xde0...</a
+                >
+              </td>
+              <td>12345.23</td>
+              <td>Aug 3 '19</td>
+              <td class="table-button">WITHDRAW</td>
+            </tr>
+            <tr>
+              <td>
+                <a
+                  href="https://etherscan.io/address/0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >0xde0...</a
+                >
+              </td>
+              <td>
+                <a
+                  href="https://etherscan.io/address/0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >0xde0...</a
+                >
+              </td>
+              <td>12345.23</td>
+              <td>Aug 4 '19</td>
+              <td>CLOSED</td>
+            </tr>
+            <tr>
+              <td>
+                <a
+                  href="https://etherscan.io/address/0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >0xde0...</a
+                >
+              </td>
+              <td>
+                <a
+                  href="https://etherscan.io/address/0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >0xde0...</a
+                >
+              </td>
+              <td>12345.23</td>
+              <td>Aug 5 '19</td>
+              <td>PENDING</td>
+            </tr>
+            <tr>
+              <td>
+                <a
+                  href="https://etherscan.io/address/0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >0xde0...</a
+                >
+              </td>
+              <td>
+                <a
+                  href="https://etherscan.io/address/0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >0xde0...</a
+                >
+              </td>
+              <td>12345.23</td>
+              <td>Aug 6 '19</td>
+              <td>OPEN</td>
+            </tr>
+          </table>
+        </div>
+      </div>
+
+      <!-- VOTES -->
+      <div id="votes-container" class="content-container hidden">
+        <div class="title">
+          <h2>Voting for HOPR DAO</h2>
+          <div class="font-12">[coming soon...]</div>
+        </div>
+
+        <!-- <div class="title">
+          <h2>Vote Title</h2>
+          <div class="font-12">Created by 0ex13..A915</div>
+        </div>
+        <div class="description">
+          <h2>Description</h2>
+          <div class="font-12">
+            Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam sed
+            metus sit amet arcu posuere consequat. Nullam sed metus id ex luctus
+            dapibus non maximus felis. Vestibulum facilisis dui id fringilla
+            pulvinar. Nullam molestie sed dui nec accumsan. Sed non justo
+            malesuada, mollis augue et, tempor mauris. Aenean rhoncus velit
+            libero, a commodo elit elementum a.
+          </div>
+        </div>
+        <div class="current-votes">
+          <h2>Current Votes</h2>
+          <div class="votes-bar">
+            <div class="green-bar"></div>
+            <div class="white-bar"></div>
+            <div class="red-bar"></div>
+          </div>
+        </div>
+
+        <div class="voting-info">
+          <div class="vote-results font-12">
+            <div class="circle-green"></div>
+            YES <span class="vote-percentage">50%</span>
+            <span class="hopr-amount">10 HOPR</span>
+          </div>
+          <div class="vote-results font-12">
+            <div class="circle-red"></div>
+            NO <span class="vote-percentage">50%</span>
+            <span class="hopr-amount">10 HOPR</span>
+          </div>
+        </div>
+
+        <div class="align-buttons">
+          <div class="button green-border">YES</div>
+          <div class="button red-border">NO</div>
+        </div> -->
+      </div>
+    </div>
+  </body>
+</html>
