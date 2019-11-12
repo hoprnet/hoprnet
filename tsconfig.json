@@ -1,0 +1,14 @@
+{
+    "compilerOptions": {
+        "module": "commonjs",
+        "esModuleInterop": true,
+        "outDir": "./lib",
+        "noImplicitAny": true,
+        "moduleResolution": "node",
+        "target": "es2019"
+    },
+    "include": [
+        "./truffle-config.ts",
+        "./migrations"
+    ]
+}

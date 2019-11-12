@@ -1,0 +1,26 @@
+{
+  "name": "hopr-ethereum",
+  "version": "0.0.1",
+  "description": "On-chain logic for hopr.network",
+  "main": "index.ts",
+  "repository": "git@github.com:hoprnet/hopr-ethereum.git",
+  "author": "Robert Kiel <robert.kiel@validitylabs.org>",
+  "license": "LGPL-3.0-only",
+  "private": false,
+  "dependencies": {
+    "@openzeppelin/contracts": "^2.4.0",
+    "@types/node": "^12.12.7"
+  },
+  "engines": {
+    "node": "v12"
+  },
+  "files": [
+    "lib/"
+  ],
+  "scripts": {
+    "preinstall": "tsc -d -p .",
+    "compile": "cp -R ./contracts ./lib && cd ./lib && truffle compile",
+    "migrate": "cp -R ./contracts ./lib && cd ./lib && truffle migrate",
+    "test": "cp -R ./contracts ./lib && cd ./lib && truffle test"
+  }
+}
