@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width" />
     <title>hopr-widget</title>
     <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="chart.css" />
     <link
       href="https://fonts.googleapis.com/css?family=Roboto&display=swap"
       rel="stylesheet"
@@ -14,6 +15,7 @@
       rel="stylesheet"
       href="https://fonts.googleapis.com/icon?family=Material+Icons"
     />
+    <script src="https://d3js.org/d3.v4.min.js"></script>
     <script src="script.js"></script>
   </head>
   <body>
@@ -57,7 +59,7 @@
           </div>
         </div>
 
-        <div class="chart font-12">[coming soon...]</div>
+        <div id="chart-container" class="chart font-12"></div>
         <div class="title">
           <h2 class="h2-alt-margin">List of HOPR Payment Channels</h2>
           <div class="font-12">
@@ -421,5 +423,6 @@
         </div> -->
       </div>
     </div>
+    <script src="./chart.js"></script>
   </body>
 </html>

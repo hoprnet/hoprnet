@@ -1,0 +1,54 @@
+
+
+path {
+  fill: none;
+}
+
+text {
+  fill: var(--font-color);
+}
+
+.axis path {
+  stroke: var(--font-color);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+
+.axis line,
+.axis path {
+  stroke: var(--font-color);
+}
+.axis text {
+  fill: var(--font-color);
+  font-size: 12px;
+}
+
+.amount-line {
+  stroke: var(--hopr-amount-color);
+}
+
+.count-line {
+  stroke: var(--font-color);
+}
+
+.tooltip-circle {
+  stroke-width: 3;
+  fill: var(--primary-color);
+}
+
+.tooltip-circle-amount {
+  stroke: var(--hopr-amount-color);
+}
+
+.tooltip-circle-count {
+  stroke: var(--font-color);
+}
+
+.tooltip {
+  stroke: var(--font-color);
+  stroke-width: 2;
+}
+
+.chart-overlay{
+  fill: transparent;
+}
