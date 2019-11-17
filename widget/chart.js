@@ -99,7 +99,6 @@ function initChart() {
 
   amountLine = d3
     .line()
-    .curve(d3.curveCatmullRom.alpha(0.5))
     .x(function(d) {
       return timeScale(d.date);
     })
@@ -110,7 +109,6 @@ function initChart() {
 
   countLine = d3
     .line()
-    .curve(d3.curveCatmullRom.alpha(0.5))
     .x(function(d) {
       return timeScale(d.date);
     })
