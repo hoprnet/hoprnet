@@ -3,7 +3,7 @@ var channelEventRecords = [];
 var svg, timeScale, amountScale, countScale, width, height, margin, chartData, focus;
 var xAxis, yAxisAmount, yAxisCount, amountLine, countLine;
 var dateFormat = d3.timeFormat('%b %d');
-var fullMonthDateFormat = d3.timeFormat('%B %d');
+var fullMonthDateFormat = d3.timeFormat('%b %d, %Y');
 var bisectDate = d3.bisector(function(d) { return d.date; }).left;
 
 window.addEventListener('resize', function() {
