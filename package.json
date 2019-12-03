@@ -1,0 +1,24 @@
+{
+  "name": "hopr-core-ethereum",
+  "version": "0.0.1",
+  "repository": "git@github.com:hoprnet/hopr-core-polkadot.git",
+  "author": "Robert Kiel <robert.kiel@validitylabs.org>",
+  "license": "LGPL-3.0-only",
+  "main": "./lib/index.js",
+  "types": "./lib/index.d.ts",
+  "scripts": {
+    "build": "tsc -d -p ."
+  },
+  "devDependencies": {
+    "@types/levelup": "^3.1.1",
+    "@types/node": "^12.12.8",
+    "ts-node": "^8.5.2",
+    "typescript": "^3.7.2"
+  },
+  "prettier": {
+    "tabWidth": 2,
+    "semi": false,
+    "singleQuote": true,
+    "printWidth": 120
+  }
+}
