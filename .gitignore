@@ -1,0 +1,2 @@
+# Exclude Node.js stuff
+node-modules/

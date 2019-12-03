@@ -1,0 +1,8 @@
+message SettlementRequest {
+    required bytes channelId = 1;
+}
+
+message SettlementResponse {
+    required bytes channelId = 1;
+    required bytes transaction = 2;
+}

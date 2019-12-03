@@ -1,0 +1,5 @@
+message Signature {
+    required bytes r = 1;
+    required bytes s = 2;
+    required bool v = 3;
+}
