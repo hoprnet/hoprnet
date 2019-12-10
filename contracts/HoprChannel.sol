@@ -190,7 +190,16 @@ contract HoprChannel {
      * @param s bytes32
      * @param v bytes1
      */
-    function closeChannel(bytes16 index, bytes16 nonce, uint256 balanceA, bytes32 curvePointFirst, bytes1 curvePointSecond, bytes32 r, bytes32 s, uint8 v) public {
+    function closeChannel(
+        bytes16 index,
+        bytes16 nonce,
+        uint256 balanceA,
+        bytes32 curvePointFirst,
+        bytes1 curvePointSecond,
+        bytes32 r,
+        bytes32 s,
+        uint8 v
+    ) public {
         bytes32 hashedMessage = keccak256(abi.encodePacked(nonce, index, balanceA, curvePointFirst, curvePointSecond));
         address counterparty = ecrecover(hashedMessage, v, r, s);
 
