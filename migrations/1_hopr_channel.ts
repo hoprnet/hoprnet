@@ -1,12 +1,8 @@
-/* eslint-disable prefer-destructuring */
-/**
- * Migration
- */
-// const cnf = require('../../config/contract-hopr.json');
+const HoprChannel = artifacts.require("HoprChannel");
 
-declare let artifacts: any;
-const HoprChannel = artifacts.require("./HoprChannel.sol");
-
-module.exports = function(deployer: any, _network: any, _accounts: any) {
+module.exports = (deployer => {
   deployer.deploy(HoprChannel);
-};
+}) as Truffle.Migration;
+
+// because of https://stackoverflow.com/questions/40900791/cannot-redeclare-block-scoped-variable-in-unrelated-files
+export {};

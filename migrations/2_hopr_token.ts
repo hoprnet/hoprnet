@@ -1,8 +1,8 @@
-/**
- * Migrate Token
- */
-const HoprToken = artifacts.require("./HoprToken.sol");
+const HoprToken = artifacts.require("HoprToken");
 
-module.exports = function(deployer: any, _network: any, _accounts: any) {
+module.exports = (deployer => {
   deployer.deploy(HoprToken);
-};
+}) as Truffle.Migration;
+
+// because of https://stackoverflow.com/questions/40900791/cannot-redeclare-block-scoped-variable-in-unrelated-files
+export {};

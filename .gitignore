@@ -1,6 +1,3 @@
-# Exclude typescript builds
-lib/
-
 # Exclude node.js module directory
 node_modules/
 
@@ -9,3 +6,18 @@ node_modules/
 
 # Exclude solidity builds
 build/
+
+# Exclude typechain builds
+types/
+
+# Exclude tsc migrations builds
+migrations/**/*.js
+migrations/**/*.map
+
+# Coverage directory used by tools like istanbul
+coverage
+coverage.json
+coverageEnv
+
+# temporary artifact from solidity-coverage
+allFiredEvents

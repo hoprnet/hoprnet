@@ -8,25 +8,37 @@
   "license": "LGPL-3.0-only",
   "private": false,
   "dependencies": {
-    "@openzeppelin/contracts": "^2.4.0",
-    "@types/node": "^12.12.7"
+    "@openzeppelin/contracts": "^2.4.0"
   },
   "devDependencies": {
+    "@types/chai": "^4.2.7",
+    "@types/mocha": "^5.2.7",
+    "@types/node": "^12.12.17",
+    "chai": "^4.2.0",
+    "mocha": "^6.2.2",
     "solhint": "^2.3.0",
+    "solidity-coverage": "^0.6.7",
     "truffle": "^5.1.3",
+    "truffle-typings": "^1.0.8",
+    "ts-node": "^8.5.4",
+    "typechain": "^1.0.3",
+    "typechain-target-truffle": "^1.0.2",
     "typescript": "^3.7.3"
   },
   "files": [
     "lib/"
   ],
   "scripts": {
-    "compile-ts": "tsc -d -p .",
-    "compile-to-lib": "yarn compile-ts && cp -R ./contracts ./lib",
-    "lint": "solhint \"contracts/**/*.sol\"",
-    "postinstall": "yarn compile-to-lib",
-    "compile": "yarn lint && yarn compile-to-lib && cd ./lib && truffle compile",
-    "migrate": "yarn compile-to-lib && cd ./lib && truffle migrate",
-    "test": "echo \"not implemented yet\"",
-    "develop": "yarn compile-to-lib && cd ./lib && truffle develop"
+    "postinstall": "yarn build",
+    "lint:sol": "solhint 'contracts/**/*.sol'",
+    "build:sol": "yarn lint:sol && truffle compile",
+    "build:tsc": "tsc",
+    "build:types": "typechain --target truffle --outDir './types/truffle-contracts' './build/**/*.json' && yarn postbuild:types",
+    "postbuild:types": "sed -i -e 's/BigNumber/BN/g' -e '/bignumber\\.js/d' types/truffle-contracts/index.d.ts",
+    "build": "yarn build:sol && yarn build:types",
+    "develop": "truffle develop",
+    "migrate": "yarn build:tsc && truffle migrate",
+    "test": "truffle test",
+    "coverage": "solidity-coverage"
   }
 }

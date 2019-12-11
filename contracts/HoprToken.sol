@@ -8,6 +8,6 @@ import "@openzeppelin/contracts/token/ERC20/ERC20Detailed.sol";
 contract HoprToken is ERC20Snapshot, ERC20Mintable, ERC20Burnable, ERC20Detailed {
     constructor () public
     ERC20Detailed("HOPR", "HOPR", 18) {
-        _mint(msg.sender, 100_000_000);
+        _mint(msg.sender, 100000000);
     }
 }

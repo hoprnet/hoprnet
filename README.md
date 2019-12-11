@@ -19,12 +19,11 @@ Requirements:
 
 ```bash
 # Installs dependencies & compiles the typescript files
-yarn
+yarn # `yarn build` will be executed after install
 
-yarn compile
-yarn test
 yarn develop # spawns a development blockchain
 yarn migrate
+yarn test
 ```
 
 # Contracts
