@@ -1,3 +1,6 @@
+/*
+  Fixes typechain issue, see https://github.com/ethereum-ts/TypeChain/issues/193
+*/
 import { join } from "path";
 import { readFile, writeFile } from "fs";
 
