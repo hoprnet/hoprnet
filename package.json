@@ -7,6 +7,9 @@
   "author": "Robert Kiel <robert.kiel@validitylabs.org>",
   "license": "LGPL-3.0-only",
   "private": false,
+  "engines": {
+    "node": "v12"
+  },
   "dependencies": {
     "@openzeppelin/contracts": "^2.4.0"
   },
@@ -34,7 +37,7 @@
     "build:sol": "yarn lint:sol && truffle compile",
     "build:tsc": "tsc",
     "build:types": "typechain --target truffle --outDir './types/truffle-contracts' './build/**/*.json' && yarn postbuild:types",
-    "postbuild:types": "sed -i -e 's/BigNumber/BN/g' -e '/bignumber\\.js/d' types/truffle-contracts/index.d.ts",
+    "postbuild:types": "sed -i -e 's/BigNumber/BN/g' -e '/bignumber\\.js/d' ./types/truffle-contracts/index.d.ts",
     "build": "yarn build:sol && yarn build:types",
     "develop": "truffle develop",
     "migrate": "yarn build:tsc && truffle migrate",
