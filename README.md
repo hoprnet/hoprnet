@@ -8,7 +8,7 @@ Table of Contents:
 - [Install](#install)
 - [Contracts](#contracts)
   - [HoprChannel](#hoprchannel)
-  - [Token](#token)
+  - [HoprToken](#hoprtoken)
 
 # Install
 
@@ -30,4 +30,13 @@ yarn test
 
 ## HoprChannel
 
-## Token
+## HoprToken
+
+A standard ERC20 token with snapshot functionality.
+
+```
+Name: HOPR
+Symbol: HOPR
+Decimals: 18
+Total Supply: 100,000,000
+```
