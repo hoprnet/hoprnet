@@ -37,7 +37,7 @@
     "build:sol": "yarn lint:sol && truffle compile",
     "build:tsc": "tsc",
     "build:types": "typechain --target truffle --outDir './types/truffle-contracts' './build/**/*.json' && yarn postbuild:types",
-    "postbuild:types": "sed -i -e 's/BigNumber/BN/g' -e '/bignumber\\.js/d' ./types/truffle-contracts/index.d.ts",
+    "postbuild:types": "ts-node ./scripts/fix-typechain.ts",
     "build": "yarn build:sol && yarn build:types",
     "develop": "truffle develop",
     "migrate": "yarn build:tsc && truffle migrate",
