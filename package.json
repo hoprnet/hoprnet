@@ -18,6 +18,7 @@
     "@types/mocha": "^5.2.7",
     "@types/node": "^12.12.17",
     "chai": "^4.2.0",
+    "ganache-cli": "^6.7.0",
     "mocha": "^6.2.2",
     "solhint": "^2.3.0",
     "solidity-coverage": "^0.6.7",
@@ -34,14 +35,13 @@
   "scripts": {
     "postinstall": "yarn build",
     "lint:sol": "solhint 'contracts/**/*.sol'",
-    "build:sol": "yarn lint:sol && truffle compile",
     "build:tsc": "tsc",
     "build:types": "typechain --target truffle --outDir './types/truffle-contracts' './build/**/*.json' && yarn postbuild:types",
+    "build:sol": "yarn lint:sol && truffle compile && yarn build:types",
     "postbuild:types": "ts-node ./scripts/fix-typechain.ts",
-    "build": "yarn build:sol && yarn build:types",
-    "develop": "truffle develop",
-    "migrate": "yarn build:tsc && truffle migrate",
-    "test": "truffle test",
+    "build": "yarn build:sol && yarn build:tsc",
+    "migrate": "yarn build && truffle migrate",
+    "test": "yarn build && scripts/test.sh",
     "coverage": "solidity-coverage"
   }
 }

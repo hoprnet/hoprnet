@@ -1,24 +1,28 @@
 import BN = require("bn.js");
-import { HoprTokenContract } from "../types/truffle-contracts";
+import {
+  HoprTokenContract,
+  HoprTokenInstance
+} from "../types/truffle-contracts";
 
-const HoprToken = artifacts.require("HoprToken") as HoprTokenContract;
+const HoprToken: HoprTokenContract = artifacts.require("HoprToken");
 
 contract("HoprToken", _accounts => {
-  it("should be named 'HOPR'", async () => {
-    const contract = await HoprToken.deployed();
+  let hoprToken: HoprTokenInstance;
 
-    expect(await contract.name()).to.be.equal("HOPR");
+  before(async () => {
+    hoprToken = await HoprToken.deployed();
+  });
+
+  it("should be named 'HOPR'", async () => {
+    expect(await hoprToken.name()).to.be.equal("HOPR");
   });
 
   it("should have symbol 'HOPR'", async () => {
-    const contract = await HoprToken.deployed();
-
-    expect(await contract.symbol()).to.be.equal("HOPR");
+    expect(await hoprToken.symbol()).to.be.equal("HOPR");
   });
 
   it("should have a supply of '100 million'", async () => {
-    const contract = await HoprToken.deployed();
-    const totalSupply = await contract.totalSupply();
+    const totalSupply = await hoprToken.totalSupply();
 
     assert.isTrue(totalSupply.eq(new BN(100e6)));
   });

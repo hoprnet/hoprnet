@@ -8,7 +8,7 @@ node_modules/
 build/
 
 # Exclude typechain builds
-types/
+types/truffle-contracts
 
 # Exclude tsc migrations builds
 migrations/**/*.js
@@ -19,5 +19,5 @@ coverage
 coverage.json
 coverageEnv
 
-# temporary artifact from solidity-coverage
+# Exclude temporary artifact from solidity-coverage
 allFiredEvents
