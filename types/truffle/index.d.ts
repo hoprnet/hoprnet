@@ -1,5 +1,5 @@
 /*
-  Adding extra types that are missing from `truffle-contracts`
+  Extra types that are missing from `truffle-contracts`
 */
 
 export type Debug = <P extends Promise<any>>(p: P) => Promise<P>;
