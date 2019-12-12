@@ -16,10 +16,10 @@ readFile(typesFile, "utf8", (error, data) => {
   if (error) throw error;
 
   const result = data
-    .replace('import { BN } from "bignumber.js";', "")
-    .replace(/BigNumber/g, "BN");
+    .replace(/BigNumber/g, "BN")
+    .replace('import { BN } from "bignumber.js";', "");
 
-  writeFile(typesFile, result, "utf8", function(error) {
+  writeFile(typesFile, result, "utf8", error => {
     if (error) throw error;
 
     console.log("Successfully patched typechain output!");
