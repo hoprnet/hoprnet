@@ -43,6 +43,6 @@
     "build": "yarn build:sol && yarn build:tsc",
     "migrate": "yarn build && truffle migrate",
     "test": "yarn build && scripts/test.sh",
-    "coverage": "scripts/coverage.sh"
+    "coverage": "yarn build && scripts/coverage.sh"
   }
 }
