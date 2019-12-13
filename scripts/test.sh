@@ -13,7 +13,11 @@ cleanup() {
   fi
 }
 
-ganache_port=9545
+if [ "$SOLIDITY_COVERAGE" = true ]; then
+  ganache_port=8555
+else
+  ganache_port=9545
+fi
 
 ganache_running() {
   nc -z localhost "$ganache_port"
@@ -38,7 +42,11 @@ start_ganache() {
     # --account="0x956b91cb2344d7863ea89e6945b753ca32f6d74bb97a59e59e04903ded14ad02,1000000000000000000000000"
   )
 
-  npx ganache-cli --gasLimit 0xfffffffffff --port "$ganache_port" "${accounts[@]}" > /dev/null &
+  if [ "$SOLIDITY_COVERAGE" = true ]; then
+    npx ganache-cli-coverage --emitFreeLogs true --allowUnlimitedContractSize true --gasLimit 0xfffffffffffff --port "$ganache_port" "${accounts[@]}" > /dev/null &
+  else
+    npx ganache-cli --gasLimit 0xfffffffffff --port "$ganache_port" "${accounts[@]}" > /dev/null &
+  fi
 
   ganache_pid=$!
 
@@ -60,4 +68,8 @@ fi
 
 npx truffle version
 
-npx truffle test --debug "$@"
+if [ "$SOLIDITY_COVERAGE" = true ]; then
+  npx solidity-coverage
+else
+  npx truffle test --debug "$@"
+fi

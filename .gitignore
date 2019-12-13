@@ -19,5 +19,9 @@ coverage
 coverage.json
 coverageEnv
 
-# Exclude temporary artifact from solidity-coverage
+# Exclude runtime data
+pids
+*.pid
+*.seed
 allFiredEvents
+scTopics

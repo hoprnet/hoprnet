@@ -1,4 +1,8 @@
 module.exports = {
-  norpc: false,
-  copyPackages: ["@openzeppelin/contracts"]
+  norpc: true,
+  testCommand:
+    "node --max-old-space-size=4096 ../node_modules/.bin/truffle test --network coverage",
+  compileCommand:
+    "node --max-old-space-size=4096 ../node_modules/.bin/truffle compile --network coverage",
+  copyPackages: ["@openzeppelin/contracts", "@openzeppelin/test-helpers"]
 };
