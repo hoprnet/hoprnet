@@ -1,8 +1,27 @@
-# Exclude typescript builds
-lib/
-
 # Exclude node.js module directory
 node_modules/
 
 # Exclude IDE stuff
 .vscode/
+
+# Exclude solidity builds
+build/
+
+# Exclude typechain builds
+types/truffle-contracts
+
+# Exclude tsc migrations builds
+migrations/**/*.js
+migrations/**/*.map
+
+# Coverage directory used by tools like istanbul
+coverage
+coverage.json
+coverageEnv
+
+# Exclude runtime data
+pids
+*.pid
+*.seed
+allFiredEvents
+scTopics
