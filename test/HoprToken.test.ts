@@ -13,8 +13,8 @@ contract("HoprToken", _accounts => {
     hoprToken = await HoprToken.deployed();
   });
 
-  it("should be named 'HOPR'", async () => {
-    expect(await hoprToken.name()).to.be.equal("HOPR");
+  it("should be named 'HOPR Token'", async () => {
+    expect(await hoprToken.name()).to.be.equal("HOPR Token");
   });
 
   it("should have symbol 'HOPR'", async () => {

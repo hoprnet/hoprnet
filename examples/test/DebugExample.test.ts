@@ -1,3 +1,6 @@
+/*
+  This is an example demonstrating how to use truffle's debug function
+*/
 import {
   HoprTokenContract,
   HoprTokenInstance
@@ -7,7 +10,7 @@ import { Debug } from "../../types/truffle";
 const HoprToken: HoprTokenContract = artifacts.require("HoprToken");
 const debug: Debug = global["debug"];
 
-contract.skip("DebugExample.test", _accounts => {
+contract("DebugExample.test", _accounts => {
   let hoprToken: HoprTokenInstance;
 
   before(async () => {

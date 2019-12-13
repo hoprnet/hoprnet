@@ -7,7 +7,7 @@ import "./ERC20Token.sol";
 
 contract HoprToken is ERC20Token, ERC20Mintable, ERC20Burnable, ERC20Detailed {
     constructor () public
-    ERC20Detailed("HOPR", "HOPR", 18) {
+    ERC20Detailed("HOPR Token", "HOPR", 18) {
         _mint(msg.sender, 100000000);
     }
 }
