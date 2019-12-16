@@ -11,8 +11,7 @@ build/
 types/truffle-contracts
 
 # Exclude tsc migrations builds
-migrations/**/*.js
-migrations/**/*.map
+migrations/**/*.js*
 
 # Coverage directory used by tools like istanbul
 coverage

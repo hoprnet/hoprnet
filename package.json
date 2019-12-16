@@ -37,7 +37,7 @@
   "scripts": {
     "postinstall": "yarn build",
     "lint:sol": "solhint 'contracts/**/*.sol'",
-    "build:tsc": "tsc",
+    "build:tsc": "rm -f migrations/*.js* && tsc",
     "build:types": "typechain --target truffle --outDir './types/truffle-contracts' './build/**/*.json' && scripts/fix.sh",
     "build:sol": "yarn lint:sol && truffle compile && yarn build:types",
     "build": "yarn build:sol && yarn build:tsc",
