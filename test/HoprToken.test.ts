@@ -22,8 +22,10 @@ contract("HoprToken", _accounts => {
   });
 
   it("should have a supply of '100 million'", async () => {
-    const totalSupply = await hoprToken.totalSupply();
+    const totalSupply = await hoprToken
+      .totalSupply()
+      .then(res => res.toString());
 
-    assert.isTrue(totalSupply.eq(new BN(100e6)));
+    expect(totalSupply).to.be.equal(web3.utils.toWei("100000000", "ether"));
   });
 });
