@@ -25,7 +25,7 @@ const responseToChannel = (
   sender: res[1],
   recipient: res[2],
   token: res[3],
-  amount: res[4],
+  deposit: res[4],
   expiration: res[5],
   status: res[6]
 });
@@ -126,6 +126,7 @@ contract("HoprToken", ([sender, recipient]) => {
 
     const channel = await paymentChannel.channels("2").then(responseToChannel);
     expect(channel.status.toString()).to.be.equal("1");
+    expect(channel.deposit.toString()).to.be.equal("0");
 
     const senderBalance = await hoprToken
       .balanceOf(sender)

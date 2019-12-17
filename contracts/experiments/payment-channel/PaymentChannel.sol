@@ -114,6 +114,7 @@ contract PaymentChannel {
             channel.token.safeTransfer(channel.sender, remaining);
         }
 
+        channel.deposit = 0;
         channel.status = ChannelStatus.CLOSED;
         emit ClosedChannel(channel.id, remaining, amount);
     }
