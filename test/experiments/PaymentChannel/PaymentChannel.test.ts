@@ -30,7 +30,7 @@ const responseToChannel = (
   status: res[6]
 });
 
-contract("HoprToken", ([sender, recipient]) => {
+contract("PaymentChannel", ([sender, recipient]) => {
   let hoprToken: HoprTokenInstance;
   let paymentChannel: PaymentChannelInstance;
 

@@ -96,7 +96,6 @@ contract PaymentChannel {
     external channelMustExist(channelId) {
         Channel storage channel = channels[channelId];
 
-        require(msg.sender == channel.sender, "caller is not sender");
         require(now >= channel.expiration, "channel has not expired");
 
         settle(channel, 0);
