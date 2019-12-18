@@ -10,81 +10,113 @@ contract PaymentChannel {
     using SafeMath for uint256;
     using Address for address;
 
-    event OpenedChannel(uint256 indexed channelId, uint256 depositedAmount);
-    event ClosedChannel(uint256 indexed channelId, uint256 senderAmount, uint256 receiverAmount);
+    // inform that a payment channel has been created
+    event OpenedChannel(
+        uint256 channelId,
+        address funder,
+        address indexed sender,
+        address indexed recipient,
+        address indexed token,
+        uint256 depositedAmount
+    );
+
+    // inform that a payment channel partners that the channel has been settled and closed
+    event ClosedChannel(uint256 indexed channelId, uint256 senderAmount, uint256 recipientAmount);
 
     enum ChannelStatus {
         OPEN,
-        CLOSED
+        CLOSE
     }
 
     struct Channel {
-        uint256 id;             //  Channel ID
-        address sender;         //  The account sending payments
-        address recipient;      //  The account receiving the payments
-        IERC20 token;           //  The token that will be used
-        uint256 deposit;        //  Token deposit amount
-        uint256 expiration;     //  Timeout in case the recipient never closes
-        ChannelStatus status;   //  Channel status
+        uint256 id;             //  channel's id
+        address sender;         //  the account sending payments
+        address recipient;      //  the account receiving the payments
+        IERC20 token;           //  the token that will be used to settle payments
+        uint256 deposit;        //  the token deposit, TODO: move this to constructor
+        uint256 expiration;     //  timeout in case the recipient never closes
+        ChannelStatus status;   //  channel's status
     }
-    uint256 public numberOfChannels = 0;
 
-    mapping(uint256 => Channel) public channels;
+    mapping(uint256 => Channel) public channels;    //  store channels by channelId
+    uint256 public numberOfChannels = 0;            //  number of channels
 
-    // Ensure channel exists
-    modifier channelMustExist(uint256 channelId) {
+    // channel must exist
+    function channelMustExist(uint256 channelId) internal view {
         require(channels[channelId].id == channelId, "channel does not exist");
-        _;
     }
 
-    // Create a channel, specified tokens must be approved beforehand
-    function createChannel(address _recipient, address _token, uint256 amount, uint256 duration)
-    external returns(uint256) {
+    // channel must not exist
+    function channelMustNotExist(uint256 channelId) internal view {
+        require(channels[channelId].id == 0, "channel already exists");
+    }
+
+    // caller must be channel's sender
+    function callerMustBeSender(Channel storage channel) internal view {
+        require(msg.sender == channel.sender, "caller is not channel's sender");
+    }
+
+    // caller must be channel's recipient
+    function callerMustBeRecipient(Channel storage channel) internal view {
+        require(msg.sender == channel.recipient, "caller is not channel's recipient");
+    }
+
+    // create a channel, specified tokens must be approved beforehand
+    function createChannel(
+        address funder,
+        address sender,
+        address recipient,
+        address tokenAddress,
+        uint256 amount,
+        uint256 duration
+    ) external returns (uint256) {
         uint256 channelId = numberOfChannels.add(1);
 
-        require(channels[channelId].id == 0, "channel already exists");
-        require(_token != address(0), "address is empty");
+        channelMustNotExist(channelId);
+        require(tokenAddress != address(0), "address should not be empty");
         require(amount > 0, "amount must be larger than 0");
         require(duration > 0, "duration must be larger than 0");
 
-        IERC20 token = IERC20(_token);
-        token.safeTransferFrom(msg.sender, address(this), amount);
+        IERC20 token = IERC20(tokenAddress);
+        token.safeTransferFrom(funder, address(this), amount);
         numberOfChannels = channelId;
 
         channels[channelId] = Channel(
             channelId,
-            msg.sender,
-            _recipient,
+            sender,
+            recipient,
             token,
             amount,
             now + duration,
             ChannelStatus.OPEN
         );
 
-        emit OpenedChannel(channelId, amount);
+        emit OpenedChannel(channelId, funder, sender, recipient, tokenAddress, amount);
 
         return channelId;
     }
 
-    // The recipient can close the channel at any time by presenting a signed
-    // amount from the sender. The recipient will be sent that amount, and the
-    // remainder will go back to the sender.
-    function closeChannel(uint256 channelId, uint256 amount, bytes calldata signature)
-    external channelMustExist(channelId) {
+    // close a channel, the recipient can close the channel at any time
+    // by presenting a signed amount from the sender. The recipient will
+    // be sent that amount, and the remainder will go back to the sender
+    function closeChannel(uint256 channelId, uint256 amount, bytes calldata signature) external {
+        channelMustExist(channelId);
+
         Channel storage channel = channels[channelId];
 
-        require(msg.sender == channel.recipient, "caller is not channel's recipient");
+        callerMustBeRecipient(channel);
         require(isValidSignature(channel.sender, amount, signature), "signature is not valid");
 
         settle(channel, amount);
     }
 
     // The sender can extend the expiration at any time.
-    function extendChannelExpiration(uint256 channelId, uint256 newExpiration)
-    external channelMustExist(channelId) {
+    function extendChannelExpiration(uint256 channelId, uint256 newExpiration) external {
+        channelMustExist(channelId);
+
         Channel storage channel = channels[channelId];
 
-        require(msg.sender == channel.sender, "caller is not sender");
+        callerMustBeSender(channel);
         require(newExpiration > channel.expiration, "new expiration is smaller than current expiration");
 
         channel.expiration = newExpiration;
@@ -92,8 +124,9 @@ contract PaymentChannel {
 
     // If the timeout is reached without the recipient closing the channel, then
     // the ether is released back to the sender.
-    function claimChannelTimeout(uint256 channelId)
-    external channelMustExist(channelId) {
+    function claimChannelTimeout(uint256 channelId) external {
+        channelMustExist(channelId);
+
         Channel storage channel = channels[channelId];
 
         require(now >= channel.expiration, "channel has not expired");
@@ -114,7 +147,7 @@ contract PaymentChannel {
         }
 
         channel.deposit = 0;
-        channel.status = ChannelStatus.CLOSED;
+        channel.status = ChannelStatus.CLOSE;
         emit ClosedChannel(channel.id, remaining, amount);
     }
 

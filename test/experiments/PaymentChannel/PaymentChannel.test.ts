@@ -7,7 +7,7 @@ import {
 } from "../../../types/truffle-contracts";
 import { signPayment, recoverSigner } from "./utils";
 import { PromiseType } from "../../../types/typescript";
-import { time } from "@openzeppelin/test-helpers";
+import { time, expectEvent } from "@openzeppelin/test-helpers";
 
 const HoprToken: HoprTokenContract = artifacts.require("HoprToken");
 
@@ -47,12 +47,23 @@ contract("PaymentChannel", ([sender, recipient]) => {
   });
 
   it("should have created channel correctly", async () => {
-    await paymentChannel.createChannel(
+    const receipt = await paymentChannel.createChannel(
+      sender,
+      sender,
       recipient,
       hoprToken.address,
       depositAmount,
       time.duration.weeks(1)
     );
+
+    expectEvent(receipt, "OpenedChannel", {
+      channelId: "1",
+      funder: sender,
+      sender,
+      recipient,
+      token: hoprToken.address,
+      depositedAmount: depositAmount
+    });
 
     const channel = await paymentChannel.channels("1").then(responseToChannel);
     const numberOfChannels = await paymentChannel.numberOfChannels();
@@ -88,8 +99,19 @@ contract("PaymentChannel", ([sender, recipient]) => {
       amount
     );
 
-    await paymentChannel.closeChannel("1", amount, payment.signature, {
-      from: recipient
+    const receipt = await paymentChannel.closeChannel(
+      "1",
+      amount,
+      payment.signature,
+      {
+        from: recipient
+      }
+    );
+
+    expectEvent(receipt, "ClosedChannel", {
+      channelId: "1",
+      senderAmount: web3.utils.toWei("0.5", "ether").toString(),
+      recipientAmount: web3.utils.toWei("0.5", "ether").toString()
     });
 
     const senderBalance = await hoprToken
@@ -115,6 +137,8 @@ contract("PaymentChannel", ([sender, recipient]) => {
 
   it("should send 1 HOPR to 'sender' on timeout", async () => {
     await paymentChannel.createChannel(
+      sender,
+      sender,
       recipient,
       hoprToken.address,
       depositAmount,
