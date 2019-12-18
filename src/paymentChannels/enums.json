@@ -1,9 +1,0 @@
-{
-    "ChannelState": {
-        "UNINITIALIZED": 0,
-        "PARTYA_FUNDED": 1,
-        "PARTYB_FUNDED": 2,
-        "ACTIVE": 3,
-        "PENDING_SETTLEMENT": 4
-    }
-}

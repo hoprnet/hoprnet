@@ -1,8 +1,0 @@
-import "./signature.proto"
-
-message Transaction {
-    required Signature signature = 1;
-    required bytes nonce = 2;
-    required bytes index = 3;
-    required bytes value = 4;
-}
