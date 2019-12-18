@@ -19,7 +19,7 @@ On Windows? 👀 here: [Windows Setup](../../wiki/Setup#Windows)
 
 Start by cloning this repository and install it:
 ```sh
-git clone https://github.com/validitylabs/hopr.git
+git clone https://github.com/hoprnet/hopr.git
 cd hopr
 yarn install
 ```

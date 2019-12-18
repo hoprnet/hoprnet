@@ -20,9 +20,10 @@
     "homepage": "https://hopr.network",
     "repository": {
         "type": "git",
-        "url": "https://github.com/validitylabs/hopr.git"
+        "url": "https://github.com/hoprnet/hopr-core.git"
     },
     "scripts": {
+        "build": "tsc -d -p .",
         "demo": "node test/demo.js",
         "multiprocess": "node test/multiprocess.js",
         "hopr": "node hopr.js",
