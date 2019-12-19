@@ -1,7 +1,7 @@
 'use strict'
 
 const { sha3, toChecksumAddress } = require('web3-utils')
-const { randomBytes } = require('crypto')
+const { randomBytes, createCipheriv } = require('crypto')
 const { promisify } = require('util')
 const fs = require('fs')
 const fsPromise = require('fs').promises
@@ -13,22 +13,22 @@ const Multiaddr = require('multiaddr')
 const Multihash = require('multihashes')
 const { publicKeyConvert } = require('secp256k1')
 const scrypt = require('scrypt')
-const chacha = require('chacha')
 const read = require('read')
 const solc = require('solc')
 const chalk = require('chalk')
-const crypto = require('crypto')
+
+const CIPHER_ALGORITHM = 'chacha20'
 
 const COMPRESSED_PUBLIC_KEY_LENGTH = 33
 const PRIVKEY_LENGTH = 32
+
+export * from './u8a'
 
 // ==========================
 // General methods
 // ==========================
 
-module.exports.hash = buf => {
-    if (!Buffer.isBuffer(buf)) throw Error('Invalid input. Please use a Buffer')
-
+module.exports.hash = (buf: Buffer) => {
     return Buffer.from(sha3(buf).replace(/0x/, ''), 'hex')
 }
 /**
@@ -45,20 +45,8 @@ module.exports.deepCopy = (instance, Class) => {
     return Class.fromBuffer(buf)
 }
 
-/**
- * Parse JSON while recovering all Buffer elements
- * @param  {String} str JSON string
- */
-module.exports.parseJSON = str =>
-    JSON.parse(str || '', (key, value) => {
-        if (value && value.type === 'Buffer') {
-            return Buffer.from(value.data)
-        }
 
-        return value
-    })
-
-module.exports.log = (peerId, msg) => console.log(`['\x1b[34m${peerId.toB58String()}\x1b[0m']: ${msg}`)
+module.exports.log = (peerId, msg) => console.log(`['${chalk.blue(peerId.toB58String())}']: ${msg}`)
 // ==========================
 // Buffer methods
 // ==========================
@@ -93,142 +81,6 @@ module.exports.bufferToNumber = buf => {
     if (!Buffer.isBuffer(buf) || buf.length === 0) throw Error('Invalid input value. Expected a non-empty buffer.')
 
     return parseInt(buf.toString('hex'), 16)
-}
-
-// ==========================
-// Collection methods
-// ==========================
-/**
- * Picks @param subsetSize elements at random from @param array .
- * The order of the picked elements does not coincide with their
- * order in @param array
- *
- * @param  {Array} array the array to pick the elements from
- * @param  {Number} subsetSize the requested size of the subset
- * @param  {Function} filter called with `(peerInfo)` and should return `true`
- * for every node that should be in the subset
- *
- * @returns {Array} array with at most @param subsetSize elements
- * that pass the test.
- *
- * @notice If less than @param subsetSize elements pass the test,
- * the result will contain less than @param subsetSize elements.
- */
-module.exports.randomSubset = (array, subsetSize, filter = _ => true) => {
-    if (!Number.isInteger(subsetSize) || subsetSize < 0)
-        throw Error(`Invalid input arguments. Please provide a positive subset size. Got '${subsetSize}' instead.`)
-
-    if (!array || !Array.isArray(array)) throw Error(`Invalid input parameters. Expected an Array. Got '${typeof array}' instead.`)
-
-    if (subsetSize > array.length) throw Error('Invalid subset size. Subset size must not be greater than set size.')
-
-    if (subsetSize <= 0) return []
-
-    if (subsetSize === array.length)
-        // Returns a random permutation of all elements that pass
-        // the test.
-        return module.exports.randomPermutation(array.filter(filter))
-
-    const byteAmount = Math.max(Math.ceil(Math.log2(array.length)) / 8, 1)
-
-    if (subsetSize == 1) {
-        let i = 0
-        let index = module.exports.bufferToNumber(randomBytes(byteAmount)) % array.length
-        while (!filter(array[index])) {
-            if (i === array.length) {
-                // There seems to be no element in the array
-                // that passes the test.
-                return []
-            }
-            i++
-            index = (index + 1) % array.length
-        }
-        return [array[index]]
-    }
-
-    let notChosen = new Set()
-    let chosen = new Set()
-    let found,
-        breakUp = false
-
-    let index = 0
-    for (let i = 0; i < subsetSize && !breakUp; i++) {
-        index = (index + module.exports.bufferToNumber(randomBytes(byteAmount))) % array.length
-
-        found = false
-
-        do {
-            while (chosen.has(index) || notChosen.has(index)) {
-                index = (index + 1) % array.length
-            }
-
-            if (!filter(array[index])) {
-                notChosen.add(index)
-                index = (index + 1) % array.length
-                found = false
-            } else {
-                chosen.add(index)
-                found = true
-            }
-
-            if (notChosen.size + chosen.size == array.length && chosen.size < subsetSize) {
-                breakUp = true
-                break
-            }
-        } while (!found)
-    }
-
-    const result = []
-    for (let index of chosen) {
-        result.push(array[index])
-    }
-
-    return result
-}
-
-/**
- * Return a random permutation of the given @param array
- * by using the (optimized) Fisher-Yates shuffling algorithm.
- *
- * @param  {Array} array the array to permutate
- */
-module.exports.randomPermutation = array => {
-    if (!Array.isArray(array)) throw Error("Invalid input parameters. Got '" + typeof array + "' instead of Buffer.")
-
-    if (array.length <= 1) return array
-
-    let i, j, tmp
-
-    const byteAmount = Math.max(Math.ceil(Math.log2(array.length)) / 8, 1)
-
-    for (i = array.length - 1; i > 0; i--) {
-        j = module.exports.bufferToNumber(randomBytes(byteAmount)) % (i + 1)
-        tmp = array[i]
-        array[i] = array[j]
-        array[j] = tmp
-    }
-
-    return array
-}
-
-/**
- * @param {Number} start
- * @param {Number} end
- * @returns {Number} random number between @param start and @param end
- */
-module.exports.randomNumber = (start, end) => {
-    if (!end) {
-        end = start
-        start = 0
-    }
-
-    if (start >= end) throw Error('Invalid interval.')
-
-    if (start + 1 == end) return start
-
-    const byteAmount = Math.max(Math.ceil(Math.log2(end - start)) / 8, 1)
-
-    return start + (this.bufferToNumber(randomBytes(byteAmount)) % end)
 }
 
 // ==========================
@@ -533,7 +385,7 @@ module.exports.compileIfNecessary = async (srcFiles, artifacts) => {
     const srcTimes = (await Promise.all(srcFiles.map(srcFile => fsPromise.stat(srcFile)))).map(stat => stat.mtimeMs)
     const artifactTimes = (await Promise.all(artifacts.map(artifact => fsPromise.stat(artifact)))).map(stat => stat.mtimeMs)
 
-    if (Math.max(srcTimes) > Math.min(artifactTimes)) {
+    if (Math.max(...srcTimes) > Math.min(...artifactTimes)) {
         return compile()
     }
 }
@@ -598,57 +450,6 @@ function updateContractAddress(fileNames, contractAddress) {
         })
     )
 }
-/**
- * Decodes the serialized peerBook and inserts the peerInfos in the given
- * peerBook instance.
- *
- * @param {Buffer} serializePeerBook the encodes serialized peerBook
- * @param {PeerBook} peerBook a peerBook instance to store the peerInfo instances
- */
-module.exports.deserializePeerBook = async (serializedPeerBook, peerBook) => {
-    if (!serializedPeerBook) return peerBook
-
-    const serializedPeerInfos = rlp.decode(serializedPeerBook)
-
-    await Promise.all(
-        serializedPeerInfos.map(async serializedPeerInfo => {
-            const peerId = PeerId.createFromBytes(serializedPeerInfo[0])
-
-            if (serializedPeerInfo.length === 3) {
-                peerId.pubKey = libp2p_crypto.unmarshalPublicKey(serializedPeerInfo[2])
-            }
-
-            const peerInfo = await PeerInfo.create(peerId)
-            serializedPeerInfo[1].forEach(multiaddr => peerInfo.multiaddrs.add(Multiaddr(multiaddr)))
-            peerBook.put(peerInfo)
-        })
-    )
-
-    return peerBook
-}
-
-/**
- * Serializes a given peerBook by serializing the included peerInfo instances.
- *
- * @param {PeerBook} peerBook the peerBook instance
- * @returns the encoded peerBook
- */
-module.exports.serializePeerBook = peerBook => {
-    function serializePeerInfo(peerInfo) {
-        const result = [peerInfo.id.toBytes(), peerInfo.multiaddrs.toArray().map(multiaddr => multiaddr.buffer)]
-
-        if (peerInfo.id.pubKey) {
-            result.push(peerInfo.id.pubKey.bytes)
-        }
-
-        return result
-    }
-
-    const peerInfos = []
-    peerBook.getAllArray().forEach(peerInfo => peerInfos.push(serializePeerInfo(peerInfo)))
-
-    return rlp.encode(peerInfos)
-}
 
 const SALT_LENGTH = 32
 
@@ -665,14 +466,14 @@ module.exports.serializeKeyPair = async peerId => {
 
     const pw = await this.askForPassword(question)
 
-    console.log(`Done. Using peerId \x1b[34m${peerId.toB58String()}\x1b[0m\n`)
+    console.log(`Done. Using peerId '${chalk.blue(peerId.toB58String())}'`)
 
     const key = scrypt.hashSync(pw, scryptParams, 32, salt)
-    const iv = crypto.randomBytes(12)
+    const iv = randomBytes(12)
 
     const serializedPeerId = Buffer.concat([Buffer.alloc(16, 0), peerId.marshal()])
 
-    const ciphertext = chacha.chacha20(key, iv).update(serializedPeerId)
+    const ciphertext = createCipheriv(CIPHER_ALGORITHM, key, iv).update(serializedPeerId)
 
     return rlp.encode([salt, iv, ciphertext])
 }
@@ -700,11 +501,11 @@ module.exports.deserializeKeyPair = async encryptedSerializedKeyPair => {
 
         const key = scrypt.hashSync(pw, scryptParams, 32, salt)
 
-        plaintext = chacha.chacha20(key, iv).update(ciphertext)
+        plaintext = createCipheriv(CIPHER_ALGORITHM, key, iv).update(ciphertext)
     } while (!plaintext.slice(0, 16).equals(Buffer.alloc(16, 0)))
 
     const peerId = await PeerId.createFromProtobuf(plaintext)
-    console.log(`Successfully restored ID \x1b[34m${peerId.toB58String()}\x1b[0m.`)
+    console.log(`Successfully restored ID ${chalk.blue(peerId.toB58String())}.`)
 
     return peerId
 }
@@ -741,15 +542,15 @@ module.exports.askForPassword = question =>
  *
  * @param {string} path the path to the directory
  */
-module.exports.clearDirectory = path => {
-    let files = []
+module.exports.clearDirectory = (path: string) => {
+    let files: string[] = []
     if (fs.existsSync(path)) {
         files = fs.readdirSync(path)
-        files.forEach(function(file, index) {
+        files.forEach((file: string) => {
             const curPath = path + '/' + file
             if (fs.lstatSync(curPath).isDirectory()) {
                 // recurse
-                deleteFolderRecursive(curPath)
+                this.clearDirectory(curPath)
             } else {
                 // delete file
                 fs.unlinkSync(curPath)
