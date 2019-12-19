@@ -32,8 +32,8 @@ contract PaymentChannel {
         uint256 id;             //  channel's id
         address sender;         //  the account sending payments
         address recipient;      //  the account receiving the payments
-        IERC20 token;           //  the token that will be used to settle payments
-        uint256 deposit;        //  the token deposit, TODO: move this to constructor
+        IERC20 token;           //  the token that will be used to settle payments, TODO: move this to constructor
+        uint256 deposit;        //  the token deposit
         uint256 expiration;     //  timeout in case the recipient never closes
         ChannelStatus status;   //  channel's status
     }
@@ -110,7 +110,7 @@ contract PaymentChannel {
         settle(channel, amount);
     }
 
-    // The sender can extend the expiration at any time.
+    // the sender can extend the expiration at any time
     function extendChannelExpiration(uint256 channelId, uint256 newExpiration) external {
         channelMustExist(channelId);
 
@@ -122,8 +122,8 @@ contract PaymentChannel {
         channel.expiration = newExpiration;
     }
 
-    // If the timeout is reached without the recipient closing the channel, then
-    // the ether is released back to the sender.
+    // if the timeout is reached without the recipient closing the channel, then
+    // the ether is released back to the sender
     function claimChannelTimeout(uint256 channelId) external {
         channelMustExist(channelId);
 
@@ -134,7 +134,7 @@ contract PaymentChannel {
         settle(channel, 0);
     }
 
-    // Settle channel, send 'amount' to recipient and the rest to sender
+    // settle channel, send 'amount' to recipient and the rest to sender
     function settle(Channel storage channel, uint256 amount) internal {
         if (amount > 0) {
             channel.token.safeTransfer(channel.recipient, amount);
@@ -180,7 +180,7 @@ contract PaymentChannel {
         return ecrecover(message, v, r, s);
     }
 
-    // Builds a prefixed hash to mimic the behavior of eth_sign.
+    // builds a prefixed hash to mimic the behavior of eth_sign
     function prefixed(bytes32 hash) internal pure returns (bytes32) {
         return keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", hash));
     }
@@ -192,7 +192,7 @@ contract PaymentChannel {
         return recoverSigner(message, signature) == sender;
     }
 
-    // Revert when somebody is sending ether
+    // revert when somebody is sending ether
     function () external {
         revert();
     }
