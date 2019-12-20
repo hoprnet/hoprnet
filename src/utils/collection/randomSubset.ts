@@ -1,7 +1,4 @@
-import { randomBytes } from 'crypto'
-import BN from 'bn.js'
-
-import randomInteger from '../base/randomInteger'
+import randomInteger from '../general/randomInteger'
 import randomPermutation from './randomPermutation'
 
 /**
@@ -20,33 +17,31 @@ import randomPermutation from './randomPermutation'
  * @notice If less than @param subsetSize elements pass the test,
  * the result will contain less than @param subsetSize elements.
  */
-export default function randomSubset<T>(array: T[], subsetSize: number, filter: (candidate: T) => boolean): T[] {
+export default function randomSubset<T>(array: T[], subsetSize: number, filter?: (candidate: T) => boolean): T[] {
     if (subsetSize < 0) {
         throw Error(`Invalid input arguments. Please provide a positive subset size. Got '${subsetSize}' instead.`)
     }
 
     if (subsetSize > array.length) {
-        throw Error(`Invalid subset size. Subset size must not be greater than set size.`)
-    } 
+        throw Error(`Invalid subset size. Subset size must not be greater than the array size.`)
+    }
 
-    if (subsetSize <= 0) {
+    if (subsetSize == 0) {
         return []
     }
 
-    if (subsetSize === array.length) {
+    if (subsetSize == array.length) {
         // Returns a random permutation of all elements that pass
         // the test.
-        return randomPermutation(array.filter(filter))
+        return randomPermutation(filter != null ? array.filter(filter) : array)
     }
-
-    const byteAmount: number = Math.max(Math.ceil(Math.log2(array.length)) / 8, 1)
 
     if (subsetSize == 1) {
         let i = 0
         let index = randomInteger(0, array.length)
-        
-        while (!filter(array[index])) {
-            if (i === array.length) {
+
+        while (filter != null && !filter(array[index])) {
+            if (i == array.length) {
                 // There seems to be no element in the array
                 // that passes the test.
                 return []
@@ -57,18 +52,14 @@ export default function randomSubset<T>(array: T[], subsetSize: number, filter: 
         return [array[index]]
     }
 
-    let notChosen = new Set<T>()
-    let chosen = new Set<T>()
+    let notChosen = new Set<number>()
+    let chosen = new Set<number>()
     let found: boolean
     let breakUp = false
 
     let index: number
-    const arrayLength = array.length
     for (let i = 0; i < subsetSize && !breakUp; i++) {
-        index = randomInteger(0, )
-        
-        
-        new BN(randomBytes(byteAmount)).umod(new BN(arrayLength)).addn(index).toNumber()
+        index = randomInteger(0, array.length)
 
         found = false
 
@@ -77,7 +68,7 @@ export default function randomSubset<T>(array: T[], subsetSize: number, filter: 
                 index = (index + 1) % array.length
             }
 
-            if (!filter(array[index])) {
+            if (filter != null && !filter(array[index])) {
                 notChosen.add(index)
                 index = (index + 1) % array.length
                 found = false
@@ -86,14 +77,14 @@ export default function randomSubset<T>(array: T[], subsetSize: number, filter: 
                 found = true
             }
 
-            if (notChosen.size + chosen.size == array.length && chosen.size < subsetSize) {
+            if (notChosen.size + chosen.size == array.length) {
                 breakUp = true
                 break
             }
         } while (!found)
     }
 
-    const result = []
+    const result: T[] = []
     for (let index of chosen) {
         result.push(array[index])
     }

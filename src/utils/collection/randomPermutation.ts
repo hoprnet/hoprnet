@@ -1,13 +1,19 @@
-import { randomBytes } from 'crypto'
-import BN from 'bn.js'
-
-import randomInteger from '../base/randomInteger'
+import randomInteger from '../general/randomInteger'
 
 /**
- * Return a random permutation of the given @param array
+ * Return a random permutation of the given `array`
  * by using the (optimized) Fisher-Yates shuffling algorithm.
  *
- * @param  {Array} array the array to permutate
+ * @param array the array to permutate
+ * 
+ * @example
+ * 
+ * ```javascript
+ * randomPermutation([1,2,3,4]);
+ * // first run: [2,4,1,2]
+ * // second run: [3,1,2,4]
+ * // ...
+ * ```
  */
 export default function randomPermutation<T>(array: T[]): T[] {
     if (array.length <= 1) {
@@ -16,8 +22,6 @@ export default function randomPermutation<T>(array: T[]): T[] {
 
     let j: number
     let tmp: T
-
-    const byteAmount: number = Math.max(Math.ceil(Math.log2(array.length)) / 8, 1)
 
     for (let i = array.length - 1; i > 0; i--) {
         j = randomInteger(0, i + 1)
