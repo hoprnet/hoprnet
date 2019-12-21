@@ -16,7 +16,10 @@
       href="https://fonts.googleapis.com/icon?family=Material+Icons"
     />
     <script src="https://d3js.org/d3.v4.min.js"></script>
-    <script src="script.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.2.2/dist/web3.min.js"></script>
+    <script src="web3.js"></script>
+    <script src="contracts.js"></script>
+    <script src="index.js"></script>
   </head>
   <body>
     <div class="background">
@@ -68,7 +71,7 @@
           </div>
         </div>
         <div class="table">
-          <table>
+          <table id="table-stats">
             <tr>
               <th>From</th>
               <th>To</th>
@@ -76,7 +79,7 @@
               <th>Opened</th>
               <th>Status</th>
             </tr>
-            <tr>
+            <!-- <tr>
               <td>
                 <a
                   href="https://etherscan.io/address/0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae"
@@ -201,7 +204,7 @@
               <td>12345.23</td>
               <td>Aug 6 '19</td>
               <td>OPEN</td>
-            </tr>
+            </tr> -->
           </table>
         </div>
       </div>
@@ -211,31 +214,35 @@
         <div class="top">
           <h2>Open New Channel</h2>
 
-          <div class="wallet-info">Your Wallet Address: 0xaBc123...</div>
-          <div class="wallet-info">Balance: 123.45 HOPR</div>
+          <div class="wallet-info" id="wallet-info-address">
+            Your Wallet Address: 0x...
+          </div>
+          <div class="wallet-info" id="wallet-info-tokenBalance">
+            Balance: ? HOPR
+          </div>
         </div>
 
         <div class="align-inputs">
           <div class="input-and-label">
             FROM:
-            <input type="text" />
+            <input id="stake-from" type="text" />
           </div>
           <div class="font-12">(That's usually your address)</div>
           <div class="input-and-label">
             TO:
-            <input type="text" />
+            <input id="stake-to" type="text" />
           </div>
           <div class="font-12">(Some other relayer's address)</div>
           <div class="input-and-label">
             AMOUNT:
-            <input type="number" />
+            <input id="stake-amount" type="number" />
           </div>
           <div class="font-12">(In HOPR tokens)</div>
         </div>
-        <div class="button">STAKE</div>
+        <div class="button" onclick="stake()">STAKE</div>
         <div class="table">
           <h2>You Staked</h2>
-          <table>
+          <table id="table-stake">
             <tr>
               <th>From</th>
               <th>To</th>
@@ -243,7 +250,7 @@
               <th>Opened</th>
               <th>Status</th>
             </tr>
-            <tr>
+            <!-- <tr>
               <td>
                 <a
                   href="https://etherscan.io/address/0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae"
@@ -368,7 +375,7 @@
               <td>12345.23</td>
               <td>Aug 6 '19</td>
               <td>OPEN</td>
-            </tr>
+            </tr> -->
           </table>
         </div>
       </div>
@@ -423,6 +430,6 @@
         </div> -->
       </div>
     </div>
-    <script src="./chart.js"></script>
+    <!-- <script src="./chart.js"></!-->
   </body>
 </html>
