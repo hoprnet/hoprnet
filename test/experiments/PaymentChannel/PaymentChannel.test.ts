@@ -57,12 +57,12 @@ contract("PaymentChannel", ([sender, recipient]) => {
     );
 
     expectEvent(receipt, "OpenedChannel", {
-      channelId: "1",
+      id: "1",
       funder: sender,
       sender,
       recipient,
       token: hoprToken.address,
-      depositedAmount: depositAmount
+      deposit: depositAmount
     });
 
     const channel = await paymentChannel.channels("1").then(responseToChannel);
@@ -109,7 +109,7 @@ contract("PaymentChannel", ([sender, recipient]) => {
     );
 
     expectEvent(receipt, "ClosedChannel", {
-      channelId: "1",
+      id: "1",
       senderAmount: web3.utils.toWei("0.5", "ether").toString(),
       recipientAmount: web3.utils.toWei("0.5", "ether").toString()
     });

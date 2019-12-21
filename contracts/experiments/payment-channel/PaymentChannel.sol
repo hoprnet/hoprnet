@@ -12,16 +12,16 @@ contract PaymentChannel {
 
     // inform that a payment channel has been created
     event OpenedChannel(
-        uint256 channelId,
+        uint256 id,
         address funder,
         address indexed sender,
         address indexed recipient,
         address indexed token,
-        uint256 depositedAmount
+        uint256 deposit
     );
 
     // inform that a payment channel partners that the channel has been settled and closed
-    event ClosedChannel(uint256 indexed channelId, uint256 senderAmount, uint256 recipientAmount);
+    event ClosedChannel(uint256 indexed id, uint256 senderAmount, uint256 recipientAmount);
 
     enum ChannelStatus {
         OPEN,
