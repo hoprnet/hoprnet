@@ -15,19 +15,18 @@ const PaymentChannel: PaymentChannelContract = artifacts.require(
   "PaymentChannel"
 );
 
+// taken from "scripts/test.sh"
 const senderPrivKey =
   "0x2bdd21761a483f71054e14f5b827213567971c676928d9a1808cbfa4b7501200";
 
 const responseToChannel = (
   res: PromiseType<PaymentChannelInstance["channels"]>
 ) => ({
-  id: res[0],
-  sender: res[1],
-  recipient: res[2],
-  token: res[3],
-  deposit: res[4],
-  expiration: res[5],
-  status: res[6]
+  sender: res[0],
+  recipient: res[1],
+  deposit: res[2],
+  expiration: res[3],
+  status: res[4]
 });
 
 contract("PaymentChannel", ([sender, recipient]) => {
@@ -41,7 +40,10 @@ contract("PaymentChannel", ([sender, recipient]) => {
     hoprToken = await HoprToken.new();
     totalSupply = await hoprToken.totalSupply().then(res => res.toString());
 
-    paymentChannel = await PaymentChannel.new();
+    paymentChannel = await PaymentChannel.new(
+      hoprToken.address,
+      time.duration.weeks(1)
+    );
 
     await hoprToken.approve(paymentChannel.address, totalSupply);
   });
@@ -51,9 +53,7 @@ contract("PaymentChannel", ([sender, recipient]) => {
       sender,
       sender,
       recipient,
-      hoprToken.address,
-      depositAmount,
-      time.duration.weeks(1)
+      depositAmount
     );
 
     expectEvent(receipt, "OpenedChannel", {
@@ -61,18 +61,15 @@ contract("PaymentChannel", ([sender, recipient]) => {
       funder: sender,
       sender,
       recipient,
-      token: hoprToken.address,
       deposit: depositAmount
     });
 
     const channel = await paymentChannel.channels("1").then(responseToChannel);
     const numberOfChannels = await paymentChannel.numberOfChannels();
 
-    expect(channel.id.toString()).to.be.equal("1");
     expect(channel.sender).to.be.equal(sender);
     expect(channel.recipient).to.be.equal(recipient);
-    expect(channel.token).to.be.equal(hoprToken.address);
-    expect(channel.status.toString()).to.be.equal("0");
+    expect(channel.status.toString()).to.be.equal("1");
     expect(numberOfChannels.toString()).to.be.equal("1");
   });
 
@@ -140,16 +137,14 @@ contract("PaymentChannel", ([sender, recipient]) => {
       sender,
       sender,
       recipient,
-      hoprToken.address,
-      depositAmount,
-      time.duration.weeks(1)
+      depositAmount
     );
 
     await time.increase(time.duration.weeks(2));
     await paymentChannel.claimChannelTimeout("2");
 
     const channel = await paymentChannel.channels("2").then(responseToChannel);
-    expect(channel.status.toString()).to.be.equal("1");
+    expect(channel.status.toString()).to.be.equal("2");
     expect(channel.deposit.toString()).to.be.equal("0");
 
     const senderBalance = await hoprToken
