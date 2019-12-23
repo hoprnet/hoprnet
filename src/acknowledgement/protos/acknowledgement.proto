@@ -1,0 +1,12 @@
+message Signature {
+    required bytes r = 1;
+    required bytes s = 2;
+    required bool recovery = 3;
+}
+
+message Acknowledgement {
+    required bytes key = 1;
+    required Signature challengeSignature = 2;
+    required Signature responseSignature = 3;
+
+}

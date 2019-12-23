@@ -1,26 +1,15 @@
 'use strict'
 
 const { sha3, toChecksumAddress } = require('web3-utils')
-const { randomBytes, createCipheriv } = require('crypto')
 const { promisify } = require('util')
 const fs = require('fs')
-const fsPromise = require('fs').promises
-const libp2p_crypto = require('libp2p-crypto').keys
-const PeerId = require('peer-id')
-const rlp = require('rlp')
-const PeerInfo = require('peer-info')
-const Multiaddr = require('multiaddr')
-const Multihash = require('multihashes')
+import { promises as fsPromise, Stats, readFileSync } from 'fs'
+
 const { publicKeyConvert } = require('secp256k1')
-const scrypt = require('scrypt')
-const read = require('read')
 const solc = require('solc')
 const chalk = require('chalk')
 
-const CIPHER_ALGORITHM = 'chacha20'
 
-const COMPRESSED_PUBLIC_KEY_LENGTH = 33
-const PRIVKEY_LENGTH = 32
 
 export * from './u8a'
 
@@ -44,7 +33,6 @@ module.exports.deepCopy = (instance, Class) => {
 
     return Class.fromBuffer(buf)
 }
-
 
 module.exports.log = (peerId, msg) => console.log(`['${chalk.blue(peerId.toB58String())}']: ${msg}`)
 // ==========================
@@ -169,64 +157,9 @@ module.exports.getId = (sender, counterparty) => {
 // ==========================
 // libp2p methods
 // ==========================
-/**
- * Converts a plain compressed ECDSA public key over the curve `secp256k1`
- * to a peerId in order to use it with libp2p.
- *
- * @notice Libp2p stores the keys in format that is derived from `protobuf`.
- * Using `libsecp256k1` directly does not work.
- *
- * @param {Buffer | string} pubKey the plain public key
- * @returns {Promise<PeerId>}
- */
-module.exports.pubKeyToPeerId = pubKey => {
-    if (typeof pubKey === 'string') {
-        pubKey = Buffer.from(pubKey.replace(/0x/, ''), 'hex')
-    }
 
-    if (!Buffer.isBuffer(pubKey)) throw Error(`Unable to parse public key to desired representation. Got ${pubKey.toString()}.`)
 
-    if (pubKey.length != COMPRESSED_PUBLIC_KEY_LENGTH)
-        throw Error(`Invalid public key. Expected a buffer of size ${COMPRESSED_PUBLIC_KEY_LENGTH} bytes. Got one of ${pubKey.length} bytes.`)
 
-    pubKey = new libp2p_crypto.supportedKeys.secp256k1.Secp256k1PublicKey(pubKey)
-
-    return PeerId.createFromPubKey(pubKey.bytes)
-}
-
-/**
- * Converts a plain compressed ECDSA private key over the curve `secp256k1`
- * to a peerId in order to use it with libp2p.
- * It equips the generated peerId with private key and public key.
- *
- * @param {Buffer | string} privKey the plain private key
- */
-module.exports.privKeyToPeerId = privKey => {
-    if (typeof privKey === 'string') privKey = Buffer.from(privKey.replace(/0x/, ''), 'hex')
-
-    if (!Buffer.isBuffer(privKey)) throw Error(`Unable to parse private key to desired representation. Got type '${typeof privKey}'.`)
-
-    if (privKey.length != PRIVKEY_LENGTH)
-        throw Error(`Invalid private key. Expected a buffer of size ${PRIVKEY_LENGTH} bytes. Got one of ${privKey.length} bytes.`)
-
-    privKey = new libp2p_crypto.supportedKeys.secp256k1.Secp256k1PrivateKey(privKey)
-
-    return PeerId.createFromPrivKey(privKey.bytes)
-}
-
-/**
- * Takes a peerId and returns a peerId with the public key set to the corresponding
- * public key.
- *
- * @param {PeerId} peerId the PeerId instance that has probably no pubKey set
- */
-module.exports.addPubKey = async peerId => {
-    if (PeerId.isPeerId(peerId) && peerId.pubKey) return peerId
-
-    peerId.pubKey = await libp2p_crypto.unmarshalPublicKey(Multihash.decode(peerId.toBytes()).digest)
-
-    return peerId
-}
 
 // ==========================
 // Ganache-core methods   <-- ONLY FOR TESTING
@@ -329,15 +262,17 @@ module.exports.sendTransaction = async (tx, peerId, web3) => {
  * @param {Array} srcFiles the absolute paths of the source files
  * @param {Array} artifacts the absolute paths of the artifacts
  */
-module.exports.compileIfNecessary = async (srcFiles, artifacts) => {
-    function findImports(path) {
+export async function compileIfNecessary(srcFiles: string[], artifacts: string[]): Promise<void> {
+    function findImports(path: string): { contents: string } {
         return {
-            contents: fs.readFileSync(`${process.cwd()}/node_modules/${path}`).toString()
+            contents: readFileSync(`${process.cwd()}/node_modules/${path}`).toString()
         }
     }
 
-    const compile = async () => {
-        const sources = await Promise.all(srcFiles.map(srcFile => fsPromise.readFile(srcFile).then(file => [srcFile, file.toString()])))
+    async function compile() {
+        const sources: [string, string][] = await Promise.all<[string, string]>(
+            srcFiles.map((srcFile: string) => fsPromise.readFile(srcFile).then((file: Buffer) => [srcFile, file.toString()]))
+        )
 
         const srcObject = {}
         sources.forEach(([file, content]) => {
@@ -359,9 +294,12 @@ module.exports.compileIfNecessary = async (srcFiles, artifacts) => {
                 }
             }
         }
+
         const compiledContracts = JSON.parse(solc.compile(JSON.stringify(input), findImports))
 
-        if (compiledContracts.errors) throw compiledContracts.errors.map(err => err.formattedMessage).join('\n')
+        if (compiledContracts.errors) {
+            throw compiledContracts.errors.map(err => err.formattedMessage).join('\n')
+        }
 
         this.createDirectoryIfNotExists('build/contracts')
 
@@ -377,13 +315,15 @@ module.exports.compileIfNecessary = async (srcFiles, artifacts) => {
     }
 
     try {
-        await Promise.all(artifacts.map(artifact => fsPromise.access(artifact)))
+        await Promise.all<void>(artifacts.map((artifact: string) => fsPromise.access(artifact)))
     } catch (err) {
         return compile()
     }
 
-    const srcTimes = (await Promise.all(srcFiles.map(srcFile => fsPromise.stat(srcFile)))).map(stat => stat.mtimeMs)
-    const artifactTimes = (await Promise.all(artifacts.map(artifact => fsPromise.stat(artifact)))).map(stat => stat.mtimeMs)
+    const [srcTimes, artifactTimes] = await Promise.all<number[]>([
+        Promise.all<Stats>(srcFiles.map((srcFile: string) => fsPromise.stat(srcFile))).then((stats: Stats[]) => stats.map((stat: Stats) => stat.mtimeMs)),
+        Promise.all<Stats>(artifacts.map((artifact: string) => fsPromise.stat(artifact))).then((stats: Stats[]) => stats.map((stat: Stats) => stat.mtimeMs))
+    ])
 
     if (Math.max(...srcTimes) > Math.min(...artifactTimes)) {
         return compile()
@@ -393,12 +333,12 @@ module.exports.compileIfNecessary = async (srcFiles, artifacts) => {
 /**
  * Deploys the smart contract.
  *
- * @param {Number} index current index of the account of `FUNDING_PEER`
- * @param {Web3} web3 instance of web3.js
- * @returns {Promise} promise that resolve once the contract is compiled and deployed, otherwise
+ * @param index current index of the account of `FUNDING_PEER`
+ * @param web3 instance of web3.js
+ * @returns promise that resolve once the contract is compiled and deployed, otherwise
  * it rejects.
  */
-module.exports.deployContract = async (index, web3) => {
+export async function deployContract(index, web3) {
     const fundingPeer = await this.privKeyToPeerId(process.env.FUND_ACCOUNT_PRIVATE_KEY)
 
     let compiledContract = await this.compileIfNecessary([`${process.cwd()}/contracts/HoprChannel.sol`], [`${process.cwd()}/build/contracts/HoprChannel.json`])
@@ -431,17 +371,15 @@ module.exports.deployContract = async (index, web3) => {
 /**
  * Takes a contract address and changes every occurence of `CONTRACT_ADDRESS = //...` to
  * the given contract address
- * @param {string[]} fileNames the files whose CONTRACT_ADDRESS should be changed
- * @param {string} contractAddress the new contract address
+ * @param fileNames the files whose CONTRACT_ADDRESS should be changed
+ * @param contractAddress the new contract address
  */
-function updateContractAddress(fileNames, contractAddress) {
-    if (!Array.isArray(fileNames)) fileNames = [fileNames]
-
+function updateContractAddress(fileNames: string[], contractAddress: string): Promise<void[]> {
     process.env[`CONTRACT_ADDRESS`] = contractAddress
 
-    return Promise.all(
+    return Promise.all<void>(
         fileNames.map(async filename => {
-            let file = (await fsPromise.readFile(filename)).toString()
+            let file: string = (await fsPromise.readFile(filename)).toString()
             const regex = new RegExp(`CONTRACT_ADDRESS_${process.env.NETWORK.toUpperCase()}\\s{0,}=(\\s{0,}0x[0-9a-fA-F]{0,})?`, 'g')
 
             file = file.replace(regex, `CONTRACT_ADDRESS_${process.env.NETWORK.toUpperCase()} = ${contractAddress}`)
@@ -449,135 +387,4 @@ function updateContractAddress(fileNames, contractAddress) {
             await fsPromise.writeFile(filename, Buffer.from(file))
         })
     )
-}
-
-const SALT_LENGTH = 32
-
-/**
- * Serializes a given peerId by serializing the included private key and public key.
- *
- * @param {PeerId} peerId the peerId that should be serialized
- */
-module.exports.serializeKeyPair = async peerId => {
-    const salt = randomBytes(SALT_LENGTH)
-    const scryptParams = { N: 8192, r: 8, p: 16 }
-
-    const question = 'Please type in the password that will be used to encrypt the generated key.'
-
-    const pw = await this.askForPassword(question)
-
-    console.log(`Done. Using peerId '${chalk.blue(peerId.toB58String())}'`)
-
-    const key = scrypt.hashSync(pw, scryptParams, 32, salt)
-    const iv = randomBytes(12)
-
-    const serializedPeerId = Buffer.concat([Buffer.alloc(16, 0), peerId.marshal()])
-
-    const ciphertext = createCipheriv(CIPHER_ALGORITHM, key, iv).update(serializedPeerId)
-
-    return rlp.encode([salt, iv, ciphertext])
-}
-
-/**
- * Deserializes a serialized key pair and returns a peerId.
- *
- * @notice This method will ask for a password to decrypt the encrypted
- * private key.
- * @notice The decryption of the private key makes use of a memory-hard
- * hash function and consumes therefore a lot of memory.
- *
- * @param {Buffer} encryptedSerializedKeyPair the encoded and encrypted key pair
- */
-module.exports.deserializeKeyPair = async encryptedSerializedKeyPair => {
-    const [salt, iv, ciphertext] = rlp.decode(encryptedSerializedKeyPair)
-
-    const scryptParams = { N: 8192, r: 8, p: 16 }
-
-    const question = 'Please type in the password that was used to encrypt the key.'
-
-    let plaintext
-    do {
-        const pw = await this.askForPassword(question)
-
-        const key = scrypt.hashSync(pw, scryptParams, 32, salt)
-
-        plaintext = createCipheriv(CIPHER_ALGORITHM, key, iv).update(ciphertext)
-    } while (!plaintext.slice(0, 16).equals(Buffer.alloc(16, 0)))
-
-    const peerId = await PeerId.createFromProtobuf(plaintext)
-    console.log(`Successfully restored ID ${chalk.blue(peerId.toB58String())}.`)
-
-    return peerId
-}
-
-/**
- * Asks the user for a password. Does not echo the password.
- *
- * @param {string} question string that is displayed before the user input
- */
-module.exports.askForPassword = question =>
-    new Promise((resolve, reject) => {
-        if (process.env.DEBUG === 'true') {
-            console.log('Debug mode: using password Epo5kZTFidOCHrnL0MzsXNwN9St')
-            resolve('Epo5kZTFidOCHrnL0MzsXNwN9St')
-        } else {
-            read(
-                {
-                    prompt: question,
-                    silent: true,
-                    edit: true,
-                    replace: '*'
-                },
-                (err, pw, isDefault) => {
-                    if (err) return reject(err)
-
-                    resolve(pw)
-                }
-            )
-        }
-    })
-
-/**
- * Deletes recursively (and synchronously) all files in a directory.
- *
- * @param {string} path the path to the directory
- */
-module.exports.clearDirectory = (path: string) => {
-    let files: string[] = []
-    if (fs.existsSync(path)) {
-        files = fs.readdirSync(path)
-        files.forEach((file: string) => {
-            const curPath = path + '/' + file
-            if (fs.lstatSync(curPath).isDirectory()) {
-                // recurse
-                this.clearDirectory(curPath)
-            } else {
-                // delete file
-                fs.unlinkSync(curPath)
-            }
-        })
-        fs.rmdirSync(path)
-    }
-}
-
-/**
- * Creates a directory if it doesn't exist.
- *
- * @example
- * createDirectoryIfNotExists('db/testnet') // creates `./db` and `./db/testnet`
- * @param {string} path
- */
-module.exports.createDirectoryIfNotExists = path => {
-    const chunks = path.split('/')
-
-    chunks.reduce((searchPath, chunk) => {
-        searchPath += '/'
-        searchPath += chunk
-        try {
-            fs.accessSync(`${process.cwd()}${searchPath}`)
-        } catch (err) {
-            fs.mkdirSync(`${process.cwd()}${searchPath}`)
-        }
-        return searchPath
-    }, '')
 }

@@ -7,9 +7,8 @@
  * @summary Creates a concatenated Uint8Array from the inputs.
  * @description
  * Concatenates the input arrays into a single `UInt8Array`.
+ * 
  * @example
- * <BR>
- *
  * ```javascript
  *
  * u8aConcat(

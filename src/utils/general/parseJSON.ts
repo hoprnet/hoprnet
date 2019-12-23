@@ -2,7 +2,7 @@
  * Parse JSON while recovering all Buffer elements
  * @param str JSON string
  */
-export default function parseJSON(str: string) {
+export default function parseJSON(str: string): object {
     return JSON.parse(str, (key, value) => {
         if (value && value.type === 'Buffer') {
             return Buffer.from(value.data)
@@ -11,4 +11,3 @@ export default function parseJSON(str: string) {
         return value
     })
 }
-    

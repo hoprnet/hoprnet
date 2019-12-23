@@ -3,6 +3,7 @@ import randomPermutation from './randomPermutation'
 
 describe('testing random permutation', function() {
     let ATTEMPTS = 2
+    
     it(`should apply a random permutation`, function() {
         for (let counter = 0; counter < ATTEMPTS; counter++) {
             let array = []
