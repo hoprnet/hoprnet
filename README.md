@@ -13,6 +13,7 @@ Table of Contents:
 - [Contracts](#contracts)
   - [HoprChannel](#hoprchannel)
   - [HoprToken](#hoprtoken)
+  - [Linting](#linting)
 - [Future Improvements](#future-improvements)
 
 # Requirements
@@ -90,12 +91,16 @@ Decimals: 18
 Total Supply: 100,000,000
 ```
 
+## Linting
+
+We use solhint's default preset to perform linting onto our smart contracts.
+
 # Future Improvements
 
-* **ganache-cli-coverage**: eventually we would like to switch to [ganache-core-coverage](https://github.com/OpenZeppelin/ganache-core-coverage) once it matures enough. [#issue](https://forum.openzeppelin.com/t/how-is-solidity-coverage-integrated-into-openzeppelin/1323/3)
+- **ganache-cli-coverage**: eventually we would like to switch to [ganache-core-coverage](https://github.com/OpenZeppelin/ganache-core-coverage) once it matures enough. [#issue](https://forum.openzeppelin.com/t/how-is-solidity-coverage-integrated-into-openzeppelin/1323/3)
 
-* **redundant compiles**: when running `yarn test` or `yarn coverage`, we always make sure to generate the latest typescript types, this requires us to compile the contracts. Internally, both scripts use `truffle test` which recompiles the contracts even though they haven't changed. [#issue](https://github.com/trufflesuite/truffle/issues/469) [#solution](https://github.com/trufflesuite/truffle/issues/2661)
+- **redundant compiles**: when running `yarn test` or `yarn coverage`, we always make sure to generate the latest typescript types, this requires us to compile the contracts. Internally, both scripts use `truffle test` which recompiles the contracts even though they haven't changed. [#issue](https://github.com/trufflesuite/truffle/issues/469) [#solution](https://github.com/trufflesuite/truffle/issues/2661)
 
-* **fix-typechain**: [typechain](https://github.com/ethereum-ts/TypeChain) does not fully support Truffle v5 yet. [#issue](https://github.com/ethereum-ts/TypeChain/issues/193)
+- **fix-typechain**: [typechain](https://github.com/ethereum-ts/TypeChain) does not fully support Truffle v5 yet. [#issue](https://github.com/ethereum-ts/TypeChain/issues/193)
 
-* **fix-truffle-typings**: [truffle-typings](https://github.com/ethereum-ts/truffle-typings) does not fully support Truffle v5 yet. [#issue](https://github.com/ethereum-ts/truffle-typings/pull/13#issuecomment-550325019)
+- **fix-truffle-typings**: [truffle-typings](https://github.com/ethereum-ts/truffle-typings) does not fully support Truffle v5 yet. [#issue](https://github.com/ethereum-ts/truffle-typings/pull/13#issuecomment-550325019)
