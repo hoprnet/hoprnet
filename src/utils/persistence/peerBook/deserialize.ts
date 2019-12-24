@@ -2,8 +2,9 @@ import rlp from 'rlp'
 import * as PeerBook from 'peer-book'
 import PeerId from 'peer-id'
 import PeerInfo from 'peer-info'
-import * as Multiaddr from 'multiaddr'
+import Multiaddr from 'multiaddr'
 import { keys as libp2pCrypto } from 'libp2p-crypto'
+import { SerializedPeerBook, SerializedPeerInfo} from './serialize'
 
 /**
  * Decodes the serialized peerBook and inserts the peerInfos in the given
@@ -13,10 +14,10 @@ import { keys as libp2pCrypto } from 'libp2p-crypto'
  * @param {PeerBook} peerBook a peerBook instance to store the peerInfo instances
  */
 export default async function deserializePeerBook(serializedPeerBook: Uint8Array, peerBook?: PeerBook): PeerBook {
-    const serializedPeerInfos = (rlp.decode(serializedPeerBook) as unknown) as Buffer[][]
+    const serializedPeerInfos = (rlp.decode(serializedPeerBook) as unknown) as SerializedPeerBook
 
     await Promise.all(
-        serializedPeerInfos.map(async (serializedPeerInfo: Buffer[]) => {
+        serializedPeerInfos.map(async (serializedPeerInfo: SerializedPeerInfo) => {
             const peerId = PeerId.createFromBytes(serializedPeerInfo[0])
 
             if (serializedPeerInfo.length === 3) {
@@ -24,7 +25,7 @@ export default async function deserializePeerBook(serializedPeerBook: Uint8Array
             }
 
             const peerInfo = await PeerInfo.create(peerId)
-            serializedPeerInfo[1].forEach(multiaddr => peerInfo.multiaddrs.add(Multiaddr(multiaddr)))
+            serializedPeerInfo[1].forEach((multiaddr: Buffer) => peerInfo.multiaddrs.add(Multiaddr(multiaddr)))
             peerBook.put(peerInfo)
         })
     )

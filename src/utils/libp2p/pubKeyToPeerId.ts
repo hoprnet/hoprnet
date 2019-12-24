@@ -13,11 +13,11 @@ const COMPRESSED_PUBLIC_KEY_LENGTH = 33
  * @param {Buffer | string} pubKey the plain public key
  * @returns {Promise<PeerId>}
  */
-export default function pubKeyToPeerId(pubKey: Buffer) {
+export default function pubKeyToPeerId(pubKey: Buffer): Promise<PeerId> {
     if (pubKey.length != COMPRESSED_PUBLIC_KEY_LENGTH)
         throw Error(`Invalid public key. Expected a buffer of size ${COMPRESSED_PUBLIC_KEY_LENGTH} bytes. Got one of ${pubKey.length} bytes.`)
 
-    pubKey = new libp2p_crypto.supportedKeys.secp256k1.Secp256k1PublicKey(pubKey)
+    const secp256k1PubKey = new libp2p_crypto.supportedKeys.secp256k1.Secp256k1PublicKey(pubKey)
 
-    return PeerId.createFromPubKey(pubKey.bytes)
+    return PeerId.createFromPubKey(secp256k1PubKey.bytes)
 }
