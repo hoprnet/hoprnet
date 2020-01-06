@@ -70,89 +70,6 @@ module.exports.bufferToNumber = buf => {
 }
 
 // ==========================
-// Ethereum methods
-// ==========================
-// /**
-//  * Derives an Ethereum address from a given public key.
-//  *
-//  * @param  {Buffer} pubKey given as compressed elliptic curve point.
-//  *
-//  * @returns {String} e.g. 0xc1912fEE45d61C87Cc5EA59DaE31190FFFFf232d
-//  */
-// module.exports.pubKeyToEthereumAddress = pubKey => {
-//     if (!Buffer.isBuffer(pubKey) || pubKey.length !== COMPRESSED_PUBLIC_KEY_LENGTH)
-//         throw Error(
-//             `Invalid input parameter. Expected a Buffer of size ${COMPRESSED_PUBLIC_KEY_LENGTH}. Got '${typeof pubKey}'${
-//                 pubKey.length ? ` of length ${pubKey.length}` : ''
-//             }.`
-//         )
-
-//     const hash = sha3(publicKeyConvert(pubKey, false).slice(1))
-
-//     return toChecksumAddress(hash.replace(/(0x)[0-9a-fA-F]{24}([0-9a-fA-F]{20})/, '$1$2'))
-// }
-
-// /**
-//  * Checks whether the ethereum address of the @param sender is
-//  * smaller than the ethereum address of the @param otherParty
-//  *
-//  * @param {String | Buffer} sender an ethereum address
-//  * @param {String | Buffer} otherParty another ethereum address
-//  */
-// module.exports.isPartyA = (sender, otherParty) => {
-//     if (typeof sender === 'string') {
-//         if (sender.length !== 42) throw Error('Invalid input parameters')
-
-//         sender = Buffer.from(sender.replace(/0x/, ''), 'hex')
-//     }
-
-//     if (typeof otherParty === 'string') {
-//         if (otherParty.length !== 42) {
-//             throw Error('Invalid input parameters')
-//         }
-//         otherParty = Buffer.from(otherParty.replace(/0x/, ''), 'hex')
-//     }
-
-//     if (!Buffer.isBuffer(sender) || !Buffer.isBuffer(otherParty)) throw Error('Invalid input parameters')
-
-//     if (sender.length != 20 || otherParty.length != 20) throw Error('Invalid input parameters')
-
-//     return Buffer.compare(sender, otherParty) < 0
-// }
-
-// const ETHEUREUM_ADDRESS_SIZE = 20 // Bytes
-
-// /**
-//  * Computes the ID that is used by the smart contract to
-//  * store payment channels.
-//  *
-//  * @param {String | Buffer} sender an ethereum address or the corresponding public key
-//  * @param {String | Buffer} counterparty another ethereum address or the corresponding public key
-//  * @returns {Buffer} the Id
-//  */
-// module.exports.getId = (sender, counterparty) => {
-//     if (Buffer.isBuffer(sender) && sender.length == COMPRESSED_PUBLIC_KEY_LENGTH) {
-//         sender = this.pubKeyToEthereumAddress(sender)
-//     }
-
-//     if (Buffer.isBuffer(counterparty) && counterparty.length == COMPRESSED_PUBLIC_KEY_LENGTH) {
-//         counterparty = this.pubKeyToEthereumAddress(counterparty)
-//     }
-
-//     if (typeof sender !== 'string' || typeof counterparty !== 'string')
-//         throw Error(`Invalid input parameters. Unable to convert ${typeof sender} and / or ${typeof counterparty} to an Ethereum address.`)
-
-//     sender = Buffer.from(sender.replace(/0x/, ''), 'hex')
-//     counterparty = Buffer.from(counterparty.replace(/0x/, ''), 'hex')
-
-//     if (module.exports.isPartyA(sender, counterparty)) {
-//         return module.exports.hash(Buffer.concat([sender, counterparty], 2 * ETHEUREUM_ADDRESS_SIZE))
-//     } else {
-//         return module.exports.hash(Buffer.concat([counterparty, sender], 2 * ETHEUREUM_ADDRESS_SIZE))
-//     }
-// }
-
-// ==========================
 // libp2p methods
 // ==========================
 
@@ -192,48 +109,6 @@ module.exports.mineBlock = async (provider, amountOfTime = ONE_MINUTE) => {
     })
 
     console.log(`\x1b[34mNow on block ${parseInt(result, 16)}.\x1b[0m`)
-}
-
-// ==========================
-// Web3.js methods
-// ==========================
-
-module.exports.signTransaction = async (tx, peerId, web3) => {
-    const account = this.peerIdToWeb3Account(peerId, web3)
-
-    return account.signTransaction(
-        Object.assign(tx, {
-            from: this.pubKeyToEthereumAddress(peerId.pubKey.marshal()),
-            gasPrice: await web3.eth.getGasPrice()
-        })
-    )
-}
-
-/**
- * Signs a transaction with the private key that is given by
- * the peerId instance and publishes it to the network given by
- * the web3.js instance
- *
- * @param {Object} tx an Ethereum transaction
- * @param {Object} peerId a peerId
- * @param {Object} web3 a web3.js instance
- */
-module.exports.sendTransaction = async (tx, peerId, web3) => {
-    const signedTransaction = await this.signTransaction(tx, peerId, web3)
-
-    return web3.eth.sendSignedTransaction(signedTransaction.rawTransaction).then(receipt => {
-        if (typeof receipt.status === 'string') {
-            receipt.status = parseInt(receipt.status, 16)
-        }
-
-        if (typeof receipt.status === 'number') {
-            receipt.status === Boolean(receipt.status)
-        }
-
-        if (!receipt.status) throw Error('Reverted tx.')
-
-        return receipt
-    })
 }
 
 /**

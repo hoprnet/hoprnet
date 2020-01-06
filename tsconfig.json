@@ -8,5 +8,4 @@
     "sourceMap": true
   },
   "include": ["./src/**/*", "./node_modules/hopr-types/src/**/*.d.ts"],
-  // "exclude": ["./node_modules"]
 }
