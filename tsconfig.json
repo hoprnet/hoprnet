@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "allowJs": true,
+    "resolveJsonModule": true,
     "module": "commonjs",
     "esModuleInterop": true,
     "outDir": "./lib",
@@ -9,5 +10,5 @@
     "target": "es2019",
     "strict": true
   },
-  "include": ["./src/"]
+  "include": ["./src/**/*", "./node_modules/hopr-types/src/**/*.d.ts"]
 }
