@@ -154,6 +154,11 @@ contract PaymentChannel {
     // the tokens is released back to the sender
     function claimChannelExpiration(uint256 channelId) external {
         Channel storage channel = channels[channelId];
+        require(
+            uint256(channel.status) == uint256(ChannelStatus.OPEN) ||
+            uint256(channel.status) == uint256(ChannelStatus.PENDING_CLOSURE),
+            "channel's status must be 'OPEN' or 'PENDING_CLOSURE'"
+        );
         require(now >= channel.expiration_time, "channel has not expired");
 
         settle(channelId, channel.closure_amount);
