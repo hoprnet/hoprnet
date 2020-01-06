@@ -8,5 +8,5 @@ module.exports = (async deployer => {
   const oneWeek = 604800;
   const twoDays = 172800;
 
-  deployer.deploy(PaymentChannel, token.address, oneWeek, twoDays);
+  await deployer.deploy(PaymentChannel, token.address, oneWeek, twoDays);
 }) as Truffle.Migration;
