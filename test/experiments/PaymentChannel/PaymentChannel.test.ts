@@ -23,9 +23,8 @@ const formatChannel = (
   res: PromiseType<PaymentChannelInstance["channels"]>
 ) => ({
   deposit: res[0],
-  closure_amount: res[1],
-  closure_time: res[2],
-  status: res[3]
+  closure_time: res[1],
+  status: res[2]
 });
 
 contract("PaymentChannel", ([sender, recipient]) => {
@@ -69,10 +68,6 @@ contract("PaymentChannel", ([sender, recipient]) => {
     expect(channel.deposit.eq(new BN(depositAmount))).to.be.equal(
       true,
       "wrong deposit"
-    );
-    expect(channel.closure_amount.isZero()).to.be.equal(
-      true,
-      "wrong closure_amount"
     );
     expect(channel.closure_time.isZero()).to.be.equal(
       true,
@@ -162,18 +157,20 @@ contract("PaymentChannel", ([sender, recipient]) => {
 
     const receipt = await paymentChannel.initiateChannelClosure(
       sender,
-      recipient,
-      web3.utils.toWei("0.5", "ether")
+      recipient
     );
 
     expectEvent(receipt, "InitiatedChannelClosure", {
       sender,
-      recipient,
-      closure_amount: web3.utils.toWei("0.5", "ether").toString()
+      recipient
     });
 
     await time.increase(time.duration.days(3));
-    await paymentChannel.claimChannelClosure(sender, recipient);
+    await paymentChannel.claimChannelClosure(
+      sender,
+      recipient,
+      web3.utils.toWei("0.5", "ether")
+    );
 
     const channel = await paymentChannel
       .channels(sender, recipient)

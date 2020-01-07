@@ -26,7 +26,6 @@ contract PaymentChannel {
     event InitiatedChannelClosure(
         address indexed sender,
         address indexed recipient,
-        uint256 closure_amount,
         uint256 closure_time
     );
 
@@ -46,8 +45,6 @@ contract PaymentChannel {
 
     struct Channel {
         uint256 deposit;        // the token deposit
-        uint256 closure_amount; // the amount of tokens that will be send to the recipient -
-                                // if channel is closed by 'sender'
         uint256 closure_time;   // the time when the channel can be closed by 'sender'
         ChannelStatus status;   // channel's status
     }
@@ -87,7 +84,6 @@ contract PaymentChannel {
         channels[sender][recipient] = Channel(
             amount,
             0,
-            0,
             ChannelStatus.OPEN
         );
 
@@ -107,37 +103,37 @@ contract PaymentChannel {
             "channel's status must be 'OPEN' or 'PENDING_CLOSURE'"
         );
         require(isValidSignature(sender, amount, signature), "signature is not valid");
-        require(amount > channel.closure_amount, "'amount' must be larger than 'closure_amount'");
 
         settle(sender, recipient, amount);
     }
 
-    function initiateChannelClosure(address sender, address recipient, uint256 amount) external
+    function initiateChannelClosure(address sender, address recipient) external
     senderMustBe(sender) statusMustBe(sender, recipient, ChannelStatus.OPEN) {
         Channel storage channel = channels[sender][recipient];
 
         uint256 closure_time = now + secs_closure;
 
-        channel.closure_amount = amount;
         channel.closure_time = closure_time;
         channel.status = ChannelStatus.PENDING_CLOSURE;
 
-        emit InitiatedChannelClosure(sender, recipient, amount, closure_time);
+        emit InitiatedChannelClosure(sender, recipient, closure_time);
     }
 
     // if the timeout is reached without the recipient providing a better signature, then
     // the tokens is released according to `closure_amount`
-    function claimChannelClosure(address sender, address recipient)
+    function claimChannelClosure(address sender, address recipient, uint256 amount)
     external statusMustBe(sender, recipient, ChannelStatus.PENDING_CLOSURE) {
         Channel storage channel = channels[sender][recipient];
         require(now >= channel.closure_time, "'closure_time' has not passed");
 
-        settle(sender, recipient, channel.closure_amount);
+        settle(sender, recipient, amount);
     }
 
     // settle channel, send 'amount' to recipient and the rest to sender
     function settle(address sender, address recipient, uint256 amount) internal {
         Channel storage channel = channels[sender][recipient];
+
+        require(amount <= channel.deposit, "'amount' is larger than deposit");
 
         if (amount > 0) {
             token.safeTransfer(recipient, amount);
