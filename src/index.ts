@@ -17,31 +17,35 @@ const heartbeat = require('./network/heartbeat')
 const getPeerInfo = require('./getPeerInfo')
 const { randomSubset, serializePeerBook, deserializePeerBook, log, addPubKey, createDirectoryIfNotExists } = require('./utils')
 
-const levelup = require('levelup')
-const leveldown = require('leveldown')
+import { default as levelup, LevelUp } from 'levelup'
+import leveldown from 'leveldown'
+import Multiaddr from 'multiaddr'
 
-const PeerId = require('peer-id')
-const PeerInfo = require('peer-info')
+import PeerId from 'peer-id'
+import PeerInfo, { MultiaddrSet } from 'peer-info'
 const PeerBook = require('peer-book')
 
 const PaymentChannels = require('./paymentChannels')
 
-const pull = require('pull-stream')
+import pull from 'pull-stream'
 const lp = require('pull-length-prefixed')
 const Acknowledgement = require('./acknowledgement')
 
-class Hopr extends libp2p {
+type HoprOptions = {
+    peerInfo: PeerInfo,
+    output: (str: string) => void,
+    id?: number
+}
+
+export default class Hopr extends libp2p {
     /**
      * @constructor
      *
-     * @param {Object} _options
-     * @param {Object} provider
+     * @param _options
+     * @param provider
      */
-    constructor(_options, db, bootstrapServers) {
-        if (!_options || !_options.peerInfo || !PeerInfo.isPeerInfo(_options.peerInfo))
-            throw Error("Invalid input parameters. Expected a valid PeerInfo, but got '" + typeof _options.peerInfo + "' instead.")
-
-        const defaults = {
+    constructor(_options: HoprOptions, public db: LevelUp) {
+        super(defaultsDeep(_options, {
             // Disable libp2p-switch protections for the moment
             switch: {
                 denyTTL: 1,
@@ -75,26 +79,33 @@ class Hopr extends libp2p {
                     enabled: false
                 }
             }
-        }
-        super(defaultsDeep(_options, defaults))
+        }))
 
-        this.bootstrapServers = bootstrapServers
-        this.db = db
+        this.bootStrapServers = options.bootStrapServers
         this.heartbeat = heartbeat(this)
     }
 
     /**
      * Creates a new node.
      *
-     * @param {Object} options the parameters
-     * @param {Object} options.web3provider a web3 provider, default `http://localhost:8545`
-     * @param {String} options.contractAddress the Ethereum address of the contract
-     * @param {Object} options.peerInfo
+     * @param options the parameters
+     * @param options.web3provider a web3 provider, default `http://localhost:8545`
+     * @param options.contractAddress the Ethereum address of the contract
+     * @param options.peerInfo
      */
-    static async createNode(options = {}) {
-        options.output = options.output || console.log
-
+    static async createNode(options?: HoprOptions): Promise<Hopr> {
         const db = Hopr.openDatabase(`db`, options)
+
+        if (options == null) {
+            options = {
+                // config: {
+                //     // WebRTC: options.WebRTC
+                // },
+                // peerBook: peerBook,
+                peerInfo: await getPeerInfo(options, db),
+                output: console.log
+            }
+        }
 
         // peerBook: (cb) => {
         //     if (options.peerBook) {
@@ -105,13 +116,7 @@ class Hopr extends libp2p {
         // }
 
         const hopr = new Hopr(
-            {
-                config: {
-                    // WebRTC: options.WebRTC
-                },
-                // peerBook: peerBook,
-                peerInfo: await getPeerInfo(options, db)
-            },
+            options,
             db,
             options['bootstrap-node'] ? null : options.bootstrapServers
         )
@@ -134,10 +139,9 @@ class Hopr extends libp2p {
      * This method starts the node and registers all necessary handlers. It will
      * also open the database and creates one if it doesn't exists.
      *
-     * @param {Object} options
-     * @param {Function} options.output function to which the plaintext of the received message is passed
+     * @param options
      */
-    async up(options) {
+    async up(options: HoprOptions) {
         await new Promise((resolve, reject) =>
             super.start(err => {
                 if (err) return reject(err)
@@ -152,7 +156,7 @@ class Hopr extends libp2p {
             await this.connectToBootstrapServers(options.bootstrapServers)
         } else {
             log(this.peerInfo.id, `Available under the following addresses:`)
-            this.peerInfo.multiaddrs.forEach(ma => {
+            this.peerInfo.multiaddrs.forEach((ma: Multiaddr) => {
                 log(this.peerInfo.id, ma.toString())
             })
         }
@@ -284,16 +288,19 @@ class Hopr extends libp2p {
      * Takes a destination and samples randomly intermediate nodes
      * that will relay that message before it reaches its destination.
      *
-     * @param {Object} destination instance of peerInfo that contains the peerId of the destination
+     * @param destination instance of peerInfo that contains the peerId of the destination
      */
-    async getIntermediateNodes(destination) {
-        const filter = peerInfo =>
-            !peerInfo.id.isEqual(this.peerInfo.id) && !peerInfo.id.isEqual(destination) && !this.bootstrapServers.some(pInfo => pInfo.id.isEqual(peerInfo.id))
+    async getIntermediateNodes(destination: PeerId) {
+        const filter = (peerInfo: PeerInfo) =>     
+            !peerInfo.id.isEqual(this.peerInfo.id) && 
+            !peerInfo.id.isEqual(destination) && 
+            !this.bootstrapServers.some((pInfo: PeerInfo) => pInfo.id.isEqual(peerInfo.id))
+
 
         // @TODO exclude bootstrap server(s) from crawling results
         await this.crawler.crawl()
 
-        return randomSubset(this.peerBook.getAllArray(), MAX_HOPS - 1, filter).map(peerInfo => peerInfo.id)
+        return randomSubset(this.peerBook.getAllArray(), MAX_HOPS - 1, filter).map((peerInfo: PeerInfo) => peerInfo.id)
     }
 
     static async importPeerBook(db) {
@@ -340,5 +347,3 @@ class Hopr extends libp2p {
         return levelup(leveldown(db_dir))
     }
 }
-
-module.exports = Hopr
