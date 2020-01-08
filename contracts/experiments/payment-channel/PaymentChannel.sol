@@ -49,37 +49,13 @@ contract PaymentChannel {
         secsClosure = _secsClosure;
     }
 
-    // channel must be open
-    modifier channelMustBeOpen(address sender, address recipient) {
-        require(channels[sender][recipient].isOpen, "channel is not open");
-        _;
-    }
-
-    // channel must be closed
-    modifier channelMustBeClosed(address sender, address recipient) {
-        require(channels[sender][recipient].isOpen == false, "channel is not closed");
-        _;
-    }
-
-    // channel must be pending for closure
-    modifier channelMustBePendingClosure(address sender, address recipient) {
-        Channel storage channel = channels[sender][recipient];
-
-        require(
-            channel.isOpen &&
-            isChannelPendingClosure(channel),
-            "channel is not pending for closure"
-        );
-        _;
-    }
-
     // create a channel, specified tokens must be approved beforehand
-    function createChannel(address funder, address sender, address recipient, uint256 amount)
-    external channelMustBeClosed(sender, recipient) {
+    function createChannel(address funder, address sender, address recipient, uint256 amount) external {
         require(funder != address(0), "'funder' address is empty");
         require(sender != address(0), "'sender' address is empty");
         require(recipient != address(0), "'recipient' address is empty");
         require(amount > 0, "'amount' must be larger than 0");
+        require(channels[sender][recipient].isOpen == false, "channel is not closed");
 
         token.safeTransferFrom(funder, address(this), amount);
 
@@ -95,8 +71,7 @@ contract PaymentChannel {
     // close a channel, the recipient can close the channel at any time
     // by presenting a signed amount from the sender. The recipient will
     // be sent that amount, and the remainder will go back to the sender
-    function closeChannel(address sender, uint256 amount, bytes calldata signature)
-    external {
+    function closeChannel(address sender, uint256 amount, bytes calldata signature) external {
         Channel storage channel = channels[sender][msg.sender];
 
         require(
@@ -109,9 +84,9 @@ contract PaymentChannel {
         settle(sender, msg.sender, amount);
     }
 
-    function initiateChannelClosure(address recipient)
-    external channelMustBeOpen(msg.sender, recipient) {
+    function initiateChannelClosure(address recipient) external {
         Channel storage channel = channels[msg.sender][recipient];
+        require(channel.isOpen, "channel is not open");
 
         channel.closureTime = now + secsClosure;
 
@@ -120,9 +95,15 @@ contract PaymentChannel {
 
     // if the timeout is reached without the recipient providing a better signature, then
     // the tokens is released according to `closure_amount`
-    function claimChannelClosure(address recipient, uint256 amount)
-    external channelMustBePendingClosure(msg.sender, recipient) {
-        require(now >= channels[msg.sender][recipient].closureTime, "'closureTime' has not passed");
+    function claimChannelClosure(address recipient, uint256 amount) external {
+        Channel storage channel = channels[msg.sender][recipient];
+
+        require(
+            channel.isOpen &&
+            isChannelPendingClosure(channel),
+            "channel is not pending for closure"
+        );
+        require(now >= channel.closureTime, "'closureTime' has not passed");
 
         settle(msg.sender, recipient, amount);
     }

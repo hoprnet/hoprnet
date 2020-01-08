@@ -7,7 +7,7 @@ import {
 } from "../../../types/truffle-contracts";
 import { signPayment, recoverSigner } from "./utils";
 import { PromiseType } from "../../../types/typescript";
-import { time, expectEvent } from "@openzeppelin/test-helpers";
+import { time, expectEvent, expectRevert } from "@openzeppelin/test-helpers";
 
 const HoprToken: HoprTokenContract = artifacts.require("HoprToken");
 
@@ -198,6 +198,20 @@ contract("PaymentChannel", ([sender, recipient]) => {
     expect(paymentChannelBalance.isZero()).to.be.equal(
       true,
       "wrong paymentChannelBalance"
+    );
+  });
+
+  it("should fail when creating an open channel a second time", async () => {
+    await paymentChannel.createChannel(
+      sender,
+      sender,
+      recipient,
+      depositAmount
+    );
+
+    await expectRevert(
+      paymentChannel.createChannel(sender, sender, recipient, depositAmount),
+      "channel is not closed"
     );
   });
 });
