@@ -1465,7 +1465,7 @@ hmac-drbg@^1.0.0:
 
 hopr-types@hoprnet/hopr-types:
   version "0.3.0"
-  resolved "https://codeload.github.com/hoprnet/hopr-types/tar.gz/6625293556925073fe4a37db47b3e8d3375932bb"
+  resolved "https://codeload.github.com/hoprnet/hopr-types/tar.gz/42c4a413e419dc936700b664c255d2856854be6b"
 
 http-cache-semantics@^4.0.0:
   version "4.0.3"
