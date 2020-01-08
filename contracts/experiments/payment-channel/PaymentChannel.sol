@@ -3,16 +3,14 @@ pragma solidity ^0.5.3;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
-import "@openzeppelin/contracts/utils/Address.sol";
 
 contract PaymentChannel {
     using SafeERC20 for IERC20;
     using SafeMath for uint256;
-    using Address for address;
 
-    IERC20 public token;            // the token that will be used to settle payments
-    uint256 public secs_closure;    // seconds it takes to allow closing of channel after channel's -
-                                    // 'sender' provided a signature
+    IERC20 public token;        // the token that will be used to settle payments
+    uint256 public secsClosure; // seconds it takes to allow closing of channel after channel's -
+                                // 'sender' provided a signature
 
     // the payment channel has been created and opened
     event OpenedChannel(
@@ -26,54 +24,57 @@ contract PaymentChannel {
     event InitiatedChannelClosure(
         address indexed sender,
         address indexed recipient,
-        uint256 closure_time
+        uint256 closureTime
     );
 
     // the payment channel has been settled and closed
     event ClosedChannel(
         address indexed sender,
         address indexed recipient,
-        uint256 senderAmount,
         uint256 recipientAmount
     );
 
-    enum ChannelStatus {
-        CLOSED,         // channel is closed
-        OPEN,           // channel is open
-        PENDING_CLOSURE // channel is pending for closure
-    }
-
     struct Channel {
         uint256 deposit;        // the token deposit
-        uint256 closure_time;   // the time when the channel can be closed by 'sender'
-        ChannelStatus status;   // channel's status
+        uint256 closureTime;    // the time when the channel can be closed by 'sender'
+        bool isOpen;            // channel is open
     }
 
     // store channels e.g: channels[sender][recipient]
     mapping(address => mapping(address => Channel)) public channels;
 
-    constructor(IERC20 _token, uint256 _secs_closure) public {
+    constructor(IERC20 _token, uint256 _secsClosure) public {
         token = _token;
-        secs_closure = _secs_closure;
+        secsClosure = _secsClosure;
     }
 
-    // channel's status must be equal to 'status'
-    modifier statusMustBe(address sender, address recipient, ChannelStatus status) {
-        Channel storage channel = channels[sender][recipient];
-
-        require(uint256(channel.status) == uint256(status), "channel's status is wrong");
+    // channel must be open
+    modifier channelMustBeOpen(address sender, address recipient) {
+        require(channels[sender][recipient].isOpen, "channel is not open");
         _;
     }
 
-    // msg.sender must be equal to 'caller'
-    modifier senderMustBe(address caller) {
-        require(msg.sender == caller, "msg.sender is not required caller");
+    // channel must be closed
+    modifier channelMustBeClosed(address sender, address recipient) {
+        require(channels[sender][recipient].isOpen == false, "channel is not closed");
+        _;
+    }
+
+    // channel must be pending for closure
+    modifier channelMustBePendingClosure(address sender, address recipient) {
+        Channel storage channel = channels[sender][recipient];
+
+        require(
+            channel.isOpen &&
+            isChannelPendingClosure(channel),
+            "channel is not pending for closure"
+        );
         _;
     }
 
     // create a channel, specified tokens must be approved beforehand
     function createChannel(address funder, address sender, address recipient, uint256 amount)
-    external statusMustBe(sender, recipient, ChannelStatus.CLOSED) {
+    external channelMustBeClosed(sender, recipient) {
         require(funder != address(0), "'funder' address is empty");
         require(sender != address(0), "'sender' address is empty");
         require(recipient != address(0), "'recipient' address is empty");
@@ -84,7 +85,7 @@ contract PaymentChannel {
         channels[sender][recipient] = Channel(
             amount,
             0,
-            ChannelStatus.OPEN
+            true
         );
 
         emit OpenedChannel(funder, sender, recipient, amount);
@@ -94,13 +95,13 @@ contract PaymentChannel {
     // by presenting a signed amount from the sender. The recipient will
     // be sent that amount, and the remainder will go back to the sender
     function closeChannel(address sender, uint256 amount, bytes calldata signature)
-    external senderMustBe(msg.sender) {
+    external {
         Channel storage channel = channels[sender][msg.sender];
 
         require(
-            uint256(channel.status) == uint256(ChannelStatus.OPEN) ||
-            uint256(channel.status) == uint256(ChannelStatus.PENDING_CLOSURE),
-            "channel's status must be 'OPEN' or 'PENDING_CLOSURE'"
+            channel.isOpen ||
+            isChannelPendingClosure(channel),
+            "channel must be 'open' or 'pending for closure'"
         );
         require(isValidSignature(sender, amount, signature), "signature is not valid");
 
@@ -108,23 +109,19 @@ contract PaymentChannel {
     }
 
     function initiateChannelClosure(address recipient)
-    external senderMustBe(msg.sender) statusMustBe(msg.sender, recipient, ChannelStatus.OPEN) {
+    external channelMustBeOpen(msg.sender, recipient) {
         Channel storage channel = channels[msg.sender][recipient];
 
-        uint256 closure_time = now + secs_closure;
+        channel.closureTime = now + secsClosure;
 
-        channel.closure_time = closure_time;
-        channel.status = ChannelStatus.PENDING_CLOSURE;
-
-        emit InitiatedChannelClosure(msg.sender, recipient, closure_time);
+        emit InitiatedChannelClosure(msg.sender, recipient, channel.closureTime);
     }
 
     // if the timeout is reached without the recipient providing a better signature, then
     // the tokens is released according to `closure_amount`
     function claimChannelClosure(address recipient, uint256 amount)
-    external statusMustBe(msg.sender, recipient, ChannelStatus.PENDING_CLOSURE) {
-        Channel storage channel = channels[msg.sender][recipient];
-        require(now >= channel.closure_time, "'closure_time' has not passed");
+    external channelMustBePendingClosure(msg.sender, recipient) {
+        require(now >= channels[msg.sender][recipient].closureTime, "'closureTime' has not passed");
 
         settle(msg.sender, recipient, amount);
     }
@@ -140,20 +137,22 @@ contract PaymentChannel {
             channel.deposit = channel.deposit.sub(amount);
         }
 
-        uint256 remaining = channel.deposit;
-        if (remaining > 0) {
-            token.safeTransfer(sender, remaining);
+        if (channel.deposit > 0) {
+            token.safeTransfer(sender, channel.deposit);
         }
 
-        // channel.deposit = 0;
-        // channel.closure_amount = 0;
-        // channel.closure_time = 0;
-        channel.status = ChannelStatus.CLOSED;
-        emit ClosedChannel(sender, recipient, remaining, amount);
+        channel.isOpen = false;
+        emit ClosedChannel(sender, recipient, amount);
+    }
+
+    /// return 'true' if channel is pending for closure
+    function isChannelPendingClosure(Channel memory channel) internal pure returns (bool) {
+        return channel.closureTime > 0;
     }
 
     // return 'true' if signaure is signed by 'signer'
-    function isValidSignature(address signer, uint256 amount, bytes memory signature) internal view returns (bool) {
+    function isValidSignature(address signer, uint256 amount, bytes memory signature)
+    internal view returns (bool) {
         bytes32 message = prefixed(keccak256(abi.encodePacked(address(this), amount)));
 
         return recoverSigner(message, signature) == signer;

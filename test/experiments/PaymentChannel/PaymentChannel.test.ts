@@ -23,9 +23,16 @@ const formatChannel = (
   res: PromiseType<PaymentChannelInstance["channels"]>
 ) => ({
   deposit: res[0],
-  closure_time: res[1],
-  status: res[2]
+  closureTime: res[1],
+  isOpen: res[2]
 });
+
+const PrintGasUsed = (name: string) => (
+  response: Truffle.TransactionResponse
+) => {
+  console.log(`gas used in '${name}'`, response.receipt.gasUsed);
+  return response;
+};
 
 contract("PaymentChannel", ([sender, recipient]) => {
   let hoprToken: HoprTokenInstance;
@@ -47,14 +54,11 @@ contract("PaymentChannel", ([sender, recipient]) => {
   });
 
   it("should have created channel correctly", async () => {
-    const receipt = await paymentChannel.createChannel(
-      sender,
-      sender,
-      recipient,
-      depositAmount
-    );
+    const response = await paymentChannel
+      .createChannel(sender, sender, recipient, depositAmount)
+      .then(PrintGasUsed("createChannel first time"));
 
-    expectEvent(receipt, "OpenedChannel", {
+    expectEvent(response, "OpenedChannel", {
       funder: sender,
       sender,
       recipient,
@@ -69,11 +73,8 @@ contract("PaymentChannel", ([sender, recipient]) => {
       true,
       "wrong deposit"
     );
-    expect(channel.closure_time.isZero()).to.be.equal(
-      true,
-      "wrong closure_time"
-    );
-    expect(channel.status.eq(new BN(1))).to.be.equal(true, "wrong status");
+    expect(channel.closureTime.isZero()).to.be.equal(true, "wrong closureTime");
+    expect(channel.isOpen).to.be.equal(true, "wrong isOpen");
   });
 
   it("payment 'signer' should be 'sender'", async () => {
@@ -99,19 +100,15 @@ contract("PaymentChannel", ([sender, recipient]) => {
       amount
     );
 
-    const receipt = await paymentChannel.closeChannel(
-      sender,
-      amount,
-      payment.signature,
-      {
+    const response = await paymentChannel
+      .closeChannel(sender, amount, payment.signature, {
         from: recipient
-      }
-    );
+      })
+      .then(PrintGasUsed("closeChannel first time"));
 
-    expectEvent(receipt, "ClosedChannel", {
+    expectEvent(response, "ClosedChannel", {
       sender,
       recipient,
-      senderAmount: web3.utils.toWei("0.5", "ether").toString(),
       recipientAmount: web3.utils.toWei("0.5", "ether").toString()
     });
 
@@ -119,7 +116,7 @@ contract("PaymentChannel", ([sender, recipient]) => {
       .channels(sender, recipient)
       .then(formatChannel);
 
-    expect(channel.status.isZero()).to.be.equal(true, "wrong status");
+    expect(channel.isOpen).to.be.equal(false, "wrong isOpen");
 
     const senderBalance = await hoprToken.balanceOf(sender);
     const recipientBalance = await hoprToken.balanceOf(recipient);
@@ -147,31 +144,29 @@ contract("PaymentChannel", ([sender, recipient]) => {
   });
 
   it("should send 0.5 HOPR to 'recipient' and 0.5 HOPR to 'sender' by closure", async () => {
-    await paymentChannel.createChannel(
-      sender,
-      sender,
-      recipient,
-      depositAmount
-    );
+    await paymentChannel
+      .createChannel(sender, sender, recipient, depositAmount)
+      .then(PrintGasUsed("createChannel second time"));
 
-    const receipt = await paymentChannel.initiateChannelClosure(recipient);
+    const response = await paymentChannel
+      .initiateChannelClosure(recipient)
+      .then(PrintGasUsed("initiateChannelClosure"));
 
-    expectEvent(receipt, "InitiatedChannelClosure", {
+    expectEvent(response, "InitiatedChannelClosure", {
       sender,
       recipient
     });
 
     await time.increase(time.duration.days(3));
-    await paymentChannel.claimChannelClosure(
-      recipient,
-      web3.utils.toWei("0.5", "ether")
-    );
+    await paymentChannel
+      .claimChannelClosure(recipient, web3.utils.toWei("0.5", "ether"))
+      .then(PrintGasUsed("claimChannelClosure"));
 
     const channel = await paymentChannel
       .channels(sender, recipient)
       .then(formatChannel);
 
-    expect(channel.status.isZero()).to.be.equal(true, "wrong status");
+    expect(channel.isOpen).to.be.equal(false, "wrong isOpen");
 
     const senderBalance = await hoprToken.balanceOf(sender);
     const recipientBalance = await hoprToken.balanceOf(recipient);
