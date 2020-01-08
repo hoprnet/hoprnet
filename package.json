@@ -21,7 +21,7 @@
     "@types/node": "^12.12.8",
     "@types/secp256k1": "^3.5.0",
     "hopr-types": "hoprnet/hopr-types",
-    "mocha": "^6.2.2",
+    "mocha": "^7.0.0",
     "ts-node": "^8.5.4",
     "typescript": "^3.7.2"
   },

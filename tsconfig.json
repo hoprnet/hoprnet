@@ -10,5 +10,9 @@
     "target": "es2019",
     "strict": true
   },
-  "include": ["./src/**/*", "./node_modules/hopr-types/src/**/*.d.ts"]
+  "include": ["src/**/*"],
+  "typeRoots": [
+    "node_modules/hopr-types/types",
+    "node_modules/@types"
+  ]
 }
