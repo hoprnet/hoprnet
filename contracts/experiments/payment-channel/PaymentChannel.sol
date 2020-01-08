@@ -55,15 +55,14 @@ contract PaymentChannel {
         require(sender != address(0), "'sender' address is empty");
         require(recipient != address(0), "'recipient' address is empty");
         require(amount > 0, "'amount' must be larger than 0");
-        require(channels[sender][recipient].isOpen == false, "channel is not closed");
+
+        Channel storage channel = channels[sender][recipient];
+        require(channel.isOpen == false, "channel is not closed");
 
         token.safeTransferFrom(funder, address(this), amount);
 
-        channels[sender][recipient] = Channel(
-            amount,
-            0,
-            true
-        );
+        channel.deposit = amount;
+        channel.isOpen = true;
 
         emit OpenedChannel(funder, sender, recipient, amount);
     }
@@ -94,7 +93,7 @@ contract PaymentChannel {
     }
 
     // if the timeout is reached without the recipient providing a better signature, then
-    // the tokens is released according to `closure_amount`
+    // the tokens is released according to `amount`
     function claimChannelClosure(address recipient, uint256 amount) external {
         Channel storage channel = channels[msg.sender][recipient];
 
@@ -123,8 +122,11 @@ contract PaymentChannel {
             token.safeTransfer(sender, channel.deposit);
         }
 
-        channel.isOpen = false;
         emit ClosedChannel(sender, recipient, channel.deposit, amount);
+
+        channel.deposit = 0;
+        channel.closureTime = 0;
+        channel.isOpen = false;
     }
 
     /// return 'true' if channel is pending for closure
