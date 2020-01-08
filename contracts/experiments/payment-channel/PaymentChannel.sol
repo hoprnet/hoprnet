@@ -93,9 +93,9 @@ contract PaymentChannel {
     // close a channel, the recipient can close the channel at any time
     // by presenting a signed amount from the sender. The recipient will
     // be sent that amount, and the remainder will go back to the sender
-    function closeChannel(address sender, address recipient, uint256 amount, bytes calldata signature)
-    external senderMustBe(recipient) {
-        Channel storage channel = channels[sender][recipient];
+    function closeChannel(address sender, uint256 amount, bytes calldata signature)
+    external senderMustBe(msg.sender) {
+        Channel storage channel = channels[sender][msg.sender];
 
         require(
             uint256(channel.status) == uint256(ChannelStatus.OPEN) ||
@@ -104,29 +104,29 @@ contract PaymentChannel {
         );
         require(isValidSignature(sender, amount, signature), "signature is not valid");
 
-        settle(sender, recipient, amount);
+        settle(sender, msg.sender, amount);
     }
 
-    function initiateChannelClosure(address sender, address recipient) external
-    senderMustBe(sender) statusMustBe(sender, recipient, ChannelStatus.OPEN) {
-        Channel storage channel = channels[sender][recipient];
+    function initiateChannelClosure(address recipient)
+    external senderMustBe(msg.sender) statusMustBe(msg.sender, recipient, ChannelStatus.OPEN) {
+        Channel storage channel = channels[msg.sender][recipient];
 
         uint256 closure_time = now + secs_closure;
 
         channel.closure_time = closure_time;
         channel.status = ChannelStatus.PENDING_CLOSURE;
 
-        emit InitiatedChannelClosure(sender, recipient, closure_time);
+        emit InitiatedChannelClosure(msg.sender, recipient, closure_time);
     }
 
     // if the timeout is reached without the recipient providing a better signature, then
     // the tokens is released according to `closure_amount`
-    function claimChannelClosure(address sender, address recipient, uint256 amount)
-    external statusMustBe(sender, recipient, ChannelStatus.PENDING_CLOSURE) {
-        Channel storage channel = channels[sender][recipient];
+    function claimChannelClosure(address recipient, uint256 amount)
+    external statusMustBe(msg.sender, recipient, ChannelStatus.PENDING_CLOSURE) {
+        Channel storage channel = channels[msg.sender][recipient];
         require(now >= channel.closure_time, "'closure_time' has not passed");
 
-        settle(sender, recipient, amount);
+        settle(msg.sender, recipient, amount);
     }
 
     // settle channel, send 'amount' to recipient and the rest to sender

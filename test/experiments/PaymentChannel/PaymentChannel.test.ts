@@ -101,7 +101,6 @@ contract("PaymentChannel", ([sender, recipient]) => {
 
     const receipt = await paymentChannel.closeChannel(
       sender,
-      recipient,
       amount,
       payment.signature,
       {
@@ -155,10 +154,7 @@ contract("PaymentChannel", ([sender, recipient]) => {
       depositAmount
     );
 
-    const receipt = await paymentChannel.initiateChannelClosure(
-      sender,
-      recipient
-    );
+    const receipt = await paymentChannel.initiateChannelClosure(recipient);
 
     expectEvent(receipt, "InitiatedChannelClosure", {
       sender,
@@ -167,7 +163,6 @@ contract("PaymentChannel", ([sender, recipient]) => {
 
     await time.increase(time.duration.days(3));
     await paymentChannel.claimChannelClosure(
-      sender,
       recipient,
       web3.utils.toWei("0.5", "ether")
     );
