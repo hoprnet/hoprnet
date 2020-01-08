@@ -31,6 +31,7 @@ contract PaymentChannel {
     event ClosedChannel(
         address indexed sender,
         address indexed recipient,
+        uint256 senderAmount,
         uint256 recipientAmount
     );
 
@@ -142,7 +143,7 @@ contract PaymentChannel {
         }
 
         channel.isOpen = false;
-        emit ClosedChannel(sender, recipient, amount);
+        emit ClosedChannel(sender, recipient, channel.deposit, amount);
     }
 
     /// return 'true' if channel is pending for closure

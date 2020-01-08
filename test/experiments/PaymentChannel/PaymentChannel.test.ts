@@ -109,6 +109,7 @@ contract("PaymentChannel", ([sender, recipient]) => {
     expectEvent(response, "ClosedChannel", {
       sender,
       recipient,
+      senderAmount: web3.utils.toWei("0.5", "ether").toString(),
       recipientAmount: web3.utils.toWei("0.5", "ether").toString()
     });
 
@@ -158,9 +159,16 @@ contract("PaymentChannel", ([sender, recipient]) => {
     });
 
     await time.increase(time.duration.days(3));
-    await paymentChannel
+    const response2 = await paymentChannel
       .claimChannelClosure(recipient, web3.utils.toWei("0.5", "ether"))
       .then(PrintGasUsed("claimChannelClosure"));
+
+    expectEvent(response2, "ClosedChannel", {
+      sender,
+      recipient,
+      senderAmount: web3.utils.toWei("0.5", "ether").toString(),
+      recipientAmount: web3.utils.toWei("0.5", "ether").toString()
+    });
 
     const channel = await paymentChannel
       .channels(sender, recipient)
