@@ -7,5 +7,5 @@
     "target": "es2019",
     "sourceMap": true
   },
-  "include": ["./src/**/*", "./node_modules/hopr-types/src/**/*.d.ts"],
+  "include": ["src/**/*", "hopr.ts", "config.ts", "node_modules/@hoprnet/hopr-types/types/**/*.d.ts"]
 }

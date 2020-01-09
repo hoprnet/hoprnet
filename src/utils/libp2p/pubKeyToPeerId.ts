@@ -1,5 +1,5 @@
 import PeerId from 'peer-id'
-import {keys as libp2p_crypto } from 'libp2p-crypto'
+import { keys as libp2p_crypto } from 'libp2p-crypto'
 
 const COMPRESSED_PUBLIC_KEY_LENGTH = 33
 
@@ -10,14 +10,14 @@ const COMPRESSED_PUBLIC_KEY_LENGTH = 33
  * @notice Libp2p stores the keys in format that is derived from `protobuf`.
  * Using `libsecp256k1` directly does not work.
  *
- * @param {Buffer | string} pubKey the plain public key
- * @returns {Promise<PeerId>}
+ * @param pubKey the plain public key
  */
-export default function pubKeyToPeerId(pubKey: Buffer): Promise<PeerId> {
-    if (pubKey.length != COMPRESSED_PUBLIC_KEY_LENGTH)
-        throw Error(`Invalid public key. Expected a buffer of size ${COMPRESSED_PUBLIC_KEY_LENGTH} bytes. Got one of ${pubKey.length} bytes.`)
+export function pubKeyToPeerId(pubKey: Buffer): Promise<PeerId> {
+  if (pubKey.length != COMPRESSED_PUBLIC_KEY_LENGTH) {
+    throw Error(`Invalid public key. Expected a buffer of size ${COMPRESSED_PUBLIC_KEY_LENGTH} bytes. Got one of ${pubKey.length} bytes.`)
+  }
 
-    const secp256k1PubKey = new libp2p_crypto.supportedKeys.secp256k1.Secp256k1PublicKey(pubKey)
+  const secp256k1PubKey = new libp2p_crypto.supportedKeys.secp256k1.Secp256k1PublicKey(pubKey)
 
-    return PeerId.createFromPubKey(secp256k1PubKey.bytes)
+  return PeerId.createFromPubKey(secp256k1PubKey.bytes)
 }

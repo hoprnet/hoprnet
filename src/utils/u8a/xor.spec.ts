@@ -1,29 +1,29 @@
 import assert from 'assert'
-import xor from './xor'
+import { u8aXOR } from './xor'
 
 describe('testing XORing Uint8Array', function() {
-    it('should XOR two arrays', function() {
-        let a = new Uint8Array([0, 255, 0, 255, 0])
-        let b = new Uint8Array([255, 0, 255, 0, 255])
+  it('should XOR two arrays', function() {
+    let a = new Uint8Array([0, 255, 0, 255, 0])
+    let b = new Uint8Array([255, 0, 255, 0, 255])
 
-        let aXORb = new Uint8Array([255, 255, 255, 255, 255])
+    let aXORb = new Uint8Array([255, 255, 255, 255, 255])
 
-        assert.deepEqual(xor(false, a, b), aXORb)
+    assert.deepEqual(u8aXOR(false, a, b), aXORb)
 
-        xor(true, a, b)
-        assert.deepEqual(a, aXORb)
-    })
+    u8aXOR(true, a, b)
+    assert.deepEqual(a, aXORb)
+  })
 
-    it('should XOR more than two arrays', function() {
-        let a = new Uint8Array([0, 255, 0, 255, 0])
-        let b = new Uint8Array([255, 0, 255, 0, 255])
-        let c = new Uint8Array([0, 0, 255, 0, 0])
+  it('should XOR more than two arrays', function() {
+    let a = new Uint8Array([0, 255, 0, 255, 0])
+    let b = new Uint8Array([255, 0, 255, 0, 255])
+    let c = new Uint8Array([0, 0, 255, 0, 0])
 
-        let aXORbXORc = new Uint8Array([255, 255, 0, 255, 255])
+    let aXORbXORc = new Uint8Array([255, 255, 0, 255, 255])
 
-        assert.deepEqual(xor(false, a, b, c), aXORbXORc)
+    assert.deepEqual(u8aXOR(false, a, b, c), aXORbXORc)
 
-        xor(true, a, b, c)
-        assert.deepEqual(a, aXORbXORc)
-    })
+    u8aXOR(true, a, b, c)
+    assert.deepEqual(a, aXORbXORc)
+  })
 })

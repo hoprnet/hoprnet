@@ -1,26 +1,26 @@
 import assert from 'assert'
-import randomPermutation from './randomPermutation'
+import { randomPermutation } from './randomPermutation'
 
 describe('testing random permutation', function() {
-    let ATTEMPTS = 2
-    
-    it(`should apply a random permutation`, function() {
-        for (let counter = 0; counter < ATTEMPTS; counter++) {
-            let array = []
-            for (let i = 0; i < 30; i++) {
-                array.push(i)
-            }
+  let ATTEMPTS = 2
 
-            let length = array.length
-            randomPermutation(array)
+  it(`should apply a random permutation`, function() {
+    for (let counter = 0; counter < ATTEMPTS; counter++) {
+      let array = []
+      for (let i = 0; i < 30; i++) {
+        array.push(i)
+      }
 
-            assert(array.length == length)
+      let length = array.length
+      randomPermutation(array)
 
-            let set = new Set<number>()
-            array.forEach((value: number) => {
-                assert(!set.has(value))
-                set.add(value)
-            })
-        }
-    })
+      assert(array.length == length)
+
+      let set = new Set<number>()
+      array.forEach((value: number) => {
+        assert(!set.has(value))
+        set.add(value)
+      })
+    }
+  })
 })

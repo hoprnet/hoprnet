@@ -7,7 +7,7 @@
  * @summary Creates a concatenated Uint8Array from the inputs.
  * @description
  * Concatenates the input arrays into a single `UInt8Array`.
- * 
+ *
  * @example
  * ```javascript
  *
@@ -17,15 +17,15 @@
  * ); // [1, 2, 3, 4, 5, 6]
  * ```
  */
-export default function u8aConcat(...list: Uint8Array[]): Uint8Array {
-    const length = list.reduce((total, item): number => total + item.length, 0)
-    const result = new Uint8Array(length)
-    let offset = 0
+export function u8aConcat(...list: Uint8Array[]): Uint8Array {
+  const length = list.reduce((total, item): number => total + item.length, 0)
+  const result = new Uint8Array(length)
+  let offset = 0
 
-    return list.reduce((result, item): Uint8Array => {
-        result.set(item, offset)
-        offset += item.length
+  return list.reduce((result, item): Uint8Array => {
+    result.set(item, offset)
+    offset += item.length
 
-        return result
-    }, result)
+    return result
+  }, result)
 }

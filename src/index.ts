@@ -22,328 +22,331 @@ import leveldown from 'leveldown'
 import Multiaddr from 'multiaddr'
 
 import PeerId from 'peer-id'
-import PeerInfo, { MultiaddrSet } from 'peer-info'
-const PeerBook = require('peer-book')
+import PeerInfo from 'peer-info'
+import PeerBook from 'peer-book'
 
-const PaymentChannels = require('./paymentChannels')
+import PaymentChannels from '@hoprnet/hopr-core-connector-interface'
 
 import pull from 'pull-stream'
+
 const lp = require('pull-length-prefixed')
 const Acknowledgement = require('./acknowledgement')
 
 type HoprOptions = {
-    peerInfo: PeerInfo,
-    output: (str: string) => void,
-    id?: number
+  peerInfo: PeerInfo
+  output: (str: string) => void
+  id?: number
 }
 
-export default class Hopr extends libp2p {
-    /**
-     * @constructor
-     *
-     * @param _options
-     * @param provider
-     */
-    constructor(_options: HoprOptions, public db: LevelUp) {
-        super(defaultsDeep(_options, {
-            // Disable libp2p-switch protections for the moment
-            switch: {
-                denyTTL: 1,
-                denyAttempts: Infinity
-            },
-            // The libp2p modules for this libp2p bundle
-            modules: {
-                transport: [
-                    TCP,
-                    // WebRTCv4,
-                    // WebRTCv6
-                ],
+export default class Hopr<ChainConnector extends PaymentChannels> extends libp2p {
+  /**
+   * @constructor
+   *
+   * @param _options
+   * @param provider
+   */
+  private constructor(_options: HoprOptions, public db: LevelUp, public bootstrapServers: PeerInfo[], public paymentChannels: PaymentChannels) {
+    super(
+      defaultsDeep(_options, {
+        // Disable libp2p-switch protections for the moment
+        switch: {
+          denyTTL: 1,
+          denyAttempts: Infinity
+        },
+        // The libp2p modules for this libp2p bundle
+        modules: {
+          transport: [
+            TCP
+            // WebRTCv4,
+            // WebRTCv6
+          ],
 
-                streamMuxer: [MPLEX],
-                connEncryption: [], //  [SECIO],
-                dht: KadDHT
-                // peerDiscovery: [
-                //     WebRTC.discovery
-                // ]
-            },
-            config: {
-                // peerDiscovery: {
-                //     webRTCStar: {
-                //         enabled: true
-                //     }
-                // },
-                dht: {
-                    enabled: true
-                },
-                relay: {
-                    enabled: false
-                }
-            }
-        }))
+          streamMuxer: [MPLEX],
+          connEncryption: [], //  [SECIO],
+          dht: KadDHT
+          // peerDiscovery: [
+          //     WebRTC.discovery
+          // ]
+        },
+        config: {
+          // peerDiscovery: {
+          //     webRTCStar: {
+          //         enabled: true
+          //     }
+          // },
+          dht: {
+            enabled: true
+          },
+          relay: {
+            enabled: false
+          }
+        }
+      })
+    )
 
-        this.bootStrapServers = options.bootStrapServers
-        this.heartbeat = heartbeat(this)
+    this.heartbeat = heartbeat(this)
+  }
+
+  /**
+   * Creates a new node.
+   *
+   * @param options the parameters
+   */
+  static async createNode<ChainConnector extends PaymentChannels>(
+    ChainConnector: ChainConnector,
+    options?: HoprOptions & {
+      'bootstrapServers'?: PeerInfo[]
+      'bootstrap-node'?: boolean
+      'provider'?: string
+    }
+  ): Promise<Hopr<ChainConnector>> {
+    const db = Hopr.openDatabase(`db`, options)
+
+    if (options == null) {
+      options = {
+        // config: {
+        //     // WebRTC: options.WebRTC
+        // },
+        // peerBook: peerBook,
+        peerInfo: await getPeerInfo(options, db),
+        output: console.log
+      }
     }
 
-    /**
-     * Creates a new node.
-     *
-     * @param options the parameters
-     * @param options.web3provider a web3 provider, default `http://localhost:8545`
-     * @param options.contractAddress the Ethereum address of the contract
-     * @param options.peerInfo
-     */
-    static async createNode(options?: HoprOptions): Promise<Hopr> {
-        const db = Hopr.openDatabase(`db`, options)
+    // peerBook: (cb) => {
+    //     if (options.peerBook) {
+    //         cb(null, options.peerBook)
+    //     } else {
+    //         Hopr.importPeerBook(db, cb)
+    //     }
+    // }
 
-        if (options == null) {
-            options = {
-                // config: {
-                //     // WebRTC: options.WebRTC
-                // },
-                // peerBook: peerBook,
-                peerInfo: await getPeerInfo(options, db),
-                output: console.log
-            }
-        }
+    return new Hopr<ChainConnector>(
+      options,
+      db,
+      options['bootstrap-node'] ? null : options.bootstrapServers,
+      options['bootstrap-node'] ? null : await ChainConnector.create(db, new Uint8Array(), options['provider'])
+    ).up(options)
+  }
 
-        // peerBook: (cb) => {
-        //     if (options.peerBook) {
-        //         cb(null, options.peerBook)
-        //     } else {
-        //         Hopr.importPeerBook(db, cb)
-        //     }
-        // }
-
-        const hopr = new Hopr(
-            options,
-            db,
-            options['bootstrap-node'] ? null : options.bootstrapServers
+  /**
+   * Parses the bootstrap servers given in `.env` and tries to connect to each of them.
+   *
+   * @throws an error if none of the bootstrapservers is online
+   */
+  async connectToBootstrapServers(): Promise<void> {
+    const results = await Promise.all(
+      this.bootstrapServers.map(addr =>
+        this.dial(addr).then(
+          () => true,
+          () => false
         )
+      )
+    )
 
-        return hopr.up(options)
+    if (!results.some(online => online)) {
+      throw Error('Unable to connect to any bootstrap server.')
+    }
+  }
+
+  /**
+   * This method starts the node and registers all necessary handlers. It will
+   * also open the database and creates one if it doesn't exists.
+   *
+   * @param options
+   */
+  async up(options: HoprOptions): Promise<Hopr<ChainConnector>> {
+    await new Promise((resolve, reject) =>
+      super.start((err: Error) => {
+        if (err) return reject(err)
+
+        resolve()
+      })
+    )
+
+    registerHandlers(this, options)
+
+    if (!options['bootstrap-node']) {
+      await this.connectToBootstrapServers()
+    } else {
+      log(this.peerInfo.id, `Available under the following addresses:`)
+      this.peerInfo.multiaddrs.forEach((ma: Multiaddr) => {
+        log(this.peerInfo.id, ma.toString())
+      })
     }
 
-    /**
-     * Parses the bootstrap servers given in `.env` and tries to connect to each of them.
-     *
-     * @throws an error if none of the bootstrapservers is online
-     */
-    async connectToBootstrapServers() {
-        const results = await Promise.all(this.bootstrapServers.map(addr => this.dial(addr).then(() => true, () => false)))
+    // this.heartbeat.start()
 
-        if (!results.some(online => online)) throw Error('Unable to connect to any bootstrap server.')
+    this.crawler = new crawler({ libp2p: this })
+
+    // this.peerInfo.multiaddrs.forEach(addr => {
+    //     if (match.LOCALHOST(addr)) {
+    //         this.peerInfo.multiaddrs.delete(addr)
+    //     }
+    // })
+
+    if (!options['bootstrap-node']) {
+      this.paymentChannels = await PaymentChannels.create(this)
     }
 
-    /**
-     * This method starts the node and registers all necessary handlers. It will
-     * also open the database and creates one if it doesn't exists.
-     *
-     * @param options
-     */
-    async up(options: HoprOptions) {
-        await new Promise((resolve, reject) =>
-            super.start(err => {
-                if (err) return reject(err)
+    // if (publicAddrs) publicAddrs.forEach(addr => this.peerInfo.multiaddrs.add(addr.encapsulate(`/${NAME}/${this.peerInfo.id.toB58String()}`)))
 
-                resolve()
-            })
-        )
+    return this
+  }
 
-        registerHandlers(this, options)
+  /**
+   * Shuts down the node and saves keys and peerBook in the database
+   */
+  async down(): Promise<void> {
+    if (this.db) await this.db.close()
 
-        if (!options['bootstrap-node']) {
-            await this.connectToBootstrapServers(options.bootstrapServers)
-        } else {
-            log(this.peerInfo.id, `Available under the following addresses:`)
-            this.peerInfo.multiaddrs.forEach((ma: Multiaddr) => {
-                log(this.peerInfo.id, ma.toString())
-            })
-        }
+    log(this.peerInfo.id, `Database closed.`)
 
-        // this.heartbeat.start()
+    await new Promise((resolve, reject) =>
+      super.stop((err: Error) => {
+        if (err) return reject(err)
 
-        this.crawler = new crawler({ libp2p: this })
+        log(this.peerInfo.id, `Node shut down.`)
 
-        // this.peerInfo.multiaddrs.forEach(addr => {
-        //     if (match.LOCALHOST(addr)) {
-        //         this.peerInfo.multiaddrs.delete(addr)
-        //     }
-        // })
+        resolve()
+      })
+    )
+    // this.heartbeat.stop()
+  }
 
-        if (!options['bootstrap-node']) {
-            this.paymentChannels = await PaymentChannels.create(this)
-        }
+  /**
+   * Sends a message.
+   *
+   * @notice THIS METHOD WILL SPEND YOUR ETHER.
+   * @notice This method will fail if there are not enough funds to open
+   * the required payment channels. Please make sure that there are enough
+   * funds controlled by the given key pair.
+   *
+   * @param msg message to send
+   * @param destination PeerId of the destination
+   * the acknowledgement of the first hop
+   */
+  async sendMessage(msg: string | Buffer, destination: PeerId): Promise<void> {
+    if (!destination) throw Error(`Expecting a non-empty destination.`)
 
-        // if (publicAddrs) publicAddrs.forEach(addr => this.peerInfo.multiaddrs.add(addr.encapsulate(`/${NAME}/${this.peerInfo.id.toB58String()}`)))
-
-        return this
+    if (!Buffer.isBuffer(msg)) {
+      msg = Buffer.from(msg)
     }
 
-    /**
-     * Shuts down the node and saves keys and peerBook in the database
-     */
-    async down() {
-        if (this.db) await this.db.close()
+    const promises = []
 
-        log(this.peerInfo.id, `Database closed.`)
+    for (let n = 0; n < msg.length / PACKET_SIZE; n++) {
+      promises.push(
+        new Promise(async (resolve, reject) => {
+          let intermediateNodes = await this.getIntermediateNodes(destination)
 
-        await new Promise((resolve, reject) =>
-            super.stop(err => {
-                if (err) return reject(err)
+          let path = intermediateNodes.concat(destination)
 
-                log(this.peerInfo.id, `Node shut down.`)
+          await Promise.all(path.map(addPubKey))
 
-                resolve()
-            })
-        )
-        // this.heartbeat.stop()
+          const peerInfo = await this.peerRouting.findPeer(path[0])
+
+          const conn = await this.dialProtocol(peerInfo, PROTOCOL_STRING)
+
+          const packet = await createPacket(
+            /* prettier-ignore */
+            this,
+            msg.slice(n * PACKET_SIZE, Math.min(msg.length, (n + 1) * PACKET_SIZE)),
+            path
+          )
+
+          pull(
+            pull.once(packet.toBuffer()),
+            lp.encode(),
+            conn,
+            lp.decode({
+              maxLength: Acknowledgement.SIZE
+            }),
+            pull.drain(data => {
+              log(this.peerInfo.id, `Received acknowledgement.`)
+              // return cb()
+              // if (!cb.called) {
+              //     return cb()
+              // }
+            }, resolve)
+          )
+        })
+      )
     }
 
-    /**
-     * Sends a message.
-     *
-     * @notice THIS METHOD WILL SPEND YOUR ETHER.
-     * @notice This method will fail if there are not enough funds to open
-     * the required payment channels. Please make sure that there are enough
-     * funds controlled by the given key pair.
-     *
-     * @param {Number | String | Buffer} msg message to send
-     * @param {PeerId | PeerInfo | String} destination PeerId of the destination
-     * the acknowledgement of the first hop
-     */
-    async sendMessage(msg, destination) {
-        if (!msg) throw Error(`Expecting a non-empty message.`)
+    try {
+      await Promise.all(promises)
+    } catch (err) {
+      console.log(err)
+    }
+  }
 
-        if (!destination) throw Error(`Expecting a non-empty destination.`)
+  /**
+   * Takes a destination and samples randomly intermediate nodes
+   * that will relay that message before it reaches its destination.
+   *
+   * @param destination instance of peerInfo that contains the peerId of the destination
+   */
+  async getIntermediateNodes(destination: PeerId) {
+    const filter = (peerInfo: PeerInfo) =>
+      !peerInfo.id.isEqual(this.peerInfo.id) &&
+      !peerInfo.id.isEqual(destination) &&
+      !this.bootstrapServers.some((pInfo: PeerInfo) => pInfo.id.isEqual(peerInfo.id))
 
-        if (PeerInfo.isPeerInfo(destination)) destination = destination.id
+    // @TODO exclude bootstrap server(s) from crawling results
+    await this.crawler.crawl()
 
-        if (typeof destination === 'string') destination = PeerId.createFromB58String(destination)
+    return randomSubset(this.peerBook.getAllArray(), MAX_HOPS - 1, filter).map((peerInfo: PeerInfo) => peerInfo.id)
+  }
 
-        if (!PeerId.isPeerId(destination))
-            throw Error(`Unable to parse given destination to a PeerId instance. Got type ${typeof destination} with value ${destination}.`)
+  static async importPeerBook(db: LevelUp) {
+    const key = 'peer-book'
 
-        // Let's try to convert input msg to a Buffer in case it isn't already a Buffer
-        if (!Buffer.isBuffer(msg)) {
-            switch (typeof msg) {
-                default:
-                    throw Error(`Invalid input value. Got '${typeof msg}'.`)
-                case 'number':
-                    msg = msg.toString()
-                case 'string':
-                    msg = Buffer.from(msg)
-            }
-        }
+    const peerBook = new PeerBook()
 
-        const promises = []
-
-        for (let n = 0; n < msg.length / PACKET_SIZE; n++) {
-            promises.push(
-                new Promise(async (resolve, reject) => {
-                    let intermediateNodes = await this.getIntermediateNodes(destination)
-
-                    let path = intermediateNodes.concat(destination)
-
-                    await Promise.all(path.map(addPubKey))
-
-                    const peerInfo = await this.peerRouting.findPeer(path[0])
-
-                    const conn = await this.dialProtocol(peerInfo, PROTOCOL_STRING)
-
-                    const packet = await createPacket(
-                        /* prettier-ignore */
-                        this,
-                        msg.slice(n * PACKET_SIZE, Math.min(msg.length, (n + 1) * PACKET_SIZE)),
-                        path
-                    )
-
-                    pull(
-                        pull.once(packet.toBuffer()),
-                        lp.encode(),
-                        conn,
-                        lp.decode({
-                            maxLength: Acknowledgement.SIZE
-                        }),
-                        pull.drain(data => {
-                            log(this.peerInfo.id, `Received acknowledgement.`)
-                            // return cb()
-                            // if (!cb.called) {
-                            //     return cb()
-                            // }
-                        }, resolve)
-                    )
-                })
-            )
-        }
-
-        try {
-            await Promise.all(promises)
-        } catch (err) {
-            console.log(err)
-        }
+    let serializedPeerbook: Buffer
+    try {
+      serializedPeerbook = await db.get(key)
+    } catch (err) {
+      if (err.notFound) {
+        return peerBook
+      } else {
+        throw err
+      }
     }
 
-    /**
-     * Takes a destination and samples randomly intermediate nodes
-     * that will relay that message before it reaches its destination.
-     *
-     * @param destination instance of peerInfo that contains the peerId of the destination
-     */
-    async getIntermediateNodes(destination: PeerId) {
-        const filter = (peerInfo: PeerInfo) =>     
-            !peerInfo.id.isEqual(this.peerInfo.id) && 
-            !peerInfo.id.isEqual(destination) && 
-            !this.bootstrapServers.some((pInfo: PeerInfo) => pInfo.id.isEqual(peerInfo.id))
+    return deserializePeerBook(serializedPeerbook, peerBook)
+  }
 
+  async exportPeerBook() {
+    const key = 'peer-book'
 
-        // @TODO exclude bootstrap server(s) from crawling results
-        await this.crawler.crawl()
+    await this.db.put(key, serializePeerBook(this.peerBook))
+  }
 
-        return randomSubset(this.peerBook.getAllArray(), MAX_HOPS - 1, filter).map((peerInfo: PeerInfo) => peerInfo.id)
+  static openDatabase(db_dir: string, options?: { id?: number }) {
+    if (options != null) {
+      db_dir += `/${process.env['NETWORK']}/`
+      if (Number.isInteger(options.id) && options['bootstrap-node'] == false) {
+        // For testing ...
+        db_dir += `node_${options.id}`
+      } else if (!Number.isInteger(options.id) && options['bootstrap-node'] == false) {
+        db_dir += `node`
+      } else if (!Number.isInteger(options.id) && options['bootstrap-node'] == true) {
+        db_dir += `bootstrap`
+      } else {
+        throw Error(`Cannot run hopr with index ${options.id} as bootstrap node.`)
+      }
     }
 
-    static async importPeerBook(db) {
-        const key = 'peer-book'
+    createDirectoryIfNotExists(db_dir)
 
-        const peerBook = new PeerBook()
+    //     clearDirectory(db_dir)
+    //     fs.mkdirSync(db_dir, {
+    //         mode: 0o777
+    //     })
+    // --------------------------
 
-        let serializedPeerBook
-        try {
-            serializedPeerbook = await db.get(key)
-        } catch (err) {
-            if (err.notFound) {
-                return peerBook
-            } else {
-                throw err
-            }
-        }
-
-        return deserializePeerBook(serializedPeerbook, peerBook)
-    }
-
-    async exportPeerBook() {
-        const key = 'peer-book'
-
-        await this.db.put(key, serializePeerBook(this.peerBook))
-    }
-
-    static openDatabase(db_dir, options) {
-        if (options && Number.isInteger(options.id)) {
-            // Only for unit testing !!!
-            db_dir = `${db_dir}/node ${options.id}`
-        } else if (options && options['bootstap-node']) {
-            db_dir = `${db_dir}/bootstrap ${options.id}`
-        }
-
-        createDirectoryIfNotExists(db_dir)
-
-        //     clearDirectory(db_dir)
-        //     fs.mkdirSync(db_dir, {
-        //         mode: 0o777
-        //     })
-        // --------------------------
-
-        return levelup(leveldown(db_dir))
-    }
+    return levelup(leveldown(db_dir))
+  }
 }

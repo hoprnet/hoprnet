@@ -3,7 +3,7 @@ import { createCipheriv, scryptSync } from 'crypto'
 import chalk from 'chalk'
 import PeerId from 'peer-id'
 
-import askForPassword from '../askForPassword'
+import { askForPassword } from '../askForPassword'
 
 const CIPHER_ALGORITHM = 'chacha20'
 
@@ -18,24 +18,24 @@ const CIPHER_ALGORITHM = 'chacha20'
  * @param encryptedSerializedKeyPair the encoded and encrypted key pair
  */
 export async function deserializeKeyPair(encryptedSerializedKeyPair: Uint8Array) {
-    const [salt, iv, ciphertext] = rlp.decode(encryptedSerializedKeyPair) as Buffer[]
+  const [salt, iv, ciphertext] = rlp.decode(encryptedSerializedKeyPair) as Buffer[]
 
-    const scryptParams = { N: 8192, r: 8, p: 16 }
+  const scryptParams = { N: 8192, r: 8, p: 16 }
 
-    const question = 'Please type in the password that was used to encrypt the key.'
+  const question = 'Please type in the password that was used to encrypt the key.'
 
-    let plaintext: Buffer
+  let plaintext: Buffer
 
-    do {
-        const pw = await askForPassword(question)
+  do {
+    const pw = await askForPassword(question)
 
-        const key = scryptSync(pw, salt, 32, scryptParams)
-        
-        plaintext = createCipheriv(CIPHER_ALGORITHM, key, iv).update(ciphertext)
-    } while (!plaintext.slice(0, 16).equals(Buffer.alloc(16, 0)))
+    const key = scryptSync(pw, salt, 32, scryptParams)
 
-    const peerId: PeerId = await PeerId.createFromProtobuf(plaintext)
-    console.log(`Successfully restored ID ${chalk.blue(peerId.toB58String())}.`)
+    plaintext = createCipheriv(CIPHER_ALGORITHM, key, iv).update(ciphertext)
+  } while (!plaintext.slice(0, 16).equals(Buffer.alloc(16, 0)))
 
-    return peerId
+  const peerId: PeerId = await PeerId.createFromProtobuf(plaintext)
+  console.log(`Successfully restored ID ${chalk.blue(peerId.toB58String())}.`)
+
+  return peerId
 }

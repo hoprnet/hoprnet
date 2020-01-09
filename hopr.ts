@@ -2,17 +2,19 @@
 
 require('./config')
 
-const readline = require('readline')
+import readline from 'readline'
 
-const chalk = require('chalk')
+import chalk from 'chalk'
 const rlp = require('rlp')
 
 const groupBy = require('lodash.groupby')
 
-const BN = require('bn.js')
-const PeerInfo = require('peer-info')
-const PeerId = require('peer-id')
-const Multiaddr = require('multiaddr')
+import BN from 'bn.js'
+
+import PeerInfo from 'peer-info'
+import PeerId from 'peer-id'
+import Multiaddr from 'multiaddr'
+
 const Multihash = require('multihashes')
 const bs58 = require('bs58')
 
@@ -27,7 +29,7 @@ const DEFAULT_STAKE = new BN(toWei('0.11', 'ether'))
 
 const SPLIT_OPERAND_QUERY_REGEX = /([\w\-]+)(?:\s+)?([\w\s\-.]+)?/
 
-let node, funds, ownAddress, stakedEther, rl, options
+let node, funds, ownAddress: string, stakedEther, rl: readline.Interface, options
 
 /**
  * Parses the given command-line options and returns a configuration object.
@@ -82,11 +84,14 @@ function parseOptions() {
         return displayHelp()
     }
 
-    const tmp = groupBy(process.env.BOOTSTRAP_SERVERS.split(',').map(addr => Multiaddr(addr)), ma => ma.getPeerId())
-    options.bootstrapServers = Object.keys(tmp).reduce((acc, peerId) => {
+    const tmp = groupBy(
+        process.env.BOOTSTRAP_SERVERS.split(',').map(addr => Multiaddr(addr)),
+        (ma: Multiaddr) => ma.getPeerId()
+    )
+    options.bootstrapServers = Object.keys(tmp).reduce((acc, peerId: string) => {
         const peerInfo = new PeerInfo(PeerId.createFromB58String(peerId))
 
-        tmp[peerId].forEach(ma => peerInfo.multiaddrs.add(ma))
+        tmp[peerId].forEach((ma: Multiaddr) => peerInfo.multiaddrs.add(ma))
         acc.push(peerInfo)
         return acc
     }, [])
@@ -97,11 +102,10 @@ function parseOptions() {
 /**
  * Checks whether the given PeerId belongs to any known bootstrap node.
  *
- * @param {PeerId} peerId
- * @returns {boolean}
+ * @param peerId
  */
-function isNotBootstrapNode(peerId) {
-    return !node.bootstrapServers.some(peerInfo => peerInfo.id.isEqual(peerId))
+function isNotBootstrapNode(peerId: PeerId): boolean {
+    return !node.bootstrapServers.some((peerInfo: PeerInfo) => peerInfo.id.isEqual(peerId))
 }
 
 // Allowed keywords
@@ -146,69 +150,71 @@ function tabCompletion(line, cb) {
             return cb(null, [[`unstake ${fromWei(stakedEther, 'ether')}`], line])
         case 'open':
             node.paymentChannels.getAllChannels(
-                channel => channel.channelId.toString('hex'),
-                channelIds => Promise.all(channelIds)
-                    .then(channelIds => {
-                        channelIds = new Set(channelIds)
-                        const peers = node.peerBook.getAllArray().reduce((acc, peerInfo) => {
-                            if (!isNotBootstrapNode(peerInfo.id)) return acc
+                (channel: { channelId: Buffer; state: any }) => channel.channelId.toString('hex'),
+                (channelIds: Promise<string>[]) =>
+                    Promise.all(channelIds)
+                        .then((channelIds: string[]) => {
+                            const channelIdSet = new Set<string>(channelIds)
+                            const peers = node.peerBook.getAllArray().reduce((acc, peerInfo) => {
+                                if (!isNotBootstrapNode(peerInfo.id)) return acc
 
-                            const channelId = getId(
-                                pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()),
-                                pubKeyToEthereumAddress(peerInfo.id.pubKey.marshal())
-                            ).toString('hex')
+                                const channelId = getId(
+                                    pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()),
+                                    pubKeyToEthereumAddress(peerInfo.id.pubKey.marshal())
+                                ).toString('hex')
 
-                            if (!channelIds.has(channelId))
-                                acc.push(peerInfo.id.toB58String())
+                                if (!channelIdSet.has(channelId)) acc.push(peerInfo.id.toB58String())
 
-                            return acc
-                        }, [])
+                                return acc
+                            }, [])
 
-                        channelIds.clear()
+                            channelIdSet.clear()
 
-                        if (peers.length < 1) {
-                            console.log(chalk.red(`\nDoesn't know any node to open a payment channel with.`))
+                            if (peers.length < 1) {
+                                console.log(chalk.red(`\nDoesn't know any node to open a payment channel with.`))
+                                return cb(null, [[''], line])
+                            }
+
+                            hits = query ? peers.filter((peerId: string) => peerId.startsWith(query)) : peers
+
+                            return cb(null, [hits.length ? hits.map((str: string) => `open ${str}`) : ['open'], line])
+                        })
+                        .catch(err => {
+                            console.log(chalk.red(err.message))
                             return cb(null, [[''], line])
-                        }
-
-                        hits = query ? peers.filter(peerId => peerId.startsWith(query)) : peers
-
-
-                        return cb(null, [hits.length ? hits.map(str => `open ${str}`) : ['open'], line])
-                    })
-                    .catch(err => {
-                        console.log(chalk.red(err.message))
-                        return cb(null, [[''], line])
-                    })
+                        })
             )
             break
         case 'close':
             node.paymentChannels.getAllChannels(
-                channel => {
+                (channel: { channelId: Buffer; state: any }) => {
                     if (!channel.state.counterparty) return
 
                     return pubKeyToPeerId(channel.state.counterparty)
                 },
-                peerIds =>
+                (peerIds: Promise<PeerId| undefined>[]) =>
                     Promise.all(peerIds)
-                        .then(peerIds => {
-                            // Exclude all falsy entries
-                            peerIds = peerIds.filter(peerId => peerId)
+                        .then((peerIds: (PeerId | undefined)[]) => {
+                            peerIds = peerIds.filter((peerId: PeerId | undefined) => peerId != null)
 
-                            if (peerIds && peerIds.length < 1) {
-                                console.log(chalk.red(`\nCannot close any channel because there are not any open ones and/or channels were opened by a third party.`))
+                            if (peerIds != null && peerIds.length < 1) {
+                                console.log(
+                                    chalk.red(`\nCannot close any channel because there are not any open ones and/or channels were opened by a third party.`)
+                                )
                                 return cb(null, [[''], line])
                             }
 
                             hits = query
-                                ? peerIds.reduce((result, peerId) => {
-                                    if (peerId.toB58String().startsWith(query)) result.push(peerId.toB58String())
+                                ? peerIds.reduce((result: string[], peerId: PeerId) => {
+                                      if (peerId.toB58String().startsWith(query)) {
+                                          result.push(peerId.toB58String())
+                                      }
 
-                                    return result
-                                }, [])
-                                : peerIds.map(peerId => peerId.toB58String())
+                                      return result
+                                  }, [])
+                                : peerIds.map((peerId: PeerId) => peerId.toB58String())
 
-                            return cb(null, [hits.length ? hits.map(str => `close ${str}`) : ['close'], line])
+                            return cb(null, [hits.length ? hits.map((str: string) => `close ${str}`) : ['close'], line])
                         })
                         .catch(err => {
                             console.log(chalk.red(err.message))
@@ -230,8 +236,8 @@ function tabCompletion(line, cb) {
  *
  * @param {string} query query that contains the peerId
  */
-async function checkPeerIdInput(query) {
-    let peerId
+async function checkPeerIdInput(query: string): Promise<PeerId> {
+    let peerId: PeerId
 
     try {
         // Throws an error if the Id is invalid
@@ -285,8 +291,8 @@ async function runAsRegularNode() {
 
     console.log(
         `Own Ethereum address: ${chalk.green(pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()))}\n` +
-        `Funds: ${fromWei(funds, 'ether')} ETH\n` +
-        `Stake: ${fromWei(stakedEther, 'ether')} ETH\n`
+            `Funds: ${fromWei(funds, 'ether')} ETH\n` +
+            `Stake: ${fromWei(stakedEther, 'ether')} ETH\n`
     )
 
     if (stakedEther.lt(MINIMAL_STAKE)) {
@@ -369,9 +375,8 @@ async function runAsRegularNode() {
     rl.prompt()
 }
 
-process.title = 'hopr';
-
-(async function main() {
+process.title = 'hopr'
+;(async function main() {
     console.log(`Welcome to ${chalk.bold('HOPR')}!\n`)
 
     options = parseOptions()
@@ -400,14 +405,14 @@ process.title = 'hopr';
     }
 })()
 
-async function close(query) {
-    if (!query) {
+async function close(query?: string): Promise<any> {
+    if (query == null) {
         console.log(chalk.red(`Invalid arguments. Expected 'close <peerId>'. Received '${query}'`))
         rl.prompt()
         return
     }
 
-    let peerId
+    let peerId: PeerId
     try {
         peerId = await checkPeerIdInput(query)
     } catch (err) {
@@ -421,7 +426,7 @@ async function close(query) {
     const channelId = getId(pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()), pubKeyToEthereumAddress(peerId.pubKey.marshal()))
 
     try {
-        let interval
+        let interval: NodeJS.Timeout
         node.paymentChannels
             .closeChannel(channelId)
             .then(receivedMoney => {
@@ -436,7 +441,7 @@ async function close(query) {
                     rl.prompt()
                 })
             })
-            .catch(err => {
+            .catch((err: Error) => {
                 console.log(err.message)
                 clearInterval(interval)
                 readline.clearLine(process.stdin, 0)
@@ -452,14 +457,14 @@ async function close(query) {
     return
 }
 
-async function send(query) {
-    if (!query) {
+async function send(query?: string) {
+    if (query == null) {
         console.log(chalk.red(`Invalid arguments. Expected 'open <peerId>'. Received '${query}'`))
         rl.prompt()
         return
     }
 
-    let peerId
+    let peerId: PeerId
     try {
         peerId = await checkPeerIdInput(query)
     } catch (err) {
@@ -470,22 +475,22 @@ async function send(query) {
         return
     }
 
-    rl.question(`Sending message to ${chalk.blue(peerId.toB58String())}\nType in your message and press ENTER to send:\n`, message =>
+    rl.question(`Sending message to ${chalk.blue(peerId.toB58String())}\nType in your message and press ENTER to send:\n`, (message: string) =>
         node
             .sendMessage(rlp.encode([message, Date.now().toString()]), peerId)
-            .catch(err => console.log(chalk.red(err.message)))
+            .catch((err: Error) => console.log(chalk.red(err.message)))
             .finally(() => rl.prompt())
     )
 }
 
-async function open(query) {
-    if (!query) {
+async function open(query?: string) {
+    if (query == null) {
         console.log(chalk.red(`Invalid arguments. Expected 'open <peerId>'. Received '${query}'`))
         rl.prompt()
         return
     }
 
-    let peerId
+    let peerId: PeerId
     try {
         peerId = await checkPeerIdInput(query)
     } catch (err) {
@@ -502,13 +507,13 @@ async function open(query) {
         pubKeyToEthereumAddress(peerId.pubKey.marshal())
     )
 
-    let interval
+    let interval: NodeJS.Timeout
     node.paymentChannels
         .open(peerId)
         .then(() => {
             console.log(`${chalk.green(`Successfully opened channel`)} ${chalk.yellow(channelId.toString('hex'))}`)
         })
-        .catch(err => {
+        .catch((err: Error) => {
             console.log(chalk.red(err.message))
         })
         .finally(() => {
@@ -523,24 +528,25 @@ async function open(query) {
     interval = setInterval(() => process.stdout.write('.'), 1000)
 }
 
-async function openChannels() {
+async function openChannels(): Promise<void> {
     let str = `${chalk.yellow('ChannelId:'.padEnd(64, ' '))} - ${chalk.blue('PeerId:')}\n`
 
     try {
         str += await node.paymentChannels.getAllChannels(
-            channel => {
-                if (!channel.state.counterparty)
-                    return `${chalk.yellow(channel.channelId.toString('hex'))} - ${chalk.gray('pre-opened')}`
+            (channel: {
+                channelId: Buffer,
+                state: any
+            }) => {
+                if (!channel.state.counterparty) return `${chalk.yellow(channel.channelId.toString('hex'))} - ${chalk.gray('pre-opened')}`
 
                 return pubKeyToPeerId(channel.state.counterparty).then(
-                    peerId => `${chalk.yellow(channel.channelId.toString('hex'))} - ${chalk.blue(peerId.toB58String())}`
+                    (peerId: PeerId) => `${chalk.yellow(channel.channelId.toString('hex'))} - ${chalk.blue(peerId.toB58String())}`
                 )
-
             },
-            promises => {
+            (promises: Promise<string>[]) => {
                 if (promises.length == 0) return `\n  No open channels.`
 
-                return Promise.all(promises).then(results => results.join('\n'))
+                return Promise.all(promises).then((results: string[]) => results.join('\n'))
             }
         )
     } catch (err) {
@@ -554,7 +560,7 @@ async function openChannels() {
     })
 }
 
-async function stake(query) {
+async function stake(query: string): Promise<void> {
     if (!query) {
         console.log(chalk.red(`Invalid arguments. Expected 'stake <amount of ETH>'. Received '${query}'`))
         rl.prompt()
@@ -591,8 +597,8 @@ async function stake(query) {
     }
 }
 
-async function unstake(query) {
-    if (!query) {
+async function unstake(query: string): Promise<void> {
+    if (query == null) {
         console.log(chalk.red(`Invalid arguments. Expected 'unstake <amount of ETH>'. Received '${query}'`))
         rl.prompt()
         return
@@ -616,9 +622,9 @@ async function unstake(query) {
     }
 }
 
-async function crawl() {
+async function crawl(): Promise<void> {
     try {
-        await node.crawler.crawl(peerInfo => isNotBootstrapNode(peerInfo.id))
+        await node.crawler.crawl((peerInfo: PeerInfo) => isNotBootstrapNode(peerInfo.id))
     } catch (err) {
         console.log(chalk.red(err.message))
     } finally {
@@ -629,7 +635,7 @@ async function crawl() {
     }
 }
 
-async function closeAll() {
+async function closeAll(): Promise<void> {
     try {
         const receivedMoney = await node.paymentChannels.closeChannels()
         console.log(`${chalk.green(`Closed all channels and received`)} ${chalk.magenta(fromWei(receivedMoney.toString(), 'ether'))} ETH.`)
@@ -642,7 +648,7 @@ async function closeAll() {
     }
 }
 
-async function getStakedEther() {
+async function getStakedEther(): Promise<BN> {
     try {
         let state = await node.paymentChannels.contract.methods.states(ownAddress).call({ from: ownAddress })
 
