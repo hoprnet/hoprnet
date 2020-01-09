@@ -2,7 +2,7 @@ import { LevelUp } from 'levelup'
 import BN from 'bn.js'
 
 export interface SignedTicket<Ticket> {
-  lotteryTicket: Ticket,
+  lotteryTicket: Ticket
   signature: Uint8Array
 }
 
@@ -38,13 +38,16 @@ export interface Channel<Balance extends BN, Hash extends Uint8Array, Moment, Ti
   submitTicket(signedTicket: SignedTicket<Ticket>): Promise<void>
 }
 
-export interface HoprCoreConnectorStatic {
-  new (_props: any): HoprCoreConnector
+export default class HoprCoreConnector {
+  constructor(_props: any)
 
-  create(db: LevelUp, keyPair: any, uri: string): Promise<HoprCoreConnector>
-}
+  /**
+   * Creates an uninitialised instance.
+   *
+   * @param db database instance
+   */
+  static create(db: LevelUp, keyPair: any, uri?: string): Promise<HoprCoreConnector>
 
-export default interface HoprCoreConnector {
   started: boolean
 
   readonly self: any
@@ -52,12 +55,6 @@ export default interface HoprCoreConnector {
   readonly db: LevelUp
 
   nonce: Promise<number>
-
-  /**
-   * Creates an uninitialised instance.
-   *
-   * @param db database instance
-   */
 
   start(): Promise<void>
 
