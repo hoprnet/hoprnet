@@ -6,15 +6,9 @@ export interface SignedTicket<Ticket> {
   signature: Uint8Array
 }
 
-export interface ChannelStatic<Balance extends BN, Hash extends Uint8Array, Moment, Ticket> {
-  new (): Channel<Balance, Hash, Moment, Ticket>
+export class Channel<Balance extends BN, Hash extends Uint8Array, Moment, Ticket> {
+  constructor()
 
-  fromDatabase(props: any): Promise<Channel<Balance, Hash, Moment, Ticket>>
-
-  open(props: any, amount: Balance, signature: Promise<Uint8Array>): Promise<Channel<Balance, Hash, Moment, Ticket>>
-}
-
-export interface Channel<Balance extends BN, Hash extends Uint8Array, Moment, Ticket> {
   readonly channelId: Promise<any>
 
   readonly settlementWindow: Promise<any>
@@ -36,6 +30,10 @@ export interface Channel<Balance extends BN, Hash extends Uint8Array, Moment, Ti
   initiateSettlement(): Promise<void>
 
   submitTicket(signedTicket: SignedTicket<Ticket>): Promise<void>
+
+  static fromDatabase<Balance extends BN, Hash extends Uint8Array, Moment, Ticket>(props: any): Promise<Channel<Balance, Hash, Moment, Ticket>>
+
+  static open<Balance extends BN, Hash extends Uint8Array, Moment, Ticket>(props: any, amount: Balance, signature: Promise<Uint8Array>): Promise<Channel<Balance, Hash, Moment, Ticket>>
 }
 
 export default class HoprCoreConnector {
