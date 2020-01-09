@@ -1,11 +1,11 @@
 {
   "name": "@hoprnet/hopr-core-connector-interface",
   "version": "1.0.0",
-  "main": "index.js",
   "repository": "https://github.com/hoprnet/hopr-core-connector-interface.git",
   "author": "Robert Kiel <robert.kiel@validitylabs.org>",
   "private": false,
   "files": [
-    "src/**/*"
-  ]
+    "src/"
+  ],
+  "types": "src/index.d.ts"
 }
