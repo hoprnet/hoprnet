@@ -14,5 +14,10 @@
     "singleQuote": true,
     "quoteProps": "consistent",
     "arrowParens": "avoid"
+  },
+  "devDependencies": {
+    "@types/bn.js": "^4.11.6",
+    "@types/levelup": "^4.3.0",
+    "bn.js": "^5.1.1"
   }
 }

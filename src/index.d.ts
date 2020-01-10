@@ -1,50 +1,12 @@
 import { LevelUp } from 'levelup'
 import BN from 'bn.js'
 
-export interface SignedTicket<Ticket> {
-  lotteryTicket: Ticket
-  signature: Uint8Array
-}
+export { default as utils } from './utils'
+export { default as Channel, ChannelClass, ChannelStatic } from './channel'
+export * from './types'
 
-export class Channel<Balance extends BN, Hash extends Uint8Array, Moment, Ticket> {
-  constructor()
-
-  readonly channelId: Promise<any>
-
-  readonly settlementWindow: Promise<any>
-
-  readonly state: Promise<any>
-
-  readonly balance_a: Promise<Balance>
-
-  readonly balance: Promise<Balance>
-
-  readonly currentBalance: Promise<Balance>
-
-  readonly currentBalanceOfCounterparty: Promise<Balance>
-
-  createTicket(secretKey: Uint8Array, amount: Balance, challenge: Hash, winProb: Hash): Promise<Ticket>
-
-  verifyTicket(signedTicket: SignedTicket<Ticket>): Promise<boolean>
-
-  initiateSettlement(): Promise<void>
-
-  submitTicket(signedTicket: SignedTicket<Ticket>): Promise<void>
-
-  static fromDatabase<Balance extends BN, Hash extends Uint8Array, Moment, Ticket>(props: any): Promise<Channel<Balance, Hash, Moment, Ticket>>
-
-  static open<Balance extends BN, Hash extends Uint8Array, Moment, Ticket>(props: any, amount: Balance, signature: Promise<Uint8Array>): Promise<Channel<Balance, Hash, Moment, Ticket>>
-}
-
-export default class HoprCoreConnector {
-  constructor(_props: any)
-
-  /**
-   * Creates an uninitialised instance.
-   *
-   * @param db database instance
-   */
-  static create(db: LevelUp, keyPair: any, uri?: string): Promise<HoprCoreConnector>
+declare class HoprCoreConnectorClass {
+  private constructor(...props: any[])
 
   started: boolean
 
@@ -62,3 +24,18 @@ export default class HoprCoreConnector {
 
   checkFreeBalance(newBalance: any): Promise<void>
 }
+
+declare interface HoprCoreConnectorStatic {
+  /**
+   * Creates an uninitialised instance.
+   *
+   * @param db database instance
+   */
+  create(db: LevelUp, keyPair: any, uri?: string): Promise<HoprCoreConnectorClass>
+}
+
+export { HoprCoreConnectorClass, HoprCoreConnectorStatic }
+
+declare const HoprCoreConnector: HoprCoreConnectorClass & HoprCoreConnectorStatic
+
+export default HoprCoreConnector
