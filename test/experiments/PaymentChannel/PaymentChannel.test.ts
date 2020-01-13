@@ -34,14 +34,13 @@ const PrintGasUsed = (name: string) => (
   return response;
 };
 
-contract("PaymentChannel", ([sender, recipient]) => {
+contract("PaymentChannel", function([sender, recipient, randomUser]) {
+  const depositAmount = web3.utils.toWei("1", "ether");
   let hoprToken: HoprTokenInstance;
   let paymentChannel: PaymentChannelInstance;
-
-  const depositAmount = web3.utils.toWei("1", "ether");
   let totalSupply: string;
 
-  before(async () => {
+  const reset = async () => {
     hoprToken = await HoprToken.new();
     totalSupply = await hoprToken.totalSupply().then(res => res.toString());
 
@@ -49,169 +48,297 @@ contract("PaymentChannel", ([sender, recipient]) => {
       hoprToken.address,
       time.duration.days(2)
     );
+  };
 
-    await hoprToken.approve(paymentChannel.address, totalSupply);
-  });
-
-  it("should have created channel correctly", async () => {
-    const response = await paymentChannel
-      .createChannel(sender, sender, recipient, depositAmount)
-      .then(PrintGasUsed("createChannel first time"));
-
-    expectEvent(response, "OpenedChannel", {
-      funder: sender,
-      sender,
-      recipient,
-      deposit: depositAmount
+  // reset contracts for every test
+  describe.only("unit tests", function() {
+    beforeEach(async function() {
+      await reset();
     });
 
-    const channel = await paymentChannel
-      .channels(sender, recipient)
-      .then(formatChannel);
+    it("should have created channel correctly", async function() {
+      await hoprToken.approve(paymentChannel.address, depositAmount);
 
-    expect(channel.deposit.eq(new BN(depositAmount))).to.be.equal(
-      true,
-      "wrong deposit"
-    );
-    expect(channel.closureTime.isZero()).to.be.equal(true, "wrong closureTime");
-    expect(channel.isOpen).to.be.equal(true, "wrong isOpen");
-  });
+      const response = await paymentChannel.createChannel(
+        sender,
+        sender,
+        recipient,
+        depositAmount
+      );
 
-  it("payment 'signer' should be 'sender'", async () => {
-    const signature = signPayment(
-      web3,
-      senderPrivKey,
-      paymentChannel.address,
-      web3.utils.toWei("1", "ether").toString()
-    );
+      expectEvent(response, "OpenedChannel", {
+        funder: sender,
+        sender,
+        recipient,
+        deposit: depositAmount
+      });
 
-    const signer = recoverSigner(web3, signature.message, signature.signature);
+      const channel = await paymentChannel
+        .channels(sender, recipient)
+        .then(formatChannel);
 
-    expect(signer).to.be.eq(sender, "wrong signer");
-  });
-
-  it("should send 0.5 HOPR to 'recipient' and 0.5 HOPR to 'sender'", async () => {
-    const amount = web3.utils.toWei("0.5", "ether");
-
-    const payment = signPayment(
-      web3,
-      senderPrivKey,
-      paymentChannel.address,
-      amount
-    );
-
-    const response = await paymentChannel
-      .closeChannel(sender, amount, payment.signature, {
-        from: recipient
-      })
-      .then(PrintGasUsed("closeChannel first time"));
-
-    expectEvent(response, "ClosedChannel", {
-      sender,
-      recipient,
-      senderAmount: web3.utils.toWei("0.5", "ether").toString(),
-      recipientAmount: web3.utils.toWei("0.5", "ether").toString()
+      expect(channel.deposit.eq(new BN(depositAmount))).to.be.equal(
+        true,
+        "wrong deposit"
+      );
+      expect(channel.closureTime.isZero()).to.be.equal(
+        true,
+        "wrong closureTime"
+      );
+      expect(channel.isOpen).to.be.equal(true, "wrong isOpen");
     });
 
-    const channel = await paymentChannel
-      .channels(sender, recipient)
-      .then(formatChannel);
+    it("payment 'signer' should be 'sender'", async function() {
+      const payment = signPayment(
+        web3,
+        senderPrivKey,
+        paymentChannel.address,
+        web3.utils.toWei("1", "ether").toString()
+      );
 
-    expect(channel.isOpen).to.be.equal(false, "wrong isOpen");
+      const signer = recoverSigner(web3, payment.message, payment.signature);
 
-    const senderBalance = await hoprToken.balanceOf(sender);
-    const recipientBalance = await hoprToken.balanceOf(recipient);
-    const paymentChannelBalance = await hoprToken.balanceOf(
-      paymentChannel.address
-    );
-
-    const expectedSenderBalance = new BN(totalSupply).sub(
-      new BN(web3.utils.toWei("0.5", "ether"))
-    );
-    const expectedRecipientBalance = new BN(web3.utils.toWei("0.5", "ether"));
-
-    expect(senderBalance.eq(expectedSenderBalance)).to.be.equal(
-      true,
-      "wrong senderBalance"
-    );
-    expect(recipientBalance.eq(expectedRecipientBalance)).to.be.equal(
-      true,
-      "wrong recipientBalance"
-    );
-    expect(paymentChannelBalance.isZero()).to.be.equal(
-      true,
-      "wrong paymentChannelBalance"
-    );
-  });
-
-  it("should send 0.5 HOPR to 'recipient' and 0.5 HOPR to 'sender' by closure", async () => {
-    await paymentChannel
-      .createChannel(sender, sender, recipient, depositAmount)
-      .then(PrintGasUsed("createChannel second time"));
-
-    const response = await paymentChannel
-      .initiateChannelClosure(recipient)
-      .then(PrintGasUsed("initiateChannelClosure"));
-
-    expectEvent(response, "InitiatedChannelClosure", {
-      sender,
-      recipient
+      expect(signer).to.be.eq(sender, "wrong signer");
     });
 
-    await time.increase(time.duration.days(3));
-    const response2 = await paymentChannel
-      .claimChannelClosure(recipient, web3.utils.toWei("0.5", "ether"))
-      .then(PrintGasUsed("claimChannelClosure"));
+    it("should fail when creating an open channel a second time", async function() {
+      await hoprToken.approve(paymentChannel.address, depositAmount);
 
-    expectEvent(response2, "ClosedChannel", {
-      sender,
-      recipient,
-      senderAmount: web3.utils.toWei("0.5", "ether").toString(),
-      recipientAmount: web3.utils.toWei("0.5", "ether").toString()
+      await paymentChannel.createChannel(
+        sender,
+        sender,
+        recipient,
+        depositAmount
+      );
+
+      await expectRevert(
+        paymentChannel.createChannel(sender, sender, recipient, depositAmount),
+        "channel is not closed"
+      );
     });
 
-    const channel = await paymentChannel
-      .channels(sender, recipient)
-      .then(formatChannel);
+    it("should fail when 'sender' is calling 'closeChannel'", async function() {
+      await hoprToken.approve(paymentChannel.address, depositAmount);
 
-    expect(channel.isOpen).to.be.equal(false, "wrong isOpen");
+      await paymentChannel.createChannel(
+        sender,
+        sender,
+        recipient,
+        depositAmount
+      );
 
-    const senderBalance = await hoprToken.balanceOf(sender);
-    const recipientBalance = await hoprToken.balanceOf(recipient);
-    const paymentChannelBalance = await hoprToken.balanceOf(
-      paymentChannel.address
-    );
+      const payment = signPayment(
+        web3,
+        senderPrivKey,
+        paymentChannel.address,
+        web3.utils.toWei("1", "ether").toString()
+      );
 
-    const expectedSenderBalance = new BN(totalSupply).sub(
-      new BN(web3.utils.toWei("1", "ether"))
-    );
-    const expectedRecipientBalance = new BN(web3.utils.toWei("1", "ether"));
+      await expectRevert(
+        paymentChannel.closeChannel(sender, depositAmount, payment.signature, {
+          from: sender
+        }),
+        "channel must be 'open' or 'pending for closure'"
+      );
+    });
 
-    expect(senderBalance.eq(expectedSenderBalance)).to.be.equal(
-      true,
-      "wrong senderBalance"
-    );
-    expect(recipientBalance.eq(expectedRecipientBalance)).to.be.equal(
-      true,
-      "wrong recipientBalance"
-    );
-    expect(paymentChannelBalance.isZero()).to.be.equal(
-      true,
-      "wrong paymentChannelBalance"
-    );
+    it("should fail when 'claimChannelClosure' before closureTime", async function() {
+      await hoprToken.approve(paymentChannel.address, depositAmount);
+
+      await paymentChannel.createChannel(
+        sender,
+        sender,
+        recipient,
+        depositAmount
+      );
+
+      await paymentChannel.initiateChannelClosure(recipient, {
+        from: sender
+      });
+
+      await expectRevert(
+        paymentChannel.claimChannelClosure(recipient, depositAmount, {
+          from: sender
+        }),
+        "'closureTime' has not passed"
+      );
+    });
+
+    it("should fail when calling 'initiateChannelClosure' from 'randomUser'", async function() {
+      await hoprToken.approve(paymentChannel.address, depositAmount);
+
+      await paymentChannel.createChannel(
+        sender,
+        sender,
+        recipient,
+        depositAmount
+      );
+
+      await expectRevert(
+        paymentChannel.initiateChannelClosure(recipient, {
+          from: randomUser
+        }),
+        "channel is not open"
+      );
+    });
+
+    it("should fail when calling 'claimChannelClosure' from 'randomUser'", async function() {
+      await hoprToken.approve(paymentChannel.address, depositAmount);
+
+      await paymentChannel.createChannel(
+        sender,
+        sender,
+        recipient,
+        depositAmount
+      );
+
+      await paymentChannel.initiateChannelClosure(recipient, {
+        from: sender
+      });
+
+      await expectRevert(
+        paymentChannel.claimChannelClosure(recipient, depositAmount, {
+          from: randomUser
+        }),
+        "channel is not pending for closure"
+      );
+    });
+
+    it("should fail 'createChannel' when token balance too low'", async function() {
+      await hoprToken.approve(paymentChannel.address, depositAmount);
+      await hoprToken.burn(totalSupply, {
+        from: sender
+      });
+
+      await expectRevert(
+        paymentChannel.createChannel(sender, sender, recipient, depositAmount, {
+          from: sender
+        }),
+        "SafeERC20: low-level call failed"
+      );
+    });
   });
 
-  it("should fail when creating an open channel a second time", async () => {
-    await paymentChannel.createChannel(
-      sender,
-      sender,
-      recipient,
-      depositAmount
-    );
+  // reset contracts once
+  describe("intergration tests", function() {
+    before(async function() {
+      await reset();
+      await hoprToken.approve(paymentChannel.address, totalSupply);
+    });
 
-    await expectRevert(
-      paymentChannel.createChannel(sender, sender, recipient, depositAmount),
-      "channel is not closed"
-    );
+    it("should send 0.2 HOPR to 'recipient' and 0.8 HOPR to 'sender'", async function() {
+      await paymentChannel
+        .createChannel(sender, sender, recipient, depositAmount)
+        .then(PrintGasUsed("createChannel first time"));
+
+      const amount = web3.utils.toWei("0.2", "ether");
+
+      const payment = signPayment(
+        web3,
+        senderPrivKey,
+        paymentChannel.address,
+        amount
+      );
+
+      const response = await paymentChannel
+        .closeChannel(sender, amount, payment.signature, {
+          from: recipient
+        })
+        .then(PrintGasUsed("closeChannel first time"));
+
+      expectEvent(response, "ClosedChannel", {
+        sender,
+        recipient,
+        senderAmount: web3.utils.toWei("0.8", "ether").toString(),
+        recipientAmount: web3.utils.toWei("0.2", "ether").toString()
+      });
+
+      const channel = await paymentChannel
+        .channels(sender, recipient)
+        .then(formatChannel);
+
+      expect(channel.isOpen).to.be.equal(false, "wrong isOpen");
+
+      const senderBalance = await hoprToken.balanceOf(sender);
+      const recipientBalance = await hoprToken.balanceOf(recipient);
+      const paymentChannelBalance = await hoprToken.balanceOf(
+        paymentChannel.address
+      );
+
+      const expectedSenderBalance = new BN(totalSupply).sub(
+        new BN(web3.utils.toWei("0.2", "ether"))
+      );
+      const expectedRecipientBalance = new BN(web3.utils.toWei("0.2", "ether"));
+
+      expect(senderBalance.eq(expectedSenderBalance)).to.be.equal(
+        true,
+        "wrong senderBalance"
+      );
+      expect(recipientBalance.eq(expectedRecipientBalance)).to.be.equal(
+        true,
+        "wrong recipientBalance"
+      );
+      expect(paymentChannelBalance.isZero()).to.be.equal(
+        true,
+        "wrong paymentChannelBalance"
+      );
+    });
+
+    it("should send 0.8 HOPR to 'recipient' and 0.2 HOPR to 'sender' by closure", async function() {
+      await paymentChannel
+        .createChannel(sender, sender, recipient, depositAmount)
+        .then(PrintGasUsed("createChannel second time"));
+
+      const response = await paymentChannel
+        .initiateChannelClosure(recipient)
+        .then(PrintGasUsed("initiateChannelClosure"));
+
+      expectEvent(response, "InitiatedChannelClosure", {
+        sender,
+        recipient
+      });
+
+      await time.increase(time.duration.days(3));
+      const response2 = await paymentChannel
+        .claimChannelClosure(recipient, web3.utils.toWei("0.8", "ether"))
+        .then(PrintGasUsed("claimChannelClosure"));
+
+      expectEvent(response2, "ClosedChannel", {
+        sender,
+        recipient,
+        senderAmount: web3.utils.toWei("0.2", "ether").toString(),
+        recipientAmount: web3.utils.toWei("0.8", "ether").toString()
+      });
+
+      const channel = await paymentChannel
+        .channels(sender, recipient)
+        .then(formatChannel);
+
+      expect(channel.isOpen).to.be.equal(false, "wrong isOpen");
+
+      const senderBalance = await hoprToken.balanceOf(sender);
+      const recipientBalance = await hoprToken.balanceOf(recipient);
+      const paymentChannelBalance = await hoprToken.balanceOf(
+        paymentChannel.address
+      );
+
+      const expectedSenderBalance = new BN(totalSupply).sub(
+        new BN(web3.utils.toWei("1", "ether"))
+      );
+      const expectedRecipientBalance = new BN(web3.utils.toWei("1", "ether"));
+
+      expect(senderBalance.eq(expectedSenderBalance)).to.be.equal(
+        true,
+        "wrong senderBalance"
+      );
+      expect(recipientBalance.eq(expectedRecipientBalance)).to.be.equal(
+        true,
+        "wrong recipientBalance"
+      );
+      expect(paymentChannelBalance.isZero()).to.be.equal(
+        true,
+        "wrong paymentChannelBalance"
+      );
+    });
   });
 });

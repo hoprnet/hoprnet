@@ -1,4 +1,3 @@
-import BN = require("bn.js");
 import {
   HoprTokenContract,
   HoprTokenInstance
@@ -6,22 +5,22 @@ import {
 
 const HoprToken: HoprTokenContract = artifacts.require("HoprToken");
 
-contract("HoprToken", _accounts => {
+contract("HoprToken", function(_accounts) {
   let hoprToken: HoprTokenInstance;
 
-  before(async () => {
+  before(async function() {
     hoprToken = await HoprToken.deployed();
   });
 
-  it("should be named 'HOPR Token'", async () => {
+  it("should be named 'HOPR Token'", async function() {
     expect(await hoprToken.name()).to.be.equal("HOPR Token");
   });
 
-  it("should have symbol 'HOPR'", async () => {
+  it("should have symbol 'HOPR'", async function() {
     expect(await hoprToken.symbol()).to.be.equal("HOPR");
   });
 
-  it("should have a supply of '100 million'", async () => {
+  it("should have a supply of '100 million'", async function() {
     const totalSupply = await hoprToken
       .totalSupply()
       .then(res => res.toString());
