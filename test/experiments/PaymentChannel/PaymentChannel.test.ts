@@ -51,7 +51,7 @@ contract("PaymentChannel", function([sender, recipient, randomUser]) {
   };
 
   // reset contracts for every test
-  describe.only("unit tests", function() {
+  describe("unit tests", function() {
     beforeEach(async function() {
       await reset();
     });
