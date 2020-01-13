@@ -220,7 +220,7 @@ contract("PaymentChannel", function([sender, recipient, randomUser]) {
   });
 
   // reset contracts once
-  describe("intergration tests", function() {
+  describe("integration tests", function() {
     before(async function() {
       await reset();
       await hoprToken.approve(paymentChannel.address, totalSupply);
