@@ -1,18 +1,28 @@
 import BN from 'bn.js'
 
-export class Balance extends BN {}
+declare class Balance extends BN {}
 
-export class Hash extends Uint8Array {}
+declare class Hash extends Uint8Array {}
 
-export class Moment {}
+declare class Moment {}
 
-export class Ticket {}
+declare class Ticket {}
 
-export class AccountId extends Uint8Array {}
+declare class AccountId extends Uint8Array {}
 
-export class State {}
+declare class State {}
 
-export class SignedTicket<Ticket> {
+declare class SignedTicket {
   lotteryTicket: Ticket
   signature: Uint8Array
+}
+
+export default interface Types {
+  Balance: Balance
+  Hash: Hash
+  Moment: Moment
+  Ticket: Ticket
+  AccountId: AccountId
+  State: State
+  SignedTicket: SignedTicket
 }

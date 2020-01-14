@@ -1,11 +1,11 @@
 import { LevelUp } from 'levelup'
 import BN from 'bn.js'
 
-export { default as utils } from './utils'
-export { default as Channel, ChannelClass, ChannelStatic } from './channel'
-export * from './types'
+import Utils from './utils'
+import Channel from './channel'
+import Types from './types'
 
-declare class HoprCoreConnectorClass {
+declare class HoprCoreConnector {
   private constructor(...props: any[])
 
   started: boolean
@@ -13,6 +13,12 @@ declare class HoprCoreConnectorClass {
   readonly self: any
 
   readonly db: LevelUp
+
+  readonly utils: Utils
+
+  readonly channel: Channel
+
+  readonly types: Types
 
   nonce: Promise<number>
 
@@ -31,11 +37,12 @@ declare interface HoprCoreConnectorStatic {
    *
    * @param db database instance
    */
-  create(db: LevelUp, keyPair: any, uri?: string): Promise<HoprCoreConnectorClass>
+  create(db: LevelUp, keyPair: any, uri?: string): Promise<HoprCoreConnector>
+
+  readonly types: Types
 }
 
-export { HoprCoreConnectorClass, HoprCoreConnectorStatic }
+export { HoprCoreConnector }
 
-declare const HoprCoreConnector: HoprCoreConnectorClass & HoprCoreConnectorStatic
 
-export default HoprCoreConnector
+export default HoprCoreConnectorStatic

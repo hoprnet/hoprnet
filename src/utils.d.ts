@@ -1,9 +1,16 @@
 import { AccountId, Hash } from './types'
 
-export function isPartyA(self: AccountId, counterparty: AccountId): boolean
+declare function isPartyA(self: AccountId, counterparty: AccountId): boolean
 
-export function getId(self: AccountId, counterparty: AccountId, api?: any): Promise<Hash>
+declare function getId(self: AccountId, counterparty: AccountId, api?: any): Promise<Hash>
 
-export function pubKeytToAccountId(pubkey: Uint8Array, ...args: any[]): Promise<AccountId>
+declare function pubKeytToAccountId(pubkey: Uint8Array, ...args: any[]): Promise<AccountId>
 
-export function hash(msg: Uint8Array): Uint8Array
+declare function hash(msg: Uint8Array): Uint8Array
+
+export default interface Utils {
+  isPartyA: typeof isPartyA
+  getId: typeof getId
+  pubKeyToAccountId: typeof pubKeytToAccountId
+  hash: typeof hash
+}

@@ -2,7 +2,7 @@ import { SignedTicket } from './types'
 
 import { Balance, Hash, Moment, Ticket, State } from './types'
 
-declare class ChannelClass {
+export default class Channel {
   private constructor()
 
   readonly channelId: Promise<Hash>
@@ -21,23 +21,21 @@ declare class ChannelClass {
 
   createTicket(secretKey: Uint8Array, amount: Balance, challenge: Hash, winProb: Hash): Promise<Ticket>
 
-  verifyTicket(signedTicket: SignedTicket<Ticket>): Promise<boolean>
+  verifyTicket(signedTicket: SignedTicket): Promise<boolean>
 
   initiateSettlement(): Promise<void>
 
-  submitTicket(signedTicket: SignedTicket<Ticket>): Promise<void>
-}
+  submitTicket(signedTicket: SignedTicket): Promise<void>
 
-declare interface ChannelStatic {
-  fromDatabase(props: any): Promise<ChannelClass>
+  static fromDatabase(props: any): Promise<Channel>
 
-  open(
+  static open(
     props: any,
     amount: Balance,
     signature: Promise<Uint8Array>
-  ): Promise<ChannelClass>
+  ): Promise<Channel>
 
-  getAllChannels<T, R>(
+  static getAllChannels<T, R>(
     onData: ({
       channelId: Hash,
       state: State
@@ -45,11 +43,5 @@ declare interface ChannelStatic {
     onEnd: (promises: Promise<T>[]) => R
   ): Promise<R>
 
-  closeChannels(): Promise<Balance>
+  static closeChannels(): Promise<Balance>
 }
-
-declare const Channel: ChannelClass & ChannelStatic
-
-export { ChannelClass, ChannelStatic }
-
-export default Channel
