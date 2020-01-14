@@ -2,7 +2,7 @@ import { toU8a } from './toU8a'
 import { u8aConcat } from './concat'
 import { PACKET_SIZE } from '../../constants'
 
-const LENGTH_PREFIX_LENGTH = 4
+import { LENGTH_PREFIX_LENGTH } from '.'
 /**
  * Adds a length-prefix to a Uint8Array
  * @param arg data to add padding

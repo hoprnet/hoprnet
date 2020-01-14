@@ -1,4 +1,4 @@
-const LENGTH_PREFIX_LENGTH = 4
+import { LENGTH_PREFIX_LENGTH } from '.'
 
 /**
  * Decodes a length-prefixed array and returns the encoded data.
