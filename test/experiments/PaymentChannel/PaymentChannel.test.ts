@@ -42,6 +42,8 @@ contract("PaymentChannel", function([sender, recipient, randomUser]) {
 
   const reset = async () => {
     hoprToken = await HoprToken.new();
+    // mint supply
+    await hoprToken.mint(sender, web3.utils.toWei("100000000", "ether"));
     totalSupply = await hoprToken.totalSupply().then(res => res.toString());
 
     paymentChannel = await PaymentChannel.new(

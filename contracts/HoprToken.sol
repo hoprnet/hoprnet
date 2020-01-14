@@ -7,7 +7,13 @@ import "./ERC20Token.sol";
 
 contract HoprToken is ERC20Token, ERC20Mintable, ERC20Burnable, ERC20Detailed {
     constructor () public
-    ERC20Detailed("HOPR Token", "HOPR", 18) {
-        _mint(msg.sender, 100000000 ether);
+    ERC20Detailed("HOPR Token", "HOPR", 18) {}
+
+    // Q: perhaps allow owner to change minter at any time?
+    function replaceMinter(address account) external onlyMinter {
+        // add HoprMinter as minter
+        addMinter(account);
+        // remove msg.sender from being a minter
+        renounceMinter();
     }
 }
