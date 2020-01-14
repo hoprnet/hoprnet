@@ -13,7 +13,7 @@ declare class AccountId extends Uint8Array {}
 declare class State {}
 
 declare class SignedTicket {
-  lotteryTicket: Ticket
+  ticket: Ticket
   signature: Uint8Array
 }
 
