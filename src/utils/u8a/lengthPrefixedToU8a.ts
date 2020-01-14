@@ -5,9 +5,12 @@ const LENGTH_PREFIX_LENGTH = 4
  *
  * @param arg array to decode
  * @param additionalPadding additional padding to remove
+ * @param targetLength optional target length
  */
-export function lengthPrefixedToU8a(arg: Uint8Array, additionalPadding?: Uint8Array) {
-  if (arg.length < LENGTH_PREFIX_LENGTH || (additionalPadding != null && arg.length < LENGTH_PREFIX_LENGTH + additionalPadding.length)) {
+export function lengthPrefixedToU8a(arg: Uint8Array, additionalPadding?: Uint8Array, targetLength?: number) {
+  if (targetLength != null && arg.length < targetLength) {
+    throw Error(`Expected a ${Uint8Array.name} of at least lenght ${targetLength}`)
+  } else if (arg.length < LENGTH_PREFIX_LENGTH || (additionalPadding != null && arg.length < LENGTH_PREFIX_LENGTH + additionalPadding.length)) {
     throw Error(
       `Expected a ${Uint8Array.name} of at least length ${
         additionalPadding != null ? LENGTH_PREFIX_LENGTH + additionalPadding.length : LENGTH_PREFIX_LENGTH
@@ -15,19 +18,22 @@ export function lengthPrefixedToU8a(arg: Uint8Array, additionalPadding?: Uint8Ar
     )
   }
 
-  let length = parseInt(
+  let arrLength = parseInt(
     arg.subarray(0, LENGTH_PREFIX_LENGTH).reduce((acc, n) => (acc += n.toString(16).padStart(2, '0')), ''),
     16
   )
 
-  if (!Number.isInteger(length)) {
+  if (!Number.isInteger(arrLength)) {
     throw Error(`Invalid encoded length.`)
   }
 
-  if (additionalPadding != null ? length + additionalPadding.length + LENGTH_PREFIX_LENGTH != arg.length : length + LENGTH_PREFIX_LENGTH != arg.length) {
+  if (
+    targetLength == null &&
+    (additionalPadding != null ? arrLength + additionalPadding.length + LENGTH_PREFIX_LENGTH != arg.length : arrLength + LENGTH_PREFIX_LENGTH != arg.length)
+  ) {
     throw Error(
       `Invalid array length. Expected a ${Uint8Array.name} of at least length ${
-        additionalPadding != null ? LENGTH_PREFIX_LENGTH + additionalPadding.length + length : LENGTH_PREFIX_LENGTH + length
+        additionalPadding != null ? LENGTH_PREFIX_LENGTH + additionalPadding.length + arrLength : LENGTH_PREFIX_LENGTH + arrLength
       } but got ${arg.length}.`
     )
   }
@@ -42,8 +48,8 @@ export function lengthPrefixedToU8a(arg: Uint8Array, additionalPadding?: Uint8Ar
   }
 
   if (additionalPadding != null) {
-    return arg.subarray(LENGTH_PREFIX_LENGTH + additionalPadding.length)
+    return arg.subarray(LENGTH_PREFIX_LENGTH + additionalPadding.length, LENGTH_PREFIX_LENGTH + additionalPadding.length + arrLength)
   } else {
-    return arg.subarray(LENGTH_PREFIX_LENGTH)
+    return arg.subarray(LENGTH_PREFIX_LENGTH, LENGTH_PREFIX_LENGTH + arrLength)
   }
 }
