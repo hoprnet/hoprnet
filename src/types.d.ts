@@ -7,7 +7,7 @@ export namespace Types {
 
   interface Hash extends Uint8Array {}
 
-  interface Moment extends Uint8Array {}
+  interface Moment extends BN {}
 
   interface State {}
 

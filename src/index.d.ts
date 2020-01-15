@@ -8,7 +8,7 @@ import Constructors, { Types } from './types'
 export { IUtils, Types, Channel }
 
 declare class HoprCoreConnector {
-  private constructor(...props: any[])
+  protected constructor(...props: any[])
 
   readonly started: boolean
   readonly self: any
