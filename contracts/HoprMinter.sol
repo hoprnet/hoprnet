@@ -38,8 +38,9 @@ contract HoprMinter is Ownable {
         deadline = now.add(_duration);
     }
 
-    // Q: should we just move this to a single HoprToken function?
     function replaceMinter(address account) external onlyOwner {
+        require(now >= deadline, "cannot replaceMinter before deadline");
+
         // add 'account' as minter
         token.addMinter(account);
         // remove this contract from being a minter

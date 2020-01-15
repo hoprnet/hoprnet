@@ -27,7 +27,11 @@ contract("HoprMinter", function([owner, user]) {
     hoprToken = await HoprToken.new();
     hoprMinter = await HoprMinter.new(hoprToken.address, maxAmount, duration);
 
-    await hoprToken.replaceMinter(hoprMinter.address, {
+    // make HoprMinter the only minter
+    await hoprToken.addMinter(hoprMinter.address, {
+      from: owner
+    });
+    await hoprToken.renounceMinter({
       from: owner
     });
   };
@@ -39,8 +43,17 @@ contract("HoprMinter", function([owner, user]) {
     });
 
     it("should replace minter to 'owner'", async function() {
+      await time.increase(time.duration.years(1));
       await hoprMinter.replaceMinter(owner);
+
       expect(await hoprToken.isMinter(owner)).to.be.equal(true, "wrong minter");
+    });
+
+    it("should fail to replace minter before deadline", async function() {
+      await expectRevert(
+        hoprMinter.replaceMinter(owner),
+        "cannot replaceMinter before deadline"
+      );
     });
 
     it("'user' should fail to 'increaseBalance'", async function() {
