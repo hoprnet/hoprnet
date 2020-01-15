@@ -36,3 +36,5 @@ declare namespace HoprCoreConnector {
   const channel: Channel
   const types: Constructors
 }
+
+export default HoprCoreConnector
