@@ -5,6 +5,8 @@ import Utils from './utils'
 import Channel from './channel'
 import Types from './types'
 
+export { Utils, Types, Channel }
+
 export default class HoprCoreConnector {
   private constructor(...props: any[])
 
