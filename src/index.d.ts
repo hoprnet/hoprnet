@@ -5,22 +5,24 @@ import Utils from './utils'
 import Channel from './channel'
 import Types from './types'
 
-declare class HoprCoreConnector {
+export default class HoprCoreConnector {
   private constructor(...props: any[])
 
-  started: boolean
-
+  readonly started: boolean
   readonly self: any
-
   readonly db: LevelUp
+  readonly nonce: Promise<number>
 
-  readonly utils: Utils
+  static readonly utils: Utils
+  static readonly channel: Channel
+  static readonly types: Types
 
-  readonly channel: Channel
-
-  readonly types: Types
-
-  nonce: Promise<number>
+  /**
+   * Creates an uninitialised instance.
+   *
+   * @param db database instance
+   */
+  static create(db: LevelUp, keyPair: any, uri?: string): Promise<HoprCoreConnector>
 
   start(): Promise<void>
 
@@ -31,18 +33,3 @@ declare class HoprCoreConnector {
   checkFreeBalance(newBalance: any): Promise<void>
 }
 
-declare interface HoprCoreConnectorStatic {
-  /**
-   * Creates an uninitialised instance.
-   *
-   * @param db database instance
-   */
-  create(db: LevelUp, keyPair: any, uri?: string): Promise<HoprCoreConnector>
-
-  readonly types: Types
-}
-
-export { HoprCoreConnector }
-
-
-export default HoprCoreConnectorStatic

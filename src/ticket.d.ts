@@ -1,17 +1,11 @@
-import { Hash, Balance, SignedTicket } from './types'
+import Types from './types'
 
-declare class TicketClass {
+export default class Ticket extends Uint8Array {
   private constructor(...props: any[])
+
+  static create(secretKey: Uint8Array, amount: Types['Balance'], challenge: Types['Hash'], winProb: Types['Hash']): Promise<Ticket>
+
+  static verify(signedTicket: Types['SignedTicket'], ...props: any[]): Promise<boolean>
+
+  static aggregate(tickets: Ticket[], ...props: any[]): Promise<Ticket>
 }
-
-declare interface TicketStatic {
-  create(secretKey: Uint8Array, amount: Balance, challenge: Hash, winProb: Hash): Promise<TicketClass>
-
-  verify(signedTicket: SignedTicket<TicketClass>, ...props: any[]): Promise<boolean>
-
-  aggregate(tickets: TicketClass[], ...props: any[]): Promise<TicketClass>
-}
-
-declare const Ticket: TicketClass & TicketStatic
-
-export default Ticket

@@ -1,16 +1,9 @@
-import { AccountId, Hash } from './types'
-
-declare function isPartyA(self: AccountId, counterparty: AccountId): boolean
-
-declare function getId(self: AccountId, counterparty: AccountId, api?: any): Promise<Hash>
-
-declare function pubKeytToAccountId(pubkey: Uint8Array, ...args: any[]): Promise<AccountId>
-
-declare function hash(msg: Uint8Array): Uint8Array
+import Types from './types'
 
 export default interface Utils {
-  isPartyA: typeof isPartyA
-  getId: typeof getId
-  pubKeyToAccountId: typeof pubKeytToAccountId
-  hash: typeof hash
+  isPartyA: (self: Types['AccountId'], counterparty: Types['AccountId']) => boolean
+  getId: (self: Types['AccountId'], counterparty: Types['AccountId'], ...props: any[]) => Promise<Types['Hash']>
+
+  pubKeyToAccountId: (pubkey: Uint8Array, ...args: any[]) => Promise<Types['AccountId']>
+  hash: (msg: Uint8Array) => Promise<Types['Hash']>
 }
