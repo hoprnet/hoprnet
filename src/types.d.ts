@@ -1,5 +1,9 @@
 import BN from 'bn.js'
 
+interface toU8a {
+  toU8a: (...props: any[]) => Uint8Array
+}
+
 export namespace Types {
   interface AccountId extends Uint8Array {}
 
@@ -9,14 +13,23 @@ export namespace Types {
 
   interface Moment extends BN {}
 
-  interface State {}
+  interface State extends toU8a {}
 
-  interface SignedTicket extends Uint8Array {
+  interface SignedTicket extends toU8a {
     ticket: Ticket
     signature: Uint8Array
   }
 
-  interface Ticket extends Uint8Array {}
+  interface Ticket extends toU8a {
+    channelId: Hash
+    challenge: Hash
+    epoch: TicketEpoch
+    amount: Balance
+    winProb: Hash
+    onChainSecret: Hash
+  }
+
+  interface TicketEpoch extends BN, toU8a {}
 }
 
 export default interface Constructors {
@@ -27,4 +40,5 @@ export default interface Constructors {
   AccountId: new (...props: any[]) => Types.AccountId
   State: new (...props: any[]) => Types.State
   SignedTicket: new (...props: any[]) => Types.SignedTicket
+  TicketEpoch: new (...props: any[]) => Types.TicketEpoch
 }
