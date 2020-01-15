@@ -3,7 +3,7 @@ import BN from 'bn.js'
 
 import Utils from './utils'
 import Channel from './channel'
-import Types from './types'
+import Constructors, {Types} from './types'
 
 export { Utils, Types, Channel }
 
@@ -17,7 +17,7 @@ export default class HoprCoreConnector {
 
   static readonly utils: Utils
   static readonly channel: Channel
-  static readonly types: Types
+  static readonly types: Constructors
 
   /**
    * Creates an uninitialised instance.
