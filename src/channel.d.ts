@@ -27,19 +27,9 @@ export default class Channel {
 
   static fromDatabase(props: any): Promise<Channel>
 
-  static open(
-    amount: Types['Balance'],
-    signature: Promise<Uint8Array>,
-    ...props: any[]
-  ): Promise<Channel>
+  static open(amount: Types['Balance'], signature: Promise<Uint8Array>, ...props: any[]): Promise<Channel>
 
-  static getAllChannels<T, R>(
-    onData: ({
-      channelId: Hash,
-      state: State
-    }) => T,
-    onEnd: (promises: Promise<T>[]) => R
-  ): Promise<R>
+  static getAllChannels<T, R>(onData: (channelId: Types['Hash'], state: Types['State']) => T, onEnd: (promises: Promise<T>[]) => R): Promise<R>
 
   static closeChannels(): Promise<Types['Balance']>
 }
