@@ -15,6 +15,17 @@ declare class HoprCoreConnector {
   readonly db: LevelUp
   readonly nonce: Promise<number>
 
+    /**
+   * Creates an uninitialised instance.
+   *
+   * @param db database instance
+   */
+  static create(db: LevelUp, keyPair: any, uri?: string): Promise<HoprCoreConnector>
+
+  static readonly utils: IUtils
+  static readonly channel : Channel
+  static readonly types: Constructors
+
   start(): Promise<void>
 
   stop(): Promise<void>
@@ -24,17 +35,5 @@ declare class HoprCoreConnector {
   checkFreeBalance(newBalance: any): Promise<void>
 }
 
-declare namespace HoprCoreConnector {
-  /**
-   * Creates an uninitialised instance.
-   *
-   * @param db database instance
-   */
-  function create(db: LevelUp, keyPair: any, uri?: string): Promise<HoprCoreConnector>
-
-  const Utils: IUtils
-  const channel: Channel
-  const types: Constructors
-}
 
 export default HoprCoreConnector
