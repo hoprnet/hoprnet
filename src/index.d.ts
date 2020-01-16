@@ -5,7 +5,7 @@ import Utils from './utils'
 import Channel, { ChannelClass } from './channel'
 import Types, { TypeClasses } from './types'
 
-export { Utils, TypeClasses, ChannelClass }
+export { Utils, TypeClasses, Channel, ChannelClass }
 
 export interface HoprCoreConnectorClass {
   readonly started: boolean
