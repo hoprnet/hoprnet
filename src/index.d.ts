@@ -1,11 +1,11 @@
 import { LevelUp } from 'levelup'
 import BN from 'bn.js'
 
-import IUtils from './utils'
-import Channel from './channel'
-import Constructors, { Types } from './types'
+import Utils from './utils'
+import Channel, { ChannelClass } from './channel'
+import Types, { TypeClasses } from './types'
 
-export { IUtils, Types, Channel }
+export { Utils, TypeClasses , ChannelClass }
 
 export declare class HoprCoreConnectorClass {
   protected constructor(...props: any[])
@@ -32,9 +32,9 @@ declare interface HoprCoreConnector {
    */
   create<T extends HoprCoreConnectorClass>(db: LevelUp, keyPair: any, uri?: string): Promise<T>
 
-  utils: IUtils
+  utils: Utils
   channel: Channel
-  types: Constructors
+  types: Types
 }
 
 export default HoprCoreConnector

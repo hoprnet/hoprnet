@@ -1,37 +1,37 @@
-import { Types } from './types'
+import { TypeClasses } from './types'
 
 export class ChannelClass {
   private constructor()
 
-  readonly channelId: Promise<Types.Hash>
+  readonly channelId: Promise<TypeClasses.Hash>
 
-  readonly settlementWindow: Promise<Types.Moment>
+  readonly settlementWindow: Promise<TypeClasses.Moment>
 
-  readonly state: Promise<Types.State>
+  readonly state: Promise<TypeClasses.State>
 
-  readonly balance_a: Promise<Types.Balance>
+  readonly balance_a: Promise<TypeClasses.Balance>
 
-  readonly balance: Promise<Types.Balance>
+  readonly balance: Promise<TypeClasses.Balance>
 
-  readonly currentBalance: Promise<Types.Balance>
+  readonly currentBalance: Promise<TypeClasses.Balance>
 
-  readonly currentBalanceOfCounterparty: Promise<Types.Balance>
+  readonly currentBalanceOfCounterparty: Promise<TypeClasses.Balance>
 
-  createTicket(secretKey: Uint8Array, amount: Types.Balance, challenge: Types.Hash, winProb: Types.Hash): Promise<Types.Ticket>
+  createTicket(secretKey: Uint8Array, amount: TypeClasses.Balance, challenge: TypeClasses.Hash, winProb: TypeClasses.Hash): Promise<TypeClasses.Ticket>
 
-  verifyTicket(signedTicket: Types.SignedTicket): Promise<boolean>
+  verifyTicket(signedTicket: TypeClasses.SignedTicket): Promise<boolean>
 
   initiateSettlement(): Promise<void>
 
-  submitTicket(signedTicket: Types.SignedTicket): Promise<void>
+  submitTicket(signedTicket: TypeClasses.SignedTicket): Promise<void>
 }
 
 export default interface Channel {
   fromDatabase(props: any): Promise<ChannelClass>
 
-  open(amount: Types.Balance, signature: Promise<Uint8Array>, ...props: any[]): Promise<ChannelClass>
+  open(amount: TypeClasses.Balance, signature: Promise<Uint8Array>, ...props: any[]): Promise<ChannelClass>
 
-  getAllChannels<T, R>(onData: (channelId: Types.Hash, state: Types.State) => T, onEnd: (promises: Promise<T>[]) => R): Promise<R>
+  getAllChannels<T, R>(onData: (channelId: TypeClasses.Hash, state: TypeClasses.State) => T, onEnd: (promises: Promise<T>[]) => R): Promise<R>
 
-  closeChannels(): Promise<Types.Balance>
+  closeChannels(): Promise<TypeClasses.Balance>
 }

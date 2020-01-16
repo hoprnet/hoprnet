@@ -1,10 +1,10 @@
-import { Types } from './types'
+import { TypeClasses } from './types'
 
 declare type Utils = {
-  isPartyA(self: Types.AccountId, counterparty: Types.AccountId): boolean
-  getId(self: Types.AccountId, counterparty: Types.AccountId, ...props: any[]): Promise<Types.Hash>
-  pubKeyToAccountId(pubkey: Uint8Array, ...args: any[]): Promise<Types.AccountId>
-  hash(msg: Uint8Array): Promise<Types.Hash>
+  isPartyA(self: TypeClasses.AccountId, counterparty: TypeClasses.AccountId): boolean
+  getId(self: TypeClasses.AccountId, counterparty: TypeClasses.AccountId, ...props: any[]): Promise<TypeClasses.Hash>
+  pubKeyToAccountId(pubkey: Uint8Array, ...args: any[]): Promise<TypeClasses.AccountId>
+  hash(msg: Uint8Array): Promise<TypeClasses.Hash>
 }
 
 export default Utils

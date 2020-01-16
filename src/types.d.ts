@@ -4,7 +4,7 @@ interface toU8a {
   toU8a: (...props: any[]) => Uint8Array
 }
 
-export namespace Types {
+export namespace TypeClasses {
   interface AccountId extends Uint8Array {}
 
   interface Balance extends BN {}
@@ -32,13 +32,13 @@ export namespace Types {
   interface TicketEpoch extends BN, toU8a {}
 }
 
-export default interface Constructors {
-  Balance: new (...props: any[]) => Types.Balance
-  Hash: new (...props: any[]) => Types.Hash
-  Moment: new (...props: any[]) => Types.Moment
-  Ticket: new (...props: any[]) => Types.Ticket
-  AccountId: new (...props: any[]) => Types.AccountId
-  State: new (...props: any[]) => Types.State
-  SignedTicket: new (...props: any[]) => Types.SignedTicket
-  TicketEpoch: new (...props: any[]) => Types.TicketEpoch
+export default interface Types {
+  Balance: new (...props: any[]) => TypeClasses.Balance
+  Hash: new (...props: any[]) => TypeClasses.Hash
+  Moment: new (...props: any[]) => TypeClasses.Moment
+  Ticket: new (...props: any[]) => TypeClasses.Ticket
+  AccountId: new (...props: any[]) => TypeClasses.AccountId
+  State: new (...props: any[]) => TypeClasses.State
+  SignedTicket: new (...props: any[]) => TypeClasses.SignedTicket
+  TicketEpoch: new (...props: any[]) => TypeClasses.TicketEpoch
 }
