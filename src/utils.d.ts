@@ -5,7 +5,7 @@ type Utils = {
   getId(self: TypeClasses.AccountId, counterparty: TypeClasses.AccountId, ...props: any[]): Promise<TypeClasses.Hash>
   pubKeyToAccountId(pubkey: Uint8Array, ...args: any[]): Promise<TypeClasses.AccountId>
   hash(msg: Uint8Array): Promise<TypeClasses.Hash>
-  sign(msg: Uint8Array, privKey: Uint8Array): Promise<{
+  sign(msg: Uint8Array, privKey: Uint8Array, pubKey: Uint8Array): Promise<{
     signature: Uint8Array,
     recovery: number
   }>
