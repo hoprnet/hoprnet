@@ -24,10 +24,10 @@ export interface ChannelClass {
   submitTicket(signedTicket: TypeClasses.SignedTicket): Promise<void>
 }
 
-export default interface Channel<ConcreteChannel extends ChannelClass> {
-  fromDatabase(props: any): Promise<ConcreteChannel>
+export default interface Channel {
+  fromDatabase(props: any): Promise<ChannelClass>
 
-  open(amount: TypeClasses.Balance, signature: Promise<Uint8Array>, ...props: any[]): Promise<ConcreteChannel>
+  open(amount: TypeClasses.Balance, signature: Promise<Uint8Array>, ...props: any[]): Promise<ChannelClass>
 
   getAllChannels<T, R>(onData: (channelId: TypeClasses.Hash, state: TypeClasses.State, ...props: any[]) => T, onEnd: (promises: Promise<T>[]) => R): Promise<R>
 
