@@ -1,6 +1,6 @@
 import { TypeClasses } from './types'
 
-declare type Utils = {
+type Utils = {
   isPartyA(self: TypeClasses.AccountId, counterparty: TypeClasses.AccountId): boolean
   getId(self: TypeClasses.AccountId, counterparty: TypeClasses.AccountId, ...props: any[]): Promise<TypeClasses.Hash>
   pubKeyToAccountId(pubkey: Uint8Array, ...args: any[]): Promise<TypeClasses.AccountId>

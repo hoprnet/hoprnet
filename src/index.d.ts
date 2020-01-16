@@ -22,15 +22,15 @@ export interface HoprCoreConnectorClass {
   checkFreeBalance(newBalance: any): Promise<void>
 }
 
-export default interface HoprCoreConnector {
+export default interface HoprCoreConnector<ConcreteChannel extends ChannelClass, ConcreteConnector extends HoprCoreConnectorClass> {
   /**
    * Creates an uninitialised instance.
    *
    * @param db database instance
    */
-  create(db: LevelUp, keyPair: any, uri?: string): Promise<HoprCoreConnectorClass>
+  create(db: LevelUp, keyPair: any, uri?: string): Promise<ConcreteConnector>
 
   utils: Utils
-  channel: Channel
+  channel: Channel<ConcreteChannel>
   types: Types
 }
