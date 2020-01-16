@@ -32,10 +32,9 @@ declare interface HoprCoreConnector {
    */
   create<T extends HoprCoreConnectorClass>(db: LevelUp, keyPair: any, uri?: string): Promise<T>
 
-   utils: IUtils
-    channel : Channel
-    types: Constructors
+  utils: IUtils
+  channel: Channel
+  types: Constructors
 }
-
 
 export default HoprCoreConnector

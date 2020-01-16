@@ -1,6 +1,6 @@
 import { Types } from './types'
 
-export default class Channel {
+export class ChannelClass {
   private constructor()
 
   readonly channelId: Promise<Types.Hash>
@@ -24,12 +24,14 @@ export default class Channel {
   initiateSettlement(): Promise<void>
 
   submitTicket(signedTicket: Types.SignedTicket): Promise<void>
+}
 
-  static fromDatabase(props: any): Promise<Channel>
+export default interface Channel {
+  fromDatabase(props: any): Promise<ChannelClass>
 
-  static open(amount: Types.Balance, signature: Promise<Uint8Array>, ...props: any[]): Promise<Channel>
+  open(amount: Types.Balance, signature: Promise<Uint8Array>, ...props: any[]): Promise<ChannelClass>
 
-  static getAllChannels<T, R>(onData: (channelId: Types.Hash, state: Types.State) => T, onEnd: (promises: Promise<T>[]) => R): Promise<R>
+  getAllChannels<T, R>(onData: (channelId: Types.Hash, state: Types.State) => T, onEnd: (promises: Promise<T>[]) => R): Promise<R>
 
-  static closeChannels(): Promise<Types.Balance>
+  closeChannels(): Promise<Types.Balance>
 }
