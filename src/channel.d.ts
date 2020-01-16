@@ -17,7 +17,7 @@ export class ChannelClass {
 
   readonly currentBalanceOfCounterparty: Promise<TypeClasses.Balance>
 
-  createTicket(secretKey: Uint8Array, amount: TypeClasses.Balance, challenge: TypeClasses.Hash, winProb: TypeClasses.Hash): Promise<TypeClasses.Ticket>
+  createTicket(secretKey: Uint8Array, amount: TypeClasses.Balance, challenge: TypeClasses.Hash, winProb: TypeClasses.Hash): Promise<TypeClasses.SignedTicket>
 
   verifyTicket(signedTicket: TypeClasses.SignedTicket): Promise<boolean>
 
@@ -27,9 +27,9 @@ export class ChannelClass {
 }
 
 export default interface Channel {
-  fromDatabase<U extends ChannelClass>(props: any): Promise<U>
+  fromDatabase(props: any): Promise<ChannelClass>
 
-  open<U extends ChannelClass>(amount: TypeClasses.Balance, signature: Promise<Uint8Array>, ...props: any[]): Promise<U>
+  open(amount: TypeClasses.Balance, signature: Promise<Uint8Array>, ...props: any[]): Promise<ChannelClass>
 
   getAllChannels<T, R>(onData: (channelId: TypeClasses.Hash, state: TypeClasses.State) => T, onEnd: (promises: Promise<T>[]) => R): Promise<R>
 

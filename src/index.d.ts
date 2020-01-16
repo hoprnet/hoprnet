@@ -30,7 +30,7 @@ declare interface HoprCoreConnector {
    *
    * @param db database instance
    */
-  create<T extends HoprCoreConnectorClass>(db: LevelUp, keyPair: any, uri?: string): Promise<T>
+  create(db: LevelUp, keyPair: any, uri?: string): Promise<HoprCoreConnectorClass>
 
   utils: Utils
   channel: Channel
