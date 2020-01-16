@@ -27,9 +27,9 @@ export class ChannelClass {
 }
 
 export default interface Channel {
-  fromDatabase(props: any): Promise<ChannelClass>
+  fromDatabase<U extends ChannelClass>(props: any): Promise<U>
 
-  open(amount: TypeClasses.Balance, signature: Promise<Uint8Array>, ...props: any[]): Promise<ChannelClass>
+  open<U extends ChannelClass>(amount: TypeClasses.Balance, signature: Promise<Uint8Array>, ...props: any[]): Promise<U>
 
   getAllChannels<T, R>(onData: (channelId: TypeClasses.Hash, state: TypeClasses.State) => T, onEnd: (promises: Promise<T>[]) => R): Promise<R>
 
