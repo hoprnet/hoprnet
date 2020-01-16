@@ -29,7 +29,7 @@ export default interface Channel {
 
   open(amount: TypeClasses.Balance, signature: Promise<Uint8Array>, ...props: any[]): Promise<ChannelClass>
 
-  getAllChannels<T, R>(onData: (channelId: TypeClasses.Hash, state: TypeClasses.State) => T, onEnd: (promises: Promise<T>[]) => R): Promise<R>
+  getAllChannels<T, R>(onData: (channelId: TypeClasses.Hash, state: TypeClasses.State, ...props: any[]) => T, onEnd: (promises: Promise<T>[]) => R): Promise<R>
 
-  closeChannels(): Promise<TypeClasses.Balance>
+  closeChannels(...props: any[]): Promise<TypeClasses.Balance>
 }
