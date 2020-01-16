@@ -49,7 +49,16 @@ contract PaymentChannel {
         secsClosure = _secsClosure;
     }
 
-    // create a channel, specified tokens must be approved beforehand
+    /**
+     * Create and open a channel between 'sender' and 'recipient',
+     * specified tokens must be approved beforehand.
+     *
+     * @notice create and open a channel
+     * @param funder address account which funds the channel
+     * @param sender address account which owns the channel
+     * @param recipient address account which receives payments
+     * @param amount uint256 amount to fund the channel
+     */
     function createChannel(address funder, address sender, address recipient, uint256 amount) external {
         require(funder != address(0), "'funder' address is empty");
         require(sender != address(0), "'sender' address is empty");
@@ -67,9 +76,19 @@ contract PaymentChannel {
         emit OpenedChannel(funder, sender, recipient, amount);
     }
 
-    // close a channel, the recipient can close the channel at any time
-    // by presenting a signed amount from the sender. The recipient will
-    // be sent that amount, and the remainder will go back to the sender
+    /**
+     * Close a channel between 'sender' and 'recipient',
+     * the recipient can close the channel at any time,
+     * by presenting a signed amount from the sender.
+     * 
+     * The recipient will be sent that amount,
+     * and the remainder will go back to the sender.
+     *
+     * @notice close and settle channel
+     * @param sender address account which will receive the 'amount'
+     * @param amount uint256 amount that the recipient will claim
+     * @param signature bytes signature to verify that the recipient can claim tokens
+     */
     function closeChannel(address sender, uint256 amount, bytes calldata signature) external {
         Channel storage channel = channels[sender][msg.sender];
 
@@ -83,6 +102,13 @@ contract PaymentChannel {
         settle(sender, msg.sender, amount);
     }
 
+    /**
+     * The 'sender' can initiate channel closure at any time,
+     * it starts a timeout.
+     *
+     * @notice initiate channel's closure
+     * @param recipient address account which will receive the payment
+     */
     function initiateChannelClosure(address recipient) external {
         Channel storage channel = channels[msg.sender][recipient];
         require(channel.isOpen, "channel is not open");
@@ -92,8 +118,14 @@ contract PaymentChannel {
         emit InitiatedChannelClosure(msg.sender, recipient, channel.closureTime);
     }
 
-    // if the timeout is reached without the recipient providing a better signature, then
-    // the tokens is released according to `amount`
+    /**
+     * If the timeout is reached without the recipient providing a signature,
+     * then the tokens can be claimed by 'sender'.
+     *
+     * @notice claim channel's closure
+     * @param recipient address account which will receive the 'amount'
+     * @param amount uint256 amount that the recipient will claim
+     */
     function claimChannelClosure(address recipient, uint256 amount) external {
         Channel storage channel = channels[msg.sender][recipient];
 
@@ -107,7 +139,14 @@ contract PaymentChannel {
         settle(msg.sender, recipient, amount);
     }
 
-    // settle channel, send 'amount' to recipient and the rest to sender
+    /**
+     * Settle channel, send 'amount' to recipient and the rest to sender.
+     *
+     * @notice settle channel
+     * @param sender address account which owns the channel
+     * @param recipient address account which receives payments
+     * @param amount uint256 amount to fund the channel
+     */
     function settle(address sender, address recipient, uint256 amount) internal {
         Channel storage channel = channels[sender][recipient];
 

@@ -38,8 +38,14 @@ contract HoprMinter is Ownable {
         deadline = now.add(_duration);
     }
 
-    // increase balance of an account, this allows the account -
-    // to mint specified amount in a linear fashion
+    /**
+     * Increase balance of an account,
+     * this allows the account to mint specified amount in a linear fashion.
+     *
+     * @notice increase balance of an account
+     * @param account address that the balance will be increased for
+     * @param amount uint256 how much tokens to increase
+     */
     function increaseBalance(address account, uint256 amount) external onlyOwner {
         require(now < deadline, "cannot update balances past deadline");
 
@@ -50,19 +56,29 @@ contract HoprMinter is Ownable {
         accounts[account].balance = accounts[account].balance.add(amount);
     }
 
-    // 'sender' claims tokens
+    /**
+     * @notice 'msg.sender' claims tokens
+     */
     function claim() external {
         _claim(msg.sender);
     }
 
-    // 'sender' claims tokens for an account
+    /**
+     * @notice 'msg.sender' claims tokens for the specified account
+     * @param account address that the tokens will be claimed for
+     */
     function claimFor(address account) external {
         require(account != address(0), "'account' address is empty");
 
         _claim(account);
     }
 
-    // mints claimable tokens and updates state
+    /**
+     * Mints claimable tokens and the account's state.
+     *
+     * @notice mints claimable tokens
+     * @param _account address that the balance will be increased for
+     */
     function _claim(address _account) internal {
         Account storage account = accounts[_account];
 
@@ -75,7 +91,10 @@ contract HoprMinter is Ownable {
         account.lastClaim = now;
     }
 
-    // calculate amount that can be claimed
+    /**
+     * @notice calculate amount that can be claimed
+     * @param account Account that the claimable tokens will be calculated for
+     */
     function _claimable(Account storage account) internal view returns (uint256) {
         if (now >= deadline) {
             return account.balance;
