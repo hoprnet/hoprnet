@@ -1,7 +1,7 @@
 import { TypeClasses } from './types'
 
 export class ChannelClass {
-  private constructor()
+  protected constructor()
 
   readonly channelId: Promise<TypeClasses.Hash>
 
