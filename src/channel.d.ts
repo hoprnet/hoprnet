@@ -7,7 +7,7 @@ export class ChannelClass {
 
   readonly settlementWindow: Promise<TypeClasses.Moment>
 
-  readonly state: Promise<TypeClasses.State>
+  readonly state: Promise<TypeClasses.Channel>
 
   readonly balance_a: Promise<TypeClasses.Balance>
 
