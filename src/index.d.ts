@@ -7,17 +7,13 @@ import Constructors, { Types } from './types'
 
 export { IUtils, Types, Channel }
 
-declare class HoprCoreConnector {
+export declare class HoprCoreConnectorClass {
   protected constructor(...props: any[])
 
   readonly started: boolean
   readonly self: any
   readonly db: LevelUp
   readonly nonce: Promise<number>
-
-  static readonly utils: IUtils
-  static readonly channel : Channel
-  static readonly types: Constructors
 
   start(): Promise<void>
 
@@ -34,7 +30,11 @@ declare interface HoprCoreConnector {
    *
    * @param db database instance
    */
-  create<T extends HoprCoreConnector>(db: LevelUp, keyPair: any, uri?: string): Promise<T>
+  create<T extends HoprCoreConnectorClass>(db: LevelUp, keyPair: any, uri?: string): Promise<T>
+
+   utils: IUtils
+    channel : Channel
+    types: Constructors
 }
 
 
