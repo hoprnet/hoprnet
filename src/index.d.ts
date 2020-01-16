@@ -5,11 +5,9 @@ import Utils from './utils'
 import Channel, { ChannelClass } from './channel'
 import Types, { TypeClasses } from './types'
 
-export { Utils, TypeClasses , ChannelClass }
+export { Utils, TypeClasses, ChannelClass }
 
-export declare class HoprCoreConnectorClass {
-  protected constructor(...props: any[])
-
+export interface HoprCoreConnectorClass {
   readonly started: boolean
   readonly self: any
   readonly db: LevelUp
@@ -24,7 +22,7 @@ export declare class HoprCoreConnectorClass {
   checkFreeBalance(newBalance: any): Promise<void>
 }
 
-declare interface HoprCoreConnector {
+export default interface HoprCoreConnector {
   /**
    * Creates an uninitialised instance.
    *
@@ -36,5 +34,3 @@ declare interface HoprCoreConnector {
   channel: Channel
   types: Types
 }
-
-export default HoprCoreConnector

@@ -1,8 +1,6 @@
 import { TypeClasses } from './types'
 
-export class ChannelClass {
-  protected constructor()
-
+export interface ChannelClass {
   readonly channelId: Promise<TypeClasses.Hash>
 
   readonly settlementWindow: Promise<TypeClasses.Moment>
