@@ -31,29 +31,12 @@ contract("HoprMinter", function([owner, user]) {
     await hoprToken.addMinter(hoprMinter.address, {
       from: owner
     });
-    await hoprToken.renounceMinter({
-      from: owner
-    });
   };
 
   // reset contracts for every test
   describe("unit tests", function() {
     beforeEach(async function() {
       await reset();
-    });
-
-    it("should replace minter to 'owner'", async function() {
-      await time.increase(time.duration.years(1));
-      await hoprMinter.replaceMinter(owner);
-
-      expect(await hoprToken.isMinter(owner)).to.be.equal(true, "wrong minter");
-    });
-
-    it("should fail to replace minter before deadline", async function() {
-      await expectRevert(
-        hoprMinter.replaceMinter(owner),
-        "cannot replaceMinter before deadline"
-      );
     });
 
     it("'user' should fail to 'increaseBalance'", async function() {

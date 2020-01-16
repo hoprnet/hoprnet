@@ -38,18 +38,8 @@ contract HoprMinter is Ownable {
         deadline = now.add(_duration);
     }
 
-    function replaceMinter(address account) external onlyOwner {
-        require(now >= deadline, "cannot replaceMinter before deadline");
-
-        // add 'account' as minter
-        token.addMinter(account);
-        // remove this contract from being a minter
-        token.renounceMinter();
-    }
-
     // increase balance of an account, this allows the account -
     // to mint specified amount in a linear fashion
-    // Q: should we implement 'decreaseBalance'
     function increaseBalance(address account, uint256 amount) external onlyOwner {
         require(now < deadline, "cannot update balances past deadline");
 

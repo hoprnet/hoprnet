@@ -5,7 +5,7 @@ import {
 
 const HoprToken: HoprTokenContract = artifacts.require("HoprToken");
 
-contract("HoprToken", function() {
+contract("HoprToken", function([owner]) {
   let hoprToken: HoprTokenInstance;
 
   before(async function() {
@@ -24,5 +24,9 @@ contract("HoprToken", function() {
     const totalSupply = await hoprToken.totalSupply();
 
     expect(totalSupply.isZero()).to.be.equal(true, "wrong total supply");
+  });
+
+  it("'owner' should be a minter", async function() {
+    expect(await hoprToken.isMinter(owner)).to.be.equal(true, "wrong minter");
   });
 });
