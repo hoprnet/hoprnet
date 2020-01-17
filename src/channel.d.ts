@@ -24,7 +24,7 @@ export interface ChannelClass {
      * @param challenge a challenge that has to be solved be the redeemer
      * @param winProb winning probability of this ticket
      */
-    create(secretKey: Uint8Array, amount: TypeClasses.Balance, challenge: TypeClasses.Hash, winProb: TypeClasses.Hash): Promise<Ticket>
+    create(secretKey: Uint8Array, amount: TypeClasses.Balance, challenge: TypeClasses.Hash, winProb: TypeClasses.Hash): Promise<TypeClasses.SignedTicket>
 
     /**
      * Checks a previously issued ticket for its validity.
