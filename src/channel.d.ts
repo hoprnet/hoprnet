@@ -69,7 +69,7 @@ export default interface Channel {
    * @param onData applied on all channel instances
    * @param onEnd composes at the end the received data
    */
-  getAllChannels<T, R>(onData: (channel: ChannelClass, ...props: any[]) => T, onEnd: (promises: Promise<T>[], ...props: any[]) => R): Promise<R>
+  getAllChannels<T, R>(onData: (channel: ChannelClass, ...props: any[]) => T, onEnd: (promises: Promise<T>[], ...props: any[]) => R, ...props: any[]): Promise<R>
 
   /**
    * Fetches all channel instances from the database and initiates a settlement on
