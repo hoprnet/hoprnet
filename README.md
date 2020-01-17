@@ -8,6 +8,6 @@ HOPR is a privacy-preserving messaging protocol that incentivizes users to parti
 
 This repo defines the interface between [`hopr-core`](https://github.com/hoprnet/hopr-core) and the Ethereum resp. Polkadot on-chain logic.
 
-Implementor (in alphabetical order):
+### Implementors (in alphabetical order):
 - [`hopr-core-ethereum`](https://github.com/hoprnet/hopr-core-ethereum)
 - [`hopr-core-polkadot`](https://github.com/hoprnet/hopr-core-polkadot)
