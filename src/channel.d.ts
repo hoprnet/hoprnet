@@ -22,6 +22,8 @@ export interface ChannelClass {
   initiateSettlement(): Promise<void>
 
   submitTicket(signedTicket: TypeClasses.SignedTicket): Promise<void>
+
+  getPreviousChallenges(): Promise<TypeClasses.Hash>
 }
 
 export default interface Channel {
