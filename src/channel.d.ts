@@ -39,7 +39,7 @@ export interface ChannelClass {
      * @param tickets array of tickets to aggregate
      * @param props additional arguments
      */
-    aggregate(tickets: Ticket[], ...props: any[]): Promise<Ticket>
+    // aggregate(tickets: Ticket[], ...props: any[]): Promise<Ticket>
 
     /**
      * Submits a signed to the blockchain.
