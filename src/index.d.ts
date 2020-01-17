@@ -6,7 +6,7 @@ import Channel, { ChannelClass } from './channel'
 import Types, { TypeClasses } from './types'
 import DbKeys from './dbKeys'
 
-export { Utils, TypeClasses, Channel, ChannelClass }
+export { Utils, DbKeys, TypeClasses, Channel, ChannelClass }
 
 export interface HoprCoreConnectorClass {
   readonly started: boolean
@@ -44,17 +44,6 @@ export interface HoprCoreConnectorClass {
    * @param props additional arguments
    */
   transfer(to: TypeClasses.AccountId, amount: TypeClasses.Balance, ...props: any[]): Promise<void>
-}
-
-export default interface HoprCoreConnector {
-  /**
-   * Creates an uninitialised instance.
-   *
-   * @param db database instance
-   * @param keyPair public key and private key of the account
-   * @param uri URI of the blockchain node, e.g. `ws://localhost:9944`
-   */
-  create(db: LevelUp, keyPair: any, uri?: string): Promise<HoprCoreConnectorClass>
 
   /**
    * (Static) utils to use in the connector module
@@ -76,4 +65,15 @@ export default interface HoprCoreConnector {
    * Export keys under which our data gets stored in the database.
    */
   dbKeys: DbKeys
+}
+
+export default interface HoprCoreConnector {
+  /**
+   * Creates an uninitialised instance.
+   *
+   * @param db database instance
+   * @param keyPair public key and private key of the account
+   * @param uri URI of the blockchain node, e.g. `ws://localhost:9944`
+   */
+  create(db: LevelUp, keyPair: any, uri?: string): Promise<HoprCoreConnectorClass>
 }
