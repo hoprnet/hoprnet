@@ -12,7 +12,7 @@ const COMPRESSED_PUBLIC_KEY_LENGTH = 33
  *
  * @param pubKey the plain public key
  */
-export function pubKeyToPeerId(pubKey: Buffer): Promise<PeerId> {
+export function pubKeyToPeerId(pubKey: Uint8Array): Promise<PeerId> {
   if (pubKey.length != COMPRESSED_PUBLIC_KEY_LENGTH) {
     throw Error(`Invalid public key. Expected a buffer of size ${COMPRESSED_PUBLIC_KEY_LENGTH} bytes. Got one of ${pubKey.length} bytes.`)
   }
