@@ -4,7 +4,7 @@ interface toU8a {
   toU8a: (...props: any[]) => Uint8Array
 }
 
-export namespace TypeClasses {
+export declare namespace TypeClasses {
   interface AccountId extends Uint8Array {}
 
   interface Channel {}
