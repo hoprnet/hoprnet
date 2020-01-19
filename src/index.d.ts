@@ -61,6 +61,11 @@ export interface HoprCoreConnectorClass {
    */
   dbKeys: DbKeys
 
+  /**
+   * Export chain-specific constants.
+   */
+  constants: Constants
+
   channel: {
     /**
      * Creates a Channel instance from the database.
