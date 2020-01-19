@@ -17,7 +17,7 @@ describe('test creation & verification of a challenge', function() {
     const hash = await paymentChannels.utils.hash(new Uint8Array(32))
 
     const exponent = randomBytes(32)
-    
+
     const challenge = Challenge.create(paymentChannels, secp256k1.publicKeyCreate(exponent), new BN(0))
 
     const peerId = await PeerId.create({
@@ -25,6 +25,12 @@ describe('test creation & verification of a challenge', function() {
     })
     await challenge.sign(peerId)
 
-    assert(challenge.verify(peerId))
+    assert(await challenge.verify(peerId))
+
+    challenge[0] ^= 0xff
+    try {
+      await challenge.verify(peerId)
+      assert.fail(`Manipulated signature should be with high probability invalid.`)
+    } catch (err) {}
   })
 })
