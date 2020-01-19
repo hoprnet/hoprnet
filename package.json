@@ -7,7 +7,7 @@
   "files": [
     "src/"
   ],
-  "types": "src/index.d.ts",
+  "types": "index.d.ts",
   "prettier": {
     "printWidth": 160,
     "semi": false,
