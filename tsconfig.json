@@ -3,7 +3,8 @@
     "esModuleInterop": true,
     "allowJs": true,
     "outDir": "./lib",
-    "moduleResolution": "node",
+    "lib": ["es2020", "dom"],
+    "module": "commonjs",
     "target": "es2019",
     "sourceMap": true
   },
