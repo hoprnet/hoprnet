@@ -1,4 +1,4 @@
-const Web3 = require("web3") as Web3;
+const Web3 = require("web3");
 
 export const createMessage = (contract: string, amount: string): string => {
   return Web3.utils.soliditySha3(
@@ -21,7 +21,7 @@ export const prefixMessageHash = (messageHash: string) => {
 };
 
 export const signMessage = (
-  web3: Web3,
+  web3: any,
   message: string,
   senderPrivKey: string
 ) => {
@@ -29,7 +29,7 @@ export const signMessage = (
 };
 
 export const signPayment = (
-  web3: Web3,
+  web3: any,
   senderPrivKey: string,
   contract: string,
   amount: string
@@ -40,7 +40,7 @@ export const signPayment = (
 };
 
 export const recoverSigner = (
-  web3: Web3,
+  web3: any,
   message: string,
   signature: string
 ) => {
