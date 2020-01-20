@@ -1,7 +1,5 @@
 import { createCipheriv } from 'crypto'
-import { u8aConcat } from '../u8a/concat'
-
-import BN from 'bn.js'
+import { u8aConcat, toU8a } from '../u8a'
 
 const BLOCK_LENGTH = 16
 const KEY_LENGTH = BLOCK_LENGTH
@@ -55,7 +53,7 @@ export class PRG {
 
     const amountOfBlocks = lastBlock - firstBlock
 
-    const iv = u8aConcat(this.iv, new Uint8Array(new BN(firstBlock).toArray('le', COUNTER_LENGTH)))
+    const iv = u8aConcat(this.iv, toU8a(firstBlock, COUNTER_LENGTH))
 
     return new Uint8Array(createCipheriv(PRG_ALGORITHM, this.key, iv).update(new Uint8Array(amountOfBlocks * BLOCK_LENGTH))).subarray(
       startOffset,

@@ -17,7 +17,7 @@ export default class Message extends Uint8Array {
   }
 
   subarray(begin?: number, end?: number): Uint8Array {
-    return Uint8Array.from(this).subarray(begin, end)
+    return new Uint8Array(this.buffer, begin, end != null ? end - begin : undefined)
   }
 
 

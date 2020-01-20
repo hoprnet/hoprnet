@@ -14,7 +14,7 @@ describe('test creation & verification of a challenge', function() {
       constants: Constants
     } as unknown) as HoprCoreConnectorClass
 
-    const hash = await paymentChannels.utils.hash(new Uint8Array(32))
+    // const hash = await paymentChannels.utils.hash(new Uint8Array(32))
 
     const exponent = randomBytes(32)
 

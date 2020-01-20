@@ -24,23 +24,16 @@ export class Challenge<Chain extends HoprCoreConnectorClass> extends Uint8Array 
   }
 
   get challengeSignature(): Uint8Array {
-    return this.subarray(0, this.paymentChannels.constants.SIGNATURE_LENGTH)
-  }
-
-  set challengeSignature(signature: Uint8Array) {
-    this.set(signature, 0)
+    return new Uint8Array(this.buffer, 0, this.paymentChannels.constants.SIGNATURE_LENGTH)
   }
 
   get challengeSignatureRecovery(): Uint8Array {
-    return this.subarray(this.paymentChannels.constants.SIGNATURE_LENGTH, this.paymentChannels.constants.SIGNATURE_LENGTH + 1)
+    return new Uint8Array(this.buffer, this.paymentChannels.constants.SIGNATURE_LENGTH, 1)
   }
 
-  set challengeSignatureRecovery(recovery: Uint8Array) {
-    this.set(recovery, this.paymentChannels.constants.SIGNATURE_LENGTH)
-  }
 
   get signatureHash(): Promise<Uint8Array> {
-    return this.paymentChannels.utils.hash(Buffer.from(this.subarray(0, this.paymentChannels.constants.SIGNATURE_LENGTH + 1).buffer))
+    return this.paymentChannels.utils.hash(this.subarray(0, this.paymentChannels.constants.SIGNATURE_LENGTH + 1))
   }
 
   get SIZE(): number {
@@ -52,7 +45,7 @@ export class Challenge<Chain extends HoprCoreConnectorClass> extends Uint8Array 
   }
 
   subarray(begin?: number, end?: number): Uint8Array {
-    return new Uint8Array(this).subarray(begin, end)
+    return new Uint8Array(this.buffer, begin, end != null ? end - begin : undefined)
   }
 
   /**
@@ -86,9 +79,9 @@ export class Challenge<Chain extends HoprCoreConnectorClass> extends Uint8Array 
     // const hashedChallenge = hash(Buffer.concat([this._hashedKey, this._fee.toBuffer('be', VALUE_LENGTH)], HASH_LENGTH + VALUE_LENGTH))
     const signature = await this.paymentChannels.utils.sign(await this.hash, peerId.privKey.marshal(), peerId.pubKey.marshal())
 
-    this.challengeSignature = signature.signature
-    
-    this.challengeSignatureRecovery = toU8a(signature.recovery, 1)
+    this.challengeSignature.set(signature.signature)
+
+    this.challengeSignatureRecovery.set(toU8a(signature.recovery, 1))
 
     return this
   }

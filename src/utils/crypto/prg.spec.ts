@@ -1,162 +1,24 @@
-// import PRG from './prg' 
+import { PRG } from './prg'
+import { randomBytes } from 'crypto'
+import assert from 'assert'
 
-// describe('Hopr Polkadot', async function() {
-    
-//   const path: string = resolve(__dirname, config.polkadotBasepath)
-//   const binaryPath: string = resolve(path, 'target/debug')
+describe('Hopr Polkadot', async function() {
+  it('should create a digest', function() {
+    const [key, iv] = [randomBytes(PRG.KEY_LENGTH), randomBytes(PRG.IV_LENGTH)]
 
-//   let keys: Keyring
+    const prg = PRG.createPRG(key, iv)
+    const digest = prg.digest(0, 500)
 
-//   let Alice: KeyringPair
-//   let Bob: KeyringPair
+    const firstSlice = prg.digest(0, 32)
+    assert.equal(firstSlice.length, 32, `check length`)
+    assert.deepEqual(firstSlice, digest.slice(0, 32), `check that beginning is the same`)
 
-//   let polkadotNode: ChildProcess
+    const secondSlice = prg.digest(123, 234)
+    assert.equal(secondSlice.length, 234 - 123, `check size`)
+    assert.deepEqual(secondSlice, digest.slice(123, 234), `check that slice somewhere in the middle is the same`)
+    assert.deepEqual(PRG.createPRG(key, iv).digest(123, 234), prg.digest(123, 234), `check that slice somewhere in the middle is the same when computed by different methods`)
 
-//   let hoprAlice: HoprPolkadot, hoprBob: HoprPolkadot
-
-//   before(async function() {
-//     this.timeout(TWENTY_MINUTES)
-
-//     if (!existsSync(path)) {
-//       throw Error(`Unable to find Polkadot runtime in '${path}'.`)
-//     }
-
-//     if (!existsSync(binaryPath)) {
-//       await new Promise((resolve, reject) => {
-//         const cargoBuild = spawn('cargo', ['build', '--release'], { cwd: path })
-
-//         cargoBuild.on('error', data => reject(data.toString()))
-
-//         cargoBuild.stdout.on('data', data => console.log(data.toString()))
-//         cargoBuild.on('exit', () => resolve())
-//       })
-//     }
-
-//     await cryptoWaitReady()
-
-//     keys = new Keyring({ type: 'sr25519' })
-//     Alice = keys.createFromUri('//Alice')
-//     Bob = keys.createFromUri('//Bob')
-//   })
-
-//   beforeEach(async function() {
-//     this.timeout(TWENTY_MINUTES)
-
-//     await new Promise((resolve, reject) => {
-//       const purgeChain = spawn(`${binaryPath}/hopr-polkadot`, ['purge-chain', '--dev', '-y'], { cwd: binaryPath })
-
-//       purgeChain.on('error', data => reject(data.toString()))
-
-//       purgeChain.stdout.on('data', data => console.log(data.toString()))
-//       purgeChain.on('exit', () => resolve())
-//     })
-
-//     polkadotNode = spawn('cargo', ['run', '--', '--dev', '--no-mdns', '--no-telemetry'], {
-//       stdio: 'inherit',
-//       cwd: path
-//     })
-
-//     polkadotNode.stdout?.on('data', data => console.log(data.toString()))
-
-//     await wait(14 * 1000)
-//     ;[hoprAlice, hoprBob] = await Promise.all([
-//       HoprPolkadot.create(LevelUp(Memdown()), Alice),
-//       HoprPolkadot.create(LevelUp(Memdown()), Bob)
-//     ])
-
-//     await Promise.all([
-//       /* prettier-ignore */
-//       hoprAlice.start(),
-//       hoprBob.start()
-//     ])
-
-//     const [first, second, third] = [await hoprAlice.nonce, await hoprAlice.nonce, await hoprAlice.nonce]
-
-//     await Promise.all([
-//       /* prettier-ignore */
-//       hoprAlice.initOnchainValues(first),
-//       hoprBob.initOnchainValues(),
-//       hoprAlice.api.tx.sudo
-//         .sudo(
-//           hoprAlice.api.tx.balances.setBalance(
-//             Alice.publicKey,
-//             hoprAlice.api.createType('Balance', 1234567),
-//             hoprAlice.api.createType('Balance', 0)
-//           )
-//         )
-//         .signAndSend(Alice, { nonce: second }),
-//       hoprAlice.api.tx.sudo
-//         .sudo(
-//           hoprAlice.api.tx.balances.setBalance(
-//             Bob.publicKey,
-//             hoprAlice.api.createType('Balance', 1234567),
-//             hoprAlice.api.createType('Balance', 0)
-//           )
-//         )
-//         .signAndSend(Alice, { nonce: third })
-//     ])
-
-//     await waitForNextBlock(hoprAlice.api)
-
-//     await hoprAlice.api.tx.balances.transfer(Bob.publicKey, 123).signAndSend(Alice)
-
-//     console.log(
-//       `Alice's new balance '${chalk.green(
-//         (await hoprAlice.api.query.balances.freeBalance(Alice.publicKey)).toString()
-//       )}'`
-//     )
-//   })
-
-//   afterEach(() => {
-//     polkadotNode.kill()
-//     hoprAlice.stop()
-//     hoprBob.stop()
-//   })
-
-//   it('should connect', async function() {
-//     this.timeout(TWENTY_MINUTES)
-
-//     const balance = hoprAlice.api.createType('Balance', 12345)
-
-//     const channelEnum = createTypeUnsafe<ChannelEnum>(hoprAlice.api.registry, 'Channel', [
-//       createTypeUnsafe<Funded>(hoprAlice.api.registry, 'Funded', [
-//         createTypeUnsafe<ChannelBalance>(hoprAlice.api.registry, 'ChannelBalance', [
-//           {
-//             balance,
-//             balanceA: balance
-//           }
-//         ])
-//       ])
-//     ])
-
-//     console.log(chalk.green('Opening channel'))
-
-//     const channelOpener = await Channel.open(
-//       {
-//         hoprPolkadot: hoprAlice,
-//         counterparty: hoprAlice.api.createType('AccountId', Bob.publicKey)
-//       },
-//       balance,
-//       Promise.resolve(Bob.sign(channelEnum.toU8a()))
-//     )
-
-//     console.log('channel opened')
-
-//     const channelId = await getId(
-//       hoprAlice.api,
-//       hoprAlice.api.createType('AccountId', Alice.publicKey),
-//       hoprAlice.api.createType('AccountId', Bob.publicKey)
-//     )
-
-//     await waitForNextBlock(hoprAlice.api)
-
-//     let channel = await hoprAlice.api.query.hopr.channels<ChannelEnum>(channelId)
-//     console.log(channel.asActive.toString())
-
-//     await channelOpener.initiateSettlement()
-//     await waitForNextBlock(hoprAlice.api)
-
-//     channel = await hoprAlice.api.query.hopr.channels<ChannelEnum>(channelId)
-//     console.log(`Channel '${channel.toString()}`)
-//   })
-// })
+    assert.throws(() => prg.digest(234, 234), `should throw when start == end`)
+    assert.throws(() => prg.digest(234, 233), `should throw when start > end`)
+  })
+})
