@@ -1,4 +1,5 @@
 import { TypeClasses } from './types';
+
 export default interface DbKeys {
     /**
      * Returns the db-key under which the channel is saved.
@@ -38,4 +39,8 @@ export default interface DbKeys {
      * Returns the db-key under which the on-chain secret is saved.
      */
     OnChainSecret(): Uint8Array;
+    /**
+     * Returns the db-key under which the tickets are saved in the database.
+     */
+    Ticket(channelId: TypeClasses.Hash, challenge: TypeClasses.Hash): Uint8Array
 }

@@ -7,5 +7,7 @@ export interface Ticket extends Uint8Array {
   amount: TypeClasses.Balance
   winProb: TypeClasses.Hash
   onChainSecret: TypeClasses.Hash
+
+  getEmbeddedFunds(): TypeClasses.Balance
 }
 

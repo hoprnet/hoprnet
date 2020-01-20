@@ -39,12 +39,9 @@ export interface HoprCoreConnectorClass {
   checkFreeBalance(newBalance: any): Promise<void>
 
   /**
-   * Creates and send a transaction that transfers `amount` coins to `to`.
-   * @param to account of the recipient
-   * @param amount how much to transfer
-   * @param props additional arguments
+   * Returns the current balances of the account associated with this node.
    */
-  transfer(to: TypeClasses.AccountId, amount: TypeClasses.Balance, ...props: any[]): Promise<void>
+  getAccountBalance(): Promise<TypeClasses.Balance>
 
   /**
    * (Static) utils to use in the connector module
