@@ -34,15 +34,15 @@ export class PRP {
       throw Error(`Invalid initialisation vector. Expected ${Uint8Array.name} of size ${IV_LENGTH} bytes but got a ${typeof key} of ${key.length} bytes..`)
     }
 
-    this.k1 = key.slice(0, INTERMEDIATE_KEY_LENGTH)
-    this.k2 = key.slice(INTERMEDIATE_KEY_LENGTH, 2 * INTERMEDIATE_KEY_LENGTH)
-    this.k3 = key.slice(2 * INTERMEDIATE_KEY_LENGTH, 3 * INTERMEDIATE_KEY_LENGTH)
-    this.k4 = key.slice(3 * INTERMEDIATE_KEY_LENGTH, 4 * INTERMEDIATE_KEY_LENGTH)
+    this.k1 = key.subarray(0, INTERMEDIATE_KEY_LENGTH)
+    this.k2 = key.subarray(INTERMEDIATE_KEY_LENGTH, 2 * INTERMEDIATE_KEY_LENGTH)
+    this.k3 = key.subarray(2 * INTERMEDIATE_KEY_LENGTH, 3 * INTERMEDIATE_KEY_LENGTH)
+    this.k4 = key.subarray(3 * INTERMEDIATE_KEY_LENGTH, 4 * INTERMEDIATE_KEY_LENGTH)
 
-    this.iv1 = iv.slice(0, INTERMEDIATE_IV_LENGTH)
-    this.iv2 = iv.slice(INTERMEDIATE_IV_LENGTH, 2 * INTERMEDIATE_IV_LENGTH)
-    this.iv3 = iv.slice(2 * INTERMEDIATE_IV_LENGTH, 3 * INTERMEDIATE_IV_LENGTH)
-    this.iv4 = iv.slice(3 * INTERMEDIATE_IV_LENGTH, 4 * INTERMEDIATE_IV_LENGTH)
+    this.iv1 = iv.subarray(0, INTERMEDIATE_IV_LENGTH)
+    this.iv2 = iv.subarray(INTERMEDIATE_IV_LENGTH, 2 * INTERMEDIATE_IV_LENGTH)
+    this.iv3 = iv.subarray(2 * INTERMEDIATE_IV_LENGTH, 3 * INTERMEDIATE_IV_LENGTH)
+    this.iv4 = iv.subarray(3 * INTERMEDIATE_IV_LENGTH, 4 * INTERMEDIATE_IV_LENGTH)
 
     this.initialised = true
   }
@@ -106,7 +106,7 @@ function hash(data: Uint8Array, k: Uint8Array, iv: Uint8Array): void {
   const hash = createHmac(HASH_ALGORITHM, Buffer.concat([k, iv], INTERMEDIATE_KEY_LENGTH + INTERMEDIATE_IV_LENGTH))
   hash.update(data.subarray(HASH_LENGTH))
 
-  data.set(u8aXOR(false, data.subarray(0, HASH_LENGTH), hash.digest()), 0)
+  u8aXOR(true, data.subarray(0, HASH_LENGTH), hash.digest())
 }
 
 function encrypt(data: Uint8Array, k: Uint8Array, iv: Uint8Array): void {

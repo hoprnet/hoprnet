@@ -90,7 +90,6 @@ export function createHeader<Chain extends HoprCoreConnectorClass>(header: Heade
   function generateFiller(secrets: Uint8Array[]) {
     const filler = new Uint8Array(PER_HOP_SIZE * (MAX_HOPS - 1))
 
-    filler.fill(0)
     let length: number, start: number, end: number
 
     for (let index = 0; index < MAX_HOPS - 1; index++) {
@@ -101,7 +100,7 @@ export function createHeader<Chain extends HoprCoreConnectorClass>(header: Heade
 
       length = (index + 1) * PER_HOP_SIZE
 
-      filler.set(u8aXOR(false, filler.subarray(0, length), PRG.createPRG(key, iv).digest(start, end)), 0)
+      u8aXOR(true, filler.subarray(0, length), PRG.createPRG(key, iv).digest(start, end))
     }
 
     return filler

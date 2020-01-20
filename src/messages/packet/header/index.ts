@@ -197,7 +197,7 @@ export function deriveBlinding(alpha: Uint8Array, secret: Uint8Array): Uint8Arra
 }
 
 export function deriveTransactionKey(secret: Uint8Array): Uint8Array {
-  if (!secret || !secp256k1.publicKeyVerify(Buffer.from(secret))) {
+  if (!secp256k1.publicKeyVerify(Buffer.from(secret))) {
     throw Error('General error')
   }
 
