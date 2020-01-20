@@ -50,13 +50,12 @@ describe('test creation & transformation of a header', function() {
         header.transformForNextNode()
     }
 
-    header.deriveSecret(peerIds[2].privKey.marshal())
+    header.deriveSecret(peerIds[2].privKey.marshal(), true)
     assert.deepEqual(header.derivedSecret, secrets[2], `pre-computed secret and derived secret should be the same`)
     assert(header.verify(), `MAC should be valid`)
-    header.extractHeaderInformation()
+    header.extractHeaderInformation(true)
     assert(peerIds[2].pubKey.marshal().every((value: number, index: number) => value == header.address[index]), `Decrypted address should be the same as the final recipient`)
-
-
+    assert(header.identifier.every((value: number, index: number) => value == identifier[index]), `Decrypted identifier should have the expected value`)
   })
 })
 

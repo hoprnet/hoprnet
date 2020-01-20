@@ -16,7 +16,9 @@ import {
   LAST_HOP_SIZE,
   PER_HOP_SIZE,
   PRIVATE_KEY_LENGTH,
-  KEY_LENGTH
+  KEY_LENGTH,
+  IDENTIFIER_SIZE,
+  DESINATION_SIZE
 } from './parameters'
 import PeerId from 'peer-id'
 
@@ -45,6 +47,7 @@ export type PRGParameters = {
 
 export class Header<Chain extends HoprCoreConnectorClass> extends Uint8Array {
   tmpData?: Uint8Array
+  derivedSecretLastNode?: Uint8Array
 
   constructor(arr: Uint8Array) {
     super(arr)
@@ -72,6 +75,10 @@ export class Header<Chain extends HoprCoreConnectorClass> extends Uint8Array {
     return this.tmpData != null ? this.tmpData.subarray(0, ADDRESS_SIZE) : undefined
   }
 
+  get identifier(): this['tmpData'] {
+    return this.tmpData != null ? this.tmpData.subarray(ADDRESS_SIZE, ADDRESS_SIZE + IDENTIFIER_SIZE) : undefined
+  }
+
   get hashedKeyHalf(): this['tmpData'] {
     return this.tmpData != null ? this.tmpData.subarray(ADDRESS_SIZE, ADDRESS_SIZE + COMPRESSED_PUBLIC_KEY_LENGTH) : undefined
   }
@@ -81,15 +88,24 @@ export class Header<Chain extends HoprCoreConnectorClass> extends Uint8Array {
   }
 
   get derivedSecret(): this['tmpData'] {
-    return this.tmpData != null ? this.tmpData.subarray(ADDRESS_SIZE + PROVING_VALUES_SIZE, ADDRESS_SIZE + PROVING_VALUES_SIZE + COMPRESSED_PUBLIC_KEY_LENGTH) : undefined
+    return this.tmpData != null
+      ? this.derivedSecretLastNode != null
+        ? this.derivedSecretLastNode
+        : this.tmpData.subarray(ADDRESS_SIZE + PROVING_VALUES_SIZE, ADDRESS_SIZE + PROVING_VALUES_SIZE + COMPRESSED_PUBLIC_KEY_LENGTH)
+      : undefined
   }
 
-  deriveSecret(secretKey: Uint8Array): void {
+  deriveSecret(secretKey: Uint8Array, lastNode: boolean = false): void {
     if (!secp256k1.privateKeyVerify(Buffer.from(secretKey))) {
       throw Error(`Invalid private key.`)
     }
 
-    this.tmpData = new Uint8Array(ADDRESS_SIZE + PROVING_VALUES_SIZE + COMPRESSED_PUBLIC_KEY_LENGTH)
+    if (lastNode) {
+      this.tmpData = this.beta.subarray(0, LAST_HOP_SIZE)
+      this.derivedSecretLastNode = new Uint8Array(COMPRESSED_PUBLIC_KEY_LENGTH)
+    } else {
+      this.tmpData = new Uint8Array(ADDRESS_SIZE + PROVING_VALUES_SIZE + COMPRESSED_PUBLIC_KEY_LENGTH)
+    }
 
     this.derivedSecret.set(new Uint8Array(secp256k1.publicKeyTweakMul(Buffer.from(this.alpha), Buffer.from(secretKey))), 0)
   }
@@ -98,25 +114,34 @@ export class Header<Chain extends HoprCoreConnectorClass> extends Uint8Array {
     return createMAC(this.derivedSecret, this.beta).every((value: number, index: number) => value == this.gamma[index])
   }
 
-  extractHeaderInformation(): void {
+  extractHeaderInformation(lastNode: boolean = false): void {
     const { key, iv } = derivePRGParameters(this.derivedSecret)
 
-    const tmp = new Uint8Array(BETA_LENGTH + PER_HOP_SIZE)
+    if (lastNode) {
+      const { key, iv } = derivePRGParameters(this.derivedSecret)
 
-    tmp.set(this.beta, 0)
-    tmp.fill(0, BETA_LENGTH, BETA_LENGTH + PER_HOP_SIZE)
+      this.tmpData.set(
+        u8aXOR(false, this.beta.subarray(0, DESINATION_SIZE + IDENTIFIER_SIZE), PRG.createPRG(key, iv).digest(0, DESINATION_SIZE + IDENTIFIER_SIZE)),
+        0
+      )
+    } else {
+      const tmp = new Uint8Array(BETA_LENGTH + PER_HOP_SIZE)
 
-    u8aXOR(true, tmp, PRG.createPRG(key, iv).digest(0, BETA_LENGTH + PER_HOP_SIZE))
+      tmp.set(this.beta, 0)
+      tmp.fill(0, BETA_LENGTH, BETA_LENGTH + PER_HOP_SIZE)
 
-    // this.tmpData = this.tmpData || Buffer.alloc(ADDRESS_SIZE + PROVING_VALUES_SIZE + COMPRESSED_PUBLIC_KEY_LENGTH)
+      u8aXOR(true, tmp, PRG.createPRG(key, iv).digest(0, BETA_LENGTH + PER_HOP_SIZE))
 
-    this.tmpData.set(tmp.subarray(0, ADDRESS_SIZE), 0)
+      // this.tmpData = this.tmpData || Buffer.alloc(ADDRESS_SIZE + PROVING_VALUES_SIZE + COMPRESSED_PUBLIC_KEY_LENGTH)
 
-    this.tmpData.set(tmp.subarray(ADDRESS_SIZE + MAC_SIZE, PER_HOP_SIZE), ADDRESS_SIZE)
+      this.tmpData.set(tmp.subarray(0, ADDRESS_SIZE), 0)
 
-    this.gamma.set(tmp.subarray(ADDRESS_SIZE, ADDRESS_SIZE + MAC_SIZE), 0)
+      this.tmpData.set(tmp.subarray(ADDRESS_SIZE + MAC_SIZE, PER_HOP_SIZE), ADDRESS_SIZE)
 
-    this.beta.set(tmp.subarray(PER_HOP_SIZE, PER_HOP_SIZE + BETA_LENGTH), 0)
+      this.gamma.set(tmp.subarray(ADDRESS_SIZE, ADDRESS_SIZE + MAC_SIZE), 0)
+
+      this.beta.set(tmp.subarray(PER_HOP_SIZE, PER_HOP_SIZE + BETA_LENGTH), 0)
+    }
   }
 
   transformForNextNode(): void {
