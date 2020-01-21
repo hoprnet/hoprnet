@@ -19,12 +19,10 @@ export interface ChannelClass {
   ticket: {
     /**
      * Constructs a ticket to use in a probabilistic payment channel.
-     * @param secretKey private key of the issuer
      * @param amount amount of funds to include
      * @param challenge a challenge that has to be solved be the redeemer
-     * @param winProb winning probability of this ticket
      */
-    create(secretKey: Uint8Array, amount: TypeClasses.Balance, challenge: TypeClasses.Hash, winProb: TypeClasses.Hash): Promise<TypeClasses.SignedTicket>
+    create(amount: TypeClasses.Balance, challenge: TypeClasses.Hash): Promise<TypeClasses.SignedTicket>
 
     /**
      * Checks a previously issued ticket for its validity.
