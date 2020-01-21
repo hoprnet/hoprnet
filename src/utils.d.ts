@@ -1,10 +1,5 @@
 import { TypeClasses } from './types'
 
-export interface Signature {
-  signature: Uint8Array,
-  recovery: number
-}
-
 export default interface Utils {
   /**
    * Decides whether we take the role of partyA in the channel with `counterparty`.
@@ -44,7 +39,7 @@ export default interface Utils {
     msg: Uint8Array,
     privKey: Uint8Array,
     pubKey: Uint8Array
-  ): Promise<Signature>
+  ): Promise<TypeClasses.Signature>
 
   /**
    * Uses the native on-chain signature scheme to check a signature for its validity.
@@ -52,5 +47,5 @@ export default interface Utils {
    * @param signature signature over `msg` to verify
    * @param pubkey public key of the signer
    */
-  verify(msg: Uint8Array, signature: Signature, pubkey: Uint8Array): Promise<boolean>
+  verify(msg: Uint8Array, signature: TypeClasses.Signature, pubkey: Uint8Array): Promise<boolean>
 }
