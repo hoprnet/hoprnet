@@ -68,9 +68,10 @@ export interface HoprCoreConnectorClass {
   channel: {
     /**
      * Creates a Channel instance from the database.
+     * @param counterparty AccountId of the counterparty
      * @param props additional arguments
      */
-    create(...props: any[]): Promise<ChannelClass>
+    create(counterparty: TypeClasses.AccountId, ...props: any[]): Promise<ChannelClass>
 
     /**
      * Opens a new payment channel and initializes the on-chain data.
