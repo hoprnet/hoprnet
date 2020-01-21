@@ -1,4 +1,5 @@
 import BN from 'bn.js'
+import Ticket from './ticket'
 
 interface toU8a {
   toU8a: (...props: any[]) => Uint8Array
@@ -22,15 +23,6 @@ export declare namespace TypeClasses {
     signature: Uint8Array
   }
 
-  interface Ticket extends toU8a {
-    channelId: Hash
-    challenge: Hash
-    epoch: TicketEpoch
-    amount: Balance
-    winProb: Hash
-    onChainSecret: Hash
-  }
-
   interface TicketEpoch extends BN, toU8a {}
 }
 
@@ -39,7 +31,7 @@ export default interface Types {
   Channel: new (...props: any[]) => TypeClasses.Channel
   Hash: new (...props: any[]) => TypeClasses.Hash
   Moment: new (...props: any[]) => TypeClasses.Moment
-  Ticket: new (...props: any[]) => TypeClasses.Ticket
+  Ticket: new (...props: any[]) => Ticket
   AccountId: new (...props: any[]) => TypeClasses.AccountId
   State: new (...props: any[]) => TypeClasses.State
   SignedTicket: new (...props: any[]) => TypeClasses.SignedTicket

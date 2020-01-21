@@ -1,6 +1,6 @@
 import { TypeClasses } from './types'
 
-export interface Ticket extends Uint8Array {
+export default interface Ticket extends Uint8Array {
   channelId: TypeClasses.Hash
   challenge: TypeClasses.Hash
   epoch: TypeClasses.TicketEpoch
