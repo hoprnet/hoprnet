@@ -22,7 +22,7 @@ export interface ChannelClass {
      * @param amount amount of funds to include
      * @param challenge a challenge that has to be solved be the redeemer
      */
-    create(amount: TypeClasses.Balance, challenge: TypeClasses.Hash): Promise<TypeClasses.SignedTicket>
+    create(amount: TypeClasses.Balance, challenge: TypeClasses.Hash, privKey: Uint8Array, pubKey: Uint8Array): Promise<TypeClasses.SignedTicket>
 
     /**
      * Checks a previously issued ticket for its validity.

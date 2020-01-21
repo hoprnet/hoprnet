@@ -18,9 +18,11 @@ export declare namespace TypeClasses {
 
   interface State extends toU8a {}
 
+  interface Signature extends Uint8Array {}
+
   interface SignedTicket extends toU8a {
     ticket: Ticket
-    signature: Uint8Array
+    signature: Signature
   }
 
   interface TicketEpoch extends BN, toU8a {}
