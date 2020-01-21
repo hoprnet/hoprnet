@@ -1,5 +1,5 @@
 import { TypeClasses } from './types'
-import { Ticket } from './ticket'
+import Ticket from './ticket'
 
 export interface ChannelClass {
   readonly channelId: Promise<TypeClasses.Hash>
