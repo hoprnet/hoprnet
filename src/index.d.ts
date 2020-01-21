@@ -5,9 +5,11 @@ import Utils from './utils'
 import { ChannelClass } from './channel'
 import Types, { TypeClasses } from './types'
 import DbKeys from './dbKeys'
+import Ticket from './ticket'
+
 import Constants from './constants'
 
-export { Utils, DbKeys, TypeClasses, ChannelClass, Constants }
+export { Utils, DbKeys, TypeClasses, ChannelClass, Constants, Ticket }
 
 export interface HoprCoreConnectorClass {
   readonly started: boolean
