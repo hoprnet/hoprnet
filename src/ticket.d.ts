@@ -1,6 +1,7 @@
-import { TypeClasses } from './types'
+import { TypeClasses, toU8a } from './types'
 
-export default interface Ticket extends Uint8Array {
+
+export default interface Ticket extends toU8a {
   channelId: TypeClasses.Hash
   challenge: TypeClasses.Hash
   epoch: TypeClasses.TicketEpoch
@@ -10,4 +11,3 @@ export default interface Ticket extends Uint8Array {
 
   getEmbeddedFunds(): TypeClasses.Balance
 }
-

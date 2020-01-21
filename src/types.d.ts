@@ -1,7 +1,7 @@
 import BN from 'bn.js'
 import Ticket from './ticket'
 
-interface toU8a {
+export interface toU8a {
   toU8a: (...props: any[]) => Uint8Array
 }
 
