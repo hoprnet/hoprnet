@@ -1,4 +1,12 @@
 require("ts-node/register");
+const HDWalletProvider = require("@truffle/hdwallet-provider");
+
+let secrets;
+try {
+  secrets = require("./truffle-secrets.json");
+} catch (error) {
+  console.log("truffle-secrets not found!");
+}
 
 module.exports = {
   networks: {
@@ -15,6 +23,17 @@ module.exports = {
       port: 8555, // if you change this, also set the port option in '.solcover.js'
       gas: 0xfffffffffff, // high gas value
       gasPrice: 0x01 // low gas price
+    },
+
+    rinkeby: secrets && {
+      provider: () =>
+        new HDWalletProvider(
+          secrets.mnemonic,
+          `https://rinkeby.infura.io/v3/${secrets.infura}`
+        ),
+      gas: 6500000,
+      gasPrice: 1000000000,
+      network_id: "4"
     }
   },
 

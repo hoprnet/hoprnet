@@ -1,5 +1,5 @@
 /*
-  In this smart contract we implement custom token behaviours
+  Intermediary smart contract to run OZ's tests
 */
 pragma solidity ^0.5.3;
 

@@ -68,12 +68,11 @@ yarn coverage
 
 # Migrating
 
-While migrations are implemented, setups for testnet/mainnet are not yet complete.
-You can run migrations by running your own in memory blockchain, for example:
+For testnet/mainnet migrations, you will have to create a [truffle-secrets.json](./truffle-secrets.example.json) file within the root of the project, this file allows you to use your own mnemonic and infura api key securely.
 
 ```bash
-npx truffle develop
-yarn migrate
+npx truffle develop # starts a locally hosted network
+yarn migrate --network development
 ```
 
 # Contracts

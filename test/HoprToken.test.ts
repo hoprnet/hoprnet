@@ -1,4 +1,3 @@
-import BN = require("bn.js");
 import {
   HoprTokenContract,
   HoprTokenInstance
@@ -6,26 +5,28 @@ import {
 
 const HoprToken: HoprTokenContract = artifacts.require("HoprToken");
 
-contract("HoprToken", _accounts => {
+contract("HoprToken", function([owner]) {
   let hoprToken: HoprTokenInstance;
 
-  before(async () => {
+  before(async function() {
     hoprToken = await HoprToken.deployed();
   });
 
-  it("should be named 'HOPR Token'", async () => {
-    expect(await hoprToken.name()).to.be.equal("HOPR Token");
+  it("should be named 'HOPR Token'", async function() {
+    expect(await hoprToken.name()).to.be.equal("HOPR Token", "wrong name");
   });
 
-  it("should have symbol 'HOPR'", async () => {
-    expect(await hoprToken.symbol()).to.be.equal("HOPR");
+  it("should have symbol 'HOPR'", async function() {
+    expect(await hoprToken.symbol()).to.be.equal("HOPR", "wrong symbol");
   });
 
-  it("should have a supply of '100 million'", async () => {
-    const totalSupply = await hoprToken
-      .totalSupply()
-      .then(res => res.toString());
+  it("should have a supply of '0'", async function() {
+    const totalSupply = await hoprToken.totalSupply();
 
-    expect(totalSupply).to.be.equal(web3.utils.toWei("100000000", "ether"));
+    expect(totalSupply.isZero()).to.be.equal(true, "wrong total supply");
+  });
+
+  it("'owner' should be a minter", async function() {
+    expect(await hoprToken.isMinter(owner)).to.be.equal(true, "wrong minter");
   });
 });
