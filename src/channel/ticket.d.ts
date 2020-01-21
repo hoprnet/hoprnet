@@ -1,4 +1,4 @@
-import { TypeClasses, toU8a } from './types'
+import { TypeClasses, toU8a } from '../types'
 
 
 export default interface Ticket extends toU8a {

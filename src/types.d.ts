@@ -1,5 +1,5 @@
 import BN from 'bn.js'
-import Ticket from './ticket'
+import Ticket from './channel/ticket'
 
 export interface toU8a {
   toU8a: (...props: any[]) => Uint8Array
@@ -8,7 +8,7 @@ export interface toU8a {
 export declare namespace TypeClasses {
   interface AccountId extends Uint8Array {}
 
-  interface Channel {}
+  interface Channel extends toU8a {}
 
   interface Balance extends BN {}
 
@@ -27,13 +27,13 @@ export declare namespace TypeClasses {
 }
 
 export default interface Types {
+  AccountId: new (...props: any[]) => TypeClasses.AccountId
   Balance: new (...props: any[]) => TypeClasses.Balance
   Channel: new (...props: any[]) => TypeClasses.Channel
   Hash: new (...props: any[]) => TypeClasses.Hash
   Moment: new (...props: any[]) => TypeClasses.Moment
-  Ticket: new (...props: any[]) => Ticket
-  AccountId: new (...props: any[]) => TypeClasses.AccountId
   State: new (...props: any[]) => TypeClasses.State
   SignedTicket: new (...props: any[]) => TypeClasses.SignedTicket
+  Ticket: new (...props: any[]) => Ticket
   TicketEpoch: new (...props: any[]) => TypeClasses.TicketEpoch
 }

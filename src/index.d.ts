@@ -5,7 +5,7 @@ import Utils from './utils'
 import { ChannelClass } from './channel'
 import Types, { TypeClasses } from './types'
 import DbKeys from './dbKeys'
-import Ticket from './ticket'
+import Ticket from './channel/ticket'
 
 import Constants from './constants'
 

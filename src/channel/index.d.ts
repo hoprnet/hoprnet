@@ -1,4 +1,4 @@
-import { TypeClasses } from './types'
+import { TypeClasses } from '../types'
 import Ticket from './ticket'
 
 export interface ChannelClass {
