@@ -22,7 +22,7 @@ export declare namespace TypeClasses {
     onChainSignature: Uint8Array
   }
 
-  interface SignedTicket extends toU8a {
+  interface SignedTicket extends Uint8Array {
     ticket: Ticket
     signature: Signature
   }
