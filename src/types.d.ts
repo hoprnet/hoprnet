@@ -22,9 +22,17 @@ export declare namespace TypeClasses {
     onChainSignature: Uint8Array
   }
 
+  namespace Signature {
+    type length = number
+  }
+
   interface SignedTicket extends Uint8Array {
     ticket: Ticket
     signature: Signature
+  }
+
+  namespace SignedTicket {
+    type length = number
   }
 
   interface TicketEpoch extends BN, toU8a {}
