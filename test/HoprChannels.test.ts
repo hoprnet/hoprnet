@@ -4,9 +4,9 @@ import {
   HoprChannelsInstance,
   HoprTokenContract,
   HoprTokenInstance
-} from "../../../types/truffle-contracts";
-import { signPayment, recoverSigner } from "./utils";
-import { PromiseType } from "../../../types/typescript";
+} from "../types/truffle-contracts";
+import { signPayment, recoverSigner, createTicket } from "./utils";
+import { PromiseType } from "../types/typescript";
 import { time, expectEvent, expectRevert } from "@openzeppelin/test-helpers";
 
 const HoprToken: HoprTokenContract = artifacts.require("HoprToken");
@@ -132,7 +132,7 @@ contract("HoprChannels", function([sender, recipient, randomUser]) {
       );
 
       await expectRevert(
-        hoprChannels.closeChannel(sender, depositAmount, payment.signature, {
+        hoprChannels.closeChannel(sender, {
           from: sender
         }),
         "channel must be 'open' or 'pending for closure'"
@@ -154,7 +154,7 @@ contract("HoprChannels", function([sender, recipient, randomUser]) {
       });
 
       await expectRevert(
-        hoprChannels.claimChannelClosure(recipient, depositAmount, {
+        hoprChannels.claimChannelClosure(recipient, {
           from: sender
         }),
         "'closureTime' has not passed"
@@ -194,7 +194,7 @@ contract("HoprChannels", function([sender, recipient, randomUser]) {
       });
 
       await expectRevert(
-        hoprChannels.claimChannelClosure(recipient, depositAmount, {
+        hoprChannels.claimChannelClosure(recipient, {
           from: randomUser
         }),
         "channel is not pending for closure"
@@ -223,22 +223,43 @@ contract("HoprChannels", function([sender, recipient, randomUser]) {
       await hoprToken.approve(hoprChannels.address, totalSupply);
     });
 
-    it("should send 0.2 HOPR to 'recipient' and 0.8 HOPR to 'sender'", async function() {
+    it.only("should send 0.2 HOPR to 'recipient' and 0.8 HOPR to 'sender'", async function() {
+      await hoprChannels.setHashedSecret(web3.utils.keccak256("secret"), {
+        from: recipient
+      });
+
       await hoprChannels
         .createChannel(sender, sender, recipient, depositAmount)
         .then(PrintGasUsed("createChannel first time"));
 
       const amount = web3.utils.toWei("0.2", "ether");
+      const secret = web3.utils.stringToHex("secret");
 
-      const payment = signPayment(
+      const ticket = createTicket({
         web3,
         senderPrivKey,
-        hoprChannels.address,
-        amount
-      );
+        secret,
+        amount,
+        winProbPercent: "100"
+      });
+
+      console.log(ticket);
+
+      // await hoprChannels.redeemTicketAndCloseChannel(
+      //   sender,
+      //   secret,
+      //   ticket.s_a,
+      //   ticket.s_b,
+      //   amount,
+      //   ticket.winProb,
+      //   ticket.signature,
+      //   { from: recipient }
+      // );
+
+      return;
 
       const response = await hoprChannels
-        .closeChannel(sender, amount, payment.signature, {
+        .closeChannel(sender, {
           from: recipient
         })
         .then(PrintGasUsed("closeChannel first time"));
@@ -297,7 +318,7 @@ contract("HoprChannels", function([sender, recipient, randomUser]) {
 
       await time.increase(time.duration.days(3));
       const response2 = await hoprChannels
-        .claimChannelClosure(recipient, web3.utils.toWei("0.8", "ether"))
+        .claimChannelClosure(recipient)
         .then(PrintGasUsed("claimChannelClosure"));
 
       expectEvent(response2, "ClosedChannel", {

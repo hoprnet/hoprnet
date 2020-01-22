@@ -20,6 +20,21 @@ contract HoprChannels {
         uint256 deposit
     );
 
+    // TODO: check with Sebastian if we need this
+    // recipient has reedemed a ticket
+    // event TickedReedemed(
+    //     address indexed sender,
+    //     address indexed recipient,
+    //     uint256 amount
+    // );
+
+    // recipient withdrawed unsettled channel balance
+    event Withdrawed(
+        address indexed sender,
+        address indexed recipient,
+        uint256 recipientAmount
+    );
+
     // the payment channel's 'sender' is closing the channel
     event InitiatedChannelClosure(
         address indexed sender,
@@ -36,17 +51,30 @@ contract HoprChannels {
     );
 
     struct Channel {
-        uint256 deposit;        // the token deposit
+        uint256 deposit;        // tokens deposited
+        uint256 unsettled;      // tokens that are claimable but not yet settled
         uint256 closureTime;    // the time when the channel can be closed by 'sender'
         bool isOpen;            // channel is open
     }
 
     // store channels e.g: channels[sender][recipient]
     mapping(address => mapping(address => Channel)) public channels;
+    mapping(address => bytes32) public hashedSecrets;  
 
     constructor(IERC20 _token, uint256 _secsClosure) public {
         token = _token;
         secsClosure = _secsClosure;
+    }
+
+    /**
+     * @notice sets caller's hashedSecret
+     * @param hashedSecret bytes32 hashedSecret to store
+     */
+    // TODO: check with Robert if this is ok
+    function setHashedSecret(bytes32 hashedSecret) external {
+        require(hashedSecrets[msg.sender] != hashedSecret, "new and old hashedSecret must not be the same");
+
+        hashedSecrets[msg.sender] = hashedSecret;
     }
 
     /**
@@ -63,7 +91,8 @@ contract HoprChannels {
         require(funder != address(0), "'funder' address is empty");
         require(sender != address(0), "'sender' address is empty");
         require(recipient != address(0), "'recipient' address is empty");
-        require(amount > 0, "'amount' must be larger than 0");
+        require(hashedSecrets[recipient] != bytes32(0), "'recipient' has not set a hashed secret");
+        require(amount > 0, "'amount' must be greater than 0");
 
         Channel storage channel = channels[sender][recipient];
         require(channel.isOpen == false, "channel is not closed");
@@ -77,29 +106,116 @@ contract HoprChannels {
     }
 
     /**
-     * Close a channel between 'sender' and 'recipient',
-     * the recipient can close the channel at any time,
-     * by presenting a signed amount from the sender.
-     * 
-     * The recipient will be sent that amount,
-     * and the remainder will go back to the sender.
-     *
-     * @notice close and settle channel
-     * @param sender address account which will receive the 'amount'
-     * @param amount uint256 amount that the recipient will claim
-     * @param signature bytes signature to verify that the recipient can claim tokens
+     * @notice redeem ticket
+     * @param sender address account that created the channel
+     * @param pre_image bytes32 the value that once hashed produces recipients hashedSecret
+     * @param s_a bytes32 secret
+     * @param s_b bytes32 secret
+     * @param amount uint256 amount recipient will receive
+     * @param win_prob bytes32 win probability
+     * @param signature bytes recipient's signature
      */
-    function closeChannel(address sender, uint256 amount, bytes calldata signature) external {
-        Channel storage channel = channels[sender][msg.sender];
+    function redeemTicket(
+        address sender,
+        bytes32 pre_image,
+        bytes32 s_a,
+        bytes32 s_b,
+        uint256 amount,
+        bytes32 win_prob,
+        bytes memory signature
+    ) public {
+        address recipient = msg.sender;
+        bytes32 hashedSecret = hashedSecrets[recipient];
+        Channel storage channel = channels[sender][recipient];
 
         require(
             channel.isOpen ||
             isChannelPendingClosure(channel),
             "channel must be 'open' or 'pending for closure'"
         );
-        require(isValidSignature(sender, amount, signature), "signature is not valid");
+        require(amount > 0, "amount must be strictly greater than zero");
+        require(
+            hashedSecret == keccak256(abi.encodePacked(pre_image)),
+            "given value is not a pre-image of the stored on-chain secret"
+        );
 
-        settle(sender, msg.sender, amount);
+        bytes32 hashed_s_a = keccak256(abi.encodePacked(s_a));
+        bytes32 hashed_s_b = keccak256(abi.encodePacked(s_b));
+        bytes32 challange = keccak256(abi.encodePacked(hashed_s_a, hashed_s_b));
+        bytes32 hashedTicket = keccak256(abi.encodePacked(challange, hashedSecret, amount, win_prob));
+
+        // TODO: implement xor
+        require(uint256(hashedTicket) < uint256(win_prob), "ticket must be a win");
+        require(recoverSigner(hashedTicket, signature) == recipient, "signature must be valid");
+
+        hashedSecrets[recipient] = pre_image;
+        channel.unsettled = channel.unsettled.add(amount);
+
+        require(channel.unsettled <= channel.deposit, "unsettled balance must be strictly lesser than deposit balance");
+    }
+
+    /**
+     * Close a channel between 'sender' and 'recipient',
+     * the recipient can close the channel at any time.
+     * 
+     * The recipient will be sent the unsettled balance,
+     * and the remainder will go back to the sender.
+     *
+     * @notice close channel and settle payment
+     * @param sender address account that created the channel
+    */
+    function closeChannel(address sender) public {
+        require(sender != address(0), "'sender' address is empty");
+
+        settle(sender, msg.sender);
+    }
+
+    /**
+     * @notice redeem ticket and close channel
+     * @param sender address account that created the channel
+     * @param pre_image bytes32 the value that once hashed produces recipients hashedSecret
+     * @param s_a bytes32 secret
+     * @param s_b bytes32 secret
+     * @param amount uint256 amount recipient will receive
+     * @param win_prob bytes32 win probability
+     * @param signature bytes recipient's signature
+     */
+    function redeemTicketAndCloseChannel(
+        address sender,
+        bytes32 pre_image,
+        bytes32 s_a,
+        bytes32 s_b,
+        uint256 amount,
+        bytes32 win_prob,
+        bytes calldata signature
+    ) external {
+        redeemTicket(
+            sender,
+            pre_image,
+            s_a,
+            s_b,
+            amount,
+            win_prob,
+            signature
+        );
+        closeChannel(sender);
+    }
+
+    /**
+     * @notice withdraw unsettled balance
+     * @param sender address account which owns the channel
+     */
+    function withdraw(address sender) external {
+        Channel storage channel = channels[sender][msg.sender];
+
+        if (channel.unsettled > 0) {
+            token.safeTransfer(msg.sender, channel.unsettled);
+            channel.deposit = channel.deposit.sub(channel.unsettled);
+
+            emit Withdrawed(sender, msg.sender, channel.unsettled);
+
+            channel.unsettled = 0;
+        }
     }
 
     /**
@@ -123,10 +239,9 @@ contract HoprChannels {
      * then the tokens can be claimed by 'sender'.
      *
      * @notice claim channel's closure
-     * @param recipient address account which will receive the 'amount'
-     * @param amount uint256 amount that the recipient will claim
+     * @param recipient address the recipient account
      */
-    function claimChannelClosure(address recipient, uint256 amount) external {
+    function claimChannelClosure(address recipient) external {
         Channel storage channel = channels[msg.sender][recipient];
 
         require(
@@ -136,7 +251,7 @@ contract HoprChannels {
         );
         require(now >= channel.closureTime, "'closureTime' has not passed");
 
-        settle(msg.sender, recipient, amount);
+        settle(msg.sender, recipient);
     }
 
     /**
@@ -145,25 +260,23 @@ contract HoprChannels {
      * @notice settle channel
      * @param sender address account which owns the channel
      * @param recipient address account which receives payments
-     * @param amount uint256 amount to fund the channel
      */
-    function settle(address sender, address recipient, uint256 amount) internal {
+    function settle(address sender, address recipient) internal {
         Channel storage channel = channels[sender][recipient];
 
-        require(amount <= channel.deposit, "'amount' is larger than deposit");
-
-        if (amount > 0) {
-            token.safeTransfer(recipient, amount);
-            channel.deposit = channel.deposit.sub(amount);
+        if (channel.unsettled > 0) {
+            token.safeTransfer(recipient, channel.unsettled);
+            channel.deposit = channel.deposit.sub(channel.unsettled);
         }
 
         if (channel.deposit > 0) {
             token.safeTransfer(sender, channel.deposit);
         }
 
-        emit ClosedChannel(sender, recipient, channel.deposit, amount);
+        emit ClosedChannel(sender, recipient, channel.deposit, channel.unsettled);
 
         channel.deposit = 0;
+        channel.unsettled = 0;
         channel.closureTime = 0;
         channel.isOpen = false;
     }
@@ -173,14 +286,7 @@ contract HoprChannels {
         return channel.closureTime > 0;
     }
 
-    // return 'true' if signaure is signed by 'signer'
-    function isValidSignature(address signer, uint256 amount, bytes memory signature)
-    internal view returns (bool) {
-        bytes32 message = prefixed(keccak256(abi.encodePacked(address(this), amount)));
-
-        return recoverSigner(message, signature) == signer;
-    }
-
+    // TODO: check if this works
     function splitSignature(bytes memory signature) internal pure returns (uint8, bytes32, bytes32) {
         require(signature.length == 65, "signature length is not 65");
 
@@ -208,10 +314,5 @@ contract HoprChannels {
         (v, r, s) = splitSignature(signature);
 
         return ecrecover(message, v, r, s);
-    }
-
-    // builds a prefixed hash to mimic the behavior of eth_sign
-    function prefixed(bytes32 message) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", message));
     }
 }
