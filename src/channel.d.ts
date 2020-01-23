@@ -16,7 +16,7 @@ declare interface ChannelInstance {
 
   readonly currentBalanceOfCounterparty: Promise<Balance.Instance>
 
-  readonly ticket: Ticket.Instance
+  readonly ticket: Ticket.Static
 
   /**
    * Initiates a settlement for this channel.
