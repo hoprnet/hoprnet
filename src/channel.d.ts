@@ -36,7 +36,7 @@ declare interface Channel {
    * @param counterparty AccountId of the counterparty
    * @param props additional arguments
    */
-  create(counterparty: AccountId.Instance, ...props: any[]): Promise<ChannelInstance>
+  create<CoreConnector extends HoprCoreConnectorInstance>(coreConnector: CoreConnector, counterparty: AccountId.Instance, ...props: any[]): Promise<ChannelInstance>
 
   /**
    * Opens a new payment channel and initializes the on-chain data.
@@ -44,7 +44,7 @@ declare interface Channel {
    * @param signature a signature over channel state
    * @param props additional arguments
    */
-  open(amount: Balance.Instance, signature: Promise<Uint8Array>, ...props: any[]): Promise<ChannelInstance>
+  open<CoreConnector extends HoprCoreConnectorInstance>(coreConnector: CoreConnector, amount: Balance.Instance, signature: Promise<Uint8Array>, ...props: any[]): Promise<ChannelInstance>
 
   /**
    * Fetches all channel instances from the database and applies first `onData` and
@@ -52,14 +52,14 @@ declare interface Channel {
    * @param onData applied on all channel instances
    * @param onEnd composes at the end the received data
    */
-  getAll<T, R>(onData: (channel: ChannelInstance, ...props: any[]) => T, onEnd: (promises: Promise<T>[], ...props: any[]) => R, ...props: any[]): Promise<R>
+  getAll<T, R, CoreConnector extends HoprCoreConnectorInstance>(coreConnector: CoreConnector, onData: (channel: ChannelInstance, ...props: any[]) => T, onEnd: (promises: Promise<T>[], ...props: any[]) => R, ...props: any[]): Promise<R>
 
   /**
    * Fetches all channel instances from the database and initiates a settlement on
    * each of them.
    * @param props additional arguments
    */
-  closeChannels(...props: any[]): Promise<Balance.Instance>
+  closeChannels<CoreConnector extends HoprCoreConnectorInstance>(coreConnector: CoreConnector, ...props: any[]): Promise<Balance.Instance>
 }
 
 export { ChannelInstance }

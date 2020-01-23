@@ -72,14 +72,25 @@ declare namespace Ticket {
      * @param amount amount of funds to include
      * @param challenge a challenge that has to be solved be the redeemer
      */
-    create(channel: ChannelInstance, amount: Balance.Instance, challenge: Hash.Instance, privKey: Uint8Array, pubKey: Uint8Array, ...props: any[]): Promise<SignedTicket.Instance>
+    create<ConcretChannelInstance extends ChannelInstance>(
+      channel: ConcretChannelInstance,
+      amount: Balance.Instance,
+      challenge: Hash.Instance,
+      privKey: Uint8Array,
+      pubKey: Uint8Array,
+      ...props: any[]
+    ): Promise<SignedTicket.Instance>
 
     /**
      * Checks a previously issued ticket for its validity.
      * @param signedTicket a previously issued ticket to check
      * @param props additional arguments
      */
-    verify(channel: ChannelInstance, signedTicket: SignedTicket.Instance, ...props: any[]): Promise<boolean>
+    verify<ConcretChannelInstance extends ChannelInstance>(
+      channel: ConcretChannelInstance,
+      signedTicket: SignedTicket.Instance,
+      ...props: any[]
+    ): Promise<boolean>
 
     /**
      * BIG TODO
@@ -87,13 +98,13 @@ declare namespace Ticket {
      * @param tickets array of tickets to aggregate
      * @param props additional arguments
      */
-    // aggregate(channel: ChannelInstance, tickets: Ticket[], ...props: any[]): Promise<Ticket>
+    // aggregate<ConcretChannelInstance extends ChannelInstance>(channel: ConcretChannelInstance, tickets: Ticket[], ...props: any[]): Promise<Ticket>
 
     /**
      * Submits a signed to the blockchain.
      * @param signedTicket a signed ticket
      */
-    submit(channel: ChannelInstance, signedTicket: SignedTicket.Instance, ...props: any[]): Promise<void>
+    submit<ConcretChannelInstance extends ChannelInstance>(channel: ConcretChannelInstance, signedTicket: SignedTicket.Instance, ...props: any[]): Promise<void>
   }
 
   interface Instance extends toU8a {
