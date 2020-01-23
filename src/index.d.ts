@@ -2,16 +2,13 @@ import { LevelUp } from 'levelup'
 import BN from 'bn.js'
 
 import Utils from './utils'
-import { ChannelClass } from './channel'
-import Types, { TypeClasses } from './types'
+import Channel, { ChannelInstance } from './channel'
+import TypeConstructors, { Types, AccountId, Balance, Ticket } from './types'
 import DbKeys from './dbKeys'
-import Ticket from './channel/ticket'
 
 import Constants from './constants'
 
-export { Utils, DbKeys, TypeClasses, ChannelClass, Constants, Ticket }
-
-export interface HoprCoreConnectorClass {
+declare interface HoprCoreConnectorInstance {
   readonly started: boolean
   readonly self: any
   readonly db: LevelUp
@@ -43,62 +40,35 @@ export interface HoprCoreConnectorClass {
   /**
    * Returns the current balances of the account associated with this node.
    */
-  getAccountBalance(): Promise<TypeClasses.Balance>
+  getAccountBalance(): Promise<Balance.Instance>
 
   /**
    * (Static) utils to use in the connector module
    */
-  utils: Utils
+  readonly utils: Utils
 
   /**
    * Export creator for all Types used on-chain.
    */
-  types: Types
+  readonly types: TypeConstructors
 
   /**
    * Export keys under which our data gets stored in the database.
    */
-  dbKeys: DbKeys
+  readonly dbKeys: DbKeys
 
   /**
    * Export chain-specific constants.
    */
-  constants: Constants
+  readonly constants: Constants
 
-  channel: {
-    /**
-     * Creates a Channel instance from the database.
-     * @param counterparty AccountId of the counterparty
-     * @param props additional arguments
-     */
-    create(counterparty: TypeClasses.AccountId, ...props: any[]): Promise<ChannelClass>
-
-    /**
-     * Opens a new payment channel and initializes the on-chain data.
-     * @param amount how much should be staked
-     * @param signature a signature over channel state
-     * @param props additional arguments
-     */
-    open(amount: TypeClasses.Balance, signature: Promise<Uint8Array>, ...props: any[]): Promise<ChannelClass>
-
-    /**
-     * Fetches all channel instances from the database and applies first `onData` and
-     * then `onEnd` on the received nstances.
-     * @param onData applied on all channel instances
-     * @param onEnd composes at the end the received data
-     */
-    getAll<T, R>(onData: (channel: ChannelClass, ...props: any[]) => T, onEnd: (promises: Promise<T>[], ...props: any[]) => R, ...props: any[]): Promise<R>
-
-    /**
-     * Fetches all channel instances from the database and initiates a settlement on
-     * each of them.
-     * @param props additional arguments
-     */
-    closeChannels(...props: any[]): Promise<TypeClasses.Balance>
-  }
+  /**
+   * Encapsulates payment channel between nodes.
+   */
+  readonly channel: Channel
 }
 
-export default interface HoprCoreConnector {
+declare interface HoprCoreConnector {
   /**
    * Creates an uninitialised instance.
    *
@@ -106,5 +76,9 @@ export default interface HoprCoreConnector {
    * @param keyPair public key and private key of the account
    * @param uri URI of the blockchain node, e.g. `ws://localhost:9944`
    */
-  create(db: LevelUp, keyPair: any, uri?: string): Promise<HoprCoreConnectorClass>
+  create(db: LevelUp, keyPair: any, uri?: string): Promise<HoprCoreConnectorInstance>
 }
+
+export { HoprCoreConnectorInstance, Utils, DbKeys, Types, ChannelInstance as Channel, Constants, Ticket }
+
+export default HoprCoreConnector
