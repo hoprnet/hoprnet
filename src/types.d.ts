@@ -56,6 +56,7 @@ declare namespace SignedTicket {
   interface Instance extends Uint8Array {
     ticket: Ticket.Instance
     signature: Signature.Instance
+    signer: Uint8Array
   }
 }
 
