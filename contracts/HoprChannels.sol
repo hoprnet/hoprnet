@@ -8,10 +8,6 @@ contract HoprChannels {
     using SafeERC20 for IERC20;
     using SafeMath for uint256;
 
-    IERC20 public token;        // the token that will be used to settle payments
-    uint256 public secsClosure; // seconds it takes to allow closing of channel after channel's -
-                                // 'sender' provided a signature
-
     // the payment channel has been created and opened
     event OpenedChannel(
         address indexed funder,
@@ -19,14 +15,6 @@ contract HoprChannels {
         address indexed recipient,
         uint256 deposit
     );
-
-    // TODO: check with Sebastian if we need this
-    // recipient has reedemed a ticket
-    // event TickedReedemed(
-    //     address indexed sender,
-    //     address indexed recipient,
-    //     uint256 amount
-    // );
 
     // recipient withdrawed unsettled channel balance
     event Withdrawed(
@@ -50,6 +38,11 @@ contract HoprChannels {
         uint256 recipientAmount
     );
 
+    struct Account {
+        bytes32 hashedSecret;   // account's hashedSecret
+        uint256 counter;        // increases everytime 'setHashedSecret' is called by the account
+    }
+
     struct Channel {
         uint256 deposit;        // tokens deposited
         uint256 unsettled;      // tokens that are claimable but not yet settled
@@ -57,9 +50,15 @@ contract HoprChannels {
         bool isOpen;            // channel is open
     }
 
-    // store channels e.g: channels[sender][recipient]
+    IERC20 public token;        // the token that will be used to settle payments
+    uint256 public secsClosure; // seconds it takes to allow closing of channel after channel's -
+                                // 'sender' provided a signature
+
+    // store accounts' state
+    mapping(address => Account) public accounts;
+
+    // store channels' state e.g: channels[sender][recipient]
     mapping(address => mapping(address => Channel)) public channels;
-    mapping(address => bytes32) public hashedSecrets;  
 
     constructor(IERC20 _token, uint256 _secsClosure) public {
         token = _token;
@@ -70,11 +69,14 @@ contract HoprChannels {
      * @notice sets caller's hashedSecret
      * @param hashedSecret bytes32 hashedSecret to store
      */
-    // TODO: check with Robert if this is ok
     function setHashedSecret(bytes32 hashedSecret) external {
-        require(hashedSecrets[msg.sender] != hashedSecret, "new and old hashedSecret must not be the same");
+        require(hashedSecret != bytes32(0), "hashedSecret must not be empty");
 
-        hashedSecrets[msg.sender] = hashedSecret;
+        Account storage account = accounts[msg.sender];
+        require(account.hashedSecret != hashedSecret, "new and old hashedSecret must not be the same");
+
+        account.hashedSecret = hashedSecret;
+        account.counter = account.counter.add(1);
     }
 
     /**
@@ -91,7 +93,7 @@ contract HoprChannels {
         require(funder != address(0), "'funder' address is empty");
         require(sender != address(0), "'sender' address is empty");
         require(recipient != address(0), "'recipient' address is empty");
-        require(hashedSecrets[recipient] != bytes32(0), "'recipient' has not set a hashed secret");
+        require(accounts[recipient].hashedSecret != bytes32(0), "'recipient' has not set a hashed secret");
         require(amount > 0, "'amount' must be greater than 0");
 
         Channel storage channel = channels[sender][recipient];
@@ -125,7 +127,7 @@ contract HoprChannels {
         bytes memory signature
     ) public {
         address recipient = msg.sender;
-        bytes32 hashedSecret = hashedSecrets[recipient];
+        Account storage recipientAccount = accounts[recipient];
         Channel storage channel = channels[sender][recipient];
 
         require(
@@ -135,23 +137,32 @@ contract HoprChannels {
         );
         require(amount > 0, "amount must be strictly greater than zero");
         require(
-            hashedSecret == keccak256(abi.encodePacked(pre_image)),
+            recipientAccount.hashedSecret == keccak256(abi.encodePacked(pre_image)),
             "given value is not a pre-image of the stored on-chain secret"
         );
 
+        // TODO: implement xor
         bytes32 hashed_s_a = keccak256(abi.encodePacked(s_a));
         bytes32 hashed_s_b = keccak256(abi.encodePacked(s_b));
         bytes32 challange = keccak256(abi.encodePacked(hashed_s_a, hashed_s_b));
-        bytes32 hashedTicket = keccak256(abi.encodePacked(challange, hashedSecret, amount, win_prob));
+        bytes32 hashedTicket = keccak256(abi.encodePacked(
+            challange,
+            recipientAccount.hashedSecret,
+            recipientAccount.counter,
+            amount,
+            win_prob
+        ));
 
-        // TODO: implement xor
         require(uint256(hashedTicket) < uint256(win_prob), "ticket must be a win");
-        require(recoverSigner(hashedTicket, signature) == recipient, "signature must be valid");
+        require(recoverSigner(hashedTicket, signature) == sender, "signature must be valid");
 
-        hashedSecrets[recipient] = pre_image;
+        recipientAccount.hashedSecret = pre_image;
         channel.unsettled = channel.unsettled.add(amount);
 
-        require(channel.unsettled <= channel.deposit, "unsettled balance must be strictly lesser than deposit balance");
+        require(
+            channel.unsettled <= channel.deposit,
+            "unsettled balance must be strictly lesser than deposit balance"
+        );
     }
 
     /**

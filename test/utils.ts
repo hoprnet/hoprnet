@@ -54,10 +54,11 @@ export const createTicket = (ops: {
   web3: any;
   senderPrivKey: string;
   secret: string;
+  counter: number;
   amount: string;
   winProbPercent: string;
 }) => {
-  const { web3, senderPrivKey, secret, amount, winProbPercent } = ops;
+  const { web3, senderPrivKey, secret, counter, amount, winProbPercent } = ops;
 
   const s_a = Web3.utils.stringToHex("s_a");
   const s_b = Web3.utils.stringToHex("s_b");
@@ -77,7 +78,7 @@ export const createTicket = (ops: {
 
   const signature = signMessage(
     web3,
-    Web3.utils.keccak256(challenge, hashedSecret, amount, winProb),
+    Web3.utils.keccak256(challenge, hashedSecret, counter, amount, winProb),
     senderPrivKey
   );
 
@@ -86,6 +87,7 @@ export const createTicket = (ops: {
     s_b,
     challenge,
     hashedSecret,
+    counter,
     amount,
     winProb,
     signature

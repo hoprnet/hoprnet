@@ -239,22 +239,23 @@ contract("HoprChannels", function([sender, recipient, randomUser]) {
         web3,
         senderPrivKey,
         secret,
+        counter: 1,
         amount,
         winProbPercent: "100"
       });
 
       console.log(ticket);
 
-      // await hoprChannels.redeemTicketAndCloseChannel(
-      //   sender,
-      //   secret,
-      //   ticket.s_a,
-      //   ticket.s_b,
-      //   amount,
-      //   ticket.winProb,
-      //   ticket.signature,
-      //   { from: recipient }
-      // );
+      await hoprChannels.redeemTicketAndCloseChannel(
+        sender,
+        secret,
+        ticket.s_a,
+        ticket.s_b,
+        amount,
+        ticket.winProb,
+        ticket.signature.signature,
+        { from: recipient }
+      );
 
       return;
 
