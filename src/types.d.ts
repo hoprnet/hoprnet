@@ -45,6 +45,7 @@ declare namespace Signature {
   interface Instance extends Uint8Array {
     onChainSignature: Uint8Array
     signature: Uint8Array
+    recovery: number
   }
 }
 
