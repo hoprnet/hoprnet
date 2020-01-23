@@ -112,7 +112,7 @@ declare namespace TicketEpoch {
   interface Instance extends BN, toU8a {}
 }
 
-declare interface Types {
+declare type Types = {
   AccountId: AccountId.Instance
   Balance: Balance.Instance
   Channel: Channel.Instance
