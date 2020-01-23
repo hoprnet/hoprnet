@@ -6,7 +6,7 @@ declare interface toU8a {
 
 interface length<Instance> {
   new (...props: any[]): Instance
-  length: number
+  SIZE: number
 }
 
 declare namespace AccountId {
