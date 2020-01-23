@@ -1,4 +1,5 @@
 import BN from 'bn.js'
+import { ChannelInstance } from './channel'
 
 declare interface toU8a {
   toU8a: (...props: any[]) => Uint8Array
@@ -71,14 +72,14 @@ declare namespace Ticket {
      * @param amount amount of funds to include
      * @param challenge a challenge that has to be solved be the redeemer
      */
-    create(amount: Balance.Instance, challenge: Hash.Instance, privKey: Uint8Array, pubKey: Uint8Array): Promise<SignedTicket.Instance>
+    create(channel: ChannelInstance, amount: Balance.Instance, challenge: Hash.Instance, privKey: Uint8Array, pubKey: Uint8Array, ...props: any[]): Promise<SignedTicket.Instance>
 
     /**
      * Checks a previously issued ticket for its validity.
      * @param signedTicket a previously issued ticket to check
      * @param props additional arguments
      */
-    verify(signedTicket: SignedTicket.Instance, ...props: any[]): Promise<boolean>
+    verify(channel: ChannelInstance, signedTicket: SignedTicket.Instance, ...props: any[]): Promise<boolean>
 
     /**
      * BIG TODO
@@ -86,13 +87,13 @@ declare namespace Ticket {
      * @param tickets array of tickets to aggregate
      * @param props additional arguments
      */
-    // aggregate(tickets: Ticket[], ...props: any[]): Promise<Ticket>
+    // aggregate(channel: ChannelInstance, tickets: Ticket[], ...props: any[]): Promise<Ticket>
 
     /**
      * Submits a signed to the blockchain.
      * @param signedTicket a signed ticket
      */
-    submit(signedTicket: SignedTicket.Instance): Promise<void>
+    submit(channel: ChannelInstance, signedTicket: SignedTicket.Instance, ...props: any[]): Promise<void>
   }
 
   interface Instance extends toU8a {
