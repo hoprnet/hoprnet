@@ -145,6 +145,7 @@ declare interface TypeConstructors {
   Hash: Hash.Static
   Moment: Moment.Static
   State: State.Static
+  Signature: Signature.Static
   SignedTicket: SignedTicket.Static
   Ticket: Ticket.Static
   TicketEpoch: TicketEpoch.Static
