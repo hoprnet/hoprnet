@@ -119,6 +119,7 @@ declare namespace Types {
   interface Hash extends Hash.Instance {}
   interface Moment extends Moment.Instance {}
   interface State extends State.Instance {}
+  interface Signature extends Signature.Instance {}
   interface SignedTicket extends SignedTicket.Instance {}
   interface Ticket extends Ticket.Instance {}
   interface TicketEpoch extends TicketEpoch.Instance {}
