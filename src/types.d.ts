@@ -112,16 +112,16 @@ declare namespace TicketEpoch {
   interface Instance extends BN, toU8a {}
 }
 
-declare type Types = {
-  AccountId: AccountId.Instance
-  Balance: Balance.Instance
-  Channel: Channel.Instance
-  Hash: Hash.Instance
-  Moment: Moment.Instance
-  State: State.Instance
-  SignedTicket: SignedTicket.Instance
-  Ticket: Ticket.Instance
-  TicketEpoch: TicketEpoch.Instance
+declare namespace Types {
+  interface AccountId extends AccountId.Instance {}
+  interface Balance extends Balance.Instance {}
+  interface Channel extends Channel.Instance {}
+  interface Hash extends Hash.Instance {}
+  interface Moment extends Moment.Instance {}
+  interface State extends State.Instance {}
+  interface SignedTicket extends SignedTicket.Instance {}
+  interface Ticket extends Ticket.Instance {}
+  interface TicketEpoch extends TicketEpoch.Instance {}
 }
 
 declare interface TypeConstructors {
