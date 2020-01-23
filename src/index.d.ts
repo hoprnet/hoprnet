@@ -79,6 +79,6 @@ declare interface HoprCoreConnector {
   create(db: LevelUp, keyPair: any, uri?: string): Promise<HoprCoreConnectorInstance>
 }
 
-export { HoprCoreConnectorInstance, Utils, DbKeys, Types, ChannelInstance as Channel, Constants, Ticket }
+export { HoprCoreConnectorInstance, Utils, DbKeys, Types, ChannelInstance, Constants, Ticket }
 
 export default HoprCoreConnector
