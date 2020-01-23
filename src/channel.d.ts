@@ -1,4 +1,4 @@
-import { AccountId, Balance, Channel, Hash, Moment, SignedTicket, Ticket } from './types'
+import { AccountId, Balance, Channel as ChannelType, Hash, Moment, SignedTicket, Ticket } from './types'
 import { HoprCoreConnectorInstance } from '.'
 
 declare interface ChannelInstance {
@@ -6,7 +6,7 @@ declare interface ChannelInstance {
 
   readonly settlementWindow: Promise<Moment.Instance>
 
-  readonly state: Promise<Channel.Instance>
+  readonly state: Promise<ChannelType.Instance>
 
   readonly balance_a: Promise<Balance.Instance>
 
