@@ -6,15 +6,15 @@ import forEachRight from 'lodash.foreachright'
 import { PRG, u8aXOR } from '../../../utils'
 import { MAX_HOPS } from '../../../constants'
 
-import { Header, BETA_LENGTH, deriveBlinding, derivePRGParameters, deriveTransactionKey, createMAC } from './index'
+import { Header, BETA_LENGTH, deriveBlinding, derivePRGParameters, deriveTicketKey, createMAC } from './index'
 
-import { HoprCoreConnectorClass } from '@hoprnet/hopr-core-connector-interface'
+import { HoprCoreConnectorInstance } from '@hoprnet/hopr-core-connector-interface'
 
 import PeerId from 'peer-id'
 
 import { PRIVATE_KEY_LENGTH, PER_HOP_SIZE, DESINATION_SIZE, IDENTIFIER_SIZE, ADDRESS_SIZE, MAC_SIZE, COMPRESSED_PUBLIC_KEY_LENGTH, LAST_HOP_SIZE } from './parameters'
 
-export function createHeader<Chain extends HoprCoreConnectorClass>(header: Header<Chain>, peerIds: PeerId[]) {
+export function createHeader<Chain extends HoprCoreConnectorInstance>(header: Header<Chain>, peerIds: PeerId[]) {
   function checkPeerIds() {
     if (peerIds.length > MAX_HOPS) {
       throw Error(`Expected at most ${MAX_HOPS} but got ${peerIds.length}`)
@@ -129,16 +129,16 @@ export function createHeader<Chain extends HoprCoreConnectorClass>(header: Heade
 
         header.beta.set(peerIds[index + 1].pubKey.marshal(), 0)
         header.beta.set(header.gamma, ADDRESS_SIZE)
-        header.beta.set(secp256k1.publicKeyCreate(Buffer.from(deriveTransactionKey(secrets[index + 1]))), ADDRESS_SIZE + MAC_SIZE)
+        header.beta.set(secp256k1.publicKeyCreate(Buffer.from(deriveTicketKey(secrets[index + 1]))), ADDRESS_SIZE + MAC_SIZE)
         header.beta.set(tmp, PER_HOP_SIZE)
 
         if (secrets.length > 2) {
           let key: Uint8Array
           if (index < secrets.length - 2) {
-            key = secp256k1.privateKeyTweakAdd(Buffer.from(deriveTransactionKey(secrets[index + 1])), Buffer.from(deriveTransactionKey(secrets[index + 2])))
+            key = secp256k1.privateKeyTweakAdd(Buffer.from(deriveTicketKey(secrets[index + 1])), Buffer.from(deriveTicketKey(secrets[index + 2])))
           } else if (index == secrets.length - 2) {
             // console.log(`created key half ${Header.deriveTransactionKey(secrets[index + 1]).toString('hex')}`)
-            key = deriveTransactionKey(secrets[index + 1])
+            key = deriveTicketKey(secrets[index + 1])
           }
           header.beta.set(key, ADDRESS_SIZE + MAC_SIZE + COMPRESSED_PUBLIC_KEY_LENGTH)
         }
@@ -152,7 +152,7 @@ export function createHeader<Chain extends HoprCoreConnectorClass>(header: Heade
   }
 
   function deriveKey(a: Uint8Array, b: Uint8Array) {
-    return secp256k1.privateKeyTweakAdd(Buffer.from(deriveTransactionKey(a)), Buffer.from(deriveTransactionKey(b)))
+    return secp256k1.privateKeyTweakAdd(Buffer.from(deriveTicketKey(a)), Buffer.from(deriveTicketKey(b)))
   }
 
   function printValues(header: Header<Chain>, secrets: Uint8Array[]) {

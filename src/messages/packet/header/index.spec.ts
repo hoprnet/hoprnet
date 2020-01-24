@@ -1,8 +1,8 @@
 import assert from 'assert'
-import { deriveBlinding, deriveCipherParameters, deriveTagParameters, createMAC, deriveTransactionKey, derivePRGParameters, createHeader } from '.'
+import { deriveBlinding, deriveCipherParameters, deriveTagParameters, createMAC, deriveTicketKey, derivePRGParameters, createHeader } from '.'
 import { Utils, Constants } from '@hoprnet/hopr-core-polkadot'
 import PeerId from 'peer-id'
-import { HoprCoreConnectorClass } from '@hoprnet/hopr-core-connector-interface'
+import { HoprCoreConnectorInstance } from '@hoprnet/hopr-core-connector-interface'
 import { randomBytes } from 'crypto'
 import secp256k1 from 'secp256k1'
 
@@ -17,7 +17,7 @@ describe('test creation & transformation of a header', function() {
     const encryptionKey = deriveCipherParameters(secretGroupElement)
     const tagParameter = deriveTagParameters(secretGroupElement)
     const mac = createMAC(secretGroupElement, new TextEncoder().encode('test'))
-    const transactionKey = deriveTransactionKey(secretGroupElement)
+    const transactionKey = deriveTicketKey(secretGroupElement)
     const prgParameters = derivePRGParameters(secretGroupElement)
 
     assert(
@@ -36,9 +36,9 @@ describe('test creation & transformation of a header', function() {
     const paymentChannels = ({
       utils: Utils,
       constants: Constants
-    } as unknown) as HoprCoreConnectorClass
+    } as unknown) as HoprCoreConnectorInstance
 
-    const { header, identifier, secrets } = createHeader<HoprCoreConnectorClass>(peerIds)
+    const { header, identifier, secrets } = createHeader<HoprCoreConnectorInstance>(peerIds)
 
     for(let i = 0; i < peerIds.length - 1; i++) {
         header.deriveSecret(peerIds[i].privKey.marshal())

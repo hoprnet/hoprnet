@@ -33,7 +33,7 @@ const HASH_KEY_TX_BLINDED = 'Tx_'
 
 const TAG_SIZE = 16
 
-import { HoprCoreConnectorClass } from '@hoprnet/hopr-core-connector-interface'
+import { HoprCoreConnectorInstance } from '@hoprnet/hopr-core-connector-interface'
 
 export type CipherParameters = {
   key: Uint8Array
@@ -45,7 +45,7 @@ export type PRGParameters = {
   iv: Uint8Array
 }
 
-export class Header<Chain extends HoprCoreConnectorClass> extends Uint8Array {
+export class Header<Chain extends HoprCoreConnectorInstance> extends Uint8Array {
   tmpData?: Uint8Array
   derivedSecretLastNode?: Uint8Array
 
@@ -221,7 +221,7 @@ export function deriveBlinding(alpha: Uint8Array, secret: Uint8Array): Uint8Arra
   return hkdf(Buffer.from(u8aConcat(alpha, secret)), PRIVATE_KEY_LENGTH, { salt: HASH_KEY_BLINDINGS })
 }
 
-export function deriveTransactionKey(secret: Uint8Array): Uint8Array {
+export function deriveTicketKey(secret: Uint8Array): Uint8Array {
   if (!secp256k1.publicKeyVerify(Buffer.from(secret))) {
     throw Error('General error')
   }
@@ -250,7 +250,7 @@ export function createMAC(secret: Uint8Array, msg: Uint8Array): Uint8Array {
     .digest()
 }
 
-export function createHeader<Chain extends HoprCoreConnectorClass>(
+export function createHeader<Chain extends HoprCoreConnectorInstance>(
   peerIds: PeerId[]
 ): {
   header: Header<Chain>
