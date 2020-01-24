@@ -1,9 +1,9 @@
 import assert from 'assert'
 import { Challenge } from './challenge'
-import { Utils, Constants } from '@hoprnet/hopr-core-polkadot'
+import { Utils, Types } from '@hoprnet/hopr-core-polkadot'
 import BN from 'bn.js'
 import PeerId from 'peer-id'
-import { HoprCoreConnectorClass } from '@hoprnet/hopr-core-connector-interface'
+import { HoprCoreConnectorInstance } from '@hoprnet/hopr-core-connector-interface'
 import { randomBytes } from 'crypto'
 import secp256k1 from 'secp256k1'
 
@@ -11,8 +11,8 @@ describe('test creation & verification of a challenge', function() {
   it('should create a verifiable challenge', async function() {
     const paymentChannels = ({
       utils: Utils,
-      constants: Constants
-    } as unknown) as HoprCoreConnectorClass
+      types: Types
+    } as unknown) as HoprCoreConnectorInstance
 
     // const hash = await paymentChannels.utils.hash(new Uint8Array(32))
 
@@ -25,7 +25,10 @@ describe('test creation & verification of a challenge', function() {
     })
     await challenge.sign(peerId)
 
-    assert(await challenge.verify(peerId))
+    assert(await challenge.verify(peerId), `Previously generated signature should be valid.`)
+
+    const pubKey = peerId.pubKey.marshal()
+    assert((await challenge.counterparty).every((value: number, index: number) => pubKey[index] == value), `recovered pubKey should be equal.`)
 
     challenge[0] ^= 0xff
     try {

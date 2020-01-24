@@ -3,7 +3,7 @@ import secp256k1 from 'secp256k1'
 import { toU8a } from '../../utils'
 import PeerId from 'peer-id'
 
-import { HoprCoreConnectorClass } from '@hoprnet/hopr-core-connector-interface'
+import { HoprCoreConnectorInstance, Types } from '@hoprnet/hopr-core-connector-interface'
 
 import BN from 'bn.js'
 
@@ -14,33 +14,51 @@ const COMPRESSED_PUBLIC_KEY_LENGTH = 33
  * the proposed funds in case the the next downstream node responds with an
  * inappropriate acknowledgement.
  */
-export class Challenge<Chain extends HoprCoreConnectorClass> extends Uint8Array {
+export class Challenge<Chain extends HoprCoreConnectorInstance> extends Uint8Array {
   // private : Uint8Array
+  private paymentChannels: Chain
   private _hashedKey: Uint8Array
   private _fee: BN
+  private _counterparty: Uint8Array
 
-  private constructor(private paymentChannels: Chain, buf: Uint8Array) {
-    super(buf)
+  constructor(
+    paymentChannels: Chain,
+    buf?: Uint8Array,
+    struct?: {
+      signature: Types.Signature
+    }
+  ) {
+    if (buf != null && struct == null) {
+      super(buf)
+    } else if (buf == null && struct != null) {
+      super(struct.signature)
+    } else {
+      throw Error(`Invalid constructor parameters`)
+    }
+
+    this.paymentChannels = paymentChannels
   }
 
-  get challengeSignature(): Uint8Array {
-    return new Uint8Array(this.buffer, 0, this.paymentChannels.constants.SIGNATURE_LENGTH)
+  get challengeSignature(): Types.Signature {
+    return new this.paymentChannels.types.Signature(this.subarray(0, this.paymentChannels.types.Signature.SIZE))
   }
 
-  get challengeSignatureRecovery(): Uint8Array {
-    return new Uint8Array(this.buffer, this.paymentChannels.constants.SIGNATURE_LENGTH, 1)
+  set challengeSignature(signature: Types.Signature) {
+    this.set(signature, 0)
   }
 
-
-  get signatureHash(): Promise<Uint8Array> {
-    return this.paymentChannels.utils.hash(this.subarray(0, this.paymentChannels.constants.SIGNATURE_LENGTH + 1))
+  get signatureHash(): Promise<Types.Hash> {
+    return this.paymentChannels.utils.hash(this.challengeSignature)
   }
 
-  get SIZE(): number {
-    return this.paymentChannels.constants.SIGNATURE_LENGTH + 1
+  static SIZE<Chain extends HoprCoreConnectorInstance>(paymentChannels: Chain): number {
+    return paymentChannels.types.Signature.SIZE
   }
 
-  get hash(): Promise<Uint8Array> {
+  get hash(): Promise<Types.Hash> {
+    if (this._hashedKey == null) {
+      return Promise.reject(Error(`Challenge was not set yet.`))
+    }
     return this.paymentChannels.utils.hash(this._hashedKey)
   }
 
@@ -52,22 +70,20 @@ export class Challenge<Chain extends HoprCoreConnectorClass> extends Uint8Array 
    * Uses the derived secret and the signature to recover the public
    * key of the signer.
    */
-  // get counterparty(): Promise<Uint8Array> {
-  //   return new Promise<Uint8Array>(async (resolve, reject) => {
-  //     if (this._counterparty) return this._counterparty
+  get counterparty(): Promise<Uint8Array> {
+    if (this._hashedKey == null) {
+      return Promise.reject(Error(`Challenge was not set yet.`))
+    }
 
-  //     if (!this._hashedKey) {
-  //       return reject(Error(`Can't recover public key without challenge.`))
-  //     }
+    if (this._counterparty != null) {
+      return Promise.resolve(this._counterparty)
+    }
 
-  //     this._counterparty = secp256k1.recover(
-  //       Buffer.from(await this.paymentChannels.utils.hash(this._hashedKey)),
-  //       Buffer.from(this.challengeSignature),
-  //       parseInt(this.challengeSignatureRecovery.toString(), 16)
-  //     )
-  //     return resolve(this._counterparty)
-  //   })
-  // }
+    return this.hash.then((hash: Uint8Array) => {
+      // @ts-ignore
+      return secp256k1.recover(Buffer.from(this.challengeSignature.sr25519PublicKey), Buffer.from(this.challengeSignature.signature), this.challengeSignature.recovery)
+    })
+  }
 
   /**
    * Signs the challenge and includes the transferred amount of money as
@@ -79,9 +95,7 @@ export class Challenge<Chain extends HoprCoreConnectorClass> extends Uint8Array 
     // const hashedChallenge = hash(Buffer.concat([this._hashedKey, this._fee.toBuffer('be', VALUE_LENGTH)], HASH_LENGTH + VALUE_LENGTH))
     const signature = await this.paymentChannels.utils.sign(await this.hash, peerId.privKey.marshal(), peerId.pubKey.marshal())
 
-    this.challengeSignature.set(signature.signature)
-
-    this.challengeSignatureRecovery.set(toU8a(signature.recovery, 1))
+    this.challengeSignature = signature
 
     return this
   }
@@ -92,12 +106,12 @@ export class Challenge<Chain extends HoprCoreConnectorClass> extends Uint8Array 
    * @param hashedKey that is used to generate the key half
    * @param fee
    */
-  static create<Chain extends HoprCoreConnectorClass>(hoprCoreConnector: Chain, hashedKey: Uint8Array, fee: BN): Challenge<Chain> {
+  static create<Chain extends HoprCoreConnectorInstance>(hoprCoreConnector: Chain, hashedKey: Uint8Array, fee: BN): Challenge<Chain> {
     if (hashedKey.length != COMPRESSED_PUBLIC_KEY_LENGTH) {
       throw Error(`Invalid secret format. Expected a ${Uint8Array.name} of ${COMPRESSED_PUBLIC_KEY_LENGTH} elements but got one with ${hashedKey.length}`)
     }
 
-    const challenge = new Challenge(hoprCoreConnector, new Uint8Array(SIZE(hoprCoreConnector.constants.SIGNATURE_LENGTH)))
+    const challenge = new Challenge(hoprCoreConnector, new Uint8Array(Challenge.SIZE(hoprCoreConnector)))
     challenge._hashedKey = hashedKey
     challenge._fee = fee
 
@@ -117,11 +131,6 @@ export class Challenge<Chain extends HoprCoreConnectorClass> extends Uint8Array 
       throw Error('Unable to verify challenge without a public key.')
     }
 
-    return this.paymentChannels.utils.verify(await this.hash, {
-      signature: this.challengeSignature,
-      recovery: this.challengeSignatureRecovery[0]
-    }, peerId.pubKey.marshal())
+    return this.paymentChannels.utils.verify(await this.hash, this.challengeSignature, peerId.pubKey.marshal())
   }
 }
-
-export const SIZE = (signatureSize: number) => signatureSize + 1

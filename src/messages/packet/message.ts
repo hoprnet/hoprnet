@@ -8,12 +8,16 @@ import { PRP, toLengthPrefixedU8a, lengthPrefixedToU8a } from '../../utils'
 export const PADDING = new TextEncoder().encode('PADDING')
 
 export default class Message extends Uint8Array {
-  private constructor(arr: Uint8Array, public encrypted: boolean) {
+  constructor(arr: Uint8Array, public encrypted: boolean) {
     super(arr)
 
     if (arr.length != PACKET_SIZE) {
       throw Error(`Expected a ${Uint8Array.name} of size ${PACKET_SIZE} but got ${arr.length}.`)
     }
+  }
+
+  static get SIZE(): number {
+    return PACKET_SIZE
   }
 
   subarray(begin?: number, end?: number): Uint8Array {
@@ -72,5 +76,3 @@ export default class Message extends Uint8Array {
     return this
   }
 }
-
-export const SIZE = PACKET_SIZE
