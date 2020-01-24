@@ -178,6 +178,13 @@ contract HoprChannels {
     function closeChannel(address sender) public {
         require(sender != address(0), "'sender' address is empty");
 
+        Channel storage channel = channels[sender][msg.sender];
+        require(
+            channel.isOpen ||
+            isChannelPendingClosure(channel),
+            "channel must be 'open' or 'pending for closure'"
+        );
+
         settle(sender, msg.sender);
     }
 

@@ -5,7 +5,7 @@ import {
   HoprTokenContract,
   HoprTokenInstance
 } from "../types/truffle-contracts";
-import { recoverSigner, createTicket } from "./utils";
+import { recoverSigner, keccak256, Ticket } from "./utils";
 import { PromiseType } from "../types/typescript";
 import { time, expectEvent, expectRevert } from "@openzeppelin/test-helpers";
 
@@ -15,6 +15,11 @@ const HoprChannels: HoprChannelsContract = artifacts.require("HoprChannels");
 // taken from "scripts/test.sh"
 const senderPrivKey =
   "0x2bdd21761a483f71054e14f5b827213567971c676928d9a1808cbfa4b7501200";
+
+const formatAccount = (res: PromiseType<HoprChannelsInstance["accounts"]>) => ({
+  hashedSecret: res[0],
+  counter: res[1]
+});
 
 const formatChannel = (res: PromiseType<HoprChannelsInstance["channels"]>) => ({
   deposit: res[0],
@@ -57,6 +62,13 @@ contract("HoprChannels", function([sender, recipient, randomUser]) {
     it("should have created channel correctly", async function() {
       await hoprToken.approve(hoprChannels.address, depositAmount);
 
+      await hoprChannels.setHashedSecret(
+        keccak256({ type: "string", value: "recipient secret" }),
+        {
+          from: recipient
+        }
+      );
+
       const response = await hoprChannels.createChannel(
         sender,
         sender,
@@ -87,18 +99,41 @@ contract("HoprChannels", function([sender, recipient, randomUser]) {
     });
 
     it("payment 'signer' should be 'sender'", async function() {
-      // const payment = signPayment(
-      //   web3,
-      //   senderPrivKey,
-      //   hoprChannels.address,
-      //   web3.utils.toWei("1", "ether").toString()
-      // );
-      // const signer = recoverSigner(web3, payment.message, payment.signature);
-      // expect(signer).to.be.eq(sender, "wrong signer");
+      const ticket = Ticket({
+        web3,
+        sender,
+        recipient,
+        senderPrivKey,
+        porSecretA: keccak256({
+          type: "bytes32",
+          value: keccak256({ type: "string", value: "por secret a" })
+        }),
+        porSecretB: keccak256({
+          type: "bytes32",
+          value: keccak256({ type: "string", value: "por secret b" })
+        }),
+        recipientSecret: keccak256({
+          type: "bytes32",
+          value: keccak256({ type: "string", value: "recipient secret" })
+        }),
+        amount: web3.utils.toWei("0.2", "ether"),
+        counter: 1,
+        winProbPercent: "100"
+      });
+
+      const signer = recoverSigner(web3, ticket.hashedTicket, ticket.signature);
+      expect(signer).to.be.eq(sender, "wrong signer");
     });
 
     it("should fail when creating an open channel a second time", async function() {
       await hoprToken.approve(hoprChannels.address, depositAmount);
+
+      await hoprChannels.setHashedSecret(
+        keccak256({ type: "string", value: "recipient secret" }),
+        {
+          from: recipient
+        }
+      );
 
       await hoprChannels.createChannel(
         sender,
@@ -115,6 +150,13 @@ contract("HoprChannels", function([sender, recipient, randomUser]) {
 
     it("should fail when 'sender' is calling 'closeChannel'", async function() {
       await hoprToken.approve(hoprChannels.address, depositAmount);
+
+      await hoprChannels.setHashedSecret(
+        keccak256({ type: "string", value: "recipient secret" }),
+        {
+          from: recipient
+        }
+      );
 
       await hoprChannels.createChannel(
         sender,
@@ -133,6 +175,13 @@ contract("HoprChannels", function([sender, recipient, randomUser]) {
 
     it("should fail when 'claimChannelClosure' before closureTime", async function() {
       await hoprToken.approve(hoprChannels.address, depositAmount);
+
+      await hoprChannels.setHashedSecret(
+        keccak256({ type: "string", value: "recipient secret" }),
+        {
+          from: recipient
+        }
+      );
 
       await hoprChannels.createChannel(
         sender,
@@ -156,6 +205,13 @@ contract("HoprChannels", function([sender, recipient, randomUser]) {
     it("should fail when calling 'initiateChannelClosure' from 'randomUser'", async function() {
       await hoprToken.approve(hoprChannels.address, depositAmount);
 
+      await hoprChannels.setHashedSecret(
+        keccak256({ type: "string", value: "recipient secret" }),
+        {
+          from: recipient
+        }
+      );
+
       await hoprChannels.createChannel(
         sender,
         sender,
@@ -173,6 +229,13 @@ contract("HoprChannels", function([sender, recipient, randomUser]) {
 
     it("should fail when calling 'claimChannelClosure' from 'randomUser'", async function() {
       await hoprToken.approve(hoprChannels.address, depositAmount);
+
+      await hoprChannels.setHashedSecret(
+        keccak256({ type: "string", value: "recipient secret" }),
+        {
+          from: recipient
+        }
+      );
 
       await hoprChannels.createChannel(
         sender,
@@ -199,6 +262,13 @@ contract("HoprChannels", function([sender, recipient, randomUser]) {
         from: sender
       });
 
+      await hoprChannels.setHashedSecret(
+        keccak256({ type: "string", value: "recipient secret" }),
+        {
+          from: recipient
+        }
+      );
+
       await expectRevert(
         hoprChannels.createChannel(sender, sender, recipient, depositAmount, {
           from: sender
@@ -215,11 +285,30 @@ contract("HoprChannels", function([sender, recipient, randomUser]) {
       await hoprToken.approve(hoprChannels.address, totalSupply);
     });
 
-    it.only("should send 0.2 HOPR to 'recipient' and 0.8 HOPR to 'sender'", async function() {
-      const secret = web3.utils.keccak256("secret");
-      const hashedSecret = web3.utils.keccak256(secret);
+    it("should send 0.2 HOPR to 'recipient' and 0.8 HOPR to 'sender'", async function() {
+      const ticket = Ticket({
+        web3,
+        sender,
+        recipient,
+        senderPrivKey,
+        porSecretA: keccak256({
+          type: "bytes32",
+          value: keccak256({ type: "string", value: "por secret a" })
+        }),
+        porSecretB: keccak256({
+          type: "bytes32",
+          value: keccak256({ type: "string", value: "por secret b" })
+        }),
+        recipientSecret: keccak256({
+          type: "bytes32",
+          value: keccak256({ type: "string", value: "recipient secret" })
+        }),
+        amount: web3.utils.toWei("0.2", "ether"),
+        counter: 1,
+        winProbPercent: "100"
+      });
 
-      await hoprChannels.setHashedSecret(hashedSecret, {
+      await hoprChannels.setHashedSecret(ticket.hashedRecipientSecret, {
         from: recipient
       });
 
@@ -227,33 +316,18 @@ contract("HoprChannels", function([sender, recipient, randomUser]) {
         .createChannel(sender, sender, recipient, depositAmount)
         .then(PrintGasUsed("createChannel first time"));
 
-      const amount = web3.utils.toWei("0.2", "ether");
-
-      const ticket = createTicket({
-        web3,
-        senderPrivKey,
-        secret,
-        counter: 1,
-        amount,
-        winProbPercent: "100"
-      });
-
-      const response = await hoprChannels.redeemTicketAndCloseChannel(
-        sender,
-        secret,
-        ticket.s_a,
-        ticket.s_b,
-        amount,
-        ticket.winProb,
-        ticket.signature.signature,
-        { from: recipient }
-      );
-
-      // const response = await hoprChannels
-      //   .closeChannel(sender, {
-      //     from: recipient
-      //   })
-      //   .then(PrintGasUsed("closeChannel first time"));
+      const response = await hoprChannels
+        .redeemTicketAndCloseChannel(
+          ticket.sender,
+          ticket.recipientSecret,
+          ticket.porSecretA,
+          ticket.porSecretB,
+          ticket.amount,
+          ticket.winProb,
+          ticket.signature,
+          { from: ticket.recipient }
+        )
+        .then(PrintGasUsed("reedem ticket and close channel"));
 
       expectEvent(response, "ClosedChannel", {
         sender,
@@ -261,6 +335,20 @@ contract("HoprChannels", function([sender, recipient, randomUser]) {
         senderAmount: web3.utils.toWei("0.8", "ether").toString(),
         recipientAmount: web3.utils.toWei("0.2", "ether").toString()
       });
+
+      const recipientAccount = await hoprChannels
+        .accounts(recipient)
+        .then(formatAccount);
+
+      expect(recipientAccount.hashedSecret).to.be.equal(
+        ticket.recipientSecret,
+        "wrong hashedSecret"
+      );
+
+      expect(recipientAccount.counter.eq(new BN(1))).to.be.equal(
+        true,
+        "wrong counter"
+      );
 
       const channel = await hoprChannels
         .channels(sender, recipient)
@@ -294,9 +382,51 @@ contract("HoprChannels", function([sender, recipient, randomUser]) {
     });
 
     it("should send 0.8 HOPR to 'recipient' and 0.2 HOPR to 'sender' by closure", async function() {
+      const ticket = Ticket({
+        web3,
+        sender,
+        recipient,
+        senderPrivKey,
+        porSecretA: keccak256({
+          type: "bytes32",
+          value: keccak256({ type: "string", value: "por secret a" })
+        }),
+        porSecretB: keccak256({
+          type: "bytes32",
+          value: keccak256({ type: "string", value: "por secret b" })
+        }),
+        recipientSecret: keccak256({
+          type: "bytes32",
+          value: keccak256({ type: "string", value: "recipient secret" })
+        }),
+        amount: web3.utils.toWei("0.8", "ether"),
+        counter: 2,
+        winProbPercent: "100"
+      });
+
+      await hoprChannels.setHashedSecret(ticket.hashedRecipientSecret, {
+        from: recipient
+      });
+
+      await hoprChannels.createChannel(
+        sender,
+        sender,
+        recipient,
+        depositAmount
+      );
+
       await hoprChannels
-        .createChannel(sender, sender, recipient, depositAmount)
-        .then(PrintGasUsed("createChannel second time"));
+        .redeemTicket(
+          ticket.sender,
+          ticket.recipientSecret,
+          ticket.porSecretA,
+          ticket.porSecretB,
+          ticket.amount,
+          ticket.winProb,
+          ticket.signature,
+          { from: ticket.recipient }
+        )
+        .then(PrintGasUsed("reedem ticket"));
 
       const response = await hoprChannels
         .initiateChannelClosure(recipient)
@@ -318,6 +448,20 @@ contract("HoprChannels", function([sender, recipient, randomUser]) {
         senderAmount: web3.utils.toWei("0.2", "ether").toString(),
         recipientAmount: web3.utils.toWei("0.8", "ether").toString()
       });
+
+      const recipientAccount = await hoprChannels
+        .accounts(recipient)
+        .then(formatAccount);
+
+      expect(recipientAccount.hashedSecret).to.be.equal(
+        ticket.recipientSecret,
+        "wrong hashedSecret"
+      );
+
+      expect(recipientAccount.counter.eq(new BN(2))).to.be.equal(
+        true,
+        "wrong counter"
+      );
 
       const channel = await hoprChannels
         .channels(sender, recipient)
