@@ -125,7 +125,7 @@ contract HoprChannels {
         uint256 amount,
         bytes32 win_prob,
         bytes memory signature
-    ) public {
+    ) public returns(bytes32) {
         address recipient = msg.sender;
         Account storage recipientAccount = accounts[recipient];
         Channel storage channel = channels[sender][recipient];
@@ -145,13 +145,13 @@ contract HoprChannels {
         bytes32 hashed_s_a = keccak256(abi.encodePacked(s_a));
         bytes32 hashed_s_b = keccak256(abi.encodePacked(s_b));
         bytes32 challange = keccak256(abi.encodePacked(hashed_s_a, hashed_s_b));
-        bytes32 hashedTicket = keccak256(abi.encodePacked(
+        bytes32 hashedTicket = prefixed(keccak256(abi.encodePacked(
             challange,
             recipientAccount.hashedSecret,
             recipientAccount.counter,
             amount,
             win_prob
-        ));
+        )));
 
         require(uint256(hashedTicket) < uint256(win_prob), "ticket must be a win");
         require(recoverSigner(hashedTicket, signature) == sender, "signature must be valid");
@@ -297,7 +297,16 @@ contract HoprChannels {
         return channel.closureTime > 0;
     }
 
-    // TODO: check if this works
+    function recoverSigner(bytes32 message, bytes memory signature) internal pure returns (address) {
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
+
+        (v, r, s) = splitSignature(signature);
+
+        return ecrecover(message, v, r, s);
+    }
+
     function splitSignature(bytes memory signature) internal pure returns (uint8, bytes32, bytes32) {
         require(signature.length == 65, "signature length is not 65");
 
@@ -317,13 +326,8 @@ contract HoprChannels {
         return (v, r, s);
     }
 
-    function recoverSigner(bytes32 message, bytes memory signature) internal pure returns (address) {
-        uint8 v;
-        bytes32 r;
-        bytes32 s;
-
-        (v, r, s) = splitSignature(signature);
-
-        return ecrecover(message, v, r, s);
+    // builds a prefixed hash to mimic the behavior of eth_sign
+    function prefixed(bytes32 message) internal pure returns (bytes32) {
+        return keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", message));
     }
 }
