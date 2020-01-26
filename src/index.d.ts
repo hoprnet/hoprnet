@@ -32,15 +32,9 @@ declare interface HoprCoreConnectorInstance {
   initOnchainValues(nonce?: number): Promise<void>
 
   /**
-   * Check whether our account possesses more than `newBalance` coin.
-   * @param newBalance balance after update
-   */
-  checkFreeBalance(newBalance: any): Promise<void>
-
-  /**
    * Returns the current balances of the account associated with this node.
    */
-  getAccountBalance(): Promise<Balance.Instance>
+  accountBalance: Promise<Balance.Instance>
 
   /**
    * (Static) utils to use in the connector module
