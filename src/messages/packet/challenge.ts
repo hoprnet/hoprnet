@@ -1,13 +1,11 @@
 import secp256k1 from 'secp256k1'
-
-import { toU8a } from '../../utils'
 import PeerId from 'peer-id'
 
 import { HoprCoreConnectorInstance, Types } from '@hoprnet/hopr-core-connector-interface'
 
 import BN from 'bn.js'
 
-const COMPRESSED_PUBLIC_KEY_LENGTH = 33
+const KEY_LENGTH = 32
 
 /**
  * The purpose of this class is to give the relayer the opportunity to claim
@@ -80,8 +78,12 @@ export class Challenge<Chain extends HoprCoreConnectorInstance> extends Uint8Arr
     }
 
     return this.hash.then((hash: Uint8Array) => {
-      // @ts-ignore
-      return secp256k1.recover(Buffer.from(this.challengeSignature.sr25519PublicKey), Buffer.from(this.challengeSignature.signature), this.challengeSignature.recovery)
+      return secp256k1.recover(
+        // @ts-ignore
+        Buffer.from(this.challengeSignature.sr25519PublicKey),
+        Buffer.from(this.challengeSignature.signature),
+        this.challengeSignature.recovery
+      )
     })
   }
 
@@ -107,8 +109,8 @@ export class Challenge<Chain extends HoprCoreConnectorInstance> extends Uint8Arr
    * @param fee
    */
   static create<Chain extends HoprCoreConnectorInstance>(hoprCoreConnector: Chain, hashedKey: Uint8Array, fee: BN): Challenge<Chain> {
-    if (hashedKey.length != COMPRESSED_PUBLIC_KEY_LENGTH) {
-      throw Error(`Invalid secret format. Expected a ${Uint8Array.name} of ${COMPRESSED_PUBLIC_KEY_LENGTH} elements but got one with ${hashedKey.length}`)
+    if (hashedKey.length != KEY_LENGTH) {
+      throw Error(`Invalid secret format. Expected a ${Uint8Array.name} of ${KEY_LENGTH} elements but got one with ${hashedKey.length}`)
     }
 
     const challenge = new Challenge(hoprCoreConnector, new Uint8Array(Challenge.SIZE(hoprCoreConnector)))

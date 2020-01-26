@@ -6,12 +6,10 @@ export * from './libp2p'
 export * from './persistence'
 export * from './u8a'
 
-const { sha3 } = require('web3-utils')
 const { promisify } = require('util')
 import { promises as fsPromise, Stats, readFileSync } from 'fs'
 
 const { publicKeyConvert } = require('secp256k1')
-const solc = require('solc')
 const chalk = require('chalk')
 
 // ==========================

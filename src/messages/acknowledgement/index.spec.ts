@@ -23,9 +23,9 @@ describe('test acknowledgement generation', function() {
       keyType: 'secp256k1'
     })
 
-    const exponent = randomBytes(32)
+    const secret = randomBytes(32)
 
-    const challenge = await Challenge.create(paymentChannels, secp256k1.publicKeyCreate(exponent), new BN(0)).sign(sender)
+    const challenge = await Challenge.create(paymentChannels, secret, new BN(0)).sign(sender)
     assert(await challenge.verify(sender), `Previously generated challenge should be valid.`)
 
     const pubKey = sender.pubKey.marshal()
@@ -34,7 +34,7 @@ describe('test acknowledgement generation', function() {
       `recovered pubKey should be equal.`
     )
 
-    const ack = await Acknowledgement.create(paymentChannels, challenge, secp256k1.publicKeyCreate(exponent), receiver)
+    const ack = await Acknowledgement.create(paymentChannels, challenge, secp256k1.publicKeyCreate(secret), receiver)
 
     assert(await ack.verify(receiver), `Previously generated acknowledgement should be valid.`)
     assert(

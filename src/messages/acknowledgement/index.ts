@@ -94,9 +94,7 @@ export default class Acknowledgement<Chain extends HoprCoreConnectorInstance> ex
   }
 
   async sign(peerId: PeerId): Promise<void> {
-    const signature = await this.paymentChannels.utils.sign(await this.hash, peerId.privKey.marshal(), peerId.pubKey.marshal())
-
-    this.responseSignature = signature
+    this.responseSignature = await this.paymentChannels.utils.sign(await this.hash, peerId.privKey.marshal(), peerId.pubKey.marshal())
   }
 
   async verify(peerId: PeerId): Promise<boolean> {
