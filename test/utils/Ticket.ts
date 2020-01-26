@@ -1,5 +1,5 @@
 import BigNumber from "bignumber.js";
-import { keccak256, signMessage, MAX_UINT256 } from "./random";
+import { keccak256, xorBytes32, signMessage, MAX_UINT256 } from "./random";
 
 BigNumber.config({ EXPONENTIAL_AT: 1e9 });
 
@@ -24,7 +24,7 @@ type ITicket = (args: {
   counter: number; // return same as provided
   hashedPorSecretA: string; // return hashed alternative
   hashedPorSecretB: string; // return hashed alternative
-  hashedPorChallenge: string; // return hashed alternative
+  challenge: string; // return hashed alternative
   hashedRecipientSecret: string; // return hashed alternative
   winProb: string; // return winProb in bytes32
   hashedTicket: string; // return hashed alternative
@@ -49,16 +49,7 @@ const Ticket: ITicket = ({
   // proof of relay related hashes
   const hashedPorSecretA = keccak256({ type: "bytes32", value: porSecretA });
   const hashedPorSecretB = keccak256({ type: "bytes32", value: porSecretB });
-  const hashedPorChallenge = keccak256(
-    {
-      type: "bytes32",
-      value: hashedPorSecretA
-    },
-    {
-      type: "bytes32",
-      value: hashedPorSecretB
-    }
-  );
+  const challenge = xorBytes32(hashedPorSecretA, hashedPorSecretB);
 
   // proof of randomness related hashes
   const hashedRecipientSecret = keccak256({
@@ -75,7 +66,7 @@ const Ticket: ITicket = ({
   );
 
   const hashedTicket = keccak256(
-    { type: "bytes32", value: hashedPorChallenge },
+    { type: "bytes32", value: challenge },
     { type: "bytes32", value: hashedRecipientSecret },
     { type: "uint256", value: counter },
     { type: "uint256", value: amount },
@@ -95,7 +86,7 @@ const Ticket: ITicket = ({
     counter,
     hashedPorSecretA,
     hashedPorSecretB,
-    hashedPorChallenge,
+    challenge,
     hashedRecipientSecret,
     winProb,
     hashedTicket,

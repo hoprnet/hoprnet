@@ -149,10 +149,9 @@ contract HoprChannels {
             "given value is not a pre-image of the stored on-chain secret"
         );
 
-        // TODO: implement xor
         bytes32 hashed_s_a = keccak256(abi.encodePacked(s_a));
         bytes32 hashed_s_b = keccak256(abi.encodePacked(s_b));
-        bytes32 challenge = keccak256(abi.encodePacked(hashed_s_a, hashed_s_b));
+        bytes32 challenge = hashed_s_a ^ hashed_s_b;
         bytes32 hashedTicket = prefixed(keccak256(abi.encodePacked(
             challenge,
             recipientAccount.hashedSecret,
