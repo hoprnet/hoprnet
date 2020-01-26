@@ -76,7 +76,10 @@ declare interface HoprCoreConnector {
    * @param keyPair public key and private key of the account
    * @param uri URI of the blockchain node, e.g. `ws://localhost:9944`
    */
-  create(db: LevelUp, keyPair: any, uri?: string): Promise<HoprCoreConnectorInstance>
+  create(db: LevelUp, keyPair: {
+    publicKey: Uint8Array,
+    privateKey: Uint8Array
+  }, uri?: string): Promise<HoprCoreConnectorInstance>
 }
 
 export { HoprCoreConnectorInstance, Utils, DbKeys, Types, ChannelInstance, Constants, Ticket }
