@@ -24,7 +24,7 @@ type ITicket = (args: {
   counter: number; // return same as provided
   hashedPorSecretA: string; // return hashed alternative
   hashedPorSecretB: string; // return hashed alternative
-  hashedPorChallange: string; // return hashed alternative
+  hashedPorChallenge: string; // return hashed alternative
   hashedRecipientSecret: string; // return hashed alternative
   winProb: string; // return winProb in bytes32
   hashedTicket: string; // return hashed alternative
@@ -49,7 +49,7 @@ const Ticket: ITicket = ({
   // proof of relay related hashes
   const hashedPorSecretA = keccak256({ type: "bytes32", value: porSecretA });
   const hashedPorSecretB = keccak256({ type: "bytes32", value: porSecretB });
-  const hashedPorChallange = keccak256(
+  const hashedPorChallenge = keccak256(
     {
       type: "bytes32",
       value: hashedPorSecretA
@@ -75,7 +75,7 @@ const Ticket: ITicket = ({
   );
 
   const hashedTicket = keccak256(
-    { type: "bytes32", value: hashedPorChallange },
+    { type: "bytes32", value: hashedPorChallenge },
     { type: "bytes32", value: hashedRecipientSecret },
     { type: "uint256", value: counter },
     { type: "uint256", value: amount },
@@ -95,7 +95,7 @@ const Ticket: ITicket = ({
     counter,
     hashedPorSecretA,
     hashedPorSecretB,
-    hashedPorChallange,
+    hashedPorChallenge,
     hashedRecipientSecret,
     winProb,
     hashedTicket,

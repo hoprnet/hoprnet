@@ -8,6 +8,12 @@ contract HoprChannels {
     using SafeERC20 for IERC20;
     using SafeMath for uint256;
 
+    // an account has set a new secret hash
+    event SecretHashSet(
+        address indexed account,
+        bytes32 secretHash
+    );
+
     // the payment channel has been created and opened
     event OpenedChannel(
         address indexed funder,
@@ -77,6 +83,8 @@ contract HoprChannels {
 
         account.hashedSecret = hashedSecret;
         account.counter = account.counter.add(1);
+
+        emit SecretHashSet(msg.sender, hashedSecret);
     }
 
     /**
@@ -94,10 +102,10 @@ contract HoprChannels {
         require(sender != address(0), "'sender' address is empty");
         require(recipient != address(0), "'recipient' address is empty");
         require(accounts[recipient].hashedSecret != bytes32(0), "'recipient' has not set a hashed secret");
-        require(amount > 0, "'amount' must be greater than 0");
+        // require(amount > 0, "'amount' must be greater than 0");
 
         Channel storage channel = channels[sender][recipient];
-        require(channel.isOpen == false, "channel is not closed");
+        require(channel.isOpen == false, "channel is already open");
 
         token.safeTransferFrom(funder, address(this), amount);
 
@@ -144,9 +152,9 @@ contract HoprChannels {
         // TODO: implement xor
         bytes32 hashed_s_a = keccak256(abi.encodePacked(s_a));
         bytes32 hashed_s_b = keccak256(abi.encodePacked(s_b));
-        bytes32 challange = keccak256(abi.encodePacked(hashed_s_a, hashed_s_b));
+        bytes32 challenge = keccak256(abi.encodePacked(hashed_s_a, hashed_s_b));
         bytes32 hashedTicket = prefixed(keccak256(abi.encodePacked(
-            challange,
+            challenge,
             recipientAccount.hashedSecret,
             recipientAccount.counter,
             amount,

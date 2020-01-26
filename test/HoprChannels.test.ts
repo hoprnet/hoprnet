@@ -59,6 +59,22 @@ contract("HoprChannels", function([sender, recipient, randomUser]) {
       await reset();
     });
 
+    it("should have set hashedSecret correctly", async function() {
+      const secretHash = keccak256({
+        type: "string",
+        value: "recipient secret"
+      });
+
+      const response = await hoprChannels.setHashedSecret(secretHash, {
+        from: recipient
+      });
+
+      expectEvent(response, "SecretHashSet", {
+        account: recipient,
+        secretHash
+      });
+    });
+
     it("should have created channel correctly", async function() {
       await hoprToken.approve(hoprChannels.address, depositAmount);
 
@@ -144,7 +160,7 @@ contract("HoprChannels", function([sender, recipient, randomUser]) {
 
       await expectRevert(
         hoprChannels.createChannel(sender, sender, recipient, depositAmount),
-        "channel is not closed"
+        "channel is already open"
       );
     });
 
