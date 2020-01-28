@@ -78,13 +78,6 @@ contract("HoprChannels", function([sender, recipient, randomUser]) {
     it("should have created channel correctly", async function() {
       await hoprToken.approve(hoprChannels.address, depositAmount);
 
-      await hoprChannels.setHashedSecret(
-        keccak256({ type: "string", value: "recipient secret" }),
-        {
-          from: recipient
-        }
-      );
-
       const response = await hoprChannels.createChannel(
         sender,
         sender,
@@ -144,13 +137,6 @@ contract("HoprChannels", function([sender, recipient, randomUser]) {
     it("should fail when creating an open channel a second time", async function() {
       await hoprToken.approve(hoprChannels.address, depositAmount);
 
-      await hoprChannels.setHashedSecret(
-        keccak256({ type: "string", value: "recipient secret" }),
-        {
-          from: recipient
-        }
-      );
-
       await hoprChannels.createChannel(
         sender,
         sender,
@@ -166,13 +152,6 @@ contract("HoprChannels", function([sender, recipient, randomUser]) {
 
     it("should fail when 'sender' is calling 'closeChannel'", async function() {
       await hoprToken.approve(hoprChannels.address, depositAmount);
-
-      await hoprChannels.setHashedSecret(
-        keccak256({ type: "string", value: "recipient secret" }),
-        {
-          from: recipient
-        }
-      );
 
       await hoprChannels.createChannel(
         sender,
@@ -191,13 +170,6 @@ contract("HoprChannels", function([sender, recipient, randomUser]) {
 
     it("should fail when 'claimChannelClosure' before closureTime", async function() {
       await hoprToken.approve(hoprChannels.address, depositAmount);
-
-      await hoprChannels.setHashedSecret(
-        keccak256({ type: "string", value: "recipient secret" }),
-        {
-          from: recipient
-        }
-      );
 
       await hoprChannels.createChannel(
         sender,
@@ -221,13 +193,6 @@ contract("HoprChannels", function([sender, recipient, randomUser]) {
     it("should fail when calling 'initiateChannelClosure' from 'randomUser'", async function() {
       await hoprToken.approve(hoprChannels.address, depositAmount);
 
-      await hoprChannels.setHashedSecret(
-        keccak256({ type: "string", value: "recipient secret" }),
-        {
-          from: recipient
-        }
-      );
-
       await hoprChannels.createChannel(
         sender,
         sender,
@@ -245,13 +210,6 @@ contract("HoprChannels", function([sender, recipient, randomUser]) {
 
     it("should fail when calling 'claimChannelClosure' from 'randomUser'", async function() {
       await hoprToken.approve(hoprChannels.address, depositAmount);
-
-      await hoprChannels.setHashedSecret(
-        keccak256({ type: "string", value: "recipient secret" }),
-        {
-          from: recipient
-        }
-      );
 
       await hoprChannels.createChannel(
         sender,
@@ -277,13 +235,6 @@ contract("HoprChannels", function([sender, recipient, randomUser]) {
       await hoprToken.burn(totalSupply, {
         from: sender
       });
-
-      await hoprChannels.setHashedSecret(
-        keccak256({ type: "string", value: "recipient secret" }),
-        {
-          from: recipient
-        }
-      );
 
       await expectRevert(
         hoprChannels.createChannel(sender, sender, recipient, depositAmount, {

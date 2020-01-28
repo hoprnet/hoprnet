@@ -101,7 +101,7 @@ contract HoprChannels {
         require(funder != address(0), "'funder' address is empty");
         require(sender != address(0), "'sender' address is empty");
         require(recipient != address(0), "'recipient' address is empty");
-        require(accounts[recipient].hashedSecret != bytes32(0), "'recipient' has not set a hashed secret");
+        // require(accounts[recipient].hashedSecret != bytes32(0), "'recipient' has not set a hashed secret");
         // require(amount > 0, "'amount' must be greater than 0");
 
         Channel storage channel = channels[sender][recipient];
