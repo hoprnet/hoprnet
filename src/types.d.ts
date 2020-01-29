@@ -28,6 +28,15 @@ declare namespace Channel {
   interface Instance extends toU8a {}
 }
 
+declare namespace ChannelBalance {
+  interface Static extends length<Instance> {}
+
+  interface Instance {
+    balance: Balance.Instance
+    balance_a: Balance.Instance
+  }
+}
+
 declare namespace Hash {
   interface Static extends length<Instance> {}
 
@@ -87,11 +96,7 @@ declare namespace Ticket {
      * @param signedTicket a previously issued ticket to check
      * @param props additional arguments
      */
-    verify(
-      channel: any,
-      signedTicket: SignedTicket.Instance,
-      ...props: any[]
-    ): Promise<boolean>
+    verify(channel: any, signedTicket: SignedTicket.Instance, ...props: any[]): Promise<boolean>
 
     /**
      * BIG TODO
@@ -130,6 +135,7 @@ declare namespace Types {
   interface AccountId extends AccountId.Instance {}
   interface Balance extends Balance.Instance {}
   interface Channel extends Channel.Instance {}
+  interface ChannelBalance extends ChannelBalance.Instance {}
   interface Hash extends Hash.Instance {}
   interface Moment extends Moment.Instance {}
   interface State extends State.Instance {}
@@ -143,6 +149,7 @@ declare interface TypeConstructors {
   AccountId: AccountId.Static
   Balance: Balance.Static
   Channel: Channel.Static
+  ChannelBalance: ChannelBalance.Static
   Hash: Hash.Static
   Moment: Moment.Static
   State: State.Static
@@ -152,6 +159,6 @@ declare interface TypeConstructors {
   TicketEpoch: TicketEpoch.Static
 }
 
-export { AccountId, Balance, Channel, Hash, Moment, State, Signature, SignedTicket, Ticket, TicketEpoch, Types, toU8a }
+export { AccountId, Balance, Channel, ChannelBalance, Hash, Moment, State, Signature, SignedTicket, Ticket, TicketEpoch, Types, toU8a }
 
 export default TypeConstructors

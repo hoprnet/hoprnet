@@ -1,4 +1,4 @@
-import { AccountId, Balance, Channel as ChannelType, Hash, Moment, SignedTicket, Ticket } from './types'
+import { AccountId, Balance, Channel as ChannelType, ChannelBalance, Hash, Moment, SignedTicket, Ticket } from './types'
 import { HoprCoreConnectorInstance } from '.'
 
 declare interface ChannelInstance {
@@ -36,7 +36,13 @@ declare interface Channel {
    * @param counterparty AccountId of the counterparty
    * @param props additional arguments
    */
-  create(coreConnector: any, counterparty: AccountId.Instance, ...props: any[]): Promise<ChannelInstance>
+  create(
+    coreConnector: any,
+    offChainCounterparty: Uint8Array,
+    getOnChainPublicKey: (counterparty: Uint8Array) => Promise<Uint8Array>,
+    channelBalance?: ChannelBalance.Instance,
+    sign?: (channelBalance: ChannelBalance.Instance) => Promise<Uint8Array>
+  ): Promise<ChannelInstance>
 
   /**
    * Opens a new payment channel and initializes the on-chain data.
@@ -44,7 +50,7 @@ declare interface Channel {
    * @param signature a signature over channel state
    * @param props additional arguments
    */
-  open(coreConnector: any, amount: Balance.Instance, signature: Promise<Uint8Array>, ...props: any[]): Promise<ChannelInstance>
+  // open(coreConnector: any, amount: Balance.Instance, signature: Promise<Uint8Array>, ...props: any[]): Promise<ChannelInstance>
 
   /**
    * Fetches all channel instances from the database and applies first `onData` and
@@ -52,7 +58,12 @@ declare interface Channel {
    * @param onData applied on all channel instances
    * @param onEnd composes at the end the received data
    */
-  getAll<T, R>(coreConnector: any, onData: (channel: ChannelInstance, ...props: any[]) => T, onEnd: (promises: Promise<T>[], ...props: any[]) => R, ...props: any[]): Promise<R>
+  getAll<T, R>(
+    coreConnector: any,
+    onData: (channel: ChannelInstance, ...props: any[]) => T,
+    onEnd: (promises: Promise<T>[], ...props: any[]) => R,
+    ...props: any[]
+  ): Promise<R>
 
   /**
    * Fetches all channel instances from the database and initiates a settlement on
@@ -60,6 +71,13 @@ declare interface Channel {
    * @param props additional arguments
    */
   closeChannels(coreConnector: any, ...props: any[]): Promise<Balance.Instance>
+
+  /**
+   * Handles a channel opening request. Returns the response to the request.
+   * @param coreConnector coreConnector instance
+   * @param input received input
+   */
+  handleOpeningRequest(coreConnector: any, input: Uint8Array): Promise<Uint8Array>
 }
 
 export { ChannelInstance }
