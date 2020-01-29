@@ -57,30 +57,22 @@ declare namespace Signature {
     signature: Uint8Array
     recovery: number
     msgPrefix: Uint8Array
-    // @TODO: this needs to disappear
-    secp256k1Signature: Uint8Array
-    // @TODO: this needs to disappear
-    secp256k1Recovery: Uint8Array
-    // @TODO: this needs to disappear
-    sr25519PublicKey: Uint8Array
-    // @TODO: this needs to disappear
-    sr25519Signature: Uint8Array
   }
 }
 
-declare namespace SignedChannel {
-  interface Static extends length<Instance> {
+declare namespace SignedChannel  {
+  interface Static<ConcreteSignature extends Signature.Instance, ConcreteChannel extends Channel.Instance> extends length<Instance<ConcreteSignature, ConcreteChannel>> {
     new (
       coreConnector: any,
       arr?: Uint8Array,
       struct?: {
-        signature: Signature.Instance
-        channel: Channel.Instance
+        signature: ConcreteSignature
+        channel: ConcreteChannel
       }
-    )
+    ): Instance<ConcreteSignature, ConcreteChannel>
   }
 
-  interface Instance extends Uint8Array, toU8a {
+  interface Instance<ConcreteSignature extends Signature.Instance, ConcreteChannel extends Channel.Instance> extends Uint8Array, toU8a {
     channel: Channel.Instance
     signature: Signature.Instance
     signer: Uint8Array
@@ -168,7 +160,7 @@ declare namespace Types {
   interface Moment extends Moment.Instance {}
   interface State extends State.Instance {}
   interface Signature extends Signature.Instance {}
-  interface SignedChannel extends SignedChannel.Instance {}
+  interface SignedChannel extends SignedChannel.Instance<any, any> {}
   interface SignedTicket extends SignedTicket.Instance {}
   interface Ticket extends Ticket.Instance {}
   interface TicketEpoch extends TicketEpoch.Instance {}
@@ -183,7 +175,7 @@ declare interface TypeConstructors {
   Moment: Moment.Static
   State: State.Static
   Signature: Signature.Static
-  SignedChannel: SignedChannel.Static
+  SignedChannel: SignedChannel.Static<any, any>
   SignedTicket: SignedTicket.Static
   Ticket: Ticket.Static
   TicketEpoch: TicketEpoch.Static
