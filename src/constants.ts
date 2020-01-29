@@ -23,6 +23,8 @@ export const PROTOCOL_PAYMENT_CHANNEL = `${BASESTRING}/payment/open`
 
 export const PROTOCOL_DELIVER_PUBKEY = `${BASESTRING}/pubKey`
 
+export const PROTOCOL_ONCHAIN_KEY = `${BASESTRING}/onChainKey`
+
 export const PROTOCOL_SETTLE_CHANNEL = `${BASESTRING}/payment/settle`
 
 export const PROTOCOL_STUN = `${BASESTRING}/stun`

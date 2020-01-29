@@ -1,5 +1,3 @@
-'use strict'
-
 const libp2p = require('libp2p')
 const MPLEX = require('libp2p-mplex')
 const KadDHT = require('libp2p-kad-dht')
@@ -9,28 +7,32 @@ const TCP = require('libp2p-tcp')
 
 const defaultsDeep = require('@nodeutils/defaults-deep')
 
-const { createPacket } = require('./packet')
+import { Packet } from './messages/packet'
 const registerHandlers = require('./handlers')
-const { NAME, PACKET_SIZE, PROTOCOL_STRING, MAX_HOPS } = require('./constants')
+import { PACKET_SIZE, PROTOCOL_STRING, MAX_HOPS } from './constants'
 const crawler = require('./network/crawler')
 const heartbeat = require('./network/heartbeat')
-const getPeerInfo = require('./getPeerInfo')
-const { randomSubset, serializePeerBook, deserializePeerBook, log, addPubKey, createDirectoryIfNotExists } = require('./utils')
+import { getPeerInfo } from './getPeerInfo'
 
-import { default as levelup, LevelUp } from 'levelup'
+import { randomSubset, serializePeerBook, deserializePeerBook, addPubKey, createDirectoryIfNotExists } from './utils'
+
+import levelup, { LevelUp } from 'levelup'
 import leveldown from 'leveldown'
 import Multiaddr from 'multiaddr'
+import chalk from 'chalk'
+import Debug from 'debug'
 
 import PeerId from 'peer-id'
 import PeerInfo from 'peer-info'
 import PeerBook from 'peer-book'
 
-import PaymentChannels from '@hoprnet/hopr-core-connector-interface'
+import HoprCoreConnector, { HoprCoreConnectorInstance } from '@hoprnet/hopr-core-connector-interface'
+import { Interactions } from './interactions'
 
 import pull from 'pull-stream'
 
 const lp = require('pull-length-prefixed')
-const Acknowledgement = require('./acknowledgement')
+import Acknowledgement from './messages/acknowledgement'
 
 type HoprOptions = {
   peerInfo: PeerInfo
@@ -38,14 +40,16 @@ type HoprOptions = {
   id?: number
 }
 
-export default class Hopr<ChainConnector extends PaymentChannels> extends libp2p {
+export default class Hopr<Chain extends HoprCoreConnectorInstance> extends libp2p {
+  interactions: Interactions<Chain>
+
   /**
    * @constructor
    *
    * @param _options
    * @param provider
    */
-  private constructor(_options: HoprOptions, public db: LevelUp, public bootstrapServers: PeerInfo[], public paymentChannels: PaymentChannels) {
+  constructor(_options: HoprOptions, public db: LevelUp, public bootstrapServers: PeerInfo[], public paymentChannels: Chain) {
     super(
       defaultsDeep(_options, {
         // Disable libp2p-switch protections for the moment
@@ -84,7 +88,11 @@ export default class Hopr<ChainConnector extends PaymentChannels> extends libp2p
       })
     )
 
+    this.interactions = new Interactions(this)
+
     this.heartbeat = heartbeat(this)
+
+    this.log = Debug(`${chalk.blue(_options.peerInfo.id.toB58String())}: `)
   }
 
   /**
@@ -92,14 +100,14 @@ export default class Hopr<ChainConnector extends PaymentChannels> extends libp2p
    *
    * @param options the parameters
    */
-  static async createNode<ChainConnector extends PaymentChannels>(
-    ChainConnector: ChainConnector,
+  static async createNode<Constructor extends HoprCoreConnector>(
+    HoprCoreConnector: Constructor,
     options?: HoprOptions & {
       'bootstrapServers'?: PeerInfo[]
       'bootstrap-node'?: boolean
       'provider'?: string
     }
-  ): Promise<Hopr<ChainConnector>> {
+  ): Promise<Hopr<HoprCoreConnectorInstance>> {
     const db = Hopr.openDatabase(`db`, options)
 
     if (options == null) {
@@ -108,7 +116,7 @@ export default class Hopr<ChainConnector extends PaymentChannels> extends libp2p
         //     // WebRTC: options.WebRTC
         // },
         // peerBook: peerBook,
-        peerInfo: await getPeerInfo(options, db),
+        peerInfo: await getPeerInfo({}, db),
         output: console.log
       }
     }
@@ -121,11 +129,20 @@ export default class Hopr<ChainConnector extends PaymentChannels> extends libp2p
     //     }
     // }
 
-    return new Hopr<ChainConnector>(
+    return new Hopr(
       options,
       db,
       options['bootstrap-node'] ? null : options.bootstrapServers,
-      options['bootstrap-node'] ? null : await ChainConnector.create(db, new Uint8Array(), options['provider'])
+      options['bootstrap-node']
+        ? null
+        : await HoprCoreConnector.create(
+            db,
+            {
+              publicKey: options.peerInfo.id.pubKey.marshal(),
+              privateKey: options.peerInfo.id.privKey.marshal()
+            },
+            options['provider']
+          )
     ).up(options)
   }
 
@@ -155,7 +172,7 @@ export default class Hopr<ChainConnector extends PaymentChannels> extends libp2p
    *
    * @param options
    */
-  async up(options: HoprOptions): Promise<Hopr<ChainConnector>> {
+  async up(options: HoprOptions): Promise<Hopr<Chain>> {
     await new Promise((resolve, reject) =>
       super.start((err: Error) => {
         if (err) return reject(err)
@@ -169,9 +186,9 @@ export default class Hopr<ChainConnector extends PaymentChannels> extends libp2p
     if (!options['bootstrap-node']) {
       await this.connectToBootstrapServers()
     } else {
-      log(this.peerInfo.id, `Available under the following addresses:`)
+      this.debug(`Available under the following addresses:`)
       this.peerInfo.multiaddrs.forEach((ma: Multiaddr) => {
-        log(this.peerInfo.id, ma.toString())
+        this.debug(ma.toString())
       })
     }
 
@@ -185,10 +202,6 @@ export default class Hopr<ChainConnector extends PaymentChannels> extends libp2p
     //     }
     // })
 
-    if (!options['bootstrap-node']) {
-      this.paymentChannels = await PaymentChannels.create(this)
-    }
-
     // if (publicAddrs) publicAddrs.forEach(addr => this.peerInfo.multiaddrs.add(addr.encapsulate(`/${NAME}/${this.peerInfo.id.toB58String()}`)))
 
     return this
@@ -200,13 +213,13 @@ export default class Hopr<ChainConnector extends PaymentChannels> extends libp2p
   async down(): Promise<void> {
     if (this.db) await this.db.close()
 
-    log(this.peerInfo.id, `Database closed.`)
+    this.debug(`Database closed.`)
 
     await new Promise((resolve, reject) =>
       super.stop((err: Error) => {
         if (err) return reject(err)
 
-        log(this.peerInfo.id, `Node shut down.`)
+        this.debug(`Node shut down.`)
 
         resolve()
       })
@@ -226,12 +239,8 @@ export default class Hopr<ChainConnector extends PaymentChannels> extends libp2p
    * @param destination PeerId of the destination
    * the acknowledgement of the first hop
    */
-  async sendMessage(msg: string | Buffer, destination: PeerId): Promise<void> {
+  async sendMessage(msg: Uint8Array, destination: PeerId): Promise<void> {
     if (!destination) throw Error(`Expecting a non-empty destination.`)
-
-    if (!Buffer.isBuffer(msg)) {
-      msg = Buffer.from(msg)
-    }
 
     const promises = []
 
@@ -248,7 +257,7 @@ export default class Hopr<ChainConnector extends PaymentChannels> extends libp2p
 
           const conn = await this.dialProtocol(peerInfo, PROTOCOL_STRING)
 
-          const packet = await createPacket(
+          const packet = await Packet.create(
             /* prettier-ignore */
             this,
             msg.slice(n * PACKET_SIZE, Math.min(msg.length, (n + 1) * PACKET_SIZE)),
@@ -256,14 +265,14 @@ export default class Hopr<ChainConnector extends PaymentChannels> extends libp2p
           )
 
           pull(
-            pull.once(packet.toBuffer()),
+            pull.once(Buffer.from(packet)),
             lp.encode(),
             conn,
             lp.decode({
-              maxLength: Acknowledgement.SIZE
+              // maxLength: Acknowledgement.SIZE
             }),
             pull.drain(data => {
-              log(this.peerInfo.id, `Received acknowledgement.`)
+              this.debug(this.peerInfo.id, `Received acknowledgement.`)
               // return cb()
               // if (!cb.called) {
               //     return cb()

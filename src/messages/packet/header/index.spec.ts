@@ -1,5 +1,5 @@
 import assert from 'assert'
-import { deriveBlinding, deriveCipherParameters, deriveTagParameters, createMAC, deriveTicketKey, derivePRGParameters, createHeader } from '.'
+import { Header, deriveBlinding, deriveCipherParameters, deriveTagParameters, createMAC, deriveTicketKey, derivePRGParameters } from '.'
 import { Utils, Constants } from '@hoprnet/hopr-core-polkadot'
 import PeerId from 'peer-id'
 import { HoprCoreConnectorInstance } from '@hoprnet/hopr-core-connector-interface'
@@ -38,24 +38,36 @@ describe('test creation & transformation of a header', function() {
       constants: Constants
     } as unknown) as HoprCoreConnectorInstance
 
-    const { header, identifier, secrets } = createHeader<HoprCoreConnectorInstance>(peerIds)
+    const { header, identifier, secrets } = Header.create<HoprCoreConnectorInstance>(peerIds)
 
-    for(let i = 0; i < peerIds.length - 1; i++) {
-        header.deriveSecret(peerIds[i].privKey.marshal())
-        assert.deepEqual(header.derivedSecret, secrets[i], `pre-computed secret and derived secret should be the same`)
-        assert(header.verify(), `MAC should be valid`)
+    for (let i = 0; i < peerIds.length - 1; i++) {
+      header.deriveSecret(peerIds[i].privKey.marshal())
+      assert.deepEqual(header.derivedSecret, secrets[i], `pre-computed secret and derived secret should be the same`)
+      assert(header.verify(), `MAC should be valid`)
 
-        header.extractHeaderInformation()
-        assert(peerIds[i + 1].pubKey.marshal().every((value: number, index: number) => value == header.address[index]), `Decrypted address should be the same as the of node ${i+1}`)
-        header.transformForNextNode()
+      header.extractHeaderInformation()
+      assert(
+        peerIds[i + 1].pubKey.marshal().every((value: number, index: number) => value == header.address[index]),
+        `Decrypted address should be the same as the of node ${i + 1}`
+      )
+      header.transformForNextNode()
     }
 
     header.deriveSecret(peerIds[2].privKey.marshal(), true)
     assert.deepEqual(header.derivedSecret, secrets[2], `pre-computed secret and derived secret should be the same`)
+
     assert(header.verify(), `MAC should be valid`)
     header.extractHeaderInformation(true)
-    assert(peerIds[2].pubKey.marshal().every((value: number, index: number) => value == header.address[index]), `Decrypted address should be the same as the final recipient`)
-    assert(header.identifier.every((value: number, index: number) => value == identifier[index]), `Decrypted identifier should have the expected value`)
+
+    assert(
+      peerIds[2].pubKey.marshal().every((value: number, index: number) => value == header.address[index]),
+      `Decrypted address should be the same as the final recipient`
+    )
+
+    assert(
+      header.identifier.every((value: number, index: number) => value == identifier[index]),
+      `Decrypted identifier should have the expected value`
+    )
   })
 })
 

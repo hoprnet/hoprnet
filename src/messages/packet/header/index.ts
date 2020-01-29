@@ -52,7 +52,7 @@ export class Header<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
   constructor(arr: Uint8Array) {
     super(arr)
 
-    if (arr.length != SIZE) throw Error(`Wrong input. Please provide a Buffer of size ${SIZE}.`)
+    if (arr.length != Header.SIZE) throw Error(`Wrong input. Please provide a Buffer of size ${Header.SIZE}.`)
   }
 
   subarray(begin?: number, end?: number): Uint8Array {
@@ -169,11 +169,26 @@ export class Header<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
       '\n'
     )
   }
+
+  static get SIZE(): number {
+    return COMPRESSED_PUBLIC_KEY_LENGTH + BETA_LENGTH + MAC_SIZE
+  }
+
+  static create<Chain extends HoprCoreConnectorInstance>(
+    peerIds: PeerId[]
+  ): {
+    header: Header<Chain>
+    secrets: Uint8Array[]
+    identifier: Uint8Array
+  } {
+    const header = new Header<Chain>(new Uint8Array(Header.SIZE))
+    header.tmpData = header.beta.subarray(ADDRESS_SIZE + MAC_SIZE, PER_HOP_SIZE)
+
+    return createHeaderHelper(header, peerIds)
+  }
 }
 
 export const BETA_LENGTH = PER_HOP_SIZE * (MAX_HOPS - 1) + LAST_HOP_SIZE
-
-export const SIZE = COMPRESSED_PUBLIC_KEY_LENGTH + BETA_LENGTH + MAC_SIZE
 
 export function deriveTagParameters(secret: Uint8Array): Uint8Array {
   if (!secp256k1.publicKeyVerify(Buffer.from(secret))) {
@@ -248,17 +263,4 @@ export function createMAC(secret: Uint8Array, msg: Uint8Array): Uint8Array {
     .createHmac('sha256', key)
     .update(msg)
     .digest()
-}
-
-export function createHeader<Chain extends HoprCoreConnectorInstance>(
-  peerIds: PeerId[]
-): {
-  header: Header<Chain>
-  secrets: Uint8Array[]
-  identifier: Uint8Array
-} {
-  const header = new Header<Chain>(new Uint8Array(SIZE))
-  header.tmpData = header.beta.subarray(ADDRESS_SIZE + MAC_SIZE, PER_HOP_SIZE)
-
-  return createHeaderHelper(header, peerIds)
 }

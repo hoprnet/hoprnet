@@ -93,7 +93,7 @@
     "@types/node": "~12.12.21",
     "@types/pull-stream": "^3.6.0",
     "@types/read": "^0.0.28",
-    "@types/secp256k1": "^3.5.0",
+    "@types/secp256k1": "3.5.0",
     "axios": "^0.19.1",
     "debug": "^4.1.1",
     "eslint": "~6.1.0",

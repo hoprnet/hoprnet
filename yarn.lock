@@ -27,11 +27,11 @@
 
 "@hoprnet/hopr-core-connector-interface@hoprnet/hopr-core-connector-interface":
   version "1.0.0"
-  resolved "https://codeload.github.com/hoprnet/hopr-core-connector-interface/tar.gz/d7c4fde028df755f40412a6a4ba9789e3f5dbc49"
+  resolved "https://codeload.github.com/hoprnet/hopr-core-connector-interface/tar.gz/9a18e364a8d9e3b663b0c3bdd68164e2e943e7d7"
 
 "@hoprnet/hopr-core-polkadot@hoprnet/hopr-core-polkadot":
   version "0.0.2"
-  resolved "https://codeload.github.com/hoprnet/hopr-core-polkadot/tar.gz/b2a1e405001facefeb3b5796afe73ad0fce6518b"
+  resolved "https://codeload.github.com/hoprnet/hopr-core-polkadot/tar.gz/cd0c79ba6ae0682ec1280d8b3b3e16350fbbaa68"
   dependencies:
     "@polkadot/api" "^0.100.1"
     "@polkadot/util" "^1.8.1"
@@ -43,7 +43,7 @@
 
 "@hoprnet/hopr-types@hoprnet/hopr-types":
   version "0.3.0"
-  resolved "https://codeload.github.com/hoprnet/hopr-types/tar.gz/3d0faf4bb116fa7fbcbd37d0ccc58864ed1ee818"
+  resolved "https://codeload.github.com/hoprnet/hopr-types/tar.gz/557f90622ac351b3e43ed4cb2b9ac9ff16930cc4"
 
 "@nodeutils/defaults-deep@~1.1.0":
   version "1.1.0"
@@ -260,14 +260,14 @@
   integrity sha512-NYrtPht0wGzhwe9+/idPaBB+TqkY9AhTvOLMkThm0IoEfLaiVQZwBwyJ5puCkO3AUCWrmcoePjp2mbFocKy4SQ==
 
 "@types/node@*":
-  version "13.5.0"
-  resolved "https://registry.yarnpkg.com/@types/node/-/node-13.5.0.tgz#4e498dbf355795a611a87ae5ef811a8660d42662"
-  integrity sha512-Onhn+z72D2O2Pb2ql2xukJ55rglumsVo1H6Fmyi8mlU9SvKdBk/pUSUAiBY/d9bAOF7VVWajX3sths/+g6ZiAQ==
+  version "13.5.1"
+  resolved "https://registry.yarnpkg.com/@types/node/-/node-13.5.1.tgz#6fae50892d1841f4b38b298e2f78fb68c5960cb9"
+  integrity sha512-Jj2W7VWQ2uM83f8Ls5ON9adxN98MvyJsMSASYFuSvrov8RMRY64Ayay7KV35ph1TSGIJ2gG9ZVDdEq3c3zaydA==
 
 "@types/node@~12.12.21":
-  version "12.12.25"
-  resolved "https://registry.yarnpkg.com/@types/node/-/node-12.12.25.tgz#792c0afb798f1dd681dce9c4b4c431f7245a0a42"
-  integrity sha512-nf1LMGZvgFX186geVZR1xMZKKblJiRfiASTHw85zED2kI1yDKHDwTKMdkaCbTlXoRKlGKaDfYywt+V0As30q3w==
+  version "12.12.26"
+  resolved "https://registry.yarnpkg.com/@types/node/-/node-12.12.26.tgz#213e153babac0ed169d44a6d919501e68f59dea9"
+  integrity sha512-UmUm94/QZvU5xLcUlNR8hA7Ac+fGpO1EG/a8bcWVz0P0LqtxFmun9Y2bbtuckwGboWJIT70DoWq1r3hb56n3DA==
 
 "@types/pbkdf2@^3.0.0":
   version "3.0.0"
@@ -286,10 +286,17 @@
   resolved "https://registry.yarnpkg.com/@types/read/-/read-0.0.28.tgz#cd0be409b192c6119f17e67d434f4c6e9418f1b5"
   integrity sha1-zQvkCbGSxhGfF+Z9Q09MbpQY8bU=
 
-"@types/secp256k1@^3.5.0":
+"@types/secp256k1@3.5.0":
   version "3.5.0"
   resolved "https://registry.yarnpkg.com/@types/secp256k1/-/secp256k1-3.5.0.tgz#0f3baf16b07488c6da2633a63b4160bcf8d0fd5b"
   integrity sha512-ZE39QhkIaNK6xbKIp1VLN5O36r97LuslLmRnjAcT0sVDxcfvrk3zqp/VnIfmGza7J6jDxR8dIai3hsCxPYglPA==
+  dependencies:
+    "@types/node" "*"
+
+"@types/secp256k1@^3.5.0":
+  version "3.5.1"
+  resolved "https://registry.yarnpkg.com/@types/secp256k1/-/secp256k1-3.5.1.tgz#bb02d62aa037ac0b1e90bf95bd83f11432fbcfa6"
+  integrity sha512-kZqDSKgDu5b6iD3QZdQ9Ia4FHd7H37S5TMM4WJtt0DK0M9XkrtQOvm5sWzE2LVoie2XRtk5s7uKdjDzBi2BoNw==
   dependencies:
     "@types/node" "*"
 
@@ -690,10 +697,10 @@ chunky@0.0.0:
   resolved "https://registry.yarnpkg.com/chunky/-/chunky-0.0.0.tgz#1e7580a23c083897d2ad662459e7efd8465f608a"
   integrity sha1-HnWAojwIOJfSrWYkWefv2EZfYIo=
 
-cids@~0.7.0, cids@~0.7.1:
-  version "0.7.2"
-  resolved "https://registry.yarnpkg.com/cids/-/cids-0.7.2.tgz#f7a46b72d6b662b36b28a28e1eda1d07f8d3d371"
-  integrity sha512-lnAfyxzcmVb9a2oi6kJQ/peexYzcVq0xPe3mmQlGpCirRsR5BJL7aXZ93oO9jC1g6zI2m7pciRtecm0+BXEUUg==
+cids@^0.7.3, cids@~0.7.0, cids@~0.7.1:
+  version "0.7.3"
+  resolved "https://registry.yarnpkg.com/cids/-/cids-0.7.3.tgz#2069c7277c71261717e6844e2e547ca133ccc560"
+  integrity sha512-V0xa0oFIH1GGsGE4vaTsAgiTkrZw3wUVOTAVN/oZU8ptW6oaz4cOdFbqRv+tbienIZq5bG2ok0CRKfUurUtFnA==
   dependencies:
     class-is "^1.1.0"
     multibase "~0.6.0"
@@ -2051,7 +2058,7 @@ libp2p-crypto@~0.16.1:
     tweetnacl "^1.0.0"
     ursa-optional "~0.10.0"
 
-libp2p-crypto@~0.17.0:
+libp2p-crypto@~0.17.0, libp2p-crypto@~0.17.2:
   version "0.17.2"
   resolved "https://registry.yarnpkg.com/libp2p-crypto/-/libp2p-crypto-0.17.2.tgz#a45a93e047fac02ed3391d772749598fdee85c3a"
   integrity sha512-mCzxbmqJhZF6AvyJPg80dyobOd2JJZm9BDQNLAkVFvC8d29tPox+Rub9v+AK+QILj8gzzQUj2W1ZLTNLhC98Xg==
@@ -2422,9 +2429,9 @@ mkdirp@0.5.1, mkdirp@0.x.x, mkdirp@^0.5.0, mkdirp@^0.5.1:
     minimist "0.0.8"
 
 mocha@^7.0.0:
-  version "7.0.0"
-  resolved "https://registry.yarnpkg.com/mocha/-/mocha-7.0.0.tgz#c60d14bf3de9601f549b3ff5be657eb8381c54bf"
-  integrity sha512-CirsOPbO3jU86YKjjMzFLcXIb5YiGLUrjrXFHoJ3e2z9vWiaZVCZQ2+gtRGMPWF+nFhN6AWwLM/juzAQ6KRkbA==
+  version "7.0.1"
+  resolved "https://registry.yarnpkg.com/mocha/-/mocha-7.0.1.tgz#276186d35a4852f6249808c6dd4a1376cbf6c6ce"
+  integrity sha512-9eWmWTdHLXh72rGrdZjNbG3aa1/3NRPpul1z0D979QpEnFdCG0Q5tv834N+94QEN2cysfV72YocQ3fn87s70fg==
   dependencies:
     ansi-colors "3.2.3"
     browser-stdout "1.3.1"
@@ -2930,13 +2937,13 @@ peer-id@^0.12.2, peer-id@~0.12.2:
     multihashes "~0.4.15"
 
 peer-id@^0.13.6, peer-id@~0.13.2, peer-id@~0.13.3, peer-id@~0.13.6:
-  version "0.13.6"
-  resolved "https://registry.yarnpkg.com/peer-id/-/peer-id-0.13.6.tgz#037aa682e0bd8bab389621a85cb84f5918f7d751"
-  integrity sha512-L0BK78lqfODyYjph4yNHmwQGFE28UF9GPn+XFupSFzhYB5kwLeigJLYvmtfE4DkatvC8412Bhoz8U81qhQNhYA==
+  version "0.13.7"
+  resolved "https://registry.yarnpkg.com/peer-id/-/peer-id-0.13.7.tgz#001968fe8d0223f93f724d0cf39ec181adc2c624"
+  integrity sha512-m8LjezhG614dXCFB1WGAytdt3+kKZ0cadAbNq+wOM5dLseevwMt9weLVWAkFRYDtoOrhjlUxscBvj+KtwPm7oA==
   dependencies:
-    cids "~0.7.1"
+    cids "^0.7.3"
     class-is "^1.1.0"
-    libp2p-crypto "~0.17.0"
+    libp2p-crypto "~0.17.2"
     multihashes "~0.4.15"
     protons "^1.0.1"
 
