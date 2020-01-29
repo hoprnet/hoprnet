@@ -60,7 +60,16 @@ declare namespace Signature {
 }
 
 declare namespace SignedChannel {
-  interface Static extends length<Instance> {}
+  interface Static extends length<Instance> {
+    new (
+      coreConnector: any,
+      arr?: Uint8Array,
+      struct?: {
+        signature: Signature.Instance
+        channel: Channel.Instance
+      }
+    )
+  }
 
   interface Instance extends Uint8Array, toU8a {
     channel: Channel.Instance
