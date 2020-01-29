@@ -29,7 +29,7 @@ declare namespace Channel {
 }
 
 declare namespace ChannelBalance {
-  interface Static extends length<Instance> {}
+  interface Static extends toU8a, length<Instance> {}
 
   interface Instance {
     balance: Balance.Instance
