@@ -59,6 +59,16 @@ declare namespace Signature {
   }
 }
 
+declare namespace SignedChannel {
+  interface Static extends length<Instance> {}
+
+  interface Instance extends Uint8Array, toU8a {
+    channel: Channel.Instance
+    signature: Signature.Instance
+    signer: Uint8Array
+  }
+}
+
 declare namespace SignedTicket {
   interface Static extends length<Instance> {}
 
@@ -140,6 +150,7 @@ declare namespace Types {
   interface Moment extends Moment.Instance {}
   interface State extends State.Instance {}
   interface Signature extends Signature.Instance {}
+  interface SignedChannel extends SignedChannel.Instance {}
   interface SignedTicket extends SignedTicket.Instance {}
   interface Ticket extends Ticket.Instance {}
   interface TicketEpoch extends TicketEpoch.Instance {}
@@ -154,11 +165,12 @@ declare interface TypeConstructors {
   Moment: Moment.Static
   State: State.Static
   Signature: Signature.Static
+  SignedChannel: SignedChannel.Static
   SignedTicket: SignedTicket.Static
   Ticket: Ticket.Static
   TicketEpoch: TicketEpoch.Static
 }
 
-export { AccountId, Balance, Channel, ChannelBalance, Hash, Moment, State, Signature, SignedTicket, Ticket, TicketEpoch, Types, toU8a }
+export { AccountId, Balance, Channel, ChannelBalance, Hash, Moment, State, Signature, SignedChannel, SignedTicket, Ticket, TicketEpoch, Types, toU8a }
 
 export default TypeConstructors
