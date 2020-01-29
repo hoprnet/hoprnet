@@ -60,7 +60,7 @@ declare namespace Signature {
     // @TODO: this needs to disappear
     secp256k1Signature: Uint8Array
     // @TODO: this needs to disappear
-    secp256k1Recovery: number
+    secp256k1Recovery: Uint8Array
     // @TODO: this needs to disappear
     sr25519PublicKey: Uint8Array
     // @TODO: this needs to disappear
