@@ -56,6 +56,15 @@ declare namespace Signature {
     onChainSignature: Uint8Array
     signature: Uint8Array
     recovery: number
+    msgPrefix: Uint8Array
+    // @TODO: this needs to disappear
+    secp256k1Signature: Uint8Array
+    // @TODO: this needs to disappear
+    secp256k1Recovery: number
+    // @TODO: this needs to disappear
+    sr25519PublicKey: Uint8Array
+    // @TODO: this needs to disappear
+    sr25519Signature: Uint8Array
   }
 }
 
