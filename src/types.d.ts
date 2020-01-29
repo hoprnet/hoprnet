@@ -29,7 +29,12 @@ declare namespace Channel {
 }
 
 declare namespace ChannelBalance {
-  interface Static extends length<Instance> {}
+  interface Static extends length<Instance> {
+    new (coreConnector: any, struct: {
+      balance: BN,
+      balance_a: BN
+    }): Instance
+  }
 
   interface Instance extends toU8a {
     balance: Balance.Instance
