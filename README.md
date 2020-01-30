@@ -34,6 +34,10 @@ Note that the documentation is under active development and does not always repr
   - [Use HOPR Testnet](#use-hopr-testnet)
 - [Project Structure](#project-structure)
 - [HOPR on Polkadot](#hopr-on-polkadot)
+  - [Dependencies](#dependencies-1)
+  - [Get HOPR](#get-hopr-1)
+  - [Get Substrate module](#get-substrate-module)
+  - [Run HOPR](#run-hopr-1)
 
 # Setup
 
@@ -333,3 +337,67 @@ The most relevant project folders and files are as follows:
 ```
 
 # HOPR on Polkadot
+
+## Dependencies 
+The implementation of HOPR is written in Typescript so you need:
+- [`Node.js`](https://nodejs.org/en/download/) >= 12
+- [`Typescript`](https://www.typescriptlang.org/index.html#download-links)
+- [`yarn`](https://yarnpkg.com/en/docs/install) >= 1.19.0, a package manager for Node.JS
+- [`Rust`](https://rust-lang.org), install by following these [instructions](https://rustup.rs)
+- [`Substrate 1.0`](https://www.parity.io/substrate/), **the installation is described later**.
+
+You might need to setup further operating system dependent, please refer to the wiki links below for more details: 
+- [Ubuntu](../../wiki/Setup#Ubuntu)
+- [macOS](../../wiki/Setup#macOS)
+- [Windows](../../wiki/Setup#Windows)
+
+## Get HOPR
+
+Start by cloning this repository, let `yarn` install the dependencies and change the filename of the example settings file (don't worry, to do a quick local test you don't need to touch the content of the file and default settings work!):
+```
+# clone this branch
+$ git clone -b jigsaw https://github.com/hoprnet/hopr-core.git
+$ cd hopr-core
+
+# in case you are using NVM (Node Versioning Manager), run the following two commands:
+$ nvm install 12
+$ nvm use
+
+$ yarn install
+$ yarn add https://github.com/hoprnet/hopr-core-polkadot
+```
+
+## Get Substrate module
+
+```
+$ cd ..
+$ git clone https://github.com/hoprnet/hopr-polkadot
+$ cd hopr-polkadot
+
+# Install Rust, if not yet happened
+$ curl https://sh.rustup.rs -sSf | sh
+
+# Install required build tools
+$ ./scripts/init.sh
+
+# Build Substrate & Substrate module, this might take some time
+$ cargo build 
+
+# Check if everything is working
+$ cargo test -p hopr-polkadot-runtime
+```
+
+## Run HOPR
+```
+# Start local testnet
+$ cargo run -- --dev
+
+# Start HOPR bootstrap node
+$ ts-node hopr -b -n polkadot
+
+# Start local HOPR testnet (in separate terminals)
+$ ts-node hopr -b -n polkadot 0
+$ ts-node hopr -b -n polkadot 1
+$ ts-node hopr -b -n polkadot 2
+$ ts-node hopr -b -n polkadot 3
+```
