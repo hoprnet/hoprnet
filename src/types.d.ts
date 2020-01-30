@@ -26,7 +26,7 @@ declare namespace Balance {
     /**
      * Decimals of the currency, e.g. 18
      */
-    readonly DECIMAL: number
+    readonly DECIMALS: number
   }
 
   interface Instance extends BN {}
