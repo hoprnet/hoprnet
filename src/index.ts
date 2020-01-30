@@ -100,14 +100,14 @@ export default class Hopr<Chain extends HoprCoreConnectorInstance> extends libp2
    *
    * @param options the parameters
    */
-  static async createNode<Constructor extends HoprCoreConnector>(
+  static async createNode<Constructor extends HoprCoreConnector, Instance extends HoprCoreConnectorInstance>(
     HoprCoreConnector: Constructor,
     options?: HoprOptions & {
       'bootstrapServers'?: PeerInfo[]
       'bootstrap-node'?: boolean
       'provider'?: string
     }
-  ): Promise<Hopr<HoprCoreConnectorInstance>> {
+  ): Promise<Hopr<Instance>> {
     const db = Hopr.openDatabase(`db`, options)
 
     if (options == null) {
@@ -129,20 +129,19 @@ export default class Hopr<Chain extends HoprCoreConnectorInstance> extends libp2
     //     }
     // }
 
-    return new Hopr(
+
+    return new Hopr<Instance>(
       options,
       db,
       options['bootstrap-node'] ? null : options.bootstrapServers,
-      options['bootstrap-node']
-        ? null
-        : await HoprCoreConnector.create(
-            db,
-            {
-              publicKey: options.peerInfo.id.pubKey.marshal(),
-              privateKey: options.peerInfo.id.privKey.marshal()
-            },
-            options['provider']
-          )
+      await HoprCoreConnector.create(
+        db,
+        {
+          publicKey: options.peerInfo.id.pubKey.marshal(),
+          privateKey: options.peerInfo.id.privKey.marshal()
+        },
+        options['provider']
+      ) as Instance
     ).up(options)
   }
 
