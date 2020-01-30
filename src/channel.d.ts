@@ -60,7 +60,7 @@ declare interface Channel {
    */
   getAll<T, R>(
     coreConnector: any,
-    onData: (channel: ChannelInstance, ...props: any[]) => T,
+    onData: (channel: ChannelInstance, ...props: any[]) => Promise<T>,
     onEnd: (promises: Promise<T>[], ...props: any[]) => R,
     ...props: any[]
   ): Promise<R>
