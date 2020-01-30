@@ -62,6 +62,8 @@ declare interface HoprCoreConnectorInstance {
   readonly channel: Channel
 
   readonly CHAIN_NAME: string
+
+  readonly DEFAULT_PROVIDER: string
 }
 
 declare interface HoprCoreConnector {
