@@ -33,9 +33,13 @@ Note that the documentation is under active development and does not always repr
     - [Multi Account Mode](#multi-account-mode)
   - [Use HOPR Testnet](#use-hopr-testnet)
 - [Project Structure](#project-structure)
+- [HOPR on Polkadot](#hopr-on-polkadot)
+
 # Setup
 
 ## Dependencies
+
+**For Hopr on [Polkadot](https://polkadot.network), please follow the instruction [here](#HOPR-on-Polkadot)
 
 The current implementation of HOPR is in JavaScript so you need:
 - [`Node.js`](https://nodejs.org/en/download/) >= 12
@@ -327,3 +331,5 @@ The most relevant project folders and files are as follows:
 ├── hopr.js #  command-line interface
 └── ...
 ```
+
+# HOPR on Polkadot
