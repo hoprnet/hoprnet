@@ -1,4 +1,4 @@
-import { AccountId, Balance, Channel as ChannelType, ChannelBalance, Hash, Moment, SignedTicket, Ticket } from './types'
+import { AccountId, Balance, Channel as ChannelType, ChannelBalance, Hash, Moment, SignedTicket, Ticket, Types } from './types'
 import { HoprCoreConnectorInstance } from '.'
 
 declare interface ChannelInstance {
@@ -17,6 +17,8 @@ declare interface ChannelInstance {
   readonly currentBalanceOfCounterparty: Promise<Balance.Instance>
 
   readonly ticket: Ticket.Static
+
+  readonly counterparty: Types.AccountId
 
   /**
    * Initiates a settlement for this channel.
