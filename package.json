@@ -1,14 +1,24 @@
 {
-  "name": "hopr-core-ethereum",
-  "version": "0.0.1",
-  "repository": "git@github.com:hoprnet/hopr-core-polkadot.git",
+  "name": "@hoprnet/hopr-core-ethereum",
+  "version": "0.0.2",
+  "repository": "git@github.com:hoprnet/hopr-core-ethereum.git",
   "author": "Robert Kiel <robert.kiel@validitylabs.org>",
   "license": "LGPL-3.0-only",
-  "main": "./lib/index.js",
-  "types": "./lib/index.d.ts",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
   "scripts": {
+    "postinstall": "tsc -d -p .",
     "test": "npx mocha",
     "build": "tsc -d -p ."
+  },
+  "files": [
+    "!**/*.spec.ts",
+    "lib/",
+    "hopr.png"
+  ],
+  "engines": {
+    "yarn": "^1.19.2",
+    "node": "^12"
   },
   "dependencies": {
     "peer-id": "^0.13.6",
@@ -17,10 +27,11 @@
     "web3-utils": "^1.2.4"
   },
   "devDependencies": {
+    "@hoprnet/hopr-core-connector-interface": "hoprnet/hopr-core-connector-interface",
+    "@hoprnet/hopr-types": "hoprnet/hopr-types",
     "@types/levelup": "^4.3.0",
     "@types/node": "^12.12.8",
     "@types/secp256k1": "^3.5.0",
-    "hopr-types": "hoprnet/hopr-types",
     "mocha": "^7.0.0",
     "ts-node": "^8.5.4",
     "typescript": "^3.7.2"

@@ -2,6 +2,14 @@
 # yarn lockfile v1
 
 
+"@hoprnet/hopr-core-connector-interface@hoprnet/hopr-core-connector-interface":
+  version "1.0.0"
+  resolved "https://codeload.github.com/hoprnet/hopr-core-connector-interface/tar.gz/63088f3afef91afcbfae006d2c1084b00d67d988"
+
+"@hoprnet/hopr-types@hoprnet/hopr-types":
+  version "0.3.0"
+  resolved "https://codeload.github.com/hoprnet/hopr-types/tar.gz/557f90622ac351b3e43ed4cb2b9ac9ff16930cc4"
+
 "@sindresorhus/is@^0.14.0":
   version "0.14.0"
   resolved "https://registry.yarnpkg.com/@sindresorhus/is/-/is-0.14.0.tgz#9fb3a3cf3132328151f353de4632e01e52102bea"
@@ -1462,10 +1470,6 @@ hmac-drbg@^1.0.0:
     hash.js "^1.0.3"
     minimalistic-assert "^1.0.0"
     minimalistic-crypto-utils "^1.0.1"
-
-hopr-types@hoprnet/hopr-types:
-  version "0.3.0"
-  resolved "https://codeload.github.com/hoprnet/hopr-types/tar.gz/42c4a413e419dc936700b664c255d2856854be6b"
 
 http-cache-semantics@^4.0.0:
   version "4.0.3"

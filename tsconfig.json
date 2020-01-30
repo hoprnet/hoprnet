@@ -1,14 +1,13 @@
 {
   "compilerOptions": {
-    "allowJs": true,
-    "resolveJsonModule": true,
-    "module": "commonjs",
     "esModuleInterop": true,
     "outDir": "./lib",
     "noImplicitAny": true,
-    "moduleResolution": "node",
+    "lib": ["es2020", "dom"],
+    "module": "commonjs",
     "target": "es2019",
-    "strict": true
+    "strict": true,
+    "sourceMap": true
   },
-  "include": ["src/**/*", "node_modules/hopr-types/types/**/*"]
+  "include": ["src/**/*"]
 }
