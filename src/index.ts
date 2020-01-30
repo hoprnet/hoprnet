@@ -38,6 +38,8 @@ type HoprOptions = {
   peerInfo: PeerInfo
   output: (str: string) => void
   id?: number
+  bootstrapServers?: PeerInfo[]
+  bootstrapNode: boolean
 }
 
 export default class Hopr<Chain extends HoprCoreConnectorInstance> extends libp2p {
@@ -102,23 +104,26 @@ export default class Hopr<Chain extends HoprCoreConnectorInstance> extends libp2
    */
   static async createNode<Constructor extends HoprCoreConnector, Instance extends HoprCoreConnectorInstance>(
     HoprCoreConnector: Constructor,
-    options?: HoprOptions & {
-      'bootstrapServers'?: PeerInfo[]
-      'bootstrap-node'?: boolean
-      'provider'?: string
+    options?: Partial<HoprOptions> & {
+      provider?: string
     }
   ): Promise<Hopr<Instance>> {
     const db = Hopr.openDatabase(`db`, options)
 
     if (options == null) {
-      options = {
-        // config: {
-        //     // WebRTC: options.WebRTC
-        // },
-        // peerBook: peerBook,
-        peerInfo: await getPeerInfo({}, db),
-        output: console.log
-      }
+      options = {}
+    }
+
+    if (options.bootstrapNode == null) {
+      options.bootstrapNode = false
+    }
+
+    if (options.output == null) {
+      options.output = console.log
+    }
+
+    if (options.peerInfo == null) {
+      options.peerInfo = await getPeerInfo(options, db)
     }
 
     // peerBook: (cb) => {
@@ -129,20 +134,19 @@ export default class Hopr<Chain extends HoprCoreConnectorInstance> extends libp2
     //     }
     // }
 
-
     return new Hopr<Instance>(
-      options,
+      options as HoprOptions,
       db,
-      options['bootstrap-node'] ? null : options.bootstrapServers,
-      await HoprCoreConnector.create(
+      options.bootstrapNode ? null : options.bootstrapServers,
+      (await HoprCoreConnector.create(
         db,
         {
           publicKey: options.peerInfo.id.pubKey.marshal(),
           privateKey: options.peerInfo.id.privKey.marshal()
         },
         options['provider']
-      ) as Instance
-    ).up(options)
+      )) as Instance
+    ).up(options as HoprOptions)
   }
 
   /**
@@ -182,7 +186,7 @@ export default class Hopr<Chain extends HoprCoreConnectorInstance> extends libp2
 
     registerHandlers(this, options)
 
-    if (!options['bootstrap-node']) {
+    if (!options.bootstrapNode) {
       await this.connectToBootstrapServers()
     } else {
       this.debug(`Available under the following addresses:`)
@@ -332,15 +336,15 @@ export default class Hopr<Chain extends HoprCoreConnectorInstance> extends libp2
     await this.db.put(key, serializePeerBook(this.peerBook))
   }
 
-  static openDatabase(db_dir: string, options?: { id?: number }) {
+  static openDatabase(db_dir: string, options?: { id?: number, bootstrapNode?: boolean }) {
     if (options != null) {
       db_dir += `/${process.env['NETWORK']}/`
-      if (Number.isInteger(options.id) && options['bootstrap-node'] == false) {
+      if (Number.isInteger(options.id) && options.bootstrapNode == false) {
         // For testing ...
         db_dir += `node_${options.id}`
-      } else if (!Number.isInteger(options.id) && options['bootstrap-node'] == false) {
+      } else if (!Number.isInteger(options.id) && options.bootstrapNode != true) {
         db_dir += `node`
-      } else if (!Number.isInteger(options.id) && options['bootstrap-node'] == true) {
+      } else if (!Number.isInteger(options.id) && options.bootstrapNode == true) {
         db_dir += `bootstrap`
       } else {
         throw Error(`Cannot run hopr with index ${options.id} as bootstrap node.`)

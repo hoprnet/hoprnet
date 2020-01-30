@@ -1,5 +1,5 @@
-require('./config')
-
+import dotenv from 'dotenv'
+dotenv.config()
 import readline from 'readline'
 import getopts from 'getopts'
 
@@ -42,7 +42,13 @@ const MINIMAL_STAKE = new BN(toWei('0.10', 'ether'))
 
 const SPLIT_OPERAND_QUERY_REGEX: RegExp = /([\w\-]+)(?:\s+)?([\w\s\-.]+)?/
 
-let node: Hopr<HoprPolkadot>, funds: Types.Balance, ownAddress: Types.AccountId, stakedFunds: Types.Balance, rl: readline.Interface, options, connector: HoprCoreConnector
+let node: Hopr<HoprPolkadot>,
+  funds: Types.Balance,
+  ownAddress: Types.AccountId,
+  stakedFunds: Types.Balance,
+  rl: readline.Interface,
+  options,
+  connector: HoprCoreConnector
 
 /**
  * Parses the given command-line options and returns a configuration object.
@@ -54,7 +60,7 @@ function parseOptions() {
     console.log(
       /* prettier-ignore */
       `\nStart HOPR with:\n` +
-            `-b [--bootstrap-node, bootstrap]\tstarts HOPR as a bootstrap node\n` +
+            `-b [--bootstrapNode, bootstrap]\tstarts HOPR as a bootstrap node\n` +
             `<ID>\t\t\t\t\tstarts HOPR with ID <ID> specified .env\n`
     )
     process.exit(0)
@@ -63,29 +69,34 @@ function parseOptions() {
   const unknownOptions: string[] = []
 
   const options = getopts(process.argv.slice(2), {
-    boolean: ['bootstrap-node'],
+    boolean: ['bootstrapNode'],
+    string: ['network'],
     alias: {
-      b: 'bootstrap-node'
+      b: 'bootstrapNode',
+      n: 'network'
     },
-    unknown: option => {
-      if (option.toLowerCase() == 'bootstrap') {
-        options['bootstrap-node'] = true
-        return false
-      }
+    unknown: (option: string) => {
+      unknownOptions.push(option)
+      return false
+    }
+  })
 
+  delete options.b
+  delete options.n
+
+  if (options._ != null) {
+    options._.forEach((option: string) => {
       try {
         const int = parseInt(option)
 
         if (isFinite(int)) {
           options.id = int
         }
-        return false
       } catch {}
+    })
+  }
 
-      unknownOptions.push(option)
-      return false
-    }
-  })
+  delete options._
 
   if (unknownOptions.length) {
     console.log(`Got unknown option${unknownOptions.length == 1 ? '' : 's'} [${unknownOptions.join(', ')}]`)
@@ -286,7 +297,7 @@ async function stopNode(): Promise<void> {
 }
 
 function runAsBootstrapNode() {
-  if (options['bootstrap-node']) {
+  if (options.bootstrapNode) {
     console.log(`... running as bootstrap node!.`)
   }
 
@@ -421,7 +432,7 @@ process.title = 'hopr'
 
   rl.on('close', stopNode)
 
-  if (options['bootstrap-node']) {
+  if (options.bootstrapNode) {
     return runAsBootstrapNode()
   } else {
     return runAsRegularNode()
@@ -543,10 +554,16 @@ async function open(query?: string): Promise<void> {
   )
 
   let interval: NodeJS.Timeout
-  node.paymentChannels.channel.create(node.paymentChannels, counterparty.pubKey.marshal(), async () => node.paymentChannels.utils.pubKeyToAccountId(await node.interactions.payments.onChainKey.interact(counterparty)), new node.paymentChannels.types.ChannelBalance(node.paymentChannels.api.registry, {
-    balance: new BN(12345),
-    balance_a: new BN(123)
-  }))
+  node.paymentChannels.channel
+    .create(
+      node.paymentChannels,
+      counterparty.pubKey.marshal(),
+      async () => node.paymentChannels.utils.pubKeyToAccountId(await node.interactions.payments.onChainKey.interact(counterparty)),
+      new node.paymentChannels.types.ChannelBalance(node.paymentChannels.api.registry, {
+        balance: new BN(12345),
+        balance_a: new BN(123)
+      })
+    )
     .then(() => {
       console.log(`${chalk.green(`Successfully opened channel`)} ${chalk.yellow(channelId.toString())}`)
     })
@@ -575,7 +592,7 @@ async function openChannels(): Promise<void> {
         }
 
         const peerId = await pubKeyToPeerId(channel.counterparty)
-        
+
         return `${chalk.yellow(u8aToHex(await channel.channelId))} - ${chalk.blue(peerId.toB58String())}`
       },
       (promises: Promise<string>[]) => {
@@ -591,9 +608,8 @@ async function openChannels(): Promise<void> {
     return console.log(chalk.red(err.message))
   }
 
-  console.log(str)
-
   setTimeout(() => {
+    console.log(str)
     rl.prompt()
   })
 }
@@ -651,7 +667,7 @@ async function unstake(query: string): Promise<void> {
   }
 
   try {
-// x    await node.paymentChannels.contractCall(node.paymentChannels.contract.methods.unstakeEther(amount.toString()))
+    // x    await node.paymentChannels.contractCall(node.paymentChannels.contract.methods.unstakeEther(amount.toString()))
   } catch (err) {
     console.log(chalk.red(err.message))
   } finally {
@@ -689,7 +705,6 @@ async function closeAll(): Promise<void> {
 async function getStakedEther(): Promise<BN> {
   try {
     // let state = await node.paymentChannels.contract.methods.states(ownAddress).call({ from: ownAddress })
-
     // console.log(`Current stake: ${chalk.green(fromWei(state.stakedEther, 'ether'))} ETH`)
     // return new BN(state.stakedEther)
   } catch (err) {

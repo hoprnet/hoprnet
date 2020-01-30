@@ -10,11 +10,11 @@ import { NAME } from './constants'
 
 async function getPeerInfo(
   options: {
-    'id'?: number
-    'bootstrap-node'?: boolean
-    'peerId'?: PeerId
-    'peerInfo'?: PeerInfo
-    'addrs'?: Multiaddr[]
+    id?: number
+    bootstrapNode?: boolean
+    peerId?: PeerId
+    peerInfo?: PeerInfo
+    addrs?: Multiaddr[]
   },
   db: LevelUp
 ): Promise<PeerInfo> {
@@ -93,7 +93,7 @@ async function getPeerInfo(
         return privKeyToPeerId(process.env[`DEMO_ACCOUNT_${options.id}_PRIVATE_KEY`])
       } else if (options.peerId != null && PeerId.isPeerId(options.peerId)) {
         return options.peerId
-      } else if (options['bootstrap-node'] == true) {
+      } else if (options.bootstrapNode == true) {
         return privKeyToPeerId(process.env.FUND_ACCOUNT_PRIVATE_KEY)
       }
     }
