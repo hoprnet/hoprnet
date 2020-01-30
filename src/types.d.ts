@@ -17,7 +17,17 @@ declare namespace AccountId {
 }
 
 declare namespace Balance {
-  interface Static extends length<Instance> {}
+  interface Static extends length<Instance> {
+    /**
+     * Abbreviation of the currency, e.g. `ETH`
+     */
+    readonly SYMBOL: string
+
+    /**
+     * Decimals of the currency, e.g. 18
+     */
+    readonly DECIMAL: number
+  }
 
   interface Instance extends BN {}
 }
