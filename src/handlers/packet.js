@@ -10,8 +10,8 @@ const lp = require('pull-length-prefixed')
 const { log, getId, pubKeyToEthereumAddress } = require('../utils')
 
 const { PROTOCOL_STRING } = require('../constants')
-const Packet = require('../packet')
-const Acknowledgement = require('../acknowledgement')
+const Packet = require('../messages/packet')
+const Acknowledgement = require('../messages/acknowledgement')
 
 const PRIVATE_KEY_LENGTH = 32
 
