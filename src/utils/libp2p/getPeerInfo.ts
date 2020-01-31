@@ -1,12 +1,12 @@
 import { keys } from 'libp2p-crypto'
 import { LevelUp } from 'levelup'
-import { deserializeKeyPair, serializeKeyPair, privKeyToPeerId } from './utils'
+import { deserializeKeyPair, serializeKeyPair, privKeyToPeerId } from '..'
 
 import PeerInfo from 'peer-info'
 import PeerId from 'peer-id'
 import Multiaddr from 'multiaddr'
 
-import { NAME } from './constants'
+import { NAME } from '../../constants'
 
 async function getPeerInfo(
   options: {
@@ -16,7 +16,7 @@ async function getPeerInfo(
     peerInfo?: PeerInfo
     addrs?: Multiaddr[]
   },
-  db: LevelUp
+  db?: LevelUp
 ): Promise<PeerInfo> {
   /**
    * Check whether our config was right.
@@ -101,7 +101,7 @@ async function getPeerInfo(
     return getFromDatabase()
   }
 
-  if (db == null && options == null && !(options.peerInfo == null && options.peerId == null)) {
+  if (db == null && options == null && options.peerInfo == null && options.peerId == null) {
     throw Error('Invalid input parameter. Please set a valid peerInfo.')
   }
 
