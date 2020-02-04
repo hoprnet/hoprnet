@@ -1,38 +1,57 @@
-import pull from 'pull-stream'
-import lp from 'pull-length-prefixed'
 import Hopr from '../../'
 import { HoprCoreConnectorInstance } from '@hoprnet/hopr-core-connector-interface'
 
 import { PROTOCOL_ONCHAIN_KEY } from '../../constants'
-import { AbstractInteraction } from '../abstractInteraction'
-import PeerId from 'peer-id'
+import { AbstractInteraction, Duplex } from '../abstractInteraction'
+import PeerInfo from 'peer-info'
+
+import pipe from 'it-pipe'
 
 class OnChainKey<Chain extends HoprCoreConnectorInstance> extends AbstractInteraction<Chain> {
   constructor(public node: Hopr<Chain>) {
-    super(node, PROTOCOL_ONCHAIN_KEY)
+    super(node, [PROTOCOL_ONCHAIN_KEY])
   }
 
-  handle(protocol: any, conn: pull.Sink<Buffer>) {
-    pull(pull.once(this.node.paymentChannels.self.keyPair.publicKey), lp.encode(), conn)
+  handler(struct: { stream: Duplex }) {
+    pipe(
+      /* prettier-ignore */
+      this.node.paymentChannels.self.keyPair.publicKey,
+      struct.stream
+    )
   }
 
-  interact(counterparty: PeerId): Promise<Uint8Array> {
-    return new Promise<Uint8Array>((resolve, reject) => {
-      let resolved = false
-      this.node.dialProtocol(counterparty, PROTOCOL_ONCHAIN_KEY, (err: Error | null, conn: pull.Source<Buffer>) => {
-        pull(
-          conn,
-          lp.decode(),
-          pull.drain((data?: Buffer) => {
-            if (data == null || data.length == 0) {
-              return reject(Error(`received ${data} but expected a public key`))
-            }
+  async interact(counterparty: PeerInfo): Promise<Uint8Array> {
+    let struct: {
+      stream: Duplex
+      protocol: string
+    }
 
-            return resolve(data)
-          })
-        )
-      })
-    })
+    try {
+      struct = await this.node.dialProtocol(counterparty, PROTOCOL_ONCHAIN_KEY)
+    } catch {
+      throw Error(`Tried to get onChain key from party ${counterparty.id.toB58String()} but failed while trying to connect to that node.`)
+    }
+
+    return pipe(
+      /* prettier-ignore */
+      struct.stream,
+      async function(source: any) {
+        const msgs: Uint8Array[] = []
+        for await (const msg of source) {
+          if (msg == null || msg.length == 0) {
+            throw Error(`received ${msg} but expected a public key`)
+          }
+
+          if (msgs.length > 0) {
+            continue
+          } else {
+            msgs.push(msg)
+          }
+        }
+
+        return msgs[0]
+      }
+    )
   }
 }
 

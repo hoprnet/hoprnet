@@ -1,45 +1,52 @@
-import pull from 'pull-stream'
-import lp from 'pull-length-prefixed'
 import Hopr from '../../'
 import { HoprCoreConnectorInstance, Types } from '@hoprnet/hopr-core-connector-interface'
 
-import { AbstractInteraction } from '../abstractInteraction'
+import pipe from 'it-pipe'
+
+import { AbstractInteraction, Duplex } from '../abstractInteraction'
 
 import { PROTOCOL_PAYMENT_CHANNEL } from '../../constants'
-import PeerId from 'peer-id'
+import PeerInfo from 'peer-info'
 
 class Opening<Chain extends HoprCoreConnectorInstance> extends AbstractInteraction<Chain> {
   constructor(public node: Hopr<Chain>) {
-    super(node, PROTOCOL_PAYMENT_CHANNEL)
+    super(node, [PROTOCOL_PAYMENT_CHANNEL])
   }
 
-  handle(protocol: any, conn: pull.Through<Buffer, Buffer>) {
-    pull(
-      conn,
-      lp.decode(),
-      pull.asyncMap((data: Buffer, cb: (err: Error | null, result?: Buffer) => void) => {
-        this.node.paymentChannels.channel.handleOpeningRequest(this.node.paymentChannels, data).then(
-          (data: Uint8Array) => cb(null, Buffer.from(data)),
-          (err: Error) => cb(err)
-        )
-      }),
-      lp.encode(),
-      conn
+  async handler(struct: { stream: Duplex }) {
+    pipe(
+      /** prettier-ignore */
+      struct.stream,
+      this.node.paymentChannels.channel.handleOpeningRequest(this.node),
+      struct.stream
     )
   }
 
-  interact(counterparty: PeerId, channelBalance: Types.ChannelBalance): Promise<Types.SignedChannel> {
-    return new Promise<Types.SignedChannel>((resolve, reject) => {
-        this.node.dialProtocol(counterparty, PROTOCOL_PAYMENT_CHANNEL, (err: Error | null, conn: pull.Source<Buffer>) => {
-            pull(
-                pull.once(channelBalance.toU8a()),
-                lp.encode(),
-                conn,
-                lp.decode(),
-                pull.drain((data: Buffer) => resolve(new this.node.paymentChannels.types.SignedChannel()))
-            )
-        })
-    })
+  async interact(counterparty: PeerInfo, channelBalance: Types.ChannelBalance): Promise<Types.SignedChannel> {
+    let struct: {
+      stream: Duplex
+      protocol: string
+    }
+
+    try {
+      struct = await this.node.dialProtocol(counterparty, this.protocols[0])
+    } catch (err) {
+      console.log(struct)
+      throw Error(`Tried to open a payment channel but could not connect to ${counterparty.id.toB58String()}. Error was: ${err.message}`)
+    }
+
+    return pipe(
+      /* prettier-ignore */
+      [channelBalance.toU8a()],
+      struct.stream,
+      async function collect(source: any) {
+        let msgs: Uint8Array[] = []
+        for await (const msg of source) {
+          msgs.push(msg)
+        }
+        return msgs
+      }
+    )
   }
 }
 
