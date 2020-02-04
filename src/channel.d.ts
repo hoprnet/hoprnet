@@ -16,7 +16,7 @@ declare interface ChannelInstance {
 
   readonly currentBalanceOfCounterparty: Promise<Balance.Instance>
 
-  readonly ticket: Ticket.Static
+  readonly ticket: Ticket.Static<any, any>
 
   readonly counterparty: Types.AccountId
 
@@ -32,13 +32,13 @@ declare interface ChannelInstance {
   getPreviousChallenges(): Promise<Hash.Instance>
 }
 
-declare interface Channel {
+declare interface Channel<ConcreteConnector extends HoprCoreConnectorInstance> {
   /**
    * Creates a Channel instance from the database.
    * @param counterparty AccountId of the counterparty
    * @param props additional arguments
    */
-  create<ConcreteConnector extends HoprCoreConnectorInstance>(
+  create(
     coreConnector: ConcreteConnector,
     offChainCounterparty: Uint8Array,
     getOnChainPublicKey: (counterparty: Uint8Array) => Promise<Uint8Array>,
@@ -60,7 +60,7 @@ declare interface Channel {
    * @param onData applied on all channel instances
    * @param onEnd composes at the end the received data
    */
-  getAll<T, R, ConcreteConnector extends HoprCoreConnectorInstance>(
+  getAll<T, R>(
     coreConnector: ConcreteConnector,
     onData: (channel: ChannelInstance, ...props: any[]) => Promise<T>,
     onEnd: (promises: Promise<T>[], ...props: any[]) => R,
@@ -72,14 +72,14 @@ declare interface Channel {
    * each of them.
    * @param props additional arguments
    */
-  closeChannels<ConcreteConnector extends HoprCoreConnectorInstance>(coreConnector: ConcreteConnector, ...props: any[]): Promise<Balance.Instance>
+  closeChannels(coreConnector: ConcreteConnector, ...props: any[]): Promise<Balance.Instance>
 
   /**
    * Handles a channel opening request.
    * @notice Takes the `coreConnector` instance and returns an async iterable duplex stream.
    * @param coreConnector coreConnector instance
    */
-  handleOpeningRequest<ConcreteConnector extends HoprCoreConnectorInstance>(coreConnector: ConcreteConnector, ...props: any[]): (source: AsyncIterable<Uint8Array>) => AsyncIterator<Uint8Array>
+  handleOpeningRequest(coreConnector: ConcreteConnector, ...props: any[]): (source: AsyncIterable<Uint8Array>) => AsyncIterator<Uint8Array>
 }
 
 export { ChannelInstance }

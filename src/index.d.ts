@@ -59,7 +59,7 @@ declare interface HoprCoreConnectorInstance {
   /**
    * Encapsulates payment channel between nodes.
    */
-  readonly channel: Channel
+  readonly channel: Channel<any>
 
   readonly CHAIN_NAME: string
 }

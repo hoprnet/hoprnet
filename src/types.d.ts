@@ -95,11 +95,11 @@ declare namespace SignedChannel  {
 }
 
 declare namespace SignedTicket {
-  interface Static extends length<Instance> {}
+  interface Static<ConcreteSignature extends Signature.Instance, ConcreteChannel extends ChannelInstance, ConcreteTicket extends Ticket.Instance> extends length<Instance<ConcreteSignature, ConcreteChannel, ConcreteTicket>> {}
 
-  interface Instance extends Uint8Array {
-    ticket: Ticket.Instance
-    signature: Signature.Instance
+  interface Instance<ConcreteSignature extends Signature.Instance, ConcreteChannel extends ChannelInstance, ConcreteTicket extends Ticket.Instance> extends Uint8Array {
+    ticket: ConcreteTicket
+    signature: ConcreteChannel
     signer: Uint8Array
   }
 }
@@ -111,27 +111,27 @@ declare namespace State {
 }
 
 declare namespace Ticket {
-  interface Static extends length<Instance> {
+  interface Static<ConcreteChannel extends ChannelInstance, ConcreteSignature extends Signature.Instance> extends length<Instance> {
     /**
      * Constructs a ticket to use in a probabilistic payment channel.
      * @param amount amount of funds to include
      * @param challenge a challenge that has to be solved be the redeemer
      */
     create(
-      channel: any,
+      channel: ConcreteChannel,
       amount: Balance.Instance,
       challenge: Hash.Instance,
       privKey: Uint8Array,
       pubKey: Uint8Array,
       ...props: any[]
-    ): Promise<SignedTicket.Instance>
+    ): Promise<SignedTicket.Instance<ConcreteSignature, ConcreteChannel, any>>
 
     /**
      * Checks a previously issued ticket for its validity.
      * @param signedTicket a previously issued ticket to check
      * @param props additional arguments
      */
-    verify(channel: any, signedTicket: SignedTicket.Instance, ...props: any[]): Promise<boolean>
+    verify(channel: ConcreteChannel, signedTicket: SignedTicket.Instance<ConcreteSignature, ConcreteChannel, any>, ...props: any[]): Promise<boolean>
 
     /**
      * BIG TODO
@@ -145,7 +145,7 @@ declare namespace Ticket {
      * Submits a signed to the blockchain.
      * @param signedTicket a signed ticket
      */
-    submit(channel: any, signedTicket: SignedTicket.Instance, ...props: any[]): Promise<void>
+    submit(channel: ConcreteChannel, signedTicket: SignedTicket.Instance<ConcreteSignature, ConcreteChannel, any>, ...props: any[]): Promise<void>
   }
 
   interface Instance extends toU8a {
@@ -176,7 +176,7 @@ declare namespace Types {
   interface State extends State.Instance {}
   interface Signature extends Signature.Instance {}
   interface SignedChannel extends SignedChannel.Instance<any, any> {}
-  interface SignedTicket extends SignedTicket.Instance {}
+  interface SignedTicket extends SignedTicket.Instance<any, any, any> {}
   interface Ticket extends Ticket.Instance {}
   interface TicketEpoch extends TicketEpoch.Instance {}
 }
@@ -191,8 +191,8 @@ declare interface TypeConstructors {
   State: State.Static
   Signature: Signature.Static
   SignedChannel: SignedChannel.Static<any, any>
-  SignedTicket: SignedTicket.Static
-  Ticket: Ticket.Static
+  SignedTicket: SignedTicket.Static<any, any, any>
+  Ticket: Ticket.Static<any, any>
   TicketEpoch: TicketEpoch.Static
 }
 
