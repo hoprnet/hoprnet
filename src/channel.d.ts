@@ -1,4 +1,4 @@
-import { AccountId, Balance, Channel as ChannelType, ChannelBalance, Hash, Moment, SignedTicket, Ticket, Types } from './types'
+import { AccountId, Balance, Channel as ChannelType, ChannelBalance, Hash, Moment, Signature, SignedTicket, Ticket, Types, SignedChannel } from './types'
 import { HoprCoreConnectorInstance } from '.'
 
 declare interface ChannelInstance {
@@ -38,8 +38,8 @@ declare interface Channel {
    * @param counterparty AccountId of the counterparty
    * @param props additional arguments
    */
-  create(
-    coreConnector: any,
+  create<ConcreteConnector extends HoprCoreConnectorInstance>(
+    coreConnector: ConcreteConnector,
     offChainCounterparty: Uint8Array,
     getOnChainPublicKey: (counterparty: Uint8Array) => Promise<Uint8Array>,
     channelBalance?: ChannelBalance.Instance,
@@ -60,8 +60,8 @@ declare interface Channel {
    * @param onData applied on all channel instances
    * @param onEnd composes at the end the received data
    */
-  getAll<T, R>(
-    coreConnector: any,
+  getAll<T, R, ConcreteConnector extends HoprCoreConnectorInstance>(
+    coreConnector: ConcreteConnector,
     onData: (channel: ChannelInstance, ...props: any[]) => Promise<T>,
     onEnd: (promises: Promise<T>[], ...props: any[]) => R,
     ...props: any[]
@@ -72,14 +72,14 @@ declare interface Channel {
    * each of them.
    * @param props additional arguments
    */
-  closeChannels(coreConnector: any, ...props: any[]): Promise<Balance.Instance>
+  closeChannels<ConcreteConnector extends HoprCoreConnectorInstance>(coreConnector: ConcreteConnector, ...props: any[]): Promise<Balance.Instance>
 
   /**
-   * Handles a channel opening request. Returns the response to the request.
+   * Handles a channel opening request.
+   * @notice Takes the `coreConnector` instance and returns an async iterable duplex stream.
    * @param coreConnector coreConnector instance
-   * @param input received input
    */
-  handleOpeningRequest(coreConnector: any, input: Uint8Array): Promise<Uint8Array>
+  handleOpeningRequest<ConcreteConnector extends HoprCoreConnectorInstance>(coreConnector: ConcreteConnector, ...props: any[]): (source: AsyncIterable<Uint8Array>) => AsyncIterator<Uint8Array>
 }
 
 export { ChannelInstance }
