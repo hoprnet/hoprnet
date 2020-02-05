@@ -6,4 +6,4 @@ HOPR is a privacy-preserving messaging protocol that incentivizes users to parti
 
 ## hopr-core-ethereum
 
-This repository includes the connector between the Ethereum on-chain logic and `hopr-core` and implements `hopr-core-connector-interface`.
+This repository includes the connector between the Ethereum on-chain logic and [`hopr-core`](https://github.com/hoprnet/hopr-core) and implements [`hopr-core-connector-interface`](https://github.com/hoprnet/hopr-core-connector-interface).
