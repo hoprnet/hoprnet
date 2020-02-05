@@ -1,27 +1,71 @@
 import chalk from 'chalk'
 import PeerId from 'peer-id'
 import PeerInfo from 'peer-info'
-
-import Queue = require('promise-queue')
-
 import { HoprCoreConnectorInstance } from '@hoprnet/hopr-core-connector-interface'
 
-import { randomSubset, pubKeyToPeerId } from '../utils'
-import { MAX_HOPS, PROTOCOL_CRAWLING, CRAWLING_RESPONSE_NODES } from '../constants'
+import { randomSubset, pubKeyToPeerId, randomInteger } from '../utils'
+import { MAX_HOPS, CRAWLING_RESPONSE_NODES } from '../constants'
 import Hopr from '..'
 
 const MAX_PARALLEL_REQUESTS = 4
-const QUEUE_MAX_SIZE = Infinity
 
 class Crawler<Chain extends HoprCoreConnectorInstance> {
   constructor(public node: Hopr<Chain>) {}
 
-  async crawl(comparator: (peerInfo: PeerInfo) => boolean = () => true) {
-    const queue = new Queue(MAX_PARALLEL_REQUESTS, QUEUE_MAX_SIZE)
-    let finished = false,
-      first = true
+  async crawl(comparator: (peerInfo: PeerInfo) => boolean = () => true): Promise<void> {
+    const errors: Error[] = []
 
-    const errors = []
+    // fast non-inclusion check
+    const contactedPeerIds = new Set<string>() // @TODO could be replaced by a bloom filter
+
+    // enumerable
+    const unContactedPeerIdArray: PeerId[] = [] // @TODO add new peerIds lazily
+    // fast non-inclusion check
+    const unContactedPeerIdSet = new Set<string>() // @TODO could be replaced by a bloom filter
+
+    let before = 0 // initialiser
+    for (const peerInfo of this.node.peerStore.peers.values()) {
+      unContactedPeerIdArray.push(peerInfo.id)
+
+      if (comparator(peerInfo)) {
+        before += 1
+      }
+    }
+
+    /**
+     * Get all known nodes that match our requirements.
+     */
+    const getCurrentNodes = () => {
+      let currentNodes = 0
+
+      for (const peerInfo of this.node.peerStore.peers.values()) {
+        if (comparator(peerInfo) == true) {
+          currentNodes += 1
+        }
+      }
+
+      return currentNodes
+    }
+
+    /**
+     * Check if we're finished
+     */
+    const isDone = (): boolean => {
+      return contactedPeerIds.size >= MAX_HOPS && getCurrentNodes() >= MAX_HOPS
+    }
+    /**
+     * Returns a random node and removes it from the array.
+     */
+    const getRandomNode = (): PeerId => {
+      const index = randomInteger(0, unContactedPeerIdArray.length)
+
+      return unContactedPeerIdArray.splice(index, 1)[0]
+    }
+
+    /**
+     * Stores the crawling "threads"
+     */
+    const promises = []
 
     /**
      * Connect to another peer and returns a promise that resolves to all received nodes
@@ -29,95 +73,101 @@ class Crawler<Chain extends HoprCoreConnectorInstance> {
      *
      * @param peerId PeerId of the peer that is queried
      */
-    async function queryNode(peerId: PeerId) {
-      let peerIds = await this.node.interactions.network.crawler.interact(peerId)
+    const queryNode = async (peerId: PeerId): Promise<void> => {
+      let peerIds: PeerId[]
 
-      const set = new Set<string>()
-      peerIds = peerIds.reduce((acc: PeerId[], peerId: PeerId) => {
-        if (peerId.isEqual(this.node.peerInfo.id)) {
+      if (isDone()) {
+        return
+      }
+
+      // Start additional "threads"
+      while (promises.length < MAX_PARALLEL_REQUESTS && unContactedPeerIdArray.length > 0) {
+        promises.push(queryNode(getRandomNode()))
+      }
+
+      unContactedPeerIdSet.delete(peerId.toB58String())
+      contactedPeerIds.add(peerId.toB58String())
+
+      try {
+        peerIds = await this.node.interactions.network.crawler.interact(peerId)
+      } catch (err) {
+        errors.push(err)
+      } finally {
+        for (let i = 0; i < peerIds.length; i++) {
+          if (peerIds[i].isEqual(this.node.peerInfo.id)) {
+            continue
+          }
+
+          if (!contactedPeerIds.has(peerIds[i].toB58String()) && !unContactedPeerIdSet.has(peerIds[i].toB58String())) {
+            unContactedPeerIdSet.add(peerIds[i].toB58String())
+            unContactedPeerIdArray.push(peerIds[i])
+          }
+        }
+      }
+
+      if (unContactedPeerIdArray.length > 0) {
+        return queryNode(getRandomNode())
+      } else {
+        return
+      }
+    }
+
+    for (let i = 0; i < MAX_PARALLEL_REQUESTS; i++) {
+      if (unContactedPeerIdArray.length > 0) {
+        promises.push(queryNode(getRandomNode()))
+      }
+    }
+
+    if (!isDone()) {
+      await Promise.all(promises)
+    }
+
+    const addPromises = []
+
+    const addPromiseFactory = (peerId: string) => {
+      addPromises.push(PeerInfo.create(PeerId.createFromB58String(peerId)).then((peerInfo: PeerInfo) => this.node.peerStore.put(peerInfo)))
+    }
+
+    unContactedPeerIdSet.forEach(addPromiseFactory)
+    contactedPeerIds.forEach(addPromiseFactory)
+
+    await Promise.all(addPromises)
+
+    if (errors.length > 0) {
+      this.node.log(
+        `Errors while crawling:${errors.reduce((acc, err) => {
+          acc += `\n\t${chalk.red(err.message)}`
           return acc
-        }
-
-        if (!set.has(peerId.toB58String()) && !this.node.peerBook.has(peerId.toB58String())) {
-          acc.push(peerId)
-          this.node.peerBook.put(new PeerInfo(peerId))
-          set.add(peerId.toB58String())
-        }
-      }, [])
+        }, '')}`
+      )
     }
 
-    /**
-     * Decides whether we have enough peers to build a path and initiates some queries
-     * if that's not the case.
-     *
-     * @param peerIds array of peerIds
-     */
-    function processResults(peerIds: PeerId[]) {
-      const now = this.node.peerBook.getAllArray().filter(comparator).length
+    const now = getCurrentNodes()
+    let contactedNodes = ``
+    contactedPeerIds.forEach((peerId: string) => {
+      contactedNodes += `\n        ${peerId}`
+    })
+    this.node.log(
+      `Crawling results:\n    ${chalk.yellow(`contacted nodes:`)}: ${contactedNodes}\n    ${chalk.green(`new nodes`)}: ${now - before} node${
+        now - before == 1 ? '' : 's'
+      }\n    total: ${now} node${now == 1 ? '' : 's'}`
+    )
 
-      if (finished) {
-        return
-      }
-
-      if (!first && now >= MAX_HOPS) {
-        if (errors.length > 0) {
-          this.node.log(
-            `Errors while crawling:${errors.reduce((acc, err) => {
-              acc += `\n${chalk.red(err.message)}`
-              return acc
-            }, '')}`
-          )
-        }
-
-        finished = true
-
-        this.node.log(`Received ${now - before} new node${now - before == 1 ? '' : 's'}.`)
-        this.node.log(`Now holding peer information of ${now} node${now == 1 ? '' : 's'} in the network.`)
-
-        return
-      }
-
-      first = false
-
-      if (peerIds.length > 0) {
-        const subset = randomSubset(peerIds, Math.min(peerIds.length, MAX_PARALLEL_REQUESTS))
-
-        subset.forEach((peerId: PeerId) => {
-          queue
-            .add(() => queryNode(peerId))
-            .then((peerIds: PeerId[]) => {
-              processResults(peerIds)
-            })
-            .catch((err: Error) => {
-              errors.push(err)
-              return processResults([])
-            })
-        })
-      }
-
-      if (queue.getPendingLength() == 0 && queue.getQueueLength() == 0) {
-        if (errors.length > 0) {
-          this.node.log(`Errors while crawling:${errors.reduce((acc, err) => `\n${chalk.red(err.message)}`, '')}`)
-        }
-
-        this.node.log(`Received ${now - before} new node${now - before == 1 ? '' : 's'}.`)
-        this.node.log(`Now holding peer information of ${now} node${now == 1 ? '' : 's'} in the network.`)
-
-        throw Error('Unable to find enough other nodes in the network.')
-      }
+    if (!isDone()) {
+      throw Error(`Unable to find enough other nodes in the network.`)
     }
-
-    const before = this.node.peerBook.getAllArray().filter(comparator).length
-
-    let nodes = this.node.peerBook.getAllArray().map(peerInfo => peerInfo.id)
-
-    processResults(nodes)
   }
 
-  handleCrawlRequest<Chain extends HoprCoreConnectorInstance>(CrawlResponse: any, Status: any) {
+  handleCrawlRequest(CrawlResponse: any, Status: any) {
+    let self = this
     return (function*() {
-      const peers = this.node.peerBook.getAllArray()
-      const filter = (peerInfo: PeerInfo) => peerInfo.id.pubKey && !peerInfo.id.isEqual(this.node.peerInfo.id)
+      const peers = []
+
+      for (const peerInfo of self.node.peerStore.peers.values()) {
+        peers.push(peerInfo)
+      }
+
+      const filter = (peerInfo: PeerInfo) => peerInfo.id.pubKey && !peerInfo.id.isEqual(self.node.peerInfo.id)
 
       const amountOfNodes = Math.min(CRAWLING_RESPONSE_NODES, peers.length)
 

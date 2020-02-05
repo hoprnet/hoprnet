@@ -22,9 +22,8 @@ class Crawler<Chain extends HoprCoreConnectorInstance> extends AbstractInteracti
   }
 
   async handler(struct: { stream: Duplex }) {
-    pipe(
+    await pipe(
       /* prettier-ignore */
-      struct.stream,
       this.node.network.crawler.handleCrawlRequest(CrawlResponse, Status),
       struct.stream
     )
@@ -40,8 +39,8 @@ class Crawler<Chain extends HoprCoreConnectorInstance> extends AbstractInteracti
       struct = await this.node.dialProtocol(counterparty, this.protocols[0])
     } catch (err) {
       try {
-        struct = await this.node.peerRouting.findPeer(counterparty).then((peerInfo: PeerInfo) => this.node.dialProtocol(peerInfo, PROTOCOL_CRAWLING))
-      } catch (err) {
+        struct = await this.node.peerRouting.findPeer(counterparty).then((peerInfo: PeerInfo) => this.node.dialProtocol(peerInfo, this.protocols[0]))
+      } catch {
         return []
       }
     }
@@ -54,7 +53,7 @@ class Crawler<Chain extends HoprCoreConnectorInstance> extends AbstractInteracti
         for await (const encodedResponse of source) {
           let decodedResponse: any
           try {
-            decodedResponse = CrawlResponse.decode(encodedResponse)
+            decodedResponse = CrawlResponse.decode(encodedResponse.slice())
           } catch {
             continue
           }
@@ -63,7 +62,7 @@ class Crawler<Chain extends HoprCoreConnectorInstance> extends AbstractInteracti
             continue
           }
 
-          peerIds.push(Promise.all(decodedResponse.pubKeys.map((pubKey: Uint8Array) => pubKeyToPeerId(pubKey))))
+          peerIds.push(...(await Promise.all(decodedResponse.pubKeys.map((pubKey: Uint8Array) => pubKeyToPeerId(pubKey)))))
         }
 
         return peerIds
