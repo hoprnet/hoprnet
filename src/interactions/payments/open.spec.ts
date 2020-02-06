@@ -54,14 +54,16 @@ describe('should perform an opening interaction', function() {
 
     Bob.paymentChannels = ({
       channel: {
-        handleOpeningRequest: (source: any) => {
-          return (async function*() {
-            for await (const chunk of source) {
-              assert(u8aEquals(Uint8Array.from(chunk.slice(0, 32)), testArray))
+        handleOpeningRequest(_: any) {
+          return (source: any) => {
+            return (async function*() {
+              for await (const chunk of source) {
+                assert(u8aEquals(Uint8Array.from(chunk.slice(0, 32)), testArray))
 
-              yield response
-            }
-          })()
+                yield response
+              }
+            })()
+          }
         }
       }
     } as unknown) as HoprCoreConnectorInstance
@@ -79,4 +81,11 @@ describe('should perform an opening interaction', function() {
       )
     )
   })
+
+  // after(async function () {
+  //   await Promise.all([
+  //     Alice.stop(),
+  //     Bob.stop()
+  //   ])
+  // })
 })

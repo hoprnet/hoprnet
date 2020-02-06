@@ -1,11 +1,6 @@
 import Hopr from '..'
 import { HoprCoreConnectorInstance } from '@hoprnet/hopr-core-connector-interface'
 
-import PeerId from 'peer-id'
-import PeerInfo from 'peer-info'
-import Multiaddr from 'multiaddr'
-
-
 export type Sink = (source: AsyncIterable<Uint8Array>) => void
 
 export type Source = AsyncIterator<Uint8Array>
@@ -28,7 +23,7 @@ abstract class AbstractInteraction<Chain extends HoprCoreConnectorInstance> {
 
   abstract handler(struct: { stream: Duplex }): void
 
-  abstract interact(counterparty: PeerInfo | PeerId | Multiaddr, ...props: any[]): any
+  abstract interact(...props: any[]): any
 }
 
 export { AbstractInteraction }

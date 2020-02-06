@@ -3,17 +3,17 @@ import { HoprCoreConnectorInstance, Types } from '@hoprnet/hopr-core-connector-i
 
 import pipe from 'it-pipe'
 
-import { AbstractInteraction, Duplex } from '../abstractInteraction'
+import { AbstractInteraction } from '../abstractInteraction'
 
 import { PROTOCOL_PAYMENT_CHANNEL } from '../../constants'
 import PeerInfo from 'peer-info'
 
 class Opening<Chain extends HoprCoreConnectorInstance> extends AbstractInteraction<Chain> {
-  constructor(public node: Hopr<Chain>) {
+  constructor(node: Hopr<Chain>) {
     super(node, [PROTOCOL_PAYMENT_CHANNEL])
   }
 
-  async handler(struct: { stream: Duplex }) {
+  async handler(struct: { stream: any }) {
     pipe(
       /** prettier-ignore */
       struct.stream,
@@ -24,7 +24,7 @@ class Opening<Chain extends HoprCoreConnectorInstance> extends AbstractInteracti
 
   async interact(counterparty: PeerInfo, channelBalance: Types.ChannelBalance): Promise<Types.SignedChannel> {
     let struct: {
-      stream: Duplex
+      stream: any
       protocol: string
     }
 
@@ -42,9 +42,13 @@ class Opening<Chain extends HoprCoreConnectorInstance> extends AbstractInteracti
       async function collect(source: any) {
         let msgs: Uint8Array[] = []
         for await (const msg of source) {
-          msgs.push(msg)
+          if (msgs.length > 0) {
+            continue
+          } else {
+            msgs.push(msg)
+          }
         }
-        return msgs
+        return msgs[0]
       }
     )
   }

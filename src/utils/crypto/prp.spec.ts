@@ -1,4 +1,5 @@
 import { PRP } from './prp'
+import { u8aEquals } from '../u8a'
 import assert from 'assert'
 import { randomBytes } from 'crypto'
 
@@ -15,10 +16,7 @@ describe(`test Pseudo-Random Generator`, function() {
     )
 
     const plaintext = prp.inverse(ciphertext)
-    assert(
-      plaintext.every((value: number, index: number) => value == test[index]),
-      `'encryption' and 'decryption' should yield the plaintext`
-    )
+    assert(u8aEquals(plaintext, test), `'encryption' and 'decryption' should yield the plaintext`)
   })
 
   it(`should 'decrypt' and 'encrypt' a U8a`, function() {

@@ -12,7 +12,7 @@ import PeerId from 'peer-id'
  * and allows that party to compute the key that is necessary to redeem
  * the previously received transaction.
  */
-export default class Acknowledgement<Chain extends HoprCoreConnectorInstance> extends Uint8Array {
+class Acknowledgement<Chain extends HoprCoreConnectorInstance> extends Uint8Array {
   private paymentChannels: Chain
 
   constructor(
@@ -109,7 +109,12 @@ export default class Acknowledgement<Chain extends HoprCoreConnectorInstance> ex
    * @param derivedSecret the secret that is used to create the second key half
    * @param peerId contains private key
    */
-  static async create<Chain extends HoprCoreConnectorInstance>(hoprCoreConnector: Chain, challenge: Challenge<Chain>, derivedSecret: Uint8Array, peerId: PeerId): Promise<Acknowledgement<Chain>> {
+  static async create<Chain extends HoprCoreConnectorInstance>(
+    hoprCoreConnector: Chain,
+    challenge: Challenge<Chain>,
+    derivedSecret: Uint8Array,
+    peerId: PeerId
+  ): Promise<Acknowledgement<Chain>> {
     const ack = new Acknowledgement(hoprCoreConnector, new Uint8Array(Acknowledgement.SIZE(hoprCoreConnector)))
 
     ack.key = deriveTicketKey(derivedSecret)
@@ -125,3 +130,5 @@ export default class Acknowledgement<Chain extends HoprCoreConnectorInstance> ex
     return KEY_LENGTH + Challenge.SIZE(hoprCoreConnector) + hoprCoreConnector.types.Signature.SIZE
   }
 }
+
+export { Acknowledgement }

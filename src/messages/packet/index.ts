@@ -8,7 +8,7 @@ const RELAY_FEE = 10
 function fromWei(arg: any, unit: any) {
   return arg.toString()
 }
-import { pubKeyToPeerId, u8aXOR, u8aConcat } from '../../utils'
+import { pubKeyToPeerId, u8aXOR, u8aConcat, u8aEquals } from '../../utils'
 
 import { Header, deriveTicketKey, deriveTagParameters } from './header'
 import { Challenge } from './challenge'
@@ -30,10 +30,10 @@ export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
   private _senderPeerId: PeerId
   private oldChallenge: Challenge<Chain>
 
-  hoprCoreConnector: Chain
+  private node: Hopr<Chain>
 
   constructor(
-    hoprCoreConnector: Chain,
+    node: Hopr<Chain>,
     arr?: Uint8Array,
     struct?: {
       header: Header<Chain>
@@ -50,9 +50,8 @@ export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
       throw Error(`Invalid constructor parameters.`)
     }
 
-    this.hoprCoreConnector = hoprCoreConnector
+    this.node = node
   }
-
 
   subarray(begin?: number, end?: number): Uint8Array {
     return new Uint8Array(this.buffer, begin, end != null ? end - begin : undefined)
@@ -63,15 +62,15 @@ export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
   }
 
   get ticket(): Types.SignedTicket {
-    return new this.hoprCoreConnector.types.SignedTicket(this.subarray(Header.SIZE, Header.SIZE + this.hoprCoreConnector.types.Ticket.SIZE))
+    return new this.node.paymentChannels.types.SignedTicket(this.subarray(Header.SIZE, Header.SIZE + this.node.paymentChannels.types.Ticket.SIZE))
   }
 
   get challenge(): Challenge<Chain> {
     return new Challenge<Chain>(
-      this.hoprCoreConnector,
+      this.node.paymentChannels,
       this.subarray(
-        Header.SIZE + this.hoprCoreConnector.types.Ticket.SIZE,
-        Header.SIZE + this.hoprCoreConnector.types.Ticket.SIZE + Challenge.SIZE(this.hoprCoreConnector)
+        Header.SIZE + this.node.paymentChannels.types.Ticket.SIZE,
+        Header.SIZE + this.node.paymentChannels.types.Ticket.SIZE + Challenge.SIZE(this.node.paymentChannels)
       )
     )
   }
@@ -79,8 +78,8 @@ export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
   get message(): Message {
     return new Message(
       this.subarray(
-        Header.SIZE + this.hoprCoreConnector.types.Ticket.SIZE + Challenge.SIZE(this.hoprCoreConnector),
-        Header.SIZE + this.hoprCoreConnector.types.Ticket.SIZE + Challenge.SIZE(this.hoprCoreConnector) + Message.SIZE
+        Header.SIZE + this.node.paymentChannels.types.Ticket.SIZE + Challenge.SIZE(this.node.paymentChannels),
+        Header.SIZE + this.node.paymentChannels.types.Ticket.SIZE + Challenge.SIZE(this.node.paymentChannels) + Message.SIZE
       ),
       true
     )
@@ -100,7 +99,7 @@ export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
    *
    * @param node the node itself
    * @param msg the message that is sent through the network
-   * @param {PeerId[]} path array of peerId that determines the route that
+   * @param path array of peerId that determines the route that
    * the packet takes
    */
   static async create<Chain extends HoprCoreConnectorInstance>(node: Hopr<Chain>, msg: Uint8Array, path: PeerId[]) {
@@ -144,7 +143,7 @@ export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
       node.peerInfo.id.pubKey.marshal()
     )
 
-    return new Packet(node.paymentChannels, null, {
+    return new Packet(node, null, {
       header,
       ticket,
       challenge,
@@ -185,12 +184,12 @@ export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
   /**
    * Checks the packet and transforms it such that it can be send to the next node.
    *
-   * @param {Hopr} node the node itself
+   * @param node the node itself
    */
   async forwardTransform(node: Hopr<Chain>): Promise<Packet<Chain>> {
-    this.header.deriveSecret(node.peerInfo.id.privKey.marshal())
+    this.header.deriveSecret(this.node.peerInfo.id.privKey.marshal())
 
-    if (await this.hasTag(node.db)) {
+    if (await this.hasTag(this.node.db)) {
       throw Error('General error.')
     }
 
@@ -202,9 +201,9 @@ export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
 
     const [sender, target] = await Promise.all([this.getSenderPeerId(), this.getTargetPeerId()])
 
-    const channelId = await this.hoprCoreConnector.utils.getId(
-      await this.hoprCoreConnector.utils.pubKeyToAccountId(node.peerInfo.id.pubKey.marshal()),
-      await this.hoprCoreConnector.utils.pubKeyToAccountId(sender.pubKey.marshal())
+    const channelId = await this.node.paymentChannels.utils.getId(
+      await this.node.paymentChannels.utils.pubKeyToAccountId(this.node.peerInfo.id.pubKey.marshal()),
+      await this.node.paymentChannels.utils.pubKeyToAccountId(sender.pubKey.marshal())
     )
 
     // const currentState = await node.paymentChannels.state(channelId)
@@ -234,19 +233,19 @@ export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
     //   throw Error('General error.')
     // }
 
-    node.log(
+    this.node.log(
       `Payment channel exists. Requested SHA256 pre-image of ${chalk.green(
-        node.paymentChannels.utils.hash(this.header.derivedSecret).toString()
+        this.node.paymentChannels.utils.hash(this.header.derivedSecret).toString()
       )} is derivable.`
     )
 
     this.message.decrypt(this.header.derivedSecret)
     this.oldChallenge = this.challenge
 
-    if (node.peerInfo.id.pubKey.marshal().every((value: number, index: number) => value == this.header.address[index])) {
-      await this.prepareDelivery(node, null, null, channelId)
+    if (u8aEquals(node.peerInfo.id.pubKey.marshal(), this.header.address)) {
+      await this.prepareDelivery(null, null, channelId)
     } else {
-      await this.prepareForward(node, null, null, target)
+      await this.prepareForward(null, null, target)
     }
 
     return this
@@ -260,7 +259,7 @@ export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
    * @param newState future off-chain state
    * @param nextNode the ID of the payment channel
    */
-  async prepareDelivery(node: Hopr<Chain>, state, newState, nextNode): Promise<void> {
+  async prepareDelivery(state, newState, nextNode): Promise<void> {
     // const challenges = [secp256k1.publicKeyCreate(Buffer.from(deriveTicketKey(this.header.derivedSecret)))]
     // const previousChallenges = await (await node.paymentChannels.channel.create(node.paymentChannels, nextNode)).getPreviousChallenges()
     // if (previousChallenges != null) challenges.push(Buffer.from(previousChallenges))
@@ -284,10 +283,10 @@ export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
    * @param channelId the ID of the payment channel
    * @param target peer Id of the next node
    */
-  async prepareForward(node: Hopr<Chain>, state, newState, target: PeerId): Promise<void> {
-    const channelId = await this.hoprCoreConnector.utils.getId(
-      await this.hoprCoreConnector.utils.pubKeyToAccountId(node.peerInfo.id.pubKey.marshal()),
-      await this.hoprCoreConnector.utils.pubKeyToAccountId(target.pubKey.marshal())
+  async prepareForward(state, newState, target: PeerId): Promise<void> {
+    const channelId = await this.node.paymentChannels.utils.getId(
+      await this.node.paymentChannels.utils.pubKeyToAccountId(this.node.peerInfo.id.pubKey.marshal()),
+      await this.node.paymentChannels.utils.pubKeyToAccountId(target.pubKey.marshal())
     )
 
     // const challenges = [secp256k1.publicKeyCreate(Buffer.from(deriveTicketKey(this.header.derivedSecret))), this.header.hashedKeyHalf]
@@ -305,22 +304,22 @@ export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
     //   throw Error('General error.')
     // }
 
-    const channelBalance = new node.paymentChannels.types.ChannelBalance(node.paymentChannels, {
+    const channelBalance = new this.node.paymentChannels.types.ChannelBalance(this.node.paymentChannels, {
       balance: new BN(0),
       balance_a: new BN(123)
     })
 
-    const channel = await node.paymentChannels.channel.create(
-      node.paymentChannels,
+    const channel = await this.node.paymentChannels.channel.create(
+      this.node.paymentChannels,
       target.pubKey.marshal(),
-      (_counterparty: Uint8Array) => node.interactions.payments.onChainKey.interact(target),
+      (_counterparty: Uint8Array) => this.node.interactions.payments.onChainKey.interact(target),
       channelBalance,
-      (_channelBalance: Types.ChannelBalance) => node.interactions.payments.open.interact(target, channelBalance)
+      (_channelBalance: Types.ChannelBalance) => this.node.interactions.payments.open.interact(target, channelBalance)
     )
 
     const receivedMoney = this.ticket.ticket.getEmbeddedFunds()
 
-    node.log(`Received ${chalk.magenta(`${fromWei(receivedMoney, 'ether').toString()} ETH`)} on channel ${chalk.yellow(channelId.toString())}.`)
+    this.node.log(`Received ${chalk.magenta(`${fromWei(receivedMoney, 'ether').toString()} ETH`)} on channel ${chalk.yellow(channelId.toString())}.`)
 
     // if (receivedMoney.lt(RELAY_FEE)) {
     //   throw Error('Bad transaction.')
@@ -330,7 +329,7 @@ export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
 
     const forwardedFunds = receivedMoney.isub(new BN(RELAY_FEE, 10))
 
-    this.challenge.set(await Challenge.create<Chain>(this.hoprCoreConnector, this.header.hashedKeyHalf, forwardedFunds).sign(node.peerInfo.id))
+    this.challenge.set(await Challenge.create<Chain>(this.node.paymentChannels, this.header.hashedKeyHalf, forwardedFunds).sign(this.node.peerInfo.id))
 
     // const [tx] = await Promise.all([
     //   node.paymentChannels.transfer(await node.paymentChannels.utils.pubKeyToAccountId(target.pubKey.marshal()), forwardedFunds, this.header.encryptionKey),
@@ -343,7 +342,13 @@ export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
     // ])
 
     this.ticket.set(
-      await channel.ticket.create(channel, forwardedFunds, this.header.encryptionKey, node.peerInfo.id.privKey.marshal(), node.peerInfo.id.pubKey.marshal())
+      await channel.ticket.create(
+        channel,
+        forwardedFunds,
+        this.header.encryptionKey,
+        this.node.peerInfo.id.privKey.marshal(),
+        this.node.peerInfo.id.pubKey.marshal()
+      )
     )
   }
 
@@ -379,10 +384,10 @@ export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
     try {
       await db.get(key)
     } catch (err) {
-      if (err.notFound) {
-        return false
+      if (err.notFound != true) {
+        this.node.log(err)
       }
-      throw err
+      return false
     }
 
     return true

@@ -1,7 +1,8 @@
 import assert from 'assert'
 import PeerId from 'peer-id'
-import Acknowledgement from '.'
+import { Acknowledgement } from '.'
 import { Challenge } from '../packet/challenge'
+import { u8aEquals } from '../../utils'
 import BN from 'bn.js'
 import { Utils, Types } from '@hoprnet/hopr-core-polkadot'
 import { HoprCoreConnectorInstance } from '@hoprnet/hopr-core-connector-interface'
@@ -29,19 +30,11 @@ describe('test acknowledgement generation', function() {
     assert(await challenge.verify(sender), `Previously generated challenge should be valid.`)
 
     const pubKey = sender.pubKey.marshal()
-    assert(
-      (await challenge.counterparty).every((value: number, index: number) => pubKey[index] == value),
-      `recovered pubKey should be equal.`
-    )
+    assert(u8aEquals(await challenge.counterparty, pubKey), `recovered pubKey should be equal.`)
 
     const ack = await Acknowledgement.create(paymentChannels, challenge, secp256k1.publicKeyCreate(secret), receiver)
 
     assert(await ack.verify(receiver), `Previously generated acknowledgement should be valid.`)
-    assert(
-      ack.responseSigningParty.every((value: number, index: number) => receiver.pubKey.marshal()[index] == value),
-      `recovered pubKey should be equal.`
-    )
-
-    assert
+    assert(u8aEquals(ack.responseSigningParty, receiver.pubKey.marshal()), `recovered pubKey should be equal.`)
   })
 })

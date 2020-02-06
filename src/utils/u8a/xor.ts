@@ -5,7 +5,7 @@
  * @param list arrays to XOR
  */
 export function u8aXOR(inPlace: boolean = false, ...list: Uint8Array[]): Uint8Array {
-  if (!list.every(array => array.length == list[0].length)) {
+  if (!list.slice(1).every(array => array.length == list[0].length)) {
     throw Error(`Uint8Array must not have different sizes`)
   }
 

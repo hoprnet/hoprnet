@@ -5,7 +5,7 @@ import bs58 from 'bs58'
 
 import { createHeader as createHeaderHelper } from './createHeader'
 
-import { PRP, PRG, u8aXOR, u8aConcat } from '../../../utils'
+import { PRP, PRG, u8aXOR, u8aConcat, u8aEquals } from '../../../utils'
 import { MAX_HOPS } from '../../../constants'
 
 import {
@@ -111,7 +111,7 @@ export class Header<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
   }
 
   verify(): boolean {
-    return createMAC(this.derivedSecret, this.beta).every((value: number, index: number) => value == this.gamma[index])
+    return u8aEquals(createMAC(this.derivedSecret, this.beta), this.gamma)
   }
 
   extractHeaderInformation(lastNode: boolean = false): void {

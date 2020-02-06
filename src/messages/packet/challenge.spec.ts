@@ -3,6 +3,7 @@ import { Challenge } from './challenge'
 import { Utils, Types } from '@hoprnet/hopr-core-polkadot'
 import BN from 'bn.js'
 import PeerId from 'peer-id'
+import { u8aEquals } from '../../utils'
 import { HoprCoreConnectorInstance } from '@hoprnet/hopr-core-connector-interface'
 import { randomBytes } from 'crypto'
 
@@ -28,10 +29,7 @@ describe('test creation & verification of a challenge', function() {
     assert(await challenge.verify(peerId), `Previously generated signature should be valid.`)
 
     const pubKey = peerId.pubKey.marshal()
-    assert(
-      (await challenge.counterparty).every((value: number, index: number) => pubKey[index] == value),
-      `recovered pubKey should be equal.`
-    )
+    assert(u8aEquals(await challenge.counterparty, pubKey), `recovered pubKey should be equal.`)
 
     challenge[0] ^= 0xff
     try {
