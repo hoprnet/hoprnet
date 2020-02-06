@@ -1,10 +1,10 @@
-import { Status } from '.'
+import { CrawlStatus } from '.'
 
 import PeerInfo from 'peer-info'
 
 import { encode, decode } from 'rlp'
 
-import { u8aToNumber, u8aConcat, toU8a, serializePeerInfo, deserializePeerInfo } from '../../utils'
+import { u8aConcat, u8aToNumber, toU8a, serializePeerInfo, deserializePeerInfo } from '../../utils'
 
 const ENUM_LENGTH = 1
 
@@ -12,17 +12,22 @@ class CrawlResponse extends Uint8Array {
   constructor(
     arr?: Uint8Array,
     struct?: {
-      status: Status
+      status: CrawlStatus
       peerInfos?: PeerInfo[]
     }
   ) {
     if (arr != null && struct == null) {
       super(arr)
     } else if (arr == null && struct != null) {
-      if (struct.peerInfos != null) {
+      if (struct.peerInfos == null) {
+        if (struct.status == CrawlStatus.OK) {
+          throw Error(`Cannot have successful crawling responses without any peerInfos.`)
+        }
+        super(u8aConcat(toU8a(struct.status, ENUM_LENGTH)))
+      } else if (struct.status == CrawlStatus.OK) {
         super(u8aConcat(toU8a(struct.status, ENUM_LENGTH), encode(struct.peerInfos.map((peerInfo: PeerInfo) => serializePeerInfo(peerInfo)))))
       } else {
-        super(u8aConcat(toU8a(struct.status, ENUM_LENGTH)))
+        throw Error(`Invalid creation parameters.`)
       }
     }
   }
@@ -34,7 +39,7 @@ class CrawlResponse extends Uint8Array {
     return this.subarray(0, ENUM_LENGTH)
   }
 
-  get status(): Status {
+  get status(): CrawlStatus {
     return u8aToNumber(this.statusRaw)
   }
 

@@ -1,8 +1,8 @@
 import { CrawlResponse } from './resonse'
 
-enum Status {
+enum CrawlStatus {
   OK,
   FAIL
 }
 
-export { Status, CrawlResponse }
+export { CrawlStatus, CrawlResponse }

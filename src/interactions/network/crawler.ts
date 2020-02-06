@@ -2,19 +2,14 @@ import Hopr from '../../'
 import { HoprCoreConnectorInstance } from '@hoprnet/hopr-core-connector-interface'
 
 import pipe from 'it-pipe'
+import chalk from 'chalk'
 
 import { AbstractInteraction, Duplex } from '../abstractInteraction'
 
 import { PROTOCOL_CRAWLING } from '../../constants'
 import PeerInfo from 'peer-info'
-import PeerId from 'peer-id'
 
-import fs from 'fs'
-import protons = require('protons')
-
-import path from 'path'
-import { pubKeyToPeerId } from '../../utils'
-const { CrawlResponse, Status } = protons(fs.readFileSync(path.resolve(__dirname, './protos/response.proto')))
+import { CrawlResponse, CrawlStatus } from '../../messages'
 
 class Crawler<Chain extends HoprCoreConnectorInstance> extends AbstractInteraction<Chain> {
   constructor(public node: Hopr<Chain>) {
@@ -24,48 +19,46 @@ class Crawler<Chain extends HoprCoreConnectorInstance> extends AbstractInteracti
   async handler(struct: { stream: Duplex }) {
     await pipe(
       /* prettier-ignore */
-      this.node.network.crawler.handleCrawlRequest(CrawlResponse, Status),
+      this.node.network.crawler.handleCrawlRequest(),
       struct.stream
     )
   }
 
-  async interact(counterparty: PeerId): Promise<PeerId[]> {
+  async interact(counterparty: PeerInfo): Promise<PeerInfo[]> {
     let struct: {
       stream: Duplex
       protocol: string
     }
-
     try {
-      struct = await this.node.dialProtocol(counterparty, this.protocols[0])
+      struct = await this.node.dialProtocol(counterparty, this.protocols[0]).catch(async (err: Error) => {
+        return this.node.peerRouting.findPeer(counterparty.id).then((peerInfo: PeerInfo) => this.node.dialProtocol(peerInfo, this.protocols[0]))
+      })
     } catch (err) {
-      try {
-        struct = await this.node.peerRouting.findPeer(counterparty).then((peerInfo: PeerInfo) => this.node.dialProtocol(peerInfo, this.protocols[0]))
-      } catch {
-        return []
-      }
+      this.node.log(`Could not ask node ${counterparty.id.toB58String()} for other nodes. Error was: ${chalk.red(err.message)}.`)
+      return []
     }
 
     return pipe(
       /** prettier-ignore */
       struct.stream,
       async function collect(source: AsyncIterable<Uint8Array>) {
-        const peerIds = []
+        const peerInfos = []
         for await (const encodedResponse of source) {
           let decodedResponse: any
           try {
-            decodedResponse = CrawlResponse.decode(encodedResponse.slice())
+            decodedResponse = new CrawlResponse(encodedResponse.slice())
           } catch {
             continue
           }
 
-          if (decodedResponse.status !== Status.OK) {
+          if (decodedResponse.status !== CrawlStatus.OK) {
             continue
           }
 
-          peerIds.push(...(await Promise.all(decodedResponse.pubKeys.map((pubKey: Uint8Array) => pubKeyToPeerId(pubKey)))))
+          peerInfos.push(...(await decodedResponse.peerInfos))
         }
 
-        return peerIds
+        return peerInfos
       }
     )
   }
