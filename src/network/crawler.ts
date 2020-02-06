@@ -3,7 +3,7 @@ import PeerId from 'peer-id'
 import PeerInfo from 'peer-info'
 import { HoprCoreConnectorInstance } from '@hoprnet/hopr-core-connector-interface'
 
-import { randomSubset, pubKeyToPeerId, randomInteger } from '../utils'
+import { randomSubset, randomInteger } from '../utils'
 import { MAX_HOPS, CRAWLING_RESPONSE_NODES } from '../constants'
 import Hopr from '..'
 
@@ -23,7 +23,7 @@ class Crawler<Chain extends HoprCoreConnectorInstance> {
     // fast non-inclusion check
     const unContactedPeerIdSet = new Set<string>() // @TODO could be replaced by a bloom filter
 
-    let before = 0 // initialiser
+    let before = 0 // store current state
     for (const peerInfo of this.node.peerStore.peers.values()) {
       unContactedPeerIdArray.push(peerInfo.id)
 
@@ -35,7 +35,7 @@ class Crawler<Chain extends HoprCoreConnectorInstance> {
     /**
      * Get all known nodes that match our requirements.
      */
-    const getCurrentNodes = () => {
+    const getCurrentNodes = (): number => {
       let currentNodes = 0
 
       for (const peerInfo of this.node.peerStore.peers.values()) {
@@ -59,7 +59,14 @@ class Crawler<Chain extends HoprCoreConnectorInstance> {
     const getRandomNode = (): PeerId => {
       const index = randomInteger(0, unContactedPeerIdArray.length)
 
-      return unContactedPeerIdArray.splice(index, 1)[0]
+      if (index == unContactedPeerIdArray.length - 1) {
+        return unContactedPeerIdArray.pop()
+      }
+
+      const selected: PeerId = unContactedPeerIdArray[index]
+      unContactedPeerIdArray[index] = unContactedPeerIdArray.pop()
+
+      return selected
     }
 
     /**
@@ -153,6 +160,9 @@ class Crawler<Chain extends HoprCoreConnectorInstance> {
       }\n    total: ${now} node${now == 1 ? '' : 's'}`
     )
 
+    unContactedPeerIdSet.clear()
+    contactedPeerIds.clear()
+    
     if (!isDone()) {
       throw Error(`Unable to find enough other nodes in the network.`)
     }
