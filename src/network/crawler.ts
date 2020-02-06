@@ -7,6 +7,8 @@ import { randomSubset, randomInteger } from '../utils'
 import { MAX_HOPS, CRAWLING_RESPONSE_NODES } from '../constants'
 import Hopr from '..'
 
+import { CrawlResponse, CrawlStatus } from '../messages'
+
 const MAX_PARALLEL_REQUESTS = 4
 
 class Crawler<Chain extends HoprCoreConnectorInstance> {
@@ -19,13 +21,13 @@ class Crawler<Chain extends HoprCoreConnectorInstance> {
     const contactedPeerIds = new Set<string>() // @TODO could be replaced by a bloom filter
 
     // enumerable
-    const unContactedPeerIdArray: PeerId[] = [] // @TODO add new peerIds lazily
+    const unContactedPeerIdArray: PeerInfo[] = [] // @TODO add new peerIds lazily
     // fast non-inclusion check
     const unContactedPeerIdSet = new Set<string>() // @TODO could be replaced by a bloom filter
 
     let before = 0 // store current state
     for (const peerInfo of this.node.peerStore.peers.values()) {
-      unContactedPeerIdArray.push(peerInfo.id)
+      unContactedPeerIdArray.push(peerInfo)
 
       if (comparator(peerInfo)) {
         before += 1
@@ -56,14 +58,14 @@ class Crawler<Chain extends HoprCoreConnectorInstance> {
     /**
      * Returns a random node and removes it from the array.
      */
-    const getRandomNode = (): PeerId => {
+    const getRandomNode = (): PeerInfo => {
       const index = randomInteger(0, unContactedPeerIdArray.length)
 
       if (index == unContactedPeerIdArray.length - 1) {
         return unContactedPeerIdArray.pop()
       }
 
-      const selected: PeerId = unContactedPeerIdArray[index]
+      const selected: PeerInfo = unContactedPeerIdArray[index]
       unContactedPeerIdArray[index] = unContactedPeerIdArray.pop()
 
       return selected
@@ -78,10 +80,10 @@ class Crawler<Chain extends HoprCoreConnectorInstance> {
      * Connect to another peer and returns a promise that resolves to all received nodes
      * that were previously unknown.
      *
-     * @param peerId PeerId of the peer that is queried
+     * @param peerInfo PeerInfo of the peer that is queried
      */
-    const queryNode = async (peerId: PeerId): Promise<void> => {
-      let peerIds: PeerId[]
+    const queryNode = async (peerInfo: PeerInfo): Promise<void> => {
+      let peerInfos: PeerInfo[]
 
       if (isDone()) {
         return
@@ -92,22 +94,23 @@ class Crawler<Chain extends HoprCoreConnectorInstance> {
         promises.push(queryNode(getRandomNode()))
       }
 
-      unContactedPeerIdSet.delete(peerId.toB58String())
-      contactedPeerIds.add(peerId.toB58String())
+      unContactedPeerIdSet.delete(peerInfo.id.toB58String())
+      contactedPeerIds.add(peerInfo.id.toB58String())
 
       try {
-        peerIds = await this.node.interactions.network.crawler.interact(peerId)
+        peerInfos = await this.node.interactions.network.crawler.interact(peerInfo)
       } catch (err) {
         errors.push(err)
       } finally {
-        for (let i = 0; i < peerIds.length; i++) {
-          if (peerIds[i].isEqual(this.node.peerInfo.id)) {
+        for (let i = 0; i < peerInfos.length; i++) {
+          if (peerInfos[i].id.isEqual(this.node.peerInfo.id)) {
             continue
           }
 
-          if (!contactedPeerIds.has(peerIds[i].toB58String()) && !unContactedPeerIdSet.has(peerIds[i].toB58String())) {
-            unContactedPeerIdSet.add(peerIds[i].toB58String())
-            unContactedPeerIdArray.push(peerIds[i])
+          if (!contactedPeerIds.has(peerInfos[i].id.toB58String()) && !unContactedPeerIdSet.has(peerInfos[i].id.toB58String())) {
+            unContactedPeerIdSet.add(peerInfos[i].id.toB58String())
+            unContactedPeerIdArray.push(peerInfos[i])
+            this.node.peerStore.put(peerInfos[i])
           }
         }
       }
@@ -129,10 +132,20 @@ class Crawler<Chain extends HoprCoreConnectorInstance> {
       await Promise.all(promises)
     }
 
-    const addPromises = []
+    const addPromises: Promise<void>[] = []
 
-    const addPromiseFactory = (peerId: string) => {
-      addPromises.push(PeerInfo.create(PeerId.createFromB58String(peerId)).then((peerInfo: PeerInfo) => this.node.peerStore.put(peerInfo)))
+    const addPromiseFactory = (peerIdString: string) => {
+      const peerId = PeerId.createFromB58String(peerIdString)
+
+      if (!this.node.peerStore.has(peerId)) {
+        addPromises.push(
+          PeerInfo.create(peerId).then((peerInfo: PeerInfo) => {
+            this.node.peerStore.put(peerInfo)
+          })
+        )
+      } else {
+        return Promise.resolve()
+      }
     }
 
     unContactedPeerIdSet.forEach(addPromiseFactory)
@@ -160,15 +173,15 @@ class Crawler<Chain extends HoprCoreConnectorInstance> {
       }\n    total: ${now} node${now == 1 ? '' : 's'}`
     )
 
-    unContactedPeerIdSet.clear()
-    contactedPeerIds.clear()
-    
     if (!isDone()) {
       throw Error(`Unable to find enough other nodes in the network.`)
     }
+
+    unContactedPeerIdSet.clear()
+    contactedPeerIds.clear()
   }
 
-  handleCrawlRequest(CrawlResponse: any, Status: any) {
+  handleCrawlRequest() {
     let self = this
     return (function*() {
       const peers = []
@@ -181,16 +194,16 @@ class Crawler<Chain extends HoprCoreConnectorInstance> {
 
       const amountOfNodes = Math.min(CRAWLING_RESPONSE_NODES, peers.length)
 
-      const selectedNodes = randomSubset(peers, amountOfNodes, filter).map(peerInfo => peerInfo.id.pubKey.marshal())
+      const selectedNodes = randomSubset(peers, amountOfNodes, filter)
 
       if (selectedNodes.length > 0) {
-        yield CrawlResponse.encode({
-          status: Status.OK,
-          pubKeys: selectedNodes
+        yield new CrawlResponse(undefined, {
+          status: CrawlStatus.OK,
+          peerInfos: selectedNodes
         })
       } else {
-        yield CrawlResponse.encode({
-          status: Status.FAIL
+        yield new CrawlResponse(undefined, {
+          status: CrawlStatus.FAIL
         })
       }
     })()

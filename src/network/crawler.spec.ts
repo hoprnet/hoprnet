@@ -17,11 +17,6 @@ import { Interactions } from '../interactions'
 import { Crawler } from './crawler'
 
 describe('test crawler', function() {
-  let Alice: Hopr<HoprCoreConnectorInstance>
-  let Bob: Hopr<HoprCoreConnectorInstance>
-  let Chris: Hopr<HoprCoreConnectorInstance>
-  let Dave: Hopr<HoprCoreConnectorInstance>
-
   async function generateNode(): Promise<Hopr<HoprCoreConnectorInstance>> {
     const node = (await libp2p.create({
       peerInfo: await PeerInfo.create(await PeerId.create({ keyType: 'secp256k1' })),
@@ -48,11 +43,9 @@ describe('test crawler', function() {
     return (node as unknown) as Hopr<HoprCoreConnectorInstance>
   }
 
-  before(async function() {
-    ;[Alice, Bob, Chris, Dave] = await Promise.all([generateNode(), generateNode(), generateNode(), generateNode()])
-  })
-
   it('should return the node', async function() {
+    const [Alice, Bob, Chris, Dave, Eve] = await Promise.all([generateNode(), generateNode(), generateNode(), generateNode(), generateNode()])
+
     await assert.rejects(() => Alice.network.crawler.crawl(), Error(`Unable to find enough other nodes in the network.`))
 
     Alice.peerStore.put(Bob.peerInfo)
@@ -63,12 +56,25 @@ describe('test crawler', function() {
 
     await assert.rejects(() => Alice.network.crawler.crawl(), Error(`Unable to find enough other nodes in the network.`))
 
-    Bob.peerStore.put(Dave.peerInfo)
+    Chris.peerStore.put(Dave.peerInfo)
 
     await assert.doesNotReject(() => Alice.network.crawler.crawl(), `Should find enough nodes.`)
+
+    Bob.peerStore.put(Alice.peerInfo)
+    Dave.peerStore.put(Eve.peerInfo)
+
+    await assert.doesNotReject(() => Bob.network.crawler.crawl(), `Should find enough nodes.`)
+
+    await Promise.all([
+      /* prettier-ignore */
+      Alice.stop(),
+      Bob.stop(),
+      Chris.stop(),
+      Dave.stop()
+    ])
   })
 
-  after(async function() {
-    await Promise.all([Alice.stop(), Bob.stop(), Chris.stop(), Dave.stop()])
-  })
+  //   after(async function() {
+  //     await Promise.all([Alice.stop(), Bob.stop(), Chris.stop(), Dave.stop()])
+  //   })
 })
