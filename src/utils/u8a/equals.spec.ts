@@ -14,7 +14,7 @@ describe('test u8a equals', function() {
 
     assert(u8aEquals(new Uint8Array(32).fill(0xff), new Uint8Array(32).fill(0xff)), `check equal arrays`)
 
-    assert(!u8aEquals(new Uint8Array(32).fill(0xff), new Uint8Array(32).fill(0xff), new Uint8Array(32).fill(0x10)), `check different arrays`)
+    assert(!u8aEquals(new Uint8Array(32).fill(0xff), new Uint8Array(32).fill(0xff), new Uint8Array(32).fill(0xaa)), `check different arrays`)
 
     assert(!u8aEquals(randomBytes(32), randomBytes(32), randomBytes(32)), `random data should be with high probability not equal`)
 

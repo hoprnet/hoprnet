@@ -1,4 +1,5 @@
 import { LENGTH_PREFIX_LENGTH } from '.'
+import { u8aToNumber } from './u8aToNumber'
 
 /**
  * Decodes a length-prefixed array and returns the encoded data.
@@ -18,10 +19,7 @@ export function lengthPrefixedToU8a(arg: Uint8Array, additionalPadding?: Uint8Ar
     )
   }
 
-  let arrLength = parseInt(
-    arg.subarray(0, LENGTH_PREFIX_LENGTH).reduce((acc, n) => (acc += n.toString(16).padStart(2, '0')), ''),
-    16
-  )
+  let arrLength = u8aToNumber(arg.subarray(0, LENGTH_PREFIX_LENGTH))
 
   if (!Number.isInteger(arrLength)) {
     throw Error(`Invalid encoded length.`)

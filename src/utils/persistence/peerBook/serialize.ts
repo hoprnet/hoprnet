@@ -1,11 +1,10 @@
-import rlp from 'rlp'
+import { encode } from 'rlp'
 import PeerBook from 'peer-book'
-import Multiaddr from 'multiaddr'
 import PeerInfo from 'peer-info'
 
-export type SerializedPeerInfo = [Buffer, Buffer[]] | [Buffer, Buffer[], Buffer]
+import { serializePeerInfo } from '..'
 
-export type SerializedPeerBook = [SerializedPeerInfo]
+export type SerializedPeerBook = Buffer[]
 
 /**
  * Serializes a given peerBook by serializing the included peerInfo instances.
@@ -14,18 +13,8 @@ export type SerializedPeerBook = [SerializedPeerInfo]
  * @returns the encoded peerBook
  */
 export function serializePeerBook(peerBook: PeerBook): Uint8Array {
-  function serializePeerInfo(peerInfo: PeerInfo): SerializedPeerInfo {
-    const result: SerializedPeerInfo = [peerInfo.id.toBytes(), peerInfo.multiaddrs.toArray().map((multiaddr: Multiaddr) => multiaddr.buffer)]
-
-    if (peerInfo.id.pubKey) {
-      result.push(peerInfo.id.pubKey.bytes)
-    }
-
-    return result
-  }
-
   const peerInfos = []
   peerBook.getAllArray().forEach((peerInfo: PeerInfo) => peerInfos.push(serializePeerInfo(peerInfo)))
 
-  return new Uint8Array(rlp.encode(peerInfos))
+  return encode(peerInfos)
 }
