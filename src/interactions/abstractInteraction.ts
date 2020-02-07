@@ -6,24 +6,17 @@ export type Sink = (source: AsyncIterable<Uint8Array>) => void
 export type Source = AsyncIterator<Uint8Array>
 
 export type Duplex = {
-  sink: Sink,
+  sink: Sink
   source: Source
 }
 
-abstract class AbstractInteraction<Chain extends HoprCoreConnectorInstance> {
-  protected protocols: string[]
-  protected node: Hopr<Chain>
+interface AbstractInteraction<Chain extends HoprCoreConnectorInstance> {
+  protocols: string[]
+  node: Hopr<Chain>
 
-  constructor(node: Hopr<Chain>, protocols: string[]) {
-    this.protocols = protocols
-    this.node = node
+  handler(struct: { stream: Duplex }): void
 
-    node.handle(this.protocols, this.handler.bind(this))
-  }
-
-  abstract handler(struct: { stream: Duplex }): void
-
-  abstract interact(...props: any[]): any
+  interact(...props: any[]): any
 }
 
 export { AbstractInteraction }

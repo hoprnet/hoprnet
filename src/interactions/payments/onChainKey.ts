@@ -2,17 +2,19 @@ import Hopr from '../../'
 import { HoprCoreConnectorInstance } from '@hoprnet/hopr-core-connector-interface'
 
 import { PROTOCOL_ONCHAIN_KEY } from '../../constants'
-import { AbstractInteraction, Duplex } from '../abstractInteraction'
+import { AbstractInteraction } from '../abstractInteraction'
 import PeerInfo from 'peer-info'
 
 import pipe from 'it-pipe'
 
-class OnChainKey<Chain extends HoprCoreConnectorInstance> extends AbstractInteraction<Chain> {
+class OnChainKey<Chain extends HoprCoreConnectorInstance> implements AbstractInteraction<Chain> {
+  protocols: string[] = [PROTOCOL_ONCHAIN_KEY]
+
   constructor(public node: Hopr<Chain>) {
-    super(node, [PROTOCOL_ONCHAIN_KEY])
+    this.node.handle(this.protocols, this.handler.bind(this))
   }
 
-  handler(struct: { stream: Duplex }) {
+  handler(struct: { stream: any }) {
     pipe(
       /* prettier-ignore */
       this.node.paymentChannels.self.keyPair.publicKey,
@@ -22,7 +24,7 @@ class OnChainKey<Chain extends HoprCoreConnectorInstance> extends AbstractIntera
 
   async interact(counterparty: PeerInfo): Promise<Uint8Array> {
     let struct: {
-      stream: Duplex
+      stream: any
       protocol: string
     }
 

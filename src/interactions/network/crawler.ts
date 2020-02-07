@@ -11,12 +11,14 @@ import PeerInfo from 'peer-info'
 
 import { CrawlResponse, CrawlStatus } from '../../messages'
 
-class Crawler<Chain extends HoprCoreConnectorInstance> extends AbstractInteraction<Chain> {
+class Crawler<Chain extends HoprCoreConnectorInstance> implements AbstractInteraction<Chain> {
+  protocols: string[] = [PROTOCOL_CRAWLING]
+
   constructor(public node: Hopr<Chain>) {
-    super(node, [PROTOCOL_CRAWLING])
+    this.node.handle(this.protocols, this.handler.bind(this))
   }
 
-  async handler(struct: { stream: Duplex }) {
+  async handler(struct: { stream: any }) {
     await pipe(
       /* prettier-ignore */
       this.node.network.crawler.handleCrawlRequest(),

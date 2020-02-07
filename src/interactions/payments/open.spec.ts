@@ -15,7 +15,7 @@ import { Interactions } from '..'
 import Hopr from '../..'
 import BN from 'bn.js'
 
-describe('should perform an opening interaction', function() {
+describe('test channel opening interaction', function() {
   let Alice: Hopr<HoprCoreConnectorInstance>
   let Bob: Hopr<HoprCoreConnectorInstance>
 

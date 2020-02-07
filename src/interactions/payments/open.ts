@@ -8,9 +8,11 @@ import { AbstractInteraction } from '../abstractInteraction'
 import { PROTOCOL_PAYMENT_CHANNEL } from '../../constants'
 import PeerInfo from 'peer-info'
 
-class Opening<Chain extends HoprCoreConnectorInstance> extends AbstractInteraction<Chain> {
-  constructor(node: Hopr<Chain>) {
-    super(node, [PROTOCOL_PAYMENT_CHANNEL])
+class Opening<Chain extends HoprCoreConnectorInstance> implements AbstractInteraction<Chain> {
+  protocols: string[] = [PROTOCOL_PAYMENT_CHANNEL]
+
+  constructor(public node: Hopr<Chain>) {
+    this.node.handle(this.protocols, this.handler.bind(this))
   }
 
   async handler(struct: { stream: any }) {
