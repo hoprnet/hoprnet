@@ -43,7 +43,7 @@ Note that the documentation is under active development and does not always repr
 
 ## Dependencies
 
-**For Hopr on [Polkadot](https://polkadot.network), please follow the instruction [here](#HOPR-on-Polkadot)
+**For Hopr on [Polkadot](https://polkadot.network)**, please follow the instruction [here](#HOPR-on-Polkadot)
 
 The current implementation of HOPR is in JavaScript so you need:
 - [`Node.js`](https://nodejs.org/en/download/) >= 12
