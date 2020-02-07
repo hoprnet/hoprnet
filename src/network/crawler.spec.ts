@@ -6,7 +6,6 @@ import libp2p = require('libp2p')
 import TCP = require('libp2p-tcp')
 import MPLEX = require('libp2p-mplex')
 import SECIO = require('libp2p-secio')
-import DHT = require('libp2p-kad-dht')
 
 import Debug from 'debug'
 import chalk from 'chalk'
@@ -23,8 +22,7 @@ describe('test crawler', function() {
       modules: {
         transport: [TCP],
         streamMuxer: [MPLEX],
-        connEncryption: [SECIO],
-        dht: DHT
+        connEncryption: [SECIO]
       }
     })) as Hopr<HoprCoreConnectorInstance>
 
@@ -32,6 +30,9 @@ describe('test crawler', function() {
     node.peerInfo.multiaddrs.add('/ip4/0.0.0.0/tcp/0')
 
     await node.start()
+
+    node.peerRouting.findPeer = (_: PeerId) => Promise.reject('not implemented')
+
 
     node.interactions = new Interactions(node)
     node.network = {
@@ -43,7 +44,7 @@ describe('test crawler', function() {
     return (node as unknown) as Hopr<HoprCoreConnectorInstance>
   }
 
-  it('should return the node', async function() {
+  it('should crawl the network and find some nodes', async function() {
     const [Alice, Bob, Chris, Dave, Eve] = await Promise.all([generateNode(), generateNode(), generateNode(), generateNode(), generateNode()])
 
     await assert.rejects(() => Alice.network.crawler.crawl(), Error(`Unable to find enough other nodes in the network.`))
@@ -70,11 +71,8 @@ describe('test crawler', function() {
       Alice.stop(),
       Bob.stop(),
       Chris.stop(),
-      Dave.stop()
+      Dave.stop(),
+      Eve.stop()
     ])
   })
-
-  //   after(async function() {
-  //     await Promise.all([Alice.stop(), Bob.stop(), Chris.stop(), Dave.stop()])
-  //   })
 })

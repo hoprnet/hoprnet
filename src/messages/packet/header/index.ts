@@ -244,7 +244,7 @@ export function deriveTicketKey(secret: Uint8Array): Uint8Array {
   return hkdf(Buffer.from(secret), KEY_LENGTH, { salt: HASH_KEY_TX })
 }
 
-export function deriveTransactionKeyBlinding(secret: Uint8Array) {
+export function deriveTicketKeyBlinding(secret: Uint8Array) {
   if (!secp256k1.publicKeyVerify(Buffer.from(secret))) {
     throw Error('General error')
   }

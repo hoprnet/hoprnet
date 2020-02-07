@@ -5,6 +5,7 @@ export * from './general'
 export * from './libp2p'
 export * from './persistence'
 export * from './u8a'
+export * from './concurrency'
 
 const { promisify } = require('util')
 import { promises as fsPromise, Stats, readFileSync } from 'fs'

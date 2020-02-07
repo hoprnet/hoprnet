@@ -6,7 +6,7 @@ import Multiaddr from 'multiaddr'
 
 import { serializePeerInfo, deserializePeerInfo } from '.'
 
-describe('peerInfo serialisation', function() {
+describe('test peerInfo serialisation', function() {
   it('should serialize and deserilize a peerInfo', async function() {
     const peerInfo = await PeerInfo.create(await PeerId.create({ keyType: 'secp256k1' }))
 
