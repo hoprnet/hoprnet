@@ -29,6 +29,9 @@ type ITicket = (args: {
   winProb: string; // return winProb in bytes32
   hashedTicket: string; // return hashed alternative
   signature: string; // signature of hashedTicket
+  r: string;
+  s: string;
+  v: string
 };
 
 /*
@@ -74,7 +77,7 @@ const Ticket: ITicket = ({
   );
 
   // sender signs ticket
-  const { signature } = signMessage(web3, hashedTicket, senderPrivKey);
+  const { signature, r, s, v } = signMessage(web3, hashedTicket, senderPrivKey);
 
   return {
     sender,
@@ -90,7 +93,10 @@ const Ticket: ITicket = ({
     hashedRecipientSecret,
     winProb,
     hashedTicket,
-    signature
+    signature,
+    r,
+    s,
+    v
   };
 };
 
