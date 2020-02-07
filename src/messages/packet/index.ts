@@ -28,7 +28,7 @@ const OPENING_TIMEOUT = 86400 * 1000
 export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array {
   private _targetPeerId: PeerId
   private _senderPeerId: PeerId
-  private oldChallenge: Challenge<Chain>
+  public oldChallenge: Challenge<Chain>
 
   private node: Hopr<Chain>
 
@@ -158,7 +158,7 @@ export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
    *
    * @param channelId ID of the channel
    */
-  async getPreviousTransaction(node: Hopr<Chain>, channelId: Uint8Array, state) {
+  async getPreviousTransaction(channelId: Uint8Array, state) {
     // const recordState = node.paymentChannels.TransactionRecordState
     // switch (state.state) {
     //   case recordState.OPENING:
@@ -186,7 +186,7 @@ export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
    *
    * @param node the node itself
    */
-  async forwardTransform(node: Hopr<Chain>): Promise<Packet<Chain>> {
+  async forwardTransform(): Promise<Packet<Chain>> {
     this.header.deriveSecret(this.node.peerInfo.id.privKey.marshal())
 
     if (await this.hasTag(this.node.db)) {
@@ -242,7 +242,7 @@ export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
     this.message.decrypt(this.header.derivedSecret)
     this.oldChallenge = this.challenge
 
-    if (u8aEquals(node.peerInfo.id.pubKey.marshal(), this.header.address)) {
+    if (u8aEquals(this.node.peerInfo.id.pubKey.marshal(), this.header.address)) {
       await this.prepareDelivery(null, null, channelId)
     } else {
       await this.prepareForward(null, null, target)

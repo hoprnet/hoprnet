@@ -1,7 +1,7 @@
 import secp256k1 from 'secp256k1'
 
 import { u8aConcat } from '../../utils'
-import { deriveTicketKey } from '../packet/header'
+import { deriveTicketKeyBlinding } from '../packet/header'
 import { KEY_LENGTH } from '../packet/header/parameters'
 import { Challenge } from '../packet/challenge'
 import { HoprCoreConnectorInstance, Types } from '@hoprnet/hopr-core-connector-interface'
@@ -13,6 +13,7 @@ import PeerId from 'peer-id'
  * the previously received transaction.
  */
 class Acknowledgement<Chain extends HoprCoreConnectorInstance> extends Uint8Array {
+  private _responseSigningParty: Uint8Array
   private paymentChannels: Chain
 
   constructor(
@@ -21,13 +22,13 @@ class Acknowledgement<Chain extends HoprCoreConnectorInstance> extends Uint8Arra
     struct?: {
       key: Uint8Array
       challenge: Challenge<Chain>
-      signature: Types.Signature
+      signature?: Types.Signature
     }
   ) {
     if (arr != null && struct == null) {
       super(arr)
     } else if (arr == null && struct != null) {
-      super(u8aConcat(struct.key, struct.challenge, struct.signature))
+      super(u8aConcat(struct.key, struct.challenge, struct.signature != null ? struct.signature : new Uint8Array(paymentChannels.types.Signature.SIZE)))
     } else {
       throw Error('Invalid constructor parameters.')
     }
@@ -85,16 +86,24 @@ class Acknowledgement<Chain extends HoprCoreConnectorInstance> extends Uint8Arra
   }
 
   get responseSigningParty(): Uint8Array {
-    return secp256k1.recover(
+    if (this._responseSigningParty) {
+      return this._responseSigningParty
+    }
+
+    this._responseSigningParty = secp256k1.recover(
       // @ts-ignore
       Buffer.from(this.responseSignature.sr25519PublicKey),
       Buffer.from(this.responseSignature.signature),
       this.responseSignature.recovery
     )
+
+    return this._responseSigningParty
   }
 
-  async sign(peerId: PeerId): Promise<void> {
+  async sign(peerId: PeerId): Promise<Acknowledgement<Chain>> {
     this.responseSignature = await this.paymentChannels.utils.sign(await this.hash, peerId.privKey.marshal(), peerId.pubKey.marshal())
+
+    return this
   }
 
   async verify(peerId: PeerId): Promise<boolean> {
@@ -107,23 +116,20 @@ class Acknowledgement<Chain extends HoprCoreConnectorInstance> extends Uint8Arra
    *
    * @param challenge the signed challenge of the relayer
    * @param derivedSecret the secret that is used to create the second key half
-   * @param peerId contains private key
+   * @param signer contains private key
    */
   static async create<Chain extends HoprCoreConnectorInstance>(
     hoprCoreConnector: Chain,
     challenge: Challenge<Chain>,
     derivedSecret: Uint8Array,
-    peerId: PeerId
+    signer: PeerId
   ): Promise<Acknowledgement<Chain>> {
     const ack = new Acknowledgement(hoprCoreConnector, new Uint8Array(Acknowledgement.SIZE(hoprCoreConnector)))
 
-    ack.key = deriveTicketKey(derivedSecret)
+    ack.key = deriveTicketKeyBlinding(derivedSecret)
 
     ack.challenge = challenge
-
-    await ack.sign(peerId)
-
-    return ack
+    return ack.sign(signer)
   }
 
   static SIZE<Chain extends HoprCoreConnectorInstance>(hoprCoreConnector: Chain): number {

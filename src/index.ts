@@ -1,38 +1,36 @@
-const libp2p = require('libp2p')
-const MPLEX = require('libp2p-mplex')
-const KadDHT = require('libp2p-kad-dht')
+import libp2p = require('libp2p')
+import MPLEX = require('libp2p-mplex')
+import KadDHT = require('libp2p-kad-dht')
 // const SECIO = require('libp2p-secio')
-const { WebRTCv4, WebRTCv6 } = require('./network/natTraversal')
-const TCP = require('libp2p-tcp')
+// import { WebRTCv4, WebRTCv6 } = require('./network/natTraversal')
+import TCP = require('libp2p-tcp')
 
-const defaultsDeep = require('@nodeutils/defaults-deep')
+import defaultsDeep = require('@nodeutils/defaults-deep')
 
 import { Packet } from './messages/packet'
-const registerHandlers = require('./handlers')
 import { PACKET_SIZE, PROTOCOL_STRING, MAX_HOPS } from './constants'
-const crawler = require('./network/crawler')
-const heartbeat = require('./network/heartbeat')
-import { getPeerInfo } from './getPeerInfo'
 
-import { randomSubset, serializePeerBook, deserializePeerBook, addPubKey, createDirectoryIfNotExists } from './utils'
+import { Network } from './network'
+
+import { randomSubset, serializePeerBook, deserializePeerBook, addPubKey, createDirectoryIfNotExists, getPeerInfo } from './utils'
 
 import levelup, { LevelUp } from 'levelup'
 import leveldown from 'leveldown'
 import Multiaddr from 'multiaddr'
 import chalk from 'chalk'
-import Debug from 'debug'
+import Debug, { Debugger } from 'debug'
+import Stream from 'stream'
+import pipe from 'it-pipe'
 
 import PeerId from 'peer-id'
 import PeerInfo from 'peer-info'
 import PeerBook from 'peer-book'
 
 import HoprCoreConnector, { HoprCoreConnectorInstance } from '@hoprnet/hopr-core-connector-interface'
-import { Interactions } from './interactions'
+import { Interactions, Duplex } from './interactions'
+import { DbKeys } from './db_keys'
 
-import pull from 'pull-stream'
-
-const lp = require('pull-length-prefixed')
-import Acknowledgement from './messages/acknowledgement'
+import { Acknowledgement } from './messages/acknowledgement'
 
 type HoprOptions = {
   peerInfo: PeerInfo
@@ -43,7 +41,30 @@ type HoprOptions = {
 }
 
 export default class Hopr<Chain extends HoprCoreConnectorInstance> extends libp2p {
-  interactions: Interactions<Chain>
+  public interactions: Interactions<Chain>
+  public network: Network<Chain>
+  public log: Debugger
+  public dbKeys: DbKeys = new DbKeys()
+  public output: (str: string) => void
+
+  // @TODO put this in proper namespace
+  // public heartbeat: any
+
+  // @TODO add libp2p types
+  declare dial: (addr: Multiaddr | PeerInfo | PeerId) => Promise<any>
+  declare dialProtocol: (addr: Multiaddr | PeerInfo | PeerId, protocol: string) => Promise<{ stream: Duplex; protocol: string }>
+  declare peerInfo: PeerInfo
+  declare peerStore: {
+    has(peerId: PeerId): boolean
+    put(peerId: PeerInfo, options?: { silent: boolean }): PeerInfo
+    peers: Map<string, PeerInfo>
+  }
+  declare peerRouting: {
+    findPeer: (addr: PeerId) => Promise<PeerInfo>
+  }
+  declare handle: (protocol: string[], handler: (struct: { stream: Stream.Duplex }) => void) => void
+  declare start: () => Promise<void>
+  declare stop: () => Promise<void>
 
   /**
    * @constructor
@@ -90,9 +111,11 @@ export default class Hopr<Chain extends HoprCoreConnectorInstance> extends libp2
       })
     )
 
+    this.output = options.output
     this.interactions = new Interactions(this)
+    this.network = new Network(this)
 
-    this.heartbeat = heartbeat(this)
+    // this.heartbeat = heartbeat(this)
 
     this.log = Debug(`${chalk.blue(_options.peerInfo.id.toB58String())}: `)
   }
@@ -183,21 +206,17 @@ export default class Hopr<Chain extends HoprCoreConnectorInstance> extends libp2
         resolve()
       })
     )
-
-    registerHandlers(this, options)
-
+    
     if (!options.bootstrapNode) {
       await this.connectToBootstrapServers()
     } else {
-      this.debug(`Available under the following addresses:`)
+      this.log(`Available under the following addresses:`)
       this.peerInfo.multiaddrs.forEach((ma: Multiaddr) => {
-        this.debug(ma.toString())
+        this.log(ma.toString())
       })
     }
 
     // this.heartbeat.start()
-
-    this.crawler = new crawler({ libp2p: this })
 
     // this.peerInfo.multiaddrs.forEach(addr => {
     //     if (match.LOCALHOST(addr)) {
@@ -216,13 +235,13 @@ export default class Hopr<Chain extends HoprCoreConnectorInstance> extends libp2
   async down(): Promise<void> {
     if (this.db) await this.db.close()
 
-    this.debug(`Database closed.`)
+    this.log(`Database closed.`)
 
     await new Promise((resolve, reject) =>
       super.stop((err: Error) => {
         if (err) return reject(err)
 
-        this.debug(`Node shut down.`)
+        this.log(`Node shut down.`)
 
         resolve()
       })
@@ -258,7 +277,7 @@ export default class Hopr<Chain extends HoprCoreConnectorInstance> extends libp2
 
           const peerInfo = await this.peerRouting.findPeer(path[0])
 
-          const conn = await this.dialProtocol(peerInfo, PROTOCOL_STRING)
+          const { stream } = await this.dialProtocol(peerInfo, PROTOCOL_STRING)
 
           const packet = await Packet.create(
             /* prettier-ignore */
@@ -267,20 +286,20 @@ export default class Hopr<Chain extends HoprCoreConnectorInstance> extends libp2
             path
           )
 
-          pull(
-            pull.once(Buffer.from(packet)),
-            lp.encode(),
-            conn,
-            lp.decode({
-              // maxLength: Acknowledgement.SIZE
-            }),
-            pull.drain(data => {
-              this.debug(this.peerInfo.id, `Received acknowledgement.`)
-              // return cb()
-              // if (!cb.called) {
-              //     return cb()
-              // }
-            }, resolve)
+          pipe(
+            /* prettier-ignore */
+            packet,
+            stream,
+            async function(source: AsyncIterable<Uint8Array>) {
+              for await (const msg of source) {
+                console.log(msg.toString())
+                this.log(this.peerInfo.id, `Received acknowledgement.`)
+                // return cb()
+                // if (!cb.called) {
+                //     return cb()
+                // }
+              }
+            }
           )
         })
       )
@@ -308,7 +327,7 @@ export default class Hopr<Chain extends HoprCoreConnectorInstance> extends libp2
     // @TODO exclude bootstrap server(s) from crawling results
     await this.crawler.crawl()
 
-    return randomSubset(this.peerBook.getAllArray(), MAX_HOPS - 1, filter).map((peerInfo: PeerInfo) => peerInfo.id)
+    return randomSubset(this.peerStore.getAllArray(), MAX_HOPS - 1, filter).map((peerInfo: PeerInfo) => peerInfo.id)
   }
 
   static async importPeerBook(db: LevelUp) {
@@ -333,10 +352,10 @@ export default class Hopr<Chain extends HoprCoreConnectorInstance> extends libp2
   async exportPeerBook() {
     const key = 'peer-book'
 
-    await this.db.put(key, serializePeerBook(this.peerBook))
+    await this.db.put(key, serializePeerBook(this.peerStore))
   }
 
-  static openDatabase(db_dir: string, options?: { id?: number, bootstrapNode?: boolean }) {
+  static openDatabase(db_dir: string, options?: { id?: number; bootstrapNode?: boolean }) {
     if (options != null) {
       db_dir += `/${process.env['NETWORK']}/`
       if (Number.isInteger(options.id) && options.bootstrapNode == false) {
