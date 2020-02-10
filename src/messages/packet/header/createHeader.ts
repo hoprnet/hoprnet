@@ -1,9 +1,8 @@
 import secp256k1 from 'secp256k1'
 import crypto from 'crypto'
-import bs58 from 'bs58'
 import forEachRight from 'lodash.foreachright'
 
-import { PRG, u8aXOR } from '../../../utils'
+import { PRG, u8aXOR, u8aToHex } from '../../../utils'
 import { MAX_HOPS } from '../../../constants'
 
 import { Header, BETA_LENGTH, deriveBlinding, derivePRGParameters, deriveTicketKey, createMAC } from './index'
@@ -12,7 +11,16 @@ import { HoprCoreConnectorInstance } from '@hoprnet/hopr-core-connector-interfac
 
 import PeerId from 'peer-id'
 
-import { PRIVATE_KEY_LENGTH, PER_HOP_SIZE, DESINATION_SIZE, IDENTIFIER_SIZE, ADDRESS_SIZE, MAC_SIZE, COMPRESSED_PUBLIC_KEY_LENGTH, LAST_HOP_SIZE } from './parameters'
+import {
+  PRIVATE_KEY_LENGTH,
+  PER_HOP_SIZE,
+  DESINATION_SIZE,
+  IDENTIFIER_SIZE,
+  ADDRESS_SIZE,
+  MAC_SIZE,
+  COMPRESSED_PUBLIC_KEY_LENGTH,
+  LAST_HOP_SIZE
+} from './parameters'
 
 export function createHeader<Chain extends HoprCoreConnectorInstance>(header: Header<Chain>, peerIds: PeerId[]) {
   function checkPeerIds() {
@@ -88,17 +96,18 @@ export function createHeader<Chain extends HoprCoreConnectorInstance>(header: He
   }
 
   function generateFiller(secrets: Uint8Array[]) {
-    const filler = new Uint8Array(PER_HOP_SIZE * (MAX_HOPS - 1))
+    const filler = new Uint8Array(PER_HOP_SIZE * (secrets.length - 1))
 
-    let length: number, start: number, end: number
+    let length: number = 0
+    let start: number = LAST_HOP_SIZE + MAX_HOPS * PER_HOP_SIZE
+    let end: number = LAST_HOP_SIZE + MAX_HOPS * PER_HOP_SIZE
 
-    for (let index = 0; index < MAX_HOPS - 1; index++) {
+    for (let index = 0; index < secrets.length - 1; index++) {
       let { key, iv } = derivePRGParameters(secrets[index])
 
-      start = LAST_HOP_SIZE + (MAX_HOPS - 1 - index) * PER_HOP_SIZE
-      end = LAST_HOP_SIZE + MAX_HOPS * PER_HOP_SIZE
-
-      length = (index + 1) * PER_HOP_SIZE
+      //start = LAST_HOP_SIZE + (MAX_HOPS - 1 - index) * PER_HOP_SIZE
+      start -= PER_HOP_SIZE
+      length += PER_HOP_SIZE
 
       u8aXOR(true, filler.subarray(0, length), PRG.createPRG(key, iv).digest(start, end))
     }
@@ -118,11 +127,13 @@ export function createHeader<Chain extends HoprCoreConnectorInstance>(header: He
         header.beta.set(peerIds[index].pubKey.marshal(), 0)
         header.beta.set(identifier, DESINATION_SIZE)
 
+        // @TODO filling the array might not be necessary
         if (paddingLength > 0) {
           header.beta.fill(0, LAST_HOP_SIZE, paddingLength)
         }
 
-        u8aXOR(true, header.beta.subarray(0, LAST_HOP_SIZE), PRG.createPRG(key, iv).digest(0, LAST_HOP_SIZE))
+        u8aXOR(true, header.beta.subarray(0, LAST_HOP_SIZE + paddingLength), PRG.createPRG(key, iv).digest(0, LAST_HOP_SIZE + paddingLength))
+
         header.beta.set(filler, LAST_HOP_SIZE + paddingLength)
       } else {
         tmp.set(header.beta.subarray(0, BETA_LENGTH - PER_HOP_SIZE), 0)
@@ -146,7 +157,6 @@ export function createHeader<Chain extends HoprCoreConnectorInstance>(header: He
         u8aXOR(true, header.beta, PRG.createPRG(key, iv).digest(0, BETA_LENGTH))
       }
 
-
       header.gamma.set(createMAC(secret, header.beta), 0)
     })
   }
@@ -158,24 +168,7 @@ export function createHeader<Chain extends HoprCoreConnectorInstance>(header: He
   function printValues(header: Header<Chain>, secrets: Uint8Array[]) {
     console.log(
       peerIds.reduce((str, peerId, index) => {
-        str =
-          str +
-          '\nsecret[' +
-          index +
-          ']: ' +
-          bs58.encode(Buffer.from(secrets[index])) +
-          '\n' +
-          'peerId[' +
-          index +
-          ']: ' +
-          peerId.toB58String() +
-          '\n' +
-          'peerId[' +
-          index +
-          '] pubkey ' +
-          bs58.encode(peerId.pubKey.marshal())
-
-        return str
+        str += `\nsecret[${index}]: ${u8aToHex(secrets[index])}\npeerId[${index}]: ${peerId.toB58String()}\npeerId[${index}] pubkey: ${u8aToHex(peerId.pubKey.marshal())}`
       }, header.toString())
     )
   }

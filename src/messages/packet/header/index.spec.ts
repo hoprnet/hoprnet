@@ -7,6 +7,25 @@ import { randomBytes } from 'crypto'
 import secp256k1 from 'secp256k1'
 
 describe('test creation & transformation of a header', function() {
+  function createAndDecomposeHeader(peerIds: PeerId[]): { header: Header<HoprCoreConnectorInstance>, identifier: Uint8Array, secrets: Uint8Array[] } {
+    const { header, identifier, secrets } = Header.create<HoprCoreConnectorInstance>(peerIds)
+
+    for (let i = 0; i < peerIds.length - 1; i++) {
+      header.deriveSecret(peerIds[i].privKey.marshal())
+      assert.deepEqual(header.derivedSecret, secrets[i], `pre-computed secret and derived secret should be the same`)
+      assert(header.verify(), `MAC must be valid`)
+
+      header.extractHeaderInformation()
+      assert(
+        peerIds[i + 1].pubKey.marshal().every((value: number, index: number) => value == header.address[index]),
+        `Decrypted address should be the same as the of node ${i + 1}`
+      )
+      header.transformForNextNode()
+    }
+
+    return { header, identifier, secrets}
+  }
+
   it('should derive parameters', function() {
     const secret = randomBytes(32)
     const alpha = randomBytes(32)
@@ -33,25 +52,7 @@ describe('test creation & transformation of a header', function() {
       PeerId.create({ keyType: 'secp256k1' })
     ])
 
-    const paymentChannels = ({
-      utils: Utils,
-      constants: Constants
-    } as unknown) as HoprCoreConnectorInstance
-
-    const { header, identifier, secrets } = Header.create<HoprCoreConnectorInstance>(peerIds)
-
-    for (let i = 0; i < peerIds.length - 1; i++) {
-      header.deriveSecret(peerIds[i].privKey.marshal())
-      assert.deepEqual(header.derivedSecret, secrets[i], `pre-computed secret and derived secret should be the same`)
-      assert(header.verify(), `MAC should be valid`)
-
-      header.extractHeaderInformation()
-      assert(
-        peerIds[i + 1].pubKey.marshal().every((value: number, index: number) => value == header.address[index]),
-        `Decrypted address should be the same as the of node ${i + 1}`
-      )
-      header.transformForNextNode()
-    }
+    const { header, identifier, secrets } = createAndDecomposeHeader(peerIds)
 
     header.deriveSecret(peerIds[2].privKey.marshal(), true)
     assert.deepEqual(header.derivedSecret, secrets[2], `pre-computed secret and derived secret should be the same`)
@@ -61,6 +62,59 @@ describe('test creation & transformation of a header', function() {
 
     assert(
       peerIds[2].pubKey.marshal().every((value: number, index: number) => value == header.address[index]),
+      `Decrypted address should be the same as the final recipient`
+    )
+
+    assert(
+      header.identifier.every((value: number, index: number) => value == identifier[index]),
+      `Decrypted identifier should have the expected value`
+    )
+  })
+
+  it('should create a header with a path less than MAX_HOPS nodes', async function () {
+    const peerIds = await Promise.all([
+      PeerId.create({ keyType: 'secp256k1' }),
+      PeerId.create({ keyType: 'secp256k1' }),
+    ])
+
+    const { header, identifier, secrets } = createAndDecomposeHeader(peerIds)
+
+    header.deriveSecret(peerIds[1].privKey.marshal(), true)
+    assert.deepEqual(header.derivedSecret, secrets[1], `pre-computed secret and derived secret should be the same`)
+
+    assert(header.verify(), `MAC must be valid`)
+    header.extractHeaderInformation(true)
+
+
+    assert(
+      peerIds[1].pubKey.marshal().every((value: number, index: number) => value == header.address[index]),
+      `Decrypted address should be the same as the final recipient`
+    )
+
+    assert(
+      header.identifier.every((value: number, index: number) => value == identifier[index]),
+      `Decrypted identifier should have the expected value`
+    )
+  })
+
+
+
+  it('should create a header with exactly two nodes', async function () {
+    const peerIds = await Promise.all([
+      PeerId.create({ keyType: 'secp256k1' }),
+    ])
+
+    const { header, identifier, secrets } = createAndDecomposeHeader(peerIds)
+
+    header.deriveSecret(peerIds[0].privKey.marshal(), true)
+    assert.deepEqual(header.derivedSecret, secrets[0], `pre-computed secret and derived secret should be the same`)
+
+    assert(header.verify(), `MAC must be valid`)
+    header.extractHeaderInformation(true)
+
+
+    assert(
+      peerIds[0].pubKey.marshal().every((value: number, index: number) => value == header.address[index]),
       `Decrypted address should be the same as the final recipient`
     )
 

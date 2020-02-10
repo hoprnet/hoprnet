@@ -1,11 +1,10 @@
 import secp256k1 from 'secp256k1'
 import hkdf from 'futoin-hkdf'
 import crypto from 'crypto'
-import bs58 from 'bs58'
 
 import { createHeader as createHeaderHelper } from './createHeader'
 
-import { PRP, PRG, u8aXOR, u8aConcat, u8aEquals } from '../../../utils'
+import { PRP, PRG, u8aXOR, u8aConcat, u8aEquals, u8aToHex } from '../../../utils'
 import { MAX_HOPS } from '../../../constants'
 
 import {
@@ -157,15 +156,15 @@ export class Header<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
       'Header:\n' +
       '|-> Alpha:\n' +
       '|---> ' +
-      bs58.encode(Buffer.from(this.alpha)) +
+      u8aToHex(this.alpha)+
       '\n' +
       '|-> Beta:\n' +
       '|---> ' +
-      bs58.encode(Buffer.from(this.beta)) +
+      u8aToHex(this.beta) +
       '\n' +
       '|-> Gamma:\n' +
       '|---> ' +
-      bs58.encode(Buffer.from(this.gamma)) +
+      u8aToHex(this.gamma) +
       '\n'
     )
   }
