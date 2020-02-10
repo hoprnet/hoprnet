@@ -95,19 +95,18 @@ class Crawler<Chain extends HoprCoreConnectorInstance> {
       // Start additional "threads"
       while (tokens.length > 0 && unContactedPeerIdArray.length > 0) {
         const token: Token = tokens.pop()
+        const currentNode = getRandomNode()
 
-        if (promises.length == MAX_PARALLEL_REQUESTS) {
+        if (promises[token] != null) {
           /**
            * @TODO remove this and make sure that the Promise is always
            * already resolved.
            */
           await promises[token]
 
-          promises[token] = queryNode(getRandomNode(), token)
-        } else if (promises.length < MAX_PARALLEL_REQUESTS) {
-          promises.push(queryNode(getRandomNode(), token))
+          promises[token] = queryNode(currentNode, token)
         } else {
-          throw Error(`something went wrong. Concurrency issue.`)
+          promises.push(queryNode(currentNode, token))
         }
       }
 

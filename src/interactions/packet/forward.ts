@@ -71,7 +71,7 @@ class PacketForwardInteraction<Chain extends HoprCoreConnectorInstance> implemen
 
           if (this.tokens.length > 0) {
             const token = this.tokens.pop()
-            if (this.promises.length == MAX_PARALLEL_JOBS) {
+            if (this.promises[token] != null) {
               /**
                * @TODO remove this and make sure that the Promise is always
                * already resolved.
@@ -79,10 +79,8 @@ class PacketForwardInteraction<Chain extends HoprCoreConnectorInstance> implemen
               await this.promises[token]
 
               this.promises[token] = this.handlePacket(packet, token)
-            } else if (this.promises.length < MAX_PARALLEL_JOBS) {
-              this.handlePacket(packet, this.tokens.pop())
             } else {
-              throw Error(`something went wrong. Concurrency issue.`)
+              this.handlePacket(packet, token)
             }
           } else {
             this.queue.push(packet)
