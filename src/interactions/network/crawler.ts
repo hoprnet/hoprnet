@@ -18,8 +18,8 @@ class Crawler<Chain extends HoprCoreConnectorInstance> implements AbstractIntera
     this.node.handle(this.protocols, this.handler.bind(this))
   }
 
-  async handler(struct: { stream: any }) {
-    await pipe(
+  handler(struct: { stream: any }) {
+    pipe(
       /* prettier-ignore */
       this.node.network.crawler.handleCrawlRequest(),
       struct.stream

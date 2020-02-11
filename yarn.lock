@@ -43,7 +43,7 @@
 
 "@hoprnet/hopr-types@hoprnet/hopr-types":
   version "0.3.0"
-  resolved "https://codeload.github.com/hoprnet/hopr-types/tar.gz/557f90622ac351b3e43ed4cb2b9ac9ff16930cc4"
+  resolved "https://codeload.github.com/hoprnet/hopr-types/tar.gz/9159288b56956f50192249a0f93126fa87f6d203"
 
 "@nodeutils/defaults-deep@~1.1.0":
   version "1.1.0"
@@ -1942,9 +1942,9 @@ it-pair@^1.0.0:
     get-iterator "^1.0.2"
 
 it-pb-rpc@^0.1.4:
-  version "0.1.4"
-  resolved "https://registry.yarnpkg.com/it-pb-rpc/-/it-pb-rpc-0.1.4.tgz#d1b2e76986aafcba433fa4ee43804125c3be1836"
-  integrity sha512-AqQsxOKEgRgaH71w+5ucKRZe9arJKQ0nOEfIaOFwach54oid/0I0eLT1UmMgB+BK0x3Ivn7La9mPASRM8mt7bw==
+  version "0.1.5"
+  resolved "https://registry.yarnpkg.com/it-pb-rpc/-/it-pb-rpc-0.1.5.tgz#52f6bbafb43ee6da2fd6f0ec95ed36b5272753c3"
+  integrity sha512-BgFQDEJoQFtidEARsL5uif595AJ5gjhn2Mycquh1PS2Oi96i42fnE4XT0QwW0qDWCIe50FD9QOIqsJcJH5mNAQ==
   dependencies:
     it-handshake "^1.0.1"
     it-length-prefixed "^3.0.0"
