@@ -27,12 +27,12 @@ contract HoprChannels {
         bytes32 secretHash
     );
 
-    // the payment channel has been funded by one party
+    // the payment channel has been funded
     event FundedChannel(
         address indexed funder,
         address indexed recipient,
         address indexed counter_party,
-        uint256 funder_amount,
+        uint256 recipient_amount,
         uint256 counter_party_amount
     );
 
@@ -62,12 +62,21 @@ contract HoprChannels {
         uint256 counter;        // increases everytime 'setHashedSecret' is called by the account
     }
 
+    enum ChannelStatus {
+        CLOSED,
+        FUNDED,
+        OPEN,
+        PENDING
+    }
+
     struct Channel {
         uint256 deposit;            // tokens in the deposit
         uint256 party_a_balance;    // tokens that are claimable by party 'A'
         uint256 closureTime;        // the time when the channel can be closed by either party
-        // uint256 counter;            //
-        bool isOpen;                // channel is open
+        uint256 state_counter;      // 0: channel closed
+                                    // 1: channel funding
+                                    // 2: channel open
+                                    // 3: channel pending
     }
 
     IERC20 public token;        // the token that will be used to settle payments
@@ -110,7 +119,6 @@ contract HoprChannels {
      * @param counter_party address the counter_party of 'recipient'
      * @param amount uint256 amount to fund the channel
     */
-    // TODO: support funding both parties?
     function fundChannel(address recipient, address counter_party, uint256 amount) public {
         address funder = msg.sender; // account which funds the channel
 
@@ -119,11 +127,18 @@ contract HoprChannels {
         require(counter_party != address(0), "'counter_party' address is empty");
         require(amount > 0, "'amount' must be greater than 0");
 
-        (address party_a, address party_b) = getParties(recipient, counter_party);
-        bytes32 channelId = getChannelId(party_a, party_b);
+        (
+            address party_a,
+            ,
+            Channel storage channel,
+            ChannelStatus status
+        ) = getChannel(recipient, counter_party);
 
-        Channel storage channel = channels[channelId];
-        require(channel.isOpen == false, "channel is open");
+        require(
+            status == ChannelStatus.CLOSED ||
+            status == ChannelStatus.FUNDED,
+            "channel is open"
+        );
 
         token.safeTransferFrom(funder, address(this), amount);
 
@@ -133,30 +148,102 @@ contract HoprChannels {
             channel.party_a_balance = channel.party_a_balance.add(amount);
         }
 
+        if (status == ChannelStatus.CLOSED) {
+            channel.state_counter = channel.state_counter.add(1);
+        }
+
         emit FundedChannel(funder, recipient, counter_party, amount, 0);
     }
 
-    // // TODO: support funding using different amounts?
+    // /**
+    //  * Fund a channel between 'initiator' and 'counter_party',
+    //  * specified tokens must be approved beforehand.
+    //  *
+    //  * @notice fund a channel
+    //  * @param state_counter uint256
+    //  * @param account_a_amount uint256
+    //  * @param counter_party_amount uint256
+    //  * @param r bytes32
+    //  * @param s bytes32
+    //  * @param v uint8
+    // */
     // function fundChannelWithSig(
-    //     uint256 channelCounter,
-    //     uint256 amount,
+    //     uint256 state_counter,
+    //     uint256 deposit,
+    //     uint256 party_a_amount,
+    //     address party_a, // msg.sender -> signed last
+    //     address party_b, // counter_party
     //     bytes32 r,
     //     bytes32 s,
     //     uint8 v
     // ) external {
-    //     address initiator = msg.sender;
-    //     address counter_party = ecrecover(keccak256(abi.encodePacked(channelCounter, amount)), v, r, s);
+    //     address funder = msg.sender;
+
+    //     // bytes32 party_a = ecrecover(
+            
+    //     // , v, r, s);
+
+    //     // // account a
+    //     // bytes32 account_a_hash = keccak256(abi.encodePacked(
+    //     //     account_b,
+    //     //     account_a_amount,
+    //     //     account_b_amount,
+    //     //     state_counter
+    //     // ))
+
+    //     // bytes32 account_b_hash = keccak256(abi.encodePacked(
+    //     //     account_a,
+    //     //     account_a_amount,
+    //     //     account_b_amount,
+    //     //     state_counter
+    //     // ))
+
+    //     // uint256 deposit = account_a_amount.add(account_b_amount);
+
+    //     // bytes32 
+
+    //     // bytes32 last_hash = keccak256(abi.encodePacked(
+            
+    //     // ));
+
+    //     address counter_party = ecrecover(keccak256(abi.encodePacked(
+    //         state_counter,
+    //         initiator_amount,
+    //         counter_party_amount
+    //     )), v, r, s);
 
     //     require(initiator != counter_party, "'initiator' and 'counter_party' must not be the same");
 
-    //     (address party_a, address party_b) = getParties(recipient, counter_party);
-    //     bytes32 channelId = getChannelId(party_a, party_b);
+    //     (
+    //         address party_a,
+    //         ,
+    //         Channel storage channel,
+    //         ChannelStatus status
+    //     ) = getChannel(initiator, counter_party);
 
-    //     Channel storage channel = channels[channelId];
-    //     require(channel.isOpen == false, "channel is open");
+    //     require(channel.state_counter == state_counter, "'state_counter' do not match");
+    //     require(status == ChannelStatus.OPEN, "channel is open");
 
-    //     token.safeTransferFrom(party_a, address(this), amount);
-    //     token.safeTransferFrom(party_b, address(this), amount);
+    //     token.safeTransferFrom(initiator, address(this), initiator_amount);
+    //     token.safeTransferFrom(counter_party, address(this), counter_party_amount);
+
+    //     channel.deposit = channel.deposit.add(initiator_amount).add(counter_party_amount);
+
+    //     if (initiator == party_a) {
+    //         channel.party_a_balance = channel.party_a_balance.add(initiator_amount);
+    //     } else {
+    //         channel.party_a_balance = channel.party_a_balance.add(counter_party_amount);
+    //     }
+
+    //     channel.state_counter = channel.state_counter.add(1);
+
+    //     emit FundedChannel(
+    //         address(0),
+    //         initiator,
+    //         counter_party,
+    //         initiator_amount,
+    //         counter_party_amount
+    //     );
     // }
 
     /**
@@ -170,14 +257,16 @@ contract HoprChannels {
         require(opener != address(0), "'opener' address is empty");
         require(counter_party != address(0), "'counter_party' address is empty");
 
-        (address party_a, address party_b) = getParties(opener, counter_party);
-        bytes32 channelId = getChannelId(party_a, party_b);
+        (
+            ,
+            ,
+            Channel storage channel,
+            ChannelStatus status
+        ) = getChannel(opener, counter_party);
+ 
+        require(status == ChannelStatus.FUNDED, "channel was not funded");
 
-        Channel storage channel = channels[channelId];
-        require(channel.isOpen == false, "channel is already open");
-        require(channel.deposit > 0, "channel is not funded");
-
-        channel.isOpen = true;
+        channel.state_counter = channel.state_counter.add(1);
 
         emit OpenedChannel(opener, counter_party);
     }
@@ -211,7 +300,7 @@ contract HoprChannels {
 
         bytes32 hashedTicket = prefixed(keccak256(abi.encodePacked(
             challenge,
-            recipientAccount.hashedSecret,
+            pre_image,
             recipientAccount.counter,
             amount,
             win_prob
@@ -219,13 +308,16 @@ contract HoprChannels {
 
         require(uint256(hashedTicket) < uint256(win_prob), "ticket must be a win");
 
-        (address party_a, address party_b) = getParties(recipient, ecrecover(hashedTicket, v, r, s));
-
-        Channel storage channel = channels[getChannelId(party_a, party_b)];
+        (
+            address party_a,
+            ,
+            Channel storage channel,
+            ChannelStatus status
+        ) = getChannel(recipient, ecrecover(hashedTicket, v, r, s));
 
         require(
-            channel.isOpen ||
-            isChannelPendingClosure(channel),
+            status == ChannelStatus.OPEN ||
+            status == ChannelStatus.PENDING,
             "channel must be 'open' or 'pending for closure'"
         );
         require(amount > 0, "amount must be strictly greater than zero");
@@ -258,13 +350,17 @@ contract HoprChannels {
     function initiateChannelClosure(address counter_party) external {
         address initiator = msg.sender;
 
-        (address party_a, address party_b) = getParties(initiator, counter_party);
-        bytes32 channelId = getChannelId(party_a, party_b);
-        Channel storage channel = channels[channelId];
+        (
+            ,
+            ,
+            Channel storage channel,
+            ChannelStatus status
+        ) = getChannel(initiator, counter_party);
 
-        require(channel.isOpen, "channel is not open");
+        require(status == ChannelStatus.OPEN, "channel is not open");
 
         channel.closureTime = now + secsClosure;
+        channel.state_counter = channel.state_counter.add(1);
 
         emit InitiatedChannelClosure(initiator, counter_party, channel.closureTime);
     }
@@ -279,13 +375,15 @@ contract HoprChannels {
     function claimChannelClosure(address counter_party) external {
         address initiator = msg.sender;
 
-        (address party_a, address party_b) = getParties(initiator, counter_party);
-        bytes32 channelId = getChannelId(party_a, party_b);
-        Channel storage channel = channels[channelId];
+        (
+            address party_a,
+            address party_b,
+            Channel storage channel,
+            ChannelStatus status
+        ) = getChannel(initiator, counter_party);
 
         require(
-            channel.isOpen &&
-            isChannelPendingClosure(channel),
+            status == ChannelStatus.PENDING,
             "channel is not pending for closure"
         );
         require(now >= channel.closureTime, "'closureTime' has not passed");
@@ -305,10 +403,31 @@ contract HoprChannels {
         channel.deposit = 0;
         channel.party_a_balance = 0;
         channel.closureTime = 0;
-        channel.isOpen = false;
+        channel.state_counter = channel.state_counter.add(1);
     }
 
     // function closeChannelWithSig
+
+    /**
+     * @notice returns channel data
+     * @param account_a address of account 'A'
+     * @param account_b address of account 'B'
+    */
+    // TODO: maybe remove this
+    function getChannel(address account_a, address account_b)
+    internal view returns (address, address, Channel storage, ChannelStatus) {
+        (address party_a, address party_b) = getParties(account_a, account_b);
+        bytes32 channelId = getChannelId(party_a, party_b);
+        Channel storage channel = channels[channelId];
+        ChannelStatus status = getChannelStatus(channel);
+
+        return (
+            party_a,
+            party_b,
+            channel,
+            status
+        );
+    }
 
     /**
      * @notice return true if account_a is party_a
@@ -342,11 +461,11 @@ contract HoprChannels {
     }
 
     /**
-     * @notice return 'true' if channel is pending for closure
+     * @notice returns 'ChannelStatus'
      * @param channel Channel
     */
-    function isChannelPendingClosure(Channel memory channel) internal pure returns (bool) {
-        return channel.closureTime > 0;
+    function getChannelStatus(Channel memory channel) internal pure returns (ChannelStatus) {
+        return ChannelStatus(channel.state_counter.mod(4));
     }
 
     /**

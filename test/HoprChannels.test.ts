@@ -32,7 +32,7 @@ const formatChannel = (res: PromiseType<HoprChannelsInstance["channels"]>) => ({
   deposit: res[0],
   party_a_balance: res[1],
   closureTime: res[2],
-  isOpen: res[3]
+  state_counter: res[3]
 });
 
 const PrintGasUsed = (name: string) => (
@@ -296,7 +296,6 @@ contract("HoprChannels", function([sender, recipient, randomUser]) {
         from: sender
       });
 
-      // TODO: update to redeem ticket and close channel
       await hoprChannels
         .redeemTicket(
           ticket.recipientSecret,
@@ -354,7 +353,10 @@ contract("HoprChannels", function([sender, recipient, randomUser]) {
         .channels(getChannelId(party_a, party_b))
         .then(formatChannel);
 
-      expect(channel.isOpen).to.be.equal(false, "wrong isOpen");
+      expect(channel.state_counter.eq(new BN(4))).to.be.equal(
+        true,
+        "wrong state_counter"
+      );
 
       const senderBalance = await hoprToken.balanceOf(sender);
       const recipientBalance = await hoprToken.balanceOf(recipient);
@@ -381,7 +383,7 @@ contract("HoprChannels", function([sender, recipient, randomUser]) {
       );
     });
 
-    it("should send 0.8 HOPR to 'recipient' and 0.2 HOPR to 'sender'", async function() {
+    it("should send 0.8 HOPR to 'recipient' and 0.2 HOPR to 'sender' using sig", async function() {
       const ticket = Ticket({
         web3,
         sender,
@@ -475,7 +477,10 @@ contract("HoprChannels", function([sender, recipient, randomUser]) {
         .channels(getChannelId(party_a, party_b))
         .then(formatChannel);
 
-      expect(channel.isOpen).to.be.equal(false, "wrong isOpen");
+      expect(channel.state_counter.eq(new BN(8))).to.be.equal(
+        true,
+        "wrong state_counter"
+      );
 
       const senderBalance = await hoprToken.balanceOf(sender);
       const recipientBalance = await hoprToken.balanceOf(recipient);

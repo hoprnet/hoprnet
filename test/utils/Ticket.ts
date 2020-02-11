@@ -31,7 +31,7 @@ type ITicket = (args: {
   signature: string; // signature of hashedTicket
   r: string;
   s: string;
-  v: string
+  v: string;
 };
 
 /*
@@ -70,7 +70,7 @@ const Ticket: ITicket = ({
 
   const hashedTicket = keccak256(
     { type: "bytes32", value: challenge },
-    { type: "bytes32", value: hashedRecipientSecret },
+    { type: "bytes32", value: recipientSecret },
     { type: "uint256", value: counter },
     { type: "uint256", value: amount },
     { type: "bytes32", value: winProb }
