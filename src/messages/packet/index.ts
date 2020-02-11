@@ -102,7 +102,7 @@ export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
    * @param path array of peerId that determines the route that
    * the packet takes
    */
-  static async create<Chain extends HoprCoreConnectorInstance>(node: Hopr<Chain>, msg: Uint8Array, path: PeerId[]) {
+  static async create<Chain extends HoprCoreConnectorInstance>(node: Hopr<Chain>, msg: Uint8Array, path: PeerId[]): Promise<Packet<Chain>> {
     const { header, secrets, identifier } = Header.create(path)
 
     node.log('---------- New Packet ----------')
@@ -112,7 +112,6 @@ export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
 
     const fee = new BN(secrets.length - 1, 10).imul(new BN(RELAY_FEE, 10))
 
-    console.log(deriveTicketKey(secrets[0]))
     const challenge = await Challenge.create(node.paymentChannels, await node.paymentChannels.utils.hash(deriveTicketKey(secrets[0])), fee).sign(
       node.peerInfo.id
     )
@@ -126,7 +125,6 @@ export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
       balance_a: new BN(123)
     })
 
-    console.log(`node`, node)
     const channel = await node.paymentChannels.channel.create(
       node.paymentChannels,
       path[0].pubKey.marshal(),
@@ -143,7 +141,7 @@ export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
       node.peerInfo.id.pubKey.marshal()
     )
 
-    return new Packet(node, null, {
+    return new Packet<Chain>(node, null, {
       header,
       ticket,
       challenge,

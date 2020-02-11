@@ -169,6 +169,7 @@ export function createHeader<Chain extends HoprCoreConnectorInstance>(header: He
     console.log(
       peerIds.reduce((str, peerId, index) => {
         str += `\nsecret[${index}]: ${u8aToHex(secrets[index])}\npeerId[${index}]: ${peerId.toB58String()}\npeerId[${index}] pubkey: ${u8aToHex(peerId.pubKey.marshal())}`
+        return str
       }, header.toString())
     )
   }

@@ -20,7 +20,7 @@ class OnChainKey<Chain extends HoprCoreConnectorInstance> implements AbstractInt
   handler(struct: { stream: any }) {
     pipe(
       /* prettier-ignore */
-      this.node.paymentChannels.self.keyPair.publicKey,
+      [this.node.paymentChannels.self.keyPair.publicKey],
       struct.stream
     )
   }
@@ -32,7 +32,7 @@ class OnChainKey<Chain extends HoprCoreConnectorInstance> implements AbstractInt
     }
 
     try {
-      struct = await this.node.dialProtocol(counterparty, PROTOCOL_ONCHAIN_KEY).catch(async (_: Error) => {
+      struct = await this.node.dialProtocol(counterparty, this.protocols[0]).catch(async (_: Error) => {
         return this.node.peerRouting
           .findPeer(PeerInfo.isPeerInfo(counterparty) ? counterparty.id : counterparty)
           .then((peerInfo: PeerInfo) => this.node.dialProtocol(peerInfo, this.protocols[0]))
@@ -57,9 +57,10 @@ class OnChainKey<Chain extends HoprCoreConnectorInstance> implements AbstractInt
           }
 
           if (msgs.length > 0) {
+            // ignore any further messages
             continue
           } else {
-            msgs.push(msg)
+            msgs.push(msg.slice())
           }
         }
 
