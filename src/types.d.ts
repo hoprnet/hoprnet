@@ -78,7 +78,6 @@ declare namespace Signature {
 declare namespace SignedChannel  {
   interface Static<ConcreteSignature extends Signature.Instance, ConcreteChannel extends Channel.Instance> extends length<Instance<ConcreteSignature, ConcreteChannel>> {
     new (
-      coreConnector: any,
       arr?: Uint8Array,
       struct?: {
         signature: ConcreteSignature
