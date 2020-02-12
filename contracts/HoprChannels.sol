@@ -291,7 +291,7 @@ contract HoprChannels {
         bytes32 r,
         bytes32 s,
         uint8 v
-    ) public returns(bytes32) {
+    ) public {
         address recipient = msg.sender;
         Account storage recipientAccount = accounts[recipient];
 

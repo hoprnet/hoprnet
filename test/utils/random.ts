@@ -32,29 +32,32 @@ export const xorBytes32 = (a: string, b: string) => {
 };
 
 export const isPartyA = (a: string, b: string) => {
-  return new BN(a.slice(2), 16).lt(new BN(b.slice(2), 16))
-}
+  return new BN(a.slice(2), 16).lt(new BN(b.slice(2), 16));
+};
 
 export const getParties = (a: string, b: string) => {
   if (isPartyA(a, b)) {
     return {
-      party_a: a,
-      party_b: b
-    }
+      partyA: a,
+      partyB: b
+    };
   }
 
   return {
-    party_a: b,
-    party_b: a
-  }
-}
+    partyA: b,
+    partyB: a
+  };
+};
 
-export const getChannelId = (party_a: string, party_b: string) => {
-  return keccak256({
-    type: "address",
-    value: party_a
-  },{
-    type: "address",
-    value: party_b
-  })
-}
+export const getChannelId = (partyA: string, partyB: string) => {
+  return keccak256(
+    {
+      type: "address",
+      value: partyA
+    },
+    {
+      type: "address",
+      value: partyB
+    }
+  );
+};

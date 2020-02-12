@@ -5,27 +5,27 @@ BigNumber.config({ EXPONENTIAL_AT: 1e9 });
 
 type ITicket = (args: {
   web3: any;
-  sender: string;
-  recipient: string;
-  senderPrivKey: string;
+  accountA: string;
+  accountB: string;
   porSecretA: string; // needs to be bytes32
   porSecretB: string; // needs to be bytes32
-  recipientSecret: string; // needs to be bytes32
+  signerPrivKey: string;
+  counterPartySecret: string; // needs to be bytes32
   amount: string;
   counter: number;
   winProbPercent: string; // max 100
 }) => {
-  sender: string; // return same as provided
-  recipient: string; // return same as provided
+  accountA: string; // return same as provided
+  accountB: string; // return same as provided
   porSecretA: string; // return same as provided
   porSecretB: string; // return same as provided
-  recipientSecret: string; // return same as provided
+  counterPartySecret: string; // return same as provided
   amount: string; // return same as provided
   counter: number; // return same as provided
   hashedPorSecretA: string; // return hashed alternative
   hashedPorSecretB: string; // return hashed alternative
   challenge: string; // return hashed alternative
-  hashedRecipientSecret: string; // return hashed alternative
+  hashedCounterPartySecret: string; // return hashed alternative
   winProb: string; // return winProb in bytes32
   hashedTicket: string; // return hashed alternative
   signature: string; // signature of hashedTicket
@@ -39,12 +39,12 @@ type ITicket = (args: {
 */
 const Ticket: ITicket = ({
   web3,
-  sender,
-  recipient,
-  senderPrivKey,
+  accountA,
+  accountB,
   porSecretA,
   porSecretB,
-  recipientSecret,
+  signerPrivKey,
+  counterPartySecret,
   amount,
   counter,
   winProbPercent
@@ -55,9 +55,9 @@ const Ticket: ITicket = ({
   const challenge = xorBytes32(hashedPorSecretA, hashedPorSecretB);
 
   // proof of randomness related hashes
-  const hashedRecipientSecret = keccak256({
+  const hashedCounterPartySecret = keccak256({
     type: "bytes32",
-    value: recipientSecret
+    value: counterPartySecret
   });
 
   // calculate win probability in bytes32
@@ -70,27 +70,26 @@ const Ticket: ITicket = ({
 
   const hashedTicket = keccak256(
     { type: "bytes32", value: challenge },
-    { type: "bytes32", value: recipientSecret },
+    { type: "bytes32", value: counterPartySecret },
     { type: "uint256", value: counter },
     { type: "uint256", value: amount },
     { type: "bytes32", value: winProb }
   );
 
-  // sender signs ticket
-  const { signature, r, s, v } = signMessage(web3, hashedTicket, senderPrivKey);
+  const { signature, r, s, v } = signMessage(web3, hashedTicket, signerPrivKey);
 
   return {
-    sender,
-    recipient,
+    accountA,
+    accountB,
     porSecretA,
     porSecretB,
-    recipientSecret,
+    counterPartySecret,
     amount,
     counter,
     hashedPorSecretA,
     hashedPorSecretB,
     challenge,
-    hashedRecipientSecret,
+    hashedCounterPartySecret,
     winProb,
     hashedTicket,
     signature,
