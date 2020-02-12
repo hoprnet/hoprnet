@@ -100,7 +100,7 @@ declare namespace SignedTicket {
   interface Instance<ConcreteSignature extends Signature.Instance, ConcreteChannel extends ChannelInstance, ConcreteTicket extends Ticket.Instance> extends Uint8Array {
     ticket: ConcreteTicket
     signature: ConcreteChannel
-    signer: Uint8Array
+    signer: Promise<Uint8Array>
   }
 }
 
