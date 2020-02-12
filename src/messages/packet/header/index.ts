@@ -106,7 +106,7 @@ export class Header<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
       this.tmpData = new Uint8Array(ADDRESS_SIZE + PROVING_VALUES_SIZE + COMPRESSED_PUBLIC_KEY_LENGTH)
     }
 
-    this.derivedSecret.set(new Uint8Array(secp256k1.publicKeyTweakMul(Buffer.from(this.alpha), Buffer.from(secretKey))), 0)
+    this.derivedSecret.set(Uint8Array.from(secp256k1.publicKeyTweakMul(Buffer.from(this.alpha), Buffer.from(secretKey))), 0)
   }
 
   verify(): boolean {
@@ -156,7 +156,7 @@ export class Header<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
       'Header:\n' +
       '|-> Alpha:\n' +
       '|---> ' +
-      u8aToHex(this.alpha)+
+      u8aToHex(this.alpha) +
       '\n' +
       '|-> Beta:\n' +
       '|---> ' +

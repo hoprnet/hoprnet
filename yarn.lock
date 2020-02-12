@@ -27,11 +27,11 @@
 
 "@hoprnet/hopr-core-connector-interface@hoprnet/hopr-core-connector-interface":
   version "1.0.0"
-  resolved "https://codeload.github.com/hoprnet/hopr-core-connector-interface/tar.gz/d443ea7b0b79b16e7a92a543f200b0bf06498572"
+  resolved "https://codeload.github.com/hoprnet/hopr-core-connector-interface/tar.gz/0a790e58435554efd1e555408985ebb3cc5db369"
 
 "@hoprnet/hopr-core-polkadot@hoprnet/hopr-core-polkadot":
   version "0.0.2"
-  resolved "https://codeload.github.com/hoprnet/hopr-core-polkadot/tar.gz/0e52762a25256b951989f9855a25af0bb820aa50"
+  resolved "https://codeload.github.com/hoprnet/hopr-core-polkadot/tar.gz/17fada410197f01bc6e143ec15dbf0a087d170dc"
   dependencies:
     "@polkadot/api" "^0.100.1"
     "@polkadot/util" "^1.8.1"
@@ -294,14 +294,14 @@
   integrity sha512-L/Nw/2e5KUaprNJoRA33oly+M8X8n0K+FwLTbYqwTcR14wdPWeRkigBLfSFpN/Asf9ENZTMZwLxjtjeYucAA4Q==
 
 "@types/node@*":
-  version "13.7.0"
-  resolved "https://registry.yarnpkg.com/@types/node/-/node-13.7.0.tgz#b417deda18cf8400f278733499ad5547ed1abec4"
-  integrity sha512-GnZbirvmqZUzMgkFn70c74OQpTTUcCzlhQliTzYjQMqg+hVKcDnxdL19Ne3UdYzdMA/+W3eb646FWn/ZaT1NfQ==
+  version "13.7.1"
+  resolved "https://registry.yarnpkg.com/@types/node/-/node-13.7.1.tgz#238eb34a66431b71d2aaddeaa7db166f25971a0d"
+  integrity sha512-Zq8gcQGmn4txQEJeiXo/KiLpon8TzAl0kmKH4zdWctPj05nWwp1ClMdAVEloqrQKfaC48PNLdgN/aVaLqUrluA==
 
 "@types/node@~12.12.21":
-  version "12.12.26"
-  resolved "https://registry.yarnpkg.com/@types/node/-/node-12.12.26.tgz#213e153babac0ed169d44a6d919501e68f59dea9"
-  integrity sha512-UmUm94/QZvU5xLcUlNR8hA7Ac+fGpO1EG/a8bcWVz0P0LqtxFmun9Y2bbtuckwGboWJIT70DoWq1r3hb56n3DA==
+  version "12.12.27"
+  resolved "https://registry.yarnpkg.com/@types/node/-/node-12.12.27.tgz#d7506f73160ad30fcebbcf5b8b7d2d976e649e42"
+  integrity sha512-odQFl/+B9idbdS0e8IxDl2ia/LP8KZLXhV3BUeI98TrZp0uoIzQPhGd+5EtzHmT0SMOIaPd7jfz6pOHLWTtl7A==
 
 "@types/pbkdf2@^3.0.0":
   version "3.0.0"
@@ -763,9 +763,9 @@ chokidar@3.3.0:
     fsevents "~2.1.1"
 
 chownr@^1.1.1:
-  version "1.1.3"
-  resolved "https://registry.yarnpkg.com/chownr/-/chownr-1.1.3.tgz#42d837d5239688d55f303003a508230fa6727142"
-  integrity sha512-i70fVHhmV3DtTl6nqvZOnIjbY0Pe4kAUjwHj8z0zAdgBtYrJyYwLKCCuRBQ5ppkyL0AkN7HKRnETdmdp1zqNXw==
+  version "1.1.4"
+  resolved "https://registry.yarnpkg.com/chownr/-/chownr-1.1.4.tgz#6fc9d7b42d32a583596337666e7d08084da2cc6b"
+  integrity sha512-jJ0bqzaylmJtVnNgzTeSOs8DPavpbYgEr/b0YL8/2GO3xJEhInFmhKMUnEJQjZumK7KXGFhUy89PrsJWlakBVg==
 
 cids@^0.7.3, cids@~0.7.1:
   version "0.7.3"
@@ -2144,7 +2144,7 @@ libp2p-interfaces@^0.2.1, libp2p-interfaces@^0.2.3:
     sinon "^8.1.1"
     streaming-iterables "^4.1.0"
 
-libp2p-kad-dht@*:
+libp2p-kad-dht@^0.18.4:
   version "0.18.4"
   resolved "https://registry.yarnpkg.com/libp2p-kad-dht/-/libp2p-kad-dht-0.18.4.tgz#21bd244e3d32c216a67494f39eb66ca191f19c45"
   integrity sha512-IlukEQuVJXgBc/foBm8FMtIWUnBUisyxZo6NpSadNF3sadiTaiSBpIQRjhyfQQ4E4ueZ4UaC9HjNQv9wueCNAA==
@@ -2261,9 +2261,9 @@ libp2p-websockets@~0.13.3:
     p-timeout "^3.2.0"
 
 libp2p@~0.27.2:
-  version "0.27.2"
-  resolved "https://registry.yarnpkg.com/libp2p/-/libp2p-0.27.2.tgz#c055677b3b19775e6a353ba2e52a87484caee17c"
-  integrity sha512-JDX+a5GOpBmvWGwLKXvTiKsD2XYSSJgN7w8JHf2mbZESu1KzVZrYnpMP0b6WHUiNny74+OP5NIOEvzDNw6n95g==
+  version "0.27.3"
+  resolved "https://registry.yarnpkg.com/libp2p/-/libp2p-0.27.3.tgz#8bd62cdb8998dc55035ad872cb2658d94ee7c4fa"
+  integrity sha512-JMZ9AuMkjiOWMSg202rIhmGRseq6cgQPZksmrVZXr4HlCYzTL5q8suCGOWUf/Phe5qmQTcyEs907h6Jz9QJHNw==
   dependencies:
     abort-controller "^3.0.0"
     aggregate-error "^3.0.1"

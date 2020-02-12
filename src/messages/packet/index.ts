@@ -8,7 +8,7 @@ const RELAY_FEE = 10
 function fromWei(arg: any, unit: any) {
   return arg.toString()
 }
-import { pubKeyToPeerId, u8aXOR, u8aConcat, u8aEquals } from '../../utils'
+import { pubKeyToPeerId, u8aXOR, u8aConcat, u8aEquals, u8aToHex } from '../../utils'
 
 import { Header, deriveTicketKey, deriveTagParameters } from './header'
 import { Challenge } from './challenge'
@@ -29,6 +29,11 @@ export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
   private _targetPeerId: PeerId
   private _senderPeerId: PeerId
   public oldChallenge: Challenge<Chain>
+
+  private _header?: Header<Chain>
+  private _ticket?: Types.SignedTicket
+  private _challenge?: Challenge<Chain>
+  private _message?: Message
 
   private node: Hopr<Chain>
 
@@ -58,31 +63,49 @@ export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
   }
 
   get header(): Header<Chain> {
-    return new Header<Chain>(this.subarray(0, Header.SIZE))
+    if (this._header == null) {
+      this._header = new Header<Chain>(this.subarray(0, Header.SIZE))
+    }
+
+    return this._header
   }
 
   get ticket(): Types.SignedTicket {
-    return new this.node.paymentChannels.types.SignedTicket(this.subarray(Header.SIZE, Header.SIZE + this.node.paymentChannels.types.Ticket.SIZE))
+    if (this._ticket == null) {
+      this._ticket = new this.node.paymentChannels.types.SignedTicket(
+        this.subarray(Header.SIZE, Header.SIZE + this.node.paymentChannels.types.SignedTicket.SIZE)
+      )
+    }
+
+    return this._ticket
   }
 
   get challenge(): Challenge<Chain> {
-    return new Challenge<Chain>(
-      this.node.paymentChannels,
-      this.subarray(
-        Header.SIZE + this.node.paymentChannels.types.Ticket.SIZE,
-        Header.SIZE + this.node.paymentChannels.types.Ticket.SIZE + Challenge.SIZE(this.node.paymentChannels)
+    if (this._challenge == null) {
+      this._challenge = new Challenge<Chain>(
+        this.node.paymentChannels,
+        this.subarray(
+          Header.SIZE + this.node.paymentChannels.types.SignedTicket.SIZE,
+          Header.SIZE + this.node.paymentChannels.types.SignedTicket.SIZE + Challenge.SIZE(this.node.paymentChannels)
+        )
       )
-    )
+    }
+
+    return this._challenge
   }
 
   get message(): Message {
-    return new Message(
-      this.subarray(
-        Header.SIZE + this.node.paymentChannels.types.Ticket.SIZE + Challenge.SIZE(this.node.paymentChannels),
-        Header.SIZE + this.node.paymentChannels.types.Ticket.SIZE + Challenge.SIZE(this.node.paymentChannels) + Message.SIZE
-      ),
-      true
-    )
+    if (this._message == null) {
+      this._message = new Message(
+        this.subarray(
+          Header.SIZE + this.node.paymentChannels.types.SignedTicket.SIZE + Challenge.SIZE(this.node.paymentChannels),
+          Header.SIZE + this.node.paymentChannels.types.SignedTicket.SIZE + Challenge.SIZE(this.node.paymentChannels) + Message.SIZE
+        ),
+        true
+      )
+    }
+
+    return this._message
   }
   //     node.paymentChannels,
   //     new Header(buf.subarray(0, HeaderSIZE)),
@@ -91,7 +114,7 @@ export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
   //     new Message(buf.subarray(HeaderSIZE + Transaction.SIZE + ChallengeSIZE, HeaderSIZE + Transaction.SIZE + ChallengeSIZE + MessageSIZE), true)
 
   static SIZE<Chain extends HoprCoreConnectorInstance>(hoprCoreConnector: Chain) {
-    return Header.SIZE + hoprCoreConnector.types.SignedTicket.length + Challenge.SIZE(hoprCoreConnector) + Message.SIZE
+    return Header.SIZE + hoprCoreConnector.types.SignedTicket.SIZE + Challenge.SIZE(hoprCoreConnector) + Message.SIZE
   }
 
   /**
@@ -367,7 +390,7 @@ export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
   async getSenderPeerId(): Promise<PeerId> {
     if (this._senderPeerId) return this._senderPeerId
 
-    this._senderPeerId = await pubKeyToPeerId(this.ticket.signer)
+    this._senderPeerId = await pubKeyToPeerId(await this.ticket.signer)
 
     return this._senderPeerId
   }

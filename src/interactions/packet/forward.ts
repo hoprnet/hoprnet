@@ -54,7 +54,7 @@ class PacketForwardInteraction<Chain extends HoprCoreConnectorInstance> implemen
       return
     }
 
-    return pipe(
+    pipe(
       /* prettier-ignore */
       [packet],
       struct.stream
@@ -67,8 +67,7 @@ class PacketForwardInteraction<Chain extends HoprCoreConnectorInstance> implemen
       struct.stream,
       async (source: AsyncIterable<Uint8Array>): Promise<void> => {
         for await (const msg of source) {
-          const packet = new Packet(this.node, msg)
-
+          const packet = new Packet(this.node, msg.slice())
           if (this.tokens.length > 0) {
             const token = this.tokens.pop()
             if (this.promises[token] != null) {
@@ -92,6 +91,7 @@ class PacketForwardInteraction<Chain extends HoprCoreConnectorInstance> implemen
 
   async handlePacket(packet: Packet<Chain>, token: number): Promise<void> {
     const sender = await packet.getSenderPeerId()
+    console.log(`handling packet`)
 
     await packet.forwardTransform()
 

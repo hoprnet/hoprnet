@@ -55,8 +55,8 @@ export default class Hopr<Chain extends HoprCoreConnectorInstance> extends libp2
   declare dialProtocol: (addr: Multiaddr | PeerInfo | PeerId, protocol: string) => Promise<{ stream: Duplex; protocol: string }>
   declare peerInfo: PeerInfo
   declare peerStore: {
-    has(peerId: PeerId): boolean
-    put(peerId: PeerInfo, options?: { silent: boolean }): PeerInfo
+    has(peerInfo: PeerId): boolean
+    put(peerInfo: PeerInfo, options?: { silent: boolean }): PeerInfo
     peers: Map<string, PeerInfo>
   }
   declare peerRouting: {
@@ -206,7 +206,7 @@ export default class Hopr<Chain extends HoprCoreConnectorInstance> extends libp2
         resolve()
       })
     )
-    
+
     if (!options.bootstrapNode) {
       await this.connectToBootstrapServers()
     } else {
