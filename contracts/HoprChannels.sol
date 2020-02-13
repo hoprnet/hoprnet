@@ -182,6 +182,7 @@ contract HoprChannels {
         bytes32 s,
         uint8 v
     ) external {
+        // Verification
         require(0 < deposit, "Total balance must be strictly greater than zero.");
         require(party_a_amount <= deposit, "Balance of partyA must be strictly smaller than the total_balance.");
         require(uint256(s) <= HALF_CURVE_ORDER, "Found malleable signature. Please insert a low-s signature.");
@@ -203,31 +204,49 @@ contract HoprChannels {
         bytes32 channelId = getChannelId(msg.sender, counterparty);
         Channel storage channel = channels[channelId];
 
-        require(channel.state_counter == state_counter, "Stored state_counter and given state_counter must be the same.");
+        require(channel.state_counter == state_counter, "Stored state_counter and signed state_counter must be the same.");
         require(status == ChannelStatus.UNINITIALISED, "Channel must be UNINITIALISED.");
 
-        // not final yet
-        token.safeTransferFrom(initiator, address(this), initiator_amount);
-        token.safeTransferFrom(counter_party, address(this), counter_party_amount);
-        // -------------
-
-        channel.deposit = channel.deposit.add(initiator_amount).add(counter_party_amount);
-
+        // Pre-commit
         if (isPartyA(msg.sender, counterparty)) {
-            channel.party_a_balance = channel.party_a_balance.add(initiator_amount);
+            require(token.balanceOf(msg.sender) >= party_a_amount, "Initiator has not enough funds.");
+            require(token.balanceOf(counterparty) >= deposit - party_a_amount, "Counterparty has not enough funds.");
         } else {
-            channel.party_a_balance = channel.party_a_balance.add(counter_party_amount);
+            require(token.balanceOf(msg.sender) >= deposit - party_a_amount, "Initiator has not enough funds.");
+            require(token.balanceOf(counterparty) >= party_a_amount, "Counterparty has not enough funds.");
         }
 
-        channel.state_counter = channel.state_counter.add(1);
+        // Commit
+        if (isPartyA(msg.sender, counterparty)) {
+            token.transfer(msg.sender, address(this), party_a_amount);
+            token.transfer(counterparty, address(this), deposit - party_a_amount);
+        } else {
+            token.transfer(msg.sender, address(this), deposit - party_a_amount);
+            token.transfer(counterparty, address(this), party_a_amount);
+        }
 
-        emit FundedChannel(
-            address(0),
-            initiator,
-            counter_party,
-            initiator_amount,
-            counter_party_amount
-        );
+        channel.deposit = deposit;
+        channel.party_a_balance = party_a_amount;
+
+        channel.state_counter += 1;
+
+        if (isPartyA(msg.sender, counterparty)) {
+            emit FundedChannel(
+                address(0),
+                msg.sender,
+                counterparty,
+                party_a_amount,
+                deposit
+            );
+        } else {
+            emit FundedChannel(
+                address(0),
+                counterparty,
+                msg.sender,
+                party_a_amount,
+                deposit
+            );
+        }
     }
 
     /**
