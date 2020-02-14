@@ -61,3 +61,21 @@ export const getChannelId = (partyA: string, partyB: string) => {
     }
   );
 };
+
+// export const generatePorSecrets = (preImage: string, iterations: number) => {
+//   let result = [preImage];
+
+//   while (iterations-- > 0) {
+//     result.unshift(
+//       keccak256({
+//         type: "bytes32",
+//         value: keccak256({
+//           type: "bytes32",
+//           value: result[result.length - 1]
+//         })
+//       })
+//     );
+//   }
+
+//   return result;
+// };
