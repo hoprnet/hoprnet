@@ -13,9 +13,9 @@ export const keccak256 = (
 export const signMessage = (
   web3: any,
   message: string,
-  senderPrivKey: string
+  signerPrivKey: string
 ) => {
-  return web3.eth.accounts.sign(message, senderPrivKey);
+  return web3.eth.accounts.sign(message, signerPrivKey);
 };
 
 export const recoverSigner = (

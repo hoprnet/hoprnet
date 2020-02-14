@@ -179,7 +179,7 @@ contract HoprChannels {
         require(not_after >= now, "signature must not be expired");
 
         address counterparty = ecrecover(
-            keccak256(abi.encodePacked(state_counter, initiator, deposit, party_a_amount, not_after)),
+            prefixed(keccak256(abi.encodePacked(state_counter, initiator, deposit, party_a_amount, not_after))),
             v,
             r,
             s
@@ -200,11 +200,13 @@ contract HoprChannels {
         );
         require(status == ChannelStatus.UNINITIALISED, "channel must be UNINITIALISED");
 
+        uint256 party_b_amount = deposit - party_a_amount;
+
         if (initiator == partyA) {
             token.safeTransferFrom(initiator, address(this), party_a_amount);
-            token.safeTransferFrom(counterparty, address(this), deposit - party_a_amount);
+            token.safeTransferFrom(counterparty, address(this), party_b_amount);
         } else {
-            token.safeTransferFrom(initiator, address(this), deposit - party_a_amount);
+            token.safeTransferFrom(initiator, address(this), party_b_amount);
             token.safeTransferFrom(counterparty, address(this), party_a_amount);
         }
 
@@ -219,7 +221,7 @@ contract HoprChannels {
                 initiator,
                 counterparty,
                 party_a_amount,
-                deposit
+                party_b_amount
             );
         } else {
             emit FundedChannel(
@@ -227,7 +229,7 @@ contract HoprChannels {
                 counterparty,
                 initiator,
                 party_a_amount,
-                deposit
+                party_b_amount
             );
         }
     }
@@ -250,7 +252,7 @@ contract HoprChannels {
             ChannelStatus status
         ) = getChannel(opener, counter_party);
  
-        require(status == ChannelStatus.FUNDED, "channel was not funded");
+        require(status == ChannelStatus.FUNDED, "channel must be in funded state");
 
         channel.state_counter = channel.state_counter.add(1);
 

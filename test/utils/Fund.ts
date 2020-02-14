@@ -1,7 +1,4 @@
-import BigNumber from "bignumber.js";
 import { keccak256, signMessage } from "./random";
-
-BigNumber.config({ EXPONENTIAL_AT: 1e9 });
 
 type IFund = (args: {
   web3: any;
