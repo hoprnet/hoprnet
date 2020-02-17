@@ -1,8 +1,8 @@
 /*
   Fixes typechain issue, see https://github.com/ethereum-ts/TypeChain/issues/193
 */
-import { join } from "path";
-import { readFile, writeFile } from "fs";
+import {join} from "path";
+import {readFile, writeFile} from "fs";
 
 const typesFile = join(
   __dirname,
@@ -17,7 +17,7 @@ readFile(typesFile, "utf8", (error, data) => {
 
   const result = data
     .replace(/BigNumber/g, "BN")
-    .replace('import { BN } from "bignumber.js";', "");
+    .replace('import {BN} from "bignumber.js";', "");
 
   writeFile(typesFile, result, "utf8", error => {
     if (error) throw error;

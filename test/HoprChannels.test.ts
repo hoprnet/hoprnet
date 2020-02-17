@@ -11,7 +11,6 @@ import {
   Ticket,
   getChannelId,
   getParties,
-  isPartyA,
   Fund
 } from "./utils";
 import { PromiseType } from "../types/typescript";
@@ -27,17 +26,17 @@ const formatAccount = (res: PromiseType<HoprChannelsInstance["accounts"]>) => ({
 
 const formatChannel = (res: PromiseType<HoprChannelsInstance["channels"]>) => ({
   deposit: res[0],
-  party_a_balance: res[1],
+  partyABalance: res[1],
   closureTime: res[2],
-  state_counter: res[3]
+  stateCounter: res[3]
 });
 
-const PrintGasUsed = (name: string) => (
-  response: Truffle.TransactionResponse
-) => {
-  console.log(`gas used in '${name}'`, response.receipt.gasUsed);
-  return response;
-};
+// const PrintGasUsed = (name: string) => (
+//   response: Truffle.TransactionResponse
+// ) => {
+//   console.log(`gas used in '${name}'`, response.receipt.gasUsed);
+//   return response;
+// };
 
 contract("HoprChannels", function([accountA, accountB, randomUser]) {
   const { partyA, partyB } = getParties(accountA, accountB);
@@ -110,9 +109,9 @@ contract("HoprChannels", function([accountA, accountB, randomUser]) {
           expectEvent(result, "FundedChannel", {
             funder: partyA,
             recipient: partyA,
-            counter_party: partyB,
-            recipient_amount: depositAmount,
-            counter_party_amount: new BN(0)
+            counterParty: partyB,
+            recipientAmount: depositAmount,
+            counterPartyAmount: new BN(0)
           });
 
           const channel = await hoprChannels
@@ -123,13 +122,13 @@ contract("HoprChannels", function([accountA, accountB, randomUser]) {
             true,
             "wrong deposit"
           );
-          expect(channel.party_a_balance.eq(new BN(depositAmount))).to.be.equal(
+          expect(channel.partyABalance.eq(new BN(depositAmount))).to.be.equal(
             true,
-            "wrong party_a_balance"
+            "wrong partyABalance"
           );
-          expect(channel.state_counter.eq(new BN(1))).to.be.equal(
+          expect(channel.stateCounter.eq(new BN(1))).to.be.equal(
             true,
-            "wrong state_counter"
+            "wrong stateCounter"
           );
         });
 
@@ -150,9 +149,9 @@ contract("HoprChannels", function([accountA, accountB, randomUser]) {
           expectEvent(result, "FundedChannel", {
             funder: partyB,
             recipient: partyB,
-            counter_party: partyA,
-            recipient_amount: depositAmount,
-            counter_party_amount: new BN(0)
+            counterParty: partyA,
+            recipientAmount: depositAmount,
+            counterPartyAmount: new BN(0)
           });
 
           const channel = await hoprChannels
@@ -163,14 +162,14 @@ contract("HoprChannels", function([accountA, accountB, randomUser]) {
             channel.deposit.eq(new BN(depositAmount).mul(new BN(2)))
           ).to.be.equal(true, "wrong deposit");
 
-          expect(channel.party_a_balance.eq(new BN(depositAmount))).to.be.equal(
+          expect(channel.partyABalance.eq(new BN(depositAmount))).to.be.equal(
             true,
-            "wrong party_a_balance"
+            "wrong partyABalance"
           );
 
-          expect(channel.state_counter.eq(new BN(1))).to.be.equal(
+          expect(channel.stateCounter.eq(new BN(1))).to.be.equal(
             true,
-            "wrong state_counter"
+            "wrong stateCounter"
           );
         });
 
@@ -261,16 +260,16 @@ contract("HoprChannels", function([accountA, accountB, randomUser]) {
 
           expectEvent(result, "OpenedChannel", {
             opener: partyA,
-            counter_party: partyB
+            counterParty: partyB
           });
 
           const channel = await hoprChannels
             .channels(getChannelId(partyA, partyB))
             .then(formatChannel);
 
-          expect(channel.state_counter.eq(new BN(2))).to.be.equal(
+          expect(channel.stateCounter.eq(new BN(2))).to.be.equal(
             true,
-            "wrong state_counter"
+            "wrong stateCounter"
           );
         });
 
@@ -315,16 +314,16 @@ contract("HoprChannels", function([accountA, accountB, randomUser]) {
           ).to.be.equal(true, "wrong deposit");
 
           expect(
-            channel.party_a_balance.eq(
+            channel.partyABalance.eq(
               new BN(depositAmount).add(
                 new BN(web3.utils.toWei("0.2", "ether"))
               )
             )
-          ).to.be.equal(true, "wrong party_a_balance");
+          ).to.be.equal(true, "wrong partyABalance");
 
-          expect(channel.state_counter.eq(new BN(2))).to.be.equal(
+          expect(channel.stateCounter.eq(new BN(2))).to.be.equal(
             true,
-            "wrong state_counter"
+            "wrong stateCounter"
           );
         });
 
@@ -368,14 +367,14 @@ contract("HoprChannels", function([accountA, accountB, randomUser]) {
             channel.deposit.eq(new BN(depositAmount).mul(new BN(2)))
           ).to.be.equal(true, "wrong deposit");
 
-          expect(channel.party_a_balance.eq(new BN(0))).to.be.equal(
+          expect(channel.partyABalance.eq(new BN(0))).to.be.equal(
             true,
-            "wrong party_a_balance"
+            "wrong partyABalance"
           );
 
-          expect(channel.state_counter.eq(new BN(2))).to.be.equal(
+          expect(channel.stateCounter.eq(new BN(2))).to.be.equal(
             true,
-            "wrong state_counter"
+            "wrong stateCounter"
           );
         });
 
@@ -386,16 +385,16 @@ contract("HoprChannels", function([accountA, accountB, randomUser]) {
 
           expectEvent(result, "InitiatedChannelClosure", {
             initiator: partyB,
-            counter_party: partyA
+            counterParty: partyA
           });
 
           const channel = await hoprChannels
             .channels(getChannelId(partyA, partyB))
             .then(formatChannel);
 
-          expect(channel.state_counter.eq(new BN(3))).to.be.equal(
+          expect(channel.stateCounter.eq(new BN(3))).to.be.equal(
             true,
-            "wrong state_counter"
+            "wrong stateCounter"
           );
         });
 
@@ -440,12 +439,12 @@ contract("HoprChannels", function([accountA, accountB, randomUser]) {
           ).to.be.equal(true, "wrong deposit");
 
           expect(
-            channel.party_a_balance.eq(new BN(web3.utils.toWei("0.5", "ether")))
-          ).to.be.equal(true, "wrong party_a_balance");
+            channel.partyABalance.eq(new BN(web3.utils.toWei("0.5", "ether")))
+          ).to.be.equal(true, "wrong partyABalance");
 
-          expect(channel.state_counter.eq(new BN(3))).to.be.equal(
+          expect(channel.stateCounter.eq(new BN(3))).to.be.equal(
             true,
-            "wrong state_counter"
+            "wrong stateCounter"
           );
         });
 
@@ -458,9 +457,9 @@ contract("HoprChannels", function([accountA, accountB, randomUser]) {
 
           expectEvent(result, "ClosedChannel", {
             closer: partyA,
-            counter_party: partyB,
-            party_a_amount: web3.utils.toWei("0.5", "ether"),
-            party_b_amount: web3.utils.toWei("1.5", "ether")
+            counterParty: partyB,
+            partyAAmount: web3.utils.toWei("0.5", "ether"),
+            partyBAmount: web3.utils.toWei("1.5", "ether")
           });
 
           const channel = await hoprChannels
@@ -472,14 +471,14 @@ contract("HoprChannels", function([accountA, accountB, randomUser]) {
             "wrong deposit"
           );
 
-          expect(channel.party_a_balance.eq(new BN(0))).to.be.equal(
+          expect(channel.partyABalance.eq(new BN(0))).to.be.equal(
             true,
-            "wrong party_a_balance"
+            "wrong partyABalance"
           );
 
-          expect(channel.state_counter.eq(new BN(10))).to.be.equal(
+          expect(channel.stateCounter.eq(new BN(10))).to.be.equal(
             true,
-            "wrong state_counter"
+            "wrong stateCounter"
           );
         });
       }
@@ -511,17 +510,17 @@ contract("HoprChannels", function([accountA, accountB, randomUser]) {
           const partyAAmount = web3.utils.toWei("0.2", "ether");
           const partyBAmount = web3.utils.toWei("0.8", "ether");
 
-          const not_after = await time.latest().then(now => {
+          const notAfter = await time.latest().then(now => {
             return now.add(time.duration.days(2)).toString();
           });
 
           const fund = Fund({
             web3,
-            state_counter: "10",
+            stateCounter: "10",
             initiator: partyA,
             deposit: totalAmount,
-            party_a_amount: partyAAmount,
-            not_after,
+            partyAAmount: partyAAmount,
+            notAfter,
             signerPrivKey: partyBPrivKey
           });
 
@@ -529,7 +528,7 @@ contract("HoprChannels", function([accountA, accountB, randomUser]) {
             "10",
             totalAmount,
             partyAAmount,
-            not_after,
+            notAfter,
             fund.r,
             fund.s,
             fund.v,
@@ -541,9 +540,9 @@ contract("HoprChannels", function([accountA, accountB, randomUser]) {
           expectEvent(result, "FundedChannel", {
             // funder: partyA,
             recipient: partyA,
-            counter_party: partyB,
-            recipient_amount: partyAAmount,
-            counter_party_amount: partyBAmount
+            counterParty: partyB,
+            recipientAmount: partyAAmount,
+            counterPartyAmount: partyBAmount
           });
 
           const channel = await hoprChannels
@@ -554,13 +553,13 @@ contract("HoprChannels", function([accountA, accountB, randomUser]) {
             true,
             "wrong deposit"
           );
-          expect(channel.party_a_balance.eq(new BN(partyAAmount))).to.be.equal(
+          expect(channel.partyABalance.eq(new BN(partyAAmount))).to.be.equal(
             true,
-            "wrong party_a_balance"
+            "wrong partyABalance"
           );
-          expect(channel.state_counter.eq(new BN(11))).to.be.equal(
+          expect(channel.stateCounter.eq(new BN(11))).to.be.equal(
             true,
-            "wrong state_counter"
+            "wrong stateCounter"
           );
         });
 
@@ -651,16 +650,16 @@ contract("HoprChannels", function([accountA, accountB, randomUser]) {
 
           expectEvent(result, "OpenedChannel", {
             opener: partyA,
-            counter_party: partyB
+            counterParty: partyB
           });
 
           const channel = await hoprChannels
             .channels(getChannelId(partyA, partyB))
             .then(formatChannel);
 
-          expect(channel.state_counter.eq(new BN(12))).to.be.equal(
+          expect(channel.stateCounter.eq(new BN(12))).to.be.equal(
             true,
-            "wrong state_counter"
+            "wrong stateCounter"
           );
         });
 
@@ -706,12 +705,12 @@ contract("HoprChannels", function([accountA, accountB, randomUser]) {
           );
 
           expect(
-            channel.party_a_balance.eq(new BN(web3.utils.toWei("0.5", "ether")))
-          ).to.be.equal(true, "wrong party_a_balance");
+            channel.partyABalance.eq(new BN(web3.utils.toWei("0.5", "ether")))
+          ).to.be.equal(true, "wrong partyABalance");
 
-          expect(channel.state_counter.eq(new BN(12))).to.be.equal(
+          expect(channel.stateCounter.eq(new BN(12))).to.be.equal(
             true,
-            "wrong state_counter"
+            "wrong stateCounter"
           );
         });
 
@@ -756,14 +755,14 @@ contract("HoprChannels", function([accountA, accountB, randomUser]) {
             "wrong deposit"
           );
 
-          expect(channel.party_a_balance.eq(new BN(0))).to.be.equal(
+          expect(channel.partyABalance.eq(new BN(0))).to.be.equal(
             true,
-            "wrong party_a_balance"
+            "wrong partyABalance"
           );
 
-          expect(channel.state_counter.eq(new BN(12))).to.be.equal(
+          expect(channel.stateCounter.eq(new BN(12))).to.be.equal(
             true,
-            "wrong state_counter"
+            "wrong stateCounter"
           );
         });
 
@@ -774,16 +773,16 @@ contract("HoprChannels", function([accountA, accountB, randomUser]) {
 
           expectEvent(result, "InitiatedChannelClosure", {
             initiator: partyB,
-            counter_party: partyA
+            counterParty: partyA
           });
 
           const channel = await hoprChannels
             .channels(getChannelId(partyA, partyB))
             .then(formatChannel);
 
-          expect(channel.state_counter.eq(new BN(13))).to.be.equal(
+          expect(channel.stateCounter.eq(new BN(13))).to.be.equal(
             true,
-            "wrong state_counter"
+            "wrong stateCounter"
           );
         });
 
@@ -828,14 +827,14 @@ contract("HoprChannels", function([accountA, accountB, randomUser]) {
             "wrong deposit"
           );
 
-          expect(channel.party_a_balance.eq(new BN(depositAmount))).to.be.equal(
+          expect(channel.partyABalance.eq(new BN(depositAmount))).to.be.equal(
             true,
-            "wrong party_a_balance"
+            "wrong partyABalance"
           );
 
-          expect(channel.state_counter.eq(new BN(13))).to.be.equal(
+          expect(channel.stateCounter.eq(new BN(13))).to.be.equal(
             true,
-            "wrong state_counter"
+            "wrong stateCounter"
           );
         });
 
@@ -848,9 +847,9 @@ contract("HoprChannels", function([accountA, accountB, randomUser]) {
 
           expectEvent(result, "ClosedChannel", {
             closer: partyB,
-            counter_party: partyA,
-            party_a_amount: web3.utils.toWei("1", "ether"),
-            party_b_amount: "0"
+            counterParty: partyA,
+            partyAAmount: web3.utils.toWei("1", "ether"),
+            partyBAmount: "0"
           });
 
           const channel = await hoprChannels
@@ -862,14 +861,14 @@ contract("HoprChannels", function([accountA, accountB, randomUser]) {
             "wrong deposit"
           );
 
-          expect(channel.party_a_balance.eq(new BN(0))).to.be.equal(
+          expect(channel.partyABalance.eq(new BN(0))).to.be.equal(
             true,
-            "wrong party_a_balance"
+            "wrong partyABalance"
           );
 
-          expect(channel.state_counter.eq(new BN(20))).to.be.equal(
+          expect(channel.stateCounter.eq(new BN(20))).to.be.equal(
             true,
-            "wrong state_counter"
+            "wrong stateCounter"
           );
         });
       }
@@ -915,9 +914,9 @@ contract("HoprChannels", function([accountA, accountB, randomUser]) {
       expectEvent(result, "FundedChannel", {
         funder: partyA,
         recipient: partyA,
-        counter_party: partyB,
-        recipient_amount: depositAmount,
-        counter_party_amount: new BN(0)
+        counterParty: partyB,
+        recipientAmount: depositAmount,
+        counterPartyAmount: new BN(0)
       });
 
       // TODO: check balances
@@ -936,9 +935,9 @@ contract("HoprChannels", function([accountA, accountB, randomUser]) {
         "wrong closureTime"
       );
 
-      expect(channel.state_counter.eq(new BN(1))).to.be.equal(
+      expect(channel.stateCounter.eq(new BN(1))).to.be.equal(
         true,
-        "wrong state_counter"
+        "wrong stateCounter"
       );
     });
 
@@ -972,11 +971,11 @@ contract("HoprChannels", function([accountA, accountB, randomUser]) {
     it("fund 'signer' should be 'partyA'", async function() {
       const fund = Fund({
         web3,
-        state_counter: "0",
+        stateCounter: "0",
         initiator: partyB,
         deposit: depositAmount,
-        party_a_amount: depositAmount,
-        not_after: "0",
+        partyAAmount: depositAmount,
+        notAfter: "0",
         signerPrivKey: partyAPrivKey
       });
 

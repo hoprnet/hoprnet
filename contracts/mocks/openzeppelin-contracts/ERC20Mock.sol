@@ -3,9 +3,10 @@ pragma solidity ^0.5.0;
 // import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "../../ERC20Token.sol";
 
+
 // mock class using Token
 contract ERC20Mock is ERC20Token {
-    constructor (address initialAccount, uint256 initialBalance) public {
+    constructor(address initialAccount, uint256 initialBalance) public {
         _mint(initialAccount, initialBalance);
     }
 
@@ -25,7 +26,9 @@ contract ERC20Mock is ERC20Token {
         _transfer(from, to, value);
     }
 
-    function approveInternal(address owner, address spender, uint256 value) public {
+    function approveInternal(address owner, address spender, uint256 value)
+        public
+    {
         _approve(owner, spender, value);
     }
 }

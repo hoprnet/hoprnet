@@ -2,11 +2,11 @@ import { keccak256, signMessage } from "./random";
 
 type IFund = (args: {
   web3: any;
-  state_counter: string;
+  stateCounter: string;
   initiator: string;
   deposit: string;
-  party_a_amount: string;
-  not_after: string;
+  partyAAmount: string;
+  notAfter: string;
   signerPrivKey: string;
 }) => {
   hashedFund: string; // return hashed alternative
@@ -21,19 +21,19 @@ type IFund = (args: {
 */
 const Fund: IFund = ({
   web3,
-  state_counter,
+  stateCounter,
   initiator,
   deposit,
-  party_a_amount,
-  not_after,
+  partyAAmount,
+  notAfter,
   signerPrivKey
 }) => {
   const hashedFund = keccak256(
-    { type: "uint256", value: state_counter },
+    { type: "uint256", value: stateCounter },
     { type: "address", value: initiator },
     { type: "uint256", value: deposit },
-    { type: "uint256", value: party_a_amount },
-    { type: "uint256", value: not_after }
+    { type: "uint256", value: partyAAmount },
+    { type: "uint256", value: notAfter }
   );
 
   const { signature, r, s, v } = signMessage(web3, hashedFund, signerPrivKey);

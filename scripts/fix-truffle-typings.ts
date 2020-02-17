@@ -1,8 +1,8 @@
 /*
   Fixes truffle-typings issue, see https://github.com/ethereum-ts/truffle-typings/pull/13#issuecomment-550325019
 */
-import { join } from "path";
-import { readFile, writeFile } from "fs";
+import {join} from "path";
+import {readFile, writeFile} from "fs";
 
 const typesFile = join(
   __dirname,

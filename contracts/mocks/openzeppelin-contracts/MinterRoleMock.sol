@@ -2,6 +2,7 @@ pragma solidity ^0.5.0;
 
 import "@openzeppelin/contracts/access/roles/MinterRole.sol";
 
+
 contract MinterRoleMock is MinterRole {
     function removeMinter(address account) public {
         _removeMinter(account);

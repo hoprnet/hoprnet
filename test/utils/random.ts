@@ -31,21 +31,21 @@ export const xorBytes32 = (a: string, b: string) => {
   return `0x${new BN(a.slice(2), 16).xor(new BN(b.slice(2), 16)).toString(16)}`;
 };
 
-export const isPartyA = (a: string, b: string) => {
-  return new BN(a.slice(2), 16).lt(new BN(b.slice(2), 16));
+export const isPartyA = (accountA: string, accountB: string) => {
+  return new BN(accountA.slice(2), 16).lt(new BN(accountB.slice(2), 16));
 };
 
-export const getParties = (a: string, b: string) => {
-  if (isPartyA(a, b)) {
+export const getParties = (accountA: string, accountB: string) => {
+  if (isPartyA(accountA, accountB)) {
     return {
-      partyA: a,
-      partyB: b
+      partyA: accountA,
+      partyB: accountB
     };
   }
 
   return {
-    partyA: b,
-    partyB: a
+    partyA: accountB,
+    partyB: accountA
   };
 };
 

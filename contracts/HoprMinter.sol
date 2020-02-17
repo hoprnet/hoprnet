@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "./HoprToken.sol";
 
+
 contract HoprMinter is Ownable {
     using SafeMath for uint256;
 
@@ -30,7 +31,7 @@ contract HoprMinter is Ownable {
     // accounts
     mapping(address => Account) public accounts;
 
-    constructor (address _token, uint256 _maxAmount, uint256 _duration) public {
+    constructor(address _token, uint256 _maxAmount, uint256 _duration) public {
         token = HoprToken(_token);
         maxAmount = _maxAmount;
         started = now;
@@ -46,11 +47,17 @@ contract HoprMinter is Ownable {
      * @param account address that the balance will be increased for
      * @param amount uint256 how much tokens to increase
      */
-    function increaseBalance(address account, uint256 amount) external onlyOwner {
+    function increaseBalance(address account, uint256 amount)
+        external
+        onlyOwner
+    {
         require(now < deadline, "cannot update balances past deadline");
 
         uint256 newAmountToMint = amountToMint.add(amount);
-        require(newAmountToMint <= maxAmount, "reached max amount allowed to be minted");
+        require(
+            newAmountToMint <= maxAmount,
+            "reached max amount allowed to be minted"
+        );
 
         amountToMint = newAmountToMint;
         accounts[account].balance = accounts[account].balance.add(amount);
@@ -95,7 +102,11 @@ contract HoprMinter is Ownable {
      * @notice calculate amount that can be claimed
      * @param account Account that the claimable tokens will be calculated for
      */
-    function _claimable(Account storage account) internal view returns (uint256) {
+    function _claimable(Account storage account)
+        internal
+        view
+        returns (uint256)
+    {
         if (now >= deadline) {
             return account.balance;
         }
@@ -105,15 +116,12 @@ contract HoprMinter is Ownable {
         if (firstClaim) {
             uint256 since = now.sub(started);
 
-            return since
-                .mul(account.balance)
-                .div(duration);
+            return since.mul(account.balance).div(duration);
         } else {
             uint256 since = now.sub(account.lastClaim);
 
-            return since
-                .mul(account.balance)
-                .div(deadline.sub(account.lastClaim));
+            return
+                since.mul(account.balance).div(deadline.sub(account.lastClaim));
         }
     }
 }
