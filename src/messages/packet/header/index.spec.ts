@@ -1,14 +1,18 @@
 import assert from 'assert'
 import { Header, deriveBlinding, deriveCipherParameters, deriveTagParameters, createMAC, deriveTicketKey, derivePRGParameters } from '.'
-import { Utils, Constants } from '@hoprnet/hopr-core-polkadot'
+import { Utils } from '@hoprnet/hopr-core-polkadot'
 import PeerId from 'peer-id'
+import Hopr from '../../../'
 import { HoprCoreConnectorInstance } from '@hoprnet/hopr-core-connector-interface'
 import { randomBytes } from 'crypto'
 import secp256k1 from 'secp256k1'
 
-describe('test creation & transformation of a header', function() {
-  function createAndDecomposeHeader(peerIds: PeerId[]): { header: Header<HoprCoreConnectorInstance>, identifier: Uint8Array, secrets: Uint8Array[] } {
-    const { header, identifier, secrets } = Header.create<HoprCoreConnectorInstance>(peerIds)
+describe('test creation & transformation of a header', async function() {
+  async function createAndDecomposeHeader(
+    node: Hopr<HoprCoreConnectorInstance>,
+    peerIds: PeerId[]
+  ): Promise<{ header: Header<HoprCoreConnectorInstance>; identifier: Uint8Array; secrets: Uint8Array[] }> {
+    const { header, identifier, secrets } = await Header.create<HoprCoreConnectorInstance>(node, peerIds)
 
     for (let i = 0; i < peerIds.length - 1; i++) {
       header.deriveSecret(peerIds[i].privKey.marshal())
@@ -18,12 +22,22 @@ describe('test creation & transformation of a header', function() {
       header.extractHeaderInformation()
       assert(
         peerIds[i + 1].pubKey.marshal().every((value: number, index: number) => value == header.address[index]),
-        `Decrypted address should be the same as the of node ${i + 1}`
+        `Decrypted address should be the same as the one of node ${i + 1}`
       )
       header.transformForNextNode()
     }
 
-    return { header, identifier, secrets}
+    return { header, identifier, secrets }
+  }
+
+  function getNode(): Hopr<HoprCoreConnectorInstance> {
+    const node = ({
+      paymentChannels: {
+        utils: Utils
+      }
+    } as unknown) as Hopr<HoprCoreConnectorInstance>
+
+    return node
   }
 
   it('should derive parameters', function() {
@@ -52,7 +66,7 @@ describe('test creation & transformation of a header', function() {
       PeerId.create({ keyType: 'secp256k1' })
     ])
 
-    const { header, identifier, secrets } = createAndDecomposeHeader(peerIds)
+    const { header, identifier, secrets } = await createAndDecomposeHeader(getNode(), peerIds)
 
     header.deriveSecret(peerIds[2].privKey.marshal(), true)
     assert.deepEqual(header.derivedSecret, secrets[2], `pre-computed secret and derived secret should be the same`)
@@ -71,20 +85,16 @@ describe('test creation & transformation of a header', function() {
     )
   })
 
-  it('should create a header with a path less than MAX_HOPS nodes', async function () {
-    const peerIds = await Promise.all([
-      PeerId.create({ keyType: 'secp256k1' }),
-      PeerId.create({ keyType: 'secp256k1' }),
-    ])
+  it('should create a header with a path less than MAX_HOPS nodes', async function() {
+    const peerIds = await Promise.all([PeerId.create({ keyType: 'secp256k1' }), PeerId.create({ keyType: 'secp256k1' })])
 
-    const { header, identifier, secrets } = createAndDecomposeHeader(peerIds)
+    const { header, identifier, secrets } = await createAndDecomposeHeader(getNode(), peerIds)
 
     header.deriveSecret(peerIds[1].privKey.marshal(), true)
     assert.deepEqual(header.derivedSecret, secrets[1], `pre-computed secret and derived secret should be the same`)
 
     assert(header.verify(), `MAC must be valid`)
     header.extractHeaderInformation(true)
-
 
     assert(
       peerIds[1].pubKey.marshal().every((value: number, index: number) => value == header.address[index]),
@@ -97,21 +107,16 @@ describe('test creation & transformation of a header', function() {
     )
   })
 
+  it('should create a header with exactly two nodes', async function() {
+    const peerIds = await Promise.all([PeerId.create({ keyType: 'secp256k1' })])
 
-
-  it('should create a header with exactly two nodes', async function () {
-    const peerIds = await Promise.all([
-      PeerId.create({ keyType: 'secp256k1' }),
-    ])
-
-    const { header, identifier, secrets } = createAndDecomposeHeader(peerIds)
+    const { header, identifier, secrets } = await createAndDecomposeHeader(getNode(), peerIds)
 
     header.deriveSecret(peerIds[0].privKey.marshal(), true)
     assert.deepEqual(header.derivedSecret, secrets[0], `pre-computed secret and derived secret should be the same`)
 
     assert(header.verify(), `MAC must be valid`)
     header.extractHeaderInformation(true)
-
 
     assert(
       peerIds[0].pubKey.marshal().every((value: number, index: number) => value == header.address[index]),

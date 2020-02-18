@@ -21,14 +21,17 @@ export class Challenge<Chain extends HoprCoreConnectorInstance> extends Uint8Arr
 
   constructor(
     paymentChannels: Chain,
-    buf?: Uint8Array,
+    arr?: {
+      bytes: ArrayBuffer
+      offset: number
+    },
     struct?: {
       signature: Types.Signature
     }
   ) {
-    if (buf != null && struct == null) {
-      super(buf)
-    } else if (buf == null && struct != null) {
+    if (arr != null && struct == null) {
+      super(arr.bytes, arr.offset, Challenge.SIZE(paymentChannels))
+    } else if (arr == null && struct != null) {
       super(struct.signature)
     } else {
       throw Error(`Invalid constructor parameters`)
@@ -38,7 +41,10 @@ export class Challenge<Chain extends HoprCoreConnectorInstance> extends Uint8Arr
   }
 
   get challengeSignature(): Types.Signature {
-    return new this.paymentChannels.types.Signature(this.subarray(0, this.paymentChannels.types.Signature.SIZE))
+    return new this.paymentChannels.types.Signature({
+      bytes: this.buffer,
+      offset: this.byteOffset
+    })
   }
 
   set challengeSignature(signature: Types.Signature) {
@@ -60,8 +66,8 @@ export class Challenge<Chain extends HoprCoreConnectorInstance> extends Uint8Arr
     return this.paymentChannels.utils.hash(this._hashedKey)
   }
 
-  subarray(begin?: number, end?: number): Uint8Array {
-    return new Uint8Array(this.buffer, begin, end != null ? end - begin : undefined)
+  subarray(begin: number = 0, end?: number): Uint8Array {
+    return new Uint8Array(this.buffer, this.byteOffset + begin, end != null ? end - begin : undefined)
   }
 
   /**
@@ -113,7 +119,11 @@ export class Challenge<Chain extends HoprCoreConnectorInstance> extends Uint8Arr
       throw Error(`Invalid secret format. Expected a ${Uint8Array.name} of ${KEY_LENGTH} elements but got one with ${hashedKey.length}`)
     }
 
-    const challenge = new Challenge(hoprCoreConnector, new Uint8Array(Challenge.SIZE(hoprCoreConnector)))
+    const challenge = new Challenge(hoprCoreConnector, {
+      bytes: new Uint8Array(Challenge.SIZE(hoprCoreConnector)).buffer,
+      offset: 0
+    })
+
     challenge._hashedKey = hashedKey
     challenge._fee = fee
 

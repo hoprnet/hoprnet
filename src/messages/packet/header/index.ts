@@ -3,6 +3,7 @@ import hkdf from 'futoin-hkdf'
 import crypto from 'crypto'
 
 import { createHeader as createHeaderHelper } from './createHeader'
+import Hopr from '../../..'
 
 import { PRP, PRG, u8aXOR, u8aConcat, u8aEquals, u8aToHex } from '../../../utils'
 import { MAX_HOPS } from '../../../constants'
@@ -29,6 +30,7 @@ const HASH_KEY_HMAC = 'H'
 const HASH_KEY_TAGGING = 'T'
 const HASH_KEY_TX = 'Tx'
 const HASH_KEY_TX_BLINDED = 'Tx_'
+const HASH_KEY_TX_LAST = 'Tx_Last'
 
 const TAG_SIZE = 16
 
@@ -48,26 +50,24 @@ export class Header<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
   tmpData?: Uint8Array
   derivedSecretLastNode?: Uint8Array
 
-  constructor(arr: Uint8Array) {
-    super(arr)
-
-    if (arr.length != Header.SIZE) throw Error(`Wrong input. Please provide a Buffer of size ${Header.SIZE}.`)
+  constructor(arr: { bytes: ArrayBuffer; offset: number }) {
+    super(arr.bytes, arr.offset, Header.SIZE)
   }
 
-  subarray(begin?: number, end?: number): Uint8Array {
-    return new Uint8Array(this.buffer, begin, end != null ? end - begin : undefined)
+  subarray(begin: number = 0, end?: number): Uint8Array {
+    return new Uint8Array(this.buffer, begin + this.byteOffset, end != null ? end - begin : undefined)
   }
 
   get alpha(): Uint8Array {
-    return new Uint8Array(this.buffer, 0, COMPRESSED_PUBLIC_KEY_LENGTH)
+    return this.subarray(0, COMPRESSED_PUBLIC_KEY_LENGTH)
   }
 
   get beta(): Uint8Array {
-    return new Uint8Array(this.buffer, COMPRESSED_PUBLIC_KEY_LENGTH, BETA_LENGTH)
+    return this.subarray(COMPRESSED_PUBLIC_KEY_LENGTH, COMPRESSED_PUBLIC_KEY_LENGTH + BETA_LENGTH)
   }
 
   get gamma(): Uint8Array {
-    return new Uint8Array(this.buffer, COMPRESSED_PUBLIC_KEY_LENGTH + BETA_LENGTH, MAC_SIZE)
+    return this.subarray(COMPRESSED_PUBLIC_KEY_LENGTH + BETA_LENGTH, COMPRESSED_PUBLIC_KEY_LENGTH + BETA_LENGTH + MAC_SIZE)
   }
 
   get address(): this['tmpData'] {
@@ -79,11 +79,11 @@ export class Header<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
   }
 
   get hashedKeyHalf(): this['tmpData'] {
-    return this.tmpData != null ? this.tmpData.subarray(ADDRESS_SIZE, ADDRESS_SIZE + COMPRESSED_PUBLIC_KEY_LENGTH) : undefined
+    return this.tmpData != null ? this.tmpData.subarray(ADDRESS_SIZE, ADDRESS_SIZE + KEY_LENGTH) : undefined
   }
 
   get encryptionKey(): this['tmpData'] {
-    return this.tmpData != null ? this.tmpData.subarray(ADDRESS_SIZE + COMPRESSED_PUBLIC_KEY_LENGTH, ADDRESS_SIZE + PROVING_VALUES_SIZE) : undefined
+    return this.tmpData != null ? this.tmpData.subarray(ADDRESS_SIZE + KEY_LENGTH, ADDRESS_SIZE + PROVING_VALUES_SIZE) : undefined
   }
 
   get derivedSecret(): this['tmpData'] {
@@ -173,33 +173,34 @@ export class Header<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
     return COMPRESSED_PUBLIC_KEY_LENGTH + BETA_LENGTH + MAC_SIZE
   }
 
-  static create<Chain extends HoprCoreConnectorInstance>(
+  static async create<Chain extends HoprCoreConnectorInstance>(
+    node: Hopr<Chain>,
     peerIds: PeerId[]
-  ): {
+  ): Promise<{
     header: Header<Chain>
     secrets: Uint8Array[]
     identifier: Uint8Array
-  } {
-    const header = new Header<Chain>(new Uint8Array(Header.SIZE))
+  }> {
+    const header = new Header<Chain>({ bytes: new Uint8Array(Header.SIZE).buffer, offset: 0 })
     header.tmpData = header.beta.subarray(ADDRESS_SIZE + MAC_SIZE, PER_HOP_SIZE)
 
-    return createHeaderHelper(header, peerIds)
+    return createHeaderHelper(node, header, peerIds)
   }
 }
 
 export const BETA_LENGTH = PER_HOP_SIZE * (MAX_HOPS - 1) + LAST_HOP_SIZE
 
 export function deriveTagParameters(secret: Uint8Array): Uint8Array {
-  if (!secp256k1.publicKeyVerify(Buffer.from(secret))) {
-    throw Error('General error.')
+  if (secret.length != COMPRESSED_PUBLIC_KEY_LENGTH || (secret[0] != 0x02 && secret[0] != 0x03)) {
+    throw Error('Secret must be a public key.')
   }
 
   return hkdf(Buffer.from(secret), TAG_SIZE, { salt: HASH_KEY_TAGGING })
 }
 
 export function deriveCipherParameters(secret: Uint8Array): CipherParameters {
-  if (!secp256k1.publicKeyVerify(Buffer.from(secret))) {
-    throw Error('General error.')
+  if (secret.length != COMPRESSED_PUBLIC_KEY_LENGTH || (secret[0] != 0x02 && secret[0] != 0x03)) {
+    throw Error('Secret must be a public key')
   }
 
   const keyAndIV = hkdf(Buffer.from(secret), PRP.KEY_LENGTH + PRP.IV_LENGTH, { salt: HASH_KEY_PRP })
@@ -211,8 +212,8 @@ export function deriveCipherParameters(secret: Uint8Array): CipherParameters {
 }
 
 export function derivePRGParameters(secret: Uint8Array): PRGParameters {
-  if (!secp256k1.publicKeyVerify(Buffer.from(secret))) {
-    throw Error('General error.')
+  if (secret.length != COMPRESSED_PUBLIC_KEY_LENGTH || (secret[0] != 0x02 && secret[0] != 0x03)) {
+    throw Error('Secret must be a public key')
   }
 
   const keyAndIV = hkdf(Buffer.from(secret), PRG.KEY_LENGTH + PRG.IV_LENGTH, { salt: HASH_KEY_PRG })
@@ -224,36 +225,40 @@ export function derivePRGParameters(secret: Uint8Array): PRGParameters {
 }
 
 export function deriveBlinding(alpha: Uint8Array, secret: Uint8Array): Uint8Array {
-  if (!secp256k1.publicKeyVerify(Buffer.from(secret))) {
-    throw Error('General error.')
+  if (secret.length != COMPRESSED_PUBLIC_KEY_LENGTH || (secret[0] != 0x02 && secret[0] != 0x03)) {
+    throw Error('Secret must be a public key')
   }
 
-  if (!secp256k1.publicKeyVerify(Buffer.from(alpha))) {
-    throw Error('General error.')
+  if (alpha.length != COMPRESSED_PUBLIC_KEY_LENGTH || (alpha[0] != 0x02 && alpha[0] != 0x03)) {
+    throw Error('Alpha must be a public key')
   }
 
   return hkdf(Buffer.from(u8aConcat(alpha, secret)), PRIVATE_KEY_LENGTH, { salt: HASH_KEY_BLINDINGS })
 }
 
-export function deriveTicketKey(secret: Uint8Array): Uint8Array {
-  if (!secp256k1.publicKeyVerify(Buffer.from(secret))) {
-    throw Error('General error')
+function derivationHelper(secret: Uint8Array, salt: string) {
+  if (secret.length != COMPRESSED_PUBLIC_KEY_LENGTH || (secret[0] != 0x02 && secret[0] != 0x03)) {
+    throw Error('Secret must be a public key')
   }
 
-  return hkdf(Buffer.from(secret), KEY_LENGTH, { salt: HASH_KEY_TX })
+  return hkdf(Buffer.from(secret), KEY_LENGTH, { salt })
 }
 
-export function deriveTicketKeyBlinding(secret: Uint8Array) {
-  if (!secp256k1.publicKeyVerify(Buffer.from(secret))) {
-    throw Error('General error')
-  }
+export function deriveTicketKey(secret: Uint8Array): Uint8Array {
+  return derivationHelper(secret, HASH_KEY_TX)
+}
 
-  return hkdf(Buffer.from(secret), KEY_LENGTH, { salt: HASH_KEY_TX_BLINDED })
+export function deriveTicketKeyBlinding(secret: Uint8Array): Uint8Array {
+  return derivationHelper(secret, HASH_KEY_TX_BLINDED)
+}
+
+export function deriveTicketLastKey(secret: Uint8Array): Uint8Array {
+  return derivationHelper(secret, HASH_KEY_TX_LAST)
 }
 
 export function createMAC(secret: Uint8Array, msg: Uint8Array): Uint8Array {
-  if (!secp256k1.publicKeyVerify(Buffer.from(secret))) {
-    throw Error('General error')
+  if (secret.length != COMPRESSED_PUBLIC_KEY_LENGTH || (secret[0] != 0x02 && secret[0] != 0x03)) {
+    throw Error('Secret must be a public key')
   }
 
   const key = hkdf(Buffer.from(secret), MAC_KEY_LENGTH, { salt: HASH_KEY_HMAC })

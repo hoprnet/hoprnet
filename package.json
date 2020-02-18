@@ -55,7 +55,6 @@
     "libp2p-secio": "^0.12.2",
     "libp2p-tcp": "~0.14.3",
     "libp2p-websockets": "~0.13.3",
-    "lodash.foreachright": "~4.4.0",
     "lodash.groupby": "~4.6.0",
     "lodash.unionwith": "~4.6.0",
     "multiaddr": "^7.2.1",

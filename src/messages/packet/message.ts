@@ -1,5 +1,3 @@
-import forEachRight from 'lodash.foreachright'
-
 import { PACKET_SIZE } from '../../constants'
 import { deriveCipherParameters } from './header'
 
@@ -8,22 +6,23 @@ import { PRP, toLengthPrefixedU8a, lengthPrefixedToU8a } from '../../utils'
 export const PADDING = new TextEncoder().encode('PADDING')
 
 export default class Message extends Uint8Array {
-  constructor(arr: Uint8Array, public encrypted: boolean) {
-    super(arr)
-
-    if (arr.length != PACKET_SIZE) {
-      throw Error(`Expected a ${Uint8Array.name} of size ${PACKET_SIZE} but got ${arr.length}.`)
-    }
+  constructor(
+    arr: {
+      bytes: ArrayBuffer
+      offset: number
+    },
+    public encrypted: boolean
+  ) {
+    super(arr.bytes, arr.offset, PACKET_SIZE)
   }
 
   static get SIZE(): number {
     return PACKET_SIZE
   }
 
-  subarray(begin?: number, end?: number): Uint8Array {
-    return new Uint8Array(this.buffer, begin, end != null ? end - begin : undefined)
+  subarray(begin: number = 0, end?: number): Uint8Array {
+    return new Uint8Array(this.buffer, this.byteOffset + begin, end != null ? end - begin : undefined)
   }
-
 
   get plaintext(): Uint8Array {
     if (this.encrypted) {
@@ -42,7 +41,13 @@ export default class Message extends Uint8Array {
   }
 
   static createEncrypted(msg: Uint8Array): Message {
-    return new Message(msg, true)
+    return new Message(
+      {
+        bytes: msg.buffer,
+        offset: 0
+      },
+      true
+    )
   }
 
   static createPlain(msg: Uint8Array | string): Message {
@@ -50,7 +55,13 @@ export default class Message extends Uint8Array {
       msg = new TextEncoder().encode(msg)
     }
 
-    return new Message(toLengthPrefixedU8a(msg, PADDING, PACKET_SIZE), false)
+    return new Message(
+      {
+        bytes: toLengthPrefixedU8a(msg, PADDING, PACKET_SIZE),
+        offset: 0
+      },
+      false
+    )
   }
 
   onionEncrypt(secrets: Uint8Array[]): Message {
@@ -60,10 +71,10 @@ export default class Message extends Uint8Array {
 
     this.encrypted = true
 
-    forEachRight(secrets, (secret: Uint8Array) => {
-      const { key, iv } = deriveCipherParameters(secret)
-      PRP.createPRP(key, iv).permutate(this)
-    })
+    for (let i = secrets.length; i > 0; i--) {
+      const { key, iv } = deriveCipherParameters(secrets[i - 1])
+      PRP.createPRP(key, iv).permutate(this.subarray())
+    }
 
     return this
   }
@@ -71,7 +82,7 @@ export default class Message extends Uint8Array {
   decrypt(secret: Uint8Array): Message {
     const { key, iv } = deriveCipherParameters(secret)
 
-    PRP.createPRP(key, iv).inverse(this)
+    PRP.createPRP(key, iv).inverse(this.subarray())
 
     return this
   }

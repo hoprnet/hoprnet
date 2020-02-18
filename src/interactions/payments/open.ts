@@ -38,8 +38,12 @@ class Opening<Chain extends HoprCoreConnectorInstance> implements AbstractIntera
           .then((peerInfo: PeerInfo) => this.node.dialProtocol(peerInfo, this.protocols[0]))
       })
     } catch (err) {
-      console.log(struct)
-      throw Error(`Tried to open a payment channel but could not connect to ${(PeerInfo.isPeerInfo(counterparty) ? counterparty.id : counterparty).toB58String()}. Error was: ${err.message}`)
+      throw Error(
+        `Tried to open a payment channel but could not connect to ${(PeerInfo.isPeerInfo(counterparty)
+          ? counterparty.id
+          : counterparty
+        ).toB58String()}. Error was: ${err.message}`
+      )
     }
 
     return pipe(

@@ -36,8 +36,8 @@ class Acknowledgement<Chain extends HoprCoreConnectorInstance> extends Uint8Arra
     this.paymentChannels = paymentChannels
   }
 
-  subarray(begin?: number, end?: number): Uint8Array {
-    return new Uint8Array(this.buffer, begin, end != null ? end - begin : undefined)
+  subarray(begin: number = 0, end?: number): Uint8Array {
+    return new Uint8Array(this.buffer, begin + this.byteOffset, end != null ? end - begin : undefined)
   }
 
   get key(): Uint8Array {
@@ -53,7 +53,10 @@ class Acknowledgement<Chain extends HoprCoreConnectorInstance> extends Uint8Arra
   }
 
   get challenge(): Challenge<Chain> {
-    return new Challenge<Chain>(this.paymentChannels, this.subarray(KEY_LENGTH, KEY_LENGTH + Challenge.SIZE(this.paymentChannels)))
+    return new Challenge<Chain>(this.paymentChannels, {
+      bytes: this.buffer,
+      offset: KEY_LENGTH
+    })
   }
 
   set challenge(challenge: Challenge<Chain>) {
@@ -73,12 +76,10 @@ class Acknowledgement<Chain extends HoprCoreConnectorInstance> extends Uint8Arra
   }
 
   get responseSignature(): Types.Signature {
-    return new this.paymentChannels.types.Signature(
-      this.subarray(
-        KEY_LENGTH + Challenge.SIZE(this.paymentChannels),
-        KEY_LENGTH + Challenge.SIZE(this.paymentChannels) + this.paymentChannels.types.Signature.SIZE
-      )
-    )
+    return new this.paymentChannels.types.Signature({
+      bytes: this.buffer,
+      offset: this.byteOffset + KEY_LENGTH + Challenge.SIZE(this.paymentChannels)
+    })
   }
 
   set responseSignature(newSignature: Types.Signature) {

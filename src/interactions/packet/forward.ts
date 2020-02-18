@@ -17,7 +17,7 @@ import pipe from 'it-pipe'
 
 import { deriveTicketKeyBlinding } from '../../messages/packet/header'
 
-import { getTokens, Token, randomInteger } from '../../utils'
+import { getTokens, Token, randomInteger, u8aToHex } from '../../utils'
 
 const MAX_PARALLEL_JOBS = 20
 
@@ -54,20 +54,36 @@ class PacketForwardInteraction<Chain extends HoprCoreConnectorInstance> implemen
       return
     }
 
-    pipe(
+    console.log(
+      chalk.blue(this.node.peerInfo.id.toB58String()),
+      `sending packet `,
+      u8aToHex(packet),
+      ` to `,
+      // @ts-ignore
+      chalk.blue(PeerId.isPeerId(counterparty) ? counterparty.toB58String() : counterparty.id.toB58String())
+    )
+
+    await pipe(
       /* prettier-ignore */
       [packet],
       struct.stream
     )
   }
 
-  handler(struct: { stream: any }): void {
+  async handler(struct: { stream: any }): Promise<void> {
+    let packet: Packet<Chain>
     pipe(
       /* pretttier-ignore */
       struct.stream,
       async (source: AsyncIterable<Uint8Array>): Promise<void> => {
         for await (const msg of source) {
-          const packet = new Packet(this.node, msg.slice())
+          const arr = msg.slice()
+          packet = new Packet(this.node, {
+            bytes: arr.buffer,
+            offset: arr.byteOffset
+          })
+          console.log(chalk.blue(this.node.peerInfo.id.toB58String()), ` handling packet `, u8aToHex(packet))
+
           if (this.tokens.length > 0) {
             const token = this.tokens.pop()
             if (this.promises[token] != null) {
@@ -91,9 +107,12 @@ class PacketForwardInteraction<Chain extends HoprCoreConnectorInstance> implemen
 
   async handlePacket(packet: Packet<Chain>, token: number): Promise<void> {
     const sender = await packet.getSenderPeerId()
-    console.log(`handling packet`)
+
+    console.log(`before transformation `, u8aToHex(packet), chalk.yellow(u8aToHex(packet.header.beta)))
 
     await packet.forwardTransform()
+
+    console.log(`after  transformation `, u8aToHex(packet), chalk.green(u8aToHex(packet.header.beta)))
 
     const ack = new Acknowledgement(this.node.paymentChannels, undefined, {
       key: deriveTicketKeyBlinding(packet.header.derivedSecret),
@@ -101,7 +120,11 @@ class PacketForwardInteraction<Chain extends HoprCoreConnectorInstance> implemen
     })
 
     // Acknowledgement
-    setImmediate(async () => this.node.interactions.packet.acknowledgment.interact(sender, await ack.sign(this.node.peerInfo.id)))
+    setImmediate(
+      this.node.interactions.packet.acknowledgment.interact.bind(this.node.interactions.packet.acknowledgment),
+      sender,
+      await ack.sign(this.node.peerInfo.id)
+    )
 
     const target = await packet.getTargetPeerId()
 
@@ -111,7 +134,9 @@ class PacketForwardInteraction<Chain extends HoprCoreConnectorInstance> implemen
       await this.interact(target, packet)
     }
 
+    // Check for unserviced packets
     if (this.queue.length > 0) {
+      // Pick a random one
       const index = randomInteger(0, this.queue.length)
 
       if (index == this.queue.length - 1) {

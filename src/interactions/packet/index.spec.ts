@@ -78,11 +78,10 @@ describe('check packet forwarding & acknowledgement generation', function() {
           },
           system: {
             events(_handler: () => void) {},
-            accountNonce() { 
-                return Promise.resolve({
-                    toNumber: () => 0
-                })
-
+            accountNonce() {
+              return Promise.resolve({
+                toNumber: () => 0
+              })
             }
           }
         },
@@ -149,10 +148,18 @@ describe('check packet forwarding & acknowledgement generation', function() {
       Bob.paymentChannels.api
     )
 
+    const channelIdSecond = await Bob.paymentChannels.utils.getId(
+      new AccountId(typeRegistry, Bob.paymentChannels.self.keyPair.publicKey),
+      new AccountId(typeRegistry, Chris.paymentChannels.self.keyPair.publicKey),
+      Bob.paymentChannels.api
+    )
+
     const channelRecord = new Types.SignedChannel(undefined, {
       channel,
       signature
     })
+
+    channels.set(channelIdSecond.toHex(), channelRecord)
     channels.set(channelId.toHex(), channelRecord)
 
     await Promise.all([
@@ -161,20 +168,41 @@ describe('check packet forwarding & acknowledgement generation', function() {
         channelRecord.toU8a()
       ),
       Bob.paymentChannels.db.put(
-        Alice.paymentChannels.dbKeys.Channel(new AccountId(typeRegistry, Alice.paymentChannels.self.keyPair.publicKey)),
+        Bob.paymentChannels.dbKeys.Channel(new AccountId(typeRegistry, Alice.paymentChannels.self.keyPair.publicKey)),
+        channelRecord.toU8a()
+      ),
+      Bob.paymentChannels.db.put(
+        Bob.paymentChannels.dbKeys.Channel(new AccountId(typeRegistry, Chris.paymentChannels.self.keyPair.publicKey)),
+        channelRecord.toU8a()
+      ),
+      Chris.paymentChannels.db.put(
+        Chris.paymentChannels.dbKeys.Channel(new AccountId(typeRegistry, Bob.paymentChannels.self.keyPair.publicKey)),
         channelRecord.toU8a()
       )
     ])
 
     const testArray = new Uint8Array([1, 2, 3, 4])
 
-    console.log(`packet length before creation `, Packet.SIZE(Alice.paymentChannels))
-    Alice.interactions.packet.forward.interact(Bob.peerInfo, await Packet.create(Alice, new TextEncoder().encode('123'), [Bob.peerInfo.id, Chris.peerInfo.id]))
+    // const packet = await Packet.create(Alice, new TextEncoder().encode('123'), [Bob.peerInfo.id, Chris.peerInfo.id])
+
+    // const bobsPacket = new Packet(Bob, {
+    //   bytes: packet.buffer,
+    //   offset: packet.byteOffset
+    // })
+
+    // console.log(`before`, u8aToHex(bobsPacket))
+    // await bobsPacket.forwardTransform()
+    // console.log(`after`, u8aToHex(bobsPacket))
+
+    await Alice.interactions.packet.forward.interact(
+      Bob.peerInfo,
+      await Packet.create(Alice, new TextEncoder().encode('123'), [Bob.peerInfo.id, Chris.peerInfo.id])
+    )
   })
 
-  afterEach(function() {
-    channels.clear()
-  })
+  // afterEach(function() {
+  //   channels.clear()
+  // })
 })
 
 /**
