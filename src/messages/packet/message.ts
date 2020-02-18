@@ -73,6 +73,7 @@ export default class Message extends Uint8Array {
 
     for (let i = secrets.length; i > 0; i--) {
       const { key, iv } = deriveCipherParameters(secrets[i - 1])
+
       PRP.createPRP(key, iv).permutate(this.subarray())
     }
 

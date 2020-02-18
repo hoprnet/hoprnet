@@ -34,7 +34,7 @@ import { Acknowledgement } from './messages/acknowledgement'
 
 type HoprOptions = {
   peerInfo: PeerInfo
-  output: (str: string) => void
+  output: (msg: Uint8Array) => void
   id?: number
   bootstrapServers?: PeerInfo[]
   bootstrapNode: boolean
@@ -45,7 +45,7 @@ export default class Hopr<Chain extends HoprCoreConnectorInstance> extends libp2
   public network: Network<Chain>
   public log: Debugger
   public dbKeys: DbKeys = new DbKeys()
-  public output: (str: string) => void
+  public output: (arr: Uint8Array) => void
 
   // @TODO put this in proper namespace
   // public heartbeat: any
@@ -111,7 +111,7 @@ export default class Hopr<Chain extends HoprCoreConnectorInstance> extends libp2
       })
     )
 
-    this.output = options.output
+    this.output = _options.output
     this.interactions = new Interactions(this)
     this.network = new Network(this)
 
@@ -292,7 +292,6 @@ export default class Hopr<Chain extends HoprCoreConnectorInstance> extends libp2
             stream,
             async function(source: AsyncIterable<Uint8Array>) {
               for await (const msg of source) {
-                console.log(msg.toString())
                 this.log(this.peerInfo.id, `Received acknowledgement.`)
                 // return cb()
                 // if (!cb.called) {
@@ -308,7 +307,7 @@ export default class Hopr<Chain extends HoprCoreConnectorInstance> extends libp2
     try {
       await Promise.all(promises)
     } catch (err) {
-      console.log(err)
+      this.log(`Could not send message. Error was: ${chalk.red(err.message)}`)
     }
   }
 
