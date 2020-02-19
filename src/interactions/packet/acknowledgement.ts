@@ -29,34 +29,45 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnectorInstance> 
       struct.stream,
       async (source: any) => {
         for await (const msg of source) {
-          const acknowledgement = new Acknowledgement(this.node.paymentChannels, msg, undefined)
+          const arr = msg.slice()
+          const acknowledgement = new Acknowledgement(this.node.paymentChannels, {
+            bytes: arr.buffer,
+            offset: arr.byteOffset
+          })
+
           let record: any
 
-          const unAcknowledgedDbKey = this.node.dbKeys.UnAcknowledgedTickets(acknowledgement.responseSigningParty, acknowledgement.hashedKey)
+          const unAcknowledgedDbKey = u8aToHex(this.node.dbKeys.UnAcknowledgedTickets(acknowledgement.responseSigningParty, await acknowledgement.hashedKey))
+
           try {
             record = await this.node.db.get(unAcknowledgedDbKey)
+
+            const acknowledgedDbKey = this.node.dbKeys.AcknowledgedTickets(acknowledgement.responseSigningParty, acknowledgement.key)
+            try {
+              await this.node.db
+                .batch()
+                .del(unAcknowledgedDbKey)
+                .put(acknowledgedDbKey, record)
+                .write()
+            } catch (err) {
+              console.log(`Error while writing to database. Error was ${chalk.red(err.message)}.`)
+            }
           } catch (err) {
             if (err.notFound == true) {
-              this.node.log(
-                `received unknown acknowledgement from party ${chalk.blue(u8aToHex(acknowledgement.responseSigningParty))} for challenge ${chalk.yellow(
-                  u8aToHex(acknowledgement.hashedKey)
-                )} - response was ${chalk.green(u8aToHex(acknowledgement.responseSigningParty))}. ${chalk.red('Dropping acknowledgement')}.`
-              )
+              // console.log(
+              //   `${chalk.blue(this.node.peerInfo.id.toB58String())} received unknown acknowledgement from party ${chalk.blue(
+              //     (await pubKeyToPeerId(acknowledgement.responseSigningParty)).toB58String()
+              //   )} for challenge ${chalk.yellow(u8aToHex(await acknowledgement.hashedKey))} - response was ${chalk.green(
+              //     u8aToHex(await acknowledgement.hashedKey)
+              //   )}. ${chalk.red('Dropping acknowledgement')}.`
+              // )
             } else {
               this.node.log(`Database error: ${err.message}. ${chalk.red('Dropping acknowledgement')}.`)
             }
             continue
+          } finally {
+            this.emit(unAcknowledgedDbKey)
           }
-
-          const acknowledgedDbKey = this.node.dbKeys.AcknowledgedTickets(acknowledgement.responseSigningParty, acknowledgement.key)
-
-          await this.node.db
-            .batch()
-            .del(unAcknowledgedDbKey)
-            .put(acknowledgedDbKey, record)
-            .write()
-
-          this.emit(u8aToHex(unAcknowledgedDbKey))
         }
       }
     )
@@ -73,11 +84,13 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnectorInstance> 
         return this.node.peerRouting.findPeer(counterparty).then((peerInfo: PeerInfo) => this.node.dialProtocol(peerInfo, this.protocols[0]))
       })
     } catch (err) {
-      this.node.log(`Could not transfer packet to ${counterparty.toB58String()}. Error was: ${chalk.red(err.message)}.`)
+      console.log(err)
+
+      this.node.log(`Could not transfer acknowledgement to ${counterparty.toB58String()}. Error was: ${chalk.red(err.message)}.`)
       return
     }
 
-    return pipe(
+    await pipe(
       /* prettier-ignore */
       [acknowledgement],
       struct.stream

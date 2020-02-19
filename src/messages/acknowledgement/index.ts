@@ -14,11 +14,16 @@ import PeerId from 'peer-id'
  */
 class Acknowledgement<Chain extends HoprCoreConnectorInstance> extends Uint8Array {
   private _responseSigningParty: Uint8Array
+  private _hashedKey: Uint8Array
+
   private paymentChannels: Chain
 
   constructor(
     paymentChannels: Chain,
-    arr?: Uint8Array,
+    arr?: {
+      bytes: ArrayBuffer,
+      offset: number
+    },
     struct?: {
       key: Uint8Array
       challenge: Challenge<Chain>
@@ -26,7 +31,7 @@ class Acknowledgement<Chain extends HoprCoreConnectorInstance> extends Uint8Arra
     }
   ) {
     if (arr != null && struct == null) {
-      super(arr)
+      super(arr.bytes, arr.offset, Acknowledgement.SIZE(paymentChannels))
     } else if (arr == null && struct != null) {
       super(u8aConcat(struct.key, struct.challenge, struct.signature != null ? struct.signature : new Uint8Array(paymentChannels.types.Signature.SIZE)))
     } else {
@@ -44,23 +49,23 @@ class Acknowledgement<Chain extends HoprCoreConnectorInstance> extends Uint8Arra
     return this.subarray(0, KEY_LENGTH)
   }
 
-  set key(newKey: Uint8Array) {
-    this.set(newKey, 0)
-  }
+  get hashedKey(): Promise<Uint8Array> {
+    if (this._hashedKey != null) {
+      return Promise.resolve(this._hashedKey)
+    }
 
-  get hashedKey(): Uint8Array {
-    return secp256k1.publicKeyCreate(Buffer.from(this.key))
+    return this.paymentChannels.utils.hash(this.key).then((hashedKey: Uint8Array) => {
+      this._hashedKey = hashedKey
+
+      return hashedKey
+    })
   }
 
   get challenge(): Challenge<Chain> {
     return new Challenge<Chain>(this.paymentChannels, {
       bytes: this.buffer,
-      offset: KEY_LENGTH
+      offset: this.byteOffset + KEY_LENGTH
     })
-  }
-
-  set challenge(challenge: Challenge<Chain>) {
-    this.set(challenge, KEY_LENGTH)
   }
 
   get hash(): Promise<Uint8Array> {
@@ -82,10 +87,6 @@ class Acknowledgement<Chain extends HoprCoreConnectorInstance> extends Uint8Arra
     })
   }
 
-  set responseSignature(newSignature: Types.Signature) {
-    this.set(newSignature, KEY_LENGTH + Challenge.SIZE(this.paymentChannels))
-  }
-
   get responseSigningParty(): Uint8Array {
     if (this._responseSigningParty) {
       return this._responseSigningParty
@@ -102,7 +103,7 @@ class Acknowledgement<Chain extends HoprCoreConnectorInstance> extends Uint8Arra
   }
 
   async sign(peerId: PeerId): Promise<Acknowledgement<Chain>> {
-    this.responseSignature = await this.paymentChannels.utils.sign(await this.hash, peerId.privKey.marshal(), peerId.pubKey.marshal())
+    this.responseSignature.set(await this.paymentChannels.utils.sign(await this.hash, peerId.privKey.marshal(), peerId.pubKey.marshal()))
 
     return this
   }
@@ -125,11 +126,14 @@ class Acknowledgement<Chain extends HoprCoreConnectorInstance> extends Uint8Arra
     derivedSecret: Uint8Array,
     signer: PeerId
   ): Promise<Acknowledgement<Chain>> {
-    const ack = new Acknowledgement(hoprCoreConnector, new Uint8Array(Acknowledgement.SIZE(hoprCoreConnector)))
+    const ack = new Acknowledgement(hoprCoreConnector, {
+      bytes: new Uint8Array(Acknowledgement.SIZE(hoprCoreConnector)),
+      offset: 0
+    })
 
-    ack.key = deriveTicketKeyBlinding(derivedSecret)
+    ack.key.set(deriveTicketKeyBlinding(derivedSecret))
 
-    ack.challenge = challenge
+    ack.challenge.set(challenge)
     return ack.sign(signer)
   }
 

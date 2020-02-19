@@ -166,7 +166,7 @@ export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
       node.peerInfo.id.pubKey.marshal()
     )
 
-    return new Packet<Chain>(node, null, {
+    return new Packet<Chain>(node, undefined, {
       header,
       ticket,
       challenge,
@@ -311,6 +311,8 @@ export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
       await this.node.paymentChannels.utils.pubKeyToAccountId(this.node.peerInfo.id.pubKey.marshal()),
       await this.node.paymentChannels.utils.pubKeyToAccountId(target.pubKey.marshal())
     )
+
+    await this.node.db.put(u8aToHex(this.node.dbKeys.UnAcknowledgedTickets(target.pubKey.marshal(), this.header.hashedKeyHalf)), this.ticket)
 
     // const challenges = [secp256k1.publicKeyCreate(Buffer.from(deriveTicketKey(this.header.derivedSecret))), this.header.hashedKeyHalf]
     // let previousChallenges = await (await node.paymentChannels.channel.create(node.paymentChannels, await node.paymentChannels.utils.pubKeyToAccountId(target.pubKey.marshal()))).getPreviousChallenges()

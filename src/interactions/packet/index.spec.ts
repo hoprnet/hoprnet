@@ -8,6 +8,7 @@ import SECIO = require('libp2p-secio')
 
 import Debug from 'debug'
 import chalk from 'chalk'
+import { encode, decode } from 'rlp'
 
 import { Packet } from '../../messages/packet'
 import Hopr from '../..'
@@ -23,6 +24,10 @@ import LevelUp from 'levelup'
 import Memdown from 'memdown'
 import BN from 'bn.js'
 import HoprPolkadotClass from '@hoprnet/hopr-core-polkadot/lib'
+import { randomBytes } from 'crypto'
+import { DbKeys } from '../../db_keys'
+
+import assert from 'assert'
 
 describe('check packet forwarding & acknowledgement generation', function() {
   const channels = new Map<string, SignedChannel>()
@@ -33,6 +38,8 @@ describe('check packet forwarding & acknowledgement generation', function() {
   typeRegistry.register(SRMLTypes)
 
   async function generateNode(): Promise<Hopr<HoprPolkadotClass>> {
+    const db = LevelUp(Memdown())
+
     const node = (await libp2p.create({
       peerInfo: await PeerInfo.create(await PeerId.create({ keyType: 'secp256k1' })),
       modules: {
@@ -41,6 +48,8 @@ describe('check packet forwarding & acknowledgement generation', function() {
         connEncryption: [SECIO]
       }
     })) as Hopr<HoprPolkadot>
+
+    node.db = db
 
     // @ts-ignore
     node.peerInfo.multiaddrs.add('/ip4/0.0.0.0/tcp/0')
@@ -51,7 +60,9 @@ describe('check packet forwarding & acknowledgement generation', function() {
       waitReady()
     ])
 
-    node.peerRouting.findPeer = (_: PeerId) => Promise.reject('not implemented')
+    node.peerRouting.findPeer = (_: PeerId): Promise<never> => {
+      return Promise.reject(Error('not implemented'))
+    }
 
     node.interactions = new Interactions(node)
 
@@ -113,18 +124,19 @@ describe('check packet forwarding & acknowledgement generation', function() {
         privateKey: node.peerInfo.id.privKey.marshal(),
         keyPair: kPair
       },
-      LevelUp(Memdown())
+      db
     )
 
     await node.paymentChannels.start()
     await node.paymentChannels.initOnchainValues()
 
     node.log = Debug(`${chalk.blue(node.peerInfo.id.toB58String())}: `)
+    node.dbKeys = new DbKeys()
 
     return (node as unknown) as Hopr<HoprPolkadotClass>
   }
 
-  it('should forward a packet', async function() {
+  it('should forward a packet and receive aknowledgements', async function() {
     const [Alice, Bob, Chris, Dave] = await Promise.all([generateNode(), generateNode(), generateNode(), generateNode()])
 
     connectionHelper(Alice, Bob, Chris, Dave)
@@ -154,11 +166,18 @@ describe('check packet forwarding & acknowledgement generation', function() {
       Bob.paymentChannels.api
     )
 
+    const channelIdThird = await Bob.paymentChannels.utils.getId(
+      new AccountId(typeRegistry, Chris.paymentChannels.self.keyPair.publicKey),
+      new AccountId(typeRegistry, Dave.paymentChannels.self.keyPair.publicKey),
+      Bob.paymentChannels.api
+    )
+
     const channelRecord = new Types.SignedChannel(undefined, {
       channel,
       signature
     })
 
+    channels.set(channelIdThird.toHex(), channelRecord)
     channels.set(channelIdSecond.toHex(), channelRecord)
     channels.set(channelId.toHex(), channelRecord)
 
@@ -178,25 +197,61 @@ describe('check packet forwarding & acknowledgement generation', function() {
       Chris.paymentChannels.db.put(
         Chris.paymentChannels.dbKeys.Channel(new AccountId(typeRegistry, Bob.paymentChannels.self.keyPair.publicKey)),
         channelRecord.toU8a()
+      ),
+      Chris.paymentChannels.db.put(
+        Chris.paymentChannels.dbKeys.Channel(new AccountId(typeRegistry, Dave.paymentChannels.self.keyPair.publicKey)),
+        channelRecord.toU8a()
+      ),
+      Dave.paymentChannels.db.put(
+        Dave.paymentChannels.dbKeys.Channel(new AccountId(typeRegistry, Chris.paymentChannels.self.keyPair.publicKey)),
+        channelRecord.toU8a()
       )
     ])
 
-    const testArray = new Uint8Array([1, 2, 3, 4])
+    const testMsg = randomBytes(73)
 
-    // const packet = await Packet.create(Alice, new TextEncoder().encode('123'), [Bob.peerInfo.id, Chris.peerInfo.id])
+    // const packet = await Packet.create(Alice, encode([testMsg, new TextEncoder().encode(Date.now().toString())]), [Bob.peerInfo.id, Chris.peerInfo.id])
 
     // const bobsPacket = new Packet(Bob, {
     //   bytes: packet.buffer,
     //   offset: packet.byteOffset
     // })
 
-    // console.log(`before`, u8aToHex(bobsPacket))
-    // await bobsPacket.forwardTransform()
-    // console.log(`after`, u8aToHex(bobsPacket))
+    // assert.deepEqual(packet.ticket, bobsPacket.ticket)
+    // console.log(`before`, u8aToHex(packet))
+
+    // console.log(packet.ticket)
+    // console.log(await bobsPacket.ticket.signer, Alice.peerInfo.id.pubKey.marshal())
+
+    // console.log(bobsPacket.ticket.signature.recovery, packet.ticket.signature.recovery)
+    // console.log(bobsPacket.ticket.ticket.toHex())
+    // console.log(`after`, u8aToHex(packet))
+
+    Chris.output = (arr: Uint8Array) => {
+      const [msg] = decode(Buffer.from(arr))
+      assert.deepEqual(msg, testMsg)
+    }
 
     await Alice.interactions.packet.forward.interact(
       Bob.peerInfo,
-      await Packet.create(Alice, new TextEncoder().encode('123'), [Bob.peerInfo.id, Chris.peerInfo.id])
+      await Packet.create(Alice, encode([testMsg, new TextEncoder().encode(Date.now().toString())]), [Bob.peerInfo.id, Chris.peerInfo.id])
+    )
+
+    const testMsgSecond = randomBytes(101)
+
+    Dave.output = (arr: Uint8Array) => {
+      const [msg] = decode(Buffer.from(arr))
+
+      assert.deepEqual(msg, testMsgSecond)
+    }
+
+    await Alice.interactions.packet.forward.interact(
+      Bob.peerInfo,
+      await Packet.create(Alice, encode([testMsgSecond, new TextEncoder().encode(Date.now().toString())]), [
+        Bob.peerInfo.id,
+        Chris.peerInfo.id,
+        Dave.peerInfo.id
+      ])
     )
   })
 

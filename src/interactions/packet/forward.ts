@@ -54,15 +54,6 @@ class PacketForwardInteraction<Chain extends HoprCoreConnectorInstance> implemen
       return
     }
 
-    console.log(
-      chalk.blue(this.node.peerInfo.id.toB58String()),
-      `sending packet `,
-      u8aToHex(packet),
-      ` to `,
-      // @ts-ignore
-      chalk.blue(PeerId.isPeerId(counterparty) ? counterparty.toB58String() : counterparty.id.toB58String())
-    )
-
     await pipe(
       /* prettier-ignore */
       [packet],
@@ -82,7 +73,6 @@ class PacketForwardInteraction<Chain extends HoprCoreConnectorInstance> implemen
             bytes: arr.buffer,
             offset: arr.byteOffset
           })
-          console.log(chalk.blue(this.node.peerInfo.id.toB58String()), ` handling packet `, u8aToHex(packet))
 
           if (this.tokens.length > 0) {
             const token = this.tokens.pop()
@@ -106,13 +96,13 @@ class PacketForwardInteraction<Chain extends HoprCoreConnectorInstance> implemen
   }
 
   async handlePacket(packet: Packet<Chain>, token: number): Promise<void> {
-    const sender = await packet.getSenderPeerId()
-
-    console.log(`before transformation `, u8aToHex(packet), chalk.yellow(u8aToHex(packet.header.beta)))
-
     await packet.forwardTransform()
 
-    console.log(`after  transformation `, u8aToHex(packet), chalk.green(u8aToHex(packet.header.beta)))
+    const [sender, target] = await Promise.all([
+      /* prettier-ignore */
+      packet.getSenderPeerId(),
+      packet.getTargetPeerId()
+    ])
 
     const ack = new Acknowledgement(this.node.paymentChannels, undefined, {
       key: deriveTicketKeyBlinding(packet.header.derivedSecret),
@@ -120,16 +110,14 @@ class PacketForwardInteraction<Chain extends HoprCoreConnectorInstance> implemen
     })
 
     // Acknowledgement
-    setImmediate(
-      this.node.interactions.packet.acknowledgment.interact.bind(this.node.interactions.packet.acknowledgment),
-      sender,
-      await ack.sign(this.node.peerInfo.id)
-    )
 
-    const target = await packet.getTargetPeerId()
+    setImmediate(async () => {
+      this.node.interactions.packet.acknowledgment.interact(sender, await ack.sign(this.node.peerInfo.id))
+    })
 
     if (this.node.peerInfo.id.isEqual(target)) {
-      this.node.output(demo(packet.message.plaintext))
+      packet.message.encrypted = false
+      this.node.output(packet.message.plaintext)
     } else {
       await this.interact(target, packet)
     }
@@ -156,14 +144,14 @@ class PacketForwardInteraction<Chain extends HoprCoreConnectorInstance> implemen
 }
 
 // ==== ONLY FOR TESTING =====
-import { decode } from 'rlp'
+// import { decode } from 'rlp'
 
-function demo(plaintext: Uint8Array) {
-  const message = decode(Buffer.from(plaintext))
+// function demo(plaintext: Uint8Array) {
+//   const message = decode(Buffer.from(plaintext))
 
-  return `\n\n---------- New Message ----------\nMessage "${message[0].toString()}" latency ${Date.now() -
-    Number(message[1].toString())} ms.\n---------------------------------\n\n`
-}
+//   return `\n\n---------- New Message ----------\nMessage "${message[0].toString()}" latency ${Date.now() -
+//     Number(message[1].toString())} ms.\n---------------------------------\n\n`
+// }
 // ===========================
 
 export { PacketForwardInteraction }
