@@ -104,19 +104,17 @@ class PacketForwardInteraction<Chain extends HoprCoreConnectorInstance> implemen
       packet.getTargetPeerId()
     ])
 
-    const ack = new Acknowledgement(this.node.paymentChannels, undefined, {
-      key: deriveTicketKeyBlinding(packet.header.derivedSecret),
-      challenge: packet.oldChallenge
-    })
-
     // Acknowledgement
-
     setImmediate(async () => {
+      const ack = new Acknowledgement(this.node.paymentChannels, undefined, {
+        key: deriveTicketKeyBlinding(packet.header.derivedSecret),
+        challenge: packet.oldChallenge
+      })
+
       this.node.interactions.packet.acknowledgment.interact(sender, await ack.sign(this.node.peerInfo.id))
     })
 
     if (this.node.peerInfo.id.isEqual(target)) {
-      packet.message.encrypted = false
       this.node.output(packet.message.plaintext)
     } else {
       await this.interact(target, packet)

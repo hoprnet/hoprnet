@@ -3,14 +3,18 @@
  * @param arr Uint8Array to convert to number
  */
 function u8aToNumber(arr: Uint8Array): number {
-  if (arr.length == 1) {
-    return arr[0]
+  const arrLength = arr.length
+
+  if (arrLength == 0) {
+    return 0
   }
 
-  return parseInt(
-    arr.reduce((acc, n) => (acc += n.toString(16).padStart(2, '0')), ''),
-    16
-  )
+  let result = 0
+  for (let i = arrLength; i > 0; i--) {
+    result |= arr[i - 1] << ((arrLength - i) * 8)
+  }
+
+  return result
 }
 
 export { u8aToNumber }

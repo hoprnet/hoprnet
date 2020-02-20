@@ -26,6 +26,7 @@ import BN from 'bn.js'
 import HoprPolkadotClass from '@hoprnet/hopr-core-polkadot/lib'
 import { randomBytes } from 'crypto'
 import { DbKeys } from '../../db_keys'
+import { stringToU8a, u8aEquals } from '../../utils'
 
 import assert from 'assert'
 
@@ -152,84 +153,30 @@ describe('check packet forwarding & acknowledgement generation', function() {
       )
     )
 
-    const signature = await Bob.paymentChannels.utils.sign(channel.toU8a(), Bob.peerInfo.id.privKey.marshal(), Bob.peerInfo.id.pubKey.marshal())
-
-    const channelId = await Alice.paymentChannels.utils.getId(
-      new AccountId(typeRegistry, Alice.paymentChannels.self.keyPair.publicKey),
-      new AccountId(typeRegistry, Bob.paymentChannels.self.keyPair.publicKey),
-      Bob.paymentChannels.api
-    )
-
-    const channelIdSecond = await Bob.paymentChannels.utils.getId(
-      new AccountId(typeRegistry, Bob.paymentChannels.self.keyPair.publicKey),
-      new AccountId(typeRegistry, Chris.paymentChannels.self.keyPair.publicKey),
-      Bob.paymentChannels.api
-    )
-
-    const channelIdThird = await Bob.paymentChannels.utils.getId(
-      new AccountId(typeRegistry, Chris.paymentChannels.self.keyPair.publicKey),
-      new AccountId(typeRegistry, Dave.paymentChannels.self.keyPair.publicKey),
-      Bob.paymentChannels.api
-    )
+    const [channelId, channelIdSecond, channelIdThird] = await getIds(typeRegistry, Alice, Bob, Chris, Dave)
 
     const channelRecord = new Types.SignedChannel(undefined, {
       channel,
-      signature
+      signature: await Bob.paymentChannels.utils.sign(channel.toU8a(), Bob.peerInfo.id.privKey.marshal(), Bob.peerInfo.id.pubKey.marshal())
     })
 
     channels.set(channelIdThird.toHex(), channelRecord)
     channels.set(channelIdSecond.toHex(), channelRecord)
     channels.set(channelId.toHex(), channelRecord)
 
-    await Promise.all([
-      Alice.paymentChannels.db.put(
-        Alice.paymentChannels.dbKeys.Channel(new AccountId(typeRegistry, Bob.paymentChannels.self.keyPair.publicKey)),
-        channelRecord.toU8a()
-      ),
-      Bob.paymentChannels.db.put(
-        Bob.paymentChannels.dbKeys.Channel(new AccountId(typeRegistry, Alice.paymentChannels.self.keyPair.publicKey)),
-        channelRecord.toU8a()
-      ),
-      Bob.paymentChannels.db.put(
-        Bob.paymentChannels.dbKeys.Channel(new AccountId(typeRegistry, Chris.paymentChannels.self.keyPair.publicKey)),
-        channelRecord.toU8a()
-      ),
-      Chris.paymentChannels.db.put(
-        Chris.paymentChannels.dbKeys.Channel(new AccountId(typeRegistry, Bob.paymentChannels.self.keyPair.publicKey)),
-        channelRecord.toU8a()
-      ),
-      Chris.paymentChannels.db.put(
-        Chris.paymentChannels.dbKeys.Channel(new AccountId(typeRegistry, Dave.paymentChannels.self.keyPair.publicKey)),
-        channelRecord.toU8a()
-      ),
-      Dave.paymentChannels.db.put(
-        Dave.paymentChannels.dbKeys.Channel(new AccountId(typeRegistry, Chris.paymentChannels.self.keyPair.publicKey)),
-        channelRecord.toU8a()
-      )
-    ])
+    await channelDbHelper(typeRegistry, channelRecord.toU8a(), Alice, Bob, Chris, Dave)
 
     const testMsg = randomBytes(73)
 
-    // const packet = await Packet.create(Alice, encode([testMsg, new TextEncoder().encode(Date.now().toString())]), [Bob.peerInfo.id, Chris.peerInfo.id])
+    const emitPromises: Promise<any>[] = []
+    emitPromises.push(emitCheckerHelper(Alice, Bob.peerInfo.id))
 
-    // const bobsPacket = new Packet(Bob, {
-    //   bytes: packet.buffer,
-    //   offset: packet.byteOffset
-    // })
-
-    // assert.deepEqual(packet.ticket, bobsPacket.ticket)
-    // console.log(`before`, u8aToHex(packet))
-
-    // console.log(packet.ticket)
-    // console.log(await bobsPacket.ticket.signer, Alice.peerInfo.id.pubKey.marshal())
-
-    // console.log(bobsPacket.ticket.signature.recovery, packet.ticket.signature.recovery)
-    // console.log(bobsPacket.ticket.ticket.toHex())
-    // console.log(`after`, u8aToHex(packet))
+    emitPromises.push(emitCheckerHelper(Bob, Chris.peerInfo.id))
 
     Chris.output = (arr: Uint8Array) => {
-      const [msg] = decode(Buffer.from(arr))
-      assert.deepEqual(msg, testMsg)
+      const [msg] = (decode(Buffer.from(arr)) as unknown) as Buffer[]
+
+      assert(u8aEquals(msg, testMsg), `Checks that we receive the right message.`)
     }
 
     await Alice.interactions.packet.forward.interact(
@@ -240,10 +187,12 @@ describe('check packet forwarding & acknowledgement generation', function() {
     const testMsgSecond = randomBytes(101)
 
     Dave.output = (arr: Uint8Array) => {
-      const [msg] = decode(Buffer.from(arr))
+      const [msg] = (decode(Buffer.from(arr)) as unknown) as Buffer[]
 
-      assert.deepEqual(msg, testMsgSecond)
+      assert(u8aEquals(msg, testMsgSecond), `Checks that we receive the right message.`)
     }
+
+    emitPromises.push(emitCheckerHelper(Chris, Dave.peerInfo.id))
 
     await Alice.interactions.packet.forward.interact(
       Bob.peerInfo,
@@ -253,6 +202,8 @@ describe('check packet forwarding & acknowledgement generation', function() {
         Dave.peerInfo.id
       ])
     )
+
+    assert.doesNotReject(Promise.all(emitPromises), `Checks that we emit an event once we got an acknowledgement.`)
   })
 
   // afterEach(function() {
@@ -271,4 +222,58 @@ function connectionHelper<Chain extends HoprCoreConnectorInstance>(...nodes: Hop
       nodes[j].peerStore.put(nodes[i].peerInfo)
     }
   }
+}
+
+function emitCheckerHelper<Chain extends HoprCoreConnectorInstance>(node: Hopr<Chain>, sender: PeerId): Promise<any> {
+  return new Promise<any>((resolve, reject) => {
+    node.interactions.packet.acknowledgment.emit = (event: string) => {
+      node.dbKeys.UnAcknowledgedTicketsParse(stringToU8a(event)).then(([counterparty]) => {
+        if (u8aEquals(sender.pubKey.marshal(), counterparty.pubKey.marshal())) {
+          resolve()
+        } else {
+          reject()
+        }
+      }, reject)
+
+      return false
+    }
+  })
+}
+
+function channelDbHelper<Chain extends HoprCoreConnectorInstance>(typeRegistry: TypeRegistry, record: Uint8Array, ...nodes: Hopr<Chain>[]): Promise<any> {
+  const promises: Promise<any>[] = []
+
+  if (nodes.length < 2) {
+    throw Error('cannot do this with less than two nodes.')
+  }
+
+  promises.push(nodes[0].db.put(nodes[0].paymentChannels.dbKeys.Channel(new AccountId(typeRegistry, nodes[1].paymentChannels.self.keyPair.publicKey)), record))
+
+  for (let i = 1; i < nodes.length - 1; i++) {
+    promises.push(
+      nodes[i].db
+        .batch()
+        .put(nodes[i].paymentChannels.dbKeys.Channel(new AccountId(typeRegistry, nodes[i - 1].paymentChannels.self.keyPair.publicKey)), record)
+        .put(nodes[i].paymentChannels.dbKeys.Channel(new AccountId(typeRegistry, nodes[i + 1].paymentChannels.self.keyPair.publicKey)), record)
+        .write()
+    )
+  }
+
+  return Promise.all(promises)
+}
+
+function getIds<Chain extends HoprCoreConnectorInstance>(typeRegistry: TypeRegistry, ...nodes: Hopr<Chain>[]) {
+  const promises: Promise<any>[] = []
+  for (let i = 0; i < nodes.length - 1; i++) {
+    promises.push(
+      nodes[i].paymentChannels.utils.getId(
+        new AccountId(typeRegistry, nodes[i].paymentChannels.self.keyPair.publicKey),
+        new AccountId(typeRegistry, nodes[i + 1].paymentChannels.self.keyPair.publicKey),
+        // @ts-ignore
+        nodes[i].paymentChannels.api
+      )
+    )
+  }
+
+  return Promise.all(promises)
 }

@@ -6,5 +6,13 @@ const ALPHABET = '0123456789abcdef'
  * @param prefixed if `true` add a `0x` in the beginning
  */
 export function u8aToHex(arr: Uint8Array, prefixed: boolean = true) {
-  return arr.reduce((acc: string, value: number) => (acc += ALPHABET[value >> 4] + ALPHABET[value & 15]), prefixed ? '0x' : '')
+  const arrLength = arr.length
+  let result = prefixed ? '0x' : ''
+
+  for (let i = 0; i < arrLength; i++) {
+    result += ALPHABET[arr[i] >> 4]
+    result += ALPHABET[arr[i] & 15]
+  }
+
+  return result
 }

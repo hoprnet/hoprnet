@@ -18,14 +18,20 @@
  * ```
  */
 export function u8aConcat(...list: Uint8Array[]): Uint8Array {
-  const length = list.reduce((total, item): number => total + item.length, 0)
-  const result = new Uint8Array(length)
+  let totalLength = 0
+
+  const listLength = list.length
+  for (let i = 0; i < listLength; i++) {
+    totalLength += list[i].length
+  }
+
+  const result = new Uint8Array(totalLength)
   let offset = 0
 
-  return list.reduce((result, item): Uint8Array => {
-    result.set(item, offset)
-    offset += item.length
+  for (let i = 0; i < listLength; i++) {
+    result.set(list[i], offset)
+    offset += list[i].length
+  }
 
-    return result
-  }, result)
+  return result
 }

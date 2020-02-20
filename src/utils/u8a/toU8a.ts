@@ -9,9 +9,7 @@ export function toU8a(arg: number, length?: number): Uint8Array {
     throw Error('Not implemented')
   }
 
-  let str = arg.toString(16)
-
-  return stringToU8a(str, length)
+  return stringToU8a(arg.toString(16), length)
 }
 
 /**
@@ -22,12 +20,19 @@ export function toU8a(arg: number, length?: number): Uint8Array {
  * @param length desired length of the Uint8Array
  */
 export function stringToU8a(str: string, length?: number): Uint8Array {
+  if (length <= 0) {
+    return new Uint8Array([])
+  }
+
   if (str.startsWith('0x')) {
     str = str.slice(2)
   }
 
-  if (str.length % 2 == 1) {
-    str = '0'.concat(str)
+  let strLength = str.length
+
+  if ((strLength & 1) == 1) {
+    str = '0' + str
+    strLength++
   }
 
   if (length != null && str.length >> 1 > length) {
@@ -36,7 +41,20 @@ export function stringToU8a(str: string, length?: number): Uint8Array {
 
   if (length != null && str.length >> 1 < length) {
     str = str.padStart(length << 1, '0')
+    strLength = length << 1
   }
 
-  return Uint8Array.from(str.match(/[0-9a-f]{2}/g).map(x => parseInt(x, 16)))
+  const arr = new Uint8Array(strLength >> 1)
+
+  for (let i = 0; i < strLength; i += 2) {
+    const strSlice = str.slice(i, i + 2).match(/[0-9a-fA-F]{2}/g)
+
+    if (strSlice.length != 1) {
+      throw Error(`Got unknown character '${str.slice(i, i + 2)}'`)
+    }
+
+    arr[i >> 1] = parseInt(strSlice[0], 16)
+  }
+
+  return arr
 }

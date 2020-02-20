@@ -48,5 +48,11 @@ describe('test number to u8a', function() {
     assert.deepEqual(stringToU8a('0x23'), new Uint8Array([0x23]))
 
     assert.deepEqual(stringToU8a('23'), new Uint8Array([0x23]))
+
+    assert.throws(() => stringToU8a('g'), 'Should throw on non-Hex Strings')
+
+    assert.throws(() => stringToU8a('0x0g'), 'Should throw on non-Hex Strings')
+
+    assert.throws(() => stringToU8a('0x000g'), 'Should throw on non-Hex Strings')
   })
 })

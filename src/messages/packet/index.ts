@@ -283,6 +283,8 @@ export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
    * @param nextNode the ID of the payment channel
    */
   async prepareDelivery(state, newState, nextNode): Promise<void> {
+    this.message.encrypted = false
+
     // const challenges = [secp256k1.publicKeyCreate(Buffer.from(deriveTicketKey(this.header.derivedSecret)))]
     // const previousChallenges = await (await node.paymentChannels.channel.create(node.paymentChannels, nextNode)).getPreviousChallenges()
     // if (previousChallenges != null) challenges.push(Buffer.from(previousChallenges))
