@@ -1,4 +1,5 @@
 import { AccountId, Hash, Signature } from './types'
+import BN from 'bn.js'
 
 declare interface Utils {
   /**
@@ -35,11 +36,7 @@ declare interface Utils {
    * @param privKey private key of the signer
    * @param pubKey public key of the signer
    */
-  sign(
-    msg: Uint8Array,
-    privKey: Uint8Array,
-    pubKey: Uint8Array
-  ): Promise<Signature.Instance>
+  sign(msg: Uint8Array, privKey: Uint8Array, pubKey: Uint8Array): Promise<Signature.Instance>
 
   /**
    * Uses the native on-chain signature scheme to check a signature for its validity.
@@ -48,6 +45,19 @@ declare interface Utils {
    * @param pubkey public key of the signer
    */
   verify(msg: Uint8Array, signature: Signature.Instance, pubkey: Uint8Array): Promise<boolean>
+
+  /**
+   * Takes an amount and converts it from one unit to another one.
+   * @param amount to convert
+   * @param sourceUnit unit of `amount`
+   * @param targetUnit desired unit of the result
+   * @example
+   * ```
+   * fromUnit('1000000000000000000', 'wei', 'ether') == '1'
+   * fromUnit('1', 'ether', 'wei') == '1000000000000000000'
+   * ```
+   */
+  convertUnit(amount: BN, sourceUnit: string, targetUnit: string): BN
 }
 
 export default Utils
