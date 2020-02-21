@@ -2,7 +2,9 @@ import { decode } from 'rlp'
 
 import PeerId from 'peer-id'
 import PeerInfo from 'peer-info'
-import Multiaddr from 'multiaddr'
+
+// @TODO get back to proper types
+const Multiaddr = require('multiaddr')
 import { keys as libp2pCrypto } from 'libp2p-crypto'
 
 import { SerializedPeerInfo } from '.'

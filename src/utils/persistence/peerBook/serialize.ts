@@ -1,5 +1,4 @@
 import { encode } from 'rlp'
-import PeerBook from 'peer-book'
 import PeerInfo from 'peer-info'
 
 import { serializePeerInfo } from '..'
@@ -12,9 +11,11 @@ export type SerializedPeerBook = Buffer[]
  * @param {PeerBook} peerBook the peerBook instance
  * @returns the encoded peerBook
  */
-export function serializePeerBook(peerBook: PeerBook): Uint8Array {
-  const peerInfos = []
-  peerBook.getAllArray().forEach((peerInfo: PeerInfo) => peerInfos.push(serializePeerInfo(peerInfo)))
+export function serializePeerBook(peerBook: any): Uint8Array {
+  // const peerInfos = []
+  // peerBook.getAllArray().forEach((peerInfo: PeerInfo) => peerInfos.push(serializePeerInfo(peerInfo)))
 
-  return encode(peerInfos)
+  // return encode(peerInfos)
+  throw Error('not implemented')
+  return 
 }

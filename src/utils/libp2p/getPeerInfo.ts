@@ -4,7 +4,7 @@ import { deserializeKeyPair, serializeKeyPair, privKeyToPeerId } from '..'
 
 import PeerInfo from 'peer-info'
 import PeerId from 'peer-id'
-import Multiaddr from 'multiaddr'
+const Multiaddr = require('multiaddr')
 
 import { NAME } from '../../constants'
 
@@ -14,7 +14,7 @@ async function getPeerInfo(
     bootstrapNode?: boolean
     peerId?: PeerId
     peerInfo?: PeerInfo
-    addrs?: Multiaddr[]
+    addrs?: any[]
   },
   db?: LevelUp
 ): Promise<PeerInfo> {
@@ -48,7 +48,6 @@ async function getPeerInfo(
       const peerId = await PeerId.createFromPrivKey(key.bytes)
 
       const serializedKeyPair = await serializeKeyPair(peerId)
-      console.log(serializedKeyPair)
       await db.put('key-pair', serializedKeyPair)
 
       return peerId
@@ -58,7 +57,7 @@ async function getPeerInfo(
   /**
    * Assemble the addresses that we are using.
    */
-  function getAddrs(): Multiaddr[] {
+  function getAddrs(): any[] {
     const addrs = []
 
     let port = process.env.PORT
@@ -89,7 +88,6 @@ async function getPeerInfo(
         if (Number.parseInt(process.env.DEMO_ACCOUNTS) < options.id) {
           throw Error(`Failed while trying to access demo account number ${options.id}. Please ensure that there are enough demo account specified in '.env'.`)
         }
-
         return privKeyToPeerId(process.env[`DEMO_ACCOUNT_${options.id}_PRIVATE_KEY`])
       } else if (options.peerId != null && PeerId.isPeerId(options.peerId)) {
         return options.peerId

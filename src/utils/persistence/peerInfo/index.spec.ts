@@ -2,7 +2,8 @@ import assert from 'assert'
 
 import PeerInfo from 'peer-info'
 import PeerId from 'peer-id'
-import Multiaddr from 'multiaddr'
+
+const Multiaddr = require('multiaddr')
 
 import { serializePeerInfo, deserializePeerInfo } from '.'
 
