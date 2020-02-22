@@ -12,7 +12,7 @@ import { PACKET_SIZE, PROTOCOL_STRING, MAX_HOPS } from './constants'
 
 import { Network } from './network'
 
-import { randomSubset, serializePeerBook, deserializePeerBook, addPubKey, createDirectoryIfNotExists, getPeerInfo } from './utils'
+import { randomSubset, addPubKey, createDirectoryIfNotExists, getPeerInfo } from './utils'
 
 import levelup, { LevelUp } from 'levelup'
 import leveldown from 'leveldown'
@@ -24,13 +24,10 @@ import pipe from 'it-pipe'
 
 import PeerId from 'peer-id'
 import PeerInfo from 'peer-info'
-import PeerBook from 'peer-book'
 
 import HoprCoreConnector, { HoprCoreConnectorInstance } from '@hoprnet/hopr-core-connector-interface'
 import { Interactions, Duplex } from './interactions'
 import { DbKeys } from './db_keys'
-
-import { Acknowledgement } from './messages/acknowledgement'
 
 type HoprOptions = {
   peerInfo: PeerInfo
@@ -324,34 +321,13 @@ export default class Hopr<Chain extends HoprCoreConnectorInstance> extends libp2
       !this.bootstrapServers.some((pInfo: PeerInfo) => pInfo.id.isEqual(peerInfo.id))
 
     // @TODO exclude bootstrap server(s) from crawling results
-    await this.crawler.crawl()
+    this.network.crawler.crawl()
 
-    return randomSubset(this.peerStore.getAllArray(), MAX_HOPS - 1, filter).map((peerInfo: PeerInfo) => peerInfo.id)
-  }
-
-  static async importPeerBook(db: LevelUp) {
-    const key = 'peer-book'
-
-    const peerBook = new PeerBook()
-
-    let serializedPeerbook: Buffer
-    try {
-      serializedPeerbook = await db.get(key)
-    } catch (err) {
-      if (err.notFound) {
-        return peerBook
-      } else {
-        throw err
-      }
+    const array = []
+    for (const peerInfo of this.peerStore.peers.values()) {
+      array.push(peerInfo)
     }
-
-    return deserializePeerBook(serializedPeerbook, peerBook)
-  }
-
-  async exportPeerBook() {
-    const key = 'peer-book'
-
-    await this.db.put(key, serializePeerBook(this.peerStore))
+    return randomSubset(array, MAX_HOPS - 1, filter).map((peerInfo: PeerInfo) => peerInfo.id)
   }
 
   static openDatabase(db_dir: string, options?: { id?: number; bootstrapNode?: boolean }) {
