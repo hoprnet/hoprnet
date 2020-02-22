@@ -95,7 +95,7 @@ export class Header<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
   }
 
   deriveSecret(secretKey: Uint8Array, lastNode: boolean = false): void {
-    if (!secp256k1.privateKeyVerify(Buffer.from(secretKey))) {
+    if (!secp256k1.privateKeyVerify(secretKey)) {
       throw Error(`Invalid private key.`)
     }
 
@@ -106,7 +106,7 @@ export class Header<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
       this.tmpData = new Uint8Array(ADDRESS_SIZE + PROVING_VALUES_SIZE + COMPRESSED_PUBLIC_KEY_LENGTH)
     }
 
-    this.derivedSecret.set(Uint8Array.from(secp256k1.publicKeyTweakMul(Buffer.from(this.alpha), Buffer.from(secretKey))), 0)
+    this.derivedSecret.set(secp256k1.publicKeyTweakMul(this.alpha, secretKey), 0)
   }
 
   verify(): boolean {
@@ -148,7 +148,7 @@ export class Header<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
       throw Error(`Cannot read from 'this.data'. Please call 'deriveSecret()' first.`)
     }
 
-    this.alpha.set(secp256k1.publicKeyTweakMul(Buffer.from(this.alpha), Buffer.from(deriveBlinding(this.alpha, this.derivedSecret))), 0)
+    this.alpha.set(secp256k1.publicKeyTweakMul(this.alpha, deriveBlinding(this.alpha, this.derivedSecret)), 0)
   }
 
   toString(): string {

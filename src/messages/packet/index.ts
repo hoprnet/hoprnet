@@ -161,7 +161,7 @@ export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
     const ticket = await channel.ticket.create(
       channel,
       fee,
-      secp256k1.privateKeyTweakAdd(Buffer.from(deriveTicketKey(secrets[0])), Buffer.from(deriveTicketKey(secrets[1]))),
+      secp256k1.privateKeyTweakAdd(deriveTicketKey(secrets[0]), deriveTicketKey(secrets[1])),
       node.peerInfo.id.privKey.marshal(),
       node.peerInfo.id.pubKey.marshal()
     )

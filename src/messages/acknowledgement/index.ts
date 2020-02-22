@@ -21,7 +21,7 @@ class Acknowledgement<Chain extends HoprCoreConnectorInstance> extends Uint8Arra
   constructor(
     paymentChannels: Chain,
     arr?: {
-      bytes: ArrayBuffer,
+      bytes: ArrayBuffer
       offset: number
     },
     struct?: {
@@ -92,11 +92,12 @@ class Acknowledgement<Chain extends HoprCoreConnectorInstance> extends Uint8Arra
       return this._responseSigningParty
     }
 
-    this._responseSigningParty = secp256k1.recover(
+    this._responseSigningParty = secp256k1.ecdsaRecover(
+      this.responseSignature.signature,
       // @ts-ignore
-      Buffer.from(this.responseSignature.sr25519PublicKey),
-      Buffer.from(this.responseSignature.signature),
-      this.responseSignature.recovery
+      this.responseSignature.recovery,
+      // @ts-ignore
+      this.responseSignature.sr25519PublicKey
     )
 
     return this._responseSigningParty

@@ -10,7 +10,7 @@ export * from './concurrency'
 const { promisify } = require('util')
 import { promises as fsPromise, Stats, readFileSync } from 'fs'
 
-const { publicKeyConvert } = require('secp256k1')
+// const { publicKeyConvert } = require('secp256k1')
 const chalk = require('chalk')
 
 // ==========================

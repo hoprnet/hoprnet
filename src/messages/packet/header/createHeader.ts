@@ -43,26 +43,26 @@ export async function createHeader<Chain extends HoprCoreConnectorInstance>(node
       let mul = new Uint8Array(PRIVATE_KEY_LENGTH)
 
       mul[PRIVATE_KEY_LENGTH - 1] = 1
-      const G = secp256k1.publicKeyCreate(Buffer.from(mul))
+      const G = secp256k1.publicKeyCreate(mul)
 
       secrets = []
 
       do {
         privKey = crypto.randomBytes(PRIVATE_KEY_LENGTH)
-      } while (!secp256k1.privateKeyVerify(Buffer.from(privKey)))
+      } while (!secp256k1.privateKeyVerify(privKey))
 
-      header.alpha.set(secp256k1.publicKeyCreate(Buffer.from(privKey)), 0)
+      header.alpha.set(secp256k1.publicKeyCreate(privKey), 0)
 
       mul.set(privKey, 0)
 
       peerIds.forEach((peerId: PeerId, index: number) => {
         // parallel
         // thread 1
-        const alpha = secp256k1.publicKeyTweakMul(G, Buffer.from(mul))
+        const alpha = secp256k1.publicKeyTweakMul(G, mul)
         // secp256k1.publicKeyVerify(alpha)
 
         // thread 2
-        const secret = secp256k1.publicKeyTweakMul(peerId.pubKey.marshal(), Buffer.from(mul))
+        const secret = secp256k1.publicKeyTweakMul(peerId.pubKey.marshal(), mul)
         // secp256k1.publicKeyVerify(secret)
         // end parallel
 
@@ -70,9 +70,9 @@ export async function createHeader<Chain extends HoprCoreConnectorInstance>(node
           return
         }
 
-        mul = secp256k1.privateKeyTweakMul(Buffer.from(mul), Buffer.from(deriveBlinding(alpha, secret)))
+        mul = secp256k1.privateKeyTweakMul(mul, deriveBlinding(alpha, secret))
 
-        if (!secp256k1.privateKeyVerify(Buffer.from(mul))) {
+        if (!secp256k1.privateKeyVerify(mul)) {
           return
         }
 
@@ -166,7 +166,7 @@ export async function createHeader<Chain extends HoprCoreConnectorInstance>(node
   }
 
   function deriveKey(a: Uint8Array, b: Uint8Array) {
-    return secp256k1.privateKeyTweakAdd(Buffer.from(deriveTicketKey(a)), Buffer.from(deriveTicketKey(b)))
+    return secp256k1.privateKeyTweakAdd(deriveTicketKey(a), deriveTicketKey(b))
   }
 
   function toString(header: Header<Chain>, secrets: Uint8Array[]): string {

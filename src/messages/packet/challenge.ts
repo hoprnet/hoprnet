@@ -84,11 +84,12 @@ export class Challenge<Chain extends HoprCoreConnectorInstance> extends Uint8Arr
     }
 
     return this.hash.then((hash: Uint8Array) => {
-      return secp256k1.recover(
+      return secp256k1.ecdsaRecover(
+        this.challengeSignature.signature,
         // @ts-ignore
-        Buffer.from(this.challengeSignature.sr25519PublicKey),
-        Buffer.from(this.challengeSignature.signature),
-        this.challengeSignature.recovery
+        this.challengeSignature.recovery,
+        // @ts-ignore
+        this.challengeSignature.sr25519PublicKey
       )
     })
   }
