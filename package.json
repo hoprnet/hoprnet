@@ -24,7 +24,7 @@
     "build:types": "typechain --target truffle --outDir './types/truffle-contracts' './build/contracts/*.json' && scripts/fix.sh",
     "build:sol": "yarn lint:sol && truffle compile && yarn build:types",
     "build": "yarn build:sol && yarn build:tsc",
-    "extract": "ts-node ./scripts/extract-build.ts",
+    "extract": "rm -rf 'build/extracted' && ts-node ./scripts/extract-build.ts",
     "migrate": "yarn build && truffle migrate",
     "test": "yarn build && scripts/test.sh",
     "coverage": "yarn build && scripts/coverage.sh"

@@ -48,7 +48,7 @@ const writeData = (output: Output) => {
   return Promise.all(
     output.items.map(item => {
       return promisify(writeFile)(
-        join(outputPath, `${item.name}${output.format}.json`),
+        join(outputPath, `${item.name}.${output.format}.json`),
         JSON.stringify(item.value, null, 2)
       );
     })
@@ -76,11 +76,11 @@ const start = async () => {
     },
     {
       abis: {
-        format: "Abi",
+        format: "abi",
         items: []
       },
       bytecodes: {
-        format: "Bytecode",
+        format: "bin",
         items: []
       }
     }
