@@ -811,13 +811,16 @@ async function printBalance(): Promise<void> {
 async function listConnectors(): Promise<void> {
   let str = 'Available connectors:'
   let found = 0
+
+  const promises = []
   for (let i = 0; i < knownConnectors.length; i++) {
-    try {
-      await import(knownConnectors[i][0])
+    promises.push(import(knownConnectors[i][0]).then(() => {
       found++
       str += `\n  ${chalk.yellow(knownConnectors[i][0])} ${chalk.gray('=>')} ts-node hopr -n ${chalk.green(knownConnectors[i][1])}`
-    } catch {}
+    }, () => {}))
   }
+
+  await Promise.all(promises)
 
   if (found > 0) {
     console.log(str)
