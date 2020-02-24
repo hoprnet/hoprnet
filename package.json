@@ -18,7 +18,6 @@
     "node": "^12"
   },
   "scripts": {
-    "postinstall": "yarn build",
     "lint:sol": "solhint 'contracts/**/*.sol'",
     "format:sol": "prettier --write 'contracts/**/*.sol'",
     "build:tsc": "rm -f migrations/*.js* && tsc",

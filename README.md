@@ -7,6 +7,7 @@ Table of Contents:
 - [Introduction](#introduction)
 - [Requirements](#requirements)
 - [Install](#install)
+- [Build](#build)
 - [Testing](#testing)
 - [Coverage](#coverage)
 - [Migrating](#migrating)
@@ -25,11 +26,17 @@ Table of Contents:
 
 ```bash
 # 1. Installs dependancies
-# 2. Runs linter
-# 3. Compiles smart contracts
-# 4. Generates smart contracts' typescript types
-# 5. Compiles migrations to `.js`
 yarn
+```
+
+# Build
+
+```bash
+# 1. Runs linter
+# 2. Compiles smart contracts
+# 3. Generates smart contracts' typescript types
+# 4. Compiles migrations to `.js`
+yarn build
 ```
 
 # Testing
