@@ -2,6 +2,7 @@
   "compilerOptions": {
     "esModuleInterop": true,
     "allowJs": true,
+    "checkJs": false,
     "outDir": "./lib",
     "lib": ["es2020", "dom"],
     "module": "commonjs",

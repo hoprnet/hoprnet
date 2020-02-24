@@ -187,7 +187,7 @@ class Crawler<Chain extends HoprCoreConnectorInstance> {
 
   printStatsAndErrors(contactedPeerIds: Set<string>, errors: Error[], now: number, before: number) {
     if (errors.length > 0) {
-      this.node.log(
+      console.log(
         `Errors while crawling:${errors.reduce((acc, err) => {
           acc += `\n\t${chalk.red(err.message)}`
           return acc
@@ -200,7 +200,7 @@ class Crawler<Chain extends HoprCoreConnectorInstance> {
       contactedNodes += `\n        ${peerId}`
     })
 
-    this.node.log(
+    console.log(
       `Crawling results:\n    ${chalk.yellow(`contacted nodes:`)}: ${contactedNodes}\n    ${chalk.green(`new nodes`)}: ${now - before} node${
         now - before == 1 ? '' : 's'
       }\n    total: ${now} node${now == 1 ? '' : 's'}`

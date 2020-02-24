@@ -1,7 +1,7 @@
 import libp2p = require('libp2p')
 import MPLEX = require('libp2p-mplex')
 import KadDHT = require('libp2p-kad-dht')
-// const SECIO = require('libp2p-secio')
+import SECIO = require('libp2p-secio')
 // import { WebRTCv4, WebRTCv6 } = require('./network/natTraversal')
 import TCP = require('libp2p-tcp')
 
@@ -62,6 +62,7 @@ export default class Hopr<Chain extends HoprCoreConnectorInstance> extends libp2
   declare handle: (protocol: string[], handler: (struct: { stream: Stream.Duplex }) => void) => void
   declare start: () => Promise<void>
   declare stop: () => Promise<void>
+  declare on: (str: string, handler: (...props: any[]) => void) => void
 
   /**
    * @constructor
@@ -86,7 +87,7 @@ export default class Hopr<Chain extends HoprCoreConnectorInstance> extends libp2
           ],
 
           streamMuxer: [MPLEX],
-          connEncryption: [], //  [SECIO],
+          connEncryption: [SECIO],
           dht: KadDHT
           // peerDiscovery: [
           //     WebRTC.discovery
@@ -146,14 +147,6 @@ export default class Hopr<Chain extends HoprCoreConnectorInstance> extends libp2
       options.peerInfo = await getPeerInfo(options, db)
     }
 
-    // peerBook: (cb) => {
-    //     if (options.peerBook) {
-    //         cb(null, options.peerBook)
-    //     } else {
-    //         Hopr.importPeerBook(db, cb)
-    //     }
-    // }
-
     return new Hopr<Instance>(
       options as HoprOptions,
       db,
@@ -196,13 +189,7 @@ export default class Hopr<Chain extends HoprCoreConnectorInstance> extends libp2
    * @param options
    */
   async up(options: HoprOptions): Promise<Hopr<Chain>> {
-    await new Promise((resolve, reject) =>
-      super.start((err: Error) => {
-        if (err) return reject(err)
-
-        resolve()
-      })
-    )
+    await super.start()
 
     if (!options.bootstrapNode) {
       await this.connectToBootstrapServers()
