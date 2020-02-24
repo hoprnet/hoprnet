@@ -30,6 +30,15 @@ import clear from 'clear'
 // const MINIMAL_STAKE = new BN(toWei('0.10', 'ether'))
 // // const DEFAULT_STAKE = new BN(toWei('0.11', 'ether'))
 
+/**
+ * Alphabetical list of known connectors.
+ */
+const knownConnectors = [
+  /* prettier-ignore */
+  ['@hoprnet/hopr-core-ethereum', 'ethereum'],
+  ['@hoprnet/hopr-core-polkadot', 'polkadot']
+]
+
 let node: Hopr<HoprCoreConnectorInstance>,
   funds: Types.Balance,
   ownAddress: Types.AccountId,
@@ -101,7 +110,7 @@ interface Options {
  *
  * @returns
  */
-function parseOptions(): void | Options {
+async function parseOptions(): Promise<void | Options> {
   const unknownOptions: string[] = []
 
   const options = getopts(process.argv.slice(2), {
@@ -143,6 +152,20 @@ function parseOptions(): void | Options {
     return
   }
 
+  if (!knownConnectors.some(connector => connector[1] == options.network)) {
+    console.log(`Unknown network! <${chalk.red(options.network)}>\n`)
+    await listConnectors()
+    return
+  }
+
+  try {
+    connector = (await import(`@hoprnet/hopr-core-${options.network}`)).default
+  } catch (err) {
+    console.log(`Could not find <${chalk.red(`@hoprnet/hopr-core-${options.network}`)}>. Please make sure it is available under ./node_modules!\n`)
+    await listConnectors()
+    return
+  }
+
   const tmp = groupBy(
     process.env.BOOTSTRAP_SERVERS.split(',').map(addr => Multiaddr(addr)),
     (ma: any) => ma.getPeerId()
@@ -181,14 +204,14 @@ async function tabCompletion(line: string, cb: (err: Error, hits: [string[], str
   switch (command) {
     case 'send':
       const peerInfos: PeerInfo[] = []
-      for (const peerInfo of this.peerStore.peers.values()) {
+      for (const peerInfo of node.peerStore.peers.values()) {
         if ((!query || peerInfo.id.toB58String().startsWith(query)) && !isBootstrapNode(node, peerInfo.id)) {
           peerInfos.push(peerInfo)
         }
       }
 
       if (!peerInfos.length) {
-        console.log(chalk.red(`\nDoesn't know any other node except the bootstrap node${node.bootstrapServers.length == 1 ? '' : 's'}!`))
+        console.log(chalk.red(`\nDoesn't know any other node except apart from bootstrap node${node.bootstrapServers.length == 1 ? '' : 's'}!`))
         return cb(null, [[''], line])
       }
 
@@ -442,17 +465,10 @@ async function main() {
   )
   console.log(`Welcome to ${chalk.bold('HOPR')}!\n`)
 
-  options = parseOptions()
+  options = await parseOptions()
 
   if (options == null || options.help) {
     displayHelp()
-    return
-  }
-
-  try {
-    connector = (await import(`@hoprnet/hopr-core-${options.network}`)).default
-  } catch (err) {
-    console.log(chalk.red(err.message))
     return
   }
 
@@ -793,16 +809,7 @@ async function printBalance(): Promise<void> {
  * Check which connectors are present right now.
  */
 async function listConnectors(): Promise<void> {
-  /**
-   * Alphabetical list of known connectors.
-   */
-  const knownConnectors = [
-    /* prettier-ignore */
-    ['@hoprnet/hopr-core-ethereum', 'ethereum'],
-    ['@hoprnet/hopr-core-polkadot', 'polkadot']
-  ]
-
-  let str = 'Found connectors'
+  let str = 'Available connectors:'
   let found = 0
   for (let i = 0; i < knownConnectors.length; i++) {
     try {
@@ -818,5 +825,7 @@ async function listConnectors(): Promise<void> {
     console.log(chalk.red(`Could not find any connectors. Please make sure there is one available in 'node_modules'!`))
   }
 
-  setTimeout(() => rl.prompt())
+  if (rl != null) {
+    setTimeout(() => rl.prompt())
+  }
 }
