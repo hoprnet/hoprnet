@@ -1,0 +1,372 @@
+[
+  {
+    "constant": true,
+    "inputs": [],
+    "name": "secsClosure",
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "accounts",
+    "outputs": [
+      {
+        "name": "hashedSecret",
+        "type": "bytes32"
+      },
+      {
+        "name": "counter",
+        "type": "uint256"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [
+      {
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "name": "channels",
+    "outputs": [
+      {
+        "name": "deposit",
+        "type": "uint256"
+      },
+      {
+        "name": "partyABalance",
+        "type": "uint256"
+      },
+      {
+        "name": "closureTime",
+        "type": "uint256"
+      },
+      {
+        "name": "stateCounter",
+        "type": "uint256"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [],
+    "name": "token",
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "name": "_token",
+        "type": "address"
+      },
+      {
+        "name": "_secsClosure",
+        "type": "uint256"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "name": "account",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "name": "secretHash",
+        "type": "bytes32"
+      }
+    ],
+    "name": "SecretHashSet",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "name": "funder",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "name": "recipient",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "name": "counterParty",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "name": "recipientAmount",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "name": "counterPartyAmount",
+        "type": "uint256"
+      }
+    ],
+    "name": "FundedChannel",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "name": "opener",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "name": "counterParty",
+        "type": "address"
+      }
+    ],
+    "name": "OpenedChannel",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "name": "initiator",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "name": "counterParty",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "name": "closureTime",
+        "type": "uint256"
+      }
+    ],
+    "name": "InitiatedChannelClosure",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "name": "closer",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "name": "counterParty",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "name": "partyAAmount",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "name": "partyBAmount",
+        "type": "uint256"
+      }
+    ],
+    "name": "ClosedChannel",
+    "type": "event"
+  },
+  {
+    "constant": false,
+    "inputs": [
+      {
+        "name": "hashedSecret",
+        "type": "bytes32"
+      }
+    ],
+    "name": "setHashedSecret",
+    "outputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "constant": false,
+    "inputs": [
+      {
+        "name": "recipient",
+        "type": "address"
+      },
+      {
+        "name": "counterParty",
+        "type": "address"
+      },
+      {
+        "name": "additionalDeposit",
+        "type": "uint256"
+      }
+    ],
+    "name": "fundChannel",
+    "outputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "constant": false,
+    "inputs": [
+      {
+        "name": "stateCounter",
+        "type": "uint256"
+      },
+      {
+        "name": "additionalDeposit",
+        "type": "uint256"
+      },
+      {
+        "name": "partyAAmount",
+        "type": "uint256"
+      },
+      {
+        "name": "not_after",
+        "type": "uint256"
+      },
+      {
+        "name": "r",
+        "type": "bytes32"
+      },
+      {
+        "name": "s",
+        "type": "bytes32"
+      },
+      {
+        "name": "v",
+        "type": "uint8"
+      }
+    ],
+    "name": "fundChannelWithSig",
+    "outputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "constant": false,
+    "inputs": [
+      {
+        "name": "counterParty",
+        "type": "address"
+      }
+    ],
+    "name": "openChannel",
+    "outputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "constant": false,
+    "inputs": [
+      {
+        "name": "pre_image",
+        "type": "bytes32"
+      },
+      {
+        "name": "secret_a",
+        "type": "bytes32"
+      },
+      {
+        "name": "secret_b",
+        "type": "bytes32"
+      },
+      {
+        "name": "amount",
+        "type": "uint256"
+      },
+      {
+        "name": "win_prob",
+        "type": "bytes32"
+      },
+      {
+        "name": "r",
+        "type": "bytes32"
+      },
+      {
+        "name": "s",
+        "type": "bytes32"
+      },
+      {
+        "name": "v",
+        "type": "uint8"
+      }
+    ],
+    "name": "redeemTicket",
+    "outputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "constant": false,
+    "inputs": [
+      {
+        "name": "counterParty",
+        "type": "address"
+      }
+    ],
+    "name": "initiateChannelClosure",
+    "outputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "constant": false,
+    "inputs": [
+      {
+        "name": "counterParty",
+        "type": "address"
+      }
+    ],
+    "name": "claimChannelClosure",
+    "outputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }
+]

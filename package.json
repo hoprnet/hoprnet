@@ -2,7 +2,6 @@
   "name": "@hoprnet/hopr-ethereum",
   "version": "0.0.1",
   "description": "On-chain logic for hopr.network",
-  "main": "index.ts",
   "homepage": "https://hopr.network",
   "repository": {
     "type": "git",
@@ -11,7 +10,8 @@
   "license": "LGPL-3.0-only",
   "private": false,
   "files": [
-    "contracts/"
+    "contracts/*.sol",
+    "build/extracted/*.json"
   ],
   "engines": {
     "yarn": "^1.19.2",
@@ -22,16 +22,17 @@
     "lint:sol": "solhint 'contracts/**/*.sol'",
     "format:sol": "prettier --write 'contracts/**/*.sol'",
     "build:tsc": "rm -f migrations/*.js* && tsc",
-    "build:types": "typechain --target truffle --outDir './types/truffle-contracts' './build/**/*.json' && scripts/fix.sh",
+    "build:types": "typechain --target truffle --outDir './types/truffle-contracts' './build/contracts/*.json' && scripts/fix.sh",
     "build:sol": "yarn lint:sol && truffle compile && yarn build:types",
     "build": "yarn build:sol && yarn build:tsc",
+    "extract": "ts-node ./scripts/extract-build.ts",
     "migrate": "yarn build && truffle migrate",
     "test": "yarn build && scripts/test.sh",
     "coverage": "yarn build && scripts/coverage.sh"
   },
   "husky": {
     "hooks": {
-      "pre-commit": "npm run format:sol"
+      "pre-commit": "npm run format:sol && yarn build && yarn extract"
     }
   },
   "dependencies": {

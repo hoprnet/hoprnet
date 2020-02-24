@@ -5,7 +5,7 @@ node_modules/
 .vscode/
 
 # Exclude solidity builds
-build/
+build/contracts/
 
 # Exclude typechain builds
 types/truffle-contracts
