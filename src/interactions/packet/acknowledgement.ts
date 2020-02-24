@@ -27,49 +27,7 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnectorInstance> 
     pipe(
       /* prettier-ignore */
       struct.stream,
-      async (source: any) => {
-        for await (const msg of source) {
-          const arr = msg.slice()
-          const acknowledgement = new Acknowledgement(this.node.paymentChannels, {
-            bytes: arr.buffer,
-            offset: arr.byteOffset
-          })
-
-          let record: any
-
-          const unAcknowledgedDbKey = u8aToHex(this.node.dbKeys.UnAcknowledgedTickets(acknowledgement.responseSigningParty, await acknowledgement.hashedKey))
-
-          try {
-            record = await this.node.db.get(unAcknowledgedDbKey)
-
-            const acknowledgedDbKey = this.node.dbKeys.AcknowledgedTickets(acknowledgement.responseSigningParty, acknowledgement.key)
-            try {
-              await this.node.db
-                .batch()
-                .del(unAcknowledgedDbKey)
-                .put(acknowledgedDbKey, record)
-                .write()
-            } catch (err) {
-              console.log(`Error while writing to database. Error was ${chalk.red(err.message)}.`)
-            }
-          } catch (err) {
-            if (err.notFound == true) {
-              // console.log(
-              //   `${chalk.blue(this.node.peerInfo.id.toB58String())} received unknown acknowledgement from party ${chalk.blue(
-              //     (await pubKeyToPeerId(acknowledgement.responseSigningParty)).toB58String()
-              //   )} for challenge ${chalk.yellow(u8aToHex(await acknowledgement.hashedKey))} - response was ${chalk.green(
-              //     u8aToHex(await acknowledgement.hashedKey)
-              //   )}. ${chalk.red('Dropping acknowledgement')}.`
-              // )
-            } else {
-              this.node.log(`Database error: ${err.message}. ${chalk.red('Dropping acknowledgement')}.`)
-            }
-            continue
-          } finally {
-            this.emit(unAcknowledgedDbKey)
-          }
-        }
-      }
+      handleHelper.bind(this)
     )
   }
 
@@ -98,29 +56,48 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnectorInstance> 
   }
 }
 
+async function handleHelper(source: any): Promise<void> {
+  for await (const msg of source) {
+    const arr = msg.slice()
+    const acknowledgement = new Acknowledgement(this.node.paymentChannels, {
+      bytes: arr.buffer,
+      offset: arr.byteOffset
+    })
+
+    let record: any
+
+    const unAcknowledgedDbKey = u8aToHex(this.node.dbKeys.UnAcknowledgedTickets(acknowledgement.responseSigningParty, await acknowledgement.hashedKey))
+
+    try {
+      record = await this.node.db.get(unAcknowledgedDbKey)
+
+      const acknowledgedDbKey = this.node.dbKeys.AcknowledgedTickets(acknowledgement.responseSigningParty, acknowledgement.key)
+      try {
+        await this.node.db
+          .batch()
+          .del(unAcknowledgedDbKey)
+          .put(acknowledgedDbKey, record)
+          .write()
+      } catch (err) {
+        console.log(`Error while writing to database. Error was ${chalk.red(err.message)}.`)
+      }
+    } catch (err) {
+      if (err.notFound == true) {
+        // console.log(
+        //   `${chalk.blue(this.node.peerInfo.id.toB58String())} received unknown acknowledgement from party ${chalk.blue(
+        //     (await pubKeyToPeerId(acknowledgement.responseSigningParty)).toB58String()
+        //   )} for challenge ${chalk.yellow(u8aToHex(await acknowledgement.hashedKey))} - response was ${chalk.green(
+        //     u8aToHex(await acknowledgement.hashedKey)
+        //   )}. ${chalk.red('Dropping acknowledgement')}.`
+        // )
+      } else {
+        this.node.log(`Database error: ${err.message}. ${chalk.red('Dropping acknowledgement')}.`)
+      }
+      continue
+    } finally {
+      this.emit(unAcknowledgedDbKey)
+    }
+  }
+}
+
 export { PacketAcknowledgementInteraction }
-
-//   async function handleAcknowledgement(ack) {
-//     if (!ack.challengeSigningParty.equals(node.peerInfo.id.pubKey.marshal())) {
-//       console.log(
-//         `peer ${node.peerInfo.id.toB58String()} channelId ${getId(
-//           pubKeyToEthereumAddress(node.peerInfo.id.pubKey.marshal()),
-//           pubKeyToEthereumAddress(ack.responseSigningParty)
-//         ).toString('hex')}`
-//       )
-
-//       return node.paymentChannels.contractCall(
-//         node.paymentChannels.contract.methods.wrongAcknowledgement(
-//           ack.challengeSignature.slice(0, 32),
-//           ack.challengeSignature.slice(32, 64),
-//           ack.responseSignature.slice(0, 32),
-//           ack.responseSignature.slice(32, 64),
-//           ack.key,
-//           ack.challengeSignatureRecovery,
-//           ack.responseSignatureRecovery
-//         ),
-//         (err, receipt) => {
-//           console.log(err, receipt)
-//         }
-//       )
-//     }

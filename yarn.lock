@@ -31,7 +31,7 @@
 
 "@hoprnet/hopr-core-polkadot@hoprnet/hopr-core-polkadot":
   version "0.0.2"
-  resolved "https://codeload.github.com/hoprnet/hopr-core-polkadot/tar.gz/cf2661087bb45539f040160798eac8efa7beed7e"
+  resolved "https://codeload.github.com/hoprnet/hopr-core-polkadot/tar.gz/374f29a48eeedfc232c22657b2ac45f9cc95f204"
   dependencies:
     "@polkadot/api" "^0.100.1"
     "@polkadot/util" "^1.8.1"

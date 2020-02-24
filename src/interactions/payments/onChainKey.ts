@@ -49,25 +49,27 @@ class OnChainKey<Chain extends HoprCoreConnectorInstance> implements AbstractInt
     return pipe(
       /* prettier-ignore */
       struct.stream,
-      async function(source: any) {
-        const msgs: Uint8Array[] = []
-        for await (const msg of source) {
-          if (msg == null || msg.length == 0) {
-            throw Error(`received ${msg} but expected a public key`)
-          }
-
-          if (msgs.length > 0) {
-            // ignore any further messages
-            continue
-          } else {
-            msgs.push(msg.slice())
-          }
-        }
-
-        return msgs[0]
-      }
+      onReception
     )
   }
+}
+
+async function onReception(source: any): Promise<Uint8Array> {
+  let result: Uint8Array
+  for await (const msg of source) {
+    if (msg == null || msg.length == 0) {
+      throw Error(`received ${msg} but expected a public key`)
+    }
+
+    if (result != null) {
+      // ignore any further messages
+      continue
+    } else {
+      result = msg.slice()
+    }
+  }
+
+  return result
 }
 
 export { OnChainKey }

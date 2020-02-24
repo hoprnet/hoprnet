@@ -50,19 +50,21 @@ class Opening<Chain extends HoprCoreConnectorInstance> implements AbstractIntera
       /* prettier-ignore */
       [channelBalance.toU8a()],
       struct.stream,
-      async function collect(source: any) {
-        let msgs: Uint8Array[] = []
-        for await (const msg of source) {
-          if (msgs.length > 0) {
-            continue
-          } else {
-            msgs.push(msg)
-          }
-        }
-        return msgs[0]
-      }
+      collect
     )
   }
+}
+
+async function collect(source: any) {
+  let result: Uint8Array
+  for await (const msg of source) {
+    if (result != null) {
+      continue
+    } else {
+      result = msg.slice()
+    }
+  }
+  return result
 }
 
 export { Opening }

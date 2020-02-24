@@ -40,30 +40,32 @@ class Crawler<Chain extends HoprCoreConnectorInstance> implements AbstractIntera
       return []
     }
 
-    return pipe(
+    await pipe(
       /** prettier-ignore */
       struct.stream,
-      async function collect(source: AsyncIterable<Uint8Array>) {
-        const peerInfos = []
-        for await (const encodedResponse of source) {
-          let decodedResponse: any
-          try {
-            decodedResponse = new CrawlResponse(encodedResponse.slice())
-          } catch {
-            continue
-          }
-
-          if (decodedResponse.status !== CrawlStatus.OK) {
-            continue
-          }
-
-          peerInfos.push(...(await decodedResponse.peerInfos))
-        }
-
-        return peerInfos
-      }
+      collect
     )
   }
+}
+
+async function collect(source: AsyncIterable<Uint8Array>) {
+  const peerInfos = []
+  for await (const encodedResponse of source) {
+    let decodedResponse: any
+    try {
+      decodedResponse = new CrawlResponse(encodedResponse.slice())
+    } catch {
+      continue
+    }
+
+    if (decodedResponse.status !== CrawlStatus.OK) {
+      continue
+    }
+
+    peerInfos.push(...(await decodedResponse.peerInfos))
+  }
+
+  return peerInfos
 }
 
 export { Crawler }

@@ -61,7 +61,7 @@ class PacketForwardInteraction<Chain extends HoprCoreConnectorInstance> implemen
     )
   }
 
-  async handler(struct: { stream: any }): Promise<void> {
+  handler(struct: { stream: any }): void {
     let packet: Packet<Chain>
     pipe(
       /* pretttier-ignore */

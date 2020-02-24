@@ -26,6 +26,7 @@ import { pubKeyToPeerId, addPubKey, u8aToHex } from './src/utils'
 
 import figlet from 'figlet'
 import clear from 'clear'
+import { ChannelBalance } from '@hoprnet/hopr-core-connector-interface/src/types'
 
 // const MINIMAL_STAKE = new BN(toWei('0.10', 'ether'))
 // // const DEFAULT_STAKE = new BN(toWei('0.11', 'ether'))
@@ -231,6 +232,7 @@ async function tabCompletion(line: string, cb: (err: Error, hits: [string[], str
         async (channel: ChannelInstance) => u8aToHex(await channel.channelId),
         async (channelIds: Promise<string>[]) => {
           let channelIdSet: Set<string>
+
           try {
             channelIdSet = new Set<string>(await Promise.all(channelIds))
           } catch (err) {
@@ -239,7 +241,7 @@ async function tabCompletion(line: string, cb: (err: Error, hits: [string[], str
           }
 
           const peers: string[] = []
-          for (const peerInfo of this.peerStore.peers.values()) {
+          for (const peerInfo of node.peerStore.peers.values()) {
             if (isBootstrapNode(node, peerInfo.id)) {
               continue
             }
@@ -397,8 +399,9 @@ async function runAsRegularNode() {
       rl.prompt()
       return
     }
+
     rl.pause()
-    const [command, query]: (string | undefined)[] = (input || '')
+    const [command, query]: (string | undefined)[] = input
       .trim()
       .split(SPLIT_OPERAND_QUERY_REGEX)
       .slice(1)
@@ -424,12 +427,12 @@ async function runAsRegularNode() {
       // case 'unstake':
       //   unstake(query)
       //   break
-      // case 'openChannels':
-      //   openChannels()
-      //   break
-      // case 'open':
-      //   open(query)
-      //   break
+      case 'openChannels':
+        openChannels()
+        break
+      case 'open':
+        open(query)
+        break
       // case 'send':
       //   send(query)
       //   break
@@ -499,12 +502,6 @@ async function main() {
     runAsRegularNode()
   }
 }
-
-// if (options.network == null || options.network == 'ethereum') {
-//   throw Error(`not implemented`)
-// } else if (options.network == `polkadot`) {
-//   connector = HoprPolkadot
-// }
 
 main()
 
@@ -597,91 +594,112 @@ main()
 //   })
 // }
 
-// async function open(query?: string): Promise<void> {
-//   if (query == null) {
-//     console.log(chalk.red(`Invalid arguments. Expected 'open <peerId>'. Received '${query}'`))
-//     rl.prompt()
-//     return
-//   }
+async function open(query?: string): Promise<void> {
+  if (query == null || query == '') {
+    console.log(chalk.red(`Invalid arguments. Expected 'open <peerId>'. Received '${query}'`))
+    rl.prompt()
+    return
+  }
 
-//   let counterparty: PeerId
-//   try {
-//     counterparty = await checkPeerIdInput(query)
-//   } catch (err) {
-//     console.log(err.message)
-//     setTimeout(() => {
-//       rl.prompt()
-//     })
-//     return
-//   }
+  let counterparty: PeerId
+  try {
+    counterparty = await checkPeerIdInput(query)
+  } catch (err) {
+    setTimeout(() => {
+      console.log(err.message)
+      rl.prompt()
+    })
+    return
+  }
 
-//   const channelId = node.paymentChannels.utils.getId(
-//     /* prettier-ignore */
-//     await node.paymentChannels.utils.pubKeyToAccountId(node.peerInfo.id.pubKey.marshal()),
-//     await node.paymentChannels.utils.pubKeyToAccountId(counterparty.pubKey.marshal()),
-//     node.paymentChannels.api
-//   )
+  const channelId = node.paymentChannels.utils.getId(
+    /* prettier-ignore */
+    await node.paymentChannels.utils.pubKeyToAccountId(node.peerInfo.id.pubKey.marshal()),
+    await node.paymentChannels.utils.pubKeyToAccountId(counterparty.pubKey.marshal()),
+    // @ts-ignore
+    node.paymentChannels.api
+  )
 
-//   let interval: NodeJS.Timeout
-//   node.paymentChannels.channel
-//     .create(
-//       node.paymentChannels,
-//       counterparty.pubKey.marshal(),
-//       async () => node.paymentChannels.utils.pubKeyToAccountId(await node.interactions.payments.onChainKey.interact(counterparty)),
-//       new node.paymentChannels.types.ChannelBalance(node.paymentChannels.api.registry, {
-//         balance: new BN(12345),
-//         balance_a: new BN(123)
-//       })
-//     )
-//     .then(() => {
-//       console.log(`${chalk.green(`Successfully opened channel`)} ${chalk.yellow(channelId.toString())}`)
-//     })
-//     .catch((err: Error) => {
-//       console.log(chalk.red(err.message))
-//     })
-//     .finally(() => {
-//       setTimeout(() => {
-//         rl.prompt()
-//       })
-//     })
+  let interval: NodeJS.Timeout
+  let timeout: NodeJS.Timeout
+  try {
+    await node.paymentChannels.channel.create(
+      node.paymentChannels,
+      counterparty.pubKey.marshal(),
+      async () => node.paymentChannels.utils.pubKeyToAccountId(await node.interactions.payments.onChainKey.interact(counterparty)),
+      // @ts-ignore
+      new node.paymentChannels.types.ChannelBalance(node.paymentChannels.api.registry, {
+        balance: new BN(12345),
+        balance_a: new BN(123)
+      }),
+      (balance: ChannelBalance.Instance): Promise<Uint8Array> => node.interactions.payments.open.interact(counterparty, balance)
+    )
 
-//   process.stdout.write(`Submitted transaction. Waiting for confirmation .`)
-//   interval = setInterval(() => process.stdout.write('.'), 1000)
-// }
+    setTimeout(() => {
+      console.log(`${chalk.green(`Successfully opened channel`)} ${chalk.yellow(channelId.toString())}`)
+      clearTimeout(timeout)
+      clearInterval(interval)
+      rl.prompt()
+    })
+  } catch (err) {
+    setTimeout(() => {
+      console.log(chalk.red(err.message))
+      clearTimeout(timeout)
+      clearInterval(interval)
+      rl.prompt()
+    })
+  }
 
-// async function openChannels(): Promise<void> {
-//   let str = `${chalk.yellow('ChannelId:'.padEnd(64, ' '))} - ${chalk.blue('PeerId:')}\n`
+  timeout = setTimeout(() => {
+    process.stdout.write(`Submitted transaction. Waiting for confirmation .`)
+    interval = setInterval(() => process.stdout.write('.'), 1000)
+  }, 2 * 1000)
+}
 
-//   try {
-//     str += await node.paymentChannels.channel.getAll(
-//       node.paymentChannels,
-//       async (channel: ChannelInstance) => {
-//         if (!channel.counterparty) {
-//           return `${chalk.yellow(u8aToHex(await channel.channelId))} - ${chalk.gray('pre-opened')}`
-//         }
+/**
+ * Lists all channels that we have with other nodes.
+ */
+async function openChannels(): Promise<void> {
+  let str = `${chalk.yellow('ChannelId:'.padEnd(64, ' '))} - ${chalk.blue('PeerId:')}\n`
 
-//         const peerId = await pubKeyToPeerId(channel.counterparty)
+  try {
+    await node.paymentChannels.channel.getAll(
+      node.paymentChannels,
+      async (channel: ChannelInstance) => {
+        const channelId = await channel.channelId
+        if (!channel.counterparty) {
+          str += `${chalk.yellow(u8aToHex(channelId))} - ${chalk.gray('pre-opened')}`
+          return
+        }
 
-//         return `${chalk.yellow(u8aToHex(await channel.channelId))} - ${chalk.blue(peerId.toB58String())}`
-//       },
-//       (promises: Promise<string>[]) => {
-//         if (promises.length == 0) return `\n  No open channels.`
+        const peerId = await pubKeyToPeerId(channel.counterparty)
 
-//         return Promise.all(promises).then((results: string[]) => results.join('\n'))
-//       }
-//     )
-//   } catch (err) {
-//     setTimeout(() => {
-//       rl.prompt()
-//     })
-//     return console.log(chalk.red(err.message))
-//   }
+        str += `${chalk.yellow(u8aToHex(channelId))} - ${chalk.blue(peerId.toB58String())}`
+        return
+      },
+      async (promises: Promise<void>[]) => {
+        if (promises.length == 0) {
+          str += `  No open channels.`
+          return
+        }
 
-//   setTimeout(() => {
-//     console.log(str)
-//     rl.prompt()
-//   })
-// }
+        await Promise.all(promises)
+
+        return
+      }
+    )
+    setTimeout(() => {
+      console.log(str)
+      rl.prompt()
+    })
+  } catch (err) {
+    setTimeout(() => {
+      console.log(chalk.red(err.message))
+      rl.prompt()
+    })
+    return
+  }
+}
 
 // async function stake(query: string): Promise<void> {
 //   if (!query) {
@@ -746,6 +764,9 @@ main()
 //   }
 // }
 
+/**
+ * Crawls the network to check for other nodes.
+ */
 async function crawl(): Promise<void> {
   try {
     await node.network.crawler.crawl((peerInfo: PeerInfo) => !isBootstrapNode(node, peerInfo.id))
@@ -787,6 +808,10 @@ async function crawl(): Promise<void> {
 //   return Promise.resolve(new BN(0))
 // }
 
+/**
+ * Prints the name of the network we are using and the
+ * identity that we have on that chain.
+ */
 async function printMyAddress(): Promise<void> {
   const prefixLength = Math.max(node.paymentChannels.CHAIN_NAME.length, 'HOPR'.length) + 3
 
@@ -800,6 +825,9 @@ async function printMyAddress(): Promise<void> {
   setTimeout(() => rl.prompt())
 }
 
+/**
+ * Prints the balance of our account.
+ */
 async function printBalance(): Promise<void> {
   console.log(`Account Balance:  `, chalk.magenta((await node.paymentChannels.accountBalance).toString()), `HOPR tokens`)
   setTimeout(() => rl.prompt())
@@ -814,10 +842,15 @@ async function listConnectors(): Promise<void> {
 
   const promises = []
   for (let i = 0; i < knownConnectors.length; i++) {
-    promises.push(import(knownConnectors[i][0]).then(() => {
-      found++
-      str += `\n  ${chalk.yellow(knownConnectors[i][0])} ${chalk.gray('=>')} ts-node hopr -n ${chalk.green(knownConnectors[i][1])}`
-    }, () => {}))
+    promises.push(
+      import(knownConnectors[i][0]).then(
+        () => {
+          found++
+          str += `\n  ${chalk.yellow(knownConnectors[i][0])} ${chalk.gray('=>')} ts-node hopr -n ${chalk.green(knownConnectors[i][1])}`
+        },
+        () => {}
+      )
+    )
   }
 
   await Promise.all(promises)
