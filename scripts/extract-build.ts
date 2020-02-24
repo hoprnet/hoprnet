@@ -5,12 +5,9 @@ import {join} from "path";
 import {readdir, readFile, writeFile, mkdir} from "fs";
 import {promisify} from "util";
 
-type Output = {
-  format: string;
-  items: {
-    name: string;
-    value: any;
-  }[];
+type Item = {
+  name: string;
+  value: any;
 };
 
 const inputPath = join(__dirname, "..", "build", "contracts");
@@ -44,11 +41,15 @@ const getData = () => {
     });
 };
 
-const writeData = (output: Output) => {
+const writeData = async (folder: string, items: Item[]) => {
+  await promisify(mkdir)(join(outputPath, folder), {
+    recursive: true
+  });
+
   return Promise.all(
-    output.items.map(item => {
+    items.map(item => {
       return promisify(writeFile)(
-        join(outputPath, `${item.name}.${output.format}.json`),
+        join(outputPath, folder, `${item.name}.json`),
         JSON.stringify(item.value, null, 2)
       );
     })
@@ -59,15 +60,15 @@ const start = async () => {
   const data = await getData();
 
   const {abis, bytecodes} = data.reduce<{
-    [key: string]: Output;
+    [key: string]: Item[];
   }>(
     (result, output) => {
-      result.abis.items.push({
+      result.abis.push({
         name: output.contractName,
         value: output.abi
       });
 
-      result.bytecodes.items.push({
+      result.bytecodes.push({
         name: output.contractName,
         value: output.bytecode
       });
@@ -75,22 +76,15 @@ const start = async () => {
       return result;
     },
     {
-      abis: {
-        format: "abi",
-        items: []
-      },
-      bytecodes: {
-        format: "bin",
-        items: []
-      }
+      abis: [],
+      bytecodes: []
     }
   );
 
-  await promisify(mkdir)(outputPath, {
-    recursive: true
-  });
-
-  return Promise.all([writeData(abis), writeData(bytecodes)]);
+  return Promise.all([
+    writeData("abis", abis),
+    writeData("bytecodes", bytecodes)
+  ]);
 };
 
 start().catch(error => {
