@@ -40,7 +40,7 @@ class Crawler<Chain extends HoprCoreConnectorInstance> implements AbstractIntera
       return []
     }
 
-    await pipe(
+    return await pipe(
       /** prettier-ignore */
       struct.stream,
       collect
