@@ -20,7 +20,7 @@ export function toU8a(arg: number, length?: number): Uint8Array {
  * @param length desired length of the Uint8Array
  */
 export function stringToU8a(str: string, length?: number): Uint8Array {
-  if (length <= 0) {
+  if (length != null && length <= 0) {
     return new Uint8Array([])
   }
 
@@ -49,7 +49,7 @@ export function stringToU8a(str: string, length?: number): Uint8Array {
   for (let i = 0; i < strLength; i += 2) {
     const strSlice = str.slice(i, i + 2).match(/[0-9a-fA-F]{2}/g)
 
-    if (strSlice.length != 1) {
+    if (strSlice == null || strSlice.length != 1) {
       throw Error(`Got unknown character '${str.slice(i, i + 2)}'`)
     }
 
