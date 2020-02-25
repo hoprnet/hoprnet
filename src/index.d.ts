@@ -69,13 +69,11 @@ declare interface HoprCoreConnector {
    * Creates an uninitialised instance.
    *
    * @param db database instance
-   * @param keyPair public key and private key of the account
-   * @param uri URI of the blockchain node, e.g. `ws://localhost:9944`
+   * @param seed that is used to derive that on-chain identity
+   * @param options.id Id of the demo account
+   * @param options.uri URI that is used to connect to the blockchain
    */
-  create(db: LevelUp, keyPair: {
-    publicKey: Uint8Array,
-    privateKey: Uint8Array
-  }, uri?: string): Promise<HoprCoreConnectorInstance>
+  create(db: LevelUp, seed?: Uint8Array, options?: { id?: number, provider?: string }): Promise<HoprCoreConnectorInstance>
 }
 
 export { HoprCoreConnectorInstance, Utils, DbKeys, Types, ChannelInstance, Constants, Ticket }
