@@ -1,13 +1,12 @@
 {
   "compilerOptions": {
     "esModuleInterop": true,
-    "allowJs": true,
-    "checkJs": false,
     "outDir": "./lib",
     "lib": ["es2020", "dom"],
     "module": "commonjs",
     "target": "es2019",
-    "sourceMap": true
+    "sourceMap": true,
+    "declaration": true
   },
   "include": ["src/**/*", "hopr.ts", "config.ts", "node_modules/@hoprnet/hopr-types/types/**/*.d.ts"]
 }

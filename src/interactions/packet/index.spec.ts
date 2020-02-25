@@ -13,7 +13,6 @@ import { encode, decode } from 'rlp'
 import { Packet } from '../../messages/packet'
 import Hopr from '../..'
 import { HoprCoreConnectorInstance } from '@hoprnet/hopr-core-connector-interface'
-import HoprPolkadot from '@hoprnet/hopr-core-polkadot'
 import { SRMLTypes, Types, Active, ChannelBalance, AccountId, Hash, SignedChannel } from '@hoprnet/hopr-core-polkadot/lib/srml_types'
 import { ApiPromise } from '@polkadot/api'
 import { waitReady } from '@polkadot/wasm-crypto'
@@ -23,7 +22,7 @@ import { Interactions } from '..'
 import LevelUp from 'levelup'
 import Memdown from 'memdown'
 import BN from 'bn.js'
-import HoprPolkadotClass from '@hoprnet/hopr-core-polkadot/lib'
+import HoprPolkadotClass from '@hoprnet/hopr-core-polkadot'
 import { randomBytes } from 'crypto'
 import { DbKeys } from '../../db_keys'
 import { stringToU8a, u8aEquals } from '../../utils'
@@ -48,7 +47,7 @@ describe('check packet forwarding & acknowledgement generation', function() {
         streamMuxer: [MPLEX],
         connEncryption: [SECIO]
       }
-    })) as Hopr<HoprPolkadot>
+    })) as Hopr<HoprPolkadotClass>
 
     node.db = db
 
@@ -68,7 +67,7 @@ describe('check packet forwarding & acknowledgement generation', function() {
     node.interactions = new Interactions(node)
 
     const kPair = new Keyring({ type: 'sr25519' }).addFromSeed(node.peerInfo.id.pubKey.marshal().slice(0, 32), undefined, 'sr25519')
-    node.paymentChannels = new HoprPolkadot(
+    node.paymentChannels = new HoprPolkadotClass(
       ({
         isReady: Promise.resolve(true),
         query: {

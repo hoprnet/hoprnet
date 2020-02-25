@@ -12,7 +12,7 @@ import { PACKET_SIZE, PROTOCOL_STRING, MAX_HOPS } from './constants'
 
 import { Network } from './network'
 
-import { randomSubset, addPubKey, createDirectoryIfNotExists, getPeerInfo } from './utils'
+import { randomSubset, addPubKey, createDirectoryIfNotExists, getPeerInfo, privKeyToPeerId } from './utils'
 
 import levelup, { LevelUp } from 'levelup'
 import leveldown from 'leveldown'
@@ -123,12 +123,13 @@ export default class Hopr<Chain extends HoprCoreConnectorInstance> extends libp2
    *
    * @param options the parameters
    */
-  static async createNode<Constructor extends HoprCoreConnector, Instance extends HoprCoreConnectorInstance>(
+  static async createNode<Constructor extends HoprCoreConnector>(
     HoprCoreConnector: Constructor,
     options?: Partial<HoprOptions> & {
       provider?: string
+      peerId?: PeerId
     }
-  ): Promise<Hopr<Instance>> {
+  ): Promise<Hopr<any>> {
     const db = Hopr.openDatabase(`db`, options)
 
     if (options == null) {
@@ -143,22 +144,31 @@ export default class Hopr<Chain extends HoprCoreConnectorInstance> extends libp2
       options.output = console.log
     }
 
-    if (options.peerInfo == null) {
-      options.peerInfo = await getPeerInfo(options, db)
+    let connector: HoprCoreConnectorInstance
+    if (options != null && isFinite(options.id)) {
+      connector = await HoprCoreConnector.create(db, undefined, options)
+      options.peerId = await privKeyToPeerId(connector.self.privateKey)
+      if (options.peerInfo != null && !options.peerId.isEqual(options.peerInfo.id)) {
+        throw Error(`PeerId and PeerInfo mismatch.`)
+      }
+
+      if (options.peerInfo == null) {
+        options.peerInfo = await getPeerInfo(options, db)
+      }
+    } else {
+      if (options.peerInfo == null) {
+        options.peerInfo = await getPeerInfo(options, db)
+      }
+
+      connector = await HoprCoreConnector.create(db, options.peerInfo.id.privKey.marshal(), options)
     }
 
-    return new Hopr<Instance>(
+
+    return new Hopr(
       options as HoprOptions,
       db,
       options.bootstrapNode ? null : options.bootstrapServers,
-      (await HoprCoreConnector.create(
-        db,
-        {
-          publicKey: options.peerInfo.id.pubKey.marshal(),
-          privateKey: options.peerInfo.id.privKey.marshal()
-        },
-        options['provider']
-      )) as Instance
+      connector
     ).up(options as HoprOptions)
   }
 
