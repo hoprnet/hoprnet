@@ -93,7 +93,7 @@ declare namespace SignedChannel {
     ): Instance<ConcreteSignature, ConcreteChannel>
   }
 
-  interface Instance<ConcreteSignature extends Signature.Instance, ConcreteChannel extends Channel.Instance> extends Uint8Array, toU8a {
+  interface Instance<ConcreteSignature extends Signature.Instance, ConcreteChannel extends Channel.Instance> extends Uint8Array {
     channel: Channel.Instance
     signature: Signature.Instance
     signer: Uint8Array
