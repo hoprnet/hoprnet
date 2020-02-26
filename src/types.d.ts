@@ -40,10 +40,13 @@ declare namespace Channel {
 
 declare namespace ChannelBalance {
   interface Static extends length<Instance> {
-    new (coreConnector: any, struct: {
-      balance: BN,
-      balance_a: BN
-    }): Instance
+    new (
+      coreConnector: any,
+      struct: {
+        balance: BN
+        balance_a: BN
+      }
+    ): Instance
   }
 
   interface Instance extends toU8a {
@@ -75,10 +78,14 @@ declare namespace Signature {
   }
 }
 
-declare namespace SignedChannel  {
-  interface Static<ConcreteSignature extends Signature.Instance, ConcreteChannel extends Channel.Instance> extends length<Instance<ConcreteSignature, ConcreteChannel>> {
+declare namespace SignedChannel {
+  interface Static<ConcreteSignature extends Signature.Instance, ConcreteChannel extends Channel.Instance>
+    extends length<Instance<ConcreteSignature, ConcreteChannel>> {
     new (
-      arr?: Uint8Array,
+      arr?: {
+        bytes: ArrayBuffer
+        offset: number
+      },
       struct?: {
         signature: ConcreteSignature
         channel: ConcreteChannel
@@ -94,9 +101,11 @@ declare namespace SignedChannel  {
 }
 
 declare namespace SignedTicket {
-  interface Static<ConcreteSignature extends Signature.Instance, ConcreteChannel extends ChannelInstance, ConcreteTicket extends Ticket.Instance> extends length<Instance<ConcreteSignature, ConcreteChannel, ConcreteTicket>> {}
+  interface Static<ConcreteSignature extends Signature.Instance, ConcreteChannel extends ChannelInstance, ConcreteTicket extends Ticket.Instance>
+    extends length<Instance<ConcreteSignature, ConcreteChannel, ConcreteTicket>> {}
 
-  interface Instance<ConcreteSignature extends Signature.Instance, ConcreteChannel extends ChannelInstance, ConcreteTicket extends Ticket.Instance> extends Uint8Array {
+  interface Instance<ConcreteSignature extends Signature.Instance, ConcreteChannel extends ChannelInstance, ConcreteTicket extends Ticket.Instance>
+    extends Uint8Array {
     ticket: ConcreteTicket
     signature: ConcreteChannel
     signer: Promise<Uint8Array>
