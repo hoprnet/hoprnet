@@ -61,8 +61,8 @@ export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
     this.node = node
   }
 
-  subarray(begin: number = 0, end?: number): Uint8Array {
-    return new Uint8Array(this.buffer, this.byteOffset + begin, end != null ? end - begin : undefined)
+  subarray(begin: number = 0, end: number = Packet.SIZE(this.node.paymentChannels)): Uint8Array {
+    return new Uint8Array(this.buffer, begin + this.byteOffset, end - begin)
   }
 
   get header(): Header<Chain> {
@@ -314,7 +314,7 @@ export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
       await this.node.paymentChannels.utils.pubKeyToAccountId(target.pubKey.marshal())
     )
 
-    await this.node.db.put(u8aToHex(this.node.dbKeys.UnAcknowledgedTickets(target.pubKey.marshal(), this.header.hashedKeyHalf)), this.ticket)
+    await this.node.db.put(u8aToHex(this.node.dbKeys.UnAcknowledgedTickets(target.pubKey.marshal(), this.header.hashedKeyHalf)), Buffer.from(this.ticket))
 
     // const challenges = [secp256k1.publicKeyCreate(Buffer.from(deriveTicketKey(this.header.derivedSecret))), this.header.hashedKeyHalf]
     // let previousChallenges = await (await node.paymentChannels.channel.create(node.paymentChannels, await node.paymentChannels.utils.pubKeyToAccountId(target.pubKey.marshal()))).getPreviousChallenges()
@@ -404,6 +404,7 @@ export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
   /**
    * Checks whether the packet has already been seen.
    */
+  // @TODO: unhappy case mising
   async hasTag(db: LevelUp): Promise<boolean> {
     const tag = deriveTagParameters(this.header.derivedSecret)
     const key = Buffer.concat([Buffer.from('packet-tag-'), tag], 11 + 16)

@@ -50,21 +50,25 @@ class Opening<Chain extends HoprCoreConnectorInstance> implements AbstractIntera
       /* prettier-ignore */
       [channelBalance.toU8a()],
       struct.stream,
-      collect
+      this.collect.bind(this)
     )
   }
-}
 
-async function collect(source: any) {
-  let result: Uint8Array
-  for await (const msg of source) {
-    if (result != null) {
-      continue
-    } else {
-      result = msg.slice()
+  private async collect(source: any) {
+    let result: Uint8Array
+    for await (const msg of source) {
+      if (result != null) {
+        continue
+      } else {
+        result = msg.slice()
+      }
     }
+
+    return new this.node.paymentChannels.types.SignedChannel({
+      bytes: result.buffer,
+      offset: result.byteOffset
+    })
   }
-  return result
 }
 
 export { Opening }

@@ -9,6 +9,7 @@ import TCP = require('libp2p-tcp')
 import MPLEX = require('libp2p-mplex')
 import SECIO = require('libp2p-secio')
 
+import { Types } from '@hoprnet/hopr-core-polkadot'
 import { HoprCoreConnectorInstance } from '@hoprnet/hopr-core-connector-interface'
 import { Interactions } from '..'
 
@@ -44,13 +45,20 @@ describe('test payment (channel) interactions', function() {
       Bob.start()
     ])
 
+    Alice.paymentChannels = ({
+      types: Types
+    } as unknown) as HoprCoreConnectorInstance
+
+    Bob.paymentChannels = ({
+      types: Types
+    } as unknown) as HoprCoreConnectorInstance
     Alice.interactions = new Interactions(Alice)
     Bob.interactions = new Interactions(Bob)
   })
 
   it('should establish a connection and run through the opening sequence', async function() {
     const testArray = new Uint8Array(32).fill(0xff)
-    const response = new Uint8Array(32).fill(0x00)
+    const response = new Uint8Array(Types.SignedChannel.SIZE).fill(0x00)
 
     Bob.paymentChannels = ({
       channel: {
@@ -82,10 +90,10 @@ describe('test payment (channel) interactions', function() {
     )
   })
 
-  // after(async function () {
-  //   await Promise.all([
-  //     Alice.stop(),
-  //     Bob.stop()
-  //   ])
-  // })
+  after(async function () {
+    await Promise.all([
+      Alice.stop(),
+      Bob.stop()
+    ])
+  })
 })

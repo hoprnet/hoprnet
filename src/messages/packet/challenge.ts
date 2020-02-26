@@ -66,8 +66,8 @@ export class Challenge<Chain extends HoprCoreConnectorInstance> extends Uint8Arr
     return this.paymentChannels.utils.hash(this._hashedKey)
   }
 
-  subarray(begin: number = 0, end?: number): Uint8Array {
-    return new Uint8Array(this.buffer, this.byteOffset + begin, end != null ? end - begin : undefined)
+  subarray(begin: number = 0, end: number = Challenge.SIZE(this.paymentChannels)): Uint8Array {
+    return new Uint8Array(this.buffer, begin + this.byteOffset, end - begin)
   }
 
   /**
@@ -86,7 +86,6 @@ export class Challenge<Chain extends HoprCoreConnectorInstance> extends Uint8Arr
     return this.hash.then((hash: Uint8Array) => {
       return secp256k1.ecdsaRecover(
         this.challengeSignature.signature,
-        // @ts-ignore
         this.challengeSignature.recovery,
         // @ts-ignore
         this.challengeSignature.sr25519PublicKey

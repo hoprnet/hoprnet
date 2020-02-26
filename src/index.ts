@@ -144,6 +144,11 @@ export default class Hopr<Chain extends HoprCoreConnectorInstance> extends libp2
       options.output = console.log
     }
 
+    // @TODO give bootstrap node a different identity
+    if (options.bootstrapNode) {
+      options.id = 6
+    }
+
     let connector: HoprCoreConnectorInstance
     if (options != null && isFinite(options.id)) {
       connector = await HoprCoreConnector.create(db, undefined, options)

@@ -25,7 +25,7 @@ import BN from 'bn.js'
 import HoprPolkadotClass from '@hoprnet/hopr-core-polkadot'
 import { randomBytes } from 'crypto'
 import { DbKeys } from '../../db_keys'
-import { stringToU8a, u8aEquals } from '../../utils'
+import { stringToU8a, u8aEquals, u8aToHex } from '../../utils'
 
 import assert from 'assert'
 
@@ -163,7 +163,7 @@ describe('check packet forwarding & acknowledgement generation', function() {
     channels.set(channelIdSecond.toHex(), channelRecord)
     channels.set(channelId.toHex(), channelRecord)
 
-    await channelDbHelper(typeRegistry, channelRecord.toU8a(), Alice, Bob, Chris, Dave)
+    await channelDbHelper(typeRegistry, channelRecord, Alice, Bob, Chris, Dave)
 
     const testMsg = randomBytes(73)
 
@@ -246,14 +246,14 @@ function channelDbHelper<Chain extends HoprCoreConnectorInstance>(typeRegistry: 
     throw Error('cannot do this with less than two nodes.')
   }
 
-  promises.push(nodes[0].db.put(nodes[0].paymentChannels.dbKeys.Channel(new AccountId(typeRegistry, nodes[1].paymentChannels.self.keyPair.publicKey)), record))
+  promises.push(nodes[0].db.put(u8aToHex(nodes[0].paymentChannels.dbKeys.Channel(new AccountId(typeRegistry, nodes[1].paymentChannels.self.keyPair.publicKey))), record))
 
   for (let i = 1; i < nodes.length - 1; i++) {
     promises.push(
       nodes[i].db
         .batch()
-        .put(nodes[i].paymentChannels.dbKeys.Channel(new AccountId(typeRegistry, nodes[i - 1].paymentChannels.self.keyPair.publicKey)), record)
-        .put(nodes[i].paymentChannels.dbKeys.Channel(new AccountId(typeRegistry, nodes[i + 1].paymentChannels.self.keyPair.publicKey)), record)
+        .put(u8aToHex(nodes[i].paymentChannels.dbKeys.Channel(new AccountId(typeRegistry, nodes[i - 1].paymentChannels.self.keyPair.publicKey))), record)
+        .put(u8aToHex(nodes[i].paymentChannels.dbKeys.Channel(new AccountId(typeRegistry, nodes[i + 1].paymentChannels.self.keyPair.publicKey))), record)
         .write()
     )
   }

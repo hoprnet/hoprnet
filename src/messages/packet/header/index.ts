@@ -54,8 +54,8 @@ export class Header<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
     super(arr.bytes, arr.offset, Header.SIZE)
   }
 
-  subarray(begin: number = 0, end?: number): Uint8Array {
-    return new Uint8Array(this.buffer, begin + this.byteOffset, end != null ? end - begin : undefined)
+  subarray(begin: number = 0, end: number = Header.SIZE): Uint8Array {
+    return new Uint8Array(this.buffer, begin + this.byteOffset, end - begin)
   }
 
   get alpha(): Uint8Array {

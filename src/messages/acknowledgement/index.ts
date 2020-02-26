@@ -40,9 +40,8 @@ class Acknowledgement<Chain extends HoprCoreConnectorInstance> extends Uint8Arra
 
     this.paymentChannels = paymentChannels
   }
-
-  subarray(begin: number = 0, end?: number): Uint8Array {
-    return new Uint8Array(this.buffer, begin + this.byteOffset, end != null ? end - begin : undefined)
+  subarray(begin: number = 0, end: number = Acknowledgement.SIZE(this.paymentChannels)): Uint8Array {
+    return new Uint8Array(this.buffer, begin + this.byteOffset, end - begin)
   }
 
   get key(): Uint8Array {
@@ -94,7 +93,6 @@ class Acknowledgement<Chain extends HoprCoreConnectorInstance> extends Uint8Arra
 
     this._responseSigningParty = secp256k1.ecdsaRecover(
       this.responseSignature.signature,
-      // @ts-ignore
       this.responseSignature.recovery,
       // @ts-ignore
       this.responseSignature.sr25519PublicKey
