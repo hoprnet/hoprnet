@@ -33,7 +33,13 @@ declare namespace Balance {
 }
 
 declare namespace Channel {
-  interface Static extends length<Instance> {}
+  interface Static extends length<Instance> {
+    createFunded(balance: ChannelBalance.Instance): Instance
+
+    createActive(balance: ChannelBalance.Instance): Instance
+
+    createPending(pending: Moment.Instance, balance: ChannelBalance.Instance): Instance
+  }
 
   interface Instance extends toU8a {}
 }
