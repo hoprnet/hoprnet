@@ -1,5 +1,6 @@
 import BN from 'bn.js'
 import { ChannelInstance } from './channel'
+import { HoprCoreConnectorInstance } from '.'
 
 declare interface toU8a {
   toU8a: (...props: any[]) => Uint8Array
@@ -97,6 +98,12 @@ declare namespace SignedChannel {
         channel: ConcreteChannel
       }
     ): Instance<ConcreteSignature, ConcreteChannel>
+
+    create<CoreConnector extends HoprCoreConnectorInstance>(
+      coreConnector: HoprCoreConnectorInstance,
+      channel: ConcreteChannel,
+      arr?: { bytes: ArrayBuffer; offset: number }
+    ): Promise<Instance<ConcreteSignature, ConcreteChannel>>
   }
 
   interface Instance<ConcreteSignature extends Signature.Instance, ConcreteChannel extends Channel.Instance> extends Uint8Array {
