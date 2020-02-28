@@ -15,3 +15,6 @@ node_modules/
 yarn-error.log
 
 .DS_Store
+
+# typechain types generated
+src/types/web3

@@ -1,14 +1,14 @@
 {
   "name": "@hoprnet/hopr-core-ethereum",
-  "version": "0.0.2",
+  "version": "0.0.1",
   "repository": "git@github.com:hoprnet/hopr-core-ethereum.git",
-  "author": "Robert Kiel <robert.kiel@validitylabs.org>",
   "license": "LGPL-3.0-only",
   "main": "lib/index.js",
-  "types": "lib/index.d.ts",
   "scripts": {
-    "postinstall": "tsc -d -p .",
+    "postinstall": "yarn build",
     "test": "npx mocha",
+    "dev": "tsc -w",
+    "build:types": "typechain --target web3-v1 --outDir './src/types/web3' './node_modules/@hoprnet/hopr-ethereum/build/extracted/abis/*.json'",
     "build": "tsc -d -p ."
   },
   "files": [
@@ -21,20 +21,25 @@
     "node": "^12"
   },
   "dependencies": {
-    "peer-id": "^0.13.6",
-    "secp256k1": "^3.8.0",
-    "web3": "^1.2.4",
-    "web3-utils": "^1.2.4"
+    "@hoprnet/hopr-core-connector-interface": "hoprnet/hopr-core-connector-interface",
+    "@hoprnet/hopr-ethereum": "hoprnet/hopr-ethereum#develop",
+    "@hoprnet/hopr-types": "hoprnet/hopr-types",
+    "bn.js": "^5.1.1",
+    "keccak256": "^1.0.0",
+    "levelup": "^4.3.2",
+    "peer-id": "^0.13.9",
+    "secp256k1": "^4.0.0",
+    "web3": "^1.2.6"
   },
   "devDependencies": {
-    "@hoprnet/hopr-core-connector-interface": "hoprnet/hopr-core-connector-interface",
-    "@hoprnet/hopr-types": "hoprnet/hopr-types",
     "@types/levelup": "^4.3.0",
+    "@types/mocha": "^7.0.1",
     "@types/node": "^12.12.8",
-    "@types/secp256k1": "^3.5.0",
-    "mocha": "^7.0.0",
-    "ts-node": "^8.5.4",
-    "typescript": "^3.7.2"
+    "mocha": "^7.0.1",
+    "ts-node": "^8.6.2",
+    "typechain": "^1.0.5",
+    "typechain-target-web3-v1": "^1.0.4",
+    "typescript": "^3.8.2"
   },
   "prettier": {
     "tabWidth": 2,
