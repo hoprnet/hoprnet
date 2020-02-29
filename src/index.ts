@@ -7,18 +7,22 @@ import { HoprCoreConnectorInstance, Types as ITypes } from '@hoprnet/hopr-core-c
 import HoprChannelsAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprChannels.json'
 import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
 import DbKeysClass from './dbKeys'
-import { Types, Ticket } from './srml_types'
+import * as Types from './types'
 import * as Utils from './utils'
-import Constants from './constants'
+import * as constants from './constants'
 import { u8aToHex } from './core/u8a'
 import { DEFAULT_URI, DEFAULT_HOPR_CHANNELS_ADDRESS, DEFAULT_HOPR_TOKEN_ADDRESS } from './config'
-import { HoprChannels } from './types/web3/HoprChannels'
-import { HoprToken } from './types/web3/HoprToken'
+import { HoprChannels } from './tsc/web3/HoprChannels'
+import { HoprToken } from './tsc/web3/HoprToken'
 
 const DbKeys = new DbKeysClass()
-const constants = new Constants()
+const Constants = class Constants {
+  HASH_LENGTH = constants.HASH_LENGTH
+  SIGNATURE_LENGTH = constants.SIGNATURE_LENGTH
+}
+const Ticket = Types.Ticket
 
-import { Channel } from './channel'
+import Channel from './channel'
 export { Utils, DbKeys, Constants, Channel, Types, Ticket }
 
 export type HoprKeyPair = {

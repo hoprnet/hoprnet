@@ -8,7 +8,7 @@
     "postinstall": "yarn build",
     "test": "npx mocha",
     "dev": "tsc -w",
-    "build:types": "typechain --target web3-v1 --outDir './src/types/web3' './node_modules/@hoprnet/hopr-ethereum/build/extracted/abis/*.json'",
+    "build:types": "typechain --target web3-v1 --outDir './src/tsc/web3' './node_modules/@hoprnet/hopr-ethereum/build/extracted/abis/*.json'",
     "build": "tsc -d -p ."
   },
   "files": [

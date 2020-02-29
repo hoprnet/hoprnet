@@ -1,7 +1,6 @@
 import { DbKeys as IDbKeys, Types } from '@hoprnet/hopr-core-connector-interface'
-import Constants from './constants'
+import * as constants from './constants'
 
-const constants = new Constants()
 const encoder = new TextEncoder()
 const PREFIX: Uint8Array = encoder.encode('payments-')
 const SEPERATOR: Uint8Array = encoder.encode('-')
