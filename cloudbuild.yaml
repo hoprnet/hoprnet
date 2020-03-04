@@ -1,5 +1,5 @@
 steps:
 - name: 'gcr.io/cloud-builders/gcloud'
-  args: ['config', 'list', '--format=\'text(core.project)\'']
+  args: ['config', 'list', '--format="text(core.project)"']
 - name: 'gcr.io/cloud-builders/gcloud'
   args: ['app', 'deploy']
