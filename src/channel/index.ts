@@ -37,6 +37,56 @@ const getChannel = ({ hoprEthereum, channelId }: { hoprEthereum: HoprEthereum; c
   })
 }
 
+const onceOpen = (hoprEthereum: HoprEthereum, channelId: Hash): Promise<void> => {
+  let event: ReturnType<IHoprChannels['events']['OpenedChannel']>
+
+  return new Promise<void>((resolve, reject) => {
+    // TODO: better to filter
+    event = hoprEthereum.hoprChannels.events
+      .OpenedChannel()
+      .on('data', async data => {
+        const { opener, counterParty } = data.returnValues
+        const _channelId = await hoprEthereum.utils.getId(stringToU8a(opener), stringToU8a(counterParty))
+
+        if (!u8aEquals(_channelId, channelId)) {
+          return
+        }
+
+        resolve()
+      })
+      .on('error', (error: any) => {
+        reject(error)
+      })
+  }).finally(() => {
+    event.removeAllListeners()
+  })
+}
+
+const onceClosed = (hoprEthereum: HoprEthereum, channelId: Hash): Promise<void> => {
+  let event: ReturnType<IHoprChannels['events']['ClosedChannel']>
+
+  return new Promise<void>((resolve, reject) => {
+    // TODO: better to filter
+    event = hoprEthereum.hoprChannels.events
+      .ClosedChannel()
+      .on('data', async data => {
+        const { closer, counterParty } = data.returnValues
+        const _channelId = await hoprEthereum.utils.getId(stringToU8a(closer), stringToU8a(counterParty))
+
+        if (!u8aEquals(_channelId, channelId)) {
+          return
+        }
+
+        resolve()
+      })
+      .on('error', (error: any) => {
+        reject(error)
+      })
+  }).finally(() => {
+    event.removeAllListeners()
+  })
+}
+
 @typedClass<NChannel.Static>()
 class Channel {
   private _signedChannel: SignedChannel
@@ -47,54 +97,12 @@ class Channel {
     this._signedChannel = signedChannel
   }
 
-  private onceOpen(): Promise<void> {
-    let event: ReturnType<IHoprChannels['events']['OpenedChannel']>
-
-    return new Promise<void>((resolve, reject) => {
-      // TODO: better to filter
-      event = this.hoprEthereum.hoprChannels.events
-        .OpenedChannel()
-        .on('data', async data => {
-          const { opener, counterParty } = data.returnValues
-          const channelId = await this.hoprEthereum.utils.getId(stringToU8a(opener), stringToU8a(counterParty))
-
-          if (!u8aEquals(channelId, await this.channelId)) {
-            return
-          }
-
-          resolve()
-        })
-        .on('error', (error: any) => {
-          reject(error)
-        })
-    }).finally(() => {
-      event.removeAllListeners()
-    })
+  private async onceOpen(): Promise<void> {
+    return onceOpen(this.hoprEthereum, await this.channelId)
   }
 
-  private onceClosed(): Promise<void> {
-    let event: ReturnType<IHoprChannels['events']['ClosedChannel']>
-
-    return new Promise<void>((resolve, reject) => {
-      // TODO: better to filter
-      event = this.hoprEthereum.hoprChannels.events
-        .ClosedChannel()
-        .on('data', async data => {
-          const { closer, counterParty } = data.returnValues
-          const channelId = await this.hoprEthereum.utils.getId(stringToU8a(closer), stringToU8a(counterParty))
-
-          if (!u8aEquals(channelId, await this.channelId)) {
-            return
-          }
-
-          resolve()
-        })
-        .on('error', (error: any) => {
-          reject(error)
-        })
-    }).finally(() => {
-      event.removeAllListeners()
-    })
+  private async onceClosed(): Promise<void> {
+    return onceClosed(this.hoprEthereum, await this.channelId)
   }
 
   private get channel() {
@@ -439,8 +447,9 @@ class Channel {
 
     const counterparty = signedChannel.signer
     const channelBalance = signedChannel.channel.balance
+    const channelId = await hoprEthereum.utils.getId(hoprEthereum.account, counterparty)
 
-    // once open
+    await onceOpen(hoprEthereum, new Hash(channelId))
 
     if (hoprEthereum.utils.isPartyA(hoprEthereum.account, counterparty)) {
       await Channel.increaseFunds(hoprEthereum, counterparty, channelBalance.balance_a)
