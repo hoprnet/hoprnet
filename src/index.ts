@@ -41,7 +41,6 @@ export default class HoprEthereumClass implements HoprCoreConnectorInstance {
       privateKey: Uint8Array
     },
     public account: ITypes.AccountId,
-    public accountHex: string,
     public web3: Web3,
     public hoprChannels: HoprChannels,
     public hoprToken: HoprToken
@@ -61,7 +60,7 @@ export default class HoprEthereumClass implements HoprCoreConnectorInstance {
       }
 
       try {
-        this._nonce = await this.web3.eth.getTransactionCount(this.accountHex)
+        this._nonce = await this.web3.eth.getTransactionCount(u8aToHex(this.account))
       } catch (error) {
         reject(error)
       }
@@ -95,7 +94,7 @@ export default class HoprEthereumClass implements HoprCoreConnectorInstance {
 
     await this.utils.waitForConfirmation(
       this.hoprChannels.methods.setHashedSecret(u8aToHex(secret)).send({
-        from: this.accountHex,
+        from: u8aToHex(this.account),
         nonce: await this.nonce
       })
     )
@@ -105,7 +104,7 @@ export default class HoprEthereumClass implements HoprCoreConnectorInstance {
 
   get accountBalance() {
     return this.hoprToken.methods
-      .balanceOf(this.accountHex)
+      .balanceOf(u8aToHex(this.account))
       .call()
       .then(res => {
         return new BN(res)
@@ -115,10 +114,9 @@ export default class HoprEthereumClass implements HoprCoreConnectorInstance {
   static async create(db: LevelUp, keyPair: HoprKeyPair): Promise<HoprEthereumClass> {
     const web3 = new Web3(DEFAULT_URI)
     const account = await Utils.hash(keyPair.publicKey)
-    const accountHex = u8aToHex(account)
     const hoprChannels = new web3.eth.Contract(HoprChannelsAbi as any, DEFAULT_HOPR_CHANNELS_ADDRESS)
     const hoprToken = new web3.eth.Contract(HoprTokenAbi as any, DEFAULT_HOPR_TOKEN_ADDRESS)
 
-    return new HoprEthereumClass(db, keyPair, account, accountHex, web3, hoprChannels, hoprToken)
+    return new HoprEthereumClass(db, keyPair, account, web3, hoprChannels, hoprToken)
   }
 }

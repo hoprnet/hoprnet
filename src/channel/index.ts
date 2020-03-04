@@ -3,13 +3,16 @@ import ChannelStatic from '@hoprnet/hopr-core-connector-interface/src/channel'
 import { ChannelInstance } from '@hoprnet/hopr-core-connector-interface'
 import { typedClass } from 'src/tsc/utils'
 import { Uint8Array } from 'src/types/extended'
-import { u8aToHex, u8aXOR } from 'src/core/u8a'
+import { u8aToHex, u8aXOR, toU8a, stringToU8a, u8aEquals } from 'src/core/u8a'
 import { SignedChannel, Moment, Hash, AccountId, ChannelId, Balance, ChannelBalance, Ticket } from 'src/types'
 import HoprEthereum from '..'
 import { HASH_LENGTH } from 'src/constants'
+import { waitForConfirmation } from 'src/utils'
+import BN from 'bn.js'
+import { HoprChannels as IHoprChannels } from 'src/tsc/web3/HoprChannels'
 
 declare namespace NChannel {
-  interface Static<T extends HoprCoreConnectorInstance> extends ChannelStatic<T> {
+  interface Static extends ChannelStatic<HoprCoreConnectorInstance> {
     new (...props: any[]): Instance
   }
   interface Instance extends ChannelInstance {}
@@ -34,23 +37,64 @@ const getChannel = ({ hoprEthereum, channelId }: { hoprEthereum: HoprEthereum; c
   })
 }
 
-@typedClass<NChannel.Static<typeof HoprEthereum>>()
+@typedClass<NChannel.Static>()
 class Channel {
   private _signedChannel: SignedChannel
   private _settlementWindow?: Moment
   private _channelId?: Hash
-  public counterpartyHex: string
-  public partyAHex: string
-  public partyBHex: string
 
   constructor(public hoprEthereum: HoprEthereum, public counterparty: AccountId, signedChannel: SignedChannel) {
-    this.counterpartyHex = u8aToHex(counterparty)
-
-    const parties = hoprEthereum.utils.getParties(hoprEthereum.account, counterparty)
-    this.partyAHex = u8aToHex(parties[0])
-    this.partyBHex = u8aToHex(parties[1])
-
     this._signedChannel = signedChannel
+  }
+
+  private onceOpen(): Promise<void> {
+    let event: ReturnType<IHoprChannels['events']['OpenedChannel']>
+
+    return new Promise<void>((resolve, reject) => {
+      // TODO: better to filter
+      event = this.hoprEthereum.hoprChannels.events
+        .OpenedChannel()
+        .on('data', async data => {
+          const { opener, counterParty } = data.returnValues
+          const channelId = await this.hoprEthereum.utils.getId(stringToU8a(opener), stringToU8a(counterParty))
+
+          if (!u8aEquals(channelId, await this.channelId)) {
+            return
+          }
+
+          resolve()
+        })
+        .on('error', (error: any) => {
+          reject(error)
+        })
+    }).finally(() => {
+      event.removeAllListeners()
+    })
+  }
+
+  private onceClosed(): Promise<void> {
+    let event: ReturnType<IHoprChannels['events']['ClosedChannel']>
+
+    return new Promise<void>((resolve, reject) => {
+      // TODO: better to filter
+      event = this.hoprEthereum.hoprChannels.events
+        .ClosedChannel()
+        .on('data', async data => {
+          const { closer, counterParty } = data.returnValues
+          const channelId = await this.hoprEthereum.utils.getId(stringToU8a(closer), stringToU8a(counterParty))
+
+          if (!u8aEquals(channelId, await this.channelId)) {
+            return
+          }
+
+          resolve()
+        })
+        .on('error', (error: any) => {
+          reject(error)
+        })
+    }).finally(() => {
+      event.removeAllListeners()
+    })
   }
 
   private get channel() {
@@ -141,7 +185,7 @@ class Channel {
   get currentBalance() {
     return new Promise<Balance>(async (resolve, reject) => {
       try {
-        const response = await this.hoprEthereum.hoprToken.methods.balanceOf(this.hoprEthereum.accountHex).call()
+        const response = await this.hoprEthereum.hoprToken.methods.balanceOf(u8aToHex(this.hoprEthereum.account)).call()
         return resolve(new Balance(response))
       } catch (error) {
         return reject(error)
@@ -152,7 +196,7 @@ class Channel {
   get currentBalanceOfCounterparty() {
     return new Promise<Balance>(async (resolve, reject) => {
       try {
-        const response = await this.hoprEthereum.hoprToken.methods.balanceOf(this.counterpartyHex).call()
+        const response = await this.hoprEthereum.hoprToken.methods.balanceOf(u8aToHex(this.counterparty)).call()
         return resolve(new Balance(response))
       } catch (error) {
         return reject(error)
@@ -164,11 +208,12 @@ class Channel {
 
   async initiateSettlement(): Promise<void> {
     try {
-      await this.hoprEthereum.utils.waitForConfirmation(
-        this.hoprEthereum.hoprChannels.methods.initiateChannelClosure(this.counterpartyHex).send({
-          from: this.hoprEthereum.accountHex
+      await Promise.all([
+        this.onceClosed(),
+        this.hoprEthereum.hoprChannels.methods.initiateChannelClosure(u8aToHex(this.counterparty)).send({
+          from: u8aToHex(this.hoprEthereum.account)
         })
-      )
+      ])
     } catch (error) {
       throw error
     }
@@ -240,6 +285,24 @@ class Channel {
     return onChain && offChain
   }
 
+  static async increaseFunds(hoprEthereum: HoprEthereum, counterparty: AccountId, amount: Balance): Promise<void> {
+    try {
+      if ((await hoprEthereum.accountBalance).lt(amount)) {
+        throw Error('Insufficient funds.')
+      }
+
+      await waitForConfirmation(
+        hoprEthereum.hoprChannels.methods
+          .fundChannel(u8aToHex(hoprEthereum.account), u8aToHex(counterparty), amount.toString())
+          .send({
+            from: u8aToHex(hoprEthereum.account)
+          })
+      )
+    } catch (error) {
+      throw error
+    }
+  }
+
   /**
    * Checks whether the channel is open and opens that channel if necessary.
    * @param hoprEthereum the connector instance
@@ -259,31 +322,139 @@ class Channel {
 
     const counterparty = await getOnChainPublicKey(offChainCounterparty)
     const channelId = new Hash(await hoprEthereum.utils.getId(hoprEthereum.account, counterparty))
+    let channel: Channel
 
     if (await this.isOpen(hoprEthereum, counterparty, channelId)) {
       signedChannel = new SignedChannel(await hoprEthereum.db.get(hoprEthereum.dbKeys.Channel(counterparty)))
+      channel = new Channel(hoprEthereum, counterparty, signedChannel)
     } else if (sign != null && channelBalance != null) {
-      const channelOpener = await ChannelOpener.create(hoprEthereum, counterparty, channelId)
-
       if (hoprEthereum.utils.isPartyA(hoprEthereum.account, counterparty)) {
-        await channelOpener.increaseFunds(channelBalance.balance_a)
+        await Channel.increaseFunds(hoprEthereum, counterparty, channelBalance.balance_a)
       } else {
-        await channelOpener.increaseFunds(channelBalance.balance.sub(channelBalance.balance_a))
+        await Channel.increaseFunds(
+          hoprEthereum,
+          counterparty,
+          new Balance(channelBalance.balance.sub(channelBalance.balance_a))
+        )
       }
 
       signedChannel = await sign(channelBalance)
-      // await Promise.all([
-      //   /* prettier-ignore */
-      //   channelOpener.onceOpen(),
-      //   channelOpener.setActive(signedChannel)
-      // ])
+      channel = new Channel(hoprEthereum, counterparty, signedChannel)
+
+      await channel.onceOpen()
 
       await hoprEthereum.db.put(hoprEthereum.dbKeys.Channel(counterparty), Buffer.from(signedChannel))
     } else {
       throw Error('Invalid input parameters.')
     }
 
-    return new Channel(hoprEthereum, counterparty, signedChannel)
+    return channel
+  }
+
+  /**
+   * Get all channels from the database.
+   * @param hoprEthereum the connector instance
+   * @param onData function that is applied on every entry, cf. `map`
+   * @param onEnd function that is applied at the end, cf. `reduce`
+   */
+  static getAll<T, R>(
+    hoprEthereum: HoprEthereum,
+    onData: (channel: Channel) => Promise<T>,
+    onEnd: (promises: Promise<T>[]) => R
+  ): Promise<R> {
+    const promises: Promise<T>[] = []
+    return new Promise<R>((resolve, reject) => {
+      hoprEthereum.db
+        .createReadStream({
+          gt: hoprEthereum.dbKeys.Channel(new Uint8Array(Hash.SIZE).fill(0x00)),
+          lt: hoprEthereum.dbKeys.Channel(new Uint8Array(Hash.SIZE).fill(0xff))
+        })
+        .on('error', err => reject(err))
+        .on('data', ({ key, value }: { key: Buffer; value: Buffer }) => {
+          const signedChannel = new SignedChannel({
+            bytes: value.buffer,
+            offset: value.byteOffset
+          })
+
+          promises.push(
+            onData(new Channel(hoprEthereum, new AccountId(hoprEthereum.dbKeys.ChannelKeyParse(key)), signedChannel))
+          )
+        })
+        .on('end', () => resolve(onEnd(promises)))
+    })
+  }
+
+  /**
+   * Tries to close all channels and returns the finally received funds.
+   * @notice returns `0` if there are no open channels and/or we have not received any funds.
+   * @param hoprEthereum the connector instance
+   */
+  static async closeChannels(hoprEthereum: HoprEthereum): Promise<Balance> {
+    const result = new BN(0)
+
+    return Channel.getAll(
+      hoprEthereum,
+      (channel: Channel) =>
+        channel.initiateSettlement().then(() => {
+          // TODO: add balance
+          result.iaddn(0)
+        }),
+      async (promises: Promise<void>[]) => {
+        await Promise.all(promises)
+
+        return new Balance(result)
+      }
+    )
+  }
+
+  /**
+   * Checks whether this signature has already been used.
+   * @param signature signature to check
+   */
+  async testAndSetNonce(signature: Uint8Array): Promise<void> {
+    const key = this.hoprEthereum.dbKeys.Nonce(await this.channelId, toU8a(await this.hoprEthereum.nonce))
+
+    try {
+      await this.hoprEthereum.db.get(u8aToHex(key))
+    } catch (err) {
+      if (err.notFound == null || err.notFound != true) {
+        throw err
+      }
+      return
+    }
+
+    throw Error('Nonces must not be used twice.')
+  }
+
+  /**
+   * Handles a channel opening request. Returns the response to the request.
+   * @param coreConnector coreConnector instance
+   * @param input received input
+   */
+  static async handleOpeningRequest(hoprEthereum: HoprEthereum, input: Uint8Array): Promise<Uint8Array> {
+    const signedChannel = new SignedChannel({
+      bytes: input.buffer,
+      offset: input.byteOffset
+    })
+
+    const counterparty = signedChannel.signer
+    const channelBalance = signedChannel.channel.balance
+
+    // once open
+
+    if (hoprEthereum.utils.isPartyA(hoprEthereum.account, counterparty)) {
+      await Channel.increaseFunds(hoprEthereum, counterparty, channelBalance.balance_a)
+    } else {
+      await Channel.increaseFunds(
+        hoprEthereum,
+        counterparty,
+        new Balance(channelBalance.balance.sub(channelBalance.balance_a))
+      )
+
+      await hoprEthereum.db.put(u8aToHex(hoprEthereum.dbKeys.Channel(counterparty)), Buffer.from(signedChannel))
+    }
+
+    return signedChannel
   }
 }
 
