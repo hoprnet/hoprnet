@@ -73,11 +73,7 @@ class SignedTicket extends Uint8Array {
     let signer: Uint8Array
 
     try {
-      signer = secp256k1.ecdsaRecover(
-        this.signature.signature,
-        // @ts-ignore
-        this.signature.recovery
-      )
+      signer = secp256k1.ecdsaRecover(this.signature.signature, this.signature.recovery)
       return Promise.resolve(signer)
     } catch (err) {
       return Promise.reject(err)

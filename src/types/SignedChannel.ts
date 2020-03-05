@@ -7,7 +7,7 @@ import { u8aConcat } from 'src/core/u8a'
 import { Uint8Array } from 'src/types/extended'
 import { sign, verify } from 'src/utils'
 // TODO: check if this breaks, we should use `import type ..`
-import HoprEthereumClass from 'src'
+import type {HoprEthereumClass} from '..'
 
 @typedClass<TypeConstructors['SignedChannel']>()
 class SignedChannel extends Uint8Array {

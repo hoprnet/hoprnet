@@ -5,7 +5,8 @@ import { Hash, TicketEpoch, Balance, SignedTicket, Signature } from '.'
 import { Uint8Array } from 'src/types/extended'
 import { typedClass } from 'src/tsc/utils'
 import { sign, verify, hash } from 'src/utils'
-import { stringToU8a, u8aConcat } from 'src/core/u8a'
+import { stringToU8a, u8aConcat, u8aToHex } from 'src/core/u8a'
+import Channel from '../channel'
 
 const WIN_PROB = new BN(1)
 
@@ -96,13 +97,15 @@ class Ticket extends Uint8Array {
   }
 
   static async create(
-    channel: any, // TODO: update type
+    channel: Channel,
     amount: Balance,
     challenge: Hash,
     privKey: Uint8Array,
     pubKey: Uint8Array
   ): Promise<SignedTicket> {
-    const { hashedSecret } = await channel.hoprEthereum.hoprChannels.methods.accounts(channel.counterpartyHex).call()
+    const { hashedSecret } = await channel.hoprEthereum.hoprChannels.methods
+      .accounts(u8aToHex(channel.counterparty))
+      .call()
     const winProb = new Uint8Array(new BN(new Uint8Array(Hash.SIZE).fill(0xff)).div(WIN_PROB).toArray('le', Hash.SIZE))
     const channelId = await channel.channelId
 
@@ -123,8 +126,7 @@ class Ticket extends Uint8Array {
     })
   }
 
-  // TODO: update type
-  static async verify(channel: any, signedTicket: SignedTicket): Promise<boolean> {
+  static async verify(channel: Channel, signedTicket: SignedTicket): Promise<boolean> {
     if ((await channel.currentBalanceOfCounterparty).add(signedTicket.ticket.amount).gt(await channel.balance)) {
       return false
     }
@@ -138,8 +140,10 @@ class Ticket extends Uint8Array {
     return verify(await signedTicket.ticket.hash, signedTicket.signature, channel.offChainCounterparty)
   }
 
-  // TODO: update type
-  static async submit(channel: any, signedTicket: SignedTicket) {}
+  // TODO: implement
+  static async submit(channel: any, signedTicket: SignedTicket) {
+    throw Error('not implemented')
+  }
 }
 
 export default Ticket

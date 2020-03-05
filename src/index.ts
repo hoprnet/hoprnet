@@ -6,26 +6,19 @@ import BN from 'bn.js'
 import { HoprCoreConnectorInstance, Types as ITypes } from '@hoprnet/hopr-core-connector-interface'
 import HoprChannelsAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprChannels.json'
 import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
+import Channel from './channel'
 import DbKeysClass from './dbKeys'
 import * as Types from './types'
 import * as Utils from './utils'
 import * as constants from './constants'
 import { u8aToHex } from './core/u8a'
-import { DEFAULT_URI, DEFAULT_HOPR_CHANNELS_ADDRESS, DEFAULT_HOPR_TOKEN_ADDRESS } from './config'
 import { HoprChannels } from './tsc/web3/HoprChannels'
 import { HoprToken } from './tsc/web3/HoprToken'
+import { DEFAULT_URI, DEFAULT_HOPR_CHANNELS_ADDRESS, DEFAULT_HOPR_TOKEN_ADDRESS } from './config'
 
 const DbKeys = new DbKeysClass()
-const Constants = class Constants {
-  HASH_LENGTH = constants.HASH_LENGTH
-  SIGNATURE_LENGTH = constants.SIGNATURE_LENGTH
-}
-const Ticket = Types.Ticket
 
-import Channel from './channel'
-export { Utils, DbKeys, Constants, Channel, Types, Ticket }
-
-export type HoprKeyPair = {
+type HoprKeyPair = {
   privateKey: Uint8Array
   publicKey: Uint8Array
 }
@@ -70,12 +63,10 @@ export default class HoprEthereumClass implements HoprCoreConnectorInstance {
   }
 
   async start() {
-    // TODO: needs proper check
     this._started = true
   }
 
   async stop() {
-    // TODO: needs wind down
     this._started = false
   }
 
@@ -120,3 +111,5 @@ export default class HoprEthereumClass implements HoprCoreConnectorInstance {
     return new HoprEthereumClass(db, keyPair, account, web3, hoprChannels, hoprToken)
   }
 }
+
+export type { HoprEthereumClass }

@@ -119,6 +119,8 @@ class Channel {
     })
   }
 
+  ticket = Ticket
+
   get offChainCounterparty(): Uint8Array {
     return this._signedChannel.signer
   }
@@ -212,8 +214,6 @@ class Channel {
     })
   }
 
-  ticket = Ticket
-
   async initiateSettlement(): Promise<void> {
     try {
       await Promise.all([
@@ -227,7 +227,6 @@ class Channel {
     }
   }
 
-  // TODO: this is broken
   async getPreviousChallenges(): Promise<Hash> {
     let pubKeys: Uint8Array[] = []
     const challenge = new Uint8Array(HASH_LENGTH).fill(0x00)
@@ -256,11 +255,6 @@ class Channel {
     })
   }
 
-  /**
-   * Checks if there exists a payment channel with `counterparty`.
-   * @param hoprEthereum the CoreConnector instance
-   * @param counterparty secp256k1 public key of the counterparty
-   */
   static async isOpen(hoprEthereum: HoprEthereum, counterparty: AccountId, channelId: Hash) {
     const [onChain, offChain]: [boolean, boolean] = await Promise.all([
       getChannel({
@@ -311,14 +305,6 @@ class Channel {
     }
   }
 
-  /**
-   * Checks whether the channel is open and opens that channel if necessary.
-   * @param hoprEthereum the connector instance
-   * @param offChainCounterparty public key used off-chain
-   * @param getOnChainPublicKey yields the on-chain identity
-   * @param channelBalance desired channel balance
-   * @param sign signing provider
-   */
   static async create(
     hoprEthereum: HoprEthereum,
     offChainCounterparty: Uint8Array,
@@ -359,12 +345,6 @@ class Channel {
     return channel
   }
 
-  /**
-   * Get all channels from the database.
-   * @param hoprEthereum the connector instance
-   * @param onData function that is applied on every entry, cf. `map`
-   * @param onEnd function that is applied at the end, cf. `reduce`
-   */
   static getAll<T, R>(
     hoprEthereum: HoprEthereum,
     onData: (channel: Channel) => Promise<T>,
@@ -392,11 +372,6 @@ class Channel {
     })
   }
 
-  /**
-   * Tries to close all channels and returns the finally received funds.
-   * @notice returns `0` if there are no open channels and/or we have not received any funds.
-   * @param hoprEthereum the connector instance
-   */
   static async closeChannels(hoprEthereum: HoprEthereum): Promise<Balance> {
     const result = new BN(0)
 
@@ -415,10 +390,6 @@ class Channel {
     )
   }
 
-  /**
-   * Checks whether this signature has already been used.
-   * @param signature signature to check
-   */
   async testAndSetNonce(signature: Uint8Array): Promise<void> {
     const key = this.hoprEthereum.dbKeys.Nonce(await this.channelId, toU8a(await this.hoprEthereum.nonce))
 
@@ -434,11 +405,6 @@ class Channel {
     throw Error('Nonces must not be used twice.')
   }
 
-  /**
-   * Handles a channel opening request. Returns the response to the request.
-   * @param coreConnector coreConnector instance
-   * @param input received input
-   */
   static async handleOpeningRequest(hoprEthereum: HoprEthereum, input: Uint8Array): Promise<Uint8Array> {
     const signedChannel = new SignedChannel({
       bytes: input.buffer,

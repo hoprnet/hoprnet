@@ -29,23 +29,6 @@ export const getId: Utils['getId'] = function getId(self, counterparty, ...props
   return hash(Buffer.concat(getParties(self, counterparty), 2 * ETHEUREUM_ADDRESS_LENGTH))
 }
 
-// export const pubKeyToEthereumAddress: Utils['pubKeyToAccountId'] = function pubKeyToEthereumAddress(pubKey: Buffer) {
-//   if (pubKey.length != COMPRESSED_PUBLIC_KEY_LENGTH)
-//     throw Error(
-//       `Invalid input parameter. Expected a Buffer of size ${COMPRESSED_PUBLIC_KEY_LENGTH}. Got '${typeof pubKey}'${
-//         pubKey.length ? ` of length ${pubKey.length}` : ''
-//       }.`
-//     )
-
-//   const hash = sha3(
-//     publicKeyConvert(pubKey, false)
-//       .slice(1)
-//       .toString('hex')
-//   )
-
-//   return toChecksumAddress(hash.replace(/(0x)[0-9a-fA-F]{24}([0-9a-fA-F]{20})/, '$1$2'))
-// }
-
 export const pubKeyToAccountId: Utils['pubKeyToAccountId'] = async function pubKeyToAccountId(pubKey, ...args) {
   if (pubKey.length != COMPRESSED_PUBLIC_KEY_LENGTH)
     throw Error(
@@ -86,12 +69,11 @@ export const convertUnit: Utils['convertUnit'] = function convertUnit(amount, so
   }
 }
 
-// TODO: check if this causes RAM issues
 export const waitForConfirmation = async function<T extends PromiEvent<any>>(event: T) {
   return new Promise((resolve, reject) => {
     return event
-      .once('confirmation', (confNumber, recipient) => {
-        resolve(recipient)
+      .once('confirmation', (confNumber, receipt) => {
+        resolve(receipt)
       })
       .once('error', error => {
         reject(error)
