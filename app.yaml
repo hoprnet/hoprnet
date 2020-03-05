@@ -8,8 +8,11 @@ handlers:
   upload: www/index.html
   secure: always
   redirect_http_response_code: 301
+- url: /.well-known
+  static_files: .well-known
 - url: /(.*)
   static_files: www/\1
   upload: www/(.*)
   secure: always
   redirect_http_response_code: 301
+
