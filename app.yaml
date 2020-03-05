@@ -8,6 +8,8 @@ handlers:
   upload: www/index.html
   secure: always
   redirect_http_response_code: 301
+- url: /123
+  static_files: www/index.html
 - url: /.well-known/matrix
   static_dir: .well-known/matrix
 - url: /(.*)
