@@ -10,6 +10,8 @@ handlers:
   redirect_http_response_code: 301
 - url: /.well-known
   static_dir: well-known
+  http_headers:
+    Access-Control-Allow-Origin: hoprnet.modular.im
 - url: /(.*)
   static_files: www/\1
   upload: www/(.*)
