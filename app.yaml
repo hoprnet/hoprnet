@@ -8,10 +8,10 @@ handlers:
   upload: www/index.html
   secure: always
   redirect_http_response_code: 301
-- url: /.well-known
-  static_dir: well-known
+- url: /.well-known/matrix
+  static_dir: well-known/matrix
   http_headers:
-    Access-Control-Allow-Origin: hoprnet.modular.im
+    Access-Control-Allow-Origin: https://hoprnet.modular.im
 - url: /(.*)
   static_files: www/\1
   upload: www/(.*)
