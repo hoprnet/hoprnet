@@ -1,6 +1,6 @@
 {
     "m.homeserver": {
-        "base_url": "https://hoprnet.modular.im"
+        "base_url": "https://hopr.modular.im"
     },
     "m.identity_server": {
         "base_url": "https://vector.im"
