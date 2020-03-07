@@ -9,7 +9,7 @@
     "test": "npx mocha",
     "dev": "ttsc -w",
     "build:types": "typechain --target web3-v1 --outDir './src/tsc/web3' './node_modules/@hoprnet/hopr-ethereum/build/extracted/abis/*.json'",
-    "build": "ttsc -d -p ."
+    "build": "yarn build:types && ttsc -d -p ."
   },
   "files": [
     "!**/*.spec.ts",
