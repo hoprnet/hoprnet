@@ -9,6 +9,7 @@ import { HASH_LENGTH } from 'src/constants'
 import { waitForConfirmation } from 'src/utils'
 import BN from 'bn.js'
 import { HoprChannels as IHoprChannels } from 'src/tsc/web3/HoprChannels'
+import HoprEthereum from '..'
 
 declare namespace NChannel {
   interface Static extends ChannelStatic<HoprCoreConnectorInstance> {
@@ -24,7 +25,7 @@ type IChannel = {
   stateCounter: string
 }
 
-const getChannel = ({ hoprEthereum, channelId }: { hoprEthereum: any; channelId: Hash }) => {
+const getChannel = ({ hoprEthereum, channelId }: { hoprEthereum: HoprEthereum; channelId: Hash }) => {
   return new Promise<IChannel>(async (resolve, reject) => {
     try {
       const channelIdHex = u8aToHex(channelId)
@@ -36,7 +37,7 @@ const getChannel = ({ hoprEthereum, channelId }: { hoprEthereum: any; channelId:
   })
 }
 
-const onceOpen = (hoprEthereum: any, channelId: Hash): Promise<void> => {
+const onceOpen = (hoprEthereum: HoprEthereum, channelId: Hash): Promise<void> => {
   let event: ReturnType<IHoprChannels['events']['OpenedChannel']>
 
   return new Promise<void>((resolve, reject) => {
@@ -53,7 +54,7 @@ const onceOpen = (hoprEthereum: any, channelId: Hash): Promise<void> => {
 
         resolve()
       })
-      .on('error', (error: any) => {
+      .on('error', error => {
         reject(error)
       })
   }).finally(() => {
@@ -61,7 +62,7 @@ const onceOpen = (hoprEthereum: any, channelId: Hash): Promise<void> => {
   })
 }
 
-const onceClosed = (hoprEthereum: any, channelId: Hash): Promise<void> => {
+const onceClosed = (hoprEthereum: HoprEthereum, channelId: Hash): Promise<void> => {
   let event: ReturnType<IHoprChannels['events']['ClosedChannel']>
 
   return new Promise<void>((resolve, reject) => {
@@ -78,7 +79,7 @@ const onceClosed = (hoprEthereum: any, channelId: Hash): Promise<void> => {
 
         resolve()
       })
-      .on('error', (error: any) => {
+      .on('error', error => {
         reject(error)
       })
   }).finally(() => {
@@ -92,7 +93,7 @@ class Channel {
   private _settlementWindow?: Moment
   private _channelId?: Hash
 
-  constructor(public hoprEthereum: any, public counterparty: AccountId, signedChannel: SignedChannel) {
+  constructor(public hoprEthereum: HoprEthereum, public counterparty: AccountId, signedChannel: SignedChannel) {
     this._signedChannel = signedChannel
   }
 
@@ -237,7 +238,7 @@ class Channel {
           lt: this.hoprEthereum.dbKeys.Challenge(await this.channelId, challenge)
         })
         .on('error', reject)
-        .on('data', ({ key, ownKeyHalf }: any) => {
+        .on('data', ({ key, ownKeyHalf }) => {
           const [channelId, challenge] = this.hoprEthereum.dbKeys.ChallengeKeyParse(key)
 
           // BIG TODO !!
@@ -254,7 +255,7 @@ class Channel {
     })
   }
 
-  static async isOpen(hoprEthereum: any, counterparty: AccountId, channelId: Hash) {
+  static async isOpen(hoprEthereum: HoprEthereum, counterparty: AccountId, channelId: Hash) {
     const [onChain, offChain]: [boolean, boolean] = await Promise.all([
       getChannel({
         hoprEthereum,
@@ -265,7 +266,7 @@ class Channel {
       }),
       hoprEthereum.db.get(hoprEthereum.dbKeys.Channel(counterparty)).then(
         () => true,
-        (err: any) => {
+        err => {
           if (err.notFound) {
             return false
           } else {
@@ -286,7 +287,7 @@ class Channel {
     return onChain && offChain
   }
 
-  static async increaseFunds(hoprEthereum: any, counterparty: AccountId, amount: Balance): Promise<void> {
+  static async increaseFunds(hoprEthereum: HoprEthereum, counterparty: AccountId, amount: Balance): Promise<void> {
     try {
       if ((await hoprEthereum.accountBalance).lt(amount)) {
         throw Error('Insufficient funds.')
@@ -305,7 +306,7 @@ class Channel {
   }
 
   static async create(
-    hoprEthereum: any,
+    hoprEthereum: HoprEthereum,
     offChainCounterparty: Uint8Array,
     getOnChainPublicKey: (counterparty: Uint8Array) => Promise<Uint8Array>,
     channelBalance?: ChannelBalance,
@@ -345,7 +346,7 @@ class Channel {
   }
 
   static getAll<T, R>(
-    hoprEthereum: any,
+    hoprEthereum: HoprEthereum,
     onData: (channel: Channel) => Promise<T>,
     onEnd: (promises: Promise<T>[]) => R
   ): Promise<R> {
@@ -356,7 +357,7 @@ class Channel {
           gt: hoprEthereum.dbKeys.Channel(new Uint8Array(Hash.SIZE).fill(0x00)),
           lt: hoprEthereum.dbKeys.Channel(new Uint8Array(Hash.SIZE).fill(0xff))
         })
-        .on('error', (err: any) => reject(err))
+        .on('error', err => reject(err))
         .on('data', ({ key, value }: { key: Buffer; value: Buffer }) => {
           const signedChannel = new SignedChannel({
             bytes: value.buffer,
@@ -371,7 +372,7 @@ class Channel {
     })
   }
 
-  static async closeChannels(hoprEthereum: any): Promise<Balance> {
+  static async closeChannels(hoprEthereum: HoprEthereum): Promise<Balance> {
     const result = new BN(0)
 
     return Channel.getAll(
@@ -404,7 +405,9 @@ class Channel {
     throw Error('Nonces must not be used twice.')
   }
 
-  static handleOpeningRequest(hoprEthereum: any): (source: AsyncIterable<Uint8Array>) => AsyncIterator<Uint8Array> {
+  static handleOpeningRequest(
+    hoprEthereum: HoprEthereum
+  ): (source: AsyncIterable<Uint8Array>) => AsyncIterator<Uint8Array> {
     return source => {
       return (async function*(msgs) {
         for await (const msg of msgs) {
