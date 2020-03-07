@@ -12,9 +12,9 @@ import * as types from './types'
 import * as utils from './utils'
 import * as constants from './constants'
 import { u8aToHex, stringToU8a } from './core/u8a'
+import * as config from './config'
 import { HoprChannels } from './tsc/web3/HoprChannels'
 import { HoprToken } from './tsc/web3/HoprToken'
-import * as config from './config'
 import { typedClass } from './tsc/utils'
 
 @typedClass<HoprCoreConnector>()
@@ -61,6 +61,7 @@ export default class HoprEthereumClass {
     this._started = true
   }
 
+  // TODO: unsubscribe event listeners
   async stop() {
     this._started = false
   }
@@ -114,7 +115,7 @@ export default class HoprEthereumClass {
     const publicKey = await utils.privKeyToPubKey(privateKey)
 
     const web3 = new Web3(provider)
-    const account = new types.AccountId(await utils.hash(publicKey))
+    const account = new types.AccountId(publicKey)
     const hoprChannels = new web3.eth.Contract(HoprChannelsAbi as any, config.DEFAULT_HOPR_CHANNELS_ADDRESS)
     const hoprToken = new web3.eth.Contract(HoprTokenAbi as any, config.DEFAULT_HOPR_TOKEN_ADDRESS)
 

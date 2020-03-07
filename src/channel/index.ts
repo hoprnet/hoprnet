@@ -434,7 +434,7 @@ class Channel {
             await hoprEthereum.db.put(u8aToHex(hoprEthereum.dbKeys.Channel(counterparty)), Buffer.from(signedChannel))
           }
 
-          return signedChannel
+          yield signedChannel
         }
       })(source)
     }

@@ -1,4 +1,3 @@
-// @ts-ignore
 import TypeConstructors from '@hoprnet/hopr-core-connector-interface/src/types'
 import BN from 'bn.js'
 import { Hash, TicketEpoch, Balance, SignedTicket, Signature } from '.'
