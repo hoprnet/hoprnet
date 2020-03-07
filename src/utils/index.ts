@@ -6,7 +6,6 @@ import { publicKeyConvert, publicKeyCreate, ecdsaSign, ecdsaVerify } from 'secp2
 import keccak256 from 'keccak256'
 import { PromiEvent } from 'web3-core'
 import Web3 from 'web3'
-// import { Uint8Array } from 'src/types/extended'
 import * as constants from 'src/constants'
 import { Signature } from 'src/types'
 import { stringToU8a, u8aToHex } from 'src/core/u8a'

@@ -23,7 +23,7 @@ function allocationHelper(arr: [number, Uint8Array][]) {
   return result
 }
 
-const DbKeys: IDbKeys = {
+const dbKeys: IDbKeys = {
   Channel(counterparty: Types.AccountId): Uint8Array {
     return allocationHelper([
       [PREFIX.length, PREFIX],
@@ -103,4 +103,4 @@ const DbKeys: IDbKeys = {
   }
 }
 
-export default DbKeys
+export default dbKeys
