@@ -1,14 +1,15 @@
 import { Utils, Types } from '@hoprnet/hopr-core-connector-interface'
 import assert from 'assert'
 // @ts-ignore-next-line
-import { publicKeyConvert, ecdsaSign, ecdsaVerify } from 'secp256k1'
+import { publicKeyConvert, publicKeyCreate, ecdsaSign, ecdsaVerify } from 'secp256k1'
 // @ts-ignore-next-line
 import keccak256 from 'keccak256'
 import { PromiEvent } from 'web3-core'
 import Web3 from 'web3'
-import { Uint8Array } from 'src/types/extended'
-import { COMPRESSED_PUBLIC_KEY_LENGTH, ETHEUREUM_ADDRESS_LENGTH } from 'src/constants'
+// import { Uint8Array } from 'src/types/extended'
+import * as constants from 'src/constants'
 import { Signature } from 'src/types'
+import { stringToU8a, u8aToHex } from 'src/core/u8a'
 
 export const isPartyA: Utils['isPartyA'] = function isPartyA(self, counterparty) {
   return Buffer.compare(self, counterparty) < 0
@@ -25,26 +26,41 @@ export const getParties = function getParties(
   }
 }
 
-export const getId: Utils['getId'] = function getId(self, counterparty, ...props) {
-  return hash(Buffer.concat(getParties(self, counterparty), 2 * ETHEUREUM_ADDRESS_LENGTH))
+export const getId: Utils['getId'] = function getId(self, counterparty) {
+  return hash(Buffer.concat(getParties(self, counterparty), 2 * constants.ADDRESS_LENGTH))
 }
 
-export const pubKeyToAccountId: Utils['pubKeyToAccountId'] = async function pubKeyToAccountId(pubKey, ...args) {
-  if (pubKey.length != COMPRESSED_PUBLIC_KEY_LENGTH)
+export const privKeyToPubKey = async function privKeyToPubKey(privKey: Uint8Array): Promise<Uint8Array> {
+  if (privKey.length != constants.PRIVATE_KEY_LENGTH)
     throw Error(
-      `Invalid input parameter. Expected a Buffer of size ${COMPRESSED_PUBLIC_KEY_LENGTH}. Got '${typeof pubKey}'${
-        pubKey.length ? ` of length ${pubKey.length}` : ''
+      `Invalid input parameter. Expected a Buffer of size ${constants.PRIVATE_KEY_LENGTH}. Got '${typeof privKey}'${
+        privKey.length ? ` of length ${privKey.length}` : ''
       }.`
     )
 
-  return publicKeyConvert(pubKey, false).slice(1)
+  return publicKeyCreate(privKey)
 }
+
+export const pubKeyToAddress: Utils['pubKeyToAccountId'] = async function pubKeyToAddress(pubKey) {
+  if (pubKey.length != constants.COMPRESSED_PUBLIC_KEY_LENGTH)
+    throw Error(
+      `Invalid input parameter. Expected a Buffer of size ${
+        constants.COMPRESSED_PUBLIC_KEY_LENGTH
+      }. Got '${typeof pubKey}'${pubKey.length ? ` of length ${pubKey.length}` : ''}.`
+    )
+
+  return hash(publicKeyConvert(pubKey, false).slice(1))
+    .then(v => u8aToHex(v))
+    .then(v => v.replace(/(0x)[0-9a-fA-F]{24}([0-9a-fA-F]{20})/, '$1$2'))
+    .then(v => stringToU8a(v))
+}
+export const pubKeyToAccountId: Utils['pubKeyToAccountId'] = pubKeyToAddress
 
 export const hash: Utils['hash'] = async function hash(msg) {
   return new Uint8Array(keccak256(Buffer.from(msg)))
 }
 
-export const sign: Utils['sign'] = async function sign(msg, privKey, pubKey) {
+export const sign: Utils['sign'] = async function sign(msg, privKey) {
   const result = ecdsaSign(msg, privKey)
 
   const response = new Signature(undefined, {

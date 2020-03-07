@@ -1,7 +1,11 @@
-class Uint8Array_U8a extends Uint8Array {
+class Uint8ArrayE extends Uint8Array {
+  subarray(begin: number = 0, end?: number) {
+    return new Uint8Array(this.buffer, begin + this.byteOffset, end != null ? end - begin : undefined)
+  }
+
   toU8a() {
-    return this
+    return new Uint8Array(this)
   }
 }
 
-export default Uint8Array_U8a
+export default Uint8ArrayE

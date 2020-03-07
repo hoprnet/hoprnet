@@ -3,45 +3,40 @@ import { randomBytes } from 'crypto'
 import Web3 from 'web3'
 import { LevelUp } from 'levelup'
 import BN from 'bn.js'
-import { HoprCoreConnectorInstance, Types as ITypes } from '@hoprnet/hopr-core-connector-interface'
+import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import HoprChannelsAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprChannels.json'
 import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
-import Channel from './channel'
-import DbKeysClass from './dbKeys'
-import * as Types from './types'
-import * as Utils from './utils'
+import Channel from './Channel'
+import dbKeys from './dbKeys'
+import * as types from './types'
+import * as utils from './utils'
 import * as constants from './constants'
-import { u8aToHex } from './core/u8a'
+import { u8aToHex, toU8a, stringToU8a } from './core/u8a'
 import { HoprChannels } from './tsc/web3/HoprChannels'
 import { HoprToken } from './tsc/web3/HoprToken'
-import { DEFAULT_URI, DEFAULT_HOPR_CHANNELS_ADDRESS, DEFAULT_HOPR_TOKEN_ADDRESS } from './config'
+import * as config from './config'
+import { typedClass } from './tsc/utils'
 
-const DbKeys = new DbKeysClass()
-
-type HoprKeyPair = {
-  privateKey: Uint8Array
-  publicKey: Uint8Array
-}
-
-export default class HoprEthereumClass implements HoprCoreConnectorInstance {
+@typedClass<HoprCoreConnector>()
+export default class HoprEthereumClass {
   private _started: boolean = false
   private _nonce?: number
 
   constructor(
     public db: LevelUp,
     public self: {
-      publicKey: Uint8Array
       privateKey: Uint8Array
+      publicKey: Uint8Array
     },
-    public account: ITypes.AccountId,
+    public account: types.AccountId,
     public web3: Web3,
     public hoprChannels: HoprChannels,
     public hoprToken: HoprToken
   ) {}
 
-  readonly dbKeys = DbKeys
-  readonly utils = Utils
-  readonly types = Types
+  readonly dbKeys = dbKeys
+  readonly utils = utils
+  readonly types = types
   readonly channel = Channel
   readonly constants = constants
   readonly CHAIN_NAME = 'HOPR on Ethereum'
@@ -102,14 +97,37 @@ export default class HoprEthereumClass implements HoprCoreConnectorInstance {
       })
   }
 
-  static async create(db: LevelUp, keyPair: HoprKeyPair): Promise<HoprEthereumClass> {
-    const web3 = new Web3(DEFAULT_URI)
-    const account = await Utils.hash(keyPair.publicKey)
-    const hoprChannels = new web3.eth.Contract(HoprChannelsAbi as any, DEFAULT_HOPR_CHANNELS_ADDRESS)
-    const hoprToken = new web3.eth.Contract(HoprTokenAbi as any, DEFAULT_HOPR_TOKEN_ADDRESS)
+  static async create(
+    db: LevelUp,
+    seed?: Uint8Array,
+    options?: { id?: number; provider?: string }
+  ): Promise<HoprEthereumClass> {
+    const usingSeed = typeof seed !== 'undefined'
+    const usingOptions = typeof options !== 'undefined'
 
-    return new HoprEthereumClass(db, keyPair, account, web3, hoprChannels, hoprToken)
+    if (!usingSeed && !usingOptions) {
+      throw Error("'seed' or 'options' must be provided")
+    }
+
+    const provider = options?.provider || config.DEFAULT_URI
+    const privateKey = usingSeed ? seed : stringToU8a(config.DEMO_ACCOUNTS[options.id])
+    const publicKey = await utils.privKeyToPubKey(privateKey)
+
+    const web3 = new Web3(provider)
+    const account = new types.AccountId(await utils.hash(publicKey))
+    const hoprChannels = new web3.eth.Contract(HoprChannelsAbi as any, config.DEFAULT_HOPR_CHANNELS_ADDRESS)
+    const hoprToken = new web3.eth.Contract(HoprTokenAbi as any, config.DEFAULT_HOPR_TOKEN_ADDRESS)
+
+    return new HoprEthereumClass(
+      db,
+      {
+        privateKey,
+        publicKey
+      },
+      account,
+      web3,
+      hoprChannels,
+      hoprToken
+    )
   }
 }
-
-export type { HoprEthereumClass }

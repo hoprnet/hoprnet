@@ -4,13 +4,13 @@ import TypeConstructors from '@hoprnet/hopr-core-connector-interface/src/types'
 import { Signature, Channel, ChannelBalance } from '.'
 import { typedClass } from 'src/tsc/utils'
 import { u8aConcat } from 'src/core/u8a'
-import { Uint8Array } from 'src/types/extended'
+import { Uint8ArrayE } from 'src/types/extended'
 import { sign, verify } from 'src/utils'
 // TODO: check if this breaks, we should use `import type ..`
-import type {HoprEthereumClass} from '..'
+// import HoprEthereumClass from '..'
 
 @typedClass<TypeConstructors['SignedChannel']>()
-class SignedChannel extends Uint8Array {
+class SignedChannel extends Uint8ArrayE {
   private _signature?: Signature
   private _channel?: Channel
 
@@ -31,10 +31,6 @@ class SignedChannel extends Uint8Array {
     } else {
       throw Error(`Invalid constructor arguments.`)
     }
-  }
-
-  subarray(begin: number = 0, end: number = SignedChannel.SIZE): Uint8Array {
-    return new Uint8Array(this.buffer, begin + this.byteOffset, end - begin)
   }
 
   get signature() {
@@ -67,7 +63,7 @@ class SignedChannel extends Uint8Array {
     return secp256k1.ecdsaRecover(this.signature.signature, this.signature.recovery)
   }
 
-  async verify(coreConnector: HoprEthereumClass) {
+  async verify(coreConnector: any) {
     return await verify(this.channel.toU8a(), this.signature, coreConnector.self.publicKey)
   }
 
@@ -76,7 +72,7 @@ class SignedChannel extends Uint8Array {
   }
 
   static async create(
-    coreConnector: HoprEthereumClass,
+    coreConnector: any,
     channel: Channel,
     arr?: {
       bytes: ArrayBuffer

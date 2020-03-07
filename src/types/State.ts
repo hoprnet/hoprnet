@@ -1,10 +1,10 @@
 import TypeConstructors from '@hoprnet/hopr-core-connector-interface/src/types'
 import { typedClass } from 'src/tsc/utils'
 import { TicketEpoch, Hash, Public } from '.'
-import { Uint8Array } from 'src/types/extended'
+import { Uint8ArrayE } from 'src/types/extended'
 
 @typedClass<TypeConstructors['State']>()
-class State extends Uint8Array {
+class State extends Uint8ArrayE {
   secret: Hash
   pubkey: Public
   epoch: TicketEpoch

@@ -2,10 +2,16 @@ import assert from 'assert'
 import { randomBytes } from 'crypto'
 // @ts-ignore-next-line
 import secp256k1 from 'secp256k1'
-
 import * as utils from '.'
+import * as u8a from 'src/core/u8a'
 
-const generatePairs = () => {
+const pair = {
+  privKey: u8a.stringToU8a('0x9feaac2858974b0e16f6e3cfa7c21db6c7bbcd2094daa651ff3d5bb48a57b759'),
+  pubKey: u8a.stringToU8a('0x03950056bd3c566eb3ac90b4e8cb0e93a648bf8000833161d679bd802505b224b5'),
+  address: u8a.stringToU8a('0x81E1192eae6d7289A610956CaE1C4b76e083Eb39')
+}
+
+const generatePair = () => {
   // generate private key
   let privKey
   do {
@@ -15,13 +21,20 @@ const generatePairs = () => {
   // get the public key in a compressed format
   const pubKey = secp256k1.publicKeyCreate(privKey)
 
+  const address = secp256k1.publicKeyConvert(pubKey)
+
   return {
     privKey,
-    pubKey
+    pubKey,
+    address
   }
 }
 
-describe('test utils', function() {
+const generateMsg = () => {
+  return randomBytes(32)
+}
+
+describe.only('test utils', function() {
   it('should hash values', async function() {
     const testMsg = new Uint8Array([0, 0, 0, 0])
 
@@ -33,9 +46,9 @@ describe('test utils', function() {
   })
 
   it('should sign and verify messages', async function() {
-    const { privKey, pubKey } = generatePairs()
+    const { privKey, pubKey } = generatePair()
 
-    const message = randomBytes(32)
+    const message = generateMsg()
     const signature = await utils.sign(message, privKey, pubKey)
     assert(await utils.verify(message, signature, pubKey), `check that signature is verifiable`)
 
@@ -43,9 +56,15 @@ describe('test utils', function() {
     assert(!(await utils.verify(message, signature, pubKey)), `check that manipulated message is not verifiable`)
   })
 
-  it('should get address using public key', async function() {
-    const { privKey, pubKey } = generatePairs()
+  it('should get private key using public key', async function() {
+    const pubKey = await utils.privKeyToPubKey(pair.privKey)
 
-    console.log(utils.pubKeyToAccountId(pubKey))
+    assert(u8a.u8aEquals(pubKey, pair.pubKey))
+  })
+
+  it('should get address using public key', async function() {
+    const address = await utils.pubKeyToAddress(pair.pubKey)
+
+    assert(u8a.u8aEquals(address, pair.address))
   })
 })

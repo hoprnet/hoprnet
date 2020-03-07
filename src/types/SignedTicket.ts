@@ -3,11 +3,11 @@ import secp256k1 from 'secp256k1'
 import TypeConstructors from '@hoprnet/hopr-core-connector-interface/src/types'
 import { Signature, Ticket } from '.'
 import { typedClass } from 'src/tsc/utils'
-import { Uint8Array } from 'src/types/extended'
+import { Uint8ArrayE } from 'src/types/extended'
 import { u8aConcat } from 'src/core/u8a'
 
 @typedClass<TypeConstructors['SignedTicket']>()
-class SignedTicket extends Uint8Array {
+class SignedTicket extends Uint8ArrayE {
   private _ticket?: Ticket
   private _signature?: Signature
 
@@ -36,10 +36,6 @@ class SignedTicket extends Uint8Array {
     } else {
       throw Error(`Invalid constructor arguments.`)
     }
-  }
-
-  subarray(begin: number = 0, end?: number): Uint8Array {
-    return new Uint8Array(this.buffer, this.byteOffset + begin, end != null ? end - begin : undefined)
   }
 
   get ticket(): Ticket {

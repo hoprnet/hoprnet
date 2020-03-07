@@ -2,16 +2,16 @@
 import TypeConstructors from '@hoprnet/hopr-core-connector-interface/src/types'
 import BN from 'bn.js'
 import { Hash, TicketEpoch, Balance, SignedTicket, Signature } from '.'
-import { Uint8Array } from 'src/types/extended'
+import { Uint8ArrayE } from 'src/types/extended'
 import { typedClass } from 'src/tsc/utils'
 import { sign, verify, hash } from 'src/utils'
 import { stringToU8a, u8aConcat, u8aToHex } from 'src/core/u8a'
-import Channel from '../channel'
+import Channel from '../Channel'
 
 const WIN_PROB = new BN(1)
 
 @typedClass<TypeConstructors['Ticket']>()
-class Ticket extends Uint8Array {
+class Ticket extends Uint8ArrayE {
   constructor(
     arr?: {
       bytes: ArrayBuffer
@@ -42,10 +42,6 @@ class Ticket extends Uint8Array {
     } else {
       throw Error(`Invalid constructor arguments.`)
     }
-  }
-
-  subarray(begin: number = 0, end?: number): Uint8Array {
-    return new Uint8Array(this.buffer, begin + this.byteOffset, end != null ? end - begin : undefined)
   }
 
   get channelId(): Hash {
@@ -106,14 +102,14 @@ class Ticket extends Uint8Array {
     const { hashedSecret } = await channel.hoprEthereum.hoprChannels.methods
       .accounts(u8aToHex(channel.counterparty))
       .call()
-    const winProb = new Uint8Array(new BN(new Uint8Array(Hash.SIZE).fill(0xff)).div(WIN_PROB).toArray('le', Hash.SIZE))
+    const winProb = new Uint8ArrayE(new BN(new Uint8Array(Hash.SIZE).fill(0xff)).div(WIN_PROB).toArray('le', Hash.SIZE))
     const channelId = await channel.channelId
 
     const ticket = new Ticket(undefined, {
       channelId: channelId,
       epoch: new TicketEpoch(new BN(0)),
       challenge: challenge,
-      onChainSecret: new Uint8Array(stringToU8a(hashedSecret)),
+      onChainSecret: new Uint8ArrayE(stringToU8a(hashedSecret)),
       amount: amount,
       winProb: winProb
     })

@@ -1,11 +1,11 @@
 import TypeConstructors from '@hoprnet/hopr-core-connector-interface/src/types'
 import { typedClass } from 'src/tsc/utils'
 import { u8aConcat, u8aToNumber } from 'src/core/u8a'
-import { Uint8Array } from 'src/types/extended'
+import { Uint8ArrayE } from 'src/types/extended'
 import { SIGNATURE_LENGTH, SIGNATURE_RECOVERY_LENGTH } from 'src/constants'
 
 @typedClass<TypeConstructors['Signature']>()
-class Signature extends Uint8Array {
+class Signature extends Uint8ArrayE {
   constructor(
     arr?: {
       bytes: ArrayBuffer
@@ -23,10 +23,6 @@ class Signature extends Uint8Array {
     } else {
       throw Error('Invalid constructor arguments.')
     }
-  }
-
-  subarray(begin: number = 0, end?: number): Uint8Array {
-    return new Uint8Array(this.buffer, begin + this.byteOffset, end != null ? end - begin : undefined)
   }
 
   get signature() {

@@ -1,7 +1,7 @@
-import { BN } from 'src/types/extended'
+import { BNE } from 'src/types/extended'
 
 // TODO: SIZE check on construction
-class UINT265 extends BN {
+class UINT265 extends BNE {
   static get SIZE() {
     return 32
   }

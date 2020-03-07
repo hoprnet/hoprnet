@@ -1,6 +1,6 @@
 import TypeConstructors from '@hoprnet/hopr-core-connector-interface/src/types'
 import { ChannelBalance, Moment } from '.'
-import { Uint8Array } from 'src/types/extended'
+import { Uint8ArrayE } from 'src/types/extended'
 import { typedClass } from 'src/tsc/utils'
 import { u8aConcat } from 'src/core/u8a'
 
@@ -12,7 +12,7 @@ enum ChannelStatus {
 }
 
 @typedClass<TypeConstructors['Channel']>()
-class Channel extends Uint8Array {
+class Channel extends Uint8ArrayE {
   moment?: Moment
 
   constructor(
@@ -33,10 +33,6 @@ class Channel extends Uint8Array {
     } else {
       throw Error(`Invalid constructor arguments.`)
     }
-  }
-
-  subarray(begin: number = 0, end?: number): Uint8Array {
-    return new Uint8Array(this.buffer, begin + this.byteOffset, end != null ? end - begin : undefined)
   }
 
   get balance(): ChannelBalance {

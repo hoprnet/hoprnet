@@ -2,10 +2,9 @@ import { HoprCoreConnectorInstance } from '@hoprnet/hopr-core-connector-interfac
 import ChannelStatic from '@hoprnet/hopr-core-connector-interface/src/channel'
 import { ChannelInstance } from '@hoprnet/hopr-core-connector-interface'
 import { typedClass } from 'src/tsc/utils'
-import { Uint8Array } from 'src/types/extended'
+import { Uint8ArrayE } from 'src/types/extended'
 import { u8aToHex, u8aXOR, toU8a, stringToU8a, u8aEquals } from 'src/core/u8a'
-import { SignedChannel, Moment, Hash, AccountId, ChannelId, Balance, ChannelBalance, Ticket } from 'src/types'
-import HoprEthereum from '..'
+import { SignedChannel, Moment, Hash, AccountId, ChannelId, Balance, ChannelBalance, Ticket, State } from 'src/types'
 import { HASH_LENGTH } from 'src/constants'
 import { waitForConfirmation } from 'src/utils'
 import BN from 'bn.js'
@@ -25,7 +24,7 @@ type IChannel = {
   stateCounter: string
 }
 
-const getChannel = ({ hoprEthereum, channelId }: { hoprEthereum: HoprEthereum; channelId: Hash }) => {
+const getChannel = ({ hoprEthereum, channelId }: { hoprEthereum: any; channelId: Hash }) => {
   return new Promise<IChannel>(async (resolve, reject) => {
     try {
       const channelIdHex = u8aToHex(channelId)
@@ -37,7 +36,7 @@ const getChannel = ({ hoprEthereum, channelId }: { hoprEthereum: HoprEthereum; c
   })
 }
 
-const onceOpen = (hoprEthereum: HoprEthereum, channelId: Hash): Promise<void> => {
+const onceOpen = (hoprEthereum: any, channelId: Hash): Promise<void> => {
   let event: ReturnType<IHoprChannels['events']['OpenedChannel']>
 
   return new Promise<void>((resolve, reject) => {
@@ -62,7 +61,7 @@ const onceOpen = (hoprEthereum: HoprEthereum, channelId: Hash): Promise<void> =>
   })
 }
 
-const onceClosed = (hoprEthereum: HoprEthereum, channelId: Hash): Promise<void> => {
+const onceClosed = (hoprEthereum: any, channelId: Hash): Promise<void> => {
   let event: ReturnType<IHoprChannels['events']['ClosedChannel']>
 
   return new Promise<void>((resolve, reject) => {
@@ -93,7 +92,7 @@ class Channel {
   private _settlementWindow?: Moment
   private _channelId?: Hash
 
-  constructor(public hoprEthereum: HoprEthereum, public counterparty: AccountId, signedChannel: SignedChannel) {
+  constructor(public hoprEthereum: any, public counterparty: AccountId, signedChannel: SignedChannel) {
     this._signedChannel = signedChannel
   }
 
@@ -160,10 +159,10 @@ class Channel {
   }
 
   get state() {
-    return new Promise<Uint8Array>(async (resolve, reject) => {
+    return new Promise<State>(async (resolve, reject) => {
       try {
         const channel = await this.channel
-        return resolve(new Uint8Array(Number(channel.stateCounter)))
+        return resolve(new State(Number(channel.stateCounter)))
       } catch (error) {
         return reject(error)
       }
@@ -238,7 +237,7 @@ class Channel {
           lt: this.hoprEthereum.dbKeys.Challenge(await this.channelId, challenge)
         })
         .on('error', reject)
-        .on('data', ({ key, ownKeyHalf }) => {
+        .on('data', ({ key, ownKeyHalf }: any) => {
           const [channelId, challenge] = this.hoprEthereum.dbKeys.ChallengeKeyParse(key)
 
           // BIG TODO !!
@@ -247,7 +246,7 @@ class Channel {
         })
         .on('end', () => {
           if (pubKeys.length > 0) {
-            return resolve(new Uint8Array(u8aXOR(false, ...pubKeys)))
+            return resolve(new Hash(u8aXOR(false, ...pubKeys)))
           }
 
           resolve()
@@ -255,7 +254,7 @@ class Channel {
     })
   }
 
-  static async isOpen(hoprEthereum: HoprEthereum, counterparty: AccountId, channelId: Hash) {
+  static async isOpen(hoprEthereum: any, counterparty: AccountId, channelId: Hash) {
     const [onChain, offChain]: [boolean, boolean] = await Promise.all([
       getChannel({
         hoprEthereum,
@@ -287,7 +286,7 @@ class Channel {
     return onChain && offChain
   }
 
-  static async increaseFunds(hoprEthereum: HoprEthereum, counterparty: AccountId, amount: Balance): Promise<void> {
+  static async increaseFunds(hoprEthereum: any, counterparty: AccountId, amount: Balance): Promise<void> {
     try {
       if ((await hoprEthereum.accountBalance).lt(amount)) {
         throw Error('Insufficient funds.')
@@ -306,7 +305,7 @@ class Channel {
   }
 
   static async create(
-    hoprEthereum: HoprEthereum,
+    hoprEthereum: any,
     offChainCounterparty: Uint8Array,
     getOnChainPublicKey: (counterparty: Uint8Array) => Promise<Uint8Array>,
     channelBalance?: ChannelBalance,
@@ -314,7 +313,7 @@ class Channel {
   ): Promise<Channel> {
     let signedChannel: SignedChannel
 
-    const counterparty = await getOnChainPublicKey(offChainCounterparty)
+    const counterparty = await getOnChainPublicKey(offChainCounterparty).then(v => new Uint8ArrayE(v))
     const channelId = new Hash(await hoprEthereum.utils.getId(hoprEthereum.account, counterparty))
     let channel: Channel
 
@@ -346,7 +345,7 @@ class Channel {
   }
 
   static getAll<T, R>(
-    hoprEthereum: HoprEthereum,
+    hoprEthereum: any,
     onData: (channel: Channel) => Promise<T>,
     onEnd: (promises: Promise<T>[]) => R
   ): Promise<R> {
@@ -357,7 +356,7 @@ class Channel {
           gt: hoprEthereum.dbKeys.Channel(new Uint8Array(Hash.SIZE).fill(0x00)),
           lt: hoprEthereum.dbKeys.Channel(new Uint8Array(Hash.SIZE).fill(0xff))
         })
-        .on('error', err => reject(err))
+        .on('error', (err: any) => reject(err))
         .on('data', ({ key, value }: { key: Buffer; value: Buffer }) => {
           const signedChannel = new SignedChannel({
             bytes: value.buffer,
@@ -372,7 +371,7 @@ class Channel {
     })
   }
 
-  static async closeChannels(hoprEthereum: HoprEthereum): Promise<Balance> {
+  static async closeChannels(hoprEthereum: any): Promise<Balance> {
     const result = new BN(0)
 
     return Channel.getAll(
@@ -405,31 +404,37 @@ class Channel {
     throw Error('Nonces must not be used twice.')
   }
 
-  static async handleOpeningRequest(hoprEthereum: HoprEthereum, input: Uint8Array): Promise<Uint8Array> {
-    const signedChannel = new SignedChannel({
-      bytes: input.buffer,
-      offset: input.byteOffset
-    })
+  static handleOpeningRequest(hoprEthereum: any): (source: AsyncIterable<Uint8Array>) => AsyncIterator<Uint8Array> {
+    return source => {
+      return (async function*(msgs) {
+        for await (const msg of msgs) {
+          const signedChannel = new SignedChannel({
+            bytes: msg.buffer,
+            offset: msg.byteOffset
+          })
 
-    const counterparty = signedChannel.signer
-    const channelBalance = signedChannel.channel.balance
-    const channelId = await hoprEthereum.utils.getId(hoprEthereum.account, counterparty)
+          const counterparty = signedChannel.signer
+          const channelBalance = signedChannel.channel.balance
+          const channelId = await hoprEthereum.utils.getId(hoprEthereum.account, counterparty)
 
-    await onceOpen(hoprEthereum, new Hash(channelId))
+          await onceOpen(hoprEthereum, new Hash(channelId))
 
-    if (hoprEthereum.utils.isPartyA(hoprEthereum.account, counterparty)) {
-      await Channel.increaseFunds(hoprEthereum, counterparty, channelBalance.balance_a)
-    } else {
-      await Channel.increaseFunds(
-        hoprEthereum,
-        counterparty,
-        new Balance(channelBalance.balance.sub(channelBalance.balance_a))
-      )
+          if (hoprEthereum.utils.isPartyA(hoprEthereum.account, counterparty)) {
+            await Channel.increaseFunds(hoprEthereum, counterparty, channelBalance.balance_a)
+          } else {
+            await Channel.increaseFunds(
+              hoprEthereum,
+              counterparty,
+              new Balance(channelBalance.balance.sub(channelBalance.balance_a))
+            )
 
-      await hoprEthereum.db.put(u8aToHex(hoprEthereum.dbKeys.Channel(counterparty)), Buffer.from(signedChannel))
+            await hoprEthereum.db.put(u8aToHex(hoprEthereum.dbKeys.Channel(counterparty)), Buffer.from(signedChannel))
+          }
+
+          return signedChannel
+        }
+      })(source)
     }
-
-    return signedChannel
   }
 }
 
