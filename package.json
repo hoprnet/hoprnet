@@ -6,10 +6,11 @@
   "main": "lib/index.js",
   "scripts": {
     "postinstall": "yarn build",
+    "clean": "rm -rf ./lib",
     "test": "npx mocha",
-    "dev": "ttsc -w",
+    "dev": "yarn clean && yarn build:types && ttsc -w",
     "build:types": "typechain --target web3-v1 --outDir './src/tsc/web3' './node_modules/@hoprnet/hopr-ethereum/build/extracted/abis/*.json'",
-    "build": "yarn build:types && ttsc -d -p ."
+    "build": "yarn clean && yarn build:types && ttsc -d -p ."
   },
   "files": [
     "!**/*.spec.ts",
