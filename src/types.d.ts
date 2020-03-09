@@ -142,8 +142,6 @@ declare namespace Ticket {
       channel: ConcreteChannel,
       amount: Balance.Instance,
       challenge: Hash.Instance,
-      privKey: Uint8Array,
-      pubKey: Uint8Array,
       ...props: any[]
     ): Promise<SignedTicket.Instance<ConcreteSignature, ConcreteChannel, any>>
 
