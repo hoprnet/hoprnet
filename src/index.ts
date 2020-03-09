@@ -8,11 +8,11 @@ import TCP = require('libp2p-tcp')
 import defaultsDeep = require('@nodeutils/defaults-deep')
 
 import { Packet } from './messages/packet'
-import { PACKET_SIZE, PROTOCOL_STRING, MAX_HOPS } from './constants'
+import { PACKET_SIZE, MAX_HOPS } from './constants'
 
 import { Network } from './network'
 
-import { randomSubset, addPubKey, createDirectoryIfNotExists, getPeerInfo, privKeyToPeerId } from './utils'
+import { randomSubset, addPubKey, createDirectoryIfNotExists, getPeerInfo, privKeyToPeerId, u8aToHex } from './utils'
 
 import levelup, { LevelUp } from 'levelup'
 import leveldown from 'leveldown'
@@ -20,7 +20,6 @@ import Multiaddr from 'multiaddr'
 import chalk from 'chalk'
 import Debug, { Debugger } from 'debug'
 import Stream from 'stream'
-import pipe from 'it-pipe'
 
 import PeerId from 'peer-id'
 import PeerInfo from 'peer-info'
@@ -168,13 +167,7 @@ export default class Hopr<Chain extends HoprCoreConnectorInstance> extends libp2
       connector = await HoprCoreConnector.create(db, options.peerInfo.id.privKey.marshal(), options)
     }
 
-
-    return new Hopr(
-      options as HoprOptions,
-      db,
-      options.bootstrapNode ? null : options.bootstrapServers,
-      connector
-    ).up(options as HoprOptions)
+    return new Hopr(options as HoprOptions, db, options.bootstrapNode ? null : options.bootstrapServers, connector).up(options as HoprOptions)
   }
 
   /**
@@ -274,31 +267,31 @@ export default class Hopr<Chain extends HoprCoreConnectorInstance> extends libp2
 
           await Promise.all(path.map(addPubKey))
 
-          const peerInfo = await this.peerRouting.findPeer(path[0])
+          let packet: Packet<Chain>
+          try {
+            packet = await Packet.create(
+              /* prettier-ignore */
+              this,
+              msg.slice(n * PACKET_SIZE, Math.min(msg.length, (n + 1) * PACKET_SIZE)),
+              path
+            )
+          } catch (err) {
+            return reject(err)
+          }
 
-          const { stream } = await this.dialProtocol(peerInfo, PROTOCOL_STRING)
-
-          const packet = await Packet.create(
-            /* prettier-ignore */
-            this,
-            msg.slice(n * PACKET_SIZE, Math.min(msg.length, (n + 1) * PACKET_SIZE)),
-            path
-          )
-
-          pipe(
-            /* prettier-ignore */
-            packet,
-            stream,
-            async function(source: AsyncIterable<Uint8Array>) {
-              for await (const msg of source) {
-                this.log(this.peerInfo.id, `Received acknowledgement.`)
-                // return cb()
-                // if (!cb.called) {
-                //     return cb()
-                // }
-              }
+          this.interactions.packet.acknowledgment.once(
+            u8aToHex(this.dbKeys.UnAcknowledgedTickets(path[0].pubKey.marshal(), packet.ticket.ticket.challenge)),
+            () => {
+              console.log(`received acknowledgement`)
+              resolve()
             }
           )
+
+          try {
+            await this.interactions.packet.forward.interact(path[0], packet)
+          } catch (err) {
+            return reject(err)
+          }
         })
       )
     }

@@ -96,6 +96,7 @@ class PacketForwardInteraction<Chain extends HoprCoreConnectorInstance> implemen
   }
 
   async handlePacket(packet: Packet<Chain>, token: number): Promise<void> {
+    console.log(`received packet`, this.node.peerInfo.id.toB58String(), u8aToHex(packet))
     await packet.forwardTransform()
 
     const [sender, target] = await Promise.all([

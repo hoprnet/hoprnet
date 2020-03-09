@@ -32,6 +32,7 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnectorInstance> 
   }
 
   async interact(counterparty: PeerId, acknowledgement: Acknowledgement<Chain>): Promise<void> {
+    console.log(`sending acknowledgement to `, counterparty.toB58String())
     let struct: {
       stream: any
       protocol: string
@@ -44,7 +45,7 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnectorInstance> 
     } catch (err) {
       console.log(err)
 
-      this.node.log(`Could not transfer acknowledgement to ${counterparty.toB58String()}. Error was: ${chalk.red(err.message)}.`)
+      console.log(`Could not transfer acknowledgement to ${counterparty.toB58String()}. Error was: ${chalk.red(err.message)}.`)
       return
     }
 
@@ -63,6 +64,8 @@ async function handleHelper(source: any): Promise<void> {
       bytes: arr.buffer,
       offset: arr.byteOffset
     })
+
+    console.log(`received acknowledgement`, u8aToHex(acknowledgement))
 
     let record: any
 

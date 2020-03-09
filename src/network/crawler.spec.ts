@@ -14,6 +14,7 @@ import Hopr from '..'
 import { HoprCoreConnectorInstance } from '@hoprnet/hopr-core-connector-interface'
 import { Interactions } from '../interactions'
 import { Crawler } from './crawler'
+import Multiaddr from 'multiaddr'
 
 describe('test crawler', function() {
   async function generateNode(): Promise<Hopr<HoprCoreConnectorInstance>> {
@@ -26,8 +27,7 @@ describe('test crawler', function() {
       }
     })) as Hopr<HoprCoreConnectorInstance>
 
-    // @ts-ignore
-    node.peerInfo.multiaddrs.add('/ip4/0.0.0.0/tcp/0')
+    node.peerInfo.multiaddrs.add(Multiaddr('/ip4/0.0.0.0/tcp/0'))
 
     await node.start()
 

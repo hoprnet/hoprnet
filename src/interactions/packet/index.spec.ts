@@ -28,6 +28,7 @@ import { DbKeys } from '../../db_keys'
 import { stringToU8a, u8aEquals, u8aToHex } from '../../utils'
 
 import assert from 'assert'
+import Multiaddr from 'multiaddr'
 
 describe('check packet forwarding & acknowledgement generation', function() {
   const channels = new Map<string, SignedChannel>()
@@ -51,8 +52,7 @@ describe('check packet forwarding & acknowledgement generation', function() {
 
     node.db = db
 
-    // @ts-ignore
-    node.peerInfo.multiaddrs.add('/ip4/0.0.0.0/tcp/0')
+    node.peerInfo.multiaddrs.add(Multiaddr('/ip4/0.0.0.0/tcp/0'))
 
     await Promise.all([
       /* prettier-ignore */

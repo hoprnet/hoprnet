@@ -8,6 +8,7 @@ import { AbstractInteraction } from '../abstractInteraction'
 import { PROTOCOL_PAYMENT_CHANNEL } from '../../constants'
 import PeerInfo from 'peer-info'
 import PeerId from 'peer-id'
+import { u8aToHex } from '../../utils'
 
 class Opening<Chain extends HoprCoreConnectorInstance> implements AbstractInteraction<Chain> {
   protocols: string[] = [PROTOCOL_PAYMENT_CHANNEL]
@@ -20,7 +21,7 @@ class Opening<Chain extends HoprCoreConnectorInstance> implements AbstractIntera
     pipe(
       /** prettier-ignore */
       struct.stream,
-      this.node.paymentChannels.channel.handleOpeningRequest(this.node),
+      this.node.paymentChannels.channel.handleOpeningRequest(this.node.paymentChannels),
       struct.stream
     )
   }
@@ -46,9 +47,9 @@ class Opening<Chain extends HoprCoreConnectorInstance> implements AbstractIntera
       )
     }
 
-    return pipe(
+    return await pipe(
       /* prettier-ignore */
-      [channelBalance.toU8a()],
+      [(await this.node.paymentChannels.types.SignedChannel.create(this.node.paymentChannels, this.node.paymentChannels.types.Channel.createFunded(channelBalance))).subarray()],
       struct.stream,
       this.collect.bind(this)
     )

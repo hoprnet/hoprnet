@@ -14,7 +14,9 @@ import BN from 'bn.js'
 
 import PeerInfo from 'peer-info'
 import PeerId from 'peer-id'
-const Multiaddr = require('multiaddr')
+import Multiaddr from 'multiaddr'
+
+import { encode, decode } from 'rlp'
 
 const Multihash = require('multihashes')
 import bs58 from 'bs58'
@@ -22,7 +24,7 @@ import bs58 from 'bs58'
 import HoprCoreConnector, { Types, ChannelInstance, HoprCoreConnectorInstance } from '@hoprnet/hopr-core-connector-interface'
 
 import Hopr from './src'
-import { pubKeyToPeerId, addPubKey, u8aToHex } from './src/utils'
+import { pubKeyToPeerId, addPubKey, u8aToHex, u8aToNumber, toU8a } from './src/utils'
 
 import figlet from 'figlet'
 import clear from 'clear'
@@ -169,15 +171,28 @@ async function parseOptions(): Promise<void | Options> {
 
   const tmp = groupBy(
     process.env.BOOTSTRAP_SERVERS.split(',').map(addr => Multiaddr(addr)),
-    (ma: any) => ma.getPeerId()
+    (ma: Multiaddr) => ma.getPeerId()
   )
 
   options.bootstrapServers = []
   for (const peerId of Object.keys(tmp)) {
     const peerInfo = new PeerInfo(PeerId.createFromB58String(peerId))
 
-    tmp[peerId].forEach((ma: any) => peerInfo.multiaddrs.add(ma))
+    tmp[peerId].forEach((ma: Multiaddr) => peerInfo.multiaddrs.add(ma))
     options.bootstrapServers.push(peerInfo)
+  }
+
+  options.output = (encoded: Uint8Array) => {
+    const { latency, msg } = decodeMessage(encoded)
+
+    let str = ``
+
+    str += `===== New message ======\n`
+    str += `Message: ${msg}\n`
+    str += `Latency: ${latency}\n`
+    str += `========================\n`
+
+    console.log(str)
   }
 
   return (options as unknown) as Options
@@ -433,9 +448,9 @@ async function runAsRegularNode() {
       case 'open':
         open(query)
         break
-      // case 'send':
-      //   send(query)
-      //   break
+      case 'send':
+        send(query)
+        break
       // case 'closeAll':
       //   closeAll()
       //   break
@@ -454,6 +469,7 @@ async function runAsRegularNode() {
         break
     }
   })
+
   rl.prompt()
 }
 
@@ -557,42 +573,42 @@ main()
 //   // return
 // }
 
-// async function send(query?: string): Promise<void> {
-//   return new Promise<void>(async resolve => {
-//     if (query == null) {
-//       console.log(chalk.red(`Invalid arguments. Expected 'open <peerId>'. Received '${query}'`))
-//       setTimeout(() => {
-//         rl.prompt()
-//         resolve()
-//       })
-//       return
-//     }
+async function send(query?: string): Promise<void> {
+  if (query == null) {
+    console.log(chalk.red(`Invalid arguments. Expected 'open <peerId>'. Received '${query}'`))
+    setTimeout(() => {
+      rl.prompt()
+    })
+    return
+  }
 
-//     let peerId: PeerId
-//     try {
-//       peerId = await checkPeerIdInput(query)
-//     } catch (err) {
-//       console.log(err.message)
-//       setTimeout(() => {
-//         rl.prompt()
-//         resolve()
-//       })
-//       return
-//     }
+  let peerId: PeerId
+  try {
+    peerId = await checkPeerIdInput(query)
+  } catch (err) {
+    console.log(chalk.red(err.message))
+    setTimeout(() => {
+      rl.prompt()
+    })
+    return
+  }
 
-//     rl.question(`Sending message to ${chalk.blue(peerId.toB58String())}\nType in your message and press ENTER to send:\n`, (message: string) =>
-//       node
-//         .sendMessage(rlp.encode([message, Date.now().toString()]), peerId)
-//         .catch((err: Error) => console.log(chalk.red(err.message)))
-//         .finally(() =>
-//           setTimeout(() => {
-//             rl.prompt()
-//             resolve()
-//           })
-//         )
-//     )
-//   })
-// }
+  rl.question(`Sending message to ${chalk.blue(peerId.toB58String())}\nType in your message and press ENTER to send:\n`, async (message: string) => {
+    try {
+      await node.sendMessage(encodeMessage(message), peerId)
+
+      setTimeout(() => {
+        rl.prompt()
+      })
+    } catch (err) {
+      console.log(chalk.red(err.message))
+
+      setTimeout(() => {
+        rl.prompt()
+      })
+    }
+  })
+}
 
 async function open(query?: string): Promise<void> {
   if (query == null || query == '') {
@@ -612,7 +628,7 @@ async function open(query?: string): Promise<void> {
     return
   }
 
-  const channelId = node.paymentChannels.utils.getId(
+  const channelId = await node.paymentChannels.utils.getId(
     /* prettier-ignore */
     await node.paymentChannels.utils.pubKeyToAccountId(node.peerInfo.id.pubKey.marshal()),
     await node.paymentChannels.utils.pubKeyToAccountId(counterparty.pubKey.marshal()),
@@ -642,6 +658,7 @@ async function open(query?: string): Promise<void> {
       rl.prompt()
     })
   } catch (err) {
+    console.log(err)
     setTimeout(() => {
       console.log(chalk.red(err.message))
       clearTimeout(timeout)
@@ -863,5 +880,23 @@ async function listConnectors(): Promise<void> {
 
   if (rl != null) {
     setTimeout(() => rl.prompt())
+  }
+}
+
+function encodeMessage(msg: string): Uint8Array {
+  return encode([msg, Date.now()])
+}
+
+function decodeMessage(
+  encoded: Uint8Array
+): {
+  latency: number
+  msg: string
+} {
+  const [msg, time] = decode(encoded) as [Buffer, Buffer]
+
+  return {
+    latency: Date.now() - parseInt(time.toString('hex'), 16),
+    msg: msg.toString()
   }
 }

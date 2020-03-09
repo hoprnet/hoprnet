@@ -130,10 +130,10 @@ export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
   static async create<Chain extends HoprCoreConnectorInstance>(node: Hopr<Chain>, msg: Uint8Array, path: PeerId[]): Promise<Packet<Chain>> {
     const { header, secrets, identifier } = await Header.create(node, path)
 
-    node.log('---------- New Packet ----------')
-    path.slice(0, Math.max(0, path.length - 1)).forEach((peerId, index) => node.log(`Intermediate ${index} : ${chalk.blue(peerId.toB58String())}`))
-    node.log(`Destination    : ${chalk.blue(path[path.length - 1].toB58String())}`)
-    node.log('--------------------------------')
+    console.log('---------- New Packet ----------')
+    path.slice(0, Math.max(0, path.length - 1)).forEach((peerId, index) => console.log(`Intermediate ${index} : ${chalk.blue(peerId.toB58String())}`))
+    console.log(`Destination    : ${chalk.blue(path[path.length - 1].toB58String())}`)
+    console.log('--------------------------------')
 
     const fee = new BN(secrets.length - 1, 10).imul(new BN(RELAY_FEE, 10))
 
@@ -146,7 +146,7 @@ export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
     node.log(`Encrypting with ${node.paymentChannels.utils.hash(u8aXOR(false, deriveTicketKey(secrets[0]), deriveTicketKey(secrets[1]))).toString()}.`)
 
     const channelBalance = new node.paymentChannels.types.ChannelBalance(node.paymentChannels, {
-      balance: new BN(0),
+      balance: new BN(12345),
       balance_a: new BN(123)
     })
 
@@ -165,7 +165,7 @@ export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
       node.peerInfo.id.privKey.marshal(),
       node.peerInfo.id.pubKey.marshal()
     )
-
+    
     return new Packet<Chain>(node, undefined, {
       header,
       ticket,
@@ -332,7 +332,7 @@ export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
     // }
 
     const channelBalance = new this.node.paymentChannels.types.ChannelBalance(this.node.paymentChannels, {
-      balance: new BN(0),
+      balance: new BN(12345),
       balance_a: new BN(123)
     })
 
