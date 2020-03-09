@@ -410,7 +410,8 @@ class Channel {
   ): (source: AsyncIterable<Uint8Array>) => AsyncIterator<Uint8Array> {
     return source => {
       return (async function*(msgs) {
-        for await (const msg of msgs) {
+        for await (const _msg of msgs) {
+          const msg = _msg.slice()
           const signedChannel = new SignedChannel({
             bytes: msg.buffer,
             offset: msg.byteOffset
@@ -434,7 +435,7 @@ class Channel {
             await hoprEthereum.db.put(u8aToHex(hoprEthereum.dbKeys.Channel(counterparty)), Buffer.from(signedChannel))
           }
 
-          yield signedChannel
+          yield signedChannel.toU8a()
         }
       })(source)
     }
