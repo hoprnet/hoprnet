@@ -14,6 +14,7 @@
   },
   "files": [
     "!**/*.spec.ts",
+    "src/",
     "lib/",
     "hopr.png"
   ],
