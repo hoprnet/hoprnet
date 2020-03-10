@@ -19,7 +19,7 @@ async function getPeerInfo(
   db?: LevelUp
 ): Promise<PeerInfo> {
   /**
-   * Check whether our config was right.
+   * Check whether our config makes sense
    */
   function checkConfig(): void {
     if (!process.env.HOST_IPV4 && !process.env.HOST_IPV6) {
@@ -32,7 +32,7 @@ async function getPeerInfo(
   }
 
   /**
-   * Retrieves the peerId from the database.
+   * Try to retrieve Id from database
    */
   async function getFromDatabase(): Promise<PeerId> {
     try {
@@ -55,7 +55,7 @@ async function getPeerInfo(
   }
 
   /**
-   * Assemble the addresses that we are using.
+   * Assemble the addresses that we are using
    */
   function getAddrs(): any[] {
     const addrs = []
@@ -83,24 +83,15 @@ async function getPeerInfo(
    * Checks whether we have gotten any peerId in through the options.
    */
   async function getPeerId(): Promise<PeerId> {
-    if (options != null) {
-      if (options.id != null && Number.isInteger(options.id)) {
-        if (Number.parseInt(process.env.DEMO_ACCOUNTS) < options.id) {
-          throw Error(`Failed while trying to access demo account number ${options.id}. Please ensure that there are enough demo account specified in '.env'.`)
-        }
-        return privKeyToPeerId(process.env[`DEMO_ACCOUNT_${options.id}_PRIVATE_KEY`])
-      } else if (options.peerId != null && PeerId.isPeerId(options.peerId)) {
-        return options.peerId
-      } else if (options.bootstrapNode == true) {
-        return privKeyToPeerId(process.env.FUND_ACCOUNT_PRIVATE_KEY)
-      }
+    if (options != null && options.peerId != null && PeerId.isPeerId(options.peerId)) {
+      return options.peerId
     }
 
     return getFromDatabase()
   }
 
   if (db == null && options == null && options.peerInfo == null && options.peerId == null) {
-    throw Error('Invalid input parameter. Please set a valid peerInfo.')
+    throw Error('Invalid input parameter. Please set a valid peerInfo or pass a database handle.')
   }
 
   checkConfig()

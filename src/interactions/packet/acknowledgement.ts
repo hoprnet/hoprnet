@@ -32,7 +32,6 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnectorInstance> 
   }
 
   async interact(counterparty: PeerId, acknowledgement: Acknowledgement<Chain>): Promise<void> {
-    console.log(`sending acknowledgement to `, counterparty)
     let struct: {
       stream: any
       protocol: string
@@ -62,8 +61,6 @@ async function handleHelper(source: any): Promise<void> {
       bytes: arr.buffer,
       offset: arr.byteOffset
     })
-
-    console.log(`received acknowledgement`, u8aToHex(acknowledgement))
 
     let record: any
 

@@ -129,19 +129,13 @@ export default class Hopr<Chain extends HoprCoreConnectorInstance> extends libp2
       peerId?: PeerId
     }
   ): Promise<Hopr<any>> {
-    const db = Hopr.openDatabase(`db`, options)
+    const db = Hopr.openDatabase(`db`, HoprCoreConnector, options)
 
-    if (options == null) {
-      options = {}
-    }
+    options = options || {}
 
-    if (options.bootstrapNode == null) {
-      options.bootstrapNode = false
-    }
+    options.bootstrapNode = options.bootstrapNode || false
 
-    if (options.output == null) {
-      options.output = console.log
-    }
+    options.output = options.output || console.log
 
     // @TODO give bootstrap node a different identity
     if (options.bootstrapNode) {
@@ -149,6 +143,7 @@ export default class Hopr<Chain extends HoprCoreConnectorInstance> extends libp2
     }
 
     let connector: HoprCoreConnectorInstance
+
     if (options != null && isFinite(options.id)) {
       connector = await HoprCoreConnector.create(db, undefined, options)
       options.peerId = await privKeyToPeerId(connector.self.privateKey)
@@ -157,7 +152,7 @@ export default class Hopr<Chain extends HoprCoreConnectorInstance> extends libp2
       }
 
       if (options.peerInfo == null) {
-        options.peerInfo = await getPeerInfo(options, db)
+        options.peerInfo = await getPeerInfo(options)
       }
     } else {
       if (options.peerInfo == null) {
@@ -325,28 +320,19 @@ export default class Hopr<Chain extends HoprCoreConnectorInstance> extends libp2
     return randomSubset(array, MAX_HOPS - 1, filter).map((peerInfo: PeerInfo) => peerInfo.id)
   }
 
-  static openDatabase(db_dir: string, options?: { id?: number; bootstrapNode?: boolean }) {
-    if (options != null) {
-      db_dir += `/${process.env['NETWORK']}/`
-      if (Number.isInteger(options.id) && options.bootstrapNode == false) {
-        // For testing ...
-        db_dir += `node_${options.id}`
-      } else if (!Number.isInteger(options.id) && options.bootstrapNode != true) {
-        db_dir += `node`
-      } else if (!Number.isInteger(options.id) && options.bootstrapNode == true) {
-        db_dir += `bootstrap`
-      } else {
-        throw Error(`Cannot run hopr with index ${options.id} as bootstrap node.`)
-      }
+  static openDatabase<Constructor extends HoprCoreConnector>(db_dir: string, connector: Constructor, options?: { id?: number; bootstrapNode?: boolean }) {
+    db_dir += `/${connector.constants.CHAIN_NAME}/${connector.constants.NETWORK}/`
+
+    if (options != null && options.bootstrapNode) {
+      db_dir += `bootstrap`
+    } else if (options != null && Number.isInteger(options.id)) {
+      // For testing ...
+      db_dir += `node_${options.id}`
+    } else {
+      db_dir += `node`
     }
 
     createDirectoryIfNotExists(db_dir)
-
-    //     clearDirectory(db_dir)
-    //     fs.mkdirSync(db_dir, {
-    //         mode: 0o777
-    //     })
-    // --------------------------
 
     return levelup(leveldown(db_dir))
   }

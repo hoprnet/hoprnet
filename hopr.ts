@@ -24,7 +24,7 @@ import bs58 from 'bs58'
 import HoprCoreConnector, { Types, ChannelInstance, HoprCoreConnectorInstance } from '@hoprnet/hopr-core-connector-interface'
 
 import Hopr from './src'
-import { pubKeyToPeerId, addPubKey, u8aToHex, u8aToNumber, toU8a } from './src/utils'
+import { pubKeyToPeerId, addPubKey, u8aToHex } from './src/utils'
 
 import figlet from 'figlet'
 import clear from 'clear'
@@ -830,10 +830,10 @@ async function crawl(): Promise<void> {
  * identity that we have on that chain.
  */
 async function printMyAddress(): Promise<void> {
-  const prefixLength = Math.max(node.paymentChannels.CHAIN_NAME.length, 'HOPR'.length) + 3
+  const prefixLength = Math.max(connector.constants.CHAIN_NAME.length, 'HOPR'.length) + 3
 
   console.log(
-    `${(node.paymentChannels.CHAIN_NAME + ':').padEnd(prefixLength, ' ')}${chalk.green(
+    `${(connector.constants.CHAIN_NAME + ':').padEnd(prefixLength, ' ')}${chalk.green(
       bs58.encode(Buffer.from((await node.paymentChannels.utils.pubKeyToAccountId(node.peerInfo.id.pubKey.marshal())).toString().replace(/0x/, ''), 'hex'))
     )}\n` +
       /* prettier-ignore */

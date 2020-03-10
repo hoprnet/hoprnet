@@ -78,6 +78,7 @@
     "@hoprnet/hopr-types": "hoprnet/hopr-types",
     "@types/bn.js": "^4.11.6",
     "@types/bs58": "^4.0.1",
+    "@types/clear": "^0.1.0",
     "@types/debug": "^4.1.5",
     "@types/figlet": "^1.2.0",
     "@types/leveldown": "^4.0.2",

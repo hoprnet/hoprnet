@@ -27,11 +27,11 @@
 
 "@hoprnet/hopr-core-connector-interface@hoprnet/hopr-core-connector-interface":
   version "1.0.0"
-  resolved "https://codeload.github.com/hoprnet/hopr-core-connector-interface/tar.gz/ce61ed01f13b0bcf1bebd95d572a4bbf9f70bb44"
+  resolved "https://codeload.github.com/hoprnet/hopr-core-connector-interface/tar.gz/6ec45495ad8e5e1aa14a1326787ee907d3072571"
 
 "@hoprnet/hopr-core-polkadot@hoprnet/hopr-core-polkadot":
   version "0.0.2"
-  resolved "https://codeload.github.com/hoprnet/hopr-core-polkadot/tar.gz/bea453655d6e184c799986be58890f40a4aa31d3"
+  resolved "https://codeload.github.com/hoprnet/hopr-core-polkadot/tar.gz/8f7cccf13de37d099346792170a03de4196706aa"
   dependencies:
     "@polkadot/api" "^0.100.1"
     "@polkadot/util" "^1.8.1"
@@ -237,6 +237,11 @@
   integrity sha512-yfAgiWgVLjFCmRv8zAcOIHywYATEwiTVccTLnRp6UxTNavT55M9d/uhK3T03St/+8/z/wW+CRjGKUNmEqoHHCA==
   dependencies:
     base-x "^3.0.6"
+
+"@types/clear@^0.1.0":
+  version "0.1.0"
+  resolved "https://registry.yarnpkg.com/@types/clear/-/clear-0.1.0.tgz#915bff8e6438d080f05888d28f6beeebc54159c0"
+  integrity sha512-b2VgNzu3BxxM2nGhZSMzkiaTaCClevKkBCtgpV2Al0eGaEeQgTk5qHedzNxi/SgsvmDbqxWKDAIrxZNVKyDCXw==
 
 "@types/color-name@^1.1.1":
   version "1.1.1"
@@ -3748,9 +3753,9 @@ wrtc@~0.4.3:
     domexception "^1.0.1"
 
 ws@^7.2.1:
-  version "7.2.2"
-  resolved "https://registry.yarnpkg.com/ws/-/ws-7.2.2.tgz#36df62f68f0d1a6ec66d3f880a02476f3a81f24f"
-  integrity sha512-2qj/tYkDPDSVf7JiHanwEBwkhxi7DchFewIsSnR33MQtG3O/BPAJjqs4g6XEuayuRqIExSQMHZlmyDLbuSrXYw==
+  version "7.2.3"
+  resolved "https://registry.yarnpkg.com/ws/-/ws-7.2.3.tgz#a5411e1fb04d5ed0efee76d26d5c46d830c39b46"
+  integrity sha512-HTDl9G9hbkNDk98naoR/cHDws7+EyYMOdL1BmjsZXRUjf7d+MficC4B7HLUPlSiho0vg+CWKrGIt/VJBd1xunQ==
 
 xor-distance@^2.0.0, xor-distance@~2.0.0:
   version "2.0.0"
