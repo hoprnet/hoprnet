@@ -34,7 +34,7 @@ const generateMsg = () => {
   return randomBytes(32)
 }
 
-describe.only('test utils', function() {
+describe('test utils', function() {
   it('should hash values', async function() {
     const testMsg = new Uint8Array([0, 0, 0, 0])
 
