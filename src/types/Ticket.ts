@@ -75,7 +75,7 @@ class Ticket extends Uint8ArrayE {
     return this.amount.mul(new BN(this.winProb)).div(new BN(new Uint8Array(Hash.SIZE).fill(0xff)))
   }
 
-  get hash() {
+  private get hash() {
     return hash(
       u8aConcat(
         this.challenge,

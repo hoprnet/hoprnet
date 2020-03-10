@@ -1,4 +1,4 @@
-import { DbKeys as IDbKeys, Types } from '@hoprnet/hopr-core-connector-interface'
+import { DbKeys, Types } from '@hoprnet/hopr-core-connector-interface'
 import * as constants from './constants'
 
 const encoder = new TextEncoder()
@@ -23,7 +23,7 @@ function allocationHelper(arr: [number, Uint8Array][]) {
   return result
 }
 
-const dbKeys: IDbKeys = {
+const dbKeys: DbKeys = {
   Channel(counterparty: Types.AccountId): Uint8Array {
     return allocationHelper([
       [PREFIX.length, PREFIX],
