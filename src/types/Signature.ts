@@ -1,8 +1,8 @@
 import TypeConstructors from '@hoprnet/hopr-core-connector-interface/src/types'
-import { typedClass } from 'src/tsc/utils'
-import { u8aConcat, u8aToNumber } from 'src/core/u8a'
-import { Uint8ArrayE } from 'src/types/extended'
-import { SIGNATURE_LENGTH, SIGNATURE_RECOVERY_LENGTH } from 'src/constants'
+import { typedClass } from '../tsc/utils'
+import { u8aConcat, u8aToNumber } from '../core/u8a'
+import { Uint8ArrayE } from '../types/extended'
+import { SIGNATURE_LENGTH, SIGNATURE_RECOVERY_LENGTH } from '../constants'
 
 @typedClass<TypeConstructors['Signature']>()
 class Signature extends Uint8ArrayE {

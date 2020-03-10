@@ -1,5 +1,5 @@
-import { Uint8ArrayE } from 'src/types/extended'
-import { HASH_LENGTH } from 'src/constants'
+import { Uint8ArrayE } from '../../types/extended'
+import { HASH_LENGTH } from '../../constants'
 
 class BYTES32 extends Uint8ArrayE {
   static get SIZE() {

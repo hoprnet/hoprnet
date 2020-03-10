@@ -1,5 +1,5 @@
 import BN from 'bn.js'
-import { toU8a } from 'src/core/u8a'
+import { toU8a } from '../../core/u8a'
 
 class BNE extends BN {
   toU8a() {

@@ -9,9 +9,9 @@
     "postinstall": "yarn build",
     "clean": "rm -rf ./lib",
     "test": "npx mocha",
-    "dev": "yarn clean && yarn build:types && ttsc -w",
+    "dev": "yarn clean && yarn build:types && tsc -w",
     "build:types": "typechain --target web3-v1 --outDir './src/tsc/web3' './node_modules/@hoprnet/hopr-ethereum/build/extracted/abis/*.json'",
-    "build": "yarn clean && yarn build:types && ttsc -d -p ."
+    "build": "yarn clean && yarn build:types && tsc -d -p ."
   },
   "files": [
     "!**/*.spec.ts",
@@ -41,11 +41,9 @@
     "memdown": "^5.1.0",
     "mocha": "^7.0.1",
     "ts-node": "^8.6.2",
-    "ttypescript": "^1.5.10",
     "typechain": "^1.0.5",
     "typechain-target-web3-v1": "^1.0.4",
-    "typescript": "^3.8.2",
-    "typescript-transform-paths": "^1.1.14"
+    "typescript": "^3.8.2"
   },
   "prettier": {
     "tabWidth": 2,
@@ -58,8 +56,6 @@
       "ts"
     ],
     "spec": "src/**/*.spec.ts",
-    "require": [
-      "./scripts/tmocha.js"
-    ]
+    "require": "ts-node/register"
   }
 }

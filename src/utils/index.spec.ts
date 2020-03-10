@@ -3,7 +3,7 @@ import { randomBytes } from 'crypto'
 // @ts-ignore-next-line
 import secp256k1 from 'secp256k1'
 import * as utils from '.'
-import * as u8a from 'src/core/u8a'
+import * as u8a from '../core/u8a'
 
 const pair = {
   privKey: u8a.stringToU8a('0x9feaac2858974b0e16f6e3cfa7c21db6c7bbcd2094daa651ff3d5bb48a57b759'),

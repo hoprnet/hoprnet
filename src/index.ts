@@ -98,6 +98,8 @@ export default class HoprEthereumClass {
       })
   }
 
+  static readonly constants = constants
+
   static async create(
     db: LevelUp,
     seed?: Uint8Array,

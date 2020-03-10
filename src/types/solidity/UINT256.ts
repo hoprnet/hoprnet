@@ -1,4 +1,4 @@
-import { BNE } from 'src/types/extended'
+import { BNE } from '../../types/extended'
 
 // TODO: SIZE check on construction
 class UINT265 extends BNE {

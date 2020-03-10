@@ -10,11 +10,7 @@
     "sourceMap": true,
     "resolveJsonModule": true,
     "experimentalDecorators": true,
-    "baseUrl": "./",
-    "paths": {
-      "src/*": ["./src/*"]
-    },
-    "plugins": [{ "transform": "typescript-transform-paths" }]
+    "baseUrl": "./"
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules/*"]

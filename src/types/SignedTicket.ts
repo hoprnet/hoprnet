@@ -2,9 +2,9 @@
 import secp256k1 from 'secp256k1'
 import TypeConstructors from '@hoprnet/hopr-core-connector-interface/src/types'
 import { Signature, Ticket } from '.'
-import { typedClass } from 'src/tsc/utils'
-import { Uint8ArrayE } from 'src/types/extended'
-import { u8aConcat } from 'src/core/u8a'
+import { typedClass } from '../tsc/utils'
+import { Uint8ArrayE } from '../types/extended'
+import { u8aConcat } from '../core/u8a'
 
 @typedClass<TypeConstructors['SignedTicket']>()
 class SignedTicket extends Uint8ArrayE {

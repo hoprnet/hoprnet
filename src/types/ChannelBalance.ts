@@ -1,7 +1,7 @@
 import TypeConstructors from '@hoprnet/hopr-core-connector-interface/src/types'
-import { Uint8ArrayE } from 'src/types/extended'
-import { typedClass } from 'src/tsc/utils'
-import { u8aConcat } from 'src/core/u8a'
+import { Uint8ArrayE } from '../types/extended'
+import { typedClass } from '../tsc/utils'
+import { u8aConcat } from '../core/u8a'
 import Balance from './Balance'
 
 export type ChannelBalanceConstructorArguments = [

@@ -2,10 +2,10 @@
 import secp256k1 from 'secp256k1'
 import TypeConstructors from '@hoprnet/hopr-core-connector-interface/src/types'
 import { Signature, Channel, ChannelBalance } from '.'
-import { typedClass } from 'src/tsc/utils'
-import { u8aConcat } from 'src/core/u8a'
-import { Uint8ArrayE } from 'src/types/extended'
-import { sign, verify } from 'src/utils'
+import { typedClass } from '../tsc/utils'
+import { u8aConcat } from '../core/u8a'
+import { Uint8ArrayE } from '../types/extended'
+import { sign, verify } from '../utils'
 // TODO: check if this breaks, we should use `import type ..`
 // import HoprEthereumClass from '..'
 

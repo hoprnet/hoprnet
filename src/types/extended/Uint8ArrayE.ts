@@ -1,4 +1,4 @@
-import { u8aToHex } from 'src/core/u8a'
+import { u8aToHex } from '../../core/u8a'
 
 class Uint8ArrayE extends Uint8Array {
   // TODO: Robert should check this

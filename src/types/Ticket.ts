@@ -1,10 +1,10 @@
 import TypeConstructors from '@hoprnet/hopr-core-connector-interface/src/types'
 import BN from 'bn.js'
 import { Hash, TicketEpoch, Balance, SignedTicket, Signature } from '.'
-import { Uint8ArrayE } from 'src/types/extended'
-import { typedClass } from 'src/tsc/utils'
-import { sign, verify, hash } from 'src/utils'
-import { stringToU8a, u8aConcat, u8aToHex } from 'src/core/u8a'
+import { Uint8ArrayE } from '../types/extended'
+import { typedClass } from '../tsc/utils'
+import { sign, verify, hash } from '../utils'
+import { stringToU8a, u8aConcat, u8aToHex } from '../core/u8a'
 import Channel from '../Channel'
 
 const WIN_PROB = new BN(1)
