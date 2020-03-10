@@ -60,8 +60,6 @@ declare interface HoprCoreConnectorInstance {
    * Encapsulates payment channel between nodes.
    */
   readonly channel: Channel<any>
-
-  readonly CHAIN_NAME: string
 }
 
 declare interface HoprCoreConnector {
@@ -73,7 +71,9 @@ declare interface HoprCoreConnector {
    * @param options.id Id of the demo account
    * @param options.uri URI that is used to connect to the blockchain
    */
-  create(db: LevelUp, seed?: Uint8Array, options?: { id?: number, provider?: string }): Promise<HoprCoreConnectorInstance>
+  create(db: LevelUp, seed?: Uint8Array, options?: { id?: number; provider?: string }): Promise<HoprCoreConnectorInstance>
+
+  readonly CHAIN_NAME: string
 }
 
 export { HoprCoreConnectorInstance, Utils, DbKeys, Types, ChannelInstance, Constants, Ticket }
