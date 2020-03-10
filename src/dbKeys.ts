@@ -1,4 +1,4 @@
-import { DbKeys, Types } from '@hoprnet/hopr-core-connector-interface'
+import { DbKeys as IDbKeys, Types } from '@hoprnet/hopr-core-connector-interface'
 import * as constants from './constants'
 
 const encoder = new TextEncoder()
@@ -23,18 +23,18 @@ function allocationHelper(arr: [number, Uint8Array][]) {
   return result
 }
 
-const dbKeys: DbKeys = {
+export default class DbKeys implements IDbKeys {
   Channel(counterparty: Types.AccountId): Uint8Array {
     return allocationHelper([
       [PREFIX.length, PREFIX],
       [channelSubPrefix.length, channelSubPrefix],
       [counterparty.length, counterparty]
     ])
-  },
+  }
 
   ChannelKeyParse(arr: Uint8Array): Uint8Array {
     return arr.slice(PREFIX.length + channelSubPrefix.length)
-  },
+  }
 
   Challenge(channelId: Types.Hash, challenge: Types.Hash): Uint8Array {
     return allocationHelper([
@@ -44,7 +44,7 @@ const dbKeys: DbKeys = {
       [SEPERATOR.length, SEPERATOR],
       [challenge.length, challenge]
     ])
-  },
+  }
 
   ChallengeKeyParse(arr: Uint8Array): [Types.Hash, Types.Hash] {
     return [
@@ -57,7 +57,7 @@ const dbKeys: DbKeys = {
         PREFIX.length + channelSubPrefix.length + constants.HASH_LENGTH + SEPERATOR.length + constants.HASH_LENGTH
       )
     ]
-  },
+  }
 
   ChannelId(signatureHash: Types.Hash): Uint8Array {
     const subPrefix = encoder.encode('channelId-')
@@ -67,7 +67,7 @@ const dbKeys: DbKeys = {
       [subPrefix.length, subPrefix],
       [signatureHash.length, signatureHash]
     ])
-  },
+  }
 
   Nonce(channelId: Types.Hash, nonce: Types.Hash): Uint8Array {
     const subPrefix = encoder.encode('nonce-')
@@ -79,7 +79,7 @@ const dbKeys: DbKeys = {
       [SEPERATOR.length, SEPERATOR],
       [nonce.length, nonce]
     ])
-  },
+  }
 
   OnChainSecret(): Uint8Array {
     const subPrefix = encoder.encode('onChainSecret')
@@ -88,7 +88,7 @@ const dbKeys: DbKeys = {
       [PREFIX.length, PREFIX],
       [subPrefix.length, subPrefix]
     ])
-  },
+  }
 
   Ticket(channelId: Types.Hash, challenge: Types.Hash): Uint8Array {
     const subPrefix = encoder.encode('ticket-')
@@ -102,5 +102,3 @@ const dbKeys: DbKeys = {
     ])
   }
 }
-
-export default dbKeys

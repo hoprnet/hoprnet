@@ -7,7 +7,7 @@ import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import HoprChannelsAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprChannels.json'
 import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
 import Channel from './Channel'
-import dbKeys from './dbKeys'
+import DbKeys from './dbKeys'
 import * as types from './types'
 import * as utils from './utils'
 import * as constants from './constants'
@@ -34,7 +34,7 @@ export default class HoprEthereumClass {
     public hoprToken: HoprToken
   ) {}
 
-  readonly dbKeys = dbKeys
+  readonly dbKeys = new DbKeys()
   readonly utils = utils
   readonly types = types
   readonly channel = Channel
