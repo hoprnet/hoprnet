@@ -14,10 +14,6 @@
     bignumber.js "^9.0.0"
     web3 "^1.2.4"
 
-"@hoprnet/hopr-types@hoprnet/hopr-types":
-  version "0.3.0"
-  resolved "https://codeload.github.com/hoprnet/hopr-types/tar.gz/8059aa1da30021432af121f79f19f8e42e4c0bc2"
-
 "@openzeppelin/contracts@^2.4.0":
   version "2.5.0"
   resolved "https://registry.yarnpkg.com/@openzeppelin/contracts/-/contracts-2.5.0.tgz#e327a98ba1d26b7756ff62885a0aa0967a375449"
@@ -91,6 +87,13 @@
   version "0.0.8"
   resolved "https://registry.yarnpkg.com/@types/resolve/-/resolve-0.0.8.tgz#f26074d238e02659e323ce1a13d041eee280e194"
   integrity sha512-auApPaJf3NPfe18hSoJkp8EbZzer2ISk7o8mCC3M9he/a04+gbMF97NkpD2S8riMGvm4BMRI59/SZQSaLTKpsQ==
+  dependencies:
+    "@types/node" "*"
+
+"@types/secp256k1@^3.5.3":
+  version "3.5.3"
+  resolved "https://registry.yarnpkg.com/@types/secp256k1/-/secp256k1-3.5.3.tgz#57ebfdd19d476de3ff13758cf7b6d9e420d54c19"
+  integrity sha512-NGcsPDR0P+Q71O63e2ayshmiZGAwCOa/cLJzOIuhOiDvmbvrCIiVtEpqdCJGogG92Bnr6tw/6lqVBsRMEl15OQ==
   dependencies:
     "@types/node" "*"
 

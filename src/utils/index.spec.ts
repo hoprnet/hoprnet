@@ -1,6 +1,5 @@
 import assert from 'assert'
 import { randomBytes } from 'crypto'
-// @ts-ignore-next-line
 import secp256k1 from 'secp256k1'
 import * as utils from '.'
 import * as u8a from '../core/u8a'

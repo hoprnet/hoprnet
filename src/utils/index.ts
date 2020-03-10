@@ -1,6 +1,5 @@
 import { Utils, Types } from '@hoprnet/hopr-core-connector-interface'
 import assert from 'assert'
-// @ts-ignore-next-line
 import { publicKeyConvert, publicKeyCreate, ecdsaSign, ecdsaVerify } from 'secp256k1'
 // @ts-ignore-next-line
 import keccak256 from 'keccak256'

@@ -1,13 +1,12 @@
-// @ts-ignore
 import secp256k1 from 'secp256k1'
 import TypeConstructors from '@hoprnet/hopr-core-connector-interface/src/types'
 import { Signature, Channel, ChannelBalance } from '.'
 import { typedClass } from '../tsc/utils'
 import { u8aConcat } from '../core/u8a'
 import { Uint8ArrayE } from '../types/extended'
+import { AccountId } from '../types'
 import { sign, verify } from '../utils'
-// TODO: check if this breaks, we should use `import type ..`
-// import HoprEthereumClass from '..'
+import HoprEthereum from '..'
 
 @typedClass<TypeConstructors['SignedChannel']>()
 class SignedChannel extends Uint8ArrayE {
@@ -60,10 +59,10 @@ class SignedChannel extends Uint8ArrayE {
   }
 
   get signer() {
-    return secp256k1.ecdsaRecover(this.signature.signature, this.signature.recovery)
+    return new AccountId(secp256k1.ecdsaRecover(this.signature.signature, this.signature.recovery, this.channel))
   }
 
-  async verify(coreConnector: any) {
+  async verify(coreConnector: HoprEthereum) {
     return await verify(this.channel.toU8a(), this.signature, coreConnector.self.publicKey)
   }
 
@@ -72,7 +71,7 @@ class SignedChannel extends Uint8ArrayE {
   }
 
   static async create(
-    coreConnector: any,
+    coreConnector: HoprEthereum,
     channel: Channel,
     arr?: {
       bytes: ArrayBuffer

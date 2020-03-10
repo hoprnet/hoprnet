@@ -1,4 +1,3 @@
-// @ts-ignore
 import secp256k1 from 'secp256k1'
 import TypeConstructors from '@hoprnet/hopr-core-connector-interface/src/types'
 import { Signature, Ticket } from '.'
@@ -69,7 +68,7 @@ class SignedTicket extends Uint8ArrayE {
     let signer: Uint8Array
 
     try {
-      signer = secp256k1.ecdsaRecover(this.signature.signature, this.signature.recovery)
+      signer = secp256k1.ecdsaRecover(this.signature.signature, this.signature.recovery, this.ticket)
       return Promise.resolve(signer)
     } catch (err) {
       return Promise.reject(err)
