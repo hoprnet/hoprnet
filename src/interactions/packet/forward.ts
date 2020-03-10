@@ -96,7 +96,6 @@ class PacketForwardInteraction<Chain extends HoprCoreConnectorInstance> implemen
   }
 
   async handlePacket(packet: Packet<Chain>, token: number): Promise<void> {
-    console.log(`received packet`, this.node.peerInfo.id.toB58String(), u8aToHex(packet))
     await packet.forwardTransform()
 
     const [sender, target] = await Promise.all([
@@ -141,16 +140,5 @@ class PacketForwardInteraction<Chain extends HoprCoreConnectorInstance> implemen
     return
   }
 }
-
-// ==== ONLY FOR TESTING =====
-// import { decode } from 'rlp'
-
-// function demo(plaintext: Uint8Array) {
-//   const message = decode(Buffer.from(plaintext))
-
-//   return `\n\n---------- New Message ----------\nMessage "${message[0].toString()}" latency ${Date.now() -
-//     Number(message[1].toString())} ms.\n---------------------------------\n\n`
-// }
-// ===========================
 
 export { PacketForwardInteraction }

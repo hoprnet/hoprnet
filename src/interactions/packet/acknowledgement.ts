@@ -32,7 +32,7 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnectorInstance> 
   }
 
   async interact(counterparty: PeerId, acknowledgement: Acknowledgement<Chain>): Promise<void> {
-    console.log(`sending acknowledgement to `, counterparty.toB58String())
+    console.log(`sending acknowledgement to `, counterparty)
     let struct: {
       stream: any
       protocol: string
@@ -43,8 +43,6 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnectorInstance> 
         return this.node.peerRouting.findPeer(counterparty).then((peerInfo: PeerInfo) => this.node.dialProtocol(peerInfo, this.protocols[0]))
       })
     } catch (err) {
-      console.log(err)
-
       console.log(`Could not transfer acknowledgement to ${counterparty.toB58String()}. Error was: ${chalk.red(err.message)}.`)
       return
     }

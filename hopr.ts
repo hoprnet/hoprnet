@@ -185,7 +185,7 @@ async function parseOptions(): Promise<void | Options> {
   options.output = (encoded: Uint8Array) => {
     const { latency, msg } = decodeMessage(encoded)
 
-    let str = ``
+    let str = `\n`
 
     str += `===== New message ======\n`
     str += `Message: ${msg}\n`

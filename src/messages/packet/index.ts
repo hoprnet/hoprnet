@@ -135,13 +135,21 @@ export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
     console.log(`Destination    : ${chalk.blue(path[path.length - 1].toB58String())}`)
     console.log('--------------------------------')
 
+    const arr = new Uint8Array(Packet.SIZE(node.paymentChannels)).fill(0x00)
+    const packet = new Packet<Chain>(node, {
+      bytes: arr.buffer,
+      offset: arr.byteOffset
+    })
+
     const fee = new BN(secrets.length - 1, 10).imul(new BN(RELAY_FEE, 10))
 
-    const challenge = await Challenge.create(node.paymentChannels, await node.paymentChannels.utils.hash(deriveTicketKey(secrets[0])), fee).sign(
-      node.peerInfo.id
+    packet.header.set(header)
+
+    packet.challenge.set(
+      await Challenge.create(node.paymentChannels, await node.paymentChannels.utils.hash(deriveTicketKey(secrets[0])), fee).sign(node.peerInfo.id)
     )
 
-    const message = Message.createPlain(msg).onionEncrypt(secrets)
+    packet.message.set(Message.createPlain(msg).onionEncrypt(secrets))
 
     node.log(`Encrypting with ${node.paymentChannels.utils.hash(u8aXOR(false, deriveTicketKey(secrets[0]), deriveTicketKey(secrets[1]))).toString()}.`)
 
@@ -158,20 +166,9 @@ export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
       (_channelBalance: Types.ChannelBalance) => node.interactions.payments.open.interact(path[0], channelBalance)
     )
 
-    const ticket = await channel.ticket.create(
-      channel,
-      fee,
-      secp256k1.privateKeyTweakAdd(deriveTicketKey(secrets[0]), deriveTicketKey(secrets[1])),
-      node.peerInfo.id.privKey.marshal(),
-      node.peerInfo.id.pubKey.marshal()
-    )
-    
-    return new Packet<Chain>(node, undefined, {
-      header,
-      ticket,
-      challenge,
-      message
-    })
+    packet.ticket.set(await channel.ticket.create(channel, fee, secp256k1.privateKeyTweakAdd(deriveTicketKey(secrets[0]), deriveTicketKey(secrets[1]))))
+
+    return packet
   }
 
   /**
@@ -368,15 +365,7 @@ export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
     //     .write()
     // ])
 
-    this.ticket.set(
-      await channel.ticket.create(
-        channel,
-        forwardedFunds,
-        this.header.encryptionKey,
-        this.node.peerInfo.id.privKey.marshal(),
-        this.node.peerInfo.id.pubKey.marshal()
-      )
-    )
+    this.ticket.set(await channel.ticket.create(channel, forwardedFunds, this.header.encryptionKey))
   }
 
   /**
