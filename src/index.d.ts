@@ -73,7 +73,7 @@ declare interface HoprCoreConnector {
    */
   create(db: LevelUp, seed?: Uint8Array, options?: { id?: number; provider?: string }): Promise<HoprCoreConnectorInstance>
 
-  readonly CHAIN_NAME: string
+  readonly constants: Constants
 }
 
 export { HoprCoreConnectorInstance, Utils, DbKeys, Types, ChannelInstance, Constants, Ticket }
