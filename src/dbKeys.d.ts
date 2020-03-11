@@ -1,4 +1,4 @@
-import { AccountId, Hash } from './types';
+import type { AccountId, Hash } from './types';
 
 declare interface DbKeys {
     /**

@@ -1,5 +1,5 @@
-import { AccountId, Balance, Channel as ChannelType, ChannelBalance, Hash, Moment, Signature, SignedTicket, Ticket, Types, SignedChannel } from './types'
-import { HoprCoreConnectorInstance } from '.'
+import type { Balance, Channel as ChannelType, ChannelBalance, Hash, Moment, Ticket, Types } from './types'
+import type { HoprCoreConnectorInstance } from '.'
 
 declare interface ChannelInstance {
   readonly channelId: Promise<Hash.Instance>
@@ -19,6 +19,8 @@ declare interface ChannelInstance {
   readonly ticket: Ticket.Static<any, any>
 
   readonly counterparty: Types.AccountId
+
+  readonly offChainCounterparty: Uint8Array
 
   /**
    * Initiates a settlement for this channel.
@@ -82,6 +84,6 @@ declare interface Channel<ConcreteConnector extends HoprCoreConnectorInstance> {
   handleOpeningRequest(coreConnector: ConcreteConnector, ...props: any[]): (source: AsyncIterable<Uint8Array>) => AsyncIterator<Uint8Array>
 }
 
-export { ChannelInstance }
+export type { ChannelInstance }
 
 export default Channel

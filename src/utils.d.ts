@@ -1,5 +1,5 @@
-import { AccountId, Hash, Signature } from './types'
-import BN from 'bn.js'
+import type { AccountId, Hash, Signature } from './types'
+import type BN from 'bn.js'
 
 declare interface Utils {
   /**

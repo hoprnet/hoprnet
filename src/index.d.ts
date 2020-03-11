@@ -1,12 +1,11 @@
-import { LevelUp } from 'levelup'
-import BN from 'bn.js'
+import type { LevelUp } from 'levelup'
 
-import Utils from './utils'
+import type Utils from './utils'
 import Channel, { ChannelInstance } from './channel'
-import TypeConstructors, { Types, AccountId, Balance, Ticket } from './types'
-import DbKeys from './dbKeys'
+import TypeConstructors, { Types, Balance, Ticket } from './types'
+import type DbKeys from './dbKeys'
 
-import Constants from './constants'
+import type Constants from './constants'
 
 declare interface HoprCoreConnectorInstance {
   readonly started: boolean

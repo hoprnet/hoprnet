@@ -1,6 +1,6 @@
-import BN from 'bn.js'
-import { ChannelInstance } from './channel'
-import { HoprCoreConnectorInstance } from '.'
+import type BN from 'bn.js'
+import type { ChannelInstance } from './channel'
+import type { HoprCoreConnectorInstance } from '.'
 
 declare interface toU8a {
   toU8a: (...props: any[]) => Uint8Array
