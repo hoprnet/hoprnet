@@ -21,17 +21,16 @@ import { encode, decode } from 'rlp'
 const Multihash = require('multihashes')
 import bs58 from 'bs58'
 
-import HoprCoreConnector, { Types, ChannelInstance, HoprCoreConnectorInstance } from '@hoprnet/hopr-core-connector-interface'
+import type { Types, ChannelInstance, HoprCoreConnectorInstance } from '@hoprnet/hopr-core-connector-interface'
+import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
+
 
 import Hopr from './src'
 import { pubKeyToPeerId, addPubKey, u8aToHex } from './src/utils'
 
 import figlet from 'figlet'
 import clear from 'clear'
-import { ChannelBalance } from '@hoprnet/hopr-core-connector-interface/src/types'
-
-// const MINIMAL_STAKE = new BN(toWei('0.10', 'ether'))
-// // const DEFAULT_STAKE = new BN(toWei('0.11', 'ether'))
+import type { ChannelBalance } from '@hoprnet/hopr-core-connector-interface/src/types'
 
 /**
  * Alphabetical list of known connectors.
@@ -244,12 +243,12 @@ async function tabCompletion(line: string, cb: (err: Error, hits: [string[], str
     case 'open':
       node.paymentChannels.channel.getAll(
         node.paymentChannels,
-        async (channel: ChannelInstance) => u8aToHex(await channel.channelId),
+        async (channel: ChannelInstance) => (await pubKeyToPeerId(channel.offChainCounterparty)).toB58String(),
         async (channelIds: Promise<string>[]) => {
-          let channelIdSet: Set<string>
+          let peerIdStringSet: Set<string>
 
           try {
-            channelIdSet = new Set<string>(await Promise.all(channelIds))
+            peerIdStringSet = new Set<string>(await Promise.all(channelIds))
           } catch (err) {
             console.log(chalk.red(err.message))
             return cb(null, [[''], line])
@@ -261,21 +260,10 @@ async function tabCompletion(line: string, cb: (err: Error, hits: [string[], str
               continue
             }
 
-            const channelId = (
-              await node.paymentChannels.utils.getId(
-                await node.paymentChannels.utils.pubKeyToAccountId(node.peerInfo.id.pubKey.marshal()),
-                await node.paymentChannels.utils.pubKeyToAccountId(peerInfo.id.pubKey.marshal()),
-                // @ts-ignore @TODO
-                node.paymentChannels.api
-              )
-            ).toString()
-
-            if (!channelIdSet.has(channelId)) {
+            if (!peerIdStringSet.has(peerInfo.id.toB58String())) {
               peers.push(peerInfo.id.toB58String())
             }
           }
-
-          channelIdSet.clear()
 
           if (peers.length < 1) {
             console.log(chalk.red(`\nDoesn't know any node to open a payment channel with.`))
@@ -291,30 +279,22 @@ async function tabCompletion(line: string, cb: (err: Error, hits: [string[], str
     case 'close':
       node.paymentChannels.channel.getAll(
         node.paymentChannels,
-        (channel: ChannelInstance) => pubKeyToPeerId(channel.counterparty),
-        async (peerIdPromises: Promise<PeerId | undefined>[]) => {
-          let peerIds: PeerId[]
+        async (channel: ChannelInstance) => (await pubKeyToPeerId(channel.offChainCounterparty)).toB58String(),
+        async (peerIdPromises: Promise<string>[]) => {
+          let peerIdStrings: string[]
           try {
-            peerIds = (await Promise.all(peerIdPromises)).filter((peerId: PeerId | undefined) => peerId != null)
+            peerIdStrings = await Promise.all(peerIdPromises)
           } catch (err) {
             console.log(chalk.red(err.message))
             return cb(null, [[''], line])
           }
 
-          if (peerIds != null && peerIds.length < 1) {
+          if (peerIdStrings != null && peerIdStrings.length < 1) {
             console.log(chalk.red(`\nCannot close any channel because there are not any open ones and/or channels were opened by a third party.`))
             return cb(null, [[''], line])
           }
 
-          const hits = query
-            ? peerIds.reduce((result: string[], peerId: PeerId) => {
-                if (peerId.toB58String().startsWith(query)) {
-                  result.push(peerId.toB58String())
-                }
-
-                return result
-              }, [])
-            : peerIds.map((peerId: PeerId) => peerId.toB58String())
+          const hits = query ? peerIdStrings.filter((peerId: string) => peerId.startsWith(query)) : peerIdStrings
 
           return cb(null, [hits.length ? hits.map((str: string) => `close ${str}`) : ['close'], line])
         }
@@ -544,7 +524,6 @@ main()
 //   const channelId = await node.paymentChannels.utils.getId(
 //     await node.paymentChannels.utils.pubKeyToAccountId(node.peerInfo.id.pubKey.marshal()),
 //     await node.paymentChannels.utils.pubKeyToAccountId(peerId.pubKey.marshal()),
-//     node.paymentChannels.api
 //   )
 
 //   // try {
@@ -631,9 +610,7 @@ async function open(query?: string): Promise<void> {
   const channelId = await node.paymentChannels.utils.getId(
     /* prettier-ignore */
     await node.paymentChannels.utils.pubKeyToAccountId(node.peerInfo.id.pubKey.marshal()),
-    await node.paymentChannels.utils.pubKeyToAccountId(counterparty.pubKey.marshal()),
-    // @ts-ignore
-    node.paymentChannels.api
+    await node.paymentChannels.utils.pubKeyToAccountId(counterparty.pubKey.marshal())
   )
 
   let interval: NodeJS.Timeout
@@ -677,7 +654,7 @@ async function open(query?: string): Promise<void> {
  * Lists all channels that we have with other nodes.
  */
 async function openChannels(): Promise<void> {
-  let str = `${chalk.yellow('ChannelId:'.padEnd(64, ' '))} - ${chalk.blue('PeerId:')}\n`
+  let str = `${chalk.yellow('ChannelId:'.padEnd(66, ' '))} - ${chalk.blue('PeerId:')}\n`
 
   try {
     await node.paymentChannels.channel.getAll(
@@ -691,7 +668,7 @@ async function openChannels(): Promise<void> {
 
         const peerId = await pubKeyToPeerId(channel.offChainCounterparty)
 
-        str += `${chalk.yellow(u8aToHex(channelId))} - ${chalk.blue(peerId.toB58String())}`
+        str += `${chalk.yellow(u8aToHex(channelId))} - ${chalk.blue(peerId.toB58String())}\n`
         return
       },
       async (promises: Promise<void>[]) => {
