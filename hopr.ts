@@ -552,6 +552,10 @@ main()
 //   // return
 // }
 
+/**
+ * Encapsulates the functionality that is executed once the user decides to send a message.
+ * @param query peerId string to send message to
+ */
 async function send(query?: string): Promise<void> {
   if (query == null) {
     console.log(chalk.red(`Invalid arguments. Expected 'open <peerId>'. Received '${query}'`))
@@ -589,6 +593,11 @@ async function send(query?: string): Promise<void> {
   })
 }
 
+/**
+ * Encapsulates the functionality that is executed once the user decides to open a payment channel
+ * with another party.
+ * @param query peerId string to send message to
+ */
 async function open(query?: string): Promise<void> {
   if (query == null || query == '') {
     console.log(chalk.red(`Invalid arguments. Expected 'open <peerId>'. Received '${query}'`))
@@ -651,7 +660,7 @@ async function open(query?: string): Promise<void> {
 }
 
 /**
- * Lists all channels that we have with other nodes.
+ * Lists all channels that we have with other nodes. Triggered from the CLI.
  */
 async function openChannels(): Promise<void> {
   let str = `${chalk.yellow('ChannelId:'.padEnd(66, ' '))} - ${chalk.blue('PeerId:')}\n`
@@ -759,7 +768,7 @@ async function openChannels(): Promise<void> {
 // }
 
 /**
- * Crawls the network to check for other nodes.
+ * Crawls the network to check for other nodes. Triggered by the CLI.
  */
 async function crawl(): Promise<void> {
   try {
@@ -805,6 +814,7 @@ async function crawl(): Promise<void> {
 /**
  * Prints the name of the network we are using and the
  * identity that we have on that chain.
+ * @notice triggered by the CLI
  */
 async function printMyAddress(): Promise<void> {
   const prefixLength = Math.max(connector.constants.CHAIN_NAME.length, 'HOPR'.length) + 3
@@ -821,6 +831,7 @@ async function printMyAddress(): Promise<void> {
 
 /**
  * Prints the balance of our account.
+ * @notice triggered by the CLI
  */
 async function printBalance(): Promise<void> {
   console.log(`Account Balance:  `, chalk.magenta((await node.paymentChannels.accountBalance).toString()), `HOPR tokens`)
@@ -829,6 +840,7 @@ async function printBalance(): Promise<void> {
 
 /**
  * Check which connectors are present right now.
+ * @notice triggered by the CLI
  */
 async function listConnectors(): Promise<void> {
   let str = 'Available connectors:'
@@ -860,17 +872,31 @@ async function listConnectors(): Promise<void> {
   }
 }
 
+/**
+ * Adds the current timestamp to the message in order to measure the latency.
+ * @param msg the message
+ */
 function encodeMessage(msg: string): Uint8Array {
   return encode([msg, Date.now()])
 }
 
+/**
+ * Tries to decode the message and returns the message as well as
+ * the measured latency.
+ * @param encoded an encoded message
+ */
 function decodeMessage(
   encoded: Uint8Array
 ): {
   latency: number
   msg: string
 } {
-  const [msg, time] = decode(encoded) as [Buffer, Buffer]
+  let msg: Buffer, time: Buffer
+  try {
+    [msg, time] = decode(encoded) as [Buffer, Buffer]
+  } catch (err) {
+    console.log(chalk.red(`Could not decode received message '${u8aToHex(msg)}' Error was ${err.message}.`))
+  }
 
   return {
     latency: Date.now() - parseInt(time.toString('hex'), 16),
