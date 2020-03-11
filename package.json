@@ -27,7 +27,8 @@
     "extract": "rm -rf 'build/extracted' && ts-node ./scripts/extract-build.ts",
     "migrate": "yarn build && truffle migrate",
     "test": "yarn build && scripts/test.sh",
-    "coverage": "yarn build && scripts/coverage.sh"
+    "coverage": "yarn build && scripts/coverage.sh",
+    "network": "ONLY_NETWORK=true scripts/test.sh"
   },
   "husky": {
     "hooks": {

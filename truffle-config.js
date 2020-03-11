@@ -11,7 +11,16 @@ try {
 module.exports = {
   networks: {
     // default network
+    // migrations mint 100 HOPR to 'owner'
     development: {
+      host: "127.0.0.1",
+      port: 9545, // 'truffle develop' port
+      network_id: "*"
+    },
+
+    // used when testing
+    // migrations replicate production
+    test: {
       host: "127.0.0.1",
       port: 9545, // 'truffle develop' port
       network_id: "*"

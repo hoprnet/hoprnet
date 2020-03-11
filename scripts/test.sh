@@ -44,6 +44,8 @@ start_ganache() {
 
   if [ "$SOLIDITY_COVERAGE" = true ]; then
     npx ganache-cli-coverage --emitFreeLogs true --allowUnlimitedContractSize true --gasLimit 0xfffffffffffff --port "$ganache_port" "${accounts[@]}" > /dev/null &
+  elif [ "$ONLY_NETWORK" = true ]; then
+    npx ganache-cli --gasLimit 0xfffffffffff --port "$ganache_port" "${accounts[@]}"
   else
     npx ganache-cli --gasLimit 0xfffffffffff --port "$ganache_port" "${accounts[@]}" > /dev/null &
   fi
@@ -70,6 +72,8 @@ npx truffle version
 
 if [ "$SOLIDITY_COVERAGE" = true ]; then
   npx solidity-coverage
+elif [ "$ONLY_NETWORK" = true ]; then
+  echo "Network ready!"
 else
-  npx truffle test --debug "$@"
+  npx truffle test --network test --debug "$@"
 fi

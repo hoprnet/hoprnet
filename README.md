@@ -78,7 +78,7 @@ yarn coverage
 For testnet/mainnet migrations, you will have to create a [truffle-secrets.json](./truffle-secrets.example.json) file within the root of the project, this file allows you to use your own mnemonic and infura api key securely.
 
 ```bash
-npx truffle develop # starts a locally hosted network
+yarn network # starts a locally hosted network
 yarn migrate --network development
 ```
 
