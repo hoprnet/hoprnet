@@ -27,11 +27,11 @@
 
 "@hoprnet/hopr-core-connector-interface@hoprnet/hopr-core-connector-interface":
   version "1.0.0"
-  resolved "https://codeload.github.com/hoprnet/hopr-core-connector-interface/tar.gz/6ec45495ad8e5e1aa14a1326787ee907d3072571"
+  resolved "https://codeload.github.com/hoprnet/hopr-core-connector-interface/tar.gz/7981c3d6cb597c21184f376ef9d344cf343a2e10"
 
 "@hoprnet/hopr-core-polkadot@hoprnet/hopr-core-polkadot":
   version "0.0.2"
-  resolved "https://codeload.github.com/hoprnet/hopr-core-polkadot/tar.gz/34574c42b77adca4db5a169bb8dfef11f542ad9a"
+  resolved "https://codeload.github.com/hoprnet/hopr-core-polkadot/tar.gz/61f27ed519104c89c1d2d651e8a26247a6e29b79"
   dependencies:
     "@polkadot/api" "^0.100.1"
     "@polkadot/util" "^1.8.1"

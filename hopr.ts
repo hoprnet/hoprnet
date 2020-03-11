@@ -689,7 +689,7 @@ async function openChannels(): Promise<void> {
           return
         }
 
-        const peerId = await pubKeyToPeerId(channel.counterparty)
+        const peerId = await pubKeyToPeerId(channel.offChainCounterparty)
 
         str += `${chalk.yellow(u8aToHex(channelId))} - ${chalk.blue(peerId.toB58String())}`
         return
