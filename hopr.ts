@@ -434,9 +434,9 @@ async function runAsRegularNode() {
       // case 'closeAll':
       //   closeAll()
       //   break
-      // case 'close':
-      //   close(query)
-      //   break
+      case 'close':
+        close(query)
+        break
       case 'listConnectors':
         listConnectors()
         break
@@ -501,56 +501,54 @@ async function main() {
 
 main()
 
-// async function close(query?: string): Promise<any> {
-//   if (query == null) {
-//     console.log(chalk.red(`Invalid arguments. Expected 'close <peerId>'. Received '${query}'`))
-//     setTimeout(() => {
-//       rl.prompt()
-//     })
-//     return
-//   }
+async function close(query?: string): Promise<any> {
+  if (query == null) {
+    console.log(chalk.red(`Invalid arguments. Expected 'close <peerId>'. Received '${query}'`))
+    setTimeout(() => {
+      rl.prompt()
+    })
+    return
+  }
 
-//   let peerId: PeerId
-//   try {
-//     peerId = await checkPeerIdInput(query)
-//   } catch (err) {
-//     console.log(err.message)
-//     setTimeout(() => {
-//       rl.prompt()
-//     })
-//     return
-//   }
+  let peerId: PeerId
+  try {
+    peerId = await checkPeerIdInput(query)
+  } catch (err) {
+    console.log(err.message)
+    setTimeout(() => {
+      rl.prompt()
+    })
+    return
+  }
 
-//   const channelId = await node.paymentChannels.utils.getId(
-//     await node.paymentChannels.utils.pubKeyToAccountId(node.peerInfo.id.pubKey.marshal()),
-//     await node.paymentChannels.utils.pubKeyToAccountId(peerId.pubKey.marshal()),
-//   )
+  let interval: NodeJS.Timeout
+  let timeout = setTimeout(() => {
+    process.stdout.write(`Initiated settlement. Waiting for finalisation `)
+    interval = setInterval(() => {
+      process.stdout.write('.')
+    }, 1000)
+  }, 2 * 1000)
 
-//   // try {
-//   //   let interval: NodeJS.Timeout
-//   //   node.paymentChannels
-//   //     .closeChannel(channelId)
-//   //     .then(receivedMoney => {
-//   //       console.log(
-//   //         `${chalk.green(`Successfully closed channel`)} ${chalk.yellow(channelId.toString())}. Received ${chalk.magenta(fromWei(receivedMoney, 'ether'))} ETH.`
-//   //       )
-//   //       setTimeout(() => {
-//   //         rl.prompt()
-//   //       })
-//   //     })
-//   //     .catch((err: Error) => {
-//   //       console.log(err.message)
-//   //       rl.prompt()
-//   //     })
-//   //   // @TODO suppress the message in case of an error
-//   //   console.log(`Submitted transaction. Waiting for confirmation .`)
-//   //   interval = setInterval(() => process.stdout.write('.'), 1000)
-//   // } catch (err) {
-//   //   console.log(chalk.red(err.message))
-//   //   rl.prompt()
-//   // }
-//   // return
-// }
+  let channel: ChannelInstance
+
+  try {
+    channel = await node.paymentChannels.channel
+      .create(node.paymentChannels, peerId.pubKey.marshal(), async (counterparty: Uint8Array) => node.interactions.payments.onChainKey.interact(await pubKeyToPeerId(counterparty)))
+  
+    await channel.initiateSettlement()
+
+    console.log(`${chalk.green(`Successfully closed channel`)} ${chalk.yellow(u8aToHex(await channel.channelId))}. Received ${chalk.magenta(new BN(0).toString())} ${node.paymentChannels.types.Balance.SYMBOL}.`)
+  } catch (err) {
+    console.log(chalk.red(err.message))
+  } finally {
+    setTimeout(() => {
+      clearTimeout(timeout)
+      clearInterval(interval)
+      process.stdout.write('\n')
+      rl.prompt()
+    })
+  }
+}
 
 /**
  * Encapsulates the functionality that is executed once the user decides to send a message.
@@ -638,7 +636,7 @@ async function open(query?: string): Promise<void> {
     )
 
     setTimeout(() => {
-      console.log(`${chalk.green(`Successfully opened channel`)} ${chalk.yellow(channelId.toString())}`)
+      console.log(`${chalk.green(`Successfully opened channel`)} ${chalk.yellow(u8aToHex(channelId))}`)
       clearTimeout(timeout)
       clearInterval(interval)
       rl.prompt()
@@ -821,7 +819,7 @@ async function printMyAddress(): Promise<void> {
 
   console.log(
     `${(connector.constants.CHAIN_NAME + ':').padEnd(prefixLength, ' ')}${chalk.green(
-      bs58.encode(Buffer.from((await node.paymentChannels.utils.pubKeyToAccountId(node.peerInfo.id.pubKey.marshal())).toString().replace(/0x/, ''), 'hex'))
+      bs58.encode(await node.paymentChannels.utils.pubKeyToAccountId(node.peerInfo.id.pubKey.marshal()))
     )}\n` +
       /* prettier-ignore */
       `${'HOPR:'.padEnd(prefixLength, ' ')}${chalk.green(node.peerInfo.id.toB58String())}`
