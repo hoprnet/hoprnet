@@ -521,13 +521,7 @@ async function close(query?: string): Promise<any> {
     return
   }
 
-  let interval: NodeJS.Timeout
-  let timeout = setTimeout(() => {
-    process.stdout.write(`Initiated settlement. Waiting for finalisation `)
-    interval = setInterval(() => {
-      process.stdout.write('.')
-    }, 1000)
-  }, 2 * 1000)
+  const unsubscribe = startDelayedInterval(`Initiated settlement. Waiting for finalisation`)
 
   let channel: ChannelInstance
 
@@ -542,8 +536,7 @@ async function close(query?: string): Promise<any> {
     console.log(chalk.red(err.message))
   } finally {
     setTimeout(() => {
-      clearTimeout(timeout)
-      clearInterval(interval)
+      unsubscribe()
       process.stdout.write('\n')
       rl.prompt()
     })
@@ -620,8 +613,8 @@ async function open(query?: string): Promise<void> {
     await node.paymentChannels.utils.pubKeyToAccountId(counterparty.pubKey.marshal())
   )
 
-  let interval: NodeJS.Timeout
-  let timeout: NodeJS.Timeout
+  const unsubscribe = startDelayedInterval(`Submitted transaction. Waiting for confirmation`)
+
   try {
     await node.paymentChannels.channel.create(
       node.paymentChannels,
@@ -635,26 +628,15 @@ async function open(query?: string): Promise<void> {
       (balance: ChannelBalance.Instance): Promise<Uint8Array> => node.interactions.payments.open.interact(counterparty, balance)
     )
 
-    setTimeout(() => {
-      console.log(`${chalk.green(`Successfully opened channel`)} ${chalk.yellow(u8aToHex(channelId))}`)
-      clearTimeout(timeout)
-      clearInterval(interval)
-      rl.prompt()
-    })
+    console.log(`${chalk.green(`Successfully opened channel`)} ${chalk.yellow(u8aToHex(channelId))}`)
   } catch (err) {
-    console.log(err)
+    console.log(chalk.red(err.message))
+  } finally {
     setTimeout(() => {
-      console.log(chalk.red(err.message))
-      clearTimeout(timeout)
-      clearInterval(interval)
+      unsubscribe()
       rl.prompt()
     })
   }
-
-  timeout = setTimeout(() => {
-    process.stdout.write(`Submitted transaction. Waiting for confirmation .`)
-    interval = setInterval(() => process.stdout.write('.'), 1000)
-  }, 2 * 1000)
 }
 
 /**
@@ -899,5 +881,20 @@ function decodeMessage(
   return {
     latency: Date.now() - parseInt(time.toString('hex'), 16),
     msg: msg.toString()
+  }
+}
+
+function startDelayedInterval(msg: string): () => void {
+  let interval: NodeJS.Timeout
+  let timeout = setTimeout(() => {
+    process.stdout.write(`${chalk.green(msg)}\n`)
+    interval = setInterval(() => {
+      process.stdout.write(chalk.green('.'))
+    }, 1000)
+  }, 2 * 1000)
+
+  return () => {
+    clearTimeout(timeout)
+    clearInterval(interval)
   }
 }
