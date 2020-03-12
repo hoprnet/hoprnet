@@ -37,10 +37,22 @@ declare interface Channel {
 
 declare namespace ChannelBalance {
   const SIZE: number
+
+  function create(
+    arr?: {
+      bytes: ArrayBuffer,
+      offset: number
+    },
+    struct?: {
+    balance: Balance | BN,
+    balance_a: Balance | BN
+  }): ChannelBalance
 }
 declare interface ChannelBalance {
   balance: Balance
   balance_a: Balance
+
+  toU8a(): Uint8Array
 }
 
 declare namespace Hash {
@@ -55,8 +67,20 @@ declare interface Moment extends BN {}
 
 declare namespace Signature {
   const SIZE: number
+
+  function create(arr?: {
+    bytes: ArrayBuffer,
+    offset: number
+  },
+  struct?: {
+    onChainSignature: Uint8Array
+    signature: Uint8Array
+    recovery: number
+    msgPrefix?: Uint8Array
+  }
+  ): Signature
 }
-declare interface Signature {
+declare interface Signature extends Uint8Array {
   onChainSignature: Uint8Array
   signature: Uint8Array
   recovery: number
@@ -68,11 +92,11 @@ declare namespace SignedChannel {
 
   function create<CoreConnector extends HoprCoreConnector, ConcreteChannel extends Channel, ConcreteSignature extends Signature>(
     coreConnector: CoreConnector,
-    channel: ConcreteChannel,
+    channel?: ConcreteChannel,
     arr?: { bytes: ArrayBuffer; offset: number }
   ): Promise<SignedChannel<ConcreteSignature>>
 }
-declare interface SignedChannel<ConcreteSignature extends Signature> {
+declare interface SignedChannel<ConcreteSignature extends Signature> extends Uint8Array {
   channel: Channel
   signature: ConcreteSignature
   signer: Uint8Array
@@ -80,10 +104,21 @@ declare interface SignedChannel<ConcreteSignature extends Signature> {
 
 declare namespace SignedTicket {
   const SIZE: number
+
+  function create<ConcreteTicket extends Ticket, ConcreteSignature extends Signature>(
+    arr?: {
+      bytes: ArrayBuffer,
+      offset: number
+    },
+    struct?: {
+      ticket: ConcreteTicket,
+      signature: ConcreteSignature
+    }
+  ): SignedTicket<ConcreteTicket, ConcreteSignature>
 }
 declare interface SignedTicket<ConcreteTicket extends Ticket, ConcreteSignature extends Signature> extends Uint8Array {
   ticket: ConcreteTicket
-  signature: Signature
+  signature: ConcreteSignature
   signer: Promise<Uint8Array>
 }
 
@@ -130,7 +165,7 @@ declare namespace Ticket {
   function submit<CoreConnector extends HoprCoreConnector, ConcreteChannelInstance extends ChannelInstance<CoreConnector>, ConcreteTicket extends Ticket, ConcreteSignature extends Signature>(channel: ConcreteChannelInstance, signedTicket: SignedTicket<ConcreteTicket, ConcreteSignature>): Promise<void>
 
 }
-declare interface Ticket {
+declare interface Ticket extends Uint8Array {
   channelId: Hash
   challenge: Hash
   epoch: TicketEpoch
