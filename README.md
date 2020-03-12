@@ -1,5 +1,5 @@
 # Website of HOPR
-
+[![Netlify Status](https://api.netlify.com/api/v1/badges/2a7471f3-7f36-48de-ad74-a12b351d5d80/deploy-status)](https://app.netlify.com/sites/hoprnet/deploys)
 ## Hosting
 The website is hosted in a serverless fashion on [Google App Engine](https://cloud.google.com/appengine/), a simple tutorial can be found in their [documentation](https://cloud.google.com/appengine/docs/standard/python/getting-started/hosting-a-static-website). The basic settings are configured in the `app.yaml` file.
 
