@@ -20,9 +20,12 @@ declare namespace HoprCoreConnector {
 
   const constants: typeof Constants
 }
-declare class HoprCoreConnector {
+declare interface HoprCoreConnector {
   readonly started: boolean
-  readonly self: any
+  readonly self: {
+    privateKey: Uint8Array
+    publicKey: Uint8Array
+  }
   readonly db: LevelUp
   readonly nonce: Promise<number>
 

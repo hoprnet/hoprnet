@@ -5,21 +5,24 @@
  */
 
 import HoprCoreConnector from '.'
+import type { LevelUp } from 'levelup'
+import type { Balance, Hash } from './types'
 
-const coreConnector = new HoprCoreConnector()
-
-coreConnector.constants.CHAIN_NAME
-
-coreConnector.types.AccountId.SIZE
-
-coreConnector.start()
-
-coreConnector.utils.hash(new Uint8Array(123).fill(0x00))
 
 async function main() {
+  const coreConnector = await HoprCoreConnector.create((undefined as unknown) as LevelUp)
+
+  coreConnector.constants.CHAIN_NAME
+
+  coreConnector.types.AccountId.SIZE
+
+  coreConnector.start()
+
+  coreConnector.utils.hash(new Uint8Array(123).fill(0x00))
+
   const channel = await coreConnector.channel.create(coreConnector, new Uint8Array(), () => Promise.resolve(new Uint8Array()))
 
-  const ticket = await channel.ticket.create(channel, new coreConnector.types.Balance(1), new coreConnector.types.Hash())
+  const ticket = await channel.ticket.create(channel, (undefined as unknown) as Balance, (undefined as unknown) as Hash)
 
   ticket.signature.recovery * 2
 

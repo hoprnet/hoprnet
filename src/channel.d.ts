@@ -50,7 +50,7 @@ declare namespace Channel {
   function handleOpeningRequest<ConcreteConnector extends HoprCoreConnector>(coreConnector: ConcreteConnector, ...props: any[]): (source: AsyncIterable<Uint8Array>) => AsyncIterator<Uint8Array>
 }
 
-declare class Channel {
+declare interface Channel {
   readonly channelId: Promise<Hash>
 
   readonly settlementWindow: Promise<Moment>

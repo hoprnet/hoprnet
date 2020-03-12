@@ -6,7 +6,7 @@ declare namespace AccountId {
   const SIZE: number
 }
 
-declare class AccountId extends Uint8Array {}
+declare interface AccountId extends Uint8Array {}
 
 declare namespace Balance {
   const SIZE: number
@@ -21,7 +21,7 @@ declare namespace Balance {
    */
   const DECIMALS: number
 }
-declare class Balance extends BN {}
+declare interface Balance extends BN {}
 
 declare namespace Channel {
   function createFunded<CoreConnector extends HoprCoreConnector>(channelBalance: ChannelBalance<CoreConnector>): Channel
@@ -30,18 +30,18 @@ declare namespace Channel {
 
   function createPending<CoreConnector extends HoprCoreConnector>(pending: Moment, balance: ChannelBalance<CoreConnector>): Channel
 }
-declare class Channel {
+declare interface Channel {
   toU8a(): Uint8Array
 }
 
 declare namespace ChannelBalance {
   const SIZE: number
 }
-declare class ChannelBalance<CoreConnector extends HoprCoreConnector> {
+declare interface ChannelBalance<CoreConnector extends HoprCoreConnector> {
   balance: Balance
   balance_a: Balance
 
-  constructor(coreConnector: CoreConnector, struct: {
+  new(coreConnector: CoreConnector, struct: {
     balance: Balance | BN,
     balance_a: Balance | BN
   })
@@ -50,17 +50,17 @@ declare class ChannelBalance<CoreConnector extends HoprCoreConnector> {
 declare namespace Hash {
   const SIZE: number
 }
-declare class Hash extends Uint8Array {}
+declare interface Hash extends Uint8Array {}
 
 declare namespace Moment {
   const SIZE: number
 }
-declare class Moment extends BN {}
+declare interface Moment extends BN {}
 
 declare namespace Signature {
   const SIZE: number
 }
-declare class Signature {
+declare interface Signature {
   onChainSignature: Uint8Array
   signature: Uint8Array
   recovery: number
@@ -87,7 +87,7 @@ declare namespace SignedChannel {
     arr?: { bytes: ArrayBuffer; offset: number }
   ): Promise<SignedChannel<ConcreteSignature, ConcreteChannel>>
 }
-declare class SignedChannel<ConcreteSignature extends Signature, ConcreteChannel extends Channel> {
+declare interface SignedChannel<ConcreteSignature extends Signature, ConcreteChannel extends Channel> {
   channel: ConcreteChannel
   signature: ConcreteSignature
   signer: Uint8Array
@@ -107,7 +107,7 @@ declare class SignedChannel<ConcreteSignature extends Signature, ConcreteChannel
 declare namespace SignedTicket {
   const SIZE: number
 }
-declare class SignedTicket<ConcreteSignature extends Signature, ConcreteTicket extends Ticket> extends Uint8Array {
+declare interface SignedTicket<ConcreteSignature extends Signature, ConcreteTicket extends Ticket> extends Uint8Array {
   ticket: ConcreteTicket
   signature: ConcreteSignature
   signer: Promise<Uint8Array>
@@ -116,7 +116,7 @@ declare class SignedTicket<ConcreteSignature extends Signature, ConcreteTicket e
 declare namespace State {
   const SIZE: number
 }
-declare class State {
+declare interface State {
   toU8a(): Uint8Array
 }
 
@@ -156,7 +156,7 @@ declare namespace Ticket {
   function submit<ConcreteChannel extends ChannelInstance, ConcreteSignature extends Signature>(channel: ConcreteChannel, signedTicket: SignedTicket<ConcreteSignature, Ticket>): Promise<void>
 
 }
-declare class Ticket {
+declare interface Ticket {
   channelId: Hash
   challenge: Hash
   epoch: TicketEpoch
@@ -170,7 +170,7 @@ declare class Ticket {
 declare namespace TicketEpoch {
   const SIZE: number
 }
-declare class TicketEpoch extends BN {
+declare interface TicketEpoch extends BN {
   toU8a(): Uint8Array
 }
 
