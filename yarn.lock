@@ -2,9 +2,9 @@
 # yarn lockfile v1
 
 
-"@hoprnet/hopr-core-connector-interface@hoprnet/hopr-core-connector-interface":
+"@hoprnet/hopr-core-connector-interface@hoprnet/hopr-core-connector-interface#7981c3d6cb597c21184f376ef9d344cf343a2e10":
   version "1.0.0"
-  resolved "https://codeload.github.com/hoprnet/hopr-core-connector-interface/tar.gz/6ec45495ad8e5e1aa14a1326787ee907d3072571"
+  resolved "https://codeload.github.com/hoprnet/hopr-core-connector-interface/tar.gz/7981c3d6cb597c21184f376ef9d344cf343a2e10"
 
 "@hoprnet/hopr-ethereum@hoprnet/hopr-ethereum#develop":
   version "0.0.1"

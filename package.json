@@ -23,7 +23,7 @@
     "node": "^12"
   },
   "dependencies": {
-    "@hoprnet/hopr-core-connector-interface": "hoprnet/hopr-core-connector-interface",
+    "@hoprnet/hopr-core-connector-interface": "hoprnet/hopr-core-connector-interface#7981c3d6cb597c21184f376ef9d344cf343a2e10",
     "@hoprnet/hopr-ethereum": "hoprnet/hopr-ethereum#develop",
     "bn.js": "^5.1.1",
     "keccak256": "^1.0.0",
