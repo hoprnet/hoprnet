@@ -1,220 +1,177 @@
 import type BN from 'bn.js'
-import type { ChannelInstance } from './channel'
-import type { HoprCoreConnectorInstance } from '.'
-
-declare interface toU8a {
-  toU8a: (...props: any[]) => Uint8Array
-}
-
-interface length<Instance> {
-  new (...props: any[]): Instance
-  SIZE: number
-}
+import type ChannelInstance from './channel'
+import type HoprCoreConnector from '.'
 
 declare namespace AccountId {
-  interface Static extends length<Instance> {}
-
-  interface Instance extends Uint8Array {}
+  const SIZE: number
 }
+
+declare class AccountId extends Uint8Array {}
 
 declare namespace Balance {
-  interface Static extends length<Instance> {
-    /**
-     * Abbreviation of the currency, e.g. `ETH`
-     */
-    readonly SYMBOL: string
+  const SIZE: number
 
-    /**
-     * Decimals of the currency, e.g. 18
-     */
-    readonly DECIMALS: number
-  }
+  /**
+   * Abbreviation of the currency, e.g. `ETH`
+   */
+  const SYMBOL: string
 
-  interface Instance extends BN {}
+  /**
+   * Decimals of the currency, e.g. 18
+   */
+  const DECIMALS: number
 }
+declare class Balance extends BN {}
 
 declare namespace Channel {
-  interface Static extends length<Instance> {
-    createFunded(balance: ChannelBalance.Instance): Instance
+  function createFunded<CoreConnector extends HoprCoreConnector>(channelBalance: ChannelBalance<CoreConnector>): Channel
 
-    createActive(balance: ChannelBalance.Instance): Instance
+  function createActive<CoreConnector extends HoprCoreConnector>(channelBalance: ChannelBalance<CoreConnector>): Channel
 
-    createPending(pending: Moment.Instance, balance: ChannelBalance.Instance): Instance
-  }
-
-  interface Instance extends toU8a {}
+  function createPending<CoreConnector extends HoprCoreConnector>(pending: Moment, balance: ChannelBalance<CoreConnector>): Channel
+}
+declare class Channel {
+  toU8a(): Uint8Array
 }
 
 declare namespace ChannelBalance {
-  interface Static extends length<Instance> {
-    new (
-      coreConnector: any,
-      struct: {
-        balance: BN
-        balance_a: BN
-      }
-    ): Instance
-  }
+  const SIZE: number
+}
+declare class ChannelBalance<CoreConnector extends HoprCoreConnector> {
+  balance: Balance
+  balance_a: Balance
 
-  interface Instance extends toU8a {
-    balance: Balance.Instance
-    balance_a: Balance.Instance
-  }
+  constructor(coreConnector: CoreConnector, struct: {
+    balance: Balance | BN,
+    balance_a: Balance | BN
+  })
 }
 
 declare namespace Hash {
-  interface Static extends length<Instance> {}
-
-  interface Instance extends Uint8Array {}
+  const SIZE: number
 }
+declare class Hash extends Uint8Array {}
 
 declare namespace Moment {
-  interface Static extends length<Instance> {}
-
-  interface Instance extends BN {}
+  const SIZE: number
 }
+declare class Moment extends BN {}
 
 declare namespace Signature {
-  interface Static extends length<Instance> {}
+  const SIZE: number
+}
+declare class Signature {
+  onChainSignature: Uint8Array
+  signature: Uint8Array
+  recovery: number
+  msgPrefix: Uint8Array
 
-  interface Instance extends Uint8Array {
-    onChainSignature: Uint8Array
-    signature: Uint8Array
-    recovery: number
-    msgPrefix: Uint8Array
-  }
+  constructor(
+    arr?: {
+      bytes: ArrayBuffer
+      offset: number
+    },
+    struct?: {
+      secp256k1Signature: Uint8Array
+      secp256k1Recovery: number
+    }
+  )
 }
 
 declare namespace SignedChannel {
-  interface Static<ConcreteSignature extends Signature.Instance, ConcreteChannel extends Channel.Instance>
-    extends length<Instance<ConcreteSignature, ConcreteChannel>> {
-    new (
-      arr?: {
-        bytes: ArrayBuffer
-        offset: number
-      },
-      struct?: {
-        signature: ConcreteSignature
-        channel: ConcreteChannel
-      }
-    ): Instance<ConcreteSignature, ConcreteChannel>
+  const SIZE: number
 
-    create<CoreConnector extends HoprCoreConnectorInstance>(
-      coreConnector: HoprCoreConnectorInstance,
-      channel: ConcreteChannel,
-      arr?: { bytes: ArrayBuffer; offset: number }
-    ): Promise<Instance<ConcreteSignature, ConcreteChannel>>
-  }
+  function create<CoreConnector extends HoprCoreConnector, ConcreteChannel extends Channel, ConcreteSignature extends Signature>(
+    coreConnector: CoreConnector,
+    channel: ConcreteChannel,
+    arr?: { bytes: ArrayBuffer; offset: number }
+  ): Promise<SignedChannel<ConcreteSignature, ConcreteChannel>>
+}
+declare class SignedChannel<ConcreteSignature extends Signature, ConcreteChannel extends Channel> {
+  channel: ConcreteChannel
+  signature: ConcreteSignature
+  signer: Uint8Array
 
-  interface Instance<ConcreteSignature extends Signature.Instance, ConcreteChannel extends Channel.Instance> extends Uint8Array {
-    channel: Channel.Instance
-    signature: Signature.Instance
-    signer: Uint8Array
-  }
+  constructor(
+    arr?: {
+      bytes: ArrayBuffer
+      offset: number
+    },
+    struct?: {
+      signature: ConcreteSignature
+      channel: ConcreteChannel
+    }
+  )
 }
 
 declare namespace SignedTicket {
-  interface Static<ConcreteSignature extends Signature.Instance, ConcreteChannel extends ChannelInstance, ConcreteTicket extends Ticket.Instance>
-    extends length<Instance<ConcreteSignature, ConcreteChannel, ConcreteTicket>> {}
-
-  interface Instance<ConcreteSignature extends Signature.Instance, ConcreteChannel extends ChannelInstance, ConcreteTicket extends Ticket.Instance>
-    extends Uint8Array {
-    ticket: ConcreteTicket
-    signature: ConcreteChannel
-    signer: Promise<Uint8Array>
-  }
+  const SIZE: number
+}
+declare class SignedTicket<ConcreteSignature extends Signature, ConcreteTicket extends Ticket> extends Uint8Array {
+  ticket: ConcreteTicket
+  signature: ConcreteSignature
+  signer: Promise<Uint8Array>
 }
 
 declare namespace State {
-  interface Static extends length<Instance> {}
-
-  interface Instance extends toU8a {}
+  const SIZE: number
+}
+declare class State {
+  toU8a(): Uint8Array
 }
 
 declare namespace Ticket {
-  interface Static<ConcreteChannel extends ChannelInstance, ConcreteSignature extends Signature.Instance> extends length<Instance> {
-    /**
-     * Constructs a ticket to use in a probabilistic payment channel.
-     * @param amount amount of funds to include
-     * @param challenge a challenge that has to be solved be the redeemer
-     */
-    create(
-      channel: ConcreteChannel,
-      amount: Balance.Instance,
-      challenge: Hash.Instance,
-      ...props: any[]
-    ): Promise<SignedTicket.Instance<ConcreteSignature, ConcreteChannel, any>>
+  const SIZE: number
 
-    /**
-     * Checks a previously issued ticket for its validity.
-     * @param signedTicket a previously issued ticket to check
-     * @param props additional arguments
-     */
-    verify(channel: ConcreteChannel, signedTicket: SignedTicket.Instance<ConcreteSignature, ConcreteChannel, any>, ...props: any[]): Promise<boolean>
+  /**
+   * Constructs a ticket to use in a probabilistic payment channel.
+   * @param amount amount of funds to include
+   * @param challenge a challenge that has to be solved be the redeemer
+   */
+  function create<ConcreteChannel extends ChannelInstance, ConcreteSignature extends Signature>(
+    channel: ConcreteChannel,
+    amount: Balance,
+    challenge: Hash,
+  ): Promise<SignedTicket<ConcreteSignature, Ticket>>
 
-    /**
-     * BIG TODO
-     * Aggregate previously issued tickets. Still under active development!
-     * @param tickets array of tickets to aggregate
-     * @param props additional arguments
-     */
-    // aggregate(channel: any, tickets: Ticket[], ...props: any[]): Promise<Ticket>
+  /**
+   * Checks a previously issued ticket for its validity.
+   * @param signedTicket a previously issued ticket to check
+   * @param props additional arguments
+   */
+  function verify<ConcreteChannel extends ChannelInstance, ConcreteSignature extends Signature>(channel: ConcreteChannel, signedTicket: SignedTicket<ConcreteSignature, Ticket>): Promise<boolean>
 
-    /**
-     * Submits a signed to the blockchain.
-     * @param signedTicket a signed ticket
-     */
-    submit(channel: ConcreteChannel, signedTicket: SignedTicket.Instance<ConcreteSignature, ConcreteChannel, any>, ...props: any[]): Promise<void>
-  }
+  /**
+   * BIG TODO
+   * Aggregate previously issued tickets. Still under active development!
+   * @param tickets array of tickets to aggregate
+   * @param props additional arguments
+   */
+  // aggregate(channel: any, tickets: Ticket[], ...props: any[]): Promise<Ticket>
 
-  interface Instance extends toU8a {
-    channelId: Hash.Instance
-    challenge: Hash.Instance
-    epoch: TicketEpoch.Instance
-    amount: Balance.Instance
-    winProb: Hash.Instance
-    onChainSecret: Hash.Instance
+  /**
+   * Submits a signed to the blockchain.
+   * @param signedTicket a signed ticket
+   */
+  function submit<ConcreteChannel extends ChannelInstance, ConcreteSignature extends Signature>(channel: ConcreteChannel, signedTicket: SignedTicket<ConcreteSignature, Ticket>): Promise<void>
 
-    getEmbeddedFunds(): Balance.Instance
-  }
+}
+declare class Ticket {
+  channelId: Hash
+  challenge: Hash
+  epoch: TicketEpoch
+  amount: Balance
+  winProb: Hash
+  onChainSecret: Hash
+
+  getEmbeddedFunds(): Balance
 }
 
 declare namespace TicketEpoch {
-  interface Static extends length<Instance> {}
-
-  interface Instance extends BN, toU8a {}
+  const SIZE: number
+}
+declare class TicketEpoch extends BN {
+  toU8a(): Uint8Array
 }
 
-declare namespace Types {
-  interface AccountId extends AccountId.Instance {}
-  interface Balance extends Balance.Instance {}
-  interface Channel extends Channel.Instance {}
-  interface ChannelBalance extends ChannelBalance.Instance {}
-  interface Hash extends Hash.Instance {}
-  interface Moment extends Moment.Instance {}
-  interface State extends State.Instance {}
-  interface Signature extends Signature.Instance {}
-  interface SignedChannel extends SignedChannel.Instance<any, any> {}
-  interface SignedTicket extends SignedTicket.Instance<any, any, any> {}
-  interface Ticket extends Ticket.Instance {}
-  interface TicketEpoch extends TicketEpoch.Instance {}
-}
-
-declare interface TypeConstructors {
-  AccountId: AccountId.Static
-  Balance: Balance.Static
-  Channel: Channel.Static
-  ChannelBalance: ChannelBalance.Static
-  Hash: Hash.Static
-  Moment: Moment.Static
-  State: State.Static
-  Signature: Signature.Static
-  SignedChannel: SignedChannel.Static<any, any>
-  SignedTicket: SignedTicket.Static<any, any, any>
-  Ticket: Ticket.Static<any, any>
-  TicketEpoch: TicketEpoch.Static
-}
-
-export { AccountId, Balance, Channel, ChannelBalance, Hash, Moment, State, Signature, SignedChannel, SignedTicket, Ticket, TicketEpoch, Types, toU8a }
-
-export default TypeConstructors
+export { AccountId, Balance, Channel, ChannelBalance, Hash, Moment, State, Signature, SignedChannel, SignedTicket, Ticket, TicketEpoch }

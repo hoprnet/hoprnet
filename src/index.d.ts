@@ -1,13 +1,26 @@
 import type { LevelUp } from 'levelup'
 
-import type Utils from './utils'
-import Channel, { ChannelInstance } from './channel'
-import TypeConstructors, { Types, Balance, Ticket } from './types'
-import type DbKeys from './dbKeys'
+import type * as Utils from './utils'
+import type Channel from './channel'
+import type * as Types from './types'
+import type * as DbKeys from './dbKeys'
 
-import type Constants from './constants'
+import * as Constants from './constants'
 
-declare interface HoprCoreConnectorInstance {
+declare namespace HoprCoreConnector {
+  /**
+   * Creates an uninitialised instance.
+   *
+   * @param db database instance
+   * @param seed that is used to derive that on-chain identity
+   * @param options.id Id of the demo account
+   * @param options.uri URI that is used to connect to the blockchain
+   */
+  function create(db: LevelUp, seed?: Uint8Array, options?: { id?: number; provider?: string }): Promise<HoprCoreConnector>
+
+  const constants: typeof Constants
+}
+declare class HoprCoreConnector {
   readonly started: boolean
   readonly self: any
   readonly db: LevelUp
@@ -33,48 +46,34 @@ declare interface HoprCoreConnectorInstance {
   /**
    * Returns the current balances of the account associated with this node.
    */
-  accountBalance: Promise<Balance.Instance>
+  accountBalance: Promise<Types.Balance>
 
   /**
    * (Static) utils to use in the connector module
    */
-  readonly utils: Utils
+  readonly utils: typeof Utils
 
   /**
    * Export creator for all Types used on-chain.
    */
-  readonly types: TypeConstructors
+  readonly types: typeof Types
 
   /**
    * Export keys under which our data gets stored in the database.
    */
-  readonly dbKeys: DbKeys
+  readonly dbKeys: typeof DbKeys
 
   /**
    * Export chain-specific constants.
    */
-  readonly constants: Constants
+  readonly constants: typeof Constants
 
   /**
    * Encapsulates payment channel between nodes.
    */
-  readonly channel: Channel<any>
+  readonly channel: typeof Channel
 }
 
-declare interface HoprCoreConnector {
-  /**
-   * Creates an uninitialised instance.
-   *
-   * @param db database instance
-   * @param seed that is used to derive that on-chain identity
-   * @param options.id Id of the demo account
-   * @param options.uri URI that is used to connect to the blockchain
-   */
-  create(db: LevelUp, seed?: Uint8Array, options?: { id?: number; provider?: string }): Promise<HoprCoreConnectorInstance>
-
-  readonly constants: Constants
-}
-
-export { HoprCoreConnectorInstance, Utils, DbKeys, Types, ChannelInstance, Constants, Ticket }
+export { Utils, DbKeys, Types, Channel, Constants }
 
 export default HoprCoreConnector

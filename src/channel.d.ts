@@ -1,52 +1,19 @@
-import type { Balance, Channel as ChannelType, ChannelBalance, Hash, Moment, Ticket, Types } from './types'
-import type { HoprCoreConnectorInstance } from '.'
+import type { AccountId, Balance, Channel as ChannelType, ChannelBalance, Hash, Moment, Ticket } from './types'
+import type HoprCoreConnector from '.'
 
-declare interface ChannelInstance {
-  readonly channelId: Promise<Hash.Instance>
-
-  readonly settlementWindow: Promise<Moment.Instance>
-
-  readonly state: Promise<ChannelType.Instance>
-
-  readonly balance_a: Promise<Balance.Instance>
-
-  readonly balance: Promise<Balance.Instance>
-
-  readonly currentBalance: Promise<Balance.Instance>
-
-  readonly currentBalanceOfCounterparty: Promise<Balance.Instance>
-
-  readonly ticket: Ticket.Static<any, any>
-
-  readonly counterparty: Types.AccountId
-
-  readonly offChainCounterparty: Uint8Array
-
-  /**
-   * Initiates a settlement for this channel.
-   */
-  initiateSettlement(): Promise<void>
-
-  /**
-   * Fetches all unresolved, previous challenges from the database that
-   * have occured in this channel.
-   */
-  getPreviousChallenges(): Promise<Hash.Instance>
-}
-
-declare interface Channel<ConcreteConnector extends HoprCoreConnectorInstance> {
+declare namespace Channel {
   /**
    * Creates a Channel instance from the database.
    * @param counterparty AccountId of the counterparty
    * @param props additional arguments
    */
-  create(
+  function create<ConcreteConnector extends HoprCoreConnector>(
     coreConnector: ConcreteConnector,
     offChainCounterparty: Uint8Array,
     getOnChainPublicKey: (counterparty: Uint8Array) => Promise<Uint8Array>,
-    channelBalance?: ChannelBalance.Instance,
-    sign?: (channelBalance: ChannelBalance.Instance) => Promise<Uint8Array>
-  ): Promise<ChannelInstance>
+    channelBalance?: ChannelBalance<ConcreteConnector>,
+    sign?: (channelBalance: ChannelBalance<ConcreteConnector>) => Promise<Uint8Array>
+  ): Promise<Channel>
 
   /**
    * Opens a new payment channel and initializes the on-chain data.
@@ -62,11 +29,10 @@ declare interface Channel<ConcreteConnector extends HoprCoreConnectorInstance> {
    * @param onData applied on all channel instances
    * @param onEnd composes at the end the received data
    */
-  getAll<T, R>(
+  function getAll<T, R, ConcreteConnector extends HoprCoreConnector>(
     coreConnector: ConcreteConnector,
-    onData: (channel: ChannelInstance, ...props: any[]) => Promise<T>,
+    onData: (channel: Channel, ...props: any[]) => Promise<T>,
     onEnd: (promises: Promise<T>[], ...props: any[]) => R,
-    ...props: any[]
   ): Promise<R>
 
   /**
@@ -74,16 +40,47 @@ declare interface Channel<ConcreteConnector extends HoprCoreConnectorInstance> {
    * each of them.
    * @param props additional arguments
    */
-  closeChannels(coreConnector: ConcreteConnector, ...props: any[]): Promise<Balance.Instance>
+  function closeChannels<ConcreteConnector extends HoprCoreConnector>(coreConnector: ConcreteConnector): Promise<Balance>
 
   /**
    * Handles a channel opening request.
    * @notice Takes the `coreConnector` instance and returns an async iterable duplex stream.
    * @param coreConnector coreConnector instance
    */
-  handleOpeningRequest(coreConnector: ConcreteConnector, ...props: any[]): (source: AsyncIterable<Uint8Array>) => AsyncIterator<Uint8Array>
+  function handleOpeningRequest<ConcreteConnector extends HoprCoreConnector>(coreConnector: ConcreteConnector, ...props: any[]): (source: AsyncIterable<Uint8Array>) => AsyncIterator<Uint8Array>
 }
 
-export type { ChannelInstance }
+declare class Channel {
+  readonly channelId: Promise<Hash>
+
+  readonly settlementWindow: Promise<Moment>
+
+  readonly state: Promise<ChannelType>
+
+  readonly balance_a: Promise<Balance>
+
+  readonly balance: Promise<Balance>
+
+  readonly currentBalance: Promise<Balance>
+
+  readonly currentBalanceOfCounterparty: Promise<Balance>
+
+  readonly ticket: typeof Ticket
+
+  readonly counterparty: AccountId
+
+  readonly offChainCounterparty: Uint8Array
+
+  /**
+   * Initiates a settlement for this channel.
+   */
+  initiateSettlement(): Promise<void>
+
+  /**
+   * Fetches all unresolved, previous challenges from the database that
+   * have occured in this channel.
+   */
+  getPreviousChallenges(): Promise<Hash>
+}
 
 export default Channel
