@@ -78,7 +78,11 @@ class SignedChannel extends Uint8ArrayE {
       offset: number
     }
   ): Promise<SignedChannel> {
-    const signature = await sign(channel.toU8a(), coreConnector.self.privateKey, coreConnector.self.publicKey)
+    const signature = await sign(
+      await coreConnector.utils.hash(channel.toU8a()),
+      coreConnector.self.privateKey,
+      coreConnector.self.publicKey
+    )
 
     if (arr != null) {
       const signedChannel = new SignedChannel(arr)

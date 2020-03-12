@@ -115,9 +115,10 @@ export default class HoprEthereumClass {
     const provider = options?.provider || config.DEFAULT_URI
     const privateKey = usingSeed ? seed : stringToU8a(config.DEMO_ACCOUNTS[options.id])
     const publicKey = await utils.privKeyToPubKey(privateKey)
+    const address = await utils.pubKeyToAccountId(publicKey)
 
     const web3 = new Web3(provider)
-    const account = new types.AccountId(publicKey)
+    const account = new types.AccountId(address)
     const hoprChannels = new web3.eth.Contract(HoprChannelsAbi as any, config.DEFAULT_HOPR_CHANNELS_ADDRESS)
     const hoprToken = new web3.eth.Contract(HoprTokenAbi as any, config.DEFAULT_HOPR_TOKEN_ADDRESS)
 

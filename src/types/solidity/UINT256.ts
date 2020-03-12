@@ -1,10 +1,13 @@
 import { BNE } from '../../types/extended'
 
-// TODO: SIZE check on construction
-class UINT265 extends BNE {
+class UINT256 extends BNE {
+  toU8a() {
+    return super.toU8a(UINT256.SIZE)
+  }
+
   static get SIZE() {
     return 32
   }
 }
 
-export default UINT265
+export default UINT256
