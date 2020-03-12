@@ -165,7 +165,7 @@ declare namespace Ticket {
   function submit<CoreConnector extends HoprCoreConnector, ConcreteChannelInstance extends ChannelInstance<CoreConnector>, ConcreteTicket extends Ticket, ConcreteSignature extends Signature>(channel: ConcreteChannelInstance, signedTicket: SignedTicket<ConcreteTicket, ConcreteSignature>): Promise<void>
 
 }
-declare interface Ticket extends Uint8Array {
+declare interface Ticket {
   channelId: Hash
   challenge: Hash
   epoch: TicketEpoch
@@ -174,6 +174,8 @@ declare interface Ticket extends Uint8Array {
   onChainSecret: Hash
 
   getEmbeddedFunds(): Balance
+
+  toU8a(): Uint8Array
 }
 
 declare namespace TicketEpoch {
