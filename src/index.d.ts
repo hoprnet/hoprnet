@@ -5,7 +5,7 @@ import type Channel from './channel'
 import type * as Types from './types'
 import type * as DbKeys from './dbKeys'
 
-import * as Constants from './constants'
+import type * as Constants from './constants'
 
 declare namespace HoprCoreConnector {
   /**

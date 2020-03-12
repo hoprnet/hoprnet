@@ -43,7 +43,7 @@ export declare function sign(msg: Uint8Array, privKey: Uint8Array, pubKey: Uint8
  * @param signature signature over `msg` to verify
  * @param pubkey public key of the signer
  */
-export declare function verify(msg: Uint8Array, signature: Signature, pubkey: Uint8Array): Promise<boolean>
+export declare function verify<ConcreteSignature extends Signature>(msg: Uint8Array, signature: ConcreteSignature, pubkey: Uint8Array): Promise<boolean>
 
 /**
  * Takes an amount and converts it from one unit to another one.

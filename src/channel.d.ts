@@ -1,4 +1,5 @@
-import type { AccountId, Balance, Channel as ChannelType, ChannelBalance, Hash, Moment, Ticket } from './types'
+import type { AccountId, Balance, Channel as ChannelType, ChannelBalance, Hash, Moment, Ticket, Signature, SignedChannel } from './types'
+
 import type HoprCoreConnector from '.'
 
 declare namespace Channel {
@@ -7,13 +8,18 @@ declare namespace Channel {
    * @param counterparty AccountId of the counterparty
    * @param props additional arguments
    */
-  function create<ConcreteConnector extends HoprCoreConnector>(
-    coreConnector: ConcreteConnector,
+  function create<CoreConnector extends HoprCoreConnector, ConcreteSignature extends Signature>(
+    coreConnector: CoreConnector,
     offChainCounterparty: Uint8Array,
     getOnChainPublicKey: (counterparty: Uint8Array) => Promise<Uint8Array>,
-    channelBalance?: ChannelBalance<ConcreteConnector>,
-    sign?: (channelBalance: ChannelBalance<ConcreteConnector>) => Promise<Uint8Array>
-  ): Promise<Channel>
+    channelBalance?: ChannelBalance,
+    sign?: (channelBalance: ChannelBalance) => Promise<SignedChannel<ConcreteSignature>>
+  ): Promise<Channel<CoreConnector>>
+
+  function isOpen<CoreConnector extends HoprCoreConnector, ConcreteAccountId extends AccountId>(
+    coreConnector: CoreConnector,
+    counterparty: ConcreteAccountId
+  ): Promise<boolean>
 
   /**
    * Opens a new payment channel and initializes the on-chain data.
@@ -29,9 +35,9 @@ declare namespace Channel {
    * @param onData applied on all channel instances
    * @param onEnd composes at the end the received data
    */
-  function getAll<T, R, ConcreteConnector extends HoprCoreConnector>(
-    coreConnector: ConcreteConnector,
-    onData: (channel: Channel, ...props: any[]) => Promise<T>,
+  function getAll<T, R, CoreConnector extends HoprCoreConnector>(
+    coreConnector: CoreConnector,
+    onData: (channel: Channel<CoreConnector>, ...props: any[]) => Promise<T>,
     onEnd: (promises: Promise<T>[], ...props: any[]) => R,
   ): Promise<R>
 
@@ -40,17 +46,19 @@ declare namespace Channel {
    * each of them.
    * @param props additional arguments
    */
-  function closeChannels<ConcreteConnector extends HoprCoreConnector>(coreConnector: ConcreteConnector): Promise<Balance>
+  function closeChannels<CoreConnector extends HoprCoreConnector>(coreConnector: CoreConnector): Promise<Balance>
 
   /**
    * Handles a channel opening request.
    * @notice Takes the `coreConnector` instance and returns an async iterable duplex stream.
    * @param coreConnector coreConnector instance
    */
-  function handleOpeningRequest<ConcreteConnector extends HoprCoreConnector>(coreConnector: ConcreteConnector, ...props: any[]): (source: AsyncIterable<Uint8Array>) => AsyncIterator<Uint8Array>
+  function handleOpeningRequest<CoreConnector extends HoprCoreConnector>(coreConnector: CoreConnector, ...props: any[]): (source: AsyncIterable<Uint8Array>) => AsyncIterator<Uint8Array>
 }
 
-declare interface Channel {
+declare interface Channel<CoreConnector extends HoprCoreConnector> {
+  readonly coreConnector: CoreConnector
+
   readonly channelId: Promise<Hash>
 
   readonly settlementWindow: Promise<Moment>
