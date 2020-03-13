@@ -35,9 +35,9 @@ Note that the documentation is under active development and does not always repr
 - [Project Structure](#project-structure)
 - [HOPR on Polkadot](#hopr-on-polkadot)
   - [Dependencies](#dependencies-1)
-  - [Get HOPR](#get-hopr-1)
+  - [**General information**](#general-information)
   - [Get Substrate module](#get-substrate-module)
-  - [Run HOPR](#run-hopr-1)
+  - [Get HOPR](#get-hopr-1)
 
 # Setup
 
@@ -342,7 +342,7 @@ The most relevant project folders and files are as follows:
 The implementation of HOPR is written in Typescript so you need:
 - [`Node.js`](https://nodejs.org/en/download/) >= 12
 - [`Typescript`](https://www.typescriptlang.org/index.html#download-links)
-- [`yarn`](https://yarnpkg.com/en/docs/install) >= 1.19.0, a package manager for Node.JS
+- [`yarn`](https://yarnpkg.com/en/docs/install) >= 1.22.0, a package manager for Node.JS
 - [`Rust`](https://rust-lang.org), install by following these [instructions](https://rustup.rs)
 - [`Substrate 1.0`](https://www.parity.io/substrate/), **the installation is described later**.
 
@@ -351,26 +351,38 @@ You might need to setup further operating system dependent, please refer to the 
 - [macOS](../../wiki/Setup#macOS)
 - [Windows](../../wiki/Setup#Windows)
 
-## Get HOPR
+**Javascript build utilities**
 
-Start by cloning this repository, let `yarn` install the dependencies and change the filename of the example settings file (don't worry, to do a quick local test you don't need to touch the content of the file and default settings work!):
+HOPR is written in Typescript and since Node.JS cannot execute Typescript directly, all modules require a transpilation from Typescript to plain Javascript.
+
+You might want to install some dependencies globally:
 ```
-# clone this branch
-$ git clone -b jigsaw https://github.com/hoprnet/hopr-core.git
-$ cd hopr-core
+$ npm install -g typescript
+$ npm install -g ts-node
 
-# in case you are using NVM (Node Versioning Manager), run the following two commands:
-$ nvm install 12
-$ nvm use
+# for unit tests
+$ npm install -g mocha
+```
 
-$ yarn install
-$ yarn add https://github.com/hoprnet/hopr-core-polkadot
+## **General information**
+
+The setup consists of multiple steps:
+
+1. Download & build the Substrate module
+2. Start the Substrate-based chain
+3. Fund the accounts that we are going to use
+4. Start the HOPR bootstrap node
+5. Start (at least) four individual HOPR nodes
+
+First of all, start by creating a new directory, e.g.
+
+```
+mkdir hopr
 ```
 
 ## Get Substrate module
 
 ```
-$ cd ..
 $ git clone https://github.com/hoprnet/hopr-polkadot
 $ cd hopr-polkadot
 
@@ -385,19 +397,136 @@ $ cargo build
 
 # Check if everything is working
 $ cargo test -p hopr-polkadot-runtime
+
+# Purge existing chain records and start new chain
+$ ./target/debug/hopr-polkadot purge-chain --dev -y && cargo run -- --dev
 ```
 
-## Run HOPR
+**Wait approx. 5 seconds before proceeding**
+
+Open another terminal window and run:
+
 ```
-# Start local testnet
-$ cargo run -- --dev
+$ git clone https://github.com/hoprnet/hopr-core-polkadot.git
 
-# Start HOPR bootstrap node
-$ ts-node hopr -b -n polkadot
+$ cd hopr-core-polkadot
 
-# Start local HOPR testnet (in separate terminals)
-$ ts-node hopr -b -n polkadot 0
-$ ts-node hopr -b -n polkadot 1
-$ ts-node hopr -b -n polkadot 2
-$ ts-node hopr -b -n polkadot 3
+# In case you have NVM (Node.js Version Manager) installed, run
+$ nvm use
+
+$ yarn install
+
+# Check that everything is working
+# This will start the Substrate chain and check whether the interactions are working.
+$ npx mocha
+
+# Fund the accounts that we are going to use
+$ ts-node ./src/scripts/fundAccounts.ts
+```
+
+## Get HOPR
+
+Start by cloning this repository, let `yarn` install the dependencies and change the filename of the example settings file (don't worry, to do a quick local test you don't need to touch the content of the file and default settings work!):
+
+```
+$ git clone -b jigsaw https://github.com/hoprnet/hopr-core.git
+$ cd hopr-core
+
+# in case you are using NVM (Node Versioning Manager), run the following two commands:
+$ nvm use
+
+$ yarn install
+# if not already installed
+# yarn add https://github.com/hoprnet/hopr-core-polkadot\
+
+# print current working directory
+$ cwd // e.g. /Volumes/DEV/hopr/hopr-core
+
+# start HOPR bootstrap node
+$ rm -Rf ./db && ts-node hopr -b -n polkadot
+```
+
+Open four other terminal windows:
+
+```
+$ cd <working_directory>
+
+$ nvm use
+$ ts-node hopr -n polkadot 0
+```
+
+```
+$ cd <working_directory>
+
+$ nvm use
+$ ts-node hopr -n polkadot 1
+```
+
+```
+$ cd <working_directory>
+
+$ nvm use
+$ ts-node hopr -n polkadot 2
+```
+
+```
+$ cd <working_directory>
+
+$ nvm use
+$ ts-node hopr -n polkadot 3
+```
+
+Pick one client and type in `crawl`. It should find three other nodes:
+
+```
+Crawling results:
+    contacted nodes:: 
+        16Uiu2HAmEv6BiCD3p6uwYLQ8Pv3bSLo4SXVsmEExfnZMKYVtUDDL
+        16Uiu2HAkzuoWfxBgsgBCr8xqpkjs1RAmtDPxafCUAcbBEonnVQ65
+        16Uiu2HAmRfR1Qus69Lhn4t9gCkHjdsrWHpnwJwN7Dbjw197rZLqk
+        16Uiu2HAmU5yD9T6behtHat9wThbVajcpQqkP8m4Lqdx75hNkgWma
+    new nodes: 3 nodes
+    total: 3 nodes
+```
+
+Now check your balance by executing `balance`
+
+```
+Account Balance:   1152921504606822526 HOPR tokens
+```
+
+Check your address:
+
+```
+polkadot:  GYrUJGMNYgbG94HUwRf8TUvZ833xHumcjj9XhufhRva
+HOPR:      16Uiu2HAmVbdbHbu7ziqzwV8xvdrtSRouzuFb53wEukQmisTi8W3M
+```
+
+Send a message by executing `send`. Hint: Use tab completion for the ID of the recipient.
+
+```
+Sending message to 16Uiu2HAkzuoWfxBgsgBCr8xqpkjs1RAmtDPxafCUAcbBEonnVQ65
+Type in your message and press ENTER to send:
+Hello World!
+Crawling results:
+    contacted nodes:: 
+        16Uiu2HAmRfR1Qus69Lhn4t9gCkHjdsrWHpnwJwN7Dbjw197rZLqk
+        16Uiu2HAmU5yD9T6behtHat9wThbVajcpQqkP8m4Lqdx75hNkgWma
+        16Uiu2HAmEv6BiCD3p6uwYLQ8Pv3bSLo4SXVsmEExfnZMKYVtUDDL
+        16Uiu2HAkzuoWfxBgsgBCr8xqpkjs1RAmtDPxafCUAcbBEonnVQ65
+    new nodes: 0 nodes
+    total: 4 nodes
+---------- New Packet ----------
+Intermediate 0 : 16Uiu2HAmU5yD9T6behtHat9wThbVajcpQqkP8m4Lqdx75hNkgWma
+Intermediate 1 : 16Uiu2HAmRfR1Qus69Lhn4t9gCkHjdsrWHpnwJwN7Dbjw197rZLqk
+Destination    : 16Uiu2HAkzuoWfxBgsgBCr8xqpkjs1RAmtDPxafCUAcbBEonnVQ65
+```
+
+Node `16Uiu2HAkzuoWfxBgsgBCr8xqpkjs1RAmtDPxafCUAcbBEonnVQ65` should display something like:
+
+```
+===== New message ======
+Message: Hello World!
+Latency: 52217
+========================
 ```

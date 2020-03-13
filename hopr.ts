@@ -186,8 +186,8 @@ async function parseOptions(): Promise<void | Options> {
     let str = `\n`
 
     str += `===== New message ======\n`
-    str += `Message: ${msg}\n`
-    str += `Latency: ${latency}\n`
+    str += `Message: ${chalk.yellow(msg.toString())}\n`
+    str += `Latency: ${chalk.green(latency.toString())} ms\n`
     str += `========================\n`
 
     console.log(str)
