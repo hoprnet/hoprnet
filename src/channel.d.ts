@@ -8,12 +8,12 @@ declare namespace Channel {
    * @param counterparty AccountId of the counterparty
    * @param props additional arguments
    */
-  function create<CoreConnector extends HoprCoreConnector, ConcreteSignature extends Signature>(
+  function create<CoreConnector extends HoprCoreConnector, ConcreteChannel extends ChannelType, ConcreteSignature extends Signature>(
     coreConnector: CoreConnector,
     offChainCounterparty: Uint8Array,
     getOnChainPublicKey: (counterparty: Uint8Array) => Promise<Uint8Array>,
     channelBalance?: ChannelBalance,
-    sign?: (channelBalance: ChannelBalance) => Promise<SignedChannel<ConcreteSignature>>
+    sign?: (channelBalance: ChannelBalance) => Promise<SignedChannel<ConcreteChannel, ConcreteSignature>>
   ): Promise<Channel<CoreConnector>>
 
   function isOpen<CoreConnector extends HoprCoreConnector, ConcreteAccountId extends AccountId>(

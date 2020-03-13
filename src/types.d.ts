@@ -44,9 +44,10 @@ declare namespace ChannelBalance {
       offset: number
     },
     struct?: {
-    balance: Balance | BN,
-    balance_a: Balance | BN
-  }): ChannelBalance
+      balance: Balance | BN,
+      balance_a: Balance | BN
+    }
+  ): ChannelBalance
 }
 declare interface ChannelBalance {
   balance: Balance
@@ -94,10 +95,10 @@ declare namespace SignedChannel {
     coreConnector: CoreConnector,
     channel?: ConcreteChannel,
     arr?: { bytes: ArrayBuffer; offset: number }
-  ): Promise<SignedChannel<ConcreteSignature>>
+  ): Promise<SignedChannel<ConcreteChannel, ConcreteSignature>>
 }
-declare interface SignedChannel<ConcreteSignature extends Signature> extends Uint8Array {
-  channel: Channel
+declare interface SignedChannel<ConcreteChannel extends Channel, ConcreteSignature extends Signature> extends Uint8Array {
+  channel: ConcreteChannel
   signature: ConcreteSignature
   signer: Uint8Array
 }
