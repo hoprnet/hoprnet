@@ -1,5 +1,5 @@
 import Hopr from '../../'
-import { HoprCoreConnectorInstance } from '@hoprnet/hopr-core-connector-interface'
+import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 
 import { PROTOCOL_ONCHAIN_KEY } from '../../constants'
 import { AbstractInteraction } from '../abstractInteraction'
@@ -10,7 +10,7 @@ import chalk from 'chalk'
 
 import pipe from 'it-pipe'
 
-class OnChainKey<Chain extends HoprCoreConnectorInstance> implements AbstractInteraction<Chain> {
+class OnChainKey<Chain extends HoprCoreConnector> implements AbstractInteraction<Chain> {
   protocols: string[] = [PROTOCOL_ONCHAIN_KEY]
 
   constructor(public node: Hopr<Chain>) {
@@ -20,7 +20,7 @@ class OnChainKey<Chain extends HoprCoreConnectorInstance> implements AbstractInt
   handler(struct: { stream: any }) {
     pipe(
       /* prettier-ignore */
-      [this.node.paymentChannels.self.keyPair.publicKey],
+      [this.node.paymentChannels.self.onChainKeyPair.publicKey],
       struct.stream
     )
   }

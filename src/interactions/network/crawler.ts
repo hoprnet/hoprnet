@@ -1,5 +1,5 @@
 import Hopr from '../../'
-import { HoprCoreConnectorInstance } from '@hoprnet/hopr-core-connector-interface'
+import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 
 import pipe from 'it-pipe'
 import chalk from 'chalk'
@@ -11,7 +11,7 @@ import PeerInfo from 'peer-info'
 
 import { CrawlResponse, CrawlStatus } from '../../messages'
 
-class Crawler<Chain extends HoprCoreConnectorInstance> implements AbstractInteraction<Chain> {
+class Crawler<Chain extends HoprCoreConnector> implements AbstractInteraction<Chain> {
   protocols: string[] = [PROTOCOL_CRAWLING]
 
   constructor(public node: Hopr<Chain>) {

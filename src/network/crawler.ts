@@ -1,6 +1,6 @@
 import chalk from 'chalk'
 import PeerInfo from 'peer-info'
-import { HoprCoreConnectorInstance } from '@hoprnet/hopr-core-connector-interface'
+import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 
 import { randomSubset, randomInteger, Token, getTokens } from '../utils'
 import { MAX_HOPS, CRAWLING_RESPONSE_NODES } from '../constants'
@@ -10,7 +10,7 @@ import { CrawlResponse, CrawlStatus } from '../messages'
 
 const MAX_PARALLEL_REQUESTS = 4
 
-class Crawler<Chain extends HoprCoreConnectorInstance> {
+class Crawler<Chain extends HoprCoreConnector> {
   constructor(public node: Hopr<Chain>) {}
 
   async crawl(comparator: (peerInfo: PeerInfo) => boolean = () => true): Promise<void> {

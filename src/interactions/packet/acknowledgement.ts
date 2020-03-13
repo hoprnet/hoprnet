@@ -6,7 +6,7 @@ import PeerInfo from 'peer-info'
 
 import chalk from 'chalk'
 
-import { HoprCoreConnectorInstance } from '@hoprnet/hopr-core-connector-interface'
+import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import Hopr from '../../'
 import { Acknowledgement } from '../../messages/acknowledgement'
 
@@ -15,7 +15,7 @@ import EventEmitter from 'events'
 import { PROTOCOL_ACKNOWLEDGEMENT } from '../../constants'
 import { u8aToHex } from '../../utils'
 
-class PacketAcknowledgementInteraction<Chain extends HoprCoreConnectorInstance> extends EventEmitter implements AbstractInteraction<Chain> {
+class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector> extends EventEmitter implements AbstractInteraction<Chain> {
   protocols: string[] = [PROTOCOL_ACKNOWLEDGEMENT]
 
   constructor(public node: Hopr<Chain>) {

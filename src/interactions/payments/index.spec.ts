@@ -10,15 +10,15 @@ import MPLEX = require('libp2p-mplex')
 import SECIO = require('libp2p-secio')
 
 import { Types } from '@hoprnet/hopr-core-polkadot'
-import { HoprCoreConnectorInstance } from '@hoprnet/hopr-core-connector-interface'
+import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import { Interactions } from '..'
 
 import Hopr from '../..'
 import BN from 'bn.js'
 
 describe('test payment (channel) interactions', function() {
-  let Alice: Hopr<HoprCoreConnectorInstance>
-  let Bob: Hopr<HoprCoreConnectorInstance>
+  let Alice: Hopr<HoprCoreConnector>
+  let Bob: Hopr<HoprCoreConnector>
 
   before(async function() {
     Alice = (await libp2p.create({
@@ -28,7 +28,7 @@ describe('test payment (channel) interactions', function() {
         streamMuxer: [MPLEX],
         connEncryption: [SECIO]
       }
-    })) as Hopr<HoprCoreConnectorInstance>
+    })) as Hopr<HoprCoreConnector>
 
     Bob = (await libp2p.create({
       peerInfo: await getPeerInfo({ id: 1 }),
@@ -37,7 +37,7 @@ describe('test payment (channel) interactions', function() {
         streamMuxer: [MPLEX],
         connEncryption: [SECIO]
       }
-    })) as Hopr<HoprCoreConnectorInstance>
+    })) as Hopr<HoprCoreConnector>
 
     await Promise.all([
       /* prettier-ignore */
@@ -47,11 +47,11 @@ describe('test payment (channel) interactions', function() {
 
     Alice.paymentChannels = ({
       types: Types
-    } as unknown) as HoprCoreConnectorInstance
+    } as unknown) as HoprCoreConnector
 
     Bob.paymentChannels = ({
       types: Types
-    } as unknown) as HoprCoreConnectorInstance
+    } as unknown) as HoprCoreConnector
     Alice.interactions = new Interactions(Alice)
     Bob.interactions = new Interactions(Bob)
   })
@@ -74,7 +74,7 @@ describe('test payment (channel) interactions', function() {
           }
         }
       }
-    } as unknown) as HoprCoreConnectorInstance
+    } as unknown) as HoprCoreConnector
 
     assert(
       u8aEquals(
@@ -92,8 +92,8 @@ describe('test payment (channel) interactions', function() {
 
   after(async function () {
     await Promise.all([
-      Alice.stop(),
-      Bob.stop()
+      Alice != null ? Alice.stop() : Promise.resolve(),
+      Bob != null ? Bob.stop() : Promise.resolve()
     ])
   })
 })

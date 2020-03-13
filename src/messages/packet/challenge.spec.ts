@@ -3,7 +3,7 @@ import { Challenge } from './challenge'
 import { Utils, Types } from '@hoprnet/hopr-core-polkadot'
 import BN from 'bn.js'
 import PeerId from 'peer-id'
-import { HoprCoreConnectorInstance } from '@hoprnet/hopr-core-connector-interface'
+import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import { randomBytes } from 'crypto'
 
 describe('test creation & verification of a challenge', function() {
@@ -11,7 +11,7 @@ describe('test creation & verification of a challenge', function() {
     const paymentChannels = ({
       utils: Utils,
       types: Types
-    } as unknown) as HoprCoreConnectorInstance
+    } as unknown) as HoprCoreConnector
 
     const secret = randomBytes(32)
 

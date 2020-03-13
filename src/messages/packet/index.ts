@@ -17,7 +17,7 @@ import { LevelUp } from 'levelup'
 
 import Hopr from '../../'
 
-import { HoprCoreConnectorInstance, Types } from '@hoprnet/hopr-core-connector-interface'
+import HoprCoreConnector,  { Types } from '@hoprnet/hopr-core-connector-interface'
 
 const PRIVATE_KEY_LENGTH = 32
 const OPENING_TIMEOUT = 86400 * 1000
@@ -25,13 +25,13 @@ const OPENING_TIMEOUT = 86400 * 1000
 /**
  * Encapsulates the internal representation of a packet
  */
-export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array {
+export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
   private _targetPeerId: PeerId
   private _senderPeerId: PeerId
   public oldChallenge: Challenge<Chain>
 
   private _header?: Header<Chain>
-  private _ticket?: Types.SignedTicket
+  private _ticket?: Types.SignedTicket<Types.Ticket, Types.Signature>
   private _challenge?: Challenge<Chain>
   private _message?: Message
 
@@ -45,7 +45,7 @@ export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
     },
     struct?: {
       header: Header<Chain>
-      ticket: Types.SignedTicket
+      ticket: Types.SignedTicket<Types.Ticket, Types.Signature>
       challenge: Challenge<Chain>
       message: Message
     }
@@ -73,9 +73,9 @@ export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
     return this._header
   }
 
-  get ticket(): Types.SignedTicket {
+  get ticket(): Types.SignedTicket<Types.Ticket, Types.Signature> {
     if (this._ticket == null) {
-      this._ticket = new this.node.paymentChannels.types.SignedTicket({
+      this._ticket = this.node.paymentChannels.types.SignedTicket.create({
         bytes: this.buffer,
         offset: this.byteOffset + Header.SIZE
       })
@@ -115,7 +115,7 @@ export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
   //     new Challenge(node.paymentChannels, buf.subarray(HeaderSIZE + Transaction.SIZE, HeaderSIZE + Transaction.SIZE + ChallengeSIZE)),
   //     new Message(buf.subarray(HeaderSIZE + Transaction.SIZE + ChallengeSIZE, HeaderSIZE + Transaction.SIZE + ChallengeSIZE + MessageSIZE), true)
 
-  static SIZE<Chain extends HoprCoreConnectorInstance>(hoprCoreConnector: Chain) {
+  static SIZE<Chain extends HoprCoreConnector>(hoprCoreConnector: Chain) {
     return Header.SIZE + hoprCoreConnector.types.SignedTicket.SIZE + Challenge.SIZE(hoprCoreConnector) + Message.SIZE
   }
 
@@ -127,7 +127,7 @@ export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
    * @param path array of peerId that determines the route that
    * the packet takes
    */
-  static async create<Chain extends HoprCoreConnectorInstance>(node: Hopr<Chain>, msg: Uint8Array, path: PeerId[]): Promise<Packet<Chain>> {
+  static async create<Chain extends HoprCoreConnector>(node: Hopr<Chain>, msg: Uint8Array, path: PeerId[]): Promise<Packet<Chain>> {
     const { header, secrets, identifier } = await Header.create(node, path)
 
     console.log('---------- New Packet ----------')
@@ -153,7 +153,7 @@ export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
 
     node.log(`Encrypting with ${node.paymentChannels.utils.hash(u8aXOR(false, deriveTicketKey(secrets[0]), deriveTicketKey(secrets[1]))).toString()}.`)
 
-    const channelBalance = new node.paymentChannels.types.ChannelBalance(node.paymentChannels, {
+    const channelBalance = node.paymentChannels.types.ChannelBalance.create(undefined, {
       balance: new BN(12345),
       balance_a: new BN(123)
     })
@@ -328,7 +328,7 @@ export class Packet<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
     //   throw Error('General error.')
     // }
 
-    const channelBalance = new this.node.paymentChannels.types.ChannelBalance(this.node.paymentChannels, {
+    const channelBalance = this.node.paymentChannels.types.ChannelBalance.create(undefined, {
       balance: new BN(12345),
       balance_a: new BN(123)
     })

@@ -21,9 +21,8 @@ import { encode, decode } from 'rlp'
 const Multihash = require('multihashes')
 import bs58 from 'bs58'
 
-import type { Types, ChannelInstance, HoprCoreConnectorInstance } from '@hoprnet/hopr-core-connector-interface'
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-
+import type  HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
+import type { Types, Channel as ChannelInstance } from '@hoprnet/hopr-core-connector-interface'
 
 import Hopr from './src'
 import { pubKeyToPeerId, addPubKey, u8aToHex } from './src/utils'
@@ -41,13 +40,13 @@ const knownConnectors = [
   ['@hoprnet/hopr-core-polkadot', 'polkadot']
 ]
 
-let node: Hopr<HoprCoreConnectorInstance>,
+let node: Hopr<HoprCoreConnector>,
   funds: Types.Balance,
   ownAddress: Types.AccountId,
   stakedFunds: Types.Balance,
   rl: readline.Interface,
   options,
-  connector: HoprCoreConnector
+  connector: typeof HoprCoreConnector
 
 const SPLIT_OPERAND_QUERY_REGEX: RegExp = /([\w\-]+)(?:\s+)?([\w\s\-.]+)?/
 
@@ -92,7 +91,7 @@ async function checkPeerIdInput(query: string): Promise<PeerId> {
  *
  * @param peerId
  */
-function isBootstrapNode(node: Hopr<HoprCoreConnectorInstance>, peerId: PeerId): boolean {
+function isBootstrapNode(node: Hopr<HoprCoreConnector>, peerId: PeerId): boolean {
   for (let i = 0; i < node.bootstrapServers.length; i++) {
     if (peerId.isEqual(node.bootstrapServers[i].id)) {
       return true
@@ -161,7 +160,7 @@ async function parseOptions(): Promise<void | Options> {
   }
 
   try {
-    connector = (await import(`@hoprnet/hopr-core-${options.network}`)).default
+    connector = (await import(`@hoprnet/hopr-core-${options.network}`)).default as typeof HoprCoreConnector
   } catch (err) {
     console.log(`Could not find <${chalk.red(`@hoprnet/hopr-core-${options.network}`)}>. Please make sure it is available under ./node_modules!\n`)
     await listConnectors()
@@ -243,7 +242,7 @@ async function tabCompletion(line: string, cb: (err: Error, hits: [string[], str
     case 'open':
       node.paymentChannels.channel.getAll(
         node.paymentChannels,
-        async (channel: ChannelInstance) => (await pubKeyToPeerId(channel.offChainCounterparty)).toB58String(),
+        async (channel: ChannelInstance<HoprCoreConnector>) => (await pubKeyToPeerId(channel.offChainCounterparty)).toB58String(),
         async (channelIds: Promise<string>[]) => {
           let peerIdStringSet: Set<string>
 
@@ -279,7 +278,7 @@ async function tabCompletion(line: string, cb: (err: Error, hits: [string[], str
     case 'close':
       node.paymentChannels.channel.getAll(
         node.paymentChannels,
-        async (channel: ChannelInstance) => (await pubKeyToPeerId(channel.offChainCounterparty)).toB58String(),
+        async (channel: ChannelInstance<HoprCoreConnector>) => (await pubKeyToPeerId(channel.offChainCounterparty)).toB58String(),
         async (peerIdPromises: Promise<string>[]) => {
           let peerIdStrings: string[]
           try {
@@ -523,7 +522,7 @@ async function close(query?: string): Promise<any> {
 
   const unsubscribe = startDelayedInterval(`Initiated settlement. Waiting for finalisation`)
 
-  let channel: ChannelInstance
+  let channel: ChannelInstance<HoprCoreConnector>
 
   try {
     channel = await node.paymentChannels.channel
@@ -625,7 +624,7 @@ async function open(query?: string): Promise<void> {
         balance: new BN(12345),
         balance_a: new BN(123)
       }),
-      (balance: ChannelBalance.Instance): Promise<Uint8Array> => node.interactions.payments.open.interact(counterparty, balance)
+      (balance: Types.ChannelBalance): Promise<Types.SignedChannel<Types.Channel, Types.Signature>> => node.interactions.payments.open.interact(counterparty, balance)
     )
 
     console.log(`${chalk.green(`Successfully opened channel`)} ${chalk.yellow(u8aToHex(channelId))}`)
@@ -648,7 +647,7 @@ async function openChannels(): Promise<void> {
   try {
     await node.paymentChannels.channel.getAll(
       node.paymentChannels,
-      async (channel: ChannelInstance) => {
+      async (channel: ChannelInstance<HoprCoreConnector>) => {
         const channelId = await channel.channelId
         if (!channel.counterparty) {
           str += `${chalk.yellow(u8aToHex(channelId))} - ${chalk.gray('pre-opened')}`

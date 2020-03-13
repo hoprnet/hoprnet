@@ -1,5 +1,5 @@
 import Hopr from '../../'
-import { HoprCoreConnectorInstance, Types } from '@hoprnet/hopr-core-connector-interface'
+import HoprCoreConnector, { Types } from '@hoprnet/hopr-core-connector-interface'
 
 import pipe from 'it-pipe'
 
@@ -8,9 +8,8 @@ import { AbstractInteraction } from '../abstractInteraction'
 import { PROTOCOL_PAYMENT_CHANNEL } from '../../constants'
 import PeerInfo from 'peer-info'
 import PeerId from 'peer-id'
-import { u8aToHex } from '../../utils'
 
-class Opening<Chain extends HoprCoreConnectorInstance> implements AbstractInteraction<Chain> {
+class Opening<Chain extends HoprCoreConnector> implements AbstractInteraction<Chain> {
   protocols: string[] = [PROTOCOL_PAYMENT_CHANNEL]
 
   constructor(public node: Hopr<Chain>) {
@@ -26,7 +25,7 @@ class Opening<Chain extends HoprCoreConnectorInstance> implements AbstractIntera
     )
   }
 
-  async interact(counterparty: PeerInfo | PeerId, channelBalance: Types.ChannelBalance): Promise<Types.SignedChannel> {
+  async interact(counterparty: PeerInfo | PeerId, channelBalance: Types.ChannelBalance): Promise<Types.SignedChannel<Types.Channel, Types.Signature>> {
     let struct: {
       stream: any
       protocol: string
@@ -49,7 +48,7 @@ class Opening<Chain extends HoprCoreConnectorInstance> implements AbstractIntera
 
     return await pipe(
       /* prettier-ignore */
-      [(await this.node.paymentChannels.types.SignedChannel.create(this.node.paymentChannels, this.node.paymentChannels.types.Channel.createFunded(channelBalance))).subarray()],
+      [(await this.node.paymentChannels.types.SignedChannel.create(this.node.paymentChannels, undefined, { channel: this.node.paymentChannels.types.Channel.createFunded(channelBalance) })).subarray()],
       struct.stream,
       this.collect.bind(this)
     )
@@ -65,7 +64,7 @@ class Opening<Chain extends HoprCoreConnectorInstance> implements AbstractIntera
       }
     }
 
-    return new this.node.paymentChannels.types.SignedChannel({
+    return this.node.paymentChannels.types.SignedChannel.create(this.node.paymentChannels, {
       bytes: result.buffer,
       offset: result.byteOffset
     })

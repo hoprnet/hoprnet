@@ -6,7 +6,7 @@ import { MAX_HOPS } from '../../../constants'
 
 import { Header, BETA_LENGTH, deriveBlinding, derivePRGParameters, deriveTicketKey, deriveTicketKeyBlinding, deriveTicketLastKey, createMAC } from './index'
 
-import { HoprCoreConnectorInstance } from '@hoprnet/hopr-core-connector-interface'
+import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 
 import Hopr from '../../../'
 
@@ -14,7 +14,7 @@ import PeerId from 'peer-id'
 
 import { PRIVATE_KEY_LENGTH, PER_HOP_SIZE, DESINATION_SIZE, IDENTIFIER_SIZE, ADDRESS_SIZE, MAC_SIZE, LAST_HOP_SIZE, KEY_LENGTH } from './parameters'
 
-export async function createHeader<Chain extends HoprCoreConnectorInstance>(node: Hopr<Chain>, header: Header<Chain>, peerIds: PeerId[]) {
+export async function createHeader<Chain extends HoprCoreConnector>(node: Hopr<Chain>, header: Header<Chain>, peerIds: PeerId[]) {
   function checkPeerIds() {
     if (peerIds.length > MAX_HOPS) {
       throw Error(`Expected at most ${MAX_HOPS} but got ${peerIds.length}`)

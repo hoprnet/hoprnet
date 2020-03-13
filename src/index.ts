@@ -24,7 +24,7 @@ import Stream from 'stream'
 import PeerId from 'peer-id'
 import PeerInfo from 'peer-info'
 
-import HoprCoreConnector, { HoprCoreConnectorInstance } from '@hoprnet/hopr-core-connector-interface'
+import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import { Interactions, Duplex } from './interactions'
 import { DbKeys } from './db_keys'
 
@@ -36,7 +36,7 @@ type HoprOptions = {
   bootstrapNode: boolean
 }
 
-export default class Hopr<Chain extends HoprCoreConnectorInstance> extends libp2p {
+export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
   public interactions: Interactions<Chain>
   public network: Network<Chain>
   public log: Debugger
@@ -122,7 +122,7 @@ export default class Hopr<Chain extends HoprCoreConnectorInstance> extends libp2
    *
    * @param options the parameters
    */
-  static async createNode<Constructor extends HoprCoreConnector>(
+  static async createNode<Constructor extends typeof HoprCoreConnector>(
     HoprCoreConnector: Constructor,
     options?: Partial<HoprOptions> & {
       provider?: string
@@ -142,7 +142,7 @@ export default class Hopr<Chain extends HoprCoreConnectorInstance> extends libp2
       options.id = 6
     }
 
-    let connector: HoprCoreConnectorInstance
+    let connector: HoprCoreConnector
 
     if (options != null && isFinite(options.id)) {
       connector = await HoprCoreConnector.create(db, undefined, options)
@@ -320,7 +320,7 @@ export default class Hopr<Chain extends HoprCoreConnectorInstance> extends libp2
     return randomSubset(array, MAX_HOPS - 1, filter).map((peerInfo: PeerInfo) => peerInfo.id)
   }
 
-  static openDatabase<Constructor extends HoprCoreConnector>(db_dir: string, connector: Constructor, options?: { id?: number; bootstrapNode?: boolean }) {
+  static openDatabase<Constructor extends typeof HoprCoreConnector>(db_dir: string, connector: Constructor, options?: { id?: number; bootstrapNode?: boolean }) {
     db_dir += `/${connector.constants.CHAIN_NAME}/${connector.constants.NETWORK}/`
 
     if (options != null && options.bootstrapNode) {

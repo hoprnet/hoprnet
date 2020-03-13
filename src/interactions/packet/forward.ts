@@ -11,7 +11,7 @@ import PeerInfo from 'peer-info'
 import chalk from 'chalk'
 
 import { AbstractInteraction } from '../abstractInteraction'
-import { HoprCoreConnectorInstance } from '@hoprnet/hopr-core-connector-interface'
+import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import Hopr from '../../'
 import pipe from 'it-pipe'
 
@@ -21,7 +21,7 @@ import { getTokens, Token, randomInteger, u8aToHex } from '../../utils'
 
 const MAX_PARALLEL_JOBS = 20
 
-class PacketForwardInteraction<Chain extends HoprCoreConnectorInstance> implements AbstractInteraction<Chain> {
+class PacketForwardInteraction<Chain extends HoprCoreConnector> implements AbstractInteraction<Chain> {
   private tokens: Token[] = getTokens(MAX_PARALLEL_JOBS)
   private queue: Packet<Chain>[] = []
   private promises: Promise<void>[] = []

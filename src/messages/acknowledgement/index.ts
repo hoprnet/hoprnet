@@ -4,7 +4,7 @@ import { u8aConcat } from '../../utils'
 import { deriveTicketKeyBlinding } from '../packet/header'
 import { KEY_LENGTH } from '../packet/header/parameters'
 import { Challenge } from '../packet/challenge'
-import { HoprCoreConnectorInstance, Types } from '@hoprnet/hopr-core-connector-interface'
+import  HoprCoreConnector, { Types } from '@hoprnet/hopr-core-connector-interface'
 import PeerId from 'peer-id'
 
 /**
@@ -12,7 +12,7 @@ import PeerId from 'peer-id'
  * and allows that party to compute the key that is necessary to redeem
  * the previously received transaction.
  */
-class Acknowledgement<Chain extends HoprCoreConnectorInstance> extends Uint8Array {
+class Acknowledgement<Chain extends HoprCoreConnector> extends Uint8Array {
   private _responseSigningParty: Uint8Array
   private _hashedKey: Uint8Array
 
@@ -80,7 +80,7 @@ class Acknowledgement<Chain extends HoprCoreConnectorInstance> extends Uint8Arra
   }
 
   get responseSignature(): Types.Signature {
-    return new this.paymentChannels.types.Signature({
+    return this.paymentChannels.types.Signature.create({
       bytes: this.buffer,
       offset: this.byteOffset + KEY_LENGTH + Challenge.SIZE(this.paymentChannels)
     })
@@ -119,7 +119,7 @@ class Acknowledgement<Chain extends HoprCoreConnectorInstance> extends Uint8Arra
    * @param derivedSecret the secret that is used to create the second key half
    * @param signer contains private key
    */
-  static async create<Chain extends HoprCoreConnectorInstance>(
+  static async create<Chain extends HoprCoreConnector>(
     hoprCoreConnector: Chain,
     challenge: Challenge<Chain>,
     derivedSecret: Uint8Array,
@@ -136,7 +136,7 @@ class Acknowledgement<Chain extends HoprCoreConnectorInstance> extends Uint8Arra
     return ack.sign(signer)
   }
 
-  static SIZE<Chain extends HoprCoreConnectorInstance>(hoprCoreConnector: Chain): number {
+  static SIZE<Chain extends HoprCoreConnector>(hoprCoreConnector: Chain): number {
     return KEY_LENGTH + Challenge.SIZE(hoprCoreConnector) + hoprCoreConnector.types.Signature.SIZE
   }
 }

@@ -3,11 +3,11 @@ import { PaymentInteractions } from './payments'
 import { NetworkInteractions } from './network'
 import { PacketInteractions } from './packet'
 
-import { HoprCoreConnectorInstance } from '@hoprnet/hopr-core-connector-interface'
+import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 
 export { Duplex, Sink, Source } from './abstractInteraction'
 
-class Interactions<Chain extends HoprCoreConnectorInstance> {
+class Interactions<Chain extends HoprCoreConnector> {
   public payments: PaymentInteractions<Chain>
   public network: NetworkInteractions<Chain>
   public packet: PacketInteractions<Chain>

@@ -1,7 +1,7 @@
 import secp256k1 from 'secp256k1'
 import PeerId from 'peer-id'
 
-import { HoprCoreConnectorInstance, Types } from '@hoprnet/hopr-core-connector-interface'
+import HoprCoreConnector, { Types } from '@hoprnet/hopr-core-connector-interface'
 
 import BN from 'bn.js'
 
@@ -12,7 +12,7 @@ const KEY_LENGTH = 32
  * the proposed funds in case the the next downstream node responds with an
  * inappropriate acknowledgement.
  */
-export class Challenge<Chain extends HoprCoreConnectorInstance> extends Uint8Array {
+export class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
   // private : Uint8Array
   private paymentChannels: Chain
   private _hashedKey: Uint8Array
@@ -41,7 +41,7 @@ export class Challenge<Chain extends HoprCoreConnectorInstance> extends Uint8Arr
   }
 
   get challengeSignature(): Types.Signature {
-    return new this.paymentChannels.types.Signature({
+    return this.paymentChannels.types.Signature.create({
       bytes: this.buffer,
       offset: this.byteOffset
     })
@@ -55,7 +55,7 @@ export class Challenge<Chain extends HoprCoreConnectorInstance> extends Uint8Arr
     return this.paymentChannels.utils.hash(this.challengeSignature)
   }
 
-  static SIZE<Chain extends HoprCoreConnectorInstance>(paymentChannels: Chain): number {
+  static SIZE<Chain extends HoprCoreConnector>(paymentChannels: Chain): number {
     return paymentChannels.types.Signature.SIZE
   }
 
@@ -114,7 +114,7 @@ export class Challenge<Chain extends HoprCoreConnectorInstance> extends Uint8Arr
    * @param hashedKey that is used to generate the key half
    * @param fee
    */
-  static create<Chain extends HoprCoreConnectorInstance>(hoprCoreConnector: Chain, hashedKey: Uint8Array, fee: BN): Challenge<Chain> {
+  static create<Chain extends HoprCoreConnector>(hoprCoreConnector: Chain, hashedKey: Uint8Array, fee: BN): Challenge<Chain> {
     if (hashedKey.length != KEY_LENGTH) {
       throw Error(`Invalid secret format. Expected a ${Uint8Array.name} of ${KEY_LENGTH} elements but got one with ${hashedKey.length}`)
     }

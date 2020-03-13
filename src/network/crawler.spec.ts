@@ -11,13 +11,13 @@ import Debug from 'debug'
 import chalk from 'chalk'
 
 import Hopr from '..'
-import { HoprCoreConnectorInstance } from '@hoprnet/hopr-core-connector-interface'
+import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import { Interactions } from '../interactions'
 import { Crawler } from './crawler'
 import Multiaddr from 'multiaddr'
 
 describe('test crawler', function() {
-  async function generateNode(): Promise<Hopr<HoprCoreConnectorInstance>> {
+  async function generateNode(): Promise<Hopr<HoprCoreConnector>> {
     const node = (await libp2p.create({
       peerInfo: await PeerInfo.create(await PeerId.create({ keyType: 'secp256k1' })),
       modules: {
@@ -25,7 +25,7 @@ describe('test crawler', function() {
         streamMuxer: [MPLEX],
         connEncryption: [SECIO]
       }
-    })) as Hopr<HoprCoreConnectorInstance>
+    })) as Hopr<HoprCoreConnector>
 
     node.peerInfo.multiaddrs.add(Multiaddr('/ip4/0.0.0.0/tcp/0'))
 
@@ -41,7 +41,7 @@ describe('test crawler', function() {
 
     node.log = Debug(`${chalk.blue(node.peerInfo.id.toB58String())}: `)
 
-    return (node as unknown) as Hopr<HoprCoreConnectorInstance>
+    return (node as unknown) as Hopr<HoprCoreConnector>
   }
 
   it('should crawl the network and find some nodes', async function() {

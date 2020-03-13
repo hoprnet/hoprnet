@@ -1,5 +1,5 @@
 import Hopr from '..'
-import { HoprCoreConnectorInstance } from '@hoprnet/hopr-core-connector-interface'
+import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 
 export type Sink = (source: AsyncIterable<Uint8Array>) => void
 
@@ -10,7 +10,7 @@ export type Duplex = {
   source: Source
 }
 
-interface AbstractInteraction<Chain extends HoprCoreConnectorInstance> {
+interface AbstractInteraction<Chain extends HoprCoreConnector> {
   protocols: string[]
   node: Hopr<Chain>
 

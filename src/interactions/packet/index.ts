@@ -1,10 +1,10 @@
 import Hopr from '../..'
-import { HoprCoreConnectorInstance } from '@hoprnet/hopr-core-connector-interface'
+import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 
 import { PacketForwardInteraction } from './forward'
 import { PacketAcknowledgementInteraction } from './acknowledgement'
 
-class PacketInteractions<Chain extends HoprCoreConnectorInstance> {
+class PacketInteractions<Chain extends HoprCoreConnector> {
   acknowledgment: PacketAcknowledgementInteraction<Chain>
   forward: PacketForwardInteraction<Chain>
 

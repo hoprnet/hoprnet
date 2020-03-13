@@ -34,7 +34,7 @@ const HASH_KEY_TX_LAST = 'Tx_Last'
 
 const TAG_SIZE = 16
 
-import { HoprCoreConnectorInstance } from '@hoprnet/hopr-core-connector-interface'
+import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 
 export type CipherParameters = {
   key: Uint8Array
@@ -46,7 +46,7 @@ export type PRGParameters = {
   iv: Uint8Array
 }
 
-export class Header<Chain extends HoprCoreConnectorInstance> extends Uint8Array {
+export class Header<Chain extends HoprCoreConnector> extends Uint8Array {
   tmpData?: Uint8Array
   derivedSecretLastNode?: Uint8Array
 
@@ -173,7 +173,7 @@ export class Header<Chain extends HoprCoreConnectorInstance> extends Uint8Array 
     return COMPRESSED_PUBLIC_KEY_LENGTH + BETA_LENGTH + MAC_SIZE
   }
 
-  static async create<Chain extends HoprCoreConnectorInstance>(
+  static async create<Chain extends HoprCoreConnector>(
     node: Hopr<Chain>,
     peerIds: PeerId[]
   ): Promise<{

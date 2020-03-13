@@ -3,16 +3,16 @@ import { Header, deriveBlinding, deriveCipherParameters, deriveTagParameters, cr
 import { Utils } from '@hoprnet/hopr-core-polkadot'
 import PeerId from 'peer-id'
 import Hopr from '../../../'
-import { HoprCoreConnectorInstance } from '@hoprnet/hopr-core-connector-interface'
+import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import { randomBytes } from 'crypto'
 import secp256k1 from 'secp256k1'
 
 describe('test creation & transformation of a header', async function() {
   async function createAndDecomposeHeader(
-    node: Hopr<HoprCoreConnectorInstance>,
+    node: Hopr<HoprCoreConnector>,
     peerIds: PeerId[]
-  ): Promise<{ header: Header<HoprCoreConnectorInstance>; identifier: Uint8Array; secrets: Uint8Array[] }> {
-    const { header, identifier, secrets } = await Header.create<HoprCoreConnectorInstance>(node, peerIds)
+  ): Promise<{ header: Header<HoprCoreConnector>; identifier: Uint8Array; secrets: Uint8Array[] }> {
+    const { header, identifier, secrets } = await Header.create<HoprCoreConnector>(node, peerIds)
 
     for (let i = 0; i < peerIds.length - 1; i++) {
       header.deriveSecret(peerIds[i].privKey.marshal())
@@ -30,12 +30,12 @@ describe('test creation & transformation of a header', async function() {
     return { header, identifier, secrets }
   }
 
-  function getNode(): Hopr<HoprCoreConnectorInstance> {
+  function getNode(): Hopr<HoprCoreConnector> {
     const node = ({
       paymentChannels: {
         utils: Utils
       }
-    } as unknown) as Hopr<HoprCoreConnectorInstance>
+    } as unknown) as Hopr<HoprCoreConnector>
 
     return node
   }
