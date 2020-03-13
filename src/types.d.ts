@@ -93,8 +93,11 @@ declare namespace SignedChannel {
 
   function create<CoreConnector extends HoprCoreConnector, ConcreteChannel extends Channel, ConcreteSignature extends Signature>(
     coreConnector: CoreConnector,
-    channel?: ConcreteChannel,
-    arr?: { bytes: ArrayBuffer; offset: number }
+    arr?: { bytes: ArrayBuffer; offset: number },
+    struct?: {
+      channel: ConcreteChannel,
+      signature?: ConcreteSignature
+    }
   ): Promise<SignedChannel<ConcreteChannel, ConcreteSignature>>
 }
 declare interface SignedChannel<ConcreteChannel extends Channel, ConcreteSignature extends Signature> extends Uint8Array {
