@@ -12,7 +12,7 @@ import {
   State,
   Channel as ChannelType
 } from '../types'
-import { ChannelStatus } from '../types/Channel'
+import { ChannelStatus } from '../types/channel'
 import { HASH_LENGTH } from '../constants'
 import { u8aToHex, u8aXOR, toU8a, stringToU8a, u8aEquals } from '../core/u8a'
 import { waitForConfirmation } from '../utils'

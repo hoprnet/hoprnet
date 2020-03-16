@@ -1,5 +1,5 @@
 import assert from 'assert'
-import BNE from './BNE'
+import BNE from './bne'
 
 describe('test BNE', function() {
   it('should returns a Uint8Array', function() {

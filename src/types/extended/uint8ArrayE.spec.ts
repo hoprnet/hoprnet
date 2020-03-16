@@ -1,5 +1,5 @@
 import assert from 'assert'
-import Uint8ArrayE from './Uint8ArrayE'
+import Uint8ArrayE from './uint8ArrayE'
 
 describe('test Uint8ArrayE', function() {
   const arr = new Uint8ArrayE([1, 2, 3, 4, 5])

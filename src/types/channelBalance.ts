@@ -1,6 +1,6 @@
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import { Uint8ArrayE } from '../types/extended'
-import Balance from './Balance'
+import Balance from './balance'
 import { u8aConcat } from '../core/u8a'
 
 class ChannelBalance extends Uint8ArrayE implements Types.ChannelBalance {
