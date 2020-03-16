@@ -9,40 +9,38 @@ const COMPRESSED_PUBLIC_KEY_LENGTH = 33
 const KEY_LENGTH = 32
 
 import { pubKeyToPeerId } from './utils'
-import PeerId = require('peer-id')
+import type PeerId from 'peer-id'
 
-class DbKeys {
-  AcknowledgedTickets(publicKeyCounterparty: Uint8Array, id: Uint8Array): Uint8Array {
-    return allocationHelper([
-      [PREFIX.length, PREFIX],
-      [acknowledgedSubPrefix.length, acknowledgedSubPrefix],
-      [publicKeyCounterparty.length, publicKeyCounterparty],
-      [SEPERATOR.length, SEPERATOR],
-      [id.length, id]
-    ])
-  }
+export function AcknowledgedTickets(publicKeyCounterparty: Uint8Array, id: Uint8Array): Uint8Array {
+  return allocationHelper([
+    [PREFIX.length, PREFIX],
+    [acknowledgedSubPrefix.length, acknowledgedSubPrefix],
+    [publicKeyCounterparty.length, publicKeyCounterparty],
+    [SEPERATOR.length, SEPERATOR],
+    [id.length, id]
+  ])
+}
 
-  UnAcknowledgedTickets(publicKeyCounterparty: Uint8Array, id: Uint8Array): Uint8Array {
-    return allocationHelper([
-      [PREFIX.length, PREFIX],
-      [unAcknowledgedSubPrefix.length, unAcknowledgedSubPrefix],
-      [COMPRESSED_PUBLIC_KEY_LENGTH, publicKeyCounterparty],
-      [SEPERATOR.length, SEPERATOR],
-      [id.length, id]
-    ])
-  }
+export function UnAcknowledgedTickets(publicKeyCounterparty: Uint8Array, id: Uint8Array): Uint8Array {
+  return allocationHelper([
+    [PREFIX.length, PREFIX],
+    [unAcknowledgedSubPrefix.length, unAcknowledgedSubPrefix],
+    [COMPRESSED_PUBLIC_KEY_LENGTH, publicKeyCounterparty],
+    [SEPERATOR.length, SEPERATOR],
+    [id.length, id]
+  ])
+}
 
-  async UnAcknowledgedTicketsParse(arg: Uint8Array): Promise<[PeerId, Uint8Array]> {
-    return [
-      await pubKeyToPeerId(
-        arg.slice(PREFIX.length + unAcknowledgedSubPrefix.length, PREFIX.length + unAcknowledgedSubPrefix.length + COMPRESSED_PUBLIC_KEY_LENGTH)
-      ),
-      arg.slice(
-        PREFIX.length + unAcknowledgedSubPrefix.length + COMPRESSED_PUBLIC_KEY_LENGTH + SEPERATOR.length,
-        PREFIX.length + unAcknowledgedSubPrefix.length + COMPRESSED_PUBLIC_KEY_LENGTH + SEPERATOR.length + KEY_LENGTH
-      )
-    ]
-  }
+export async function UnAcknowledgedTicketsParse(arg: Uint8Array): Promise<[PeerId, Uint8Array]> {
+  return [
+    await pubKeyToPeerId(
+      arg.slice(PREFIX.length + unAcknowledgedSubPrefix.length, PREFIX.length + unAcknowledgedSubPrefix.length + COMPRESSED_PUBLIC_KEY_LENGTH)
+    ),
+    arg.slice(
+      PREFIX.length + unAcknowledgedSubPrefix.length + COMPRESSED_PUBLIC_KEY_LENGTH + SEPERATOR.length,
+      PREFIX.length + unAcknowledgedSubPrefix.length + COMPRESSED_PUBLIC_KEY_LENGTH + SEPERATOR.length + KEY_LENGTH
+    )
+  ]
 }
 
 type Config = [number, Uint8Array]
@@ -62,5 +60,3 @@ function allocationHelper(arr: Config[]) {
 
   return result
 }
-
-export { DbKeys }

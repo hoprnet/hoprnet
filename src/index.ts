@@ -26,7 +26,7 @@ import PeerInfo from 'peer-info'
 
 import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import { Interactions, Duplex } from './interactions'
-import { DbKeys } from './db_keys'
+import * as DbKeys from './db_keys'
 
 type HoprOptions = {
   peerInfo: PeerInfo
@@ -40,7 +40,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
   public interactions: Interactions<Chain>
   public network: Network<Chain>
   public log: Debugger
-  public dbKeys: DbKeys = new DbKeys()
+  public dbKeys = DbKeys
   public output: (arr: Uint8Array) => void
 
   // @TODO put this in proper namespace
@@ -320,7 +320,11 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
     return randomSubset(array, MAX_HOPS - 1, filter).map((peerInfo: PeerInfo) => peerInfo.id)
   }
 
-  static openDatabase<Constructor extends typeof HoprCoreConnector>(db_dir: string, connector: Constructor, options?: { id?: number; bootstrapNode?: boolean }) {
+  static openDatabase<Constructor extends typeof HoprCoreConnector>(
+    db_dir: string,
+    connector: Constructor,
+    options?: { id?: number; bootstrapNode?: boolean }
+  ) {
     db_dir += `/${connector.constants.CHAIN_NAME}/${connector.constants.NETWORK}/`
 
     if (options != null && options.bootstrapNode) {

@@ -24,7 +24,7 @@ import Memdown from 'memdown'
 import BN from 'bn.js'
 import HoprPolkadot, { Types } from '@hoprnet/hopr-core-polkadot'
 import { randomBytes } from 'crypto'
-import { DbKeys } from '../../db_keys'
+import * as DbKeys from '../../db_keys'
 import { stringToU8a, u8aEquals, u8aToHex } from '../../utils'
 
 import assert from 'assert'
@@ -131,7 +131,7 @@ describe('check packet forwarding & acknowledgement generation', function() {
     await node.paymentChannels.initOnchainValues()
 
     node.log = Debug(`${chalk.blue(node.peerInfo.id.toB58String())}: `)
-    node.dbKeys = new DbKeys()
+    node.dbKeys = DbKeys
 
     return (node as unknown) as Hopr<HoprPolkadot>
   }

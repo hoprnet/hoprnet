@@ -1,7 +1,3 @@
-'use strict'
-
-const Queue = require('promise-queue')
-
 import { PROTOCOL_STRING, MAX_HOPS } from '../../constants'
 import { Packet } from '../../messages/packet'
 import { Acknowledgement } from '../../messages/acknowledgement'
