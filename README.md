@@ -392,6 +392,10 @@ $ curl https://sh.rustup.rs -sSf | sh
 # Install required build tools
 $ ./scripts/init.sh
 
+# Build the WebAssembly runtime
+# REMARK: Substrate will not work without doing this!
+$ ./scripts/build.sh
+
 # Build Substrate & Substrate module, this might take some time
 $ cargo build 
 
