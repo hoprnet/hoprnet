@@ -22,7 +22,7 @@ import HoprCoreConnector, {
   DbKeys as IDbKeys
 } from '@hoprnet/hopr-core-connector-interface'
 
-export default class HoprEthereumClass implements HoprCoreConnector {
+export default class HoprEthereum implements HoprCoreConnector {
   private _started: boolean = false
   private _nonce?: number
 
@@ -87,7 +87,7 @@ export default class HoprEthereumClass implements HoprCoreConnector {
       secret = await this.utils.hash(secret)
     }
 
-    await this.utils.waitForConfirmation(
+    await utils.waitForConfirmation(
       this.hoprChannels.methods.setHashedSecret(u8aToHex(secret)).send({
         from: u8aToHex(this.account),
         nonce: await this.nonce
@@ -112,7 +112,7 @@ export default class HoprEthereumClass implements HoprCoreConnector {
     db: LevelUp,
     seed?: Uint8Array,
     options?: { id?: number; provider?: string }
-  ): Promise<HoprEthereumClass> {
+  ): Promise<HoprEthereum> {
     const usingSeed = typeof seed !== 'undefined'
     const usingOptions = typeof options !== 'undefined'
 
@@ -130,7 +130,7 @@ export default class HoprEthereumClass implements HoprCoreConnector {
     const hoprChannels = new web3.eth.Contract(HoprChannelsAbi as any, config.DEFAULT_HOPR_CHANNELS_ADDRESS)
     const hoprToken = new web3.eth.Contract(HoprTokenAbi as any, config.DEFAULT_HOPR_TOKEN_ADDRESS)
 
-    return new HoprEthereumClass(
+    return new HoprEthereum(
       db,
       {
         privateKey,

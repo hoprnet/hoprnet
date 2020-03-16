@@ -8,6 +8,7 @@ import BN from "bn.js"
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import { AccountId, Signature, Hash } from "../types"
 import * as constants from '../constants'
+import * as u8a from '../core/u8a'
 
 export function isPartyA(self: Types.AccountId, counterparty:Types.AccountId): boolean {
   return Buffer.compare(self, counterparty) < 0
@@ -47,7 +48,12 @@ export async function pubKeyToAccountId(pubKey: Uint8Array): Promise<Types.Accou
       }. Got '${typeof pubKey}'${pubKey.length ? ` of length ${pubKey.length}` : ''}.`
     )
 
-  return new AccountId(publicKeyConvert(pubKey, false).slice(1))
+    // TODO: simplify
+    return hash(publicKeyConvert(pubKey, false).slice(1))
+      .then(v => u8a.u8aToHex(v))
+      .then(v => v.replace(/(0x)[0-9a-fA-F]{24}([0-9a-fA-F]{20})/, '$1$2'))
+      .then(v => u8a.stringToU8a(v))
+      .then(v => new AccountId(v))
 }
 
 export function hashSync(msg: Uint8Array): Types.Hash {

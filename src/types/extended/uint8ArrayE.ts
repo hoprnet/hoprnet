@@ -1,4 +1,4 @@
-import { u8aToHex } from '../../core/u8a'
+import { u8aToHex, u8aEquals } from '../../core/u8a'
 
 class Uint8ArrayE extends Uint8Array {
   // TODO: verify jf it's correct
@@ -12,6 +12,10 @@ class Uint8ArrayE extends Uint8Array {
 
   toHex() {
     return u8aToHex(this)
+  }
+
+  eq(b: Uint8Array) {
+    return u8aEquals(this, b)
   }
 }
 
