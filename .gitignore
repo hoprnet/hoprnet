@@ -14,9 +14,5 @@ yarn-error.log
 # Exclude db dir
 db/
 
-# Exclude .env files
-.env
-.env.save
-
 # Exclude Typescript builds
 lib/
