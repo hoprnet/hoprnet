@@ -1,4 +1,4 @@
-import type { Channel as IChannel } from '@hoprnet/hopr-core-connector-interface'
+import type { Channel as IChannel, Types } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
 import {
   SignedChannel,
@@ -124,7 +124,7 @@ class Channel implements IChannel<HoprEthereum> {
   private _settlementWindow?: Moment
   private _channelId?: Hash
 
-  ticket = Ticket
+  ticket = Ticket as typeof Types.Ticket
 
   constructor(public coreConnector: HoprEthereum, public counterparty: Uint8Array, signedChannel: SignedChannel) {
     this._signedChannel = signedChannel

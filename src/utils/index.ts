@@ -1,14 +1,15 @@
 import assert from 'assert'
 import { publicKeyConvert, publicKeyCreate, ecdsaSign, ecdsaVerify } from 'secp256k1'
-// @ts-ignore-next-line
-import keccak256 from 'keccak256'
+
+// @ts-ignore
+import keccak256 = require('keccak256')
+
 import { PromiEvent, TransactionReceipt } from 'web3-core'
 import Web3 from 'web3'
 import BN from "bn.js"
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import { AccountId, Signature, Hash } from "../types"
 import * as constants from '../constants'
-import * as u8a from '../core/u8a'
 
 export function isPartyA(self: Types.AccountId, counterparty:Types.AccountId): boolean {
   return Buffer.compare(self, counterparty) < 0
@@ -25,7 +26,7 @@ export function getParties(
   }
 }
 
-export function getId(self: Types.AccountId, counterparty: Types.AccountId) {
+export function getId(self: Types.AccountId, counterparty: Types.AccountId): Promise<Uint8Array> {
   return hash(Buffer.concat(getParties(self, counterparty), 2 * constants.ADDRESS_LENGTH))
 }
 
@@ -48,12 +49,7 @@ export async function pubKeyToAccountId(pubKey: Uint8Array): Promise<Types.Accou
       }. Got '${typeof pubKey}'${pubKey.length ? ` of length ${pubKey.length}` : ''}.`
     )
 
-    // TODO: simplify
-    return hash(publicKeyConvert(pubKey, false).slice(1))
-      .then(v => u8a.u8aToHex(v))
-      .then(v => v.replace(/(0x)[0-9a-fA-F]{24}([0-9a-fA-F]{20})/, '$1$2'))
-      .then(v => u8a.stringToU8a(v))
-      .then(v => new AccountId(v))
+    return new AccountId((await hash(publicKeyConvert(pubKey, false).slice(1))).slice(12))
 }
 
 export function hashSync(msg: Uint8Array): Types.Hash {
@@ -61,7 +57,7 @@ export function hashSync(msg: Uint8Array): Types.Hash {
 }
 
 export async function hash(msg: Uint8Array): Promise<Types.Hash> {
-  return hashSync(msg)
+  return Promise.resolve(hashSync(msg))
 }
 
 export async function sign(msg: Uint8Array, privKey: Uint8Array): Promise<Types.Signature> {
@@ -79,7 +75,7 @@ export async function verify(msg: Uint8Array, signature: Types.Signature, pubKey
   return ecdsaVerify(signature.signature, msg, pubKey)
 }
 
-export function convertUnit(amount: BN, sourceUnit: string, targetUnit: string): BN {
+export function convertUnit(amount: BN, sourceUnit: string, targetUnit: 'eth' | 'wei'): BN {
   assert(['eth', 'wei'].includes(sourceUnit), 'not implemented')
 
   if (sourceUnit === 'eth') {
