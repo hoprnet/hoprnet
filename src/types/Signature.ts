@@ -16,12 +16,12 @@ class Signature extends Uint8ArrayE {
       recovery: number
     }
   ) {
-    if (arr == null && struct != null) {
+    if (arr != null && struct == null) {
+      super(arr.bytes, arr.offset, Signature.SIZE)
+    } else if (arr == null && struct != null) {
       super(u8aConcat(struct.signature, new Uint8Array([struct.recovery])))
-    } else if (arr != null && struct == null) {
-      super(arr.bytes, arr.offset, SIGNATURE_LENGTH)
     } else {
-      throw Error('Invalid constructor arguments.')
+      throw Error(`Invalid constructor arguments.`)
     }
   }
 

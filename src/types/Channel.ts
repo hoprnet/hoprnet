@@ -4,7 +4,7 @@ import { Uint8ArrayE } from '../types/extended'
 import { typedClass } from '../tsc/utils'
 import { u8aConcat } from '../core/u8a'
 
-enum ChannelStatus {
+export enum ChannelStatus {
   UNINITIALISED,
   FUNDING,
   OPEN,

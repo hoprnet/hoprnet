@@ -54,8 +54,12 @@ export const pubKeyToAddress: Utils['pubKeyToAccountId'] = async function pubKey
 }
 export const pubKeyToAccountId: Utils['pubKeyToAccountId'] = pubKeyToAddress
 
-export const hash: Utils['hash'] = async function hash(msg) {
+export const _hash = function _hash(msg: Uint8Array) {
   return new Uint8Array(keccak256(Buffer.from(msg)))
+}
+
+export const hash: Utils['hash'] = async function hash(msg) {
+  return _hash(msg)
 }
 
 export const sign: Utils['sign'] = async function sign(msg, privKey) {

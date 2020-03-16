@@ -1,11 +1,11 @@
 import secp256k1 from 'secp256k1'
 import TypeConstructors from '@hoprnet/hopr-core-connector-interface/src/types'
-import { Signature, Channel, ChannelBalance } from '.'
+import { Signature, Channel } from '.'
 import { typedClass } from '../tsc/utils'
 import { u8aConcat } from '../core/u8a'
 import { Uint8ArrayE } from '../types/extended'
 import { AccountId } from '../types'
-import { sign, verify } from '../utils'
+import { sign, verify, _hash } from '../utils'
 import HoprEthereum from '..'
 
 @typedClass<TypeConstructors['SignedChannel']>()
@@ -59,7 +59,9 @@ class SignedChannel extends Uint8ArrayE {
   }
 
   get signer() {
-    return new AccountId(secp256k1.ecdsaRecover(this.signature.signature, this.signature.recovery, this.channel))
+    return new AccountId(
+      secp256k1.ecdsaRecover(this.signature.signature, this.signature.recovery, _hash(this.channel.toU8a()))
+    )
   }
 
   async verify(coreConnector: HoprEthereum) {
@@ -67,7 +69,7 @@ class SignedChannel extends Uint8ArrayE {
   }
 
   static get SIZE() {
-    return Signature.SIZE + ChannelBalance.SIZE + 1
+    return Signature.SIZE + Channel.SIZE
   }
 
   static async create(
@@ -79,21 +81,31 @@ class SignedChannel extends Uint8ArrayE {
     }
   ): Promise<SignedChannel> {
     const signature = await sign(
-      await coreConnector.utils.hash(channel.toU8a()),
+      _hash(channel.toU8a()),
       coreConnector.self.privateKey,
       coreConnector.self.publicKey
-    )
+    ).then(s => {
+      return new Signature({
+        bytes: s.buffer,
+        offset: s.byteOffset
+      })
+    })
 
-    if (arr != null) {
-      const signedChannel = new SignedChannel(arr)
-      signedChannel.signature.set(signature, 0)
-      signedChannel.set(channel.toU8a(), Signature.SIZE)
+    console.log({
+      signature: signature.length,
+      channel: channel.length
+    })
 
-      return signedChannel
-    }
+    // if (arr != null) {
+    //   const signedChannel = new SignedChannel(arr)
+    //   signedChannel.signature.set(signature, 0)
+    //   signedChannel.set(channel.toU8a(), Signature.SIZE)
+
+    //   return signedChannel
+    // }
 
     return new SignedChannel(undefined, {
-      signature: signature as Signature,
+      signature,
       channel
     })
   }
