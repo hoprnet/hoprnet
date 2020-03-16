@@ -1,19 +1,19 @@
-import { Utils, Types } from '@hoprnet/hopr-core-connector-interface'
 import assert from 'assert'
 import { publicKeyConvert, publicKeyCreate, ecdsaSign, ecdsaVerify } from 'secp256k1'
 // @ts-ignore-next-line
 import keccak256 from 'keccak256'
-import { PromiEvent } from 'web3-core'
+import { PromiEvent, TransactionReceipt } from 'web3-core'
 import Web3 from 'web3'
+import BN from "bn.js"
+import type { Types } from '@hoprnet/hopr-core-connector-interface'
+import { AccountId, Signature, Hash } from "../types"
 import * as constants from '../constants'
-import { Signature } from '../types'
-import { stringToU8a, u8aToHex } from '../core/u8a'
 
-export const isPartyA: Utils['isPartyA'] = function isPartyA(self, counterparty) {
+export function isPartyA(self: Types.AccountId, counterparty:Types.AccountId): boolean {
   return Buffer.compare(self, counterparty) < 0
 }
 
-export const getParties = function getParties(
+export function getParties(
   self: Types.AccountId,
   counterparty: Types.AccountId
 ): [Types.AccountId, Types.AccountId] {
@@ -24,11 +24,11 @@ export const getParties = function getParties(
   }
 }
 
-export const getId: Utils['getId'] = function getId(self, counterparty) {
+export function getId(self: Types.AccountId, counterparty: Types.AccountId) {
   return hash(Buffer.concat(getParties(self, counterparty), 2 * constants.ADDRESS_LENGTH))
 }
 
-export const privKeyToPubKey = async function privKeyToPubKey(privKey: Uint8Array): Promise<Uint8Array> {
+export async function privKeyToPubKey(privKey: Uint8Array): Promise<Uint8Array> {
   if (privKey.length != constants.PRIVATE_KEY_LENGTH)
     throw Error(
       `Invalid input parameter. Expected a Buffer of size ${constants.PRIVATE_KEY_LENGTH}. Got '${typeof privKey}'${
@@ -39,7 +39,7 @@ export const privKeyToPubKey = async function privKeyToPubKey(privKey: Uint8Arra
   return publicKeyCreate(privKey)
 }
 
-export const pubKeyToAddress: Utils['pubKeyToAccountId'] = async function pubKeyToAddress(pubKey) {
+export async function pubKeyToAccountId(pubKey: Uint8Array): Promise<Types.AccountId> {
   if (pubKey.length != constants.COMPRESSED_PUBLIC_KEY_LENGTH)
     throw Error(
       `Invalid input parameter. Expected a Buffer of size ${
@@ -47,22 +47,18 @@ export const pubKeyToAddress: Utils['pubKeyToAccountId'] = async function pubKey
       }. Got '${typeof pubKey}'${pubKey.length ? ` of length ${pubKey.length}` : ''}.`
     )
 
-  return hash(publicKeyConvert(pubKey, false).slice(1))
-    .then(v => u8aToHex(v))
-    .then(v => v.replace(/(0x)[0-9a-fA-F]{24}([0-9a-fA-F]{20})/, '$1$2'))
-    .then(v => stringToU8a(v))
-}
-export const pubKeyToAccountId: Utils['pubKeyToAccountId'] = pubKeyToAddress
-
-export const _hash = function _hash(msg: Uint8Array) {
-  return new Uint8Array(keccak256(Buffer.from(msg)))
+  return new AccountId(publicKeyConvert(pubKey, false).slice(1))
 }
 
-export const hash: Utils['hash'] = async function hash(msg) {
-  return _hash(msg)
+export function hashSync(msg: Uint8Array): Types.Hash {
+  return new Hash(new Uint8Array(keccak256(Buffer.from(msg))))
 }
 
-export const sign: Utils['sign'] = async function sign(msg, privKey) {
+export async function hash(msg: Uint8Array): Promise<Types.Hash> {
+  return hashSync(msg)
+}
+
+export async function sign(msg: Uint8Array, privKey: Uint8Array): Promise<Types.Signature> {
   const result = ecdsaSign(msg, privKey)
 
   const response = new Signature(undefined, {
@@ -73,11 +69,11 @@ export const sign: Utils['sign'] = async function sign(msg, privKey) {
   return response
 }
 
-export const verify: Utils['verify'] = async function verify(msg, signature, pubKey) {
+export async function verify(msg: Uint8Array, signature: Types.Signature, pubKey: Uint8Array): Promise<boolean> {
   return ecdsaVerify(signature.signature, msg, pubKey)
 }
 
-export const convertUnit: Utils['convertUnit'] = function convertUnit(amount, sourceUnit, targetUnit) {
+export function convertUnit(amount: BN, sourceUnit: string, targetUnit: string): BN {
   assert(['eth', 'wei'].includes(sourceUnit), 'not implemented')
 
   if (sourceUnit === 'eth') {
@@ -87,8 +83,8 @@ export const convertUnit: Utils['convertUnit'] = function convertUnit(amount, so
   }
 }
 
-export const waitForConfirmation = async function<T extends PromiEvent<any>>(event: T) {
-  return new Promise((resolve, reject) => {
+export async function waitForConfirmation<T extends PromiEvent<any>>(event: T) {
+  return new Promise<TransactionReceipt>((resolve, reject) => {
     return event
       .once('confirmation', (confNumber, receipt) => {
         resolve(receipt)

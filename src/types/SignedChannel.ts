@@ -1,15 +1,13 @@
+import type { Types } from "@hoprnet/hopr-core-connector-interface"
 import secp256k1 from 'secp256k1'
-import TypeConstructors from '@hoprnet/hopr-core-connector-interface/src/types'
 import { Signature, Channel } from '.'
-import { typedClass } from '../tsc/utils'
-import { u8aConcat } from '../core/u8a'
+import { u8aConcat, u8aEquals } from '../core/u8a'
 import { Uint8ArrayE } from '../types/extended'
 import { AccountId } from '../types'
-import { sign, verify, _hash } from '../utils'
+import { sign, verify, hashSync } from '../utils'
 import HoprEthereum from '..'
 
-@typedClass<TypeConstructors['SignedChannel']>()
-class SignedChannel extends Uint8ArrayE {
+class SignedChannel extends Uint8ArrayE implements Types.SignedChannel<Channel, Signature> {
   private _signature?: Signature
   private _channel?: Channel
 
@@ -60,7 +58,7 @@ class SignedChannel extends Uint8ArrayE {
 
   get signer() {
     return new AccountId(
-      secp256k1.ecdsaRecover(this.signature.signature, this.signature.recovery, _hash(this.channel.toU8a()))
+      secp256k1.ecdsaRecover(this.signature.signature, this.signature.recovery, hashSync(this.channel.toU8a()))
     )
   }
 
@@ -74,40 +72,58 @@ class SignedChannel extends Uint8ArrayE {
 
   static async create(
     coreConnector: HoprEthereum,
-    channel: Channel,
     arr?: {
-      bytes: ArrayBuffer
+      bytes: ArrayBuffer,
       offset: number
+    }, struct?: {
+      channel: Channel,
+      signature?: Signature
     }
   ): Promise<SignedChannel> {
-    const signature = await sign(
-      _hash(channel.toU8a()),
-      coreConnector.self.privateKey,
-      coreConnector.self.publicKey
-    ).then(s => {
-      return new Signature({
-        bytes: s.buffer,
-        offset: s.byteOffset
+    let signedChannel: SignedChannel
+    if (arr != null && struct == null) {
+      signedChannel = new SignedChannel(arr)
+
+      if (u8aEquals(signedChannel.signature, new Uint8Array(Signature.SIZE).fill(0x00))) {
+        signedChannel.set(await sign(signedChannel.channel.toU8a(), coreConnector.self.privateKey), 0)
+      }
+    } else if (arr == null && struct != null) {
+      const array = new Uint8Array(SignedChannel.SIZE).fill(0x00)
+      signedChannel = new SignedChannel({
+        bytes: array.buffer,
+        offset: array.byteOffset
       })
-    })
 
-    console.log({
-      signature: signature.length,
-      channel: channel.length
-    })
+      signedChannel.set(struct.channel.toU8a(), Signature.SIZE)
 
-    // if (arr != null) {
-    //   const signedChannel = new SignedChannel(arr)
-    //   signedChannel.signature.set(signature, 0)
-    //   signedChannel.set(channel.toU8a(), Signature.SIZE)
+      if (struct.signature == null || u8aEquals(struct.signature, new Uint8Array(Signature.SIZE).fill(0x00))) {
+        signedChannel.signature.set(await sign(signedChannel.channel.toU8a(), coreConnector.self.privateKey), 0)
+      }
 
-    //   return signedChannel
-    // }
+      if (struct.signature != null) {
+        signedChannel.set(struct.signature, 0)
+      }
+    } else if (arr != null && struct != null) {
+      signedChannel = new SignedChannel(arr)
 
-    return new SignedChannel(undefined, {
-      signature,
-      channel
-    })
+      if (struct.channel != null) {
+        if (!u8aEquals(signedChannel.channel.toU8a(), new Uint8Array(signedChannel.channel.toU8a().length).fill(0x00)) && !signedChannel.channel.eq(struct.channel)) {
+          throw Error(`Argument mismatch. Please make sure the encoded channel in the array is the same as the one given throug struct.`)
+        }
+
+        signedChannel.set(struct.channel.toU8a(), Signature.SIZE)
+      }
+
+      if (struct.signature != null) {
+        signedChannel.set(struct.signature, 0)
+      } else {
+        signedChannel.signature.set(await sign(signedChannel.channel.toU8a(), coreConnector.self.privateKey), 0)
+      }
+    } else {
+      throw Error(`Invalid input parameters.`)
+    }
+
+    return signedChannel
   }
 }
 

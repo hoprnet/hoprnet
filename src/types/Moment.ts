@@ -1,8 +1,6 @@
-import TypeConstructors from '@hoprnet/hopr-core-connector-interface/src/types'
-import { typedClass } from '../tsc/utils'
+import type { Types } from "@hoprnet/hopr-core-connector-interface"
 import { UINT256 } from './solidity'
 
-@typedClass<TypeConstructors['Moment']>()
-class Moment extends UINT256 {}
+class Moment extends UINT256 implements Types.Moment {}
 
 export default Moment

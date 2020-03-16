@@ -1,11 +1,9 @@
-import TypeConstructors from '@hoprnet/hopr-core-connector-interface/src/types'
-import { typedClass } from '../tsc/utils'
+import type { Types } from "@hoprnet/hopr-core-connector-interface"
 import { u8aConcat, u8aToNumber } from '../core/u8a'
 import { Uint8ArrayE } from '../types/extended'
 import { SIGNATURE_LENGTH, SIGNATURE_RECOVERY_LENGTH } from '../constants'
 
-@typedClass<TypeConstructors['Signature']>()
-class Signature extends Uint8ArrayE {
+class Signature extends Uint8ArrayE implements Types.Signature {
   constructor(
     arr?: {
       bytes: ArrayBuffer
@@ -43,6 +41,17 @@ class Signature extends Uint8ArrayE {
 
   static get SIZE() {
     return SIGNATURE_LENGTH + SIGNATURE_RECOVERY_LENGTH
+  }
+
+  static create(    arr?: {
+    bytes: ArrayBuffer
+    offset: number
+  },
+  struct?: {
+    signature: Uint8Array
+    recovery: number
+  }) {
+    return new Signature(arr, struct)
   }
 }
 

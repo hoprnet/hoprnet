@@ -48,7 +48,7 @@ describe('test utils', function() {
     const { privKey, pubKey } = generatePair()
 
     const message = generateMsg()
-    const signature = await utils.sign(message, privKey, pubKey)
+    const signature = await utils.sign(message, privKey)
     assert(await utils.verify(message, signature, pubKey), `check that signature is verifiable`)
 
     message[0] ^= 0xff
@@ -62,7 +62,7 @@ describe('test utils', function() {
   })
 
   it('should get address using public key', async function() {
-    const address = await utils.pubKeyToAddress(pair.pubKey)
+    const address = await utils.pubKeyToAccountId(pair.pubKey)
 
     assert(u8a.u8aEquals(address, pair.address))
   })

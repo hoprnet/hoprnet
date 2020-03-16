@@ -1,12 +1,10 @@
+import type { Types } from "@hoprnet/hopr-core-connector-interface"
 import secp256k1 from 'secp256k1'
-import TypeConstructors from '@hoprnet/hopr-core-connector-interface/src/types'
 import { Signature, Ticket } from '.'
-import { typedClass } from '../tsc/utils'
 import { Uint8ArrayE } from '../types/extended'
 import { u8aConcat } from '../core/u8a'
 
-@typedClass<TypeConstructors['SignedTicket']>()
-class SignedTicket extends Uint8ArrayE {
+class SignedTicket extends Uint8ArrayE implements Types.SignedTicket<Ticket, Signature> {
   private _ticket?: Ticket
   private _signature?: Signature
 
@@ -62,6 +60,19 @@ class SignedTicket extends Uint8ArrayE {
 
   static get SIZE() {
     return Signature.SIZE + Ticket.SIZE
+  }
+
+  static create(
+    arr?: {
+      bytes: Uint8Array
+      offset: number
+    },
+    struct?: {
+      signature: Signature
+      ticket: Ticket
+    }
+  ): SignedTicket {
+    return new SignedTicket(arr, struct)
   }
 
   get signer(): Promise<Uint8Array> {

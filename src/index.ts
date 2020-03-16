@@ -3,11 +3,10 @@ import { randomBytes } from 'crypto'
 import Web3 from 'web3'
 import { LevelUp } from 'levelup'
 import BN from 'bn.js'
-import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import HoprChannelsAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprChannels.json'
 import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
 import Channel from './Channel'
-import DbKeys from './dbKeys'
+import * as dbkeys from './dbKeys'
 import * as types from './types'
 import * as utils from './utils'
 import * as constants from './constants'
@@ -15,10 +14,15 @@ import { u8aToHex, stringToU8a } from './core/u8a'
 import * as config from './config'
 import { HoprChannels } from './tsc/web3/HoprChannels'
 import { HoprToken } from './tsc/web3/HoprToken'
-import { typedClass } from './tsc/utils'
+import HoprCoreConnector, {
+  Utils as IUtils,
+  Types as ITypes,
+  Channel as IChannel,
+  Constants as IConstants,
+  DbKeys as IDbKeys
+} from '@hoprnet/hopr-core-connector-interface'
 
-@typedClass<HoprCoreConnector>()
-export default class HoprEthereumClass {
+export default class HoprEthereumClass implements HoprCoreConnector {
   private _started: boolean = false
   private _nonce?: number
 
@@ -27,6 +31,10 @@ export default class HoprEthereumClass {
     public self: {
       privateKey: Uint8Array
       publicKey: Uint8Array
+      onChainKeyPair: {
+        privateKey?: Uint8Array
+        publicKey?: Uint8Array
+      }
     },
     public account: types.AccountId,
     public web3: Web3,
@@ -34,11 +42,11 @@ export default class HoprEthereumClass {
     public hoprToken: HoprToken
   ) {}
 
-  readonly dbKeys = new DbKeys()
-  readonly utils = utils
-  readonly types = types
-  readonly channel = Channel
-  readonly constants = constants
+  readonly dbKeys = dbkeys as typeof IDbKeys
+  readonly utils = utils as typeof IUtils
+  readonly types = types as typeof ITypes
+  readonly constants = constants as typeof IConstants
+  readonly channel = Channel as typeof IChannel
   readonly CHAIN_NAME = 'HOPR on Ethereum'
 
   get nonce() {
@@ -98,7 +106,7 @@ export default class HoprEthereumClass {
       })
   }
 
-  static readonly constants = constants
+  static readonly constants = constants as typeof IConstants
 
   static async create(
     db: LevelUp,
@@ -126,7 +134,11 @@ export default class HoprEthereumClass {
       db,
       {
         privateKey,
-        publicKey
+        publicKey,
+        onChainKeyPair: {
+          privateKey,
+          publicKey
+        }
       },
       account,
       web3,

@@ -1,19 +1,9 @@
-import TypeConstructors from '@hoprnet/hopr-core-connector-interface/src/types'
+import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import { Uint8ArrayE } from '../types/extended'
-import { typedClass } from '../tsc/utils'
-import { u8aConcat } from '../core/u8a'
 import Balance from './Balance'
+import { u8aConcat } from '../core/u8a'
 
-export type ChannelBalanceConstructorArguments = [
-  any,
-  {
-    balance: Balance
-    balance_a: Balance
-  }
-]
-
-@typedClass<TypeConstructors['ChannelBalance']>()
-class ChannelBalance extends Uint8ArrayE {
+class ChannelBalance extends Uint8ArrayE implements Types.ChannelBalance {
   constructor(
     arr?: {
       bytes: ArrayBuffer
@@ -43,6 +33,17 @@ class ChannelBalance extends Uint8ArrayE {
 
   static get SIZE() {
     return Balance.SIZE + Balance.SIZE
+  }
+
+  static create(    arr?: {
+    bytes: ArrayBuffer
+    offset: number
+  },
+  struct?: {
+    balance: Balance
+    balance_a: Balance
+  }) {
+    return new ChannelBalance(arr, struct)
   }
 }
 

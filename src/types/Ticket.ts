@@ -1,16 +1,14 @@
-import TypeConstructors from '@hoprnet/hopr-core-connector-interface/src/types'
+import type { Types } from "@hoprnet/hopr-core-connector-interface"
 import BN from 'bn.js'
 import { Hash, TicketEpoch, Balance, SignedTicket, Signature } from '.'
 import { Uint8ArrayE } from '../types/extended'
-import { typedClass } from '../tsc/utils'
 import { sign, verify, hash } from '../utils'
 import { stringToU8a, u8aConcat, u8aToHex } from '../core/u8a'
-import Channel from '../Channel'
+import ChannelInstance from '../Channel'
 
 const WIN_PROB = new BN(1)
 
-@typedClass<TypeConstructors['Ticket']>()
-class Ticket extends Uint8ArrayE {
+class Ticket extends Uint8ArrayE implements Types.Ticket {
   constructor(
     arr?: {
       bytes: ArrayBuffer
@@ -92,15 +90,14 @@ class Ticket extends Uint8ArrayE {
   }
 
   static async create(
-    channel: Channel,
+    channel: ChannelInstance,
     amount: Balance,
-    challenge: Hash,
-    privKey: Uint8Array,
-    pubKey: Uint8Array
+    challenge: Hash
   ): Promise<SignedTicket> {
-    const { hashedSecret } = await channel.hoprEthereum.hoprChannels.methods
+    const { hashedSecret } = await channel.coreConnector.hoprChannels.methods
       .accounts(u8aToHex(channel.counterparty))
       .call()
+
     const winProb = new Uint8ArrayE(new BN(new Uint8Array(Hash.SIZE).fill(0xff)).div(WIN_PROB).toArray('le', Hash.SIZE))
     const channelId = await channel.channelId
 
@@ -113,15 +110,18 @@ class Ticket extends Uint8ArrayE {
       winProb: winProb
     })
 
-    const signature = await sign(await ticket.hash, privKey, pubKey)
+    const signature = await sign(await ticket.hash, channel.coreConnector.self.privateKey).then(res => new Signature({
+      bytes: res.buffer,
+      offset: res.byteOffset
+    }))
 
     return new SignedTicket(undefined, {
-      signature: signature as Signature,
+      signature,
       ticket
     })
   }
 
-  static async verify(channel: Channel, signedTicket: SignedTicket): Promise<boolean> {
+  static async verify(channel: ChannelInstance, signedTicket: SignedTicket): Promise<boolean> {
     if ((await channel.currentBalanceOfCounterparty).add(signedTicket.ticket.amount).gt(await channel.balance)) {
       return false
     }

@@ -1,7 +1,6 @@
-import TypeConstructors from '@hoprnet/hopr-core-connector-interface/src/types'
+import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import { ChannelBalance, Moment } from '.'
 import { Uint8ArrayE } from '../types/extended'
-import { typedClass } from '../tsc/utils'
 import { u8aConcat } from '../core/u8a'
 
 export enum ChannelStatus {
@@ -11,8 +10,7 @@ export enum ChannelStatus {
   PENDING
 }
 
-@typedClass<TypeConstructors['Channel']>()
-class Channel extends Uint8ArrayE {
+class Channel extends Uint8ArrayE implements Types.Channel {
   moment?: Moment
 
   constructor(

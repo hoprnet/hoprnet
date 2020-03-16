@@ -1,9 +1,7 @@
-import TypeConstructors from '@hoprnet/hopr-core-connector-interface/src/types'
-import { typedClass } from '../tsc/utils'
+import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import { UINT256 } from './solidity'
 
-@typedClass<TypeConstructors['Balance']>()
-class Balance extends UINT256 {
+class Balance extends UINT256 implements Types.Balance {
   static get SYMBOL(): string {
     return `HOPR`
   }
