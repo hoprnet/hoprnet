@@ -2,7 +2,7 @@ export const HASH_LENGTH = 32
 
 export const SIGNATURE_LENGTH = 64
 
-export const NETWORK = 'mainnet'
+export const NETWORK = 'testnet'
 
 export const CHAIN_NAME = 'ethereum'
 

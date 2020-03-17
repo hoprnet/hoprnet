@@ -429,6 +429,7 @@ class Channel implements IChannel<HoprEthereum> {
       })
       channel = new Channel(hoprEthereum, counterpartyPubKey, signedChannel)
 
+      console.log("waiting for counterparty to fund")
       await onceFundedByCounterparty(hoprEthereum, channelId, counterparty)
 
       console.log('opening')
@@ -500,9 +501,12 @@ class Channel implements IChannel<HoprEthereum> {
   static handleOpeningRequest(
     hoprEthereum: HoprEthereum
   ): (source: AsyncIterable<Uint8Array>) => AsyncIterator<Uint8Array> {
+    console.log("hoprEthereum", hoprEthereum)
     return source => {
-      return (async function*(msgs) {
-        for await (const _msg of msgs) {
+      console.log("source", source)
+      return (async function*() {
+        console.log("msgs", source)
+        for await (const _msg of source) {
           console.log('msg', _msg)
 
           const msg = _msg.slice()
@@ -534,7 +538,7 @@ class Channel implements IChannel<HoprEthereum> {
 
           yield signedChannel.toU8a()
         }
-      })(source)
+      })()
     }
   }
 }

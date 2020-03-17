@@ -1,4 +1,3 @@
-import assert from 'assert'
 import { randomBytes } from 'crypto'
 import Web3 from 'web3'
 import { LevelUp } from 'levelup'
@@ -10,7 +9,7 @@ import * as dbkeys from './dbKeys'
 import * as types from './types'
 import * as utils from './utils'
 import * as constants from './constants'
-import { u8aToHex, stringToU8a } from './core/u8a'
+import { u8aToHex, stringToU8a, u8aEquals } from './core/u8a'
 import * as config from './config'
 import { HoprChannels } from './tsc/web3/HoprChannels'
 import { HoprToken } from './tsc/web3/HoprToken'
@@ -79,22 +78,23 @@ export default class HoprEthereum implements HoprCoreConnector {
   }
 
   async initOnchainValues(nonce?: number) {
-    assert(this.started, 'Module is not yet fully initialised.')
-
     let secret = new Uint8Array(randomBytes(32))
 
-    for (let i = 0; i < 1000; i++) {
+    const dbPromise = this.db.put(Buffer.from(this.dbKeys.OnChainSecret()), secret.slice())
+
+    for (let i = 0; i < 500; i++) {
       secret = await this.utils.hash(secret)
     }
 
-    await utils.waitForConfirmation(
-      this.hoprChannels.methods.setHashedSecret(u8aToHex(secret)).send({
-        from: u8aToHex(this.account),
-        nonce: await this.nonce
-      })
-    )
-
-    await this.db.put(this.dbKeys.OnChainSecret(), secret)
+    await Promise.all([
+      await utils.waitForConfirmation(
+        this.hoprChannels.methods.setHashedSecret(u8aToHex(secret)).send({
+          from: this.account.toHex(),
+          nonce: nonce || (await this.nonce)
+        })
+      ),
+      dbPromise
+    ])
   }
 
   get accountBalance() {
@@ -119,6 +119,11 @@ export default class HoprEthereum implements HoprCoreConnector {
     if (!usingSeed && !usingOptions) {
       throw Error("'seed' or 'options' must be provided")
     }
+    if (usingOptions && options.id > config.DEMO_ACCOUNTS.length) {
+      throw Error(
+        `Unable to find demo account for index '${options.id}'. Please make sure that you have specified enough demo accounts.`
+      )
+    }
 
     const provider = options?.provider || config.DEFAULT_URI
     const privateKey = usingSeed ? seed : stringToU8a(config.DEMO_ACCOUNTS[options.id])
@@ -130,7 +135,7 @@ export default class HoprEthereum implements HoprCoreConnector {
     const hoprChannels = new web3.eth.Contract(HoprChannelsAbi as any, config.DEFAULT_HOPR_CHANNELS_ADDRESS)
     const hoprToken = new web3.eth.Contract(HoprTokenAbi as any, config.DEFAULT_HOPR_TOKEN_ADDRESS)
 
-    return new HoprEthereum(
+    const hoprEthereum = new HoprEthereum(
       db,
       {
         privateKey,
@@ -145,5 +150,49 @@ export default class HoprEthereum implements HoprCoreConnector {
       hoprChannels,
       hoprToken
     )
+
+    if (!(await checkOnChainValues(hoprChannels, db, account))) {
+      await hoprEthereum.initOnchainValues()
+    }
+
+    return hoprEthereum
   }
 }
+
+// TODO: test
+async function checkOnChainValues(hoprChannels: HoprChannels, db: LevelUp, account: types.AccountId) {
+  let offChain: boolean
+  let secret: Uint8Array = new Uint8Array()
+
+  try {
+    secret = await db.get(Buffer.from(dbkeys.OnChainSecret()))
+    offChain = true
+  } catch (err) {
+    if (err.notFound != true) {
+      throw err
+    }
+    offChain = false
+  }
+
+  const onChainSecret = await hoprChannels.methods
+    .accounts(account.toHex())
+    .call()
+    .then(res => res.hashedSecret)
+    .then(stringToU8a)
+  const onChain = !u8aEquals(onChainSecret, new Uint8Array(types.Hash.SIZE).fill(0x00))
+
+  // if (offChain != onChain) {
+  //   if (offChain) {
+  //     await hoprChannels.methods.setHashedSecret(u8aToHex(secret)).send({
+  //       from: account.toHex()
+  //     })
+  //   } else {
+  //     throw Error(`Key is present on-chain but not in our database.`)
+  //   }
+  // }
+
+  return offChain && onChain
+}
+
+export const Types = types
+export const Utils = utils
