@@ -1,3 +1,4 @@
+import BN from "bn.js"
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import { Uint8ArrayE } from '../types/extended'
 import Balance from './balance'
@@ -10,14 +11,14 @@ class ChannelBalance extends Uint8ArrayE implements Types.ChannelBalance {
       offset: number
     },
     struct?: {
-      balance: Balance
-      balance_a: Balance
+      balance: BN | Balance
+      balance_a: BN | Balance
     }
   ) {
     if (arr != null && struct == null) {
       super(arr.bytes, arr.offset, ChannelBalance.SIZE)
     } else if (arr == null && struct != null) {
-      super(u8aConcat(struct.balance.toU8a(), struct.balance_a.toU8a()))
+      super(u8aConcat(new Balance(struct.balance.toString()).toU8a(), new Balance(struct.balance_a.toString()).toU8a()))
     } else {
       throw Error(`Invalid constructor arguments.`)
     }

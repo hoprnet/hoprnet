@@ -80,47 +80,26 @@ class SignedChannel extends Uint8ArrayE implements Types.SignedChannel<Channel, 
       signature?: Signature
     }
   ): Promise<SignedChannel> {
+    const emptySignatureArray = new Uint8Array(Signature.SIZE).fill(0x00)
     let signedChannel: SignedChannel
-    if (arr != null && struct == null) {
-      signedChannel = new SignedChannel(arr)
 
-      if (u8aEquals(signedChannel.signature, new Uint8Array(Signature.SIZE).fill(0x00))) {
-        signedChannel.set(await sign(signedChannel.channel.toU8a(), coreConnector.self.privateKey), 0)
-      }
-    } else if (arr == null && struct != null) {
-      const array = new Uint8Array(SignedChannel.SIZE).fill(0x00)
-      signedChannel = new SignedChannel({
-        bytes: array.buffer,
-        offset: array.byteOffset
+    if (typeof arr !== "undefined") {
+      signedChannel = new SignedChannel(arr)
+    } else if (typeof struct !== "undefined") {
+      signedChannel = new SignedChannel(undefined, {
+        channel: struct.channel,
+        signature: struct.signature || new Signature({
+          bytes: emptySignatureArray.buffer,
+          offset: emptySignatureArray.byteOffset
+        })
       })
-
-      signedChannel.set(struct.channel.toU8a(), Signature.SIZE)
-
-      if (struct.signature == null || u8aEquals(struct.signature, new Uint8Array(Signature.SIZE).fill(0x00))) {
-        signedChannel.signature.set(await sign(signedChannel.channel.toU8a(), coreConnector.self.privateKey), 0)
-      }
-
-      if (struct.signature != null) {
-        signedChannel.set(struct.signature, 0)
-      }
-    } else if (arr != null && struct != null) {
-      signedChannel = new SignedChannel(arr)
-
-      if (struct.channel != null) {
-        if (!u8aEquals(signedChannel.channel.toU8a(), new Uint8Array(signedChannel.channel.toU8a().length).fill(0x00)) && !signedChannel.channel.eq(struct.channel)) {
-          throw Error(`Argument mismatch. Please make sure the encoded channel in the array is the same as the one given throug struct.`)
-        }
-
-        signedChannel.set(struct.channel.toU8a(), Signature.SIZE)
-      }
-
-      if (struct.signature != null) {
-        signedChannel.set(struct.signature, 0)
-      } else {
-        signedChannel.signature.set(await sign(signedChannel.channel.toU8a(), coreConnector.self.privateKey), 0)
-      }
     } else {
       throw Error(`Invalid input parameters.`)
+    }
+
+    if (signedChannel.signature.eq(emptySignatureArray)) {
+      const channelHash = await coreConnector.utils.hash(signedChannel.channel.toU8a())
+      signedChannel.set(await sign(channelHash, coreConnector.self.privateKey), 0)
     }
 
     return signedChannel
