@@ -6,7 +6,7 @@ HOPR is a privacy-preserving messaging protocol that incentivizes users to parti
 
 ## hopr-core-connector-interface
 
-This repo defines the interface between [`hopr-core`](https://github.com/hoprnet/hopr-core) and blockchains that are able to process HOPR incentives. The details of the on-chain logic are left to the implementor and must follow the [whitepaper](https://github.com/hoprnet/hopr-whitepaper), examples are [hopr-polkadot](https://github.com/hoprnet/hopr-polkadot) and [hopr-ethereum](https://github.com/hoprnet/hopr-ethereum).
+This repo defines the interface between [`hopr-core`](https://github.com/hoprnet/hopr-core) and blockchains that are able to process HOPR incentives. The details of the on-chain logic are left to the implementor and must follow the [whitepaper](https://github.com/hoprnet/hopr-whitepaper), examples are [`hopr-polkadot`](https://github.com/hoprnet/hopr-polkadot) and [`hopr-ethereum`](https://github.com/hoprnet/hopr-ethereum).
 
 ## **Chain requirements**
 
