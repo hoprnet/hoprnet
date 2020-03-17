@@ -299,6 +299,24 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
   }
 
   /**
+   * Ping a node.
+   *
+   * @param destination PeerId of the node
+   * @returns latency
+   */
+  async ping(destination: PeerId): Promise<number> {
+    if (!destination) throw Error(`Expecting a non-empty destination.`)
+
+    const latency = await super.ping(destination)
+
+    if (typeof latency === 'undefined') {
+      throw Error('node unreachable')
+    }
+
+    return latency
+  }
+
+  /**
    * Takes a destination and samples randomly intermediate nodes
    * that will relay that message before it reaches its destination.
    *

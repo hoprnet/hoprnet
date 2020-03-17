@@ -197,7 +197,7 @@ async function parseOptions(): Promise<void | Options> {
 }
 
 // Allowed keywords
-const keywords = ['open', 'stake', 'stakedEther', 'unstake', 'send', 'quit', 'crawl', 'openChannels', 'closeAll', 'myAddress', 'balance', 'listConnectors']
+const keywords = ['open', 'stake', 'stakedEther', 'unstake', 'send', 'quit', 'crawl', 'openChannels', 'closeAll', 'myAddress', 'balance', 'listConnectors', 'ping']
 
 /**
  * Completes a given input with possible endings. Used for convenience.
@@ -299,6 +299,21 @@ async function tabCompletion(line: string, cb: (err: Error, hits: [string[], str
         }
       )
       break
+    case 'ping': {
+      const peerInfos: PeerInfo[] = []
+      for (const peerInfo of node.peerStore.peers.values()) {
+        if ((!query || peerInfo.id.toB58String().startsWith(query)) && !isBootstrapNode(node, peerInfo.id)) {
+          peerInfos.push(peerInfo)
+        }
+      }
+
+      if (!peerInfos.length) {
+        console.log(chalk.red(`\nDoesn't know any other node except apart from bootstrap node${node.bootstrapServers.length == 1 ? '' : 's'}!`))
+        return cb(null, [[''], line])
+      }
+
+      return cb(null, [peerInfos.map((peerInfo: PeerInfo) => `ping ${peerInfo.id.toB58String()}`), line])
+    }
     default:
       const hits = keywords.filter(keyword => keyword.startsWith(line))
 
@@ -441,6 +456,9 @@ async function runAsRegularNode() {
         break
       case 'myAddress':
         printMyAddress()
+        break
+      case 'ping':
+        ping(query)
         break
       default:
         console.log(chalk.red('Unknown command!'))
@@ -848,6 +866,42 @@ async function listConnectors(): Promise<void> {
 
   if (rl != null) {
     setTimeout(() => rl.prompt())
+  }
+}
+
+async function ping(query?: string): Promise<void> {
+  if (query == null) {
+    console.log(chalk.red(`Invalid arguments. Expected 'ping <peerId>'. Received '${query}'`))
+    setTimeout(() => {
+      rl.prompt()
+    })
+    return
+  }
+
+  let peerId: PeerId
+  try {
+    peerId = await checkPeerIdInput(query)
+  } catch (err) {
+    console.log(chalk.red(err.message))
+    setTimeout(() => {
+      rl.prompt()
+    })
+    return
+  }
+
+  try {
+    const latency = await node.ping(peerId)
+    console.log(`Pong received in:`, chalk.magenta(String(latency)), `ms`)
+
+    setTimeout(() => {
+      rl.prompt()
+    })
+  } catch (err) {
+    console.log(`Could not ping node. Error was: ${chalk.red(err.message)}`)
+
+    setTimeout(() => {
+      rl.prompt()
+    })
   }
 }
 
