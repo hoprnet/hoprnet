@@ -6,6 +6,7 @@
   "types": "lib/index.d.ts",
   "main": "lib/index.js",
   "scripts": {
+    "postinstall": "yarn build",
     "clean": "rm -rf ./lib",
     "test": "npx mocha",
     "dev": "yarn clean && yarn build:types && tsc -w",
