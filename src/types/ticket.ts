@@ -28,12 +28,12 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
     } else if (arr == null && struct != null) {
       super(
         u8aConcat(
-          struct.channelId.toU8a(),
-          struct.challenge.toU8a(),
-          struct.epoch.toU8a(),
-          struct.amount.toU8a(),
-          struct.winProb.toU8a(),
-          struct.onChainSecret.toU8a()
+          new Hash(struct.channelId).toU8a(),
+          new Hash(struct.challenge).toU8a(),
+          new TicketEpoch(struct.epoch).toU8a(),
+          new Balance(struct.amount).toU8a(),
+          new Hash(struct.winProb).toU8a(),
+          new Hash(struct.onChainSecret).toU8a()
         )
       )
     } else {
@@ -94,8 +94,9 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
     amount: Balance,
     challenge: Hash
   ): Promise<SignedTicket> {
+    const account = await channel.coreConnector.utils.pubKeyToAccountId(channel.counterparty)
     const { hashedSecret } = await channel.coreConnector.hoprChannels.methods
-      .accounts(u8aToHex(channel.counterparty))
+      .accounts(u8aToHex(account))
       .call()
 
     const winProb = new Uint8ArrayE(new BN(new Uint8Array(Hash.SIZE).fill(0xff)).div(WIN_PROB).toArray('le', Hash.SIZE))
@@ -103,11 +104,11 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
 
     const ticket = new Ticket(undefined, {
       channelId: channelId,
-      epoch: new TicketEpoch(new BN(0)),
       challenge: challenge,
+      epoch: new TicketEpoch(0),
+      amount: new Balance(amount.toString()),
+      winProb: winProb,
       onChainSecret: new Uint8ArrayE(stringToU8a(hashedSecret)),
-      amount: amount,
-      winProb: winProb
     })
 
     const signature = await sign(await ticket.hash, channel.coreConnector.self.privateKey).then(res => new Signature({

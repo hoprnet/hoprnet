@@ -55,7 +55,7 @@ export default class HoprEthereum implements HoprCoreConnector {
       }
 
       try {
-        this._nonce = await this.web3.eth.getTransactionCount(u8aToHex(this.account))
+        this._nonce = await this.web3.eth.getTransactionCount(this.account.toHex())
       } catch (error) {
         reject(error)
       }
@@ -151,9 +151,9 @@ export default class HoprEthereum implements HoprCoreConnector {
       hoprToken
     )
 
-    if (!(await checkOnChainValues(hoprChannels, db, account))) {
-      await hoprEthereum.initOnchainValues()
-    }
+    // if (!(await checkOnChainValues(hoprChannels, db, account))) {
+    //   await hoprEthereum.initOnchainValues()
+    // }
 
     return hoprEthereum
   }
@@ -178,7 +178,8 @@ async function checkOnChainValues(hoprChannels: HoprChannels, db: LevelUp, accou
     .accounts(account.toHex())
     .call()
     .then(res => res.hashedSecret)
-    .then(stringToU8a)
+    .then(hashedSecret => stringToU8a(hashedSecret))
+
   const onChain = !u8aEquals(onChainSecret, new Uint8Array(types.Hash.SIZE).fill(0x00))
 
   // if (offChain != onChain) {
