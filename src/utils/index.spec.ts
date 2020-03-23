@@ -44,6 +44,16 @@ describe('test utils', function() {
     )
   })
 
+  it('should sign and verify signer', async function() {
+    const { privKey, pubKey } = generatePair()
+
+    const message = generateMsg()
+    const signature = await utils.sign(message, privKey)
+    const signer = await utils.signer(message, signature)
+
+    assert(u8a.u8aEquals(pubKey, signer), `check that message is signed correctly`)
+  })
+
   it('should sign and verify messages', async function() {
     const { privKey, pubKey } = generatePair()
 

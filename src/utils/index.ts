@@ -1,5 +1,5 @@
 import assert from 'assert'
-import { publicKeyConvert, publicKeyCreate, ecdsaSign, ecdsaVerify } from 'secp256k1'
+import { publicKeyConvert, publicKeyCreate, ecdsaSign, ecdsaRecover, ecdsaVerify } from 'secp256k1'
 
 // @ts-ignore
 import keccak256 = require('keccak256')
@@ -66,10 +66,15 @@ export async function sign(msg: Uint8Array, privKey: Uint8Array): Promise<Types.
 
   const response = new Signature(undefined, {
     signature: result.signature,
-    recovery: result.recovery
+    // @ts-ignore-next-line
+    recovery: result.recid
   })
 
   return response
+}
+
+export async function signer(msg: Uint8Array, signature: Types.Signature): Promise<Uint8Array> {
+  return ecdsaRecover(signature.signature, signature.recovery, msg)
 }
 
 export async function verify(msg: Uint8Array, signature: Types.Signature, pubKey: Uint8Array): Promise<boolean> {

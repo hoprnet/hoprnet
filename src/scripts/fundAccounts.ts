@@ -25,6 +25,7 @@ async function main() {
     await hoprToken.methods.mint(address, AMOUNT).send({
       from: owner
     })
+
     console.log(`funded ${address}`)
   }
 

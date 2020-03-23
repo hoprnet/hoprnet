@@ -3,7 +3,6 @@ import secp256k1 from 'secp256k1'
 import { Signature, Ticket } from '.'
 import { Uint8ArrayE } from '../types/extended'
 import { u8aConcat } from '../core/u8a'
-import { hashSync } from "../utils"
 
 class SignedTicket extends Uint8ArrayE implements Types.SignedTicket<Ticket, Signature> {
   private _ticket?: Ticket
@@ -11,7 +10,7 @@ class SignedTicket extends Uint8ArrayE implements Types.SignedTicket<Ticket, Sig
 
   constructor(
     arr?: {
-      bytes: Uint8Array
+      bytes: ArrayBuffer
       offset: number
     },
     struct?: {
@@ -65,7 +64,7 @@ class SignedTicket extends Uint8ArrayE implements Types.SignedTicket<Ticket, Sig
 
   static create(
     arr?: {
-      bytes: Uint8Array
+      bytes: ArrayBuffer
       offset: number
     },
     struct?: {
@@ -77,14 +76,14 @@ class SignedTicket extends Uint8ArrayE implements Types.SignedTicket<Ticket, Sig
   }
 
   get signer(): Promise<Uint8Array> {
-    let signer: Uint8Array
-
-    try {
-      signer = secp256k1.ecdsaRecover(this.signature.signature, this.signature.recovery, hashSync(this.ticket))
-      return Promise.resolve(signer)
-    } catch (err) {
-      return Promise.reject(err)
-    }
+    return new Promise(async (resolve, reject) => {
+      try {
+        const signer = secp256k1.ecdsaRecover(this.signature.signature, this.signature.recovery, await this.ticket.hash)
+        return resolve(signer)
+      } catch (err) {
+        return reject(err)
+      }
+    })
   }
 }
 

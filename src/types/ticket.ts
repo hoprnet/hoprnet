@@ -73,7 +73,7 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
     return this.amount.mul(new BN(this.winProb)).div(new BN(new Uint8Array(Hash.SIZE).fill(0xff)))
   }
 
-  private get hash() {
+  get hash() {
     return hash(
       u8aConcat(
         this.challenge,
@@ -122,16 +122,17 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
     })
   }
 
+  // TODO: use this
   static async verify(channel: ChannelInstance, signedTicket: SignedTicket): Promise<boolean> {
-    if ((await channel.currentBalanceOfCounterparty).add(signedTicket.ticket.amount).gt(await channel.balance)) {
-      return false
-    }
+    // if ((await channel.currentBalanceOfCounterparty).add(signedTicket.ticket.amount).gt(await channel.balance)) {
+    //   return false
+    // }
 
-    try {
-      await channel.testAndSetNonce(signedTicket)
-    } catch {
-      return false
-    }
+    // try {
+    //   await channel.testAndSetNonce(signedTicket)
+    // } catch {
+    //   return false
+    // }
 
     return verify(await signedTicket.ticket.hash, signedTicket.signature, channel.offChainCounterparty)
   }

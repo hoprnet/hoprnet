@@ -132,6 +132,16 @@ export default class HoprEthereum implements HoprCoreConnector {
 
     const web3 = new Web3(provider)
     const account = new types.AccountId(address)
+
+    // add privkey to web3
+    // TODO: check if this is good practise
+    const web3Accounts = await web3.eth.getAccounts()
+    if (!web3Accounts.includes(account.toHex())) {
+      console.log('adding private key to web3js context')
+      const acc = web3.eth.accounts.privateKeyToAccount(u8aToHex(privateKey))
+      web3.eth.accounts.wallet.add(acc)
+    }
+
     const hoprChannels = new web3.eth.Contract(HoprChannelsAbi as any, config.DEFAULT_HOPR_CHANNELS_ADDRESS)
     const hoprToken = new web3.eth.Contract(HoprTokenAbi as any, config.DEFAULT_HOPR_TOKEN_ADDRESS)
 
@@ -151,21 +161,21 @@ export default class HoprEthereum implements HoprCoreConnector {
       hoprToken
     )
 
-    if (!(await checkOnChainValues(hoprChannels, db, account))) {
-      await hoprEthereum.initOnchainValues()
-    }
+    // if (!(await checkOnChainValues(hoprEthereum))) {
+    //   await hoprEthereum.initOnchainValues()
+    // }
 
     return hoprEthereum
   }
 }
 
 // TODO: test
-async function checkOnChainValues(hoprChannels: HoprChannels, db: LevelUp, account: types.AccountId) {
+async function checkOnChainValues(hoprEthereum: HoprEthereum) {
   let offChain: boolean
   let secret: Uint8Array = new Uint8Array()
 
   try {
-    secret = await db.get(Buffer.from(dbkeys.OnChainSecret()))
+    secret = await hoprEthereum.db.get(Buffer.from(dbkeys.OnChainSecret()))
     offChain = true
   } catch (err) {
     if (err.notFound != true) {
@@ -174,8 +184,8 @@ async function checkOnChainValues(hoprChannels: HoprChannels, db: LevelUp, accou
     offChain = false
   }
 
-  const onChainSecret = await hoprChannels.methods
-    .accounts(account.toHex())
+  const onChainSecret = await hoprEthereum.hoprChannels.methods
+    .accounts(hoprEthereum.account.toHex())
     .call()
     .then(res => res.hashedSecret)
     .then(hashedSecret => stringToU8a(hashedSecret))
@@ -184,8 +194,8 @@ async function checkOnChainValues(hoprChannels: HoprChannels, db: LevelUp, accou
 
   if (offChain != onChain) {
     if (offChain) {
-      await hoprChannels.methods.setHashedSecret(u8aToHex(secret)).send({
-        from: account.toHex()
+      await hoprEthereum.hoprChannels.methods.setHashedSecret(u8aToHex(secret)).send({
+        from: hoprEthereum.account.toHex()
       })
     } else {
       throw Error(`Key is present on-chain but not in our database.`)
