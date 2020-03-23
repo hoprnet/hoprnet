@@ -1,5 +1,4 @@
-// TODO: tryout WS
-export const DEFAULT_URI = 'http://127.0.0.1:9545/'
+export const DEFAULT_URI = 'ws://127.0.0.1:9545/'
 
 export const DEFAULT_HOPR_TOKEN_ADDRESS = '0x0f5Ea0A652E851678Ebf77B69484bFcD31F9459B'
 

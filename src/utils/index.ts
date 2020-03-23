@@ -5,6 +5,7 @@ import { publicKeyConvert, publicKeyCreate, ecdsaSign, ecdsaVerify } from 'secp2
 import keccak256 = require('keccak256')
 
 import { PromiEvent, TransactionReceipt } from 'web3-core'
+import { BlockTransactionString } from 'web3-eth'
 import Web3 from 'web3'
 import BN from "bn.js"
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
@@ -88,11 +89,95 @@ export function convertUnit(amount: BN, sourceUnit: string, targetUnit: 'eth' | 
 export async function waitForConfirmation<T extends PromiEvent<any>>(event: T) {
   return new Promise<TransactionReceipt>((resolve, reject) => {
     return event
-      .once('confirmation', (confNumber, receipt) => {
+      .on('receipt', receipt => {
         resolve(receipt)
       })
-      .once('error', error => {
+      .on('error', error => {
         reject(error)
       })
   })
 }
+
+export async function wait(ms: number) {
+  return new Promise(resolve => {
+    setTimeout(resolve, ms)
+  })
+}
+
+// TODO: only use this during localnet
+export async function advanceBlockAtTime(web3: Web3, time: number) {
+  return new Promise((resolve, reject) => {
+    // @ts-ignore
+    web3.currentProvider.send(
+      {
+        jsonrpc: "2.0",
+        method: "evm_mine",
+        params: [time],
+        id: new Date().getTime(),
+      },
+      async (err: any) => {
+        if (err) {
+          return reject(err);
+        }
+        const newBlock = await web3.eth.getBlock("latest");
+        const newBlockHash = newBlock.hash
+
+        return resolve(newBlockHash);
+      },
+    );
+  });
+};
+
+export async function waitFor({
+  getCurrentBlock,
+  web3,
+  timestamp
+}: {
+  getCurrentBlock: () => Promise<BlockTransactionString>,
+  web3: Web3,
+  timestamp?: number
+  // blockNumber?: number
+}): Promise<void> {
+  const now = await getCurrentBlock().then(block => Number(block.timestamp) * 1e3)
+
+  if (timestamp < now) {
+    return undefined;
+  }
+
+  await advanceBlockAtTime(web3, Math.ceil(timestamp / 1e3) + 1)
+
+  return waitFor({
+    getCurrentBlock,
+    web3,
+    timestamp
+  })
+}
+
+// TODO: production code
+// export async function waitFor({
+//   getCurrentBlock,
+//   timestamp
+// }: {
+//   getCurrentBlock: () => Promise<BlockTransactionString>
+//   timestamp?: number
+//   // blockNumber?: number
+// }): Promise<void> {
+//   const now = await getCurrentBlock().then(block => Number(block.timestamp) * 1e3)
+//   console.log({
+//     now,
+//     timestamp,
+//     diff: now - timestamp
+//   })
+
+//   if (timestamp < now) {
+//     return undefined;
+//   }
+
+//   const diff = (now - timestamp) || 60 * 1e3
+
+//   await wait(diff)
+//   return waitFor({
+//     getCurrentBlock,
+//     timestamp: await getCurrentBlock().then(block => Number(block.timestamp) * 1e3)
+//   })
+// }

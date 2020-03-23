@@ -42,16 +42,14 @@ class Channel extends Uint8ArrayE implements Types.Channel {
   }
 
   get status(): ChannelStatus {
-    const index = Number(this.subarray(ChannelBalance.SIZE, ChannelBalance.SIZE + 1)[0])
+    const n = Number(this.subarray(ChannelBalance.SIZE, ChannelBalance.SIZE + 1)[0])
+    const status = Number(n) % 10
 
-    return index
-    // if (index === 0) return ChannelStatus.UNINITIALISED
-    // else if (index === 1) return ChannelStatus.FUNDING
-    // else if (index === 2) return ChannelStatus.OPEN
-    // else if (index === 3) return ChannelStatus.PENDING
-    // else {
-    //   throw Error("status like this doesn't exist")
-    // }
+    if (status >= Object.keys(ChannelStatus).length) {
+      throw Error("status like this doesn't exist")
+    }
+
+    return status
   }
 
   static get SIZE() {

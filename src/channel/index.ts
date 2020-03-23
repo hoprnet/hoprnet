@@ -15,24 +15,9 @@ import {
 import { ChannelStatus } from '../types/channel'
 import { HASH_LENGTH } from '../constants'
 import { u8aToHex, u8aXOR, toU8a, stringToU8a, u8aEquals } from '../core/u8a'
-import { waitForConfirmation } from '../utils'
+import { waitForConfirmation, waitFor } from '../utils'
 import { HoprChannels as IHoprChannels } from '../tsc/web3/HoprChannels'
 import type HoprEthereum from '..'
-
-// const getSignatureParameters = (signature: string) => {
-//   const r = signature.slice( 0, 66 );
-//   const s = `0x${signature.slice( 66, 130 )}`;
-//   const v = `0x${signature.slice( 130, 132 )}`;
-//   let vN = Web3.utils.hexToNumber(v)
-
-//   if ( ![ 27, 28 ].includes( vN ) ) vN += 27;
-
-//   return {
-//       r,
-//       s,
-//       v: vN
-//   };
-// };
 
 const getChannel = (coreConnector: HoprEthereum, channelId: Hash) => {
   return new Promise<{
@@ -50,10 +35,13 @@ const getChannel = (coreConnector: HoprEthereum, channelId: Hash) => {
   })
 }
 
-const onceOpen = (coreConnector: HoprEthereum, channelId: Hash): Promise<void> => {
+const onceOpen = (coreConnector: HoprEthereum, channelId: Hash) => {
   let event: ReturnType<IHoprChannels['events']['OpenedChannel']>
 
-  return new Promise<void>((resolve, reject) => {
+  return new Promise<{
+    opener: string,
+    counterParty: string
+  }>((resolve, reject) => {
     // TODO: better to filter
     event = coreConnector.hoprChannels.events
       .OpenedChannel()
@@ -65,7 +53,7 @@ const onceOpen = (coreConnector: HoprEthereum, channelId: Hash): Promise<void> =
           return
         }
 
-        resolve()
+        resolve(data.returnValues)
       })
       .on('error', error => {
         reject(error)
@@ -75,10 +63,13 @@ const onceOpen = (coreConnector: HoprEthereum, channelId: Hash): Promise<void> =
   })
 }
 
-const onceClosed = (coreConnector: HoprEthereum, channelId: Hash): Promise<void> => {
+const onceClosed = (coreConnector: HoprEthereum, channelId: Hash) => {
   let event: ReturnType<IHoprChannels['events']['ClosedChannel']>
 
-  return new Promise<void>((resolve, reject) => {
+  return new Promise<{
+    closer: string,
+    counterParty: string,
+  }>((resolve, reject) => {
     // TODO: better to filter
     event = coreConnector.hoprChannels.events
       .ClosedChannel()
@@ -90,7 +81,7 @@ const onceClosed = (coreConnector: HoprEthereum, channelId: Hash): Promise<void>
           return
         }
 
-        resolve()
+        resolve(data.returnValues)
       })
       .on('error', error => {
         reject(error)
@@ -100,36 +91,15 @@ const onceClosed = (coreConnector: HoprEthereum, channelId: Hash): Promise<void>
   })
 }
 
-const onceFundedByCounterparty = (
-  coreConnector: HoprEthereum,
-  channelId: Hash,
-  counterparty: AccountId
-): Promise<void> => {
-  let event: ReturnType<IHoprChannels['events']['FundedChannel']>
+const onOpen = async (coreConnector: HoprEthereum, counterparty: Uint8Array, signedChannel: SignedChannel) => {
+  return coreConnector.db.put(
+    Buffer.from(coreConnector.dbKeys.Channel(counterparty)),
+    Buffer.from(signedChannel)
+  )
+}
 
-  return new Promise<void>((resolve, reject) => {
-    // TODO: better to filter
-    event = coreConnector.hoprChannels.events
-      .FundedChannel()
-      .on('data', async data => {
-        const { recipient, counterParty: _counterparty } = data.returnValues
-        const _channelId = await coreConnector.utils.getId(stringToU8a(recipient), stringToU8a(_counterparty))
-
-        if (!u8aEquals(_channelId, channelId)) {
-          return
-        }
-        if (!u8aEquals(stringToU8a(_counterparty), counterparty)) {
-          return
-        }
-
-        resolve()
-      })
-      .on('error', error => {
-        reject(error)
-      })
-  }).finally(() => {
-    event.removeAllListeners()
-  })
+const onClose = async (coreConnector: HoprEthereum, counterparty: Uint8Array) => {
+  return coreConnector.db.del(Buffer.from(coreConnector.dbKeys.Channel(counterparty)))
 }
 
 class Channel implements IChannel<HoprEthereum> {
@@ -141,14 +111,35 @@ class Channel implements IChannel<HoprEthereum> {
 
   constructor(public coreConnector: HoprEthereum, public counterparty: Uint8Array, signedChannel: SignedChannel) {
     this._signedChannel = signedChannel
+
+    // check if channel still exists
+    this.status.then(status => {
+      if (status === ChannelStatus.UNINITIALISED) {
+        console.log("found channel off-chain but its closed on-chain")
+        this.onClose()
+      }
+    })
+
+    // if channel is closed
+    this.onceClosed().then(async () => {
+      return this.onClose()
+    })
   }
 
-  private async onceOpen(): Promise<void> {
+  private async onceOpen() {
     return onceOpen(this.coreConnector, await this.channelId)
   }
 
-  private async onceClosed(): Promise<void> {
+  private async onceClosed() {
     return onceClosed(this.coreConnector, await this.channelId)
+  }
+
+  private async onOpen(): Promise<void> {
+    return onOpen(this.coreConnector, this.counterparty, this._signedChannel)
+  }
+
+  private async onClose(): Promise<void> {
+    return onClose(this.coreConnector, this.counterparty)
   }
 
   private get channel(): ReturnType<typeof getChannel> {
@@ -156,6 +147,23 @@ class Channel implements IChannel<HoprEthereum> {
       try {
         const response = await getChannel(this.coreConnector, await this.channelId)
         return resolve(response)
+      } catch (error) {
+        return reject(error)
+      }
+    })
+  }
+
+  private get status(): Promise<ChannelStatus> {
+    return new Promise<ChannelStatus>(async (resolve, reject) => {
+      try {
+        const channel = await this.channel
+        const status = Number(channel.stateCounter) % 10
+
+        if (status >= Object.keys(ChannelStatus).length) {
+          throw Error("status like this doesn't exist")
+        }
+
+        return resolve(status)
       } catch (error) {
         return reject(error)
       }
@@ -261,21 +269,53 @@ class Channel implements IChannel<HoprEthereum> {
   }
 
   async initiateSettlement(): Promise<void> {
-    try {
-      const channel = await this.channel
+    let channel = await this.channel
+    const status = await this.status
 
-      if (Number(channel.stateCounter) % 10 === ChannelStatus.PENDING) {
-        await this.onceClosed()
-      } else {
-        await Promise.all([
-          this.onceClosed(),
-          this.coreConnector.hoprChannels.methods
-            .initiateChannelClosure(u8aToHex(await this.coreConnector.utils.pubKeyToAccountId(this.counterparty)))
-            .send({
-              from: this.coreConnector.account.toHex()
-            })
-        ])
+    try {
+      if (!(status === ChannelStatus.OPEN || status === ChannelStatus.PENDING)) {
+        throw Error("channel must be 'open' or 'pending'")
       }
+
+      if (status === ChannelStatus.OPEN) {
+        console.log("ChannelStatus.OPEN")
+        console.log("initiateChannelClosure")
+        await waitForConfirmation(
+          this.coreConnector.hoprChannels.methods
+          .initiateChannelClosure(u8aToHex(await this.coreConnector.utils.pubKeyToAccountId(this.counterparty)))
+          .send({
+            from: this.coreConnector.account.toHex()
+          })
+        )
+
+        channel = await getChannel(this.coreConnector, this._channelId)
+
+        // TODO: update to handle localnet & mainnet
+        await waitFor({
+          getCurrentBlock: () => {
+            return this.coreConnector.web3.eth.getBlockNumber().then(blockNumber => {
+              return this.coreConnector.web3.eth.getBlock(blockNumber)
+            })
+          },
+          web3: this.coreConnector.web3,
+          timestamp: Number(channel.closureTime) * 1e3
+        })
+  
+        console.log("claimChannelClosure")
+        await waitForConfirmation(
+          this.coreConnector.hoprChannels.methods.claimChannelClosure(u8aToHex(await this.coreConnector.utils.pubKeyToAccountId(this.counterparty)))
+          .send({
+            from: this.coreConnector.account.toHex(),
+            gas: 100e3
+          })
+        )
+      } else {
+        console.log("onceClosed")
+        await this.onceClosed()
+      }
+
+      console.log("onclose")
+      await this.onClose()
     } catch (error) {
       throw error
     }
@@ -411,7 +451,10 @@ class Channel implements IChannel<HoprEthereum> {
     // const channelId = new Hash(await hoprEthereum.utils.getId(hoprEthereum.account, counterparty))
     let channel: Channel
 
+    console.log("isOpen?")
+    
     if (await this.isOpen(hoprEthereum, counterpartyPubKey)) {
+      console.log("isOpen")
       const record = await hoprEthereum.db.get(Buffer.from(hoprEthereum.dbKeys.Channel(counterpartyPubKey)))
       signedChannel = new SignedChannel({
         bytes: record.buffer,
@@ -419,6 +462,7 @@ class Channel implements IChannel<HoprEthereum> {
       })
       channel = new Channel(hoprEthereum, counterpartyPubKey, signedChannel)
     } else if (sign != null && channelBalance != null) {
+      console.log("!isOpen")
       const spender = hoprEthereum.hoprChannels.options.address
 
       let amount: Balance
@@ -428,9 +472,12 @@ class Channel implements IChannel<HoprEthereum> {
         amount = new Balance(channelBalance.balance.sub(channelBalance.balance_a))
       }
 
+      console.log("increaseFunds")
       await Channel.increaseFunds(hoprEthereum, new AccountId(stringToU8a(spender)), counterparty, amount)
 
+      console.log("sign")
       signedChannel = await sign(channelBalance)
+      console.log("channel")
       channel = new Channel(hoprEthereum, counterpartyPubKey, signedChannel)
 
       // TODO: use 'fundChannelWithSig'
@@ -543,10 +590,7 @@ class Channel implements IChannel<HoprEthereum> {
           //     return hoprEthereum.db.put(Buffer.from(u8aToHex(hoprEthereum.dbKeys.Channel(counterpartyPubKey))), Buffer.from(signedChannel))
           //   })
 
-          await hoprEthereum.db.put(
-            Buffer.from(hoprEthereum.dbKeys.Channel(counterpartyPubKey)),
-            Buffer.from(signedChannel)
-          )
+          await onOpen(hoprEthereum, counterpartyPubKey, signedChannel)
 
           yield signedChannel.toU8a()
         }
@@ -556,3 +600,51 @@ class Channel implements IChannel<HoprEthereum> {
 }
 
 export default Channel
+
+// TODO: remove this
+// const getSignatureParameters = (signature: string) => {
+//   const r = signature.slice( 0, 66 );
+//   const s = `0x${signature.slice( 66, 130 )}`;
+//   const v = `0x${signature.slice( 130, 132 )}`;
+//   let vN = Web3.utils.hexToNumber(v)
+
+//   if ( ![ 27, 28 ].includes( vN ) ) vN += 27;
+
+//   return {
+//       r,
+//       s,
+//       v: vN
+//   };
+// };
+
+// const onceFundedByCounterparty = (
+//   coreConnector: HoprEthereum,
+//   channelId: Hash,
+//   counterparty: AccountId
+// ): Promise<void> => {
+//   let event: ReturnType<IHoprChannels['events']['FundedChannel']>
+
+//   return new Promise<void>((resolve, reject) => {
+//     // TODO: better to filter
+//     event = coreConnector.hoprChannels.events
+//       .FundedChannel()
+//       .on('data', async data => {
+//         const { recipient, counterParty: _counterparty } = data.returnValues
+//         const _channelId = await coreConnector.utils.getId(stringToU8a(recipient), stringToU8a(_counterparty))
+
+//         if (!u8aEquals(_channelId, channelId)) {
+//           return
+//         }
+//         if (!u8aEquals(stringToU8a(_counterparty), counterparty)) {
+//           return
+//         }
+
+//         resolve()
+//       })
+//       .on('error', error => {
+//         reject(error)
+//       })
+//   }).finally(() => {
+//     event.removeAllListeners()
+//   })
+// }

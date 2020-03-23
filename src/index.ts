@@ -151,9 +151,9 @@ export default class HoprEthereum implements HoprCoreConnector {
       hoprToken
     )
 
-    // if (!(await checkOnChainValues(hoprChannels, db, account))) {
-    //   await hoprEthereum.initOnchainValues()
-    // }
+    if (!(await checkOnChainValues(hoprChannels, db, account))) {
+      await hoprEthereum.initOnchainValues()
+    }
 
     return hoprEthereum
   }
@@ -182,15 +182,15 @@ async function checkOnChainValues(hoprChannels: HoprChannels, db: LevelUp, accou
 
   const onChain = !u8aEquals(onChainSecret, new Uint8Array(types.Hash.SIZE).fill(0x00))
 
-  // if (offChain != onChain) {
-  //   if (offChain) {
-  //     await hoprChannels.methods.setHashedSecret(u8aToHex(secret)).send({
-  //       from: account.toHex()
-  //     })
-  //   } else {
-  //     throw Error(`Key is present on-chain but not in our database.`)
-  //   }
-  // }
+  if (offChain != onChain) {
+    if (offChain) {
+      await hoprChannels.methods.setHashedSecret(u8aToHex(secret)).send({
+        from: account.toHex()
+      })
+    } else {
+      throw Error(`Key is present on-chain but not in our database.`)
+    }
+  }
 
   return offChain && onChain
 }

@@ -27,6 +27,9 @@ async function main() {
     })
     console.log(`funded ${address}`)
   }
+
+  // TODO: check if this is needed
+  process.exit()
 }
 
 main().catch(console.error)
