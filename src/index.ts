@@ -90,7 +90,8 @@ export default class HoprEthereum implements HoprCoreConnector {
       await utils.waitForConfirmation(
         this.hoprChannels.methods.setHashedSecret(u8aToHex(secret)).send({
           from: this.account.toHex(),
-          nonce: nonce || (await this.nonce)
+          nonce: nonce || (await this.nonce),
+          gas: 200e3
         })
       ),
       dbPromise
@@ -195,7 +196,8 @@ async function checkOnChainValues(hoprEthereum: HoprEthereum) {
   if (offChain != onChain) {
     if (offChain) {
       await hoprEthereum.hoprChannels.methods.setHashedSecret(u8aToHex(secret)).send({
-        from: hoprEthereum.account.toHex()
+        from: hoprEthereum.account.toHex(),
+        gas: 200e3
       })
     } else {
       throw Error(`Key is present on-chain but not in our database.`)

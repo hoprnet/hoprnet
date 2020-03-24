@@ -4,38 +4,75 @@ import Memdown from 'memdown'
 import BN from 'bn.js'
 import LevelUp from 'levelup'
 import pipe from 'it-pipe'
-import { Channel as ChannelType, Balance, ChannelBalance, Hash, SignedChannel } from '../types'
+import Web3 from 'web3'
+import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
+import { HoprToken } from '../tsc/web3/HoprToken'
+import { Await } from '../tsc/utils'
+import { Channel as ChannelType, Balance, ChannelBalance, Hash, SignedChannel, AccountId } from '../types'
 import { ChannelStatus } from '../types/channel'
 import CoreConnector from '..'
 import Channel from '.'
-import * as configs from '../config'
 import * as u8a from '../core/u8a'
+import * as utils from '../utils'
+import * as configs from '../config'
 
-const TEN_SECONDS = 10 * 1e3
+const getPrivKeyData = async (_privKey: Uint8Array) => {
+  const privKey = new Hash(_privKey)
+  const pubKey = new Hash(await utils.privKeyToPubKey(privKey))
+  const address = new AccountId(await utils.pubKeyToAccountId(pubKey))
 
-describe('test ticket generation and verification', function() {
+  return {
+    privKey,
+    pubKey,
+    address
+  }
+}
+
+describe.only('test ticket generation and verification', function() {
+  const web3 = new Web3(configs.DEFAULT_URI)
+  const hoprToken: HoprToken = new web3.eth.Contract(HoprTokenAbi as any, configs.DEFAULT_HOPR_TOKEN_ADDRESS)
   const channels = new Map<string, ChannelType>()
   const preChannels = new Map<string, ChannelType>()
   let coreConnector: CoreConnector
   let counterpartysCoreConnector: CoreConnector
+  let funder: Await<ReturnType<typeof getPrivKeyData>>
+
+  async function generateUser() {
+    const user = await getPrivKeyData(randomBytes(32))
+
+    // fund user with ETH
+    await web3.eth.sendTransaction({
+      value: web3.utils.toWei('1', 'ether'),
+      from: funder.address.toHex(),
+      to: user.address.toHex()
+    })
+
+    // mint user some HOPR
+    await hoprToken.methods.mint(user.address.toHex(), web3.utils.toWei('1', 'ether')).send({
+      from: funder.address.toHex(),
+      gas: 200e3
+    })
+
+    return user
+  }
 
   async function generateNode(privKey: Uint8Array): Promise<CoreConnector> {
     return CoreConnector.create(new LevelUp(Memdown()), privKey)
   }
 
   beforeEach(async function() {
-    this.timeout(TEN_SECONDS)
-
     channels.clear()
     preChannels.clear()
 
-    coreConnector = await generateNode(u8a.stringToU8a(configs.DEMO_ACCOUNTS[0]))
-    counterpartysCoreConnector = await generateNode(u8a.stringToU8a(configs.DEMO_ACCOUNTS[1]))
+    funder = await getPrivKeyData(u8a.stringToU8a(configs.FUND_ACCOUNT_PRIVATE_KEY))
+    const userA = await generateUser()
+    const userB = await generateUser()
+
+    coreConnector = await generateNode(userA.privKey)
+    counterpartysCoreConnector = await generateNode(userB.privKey)
   })
 
   it('should create a valid ticket', async function() {
-    this.timeout(TEN_SECONDS)
-
     const channelType = new ChannelType(undefined, {
       balance: new ChannelBalance(undefined, {
         balance: new BN(123),

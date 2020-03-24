@@ -23,7 +23,8 @@ async function main() {
     const address = await privKeyToAddress(privKey)
 
     await hoprToken.methods.mint(address, AMOUNT).send({
-      from: owner
+      from: owner,
+      gas: 200e3
     })
 
     console.log(`funded ${address}`)

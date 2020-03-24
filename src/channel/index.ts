@@ -282,7 +282,8 @@ class Channel implements IChannel<HoprEthereum> {
           this.coreConnector.hoprChannels.methods
           .initiateChannelClosure(u8aToHex(await this.coreConnector.utils.pubKeyToAccountId(this.counterparty)))
           .send({
-            from: this.coreConnector.account.toHex()
+            from: this.coreConnector.account.toHex(),
+            gas: 200e3
           })
         )
 
@@ -303,7 +304,7 @@ class Channel implements IChannel<HoprEthereum> {
           this.coreConnector.hoprChannels.methods.claimChannelClosure(u8aToHex(await this.coreConnector.utils.pubKeyToAccountId(this.counterparty)))
           .send({
             from: this.coreConnector.account.toHex(),
-            gas: 100e3
+            gas: 200e3
           })
         )
       } else {
@@ -408,13 +409,15 @@ class Channel implements IChannel<HoprEthereum> {
       if (allowance.isZero()) {
         await waitForConfirmation(
           hoprEthereum.hoprToken.methods.approve(spender.toHex(), amount.toString()).send({
-            from: hoprEthereum.account.toHex()
+            from: hoprEthereum.account.toHex(),
+            gas: 200e3
           })
         )
       } else if (allowance.lt(amount)) {
         await waitForConfirmation(
           hoprEthereum.hoprToken.methods.increaseAllowance(spender.toHex(), amount.sub(allowance).toString()).send({
-            from: hoprEthereum.account.toHex()
+            from: hoprEthereum.account.toHex(),
+            gas: 200e3
           })
         )
       }
@@ -422,7 +425,7 @@ class Channel implements IChannel<HoprEthereum> {
       await waitForConfirmation(
         hoprEthereum.hoprChannels.methods.fundChannel(hoprEthereum.account.toHex(), counterparty.toHex(), amount.toString()).send({
           from: hoprEthereum.account.toHex(),
-          gas: 1e6
+          gas: 200e3
         })
       )
     } catch (error) {
@@ -479,13 +482,14 @@ class Channel implements IChannel<HoprEthereum> {
       //     "0x1b"
       //   ).send({
       //     from: hoprEthereum.account.toHex(),
-      //     gas: 0xfffffffffff
+      //     gas: 200e3
       //   })
       // )
 
       await waitForConfirmation(
         hoprEthereum.hoprChannels.methods.openChannel(counterparty.toHex()).send({
-          from: hoprEthereum.account.toHex()
+          from: hoprEthereum.account.toHex(),
+          gas: 200e3
         })
       )
 

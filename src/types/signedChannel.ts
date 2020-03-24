@@ -1,10 +1,9 @@
 import type { Types } from "@hoprnet/hopr-core-connector-interface"
 import secp256k1 from 'secp256k1'
 import { Signature, Channel } from '.'
-import { u8aConcat, u8aEquals } from '../core/u8a'
+import { u8aConcat } from '../core/u8a'
 import { Uint8ArrayE } from '../types/extended'
-import { AccountId } from '../types'
-import { sign, verify, hashSync } from '../utils'
+import { sign, verify } from '../utils'
 import HoprEthereum from '..'
 
 class SignedChannel extends Uint8ArrayE implements Types.SignedChannel<Channel, Signature> {
@@ -57,9 +56,7 @@ class SignedChannel extends Uint8ArrayE implements Types.SignedChannel<Channel, 
   }
 
   get signer() {
-    return new AccountId(
-      secp256k1.ecdsaRecover(this.signature.signature, this.signature.recovery, hashSync(this.channel.toU8a()))
-    )
+    return secp256k1.ecdsaRecover(this.signature.signature, this.signature.recovery, this.channel.hashSync)
   }
 
   async verify(coreConnector: HoprEthereum) {
@@ -98,8 +95,7 @@ class SignedChannel extends Uint8ArrayE implements Types.SignedChannel<Channel, 
     }
 
     if (signedChannel.signature.eq(emptySignatureArray)) {
-      const channelHash = await coreConnector.utils.hash(signedChannel.channel.toU8a())
-      signedChannel.set(await sign(channelHash, coreConnector.self.privateKey), 0)
+      signedChannel.set(await sign(await signedChannel.channel.hash, coreConnector.self.privateKey), 0)
     }
 
     return signedChannel

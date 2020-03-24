@@ -2,6 +2,7 @@ import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import { ChannelBalance, Moment } from '.'
 import { Uint8ArrayE } from '../types/extended'
 import { u8aConcat } from '../core/u8a'
+import { hashSync } from "../utils"
 
 export enum ChannelStatus {
   UNINITIALISED,
@@ -50,6 +51,15 @@ class Channel extends Uint8ArrayE implements Types.Channel {
     }
 
     return status
+  }
+
+  // TODO: fix types
+  get hashSync() {
+    return hashSync(this.toU8a())
+  }
+
+  get hash() {
+    return Promise.resolve(this.hashSync)
   }
 
   static get SIZE() {
