@@ -64,12 +64,12 @@ async function handleHelper(source: any): Promise<void> {
 
     let record: any
 
-    const unAcknowledgedDbKey = u8aToHex(this.node.dbKeys.UnAcknowledgedTickets(acknowledgement.responseSigningParty, await acknowledgement.hashedKey))
+    const unAcknowledgedDbKey = u8aToHex(this.node.dbKeys.UnAcknowledgedTickets(await acknowledgement.responseSigningParty, await acknowledgement.hashedKey))
 
     try {
       record = await this.node.db.get(unAcknowledgedDbKey)
 
-      const acknowledgedDbKey = this.node.dbKeys.AcknowledgedTickets(acknowledgement.responseSigningParty, acknowledgement.key)
+      const acknowledgedDbKey = this.node.dbKeys.AcknowledgedTickets(await acknowledgement.responseSigningParty, acknowledgement.key)
       try {
         await this.node.db
           .batch()

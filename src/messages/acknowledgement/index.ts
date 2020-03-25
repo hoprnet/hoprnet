@@ -4,7 +4,7 @@ import { u8aConcat } from '../../utils'
 import { deriveTicketKeyBlinding } from '../packet/header'
 import { KEY_LENGTH } from '../packet/header/parameters'
 import { Challenge } from '../packet/challenge'
-import  HoprCoreConnector, { Types } from '@hoprnet/hopr-core-connector-interface'
+import HoprCoreConnector, { Types } from '@hoprnet/hopr-core-connector-interface'
 import PeerId from 'peer-id'
 
 /**
@@ -86,19 +86,16 @@ class Acknowledgement<Chain extends HoprCoreConnector> extends Uint8Array {
     })
   }
 
-  get responseSigningParty(): Uint8Array {
+  get responseSigningParty(): Promise<Uint8Array> {
     if (this._responseSigningParty) {
-      return this._responseSigningParty
+      return Promise.resolve(this._responseSigningParty)
     }
 
-    this._responseSigningParty = secp256k1.ecdsaRecover(
-      this.responseSignature.signature,
-      this.responseSignature.recovery,
-      // @ts-ignore
-      this.responseSignature.sr25519PublicKey
-    )
+    return new Promise<Uint8Array>(async resolve => {
+      this._responseSigningParty = secp256k1.ecdsaRecover(this.responseSignature.signature, this.responseSignature.recovery, await this.hash)
 
-    return this._responseSigningParty
+      resolve(this._responseSigningParty)
+    })
   }
 
   async sign(peerId: PeerId): Promise<Acknowledgement<Chain>> {

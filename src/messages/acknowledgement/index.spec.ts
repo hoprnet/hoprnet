@@ -35,6 +35,6 @@ describe('test acknowledgement generation', function() {
     const ack = await Acknowledgement.create(paymentChannels, challenge, secp256k1.publicKeyCreate(secret), receiver)
 
     assert(await ack.verify(receiver), `Previously generated acknowledgement should be valid.`)
-    assert(u8aEquals(ack.responseSigningParty, receiver.pubKey.marshal()), `recovered pubKey should be equal.`)
+    assert(u8aEquals(await ack.responseSigningParty, receiver.pubKey.marshal()), `recovered pubKey should be equal.`)
   })
 })

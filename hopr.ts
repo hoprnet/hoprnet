@@ -29,7 +29,6 @@ import { pubKeyToPeerId, addPubKey, u8aToHex } from './src/utils'
 
 import figlet from 'figlet'
 import clear from 'clear'
-import type { ChannelBalance } from '@hoprnet/hopr-core-connector-interface/src/types'
 
 /**
  * Alphabetical list of known connectors.
@@ -43,7 +42,6 @@ const knownConnectors = [
 let node: Hopr<HoprCoreConnector>,
   funds: Types.Balance,
   ownAddress: Types.AccountId,
-  stakedFunds: Types.Balance,
   rl: readline.Interface,
   options,
   connector: typeof HoprCoreConnector
@@ -57,10 +55,10 @@ function displayHelp(): void {
   console.log(
     /* prettier-ignore */
     `\nStart HOPR with:\n` +
-          `-b [--bootstrapNode, bootstrap]  starts HOPR as a bootstrap node\n` +
-          `-n [--network]                   specifies which connector to use\n` +
-          `-h [--help]                      shows this help page\n` + 
-          `<ID>                             starts HOPR with ID <ID> as specified in .env\n`
+      `-b [--bootstrapNode, bootstrap]  starts HOPR as a bootstrap node\n` +
+      `-n [--network]                   specifies which connector to use\n` +
+      `-h [--help]                      shows this help page\n` + 
+      `<ID>                             starts HOPR with ID <ID> as specified in .env\n`
   )
 }
 
@@ -230,15 +228,6 @@ async function tabCompletion(line: string, cb: (err: Error, hits: [string[], str
       }
 
       return cb(null, [peerInfos.map((peerInfo: PeerInfo) => `send ${peerInfo.id.toB58String()}`), line])
-    // case 'stake':
-    //   if (funds.isZero()) {
-    //     console.log(chalk.red(`\nCan't stake any funds without any ${node.paymentChannels.types.Balance.SYMBOL}.`))
-    //     return [['stake 0.00'], line]
-    //   }
-
-    //   return cb(null, [[`stake ${fromWei(funds)}`], line])
-    // case 'unstake':
-    //   return cb(null, [[`unstake ${fromWei(stakedFunds, 'ether')}`], line])
     case 'open':
       node.paymentChannels.channel.getAll(
         node.paymentChannels,
@@ -356,15 +345,7 @@ async function runAsRegularNode() {
   ownAddress = await node.paymentChannels.utils.pubKeyToAccountId(node.peerInfo.id.pubKey.marshal())
 
   try {
-    ;[funds, stakedFunds] = await Promise.all([
-      node.paymentChannels.accountBalance,
-      // @ts-ignore
-      Promise.resolve(new node.paymentChannels.types.Balance(node.paymentChannels.api.registry, 0))
-      // node.paymentChannels.contract.methods
-      //   .states(ownAddress)
-      //   .call({ from: ownAddress })
-      //   .then(result => new BN(result.stakedEther))
-    ])
+    funds = await node.paymentChannels.accountBalance
   } catch (err) {
     console.log(chalk.red(err.message))
     return stopNode()
@@ -637,8 +618,7 @@ async function open(query?: string): Promise<void> {
       node.paymentChannels,
       counterparty.pubKey.marshal(),
       async () => node.paymentChannels.utils.pubKeyToAccountId(await node.interactions.payments.onChainKey.interact(counterparty)),
-      // @ts-ignore
-      new node.paymentChannels.types.ChannelBalance(node.paymentChannels.api.registry, {
+      node.paymentChannels.types.ChannelBalance.create(null, {
         balance: new BN(12345),
         balance_a: new BN(123)
       }),
