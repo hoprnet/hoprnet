@@ -386,7 +386,8 @@ class Channel implements IChannel<HoprEthereum> {
 
     if (onChain != offChain) {
       if (!onChain && offChain) {
-        throw Error(`Channel ${u8aToHex(channelId)} exists off-chain but not on-chain.`)
+        console.log(`Channel ${u8aToHex(channelId)} exists off-chain but not on-chain, deleting data.`)
+        await onClose(coreConnector, counterpartyPubKey)
       } else {
         throw Error(`Channel ${u8aToHex(channelId)} exists on-chain but not off-chain.`)
       }
