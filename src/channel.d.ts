@@ -10,7 +10,7 @@ declare namespace Channel {
    */
   function create<CoreConnector extends HoprCoreConnector, ConcreteChannel extends ChannelType, ConcreteSignature extends Signature>(
     coreConnector: CoreConnector,
-    offChainCounterparty: Uint8Array,
+    offChainCounterparty: Promise<Uint8Array>,
     getOnChainPublicKey: (counterparty: Uint8Array) => Promise<Uint8Array>,
     channelBalance?: ChannelBalance,
     sign?: (channelBalance: ChannelBalance) => Promise<SignedChannel<ConcreteChannel, ConcreteSignature>>
