@@ -10,12 +10,14 @@ export function randomInteger(start: number, end?: number): number {
     throw Error(`'start' and 'end' must be positive.`)
   }
 
-  if (start >= end) {
-    throw Error(`Invalid interval. 'end' must be strictly greater than 'start'.`)
-  }
+  if (end != null) {
+    if (start >= end) {
+      throw Error(`Invalid interval. 'end' must be strictly greater than 'start'.`)
+    }
 
-  if (start + 1 == end) {
-    return start
+    if (start + 1 == end) {
+      return start
+    }
   }
 
   // Projects interval from [start, end] to [0, end - start]

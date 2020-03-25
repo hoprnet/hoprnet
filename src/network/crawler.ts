@@ -61,14 +61,18 @@ class Crawler<Chain extends HoprCoreConnector> {
      * Returns a random node and removes it from the array.
      */
     const getRandomNode = (): PeerInfo => {
+      if (unContactedPeerIdArray.length == 0) {
+        throw Error(`Cannot pick a random node because there are none.`)
+      }
+
       const index = randomInteger(0, unContactedPeerIdArray.length)
 
       if (index == unContactedPeerIdArray.length - 1) {
-        return unContactedPeerIdArray.pop()
+        return unContactedPeerIdArray.pop() as PeerInfo
       }
 
       const selected: PeerInfo = unContactedPeerIdArray[index]
-      unContactedPeerIdArray[index] = unContactedPeerIdArray.pop()
+      unContactedPeerIdArray[index] = unContactedPeerIdArray.pop() as PeerInfo
 
       return selected
     }
@@ -94,7 +98,7 @@ class Crawler<Chain extends HoprCoreConnector> {
 
       // Start additional "threads"
       while (tokens.length > 0 && unContactedPeerIdArray.length > 0) {
-        const token: Token = tokens.pop()
+        const token: Token = tokens.pop() as Token
         const currentNode = getRandomNode()
 
         if (promises[token] != null) {
@@ -118,15 +122,17 @@ class Crawler<Chain extends HoprCoreConnector> {
       } catch (err) {
         errors.push(err)
       } finally {
-        for (let i = 0; i < peerInfos.length; i++) {
-          if (peerInfos[i].id.isEqual(this.node.peerInfo.id)) {
-            continue
-          }
+        if (peerInfos != null && Array.isArray(peerInfos)) {
+          for (let i = 0; i < peerInfos.length; i++) {
+            if (peerInfos[i].id.isEqual(this.node.peerInfo.id)) {
+              continue
+            }
 
-          if (!contactedPeerIds.has(peerInfos[i].id.toB58String()) && !unContactedPeerIdSet.has(peerInfos[i].id.toB58String())) {
-            unContactedPeerIdSet.add(peerInfos[i].id.toB58String())
-            unContactedPeerIdArray.push(peerInfos[i])
-            this.node.peerStore.put(peerInfos[i])
+            if (!contactedPeerIds.has(peerInfos[i].id.toB58String()) && !unContactedPeerIdSet.has(peerInfos[i].id.toB58String())) {
+              unContactedPeerIdSet.add(peerInfos[i].id.toB58String())
+              unContactedPeerIdArray.push(peerInfos[i])
+              this.node.peerStore.put(peerInfos[i])
+            }
           }
         }
       }
@@ -140,7 +146,7 @@ class Crawler<Chain extends HoprCoreConnector> {
     }
 
     for (let i = 0; i < MAX_PARALLEL_REQUESTS && unContactedPeerIdArray.length > 0; i++) {
-      promises.push(queryNode(getRandomNode(), tokens.pop()))
+      promises.push(queryNode(getRandomNode(), tokens.pop() as Token))
     }
 
     if (!isDone()) {
