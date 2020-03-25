@@ -10,7 +10,7 @@ declare namespace Channel {
    */
   function create<CoreConnector extends HoprCoreConnector, ConcreteChannel extends ChannelType, ConcreteSignature extends Signature>(
     coreConnector: CoreConnector,
-    offChainCounterparty: Promise<Uint8Array>,
+    offChainCounterparty: Uint8Array,
     getOnChainPublicKey: (counterparty: Uint8Array) => Promise<Uint8Array>,
     channelBalance?: ChannelBalance,
     sign?: (channelBalance: ChannelBalance) => Promise<SignedChannel<ConcreteChannel, ConcreteSignature>>
@@ -77,7 +77,7 @@ declare interface Channel<CoreConnector extends HoprCoreConnector> {
 
   readonly counterparty: AccountId
 
-  readonly offChainCounterparty: Uint8Array
+  readonly offChainCounterparty: Promise<Uint8Array>
 
   /**
    * Initiates a settlement for this channel.
