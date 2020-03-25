@@ -103,7 +103,7 @@ declare namespace SignedChannel {
 declare interface SignedChannel<ConcreteChannel extends Channel, ConcreteSignature extends Signature> extends Uint8Array {
   channel: ConcreteChannel
   signature: ConcreteSignature
-  signer: Uint8Array
+  signer: Promise<Uint8Array>
 }
 
 declare namespace SignedTicket {
