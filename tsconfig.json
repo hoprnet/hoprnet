@@ -9,9 +9,8 @@
     "strict": false,
     "sourceMap": true,
     "resolveJsonModule": true,
-    "experimentalDecorators": true,
-    "baseUrl": "./"
+    "experimentalDecorators": true
   },
-  "include": ["src/**/*"],
+  "include": ["scripts/**/*", "src/**/*"],
   "exclude": ["node_modules/*"]
 }
