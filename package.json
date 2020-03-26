@@ -30,7 +30,8 @@
     "deployContract": "node test/deployContract",
     "startTestnet": "node test/startBlockchain",
     "createForTest": "node test/createFor",
-    "createFor": "node test/stakeFor"
+    "createFor": "node test/stakeFor",
+    "fundAccounts": "node ./node_modules/@hoprnet/hopr-core-ethereum/lib/scripts/fundAccounts.js"
   },
   "dependencies": {
     "@nodeutils/defaults-deep": "~1.1.0",
