@@ -68,13 +68,31 @@ $ nvm use
 $ yarn install
 
 $ mv .env.example .env
+
+# go back to previous directory
+# cd ..
+```
+
+## Get hopr-ethereum
+```
+$ git clone -b develop https://github.com/hoprnet/hopr-ethereum.git
+$ cd hopr-ethereum
+
+# in case you are using NVM (Node Versioning Manager), run the following two commands:
+$ nvm install 12
+$ nvm use
+
+$ yarn install
+
+# go back to previous directory
+$ cd ..
 ```
 
 **DO NOT USE THE DEFAULT PRIVATE KEYS ON MAIN NET - YOU WILL LOOSE ALL FUNDS ASSOCIATED WITH THOSE KEYS!**
 
 # Proof of Concept - Local Testnet
 
-The following is an early and unstable proof of concept (PoC) running a *local* testnet which highlights the functionality of HOPR. Use it at your own risk. While we are giving our best to buidl a secure and privacy-preserving base layer of the web of today and tomorrow, we do not guarantee that your funds are safu and we do not guarantee that your communication is really metadata-private.
+The following is an early and unstable proof of concept (PoC) running a *local* testnet which highlights the functionality of HOPR. Use it at your own risk. While we are giving our best to build a secure and privacy-preserving base layer of the web of today and tomorrow, we do not guarantee that your funds are safu and we do not guarantee that your communication is really metadata-private.
 
 For the proof of concept, HOPR comes with a built-in chat client that is mostly used for demonstration purposes. It will not be part of HOPR in future releases.
 
@@ -90,18 +108,19 @@ The HOPR PoC chat app is configured to send messages via 2 intermediate relay no
 
 ## Local Ethereum Node (Ganache)
 
-To start a local Ganache-based testnet, run `yarn startTestnet`.
+To start a local Ganache-based testnet, run `yarn network` in `hopr-ethereum`.
 
 ```
-$ yarn startTestnet
-// Successfully started local Ganache instance at 'ws://[::]:8545'.
+$ cd hopr-ethereum
+$ yarn network
+// Successfully started local Ganache instance at 'ws://[::]:9545'.
 ```
 
 ## Deploy Contracts
-Once Ganache is up and running, open another terminal (in many terminal applications you can simply open a new tab in the terminal via `[Command]` + `[t]`) and run `yarn deployContract` to deploy the smart contract. Just FYI, HOPR is using the account associated with the `FUND_ACCOUNT_PRIVATE_KEY` to deploy the smart contract. 
+Once Ganache is up and running, open another terminal (in many terminal applications you can simply open a new tab in the terminal via `[Command]` + `[t]`) and run `yarn migrate --network development` to deploy the smart contract. Just FYI, HOPR is using the account associated with the `FUND_ACCOUNT_PRIVATE_KEY` to deploy the smart contract. 
 
 ```
-$ yarn deployContract
+$ yarn migrate --network development
 // Deployed contract on ganache at 0x4A3CDa9bbfc63ee1Db1fC749d86B769334fe27Fb
 // Nonce is now 0.
 ```
@@ -114,6 +133,9 @@ HOPR is a decentralized network, so in order to bootstrap the network and tell r
 To start a bootstrap node, run `node hopr -b`
 
 ```
+# go to hopr-core
+$ cd ../hopr-core
+
 $ node hopr -b
 // Welcome to HOPR!
 //
@@ -139,10 +161,10 @@ $ node hopr 0
 //  /ip4/192.168.0.14/tcp/9095/ipfs/16Uiu2HAkzuoWfxBgsgBCr8xqpkjs1RAmtDPxafCUAcbBEonnVQ65
 // 
 // Own Ethereum address: 0x32C160A5008e517Ce06Df4f7d4a39fFC52E049cf
-// Funds: 100 ETH
-// Stake: 0 ETH
+// Funds: 100 HOPR
+// Stake: 0 HOPR
 ```
-You can then follow the on-screen instructions to stake funds (just hit `[enter]` twice to confirm that you want to stake and then add 0.1 ETH to the payment channel smart contract).
+You can then follow the on-screen instructions to stake funds (just hit `[enter]` twice to confirm that you want to stake and then add 0.1 HOPR to the payment channel smart contract).
 
 Repeat this step 3 more times so that you have a total of 4 HOPR nodes running. Make sure to change the parameter `0` that you entered the first time to `1`, `2`, `3` the following times. This starts the HOPR nodes with different private keys and lets you send messages from one to another.
 
@@ -195,7 +217,7 @@ There is a lot going on during this first message that we sent. HOPR needs to op
 ['16Uiu2HAmEsGQV5Ftmfu7x4dkkBnyc8Q2mWEqgQhNu7s3q1Kwimxp']: Database index 00000000000000000000000000000001 on channnel cc5fb04ed71c2c0f5205d81511bbb8416c8ca503eae95f3fd2d16da862e154f3.
 ['16Uiu2HAmEsGQV5Ftmfu7x4dkkBnyc8Q2mWEqgQhNu7s3q1Kwimxp']: Transaction index 00000000000000000000000000000002 on channnel cc5fb04ed71c2c0f5205d81511bbb8416c8ca503eae95f3fd2d16da862e154f3.
 ['16Uiu2HAmEsGQV5Ftmfu7x4dkkBnyc8Q2mWEqgQhNu7s3q1Kwimxp']: Payment channel exists. Requested SHA256 pre-image of 1314a83d1e587c2c950e75129c8e6e669cfe42724a8961db342e56f71cb71de9 is derivable.
-['16Uiu2HAmEsGQV5Ftmfu7x4dkkBnyc8Q2mWEqgQhNu7s3q1Kwimxp']: Received 0.0000000000000001 ETH on channel cc5fb04ed71c2c0f5205d81511bbb8416c8ca503eae95f3fd2d16da862e154f3.
+['16Uiu2HAmEsGQV5Ftmfu7x4dkkBnyc8Q2mWEqgQhNu7s3q1Kwimxp']: Received 0.0000000000000001 HOPR on channel cc5fb04ed71c2c0f5205d81511bbb8416c8ca503eae95f3fd2d16da862e154f3.
 ['16Uiu2HAmEsGQV5Ftmfu7x4dkkBnyc8Q2mWEqgQhNu7s3q1Kwimxp']: Listening to close event of channel 08f72788bc1ee53cd9da611c3ac13f1ed41f801f7189f843fd41847b6f640723
 ['16Uiu2HAmEsGQV5Ftmfu7x4dkkBnyc8Q2mWEqgQhNu7s3q1Kwimxp']: Listening to opening event of channel 08f72788bc1ee53cd9da611c3ac13f1ed41f801f7189f843fd41847b6f640723
 ['16Uiu2HAmEsGQV5Ftmfu7x4dkkBnyc8Q2mWEqgQhNu7s3q1Kwimxp']: Opened payment channel 08f72788bc1ee53cd9da611c3ac13f1ed41f801f7189f843fd41847b6f640723 with txHash 0x0077c23a71c927d8e450aa823000e95efbbf6df4cb2b5711f74165571023585a. Nonce is now 2.
@@ -210,7 +232,7 @@ The second node shows an output like this - note that the two intermediate nodes
 ['16Uiu2HAmBBshUFiFn3o99Kvf4CEFtujY3ZZW69ebLAkTmQvRNQoB']: Database index 00000000000000000000000000000001 on channnel fd14f0694a412f99e9fd3c3d2d13e99a140da2f11b139d5e4f82ae2d2269ce29.
 ['16Uiu2HAmBBshUFiFn3o99Kvf4CEFtujY3ZZW69ebLAkTmQvRNQoB']: Transaction index 00000000000000000000000000000002 on channnel fd14f0694a412f99e9fd3c3d2d13e99a140da2f11b139d5e4f82ae2d2269ce29.
 ['16Uiu2HAmBBshUFiFn3o99Kvf4CEFtujY3ZZW69ebLAkTmQvRNQoB']: Payment channel exists. Requested SHA256 pre-image of b217cd81f3bc033cc4af3803d3c50e4619681d67c35129259b5eecfa046c46c8 is derivable.
-['16Uiu2HAmBBshUFiFn3o99Kvf4CEFtujY3ZZW69ebLAkTmQvRNQoB']: Received 0.0000000000000002 ETH on channel fd14f0694a412f99e9fd3c3d2d13e99a140da2f11b139d5e4f82ae2d2269ce29.
+['16Uiu2HAmBBshUFiFn3o99Kvf4CEFtujY3ZZW69ebLAkTmQvRNQoB']: Received 0.0000000000000002 HOPR on channel fd14f0694a412f99e9fd3c3d2d13e99a140da2f11b139d5e4f82ae2d2269ce29.
 ['16Uiu2HAmBBshUFiFn3o99Kvf4CEFtujY3ZZW69ebLAkTmQvRNQoB']: Listening to close event of channel cc5fb04ed71c2c0f5205d81511bbb8416c8ca503eae95f3fd2d16da862e154f3
 ['16Uiu2HAmBBshUFiFn3o99Kvf4CEFtujY3ZZW69ebLAkTmQvRNQoB']: Listening to opening event of channel cc5fb04ed71c2c0f5205d81511bbb8416c8ca503eae95f3fd2d16da862e154f3
 ['16Uiu2HAmBBshUFiFn3o99Kvf4CEFtujY3ZZW69ebLAkTmQvRNQoB']: Opened payment channel cc5fb04ed71c2c0f5205d81511bbb8416c8ca503eae95f3fd2d16da862e154f3 with txHash 0x436913ad8a1b31ee43aeabe133bd586a7c3003930f41022b8e08782aa050241b. Nonce is now 2.
@@ -295,10 +317,10 @@ Available under the following addresses:
  /ip4/192.168.1.2/tcp/9091/ipfs/16Uiu2HAmNPVU9L5Fcb4Xn5W1Ws6e4TFSTUonX4YJkGrKyLjSRpdj
 
 Own Ethereum address: 0x94C1289565A62371CaC82D90bAEAA469eb2E77B7
-Funds: 0 ETH
-Stake: 0 ETH
+Funds: 0 HOPR
+Stake: 0 HOPR
 
-Staked Ether is less than 0.1 ETH. Do you want to increase the stake now? (Y/n):
+Staked Hopr is less than 0.1 HOPR. Do you want to increase the stake now? (Y/n):
 ```
 You cannot stake yet as your account has no funds, so go ahead and send some Kovan Ether to the Ethereum address shown on your screen. Then stop the HOPR node via `ctrl` + `c` and restart it once the Kovan Ether arrived.
 
