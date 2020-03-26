@@ -80,7 +80,12 @@ $ mv .env.example .env
 
 ## Get hopr-ethereum
 
+Once we are done with `hopr-core` we will do a similar process with `hopr-ethereum`.
+
 ```
+# go back to parent directory
+$ cd ..
+
 $ git clone -b develop https://github.com/hoprnet/hopr-ethereum.git
 $ cd hopr-ethereum
 
@@ -132,7 +137,12 @@ You now have a blank version of the HOPR smart contracts running on your local G
 
 ## Fund Demo Accounts
 
+HOPR uses HOPR to stake channels, we will proceed by funding our demo accounts with 100 HOPR each.
+
 ```
+# go back to parent directory
+$ cd ..
+
 $ cd hopr-core
 $ yarn fundAccounts
 ```
