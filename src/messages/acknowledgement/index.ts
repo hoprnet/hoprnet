@@ -92,7 +92,11 @@ class Acknowledgement<Chain extends HoprCoreConnector> extends Uint8Array {
     }
 
     return new Promise<Uint8Array>(async resolve => {
-      this._responseSigningParty = secp256k1.ecdsaRecover(this.responseSignature.signature, this.responseSignature.recovery, await this.hash)
+      this._responseSigningParty = secp256k1.ecdsaRecover(
+        this.responseSignature.signature,
+        this.responseSignature.recovery,
+        await this.paymentChannels.utils.hash(u8aConcat(this.responseSignature.msgPrefix, await this.hash))
+      )
 
       resolve(this._responseSigningParty)
     })

@@ -231,7 +231,7 @@ async function tabCompletion(line: string, cb: (err: Error, hits: [string[], str
     case 'open':
       node.paymentChannels.channel.getAll(
         node.paymentChannels,
-        async (channel: ChannelInstance<HoprCoreConnector>) => (await pubKeyToPeerId(channel.offChainCounterparty)).toB58String(),
+        async (channel: ChannelInstance<HoprCoreConnector>) => (await pubKeyToPeerId(await channel.offChainCounterparty)).toB58String(),
         async (channelIds: Promise<string>[]) => {
           let peerIdStringSet: Set<string>
 
@@ -267,7 +267,7 @@ async function tabCompletion(line: string, cb: (err: Error, hits: [string[], str
     case 'close':
       node.paymentChannels.channel.getAll(
         node.paymentChannels,
-        async (channel: ChannelInstance<HoprCoreConnector>) => (await pubKeyToPeerId(channel.offChainCounterparty)).toB58String(),
+        async (channel: ChannelInstance<HoprCoreConnector>) => (await pubKeyToPeerId(await channel.offChainCounterparty)).toB58String(),
         async (peerIdPromises: Promise<string>[]) => {
           let peerIdStrings: string[]
           try {
@@ -652,7 +652,7 @@ async function openChannels(): Promise<void> {
           return
         }
 
-        const peerId = await pubKeyToPeerId(channel.offChainCounterparty)
+        const peerId = await pubKeyToPeerId(await channel.offChainCounterparty)
 
         str += `${chalk.yellow(u8aToHex(channelId))} - ${chalk.blue(peerId.toB58String())}\n`
         return

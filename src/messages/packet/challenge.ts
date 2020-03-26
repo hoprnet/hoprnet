@@ -4,6 +4,7 @@ import PeerId from 'peer-id'
 import HoprCoreConnector, { Types } from '@hoprnet/hopr-core-connector-interface'
 
 import BN from 'bn.js'
+import { u8aConcat } from '../../utils'
 
 const KEY_LENGTH = 32
 
@@ -83,12 +84,13 @@ export class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
       return Promise.resolve(this._counterparty)
     }
 
-    return this.hash.then((hash: Uint8Array) => {
-      return secp256k1.ecdsaRecover(
-        this.challengeSignature.signature,
-        this.challengeSignature.recovery,
-        // @ts-ignore
-        this.challengeSignature.sr25519PublicKey
+    return new Promise<Uint8Array>(async resolve => {
+      resolve(
+        secp256k1.ecdsaRecover(
+          this.challengeSignature.signature,
+          this.challengeSignature.recovery,
+          await this.paymentChannels.utils.hash(u8aConcat(this.challengeSignature.msgPrefix, await this.hash))
+        )
       )
     })
   }
