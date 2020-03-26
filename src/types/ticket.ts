@@ -134,7 +134,7 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
     //   return false
     // }
 
-    return verify(await signedTicket.ticket.hash, signedTicket.signature, channel.offChainCounterparty)
+    return verify(await signedTicket.ticket.hash, signedTicket.signature, await channel.offChainCounterparty)
   }
 
   // TODO: implement

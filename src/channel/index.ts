@@ -170,8 +170,8 @@ class Channel implements IChannel<HoprEthereum> {
     })
   }
 
-  get offChainCounterparty(): Uint8Array {
-    return this._signedChannel.signer
+  get offChainCounterparty(): Promise<Uint8Array> {
+    return Promise.resolve(this._signedChannel.signer)
   }
 
   get channelId() {
@@ -440,14 +440,10 @@ class Channel implements IChannel<HoprEthereum> {
     _getOnChainPublicKey: (counterparty: Uint8Array) => Promise<Uint8Array>,
     channelBalance?: ChannelBalance,
     sign?: (channelBalance: ChannelBalance) => Promise<SignedChannel>
-  ): Promise<Channel> {
-    let signedChannel: SignedChannel
-
+  ): Promise<Channel> {   
     const counterparty = new AccountId(await hoprEthereum.utils.pubKeyToAccountId(counterpartyPubKey))
-
-    // const counterparty = await getOnChainPublicKey(offChainCounterparty).then(v => new AccountId(v))
-    // const channelId = new Hash(await hoprEthereum.utils.getId(hoprEthereum.account, counterparty))
     let channel: Channel
+    let signedChannel: SignedChannel
 
     if (await this.isOpen(hoprEthereum, counterpartyPubKey)) {
       const record = await hoprEthereum.db.get(Buffer.from(hoprEthereum.dbKeys.Channel(counterpartyPubKey)))
@@ -560,7 +556,7 @@ class Channel implements IChannel<HoprEthereum> {
             offset: msg.byteOffset
           })
 
-          const counterpartyPubKey = signedChannel.signer
+          const counterpartyPubKey = await signedChannel.signer
           const counterparty = new AccountId(await hoprEthereum.utils.pubKeyToAccountId(counterpartyPubKey))
           const channelBalance = signedChannel.channel.balance
           // const channelId = await hoprEthereum.utils.getId(hoprEthereum.account, counterparty)
