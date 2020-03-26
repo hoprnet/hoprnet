@@ -8,6 +8,11 @@ async function main() {
   const asRepo = path.join(cwd, 'node_modules/@hoprnet/hopr-ethereum/build/extracted/abis')
   const asLib = path.join(cwd, '../../../node_modules/@hoprnet/hopr-ethereum/build/extracted/abis')
   const isRepo = fs.existsSync(asRepo)
+  const isLib = fs.existsSync(asLib)
+
+  if (!isRepo && !isLib) {
+    throw Error("`hopr-ethereum` repo wasn't found")
+  }
 
   await tsGenerator(
     { cwd },
