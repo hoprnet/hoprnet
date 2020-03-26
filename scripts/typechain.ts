@@ -11,7 +11,7 @@ async function main() {
     new TypeChain({
       cwd,
       rawConfig: {
-        files: path.join(root, 'node_modules/@hoprnet/hopr-ethereum/build/extracted/abis/*.json'),
+        files: path.join(cwd, 'node_modules/@hoprnet/hopr-ethereum/build/extracted/abis/*.json'),
         outDir: './src/tsc/web3',
         target: 'web3-v1'
       }
