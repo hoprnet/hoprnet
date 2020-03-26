@@ -5,7 +5,7 @@
 **/.DS_Store
 
 # Exclude node stuff
-node_modules
+**/node_modules
 
 # Exclude yarn stuff
 .packages-cache
