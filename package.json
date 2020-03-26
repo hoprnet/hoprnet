@@ -33,6 +33,8 @@
     "levelup": "^4.3.2",
     "peer-id": "^0.13.9",
     "secp256k1": "^4.0.0",
+    "typechain": "^1.0.5",
+    "typechain-target-web3-v1": "^1.0.4",
     "web3": "^1.2.6"
   },
   "devDependencies": {
