@@ -86,7 +86,6 @@ describe('test payment (channel) interactions', function() {
                 assert(chunk.length > 0, 'Should receive a message')
                 console.log(chunk.slice(0, 32))
 
-                console.log('sending')
                 yield response.slice()
               }
             })()
