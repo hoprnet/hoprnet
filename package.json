@@ -6,7 +6,7 @@
   "types": "lib/index.d.ts",
   "main": "lib/index.js",
   "scripts": {
-    "postinstall": "rm -rf ./lib && typechain --target web3-v1 --outDir './src/tsc/web3' './node_modules/@hoprnet/hopr-ethereum/build/extracted/abis/*.json' && tsc -d -p .",
+    "postinstall": "typechain --target web3-v1 --outDir './src/tsc/web3' './node_modules/@hoprnet/hopr-ethereum/build/extracted/abis/*.json' && tsc -d -p .",
     "clean": "rm -rf ./lib",
     "test": "mocha",
     "dev": "yarn clean && yarn build:types && tsc -w",
