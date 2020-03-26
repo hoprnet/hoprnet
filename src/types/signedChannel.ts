@@ -4,7 +4,7 @@ import { Signature, Channel } from '.'
 import { u8aConcat } from '../core/u8a'
 import { Uint8ArrayE } from '../types/extended'
 import { sign, verify } from '../utils'
-import HoprEthereum from '..'
+import type HoprEthereum from '..'
 
 class SignedChannel extends Uint8ArrayE implements Types.SignedChannel<Channel, Signature> {
   private _signature?: Signature

@@ -4,7 +4,7 @@ import { Hash, TicketEpoch, Balance, SignedTicket, Signature } from '.'
 import { Uint8ArrayE } from '../types/extended'
 import { sign, verify, hash } from '../utils'
 import { stringToU8a, u8aConcat, u8aToHex } from '../core/u8a'
-import ChannelInstance from '../channel'
+import type ChannelInstance from '../channel'
 
 const WIN_PROB = new BN(1)
 
