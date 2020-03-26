@@ -10,7 +10,7 @@
     "clean": "rm -rf ./lib",
     "test": "mocha",
     "dev": "yarn clean && yarn build:types && tsc -w",
-    "build:types": "ts-node ./scripts/typechain.ts",
+    "build:types": "ts-node ./src/scripts/typechain.ts",
     "build": "yarn clean && yarn build:types && tsc -d -p .",
     "fundAccounts": "ts-node ./src/scripts/fundAccounts.ts"
   },

@@ -4,9 +4,9 @@ import { tsGenerator } from 'ts-generator'
 import { TypeChain } from 'typechain/dist/TypeChain'
 
 async function main() {
-  const cwd = path.join(__dirname, '..')
-  const asRepo = path.join(cwd, 'node_modules/@hoprnet/hopr-ethereum/build/extracted/abis')
-  const asLib = path.join(cwd, '../../../node_modules/@hoprnet/hopr-ethereum/build/extracted/abis')
+  const root = path.join(__dirname, '..', '..')
+  const asRepo = path.join(root, 'node_modules/@hoprnet/hopr-ethereum/build/extracted/abis')
+  const asLib = path.join(root, '../../../node_modules/@hoprnet/hopr-ethereum/build/extracted/abis')
   const isRepo = fs.existsSync(asRepo)
 
   let isLib = false
@@ -19,9 +19,9 @@ async function main() {
   }
 
   await tsGenerator(
-    { cwd },
+    { cwd: root },
     new TypeChain({
-      cwd,
+      cwd: root,
       rawConfig: {
         files: `${isRepo ? asRepo : asLib}/*.json`,
         outDir: './src/tsc/web3',
