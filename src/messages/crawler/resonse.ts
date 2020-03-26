@@ -32,7 +32,7 @@ class CrawlResponse extends Uint8Array {
     }
   }
   
-  subarray(begin?: number, end?: number): Uint8Array {
+  subarray(begin: number = 0, end?: number): Uint8Array {
     return new Uint8Array(this.buffer, begin, end != null ? end - begin : undefined)
   }
 

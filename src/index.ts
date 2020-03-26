@@ -1,10 +1,15 @@
+// @ts-ignore
 import libp2p = require('libp2p')
+// @ts-ignore
 import MPLEX = require('libp2p-mplex')
+// @ts-ignore
 import KadDHT = require('libp2p-kad-dht')
+// @ts-ignore
 import SECIO = require('libp2p-secio')
 // import { WebRTCv4, WebRTCv6 } = require('./network/natTraversal')
 import TCP = require('libp2p-tcp')
 
+// @ts-ignore
 import defaultsDeep = require('@nodeutils/defaults-deep')
 
 import { Packet } from './messages/packet'
@@ -347,7 +352,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
 
     if (options != null && options.bootstrapNode) {
       db_dir += `bootstrap`
-    } else if (options != null && Number.isInteger(options.id)) {
+    } else if (options != null && options.id != null &&  Number.isInteger(options.id)) {
       // For testing ...
       db_dir += `node_${options.id}`
     } else {

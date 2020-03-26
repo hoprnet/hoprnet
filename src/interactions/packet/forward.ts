@@ -71,7 +71,7 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
           })
 
           if (this.tokens.length > 0) {
-            const token = this.tokens.pop()
+            const token = this.tokens.pop() as number
             if (this.promises[token] != null) {
               /**
                * @TODO remove this and make sure that the Promise is always
@@ -92,7 +92,7 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
   }
 
   async handlePacket(packet: Packet<Chain>, token: number): Promise<void> {
-    await packet.forwardTransform()
+    const oldChallenge = await packet.forwardTransform()
 
     const [sender, target] = await Promise.all([
       /* prettier-ignore */
@@ -102,9 +102,11 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
 
     // Acknowledgement
     setImmediate(async () => {
+
+
       const ack = new Acknowledgement(this.node.paymentChannels, undefined, {
         key: deriveTicketKeyBlinding(packet.header.derivedSecret),
-        challenge: packet.oldChallenge
+        challenge: oldChallenge
       })
 
       this.node.interactions.packet.acknowledgment.interact(sender, await ack.sign(this.node.peerInfo.id))
@@ -127,7 +129,7 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
 
       const nextPacket = this.queue[index]
 
-      this.queue[index] = this.queue.pop()
+      this.queue[index] = this.queue.pop() as Packet<Chain>
 
       return this.handlePacket(nextPacket, token)
     }

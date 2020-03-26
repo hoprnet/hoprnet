@@ -1,4 +1,5 @@
 import dotenv from 'dotenv'
+// @ts-ignore
 const dotenvExpand = require('dotenv-expand')
 const env = dotenv.config()
 dotenvExpand(env)
@@ -18,6 +19,7 @@ import Multiaddr from 'multiaddr'
 
 import { encode, decode } from 'rlp'
 
+// @ts-ignore
 const Multihash = require('multihashes')
 import bs58 from 'bs58'
 
@@ -203,7 +205,7 @@ const keywords = ['open', 'stake', 'stakedEther', 'unstake', 'send', 'quit', 'cr
  * @param line the current input
  * @param cb to returns the suggestions
  */
-async function tabCompletion(line: string, cb: (err: Error, hits: [string[], string]) => void) {
+async function tabCompletion(line: string, cb: (err: Error | undefined, hits: [string[], string]) => void) {
   if (line == null || line == '') {
     return cb(undefined, [keywords, line])
   }
@@ -224,10 +226,10 @@ async function tabCompletion(line: string, cb: (err: Error, hits: [string[], str
 
       if (!peerInfos.length) {
         console.log(chalk.red(`\nDoesn't know any other node except apart from bootstrap node${node.bootstrapServers.length == 1 ? '' : 's'}!`))
-        return cb(null, [[''], line])
+        return cb(undefined, [[''], line])
       }
 
-      return cb(null, [peerInfos.map((peerInfo: PeerInfo) => `send ${peerInfo.id.toB58String()}`), line])
+      return cb(undefined, [peerInfos.map((peerInfo: PeerInfo) => `send ${peerInfo.id.toB58String()}`), line])
     case 'open':
       node.paymentChannels.channel.getAll(
         node.paymentChannels,
@@ -239,7 +241,7 @@ async function tabCompletion(line: string, cb: (err: Error, hits: [string[], str
             peerIdStringSet = new Set<string>(await Promise.all(channelIds))
           } catch (err) {
             console.log(chalk.red(err.message))
-            return cb(null, [[''], line])
+            return cb(undefined, [[''], line])
           }
 
           const peers: string[] = []
@@ -255,12 +257,12 @@ async function tabCompletion(line: string, cb: (err: Error, hits: [string[], str
 
           if (peers.length < 1) {
             console.log(chalk.red(`\nDoesn't know any node to open a payment channel with.`))
-            return cb(null, [[''], line])
+            return cb(undefined, [[''], line])
           }
 
           const hits = query ? peers.filter((peerId: string) => peerId.startsWith(query)) : peers
 
-          return cb(null, [hits.length ? hits.map((str: string) => `open ${str}`) : ['open'], line])
+          return cb(undefined, [hits.length ? hits.map((str: string) => `open ${str}`) : ['open'], line])
         }
       )
       break
@@ -274,17 +276,17 @@ async function tabCompletion(line: string, cb: (err: Error, hits: [string[], str
             peerIdStrings = await Promise.all(peerIdPromises)
           } catch (err) {
             console.log(chalk.red(err.message))
-            return cb(null, [[''], line])
+            return cb(undefined, [[''], line])
           }
 
           if (peerIdStrings != null && peerIdStrings.length < 1) {
             console.log(chalk.red(`\nCannot close any channel because there are not any open ones and/or channels were opened by a third party.`))
-            return cb(null, [[''], line])
+            return cb(undefined, [[''], line])
           }
 
           const hits = query ? peerIdStrings.filter((peerId: string) => peerId.startsWith(query)) : peerIdStrings
 
-          return cb(null, [hits.length ? hits.map((str: string) => `close ${str}`) : ['close'], line])
+          return cb(undefined, [hits.length ? hits.map((str: string) => `close ${str}`) : ['close'], line])
         }
       )
       break
@@ -298,15 +300,15 @@ async function tabCompletion(line: string, cb: (err: Error, hits: [string[], str
 
       if (!peerInfos.length) {
         console.log(chalk.red(`\nDoesn't know any other node except apart from bootstrap node${node.bootstrapServers.length == 1 ? '' : 's'}!`))
-        return cb(null, [[''], line])
+        return cb(undefined, [[''], line])
       }
 
-      return cb(null, [peerInfos.map((peerInfo: PeerInfo) => `ping ${peerInfo.id.toB58String()}`), line])
+      return cb(undefined, [peerInfos.map((peerInfo: PeerInfo) => `ping ${peerInfo.id.toB58String()}`), line])
     }
     default:
       const hits = keywords.filter(keyword => keyword.startsWith(line))
 
-      return cb(null, [hits.length ? hits : keywords, line])
+      return cb(undefined, [hits.length ? hits : keywords, line])
   }
 }
 
@@ -618,7 +620,7 @@ async function open(query?: string): Promise<void> {
       node.paymentChannels,
       counterparty.pubKey.marshal(),
       async () => node.paymentChannels.utils.pubKeyToAccountId(await node.interactions.payments.onChainKey.interact(counterparty)),
-      node.paymentChannels.types.ChannelBalance.create(null, {
+      node.paymentChannels.types.ChannelBalance.create(undefined, {
         balance: new BN(12345),
         balance_a: new BN(123)
       }),

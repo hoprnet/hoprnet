@@ -13,8 +13,8 @@ import PeerId from 'peer-id'
  * the previously received transaction.
  */
 class Acknowledgement<Chain extends HoprCoreConnector> extends Uint8Array {
-  private _responseSigningParty: Uint8Array
-  private _hashedKey: Uint8Array
+  private _responseSigningParty?: Uint8Array
+  private _hashedKey?: Uint8Array
 
   private paymentChannels: Chain
 
@@ -87,7 +87,7 @@ class Acknowledgement<Chain extends HoprCoreConnector> extends Uint8Array {
   }
 
   get responseSigningParty(): Promise<Uint8Array> {
-    if (this._responseSigningParty) {
+    if (this._responseSigningParty != null) {
       return Promise.resolve(this._responseSigningParty)
     }
 

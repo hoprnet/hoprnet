@@ -55,13 +55,17 @@ class Opening<Chain extends HoprCoreConnector> implements AbstractInteraction<Ch
   }
 
   private async collect(source: any) {
-    let result: Uint8Array
+    let result: Uint8Array | undefined
     for await (const msg of source) {
       if (result != null) {
         continue
       } else {
         result = msg.slice()
       }
+    }
+
+    if (result == null) {
+      throw Error('Empty stream')
     }
 
     return this.node.paymentChannels.types.SignedChannel.create(this.node.paymentChannels, {

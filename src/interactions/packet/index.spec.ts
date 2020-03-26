@@ -1,9 +1,13 @@
 import PeerInfo from 'peer-info'
 import PeerId from 'peer-id'
 
+// @ts-ignore
 import libp2p = require('libp2p')
+// @ts-ignore
 import TCP = require('libp2p-tcp')
+// @ts-ignore
 import MPLEX = require('libp2p-mplex')
+// @ts-ignore
 import SECIO = require('libp2p-secio')
 
 import Debug from 'debug'

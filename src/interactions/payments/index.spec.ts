@@ -2,16 +2,22 @@ import dotenv from 'dotenv'
 dotenv.config()
 import assert from 'assert'
 
-import { getPeerInfo, u8aEquals } from '../../utils'
+import { getPeerInfo } from '../../utils'
 
+// @ts-ignore
 import libp2p = require('libp2p')
+// @ts-ignore
 import TCP = require('libp2p-tcp')
+// @ts-ignore
 import MPLEX = require('libp2p-mplex')
+// @ts-ignore
 import SECIO = require('libp2p-secio')
 
 import { Types } from '@hoprnet/hopr-core-polkadot'
+import * as config from '@hoprnet/hopr-core-polkadot/lib/config'
 import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import { Interactions } from '..'
+import { privKeyToPeerId } from '../../utils'
 
 import Hopr from '../..'
 import BN from 'bn.js'
@@ -21,8 +27,9 @@ describe('test payment (channel) interactions', function() {
   let Bob: Hopr<HoprCoreConnector>
 
   before(async function() {
+    const peerIdAlice = await privKeyToPeerId(config.DEMO_ACCOUNTS[0])
     Alice = (await libp2p.create({
-      peerInfo: await getPeerInfo({ id: 0 }),
+      peerInfo: await getPeerInfo({ id: 0, peerId: peerIdAlice }),
       modules: {
         transport: [TCP],
         streamMuxer: [MPLEX],
@@ -30,8 +37,9 @@ describe('test payment (channel) interactions', function() {
       }
     })) as Hopr<HoprCoreConnector>
 
+    const peerIdBob = await privKeyToPeerId(config.DEMO_ACCOUNTS[1])
     Bob = (await libp2p.create({
-      peerInfo: await getPeerInfo({ id: 1 }),
+      peerInfo: await getPeerInfo({ id: 1, peerId: peerIdBob }),
       modules: {
         transport: [TCP],
         streamMuxer: [MPLEX],
@@ -46,12 +54,21 @@ describe('test payment (channel) interactions', function() {
     ])
 
     Alice.paymentChannels = ({
-      types: Types
+      types: Types,
+      self: {
+        privateKey: peerIdAlice.privKey.marshal(),
+        publicKey: peerIdAlice.pubKey.marshal()
+      }
     } as unknown) as HoprCoreConnector
 
     Bob.paymentChannels = ({
-      types: Types
+      types: Types,
+      self: {
+        privateKey: peerIdBob.privKey.marshal(),
+        publicKey: peerIdBob.pubKey.marshal()
+      }
     } as unknown) as HoprCoreConnector
+
     Alice.interactions = new Interactions(Alice)
     Bob.interactions = new Interactions(Bob)
   })
@@ -66,9 +83,11 @@ describe('test payment (channel) interactions', function() {
           return (source: any) => {
             return (async function*() {
               for await (const chunk of source) {
-                assert(u8aEquals(Uint8Array.from(chunk.slice(0, 32)), testArray))
+                assert(chunk.length > 0, 'Should receive a message')
+                console.log(chunk.slice(0, 32))
 
-                yield response
+                console.log('sending')
+                yield response.slice()
               }
             })()
           }
@@ -77,21 +96,18 @@ describe('test payment (channel) interactions', function() {
     } as unknown) as HoprCoreConnector
 
     assert(
-      u8aEquals(
-        Uint8Array.from(
-          await Alice.interactions.payments.open.interact(Bob.peerInfo, {
-            balance: new BN(123456),
-            balance_a: new BN(123),
-            toU8a: () => testArray
-          })
-        ),
-        response
-      )
+      (await Alice.interactions.payments.open.interact(Bob.peerInfo, {
+        balance: new BN(123456),
+        balance_a: new BN(123),
+        toU8a: () => testArray
+      })) != null,
+      'Should a receive a message from counterparty'
     )
   })
 
-  after(async function () {
+  after(async function() {
     await Promise.all([
+      /* prettier-ignore */
       Alice != null ? Alice.stop() : Promise.resolve(),
       Bob != null ? Bob.stop() : Promise.resolve()
     ])

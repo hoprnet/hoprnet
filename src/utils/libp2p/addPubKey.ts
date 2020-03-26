@@ -1,6 +1,7 @@
 import PeerId from 'peer-id'
 import { keys as libp2p_crypto } from 'libp2p-crypto'
-import * as Multihash from 'multihashes'
+// @ts-ignore
+import Multihash = require('multihashes')
 
 /**
  * Takes a peerId and returns a peerId with the public key set to the corresponding

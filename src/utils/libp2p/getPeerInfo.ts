@@ -1,9 +1,11 @@
 import { keys } from 'libp2p-crypto'
 import { LevelUp } from 'levelup'
-import { deserializeKeyPair, serializeKeyPair, privKeyToPeerId } from '..'
+import { deserializeKeyPair, serializeKeyPair } from '..'
 
 import PeerInfo from 'peer-info'
 import PeerId from 'peer-id'
+
+// @ts-ignore
 const Multiaddr = require('multiaddr')
 
 import { NAME } from '../../constants'
@@ -18,6 +20,10 @@ async function getPeerInfo(
   },
   db?: LevelUp
 ): Promise<PeerInfo> {
+  if (db == null && (options == null || (options != null && options.peerInfo == null && options.peerId == null))) {
+    throw Error('Invalid input parameter. Please set a valid peerInfo or pass a database handle.')
+  }
+
   /**
    * Check whether our config makes sense
    */
@@ -60,11 +66,17 @@ async function getPeerInfo(
   function getAddrs(): any[] {
     const addrs = []
 
+    if (process.env.PORT == null) {
+      throw Error('Unknown port. Please specify a port in the .env file!')
+    }
+
     let port = process.env.PORT
 
     if (process.env.HOST_IPV4) {
       // ============================= Only for testing ============================================================
-      if (options != null && Number.isInteger(options.id)) port = (Number.parseInt(process.env.PORT) + (options.id + 1) * 2).toString()
+      if (options != null && options.id != null && Number.isInteger(options.id)) {
+        port = (Number.parseInt(process.env.PORT) + (options.id + 1) * 2).toString()
+      }
       // ===========================================================================================================
       addrs.push(Multiaddr(`/ip4/${process.env.HOST_IPV4}/tcp/${port}`))
     }
@@ -90,15 +102,18 @@ async function getPeerInfo(
     return getFromDatabase()
   }
 
-  if (db == null && options == null && options.peerInfo == null && options.peerId == null) {
-    throw Error('Invalid input parameter. Please set a valid peerInfo or pass a database handle.')
-  }
 
   checkConfig()
 
   options.addrs = getAddrs()
 
-  const peerInfo = new PeerInfo(await getPeerId())
+  let peerInfo: PeerInfo
+  if (options.peerInfo != null) {
+    peerInfo = options.peerInfo
+  } else {
+    peerInfo = new PeerInfo(await getPeerId())
+  }
+   
   options.addrs.forEach(addr => peerInfo.multiaddrs.add(addr.encapsulate(`/${NAME}/${peerInfo.id.toB58String()}`)))
 
   return peerInfo

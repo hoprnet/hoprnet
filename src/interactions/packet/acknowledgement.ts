@@ -55,23 +55,25 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector> extends 
 }
 
 async function handleHelper(source: any): Promise<void> {
+  let self = this
+
   for await (const msg of source) {
     const arr = msg.slice()
-    const acknowledgement = new Acknowledgement(this.node.paymentChannels, {
+    const acknowledgement = new Acknowledgement(self.node.paymentChannels, {
       bytes: arr.buffer,
       offset: arr.byteOffset
     })
 
     let record: any
 
-    const unAcknowledgedDbKey = u8aToHex(this.node.dbKeys.UnAcknowledgedTickets(await acknowledgement.responseSigningParty, await acknowledgement.hashedKey))
+    const unAcknowledgedDbKey = u8aToHex(self.node.dbKeys.UnAcknowledgedTickets(await acknowledgement.responseSigningParty, await acknowledgement.hashedKey))
 
     try {
-      record = await this.node.db.get(unAcknowledgedDbKey)
+      record = await self.node.db.get(unAcknowledgedDbKey)
 
-      const acknowledgedDbKey = this.node.dbKeys.AcknowledgedTickets(await acknowledgement.responseSigningParty, acknowledgement.key)
+      const acknowledgedDbKey = self.node.dbKeys.AcknowledgedTickets(await acknowledgement.responseSigningParty, acknowledgement.key)
       try {
-        await this.node.db
+        await self.node.db
           .batch()
           .del(unAcknowledgedDbKey)
           .put(acknowledgedDbKey, record)
@@ -89,11 +91,11 @@ async function handleHelper(source: any): Promise<void> {
         //   )}. ${chalk.red('Dropping acknowledgement')}.`
         // )
       } else {
-        this.node.log(`Database error: ${err.message}. ${chalk.red('Dropping acknowledgement')}.`)
+        self.node.log(`Database error: ${err.message}. ${chalk.red('Dropping acknowledgement')}.`)
       }
       continue
     } finally {
-      this.emit(unAcknowledgedDbKey)
+      self.emit(unAcknowledgedDbKey)
     }
   }
 }

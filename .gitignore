@@ -5,14 +5,14 @@
 **/.DS_Store
 
 # Exclude node stuff
-node_modules/
+node_modules
 
 # Exclude yarn stuff
-.packages-cache/
+.packages-cache
 yarn-error.log
 
 # Exclude db dir
-db/
+db
 
 # Exclude Typescript builds
-lib/
+lib

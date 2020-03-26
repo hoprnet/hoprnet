@@ -28,7 +28,6 @@ const OPENING_TIMEOUT = 86400 * 1000
 export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
   private _targetPeerId: PeerId
   private _senderPeerId: PeerId
-  public oldChallenge: Challenge<Chain>
 
   private _header?: Header<Chain>
   private _ticket?: Types.SignedTicket<Types.Ticket, Types.Signature>
@@ -206,7 +205,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
    *
    * @param node the node itself
    */
-  async forwardTransform(): Promise<Packet<Chain>> {
+  async forwardTransform(): Promise<Challenge<Chain>> {
     this.header.deriveSecret(this.node.peerInfo.id.privKey.marshal())
 
     if (await this.hasTag(this.node.db)) {
@@ -260,7 +259,12 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     )
 
     this.message.decrypt(this.header.derivedSecret)
-    this.oldChallenge = this.challenge
+
+    const challengeShadowCopy = this.challenge.slice()
+    const oldChallenge = new Challenge(this.node.paymentChannels, {
+      bytes: challengeShadowCopy.buffer,
+      offset: challengeShadowCopy.byteOffset
+    })
 
     if (u8aEquals(this.node.peerInfo.id.pubKey.marshal(), this.header.address)) {
       await this.prepareDelivery(null, null, channelId)
@@ -268,7 +272,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       await this.prepareForward(null, null, target)
     }
 
-    return this
+    return oldChallenge
   }
 
   /**
