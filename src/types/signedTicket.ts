@@ -58,6 +58,17 @@ class SignedTicket extends Uint8ArrayE implements Types.SignedTicket<Ticket, Sig
     return this._signature
   }
 
+  get signer(): Promise<Uint8Array> {
+    return new Promise(async (resolve, reject) => {
+      try {
+        const signer = secp256k1.ecdsaRecover(this.signature.signature, this.signature.recovery, await this.ticket.hash)
+        return resolve(signer)
+      } catch (err) {
+        return reject(err)
+      }
+    })
+  }
+
   static get SIZE() {
     return Signature.SIZE + Ticket.SIZE
   }
@@ -73,17 +84,6 @@ class SignedTicket extends Uint8ArrayE implements Types.SignedTicket<Ticket, Sig
     }
   ): SignedTicket {
     return new SignedTicket(arr, struct)
-  }
-
-  get signer(): Promise<Uint8Array> {
-    return new Promise(async (resolve, reject) => {
-      try {
-        const signer = secp256k1.ecdsaRecover(this.signature.signature, this.signature.recovery, await this.ticket.hash)
-        return resolve(signer)
-      } catch (err) {
-        return reject(err)
-      }
-    })
   }
 }
 

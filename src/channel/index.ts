@@ -443,14 +443,10 @@ class Channel implements IChannel<HoprEthereum> {
     _getOnChainPublicKey: (counterparty: Uint8Array) => Promise<Uint8Array>,
     channelBalance?: ChannelBalance,
     sign?: (channelBalance: ChannelBalance) => Promise<SignedChannel>
-  ): Promise<Channel> {
-    let signedChannel: SignedChannel
-
+  ): Promise<Channel> {   
     const counterparty = new AccountId(await hoprEthereum.utils.pubKeyToAccountId(counterpartyPubKey))
-
-    // const counterparty = await getOnChainPublicKey(offChainCounterparty).then(v => new AccountId(v))
-    // const channelId = new Hash(await hoprEthereum.utils.getId(hoprEthereum.account, counterparty))
     let channel: Channel
+    let signedChannel: SignedChannel
 
     if (await this.isOpen(hoprEthereum, counterpartyPubKey)) {
       const record = await hoprEthereum.db.get(Buffer.from(hoprEthereum.dbKeys.Channel(counterpartyPubKey)))
