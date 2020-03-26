@@ -1,17 +1,20 @@
 import path from 'path'
+import fs from 'fs'
 import { tsGenerator } from 'ts-generator'
 import { TypeChain } from 'typechain/dist/TypeChain'
 
 async function main() {
   const cwd = path.join(__dirname, '..')
-  console.log(cwd)
+  const asRepo = path.join(cwd, 'node_modules/@hoprnet/hopr-ethereum/build/extracted/abis')
+  const asLib = path.join(cwd, '../../node_modules/@hoprnet/hopr-ethereum/build/extracted/abis')
+  const isRepo = fs.existsSync(asRepo)
 
   await tsGenerator(
     { cwd },
     new TypeChain({
       cwd,
       rawConfig: {
-        files: path.join(cwd, 'node_modules/@hoprnet/hopr-ethereum/build/extracted/abis/*.json'),
+        files: `${isRepo ? asRepo : asLib}/*.json`,
         outDir: './src/tsc/web3',
         target: 'web3-v1'
       }
