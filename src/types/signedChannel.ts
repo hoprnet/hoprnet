@@ -55,8 +55,8 @@ class SignedChannel extends Uint8ArrayE implements Types.SignedChannel<Channel, 
     return this._channel
   }
 
-  get signer() {
-    return secp256k1.ecdsaRecover(this.signature.signature, this.signature.recovery, this.channel.hashSync)
+  get signer(): Promise<Uint8Array> {
+    return Promise.resolve(secp256k1.ecdsaRecover(this.signature.signature, this.signature.recovery, this.channel.hashSync))
   }
 
   async verify(coreConnector: HoprEthereum) {

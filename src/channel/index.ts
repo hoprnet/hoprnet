@@ -15,7 +15,7 @@ import {
 import { ChannelStatus } from '../types/channel'
 import { HASH_LENGTH } from '../constants'
 import { u8aToHex, u8aXOR, toU8a, stringToU8a, u8aEquals } from '../core/u8a'
-import { waitForConfirmation, waitFor } from '../utils'
+import { waitForConfirmation, waitFor, hash } from '../utils'
 import { HoprChannels as IHoprChannels } from '../tsc/web3/HoprChannels'
 import type HoprEthereum from '..'
 
@@ -170,16 +170,16 @@ class Channel implements IChannel<HoprEthereum> {
     })
   }
 
-  get offChainCounterparty(): Uint8Array {
+  get offChainCounterparty(): Promise<Uint8Array> {
     return this._signedChannel.signer
   }
 
-  get channelId() {
-    return new Promise<Hash>(async (resolve, reject) => {
-      if (this._channelId != null) {
-        return resolve(this._channelId)
-      }
+  get channelId(): Promise<Hash> {
+    if (this._channelId != null) {
+      return Promise.resolve<Hash>(this._channelId)
+    }
 
+    return new Promise<Hash>(async (resolve, reject) => {
       try {
         const channelId = await this.coreConnector.utils.getId(
           this.coreConnector.account,
@@ -194,12 +194,12 @@ class Channel implements IChannel<HoprEthereum> {
     })
   }
 
-  get settlementWindow() {
-    return new Promise<Moment>(async (resolve, reject) => {
-      if (this._settlementWindow != null) {
-        return resolve(this._settlementWindow)
-      }
+  get settlementWindow(): Promise<Moment> {
+    if (this._settlementWindow != null) {
+      return Promise.resolve(this._settlementWindow)
+    }
 
+    return new Promise<Moment>(async (resolve, reject) => {
       try {
         const channel = await this.channel
         this._settlementWindow = new Moment(channel.closureTime)
@@ -319,13 +319,12 @@ class Channel implements IChannel<HoprEthereum> {
 
   async getPreviousChallenges(): Promise<Hash> {
     let pubKeys: Uint8Array[] = []
-    const challenge = new Uint8Array(HASH_LENGTH).fill(0x00)
 
     return new Promise<Hash>(async (resolve, reject) => {
       this.coreConnector.db
         .createReadStream({
-          gt: Buffer.from(this.coreConnector.dbKeys.Challenge(await this.channelId, challenge)),
-          lt: Buffer.from(this.coreConnector.dbKeys.Challenge(await this.channelId, challenge))
+          gt: Buffer.from(this.coreConnector.dbKeys.Challenge(await this.channelId, new Uint8Array(HASH_LENGTH).fill(0x00))),
+          lt: Buffer.from(this.coreConnector.dbKeys.Challenge(await this.channelId, new Uint8Array(HASH_LENGTH).fill(0xff)))
         })
         .on('error', reject)
         .on('data', ({ key, ownKeyHalf }) => {
@@ -346,7 +345,10 @@ class Channel implements IChannel<HoprEthereum> {
   }
   
   async testAndSetNonce(signature: Uint8Array): Promise<void> {
-    const key = this.coreConnector.dbKeys.Nonce(await this.channelId, toU8a(await this.coreConnector.nonce))
+    const channelId = await this.channelId
+    const nonce = await hash(signature)
+    
+    const key = this.coreConnector.dbKeys.Nonce(channelId, nonce)
 
     try {
       await this.coreConnector.db.get(u8aToHex(key))
@@ -354,6 +356,7 @@ class Channel implements IChannel<HoprEthereum> {
       if (err.notFound == null || err.notFound != true) {
         throw err
       }
+      await this.coreConnector.db.put(key, new Uint8Array())
       return
     }
 
@@ -560,7 +563,7 @@ class Channel implements IChannel<HoprEthereum> {
             offset: msg.byteOffset
           })
 
-          const counterpartyPubKey = signedChannel.signer
+          const counterpartyPubKey = await signedChannel.signer
           const counterparty = new AccountId(await hoprEthereum.utils.pubKeyToAccountId(counterpartyPubKey))
           const channelBalance = signedChannel.channel.balance
           // const channelId = await hoprEthereum.utils.getId(hoprEthereum.account, counterparty)

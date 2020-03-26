@@ -2,26 +2,10 @@ import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import * as constants from './constants'
 
 const encoder = new TextEncoder()
-const PREFIX: Uint8Array = encoder.encode('payments-')
-const SEPERATOR: Uint8Array = encoder.encode('-')
+const PREFIX = encoder.encode('payments-')
+const SEPERATOR = encoder.encode('-')
 const channelSubPrefix = encoder.encode('channel-')
 const challengeSubPrefix = encoder.encode('challenge-')
-
-function allocationHelper(arr: [number, Uint8Array][]): Uint8Array {
-  const totalLength = arr.reduce((acc, current) => {
-    return acc + current[0]
-  }, 0)
-
-  let result = new Uint8Array(totalLength)
-
-  let offset = 0
-  for (let [size, data] of arr) {
-    result.set(data, offset)
-    offset += size
-  }
-
-  return result
-}
 
 export function Channel(counterparty: Types.AccountId): Uint8Array {
   return allocationHelper([
@@ -99,4 +83,20 @@ export function Ticket(channelId: Types.Hash, challenge: Types.Hash): Uint8Array
     [SEPERATOR.length, SEPERATOR],
     [challenge.length, challenge]
   ])
+}
+
+function allocationHelper(arr: [number, Uint8Array][]): Uint8Array {
+  const totalLength = arr.reduce((acc, current) => {
+    return acc + current[0]
+  }, 0)
+
+  let result = new Uint8Array(totalLength)
+
+  let offset = 0
+  for (let [size, data] of arr) {
+    result.set(data, offset)
+    offset += size
+  }
+
+  return result
 }

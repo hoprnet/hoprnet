@@ -1,20 +1,20 @@
 # Exclude compiled typescript
-lib/
+lib
 
 # Exclude node.js stuff
-node_modules/
+**/node_modules
 
 # Exclude keys
 .env
 
 # Exclude IDE stuff
-.vscode/
+.vscode
 
 # Exclude yarn stuff
-.packages-cache/
+.packages-cache
 yarn-error.log
 
-.DS_Store
+**/.DS_Store
 
 # typechain types generated
 src/tsc/web3

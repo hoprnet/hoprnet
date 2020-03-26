@@ -129,7 +129,7 @@ describe('test ticket generation and verification', function() {
 
     const signedChannelCounterparty = await SignedChannel.create(coreConnector, undefined, { channel: channelType })
     assert(
-      u8a.u8aEquals(signedChannelCounterparty.signer, coreConnector.self.publicKey),
+      u8a.u8aEquals(await signedChannelCounterparty.signer, coreConnector.self.publicKey),
       `Check that signer is recoverable.`
     )
 
