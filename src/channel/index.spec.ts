@@ -176,6 +176,6 @@ describe('test ticket generation and verification', function() {
       `Should reject when trying to set nonce twice.`
     )
 
-    assert(await counterpartysChannel.ticket.verify(counterpartysChannel, ticket), 'not verified')
+    assert(await counterpartysChannel.ticket.verify(counterpartysChannel, ticket), `Ticket signature must be valid.`)
   })
 })
