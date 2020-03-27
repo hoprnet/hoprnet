@@ -14,25 +14,18 @@ import {
 } from '../types'
 import { ChannelStatus } from '../types/channel'
 import { HASH_LENGTH } from '../constants'
-import { u8aToHex, u8aXOR, toU8a, stringToU8a, u8aEquals } from '../core/u8a'
+import { u8aToHex, u8aXOR, stringToU8a, u8aEquals } from '../core/u8a'
 import { waitForConfirmation, waitFor, hash } from '../utils'
 import { HoprChannels as IHoprChannels } from '../tsc/web3/HoprChannels'
 import type HoprEthereum from '..'
 
-const getChannel = (coreConnector: HoprEthereum, channelId: Hash) => {
-  return new Promise<{
-    deposit: string
-    partyABalance: string
-    closureTime: string
-    stateCounter: string
-  }>(async (resolve, reject) => {
-    try {
-      const response = await coreConnector.hoprChannels.methods.channels(channelId.toHex()).call()
-      return resolve(response)
-    } catch (error) {
-      return reject(error)
-    }
-  })
+async function getChannel(coreConnector: HoprEthereum, channelId: Hash): Promise<{
+  deposit: string
+  partyABalance: string
+  closureTime: string
+  stateCounter: string
+}> {
+  return coreConnector.hoprChannels.methods.channels(channelId.toHex()).call()
 }
 
 const onceOpen = (coreConnector: HoprEthereum, channelId: Hash) => {
@@ -211,7 +204,7 @@ class Channel implements IChannel<HoprEthereum> {
     })
   }
 
-  get state() {
+  get state(): Promise<State> {
     return new Promise<State>(async (resolve, reject) => {
       try {
         const channel = await this.channel
@@ -222,7 +215,7 @@ class Channel implements IChannel<HoprEthereum> {
     })
   }
 
-  get balance() {
+  get balance(): Promise<Balance> {
     return new Promise<Balance>(async (resolve, reject) => {
       try {
         const channel = await this.channel
@@ -233,7 +226,7 @@ class Channel implements IChannel<HoprEthereum> {
     })
   }
 
-  get balance_a() {
+  get balance_a(): Promise<Balance> {
     return new Promise<Balance>(async (resolve, reject) => {
       try {
         const channel = await this.channel
@@ -244,7 +237,7 @@ class Channel implements IChannel<HoprEthereum> {
     })
   }
 
-  get currentBalance() {
+  get currentBalance(): Promise<Balance> {
     return new Promise<Balance>(async (resolve, reject) => {
       try {
         const response = await this.coreConnector.hoprToken.methods.balanceOf(u8aToHex(this.coreConnector.account)).call()
@@ -255,7 +248,7 @@ class Channel implements IChannel<HoprEthereum> {
     })
   }
 
-  get currentBalanceOfCounterparty() {
+  get currentBalanceOfCounterparty(): Promise<Balance> {
     return new Promise<Balance>(async (resolve, reject) => {
       try {
         const response = await this.coreConnector.hoprToken.methods
@@ -269,6 +262,7 @@ class Channel implements IChannel<HoprEthereum> {
   }
 
   async initiateSettlement(): Promise<void> {
+    // @TODO check out whether we can cache this.channel is some way
     let channel = await this.channel
     const status = await this.status
 
@@ -287,7 +281,7 @@ class Channel implements IChannel<HoprEthereum> {
           })
         )
 
-        channel = await getChannel(this.coreConnector, this._channelId)
+        channel = await getChannel(this.coreConnector, await this.channelId)
 
         // TODO: update to handle localnet & mainnet
         await waitFor({
@@ -328,7 +322,7 @@ class Channel implements IChannel<HoprEthereum> {
         })
         .on('error', reject)
         .on('data', ({ key, ownKeyHalf }) => {
-          const [channelId, challenge] = this.coreConnector.dbKeys.ChallengeKeyParse(key)
+          const challenge = this.coreConnector.dbKeys.ChallengeKeyParse(key)[1]
 
           // BIG TODO !!
           // replace this by proper EC-arithmetic
@@ -581,6 +575,8 @@ class Channel implements IChannel<HoprEthereum> {
           //     return hoprEthereum.db.put(Buffer.from(u8aToHex(hoprEthereum.dbKeys.Channel(counterpartyPubKey))), Buffer.from(signedChannel))
           //   })
 
+
+          // @TODO Attach listener to listen for opening event
           await onOpen(hoprEthereum, counterpartyPubKey, signedChannel)
 
           yield signedChannel.toU8a()

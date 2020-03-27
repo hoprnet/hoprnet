@@ -108,8 +108,8 @@ export async function wait(ms: number) {
 }
 
 // TODO: only use this during localnet
-export async function advanceBlockAtTime(web3: Web3, time: number) {
-  return new Promise((resolve, reject) => {
+export function advanceBlockAtTime(web3: Web3, time: number): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
     // @ts-ignore
     web3.currentProvider.send(
       {
@@ -147,6 +147,7 @@ export async function waitFor({
     return undefined;
   }
 
+  // @TODO add if (network == development)
   await advanceBlockAtTime(web3, Math.ceil(timestamp / 1e3) + 1)
 
   return waitFor({

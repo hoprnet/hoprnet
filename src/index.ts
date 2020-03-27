@@ -48,7 +48,7 @@ export default class HoprEthereum implements HoprCoreConnector {
   readonly channel = Channel as typeof IChannel
   readonly CHAIN_NAME = 'HOPR on Ethereum'
 
-  get nonce() {
+  get nonce(): Promise<number> {
     return new Promise<number>(async (resolve, reject) => {
       if (typeof this._nonce !== 'undefined') {
         return this._nonce++
