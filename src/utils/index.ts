@@ -5,19 +5,16 @@ import keccak256 = require('keccak256')
 import { PromiEvent, TransactionReceipt } from 'web3-core'
 import { BlockTransactionString } from 'web3-eth'
 import Web3 from 'web3'
-import BN from "bn.js"
+import BN from 'bn.js'
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
-import { AccountId, Signature, Hash } from "../types"
+import { AccountId, Signature, Hash } from '../types'
 import * as constants from '../constants'
 
-export function isPartyA(self: Types.AccountId, counterparty:Types.AccountId): boolean {
+export function isPartyA(self: Types.AccountId, counterparty: Types.AccountId): boolean {
   return Buffer.compare(self, counterparty) < 0
 }
 
-export function getParties(
-  self: Types.AccountId,
-  counterparty: Types.AccountId
-): [Types.AccountId, Types.AccountId] {
+export function getParties(self: Types.AccountId, counterparty: Types.AccountId): [Types.AccountId, Types.AccountId] {
   if (isPartyA(self, counterparty)) {
     return [self, counterparty]
   } else {
@@ -48,7 +45,7 @@ export async function pubKeyToAccountId(pubKey: Uint8Array): Promise<Types.Accou
       }. Got '${typeof pubKey}'${pubKey.length ? ` of length ${pubKey.length}` : ''}.`
     )
 
-    return new AccountId((await hash(publicKeyConvert(pubKey, false).slice(1))).slice(12))
+  return new AccountId((await hash(publicKeyConvert(pubKey, false).slice(1))).slice(12))
 }
 
 export function hashSync(msg: Uint8Array): Types.Hash {
@@ -113,38 +110,38 @@ export function advanceBlockAtTime(web3: Web3, time: number): Promise<string> {
     // @ts-ignore
     web3.currentProvider.send(
       {
-        jsonrpc: "2.0",
-        method: "evm_mine",
+        jsonrpc: '2.0',
+        method: 'evm_mine',
         params: [time],
-        id: new Date().getTime(),
+        id: new Date().getTime()
       },
       async (err: any) => {
         if (err) {
-          return reject(err);
+          return reject(err)
         }
-        const newBlock = await web3.eth.getBlock("latest");
+        const newBlock = await web3.eth.getBlock('latest')
         const newBlockHash = newBlock.hash
 
-        return resolve(newBlockHash);
-      },
-    );
-  });
-};
+        return resolve(newBlockHash)
+      }
+    )
+  })
+}
 
 export async function waitFor({
   getCurrentBlock,
   web3,
   timestamp
 }: {
-  getCurrentBlock: () => Promise<BlockTransactionString>,
-  web3: Web3,
+  getCurrentBlock: () => Promise<BlockTransactionString>
+  web3: Web3
   timestamp?: number
   // blockNumber?: number
 }): Promise<void> {
   const now = await getCurrentBlock().then(block => Number(block.timestamp) * 1e3)
 
   if (timestamp < now) {
-    return undefined;
+    return undefined
   }
 
   // @TODO add if (network == development)
