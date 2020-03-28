@@ -143,8 +143,17 @@ export default class HoprEthereum implements HoprCoreConnector {
       web3.eth.accounts.wallet.add(acc)
     }
 
-    const hoprChannels = new web3.eth.Contract(HoprChannelsAbi as any, config.DEFAULT_HOPR_CHANNELS_ADDRESS)
-    const hoprToken = new web3.eth.Contract(HoprTokenAbi as any, config.DEFAULT_HOPR_TOKEN_ADDRESS)
+    const network = await utils.getNetworkId(web3)
+
+    if (typeof config.CHANNELS_ADDRESSES[network] === 'undefined') {
+      throw Error(`channel contract address from network ${network} not found`)
+    }
+    if (typeof config.TOKEN_ADDRESSES[network] === 'undefined') {
+      throw Error(`token contract address from network ${network} not found`)
+    }
+
+    const hoprChannels = new web3.eth.Contract(HoprChannelsAbi as any, config.CHANNELS_ADDRESSES[network])
+    const hoprToken = new web3.eth.Contract(HoprTokenAbi as any, config.TOKEN_ADDRESSES[network])
 
     const hoprEthereum = new HoprEthereum(
       db,

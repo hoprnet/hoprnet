@@ -1,8 +1,26 @@
+import { Networks } from './tsc/types'
+
 export const DEFAULT_URI = 'ws://127.0.0.1:9545/'
 
-export const DEFAULT_HOPR_TOKEN_ADDRESS = '0x0f5Ea0A652E851678Ebf77B69484bFcD31F9459B'
+export const TOKEN_ADDRESSES: { [key in Networks]: string } = {
+  mainnet: undefined,
+  morden: undefined,
+  ropsten: undefined,
+  rinkeby: undefined,
+  goerli: undefined,
+  kovan: undefined,
+  private: '0x0f5Ea0A652E851678Ebf77B69484bFcD31F9459B'
+}
 
-export const DEFAULT_HOPR_CHANNELS_ADDRESS = '0xEC8bE1A5630364292E56D01129E8ee8A9578d7D8'
+export const CHANNELS_ADDRESSES: { [key in Networks]: string } = {
+  mainnet: undefined,
+  morden: undefined,
+  ropsten: undefined,
+  rinkeby: undefined,
+  goerli: undefined,
+  kovan: undefined,
+  private: '0xEC8bE1A5630364292E56D01129E8ee8A9578d7D8'
+}
 
 export const FUND_ACCOUNT_PRIVATE_KEY = '0x2bdd21761a483f71054e14f5b827213567971c676928d9a1808cbfa4b7501200'
 

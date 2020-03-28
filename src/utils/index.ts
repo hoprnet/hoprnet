@@ -9,6 +9,7 @@ import BN from 'bn.js'
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import { AccountId, Signature, Hash } from '../types'
 import * as constants from '../constants'
+import { Networks } from "../tsc/types"
 
 export function isPartyA(self: Types.AccountId, counterparty: Types.AccountId): boolean {
   return Buffer.compare(self, counterparty) < 0
@@ -151,6 +152,32 @@ export async function waitFor({
     getCurrentBlock,
     web3,
     timestamp
+  })
+}
+
+/*
+  return network name, not using 'getNetworkType' because
+  it misses networks & uses genesis block to determine networkid
+  supports all infura networks
+*/
+export async function getNetworkId(web3: Web3): Promise<Networks> {
+  return web3.eth.net.getId().then(netId => {
+    switch (netId) {
+      case 1:
+        return "mainnet"
+      case 2:
+        return "morden"
+      case 3:
+        return "ropsten"
+      case 4:
+        return "rinkeby"
+      case 5:
+        return "goerli"
+      case 42:
+        return "kovan"
+      default:
+        return "private"
+    }
   })
 }
 

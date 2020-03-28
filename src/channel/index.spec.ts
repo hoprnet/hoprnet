@@ -30,7 +30,7 @@ const getPrivKeyData = async (_privKey: Uint8Array) => {
 
 describe('test ticket generation and verification', function() {
   const web3 = new Web3(configs.DEFAULT_URI)
-  const hoprToken: HoprToken = new web3.eth.Contract(HoprTokenAbi as any, configs.DEFAULT_HOPR_TOKEN_ADDRESS)
+  const hoprToken: HoprToken = new web3.eth.Contract(HoprTokenAbi as any, configs.TOKEN_ADDRESSES.private)
   const channels = new Map<string, ChannelType>()
   const preChannels = new Map<string, ChannelType>()
   let coreConnector: CoreConnector

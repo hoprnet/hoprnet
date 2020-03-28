@@ -4,7 +4,7 @@ import { HoprToken as IHoprToken } from '../tsc/web3/HoprToken'
 import { stringToU8a } from '../core/u8a'
 import { privKeyToPubKey, pubKeyToAccountId } from '../utils'
 import { AccountId } from '../types'
-import { DEFAULT_URI, DEFAULT_HOPR_TOKEN_ADDRESS, FUND_ACCOUNT_PRIVATE_KEY, DEMO_ACCOUNTS } from '../config'
+import { DEFAULT_URI, TOKEN_ADDRESSES, FUND_ACCOUNT_PRIVATE_KEY, DEMO_ACCOUNTS } from '../config'
 
 const AMOUNT = Web3.utils.toWei('100', 'ether')
 
@@ -16,7 +16,7 @@ const privKeyToAddress = async (privKey: string) => {
 
 async function main() {
   const web3 = new Web3(DEFAULT_URI)
-  const hoprToken: IHoprToken = new web3.eth.Contract(HoprTokenAbi as any, DEFAULT_HOPR_TOKEN_ADDRESS)
+  const hoprToken: IHoprToken = new web3.eth.Contract(HoprTokenAbi as any, TOKEN_ADDRESSES.private)
   const owner = await privKeyToAddress(FUND_ACCOUNT_PRIVATE_KEY)
 
   for (const privKey of DEMO_ACCOUNTS) {
