@@ -387,10 +387,10 @@ class Channel implements IChannel<HoprEthereum> {
     const channelId = await this.channelId
     const nonce = await hash(signature)
 
-    const key = this.coreConnector.dbKeys.Nonce(channelId, nonce)
+    const key = new Hash(this.coreConnector.dbKeys.Nonce(channelId, nonce)).toHex()
 
     try {
-      await this.coreConnector.db.get(u8aToHex(key))
+      await this.coreConnector.db.get(key)
     } catch (err) {
       if (err.notFound == null || err.notFound != true) {
         throw err
