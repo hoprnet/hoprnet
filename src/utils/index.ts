@@ -49,12 +49,8 @@ export async function pubKeyToAccountId(pubKey: Uint8Array): Promise<Types.Accou
   return new AccountId((await hash(publicKeyConvert(pubKey, false).slice(1))).slice(12))
 }
 
-export function hashSync(msg: Uint8Array): Types.Hash {
-  return new Hash(new Uint8Array(keccak256(Buffer.from(msg))))
-}
-
 export async function hash(msg: Uint8Array): Promise<Types.Hash> {
-  return Promise.resolve(hashSync(msg))
+  return Promise.resolve(new Hash(new Uint8Array(keccak256(Buffer.from(msg)))))
 }
 
 export async function sign(msg: Uint8Array, privKey: Uint8Array): Promise<Types.Signature> {
