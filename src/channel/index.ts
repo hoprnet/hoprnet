@@ -242,7 +242,6 @@ class Channel implements IChannel<HoprEthereum> {
     })
   }
 
-  // @TODO: remove empty data
   get state(): Promise<State> {
     return new Promise<State>(async (resolve, reject) => {
       try {
@@ -250,7 +249,9 @@ class Channel implements IChannel<HoprEthereum> {
         const status = stateCountToStatus(Number(channel.stateCounter))
 
         return resolve(new State(undefined, {
+          // @TODO: implement this once on-chain channel secrets are added
           secret: new Hash(new Uint8Array(Hash.SIZE).fill(0x0)),
+          // not needed
           pubkey: new Public(new Uint8Array(Public.SIZE).fill(0x0)),
           epoch: new TicketEpoch(status)
         }))
