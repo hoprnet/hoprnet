@@ -624,13 +624,9 @@ class Channel implements IChannel<HoprEthereum> {
             )
           }
 
-          // onceOpen(hoprEthereum, new Hash(channelId))
-          //   .then(() => {
-          //     return hoprEthereum.db.put(Buffer.from(u8aToHex(hoprEthereum.dbKeys.Channel(counterpartyPubKey))), Buffer.from(signedChannel))
-          //   })
-
-          // @TODO Attach listener to listen for opening event
-          await onOpen(hoprEthereum, counterpartyPubKey, signedChannel)
+          // listen for opening event and update DB
+          onceOpen(hoprEthereum, hoprEthereum.account, counterparty)
+            .then(() => onOpen(hoprEthereum, counterpartyPubKey, signedChannel))
 
           yield signedChannel.toU8a()
         }
