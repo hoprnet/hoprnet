@@ -4,7 +4,7 @@ import { LevelUp } from 'levelup'
 import BN from 'bn.js'
 import HoprChannelsAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprChannels.json'
 import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
-import Channel from './channel'
+import Channel, { events } from './channel'
 import * as dbkeys from './dbKeys'
 import * as types from './types'
 import * as utils from './utils'
@@ -22,7 +22,9 @@ import HoprCoreConnector, {
 } from '@hoprnet/hopr-core-connector-interface'
 
 export default class HoprEthereum implements HoprCoreConnector {
-  private _started: boolean = false
+  private _accountSecretInitialized = false
+  private _starting: Promise<void>
+  private _started = false
   private _nonce?: number
 
   constructor(
@@ -64,12 +66,58 @@ export default class HoprEthereum implements HoprCoreConnector {
     })
   }
 
-  async start() {
-    this._started = true
+  get accountBalance() {
+    return this.hoprToken.methods
+      .balanceOf(u8aToHex(this.account))
+      .call()
+      .then(res => {
+        return new BN(res)
+      })
   }
 
-  // TODO: unsubscribe event listeners
+  async start() {
+    if (this._starting) {
+      console.log('Connector is already starting..')
+      return this._starting
+    }
+    if (this._started) {
+      console.log('Connector has already started')
+      return
+    }
+
+    this._starting = Promise.resolve()
+      .then(async () => {
+        // initialize stuff
+        await Promise.all([
+          // initialize account secret
+          this.initializeAccountSecret()
+          // ..
+        ])
+
+        // agnostic check if connector can start
+        // @TODO: maybe remove this OR introduce timeout
+        while (!this.canStart()) {
+          await utils.wait(1 * 1e3)
+        }
+
+        this._started = true
+      })
+      .catch(console.error)
+      .finally(() => {
+        this._starting = undefined
+      })
+
+    return this._starting
+  }
+
   async stop() {
+    // @TODO: cancel starting
+    if (this._starting) {
+      console.log(`Cannot stop connector while it's starting`)
+      return
+    }
+
+    events.clearAllEvents()
     this._started = false
   }
 
@@ -77,7 +125,77 @@ export default class HoprEthereum implements HoprCoreConnector {
     return this._started
   }
 
+  // check whether connector can start
+  async canStart() {
+    return this._accountSecretInitialized
+  }
+
   async initOnchainValues(nonce?: number) {
+    return this.setAccountSecret(nonce)
+  }
+
+  async initializeAccountSecret(): Promise<void> {
+    console.log('Initializing account secret')
+    const ok = await this.checkAccountSecret()
+
+    if (!ok) {
+      console.log('Setting account secret..')
+      await this.setAccountSecret()
+    }
+
+    console.log('Account secret initialized!')
+  }
+
+  // return 'true' if account secret is setup correctly
+  async checkAccountSecret(): Promise<boolean> {
+    let offChainSecret: Uint8Array
+    let onChainSecret: Uint8Array
+
+    // retrieve offChain secret
+    try {
+      offChainSecret = await this.db.get(Buffer.from(dbkeys.OnChainSecret()))
+    } catch (err) {
+      if (err.notFound != true) {
+        throw err
+      }
+      offChainSecret = undefined
+    }
+
+    // retrieve onChain secret
+    onChainSecret = await this.hoprChannels.methods
+      .accounts(this.account.toHex())
+      .call()
+      .then(res => stringToU8a(res.hashedSecret))
+      .then(secret => {
+        if (u8aEquals(secret, new Uint8Array(types.Hash.SIZE).fill(0x00))) {
+          return undefined
+        }
+
+        return secret
+      })
+
+    let hasOffChainSecret = typeof offChainSecret !== 'undefined'
+    let hasOnChainSecret = typeof onChainSecret !== 'undefined'
+
+    if (hasOffChainSecret !== hasOnChainSecret) {
+      if (hasOffChainSecret) {
+        console.log(`Key is present off-chain but not on-chain, submitting..`)
+        await utils.waitForConfirmation(
+          this.hoprChannels.methods.setHashedSecret(u8aToHex(offChainSecret)).send({
+            from: this.account.toHex(),
+            gas: 200e3
+          })
+        )
+        hasOnChainSecret = true
+      } else {
+        throw Error(`Key is present on-chain but not in our database.`)
+      }
+    }
+
+    return hasOffChainSecret && hasOnChainSecret
+  }
+
+  async setAccountSecret(nonce?: number): Promise<void> {
     let secret = new Uint8Array(randomBytes(32))
 
     const dbPromise = this.db.put(Buffer.from(this.dbKeys.OnChainSecret()), secret.slice())
@@ -96,15 +214,6 @@ export default class HoprEthereum implements HoprCoreConnector {
       ),
       dbPromise
     ])
-  }
-
-  get accountBalance() {
-    return this.hoprToken.methods
-      .balanceOf(u8aToHex(this.account))
-      .call()
-      .then(res => {
-        return new BN(res)
-      })
   }
 
   static readonly constants = constants as typeof IConstants
@@ -171,49 +280,8 @@ export default class HoprEthereum implements HoprCoreConnector {
       hoprToken
     )
 
-    // if (!(await checkOnChainValues(hoprEthereum))) {
-    //   await hoprEthereum.initOnchainValues()
-    // }
-
     return hoprEthereum
   }
-}
-
-// TODO: test
-async function checkOnChainValues(hoprEthereum: HoprEthereum) {
-  let offChain: boolean
-  let secret: Uint8Array = new Uint8Array()
-
-  try {
-    secret = await hoprEthereum.db.get(Buffer.from(dbkeys.OnChainSecret()))
-    offChain = true
-  } catch (err) {
-    if (err.notFound != true) {
-      throw err
-    }
-    offChain = false
-  }
-
-  const onChainSecret = await hoprEthereum.hoprChannels.methods
-    .accounts(hoprEthereum.account.toHex())
-    .call()
-    .then(res => res.hashedSecret)
-    .then(hashedSecret => stringToU8a(hashedSecret))
-
-  const onChain = !u8aEquals(onChainSecret, new Uint8Array(types.Hash.SIZE).fill(0x00))
-
-  if (offChain != onChain) {
-    if (offChain) {
-      await hoprEthereum.hoprChannels.methods.setHashedSecret(u8aToHex(secret)).send({
-        from: hoprEthereum.account.toHex(),
-        gas: 200e3
-      })
-    } else {
-      throw Error(`Key is present on-chain but not in our database.`)
-    }
-  }
-
-  return offChain && onChain
 }
 
 export const Types = types

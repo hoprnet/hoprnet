@@ -1,12 +1,24 @@
 import type { Channel as IChannel, Types } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
 // import Web3 from "web3"
-import { SignedChannel, Moment, Hash, AccountId, ChannelId, Balance, ChannelBalance, Ticket, State, Public, TicketEpoch } from '../types'
+import {
+  SignedChannel,
+  Moment,
+  Hash,
+  AccountId,
+  ChannelId,
+  Balance,
+  ChannelBalance,
+  Ticket,
+  State,
+  Public,
+  TicketEpoch
+} from '../types'
 import { ChannelStatus } from '../types/channel'
+import * as events from './events'
 import { HASH_LENGTH } from '../constants'
 import { u8aToHex, u8aXOR, stringToU8a, u8aEquals } from '../core/u8a'
 import { waitForConfirmation, waitFor, hash, getId, stateCountToStatus } from '../utils'
-import { HoprChannels as IHoprChannels } from '../tsc/web3/HoprChannels'
 import type HoprEthereum from '..'
 
 async function getChannel(
@@ -23,7 +35,6 @@ async function getChannel(
 
 const onceOpen = async (coreConnector: HoprEthereum, self: AccountId, counterparty: AccountId) => {
   const channelId = await getId(self, counterparty)
-  const events: ReturnType<IHoprChannels['events']['OpenedChannel']>[] = []
 
   return new Promise<{
     opener: string
@@ -41,7 +52,8 @@ const onceOpen = async (coreConnector: HoprEthereum, self: AccountId, counterpar
     }
     const onError = (error: any) => reject(error)
 
-    events.push(
+    events.addEvent(
+      'OpenedChannel',
       coreConnector.hoprChannels.events
         .OpenedChannel({
           filter: {
@@ -53,7 +65,8 @@ const onceOpen = async (coreConnector: HoprEthereum, self: AccountId, counterpar
         .on('error', onError)
     )
 
-    events.push(
+    events.addEvent(
+      'OpenedChannel',
       coreConnector.hoprChannels.events
         .OpenedChannel({
           filter: {
@@ -65,13 +78,12 @@ const onceOpen = async (coreConnector: HoprEthereum, self: AccountId, counterpar
         .on('error', onError)
     )
   }).finally(() => {
-    events.forEach(event => event.removeAllListeners())
+    events.clearEvents('OpenedChannel')
   })
 }
 
 const onceClosed = async (coreConnector: HoprEthereum, self: AccountId, counterparty: AccountId) => {
   const channelId = await getId(self, counterparty)
-  const events: ReturnType<IHoprChannels['events']['ClosedChannel']>[] = []
 
   return new Promise<{
     closer: string
@@ -89,7 +101,8 @@ const onceClosed = async (coreConnector: HoprEthereum, self: AccountId, counterp
     }
     const onError = (error: any) => reject(error)
 
-    events.push(
+    events.addEvent(
+      "ClosedChannel",
       coreConnector.hoprChannels.events
         .ClosedChannel({
           filter: {
@@ -101,7 +114,8 @@ const onceClosed = async (coreConnector: HoprEthereum, self: AccountId, counterp
         .on('error', onError)
     )
 
-    events.push(
+    events.addEvent(
+      "ClosedChannel",
       coreConnector.hoprChannels.events
         .ClosedChannel({
           filter: {
@@ -113,7 +127,7 @@ const onceClosed = async (coreConnector: HoprEthereum, self: AccountId, counterp
         .on('error', onError)
     )
   }).finally(() => {
-    events.forEach(event => event.removeAllListeners())
+    events.clearEvents("ClosedChannel")
   })
 }
 
@@ -248,13 +262,15 @@ class Channel implements IChannel<HoprEthereum> {
         const channel = await this.channel
         const status = stateCountToStatus(Number(channel.stateCounter))
 
-        return resolve(new State(undefined, {
-          // @TODO: implement this once on-chain channel secrets are added
-          secret: new Hash(new Uint8Array(Hash.SIZE).fill(0x0)),
-          // not needed
-          pubkey: new Public(new Uint8Array(Public.SIZE).fill(0x0)),
-          epoch: new TicketEpoch(status)
-        }))
+        return resolve(
+          new State(undefined, {
+            // @TODO: implement this once on-chain channel secrets are added
+            secret: new Hash(new Uint8Array(Hash.SIZE).fill(0x0)),
+            // not needed
+            pubkey: new Public(new Uint8Array(Public.SIZE).fill(0x0)),
+            epoch: new TicketEpoch(status)
+          })
+        )
       } catch (error) {
         return reject(error)
       }
@@ -613,7 +629,6 @@ class Channel implements IChannel<HoprEthereum> {
           const counterpartyPubKey = await signedChannel.signer
           const counterparty = new AccountId(await hoprEthereum.utils.pubKeyToAccountId(counterpartyPubKey))
           const channelBalance = signedChannel.channel.balance
-          // const channelId = await hoprEthereum.utils.getId(hoprEthereum.account, counterparty)
           const spender = hoprEthereum.hoprChannels.options.address
 
           if (hoprEthereum.utils.isPartyA(hoprEthereum.account, counterparty)) {
@@ -633,8 +648,9 @@ class Channel implements IChannel<HoprEthereum> {
           }
 
           // listen for opening event and update DB
-          onceOpen(hoprEthereum, hoprEthereum.account, counterparty)
-            .then(() => onOpen(hoprEthereum, counterpartyPubKey, signedChannel))
+          onceOpen(hoprEthereum, hoprEthereum.account, counterparty).then(() =>
+            onOpen(hoprEthereum, counterpartyPubKey, signedChannel)
+          )
 
           yield signedChannel.toU8a()
         }
@@ -643,6 +659,7 @@ class Channel implements IChannel<HoprEthereum> {
   }
 }
 
+export { events }
 export default Channel
 
 // TODO: remove this
