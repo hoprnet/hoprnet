@@ -8,6 +8,7 @@ import Web3 from 'web3'
 import BN from 'bn.js'
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import { AccountId, Signature, Hash } from '../types'
+import { ChannelStatus } from "../types/channel"
 import * as constants from '../constants'
 import { Networks } from "../tsc/types"
 
@@ -152,8 +153,8 @@ export async function waitFor({
 }
 
 /*
-  return network name, not using 'getNetworkType' because
-  it misses networks & uses genesis block to determine networkid
+  return network name, not using web3 'getNetworkType' because
+  it misses networks & uses genesis block to determine networkid.
   supports all infura networks
 */
 export async function getNetworkId(web3: Web3): Promise<Networks> {
@@ -175,6 +176,16 @@ export async function getNetworkId(web3: Web3): Promise<Networks> {
         return "private"
     }
   })
+}
+
+export function stateCountToStatus(stateCount: number): ChannelStatus {
+  const status = Number(stateCount) % 10
+
+  if (status >= Object.keys(ChannelStatus).length) {
+    throw Error("status like this doesn't exist")
+  }
+
+  return status
 }
 
 // TODO: production code

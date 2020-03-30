@@ -1,11 +1,11 @@
 import type { Channel as IChannel, Types } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
 // import Web3 from "web3"
-import { SignedChannel, Moment, Hash, AccountId, ChannelId, Balance, ChannelBalance, Ticket, State } from '../types'
+import { SignedChannel, Moment, Hash, AccountId, ChannelId, Balance, ChannelBalance, Ticket, State, Public, TicketEpoch } from '../types'
 import { ChannelStatus } from '../types/channel'
 import { HASH_LENGTH } from '../constants'
 import { u8aToHex, u8aXOR, stringToU8a, u8aEquals } from '../core/u8a'
-import { waitForConfirmation, waitFor, hash, getId } from '../utils'
+import { waitForConfirmation, waitFor, hash, getId, stateCountToStatus } from '../utils'
 import { HoprChannels as IHoprChannels } from '../tsc/web3/HoprChannels'
 import type HoprEthereum from '..'
 
@@ -242,11 +242,18 @@ class Channel implements IChannel<HoprEthereum> {
     })
   }
 
+  // @TODO: remove empty data
   get state(): Promise<State> {
     return new Promise<State>(async (resolve, reject) => {
       try {
         const channel = await this.channel
-        return resolve(new State(Number(channel.stateCounter)))
+        const status = stateCountToStatus(Number(channel.stateCounter))
+
+        return resolve(new State(undefined, {
+          secret: new Hash(new Uint8Array(Hash.SIZE).fill(0x0)),
+          pubkey: new Public(new Uint8Array(Public.SIZE).fill(0x0)),
+          epoch: new TicketEpoch(status)
+        }))
       } catch (error) {
         return reject(error)
       }

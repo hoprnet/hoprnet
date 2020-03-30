@@ -2,7 +2,7 @@ import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import { ChannelBalance, Moment } from '.'
 import { Uint8ArrayE } from '../types/extended'
 import { u8aConcat } from '../core/u8a'
-import { hash } from "../utils"
+import { hash, stateCountToStatus } from "../utils"
 
 export enum ChannelStatus {
   UNINITIALISED,
@@ -42,15 +42,12 @@ class Channel extends Uint8ArrayE implements Types.Channel {
     })
   }
 
+  get stateCounter(): number {
+    return Number(this.subarray(ChannelBalance.SIZE, ChannelBalance.SIZE + 1)[0])
+  }
+
   get status(): ChannelStatus {
-    const n = Number(this.subarray(ChannelBalance.SIZE, ChannelBalance.SIZE + 1)[0])
-    const status = Number(n) % 10
-
-    if (status >= Object.keys(ChannelStatus).length) {
-      throw Error("status like this doesn't exist")
-    }
-
-    return status
+    return stateCountToStatus(this.stateCounter)
   }
 
   get hash() {
