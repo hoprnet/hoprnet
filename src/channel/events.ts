@@ -18,6 +18,7 @@ const addEvent = <N extends EventNames>(name: N, event: EventEmitter<N>): EventE
 const clearEvents = (name: EventNames): void => {
   const events = store.get(name) || []
 
+  // @TODO: needs testing
   for (const event of events) {
     event.removeAllListeners()
   }

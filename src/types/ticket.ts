@@ -122,17 +122,16 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
     })
   }
 
-  // TODO: use this
   static async verify(channel: ChannelInstance, signedTicket: SignedTicket): Promise<boolean> {
-    // if ((await channel.currentBalanceOfCounterparty).add(signedTicket.ticket.amount).gt(await channel.balance)) {
-    //   return false
-    // }
+    if ((await channel.currentBalanceOfCounterparty).add(signedTicket.ticket.amount).gt(await channel.balance)) {
+      return false
+    }
 
-    // try {
-    //   await channel.testAndSetNonce(signedTicket)
-    // } catch {
-    //   return false
-    // }
+    try {
+      await channel.testAndSetNonce(signedTicket)
+    } catch {
+      return false
+    }
 
     return verify(await signedTicket.ticket.hash, signedTicket.signature, await channel.offChainCounterparty)
   }
