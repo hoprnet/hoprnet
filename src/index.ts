@@ -5,6 +5,7 @@ import BN from 'bn.js'
 import HoprChannelsAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprChannels.json'
 import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
 import Channel, { events } from './channel'
+import Ticket from './ticket'
 import * as dbkeys from './dbKeys'
 import * as types from './types'
 import * as utils from './utils'
@@ -49,6 +50,7 @@ export default class HoprEthereum implements HoprCoreConnector {
   readonly types = types as typeof ITypes
   readonly constants = constants as typeof IConstants
   readonly channel = Channel as typeof IChannel
+  readonly ticket = Ticket
   readonly CHAIN_NAME = 'HOPR on Ethereum'
 
   get nonce(): Promise<number> {

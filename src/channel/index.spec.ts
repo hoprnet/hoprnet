@@ -1,8 +1,7 @@
 import assert from 'assert'
+import { getPrivKeyData, generateUser, generateNode } from '../utils/testing'
 import { randomBytes } from 'crypto'
-import Memdown from 'memdown'
 import BN from 'bn.js'
-import LevelUp from 'levelup'
 import pipe from 'it-pipe'
 import Web3 from 'web3'
 import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
@@ -13,20 +12,7 @@ import { ChannelStatus } from '../types/channel'
 import CoreConnector from '..'
 import Channel from '.'
 import * as u8a from '../core/u8a'
-import * as utils from '../utils'
 import * as configs from '../config'
-
-const getPrivKeyData = async (_privKey: Uint8Array) => {
-  const privKey = new Hash(_privKey)
-  const pubKey = new Hash(await utils.privKeyToPubKey(privKey))
-  const address = new AccountId(await utils.pubKeyToAccountId(pubKey))
-
-  return {
-    privKey,
-    pubKey,
-    address
-  }
-}
 
 describe('test ticket generation and verification', function() {
   const web3 = new Web3(configs.DEFAULT_URI)
@@ -37,36 +23,13 @@ describe('test ticket generation and verification', function() {
   let counterpartysCoreConnector: CoreConnector
   let funder: Await<ReturnType<typeof getPrivKeyData>>
 
-  async function generateUser() {
-    const user = await getPrivKeyData(randomBytes(32))
-
-    // fund user with ETH
-    await web3.eth.sendTransaction({
-      value: web3.utils.toWei('1', 'ether'),
-      from: funder.address.toHex(),
-      to: user.address.toHex()
-    })
-
-    // mint user some HOPR
-    await hoprToken.methods.mint(user.address.toHex(), web3.utils.toWei('1', 'ether')).send({
-      from: funder.address.toHex(),
-      gas: 200e3
-    })
-
-    return user
-  }
-
-  async function generateNode(privKey: Uint8Array): Promise<CoreConnector> {
-    return CoreConnector.create(new LevelUp(Memdown()), privKey)
-  }
-
   beforeEach(async function() {
     channels.clear()
     preChannels.clear()
 
     funder = await getPrivKeyData(u8a.stringToU8a(configs.FUND_ACCOUNT_PRIVATE_KEY))
-    const userA = await generateUser()
-    const userB = await generateUser()
+    const userA = await generateUser(web3, funder, hoprToken)
+    const userB = await generateUser(web3, funder, hoprToken)
 
     coreConnector = await generateNode(userA.privKey)
     counterpartysCoreConnector = await generateNode(userB.privKey)
