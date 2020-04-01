@@ -1,7 +1,6 @@
 import { u8aToHex, u8aEquals } from '../../core/u8a'
 
 class Uint8ArrayE extends Uint8Array {
-  // TODO: verify jf it's correct
   subarray(begin: number = 0, end?: number) {
     return new Uint8Array(this.buffer, begin + this.byteOffset, end != null ? end - begin : undefined)
   }

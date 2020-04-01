@@ -4,6 +4,13 @@ import { LevelUp } from 'levelup'
 import BN from 'bn.js'
 import HoprChannelsAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprChannels.json'
 import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
+import HoprCoreConnector, {
+  Utils as IUtils,
+  Types as ITypes,
+  Channel as IChannel,
+  Constants as IConstants,
+  DbKeys as IDbKeys
+} from '@hoprnet/hopr-core-connector-interface'
 import Channel, { events } from './channel'
 import Ticket from './ticket'
 import * as dbkeys from './dbKeys'
@@ -12,15 +19,9 @@ import * as utils from './utils'
 import * as constants from './constants'
 import { u8aToHex, stringToU8a, u8aEquals } from './core/u8a'
 import * as config from './config'
+import { Networks } from './tsc/types'
 import { HoprChannels } from './tsc/web3/HoprChannels'
 import { HoprToken } from './tsc/web3/HoprToken'
-import HoprCoreConnector, {
-  Utils as IUtils,
-  Types as ITypes,
-  Channel as IChannel,
-  Constants as IConstants,
-  DbKeys as IDbKeys
-} from '@hoprnet/hopr-core-connector-interface'
 
 export default class HoprEthereum implements HoprCoreConnector {
   private _status: 'uninitialized' | 'initialized' | 'started' | 'stopped' = 'uninitialized'
@@ -28,6 +29,7 @@ export default class HoprEthereum implements HoprCoreConnector {
   private _starting: Promise<void>
   private _stopping: Promise<void>
   private _nonce?: number
+  public signTransaction: ReturnType<typeof utils.TransactionSigner>
 
   constructor(
     public db: LevelUp,
@@ -41,9 +43,12 @@ export default class HoprEthereum implements HoprCoreConnector {
     },
     public account: types.AccountId,
     public web3: Web3,
+    public network: Networks,
     public hoprChannels: HoprChannels,
     public hoprToken: HoprToken
-  ) {}
+  ) {
+    this.signTransaction = utils.TransactionSigner(web3, self.privateKey)
+  }
 
   readonly dbKeys = dbkeys as typeof IDbKeys
   readonly utils = utils as typeof IUtils
@@ -256,10 +261,12 @@ export default class HoprEthereum implements HoprCoreConnector {
       if (hasOffChainSecret) {
         console.log(`Key is present off-chain but not on-chain, submitting..`)
         await utils.waitForConfirmation(
-          this.hoprChannels.methods.setHashedSecret(u8aToHex(offChainSecret)).send({
-            from: this.account.toHex(),
-            gas: 200e3
-          })
+          (
+            await this.signTransaction(this.hoprChannels.methods.setHashedSecret(u8aToHex(offChainSecret)), {
+              from: this.account.toHex(),
+              to: this.hoprChannels.options.address
+            })
+          ).send()
         )
         hasOnChainSecret = true
       } else {
@@ -281,11 +288,13 @@ export default class HoprEthereum implements HoprCoreConnector {
 
     await Promise.all([
       await utils.waitForConfirmation(
-        this.hoprChannels.methods.setHashedSecret(u8aToHex(secret)).send({
-          from: this.account.toHex(),
-          nonce: nonce || (await this.nonce),
-          gas: 200e3
-        })
+        (
+          await this.signTransaction(this.hoprChannels.methods.setHashedSecret(u8aToHex(secret)), {
+            from: this.account.toHex(),
+            to: this.hoprChannels.options.address,
+            nonce: nonce || (await this.nonce)
+          })
+        ).send()
       ),
       dbPromise
     ])
@@ -330,16 +339,6 @@ export default class HoprEthereum implements HoprCoreConnector {
 
     const web3 = new Web3(provider)
     const account = new types.AccountId(address)
-
-    // add privkey to web3
-    // TODO: check if this is good practise
-    const web3Accounts = await web3.eth.getAccounts()
-    if (!web3Accounts.includes(account.toHex())) {
-      console.log('adding private key to web3js context')
-      const acc = web3.eth.accounts.privateKeyToAccount(u8aToHex(privateKey))
-      web3.eth.accounts.wallet.add(acc)
-    }
-
     const network = await utils.getNetworkId(web3)
 
     if (typeof config.CHANNELS_ADDRESSES[network] === 'undefined') {
@@ -352,7 +351,7 @@ export default class HoprEthereum implements HoprCoreConnector {
     const hoprChannels = new web3.eth.Contract(HoprChannelsAbi as any, config.CHANNELS_ADDRESSES[network])
     const hoprToken = new web3.eth.Contract(HoprTokenAbi as any, config.TOKEN_ADDRESSES[network])
 
-    const hoprEthereum = new HoprEthereum(
+    const coreConnector = new HoprEthereum(
       db,
       {
         privateKey,
@@ -364,14 +363,15 @@ export default class HoprEthereum implements HoprCoreConnector {
       },
       account,
       web3,
+      network,
       hoprChannels,
       hoprToken
     )
 
     // begin initializing
-    hoprEthereum.initialize().catch(console.error)
+    coreConnector.initialize().catch(console.error)
 
-    return hoprEthereum
+    return coreConnector
   }
 }
 

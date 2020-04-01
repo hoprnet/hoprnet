@@ -137,7 +137,7 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
     return verify(await signedTicket.ticket.hash, signedTicket.signature, await channel.offChainCounterparty)
   }
 
-  // TODO: implement
+  // @TODO: implement submit
   static async submit(channel: any, signedTicket: SignedTicket) {
     throw Error('not implemented')
   }

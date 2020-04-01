@@ -2,15 +2,16 @@ import assert from 'assert'
 import { publicKeyConvert, publicKeyCreate, ecdsaSign, ecdsaRecover, ecdsaVerify } from 'secp256k1'
 // @ts-ignore
 import keccak256 = require('keccak256')
-import { PromiEvent, TransactionReceipt } from 'web3-core'
+import { PromiEvent, TransactionReceipt, TransactionConfig } from 'web3-core'
 import { BlockTransactionString } from 'web3-eth'
 import Web3 from 'web3'
 import BN from 'bn.js'
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import { AccountId, Signature, Hash } from '../types'
-import { ChannelStatus } from "../types/channel"
+import { ChannelStatus } from '../types/channel'
 import * as constants from '../constants'
-import { Networks } from "../tsc/types"
+import { Networks } from '../tsc/types'
+import { TransactionObject } from '../tsc/web3/types'
 
 export function isPartyA(self: Types.AccountId, counterparty: Types.AccountId): boolean {
   return Buffer.compare(self, counterparty) < 0
@@ -96,13 +97,6 @@ export async function waitForConfirmation<T extends PromiEvent<any>>(event: T) {
   })
 }
 
-export async function wait(ms: number) {
-  return new Promise(resolve => {
-    setTimeout(resolve, ms)
-  })
-}
-
-// TODO: only use this during localnet
 export function advanceBlockAtTime(web3: Web3, time: number): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     // @ts-ignore
@@ -126,15 +120,22 @@ export function advanceBlockAtTime(web3: Web3, time: number): Promise<string> {
   })
 }
 
+export async function wait(ms: number) {
+  return new Promise(resolve => {
+    setTimeout(resolve, ms)
+  })
+}
+
 export async function waitFor({
-  getCurrentBlock,
   web3,
+  network,
+  getCurrentBlock,
   timestamp
 }: {
-  getCurrentBlock: () => Promise<BlockTransactionString>
   web3: Web3
+  network: Networks
+  getCurrentBlock: () => Promise<BlockTransactionString>
   timestamp?: number
-  // blockNumber?: number
 }): Promise<void> {
   const now = await getCurrentBlock().then(block => Number(block.timestamp) * 1e3)
 
@@ -142,13 +143,18 @@ export async function waitFor({
     return undefined
   }
 
-  // @TODO add if (network == development)
-  await advanceBlockAtTime(web3, Math.ceil(timestamp / 1e3) + 1)
+  if (network === 'private') {
+    await advanceBlockAtTime(web3, Math.ceil(timestamp / 1e3) + 1)
+  } else {
+    const diff = now - timestamp || 60 * 1e3
+    await wait(diff)
+  }
 
   return waitFor({
-    getCurrentBlock,
     web3,
-    timestamp
+    network,
+    getCurrentBlock,
+    timestamp: await getCurrentBlock().then(block => Number(block.timestamp) * 1e3)
   })
 }
 
@@ -161,19 +167,19 @@ export async function getNetworkId(web3: Web3): Promise<Networks> {
   return web3.eth.net.getId().then(netId => {
     switch (netId) {
       case 1:
-        return "mainnet"
+        return 'mainnet'
       case 2:
-        return "morden"
+        return 'morden'
       case 3:
-        return "ropsten"
+        return 'ropsten'
       case 4:
-        return "rinkeby"
+        return 'rinkeby'
       case 5:
-        return "goerli"
+        return 'goerli'
       case 42:
-        return "kovan"
+        return 'kovan'
       default:
-        return "private"
+        return 'private'
     }
   })
 }
@@ -188,31 +194,38 @@ export function stateCountToStatus(stateCount: number): ChannelStatus {
   return status
 }
 
-// TODO: production code
-// export async function waitFor({
-//   getCurrentBlock,
-//   timestamp
-// }: {
-//   getCurrentBlock: () => Promise<BlockTransactionString>
-//   timestamp?: number
-//   // blockNumber?: number
-// }): Promise<void> {
-//   const now = await getCurrentBlock().then(block => Number(block.timestamp) * 1e3)
-//   console.log({
-//     now,
-//     timestamp,
-//     diff: now - timestamp
-//   })
+// sign transaction's locally and send them
+// @TODO: switch to web3js-accounts wallet if it's safe
+export function TransactionSigner(web3: Web3, privKey: Uint8Array) {
+  const privKeyStr = new Hash(privKey).toHex()
 
-//   if (timestamp < now) {
-//     return undefined;
-//   }
+  return async function sendTransaction<T extends any>(
+    // return of our contract method in web3.Contract instance
+    txObject: TransactionObject<T>,
+    // config put in .send
+    txConfig: TransactionConfig
+  ) {
+    const abi = txObject.encodeABI()
+    // estimation is not always right, adding some more
+    // const estimatedGas = Math.floor((await txObject.estimateGas()) * 1.25)
+    const estimatedGas = 200e3
 
-//   const diff = (now - timestamp) || 60 * 1e3
+    // @TODO: provide some of the values to avoid multiple calls
+    const signedTransaction = await web3.eth.accounts.signTransaction(
+      {
+        gas: estimatedGas,
+        ...txConfig,
+        data: abi
+      },
+      privKeyStr
+    )
 
-//   await wait(diff)
-//   return waitFor({
-//     getCurrentBlock,
-//     timestamp: await getCurrentBlock().then(block => Number(block.timestamp) * 1e3)
-//   })
-// }
+    function send() {
+      return web3.eth.sendSignedTransaction(signedTransaction.rawTransaction)
+    }
+
+    return {
+      send
+    }
+  }
+}
