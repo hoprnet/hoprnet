@@ -331,10 +331,10 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
     const filter = (peerInfo: PeerInfo) =>
       !peerInfo.id.isEqual(this.peerInfo.id) &&
       !peerInfo.id.isEqual(destination) &&
+      // exclude bootstrap server(s) from crawling results
       !this.bootstrapServers.some((pInfo: PeerInfo) => pInfo.id.isEqual(peerInfo.id))
 
-    // @TODO exclude bootstrap server(s) from crawling results
-    this.network.crawler.crawl()
+    await this.network.crawler.crawl()
 
     const array = []
     for (const peerInfo of this.peerStore.peers.values()) {
@@ -352,7 +352,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
 
     if (options != null && options.bootstrapNode) {
       db_dir += `bootstrap`
-    } else if (options != null && options.id != null &&  Number.isInteger(options.id)) {
+    } else if (options != null && options.id != null && Number.isInteger(options.id)) {
       // For testing ...
       db_dir += `node_${options.id}`
     } else {
