@@ -2,12 +2,12 @@ import { AbstractInteraction } from '../abstractInteraction'
 
 import pipe from 'it-pipe'
 import PeerId from 'peer-id'
-import PeerInfo from 'peer-info'
+import type PeerInfo from 'peer-info'
 
 import chalk from 'chalk'
 
-import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import Hopr from '../../'
+import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
+import type Hopr from '../../'
 import { Acknowledgement } from '../../messages/acknowledgement'
 
 import EventEmitter from 'events'

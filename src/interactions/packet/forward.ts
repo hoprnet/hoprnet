@@ -1,14 +1,14 @@
-import { PROTOCOL_STRING, MAX_HOPS } from '../../constants'
+import { PROTOCOL_STRING } from '../../constants'
 import { Packet } from '../../messages/packet'
 import { Acknowledgement } from '../../messages/acknowledgement'
 
-import PeerId from 'peer-id'
+import type PeerId from 'peer-id'
 import PeerInfo from 'peer-info'
 import chalk from 'chalk'
 
-import { AbstractInteraction } from '../abstractInteraction'
-import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import Hopr from '../../'
+import type { AbstractInteraction } from '../abstractInteraction'
+import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
+import type Hopr from '../../'
 import pipe from 'it-pipe'
 
 import { deriveTicketKeyBlinding } from '../../messages/packet/header'

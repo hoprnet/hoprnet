@@ -1,13 +1,14 @@
-import Hopr from '../../'
-import HoprCoreConnector, { Types } from '@hoprnet/hopr-core-connector-interface'
+import type Hopr from '../../'
+import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
+import type { Types } from '@hoprnet/hopr-core-connector-interface'
 
 import pipe from 'it-pipe'
 
-import { AbstractInteraction } from '../abstractInteraction'
+import type { AbstractInteraction } from '../abstractInteraction'
 
 import { PROTOCOL_PAYMENT_CHANNEL } from '../../constants'
 import PeerInfo from 'peer-info'
-import PeerId from 'peer-id'
+import type PeerId from 'peer-id'
 
 class Opening<Chain extends HoprCoreConnector> implements AbstractInteraction<Chain> {
   protocols: string[] = [PROTOCOL_PAYMENT_CHANNEL]

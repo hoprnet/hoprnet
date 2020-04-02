@@ -1,13 +1,13 @@
-import Hopr from '../../'
-import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
+import type Hopr from '../../'
+import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 
 import pipe from 'it-pipe'
 import chalk from 'chalk'
 
-import { AbstractInteraction, Duplex } from '../abstractInteraction'
+import type { AbstractInteraction, Duplex } from '../abstractInteraction'
 
 import { PROTOCOL_CRAWLING } from '../../constants'
-import PeerInfo from 'peer-info'
+import type PeerInfo from 'peer-info'
 
 import { CrawlResponse, CrawlStatus } from '../../messages'
 
@@ -32,7 +32,7 @@ class Crawler<Chain extends HoprCoreConnector> implements AbstractInteraction<Ch
       protocol: string
     }
     try {
-      struct = await this.node.dialProtocol(counterparty, this.protocols[0]).catch(async (err: Error) => {
+      struct = await this.node.dialProtocol(counterparty, this.protocols[0]).catch(async (_: Error) => {
         return this.node.peerRouting.findPeer(counterparty.id).then((peerInfo: PeerInfo) => this.node.dialProtocol(peerInfo, this.protocols[0]))
       })
     } catch (err) {

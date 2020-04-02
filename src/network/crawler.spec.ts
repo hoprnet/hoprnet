@@ -41,7 +41,7 @@ describe('test crawler', function() {
     node.interactions = new Interactions(node)
     node.network = {
       crawler: new Crawler(node)
-    }
+    } as Hopr<HoprCoreConnector>["network"]
 
     node.log = Debug(`${chalk.blue(node.peerInfo.id.toB58String())}: `)
 

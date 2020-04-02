@@ -15,7 +15,7 @@
 
 "@hoprnet/hopr-core-ethereum@https://github.com/hoprnet/hopr-core-ethereum.git#develop":
   version "0.0.1"
-  resolved "https://github.com/hoprnet/hopr-core-ethereum.git#5f179c5d4ff8df1e1b98c74dfdb70064fe230125"
+  resolved "https://github.com/hoprnet/hopr-core-ethereum.git#cfb09386afb32a79ef0462238351a21d34c8e307"
   dependencies:
     "@hoprnet/hopr-core-connector-interface" "https://github.com/hoprnet/hopr-core-connector-interface.git"
     "@hoprnet/hopr-ethereum" "https://github.com/hoprnet/hopr-ethereum.git#develop"
@@ -33,7 +33,7 @@
 
 "@hoprnet/hopr-core-polkadot@https://github.com/hoprnet/hopr-core-polkadot.git":
   version "0.0.2"
-  resolved "https://github.com/hoprnet/hopr-core-polkadot.git#3ca7a550762c461c0cab2994cfb2b0672618106f"
+  resolved "https://github.com/hoprnet/hopr-core-polkadot.git#05a394ed26a6cfb6f29e9f3e652e59ef746e0867"
   dependencies:
     "@polkadot/api" "^0.100.1"
     "@polkadot/util" "^1.8.1"

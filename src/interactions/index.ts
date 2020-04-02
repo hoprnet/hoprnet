@@ -1,11 +1,11 @@
-import Hopr from '..'
+import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
+import type Hopr from '..'
+
 import { PaymentInteractions } from './payments'
 import { NetworkInteractions } from './network'
 import { PacketInteractions } from './packet'
 
-import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-
-export { Duplex, Sink, Source } from './abstractInteraction'
+export type { Duplex, Sink, Source } from './abstractInteraction'
 
 class Interactions<Chain extends HoprCoreConnector> {
   public payments: PaymentInteractions<Chain>

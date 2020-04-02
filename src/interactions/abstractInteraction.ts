@@ -1,5 +1,5 @@
-import Hopr from '..'
-import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
+import type Hopr from '..'
+import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 
 export type Sink = (source: AsyncIterable<Uint8Array>) => void
 

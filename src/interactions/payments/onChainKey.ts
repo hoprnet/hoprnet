@@ -1,10 +1,10 @@
-import Hopr from '../../'
-import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
+import type Hopr from '../../'
+import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 
 import { PROTOCOL_ONCHAIN_KEY } from '../../constants'
-import { AbstractInteraction } from '../abstractInteraction'
+import type { AbstractInteraction } from '../abstractInteraction'
 import PeerInfo from 'peer-info'
-import PeerId from 'peer-id'
+import type PeerId from 'peer-id'
 
 import chalk from 'chalk'
 

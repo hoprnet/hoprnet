@@ -1,10 +1,10 @@
 import chalk from 'chalk'
 import PeerInfo from 'peer-info'
-import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
+import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 
 import { randomSubset, randomInteger, Token, getTokens } from '../utils'
 import { MAX_HOPS, CRAWLING_RESPONSE_NODES } from '../constants'
-import Hopr from '..'
+import type Hopr from '..'
 
 import { CrawlResponse, CrawlStatus } from '../messages'
 
