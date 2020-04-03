@@ -11,6 +11,7 @@ const THIRTY_ONE_SECONDS = 31 * 1000
 const HASH_SIZE = 32
 
 class Heartbeat<Chain extends HoprCoreConnector> extends EventEmitter {
+    
     constructor(public node: Hopr<Chain>) {
         super()
     }
