@@ -45,7 +45,7 @@ let node: Hopr<HoprCoreConnector>,
   funds: Types.Balance,
   ownAddress: Types.AccountId,
   rl: readline.Interface,
-  options,
+  options: any,
   connector: typeof HoprCoreConnector
 
 const SPLIT_OPERAND_QUERY_REGEX: RegExp = /([\w\-]+)(?:\s+)?([\w\s\-.]+)?/
@@ -168,7 +168,7 @@ async function parseOptions(): Promise<void | Options> {
   }
 
   const tmp = groupBy(
-    process.env.BOOTSTRAP_SERVERS.split(',').map(addr => Multiaddr(addr)),
+    process.env.BOOTSTRAP_SERVERS?.split(',').map(addr => Multiaddr(addr)),
     (ma: Multiaddr) => ma.getPeerId()
   )
 
@@ -909,13 +909,18 @@ function decodeMessage(
   let msg: Buffer, time: Buffer
   try {
     [msg, time] = decode(encoded) as [Buffer, Buffer]
-  } catch (err) {
-    console.log(chalk.red(`Could not decode received message '${u8aToHex(msg)}' Error was ${err.message}.`))
-  }
 
-  return {
-    latency: Date.now() - parseInt(time.toString('hex'), 16),
-    msg: msg.toString()
+    return {
+      latency: Date.now() - parseInt(time.toString('hex'), 16),
+      msg: msg.toString()
+    }
+  } catch (err) {
+    console.log(chalk.red(`Could not decode received message '${u8aToHex(encoded)}' Error was ${err.message}.`))
+
+    return {
+      latency: NaN,
+      msg: 'Error: Could not decode message'
+    }
   }
 }
 

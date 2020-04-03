@@ -26,8 +26,8 @@ const OPENING_TIMEOUT = 86400 * 1000
  * Encapsulates the internal representation of a packet
  */
 export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
-  private _targetPeerId: PeerId
-  private _senderPeerId: PeerId
+  private _targetPeerId?: PeerId
+  private _senderPeerId?: PeerId
 
   private _header?: Header<Chain>
   private _ticket?: Types.SignedTicket<Types.Ticket, Types.Signature>

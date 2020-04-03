@@ -124,7 +124,7 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
       const index = randomInteger(0, this.queue.length)
 
       if (index == this.queue.length - 1) {
-        return this.handlePacket(this.queue.pop(), token)
+        return this.handlePacket(this.queue.pop() as Packet<Chain>, token)
       }
 
       const nextPacket = this.queue[index]

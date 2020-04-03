@@ -7,6 +7,7 @@ import KadDHT = require('libp2p-kad-dht')
 // @ts-ignore
 import SECIO = require('libp2p-secio')
 // import { WebRTCv4, WebRTCv6 } = require('./network/natTraversal')
+// @ts-ignore
 import TCP = require('libp2p-tcp')
 
 // @ts-ignore
@@ -63,7 +64,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
   declare peerRouting: {
     findPeer: (addr: PeerId) => Promise<PeerInfo>
   }
-  declare handle: (protocol: string[], handler: (struct: { stream: any }) => void) => void
+  declare handle: (protocol: string[], handler: (struct: { connection: any, stream: any }) => void) => void
   declare start: () => Promise<void>
   declare stop: () => Promise<void>
   declare on: (str: string, handler: (...props: any[]) => void) => void
@@ -147,7 +148,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
 
     let connector: HoprCoreConnector
 
-    if (options != null && isFinite(options.id)) {
+    if (options != null && options.id != null && isFinite(options.id)) {
       connector = await HoprCoreConnector.create(db, undefined, options)
       options.peerId = await privKeyToPeerId(connector.self.privateKey)
       if (options.peerInfo != null && !options.peerId.isEqual(options.peerInfo.id)) {
