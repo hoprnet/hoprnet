@@ -18,6 +18,7 @@ import Hopr from '..'
 import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import { Interactions } from '../interactions'
 import { Crawler } from './crawler'
+import { Crawler as CrawlerInteraction } from '../interactions/network/crawler'
 import Multiaddr from 'multiaddr'
 
 describe('test crawler', function() {
@@ -37,8 +38,13 @@ describe('test crawler', function() {
 
     node.peerRouting.findPeer = (_: PeerId) => Promise.reject('not implemented')
 
-
-    node.interactions = new Interactions(node)
+    node.interactions = {
+      network: {
+        crawler: new CrawlerInteraction(node)
+      }
+    } as Hopr<HoprCoreConnector>['interactions']
+    
+    new Interactions(node)
     node.network = {
       crawler: new Crawler(node)
     } as Hopr<HoprCoreConnector>["network"]

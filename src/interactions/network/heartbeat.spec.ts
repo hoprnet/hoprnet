@@ -15,10 +15,7 @@ import chalk from 'chalk'
 
 import Hopr from '../..'
 import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import LevelUp from 'levelup'
-import Memdown from 'memdown'
 import { Heartbeat } from './heartbeat'
-import * as DbKeys from '../../db_keys'
 
 import assert from 'assert'
 import Multiaddr from 'multiaddr'
@@ -27,8 +24,6 @@ import { EventEmitter } from 'events'
 
 describe('check heartbeat mechanism', function() {
   async function generateNode(): Promise<Hopr<HoprCoreConnector>> {
-    const db = LevelUp(Memdown())
-
     const node = (await libp2p.create({
       peerInfo: await PeerInfo.create(await PeerId.create({ keyType: 'secp256k1' })),
       modules: {
@@ -37,8 +32,6 @@ describe('check heartbeat mechanism', function() {
         connEncryption: [SECIO]
       }
     })) as Hopr<HoprCoreConnector>
-
-    node.db = db
 
     node.peerInfo.multiaddrs.add(Multiaddr('/ip4/0.0.0.0/tcp/0'))
 
@@ -59,7 +52,6 @@ describe('check heartbeat mechanism', function() {
     } as Hopr<HoprCoreConnector>['network']
 
     node.log = Debug(`${chalk.blue(node.peerInfo.id.toB58String())}: `)
-    node.dbKeys = DbKeys
 
     return (node as unknown) as Hopr<HoprCoreConnector>
   }
@@ -74,7 +66,7 @@ describe('check heartbeat mechanism', function() {
           resolve()
         })
       }),
-      Alice.interactions.network.heartbeat.interact(Bob.peerInfo, 0)
+      Alice.interactions.network.heartbeat.interact(Bob.peerInfo)
     ])
 
     await Promise.all([Alice.stop(), Bob.stop()])

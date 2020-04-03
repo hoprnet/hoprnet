@@ -22,7 +22,8 @@ import { ApiPromise } from '@polkadot/api'
 import { waitReady } from '@polkadot/wasm-crypto'
 import Keyring from '@polkadot/keyring'
 import { TypeRegistry } from '@polkadot/types'
-import { Interactions } from '..'
+import { PacketInteractions } from '.'
+import { OnChainKey } from '../payments/onChainKey'
 import LevelUp from 'levelup'
 import Memdown from 'memdown'
 import BN from 'bn.js'
@@ -68,7 +69,12 @@ describe('check packet forwarding & acknowledgement generation', function() {
       return Promise.reject(Error('not implemented'))
     }
 
-    node.interactions = new Interactions(node)
+    node.interactions = {
+      packet: new PacketInteractions(node),
+      payments: {
+        onChainKey: new OnChainKey(node)
+      }
+    } as Hopr<HoprPolkadot>['interactions']
 
     const onChainKeyPair = new Keyring({ type: 'sr25519' }).addFromSeed(node.peerInfo.id.pubKey.marshal().slice(0, 32), undefined, 'sr25519')
     node.paymentChannels = new HoprPolkadot(

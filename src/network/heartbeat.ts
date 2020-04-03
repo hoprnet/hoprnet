@@ -1,109 +1,127 @@
-import chalk from 'chalk'
-
-import { randomBytes, createHash } from 'crypto'
-
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '..'
+
+import PeerId from 'peer-id'
+import type PeerInfo from 'peer-info'
 
 import { EventEmitter } from 'events'
 
 const THIRTY_ONE_SECONDS = 31 * 1000
-const HASH_SIZE = 32
+const TEN_SECONDS = 10 * 1000
+
+const REFRESH_TIME = THIRTY_ONE_SECONDS
+const CHECK_INTERVAL = TEN_SECONDS
+
+const MAX_PARALLEL_CONNECTIONS = 10
+
+type PeerIdString = string
+type PeerIdLastSeen = number
 
 class Heartbeat<Chain extends HoprCoreConnector> extends EventEmitter {
-    
-    constructor(public node: Hopr<Chain>) {
-        super()
+  heap: string[] = []
+
+  nodes = new Map<PeerIdString, PeerIdLastSeen>()
+
+  interval: any
+
+  constructor(public node: Hopr<Chain>) {
+    super()
+
+    this.node.on('peer:connect', (peerInfo: PeerInfo) => this.emit('beat', peerInfo.id))
+
+    super.on('beat', this.connectionListener)
+  }
+
+  private connectionListener(peer: PeerId) {
+    const peerIdString = peer.toB58String()
+
+    let found = this.nodes.get(peerIdString)
+
+    if (found == undefined) {
+      this.heap.push(peerIdString)
     }
+
+    this.nodes.set(peerIdString, Date.now())
+  }
+
+  private comparator(a: PeerIdString, b: PeerIdString) {
+    let lastSeenA = this.nodes.get(a)
+    let lastSeenB = this.nodes.get(b)
+
+    if (lastSeenA == lastSeenB) {
+      return 0
+    }
+    if (lastSeenA == undefined) {
+      return 1
+    }
+
+    if (lastSeenB == undefined) {
+      return -1
+    }
+
+    return lastSeenA < lastSeenB ? -1 : 1
+  }
+
+  async checkNodes() {
+    const promises: Promise<void>[] = []
+
+    this.heap = this.heap.sort(this.comparator.bind(this))
+
+    const THRESHOLD_TIME = Date.now() - REFRESH_TIME
+
+    // Remove non-existing nodes
+    let index = this.heap.length - 1
+    while (this.nodes.get(this.heap[index--]) == undefined) {
+      this.heap.pop()
+    }
+
+    let heapIndex = 0
+
+    const updateHeapIndex = (): void => {
+      while (heapIndex < this.heap.length) {
+        const lastSeen = this.nodes.get(this.heap[heapIndex])
+
+        if (lastSeen == undefined || lastSeen > THRESHOLD_TIME) {
+            heapIndex++
+          continue
+        } else {
+          break
+        }
+      }
+    }
+
+    const queryNode = async (startIndex: number): Promise<void> => {
+        let currentPeerId: PeerId
+      while (startIndex < this.heap.length) {
+        currentPeerId = PeerId.createFromB58String(this.heap[startIndex])
+        try {
+          await this.node.interactions.network.heartbeat.interact(currentPeerId)
+          this.nodes.set(this.heap[startIndex], Date.now())
+        } catch (err) {
+          this.nodes.delete(this.heap[startIndex])
+          this.node.peerStore.remove(currentPeerId)
+        }
+
+        startIndex = heapIndex
+      }
+    }
+
+    updateHeapIndex()
+
+    while (promises.length < MAX_PARALLEL_CONNECTIONS && heapIndex < this.heap.length) {
+      promises.push(queryNode(heapIndex++))
+    }
+
+    await Promise.all(promises)
+  }
+
+  start(): void {
+    this.interval = setInterval(this.checkNodes.bind(this), CHECK_INTERVAL)
+  }
+
+  stop(): void {
+    clearInterval(this.interval)
+  }
 }
 
 export { Heartbeat }
-
-// module.exports = (node) => {
-//     let timers
-
-//     const queryNode = (peerInfo) => new Promise(async (resolve, reject) => {
-//         const conn = await Promise.race([
-//             node.dialProtocol(peerInfo, PROTOCOL_HEARTBEAT),
-//             node.peerRouting.findPeer(peerInfo.id).then(peerInfo => node.dialProtocol(peerInfo, PROTOCOL_HEARTBEAT))
-//         ])
-
-//         if (!conn) {
-//             return reject(Error(`Unable to connect to ${chalk.blue(peerInfo.id.toB58String())}.`))
-//         }
-
-//         const challenge = randomBytes(16)
-
-//         try {
-//             pull(
-//                 pull.once(challenge),
-//                 lp.encode(),
-//                 conn,
-//                 lp.decode({
-//                     maxLength: HASH_SIZE
-//                 }),
-//                 pull.collect((err, response) => {
-//                     if (err || response.length != 1)
-//                         return reject(Error(`Invalid response from ${chalk.blue(peerInfo.id.toB58String())}.`))
-
-//                     const correctResponse = createHash('sha256').update(challenge).digest().slice(0, 16)
-
-//                     if (!response[0].equals(correctResponse))
-//                         return reject(`Invalid response from ${chalk.blue(peerInfo.id.toB58String())}.`)
-
-//                     if (!node.peerBook.has(peerInfo.id.toB58String()))
-//                         node.peerBook.put(peerInfo)
-
-//                     resolve()
-//                 })
-//             )
-//         } catch (err) {
-//             return reject(Error(`Connection to ${chalk.blue(peerInfo.id.toB58String())} broke up due to '${err.message}'`))
-//         }
-//     })
-
-//     const startTimer = (peerInfo) => {
-//         const timer = timers.get(peerInfo.id.toB58String())
-
-//         if (!timer)
-//             timers.set(peerInfo.id.toB58String(), setInterval(async () => {
-//                 try {
-//                     availabe = await queryNode(peerInfo)
-//                 } catch (err) {
-//                     log(node.peerInfo.id, `Removing ${peerInfo.id.toB58String()} from peerBook due to "${reason}".`)
-
-//                     clearInterval(timers.get(peerInfo.id.toB58String()))
-//                     timers.delete(peerInfo.id.toB58String())
-
-//                     try {
-//                         await node.hangUp(peerInfo)
-//                         await new Promise((resolve, reject) => node._dht.routingTable.remove(peerInfo.id, (err) => {
-//                             if (err) return reject(err)
-
-//                             resolve()
-//                         }))
-//                     } catch (err) {
-//                         node.peerBook.remove(peerInfo.id)
-//                     }
-//                 }
-//             }, THIRTY_ONE_SECONDS))
-//     }
-
-//     const start = () => {
-//         timers = new Map()
-
-//         node.on('peer:connect', startTimer)
-//     }
-
-//     const stop = () => {
-//         node.off('peer:connect', startTimer)
-//         timers.forEach((timer) => clearInterval(timer))
-//         timers.clear()
-//     }
-
-//     return {
-//         start,
-//         stop
-//     }
-// }
-

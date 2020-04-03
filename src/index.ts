@@ -59,6 +59,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
     has(peerInfo: PeerId): boolean
     put(peerInfo: PeerInfo, options?: { silent: boolean }): PeerInfo
     peers: Map<string, PeerInfo>
+    remove(peer: PeerId): void
   }
   declare peerRouting: {
     findPeer: (addr: PeerId) => Promise<PeerInfo>
@@ -116,8 +117,6 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
     this.output = _options.output
     this.interactions = new Interactions(this)
     this.network = new Network(this)
-
-    // this.heartbeat = heartbeat(this)
 
     this.log = Debug(`${chalk.blue(_options.peerInfo.id.toB58String())}: `)
   }
@@ -208,7 +207,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
       })
     }
 
-    // this.heartbeat.start()
+    this.network.heartbeat.start()
 
     // this.peerInfo.multiaddrs.forEach(addr => {
     //     if (match.LOCALHOST(addr)) {

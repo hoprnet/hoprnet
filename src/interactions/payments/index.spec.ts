@@ -16,7 +16,7 @@ import SECIO = require('libp2p-secio')
 import { Types } from '@hoprnet/hopr-core-polkadot'
 import * as config from '@hoprnet/hopr-core-polkadot/lib/config'
 import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import { Interactions } from '..'
+import { PaymentInteractions } from '.'
 import { privKeyToPeerId } from '../../utils'
 
 import Hopr from '../..'
@@ -69,8 +69,13 @@ describe('test payment (channel) interactions', function() {
       }
     } as unknown) as HoprCoreConnector
 
-    Alice.interactions = new Interactions(Alice)
-    Bob.interactions = new Interactions(Bob)
+    Alice.interactions = {
+      payments: new PaymentInteractions(Alice)
+    } as Hopr<HoprCoreConnector>['interactions']
+
+    Bob.interactions = {
+      payments: new PaymentInteractions(Bob)
+    } as Hopr<HoprCoreConnector>['interactions']
   })
 
   it('should establish a connection and run through the opening sequence', async function() {
@@ -84,7 +89,6 @@ describe('test payment (channel) interactions', function() {
             return (async function*() {
               for await (const chunk of source) {
                 assert(chunk.length > 0, 'Should receive a message')
-                console.log(chunk.slice(0, 32))
 
                 yield response.slice()
               }

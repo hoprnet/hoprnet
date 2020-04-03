@@ -6,7 +6,6 @@ import { randomBytes, createHash } from 'crypto'
 import type { AbstractInteraction } from '../abstractInteraction'
 
 import pipe from 'it-pipe'
-import chalk from 'chalk'
 
 import { PROTOCOL_HEARTBEAT } from '../../constants'
 
@@ -29,7 +28,7 @@ class Heartbeat<Chain extends HoprCoreConnector> implements AbstractInteraction<
     pipe(
       struct.stream,
       (source: any) => {
-        return (async function * () {
+        return (async function* () {
           for await (const msg of source) {
             events.emit('beat', struct.connection.remotePeer)
             yield createHash(HASH_FUNCTION).update(msg.slice()).digest()
@@ -40,20 +39,15 @@ class Heartbeat<Chain extends HoprCoreConnector> implements AbstractInteraction<
     )
   }
 
-  async interact(counterparty: PeerInfo | PeerId, timeout: number): Promise<Uint8Array> {
+  async interact(counterparty: PeerInfo | PeerId): Promise<void> {
     let struct: {
       stream: any
       protocol: string
     }
 
-    try {
-      struct = await this.node.dialProtocol(counterparty, this.protocols[0]).catch(async (err: Error) => {
-        return this.node.peerRouting.findPeer(PeerInfo.isPeerInfo(counterparty) ? counterparty.id : counterparty).then((peerInfo: PeerInfo) => this.node.dialProtocol(peerInfo, this.protocols[0]))
-      })
-    } catch (err) {
-      this.node.log(`Could not query ${(PeerInfo.isPeerInfo(counterparty) ? counterparty.id : counterparty).toB58String()} for other nodes. Error was: ${chalk.red(err.message)}.`)
-      return
-    }
+    struct = await this.node.dialProtocol(counterparty, this.protocols[0]).catch(async (err: Error) => {
+      return this.node.peerRouting.findPeer(PeerInfo.isPeerInfo(counterparty) ? counterparty.id : counterparty).then((peerInfo: PeerInfo) => this.node.dialProtocol(peerInfo, this.protocols[0]))
+    })
 
     const challenge = randomBytes(16)
     const expectedResponse = createHash(HASH_FUNCTION).update(challenge).digest()
