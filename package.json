@@ -9,9 +9,9 @@
     "postinstall": "yarn build",
     "clean": "rm -rf ./lib",
     "test": "mocha",
-    "dev": "yarn clean && yarn build:types && yarn run tsc -w",
+    "dev": "yarn clean && yarn build:types && tsc -w",
     "build:types": "ts-node ./src/scripts/typechain.ts",
-    "build": "yarn clean && yarn build:types && yarn run tsc -d -p .",
+    "build": "yarn clean && yarn build:types && tsc -d -p .",
     "fundAccounts": "ts-node ./src/scripts/fundAccounts.ts"
   },
   "files": [
