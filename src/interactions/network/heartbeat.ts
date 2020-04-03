@@ -29,7 +29,7 @@ class Heartbeat<Chain extends HoprCoreConnector> implements AbstractInteraction<
     pipe(
       struct.stream,
       (source: any) => {
-        return (async function * () { // A generator is async iterable
+        return (async function * () {
           for await (const msg of source) {
             events.emit('beat', struct.connection.remotePeer)
             yield createHash(HASH_FUNCTION).update(msg.slice()).digest()

@@ -2221,6 +2221,11 @@ he@1.2.0:
   resolved "https://registry.yarnpkg.com/he/-/he-1.2.0.tgz#84ae65fa7eafb165fddb61566ae14baf05664f0f"
   integrity sha512-F/1DnUGPopORZi0ni+CvrCgHQ5FyEAHRLSApuYWMmrbSwoN2Mn/7k+Gl38gJnR7yyDZk6WLXwiGod1JOWNDKGw==
 
+heap-js@^1.5.2:
+  version "1.5.2"
+  resolved "https://registry.yarnpkg.com/heap-js/-/heap-js-1.5.2.tgz#76f06496247de828dcbb79d6bb9445b66814407a"
+  integrity sha512-nUuH9XUktKQAKeX3rN9wafo+qnZcxlLSkd6HljRZ2czp2vYUlAGcakiy+9s4e2OFZOQoq1f5MleYnIZ2MPSxpg==
+
 heap@~0.2.6:
   version "0.2.6"
   resolved "https://registry.yarnpkg.com/heap/-/heap-0.2.6.tgz#087e1f10b046932fc8594dd9e6d378afc9d1e5ac"

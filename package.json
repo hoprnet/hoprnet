@@ -23,7 +23,7 @@
     "url": "https://github.com/hoprnet/hopr-core.git"
   },
   "scripts": {
-    "postinstall": "tsc -d -p .",
+    "postinstall": "yarn run tsc -d -p .",
     "demo": "node test/demo.js",
     "multiprocess": "node test/multiprocess.js",
     "hopr": "node hopr.js",
@@ -44,6 +44,7 @@
     "figlet": "^1.2.4",
     "futoin-hkdf": "~1.3.2",
     "getopts": "~2.2.4",
+    "heap-js": "^1.5.2",
     "ip-address": "^6.1.0",
     "it-pipe": "^1.1.0",
     "leveldown": "~5.5.1",
@@ -102,6 +103,7 @@
     "require": "ts-node/register"
   },
   "prettier": {
+    "parser": "typescript",
     "printWidth": 160,
     "semi": false,
     "singleQuote": true,
