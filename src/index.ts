@@ -48,9 +48,6 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
   public dbKeys = DbKeys
   public output: (arr: Uint8Array) => void
 
-  // @TODO put this in proper namespace
-  // public heartbeat: any
-
   // @TODO add libp2p types
   declare dial: (addr: Multiaddr | PeerInfo | PeerId) => Promise<any>
   declare dialProtocol: (addr: Multiaddr | PeerInfo | PeerId, protocol: string) => Promise<{ stream: Duplex; protocol: string }>
@@ -132,8 +129,8 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
       provider?: string
       peerId?: PeerId
     }
-  ): Promise<Hopr<any>> {
-    const db = Hopr.openDatabase(`db`, HoprCoreConnector, options)
+  ): Promise<Hopr<HoprCoreConnector>> {
+    const db = Hopr.openDatabase(`db`, HoprCoreConnector.constants, options)
 
     options = options || {}
 
@@ -202,20 +199,13 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
       await this.connectToBootstrapServers()
     } else {
       this.log(`Available under the following addresses:`)
+ 
       this.peerInfo.multiaddrs.forEach((ma: Multiaddr) => {
         this.log(ma.toString())
       })
     }
 
     this.network.heartbeat.start()
-
-    // this.peerInfo.multiaddrs.forEach(addr => {
-    //     if (match.LOCALHOST(addr)) {
-    //         this.peerInfo.multiaddrs.delete(addr)
-    //     }
-    // })
-
-    // if (publicAddrs) publicAddrs.forEach(addr => this.peerInfo.multiaddrs.add(addr.encapsulate(`/${NAME}/${this.peerInfo.id.toB58String()}`)))
 
     return this
   }
@@ -247,21 +237,25 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
    *
    * @param msg message to send
    * @param destination PeerId of the destination
+   * @param intermediateNodes optional set path manually
    * the acknowledgement of the first hop
    */
-  async sendMessage(msg: Uint8Array, destination: PeerId): Promise<void> {
+  async sendMessage(msg: Uint8Array, destination: PeerId, getIntermediateNodesManually?: () => Promise<PeerId[]>): Promise<void> {
     if (!destination) throw Error(`Expecting a non-empty destination.`)
 
-    const promises = []
+    const promises: Promise<void>[] = []
 
     for (let n = 0; n < msg.length / PACKET_SIZE; n++) {
       promises.push(
-        new Promise(async (resolve, reject) => {
-          let intermediateNodes = await this.getIntermediateNodes(destination)
-
-          let path = intermediateNodes.concat(destination)
-
-          await Promise.all(path.map(addPubKey))
+        new Promise<void>(async (resolve, reject) => {
+          let path: PeerId[]
+          if (getIntermediateNodesManually != undefined) {
+            path = await getIntermediateNodesManually()
+          } else {
+            path = await this.getIntermediateNodes(destination)
+          }
+          
+          path.push(destination)
 
           let packet: Packet<Chain>
           try {
@@ -269,7 +263,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
               /* prettier-ignore */
               this,
               msg.slice(n * PACKET_SIZE, Math.min(msg.length, (n + 1) * PACKET_SIZE)),
-              path
+              await Promise.all(path.map(addPubKey))
             )
           } catch (err) {
             return reject(err)
@@ -306,7 +300,9 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
    * @returns latency
    */
   async ping(destination: PeerId): Promise<number> {
-    if (!destination) throw Error(`Expecting a non-empty destination.`)
+    if (!PeerId.isPeerId(destination)) {
+      throw Error(`Expecting a non-empty destination.`)
+    }
 
     const latency = await super.ping(destination)
 
@@ -330,7 +326,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
       // exclude bootstrap server(s) from crawling results
       !this.bootstrapServers.some((pInfo: PeerInfo) => pInfo.id.isEqual(peerInfo.id))
 
-    await this.network.crawler.crawl()
+    await this.network.crawler.crawl(filter)
 
     const array = []
     for (const peerInfo of this.peerStore.peers.values()) {
@@ -339,12 +335,12 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
     return randomSubset(array, MAX_HOPS - 1, filter).map((peerInfo: PeerInfo) => peerInfo.id)
   }
 
-  static openDatabase<Constructor extends typeof HoprCoreConnector>(
+  static openDatabase(
     db_dir: string,
-    connector: Constructor,
+    constants: { CHAIN_NAME: string, NETWORK: string },
     options?: { id?: number; bootstrapNode?: boolean }
   ) {
-    db_dir += `/${connector.constants.CHAIN_NAME}/${connector.constants.NETWORK}/`
+    db_dir += `/${constants.CHAIN_NAME}/${constants.NETWORK}/`
 
     if (options != null && options.bootstrapNode) {
       db_dir += `bootstrap`
