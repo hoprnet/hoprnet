@@ -23,7 +23,7 @@
     "url": "https://github.com/hoprnet/hopr-core.git"
   },
   "scripts": {
-    "postinstall": "yarn run tsc -d -p .",
+    "postinstall": "tsc -d -p .",
     "demo": "node test/demo.js",
     "multiprocess": "node test/multiprocess.js",
     "hopr": "node hopr.js",
