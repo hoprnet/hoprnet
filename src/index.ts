@@ -24,12 +24,11 @@ import leveldown from 'leveldown'
 import Multiaddr from 'multiaddr'
 import chalk from 'chalk'
 import Debug, { Debugger } from 'debug'
-import Stream from 'stream'
 
 import PeerId from 'peer-id'
 import PeerInfo from 'peer-info'
 
-import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
+import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import { Interactions, Duplex } from './interactions'
 import * as DbKeys from './db_keys'
 
@@ -64,7 +63,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
   declare peerRouting: {
     findPeer: (addr: PeerId) => Promise<PeerInfo>
   }
-  declare handle: (protocol: string[], handler: (struct: { stream: Stream.Duplex }) => void) => void
+  declare handle: (protocol: string[], handler: (struct: { stream: any }) => void) => void
   declare start: () => Promise<void>
   declare stop: () => Promise<void>
   declare on: (str: string, handler: (...props: any[]) => void) => void
@@ -224,20 +223,17 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
    * Shuts down the node and saves keys and peerBook in the database
    */
   async down(): Promise<void> {
-    if (this.db) await this.db.close()
+    if (this.db) {
+      await this.db.close()
+    }
 
     this.log(`Database closed.`)
 
-    await new Promise((resolve, reject) =>
-      super.stop((err: Error) => {
-        if (err) return reject(err)
+    if (this.network.heartbeat) {
+      this.network.heartbeat.stop()
+    }
 
-        this.log(`Node shut down.`)
-
-        resolve()
-      })
-    )
-    // this.heartbeat.stop()
+    await super.stop()
   }
 
   /**
