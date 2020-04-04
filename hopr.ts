@@ -180,6 +180,8 @@ async function parseOptions(): Promise<void | Options> {
     options.bootstrapServers.push(peerInfo)
   }
 
+  options.provider = process.env.ETHEREUM_PROVIDER
+
   options.output = (encoded: Uint8Array) => {
     const { latency, msg } = decodeMessage(encoded)
 
