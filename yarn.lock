@@ -15,7 +15,7 @@
 
 "@hoprnet/hopr-core-ethereum@https://github.com/hoprnet/hopr-core-ethereum.git#develop":
   version "0.0.1"
-  resolved "https://github.com/hoprnet/hopr-core-ethereum.git#ff4f290a7d0aba6df5a754fd9ce18b3596d27f7b"
+  resolved "https://github.com/hoprnet/hopr-core-ethereum.git#0af169bb6358804f1b1d0b29131af99db61c43f0"
   dependencies:
     "@hoprnet/hopr-core-connector-interface" "https://github.com/hoprnet/hopr-core-connector-interface.git"
     "@hoprnet/hopr-ethereum" "https://github.com/hoprnet/hopr-ethereum.git#develop"
@@ -45,7 +45,7 @@
 
 "@hoprnet/hopr-ethereum@https://github.com/hoprnet/hopr-ethereum.git#develop":
   version "0.0.1"
-  resolved "https://github.com/hoprnet/hopr-ethereum.git#4ed487b4a9679609a460043cf6ac500057e4d446"
+  resolved "https://github.com/hoprnet/hopr-ethereum.git#08324d4bc76bdb75a8aaa9c681e3f400bf22e635"
   dependencies:
     "@openzeppelin/contracts" "^2.4.0"
     bignumber.js "^9.0.0"
