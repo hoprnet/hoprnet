@@ -8,8 +8,8 @@ export const TOKEN_ADDRESSES: { [key in Networks]: string } = {
   ropsten: undefined,
   rinkeby: '0x25f4408b0F75D1347335fc625E7446F2CdEcD503',
   goerli: undefined,
-  kovan: undefined,
-  private: '0x0f5Ea0A652E851678Ebf77B69484bFcD31F9459B'
+  kovan: '0x591aE064387AB09805D9fF9206F0A90DB8F4C9B2',
+  private: '0x0f5Ea0A652E851678Ebf77B69484bFcD31F9459B',
 }
 
 export const CHANNELS_ADDRESSES: { [key in Networks]: string } = {
@@ -18,8 +18,8 @@ export const CHANNELS_ADDRESSES: { [key in Networks]: string } = {
   ropsten: undefined,
   rinkeby: '0x077209b19F4Db071254C468E42784588003be34C',
   goerli: undefined,
-  kovan: undefined,
-  private: '0xEC8bE1A5630364292E56D01129E8ee8A9578d7D8'
+  kovan: '0x506De99826736032cF760586ECce0bae1369155b',
+  private: '0xEC8bE1A5630364292E56D01129E8ee8A9578d7D8',
 }
 
 export const FUND_ACCOUNT_PRIVATE_KEY = '0x2bdd21761a483f71054e14f5b827213567971c676928d9a1808cbfa4b7501200'
@@ -47,5 +47,5 @@ export const DEMO_ACCOUNTS = [
   // George
   '0x2bdd21761a483f71054e14f5b827213567971c676928d9a1808cbfa4b7501207',
   // Henry
-  '0x2bdd21761a483f71054e14f5b827213567971c676928d9a1808cbfa4b7501208'
+  '0x2bdd21761a483f71054e14f5b827213567971c676928d9a1808cbfa4b7501208',
 ]
