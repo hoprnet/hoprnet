@@ -347,6 +347,7 @@ export default class HoprEthereum implements HoprCoreConnector {
     await web3.isConnected()
 
     const account = new types.AccountId(address)
+    console.log(`using address ${account.toHex()}`)
     const network = await utils.getNetworkId(web3)
 
     if (typeof config.CHANNELS_ADDRESSES[network] === 'undefined') {
