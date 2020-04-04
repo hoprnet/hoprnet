@@ -12,6 +12,8 @@
       "node": "^12",
       "yarn": "^1.22"
     },
+    "main": "lib/index.js",
+    "types": "lib/index.d.ts",
     "homepage": "https://hoprnet.io",
     "repository": {
       "type": "git",
