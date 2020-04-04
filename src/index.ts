@@ -9,7 +9,7 @@ import HoprCoreConnector, {
   Types as ITypes,
   Channel as IChannel,
   Constants as IConstants,
-  DbKeys as IDbKeys
+  DbKeys as IDbKeys,
 } from '@hoprnet/hopr-core-connector-interface'
 import Channel, { events } from './channel'
 import Ticket from './ticket'
@@ -78,7 +78,7 @@ export default class HoprEthereum implements HoprCoreConnector {
     return this.hoprToken.methods
       .balanceOf(u8aToHex(this.account))
       .call()
-      .then(res => {
+      .then((res) => {
         return new BN(res)
       })
   }
@@ -114,7 +114,7 @@ export default class HoprEthereum implements HoprCoreConnector {
         this._status = 'started'
         console.log('Connector started')
       })
-      .catch(err => {
+      .catch((err) => {
         console.log('Connector failed to start')
         console.error(err)
       })
@@ -150,7 +150,7 @@ export default class HoprEthereum implements HoprCoreConnector {
         this._status = 'stopped'
         console.log('Connector stopped')
       })
-      .catch(err => {
+      .catch((err) => {
         console.log('Connector failed to stop')
         console.error(err)
       })
@@ -189,9 +189,9 @@ export default class HoprEthereum implements HoprCoreConnector {
           // initialize account secret
           this.initializeAccountSecret(),
           // confirm web3 is connected
-          this.checkWeb3()
-        ]).then(responses => {
-          const allOk = responses.every(r => !!r)
+          this.checkWeb3(),
+        ]).then((responses) => {
+          const allOk = responses.every((r) => !!r)
 
           if (!allOk) {
             throw Error('could not initialize connector')
@@ -201,7 +201,7 @@ export default class HoprEthereum implements HoprCoreConnector {
         this._status = 'initialized'
         console.log('Connector initialized')
       })
-      .catch(err => {
+      .catch((err) => {
         console.log('Connector failed to initialize')
         console.error(err)
       })
@@ -250,8 +250,8 @@ export default class HoprEthereum implements HoprCoreConnector {
     onChainSecret = await this.hoprChannels.methods
       .accounts(this.account.toHex())
       .call()
-      .then(res => stringToU8a(res.hashedSecret))
-      .then(secret => {
+      .then((res) => stringToU8a(res.hashedSecret))
+      .then((secret) => {
         if (u8aEquals(secret, new Uint8Array(types.Hash.SIZE).fill(0x00))) {
           return undefined
         }
@@ -269,7 +269,7 @@ export default class HoprEthereum implements HoprCoreConnector {
           (
             await this.signTransaction(this.hoprChannels.methods.setHashedSecret(u8aToHex(offChainSecret)), {
               from: this.account.toHex(),
-              to: this.hoprChannels.options.address
+              to: this.hoprChannels.options.address,
             })
           ).send()
         )
@@ -297,11 +297,11 @@ export default class HoprEthereum implements HoprCoreConnector {
           await this.signTransaction(this.hoprChannels.methods.setHashedSecret(u8aToHex(secret)), {
             from: this.account.toHex(),
             to: this.hoprChannels.options.address,
-            nonce: nonce || (await this.nonce)
+            nonce: nonce || (await this.nonce),
           })
         ).send()
       ),
-      dbPromise
+      dbPromise,
     ])
   }
 
@@ -331,7 +331,7 @@ export default class HoprEthereum implements HoprCoreConnector {
     if (!usingSeed && !usingOptions) {
       throw Error("'seed' or 'options' must be provided")
     }
-    if (usingOptions && options.id > config.DEMO_ACCOUNTS.length) {
+    if (usingOptions && typeof options.id !== 'undefined' && options.id > config.DEMO_ACCOUNTS.length) {
       throw Error(
         `Unable to find demo account for index '${options.id}'. Please make sure that you have specified enough demo accounts.`
       )
@@ -366,8 +366,8 @@ export default class HoprEthereum implements HoprCoreConnector {
         publicKey,
         onChainKeyPair: {
           privateKey,
-          publicKey
-        }
+          publicKey,
+        },
       },
       account,
       web3,
