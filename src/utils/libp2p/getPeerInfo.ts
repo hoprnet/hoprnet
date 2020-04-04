@@ -1,7 +1,9 @@
 import { keys } from 'libp2p-crypto'
 import { LevelUp } from 'levelup'
 import chalk from 'chalk'
-import { deserializeKeyPair, serializeKeyPair, askForPassword } from '..'
+import { deserializeKeyPair, serializeKeyPair, askForPassword, privKeyToPeerId } from '..'
+
+import { NODE_SEEDS, BOOTSTRAP_SEEDS } from '@hoprnet/hopr-demo-seeds'
 
 import PeerInfo from 'peer-info'
 import PeerId from 'peer-id'
@@ -46,11 +48,31 @@ function getAddrs(options: any): any[] {
  * Checks whether we have gotten any peerId in through the options.
  */
 async function getPeerId(options: any, db?: LevelUp): Promise<PeerId> {
-  if (options != null && options.peerId != null && PeerId.isPeerId(options.peerId)) {
-    return options.peerId
+  if (options != null) {
+    if (options.peerId != null && PeerId.isPeerId(options.peerId)) {
+      return options.peerId
+    }
+
+    if (process.env.DEBUG === 'true') {
+      if (options.id != null && isFinite(options.id)) {
+        if (options.bootstrapNode) {
+          if (options.id >= BOOTSTRAP_SEEDS.length) {
+            throw Error(`Unable to access bootstrap seed number ${options.id} out of ${BOOTSTRAP_SEEDS.length} bootstrap seeds.`)
+          }
+          return await privKeyToPeerId(BOOTSTRAP_SEEDS[options.id])
+        } else {
+          if (options.id >= NODE_SEEDS.length) {
+            throw Error(`Unable to access node seed number ${options.id} out of ${NODE_SEEDS.length} node seeds.`)
+          }
+          return await privKeyToPeerId(NODE_SEEDS[options.id])
+        }
+      } else if (options.bootstrapNode) {
+        return await privKeyToPeerId(BOOTSTRAP_SEEDS[0])
+      }
+    }
   }
 
-  if (db === undefined) {
+  if (db == null) {
     throw Error('Cannot get/store any peerId without a database handle.')
   }
 
@@ -73,7 +95,11 @@ async function getFromDatabase(db: LevelUp): Promise<PeerId> {
       try {
         peerId = await deserializeKeyPair(serializedKeyPair, new TextEncoder().encode(pw))
         done = true
-      } catch {}
+      } catch {
+        if (process.env.DEBUG === 'true') {
+          throw Error(`DEBUG MODE: Stored database secret is not recoverable with the given demo password. You might want to delete the corresponding database.`)
+        }
+      }
     } while (!done)
 
     console.log(`Successfully recovered ${chalk.blue(peerId.toB58String())} from database.`)
@@ -94,6 +120,19 @@ async function getFromDatabase(db: LevelUp): Promise<PeerId> {
   return peerId
 }
 
+/**
+ * Check whether our config makes sense
+ */
+function checkConfig(): void {
+  if (!process.env.HOST_IPV4 && !process.env.HOST_IPV6) {
+    throw Error('Unable to start node without an address. Please provide at least one.')
+  }
+
+  if (!process.env.PORT) {
+    throw Error('Got no port to listen on. Please specify one.')
+  }
+}
+
 async function getPeerInfo(
   options: {
     id?: number
@@ -106,19 +145,6 @@ async function getPeerInfo(
 ): Promise<PeerInfo> {
   if (db == null && (options == null || (options != null && options.peerInfo == null && options.peerId == null))) {
     throw Error('Invalid input parameter. Please set a valid peerInfo or pass a database handle.')
-  }
-
-  /**
-   * Check whether our config makes sense
-   */
-  function checkConfig(): void {
-    if (!process.env.HOST_IPV4 && !process.env.HOST_IPV6) {
-      throw Error('Unable to start node without an address. Please provide at least one.')
-    }
-
-    if (!process.env.PORT) {
-      throw Error('Got no port to listen on. Please specify one.')
-    }
   }
 
   checkConfig()

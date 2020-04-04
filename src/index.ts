@@ -138,30 +138,11 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
 
     options.output = options.output || console.log
 
-    // @TODO give bootstrap node a different identity
-    if (options.bootstrapNode) {
-      options.id = 6
+    if (options.peerInfo == null) {
+      options.peerInfo = await getPeerInfo(options, db)
     }
 
-    let connector: HoprCoreConnector
-
-    if (options != null && options.id != null && isFinite(options.id)) {
-      connector = await HoprCoreConnector.create(db, undefined, options)
-      options.peerId = await privKeyToPeerId(connector.self.privateKey)
-      if (options.peerInfo != null && !options.peerId.isEqual(options.peerInfo.id)) {
-        throw Error(`PeerId and PeerInfo mismatch.`)
-      }
-
-      if (options.peerInfo == null) {
-        options.peerInfo = await getPeerInfo(options)
-      }
-    } else {
-      if (options.peerInfo == null) {
-        options.peerInfo = await getPeerInfo(options, db)
-      }
-
-      connector = await HoprCoreConnector.create(db, options.peerInfo.id.privKey.marshal(), options)
-    }
+    let connector = await HoprCoreConnector.create(db, options.peerInfo.id.privKey.marshal(), options)
 
     return new Hopr(options as HoprOptions, db, options.bootstrapNode ? null : options.bootstrapServers, connector).up(options as HoprOptions)
   }
@@ -199,7 +180,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
       await this.connectToBootstrapServers()
     } else {
       this.log(`Available under the following addresses:`)
- 
+
       this.peerInfo.multiaddrs.forEach((ma: Multiaddr) => {
         this.log(ma.toString())
       })
@@ -217,11 +198,11 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
    */
   async down(): Promise<void> {
     await this.db?.close()
-    
+
     this.log(`Database closed.`)
 
     this.network.heartbeat?.stop()
-    
+
     await this.paymentChannels?.stop()
 
     this.log(`Connector stopped.`)
@@ -256,7 +237,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
           } else {
             path = await this.getIntermediateNodes(destination)
           }
-          
+
           path.push(destination)
 
           let packet: Packet<Chain>
