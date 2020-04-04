@@ -6,6 +6,7 @@ import Hopr from '../../../'
 import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import { randomBytes } from 'crypto'
 import secp256k1 from 'secp256k1'
+import { u8aEquals } from '../../../utils'
 
 describe('test creation & transformation of a header', async function() {
   async function createAndDecomposeHeader(
@@ -16,7 +17,7 @@ describe('test creation & transformation of a header', async function() {
 
     for (let i = 0; i < peerIds.length - 1; i++) {
       header.deriveSecret(peerIds[i].privKey.marshal())
-      assert.deepEqual(header.derivedSecret, secrets[i], `pre-computed secret and derived secret should be the same`)
+      assert(u8aEquals(header.derivedSecret, secrets[i]), `pre-computed secret and derived secret should be the same`)
       assert(header.verify(), `MAC must be valid`)
 
       header.extractHeaderInformation()
@@ -69,20 +70,14 @@ describe('test creation & transformation of a header', async function() {
     const { header, identifier, secrets } = await createAndDecomposeHeader(getNode(), peerIds)
 
     header.deriveSecret(peerIds[2].privKey.marshal(), true)
-    assert.deepEqual(header.derivedSecret, secrets[2], `pre-computed secret and derived secret should be the same`)
+    assert(u8aEquals(header.derivedSecret, secrets[2]), `pre-computed secret and derived secret should be the same`)
 
     assert(header.verify(), `MAC should be valid`)
     header.extractHeaderInformation(true)
 
-    assert(
-      peerIds[2].pubKey.marshal().every((value: number, index: number) => value == header.address[index]),
-      `Decrypted address should be the same as the final recipient`
-    )
+    assert(u8aEquals(peerIds[2].pubKey.marshal(), header.address), `Decrypted address should be the same as the final recipient`)
 
-    assert(
-      header.identifier.every((value: number, index: number) => value == identifier[index]),
-      `Decrypted identifier should have the expected value`
-    )
+    assert(u8aEquals(header.identifier, identifier), `Decrypted identifier should have the expected value`)
   })
 
   it('should create a header with a path less than MAX_HOPS nodes', async function() {
@@ -91,49 +86,37 @@ describe('test creation & transformation of a header', async function() {
     const { header, identifier, secrets } = await createAndDecomposeHeader(getNode(), peerIds)
 
     header.deriveSecret(peerIds[1].privKey.marshal(), true)
-    assert.deepEqual(header.derivedSecret, secrets[1], `pre-computed secret and derived secret should be the same`)
+    assert(u8aEquals(header.derivedSecret, secrets[1]), `pre-computed secret and derived secret should be the same`)
 
     assert(header.verify(), `MAC must be valid`)
     header.extractHeaderInformation(true)
 
-    assert(
-      peerIds[1].pubKey.marshal().every((value: number, index: number) => value == header.address[index]),
-      `Decrypted address should be the same as the final recipient`
-    )
+    assert(u8aEquals(peerIds[1].pubKey.marshal(), header.address), `Decrypted address should be the same as the final recipient`)
 
-    assert(
-      header.identifier.every((value: number, index: number) => value == identifier[index]),
-      `Decrypted identifier should have the expected value`
-    )
+    assert(u8aEquals(header.identifier, identifier), `Decrypted identifier should have the expected value`)
   })
 
   it('should create a header with exactly two nodes', async function() {
-    const peerIds = await Promise.all([PeerId.create({ keyType: 'secp256k1' })])
+    const peerIds = [await PeerId.create({ keyType: 'secp256k1' })]
 
     const { header, identifier, secrets } = await createAndDecomposeHeader(getNode(), peerIds)
 
     header.deriveSecret(peerIds[0].privKey.marshal(), true)
-    assert.deepEqual(header.derivedSecret, secrets[0], `pre-computed secret and derived secret should be the same`)
+    assert(u8aEquals(header.derivedSecret, secrets[0]), `pre-computed secret and derived secret should be the same`)
 
     assert(header.verify(), `MAC must be valid`)
     header.extractHeaderInformation(true)
 
-    assert(
-      peerIds[0].pubKey.marshal().every((value: number, index: number) => value == header.address[index]),
-      `Decrypted address should be the same as the final recipient`
-    )
+    assert(u8aEquals(peerIds[0].pubKey.marshal(), header.address), `Decrypted address should be the same as the final recipient`)
 
-    assert(
-      header.identifier.every((value: number, index: number) => value == identifier[index]),
-      `Decrypted identifier should have the expected value`
-    )
+    assert(u8aEquals(header.identifier, identifier), `Decrypted identifier should have the expected value`)
   })
 })
 
 function notEqualHelper(arr: Uint8Array[]) {
   for (let i = 0; i < arr.length; i++) {
     for (let j = i + 1; j < arr.length; j++) {
-      if (arr[i].length == arr[j].length && arr[i].every((value: number, index: number) => arr[j][index] == value)) {
+      if (arr[i].length == arr[j].length && u8aEquals(arr[i], arr[j])) {
         return false
       }
     }

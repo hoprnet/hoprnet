@@ -5,6 +5,7 @@ import BN from 'bn.js'
 import PeerId from 'peer-id'
 import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import { randomBytes } from 'crypto'
+import { u8aEquals } from '../../utils'
 
 describe('test creation & verification of a challenge', function() {
   it('should create a verifiable challenge', async function() {
@@ -23,7 +24,7 @@ describe('test creation & verification of a challenge', function() {
 
     assert(await challenge.verify(peerId), `Previously generated signature should be valid.`)
 
-    assert.deepEqual(await challenge.counterparty, peerId.pubKey.marshal(), `recovered pubKey should be equal.`)
+    assert(u8aEquals(await challenge.counterparty, peerId.pubKey.marshal()), `recovered pubKey should be equal.`)
 
     challenge[0] ^= 0xff
     try {

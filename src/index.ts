@@ -205,7 +205,9 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
       })
     }
 
-    this.network.heartbeat.start()
+    await this.paymentChannels?.start()
+
+    this.network.heartbeat?.start()
 
     return this
   }
@@ -214,15 +216,15 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
    * Shuts down the node and saves keys and peerBook in the database
    */
   async down(): Promise<void> {
-    if (this.db) {
-      await this.db.close()
-    }
-
+    await this.db?.close()
+    
     this.log(`Database closed.`)
 
-    if (this.network.heartbeat) {
-      this.network.heartbeat.stop()
-    }
+    this.network.heartbeat?.stop()
+    
+    await this.paymentChannels?.stop()
+
+    this.log(`Connector stopped.`)
 
     await super.stop()
   }

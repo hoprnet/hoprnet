@@ -15,70 +15,44 @@ import SECIO = require('libp2p-secio')
 
 import { Types } from '@hoprnet/hopr-core-polkadot'
 import * as config from '@hoprnet/hopr-core-polkadot/lib/config'
-import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
+import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import { PaymentInteractions } from '.'
 import { privKeyToPeerId } from '../../utils'
 
-import Hopr from '../..'
+import type Hopr from '../..'
 import BN from 'bn.js'
 
+async function generateNode(id: number): Promise<Hopr<HoprCoreConnector>> {
+  const peerId = await privKeyToPeerId(config.DEMO_ACCOUNTS[id])
+  const node = (await libp2p.create({
+    peerInfo: await getPeerInfo({ id, peerId }),
+    modules: {
+      transport: [TCP],
+      streamMuxer: [MPLEX],
+      connEncryption: [SECIO]
+    }
+  })) as Hopr<HoprCoreConnector>
+
+  await node.start()
+
+  node.paymentChannels = ({
+    types: Types,
+    self: {
+      privateKey: peerId.privKey.marshal(),
+      publicKey: peerId.pubKey.marshal()
+    }
+  } as unknown) as HoprCoreConnector
+
+  node.interactions = {
+    payments: new PaymentInteractions(node)
+  } as Hopr<HoprCoreConnector>['interactions']
+
+  return node
+}
+
 describe('test payment (channel) interactions', function() {
-  let Alice: Hopr<HoprCoreConnector>
-  let Bob: Hopr<HoprCoreConnector>
-
-  before(async function() {
-    const peerIdAlice = await privKeyToPeerId(config.DEMO_ACCOUNTS[0])
-    Alice = (await libp2p.create({
-      peerInfo: await getPeerInfo({ id: 0, peerId: peerIdAlice }),
-      modules: {
-        transport: [TCP],
-        streamMuxer: [MPLEX],
-        connEncryption: [SECIO]
-      }
-    })) as Hopr<HoprCoreConnector>
-
-    const peerIdBob = await privKeyToPeerId(config.DEMO_ACCOUNTS[1])
-    Bob = (await libp2p.create({
-      peerInfo: await getPeerInfo({ id: 1, peerId: peerIdBob }),
-      modules: {
-        transport: [TCP],
-        streamMuxer: [MPLEX],
-        connEncryption: [SECIO]
-      }
-    })) as Hopr<HoprCoreConnector>
-
-    await Promise.all([
-      /* prettier-ignore */
-      Alice.start(),
-      Bob.start()
-    ])
-
-    Alice.paymentChannels = ({
-      types: Types,
-      self: {
-        privateKey: peerIdAlice.privKey.marshal(),
-        publicKey: peerIdAlice.pubKey.marshal()
-      }
-    } as unknown) as HoprCoreConnector
-
-    Bob.paymentChannels = ({
-      types: Types,
-      self: {
-        privateKey: peerIdBob.privKey.marshal(),
-        publicKey: peerIdBob.pubKey.marshal()
-      }
-    } as unknown) as HoprCoreConnector
-
-    Alice.interactions = {
-      payments: new PaymentInteractions(Alice)
-    } as Hopr<HoprCoreConnector>['interactions']
-
-    Bob.interactions = {
-      payments: new PaymentInteractions(Bob)
-    } as Hopr<HoprCoreConnector>['interactions']
-  })
-
   it('should establish a connection and run through the opening sequence', async function() {
+    const [Alice, Bob] = await Promise.all([generateNode(0), generateNode(1)])
     const testArray = new Uint8Array(32).fill(0xff)
     const response = new Uint8Array(Types.SignedChannel.SIZE).fill(0x00)
 
@@ -106,13 +80,10 @@ describe('test payment (channel) interactions', function() {
       })) != null,
       'Should a receive a message from counterparty'
     )
-  })
 
-  after(async function() {
     await Promise.all([
-      /* prettier-ignore */
-      Alice != null ? Alice.stop() : Promise.resolve(),
-      Bob != null ? Bob.stop() : Promise.resolve()
+      Alice.stop(),
+      Bob.stop()
     ])
   })
 })

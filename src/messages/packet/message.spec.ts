@@ -41,6 +41,6 @@ describe('test class that encapsulates (encrypted and padded) messages', functio
 
     msg.encrypted = false
 
-    assert.deepEqual(msg.plaintext, testMessage)
+    assert(u8aEquals(msg.plaintext, testMessage))
   })
 })

@@ -30,12 +30,12 @@ import BN from 'bn.js'
 import HoprPolkadot, { Types } from '@hoprnet/hopr-core-polkadot'
 import { randomBytes } from 'crypto'
 import * as DbKeys from '../../db_keys'
-import { stringToU8a, u8aEquals, u8aToHex } from '../../utils'
+import { stringToU8a, u8aEquals, randomInteger } from '../../utils'
 
 import assert from 'assert'
 import Multiaddr from 'multiaddr'
 
-describe('check packet forwarding & acknowledgement generation', function() {
+describe('check packet forwarding & acknowledgement generation', function () {
   const channels = new Map<string, SignedChannel>()
   const states = new Map<string, any>()
 
@@ -79,6 +79,12 @@ describe('check packet forwarding & acknowledgement generation', function() {
     const onChainKeyPair = new Keyring({ type: 'sr25519' }).addFromSeed(node.peerInfo.id.pubKey.marshal().slice(0, 32), undefined, 'sr25519')
     node.paymentChannels = new HoprPolkadot(
       ({
+        once(eventName: string, fn: () => void) {
+          if (eventName === 'disconnected') {
+            return fn()
+          }
+        },
+        disconnect: () => {},
         isReady: Promise.resolve(true),
         query: {
           hopr: {
@@ -89,7 +95,7 @@ describe('check packet forwarding & acknowledgement generation', function() {
 
               return Promise.resolve(channels.get(channelId.toHex()))
             },
-            state(accountId: AccountId) {
+            states(accountId: AccountId) {
               if (!states.has(accountId.toHex())) {
                 throw Error(`party ${accountId.toHex()} has not set any on-chain secrets.`)
               }
@@ -98,7 +104,7 @@ describe('check packet forwarding & acknowledgement generation', function() {
             }
           },
           system: {
-            events(_handler: () => void) {},
+            events(_handler: () => void) { },
             accountNonce() {
               return Promise.resolve({
                 toNumber: () => 0
@@ -146,7 +152,7 @@ describe('check packet forwarding & acknowledgement generation', function() {
     return (node as unknown) as Hopr<HoprPolkadot>
   }
 
-  it('should forward a packet and receive aknowledgements', async function() {
+  it('should forward a packet and receive aknowledgements', async function () {
     const [Alice, Bob, Chris, Dave] = await Promise.all([generateNode(), generateNode(), generateNode(), generateNode()])
 
     connectionHelper(Alice, Bob, Chris, Dave)
@@ -168,7 +174,7 @@ describe('check packet forwarding & acknowledgement generation', function() {
 
     await channelDbHelper(typeRegistry, channelRecord, Alice, Bob, Chris, Dave)
 
-    const testMsg = randomBytes(73)
+    const testMsg = randomBytes(randomInteger(37, 131))
 
     const emitPromises: Promise<any>[] = []
     emitPromises.push(emitCheckerHelper(Alice, Bob.peerInfo.id))
@@ -186,7 +192,7 @@ describe('check packet forwarding & acknowledgement generation', function() {
       await Packet.create(Alice, encode([testMsg, new TextEncoder().encode(Date.now().toString())]), [Bob.peerInfo.id, Chris.peerInfo.id])
     )
 
-    const testMsgSecond = randomBytes(101)
+    const testMsgSecond = randomBytes(randomInteger(33, 129))
 
     Dave.output = (arr: Uint8Array) => {
       const [msg] = (decode(Buffer.from(arr)) as unknown) as Buffer[]
@@ -205,7 +211,25 @@ describe('check packet forwarding & acknowledgement generation', function() {
       ])
     )
 
-    assert.doesNotReject(Promise.all(emitPromises), `Checks that we emit an event once we got an acknowledgement.`)
+    try {
+      await Promise.all(emitPromises)
+    } catch (err) {
+      assert.fail(`Checks that we emit an event once we got an acknowledgement.`)
+    }
+
+    await Promise.all([
+      Alice.paymentChannels.stop(),
+      Bob.paymentChannels.stop(),
+      Chris.paymentChannels.stop(),
+      Dave.paymentChannels.stop()
+    ])
+
+    await Promise.all([
+      Alice.stop(),
+      Bob.stop(),
+      Chris.stop(),
+      Dave.stop()
+    ])
   })
 
   // afterEach(function() {
@@ -226,6 +250,11 @@ function connectionHelper<Chain extends HoprCoreConnector>(...nodes: Hopr<Chain>
   }
 }
 
+/**
+ * Returns a Promise that resolves once the acknowledgement has been received
+ * @param node our Hopr node
+ * @param sender the sender of the packet
+ */
 function emitCheckerHelper<Chain extends HoprCoreConnector>(node: Hopr<Chain>, sender: PeerId): Promise<any> {
   return new Promise<any>((resolve, reject) => {
     node.interactions.packet.acknowledgment.emit = (event: string) => {
@@ -242,7 +271,7 @@ function emitCheckerHelper<Chain extends HoprCoreConnector>(node: Hopr<Chain>, s
   })
 }
 
-function channelDbHelper<Chain extends HoprCoreConnector>(typeRegistry: TypeRegistry, record: Uint8Array, ...nodes: Hopr<Chain>[]): Promise<any> {
+async function channelDbHelper<Chain extends HoprCoreConnector>(typeRegistry: TypeRegistry, record: Uint8Array, ...nodes: Hopr<Chain>[]): Promise<void> {
   const promises: Promise<any>[] = []
 
   if (nodes.length < 2) {
@@ -251,8 +280,8 @@ function channelDbHelper<Chain extends HoprCoreConnector>(typeRegistry: TypeRegi
 
   promises.push(
     nodes[0].db.put(
-      u8aToHex(nodes[0].paymentChannels.dbKeys.Channel(new AccountId(typeRegistry, nodes[1].paymentChannels.self.onChainKeyPair.publicKey))),
-      record
+      Buffer.from(nodes[0].paymentChannels.dbKeys.Channel(new AccountId(typeRegistry, nodes[1].paymentChannels.self.onChainKeyPair.publicKey))),
+      Buffer.from(record)
     )
   )
 
@@ -260,13 +289,13 @@ function channelDbHelper<Chain extends HoprCoreConnector>(typeRegistry: TypeRegi
     promises.push(
       nodes[i].db
         .batch()
-        .put(u8aToHex(nodes[i].paymentChannels.dbKeys.Channel(new AccountId(typeRegistry, nodes[i - 1].paymentChannels.self.onChainKeyPair.publicKey))), record)
-        .put(u8aToHex(nodes[i].paymentChannels.dbKeys.Channel(new AccountId(typeRegistry, nodes[i + 1].paymentChannels.self.onChainKeyPair.publicKey))), record)
+        .put(Buffer.from(nodes[i].paymentChannels.dbKeys.Channel(new AccountId(typeRegistry, nodes[i - 1].paymentChannels.self.onChainKeyPair.publicKey))), Buffer.from(record))
+        .put(Buffer.from(nodes[i].paymentChannels.dbKeys.Channel(new AccountId(typeRegistry, nodes[i + 1].paymentChannels.self.onChainKeyPair.publicKey))), Buffer.from(record))
         .write()
     )
   }
 
-  return Promise.all(promises)
+  await Promise.all(promises)
 }
 
 function getIds<Chain extends HoprCoreConnector>(typeRegistry: TypeRegistry, ...nodes: Hopr<Chain>[]) {
@@ -275,9 +304,7 @@ function getIds<Chain extends HoprCoreConnector>(typeRegistry: TypeRegistry, ...
     promises.push(
       nodes[i].paymentChannels.utils.getId(
         new AccountId(typeRegistry, nodes[i].paymentChannels.self.onChainKeyPair.publicKey),
-        new AccountId(typeRegistry, nodes[i + 1].paymentChannels.self.onChainKeyPair.publicKey),
-        // @ts-ignore
-        nodes[i].paymentChannels.api
+        new AccountId(typeRegistry, nodes[i + 1].paymentChannels.self.onChainKeyPair.publicKey)
       )
     )
   }

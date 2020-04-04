@@ -52,7 +52,7 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
 
     await pipe(
       /* prettier-ignore */
-      [packet],
+      [packet.subarray()],
       struct.stream
     )
   }
@@ -102,8 +102,6 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
 
     // Acknowledgement
     setImmediate(async () => {
-
-
       const ack = new Acknowledgement(this.node.paymentChannels, undefined, {
         key: deriveTicketKeyBlinding(packet.header.derivedSecret),
         challenge: oldChallenge

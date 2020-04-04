@@ -71,6 +71,17 @@ export class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
     return new Uint8Array(this.buffer, begin + this.byteOffset, end - begin)
   }
 
+  getCopy(): Challenge<Chain> {
+    const arrCopy = new Uint8Array(Challenge.SIZE(this.paymentChannels))
+
+    arrCopy.set(this.subarray())
+
+    return new Challenge<Chain>(this.paymentChannels, {
+      bytes: arrCopy.buffer,
+      offset: arrCopy.byteOffset
+    })
+  }
+
   /**
    * Uses the derived secret and the signature to recover the public
    * key of the signer.

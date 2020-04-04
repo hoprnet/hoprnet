@@ -1,6 +1,8 @@
 import { PRG } from './prg'
 import { randomBytes } from 'crypto'
 import assert from 'assert'
+import { u8aEquals } from '../u8a'
+import { randomInteger } from '../general'
 
 describe('Hopr Polkadot', async function() {
   it('should create a digest', function() {
@@ -11,12 +13,14 @@ describe('Hopr Polkadot', async function() {
 
     const firstSlice = prg.digest(0, 32)
     assert.equal(firstSlice.length, 32, `check length`)
-    assert.deepEqual(firstSlice, digest.slice(0, 32), `check that beginning is the same`)
+    assert(u8aEquals(firstSlice, digest.slice(0, 32)), `check that beginning is the same`)
 
-    const secondSlice = prg.digest(123, 234)
-    assert.equal(secondSlice.length, 234 - 123, `check size`)
-    assert.deepEqual(secondSlice, digest.slice(123, 234), `check that slice somewhere in the middle is the same`)
-    assert.deepEqual(PRG.createPRG(key, iv).digest(123, 234), prg.digest(123, 234), `check that slice somewhere in the middle is the same when computed by different methods`)
+    const start = randomInteger(0, 250)
+    const end = randomInteger(start, start + 251)
+    const secondSlice = prg.digest(start, end)
+    assert.equal(secondSlice.length, end - start, `check size`)
+    assert(u8aEquals(secondSlice, digest.slice(start, end)), `check that slice somewhere in the middle is the same`)
+    assert(u8aEquals(PRG.createPRG(key, iv).digest(start, end), prg.digest(start, end)), `check that slice somewhere in the middle is the same when computed by different methods`)
 
     assert.throws(() => prg.digest(234, 234), `should throw when start == end`)
     assert.throws(() => prg.digest(234, 233), `should throw when start > end`)

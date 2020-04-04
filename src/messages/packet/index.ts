@@ -8,7 +8,7 @@ const RELAY_FEE = 10
 function fromWei(arg: any, unit: any) {
   return arg.toString()
 }
-import { pubKeyToPeerId, u8aXOR, u8aConcat, u8aEquals, u8aToHex } from '../../utils'
+import { pubKeyToPeerId, u8aXOR, u8aConcat, u8aEquals } from '../../utils'
 
 import { Header, deriveTicketKey, deriveTagParameters } from './header'
 import { Challenge } from './challenge'
@@ -18,9 +18,6 @@ import { LevelUp } from 'levelup'
 import Hopr from '../../'
 
 import HoprCoreConnector,  { Types } from '@hoprnet/hopr-core-connector-interface'
-
-const PRIVATE_KEY_LENGTH = 32
-const OPENING_TIMEOUT = 86400 * 1000
 
 /**
  * Encapsulates the internal representation of a packet
@@ -260,7 +257,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
 
     this.message.decrypt(this.header.derivedSecret)
 
-    const challengeShadowCopy = this.challenge.slice()
+    const challengeShadowCopy = this.challenge.getCopy()
     const oldChallenge = new Challenge(this.node.paymentChannels, {
       bytes: challengeShadowCopy.buffer,
       offset: challengeShadowCopy.byteOffset
@@ -315,7 +312,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       await this.node.paymentChannels.utils.pubKeyToAccountId(target.pubKey.marshal())
     )
 
-    await this.node.db.put(u8aToHex(this.node.dbKeys.UnAcknowledgedTickets(target.pubKey.marshal(), this.header.hashedKeyHalf)), Buffer.from(this.ticket))
+    await this.node.db.put(Buffer.from(this.node.dbKeys.UnAcknowledgedTickets(target.pubKey.marshal(), this.header.hashedKeyHalf)), Buffer.from(this.ticket))
 
     // const challenges = [secp256k1.publicKeyCreate(Buffer.from(deriveTicketKey(this.header.derivedSecret))), this.header.hashedKeyHalf]
     // let previousChallenges = await (await node.paymentChannels.channel.create(node.paymentChannels, await node.paymentChannels.utils.pubKeyToAccountId(target.pubKey.marshal()))).getPreviousChallenges()
@@ -413,27 +410,4 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
 
     return true
   }
-
-  /**
-   * @returns the binary representation of the packet
-   */
-  // toBuffer(): Uint8Array {
-  //   return u8aConcat(this.header, this.ticket, this.challenge, this.message)
-  // }
-
-  // static fromBuffer<Chain extends HoprCoreConnectorInstance>(node: Hopr<Chain>, buf: Uint8Array) {
-  //   if (buf.length != Packet.SIZE(node.paymentChannels))
-  //     throw Error(
-  //       `Invalid input parameter. Expected a Buffer of size ${Packet.SIZE}. Got instead ${typeof buf}${
-  //         Buffer.isBuffer(buf) ? ` of length ${buf.length} but expected length ${Packet.SIZE}` : ''
-  //       }.`
-  //     )
-
-  //   return new Packet(
-  //     node.paymentChannels,
-  //     new Header(buf.subarray(0, HeaderSIZE)),
-  //     Transaction.fromBuffer(buf.slice(HeaderSIZE, HeaderSIZE + Transaction.SIZE)),
-  //     new Challenge(node.paymentChannels, buf.subarray(HeaderSIZE + Transaction.SIZE, HeaderSIZE + Transaction.SIZE + ChallengeSIZE)),
-  //     new Message(buf.subarray(HeaderSIZE + Transaction.SIZE + ChallengeSIZE, HeaderSIZE + Transaction.SIZE + ChallengeSIZE + MessageSIZE), true)
-  //   )
 }

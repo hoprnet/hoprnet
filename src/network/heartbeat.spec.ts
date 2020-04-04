@@ -98,5 +98,10 @@ describe('check heartbeat mechanism', function() {
     await Alice.network.heartbeat.checkNodes()
 
     assert(!Alice.network.heartbeat.nodes.has(Chris.peerInfo.id.toB58String()), `Alice should have removed Chris.`)
+
+    await Promise.all([
+      Alice.stop(),
+      Bob.stop()
+    ])
   })
 })
