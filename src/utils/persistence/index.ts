@@ -1,4 +1,4 @@
 export * from './askForPassword'
-export * from './keyPair'
-export * from './peerBook'
+export { serializeKeyPair, deserializeKeyPair } from './keyPair'
+export * from './peerStore'
 export * from './peerInfo'

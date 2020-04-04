@@ -17,5 +17,4 @@ export function serializePeerBook(peerBook: any): Uint8Array {
 
   // return encode(peerInfos)
   throw Error('not implemented')
-  return 
 }

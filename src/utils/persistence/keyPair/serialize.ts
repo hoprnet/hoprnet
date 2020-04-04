@@ -1,33 +1,24 @@
 import PeerId from 'peer-id'
-import rlp from 'rlp'
-import { randomBytes, createCipheriv, scryptSync } from 'crypto'
-import chalk from 'chalk'
-import { askForPassword } from '../askForPassword'
+import { encode } from 'rlp'
+import { randomBytes, createCipheriv, scryptSync, createHmac } from 'crypto'
 
-const SALT_LENGTH = 32
-const CIPHER_ALGORITHM = 'chacha20'
+import { KEYPAIR_CIPHER_ALGORITHM, KEYPAIR_SALT_LENGTH, KEYPAIR_SCRYPT_PARAMS, KEYPAIR_IV_LENGTH, KEYPAIR_CIPHER_KEY_LENGTH, KEYPAIR_MESSAGE_DIGEST_ALGORITHM } from '.'
 
 /**
  * Serializes a given peerId by serializing the included private key and public key.
  *
  * @param peerId the peerId that should be serialized
  */
-export async function serializeKeyPair(peerId: PeerId) {
-  const salt: Buffer = randomBytes(SALT_LENGTH)
-  const scryptParams = { N: 8192, r: 8, p: 16 }
+export async function serializeKeyPair(peerId: PeerId, password: Uint8Array) {
+  const salt: Buffer = randomBytes(KEYPAIR_SALT_LENGTH)
 
-  const question = 'Please type in the password that will be used to encrypt the generated key.'
+  const key = scryptSync(password, salt, KEYPAIR_CIPHER_KEY_LENGTH, KEYPAIR_SCRYPT_PARAMS)
 
-  const pw: string = await askForPassword(question)
+  const iv = randomBytes(KEYPAIR_IV_LENGTH)
 
-  console.log(`Done. Using peerId '${chalk.blue(peerId.toB58String())}'`)
+  const ciphertext = createCipheriv(KEYPAIR_CIPHER_ALGORITHM, key, iv).update(peerId.marshal())
 
-  const key = scryptSync(pw, salt, 32, scryptParams)
-  const iv = randomBytes(12)
+  const encodedCipherText = encode([iv, ciphertext])
 
-  const serializedPeerId = Buffer.concat([Buffer.alloc(16, 0), peerId.marshal()])
-
-  const ciphertext = createCipheriv(CIPHER_ALGORITHM, key, iv).update(serializedPeerId)
-
-  return rlp.encode([salt, iv, ciphertext])
+  return encode([salt, createHmac(KEYPAIR_MESSAGE_DIGEST_ALGORITHM, key).update(encodedCipherText).digest(), encodedCipherText])
 }

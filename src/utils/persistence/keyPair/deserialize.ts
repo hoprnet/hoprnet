@@ -1,11 +1,16 @@
-import rlp from 'rlp'
-import { createCipheriv, scryptSync } from 'crypto'
-import chalk from 'chalk'
+import { decode } from 'rlp'
+import { createCipheriv, scryptSync, createHmac } from 'crypto'
 import PeerId from 'peer-id'
 
-import { askForPassword } from '../askForPassword'
-
-const CIPHER_ALGORITHM = 'chacha20'
+import {
+  KEYPAIR_CIPHER_ALGORITHM,
+  KEYPAIR_SALT_LENGTH,
+  KEYPAIR_SCRYPT_PARAMS,
+  KEYPAIR_IV_LENGTH,
+  KEYPAIR_CIPHER_KEY_LENGTH,
+  KEYPAIR_MESSAGE_DIGEST_ALGORITHM
+} from '.'
+import { u8aEquals } from '../../u8a'
 
 /**
  * Deserializes a serialized key pair and returns a peerId.
@@ -17,25 +22,33 @@ const CIPHER_ALGORITHM = 'chacha20'
  *
  * @param encryptedSerializedKeyPair the encoded and encrypted key pair
  */
-export async function deserializeKeyPair(encryptedSerializedKeyPair: Uint8Array) {
-  const [salt, iv, ciphertext] = rlp.decode(encryptedSerializedKeyPair) as Buffer[]
+export async function deserializeKeyPair(encryptedSerializedKeyPair: Uint8Array, password: Uint8Array) {
+  const [salt, mac, encodedCiphertext] = decode(encryptedSerializedKeyPair) as [Buffer, Buffer, Buffer]
 
-  const scryptParams = { N: 8192, r: 8, p: 16 }
+  if (salt.length != KEYPAIR_SALT_LENGTH) {
+    throw Error('Invalid salt length.')
+  }
 
-  const question = 'Please type in the password that was used to encrypt the key.'
+  const key = scryptSync(password, salt, KEYPAIR_CIPHER_KEY_LENGTH, KEYPAIR_SCRYPT_PARAMS)
 
-  let plaintext: Buffer
+  if (
+    !u8aEquals(
+      createHmac(KEYPAIR_MESSAGE_DIGEST_ALGORITHM, key)
+        .update(encodedCiphertext)
+        .digest(),
+      mac
+    )
+  ) {
+    throw Error(`Invalid MAC. Ciphertext might have been corrupted`)
+  }
 
-  do {
-    const pw = await askForPassword(question)
+  const [iv, ciphertext] = (decode(encodedCiphertext) as unknown) as [Buffer, Buffer]
 
-    const key = scryptSync(pw, salt, 32, scryptParams)
+  if (iv.length != KEYPAIR_IV_LENGTH) {
+    throw Error('Invalid IV length.')
+  }
 
-    plaintext = createCipheriv(CIPHER_ALGORITHM, key, iv).update(ciphertext)
-  } while (!plaintext.slice(0, 16).equals(Buffer.alloc(16, 0)))
+  let plaintext = createCipheriv(KEYPAIR_CIPHER_ALGORITHM, key, iv).update(ciphertext)
 
-  const peerId: PeerId = await PeerId.createFromProtobuf(plaintext)
-  console.log(`Successfully restored ID ${chalk.blue(peerId.toB58String())}.`)
-
-  return peerId
+  return await PeerId.createFromProtobuf(plaintext)
 }

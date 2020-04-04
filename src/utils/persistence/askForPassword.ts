@@ -13,13 +13,15 @@ export function askForPassword(question: string): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     read(
       {
-        prompt: question,
+        prompt: question + '(Password will not be echoed.)',
         silent: true,
         edit: true,
-        replace: '*'
+        replace: ''
       },
       (err: any, pw: string) => {
-        if (err) return reject(err)
+        if (err) {
+          return reject(err)
+        }
 
         resolve(pw)
       }
