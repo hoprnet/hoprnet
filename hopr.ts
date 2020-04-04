@@ -473,6 +473,14 @@ async function main() {
     return
   }
 
+  try {
+    node = await Hopr.createNode(connector, options)
+  } catch (err) {
+    await stopNode()
+    console.log(chalk.red(err.message))
+    process.exit(1)
+  }
+  
   rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
@@ -483,14 +491,6 @@ async function main() {
     await stopNode()
     process.exit(0)
   })
-
-  try {
-    node = await Hopr.createNode(connector, options)
-  } catch (err) {
-    await stopNode()
-    console.log(chalk.red(err.message))
-    process.exit(1)
-  }
 
   console.log(`\nAvailable under the following addresses:\n ${node.peerInfo.multiaddrs.toArray().join('\n ')}\n`)
 

@@ -1,6 +1,7 @@
 import { keys } from 'libp2p-crypto'
 import { LevelUp } from 'levelup'
-import { deserializeKeyPair, serializeKeyPair } from '..'
+import chalk from 'chalk'
+import { deserializeKeyPair, serializeKeyPair, askForPassword } from '..'
 
 import PeerInfo from 'peer-info'
 import PeerId from 'peer-id'
@@ -9,6 +10,89 @@ import PeerId from 'peer-id'
 const Multiaddr = require('multiaddr')
 
 import { NAME } from '../../constants'
+
+/**
+ * Assemble the addresses that we are using
+ */
+function getAddrs(options: any): any[] {
+  const addrs = []
+
+  if (process.env.PORT == null) {
+    throw Error('Unknown port. Please specify a port in the .env file!')
+  }
+
+  let port = process.env.PORT
+
+  if (process.env.HOST_IPV4) {
+    // ============================= Only for testing ============================================================
+    if (options != null && options.id != null && Number.isInteger(options.id)) {
+      port = (Number.parseInt(process.env.PORT) + (options.id + 1) * 2).toString()
+    }
+    // ===========================================================================================================
+    addrs.push(Multiaddr(`/ip4/${process.env.HOST_IPV4}/tcp/${port}`))
+  }
+
+  // if (process.env.HOST_IPV6) {
+  //     // ============================= Only for testing ============================================================
+  //     if (Number.isInteger(options.id)) port = (Number.parseInt(process.env.PORT) + (options.id + 1) * 2).toString()
+  //     // ===========================================================================================================
+  //     addrs.push(Multiaddr(`/ip6/${process.env.HOST_IPV6}/tcp/${Number.parseInt(port) + 1}`))
+  // }
+
+  return addrs
+}
+
+/**
+ * Checks whether we have gotten any peerId in through the options.
+ */
+async function getPeerId(options: any, db?: LevelUp): Promise<PeerId> {
+  if (options != null && options.peerId != null && PeerId.isPeerId(options.peerId)) {
+    return options.peerId
+  }
+
+  if (db === undefined) {
+    throw Error('Cannot get/store any peerId without a database handle.')
+  }
+
+  return getFromDatabase(db)
+}
+
+/**
+ * Try to retrieve Id from database
+ */
+async function getFromDatabase(db: LevelUp): Promise<PeerId> {
+  let peerId: PeerId
+  let pw: string
+  try {
+    const serializedKeyPair = await db.get('key-pair')
+
+    let done = false
+    do {
+      pw = await askForPassword('Please type in the passwort that was used to encrypt to key.')
+
+      try {
+        peerId = await deserializeKeyPair(serializedKeyPair, new TextEncoder().encode(pw))
+        done = true
+      } catch {}
+    } while (!done)
+
+    console.log(`Successfully recovered ${chalk.blue(peerId.toB58String())} from database.`)
+  } catch (err) {
+    if (err != null && err.notFound != true) {
+      throw err
+    }
+
+    pw = await askForPassword('Please type in a password to encrypt the secret key.')
+
+    const key = await keys.generateKeyPair('secp256k1', 256)
+    peerId = await PeerId.createFromPrivKey(key.bytes)
+
+    const serializedKeyPair = await serializeKeyPair(peerId, new TextEncoder().encode(pw))
+    await db.put('key-pair', serializedKeyPair)
+  }
+
+  return peerId
+}
 
 async function getPeerInfo(
   options: {
@@ -37,83 +121,17 @@ async function getPeerInfo(
     }
   }
 
-  /**
-   * Try to retrieve Id from database
-   */
-  async function getFromDatabase(): Promise<PeerId> {
-    try {
-      const serializedKeyPair = await db.get('key-pair')
-
-      return deserializeKeyPair(serializedKeyPair)
-    } catch (err) {
-      if (err != null && err.notFound == true) {
-        throw err
-      }
-
-      const key = await keys.generateKeyPair('secp256k1', 256)
-      const peerId = await PeerId.createFromPrivKey(key.bytes)
-
-      const serializedKeyPair = await serializeKeyPair(peerId)
-      await db.put('key-pair', serializedKeyPair)
-
-      return peerId
-    }
-  }
-
-  /**
-   * Assemble the addresses that we are using
-   */
-  function getAddrs(): any[] {
-    const addrs = []
-
-    if (process.env.PORT == null) {
-      throw Error('Unknown port. Please specify a port in the .env file!')
-    }
-
-    let port = process.env.PORT
-
-    if (process.env.HOST_IPV4) {
-      // ============================= Only for testing ============================================================
-      if (options != null && options.id != null && Number.isInteger(options.id)) {
-        port = (Number.parseInt(process.env.PORT) + (options.id + 1) * 2).toString()
-      }
-      // ===========================================================================================================
-      addrs.push(Multiaddr(`/ip4/${process.env.HOST_IPV4}/tcp/${port}`))
-    }
-
-    // if (process.env.HOST_IPV6) {
-    //     // ============================= Only for testing ============================================================
-    //     if (Number.isInteger(options.id)) port = (Number.parseInt(process.env.PORT) + (options.id + 1) * 2).toString()
-    //     // ===========================================================================================================
-    //     addrs.push(Multiaddr(`/ip6/${process.env.HOST_IPV6}/tcp/${Number.parseInt(port) + 1}`))
-    // }
-
-    return addrs
-  }
-
-  /**
-   * Checks whether we have gotten any peerId in through the options.
-   */
-  async function getPeerId(): Promise<PeerId> {
-    if (options != null && options.peerId != null && PeerId.isPeerId(options.peerId)) {
-      return options.peerId
-    }
-
-    return getFromDatabase()
-  }
-
-
   checkConfig()
 
-  options.addrs = getAddrs()
+  options.addrs = getAddrs(options)
 
   let peerInfo: PeerInfo
   if (options.peerInfo != null) {
     peerInfo = options.peerInfo
   } else {
-    peerInfo = new PeerInfo(await getPeerId())
+    peerInfo = new PeerInfo(await getPeerId(options, db))
   }
-   
+
   options.addrs.forEach(addr => peerInfo.multiaddrs.add(addr.encapsulate(`/${NAME}/${peerInfo.id.toB58String()}`)))
 
   return peerInfo

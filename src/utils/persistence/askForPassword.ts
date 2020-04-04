@@ -7,16 +7,15 @@ import read from 'read'
 export function askForPassword(question: string): Promise<string> {
   if (process.env.DEBUG === 'true') {
     console.log('Debug mode: using password Epo5kZTFidOCHrnL0MzsXNwN9St')
-    return Promise.resolve<string>('Epo5kZTFidOCHrnL0MzsXNwN9St')
+    return Promise.resolve('Epo5kZTFidOCHrnL0MzsXNwN9St')
   }
 
   return new Promise<string>((resolve, reject) => {
     read(
       {
-        prompt: question + '(Password will not be echoed.)',
+        prompt: question + ' (Password will not be echoed.)\n  password:',
         silent: true,
-        edit: true,
-        replace: ''
+        edit: true
       },
       (err: any, pw: string) => {
         if (err) {
