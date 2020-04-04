@@ -1,5 +1,5 @@
 import { randomBytes } from 'crypto'
-import Web3 from 'web3'
+import Web3 from './web3'
 import { LevelUp } from 'levelup'
 import BN from 'bn.js'
 import HoprChannelsAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprChannels.json'
@@ -95,8 +95,6 @@ export default class HoprEthereum implements HoprCoreConnector {
     } else if (this._status === 'uninitialized' && typeof this._initializing === 'undefined') {
       console.log('Connector was asked to start but state was not asked to initialize, initializing..')
       this.initialize().catch(console.error)
-    } else if (this._status !== 'uninitialized' && this._status !== 'initialized') {
-      throw Error(`invalid status '${this._status}', could not start`)
     }
 
     this._starting = Promise.resolve()
@@ -105,6 +103,13 @@ export default class HoprEthereum implements HoprCoreConnector {
         while (this._status !== 'initialized') {
           await utils.wait(1 * 1e3)
         }
+
+        this.web3.events.on('reconnected', async () => {
+          console.log('lost connection to web3, restarting..')
+
+          await this.stop()
+          await this.start()
+        })
 
         this._status = 'started'
         console.log('Connector started')
@@ -338,6 +343,9 @@ export default class HoprEthereum implements HoprCoreConnector {
     const address = await utils.pubKeyToAccountId(publicKey)
 
     const web3 = new Web3(provider)
+    // @TODO: stop using this
+    await web3.isConnected()
+
     const account = new types.AccountId(address)
     const network = await utils.getNetworkId(web3)
 
@@ -370,6 +378,7 @@ export default class HoprEthereum implements HoprCoreConnector {
 
     // begin initializing
     coreConnector.initialize().catch(console.error)
+    coreConnector.start()
 
     return coreConnector
   }

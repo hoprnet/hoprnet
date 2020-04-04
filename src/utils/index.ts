@@ -225,7 +225,8 @@ export function TransactionSigner(web3: Web3, privKey: Uint8Array) {
     }
 
     return {
-      send
+      send,
+      transactionHash: signedTransaction.transactionHash
     }
   }
 }

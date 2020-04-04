@@ -6,7 +6,7 @@ export const TOKEN_ADDRESSES: { [key in Networks]: string } = {
   mainnet: undefined,
   morden: undefined,
   ropsten: undefined,
-  rinkeby: undefined,
+  rinkeby: '0x25f4408b0F75D1347335fc625E7446F2CdEcD503',
   goerli: undefined,
   kovan: undefined,
   private: '0x0f5Ea0A652E851678Ebf77B69484bFcD31F9459B'
@@ -16,7 +16,7 @@ export const CHANNELS_ADDRESSES: { [key in Networks]: string } = {
   mainnet: undefined,
   morden: undefined,
   ropsten: undefined,
-  rinkeby: undefined,
+  rinkeby: '0x077209b19F4Db071254C468E42784588003be34C',
   goerli: undefined,
   kovan: undefined,
   private: '0xEC8bE1A5630364292E56D01129E8ee8A9578d7D8'
