@@ -343,6 +343,8 @@ function runAsBootstrapNode() {
   node.on('peer:connect', (peer: PeerInfo) => {
     console.log(`Incoming connection from ${chalk.blue(peer.id.toB58String())}.`)
   })
+
+  rl.resume()
 }
 
 async function runAsRegularNode() {
@@ -354,36 +356,6 @@ async function runAsRegularNode() {
     console.log(chalk.red(err.message))
     return stopNode()
   }
-
-  // console.log(
-  //   `Own ${node.paymentChannels.CHAIN_NAME} address: ${chalk.green(await node.paymentChannels.utils.pubKeyToAccountId(node.peerInfo.id.pubKey.marshal()))}\n` +
-  //     `Funds: ${fromWei(funds, 'ether')} ${node.paymentChannels.types.Balance.SYMBOL}\n` +
-  //     `Stake: ${fromWei(stakedFunds, 'ether')} ${node.paymentChannels.types.Balance.SYMBOL}\n`
-  // )
-
-  // if (stakedFunds.lt(MINIMAL_STAKE)) {
-  //   await new Promise<void>(resolve =>
-  //     rl.question(
-  //       `Staked ${node.paymentChannels.types.Balance.SYMBOL} is less than ${fromWei(MINIMAL_STAKE, 'ether')} ${
-  //         node.paymentChannels.types.Balance.SYMBOL
-  //       }. Do you want to increase the stake now? (${chalk.green('Y')}/${chalk.red('n')}): `,
-  //       (answer: string) => {
-  //         switch (answer.toLowerCase()) {
-  //           case '':
-  //           case 'y':
-  //             rl.question(`Amount? : `, (answer: string) => resolve(stake(answer)))
-  //             rl.write(fromWei(MINIMAL_STAKE.sub(stakedFunds), 'ether'))
-  //             break
-  //           case 'n':
-  //             console.log(`Running HOPR with ${chalk.magenta(`${fromWei(stakedFunds, 'ether').toString()} ${node.paymentChannels.types.Balance.SYMBOL}`)}.`)
-  //             return resolve()
-  //           default:
-  //             return stopNode()
-  //         }
-  //       }
-  //     )
-  //   )
-  // }
 
   console.log(`Connecting to bootstrap node${node.bootstrapServers.length == 1 ? '' : 's'}...`)
 
