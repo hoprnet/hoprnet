@@ -1,0 +1,11 @@
+#!/usr/bin/env node
+
+const { existsSync } = require('fs')
+const chalk = require('chalk')
+
+if (!existsSync('./lib') || !existsSync('./lib/hpr')) {
+  console.log(`\nHOPR has not been compiled yet. Please run the Typescript compiler first. Try\n\n\t${chalk.yellow('tsc -d -p .')}\n`);
+  return
+}
+
+require('./lib/hopr')
