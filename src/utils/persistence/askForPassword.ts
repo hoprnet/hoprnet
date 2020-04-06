@@ -5,7 +5,7 @@ import read from 'read'
  * @param question question to ask before prompt
  */
 export function askForPassword(question: string): Promise<string> {
-  if (process.env.DEBUG === 'true') {
+  if (process.env.DEVEVLOP_MODE === 'true') {
     console.log('Debug mode: using password Epo5kZTFidOCHrnL0MzsXNwN9St')
     return Promise.resolve('Epo5kZTFidOCHrnL0MzsXNwN9St')
   }

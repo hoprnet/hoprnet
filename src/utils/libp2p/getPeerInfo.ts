@@ -53,7 +53,7 @@ async function getPeerId(options: any, db?: LevelUp): Promise<PeerId> {
       return options.peerId
     }
 
-    if (process.env.DEBUG === 'true') {
+    if (process.env.DEVLOPE_MODE === 'true') {
       if (options.id != null && isFinite(options.id)) {
         if (options.bootstrapNode) {
           if (options.id >= BOOTSTRAP_SEEDS.length) {
@@ -96,7 +96,7 @@ async function getFromDatabase(db: LevelUp): Promise<PeerId> {
         peerId = await deserializeKeyPair(serializedKeyPair, new TextEncoder().encode(pw))
         done = true
       } catch {
-        if (process.env.DEBUG === 'true') {
+        if (process.env.DEVELOPE_MODE === 'true') {
           throw Error(`DEBUG MODE: Stored database secret is not recoverable with the given demo password. You might want to delete the corresponding database.`)
         }
       }
