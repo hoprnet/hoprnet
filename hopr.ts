@@ -774,7 +774,7 @@ async function printMyAddress(): Promise<void> {
 
   console.log(
     `${(connector.constants.CHAIN_NAME + ':').padEnd(prefixLength, ' ')}${chalk.green(
-      bs58.encode(await node.paymentChannels.utils.pubKeyToAccountId(node.peerInfo.id.pubKey.marshal()))
+      u8aToHex(await node.paymentChannels.utils.pubKeyToAccountId(node.peerInfo.id.pubKey.marshal()))
     )}\n` +
       /* prettier-ignore */
       `${'HOPR:'.padEnd(prefixLength, ' ')}${chalk.green(node.peerInfo.id.toB58String())}`
