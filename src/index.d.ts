@@ -19,6 +19,8 @@ declare namespace HoprCoreConnector {
   function create(db: LevelUp, seed?: Uint8Array, options?: { id?: number; provider?: string }): Promise<HoprCoreConnector>
 
   const constants: typeof Constants
+
+  const requiredOptions: string[]
 }
 declare interface HoprCoreConnector {
   readonly started: boolean
