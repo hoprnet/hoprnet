@@ -1,4 +1,5 @@
 import Web3 from 'web3'
+import { BOOTSTRAP_SEEDS } from '@hoprnet/hopr-demo-seeds'
 import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
 import { HoprToken as IHoprToken } from '../tsc/web3/HoprToken'
 import { stringToU8a } from '../core/u8a'
@@ -6,6 +7,7 @@ import { privKeyToPubKey, pubKeyToAccountId } from '../utils'
 import { AccountId } from '../types'
 import { DEFAULT_URI, TOKEN_ADDRESSES, FUND_ACCOUNT_PRIVATE_KEY, DEMO_ACCOUNTS } from '../config'
 
+const ACCOUNTS = [].concat(DEMO_ACCOUNTS, BOOTSTRAP_SEEDS)
 const AMOUNT = Web3.utils.toWei('100', 'ether')
 
 const privKeyToAddress = async (privKey: string) => {
@@ -19,7 +21,7 @@ async function main() {
   const hoprToken: IHoprToken = new web3.eth.Contract(HoprTokenAbi as any, TOKEN_ADDRESSES.private)
   const owner = await privKeyToAddress(FUND_ACCOUNT_PRIVATE_KEY)
 
-  for (const privKey of DEMO_ACCOUNTS) {
+  for (const privKey of ACCOUNTS) {
     const address = await privKeyToAddress(privKey)
 
     await hoprToken.methods.mint(address, AMOUNT).send({
