@@ -20,12 +20,14 @@ import { PaymentInteractions } from '.'
 import { privKeyToPeerId } from '../../utils'
 
 import type Hopr from '../..'
+import type { HoprOptions } from '../..'
+
 import BN from 'bn.js'
 
 async function generateNode(id: number): Promise<Hopr<HoprCoreConnector>> {
   const peerId = await privKeyToPeerId(config.DEMO_ACCOUNTS[id])
   const node = (await libp2p.create({
-    peerInfo: await getPeerInfo({ id, peerId }),
+    peerInfo: await getPeerInfo({ id, peerId } as HoprOptions),
     modules: {
       transport: [TCP],
       streamMuxer: [MPLEX],

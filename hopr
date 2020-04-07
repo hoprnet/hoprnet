@@ -4,4 +4,4 @@ require('ts-node').register({
   transpileOnly: true,
 })
 
-require('./hopr.ts')
+require('./chat')

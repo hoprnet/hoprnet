@@ -8,5 +8,5 @@
     "sourceMap": true,
     "declaration": true
   },
-  "include": ["src/**/*", "hopr.ts", "node_modules/@hoprnet/hopr-types/types/**/*.d.ts"]
+  "include": ["src/**/*.ts", "chat/**/*.ts", "node_modules/@hoprnet/hopr-types/types/**/*.d.ts"]
 }

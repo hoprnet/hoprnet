@@ -18,7 +18,7 @@ import { PACKET_SIZE, MAX_HOPS } from './constants'
 
 import { Network } from './network'
 
-import { randomSubset, addPubKey, createDirectoryIfNotExists, getPeerInfo, privKeyToPeerId, u8aToHex } from './utils'
+import { randomSubset, addPubKey, createDirectoryIfNotExists, getPeerInfo, u8aToHex } from './utils'
 
 import levelup, { LevelUp } from 'levelup'
 import leveldown from 'leveldown'
@@ -33,12 +33,17 @@ import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import { Interactions, Duplex } from './interactions'
 import * as DbKeys from './db_keys'
 
-type HoprOptions = {
-  peerInfo: PeerInfo
-  output: (msg: Uint8Array) => void
+export type HoprOptions = {
+  peerId?: PeerId
+  peerInfo?: PeerInfo
+  password?: string
   id?: number
-  bootstrapServers?: PeerInfo[]
   bootstrapNode: boolean
+  network: string,
+  connector: typeof HoprCoreConnector
+  bootstrapServers: PeerInfo[]
+  provider: string
+  output: (encoded: Uint8Array) => void
 }
 
 export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
@@ -47,6 +52,8 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
   public log: Debugger
   public dbKeys = DbKeys
   public output: (arr: Uint8Array) => void
+  public isBootstrapNode: boolean
+  public bootstrapServers: PeerInfo[]
 
   // @TODO add libp2p types
   declare dial: (addr: Multiaddr | PeerInfo | PeerId) => Promise<any>
@@ -72,9 +79,11 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
    * @param _options
    * @param provider
    */
-  constructor(_options: HoprOptions, public db: LevelUp, public bootstrapServers: PeerInfo[], public paymentChannels: Chain) {
+  constructor(options: HoprOptions, public db: LevelUp, public paymentChannels: Chain) {
     super(
-      defaultsDeep(_options, {
+      defaultsDeep({
+        peerInfo: options.peerInfo
+      }, {
         // Disable libp2p-switch protections for the moment
         switch: {
           denyTTL: 1,
@@ -111,11 +120,14 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
       })
     )
 
-    this.output = _options.output
+    this.output = options.output
+    this.bootstrapServers = options.bootstrapServers
+    this.isBootstrapNode = options.bootstrapNode
+
     this.interactions = new Interactions(this)
     this.network = new Network(this)
 
-    this.log = Debug(`${chalk.blue(_options.peerInfo.id.toB58String())}: `)
+    this.log = Debug(`${chalk.blue(this.peerInfo.id.toB58String())}: `)
   }
 
   /**
@@ -123,28 +135,19 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
    *
    * @param options the parameters
    */
-  static async createNode<Constructor extends typeof HoprCoreConnector>(
-    HoprCoreConnector: Constructor,
-    options?: Partial<HoprOptions> & {
-      provider?: string
-      peerId?: PeerId
-    }
-  ): Promise<Hopr<HoprCoreConnector>> {
-    const db = Hopr.openDatabase(`db`, HoprCoreConnector.constants, options)
-
-    options = options || {}
-
-    options.bootstrapNode = options.bootstrapNode || false
-
-    options.output = options.output || console.log
+  static async createNode(options: HoprOptions): Promise<Hopr<HoprCoreConnector>> {
+    const db = Hopr.openDatabase(`db`, options.connector.constants, options)
 
     if (options.peerInfo == null) {
       options.peerInfo = await getPeerInfo(options, db)
     }
 
-    let connector = await HoprCoreConnector.create(db, options.peerInfo.id.privKey.marshal(), options)
+    let connector = await options.connector.create(db, options.peerInfo.id.privKey.marshal(), {
+      id: options.id,
+      provider: options.provider
+    })
 
-    return new Hopr(options as HoprOptions, db, options.bootstrapNode ? null : options.bootstrapServers, connector).up(options as HoprOptions)
+    return new Hopr(options, db, connector).up()
   }
 
   /**
@@ -173,10 +176,10 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
    *
    * @param options
    */
-  async up(options: HoprOptions): Promise<Hopr<Chain>> {
+  async up(): Promise<Hopr<Chain>> {
     await super.start()
 
-    if (!options.bootstrapNode) {
+    if (!this.isBootstrapNode) {
       await this.connectToBootstrapServers()
     } else {
       this.log(`Available under the following addresses:`)

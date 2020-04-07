@@ -7,7 +7,6 @@
 // import Debug from 'debug'
 // import LevelUp from 'levelup'
 // import Memdown from 'memdown'
-
 // describe(`create, transform packet with message, header, challenge and payments`, function() {
 //   it('should create a packet', async function() {
 //     const peers = await Promise.all(
