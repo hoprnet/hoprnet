@@ -24,9 +24,10 @@ ganache_running() {
 }
 
 start_ganache() {
-  # 10 accounts with balance 1M ether, needed for high-value tests.
+  # 13 accounts with balance 1M ether, needed for high-value tests.
   # taken from https://github.com/hoprnet/hopr-demo-seeds
   local accounts=(
+    # NODE accounts
     --account="0xb3faf133044aebecbd8871a920818783f8e3e809a425f131046492925110ebc0,1000000000000000000000000"
     --account="0x5cb8ef3621d94ddd2a9273d00879f74d169677ae8d3ac556dc2c8d194e7d85c8,1000000000000000000000000"
     --account="0x06416989d7877581a37ef97e0e27527b1139f6f63a42c057e60f8c45aa5011a9,1000000000000000000000000"
@@ -37,6 +38,11 @@ start_ganache() {
     --account="0x9d59b34814c2aed4ebd7b3410e7d3aaacc3ddeafee1efa14f8104a8fc47402fe,1000000000000000000000000"
     --account="0xf116b2a53c5309de9f7daf424dc7bb5251fbc0975671e60be3e05e1abdfe776b,1000000000000000000000000"
     --account="0x1148c9aa73c18e1369cbca1ef4ad9e466edb5f883acd57d3a517495adfdf4631,1000000000000000000000000"
+    # BOOTSTRAP accounts
+    --account="0x44613f500a5cd3ca5c11b50900bfff049b3850cfe6dafa1524b919406965f2c1,1000000000000000000000000"
+    --account="0xb96aa31439a04ea978a619d7f0d079f13fa071d3fd2c6191d01fc14bcb142bcf,1000000000000000000000000"
+    --account="0x1ed2372318ace9aa752d9c5531e32cf2e0ee11949bbfee54125cd7d4e4550f89,1000000000000000000000000"
+    --account="0x790eec16fce16bf624633602f602373f2b3be9ac03a3e652929c4c731fd3894f,1000000000000000000000000"
   )
 
   if [ "$SOLIDITY_COVERAGE" = true ]; then
