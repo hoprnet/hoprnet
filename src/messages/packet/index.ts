@@ -216,17 +216,16 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     this.header.extractHeaderInformation()
 
     const [sender, target] = await Promise.all([this.getSenderPeerId(), this.getTargetPeerId()])
-    const senderAccountId = await this.node.paymentChannels.utils.pubKeyToAccountId(sender.pubKey.marshal())
 
     const channelId = await this.node.paymentChannels.utils.getId(
       await this.node.paymentChannels.utils.pubKeyToAccountId(this.node.peerInfo.id.pubKey.marshal()),
-      senderAccountId
+      await this.node.paymentChannels.utils.pubKeyToAccountId(sender.pubKey.marshal())
     )
 
     // check if channel exists
     let isOpen = false
     try {
-      isOpen = await this.node.paymentChannels.channel.isOpen(this.node.paymentChannels, senderAccountId)
+      isOpen = await this.node.paymentChannels.channel.isOpen(this.node.paymentChannels, new Uint8Array(sender.pubKey.marshal()))
     } catch (err) {
       throw err
     }
