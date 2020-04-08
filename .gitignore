@@ -1,6 +1,3 @@
-# Exclude compiled typescript
-lib
-
 # Exclude node.js stuff
 **/node_modules
 
@@ -18,6 +15,3 @@ yarn-error.log
 
 # typechain types generated
 src/tsc/web3
-
-# temporary
-hopr-core-*

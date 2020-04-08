@@ -1,0 +1,33 @@
+import { PromiEvent, TransactionReceipt, TransactionConfig } from 'web3-core';
+import { BlockTransactionString } from 'web3-eth';
+import Web3 from 'web3';
+import BN from 'bn.js';
+import type { Types } from '@hoprnet/hopr-core-connector-interface';
+import { ChannelStatus } from '../types/channel';
+import { Networks } from '../tsc/types';
+import { TransactionObject } from '../tsc/web3/types';
+export declare function isPartyA(self: Types.AccountId, counterparty: Types.AccountId): boolean;
+export declare function getParties(self: Types.AccountId, counterparty: Types.AccountId): [Types.AccountId, Types.AccountId];
+export declare function getId(self: Types.AccountId, counterparty: Types.AccountId): Promise<Uint8Array>;
+export declare function privKeyToPubKey(privKey: Uint8Array): Promise<Uint8Array>;
+export declare function pubKeyToAccountId(pubKey: Uint8Array): Promise<Types.AccountId>;
+export declare function hash(msg: Uint8Array): Promise<Types.Hash>;
+export declare function sign(msg: Uint8Array, privKey: Uint8Array): Promise<Types.Signature>;
+export declare function signer(msg: Uint8Array, signature: Types.Signature): Promise<Uint8Array>;
+export declare function verify(msg: Uint8Array, signature: Types.Signature, pubKey: Uint8Array): Promise<boolean>;
+export declare function convertUnit(amount: BN, sourceUnit: string, targetUnit: 'eth' | 'wei'): BN;
+export declare function waitForConfirmation<T extends PromiEvent<any>>(event: T): Promise<TransactionReceipt>;
+export declare function advanceBlockAtTime(web3: Web3, time: number): Promise<string>;
+export declare function wait(ms: number): Promise<unknown>;
+export declare function waitFor({ web3, network, getCurrentBlock, timestamp }: {
+    web3: Web3;
+    network: Networks;
+    getCurrentBlock: () => Promise<BlockTransactionString>;
+    timestamp?: number;
+}): Promise<void>;
+export declare function getNetworkId(web3: Web3): Promise<Networks>;
+export declare function stateCountToStatus(stateCount: number): ChannelStatus;
+export declare function TransactionSigner(web3: Web3, privKey: Uint8Array): <T extends any>(txObject: TransactionObject<T>, txConfig: TransactionConfig) => Promise<{
+    send: () => PromiEvent<TransactionReceipt>;
+    transactionHash: string;
+}>;
