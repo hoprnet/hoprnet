@@ -52,8 +52,6 @@ export const cli_options: string[][] = [
 // Name our process 'hopr'
 process.title = 'hopr'
 
-
-
 /**
  * Alphabetical list of known connectors.
  */

@@ -99,9 +99,15 @@ class Heartbeat<Chain extends HoprCoreConnector> extends EventEmitter {
           this.nodes.set(this.heap[startIndex], Date.now())
         } catch (err) {
           this.nodes.delete(this.heap[startIndex])
-          console.log(`Removing ${this.heap[startIndex]}`)
-          await this.node.hangUp(PeerId.createFromB58String(this.heap[startIndex]))
+
+          // @TODO push this to libp2p
+          // @ts-ignore
+          const connections = this.node.connections.get(this.heap[startIndex])
+          if (connections) {
+            await Promise.all(connections.map((connection: any) => connection.close()))
+          }
           this.node.peerStore.remove(currentPeerId)
+
         }
 
         startIndex = heapIndex

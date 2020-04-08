@@ -1,10 +1,11 @@
 import type Hopr from '../../'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-
-import { randomBytes, createHash } from 'crypto'
-
 import type { AbstractInteraction } from '../abstractInteraction'
 
+import { randomBytes, createHash } from 'crypto'
+import { u8aEquals } from '../../utils'
+
+import AbortController from 'abort-controller'
 import pipe from 'it-pipe'
 
 import { PROTOCOL_HEARTBEAT } from '../../constants'
@@ -12,7 +13,6 @@ import { PROTOCOL_HEARTBEAT } from '../../constants'
 import PeerInfo from 'peer-info'
 import type PeerId from 'peer-id'
 
-import { u8aEquals } from '../../utils'
 
 const HASH_FUNCTION = 'blake2s256'
 
@@ -43,8 +43,6 @@ class Heartbeat<Chain extends HoprCoreConnector> implements AbstractInteraction<
   }
 
   async interact(counterparty: PeerInfo | PeerId): Promise<void> {
-    console.log(`heartbeat call`)
-
     let struct: {
       stream: any
       protocol: string
@@ -54,7 +52,6 @@ class Heartbeat<Chain extends HoprCoreConnector> implements AbstractInteraction<
     const signal = abort.signal
 
     const timeout = setTimeout(() => {
-      console.log(`aborting call`)
       abort.abort()
     }, HEARTBEAT_TIMEOUT)
 
