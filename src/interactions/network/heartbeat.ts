@@ -16,6 +16,9 @@ import { u8aEquals } from '../../utils'
 
 const HASH_FUNCTION = 'blake2s256'
 
+const TWO_SECONDS = 2 * 1000
+const HEARTBEAT_TIMEOUT = TWO_SECONDS
+
 class Heartbeat<Chain extends HoprCoreConnector> implements AbstractInteraction<Chain> {
   protocols: string[] = [PROTOCOL_HEARTBEAT]
 
@@ -45,8 +48,24 @@ class Heartbeat<Chain extends HoprCoreConnector> implements AbstractInteraction<
       protocol: string
     }
 
-    struct = await this.node.dialProtocol(counterparty, this.protocols[0]).catch(async (err: Error) => {
-      return this.node.peerRouting.findPeer(PeerInfo.isPeerInfo(counterparty) ? counterparty.id : counterparty).then((peerInfo: PeerInfo) => this.node.dialProtocol(peerInfo, this.protocols[0]))
+    const abort = new AbortController()
+
+    const timeout = setTimeout(() => {
+      console.log(`aborting call`)
+      abort.abort()
+    }, HEARTBEAT_TIMEOUT)
+
+    struct = await this.node.dialProtocol(counterparty, this.protocols[0], abort).catch(async (err: Error) => {
+      const peerInfo = await this.node.peerRouting.findPeer(PeerInfo.isPeerInfo(counterparty) ? counterparty.id : counterparty)
+      
+      try {
+        let result = await this.node.dialProtocol(peerInfo, this.protocols[0], abort)
+        clearTimeout(timeout)
+        return result
+      } catch (err) {
+        clearTimeout(timeout)
+        throw err
+      }
     })
 
     const challenge = randomBytes(16)
