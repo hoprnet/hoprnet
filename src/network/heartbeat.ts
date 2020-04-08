@@ -6,11 +6,11 @@ import type PeerInfo from 'peer-info'
 
 import { EventEmitter } from 'events'
 
-const THIRTY_ONE_SECONDS = 31 * 1000
-const TEN_SECONDS = 10 * 1000
+const TWO_MINUTES = 2 * 60 * 1000
+const FORTY_ONE_SECONDS = 41 * 1000
 
-const REFRESH_TIME = THIRTY_ONE_SECONDS
-const CHECK_INTERVAL = TEN_SECONDS
+const REFRESH_TIME = TWO_MINUTES
+const CHECK_INTERVAL = FORTY_ONE_SECONDS
 
 const MAX_PARALLEL_CONNECTIONS = 10
 
