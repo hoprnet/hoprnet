@@ -58,6 +58,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
   // @TODO add libp2p types
   declare dial: (addr: Multiaddr | PeerInfo | PeerId, options?: { signal: AbortSignal }) => Promise<any>
   declare dialProtocol: (addr: Multiaddr | PeerInfo | PeerId, protocol: string, options?: { signal: AbortSignal }) => Promise<{ stream: Duplex; protocol: string }>
+  declare hangUp: (addr: PeerInfo | PeerId | Multiaddr | string) => Promise<void>
   declare peerInfo: PeerInfo
   declare peerStore: {
     has(peerInfo: PeerId): boolean

@@ -6,10 +6,10 @@ import type PeerInfo from 'peer-info'
 
 import { EventEmitter } from 'events'
 
-const TWO_MINUTES = 2 * 60 * 1000
+const ONE_MINUTE = 1 * 60 * 1000
 const FORTY_ONE_SECONDS = 41 * 1000
 
-const REFRESH_TIME = TWO_MINUTES
+const REFRESH_TIME = ONE_MINUTE
 const CHECK_INTERVAL = FORTY_ONE_SECONDS
 
 const MAX_PARALLEL_CONNECTIONS = 10
@@ -82,7 +82,7 @@ class Heartbeat<Chain extends HoprCoreConnector> extends EventEmitter {
         const lastSeen = this.nodes.get(this.heap[heapIndex])
 
         if (lastSeen == undefined || lastSeen > THRESHOLD_TIME) {
-            heapIndex++
+          heapIndex++
           continue
         } else {
           break
@@ -91,7 +91,7 @@ class Heartbeat<Chain extends HoprCoreConnector> extends EventEmitter {
     }
 
     const queryNode = async (startIndex: number): Promise<void> => {
-        let currentPeerId: PeerId
+      let currentPeerId: PeerId
       while (startIndex < this.heap.length) {
         currentPeerId = PeerId.createFromB58String(this.heap[startIndex])
         try {
@@ -99,6 +99,8 @@ class Heartbeat<Chain extends HoprCoreConnector> extends EventEmitter {
           this.nodes.set(this.heap[startIndex], Date.now())
         } catch (err) {
           this.nodes.delete(this.heap[startIndex])
+          console.log(`Removing ${this.heap[startIndex]}`)
+          await this.node.hangUp(PeerId.createFromB58String(this.heap[startIndex]))
           this.node.peerStore.remove(currentPeerId)
         }
 
