@@ -9,7 +9,7 @@
     "clean": "rm -rf ./lib",
     "test": "mocha",
     "dev": "yarn clean && yarn build:types && tsc -w",
-    "build:types": "ts-node ./src/scripts/typechain.ts",
+    "build:types": "typechain --target web3-v1 --outDir './src/tsc/web3' './node_modules/@hoprnet/hopr-ethereum/build/extracted/abis/*.json'",
     "build": "yarn clean && yarn build:types && tsc -d -p .",
     "fundAccounts": "ts-node ./src/scripts/fundAccounts.ts"
   },
@@ -25,18 +25,14 @@
   },
   "dependencies": {
     "@hoprnet/hopr-core-connector-interface": "https://github.com/hoprnet/hopr-core-connector-interface.git",
-    "@hoprnet/hopr-ethereum": "https://github.com/hoprnet/hopr-ethereum.git#develop",
     "@hoprnet/hopr-demo-seeds": "https://github.com/hoprnet/hopr-demo-seeds.git",
+    "@hoprnet/hopr-ethereum": "https://github.com/hoprnet/hopr-ethereum.git#develop",
     "bn.js": "^5.1.1",
     "it-pipe": "^1.1.0",
     "keccak256": "^1.0.0",
     "levelup": "^4.3.2",
     "peer-id": "^0.13.9",
     "secp256k1": "^4.0.0",
-    "ts-generator": "^0.0.8",
-    "ts-node": "^8.6.2",
-    "typechain": "^1.0.5",
-    "typechain-target-web3-v1": "^1.0.4",
     "web3": "^1.2.6"
   },
   "devDependencies": {
@@ -45,8 +41,13 @@
     "@types/mocha": "^7.0.1",
     "@types/node": "^12.12.8",
     "@types/secp256k1": "^3.5.3",
+    "husky": "^4.2.3",
     "memdown": "^5.1.0",
     "mocha": "^7.0.1",
+    "ts-generator": "^0.0.8",
+    "ts-node": "^8.6.2",
+    "typechain": "^1.0.5",
+    "typechain-target-web3-v1": "^1.0.4",
     "typescript": "^3.8.2"
   },
   "husky": {
