@@ -17,7 +17,7 @@ import { LevelUp } from 'levelup'
 
 import Hopr from '../../'
 
-import HoprCoreConnector,  { Types } from '@hoprnet/hopr-core-connector-interface'
+import HoprCoreConnector, { Types } from '@hoprnet/hopr-core-connector-interface'
 
 /**
  * Encapsulates the internal representation of a packet
@@ -73,7 +73,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     if (this._ticket == null) {
       this._ticket = this.node.paymentChannels.types.SignedTicket.create({
         bytes: this.buffer,
-        offset: this.byteOffset + Header.SIZE
+        offset: this.byteOffset + Header.SIZE,
       })
     }
 
@@ -84,7 +84,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     if (this._challenge == null) {
       this._challenge = new Challenge<Chain>(this.node.paymentChannels, {
         bytes: this.buffer,
-        offset: this.byteOffset + Header.SIZE + this.node.paymentChannels.types.SignedTicket.SIZE
+        offset: this.byteOffset + Header.SIZE + this.node.paymentChannels.types.SignedTicket.SIZE,
       })
     }
 
@@ -96,7 +96,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       this._message = new Message(
         {
           bytes: this.buffer,
-          offset: this.byteOffset + Header.SIZE + this.node.paymentChannels.types.SignedTicket.SIZE + Challenge.SIZE(this.node.paymentChannels)
+          offset: this.byteOffset + Header.SIZE + this.node.paymentChannels.types.SignedTicket.SIZE + Challenge.SIZE(this.node.paymentChannels),
         },
         true
       )
@@ -134,7 +134,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     const arr = new Uint8Array(Packet.SIZE(node.paymentChannels)).fill(0x00)
     const packet = new Packet<Chain>(node, {
       bytes: arr.buffer,
-      offset: arr.byteOffset
+      offset: arr.byteOffset,
     })
 
     const fee = new BN(secrets.length - 1, 10).imul(new BN(RELAY_FEE, 10))
@@ -151,7 +151,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
 
     const channelBalance = node.paymentChannels.types.ChannelBalance.create(undefined, {
       balance: new BN(12345),
-      balance_a: new BN(123)
+      balance_a: new BN(123),
     })
 
     const channel = await node.paymentChannels.channel.create(
@@ -216,11 +216,24 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     this.header.extractHeaderInformation()
 
     const [sender, target] = await Promise.all([this.getSenderPeerId(), this.getTargetPeerId()])
+    const senderAccountId = await this.node.paymentChannels.utils.pubKeyToAccountId(sender.pubKey.marshal())
 
     const channelId = await this.node.paymentChannels.utils.getId(
       await this.node.paymentChannels.utils.pubKeyToAccountId(this.node.peerInfo.id.pubKey.marshal()),
-      await this.node.paymentChannels.utils.pubKeyToAccountId(sender.pubKey.marshal())
+      senderAccountId
     )
+
+    // check if channel exists
+    let isOpen = false
+    try {
+      isOpen = await this.node.paymentChannels.channel.isOpen(this.node.paymentChannels, senderAccountId)
+    } catch (err) {
+      throw err
+    }
+
+    if (!isOpen) {
+      throw Error('Payment channel is not open')
+    }
 
     // const currentState = await node.paymentChannels.state(channelId)
 
@@ -260,7 +273,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     const challengeShadowCopy = this.challenge.getCopy()
     const oldChallenge = new Challenge(this.node.paymentChannels, {
       bytes: challengeShadowCopy.buffer,
-      offset: challengeShadowCopy.byteOffset
+      offset: challengeShadowCopy.byteOffset,
     })
 
     if (u8aEquals(this.node.peerInfo.id.pubKey.marshal(), this.header.address)) {
@@ -331,7 +344,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
 
     const channelBalance = this.node.paymentChannels.types.ChannelBalance.create(undefined, {
       balance: new BN(12345),
-      balance_a: new BN(123)
+      balance_a: new BN(123),
     })
 
     const channel = await this.node.paymentChannels.channel.create(
