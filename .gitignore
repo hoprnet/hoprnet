@@ -6,6 +6,3 @@
 
 # Exclude node stuff
 **/node_modules
-
-# Exclude Typescript builds
-lib
