@@ -22,6 +22,11 @@
     "type": "git",
     "url": "https://github.com/hoprnet/hopr-core.git"
   },
+  "husky": {
+    "hooks": {
+      "pre-commit": "rm -rf ./lib && tsc -d -p . && git add ./lib"
+    }
+  },
   "scripts": {
     "postinstall": "tsc -d -p .",
     "demo": "node test/demo.js",
@@ -49,14 +54,12 @@
     "leveldown": "~5.6.0",
     "levelup": "~4.3.0",
     "libp2p": "~0.27.4",
-    "libp2p-crypto": "~0.17.5",
-    "libp2p-crypto-secp256k1": "~0.4.3",
+    "libp2p-crypto": "~0.17.6",
     "libp2p-kad-dht": "~0.18.6",
     "libp2p-mplex": "~0.9.5",
     "libp2p-secio": "^0.12.4",
     "libp2p-tcp": "~0.14.4",
     "libp2p-websockets": "~0.13.6",
-    "lodash.groupby": "~4.6.0",
     "multiaddr": "^7.4.3",
     "multihashes": "~0.4.15",
     "peer-id": "~0.13.11",
@@ -90,6 +93,7 @@
     "@types/read": "^0.0.28",
     "@types/secp256k1": "~3.5.2",
     "axios": "^0.19.1",
+    "husky": "^4.2.3",
     "memdown": "^5.1.0",
     "mocha": "^7.0.0",
     "ts-node": "^8.6.2",
