@@ -14,7 +14,7 @@
   },
   "husky": {
     "hooks": {
-      "pre-commit": "rm -rf ./lib && tsc -d -p ."
+      "pre-commit": "rm -rf ./lib && tsc -d -p . && git add ./lib"
     }
   },
   "main": "lib/index.js",
