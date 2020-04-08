@@ -18,7 +18,7 @@ export default class ListConnectors implements AbstractCommand {
                 import(knownConnectors[i][0]).then(
                     () => {
                         found++
-                        str += `\n  ${chalk.yellow(knownConnectors[i][0])} ${chalk.gray('=>')} ts-node hopr -n ${chalk.green(knownConnectors[i][1])}`
+                        str += `\n  ${chalk.yellow(knownConnectors[i][0])} ${chalk.gray('=>')} ./hopr -n ${chalk.green(knownConnectors[i][1])}`
                     },
                     () => { }
                 )

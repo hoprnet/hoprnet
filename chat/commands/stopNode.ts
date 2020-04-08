@@ -20,6 +20,7 @@ export default class StopNode implements AbstractCommand {
         try {
             await this.node.stop()
             clearTimeout(timeout)
+            process.exit(0)
         } catch (err) {
             console.log(chalk.red(err.message))
         }

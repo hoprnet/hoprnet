@@ -14,6 +14,7 @@ import PeerInfo from 'peer-info'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 
 import Hopr from '../src'
+import type { HoprOptions } from '../src'
 
 import figlet from 'figlet'
 import clear from 'clear'
@@ -24,7 +25,7 @@ import Commands from './commands'
 const SPLIT_OPERAND_QUERY_REGEX: RegExp = /([\w\-]+)(?:\s+)?([\w\s\-.]+)?/
 
 // Allowed keywords
-export const keywords: ([string, string])[] = [
+export const keywords: string[][] = [
     ['open', 'opens a payment channel'],
     ['send', 'sends a message to another party'],
     ['quit', 'stops the node and terminates the process'],
@@ -34,15 +35,18 @@ export const keywords: ([string, string])[] = [
     ['myAddress', 'shows the address of this node'],
     ['balance', 'shows our current balance'],
     ['listConnectors', 'lists all installed blockchain connectors'],
-    ['ping', 'pings another node to check its availability']]
+    ['ping', 'pings another node to check its availability'],
+    ['help', 'shows this help page']
+].sort((a, b) => a[0].localeCompare(b[0], 'en', {sensitivity: 'base'}))
 
 // Allowed CLI options
-export const cli_options: ([string, string | undefined, string])[] = [
+export const cli_options: string[][] = [
     ['-b', '--bootstrapNode, bootstrap', 'starts HOPR as a bootstrap node'],
     ['-n <connector>', '--network', 'starts HOPR with blockchain connector <connector>'],
     ['-h', '--help', 'shows this help page'],
+    ['-l', '--listConnectors', 'shows all available connectors'],
     ['<ID>', undefined, 'starts HOPR with a demo ID']
-]
+].sort((a, b) => a[0].localeCompare(b[0], 'en', {sensitivity: 'base'}))
 
 // Name our process 'hopr'
 process.title = 'hopr'
@@ -77,7 +81,11 @@ function tabCompletion(commands: Commands) {
             .split(SPLIT_OPERAND_QUERY_REGEX)
             .slice(1)
 
-        switch (command) {
+        if (command == null || command === '') {
+            return cb(undefined, [keywords.map(entry => entry[0]), line])
+        }
+
+        switch (command.trim()) {
             case 'send':
                 await commands.sendMessage.complete(line, cb, query)
                 break
@@ -139,14 +147,20 @@ async function runAsRegularNode() {
         }
 
         switch (command.trim()) {
+            case 'balance':
+                await commands.printBalance.execute()
+                break
+            case 'close':
+                await commands.closeChannel.execute(query)
+                break
             case 'crawl':
                 await commands.crawl.execute()
                 break
+            case 'help':
+                commands.listCommands.execute()
+                break
             case 'quit':
                 await commands.stopNode.execute()
-                break
-            case 'balance':
-                await commands.printBalance.execute()
                 break
             case 'openChannels':
                 await commands.listOpenChannels.execute()
@@ -157,9 +171,7 @@ async function runAsRegularNode() {
             case 'send':
                 await commands.sendMessage.execute(rl, query)
                 break
-            case 'close':
-                await commands.closeChannel.execute(query)
-                break
+
             case 'listConnectors':
                 await commands.listConnectors.execute()
                 break
@@ -173,9 +185,11 @@ async function runAsRegularNode() {
                 console.log(chalk.red('Unknown command!'))
                 break
         }
+
+        rl.prompt()
     })
 
-    setTimeout(rl.prompt)
+    rl.prompt()
 }
 
 
@@ -197,7 +211,7 @@ async function main() {
     )
     console.log(`Welcome to ${chalk.bold('HOPR')}!\n`)
 
-    let options 
+    let options: HoprOptions 
     try {
         options = await parseOptions()
     } catch (err) {

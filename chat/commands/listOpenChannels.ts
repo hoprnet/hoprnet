@@ -35,7 +35,7 @@ export default class ListOpenChannels implements AbstractCommand {
                 },
                 async (promises: Promise<void>[]) => {
                     if (promises.length == 0) {
-                        str += `  No open channels.`
+                        str = chalk.yellow(`  There are currently no open channels.`)
                         return
                     }
 

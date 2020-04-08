@@ -26,9 +26,10 @@ export async function parseOptions(): Promise<HoprOptions> {
     const unknownOptions: string[] = []
 
     let cli_options = getopts(process.argv.slice(2), {
-        boolean: ['bootstrapNode', 'help'],
+        boolean: ['bootstrapNode', 'help', 'listConnectors'],
         string: ['network', 'password'],
         alias: {
+            l: 'listConnectors',
             p: 'password',
             bootstrap: 'bootstrapNode',
             b: 'bootstrapNode',
@@ -45,15 +46,46 @@ export async function parseOptions(): Promise<HoprOptions> {
         }
     })
 
+    if (cli_options._.length > 1) {
+        console.log(`Found more than the allowed options. Got ${chalk.yellow(cli_options._.join(', '))}\n`)
+        displayHelp()
+        process.exit(0)
+    }
+
+    let id: number
+    for (let i = 0; i < cli_options._.length; i++) {
+        try {
+            const int = parseInt(cli_options._[i])
+
+            if (isFinite(int)) {
+                id = int
+            }
+        } catch { 
+            console.log(chalk.yellow(`Got unknown option '${cli_options._[i]}'.`))
+            displayHelp()
+            process.exit(0)
+        }
+    }
+
+
+
+    if (unknownOptions.length > 0) {
+        console.log(chalk.yellow(`Got unknown option${unknownOptions.length == 1 ? '' : 's'} [${unknownOptions.join(', ')}]\n`))
+        displayHelp()
+        process.exit(0)
+    }
+
     if (cli_options.help) {
         displayHelp()
         process.exit(0)
     }
 
-    if (unknownOptions.length > 0) {
-        console.log(`Got unknown option${unknownOptions.length == 1 ? '' : 's'} [${unknownOptions.join(', ')}]`)
-        return
+    if (cli_options.listConnectors) {
+        await listConnectors.execute()
+        process.exit()
     }
+
+
 
     if (!knownConnectors.some(connector => connector[1] == cli_options.network)) {
         console.log(`Unknown network! <${chalk.red(cli_options.network)}>\n`)
@@ -117,14 +149,8 @@ export async function parseOptions(): Promise<HoprOptions> {
         }
     }
 
-    for (let i = 0; i < cli_options._.length; i++) {
-        try {
-            const int = parseInt(cli_options._[i])
-
-            if (isFinite(int)) {
-                options.id = int
-            }
-        } catch { }
+    if (id != null) {
+        options.id = id
     }
 
     if (cli_options.password) {

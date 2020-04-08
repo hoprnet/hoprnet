@@ -4,6 +4,8 @@ import type AbstractCommand from './abstractCommand'
 
 import chalk from 'chalk'
 
+import { u8aToHex } from '../../src/utils'
+
 export default class PrintAddress implements AbstractCommand {
     constructor(public node: Hopr<HoprCoreConnector>) { }
 
@@ -17,7 +19,7 @@ export default class PrintAddress implements AbstractCommand {
 
         console.log(
             `${(this.node.paymentChannels.constants.CHAIN_NAME + ':').padEnd(prefixLength, ' ')}${chalk.green(
-                await this.node.paymentChannels.utils.pubKeyToAccountId(this.node.peerInfo.id.pubKey.marshal())
+                u8aToHex(await this.node.paymentChannels.utils.pubKeyToAccountId(this.node.peerInfo.id.pubKey.marshal()))
             )}\n` +
             /* prettier-ignore */
             `${'HOPR:'.padEnd(prefixLength, ' ')}${chalk.green(this.node.peerInfo.id.toB58String())}`
