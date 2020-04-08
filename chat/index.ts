@@ -45,6 +45,7 @@ export const cli_options: string[][] = [
     ['-n <connector>', '--network', 'starts HOPR with blockchain connector <connector>'],
     ['-h', '--help', 'shows this help page'],
     ['-l', '--listConnectors', 'shows all available connectors'],
+    ['-p <password>', '--password', 'start HOPR with <password>'],
     ['<ID>', undefined, 'starts HOPR with a demo ID']
 ].sort((a, b) => a[0].localeCompare(b[0], 'en', {sensitivity: 'base'}))
 
