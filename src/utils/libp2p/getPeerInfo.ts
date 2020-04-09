@@ -70,6 +70,8 @@ async function getPeerId(options: HoprOptions, db?: LevelUp): Promise<PeerId> {
     } else if (options.bootstrapNode) {
       return await privKeyToPeerId(BOOTSTRAP_SEEDS[0])
     }
+  } else if (options.id != null && isFinite(options.id)) {
+    throw Error(`Demo Ids are only available in DEVELOP_MODE. Consider setting DEVELOP_MODE to 'true' in .env`)
   }
 
   if (db == null) {
