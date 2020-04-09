@@ -1,1 +1,0 @@
-{"version":3,"file":"uint256.js","sourceRoot":"","sources":["../../../src/types/solidity/uint256.ts"],"names":[],"mappings":";;AAAA,mDAA0C;AAE1C,MAAM,OAAQ,SAAQ,cAAG;IACvB,KAAK;QACH,OAAO,KAAK,CAAC,KAAK,CAAC,OAAO,CAAC,IAAI,CAAC,CAAA;IAClC,CAAC;IAED,MAAM,KAAK,IAAI;QACb,OAAO,EAAE,CAAA;IACX,CAAC;CACF;AAED,kBAAe,OAAO,CAAA"}
