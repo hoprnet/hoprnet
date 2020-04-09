@@ -644,19 +644,23 @@ class Channel implements IChannel<HoprEthereum> {
           const spender = coreConnector.hoprChannels.options.address
 
           if (coreConnector.utils.isPartyA(coreConnector.account, counterparty)) {
-            await Channel.increaseFunds(
-              coreConnector,
-              new AccountId(stringToU8a(spender)),
-              counterparty,
-              channelBalance.balance_a
-            )
+            if (channelBalance.balance.sub(channelBalance.balance_a).gtn(0)) {
+              await Channel.increaseFunds(
+                coreConnector,
+                new AccountId(stringToU8a(spender)),
+                counterparty,
+                new Balance(channelBalance.balance.sub(channelBalance.balance_a))
+              )
+            }
           } else {
-            await Channel.increaseFunds(
-              coreConnector,
-              new AccountId(stringToU8a(spender)),
-              counterparty,
-              new Balance(channelBalance.balance.sub(channelBalance.balance_a))
-            )
+            if (channelBalance.balance_a.gtn(0)) {
+              await Channel.increaseFunds(
+                coreConnector,
+                new AccountId(stringToU8a(spender)),
+                counterparty,
+                channelBalance.balance_a
+              )
+            }
           }
 
           // listen for opening event and update DB
