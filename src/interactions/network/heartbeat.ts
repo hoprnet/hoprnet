@@ -13,7 +13,6 @@ import { PROTOCOL_HEARTBEAT } from '../../constants'
 import PeerInfo from 'peer-info'
 import type PeerId from 'peer-id'
 
-
 const HASH_FUNCTION = 'blake2s256'
 
 const TWO_SECONDS = 2 * 1000

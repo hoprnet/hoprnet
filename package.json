@@ -90,7 +90,7 @@
     "@types/lodash.groupby": "^4.6.6",
     "@types/memdown": "^3.0.0",
     "@types/mocha": "^7.0.1",
-    "@types/node": "~12.12.21",
+    "@types/node": "~12",
     "@types/read": "^0.0.28",
     "@types/secp256k1": "~3.5.2",
     "axios": "^0.19.1",
