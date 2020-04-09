@@ -54,7 +54,7 @@ async function getPeerId(options: HoprOptions, db?: LevelUp): Promise<PeerId> {
     return options.peerId
   }
 
-  if (process.env.DEVELOPE_MODE === 'true') {
+  if (process.env.DEVELOP_MODE === 'true') {
     if (options.id != null && isFinite(options.id)) {
       if (options.bootstrapNode) {
         if (options.id >= BOOTSTRAP_SEEDS.length) {
