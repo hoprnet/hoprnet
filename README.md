@@ -12,14 +12,13 @@ Note that the documentation is under active development and does not always repr
 
 - [Setup](#setup)
   - [Dependencies](#dependencies)
-  - [Get hopr-core](#get-hopr-core)
-  - [Get hopr-ethereum](#get-hopr-ethereum)
-- [Proof of Concept - Local Testnet](#proof-of-concept---local-testnet)
-  - [Local Ethereum Node (Ganache)](#local-ethereum-node-ganache)
-  - [Deploy Contracts](#deploy-contracts)
+  - [Setup hopr-core](#setup-hopr-core)
+  - [Joining the Public Testnet](#joining-the-public-testnet)
+- [Setting up a Local Testnet](#setting-up-a-local-testnet)
+  - [Setup hopr-ethereum](#setup-hopr-ethereum)
   - [Fund Demo Accounts](#fund-demo-accounts)
   - [Start Bootstrap Node](#start-bootstrap-node)
-  - [Run HOPR](#run-hopr)
+  - [Start HOPR as a client](#start-hopr-as-a-client)
   - [Use HOPR](#use-hopr)
     - [Crawl Network](#crawl-network)
     - [Check Your Addresses](#check-your-addresses)
@@ -59,11 +58,9 @@ You might need to setup further operating system dependent, please refer to the 
 - [macOS](../../wiki/Setup#macOS)
 - [Windows](../../wiki/Setup#Windows)
 
-We will start by cloning two repositories, `hopr-core` and `hopr-ethereum`.
+## Setup hopr-core
 
-## Get hopr-core
-
-Start by cloning this repository, let `yarn` install the dependencies and change the filename of the example settings file (don't worry, to do a quick local test you don't need to touch the content of the file and default settings work!):
+Start by cloning this repository, and installing the dependencies:
 
 ```
 $ git clone -b jigsaw https://github.com/hoprnet/hopr-core.git
@@ -74,31 +71,19 @@ $ nvm install 12
 $ nvm use
 
 $ yarn install
-
-$ mv .env.example .env
 ```
 
-## Get hopr-ethereum
+## Joining the Public Testnet
 
-Once we are done with `hopr-core` we will do a similar process with `hopr-ethereum`.
+`hopr-core` ships with a default `.env` file which is configured to connect to the public testnet, let's start `hopr-core` as a client:
 
 ```
-# go back to parent directory
-$ cd ..
-
-$ git clone -b develop https://github.com/hoprnet/hopr-ethereum.git
-$ cd hopr-ethereum
-
-# in case you are using NVM (Node Versioning Manager), run the following two commands:
-$ nvm install 12
-$ nvm use
-
-$ yarn install
+$ ./hopr 0
 ```
 
-**DO NOT USE THE DEFAULT PRIVATE KEYS ON MAIN NET - YOU WILL LOOSE ALL FUNDS ASSOCIATED WITH THOSE KEYS!**
+That's it, you are now connected to the public testnet, type `help` to see all available commands to you.
 
-# Proof of Concept - Local Testnet
+# Setting up a Local Testnet
 
 The following is an early and unstable proof of concept (PoC) running a _local_ testnet which highlights the functionality of HOPR. Use it at your own risk. While we are giving our best to build a secure and privacy-preserving base layer of the web of today and tomorrow, we do not guarantee that your funds are safu and we do not guarantee that your communication is really metadata-private.
 
@@ -115,17 +100,29 @@ To test everything locally, you will end up with 6 command line tabs (or separat
 
 The HOPR PoC chat app is configured to send messages via 2 intermediate relay nodes to the recipient, thus a total of 4 HOPR nodes is the bare minimum to run the PoC.
 
-## Local Ethereum Node (Ganache)
+**DO NOT USE THE DEFAULT PRIVATE KEYS ON MAIN NET - YOU WILL LOOSE ALL FUNDS ASSOCIATED WITH THOSE KEYS!**
 
-To start a local Ganache-based testnet, run `yarn network` in `hopr-ethereum`.
+## Setup hopr-ethereum
+
+`hopr-ethereum` will allow us to start a local ethereum network (ganache) and deploy our contracts.
 
 ```
+$ git clone -b develop https://github.com/hoprnet/hopr-ethereum.git
 $ cd hopr-ethereum
+
+# in case you are using NVM (Node Versioning Manager), run the following two commands:
+$ nvm install 12
+$ nvm use
+
+$ yarn install
+```
+
+Once done, we can start our local network running run `yarn network`.
+
+```
 $ yarn network
 // Successfully started local Ganache instance at 'ws://[::]:9545'.
 ```
-
-## Deploy Contracts
 
 Once Ganache is up and running, open another terminal (in many terminal applications you can simply open a new tab in the terminal via `[Command]` + `[t]`) and run `yarn migrate --network development` to deploy the smart contract. Just FYI, HOPR is using the account associated with the `FUND_ACCOUNT_PRIVATE_KEY` to deploy the smart contract.
 
@@ -149,12 +146,28 @@ $ yarn fundAccounts
 
 ## Start Bootstrap Node
 
-HOPR is a decentralized network, so in order to bootstrap the network and tell recently joined nodes about the participants of the network, there needs to be a bootstrap node that is known to all nodes. The default settings that in your `.env` file are pre-configured to work with the existing keys and is visible to other HOPR nodes running on the same machine, so you can just start it.
+HOPR is a decentralized network, so in order to bootstrap the network and tell recently joined nodes about the participants of the network, there needs to be a bootstrap node that is known to all nodes.
 
-To start a bootstrap node, run `npx ts-node hopr -b`
+Before we start the bootstrap node, we need to edit the `.env` file to connect to our local testnet, the highlighted lines in `red` need to be replaced with the lines in `green`:
+
+```diff
+# Default: false
+- DEVELOP_MODE = false
++ DEVELOP_MODE = true
+
+# Bootstrap servers
++ BOOTSTRAP_SERVERS = /ip4/127.0.0.1/tcp/9091/p2p/16Uiu2HAmNqLm83bwMq9KQEZEWHcbsHQfBkbpZx4eVSoDG4Mp6yfX
+- BOOTSTRAP_SERVERS = /dns4/bootstrap01.hoprnet.io/tcp/9091/p2p/16Uiu2HAmM8So1akXf5mp4Nkvmq3qgwC6f38oxEfmdrnnr4ichi1T
+
+# Ethereum provider
++ ETHEREUM_PROVIDER = 'ws://127.0.0.1:9545/'
+- ETHEREUM_PROVIDER = 'wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36'
+```
+
+To start a bootstrap node, run `./hopr -b`
 
 ```
-$ npx ts-node hopr -b
+$ ./hopr -b
 // Welcome to HOPR!
 //
 // Available under the following addresses:
@@ -166,12 +179,12 @@ $ npx ts-node hopr -b
 
 This node allows the other nodes on the network to find each other. We will start these nodes next.
 
-## Run HOPR
+## Start HOPR as a client
 
 Now that everything is set up, open a new terminal window (or tab) and you should be able to run a new HOPR node via
 
 ```
-$ npx ts-node hopr 0
+$ ./hopr 0
 
 // Welcome to HOPR!
 //
@@ -349,7 +362,7 @@ HOPR allows can be run in two modes: single account mode or multi account mode. 
 Start hopr without any number parameter and it will ask you to provide a password to encrypt the generated private key. It will then generate your HOPR identity and a corresponding Ethereum address.
 
 ```
-$ npx ts-node hopr
+$ ./hopr
 Welcome to HOPR!
 
 (node:42198) ExperimentalWarning: queueMicrotask() is experimental.
