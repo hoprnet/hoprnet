@@ -143,8 +143,8 @@ Before we start the bootstrap node, we need to edit the [.env](.env) file to con
 
 ```diff
 # Default: false
-- DEVELOP_MODE = false
 + DEVELOP_MODE = true
+- DEVELOP_MODE = false
 
 # Bootstrap servers
 + BOOTSTRAP_SERVERS = /ip4/127.0.0.1/tcp/9091/p2p/16Uiu2HAmNqLm83bwMq9KQEZEWHcbsHQfBkbpZx4eVSoDG4Mp6yfX
