@@ -66,13 +66,13 @@ The public HOPR testnet is running on the Ethereum Kovan testnet so that you do 
 
 ### Start HOPR as a client
 
-`hopr-core` ships with a default `.env` file which is configured to connect to the public testnet, let's start `hopr-core` as a client:
+`hopr-core` ships with a default [.env](.env) file which is configured to connect to the public testnet, let's start `hopr-core` as a client:
 
 ```
 $ ./hopr 0
 ```
 
-That's it, you are now connected to the public testnet, type `help` to see all available commands to you.
+That's it, you are now connected to the public testnet, type `help` to see all available commands to you, or check out the [using hopr guide](#use-hopr)
 
 # Setting up a Local Testnet
 
@@ -139,7 +139,7 @@ $ yarn fundAccounts
 
 HOPR is a decentralized network, so in order to bootstrap the network and tell recently joined nodes about the participants of the network, there needs to be a bootstrap node that is known to all nodes.
 
-Before we start the bootstrap node, we need to edit the `.env` file to connect to our local testnet, the highlighted lines in `red` need to be replaced with the lines in `green`:
+Before we start the bootstrap node, we need to edit the [.env](.env) file to connect to our local testnet, the highlighted lines in `red` need to be replaced with the lines in `green`:
 
 ```diff
 # Default: false
