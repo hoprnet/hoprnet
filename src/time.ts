@@ -7,5 +7,8 @@ export const durations = {
   },
   hours(hours: number) {
     return hours * durations.minutes(60)
-  }
+  },
+  days(days: number) {
+    return days * durations.hours(24)
+  },
 }
