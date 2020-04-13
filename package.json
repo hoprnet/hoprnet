@@ -36,6 +36,7 @@
     }
   },
   "dependencies": {
+    "@hoprnet/hopr-utils": "https://github.com/hoprnet/hopr-utils.git",
     "@openzeppelin/contracts": "^2.4.0",
     "bignumber.js": "^9.0.0",
     "web3": "^1.2.4"
