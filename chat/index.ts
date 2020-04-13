@@ -120,6 +120,16 @@ async function runAsRegularNode() {
         completer: tabCompletion(commands)
     })
 
+    rl.on('SIGINT', () => {
+        rl.question(`Are you sure you want to exit? (${chalk.green('y')}, ${chalk.red('N')}): `, async (answer) => {
+            if (answer.match(/^y(es)?$/i)) {
+                await commands.stopNode.execute()
+                return
+            }
+            rl.prompt()
+        });
+    });
+
     rl.once('close', async () => {
         await commands.stopNode.execute()
         return
@@ -204,7 +214,7 @@ function runAsBootstrapNode() {
 async function main() {
     clear()
     console.log(
-        figlet.textSync('HOPR.network', {
+        figlet.textSync('HOPRnet.eth', {
             horizontalLayout: 'fitted'
         })
     )

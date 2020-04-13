@@ -1,6 +1,4 @@
-<a href="#"><img src="hopr.png"></a>
-
----
+# HOPR net
 
 HOPR is a privacy-preserving messaging protocol that incentivizes users to participate in the network. It provides privacy by relaying messages via several relay nodes to the recipient. Relay nodes are getting paid via payment channels for their services.
 
@@ -10,11 +8,14 @@ Note that the documentation is under active development and does not always repr
 
 ## Table of Contents
 
+- [HOPR net](#hopr-net)
+  - [Table of Contents](#table-of-contents)
 - [Setup](#setup)
   - [Dependencies](#dependencies)
   - [Setup hopr-core](#setup-hopr-core)
   - [Joining the Public Testnet](#joining-the-public-testnet)
     - [Get Kovan Ether](#get-kovan-ether)
+    - [Get Kovan HOPR Tokens](#get-kovan-hopr-tokens)
     - [Start HOPR as a client](#start-hopr-as-a-client)
 - [Setting up a Local Testnet](#setting-up-a-local-testnet)
   - [Setup hopr-ethereum](#setup-hopr-ethereum)
@@ -64,12 +65,16 @@ $ yarn install
 
 The public HOPR testnet is running on the Ethereum Kovan testnet so that you do not have to pay real Ether. Get yourself some [Kovan Ether from the faucet](https://faucet.kovan.network/).
 
+### Get Kovan HOPR Tokens
+
+Ask for HOPR tokens in our [telegram](https://t.me/hoprnet).
+
 ### Start HOPR as a client
 
 `hopr-core` ships with a default [.env](.env) file which is configured to connect to the public testnet, let's start `hopr-core` as a client:
 
 ```
-$ ./hopr 0
+$ yarn hopr 0
 ```
 
 That's it, you are now connected to the public testnet, type `help` to see all available commands to you, or check out the [using hopr guide](#use-hopr)
@@ -155,10 +160,10 @@ Before we start the bootstrap node, we need to edit the [.env](.env) file to con
 - ETHEREUM_PROVIDER = 'wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36'
 ```
 
-To start a bootstrap node, run `./hopr -b`
+To start a bootstrap node, run `yarn hopr -b`
 
 ```
-$ ./hopr -b
+$ yarn hopr -b
 // Welcome to HOPR!
 //
 // Available under the following addresses:
@@ -175,7 +180,7 @@ This node allows the other nodes on the network to find each other. We will star
 Now that everything is set up, open a new terminal window (or tab) and you should be able to run a new HOPR node via
 
 ```
-$ ./hopr 0
+$ yarn hopr 0
 
 // Welcome to HOPR!
 //
