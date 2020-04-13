@@ -1,10 +1,11 @@
 import assert from 'assert'
+import { u8aToHex, stringToU8a, u8aEquals } from '@hoprnet/hopr-utils'
+import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
 import { getPrivKeyData, generateUser, generateNode } from '../utils/testing'
 import { randomBytes } from 'crypto'
 import BN from 'bn.js'
 import pipe from 'it-pipe'
 import Web3 from 'web3'
-import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
 import { HoprToken } from '../tsc/web3/HoprToken'
 import { Await } from '../tsc/utils'
 import { Channel as ChannelType, Balance, ChannelBalance, Hash, SignedChannel } from '../types'
@@ -12,7 +13,6 @@ import { ChannelStatus } from '../types/channel'
 import CoreConnector from '..'
 import Channel from '../channel'
 import Ticket from '.'
-import * as u8a from '../core/u8a'
 import * as configs from '../config'
 
 describe('test ticket generation and verification', function() {
@@ -23,7 +23,7 @@ describe('test ticket generation and verification', function() {
   let funder: Await<ReturnType<typeof getPrivKeyData>>
 
   beforeEach(async function() {
-    funder = await getPrivKeyData(u8a.stringToU8a(configs.FUND_ACCOUNT_PRIVATE_KEY))
+    funder = await getPrivKeyData(stringToU8a(configs.FUND_ACCOUNT_PRIVATE_KEY))
     const userA = await generateUser(web3, funder, hoprToken)
     const userB = await generateUser(web3, funder, hoprToken)
 
@@ -85,11 +85,11 @@ describe('test ticket generation and verification', function() {
     const hash = await coreConnector.utils.hash(preImage)
 
     const signedTicket = await channel.ticket.create(channel, new Balance(1), new Hash(hash))
-    assert(u8a.u8aEquals(await signedTicket.signer, coreConnector.self.publicKey), `Check that signer is recoverable`)
+    assert(u8aEquals(await signedTicket.signer, coreConnector.self.publicKey), `Check that signer is recoverable`)
 
     const signedChannelCounterparty = await SignedChannel.create(coreConnector, undefined, { channel: channelType })
     assert(
-      u8a.u8aEquals(await signedChannelCounterparty.signer, coreConnector.self.publicKey),
+      u8aEquals(await signedChannelCounterparty.signer, coreConnector.self.publicKey),
       `Check that signer is recoverable.`
     )
 
@@ -98,7 +98,7 @@ describe('test ticket generation and verification', function() {
     const storedSignedTicket = new Uint8Array(
       await coreConnector.db.get(Buffer.from(coreConnector.dbKeys.Ticket(channelId, signedTicket.ticket.challenge)))
     )
-    assert(u8a.u8aEquals(signedTicket, storedSignedTicket), `Check that signedTicket is stored correctly`)
+    assert(u8aEquals(signedTicket, storedSignedTicket), `Check that signedTicket is stored correctly`)
   })
 
   it('should store tickets, and retrieve them in a map', async function() {
@@ -162,10 +162,10 @@ describe('test ticket generation and verification', function() {
     const storedSignedTickets = await Ticket.get(coreConnector, channelId)
     assert(storedSignedTickets.size === 2, `Check getting signedTickets`)
 
-    const storedSignedTicketA = storedSignedTickets.get(u8a.u8aToHex(signedTicketA.ticket.challenge))
-    assert(u8a.u8aEquals(signedTicketA, storedSignedTicketA), `Check that signedTicketA is stored correctly`)
+    const storedSignedTicketA = storedSignedTickets.get(u8aToHex(signedTicketA.ticket.challenge))
+    assert(u8aEquals(signedTicketA, storedSignedTicketA), `Check that signedTicketA is stored correctly`)
 
-    const storedSignedTicketB = storedSignedTickets.get(u8a.u8aToHex(signedTicketB.ticket.challenge))
-    assert(u8a.u8aEquals(signedTicketB, storedSignedTicketB), `Check that signedTicketB is stored correctly`)
+    const storedSignedTicketB = storedSignedTickets.get(u8aToHex(signedTicketB.ticket.challenge))
+    assert(u8aEquals(signedTicketB, storedSignedTicketB), `Check that signedTicketB is stored correctly`)
   })
 })

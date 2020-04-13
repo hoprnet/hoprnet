@@ -1,5 +1,5 @@
 import type { Types } from "@hoprnet/hopr-core-connector-interface"
-import { u8aConcat, u8aToNumber } from '../core/u8a'
+import { u8aConcat, u8aToNumber } from '@hoprnet/hopr-utils'
 import { Uint8ArrayE } from '../types/extended'
 import { SIGNATURE_LENGTH, SIGNATURE_RECOVERY_LENGTH } from '../constants'
 

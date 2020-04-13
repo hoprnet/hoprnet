@@ -1,7 +1,7 @@
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
+import { u8aConcat } from '@hoprnet/hopr-utils'
 import { ChannelBalance, Moment } from '.'
 import { Uint8ArrayE } from '../types/extended'
-import { u8aConcat } from '../core/u8a'
 import { hash, stateCountToStatus } from "../utils"
 
 export enum ChannelStatus {

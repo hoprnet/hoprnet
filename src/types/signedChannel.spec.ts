@@ -1,12 +1,12 @@
 import assert from 'assert'
 import BN from 'bn.js'
+import { stringToU8a } from '@hoprnet/hopr-utils'
 import { Channel, SignedChannel, ChannelBalance, Signature, Hash } from '.'
 import { ChannelStatus } from './channel'
-import * as u8a from '../core/u8a'
 import * as utils from '../utils'
 import { DEMO_ACCOUNTS } from '../config'
 
-const [userA] = DEMO_ACCOUNTS.map(str => u8a.stringToU8a(str))
+const [userA] = DEMO_ACCOUNTS.map(str => stringToU8a(str))
 
 const generateChannelData = async () => {
   const balance = new ChannelBalance(undefined, {

@@ -1,7 +1,7 @@
 import type { Types } from "@hoprnet/hopr-core-connector-interface"
+import { u8aConcat } from "@hoprnet/hopr-utils"
 import { TicketEpoch, Hash, Public } from '.'
 import { Uint8ArrayE } from '../types/extended'
-import { u8aConcat } from "../core/u8a"
 
 class State extends Uint8ArrayE implements Types.State {
   constructor(

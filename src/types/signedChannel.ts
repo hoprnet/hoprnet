@@ -1,7 +1,7 @@
-import type { Types } from "@hoprnet/hopr-core-connector-interface"
 import secp256k1 from 'secp256k1'
+import type { Types } from "@hoprnet/hopr-core-connector-interface"
+import { u8aConcat } from '@hoprnet/hopr-utils'
 import { Signature, Channel } from '.'
-import { u8aConcat } from '../core/u8a'
 import { Uint8ArrayE } from '../types/extended'
 import { sign, verify } from '../utils'
 import type HoprEthereum from '..'

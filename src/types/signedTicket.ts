@@ -1,8 +1,8 @@
 import type { Types } from "@hoprnet/hopr-core-connector-interface"
+import { u8aConcat } from '@hoprnet/hopr-utils'
 import secp256k1 from 'secp256k1'
 import { Signature, Ticket } from '.'
 import { Uint8ArrayE } from '../types/extended'
-import { u8aConcat } from '../core/u8a'
 
 class SignedTicket extends Uint8ArrayE implements Types.SignedTicket<Ticket, Signature> {
   private _ticket?: Ticket

@@ -1,4 +1,5 @@
 import type { Channel as IChannel, Types } from '@hoprnet/hopr-core-connector-interface'
+import { u8aToHex, u8aXOR, stringToU8a, u8aEquals } from "@hoprnet/hopr-utils"
 import BN from 'bn.js'
 // import Web3 from "web3"
 import {
@@ -17,7 +18,6 @@ import {
 import { ChannelStatus } from '../types/channel'
 import * as events from './events'
 import { HASH_LENGTH } from '../constants'
-import { u8aToHex, u8aXOR, stringToU8a, u8aEquals } from '../core/u8a'
 import { waitForConfirmation, waitFor, hash, getId, stateCountToStatus } from '../utils'
 import type HoprEthereum from '..'
 

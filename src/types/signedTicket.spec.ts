@@ -1,12 +1,12 @@
 import assert from 'assert'
 import { randomBytes } from 'crypto'
+import { stringToU8a } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import { Ticket, Hash, TicketEpoch, Balance, Signature, SignedTicket } from '.'
-import * as u8a from '../core/u8a'
 import * as utils from '../utils'
 import { DEMO_ACCOUNTS } from '../config'
 
-const [userA, userB] = DEMO_ACCOUNTS.map(str => u8a.stringToU8a(str))
+const [userA, userB] = DEMO_ACCOUNTS.map(str => stringToU8a(str))
 const WIN_PROB = new BN(1)
 
 const generateTicketData = async () => {

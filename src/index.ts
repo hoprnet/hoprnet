@@ -11,13 +11,13 @@ import HoprCoreConnector, {
   Constants as IConstants,
   DbKeys as IDbKeys
 } from '@hoprnet/hopr-core-connector-interface'
+import { u8aToHex, stringToU8a, u8aEquals } from '@hoprnet/hopr-utils'
 import Channel, { events } from './channel'
 import Ticket from './ticket'
 import * as dbkeys from './dbKeys'
 import * as types from './types'
 import * as utils from './utils'
 import * as constants from './constants'
-import { u8aToHex, stringToU8a, u8aEquals } from './core/u8a'
 import * as config from './config'
 import { Networks } from './tsc/types'
 import { HoprChannels } from './tsc/web3/HoprChannels'

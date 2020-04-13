@@ -1,17 +1,17 @@
 import assert from 'assert'
+import { stringToU8a, u8aToHex, u8aEquals } from '@hoprnet/hopr-utils'
+import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
 import { getPrivKeyData, generateUser, generateNode } from '../utils/testing'
 import { randomBytes } from 'crypto'
 import BN from 'bn.js'
 import pipe from 'it-pipe'
 import Web3 from 'web3'
-import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
 import { HoprToken } from '../tsc/web3/HoprToken'
 import { Await } from '../tsc/utils'
 import { Channel as ChannelType, Balance, ChannelBalance, Hash, SignedChannel, AccountId } from '../types'
 import { ChannelStatus } from '../types/channel'
 import CoreConnector from '..'
 import Channel from '.'
-import * as u8a from '../core/u8a'
 import * as configs from '../config'
 
 describe('test ticket generation and verification', function() {
@@ -27,7 +27,7 @@ describe('test ticket generation and verification', function() {
     channels.clear()
     preChannels.clear()
 
-    funder = await getPrivKeyData(u8a.stringToU8a(configs.FUND_ACCOUNT_PRIVATE_KEY))
+    funder = await getPrivKeyData(stringToU8a(configs.FUND_ACCOUNT_PRIVATE_KEY))
     const userA = await generateUser(web3, funder, hoprToken)
     const userB = await generateUser(web3, funder, hoprToken)
 
@@ -51,7 +51,7 @@ describe('test ticket generation and verification', function() {
 
     const signedChannel = await SignedChannel.create(counterpartysCoreConnector, undefined, { channel: channelType })
 
-    preChannels.set(u8a.u8aToHex(channelId), channelType)
+    preChannels.set(u8aToHex(channelId), channelType)
 
     const channel = await Channel.create(
       coreConnector,
@@ -82,17 +82,17 @@ describe('test ticket generation and verification', function() {
       }
     )
 
-    channels.set(u8a.u8aToHex(channelId), channelType)
+    channels.set(u8aToHex(channelId), channelType)
 
     const preImage = randomBytes(32)
     const hash = await coreConnector.utils.hash(preImage)
 
     const ticket = await channel.ticket.create(channel, new Balance(1), new Hash(hash))
-    assert(u8a.u8aEquals(await ticket.signer, coreConnector.self.publicKey), `Check that signer is recoverable`)
+    assert(u8aEquals(await ticket.signer, coreConnector.self.publicKey), `Check that signer is recoverable`)
 
     const signedChannelCounterparty = await SignedChannel.create(coreConnector, undefined, { channel: channelType })
     assert(
-      u8a.u8aEquals(await signedChannelCounterparty.signer, coreConnector.self.publicKey),
+      u8aEquals(await signedChannelCounterparty.signer, coreConnector.self.publicKey),
       `Check that signer is recoverable.`
     )
 
@@ -108,7 +108,7 @@ describe('test ticket generation and verification', function() {
     )) as Channel[]
 
     assert(
-      u8a.u8aEquals(dbChannels[0].counterparty, coreConnector.self.onChainKeyPair.publicKey),
+      u8aEquals(dbChannels[0].counterparty, coreConnector.self.onChainKeyPair.publicKey),
       `Channel record should make it into the database and its db-key should lead to the AccountId of the counterparty.`
     )
 

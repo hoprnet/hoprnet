@@ -1,4 +1,4 @@
-import { u8aToHex, u8aEquals } from '../../core/u8a'
+import { u8aToHex, u8aEquals } from '@hoprnet/hopr-utils'
 
 class Uint8ArrayE extends Uint8Array {
   subarray(begin: number = 0, end?: number) {

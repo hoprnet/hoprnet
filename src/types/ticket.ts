@@ -1,9 +1,9 @@
 import type { Types } from "@hoprnet/hopr-core-connector-interface"
 import BN from 'bn.js'
+import { stringToU8a, u8aConcat, u8aToHex } from '@hoprnet/hopr-utils'
 import { Hash, TicketEpoch, Balance, SignedTicket, Signature } from '.'
 import { Uint8ArrayE } from '../types/extended'
 import { sign, verify, hash } from '../utils'
-import { stringToU8a, u8aConcat, u8aToHex } from '../core/u8a'
 import type ChannelInstance from '../channel'
 
 const WIN_PROB = new BN(1)
