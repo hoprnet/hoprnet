@@ -26,9 +26,9 @@ declare interface HoprCoreConnector {
   readonly started: boolean
   readonly self: {
     privateKey: Uint8Array
-    publicKey: Uint8Array,
+    publicKey: Uint8Array
     onChainKeyPair: {
-      privateKey?: Uint8Array,
+      privateKey?: Uint8Array
       publicKey?: Uint8Array
     }
   }
@@ -56,6 +56,11 @@ declare interface HoprCoreConnector {
    * Returns the current balances of the account associated with this node.
    */
   accountBalance: Promise<Types.Balance>
+
+  /**
+   * Returns the current balance (ex: ETH) of the account associated with this node.
+   */
+  accountSecondaryBalance?: Promise<Types.Balance>
 
   /**
    * (Static) utils to use in the connector module
