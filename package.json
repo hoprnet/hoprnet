@@ -1,0 +1,51 @@
+{
+  "name": "@hoprnet/hopr-utils",
+  "version": "0.0.1",
+  "repository": "git@github.com:hoprnet/hopr-utils.git",
+  "license": "LGPL-3.0-only",
+  "types": "lib/index.d.ts",
+  "main": "lib/index.js",
+  "scripts": {
+    "clean": "rm -rf ./lib",
+    "test": "mocha",
+    "dev": "yarn clean && tsc -w",
+    "build": "yarn clean && tsc -d -p ."
+  },
+  "files": [
+    "!**/*.spec.ts",
+    "src/",
+    "lib/",
+    "hopr.png"
+  ],
+  "engines": {
+    "yarn": "^1.22",
+    "node": "^12"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/mocha": "^7.0.1",
+    "@types/node": "^12.12.8",
+    "husky": "^4.2.3",
+    "mocha": "^7.0.1",
+    "ts-node": "^8.8.2",
+    "typescript": "^3.8.2"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "yarn build && git add ./lib"
+    }
+  },
+  "prettier": {
+    "tabWidth": 2,
+    "semi": false,
+    "singleQuote": true,
+    "printWidth": 120
+  },
+  "mocha": {
+    "extension": [
+      "ts"
+    ],
+    "spec": "src/**/*.spec.ts",
+    "require": "ts-node/register"
+  }
+}
