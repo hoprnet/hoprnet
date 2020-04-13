@@ -32,7 +32,7 @@
   },
   "husky": {
     "hooks": {
-      "pre-commit": "npm run format:sol && yarn build && yarn extract"
+      "pre-commit": "npm run format:sol && yarn build && yarn extract && git add ."
     }
   },
   "dependencies": {

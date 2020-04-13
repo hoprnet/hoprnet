@@ -87,7 +87,7 @@ contract HoprChannels {
     /**
      * @notice sets caller's hashedSecret
      * @param hashedSecret bytes32 hashedSecret to store
-    */
+     */
     function setHashedSecret(bytes32 hashedSecret) external {
         require(hashedSecret != bytes32(0), "hashedSecret must not be empty");
 
@@ -111,7 +111,7 @@ contract HoprChannels {
      * @param recipient address account which the funds are for
      * @param counterParty address the counterParty of 'recipient'
      * @param additionalDeposit uint256 amount to fund the channel
-    */
+     */
     function fundChannel(
         address recipient,
         address counterParty,
@@ -130,10 +130,12 @@ contract HoprChannels {
             "'additionalDeposit' must be greater than 0"
         );
 
-        (address party_a, , Channel storage channel, ChannelStatus status) = getChannel(
-            recipient,
-            counterParty
-        );
+        (
+            address party_a,
+            ,
+            Channel storage channel,
+            ChannelStatus status
+        ) = getChannel(recipient, counterParty);
 
         require(
             status == ChannelStatus.UNINITIALISED ||
@@ -176,7 +178,7 @@ contract HoprChannels {
      * @param r bytes32
      * @param s bytes32
      * @param v uint8
-    */
+     */
     function fundChannelWithSig(
         uint256 stateCounter,
         uint256 additionalDeposit,
@@ -225,10 +227,12 @@ contract HoprChannels {
             "initiator and counterparty must not be the same"
         );
 
-        (address partyA, , Channel storage channel, ChannelStatus status) = getChannel(
-            initiator,
-            counterparty
-        );
+        (
+            address partyA,
+            ,
+            Channel storage channel,
+            ChannelStatus status
+        ) = getChannel(initiator, counterparty);
 
         require(
             channel.stateCounter == stateCounter,
@@ -278,7 +282,7 @@ contract HoprChannels {
     /**
      * @notice open a channel
      * @param counterParty address the counterParty of 'msg.sender'
-    */
+     */
     function openChannel(address counterParty) public {
         address opener = msg.sender;
 
@@ -313,7 +317,7 @@ contract HoprChannels {
      * @param r bytes32
      * @param s bytes32
      * @param v uint8
-    */
+     */
     function redeemTicket(
         bytes32 pre_image,
         bytes32 secret_a,
@@ -352,10 +356,12 @@ contract HoprChannels {
             "ticket must be a win"
         );
 
-        (address party_a, , Channel storage channel, ChannelStatus status) = getChannel(
-            recipient,
-            ecrecover(hashedTicket, v, r, s)
-        );
+        (
+            address party_a,
+            ,
+            Channel storage channel,
+            ChannelStatus status
+        ) = getChannel(recipient, ecrecover(hashedTicket, v, r, s));
 
         require(
             status == ChannelStatus.OPEN || status == ChannelStatus.PENDING,
@@ -388,7 +394,7 @@ contract HoprChannels {
      *
      * @notice initiate channel's closure
      * @param counterParty address counter party of 'msg.sender'
-    */
+     */
     function initiateChannelClosure(address counterParty) external {
         address initiator = msg.sender;
 
@@ -415,14 +421,16 @@ contract HoprChannels {
      *
      * @notice claim channel's closure
      * @param counterParty address counter party of 'msg.sender'
-    */
+     */
     function claimChannelClosure(address counterParty) external {
         address initiator = msg.sender;
 
-        (address party_a, address party_b, Channel storage channel, ChannelStatus status) = getChannel(
-            initiator,
-            counterParty
-        );
+        (
+            address party_a,
+            address party_b,
+            Channel storage channel,
+            ChannelStatus status
+        ) = getChannel(initiator, counterParty);
 
         require(
             status == ChannelStatus.PENDING,
@@ -457,12 +465,17 @@ contract HoprChannels {
      * @notice returns channel data
      * @param accountA address of account 'A'
      * @param accountB address of account 'B'
-    */
+     */
     // TODO: maybe remove this
     function getChannel(address accountA, address accountB)
         internal
         view
-        returns (address, address, Channel storage, ChannelStatus)
+        returns (
+            address,
+            address,
+            Channel storage,
+            ChannelStatus
+        )
     {
         (address party_a, address party_b) = getParties(accountA, accountB);
         bytes32 channelId = getChannelId(party_a, party_b);
@@ -476,7 +489,7 @@ contract HoprChannels {
      * @notice return true if accountA is party_a
      * @param accountA address of account 'A'
      * @param accountB address of account 'B'
-    */
+     */
     function isPartyA(address accountA, address accountB)
         internal
         pure
@@ -489,7 +502,7 @@ contract HoprChannels {
      * @notice return party_a and party_b
      * @param accountA address of account 'A'
      * @param accountB address of account 'B'
-    */
+     */
     function getParties(address accountA, address accountB)
         internal
         pure
@@ -506,7 +519,7 @@ contract HoprChannels {
      * @notice return channel id
      * @param party_a address of party 'A'
      * @param party_b address of party 'B'
-    */
+     */
     function getChannelId(address party_a, address party_b)
         internal
         pure
@@ -518,7 +531,7 @@ contract HoprChannels {
     /**
      * @notice returns 'ChannelStatus'
      * @param channel Channel
-    */
+     */
     function getChannelStatus(Channel memory channel)
         internal
         pure
@@ -530,7 +543,7 @@ contract HoprChannels {
     /**
      * @notice builds a prefixed hash to mimic the behavior of eth_sign
      * @param message bytes32 message to prefix
-    */
+     */
     function prefixed(bytes32 message) internal pure returns (bytes32) {
         return
             keccak256(

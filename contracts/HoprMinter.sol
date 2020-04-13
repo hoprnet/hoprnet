@@ -31,7 +31,11 @@ contract HoprMinter is Ownable {
     // accounts
     mapping(address => Account) public accounts;
 
-    constructor(address _token, uint256 _maxAmount, uint256 _duration) public {
+    constructor(
+        address _token,
+        uint256 _maxAmount,
+        uint256 _duration
+    ) public {
         token = HoprToken(_token);
         maxAmount = _maxAmount;
         started = now;
