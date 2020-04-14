@@ -1,10 +1,10 @@
-export * from './collection'
+import { durations } from "@hoprnet/hopr-utils"
+
+export * from "@hoprnet/hopr-utils"
 export * from './crypto'
 export * from './fs'
-export * from './general'
 export * from './libp2p'
 export * from './persistence'
-export * from './u8a'
 export * from './concurrency'
 
 const { promisify } = require('util')
@@ -78,7 +78,7 @@ const chalk = require('chalk')
 // ==========================
 // Ganache-core methods   <-- ONLY FOR TESTING
 // ==========================
-const ONE_MINUTE = 60 * 1000
+const ONE_MINUTE = durations.minutes(1)
 /**
  * Mine a single block and increase the timestamp by the given amount.
  *

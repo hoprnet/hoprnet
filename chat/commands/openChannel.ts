@@ -1,16 +1,14 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { Types, Channel as ChannelInstance } from '@hoprnet/hopr-core-connector-interface'
 import type AbstractCommand from './abstractCommand'
-
-import BN from 'bn.js'
-
 import type Hopr from '../../src'
-
 import type PeerId from 'peer-id'
 
 import chalk from 'chalk'
+import BN from 'bn.js'
+import { startDelayedInterval } from '@hoprnet/hopr-utils'
 
-import { checkPeerIdInput, startDelayedInterval, isBootstrapNode } from '../utils'
+import { checkPeerIdInput, isBootstrapNode } from '../utils'
 import { u8aToHex, pubKeyToPeerId } from '../../src/utils'
 
 export default class OpenChannel implements AbstractCommand {

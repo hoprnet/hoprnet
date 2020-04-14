@@ -81,9 +81,10 @@
 
 "@hoprnet/hopr-utils@https://github.com/hoprnet/hopr-utils.git":
   version "0.0.1"
-  resolved "https://github.com/hoprnet/hopr-utils.git#1d1befacd01ec53f4fb80347ea9926982c048d0f"
+  resolved "https://github.com/hoprnet/hopr-utils.git#1060cd40a21a6975970ccf19f099e4238297a328"
   dependencies:
     bignumber.js "^9.0.0"
+    chalk "^4.0.0"
 
 "@nodeutils/defaults-deep@~1.1.0":
   version "1.1.0"
