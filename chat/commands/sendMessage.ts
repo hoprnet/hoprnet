@@ -1,4 +1,5 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
+import type { Channel as ChannelInstance } from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '../../src'
 import type AbstractCommand from './abstractCommand'
 
@@ -8,9 +9,38 @@ import type PeerId from 'peer-id'
 import type PeerInfo from 'peer-info'
 
 import { checkPeerIdInput, encodeMessage, isBootstrapNode } from '../utils'
+import { pubKeyToPeerId } from '../../src/utils'
 import { MAX_HOPS } from '../../src/constants'
 
 import readline from 'readline'
+
+const getOpenChannels = async (node: Hopr<HoprCoreConnector>) => {
+    return new Promise<string[]>((resolve, reject) => {
+        let openChannels: string[] = []
+
+        try {
+            node.paymentChannels.channel.getAll(
+                node.paymentChannels,
+                async (channel: ChannelInstance<HoprCoreConnector>) => {
+                    const peerId = await pubKeyToPeerId(await channel.offChainCounterparty)
+                    const peerIdStr = peerId.toB58String()
+
+                    if (!openChannels.includes(peerIdStr)) {
+                        openChannels.push(peerIdStr)
+                    }
+
+                    return
+                },
+                async (promises: Promise<void>[]) => {
+                    await Promise.all(promises)
+                    return resolve(openChannels)
+                }
+            )
+        } catch (err) {
+            return reject(err)
+        }
+    })
+}
 
 export default class SendMessage implements AbstractCommand {
     constructor(public node: Hopr<HoprCoreConnector>) { }
@@ -90,12 +120,18 @@ export default class SendMessage implements AbstractCommand {
 
     async selectIntermediateNodes(rl: readline.Interface, destination: string): Promise<PeerId[]> {
         console.log(chalk.yellow('Please select the intermediate nodes: (hint use tabCompletion)'))
+
+        const openChannels = await getOpenChannels(this.node)
         let localPeers: string[] = []
         for (let peer of this.node.peerStore.peers.values()) {
             let peerIdString = peer.id.toB58String()
-            if (peerIdString !== destination) {
+            if (peerIdString !== destination && openChannels.includes(peerIdString)) {
                 localPeers.push(peerIdString)
             }
+        }
+
+        if (localPeers.length === 0) {
+            console.log(chalk.yellow('Cannot find peers in which you have open payment channels with.'))
         }
 
         // @ts-ignore
