@@ -107,7 +107,6 @@ class Heartbeat<Chain extends HoprCoreConnector> extends EventEmitter {
             await Promise.all(connections.map((connection: any) => connection.close()))
           }
           this.node.peerStore.remove(currentPeerId)
-
         }
 
         startIndex = heapIndex

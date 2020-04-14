@@ -166,7 +166,7 @@ class Crawler<Chain extends HoprCoreConnector> {
 
   handleCrawlRequest() {
     let self = this
-    return (function*() {
+    return (function* () {
       const peers = []
 
       for (const peerInfo of self.node.peerStore.peers.values()) {
@@ -182,11 +182,11 @@ class Crawler<Chain extends HoprCoreConnector> {
       if (selectedNodes.length > 0) {
         yield new CrawlResponse(undefined, {
           status: CrawlStatus.OK,
-          peerInfos: selectedNodes
+          peerInfos: selectedNodes,
         })
       } else {
         yield new CrawlResponse(undefined, {
-          status: CrawlStatus.FAIL
+          status: CrawlStatus.FAIL,
         })
       }
     })()

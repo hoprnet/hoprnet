@@ -21,15 +21,15 @@ import { Crawler } from './crawler'
 import { Crawler as CrawlerInteraction } from '../interactions/network/crawler'
 import Multiaddr from 'multiaddr'
 
-describe('test crawler', function() {
+describe('test crawler', function () {
   async function generateNode(): Promise<Hopr<HoprCoreConnector>> {
     const node = (await libp2p.create({
       peerInfo: await PeerInfo.create(await PeerId.create({ keyType: 'secp256k1' })),
       modules: {
         transport: [TCP],
         streamMuxer: [MPLEX],
-        connEncryption: [SECIO]
-      }
+        connEncryption: [SECIO],
+      },
     })) as Hopr<HoprCoreConnector>
 
     node.peerInfo.multiaddrs.add(Multiaddr('/ip4/0.0.0.0/tcp/0'))
@@ -40,21 +40,21 @@ describe('test crawler', function() {
 
     node.interactions = {
       network: {
-        crawler: new CrawlerInteraction(node)
-      }
+        crawler: new CrawlerInteraction(node),
+      },
     } as Hopr<HoprCoreConnector>['interactions']
-    
+
     new Interactions(node)
     node.network = {
-      crawler: new Crawler(node)
-    } as Hopr<HoprCoreConnector>["network"]
+      crawler: new Crawler(node),
+    } as Hopr<HoprCoreConnector>['network']
 
     node.log = Debug(`${chalk.blue(node.peerInfo.id.toB58String())}: `)
 
     return (node as unknown) as Hopr<HoprCoreConnector>
   }
 
-  it('should crawl the network and find some nodes', async function() {
+  it('should crawl the network and find some nodes', async function () {
     const [Alice, Bob, Chris, Dave, Eve] = await Promise.all([generateNode(), generateNode(), generateNode(), generateNode(), generateNode()])
 
     await assert.rejects(() => Alice.network.crawler.crawl(), Error(`Unable to find enough other nodes in the network.`))
@@ -82,7 +82,7 @@ describe('test crawler', function() {
       Bob.stop(),
       Chris.stop(),
       Dave.stop(),
-      Eve.stop()
+      Eve.stop(),
     ])
   })
 })

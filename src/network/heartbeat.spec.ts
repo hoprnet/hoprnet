@@ -21,15 +21,15 @@ import { Heartbeat } from './heartbeat'
 import assert from 'assert'
 import Multiaddr from 'multiaddr'
 
-describe('check heartbeat mechanism', function() {
+describe('check heartbeat mechanism', function () {
   async function generateNode(): Promise<Hopr<HoprCoreConnector>> {
     const node = (await libp2p.create({
       peerInfo: await PeerInfo.create(await PeerId.create({ keyType: 'secp256k1' })),
       modules: {
         transport: [TCP],
         streamMuxer: [MPLEX],
-        connEncryption: [SECIO]
-      }
+        connEncryption: [SECIO],
+      },
     })) as Hopr<HoprCoreConnector>
 
     node.peerInfo.multiaddrs.add(Multiaddr('/ip4/0.0.0.0/tcp/0'))
@@ -42,12 +42,12 @@ describe('check heartbeat mechanism', function() {
 
     node.interactions = {
       network: {
-        heartbeat: new HeartbeatInteraction(node)
-      }
+        heartbeat: new HeartbeatInteraction(node),
+      },
     } as Hopr<HoprCoreConnector>['interactions']
 
     node.network = {
-      heartbeat: new Heartbeat(node)
+      heartbeat: new Heartbeat(node),
     } as Hopr<HoprCoreConnector>['network']
 
     node.log = Debug(`${chalk.blue(node.peerInfo.id.toB58String())}: `)
@@ -55,7 +55,7 @@ describe('check heartbeat mechanism', function() {
     return (node as unknown) as Hopr<HoprCoreConnector>
   }
 
-  it('should initialise the heartbeat module and start the heartbeat functionality', async function() {
+  it('should initialise the heartbeat module and start the heartbeat functionality', async function () {
     const [Alice, Bob, Chris, Dave] = await Promise.all([generateNode(), generateNode(), generateNode(), generateNode()])
 
     // Check whether our event listener is triggered by heartbeat interactions
@@ -66,7 +66,7 @@ describe('check heartbeat mechanism', function() {
           resolve()
         })
       }),
-      Alice.interactions.network.heartbeat.interact(Bob.peerInfo)
+      Alice.interactions.network.heartbeat.interact(Bob.peerInfo),
     ])
 
     // Check whether our event listener is triggered by `normal` interactions
@@ -77,7 +77,7 @@ describe('check heartbeat mechanism', function() {
           resolve()
         })
       }),
-      Alice.dial(Chris.peerInfo)
+      Alice.dial(Chris.peerInfo),
     ])
 
     // Check that the internal state is as expected
@@ -100,8 +100,9 @@ describe('check heartbeat mechanism', function() {
     assert(!Alice.network.heartbeat.nodes.has(Chris.peerInfo.id.toB58String()), `Alice should have removed Chris.`)
 
     await Promise.all([
+      /* pretier-ignore */
       Alice.stop(),
-      Bob.stop()
+      Bob.stop(),
     ])
   })
 })

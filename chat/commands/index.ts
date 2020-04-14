@@ -16,29 +16,29 @@ import StopNode from './stopNode'
 import type readline from 'readline'
 
 export default class Commands {
-    closeChannel: CloseChannel
-    crawl: Crawl
-    listCommands: ListCommands
-    listConnectors: ListConnectors
-    listOpenChannels: ListOpenChannels
-    openChannel: OpenChannel
-    ping: Ping
-    printAddress: PrintAddress
-    printBalance: PrintBalance
-    sendMessage: SendMessage
-    stopNode: StopNode
+  closeChannel: CloseChannel
+  crawl: Crawl
+  listCommands: ListCommands
+  listConnectors: ListConnectors
+  listOpenChannels: ListOpenChannels
+  openChannel: OpenChannel
+  ping: Ping
+  printAddress: PrintAddress
+  printBalance: PrintBalance
+  sendMessage: SendMessage
+  stopNode: StopNode
 
-    constructor(public node: Hopr<HoprCoreConnector>) {
-        this.closeChannel = new CloseChannel(node)
-        this.crawl = new Crawl(node)
-        this.listCommands = new ListCommands()
-        this.listConnectors = new ListConnectors()
-        this.listOpenChannels = new ListOpenChannels(node)
-        this.openChannel = new OpenChannel(node)
-        this.ping = new Ping(node)
-        this.printAddress = new PrintAddress(node)
-        this.printBalance = new PrintBalance(node)
-        this.sendMessage = new SendMessage(node)
-        this.stopNode = new StopNode(node)
-    }
+  constructor(public node: Hopr<HoprCoreConnector>) {
+    this.closeChannel = new CloseChannel(node)
+    this.crawl = new Crawl(node)
+    this.listCommands = new ListCommands()
+    this.listConnectors = new ListConnectors()
+    this.listOpenChannels = new ListOpenChannels(node)
+    this.openChannel = new OpenChannel(node)
+    this.ping = new Ping(node)
+    this.printAddress = new PrintAddress(node)
+    this.printBalance = new PrintBalance(node)
+    this.sendMessage = new SendMessage(node)
+    this.stopNode = new StopNode(node)
+  }
 }
