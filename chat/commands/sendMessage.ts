@@ -8,7 +8,7 @@ import chalk from 'chalk'
 import type PeerId from 'peer-id'
 import type PeerInfo from 'peer-info'
 
-import { checkPeerIdInput, encodeMessage, isBootstrapNode } from '../utils'
+import { checkPeerIdInput, encodeMessage, isBootstrapNode, clearString } from '../utils'
 import { pubKeyToPeerId } from '../../src/utils'
 import { MAX_HOPS } from '../../src/constants'
 
@@ -68,26 +68,17 @@ export default class SendMessage implements AbstractCommand {
         // @ts-ignore
         rl.completer = undefined
 
-        const manualPath = await new Promise(resolve => rl.question(`Do you want to manually set the intermediate nodes? (${chalk.green('y')}, ${chalk.red('N')}): `, (answer: string) => {
-            switch (answer.toLowerCase()) {
-                case 'y':
-                    return resolve(true)
-                default:
-                case 'n':
-                    return resolve(false)
-            }
-        }))
+        const manualIntermediateNodesQuestion = `Do you want to manually set the intermediate nodes? (${chalk.green('y')}, ${chalk.red('N')}): `
+        const manualIntermediateNodesAnswer = await new Promise<string>(resolve => rl.question(manualIntermediateNodesQuestion, resolve))
 
-        readline.moveCursor(process.stdout, -rl.line, -1)
-        readline.clearLine(process.stdout, 0)
+        clearString(manualIntermediateNodesQuestion + manualIntermediateNodesAnswer, rl)
 
-        const message = await new Promise<string>(resolve => rl.question(`${chalk.yellow(`Type in your message and press ENTER to send:`)}\n`, resolve))
+        const manualPath = (manualIntermediateNodesAnswer.toLowerCase().match(/^y(es)?$/i) || '').length
 
-        readline.moveCursor(process.stdout, -rl.line, -1)
-        readline.clearLine(process.stdout, 0)
+        const messageQuestion = `${chalk.yellow(`Type in your message and press ENTER to send:`)}\n`
+        const message = await new Promise<string>(resolve => rl.question(messageQuestion, resolve))
 
-        readline.moveCursor(process.stdout, -rl.line, -1)
-        readline.clearLine(process.stdout, 0)
+        clearString(messageQuestion + message, rl)
 
         console.log(`Sending message to ${chalk.blue(query)} ...`)
 
@@ -163,13 +154,15 @@ export default class SendMessage implements AbstractCommand {
                     console.log(chalk.red(err.message))
                 }
 
+                const peerIndex = localPeers.findIndex((str: string) => str == query)
+
                 readline.moveCursor(process.stdout, -rl.line, -1)
                 readline.clearLine(process.stdout, 0)
 
                 console.log(chalk.blue(query))
 
                 selected.push(peerId)
-                localPeers.splice(localPeers.findIndex((str: string) => str == query), 1)
+                localPeers.splice(peerIndex, 1)
 
                 if (selected.length >= MAX_HOPS - 1) {
                     rl.removeAllListeners('line')

@@ -19,7 +19,7 @@ import type { HoprOptions } from '../src'
 import figlet from 'figlet'
 import clear from 'clear'
 
-import { parseOptions } from './utils'
+import { parseOptions, clearString } from './utils'
 import Commands from './commands'
 
 const SPLIT_OPERAND_QUERY_REGEX: RegExp = /([\w\-]+)(?:\s+)?([\w\s\-.]+)?/
@@ -120,14 +120,17 @@ async function runAsRegularNode() {
         completer: tabCompletion(commands)
     })
 
-    rl.on('SIGINT', () => {
-        rl.question(`Are you sure you want to exit? (${chalk.green('y')}, ${chalk.red('N')}): `, async (answer) => {
-            if (answer.match(/^y(es)?$/i)) {
-                await commands.stopNode.execute()
-                return
-            }
-            rl.prompt()
-        });
+    rl.on('SIGINT', async () => {
+        const question = `Are you sure you want to exit? (${chalk.green('y')}, ${chalk.red('N')}): `
+
+        const answer = await new Promise<string>(resolve => rl.question(question, resolve))
+
+        if (answer.match(/^y(es)?$/i)) {
+            clearString(question, rl)
+            await commands.stopNode.execute()
+            return
+        } 
+        rl.prompt()
     });
 
     rl.once('close', async () => {
@@ -175,7 +178,7 @@ async function runAsRegularNode() {
                 await commands.listOpenChannels.execute()
                 break
             case 'open':
-                await commands.openChannel.execute(query)
+                await commands.openChannel.execute(rl, query)
                 break
             case 'send':
                 await commands.sendMessage.execute(rl, query)
