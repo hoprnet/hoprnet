@@ -1,6 +1,5 @@
 import Web3 from './web3';
 import { LevelUp } from 'levelup';
-import BN from 'bn.js';
 import HoprCoreConnector, { Utils as IUtils, Types as ITypes, Channel as IChannel, Constants as IConstants, DbKeys as IDbKeys } from '@hoprnet/hopr-core-connector-interface';
 import Ticket from './ticket';
 import * as types from './types';
@@ -45,7 +44,8 @@ export default class HoprEthereum implements HoprCoreConnector {
     readonly ticket: typeof Ticket;
     readonly CHAIN_NAME = "HOPR on Ethereum";
     get nonce(): Promise<number>;
-    get accountBalance(): Promise<BN>;
+    get accountBalance(): Promise<types.Balance>;
+    get accountNativeBalance(): Promise<types.Balance>;
     start(): Promise<void>;
     stop(): Promise<void>;
     get started(): boolean;

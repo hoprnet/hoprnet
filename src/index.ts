@@ -76,11 +76,13 @@ export default class HoprEthereum implements HoprCoreConnector {
 
   get accountBalance() {
     return this.hoprToken.methods
-      .balanceOf(u8aToHex(this.account))
+      .balanceOf(this.account.toHex())
       .call()
-      .then(res => {
-        return new BN(res)
-      })
+      .then(res => new types.Balance(res))
+  }
+
+  get accountNativeBalance() {
+    return this.web3.eth.getBalance(this.account.toHex()).then(res => new types.Balance(res))
   }
 
   async start() {
