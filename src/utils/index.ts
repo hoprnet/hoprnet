@@ -6,18 +6,17 @@ import { PromiEvent, TransactionReceipt, TransactionConfig } from 'web3-core'
 import { BlockTransactionString } from 'web3-eth'
 import Web3 from 'web3'
 import BN from 'bn.js'
-import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import { AccountId, Signature, Hash } from '../types'
 import { ChannelStatus } from '../types/channel'
 import * as constants from '../constants'
 import { Networks } from '../tsc/types'
 import { TransactionObject } from '../tsc/web3/types'
 
-export function isPartyA(self: Types.AccountId, counterparty: Types.AccountId): boolean {
+export function isPartyA(self: AccountId, counterparty: AccountId): boolean {
   return Buffer.compare(self, counterparty) < 0
 }
 
-export function getParties(self: Types.AccountId, counterparty: Types.AccountId): [Types.AccountId, Types.AccountId] {
+export function getParties(self: AccountId, counterparty: AccountId): [AccountId, AccountId] {
   if (isPartyA(self, counterparty)) {
     return [self, counterparty]
   } else {
@@ -25,7 +24,7 @@ export function getParties(self: Types.AccountId, counterparty: Types.AccountId)
   }
 }
 
-export function getId(self: Types.AccountId, counterparty: Types.AccountId): Promise<Types.Hash> {
+export function getId(self: AccountId, counterparty: AccountId): Promise<Hash> {
   return hash(Buffer.concat(getParties(self, counterparty), 2 * constants.ADDRESS_LENGTH))
 }
 
@@ -40,7 +39,7 @@ export async function privKeyToPubKey(privKey: Uint8Array): Promise<Uint8Array> 
   return publicKeyCreate(privKey)
 }
 
-export async function pubKeyToAccountId(pubKey: Uint8Array): Promise<Types.AccountId> {
+export async function pubKeyToAccountId(pubKey: Uint8Array): Promise<AccountId> {
   if (pubKey.length != constants.COMPRESSED_PUBLIC_KEY_LENGTH)
     throw Error(
       `Invalid input parameter. Expected a Buffer of size ${
@@ -51,11 +50,11 @@ export async function pubKeyToAccountId(pubKey: Uint8Array): Promise<Types.Accou
   return new AccountId((await hash(publicKeyConvert(pubKey, false).slice(1))).slice(12))
 }
 
-export async function hash(msg: Uint8Array): Promise<Types.Hash> {
+export async function hash(msg: Uint8Array): Promise<Hash> {
   return Promise.resolve(new Hash(new Uint8Array(keccak256(Buffer.from(msg)))))
 }
 
-export async function sign(msg: Uint8Array, privKey: Uint8Array): Promise<Types.Signature> {
+export async function sign(msg: Uint8Array, privKey: Uint8Array): Promise<Signature> {
   const result = ecdsaSign(msg, privKey)
 
   const response = new Signature(undefined, {
@@ -67,11 +66,11 @@ export async function sign(msg: Uint8Array, privKey: Uint8Array): Promise<Types.
   return response
 }
 
-export async function signer(msg: Uint8Array, signature: Types.Signature): Promise<Uint8Array> {
+export async function signer(msg: Uint8Array, signature: Signature): Promise<Uint8Array> {
   return ecdsaRecover(signature.signature, signature.recovery, msg)
 }
 
-export async function verify(msg: Uint8Array, signature: Types.Signature, pubKey: Uint8Array): Promise<boolean> {
+export async function verify(msg: Uint8Array, signature: Signature, pubKey: Uint8Array): Promise<boolean> {
   return ecdsaVerify(signature.signature, msg, pubKey)
 }
 

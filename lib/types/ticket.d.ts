@@ -22,7 +22,7 @@ declare class Ticket extends Uint8ArrayE implements Types.Ticket {
     get winProb(): Hash;
     get onChainSecret(): Hash;
     getEmbeddedFunds(): BN;
-    get hash(): Promise<Types.Hash>;
+    get hash(): Promise<Hash>;
     static get SIZE(): number;
     static create(channel: ChannelInstance, amount: Balance, challenge: Hash): Promise<SignedTicket>;
     static verify(channel: ChannelInstance, signedTicket: SignedTicket): Promise<boolean>;

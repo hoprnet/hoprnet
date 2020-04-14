@@ -1,4 +1,4 @@
-import type { Types } from '@hoprnet/hopr-core-connector-interface'
+import { Hash, AccountId }from './types'
 import * as constants from './constants'
 
 const encoder = new TextEncoder()
@@ -7,7 +7,7 @@ const SEPERATOR = encoder.encode('-')
 const channelSubPrefix = encoder.encode('channel-')
 const challengeSubPrefix = encoder.encode('challenge-')
 
-export function Channel(counterparty: Types.AccountId): Uint8Array {
+export function Channel(counterparty: AccountId): Uint8Array {
   return allocationHelper([
     [PREFIX.length, PREFIX],
     [channelSubPrefix.length, channelSubPrefix],
@@ -19,7 +19,7 @@ export function ChannelKeyParse(arr: Uint8Array): Uint8Array {
   return arr.slice(PREFIX.length + channelSubPrefix.length)
 }
 
-export function Challenge(channelId: Types.Hash, challenge: Types.Hash): Uint8Array {
+export function Challenge(channelId: Hash, challenge: Hash): Uint8Array {
   return allocationHelper([
     [PREFIX.length, PREFIX],
     [challengeSubPrefix.length, challengeSubPrefix],
@@ -29,20 +29,20 @@ export function Challenge(channelId: Types.Hash, challenge: Types.Hash): Uint8Ar
   ])
 }
 
-export function ChallengeKeyParse(arr: Uint8Array): [Types.Hash, Types.Hash] {
+export function ChallengeKeyParse(arr: Uint8Array): [Hash, Hash] {
   return [
-    arr.slice(
+    new Hash(arr.slice(
       PREFIX.length + channelSubPrefix.length,
       PREFIX.length + channelSubPrefix.length + constants.HASH_LENGTH
-    ),
-    arr.slice(
+    )),
+    new Hash(arr.slice(
       PREFIX.length + channelSubPrefix.length + constants.HASH_LENGTH + SEPERATOR.length,
       PREFIX.length + channelSubPrefix.length + constants.HASH_LENGTH + SEPERATOR.length + constants.HASH_LENGTH
-    )
+    ))
   ]
 }
 
-export function ChannelId(signatureHash: Types.Hash): Uint8Array {
+export function ChannelId(signatureHash: Hash): Uint8Array {
   const subPrefix = encoder.encode('channelId-')
 
   return allocationHelper([
@@ -52,7 +52,7 @@ export function ChannelId(signatureHash: Types.Hash): Uint8Array {
   ])
 }
 
-export function Nonce(channelId: Types.Hash, nonce: Types.Hash): Uint8Array {
+export function Nonce(channelId: Hash, nonce: Hash): Uint8Array {
   const subPrefix = encoder.encode('nonce-')
 
   return allocationHelper([
@@ -73,7 +73,7 @@ export function OnChainSecret(): Uint8Array {
   ])
 }
 
-export function Ticket(channelId: Types.Hash, challenge: Types.Hash): Uint8Array {
+export function Ticket(channelId: Hash, challenge: Hash): Uint8Array {
   const subPrefix = encoder.encode('ticket-')
 
   return allocationHelper([

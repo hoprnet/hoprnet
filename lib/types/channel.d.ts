@@ -20,7 +20,7 @@ declare class Channel extends Uint8ArrayE implements Types.Channel {
     get balance(): ChannelBalance;
     get stateCounter(): number;
     get status(): ChannelStatus;
-    get hash(): Promise<Types.Hash>;
+    get hash(): Promise<import("./hash").default>;
     static get SIZE(): number;
     static createFunded(balance: ChannelBalance): Channel;
     static createActive(balance: ChannelBalance): Channel;

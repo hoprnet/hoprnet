@@ -1,9 +1,8 @@
 import type HoprEthereum from ".."
-import type { Types } from "@hoprnet/hopr-core-connector-interface"
-import { SignedTicket } from '../types'
+import { SignedTicket, Hash } from '../types'
 
 class Ticket {
-  static async store(coreConnector: HoprEthereum, channelId: Types.Hash, signedTicket: Types.SignedTicket<any, any>): Promise<void> {
+  static async store(coreConnector: HoprEthereum, channelId: Hash, signedTicket: SignedTicket): Promise<void> {
     const { dbKeys, db } = coreConnector
 
     const key = Buffer.from(dbKeys.Ticket(channelId, signedTicket.ticket.challenge))
@@ -12,7 +11,7 @@ class Ticket {
     await db.put(key, value)
   }
 
-  static async get(coreConnector: HoprEthereum, channelId: Types.Hash): Promise<Map<string, SignedTicket>> {
+  static async get(coreConnector: HoprEthereum, channelId: Hash): Promise<Map<string, SignedTicket>> {
     const { dbKeys, db } = coreConnector
     const tickets = new Map<string, SignedTicket>()
 

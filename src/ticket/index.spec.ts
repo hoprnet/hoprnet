@@ -8,7 +8,7 @@ import pipe from 'it-pipe'
 import Web3 from 'web3'
 import { HoprToken } from '../tsc/web3/HoprToken'
 import { Await } from '../tsc/utils'
-import { Channel as ChannelType, Balance, ChannelBalance, Hash, SignedChannel } from '../types'
+import { Channel as ChannelType, Balance, ChannelBalance, Hash, SignedChannel, SignedTicket } from '../types'
 import { ChannelStatus } from '../types/channel'
 import CoreConnector from '..'
 import Channel from '../channel'
@@ -84,7 +84,7 @@ describe('test ticket generation and verification', function() {
     const preImage = randomBytes(32)
     const hash = await coreConnector.utils.hash(preImage)
 
-    const signedTicket = await channel.ticket.create(channel, new Balance(1), new Hash(hash))
+    const signedTicket = (await channel.ticket.create(channel, new Balance(1), new Hash(hash))) as SignedTicket
     assert(u8aEquals(await signedTicket.signer, coreConnector.self.publicKey), `Check that signer is recoverable`)
 
     const signedChannelCounterparty = await SignedChannel.create(coreConnector, undefined, { channel: channelType })
@@ -150,13 +150,13 @@ describe('test ticket generation and verification', function() {
 
     const hashA = await coreConnector.utils.hash(randomBytes(32))
     const hashB = await coreConnector.utils.hash(randomBytes(32))
-    const signedTicketA = await channel.ticket.create(channel, new Balance(1), new Hash(hashA))
-    const signedTicketB = await channel.ticket.create(channel, new Balance(1), new Hash(hashB))
+    const signedTicketA = (await channel.ticket.create(channel, new Balance(1), new Hash(hashA))) as SignedTicket
+    const signedTicketB = (await channel.ticket.create(channel, new Balance(1), new Hash(hashB))) as SignedTicket
 
     await Promise.all([
       Ticket.store(coreConnector, channelId, signedTicketA),
       Ticket.store(coreConnector, channelId, signedTicketB),
-      Ticket.store(coreConnector, new Uint8Array(Hash.SIZE).fill(0x00), signedTicketB)
+      Ticket.store(coreConnector, new Hash(new Uint8Array(Hash.SIZE).fill(0x00)), signedTicketB)
     ])
 
     const storedSignedTickets = await Ticket.get(coreConnector, channelId)
