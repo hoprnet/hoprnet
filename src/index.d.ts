@@ -60,7 +60,7 @@ declare interface HoprCoreConnector {
   /**
    * Returns the current native balance (ex: ETH) of the account associated with this node.
    */
-  accountNativeBalance?: Promise<Types.Balance>
+  accountNativeBalance: Promise<Types.NativeBalance>
 
   /**
    * (Static) utils to use in the connector module
