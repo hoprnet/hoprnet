@@ -8,7 +8,7 @@ import { Networks } from '../tsc/types';
 import { TransactionObject } from '../tsc/web3/types';
 export declare function isPartyA(self: Types.AccountId, counterparty: Types.AccountId): boolean;
 export declare function getParties(self: Types.AccountId, counterparty: Types.AccountId): [Types.AccountId, Types.AccountId];
-export declare function getId(self: Types.AccountId, counterparty: Types.AccountId): Promise<Uint8Array>;
+export declare function getId(self: Types.AccountId, counterparty: Types.AccountId): Promise<Types.Hash>;
 export declare function privKeyToPubKey(privKey: Uint8Array): Promise<Uint8Array>;
 export declare function pubKeyToAccountId(pubKey: Uint8Array): Promise<Types.AccountId>;
 export declare function hash(msg: Uint8Array): Promise<Types.Hash>;

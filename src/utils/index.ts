@@ -25,7 +25,7 @@ export function getParties(self: Types.AccountId, counterparty: Types.AccountId)
   }
 }
 
-export function getId(self: Types.AccountId, counterparty: Types.AccountId): Promise<Uint8Array> {
+export function getId(self: Types.AccountId, counterparty: Types.AccountId): Promise<Types.Hash> {
   return hash(Buffer.concat(getParties(self, counterparty), 2 * constants.ADDRESS_LENGTH))
 }
 
