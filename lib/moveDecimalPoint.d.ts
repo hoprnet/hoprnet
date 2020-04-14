@@ -1,2 +1,2 @@
 import BigNumber from 'bignumber.js';
-export declare const moveDecimalPoint: (amount: string | number | BigNumber, position: number) => string;
+export declare function moveDecimalPoint(amount: BigNumber | string | number, position: number): string;

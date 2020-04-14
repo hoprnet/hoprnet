@@ -1,4 +1,5 @@
 export * from './collection';
+export * from './console';
 export * from './u8a';
 export * from './constants';
 export * from './parseJSON';

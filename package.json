@@ -22,7 +22,8 @@
     "node": "^12"
   },
   "dependencies": {
-    "bignumber.js": "^9.0.0"
+    "bignumber.js": "^9.0.0",
+    "chalk": "^4.0.0"
   },
   "devDependencies": {
     "@types/mocha": "^7.0.1",
