@@ -152,7 +152,7 @@ class Channel implements IChannel<HoprEthereum> {
     // check if channel still exists
     this.status.then(status => {
       if (status === ChannelStatus.UNINITIALISED) {
-        console.log('found channel off-chain but its closed on-chain')
+        this.coreConnector.log.log('found channel off-chain but its closed on-chain')
         this.onClose()
       }
     })
@@ -458,7 +458,7 @@ class Channel implements IChannel<HoprEthereum> {
 
     if (onChain != offChain) {
       if (!onChain && offChain) {
-        console.log(`Channel ${u8aToHex(channelId)} exists off-chain but not on-chain, deleting data.`)
+        coreConnector.log(`Channel ${u8aToHex(channelId)} exists off-chain but not on-chain, deleting data.`)
         await onClose(coreConnector, counterpartyPubKey)
       } else {
         throw Error(`Channel ${u8aToHex(channelId)} exists on-chain but not off-chain.`)

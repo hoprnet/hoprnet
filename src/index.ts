@@ -1,7 +1,6 @@
 import { randomBytes } from 'crypto'
 import Web3 from './web3'
 import { LevelUp } from 'levelup'
-import BN from 'bn.js'
 import HoprChannelsAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprChannels.json'
 import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
 import HoprCoreConnector, {
@@ -12,6 +11,8 @@ import HoprCoreConnector, {
   DbKeys as IDbKeys
 } from '@hoprnet/hopr-core-connector-interface'
 import { u8aToHex, stringToU8a, u8aEquals } from '@hoprnet/hopr-utils'
+import Debug, { Debugger } from 'debug'
+import chalk from 'chalk'
 import Channel, { events } from './channel'
 import Ticket from './ticket'
 import * as dbkeys from './dbKeys'
@@ -30,6 +31,7 @@ export default class HoprEthereum implements HoprCoreConnector {
   private _stopping: Promise<void>
   private _nonce?: number
   public signTransaction: ReturnType<typeof utils.TransactionSigner>
+  public log: Debugger
 
   constructor(
     public db: LevelUp,
@@ -48,6 +50,7 @@ export default class HoprEthereum implements HoprCoreConnector {
     public hoprToken: HoprToken
   ) {
     this.signTransaction = utils.TransactionSigner(web3, self.privateKey)
+    this.log = Debug('hopr-core-ethereum')
   }
 
   readonly dbKeys = dbkeys as typeof IDbKeys
@@ -86,17 +89,19 @@ export default class HoprEthereum implements HoprCoreConnector {
   }
 
   async start() {
-    console.log('Starting connector..')
+    this.log('Starting connector..')
 
     if (typeof this._starting !== 'undefined') {
-      console.log('Connector is already starting..')
+      this.log('Connector is already starting..')
       return this._starting
     } else if (this._status === 'started') {
-      console.log('Connector has already started')
+      this.log('Connector has already started')
       return
     } else if (this._status === 'uninitialized' && typeof this._initializing === 'undefined') {
-      console.log('Connector was asked to start but state was not asked to initialize, initializing..')
-      this.initialize().catch(console.error)
+      this.log('Connector was asked to start but state was not asked to initialize, initializing..')
+      this.initialize().catch((err: Error) => {
+        this.log(chalk.red(err.message))
+      })
     }
 
     this._starting = Promise.resolve()
@@ -107,18 +112,17 @@ export default class HoprEthereum implements HoprCoreConnector {
         }
 
         this.web3.events.on('reconnected', async () => {
-          console.log('lost connection to web3, restarting..')
+          this.log(chalk.red('lost connection to web3, restarting..'))
 
           await this.stop()
           await this.start()
         })
 
         this._status = 'started'
-        console.log('Connector started')
+        this.log(chalk.green('Connector started'))
       })
-      .catch(err => {
-        console.log('Connector failed to start')
-        console.error(err)
+      .catch((err: Error) => {
+        this.log(chalk.red(`Connector failed to start: ${err.message}`))
       })
       .finally(() => {
         this._starting = undefined
@@ -128,13 +132,13 @@ export default class HoprEthereum implements HoprCoreConnector {
   }
 
   async stop() {
-    console.log('Stopping connector..')
+    this.log('Stopping connector..')
 
     if (typeof this._stopping !== 'undefined') {
-      console.log('Connector is already stopping..')
+      this.log('Connector is already stopping..')
       return this._stopping
     } else if (this._status === 'stopped') {
-      console.log('Connector has already stopped')
+      this.log('Connector has already stopped')
       return
     }
 
@@ -142,7 +146,7 @@ export default class HoprEthereum implements HoprCoreConnector {
       .then(async () => {
         // connector is starting
         if (typeof this._starting !== 'undefined') {
-          console.log("Connector will stop once it's started")
+          this.log("Connector will stop once it's started")
           // @TODO: cancel initializing & starting
           await this._starting
         }
@@ -150,11 +154,10 @@ export default class HoprEthereum implements HoprCoreConnector {
         events.clearAllEvents()
 
         this._status = 'stopped'
-        console.log('Connector stopped')
+        this.log(chalk.green('Connector stopped'))
       })
-      .catch(err => {
-        console.log('Connector failed to stop')
-        console.error(err)
+      .catch((err: Error) => {
+        this.log(chalk.red(`Connector failed to stop: ${err.message}`))
       })
       .finally(() => {
         this._stopping = undefined
@@ -172,13 +175,13 @@ export default class HoprEthereum implements HoprCoreConnector {
   }
 
   async initialize(): Promise<void> {
-    console.log('Initializing connector..')
+    this.log('Initializing connector..')
 
     if (typeof this._initializing !== 'undefined') {
-      console.log('Connector is already initializing..')
+      this.log('Connector is already initializing..')
       return this._initializing
     } else if (this._status === 'initialized') {
-      console.log('Connector has already initialized')
+      this.log('Connector has already initialized')
       return
     } else if (this._status !== 'uninitialized') {
       throw Error(`invalid status '${this._status}', could not initialize`)
@@ -201,11 +204,10 @@ export default class HoprEthereum implements HoprCoreConnector {
         })
 
         this._status = 'initialized'
-        console.log('Connector initialized')
+        this.log(chalk.green('Connector initialized'))
       })
-      .catch(err => {
-        console.log('Connector failed to initialize')
-        console.error(err)
+      .catch((err: Error) => {
+        this.log(`Connector failed to initialize: ${err.message}`)
       })
       .finally(() => {
         this._initializing = undefined
@@ -216,19 +218,34 @@ export default class HoprEthereum implements HoprCoreConnector {
 
   async initializeAccountSecret(): Promise<boolean> {
     try {
-      console.log('Initializing account secret')
+      this.log('Initializing account secret')
       const ok = await this.checkAccountSecret()
 
       if (!ok) {
-        console.log('Setting account secret..')
+        this.log('Setting account secret..')
         await this.setAccountSecret()
       }
 
-      console.log('Account secret initialized!')
+      this.log(chalk.green('Account secret initialized!'))
       return true
     } catch (err) {
-      console.log('error initializing account secret')
-      console.error(err)
+      this.log(chalk.red(`error initializing account secret: ${err.message}`))
+
+      // special message for testnet
+      if (
+        err.message.includes(`sender doesn't have enough funds to send tx`) &&
+        ['private', 'kovan'].includes(this.network)
+      ) {
+        console.log(`Congratulations - your HOPR testnet node is ready to go! 
+Please fund your Ethereum Kovan account ${chalk.yellow(
+          this.account.toHex()
+        )} with some Kovan ETH and Kovan HOPR test tokens
+You can request Kovan ETH from ${chalk.blue('https://faucet.kovan.network')}
+For Kovan HOPR test tokens visit our Telegram channel at ${chalk.blue('https://t.me/hoprnet')}
+        `)
+        process.exit()
+      }
+
       return false
     }
   }
@@ -266,7 +283,7 @@ export default class HoprEthereum implements HoprCoreConnector {
 
     if (hasOffChainSecret !== hasOnChainSecret) {
       if (hasOffChainSecret) {
-        console.log(`Key is present off-chain but not on-chain, submitting..`)
+        this.log(`Key is present off-chain but not on-chain, submitting..`)
         await utils.waitForConfirmation(
           (
             await this.signTransaction(this.hoprChannels.methods.setHashedSecret(u8aToHex(offChainSecret)), {
@@ -314,8 +331,7 @@ export default class HoprEthereum implements HoprCoreConnector {
 
       return true
     } catch (err) {
-      console.log('error checking web3')
-      console.error(err)
+      this.log(chalk.red(`error checking web3: ${err.message}`))
       return false
     }
   }
@@ -349,7 +365,6 @@ export default class HoprEthereum implements HoprCoreConnector {
     await web3.isConnected()
 
     const account = new types.AccountId(address)
-    console.log(`using ethereum address ${account.toHex()}`)
     const network = await utils.getNetworkId(web3)
 
     if (typeof config.CHANNELS_ADDRESSES[network] === 'undefined') {
@@ -378,9 +393,12 @@ export default class HoprEthereum implements HoprCoreConnector {
       hoprChannels,
       hoprToken
     )
+    coreConnector.log(`using ethereum address ${account.toHex()}`)
 
     // begin initializing
-    coreConnector.initialize().catch(console.error)
+    coreConnector.initialize().catch((err: Error) => {
+      coreConnector.log(chalk.red(`coreConnector.initialize error: ${err.message}`))
+    })
     coreConnector.start()
 
     return coreConnector
