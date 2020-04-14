@@ -21,7 +21,9 @@
     "yarn": "^1.22",
     "node": "^12"
   },
-  "dependencies": {},
+  "dependencies": {
+    "bignumber.js": "^9.0.0"
+  },
   "devDependencies": {
     "@types/mocha": "^7.0.1",
     "@types/node": "^12.12.8",
