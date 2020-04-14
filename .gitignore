@@ -15,3 +15,7 @@ yarn-error.log
 
 # typechain types generated
 src/tsc/web3
+
+# Exclude built tests
+lib/**/*.spec.js
+lib/**/*.spec.d.ts
