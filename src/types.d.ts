@@ -13,7 +13,7 @@ declare namespace Balance {
   const SIZE: number
 
   /**
-   * Abbreviation of the currency, e.g. `ETH`
+   * Abbreviation of the currency, e.g. `HOPR`
    */
   const SYMBOL: string
 
