@@ -476,7 +476,7 @@ class Channel implements IChannel<HoprEthereum> {
   ): Promise<void> {
     try {
       if ((await coreConnector.accountBalance).lt(amount)) {
-        throw Error('Insufficient funds.')
+        throw Error('Insufficient HOPR tokens.')
       }
 
       const allowance = await coreConnector.hoprToken.methods
