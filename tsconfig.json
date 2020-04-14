@@ -11,4 +11,5 @@
     "experimentalDecorators": true
   },
   "include": ["src/**/*"],
+  "exclude": ["lib"]
 }

@@ -152,10 +152,10 @@
   dependencies:
     "@types/node" "*"
 
-"@types/secp256k1@^3.5.3":
-  version "3.5.3"
-  resolved "https://registry.yarnpkg.com/@types/secp256k1/-/secp256k1-3.5.3.tgz#57ebfdd19d476de3ff13758cf7b6d9e420d54c19"
-  integrity sha512-NGcsPDR0P+Q71O63e2ayshmiZGAwCOa/cLJzOIuhOiDvmbvrCIiVtEpqdCJGogG92Bnr6tw/6lqVBsRMEl15OQ==
+"@types/secp256k1@^4.0.0":
+  version "4.0.0"
+  resolved "https://registry.yarnpkg.com/@types/secp256k1/-/secp256k1-4.0.0.tgz#af6d924b1456075eb1ffd869d4ebc2fac1f92b6c"
+  integrity sha512-a6q0Ru6Ht2Ol2xjXU11vpwj4o2JdhvEGyDeok0wh6G63sl088xqPJpOJ6BmIZUkXYQL5jAmbdVE/GS9kNYNUbg==
   dependencies:
     "@types/node" "*"
 
