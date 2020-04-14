@@ -32,7 +32,7 @@
 
 "@hoprnet/hopr-core-connector-interface@https://github.com/hoprnet/hopr-core-connector-interface.git":
   version "1.0.0"
-  resolved "https://github.com/hoprnet/hopr-core-connector-interface.git#5e61fc7158483504b6f33e6cb1474e714135961b"
+  resolved "https://github.com/hoprnet/hopr-core-connector-interface.git#c9b00e6f9e92a44c249f96cc7a79f02a177ad594"
 
 "@hoprnet/hopr-demo-seeds@https://github.com/hoprnet/hopr-demo-seeds.git":
   version "1.0.0"
@@ -49,7 +49,9 @@
 
 "@hoprnet/hopr-utils@https://github.com/hoprnet/hopr-utils.git":
   version "0.0.1"
-  resolved "https://github.com/hoprnet/hopr-utils.git#b7ed69638a19629edcd20a2677fd5d7dc7b99d69"
+  resolved "https://github.com/hoprnet/hopr-utils.git#a9c2c720699e00052f56c24cd238c3a4249e4d33"
+  dependencies:
+    bignumber.js "^9.0.0"
 
 "@openzeppelin/contracts@^2.4.0":
   version "2.5.0"

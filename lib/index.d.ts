@@ -45,7 +45,7 @@ export default class HoprEthereum implements HoprCoreConnector {
     readonly CHAIN_NAME = "HOPR on Ethereum";
     get nonce(): Promise<number>;
     get accountBalance(): Promise<types.Balance>;
-    get accountNativeBalance(): Promise<types.Balance>;
+    get accountNativeBalance(): Promise<types.NativeBalance>;
     start(): Promise<void>;
     stop(): Promise<void>;
     get started(): boolean;
