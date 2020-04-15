@@ -1,10 +1,16 @@
-# Introduction
+# HOPR net
+
+HOPR is a privacy-preserving messaging protocol that incentivizes users to participate in the network. It provides privacy by relaying messages via several relay nodes to the recipient. Relay nodes are getting paid via payment channels for their services.
+
+## hopr-ethereum
 
 Hopr-ethereum contains the on-chain logic that is used to process payments for [HOPR.network](https://hopr.network) on the Ethereum blockchain.
 
-Table of Contents:
+## Table of Contents
 
-- [Introduction](#introduction)
+- [HOPR net](#hopr-net)
+  - [hopr-ethereum](#hopr-ethereum)
+  - [Table of Contents](#table-of-contents)
 - [Requirements](#requirements)
 - [Install](#install)
 - [Build](#build)
