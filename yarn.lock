@@ -32,15 +32,15 @@
 
 "@hoprnet/hopr-core-connector-interface@https://github.com/hoprnet/hopr-core-connector-interface.git":
   version "1.0.0"
-  resolved "https://github.com/hoprnet/hopr-core-connector-interface.git#68520250968318ac732774e4f4a976a3a57f3f7a"
+  resolved "https://github.com/hoprnet/hopr-core-connector-interface.git#c563ead4b0419f10a3fa6c2c30f43f13a779e124"
 
 "@hoprnet/hopr-demo-seeds@https://github.com/hoprnet/hopr-demo-seeds.git":
   version "1.0.0"
-  resolved "https://github.com/hoprnet/hopr-demo-seeds.git#086ac33cc1ec85a6d59b0549e7c09f5804612320"
+  resolved "https://github.com/hoprnet/hopr-demo-seeds.git#5b02899a02e3270e9a695bff4fae78abba5d6d25"
 
 "@hoprnet/hopr-ethereum@https://github.com/hoprnet/hopr-ethereum.git#develop":
   version "0.0.1"
-  resolved "https://github.com/hoprnet/hopr-ethereum.git#ef58b812a81bacba2a27e2424c81b61f916420b4"
+  resolved "https://github.com/hoprnet/hopr-ethereum.git#54c62b9173fd7f17e0f81d45c4e6702f51158e65"
   dependencies:
     "@hoprnet/hopr-utils" "https://github.com/hoprnet/hopr-utils.git"
     "@openzeppelin/contracts" "^2.4.0"
@@ -49,7 +49,7 @@
 
 "@hoprnet/hopr-utils@https://github.com/hoprnet/hopr-utils.git":
   version "0.0.1"
-  resolved "https://github.com/hoprnet/hopr-utils.git#1060cd40a21a6975970ccf19f099e4238297a328"
+  resolved "https://github.com/hoprnet/hopr-utils.git#a8b5a5aa6dba033ce60cd6287c457bdb0a69c82d"
   dependencies:
     bignumber.js "^9.0.0"
     chalk "^4.0.0"
@@ -550,9 +550,9 @@ buffer-xor@^1.0.3:
   integrity sha1-JuYe0UIvtw3ULm42cp7VHYVf6Nk=
 
 buffer@^5.0.5, buffer@^5.2.1, buffer@^5.4.3, buffer@^5.5.0:
-  version "5.5.0"
-  resolved "https://registry.yarnpkg.com/buffer/-/buffer-5.5.0.tgz#9c3caa3d623c33dd1c7ef584b89b88bf9c9bc1ce"
-  integrity sha512-9FTEDjLjwoAkEwyMGDjYJQN2gfRgOKBKRfiglhvibGbpeeU/pQn1bJxQqm32OD/AIeEuHxU9roxXxg34Byp/Ww==
+  version "5.6.0"
+  resolved "https://registry.yarnpkg.com/buffer/-/buffer-5.6.0.tgz#a31749dc7d81d84db08abf937b6b8c4033f62786"
+  integrity sha512-/gDYp/UtU0eA1ys8bOs9J6a+E/KWIY+DZ+Q2WESNUA0jFRsJOc0SNUO6xJ5SGA1xueg3NL65W6s+NY5l9cunuw==
   dependencies:
     base64-js "^1.0.2"
     ieee754 "^1.1.4"

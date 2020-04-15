@@ -4,11 +4,9 @@ import { LevelUp } from 'levelup'
 import HoprChannelsAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprChannels.json'
 import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
 import HoprCoreConnector, {
-  Utils as IUtils,
   Types as ITypes,
   Channel as IChannel,
-  Constants as IConstants,
-  DbKeys as IDbKeys
+  Constants as IConstants
 } from '@hoprnet/hopr-core-connector-interface'
 import { u8aToHex, stringToU8a, u8aEquals } from '@hoprnet/hopr-utils'
 import Debug, { Debugger } from 'debug'
@@ -53,10 +51,10 @@ export default class HoprEthereum implements HoprCoreConnector {
     this.log = Debug('hopr-core-ethereum')
   }
 
-  readonly dbKeys = dbkeys as typeof IDbKeys
-  readonly utils = utils as typeof IUtils
+  readonly dbKeys = dbkeys
+  readonly utils = utils
   readonly types = types as typeof ITypes
-  readonly constants = constants as typeof IConstants
+  readonly constants = constants
   readonly channel = Channel as typeof IChannel
   readonly ticket = Ticket
   readonly CHAIN_NAME = 'HOPR on Ethereum'

@@ -1,10 +1,12 @@
 import Web3 from './web3';
 import { LevelUp } from 'levelup';
-import HoprCoreConnector, { Utils as IUtils, Types as ITypes, Channel as IChannel, Constants as IConstants, DbKeys as IDbKeys } from '@hoprnet/hopr-core-connector-interface';
+import HoprCoreConnector, { Types as ITypes, Channel as IChannel, Constants as IConstants } from '@hoprnet/hopr-core-connector-interface';
 import { Debugger } from 'debug';
 import Ticket from './ticket';
+import * as dbkeys from './dbKeys';
 import * as types from './types';
 import * as utils from './utils';
+import * as constants from './constants';
 import { Networks } from './tsc/types';
 import { HoprChannels } from './tsc/web3/HoprChannels';
 import { HoprToken } from './tsc/web3/HoprToken';
@@ -38,10 +40,10 @@ export default class HoprEthereum implements HoprCoreConnector {
             publicKey?: Uint8Array;
         };
     }, account: types.AccountId, web3: Web3, network: Networks, hoprChannels: HoprChannels, hoprToken: HoprToken);
-    readonly dbKeys: typeof IDbKeys;
-    readonly utils: typeof IUtils;
+    readonly dbKeys: typeof dbkeys;
+    readonly utils: typeof utils;
     readonly types: typeof ITypes;
-    readonly constants: typeof IConstants;
+    readonly constants: typeof constants;
     readonly channel: typeof IChannel;
     readonly ticket: typeof Ticket;
     readonly CHAIN_NAME = "HOPR on Ethereum";
