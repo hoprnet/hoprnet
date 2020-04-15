@@ -36,7 +36,7 @@
 
 "@hoprnet/hopr-core-ethereum@https://github.com/hoprnet/hopr-core-ethereum.git#develop":
   version "0.0.1"
-  resolved "https://github.com/hoprnet/hopr-core-ethereum.git#080083dcf26724b70bddf7775f2c8a55826fb157"
+  resolved "https://github.com/hoprnet/hopr-core-ethereum.git#12720b50e6fd237ddcd4cb82ff4245d1273a3c36"
   dependencies:
     "@hoprnet/hopr-core-connector-interface" "https://github.com/hoprnet/hopr-core-connector-interface.git"
     "@hoprnet/hopr-demo-seeds" "https://github.com/hoprnet/hopr-demo-seeds.git"
