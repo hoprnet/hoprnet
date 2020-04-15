@@ -12,3 +12,7 @@
 yarn-error.log
 
 **/.DS_Store
+
+# Exclude built tests
+lib/**/*.spec.js
+lib/**/*.spec.d.ts

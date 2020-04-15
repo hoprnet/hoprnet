@@ -9,13 +9,12 @@
     "clean": "rm -rf ./lib",
     "test": "mocha",
     "dev": "yarn clean && tsc -w",
-    "build": "yarn clean && tsc -d -p ."
+    "build": "yarn clean && tsc -p . --noEmit false"
   },
   "files": [
     "!**/*.spec.ts",
     "src/",
-    "lib/",
-    "hopr.png"
+    "lib/"
   ],
   "engines": {
     "yarn": "^1.22",
