@@ -13,20 +13,20 @@ export declare function isPartyA<ConcreteAccountId extends AccountId>(self: Conc
  * @param counterparty id of the counterparty
  * @param props additional arguments
  */
-export declare function getId<ConcreteAccountId extends AccountId, ConcreteHash extends Hash>(self: ConcreteAccountId, counterparty: ConcreteAccountId, ...props: any[]): Promise<ConcreteHash>
+export declare function getId<ConcreteAccountId extends AccountId>(self: ConcreteAccountId, counterparty: ConcreteAccountId, ...props: any[]): Promise<Hash>
 
 /**
  * Converts a public key into an on-chain AccountId (e.g. an Ethereum address).
  * @param pubkey a public key
  * @param args additional arguments
  */
-export declare function pubKeyToAccountId<ConcreteAccountId extends AccountId>(pubkey: Uint8Array, ...args: any[]): Promise<ConcreteAccountId>
+export declare function pubKeyToAccountId(pubkey: Uint8Array, ...args: any[]): Promise<AccountId>
 
 /**
  * Uses the native on-chain hash function to compute a hash value of `msg`.
  * @param msg message to hash
  */
-export declare function hash<ConcreteHash extends Hash>(msg: Uint8Array): Promise<ConcreteHash>
+export declare function hash(msg: Uint8Array): Promise<Hash>
 
 /**
  * Uses the native on-chain signature scheme to create an on-chain verifiable signature.
@@ -34,7 +34,7 @@ export declare function hash<ConcreteHash extends Hash>(msg: Uint8Array): Promis
  * @param privKey private key of the signer
  * @param pubKey public key of the signer
  */
-export declare function sign<ConcreteSignature extends Signature>(msg: Uint8Array, privKey: Uint8Array, pubKey: Uint8Array): Promise<ConcreteSignature>
+export declare function sign(msg: Uint8Array, privKey: Uint8Array, pubKey: Uint8Array): Promise<Signature>
 
 /**
  * Uses the native on-chain signature scheme to check a signature for its validity.
@@ -55,4 +55,4 @@ export declare function verify<ConcreteSignature extends Signature>(msg: Uint8Ar
  * fromUnit('1', 'ether', 'wei') == '1000000000000000000'
  * ```
  */
-export declare function convertUnit<ConcreteBalance extends Balance>(amount: ConcreteBalance, sourceUnit: string, targetUnit: string): ConcreteBalance
+export declare function convertUnit<ConcreteBalance extends Balance>(amount: ConcreteBalance, sourceUnit: string, targetUnit: string): Balance
