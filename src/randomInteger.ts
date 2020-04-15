@@ -20,8 +20,8 @@ export function randomInteger(start: number, end?: number): number {
     }
   }
 
-  // Projects interval from [start, end] to [0, end - start]
-  let interval = end != null ? end - start : start
+  // Projects interval from [start, end) to [0, end - start)
+  let interval = end == null ? start : end - start
 
   if (interval >= Math.pow(2, 32)) {
     throw Error(`Not implemented`)
@@ -44,12 +44,12 @@ export function randomInteger(start: number, end?: number): number {
 
   let result = 0
   for (let i = 0; i < byteAmount; i++) {
-    if (result + (1 << i) < interval) {
+    if ((result | (1 << i)) < interval) {
       if (nextBit() == 1) {
         result |= 1 << i
       }
     }
   }
 
-  return end != null ? start + result : result
+  return end == null ? result : start + result
 }

@@ -4,21 +4,21 @@ import { randomInteger } from './randomInteger'
 describe('testing random-number generator', function() {
   let ATTEMPTS = 100
   it(`should output values between '0' and '23'`, function() {
-    let result = []
+    let result: number
     for (let i = 0; i < ATTEMPTS; i++) {
-      result.push(randomInteger(23))
-    }
+      result = randomInteger(23)
 
-    assert(result.every(value => 0 <= value && value < 23))
+      assert(0 <= result && result < 23)
+    }
   })
 
   it(`should output values between '31' and '61'`, function() {
-    let result = []
+    let result: number
     for (let i = 0; i < ATTEMPTS; i++) {
-      result.push(randomInteger(31, 61))
-    }
+      result = randomInteger(31, 61)
 
-    assert(result.every(value => 31 <= value && value < 61))
+      assert(31 <= result && result < 61)
+    }
   })
 
   it('should throw error for falsy interval input', function() {
