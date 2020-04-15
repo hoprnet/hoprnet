@@ -1,3 +1,7 @@
+import type { Types } from '@hoprnet/hopr-core-connector-interface'
+import type { Networks } from '../tsc/types'
+import type { TransactionObject } from '../tsc/web3/types'
+
 import assert from 'assert'
 import { publicKeyConvert, publicKeyCreate, ecdsaSign, ecdsaRecover, ecdsaVerify } from 'secp256k1'
 // @ts-ignore
@@ -6,12 +10,10 @@ import { PromiEvent, TransactionReceipt, TransactionConfig } from 'web3-core'
 import { BlockTransactionString } from 'web3-eth'
 import Web3 from 'web3'
 import BN from 'bn.js'
-import type { Types } from '@hoprnet/hopr-core-connector-interface'
+import Debug from 'debug'
 import { AccountId, Signature, Hash } from '../types'
 import { ChannelStatus } from '../types/channel'
 import * as constants from '../constants'
-import { Networks } from '../tsc/types'
-import { TransactionObject } from '../tsc/web3/types'
 
 export function isPartyA(self: Types.AccountId, counterparty: Types.AccountId): boolean {
   return Buffer.compare(self, counterparty) < 0
@@ -91,8 +93,17 @@ export async function waitForConfirmation<T extends PromiEvent<any>>(event: T) {
       .on('receipt', receipt => {
         resolve(receipt)
       })
-      .on('error', error => {
-        reject(error)
+      .on("error", err => {
+        const outOfEth = err.message.includes(`sender doesn't have enough funds to send tx`)
+        const outOfHopr = err.message.includes(`SafeERC20:`)
+
+        if (outOfEth) {
+          return reject(Error(constants.ERRORS.OOF_ETH))
+        } else if (outOfHopr) {
+          return reject(Error(constants.ERRORS.OOF_HOPR))
+        } else {
+          return reject(err)
+        }
       })
   })
 }
@@ -199,7 +210,7 @@ export function stateCountToStatus(stateCount: number): ChannelStatus {
 export function TransactionSigner(web3: Web3, privKey: Uint8Array) {
   const privKeyStr = new Hash(privKey).toHex()
 
-  return async function sendTransaction<T extends any>(
+  return async function signTransaction<T extends any>(
     // return of our contract method in web3.Contract instance
     txObject: TransactionObject<T>,
     // config put in .send
@@ -229,4 +240,8 @@ export function TransactionSigner(web3: Web3, privKey: Uint8Array) {
       transactionHash: signedTransaction.transactionHash
     }
   }
+}
+
+export function Log(suffixes: string[] = []) {
+  return Debug(["hopr-core-ethereum"].concat(suffixes).join(":"))
 }

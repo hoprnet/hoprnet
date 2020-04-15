@@ -19,6 +19,7 @@ declare class CustomWeb3 extends Web3 implements Web3 {
     private readonly ops;
     private reconnecting;
     private manualDisconnect;
+    private log;
     events: IEventEmitter;
     constructor(uri: string, ops?: {
         reconnection: boolean;
