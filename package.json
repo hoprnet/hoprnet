@@ -79,7 +79,6 @@
     "@hoprnet/hopr-core-ethereum": "https://github.com/hoprnet/hopr-core-ethereum.git#develop",
     "@hoprnet/hopr-core-polkadot": "https://github.com/hoprnet/hopr-core-polkadot.git",
     "@hoprnet/hopr-demo-seeds": "https://github.com/hoprnet/hopr-demo-seeds.git",
-    "@hoprnet/hopr-types": "https://github.com/hoprnet/hopr-types.git",
     "@types/bn.js": "^4.11.6",
     "@types/bs58": "^4.0.1",
     "@types/clear": "^0.1.0",
