@@ -94,7 +94,7 @@ export async function waitForConfirmation<T extends PromiEvent<any>>(event: T) {
         resolve(receipt)
       })
       .on("error", err => {
-        const outOfEth = err.message.includes(`sender doesn't have enough funds to send tx`)
+        const outOfEth = err.message.includes(`enough funds`)
         const outOfHopr = err.message.includes(`SafeERC20:`)
 
         if (outOfEth) {
