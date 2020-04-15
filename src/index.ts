@@ -11,7 +11,6 @@ import HoprCoreConnector, {
   DbKeys as IDbKeys
 } from '@hoprnet/hopr-core-connector-interface'
 import { u8aToHex, stringToU8a, u8aEquals } from '@hoprnet/hopr-utils'
-import Debug, { Debugger } from 'debug'
 import chalk from 'chalk'
 import Channel, { events } from './channel'
 import Ticket from './ticket'
@@ -31,7 +30,7 @@ export default class HoprEthereum implements HoprCoreConnector {
   private _stopping: Promise<void>
   private _nonce?: number
   public signTransaction: ReturnType<typeof utils.TransactionSigner>
-  public log: Debugger
+  public log: ReturnType<typeof utils['Log']>
 
   constructor(
     public db: LevelUp,
@@ -50,7 +49,7 @@ export default class HoprEthereum implements HoprCoreConnector {
     public hoprToken: HoprToken
   ) {
     this.signTransaction = utils.TransactionSigner(web3, self.privateKey)
-    this.log = Debug('hopr-core-ethereum')
+    this.log = utils.Log()
   }
 
   readonly dbKeys = dbkeys as typeof IDbKeys
@@ -233,7 +232,7 @@ export default class HoprEthereum implements HoprCoreConnector {
 
       // special message for testnet
       if (
-        err.message.includes(`sender doesn't have enough funds to send tx`) &&
+        [constants.ERRORS.OOF_ETH, constants.ERRORS.OOF_HOPR].includes(err.message) &&
         ['private', 'kovan'].includes(this.network)
       ) {
         console.log(`Congratulations - your HOPR testnet node is ready to go! 

@@ -1,12 +1,13 @@
+import type { Types } from '@hoprnet/hopr-core-connector-interface';
+import type { Networks } from '../tsc/types';
+import type { TransactionObject } from '../tsc/web3/types';
 import { PromiEvent, TransactionReceipt, TransactionConfig } from 'web3-core';
 import { BlockTransactionString } from 'web3-eth';
 import Web3 from 'web3';
 import BN from 'bn.js';
-import type { Types } from '@hoprnet/hopr-core-connector-interface';
+import Debug from 'debug';
 import { AccountId, Signature, Hash } from '../types';
 import { ChannelStatus } from '../types/channel';
-import { Networks } from '../tsc/types';
-import { TransactionObject } from '../tsc/web3/types';
 export declare function isPartyA(self: Types.AccountId, counterparty: Types.AccountId): boolean;
 export declare function getParties<ConcreteAccountId extends Types.AccountId>(self: ConcreteAccountId, counterparty: ConcreteAccountId): [ConcreteAccountId, ConcreteAccountId];
 export declare function getId(self: Types.AccountId, counterparty: Types.AccountId): Promise<Hash>;
@@ -32,3 +33,4 @@ export declare function TransactionSigner(web3: Web3, privKey: Uint8Array): <T e
     send: () => PromiEvent<TransactionReceipt>;
     transactionHash: string;
 }>;
+export declare function Log(suffixes?: string[]): Debug.Debugger;

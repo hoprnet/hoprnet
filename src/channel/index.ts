@@ -1,7 +1,6 @@
 import type { Channel as IChannel, Types } from '@hoprnet/hopr-core-connector-interface'
 import { u8aToHex, u8aXOR, stringToU8a, u8aEquals } from "@hoprnet/hopr-utils"
 import BN from 'bn.js'
-// import Web3 from "web3"
 import {
   SignedChannel,
   Moment,
@@ -17,7 +16,7 @@ import {
 } from '../types'
 import { ChannelStatus } from '../types/channel'
 import * as events from './events'
-import { HASH_LENGTH } from '../constants'
+import { HASH_LENGTH, ERRORS } from '../constants'
 import { waitForConfirmation, waitFor, hash, getId, stateCountToStatus } from '../utils'
 import type HoprEthereum from '..'
 
@@ -476,7 +475,7 @@ class Channel implements IChannel<HoprEthereum> {
   ): Promise<void> {
     try {
       if ((await coreConnector.accountBalance).lt(amount)) {
-        throw Error('Insufficient HOPR tokens.')
+        throw Error(ERRORS.OOF_HOPR)
       }
 
       const allowance = await coreConnector.hoprToken.methods

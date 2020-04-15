@@ -1,7 +1,6 @@
 import Web3 from './web3';
 import { LevelUp } from 'levelup';
 import HoprCoreConnector, { Utils as IUtils, Types as ITypes, Channel as IChannel, Constants as IConstants, DbKeys as IDbKeys } from '@hoprnet/hopr-core-connector-interface';
-import { Debugger } from 'debug';
 import Ticket from './ticket';
 import * as types from './types';
 import * as utils from './utils';
@@ -29,7 +28,7 @@ export default class HoprEthereum implements HoprCoreConnector {
     private _stopping;
     private _nonce?;
     signTransaction: ReturnType<typeof utils.TransactionSigner>;
-    log: Debugger;
+    log: ReturnType<typeof utils['Log']>;
     constructor(db: LevelUp, self: {
         privateKey: Uint8Array;
         publicKey: Uint8Array;

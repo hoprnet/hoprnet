@@ -1,7 +1,7 @@
 import EventEmitter from 'events'
 import Web3 from 'web3'
 import { WebsocketProvider } from 'web3-core'
-import { wait } from '../utils'
+import { wait, Log } from '../utils'
 
 export enum Events {
   'connected' = 'connected',
@@ -24,6 +24,7 @@ interface IEventEmitter extends EventEmitter {
 class CustomWeb3 extends Web3 implements Web3 {
   private reconnecting = false
   private manualDisconnect = false
+  private log = Log(['web3'])
   public events: IEventEmitter
 
   constructor(
@@ -44,7 +45,7 @@ class CustomWeb3 extends Web3 implements Web3 {
   }
 
   private disconnected(): Promise<boolean> {
-    console.log('web3 disconnected!')
+    this.log('web3 disconnected!')
     this.events.emit('disconnected')
 
     if (this.manualDisconnect) return
@@ -59,7 +60,7 @@ class CustomWeb3 extends Web3 implements Web3 {
       if (this.reconnecting) return false
 
       this.reconnecting = true
-      console.log('web3 reconnecting..')
+      this.log('web3 reconnecting..')
 
       await wait(this.ops.reconnectionDelay)
 
