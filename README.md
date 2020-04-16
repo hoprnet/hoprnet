@@ -37,7 +37,7 @@ Note that the documentation is under active development and does not always repr
 The current implementation of HOPR is in JavaScript so you need:
 
 - [`Node.js`](https://nodejs.org/en/download/) >= 12
-- [`yarn`](https://yarnpkg.com/en/docs/install) >= 1.19.0
+- [`yarn`](https://yarnpkg.com/en/docs/install) >= 1.22.0
 
 You might need to setup further operating system dependent, please refer to the wiki links below for more details:
 
