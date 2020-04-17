@@ -8,8 +8,12 @@ import type { AbstractInteraction, Duplex } from '../abstractInteraction'
 
 import { PROTOCOL_CRAWLING } from '../../constants'
 import type PeerInfo from 'peer-info'
+import AbortController from 'abort-controller'
 
 import { CrawlResponse, CrawlStatus } from '../../messages'
+
+const TWO_SECONDS = 2 * 1000
+const CRAWL_TIMEOUT = TWO_SECONDS
 
 class Crawler<Chain extends HoprCoreConnector> implements AbstractInteraction<Chain> {
   protocols: string[] = [PROTOCOL_CRAWLING]
@@ -31,9 +35,26 @@ class Crawler<Chain extends HoprCoreConnector> implements AbstractInteraction<Ch
       stream: Duplex
       protocol: string
     }
+
+    const abort = new AbortController()
+    const signal = abort.signal
+
+    const timeout = setTimeout(() => {
+      abort.abort()
+    }, CRAWL_TIMEOUT)
+
     try {
-      struct = await this.node.dialProtocol(counterparty, this.protocols[0]).catch(async (_: Error) => {
-        return this.node.peerRouting.findPeer(counterparty.id).then((peerInfo: PeerInfo) => this.node.dialProtocol(peerInfo, this.protocols[0]))
+      struct = await this.node.dialProtocol(counterparty, this.protocols[0], { signal }).catch(async (_: Error) => {
+        const peerInfo = await this.node.peerRouting.findPeer(counterparty.id)
+
+        try {
+          let result = await this.node.dialProtocol(peerInfo, this.protocols[0], { signal })
+          clearTimeout(timeout)
+          return result
+        } catch (err) {
+          clearTimeout(timeout)
+          throw err
+        }
       })
     } catch (err) {
       this.node.log(`Could not ask node ${counterparty.id.toB58String()} for other nodes. Error was: ${chalk.red(err.message)}.`)
