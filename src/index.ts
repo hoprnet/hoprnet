@@ -278,6 +278,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
       await Promise.all(promises)
     } catch (err) {
       this.log(`Could not send message. Error was: ${chalk.red(err.message)}`)
+      throw err
     }
   }
 

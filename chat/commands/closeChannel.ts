@@ -2,11 +2,9 @@ import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { Channel as ChannelInstance } from '@hoprnet/hopr-core-connector-interface'
 import type AbstractCommand from './abstractCommand'
 import type Hopr from '../../src'
-
-import BN from 'bn.js'
-
 import type PeerId from 'peer-id'
 
+import BN from 'bn.js'
 import chalk from 'chalk'
 
 import { checkPeerIdInput } from '../utils'

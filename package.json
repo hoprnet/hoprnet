@@ -38,6 +38,7 @@
     "fundAccounts": "node ./node_modules/@hoprnet/hopr-core-ethereum/lib/scripts/fundAccounts.js"
   },
   "dependencies": {
+    "@hoprnet/hopr-utils": "https://github.com/hoprnet/hopr-utils.git",
     "@nodeutils/defaults-deep": "~1.1.0",
     "abort-controller": "^3.0.0",
     "bignumber.js": "^9.0.0",
@@ -109,7 +110,7 @@
   },
   "prettier": {
     "parser": "typescript",
-    "printWidth": 160,
+    "printWidth": 100,
     "semi": false,
     "singleQuote": true,
     "quoteProps": "consistent",

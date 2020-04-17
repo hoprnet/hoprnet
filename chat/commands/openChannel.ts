@@ -6,7 +6,6 @@ import BigNumber from 'bignumber.js'
 import BN from 'bn.js'
 
 import type Hopr from '../../src'
-
 import type PeerId from 'peer-id'
 
 import chalk from 'chalk'
