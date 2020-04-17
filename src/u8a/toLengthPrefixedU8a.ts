@@ -1,6 +1,5 @@
 import { toU8a } from './toU8a'
 import { u8aConcat } from './concat'
-import { PACKET_SIZE } from '../constants'
 
 import { LENGTH_PREFIX_LENGTH } from '.'
 /**
@@ -16,7 +15,7 @@ export function toLengthPrefixedU8a(arg: Uint8Array, additionalPadding?: Uint8Ar
       throw Error(
         `Cannot create length-prefixed ${Uint8Array.name} because encoded ${Uint8Array.name} would be ${
           length - arg.length + LENGTH_PREFIX_LENGTH + additionalPadding.length
-        } bytes greater than packet size of ${PACKET_SIZE} bytes.`
+        } bytes greater than desired size of ${length} bytes.`
       )
     }
 
@@ -35,7 +34,7 @@ export function toLengthPrefixedU8a(arg: Uint8Array, additionalPadding?: Uint8Ar
       throw Error(
         `Cannot create length-prefixed ${Uint8Array.name} because encoded ${Uint8Array.name} would be ${
           length - arg.length + LENGTH_PREFIX_LENGTH
-        } bytes greater than packet size of ${PACKET_SIZE} bytes.`
+        } bytes greater than desired size of ${length} bytes.`
       )
     }
 

@@ -14,9 +14,9 @@ describe('test length-prefixed to u8a', function() {
 
     assert.deepEqual(lengthPrefixedToU8a(toLengthPrefixedU8a(new Uint8Array([1, 2, 3, 4]))), new Uint8Array([1, 2, 3, 4]))
 
-    assert.throws(() => lengthPrefixedToU8a(new Uint8Array([]), null, 1))
+    assert.throws(() => lengthPrefixedToU8a(new Uint8Array([]), undefined, 1))
 
-    assert.deepEqual(lengthPrefixedToU8a(new Uint8Array([0, 0, 0, 1, 1, 0]), null, 6), new Uint8Array([1]))
+    assert.deepEqual(lengthPrefixedToU8a(new Uint8Array([0, 0, 0, 1, 1, 0]), undefined, 6), new Uint8Array([1]))
   })
 
   it('should convert a length-prefixed u8a with additional padding to u8a', function() {
@@ -39,6 +39,6 @@ describe('test length-prefixed to u8a', function() {
 
     assert.throws(() => lengthPrefixedToU8a(new Uint8Array([]), new Uint8Array([1]), 2))
 
-    assert.deepEqual(lengthPrefixedToU8a(new Uint8Array([0, 0, 0, 1, 1, 1, 0]), null, 7), new Uint8Array([1])), new Uint8Array([1])
+    assert.deepEqual(lengthPrefixedToU8a(new Uint8Array([0, 0, 0, 1, 1, 1, 0]), undefined, 7), new Uint8Array([1])), new Uint8Array([1])
   })
 })

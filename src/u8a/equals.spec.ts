@@ -27,8 +27,10 @@ describe('test u8a equals', function() {
       `random data should be with high probability not equal`
     )
 
+    // @ts-ignore
     assert.throws(() => u8aEquals(new Uint8Array(), undefined), `check undefined b`)
 
+    // @ts-ignore
     assert.throws(() => u8aEquals(new Uint8Array(), new Uint8Array(), undefined), `check undefined rest`)
   })
 })

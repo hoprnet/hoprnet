@@ -29,15 +29,16 @@ export function randomInteger(start: number, end?: number): number {
 
   const byteAmount = 32 - Math.clz32(interval - 1)
 
-  let bytes = new Uint8Array(randomBytes(Math.max(byteAmount / 8, 1)))
+  let bytes = randomBytes(Math.max(byteAmount / 8, 1))
   let bitCounter = 0
+  let byteCounter = 0
 
   function nextBit(): number {
-    let result = bytes[0] % 2
-    bytes[0] = bytes[0] >> 1
+    let result = bytes[byteCounter] % 2
+    bytes[byteCounter] = bytes[byteCounter] >> 1
     if (++bitCounter == 8) {
       bitCounter = 0
-      bytes = bytes.subarray(1)
+      byteCounter++
     }
     return result
   }

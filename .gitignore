@@ -16,3 +16,6 @@ yarn-error.log
 # Exclude built tests
 lib/**/*.spec.js
 lib/**/*.spec.d.ts
+
+# Exclude filesystem test
+src/fs/filesystem_test
