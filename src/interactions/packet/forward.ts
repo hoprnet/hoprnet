@@ -13,7 +13,8 @@ import pipe from 'it-pipe'
 
 import { deriveTicketKeyBlinding } from '../../messages/packet/header'
 
-import { getTokens, Token, randomInteger, u8aToHex } from '../../utils'
+import { randomInteger, u8aToHex } from '@hoprnet/hopr-utils'
+import { getTokens, Token } from '../../utils'
 
 const MAX_PARALLEL_JOBS = 20
 

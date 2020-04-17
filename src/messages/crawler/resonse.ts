@@ -4,7 +4,8 @@ import PeerInfo from 'peer-info'
 
 import { encode, decode } from 'rlp'
 
-import { u8aConcat, u8aToNumber, toU8a, serializePeerInfo, deserializePeerInfo } from '../../utils'
+import { serializePeerInfo, deserializePeerInfo } from '../../utils'
+import { u8aConcat, u8aToNumber, toU8a } from '@hoprnet/hopr-utils'
 
 const ENUM_LENGTH = 1
 

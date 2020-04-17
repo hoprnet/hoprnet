@@ -8,7 +8,8 @@ import chalk from 'chalk'
 import type PeerId from 'peer-id'
 import type PeerInfo from 'peer-info'
 
-import { checkPeerIdInput, encodeMessage, isBootstrapNode, clearString } from '../utils'
+import { checkPeerIdInput, encodeMessage, isBootstrapNode } from '../utils'
+import { clearString } from '@hoprnet/hopr-utils'
 import { pubKeyToPeerId } from '../../src/utils'
 import { MAX_HOPS } from '../../src/constants'
 

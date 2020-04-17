@@ -10,7 +10,7 @@ import {
   KEYPAIR_CIPHER_KEY_LENGTH,
   KEYPAIR_MESSAGE_DIGEST_ALGORITHM
 } from '.'
-import { u8aEquals } from '../../u8a'
+import { u8aEquals } from '@hoprnet/hopr-utils'
 
 /**
  * Deserializes a serialized key pair and returns a peerId.

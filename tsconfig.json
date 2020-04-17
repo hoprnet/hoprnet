@@ -5,8 +5,8 @@
     "lib": ["es2020", "dom"],
     "module": "commonjs",
     "target": "es2019",
-    "declaration": true
+    "declaration": true,
+    "noEmit": true
   },
-  "include": ["src/**/*.ts", "chat/**/*.ts", "node_modules/@hoprnet/hopr-types/types/**/*.d.ts"],
-  "exclude": ["**/*.spec.ts"]
+  "include": ["src/**/*.ts", "chat/**/*.ts"]
 }

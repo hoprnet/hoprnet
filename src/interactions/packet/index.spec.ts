@@ -30,7 +30,7 @@ import BN from 'bn.js'
 import HoprPolkadot, { Types } from '@hoprnet/hopr-core-polkadot'
 import { randomBytes } from 'crypto'
 import * as DbKeys from '../../db_keys'
-import { stringToU8a, u8aEquals, randomInteger } from '../../utils'
+import { stringToU8a, u8aEquals, randomInteger } from '@hoprnet/hopr-utils'
 
 import assert from 'assert'
 import Multiaddr from 'multiaddr'

@@ -1,13 +1,13 @@
 import assert from 'assert'
-import { PACKET_SIZE, MAX_HOPS } from '../../constants'
+import { PACKET_SIZE } from '../../constants'
 import Message, { PADDING } from './message'
-import { u8aConcat, u8aEquals, LENGTH_PREFIX_LENGTH } from '../../utils'
+import { u8aConcat, u8aEquals, LENGTH_PREFIX_LENGTH } from '@hoprnet/hopr-utils'
 import { randomBytes } from 'crypto'
 import { PRIVATE_KEY_LENGTH } from './header/parameters'
 import secp256k1 from 'secp256k1'
 
-describe('test class that encapsulates (encrypted and padded) messages', function() {
-  it('should create a Message object and encrypt / decrypt it', function() {
+describe('test messages', function () {
+  it('should create a Message object and encrypt / decrypt it', function () {
     const msg = Message.createPlain('test')
 
     const testMessage = new TextEncoder().encode('test')
@@ -29,18 +29,21 @@ describe('test class that encapsulates (encrypted and padded) messages', functio
 
     const secrets = []
 
+    let msgCopy: Message
     for (let i = 0; i < 2; i++) {
       secrets.push(secp256k1.publicKeyCreate(randomBytes(PRIVATE_KEY_LENGTH)))
+
+      msgCopy = msg.getCopy()
+
+      msgCopy.onionEncrypt(secrets)
+
+      secrets.forEach((secret: Uint8Array) => {
+        msgCopy.decrypt(secret)
+      })
+
+      msgCopy.encrypted = false
+
+      assert(u8aEquals(msgCopy.plaintext, testMessage))
     }
-
-    msg.onionEncrypt(secrets)
-
-    secrets.forEach((secret: Uint8Array) => {
-      msg.decrypt(secret)
-    })
-
-    msg.encrypted = false
-
-    assert(u8aEquals(msg.plaintext, testMessage))
   })
 })

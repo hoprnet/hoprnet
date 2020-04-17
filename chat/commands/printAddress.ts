@@ -4,7 +4,7 @@ import type AbstractCommand from './abstractCommand'
 
 import chalk from 'chalk'
 
-import { u8aToHex } from '../../src/utils'
+import { u8aToHex } from '@hoprnet/hopr-utils'
 
 export default class PrintAddress implements AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {}

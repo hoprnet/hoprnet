@@ -13,7 +13,7 @@ import { Acknowledgement } from '../../messages/acknowledgement'
 import EventEmitter from 'events'
 
 import { PROTOCOL_ACKNOWLEDGEMENT } from '../../constants'
-import { u8aToHex } from '../../utils'
+import { u8aToHex } from '@hoprnet/hopr-utils'
 
 class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector> extends EventEmitter implements AbstractInteraction<Chain> {
   protocols: string[] = [PROTOCOL_ACKNOWLEDGEMENT]

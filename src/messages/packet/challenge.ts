@@ -4,7 +4,7 @@ import PeerId from 'peer-id'
 import HoprCoreConnector, { Types } from '@hoprnet/hopr-core-connector-interface'
 
 import BN from 'bn.js'
-import { u8aConcat } from '../../utils'
+import { u8aConcat } from '@hoprnet/hopr-utils'
 
 const KEY_LENGTH = 32
 
@@ -44,7 +44,7 @@ export class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
   get challengeSignature(): Types.Signature {
     return this.paymentChannels.types.Signature.create({
       bytes: this.buffer,
-      offset: this.byteOffset
+      offset: this.byteOffset,
     })
   }
 
@@ -78,7 +78,7 @@ export class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
 
     return new Challenge<Chain>(this.paymentChannels, {
       bytes: arrCopy.buffer,
-      offset: arrCopy.byteOffset
+      offset: arrCopy.byteOffset,
     })
   }
 
@@ -134,7 +134,7 @@ export class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
 
     const challenge = new Challenge(hoprCoreConnector, {
       bytes: new Uint8Array(Challenge.SIZE(hoprCoreConnector)).buffer,
-      offset: 0
+      offset: 0,
     })
 
     challenge._hashedKey = hashedKey

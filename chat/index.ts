@@ -19,7 +19,8 @@ import type { HoprOptions } from '../src'
 import figlet from 'figlet'
 import clear from 'clear'
 
-import { parseOptions, clearString } from './utils'
+import { parseOptions } from './utils'
+import { clearString } from '@hoprnet/hopr-utils'
 import Commands from './commands'
 
 const SPLIT_OPERAND_QUERY_REGEX: RegExp = /([\w\-]+)(?:\s+)?([\w\s\-.]+)?/

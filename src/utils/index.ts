@@ -1,84 +1,11 @@
-export * from './collection'
 export * from './crypto'
-export * from './fs'
-export * from './general'
 export * from './libp2p'
 export * from './persistence'
-export * from './u8a'
 export * from './concurrency'
-
-const { promisify } = require('util')
-import { promises as fsPromise, Stats, readFileSync } from 'fs'
-
-// const { publicKeyConvert } = require('secp256k1')
-const chalk = require('chalk')
-
-// ==========================
-// General methods
-// ==========================
-
-// module.exports.hash = (buf: Buffer) => {
-//     return Buffer.from(sha3(buf).replace(/0x/, ''), 'hex')
-// }
-// /**
-//  * Generate deep Copy of an instance
-//  * @param {} instance instance of T
-//  * @param {} Class T
-//  */
-// module.exports.deepCopy = (instance, Class) => {
-//     if (typeof instance.toBuffer !== 'function' || !['function', 'number'].includes(typeof Class.SIZE) || typeof Class.fromBuffer !== 'function')
-//         throw Error('Incompatible class and / or invalid instance.')
-
-//     const buf = Buffer.alloc(Class.SIZE).fill(instance.toBuffer(), 0, Class.SIZE)
-
-//     return Class.fromBuffer(buf)
-// }
-
-// module.exports.log = (peerId, msg) => console.log(`['${chalk.blue(peerId.toB58String())}']: ${msg}`)
-// ==========================
-// Buffer methods
-// ==========================
-/**
- * Bitwise XOR of two Buffers.
- *
- * @param  {Buffer} buf1 first Buffer
- * @param  {Buffer} buf2 second Buffer
- *
- * @returns {Buffer} @param buf1 ^ @param buf2
- */
-// module.exports.bufferXOR = (buf1, buf2) => {
-//     if (!Buffer.isBuffer(buf1) || !Buffer.isBuffer(buf2)) throw Error(`Input values have to be provided as Buffers. Got ${typeof buf1} and ${typeof buf2}`)
-
-//     if (buf1.length !== buf2.length) throw Error(`Buffer must have the same length. Got buffers of length ${buf1.length} and ${buf2.length}.`)
-
-//     const result = Buffer.alloc(buf1.length)
-
-//     for (let i = 0; i < buf1.length; i = i + 1) {
-//         result[i] = buf1[i] ^ buf2[i]
-//     }
-//     return result
-// }
-
-// module.exports.numberToBuffer = (i, length) => {
-//     if (i < 0) throw Error('Not implemented!')
-
-//     return Buffer.from(i.toString(16).padStart(length * 2, '0'), 'hex')
-// }
-
-// module.exports.bufferToNumber = buf => {
-//     if (!Buffer.isBuffer(buf) || buf.length === 0) throw Error('Invalid input value. Expected a non-empty buffer.')
-
-//     return parseInt(buf.toString('hex'), 16)
-// }
-
-// ==========================
-// libp2p methods
-// ==========================
 
 // ==========================
 // Ganache-core methods   <-- ONLY FOR TESTING
 // ==========================
-const ONE_MINUTE = 60 * 1000
 /**
  * Mine a single block and increase the timestamp by the given amount.
  *

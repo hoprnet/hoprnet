@@ -1,5 +1,5 @@
 import { createCipheriv } from 'crypto'
-import { u8aConcat, toU8a } from '../u8a'
+import { u8aConcat, toU8a } from '@hoprnet/hopr-utils'
 
 const BLOCK_LENGTH = 16
 const KEY_LENGTH = BLOCK_LENGTH

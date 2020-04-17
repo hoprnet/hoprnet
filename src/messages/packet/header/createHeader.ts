@@ -1,7 +1,8 @@
 import secp256k1 from 'secp256k1'
 import crypto from 'crypto'
 
-import { PRG, u8aXOR, u8aToHex, u8aConcat } from '../../../utils'
+import { u8aXOR, u8aToHex, u8aConcat } from '@hoprnet/hopr-utils'
+import { PRG } from '../../../utils'
 import { MAX_HOPS } from '../../../constants'
 
 import { Header, BETA_LENGTH, deriveBlinding, derivePRGParameters, deriveTicketKey, deriveTicketKeyBlinding, deriveTicketLastKey, createMAC } from './index'

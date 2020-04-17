@@ -6,7 +6,7 @@ import Hopr from '../../../'
 import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import { randomBytes } from 'crypto'
 import secp256k1 from 'secp256k1'
-import { u8aEquals } from '../../../utils'
+import { u8aEquals } from '@hoprnet/hopr-utils'
 
 describe('test creation & transformation of a header', async function() {
   async function createAndDecomposeHeader(

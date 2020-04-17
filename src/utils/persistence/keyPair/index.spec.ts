@@ -6,8 +6,8 @@ import PeerId from 'peer-id'
 
 import { randomBytes } from 'crypto'
 import assert from 'assert'
-import { randomInteger } from '../../general'
-import { u8aEquals } from '../../u8a'
+
+import { randomInteger, u8aEquals } from '@hoprnet/hopr-utils'
 
 describe('test serialisation and deserialisation of encrypted keypair', function() {
   it('should serialize and deserialize a keypair', async function() {

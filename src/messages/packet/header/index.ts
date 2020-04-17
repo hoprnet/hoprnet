@@ -4,8 +4,9 @@ import crypto from 'crypto'
 
 import { createHeader as createHeaderHelper } from './createHeader'
 import Hopr from '../../..'
+import { u8aXOR, u8aConcat, u8aEquals, u8aToHex} from '@hoprnet/hopr-utils'
 
-import { PRP, PRG, u8aXOR, u8aConcat, u8aEquals, u8aToHex } from '../../../utils'
+import { PRP, PRG } from '../../../utils'
 import { MAX_HOPS } from '../../../constants'
 
 import {

@@ -7,6 +7,7 @@ export default class Message extends Uint8Array {
     }, encrypted: boolean);
     static get SIZE(): number;
     subarray(begin?: number, end?: number): Uint8Array;
+    getCopy(): Message;
     get plaintext(): Uint8Array;
     get ciphertext(): Uint8Array;
     static createEncrypted(msg: Uint8Array): Message;

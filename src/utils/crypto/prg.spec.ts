@@ -1,10 +1,9 @@
 import { PRG } from './prg'
 import { randomBytes } from 'crypto'
 import assert from 'assert'
-import { u8aEquals } from '../u8a'
-import { randomInteger } from '../general'
+import { randomInteger, u8aEquals } from '@hoprnet/hopr-utils'
 
-describe('Hopr Polkadot', async function() {
+describe('Test Pseudo-Random Generator', async function() {
   it('should create a digest', function() {
     const [key, iv] = [randomBytes(PRG.KEY_LENGTH), randomBytes(PRG.IV_LENGTH)]
 

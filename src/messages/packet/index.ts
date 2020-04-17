@@ -8,7 +8,8 @@ const RELAY_FEE = 10
 function fromWei(arg: any, unit: any) {
   return arg.toString()
 }
-import { pubKeyToPeerId, u8aXOR, u8aConcat, u8aEquals } from '../../utils'
+import { pubKeyToPeerId } from '../../utils'
+import { u8aXOR, u8aConcat, u8aEquals } from '@hoprnet/hopr-utils'
 
 import { Header, deriveTicketKey, deriveTagParameters } from './header'
 import { Challenge } from './challenge'

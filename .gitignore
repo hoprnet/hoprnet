@@ -13,3 +13,7 @@ yarn-error.log
 
 # Exclude db dir
 db
+
+# Exclude built test
+lib/**/*.spec.js
+lib/**/*.spec.d.ts

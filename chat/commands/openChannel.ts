@@ -11,8 +11,9 @@ import type PeerId from 'peer-id'
 
 import chalk from 'chalk'
 
-import { checkPeerIdInput, startDelayedInterval, isBootstrapNode, clearString } from '../utils'
-import { u8aToHex, pubKeyToPeerId } from '../../src/utils'
+import { checkPeerIdInput, isBootstrapNode } from '../utils'
+import { clearString, startDelayedInterval, u8aToHex } from '@hoprnet/hopr-utils'
+import { pubKeyToPeerId } from '../../src/utils'
 
 import readline from 'readline'
 

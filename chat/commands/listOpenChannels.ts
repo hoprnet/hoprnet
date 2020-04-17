@@ -6,7 +6,8 @@ import type Hopr from '../../src'
 
 import AbstractCommand from './abstractCommand'
 
-import { u8aToHex, pubKeyToPeerId } from '../../src/utils'
+import { pubKeyToPeerId } from '../../src/utils'
+import { u8aToHex } from '@hoprnet/hopr-utils'
 
 export default class ListOpenChannels implements AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {}

@@ -1,7 +1,7 @@
 import chalk from 'chalk'
 import { encode, decode } from 'rlp'
 
-import { u8aToHex } from '../../src/utils'
+import { u8aToHex } from '@hoprnet/hopr-utils'
 
 /**
  * Adds the current timestamp to the message in order to measure the latency.

@@ -1,9 +1,9 @@
 import { PRP } from './prp'
-import { u8aEquals } from '../u8a'
+import { u8aEquals } from '@hoprnet/hopr-utils'
 import assert from 'assert'
 import { randomBytes } from 'crypto'
 
-describe(`test Pseudo-Random Generator`, function() {
+describe(`test Pseudo-Random Permutation`, function() {
   it(`should 'encrypt' and 'decrypt' a U8a`, function() {
     const prp = PRP.createPRP(randomBytes(PRP.KEY_LENGTH), randomBytes(PRP.IV_LENGTH))
 

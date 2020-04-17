@@ -1,7 +1,8 @@
 import { PACKET_SIZE } from '../../constants'
 import { deriveCipherParameters } from './header'
 
-import { PRP, toLengthPrefixedU8a, lengthPrefixedToU8a } from '../../utils'
+import { PRP } from '../../utils'
+import { toLengthPrefixedU8a, lengthPrefixedToU8a } from '@hoprnet/hopr-utils'
 
 export const PADDING = new TextEncoder().encode('PADDING')
 
@@ -24,6 +25,17 @@ export default class Message extends Uint8Array {
     return new Uint8Array(this.buffer, begin + this.byteOffset, end - begin)
   }
 
+  getCopy(): Message {
+    const arrCopy = new Uint8Array(Message.SIZE)
+
+    arrCopy.set(this.subarray())
+
+    return new Message({
+      bytes: arrCopy.buffer,
+      offset: arrCopy.byteOffset
+    }, this.encrypted)
+  }
+
   get plaintext(): Uint8Array {
     if (this.encrypted) {
       throw Error(`Cannot read encrypted data.`)
@@ -44,7 +56,7 @@ export default class Message extends Uint8Array {
     return new Message(
       {
         bytes: msg.buffer,
-        offset: 0
+        offset: 0,
       },
       true
     )
@@ -58,7 +70,7 @@ export default class Message extends Uint8Array {
     return new Message(
       {
         bytes: toLengthPrefixedU8a(msg, PADDING, PACKET_SIZE),
-        offset: 0
+        offset: 0,
       },
       false
     )

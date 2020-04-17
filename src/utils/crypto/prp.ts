@@ -1,5 +1,5 @@
 import { createCipheriv, createHmac } from 'crypto'
-import { u8aXOR } from '../u8a/xor'
+import { u8aXOR } from '@hoprnet/hopr-utils'
 
 const INTERMEDIATE_KEY_LENGTH = 32
 const INTERMEDIATE_IV_LENGTH = 16

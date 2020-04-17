@@ -18,7 +18,8 @@ import { PACKET_SIZE, MAX_HOPS } from './constants'
 
 import { Network } from './network'
 
-import { randomSubset, addPubKey, createDirectoryIfNotExists, getPeerInfo, u8aToHex } from './utils'
+import { addPubKey, getPeerInfo } from './utils'
+import { randomSubset, createDirectoryIfNotExists, u8aToHex } from '@hoprnet/hopr-utils'
 
 import levelup, { LevelUp } from 'levelup'
 import leveldown from 'leveldown'
@@ -338,7 +339,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
       db_dir += `node`
     }
 
-    createDirectoryIfNotExists(db_dir)
+    createDirectoryIfNotExists(`${process.cwd()}/${db_dir}`)
 
     return levelup(leveldown(db_dir))
   }
