@@ -72,7 +72,7 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
           })
 
           if (this.tokens.length > 0) {
-            const token = this.tokens.pop() as number
+            const token = this.tokens.pop() as Token
             if (this.promises[token] != null) {
               /**
                * @TODO remove this and make sure that the Promise is always
@@ -92,6 +92,7 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
     )
   }
 
+  // @TODO convert this into iterative function
   async handlePacket(packet: Packet<Chain>, token: number): Promise<void> {
     const oldChallenge = await packet.forwardTransform()
 

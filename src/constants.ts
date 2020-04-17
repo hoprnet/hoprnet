@@ -35,14 +35,4 @@ export const PROTOCOL_WEBRTC_TURN_REQUEST = `${BASESTRING}/webrtc_turn_request`
 
 export const PROTOCOL_WEBRTC_TURN = `${BASESTRING}/webrtc_turn`
 
-export const STAKE_GAS_AMOUNT = '70000'
-
-export const UNSTAKE_GAS_AMOUNT = '40000'
-
-export const CREATE_GAS_AMOUNT = '150000'
-
-export const FUND_GAS_AMOUNT = '50000'
-
-export const DEFAULT_GAS_AMOUNT = '600000'
-
-export const ETH_SEND_GAS_AMOUNT = '21000'
+export const PROTOCOL_FORWARD = `${BASESTRING}/forward`

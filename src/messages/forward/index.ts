@@ -12,6 +12,7 @@ class ForwardPacket extends Uint8Array {
     },
     struct?: {
       destination: PeerId
+      sender: PeerId
       payload?: Uint8Array
     }
   ) {
@@ -23,7 +24,7 @@ class ForwardPacket extends Uint8Array {
         throw Error('Invalid peerId.')
       }
     } else if (arr == null && struct != null) {
-      super(u8aConcat(struct.destination.marshalPubKey(), struct.payload || new Uint8Array()))
+      super(u8aConcat(struct.destination.marshalPubKey(), struct.sender.marshalPubKey(), struct.payload || new Uint8Array()))
     }
   }
 
@@ -35,8 +36,12 @@ class ForwardPacket extends Uint8Array {
     return this.subarray(0, PUBLIC_KEY_LENGTH)
   }
 
+  get sender() {
+    return this.subarray(PUBLIC_KEY_LENGTH, PUBLIC_KEY_LENGTH + PUBLIC_KEY_LENGTH)
+  }
+
   get payload() {
-    return this.subarray(PUBLIC_KEY_LENGTH)
+    return this.subarray(PUBLIC_KEY_LENGTH + PUBLIC_KEY_LENGTH)
   }
 }
 

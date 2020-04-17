@@ -7,10 +7,14 @@ import { u8aEquals } from '@hoprnet/hopr-utils'
 
 describe('test forward packet', function () {
   it('should create a forward packet', async function () {
-    const destination = await PeerId.create({ keyType: 'secp256k1' })
+    const [destination, sender] = [
+      await PeerId.create({ keyType: 'secp256k1' }),
+      await PeerId.create({ keyType: 'secp256k1' }),
+    ]
     const payload = randomBytes(41)
 
     const packet = new ForwardPacket(undefined, {
+      sender,
       destination,
       payload,
     })
@@ -20,7 +24,19 @@ describe('test forward packet', function () {
       offset: packet.byteOffset,
     })
 
-    assert((await PeerId.createFromPubKey(Buffer.from(serializedPacket.destination))).isEqual(destination), `Recovered peerId must be the same as before.`)
+    assert(
+      (await PeerId.createFromPubKey(Buffer.from(serializedPacket.destination))).isEqual(
+        destination
+      ),
+      `Recovered peerId must be the same as before.`
+    )
+
+    assert(
+        (await PeerId.createFromPubKey(Buffer.from(serializedPacket.sender))).isEqual(
+          sender
+        ),
+        `Recovered peerId must be the same as before.`
+      )
 
     assert(u8aEquals(payload, serializedPacket.payload))
   })

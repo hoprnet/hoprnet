@@ -53,6 +53,7 @@
     "getopts": "~2.2.4",
     "ip-address": "^6.1.0",
     "it-pipe": "^1.1.0",
+    "it-pushable": "^1.4.0",
     "leveldown": "~5.6.0",
     "levelup": "~4.4.0",
     "libp2p": "~0.27.4",
