@@ -8,7 +8,7 @@ import pipe from 'it-pipe'
 import Web3 from 'web3'
 import { HoprToken } from '../tsc/web3/HoprToken'
 import { Await } from '../tsc/utils'
-import { Channel as ChannelType, Balance, ChannelBalance, Hash, SignedChannel, SignedTicket } from '../types'
+import { AccountId, Channel as ChannelType, Balance, ChannelBalance, Hash, SignedChannel, SignedTicket } from '../types'
 import { ChannelStatus } from '../types/channel'
 import CoreConnector from '..'
 import Channel from '../channel'
@@ -45,8 +45,8 @@ describe('test ticket generation and verification', function() {
 
     const channelId = new Hash(
       await coreConnector.utils.getId(
-        coreConnector.self.onChainKeyPair.publicKey,
-        counterpartysCoreConnector.self.onChainKeyPair.publicKey
+        new AccountId(coreConnector.self.onChainKeyPair.publicKey),
+        new AccountId(counterpartysCoreConnector.self.onChainKeyPair.publicKey)
       )
     )
 
@@ -112,8 +112,8 @@ describe('test ticket generation and verification', function() {
 
     const channelId = new Hash(
       await coreConnector.utils.getId(
-        coreConnector.self.onChainKeyPair.publicKey,
-        counterpartysCoreConnector.self.onChainKeyPair.publicKey
+        new AccountId(coreConnector.self.onChainKeyPair.publicKey),
+        new AccountId(counterpartysCoreConnector.self.onChainKeyPair.publicKey)
       )
     )
 

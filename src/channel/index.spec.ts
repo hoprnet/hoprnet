@@ -8,7 +8,7 @@ import pipe from 'it-pipe'
 import Web3 from 'web3'
 import { HoprToken } from '../tsc/web3/HoprToken'
 import { Await } from '../tsc/utils'
-import { Channel as ChannelType, Balance, ChannelBalance, Hash, SignedChannel } from '../types'
+import { AccountId, Channel as ChannelType, Balance, ChannelBalance, Hash, SignedChannel } from '../types'
 import { ChannelStatus } from '../types/channel'
 import CoreConnector from '..'
 import Channel from '.'
@@ -45,8 +45,8 @@ describe('test ticket generation and verification', function() {
     })
 
     const channelId = await coreConnector.utils.getId(
-      coreConnector.self.onChainKeyPair.publicKey,
-      counterpartysCoreConnector.self.onChainKeyPair.publicKey
+      new AccountId(coreConnector.self.onChainKeyPair.publicKey),
+      new AccountId(counterpartysCoreConnector.self.onChainKeyPair.publicKey)
     )
 
     const signedChannel = await SignedChannel.create(counterpartysCoreConnector, undefined, { channel: channelType })

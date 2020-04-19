@@ -41,7 +41,7 @@ const onceOpen = async (coreConnector: HoprEthereum, self: AccountId, counterpar
   }>((resolve, reject) => {
     const onData = async (data: any) => {
       const { opener, counterParty } = data.returnValues
-      const _channelId = await coreConnector.utils.getId(stringToU8a(opener), stringToU8a(counterParty))
+      const _channelId = await coreConnector.utils.getId(new AccountId(stringToU8a(opener)), new AccountId(stringToU8a(counterParty)))
 
       if (!u8aEquals(_channelId, channelId)) {
         return
@@ -90,7 +90,7 @@ const onceClosed = async (coreConnector: HoprEthereum, self: AccountId, counterp
   }>((resolve, reject) => {
     const onData = async (data: any) => {
       const { closer, counterParty } = data.returnValues
-      const _channelId = await coreConnector.utils.getId(stringToU8a(closer), stringToU8a(counterParty))
+      const _channelId = await coreConnector.utils.getId(new AccountId(stringToU8a(closer)), new AccountId(stringToU8a(counterParty)))
 
       if (!u8aEquals(_channelId, channelId)) {
         return

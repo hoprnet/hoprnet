@@ -1,4 +1,3 @@
-import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import type { Networks } from '../tsc/types'
 import type { TransactionObject } from '../tsc/web3/types'
 
@@ -15,11 +14,11 @@ import { AccountId, Signature, Hash } from '../types'
 import { ChannelStatus } from '../types/channel'
 import * as constants from '../constants'
 
-export function isPartyA(self: Types.AccountId, counterparty: Types.AccountId): boolean {
+export function isPartyA(self: AccountId, counterparty: AccountId): boolean {
   return Buffer.compare(self, counterparty) < 0
 }
 
-export function getParties<ConcreteAccountId extends Types.AccountId>(self: ConcreteAccountId, counterparty: ConcreteAccountId): [ConcreteAccountId, ConcreteAccountId] {
+export function getParties(self: AccountId, counterparty: AccountId): [AccountId, AccountId] {
   if (isPartyA(self, counterparty)) {
     return [self, counterparty]
   } else {
@@ -27,7 +26,7 @@ export function getParties<ConcreteAccountId extends Types.AccountId>(self: Conc
   }
 }
 
-export function getId(self: Types.AccountId, counterparty: Types.AccountId): Promise<Hash> {
+export function getId(self: AccountId, counterparty: AccountId): Promise<Hash> {
   return hash(Buffer.concat(getParties(self, counterparty), 2 * constants.ADDRESS_LENGTH))
 }
 
@@ -69,11 +68,11 @@ export async function sign(msg: Uint8Array, privKey: Uint8Array): Promise<Signat
   return response
 }
 
-export async function signer(msg: Uint8Array, signature: Types.Signature): Promise<Uint8Array> {
+export async function signer(msg: Uint8Array, signature: Signature): Promise<Uint8Array> {
   return ecdsaRecover(signature.signature, signature.recovery, msg)
 }
 
-export async function verify(msg: Uint8Array, signature: Types.Signature, pubKey: Uint8Array): Promise<boolean> {
+export async function verify(msg: Uint8Array, signature: Signature, pubKey: Uint8Array): Promise<boolean> {
   return ecdsaVerify(signature.signature, msg, pubKey)
 }
 
