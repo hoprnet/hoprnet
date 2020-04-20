@@ -29,7 +29,7 @@ class ForwardPacket extends Uint8Array {
   }
 
   subarray(begin: number = 0, end?: number): Uint8Array {
-    return new Uint8Array(this.buffer, begin, end != null ? end - begin : undefined)
+    return new Uint8Array(this.buffer, begin + this.byteOffset, end != null ? end - begin : undefined)
   }
 
   get destination() {

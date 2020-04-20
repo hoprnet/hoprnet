@@ -56,7 +56,7 @@ describe('check heartbeat mechanism', function() {
     return (node as unknown) as Hopr<HoprCoreConnector>
   }
 
-  it('dispatch a heartbeat', async function() {
+  it('should dispatch a heartbeat', async function() {
     const [Alice, Bob] = await Promise.all([generateNode(), generateNode()])
 
     await Promise.all([

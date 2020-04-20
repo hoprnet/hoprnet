@@ -83,7 +83,7 @@ class ForwardPacketInteraction<Chain extends HoprCoreConnector>
     let abort: AbortController
     let signal: AbortSignal
 
-    let timeout: NodeJS.Timeout
+    let timeout: any
 
     while (this.queue.length > 0) {
       forwardPacket = this.queue.pop() as ForwardPacket
@@ -169,6 +169,8 @@ class ForwardPacketInteraction<Chain extends HoprCoreConnector>
 
     const connectionEnd = pushable<Uint8Array>()
     this.connectionEnds.set(counterpartyPeerId.toB58String(), connectionEnd)
+
+    let self = this
     return {
       source: connectionEnd,
       sink: async function (source: any) {
@@ -180,7 +182,7 @@ class ForwardPacketInteraction<Chain extends HoprCoreConnector>
               for await (let msg of source) {
                 yield new ForwardPacket(undefined, {
                   destination: counterpartyPeerId,
-                  sender: this.node.peerInfo.id.toB58String(),
+                  sender: self.node.peerInfo.id,
                   payload: msg.slice(),
                 })
               }

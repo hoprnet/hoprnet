@@ -13,12 +13,14 @@ import pipe from 'it-pipe'
 
 import { deriveTicketKeyBlinding } from '../../messages/packet/header'
 
-import { randomInteger, u8aToHex } from '@hoprnet/hopr-utils'
+import { randomInteger } from '@hoprnet/hopr-utils'
 import { getTokens, Token } from '../../utils'
+import { Challenge } from '../../messages/packet/challenge'
 
 const MAX_PARALLEL_JOBS = 20
 
-class PacketForwardInteraction<Chain extends HoprCoreConnector> implements AbstractInteraction<Chain> {
+class PacketForwardInteraction<Chain extends HoprCoreConnector>
+  implements AbstractInteraction<Chain> {
   private tokens: Token[] = getTokens(MAX_PARALLEL_JOBS)
   private queue: Packet<Chain>[] = []
   private promises: Promise<void>[] = []
@@ -36,16 +38,19 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
     }
 
     try {
-      struct = await this.node.dialProtocol(counterparty, this.protocols[0]).catch(async (err: Error) => {
-        return this.node.peerRouting
-          .findPeer(PeerInfo.isPeerInfo(counterparty) ? counterparty.id : counterparty)
-          .then((peerInfo: PeerInfo) => this.node.dialProtocol(peerInfo, this.protocols[0]))
-      })
+      struct = await this.node
+        .dialProtocol(counterparty, this.protocols[0])
+        .catch(async (err: Error) => {
+          return this.node.peerRouting
+            .findPeer(PeerInfo.isPeerInfo(counterparty) ? counterparty.id : counterparty)
+            .then((peerInfo: PeerInfo) => this.node.dialProtocol(peerInfo, this.protocols[0]))
+        })
     } catch (err) {
       this.node.log(
-        `Could not transfer packet to ${(PeerInfo.isPeerInfo(counterparty) ? counterparty.id : counterparty).toB58String()}. Error was: ${chalk.red(
-          err.message
-        )}.`
+        `Could not transfer packet to ${(PeerInfo.isPeerInfo(counterparty)
+          ? counterparty.id
+          : counterparty
+        ).toB58String()}. Error was: ${chalk.red(err.message)}.`
       )
 
       return
@@ -68,8 +73,10 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
           const arr = msg.slice()
           packet = new Packet(this.node, {
             bytes: arr.buffer,
-            offset: arr.byteOffset
+            offset: arr.byteOffset,
           })
+
+          this.queue.push(packet)
 
           if (this.tokens.length > 0) {
             const token = this.tokens.pop() as Token
@@ -80,62 +87,65 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
                */
               await this.promises[token]
 
-              this.promises[token] = this.handlePacket(packet, token)
+              this.promises[token] = this.handlePacket(token)
             } else {
-              this.handlePacket(packet, token)
+              this.handlePacket(token)
             }
-          } else {
-            this.queue.push(packet)
           }
         }
       }
     )
   }
 
-  // @TODO convert this into iterative function
-  async handlePacket(packet: Packet<Chain>, token: number): Promise<void> {
-    const oldChallenge = await packet.forwardTransform()
+  async handlePacket(token: number): Promise<void> {
+    let packet: Packet<Chain>
+    let oldChallenge: Challenge<Chain>
 
-    const [sender, target] = await Promise.all([
-      /* prettier-ignore */
-      packet.getSenderPeerId(),
-      packet.getTargetPeerId()
-    ])
-
-    // Acknowledgement
-    setImmediate(async () => {
-      const ack = new Acknowledgement(this.node.paymentChannels, undefined, {
-        key: deriveTicketKeyBlinding(packet.header.derivedSecret),
-        challenge: oldChallenge
-      })
-
-      this.node.interactions.packet.acknowledgment.interact(sender, await ack.sign(this.node.peerInfo.id))
-    })
-
-    if (this.node.peerInfo.id.isEqual(target)) {
-      this.node.output(packet.message.plaintext)
-    } else {
-      await this.interact(target, packet)
-    }
+    let sender: PeerId, target: PeerId
 
     // Check for unserviced packets
-    if (this.queue.length > 0) {
+    while (this.queue.length > 0) {
       // Pick a random one
       const index = randomInteger(0, this.queue.length)
 
       if (index == this.queue.length - 1) {
-        return this.handlePacket(this.queue.pop() as Packet<Chain>, token)
+        packet = this.queue.pop() as Packet<Chain>
+      } else {
+        packet = this.queue[index]
+
+        this.queue[index] = this.queue.pop() as Packet<Chain>
       }
 
-      const nextPacket = this.queue[index]
+      oldChallenge = await packet.forwardTransform()
 
-      this.queue[index] = this.queue.pop() as Packet<Chain>
+      /* prettier-ignore */
+      ;[sender, target] = await Promise.all([
+        /* prettier-ignore */
+        packet.getSenderPeerId(),
+        packet.getTargetPeerId(),
+      ])
 
-      return this.handlePacket(nextPacket, token)
+      // dispatch acknowledgement
+      setImmediate(async () => {
+        const ack = new Acknowledgement(this.node.paymentChannels, undefined, {
+          key: deriveTicketKeyBlinding(packet.header.derivedSecret),
+          challenge: oldChallenge,
+        })
+
+        this.node.interactions.packet.acknowledgment.interact(
+          sender,
+          await ack.sign(this.node.peerInfo.id)
+        )
+      })
+
+      if (this.node.peerInfo.id.isEqual(target)) {
+        this.node.output(packet.message.plaintext)
+      } else {
+        await this.interact(target, packet)
+      }
     }
 
     this.tokens.push(token)
-    return
   }
 }
 

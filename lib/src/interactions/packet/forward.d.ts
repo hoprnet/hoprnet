@@ -15,6 +15,6 @@ declare class PacketForwardInteraction<Chain extends HoprCoreConnector> implemen
     handler(struct: {
         stream: any;
     }): void;
-    handlePacket(packet: Packet<Chain>, token: number): Promise<void>;
+    handlePacket(token: number): Promise<void>;
 }
 export { PacketForwardInteraction };
