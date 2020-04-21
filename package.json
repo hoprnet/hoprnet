@@ -10,7 +10,7 @@
     "test": "mocha",
     "dev": "yarn clean && yarn build:types && tsc -w",
     "build:types": "typechain --target web3-v1 --outDir './src/tsc/web3' './node_modules/@hoprnet/hopr-ethereum/build/extracted/abis/*.json'",
-    "build": "yarn clean && yarn build:types && tsc -p . --noEmit false",
+    "build": "yarn clean && yarn build:types && tsc && cp -R ./src/tsc/web3 ./lib/tsc/web3",
     "fundAccounts": "ts-node ./src/scripts/fundAccounts.ts"
   },
   "files": [
@@ -56,7 +56,7 @@
   },
   "husky": {
     "hooks": {
-      "pre-commit": "yarn build && cp -R ./src/tsc/web3 ./lib/tsc/web3 && git add ./lib"
+      "pre-commit": "yarn build && git add ./lib"
     }
   },
   "prettier": {
