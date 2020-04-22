@@ -35,10 +35,11 @@
     "startTestnet": "node test/startBlockchain",
     "createForTest": "node test/createFor",
     "createFor": "node test/stakeFor",
-    "fundAccounts": "node ./node_modules/@hoprnet/hopr-core-ethereum/lib/scripts/fundAccounts.js"
+    "fundAccounts": "ts-node ./scripts/fundAccounts.ts"
   },
   "dependencies": {
     "@hoprnet/hopr-utils": "https://github.com/hoprnet/hopr-utils.git",
+    "@hoprnet/hopr-ethereum": "https://github.com/hoprnet/hopr-ethereum.git#develop",
     "@nodeutils/defaults-deep": "~1.1.0",
     "abort-controller": "^3.0.0",
     "bignumber.js": "^9.0.0",
