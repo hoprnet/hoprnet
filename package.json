@@ -11,6 +11,7 @@
   "private": false,
   "main": "./build/lib/scripts/api.js",
   "files": [
+    "truffle-config.js",
     "contracts/*.sol",
     "build/extracted/",
     "build/lib/"
