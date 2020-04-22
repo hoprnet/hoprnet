@@ -59,16 +59,6 @@ yarn test
 
 > tip: we can use truffle's [debug](https://www.trufflesuite.com/docs/truffle/getting-started/debugging-your-contracts#debugging-your-contracts) feature to seemingly debug our tests, take look at this [example](./examples/test/DebugExample.test.ts)
 
-Everytime `yarn test` is run, it makes sure to always regenerate typescript types before running the tests.
-If you want to generate types only, you can do it like this:
-
-```bash
-# 1. Runs linter
-# 2. Compiles smart contracts
-# 3. Generates smart contracts' typescript types
-yarn build:sol
-```
-
 # Coverage
 
 ```bash
@@ -85,7 +75,7 @@ For testnet/mainnet migrations, you will have to create a [truffle-secrets.json]
 
 ```bash
 yarn network # starts a locally hosted network
-yarn migrate --network development
+yarn migrate
 ```
 
 # Contracts

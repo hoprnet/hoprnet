@@ -5,13 +5,12 @@ let secrets;
 try {
   secrets = require("./truffle-secrets.json");
 } catch (error) {
-  console.log("truffle-secrets not found!");
+  console.warn("truffle-secrets not found!");
 }
 
 module.exports = {
   networks: {
     // default network
-    // migrations mint 100 HOPR to 'owner'
     development: {
       host: "127.0.0.1",
       port: 9545, // 'truffle develop' port
@@ -19,19 +18,17 @@ module.exports = {
     },
 
     // used when testing
-    // migrations replicate production
     test: {
       host: "127.0.0.1",
       port: 9545, // 'truffle develop' port
       network_id: "*"
     },
 
-    coverage: {
-      host: "localhost",
-      network_id: "*",
+    // used for generating code coverage
+    soliditycoverage: {
+      host: "127.0.0.1",
       port: 8555, // if you change this, also set the port option in '.solcover.js'
-      gas: 0xfffffffffff, // high gas value
-      gasPrice: 0x01 // low gas price
+      network_id: "*"
     },
 
     rinkeby: secrets && {
@@ -75,5 +72,7 @@ module.exports = {
         }
       }
     }
-  }
+  },
+
+  plugins: ["solidity-coverage"]
 };

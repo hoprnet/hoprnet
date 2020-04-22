@@ -1,6 +1,10 @@
 # Exclude node.js module directory
 node_modules/
 
+# Exclude yarn stuff
+.packages-cache
+yarn-error.log
+
 # Exclude IDE stuff
 .vscode/
 
@@ -8,13 +12,11 @@ node_modules/
 build/contracts/
 
 # Exclude typechain builds
-types/truffle-contracts
-
-# Exclude tsc migrations builds
-migrations/**/*.js*
+types/truffle-contracts/
 
 # Coverage directory used by tools like istanbul
 coverage
+.coverage*
 coverage.json
 coverageEnv
 

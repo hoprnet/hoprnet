@@ -1,3 +1,3 @@
-export * from "./random";
-export * from "./Ticket";
-export * from "./Fund";
+export * from './random'
+export * from './Ticket'
+export * from './Fund'
