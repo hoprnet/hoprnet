@@ -9,7 +9,7 @@
   },
   "license": "LGPL-3.0-only",
   "private": false,
-  "main": "./build/lib/api.js",
+  "main": "./build/lib/scripts/api.js",
   "files": [
     "contracts/*.sol",
     "build/extracted/",
