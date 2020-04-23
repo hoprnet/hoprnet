@@ -40,7 +40,7 @@ export type HoprOptions = {
   password?: string
   id?: number
   bootstrapNode: boolean
-  network: string,
+  network: string
   connector: typeof HoprCoreConnector
   bootstrapServers: PeerInfo[]
   provider: string
@@ -57,8 +57,15 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
   public bootstrapServers: PeerInfo[]
 
   // @TODO add libp2p types
-  declare dial: (addr: Multiaddr | PeerInfo | PeerId, options?: { signal: AbortSignal }) => Promise<any>
-  declare dialProtocol: (addr: Multiaddr | PeerInfo | PeerId, protocol: string, options?: { signal: AbortSignal }) => Promise<{ stream: Duplex; protocol: string }>
+  declare dial: (
+    addr: Multiaddr | PeerInfo | PeerId,
+    options?: { signal: AbortSignal }
+  ) => Promise<any>
+  declare dialProtocol: (
+    addr: Multiaddr | PeerInfo | PeerId,
+    protocol: string,
+    options?: { signal: AbortSignal }
+  ) => Promise<{ stream: Duplex; protocol: string }>
   declare hangUp: (addr: PeerInfo | PeerId | Multiaddr | string) => Promise<void>
   declare peerInfo: PeerInfo
   declare peerStore: {
@@ -70,7 +77,10 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
   declare peerRouting: {
     findPeer: (addr: PeerId) => Promise<PeerInfo>
   }
-  declare handle: (protocol: string[], handler: (struct: { connection: any, stream: any }) => void) => void
+  declare handle: (
+    protocol: string[],
+    handler: (struct: { connection: any; stream: any }) => void
+  ) => void
   declare start: () => Promise<void>
   declare stop: () => Promise<void>
   declare on: (str: string, handler: (...props: any[]) => void) => void
@@ -83,43 +93,46 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
    */
   constructor(options: HoprOptions, public db: LevelUp, public paymentChannels: Chain) {
     super(
-      defaultsDeep({
-        peerInfo: options.peerInfo
-      }, {
-        // Disable libp2p-switch protections for the moment
-        switch: {
-          denyTTL: 1,
-          denyAttempts: Infinity
+      defaultsDeep(
+        {
+          peerInfo: options.peerInfo,
         },
-        // The libp2p modules for this libp2p bundle
-        modules: {
-          transport: [
-            TCP
-            // WebRTCv4,
-            // WebRTCv6
-          ],
-
-          streamMuxer: [MPLEX],
-          connEncryption: [SECIO],
-          dht: KadDHT
-          // peerDiscovery: [
-          //     WebRTC.discovery
-          // ]
-        },
-        config: {
-          // peerDiscovery: {
-          //     webRTCStar: {
-          //         enabled: true
-          //     }
-          // },
-          dht: {
-            enabled: true
+        {
+          // Disable libp2p-switch protections for the moment
+          switch: {
+            denyTTL: 1,
+            denyAttempts: Infinity,
           },
-          relay: {
-            enabled: false
-          }
+          // The libp2p modules for this libp2p bundle
+          modules: {
+            transport: [
+              TCP,
+              // WebRTCv4,
+              // WebRTCv6
+            ],
+
+            streamMuxer: [MPLEX],
+            connEncryption: [SECIO],
+            dht: KadDHT,
+            // peerDiscovery: [
+            //     WebRTC.discovery
+            // ]
+          },
+          config: {
+            // peerDiscovery: {
+            //     webRTCStar: {
+            //         enabled: true
+            //     }
+            // },
+            dht: {
+              enabled: true,
+            },
+            relay: {
+              enabled: false,
+            },
+          },
         }
-      })
+      )
     )
 
     this.output = options.output
@@ -146,7 +159,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
 
     let connector = await options.connector.create(db, options.peerInfo.id.privKey.marshal(), {
       id: options.id,
-      provider: options.provider
+      provider: options.provider,
     })
 
     return new Hopr(options, db, connector).up()
@@ -228,7 +241,11 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
    * @param intermediateNodes optional set path manually
    * the acknowledgement of the first hop
    */
-  async sendMessage(msg: Uint8Array, destination: PeerId, getIntermediateNodesManually?: () => Promise<PeerId[]>): Promise<void> {
+  async sendMessage(
+    msg: Uint8Array,
+    destination: PeerId,
+    getIntermediateNodesManually?: () => Promise<PeerId[]>
+  ): Promise<void> {
     if (!destination) throw Error(`Expecting a non-empty destination.`)
 
     const promises: Promise<void>[] = []
@@ -258,7 +275,12 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
           }
 
           this.interactions.packet.acknowledgment.once(
-            u8aToHex(this.dbKeys.UnAcknowledgedTickets(path[0].pubKey.marshal(), packet.ticket.ticket.challenge)),
+            u8aToHex(
+              this.dbKeys.UnAcknowledgedTickets(
+                path[0].pubKey.marshal(),
+                packet.ticket.ticket.challenge
+              )
+            ),
             () => {
               console.log(`received acknowledgement`)
               resolve()
@@ -293,13 +315,13 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
       throw Error(`Expecting a non-empty destination.`)
     }
 
-    const latency = await super.ping(destination)
-
-    if (typeof latency === 'undefined') {
+    const start = Date.now()
+    try {
+      this.interactions.network.heartbeat.interact(destination)
+      return Date.now() - start
+    } catch {
       throw Error('node unreachable')
     }
-
-    return latency
   }
 
   /**
@@ -326,7 +348,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
 
   static openDatabase(
     db_dir: string,
-    constants: { CHAIN_NAME: string, NETWORK: string },
+    constants: { CHAIN_NAME: string; NETWORK: string },
     options?: { id?: number; bootstrapNode?: boolean }
   ) {
     db_dir += `/${constants.CHAIN_NAME}/${constants.NETWORK}/`

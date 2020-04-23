@@ -4067,7 +4067,7 @@ pbkdf2@^3.0.3, pbkdf2@^3.0.9:
     safe-buffer "^5.0.1"
     sha.js "^2.4.8"
 
-peer-id@^0.13.3, peer-id@^0.13.4, peer-id@^0.13.6, peer-id@^0.13.9, peer-id@~0.13.11, peer-id@~0.13.2, peer-id@~0.13.5:
+peer-id@^0.13.3, peer-id@^0.13.4, peer-id@^0.13.6, peer-id@^0.13.9, peer-id@~0.13.2, peer-id@~0.13.5:
   version "0.13.11"
   resolved "https://registry.yarnpkg.com/peer-id/-/peer-id-0.13.11.tgz#d3b11e45d80839363aeac0e4fa1758368e3b93cd"
   integrity sha512-CWDPr4ppKslARSe1qfMlGjTiDqL4Hl25Qyfq43PEPAeRD2meI8B2HfxO0NMMB8BUhNvNGPeDAwhLptyB9jVwkw==
@@ -4076,6 +4076,19 @@ peer-id@^0.13.3, peer-id@^0.13.4, peer-id@^0.13.6, peer-id@^0.13.9, peer-id@~0.1
     cids "^0.8.0"
     class-is "^1.1.0"
     libp2p-crypto "~0.17.3"
+    multihashes "~0.4.15"
+    protons "^1.0.2"
+
+peer-id@~0.13.12:
+  version "0.13.12"
+  resolved "https://registry.yarnpkg.com/peer-id/-/peer-id-0.13.12.tgz#ab91dfe17f02cea3907173f89eb9799187b5251d"
+  integrity sha512-kiXu62BdJNeOzqpasMiauTFlDsQmevGWftHrMlUA68FMKWeMAtHFJTDGzaMXwPyH3l1MJM+SYb3APxNLGeZP6A==
+  dependencies:
+    buffer "^5.5.0"
+    cids "^0.8.0"
+    class-is "^1.1.0"
+    libp2p-crypto "~0.17.3"
+    minimist "^1.2.5"
     multihashes "~0.4.15"
     protons "^1.0.2"
 
@@ -4609,10 +4622,10 @@ simple-get@^2.7.0:
     once "^1.3.1"
     simple-concat "^1.0.0"
 
-simple-peer@~9.6.2:
-  version "9.6.2"
-  resolved "https://registry.yarnpkg.com/simple-peer/-/simple-peer-9.6.2.tgz#42418e77cf8f9184e4fa22ef1017b195c2bf84d7"
-  integrity sha512-EOKoImCaqtNvXIntxT1CBBK/3pVi7tMAoJ3shdyd9qk3zLm3QPiRLb/sPC1G2xvKJkJc5fkQjCXqRZ0AknwTig==
+simple-peer@~9.7.0:
+  version "9.7.0"
+  resolved "https://registry.yarnpkg.com/simple-peer/-/simple-peer-9.7.0.tgz#aca82638fbb38c53f143c8c054c33b2f30ada4fe"
+  integrity sha512-lZL/H/Znx7kai1kTrbxntVfbstGTnPF+w+hvnq2euBXoBg8m32mgEOpPmH9hS7ZOx0CMXcpgth/nNjZKp7aeow==
   dependencies:
     debug "^4.0.1"
     get-browser-rtc "^1.0.0"
@@ -4638,10 +4651,10 @@ slash@^3.0.0:
   resolved "https://registry.yarnpkg.com/slash/-/slash-3.0.0.tgz#6539be870c165adbd5240220dbe361f1bc4d4634"
   integrity sha512-g9Q1haeby36OSStwb4ntCGGGaKsaVSjQ68fBxoQcutl5fS1vuY18H3wSt3jFyFtrkx+Kz0V1G85A4MyAdDMi2Q==
 
-source-map-support@^0.5.6:
-  version "0.5.16"
-  resolved "https://registry.yarnpkg.com/source-map-support/-/source-map-support-0.5.16.tgz#0ae069e7fe3ba7538c64c98515e35339eac5a042"
-  integrity sha512-efyLRJDr68D9hBBNIPWFjhpFzURh+KJykQwvMyW5UiZzYwoF6l4YMMDIJJEyFWxWCqfyxLzz6tSfUFR+kXXsVQ==
+source-map-support@^0.5.17:
+  version "0.5.18"
+  resolved "https://registry.yarnpkg.com/source-map-support/-/source-map-support-0.5.18.tgz#f5f33489e270bd7f7d7e7b8debf283f3a4066960"
+  integrity sha512-9luZr/BZ2QeU6tO2uG8N2aZpVSli4TSAOAqFOyTO51AJcD9P99c0K1h6dD6r6qo5dyT44BR5exweOaLLeldTkQ==
   dependencies:
     buffer-from "^1.0.0"
     source-map "^0.6.0"
@@ -4941,15 +4954,15 @@ tough-cookie@~2.5.0:
     psl "^1.1.28"
     punycode "^2.1.1"
 
-ts-node@^8.6.2:
-  version "8.8.2"
-  resolved "https://registry.yarnpkg.com/ts-node/-/ts-node-8.8.2.tgz#0b39e690bee39ea5111513a9d2bcdc0bc121755f"
-  integrity sha512-duVj6BpSpUpD/oM4MfhO98ozgkp3Gt9qIp3jGxwU2DFvl/3IRaEAvbLa8G60uS7C77457e/m5TMowjedeRxI1Q==
+ts-node@^8.9.0:
+  version "8.9.0"
+  resolved "https://registry.yarnpkg.com/ts-node/-/ts-node-8.9.0.tgz#d7bf7272dcbecd3a2aa18bd0b96c7d2f270c15d4"
+  integrity sha512-rwkXfOs9zmoHrV8xE++dmNd6ZIS+nmHHCxcV53ekGJrxFLMbp+pizpPS07ARvhwneCIECPppOwbZHvw9sQtU4w==
   dependencies:
     arg "^4.1.0"
     diff "^4.0.1"
     make-error "^1.1.1"
-    source-map-support "^0.5.6"
+    source-map-support "^0.5.17"
     yn "3.1.1"
 
 tslib@^1.9.0:
