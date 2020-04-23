@@ -1,30 +1,24 @@
 import process from 'process'
-import { default as build } from './operations/build'
-import { default as coverage } from './operations/coverage'
-import { default as fund } from './operations/fund'
-import { default as migrate } from './operations/migrate'
-import { default as network } from './operations/network'
-import { default as test } from './operations/test'
+import { getOperations } from './operations/utils'
 
-const operations = {
-  build,
-  coverage,
-  fund,
-  migrate,
-  network,
-  test
-}
-
+const operations = getOperations()
 const [, , operation, ...rest] = process.argv
 
 if (typeof operation === 'undefined') {
   throw Error('operation not provided')
 }
 
-const fn = operations[operation]
-
-if (typeof fn === 'undefined') {
-  throw Error(`operation '${operation}' not found`)
+if (!operations.includes(operation)) {
+  throw Error(`operation '${operation}' does not exist`)
 }
 
-fn(...rest).catch(console.error)
+import(`./operations/${operation}`)
+  .then(res => {
+    const fn: (...args: any[]) => Promise<any> = res.default
+    if (typeof fn === 'undefined') {
+      throw Error(`operation '${operation}' not found`)
+    }
+
+    return fn(...rest)
+  })
+  .catch(console.error)

@@ -18,5 +18,6 @@ exports.default = async () => {
         });
         console.log(`funded ${account}`);
     }
-    web3.currentProvider['disconnect']();
+    // @ts-ignore
+    web3.currentProvider.disconnect();
 };

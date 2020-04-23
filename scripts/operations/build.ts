@@ -1,6 +1,6 @@
-import { bash, root } from './utils'
 import patch from './patch'
 import extractBuild from './extract-build'
+import { bash, root } from './utils'
 
 type Action = {
   before: string

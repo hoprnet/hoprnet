@@ -21,3 +21,15 @@ export const bash = (cmd: string): Promise<void> => {
     child.on('error', reject)
   })
 }
+
+export const getContractNames = () => {
+  return ['HoprChannels', 'HoprMinter', 'HoprToken']
+}
+
+export const getOperations = () => {
+  return ['patch', 'build', 'coverage', 'fund', 'migrate', 'network', 'test', 'verify']
+}
+
+export const isLocalNetwork = (network: string) => {
+  return !['rinkeby', 'kovan', 'mainnet'].includes(network)
+}

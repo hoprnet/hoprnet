@@ -21,3 +21,12 @@ exports.bash = (cmd) => {
         child.on('error', reject);
     });
 };
+exports.getContractNames = () => {
+    return ['HoprChannels', 'HoprMinter', 'HoprToken'];
+};
+exports.getOperations = () => {
+    return ['patch', 'build', 'coverage', 'fund', 'migrate', 'network', 'test', 'verify'];
+};
+exports.isLocalNetwork = (network) => {
+    return !['rinkeby', 'kovan', 'mainnet'].includes(network);
+};

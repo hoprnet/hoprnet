@@ -74,5 +74,11 @@ module.exports = {
     }
   },
 
-  plugins: ["solidity-coverage"]
+  api_keys: secrets
+    ? {
+        etherscan: secrets.etherscan
+      }
+    : undefined,
+
+  plugins: ["solidity-coverage", "truffle-plugin-verify"]
 };
