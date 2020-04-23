@@ -330,7 +330,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
    *
    * @param destination instance of peerInfo that contains the peerId of the destination
    */
-  async getIntermediateNodes(destination: PeerId) {
+  async getIntermediateNodes(destination: PeerId): Promise<PeerId[]> {
     const filter = (peerInfo: PeerInfo) =>
       !peerInfo.id.isEqual(this.peerInfo.id) &&
       !peerInfo.id.isEqual(destination) &&
@@ -350,7 +350,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
     db_dir: string,
     constants: { CHAIN_NAME: string; NETWORK: string },
     options?: { id?: number; bootstrapNode?: boolean }
-  ) {
+  ): LevelUp {
     db_dir += `/${constants.CHAIN_NAME}/${constants.NETWORK}/`
 
     if (options != null && options.bootstrapNode) {

@@ -123,5 +123,5 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
     }, options?: {
         id?: number;
         bootstrapNode?: boolean;
-    }): LevelUp<import("leveldown").LevelDown, import("abstract-leveldown").AbstractIterator<any, any>>;
+    }): LevelUp;
 }
