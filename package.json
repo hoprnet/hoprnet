@@ -21,12 +21,12 @@
     "node": "^12"
   },
   "scripts": {
-    "build": "ts-node ./scripts/cli.ts build",
-    "coverage": "ts-node ./scripts/cli.ts coverage",
-    "fund": "ts-node ./scripts/cli.ts fund",
-    "migrate": "ts-node ./scripts/cli.ts migrate",
-    "network": "ts-node ./scripts/cli.ts network",
-    "test": "ts-node ./scripts/cli.ts test"
+    "build": "ts-node -T ./scripts/cli.ts build",
+    "coverage": "ts-node -T ./scripts/cli.ts coverage",
+    "fund": "ts-node -T ./scripts/cli.ts fund",
+    "migrate": "ts-node -T ./scripts/cli.ts migrate",
+    "network": "ts-node -T ./scripts/cli.ts network",
+    "test": "ts-node -T ./scripts/cli.ts test"
   },
   "husky": {
     "hooks": {
