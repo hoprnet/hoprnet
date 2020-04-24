@@ -17,33 +17,23 @@ import { encode, decode } from 'rlp'
 import { Packet } from '../../messages/packet'
 import Hopr from '../..'
 import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import { SRMLTypes, AccountId, Hash, SignedChannel } from '@hoprnet/hopr-core-polkadot/lib/srml_types'
-import { ApiPromise } from '@polkadot/api'
-import { waitReady } from '@polkadot/wasm-crypto'
-import Keyring from '@polkadot/keyring'
-import { TypeRegistry } from '@polkadot/types'
 import { PacketInteractions } from '.'
 import { OnChainKey } from '../payments/onChainKey'
 import LevelUp from 'levelup'
 import Memdown from 'memdown'
 import BN from 'bn.js'
-import HoprPolkadot, { Types } from '@hoprnet/hopr-core-polkadot'
-import { randomBytes } from 'crypto'
+import { randomBytes, createHash } from 'crypto'
 import * as DbKeys from '../../db_keys'
-import { stringToU8a, u8aEquals, randomInteger } from '@hoprnet/hopr-utils'
+import { stringToU8a, u8aEquals, randomInteger, u8aConcat } from '@hoprnet/hopr-utils'
+import secp256k1 from 'secp256k1'
+
+import { MAX_HOPS } from '../../constants'
 
 import assert from 'assert'
 import Multiaddr from 'multiaddr'
 
 describe('check packet forwarding & acknowledgement generation', function () {
-  const channels = new Map<string, SignedChannel>()
-  const states = new Map<string, any>()
-
-  const typeRegistry = new TypeRegistry()
-
-  typeRegistry.register(SRMLTypes)
-
-  async function generateNode(): Promise<Hopr<HoprPolkadot>> {
+  async function generateNode(): Promise<Hopr<HoprCoreConnector>> {
     const db = LevelUp(Memdown())
 
     const node = (await libp2p.create({
@@ -51,19 +41,13 @@ describe('check packet forwarding & acknowledgement generation', function () {
       modules: {
         transport: [TCP],
         streamMuxer: [MPLEX],
-        connEncryption: [SECIO]
-      }
-    })) as Hopr<HoprPolkadot>
+        connEncryption: [SECIO],
+      },
+    })) as Hopr<HoprCoreConnector>
 
     node.db = db
 
     node.peerInfo.multiaddrs.add(Multiaddr('/ip4/0.0.0.0/tcp/0'))
-
-    await Promise.all([
-      /* prettier-ignore */
-      node.start(),
-      waitReady()
-    ])
 
     node.peerRouting.findPeer = (_: PeerId): Promise<never> => {
       return Promise.reject(Error('not implemented'))
@@ -72,176 +56,168 @@ describe('check packet forwarding & acknowledgement generation', function () {
     node.interactions = {
       packet: new PacketInteractions(node),
       payments: {
-        onChainKey: new OnChainKey(node)
-      }
-    } as Hopr<HoprPolkadot>['interactions']
+        onChainKey: new OnChainKey(node),
+      },
+    } as Hopr<HoprCoreConnector>['interactions']
 
-    const onChainKeyPair = new Keyring({ type: 'sr25519' }).addFromSeed(node.peerInfo.id.pubKey.marshal().slice(0, 32), undefined, 'sr25519')
-    node.paymentChannels = new HoprPolkadot(
-      ({
-        once(eventName: string, fn: () => void) {
-          if (eventName === 'disconnected') {
-            return fn()
-          }
-        },
-        disconnect: () => {},
-        isReady: Promise.resolve(true),
-        query: {
-          hopr: {
-            channels(channelId: Hash) {
-              if (!channels.has(channelId.toHex())) {
-                throw Error(`missing channel ${channelId.toHex()}`)
-              }
+    node.paymentChannels = ({
+      start() {
+        return Promise.resolve()
+      },
+      initOnchainValues() {
+        return Promise.resolve()
+      },
+      stop() {
+        return Promise.resolve()
+      },
+      channel: {
+        create() {
+          return {
+            ticket: {
+              create() {
+                const ticket = new Uint8Array(33)
 
-              return Promise.resolve(channels.get(channelId.toHex()))
+                ticket.set(node.peerInfo.id.pubKey.marshal())
+
+                // @ts-ignore
+                ticket.signer = ticket.subarray(0, 33)
+
+                return ticket
+              },
             },
-            states(accountId: AccountId) {
-              if (!states.has(accountId.toHex())) {
-                throw Error(`party ${accountId.toHex()} has not set any on-chain secrets.`)
-              }
-
-              return Promise.resolve(states.get(accountId.toHex()))
-            }
-          },
-          system: {
-            events(_handler: () => void) { },
-            accountNonce() {
-              return Promise.resolve({
-                toNumber: () => 0
-              })
-            }
           }
         },
-        tx: {
-          hopr: {
-            init(secret: any, publicKey: any) {
-              const signAndSend = (keyPair: any) => {
-                states.set(new AccountId(typeRegistry, keyPair.publicKey).toHex(), {
-                  secret,
-                  publicKey
-                })
-
-                return Promise.resolve()
-              }
-
-              return { signAndSend }
-            }
-          }
+        isOpen() {
+          return Promise.resolve(true)
         },
-        createType(name: string, ...args: any[]) {
-          const result = new (typeRegistry.get(name))(typeRegistry, ...args)
+      },
+      utils: {
+        hash(msg: Uint8Array) {
+          return Promise.resolve(createHash('sha256').update(msg).digest())
+        },
+        async sign(msg: Uint8Array, privKey: Uint8Array) {
+          const signature = secp256k1.ecdsaSign(msg, privKey)
 
+          const result = u8aConcat(signature.signature, new Uint8Array([signature.recid]))
+
+          // @ts-ignore
+          result.signature = result.subarray(0, 64)
+          // @ts-ignore
+          result.recovery = result.subarray(64, 65)[0]
           return result
         },
-        registry: typeRegistry
-      } as unknown) as ApiPromise,
-      {
-        publicKey: node.peerInfo.id.pubKey.marshal(),
-        privateKey: node.peerInfo.id.privKey.marshal(),
-        onChainKeyPair
+        verify() {
+          return true
+        },
+        pubKeyToAccountId(arr: Uint8Array) {
+          return arr
+        },
+        getId(a: Uint8Array, b: Uint8Array) {
+          if (Buffer.compare(a, b)) {
+            return createHash('sha256').update(u8aConcat(a, b)).digest()
+          } else {
+            return createHash('sha256').update(u8aConcat(b, a)).digest()
+          }
+        },
       },
-      db
-    )
+      types: {
+        SignedTicket: {
+          SIZE: 33,
+          create(arr: { bytes: ArrayBuffer; offset: number }) {
+            const signer = new Uint8Array(arr.bytes, arr.offset, 33)
 
-    await node.paymentChannels.start()
-    await node.paymentChannels.initOnchainValues()
+            // @ts-ignore
+            signer.signer = signer
+            // @ts-ignore
+            signer.ticket = {
+              getEmbeddedFunds() {
+                return new BN(1)
+              },
+            }
+            return signer
+          },
+        },
+        Signature: {
+          SIZE: 65,
+          create(arr: { bytes: ArrayBuffer; offset: number }) {
+            const signature = new Uint8Array(arr.bytes, arr.offset, 65)
+
+            // @ts-ignore
+            signature.signature = signature.subarray(0, 64)
+            // @ts-ignore
+            signature.recovery = signature.subarray(64, 65)[0]
+
+            return signature
+          },
+        },
+        ChannelBalance: {
+          create() {
+            return new Uint8Array(32).fill(0x00)
+          },
+        },
+      },
+    } as unknown) as HoprCoreConnector
 
     node.log = Debug(`${chalk.blue(node.peerInfo.id.toB58String())}: `)
     node.dbKeys = DbKeys
 
-    return (node as unknown) as Hopr<HoprPolkadot>
+    await node.start()
+
+    return (node as unknown) as Hopr<HoprCoreConnector>
   }
 
   it('should forward a packet and receive aknowledgements', async function () {
-    const [Alice, Bob, Chris, Dave] = await Promise.all([generateNode(), generateNode(), generateNode(), generateNode()])
+    const nodes = await Promise.all([
+      generateNode(),
+      generateNode(),
+      generateNode(),
+      generateNode(),
+    ])
 
-    connectionHelper(Alice, Bob, Chris, Dave)
+    connectionHelper(nodes)
 
-    const channel = Types.Channel.createActive({
-      balance: new BN(12345),
-      balance_a: new BN(123)
-    })
-
-    const [channelId, channelIdSecond, channelIdThird] = await getIds(typeRegistry, Alice, Bob, Chris, Dave)
-
-    const channelRecord = await Types.SignedChannel.create(Bob.paymentChannels, undefined, {
-      channel,
-    })
-
-    channels.set(channelIdThird.toHex(), channelRecord)
-    channels.set(channelIdSecond.toHex(), channelRecord)
-    channels.set(channelId.toHex(), channelRecord)
-
-    await channelDbHelper(typeRegistry, channelRecord, Alice, Bob, Chris, Dave)
+    let emitPromises: Promise<any>[]
 
     const testMsg = randomBytes(randomInteger(37, 131))
 
-    const emitPromises: Promise<any>[] = []
-    emitPromises.push(emitCheckerHelper(Alice, Bob.peerInfo.id))
+    for (let i = 1; i <= MAX_HOPS; i++) {
+      emitPromises = []
 
-    emitPromises.push(emitCheckerHelper(Bob, Chris.peerInfo.id))
+      for (let j = 0; j < i; j++) {
+        emitPromises.push(emitCheckerHelper(nodes[j], nodes[j + 1].peerInfo.id))
+      }
 
-    Chris.output = (arr: Uint8Array) => {
-      const [msg] = (decode(Buffer.from(arr)) as unknown) as Buffer[]
+      nodes[i].output = (arr: Uint8Array) => {
+        const [msg] = (decode(Buffer.from(arr)) as unknown) as Buffer[]
+  
+        assert(u8aEquals(msg, testMsg), `Checks that we receive the right message.`)
+      }
 
-      assert(u8aEquals(msg, testMsg), `Checks that we receive the right message.`)
+      await nodes[0].interactions.packet.forward.interact(
+        nodes[1].peerInfo,
+        await Packet.create(
+          nodes[0],
+          encode([testMsg, new TextEncoder().encode(Date.now().toString())]),
+          nodes.slice(1, i + 1).map((node: Hopr<HoprCoreConnector>) => node.peerInfo.id)
+        )
+      )
+
+      try {
+        await Promise.all(emitPromises)
+      } catch (err) {
+        assert.fail(`Checks that we emit an event once we got an acknowledgement.`)
+      }
     }
 
-    await Alice.interactions.packet.forward.interact(
-      Bob.peerInfo,
-      await Packet.create(Alice, encode([testMsg, new TextEncoder().encode(Date.now().toString())]), [Bob.peerInfo.id, Chris.peerInfo.id])
-    )
-
-    const testMsgSecond = randomBytes(randomInteger(33, 129))
-
-    Dave.output = (arr: Uint8Array) => {
-      const [msg] = (decode(Buffer.from(arr)) as unknown) as Buffer[]
-
-      assert(u8aEquals(msg, testMsgSecond), `Checks that we receive the right message.`)
-    }
-
-    emitPromises.push(emitCheckerHelper(Chris, Dave.peerInfo.id))
-
-    await Alice.interactions.packet.forward.interact(
-      Bob.peerInfo,
-      await Packet.create(Alice, encode([testMsgSecond, new TextEncoder().encode(Date.now().toString())]), [
-        Bob.peerInfo.id,
-        Chris.peerInfo.id,
-        Dave.peerInfo.id
-      ])
-    )
-
-    try {
-      await Promise.all(emitPromises)
-    } catch (err) {
-      assert.fail(`Checks that we emit an event once we got an acknowledgement.`)
-    }
-
-    await Promise.all([
-      Alice.paymentChannels.stop(),
-      Bob.paymentChannels.stop(),
-      Chris.paymentChannels.stop(),
-      Dave.paymentChannels.stop()
-    ])
-
-    await Promise.all([
-      Alice.stop(),
-      Bob.stop(),
-      Chris.stop(),
-      Dave.stop()
-    ])
+    await Promise.all(nodes.map((node: Hopr<HoprCoreConnector>) => node.stop()))
   })
-
-  // afterEach(function() {
-  //   channels.clear()
-  // })
 })
 
 /**
  * Informs each node about the others existence.
  * @param nodes Hopr nodes
  */
-function connectionHelper<Chain extends HoprCoreConnector>(...nodes: Hopr<Chain>[]) {
+function connectionHelper<Chain extends HoprCoreConnector>(nodes: Hopr<Chain>[]) {
   for (let i = 0; i < nodes.length; i++) {
     for (let j = i + 1; j < nodes.length; j++) {
       nodes[i].peerStore.put(nodes[j].peerInfo)
@@ -255,7 +231,10 @@ function connectionHelper<Chain extends HoprCoreConnector>(...nodes: Hopr<Chain>
  * @param node our Hopr node
  * @param sender the sender of the packet
  */
-function emitCheckerHelper<Chain extends HoprCoreConnector>(node: Hopr<Chain>, sender: PeerId): Promise<any> {
+function emitCheckerHelper<Chain extends HoprCoreConnector>(
+  node: Hopr<Chain>,
+  sender: PeerId
+): Promise<any> {
   return new Promise<any>((resolve, reject) => {
     node.interactions.packet.acknowledgment.emit = (event: string) => {
       node.dbKeys.UnAcknowledgedTicketsParse(stringToU8a(event)).then(([counterparty]) => {
@@ -271,43 +250,74 @@ function emitCheckerHelper<Chain extends HoprCoreConnector>(node: Hopr<Chain>, s
   })
 }
 
-async function channelDbHelper<Chain extends HoprCoreConnector>(typeRegistry: TypeRegistry, record: Uint8Array, ...nodes: Hopr<Chain>[]): Promise<void> {
-  const promises: Promise<any>[] = []
+// async function channelDbHelper<Chain extends HoprCoreConnector>(
+//   typeRegistry: TypeRegistry,
+//   record: Uint8Array,
+//   ...nodes: Hopr<Chain>[]
+// ): Promise<void> {
+//   const promises: Promise<any>[] = []
 
-  if (nodes.length < 2) {
-    throw Error('cannot do this with less than two nodes.')
-  }
+//   if (nodes.length < 2) {
+//     throw Error('cannot do this with less than two nodes.')
+//   }
 
-  promises.push(
-    nodes[0].db.put(
-      Buffer.from(nodes[0].paymentChannels.dbKeys.Channel(new AccountId(typeRegistry, nodes[1].paymentChannels.self.onChainKeyPair.publicKey))),
-      Buffer.from(record)
-    )
-  )
+//   promises.push(
+//     nodes[0].db.put(
+//       Buffer.from(
+//         nodes[0].paymentChannels.dbKeys.Channel(
+//           new AccountId(typeRegistry, nodes[1].paymentChannels.self.onChainKeyPair.publicKey)
+//         )
+//       ),
+//       Buffer.from(record)
+//     )
+//   )
 
-  for (let i = 1; i < nodes.length - 1; i++) {
-    promises.push(
-      nodes[i].db
-        .batch()
-        .put(Buffer.from(nodes[i].paymentChannels.dbKeys.Channel(new AccountId(typeRegistry, nodes[i - 1].paymentChannels.self.onChainKeyPair.publicKey))), Buffer.from(record))
-        .put(Buffer.from(nodes[i].paymentChannels.dbKeys.Channel(new AccountId(typeRegistry, nodes[i + 1].paymentChannels.self.onChainKeyPair.publicKey))), Buffer.from(record))
-        .write()
-    )
-  }
+//   for (let i = 1; i < nodes.length - 1; i++) {
+//     promises.push(
+//       nodes[i].db
+//         .batch()
+//         .put(
+//           Buffer.from(
+//             nodes[i].paymentChannels.dbKeys.Channel(
+//               new AccountId(
+//                 typeRegistry,
+//                 nodes[i - 1].paymentChannels.self.onChainKeyPair.publicKey
+//               )
+//             )
+//           ),
+//           Buffer.from(record)
+//         )
+//         .put(
+//           Buffer.from(
+//             nodes[i].paymentChannels.dbKeys.Channel(
+//               new AccountId(
+//                 typeRegistry,
+//                 nodes[i + 1].paymentChannels.self.onChainKeyPair.publicKey
+//               )
+//             )
+//           ),
+//           Buffer.from(record)
+//         )
+//         .write()
+//     )
+//   }
 
-  await Promise.all(promises)
-}
+//   await Promise.all(promises)
+// }
 
-function getIds<Chain extends HoprCoreConnector>(typeRegistry: TypeRegistry, ...nodes: Hopr<Chain>[]) {
-  const promises: Promise<any>[] = []
-  for (let i = 0; i < nodes.length - 1; i++) {
-    promises.push(
-      nodes[i].paymentChannels.utils.getId(
-        new AccountId(typeRegistry, nodes[i].paymentChannels.self.onChainKeyPair.publicKey),
-        new AccountId(typeRegistry, nodes[i + 1].paymentChannels.self.onChainKeyPair.publicKey)
-      )
-    )
-  }
+// function getIds<Chain extends HoprCoreConnector>(
+//   typeRegistry: TypeRegistry,
+//   ...nodes: Hopr<Chain>[]
+// ) {
+//   const promises: Promise<any>[] = []
+//   for (let i = 0; i < nodes.length - 1; i++) {
+//     promises.push(
+//       nodes[i].paymentChannels.utils.getId(
+//         new AccountId(typeRegistry, nodes[i].paymentChannels.self.onChainKeyPair.publicKey),
+//         new AccountId(typeRegistry, nodes[i + 1].paymentChannels.self.onChainKeyPair.publicKey)
+//       )
+//     )
+//   }
 
-  return Promise.all(promises)
-}
+//   return Promise.all(promises)
+// }

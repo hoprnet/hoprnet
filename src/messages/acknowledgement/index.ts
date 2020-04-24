@@ -33,14 +33,25 @@ class Acknowledgement<Chain extends HoprCoreConnector> extends Uint8Array {
     if (arr != null && struct == null) {
       super(arr.bytes, arr.offset, Acknowledgement.SIZE(paymentChannels))
     } else if (arr == null && struct != null) {
-      super(u8aConcat(struct.key, struct.challenge, struct.signature != null ? struct.signature : new Uint8Array(paymentChannels.types.Signature.SIZE)))
+      super(
+        u8aConcat(
+          struct.key,
+          struct.challenge,
+          struct.signature != null
+            ? struct.signature
+            : new Uint8Array(paymentChannels.types.Signature.SIZE)
+        )
+      )
     } else {
       throw Error('Invalid constructor parameters.')
     }
 
     this.paymentChannels = paymentChannels
   }
-  subarray(begin: number = 0, end: number = Acknowledgement.SIZE(this.paymentChannels)): Uint8Array {
+  subarray(
+    begin: number = 0,
+    end: number = Acknowledgement.SIZE(this.paymentChannels)
+  ): Uint8Array {
     return new Uint8Array(this.buffer, begin + this.byteOffset, end - begin)
   }
 
@@ -63,7 +74,7 @@ class Acknowledgement<Chain extends HoprCoreConnector> extends Uint8Array {
   get challenge(): Challenge<Chain> {
     return new Challenge<Chain>(this.paymentChannels, {
       bytes: this.buffer,
-      offset: this.byteOffset + KEY_LENGTH
+      offset: this.byteOffset + KEY_LENGTH,
     })
   }
 
@@ -82,7 +93,7 @@ class Acknowledgement<Chain extends HoprCoreConnector> extends Uint8Array {
   get responseSignature(): Types.Signature {
     return this.paymentChannels.types.Signature.create({
       bytes: this.buffer,
-      offset: this.byteOffset + KEY_LENGTH + Challenge.SIZE(this.paymentChannels)
+      offset: this.byteOffset + KEY_LENGTH + Challenge.SIZE(this.paymentChannels),
     })
   }
 
@@ -95,7 +106,11 @@ class Acknowledgement<Chain extends HoprCoreConnector> extends Uint8Array {
       this._responseSigningParty = secp256k1.ecdsaRecover(
         this.responseSignature.signature,
         this.responseSignature.recovery,
-        await this.paymentChannels.utils.hash(u8aConcat(this.responseSignature.msgPrefix, await this.hash))
+        this.responseSignature.msgPrefix != null && this.responseSignature.msgPrefix.length > 0
+          ? await this.paymentChannels.utils.hash(
+              u8aConcat(this.responseSignature.msgPrefix, await this.hash)
+            )
+          : await this.hash
       )
 
       resolve(this._responseSigningParty)
@@ -103,13 +118,23 @@ class Acknowledgement<Chain extends HoprCoreConnector> extends Uint8Array {
   }
 
   async sign(peerId: PeerId): Promise<Acknowledgement<Chain>> {
-    this.responseSignature.set(await this.paymentChannels.utils.sign(await this.hash, peerId.privKey.marshal(), peerId.pubKey.marshal()))
+    this.responseSignature.set(
+      await this.paymentChannels.utils.sign(
+        await this.hash,
+        peerId.privKey.marshal(),
+        peerId.pubKey.marshal()
+      )
+    )
 
     return this
   }
 
   async verify(peerId: PeerId): Promise<boolean> {
-    return this.paymentChannels.utils.verify(await this.hash, this.responseSignature, peerId.pubKey.marshal())
+    return this.paymentChannels.utils.verify(
+      await this.hash,
+      this.responseSignature,
+      peerId.pubKey.marshal()
+    )
   }
 
   /**
@@ -128,7 +153,7 @@ class Acknowledgement<Chain extends HoprCoreConnector> extends Uint8Array {
   ): Promise<Acknowledgement<Chain>> {
     const ack = new Acknowledgement(hoprCoreConnector, {
       bytes: new Uint8Array(Acknowledgement.SIZE(hoprCoreConnector)),
-      offset: 0
+      offset: 0,
     })
 
     ack.key.set(deriveTicketKeyBlinding(derivedSecret))

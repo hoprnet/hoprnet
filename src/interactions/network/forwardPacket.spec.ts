@@ -116,7 +116,7 @@ describe('check packet forward mechanism', function () {
  * Informs each node about the others existence.
  * @param nodes Hopr nodes
  */
-function connectionHelper<Chain extends HoprCoreConnector>(...nodes: Hopr<Chain>[]) {
+function connectionHelper<Chain extends HoprCoreConnector>(...nodes: Hopr<Chain>[]): void {
   for (let i = 0; i < nodes.length; i++) {
     for (let j = i + 1; j < nodes.length; j++) {
       nodes[i].peerStore.put(nodes[j].peerInfo)

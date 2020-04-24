@@ -6,6 +6,8 @@ import type PeerId from 'peer-id'
 import PeerInfo from 'peer-info'
 import chalk from 'chalk'
 
+import AbortController from 'abort-controller'
+
 import type { AbstractInteraction } from '../abstractInteraction'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '../../'
@@ -18,6 +20,9 @@ import { getTokens, Token } from '../../utils'
 import { Challenge } from '../../messages/packet/challenge'
 
 const MAX_PARALLEL_JOBS = 20
+
+const TWO_SECONDS = 2 * 1000
+const FORWARD_TIMEOUT = TWO_SECONDS
 
 class PacketForwardInteraction<Chain extends HoprCoreConnector>
   implements AbstractInteraction<Chain> {
@@ -37,24 +42,37 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector>
       protocol: string
     }
 
-    try {
-      struct = await this.node
-        .dialProtocol(counterparty, this.protocols[0])
-        .catch(async (err: Error) => {
-          return this.node.peerRouting
-            .findPeer(PeerInfo.isPeerInfo(counterparty) ? counterparty.id : counterparty)
-            .then((peerInfo: PeerInfo) => this.node.dialProtocol(peerInfo, this.protocols[0]))
-        })
-    } catch (err) {
-      this.node.log(
-        `Could not transfer packet to ${(PeerInfo.isPeerInfo(counterparty)
-          ? counterparty.id
-          : counterparty
-        ).toB58String()}. Error was: ${chalk.red(err.message)}.`
-      )
+    const abort = new AbortController()
+    const signal = abort.signal
 
-      return
-    }
+    const timeout = setTimeout(() => {
+      abort.abort()
+    }, FORWARD_TIMEOUT)
+
+    struct = await this.node
+      .dialProtocol(counterparty, this.protocols[0], { signal })
+      .catch(async (err: Error) => {
+        const peerInfo = await this.node.peerRouting.findPeer(
+          PeerInfo.isPeerInfo(counterparty) ? counterparty.id : counterparty
+        )
+
+        try {
+          let result = await this.node.dialProtocol(peerInfo, this.protocols[0], { signal })
+          clearTimeout(timeout)
+          return result
+        } catch (err) {
+          clearTimeout(timeout)
+
+          this.node.log(
+            `Could not transfer packet to ${(PeerInfo.isPeerInfo(counterparty)
+              ? counterparty.id
+              : counterparty
+            ).toB58String()}. Error was: ${chalk.red(err.message)}.`
+          )
+
+          return
+        }
+      })
 
     await pipe(
       /* prettier-ignore */

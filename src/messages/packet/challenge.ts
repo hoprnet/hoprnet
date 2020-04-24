@@ -100,7 +100,11 @@ export class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
         secp256k1.ecdsaRecover(
           this.challengeSignature.signature,
           this.challengeSignature.recovery,
-          await this.paymentChannels.utils.hash(u8aConcat(this.challengeSignature.msgPrefix, await this.hash))
+          this.challengeSignature.msgPrefix != null && this.challengeSignature.msgPrefix.length > 0
+            ? await this.paymentChannels.utils.hash(
+                u8aConcat(this.challengeSignature.msgPrefix, await this.hash)
+              )
+            : await this.hash
         )
       )
     })
@@ -114,7 +118,11 @@ export class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
    */
   async sign(peerId: PeerId): Promise<Challenge<Chain>> {
     // const hashedChallenge = hash(Buffer.concat([this._hashedKey, this._fee.toBuffer('be', VALUE_LENGTH)], HASH_LENGTH + VALUE_LENGTH))
-    const signature = await this.paymentChannels.utils.sign(await this.hash, peerId.privKey.marshal(), peerId.pubKey.marshal())
+    const signature = await this.paymentChannels.utils.sign(
+      await this.hash,
+      peerId.privKey.marshal(),
+      peerId.pubKey.marshal()
+    )
 
     this.challengeSignature = signature
 
@@ -127,9 +135,15 @@ export class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
    * @param hashedKey that is used to generate the key half
    * @param fee
    */
-  static create<Chain extends HoprCoreConnector>(hoprCoreConnector: Chain, hashedKey: Uint8Array, fee: BN): Challenge<Chain> {
+  static create<Chain extends HoprCoreConnector>(
+    hoprCoreConnector: Chain,
+    hashedKey: Uint8Array,
+    fee: BN
+  ): Challenge<Chain> {
     if (hashedKey.length != KEY_LENGTH) {
-      throw Error(`Invalid secret format. Expected a ${Uint8Array.name} of ${KEY_LENGTH} elements but got one with ${hashedKey.length}`)
+      throw Error(
+        `Invalid secret format. Expected a ${Uint8Array.name} of ${KEY_LENGTH} elements but got one with ${hashedKey.length}`
+      )
     }
 
     const challenge = new Challenge(hoprCoreConnector, {
@@ -156,6 +170,10 @@ export class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
       throw Error('Unable to verify challenge without a public key.')
     }
 
-    return this.paymentChannels.utils.verify(await this.hash, this.challengeSignature, peerId.pubKey.marshal())
+    return this.paymentChannels.utils.verify(
+      await this.hash,
+      this.challengeSignature,
+      peerId.pubKey.marshal()
+    )
   }
 }
