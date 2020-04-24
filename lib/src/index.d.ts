@@ -9,16 +9,18 @@ import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface';
 import { Interactions, Duplex } from './interactions';
 import * as DbKeys from './db_keys';
 export declare type HoprOptions = {
+    debug: boolean;
+    db?: LevelUp;
     peerId?: PeerId;
     peerInfo?: PeerInfo;
     password?: string;
     id?: number;
-    bootstrapNode: boolean;
+    bootstrapNode?: boolean;
     network: string;
     connector: typeof HoprCoreConnector;
-    bootstrapServers: PeerInfo[];
+    bootstrapServers?: PeerInfo[];
     provider: string;
-    output: (encoded: Uint8Array) => void;
+    output?: (encoded: Uint8Array) => void;
 };
 export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
     db: LevelUp;
@@ -71,7 +73,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
      *
      * @param options the parameters
      */
-    static createNode(options: HoprOptions): Promise<Hopr<HoprCoreConnector>>;
+    static create(options: HoprOptions): Promise<Hopr<HoprCoreConnector>>;
     /**
      * Parses the bootstrap servers given in `.env` and tries to connect to each of them.
      *

@@ -26,7 +26,7 @@ export async function parseOptions(): Promise<HoprOptions> {
   const unknownOptions: string[] = []
 
   let cli_options = getopts(process.argv.slice(2), {
-    boolean: ['bootstrapNode', 'help', 'listConnectors', 'verbose'],
+    boolean: ['debug', 'bootstrapNode', 'help', 'listConnectors', 'verbose'],
     string: ['network', 'password'],
     alias: {
       l: 'listConnectors',
@@ -151,6 +151,7 @@ export async function parseOptions(): Promise<HoprOptions> {
   }
 
   let options: HoprOptions = {
+    debug: cli_options.debug || false,
     bootstrapNode: cli_options.bootstrapNode,
     network: cli_options.network,
     connector,
