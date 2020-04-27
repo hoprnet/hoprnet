@@ -13,7 +13,7 @@ export default async () => {
   for (const account of accounts) {
     await hoprToken.methods.mint(account, AMOUNT).send({
       from: owner,
-      gas: 200e3
+      gas: 200e3,
     })
 
     console.log(`funded ${account}`)

@@ -16,25 +16,25 @@ const outputPath = join(root, 'build', 'extracted')
 
 const getData = async () => {
   return promisify(readdir)(inputPath)
-    .then(list => {
+    .then((list) => {
       return list
-        .filter(file => file.startsWith('Hopr'))
-        .map(file => {
+        .filter((file) => file.startsWith('Hopr'))
+        .map((file) => {
           return join(inputPath, file)
         })
     })
-    .then(files => {
+    .then((files) => {
       return Promise.all(
-        files.map(async file => {
+        files.map(async (file) => {
           return promisify(readFile)(file, {
-            encoding: 'utf8'
+            encoding: 'utf8',
           })
-            .then(txt => JSON.parse(txt))
-            .then(json => {
+            .then((txt) => JSON.parse(txt))
+            .then((json) => {
               return {
                 contractName: json.contractName,
                 abi: json.abi,
-                bytecode: json.bytecode
+                bytecode: json.bytecode,
               }
             })
         })
@@ -44,11 +44,11 @@ const getData = async () => {
 
 const writeData = async (folder: string, items: Item[]) => {
   await promisify(mkdir)(join(outputPath, folder), {
-    recursive: true
+    recursive: true,
   })
 
   return Promise.all(
-    items.map(item => {
+    items.map((item) => {
       return promisify(writeFile)(join(outputPath, folder, `${item.name}.json`), JSON.stringify(item.value, null, 2))
     })
   )
@@ -63,19 +63,19 @@ export default async () => {
     (result, output) => {
       result.abis.push({
         name: output.contractName,
-        value: output.abi
+        value: output.abi,
       })
 
       result.bytecodes.push({
         name: output.contractName,
-        value: output.bytecode
+        value: output.bytecode,
       })
 
       return result
     },
     {
       abis: [],
-      bytecodes: []
+      bytecodes: [],
     }
   )
 

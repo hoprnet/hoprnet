@@ -7,7 +7,7 @@ import { Debug } from '../../types/truffle'
 const HoprToken: HoprTokenContract = artifacts.require('HoprToken')
 const debug: Debug = global['debug']
 
-contract('DebugExample.test', _accounts => {
+contract('DebugExample.test', (_accounts) => {
   let hoprToken: HoprTokenInstance
 
   before(async () => {

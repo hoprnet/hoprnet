@@ -7,7 +7,7 @@ export const bash = (cmd: string): Promise<void> => {
   return new Promise<void>((resolve, reject) => {
     const [first, ...rest] = cmd.split(' ')
     const child = spawn(first, rest, {
-      cwd: root
+      cwd: root,
     })
 
     child.stdout.setEncoding('utf8')

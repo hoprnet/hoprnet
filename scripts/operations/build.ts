@@ -14,15 +14,15 @@ const actions: Action[] = [
   {
     before: "generating contracts' typescript types",
     cmd: `npx typechain --target truffle --outDir ${root}/types/truffle-contracts ${root}/build/contracts/*.json`,
-    after: 'done ✅'
+    after: 'done ✅',
   },
   { before: 'applying patches', cmd: patch, after: 'done ✅' },
   { before: 'transpiling typescript files', cmd: 'npx tsc', after: 'done ✅' },
   {
     before: 'extracting compiled output',
     cmd: extractBuild,
-    after: 'done ✅'
-  }
+    after: 'done ✅',
+  },
 ]
 
 export default async () => {

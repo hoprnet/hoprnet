@@ -29,13 +29,13 @@ export const getParties = (accountA: string, accountB: string) => {
   if (isPartyA(accountA, accountB)) {
     return {
       partyA: accountA,
-      partyB: accountB
+      partyB: accountB,
     }
   }
 
   return {
     partyA: accountB,
-    partyB: accountA
+    partyB: accountA,
   }
 }
 
@@ -43,11 +43,11 @@ export const getChannelId = (partyA: string, partyB: string) => {
   return keccak256(
     {
       type: 'address',
-      value: partyA
+      value: partyA,
     },
     {
       type: 'address',
-      value: partyB
+      value: partyB,
     }
   )
 }

@@ -1,5 +1,5 @@
-const HoprToken = artifacts.require("HoprToken");
+const HoprToken = artifacts.require('HoprToken')
 
-module.exports = async deployer => {
-  await deployer.deploy(HoprToken);
-};
+module.exports = async (deployer) => {
+  await deployer.deploy(HoprToken)
+}

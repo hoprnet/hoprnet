@@ -13,7 +13,7 @@ if (!operations.includes(operation)) {
 }
 
 import(`./operations/${operation}`)
-  .then(res => {
+  .then((res) => {
     const fn: (...args: any[]) => Promise<any> = res.default
     if (typeof fn === 'undefined') {
       throw Error(`operation '${operation}' not found`)

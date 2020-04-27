@@ -47,7 +47,7 @@ const Ticket: ITicket = ({
   counterPartySecret,
   amount,
   counter,
-  winProbPercent
+  winProbPercent,
 }) => {
   // proof of relay related hashes
   const hashedPorSecretA = keccak256({ type: 'bytes32', value: porSecretA })
@@ -57,15 +57,12 @@ const Ticket: ITicket = ({
   // proof of randomness related hashes
   const hashedCounterPartySecret = keccak256({
     type: 'bytes32',
-    value: counterPartySecret
+    value: counterPartySecret,
   })
 
   // calculate win probability in bytes32
   const winProb = web3.utils.numberToHex(
-    new BigNumber(winProbPercent)
-      .multipliedBy(MAX_UINT256)
-      .dividedBy(100)
-      .toString()
+    new BigNumber(winProbPercent).multipliedBy(MAX_UINT256).dividedBy(100).toString()
   )
 
   const hashedTicket = keccak256(
@@ -95,7 +92,7 @@ const Ticket: ITicket = ({
     signature,
     r,
     s,
-    v
+    v,
   }
 }
 

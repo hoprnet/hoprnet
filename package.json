@@ -27,7 +27,7 @@
     "migrate": "ts-node -T ./scripts/cli.ts migrate",
     "network": "ts-node -T ./scripts/cli.ts network",
     "test": "ts-node -T ./scripts/cli.ts test",
-    "lint": "prettier --list-different contracts/**/*.sol"
+    "lint": "prettier --list-different ."
   },
   "husky": {
     "hooks": {
@@ -37,27 +37,27 @@
   "dependencies": {
     "@hoprnet/hopr-demo-seeds": "https://github.com/hoprnet/hopr-demo-seeds.git",
     "@hoprnet/hopr-utils": "https://github.com/hoprnet/hopr-utils.git",
-    "@openzeppelin/contracts": "^2.4.0",
-    "@truffle/hdwallet-provider": "^1.0.28",
+    "@openzeppelin/contracts": "^3.0.0",
+    "@truffle/hdwallet-provider": "^1.0.34",
     "bignumber.js": "^9.0.0",
     "ganache-core": "^2.10.2",
-    "truffle": "^5.1.22",
+    "truffle": "^5.1.23",
     "truffle-plugin-verify": "^0.3.10",
-    "ts-node": "^8.9.0",
-    "web3": "^1.2.6"
+    "ts-node": "^8.9.1",
+    "web3": "^1.2.7"
   },
   "devDependencies": {
-    "@openzeppelin/test-helpers": "^0.5.4",
-    "@types/chai": "^4.2.7",
-    "@types/mocha": "^5.2.7",
-    "@types/node": "^12.12.17",
+    "@openzeppelin/test-helpers": "^0.5.5",
+    "@types/chai": "^4.2.11",
+    "@types/mocha": "^7.0.2",
+    "@types/node": "^13.13.4",
     "chai": "^4.2.0",
-    "husky": "^4.2.3",
-    "mocha": "^6.2.2",
+    "husky": "^4.2.5",
+    "mocha": "^7.1.2",
     "prettier": "^2.0.5",
     "prettier-plugin-solidity": "^1.0.0-alpha.49",
-    "solhint": "^2.3.0",
-    "solidity-coverage": "^0.7.0",
+    "solhint": "^2.3.1",
+    "solidity-coverage": "^0.7.4",
     "truffle-typings": "^1.0.8",
     "typechain": "^1.0.5",
     "typechain-target-truffle": "^1.0.2",

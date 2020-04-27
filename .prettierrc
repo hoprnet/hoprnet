@@ -1,23 +1,18 @@
 {
+  "tabWidth": 2,
+  "semi": false,
+  "singleQuote": true,
+  "printWidth": 120,
+  "bracketSpacing": true,
   "overrides": [
     {
-      "files": "*.sol",
+      "files": "contracts/**/*.sol",
       "options": {
-        "printWidth": 80,
         "tabWidth": 4,
         "useTabs": false,
         "singleQuote": false,
         "bracketSpacing": false,
         "explicitTypes": "always"
-      }
-    },
-    {
-      "files": "*.ts",
-      "options": {
-        "tabWidth": 2,
-        "semi": false,
-        "singleQuote": true,
-        "printWidth": 120
       }
     }
   ]

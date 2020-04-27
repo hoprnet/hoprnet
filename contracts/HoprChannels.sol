@@ -1,4 +1,4 @@
-pragma solidity ^0.5.3;
+pragma solidity ^0.6.0;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
@@ -25,11 +25,7 @@ contract HoprChannels {
     event OpenedChannel(address indexed opener, address indexed counterParty);
 
     // a party has initiated channel closure
-    event InitiatedChannelClosure(
-        address indexed initiator,
-        address indexed counterParty,
-        uint256 closureTime
-    );
+    event InitiatedChannelClosure(address indexed initiator, address indexed counterParty, uint256 closureTime);
 
     // the payment channel has been settled and closed
     event ClosedChannel(
@@ -64,9 +60,7 @@ contract HoprChannels {
     uint8 constant NUMBER_OF_STATES = 4;
 
     // used to protect against malleable signatures
-    uint256 constant HALF_CURVE_ORDER = uint256(
-        0x7fffffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a0
-    );
+    uint256 constant HALF_CURVE_ORDER = uint256(0x7fffffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a0);
 
     IERC20 public token; // the token that will be used to settle payments
     uint256 public secsClosure; // seconds it takes to allow closing of channel after channel's -
@@ -92,10 +86,7 @@ contract HoprChannels {
         require(hashedSecret != bytes32(0), "hashedSecret must not be empty");
 
         Account storage account = accounts[msg.sender];
-        require(
-            account.hashedSecret != hashedSecret,
-            "new and old hashedSecret must not be the same"
-        );
+        require(account.hashedSecret != hashedSecret, "new and old hashedSecret must not be the same");
 
         account.hashedSecret = hashedSecret;
         account.counter = account.counter += 1;
@@ -119,51 +110,28 @@ contract HoprChannels {
     ) public {
         address funder = msg.sender; // account which funds the channel
 
-        require(
-            recipient != counterParty,
-            "'recipient' and 'counterParty' must not be the same"
-        );
+        require(recipient != counterParty, "'recipient' and 'counterParty' must not be the same");
         require(recipient != address(0), "'recipient' address is empty");
         require(counterParty != address(0), "'counterParty' address is empty");
-        require(
-            additionalDeposit > 0,
-            "'additionalDeposit' must be greater than 0"
-        );
+        require(additionalDeposit > 0, "'additionalDeposit' must be greater than 0");
 
-        (
-            address party_a,
-            ,
-            Channel storage channel,
-            ChannelStatus status
-        ) = getChannel(recipient, counterParty);
+        (address party_a, , Channel storage channel, ChannelStatus status) = getChannel(recipient, counterParty);
 
-        require(
-            status == ChannelStatus.UNINITIALISED ||
-                status == ChannelStatus.FUNDED,
-            "channel is open"
-        );
+        require(status == ChannelStatus.UNINITIALISED || status == ChannelStatus.FUNDED, "channel is open");
 
         token.safeTransferFrom(funder, address(this), additionalDeposit);
 
         channel.deposit = channel.deposit.add(additionalDeposit);
 
         if (recipient == party_a) {
-            channel.partyABalance = channel.partyABalance.add(
-                additionalDeposit
-            );
+            channel.partyABalance = channel.partyABalance.add(additionalDeposit);
         }
 
         if (status == ChannelStatus.UNINITIALISED) {
             channel.stateCounter += 1;
         }
 
-        emit FundedChannel(
-            funder,
-            recipient,
-            counterParty,
-            additionalDeposit,
-            0
-        );
+        emit FundedChannel(funder, recipient, counterParty, additionalDeposit, 0);
     }
 
     /**
@@ -191,58 +159,24 @@ contract HoprChannels {
         address initiator = msg.sender;
 
         // verification
-        require(
-            additionalDeposit > 0,
-            "'additionalDeposit' must be strictly greater than zero"
-        );
-        require(
-            partyAAmount <= additionalDeposit,
-            "'partyAAmount' must be strictly smaller than 'additionalDeposit'"
-        );
-        require(
-            uint256(s) <= HALF_CURVE_ORDER,
-            "found malleable signature, please insert a low-s signature"
-        );
+        require(additionalDeposit > 0, "'additionalDeposit' must be strictly greater than zero");
+        require(partyAAmount <= additionalDeposit, "'partyAAmount' must be strictly smaller than 'additionalDeposit'");
+        require(uint256(s) <= HALF_CURVE_ORDER, "found malleable signature, please insert a low-s signature");
         require(not_after >= now, "signature must not be expired");
 
         address counterparty = ecrecover(
-            prefixed(
-                keccak256(
-                    abi.encodePacked(
-                        stateCounter,
-                        initiator,
-                        additionalDeposit,
-                        partyAAmount,
-                        not_after
-                    )
-                )
-            ),
+            prefixed(keccak256(abi.encodePacked(stateCounter, initiator, additionalDeposit, partyAAmount, not_after))),
             v,
             r,
             s
         );
 
-        require(
-            initiator != counterparty,
-            "initiator and counterparty must not be the same"
-        );
+        require(initiator != counterparty, "initiator and counterparty must not be the same");
 
-        (
-            address partyA,
-            ,
-            Channel storage channel,
-            ChannelStatus status
-        ) = getChannel(initiator, counterparty);
+        (address partyA, , Channel storage channel, ChannelStatus status) = getChannel(initiator, counterparty);
 
-        require(
-            channel.stateCounter == stateCounter,
-            "stored stateCounter and signed stateCounter must be the same"
-        );
-        require(
-            status == ChannelStatus.UNINITIALISED ||
-                status == ChannelStatus.FUNDED,
-            "channel is open"
-        );
+        require(channel.stateCounter == stateCounter, "stored stateCounter and signed stateCounter must be the same");
+        require(status == ChannelStatus.UNINITIALISED || status == ChannelStatus.FUNDED, "channel is open");
 
         uint256 partyBAmount = additionalDeposit - partyAAmount;
 
@@ -261,21 +195,9 @@ contract HoprChannels {
         }
 
         if (initiator == partyA) {
-            emit FundedChannel(
-                address(0),
-                initiator,
-                counterparty,
-                partyAAmount,
-                partyBAmount
-            );
+            emit FundedChannel(address(0), initiator, counterparty, partyAAmount, partyBAmount);
         } else {
-            emit FundedChannel(
-                address(0),
-                counterparty,
-                initiator,
-                partyAAmount,
-                partyBAmount
-            );
+            emit FundedChannel(address(0), counterparty, initiator, partyAAmount, partyBAmount);
         }
     }
 
@@ -286,21 +208,12 @@ contract HoprChannels {
     function openChannel(address counterParty) public {
         address opener = msg.sender;
 
-        require(
-            opener != counterParty,
-            "'opener' and 'counterParty' must not be the same"
-        );
+        require(opener != counterParty, "'opener' and 'counterParty' must not be the same");
         require(counterParty != address(0), "'counterParty' address is empty");
 
-        (, , Channel storage channel, ChannelStatus status) = getChannel(
-            opener,
-            counterParty
-        );
+        (, , Channel storage channel, ChannelStatus status) = getChannel(opener, counterParty);
 
-        require(
-            status == ChannelStatus.FUNDED,
-            "channel must be in funded state"
-        );
+        require(status == ChannelStatus.FUNDED, "channel must be in funded state");
 
         channel.stateCounter += 1;
 
@@ -328,40 +241,23 @@ contract HoprChannels {
         bytes32 s,
         uint8 v
     ) public {
-        require(
-            uint256(s) <= HALF_CURVE_ORDER,
-            "found malleable signature, please insert a low-s signature"
-        );
+        require(uint256(s) <= HALF_CURVE_ORDER, "found malleable signature, please insert a low-s signature");
 
         address recipient = msg.sender;
         Account storage recipientAccount = accounts[recipient];
 
-        bytes32 challenge = keccak256(abi.encodePacked(secret_a)) ^
-            keccak256(abi.encodePacked(secret_b));
+        bytes32 challenge = keccak256(abi.encodePacked(secret_a)) ^ keccak256(abi.encodePacked(secret_b));
 
         bytes32 hashedTicket = prefixed(
-            keccak256(
-                abi.encodePacked(
-                    challenge,
-                    pre_image,
-                    recipientAccount.counter,
-                    amount,
-                    win_prob
-                )
-            )
+            keccak256(abi.encodePacked(challenge, pre_image, recipientAccount.counter, amount, win_prob))
         );
 
-        require(
-            uint256(hashedTicket) < uint256(win_prob),
-            "ticket must be a win"
-        );
+        require(uint256(hashedTicket) < uint256(win_prob), "ticket must be a win");
 
-        (
-            address party_a,
-            ,
-            Channel storage channel,
-            ChannelStatus status
-        ) = getChannel(recipient, ecrecover(hashedTicket, v, r, s));
+        (address party_a, , Channel storage channel, ChannelStatus status) = getChannel(
+            recipient,
+            ecrecover(hashedTicket, v, r, s)
+        );
 
         require(
             status == ChannelStatus.OPEN || status == ChannelStatus.PENDING,
@@ -369,8 +265,7 @@ contract HoprChannels {
         );
         require(amount > 0, "amount must be strictly greater than zero");
         require(
-            recipientAccount.hashedSecret ==
-                keccak256(abi.encodePacked(pre_image)),
+            recipientAccount.hashedSecret == keccak256(abi.encodePacked(pre_image)),
             "given value is not a pre-image of the stored on-chain secret"
         );
 
@@ -398,21 +293,14 @@ contract HoprChannels {
     function initiateChannelClosure(address counterParty) external {
         address initiator = msg.sender;
 
-        (, , Channel storage channel, ChannelStatus status) = getChannel(
-            initiator,
-            counterParty
-        );
+        (, , Channel storage channel, ChannelStatus status) = getChannel(initiator, counterParty);
 
         require(status == ChannelStatus.OPEN, "channel is not open");
 
         channel.closureTime = now + secsClosure;
         channel.stateCounter += 1;
 
-        emit InitiatedChannelClosure(
-            initiator,
-            counterParty,
-            channel.closureTime
-        );
+        emit InitiatedChannelClosure(initiator, counterParty, channel.closureTime);
     }
 
     /**
@@ -425,17 +313,12 @@ contract HoprChannels {
     function claimChannelClosure(address counterParty) external {
         address initiator = msg.sender;
 
-        (
-            address party_a,
-            address party_b,
-            Channel storage channel,
-            ChannelStatus status
-        ) = getChannel(initiator, counterParty);
-
-        require(
-            status == ChannelStatus.PENDING,
-            "channel is not pending for closure"
+        (address party_a, address party_b, Channel storage channel, ChannelStatus status) = getChannel(
+            initiator,
+            counterParty
         );
+
+        require(status == ChannelStatus.PENDING, "channel is not pending for closure");
         require(now >= channel.closureTime, "'closureTime' has not passed");
 
         // settle balances
@@ -448,12 +331,7 @@ contract HoprChannels {
             token.safeTransfer(party_b, channel.deposit);
         }
 
-        emit ClosedChannel(
-            initiator,
-            counterParty,
-            channel.partyABalance,
-            channel.deposit
-        );
+        emit ClosedChannel(initiator, counterParty, channel.partyABalance, channel.deposit);
 
         delete channel.deposit;
         delete channel.partyABalance;
@@ -490,11 +368,7 @@ contract HoprChannels {
      * @param accountA address of account 'A'
      * @param accountB address of account 'B'
      */
-    function isPartyA(address accountA, address accountB)
-        internal
-        pure
-        returns (bool)
-    {
+    function isPartyA(address accountA, address accountB) internal pure returns (bool) {
         return uint160(accountA) < uint160(accountB);
     }
 
@@ -503,11 +377,7 @@ contract HoprChannels {
      * @param accountA address of account 'A'
      * @param accountB address of account 'B'
      */
-    function getParties(address accountA, address accountB)
-        internal
-        pure
-        returns (address, address)
-    {
+    function getParties(address accountA, address accountB) internal pure returns (address, address) {
         if (isPartyA(accountA, accountB)) {
             return (accountA, accountB);
         } else {
@@ -520,11 +390,7 @@ contract HoprChannels {
      * @param party_a address of party 'A'
      * @param party_b address of party 'B'
      */
-    function getChannelId(address party_a, address party_b)
-        internal
-        pure
-        returns (bytes32)
-    {
+    function getChannelId(address party_a, address party_b) internal pure returns (bytes32) {
         return keccak256(abi.encodePacked(party_a, party_b));
     }
 
@@ -532,11 +398,7 @@ contract HoprChannels {
      * @notice returns 'ChannelStatus'
      * @param channel Channel
      */
-    function getChannelStatus(Channel memory channel)
-        internal
-        pure
-        returns (ChannelStatus)
-    {
+    function getChannelStatus(Channel memory channel) internal pure returns (ChannelStatus) {
         return ChannelStatus(channel.stateCounter.mod(10));
     }
 
@@ -545,9 +407,6 @@ contract HoprChannels {
      * @param message bytes32 message to prefix
      */
     function prefixed(bytes32 message) internal pure returns (bytes32) {
-        return
-            keccak256(
-                abi.encodePacked("\x19Ethereum Signed Message:\n32", message)
-            );
+        return keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", message));
     }
 }

@@ -35,7 +35,7 @@ const Fund: IFund = ({ web3, stateCounter, initiator, deposit, partyAAmount, not
     signature,
     r,
     s,
-    v
+    v,
   }
 }
 

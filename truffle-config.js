@@ -1,84 +1,75 @@
-require("ts-node/register");
-const HDWalletProvider = require("@truffle/hdwallet-provider");
+require('ts-node/register')
+const HDWalletProvider = require('@truffle/hdwallet-provider')
 
-let secrets;
+let secrets
 try {
-  secrets = require("./truffle-secrets.json");
+  secrets = require('./truffle-secrets.json')
 } catch (error) {
-  console.warn("truffle-secrets not found!");
+  console.warn('truffle-secrets not found!')
 }
 
 module.exports = {
   networks: {
     // default network
     development: {
-      host: "127.0.0.1",
+      host: '127.0.0.1',
       port: 9545, // 'truffle develop' port
-      network_id: "*"
+      network_id: '*',
     },
 
     // used when testing
     test: {
-      host: "127.0.0.1",
+      host: '127.0.0.1',
       port: 9545, // 'truffle develop' port
-      network_id: "*"
+      network_id: '*',
     },
 
     // used for generating code coverage
     soliditycoverage: {
-      host: "127.0.0.1",
+      host: '127.0.0.1',
       port: 8555, // if you change this, also set the port option in '.solcover.js'
-      network_id: "*"
+      network_id: '*',
     },
 
     rinkeby: secrets && {
-      provider: () =>
-        new HDWalletProvider(
-          secrets.mnemonic,
-          `https://rinkeby.infura.io/v3/${secrets.infura}`
-        ),
+      provider: () => new HDWalletProvider(secrets.mnemonic, `https://rinkeby.infura.io/v3/${secrets.infura}`),
       gas: 6500000,
       gasPrice: 1000000000,
-      network_id: "4"
+      network_id: '4',
     },
 
     kovan: secrets && {
-      provider: () =>
-        new HDWalletProvider(
-          secrets.mnemonic,
-          `https://kovan.infura.io/v3/${secrets.infura}`
-        ),
+      provider: () => new HDWalletProvider(secrets.mnemonic, `https://kovan.infura.io/v3/${secrets.infura}`),
       gas: 6500000,
       gasPrice: 1000000000,
-      network_id: "42"
-    }
+      network_id: '42',
+    },
   },
 
   // default mocha options
   mocha: {
-    timeout: 100000
+    timeout: 100000,
   },
 
   // configure your compilers
   compilers: {
     solc: {
-      version: "0.5.7", // Fetch exact version from solc-bin (default: truffle's version)
-      docker: false, // Use "0.5.7" you've installed locally with docker (default: false)
+      version: '0.6.6', // Fetch exact version from solc-bin (default: truffle's version)
       settings: {
         // See the solidity docs for advice about optimization and evmVersion
         optimizer: {
           enabled: true,
-          runs: 200
-        }
-      }
-    }
+          runs: 200,
+        },
+      },
+    },
   },
 
   api_keys: secrets
     ? {
-        etherscan: secrets.etherscan
+        etherscan: secrets.etherscan,
       }
     : undefined,
 
-  plugins: ["solidity-coverage", "truffle-plugin-verify"]
-};
+  plugins: ['solidity-coverage', 'truffle-plugin-verify'],
+}

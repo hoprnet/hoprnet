@@ -2,7 +2,7 @@ import {
   HoprMinterContract,
   HoprMinterInstance,
   HoprTokenContract,
-  HoprTokenInstance
+  HoprTokenInstance,
 } from '../types/truffle-contracts'
 import { PromiseType } from '../types/typescript'
 import { time, expectRevert } from '@openzeppelin/test-helpers'
@@ -12,10 +12,10 @@ const HoprMinter: HoprMinterContract = artifacts.require('HoprMinter')
 
 const formatAccount = (res: PromiseType<HoprMinterInstance['accounts']>) => ({
   balance: res[0],
-  lastClaim: res[1]
+  lastClaim: res[1],
 })
 
-contract('HoprMinter', function([owner, user]) {
+contract('HoprMinter', function ([owner, user]) {
   let hoprToken: HoprTokenInstance
   let hoprMinter: HoprMinterInstance
 
@@ -28,78 +28,71 @@ contract('HoprMinter', function([owner, user]) {
     hoprMinter = await HoprMinter.new(hoprToken.address, maxAmount, duration)
 
     // make HoprMinter the only minter
-    await hoprToken.addMinter(hoprMinter.address, {
-      from: owner
+    await hoprToken.grantRole(await hoprToken.MINTER_ROLE(), hoprMinter.address, {
+      from: owner,
     })
   }
 
   // reset contracts for every test
-  describe('unit tests', function() {
-    beforeEach(async function() {
+  describe('unit tests', function () {
+    beforeEach(async function () {
       await reset()
     })
 
-    it("'user' should fail to 'increaseBalance'", async function() {
+    it("'user' should fail to 'increaseBalance'", async function () {
       await expectRevert.unspecified(
         hoprMinter.increaseBalance(user, '1', {
-          from: user
+          from: user,
         })
       )
     })
 
-    it("should fail to 'increaseBalance' after deadline", async function() {
+    it("should fail to 'increaseBalance' after deadline", async function () {
       await time.increase(time.duration.years(1))
 
       await expectRevert(
         hoprMinter.increaseBalance(user, '1', {
-          from: owner
+          from: owner,
         }),
         'cannot update balances past deadline'
       )
     })
 
-    it("should fail to 'increaseBalance' past maximum", async function() {
+    it("should fail to 'increaseBalance' past maximum", async function () {
       await expectRevert(
-        hoprMinter.increaseBalance(
-          user,
-          web3.utils
-            .toBN(maxAmount)
-            .add(web3.utils.toBN(1))
-            .toString(),
-          {
-            from: owner
-          }
-        ),
+        hoprMinter.increaseBalance(user, web3.utils.toBN(maxAmount).add(web3.utils.toBN(1)).toString(), {
+          from: owner,
+        }),
         'reached max amount allowed to be minted'
       )
     })
   })
 
   // reset contracts once
-  describe('integration tests', function() {
-    before(async function() {
+  describe('integration tests', function () {
+    before(async function () {
       await reset()
     })
 
-    it('claim 50 HOPR after 50 days', async function() {
+    it('claim 50 HOPR after 50 days', async function () {
       await hoprMinter.increaseBalance(user, web3.utils.toWei('100', 'ether'), {
-        from: owner
+        from: owner,
       })
 
       await time.increase(time.duration.days(50))
 
       await hoprMinter.claim({
-        from: user
+        from: user,
       })
 
       const minterBalance = await hoprMinter
         .accounts(user)
         .then(formatAccount)
-        .then(res => {
+        .then((res) => {
           return Number(res.balance.toString())
         })
 
-      const balance = await hoprToken.balanceOf(user).then(res => Number(res.toString()))
+      const balance = await hoprToken.balanceOf(user).then((res) => Number(res.toString()))
 
       expect(minterBalance).to.be.closeTo(
         Number(web3.utils.toWei('50', 'ether')),
@@ -110,21 +103,21 @@ contract('HoprMinter', function([owner, user]) {
       expect(balance).to.be.closeTo(Number(web3.utils.toWei('50', 'ether')), Number(approximate), 'wrong balance')
     })
 
-    it('claim 25 HOPR after 25 days', async function() {
+    it('claim 25 HOPR after 25 days', async function () {
       await time.increase(time.duration.days(25))
 
       await hoprMinter.claimFor(user, {
-        from: owner
+        from: owner,
       })
 
       const minterBalance = await hoprMinter
         .accounts(user)
         .then(formatAccount)
-        .then(res => {
+        .then((res) => {
           return Number(res.balance.toString())
         })
 
-      const balance = await hoprToken.balanceOf(user).then(res => Number(res.toString()))
+      const balance = await hoprToken.balanceOf(user).then((res) => Number(res.toString()))
 
       expect(minterBalance).to.be.closeTo(
         Number(web3.utils.toWei('25', 'ether')),
@@ -135,15 +128,15 @@ contract('HoprMinter', function([owner, user]) {
       expect(balance).to.be.closeTo(Number(web3.utils.toWei('75', 'ether')), Number(approximate), 'wrong balance')
     })
 
-    it("increase user's minter balance by 75", async function() {
+    it("increase user's minter balance by 75", async function () {
       await hoprMinter.increaseBalance(user, web3.utils.toWei('75', 'ether'), {
-        from: owner
+        from: owner,
       })
 
       const minterBalance = await hoprMinter
         .accounts(user)
         .then(formatAccount)
-        .then(res => {
+        .then((res) => {
           return Number(res.balance.toString())
         })
 
@@ -154,21 +147,21 @@ contract('HoprMinter', function([owner, user]) {
       )
     })
 
-    it('claim 60 HOPR after 15 days', async function() {
+    it('claim 60 HOPR after 15 days', async function () {
       await time.increase(time.duration.days(15))
 
       await hoprMinter.claim({
-        from: user
+        from: user,
       })
 
       const minterBalance = await hoprMinter
         .accounts(user)
         .then(formatAccount)
-        .then(res => {
+        .then((res) => {
           return Number(res.balance.toString())
         })
 
-      const balance = await hoprToken.balanceOf(user).then(res => Number(res.toString()))
+      const balance = await hoprToken.balanceOf(user).then((res) => Number(res.toString()))
 
       expect(minterBalance).to.be.closeTo(
         Number(web3.utils.toWei('40', 'ether')),
@@ -179,21 +172,21 @@ contract('HoprMinter', function([owner, user]) {
       expect(balance).to.be.closeTo(Number(web3.utils.toWei('135', 'ether')), Number(approximate), 'wrong balance')
     })
 
-    it('claim remaining HOPR after deadline', async function() {
+    it('claim remaining HOPR after deadline', async function () {
       await time.increase(time.duration.years(1))
 
       await hoprMinter.claim({
-        from: user
+        from: user,
       })
 
       const minterBalance = await hoprMinter
         .accounts(user)
         .then(formatAccount)
-        .then(res => {
+        .then((res) => {
           return Number(res.balance.toString())
         })
 
-      const balance = await hoprToken.balanceOf(user).then(res => Number(res.toString()))
+      const balance = await hoprToken.balanceOf(user).then((res) => Number(res.toString()))
 
       expect(minterBalance).to.be.closeTo(
         Number(web3.utils.toWei('0', 'ether')),
