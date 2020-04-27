@@ -7,7 +7,7 @@ import type * as DbKeys from './dbKeys'
 
 import type * as Constants from './constants'
 
-declare namespace HoprCoreConnector {
+declare namespace HoprCoreConnectorStatic {
   /**
    * Creates an uninitialised instance.
    *
@@ -86,6 +86,8 @@ declare interface HoprCoreConnector {
   readonly channel: typeof Channel
 }
 
-export { Utils, DbKeys, Types, Channel, Constants }
+export { Utils, DbKeys, Types, Channel, Constants, HoprCoreConnectorStatic }
 
-export default HoprCoreConnector
+type CoreConnector = HoprCoreConnector & typeof HoprCoreConnectorStatic
+
+export default  CoreConnector
