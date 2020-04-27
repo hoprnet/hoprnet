@@ -27,7 +27,7 @@
     "migrate": "ts-node -T ./scripts/cli.ts migrate",
     "network": "ts-node -T ./scripts/cli.ts network",
     "test": "ts-node -T ./scripts/cli.ts test",
-    "lint": "prettier --list-different ."
+    "lint": "prettier --check ."
   },
   "husky": {
     "hooks": {
