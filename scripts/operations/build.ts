@@ -9,7 +9,8 @@ type Action = {
 }
 
 const actions: Action[] = [
-  { before: 'running solhint on contracts', cmd: `npx solhint ${root}/contracts/**/*.sol`, after: 'done ✅' },
+  // @TODO: re-enable once solhint supports solidity 0.6
+  // { before: 'running solhint on contracts', cmd: `npx solhint ${root}/contracts/**/*.sol`, after: 'done ✅' },
   { before: 'compiling contracts', cmd: 'npx truffle compile', after: 'done ✅' },
   {
     before: "generating contracts' typescript types",

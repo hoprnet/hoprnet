@@ -10,7 +10,7 @@ exports.bash = (cmd) => {
     return new Promise((resolve, reject) => {
         const [first, ...rest] = cmd.split(' ');
         const child = child_process_1.spawn(first, rest, {
-            cwd: exports.root
+            cwd: exports.root,
         });
         child.stdout.setEncoding('utf8');
         child.stderr.setEncoding('utf8');

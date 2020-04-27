@@ -90,7 +90,7 @@ contract HoprMinter is Ownable {
         uint256 claimable = _claimable(account);
         require(claimable > 0, "nothing to claim");
 
-        token.mint(_account, claimable);
+        token.mint(_account, claimable, "", "");
         account.balance = account.balance.sub(claimable);
         account.lastClaim = now;
     }

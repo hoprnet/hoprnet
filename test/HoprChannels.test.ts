@@ -32,7 +32,7 @@ const formatChannel = (res: PromiseType<HoprChannelsInstance['channels']>) => ({
 //   return response;
 // };
 
-contract('HoprChannels', function ([accountA, accountB, randomUser]) {
+contract('HoprChannels', function ([accountA, accountB]) {
   const { partyA, partyB } = getParties(accountA, accountB)
 
   const partyAPrivKey = NODE_SEEDS[1]
@@ -46,8 +46,8 @@ contract('HoprChannels', function ([accountA, accountB, randomUser]) {
   const reset = async () => {
     hoprToken = await HoprToken.new()
     // mint supply
-    await hoprToken.mint(partyA, web3.utils.toWei('100', 'ether'))
-    await hoprToken.mint(partyB, web3.utils.toWei('100', 'ether'))
+    await hoprToken.mint(partyA, web3.utils.toWei('100', 'ether'), '0x00', '0x00')
+    await hoprToken.mint(partyB, web3.utils.toWei('100', 'ether'), '0x00', '0x00')
     totalSupply = await hoprToken.totalSupply().then((res) => res.toString())
 
     hoprChannels = await HoprChannels.new(hoprToken.address, time.duration.days(2))
@@ -799,7 +799,7 @@ contract('HoprChannels', function ([accountA, accountB, randomUser]) {
 
     it("should fail 'fundChannel' when token balance too low'", async function () {
       await hoprToken.approve(hoprChannels.address, depositAmount)
-      await hoprToken.burn(await hoprToken.balanceOf(partyA), {
+      await hoprToken.burn(await hoprToken.balanceOf(partyA), '0x00', {
         from: partyA,
       })
 

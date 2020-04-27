@@ -14,7 +14,7 @@ export const bash = (cmd: string): Promise<void> => {
     child.stderr.setEncoding('utf8')
 
     child.stdout.on('data', console.log)
-    child.stderr.on('data', console.error)
+    child.stderr.on('data', reject)
 
     child.on('close', resolve)
     child.on('exit', resolve)

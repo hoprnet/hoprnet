@@ -11,25 +11,25 @@ let server;
 const DEFAULT_OPS = {
     ws: true,
     port: 9545,
-    accounts: accounts.map(account => ({
+    accounts: accounts.map((account) => ({
         secretKey: account,
-        balance
+        balance,
     })),
     gasLimit: 0xfffffffffff,
-    gasPrice: '1'
+    gasPrice: '1',
 };
 class CustomGanache {
     constructor(customOps = {}) {
         this.ops = {
             ...DEFAULT_OPS,
-            ...customOps
+            ...customOps,
         };
     }
     async start() {
         return new Promise((resolve, reject) => {
             console.log('Starting ganache instance');
             server = ganache_core_1.default.server(this.ops);
-            server.listen(this.ops.port, err => {
+            server.listen(this.ops.port, (err) => {
                 if (err)
                     return reject(err.message);
                 const url = `${this.ops.ws ? 'ws' : 'http'}://127.0.0.1:${this.ops.port}`;
@@ -44,7 +44,7 @@ class CustomGanache {
             if (typeof server === 'undefined') {
                 return resolve(this);
             }
-            server.close(err => {
+            server.close((err) => {
                 if (err)
                     return reject(err.message);
                 console.log('Network closed');
