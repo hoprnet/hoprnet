@@ -26,11 +26,12 @@
     "fund": "ts-node -T ./scripts/cli.ts fund",
     "migrate": "ts-node -T ./scripts/cli.ts migrate",
     "network": "ts-node -T ./scripts/cli.ts network",
-    "test": "ts-node -T ./scripts/cli.ts test"
+    "test": "ts-node -T ./scripts/cli.ts test",
+    "lint": "prettier --list-different contracts/**/*.sol"
   },
   "husky": {
     "hooks": {
-      "pre-commit": "yarn build && git add ."
+      "pre-commit": "yarn lint && yarn build && git add ."
     }
   },
   "dependencies": {
@@ -53,7 +54,8 @@
     "chai": "^4.2.0",
     "husky": "^4.2.3",
     "mocha": "^6.2.2",
-    "prettier": "^1.19.1",
+    "prettier": "^2.0.5",
+    "prettier-plugin-solidity": "^1.0.0-alpha.49",
     "solhint": "^2.3.0",
     "solidity-coverage": "^0.7.0",
     "truffle-typings": "^1.0.8",
