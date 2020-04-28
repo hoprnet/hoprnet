@@ -8,7 +8,9 @@ declare class Signature extends Uint8ArrayE implements Types.Signature {
         signature: Uint8Array;
         recovery: number;
     });
+    get signatureOffset(): number;
     get signature(): Uint8Array;
+    get recoveryOffset(): number;
     get recovery(): number;
     get msgPrefix(): Uint8Array;
     get onChainSignature(): Uint8Array;

@@ -1,5 +1,4 @@
 import type { Types } from "@hoprnet/hopr-core-connector-interface"
-import { u8aConcat, u8aToNumber } from '@hoprnet/hopr-utils'
 import { Uint8ArrayE } from '../types/extended'
 import { SIGNATURE_LENGTH, SIGNATURE_RECOVERY_LENGTH } from '../constants'
 
@@ -14,43 +13,56 @@ class Signature extends Uint8ArrayE implements Types.Signature {
       recovery: number
     }
   ) {
-    if (arr != null && struct == null) {
-      super(arr.bytes, arr.offset, Signature.SIZE)
-    } else if (arr == null && struct != null) {
-      super(u8aConcat(struct.signature, new Uint8Array([struct.recovery])))
-    } else {
+    if (arr == null && struct == null) {
       throw Error(`Invalid constructor arguments.`)
+    }
+
+    if (arr == null) {
+      super(Signature.SIZE)
+    } else {
+      super(arr.bytes, arr.offset, Signature.SIZE)
+    }
+
+    if (struct != null) {
+      this.set(struct.signature, this.signatureOffset)
+      this.set([struct.recovery], this.recoveryOffset)
     }
   }
 
+  get signatureOffset(): number {
+    return this.byteOffset
+  }
   get signature() {
-    return this.subarray(0, SIGNATURE_LENGTH)
+    return new Uint8Array(this.buffer, this.signatureOffset, SIGNATURE_LENGTH)
   }
 
-  get recovery() {
-    return u8aToNumber(this.subarray(SIGNATURE_LENGTH, SIGNATURE_LENGTH + SIGNATURE_RECOVERY_LENGTH))
+  get recoveryOffset(): number {
+    return this.byteOffset + SIGNATURE_LENGTH
   }
 
-  get msgPrefix() {
+  get recovery(): number {
+    return this[this.recoveryOffset]
+  }
+
+  get msgPrefix(): Uint8Array {
     return new Uint8Array()
   }
 
-  get onChainSignature() {
+  get onChainSignature(): Uint8Array {
     return this.signature
   }
 
-  static get SIZE() {
+  static get SIZE(): number {
     return SIGNATURE_LENGTH + SIGNATURE_RECOVERY_LENGTH
   }
 
-  static create(    arr?: {
+  static create(arr?: {
     bytes: ArrayBuffer
     offset: number
-  },
-  struct?: {
-    signature: Uint8Array
-    recovery: number
-  }) {
+  }, struct?: {
+      signature: Uint8Array
+      recovery: number
+    }) {
     return new Signature(arr, struct)
   }
 }

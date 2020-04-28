@@ -1,6 +1,5 @@
 import type { Networks } from '../tsc/types';
-import type { TransactionObject } from '../tsc/web3/types';
-import { PromiEvent, TransactionReceipt, TransactionConfig } from 'web3-core';
+import { PromiEvent, TransactionReceipt } from 'web3-core';
 import { BlockTransactionString } from 'web3-eth';
 import Web3 from 'web3';
 import BN from 'bn.js';
@@ -13,7 +12,10 @@ export declare function getId(self: AccountId, counterparty: AccountId): Promise
 export declare function privKeyToPubKey(privKey: Uint8Array): Promise<Uint8Array>;
 export declare function pubKeyToAccountId(pubKey: Uint8Array): Promise<AccountId>;
 export declare function hash(msg: Uint8Array): Promise<Hash>;
-export declare function sign(msg: Uint8Array, privKey: Uint8Array): Promise<Signature>;
+export declare function sign(msg: Uint8Array, privKey: Uint8Array, pubKey?: Uint8Array, arr?: {
+    bytes: ArrayBuffer;
+    offset: number;
+}): Promise<Signature>;
 export declare function signer(msg: Uint8Array, signature: Signature): Promise<Uint8Array>;
 export declare function verify(msg: Uint8Array, signature: Signature, pubKey: Uint8Array): Promise<boolean>;
 export declare function convertUnit(amount: BN, sourceUnit: string, targetUnit: 'eth' | 'wei'): BN;
@@ -28,8 +30,5 @@ export declare function waitFor({ web3, network, getCurrentBlock, timestamp }: {
 }): Promise<void>;
 export declare function getNetworkId(web3: Web3): Promise<Networks>;
 export declare function stateCountToStatus(stateCount: number): ChannelStatus;
-export declare function TransactionSigner(web3: Web3, privKey: Uint8Array): <T extends any>(txObject: TransactionObject<T>, txConfig: TransactionConfig) => Promise<{
-    send: () => PromiEvent<TransactionReceipt>;
-    transactionHash: string;
-}>;
+export declare function TransactionSigner(web3: Web3, privKey: Uint8Array): any;
 export declare function Log(suffixes?: string[]): Debug.Debugger;

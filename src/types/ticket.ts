@@ -1,7 +1,7 @@
 import type { Types } from "@hoprnet/hopr-core-connector-interface"
 import BN from 'bn.js'
-import { stringToU8a, u8aConcat, u8aToHex } from '@hoprnet/hopr-utils'
-import { Hash, TicketEpoch, Balance, SignedTicket, Signature } from '.'
+import { stringToU8a, u8aToHex } from '@hoprnet/hopr-utils'
+import { Hash, TicketEpoch, Balance, SignedTicket } from '.'
 import { Uint8ArrayE } from '../types/extended'
 import { sign, verify, hash } from '../utils'
 import type ChannelInstance from '../channel'
@@ -23,76 +23,94 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
       onChainSecret: Hash
     }
   ) {
-    if (arr != null && struct == null) {
-      super(arr.bytes, arr.offset, Ticket.SIZE)
-    } else if (arr == null && struct != null) {
-      super(
-        u8aConcat(
-          new Hash(struct.channelId).toU8a(),
-          new Hash(struct.challenge).toU8a(),
-          new TicketEpoch(struct.epoch).toU8a(),
-          new Balance(struct.amount).toU8a(),
-          new Hash(struct.winProb).toU8a(),
-          new Hash(struct.onChainSecret).toU8a()
-        )
-      )
-    } else {
+    if (arr == null && struct == null) {
       throw Error(`Invalid constructor arguments.`)
+    }
+
+    if (arr == null) {
+      super(Ticket.SIZE)
+    } else {
+      super(arr.bytes, arr.offset, Ticket.SIZE)
+    }
+
+    if (struct != null) {
+      this.set(struct.channelId, this.channelIdOffset)
+      this.set(struct.challenge, this.challengeOffset)
+      this.set(struct.epoch.toU8a(), this.epochOffset)
+      this.set(struct.amount.toU8a(), this.amountOffset)
+      this.set(struct.winProb, this.winProbOffset)
+      this.set(struct.onChainSecret, this.onChainSecretOffset)
     }
   }
 
+  get channelIdOffset(): number {
+    return this.byteOffset
+  }
+
   get channelId(): Hash {
-    return new Hash(this.subarray(0, Hash.SIZE))
+    return new Hash(new Uint8Array(this.buffer, this.channelIdOffset, Hash.SIZE))
+  }
+
+  get challengeOffset(): number {
+    return this.byteOffset + Hash.SIZE
   }
 
   get challenge(): Hash {
-    return new Hash(this.subarray(Hash.SIZE, Hash.SIZE + Hash.SIZE))
+    return new Hash(new Uint8Array(this.buffer, this.challengeOffset, Hash.SIZE))
+  }
+
+  get epochOffset(): number {
+    return this.byteOffset + Hash.SIZE + Hash.SIZE
   }
 
   get epoch(): TicketEpoch {
-    const start = Hash.SIZE + Hash.SIZE
-    return new TicketEpoch(this.subarray(start, start + TicketEpoch.SIZE))
+    return new TicketEpoch(new Uint8Array(this.buffer, this.epochOffset, TicketEpoch.SIZE))
+  }
+
+  get amountOffset(): number {
+    return this.byteOffset + Hash.SIZE + Hash.SIZE + TicketEpoch.SIZE
   }
 
   get amount(): Balance {
-    const start = Hash.SIZE + Hash.SIZE + TicketEpoch.SIZE
-    return new Balance(this.subarray(start, start + Balance.SIZE))
+    return new Balance(new Uint8Array(this.buffer, this.amountOffset, Balance.SIZE))
+  }
+
+  get winProbOffset(): number {
+    return this.byteOffset + Hash.SIZE + Hash.SIZE + TicketEpoch.SIZE + Balance.SIZE
   }
 
   get winProb(): Hash {
-    const start = Hash.SIZE + Hash.SIZE + TicketEpoch.SIZE + Balance.SIZE
-    return new Hash(this.subarray(start, start + Hash.SIZE))
+    return new Hash(new Uint8Array(this.buffer, this.winProbOffset, Hash.SIZE))
+  }
+
+  get onChainSecretOffset(): number {
+    return this.byteOffset + Hash.SIZE + Hash.SIZE + TicketEpoch.SIZE + Balance.SIZE + Hash.SIZE
   }
 
   get onChainSecret(): Hash {
-    const start = Hash.SIZE + Hash.SIZE + TicketEpoch.SIZE + Balance.SIZE + Hash.SIZE
-    return new Hash(this.subarray(start, start + Hash.SIZE))
+    return new Hash(new Uint8Array(this.buffer, this.onChainSecretOffset, Hash.SIZE))
   }
 
-  getEmbeddedFunds() {
-    return this.amount.mul(new BN(this.winProb)).div(new BN(new Uint8Array(Hash.SIZE).fill(0xff)))
-  }
-
-  get hash() {
-    return hash(
-      u8aConcat(
-        this.challenge,
-        this.onChainSecret,
-        this.epoch.toU8a(),
-        new Uint8Array(this.amount.toNumber()),
-        this.winProb
-      )
-    )
+  get hash(): Promise<Hash> {
+    return hash(this)
   }
 
   static get SIZE(): number {
     return Hash.SIZE + Hash.SIZE + TicketEpoch.SIZE + Balance.SIZE + Hash.SIZE + Hash.SIZE
   }
 
+  getEmbeddedFunds() {
+    return this.amount.mul(new BN(this.winProb)).div(new BN(new Uint8Array(Hash.SIZE).fill(0xff)))
+  }
+
   static async create(
     channel: ChannelInstance,
     amount: Balance,
-    challenge: Hash
+    challenge: Hash,
+    arr?: {
+      bytes: ArrayBuffer,
+      offset: number
+    }
   ): Promise<SignedTicket> {
     const account = await channel.coreConnector.utils.pubKeyToAccountId(channel.counterparty)
     const { hashedSecret } = await channel.coreConnector.hoprChannels.methods
@@ -102,24 +120,27 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
     const winProb = new Uint8ArrayE(new BN(new Uint8Array(Hash.SIZE).fill(0xff)).div(WIN_PROB).toArray('le', Hash.SIZE))
     const channelId = await channel.channelId
 
-    const ticket = new Ticket(undefined, {
-      channelId: channelId,
-      challenge: challenge,
+    const signedTicket = new SignedTicket(arr) 
+
+    const ticket = new Ticket({
+      bytes: signedTicket.buffer,
+      offset: signedTicket.ticketOffset
+    }, {
+      channelId,
+      challenge,
+      // @TODO set this dynamically
       epoch: new TicketEpoch(0),
       amount: new Balance(amount.toString()),
-      winProb: winProb,
-      onChainSecret: new Uint8ArrayE(stringToU8a(hashedSecret)),
+      winProb,
+      onChainSecret: new Uint8ArrayE(stringToU8a(hashedSecret))
     })
 
-    const signature = await sign(await ticket.hash, channel.coreConnector.self.privateKey).then(res => new Signature({
-      bytes: res.buffer,
-      offset: res.byteOffset
-    }))
-
-    return new SignedTicket(undefined, {
-      signature,
-      ticket
+    await sign(await ticket.hash, channel.coreConnector.self.privateKey, undefined, {
+      bytes: signedTicket.buffer,
+      offset: signedTicket.signatureOffset
     })
+
+    return signedTicket
   }
 
   static async verify(channel: ChannelInstance, signedTicket: SignedTicket): Promise<boolean> {

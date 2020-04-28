@@ -6,7 +6,7 @@ import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.
 import HoprCoreConnector, {
   Types as ITypes,
   Channel as IChannel,
-  Constants as IConstants
+  Constants as IConstants,
 } from '@hoprnet/hopr-core-connector-interface'
 import { u8aToHex, stringToU8a, u8aEquals } from '@hoprnet/hopr-utils'
 import chalk from 'chalk'
@@ -78,11 +78,11 @@ export default class HoprEthereum implements HoprCoreConnector {
     return this.hoprToken.methods
       .balanceOf(this.account.toHex())
       .call()
-      .then(res => new types.Balance(res))
+      .then((res) => new types.Balance(res))
   }
 
   get accountNativeBalance() {
-    return this.web3.eth.getBalance(this.account.toHex()).then(res => new types.NativeBalance(res))
+    return this.web3.eth.getBalance(this.account.toHex()).then((res) => new types.NativeBalance(res))
   }
 
   async start() {
@@ -191,9 +191,9 @@ export default class HoprEthereum implements HoprCoreConnector {
           // initialize account secret
           this.initializeAccountSecret(),
           // confirm web3 is connected
-          this.checkWeb3()
-        ]).then(responses => {
-          const allOk = responses.every(r => !!r)
+          this.checkWeb3(),
+        ]).then((responses) => {
+          const allOk = responses.every((r) => !!r)
 
           if (!allOk) {
             throw Error('could not initialize connector')
@@ -266,8 +266,8 @@ For Kovan HOPR test tokens visit our Telegram channel at ${chalk.blue('https://t
     onChainSecret = await this.hoprChannels.methods
       .accounts(this.account.toHex())
       .call()
-      .then(res => stringToU8a(res.hashedSecret))
-      .then(secret => {
+      .then((res) => stringToU8a(res.hashedSecret))
+      .then((secret) => {
         if (u8aEquals(secret, new Uint8Array(types.Hash.SIZE).fill(0x00))) {
           return undefined
         }
@@ -285,7 +285,7 @@ For Kovan HOPR test tokens visit our Telegram channel at ${chalk.blue('https://t
           (
             await this.signTransaction(this.hoprChannels.methods.setHashedSecret(u8aToHex(offChainSecret)), {
               from: this.account.toHex(),
-              to: this.hoprChannels.options.address
+              to: this.hoprChannels.options.address,
             })
           ).send()
         )
@@ -313,11 +313,11 @@ For Kovan HOPR test tokens visit our Telegram channel at ${chalk.blue('https://t
           await this.signTransaction(this.hoprChannels.methods.setHashedSecret(u8aToHex(secret)), {
             from: this.account.toHex(),
             to: this.hoprChannels.options.address,
-            nonce: nonce || (await this.nonce)
+            nonce: nonce || (await this.nonce),
           })
         ).send()
       ),
-      dbPromise
+      dbPromise,
     ])
   }
 
@@ -381,8 +381,8 @@ For Kovan HOPR test tokens visit our Telegram channel at ${chalk.blue('https://t
         publicKey,
         onChainKeyPair: {
           privateKey,
-          publicKey
-        }
+          publicKey,
+        },
       },
       account,
       web3,

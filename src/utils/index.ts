@@ -3,8 +3,7 @@ import type { TransactionObject } from '../tsc/web3/types'
 
 import assert from 'assert'
 import { publicKeyConvert, publicKeyCreate, ecdsaSign, ecdsaRecover, ecdsaVerify } from 'secp256k1'
-// @ts-ignore
-import keccak256 = require('keccak256')
+import createKeccakHash from 'keccak'
 import { PromiEvent, TransactionReceipt, TransactionConfig } from 'web3-core'
 import { BlockTransactionString } from 'web3-eth'
 import Web3 from 'web3'
@@ -53,13 +52,16 @@ export async function pubKeyToAccountId(pubKey: Uint8Array): Promise<AccountId> 
 }
 
 export async function hash(msg: Uint8Array): Promise<Hash> {
-  return Promise.resolve(new Hash(new Uint8Array(keccak256(Buffer.from(msg)))))
+  return Promise.resolve(new Hash(createKeccakHash('keccak256').update(Buffer.from(msg)).digest()))
 }
 
-export async function sign(msg: Uint8Array, privKey: Uint8Array): Promise<Signature> {
+export async function sign(msg: Uint8Array, privKey: Uint8Array, pubKey?: Uint8Array, arr?: {
+  bytes: ArrayBuffer,
+  offset: number
+}): Promise<Signature> {
   const result = ecdsaSign(msg, privKey)
 
-  const response = new Signature(undefined, {
+  const response = new Signature(arr, {
     signature: result.signature,
     // @ts-ignore-next-line
     recovery: result.recid
@@ -206,7 +208,8 @@ export function stateCountToStatus(stateCount: number): ChannelStatus {
 
 // sign transaction's locally and send them
 // @TODO: switch to web3js-accounts wallet if it's safe
-export function TransactionSigner(web3: Web3, privKey: Uint8Array) {
+// @TODO: remove explicit any
+export function TransactionSigner(web3: Web3, privKey: Uint8Array): any {
   const privKeyStr = new Hash(privKey).toHex()
 
   return async function signTransaction<T extends any>(

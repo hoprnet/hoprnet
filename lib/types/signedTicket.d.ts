@@ -11,7 +11,9 @@ declare class SignedTicket extends Uint8ArrayE implements Types.SignedTicket<Tic
         signature: Signature;
         ticket: Ticket;
     });
+    get ticketOffset(): number;
     get ticket(): Ticket;
+    get signatureOffset(): number;
     get signature(): Signature;
     get signer(): Promise<Uint8Array>;
     static get SIZE(): number;

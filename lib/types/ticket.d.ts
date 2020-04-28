@@ -15,16 +15,25 @@ declare class Ticket extends Uint8ArrayE implements Types.Ticket {
         winProb: Hash;
         onChainSecret: Hash;
     });
+    get channelIdOffset(): number;
     get channelId(): Hash;
+    get challengeOffset(): number;
     get challenge(): Hash;
+    get epochOffset(): number;
     get epoch(): TicketEpoch;
+    get amountOffset(): number;
     get amount(): Balance;
+    get winProbOffset(): number;
     get winProb(): Hash;
+    get onChainSecretOffset(): number;
     get onChainSecret(): Hash;
-    getEmbeddedFunds(): BN;
     get hash(): Promise<Hash>;
     static get SIZE(): number;
-    static create(channel: ChannelInstance, amount: Balance, challenge: Hash): Promise<SignedTicket>;
+    getEmbeddedFunds(): BN;
+    static create(channel: ChannelInstance, amount: Balance, challenge: Hash, arr?: {
+        bytes: ArrayBuffer;
+        offset: number;
+    }): Promise<SignedTicket>;
     static verify(channel: ChannelInstance, signedTicket: SignedTicket): Promise<boolean>;
     static submit(channel: any, signedTicket: SignedTicket): Promise<void>;
 }

@@ -18,40 +18,53 @@ class SignedTicket extends Uint8ArrayE implements Types.SignedTicket<Ticket, Sig
       ticket: Ticket
     }
   ) {
-    if (arr != null && struct == null) {
+    if (arr == null) {
+      super(SignedTicket.SIZE)
+    } else {
       super(arr.bytes, arr.offset, SignedTicket.SIZE)
-    } else if (arr == null && struct != null) {
+    }
+
+    if (struct != null) {
       const ticket = struct.ticket.toU8a()
 
+      this.set(struct.signature, this.signatureOffset)
+      this._signature = struct.signature
+
       if (ticket.length == Ticket.SIZE) {
-        super(u8aConcat(struct.signature, ticket))
+        this.set(struct.ticket, this.ticketOffset)
       } else if (ticket.length < Ticket.SIZE) {
-        super(u8aConcat(struct.signature, ticket, new Uint8Array(Ticket.SIZE - ticket.length)))
+        this.set(u8aConcat(ticket, new Uint8Array(Ticket.SIZE - ticket.length)), this.ticketOffset)
       } else {
         throw Error(`Ticket is too big by ${ticket.length - Ticket.SIZE} elements.`)
       }
-    } else {
-      throw Error(`Invalid constructor arguments.`)
+      this._ticket = struct.ticket
     }
+  }
+
+  get ticketOffset(): number {
+    return this.byteOffset + Signature.SIZE
   }
 
   get ticket(): Ticket {
     if (this._ticket == null) {
-      const ticket = this.subarray(Signature.SIZE, Signature.SIZE + Ticket.SIZE)
       this._ticket = new Ticket({
-        bytes: ticket.buffer,
-        offset: ticket.byteOffset
+        bytes: this.buffer,
+        offset: this.ticketOffset
       })
     }
 
     return this._ticket
   }
 
+  get signatureOffset(): number {
+    return this.byteOffset
+  }
+  
   get signature(): Signature {
     if (this._signature == null) {
       this._signature = new Signature({
         bytes: this.buffer,
-        offset: this.byteOffset
+        offset: this.signatureOffset
       })
     }
 
