@@ -24,8 +24,8 @@ class Signature extends Uint8ArrayE implements Types.Signature {
     }
 
     if (struct != null) {
-      this.set(struct.signature, this.signatureOffset)
-      this.set([struct.recovery], this.recoveryOffset)
+      this.set(struct.signature, this.signatureOffset - this.byteOffset)
+      this.set([struct.recovery], this.recoveryOffset - this.byteOffset)
     }
   }
 
@@ -41,7 +41,7 @@ class Signature extends Uint8ArrayE implements Types.Signature {
   }
 
   get recovery(): number {
-    return this[this.recoveryOffset]
+    return this[this.recoveryOffset - this.byteOffset]
   }
 
   get msgPrefix(): Uint8Array {

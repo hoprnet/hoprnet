@@ -27,13 +27,13 @@ class SignedTicket extends Uint8ArrayE implements Types.SignedTicket<Ticket, Sig
     if (struct != null) {
       const ticket = struct.ticket.toU8a()
 
-      this.set(struct.signature, this.signatureOffset)
+      this.set(struct.signature, this.signatureOffset - this.byteOffset)
       this._signature = struct.signature
 
       if (ticket.length == Ticket.SIZE) {
-        this.set(struct.ticket, this.ticketOffset)
+        this.set(struct.ticket, this.ticketOffset - this.byteOffset)
       } else if (ticket.length < Ticket.SIZE) {
-        this.set(u8aConcat(ticket, new Uint8Array(Ticket.SIZE - ticket.length)), this.ticketOffset)
+        this.set(u8aConcat(ticket, new Uint8Array(Ticket.SIZE - ticket.length)), this.ticketOffset - this.byteOffset)
       } else {
         throw Error(`Ticket is too big by ${ticket.length - Ticket.SIZE} elements.`)
       }

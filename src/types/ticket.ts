@@ -34,12 +34,12 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
     }
 
     if (struct != null) {
-      this.set(struct.channelId, this.channelIdOffset)
-      this.set(struct.challenge, this.challengeOffset)
-      this.set(struct.epoch.toU8a(), this.epochOffset)
-      this.set(struct.amount.toU8a(), this.amountOffset)
-      this.set(struct.winProb, this.winProbOffset)
-      this.set(struct.onChainSecret, this.onChainSecretOffset)
+      this.set(struct.channelId, this.channelIdOffset - this.byteOffset)
+      this.set(struct.challenge, this.challengeOffset - this.byteOffset)
+      this.set(struct.epoch.toU8a(), this.epochOffset - this.byteOffset)
+      this.set(struct.amount.toU8a(), this.amountOffset - this.byteOffset)
+      this.set(struct.winProb, this.winProbOffset - this.byteOffset)
+      this.set(struct.onChainSecret, this.onChainSecretOffset - this.byteOffset)
     }
   }
 
