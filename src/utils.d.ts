@@ -5,7 +5,7 @@ import type { AccountId, Hash, Signature, Balance } from './types'
  * @param self id of ourself
  * @param counterparty id of the counterparty
 */
-export declare function isPartyA<ConcreteAccountId extends AccountId>(self: ConcreteAccountId, counterparty: ConcreteAccountId): boolean
+export declare function isPartyA(self: AccountId, counterparty: AccountId): boolean
 
 /**
  * Returns the Id of the channel between ourself and `counterparty`.
@@ -13,7 +13,7 @@ export declare function isPartyA<ConcreteAccountId extends AccountId>(self: Conc
  * @param counterparty id of the counterparty
  * @param props additional arguments
  */
-export declare function getId<ConcreteAccountId extends AccountId>(self: ConcreteAccountId, counterparty: ConcreteAccountId, ...props: any[]): Promise<Hash>
+export declare function getId(self: AccountId, counterparty: AccountId, ...props: any[]): Promise<Hash>
 
 /**
  * Converts a public key into an on-chain AccountId (e.g. an Ethereum address).
@@ -42,7 +42,7 @@ export declare function sign(msg: Uint8Array, privKey: Uint8Array, pubKey: Uint8
  * @param signature signature over `msg` to verify
  * @param pubkey public key of the signer
  */
-export declare function verify<ConcreteSignature extends Signature>(msg: Uint8Array, signature: ConcreteSignature, pubkey: Uint8Array): Promise<boolean>
+export declare function verify(msg: Uint8Array, signature: Signature, pubkey: Uint8Array): Promise<boolean>
 
 /**
  * Takes an amount and converts it from one unit to another one.
@@ -55,4 +55,4 @@ export declare function verify<ConcreteSignature extends Signature>(msg: Uint8Ar
  * fromUnit('1', 'ether', 'wei') == '1000000000000000000'
  * ```
  */
-export declare function convertUnit<ConcreteBalance extends Balance>(amount: ConcreteBalance, sourceUnit: string, targetUnit: string): Balance
+export declare function convertUnit(amount: Balance, sourceUnit: string, targetUnit: string): Balance

@@ -164,7 +164,15 @@ declare namespace Ticket {
     ConcreteHash extends Hash,
     ConcreteTicket extends Ticket,
     ConcreteSignature extends Signature
-  >(channel: ConcreteChannelInstance, amount: ConcreteBalance, challenge: ConcreteHash): Promise<SignedTicket<ConcreteTicket, ConcreteSignature>>
+  >(
+    channel: ConcreteChannelInstance,
+    amount: ConcreteBalance,
+    challenge: ConcreteHash,
+    arr?: {
+      bytes: ArrayBuffer
+      offset: number
+    }
+  ): Promise<SignedTicket<ConcreteTicket, ConcreteSignature>>
 
   /**
    * Checks a previously issued ticket for its validity.
