@@ -74,8 +74,16 @@ describe('check packet forwarding & acknowledgement generation', function () {
         create() {
           return {
             ticket: {
-              create() {
-                const ticket = new Uint8Array(33)
+              create(
+                _channel: any,
+                _amount: any,
+                _challenge: any,
+                arr: {
+                  bytes: ArrayBuffer
+                  offset: number
+                }
+              ) {
+                const ticket = new Uint8Array(arr.bytes, arr.offset, 33)
 
                 ticket.set(node.peerInfo.id.pubKey.marshal())
 
@@ -189,7 +197,7 @@ describe('check packet forwarding & acknowledgement generation', function () {
 
       nodes[i].output = (arr: Uint8Array) => {
         const [msg] = (decode(Buffer.from(arr)) as unknown) as Buffer[]
-  
+
         assert(u8aEquals(msg, testMsg), `Checks that we receive the right message.`)
       }
 

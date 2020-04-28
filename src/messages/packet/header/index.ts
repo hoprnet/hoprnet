@@ -32,6 +32,7 @@ const HASH_KEY_TAGGING = 'T'
 const HASH_KEY_TX = 'Tx'
 const HASH_KEY_TX_BLINDED = 'Tx_'
 const HASH_KEY_TX_LAST = 'Tx_Last'
+const HASH_KEY_TX_LAST_BLINDED = 'Tx_Last_'
 
 const TAG_SIZE = 16
 
@@ -176,13 +177,25 @@ export class Header<Chain extends HoprCoreConnector> extends Uint8Array {
 
   static async create<Chain extends HoprCoreConnector>(
     node: Hopr<Chain>,
-    peerIds: PeerId[]
+    peerIds: PeerId[],
+    arr?: {
+      bytes: ArrayBuffer,
+      offset: number
+    }
   ): Promise<{
     header: Header<Chain>
     secrets: Uint8Array[]
     identifier: Uint8Array
   }> {
-    const header = new Header<Chain>({ bytes: new Uint8Array(Header.SIZE).buffer, offset: 0 })
+    if (arr == null) {
+      let tmpArray = new Uint8Array(Header.SIZE)
+      arr = {
+        bytes: tmpArray.buffer,
+        offset: tmpArray.byteOffset
+      }
+    }
+    
+    const header = new Header<Chain>(arr)
     header.tmpData = header.beta.subarray(ADDRESS_SIZE + MAC_SIZE, PER_HOP_SIZE)
 
     return createHeaderHelper(node, header, peerIds)
@@ -255,6 +268,10 @@ export function deriveTicketKeyBlinding(secret: Uint8Array): Uint8Array {
 
 export function deriveTicketLastKey(secret: Uint8Array): Uint8Array {
   return derivationHelper(secret, HASH_KEY_TX_LAST)
+}
+
+export function deriveTicketLastKeyBlinding(secret: Uint8Array) {
+  return derivationHelper(secret, HASH_KEY_TX_LAST_BLINDED)
 }
 
 export function createMAC(secret: Uint8Array, msg: Uint8Array): Uint8Array {

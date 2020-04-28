@@ -1,4 +1,3 @@
-import secp256k1 from 'secp256k1'
 import BN from 'bn.js'
 import chalk from 'chalk'
 
@@ -8,10 +7,17 @@ const RELAY_FEE = 10
 function fromWei(arg: any, unit: any) {
   return arg.toString()
 }
+
 import { pubKeyToPeerId } from '../../utils'
 import { u8aConcat, u8aEquals } from '@hoprnet/hopr-utils'
 
-import { Header, deriveTicketKey, deriveTagParameters, deriveTicketLastKey } from './header'
+import {
+  Header,
+  deriveTicketKey,
+  deriveTicketKeyBlinding,
+  deriveTagParameters,
+  deriveTicketLastKey,
+} from './header'
 import { Challenge } from './challenge'
 import Message from './message'
 import { LevelUp } from 'levelup'
@@ -47,12 +53,25 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       message: Message
     }
   ) {
-    if (arr != null && struct == null) {
-      super(arr.bytes, arr.offset, Packet.SIZE(node.paymentChannels))
-    } else if (arr == null && struct != null) {
-      super(u8aConcat(struct.header, struct.ticket, struct.challenge, struct.message))
-    } else {
+    if (arr == null && struct == null) {
       throw Error(`Invalid constructor parameters.`)
+    }
+    if (arr == null) {
+      super(Packet.SIZE(node.paymentChannels))
+    } else {
+      super(arr.bytes, arr.offset, Packet.SIZE(node.paymentChannels))
+    }
+
+    if (struct != null) {
+      this.set(struct.header, this.headerOffset - this.byteOffset)
+      this.set(struct.ticket, this.ticketOffset - this.byteOffset)
+      this.set(struct.challenge, this.challengeOffset - this.byteOffset)
+      this.set(struct.message, this.messageOffset - this.byteOffset)
+
+      this._header = struct.header
+      this._ticket = struct.ticket
+      this._challenge = struct.challenge
+      this._message = struct.message
     }
 
     this.node = node
@@ -62,34 +81,55 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     return new Uint8Array(this.buffer, begin + this.byteOffset, end - begin)
   }
 
+  get headerOffset(): number {
+    return this.byteOffset
+  }
+
   get header(): Header<Chain> {
     if (this._header == null) {
-      this._header = new Header<Chain>({ bytes: this.buffer, offset: this.byteOffset })
+      this._header = new Header<Chain>({ bytes: this.buffer, offset: this.headerOffset })
     }
 
     return this._header
+  }
+
+  get ticketOffset(): number {
+    return this.byteOffset + Header.SIZE
   }
 
   get ticket(): Types.SignedTicket<Types.Ticket, Types.Signature> {
     if (this._ticket == null) {
       this._ticket = this.node.paymentChannels.types.SignedTicket.create({
         bytes: this.buffer,
-        offset: this.byteOffset + Header.SIZE,
+        offset: this.ticketOffset,
       })
     }
 
     return this._ticket
   }
 
+  get challengeOffset() {
+    return this.byteOffset + Header.SIZE + this.node.paymentChannels.types.SignedTicket.SIZE
+  }
+
   get challenge(): Challenge<Chain> {
     if (this._challenge == null) {
       this._challenge = new Challenge<Chain>(this.node.paymentChannels, {
         bytes: this.buffer,
-        offset: this.byteOffset + Header.SIZE + this.node.paymentChannels.types.SignedTicket.SIZE,
+        offset: this.challengeOffset,
       })
     }
 
     return this._challenge
+  }
+
+  get messageOffset(): number {
+    return (
+      this.byteOffset +
+      Header.SIZE +
+      this.node.paymentChannels.types.SignedTicket.SIZE +
+      Challenge.SIZE(this.node.paymentChannels)
+    )
   }
 
   get message(): Message {
@@ -97,11 +137,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       this._message = new Message(
         {
           bytes: this.buffer,
-          offset:
-            this.byteOffset +
-            Header.SIZE +
-            this.node.paymentChannels.types.SignedTicket.SIZE +
-            Challenge.SIZE(this.node.paymentChannels),
+          offset: this.messageOffset,
         },
         true
       )
@@ -132,7 +168,20 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     msg: Uint8Array,
     path: PeerId[]
   ): Promise<Packet<Chain>> {
-    const { header, secrets, identifier } = await Header.create(node, path)
+    const arr = new Uint8Array(Packet.SIZE(node.paymentChannels)).fill(0x00)
+    const packet = new Packet<Chain>(node, {
+      bytes: arr.buffer,
+      offset: arr.byteOffset,
+    })
+
+    const { header, secrets, identifier } = await Header.create(node, path, {
+      bytes: packet.buffer,
+      offset: packet.headerOffset,
+    })
+
+    packet._header = header
+
+    const fee = new BN(secrets.length - 1, 10).imul(new BN(RELAY_FEE, 10))
 
     console.log('---------- New Packet ----------')
     path
@@ -143,34 +192,25 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     console.log(`Destination    : ${chalk.blue(path[path.length - 1].toB58String())}`)
     console.log('--------------------------------')
 
-    const arr = new Uint8Array(Packet.SIZE(node.paymentChannels)).fill(0x00)
-    const packet = new Packet<Chain>(node, {
-      bytes: arr.buffer,
-      offset: arr.byteOffset,
-    })
-
-    const fee = new BN(secrets.length - 1, 10).imul(new BN(RELAY_FEE, 10))
-
-    packet.header.set(header)
-
-    packet.challenge.set(
-      await Challenge.create(
-        node.paymentChannels,
-        await node.paymentChannels.utils.hash(deriveTicketKey(secrets[0])),
-        fee
-      ).sign(node.peerInfo.id)
-    )
+    packet._challenge = await Challenge.create(
+      node.paymentChannels,
+      await node.paymentChannels.utils.hash(deriveTicketKeyBlinding(secrets[0])),
+      fee,
+      {
+        bytes: packet.buffer,
+        offset: packet.challengeOffset,
+      }
+    ).sign(node.peerInfo.id)
 
     packet.message.set(Message.createPlain(msg).onionEncrypt(secrets))
 
-    node.log(
-      `Encrypting with ${(
-        await node.paymentChannels.utils.hash(
-          secrets.length == 1
-            ? deriveTicketLastKey(secrets[0])
-            : secp256k1.privateKeyTweakAdd(deriveTicketKey(secrets[0]), deriveTicketKey(secrets[1]))
-        )
-      ).toString()}.`
+    const ticketChallenge = await node.paymentChannels.utils.hash(
+      secrets.length == 1
+        ? deriveTicketLastKey(secrets[0])
+        : u8aConcat(
+            (deriveTicketKey(secrets[0]),
+            await node.paymentChannels.utils.hash(deriveTicketKeyBlinding(secrets[1])))
+          )
     )
 
     const channelBalance = node.paymentChannels.types.ChannelBalance.create(undefined, {
@@ -187,15 +227,10 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
         node.interactions.payments.open.interact(path[0], channelBalance)
     )
 
-    packet.ticket.set(
-      await channel.ticket.create(
-        channel,
-        fee,
-        secrets.length == 1
-          ? deriveTicketLastKey(secrets[0])
-          : secp256k1.privateKeyTweakAdd(deriveTicketKey(secrets[0]), deriveTicketKey(secrets[1]))
-      )
-    )
+    packet._ticket = await channel.ticket.create(channel, fee, ticketChallenge, {
+      bytes: packet.buffer,
+      offset: packet.ticketOffset,
+    })
 
     return packet
   }
@@ -235,7 +270,10 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
    *
    * @param node the node itself
    */
-  async forwardTransform(): Promise<Challenge<Chain>> {
+  async forwardTransform(): Promise<{
+    receivedChallenge: Challenge<Chain>
+    ticketKey: Uint8Array
+  }> {
     this.header.deriveSecret(this.node.peerInfo.id.privKey.marshal())
 
     if (await this.hasTag(this.node.db)) {
@@ -258,46 +296,14 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     )
 
     // check if channel exists
-    let isOpen = false
-    try {
-      isOpen = await this.node.paymentChannels.channel.isOpen(
+    if (
+      !(await this.node.paymentChannels.channel.isOpen(
         this.node.paymentChannels,
         new Uint8Array(sender.pubKey.marshal())
-      )
-    } catch (err) {
-      throw err
-    }
-
-    if (!isOpen) {
+      ))
+    ) {
       throw Error('Payment channel is not open')
     }
-
-    // const currentState = await node.paymentChannels.state(channelId)
-
-    // Update incoming payment channel
-    // const newState = {
-    //   currentOffchainBalance: this.transaction.value,
-    //   currentIndex: this.transaction.index,
-    //   lastTransaction: this.transaction
-    // }
-
-    // if (currentState.state == node.paymentChannels.TransactionRecordState.PRE_OPENED) {
-    //   // @TODO da fehlt noch was
-    //   node.log(`incoming payment over pre-opened channel ${chalk.yellow(channelId.toString())}`)
-    //   newState.state = node.paymentChannels.TransactionRecordState.OPEN
-    //   newState.nonce = this.transaction.nonce
-    //   newState.counterparty = sender.pubKey.marshal()
-    // } else {
-    //   // Check whether we have an open channel in our database
-    //   await this.getPreviousTransaction(node, channelId, currentState)
-    // }
-
-    // node.log(`Database index ${chalk.cyan(currentState.currentIndex.toString('hex'))} on channnel ${chalk.yellow(channelId.toString())}.`)
-    // node.log(`Transaction index ${chalk.cyan(this.transaction.index.toString('hex'))} on channnel ${chalk.yellow(channelId.toString())}.`)
-
-    // if (!new BN(currentState.currentIndex).addn(1).eq(new BN(this.transaction.index))) {
-    //   throw Error('General error.')
-    // }
 
     this.node.log(
       `Payment channel exists. Requested SHA256 pre-image of ${chalk.green(
@@ -307,11 +313,8 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
 
     this.message.decrypt(this.header.derivedSecret)
 
-    const challengeShadowCopy = this.challenge.getCopy()
-    const oldChallenge = new Challenge(this.node.paymentChannels, {
-      bytes: challengeShadowCopy.buffer,
-      offset: challengeShadowCopy.byteOffset,
-    })
+    const receivedChallenge = this.challenge.getCopy()
+    const ticketKey = deriveTicketKeyBlinding(this.header.derivedSecret)
 
     if (u8aEquals(this.node.peerInfo.id.pubKey.marshal(), this.header.address)) {
       await this.prepareDelivery(null, null, channelId)
@@ -319,7 +322,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       await this.prepareForward(null, null, target)
     }
 
-    return oldChallenge
+    return { receivedChallenge, ticketKey }
   }
 
   /**
@@ -416,13 +419,15 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
 
     const forwardedFunds = receivedMoney.isub(new BN(RELAY_FEE, 10))
 
-    this.challenge.set(
-      await Challenge.create<Chain>(
-        this.node.paymentChannels,
-        this.header.hashedKeyHalf,
-        forwardedFunds
-      ).sign(this.node.peerInfo.id)
-    )
+    this._challenge = await Challenge.create<Chain>(
+      this.node.paymentChannels,
+      this.header.hashedKeyHalf,
+      forwardedFunds,
+      {
+        bytes: this.buffer,
+        offset: this.challengeOffset,
+      }
+    ).sign(this.node.peerInfo.id)
 
     // const [tx] = await Promise.all([
     //   node.paymentChannels.transfer(await node.paymentChannels.utils.pubKeyToAccountId(target.pubKey.marshal()), forwardedFunds, this.header.encryptionKey),
@@ -434,7 +439,10 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     //     .write()
     // ])
 
-    this.ticket.set(await channel.ticket.create(channel, forwardedFunds, this.header.encryptionKey))
+    this._ticket = await channel.ticket.create(channel, forwardedFunds, this.header.encryptionKey, {
+      bytes: this.buffer,
+      offset: this.ticketOffset,
+    })
   }
 
   /**

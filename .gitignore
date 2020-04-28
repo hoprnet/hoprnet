@@ -17,3 +17,6 @@ db
 # Exclude built test
 lib/**/*.spec.js
 lib/**/*.spec.d.ts
+
+# Exclude source map
+lib/**/*.js.map

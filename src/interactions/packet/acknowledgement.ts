@@ -15,7 +15,8 @@ import EventEmitter from 'events'
 import { PROTOCOL_ACKNOWLEDGEMENT } from '../../constants'
 import { u8aToHex } from '@hoprnet/hopr-utils'
 
-class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector> extends EventEmitter implements AbstractInteraction<Chain> {
+class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector> extends EventEmitter
+  implements AbstractInteraction<Chain> {
   protocols: string[] = [PROTOCOL_ACKNOWLEDGEMENT]
 
   constructor(public node: Hopr<Chain>) {
@@ -38,11 +39,19 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector> extends 
     }
 
     try {
-      struct = await this.node.dialProtocol(counterparty, this.protocols[0]).catch(async (err: Error) => {
-        return this.node.peerRouting.findPeer(counterparty).then((peerInfo: PeerInfo) => this.node.dialProtocol(peerInfo, this.protocols[0]))
-      })
+      struct = await this.node
+        .dialProtocol(counterparty, this.protocols[0])
+        .catch(async (err: Error) => {
+          return this.node.peerRouting
+            .findPeer(counterparty)
+            .then((peerInfo: PeerInfo) => this.node.dialProtocol(peerInfo, this.protocols[0]))
+        })
     } catch (err) {
-      console.log(`Could not transfer acknowledgement to ${counterparty.toB58String()}. Error was: ${chalk.red(err.message)}.`)
+      console.log(
+        `Could not transfer acknowledgement to ${counterparty.toB58String()}. Error was: ${chalk.red(
+          err.message
+        )}.`
+      )
       return
     }
 
@@ -61,23 +70,27 @@ async function handleHelper(source: any): Promise<void> {
     const arr = msg.slice()
     const acknowledgement = new Acknowledgement(self.node.paymentChannels, {
       bytes: arr.buffer,
-      offset: arr.byteOffset
+      offset: arr.byteOffset,
     })
 
     let record: any
 
-    const unAcknowledgedDbKey = u8aToHex(self.node.dbKeys.UnAcknowledgedTickets(await acknowledgement.responseSigningParty, await acknowledgement.hashedKey))
+    const unAcknowledgedDbKey = u8aToHex(
+      self.node.dbKeys.UnAcknowledgedTickets(
+        await acknowledgement.responseSigningParty,
+        await acknowledgement.hashedKey
+      )
+    )
 
     try {
       record = await self.node.db.get(unAcknowledgedDbKey)
 
-      const acknowledgedDbKey = self.node.dbKeys.AcknowledgedTickets(await acknowledgement.responseSigningParty, acknowledgement.key)
+      const acknowledgedDbKey = self.node.dbKeys.AcknowledgedTickets(
+        await acknowledgement.responseSigningParty,
+        acknowledgement.key
+      )
       try {
-        await self.node.db
-          .batch()
-          .del(unAcknowledgedDbKey)
-          .put(acknowledgedDbKey, record)
-          .write()
+        await self.node.db.batch().del(unAcknowledgedDbKey).put(acknowledgedDbKey, record).write()
       } catch (err) {
         console.log(`Error while writing to database. Error was ${chalk.red(err.message)}.`)
       }

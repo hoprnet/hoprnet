@@ -13,11 +13,8 @@ import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '../../'
 import pipe from 'it-pipe'
 
-import { deriveTicketKeyBlinding } from '../../messages/packet/header'
-
 import { randomInteger } from '@hoprnet/hopr-utils'
 import { getTokens, Token } from '../../utils'
-import { Challenge } from '../../messages/packet/challenge'
 
 const MAX_PARALLEL_JOBS = 20
 
@@ -117,8 +114,6 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector>
 
   async handlePacket(token: number): Promise<void> {
     let packet: Packet<Chain>
-    let oldChallenge: Challenge<Chain>
-
     let sender: PeerId, target: PeerId
 
     // Check for unserviced packets
@@ -134,7 +129,7 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector>
         this.queue[index] = this.queue.pop() as Packet<Chain>
       }
 
-      oldChallenge = await packet.forwardTransform()
+      let { receivedChallenge, ticketKey } = await packet.forwardTransform()
 
       /* prettier-ignore */
       ;[sender, target] = await Promise.all([
@@ -143,14 +138,13 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector>
         packet.getTargetPeerId(),
       ])
 
-      // dispatch acknowledgement
       setImmediate(async () => {
         const ack = new Acknowledgement(this.node.paymentChannels, undefined, {
-          key: deriveTicketKeyBlinding(packet.header.derivedSecret),
-          challenge: oldChallenge,
+          key: ticketKey,
+          challenge: receivedChallenge,
         })
 
-        this.node.interactions.packet.acknowledgment.interact(
+        await this.node.interactions.packet.acknowledgment.interact(
           sender,
           await ack.sign(this.node.peerInfo.id)
         )

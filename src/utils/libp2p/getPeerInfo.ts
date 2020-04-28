@@ -54,16 +54,20 @@ async function getPeerId(options: HoprOptions, db?: LevelUp): Promise<PeerId> {
     return options.peerId
   }
 
-  if (process.env.DEVELOP_MODE === 'true') {
+  if (options.debug) {
     if (options.id != null && isFinite(options.id)) {
       if (options.bootstrapNode) {
         if (options.id >= BOOTSTRAP_SEEDS.length) {
-          throw Error(`Unable to access bootstrap seed number ${options.id} out of ${BOOTSTRAP_SEEDS.length} bootstrap seeds.`)
+          throw Error(
+            `Unable to access bootstrap seed number ${options.id} out of ${BOOTSTRAP_SEEDS.length} bootstrap seeds.`
+          )
         }
         return await privKeyToPeerId(BOOTSTRAP_SEEDS[options.id])
       } else {
         if (options.id >= NODE_SEEDS.length) {
-          throw Error(`Unable to access node seed number ${options.id} out of ${NODE_SEEDS.length} node seeds.`)
+          throw Error(
+            `Unable to access node seed number ${options.id} out of ${NODE_SEEDS.length} node seeds.`
+          )
         }
         return await privKeyToPeerId(NODE_SEEDS[options.id])
       }
@@ -71,7 +75,9 @@ async function getPeerId(options: HoprOptions, db?: LevelUp): Promise<PeerId> {
       return await privKeyToPeerId(BOOTSTRAP_SEEDS[0])
     }
   } else if (options.id != null && isFinite(options.id)) {
-    throw Error(`Demo Ids are only available in DEVELOP_MODE. Consider setting DEVELOP_MODE to 'true' in .env`)
+    throw Error(
+      `Demo Ids are only available in DEBUG_MODE. Consider setting DEBUG_MODE to 'true' in .env`
+    )
   }
 
   if (db == null) {
@@ -91,7 +97,8 @@ async function getFromDatabase(db: LevelUp, pw?: string): Promise<PeerId> {
 
     let done = false
     do {
-      pw = pw || (await askForPassword('Please type in the passwort that was used to encrypt to key.'))
+      pw =
+        pw || (await askForPassword('Please type in the passwort that was used to encrypt to key.'))
 
       try {
         peerId = await deserializeKeyPair(serializedKeyPair, new TextEncoder().encode(pw))
@@ -133,7 +140,10 @@ function checkConfig(): void {
 }
 
 async function getPeerInfo(options: HoprOptions, db?: LevelUp): Promise<PeerInfo> {
-  if (db == null && (options == null || (options != null && options.peerInfo == null && options.peerId == null))) {
+  if (
+    db == null &&
+    (options == null || (options != null && options.peerInfo == null && options.peerId == null))
+  ) {
     throw Error('Invalid input parameter. Please set a valid peerInfo or pass a database handle.')
   }
 
@@ -148,7 +158,9 @@ async function getPeerInfo(options: HoprOptions, db?: LevelUp): Promise<PeerInfo
     peerInfo = new PeerInfo(await getPeerId(options, db))
   }
 
-  addrs.forEach(addr => peerInfo.multiaddrs.add(addr.encapsulate(`/${NAME}/${peerInfo.id.toB58String()}`)))
+  addrs.forEach(addr =>
+    peerInfo.multiaddrs.add(addr.encapsulate(`/${NAME}/${peerInfo.id.toB58String()}`))
+  )
 
   return peerInfo
 }

@@ -6,6 +6,7 @@
     "module": "commonjs",
     "target": "es2019",
     "declaration": true,
+    "sourceMap": true,
     "noEmit": true
   },
   "include": ["src/**/*.ts", "chat/**/*.ts"]

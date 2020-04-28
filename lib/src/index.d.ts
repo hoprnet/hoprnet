@@ -6,6 +6,7 @@ import { Debugger } from 'debug';
 import PeerId from 'peer-id';
 import PeerInfo from 'peer-info';
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface';
+import type { HoprCoreConnectorStatic } from '@hoprnet/hopr-core-connector-interface';
 import { Interactions, Duplex } from './interactions';
 import * as DbKeys from './db_keys';
 export declare type HoprOptions = {
@@ -17,7 +18,7 @@ export declare type HoprOptions = {
     id?: number;
     bootstrapNode?: boolean;
     network: string;
-    connector: typeof HoprCoreConnector;
+    connector: HoprCoreConnectorStatic;
     bootstrapServers?: PeerInfo[];
     provider: string;
     output?: (encoded: Uint8Array) => void;
@@ -73,7 +74,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
      *
      * @param options the parameters
      */
-    static create(options: HoprOptions): Promise<Hopr<HoprCoreConnector>>;
+    static create<CoreConnector extends HoprCoreConnector>(options: HoprOptions): Promise<Hopr<CoreConnector>>;
     /**
      * Parses the bootstrap servers given in `.env` and tries to connect to each of them.
      *
@@ -104,7 +105,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
      * @param intermediateNodes optional set path manually
      * the acknowledgement of the first hop
      */
-    sendMessage(msg: Uint8Array, destination: PeerId, getIntermediateNodesManually?: () => Promise<PeerId[]>): Promise<void>;
+    sendMessage(msg: Uint8Array, destination: PeerId | PeerInfo, getIntermediateNodesManually?: () => Promise<PeerId[]>): Promise<void>;
     /**
      * Ping a node.
      *

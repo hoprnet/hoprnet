@@ -60,11 +60,12 @@ export class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
     return paymentChannels.types.Signature.SIZE
   }
 
-  get hash(): Promise<Types.Hash> {
+  get hash(): Types.Hash {
     if (this._hashedKey == null) {
-      return Promise.reject(Error(`Challenge was not set yet.`))
+      throw Error(`Challenge was not set yet.`)
     }
-    return this.paymentChannels.utils.hash(this._hashedKey)
+
+    return this._hashedKey
   }
 
   subarray(begin: number = 0, end: number = Challenge.SIZE(this.paymentChannels)): Uint8Array {
@@ -74,12 +75,17 @@ export class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
   getCopy(): Challenge<Chain> {
     const arrCopy = new Uint8Array(Challenge.SIZE(this.paymentChannels))
 
-    arrCopy.set(this.subarray())
+    arrCopy.set(this)
 
-    return new Challenge<Chain>(this.paymentChannels, {
+    const copiedChallenge = new Challenge<Chain>(this.paymentChannels, {
       bytes: arrCopy.buffer,
       offset: arrCopy.byteOffset,
     })
+
+    copiedChallenge._hashedKey = this._hashedKey
+    copiedChallenge._fee = this._fee
+
+    return copiedChallenge
   }
 
   /**
@@ -138,7 +144,11 @@ export class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
   static create<Chain extends HoprCoreConnector>(
     hoprCoreConnector: Chain,
     hashedKey: Uint8Array,
-    fee: BN
+    fee: BN,
+    arr?: {
+      bytes: ArrayBuffer
+      offset: number
+    }
   ): Challenge<Chain> {
     if (hashedKey.length != KEY_LENGTH) {
       throw Error(
@@ -146,10 +156,16 @@ export class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
       )
     }
 
-    const challenge = new Challenge(hoprCoreConnector, {
-      bytes: new Uint8Array(Challenge.SIZE(hoprCoreConnector)).buffer,
-      offset: 0,
-    })
+    if (arr == null) {
+      const tmp = new Uint8Array(Challenge.SIZE(hoprCoreConnector))
+
+      arr = {
+        bytes: tmp.buffer,
+        offset: tmp.byteOffset,
+      }
+    }
+
+    const challenge = new Challenge(hoprCoreConnector, arr)
 
     challenge._hashedKey = hashedKey
     challenge._fee = fee
@@ -171,7 +187,7 @@ export class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
     }
 
     return this.paymentChannels.utils.verify(
-      await this.hash,
+      this.hash,
       this.challengeSignature,
       peerId.pubKey.marshal()
     )

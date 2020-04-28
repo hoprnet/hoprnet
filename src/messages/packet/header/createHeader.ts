@@ -5,7 +5,17 @@ import { u8aXOR, u8aToHex, u8aConcat } from '@hoprnet/hopr-utils'
 import { PRG } from '../../../utils'
 import { MAX_HOPS } from '../../../constants'
 
-import { Header, BETA_LENGTH, deriveBlinding, derivePRGParameters, deriveTicketKey, deriveTicketKeyBlinding, deriveTicketLastKey, createMAC } from './index'
+import {
+  Header,
+  BETA_LENGTH,
+  deriveBlinding,
+  derivePRGParameters,
+  deriveTicketKey,
+  deriveTicketKeyBlinding,
+  deriveTicketLastKey,
+  deriveTicketLastKeyBlinding,
+  createMAC,
+} from './index'
 
 import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 
@@ -13,9 +23,22 @@ import Hopr from '../../../'
 
 import PeerId from 'peer-id'
 
-import { PRIVATE_KEY_LENGTH, PER_HOP_SIZE, DESINATION_SIZE, IDENTIFIER_SIZE, ADDRESS_SIZE, MAC_SIZE, LAST_HOP_SIZE, KEY_LENGTH } from './parameters'
+import {
+  PRIVATE_KEY_LENGTH,
+  PER_HOP_SIZE,
+  DESINATION_SIZE,
+  IDENTIFIER_SIZE,
+  ADDRESS_SIZE,
+  MAC_SIZE,
+  LAST_HOP_SIZE,
+  KEY_LENGTH,
+} from './parameters'
 
-export async function createHeader<Chain extends HoprCoreConnector>(node: Hopr<Chain>, header: Header<Chain>, peerIds: PeerId[]) {
+export async function createHeader<Chain extends HoprCoreConnector>(
+  node: Hopr<Chain>,
+  header: Header<Chain>,
+  peerIds: PeerId[]
+) {
   function checkPeerIds() {
     if (peerIds.length > MAX_HOPS) {
       throw Error(`Expected at most ${MAX_HOPS} but got ${peerIds.length}`)
@@ -107,7 +130,11 @@ export async function createHeader<Chain extends HoprCoreConnector>(node: Hopr<C
     return filler
   }
 
-  async function createBetaAndGamma(secrets: Uint8Array[], filler: Uint8Array, identifier: Uint8Array) {
+  async function createBetaAndGamma(
+    secrets: Uint8Array[],
+    filler: Uint8Array,
+    identifier: Uint8Array
+  ) {
     const tmp = new Uint8Array(BETA_LENGTH - PER_HOP_SIZE)
 
     for (let i = secrets.length; i > 0; i--) {
@@ -124,7 +151,11 @@ export async function createHeader<Chain extends HoprCoreConnector>(node: Hopr<C
           header.beta.fill(0, LAST_HOP_SIZE, paddingLength)
         }
 
-        u8aXOR(true, header.beta.subarray(0, LAST_HOP_SIZE + paddingLength), PRG.createPRG(key, iv).digest(0, LAST_HOP_SIZE + paddingLength))
+        u8aXOR(
+          true,
+          header.beta.subarray(0, LAST_HOP_SIZE + paddingLength),
+          PRG.createPRG(key, iv).digest(0, LAST_HOP_SIZE + paddingLength)
+        )
 
         header.beta.set(filler, LAST_HOP_SIZE + paddingLength)
       } else {
@@ -134,11 +165,13 @@ export async function createHeader<Chain extends HoprCoreConnector>(node: Hopr<C
         header.beta.set(header.gamma, ADDRESS_SIZE)
 
         // Used for the challenge that is created for the next node
-        header.beta.set(await node.paymentChannels.utils.hash(deriveTicketKeyBlinding(secrets[i])), ADDRESS_SIZE + MAC_SIZE)
+        header.beta.set(
+          await node.paymentChannels.utils.hash(deriveTicketKeyBlinding(secrets[i])),
+          ADDRESS_SIZE + MAC_SIZE
+        )
         header.beta.set(tmp, PER_HOP_SIZE)
 
         if (secrets.length > 2) {
-          let key: Uint8Array
           if (i < secrets.length - 1) {
             /**
              * Tells the relay node which challenge it should for the issued ticket.
@@ -148,15 +181,26 @@ export async function createHeader<Chain extends HoprCoreConnector>(node: Hopr<C
              *     the secret
              *   - the relay node can verify the key derivation path
              */
-            key = await node.paymentChannels.utils.hash(
-              u8aConcat(deriveTicketKey(secrets[i]), await node.paymentChannels.utils.hash(deriveTicketKeyBlinding(secrets[i + 1])))
+            header.beta.set(
+              await node.paymentChannels.utils.hash(
+                u8aConcat(
+                  deriveTicketKey(secrets[i]),
+                  await node.paymentChannels.utils.hash(deriveTicketKeyBlinding(secrets[i + 1]))
+                )
+              ),
+              ADDRESS_SIZE + MAC_SIZE + KEY_LENGTH
             )
           } else if (i == secrets.length - 1) {
-            key = await node.paymentChannels.utils.hash(
-              u8aConcat(deriveTicketLastKey(secrets[i]), await node.paymentChannels.utils.hash(deriveTicketKeyBlinding(secrets[i])))
+            header.beta.set(
+              await node.paymentChannels.utils.hash(
+                u8aConcat(
+                  deriveTicketLastKey(secrets[i]),
+                  await node.paymentChannels.utils.hash(deriveTicketLastKeyBlinding(secrets[i]))
+                )
+              ),
+              ADDRESS_SIZE + MAC_SIZE + KEY_LENGTH
             )
           }
-          header.beta.set(key, ADDRESS_SIZE + MAC_SIZE + KEY_LENGTH)
         }
 
         u8aXOR(true, header.beta, PRG.createPRG(key, iv).digest(0, BETA_LENGTH))
@@ -166,13 +210,11 @@ export async function createHeader<Chain extends HoprCoreConnector>(node: Hopr<C
     }
   }
 
-  function deriveKey(a: Uint8Array, b: Uint8Array) {
-    return secp256k1.privateKeyTweakAdd(deriveTicketKey(a), deriveTicketKey(b))
-  }
-
   function toString(header: Header<Chain>, secrets: Uint8Array[]): string {
     return peerIds.reduce((str, peerId, index) => {
-      str += `\nsecret[${index}]: ${u8aToHex(secrets[index])}\npeerId[${index}]: ${peerId.toB58String()}\npeerId[${index}] pubkey: ${u8aToHex(
+      str += `\nsecret[${index}]: ${u8aToHex(
+        secrets[index]
+      )}\npeerId[${index}]: ${peerId.toB58String()}\npeerId[${index}] pubkey: ${u8aToHex(
         peerId.pubKey.marshal()
       )}`
       return str
@@ -190,6 +232,6 @@ export async function createHeader<Chain extends HoprCoreConnector>(node: Hopr<C
   return {
     header: header,
     secrets: secrets,
-    identifier: identifier
+    identifier: identifier,
   }
 }

@@ -28,7 +28,7 @@ export default class Message extends Uint8Array {
   getCopy(): Message {
     const arrCopy = new Uint8Array(Message.SIZE)
 
-    arrCopy.set(this.subarray())
+    arrCopy.set(this)
 
     return new Message({
       bytes: arrCopy.buffer,

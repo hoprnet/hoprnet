@@ -21,7 +21,7 @@ export declare class Challenge<Chain extends HoprCoreConnector> extends Uint8Arr
     set challengeSignature(signature: Types.Signature);
     get signatureHash(): Promise<Types.Hash>;
     static SIZE<Chain extends HoprCoreConnector>(paymentChannels: Chain): number;
-    get hash(): Promise<Types.Hash>;
+    get hash(): Types.Hash;
     subarray(begin?: number, end?: number): Uint8Array;
     getCopy(): Challenge<Chain>;
     /**
@@ -42,7 +42,10 @@ export declare class Challenge<Chain extends HoprCoreConnector> extends Uint8Arr
      * @param hashedKey that is used to generate the key half
      * @param fee
      */
-    static create<Chain extends HoprCoreConnector>(hoprCoreConnector: Chain, hashedKey: Uint8Array, fee: BN): Challenge<Chain>;
+    static create<Chain extends HoprCoreConnector>(hoprCoreConnector: Chain, hashedKey: Uint8Array, fee: BN, arr?: {
+        bytes: ArrayBuffer;
+        offset: number;
+    }): Challenge<Chain>;
     /**
      * Verifies the challenge by checking whether the given public matches the
      * one restored from the signature.

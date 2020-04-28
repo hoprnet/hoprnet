@@ -26,9 +26,13 @@ export declare class Packet<Chain extends HoprCoreConnector> extends Uint8Array 
         message: Message;
     });
     subarray(begin?: number, end?: number): Uint8Array;
+    get headerOffset(): number;
     get header(): Header<Chain>;
+    get ticketOffset(): number;
     get ticket(): Types.SignedTicket<Types.Ticket, Types.Signature>;
+    get challengeOffset(): number;
     get challenge(): Challenge<Chain>;
+    get messageOffset(): number;
     get message(): Message;
     static SIZE<Chain extends HoprCoreConnector>(hoprCoreConnector: Chain): number;
     /**
@@ -53,7 +57,10 @@ export declare class Packet<Chain extends HoprCoreConnector> extends Uint8Array 
      *
      * @param node the node itself
      */
-    forwardTransform(): Promise<Challenge<Chain>>;
+    forwardTransform(): Promise<{
+        receivedChallenge: Challenge<Chain>;
+        ticketKey: Uint8Array;
+    }>;
     /**
      * Prepares the delivery of the packet.
      *

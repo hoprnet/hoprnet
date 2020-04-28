@@ -31,20 +31,24 @@ import PeerId from 'peer-id'
 import PeerInfo from 'peer-info'
 
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
+import type { HoprCoreConnectorStatic } from '@hoprnet/hopr-core-connector-interface'
+
 import { Interactions, Duplex } from './interactions'
 import * as DbKeys from './db_keys'
 
 export type HoprOptions = {
+  debug: boolean
+  db?: LevelUp
   peerId?: PeerId
   peerInfo?: PeerInfo
   password?: string
   id?: number
-  bootstrapNode: boolean
+  bootstrapNode?: boolean
   network: string
-  connector: typeof HoprCoreConnector
-  bootstrapServers: PeerInfo[]
+  connector: HoprCoreConnectorStatic
+  bootstrapServers?: PeerInfo[]
   provider: string
-  output: (encoded: Uint8Array) => void
+  output?: (encoded: Uint8Array) => void
 }
 
 export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
@@ -135,9 +139,9 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
       )
     )
 
-    this.output = options.output
-    this.bootstrapServers = options.bootstrapServers
-    this.isBootstrapNode = options.bootstrapNode
+    this.output = options.output || console.log
+    this.bootstrapServers = options.bootstrapServers || []
+    this.isBootstrapNode = options.bootstrapNode || false
 
     this.interactions = new Interactions(this)
     this.network = new Network(this)
@@ -150,19 +154,27 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
    *
    * @param options the parameters
    */
-  static async createNode(options: HoprOptions): Promise<Hopr<HoprCoreConnector>> {
-    const db = Hopr.openDatabase(`db`, options.connector.constants, options)
+  static async create<CoreConnector extends HoprCoreConnector>(
+    options: HoprOptions
+  ): Promise<Hopr<CoreConnector>> {
+    const db = options.db || Hopr.openDatabase(`db`, options.connector.constants, options)
 
-    if (options.peerInfo == null) {
-      options.peerInfo = await getPeerInfo(options, db)
+    options.peerInfo = options.peerInfo || (await getPeerInfo(options, db))
+
+    if (
+      !options.debug &&
+      !options.bootstrapNode &&
+      (options.bootstrapServers == null || options.bootstrapServers.length == 0)
+    ) {
+      throw Error(`Cannot start node without a bootstrap server`)
     }
 
-    let connector = await options.connector.create(db, options.peerInfo.id.privKey.marshal(), {
+    let connector = (await options.connector.create(db, options.peerInfo.id.privKey.marshal(), {
       id: options.id,
       provider: options.provider,
-    })
+    })) as CoreConnector
 
-    return new Hopr(options, db, connector).up()
+    return new Hopr<CoreConnector>(options, db, connector).up()
   }
 
   /**
@@ -194,15 +206,15 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
   async up(): Promise<Hopr<Chain>> {
     await super.start()
 
-    if (!this.isBootstrapNode) {
+    if (!this.isBootstrapNode && this.bootstrapServers.length != 0) {
       await this.connectToBootstrapServers()
-    } else {
-      this.log(`Available under the following addresses:`)
-
-      this.peerInfo.multiaddrs.forEach((ma: Multiaddr) => {
-        this.log(ma.toString())
-      })
     }
+
+    this.log(`Available under the following addresses:`)
+
+    this.peerInfo.multiaddrs.forEach((ma: Multiaddr) => {
+      this.log(ma.toString())
+    })
 
     await this.paymentChannels?.start()
 
@@ -243,10 +255,10 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
    */
   async sendMessage(
     msg: Uint8Array,
-    destination: PeerId,
+    destination: PeerId | PeerInfo,
     getIntermediateNodesManually?: () => Promise<PeerId[]>
   ): Promise<void> {
-    if (!destination) throw Error(`Expecting a non-empty destination.`)
+    const destinationId = PeerInfo.isPeerInfo(destination) ? destination.id : destination
 
     const promises: Promise<void>[] = []
 
@@ -257,10 +269,10 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
           if (getIntermediateNodesManually != undefined) {
             path = await getIntermediateNodesManually()
           } else {
-            path = await this.getIntermediateNodes(destination)
+            path = await this.getIntermediateNodes(destinationId)
           }
 
-          path.push(destination)
+          path.push(destinationId)
 
           let packet: Packet<Chain>
           try {
@@ -276,13 +288,9 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
 
           this.interactions.packet.acknowledgment.once(
             u8aToHex(
-              this.dbKeys.UnAcknowledgedTickets(
-                path[0].pubKey.marshal(),
-                packet.ticket.ticket.challenge
-              )
+              this.dbKeys.UnAcknowledgedTickets(path[0].pubKey.marshal(), packet.challenge.hash)
             ),
             () => {
-              console.log(`received acknowledgement`)
               resolve()
             }
           )
