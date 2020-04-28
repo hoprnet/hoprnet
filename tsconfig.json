@@ -9,7 +9,6 @@
     "strict": false,
     "resolveJsonModule": true,
     "experimentalDecorators": true,
-    "noEmit": true,
     "declaration": true
   },
   "include": ["src/**/*"],
