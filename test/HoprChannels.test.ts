@@ -1,5 +1,4 @@
-import BN = require('bn.js')
-import { time, expectEvent, expectRevert } from '@openzeppelin/test-helpers'
+import { BN, time, expectEvent, expectRevert } from '@openzeppelin/test-helpers'
 import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
 import {
   HoprChannelsContract,

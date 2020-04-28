@@ -1,3 +1,4 @@
+import { time, expectRevert } from '@openzeppelin/test-helpers'
 import {
   HoprMinterContract,
   HoprMinterInstance,
@@ -5,7 +6,6 @@ import {
   HoprTokenInstance,
 } from '../types/truffle-contracts'
 import { PromiseType } from '../types/typescript'
-import { time, expectRevert } from '@openzeppelin/test-helpers'
 
 const HoprToken: HoprTokenContract = artifacts.require('HoprToken')
 const HoprMinter: HoprMinterContract = artifacts.require('HoprMinter')
