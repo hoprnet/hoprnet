@@ -8,21 +8,23 @@ type Action = {
   after: string
 }
 
+const SUCCESS_MSG = 'success ✅'
+
 const actions: Action[] = [
   // @TODO: re-enable once solhint supports solidity 0.6
-  // { before: 'running solhint on contracts', cmd: `npx solhint ${root}/contracts/**/*.sol`, after: 'done ✅' },
-  { before: 'compiling contracts', cmd: 'npx truffle compile', after: 'done ✅' },
+  // { before: 'running solhint on contracts', cmd: `npx solhint ${root}/contracts/**/*.sol`, after: SUCCESS_MSG },
+  { before: 'compiling contracts', cmd: 'npx truffle compile', after: SUCCESS_MSG },
   {
     before: "generating contracts' typescript types",
     cmd: `npx typechain --target truffle --outDir ${root}/types/truffle-contracts ${root}/build/contracts/*.json`,
-    after: 'done ✅',
+    after: SUCCESS_MSG,
   },
-  { before: 'applying patches', cmd: patch, after: 'done ✅' },
-  { before: 'transpiling typescript files', cmd: 'npx tsc', after: 'done ✅' },
+  { before: 'applying patches', cmd: patch, after: SUCCESS_MSG },
+  { before: 'transpiling typescript files', cmd: 'npx tsc', after: SUCCESS_MSG },
   {
     before: 'extracting compiled output',
     cmd: extractBuild,
-    after: 'done ✅',
+    after: SUCCESS_MSG,
   },
 ]
 
