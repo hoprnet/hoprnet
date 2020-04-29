@@ -6,7 +6,7 @@ import { AccountId, Ticket, Hash, TicketEpoch, Balance } from '.'
 import * as utils from '../utils'
 import { DEMO_ACCOUNTS } from '../config'
 
-const [userA, userB] = DEMO_ACCOUNTS.map(str => new AccountId(stringToU8a(str)))
+const [userA, userB] = DEMO_ACCOUNTS.map((str) => new AccountId(stringToU8a(str)))
 const WIN_PROB = new BN(1)
 
 const generateTicketData = async () => {
@@ -23,12 +23,12 @@ const generateTicketData = async () => {
     epoch,
     amount,
     winProb,
-    onChainSecret
+    onChainSecret,
   }
 }
 
-describe('test ticket construction', function() {
-  it('should create new ticket using struct', async function() {
+describe('test ticket construction', function () {
+  it('should create new ticket using struct', async function () {
     const ticketData = await generateTicketData()
 
     const ticket = new Ticket(undefined, ticketData)
@@ -41,13 +41,13 @@ describe('test ticket construction', function() {
     assert(ticket.onChainSecret.eq(ticketData.onChainSecret), 'wrong onChainSecret')
   })
 
-  it('should create new ticket using array', async function() {
+  it('should create new ticket using array', async function () {
     const ticketData = await generateTicketData()
 
     const ticketA = new Ticket(undefined, ticketData)
     const ticketB = new Ticket({
       bytes: ticketA.buffer,
-      offset: ticketA.byteOffset
+      offset: ticketA.byteOffset,
     })
 
     assert(ticketB.channelId.eq(ticketData.channelId), 'wrong channelId')

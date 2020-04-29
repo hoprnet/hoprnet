@@ -15,14 +15,14 @@ import Channel from '../channel'
 import Ticket from '.'
 import * as configs from '../config'
 
-describe('test ticket generation and verification', function() {
+describe('test ticket generation and verification', function () {
   const web3 = new Web3(configs.DEFAULT_URI)
   const hoprToken: HoprToken = new web3.eth.Contract(HoprTokenAbi as any, configs.TOKEN_ADDRESSES.private)
   let coreConnector: CoreConnector
   let counterpartysCoreConnector: CoreConnector
   let funder: Await<ReturnType<typeof getPrivKeyData>>
 
-  beforeEach(async function() {
+  beforeEach(async function () {
     funder = await getPrivKeyData(stringToU8a(configs.FUND_ACCOUNT_PRIVATE_KEY))
     const userA = await generateUser(web3, funder, hoprToken)
     const userB = await generateUser(web3, funder, hoprToken)
@@ -34,13 +34,13 @@ describe('test ticket generation and verification', function() {
     await counterpartysCoreConnector.db.clear()
   })
 
-  it('should store ticket', async function() {
+  it('should store ticket', async function () {
     const channelType = new ChannelType(undefined, {
       balance: new ChannelBalance(undefined, {
         balance: new BN(123),
-        balance_a: new BN(122)
+        balance_a: new BN(122),
       }),
-      status: ChannelStatus.FUNDING
+      status: ChannelStatus.FUNDING,
     })
 
     const channelId = new Hash(
@@ -76,7 +76,7 @@ describe('test ticket generation and verification', function() {
 
         return new SignedChannel({
           bytes: result.buffer,
-          offset: result.byteOffset
+          offset: result.byteOffset,
         })
       }
     )
@@ -101,13 +101,13 @@ describe('test ticket generation and verification', function() {
     assert(u8aEquals(signedTicket, storedSignedTicket), `Check that signedTicket is stored correctly`)
   })
 
-  it('should store tickets, and retrieve them in a map', async function() {
+  it('should store tickets, and retrieve them in a map', async function () {
     const channelType = new ChannelType(undefined, {
       balance: new ChannelBalance(undefined, {
         balance: new BN(123),
-        balance_a: new BN(122)
+        balance_a: new BN(122),
       }),
-      status: ChannelStatus.FUNDING
+      status: ChannelStatus.FUNDING,
     })
 
     const channelId = new Hash(
@@ -143,7 +143,7 @@ describe('test ticket generation and verification', function() {
 
         return new SignedChannel({
           bytes: result.buffer,
-          offset: result.byteOffset
+          offset: result.byteOffset,
         })
       }
     )
@@ -156,7 +156,7 @@ describe('test ticket generation and verification', function() {
     await Promise.all([
       Ticket.store(coreConnector, channelId, signedTicketA),
       Ticket.store(coreConnector, channelId, signedTicketB),
-      Ticket.store(coreConnector, new Hash(new Uint8Array(Hash.SIZE).fill(0x00)), signedTicketB)
+      Ticket.store(coreConnector, new Hash(new Uint8Array(Hash.SIZE).fill(0x00)), signedTicketB),
     ])
 
     const storedSignedTickets = await Ticket.get(coreConnector, channelId)

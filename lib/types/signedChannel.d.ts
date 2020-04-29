@@ -1,4 +1,4 @@
-import type { Types } from "@hoprnet/hopr-core-connector-interface";
+import type { Types } from '@hoprnet/hopr-core-connector-interface';
 import { Signature, Channel } from '.';
 import { Uint8ArrayE } from '../types/extended';
 import type HoprEthereum from '..';

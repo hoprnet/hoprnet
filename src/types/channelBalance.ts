@@ -1,4 +1,4 @@
-import BN from "bn.js"
+import BN from 'bn.js'
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import { u8aConcat } from '@hoprnet/hopr-utils'
 import { Uint8ArrayE } from '../types/extended'
@@ -36,14 +36,16 @@ class ChannelBalance extends Uint8ArrayE implements Types.ChannelBalance {
     return Balance.SIZE + Balance.SIZE
   }
 
-  static create(    arr?: {
-    bytes: ArrayBuffer
-    offset: number
-  },
-  struct?: {
-    balance: Balance
-    balance_a: Balance
-  }) {
+  static create(
+    arr?: {
+      bytes: ArrayBuffer
+      offset: number
+    },
+    struct?: {
+      balance: Balance
+      balance_a: Balance
+    }
+  ) {
     return new ChannelBalance(arr, struct)
   }
 }

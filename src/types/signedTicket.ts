@@ -1,4 +1,4 @@
-import type { Types } from "@hoprnet/hopr-core-connector-interface"
+import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import { u8aConcat } from '@hoprnet/hopr-utils'
 import secp256k1 from 'secp256k1'
 import { Signature, Ticket } from '.'
@@ -49,7 +49,7 @@ class SignedTicket extends Uint8ArrayE implements Types.SignedTicket<Ticket, Sig
     if (this._ticket == null) {
       this._ticket = new Ticket({
         bytes: this.buffer,
-        offset: this.ticketOffset
+        offset: this.ticketOffset,
       })
     }
 
@@ -59,12 +59,12 @@ class SignedTicket extends Uint8ArrayE implements Types.SignedTicket<Ticket, Sig
   get signatureOffset(): number {
     return this.byteOffset
   }
-  
+
   get signature(): Signature {
     if (this._signature == null) {
       this._signature = new Signature({
         bytes: this.buffer,
-        offset: this.signatureOffset
+        offset: this.signatureOffset,
       })
     }
 

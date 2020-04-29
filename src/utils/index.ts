@@ -55,16 +55,21 @@ export async function hash(msg: Uint8Array): Promise<Hash> {
   return Promise.resolve(new Hash(createKeccakHash('keccak256').update(Buffer.from(msg)).digest()))
 }
 
-export async function sign(msg: Uint8Array, privKey: Uint8Array, pubKey?: Uint8Array, arr?: {
-  bytes: ArrayBuffer,
-  offset: number
-}): Promise<Signature> {
+export async function sign(
+  msg: Uint8Array,
+  privKey: Uint8Array,
+  pubKey?: Uint8Array,
+  arr?: {
+    bytes: ArrayBuffer
+    offset: number
+  }
+): Promise<Signature> {
   const result = ecdsaSign(msg, privKey)
 
   const response = new Signature(arr, {
     signature: result.signature,
     // @ts-ignore-next-line
-    recovery: result.recid
+    recovery: result.recid,
   })
 
   return response
@@ -91,10 +96,10 @@ export function convertUnit(amount: BN, sourceUnit: string, targetUnit: 'eth' | 
 export async function waitForConfirmation<T extends PromiEvent<any>>(event: T) {
   return new Promise<TransactionReceipt>((resolve, reject) => {
     return event
-      .on('receipt', receipt => {
+      .on('receipt', (receipt) => {
         resolve(receipt)
       })
-      .on("error", err => {
+      .on('error', (err) => {
         const outOfEth = err.message.includes(`enough funds`)
         const outOfHopr = err.message.includes(`SafeERC20:`)
 
@@ -117,7 +122,7 @@ export function advanceBlockAtTime(web3: Web3, time: number): Promise<string> {
         jsonrpc: '2.0',
         method: 'evm_mine',
         params: [time],
-        id: new Date().getTime()
+        id: new Date().getTime(),
       },
       async (err: any) => {
         if (err) {
@@ -133,7 +138,7 @@ export function advanceBlockAtTime(web3: Web3, time: number): Promise<string> {
 }
 
 export async function wait(ms: number) {
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     setTimeout(resolve, ms)
   })
 }
@@ -142,14 +147,14 @@ export async function waitFor({
   web3,
   network,
   getCurrentBlock,
-  timestamp
+  timestamp,
 }: {
   web3: Web3
   network: Networks
   getCurrentBlock: () => Promise<BlockTransactionString>
   timestamp?: number
 }): Promise<void> {
-  const now = await getCurrentBlock().then(block => Number(block.timestamp) * 1e3)
+  const now = await getCurrentBlock().then((block) => Number(block.timestamp) * 1e3)
 
   if (timestamp < now) {
     return undefined
@@ -166,7 +171,7 @@ export async function waitFor({
     web3,
     network,
     getCurrentBlock,
-    timestamp: await getCurrentBlock().then(block => Number(block.timestamp) * 1e3)
+    timestamp: await getCurrentBlock().then((block) => Number(block.timestamp) * 1e3),
   })
 }
 
@@ -176,7 +181,7 @@ export async function waitFor({
   supports all infura networks
 */
 export async function getNetworkId(web3: Web3): Promise<Networks> {
-  return web3.eth.net.getId().then(netId => {
+  return web3.eth.net.getId().then((netId) => {
     switch (netId) {
       case 1:
         return 'mainnet'
@@ -228,7 +233,7 @@ export function TransactionSigner(web3: Web3, privKey: Uint8Array): any {
       {
         gas: estimatedGas,
         ...txConfig,
-        data: abi
+        data: abi,
       },
       privKeyStr
     )
@@ -239,11 +244,11 @@ export function TransactionSigner(web3: Web3, privKey: Uint8Array): any {
 
     return {
       send,
-      transactionHash: signedTransaction.transactionHash
+      transactionHash: signedTransaction.transactionHash,
     }
   }
 }
 
 export function Log(suffixes: string[] = []) {
-  return Debug(["hopr-core-ethereum"].concat(suffixes).join(":"))
+  return Debug(['hopr-core-ethereum'].concat(suffixes).join(':'))
 }

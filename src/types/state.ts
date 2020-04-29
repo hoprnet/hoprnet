@@ -1,5 +1,5 @@
-import type { Types } from "@hoprnet/hopr-core-connector-interface"
-import { u8aConcat } from "@hoprnet/hopr-utils"
+import type { Types } from '@hoprnet/hopr-core-connector-interface'
+import { u8aConcat } from '@hoprnet/hopr-utils'
 import { TicketEpoch, Hash, Public } from '.'
 import { Uint8ArrayE } from '../types/extended'
 

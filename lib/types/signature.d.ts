@@ -1,4 +1,4 @@
-import type { Types } from "@hoprnet/hopr-core-connector-interface";
+import type { Types } from '@hoprnet/hopr-core-connector-interface';
 import { Uint8ArrayE } from '../types/extended';
 declare class Signature extends Uint8ArrayE implements Types.Signature {
     constructor(arr?: {

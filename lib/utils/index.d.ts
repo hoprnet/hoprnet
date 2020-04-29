@@ -22,7 +22,7 @@ export declare function convertUnit(amount: BN, sourceUnit: string, targetUnit: 
 export declare function waitForConfirmation<T extends PromiEvent<any>>(event: T): Promise<TransactionReceipt>;
 export declare function advanceBlockAtTime(web3: Web3, time: number): Promise<string>;
 export declare function wait(ms: number): Promise<unknown>;
-export declare function waitFor({ web3, network, getCurrentBlock, timestamp }: {
+export declare function waitFor({ web3, network, getCurrentBlock, timestamp, }: {
     web3: Web3;
     network: Networks;
     getCurrentBlock: () => Promise<BlockTransactionString>;

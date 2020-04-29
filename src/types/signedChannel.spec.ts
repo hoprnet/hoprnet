@@ -6,80 +6,80 @@ import { ChannelStatus } from './channel'
 import * as utils from '../utils'
 import { DEMO_ACCOUNTS } from '../config'
 
-const [userA] = DEMO_ACCOUNTS.map(str => stringToU8a(str))
+const [userA] = DEMO_ACCOUNTS.map((str) => stringToU8a(str))
 
 const generateChannelData = async () => {
   const balance = new ChannelBalance(undefined, {
     balance: new BN(10),
-    balance_a: new BN(2)
+    balance_a: new BN(2),
   })
   const status = ChannelStatus.UNINITIALISED
 
   return {
     balance,
-    status
+    status,
   }
 }
 
-describe('test signedChannel construction', function() {
-  it('should create new signedChannel using struct', async function() {
+describe('test signedChannel construction', function () {
+  it('should create new signedChannel using struct', async function () {
     const channelData = await generateChannelData()
 
     const channel = new Channel(undefined, channelData)
-    const signature = await utils.sign(await channel.hash, userA).then(res => {
+    const signature = await utils.sign(await channel.hash, userA).then((res) => {
       return new Signature({
         bytes: res.buffer,
-        offset: res.byteOffset
+        offset: res.byteOffset,
       })
     })
 
     const signedChannel = new SignedChannel(undefined, {
       signature,
-      channel
+      channel,
     })
 
     assert(signedChannel.channel.balance.eq(channelData.balance), 'wrong balance')
     assert(new BN(signedChannel.channel.status).eq(new BN(channelData.status)), 'wrong status')
   })
 
-  it('should create new signedChannel using array', async function() {
+  it('should create new signedChannel using array', async function () {
     const channelData = await generateChannelData()
 
     const channel = new Channel(undefined, channelData)
-    const signature = await utils.sign(await channel.hash, userA).then(res => {
+    const signature = await utils.sign(await channel.hash, userA).then((res) => {
       return new Signature({
         bytes: res.buffer,
-        offset: res.byteOffset
+        offset: res.byteOffset,
       })
     })
 
     const signedChannelA = new SignedChannel(undefined, {
       signature,
-      channel
+      channel,
     })
     const signedChannelB = new SignedChannel({
       bytes: signedChannelA.buffer,
-      offset: signedChannelA.byteOffset
+      offset: signedChannelA.byteOffset,
     })
 
     assert(signedChannelB.channel.balance.eq(channelData.balance), 'wrong balance')
     assert(new BN(signedChannelB.channel.status).eq(new BN(channelData.status)), 'wrong status')
   })
 
-  it('should verify signedChannel', async function() {
+  it('should verify signedChannel', async function () {
     const channelData = await generateChannelData()
     const channel = new Channel(undefined, channelData)
 
-    const signature = await utils.sign(await channel.hash, userA).then(res => {
+    const signature = await utils.sign(await channel.hash, userA).then((res) => {
       return new Signature({
         bytes: res.buffer,
-        offset: res.byteOffset
+        offset: res.byteOffset,
       })
     })
 
     const signedChannel = new SignedChannel(undefined, {
       signature,
-      channel
+      channel,
     })
 
     const signer = new Hash(await signedChannel.signer)

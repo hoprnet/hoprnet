@@ -1,4 +1,4 @@
-import BN from "bn.js";
+import BN from 'bn.js';
 import type { Types } from '@hoprnet/hopr-core-connector-interface';
 import { Uint8ArrayE } from '../types/extended';
 import Balance from './balance';

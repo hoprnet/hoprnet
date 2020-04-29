@@ -1,4 +1,4 @@
-import type HoprEthereum from "..";
+import type HoprEthereum from '..';
 import { SignedTicket, Hash } from '../types';
 declare class Ticket {
     static store(coreConnector: HoprEthereum, channelId: Hash, signedTicket: SignedTicket): Promise<void>;

@@ -1,4 +1,4 @@
-import type { Types } from "@hoprnet/hopr-core-connector-interface";
+import type { Types } from '@hoprnet/hopr-core-connector-interface';
 import { Signature, Ticket } from '.';
 import { Uint8ArrayE } from '../types/extended';
 declare class SignedTicket extends Uint8ArrayE implements Types.SignedTicket<Ticket, Signature> {

@@ -1,4 +1,4 @@
-import { Hash }from './types'
+import { Hash } from './types'
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import * as constants from './constants'
 
@@ -12,7 +12,7 @@ export function Channel(counterparty: Types.AccountId): Uint8Array {
   return allocationHelper([
     [PREFIX.length, PREFIX],
     [channelSubPrefix.length, channelSubPrefix],
-    [counterparty.length, counterparty]
+    [counterparty.length, counterparty],
   ])
 }
 
@@ -26,20 +26,24 @@ export function Challenge(channelId: Types.Hash, challenge: Types.Hash): Uint8Ar
     [challengeSubPrefix.length, challengeSubPrefix],
     [channelId.length, channelId],
     [SEPERATOR.length, SEPERATOR],
-    [challenge.length, challenge]
+    [challenge.length, challenge],
   ])
 }
 
 export function ChallengeKeyParse(arr: Uint8Array): [Hash, Hash] {
   return [
-    new Hash(arr.slice(
-      PREFIX.length + channelSubPrefix.length,
-      PREFIX.length + channelSubPrefix.length + constants.HASH_LENGTH
-    )),
-    new Hash(arr.slice(
-      PREFIX.length + channelSubPrefix.length + constants.HASH_LENGTH + SEPERATOR.length,
-      PREFIX.length + channelSubPrefix.length + constants.HASH_LENGTH + SEPERATOR.length + constants.HASH_LENGTH
-    ))
+    new Hash(
+      arr.slice(
+        PREFIX.length + channelSubPrefix.length,
+        PREFIX.length + channelSubPrefix.length + constants.HASH_LENGTH
+      )
+    ),
+    new Hash(
+      arr.slice(
+        PREFIX.length + channelSubPrefix.length + constants.HASH_LENGTH + SEPERATOR.length,
+        PREFIX.length + channelSubPrefix.length + constants.HASH_LENGTH + SEPERATOR.length + constants.HASH_LENGTH
+      )
+    ),
   ]
 }
 
@@ -49,7 +53,7 @@ export function ChannelId(signatureHash: Types.Hash): Uint8Array {
   return allocationHelper([
     [PREFIX.length, PREFIX],
     [subPrefix.length, subPrefix],
-    [signatureHash.length, signatureHash]
+    [signatureHash.length, signatureHash],
   ])
 }
 
@@ -61,7 +65,7 @@ export function Nonce(channelId: Types.Hash, nonce: Types.Hash): Uint8Array {
     [subPrefix.length, subPrefix],
     [channelId.length, channelId],
     [SEPERATOR.length, SEPERATOR],
-    [nonce.length, nonce]
+    [nonce.length, nonce],
   ])
 }
 
@@ -70,7 +74,7 @@ export function OnChainSecret(): Uint8Array {
 
   return allocationHelper([
     [PREFIX.length, PREFIX],
-    [subPrefix.length, subPrefix]
+    [subPrefix.length, subPrefix],
   ])
 }
 
@@ -82,7 +86,7 @@ export function Ticket(channelId: Types.Hash, challenge: Types.Hash): Uint8Array
     [subPrefix.length, subPrefix],
     [channelId.length, channelId],
     [SEPERATOR.length, SEPERATOR],
-    [challenge.length, challenge]
+    [challenge.length, challenge],
   ])
 }
 

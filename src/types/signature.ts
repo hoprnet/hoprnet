@@ -1,4 +1,4 @@
-import type { Types } from "@hoprnet/hopr-core-connector-interface"
+import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import { Uint8ArrayE } from '../types/extended'
 import { SIGNATURE_LENGTH, SIGNATURE_RECOVERY_LENGTH } from '../constants'
 
@@ -56,13 +56,16 @@ class Signature extends Uint8ArrayE implements Types.Signature {
     return SIGNATURE_LENGTH + SIGNATURE_RECOVERY_LENGTH
   }
 
-  static create(arr?: {
-    bytes: ArrayBuffer
-    offset: number
-  }, struct?: {
+  static create(
+    arr?: {
+      bytes: ArrayBuffer
+      offset: number
+    },
+    struct?: {
       signature: Uint8Array
       recovery: number
-    }) {
+    }
+  ) {
     return new Signature(arr, struct)
   }
 }

@@ -2,13 +2,13 @@ import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import { u8aConcat } from '@hoprnet/hopr-utils'
 import { ChannelBalance, Moment } from '.'
 import { Uint8ArrayE } from '../types/extended'
-import { hash, stateCountToStatus } from "../utils"
+import { hash, stateCountToStatus } from '../utils'
 
 export enum ChannelStatus {
   UNINITIALISED,
   FUNDING,
   OPEN,
-  PENDING
+  PENDING,
 }
 
 class Channel extends Uint8ArrayE implements Types.Channel {
@@ -38,7 +38,7 @@ class Channel extends Uint8ArrayE implements Types.Channel {
     const balance = this.subarray(0, ChannelBalance.SIZE)
     return new ChannelBalance({
       bytes: balance.buffer,
-      offset: balance.byteOffset
+      offset: balance.byteOffset,
     })
   }
 
@@ -61,14 +61,14 @@ class Channel extends Uint8ArrayE implements Types.Channel {
   static createFunded(balance: ChannelBalance) {
     return new Channel(undefined, {
       balance,
-      status: ChannelStatus.FUNDING
+      status: ChannelStatus.FUNDING,
     })
   }
 
   static createActive(balance: ChannelBalance): Channel {
     return new Channel(undefined, {
       balance,
-      status: ChannelStatus.OPEN
+      status: ChannelStatus.OPEN,
     })
   }
 
@@ -76,7 +76,7 @@ class Channel extends Uint8ArrayE implements Types.Channel {
     return new Channel(undefined, {
       balance,
       status: ChannelStatus.PENDING,
-      moment
+      moment,
     })
   }
 }

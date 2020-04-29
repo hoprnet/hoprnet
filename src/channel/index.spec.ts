@@ -14,7 +14,7 @@ import CoreConnector from '..'
 import Channel from '.'
 import * as configs from '../config'
 
-describe('test ticket generation and verification', function() {
+describe('test ticket generation and verification', function () {
   const web3 = new Web3(configs.DEFAULT_URI)
   const hoprToken: HoprToken = new web3.eth.Contract(HoprTokenAbi as any, configs.TOKEN_ADDRESSES.private)
   const channels = new Map<string, ChannelType>()
@@ -23,7 +23,7 @@ describe('test ticket generation and verification', function() {
   let counterpartysCoreConnector: CoreConnector
   let funder: Await<ReturnType<typeof getPrivKeyData>>
 
-  beforeEach(async function() {
+  beforeEach(async function () {
     channels.clear()
     preChannels.clear()
 
@@ -35,13 +35,13 @@ describe('test ticket generation and verification', function() {
     counterpartysCoreConnector = await generateNode(userB.privKey)
   })
 
-  it('should create a valid ticket', async function() {
+  it('should create a valid ticket', async function () {
     const channelType = new ChannelType(undefined, {
       balance: new ChannelBalance(undefined, {
         balance: new BN(123),
-        balance_a: new BN(122)
+        balance_a: new BN(122),
       }),
-      status: ChannelStatus.FUNDING
+      status: ChannelStatus.FUNDING,
     })
 
     const channelId = await coreConnector.utils.getId(
@@ -77,7 +77,7 @@ describe('test ticket generation and verification', function() {
 
         return new SignedChannel({
           bytes: result.buffer,
-          offset: result.byteOffset
+          offset: result.byteOffset,
         })
       }
     )

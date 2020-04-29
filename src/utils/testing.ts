@@ -16,7 +16,7 @@ export async function getPrivKeyData(_privKey: Uint8Array) {
   return {
     privKey,
     pubKey,
-    address
+    address,
   }
 }
 
@@ -27,13 +27,13 @@ export async function generateUser(web3: Web3, funder: Await<ReturnType<typeof g
   await web3.eth.sendTransaction({
     value: web3.utils.toWei('1', 'ether'),
     from: funder.address.toHex(),
-    to: user.address.toHex()
+    to: user.address.toHex(),
   })
 
   // mint user some HOPR
   await hoprToken.methods.mint(user.address.toHex(), web3.utils.toWei('1', 'ether')).send({
     from: funder.address.toHex(),
-    gas: 200e3
+    gas: 200e3,
   })
 
   return user

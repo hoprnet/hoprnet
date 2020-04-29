@@ -6,7 +6,7 @@ import { wait, Log } from '../utils'
 export enum Events {
   'connected' = 'connected',
   'disconnected' = 'disconnected',
-  'reconnected' = 'reconnected'
+  'reconnected' = 'reconnected',
 }
 export type IEvents = keyof typeof Events
 
@@ -34,7 +34,7 @@ class CustomWeb3 extends Web3 implements Web3 {
       reconnectionDelay: number
     } = {
       reconnection: true,
-      reconnectionDelay: 1000
+      reconnectionDelay: 1000,
     }
   ) {
     super()

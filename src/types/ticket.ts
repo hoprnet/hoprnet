@@ -1,4 +1,4 @@
-import type { Types } from "@hoprnet/hopr-core-connector-interface"
+import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
 import { stringToU8a, u8aToHex } from '@hoprnet/hopr-utils'
 import { Hash, TicketEpoch, Balance, SignedTicket } from '.'
@@ -108,36 +108,37 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
     amount: Balance,
     challenge: Hash,
     arr?: {
-      bytes: ArrayBuffer,
+      bytes: ArrayBuffer
       offset: number
     }
   ): Promise<SignedTicket> {
     const account = await channel.coreConnector.utils.pubKeyToAccountId(channel.counterparty)
-    const { hashedSecret } = await channel.coreConnector.hoprChannels.methods
-      .accounts(u8aToHex(account))
-      .call()
+    const { hashedSecret } = await channel.coreConnector.hoprChannels.methods.accounts(u8aToHex(account)).call()
 
     const winProb = new Uint8ArrayE(new BN(new Uint8Array(Hash.SIZE).fill(0xff)).div(WIN_PROB).toArray('le', Hash.SIZE))
     const channelId = await channel.channelId
 
-    const signedTicket = new SignedTicket(arr) 
+    const signedTicket = new SignedTicket(arr)
 
-    const ticket = new Ticket({
-      bytes: signedTicket.buffer,
-      offset: signedTicket.ticketOffset
-    }, {
-      channelId,
-      challenge,
-      // @TODO set this dynamically
-      epoch: new TicketEpoch(0),
-      amount: new Balance(amount.toString()),
-      winProb,
-      onChainSecret: new Uint8ArrayE(stringToU8a(hashedSecret))
-    })
+    const ticket = new Ticket(
+      {
+        bytes: signedTicket.buffer,
+        offset: signedTicket.ticketOffset,
+      },
+      {
+        channelId,
+        challenge,
+        // @TODO set this dynamically
+        epoch: new TicketEpoch(0),
+        amount: new Balance(amount.toString()),
+        winProb,
+        onChainSecret: new Uint8ArrayE(stringToU8a(hashedSecret)),
+      }
+    )
 
     await sign(await ticket.hash, channel.coreConnector.self.privateKey, undefined, {
       bytes: signedTicket.buffer,
-      offset: signedTicket.signatureOffset
+      offset: signedTicket.signatureOffset,
     })
 
     return signedTicket

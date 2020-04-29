@@ -6,7 +6,7 @@ import { AccountId, Ticket, Hash, TicketEpoch, Balance, Signature, SignedTicket 
 import * as utils from '../utils'
 import { DEMO_ACCOUNTS } from '../config'
 
-const [userA, userB] = DEMO_ACCOUNTS.map(str => new AccountId(stringToU8a(str)))
+const [userA, userB] = DEMO_ACCOUNTS.map((str) => new AccountId(stringToU8a(str)))
 const WIN_PROB = new BN(1)
 
 const generateTicketData = async () => {
@@ -23,25 +23,25 @@ const generateTicketData = async () => {
     epoch,
     amount,
     winProb,
-    onChainSecret
+    onChainSecret,
   }
 }
 
-describe('test signedTicket construction', function() {
-  it('should create new signedTicket using struct', async function() {
+describe('test signedTicket construction', function () {
+  it('should create new signedTicket using struct', async function () {
     const ticketData = await generateTicketData()
 
     const ticket = new Ticket(undefined, ticketData)
-    const signature = await utils.sign(await ticket.hash, userA).then(res => {
+    const signature = await utils.sign(await ticket.hash, userA).then((res) => {
       return new Signature({
         bytes: res.buffer,
-        offset: res.byteOffset
+        offset: res.byteOffset,
       })
     })
 
     const signedTicket = new SignedTicket(undefined, {
       signature,
-      ticket
+      ticket,
     })
 
     assert(signedTicket.ticket.channelId.eq(ticketData.channelId), 'wrong channelId')
@@ -52,24 +52,24 @@ describe('test signedTicket construction', function() {
     assert(signedTicket.ticket.onChainSecret.eq(ticketData.onChainSecret), 'wrong onChainSecret')
   })
 
-  it('should create new signedTicket using array', async function() {
+  it('should create new signedTicket using array', async function () {
     const ticketData = await generateTicketData()
 
     const ticket = new Ticket(undefined, ticketData)
-    const signature = await utils.sign(await ticket.hash, userA).then(res => {
+    const signature = await utils.sign(await ticket.hash, userA).then((res) => {
       return new Signature({
         bytes: res.buffer,
-        offset: res.byteOffset
+        offset: res.byteOffset,
       })
     })
 
     const signedTicketA = new SignedTicket(undefined, {
       signature,
-      ticket
+      ticket,
     })
     const signedTicketB = new SignedTicket({
       bytes: signedTicketA.buffer,
-      offset: signedTicketA.byteOffset
+      offset: signedTicketA.byteOffset,
     })
 
     assert(signedTicketB.ticket.channelId.eq(ticketData.channelId), 'wrong channelId')
@@ -80,20 +80,20 @@ describe('test signedTicket construction', function() {
     assert(signedTicketB.ticket.onChainSecret.eq(ticketData.onChainSecret), 'wrong onChainSecret')
   })
 
-  it('should verify signedTicket', async function() {
+  it('should verify signedTicket', async function () {
     const ticketData = await generateTicketData()
     const ticket = new Ticket(undefined, ticketData)
 
-    const signature = await utils.sign(await ticket.hash, userA).then(res => {
+    const signature = await utils.sign(await ticket.hash, userA).then((res) => {
       return new Signature({
         bytes: res.buffer,
-        offset: res.byteOffset
+        offset: res.byteOffset,
       })
     })
 
     const signedTicket = new SignedTicket(undefined, {
       signature,
-      ticket
+      ticket,
     })
 
     const signer = new Hash(await signedTicket.signer)

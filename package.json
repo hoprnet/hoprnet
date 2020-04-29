@@ -10,7 +10,8 @@
     "test": "mocha",
     "dev": "yarn clean && yarn build:types && tsc -w",
     "build:types": "typechain --target web3-v1 --outDir './src/tsc/web3' './node_modules/@hoprnet/hopr-ethereum/build/extracted/abis/*.json'",
-    "build": "yarn clean && yarn build:types && tsc && cp -R ./src/tsc/web3 ./lib/tsc/web3"
+    "build": "yarn clean && yarn build:types && tsc && cp -R ./src/tsc/web3 ./lib/tsc/web3",
+    "lint": "prettier --check ."
   },
   "files": [
     "!**/*.spec.ts",
@@ -50,7 +51,7 @@
     "husky": "^4.2.3",
     "memdown": "^5.1.0",
     "mocha": "^7.0.1",
-    "prettier": "2.0.5",
+    "prettier": "^2.0.5",
     "ts-generator": "^0.0.8",
     "ts-node": "^8.6.2",
     "typechain": "^1.0.5",
@@ -59,7 +60,7 @@
   },
   "husky": {
     "hooks": {
-      "pre-commit": "yarn build && git add ./lib"
+      "pre-commit": "yarn lint && yarn build && git add ./lib"
     }
   },
   "prettier": {
