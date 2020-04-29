@@ -350,6 +350,7 @@ class Channel implements IChannel<HoprEthereum> {
               {
                 from: this.coreConnector.account.toHex(),
                 to: this.coreConnector.hoprChannels.options.address,
+                nonce: await this.coreConnector.nonce,
               }
             )
           ).send()
@@ -377,6 +378,7 @@ class Channel implements IChannel<HoprEthereum> {
               {
                 from: this.coreConnector.account.toHex(),
                 to: this.coreConnector.hoprChannels.options.address,
+                nonce: await this.coreConnector.nonce,
               }
             )
           ).send()
@@ -497,6 +499,7 @@ class Channel implements IChannel<HoprEthereum> {
               {
                 from: coreConnector.account.toHex(),
                 to: coreConnector.hoprToken.options.address,
+                nonce: await coreConnector.nonce,
               }
             )
           ).send()
@@ -509,6 +512,7 @@ class Channel implements IChannel<HoprEthereum> {
               {
                 from: coreConnector.account.toHex(),
                 to: coreConnector.hoprToken.options.address,
+                nonce: await coreConnector.nonce,
               }
             )
           ).send()
@@ -526,6 +530,7 @@ class Channel implements IChannel<HoprEthereum> {
             {
               from: coreConnector.account.toHex(),
               to: coreConnector.hoprChannels.options.address,
+              nonce: await coreConnector.nonce,
             }
           )
         ).send()
@@ -573,6 +578,7 @@ class Channel implements IChannel<HoprEthereum> {
           await coreConnector.signTransaction(coreConnector.hoprChannels.methods.openChannel(counterparty.toHex()), {
             from: coreConnector.account.toHex(),
             to: coreConnector.hoprChannels.options.address,
+            nonce: await coreConnector.nonce,
           })
         ).send()
       )

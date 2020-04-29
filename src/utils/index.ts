@@ -5,6 +5,7 @@ import assert from 'assert'
 import { publicKeyConvert, publicKeyCreate, ecdsaSign, ecdsaRecover, ecdsaVerify } from 'secp256k1'
 import createKeccakHash from 'keccak'
 import { PromiEvent, TransactionReceipt, TransactionConfig } from 'web3-core'
+import { TransactionRevertInstructionError } from 'web3-core-helpers'
 import { BlockTransactionString } from 'web3-eth'
 import Web3 from 'web3'
 import BN from 'bn.js'
@@ -213,8 +214,7 @@ export function stateCountToStatus(stateCount: number): ChannelStatus {
 
 // sign transaction's locally and send them
 // @TODO: switch to web3js-accounts wallet if it's safe
-// @TODO: remove explicit any
-export function TransactionSigner(web3: Web3, privKey: Uint8Array): any {
+export function TransactionSigner(web3: Web3, privKey: Uint8Array) {
   const privKeyStr = new Hash(privKey).toHex()
 
   return async function signTransaction<T extends any>(

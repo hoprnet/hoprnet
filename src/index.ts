@@ -61,7 +61,7 @@ export default class HoprEthereum implements HoprCoreConnector {
   get nonce(): Promise<number> {
     return new Promise<number>(async (resolve, reject) => {
       if (typeof this._nonce !== 'undefined') {
-        return this._nonce++
+        return resolve(this._nonce++)
       }
 
       try {
@@ -279,6 +279,7 @@ For Kovan HOPR test tokens visit our Telegram channel at ${chalk.blue('https://t
             await this.signTransaction(this.hoprChannels.methods.setHashedSecret(u8aToHex(offChainSecret)), {
               from: this.account.toHex(),
               to: this.hoprChannels.options.address,
+              nonce: await this.nonce,
             })
           ).send()
         )

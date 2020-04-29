@@ -38,6 +38,7 @@
     "secp256k1": "^4.0.1",
     "web3": "^1.2.7",
     "web3-core": "^1.2.7",
+    "web3-core-helpers": "^1.2.7",
     "web3-eth-contract": "^1.2.7"
   },
   "devDependencies": {
