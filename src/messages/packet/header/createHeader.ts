@@ -171,36 +171,34 @@ export async function createHeader<Chain extends HoprCoreConnector>(
         )
         header.beta.set(tmp, PER_HOP_SIZE)
 
-        if (secrets.length > 2) {
-          if (i < secrets.length - 1) {
-            /**
-             * Tells the relay node which challenge it should for the issued ticket.
-             * The challenge should be done in a way such that:
-             *   - the relay node does not know how to solve it
-             *   - having one secret share is not sufficient to reconstruct
-             *     the secret
-             *   - the relay node can verify the key derivation path
-             */
-            header.beta.set(
-              await node.paymentChannels.utils.hash(
-                u8aConcat(
-                  deriveTicketKey(secrets[i]),
-                  await node.paymentChannels.utils.hash(deriveTicketKeyBlinding(secrets[i + 1]))
-                )
-              ),
-              ADDRESS_SIZE + MAC_SIZE + KEY_LENGTH
-            )
-          } else if (i == secrets.length - 1) {
-            header.beta.set(
-              await node.paymentChannels.utils.hash(
-                u8aConcat(
-                  deriveTicketLastKey(secrets[i]),
-                  await node.paymentChannels.utils.hash(deriveTicketLastKeyBlinding(secrets[i]))
-                )
-              ),
-              ADDRESS_SIZE + MAC_SIZE + KEY_LENGTH
-            )
-          }
+        if (i < secrets.length - 1) {
+          /**
+           * Tells the relay node which challenge it should for the issued ticket.
+           * The challenge should be done in a way such that:
+           *   - the relay node does not know how to solve it
+           *   - having one secret share is not sufficient to reconstruct
+           *     the secret
+           *   - the relay node can verify the key derivation path
+           */
+          header.beta.set(
+            await node.paymentChannels.utils.hash(
+              u8aConcat(
+                deriveTicketKey(secrets[i]),
+                await node.paymentChannels.utils.hash(deriveTicketKeyBlinding(secrets[i + 1]))
+              )
+            ),
+            ADDRESS_SIZE + MAC_SIZE + KEY_LENGTH
+          )
+        } else if (i == secrets.length - 1) {
+          header.beta.set(
+            await node.paymentChannels.utils.hash(
+              u8aConcat(
+                deriveTicketLastKey(secrets[i]),
+                await node.paymentChannels.utils.hash(deriveTicketLastKeyBlinding(secrets[i]))
+              )
+            ),
+            ADDRESS_SIZE + MAC_SIZE + KEY_LENGTH
+          )
         }
 
         u8aXOR(true, header.beta, PRG.createPRG(key, iv).digest(0, BETA_LENGTH))

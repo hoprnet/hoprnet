@@ -17,6 +17,7 @@ import {
   deriveTicketKeyBlinding,
   deriveTagParameters,
   deriveTicketLastKey,
+  deriveTicketLastKeyBlinding,
 } from './header'
 import { Challenge } from './challenge'
 import Message from './message'
@@ -134,13 +135,10 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
 
   get message(): Message {
     if (this._message == null) {
-      this._message = new Message(
-        {
-          bytes: this.buffer,
-          offset: this.messageOffset,
-        },
-        true
-      )
+      this._message = new Message(true, {
+        bytes: this.buffer,
+        offset: this.messageOffset,
+      })
     }
 
     return this._message
@@ -202,14 +200,20 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       }
     ).sign(node.peerInfo.id)
 
-    packet.message.set(Message.createPlain(msg).onionEncrypt(secrets))
+    packet._message = Message.create(msg, {
+      bytes: packet.buffer,
+      offset: packet.messageOffset,
+    }).onionEncrypt(secrets)
 
     const ticketChallenge = await node.paymentChannels.utils.hash(
       secrets.length == 1
-        ? deriveTicketLastKey(secrets[0])
+        ? u8aConcat(
+            deriveTicketLastKey(secrets[0]),
+            await node.paymentChannels.utils.hash(deriveTicketLastKeyBlinding(secrets[0]))
+          )
         : u8aConcat(
-            (deriveTicketKey(secrets[0]),
-            await node.paymentChannels.utils.hash(deriveTicketKeyBlinding(secrets[1])))
+            deriveTicketKey(secrets[0]),
+            await node.paymentChannels.utils.hash(deriveTicketKeyBlinding(secrets[1]))
           )
     )
 
@@ -305,12 +309,6 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       throw Error('Payment channel is not open')
     }
 
-    this.node.log(
-      `Payment channel exists. Requested SHA256 pre-image of ${chalk.green(
-        this.node.paymentChannels.utils.hash(this.header.derivedSecret).toString()
-      )} is derivable.`
-    )
-
     this.message.decrypt(this.header.derivedSecret)
 
     const receivedChallenge = this.challenge.getCopy()
@@ -334,6 +332,21 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
    * @param nextNode the ID of the payment channel
    */
   async prepareDelivery(state, newState, nextNode): Promise<void> {
+    if (
+      !u8aEquals(
+        await this.node.paymentChannels.utils.hash(
+          u8aConcat(
+            deriveTicketLastKey(this.header.derivedSecret),
+            await this.node.paymentChannels.utils.hash(
+              deriveTicketLastKeyBlinding(this.header.derivedSecret)
+            )
+          )
+        ),
+        this.ticket.ticket.challenge
+      )
+    ) {
+      throw Error('General error.')
+    }
     this.message.encrypted = false
 
     // const challenges = [secp256k1.publicKeyCreate(Buffer.from(deriveTicketKey(this.header.derivedSecret)))]
@@ -360,6 +373,17 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
    * @param target peer Id of the next node
    */
   async prepareForward(state, newState, target: PeerId): Promise<void> {
+    if (
+      !u8aEquals(
+        await this.node.paymentChannels.utils.hash(
+          u8aConcat(deriveTicketKey(this.header.derivedSecret), this.header.hashedKeyHalf)
+        ),
+        this.ticket.ticket.challenge
+      )
+    ) {
+      throw Error('General error.')
+    }
+
     const channelId = await this.node.paymentChannels.utils.getId(
       await this.node.paymentChannels.utils.pubKeyToAccountId(
         this.node.peerInfo.id.pubKey.marshal()
@@ -421,6 +445,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
 
     this._challenge = await Challenge.create<Chain>(
       this.node.paymentChannels,
+      // @TODO use correct value
       this.header.hashedKeyHalf,
       forwardedFunds,
       {

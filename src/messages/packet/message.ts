@@ -7,14 +7,21 @@ import { toLengthPrefixedU8a, lengthPrefixedToU8a } from '@hoprnet/hopr-utils'
 export const PADDING = new TextEncoder().encode('PADDING')
 
 export default class Message extends Uint8Array {
+  public encrypted: boolean
   constructor(
-    arr: {
+    _encrypted: boolean,
+    arr?: {
       bytes: ArrayBuffer
       offset: number
-    },
-    public encrypted: boolean
+    }
   ) {
-    super(arr.bytes, arr.offset, PACKET_SIZE)
+    if (arr == null) {
+      super(Message.SIZE)
+    } else {
+      super(arr.bytes, arr.offset, PACKET_SIZE)
+    }
+
+    this.encrypted = _encrypted
   }
 
   static get SIZE(): number {
@@ -26,14 +33,11 @@ export default class Message extends Uint8Array {
   }
 
   getCopy(): Message {
-    const arrCopy = new Uint8Array(Message.SIZE)
+    const msgCopy = new Message(this.encrypted)
 
-    arrCopy.set(this)
+    msgCopy.set(this)
 
-    return new Message({
-      bytes: arrCopy.buffer,
-      offset: arrCopy.byteOffset
-    }, this.encrypted)
+    return msgCopy
   }
 
   get plaintext(): Uint8Array {
@@ -52,28 +56,18 @@ export default class Message extends Uint8Array {
     return this
   }
 
-  static createEncrypted(msg: Uint8Array): Message {
-    return new Message(
-      {
-        bytes: msg.buffer,
-        offset: 0,
-      },
-      true
-    )
-  }
-
-  static createPlain(msg: Uint8Array | string): Message {
-    if (typeof msg == 'string') {
-      msg = new TextEncoder().encode(msg)
+  static create(
+    msg: Uint8Array,
+    arr?: {
+      bytes: ArrayBuffer
+      offset: number
     }
+  ): Message {
+    const message = new Message(false, arr)
 
-    return new Message(
-      {
-        bytes: toLengthPrefixedU8a(msg, PADDING, PACKET_SIZE),
-        offset: 0,
-      },
-      false
-    )
+    message.set(toLengthPrefixedU8a(msg, PADDING, PACKET_SIZE))
+
+    return message
   }
 
   onionEncrypt(secrets: Uint8Array[]): Message {
@@ -86,7 +80,7 @@ export default class Message extends Uint8Array {
     for (let i = secrets.length; i > 0; i--) {
       const { key, iv } = deriveCipherParameters(secrets[i - 1])
 
-      PRP.createPRP(key, iv).permutate(this.subarray())
+      PRP.createPRP(key, iv).permutate(this)
     }
 
     return this
@@ -95,7 +89,7 @@ export default class Message extends Uint8Array {
   decrypt(secret: Uint8Array): Message {
     const { key, iv } = deriveCipherParameters(secret)
 
-    PRP.createPRP(key, iv).inverse(this.subarray())
+    PRP.createPRP(key, iv).inverse(this)
 
     return this
   }

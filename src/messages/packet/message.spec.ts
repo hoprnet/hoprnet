@@ -8,9 +8,9 @@ import secp256k1 from 'secp256k1'
 
 describe('test messages', function () {
   it('should create a Message object and encrypt / decrypt it', function () {
-    const msg = Message.createPlain('test')
-
     const testMessage = new TextEncoder().encode('test')
+
+    const msg = Message.create(testMessage)
 
     assert(
       u8aEquals(
@@ -25,7 +25,7 @@ describe('test messages', function () {
       )
     )
 
-    assert.throws(() => Message.createPlain(new Uint8Array(PACKET_SIZE - PADDING.length - LENGTH_PREFIX_LENGTH + 1)))
+    assert.throws(() => Message.create(new Uint8Array(PACKET_SIZE - PADDING.length - LENGTH_PREFIX_LENGTH + 1)))
 
     const secrets = []
 
