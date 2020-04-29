@@ -77,18 +77,24 @@ describe('check packet forwarding & acknowledgement generation', function () {
               create(
                 _channel: any,
                 _amount: any,
-                _challenge: any,
+                challenge: Uint8Array,
                 arr: {
                   bytes: ArrayBuffer
                   offset: number
                 }
               ) {
-                const ticket = new Uint8Array(arr.bytes, arr.offset, 33)
+                const ticket = new Uint8Array(arr.bytes, arr.offset, 33 + 32)
 
                 ticket.set(node.peerInfo.id.pubKey.marshal())
+                ticket.set(challenge, 33)
 
                 // @ts-ignore
                 ticket.signer = ticket.subarray(0, 33)
+
+                // @ts-ignore
+                ticket.ticket = {
+                  challenge: ticket.subarray(33, 33 + 32),
+                }
 
                 return ticket
               },
@@ -130,19 +136,20 @@ describe('check packet forwarding & acknowledgement generation', function () {
       },
       types: {
         SignedTicket: {
-          SIZE: 33,
+          SIZE: 33 + 32,
           create(arr: { bytes: ArrayBuffer; offset: number }) {
-            const signer = new Uint8Array(arr.bytes, arr.offset, 33)
+            const ticket = new Uint8Array(arr.bytes, arr.offset, 33 + 32)
 
             // @ts-ignore
-            signer.signer = signer
+            ticket.signer = ticket.subarray(0, 33)
             // @ts-ignore
-            signer.ticket = {
+            ticket.ticket = {
               getEmbeddedFunds() {
                 return new BN(1)
               },
+              challenge: ticket.subarray(33, 33 + 32),
             }
-            return signer
+            return ticket
           },
         },
         Signature: {
