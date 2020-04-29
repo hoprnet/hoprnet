@@ -1,4 +1,4 @@
-import Web3 from './web3';
+import Web3 from 'web3';
 import { LevelUp } from 'levelup';
 import HoprCoreConnector, { Types as ITypes, Channel as IChannel, Constants as IConstants } from '@hoprnet/hopr-core-connector-interface';
 import Ticket from './ticket';

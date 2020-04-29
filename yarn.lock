@@ -152,7 +152,7 @@
   dependencies:
     "@types/node" "*"
 
-"@types/mocha@^7.0.1":
+"@types/mocha@^7.0.2":
   version "7.0.2"
   resolved "https://registry.yarnpkg.com/@types/mocha/-/mocha-7.0.2.tgz#b17f16cf933597e10d6d78eae3251e692ce8b0ce"
   integrity sha512-ZvO2tAcjmMi8V/5Z3JsyofMe3hasRcaw88cto5etSVMwVQfeivGAlEYmaQgceUSVYFofVjT+ioHsATjdWcFt1w==
@@ -189,7 +189,7 @@
   dependencies:
     "@types/node" "*"
 
-"@types/secp256k1@^4.0.0":
+"@types/secp256k1@^4.0.1":
   version "4.0.1"
   resolved "https://registry.yarnpkg.com/@types/secp256k1/-/secp256k1-4.0.1.tgz#fb3aa61a1848ad97d7425ff9dcba784549fca5a4"
   integrity sha512-+ZjSA8ELlOp8SlKi0YLB2tz9d5iPNEmOBd+8Rz21wTMdaXQIa9b6TEnD6l5qKOCypE7FSyPyck12qZJxSDNoog==
@@ -3807,7 +3807,7 @@ http-signature@~1.2.0:
     jsprim "^1.2.2"
     sshpk "^1.7.0"
 
-husky@^4.2.3:
+husky@^4.2.5:
   version "4.2.5"
   resolved "https://registry.yarnpkg.com/husky/-/husky-4.2.5.tgz#2b4f7622673a71579f901d9885ed448394b5fa36"
   integrity sha512-SYZ95AjKcX7goYVZtVZF2i6XiZcHknw50iXvY7b0MiGoj5RwdgRQNEHdb+gPDPCXKlzwrybjFjkL6FOj8uRhZQ==
@@ -4613,7 +4613,7 @@ levelup@^1.2.1:
     semver "~5.4.1"
     xtend "~4.0.0"
 
-levelup@^4.3.2:
+levelup@^4.4.0:
   version "4.4.0"
   resolved "https://registry.yarnpkg.com/levelup/-/levelup-4.4.0.tgz#f89da3a228c38deb49c48f88a70fb71f01cafed6"
   integrity sha512-94++VFO3qN95cM/d6eBXvd894oJE0w3cInq9USsyQzzoJxmiYzPAocNcuGCPGGjoXqDVJcr3C1jzt1TSjyaiLQ==
@@ -5040,7 +5040,7 @@ mocha@5.2.0:
     mkdirp "0.5.1"
     supports-color "5.4.0"
 
-mocha@^7.0.1:
+mocha@^7.1.2:
   version "7.1.2"
   resolved "https://registry.yarnpkg.com/mocha/-/mocha-7.1.2.tgz#8e40d198acf91a52ace122cd7599c9ab857b29e6"
   integrity sha512-o96kdRKMKI3E8U0bjnfqW4QMk12MwZ4mhdBTf+B5a1q9+aq2HRnj+3ZdJu0B/ZhJeK78MgYuv6L8d/rA5AeBJA==
@@ -6333,7 +6333,7 @@ secp256k1@^3.0.1:
     nan "^2.14.0"
     safe-buffer "^5.1.2"
 
-secp256k1@^4.0.0:
+secp256k1@^4.0.0, secp256k1@^4.0.1:
   version "4.0.1"
   resolved "https://registry.yarnpkg.com/secp256k1/-/secp256k1-4.0.1.tgz#b9570ca26ace9e74c3171512bba253da9c0b6d60"
   integrity sha512-iGRjbGAKfXMqhtdkkuNxsgJQfJO8Oo78Rm7DAvsG3XKngq+nJIOGqrCSXcQqIVsmCj0wFanE5uTKFxV3T9j2wg==
@@ -7157,7 +7157,7 @@ ts-generator@^0.0.8:
     resolve "^1.8.1"
     ts-essentials "^1.0.0"
 
-ts-node@^8.6.2, ts-node@^8.9.0:
+ts-node@^8.9.0, ts-node@^8.9.1:
   version "8.9.1"
   resolved "https://registry.yarnpkg.com/ts-node/-/ts-node-8.9.1.tgz#2f857f46c47e91dcd28a14e052482eb14cfd65a5"
   integrity sha512-yrq6ODsxEFTLz0R3BX2myf0WBCSQh9A+py8PBo1dCzWIOcvisbyH6akNKqDHMgXePF2kir5mm5JXJTH3OUJYOQ==
@@ -7240,7 +7240,7 @@ typedarray@^0.0.6:
   resolved "https://registry.yarnpkg.com/typedarray/-/typedarray-0.0.6.tgz#867ac74e3864187b1d3d47d996a78ec5c8830777"
   integrity sha1-hnrHTjhkGHsdPUfZlqeOxciDB3c=
 
-typescript@^3.8.2:
+typescript@^3.8.3:
   version "3.8.3"
   resolved "https://registry.yarnpkg.com/typescript/-/typescript-3.8.3.tgz#409eb8544ea0335711205869ec458ab109ee1061"
   integrity sha512-MYlEfn5VrLNsgudQTVJeNaQFUAI7DkhnOjdpAp4T+ku1TfQClewlbSuTVHiA+8skNBgaf02TL/kLOvig4y3G8w==
@@ -7727,7 +7727,7 @@ web3-core@1.2.4:
     web3-core-requestmanager "1.2.4"
     web3-utils "1.2.4"
 
-web3-core@1.2.7, web3-core@^1.2.6:
+web3-core@1.2.7, web3-core@^1.2.7:
   version "1.2.7"
   resolved "https://registry.yarnpkg.com/web3-core/-/web3-core-1.2.7.tgz#9248b04331e458c76263d758c51b0cc612953900"
   integrity sha512-QA0MTae0gXcr3KHe3cQ4x56+Wh43ZKWfMwg1gfCc3NNxPRM1jJ8qudzyptCAUcxUGXWpDG8syLIn1APDz5J8BQ==
@@ -7848,7 +7848,7 @@ web3-eth-contract@1.2.4:
     web3-eth-abi "1.2.4"
     web3-utils "1.2.4"
 
-web3-eth-contract@1.2.7, web3-eth-contract@^1.2.6:
+web3-eth-contract@1.2.7, web3-eth-contract@^1.2.7:
   version "1.2.7"
   resolved "https://registry.yarnpkg.com/web3-eth-contract/-/web3-eth-contract-1.2.7.tgz#13d7f6003d6221f9a5fd61c2d3b5d039477c9674"
   integrity sha512-uW23Y0iL7XroRNbf9fWZ1N6OYhEYTJX8gTuYASuRnpYrISN5QGiQML6pq/NCzqypR1bl5E0fuINZQSK/xefIVw==
@@ -8276,7 +8276,7 @@ web3@1.2.4:
     web3-shh "1.2.4"
     web3-utils "1.2.4"
 
-web3@^1.2.4, web3@^1.2.6:
+web3@^1.2.4, web3@^1.2.6, web3@^1.2.7:
   version "1.2.7"
   resolved "https://registry.yarnpkg.com/web3/-/web3-1.2.7.tgz#fcb83571036c1c6f475bc984785982a444e8d78e"
   integrity sha512-jAAJHMfUlTps+jH2li1ckDFEpPrEEriU/ubegSTGRl3KRdNhEqT93+3kd7FHJTn3NgjcyURo2+f7Da1YcZL8Mw==

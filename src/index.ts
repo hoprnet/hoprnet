@@ -1,5 +1,5 @@
 import { randomBytes } from 'crypto'
-import Web3 from './web3'
+import Web3 from 'web3'
 import { LevelUp } from 'levelup'
 import HoprChannelsAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprChannels.json'
 import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
@@ -107,13 +107,6 @@ export default class HoprEthereum implements HoprCoreConnector {
         while (this._status !== 'initialized') {
           await utils.wait(1 * 1e3)
         }
-
-        this.web3.events.on('reconnected', async () => {
-          this.log(chalk.red('lost connection to web3, restarting..'))
-
-          await this.stop()
-          await this.start()
-        })
 
         this._status = 'started'
         this.log(chalk.green('Connector started'))
@@ -357,9 +350,16 @@ For Kovan HOPR test tokens visit our Telegram channel at ${chalk.blue('https://t
     const publicKey = await utils.privKeyToPubKey(privateKey)
     const address = await utils.pubKeyToAccountId(publicKey)
 
-    const web3 = new Web3(provider)
-    // @TODO: stop using this
-    await web3.isConnected()
+    const web3 = new Web3(
+      new Web3.providers.WebsocketProvider(provider, {
+        reconnect: {
+          auto: true,
+          delay: 5000, // ms
+          maxAttempts: 5,
+          onTimeout: false,
+        },
+      })
+    )
 
     const account = new types.AccountId(address)
     const network = await utils.getNetworkId(web3)

@@ -1,3 +1,4 @@
+import { Ganache, migrate } from '@hoprnet/hopr-ethereum'
 import assert from 'assert'
 import { stringToU8a, u8aToHex, u8aEquals } from '@hoprnet/hopr-utils'
 import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
@@ -15,13 +16,30 @@ import Channel from '.'
 import * as configs from '../config'
 
 describe('test ticket generation and verification', function () {
-  const web3 = new Web3(configs.DEFAULT_URI)
-  const hoprToken: HoprToken = new web3.eth.Contract(HoprTokenAbi as any, configs.TOKEN_ADDRESSES.private)
+  const ganache = new Ganache()
   const channels = new Map<string, ChannelType>()
   const preChannels = new Map<string, ChannelType>()
+  let web3: Web3
+  let hoprToken: HoprToken
   let coreConnector: CoreConnector
   let counterpartysCoreConnector: CoreConnector
   let funder: Await<ReturnType<typeof getPrivKeyData>>
+
+  before(async function () {
+    this.timeout(60e3)
+
+    await ganache.start()
+    await migrate()
+
+    web3 = new Web3(configs.DEFAULT_URI)
+    hoprToken = new web3.eth.Contract(HoprTokenAbi as any, configs.TOKEN_ADDRESSES.private)
+  })
+
+  after(async function () {
+    // @ts-ignore
+    web3.currentProvider.disconnect()
+    await ganache.stop()
+  })
 
   beforeEach(async function () {
     channels.clear()
