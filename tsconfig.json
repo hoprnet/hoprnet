@@ -9,5 +9,6 @@
     "sourceMap": true,
     "noEmit": true
   },
-  "include": ["src/**/*.ts", "chat/**/*.ts"]
+  "include": ["src/**/*.ts", "chat/**/*.ts"],
+  "exclude": ["src/network/transport"]
 }

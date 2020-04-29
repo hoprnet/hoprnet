@@ -74,18 +74,29 @@ describe('test packet composition and decomposition', function () {
 
     const msgReceivedPromises = []
 
-    for (let i = 1; i <= MAX_HOPS; i++) {
-      msgReceivedPromises.push(receiveChecker(testMessages.slice(i - 1, i), nodes[i]))
-      await nodes[0].sendMessage(testMessages[i - 1], nodes[i].peerInfo, async () =>
-        nodes.slice(1, i).map(node => node.peerInfo.id)
+    // for (let i = 1; i <= MAX_HOPS; i++) {
+    //   msgReceivedPromises.push(receiveChecker(testMessages.slice(i - 1, i), nodes[i]))
+    //   await nodes[0].sendMessage(testMessages[i - 1], nodes[i].peerInfo, async () =>
+    //     nodes.slice(1, i).map(node => node.peerInfo.id)
+    //   )
+    // }
+
+    // await Promise.all(msgReceivedPromises)
+
+    msgReceivedPromises.push(receiveChecker(testMessages, nodes[nodes.length - 1]))
+
+    for (let i = 0; i < MAX_HOPS; i++) {
+      await nodes[i].sendMessage(testMessages[i], nodes[nodes.length - 1].peerInfo, async () =>
+        nodes.slice(i + 1, nodes.length - 1).map(node => node.peerInfo.id)
       )
     }
+
+    await Promise.all(msgReceivedPromises)
 
     const timeout = setTimeout(() => {
       assert.fail(`No message received`)
     }, TWO_SECONDS)
 
-    await Promise.all(msgReceivedPromises)
 
     clearTimeout(timeout)
   })
