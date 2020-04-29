@@ -103,6 +103,8 @@ We use solhint's default preset to perform linting onto our smart contracts.
 
 - **redundant compiles**: when running `yarn test` or `yarn coverage`, we always make sure to generate the latest typescript types, this requires us to compile the contracts. Internally, both scripts use `truffle test` which recompiles the contracts even though they haven't changed. [#issue](https://github.com/trufflesuite/truffle/issues/469) [#solution](https://github.com/trufflesuite/truffle/issues/2661)
 
-- **fix-typechain**: [typechain](https://github.com/ethereum-ts/TypeChain) does not fully support Truffle v5 yet. [#issue](https://github.com/ethereum-ts/TypeChain/issues/193)
+- **patch-typechain**: [ganache-core](https://github.com/trufflesuite/ganache-core) uses wrong Web3 types. [#issue](https://github.com/trufflesuite/ganache-core/issues/465)
 
-- **fix-truffle-typings**: [truffle-typings](https://github.com/ethereum-ts/truffle-typings) does not fully support Truffle v5 yet. [#issue](https://github.com/ethereum-ts/truffle-typings/pull/13#issuecomment-550325019)
+- **patch-truffle-typings**: [truffle-typings](https://github.com/ethereum-ts/truffle-typings) does not fully support Truffle v5 yet. [#issue](https://github.com/ethereum-ts/truffle-typings/pull/13#issuecomment-550325019)
+
+- **patch-typechain**: [typechain](https://github.com/ethereum-ts/TypeChain) does not fully support Truffle v5 yet. [#issue](https://github.com/ethereum-ts/TypeChain/issues/193)
