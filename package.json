@@ -7,7 +7,7 @@
   "main": "lib/index.js",
   "scripts": {
     "clean": "rm -rf ./lib",
-    "test": "mocha",
+    "test": "mocha --exit",
     "dev": "yarn clean && yarn build:types && tsc -w",
     "build:types": "typechain --target web3-v1 --outDir './src/tsc/web3' './node_modules/@hoprnet/hopr-ethereum/build/extracted/abis/*.json'",
     "build": "yarn clean && yarn build:types && tsc && cp -R ./src/tsc/web3 ./lib/tsc/web3",

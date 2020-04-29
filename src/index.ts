@@ -26,7 +26,11 @@ export default class HoprEthereum implements HoprCoreConnector {
   private _initializing: Promise<void>
   private _starting: Promise<void>
   private _stopping: Promise<void>
-  private _nonce?: number
+  private _nonce?: {
+    getTransactionCount: Promise<number>
+    virtualNonce?: number
+    nonce?: number
+  }
   public signTransaction: ReturnType<typeof utils.TransactionSigner>
   public log: ReturnType<typeof utils['Log']>
 
@@ -60,17 +64,38 @@ export default class HoprEthereum implements HoprCoreConnector {
 
   get nonce(): Promise<number> {
     return new Promise<number>(async (resolve, reject) => {
-      if (typeof this._nonce !== 'undefined') {
-        return resolve(this._nonce++)
-      }
-
       try {
-        this._nonce = await this.web3.eth.getTransactionCount(this.account.toHex())
-      } catch (error) {
-        reject(error)
-      }
+        let nonce: number | undefined
 
-      resolve(this._nonce++)
+        // 'first' call
+        if (typeof this._nonce === 'undefined') {
+          this._nonce = {
+            getTransactionCount: this.web3.eth.getTransactionCount(this.account.toHex()),
+            virtualNonce: 0,
+            nonce: undefined,
+          }
+
+          nonce = await this._nonce.getTransactionCount
+        }
+        // called while 'first' call hasnt returned
+        else if (typeof this._nonce.nonce === 'undefined') {
+          this._nonce.virtualNonce += 1
+          const virtualNonce = this._nonce.virtualNonce
+
+          nonce = await this._nonce.getTransactionCount.then((count) => {
+            return count + virtualNonce
+          })
+        }
+        // called after 'first' call has returned
+        else {
+          nonce = this._nonce.nonce + 1
+        }
+
+        this._nonce.nonce = nonce
+        return resolve(nonce)
+      } catch (err) {
+        return reject(err.message)
+      }
     })
   }
 
