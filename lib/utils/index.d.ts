@@ -1,12 +1,12 @@
 import type { Networks } from '../tsc/types';
 import type { TransactionObject } from '../tsc/web3/types';
 import { PromiEvent, TransactionReceipt, TransactionConfig } from 'web3-core';
-import { TransactionRevertInstructionError } from 'web3-core-helpers';
 import { BlockTransactionString } from 'web3-eth';
 import Web3 from 'web3';
 import BN from 'bn.js';
 import Debug from 'debug';
 import { AccountId, Signature, Hash } from '../types';
+import { ContractEventEmitter } from '../tsc/web3/types';
 import { ChannelStatus } from '../types/channel';
 export declare function isPartyA(self: AccountId, counterparty: AccountId): boolean;
 export declare function getParties(self: AccountId, counterparty: AccountId): [AccountId, AccountId];
@@ -33,7 +33,8 @@ export declare function waitFor({ web3, network, getCurrentBlock, timestamp, }: 
 export declare function getNetworkId(web3: Web3): Promise<Networks>;
 export declare function stateCountToStatus(stateCount: number): ChannelStatus;
 export declare function TransactionSigner(web3: Web3, privKey: Uint8Array): <T extends any>(txObject: TransactionObject<T>, txConfig: TransactionConfig) => Promise<{
-    send: () => PromiEvent<TransactionRevertInstructionError | TransactionReceipt>;
+    send: () => PromiEvent<import("web3-core-helpers").TransactionRevertInstructionError | TransactionReceipt>;
     transactionHash: string;
 }>;
 export declare function Log(suffixes?: string[]): Debug.Debugger;
+export declare function cleanupPromiEvent<E extends ContractEventEmitter<any>, R extends Promise<any>>(event: E, fn: (event: E) => R): Promise<R>;

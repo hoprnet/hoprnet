@@ -1,16 +1,15 @@
 import type { Networks } from '../tsc/types'
 import type { TransactionObject } from '../tsc/web3/types'
-
 import assert from 'assert'
 import { publicKeyConvert, publicKeyCreate, ecdsaSign, ecdsaRecover, ecdsaVerify } from 'secp256k1'
 import createKeccakHash from 'keccak'
 import { PromiEvent, TransactionReceipt, TransactionConfig } from 'web3-core'
-import { TransactionRevertInstructionError } from 'web3-core-helpers'
 import { BlockTransactionString } from 'web3-eth'
 import Web3 from 'web3'
 import BN from 'bn.js'
 import Debug from 'debug'
 import { AccountId, Signature, Hash } from '../types'
+import { ContractEventEmitter } from '../tsc/web3/types'
 import { ChannelStatus } from '../types/channel'
 import * as constants from '../constants'
 
@@ -251,4 +250,12 @@ export function TransactionSigner(web3: Web3, privKey: Uint8Array) {
 
 export function Log(suffixes: string[] = []) {
   return Debug(['hopr-core-ethereum'].concat(suffixes).join(':'))
+}
+
+// stop listening once fn resolves
+export async function cleanupPromiEvent<E extends ContractEventEmitter<any>, R extends Promise<any>>(
+  event: E,
+  fn: (event: E) => R
+): Promise<R> {
+  return fn(event).finally(() => event.removeAllListeners())
 }

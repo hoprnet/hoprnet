@@ -1,6 +1,5 @@
 import type { Channel as IChannel, Types } from '@hoprnet/hopr-core-connector-interface';
 import { SignedChannel, Moment, Hash, AccountId, Balance, ChannelBalance, State } from '../types';
-import * as events from './events';
 import type HoprEthereum from '..';
 declare class Channel implements IChannel<HoprEthereum> {
     coreConnector: HoprEthereum;
@@ -10,9 +9,7 @@ declare class Channel implements IChannel<HoprEthereum> {
     private _channelId?;
     ticket: typeof Types.Ticket;
     constructor(coreConnector: HoprEthereum, counterparty: Uint8Array, signedChannel: SignedChannel);
-    private onceOpen;
     private onceClosed;
-    private onOpen;
     private onClose;
     private get channel();
     private get status();
@@ -34,5 +31,4 @@ declare class Channel implements IChannel<HoprEthereum> {
     static closeChannels(coreConnector: HoprEthereum): Promise<Balance>;
     static handleOpeningRequest(coreConnector: HoprEthereum): (source: AsyncIterable<Uint8Array>) => AsyncIterator<Uint8Array>;
 }
-export { events };
 export default Channel;

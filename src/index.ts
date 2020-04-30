@@ -10,7 +10,7 @@ import HoprCoreConnector, {
 } from '@hoprnet/hopr-core-connector-interface'
 import { u8aToHex, stringToU8a, u8aEquals } from '@hoprnet/hopr-utils'
 import chalk from 'chalk'
-import Channel, { events } from './channel'
+import Channel from './channel'
 import Ticket from './ticket'
 import * as dbkeys from './dbKeys'
 import * as types from './types'
@@ -165,8 +165,6 @@ export default class HoprEthereum implements HoprCoreConnector {
           // @TODO: cancel initializing & starting
           await this._starting
         }
-
-        events.clearAllEvents()
 
         this._status = 'stopped'
         this.log(chalk.green('Connector stopped'))
@@ -351,11 +349,6 @@ For Kovan HOPR test tokens visit our Telegram channel at ${chalk.blue('https://t
       return false
     }
   }
-
-  // listen to all open / close events, store entries after X confirmations
-  // async initializeMonitoring(): Promise<void> {
-  //   this.hoprChannels.events.OpenedChannel()
-  // }
 
   static readonly constants = constants as typeof IConstants
 
