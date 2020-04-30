@@ -97,7 +97,7 @@ describe('test dbKeys', function () {
     assert(u8aEquals(result, expected), 'check channelEntry key creation')
   })
 
-  it("should create 'ChannelEntry' key", function () {
+  it("should parse 'ChannelEntry' key", function () {
     const key = u8aConcat(encoder.encode('payments-channel-'), userA.address, encoder.encode('-'), userB.address)
     const [result1, result2] = dbKeys.ChannelEntryParse(key)
     const expected1 = userA.address
