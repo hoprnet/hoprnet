@@ -352,6 +352,11 @@ For Kovan HOPR test tokens visit our Telegram channel at ${chalk.blue('https://t
     }
   }
 
+  // listen to all open / close events, store entries after X confirmations
+  // async initializeMonitoring(): Promise<void> {
+  //   this.hoprChannels.events.OpenedChannel()
+  // }
+
   static readonly constants = constants as typeof IConstants
 
   static async create(

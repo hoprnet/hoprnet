@@ -1,6 +1,6 @@
 import { Hash } from './types';
 import type { Types } from '@hoprnet/hopr-core-connector-interface';
-export declare function Channel(counterparty: Types.AccountId): Uint8Array;
+export declare function Channel(counterparty: Types.Hash): Uint8Array;
 export declare function ChannelKeyParse(arr: Uint8Array): Uint8Array;
 export declare function Challenge(channelId: Types.Hash, challenge: Types.Hash): Uint8Array;
 export declare function ChallengeKeyParse(arr: Uint8Array): [Hash, Hash];
@@ -8,3 +8,6 @@ export declare function ChannelId(signatureHash: Types.Hash): Uint8Array;
 export declare function Nonce(channelId: Types.Hash, nonce: Types.Hash): Uint8Array;
 export declare function OnChainSecret(): Uint8Array;
 export declare function Ticket(channelId: Types.Hash, challenge: Types.Hash): Uint8Array;
+export declare function ConfirmedBlockNumber(): Uint8Array;
+export declare function ChannelEntry(from: Types.AccountId, to: Types.AccountId): Uint8Array;
+export declare function ChannelEntryParse(arr: Uint8Array): [Types.AccountId, Types.AccountId];

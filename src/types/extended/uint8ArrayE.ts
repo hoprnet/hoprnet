@@ -9,8 +9,8 @@ class Uint8ArrayE extends Uint8Array {
     return new Uint8Array(this)
   }
 
-  toHex() {
-    return u8aToHex(this)
+  toHex(prefixed?: boolean) {
+    return u8aToHex(this, prefixed)
   }
 
   eq(b: Uint8Array) {

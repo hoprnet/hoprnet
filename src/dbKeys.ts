@@ -1,14 +1,18 @@
-import { Hash } from './types'
+import { Hash, AccountId } from './types'
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
-import * as constants from './constants'
 
 const encoder = new TextEncoder()
 const PREFIX = encoder.encode('payments-')
 const SEPERATOR = encoder.encode('-')
 const channelSubPrefix = encoder.encode('channel-')
 const challengeSubPrefix = encoder.encode('challenge-')
+const channelIdSubPrefix = encoder.encode('channelId-')
+const nonceSubPrefix = encoder.encode('nonce-')
+const ticketSubPrefix = encoder.encode('ticket-')
+const onChainSecret = encoder.encode('onChainSecret')
+const confirmedBlockNumber = encoder.encode('confirmedBlockNumber')
 
-export function Channel(counterparty: Types.AccountId): Uint8Array {
+export function Channel(counterparty: Types.Hash): Uint8Array {
   return allocationHelper([
     [PREFIX.length, PREFIX],
     [channelSubPrefix.length, channelSubPrefix],
@@ -31,38 +35,26 @@ export function Challenge(channelId: Types.Hash, challenge: Types.Hash): Uint8Ar
 }
 
 export function ChallengeKeyParse(arr: Uint8Array): [Hash, Hash] {
-  return [
-    new Hash(
-      arr.slice(
-        PREFIX.length + channelSubPrefix.length,
-        PREFIX.length + channelSubPrefix.length + constants.HASH_LENGTH
-      )
-    ),
-    new Hash(
-      arr.slice(
-        PREFIX.length + channelSubPrefix.length + constants.HASH_LENGTH + SEPERATOR.length,
-        PREFIX.length + channelSubPrefix.length + constants.HASH_LENGTH + SEPERATOR.length + constants.HASH_LENGTH
-      )
-    ),
-  ]
+  const fromStart = PREFIX.length + challengeSubPrefix.length
+  const fromEnd = fromStart + Hash.SIZE
+  const toStart = fromEnd + SEPERATOR.length
+  const toEnd = toStart + Hash.SIZE
+
+  return [new Hash(arr.slice(fromStart, fromEnd)), new Hash(arr.slice(toStart, toEnd))]
 }
 
 export function ChannelId(signatureHash: Types.Hash): Uint8Array {
-  const subPrefix = encoder.encode('channelId-')
-
   return allocationHelper([
     [PREFIX.length, PREFIX],
-    [subPrefix.length, subPrefix],
+    [channelIdSubPrefix.length, channelIdSubPrefix],
     [signatureHash.length, signatureHash],
   ])
 }
 
 export function Nonce(channelId: Types.Hash, nonce: Types.Hash): Uint8Array {
-  const subPrefix = encoder.encode('nonce-')
-
   return allocationHelper([
     [PREFIX.length, PREFIX],
-    [subPrefix.length, subPrefix],
+    [nonceSubPrefix.length, nonceSubPrefix],
     [channelId.length, channelId],
     [SEPERATOR.length, SEPERATOR],
     [nonce.length, nonce],
@@ -70,24 +62,46 @@ export function Nonce(channelId: Types.Hash, nonce: Types.Hash): Uint8Array {
 }
 
 export function OnChainSecret(): Uint8Array {
-  const subPrefix = encoder.encode('onChainSecret')
-
   return allocationHelper([
     [PREFIX.length, PREFIX],
-    [subPrefix.length, subPrefix],
+    [onChainSecret.length, onChainSecret],
   ])
 }
 
 export function Ticket(channelId: Types.Hash, challenge: Types.Hash): Uint8Array {
-  const subPrefix = encoder.encode('ticket-')
-
   return allocationHelper([
     [PREFIX.length, PREFIX],
-    [subPrefix.length, subPrefix],
+    [ticketSubPrefix.length, ticketSubPrefix],
     [channelId.length, channelId],
     [SEPERATOR.length, SEPERATOR],
     [challenge.length, challenge],
   ])
+}
+
+export function ConfirmedBlockNumber(): Uint8Array {
+  return allocationHelper([
+    [PREFIX.length, PREFIX],
+    [confirmedBlockNumber.length, confirmedBlockNumber],
+  ])
+}
+
+export function ChannelEntry(from: Types.AccountId, to: Types.AccountId): Uint8Array {
+  return allocationHelper([
+    [PREFIX.length, PREFIX],
+    [channelSubPrefix.length, channelSubPrefix],
+    [from.length, from],
+    [SEPERATOR.length, SEPERATOR],
+    [to.length, to],
+  ])
+}
+
+export function ChannelEntryParse(arr: Uint8Array): [Types.AccountId, Types.AccountId] {
+  const fromStart = PREFIX.length + channelSubPrefix.length
+  const fromEnd = fromStart + AccountId.SIZE
+  const toStart = fromEnd + SEPERATOR.length
+  const toEnd = toStart + AccountId.SIZE
+
+  return [new AccountId(arr.slice(fromStart, fromEnd)), new AccountId(arr.slice(toStart, toEnd))]
 }
 
 function allocationHelper(arr: [number, Uint8Array][]): Uint8Array {
