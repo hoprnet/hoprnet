@@ -135,6 +135,9 @@ export default class HoprEthereum implements HoprCoreConnector {
           await utils.wait(1 * 1e3)
         }
 
+        // // restart
+        // this.channels.start(this)
+
         this._status = 'started'
         this.log(chalk.green('Connector started'))
       })
@@ -167,6 +170,8 @@ export default class HoprEthereum implements HoprCoreConnector {
           // @TODO: cancel initializing & starting
           await this._starting
         }
+
+        await this.channels.stop()
 
         this._status = 'stopped'
         this.log(chalk.green('Connector stopped'))
@@ -206,10 +211,12 @@ export default class HoprEthereum implements HoprCoreConnector {
       .then(async () => {
         // initialize stuff
         await Promise.all<boolean>([
-          // initialize account secret
-          this.initializeAccountSecret(),
           // confirm web3 is connected
           this.checkWeb3(),
+          // initialize account secret
+          this.initializeAccountSecret(),
+          // start channels indexing
+          this.channels.start(this),
         ]).then((responses) => {
           const allOk = responses.every((r) => !!r)
 

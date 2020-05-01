@@ -35,12 +35,12 @@ export function Challenge(channelId: Types.Hash, challenge: Types.Hash): Uint8Ar
 }
 
 export function ChallengeKeyParse(arr: Uint8Array): [Hash, Hash] {
-  const fromStart = PREFIX.length + challengeSubPrefix.length
-  const fromEnd = fromStart + Hash.SIZE
-  const toStart = fromEnd + SEPERATOR.length
-  const toEnd = toStart + Hash.SIZE
+  const channelIdStart = PREFIX.length + challengeSubPrefix.length
+  const channelIdEnd = channelIdStart + Hash.SIZE
+  const challangeStart = channelIdEnd + SEPERATOR.length
+  const challangeEnd = challangeStart + Hash.SIZE
 
-  return [new Hash(arr.slice(fromStart, fromEnd)), new Hash(arr.slice(toStart, toEnd))]
+  return [new Hash(arr.slice(channelIdStart, channelIdEnd)), new Hash(arr.slice(challangeStart, challangeEnd))]
 }
 
 export function ChannelId(signatureHash: Types.Hash): Uint8Array {
@@ -96,12 +96,12 @@ export function ChannelEntry(from: Types.AccountId, to: Types.AccountId): Uint8A
 }
 
 export function ChannelEntryParse(arr: Uint8Array): [Types.AccountId, Types.AccountId] {
-  const fromStart = PREFIX.length + channelSubPrefix.length
-  const fromEnd = fromStart + AccountId.SIZE
-  const toStart = fromEnd + SEPERATOR.length
-  const toEnd = toStart + AccountId.SIZE
+  const partyAStart = PREFIX.length + channelSubPrefix.length
+  const partyAEnd = partyAStart + AccountId.SIZE
+  const partyBStart = partyAEnd + SEPERATOR.length
+  const partyBEnd = partyBStart + AccountId.SIZE
 
-  return [new AccountId(arr.slice(fromStart, fromEnd)), new AccountId(arr.slice(toStart, toEnd))]
+  return [new AccountId(arr.slice(partyAStart, partyAEnd)), new AccountId(arr.slice(partyBStart, partyBEnd))]
 }
 
 function allocationHelper(arr: [number, Uint8Array][]): Uint8Array {

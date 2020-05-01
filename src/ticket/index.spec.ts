@@ -35,8 +35,6 @@ describe('test ticket generation and verification', function () {
   })
 
   after(async function () {
-    // @ts-ignore
-    web3.currentProvider.disconnect()
     await ganache.stop()
   })
 

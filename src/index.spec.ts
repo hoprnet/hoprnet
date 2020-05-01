@@ -29,12 +29,12 @@ describe('test connector', function () {
     web3 = new Web3(configs.DEFAULT_URI)
     hoprToken = new web3.eth.Contract(HoprTokenAbi as any, configs.TOKEN_ADDRESSES.private)
     connector = await generateNode(owner.privKey)
+
     await connector.start()
   })
 
   after(async function () {
-    // @ts-ignore
-    web3.currentProvider.disconnect()
+    await connector.stop()
     await ganache.stop()
   })
 

@@ -1,3 +1,4 @@
+// @ts-ignore
 import type { Networks } from '../tsc/types'
 import type { TransactionObject } from '../tsc/web3/types'
 import assert from 'assert'
@@ -9,9 +10,12 @@ import Web3 from 'web3'
 import BN from 'bn.js'
 import Debug from 'debug'
 import { AccountId, Signature, Hash } from '../types'
-import { ContractEventEmitter } from '../tsc/web3/types'
+import { ContractEventEmitter, ContractEventLog } from '../tsc/web3/types'
 import { ChannelStatus } from '../types/channel'
 import * as constants from '../constants'
+import * as time from './time'
+
+export { time }
 
 export function isPartyA(self: AccountId, counterparty: AccountId): boolean {
   return Buffer.compare(self, counterparty) < 0
@@ -114,29 +118,6 @@ export async function waitForConfirmation<T extends PromiEvent<any>>(event: T) {
   })
 }
 
-export function advanceBlockAtTime(web3: Web3, time: number): Promise<string> {
-  return new Promise<string>((resolve, reject) => {
-    // @ts-ignore
-    web3.currentProvider.send(
-      {
-        jsonrpc: '2.0',
-        method: 'evm_mine',
-        params: [time],
-        id: new Date().getTime(),
-      },
-      async (err: any) => {
-        if (err) {
-          return reject(err)
-        }
-        const newBlock = await web3.eth.getBlock('latest')
-        const newBlockHash = newBlock.hash
-
-        return resolve(newBlockHash)
-      }
-    )
-  })
-}
-
 export async function wait(ms: number) {
   return new Promise((resolve) => {
     setTimeout(resolve, ms)
@@ -160,11 +141,12 @@ export async function waitFor({
     return undefined
   }
 
+  const diff = now - timestamp || 60
+
   if (network === 'private') {
-    await advanceBlockAtTime(web3, Math.ceil(timestamp / 1e3) + 1)
+    await time.increase(web3, diff)
   } else {
-    const diff = now - timestamp || 60 * 1e3
-    await wait(diff)
+    await wait(diff * 1e3)
   }
 
   return waitFor({
@@ -258,4 +240,9 @@ export async function cleanupPromiEvent<E extends ContractEventEmitter<any>, R e
   fn: (event: E) => R
 ): Promise<R> {
   return fn(event).finally(() => event.removeAllListeners())
+}
+
+// return an event's id
+export function getEventId(event: ContractEventLog<any>): string {
+  return `${event.event}-${event.transactionHash}-${event.logIndex}`
 }
