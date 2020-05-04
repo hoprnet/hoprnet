@@ -1,5 +1,6 @@
 require('ts-node/register')
 const HDWalletProvider = require('@truffle/hdwallet-provider')
+const networks = require('./truffle-networks.json')
 
 let secrets
 try {
@@ -12,37 +13,27 @@ module.exports = {
   networks: {
     // default network
     development: {
-      host: '127.0.0.1',
-      port: 9545, // 'truffle develop' port
-      network_id: '*',
+      ...networks.development,
     },
 
     // used when testing
     test: {
-      host: '127.0.0.1',
-      port: 9545, // 'truffle develop' port
-      network_id: '*',
+      ...networks.test,
     },
 
     // used for generating code coverage
     soliditycoverage: {
-      host: '127.0.0.1',
-      port: 8555, // if you change this, also set the port option in '.solcover.js'
-      network_id: '*',
+      ...networks.soliditycoverage,
     },
 
     rinkeby: secrets && {
+      ...networks.rinkeby,
       provider: () => new HDWalletProvider(secrets.mnemonic, `https://rinkeby.infura.io/v3/${secrets.infura}`),
-      gas: 6500000,
-      gasPrice: 1000000000,
-      network_id: '4',
     },
 
     kovan: secrets && {
+      ...networks.kovan,
       provider: () => new HDWalletProvider(secrets.mnemonic, `https://kovan.infura.io/v3/${secrets.infura}`),
-      gas: 6500000,
-      gasPrice: 1000000000,
-      network_id: '42',
     },
   },
 

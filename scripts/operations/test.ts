@@ -1,8 +1,9 @@
 import { Ganache, bash } from './utils'
+import networks from '../../truffle-networks.json'
 
 export default async () => {
   const ganache = new Ganache({
-    port: 9545,
+    port: networks.test.port,
   })
 
   await ganache.start()

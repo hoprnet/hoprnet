@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const path_1 = __importDefault(require("path"));
 const child_process_1 = require("child_process");
+const truffle_networks_json_1 = __importDefault(require("../../../truffle-networks.json"));
 exports.root = path_1.default.join(__dirname, '..', '..', '..');
 exports.bash = (cmd) => {
     return new Promise((resolve, reject) => {
@@ -28,5 +29,7 @@ exports.getOperations = () => {
     return ['patch', 'build', 'coverage', 'fund', 'migrate', 'network', 'test', 'verify'];
 };
 exports.isLocalNetwork = (network) => {
-    return !['rinkeby', 'kovan', 'mainnet'].includes(network);
+    return !!Object.entries(truffle_networks_json_1.default)
+        .filter(([, config]) => config.network_id === '*')
+        .find(([name]) => name === network);
 };

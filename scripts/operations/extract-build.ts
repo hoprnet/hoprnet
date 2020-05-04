@@ -1,5 +1,7 @@
 /*
-  extract abi and bytecode into seperate files
+  extract abi and bytecode into a seperate folder,
+  the files then can be used by application by simply
+  fetching the files through rawgit or similar
 */
 import { join } from 'path'
 import { readdir, readFile, writeFile, mkdir } from 'fs'

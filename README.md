@@ -48,12 +48,7 @@ yarn build
 # Testing
 
 ```bash
-# 1. Runs linter
-# 2. Compiles smart contracts
-# 3. Generates smart contracts' typescript types
-# 4. Compiles migrations to `.js`
-# 5. If ganache port is free, launches ganache or use an existing instance
-# 6. Runs `truffle test`
+# Runs `truffle test`
 yarn test
 ```
 
@@ -71,7 +66,7 @@ yarn coverage
 
 # Migrating
 
-For testnet/mainnet migrations, you will have to create a [truffle-secrets.json](./truffle-secrets.example.json) file within the root of the project, this file allows you to use your own mnemonic and infura api key securely.
+For public network migrations (rinkeby, kovan, etc), you will have to create a [truffle-secrets.json](./truffle-secrets.example.json) file within the root of the project, this file allows you to use your own mnemonic and infura api key securely.
 
 ```bash
 yarn network # starts a locally hosted network
@@ -84,7 +79,7 @@ yarn migrate
 
 ## HoprToken
 
-A standard ERC20 token with snapshot functionality.
+A standard ERC777 token with snapshot functionality.
 
 ```
 Name: HOPR Token

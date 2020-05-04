@@ -1,5 +1,6 @@
 import path from 'path'
 import { spawn } from 'child_process'
+import networks from '../../../truffle-networks.json'
 
 export const root = path.join(__dirname, '..', '..', '..')
 
@@ -31,5 +32,7 @@ export const getOperations = () => {
 }
 
 export const isLocalNetwork = (network: string) => {
-  return !['rinkeby', 'kovan', 'mainnet'].includes(network)
+  return !!Object.entries(networks)
+    .filter(([, config]) => config.network_id === '*')
+    .find(([name]) => name === network)
 }

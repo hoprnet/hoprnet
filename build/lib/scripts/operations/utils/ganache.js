@@ -5,12 +5,13 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const ganache_core_1 = __importDefault(require("ganache-core"));
 const hopr_demo_seeds_1 = require("@hoprnet/hopr-demo-seeds");
+const truffle_networks_json_1 = __importDefault(require("../../../truffle-networks.json"));
 const accounts = hopr_demo_seeds_1.NODE_SEEDS.concat(hopr_demo_seeds_1.BOOTSTRAP_SEEDS);
 const balance = Number(1000000000000000000000000).toString(16);
 let server;
 const DEFAULT_OPS = {
     ws: true,
-    port: 9545,
+    port: truffle_networks_json_1.default.development.port,
     accounts: accounts.map((account) => ({
         secretKey: account,
         balance,

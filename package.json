@@ -27,11 +27,11 @@
     "migrate": "ts-node -T ./scripts/cli.ts migrate",
     "network": "ts-node -T ./scripts/cli.ts network",
     "test": "ts-node -T ./scripts/cli.ts test",
-    "lint": "prettier --check ."
+    "format": "prettier --check ."
   },
   "husky": {
     "hooks": {
-      "pre-commit": "yarn lint && yarn build && git add ."
+      "pre-commit": "yarn format && yarn build && git add ."
     }
   },
   "dependencies": {

@@ -1,5 +1,6 @@
 import Ganache from 'ganache-core'
 import { NODE_SEEDS, BOOTSTRAP_SEEDS } from '@hoprnet/hopr-demo-seeds'
+import networks from '../../../truffle-networks.json'
 
 const accounts = NODE_SEEDS.concat(BOOTSTRAP_SEEDS)
 const balance = Number(1000000000000000000000000).toString(16)
@@ -13,7 +14,7 @@ let server:
 
 const DEFAULT_OPS: Ganache.IServerOptions = {
   ws: true,
-  port: 9545,
+  port: networks.development.port,
   accounts: accounts.map((account) => ({
     secretKey: account,
     balance,
