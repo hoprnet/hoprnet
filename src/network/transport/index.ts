@@ -57,7 +57,7 @@ class TCP {
    * @param {AbortSignal} options.signal Used to abort dial requests
    * @returns {Connection} An upgraded Connection
    */
-  async dial(ma: Multiaddr, options?: DialOptions) {
+  async dial(ma: Multiaddr, options?: DialOptions): Promise<any> {
     options = options || {}
     const socket = await this._connect(ma, options)
     const maConn = socketToConn(socket, { remoteAddr: ma, signal: options.signal })
