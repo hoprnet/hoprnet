@@ -12,7 +12,7 @@ export default async () => {
   const owner = accounts[0]
 
   for (const account of accounts) {
-    await hoprToken.methods.mint(account, AMOUNT).send({
+    await hoprToken.methods.mint(account, AMOUNT, '0x00', '0x00').send({
       from: owner,
       gas: 200e3,
     })
