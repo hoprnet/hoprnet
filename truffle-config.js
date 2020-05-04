@@ -6,7 +6,7 @@ let secrets
 try {
   secrets = require('./truffle-secrets.json')
 } catch (error) {
-  console.warn('truffle-secrets not found!')
+  console.log('truffle-secrets not found!')
 }
 
 module.exports = {
