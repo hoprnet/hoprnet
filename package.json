@@ -38,6 +38,7 @@
     "@hoprnet/hopr-demo-seeds": "https://github.com/hoprnet/hopr-demo-seeds.git",
     "@hoprnet/hopr-utils": "https://github.com/hoprnet/hopr-utils.git",
     "@openzeppelin/contracts": "^3.0.1",
+    "@openzeppelin/test-helpers": "^0.5.5",
     "@truffle/hdwallet-provider": "^1.0.34",
     "bignumber.js": "^9.0.0",
     "ganache-core": "^2.10.2",
@@ -47,7 +48,6 @@
     "web3": "^1.2.7"
   },
   "devDependencies": {
-    "@openzeppelin/test-helpers": "^0.5.5",
     "@types/chai": "^4.2.11",
     "@types/mocha": "^7.0.2",
     "@types/node": "^13.13.4",
