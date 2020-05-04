@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "description": "Demo seeds for HOPR testing",
   "license": "GPL-3.0-only",
+  "scripts": {
+    "preinstall": "tsc",
+    "start": "micro"
+  },
   "keywords": [
     "privacy",
     "web3",
@@ -41,5 +45,8 @@
     "singleQuote": true,
     "quoteProps": "consistent",
     "arrowParens": "avoid"
+  },
+  "dependencies": {
+    "micro": "^9.3.4"
   }
 }
