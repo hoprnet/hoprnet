@@ -15,7 +15,7 @@ import type CoreConnector from '..'
 
 const CLOSURE_DURATION = durations.days(3)
 
-describe.skip('test channels', function () {
+describe.only('test channels', function () {
   const ganache = new Ganache()
   let web3: Web3
   let hoprToken: HoprToken
@@ -92,7 +92,7 @@ describe.skip('test channels', function () {
 
       assert(allChannels[0].partyA.eq(partyA), 'check Channels.store')
       assert(allChannels[0].partyB.eq(partyB), 'check Channels.store')
-      assert.equal(allChannels[0].blockNumber, blockNumber, 'check Channels.store')
+      assert.equal(allChannels[0].channelEntry.blockNumber.toNumber(), blockNumber, 'check Channels.store')
       assert.equal(latestConfirmedBlockNumber, blockNumber, 'check Channels.store')
     })
 
@@ -198,13 +198,15 @@ describe.skip('test channels', function () {
       await coreConnector.db.clear()
     })
 
-    it('should not store older channel', async function () {
+    it('should not store older channel according to blockNumber', async function () {
       await coreConnector.channels.onOpenedChannel(coreConnector, {
         returnValues: {
           opener: userA.address.toHex(),
           counterParty: userB.address.toHex(),
         },
         blockNumber: 2,
+        transactionIndex: 0,
+        logIndex: 0,
       } as any)
 
       await coreConnector.channels.onOpenedChannel(coreConnector, {
@@ -213,20 +215,24 @@ describe.skip('test channels', function () {
           counterParty: userB.address.toHex(),
         },
         blockNumber: 1,
+        transactionIndex: 0,
+        logIndex: 0,
       } as any)
 
       const allChannels = await coreConnector.channels.getAll(coreConnector)
-      assert.equal(allChannels.length, 1, 'check Channels.onOpenedChannel')
-      assert.equal(allChannels[0].blockNumber, 2, 'check Channels.onOpenedChannel')
+      assert.equal(allChannels.length, 1, 'check Channels.onOpenedChannel blockNumber')
+      assert.equal(allChannels[0].channelEntry.blockNumber.toNumber(), 2, 'check Channels.onOpenedChannel blockNumber')
     })
 
-    it('should not delete latest channel', async function () {
+    it('should not delete latest channel according to blockNumber', async function () {
       await coreConnector.channels.onOpenedChannel(coreConnector, {
         returnValues: {
           opener: userA.address.toHex(),
           counterParty: userB.address.toHex(),
         },
         blockNumber: 2,
+        transactionIndex: 0,
+        logIndex: 0,
       } as any)
 
       await coreConnector.channels.onClosedChannel(coreConnector, {
@@ -235,11 +241,125 @@ describe.skip('test channels', function () {
           counterParty: userB.address.toHex(),
         },
         blockNumber: 1,
+        transactionIndex: 0,
+        logIndex: 0,
       } as any)
 
       const allChannels = await coreConnector.channels.getAll(coreConnector)
-      assert.equal(allChannels.length, 1, 'check Channels.onClosedChannel')
-      assert.equal(allChannels[0].blockNumber, 2, 'check Channels.onClosedChannel')
+      assert.equal(allChannels.length, 1, 'check Channels.onClosedChannel blockNumber')
+      assert.equal(allChannels[0].channelEntry.blockNumber.toNumber(), 2, 'check Channels.onClosedChannel blockNumber')
+    })
+
+    it('should not store older channel according to transactionIndex', async function () {
+      await coreConnector.channels.onOpenedChannel(coreConnector, {
+        returnValues: {
+          opener: userA.address.toHex(),
+          counterParty: userB.address.toHex(),
+        },
+        blockNumber: 1,
+        transactionIndex: 2,
+        logIndex: 0,
+      } as any)
+
+      await coreConnector.channels.onOpenedChannel(coreConnector, {
+        returnValues: {
+          opener: userA.address.toHex(),
+          counterParty: userB.address.toHex(),
+        },
+        blockNumber: 1,
+        transactionIndex: 1,
+        logIndex: 0,
+      } as any)
+
+      const allChannels = await coreConnector.channels.getAll(coreConnector)
+      assert.equal(allChannels.length, 1, 'check Channels.onOpenedChannel transactionIndex')
+      assert.equal(
+        allChannels[0].channelEntry.transactionIndex.toNumber(),
+        2,
+        'check Channels.onOpenedChannel transactionIndex'
+      )
+    })
+
+    it('should not delete latest channel according to transactionIndex', async function () {
+      await coreConnector.channels.onOpenedChannel(coreConnector, {
+        returnValues: {
+          opener: userA.address.toHex(),
+          counterParty: userB.address.toHex(),
+        },
+        blockNumber: 1,
+        transactionIndex: 2,
+        logIndex: 0,
+      } as any)
+
+      await coreConnector.channels.onClosedChannel(coreConnector, {
+        returnValues: {
+          closer: userA.address.toHex(),
+          counterParty: userB.address.toHex(),
+        },
+        blockNumber: 1,
+        transactionIndex: 1,
+        logIndex: 0,
+      } as any)
+
+      const allChannels = await coreConnector.channels.getAll(coreConnector)
+      assert.equal(allChannels.length, 1, 'check Channels.onOpenedChannel transactionIndex')
+      assert.equal(
+        allChannels[0].channelEntry.transactionIndex.toNumber(),
+        2,
+        'check Channels.onOpenedChannel transactionIndex'
+      )
+    })
+
+    it('should not store older channel according to logIndex', async function () {
+      await coreConnector.channels.onOpenedChannel(coreConnector, {
+        returnValues: {
+          opener: userA.address.toHex(),
+          counterParty: userB.address.toHex(),
+        },
+        blockNumber: 1,
+        transactionIndex: 0,
+        logIndex: 2,
+      } as any)
+
+      await coreConnector.channels.onOpenedChannel(coreConnector, {
+        returnValues: {
+          opener: userA.address.toHex(),
+          counterParty: userB.address.toHex(),
+        },
+        blockNumber: 1,
+        transactionIndex: 0,
+        logIndex: 1,
+      } as any)
+
+      const allChannels = await coreConnector.channels.getAll(coreConnector)
+      assert.equal(allChannels.length, 1, 'check Channels.onOpenedChannel logIndex')
+      assert.equal(allChannels[0].channelEntry.logIndex.toNumber(), 2, 'check Channels.onOpenedChannel logIndex')
+    })
+
+    it('should not delete latest channel according to logIndex', async function () {
+      await coreConnector.channels.onOpenedChannel(coreConnector, {
+        returnValues: {
+          opener: userA.address.toHex(),
+          counterParty: userB.address.toHex(),
+        },
+        blockNumber: 1,
+        transactionIndex: 0,
+        logIndex: 2,
+      } as any)
+
+      await coreConnector.channels.onClosedChannel(coreConnector, {
+        returnValues: {
+          closer: userA.address.toHex(),
+          counterParty: userB.address.toHex(),
+        },
+        blockNumber: 1,
+        transactionIndex: 0,
+        logIndex: 1,
+      } as any)
+
+      const allChannels = await coreConnector.channels.getAll(coreConnector)
+      assert.equal(allChannels.length, 1, 'check Channels.onOpenedChannel logIndex')
+      assert.equal(allChannels[0].channelEntry.logIndex.toNumber(), 2, 'check Channels.onOpenedChannel logIndex')
     })
   })
 })

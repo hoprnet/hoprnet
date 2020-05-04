@@ -6,7 +6,7 @@ import Web3 from 'web3';
 import BN from 'bn.js';
 import Debug from 'debug';
 import { AccountId, Signature, Hash } from '../types';
-import { ContractEventEmitter, ContractEventLog } from '../tsc/web3/types';
+import { ContractEventEmitter } from '../tsc/web3/types';
 import { ChannelStatus } from '../types/channel';
 import * as time from './time';
 export { time };
@@ -39,4 +39,3 @@ export declare function TransactionSigner(web3: Web3, privKey: Uint8Array): <T e
 }>;
 export declare function Log(suffixes?: string[]): Debug.Debugger;
 export declare function cleanupPromiEvent<E extends ContractEventEmitter<any>, R extends Promise<any>>(event: E, fn: (event: E) => R): Promise<R>;
-export declare function getEventId(event: ContractEventLog<any>): string;

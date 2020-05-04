@@ -1,14 +1,15 @@
 import type HoprEthereum from '..'
+import BN from 'bn.js'
 import { Subscription } from 'web3-core-subscriptions'
 import { BlockHeader } from 'web3-eth'
-import { u8aToNumber, toU8a, stringToU8a } from '@hoprnet/hopr-utils'
+import { u8aToNumber, stringToU8a } from '@hoprnet/hopr-utils'
 import * as dbKeys from '../dbKeys'
-import { AccountId } from '../types'
-import { getParties, Log, getEventId } from '../utils'
+import { AccountId, ChannelEntry } from '../types'
+import { getParties, Log } from '../utils'
 import { MAX_CONFIRMATIONS } from '../config'
 import { ContractEventEmitter, ContractEventLog } from '../tsc/web3/types'
 
-type Channel = { partyA: AccountId; partyB: AccountId; blockNumber: number }
+type Channel = { partyA: AccountId; partyB: AccountId; channelEntry: ChannelEntry }
 type OpenedChannelEvent = ContractEventLog<{ opener: string; counterParty: string }>
 type ClosedChannelEvent = ContractEventLog<{ closer: string; counterParty: string }>
 
@@ -19,14 +20,26 @@ let newBlockEvent: Subscription<BlockHeader>
 let openedChannelEvent: ContractEventEmitter<any> | undefined
 let closedChannelEvent: ContractEventEmitter<any> | undefined
 
+// return a custom event id for logging purposes
+function getEventId(event: ContractEventLog<any>): string {
+  return `${event.event}-${event.transactionHash}-${event.transactionIndex}-${event.logIndex}`
+}
+
+// ensure new channel is new
+function isNewEvent(oldChannelEntry: ChannelEntry, newChannelEntry: ChannelEntry): boolean {
+  const okBlockNumber = oldChannelEntry.blockNumber.lte(newChannelEntry.blockNumber)
+  const okTransactionIndex = okBlockNumber && oldChannelEntry.transactionIndex.lte(newChannelEntry.transactionIndex)
+  const okLogIndex = okTransactionIndex && oldChannelEntry.logIndex.lt(newChannelEntry.logIndex)
+
+  return okBlockNumber && okTransactionIndex && okLogIndex
+}
+
 class Channels {
-  static async getLatestConfirmedBlockNumber(coreConnector: HoprEthereum): Promise<number> {
+  static async getLatestConfirmedBlockNumber(connector: HoprEthereum): Promise<number> {
     try {
-      const blockNumber = await coreConnector.db
-        .get(Buffer.from(coreConnector.dbKeys.ConfirmedBlockNumber()))
-        .then((res) => {
-          return u8aToNumber(res)
-        })
+      const blockNumber = await connector.db.get(Buffer.from(connector.dbKeys.ConfirmedBlockNumber())).then((res) => {
+        return u8aToNumber(res)
+      })
 
       return blockNumber
     } catch (err) {
@@ -39,8 +52,8 @@ class Channels {
   }
 
   // does it exist
-  static async has(coreConnector: HoprEthereum, partyA: AccountId, partyB: AccountId): Promise<boolean> {
-    return coreConnector.db.get(Buffer.from(dbKeys.ChannelEntry(partyA, partyB))).then(
+  static async has(connector: HoprEthereum, partyA: AccountId, partyB: AccountId): Promise<boolean> {
+    return connector.db.get(Buffer.from(dbKeys.ChannelEntry(partyA, partyB))).then(
       () => true,
       (err) => {
         if (err.notFound) {
@@ -55,13 +68,13 @@ class Channels {
   // @TODO: improve function types
   // get stored channels using a query
   static async get(
-    coreConnector: HoprEthereum,
+    connector: HoprEthereum,
     query?: {
       partyA?: AccountId
       partyB?: AccountId
     }
   ): Promise<Channel[]> {
-    const { dbKeys, db } = coreConnector
+    const { dbKeys, db } = connector
     const channels: Channel[] = []
     const allSmall = new Uint8Array(AccountId.SIZE).fill(0x00)
     const allBig = new Uint8Array(AccountId.SIZE).fill(0xff)
@@ -91,10 +104,15 @@ class Channels {
         .on('error', (err) => reject(err))
         .on('data', ({ key, value }: { key: Buffer; value: Buffer }) => {
           const [partyA, partyB] = dbKeys.ChannelEntryParse(key)
+          const channelEntry = new ChannelEntry({
+            bytes: value,
+            offset: value.byteOffset,
+          })
+
           channels.push({
             partyA: new AccountId(partyA),
             partyB: new AccountId(partyB),
-            blockNumber: u8aToNumber(value),
+            channelEntry,
           })
         })
         .on('end', () => resolve(channels))
@@ -102,39 +120,49 @@ class Channels {
   }
 
   // get all stored channels
-  static async getAll(coreConnector: HoprEthereum): Promise<Channel[]> {
-    return Channels.get(coreConnector)
+  static async getAll(connector: HoprEthereum): Promise<Channel[]> {
+    return Channels.get(connector)
   }
 
   // store a channel
   static async store(
-    coreConnector: HoprEthereum,
+    connector: HoprEthereum,
     partyA: AccountId,
     partyB: AccountId,
-    blockNumber: number
-  ): Promise<[void, void]> {
-    log(`storing channel ${partyA.toHex()}-${partyB.toHex()}:${blockNumber}`)
+    channelEntry: ChannelEntry
+  ): Promise<void> {
+    const { dbKeys, db } = connector
+    const { blockNumber, logIndex, transactionIndex } = channelEntry
+    log(
+      `storing channel ${partyA.toHex()}-${partyB.toHex()}:${blockNumber.toString()}-${transactionIndex.toString()}-${logIndex.toString()}`
+    )
 
-    const { dbKeys, db } = coreConnector
-
-    return Promise.all([
-      db.put(Buffer.from(dbKeys.ChannelEntry(partyA, partyB)), Buffer.from(toU8a(blockNumber))),
-      db.put(Buffer.from(dbKeys.ConfirmedBlockNumber()), Buffer.from(toU8a(blockNumber))),
+    return db.batch([
+      {
+        type: 'put',
+        key: Buffer.from(dbKeys.ChannelEntry(partyA, partyB)),
+        value: Buffer.from(channelEntry),
+      },
+      {
+        type: 'put',
+        key: Buffer.from(dbKeys.ConfirmedBlockNumber()),
+        value: Buffer.from(blockNumber.toU8a()),
+      },
     ])
   }
 
   // delete a channel
-  static async delete(coreConnector: HoprEthereum, partyA: AccountId, partyB: AccountId): Promise<void> {
+  static async delete(connector: HoprEthereum, partyA: AccountId, partyB: AccountId): Promise<void> {
     log(`deleting channel ${partyA.toHex()}-${partyB.toHex()}`)
 
-    const { dbKeys, db } = coreConnector
+    const { dbKeys, db } = connector
 
     const key = Buffer.from(dbKeys.ChannelEntry(partyA, partyB))
 
     return db.del(key)
   }
 
-  static async onNewBlock(coreConnector: HoprEthereum, block: BlockHeader) {
+  static async onNewBlock(connector: HoprEthereum, block: BlockHeader) {
     const confirmedEvents = Array.from(unconfirmedEvents.values()).filter((event) => {
       return event.blockNumber + MAX_CONFIRMATIONS <= block.number
     })
@@ -144,58 +172,69 @@ class Channels {
       unconfirmedEvents.delete(id)
 
       if (event.event === 'OpenedChannel') {
-        Channels.onOpenedChannel(coreConnector, event as OpenedChannelEvent)
+        Channels.onOpenedChannel(connector, event as OpenedChannelEvent)
       } else {
-        Channels.onClosedChannel(coreConnector, event as ClosedChannelEvent)
+        Channels.onClosedChannel(connector, event as ClosedChannelEvent)
       }
     }
   }
 
-  static async onOpenedChannel(coreConnector: HoprEthereum, event: OpenedChannelEvent): Promise<void> {
+  static async onOpenedChannel(connector: HoprEthereum, event: OpenedChannelEvent): Promise<void> {
     const opener = new AccountId(stringToU8a(event.returnValues.opener))
     const counterParty = new AccountId(stringToU8a(event.returnValues.counterParty))
     const [partyA, partyB] = getParties(opener, counterParty)
 
-    const channels = await Channels.get(coreConnector, {
+    const newChannelEntry = new ChannelEntry(undefined, {
+      blockNumber: new BN(event.blockNumber),
+      transactionIndex: new BN(event.transactionIndex),
+      logIndex: new BN(event.logIndex),
+    })
+
+    const channels = await Channels.get(connector, {
       partyA,
       partyB,
     })
 
-    if (channels.length > 0 && channels[0].blockNumber > event.blockNumber) {
+    if (channels.length > 0 && !isNewEvent(channels[0].channelEntry, newChannelEntry)) {
       return
     }
 
-    Channels.store(coreConnector, partyA, partyB, event.blockNumber)
+    Channels.store(connector, partyA, partyB, newChannelEntry)
   }
 
-  static async onClosedChannel(coreConnector: HoprEthereum, event: ClosedChannelEvent): Promise<void> {
+  static async onClosedChannel(connector: HoprEthereum, event: ClosedChannelEvent): Promise<void> {
     const closer = new AccountId(stringToU8a(event.returnValues.closer))
     const counterParty = new AccountId(stringToU8a(event.returnValues.counterParty))
     const [partyA, partyB] = getParties(closer, counterParty)
+    const newChannelEntry = new ChannelEntry(undefined, {
+      blockNumber: new BN(event.blockNumber),
+      transactionIndex: new BN(event.transactionIndex),
+      logIndex: new BN(event.logIndex),
+    })
 
-    const channels = await Channels.get(coreConnector, {
+    const channels = await Channels.get(connector, {
       partyA,
       partyB,
     })
 
     if (channels.length === 0) {
       return
-    } else if (channels.length > 0 && channels[0].blockNumber > event.blockNumber) {
+    } else if (channels.length > 0 && !isNewEvent(channels[0].channelEntry, newChannelEntry)) {
       return
     }
 
-    Channels.delete(coreConnector, partyA, partyB)
+    Channels.delete(connector, partyA, partyB)
   }
 
   // listen to all open / close events, store entries after X confirmations
-  static async start(coreConnector: HoprEthereum): Promise<boolean> {
+  static async start(connector: HoprEthereum): Promise<boolean> {
     try {
       if (isStarted) {
         log(`already started..`)
         return true
       }
 
-      let fromBlock = await Channels.getLatestConfirmedBlockNumber(coreConnector)
+      let fromBlock = await Channels.getLatestConfirmedBlockNumber(connector)
       // go back 12 blocks in case of a re-org
       if (fromBlock - MAX_CONFIRMATIONS > 0) {
         fromBlock = fromBlock - MAX_CONFIRMATIONS
@@ -203,11 +242,11 @@ class Channels {
 
       log(`starting to pull events from block ${fromBlock}..`)
 
-      newBlockEvent = coreConnector.web3.eth.subscribe('newBlockHeaders').on('data', (block) => {
-        Channels.onNewBlock(coreConnector, block)
+      newBlockEvent = connector.web3.eth.subscribe('newBlockHeaders').on('data', (block) => {
+        Channels.onNewBlock(connector, block)
       })
 
-      openedChannelEvent = coreConnector.hoprChannels.events
+      openedChannelEvent = connector.hoprChannels.events
         .OpenedChannel({
           fromBlock,
         })
@@ -215,7 +254,7 @@ class Channels {
           unconfirmedEvents.set(getEventId(event), event)
         })
 
-      closedChannelEvent = coreConnector.hoprChannels.events
+      closedChannelEvent = connector.hoprChannels.events
         .ClosedChannel({
           fromBlock,
         })

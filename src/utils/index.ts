@@ -241,8 +241,3 @@ export async function cleanupPromiEvent<E extends ContractEventEmitter<any>, R e
 ): Promise<R> {
   return fn(event).finally(() => event.removeAllListeners())
 }
-
-// return an event's id
-export function getEventId(event: ContractEventLog<any>): string {
-  return `${event.event}-${event.transactionHash}-${event.logIndex}`
-}
