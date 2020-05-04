@@ -2,16 +2,19 @@ import net from 'net'
 import mafmt from 'mafmt'
 const errCode = require('err-code')
 const log = require('debug')('libp2p:tcp')
-const toConnection = require('./socket-to-conn')
-const createListener = require('./listener')
+import { socketToConn } from './socket-to-conn'
+import { createListener } from './listener'
 import { multiaddrToNetConfig } from './utils'
 import { AbortError } from 'abortable-iterator'
 import { CODE_CIRCUIT, CODE_P2P } from './constants'
 
 import type Multiaddr from 'multiaddr'
+import PeerInfo from 'peer-info'
+import PeerId from 'peer-id'
 
 interface DialOptions {
   signal?: AbortSignal
+  relay?: PeerInfo | PeerId
 }
 
 export interface MultiaddrConnection {
@@ -57,7 +60,7 @@ class TCP {
   async dial(ma: Multiaddr, options?: DialOptions) {
     options = options || {}
     const socket = await this._connect(ma, options)
-    const maConn = toConnection(socket, { remoteAddr: ma, signal: options.signal })
+    const maConn = socketToConn(socket, { remoteAddr: ma, signal: options.signal })
 
     log('new outbound connection %s', maConn.remoteAddr)
     const conn = await this._upgrader.upgradeOutbound(maConn)
@@ -80,7 +83,7 @@ class TCP {
 
     return new Promise((resolve, reject) => {
       const start = Date.now()
-      const cOpts = multiaddrToNetConfig(ma)
+      const cOpts = multiaddrToNetConfig(ma) as any
 
       log('dialing %j', cOpts)
       const rawSocket = net.connect(cOpts)

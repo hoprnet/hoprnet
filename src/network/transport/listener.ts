@@ -11,7 +11,7 @@ import { getMultiaddrs, multiaddrToNetConfig } from './utils'
 import { MultiaddrConnection } from '.'
 import Multiaddr from 'multiaddr'
 
-interface Listener extends EventEmitter {
+export interface Listener extends EventEmitter {
   close(): void
   listen(ma: Multiaddr): Promise<void>
   getAddrs(): Multiaddr[]
@@ -30,7 +30,7 @@ async function attemptClose(maConn: MultiaddrConnection) {
   }
 }
 
-export default function({ handler, upgrader }, options) {
+export function createListener({ handler, upgrader }, options) {
   const listener = new EventEmitter() as Listener
 
   const server = net.createServer(async socket => {
