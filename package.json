@@ -40,6 +40,7 @@
     "@hoprnet/hopr-utils": "https://github.com/hoprnet/hopr-utils.git",
     "@openzeppelin/contracts": "^3.0.1",
     "@openzeppelin/test-helpers": "^0.5.5",
+    "@truffle/debug-utils": "^4.1.1",
     "@truffle/hdwallet-provider": "^1.0.34",
     "bignumber.js": "^9.0.0",
     "ganache-core": "^2.10.2",
