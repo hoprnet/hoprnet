@@ -13,7 +13,7 @@ jobs:
       steps:
       - uses: actions/checkout@v2
       - name: Make prerelease to npm
-        uses: jjperezaguinaga/npm-release@v1
+        uses: jjperezaguinaga/npm-release@v1.3.0
         with:
           type: prerelease
           public: true
