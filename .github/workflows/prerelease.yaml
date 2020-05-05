@@ -1,0 +1,19 @@
+# This workflow will run a pre-release version of the built package.
+# See more in https://github.com/esamattis/npm-release
+
+name: Pre-release
+
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+    prerelease:
+      runs-on: ubuntu-latest
+      steps:
+      - uses: actions/checkout@v2
+      - name: Make prerelease to npm
+        uses: epeli/npm-release@v1
+        with:
+          type: prerelease
+          token: ${{ secrets.NPM_TOKEN }}
