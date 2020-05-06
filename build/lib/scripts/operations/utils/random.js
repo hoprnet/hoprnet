@@ -9,17 +9,21 @@ const truffle_networks_json_1 = __importDefault(require("../../../truffle-networ
 exports.root = path_1.default.join(__dirname, '..', '..', '..');
 exports.bash = (cmd) => {
     return new Promise((resolve, reject) => {
-        const [first, ...rest] = cmd.split(' ');
-        const child = child_process_1.spawn(first, rest, {
-            cwd: exports.root,
-        });
-        child.stdout.setEncoding('utf8');
-        child.stderr.setEncoding('utf8');
-        child.stdout.on('data', console.log);
-        child.stderr.on('data', reject);
-        child.on('close', resolve);
-        child.on('exit', resolve);
-        child.on('error', reject);
+        try {
+            const [first, ...rest] = cmd.split(' ');
+            const child = child_process_1.spawn(first, rest, {
+                cwd: exports.root,
+            });
+            child.stdout.setEncoding('utf8');
+            child.stderr.setEncoding('utf8');
+            child.stdout.on('data', console.log);
+            child.stderr.on('data', console.error);
+            child.on('exit', resolve);
+            child.on('error', reject);
+        }
+        catch (err) {
+            reject(err);
+        }
     });
 };
 exports.getContractNames = () => {

@@ -39,7 +39,7 @@ module.exports = {
 
   // default mocha options
   mocha: {
-    timeout: 100000,
+    timeout: 200e3,
   },
 
   // configure your compilers
