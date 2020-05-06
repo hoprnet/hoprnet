@@ -6,7 +6,7 @@ const AMOUNT = Web3.utils.toWei('1000000', 'ether')
 
 export default async () => {
   const web3 = new Web3(`ws://${networks.development.host}:${networks.development.port}`)
-  const hoprToken: any = new web3.eth.Contract(HoprTokenAbi as any, '0x302be990306f95a21905d411450e2466DC5DD927')
+  const hoprToken: any = new web3.eth.Contract(HoprTokenAbi as any, '0x66DB78F4ADD912a6Cb92b672Dfa09028ecc3085E')
 
   const accounts = await web3.eth.getAccounts()
   const owner = accounts[0]

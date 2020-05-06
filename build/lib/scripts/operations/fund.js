@@ -9,7 +9,7 @@ const truffle_networks_json_1 = __importDefault(require("../../truffle-networks.
 const AMOUNT = web3_1.default.utils.toWei('1000000', 'ether');
 exports.default = async () => {
     const web3 = new web3_1.default(`ws://${truffle_networks_json_1.default.development.host}:${truffle_networks_json_1.default.development.port}`);
-    const hoprToken = new web3.eth.Contract(HoprToken_json_1.default, '0x302be990306f95a21905d411450e2466DC5DD927');
+    const hoprToken = new web3.eth.Contract(HoprToken_json_1.default, '0x66DB78F4ADD912a6Cb92b672Dfa09028ecc3085E');
     const accounts = await web3.eth.getAccounts();
     const owner = accounts[0];
     for (const account of accounts) {
