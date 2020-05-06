@@ -21,8 +21,6 @@ export class HoprChannels extends Contract {
   );
   clone(): HoprChannels;
   methods: {
-    secsClosure(): TransactionObject<string>;
-
     accounts(
       arg0: string
     ): TransactionObject<{
@@ -44,6 +42,8 @@ export class HoprChannels extends Contract {
       2: string;
       3: string;
     }>;
+
+    secsClosure(): TransactionObject<string>;
 
     token(): TransactionObject<string>;
 
@@ -83,11 +83,15 @@ export class HoprChannels extends Contract {
     claimChannelClosure(counterParty: string): TransactionObject<void>;
   };
   events: {
-    SecretHashSet: ContractEvent<{
-      account: string;
-      secretHash: string;
+    ClosedChannel: ContractEvent<{
+      closer: string;
+      counterParty: string;
+      partyAAmount: string;
+      partyBAmount: string;
       0: string;
       1: string;
+      2: string;
+      3: string;
     }>;
     FundedChannel: ContractEvent<{
       funder: string;
@@ -101,12 +105,6 @@ export class HoprChannels extends Contract {
       3: string;
       4: string;
     }>;
-    OpenedChannel: ContractEvent<{
-      opener: string;
-      counterParty: string;
-      0: string;
-      1: string;
-    }>;
     InitiatedChannelClosure: ContractEvent<{
       initiator: string;
       counterParty: string;
@@ -115,15 +113,17 @@ export class HoprChannels extends Contract {
       1: string;
       2: string;
     }>;
-    ClosedChannel: ContractEvent<{
-      closer: string;
+    OpenedChannel: ContractEvent<{
+      opener: string;
       counterParty: string;
-      partyAAmount: string;
-      partyBAmount: string;
       0: string;
       1: string;
-      2: string;
-      3: string;
+    }>;
+    SecretHashSet: ContractEvent<{
+      account: string;
+      secretHash: string;
+      0: string;
+      1: string;
     }>;
     allEvents: (
       options?: EventOptions,

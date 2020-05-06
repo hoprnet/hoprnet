@@ -473,6 +473,7 @@ class Channel implements IChannel<HoprEthereum> {
         await waitForConfirmation(
           (
             await coreConnector.signTransaction(
+              // @ts-ignore @TODO: implement ERC777
               coreConnector.hoprToken.methods.increaseAllowance(spender.toHex(), amount.sub(allowance).toString()),
               {
                 from: coreConnector.account.toHex(),

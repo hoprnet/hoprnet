@@ -21,80 +21,199 @@ export class HoprToken extends Contract {
   );
   clone(): HoprToken;
   methods: {
-    name(): TransactionObject<string>;
+    DEFAULT_ADMIN_ROLE(): TransactionObject<string>;
+
+    MINTER_ROLE(): TransactionObject<string>;
+
+    allowance(holder: string, spender: string): TransactionObject<string>;
 
     approve(
       spender: string,
-      amount: number | string
+      value: number | string
     ): TransactionObject<boolean>;
 
-    totalSupply(): TransactionObject<string>;
+    authorizeOperator(operator: string): TransactionObject<void>;
 
-    transferFrom(
-      sender: string,
-      recipient: string,
-      amount: number | string
-    ): TransactionObject<boolean>;
-
-    decimals(): TransactionObject<string>;
-
-    increaseAllowance(
-      spender: string,
-      addedValue: number | string
-    ): TransactionObject<boolean>;
-
-    mint(account: string, amount: number | string): TransactionObject<boolean>;
-
-    burn(amount: number | string): TransactionObject<void>;
+    balanceOf(tokenHolder: string): TransactionObject<string>;
 
     balanceOfAt(
       account: string,
       snapshotId: number | string
     ): TransactionObject<string>;
 
-    balanceOf(account: string): TransactionObject<string>;
+    burn(
+      amount: number | string,
+      data: string | number[]
+    ): TransactionObject<void>;
 
-    burnFrom(account: string, amount: number | string): TransactionObject<void>;
+    decimals(): TransactionObject<string>;
+
+    defaultOperators(): TransactionObject<string[]>;
+
+    getRoleAdmin(role: string | number[]): TransactionObject<string>;
+
+    getRoleMember(
+      role: string | number[],
+      index: number | string
+    ): TransactionObject<string>;
+
+    getRoleMemberCount(role: string | number[]): TransactionObject<string>;
+
+    grantRole(
+      role: string | number[],
+      account: string
+    ): TransactionObject<void>;
+
+    granularity(): TransactionObject<string>;
+
+    hasRole(
+      role: string | number[],
+      account: string
+    ): TransactionObject<boolean>;
+
+    isOperatorFor(
+      operator: string,
+      tokenHolder: string
+    ): TransactionObject<boolean>;
+
+    name(): TransactionObject<string>;
+
+    operatorBurn(
+      account: string,
+      amount: number | string,
+      data: string | number[],
+      operatorData: string | number[]
+    ): TransactionObject<void>;
+
+    operatorSend(
+      sender: string,
+      recipient: string,
+      amount: number | string,
+      data: string | number[],
+      operatorData: string | number[]
+    ): TransactionObject<void>;
+
+    renounceRole(
+      role: string | number[],
+      account: string
+    ): TransactionObject<void>;
+
+    revokeOperator(operator: string): TransactionObject<void>;
+
+    revokeRole(
+      role: string | number[],
+      account: string
+    ): TransactionObject<void>;
+
+    send(
+      recipient: string,
+      amount: number | string,
+      data: string | number[]
+    ): TransactionObject<void>;
 
     symbol(): TransactionObject<string>;
 
-    snapshot(): TransactionObject<string>;
+    totalSupply(): TransactionObject<string>;
 
     totalSupplyAt(snapshotId: number | string): TransactionObject<string>;
-
-    addMinter(account: string): TransactionObject<void>;
-
-    renounceMinter(): TransactionObject<void>;
-
-    decreaseAllowance(
-      spender: string,
-      subtractedValue: number | string
-    ): TransactionObject<boolean>;
 
     transfer(
       recipient: string,
       amount: number | string
     ): TransactionObject<boolean>;
 
-    isMinter(account: string): TransactionObject<boolean>;
+    transferFrom(
+      holder: string,
+      recipient: string,
+      amount: number | string
+    ): TransactionObject<boolean>;
 
-    allowance(owner: string, spender: string): TransactionObject<string>;
+    mint(
+      account: string,
+      amount: number | string,
+      userData: string | number[],
+      operatorData: string | number[]
+    ): TransactionObject<void>;
   };
   events: {
-    MinterAdded: ContractEvent<string>;
-    MinterRemoved: ContractEvent<string>;
-    Snapshot: ContractEvent<string>;
-    Transfer: ContractEvent<{
-      from: string;
-      to: string;
+    Approval: ContractEvent<{
+      owner: string;
+      spender: string;
       value: string;
       0: string;
       1: string;
       2: string;
     }>;
-    Approval: ContractEvent<{
-      owner: string;
-      spender: string;
+    AuthorizedOperator: ContractEvent<{
+      operator: string;
+      tokenHolder: string;
+      0: string;
+      1: string;
+    }>;
+    Burned: ContractEvent<{
+      operator: string;
+      from: string;
+      amount: string;
+      data: string;
+      operatorData: string;
+      0: string;
+      1: string;
+      2: string;
+      3: string;
+      4: string;
+    }>;
+    Minted: ContractEvent<{
+      operator: string;
+      to: string;
+      amount: string;
+      data: string;
+      operatorData: string;
+      0: string;
+      1: string;
+      2: string;
+      3: string;
+      4: string;
+    }>;
+    RevokedOperator: ContractEvent<{
+      operator: string;
+      tokenHolder: string;
+      0: string;
+      1: string;
+    }>;
+    RoleGranted: ContractEvent<{
+      role: string;
+      account: string;
+      sender: string;
+      0: string;
+      1: string;
+      2: string;
+    }>;
+    RoleRevoked: ContractEvent<{
+      role: string;
+      account: string;
+      sender: string;
+      0: string;
+      1: string;
+      2: string;
+    }>;
+    Sent: ContractEvent<{
+      operator: string;
+      from: string;
+      to: string;
+      amount: string;
+      data: string;
+      operatorData: string;
+      0: string;
+      1: string;
+      2: string;
+      3: string;
+      4: string;
+      5: string;
+    }>;
+    Snapshot: ContractEvent<string>;
+    Transfer: ContractEvent<{
+      from: string;
+      to: string;
       value: string;
       0: string;
       1: string;

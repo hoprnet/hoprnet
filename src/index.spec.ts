@@ -8,7 +8,7 @@ import HoprEthereum from '.'
 import { HoprToken } from './tsc/web3/HoprToken'
 import { Await } from './tsc/utils'
 import { cleanupPromiEvent } from './utils'
-import { generateNode, getPrivKeyData } from './utils/testing'
+import { generateNode, getPrivKeyData, generateUser } from './utils/testing'
 import * as configs from './config'
 
 describe('test connector', function () {
@@ -25,7 +25,7 @@ describe('test connector', function () {
     await migrate()
     await fund()
 
-    owner = await getPrivKeyData(stringToU8a(configs.DEMO_ACCOUNTS[0]))
+    owner = await getPrivKeyData(stringToU8a(configs.FUND_ACCOUNT_PRIVATE_KEY))
     web3 = new Web3(configs.DEFAULT_URI)
     hoprToken = new web3.eth.Contract(HoprTokenAbi as any, configs.TOKEN_ADDRESSES.private)
     connector = await generateNode(owner.privKey)
@@ -84,19 +84,16 @@ describe('test connector', function () {
 
       return new Promise(async (resolve, reject) => {
         try {
-          const nonce = await web3.eth.getTransactionCount(owner.address.toHex())
-          const receiver = await getPrivKeyData(randomBytes(32))
+          const receiver = await generateUser(web3, owner, hoprToken)
 
           await Promise.all([
             once(),
-            hoprToken.methods.transfer(receiver.address.toHex(), 1).send({ from: owner.address.toHex(), nonce }),
-            hoprToken.methods
-              .transfer(receiver.address.toHex(), 1)
-              .send({ from: owner.address.toHex(), nonce: nonce + 1 }),
+            hoprToken.methods.transfer(receiver.address.toHex(), 1).send({ from: owner.address.toHex() }),
+            hoprToken.methods.transfer(receiver.address.toHex(), 1).send({ from: owner.address.toHex() }),
           ])
           await hoprToken.methods.transfer(receiver.address.toHex(), 1).send({ from: owner.address.toHex() })
 
-          assert.equal(numberOfEvents, 1, 'sub')
+          assert.equal(numberOfEvents, 1, 'check cleanupPromiEvent')
           return resolve()
         } catch (err) {
           return reject(err)

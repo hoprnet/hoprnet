@@ -15,7 +15,7 @@ import type CoreConnector from '..'
 
 const CLOSURE_DURATION = durations.days(3)
 
-describe.only('test channels', function () {
+describe('test channels', function () {
   const ganache = new Ganache()
   let web3: Web3
   let hoprToken: HoprToken
@@ -55,7 +55,7 @@ describe.only('test channels', function () {
     await ganache.stop()
   })
 
-  context('intergration tests', function () {
+  context.skip('intergration tests', function () {
     it('should not store channel before confirmations', async function () {
       this.timeout(5e3)
 

@@ -31,7 +31,7 @@ export async function generateUser(web3: Web3, funder: Await<ReturnType<typeof g
   })
 
   // mint user some HOPR
-  await hoprToken.methods.mint(user.address.toHex(), web3.utils.toWei('1', 'ether')).send({
+  await hoprToken.methods.mint(user.address.toHex(), web3.utils.toWei('1', 'ether'), '0x00', '0x00').send({
     from: funder.address.toHex(),
     gas: 200e3,
   })

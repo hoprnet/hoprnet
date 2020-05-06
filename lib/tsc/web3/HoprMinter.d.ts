@@ -21,12 +21,6 @@ export class HoprMinter extends Contract {
   );
   clone(): HoprMinter;
   methods: {
-    duration(): TransactionObject<string>;
-
-    started(): TransactionObject<string>;
-
-    deadline(): TransactionObject<string>;
-
     accounts(
       arg0: string
     ): TransactionObject<{
@@ -36,19 +30,23 @@ export class HoprMinter extends Contract {
       1: string;
     }>;
 
-    maxAmount(): TransactionObject<string>;
+    amountToMint(): TransactionObject<string>;
 
-    renounceOwnership(): TransactionObject<void>;
+    deadline(): TransactionObject<string>;
+
+    duration(): TransactionObject<string>;
+
+    maxAmount(): TransactionObject<string>;
 
     owner(): TransactionObject<string>;
 
-    isOwner(): TransactionObject<boolean>;
+    renounceOwnership(): TransactionObject<void>;
 
-    amountToMint(): TransactionObject<string>;
-
-    transferOwnership(newOwner: string): TransactionObject<void>;
+    started(): TransactionObject<string>;
 
     token(): TransactionObject<string>;
+
+    transferOwnership(newOwner: string): TransactionObject<void>;
 
     increaseBalance(
       account: string,
