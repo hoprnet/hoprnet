@@ -40,14 +40,13 @@ contract('HoprChannels', function ([accountA, accountB]) {
   const depositAmount = web3.utils.toWei('1', 'ether')
   let hoprToken: HoprTokenInstance
   let hoprChannels: HoprChannelsInstance
-  let totalSupply: string
 
   const reset = async () => {
     hoprToken = await HoprToken.new()
+
     // mint supply
     await hoprToken.mint(partyA, web3.utils.toWei('100', 'ether'), '0x00', '0x00')
     await hoprToken.mint(partyB, web3.utils.toWei('100', 'ether'), '0x00', '0x00')
-    totalSupply = await hoprToken.totalSupply().then((res) => res.toString())
 
     hoprChannels = await HoprChannels.new(hoprToken.address, time.duration.days(2))
   }
@@ -78,15 +77,16 @@ contract('HoprChannels', function ([accountA, accountB]) {
       })
 
       it("'partyA' should fund 'partyA' with 1 HOPR", async function () {
-        await hoprToken.approve(hoprChannels.address, totalSupply, {
-          from: partyA,
-        })
+        const receipt = await hoprToken.send(
+          hoprChannels.address,
+          depositAmount,
+          web3.eth.abi.encodeParameters(['address', 'address'], [partyA, partyB]),
+          {
+            from: partyA,
+          }
+        )
 
-        const result = await hoprChannels.fundChannel(partyA, partyB, depositAmount, {
-          from: partyA,
-        })
-
-        expectEvent(result, 'FundedChannel', {
+        expectEvent.inTransaction(receipt.tx, HoprChannels, 'FundedChannel', {
           funder: partyA,
           recipient: partyA,
           counterParty: partyB,
@@ -102,15 +102,16 @@ contract('HoprChannels', function ([accountA, accountB]) {
       })
 
       it("'partyB' should fund 'partyB' with 1 HOPR", async function () {
-        await hoprToken.approve(hoprChannels.address, totalSupply, {
-          from: partyB,
-        })
+        const receipt = await hoprToken.send(
+          hoprChannels.address,
+          depositAmount,
+          web3.eth.abi.encodeParameters(['address', 'address'], [partyB, partyA]),
+          {
+            from: partyB,
+          }
+        )
 
-        const result = await hoprChannels.fundChannel(partyB, partyA, depositAmount, {
-          from: partyB,
-        })
-
-        expectEvent(result, 'FundedChannel', {
+        expectEvent.inTransaction(receipt.tx, HoprChannels, 'FundedChannel', {
           funder: partyB,
           recipient: partyB,
           counterParty: partyA,
@@ -192,11 +193,11 @@ contract('HoprChannels', function ([accountA, accountB]) {
       })
 
       it('should open channel', async function () {
-        const result = await hoprChannels.openChannel(partyB, {
+        const receipt = await hoprChannels.openChannel(partyB, {
           from: partyA,
         })
 
-        expectEvent(result, 'OpenedChannel', {
+        expectEvent.inTransaction(receipt.tx, HoprChannels, 'OpenedChannel', {
           opener: partyA,
           counterParty: partyB,
         })
@@ -291,11 +292,11 @@ contract('HoprChannels', function ([accountA, accountB]) {
       })
 
       it("'partyB' should initiate closure", async function () {
-        const result = await hoprChannels.initiateChannelClosure(partyA, {
+        const receipt = await hoprChannels.initiateChannelClosure(partyA, {
           from: partyB,
         })
 
-        expectEvent(result, 'InitiatedChannelClosure', {
+        expectEvent.inTransaction(receipt.tx, HoprChannels, 'InitiatedChannelClosure', {
           initiator: partyB,
           counterParty: partyA,
         })
@@ -352,11 +353,11 @@ contract('HoprChannels', function ([accountA, accountB]) {
       it("'partyA' should close channel", async function () {
         await time.increase(time.duration.days(3))
 
-        const result = await hoprChannels.claimChannelClosure(partyB, {
+        const receipt = await hoprChannels.claimChannelClosure(partyB, {
           from: partyA,
         })
 
-        expectEvent(result, 'ClosedChannel', {
+        expectEvent.inTransaction(receipt.tx, HoprChannels, 'ClosedChannel', {
           closer: partyA,
           counterParty: partyB,
           partyAAmount: web3.utils.toWei('0.5', 'ether'),
@@ -399,6 +400,13 @@ contract('HoprChannels', function ([accountA, accountB]) {
           const partyAAmount = web3.utils.toWei('0.2', 'ether')
           const partyBAmount = web3.utils.toWei('0.8', 'ether')
 
+          await hoprToken.approve(hoprChannels.address, totalAmount, {
+            from: partyA,
+          })
+          await hoprToken.approve(hoprChannels.address, totalAmount, {
+            from: partyB,
+          })
+
           const notAfter = await time.latest().then((now) => {
             return now.add(time.duration.days(2)).toString()
           })
@@ -413,7 +421,7 @@ contract('HoprChannels', function ([accountA, accountB]) {
             signerPrivKey: partyBPrivKey,
           })
 
-          const result = await hoprChannels.fundChannelWithSig(
+          const receipt = await hoprChannels.fundChannelWithSig(
             '10',
             totalAmount,
             partyAAmount,
@@ -426,7 +434,7 @@ contract('HoprChannels', function ([accountA, accountB]) {
             }
           )
 
-          expectEvent(result, 'FundedChannel', {
+          expectEvent.inTransaction(receipt.tx, HoprChannels, 'FundedChannel', {
             // funder: partyA,
             recipient: partyA,
             counterParty: partyB,
@@ -506,11 +514,11 @@ contract('HoprChannels', function ([accountA, accountB]) {
         })
 
         it('should open channel', async function () {
-          const result = await hoprChannels.openChannel(partyB, {
+          const receipt = await hoprChannels.openChannel(partyB, {
             from: partyA,
           })
 
-          expectEvent(result, 'OpenedChannel', {
+          expectEvent.inTransaction(receipt.tx, HoprChannels, 'OpenedChannel', {
             opener: partyA,
             counterParty: partyB,
           })
@@ -606,11 +614,11 @@ contract('HoprChannels', function ([accountA, accountB]) {
         })
 
         it("'partyB' should initiate closure", async function () {
-          const result = await hoprChannels.initiateChannelClosure(partyA, {
+          const receipt = await hoprChannels.initiateChannelClosure(partyA, {
             from: partyB,
           })
 
-          expectEvent(result, 'InitiatedChannelClosure', {
+          expectEvent.inTransaction(receipt.tx, HoprChannels, 'InitiatedChannelClosure', {
             initiator: partyB,
             counterParty: partyA,
           })
@@ -664,11 +672,11 @@ contract('HoprChannels', function ([accountA, accountB]) {
         it("'partyB' should close channel", async function () {
           await time.increase(time.duration.days(3))
 
-          const result = await hoprChannels.claimChannelClosure(partyA, {
+          const receipt = await hoprChannels.claimChannelClosure(partyA, {
             from: partyB,
           })
 
-          expectEvent(result, 'ClosedChannel', {
+          expectEvent.inTransaction(receipt.tx, HoprChannels, 'ClosedChannel', {
             closer: partyB,
             counterParty: partyA,
             partyAAmount: web3.utils.toWei('1', 'ether'),
@@ -710,15 +718,16 @@ contract('HoprChannels', function ([accountA, accountB]) {
     })
 
     it("should have funded channel correctly using 'fundChannel'", async function () {
-      await hoprToken.approve(hoprChannels.address, depositAmount, {
-        from: partyA,
-      })
+      const receipt = await hoprToken.send(
+        hoprChannels.address,
+        depositAmount,
+        web3.eth.abi.encodeParameters(['address', 'address'], [partyA, partyB]),
+        {
+          from: partyA,
+        }
+      )
 
-      const result = await hoprChannels.fundChannel(partyA, partyB, depositAmount, {
-        from: partyA,
-      })
-
-      expectEvent(result, 'FundedChannel', {
+      expectEvent.inTransaction(receipt.tx, HoprChannels, 'FundedChannel', {
         funder: partyA,
         recipient: partyA,
         counterParty: partyB,
@@ -780,9 +789,11 @@ contract('HoprChannels', function ([accountA, accountB]) {
     })
 
     it('should fail when creating an open channel a second time', async function () {
-      await hoprToken.approve(hoprChannels.address, depositAmount)
-
-      await hoprChannels.fundChannel(partyA, partyB, depositAmount)
+      await hoprToken.send(
+        hoprChannels.address,
+        depositAmount,
+        web3.eth.abi.encodeParameters(['address', 'address'], [partyA, partyB])
+      )
 
       await hoprChannels.openChannel(partyB, {
         from: partyA,
@@ -797,23 +808,29 @@ contract('HoprChannels', function ([accountA, accountB]) {
     })
 
     it("should fail 'fundChannel' when token balance too low'", async function () {
-      await hoprToken.approve(hoprChannels.address, depositAmount)
       await hoprToken.burn(await hoprToken.balanceOf(partyA), '0x00', {
         from: partyA,
       })
 
       await expectRevert(
-        hoprChannels.fundChannel(partyA, partyB, depositAmount, {
-          from: partyA,
-        }),
-        'SafeERC20: low-level call failed'
+        hoprToken.send(
+          hoprChannels.address,
+          depositAmount,
+          web3.eth.abi.encodeParameters(['address', 'address'], [partyA, partyB]),
+          {
+            from: partyA,
+          }
+        ),
+        'ERC777: transfer amount exceeds balance'
       )
     })
 
     it("should fail when 'claimChannelClosure' before closureTime", async function () {
-      await hoprToken.approve(hoprChannels.address, depositAmount)
-
-      await hoprChannels.fundChannel(partyA, partyB, depositAmount)
+      await hoprToken.send(
+        hoprChannels.address,
+        depositAmount,
+        web3.eth.abi.encodeParameters(['address', 'address'], [partyA, partyB])
+      )
 
       await hoprChannels.openChannel(partyB, {
         from: partyA,

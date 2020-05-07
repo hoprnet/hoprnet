@@ -1,6 +1,8 @@
 require('@openzeppelin/test-helpers/configure')({ provider: web3.currentProvider, environment: 'truffle' })
+
 const { singletons } = require('@openzeppelin/test-helpers')
 const networks = require('../truffle-networks.json')
+
 const HoprToken = artifacts.require('HoprToken')
 
 module.exports = async (deployer, network, [owner]) => {

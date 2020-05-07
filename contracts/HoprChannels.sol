@@ -1,12 +1,14 @@
 pragma solidity ^0.6.0;
 
+import "@openzeppelin/contracts/introspection/IERC1820Registry.sol";
+import "@openzeppelin/contracts/introspection/ERC1820Implementer.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC777/IERC777Recipient.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 
 
-contract HoprChannels {
-    using SafeERC20 for IERC20;
+contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     using SafeMath for uint256;
 
     // an account has set a new secret hash
@@ -56,6 +58,10 @@ contract HoprChannels {
         */
     }
 
+    // setup ERC1820
+    IERC1820Registry internal constant _ERC1820_REGISTRY = IERC1820Registry(0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24);
+    bytes32 public constant TOKENS_RECIPIENT_INTERFACE_HASH = keccak256("ERC777TokensRecipient");
+
     // TODO: update this when adding / removing states.
     uint8 constant NUMBER_OF_STATES = 4;
 
@@ -76,6 +82,8 @@ contract HoprChannels {
     constructor(IERC20 _token, uint256 _secsClosure) public {
         token = _token;
         secsClosure = _secsClosure;
+
+        _ERC1820_REGISTRY.setInterfaceImplementer(address(this), TOKENS_RECIPIENT_INTERFACE_HASH, address(this));
     }
 
     /**
@@ -97,6 +105,7 @@ contract HoprChannels {
     /**
      * Fund a channel between 'accountA' and 'accountB',
      * specified tokens must be approved beforehand.
+     * Called when HOPR tokens are send to this contract.
      *
      * @notice fund a channel
      * @param recipient address account which the funds are for
@@ -104,12 +113,11 @@ contract HoprChannels {
      * @param additionalDeposit uint256 amount to fund the channel
      */
     function fundChannel(
+        address funder,
         address recipient,
         address counterParty,
         uint256 additionalDeposit
-    ) public {
-        address funder = msg.sender; // account which funds the channel
-
+    ) internal {
         require(recipient != counterParty, "'recipient' and 'counterParty' must not be the same");
         require(recipient != address(0), "'recipient' address is empty");
         require(counterParty != address(0), "'counterParty' address is empty");
@@ -118,8 +126,6 @@ contract HoprChannels {
         (address party_a, , Channel storage channel, ChannelStatus status) = getChannel(recipient, counterParty);
 
         require(status == ChannelStatus.UNINITIALISED || status == ChannelStatus.FUNDED, "channel is open");
-
-        token.safeTransferFrom(funder, address(this), additionalDeposit);
 
         channel.deposit = channel.deposit.add(additionalDeposit);
 
@@ -181,11 +187,11 @@ contract HoprChannels {
         uint256 partyBAmount = additionalDeposit - partyAAmount;
 
         if (initiator == partyA) {
-            token.safeTransferFrom(initiator, address(this), partyAAmount);
-            token.safeTransferFrom(counterparty, address(this), partyBAmount);
+            token.transferFrom(initiator, address(this), partyAAmount);
+            token.transferFrom(counterparty, address(this), partyBAmount);
         } else {
-            token.safeTransferFrom(initiator, address(this), partyBAmount);
-            token.safeTransferFrom(counterparty, address(this), partyAAmount);
+            token.transferFrom(initiator, address(this), partyBAmount);
+            token.transferFrom(counterparty, address(this), partyAAmount);
         }
 
         channel.deposit = additionalDeposit;
@@ -323,12 +329,12 @@ contract HoprChannels {
 
         // settle balances
         if (channel.partyABalance > 0) {
-            token.safeTransfer(party_a, channel.partyABalance);
+            token.transfer(party_a, channel.partyABalance);
             channel.deposit = channel.deposit.sub(channel.partyABalance);
         }
 
         if (channel.deposit > 0) {
-            token.safeTransfer(party_b, channel.deposit);
+            token.transfer(party_b, channel.deposit);
         }
 
         emit ClosedChannel(initiator, counterParty, channel.partyABalance, channel.deposit);
@@ -337,6 +343,36 @@ contract HoprChannels {
         delete channel.partyABalance;
         delete channel.closureTime;
         channel.stateCounter += 7;
+    }
+
+    /**
+     * A hook triggered when HOPR tokens are send to this contract.
+     *
+     * @param operator address operator requesting the transfer
+     * @param from address token holder address
+     * @param to address recipient address
+     * @param amount uint256 amount of tokens to transfer
+     * @param userData bytes extra information provided by the token holder (if any)
+     * @param operatorData bytes extra information provided by the operator (if any)
+     */
+    function tokensReceived(
+        address operator,
+        address from,
+        address to,
+        uint256 amount,
+        bytes calldata userData,
+        bytes calldata operatorData
+    ) external override {
+        require(msg.sender == address(token), "Invalid token");
+
+        // if operator is self (fundWithSignature), don't call fundChannel
+        if (operator != address(this)) {
+            (address recipient, address counterParty) = abi.decode(userData, (address, address));
+
+            if (recipient != address(0) && counterParty != address(0)) {
+                fundChannel(from, recipient, counterParty, amount);
+            }
+        }
     }
 
     /**
