@@ -440,62 +440,26 @@ class Channel implements IChannel<HoprEthereum> {
     return onChain && offChain
   }
 
-  static async increaseFunds(
-    coreConnector: HoprEthereum,
-    spender: AccountId,
-    counterparty: AccountId,
-    amount: Balance
-  ): Promise<void> {
+  static async increaseFunds(coreConnector: HoprEthereum, counterparty: AccountId, amount: Balance): Promise<void> {
     try {
       if ((await coreConnector.accountBalance).lt(amount)) {
         throw Error(ERRORS.OOF_HOPR)
       }
 
-      const allowance = await coreConnector.hoprToken.methods
-        .allowance(coreConnector.account.toHex(), spender.toHex())
-        .call()
-        .then((v) => new BN(v))
-
-      if (allowance.isZero()) {
-        await waitForConfirmation(
-          (
-            await coreConnector.signTransaction(
-              coreConnector.hoprToken.methods.approve(spender.toHex(), amount.toString()),
-              {
-                from: coreConnector.account.toHex(),
-                to: coreConnector.hoprToken.options.address,
-                nonce: await coreConnector.nonce,
-              }
-            )
-          ).send()
-        )
-      } else if (allowance.lt(amount)) {
-        await waitForConfirmation(
-          (
-            await coreConnector.signTransaction(
-              // @ts-ignore @TODO: implement ERC777
-              coreConnector.hoprToken.methods.increaseAllowance(spender.toHex(), amount.sub(allowance).toString()),
-              {
-                from: coreConnector.account.toHex(),
-                to: coreConnector.hoprToken.options.address,
-                nonce: await coreConnector.nonce,
-              }
-            )
-          ).send()
-        )
-      }
-
       await waitForConfirmation(
         (
           await coreConnector.signTransaction(
-            coreConnector.hoprChannels.methods.fundChannel(
-              coreConnector.account.toHex(),
-              counterparty.toHex(),
-              amount.toString()
+            coreConnector.hoprToken.methods.send(
+              coreConnector.hoprChannels.options.address,
+              amount.toString(),
+              coreConnector.web3.eth.abi.encodeParameters(
+                ['address', 'address'],
+                [coreConnector.account.toHex(), counterparty.toHex()]
+              )
             ),
             {
               from: coreConnector.account.toHex(),
-              to: coreConnector.hoprChannels.options.address,
+              to: coreConnector.hoprToken.options.address,
               nonce: await coreConnector.nonce,
             }
           )
@@ -534,7 +498,7 @@ class Channel implements IChannel<HoprEthereum> {
         amount = new Balance(channelBalance.balance.sub(channelBalance.balance_a))
       }
 
-      await Channel.increaseFunds(coreConnector, new AccountId(stringToU8a(spender)), counterparty, amount)
+      await Channel.increaseFunds(coreConnector, counterparty, amount)
 
       signedChannel = await sign(channelBalance)
       channel = new Channel(coreConnector, counterpartyPubKey, signedChannel)
@@ -618,25 +582,18 @@ class Channel implements IChannel<HoprEthereum> {
           const counterpartyPubKey = await signedChannel.signer
           const counterparty = new AccountId(await coreConnector.utils.pubKeyToAccountId(counterpartyPubKey))
           const channelBalance = signedChannel.channel.balance
-          const spender = coreConnector.hoprChannels.options.address
 
           if (coreConnector.utils.isPartyA(coreConnector.account, counterparty)) {
             if (channelBalance.balance.sub(channelBalance.balance_a).gtn(0)) {
               await Channel.increaseFunds(
                 coreConnector,
-                new AccountId(stringToU8a(spender)),
                 counterparty,
                 new Balance(channelBalance.balance.sub(channelBalance.balance_a))
               )
             }
           } else {
             if (channelBalance.balance_a.gtn(0)) {
-              await Channel.increaseFunds(
-                coreConnector,
-                new AccountId(stringToU8a(spender)),
-                counterparty,
-                channelBalance.balance_a
-              )
+              await Channel.increaseFunds(coreConnector, counterparty, channelBalance.balance_a)
             }
           }
 

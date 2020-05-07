@@ -25,7 +25,7 @@
   "dependencies": {
     "@hoprnet/hopr-core-connector-interface": "https://github.com/hoprnet/hopr-core-connector-interface.git",
     "@hoprnet/hopr-demo-seeds": "https://github.com/hoprnet/hopr-demo-seeds.git",
-    "@hoprnet/hopr-ethereum": "https://github.com/hoprnet/hopr-ethereum.git#develop",
+    "@hoprnet/hopr-ethereum": "https://github.com/hoprnet/hopr-ethereum.git#feature/ERC777",
     "@hoprnet/hopr-utils": "https://github.com/hoprnet/hopr-utils.git",
     "bn.js": "^5.1.1",
     "chalk": "^4.0.0",

@@ -3,6 +3,7 @@ import { u8aConcat } from '@hoprnet/hopr-utils'
 import { UINT256 } from '../types/solidity'
 import { BNE, Uint8ArrayE } from '../types/extended'
 
+// @TODO: we should optimize this since it will use more storage than needed
 class ChannelEntry extends Uint8ArrayE {
   constructor(
     arr?: {

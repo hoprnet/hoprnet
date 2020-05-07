@@ -21,6 +21,8 @@ export class HoprChannels extends Contract {
   );
   clone(): HoprChannels;
   methods: {
+    TOKENS_RECIPIENT_INTERFACE_HASH(): TransactionObject<string>;
+
     accounts(
       arg0: string
     ): TransactionObject<{
@@ -29,6 +31,11 @@ export class HoprChannels extends Contract {
       0: string;
       1: string;
     }>;
+
+    canImplementInterfaceForAddress(
+      interfaceHash: string | number[],
+      account: string
+    ): TransactionObject<string>;
 
     channels(
       arg0: string | number[]
@@ -48,12 +55,6 @@ export class HoprChannels extends Contract {
     token(): TransactionObject<string>;
 
     setHashedSecret(hashedSecret: string | number[]): TransactionObject<void>;
-
-    fundChannel(
-      recipient: string,
-      counterParty: string,
-      additionalDeposit: number | string
-    ): TransactionObject<void>;
 
     fundChannelWithSig(
       stateCounter: number | string,
@@ -81,6 +82,15 @@ export class HoprChannels extends Contract {
     initiateChannelClosure(counterParty: string): TransactionObject<void>;
 
     claimChannelClosure(counterParty: string): TransactionObject<void>;
+
+    tokensReceived(
+      operator: string,
+      from: string,
+      to: string,
+      amount: number | string,
+      userData: string | number[],
+      operatorData: string | number[]
+    ): TransactionObject<void>;
   };
   events: {
     ClosedChannel: ContractEvent<{

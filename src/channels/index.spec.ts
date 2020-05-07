@@ -1,4 +1,5 @@
 import assert from 'assert'
+import BN from 'bn.js'
 import Web3 from 'web3'
 import { Ganache, migrate, fund } from '@hoprnet/hopr-ethereum'
 import { durations } from '@hoprnet/hopr-utils'
@@ -6,7 +7,7 @@ import { stringToU8a } from '@hoprnet/hopr-utils'
 import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
 import HoprChannelsAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprChannels.json'
 import * as configs from '../config'
-import { wait, getParties, isPartyA, time } from '../utils'
+import { getParties, isPartyA, time } from '../utils'
 import { getPrivKeyData, generateUser, generateNode } from '../utils/testing'
 import { HoprToken } from '../tsc/web3/HoprToken'
 import { HoprChannels } from '../tsc/web3/HoprChannels'
@@ -28,7 +29,6 @@ describe('test channels', function () {
   before(async function () {
     this.timeout(60e3)
 
-    // initialize ganache and contracts
     await ganache.start()
     await migrate()
     await fund()
@@ -41,10 +41,6 @@ describe('test channels', function () {
     userB = await generateUser(web3, userA, hoprToken)
     userC = await generateUser(web3, userA, hoprToken)
     coreConnector = await generateNode(userA.privKey)
-
-    await hoprToken.methods.approve(hoprChannels.options.address, 100).send({
-      from: userA.address.toHex(),
-    })
 
     await coreConnector.start()
     await coreConnector.db.clear()
@@ -59,17 +55,21 @@ describe('test channels', function () {
     it('should not store channel before confirmations', async function () {
       this.timeout(5e3)
 
-      await hoprChannels.methods.fundChannel(userA.address.toHex(), userB.address.toHex(), 1).send({
-        from: userA.address.toHex(),
-        gas: 200e3,
-      })
+      await hoprToken.methods
+        .send(
+          hoprChannels.options.address,
+          1,
+          web3.eth.abi.encodeParameters(['address', 'address'], [userA.address.toHex(), userB.address.toHex()])
+        )
+        .send({
+          from: userA.address.toHex(),
+          gas: 200e3,
+        })
 
       await hoprChannels.methods.openChannel(userB.address.toHex()).send({
         from: userA.address.toHex(),
         gas: 200e3,
       })
-
-      await wait(3e3)
 
       const allChannels = await coreConnector.channels.getAll(coreConnector)
       assert.equal(allChannels.length, 0, 'check Channels.store')
@@ -86,14 +86,14 @@ describe('test channels', function () {
     it('should query all channels', async function () {
       const [partyA, partyB] = getParties(userA.address, userB.address)
 
-      const blockNumber = await web3.eth.getBlockNumber().then((blockNumber) => blockNumber - configs.MAX_CONFIRMATIONS)
+      const blockNumber = await web3.eth.getBlockNumber()
       const allChannels = await coreConnector.channels.getAll(coreConnector)
       const latestConfirmedBlockNumber = await coreConnector.channels.getLatestConfirmedBlockNumber(coreConnector)
 
       assert(allChannels[0].partyA.eq(partyA), 'check Channels.store')
       assert(allChannels[0].partyB.eq(partyB), 'check Channels.store')
-      assert.equal(allChannels[0].channelEntry.blockNumber.toNumber(), blockNumber, 'check Channels.store')
-      assert.equal(latestConfirmedBlockNumber, blockNumber, 'check Channels.store')
+      assert(allChannels[0].channelEntry.blockNumber.lt(new BN(blockNumber)), 'check Channels.store')
+      assert(latestConfirmedBlockNumber < blockNumber, 'check Channels.store')
     })
 
     it('should query channel using partyA', async function () {
@@ -139,17 +139,22 @@ describe('test channels', function () {
       const userAisPartyA = isPartyA(userA.address, userC.address)
       const [partyA, partyB] = getParties(userA.address, userC.address)
 
-      await hoprChannels.methods.fundChannel(userA.address.toHex(), userC.address.toHex(), 1).send({
-        from: userA.address.toHex(),
-        gas: 200e3,
-      })
+      await hoprToken.methods
+        .send(
+          hoprChannels.options.address,
+          1,
+          web3.eth.abi.encodeParameters(['address', 'address'], [userA.address.toHex(), userC.address.toHex()])
+        )
+        .send({
+          from: userA.address.toHex(),
+          gas: 200e3,
+        })
 
       await hoprChannels.methods.openChannel(userC.address.toHex()).send({
         from: userA.address.toHex(),
         gas: 200e3,
       })
 
-      await wait(3e3)
       const currentBlockNumber = await web3.eth.getBlockNumber()
       await time.advanceBlockTo(web3, currentBlockNumber + configs.MAX_CONFIRMATIONS)
 
@@ -159,12 +164,14 @@ describe('test channels', function () {
       const channelsByA = await coreConnector.channels.get(coreConnector, {
         partyA,
       })
-      assert.equal(channelsByA.length, userAisPartyA ? 2 : 1, 'check Channels.get')
+      console.log(channelsByA, userAisPartyA)
+      assert.equal(channelsByA.length, userAisPartyA ? 2 : 1, 'check Channels.get partyA')
 
       const channelsByB = await coreConnector.channels.get(coreConnector, {
         partyB,
       })
-      assert.equal(channelsByB.length, userAisPartyA ? 1 : 2, 'check Channels.get')
+      console.log(channelsByB, userAisPartyA)
+      assert.equal(channelsByB.length, userAisPartyA ? 1 : 2, 'check Channels.get partyB')
     })
 
     it('should not delete channel before confirmations', async function () {

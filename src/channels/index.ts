@@ -1,5 +1,6 @@
 import type HoprEthereum from '..'
 import BN from 'bn.js'
+import chalk from 'chalk'
 import { Subscription } from 'web3-core-subscriptions'
 import { BlockHeader } from 'web3-eth'
 import { u8aToNumber, stringToU8a } from '@hoprnet/hopr-utils'
@@ -15,7 +16,9 @@ type ClosedChannelEvent = ContractEventLog<{ closer: string; counterParty: strin
 
 const log = Log(['channels'])
 const unconfirmedEvents = new Map<string, OpenedChannelEvent | ClosedChannelEvent>()
-let isStarted = false
+let status: 'started' | 'stopped' = 'stopped'
+let starting: Promise<any>
+let stopping: Promise<any>
 let newBlockEvent: Subscription<BlockHeader>
 let openedChannelEvent: ContractEventEmitter<any> | undefined
 let closedChannelEvent: ContractEventEmitter<any> | undefined
@@ -240,71 +243,105 @@ class Channels {
 
   // listen to all open / close events, store entries after X confirmations
   static async start(connector: HoprEthereum): Promise<boolean> {
-    try {
-      if (isStarted) {
-        log(`already started..`)
-        return true
-      }
+    log(`Starting indexer...`)
 
-      let fromBlock = await Channels.getLatestConfirmedBlockNumber(connector)
-      // go back 12 blocks in case of a re-org
-      if (fromBlock - MAX_CONFIRMATIONS > 0) {
-        fromBlock = fromBlock - MAX_CONFIRMATIONS
-      }
-
-      log(`starting to pull events from block ${fromBlock}..`)
-
-      newBlockEvent = connector.web3.eth.subscribe('newBlockHeaders').on('data', (block) => {
-        Channels.onNewBlock(connector, block)
-      })
-
-      openedChannelEvent = connector.hoprChannels.events
-        .OpenedChannel({
-          fromBlock,
-        })
-        .on('data', (event) => {
-          unconfirmedEvents.set(getEventId(event), event)
-        })
-
-      closedChannelEvent = connector.hoprChannels.events
-        .ClosedChannel({
-          fromBlock,
-        })
-        .on('data', (event) => {
-          unconfirmedEvents.set(getEventId(event), event)
-        })
-
-      isStarted = true
+    if (typeof starting !== 'undefined') {
+      return starting
+    } else if (typeof stopping !== 'undefined') {
+      throw Error('cannot start while stopping')
+    } else if (status === 'started') {
       return true
-    } catch (err) {
-      log(err.message)
-      return isStarted
     }
+
+    starting = new Promise(async (resolve, reject) => {
+      try {
+        let fromBlock = await Channels.getLatestConfirmedBlockNumber(connector)
+        // go back 12 blocks in case of a re-org
+        if (fromBlock - MAX_CONFIRMATIONS > 0) {
+          fromBlock = fromBlock - MAX_CONFIRMATIONS
+        }
+
+        log(`starting to pull events from block ${fromBlock}..`)
+
+        newBlockEvent = connector.web3.eth
+          .subscribe('newBlockHeaders')
+          .on('data', (block) => {
+            Channels.onNewBlock(connector, block)
+          })
+          .on('error', reject)
+
+        openedChannelEvent = connector.hoprChannels.events
+          .OpenedChannel({
+            fromBlock,
+          })
+          .on('data', (event) => {
+            unconfirmedEvents.set(getEventId(event), event)
+          })
+          .on('error', reject)
+
+        closedChannelEvent = connector.hoprChannels.events
+          .ClosedChannel({
+            fromBlock,
+          })
+          .on('data', (event) => {
+            unconfirmedEvents.set(getEventId(event), event)
+          })
+          .on('error', reject)
+
+        status = 'started'
+        log(chalk.green('Indexer started!'))
+        return resolve(true)
+      } catch (err) {
+        log(err.message)
+
+        return Channels.stop()
+      }
+    }).finally(() => {
+      starting = undefined
+    })
+
+    return starting
   }
 
   // stop listening to events
   static async stop(): Promise<boolean> {
-    try {
-      if (!isStarted) return true
+    log(`Stopping indexer...`)
 
-      if (typeof newBlockEvent !== 'undefined') {
-        newBlockEvent.unsubscribe()
-      }
-      if (typeof openedChannelEvent !== 'undefined') {
-        openedChannelEvent.removeAllListeners()
-      }
-      if (typeof closedChannelEvent !== 'undefined') {
-        openedChannelEvent.removeAllListeners()
-      }
-
-      unconfirmedEvents.clear()
-
-      isStarted = false
+    if (typeof starting !== 'undefined') {
+      throw Error('cannot stop while starting')
+    } else if (typeof stopping !== 'undefined') {
+      return stopping
+    } else if (status === 'stopped') {
       return true
-    } catch (err) {
-      log(err.message)
-      return isStarted
     }
+
+    stopping = new Promise((resolve) => {
+      try {
+        if (typeof newBlockEvent !== 'undefined') {
+          newBlockEvent.unsubscribe()
+        }
+        if (typeof openedChannelEvent !== 'undefined') {
+          openedChannelEvent.removeAllListeners()
+        }
+        if (typeof closedChannelEvent !== 'undefined') {
+          openedChannelEvent.removeAllListeners()
+        }
+
+        unconfirmedEvents.clear()
+
+        status = 'stopped'
+        log(chalk.green('Indexer stopped!'))
+        return resolve(true)
+      } catch (err) {
+        log(err.message)
+
+        return resolve(false)
+      }
+    }).finally(() => {
+      stopping = undefined
+    })
+
+    return stopping
   }
 }
 

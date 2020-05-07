@@ -15,7 +15,7 @@ import CoreConnector from '..'
 import Channel from '.'
 import * as configs from '../config'
 
-describe('test ticket generation and verification', function () {
+describe('test Channel class', function () {
   const ganache = new Ganache()
   const channels = new Map<string, ChannelType>()
   const preChannels = new Map<string, ChannelType>()
@@ -51,7 +51,7 @@ describe('test ticket generation and verification', function () {
     counterpartysCoreConnector = await generateNode(userB.privKey)
   })
 
-  it('should create a valid ticket', async function () {
+  it('should create a channel', async function () {
     const channelType = new ChannelType(undefined, {
       balance: new ChannelBalance(undefined, {
         balance: new BN(123),

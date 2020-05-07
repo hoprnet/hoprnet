@@ -25,7 +25,7 @@ declare class Channel implements IChannel<HoprEthereum> {
     getPreviousChallenges(): Promise<Hash>;
     testAndSetNonce(signature: Uint8Array): Promise<void>;
     static isOpen(coreConnector: HoprEthereum, counterpartyPubKey: Uint8Array): Promise<boolean>;
-    static increaseFunds(coreConnector: HoprEthereum, spender: AccountId, counterparty: AccountId, amount: Balance): Promise<void>;
+    static increaseFunds(coreConnector: HoprEthereum, counterparty: AccountId, amount: Balance): Promise<void>;
     static create(coreConnector: HoprEthereum, counterpartyPubKey: Uint8Array, _getOnChainPublicKey: (counterparty: Uint8Array) => Promise<Uint8Array>, channelBalance?: ChannelBalance, sign?: (channelBalance: ChannelBalance) => Promise<SignedChannel>): Promise<Channel>;
     static getAll<T, R>(coreConnector: HoprEthereum, onData: (channel: Channel) => Promise<T>, onEnd: (promises: Promise<T>[]) => R): Promise<R>;
     static closeChannels(coreConnector: HoprEthereum): Promise<Balance>;
