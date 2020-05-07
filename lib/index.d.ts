@@ -47,7 +47,7 @@ export default class HoprEthereum implements HoprCoreConnector {
     readonly channel: typeof IChannel;
     readonly CHAIN_NAME = "HOPR on Ethereum";
     readonly ticket: typeof Ticket;
-    readonly channels: typeof Channels;
+    readonly channels: Channels;
     /**
      * @returns the current balances of the account associated with this node (HOPR)
      */

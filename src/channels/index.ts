@@ -14,15 +14,6 @@ type Channel = { partyA: AccountId; partyB: AccountId; channelEntry: ChannelEntr
 type OpenedChannelEvent = ContractEventLog<{ opener: string; counterParty: string }>
 type ClosedChannelEvent = ContractEventLog<{ closer: string; counterParty: string }>
 
-const log = Log(['channels'])
-const unconfirmedEvents = new Map<string, OpenedChannelEvent | ClosedChannelEvent>()
-let status: 'started' | 'stopped' = 'stopped'
-let starting: Promise<any>
-let stopping: Promise<any>
-let newBlockEvent: Subscription<BlockHeader>
-let openedChannelEvent: ContractEventEmitter<any> | undefined
-let closedChannelEvent: ContractEventEmitter<any> | undefined
-
 /**
  * @returns a custom event id for logging purposes.
  */
@@ -50,11 +41,24 @@ function isMoreRecent(oldChannelEntry: ChannelEntry, newChannelEntry: ChannelEnt
  * Eventually we will move to a better solution.
  */
 class Channels {
-  static async getLatestConfirmedBlockNumber(connector: HoprEthereum): Promise<number> {
+  private log = Log(['channels'])
+  private status: 'started' | 'stopped' = 'stopped'
+  private unconfirmedEvents = new Map<string, OpenedChannelEvent | ClosedChannelEvent>()
+  private starting: Promise<any>
+  private stopping: Promise<any>
+  private newBlockEvent: Subscription<BlockHeader>
+  private openedChannelEvent: ContractEventEmitter<any> | undefined
+  private closedChannelEvent: ContractEventEmitter<any> | undefined
+
+  constructor(private connector: HoprEthereum) {}
+
+  private async getLatestConfirmedBlockNumber(): Promise<number> {
     try {
-      const blockNumber = await connector.db.get(Buffer.from(connector.dbKeys.ConfirmedBlockNumber())).then((res) => {
-        return u8aToNumber(res)
-      })
+      const blockNumber = await this.connector.db
+        .get(Buffer.from(this.connector.dbKeys.ConfirmedBlockNumber()))
+        .then((res) => {
+          return u8aToNumber(res)
+        })
 
       return blockNumber
     } catch (err) {
@@ -67,8 +71,8 @@ class Channels {
   }
 
   // does it exist
-  static async has(connector: HoprEthereum, partyA: AccountId, partyB: AccountId): Promise<boolean> {
-    return connector.db.get(Buffer.from(dbKeys.ChannelEntry(partyA, partyB))).then(
+  public async has(partyA: AccountId, partyB: AccountId): Promise<boolean> {
+    return this.connector.db.get(Buffer.from(dbKeys.ChannelEntry(partyA, partyB))).then(
       () => true,
       (err) => {
         if (err.notFound) {
@@ -82,14 +86,8 @@ class Channels {
 
   // @TODO: improve function types
   // get stored channels using a query
-  static async get(
-    connector: HoprEthereum,
-    query?: {
-      partyA?: AccountId
-      partyB?: AccountId
-    }
-  ): Promise<Channel[]> {
-    const { dbKeys, db } = connector
+  public async get(query?: { partyA?: AccountId; partyB?: AccountId }): Promise<Channel[]> {
+    const { dbKeys, db } = this.connector
     const channels: Channel[] = []
     const allSmall = new Uint8Array(AccountId.SIZE).fill(0x00)
     const allBig = new Uint8Array(AccountId.SIZE).fill(0xff)
@@ -135,20 +133,15 @@ class Channels {
   }
 
   // get all stored channels
-  static async getAll(connector: HoprEthereum): Promise<Channel[]> {
-    return Channels.get(connector)
+  public async getAll(): Promise<Channel[]> {
+    return this.get()
   }
 
   // store a channel
-  static async store(
-    connector: HoprEthereum,
-    partyA: AccountId,
-    partyB: AccountId,
-    channelEntry: ChannelEntry
-  ): Promise<void> {
-    const { dbKeys, db } = connector
+  private async store(partyA: AccountId, partyB: AccountId, channelEntry: ChannelEntry): Promise<void> {
+    const { dbKeys, db } = this.connector
     const { blockNumber, logIndex, transactionIndex } = channelEntry
-    log(
+    this.log(
       `storing channel ${partyA.toHex()}-${partyB.toHex()}:${blockNumber.toString()}-${transactionIndex.toString()}-${logIndex.toString()}`
     )
 
@@ -167,34 +160,34 @@ class Channels {
   }
 
   // delete a channel
-  static async delete(connector: HoprEthereum, partyA: AccountId, partyB: AccountId): Promise<void> {
-    log(`deleting channel ${partyA.toHex()}-${partyB.toHex()}`)
+  private async delete(partyA: AccountId, partyB: AccountId): Promise<void> {
+    this.log(`deleting channel ${partyA.toHex()}-${partyB.toHex()}`)
 
-    const { dbKeys, db } = connector
+    const { dbKeys, db } = this.connector
 
     const key = Buffer.from(dbKeys.ChannelEntry(partyA, partyB))
 
     return db.del(key)
   }
 
-  static async onNewBlock(connector: HoprEthereum, block: BlockHeader) {
-    const confirmedEvents = Array.from(unconfirmedEvents.values()).filter((event) => {
+  private async onNewBlock(block: BlockHeader) {
+    const confirmedEvents = Array.from(this.unconfirmedEvents.values()).filter((event) => {
       return event.blockNumber + MAX_CONFIRMATIONS <= block.number
     })
 
     for (const event of confirmedEvents) {
       const id = getEventId(event)
-      unconfirmedEvents.delete(id)
+      this.unconfirmedEvents.delete(id)
 
       if (event.event === 'OpenedChannel') {
-        Channels.onOpenedChannel(connector, event as OpenedChannelEvent)
+        this.onOpenedChannel(event as OpenedChannelEvent)
       } else {
-        Channels.onClosedChannel(connector, event as ClosedChannelEvent)
+        this.onClosedChannel(event as ClosedChannelEvent)
       }
     }
   }
 
-  static async onOpenedChannel(connector: HoprEthereum, event: OpenedChannelEvent): Promise<void> {
+  private async onOpenedChannel(event: OpenedChannelEvent): Promise<void> {
     const opener = new AccountId(stringToU8a(event.returnValues.opener))
     const counterParty = new AccountId(stringToU8a(event.returnValues.counterParty))
     const [partyA, partyB] = getParties(opener, counterParty)
@@ -205,7 +198,7 @@ class Channels {
       logIndex: new BN(event.logIndex),
     })
 
-    const channels = await Channels.get(connector, {
+    const channels = await this.get({
       partyA,
       partyB,
     })
@@ -214,10 +207,10 @@ class Channels {
       return
     }
 
-    Channels.store(connector, partyA, partyB, newChannelEntry)
+    this.store(partyA, partyB, newChannelEntry)
   }
 
-  static async onClosedChannel(connector: HoprEthereum, event: ClosedChannelEvent): Promise<void> {
+  private async onClosedChannel(event: ClosedChannelEvent): Promise<void> {
     const closer = new AccountId(stringToU8a(event.returnValues.closer))
     const counterParty = new AccountId(stringToU8a(event.returnValues.counterParty))
     const [partyA, partyB] = getParties(closer, counterParty)
@@ -227,7 +220,7 @@ class Channels {
       logIndex: new BN(event.logIndex),
     })
 
-    const channels = await Channels.get(connector, {
+    const channels = await this.get({
       partyA,
       partyB,
     })
@@ -238,110 +231,110 @@ class Channels {
       return
     }
 
-    Channels.delete(connector, partyA, partyB)
+    this.delete(partyA, partyB)
   }
 
   // listen to all open / close events, store entries after X confirmations
-  static async start(connector: HoprEthereum): Promise<boolean> {
-    log(`Starting indexer...`)
+  public async start(): Promise<boolean> {
+    this.log(`Starting indexer...`)
 
-    if (typeof starting !== 'undefined') {
-      return starting
-    } else if (typeof stopping !== 'undefined') {
+    if (typeof this.starting !== 'undefined') {
+      return this.starting
+    } else if (typeof this.stopping !== 'undefined') {
       throw Error('cannot start while stopping')
-    } else if (status === 'started') {
+    } else if (this.status === 'started') {
       return true
     }
 
-    starting = new Promise(async (resolve, reject) => {
+    this.starting = new Promise(async (resolve, reject) => {
       try {
-        let fromBlock = await Channels.getLatestConfirmedBlockNumber(connector)
+        let fromBlock = await this.getLatestConfirmedBlockNumber()
         // go back 12 blocks in case of a re-org
         if (fromBlock - MAX_CONFIRMATIONS > 0) {
           fromBlock = fromBlock - MAX_CONFIRMATIONS
         }
 
-        log(`starting to pull events from block ${fromBlock}..`)
+        this.log(`starting to pull events from block ${fromBlock}..`)
 
-        newBlockEvent = connector.web3.eth
+        this.newBlockEvent = this.connector.web3.eth
           .subscribe('newBlockHeaders')
           .on('data', (block) => {
-            Channels.onNewBlock(connector, block)
+            this.onNewBlock(block)
           })
           .on('error', reject)
 
-        openedChannelEvent = connector.hoprChannels.events
+        this.openedChannelEvent = this.connector.hoprChannels.events
           .OpenedChannel({
             fromBlock,
           })
           .on('data', (event) => {
-            unconfirmedEvents.set(getEventId(event), event)
+            this.unconfirmedEvents.set(getEventId(event), event)
           })
           .on('error', reject)
 
-        closedChannelEvent = connector.hoprChannels.events
+        this.closedChannelEvent = this.connector.hoprChannels.events
           .ClosedChannel({
             fromBlock,
           })
           .on('data', (event) => {
-            unconfirmedEvents.set(getEventId(event), event)
+            this.unconfirmedEvents.set(getEventId(event), event)
           })
           .on('error', reject)
 
-        status = 'started'
-        log(chalk.green('Indexer started!'))
+        this.status = 'started'
+        this.log(chalk.green('Indexer started!'))
         return resolve(true)
       } catch (err) {
-        log(err.message)
+        this.log(err.message)
 
-        return Channels.stop()
+        return this.stop()
       }
     }).finally(() => {
-      starting = undefined
+      this.starting = undefined
     })
 
-    return starting
+    return this.starting
   }
 
   // stop listening to events
-  static async stop(): Promise<boolean> {
-    log(`Stopping indexer...`)
+  public async stop(): Promise<boolean> {
+    this.log(`Stopping indexer...`)
 
-    if (typeof starting !== 'undefined') {
+    if (typeof this.starting !== 'undefined') {
       throw Error('cannot stop while starting')
-    } else if (typeof stopping !== 'undefined') {
-      return stopping
-    } else if (status === 'stopped') {
+    } else if (typeof this.stopping !== 'undefined') {
+      return this.stopping
+    } else if (this.status === 'stopped') {
       return true
     }
 
-    stopping = new Promise((resolve) => {
+    this.stopping = new Promise((resolve) => {
       try {
-        if (typeof newBlockEvent !== 'undefined') {
-          newBlockEvent.unsubscribe()
+        if (typeof this.newBlockEvent !== 'undefined') {
+          this.newBlockEvent.unsubscribe()
         }
-        if (typeof openedChannelEvent !== 'undefined') {
-          openedChannelEvent.removeAllListeners()
+        if (typeof this.openedChannelEvent !== 'undefined') {
+          this.openedChannelEvent.removeAllListeners()
         }
-        if (typeof closedChannelEvent !== 'undefined') {
-          openedChannelEvent.removeAllListeners()
+        if (typeof this.closedChannelEvent !== 'undefined') {
+          this.openedChannelEvent.removeAllListeners()
         }
 
-        unconfirmedEvents.clear()
+        this.unconfirmedEvents.clear()
 
-        status = 'stopped'
-        log(chalk.green('Indexer stopped!'))
+        this.status = 'stopped'
+        this.log(chalk.green('Indexer stopped!'))
         return resolve(true)
       } catch (err) {
-        log(err.message)
+        this.log(err.message)
 
         return resolve(false)
       }
     }).finally(() => {
-      stopping = undefined
+      this.stopping = undefined
     })
 
-    return stopping
+    return this.stopping
   }
 }
 

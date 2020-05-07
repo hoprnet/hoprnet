@@ -62,7 +62,7 @@ export default class HoprEthereum implements HoprCoreConnector {
   readonly channel = Channel as typeof IChannel
   readonly CHAIN_NAME = 'HOPR on Ethereum'
   readonly ticket = Ticket
-  readonly channels = Channels
+  readonly channels = new Channels(this)
 
   /**
    * @returns the current balances of the account associated with this node (HOPR)
@@ -149,8 +149,8 @@ export default class HoprEthereum implements HoprCoreConnector {
           await utils.wait(1 * 1e3)
         }
 
-        // // restart
-        // this.channels.start(this)
+        // restart
+        await this.channels.start()
 
         this._status = 'started'
         this.log(chalk.green('Connector started'))
@@ -241,7 +241,7 @@ export default class HoprEthereum implements HoprCoreConnector {
           // initialize account secret
           this.initializeAccountSecret(),
           // start channels indexing
-          this.channels.start(this),
+          this.channels.start(),
         ]).then((responses) => {
           const allOk = responses.every((r) => !!r)
 
