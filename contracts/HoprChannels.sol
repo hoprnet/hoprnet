@@ -369,9 +369,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         if (operator != address(this)) {
             (address recipient, address counterParty) = abi.decode(userData, (address, address));
 
-            if (recipient != address(0) && counterParty != address(0)) {
-                fundChannel(from, recipient, counterParty, amount);
-            }
+            fundChannel(from, recipient, counterParty, amount);
         }
     }
 
