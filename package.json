@@ -32,16 +32,12 @@
     "@types/ramda": "^0.27.4",
     "chai": "^4.2.0",
     "husky": "^4.2.3",
+    "lint-staged": ">=10",
     "mocha": "^7.0.1",
     "prettier": "^2.0.5",
     "ramda": "^0.27.0",
     "ts-node": "^8.8.2",
     "typescript": "^3.8.2"
-  },
-  "husky": {
-    "hooks": {
-      "pre-commit": "yarn build && git add ./lib"
-    }
   },
   "prettier": {
     "tabWidth": 2,
@@ -55,5 +51,13 @@
     ],
     "spec": "src/**/*.spec.ts",
     "require": "ts-node/register"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged"
+    }
+  },
+  "lint-staged": {
+    "*.{ts}": "prettier --write"
   }
 }
