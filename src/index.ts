@@ -64,6 +64,9 @@ export default class HoprEthereum implements HoprCoreConnector {
   readonly ticket = Ticket
   readonly channels = Channels
 
+  /**
+   * @returns the current balances of the account associated with this node (HOPR)
+   */
   get nonce(): Promise<number> {
     return new Promise<number>(async (resolve, reject) => {
       try {
@@ -101,6 +104,10 @@ export default class HoprEthereum implements HoprCoreConnector {
     })
   }
 
+  /**
+   * Returns the current balances of the account associated with this node (HOPR)
+   * @returns a promise resolved to Balance
+   */
   get accountBalance() {
     return this.hoprToken.methods
       .balanceOf(this.account.toHex())
@@ -108,10 +115,17 @@ export default class HoprEthereum implements HoprCoreConnector {
       .then((res) => new types.Balance(res))
   }
 
+  /**
+   * Returns the current native balance (ETH)
+   * @returns a promise resolved to Balance
+   */
   get accountNativeBalance() {
     return this.web3.eth.getBalance(this.account.toHex()).then((res) => new types.NativeBalance(res))
   }
 
+  /**
+   * Initialises the connector, e.g. connect to a blockchain node.
+   */
   async start() {
     this.log('Starting connector..')
 
@@ -151,6 +165,9 @@ export default class HoprEthereum implements HoprCoreConnector {
     return this._starting
   }
 
+  /**
+   * Stops the connector.
+   */
   async stop() {
     this.log('Stopping connector..')
 
@@ -190,10 +207,18 @@ export default class HoprEthereum implements HoprCoreConnector {
     return this._status === 'started'
   }
 
+  /**
+   * Initializes the on-chain values of our account.
+   * @param nonce optional specify nonce of the account to run multiple queries simultaneously
+   */
   async initOnchainValues(nonce?: number) {
     return this.setAccountSecret(nonce)
   }
 
+  /**
+   * Initializes connector, insures that connector is only initialized once,
+   * and it only resolves once it's done initializing.
+   */
   async initialize(): Promise<void> {
     this.log('Initializing connector..')
 
@@ -238,6 +263,11 @@ export default class HoprEthereum implements HoprCoreConnector {
     return this._initializing
   }
 
+  /**
+   * Initializes node's account secret, if it doesn't exist
+   * it will generate one.
+   * @returns a promise resolved true if account secret is set correctly
+   */
   async initializeAccountSecret(): Promise<boolean> {
     try {
       this.log('Initializing account secret')
@@ -272,7 +302,10 @@ For Kovan HOPR test tokens visit our Telegram channel at ${chalk.blue('https://t
     }
   }
 
-  // return 'true' if account secret is setup correctly
+  /**
+   * Checks whether node has an account secret set onchain and offchain
+   * @returns a promise resolved true if secret is set correctly
+   */
   async checkAccountSecret(): Promise<boolean> {
     let offChainSecret: Uint8Array
     let onChainSecret: Uint8Array
@@ -324,7 +357,9 @@ For Kovan HOPR test tokens visit our Telegram channel at ${chalk.blue('https://t
     return hasOffChainSecret && hasOnChainSecret
   }
 
-  // generate and set account secret
+  /**
+   * generate and set account secret
+   */
   async setAccountSecret(nonce?: number): Promise<void> {
     let secret = new Uint8Array(randomBytes(32))
     const dbPromise = this.db.put(Buffer.from(this.dbKeys.OnChainSecret()), Buffer.from(secret.slice()))
@@ -347,6 +382,10 @@ For Kovan HOPR test tokens visit our Telegram channel at ${chalk.blue('https://t
     ])
   }
 
+  /**
+   * Checks whether web3 connection is alive
+   * @returns a promise resolved true if web3 connection is alive
+   */
   async checkWeb3(): Promise<boolean> {
     try {
       const isListening = await this.web3.eth.net.isListening()
@@ -361,6 +400,15 @@ For Kovan HOPR test tokens visit our Telegram channel at ${chalk.blue('https://t
 
   static readonly constants = constants as typeof IConstants
 
+  /**
+   * Creates an uninitialised instance.
+   *
+   * @param db database instance
+   * @param seed that is used to derive that on-chain identity
+   * @param options.id Id of the demo account
+   * @param options.uri URI that is used to connect to the blockchain
+   * @returns a promise resolved to the connector
+   */
   static async create(
     db: LevelUp,
     seed?: Uint8Array,

@@ -10,17 +10,27 @@ import Web3 from 'web3'
 import BN from 'bn.js'
 import Debug from 'debug'
 import { AccountId, Signature, Hash } from '../types'
-import { ContractEventEmitter, ContractEventLog } from '../tsc/web3/types'
+import { ContractEventEmitter } from '../tsc/web3/types'
 import { ChannelStatus } from '../types/channel'
 import * as constants from '../constants'
 import * as time from './time'
 
 export { time }
 
+/**
+ * @param self our node's accountId
+ * @param counterparty counterparty's accountId
+ * @returns true if self is partyA
+ */
 export function isPartyA(self: AccountId, counterparty: AccountId): boolean {
   return Buffer.compare(self, counterparty) < 0
 }
 
+/**
+ * @param self our node's accountId
+ * @param counterparty counterparty's accountId
+ * @returns an array of partyA's and partyB's accountIds
+ */
 export function getParties(self: AccountId, counterparty: AccountId): [AccountId, AccountId] {
   if (isPartyA(self, counterparty)) {
     return [self, counterparty]
@@ -29,10 +39,21 @@ export function getParties(self: AccountId, counterparty: AccountId): [AccountId
   }
 }
 
+/**
+ * Get the channel id of self and counterparty
+ * @param self our node's accountId
+ * @param counterparty counterparty's accountId
+ * @returns a promise resolved to Hash
+ */
 export function getId(self: AccountId, counterparty: AccountId): Promise<Hash> {
   return hash(Buffer.concat(getParties(self, counterparty), 2 * constants.ADDRESS_LENGTH))
 }
 
+/**
+ * Given a private key, derive public key.
+ * @param privKey the private key to derive the public key from
+ * @returns a promise resolved to Uint8Array
+ */
 export async function privKeyToPubKey(privKey: Uint8Array): Promise<Uint8Array> {
   if (privKey.length != constants.PRIVATE_KEY_LENGTH)
     throw Error(
@@ -44,6 +65,11 @@ export async function privKeyToPubKey(privKey: Uint8Array): Promise<Uint8Array> 
   return publicKeyCreate(privKey)
 }
 
+/**
+ * Given a public key, derive the AccountId.
+ * @param pubKey the public key to derive the AccountId from
+ * @returns a promise resolved to AccountId
+ */
 export async function pubKeyToAccountId(pubKey: Uint8Array): Promise<AccountId> {
   if (pubKey.length != constants.COMPRESSED_PUBLIC_KEY_LENGTH)
     throw Error(
@@ -55,10 +81,23 @@ export async function pubKeyToAccountId(pubKey: Uint8Array): Promise<AccountId> 
   return new AccountId((await hash(publicKeyConvert(pubKey, false).slice(1))).slice(12))
 }
 
+/**
+ * Given a message, generate hash using keccak256.
+ * @param msg the message to hash
+ * @returns a promise resolved to Hash
+ */
 export async function hash(msg: Uint8Array): Promise<Hash> {
   return Promise.resolve(new Hash(createKeccakHash('keccak256').update(Buffer.from(msg)).digest()))
 }
 
+/**
+ * Sign message.
+ * @param msg the message to sign
+ * @param privKey the private key to use when signing
+ * @param pubKey deprecated
+ * @param arr
+ * @returns a promise resolved to Hash
+ */
 export async function sign(
   msg: Uint8Array,
   privKey: Uint8Array,
@@ -79,15 +118,37 @@ export async function sign(
   return response
 }
 
+/**
+ * Recover signer.
+ * @param msg the message that was signed
+ * @param signature the signature of the signed message
+ * @returns a promise resolved to Uint8Array, the signers public key
+ */
 export async function signer(msg: Uint8Array, signature: Signature): Promise<Uint8Array> {
   return ecdsaRecover(signature.signature, signature.recovery, msg)
 }
 
+/**
+ * Verify signer.
+ * @param msg the message that was signed
+ * @param signature the signature of the signed message
+ * @param pubKey the public key of the potential signer
+ * @returns a promise resolved to true if the public key provided matches the signer's
+ */
 export async function verify(msg: Uint8Array, signature: Signature, pubKey: Uint8Array): Promise<boolean> {
   return ecdsaVerify(signature.signature, msg, pubKey)
 }
 
-export function convertUnit(amount: BN, sourceUnit: string, targetUnit: 'eth' | 'wei'): BN {
+/**
+ * Convert between units'
+ * @param amount a BN instance of the amount to be converted
+ * @param sourceUnit
+ * @param targetUnit
+ * @returns a BN instance of the resulted conversion
+ */
+export function convertUnit(amount: BN, sourceUnit: 'eth', targetUnit: 'wei'): BN
+export function convertUnit(amount: BN, sourceUnit: 'wei', targetUnit: 'eth'): BN
+export function convertUnit(amount: BN, sourceUnit: 'eth' | 'wei', targetUnit: 'eth' | 'wei'): BN {
   assert(['eth', 'wei'].includes(sourceUnit), 'not implemented')
 
   if (sourceUnit === 'eth') {
@@ -97,6 +158,13 @@ export function convertUnit(amount: BN, sourceUnit: string, targetUnit: 'eth' | 
   }
 }
 
+/**
+ * Wait until block has been confirmed.
+ *
+ * @typeparam T Our PromiEvent
+ * @param event Our event, returned by web3
+ * @returns the transaction receipt
+ */
 export async function waitForConfirmation<T extends PromiEvent<any>>(event: T) {
   return new Promise<TransactionReceipt>((resolve, reject) => {
     return event
@@ -118,12 +186,22 @@ export async function waitForConfirmation<T extends PromiEvent<any>>(event: T) {
   })
 }
 
+/**
+ * An asychronous setTimeout.
+ *
+ * @param ms milliseconds to wait
+ */
 export async function wait(ms: number) {
   return new Promise((resolve) => {
     setTimeout(resolve, ms)
   })
 }
 
+/**
+ * Wait until timestamp is reached onchain.
+ *
+ * @param ms milliseconds to wait
+ */
 export async function waitFor({
   web3,
   network,
@@ -157,11 +235,12 @@ export async function waitFor({
   })
 }
 
-/*
-  return network name, not using web3 'getNetworkType' because
-  it misses networks & uses genesis block to determine networkid.
-  supports all infura networks
-*/
+/**
+ * Get current network's name.
+ *
+ * @param web3 a web3 instance
+ * @returns the network's name
+ */
 export async function getNetworkId(web3: Web3): Promise<Networks> {
   return web3.eth.net.getId().then((netId) => {
     switch (netId) {
@@ -183,6 +262,13 @@ export async function getNetworkId(web3: Web3): Promise<Networks> {
   })
 }
 
+/**
+ * Convert a state count (one received from on-chain),
+ * to an enumarated representation.
+ *
+ * @param stateCount the state count
+ * @returns ChannelStatus
+ */
 export function stateCountToStatus(stateCount: number): ChannelStatus {
   const status = Number(stateCount) % 10
 
@@ -193,7 +279,13 @@ export function stateCountToStatus(stateCount: number): ChannelStatus {
   return status
 }
 
-// sign transaction's locally and send them
+/**
+ * A signer factory that signs transactions using the given private key.
+ *
+ * @param web3 a web3 instance
+ * @param privKey the private key to sign transactions with
+ * @returns signer
+ */
 // @TODO: switch to web3js-accounts wallet if it's safe
 export function TransactionSigner(web3: Web3, privKey: Uint8Array) {
   const privKeyStr = new Hash(privKey).toHex()
@@ -230,11 +322,24 @@ export function TransactionSigner(web3: Web3, privKey: Uint8Array) {
   }
 }
 
-export function Log(suffixes: string[] = []) {
-  return Debug(['hopr-core-ethereum'].concat(suffixes).join(':'))
+/**
+ * Create a prefixed Debug instance.
+ *
+ * @param prefixes an array containing prefixes
+ * @returns a debug instance prefixed by joining 'prefixes'
+ */
+export function Log(prefixes: string[] = []) {
+  return Debug(['hopr-core-ethereum'].concat(prefixes).join(':'))
 }
 
-// stop listening once fn resolves
+/**
+ * Once function 'fn' resolves, remove all listeners from 'event'.
+ *
+ * @typeparam E Our contract event emitteer
+ * @typeparam R fn's return
+ * @param event an event
+ * @param fn a function to wait for
+ */
 export async function cleanupPromiEvent<E extends ContractEventEmitter<any>, R extends Promise<any>>(
   event: E,
   fn: (event: E) => R

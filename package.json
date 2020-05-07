@@ -16,8 +16,7 @@
   "files": [
     "!**/*.spec.ts",
     "src/",
-    "lib/",
-    "hopr.png"
+    "lib/"
   ],
   "engines": {
     "yarn": "^1.22",

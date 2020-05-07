@@ -15,6 +15,10 @@ declare type ClosedChannelEvent = ContractEventLog<{
     closer: string;
     counterParty: string;
 }>;
+/**
+ * Barebones indexer to keep track of all open payment channels.
+ * Eventually we will move to a better solution.
+ */
 declare class Channels {
     static getLatestConfirmedBlockNumber(connector: HoprEthereum): Promise<number>;
     static has(connector: HoprEthereum, partyA: AccountId, partyB: AccountId): Promise<boolean>;

@@ -20,13 +20,21 @@ let newBlockEvent: Subscription<BlockHeader>
 let openedChannelEvent: ContractEventEmitter<any> | undefined
 let closedChannelEvent: ContractEventEmitter<any> | undefined
 
-// return a custom event id for logging purposes
+/**
+ * @returns a custom event id for logging purposes.
+ */
 function getEventId(event: ContractEventLog<any>): string {
   return `${event.event}-${event.transactionHash}-${event.transactionIndex}-${event.logIndex}`
 }
 
-// ensure new channel is new
-function isNewEvent(oldChannelEntry: ChannelEntry, newChannelEntry: ChannelEntry): boolean {
+/**
+ * Returns true if 'newChannelEntry' is more recent.
+ *
+ * @param oldChannelEntry
+ * @param newChannelEntry
+ * @returns true if 'newChannelEntry' is more recent than 'oldChannelEntry'
+ */
+function isMoreRecent(oldChannelEntry: ChannelEntry, newChannelEntry: ChannelEntry): boolean {
   const okBlockNumber = oldChannelEntry.blockNumber.lte(newChannelEntry.blockNumber)
   const okTransactionIndex = okBlockNumber && oldChannelEntry.transactionIndex.lte(newChannelEntry.transactionIndex)
   const okLogIndex = okTransactionIndex && oldChannelEntry.logIndex.lt(newChannelEntry.logIndex)
@@ -34,6 +42,10 @@ function isNewEvent(oldChannelEntry: ChannelEntry, newChannelEntry: ChannelEntry
   return okBlockNumber && okTransactionIndex && okLogIndex
 }
 
+/**
+ * Barebones indexer to keep track of all open payment channels.
+ * Eventually we will move to a better solution.
+ */
 class Channels {
   static async getLatestConfirmedBlockNumber(connector: HoprEthereum): Promise<number> {
     try {
@@ -195,7 +207,7 @@ class Channels {
       partyB,
     })
 
-    if (channels.length > 0 && !isNewEvent(channels[0].channelEntry, newChannelEntry)) {
+    if (channels.length > 0 && !isMoreRecent(channels[0].channelEntry, newChannelEntry)) {
       return
     }
 
@@ -219,7 +231,7 @@ class Channels {
 
     if (channels.length === 0) {
       return
-    } else if (channels.length > 0 && !isNewEvent(channels[0].channelEntry, newChannelEntry)) {
+    } else if (channels.length > 0 && !isMoreRecent(channels[0].channelEntry, newChannelEntry)) {
       return
     }
 

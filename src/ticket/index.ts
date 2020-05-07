@@ -1,6 +1,9 @@
 import type HoprEthereum from '..'
 import { SignedTicket, Hash } from '../types'
 
+/**
+ * Store and get tickets stored by the node.
+ */
 class Ticket {
   static async store(coreConnector: HoprEthereum, channelId: Hash, signedTicket: SignedTicket): Promise<void> {
     const { dbKeys, db } = coreConnector
