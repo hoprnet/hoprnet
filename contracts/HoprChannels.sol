@@ -91,10 +91,10 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      * @param hashedSecret bytes32 hashedSecret to store
      */
     function setHashedSecret(bytes32 hashedSecret) external {
-        require(hashedSecret != bytes32(0), "hashedSecret must not be empty");
+        require(hashedSecret != bytes32(0), "HoprChannels: hashedSecret is empty");
 
         Account storage account = accounts[msg.sender];
-        require(account.hashedSecret != hashedSecret, "new and old hashedSecret must not be the same");
+        require(account.hashedSecret != hashedSecret, "HoprChannels: new and old hashedSecrets are the same");
 
         account.hashedSecret = hashedSecret;
         account.counter = account.counter += 1;
@@ -118,14 +118,17 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         address counterParty,
         uint256 additionalDeposit
     ) internal {
-        require(recipient != counterParty, "'recipient' and 'counterParty' must not be the same");
-        require(recipient != address(0), "'recipient' address is empty");
-        require(counterParty != address(0), "'counterParty' address is empty");
-        require(additionalDeposit > 0, "'additionalDeposit' must be greater than 0");
+        require(recipient != counterParty, "HoprChannels: 'recipient' and 'counterParty' must not be the same");
+        require(recipient != address(0), "HoprChannels: 'recipient' address is empty");
+        require(counterParty != address(0), "HoprChannels: 'counterParty' address is empty");
+        require(additionalDeposit > 0, "HoprChannels: 'additionalDeposit' must be greater than 0");
 
         (address party_a, , Channel storage channel, ChannelStatus status) = getChannel(recipient, counterParty);
 
-        require(status == ChannelStatus.UNINITIALISED || status == ChannelStatus.FUNDED, "channel is open");
+        require(
+            status == ChannelStatus.UNINITIALISED || status == ChannelStatus.FUNDED,
+            "HoprChannels: channel must be 'UNINITIALISED' or 'FUNDED'"
+        );
 
         channel.deposit = channel.deposit.add(additionalDeposit);
 
@@ -165,10 +168,16 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         address initiator = msg.sender;
 
         // verification
-        require(additionalDeposit > 0, "'additionalDeposit' must be strictly greater than zero");
-        require(partyAAmount <= additionalDeposit, "'partyAAmount' must be strictly smaller than 'additionalDeposit'");
-        require(uint256(s) <= HALF_CURVE_ORDER, "found malleable signature, please insert a low-s signature");
-        require(not_after >= now, "signature must not be expired");
+        require(additionalDeposit > 0, "HoprChannels: 'additionalDeposit' must be strictly greater than zero");
+        require(
+            partyAAmount <= additionalDeposit,
+            "HoprChannels: 'partyAAmount' must be strictly smaller than 'additionalDeposit'"
+        );
+        require(
+            uint256(s) <= HALF_CURVE_ORDER,
+            "HoprChannels: found malleable signature, please insert a low-s signature"
+        );
+        require(not_after >= now, "HoprChannels: signature must not be expired");
 
         address counterparty = ecrecover(
             prefixed(keccak256(abi.encodePacked(stateCounter, initiator, additionalDeposit, partyAAmount, not_after))),
@@ -177,12 +186,18 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             s
         );
 
-        require(initiator != counterparty, "initiator and counterparty must not be the same");
+        require(initiator != counterparty, "HoprChannels: initiator and counterparty must not be the same");
 
         (address partyA, , Channel storage channel, ChannelStatus status) = getChannel(initiator, counterparty);
 
-        require(channel.stateCounter == stateCounter, "stored stateCounter and signed stateCounter must be the same");
-        require(status == ChannelStatus.UNINITIALISED || status == ChannelStatus.FUNDED, "channel is open");
+        require(
+            channel.stateCounter == stateCounter,
+            "HoprChannels: stored stateCounter and signed stateCounter must be the same"
+        );
+        require(
+            status == ChannelStatus.UNINITIALISED || status == ChannelStatus.FUNDED,
+            "HoprChannels: channel must be 'UNINITIALISED' or 'FUNDED'"
+        );
 
         uint256 partyBAmount = additionalDeposit - partyAAmount;
 
@@ -214,12 +229,12 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     function openChannel(address counterParty) public {
         address opener = msg.sender;
 
-        require(opener != counterParty, "'opener' and 'counterParty' must not be the same");
-        require(counterParty != address(0), "'counterParty' address is empty");
+        require(opener != counterParty, "HoprChannels: 'opener' and 'counterParty' must not be the same");
+        require(counterParty != address(0), "HoprChannels: 'counterParty' address is empty");
 
         (, , Channel storage channel, ChannelStatus status) = getChannel(opener, counterParty);
 
-        require(status == ChannelStatus.FUNDED, "channel must be in funded state");
+        require(status == ChannelStatus.FUNDED, "HoprChannels: channel must be in 'FUNDED' state");
 
         channel.stateCounter += 1;
 
@@ -247,7 +262,10 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         bytes32 s,
         uint8 v
     ) public {
-        require(uint256(s) <= HALF_CURVE_ORDER, "found malleable signature, please insert a low-s signature");
+        require(
+            uint256(s) <= HALF_CURVE_ORDER,
+            "HoprChannels: found malleable signature, please insert a low-s signature"
+        );
 
         address recipient = msg.sender;
         Account storage recipientAccount = accounts[recipient];
@@ -258,7 +276,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             keccak256(abi.encodePacked(challenge, pre_image, recipientAccount.counter, amount, win_prob))
         );
 
-        require(uint256(hashedTicket) < uint256(win_prob), "ticket must be a win");
+        require(uint256(hashedTicket) < uint256(win_prob), "HoprChannels: ticket must be a win");
 
         (address party_a, , Channel storage channel, ChannelStatus status) = getChannel(
             recipient,
@@ -267,12 +285,12 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
 
         require(
             status == ChannelStatus.OPEN || status == ChannelStatus.PENDING,
-            "channel must be 'open' or 'pending for closure'"
+            "HoprChannels: channel must be 'OPEN' or 'PENDING'"
         );
-        require(amount > 0, "amount must be strictly greater than zero");
+        require(amount > 0, "HoprChannels: amount must be strictly greater than zero");
         require(
             recipientAccount.hashedSecret == keccak256(abi.encodePacked(pre_image)),
-            "given value is not a pre-image of the stored on-chain secret"
+            "HoprChannels: given value is not a pre-image of the stored on-chain secret"
         );
 
         recipientAccount.hashedSecret = pre_image;
@@ -285,7 +303,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
 
         require(
             channel.partyABalance <= channel.deposit,
-            "partyABalance must be strictly smaller than deposit balance"
+            "HoprChannels: partyABalance must be strictly smaller than deposit balance"
         );
     }
 
@@ -301,7 +319,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
 
         (, , Channel storage channel, ChannelStatus status) = getChannel(initiator, counterParty);
 
-        require(status == ChannelStatus.OPEN, "channel is not open");
+        require(status == ChannelStatus.OPEN, "HoprChannels: channel must be 'OPEN'");
 
         channel.closureTime = now + secsClosure;
         channel.stateCounter += 1;
@@ -324,8 +342,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             counterParty
         );
 
-        require(status == ChannelStatus.PENDING, "channel is not pending for closure");
-        require(now >= channel.closureTime, "'closureTime' has not passed");
+        require(status == ChannelStatus.PENDING, "HoprChannels: channel must be 'PENDING'");
+        require(now >= channel.closureTime, "HoprChannels: 'closureTime' has not passed");
 
         // settle balances
         if (channel.partyABalance > 0) {
@@ -363,7 +381,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         bytes calldata userData,
         bytes calldata operatorData
     ) external override {
-        require(msg.sender == address(token), "Invalid token");
+        require(msg.sender == address(token), "HoprChannels: Invalid token");
 
         // if operator is self (fundWithSignature), don't call fundChannel
         if (operator != address(this)) {

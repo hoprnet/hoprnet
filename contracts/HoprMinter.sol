@@ -52,10 +52,10 @@ contract HoprMinter is Ownable {
      * @param amount uint256 how much tokens to increase
      */
     function increaseBalance(address account, uint256 amount) external onlyOwner {
-        require(now < deadline, "cannot update balances past deadline");
+        require(now < deadline, "HoprMinter: deadline passed");
 
         uint256 newAmountToMint = amountToMint.add(amount);
-        require(newAmountToMint <= maxAmount, "reached max amount allowed to be minted");
+        require(newAmountToMint <= maxAmount, "HoprMinter: maximum allowed tokens to mint reached");
 
         amountToMint = newAmountToMint;
         accounts[account].balance = accounts[account].balance.add(amount);
@@ -73,7 +73,7 @@ contract HoprMinter is Ownable {
      * @param account address that the tokens will be claimed for
      */
     function claimFor(address account) external {
-        require(account != address(0), "'account' address is empty");
+        require(account != address(0), "HoprMinter: 'account' address is empty");
 
         _claim(account);
     }
@@ -88,7 +88,7 @@ contract HoprMinter is Ownable {
         Account storage account = accounts[_account];
 
         uint256 claimable = _claimable(account);
-        require(claimable > 0, "nothing to claim");
+        require(claimable > 0, "HoprMinter: nothing to claim");
 
         token.mint(_account, claimable, "", "");
         account.balance = account.balance.sub(claimable);

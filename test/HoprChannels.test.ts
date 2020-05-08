@@ -803,7 +803,7 @@ contract('HoprChannels', function ([accountA, accountB]) {
         hoprChannels.openChannel(partyB, {
           from: partyA,
         }),
-        'channel must be in funded state'
+        `HoprChannels: channel must be in 'FUNDED' state`
       )
     })
 
@@ -844,7 +844,7 @@ contract('HoprChannels', function ([accountA, accountB]) {
         hoprChannels.claimChannelClosure(partyB, {
           from: partyA,
         }),
-        "'closureTime' has not passed"
+        "HoprChannels: 'closureTime' has not passed"
       )
     })
   })

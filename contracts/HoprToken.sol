@@ -29,7 +29,7 @@ contract HoprToken is Context, AccessControl, ERC777Snapshot {
         bytes memory userData,
         bytes memory operatorData
     ) public {
-        require(hasRole(MINTER_ROLE, _msgSender()), "HoprToken: must have minter role to mint");
+        require(hasRole(MINTER_ROLE, _msgSender()), "HoprToken: caller does not have minter role");
         _mint(account, amount, userData, operatorData);
     }
 }

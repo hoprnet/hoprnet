@@ -54,7 +54,7 @@ contract('HoprMinter', function ([owner, user]) {
         hoprMinter.increaseBalance(user, '1', {
           from: owner,
         }),
-        'cannot update balances past deadline'
+        'HoprMinter: deadline passed'
       )
     })
 
@@ -63,7 +63,7 @@ contract('HoprMinter', function ([owner, user]) {
         hoprMinter.increaseBalance(user, web3.utils.toBN(maxAmount).add(web3.utils.toBN(1)).toString(), {
           from: owner,
         }),
-        'reached max amount allowed to be minted'
+        'HoprMinter: maximum allowed tokens to mint reached'
       )
     })
   })
