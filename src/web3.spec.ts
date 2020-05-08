@@ -12,7 +12,7 @@ describe('test web3 connect/reconnect', function () {
   const disconnect = async () => {
     try {
       // @ts-ignore
-      return web3.currentProvider.disconnect(1012, 'restart')
+      return web3.currentProvider.disconnect(4000)
     } catch (err) {
       // console.error(err)
     }
@@ -23,7 +23,7 @@ describe('test web3 connect/reconnect', function () {
 
     web3 = new Web3(
       new Web3.providers.WebsocketProvider(configs.DEFAULT_URI, {
-        reconnect: { auto: true, delay: 1000, maxAttempts: 5 },
+        reconnect: { auto: true, delay: 500, maxAttempts: 2, onTimeout: true },
       })
     )
   })
@@ -99,30 +99,49 @@ describe('test web3 connect/reconnect', function () {
     })
   })
 
-  it.skip('auto reconnects, broadcasts missed blocks', function () {
-    this.timeout(5e3)
+  // // after v1.2.8 https://github.com/ethereum/web3.js/pull/3494
+  // it('should not emit error while reconnecting', function () {
+  //   this.timeout(20e3)
 
-    const sub = web3.eth.subscribe('newBlockHeaders')
-    let count = 0
+  //   const p = new Promise((resolve) => {
+  //     // @ts-ignore
+  //     web3.currentProvider.on('error', (err) => {
+  //       console.log('here', err)
 
-    return new Promise(async function (resolve) {
-      sub.on('data', async function (result) {
-        if (count === 0) {
-          // trigger "unexpected" disconnect
-          await disconnect()
-          await time.advanceBlock(web3)
-        } else if (count === 1) {
-          // exit point
-          assert(result.parentHash)
-          resolve()
-        }
+  //       resolve()
+  //     })
+  //   })
 
-        count++
-      })
+  //   disconnect()
 
-      await time.advanceBlock(web3)
-    }).finally(() => {
-      sub.unsubscribe()
-    })
-  })
+  //   return p
+  // })
+
+  // // after v1.2.8 https://github.com/ethereum/web3.js/pull/3502
+  // it('auto reconnects, broadcasts missed blocks', function () {
+  //   this.timeout(5e3)
+
+  //   const sub = web3.eth.subscribe('newBlockHeaders')
+  //   let count = 0
+
+  //   return new Promise(async function (resolve) {
+  //     sub.on('data', async function (result) {
+  //       if (count === 0) {
+  //         // trigger "unexpected" disconnect
+  //         await disconnect()
+  //         await time.advanceBlock(web3)
+  //       } else if (count === 1) {
+  //         // exit point
+  //         assert(result.parentHash)
+  //         resolve()
+  //       }
+
+  //       count++
+  //     })
+
+  //     await time.advanceBlock(web3)
+  //   }).finally(() => {
+  //     sub.unsubscribe()
+  //   })
+  // })
 })

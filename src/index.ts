@@ -426,21 +426,20 @@ For Kovan HOPR test tokens visit our Telegram channel at ${chalk.blue('https://t
       )
     }
 
-    const provider = options?.provider || config.DEFAULT_URI
+    const providerUri = options?.provider || config.DEFAULT_URI
     const privateKey = usingSeed ? seed : stringToU8a(config.DEMO_ACCOUNTS[options.id])
     const publicKey = await utils.privKeyToPubKey(privateKey)
     const address = await utils.pubKeyToAccountId(publicKey)
 
-    const web3 = new Web3(
-      new Web3.providers.WebsocketProvider(provider, {
-        reconnect: {
-          auto: true,
-          delay: 5000, // ms
-          maxAttempts: 5,
-          onTimeout: false,
-        },
-      })
-    )
+    const provider = new Web3.providers.WebsocketProvider(providerUri, {
+      reconnect: {
+        auto: true,
+        delay: 1000, // ms
+        maxAttempts: 10,
+      },
+    })
+
+    const web3 = new Web3(provider)
 
     const account = new types.AccountId(address)
     const network = await utils.getNetworkId(web3)
