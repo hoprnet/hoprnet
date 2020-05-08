@@ -1,5 +1,4 @@
 import assert from 'assert'
-import { randomBytes } from 'crypto'
 import Web3 from 'web3'
 import { stringToU8a } from '@hoprnet/hopr-utils'
 import { Ganache, migrate, fund } from '@hoprnet/hopr-ethereum'

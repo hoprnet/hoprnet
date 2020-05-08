@@ -302,7 +302,7 @@ class Channel implements IChannel<HoprEthereum> {
 
     try {
       if (!(status === ChannelStatus.OPEN || status === ChannelStatus.PENDING)) {
-        throw Error("channel must be 'open' or 'pending'")
+        throw Error("channel must be 'OPEN' or 'PENDING'")
       }
 
       if (status === ChannelStatus.OPEN) {
@@ -489,8 +489,6 @@ class Channel implements IChannel<HoprEthereum> {
       })
       channel = new Channel(coreConnector, counterpartyPubKey, signedChannel)
     } else if (sign != null && channelBalance != null) {
-      const spender = coreConnector.hoprChannels.options.address
-
       let amount: Balance
       if (coreConnector.utils.isPartyA(coreConnector.account, counterparty)) {
         amount = channelBalance.balance_a
