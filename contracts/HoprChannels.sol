@@ -389,7 +389,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     ) external override {
         require(msg.sender == address(token), "HoprChannels: Invalid token");
 
-        // only call 'fundChannel' when the operator is not this contract
+        // only call 'fundChannel' when the operator is not self
         if (operator != address(this)) {
             (address recipient, address counterParty) = abi.decode(userData, (address, address));
 
