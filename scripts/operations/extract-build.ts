@@ -59,27 +59,10 @@ const writeData = async (folder: string, items: Item[]) => {
 export default async () => {
   const data = await getData()
 
-  const { abis, bytecodes } = data.reduce<{
-    [key: string]: Item[]
-  }>(
-    (result, output) => {
-      result.abis.push({
-        name: output.contractName,
-        value: output.abi,
-      })
+  const abis = data.map((output) => ({
+    name: output.contractName,
+    value: output.abi,
+  }))
 
-      result.bytecodes.push({
-        name: output.contractName,
-        value: output.bytecode,
-      })
-
-      return result
-    },
-    {
-      abis: [],
-      bytecodes: [],
-    }
-  )
-
-  return Promise.all([writeData('abis', abis), writeData('bytecodes', bytecodes)])
+  return writeData('abis', abis)
 }

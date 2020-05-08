@@ -4,7 +4,7 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/Arrays.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
-import "./ERC777.sol";
+import "@openzeppelin/contracts/token/ERC777/ERC777.sol";
 
 
 /**
@@ -104,45 +104,28 @@ abstract contract ERC777Snapshot is ERC777 {
         return snapshotted ? value : totalSupply();
     }
 
-    // _transfer, _mint and _burn are the only functions where the balances are modified, so it is there that the
-    // snapshots are updated. Note that the update happens _before_ the balance change, with the pre-modified value.
-    // The same is true for the total supply and _mint and _burn.
-    function _move(
+    // use _beforeTokenTransfer hook to capture instances where a balance or total supply is modified
+    function _beforeTokenTransfer(
         address operator,
         address from,
         address to,
-        uint256 amount,
-        bytes memory userData,
-        bytes memory operatorData
-    ) internal virtual override(ERC777) {
-        _updateAccountSnapshot(from);
-        _updateAccountSnapshot(to);
-
-        super._move(operator, from, to, amount, userData, operatorData);
-    }
-
-    function _mint(
-        address account,
-        uint256 amount,
-        bytes memory userData,
-        bytes memory operatorData
+        uint256 amount
     ) internal virtual override {
-        _updateAccountSnapshot(account);
-        _updateTotalSupplySnapshot();
+        super._beforeTokenTransfer(operator, from, to, amount);
 
-        super._mint(account, amount, userData, operatorData);
-    }
-
-    function _burn(
-        address account,
-        uint256 amount,
-        bytes memory data,
-        bytes memory operatorData
-    ) internal virtual override {
-        _updateAccountSnapshot(account);
-        _updateTotalSupplySnapshot();
-
-        super._burn(account, amount, data, operatorData);
+        if (from == address(0)) {
+            // handle '_mint'
+            _updateAccountSnapshot(to);
+            _updateTotalSupplySnapshot();
+        } else if (to == address(0)) {
+            // handle '_burn'
+            _updateAccountSnapshot(from);
+            _updateTotalSupplySnapshot();
+        } else {
+            // handle '_move'
+            _updateAccountSnapshot(from);
+            _updateAccountSnapshot(to);
+        }
     }
 
     function _valueAt(uint256 snapshotId, Snapshots storage snapshots) private view returns (bool, uint256) {

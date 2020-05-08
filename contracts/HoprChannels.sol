@@ -137,6 +137,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         }
 
         if (status == ChannelStatus.UNINITIALISED) {
+            // The state counter indicates the recycling generation and ensures that both parties are using the correct generation.
             channel.stateCounter += 1;
         }
 
@@ -212,6 +213,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         channel.deposit = additionalDeposit;
         channel.partyABalance = partyAAmount;
         if (status == ChannelStatus.UNINITIALISED) {
+            // The state counter indicates the recycling generation and ensures that both parties are using the correct generation.
             channel.stateCounter += 1;
         }
 
@@ -236,6 +238,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
 
         require(status == ChannelStatus.FUNDED, "HoprChannels: channel must be in 'FUNDED' state");
 
+        // The state counter indicates the recycling generation and ensures that both parties are using the correct generation.
         channel.stateCounter += 1;
 
         emit OpenedChannel(opener, counterParty);
@@ -322,6 +325,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         require(status == ChannelStatus.OPEN, "HoprChannels: channel must be 'OPEN'");
 
         channel.closureTime = now + secsClosure;
+        // The state counter indicates the recycling generation and ensures that both parties are using the correct generation.
         channel.stateCounter += 1;
 
         emit InitiatedChannelClosure(initiator, counterParty, channel.closureTime);
@@ -360,6 +364,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         delete channel.deposit;
         delete channel.partyABalance;
         delete channel.closureTime;
+        // The state counter indicates the recycling generation and ensures that both parties are using the correct generation.
+        // Increase state counter so that we can re-use the same channel after it has been closed.
         channel.stateCounter += 7;
     }
 
@@ -383,7 +389,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     ) external override {
         require(msg.sender == address(token), "HoprChannels: Invalid token");
 
-        // if operator is self (fundWithSignature), don't call fundChannel
+        // only call 'fundChannel' when the operator is not this contract
         if (operator != address(this)) {
             (address recipient, address counterParty) = abi.decode(userData, (address, address));
 
