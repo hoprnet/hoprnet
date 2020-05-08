@@ -40,7 +40,7 @@
 
 "@hoprnet/hopr-ethereum@https://github.com/hoprnet/hopr-ethereum.git#feature/ERC777":
   version "0.0.1"
-  resolved "https://github.com/hoprnet/hopr-ethereum.git#d4b22dfcba247da85e13f261e48d910bef1356c1"
+  resolved "https://github.com/hoprnet/hopr-ethereum.git#ee6a02c931f7ea4b551c898d203eefa6a5472b53"
   dependencies:
     "@hoprnet/hopr-demo-seeds" "https://github.com/hoprnet/hopr-demo-seeds.git"
     "@hoprnet/hopr-utils" "https://github.com/hoprnet/hopr-utils.git"

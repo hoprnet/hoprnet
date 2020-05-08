@@ -4,7 +4,7 @@ import { Ganache } from '@hoprnet/hopr-ethereum'
 import { time } from './utils'
 import * as configs from './config'
 
-describe.only('test web3 connect/reconnect', function () {
+describe('test web3 connect/reconnect', function () {
   const ganache = new Ganache()
   let web3: Web3
 
