@@ -5,13 +5,6 @@ import networks from '../../../truffle-networks.json'
 const accounts = NODE_SEEDS.concat(BOOTSTRAP_SEEDS)
 const balance = Number(1000000000000000000000000).toString(16)
 
-let server:
-  | {
-      listen: (port: number, cb: (err: Error, blockchain: any) => void) => void
-      close: (cb: (err: Error) => void) => void
-    }
-  | undefined
-
 const DEFAULT_OPS: Ganache.IServerOptions = {
   ws: true,
   port: networks.development.port,
@@ -24,6 +17,10 @@ const DEFAULT_OPS: Ganache.IServerOptions = {
 }
 
 class CustomGanache {
+  private server: {
+    listen: (port: number, cb: (err: Error, blockchain: any) => void) => void
+    close: (cb: (err: Error) => void) => void
+  }
   private ops: Ganache.IServerOptions
 
   constructor(customOps: Ganache.IServerOptions = {}) {
@@ -37,9 +34,9 @@ class CustomGanache {
     return new Promise<this>((resolve, reject) => {
       console.log('Starting ganache instance')
 
-      server = Ganache.server(this.ops)
+      this.server = Ganache.server(this.ops)
 
-      server.listen(this.ops.port, (err) => {
+      this.server.listen(this.ops.port, (err) => {
         if (err) return reject(err.message)
 
         const url = `${this.ops.ws ? 'ws' : 'http'}://127.0.0.1:${this.ops.port}`
@@ -53,15 +50,15 @@ class CustomGanache {
     return new Promise<this>((resolve, reject) => {
       console.log('Closing ganache instance')
 
-      if (typeof server === 'undefined') {
+      if (typeof this.server === 'undefined') {
         return resolve(this)
       }
 
-      server.close((err) => {
+      this.server.close((err) => {
         if (err) return reject(err.message)
 
         console.log('Network closed')
-        server = undefined
+        this.server = undefined
         return resolve(this)
       })
     })

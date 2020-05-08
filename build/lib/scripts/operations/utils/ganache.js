@@ -8,7 +8,6 @@ const hopr_demo_seeds_1 = require("@hoprnet/hopr-demo-seeds");
 const truffle_networks_json_1 = __importDefault(require("../../../truffle-networks.json"));
 const accounts = hopr_demo_seeds_1.NODE_SEEDS.concat(hopr_demo_seeds_1.BOOTSTRAP_SEEDS);
 const balance = Number(1000000000000000000000000).toString(16);
-let server;
 const DEFAULT_OPS = {
     ws: true,
     port: truffle_networks_json_1.default.development.port,
@@ -29,8 +28,8 @@ class CustomGanache {
     async start() {
         return new Promise((resolve, reject) => {
             console.log('Starting ganache instance');
-            server = ganache_core_1.default.server(this.ops);
-            server.listen(this.ops.port, (err) => {
+            this.server = ganache_core_1.default.server(this.ops);
+            this.server.listen(this.ops.port, (err) => {
                 if (err)
                     return reject(err.message);
                 const url = `${this.ops.ws ? 'ws' : 'http'}://127.0.0.1:${this.ops.port}`;
@@ -42,14 +41,14 @@ class CustomGanache {
     async stop() {
         return new Promise((resolve, reject) => {
             console.log('Closing ganache instance');
-            if (typeof server === 'undefined') {
+            if (typeof this.server === 'undefined') {
                 return resolve(this);
             }
-            server.close((err) => {
+            this.server.close((err) => {
                 if (err)
                     return reject(err.message);
                 console.log('Network closed');
-                server = undefined;
+                this.server = undefined;
                 return resolve(this);
             });
         });
