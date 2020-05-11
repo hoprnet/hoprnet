@@ -2,7 +2,7 @@
 
 root = true
 
-[**.ts, **.json]
+[**.ts, **.json, **.spec.ts]
 indent_style = space
 indent_size = 2
 charset = utf-8
