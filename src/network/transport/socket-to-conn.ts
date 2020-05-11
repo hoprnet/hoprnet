@@ -5,11 +5,21 @@ const log = debug('libp2p:tcp:socket')
 import toIterable = require('stream-to-it')
 const toMultiaddr = require('libp2p-utils/src/ip-port-to-multiaddr')
 import { CLOSE_TIMEOUT } from './constants'
-import { MultiaddrConnection } from '.'
+import { MultiaddrConnection } from './types'
+import type Multiaddr from 'multiaddr'
+import type { Socket } from 'net'
 
 // Convert a socket into a MultiaddrConnection
 // https://github.com/libp2p/interface-transport#multiaddrconnection
-export function socketToConn(socket: any, options): MultiaddrConnection {
+export function socketToConn(
+  socket: Socket,
+  options?: {
+    listeningAddr?: Multiaddr
+    localAddr?: Multiaddr
+    remoteAddr?: Multiaddr
+    signal?: AbortSignal
+  }
+): MultiaddrConnection {
   options = options || {}
 
   // Check if we are connected on a unix path
@@ -23,18 +33,20 @@ export function socketToConn(socket: any, options): MultiaddrConnection {
 
   const { sink, source } = toIterable.duplex(socket)
   const maConn: MultiaddrConnection = {
-    async sink (source) {
+    async sink(source) {
       if (options.signal) {
         source = abortable(source, options.signal)
       }
 
       try {
-        await sink((async function * () {
-          for await (const chunk of source) {
-            // Convert BufferList to Buffer
-            yield Buffer.isBuffer(chunk) ? chunk : chunk.slice()
-          }
-        })())
+        await sink(
+          (async function* () {
+            for await (const chunk of source) {
+              // Convert BufferList to Buffer
+              yield Buffer.isBuffer(chunk) ? chunk : chunk.slice()
+            }
+          })()
+        )
       } catch (err) {
         // If aborted we can safely ignore
         if (err.type !== 'aborted') {
@@ -57,7 +69,7 @@ export function socketToConn(socket: any, options): MultiaddrConnection {
 
     timeline: { open: Date.now() },
 
-    close () {
+    close() {
       if (socket.destroyed) return
 
       return new Promise((resolve, reject) => {
@@ -67,8 +79,12 @@ export function socketToConn(socket: any, options): MultiaddrConnection {
         // timeout, destroy it manually.
         const timeout = setTimeout(() => {
           const { host, port } = maConn.remoteAddr.toOptions()
-          log('timeout closing socket to %s:%s after %dms, destroying it manually',
-            host, port, Date.now() - start)
+          log(
+            'timeout closing socket to %s:%s after %dms, destroying it manually',
+            host,
+            port,
+            Date.now() - start
+          )
 
           if (socket.destroyed) {
             log('%s:%s is already destroyed', host, port)
@@ -80,13 +96,13 @@ export function socketToConn(socket: any, options): MultiaddrConnection {
         }, CLOSE_TIMEOUT)
 
         socket.once('close', () => clearTimeout(timeout))
-        socket.end(err => {
+        socket.end((err?: Error) => {
           maConn.timeline.close = Date.now()
           if (err) return reject(err)
           resolve()
         })
       })
-    }
+    },
   }
 
   socket.once('close', () => {

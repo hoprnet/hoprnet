@@ -1,2 +1,10 @@
-import { MultiaddrConnection } from '.';
-export declare function socketToConn(socket: any, options: any): MultiaddrConnection;
+/// <reference types="node" />
+import { MultiaddrConnection } from './types';
+import type Multiaddr from 'multiaddr';
+import type { Socket } from 'net';
+export declare function socketToConn(socket: Socket, options?: {
+    listeningAddr?: Multiaddr;
+    localAddr?: Multiaddr;
+    remoteAddr?: Multiaddr;
+    signal?: AbortSignal;
+}): MultiaddrConnection;

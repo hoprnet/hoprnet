@@ -1,13 +1,14 @@
 import PeerId from 'peer-id'
 
 import { u8aConcat } from '@hoprnet/hopr-utils'
+import { pubKeyToPeerId } from '../../utils'
 
-const PUBLIC_KEY_LENGTH = 37
+const PUBLIC_KEY_LENGTH = 33
 
 class ForwardPacket extends Uint8Array {
   constructor(
     arr?: {
-      bytes: ArrayBuffer,
+      bytes: ArrayBuffer
       offset: number
     },
     struct?: {
@@ -24,23 +25,41 @@ class ForwardPacket extends Uint8Array {
         throw Error('Invalid peerId.')
       }
     } else if (arr == null && struct != null) {
-      super(u8aConcat(struct.destination.marshalPubKey(), struct.sender.marshalPubKey(), struct.payload || new Uint8Array()))
+      super(
+        u8aConcat(
+          struct.destination.pubKey.marshal(),
+          struct.sender.pubKey.marshal(),
+          struct.payload || new Uint8Array()
+        )
+      )
     }
   }
 
   subarray(begin: number = 0, end?: number): Uint8Array {
-    return new Uint8Array(this.buffer, begin + this.byteOffset, end != null ? end - begin : undefined)
+    return new Uint8Array(
+      this.buffer,
+      begin + this.byteOffset,
+      end != null ? end - begin : undefined
+    )
   }
 
-  get destination() {
+  get destination(): Uint8Array {
     return this.subarray(0, PUBLIC_KEY_LENGTH)
   }
 
-  get sender() {
+  get destinationPeerId(): Promise<PeerId> {
+    return pubKeyToPeerId(this.destination)
+  }
+
+  get sender(): Uint8Array {
     return this.subarray(PUBLIC_KEY_LENGTH, PUBLIC_KEY_LENGTH + PUBLIC_KEY_LENGTH)
   }
 
-  get payload() {
+  get senderPeerId(): Promise<PeerId> {
+    return pubKeyToPeerId(this.sender)
+  }
+
+  get payload(): Uint8Array {
     return this.subarray(PUBLIC_KEY_LENGTH + PUBLIC_KEY_LENGTH)
   }
 }

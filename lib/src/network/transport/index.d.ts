@@ -1,34 +1,33 @@
+/// <reference types="node" />
+import type { Socket } from 'net';
+import libp2p = require('libp2p');
+import { Listener } from './listener';
 import type Multiaddr from 'multiaddr';
-import PeerInfo from 'peer-info';
 import PeerId from 'peer-id';
-interface DialOptions {
-    signal?: AbortSignal;
-    relay?: PeerInfo | PeerId;
-}
-export interface MultiaddrConnection {
-    sink(source: any): void;
-    source: any;
-    close(err?: Error): Promise<void>;
-    conn: any;
-    remoteAddr: Multiaddr;
-    localAddr?: Multiaddr;
-    timeline: {
-        open: number;
-        close?: number;
-    };
-}
-export interface Upgrader {
-    upgradeOutbound(multiaddrConnection: MultiaddrConnection): Promise<any>;
-    upgradeInbound(multiaddrConnection: MultiaddrConnection): Promise<any>;
-}
+import type { Connection, Upgrader, DialOptions, Handler } from './types';
 /**
  * @class TCP
  */
 declare class TCP {
+    get [Symbol.toStringTag](): string;
     private _upgrader;
-    constructor({ upgrader }: {
+    private _peerInfo;
+    private _dialer;
+    private _registrar;
+    private _handle;
+    private _unhandle;
+    private connHandler;
+    constructor({ upgrader, libp2p }: {
         upgrader: Upgrader;
+        libp2p: libp2p;
     });
+    deliveryHandlerFactory(sender: PeerId): ({ stream }: Handler) => Promise<void>;
+    forwardHandlerFactory(counterparty: PeerId): ({ stream }: Handler) => void;
+    handleDeliveryRegister({ stream }: Handler): void;
+    handleRelayUnregister({ stream }: Handler): void;
+    closeConnection(counterparty: PeerId, relayer: PeerId): Promise<void>;
+    registerDelivery(outerconnection: Connection, counterparty: PeerId): Promise<Uint8Array>;
+    handleRelayRegister({ stream, connection }: Handler): void;
     /**
      * @async
      * @param {Multiaddr} ma
@@ -36,7 +35,7 @@ declare class TCP {
      * @param {AbortSignal} options.signal Used to abort dial requests
      * @returns {Connection} An upgraded Connection
      */
-    dial(ma: Multiaddr, options?: DialOptions): Promise<any>;
+    dial(ma: Multiaddr, options?: DialOptions): Promise<Connection>;
     /**
      * @private
      * @param {Multiaddr} ma
@@ -44,7 +43,7 @@ declare class TCP {
      * @param {AbortSignal} options.signal Used to abort dial requests
      * @returns {Promise<Socket>} Resolves a TCP Socket
      */
-    _connect(ma: Multiaddr, options: DialOptions): Promise<unknown>;
+    _connect(ma: Multiaddr, options: DialOptions): Promise<Socket>;
     /**
      * Creates a TCP listener. The provided `handler` function will be called
      * anytime a new incoming Connection has been successfully upgraded via
@@ -53,12 +52,12 @@ declare class TCP {
      * @param {function(Connection)} handler
      * @returns {Listener} A TCP listener
      */
-    createListener(options: any, handler: any): import("./listener").Listener;
+    createListener(options: any, handler: (connection: any) => void): Listener;
     /**
      * Takes a list of `Multiaddr`s and returns only valid TCP addresses
-     * @param {Multiaddr[]} multiaddrs
-     * @returns {Multiaddr[]} Valid TCP multiaddrs
+     * @param multiaddrs
+     * @returns Valid TCP multiaddrs
      */
-    filter(multiaddrs: any): any;
+    filter(multiaddrs: Multiaddr[]): Multiaddr[];
 }
 export default TCP;

@@ -1,4 +1,4 @@
-import net, { AddressInfo } from 'net'
+import net, { AddressInfo, Server } from 'net'
 import EventEmitter from 'events'
 import debug from 'debug'
 
@@ -8,7 +8,7 @@ const error = debug('libp2p:tcp:listener:error')
 import { socketToConn } from './socket-to-conn'
 import { CODE_P2P } from './constants'
 import { getMultiaddrs, multiaddrToNetConfig } from './utils'
-import { MultiaddrConnection } from '.'
+import { MultiaddrConnection } from './types'
 import Multiaddr from 'multiaddr'
 
 export interface Listener extends EventEmitter {
@@ -20,7 +20,7 @@ export interface Listener extends EventEmitter {
 /**
  * Attempts to close the given maConn. If a failure occurs, it will be logged.
  * @private
- * @param {MultiaddrConnection} maConn
+ * @param maConn
  */
 async function attemptClose(maConn: MultiaddrConnection) {
   try {
@@ -30,15 +30,16 @@ async function attemptClose(maConn: MultiaddrConnection) {
   }
 }
 
-export function createListener({ handler, upgrader }, options) {
+export function createListener({ handler, upgrader }, options: any) {
   const listener = new EventEmitter() as Listener
 
   const server = net.createServer(async socket => {
     // Avoid uncaught errors caused by unstable connections
+    console.log('received connection')
     socket.on('error', err => log('socket error', err))
 
     let maConn: MultiaddrConnection
-    let conn
+    let conn: MultiaddrConnection
     try {
       maConn = socketToConn(socket, { listeningAddr })
       log('new inbound connection %s', maConn.remoteAddr)
@@ -73,14 +74,14 @@ export function createListener({ handler, upgrader }, options) {
 
     return new Promise((resolve, reject) => {
       // @ts-ignore
-      server.__connections.forEach(maConn => attemptClose(maConn))
+      server.__connections.forEach((maConn: MultiaddrConnection) => attemptClose(maConn))
       server.close(err => (err ? reject(err) : resolve()))
     })
   }
 
-  let peerId, listeningAddr
+  let peerId: string, listeningAddr: Multiaddr | undefined
 
-  listener.listen = (ma: Multiaddr) => {
+  listener.listen = (ma: Multiaddr): Promise<void> => {
     listeningAddr = ma
     peerId = ma.getPeerId()
 
@@ -120,10 +121,12 @@ export function createListener({ handler, upgrader }, options) {
   return listener
 }
 
-function trackConn(server, maConn) {
+function trackConn(server: Server, maConn: MultiaddrConnection) {
+  // @ts-ignore
   server.__connections.push(maConn)
 
   const untrackConn = () => {
+    // @ts-ignore
     server.__connections = server.__connections.filter(c => c !== maConn)
   }
 
