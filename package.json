@@ -34,7 +34,7 @@
     "fundAccounts": "ts-node -T ./scripts/fundAccounts.ts"
   },
   "dependencies": {
-    "@hoprnet/hopr-utils": "https://github.com/hoprnet/hopr-utils.git",
+    "@hoprnet/hopr-utils": "^0.0.2-dev.119b5cf0b",
     "@nodeutils/defaults-deep": "~1.1.0",
     "abort-controller": "^3.0.0",
     "bignumber.js": "^9.0.0",

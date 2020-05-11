@@ -86,6 +86,15 @@
     ts-node "^8.9.0"
     web3 "^1.2.6"
 
+"@hoprnet/hopr-utils@^0.0.2-dev.119b5cf0b":
+  version "0.0.2-dev.119b5cf0b"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-0.0.2-dev.119b5cf0b.tgz#a81055ff09237ece27260d55acd5820364f7de9b"
+  integrity sha512-ZEb7L1+nPqva8bMYjkaaIUWxfNXVO1EDrc9cHawU5cRz1ureX4SA6x0N433MiVB1ihiypDX07RAvBW6HHBHCfQ==
+  dependencies:
+    bignumber.js "^9.0.0"
+    chalk "^4.0.0"
+    strip-ansi "^6.0.0"
+
 "@hoprnet/hopr-utils@https://github.com/hoprnet/hopr-utils.git":
   version "0.0.1"
   resolved "https://github.com/hoprnet/hopr-utils.git#9e4bcb285600757636e204bd9fcf62afbf4b862d"
