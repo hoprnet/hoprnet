@@ -7,7 +7,7 @@ import HoprEthereum from '.'
 import { HoprToken } from './tsc/web3/HoprToken'
 import { Await } from './tsc/utils'
 import { cleanupPromiEvent } from './utils'
-import { generateNode, getPrivKeyData, generateUser } from './utils/testing'
+import { createNode, getPrivKeyData, createAccountAndFund } from './utils/testing'
 import * as configs from './config'
 
 describe('test connector', function () {
@@ -27,7 +27,7 @@ describe('test connector', function () {
     owner = await getPrivKeyData(stringToU8a(configs.FUND_ACCOUNT_PRIVATE_KEY))
     web3 = new Web3(configs.DEFAULT_URI)
     hoprToken = new web3.eth.Contract(HoprTokenAbi as any, configs.TOKEN_ADDRESSES.private)
-    connector = await generateNode(owner.privKey)
+    connector = await createNode(owner.privKey)
 
     await connector.start()
   })
@@ -83,7 +83,7 @@ describe('test connector', function () {
 
       return new Promise(async (resolve, reject) => {
         try {
-          const receiver = await generateUser(web3, owner, hoprToken)
+          const receiver = await createAccountAndFund(web3, hoprToken, owner)
 
           await Promise.all([
             once(),

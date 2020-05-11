@@ -364,19 +364,19 @@ class Channel implements IChannel<HoprEthereum> {
     return new Promise<Hash>(async (resolve, reject) => {
       this.coreConnector.db
         .createReadStream({
-          gt: Buffer.from(
+          gte: Buffer.from(
             this.coreConnector.dbKeys.Challenge(await this.channelId, new Uint8Array(HASH_LENGTH).fill(0x00))
           ),
-          lt: Buffer.from(
+          lte: Buffer.from(
             this.coreConnector.dbKeys.Challenge(await this.channelId, new Uint8Array(HASH_LENGTH).fill(0xff))
           ),
         })
-        .on('error', reject)
-        .on('data', ({ key, ownKeyHalf }) => {
+        .on('error', (err) => reject(err))
+        .on('data', ({ key, ownKeyHalf }: { key: Buffer; ownKeyHalf: Buffer }) => {
           const challenge = this.coreConnector.dbKeys.ChallengeKeyParse(key)[1]
 
           // @TODO: replace this by proper EC-arithmetic once it's implemented in `hopr-core`
-          pubKeys.push(new Uint8Array(u8aXOR(false, challenge, ownKeyHalf.toU8a())))
+          pubKeys.push(new Uint8Array(u8aXOR(false, challenge, new Uint8Array(ownKeyHalf))))
         })
         .on('end', () => {
           if (pubKeys.length > 0) {
@@ -531,8 +531,8 @@ class Channel implements IChannel<HoprEthereum> {
     return new Promise<R>((resolve, reject) => {
       coreConnector.db
         .createReadStream({
-          gt: Buffer.from(coreConnector.dbKeys.Channel(new Uint8Array(Hash.SIZE).fill(0x00))),
-          lt: Buffer.from(coreConnector.dbKeys.Channel(new Uint8Array(Hash.SIZE).fill(0xff))),
+          gte: Buffer.from(coreConnector.dbKeys.Channel(new Uint8Array(Hash.SIZE).fill(0x00))),
+          lte: Buffer.from(coreConnector.dbKeys.Channel(new Uint8Array(Hash.SIZE).fill(0xff))),
         })
         .on('error', (err) => reject(err))
         .on('data', ({ key, value }: { key: Buffer; value: Buffer }) => {

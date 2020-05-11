@@ -2,31 +2,39 @@ import Web3 from 'web3';
 import CoreConnector from '..';
 import { Hash, AccountId } from '../types';
 import { HoprToken } from '../tsc/web3/HoprToken';
-import { Await } from '../tsc/utils';
+export declare type Account = {
+    privKey: Hash;
+    pubKey: Hash;
+    address: AccountId;
+};
 /**
- * Return private key data like public key and address
+ * Return private key data like public key and address.
  * @param _privKey private key to derive data from
  */
-export declare function getPrivKeyData(_privKey: Uint8Array): Promise<{
-    privKey: Hash;
-    pubKey: Hash;
-    address: AccountId;
-}>;
+export declare function getPrivKeyData(_privKey: Uint8Array): Promise<Account>;
 /**
- * Given web3 instance, and hoprToken instance, generate a new user and send funds to it.
+ * Fund an account.
  * @param web3 the web3 instance the our hoprToken contract is deployed to
- * @param funder object
  * @param hoprToken the hoprToken instance that will be used to mint tokens
- * @returns user object
+ * @param funder object
+ * @param account object
  */
-export declare function generateUser(web3: Web3, funder: Await<ReturnType<typeof getPrivKeyData>>, hoprToken: HoprToken): Promise<{
-    privKey: Hash;
-    pubKey: Hash;
-    address: AccountId;
-}>;
+export declare function fundAccount(web3: Web3, hoprToken: HoprToken, funder: Account, account: Account): Promise<void>;
 /**
- * Given a private key, generate a connector node.
+ * Create a random account.
  * @param privKey the private key of the connector
  * @returns CoreConnector
  */
-export declare function generateNode(privKey: Uint8Array): Promise<CoreConnector>;
+export declare function createAccount(): Promise<Account>;
+/**
+ * Create a random account or use provided one, and then fund it.
+ * @param privKey the private key of the connector
+ * @returns CoreConnector
+ */
+export declare function createAccountAndFund(web3: Web3, hoprToken: HoprToken, funder: Account, account?: string | Uint8Array | Account): Promise<Account>;
+/**
+ * Given a private key, create a connector node.
+ * @param privKey the private key of the connector
+ * @returns CoreConnector
+ */
+export declare function createNode(privKey: Uint8Array): Promise<CoreConnector>;

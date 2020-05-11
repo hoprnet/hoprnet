@@ -10,14 +10,19 @@ import { getParties, Log } from '../utils'
 import { MAX_CONFIRMATIONS } from '../config'
 import { ContractEventEmitter, ContractEventLog } from '../tsc/web3/types'
 
+// we save up some memory by only caching the event data we use
+type LightEvent<E extends ContractEventLog<any>> = Pick<
+  E,
+  'event' | 'blockNumber' | 'transactionHash' | 'transactionIndex' | 'logIndex' | 'returnValues'
+>
 type Channel = { partyA: AccountId; partyB: AccountId; channelEntry: ChannelEntry }
-type OpenedChannelEvent = ContractEventLog<{ opener: string; counterParty: string }>
-type ClosedChannelEvent = ContractEventLog<{ closer: string; counterParty: string }>
+type OpenedChannelEvent = LightEvent<ContractEventLog<{ opener: string; counterParty: string }>>
+type ClosedChannelEvent = LightEvent<ContractEventLog<{ closer: string; counterParty: string }>>
 
 /**
  * @returns a custom event id for logging purposes.
  */
-function getEventId(event: ContractEventLog<any>): string {
+function getEventId(event: LightEvent<any>): string {
   return `${event.event}-${event.transactionHash}-${event.transactionIndex}-${event.logIndex}`
 }
 
@@ -36,9 +41,12 @@ function isMoreRecent(oldChannelEntry: ChannelEntry, newChannelEntry: ChannelEnt
   return okBlockNumber && okTransactionIndex && okLogIndex
 }
 
+function isConfirmedBlock(blockNumber: number, onChainBlockNumber: number): boolean {
+  return blockNumber + MAX_CONFIRMATIONS <= onChainBlockNumber
+}
+
 /**
- * Barebones indexer to keep track of all open payment channels.
- * Eventually we will move to a better solution.
+ * Simple indexer to keep track of all open payment channels.
  */
 class Channels {
   private log = Log(['channels'])
@@ -52,6 +60,11 @@ class Channels {
 
   constructor(private connector: HoprEthereum) {}
 
+  /**
+   * Returns the latest confirmed block number.
+   *
+   * @returns promive that resolves to a number
+   */
   private async getLatestConfirmedBlockNumber(): Promise<number> {
     try {
       const blockNumber = await this.connector.db
@@ -70,7 +83,11 @@ class Channels {
     }
   }
 
-  // does it exist
+  /**
+   * Check if channel entry exists.
+   *
+   * @returns promise that resolves to true or false
+   */
   public async has(partyA: AccountId, partyB: AccountId): Promise<boolean> {
     return this.connector.db.get(Buffer.from(dbKeys.ChannelEntry(partyA, partyB))).then(
       () => true,
@@ -84,8 +101,12 @@ class Channels {
     )
   }
 
-  // @TODO: improve function types
-  // get stored channels using a query
+  /**
+   * Get stored channels entries.
+   *
+   * @param query
+   * @returns promise that resolves to a list of channel entries
+   */
   public async get(query?: { partyA?: AccountId; partyB?: AccountId }): Promise<Channel[]> {
     const { dbKeys, db } = this.connector
     const channels: Channel[] = []
@@ -95,13 +116,9 @@ class Channels {
     const hasPartyA = hasQuery && typeof query.partyA !== 'undefined'
     const hasPartyB = hasQuery && typeof query.partyB !== 'undefined'
 
-    if (hasQuery && !hasPartyA && !hasPartyB) {
-      throw Error('query is empty')
-    }
-
     let gte: Buffer
     let lte: Buffer
-    if (hasQuery) {
+    if (hasQuery && (hasPartyA || hasPartyB)) {
       gte = Buffer.from(dbKeys.ChannelEntry(hasPartyA ? query.partyA : allSmall, hasPartyB ? query.partyB : allSmall))
       lte = Buffer.from(dbKeys.ChannelEntry(hasPartyA ? query.partyA : allBig, hasPartyB ? query.partyB : allBig))
     } else {
@@ -132,12 +149,15 @@ class Channels {
     })
   }
 
-  // get all stored channels
+  /**
+   * Get all stored channels entries.
+   *
+   * @returns promise that resolves to a list of channel entries
+   */
   public async getAll(): Promise<Channel[]> {
     return this.get()
   }
 
-  // store a channel
   private async store(partyA: AccountId, partyB: AccountId, channelEntry: ChannelEntry): Promise<void> {
     const { dbKeys, db } = this.connector
     const { blockNumber, logIndex, transactionIndex } = channelEntry
@@ -172,7 +192,7 @@ class Channels {
 
   private async onNewBlock(block: BlockHeader) {
     const confirmedEvents = Array.from(this.unconfirmedEvents.values()).filter((event) => {
-      return event.blockNumber + MAX_CONFIRMATIONS <= block.number
+      return isConfirmedBlock(event.blockNumber, block.number)
     })
 
     for (const event of confirmedEvents) {
@@ -234,7 +254,13 @@ class Channels {
     this.delete(partyA, partyB)
   }
 
-  // listen to all open / close events, store entries after X confirmations
+  /**
+   * Start indexing,
+   * listen to all open / close events,
+   * store entries after X confirmations.
+   *
+   * @returns true if start was succesful
+   */
   public async start(): Promise<boolean> {
     this.log(`Starting indexer...`)
 
@@ -248,8 +274,10 @@ class Channels {
 
     this.starting = new Promise(async (resolve, reject) => {
       try {
+        const onChainBlockNumber = await this.connector.web3.eth.getBlockNumber()
         let fromBlock = await this.getLatestConfirmedBlockNumber()
-        // go back 12 blocks in case of a re-org
+
+        // go back 12 blocks in case of a re-org at time of stopping
         if (fromBlock - MAX_CONFIRMATIONS > 0) {
           fromBlock = fromBlock - MAX_CONFIRMATIONS
         }
@@ -258,28 +286,54 @@ class Channels {
 
         this.newBlockEvent = this.connector.web3.eth
           .subscribe('newBlockHeaders')
+          .on('error', (err) => reject(err))
           .on('data', (block) => {
             this.onNewBlock(block)
           })
-          .on('error', reject)
 
         this.openedChannelEvent = this.connector.hoprChannels.events
           .OpenedChannel({
             fromBlock,
           })
-          .on('data', (event) => {
-            this.unconfirmedEvents.set(getEventId(event), event)
+          .on('error', (err) => reject(err))
+          .on('data', (_event) => {
+            const event: LightEvent<typeof _event> = {
+              event: _event.event,
+              blockNumber: _event.blockNumber,
+              transactionHash: _event.transactionHash,
+              transactionIndex: _event.transactionIndex,
+              logIndex: _event.logIndex,
+              returnValues: _event.returnValues,
+            }
+
+            if (isConfirmedBlock(event.blockNumber, onChainBlockNumber)) {
+              this.onOpenedChannel(event)
+            } else {
+              this.unconfirmedEvents.set(getEventId(event), event)
+            }
           })
-          .on('error', reject)
 
         this.closedChannelEvent = this.connector.hoprChannels.events
           .ClosedChannel({
             fromBlock,
           })
-          .on('data', (event) => {
-            this.unconfirmedEvents.set(getEventId(event), event)
+          .on('error', (err) => reject(err))
+          .on('data', (_event) => {
+            const event: LightEvent<typeof _event> = {
+              event: _event.event,
+              blockNumber: _event.blockNumber,
+              transactionHash: _event.transactionHash,
+              transactionIndex: _event.transactionIndex,
+              logIndex: _event.logIndex,
+              returnValues: _event.returnValues,
+            }
+
+            if (isConfirmedBlock(event.blockNumber, onChainBlockNumber)) {
+              this.onClosedChannel(event)
+            } else {
+              this.unconfirmedEvents.set(getEventId(event), event)
+            }
           })
-          .on('error', reject)
 
         this.status = 'started'
         this.log(chalk.green('Indexer started!'))
@@ -296,7 +350,11 @@ class Channels {
     return this.starting
   }
 
-  // stop listening to events
+  /**
+   * Stop indexing.
+   *
+   * @returns true if stop was succesful
+   */
   public async stop(): Promise<boolean> {
     this.log(`Stopping indexer...`)
 
@@ -317,7 +375,7 @@ class Channels {
           this.openedChannelEvent.removeAllListeners()
         }
         if (typeof this.closedChannelEvent !== 'undefined') {
-          this.openedChannelEvent.removeAllListeners()
+          this.closedChannelEvent.removeAllListeners()
         }
 
         this.unconfirmedEvents.clear()

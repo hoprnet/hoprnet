@@ -7,11 +7,10 @@ import { stringToU8a } from '@hoprnet/hopr-utils'
 import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
 import HoprChannelsAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprChannels.json'
 import * as configs from '../config'
-import { getParties, isPartyA, time } from '../utils'
-import { getPrivKeyData, generateUser, generateNode } from '../utils/testing'
+import { getParties, time, wait } from '../utils'
+import { Account, getPrivKeyData, createAccountAndFund, createNode } from '../utils/testing'
 import { HoprToken } from '../tsc/web3/HoprToken'
 import { HoprChannels } from '../tsc/web3/HoprChannels'
-import { Await } from '../tsc/utils'
 import type CoreConnector from '..'
 
 const CLOSURE_DURATION = durations.days(3)
@@ -21,10 +20,11 @@ describe('test channels', function () {
   let web3: Web3
   let hoprToken: HoprToken
   let hoprChannels: HoprChannels
-  let coreConnector: CoreConnector
-  let userA: Await<ReturnType<typeof getPrivKeyData>>
-  let userB: Await<ReturnType<typeof getPrivKeyData>>
-  let userC: Await<ReturnType<typeof getPrivKeyData>>
+  let connector: CoreConnector
+  let userA: Account
+  let userB: Account
+  let userC: Account
+  let userD: Account
 
   before(async function () {
     this.timeout(60e3)
@@ -38,16 +38,20 @@ describe('test channels', function () {
     hoprChannels = new web3.eth.Contract(HoprChannelsAbi as any, configs.CHANNELS_ADDRESSES.private)
 
     userA = await getPrivKeyData(stringToU8a(configs.FUND_ACCOUNT_PRIVATE_KEY))
-    userB = await generateUser(web3, userA, hoprToken)
-    userC = await generateUser(web3, userA, hoprToken)
-    coreConnector = await generateNode(userA.privKey)
+    // userA < userB
+    userB = await createAccountAndFund(web3, hoprToken, userA, configs.DEMO_ACCOUNTS[1])
+    // userC < userA
+    userC = await createAccountAndFund(web3, hoprToken, userA, configs.DEMO_ACCOUNTS[2])
+    //
+    userD = await createAccountAndFund(web3, hoprToken, userA, configs.DEMO_ACCOUNTS[3])
+    connector = await createNode(userA.privKey)
 
-    await coreConnector.start()
-    await coreConnector.db.clear()
+    await connector.start()
+    await connector.db.clear()
   })
 
   after(async function () {
-    await coreConnector.stop()
+    await connector.stop()
     await ganache.stop()
   })
 
@@ -71,74 +75,74 @@ describe('test channels', function () {
         gas: 200e3,
       })
 
-      const allChannels = await coreConnector.channels.getAll()
-      assert.equal(allChannels.length, 0, 'check Channels.store')
+      const channels = await connector.channels.getAll()
+      assert.equal(channels.length, 0, 'check Channels.store')
     })
 
     it('should store channel & blockNumber correctly', async function () {
       const currentBlockNumber = await web3.eth.getBlockNumber()
       await time.advanceBlockTo(web3, currentBlockNumber + configs.MAX_CONFIRMATIONS)
 
-      const allChannels = await coreConnector.channels.getAll()
-      assert.equal(allChannels.length, 1, 'check Channels.store')
+      const channels = await connector.channels.getAll()
+      assert.equal(channels.length, 1, 'check Channels.store')
     })
 
-    it('should query all channels', async function () {
+    it('should find all channels', async function () {
       const [partyA, partyB] = getParties(userA.address, userB.address)
 
       const blockNumber = await web3.eth.getBlockNumber()
-      const allChannels = await coreConnector.channels.getAll()
+      const [channel] = await connector.channels.getAll()
       // @ts-ignore
-      const latestConfirmedBlockNumber = await coreConnector.channels.getLatestConfirmedBlockNumber()
+      const latestConfirmedBlockNumber = await connector.channels.getLatestConfirmedBlockNumber()
 
-      assert(allChannels[0].partyA.eq(partyA), 'check Channels.store')
-      assert(allChannels[0].partyB.eq(partyB), 'check Channels.store')
-      assert(allChannels[0].channelEntry.blockNumber.lt(new BN(blockNumber)), 'check Channels.store')
+      assert(channel.partyA.eq(partyA), 'check Channels.store')
+      assert(channel.partyB.eq(partyB), 'check Channels.store')
+      assert(channel.channelEntry.blockNumber.lt(new BN(blockNumber)), 'check Channels.store')
       assert(latestConfirmedBlockNumber < blockNumber, 'check Channels.store')
     })
 
-    it('should query channel using partyA', async function () {
+    it('should find channel using partyA', async function () {
       const [partyA, partyB] = getParties(userA.address, userB.address)
 
-      const channels = await coreConnector.channels.get({
+      const channels = await connector.channels.get({
         partyA,
       })
+      const [channel] = channels
 
       assert.equal(channels.length, 1, 'check Channels.get')
-      assert(channels[0].partyA.eq(partyA), 'check Channels.get')
-      assert(channels[0].partyB.eq(partyB), 'check Channels.get')
+      assert(channel.partyA.eq(partyA), 'check Channels.get')
+      assert(channel.partyB.eq(partyB), 'check Channels.get')
     })
 
-    it('should query channel using partyB', async function () {
+    it('should find channel using partyB', async function () {
       const [partyA, partyB] = getParties(userA.address, userB.address)
 
-      const channels = await coreConnector.channels.get({
+      const channels = await connector.channels.get({
         partyA,
       })
+      const [channel] = channels
 
       assert.equal(channels.length, 1, 'check Channels.get')
-      assert(channels[0].partyA.eq(partyA), 'check Channels.get')
-      assert(channels[0].partyB.eq(partyB), 'check Channels.get')
+      assert(channel.partyA.eq(partyA), 'check Channels.get')
+      assert(channel.partyB.eq(partyB), 'check Channels.get')
     })
 
-    it('should query channel using partyA & partyB', async function () {
+    it('should find channel using partyA & partyB', async function () {
       const [partyA, partyB] = getParties(userA.address, userB.address)
 
-      const channels = await coreConnector.channels.get({
+      const channels = await connector.channels.get({
         partyA,
         partyB,
       })
+      const [channel] = channels
 
       assert.equal(channels.length, 1, 'check Channels.get')
-      assert(channels[0].partyA.eq(partyA), 'check Channels.get')
-      assert(channels[0].partyB.eq(partyB), 'check Channels.get')
+      assert(channel.partyA.eq(partyA), 'check Channels.get')
+      assert(channel.partyB.eq(partyB), 'check Channels.get')
     })
 
     it('should store another channel', async function () {
       this.timeout(5e3)
-
-      const userAisPartyA = isPartyA(userA.address, userC.address)
-      const [partyA, partyB] = getParties(userA.address, userC.address)
 
       await hoprToken.methods
         .send(
@@ -159,18 +163,8 @@ describe('test channels', function () {
       const currentBlockNumber = await web3.eth.getBlockNumber()
       await time.advanceBlockTo(web3, currentBlockNumber + configs.MAX_CONFIRMATIONS)
 
-      const allChannels = await coreConnector.channels.getAll()
-      assert.equal(allChannels.length, 2, 'check Channels.store')
-
-      const channelsByA = await coreConnector.channels.get({
-        partyA,
-      })
-      assert.equal(channelsByA.length, userAisPartyA ? 2 : 1, 'check Channels.get partyA')
-
-      const channelsByB = await coreConnector.channels.get({
-        partyB,
-      })
-      assert.equal(channelsByB.length, userAisPartyA ? 1 : 2, 'check Channels.get partyB')
+      const channels = await connector.channels.getAll()
+      assert.equal(channels.length, 2, 'check Channels.store')
     })
 
     it('should not delete channel before confirmations', async function () {
@@ -186,27 +180,69 @@ describe('test channels', function () {
         gas: 200e3,
       })
 
-      const allChannels = await coreConnector.channels.getAll()
-      assert.equal(allChannels.length, 2, 'check Channels.store')
+      const channels = await connector.channels.getAll()
+      assert.equal(channels.length, 2, 'check Channels.store')
     })
 
     it('should delete channel', async function () {
       const currentBlockNumber = await web3.eth.getBlockNumber()
       await time.advanceBlockTo(web3, currentBlockNumber + configs.MAX_CONFIRMATIONS)
 
-      const allChannels = await coreConnector.channels.getAll()
-      assert.equal(allChannels.length, 1, 'check Channels.store')
+      const channels = await connector.channels.getAll()
+      assert.equal(channels.length, 1, 'check Channels.store')
+    })
+
+    it('should stop indexer and open new channel', async function () {
+      this.timeout(5e3)
+      assert(await connector.channels.stop(), 'could not stop indexer')
+
+      await hoprToken.methods
+        .send(
+          hoprChannels.options.address,
+          1,
+          web3.eth.abi.encodeParameters(['address', 'address'], [userA.address.toHex(), userD.address.toHex()])
+        )
+        .send({
+          from: userA.address.toHex(),
+          gas: 200e3,
+        })
+
+      await hoprChannels.methods.openChannel(userD.address.toHex()).send({
+        from: userA.address.toHex(),
+        gas: 200e3,
+      })
+
+      const channels = await connector.channels.getAll()
+      assert.equal(channels.length, 1, 'check Channels.store')
+    })
+
+    it('should not index new channel', async function () {
+      const currentBlockNumber = await web3.eth.getBlockNumber()
+      await time.advanceBlockTo(web3, currentBlockNumber + configs.MAX_CONFIRMATIONS)
+
+      const channels = await connector.channels.getAll()
+      assert.equal(channels.length, 1, 'check Channels.store')
+    })
+
+    it('should start indexer', async function () {
+      this.timeout(5e3)
+
+      assert(await connector.channels.start(), 'could not start indexer')
+      await wait(1e3)
+
+      const channels = await connector.channels.getAll()
+      assert.equal(channels.length, 2, 'check Channels.store')
     })
   })
 
   context('unit tests', function () {
     beforeEach(async function () {
-      await coreConnector.db.clear()
+      await connector.db.clear()
     })
 
     it('should not store older channel according to blockNumber', async function () {
       // @ts-ignore
-      await coreConnector.channels.onOpenedChannel({
+      await connector.channels.onOpenedChannel({
         returnValues: {
           opener: userA.address.toHex(),
           counterParty: userB.address.toHex(),
@@ -217,7 +253,7 @@ describe('test channels', function () {
       } as any)
 
       // @ts-ignore
-      await coreConnector.channels.onOpenedChannel({
+      await connector.channels.onOpenedChannel({
         returnValues: {
           opener: userA.address.toHex(),
           counterParty: userB.address.toHex(),
@@ -227,14 +263,14 @@ describe('test channels', function () {
         logIndex: 0,
       } as any)
 
-      const allChannels = await coreConnector.channels.getAll()
+      const allChannels = await connector.channels.getAll()
       assert.equal(allChannels.length, 1, 'check Channels.onOpenedChannel blockNumber')
       assert.equal(allChannels[0].channelEntry.blockNumber.toNumber(), 2, 'check Channels.onOpenedChannel blockNumber')
     })
 
     it('should not delete latest channel according to blockNumber', async function () {
       // @ts-ignore
-      await coreConnector.channels.onOpenedChannel({
+      await connector.channels.onOpenedChannel({
         returnValues: {
           opener: userA.address.toHex(),
           counterParty: userB.address.toHex(),
@@ -245,7 +281,7 @@ describe('test channels', function () {
       } as any)
 
       // @ts-ignore
-      await coreConnector.channels.onClosedChannel({
+      await connector.channels.onClosedChannel({
         returnValues: {
           closer: userA.address.toHex(),
           counterParty: userB.address.toHex(),
@@ -255,14 +291,14 @@ describe('test channels', function () {
         logIndex: 0,
       } as any)
 
-      const allChannels = await coreConnector.channels.getAll()
+      const allChannels = await connector.channels.getAll()
       assert.equal(allChannels.length, 1, 'check Channels.onClosedChannel blockNumber')
       assert.equal(allChannels[0].channelEntry.blockNumber.toNumber(), 2, 'check Channels.onClosedChannel blockNumber')
     })
 
     it('should not store older channel according to transactionIndex', async function () {
       // @ts-ignore
-      await coreConnector.channels.onOpenedChannel({
+      await connector.channels.onOpenedChannel({
         returnValues: {
           opener: userA.address.toHex(),
           counterParty: userB.address.toHex(),
@@ -273,7 +309,7 @@ describe('test channels', function () {
       } as any)
 
       // @ts-ignore
-      await coreConnector.channels.onOpenedChannel({
+      await connector.channels.onOpenedChannel({
         returnValues: {
           opener: userA.address.toHex(),
           counterParty: userB.address.toHex(),
@@ -283,7 +319,7 @@ describe('test channels', function () {
         logIndex: 0,
       } as any)
 
-      const allChannels = await coreConnector.channels.getAll()
+      const allChannels = await connector.channels.getAll()
       assert.equal(allChannels.length, 1, 'check Channels.onOpenedChannel transactionIndex')
       assert.equal(
         allChannels[0].channelEntry.transactionIndex.toNumber(),
@@ -294,7 +330,7 @@ describe('test channels', function () {
 
     it('should not delete latest channel according to transactionIndex', async function () {
       // @ts-ignore
-      await coreConnector.channels.onOpenedChannel({
+      await connector.channels.onOpenedChannel({
         returnValues: {
           opener: userA.address.toHex(),
           counterParty: userB.address.toHex(),
@@ -305,7 +341,7 @@ describe('test channels', function () {
       } as any)
 
       // @ts-ignore
-      await coreConnector.channels.onClosedChannel({
+      await connector.channels.onClosedChannel({
         returnValues: {
           closer: userA.address.toHex(),
           counterParty: userB.address.toHex(),
@@ -315,7 +351,7 @@ describe('test channels', function () {
         logIndex: 0,
       } as any)
 
-      const allChannels = await coreConnector.channels.getAll()
+      const allChannels = await connector.channels.getAll()
       assert.equal(allChannels.length, 1, 'check Channels.onOpenedChannel transactionIndex')
       assert.equal(
         allChannels[0].channelEntry.transactionIndex.toNumber(),
@@ -326,7 +362,7 @@ describe('test channels', function () {
 
     it('should not store older channel according to logIndex', async function () {
       // @ts-ignore
-      await coreConnector.channels.onOpenedChannel({
+      await connector.channels.onOpenedChannel({
         returnValues: {
           opener: userA.address.toHex(),
           counterParty: userB.address.toHex(),
@@ -337,7 +373,7 @@ describe('test channels', function () {
       } as any)
 
       // @ts-ignore
-      await coreConnector.channels.onOpenedChannel({
+      await connector.channels.onOpenedChannel({
         returnValues: {
           opener: userA.address.toHex(),
           counterParty: userB.address.toHex(),
@@ -347,14 +383,14 @@ describe('test channels', function () {
         logIndex: 1,
       } as any)
 
-      const allChannels = await coreConnector.channels.getAll()
+      const allChannels = await connector.channels.getAll()
       assert.equal(allChannels.length, 1, 'check Channels.onOpenedChannel logIndex')
       assert.equal(allChannels[0].channelEntry.logIndex.toNumber(), 2, 'check Channels.onOpenedChannel logIndex')
     })
 
     it('should not delete latest channel according to logIndex', async function () {
       // @ts-ignore
-      await coreConnector.channels.onOpenedChannel({
+      await connector.channels.onOpenedChannel({
         returnValues: {
           opener: userA.address.toHex(),
           counterParty: userB.address.toHex(),
@@ -365,7 +401,7 @@ describe('test channels', function () {
       } as any)
 
       // @ts-ignore
-      await coreConnector.channels.onClosedChannel({
+      await connector.channels.onClosedChannel({
         returnValues: {
           closer: userA.address.toHex(),
           counterParty: userB.address.toHex(),
@@ -375,7 +411,7 @@ describe('test channels', function () {
         logIndex: 1,
       } as any)
 
-      const allChannels = await coreConnector.channels.getAll()
+      const allChannels = await connector.channels.getAll()
       assert.equal(allChannels.length, 1, 'check Channels.onOpenedChannel logIndex')
       assert.equal(allChannels[0].channelEntry.logIndex.toNumber(), 2, 'check Channels.onOpenedChannel logIndex')
     })

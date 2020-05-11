@@ -2,7 +2,7 @@ import { Ganache, migrate } from '@hoprnet/hopr-ethereum'
 import assert from 'assert'
 import { u8aToHex, stringToU8a, u8aEquals } from '@hoprnet/hopr-utils'
 import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
-import { getPrivKeyData, generateUser, generateNode } from '../utils/testing'
+import { getPrivKeyData, createAccountAndFund, createNode } from '../utils/testing'
 import { randomBytes } from 'crypto'
 import BN from 'bn.js'
 import pipe from 'it-pipe'
@@ -40,11 +40,11 @@ describe('test ticket generation and verification', function () {
 
   beforeEach(async function () {
     funder = await getPrivKeyData(stringToU8a(configs.FUND_ACCOUNT_PRIVATE_KEY))
-    const userA = await generateUser(web3, funder, hoprToken)
-    const userB = await generateUser(web3, funder, hoprToken)
+    const userA = await createAccountAndFund(web3, hoprToken, funder)
+    const userB = await createAccountAndFund(web3, hoprToken, funder)
 
-    coreConnector = await generateNode(userA.privKey)
-    counterpartysCoreConnector = await generateNode(userB.privKey)
+    coreConnector = await createNode(userA.privKey)
+    counterpartysCoreConnector = await createNode(userB.privKey)
 
     await coreConnector.db.clear()
     await counterpartysCoreConnector.db.clear()

@@ -20,11 +20,11 @@ class Ticket {
 
     return new Promise(async (resolve, reject) => {
       db.createReadStream({
-        gt: Buffer.from(dbKeys.Ticket(channelId, new Uint8Array(SignedTicket.SIZE).fill(0x00))),
-        lt: Buffer.from(dbKeys.Ticket(channelId, new Uint8Array(SignedTicket.SIZE).fill(0xff))),
+        gte: Buffer.from(dbKeys.Ticket(channelId, new Uint8Array(SignedTicket.SIZE).fill(0x00))),
+        lte: Buffer.from(dbKeys.Ticket(channelId, new Uint8Array(SignedTicket.SIZE).fill(0xff))),
       })
         .on('error', (err) => reject(err))
-        .on('data', ({ key, value }: { key: Buffer; value: Buffer }) => {
+        .on('data', ({ value }: { value: Buffer }) => {
           const signedTicket = new SignedTicket({
             bytes: value.buffer,
             offset: value.byteOffset,
