@@ -34,9 +34,10 @@
   version "1.0.0"
   resolved "https://github.com/hoprnet/hopr-demo-seeds.git#5b02899a02e3270e9a695bff4fae78abba5d6d25"
 
-"@hoprnet/hopr-utils@https://github.com/hoprnet/hopr-utils.git":
-  version "0.0.1"
-  resolved "https://github.com/hoprnet/hopr-utils.git#119b5cf0b63a87d22509d73c41c52772ec355e68"
+"@hoprnet/hopr-utils@^0.0.2-dev.119b5cf0b":
+  version "0.0.2-dev.119b5cf0b"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-0.0.2-dev.119b5cf0b.tgz#a81055ff09237ece27260d55acd5820364f7de9b"
+  integrity sha512-ZEb7L1+nPqva8bMYjkaaIUWxfNXVO1EDrc9cHawU5cRz1ureX4SA6x0N433MiVB1ihiypDX07RAvBW6HHBHCfQ==
   dependencies:
     bignumber.js "^9.0.0"
     chalk "^4.0.0"
@@ -8030,9 +8031,9 @@ web3-provider-engine@14.2.1:
     xhr "^2.2.0"
     xtend "^4.0.1"
 
-"web3-provider-engine@git+https://github.com/trufflesuite/provider-engine.git#web3-one":
+"web3-provider-engine@https://github.com/trufflesuite/provider-engine#web3-one":
   version "14.0.6"
-  resolved "git+https://github.com/trufflesuite/provider-engine.git#3538c60bc4836b73ccae1ac3f64c8fed8ef19c1a"
+  resolved "https://github.com/trufflesuite/provider-engine#3538c60bc4836b73ccae1ac3f64c8fed8ef19c1a"
   dependencies:
     async "^2.5.0"
     backoff "^2.5.0"

@@ -37,7 +37,7 @@
   },
   "dependencies": {
     "@hoprnet/hopr-demo-seeds": "https://github.com/hoprnet/hopr-demo-seeds.git",
-    "@hoprnet/hopr-utils": "https://github.com/hoprnet/hopr-utils.git",
+    "@hoprnet/hopr-utils": "^0.0.2-dev.119b5cf0b",
     "@openzeppelin/contracts": "^3.0.1",
     "@openzeppelin/test-helpers": "^0.5.5",
     "@truffle/debug-utils": "^4.1.1",
