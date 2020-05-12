@@ -1,11 +1,10 @@
 import type { LevelUp } from 'levelup'
-
 import type * as Utils from './utils'
 import type Channel from './channel'
 import type * as Types from './types'
 import type * as DbKeys from './dbKeys'
-
 import type * as Constants from './constants'
+import type Indexer from './indexer'
 
 declare namespace HoprCoreConnector {
   /**
@@ -85,10 +84,15 @@ declare interface HoprCoreConnector {
    * Encapsulates payment channel between nodes.
    */
   readonly channel: typeof Channel
+
+  /**
+   * Returns an instance of Indexer.
+   */
+  readonly indexer?: Indexer
 }
 
 type HoprCoreConnectorStatic = typeof HoprCoreConnector
 
-export { Utils, DbKeys, Types, Channel, Constants, HoprCoreConnectorStatic }
+export { Utils, DbKeys, Types, Channel, Constants, Indexer, HoprCoreConnectorStatic }
 
 export default HoprCoreConnector

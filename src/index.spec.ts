@@ -8,7 +8,6 @@ import HoprCoreConnector from '.'
 import type { LevelUp } from 'levelup'
 import type { Balance, Hash } from './types'
 
-
 async function main() {
   const coreConnector = await HoprCoreConnector.create((undefined as unknown) as LevelUp)
 
@@ -17,6 +16,8 @@ async function main() {
   coreConnector.types.AccountId.SIZE
 
   coreConnector.start()
+
+  coreConnector.indexer.has(undefined, undefined)
 
   coreConnector.utils.hash(new Uint8Array(123).fill(0x00))
 
