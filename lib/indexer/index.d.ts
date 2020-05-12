@@ -33,7 +33,26 @@ declare class Indexer implements IIndexer {
      */
     has(partyA: AccountId, partyB: AccountId): Promise<boolean>;
     /**
+     * Get all stored channel entries, if party is provided,
+     * it will return the open channels of the given party.
+     *
+     * @returns promise that resolves to a list of channel entries
+     */
+    private getAll;
+    /**
+     * Get stored channel of the given parties.
+     *
+     * @returns promise that resolves to a channel entry or undefined if not found
+     */
+    private getSingle;
+    /**
      * Get stored channels entries.
+     *
+     * If query is left empty, it will return all channels.
+     *
+     * If only one party is provided, it will return all channels of the given party.
+     *
+     * If both parties are provided, it will return the channel of the given party.
      *
      * @param query
      * @returns promise that resolves to a list of channel entries
@@ -42,12 +61,6 @@ declare class Indexer implements IIndexer {
         partyA?: AccountId;
         partyB?: AccountId;
     }): Promise<Channel[]>;
-    /**
-     * Get all stored channels entries.
-     *
-     * @returns promise that resolves to a list of channel entries
-     */
-    getAll(): Promise<Channel[]>;
     private store;
     private delete;
     private onNewBlock;

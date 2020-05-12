@@ -5,7 +5,6 @@ import chalk from 'chalk'
 import { Subscription } from 'web3-core-subscriptions'
 import { BlockHeader } from 'web3-eth'
 import { u8aToNumber, stringToU8a } from '@hoprnet/hopr-utils'
-import * as dbKeys from '../dbKeys'
 import { AccountId, ChannelEntry } from '../types'
 import { getParties, Log } from '../utils'
 import { MAX_CONFIRMATIONS } from '../config'
@@ -19,6 +18,9 @@ type LightEvent<E extends ContractEventLog<any>> = Pick<
 type Channel = { partyA: AccountId; partyB: AccountId; channelEntry: ChannelEntry }
 type OpenedChannelEvent = LightEvent<ContractEventLog<{ opener: string; counterParty: string }>>
 type ClosedChannelEvent = LightEvent<ContractEventLog<{ closer: string; counterParty: string }>>
+
+const SMALLEST_ACCOUNT = new Uint8Array(AccountId.SIZE).fill(0x00)
+const BIGGEST_ACCOUNT = new Uint8Array(AccountId.SIZE).fill(0xff)
 
 /**
  * @returns a custom event id for logging purposes.
@@ -42,6 +44,9 @@ function isMoreRecent(oldChannelEntry: ChannelEntry, newChannelEntry: ChannelEnt
   return okBlockNumber && okTransactionIndex && okLogIndex
 }
 
+/**
+ * @returns true if blockNumber has passed max confirmations
+ */
 function isConfirmedBlock(blockNumber: number, onChainBlockNumber: number): boolean {
   return blockNumber + MAX_CONFIRMATIONS <= onChainBlockNumber
 }
@@ -90,7 +95,9 @@ class Indexer implements IIndexer {
    * @returns promise that resolves to true or false
    */
   public async has(partyA: AccountId, partyB: AccountId): Promise<boolean> {
-    return this.connector.db.get(Buffer.from(dbKeys.ChannelEntry(partyA, partyB))).then(
+    const { dbKeys, db } = this.connector
+
+    return db.get(Buffer.from(dbKeys.ChannelEntry(partyA, partyB))).then(
       () => true,
       (err) => {
         if (err.notFound) {
@@ -103,38 +110,27 @@ class Indexer implements IIndexer {
   }
 
   /**
-   * Get stored channels entries.
+   * Get all stored channel entries, if party is provided,
+   * it will return the open channels of the given party.
    *
-   * @param query
    * @returns promise that resolves to a list of channel entries
    */
-  public async get(query?: { partyA?: AccountId; partyB?: AccountId }): Promise<Channel[]> {
+  private async getAll(party?: AccountId): Promise<Channel[]> {
     const { dbKeys, db } = this.connector
     const channels: Channel[] = []
-    const allSmall = new Uint8Array(AccountId.SIZE).fill(0x00)
-    const allBig = new Uint8Array(AccountId.SIZE).fill(0xff)
-    const hasQuery = typeof query !== 'undefined'
-    const hasPartyA = hasQuery && typeof query.partyA !== 'undefined'
-    const hasPartyB = hasQuery && typeof query.partyB !== 'undefined'
-
-    let gte: Buffer
-    let lte: Buffer
-    if (hasQuery && (hasPartyA || hasPartyB)) {
-      gte = Buffer.from(dbKeys.ChannelEntry(hasPartyA ? query.partyA : allSmall, hasPartyB ? query.partyB : allSmall))
-      lte = Buffer.from(dbKeys.ChannelEntry(hasPartyA ? query.partyA : allBig, hasPartyB ? query.partyB : allBig))
-    } else {
-      gte = Buffer.from(dbKeys.ChannelEntry(allSmall, allSmall))
-      lte = Buffer.from(dbKeys.ChannelEntry(allBig, allBig))
-    }
 
     return new Promise((resolve, reject) => {
       db.createReadStream({
-        gte,
-        lte,
+        gte: Buffer.from(dbKeys.ChannelEntry(SMALLEST_ACCOUNT, SMALLEST_ACCOUNT)),
+        lte: Buffer.from(dbKeys.ChannelEntry(BIGGEST_ACCOUNT, BIGGEST_ACCOUNT)),
       })
         .on('error', (err) => reject(err))
         .on('data', ({ key, value }: { key: Buffer; value: Buffer }) => {
           const [partyA, partyB] = dbKeys.ChannelEntryParse(key)
+          if (party && !party.eq(partyA) && !party.eq(partyB)) {
+            return
+          }
+
           const channelEntry = new ChannelEntry({
             bytes: value,
             offset: value.byteOffset,
@@ -151,12 +147,69 @@ class Indexer implements IIndexer {
   }
 
   /**
-   * Get all stored channels entries.
+   * Get stored channel of the given parties.
    *
+   * @returns promise that resolves to a channel entry or undefined if not found
+   */
+  private async getSingle(partyA: AccountId, partyB: AccountId): Promise<Channel | undefined> {
+    const { dbKeys, db } = this.connector
+
+    return db.get(Buffer.from(dbKeys.ChannelEntry(partyA, partyB))).then(
+      (value) => {
+        const channelEntry = new ChannelEntry({
+          bytes: value,
+          offset: value.byteOffset,
+        })
+
+        return {
+          partyA,
+          partyB,
+          channelEntry,
+        }
+      },
+      (err) => {
+        if (err.notFound) {
+          return undefined
+        } else {
+          throw err
+        }
+      }
+    )
+  }
+
+  /**
+   * Get stored channels entries.
+   *
+   * If query is left empty, it will return all channels.
+   *
+   * If only one party is provided, it will return all channels of the given party.
+   *
+   * If both parties are provided, it will return the channel of the given party.
+   *
+   * @param query
    * @returns promise that resolves to a list of channel entries
    */
-  public async getAll(): Promise<Channel[]> {
-    return this.get()
+  public async get(query?: { partyA?: AccountId; partyB?: AccountId }): Promise<Channel[]> {
+    const hasQuery = typeof query !== 'undefined'
+    const hasPartyA = hasQuery && typeof query.partyA !== 'undefined'
+    const hasPartyB = hasQuery && typeof query.partyB !== 'undefined'
+
+    if (!hasQuery) {
+      // query not provided, get all channels
+      return this.getAll()
+    } else if (hasPartyA && hasPartyB) {
+      // both parties provided, get channel
+      const entry = await this.getSingle(query.partyA, query.partyB)
+
+      if (typeof entry === 'undefined') {
+        return []
+      } else {
+        return [entry]
+      }
+    } else {
+      // only one of the parties provided, get all open channels of party
+      return this.getAll(hasPartyA ? query.partyA : query.partyB)
+    }
   }
 
   private async store(partyA: AccountId, partyB: AccountId, channelEntry: ChannelEntry): Promise<void> {

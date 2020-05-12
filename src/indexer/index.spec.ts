@@ -15,7 +15,7 @@ import type CoreConnector from '..'
 
 const CLOSURE_DURATION = durations.days(3)
 
-describe('test indexer', function () {
+describe.only('test indexer', function () {
   const ganache = new Ganache()
   let web3: Web3
   let hoprToken: HoprToken
@@ -75,7 +75,7 @@ describe('test indexer', function () {
         gas: 200e3,
       })
 
-      const channels = await connector.indexer.getAll()
+      const channels = await connector.indexer.get()
       assert.equal(channels.length, 0, 'check Channels.store')
     })
 
@@ -83,7 +83,7 @@ describe('test indexer', function () {
       const currentBlockNumber = await web3.eth.getBlockNumber()
       await time.advanceBlockTo(web3, currentBlockNumber + configs.MAX_CONFIRMATIONS)
 
-      const channels = await connector.indexer.getAll()
+      const channels = await connector.indexer.get()
       assert.equal(channels.length, 1, 'check Channels.store')
     })
 
@@ -91,10 +91,13 @@ describe('test indexer', function () {
       const [partyA, partyB] = getParties(userA.address, userB.address)
 
       const blockNumber = await web3.eth.getBlockNumber()
-      const [channel] = await connector.indexer.getAll()
+      const channels = await connector.indexer.get()
+      assert.equal(channels.length, 1, 'check Channels.store')
+
       // @ts-ignore
       const latestConfirmedBlockNumber = await connector.indexer.getLatestConfirmedBlockNumber()
 
+      const [channel] = channels
       assert(channel.partyA.eq(partyA), 'check Channels.store')
       assert(channel.partyB.eq(partyB), 'check Channels.store')
       assert(channel.channelEntry.blockNumber.lt(new BN(blockNumber)), 'check Channels.store')
@@ -118,7 +121,7 @@ describe('test indexer', function () {
       const [partyA, partyB] = getParties(userA.address, userB.address)
 
       const channels = await connector.indexer.get({
-        partyA,
+        partyB,
       })
       const [channel] = channels
 
@@ -163,8 +166,18 @@ describe('test indexer', function () {
       const currentBlockNumber = await web3.eth.getBlockNumber()
       await time.advanceBlockTo(web3, currentBlockNumber + configs.MAX_CONFIRMATIONS)
 
-      const channels = await connector.indexer.getAll()
+      const channels = await connector.indexer.get()
       assert.equal(channels.length, 2, 'check Channels.store')
+
+      const channelsUsingPartyA = await connector.indexer.get({
+        partyA: userA.address,
+      })
+      assert.equal(channelsUsingPartyA.length, 2, 'check Channels.get')
+
+      const channelsUsingPartyB = await connector.indexer.get({
+        partyB: userB.address,
+      })
+      assert.equal(channelsUsingPartyB.length, 1, 'check Channels.get')
     })
 
     it('should not delete channel before confirmations', async function () {
@@ -180,7 +193,7 @@ describe('test indexer', function () {
         gas: 200e3,
       })
 
-      const channels = await connector.indexer.getAll()
+      const channels = await connector.indexer.get()
       assert.equal(channels.length, 2, 'check Channels.store')
     })
 
@@ -188,7 +201,7 @@ describe('test indexer', function () {
       const currentBlockNumber = await web3.eth.getBlockNumber()
       await time.advanceBlockTo(web3, currentBlockNumber + configs.MAX_CONFIRMATIONS)
 
-      const channels = await connector.indexer.getAll()
+      const channels = await connector.indexer.get()
       assert.equal(channels.length, 1, 'check Channels.store')
     })
 
@@ -212,7 +225,7 @@ describe('test indexer', function () {
         gas: 200e3,
       })
 
-      const channels = await connector.indexer.getAll()
+      const channels = await connector.indexer.get()
       assert.equal(channels.length, 1, 'check Channels.store')
     })
 
@@ -220,7 +233,7 @@ describe('test indexer', function () {
       const currentBlockNumber = await web3.eth.getBlockNumber()
       await time.advanceBlockTo(web3, currentBlockNumber + configs.MAX_CONFIRMATIONS)
 
-      const channels = await connector.indexer.getAll()
+      const channels = await connector.indexer.get()
       assert.equal(channels.length, 1, 'check Channels.store')
     })
 
@@ -230,7 +243,7 @@ describe('test indexer', function () {
       assert(await connector.indexer.start(), 'could not start indexer')
       await wait(1e3)
 
-      const channels = await connector.indexer.getAll()
+      const channels = await connector.indexer.get()
       assert.equal(channels.length, 2, 'check Channels.store')
     })
   })
@@ -263,7 +276,7 @@ describe('test indexer', function () {
         logIndex: 0,
       } as any)
 
-      const allChannels = await connector.indexer.getAll()
+      const allChannels = await connector.indexer.get()
       assert.equal(allChannels.length, 1, 'check Channels.onOpenedChannel blockNumber')
       assert.equal(allChannels[0].channelEntry.blockNumber.toNumber(), 2, 'check Channels.onOpenedChannel blockNumber')
     })
@@ -291,7 +304,7 @@ describe('test indexer', function () {
         logIndex: 0,
       } as any)
 
-      const allChannels = await connector.indexer.getAll()
+      const allChannels = await connector.indexer.get()
       assert.equal(allChannels.length, 1, 'check Channels.onClosedChannel blockNumber')
       assert.equal(allChannels[0].channelEntry.blockNumber.toNumber(), 2, 'check Channels.onClosedChannel blockNumber')
     })
@@ -319,7 +332,7 @@ describe('test indexer', function () {
         logIndex: 0,
       } as any)
 
-      const allChannels = await connector.indexer.getAll()
+      const allChannels = await connector.indexer.get()
       assert.equal(allChannels.length, 1, 'check Channels.onOpenedChannel transactionIndex')
       assert.equal(
         allChannels[0].channelEntry.transactionIndex.toNumber(),
@@ -351,7 +364,7 @@ describe('test indexer', function () {
         logIndex: 0,
       } as any)
 
-      const allChannels = await connector.indexer.getAll()
+      const allChannels = await connector.indexer.get()
       assert.equal(allChannels.length, 1, 'check Channels.onOpenedChannel transactionIndex')
       assert.equal(
         allChannels[0].channelEntry.transactionIndex.toNumber(),
@@ -383,7 +396,7 @@ describe('test indexer', function () {
         logIndex: 1,
       } as any)
 
-      const allChannels = await connector.indexer.getAll()
+      const allChannels = await connector.indexer.get()
       assert.equal(allChannels.length, 1, 'check Channels.onOpenedChannel logIndex')
       assert.equal(allChannels[0].channelEntry.logIndex.toNumber(), 2, 'check Channels.onOpenedChannel logIndex')
     })
@@ -411,7 +424,7 @@ describe('test indexer', function () {
         logIndex: 1,
       } as any)
 
-      const allChannels = await connector.indexer.getAll()
+      const allChannels = await connector.indexer.get()
       assert.equal(allChannels.length, 1, 'check Channels.onOpenedChannel logIndex')
       assert.equal(allChannels[0].channelEntry.logIndex.toNumber(), 2, 'check Channels.onOpenedChannel logIndex')
     })
