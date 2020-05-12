@@ -4,8 +4,8 @@ import { u8aEquals } from './equals'
 
 import { randomBytes } from 'crypto'
 
-describe('test u8a equals', function() {
-  it('should check whether two (or more) Uint8Arrays are equal', function() {
+describe('test u8a equals', function () {
+  it('should check whether two (or more) Uint8Arrays are equal', function () {
     assert(u8aEquals(new Uint8Array(), new Uint8Array()), `check empty array`)
 
     assert(!u8aEquals(randomBytes(32), randomBytes(32)), `random data should be with high probability not equal`)

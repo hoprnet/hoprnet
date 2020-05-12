@@ -1,7 +1,9 @@
 export * from './constants'
 
 export * from './concat'
+
 export * from './xor'
+export * from './u8aAdd'
 
 export * from './lengthPrefixedToU8a'
 export * from './toLengthPrefixedU8a'

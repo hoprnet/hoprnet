@@ -11,7 +11,10 @@ import { u8aToNumber } from './u8aToNumber'
 export function lengthPrefixedToU8a(arg: Uint8Array, additionalPadding?: Uint8Array, targetLength?: number) {
   if (targetLength != null && arg.length < targetLength) {
     throw Error(`Expected a ${Uint8Array.name} of at least lenght ${targetLength}`)
-  } else if (arg.length < LENGTH_PREFIX_LENGTH || (additionalPadding != null && arg.length < LENGTH_PREFIX_LENGTH + additionalPadding.length)) {
+  } else if (
+    arg.length < LENGTH_PREFIX_LENGTH ||
+    (additionalPadding != null && arg.length < LENGTH_PREFIX_LENGTH + additionalPadding.length)
+  ) {
     throw Error(
       `Expected a ${Uint8Array.name} of at least length ${
         additionalPadding != null ? LENGTH_PREFIX_LENGTH + additionalPadding.length : LENGTH_PREFIX_LENGTH
@@ -27,11 +30,15 @@ export function lengthPrefixedToU8a(arg: Uint8Array, additionalPadding?: Uint8Ar
 
   if (
     targetLength == null &&
-    (additionalPadding != null ? arrLength + additionalPadding.length + LENGTH_PREFIX_LENGTH != arg.length : arrLength + LENGTH_PREFIX_LENGTH != arg.length)
+    (additionalPadding != null
+      ? arrLength + additionalPadding.length + LENGTH_PREFIX_LENGTH != arg.length
+      : arrLength + LENGTH_PREFIX_LENGTH != arg.length)
   ) {
     throw Error(
       `Invalid array length. Expected a ${Uint8Array.name} of at least length ${
-        additionalPadding != null ? LENGTH_PREFIX_LENGTH + additionalPadding.length + arrLength : LENGTH_PREFIX_LENGTH + arrLength
+        additionalPadding != null
+          ? LENGTH_PREFIX_LENGTH + additionalPadding.length + arrLength
+          : LENGTH_PREFIX_LENGTH + arrLength
       } but got ${arg.length}.`
     )
   }
@@ -46,7 +53,10 @@ export function lengthPrefixedToU8a(arg: Uint8Array, additionalPadding?: Uint8Ar
   }
 
   if (additionalPadding != null) {
-    return arg.subarray(LENGTH_PREFIX_LENGTH + additionalPadding.length, LENGTH_PREFIX_LENGTH + additionalPadding.length + arrLength)
+    return arg.subarray(
+      LENGTH_PREFIX_LENGTH + additionalPadding.length,
+      LENGTH_PREFIX_LENGTH + additionalPadding.length + arrLength
+    )
   } else {
     return arg.subarray(LENGTH_PREFIX_LENGTH, LENGTH_PREFIX_LENGTH + arrLength)
   }
