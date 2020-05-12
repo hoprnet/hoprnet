@@ -1,8 +1,8 @@
 import assert from 'assert'
 import { u8aXOR } from './xor'
 
-describe('testing XORing Uint8Array', function() {
-  it('should XOR two arrays', function() {
+describe('testing XORing Uint8Array', function () {
+  it('should XOR two arrays', function () {
     let a = new Uint8Array([0, 255, 0, 255, 0])
     let b = new Uint8Array([255, 0, 255, 0, 255])
 
@@ -14,7 +14,7 @@ describe('testing XORing Uint8Array', function() {
     assert.deepEqual(a, aXORb)
   })
 
-  it('should XOR more than two arrays', function() {
+  it('should XOR more than two arrays', function () {
     let a = new Uint8Array([0, 255, 0, 255, 0])
     let b = new Uint8Array([255, 0, 255, 0, 255])
     let c = new Uint8Array([0, 0, 255, 0, 0])

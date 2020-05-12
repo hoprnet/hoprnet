@@ -6,9 +6,7 @@ import { timer, MAX_EXECUTION_TIME_FOR_CONCAT_IN_MS } from '../utils'
 
 import { randomBytes } from 'crypto'
 
-
 describe('test u8a concat', function () {
-
   const firstArray = randomBytes(43)
   const secondArray = randomBytes(31)
   const thirdArray = new Uint8Array()

@@ -1,9 +1,9 @@
 import assert from 'assert'
 import { randomInteger } from './randomInteger'
 
-describe('testing random-number generator', function() {
+describe('testing random-number generator', function () {
   let ATTEMPTS = 100
-  it(`should output values between '0' and '23'`, function() {
+  it(`should output values between '0' and '23'`, function () {
     let result: number
     for (let i = 0; i < ATTEMPTS; i++) {
       result = randomInteger(23)
@@ -12,7 +12,7 @@ describe('testing random-number generator', function() {
     }
   })
 
-  it(`should output values between '31' and '61'`, function() {
+  it(`should output values between '31' and '61'`, function () {
     let result: number
     for (let i = 0; i < ATTEMPTS; i++) {
       result = randomInteger(31, 61)
@@ -21,7 +21,7 @@ describe('testing random-number generator', function() {
     }
   })
 
-  it('should throw error for falsy interval input', function() {
+  it('should throw error for falsy interval input', function () {
     assert.throws(() => randomInteger(2, 1))
 
     assert.throws(() => randomInteger(Math.pow(2, 32)))
