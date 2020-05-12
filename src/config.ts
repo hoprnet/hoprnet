@@ -26,4 +26,4 @@ export const CHANNELS_ADDRESSES: { [key in Networks]: string } = {
 export const FUND_ACCOUNT_PRIVATE_KEY = NODE_SEEDS[0]
 export const DEMO_ACCOUNTS = NODE_SEEDS
 
-export const MAX_CONFIRMATIONS = 12
+export const MAX_CONFIRMATIONS = 8

@@ -1,3 +1,4 @@
+import type { Indexer as IIndexer } from '@hoprnet/hopr-core-connector-interface';
 import type HoprEthereum from '..';
 import { AccountId, ChannelEntry } from '../types';
 declare type Channel = {
@@ -8,7 +9,7 @@ declare type Channel = {
 /**
  * Simple indexer to keep track of all open payment channels.
  */
-declare class Channels {
+declare class Indexer implements IIndexer {
     private connector;
     private log;
     private status;
@@ -67,4 +68,4 @@ declare class Channels {
      */
     stop(): Promise<boolean>;
 }
-export default Channels;
+export default Indexer;

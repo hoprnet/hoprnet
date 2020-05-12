@@ -32,7 +32,7 @@
 
 "@hoprnet/hopr-core-connector-interface@https://github.com/hoprnet/hopr-core-connector-interface.git":
   version "1.0.0"
-  resolved "https://github.com/hoprnet/hopr-core-connector-interface.git#56236b30dcf7ae895ecf07c6b37fcfdee4599644"
+  resolved "https://github.com/hoprnet/hopr-core-connector-interface.git#594d1bdba32e3c0617be6fc8d300439e1f80e54d"
 
 "@hoprnet/hopr-demo-seeds@https://github.com/hoprnet/hopr-demo-seeds.git":
   version "1.0.0"
@@ -40,10 +40,10 @@
 
 "@hoprnet/hopr-ethereum@https://github.com/hoprnet/hopr-ethereum.git#develop":
   version "0.0.1"
-  resolved "https://github.com/hoprnet/hopr-ethereum.git#ee6a02c931f7ea4b551c898d203eefa6a5472b53"
+  resolved "https://github.com/hoprnet/hopr-ethereum.git#ad8c30e037e7f74aaf97133bc673e1b5dc0be3ff"
   dependencies:
     "@hoprnet/hopr-demo-seeds" "https://github.com/hoprnet/hopr-demo-seeds.git"
-    "@hoprnet/hopr-utils" "https://github.com/hoprnet/hopr-utils.git"
+    "@hoprnet/hopr-utils" "^0.0.2-dev.119b5cf0b"
     "@openzeppelin/contracts" "^3.0.1"
     "@openzeppelin/test-helpers" "^0.5.5"
     "@truffle/debug-utils" "^4.1.1"
@@ -59,14 +59,6 @@
   version "0.0.2-dev.119b5cf0b"
   resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-0.0.2-dev.119b5cf0b.tgz#a81055ff09237ece27260d55acd5820364f7de9b"
   integrity sha512-ZEb7L1+nPqva8bMYjkaaIUWxfNXVO1EDrc9cHawU5cRz1ureX4SA6x0N433MiVB1ihiypDX07RAvBW6HHBHCfQ==
-  dependencies:
-    bignumber.js "^9.0.0"
-    chalk "^4.0.0"
-    strip-ansi "^6.0.0"
-
-"@hoprnet/hopr-utils@https://github.com/hoprnet/hopr-utils.git":
-  version "0.0.1"
-  resolved "https://github.com/hoprnet/hopr-utils.git#119b5cf0b63a87d22509d73c41c52772ec355e68"
   dependencies:
     bignumber.js "^9.0.0"
     chalk "^4.0.0"
@@ -2601,9 +2593,9 @@ ee-first@1.1.1:
   integrity sha1-WQxhFWsK4vTwJVcyoViyZrxWsh0=
 
 electron-to-chromium@^1.3.47:
-  version "1.3.432"
-  resolved "https://registry.yarnpkg.com/electron-to-chromium/-/electron-to-chromium-1.3.432.tgz#3bf7b191978ff2e8bc3caf811bb52b1e9f9eab25"
-  integrity sha512-/GdNhXyLP5Yl2322CUX/+Xi8NhdHBqL6lD9VJVKjH6CjoPGakvwZ5CpKgj/oOlbzuWWjOvMjDw1bBuAIRCNTlw==
+  version "1.3.433"
+  resolved "https://registry.yarnpkg.com/electron-to-chromium/-/electron-to-chromium-1.3.433.tgz#5e7da22eb852955f6b157596bdd89bee0fd5c73a"
+  integrity sha512-C0gcgwB8RpPAq2Ia6teihNOHOfNzGy4jJXgjIXSmKdt6O2xrJM8CPjA8jTFyo97KozVrZ8oH2FUCixC6Hnuk2g==
 
 elliptic@6.3.3:
   version "6.3.3"
@@ -3225,9 +3217,9 @@ eventemitter3@3.1.2:
   integrity sha512-tvtQIeLVHjDkJYnzf2dgVMxfuSGJeM/7UCG17TT4EumTfNtF+0nebF/4zWOIkCreAbtNqhGEboB6BWrwqNaw4Q==
 
 eventemitter3@^4.0.0:
-  version "4.0.1"
-  resolved "https://registry.yarnpkg.com/eventemitter3/-/eventemitter3-4.0.1.tgz#3bcf626b0d3b16ce22ee88625a3772706300ba1f"
-  integrity sha512-MnI0l35oYL2C/c80rjJN7qu50MDx39yYE7y7oYck2YA3v+y7EaAenY8IU8AP4d1RWqE8VAKWFGSh3rfP87ll3g==
+  version "4.0.3"
+  resolved "https://registry.yarnpkg.com/eventemitter3/-/eventemitter3-4.0.3.tgz#850b43083fdb36a246f03168f189e9054f90bdb4"
+  integrity sha512-HyaFeyfTa18nYjft59vEPsvuq6ZVcrCC1rBw6Fx8ZV9NcuUITBNCnTOyr0tHHkkHn//d+lzhsL1YybgtLQ7lng==
 
 events@^3.0.0:
   version "3.1.0"
@@ -8609,9 +8601,9 @@ web3-provider-engine@14.2.1:
     xhr "^2.2.0"
     xtend "^4.0.1"
 
-"web3-provider-engine@https://github.com/trufflesuite/provider-engine#web3-one":
+"web3-provider-engine@git+https://github.com/trufflesuite/provider-engine.git#web3-one":
   version "14.0.6"
-  resolved "https://github.com/trufflesuite/provider-engine#3538c60bc4836b73ccae1ac3f64c8fed8ef19c1a"
+  resolved "git+https://github.com/trufflesuite/provider-engine.git#3538c60bc4836b73ccae1ac3f64c8fed8ef19c1a"
   dependencies:
     async "^2.5.0"
     backoff "^2.5.0"

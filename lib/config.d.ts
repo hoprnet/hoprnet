@@ -8,4 +8,4 @@ export declare const CHANNELS_ADDRESSES: {
 };
 export declare const FUND_ACCOUNT_PRIVATE_KEY: string;
 export declare const DEMO_ACCOUNTS: string[];
-export declare const MAX_CONFIRMATIONS = 12;
+export declare const MAX_CONFIRMATIONS = 8;

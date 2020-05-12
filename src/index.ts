@@ -12,7 +12,7 @@ import { u8aToHex, stringToU8a, u8aEquals } from '@hoprnet/hopr-utils'
 import chalk from 'chalk'
 import Channel from './channel'
 import Ticket from './ticket'
-import Channels from './channels'
+import Indexer from './indexer'
 import * as dbkeys from './dbKeys'
 import * as types from './types'
 import * as utils from './utils'
@@ -62,7 +62,7 @@ export default class HoprEthereum implements HoprCoreConnector {
   readonly channel = Channel as typeof IChannel
   readonly CHAIN_NAME = 'HOPR on Ethereum'
   readonly ticket = Ticket
-  readonly channels = new Channels(this)
+  readonly indexer = new Indexer(this)
 
   /**
    * @returns the current balances of the account associated with this node (HOPR)
@@ -150,7 +150,7 @@ export default class HoprEthereum implements HoprCoreConnector {
         }
 
         // restart
-        await this.channels.start()
+        await this.indexer.start()
 
         this._status = 'started'
         this.log(chalk.green('Connector started'))
@@ -188,7 +188,7 @@ export default class HoprEthereum implements HoprCoreConnector {
           await this._starting
         }
 
-        await this.channels.stop()
+        await this.indexer.stop()
 
         this._status = 'stopped'
         this.log(chalk.green('Connector stopped'))
@@ -235,20 +235,19 @@ export default class HoprEthereum implements HoprCoreConnector {
     this._initializing = Promise.resolve()
       .then(async () => {
         // initialize stuff
-        await Promise.all<boolean>([
+        const responses = await Promise.all<boolean>([
           // confirm web3 is connected
           this.checkWeb3(),
           // initialize account secret
           this.initializeAccountSecret(),
           // start channels indexing
-          this.channels.start(),
-        ]).then((responses) => {
-          const allOk = responses.every((r) => !!r)
+          this.indexer.start(),
+        ])
 
-          if (!allOk) {
-            throw Error('could not initialize connector')
-          }
-        })
+        const allOk = responses.every((r) => !!r)
+        if (!allOk) {
+          throw Error('could not initialize connector')
+        }
 
         this._status = 'initialized'
         this.log(chalk.green('Connector initialized'))
