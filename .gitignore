@@ -20,3 +20,6 @@ lib/**/*.spec.d.ts
 
 # Exclude source map
 lib/**/*.js.map
+
+# Exclude vim swap files
+*.swp
