@@ -14,8 +14,8 @@ export type Stream = {
 
 export type Handler = {
   stream: Stream
-  connection: Connection
-  protocol: string
+  connection?: Connection
+  protocol?: string
 }
 
 export interface MultiaddrConnection extends Stream {

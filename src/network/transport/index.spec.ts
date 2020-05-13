@@ -24,10 +24,12 @@ describe('should create a socket and connect to it', function () {
     upgradeInbound: async (maConn: MultiaddrConnection) => maConn,
   }
 
-  async function generateNode(id: number) {
-    const peerInfo = new PeerInfo( await PeerId.create({ keyType: 'secp256k1' }))
+  async function generateNode(id: number, bootstrap?: PeerInfo): Promise<libp2p> {
+    const peerInfo = new PeerInfo(await PeerId.create({ keyType: 'secp256k1' }))
 
-    peerInfo.multiaddrs.add(Multiaddr(`/ip4/127.0.0.1/tcp/${9090 + id}`).encapsulate(`/ipfs/${peerInfo.id.toB58String()}`))
+    peerInfo.multiaddrs.add(
+      Multiaddr(`/ip4/127.0.0.1/tcp/${9090 + id}`).encapsulate(`/ipfs/${peerInfo.id.toB58String()}`)
+    )
 
     const node = new libp2p({
       peerInfo,
@@ -38,11 +40,19 @@ describe('should create a socket and connect to it', function () {
         dht: KadDHT,
       },
       config: {
+        transport: {
+          TCP: {
+            bootstrap
+          }
+        },
         dht: {
-          enabled: true,
+          enabled: false,
         },
         relay: {
           enabled: false,
+        },
+        peerDiscovery: {
+          autoDial: false,
         },
       },
     })
@@ -53,20 +63,19 @@ describe('should create a socket and connect to it', function () {
   }
 
   it('should set up a socket', async function () {
-    const [sender, relay, counterparty] = await Promise.all([
-      generateNode(0),
-      generateNode(1),
-      generateNode(2),
+    const relay = await generateNode(2)
+
+    const [sender, counterparty] = await Promise.all([
+      generateNode(0, relay.peerInfo),
+      generateNode(1, relay.peerInfo),
     ])
-    
+
     connectionHelper([sender, relay])
     connectionHelper([relay, counterparty])
 
-    await sender.dial(counterparty.peerInfo, {
+    const conn = await sender.dial(counterparty.peerInfo, {
       relay: relay.peerInfo,
     })
-
-    console.log('finished')
   })
 })
 
