@@ -486,7 +486,7 @@ export default class HoprEthereum implements HoprCoreConnector {
       network,
       hoprChannels,
       hoprToken,
-      { debug: options !== undefined && options.debug !== undefined ? options.debug : false }
+      { debug: options?.debug || false }
     )
     coreConnector.log(`using ethereum address ${account.toHex()}`)
 
