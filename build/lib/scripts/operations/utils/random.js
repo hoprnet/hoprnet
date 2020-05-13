@@ -3,6 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.isLocalNetwork = exports.getOperations = exports.getContractNames = exports.bash = exports.root = void 0;
 const path_1 = __importDefault(require("path"));
 const child_process_1 = require("child_process");
 const truffle_networks_json_1 = __importDefault(require("../../../truffle-networks.json"));
