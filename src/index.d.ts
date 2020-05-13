@@ -15,7 +15,7 @@ declare namespace HoprCoreConnector {
    * @param options.id Id of the demo account
    * @param options.uri URI that is used to connect to the blockchain
    */
-  function create(db: LevelUp, seed?: Uint8Array, options?: { id?: number; provider?: string }): Promise<HoprCoreConnector>
+  function create(db: LevelUp, seed?: Uint8Array, options?: { id?: number; provider?: string, debug?: boolean }): Promise<HoprCoreConnector>
 
   const constants: typeof Constants
 }
