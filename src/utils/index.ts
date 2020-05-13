@@ -1,5 +1,4 @@
-// @ts-ignore
-import type { Networks } from '../tsc/types'
+import type { addresses } from '@hoprnet/hopr-ethereum'
 import type { TransactionObject } from '../tsc/web3/types'
 import assert from 'assert'
 import { publicKeyConvert, publicKeyCreate, ecdsaSign, ecdsaRecover, ecdsaVerify } from 'secp256k1'
@@ -209,7 +208,7 @@ export async function waitFor({
   timestamp,
 }: {
   web3: Web3
-  network: Networks
+  network: addresses.Networks
   getCurrentBlock: () => Promise<BlockTransactionString>
   timestamp?: number
 }): Promise<void> {
@@ -241,7 +240,7 @@ export async function waitFor({
  * @param web3 a web3 instance
  * @returns the network's name
  */
-export async function getNetworkId(web3: Web3): Promise<Networks> {
+export async function getNetworkId(web3: Web3): Promise<addresses.Networks> {
   return web3.eth.net.getId().then((netId) => {
     switch (netId) {
       case 1:

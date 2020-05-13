@@ -1,4 +1,4 @@
-import type { Networks } from '../tsc/types';
+import type { addresses } from '@hoprnet/hopr-ethereum';
 import type { TransactionObject } from '../tsc/web3/types';
 import { PromiEvent, TransactionReceipt, TransactionConfig } from 'web3-core';
 import { BlockTransactionString } from 'web3-eth';
@@ -104,7 +104,7 @@ export declare function wait(ms: number): Promise<unknown>;
  */
 export declare function waitFor({ web3, network, getCurrentBlock, timestamp, }: {
     web3: Web3;
-    network: Networks;
+    network: addresses.Networks;
     getCurrentBlock: () => Promise<BlockTransactionString>;
     timestamp?: number;
 }): Promise<void>;
@@ -114,7 +114,7 @@ export declare function waitFor({ web3, network, getCurrentBlock, timestamp, }: 
  * @param web3 a web3 instance
  * @returns the network's name
  */
-export declare function getNetworkId(web3: Web3): Promise<Networks>;
+export declare function getNetworkId(web3: Web3): Promise<addresses.Networks>;
 /**
  * Convert a state count (one received from on-chain),
  * to an enumarated representation.

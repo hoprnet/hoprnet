@@ -1,3 +1,4 @@
+import type { addresses } from '@hoprnet/hopr-ethereum';
 import Web3 from 'web3';
 import { LevelUp } from 'levelup';
 import HoprCoreConnector, { Types as ITypes, Channel as IChannel, Constants as IConstants } from '@hoprnet/hopr-core-connector-interface';
@@ -7,7 +8,6 @@ import * as dbkeys from './dbKeys';
 import * as types from './types';
 import * as utils from './utils';
 import * as constants from './constants';
-import { Networks } from './tsc/types';
 import { HoprChannels } from './tsc/web3/HoprChannels';
 import { HoprToken } from './tsc/web3/HoprToken';
 export default class HoprEthereum implements HoprCoreConnector {
@@ -22,7 +22,7 @@ export default class HoprEthereum implements HoprCoreConnector {
     };
     account: types.AccountId;
     web3: Web3;
-    network: Networks;
+    network: addresses.Networks;
     hoprChannels: HoprChannels;
     hoprToken: HoprToken;
     options: {
@@ -42,7 +42,7 @@ export default class HoprEthereum implements HoprCoreConnector {
             privateKey?: Uint8Array;
             publicKey?: Uint8Array;
         };
-    }, account: types.AccountId, web3: Web3, network: Networks, hoprChannels: HoprChannels, hoprToken: HoprToken, options: {
+    }, account: types.AccountId, web3: Web3, network: addresses.Networks, hoprChannels: HoprChannels, hoprToken: HoprToken, options: {
         debug: boolean;
     });
     readonly dbKeys: typeof dbkeys;
