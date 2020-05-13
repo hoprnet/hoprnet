@@ -8,6 +8,7 @@ const encoder = new TextEncoder()
 const PREFIX = encoder.encode('payments-')
 const SEPERATOR = encoder.encode('-')
 const channelSubPrefix = encoder.encode('channel-')
+const channelEntrySubPrefix = encoder.encode('channelEntry-')
 const challengeSubPrefix = encoder.encode('challenge-')
 const channelIdSubPrefix = encoder.encode('channelId-')
 const nonceSubPrefix = encoder.encode('nonce-')
@@ -131,7 +132,7 @@ export function ConfirmedBlockNumber(): Uint8Array {
 export function ChannelEntry(partyA: Types.AccountId, partyB: Types.AccountId): Uint8Array {
   return allocationHelper([
     [PREFIX.length, PREFIX],
-    [channelSubPrefix.length, channelSubPrefix],
+    [channelEntrySubPrefix.length, channelEntrySubPrefix],
     [partyA.length, partyA],
     [SEPERATOR.length, SEPERATOR],
     [partyB.length, partyB],
@@ -144,7 +145,7 @@ export function ChannelEntry(partyA: Types.AccountId, partyB: Types.AccountId): 
  * @returns an array containing partyA's and partyB's accountIds
  */
 export function ChannelEntryParse(arr: Uint8Array): [Types.AccountId, Types.AccountId] {
-  const partyAStart = PREFIX.length + channelSubPrefix.length
+  const partyAStart = PREFIX.length + channelEntrySubPrefix.length
   const partyAEnd = partyAStart + AccountId.SIZE
   const partyBStart = partyAEnd + SEPERATOR.length
   const partyBEnd = partyBStart + AccountId.SIZE
