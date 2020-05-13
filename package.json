@@ -1,10 +1,5 @@
 {
   "name": "@hoprnet/hopr-core",
-  "author": {
-    "name": "Validity Labs AG",
-    "email": "info@validitylabs.org",
-    "url": "https://validitylabs.org"
-  },
   "version": "0.3.0",
   "description": "Privacy-preserving messaging protocol with incentivations for relay operators",
   "license": "GPL-3.0-only",
@@ -34,7 +29,7 @@
     "fundAccounts": "ts-node -T ./scripts/fundAccounts.ts"
   },
   "dependencies": {
-    "@hoprnet/hopr-utils": "^0.0.2-dev.119b5cf0b",
+    "@hoprnet/hopr-utils": "latest",
     "@nodeutils/defaults-deep": "~1.1.0",
     "abort-controller": "^3.0.0",
     "bignumber.js": "^9.0.0",

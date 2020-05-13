@@ -246,7 +246,7 @@ async function main() {
     console.log(err.message + '\n')
     return
   }
-
+  
   try {
     node = await Hopr.create(options)
   } catch (err) {

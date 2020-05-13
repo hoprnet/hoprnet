@@ -172,9 +172,10 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
     let connector = (await options.connector.create(db, options.peerInfo.id.privKey.marshal(), {
       id: options.id,
       provider: options.provider,
+      debug: options.debug
     })) as CoreConnector
 
-    return new Hopr<CoreConnector>(options, db, connector).up()
+    return await new Hopr<CoreConnector>(options, db, connector).up()
   }
 
   /**
@@ -210,10 +211,10 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
       await this.connectToBootstrapServers()
     }
 
-    this.log(`Available under the following addresses:`)
+    console.log(`Available under the following addresses:`)
 
     this.peerInfo.multiaddrs.forEach((ma: Multiaddr) => {
-      this.log(ma.toString())
+      console.log(ma.toString())
     })
 
     await this.paymentChannels?.start()

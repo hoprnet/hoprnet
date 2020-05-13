@@ -321,23 +321,23 @@ class TCP {
     console.log(ma.toString())
 
     try {
-      return this.dialDirectly(ma, options)
-    } catch (err) {
-      return this.dialWithRelay(ma, options)
+      return await this.dialDirectly(ma, options)
+    } catch (err) {      
+      return await this.dialWithRelay(ma, options)
     }
   }
 
   async dialWithRelay(ma: Multiaddr, options?: DialOptions): Promise<Connection> {
     const destinationPeerId = PeerId.createFromCID(ma.getPeerId())
 
-    console.log(`Dailling over bootstrap node`)
+    console.log(`Dailing over bootstrap node`)
 
     let relayConnection = this._registrar.getConnection(
-      PeerInfo.isPeerInfo(options.relay) ? options.relay : new PeerInfo(options.relay)
+      PeerInfo.isPeerInfo(this.relay) ? this.relay : new PeerInfo(this.relay)
     )
 
     if (!relayConnection) {
-      relayConnection = await this._dialer.connectToPeer(options.relay)
+      relayConnection = await this._dialer.connectToPeer(this.relay)
     }
 
     const { stream } = await relayConnection.newStream([RELAY_REGISTER])
