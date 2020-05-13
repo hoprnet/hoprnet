@@ -130,7 +130,7 @@ export declare function stateCountToStatus(stateCount: number): ChannelStatus;
  * @param privKey the private key to sign transactions with
  * @returns signer
  */
-export declare function TransactionSigner(web3: Web3, privKey: Uint8Array): <T extends any>(txObject: TransactionObject<T>, txConfig: TransactionConfig) => Promise<{
+export declare function TransactionSigner(web3: Web3, privKey: Uint8Array): <T extends unknown>(txObject: TransactionObject<T>, txConfig: TransactionConfig) => Promise<{
     send: () => PromiEvent<import("web3-core-helpers").TransactionRevertInstructionError | TransactionReceipt>;
     transactionHash: string;
 }>;

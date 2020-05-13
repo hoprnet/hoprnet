@@ -1,4 +1,4 @@
-import { randomBytes } from 'crypto'
+import { randomBytes, createHash } from 'crypto'
 import Web3 from 'web3'
 import { LevelUp } from 'levelup'
 import HoprChannelsAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprChannels.json'
@@ -49,7 +49,10 @@ export default class HoprEthereum implements HoprCoreConnector {
     public web3: Web3,
     public network: Networks,
     public hoprChannels: HoprChannels,
-    public hoprToken: HoprToken
+    public hoprToken: HoprToken,
+    public options: {
+      debug: boolean
+    }
   ) {
     this.signTransaction = utils.TransactionSigner(web3, self.privateKey)
     this.log = utils.Log()
@@ -287,13 +290,14 @@ export default class HoprEthereum implements HoprCoreConnector {
         [constants.ERRORS.OOF_ETH, constants.ERRORS.OOF_HOPR].includes(err.message) &&
         ['private', 'kovan'].includes(this.network)
       ) {
-        console.log(`Congratulations - your HOPR testnet node is ready to go! 
-Please fund your Ethereum Kovan account ${chalk.yellow(
-          this.account.toHex()
-        )} with some Kovan ETH and Kovan HOPR test tokens
-You can request Kovan ETH from ${chalk.blue('https://faucet.kovan.network')}
-For Kovan HOPR test tokens visit our Telegram channel at ${chalk.blue('https://t.me/hoprnet')}
-        `)
+        console.log(
+          `Congratulations - your HOPR testnet node is ready to go!\n` +
+            `Please fund your Ethereum Kovan account ${chalk.yellow(
+              this.account.toHex()
+            )} with some Kovan ETH and Kovan HOPR test tokens\n` +
+            `You can request Kovan ETH from ${chalk.blue('https://faucet.kovan.network')}\n` +
+            `For Kovan HOPR test tokens visit our Telegram channel at ${chalk.blue('https://t.me/hoprnet')}\n`
+        )
         process.exit()
       }
 
@@ -311,7 +315,7 @@ For Kovan HOPR test tokens visit our Telegram channel at ${chalk.blue('https://t
 
     // retrieve offChain secret
     try {
-      offChainSecret = new Uint8Array(await this.db.get(Buffer.from(dbkeys.OnChainSecret())))
+      offChainSecret = await this.db.get(Buffer.from(dbkeys.OnChainSecret()))
     } catch (err) {
       if (err.notFound != true) {
         throw err
@@ -324,7 +328,7 @@ For Kovan HOPR test tokens visit our Telegram channel at ${chalk.blue('https://t
       .accounts(this.account.toHex())
       .call()
       .then((res) => stringToU8a(res.hashedSecret))
-      .then((secret) => {
+      .then((secret: Uint8Array) => {
         if (u8aEquals(secret, new Uint8Array(types.Hash.SIZE).fill(0x00))) {
           return undefined
         }
@@ -349,7 +353,11 @@ For Kovan HOPR test tokens visit our Telegram channel at ${chalk.blue('https://t
         )
         hasOnChainSecret = true
       } else {
-        throw Error(`Key is present on-chain but not in our database.`)
+        if (this.options.debug) {
+          await this.db.put(Buffer.from(dbkeys.OnChainSecret()), Buffer.from(this.getDebugAccountSecret()))
+        } else {
+          throw Error(`Key is present on-chain but not in our database.`)
+        }
       }
     }
 
@@ -360,7 +368,13 @@ For Kovan HOPR test tokens visit our Telegram channel at ${chalk.blue('https://t
    * generate and set account secret
    */
   async setAccountSecret(nonce?: number): Promise<void> {
-    let secret = new Uint8Array(randomBytes(32))
+    let secret: Uint8Array
+    if (this.options.debug) {
+      secret = this.getDebugAccountSecret()
+    } else {
+      secret = new Uint8Array(randomBytes(32))
+    }
+
     const dbPromise = this.db.put(Buffer.from(this.dbKeys.OnChainSecret()), Buffer.from(secret.slice()))
 
     for (let i = 0; i < 500; i++) {
@@ -397,6 +411,10 @@ For Kovan HOPR test tokens visit our Telegram channel at ${chalk.blue('https://t
     }
   }
 
+  private getDebugAccountSecret(): Uint8Array {
+    return createHash('sha256').update(this.self.publicKey).digest()
+  }
+
   static readonly constants = constants as typeof IConstants
 
   /**
@@ -411,7 +429,7 @@ For Kovan HOPR test tokens visit our Telegram channel at ${chalk.blue('https://t
   static async create(
     db: LevelUp,
     seed?: Uint8Array,
-    options?: { id?: number; provider?: string }
+    options?: { id?: number; provider?: string; debug?: boolean }
   ): Promise<HoprEthereum> {
     const usingSeed = typeof seed !== 'undefined'
     const usingOptions = typeof options !== 'undefined'
@@ -467,7 +485,8 @@ For Kovan HOPR test tokens visit our Telegram channel at ${chalk.blue('https://t
       web3,
       network,
       hoprChannels,
-      hoprToken
+      hoprToken,
+      { debug: options.debug || false }
     )
     coreConnector.log(`using ethereum address ${account.toHex()}`)
 

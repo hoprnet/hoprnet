@@ -25,6 +25,9 @@ export default class HoprEthereum implements HoprCoreConnector {
     network: Networks;
     hoprChannels: HoprChannels;
     hoprToken: HoprToken;
+    options: {
+        debug: boolean;
+    };
     private _status;
     private _initializing;
     private _starting;
@@ -39,7 +42,9 @@ export default class HoprEthereum implements HoprCoreConnector {
             privateKey?: Uint8Array;
             publicKey?: Uint8Array;
         };
-    }, account: types.AccountId, web3: Web3, network: Networks, hoprChannels: HoprChannels, hoprToken: HoprToken);
+    }, account: types.AccountId, web3: Web3, network: Networks, hoprChannels: HoprChannels, hoprToken: HoprToken, options: {
+        debug: boolean;
+    });
     readonly dbKeys: typeof dbkeys;
     readonly utils: typeof utils;
     readonly types: typeof ITypes;
@@ -101,6 +106,7 @@ export default class HoprEthereum implements HoprCoreConnector {
      * @returns a promise resolved true if web3 connection is alive
      */
     checkWeb3(): Promise<boolean>;
+    private getDebugAccountSecret;
     static readonly constants: typeof IConstants;
     /**
      * Creates an uninitialised instance.
@@ -114,6 +120,7 @@ export default class HoprEthereum implements HoprCoreConnector {
     static create(db: LevelUp, seed?: Uint8Array, options?: {
         id?: number;
         provider?: string;
+        debug?: boolean;
     }): Promise<HoprEthereum>;
 }
 export declare const Types: typeof types;
