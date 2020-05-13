@@ -13,6 +13,7 @@
   },
   "files": [
     "lib/",
+    "!lib/*.spec**",
     "README.md",
     "package.json",
     "yarn.lock"
