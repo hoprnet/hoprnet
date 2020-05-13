@@ -1,3 +1,4 @@
+import type { addresses } from '@hoprnet/hopr-ethereum'
 import { randomBytes, createHash } from 'crypto'
 import Web3 from 'web3'
 import { LevelUp } from 'levelup'
@@ -18,7 +19,6 @@ import * as types from './types'
 import * as utils from './utils'
 import * as constants from './constants'
 import * as config from './config'
-import { Networks } from './tsc/types'
 import { HoprChannels } from './tsc/web3/HoprChannels'
 import { HoprToken } from './tsc/web3/HoprToken'
 
@@ -47,7 +47,7 @@ export default class HoprEthereum implements HoprCoreConnector {
     },
     public account: types.AccountId,
     public web3: Web3,
-    public network: Networks,
+    public network: addresses.Networks,
     public hoprChannels: HoprChannels,
     public hoprToken: HoprToken,
     public options: {
