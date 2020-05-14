@@ -1,0 +1,12 @@
+const { durations } = require('@hoprnet/hopr-utils')
+
+const HoprMinter = artifacts.require('HoprMinter')
+const HoprToken = artifacts.require('HoprToken')
+
+module.exports = async (deployer) => {
+  const token = await HoprToken.deployed()
+  const maxAmount = web3.utils.toWei('100000000', 'ether')
+  const duration = Math.floor(durations.days(365) / 1e3)
+
+  await deployer.deploy(HoprMinter, token.address, maxAmount, duration)
+}

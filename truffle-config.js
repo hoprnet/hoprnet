@@ -1,41 +1,66 @@
-require("ts-node/register");
+require('ts-node/register')
+const HDWalletProvider = require('@truffle/hdwallet-provider')
+const networks = require('./truffle-networks.json')
+
+let secrets
+try {
+  secrets = require('./truffle-secrets.json')
+} catch (error) {
+  console.log('truffle-secrets not found!')
+}
 
 module.exports = {
   networks: {
     // default network
     development: {
-      host: "127.0.0.1",
-      port: 9545, // 'truffle develop' port
-      network_id: "*"
+      ...networks.development,
     },
 
-    coverage: {
-      host: "localhost",
-      network_id: "*",
-      port: 8555, // if you change this, also set the port option in '.solcover.js'
-      gas: 0xfffffffffff, // high gas value
-      gasPrice: 0x01 // low gas price
-    }
+    // used when testing
+    test: {
+      ...networks.test,
+    },
+
+    // used for generating code coverage
+    soliditycoverage: {
+      ...networks.soliditycoverage,
+    },
+
+    rinkeby: secrets && {
+      ...networks.rinkeby,
+      provider: () => new HDWalletProvider(secrets.mnemonic, `https://rinkeby.infura.io/v3/${secrets.infura}`),
+    },
+
+    kovan: secrets && {
+      ...networks.kovan,
+      provider: () => new HDWalletProvider(secrets.mnemonic, `https://kovan.infura.io/v3/${secrets.infura}`),
+    },
   },
 
   // default mocha options
   mocha: {
-    timeout: 100000
+    timeout: 200e3,
   },
 
   // configure your compilers
   compilers: {
     solc: {
-      version: "0.5.3", // Fetch exact version from solc-bin (default: truffle's version)
-      docker: false, // Use "0.5.3" you've installed locally with docker (default: false)
+      version: '0.6.6', // Fetch exact version from solc-bin (default: truffle's version)
       settings: {
         // See the solidity docs for advice about optimization and evmVersion
         optimizer: {
           enabled: true,
-          runs: 200
+          runs: 200,
         },
-        evmVersion: "byzantium"
+      },
+    },
+  },
+
+  api_keys: secrets
+    ? {
+        etherscan: secrets.etherscan,
       }
-    }
-  }
-};
+    : undefined,
+
+  plugins: ['solidity-coverage', 'truffle-plugin-verify'],
+}

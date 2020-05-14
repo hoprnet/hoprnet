@@ -1,13 +1,35 @@
-pragma solidity ^0.5.3;
+pragma solidity ^0.6.0;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20Mintable.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20Burnable.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20Detailed.sol";
-import "./ERC20Token.sol";
+import "@openzeppelin/contracts/GSN/Context.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/token/ERC777/ERC777.sol";
+import "./ERC777/ERC777Snapshot.sol";
 
-contract HoprToken is ERC20Token, ERC20Mintable, ERC20Burnable, ERC20Detailed {
-    constructor () public
-    ERC20Detailed("HOPR", "HOPR", 18) {
-        _mint(msg.sender, 100000000);
+
+contract HoprToken is Context, AccessControl, ERC777Snapshot {
+    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+
+    constructor() public ERC777("HOPR Token", "HOPR", new address[](0)) {
+        _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
+        _setupRole(MINTER_ROLE, _msgSender());
+    }
+
+    /**
+     * @dev Creates `amount` new tokens for `to`.
+     *
+     * See {ERC20-_mint}.
+     *
+     * Requirements:
+     *
+     * - the caller must have the `MINTER_ROLE`.
+     */
+    function mint(
+        address account,
+        uint256 amount,
+        bytes memory userData,
+        bytes memory operatorData
+    ) public {
+        require(hasRole(MINTER_ROLE, _msgSender()), "HoprToken: caller does not have minter role");
+        _mint(account, amount, userData, operatorData);
     }
 }

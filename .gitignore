@@ -1,21 +1,22 @@
 # Exclude node.js module directory
 node_modules/
 
+# Exclude yarn stuff
+.packages-cache
+yarn-error.log
+
 # Exclude IDE stuff
 .vscode/
 
 # Exclude solidity builds
-build/
+build/contracts/
 
 # Exclude typechain builds
-types/truffle-contracts
-
-# Exclude tsc migrations builds
-migrations/**/*.js
-migrations/**/*.map
+types/truffle-contracts/
 
 # Coverage directory used by tools like istanbul
 coverage
+.coverage*
 coverage.json
 coverageEnv
 
@@ -25,3 +26,6 @@ pids
 *.seed
 allFiredEvents
 scTopics
+
+# Exclude truffle-config secrets
+truffle-secrets.json

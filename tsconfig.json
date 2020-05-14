@@ -1,20 +1,18 @@
 {
   "compilerOptions": {
-    "target": "es2017",
-    "module": "commonjs",
-    "strict": true,
-    "moduleResolution": "node",
-    "noImplicitThis": true,
+    "esModuleInterop": true,
+    "outDir": "./build/lib",
     "noImplicitAny": false,
-    "alwaysStrict": true,
+    "lib": ["es2020", "dom"],
+    "module": "commonjs",
+    "target": "es2019",
+    "strict": false,
+    "resolveJsonModule": true,
     "experimentalDecorators": true,
-    "emitDecoratorMetadata": true,
-    "forceConsistentCasingInFileNames": true,
-    "lib": ["es2015", "esnext.asynciterable"],
-    "sourceMap": true,
+    "declaration": true,
     "typeRoots": ["./node_modules/@types", "./types"],
     "types": ["node", "truffle-contracts"]
   },
-  "include": ["migrations/**/*.ts"],
+  "include": ["scripts/api.ts"],
   "exclude": ["node_modules", "build", "test/openzeppelin-contracts"]
 }
