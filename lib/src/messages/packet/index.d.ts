@@ -91,5 +91,5 @@ export declare class Packet<Chain extends HoprCoreConnector> extends Uint8Array 
     /**
      * Checks whether the packet has already been seen.
      */
-    hasTag(db: LevelUp): Promise<boolean>;
+    testAndSetTag(db: LevelUp): Promise<boolean>;
 }

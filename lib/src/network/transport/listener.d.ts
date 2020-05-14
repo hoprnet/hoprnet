@@ -1,5 +1,6 @@
 /// <reference types="node" />
 import EventEmitter from 'events';
+import { Connection, Upgrader } from './types';
 import Multiaddr from 'multiaddr';
 export interface Listener extends EventEmitter {
     close(): void;
@@ -7,6 +8,6 @@ export interface Listener extends EventEmitter {
     getAddrs(): Multiaddr[];
 }
 export declare function createListener({ handler, upgrader }: {
-    handler: any;
-    upgrader: any;
+    handler: (_conn: Connection) => void;
+    upgrader: Upgrader;
 }, options: any): Listener;

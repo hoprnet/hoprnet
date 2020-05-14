@@ -20,6 +20,7 @@ import {
   deriveTicketLastKeyBlinding,
 } from './header'
 import { Challenge } from './challenge'
+import { PacketTag } from '../../dbKeys'
 import Message from './message'
 import { LevelUp } from 'levelup'
 
@@ -280,7 +281,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
   }> {
     this.header.deriveSecret(this.node.peerInfo.id.privKey.marshal())
 
-    if (await this.hasTag(this.node.db)) {
+    if (await this.testAndSetTag(this.node.db)) {
       throw Error('General error.')
     }
 
@@ -474,7 +475,9 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
    * Computes the peerId of the next downstream node and caches it for later use.
    */
   async getTargetPeerId(): Promise<PeerId> {
-    if (this._targetPeerId) return this._targetPeerId
+    if (this._targetPeerId !== undefined) {
+      return this._targetPeerId
+    }
 
     this._targetPeerId = await pubKeyToPeerId(this.header.address)
 
@@ -485,7 +488,9 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
    * Computes the peerId if the preceeding node and caches it for later use.
    */
   async getSenderPeerId(): Promise<PeerId> {
-    if (this._senderPeerId) return this._senderPeerId
+    if (this._senderPeerId !== undefined) {
+      return this._senderPeerId
+    }
 
     this._senderPeerId = await pubKeyToPeerId(await this.ticket.signer)
 
@@ -495,20 +500,18 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
   /**
    * Checks whether the packet has already been seen.
    */
-  // @TODO: unhappy case mising
-  async hasTag(db: LevelUp): Promise<boolean> {
-    const tag = deriveTagParameters(this.header.derivedSecret)
-    const key = Buffer.concat([Buffer.from('packet-tag-'), tag], 11 + 16)
+  async testAndSetTag(db: LevelUp): Promise<boolean> {
+    const key = PacketTag(deriveTagParameters(this.header.derivedSecret))
 
     try {
       await db.get(key)
     } catch (err) {
-      if (err.notFound != true) {
-        this.node.log(err)
+      if (!err.notFound) {
+        await db.put(Buffer.from(key), Buffer.from(''))
+        return
       }
-      return false
     }
 
-    return true
+    throw Error('Key is already present. Cannot accept packet because it might be a duplicate.')
   }
 }

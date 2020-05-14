@@ -10,6 +10,8 @@ import { NODE_SEEDS, BOOTSTRAP_SEEDS } from '@hoprnet/hopr-demo-seeds'
 import PeerInfo from 'peer-info'
 import PeerId from 'peer-id'
 
+import { KeyPair } from '../../dbKeys'
+
 // @ts-ignore
 const Multiaddr = require('multiaddr')
 
@@ -91,37 +93,53 @@ async function getPeerId(options: HoprOptions, db?: LevelUp): Promise<PeerId> {
  * Try to retrieve Id from database
  */
 async function getFromDatabase(db: LevelUp, pw?: string): Promise<PeerId> {
-  let peerId: PeerId
+  let serializedKeyPair: Uint8Array
   try {
-    const serializedKeyPair = await db.get('key-pair')
-
-    let done = false
-    do {
-      pw =
-        pw || (await askForPassword('Please type in the passwort that was used to encrypt to key.'))
-
-      try {
-        peerId = await deserializeKeyPair(serializedKeyPair, new TextEncoder().encode(pw))
-        done = true
-      } catch {
-        pw = undefined
-      }
-    } while (!done)
-
-    console.log(`Successfully recovered ${chalk.blue(peerId.toB58String())} from database.`)
+    serializedKeyPair = await db.get(Buffer.from(KeyPair))
   } catch (err) {
-    if (err != null && err.notFound != true) {
-      throw err
-    }
-
-    pw = pw || (await askForPassword('Please type in a password to encrypt the secret key.'))
-
-    const key = await keys.generateKeyPair('secp256k1', 256)
-    peerId = await PeerId.createFromPrivKey(key.bytes)
-
-    const serializedKeyPair = await serializeKeyPair(peerId, new TextEncoder().encode(pw))
-    await db.put('key-pair', serializedKeyPair)
+    return createIdentity(db, pw)
   }
+
+  return recoverIdentity(serializedKeyPair, pw)
+}
+
+async function recoverIdentity(serializedKeyPair: Uint8Array, pw?: string): Promise<PeerId> {
+  let peerId: PeerId | undefined
+  let done = false
+
+  if (pw !== undefined) {
+    try {
+      peerId = await deserializeKeyPair(serializedKeyPair, new TextEncoder().encode(pw))
+      done = true
+    } catch (err) {
+      console.log(
+        `Could not recover id from database with given password. Please type it in manually.`
+      )
+    }
+  }
+
+  while (!done) {
+    pw = await askForPassword('Please type in the passwort that was used to encrypt to key.')
+
+    try {
+      peerId = await deserializeKeyPair(serializedKeyPair, new TextEncoder().encode(pw))
+      done = true
+    } catch {}
+  }
+
+  console.log(`Successfully recovered ${chalk.blue((peerId as PeerId).toB58String())} from database.`)
+
+  return peerId as PeerId
+}
+
+async function createIdentity(db: LevelUp, pw?: string): Promise<PeerId> {
+  pw = pw || (await askForPassword('Please type in a password to encrypt the secret key.'))
+
+  const key = await keys.generateKeyPair('secp256k1', 256)
+  const peerId = await PeerId.createFromPrivKey(key.bytes)
+
+  const serializedKeyPair = await serializeKeyPair(peerId, new TextEncoder().encode(pw))
+  await db.put(Buffer.from(KeyPair), serializedKeyPair)
 
   return peerId
 }

@@ -16,7 +16,7 @@ declare class TCP {
     private _peerInfo;
     private _handle;
     private _unhandle;
-    private relay;
+    private relay?;
     private connHandler;
     constructor({ upgrader, libp2p, bootstrap, }: {
         upgrader: Upgrader;
@@ -28,7 +28,7 @@ declare class TCP {
     forwardHandlerFactory(counterparty: PeerId): (handler: Handler) => void;
     handleDeliveryRegister({ stream }: Handler): void;
     handleRelayUnregister({ stream, connection }: Handler): void;
-    closeConnection(counterparty: PeerId, relayer: PeerId): Promise<void>;
+    closeConnection(counterparty: PeerId): Promise<void>;
     registerDelivery(outerconnection: Connection, counterparty: PeerId): Promise<Uint8Array>;
     handleRelayRegister({ stream, connection }: Handler): void;
     /**

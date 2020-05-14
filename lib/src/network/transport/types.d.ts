@@ -65,6 +65,6 @@ export interface Registrar {
     handle(protocol: string, handler: Handler): void;
 }
 export interface Dialer {
-    connectToPeer(peer: PeerInfo | PeerId, options?: any): Promise<Connection>;
+    connectToPeer(peer: PeerInfo, options?: any): Promise<Connection>;
 }
 export declare type ConnHandler = (conn: Connection) => void;
