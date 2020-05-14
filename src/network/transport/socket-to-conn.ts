@@ -2,6 +2,7 @@ import abortable from 'abortable-iterator'
 import debug from 'debug'
 const log = debug('libp2p:tcp:socket')
 
+// @ts-ignore
 import toIterable = require('stream-to-it')
 const toMultiaddr = require('libp2p-utils/src/ip-port-to-multiaddr')
 import { CLOSE_TIMEOUT } from './constants'
@@ -72,7 +73,7 @@ export function socketToConn(
     close() {
       if (socket.destroyed) return
 
-      return new Promise((resolve, reject) => {
+      return new Promise<void>((resolve, reject) => {
         const start = Date.now()
 
         // Attempt to end the socket. If it takes longer to close than the

@@ -86,8 +86,8 @@ describe('should create a socket and connect to it', function () {
     const relay = await generateNode(2)
 
     const [sender, counterparty] = await Promise.all([
-      generateNode(0, relay.peerInfo),
-      generateNode(1, relay.peerInfo),
+      generateNode(0, relay.peerInfo.id),
+      generateNode(1, relay.peerInfo.id),
     ])
 
     connectionHelper([sender, relay])
