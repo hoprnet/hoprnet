@@ -228,6 +228,11 @@ function runAsBootstrapNode() {
   node.on('peer:connect', (peer: PeerInfo) => {
     console.log(`Incoming connection from ${chalk.blue(peer.id.toB58String())}.`)
   })
+
+  process.once('exit', async () => {
+    await node.down()
+    return
+  })
 }
 
 async function main() {
