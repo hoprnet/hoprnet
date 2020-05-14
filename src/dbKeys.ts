@@ -1,3 +1,6 @@
+import { pubKeyToPeerId } from './utils'
+import type PeerId from 'peer-id'
+
 const encoder = new TextEncoder()
 const PREFIX: Uint8Array = encoder.encode('tickets-')
 const SEPERATOR: Uint8Array = encoder.encode('-')
@@ -7,9 +10,6 @@ const unAcknowledgedSubPrefix = encoder.encode('unacknowledged-')
 
 const COMPRESSED_PUBLIC_KEY_LENGTH = 33
 const KEY_LENGTH = 32
-
-import { pubKeyToPeerId } from './utils'
-import type PeerId from 'peer-id'
 
 export function AcknowledgedTickets(publicKeyCounterparty: Uint8Array, id: Uint8Array): Uint8Array {
   return allocationHelper([

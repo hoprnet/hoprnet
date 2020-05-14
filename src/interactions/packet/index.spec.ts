@@ -23,7 +23,7 @@ import LevelUp from 'levelup'
 import Memdown from 'memdown'
 import BN from 'bn.js'
 import { randomBytes, createHash } from 'crypto'
-import * as DbKeys from '../../db_keys'
+import * as DbKeys from '../../dbKeys'
 import { stringToU8a, u8aEquals, randomInteger, u8aConcat } from '@hoprnet/hopr-utils'
 import secp256k1 from 'secp256k1'
 

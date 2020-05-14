@@ -34,7 +34,7 @@ import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { HoprCoreConnectorStatic } from '@hoprnet/hopr-core-connector-interface'
 
 import { Interactions, Duplex } from './interactions'
-import * as DbKeys from './db_keys'
+import * as DbKeys from './dbKeys'
 
 export type HoprOptions = {
   debug: boolean
