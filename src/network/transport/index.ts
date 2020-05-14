@@ -62,11 +62,11 @@ class TCP {
   private _peerInfo: PeerInfo
   private _handle: (protocols: string[] | string, handler: (connection: Handler) => void) => void
   private _unhandle: (protocols: string[] | string) => void
-  private relay?: PeerId
+  private relay?: PeerInfo
 
   private connHandler: ConnHandler
 
-  constructor({ upgrader, libp2p, bootstrap }: { upgrader: Upgrader; libp2p: libp2p; bootstrap?: PeerId }) {
+  constructor({ upgrader, libp2p, bootstrap }: { upgrader: Upgrader; libp2p: libp2p; bootstrap?: PeerInfo }) {
     if (!upgrader) {
       throw new Error('An upgrader must be provided. See https://github.com/libp2p/interface-transport#upgrader.')
     }
@@ -205,10 +205,10 @@ class TCP {
     let conn: Connection
 
     try {
-      conn = await this._dialer.connectToPeer(new PeerInfo(this.relay))
+      conn = await this._dialer.connectToPeer(this.relay)
     } catch (err) {
       console.log(
-        `Could not request relayer ${this.relay.toB58String()} to tear down relayed connection. Error was:\n`,
+        `Could not request relayer ${this.relay.id.toB58String()} to tear down relayed connection. Error was:\n`,
         err
       )
       return
@@ -299,6 +299,7 @@ class TCP {
   async dial(ma: Multiaddr, options?: DialOptions): Promise<Connection> {
     options = options || {}
 
+    console.log(`dailing ${ma.toString()}`)
     try {
       return await this.dialDirectly(ma, options)
     } catch (err) {
@@ -315,10 +316,10 @@ class TCP {
 
     console.log(`Dailing over relay node`)
 
-    let relayConnection = this._registrar.getConnection(new PeerInfo(this.relay))
+    let relayConnection = this._registrar.getConnection(this.relay)
 
     if (!relayConnection) {
-      relayConnection = await this._dialer.connectToPeer(new PeerInfo(this.relay))
+      relayConnection = await this._dialer.connectToPeer(this.relay)
     }
 
     const { stream: registerStream } = await relayConnection.newStream([RELAY_REGISTER])
@@ -377,7 +378,7 @@ class TCP {
       const start = Date.now()
       const cOpts = multiaddrToNetConfig(ma) as any
 
-      log('dialing %j', cOpts)
+      console.log('dialing %j', cOpts)
       const rawSocket = net.connect(cOpts)
 
       const onError = (err: Error) => {

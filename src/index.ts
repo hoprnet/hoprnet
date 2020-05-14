@@ -111,7 +111,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
           config: {
             transport: {
               TCP: {
-                bootstrap: (options.bootstrapServers != null && options.bootstrapServers.length > 0) ? options.bootstrapServers[0].id : undefined,
+                bootstrap: (options.bootstrapServers != null && options.bootstrapServers.length > 0) ? options.bootstrapServers[0] : undefined,
               },
             },
             dht: {

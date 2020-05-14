@@ -3,6 +3,7 @@ import type { Socket } from 'net';
 import libp2p = require('libp2p');
 import { Listener } from './listener';
 import Multiaddr from 'multiaddr';
+import PeerInfo from 'peer-info';
 import PeerId from 'peer-id';
 import type { Connection, Upgrader, DialOptions, Handler } from './types';
 /**
@@ -21,7 +22,7 @@ declare class TCP {
     constructor({ upgrader, libp2p, bootstrap }: {
         upgrader: Upgrader;
         libp2p: libp2p;
-        bootstrap?: PeerId;
+        bootstrap?: PeerInfo;
     });
     private relayToConn;
     deliveryHandlerFactory(sender: PeerId): (handler: Handler) => void;
