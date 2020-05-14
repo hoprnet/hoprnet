@@ -1,3 +1,6 @@
+// see https://github.com/trufflesuite/ganache-core/issues/465
+import '@hoprnet/hopr-core-ethereum/src/ganache-core'
+
 import Hopr from '../..'
 import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 
