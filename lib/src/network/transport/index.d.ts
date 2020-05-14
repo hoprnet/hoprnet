@@ -18,7 +18,7 @@ declare class TCP {
     private _unhandle;
     private relay?;
     private connHandler;
-    constructor({ upgrader, libp2p, bootstrap, }: {
+    constructor({ upgrader, libp2p, bootstrap }: {
         upgrader: Upgrader;
         libp2p: libp2p;
         bootstrap?: PeerId;

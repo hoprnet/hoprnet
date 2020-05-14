@@ -38,7 +38,6 @@ export function createListener(
 
   const server = net.createServer(async socket => {
     // Avoid uncaught errors caused by unstable connections
-    console.log('received connection')
     socket.on('error', err => log('socket error', err))
 
     let maConn: MultiaddrConnection

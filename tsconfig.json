@@ -10,5 +10,4 @@
     "noEmit": true
   },
   "include": ["src/**/*.ts", "chat/**/*.ts"],
-  "exclude": ["src/network/transport"]
 }

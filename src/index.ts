@@ -7,8 +7,8 @@ import KadDHT = require('libp2p-kad-dht')
 // @ts-ignore
 import SECIO = require('libp2p-secio')
 // import { WebRTCv4, WebRTCv6 } = require('./network/natTraversal')
-// @ts-ignore
-import TCP = require('libp2p-tcp')
+
+import TCP from './network/transport'
 
 // @ts-ignore
 import defaultsDeep = require('@nodeutils/defaults-deep')
@@ -61,10 +61,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
   public bootstrapServers: PeerInfo[]
 
   // @TODO add libp2p types
-  declare dial: (
-    addr: Multiaddr | PeerInfo | PeerId,
-    options?: { signal: AbortSignal }
-  ) => Promise<any>
+  declare dial: (addr: Multiaddr | PeerInfo | PeerId, options?: { signal: AbortSignal }) => Promise<any>
   declare dialProtocol: (
     addr: Multiaddr | PeerInfo | PeerId,
     protocol: string,
@@ -81,10 +78,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
   declare peerRouting: {
     findPeer: (addr: PeerId) => Promise<PeerInfo>
   }
-  declare handle: (
-    protocol: string[],
-    handler: (struct: { connection: any; stream: any }) => void
-  ) => void
+  declare handle: (protocol: string[], handler: (struct: { connection: any; stream: any }) => void) => void
   declare start: () => Promise<void>
   declare stop: () => Promise<void>
   declare on: (str: string, handler: (...props: any[]) => void) => void
@@ -109,25 +103,17 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
           },
           // The libp2p modules for this libp2p bundle
           modules: {
-            transport: [
-              TCP,
-              // WebRTCv4,
-              // WebRTCv6
-            ],
-
+            transport: [TCP],
             streamMuxer: [MPLEX],
             connEncryption: [SECIO],
             dht: KadDHT,
-            // peerDiscovery: [
-            //     WebRTC.discovery
-            // ]
           },
           config: {
-            // peerDiscovery: {
-            //     webRTCStar: {
-            //         enabled: true
-            //     }
-            // },
+            transport: {
+              TCP: {
+                bootstrap: (options.bootstrapServers != null && options.bootstrapServers.length > 0) ? options.bootstrapServers[0].id : undefined,
+              },
+            },
             dht: {
               enabled: true,
             },
@@ -154,9 +140,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
    *
    * @param options the parameters
    */
-  static async create<CoreConnector extends HoprCoreConnector>(
-    options: HoprOptions
-  ): Promise<Hopr<CoreConnector>> {
+  static async create<CoreConnector extends HoprCoreConnector>(options: HoprOptions): Promise<Hopr<CoreConnector>> {
     const db = options.db || Hopr.openDatabase(`db`, options.connector.constants, options)
 
     options.peerInfo = options.peerInfo || (await getPeerInfo(options, db))
@@ -172,7 +156,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
     let connector = (await options.connector.create(db, options.peerInfo.id.privKey.marshal(), {
       id: options.id,
       provider: options.provider,
-      debug: options.debug
+      debug: options.debug,
     })) as CoreConnector
 
     return await new Hopr<CoreConnector>(options, db, connector).up()
@@ -211,10 +195,10 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
       await this.connectToBootstrapServers()
     }
 
-    console.log(`Available under the following addresses:`)
+    this.log(`Available under the following addresses:`)
 
     this.peerInfo.multiaddrs.forEach((ma: Multiaddr) => {
-      console.log(ma.toString())
+      this.log(ma.toString())
     })
 
     await this.paymentChannels?.start()
@@ -288,9 +272,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
           }
 
           this.interactions.packet.acknowledgment.once(
-            u8aToHex(
-              this.dbKeys.UnAcknowledgedTickets(path[0].pubKey.marshal(), packet.challenge.hash)
-            ),
+            u8aToHex(this.dbKeys.UnAcknowledgedTickets(path[0].pubKey.marshal(), packet.challenge.hash)),
             () => {
               resolve()
             }

@@ -26,7 +26,8 @@
     "hopr": "ts-node -T chat/index.ts",
     "build": "yarn clean && tsc -p . --noEmit false",
     "clean": "rm -rf ./lib",
-    "fundAccounts": "ts-node -T ./scripts/fundAccounts.ts"
+    "fundAccounts": "ts-node -T ./scripts/fundAccounts.ts",
+    "test": "mocha --exit"
   },
   "dependencies": {
     "@hoprnet/hopr-utils": "latest",
@@ -100,7 +101,7 @@
   },
   "prettier": {
     "parser": "typescript",
-    "printWidth": 100,
+    "printWidth": 120,
     "semi": false,
     "singleQuote": true,
     "quoteProps": "consistent",

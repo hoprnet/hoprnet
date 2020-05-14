@@ -27,9 +27,7 @@ const DELIVERY_REGISTER = '/hopr/delivery-register/0.0.1'
 const RELAY_DELIVER = (from: Uint8Array) => `/hopr/deliver${u8aToHex(from)}/0.0.1`
 const RELAY_FORWARD = (from: Uint8Array, to: Uint8Array) => {
   if (from.length !== to.length) {
-    throw Error(
-      `Could not generate RELAY_FORWARD protocol string because array lengths do not match`
-    )
+    throw Error(`Could not generate RELAY_FORWARD protocol string because array lengths do not match`)
   }
 
   return `/hopr/forward${u8aToHex(u8aAdd(false, from, to))}/0.0.1`
@@ -68,19 +66,9 @@ class TCP {
 
   private connHandler: ConnHandler
 
-  constructor({
-    upgrader,
-    libp2p,
-    bootstrap,
-  }: {
-    upgrader: Upgrader
-    libp2p: libp2p
-    bootstrap?: PeerId
-  }) {
+  constructor({ upgrader, libp2p, bootstrap }: { upgrader: Upgrader; libp2p: libp2p; bootstrap?: PeerId }) {
     if (!upgrader) {
-      throw new Error(
-        'An upgrader must be provided. See https://github.com/libp2p/interface-transport#upgrader.'
-      )
+      throw new Error('An upgrader must be provided. See https://github.com/libp2p/interface-transport#upgrader.')
     }
 
     if (!libp2p) {
@@ -127,7 +115,7 @@ class TCP {
       const conn = await this._upgrader.upgradeInbound(
         this.relayToConn({
           stream,
-          counterparty: sender
+          counterparty: sender,
         })
       )
 
@@ -154,9 +142,7 @@ class TCP {
         return
       }
 
-      const { stream: innerStream } = await conn.newStream([
-        RELAY_DELIVER(connection.remotePeer.pubKey.marshal()),
-      ])
+      const { stream: innerStream } = await conn.newStream([RELAY_DELIVER(connection.remotePeer.pubKey.marshal())])
 
       pipe(stream, innerStream, stream)
     }).bind(this)
@@ -170,10 +156,7 @@ class TCP {
           for await (const msg of source) {
             const sender = await pubKeyToPeerId(msg.slice())
 
-            this._handle(
-              RELAY_DELIVER(sender.pubKey.marshal()),
-              this.deliveryHandlerFactory(sender)
-            )
+            this._handle(RELAY_DELIVER(sender.pubKey.marshal()), this.deliveryHandlerFactory(sender))
             yield OK
           }
         }.apply(this)
@@ -316,8 +299,6 @@ class TCP {
   async dial(ma: Multiaddr, options?: DialOptions): Promise<Connection> {
     options = options || {}
 
-    console.log(ma.toString())
-
     try {
       return await this.dialDirectly(ma, options)
     } catch (err) {
@@ -364,7 +345,7 @@ class TCP {
     return await this._upgrader.upgradeOutbound(
       this.relayToConn({
         stream: msgStream,
-        counterparty: destinationPeerId
+        counterparty: destinationPeerId,
       })
     )
   }
@@ -406,10 +387,7 @@ class TCP {
 
       const onTimeout = () => {
         log('connnection timeout %s:%s', cOpts.host, cOpts.port)
-        const err = errCode(
-          new Error(`connection timeout after ${Date.now() - start}ms`),
-          'ERR_CONNECT_TIMEOUT'
-        )
+        const err = errCode(new Error(`connection timeout after ${Date.now() - start}ms`), 'ERR_CONNECT_TIMEOUT')
         // Note: this will result in onError() being called
         rawSocket.emit('error', err)
       }
@@ -451,8 +429,6 @@ class TCP {
    * @returns {Listener} A TCP listener
    */
   createListener(options: any, handler: (connection: any) => void): Listener {
-    console.log(options, handler)
-
     if (typeof options === 'function') {
       handler = options
       options = {}
