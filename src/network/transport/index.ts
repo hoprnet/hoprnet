@@ -299,7 +299,6 @@ class TCP {
   async dial(ma: Multiaddr, options?: DialOptions): Promise<Connection> {
     options = options || {}
 
-    console.log(`dailing ${ma.toString()}`)
     try {
       return await this.dialDirectly(ma, options)
     } catch (err) {
@@ -314,7 +313,7 @@ class TCP {
   async dialWithRelay(ma: Multiaddr, options?: DialOptions): Promise<Connection> {
     const destinationPeerId = PeerId.createFromCID(ma.getPeerId())
 
-    console.log(`Dailing over relay node`)
+    console.log(`dailing ${ma.toString()} over relay node`)
 
     let relayConnection = this._registrar.getConnection(this.relay)
 
@@ -352,7 +351,7 @@ class TCP {
   }
 
   async dialDirectly(ma: Multiaddr, options?: DialOptions): Promise<Connection> {
-    console.log(`establishing normal connection`)
+    console.log(`dailing ${ma.toString()} directly`)
     const socket = await this._connect(ma, options)
     const maConn = socketToConn(socket, { remoteAddr: ma, signal: options.signal })
 
