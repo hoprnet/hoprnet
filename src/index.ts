@@ -1,5 +1,6 @@
 export * from './collection'
 export * from './console'
+export * from './crypto'
 export * from './fs'
 export * from './u8a'
 export * from './parseJSON'
