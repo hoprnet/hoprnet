@@ -36,6 +36,11 @@ import type { HoprCoreConnectorStatic } from '@hoprnet/hopr-core-connector-inter
 import { Interactions, Duplex } from './interactions'
 import * as DbKeys from './dbKeys'
 
+interface NetOptions {
+  ip: string,
+  port: number
+}
+
 export type HoprOptions = {
   debug: boolean
   db?: LevelUp
@@ -48,7 +53,11 @@ export type HoprOptions = {
   connector: HoprCoreConnectorStatic
   bootstrapServers?: PeerInfo[]
   provider: string
-  output?: (encoded: Uint8Array) => void
+  output?: (encoded: Uint8Array) => void,
+  hosts?: {
+    ip4?: NetOptions,
+    ip6?: NetOptions
+  }
 }
 
 export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
