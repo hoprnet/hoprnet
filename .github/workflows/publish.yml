@@ -1,14 +1,11 @@
-# This workflow will run a pre-release version of the built package.
-# See more in https://github.com/esamattis/npm-release
-
-name: Pre-release
+name: Publish
 
 on:
   push:
     branches: [master]
 
 jobs:
-  prerelease:
+  publish:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -25,8 +22,7 @@ jobs:
         run: yarn build
       - name: Test library
         run: yarn test
+      - name: Setup NPM Registry
+        run: npm config set //npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}
       - name: Publish
-        uses: mikeal/merge-release@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish
