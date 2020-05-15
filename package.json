@@ -7,8 +7,11 @@
     "type": "git",
     "url": "https://github.com/hoprnet/hopr-ethereum.git"
   },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://npm.pkg.github.com/"
+  },
   "license": "LGPL-3.0-only",
-  "private": false,
   "main": "./build/lib/scripts/api.js",
   "files": [
     "truffle-networks.json",
@@ -32,7 +35,7 @@
   },
   "husky": {
     "hooks": {
-      "pre-commit": "yarn format && yarn build && git add ."
+      "pre-commit": "yarn format"
     }
   },
   "dependencies": {
