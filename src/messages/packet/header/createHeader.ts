@@ -1,8 +1,7 @@
 import secp256k1 from 'secp256k1'
 import crypto from 'crypto'
 
-import { u8aXOR, u8aToHex, u8aConcat } from '@hoprnet/hopr-utils'
-import { PRG } from '../../../utils'
+import { u8aXOR, u8aToHex, u8aConcat, PRG } from '@hoprnet/hopr-utils'
 import { MAX_HOPS } from '../../../constants'
 
 import {

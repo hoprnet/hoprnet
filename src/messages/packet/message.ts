@@ -1,8 +1,7 @@
 import { PACKET_SIZE } from '../../constants'
 import { deriveCipherParameters } from './header'
 
-import { PRP } from '../../utils'
-import { toLengthPrefixedU8a, lengthPrefixedToU8a } from '@hoprnet/hopr-utils'
+import { toLengthPrefixedU8a, lengthPrefixedToU8a, PRP } from '@hoprnet/hopr-utils'
 
 export const PADDING = new TextEncoder().encode('PADDING')
 
