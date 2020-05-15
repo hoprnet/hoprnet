@@ -9,41 +9,53 @@ import { NODE_SEEDS, BOOTSTRAP_SEEDS } from '@hoprnet/hopr-demo-seeds'
 
 import PeerInfo from 'peer-info'
 import PeerId from 'peer-id'
+import Multiaddr from 'multiaddr'
 
 import { KeyPair } from '../../dbKeys'
 
-// @ts-ignore
-const Multiaddr = require('multiaddr')
 
 import { NAME } from '../../constants'
 
 /**
  * Assemble the addresses that we are using
  */
-function getAddrs(options: any): any[] {
+function getAddrs(options: HoprOptions): any[] {
   const addrs = []
 
-  if (process.env.PORT == null) {
-    throw Error('Unknown port. Please specify a port in the .env file!')
-  }
-
-  let port = process.env.PORT
-
-  if (process.env.HOST_IPV4) {
+  if (options.hosts === undefined || (options.hosts.ip4 === undefined && options.hosts.ip6 === undefined)) {
+    let ip4Port = 9091
     // ============================= Only for testing ============================================================
-    if (options != null && options.id != null && Number.isInteger(options.id)) {
-      port = (Number.parseInt(process.env.PORT) + (options.id + 1) * 2).toString()
+    if (options.id != null && Number.isInteger(options.id)) {
+      ip4Port += (options.id + 1) * 2
     }
     // ===========================================================================================================
-    addrs.push(Multiaddr(`/ip4/${process.env.HOST_IPV4}/tcp/${port}`))
+    addrs.push(Multiaddr(`/ip4/0.0.0.0/tcp/${ip4Port}`))
   }
 
-  // if (process.env.HOST_IPV6) {
-  //     // ============================= Only for testing ============================================================
-  //     if (Number.isInteger(options.id)) port = (Number.parseInt(process.env.PORT) + (options.id + 1) * 2).toString()
-  //     // ===========================================================================================================
-  //     addrs.push(Multiaddr(`/ip6/${process.env.HOST_IPV6}/tcp/${Number.parseInt(port) + 1}`))
-  // }
+  if (options.hosts !== undefined) {
+    if (options.hosts.ip4 === undefined && options.hosts.ip6 === undefined) {
+      throw Error(`Unable `)
+    }
+    if (options.hosts.ip4 !== undefined) {
+      let ip4Port = options.hosts.ip4.port
+      // ============================= Only for testing ============================================================
+      if (options.id != null && Number.isInteger(options.id)) {
+        ip4Port += (options.id + 1) * 2
+      }
+      // ===========================================================================================================
+      addrs.push(Multiaddr(`/ip4/${options.hosts.ip4.ip}/tcp/${ip4Port}`))
+    }
+
+    if (options.hosts.ip6 !== undefined) {
+      let ip6Port = options.hosts.ip6.port
+      // ============================= Only for testing ============================================================
+      if (options.id != null && Number.isInteger(options.id)) {
+        ip6Port += (options.id + 1) * 2
+      }
+      // ===========================================================================================================
+      addrs.push(Multiaddr(`/ip6/${options.hosts.ip6.ip}/tcp/${ip6Port}`))
+    }
+  }
 
   return addrs
 }
@@ -67,9 +79,7 @@ async function getPeerId(options: HoprOptions, db?: LevelUp): Promise<PeerId> {
         return await privKeyToPeerId(BOOTSTRAP_SEEDS[options.id])
       } else {
         if (options.id >= NODE_SEEDS.length) {
-          throw Error(
-            `Unable to access node seed number ${options.id} out of ${NODE_SEEDS.length} node seeds.`
-          )
+          throw Error(`Unable to access node seed number ${options.id} out of ${NODE_SEEDS.length} node seeds.`)
         }
         return await privKeyToPeerId(NODE_SEEDS[options.id])
       }
@@ -77,9 +87,7 @@ async function getPeerId(options: HoprOptions, db?: LevelUp): Promise<PeerId> {
       return await privKeyToPeerId(BOOTSTRAP_SEEDS[0])
     }
   } else if (options.id != null && isFinite(options.id)) {
-    throw Error(
-      `Demo Ids are only available in DEBUG_MODE. Consider setting DEBUG_MODE to 'true' in .env`
-    )
+    throw Error(`Demo Ids are only available in DEBUG_MODE. Consider setting DEBUG_MODE to 'true' in .env`)
   }
 
   if (db == null) {
@@ -112,9 +120,7 @@ async function recoverIdentity(serializedKeyPair: Uint8Array, pw?: string): Prom
       peerId = await deserializeKeyPair(serializedKeyPair, new TextEncoder().encode(pw))
       done = true
     } catch (err) {
-      console.log(
-        `Could not recover id from database with given password. Please type it in manually.`
-      )
+      console.log(`Could not recover id from database with given password. Please type it in manually.`)
     }
   }
 
@@ -144,28 +150,10 @@ async function createIdentity(db: LevelUp, pw?: string): Promise<PeerId> {
   return peerId
 }
 
-/**
- * Check whether our config makes sense
- */
-function checkConfig(): void {
-  if (!process.env.HOST_IPV4 && !process.env.HOST_IPV6) {
-    throw Error('Unable to start node without an address. Please provide at least one.')
-  }
-
-  if (!process.env.PORT) {
-    throw Error('Got no port to listen on. Please specify one.')
-  }
-}
-
 async function getPeerInfo(options: HoprOptions, db?: LevelUp): Promise<PeerInfo> {
-  if (
-    db == null &&
-    (options == null || (options != null && options.peerInfo == null && options.peerId == null))
-  ) {
+  if (db == null && (options == null || (options != null && options.peerInfo == null && options.peerId == null))) {
     throw Error('Invalid input parameter. Please set a valid peerInfo or pass a database handle.')
   }
-
-  checkConfig()
 
   const addrs = getAddrs(options)
 
@@ -176,9 +164,7 @@ async function getPeerInfo(options: HoprOptions, db?: LevelUp): Promise<PeerInfo
     peerInfo = new PeerInfo(await getPeerId(options, db))
   }
 
-  addrs.forEach(addr =>
-    peerInfo.multiaddrs.add(addr.encapsulate(`/${NAME}/${peerInfo.id.toB58String()}`))
-  )
+  addrs.forEach(addr => peerInfo.multiaddrs.add(addr.encapsulate(`/${NAME}/${peerInfo.id.toB58String()}`)))
 
   return peerInfo
 }
