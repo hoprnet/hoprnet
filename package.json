@@ -4,9 +4,18 @@
   "description": "Demo seeds for HOPR testing",
   "license": "GPL-3.0-only",
   "scripts": {
-    "preinstall": "tsc",
-    "start": "micro"
+    "start": "micro",
+    "test": "echo '✅ No tests needed'",
+    "build": "tsc -d -p ."
   },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://npm.pkg.github.com/"
+  },
+  "files": [
+    "lib",
+    "README"
+  ],
   "keywords": [
     "privacy",
     "web3",
@@ -15,11 +24,6 @@
   "engines": {
     "node": "^12",
     "yarn": "^1.22"
-  },
-  "husky": {
-    "hooks": {
-      "pre-commit": "rm -rf ./lib && tsc -d -p . && git add ./lib"
-    }
   },
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
