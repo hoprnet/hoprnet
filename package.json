@@ -9,10 +9,6 @@
     "build": "tsc -d -p .",
     "prepare": "yarn build"
   },
-  "publishConfig": {
-    "access": "public",
-    "registry": "https://npm.pkg.github.com/"
-  },
   "files": [
     "lib",
     "README"
