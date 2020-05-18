@@ -35,14 +35,11 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         name: Publish to GitHub Packages
         run: npm publish || echo "Publish will not fail, please verify manually"
-
       - name: Setup Node.js for NPM
         uses: actions/setup-node@v1
         with:
           node-version: 12
-          registry-url: 'https://registry.npm.org'
-          scope: '@hoprnet'
-      - env:
+          registry-url: https://registry.npmjs.org/
+      - run: npm publish --access public
+        env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        name: Publish to NPM Registry
-        run: npm publish --access public || echo "Publish will not fail, please verify manually"
