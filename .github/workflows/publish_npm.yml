@@ -1,21 +1,16 @@
-name: Node.js CI
+name: Publish to NPM
 
 on:
-  pull_request:
-    branches: [master, develop]
+  push:
+    branches: [master, debug]
 
 jobs:
-  build:
+  publish_npm:
     runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        node-version: [12.x]
-
     steps:
       # Checkout, Cache and Setup Steps
       - name: Checkout repository
-      - uses: actions/checkout@v2
+        uses: actions/checkout@v2
       - name: Cache node_modules
         id: cache-modules
         uses: actions/cache@v1
@@ -27,11 +22,17 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
 
-      # Building and testing library
+      # Installing library requirements
       - name: Install node modules
         if: steps.cache-modules.outputs.cache-hit != 'true'
         run: yarn install --frozen-lockfile
-      - name: Build library
-        run: yarn build
-      - name: Test library
-        run: yarn test
+
+      - name: Setup Node.js for NPM
+        uses: actions/setup-node@v1
+        with:
+          node-version: 12
+          registry-url: https://registry.npmjs.org/
+      - env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        name: Publish to NPM Registry
+        run: npm publish --access public
