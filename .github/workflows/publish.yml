@@ -29,9 +29,8 @@ jobs:
       - name: Setup Node.js for GPR
         uses: actions/setup-node@v1
         with:
+          node-version: 12
           registry-url: 'https://npm.pkg.github.com'
-      - name: Debugging registry
-        run: npm config get registry
       - env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         name: Publish to GitHub Packages
@@ -40,11 +39,9 @@ jobs:
       - name: Setup Node.js for NPM
         uses: actions/setup-node@v1
         with:
+          node-version: 12
           registry-url: 'https://registry.npm.org'
-          scope: '@hoprnet'
-      - name: Debugging registry
-        run: npm config get registry
       - env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         name: Publish to NPM Registry
-        run: npm publish || echo "Publish will not fail, please verify manually"
+        run: npm publish --access public || echo "Publish will not fail, please verify manually"
