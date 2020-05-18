@@ -1,11 +1,11 @@
-name: Publish
+name: Publish to NPM
 
 on:
   push:
     branches: [master, debug]
 
 jobs:
-  publish:
+  publish_npm:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -24,15 +24,6 @@ jobs:
       - name: Test library
         run: yarn test
 
-      - name: Setup Node.js for GPR
-        uses: actions/setup-node@v1
-        with:
-          node-version: 12
-          registry-url: 'https://npm.pkg.github.com'
-      - env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        name: Publish to GitHub Packages
-        run: npm publish || echo "Publish will not fail, please verify manually"
       - name: Setup Node.js for NPM
         uses: actions/setup-node@v1
         with:
