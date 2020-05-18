@@ -41,6 +41,7 @@ jobs:
         with:
           node-version: 12
           registry-url: 'https://registry.npm.org'
+          scope: '@hoprnet'
       - env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         name: Publish to NPM Registry
