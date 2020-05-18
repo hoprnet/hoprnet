@@ -11,6 +11,10 @@ import { getMultiaddrs, multiaddrToNetConfig } from './utils'
 import { MultiaddrConnection, Connection, Upgrader } from './types'
 import Multiaddr from 'multiaddr'
 
+export interface Libp2pServer extends Server {
+  __connections: MultiaddrConnection[]
+}
+
 export interface Listener extends EventEmitter {
   close(): void
   listen(ma: Multiaddr): Promise<void>
@@ -38,7 +42,7 @@ export function createListener(
 
   const server = net.createServer(async socket => {
     // Avoid uncaught errors caused by unstable connections
-    socket.on('error', err => log('socket error', err))
+    socket.on('error', err => error('socket error', err))
 
     let maConn: MultiaddrConnection
     let conn: Connection
@@ -60,7 +64,8 @@ export function createListener(
     }
 
     listener.emit('connection', conn)
-  })
+  }) as Libp2pServer
+
 
   server
     .on('listening', () => listener.emit('listening'))
@@ -68,14 +73,12 @@ export function createListener(
     .on('close', () => listener.emit('close'))
 
   // Keep track of open connections to destroy in case of timeout
-  // @ts-ignore
   server.__connections = []
 
   listener.close = () => {
     if (!server.listening) return
 
     return new Promise((resolve, reject) => {
-      // @ts-ignore
       server.__connections.forEach((maConn: MultiaddrConnection) => attemptClose(maConn))
       server.close(err => (err ? reject(err) : resolve()))
     })
@@ -123,7 +126,7 @@ export function createListener(
   return listener
 }
 
-function trackConn(server: Server, maConn: MultiaddrConnection) {
+function trackConn(server: Libp2pServer, maConn: MultiaddrConnection) {
   // @ts-ignore
   server.__connections.push(maConn)
 

@@ -4,7 +4,8 @@ const log = debug('libp2p:tcp:socket')
 
 // @ts-ignore
 import toIterable = require('stream-to-it')
-const toMultiaddr = require('libp2p-utils/src/ip-port-to-multiaddr')
+// @ts-ignore
+import toMultiaddr = require('libp2p-utils/src/ip-port-to-multiaddr')
 import { CLOSE_TIMEOUT } from './constants'
 import { MultiaddrConnection } from './types'
 import type Multiaddr from 'multiaddr'
