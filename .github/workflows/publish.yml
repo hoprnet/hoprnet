@@ -2,7 +2,7 @@ name: Publish
 
 on:
   push:
-    branches: [master]
+    branches: [master, debug]
 
 jobs:
   publish:
@@ -30,6 +30,8 @@ jobs:
         uses: actions/setup-node@v1
         with:
           registry-url: 'https://npm.pkg.github.com'
+      - name: Debugging registry
+        run: npm config get registry
       - env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         name: Publish to GitHub Packages
@@ -40,6 +42,8 @@ jobs:
         with:
           registry-url: 'https://registry.npm.org'
           scope: '@hoprnet'
+      - name: Debugging registry
+        run: npm config get registry
       - env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         name: Publish to NPM Registry
