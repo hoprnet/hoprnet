@@ -4,6 +4,7 @@ import mafmt from 'mafmt'
 const errCode = require('err-code')
 const log = require('debug')('libp2p:tcp')
 import { socketToConn } from './socket-to-conn'
+import abortable from 'abortable-iterator'
 
 // @ts-ignore
 import libp2p = require('libp2p')
@@ -194,12 +195,14 @@ class TCP {
             try {
               sender = await pubKeyToPeerId(msg.slice())
             } catch {
-              return FAIL
+              yield FAIL
+              return
             }
 
             this._handle(RELAY_DELIVER(sender.pubKey.marshal()), this.deliveryHandlerFactory(sender))
 
-            return OK
+            yield OK
+            return
           }
         }.apply(this)
       },
@@ -320,7 +323,8 @@ class TCP {
             try {
               counterparty = await pubKeyToPeerId(msg.slice())
             } catch {
-              return FAIL
+              yield FAIL
+              return
             }
 
             const answer = await this.registerDelivery(connection, counterparty)
@@ -334,12 +338,16 @@ class TCP {
                 ),
                 this.forwardHandlerFactory(counterparty)
               )
-              return OK
-            } else if (u8aEquals(answer, FAIL)) {
-              return FAIL
-            } else {
+              yield OK
+              return
+            }
+
+            if (!u8aEquals(answer, FAIL)) {
               console.log(`Received unexpected message from counterparty '${answer}'`)
             }
+
+            yield FAIL
+            return
           }
         }.apply(this)
       },
@@ -408,7 +416,7 @@ class TCP {
     }
   }
 
-  tryWebRTC(conn: Connection, counterparty: PeerId): Promise<Connection> {
+  tryWebRTC(conn: Connection, counterparty: PeerId, options?: { signal: AbortSignal }): Promise<Connection> {
     return new Promise<Connection>(async (resolve, reject) => {
       const { stream } = await conn.newStream([WEBRTC])
       const queue = pushable<Uint8Array>()
@@ -423,6 +431,7 @@ class TCP {
         channel.removeListener('connect', onConnect)
         channel.removeListener('error', onError)
         channel.removeListener('signal', onSignal)
+        options.signal && options.signal.removeEventListener('abort', onAbort)
 
         if (err) {
           reject(err)
@@ -430,6 +439,12 @@ class TCP {
           resolve(conn)
         }
       }
+
+      const onAbort = () => {
+        channel.destroy()
+        setImmediate(reject)
+      }
+
       const onSignal = (data: string): void => {
         queue.push(this._encoder.encode(JSON.stringify(data)))
       }
@@ -470,7 +485,7 @@ class TCP {
 
     if (!relayConnection) {
       try {
-        relayConnection = await this._dialer.connectToPeer(this.relay)
+        relayConnection = await this._dialer.connectToPeer(this.relay, { signal: options?.signal })
       } catch (err) {
         throw Error(`Could not connect to relay. Error was: '${chalk.red(err.message)}`)
       }
@@ -497,6 +512,10 @@ class TCP {
       RELAY_FORWARD(this._peerInfo.id.pubKey.marshal(), destinationPeerId.pubKey.marshal()),
     ])
 
+    if (options.signal) {
+      msgStream.source = abortable(msgStream.source, options.signal)
+    }
+
     let conn = await this._upgrader.upgradeOutbound(
       this.relayToConn({
         stream: msgStream,
@@ -505,7 +524,7 @@ class TCP {
     )
 
     try {
-      let webRTCConn = await this.tryWebRTC(conn, destinationPeerId)
+      let webRTCConn = await this.tryWebRTC(conn, destinationPeerId, { signal: options.signal })
       conn.close()
 
       return webRTCConn

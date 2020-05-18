@@ -44,7 +44,9 @@ declare class TCP {
      * @returns {Connection} An upgraded Connection
      */
     dial(ma: Multiaddr, options?: DialOptions): Promise<Connection>;
-    tryWebRTC(conn: Connection, counterparty: PeerId): Promise<Connection>;
+    tryWebRTC(conn: Connection, counterparty: PeerId, options?: {
+        signal: AbortSignal;
+    }): Promise<Connection>;
     dialWithRelay(ma: Multiaddr, options?: DialOptions): Promise<Connection>;
     dialDirectly(ma: Multiaddr, options?: DialOptions): Promise<Connection>;
     /**
