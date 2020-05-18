@@ -15,8 +15,6 @@ jobs:
         with:
           path: node_modules
           key: ${{ runner.OS }}-build-${{ hashFiles('package.json') }}
-      - name: Setup NPM Registry for private repos
-        run: npm config set //npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}
 
       - name: Install node modules
         if: steps.cache-modules.outputs.cache-hit != 'true'
