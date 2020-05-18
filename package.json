@@ -11,10 +11,6 @@
     "dev": "yarn clean && tsc -w",
     "build": "yarn clean && tsc -p . --noEmit false"
   },
-  "publishConfig": {
-    "access": "public",
-    "registry": "https://npm.pkg.github.com/"
-  },
   "files": [
     "lib/",
     "!lib/*.spec**",
