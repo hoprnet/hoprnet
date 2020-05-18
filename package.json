@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-utils",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "repository": "git@github.com:hoprnet/hopr-utils.git",
   "license": "LGPL-3.0-only",
   "types": "lib/index.d.ts",
@@ -10,10 +10,6 @@
     "test": "mocha",
     "dev": "yarn clean && tsc -w",
     "build": "yarn clean && tsc -p . --noEmit false"
-  },
-  "publishConfig": {
-    "access": "public",
-    "registry": "https://npm.pkg.github.com/"
   },
   "files": [
     "lib/",
