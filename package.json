@@ -5,7 +5,13 @@
   "license": "GPL-3.0-only",
   "scripts": {
     "preinstall": "tsc",
-    "start": "micro"
+    "start": "micro",
+    "test": "echo '✅ No tests needed',
+    "build": "echo '✅ No build needed'
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://npm.pkg.github.com/"
   },
   "keywords": [
     "privacy",
