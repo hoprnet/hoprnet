@@ -1,0 +1,46 @@
+name: Publish
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Cache node_modules
+        id: cache-modules
+        uses: actions/cache@v1
+        with:
+          path: node_modules
+          key: ${{ runner.OS }}-build-${{ hashFiles('package.json') }}
+      - name: Setup NPM Registry for private repos
+        run: npm config set //npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install node modules
+        if: steps.cache-modules.outputs.cache-hit != 'true'
+        run: yarn install --frozen-lockfile
+      - name: Build library
+        run: yarn build
+      - name: Test library
+        run: yarn test
+
+      - name: Setup Node.js for GPR
+        uses: actions/setup-node@v1
+        with:
+          registry-url: 'https://npm.pkg.github.com'
+      - env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        name: Publish to GitHub Packages
+        run: yarn publish
+
+      - name: Setup Node.js for NPM
+        uses: actions/setup-node@v1
+        with:
+          registry-url: 'https://registry.npm.org'
+          scope: '@hoprnet'
+      - env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        name: Publish to NPM Registry
+        run: yarn publish
