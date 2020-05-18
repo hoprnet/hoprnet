@@ -6,8 +6,8 @@
   "scripts": {
     "preinstall": "tsc",
     "start": "micro",
-    "test": "echo '✅ No tests needed',
-    "build": "echo '✅ No build needed'
+    "test": "echo '✅ No tests needed'",
+    "build": "echo '✅ No build needed'"
   },
   "publishConfig": {
     "access": "public",
