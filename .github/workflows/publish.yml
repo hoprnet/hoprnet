@@ -33,7 +33,7 @@ jobs:
       - env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         name: Publish to GitHub Packages
-        run: npm publish
+        run: npm publish || echo "Publish will not fail, please verify manually"
 
       - name: Setup Node.js for NPM
         uses: actions/setup-node@v1
@@ -43,4 +43,4 @@ jobs:
       - env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         name: Publish to NPM Registry
-        run: npm publish
+        run: npm publish || echo "Publish will not fail, please verify manually"
