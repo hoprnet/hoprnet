@@ -20,12 +20,12 @@ const actions: Action[] = [
     after: SUCCESS_MSG,
   },
   { before: 'applying patches', cmd: patch, after: SUCCESS_MSG },
-  { before: 'transpiling typescript files', cmd: 'npx tsc', after: SUCCESS_MSG },
   {
     before: 'extracting compiled output',
     cmd: extractBuild,
     after: SUCCESS_MSG,
   },
+  { before: 'transpiling typescript files', cmd: 'npx tsc', after: SUCCESS_MSG },
 ]
 
 export default async () => {
