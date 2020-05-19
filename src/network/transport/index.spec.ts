@@ -21,6 +21,11 @@ import pipe from 'it-pipe'
 
 import { u8aEquals } from '@hoprnet/hopr-utils'
 
+import chalk from 'chalk'
+
+// @ts-ignore
+import miniStun = require('ministun')
+
 const TEST_PROTOCOL = `/test/0.0.1`
 
 describe('should create a socket and connect to it', function () {
@@ -29,12 +34,42 @@ describe('should create a socket and connect to it', function () {
     upgradeInbound: async (maConn: MultiaddrConnection) => maConn,
   }
 
-  async function generateNode(id: number, bootstrap?: PeerInfo): Promise<libp2p> {
+  async function startStun() {
+    const server = new miniStun({
+      udp4: true,
+      upd6: true,
+      port: 3478,
+      log: null,
+      err: null,
+      sw: true,
+    })
+    
+    await server.start()
+
+    return server
+  }
+
+  async function generateNode(
+    options: {
+      id: number
+      ipv4?: boolean
+      ipv6?: boolean
+    },
+    bootstrap?: PeerInfo
+  ): Promise<libp2p> {
     const peerInfo = new PeerInfo(await PeerId.create({ keyType: 'secp256k1' }))
 
-    peerInfo.multiaddrs.add(
-      Multiaddr(`/ip4/127.0.0.1/tcp/${9090 + id}`).encapsulate(`/p2p/${peerInfo.id.toB58String()}`)
-    )
+    if (options.ipv4) {
+      peerInfo.multiaddrs.add(
+        Multiaddr(`/ip4/127.0.0.1/tcp/${9090 + 2 * options.id}`).encapsulate(`/p2p/${peerInfo.id.toB58String()}`)
+      )
+    }
+
+    if (options.ipv6) {
+      peerInfo.multiaddrs.add(
+        Multiaddr(`/ip6/::1/tcp/${9090 + 2 * options.id + 1}`).encapsulate(`/p2p/${peerInfo.id.toB58String()}`)
+      )
+    }
 
     const node = new libp2p({
       peerInfo,
@@ -47,7 +82,7 @@ describe('should create a socket and connect to it', function () {
       config: {
         transport: {
           TCP: {
-            bootstrap,
+            bootstrapServers: [bootstrap],
           },
         },
         dht: {
@@ -83,12 +118,21 @@ describe('should create a socket and connect to it', function () {
   }
 
   it('should set up a socket', async function () {
-    const relay = await generateNode(2)
+    // const server = await startStun()
+
+    const relay = await generateNode({ id: 2, ipv4: true, ipv6: true })
 
     const [sender, counterparty] = await Promise.all([
-      generateNode(0, relay.peerInfo),
-      generateNode(1, relay.peerInfo),
+      generateNode({ id: 0, ipv4: true }, relay.peerInfo),
+      generateNode({ id: 1, ipv6: true }, relay.peerInfo),
     ])
+
+    console.log(`Sender       ${chalk.yellow(sender.peerInfo.id.toB58String())}`)
+    console.log(`Counterparty ${chalk.yellow(counterparty.peerInfo.id.toB58String())}\n`)
+
+    console.log(`Relay        ${chalk.yellow(relay.peerInfo.id.toB58String())}\n`)
+
+
 
     connectionHelper([sender, relay])
     connectionHelper([relay, counterparty])
@@ -100,7 +144,8 @@ describe('should create a socket and connect to it', function () {
 
     const INVALID_PORT = 8758
     const conn2 = await sender.dialProtocol(
-      Multiaddr(`/ip4/127.0.0.1/tcp/${INVALID_PORT}/p2p/${counterparty.peerInfo.id.toB58String()}`), TEST_PROTOCOL
+      Multiaddr(`/ip4/127.0.0.1/tcp/${INVALID_PORT}/p2p/${counterparty.peerInfo.id.toB58String()}`),
+      TEST_PROTOCOL
     )
 
     const testMessage = new TextEncoder().encode('12356')
@@ -111,6 +156,7 @@ describe('should create a socket and connect to it', function () {
       async (source: AsyncIterable<Uint8Array>) => {
         for await (const msg of source) {
           assert(u8aEquals(msg.slice(), testMessage), 'sent message and received message must be identical')
+          console.log(`message received`)
           return
         }
       }

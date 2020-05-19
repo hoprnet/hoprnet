@@ -37,7 +37,7 @@ import { Interactions, Duplex } from './interactions'
 import * as DbKeys from './dbKeys'
 
 interface NetOptions {
-  ip: string,
+  ip: string
   port: number
 }
 
@@ -53,9 +53,9 @@ export type HoprOptions = {
   connector: HoprCoreConnectorStatic
   bootstrapServers?: PeerInfo[]
   provider: string
-  output?: (encoded: Uint8Array) => void,
+  output?: (encoded: Uint8Array) => void
   hosts?: {
-    ip4?: NetOptions,
+    ip4?: NetOptions
     ip6?: NetOptions
   }
 }
@@ -120,7 +120,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
           config: {
             transport: {
               TCP: {
-                bootstrap: (!options.bootstrapNode && options.bootstrapServers != null && options.bootstrapServers.length > 0) ? options.bootstrapServers[0] : undefined,
+                bootstrap: options.bootstrapServers,
               },
             },
             dht: {
@@ -139,7 +139,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
     this.isBootstrapNode = options.bootstrapNode || false
 
     this.interactions = new Interactions(this)
-    this.network = new Network(this)
+    this.network = new Network(this, options)
 
     this.log = Debug(`${chalk.blue(this.peerInfo.id.toB58String())}: `)
   }
@@ -212,7 +212,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
 
     await this.paymentChannels?.start()
 
-    this.network.heartbeat?.start()
+    await this.network.start()
 
     return this
   }

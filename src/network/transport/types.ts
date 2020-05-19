@@ -65,6 +65,7 @@ export interface Connection {
 export interface PeerStore {
   has(peerInfo: PeerId): boolean
   put(peerInfo: PeerInfo, options?: { silent: boolean }): PeerInfo
+  get(peerId: PeerId): PeerInfo
   peers: Map<string, PeerInfo>
   remove(peer: PeerId): void
 }

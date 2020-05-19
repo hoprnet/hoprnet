@@ -4,7 +4,9 @@ import mafmt from 'mafmt'
 const errCode = require('err-code')
 const log = require('debug')('libp2p:tcp')
 import { socketToConn } from './socket-to-conn'
+
 import abortable from 'abortable-iterator'
+import AbortController from 'abort-controller'
 
 // @ts-ignore
 import libp2p = require('libp2p')
@@ -12,7 +14,7 @@ import libp2p = require('libp2p')
 import { createListener, Listener } from './listener'
 import { multiaddrToNetConfig } from './utils'
 import { AbortError } from 'abortable-iterator'
-import { CODE_CIRCUIT, CODE_P2P } from './constants'
+import { CODE_CIRCUIT, CODE_P2P, RELAY_CIRCUIT_TIMEOUT, USE_OWN_STUN_SERVERS } from './constants'
 
 import Multiaddr from 'multiaddr'
 import PeerInfo from 'peer-info'
@@ -21,13 +23,28 @@ import PeerId from 'peer-id'
 import pipe from 'it-pipe'
 import pushable from 'it-pushable'
 
-import Peer from 'simple-peer'
+import Peer, { Instance as SimplePeerInstance } from 'simple-peer'
 
 // @ts-ignore
 import wrtc = require('wrtc')
 
 import { pubKeyToPeerId } from '../../utils'
 import { u8aToHex, u8aEquals, u8aAdd } from '@hoprnet/hopr-utils'
+
+import type {
+  Connection,
+  Upgrader,
+  DialOptions,
+  Registrar,
+  Dialer,
+  ConnHandler,
+  Handler,
+  Stream,
+  MultiaddrConnection,
+} from './types'
+
+import chalk from 'chalk'
+
 const RELAY_REGISTER = '/hopr/relay-register/0.0.1'
 const RELAY_UNREGISTER = '/hopr/relay-unregister/0.0.1'
 const DELIVERY_REGISTER = '/hopr/delivery-register/0.0.1'
@@ -46,20 +63,6 @@ const RELAY_FORWARD = (from: Uint8Array, to: Uint8Array) => {
 const OK = new TextEncoder().encode('OK')
 const FAIL = new TextEncoder().encode('FAIL')
 
-import type {
-  Connection,
-  Upgrader,
-  DialOptions,
-  Registrar,
-  Dialer,
-  ConnHandler,
-  Handler,
-  Stream,
-  MultiaddrConnection,
-} from './types'
-
-import chalk from 'chalk'
-
 /**
  * @class TCP
  */
@@ -74,14 +77,23 @@ class TCP {
   private _peerInfo: PeerInfo
   private _handle: (protocols: string[] | string, handler: (connection: Handler) => void) => void
   private _unhandle: (protocols: string[] | string) => void
-  private relay?: PeerInfo
+  private relays?: PeerInfo[]
+  private stunServers: { urls: string }[]
 
   private _encoder: TextEncoder
   private _decoder: TextDecoder
 
   private connHandler: ConnHandler
 
-  constructor({ upgrader, libp2p, bootstrap }: { upgrader: Upgrader; libp2p: libp2p; bootstrap?: PeerInfo }) {
+  constructor({
+    upgrader,
+    libp2p,
+    bootstrapServers,
+  }: {
+    upgrader: Upgrader
+    libp2p: libp2p
+    bootstrapServers?: PeerInfo[]
+  }) {
     if (!upgrader) {
       throw new Error('An upgrader must be provided. See https://github.com/libp2p/interface-transport#upgrader.')
     }
@@ -90,7 +102,32 @@ class TCP {
       throw new Error('Transport module needs access to libp2p.')
     }
 
-    this.relay = bootstrap
+    if (bootstrapServers !== undefined && bootstrapServers.length > 0) {
+      this.relays = bootstrapServers.filter(
+        (peerInfo: PeerInfo) => peerInfo !== undefined && !libp2p.peerInfo.id.isEqual(peerInfo.id)
+      )
+
+      this.stunServers = []
+      for (let i = 0; i < this.relays.length; i++) {
+        let urls = ''
+        this.relays[i].multiaddrs.forEach((ma: Multiaddr) => {
+          if (urls.length > 0) {
+            urls += ', '
+          }
+
+          const opts = ma.toOptions()
+
+          if (opts.family == 'ipv4') {
+            urls += `stun:${opts.host}`
+          } else if (opts.family == 'ipv6') {
+            // WebRTC seems to have no support IPv6 addresses
+            // urls += `stun:[0${opts.host}]`
+          }
+        })
+        this.stunServers.push({ urls })
+      }
+    }
+
     this._registrar = libp2p.registrar
     this._handle = libp2p.handle.bind(libp2p)
     this._unhandle = libp2p.unhandle.bind(libp2p)
@@ -108,7 +145,7 @@ class TCP {
     this._handle(WEBRTC, this.handleWebRTC.bind(this))
   }
 
-  private relayToConn(options: { stream: Stream; counterparty: PeerId }): MultiaddrConnection {
+  private relayToConn(options: { stream: Stream; counterparty: PeerId; relay: PeerId }): MultiaddrConnection {
     const maConn: MultiaddrConnection = {
       ...options.stream,
       conn: options.stream,
@@ -118,7 +155,7 @@ class TCP {
           console.log(err)
         }
 
-        await this.closeConnection(options.counterparty)
+        await this.closeConnection(options.counterparty, options.relay)
 
         maConn.timeline.close = Date.now()
       },
@@ -136,6 +173,7 @@ class TCP {
         this.relayToConn({
           stream,
           counterparty: sender,
+          relay: connection.remotePeer,
         })
       )
 
@@ -195,14 +233,12 @@ class TCP {
             try {
               sender = await pubKeyToPeerId(msg.slice())
             } catch {
-              yield FAIL
-              return
+              return yield FAIL
             }
 
             this._handle(RELAY_DELIVER(sender.pubKey.marshal()), this.deliveryHandlerFactory(sender))
 
-            yield OK
-            return
+            return yield OK
           }
         }.apply(this)
       },
@@ -254,17 +290,18 @@ class TCP {
     )
   }
 
-  async closeConnection(counterparty: PeerId) {
+  async closeConnection(counterparty: PeerId, relay: PeerId) {
     this._unhandle(RELAY_DELIVER(counterparty.pubKey.marshal()))
 
-    let conn = this._registrar.getConnection(this.relay)
+    // @TODO unregister at correct relay node
+    let conn = this._registrar.getConnection(new PeerInfo(relay))
 
     if (!conn) {
       try {
-        conn = await this._dialer.connectToPeer(this.relay)
+        conn = await this._dialer.connectToPeer(new PeerInfo(relay))
       } catch (err) {
         console.log(
-          `Could not request relayer ${this.relay.id.toB58String()} to tear down relayed connection. Error was:\n`,
+          `Could not request relayer ${relay.toB58String()} to tear down relayed connection. Error was:\n`,
           err
         )
         return
@@ -285,12 +322,16 @@ class TCP {
   async registerDelivery(outerconnection: Connection, counterparty: PeerId): Promise<Uint8Array> {
     let conn = this._registrar.getConnection(new PeerInfo(counterparty))
 
+    const abort = new AbortController()
+
+    const timeout = setTimeout(abort.abort, RELAY_CIRCUIT_TIMEOUT)
+
     if (!conn) {
       try {
-        conn = await this._dialer.connectToPeer(new PeerInfo(counterparty))
+        conn = await this._dialer.connectToPeer(new PeerInfo(counterparty), { signal: abort.signal })
       } catch (err) {
         console.log(
-          `[Relayer] Could not establish relayed connection to destination ${counterparty.toString()}. Err was:\n`,
+          `[Relayer] Could not establish relayed connection to destination ${counterparty.toB58String()}. Err was:\n`,
           err
         )
         return
@@ -299,7 +340,7 @@ class TCP {
 
     const { stream: deliverRegisterStream } = await conn.newStream([DELIVERY_REGISTER])
 
-    return await pipe(
+    let answer = await pipe(
       /* prettier-ignore */
       [outerconnection.remotePeer.pubKey.marshal()],
       deliverRegisterStream,
@@ -309,6 +350,10 @@ class TCP {
         }
       }
     )
+
+    clearTimeout(timeout)
+
+    return answer || FAIL
   }
 
   handleRelayRegister({ stream, connection }: Handler) {
@@ -323,8 +368,7 @@ class TCP {
             try {
               counterparty = await pubKeyToPeerId(msg.slice())
             } catch {
-              yield FAIL
-              return
+              return yield FAIL
             }
 
             const answer = await this.registerDelivery(connection, counterparty)
@@ -338,16 +382,14 @@ class TCP {
                 ),
                 this.forwardHandlerFactory(counterparty)
               )
-              yield OK
-              return
+              return yield OK
             }
 
             if (!u8aEquals(answer, FAIL)) {
               console.log(`Received unexpected message from counterparty '${answer}'`)
             }
 
-            yield FAIL
-            return
+            return yield FAIL
           }
         }.apply(this)
       },
@@ -358,7 +400,12 @@ class TCP {
   handleWebRTC({ stream }: Handler) {
     const queue = pushable<Uint8Array>()
 
-    const channel = new Peer({ wrtc, trickle: true })
+    let channel: SimplePeerInstance
+    if (USE_OWN_STUN_SERVERS) {
+      channel = new Peer({ wrtc, trickle: true, config: { iceServers: this.stunServers } })
+    } else {
+      channel = new Peer({ wrtc, trickle: true })
+    }
 
     const done = (err?: Error, conn?: Connection) => {
       channel.removeListener('connect', onConnect)
@@ -408,11 +455,28 @@ class TCP {
     try {
       return await this.dialDirectly(ma, options)
     } catch (err) {
-      if (this.relay === undefined) {
-        throw err
+      const destination = PeerId.createFromCID(ma.getPeerId())
+
+      if (this.relays === undefined) {
+        throw Error(
+          `Could not connect ${chalk.yellow(
+            ma.toString()
+          )} because there was no relay defined. Connection error was:\n${err}`
+        )
       }
 
-      return await this.dialWithRelay(ma, options)
+      // Check whether we know some relays that we can use
+      const potentialRelays = this.relays?.filter((peerInfo: PeerInfo) => !peerInfo.id.isEqual(destination))
+
+      if (potentialRelays == null || potentialRelays.length == 0) {
+        throw Error(
+          `Destination ${chalk.yellow(
+            ma.toString()
+          )} cannot be accessed and directly and there is no other relay node know. Connection error was:\n${err}`
+        )
+      }
+
+      return await this.dialWithRelay(ma, potentialRelays, options)
     }
   }
 
@@ -421,11 +485,21 @@ class TCP {
       const { stream } = await conn.newStream([WEBRTC])
       const queue = pushable<Uint8Array>()
 
-      const channel = new Peer({
-        wrtc,
-        initiator: true,
-        trickle: true,
-      })
+      let channel: SimplePeerInstance
+      if (USE_OWN_STUN_SERVERS) {
+        channel = new Peer({
+          wrtc,
+          initiator: true,
+          trickle: true,
+          config: { iceServers: this.stunServers },
+        })
+      } else {
+        channel = new Peer({
+          wrtc,
+          initiator: true,
+          trickle: true,
+        })
+      }
 
       const done = (err?: Error, conn?: Connection) => {
         channel.removeListener('connect', onConnect)
@@ -476,26 +550,43 @@ class TCP {
     })
   }
 
-  async dialWithRelay(ma: Multiaddr, options?: DialOptions): Promise<Connection> {
-    const destinationPeerId = PeerId.createFromCID(ma.getPeerId())
+  async dialWithRelay(ma: Multiaddr, relays: PeerInfo[], options?: DialOptions): Promise<Connection> {
+    const destination = PeerId.createFromCID(ma.getPeerId())
 
-    console.log(`dailing ${ma.toString()} over relay node`)
+    let relayConnection = await Promise.race(
+      relays.map(
+        (relay: PeerInfo) =>
+          new Promise<Connection>(async resolve => {
+            console.log(
+              `[${chalk.blue(this._peerInfo.id.toB58String())}] trying to call ${chalk.yellow(
+                ma.toString()
+              )} over relay node ${chalk.yellow(relay.id.toB58String())}`
+            )
 
-    let relayConnection = this._registrar.getConnection(this.relay)
+            let relayConnection = this._registrar.getConnection(relay)
+
+            if (!relayConnection) {
+              try {
+                return resolve(await this._dialer.connectToPeer(relay, { signal: options?.signal }))
+              } catch {}
+            }
+          })
+      )
+    )
 
     if (!relayConnection) {
-      try {
-        relayConnection = await this._dialer.connectToPeer(this.relay, { signal: options?.signal })
-      } catch (err) {
-        throw Error(`Could not connect to relay. Error was: '${chalk.red(err.message)}`)
-      }
+      throw Error(
+        `Unable to establish a connection to any known relay node. Tried ${chalk.yellow(
+          relays.map((relay: PeerInfo) => relay.id.toB58String()).join(`, `)
+        )}`
+      )
     }
 
     const { stream: registerStream } = await relayConnection.newStream([RELAY_REGISTER])
 
     const answer = await pipe(
       /* prettier-ignore */
-      [destinationPeerId.pubKey.marshal()],
+      [destination.pubKey.marshal()],
       registerStream,
       async (source: AsyncIterable<Uint8Array>) => {
         for await (const msg of source) {
@@ -509,7 +600,7 @@ class TCP {
     }
 
     const { stream: msgStream } = await relayConnection.newStream([
-      RELAY_FORWARD(this._peerInfo.id.pubKey.marshal(), destinationPeerId.pubKey.marshal()),
+      RELAY_FORWARD(this._peerInfo.id.pubKey.marshal(), destination.pubKey.marshal()),
     ])
 
     if (options.signal) {
@@ -519,12 +610,13 @@ class TCP {
     let conn = await this._upgrader.upgradeOutbound(
       this.relayToConn({
         stream: msgStream,
-        counterparty: destinationPeerId,
+        counterparty: destination,
+        relay: relayConnection.remotePeer,
       })
     )
 
     try {
-      let webRTCConn = await this.tryWebRTC(conn, destinationPeerId, { signal: options.signal })
+      let webRTCConn = await this.tryWebRTC(conn, destination, { signal: options.signal })
       conn.close()
 
       return webRTCConn
@@ -536,7 +628,7 @@ class TCP {
   }
 
   async dialDirectly(ma: Multiaddr, options?: DialOptions): Promise<Connection> {
-    console.log(`dailing ${ma.toString()} directly`)
+    console.log(`[${chalk.blue(this._peerInfo.id.toB58String())}] dailing ${chalk.yellow(ma.toString())} directly`)
     const socket = await this._connect(ma, options)
     const maConn = socketToConn(socket, { remoteAddr: ma, signal: options.signal })
 

@@ -57,6 +57,7 @@ export interface PeerStore {
     put(peerInfo: PeerInfo, options?: {
         silent: boolean;
     }): PeerInfo;
+    get(peerId: PeerId): PeerInfo;
     peers: Map<string, PeerInfo>;
     remove(peer: PeerId): void;
 }
