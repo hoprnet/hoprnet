@@ -6,9 +6,12 @@
   "author": "Robert Kiel <robert.kiel@validitylabs.org>",
   "license": "GPL-3.0-only",
   "files": [
-    "src/",
-    "hopr.png"
+    "src/"
   ],
+  "scripts": {
+   "test": "echo '✅ No tests needed'",
+   "build": "echo '✅ No build needed'"
+  },
   "types": "src/index.d.ts",
   "prettier": {
     "printWidth": 160,
