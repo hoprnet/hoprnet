@@ -23,17 +23,17 @@
     chalk "^2.0.0"
     js-tokens "^4.0.0"
 
-"@hoprnet/hopr-demo-seeds@^1.0.0":
-  version "1.0.0"
-  resolved "https://npm.pkg.github.com/download/@hoprnet/hopr-demo-seeds/1.0.0/ae0bd9d428e1ea3b9bb851327e5ceb184dde2d7786583a99322d19f0be6d8243#ff80bb1203067e461d3468471348ff33ec48aa28"
-  integrity sha512-wt7OqkHSKpG2mjwWfWSJ+TGUNlD3689i5U/h9OEnMDgpl/hl1DzY7J3jE58rp/Vhy0v3lBAeAaiFkHu3zFaa9Q==
+"@hoprnet/hopr-demo-seeds@1.0.1":
+  version "1.0.1"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-demo-seeds/-/hopr-demo-seeds-1.0.1.tgz#416752a0c0e6fc36f56e1b397a982b5bebdd4c7a"
+  integrity sha512-KGIdLE1EAsKkaxVYRi0GnNcibtfqsQvEx6igyBEJvwtX5Rl+M/hPkSTb/54tS/S3xjatZh0JMczXvI6IGv6STg==
   dependencies:
     micro "^9.3.4"
 
-"@hoprnet/hopr-utils@latest":
-  version "0.1.2"
-  resolved "https://npm.pkg.github.com/download/@hoprnet/hopr-utils/0.1.2/af3b857ef90d403a41afa3c374861967103b32d88deb59f2cb74b6f4bbcf6a93#707c9eea620a1c64b7071f8779b705837ac6be5b"
-  integrity sha512-I+dhlmqMdB3AaWdk7HY/GRj1FJteGPrL/zffoYSAJyXAVYkpB1ZljKknjKWBCy01nTnbpzCLRbXi7my1Dw9EPA==
+"@hoprnet/hopr-utils@0.1.3":
+  version "0.1.3"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-0.1.3.tgz#ff6fc81584249f5b81c73cfa59ee336200723305"
+  integrity sha512-MoPgSlig0sUF+jUyLNTyKr16GmZBn4So5JMTX6/F/kEy4CWjd+yNVbt3DHY9ZusoQfrXmRsf0REniPcaSz4CBw==
   dependencies:
     bignumber.js "^9.0.0"
     chalk "^4.0.0"
@@ -1406,9 +1406,9 @@ browserify-sha3@^0.0.4:
     safe-buffer "^5.1.1"
 
 browserify-sign@^4.0.0:
-  version "4.1.0"
-  resolved "https://registry.yarnpkg.com/browserify-sign/-/browserify-sign-4.1.0.tgz#4fe971b379a5aeb4925e06779f9fa1f41d249d70"
-  integrity sha512-VYxo7cDCeYUoBZ0ZCy4UyEUCP3smyBd4DRQM5nrFS1jJjPJjX7rP3oLRpPoWfkhQfyJ0I9ZbHbKafrFD/SGlrg==
+  version "4.2.0"
+  resolved "https://registry.yarnpkg.com/browserify-sign/-/browserify-sign-4.2.0.tgz#545d0b1b07e6b2c99211082bf1b12cce7a0b0e11"
+  integrity sha512-hEZC1KEeYuoHRqhGhTy6gWrpJA3ZDjFWv0DE61643ZnOXAKJb3u7yWcrU0mMc9SwAqK1n7myPGndkp0dFG7NFA==
   dependencies:
     bn.js "^5.1.1"
     browserify-rsa "^4.0.1"
@@ -1418,6 +1418,7 @@ browserify-sign@^4.0.0:
     inherits "^2.0.4"
     parse-asn1 "^5.1.5"
     readable-stream "^3.6.0"
+    safe-buffer "^5.2.0"
 
 browserslist@^3.2.6:
   version "3.2.8"
@@ -1570,9 +1571,9 @@ camelcase@^5.0.0:
   integrity sha512-L28STB170nwWS63UjtlEOE3dldQApaJXZkOI1uMFfzf3rRuPegHaHesyee+YxQ+W6SvRDQV6UrdOdRiR153wJg==
 
 caniuse-lite@^1.0.30000844:
-  version "1.0.30001061"
-  resolved "https://registry.yarnpkg.com/caniuse-lite/-/caniuse-lite-1.0.30001061.tgz#80ca87ef14eb543a7458e7fd2b5e2face3458c9f"
-  integrity sha512-SMICCeiNvMZnyXpuoO+ot7FHpMVPlrsR+HmfByj6nY4xYDHXLqMTbgH7ecEkDNXWkH1vaip+ZS0D7VTXwM1KYQ==
+  version "1.0.30001062"
+  resolved "https://registry.yarnpkg.com/caniuse-lite/-/caniuse-lite-1.0.30001062.tgz#d814b648338504b315222ace6f1a533d9a55e390"
+  integrity sha512-ei9ZqeOnN7edDrb24QfJ0OZicpEbsWxv7WusOiQGz/f2SfvBgHHbOEwBJ8HKGVSyx8Z6ndPjxzR6m0NQq+0bfw==
 
 caseless@~0.12.0:
   version "0.12.0"
@@ -2367,9 +2368,9 @@ ee-first@1.1.1:
   integrity sha1-WQxhFWsK4vTwJVcyoViyZrxWsh0=
 
 electron-to-chromium@^1.3.47:
-  version "1.3.441"
-  resolved "https://registry.yarnpkg.com/electron-to-chromium/-/electron-to-chromium-1.3.441.tgz#094f71b992dca5bc96b798cfbaf37dc76302015a"
-  integrity sha512-leBfJwLuyGs1jEei2QioI+PjVMavmUIvPYidE8dCCYWLAq0uefhN3NYgDNb8WxD3uiUNnJ3ScMXg0upSlwySzQ==
+  version "1.3.442"
+  resolved "https://registry.yarnpkg.com/electron-to-chromium/-/electron-to-chromium-1.3.442.tgz#62f96e0529f40a214a97411b57f27c4f080f0aa2"
+  integrity sha512-3OjmbnD9+LyWzh9o3rjC7LNIkcDHjKyHM6Xt0G/+7gHGCaEIwvWYi8TrNA8feNnuGmvI9WKu289PFMQGMLHAig==
 
 elliptic@6.3.3:
   version "6.3.3"
