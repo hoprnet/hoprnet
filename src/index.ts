@@ -353,8 +353,10 @@ export default class HoprEthereum implements HoprCoreConnector {
         )
         hasOnChainSecret = true
       } else {
+        this.log(`Key is present on-chain but not in our database.`)
         if (this.options.debug) {
           await this.db.put(Buffer.from(dbkeys.OnChainSecret()), Buffer.from(this.getDebugAccountSecret()))
+          hasOffChainSecret = true
         } else {
           throw Error(`Key is present on-chain but not in our database.`)
         }
@@ -423,7 +425,8 @@ export default class HoprEthereum implements HoprCoreConnector {
    * @param db database instance
    * @param seed that is used to derive that on-chain identity
    * @param options.id Id of the demo account
-   * @param options.uri URI that is used to connect to the blockchain
+   * @param options.provider provider URI that is used to connect to the blockchain
+   * @param options.debug debug mode, will generate account secrets using account's public key
    * @returns a promise resolved to the connector
    */
   static async create(

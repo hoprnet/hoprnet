@@ -91,5 +91,7 @@ export async function createAccountAndFund(
  * @returns CoreConnector
  */
 export async function createNode(privKey: Uint8Array): Promise<CoreConnector> {
-  return CoreConnector.create(new LevelUp(Memdown()), privKey)
+  return CoreConnector.create(new LevelUp(Memdown()), privKey, {
+    debug: true,
+  })
 }
