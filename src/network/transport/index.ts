@@ -324,7 +324,9 @@ class TCP {
 
     const abort = new AbortController()
 
-    const timeout = setTimeout(abort.abort.bind(abort), RELAY_CIRCUIT_TIMEOUT)
+    const timeout = setTimeout(() => {
+      abort.abort()
+    }, RELAY_CIRCUIT_TIMEOUT)
 
     if (!conn) {
       try {
@@ -472,7 +474,7 @@ class TCP {
         throw Error(
           `Destination ${chalk.yellow(
             ma.toString()
-          )} cannot be accessed and directly and there is no other relay node know. Connection error was:\n${err}`
+          )} cannot be accessed and directly and there is no other relay node known. Connection error was:\n${err}`
         )
       }
 
@@ -557,7 +559,7 @@ class TCP {
       relays.map(
         (relay: PeerInfo) =>
           new Promise<Connection>(async resolve => {
-            console.log(
+            log(
               `[${chalk.blue(this._peerInfo.id.toB58String())}] trying to call ${chalk.yellow(
                 ma.toString()
               )} over relay node ${chalk.yellow(relay.id.toB58String())}`
@@ -628,7 +630,7 @@ class TCP {
   }
 
   async dialDirectly(ma: Multiaddr, options?: DialOptions): Promise<Connection> {
-    console.log(`[${chalk.blue(this._peerInfo.id.toB58String())}] dailing ${chalk.yellow(ma.toString())} directly`)
+    log(`[${chalk.blue(this._peerInfo.id.toB58String())}] dailing ${chalk.yellow(ma.toString())} directly`)
     const socket = await this._connect(ma, options)
     const maConn = socketToConn(socket, { remoteAddr: ma, signal: options.signal })
 
