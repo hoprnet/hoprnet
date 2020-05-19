@@ -15,7 +15,7 @@ import type CoreConnector from '..'
 
 const CLOSURE_DURATION = durations.days(3)
 
-describe.only('test indexer', function () {
+describe('test indexer', function () {
   const ganache = new Ganache()
   let web3: Web3
   let hoprToken: HoprToken
