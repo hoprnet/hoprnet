@@ -30,22 +30,22 @@
   dependencies:
     regenerator-runtime "^0.13.4"
 
-"@hoprnet/hopr-core-connector-interface@^1.0.1-0":
+"@hoprnet/hopr-core-connector-interface@~1.0.1-0":
   version "1.0.1-0"
   resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-connector-interface/-/hopr-core-connector-interface-1.0.1-0.tgz#d6a68177224f0595ebee5c0b611b728990af8627"
   integrity sha512-crplIv7bEFb7k1nwlL6M839OLyXEdBKXxfrep1rK8cIyhucK8sG4R5H61pVCSjHGzkBL8c1v/Ye4AhSxSgecqQ==
 
-"@hoprnet/hopr-demo-seeds@1.0.1", "@hoprnet/hopr-demo-seeds@^1.0.1":
+"@hoprnet/hopr-demo-seeds@1.0.1", "@hoprnet/hopr-demo-seeds@~1.0.1":
   version "1.0.1"
   resolved "https://registry.yarnpkg.com/@hoprnet/hopr-demo-seeds/-/hopr-demo-seeds-1.0.1.tgz#416752a0c0e6fc36f56e1b397a982b5bebdd4c7a"
   integrity sha512-KGIdLE1EAsKkaxVYRi0GnNcibtfqsQvEx6igyBEJvwtX5Rl+M/hPkSTb/54tS/S3xjatZh0JMczXvI6IGv6STg==
   dependencies:
     micro "^9.3.4"
 
-"@hoprnet/hopr-ethereum@^0.1.1":
-  version "0.1.1"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-ethereum/-/hopr-ethereum-0.1.1.tgz#fcf3d9aa399e3fc5492cadbf9f6d9a5a4e7955f7"
-  integrity sha512-vsl7HHJduuwn8uj1/01ReO2om5X0jEVNUvSpLT2u7BvJPS3TrBeFj9wB4g1qcZDNsGCGIkKpX/FKEMGMq+ZABg==
+"@hoprnet/hopr-ethereum@~0.2.0":
+  version "0.2.0"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-ethereum/-/hopr-ethereum-0.2.0.tgz#7c454901044b3029df1e8986dfca06717a4fc3c0"
+  integrity sha512-dvWU+qR0Kz4xogirFJRhFc7blH7ivzmKrldOlGnYb2OIwq/ZxrfTa+AARuN7213CqSKgWVN2Axhl3KiMwCyX2A==
   dependencies:
     "@hoprnet/hopr-demo-seeds" "1.0.1"
     "@hoprnet/hopr-utils" "0.1.3"
@@ -60,7 +60,7 @@
     ts-node "^8.9.1"
     web3 "^1.2.7"
 
-"@hoprnet/hopr-utils@0.1.3", "@hoprnet/hopr-utils@^0.1.3":
+"@hoprnet/hopr-utils@0.1.3", "@hoprnet/hopr-utils@~0.1.3":
   version "0.1.3"
   resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-0.1.3.tgz#ff6fc81584249f5b81c73cfa59ee336200723305"
   integrity sha512-MoPgSlig0sUF+jUyLNTyKr16GmZBn4So5JMTX6/F/kEy4CWjd+yNVbt3DHY9ZusoQfrXmRsf0REniPcaSz4CBw==
