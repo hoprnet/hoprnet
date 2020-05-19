@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-ethereum",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "On-chain logic for hopr.network",
   "homepage": "https://hopr.network",
   "repository": {
@@ -27,7 +27,8 @@
     "migrate": "ts-node -T ./scripts/cli.ts migrate",
     "network": "ts-node -T ./scripts/cli.ts network",
     "test": "ts-node -T ./scripts/cli.ts test",
-    "format": "prettier --check ."
+    "format": "prettier --check .",
+    "prepare": "yarn build"
   },
   "husky": {
     "hooks": {
