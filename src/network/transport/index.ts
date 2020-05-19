@@ -324,7 +324,7 @@ class TCP {
 
     const abort = new AbortController()
 
-    const timeout = setTimeout(abort.abort, RELAY_CIRCUIT_TIMEOUT)
+    const timeout = setTimeout(abort.abort.bind(abort), RELAY_CIRCUIT_TIMEOUT)
 
     if (!conn) {
       try {

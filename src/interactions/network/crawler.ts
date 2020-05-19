@@ -12,8 +12,7 @@ import AbortController from 'abort-controller'
 
 import { CrawlResponse, CrawlStatus } from '../../messages'
 
-const TWO_SECONDS = 2 * 1000
-const CRAWL_TIMEOUT = TWO_SECONDS
+const CRAWL_TIMEOUT = 1 * 1000
 
 class Crawler<Chain extends HoprCoreConnector> implements AbstractInteraction<Chain> {
   protocols: string[] = [PROTOCOL_CRAWLING]
@@ -39,9 +38,7 @@ class Crawler<Chain extends HoprCoreConnector> implements AbstractInteraction<Ch
     const abort = new AbortController()
     const signal = abort.signal
 
-    const timeout = setTimeout(() => {
-      abort.abort()
-    }, CRAWL_TIMEOUT)
+    const timeout = setTimeout(abort.abort.bind(abort), CRAWL_TIMEOUT)
 
     try {
       struct = await this.node.dialProtocol(counterparty, this.protocols[0], { signal }).catch(async (_: Error) => {
