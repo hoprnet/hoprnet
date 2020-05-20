@@ -42,10 +42,10 @@
   dependencies:
     micro "^9.3.4"
 
-"@hoprnet/hopr-ethereum@~0.3.0":
-  version "0.3.0"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-ethereum/-/hopr-ethereum-0.3.0.tgz#8768562913b3af7fecec6c8ac85287a616256f0c"
-  integrity sha512-174c5HhYwfb1NOZ2kqRGW/kRLRYrNMHUWXcdXG+L12+VPvV+w/UIls6DjEeTJSst5CSSmAKyHnYAChhxOfmUVg==
+"@hoprnet/hopr-ethereum@~0.3.2-dev.00cc125":
+  version "0.3.2-dev.00cc125"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-ethereum/-/hopr-ethereum-0.3.2-dev.00cc125.tgz#1959d5f1566019bae69f05c720288a2d4b6eeeea"
+  integrity sha512-NZ6MFKOSB4ZmBRtHJt/bYKkyHJTYjqwsic25pwcV+IhH1CUKT5/NJDYVrfnkvy4D7MHv1p7qYwMeQDCDY6uvwA==
   dependencies:
     "@hoprnet/hopr-demo-seeds" "1.0.1"
     "@hoprnet/hopr-utils" "0.1.3"
@@ -54,6 +54,7 @@
     "@truffle/debug-utils" "^4.1.1"
     "@truffle/hdwallet-provider" "^1.0.34"
     bignumber.js "^9.0.0"
+    dotenv "^8.2.0"
     ganache-core "^2.10.2"
     truffle "^5.1.23"
     truffle-plugin-verify "^0.3.10"
@@ -2559,6 +2560,11 @@ domutils@^1.5.1:
   dependencies:
     dom-serializer "0"
     domelementtype "1"
+
+dotenv@^8.2.0:
+  version "8.2.0"
+  resolved "https://registry.yarnpkg.com/dotenv/-/dotenv-8.2.0.tgz#97e619259ada750eea3e4ea3e26bceea5424b16a"
+  integrity sha512-8sJ78ElpbDJBHNeBzUbUVLsqKdccaa/BXF1uPTw3GrvQTBgrQrtObr2mUrE38vzYd8cEv+m/JBfDLioYcfXoaw==
 
 dotignore@~0.1.2:
   version "0.1.2"
