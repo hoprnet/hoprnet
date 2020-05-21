@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core",
-  "version": "0.3.0",
+  "version": "0.4.0-dev.561bb0a",
   "description": "Privacy-preserving messaging protocol with incentivations for relay operators",
   "license": "GPL-3.0-only",
   "keywords": [
@@ -12,9 +12,9 @@
     "lib/src",
     "README.md"
   ],
-	"publishConfig": {
-		"access": "public"
-	},
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": "^12",
     "yarn": "^1.22"
