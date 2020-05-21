@@ -2,7 +2,7 @@ import net from 'net'
 import type { Socket } from 'net'
 import mafmt from 'mafmt'
 const errCode = require('err-code')
-const log = require('debug')('libp2p:tcp')
+const log = require('debug')('hopr-core:transport')
 import { socketToConn } from './socket-to-conn'
 
 import abortable from 'abortable-iterator'
@@ -152,7 +152,7 @@ class TCP {
       remoteAddr: Multiaddr(`/p2p/${options.counterparty.toB58String()}`),
       close: async (err?: Error) => {
         if (err !== undefined) {
-          console.log(err)
+          log(err)
         }
 
         await this.closeConnection(options.counterparty, options.relay)
@@ -191,11 +191,11 @@ class TCP {
         try {
           conn = await this._dialer.connectToPeer(new PeerInfo(counterparty))
         } catch (err) {
-          console.log(`Could not forward packet to ${counterparty.toB58String()}. Error was :\n`, err)
+          log(`Could not forward packet to ${counterparty.toB58String()}. Error was :\n`, err)
           try {
             pipe([FAIL], stream)
           } catch (err) {
-            console.log(`Failed to inform counterparty ${connection.remotePeer.toB58String()}`)
+            log(`Failed to inform counterparty ${connection.remotePeer.toB58String()}`)
           }
 
           return
@@ -300,7 +300,7 @@ class TCP {
       try {
         conn = await this._dialer.connectToPeer(new PeerInfo(relay))
       } catch (err) {
-        console.log(
+        log(
           `Could not request relayer ${relay.toB58String()} to tear down relayed connection. Error was:\n`,
           err
         )
@@ -332,7 +332,7 @@ class TCP {
       try {
         conn = await this._dialer.connectToPeer(new PeerInfo(counterparty), { signal: abort.signal })
       } catch (err) {
-        console.log(
+        log(
           `[Relayer] Could not establish relayed connection to destination ${counterparty.toB58String()}. Err was:\n`,
           err
         )
@@ -388,7 +388,7 @@ class TCP {
             }
 
             if (!u8aEquals(answer, FAIL)) {
-              console.log(`Received unexpected message from counterparty '${answer}'`)
+              log(`Received unexpected message from counterparty '${answer}'`)
             }
 
             return yield FAIL
@@ -483,6 +483,7 @@ class TCP {
   }
 
   tryWebRTC(conn: Connection, counterparty: PeerId, options?: { signal: AbortSignal }): Promise<Connection> {
+    log(`Trying WebRTC with peer ${counterparty.toB58String()}`)
     return new Promise<Connection>(async (resolve, reject) => {
       const { stream } = await conn.newStream([WEBRTC])
       const queue = pushable<Uint8Array>()
@@ -526,10 +527,12 @@ class TCP {
       }
 
       const onConnect = async (): Promise<void> => {
+        log(`WebRTC connection with ${counterparty.toB58String()} was successful`)
         done(undefined, await this._upgrader.upgradeOutbound(socketToConn((channel as unknown) as Socket)))
       }
 
       const onError = (err?: Error) => {
+        log(`WebRTC with peer ${counterparty.toB58String()} failed. Error was: ${err}`)
         done(err)
       }
 
@@ -555,6 +558,7 @@ class TCP {
   async dialWithRelay(ma: Multiaddr, relays: PeerInfo[], options?: DialOptions): Promise<Connection> {
     const destination = PeerId.createFromCID(ma.getPeerId())
 
+    log(`Trying to connect to ${destination.toB58String()} over relay: ${relays[0].id.toB58String()}`)
     let relayConnection = await Promise.race(
       relays.map(
         (relay: PeerInfo) =>
@@ -623,7 +627,7 @@ class TCP {
 
       return webRTCConn
     } catch (err) {
-      console.log(err)
+      log(err)
     }
 
     return conn
