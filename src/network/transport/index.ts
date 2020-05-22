@@ -300,10 +300,7 @@ class TCP {
       try {
         conn = await this._dialer.connectToPeer(new PeerInfo(relay))
       } catch (err) {
-        log(
-          `Could not request relayer ${relay.toB58String()} to tear down relayed connection. Error was:\n`,
-          err
-        )
+        log(`Could not request relayer ${relay.toB58String()} to tear down relayed connection. Error was:\n`, err)
         return
       }
     }
@@ -732,11 +729,7 @@ class TCP {
     multiaddrs = Array.isArray(multiaddrs) ? multiaddrs : [multiaddrs]
 
     return multiaddrs.filter(ma => {
-      if (ma.protoCodes().includes(CODE_CIRCUIT)) {
-        return false
-      }
-
-      return mafmt.TCP.matches(ma.decapsulateCode(CODE_P2P))
+      return mafmt.TCP.matches(ma.decapsulateCode(CODE_P2P)) || mafmt.P2P.matches(ma)
     })
   }
 }

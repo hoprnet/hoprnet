@@ -13,13 +13,14 @@ import Multiaddr from 'multiaddr'
 
 import { KeyPair } from '../../dbKeys'
 
+import { Stun, Interface } from '../../network/stun'
 
 import { NAME } from '../../constants'
 
 /**
  * Assemble the addresses that we are using
  */
-function getAddrs(options: HoprOptions): any[] {
+async function getAddrs(options: HoprOptions): Promise<Multiaddr[]> {
   const addrs = []
 
   if (options.hosts === undefined || (options.hosts.ip4 === undefined && options.hosts.ip6 === undefined)) {
@@ -29,12 +30,30 @@ function getAddrs(options: HoprOptions): any[] {
       ip4Port += (options.id + 1) * 2
     }
     // ===========================================================================================================
+    const promises: Promise<Interface>[] = []
+
+    let externalIp: Interface
+    // if (!options.bootstrapNode) {
+    //   options.bootstrapServers[0].multiaddrs.forEach((ma: Multiaddr) => {
+    //     const opts = ma.nodeAddress()
+    //     promises.push(Stun.getExternalIP({ hostname: opts.address, port: DEFAULT_STUN_PORT }))
+    //   })
+
+    //   externalIp = await Promise.race(promises)
+    // } else {
+    //   externalIp = await Stun.getExternalIP({
+    //     hostname: 'stun.l.google.com',
+    //     port: 19302,
+    //   })
+    // }
+    // addrs.push(Multiaddr(`/ip4/${externalIp.address}/tcp/${externalIp.port}`))
+
     addrs.push(Multiaddr(`/ip4/0.0.0.0/tcp/${ip4Port}`))
   }
 
   if (options.hosts !== undefined) {
     if (options.hosts.ip4 === undefined && options.hosts.ip6 === undefined) {
-      throw Error(`Unable `)
+      throw Error(`Unable to detect to which interface we should listen`)
     }
     if (options.hosts.ip4 !== undefined) {
       let ip4Port = options.hosts.ip4.port
@@ -43,6 +62,24 @@ function getAddrs(options: HoprOptions): any[] {
         ip4Port += (options.id + 1) * 2
       }
       // ===========================================================================================================
+      const promises: Promise<Interface>[] = []
+
+      let externalIp: Interface
+      // if (!options.bootstrapNode) {
+      //   options.bootstrapServers[0].multiaddrs.forEach((ma: Multiaddr) => {
+      //     const opts = ma.nodeAddress()
+      //     promises.push(Stun.getExternalIP({ hostname: opts.address, port: DEFAULT_STUN_PORT }))
+      //   })
+
+      //   externalIp = await Promise.race(promises)
+      // } else {
+      //   externalIp = await Stun.getExternalIP({
+      //     hostname: 'stun.l.google.com',
+      //     port: 19302,
+      //   })
+      // }
+      //   addrs.push(Multiaddr(`/ip4/${externalIp.address}/tcp/${externalIp.port}`))
+      
       addrs.push(Multiaddr(`/ip4/${options.hosts.ip4.ip}/tcp/${ip4Port}`))
     }
 
@@ -155,7 +192,7 @@ async function getPeerInfo(options: HoprOptions, db?: LevelUp): Promise<PeerInfo
     throw Error('Invalid input parameter. Please set a valid peerInfo or pass a database handle.')
   }
 
-  const addrs = getAddrs(options)
+  const addrs = await getAddrs(options)
 
   let peerInfo: PeerInfo
   if (options.peerInfo != null) {
