@@ -11,6 +11,7 @@ import pushable from 'it-pushable'
 import type { Pushable } from 'it-pushable'
 
 import { PROTOCOL_FORWARD } from '../../constants'
+import { Handler } from '../../network/transport/types'
 
 import PeerInfo from 'peer-info'
 import PeerId from 'peer-id'
@@ -71,10 +72,7 @@ class ForwardPacketInteraction<Chain extends HoprCoreConnector>
   }
 
   async handleForwardPacket(token: number) {
-    let struct: {
-      stream: any
-      protocol: string
-    }
+    let struct: Handler
 
     let destination: PeerId
     let sender: PeerId
@@ -137,10 +135,7 @@ class ForwardPacketInteraction<Chain extends HoprCoreConnector>
   }
 
   async interact(counterparty: PeerInfo | PeerId, relay: PeerId | PeerInfo): Promise<any> {
-    let struct: {
-      stream: any
-      protocol: string
-    }
+    let struct: Handler
 
     let relayPeerId = PeerInfo.isPeerInfo(relay) ? relay.id : relay
     let counterpartyPeerId = PeerInfo.isPeerInfo(counterparty) ? counterparty.id : counterparty

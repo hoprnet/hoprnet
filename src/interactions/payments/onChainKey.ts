@@ -6,6 +6,8 @@ import type { AbstractInteraction } from '../abstractInteraction'
 import PeerInfo from 'peer-info'
 import type PeerId from 'peer-id'
 
+import type { Handler } from '../../network/transport/types'
+
 import chalk from 'chalk'
 
 import pipe from 'it-pipe'
@@ -17,7 +19,7 @@ class OnChainKey<Chain extends HoprCoreConnector> implements AbstractInteraction
     this.node.handle(this.protocols, this.handler.bind(this))
   }
 
-  handler(struct: { stream: any }) {
+  handler(struct: Handler) {
     pipe(
       /* prettier-ignore */
       [this.node.paymentChannels.self.onChainKeyPair.publicKey],
@@ -26,10 +28,7 @@ class OnChainKey<Chain extends HoprCoreConnector> implements AbstractInteraction
   }
 
   async interact(counterparty: PeerInfo | PeerId): Promise<Uint8Array> {
-    let struct: {
-      stream: any
-      protocol: string
-    }
+    let struct: Handler
 
     try {
       struct = await this.node.dialProtocol(counterparty, this.protocols[0]).catch(async (_: Error) => {

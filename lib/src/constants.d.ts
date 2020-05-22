@@ -15,3 +15,4 @@ export declare const PROTOCOL_HEARTBEAT: string;
 export declare const PROTOCOL_WEBRTC_TURN_REQUEST: string;
 export declare const PROTOCOL_WEBRTC_TURN: string;
 export declare const PROTOCOL_FORWARD: string;
+export declare const DEFAULT_STUN_PORT = 3478;

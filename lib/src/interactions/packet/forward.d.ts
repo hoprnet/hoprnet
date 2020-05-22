@@ -4,6 +4,7 @@ import PeerInfo from 'peer-info';
 import type { AbstractInteraction } from '../abstractInteraction';
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface';
 import type Hopr from '../../';
+import type { Handler } from '../../network/transport/types';
 declare class PacketForwardInteraction<Chain extends HoprCoreConnector> implements AbstractInteraction<Chain> {
     node: Hopr<Chain>;
     private tokens;
@@ -12,9 +13,7 @@ declare class PacketForwardInteraction<Chain extends HoprCoreConnector> implemen
     protocols: string[];
     constructor(node: Hopr<Chain>);
     interact(counterparty: PeerInfo | PeerId, packet: Packet<Chain>): Promise<void>;
-    handler(struct: {
-        stream: any;
-    }): void;
+    handler(struct: Handler): void;
     handlePacket(token: number): Promise<void>;
 }
 export { PacketForwardInteraction };

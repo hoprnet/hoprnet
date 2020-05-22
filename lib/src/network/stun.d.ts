@@ -1,8 +1,21 @@
+/// <reference types="node" />
+import dgram from 'dgram';
 import { HoprOptions } from '..';
-declare class StunServer {
-    private server;
+export declare type Interface = {
+    family: 'IPv4' | 'IPv6';
+    port: number;
+    address: string;
+};
+declare class Stun {
+    private options;
+    private socket;
     constructor(options: HoprOptions);
-    start(): Promise<void>;
-    stop(): Promise<void>;
+    static getExternalIP(address: {
+        hostname: string;
+        port: number;
+    }, usePort?: number): Promise<Interface>;
+    getSocket(): dgram.Socket;
+    startServer(): Promise<unknown>;
+    stopServer(): Promise<void>;
 }
-export { StunServer };
+export { Stun };

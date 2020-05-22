@@ -5,9 +5,10 @@ import Multiaddr from 'multiaddr';
 import { Debugger } from 'debug';
 import PeerId from 'peer-id';
 import PeerInfo from 'peer-info';
+import { Handler } from './network/transport/types';
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface';
 import type { HoprCoreConnectorStatic } from '@hoprnet/hopr-core-connector-interface';
-import { Interactions, Duplex } from './interactions';
+import { Interactions } from './interactions';
 import * as DbKeys from './dbKeys';
 interface NetOptions {
     ip: string;
@@ -43,13 +44,10 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
     bootstrapServers: PeerInfo[];
     dial: (addr: Multiaddr | PeerInfo | PeerId, options?: {
         signal: AbortSignal;
-    }) => Promise<any>;
+    }) => Promise<Handler>;
     dialProtocol: (addr: Multiaddr | PeerInfo | PeerId, protocol: string, options?: {
         signal: AbortSignal;
-    }) => Promise<{
-        stream: Duplex;
-        protocol: string;
-    }>;
+    }) => Promise<Handler>;
     hangUp: (addr: PeerInfo | PeerId | Multiaddr | string) => Promise<void>;
     peerInfo: PeerInfo;
     peerStore: {

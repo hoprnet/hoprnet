@@ -13,6 +13,8 @@ import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '../../'
 import pipe from 'it-pipe'
 
+import type { Handler } from '../../network/transport/types'
+
 import { randomInteger } from '@hoprnet/hopr-utils'
 import { getTokens, Token } from '../../utils'
 
@@ -34,10 +36,7 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector>
   }
 
   async interact(counterparty: PeerInfo | PeerId, packet: Packet<Chain>): Promise<void> {
-    let struct: {
-      stream: any
-      protocol: string
-    }
+    let struct: Handler
 
     const abort = new AbortController()
     const signal = abort.signal
@@ -78,7 +77,7 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector>
     )
   }
 
-  handler(struct: { stream: any }): void {
+  handler(struct: Handler): void {
     let packet: Packet<Chain>
     pipe(
       /* pretttier-ignore */
