@@ -14,12 +14,8 @@ yarn-error.log
 # Exclude db dir
 db
 
-# Exclude built test
-lib/**/*.spec.js
-lib/**/*.spec.d.ts
-
-# Exclude source map
-lib/**/*.js.map
+# Exclude built files
+lib/
 
 # Exclude vim swap files
 *.swp
