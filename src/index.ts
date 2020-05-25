@@ -339,7 +339,9 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
       // exclude bootstrap server(s) from crawling results
       !this.bootstrapServers.some((pInfo: PeerInfo) => pInfo.id.isEqual(peerInfo.id))
 
-    await this.network.crawler.crawl(filter)
+    try {
+      await this.network.crawler.crawl(filter)
+    } catch {}
 
     const array = []
     for (const peerInfo of this.peerStore.peers.values()) {
