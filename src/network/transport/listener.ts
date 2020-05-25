@@ -105,7 +105,6 @@ export function createListener(
         },
         ma.toOptions().port
       )
-      console.log(externalIp)
       const options = multiaddrToNetConfig(listeningAddr)
       server.listen(options, (err?: Error) => {
         if (err) return reject(err)
