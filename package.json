@@ -57,7 +57,6 @@
     "libp2p-mplex": "~0.9.5",
     "libp2p-secio": "^0.12.5",
     "libp2p-websockets": "~0.13.6",
-    "ministun": "^1.0.3",
     "multiaddr": "^7.4.3",
     "multihashes": "~0.4.15",
     "peer-id": "~0.13.12",
@@ -67,6 +66,7 @@
     "secp256k1": "~4.0.1",
     "simple-peer": "~9.7.2",
     "ts-node": "^8.10.1",
+    "webrtc-stun": "^3.0.0",
     "wrtc": "~0.4.4"
   },
   "devDependencies": {
@@ -98,7 +98,7 @@
     "extension": [
       "ts"
     ],
-    "spec": "src/network/transport/*.spec.ts",
+    "spec": "src/network/stun.spec.ts",
     "require": "ts-node/register"
   },
   "prettier": {

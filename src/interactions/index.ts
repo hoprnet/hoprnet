@@ -5,8 +5,6 @@ import { PaymentInteractions } from './payments'
 import { NetworkInteractions } from './network'
 import { PacketInteractions } from './packet'
 
-export type { Duplex, Sink, Source } from './abstractInteraction'
-
 class Interactions<Chain extends HoprCoreConnector> {
   public payments: PaymentInteractions<Chain>
   public network: NetworkInteractions<Chain>

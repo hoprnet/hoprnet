@@ -6,6 +6,8 @@ import pipe from 'it-pipe'
 
 import type { AbstractInteraction } from '../abstractInteraction'
 
+import type { Handler } from '../../network/transport/types'
+
 import { PROTOCOL_PAYMENT_CHANNEL } from '../../constants'
 import PeerInfo from 'peer-info'
 import type PeerId from 'peer-id'
@@ -17,7 +19,7 @@ class Opening<Chain extends HoprCoreConnector> implements AbstractInteraction<Ch
     this.node.handle(this.protocols, this.handler.bind(this))
   }
 
-  async handler(struct: { stream: any }) {
+  async handler(struct: Handler) {
     pipe(
       /** prettier-ignore */
       struct.stream,
@@ -27,10 +29,7 @@ class Opening<Chain extends HoprCoreConnector> implements AbstractInteraction<Ch
   }
 
   async interact(counterparty: PeerInfo | PeerId, channelBalance: Types.ChannelBalance): Promise<Types.SignedChannel<Types.Channel, Types.Signature>> {
-    let struct: {
-      stream: any
-      protocol: string
-    }
+    let struct: Handler
 
     try {
       struct = await this.node.dialProtocol(counterparty, this.protocols[0]).catch(async (_: Error) => {

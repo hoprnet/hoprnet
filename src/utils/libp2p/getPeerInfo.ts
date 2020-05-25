@@ -13,13 +13,12 @@ import Multiaddr from 'multiaddr'
 
 import { KeyPair } from '../../dbKeys'
 
-
 import { NAME } from '../../constants'
 
 /**
  * Assemble the addresses that we are using
  */
-function getAddrs(options: HoprOptions): any[] {
+async function getAddrs(options: HoprOptions): Promise<Multiaddr[]> {
   const addrs = []
 
   if (options.hosts === undefined || (options.hosts.ip4 === undefined && options.hosts.ip6 === undefined)) {
@@ -34,7 +33,7 @@ function getAddrs(options: HoprOptions): any[] {
 
   if (options.hosts !== undefined) {
     if (options.hosts.ip4 === undefined && options.hosts.ip6 === undefined) {
-      throw Error(`Unable `)
+      throw Error(`Unable to detect to which interface we should listen`)
     }
     if (options.hosts.ip4 !== undefined) {
       let ip4Port = options.hosts.ip4.port
@@ -155,7 +154,7 @@ async function getPeerInfo(options: HoprOptions, db?: LevelUp): Promise<PeerInfo
     throw Error('Invalid input parameter. Please set a valid peerInfo or pass a database handle.')
   }
 
-  const addrs = getAddrs(options)
+  const addrs = await getAddrs(options)
 
   let peerInfo: PeerInfo
   if (options.peerInfo != null) {

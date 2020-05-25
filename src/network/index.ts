@@ -2,34 +2,36 @@ import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '..'
 import type { HoprOptions } from '..'
 
-
-
 import { Crawler } from './crawler'
 import { Heartbeat } from './heartbeat'
-import { StunServer } from './stun'
+import { Stun } from './stun'
 
 class Network<Chain extends HoprCoreConnector> {
   public crawler: Crawler<Chain>
-  public heartbeat?: Heartbeat<Chain>
-  public stun?: StunServer
+  public heartbeat: Heartbeat<Chain>
+  public stun?: Stun
 
-  constructor(node: Hopr<Chain>, options: HoprOptions) {
+  constructor(node: Hopr<Chain>, private options: HoprOptions) {
     this.crawler = new Crawler(node)
     this.heartbeat = new Heartbeat(node)
 
     if (options.bootstrapNode) {
-      this.stun = new StunServer(options)
+      this.stun = new Stun(options)
     }
   }
 
   async start() {
-    // await this.stun?.start()
+    if (this.options.bootstrapNode) {
+      await this.stun?.startServer()
+    }
 
     this.heartbeat?.start()
   }
 
   async stop() {
-    // await this.stun?.stop()
+    if (this.options.bootstrapNode) {
+      await this.stun?.stopServer()
+    }
 
     this.heartbeat?.stop()
   }

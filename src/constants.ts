@@ -36,3 +36,5 @@ export const PROTOCOL_WEBRTC_TURN_REQUEST = `${BASESTRING}/webrtc_turn_request`
 export const PROTOCOL_WEBRTC_TURN = `${BASESTRING}/webrtc_turn`
 
 export const PROTOCOL_FORWARD = `${BASESTRING}/forward`
+
+export const DEFAULT_STUN_PORT = 3478

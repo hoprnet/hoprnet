@@ -1,20 +1,13 @@
 import type Hopr from '..'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 
-export type Sink = (source: AsyncIterable<Uint8Array>) => void
-
-export type Source = AsyncIterator<Uint8Array>
-
-export type Duplex = {
-  sink: Sink
-  source: Source
-}
+import type { Handler } from '../network/transport/types'
 
 interface AbstractInteraction<Chain extends HoprCoreConnector> {
   protocols: string[]
   node: Hopr<Chain>
 
-  handler(struct: { stream: Duplex }): void
+  handler(struct: Handler): void
 
   interact(...props: any[]): any
 }

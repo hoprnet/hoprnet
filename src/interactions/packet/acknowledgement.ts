@@ -10,6 +10,8 @@ import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '../../'
 import { Acknowledgement } from '../../messages/acknowledgement'
 
+import type { Handler } from '../../network/transport/types'
+
 import EventEmitter from 'events'
 
 import { PROTOCOL_ACKNOWLEDGEMENT } from '../../constants'
@@ -24,7 +26,7 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector> extends 
     this.node.handle(this.protocols, this.handler.bind(this))
   }
 
-  handler(struct: { stream: any }) {
+  handler(struct: Handler) {
     pipe(
       /* prettier-ignore */
       struct.stream,
@@ -33,10 +35,7 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector> extends 
   }
 
   async interact(counterparty: PeerId, acknowledgement: Acknowledgement<Chain>): Promise<void> {
-    let struct: {
-      stream: any
-      protocol: string
-    }
+    let struct: Handler
 
     try {
       struct = await this.node

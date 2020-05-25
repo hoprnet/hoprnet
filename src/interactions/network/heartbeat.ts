@@ -9,6 +9,7 @@ import AbortController from 'abort-controller'
 import pipe from 'it-pipe'
 
 import { PROTOCOL_HEARTBEAT } from '../../constants'
+import type { Stream, Connection, Handler } from '../../network/transport/types'
 
 import PeerInfo from 'peer-info'
 import type PeerId from 'peer-id'
@@ -25,7 +26,7 @@ class Heartbeat<Chain extends HoprCoreConnector> implements AbstractInteraction<
     this.node.handle(this.protocols, this.handler.bind(this))
   }
 
-  handler(struct: { connection: any; stream: any }) {
+  handler(struct: { connection: Connection; stream: Stream }) {
     let events = this.node.network.heartbeat
     pipe(
       struct.stream,
@@ -42,10 +43,7 @@ class Heartbeat<Chain extends HoprCoreConnector> implements AbstractInteraction<
   }
 
   async interact(counterparty: PeerInfo | PeerId): Promise<void> {
-    let struct: {
-      stream: any
-      protocol: string
-    }
+    let struct: Handler
 
     const abort = new AbortController()
     const signal = abort.signal
@@ -74,7 +72,7 @@ class Heartbeat<Chain extends HoprCoreConnector> implements AbstractInteraction<
       /** prettier-ignore */
       [challenge],
       struct.stream,
-      async (source: AsyncIterable<Buffer>) => {
+      async (source: AsyncIterable<Uint8Array>) => {
         let done = false
         for await (const msg of source) {
           if (done == true) {

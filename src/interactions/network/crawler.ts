@@ -1,10 +1,12 @@
 import type Hopr from '../../'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 
+import type { Handler } from '../../network/transport/types'
+ 
 import pipe from 'it-pipe'
 import chalk from 'chalk'
 
-import type { AbstractInteraction, Duplex } from '../abstractInteraction'
+import type { AbstractInteraction } from '../abstractInteraction'
 
 import { PROTOCOL_CRAWLING } from '../../constants'
 import type PeerInfo from 'peer-info'
@@ -21,7 +23,7 @@ class Crawler<Chain extends HoprCoreConnector> implements AbstractInteraction<Ch
     this.node.handle(this.protocols, this.handler.bind(this))
   }
 
-  handler(struct: { stream: any }) {
+  handler(struct: Handler) {
     pipe(
       /* prettier-ignore */
       this.node.network.crawler.handleCrawlRequest(),
@@ -30,10 +32,7 @@ class Crawler<Chain extends HoprCoreConnector> implements AbstractInteraction<Ch
   }
 
   async interact(counterparty: PeerInfo): Promise<PeerInfo[]> {
-    let struct: {
-      stream: Duplex
-      protocol: string
-    }
+    let struct: Handler
 
     const abort = new AbortController()
     const signal = abort.signal
@@ -66,7 +65,7 @@ class Crawler<Chain extends HoprCoreConnector> implements AbstractInteraction<Ch
   }
 }
 
-async function collect(source: AsyncIterable<Uint8Array>) {
+async function collect(source: Handler['stream']['source']) {
   const peerInfos = []
   for await (const encodedResponse of source) {
     let decodedResponse: any

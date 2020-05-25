@@ -11,6 +11,9 @@ import { getMultiaddrs, multiaddrToNetConfig } from './utils'
 import { MultiaddrConnection, Connection, Upgrader } from './types'
 import Multiaddr from 'multiaddr'
 
+import type { Interface } from '../stun'
+import { Stun } from '../stun'
+
 export interface Libp2pServer extends Server {
   __connections: MultiaddrConnection[]
 }
@@ -66,7 +69,6 @@ export function createListener(
     listener.emit('connection', conn)
   }) as Libp2pServer
 
-
   server
     .on('listening', () => listener.emit('listening'))
     .on('error', err => listener.emit('error', err))
@@ -85,8 +87,9 @@ export function createListener(
   }
 
   let peerId: string, listeningAddr: Multiaddr | undefined
+  let externalIp: Interface
 
-  listener.listen = (ma: Multiaddr): Promise<void> => {
+  listener.listen = async (ma: Multiaddr): Promise<void> => {
     listeningAddr = ma
     peerId = ma.getPeerId()
 
@@ -94,7 +97,14 @@ export function createListener(
       listeningAddr = ma.decapsulateCode(CODE_P2P)
     }
 
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
+      externalIp = await Stun.getExternalIP(
+        {
+          hostname: 'stun.l.google.com',
+          port: 19302,
+        },
+        ma.toOptions().port
+      )
       const options = multiaddrToNetConfig(listeningAddr)
       server.listen(options, (err?: Error) => {
         if (err) return reject(err)
@@ -115,7 +125,8 @@ export function createListener(
     // Because TCP will only return the IPv6 version
     // we need to capture from the passed multiaddr
     if (listeningAddr.toString().startsWith('/ip4')) {
-      addrs = addrs.concat(getMultiaddrs('ip4', address.address, address.port))
+      addrs.push(Multiaddr(`/ip4/${externalIp.address}/tcp/${externalIp.port}`))
+      addrs.push(...getMultiaddrs('ip4', address.address, address.port))
     } else if (address.family === 'IPv6') {
       addrs = addrs.concat(getMultiaddrs('ip6', address.address, address.port))
     }
