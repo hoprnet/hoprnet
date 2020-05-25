@@ -13,8 +13,6 @@ import Multiaddr from 'multiaddr'
 
 import { KeyPair } from '../../dbKeys'
 
-import { Stun, Interface } from '../../network/stun'
-
 import { NAME } from '../../constants'
 
 /**
@@ -30,24 +28,6 @@ async function getAddrs(options: HoprOptions): Promise<Multiaddr[]> {
       ip4Port += (options.id + 1) * 2
     }
     // ===========================================================================================================
-    const promises: Promise<Interface>[] = []
-
-    let externalIp: Interface
-    // if (!options.bootstrapNode) {
-    //   options.bootstrapServers[0].multiaddrs.forEach((ma: Multiaddr) => {
-    //     const opts = ma.nodeAddress()
-    //     promises.push(Stun.getExternalIP({ hostname: opts.address, port: DEFAULT_STUN_PORT }))
-    //   })
-
-    //   externalIp = await Promise.race(promises)
-    // } else {
-    //   externalIp = await Stun.getExternalIP({
-    //     hostname: 'stun.l.google.com',
-    //     port: 19302,
-    //   })
-    // }
-    // addrs.push(Multiaddr(`/ip4/${externalIp.address}/tcp/${externalIp.port}`))
-
     addrs.push(Multiaddr(`/ip4/0.0.0.0/tcp/${ip4Port}`))
   }
 
@@ -62,24 +42,6 @@ async function getAddrs(options: HoprOptions): Promise<Multiaddr[]> {
         ip4Port += (options.id + 1) * 2
       }
       // ===========================================================================================================
-      const promises: Promise<Interface>[] = []
-
-      let externalIp: Interface
-      // if (!options.bootstrapNode) {
-      //   options.bootstrapServers[0].multiaddrs.forEach((ma: Multiaddr) => {
-      //     const opts = ma.nodeAddress()
-      //     promises.push(Stun.getExternalIP({ hostname: opts.address, port: DEFAULT_STUN_PORT }))
-      //   })
-
-      //   externalIp = await Promise.race(promises)
-      // } else {
-      //   externalIp = await Stun.getExternalIP({
-      //     hostname: 'stun.l.google.com',
-      //     port: 19302,
-      //   })
-      // }
-      //   addrs.push(Multiaddr(`/ip4/${externalIp.address}/tcp/${externalIp.port}`))
-      
       addrs.push(Multiaddr(`/ip4/${options.hosts.ip4.ip}/tcp/${ip4Port}`))
     }
 
