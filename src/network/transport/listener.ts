@@ -103,7 +103,7 @@ export function createListener(
           hostname: 'stun.l.google.com',
           port: 19302,
         },
-        3479
+        ma.toOptions().port
       )
       console.log(externalIp)
       const options = multiaddrToNetConfig(listeningAddr)
