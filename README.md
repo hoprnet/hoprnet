@@ -1,20 +1,70 @@
-# Website of HOPR
+# Surface
 
-## Hosting
-The website is hosted in a serverless fashion on [Google App Engine](https://cloud.google.com/appengine/), a simple tutorial can be found in their [documentation](https://cloud.google.com/appengine/docs/standard/python/getting-started/hosting-a-static-website). The basic settings are configured in the `app.yaml` file.
+This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
-1. Register for [Google Cloud Platform](https://console.cloud.google.com/) and create a new project
-2. [Install `gcloud`](https://cloud.google.com/sdk/docs) command line tools
-3. Initialize via `gcloud init`, and select the GCP project that you created in step 1
-4. Clone this repository and navigate into the root folder of this repository on your local machine
-5. Deploy the app via `gcloud app deploy`, the first time this creates an app and lets you choose the region in which to deploy the app
-6. View the page via `gcloud app browse` which should open a browser window on a domain called `YOURAPPID.appspot.com`
+## Available Scripts
 
-## Deployment
-Our website is configured to auto-deploy via GitHub. Following the [Google Cloud Build documentation](https://cloud.google.com/cloud-build/docs/automating-builds/run-builds-on-github#installing_the_google_cloud_build_app), enable the Cloud Build API (just the first confirmation is enough, you do not need to check the API key) and then head to GitHub Marketplace to add the [Google Cloud Build app](https://github.com/marketplace/google-cloud-build) to your GitHub repository. After adding the Google Cloud Build app on GitHub, the installation will take you back to GCP to select the project (e.g. the one created in the previous section), consent to storing GitHub login information, select the repository and create the push trigger.
+In the project directory, you can run:
 
-Open [Google Cloud Build](https://console.cloud.google.com/cloud-build/) in GCP, you should only see one build that gets triggered for the installation of the toolchain. Now do some modification in the repository, commit and push the changes to GitHub. You should within 15s see that a new build got started on Google Cloud Build.
+### `npm start`
 
-After configuring the above, any commit to the repository that gets pushed to GitHub will initiate a build via `gcloud app deploy` which is triggered via the `cloudbuild.yaml` file.
+Runs the app in the development mode.<br>
+Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
 
-You might have to change the [IAM permissions](https://console.cloud.google.com/iam-admin) for the account `PROJECTID@cloudbuild.gserviceaccount.com` to Project Owner. **TODO**: find out what permissions are actually needed as this permission is maximally wide.
+The page will reload if you make edits.<br>
+You will also see any lint errors in the console.
+
+### `npm test`
+
+Launches the test runner in the interactive watch mode.<br>
+See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+
+### `npm run build`
+
+Builds the app for production to the `build` folder.<br>
+It correctly bundles React in production mode and optimizes the build for the best performance.
+
+The build is minified and the filenames include the hashes.<br>
+Your app is ready to be deployed!
+
+See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+
+### `npm run eject`
+
+**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+
+If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+
+Instead, it will copy all the configuration files and the transitive dependencies (Webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+
+You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+
+## Learn More
+
+You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+
+To learn React, check out the [React documentation](https://reactjs.org/).
+
+### Code Splitting
+
+This section has moved here: https://facebook.github.io/create-react-app/docs/code-splitting
+
+### Analyzing the Bundle Size
+
+This section has moved here: https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size
+
+### Making a Progressive Web App
+
+This section has moved here: https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app
+
+### Advanced Configuration
+
+This section has moved here: https://facebook.github.io/create-react-app/docs/advanced-configuration
+
+### Deployment
+
+This section has moved here: https://facebook.github.io/create-react-app/docs/deployment
+
+### `npm run build` fails to minify
+
+This section has moved here: https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify

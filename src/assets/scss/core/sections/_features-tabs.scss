@@ -1,0 +1,85 @@
+.features-tabs {
+
+	.section-inner {
+		padding-top: $features-tabs--padding-t__mobile;
+		padding-bottom: $features-tabs--padding-b__mobile;
+	}
+
+	.section-header {
+		padding-bottom: $features-tabs-header--padding__mobile;
+    }
+
+    .tab-list {
+        margin-top: -$features-tabs-item--padding-v;
+        margin-bottom: -$features-tabs-item--padding-v !important;        
+        justify-content: center;
+        flex-wrap: wrap;
+        overflow-x: initial;
+        padding-bottom: $features-tabs-list--padding-b;
+
+        &::after {
+            content: normal;
+        }        
+    }
+    
+    .tab {
+        flex-direction: column;
+        opacity: 0.48;
+        border: initial;
+		padding-top: $features-tabs-item--padding-v;
+		padding-bottom: $features-tabs-item--padding-v;
+		padding-left: $features-tabs-item--padding-h;
+        padding-right: $features-tabs-item--padding-h;
+        transition: opacity .15s ease;
+        
+        &:hover {
+            opacity: .72;
+        }
+
+        &.is-active {
+            opacity: 1;
+        }
+    }
+
+    .tab-panel {
+        padding-left: $features-tabs-panel--padding-h;
+        padding-right: $features-tabs-panel--padding-h;
+        padding-top: $features-tabs-panel--padding-v;
+        padding-bottom: $features-tabs-panel--padding-v;
+		opacity: 0;
+        visibility: hidden;
+        will-change: transform;
+
+        &.is-active {
+			opacity: 1;
+			visibility: visible;
+			animation: tabsPanelIn .5s ease .15s both;
+        }
+    }
+}
+
+@include media( '>medium' ) {
+
+	.features-tabs {
+
+		.section-inner {
+			padding-top: $features-tabs--padding-t__desktop;
+			padding-bottom: $features-tabs--padding-b__desktop;
+		}
+
+		.section-header {
+			padding-bottom: $features-tabs-header--padding__desktop;
+		}
+	}
+}
+
+@keyframes tabsPanelIn {
+    0% {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

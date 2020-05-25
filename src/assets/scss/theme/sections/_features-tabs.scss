@@ -1,0 +1,6 @@
+.features-tabs-tab-image {
+	display: inline-flex;
+	border-radius: 50%;
+    background: linear-gradient(0deg, get-color(light, 3) 0, get-color(light, 1) 100%);
+    box-shadow: 0 2px 4px rgba(get-color(dark, 1), .32);
+}

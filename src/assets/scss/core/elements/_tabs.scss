@@ -1,0 +1,72 @@
+.tab-list {
+    position: relative;
+    display: flex;
+    justify-content: flex-start;
+    flex-grow: 1;
+    flex-shrink: 0;
+    margin-bottom: 0 !important;
+    white-space: nowrap;
+    overflow-x: auto;
+    user-select: none;
+
+    &::after {
+        content: '';
+        display: block;
+        position: absolute;
+        bottom: 0;
+        width: 100%;
+        height: $tabs-item--line-width;
+        background-color: color-border(tabs-line);
+        z-index: -1;
+    }
+}
+
+.tab {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    @include font-size(tabs-item);
+    @include font-weight(tabs-item);    
+    padding: $tabs-item--padding-v $tabs-item--padding-h;
+    color: color(tabs-item);
+    border-bottom-width: $tabs-item--line-width;
+    border-bottom-style: solid;
+    border-bottom-color: color-border(tabs-line);
+    cursor: pointer;
+
+    &.is-active {
+        color: color(tabs-item-active);
+        border-bottom-color: color-border(tabs-line-active);
+    }
+}
+
+.tab-panel {
+    padding-left: $tabs-panel--padding-h;
+    padding-right: $tabs-panel--padding-h;
+    padding-top: $tabs-panel--padding-v;
+    padding-bottom: $tabs-panel--padding-v;
+
+    &:not(.is-active) {
+        display: none !important;
+    }
+}
+
+.invert-color {
+
+    .tab-list {
+
+        &::after {
+            background-color: color-border(tabs-line-inverse);
+        }
+    }    
+
+    .tab {
+        color: color(tabs-item-inverse);
+        border-bottom-color: color-border(tabs-line-inverse);
+
+        &.is-active {
+            color: color(tabs-item-active-inverse);
+            border-bottom-color: color-border(tabs-line-active-inverse);
+        }        
+    }
+}
