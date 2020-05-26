@@ -15,11 +15,11 @@ class Home extends React.Component {
     return (
       <React.Fragment>
         <HeroFull /> {/* className="illustration-section-01" */}
-        <FeaturesTabs />
+        <FeaturesTabs topDivider />
         <FeaturesTiles topDivider />
-        <Clients topDivider bottomDivider />
-        <Team />
-        <Investors />
+        <Clients topDivider />
+        <Team topDivider />
+        <Investors topDivider />
         {/* <Testimonial
           topDivider
           bottomOuterDivider

@@ -46,13 +46,13 @@ class HeroFull extends React.Component {
           <div className={innerClasses}>
             <div
               className="hero-content"
-              style={{
-                minHeight: '70vh',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
+              // style={{
+              //   minHeight: '70vh',
+              //   display: 'flex',
+              //   flexDirection: 'column',
+              //   alignItems: 'center',
+              //   justifyContent: 'center',
+              // }}
             >
               <h1 className="mt-0 mb-16 reveal-from-top" data-reveal-delay="150">
                 HOPR
@@ -68,7 +68,7 @@ class HeroFull extends React.Component {
                 </div> */}
               </div>
             </div>
-            {/* <div className="hero-figure reveal-from-bottom" data-reveal-delay="600">
+            <div className="hero-figure reveal-from-bottom" data-reveal-delay="600">
               <Image
                 className="has-shadow"
                 src={require('./../../assets/images/hero-image.png')}
@@ -76,7 +76,7 @@ class HeroFull extends React.Component {
                 width={896}
                 height={504}
               />
-            </div> */}
+            </div>
           </div>
         </div>
       </section>
