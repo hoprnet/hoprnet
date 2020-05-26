@@ -3,18 +3,19 @@ import HeroFull from '../components/sections/HeroFull'
 import Clients from '../components/sections/Clients'
 import FeaturesTabs from '../components/sections/FeaturesTabs'
 import FeaturesTiles from '../components/sections/FeaturesTiles'
-import Testimonial from '../components/sections/Testimonial'
-import Pricing from '../components/sections/Pricing'
-import Cta from '../components/sections/Cta'
+// import Testimonial from '../components/sections/Testimonial'
+// import Pricing from '../components/sections/Pricing'
+// import Cta from '../components/sections/Cta'
+import Contact from '../components/sections/Contact'
 
 class Home extends React.Component {
   render() {
     return (
       <React.Fragment>
         <HeroFull className="illustration-section-01" />
-        {/* <Clients topDivider bottomDivider /> */}
         <FeaturesTabs />
         <FeaturesTiles topDivider />
+        <Clients topDivider />
         {/* <Testimonial
           topDivider
           bottomOuterDivider
@@ -22,6 +23,7 @@ class Home extends React.Component {
         /> */}
         {/* <Pricing topDivider pricingSlider className="has-bg-color-cut" /> */}
         {/* <Cta hasBgColor invertColor split /> */}
+        <Contact />
       </React.Fragment>
     )
   }

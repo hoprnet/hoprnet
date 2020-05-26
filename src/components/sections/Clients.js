@@ -45,20 +45,33 @@ class Clients extends React.Component {
           <div className={innerClasses}>
             <ul className="list-reset">
               <li className="reveal-from-bottom">
-                <Image src={require('./../../assets/images/clients-01.svg')} alt="Client 01" width={124} height={24} />
+                <Image
+                  src={require('./../../assets/images/client-binance.svg')}
+                  alt="Binance Logo"
+                  width={124}
+                  height={24}
+                  style={{ filter: 'contrast(0)' }}
+                />
               </li>
               <li className="reveal-from-bottom" data-reveal-delay="150">
-                <Image src={require('./../../assets/images/clients-02.svg')} alt="Client 02" width={83} height={30} />
+                <Image
+                  src={require('./../../assets/images/client-bank-frick.svg')}
+                  alt="Bank Frick Logo"
+                  width={124}
+                  height={24}
+                  style={{ filter: 'contrast(0)' }}
+                />
               </li>
               <li className="reveal-from-bottom" data-reveal-delay="300">
-                <Image src={require('./../../assets/images/clients-03.svg')} alt="Client 03" width={125} height={39} />
+                <span style={{ filter: 'contrast(0)' }}>Become our partner</span>
+                {/* <Image src={require('./../../assets/images/clients-03.svg')} alt="Client 03" width={125} height={39} /> */}
               </li>
-              <li className="reveal-from-bottom" data-reveal-delay="450">
+              {/* <li className="reveal-from-bottom" data-reveal-delay="450">
                 <Image src={require('./../../assets/images/clients-04.svg')} alt="Client 04" width={150} height={31} />
               </li>
               <li className="reveal-from-bottom" data-reveal-delay="600">
                 <Image src={require('./../../assets/images/clients-05.svg')} alt="Client 05" width={113} height={30} />
-              </li>
+              </li> */}
             </ul>
           </div>
         </div>
