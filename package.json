@@ -30,7 +30,7 @@
     "clean": "rm -rf ./lib",
     "fundAccounts": "ts-node -T ./scripts/fundAccounts.ts",
     "test": "mocha --exit",
-    "prepublish": "yarn build"
+    "prepublishOnly": "yarn build"
   },
   "dependencies": {
     "@hoprnet/hopr-utils": "0.1.3",
