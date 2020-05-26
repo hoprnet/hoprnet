@@ -86,7 +86,7 @@ class FeaturesTabs extends React.Component {
                       height={56}
                     />
                   </div>
-                  <div className="text-color-high text-sm">Tech & Blockchain experts</div>
+                  <div className="text-color-high text-sm">Techies</div>
                 </Tab>
                 <Tab tabId="tab-d">
                   <div className="features-tabs-tab-image mb-12">
@@ -97,7 +97,7 @@ class FeaturesTabs extends React.Component {
                       height={56}
                     />
                   </div>
-                  <div className="text-color-high text-sm">Collaborators</div>
+                  <div className="text-color-high text-sm">Entrepreneurs</div>
                 </Tab>
                 <Tab tabId="tab-e">
                   <div className="features-tabs-tab-image mb-12">

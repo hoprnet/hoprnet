@@ -6,16 +6,18 @@ import FeaturesTiles from '../components/sections/FeaturesTiles'
 // import Testimonial from '../components/sections/Testimonial'
 // import Pricing from '../components/sections/Pricing'
 // import Cta from '../components/sections/Cta'
+import Team from '../components/sections/Team'
 import Contact from '../components/sections/Contact'
 
 class Home extends React.Component {
   render() {
     return (
       <React.Fragment>
-        <HeroFull className="illustration-section-01" />
+        <HeroFull /> {/* className="illustration-section-01" */}
         <FeaturesTabs />
         <FeaturesTiles topDivider />
-        <Clients topDivider />
+        <Clients topDivider bottomDivider />
+        <Team />
         {/* <Testimonial
           topDivider
           bottomOuterDivider

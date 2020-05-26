@@ -36,7 +36,7 @@ class Team extends React.Component {
     )
 
     const innerClasses = classNames(
-      'team-inner section-inner pt-0',
+      'team-inner section-inner',
       topDivider && 'has-top-divider',
       bottomDivider && 'has-bottom-divider'
     )

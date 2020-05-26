@@ -63,7 +63,7 @@ class Clients extends React.Component {
                 />
               </li>
               <li className="reveal-from-bottom" data-reveal-delay="300">
-                <span style={{ filter: 'contrast(0)' }}>Become our partner</span>
+                <span style={{ filter: 'contrast(0)', fontWeight: 'bold' }}>Become our partner</span>
                 {/* <Image src={require('./../../assets/images/clients-03.svg')} alt="Client 03" width={125} height={39} /> */}
               </li>
               {/* <li className="reveal-from-bottom" data-reveal-delay="450">
