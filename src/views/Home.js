@@ -7,6 +7,7 @@ import FeaturesTiles from '../components/sections/FeaturesTiles'
 // import Pricing from '../components/sections/Pricing'
 // import Cta from '../components/sections/Cta'
 import Team from '../components/sections/Team'
+import Investors from '../components/sections/Investors'
 import Contact from '../components/sections/Contact'
 
 class Home extends React.Component {
@@ -18,6 +19,7 @@ class Home extends React.Component {
         <FeaturesTiles topDivider />
         <Clients topDivider bottomDivider />
         <Team />
+        <Investors />
         {/* <Testimonial
           topDivider
           bottomOuterDivider

@@ -12,7 +12,7 @@ const defaultProps = {
   ...SectionTilesProps.defaults,
 }
 
-class Team extends React.Component {
+class Investors extends React.Component {
   render() {
     const {
       className,
@@ -44,7 +44,7 @@ class Team extends React.Component {
     const tilesClasses = classNames('tiles-wrap', pushLeft && 'push-left')
 
     const sectionHeader = {
-      title: 'The people behind HOPR',
+      title: 'The investors behind HOPR',
       paragraph:
         'Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum — semper quis lectus nulla at volutpat diam ut venenatis.',
     }
@@ -214,7 +214,7 @@ class Team extends React.Component {
   }
 }
 
-Team.propTypes = propTypes
-Team.defaultProps = defaultProps
+Investors.propTypes = propTypes
+Investors.defaultProps = defaultProps
 
-export default Team
+export default Investors
