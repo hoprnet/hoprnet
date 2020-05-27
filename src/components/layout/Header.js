@@ -99,8 +99,8 @@ class Header extends React.Component {
                   <div className="header-nav-inner">
                     <ul className={classNames('list-reset text-xxs', navPosition && `header-nav-${navPosition}`)}>
                       <li>
-                        <Link to="/secondary/" onClick={this.closeMenu}>
-                          Secondary page
+                        <Link to="/HOPR/" onClick={this.closeMenu}>
+                          HOPR
                         </Link>
                       </li>
                     </ul>

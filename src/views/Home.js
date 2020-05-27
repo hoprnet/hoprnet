@@ -11,11 +11,11 @@ class Home extends React.Component {
     return (
       <React.Fragment>
         <HeroFull />
-        <FeaturesTabs topDivider />
-        <FeaturesTiles topDivider />
-        <Clients topDivider />
-        <TeamAndInvestors topDivider />
-        <Contact topDivider />
+        <FeaturesTabs id="built_for" topDivider />
+        <FeaturesTiles id="all_about" topDivider />
+        <Clients id="investors" topDivider />
+        <TeamAndInvestors id="team_and_investors" topDivider />
+        <Contact id="contact" topDivider />
       </React.Fragment>
     )
   }

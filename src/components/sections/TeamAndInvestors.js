@@ -52,9 +52,11 @@ class TeamAndInvestors extends React.Component {
           >
             <div className="tiles-item">
               <div className="tiles-item-content center-content-mobile">
-                <h3 className="mt-0 mb-16 reveal-from-bottom" data-reveal-container=".tiles-item">
-                  The people behind HOPR
-                </h3>
+                <a href="/HOPR/#team">
+                  <h3 className="mt-0 mb-16 reveal-from-bottom" data-reveal-container=".tiles-item">
+                    The people behind HOPR
+                  </h3>
+                </a>
                 <p className="m-0 reveal-from-bottom" data-reveal-delay="100" data-reveal-container=".tiles-item">
                   Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et
                   dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut
@@ -65,9 +67,11 @@ class TeamAndInvestors extends React.Component {
 
             <div className="tiles-item">
               <div className="tiles-item-content center-content-mobile">
-                <h3 className="mt-0 mb-16 reveal-from-bottom" data-reveal-container=".tiles-item">
-                  The investors behind HOPR
-                </h3>
+                <a href="/HOPR/#investors">
+                  <h3 className="mt-0 mb-16 reveal-from-bottom" data-reveal-container=".tiles-item">
+                    The investors behind HOPR
+                  </h3>
+                </a>
                 <p className="m-0 reveal-from-bottom" data-reveal-delay="100" data-reveal-container=".tiles-item">
                   Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et
                   dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut
