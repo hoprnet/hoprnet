@@ -53,7 +53,8 @@ class FeaturesTabs extends React.Component {
         <div className="container">
           <div className={innerClasses}>
             <SectionHeader data={sectionHeader} className="center-content" />
-            <Tabs active="tab-a">
+            <Tabs>
+              {/* active="tab-a" */}
               <TabList>
                 <Tab tabId="tab-a">
                   <div className="features-tabs-tab-image mb-12">
@@ -111,7 +112,7 @@ class FeaturesTabs extends React.Component {
                   <div className="text-color-high text-sm">Miners & Relayers</div>
                 </Tab>
               </TabList>
-              <TabPanel id="tab-a">
+              {/* <TabPanel id="tab-a">
                 <Image
                   className="has-shadow"
                   src={require('./../../assets/images/features-tabs-image.png')}
@@ -155,7 +156,7 @@ class FeaturesTabs extends React.Component {
                   width={896}
                   height={504}
                 />
-              </TabPanel>
+              </TabPanel> */}
             </Tabs>
           </div>
         </div>
