@@ -158,24 +158,27 @@ export async function parseOptions(): Promise<HoprOptions> {
     console.log(chalk.red('Cannot start HOPR without a bootstrap node'))
   }
 
-  const bootstrapAddresses = process.env.BOOTSTRAP_SERVERS.split(',')
+  let addr: Multiaddr
+  let bootstrapServerMap = new Map<string, PeerInfo>()
 
-  if (bootstrapAddresses.length == 0) {
-    console.log(chalk.red('Invalid bootstrap servers. Cannot start HOPR without a bootstrap node'))
-  }
+  if (!cli_options.bootstrapNode) {
+    const bootstrapAddresses = process.env.BOOTSTRAP_SERVERS.split(',')
 
-  let addr: Multiaddr,
-    bootstrapServerMap = new Map<string, PeerInfo>()
-  for (let i = 0; i < bootstrapAddresses.length; i++) {
-    addr = Multiaddr(bootstrapAddresses[i].trim())
-
-    let peerInfo = bootstrapServerMap.get(addr.getPeerId())
-    if (peerInfo == null) {
-      peerInfo = await PeerInfo.create(PeerId.createFromB58String(addr.getPeerId()))
+    if (bootstrapAddresses.length == 0) {
+      console.log(chalk.red('Invalid bootstrap servers. Cannot start HOPR without a bootstrap node'))
     }
 
-    peerInfo.multiaddrs.add(addr)
-    bootstrapServerMap.set(addr.getPeerId(), peerInfo)
+    for (let i = 0; i < bootstrapAddresses.length; i++) {
+      addr = Multiaddr(bootstrapAddresses[i].trim())
+
+      let peerInfo = bootstrapServerMap.get(addr.getPeerId())
+      if (peerInfo == null) {
+        peerInfo = await PeerInfo.create(PeerId.createFromB58String(addr.getPeerId()))
+      }
+
+      peerInfo.multiaddrs.add(addr)
+      bootstrapServerMap.set(addr.getPeerId(), peerInfo)
+    }
   }
 
   if (process.env[`${cli_options.network.toUpperCase()}_PROVIDER`] === undefined) {
