@@ -36,7 +36,7 @@
   },
   "dependencies": {
     "@hoprnet/hopr-core-connector-interface": "1.0.1-0",
-    "@hoprnet/hopr-core-ethereum": "~0.0.2-dev.b46cf2c",
+    "@hoprnet/hopr-core-ethereum": "~0.0.3-dev.3102b43",
     "@hoprnet/hopr-core-polkadot": "https://github.com/hoprnet/hopr-core-polkadot.git",
     "@hoprnet/hopr-demo-seeds": "1.0.1",
     "@hoprnet/hopr-ethereum": "~0.3.2-dev.00cc125",

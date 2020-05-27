@@ -19,7 +19,7 @@
   "dependencies": {
     "@hoprnet/hopr-core": "^0.4.5-dev.f7beb27",
     "@hoprnet/hopr-core-connector-interface": "^1.0.1-0",
-    "@hoprnet/hopr-core-ethereum": "~0.0.2-dev.b46cf2c",
+    "@hoprnet/hopr-core-ethereum": "~0.0.3-dev.3102b43",
     "@hoprnet/hopr-demo-seeds": "1.0.1",
     "@hoprnet/hopr-utils": "^0.1.3",
     "bn.js": "^5.1.2",

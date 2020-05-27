@@ -133,10 +133,10 @@
   resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-connector-interface/-/hopr-core-connector-interface-1.0.1-0.tgz#d6a68177224f0595ebee5c0b611b728990af8627"
   integrity sha512-crplIv7bEFb7k1nwlL6M839OLyXEdBKXxfrep1rK8cIyhucK8sG4R5H61pVCSjHGzkBL8c1v/Ye4AhSxSgecqQ==
 
-"@hoprnet/hopr-core-ethereum@~0.0.2-dev.b46cf2c":
-  version "0.0.2-dev.b46cf2c"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-ethereum/-/hopr-core-ethereum-0.0.2-dev.b46cf2c.tgz#b07a2a0fb91d636d29fd0ae13e348e353f6bf88d"
-  integrity sha512-7x8QCEvueXbTfFZyizUusP6pPRV+v2JBSoR3vxox3VDVYRyHw/dUK0SrkbV04cxqb8+MlUT9usDkN0g1vxscAQ==
+"@hoprnet/hopr-core-ethereum@~0.0.3-dev.3102b43":
+  version "0.0.3-dev.3102b43"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-ethereum/-/hopr-core-ethereum-0.0.3-dev.3102b43.tgz#5c44f0f484f150ee40c46aeef3cc5afd51f551e2"
+  integrity sha512-st+dvW5yUK0AwHo16cJn9uu0OWTve114FnrlBq1wfg2Qo9Eyz80Qlrq9M1pOkGZFCEoz9dp9w6yTiZ6K5I3W2w==
   dependencies:
     "@hoprnet/hopr-core-connector-interface" "~1.0.1-0"
     "@hoprnet/hopr-demo-seeds" "~1.0.1"
@@ -9999,9 +9999,9 @@ web3-provider-engine@14.2.1:
     xhr "^2.2.0"
     xtend "^4.0.1"
 
-"web3-provider-engine@git+https://github.com/trufflesuite/provider-engine.git#web3-one":
+"web3-provider-engine@https://github.com/trufflesuite/provider-engine#web3-one":
   version "14.0.6"
-  resolved "git+https://github.com/trufflesuite/provider-engine.git#3538c60bc4836b73ccae1ac3f64c8fed8ef19c1a"
+  resolved "https://github.com/trufflesuite/provider-engine#3538c60bc4836b73ccae1ac3f64c8fed8ef19c1a"
   dependencies:
     async "^2.5.0"
     backoff "^2.5.0"
