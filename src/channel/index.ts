@@ -186,7 +186,7 @@ class Channel implements IChannel<HoprEthereum> {
   }
 
   get offChainCounterparty(): Promise<Uint8Array> {
-    return this._signedChannel.signer
+    return Promise.resolve(this.counterparty)
   }
 
   get channelId(): Promise<Hash> {
