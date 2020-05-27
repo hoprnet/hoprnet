@@ -8,8 +8,8 @@
     "web3",
     "messaging"
   ],
-  "main": "lib/src/index.js",
-  "types": "lib/src/index.d.ts",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
   "files": [
     "lib/",
     "README.md"
