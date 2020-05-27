@@ -19,3 +19,6 @@ lib/
 
 # Exclude vim swap files
 *.swp
+
+# Exclude .env
+.env

@@ -1,7 +1,7 @@
 import type PeerInfo from 'peer-info'
 
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import type Hopr from '../../src'
+import type Hopr from '@hoprnet/hopr-core'
 
 import chalk from 'chalk'
 

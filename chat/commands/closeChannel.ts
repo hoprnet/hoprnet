@@ -1,7 +1,7 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { Channel as ChannelInstance } from '@hoprnet/hopr-core-connector-interface'
 import type AbstractCommand from './abstractCommand'
-import type Hopr from '../../src'
+import type Hopr from '@hoprnet/hopr-core'
 import type PeerId from 'peer-id'
 
 import BN from 'bn.js'
@@ -9,7 +9,7 @@ import chalk from 'chalk'
 
 import { checkPeerIdInput } from '../utils'
 import { startDelayedInterval, u8aToHex } from '@hoprnet/hopr-utils'
-import { pubKeyToPeerId } from '../../src/utils'
+import { pubKeyToPeerId } from '@hoprnet/hopr-core/lib/src/utils'
 
 export default class CloseChannel implements AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {}

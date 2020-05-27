@@ -13,7 +13,7 @@ import ListConnctor from '../commands/listConnectors'
 import { decodeMessage, displayHelp } from '.'
 
 import { knownConnectors } from '..'
-import type { HoprOptions } from '../../src'
+import type { HoprOptions } from '@hoprnet/hopr-core'
 
 const listConnectors = new ListConnctor()
 

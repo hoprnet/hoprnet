@@ -13,8 +13,8 @@ import PeerInfo from 'peer-info'
 
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 
-import Hopr from '../src'
-import type { HoprOptions } from '../src'
+import Hopr from '@hoprnet/hopr-core'
+import type { HoprOptions } from '@hoprnet/hopr-core'
 
 import figlet from 'figlet'
 import clear from 'clear'

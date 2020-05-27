@@ -5,14 +5,14 @@ import type AbstractCommand from './abstractCommand'
 import BigNumber from 'bignumber.js'
 import BN from 'bn.js'
 
-import type Hopr from '../../src'
+import type Hopr from '@hoprnet/hopr-core'
 import type PeerId from 'peer-id'
 
 import chalk from 'chalk'
 
 import { checkPeerIdInput, isBootstrapNode } from '../utils'
 import { clearString, startDelayedInterval, u8aToHex } from '@hoprnet/hopr-utils'
-import { pubKeyToPeerId } from '../../src/utils'
+import { pubKeyToPeerId } from '@hoprnet/hopr-core/lib/src/utils'
 
 import readline from 'readline'
 

@@ -2,11 +2,11 @@ import chalk from 'chalk'
 
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { Channel as ChannelInstance } from '@hoprnet/hopr-core-connector-interface'
-import type Hopr from '../../src'
+import type Hopr from '@hoprnet/hopr-core'
 
 import AbstractCommand from './abstractCommand'
 
-import { pubKeyToPeerId } from '../../src/utils'
+import { pubKeyToPeerId } from '@hoprnet/hopr-core/lib/src/utils'
 import { u8aToHex } from '@hoprnet/hopr-utils'
 
 export default class ListOpenChannels implements AbstractCommand {

@@ -1,5 +1,5 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import type Hopr from '../../src'
+import type Hopr from '@hoprnet/hopr-core'
 import type AbstractCommand from './abstractCommand'
 
 import type PeerId from 'peer-id'
