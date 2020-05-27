@@ -2,8 +2,12 @@ import React from 'react'
 import classNames from 'classnames'
 import { SectionProps } from '../../utils/SectionProps'
 import SectionHeader from './partials/SectionHeader'
-import Tabs, { TabList, Tab, TabPanel } from './../elements/Tabs'
-import Image from '../elements/Image'
+import Tabs, { TabList, Tab } from './../elements/Tabs'
+import { ReactComponent as ShieldIcon } from 'svg-icon/dist/svg/awesome/shield.svg'
+import { ReactComponent as LockIcon } from 'svg-icon/dist/svg/awesome/lock.svg'
+import { ReactComponent as UserIcon } from 'svg-icon/dist/svg/awesome/user-secret.svg'
+import { ReactComponent as LightbulbIcon } from 'svg-icon/dist/svg/awesome/lightbulb-o.svg'
+import { ReactComponent as WrenchIcon } from 'svg-icon/dist/svg/awesome/wrench.svg'
 
 const propTypes = {
   ...SectionProps.types,
@@ -54,60 +58,34 @@ class FeaturesTabs extends React.Component {
           <div className={innerClasses}>
             <SectionHeader data={sectionHeader} className="center-content" />
             <Tabs>
-              {/* active="tab-a" */}
               <TabList>
                 <Tab tabId="tab-a">
                   <div className="features-tabs-tab-image mb-12">
-                    <Image
-                      src={require('./../../assets/images/features-tabs-icon-01.svg')}
-                      alt="Tab icon 01"
-                      width={56}
-                      height={56}
-                    />
+                    <ShieldIcon />
                   </div>
                   <div className="text-color-high text-sm">Privacy Experts</div>
                 </Tab>
                 <Tab tabId="tab-b">
                   <div className="features-tabs-tab-image mb-12">
-                    <Image
-                      src={require('./../../assets/images/features-tabs-icon-02.svg')}
-                      alt="Tab icon 02"
-                      width={56}
-                      height={56}
-                    />
+                    <LockIcon />
                   </div>
                   <div className="text-color-high text-sm">Cryptographers</div>
                 </Tab>
                 <Tab tabId="tab-c">
                   <div className="features-tabs-tab-image mb-12">
-                    <Image
-                      src={require('./../../assets/images/features-tabs-icon-03.svg')}
-                      alt="Tab icon 03"
-                      width={56}
-                      height={56}
-                    />
+                    <UserIcon />
                   </div>
                   <div className="text-color-high text-sm">Techies</div>
                 </Tab>
                 <Tab tabId="tab-d">
                   <div className="features-tabs-tab-image mb-12">
-                    <Image
-                      src={require('./../../assets/images/features-tabs-icon-04.svg')}
-                      alt="Tab icon 04"
-                      width={56}
-                      height={56}
-                    />
+                    <LightbulbIcon />
                   </div>
                   <div className="text-color-high text-sm">Entrepreneurs</div>
                 </Tab>
                 <Tab tabId="tab-e">
                   <div className="features-tabs-tab-image mb-12">
-                    <Image
-                      src={require('./../../assets/images/features-tabs-icon-04.svg')}
-                      alt="Tab icon 05"
-                      width={56}
-                      height={56}
-                    />
+                    <WrenchIcon />
                   </div>
                   <div className="text-color-high text-sm">Miners & Relayers</div>
                 </Tab>

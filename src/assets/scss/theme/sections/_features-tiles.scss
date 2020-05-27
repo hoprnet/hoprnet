@@ -4,3 +4,10 @@
     background: linear-gradient(0deg, get-color(primary, 1) 0, get-color(primary, 2) 100%);
     box-shadow: 0 2px 4px rgba(get-color(dark, 1), .12);    
 }
+
+.features-tiles-item-image svg {
+    width: 40px;
+    height: 40px;
+    fill: #ffffff;
+    margin: 15px !important;
+}
