@@ -90,51 +90,6 @@ class FeaturesTabs extends React.Component {
                   <div className="text-color-high text-sm">Miners & Relayers</div>
                 </Tab>
               </TabList>
-              {/* <TabPanel id="tab-a">
-                <Image
-                  className="has-shadow"
-                  src={require('./../../assets/images/features-tabs-image.png')}
-                  alt="Features tabs image 01"
-                  width={896}
-                  height={504}
-                />
-              </TabPanel>
-              <TabPanel id="tab-b">
-                <Image
-                  className="has-shadow"
-                  src={require('./../../assets/images/features-tabs-image.png')}
-                  alt="Features tabs image 02"
-                  width={896}
-                  height={504}
-                />
-              </TabPanel>
-              <TabPanel id="tab-c">
-                <Image
-                  className="has-shadow"
-                  src={require('./../../assets/images/features-tabs-image.png')}
-                  alt="Features tabs image 03"
-                  width={896}
-                  height={504}
-                />
-              </TabPanel>
-              <TabPanel id="tab-d">
-                <Image
-                  className="has-shadow"
-                  src={require('./../../assets/images/features-tabs-image.png')}
-                  alt="Features tabs image 04"
-                  width={896}
-                  height={504}
-                />
-              </TabPanel>
-              <TabPanel id="tab-e">
-                <Image
-                  className="has-shadow"
-                  src={require('./../../assets/images/features-tabs-image.png')}
-                  alt="Features tabs image 05"
-                  width={896}
-                  height={504}
-                />
-              </TabPanel> */}
             </Tabs>
           </div>
         </div>
