@@ -9,8 +9,8 @@
     "src/"
   ],
   "scripts": {
-   "test": "echo '✅ No tests needed'",
-   "build": "echo '✅ No build needed'"
+    "test": "echo '✅ No tests needed'",
+    "build": "echo '✅ No build needed'"
   },
   "types": "src/index.d.ts",
   "prettier": {
