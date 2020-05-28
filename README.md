@@ -6,6 +6,10 @@ For further details, see the [protocol specification on the wiki](../../wiki).
 
 Note that the documentation is under active development and does not always represent the latest version of the protocol.
 
+## Development Branch
+
+Please bear in mind the existing documentation does not reflect our actual state in this branch (i.e. `develop`). To follow the existing documentation, please visit our `master` [branch](https://github.com/hoprnet/hopr-core/tree/master).
+
 ## Table of Contents
 
 - [HOPR net](#hopr-net)
