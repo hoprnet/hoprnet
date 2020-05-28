@@ -37,6 +37,7 @@ export const keywords: string[][] = [
   ['balance', 'shows our current balance'],
   ['listConnectors', 'lists all installed blockchain connectors'],
   ['ping', 'pings another node to check its availability'],
+  ['version', 'shows the versions for `hopr-chat` and `hopr-core`'],
   ['help', 'shows this help page'],
 ].sort((a, b) => a[0].localeCompare(b[0], 'en', { sensitivity: 'base' }))
 
@@ -93,10 +94,7 @@ function tabCompletion(commands: Commands) {
       return cb(undefined, [keywords.map(entry => entry[0]), line])
     }
 
-    const [command, query]: (string | undefined)[] = line
-      .trim()
-      .split(SPLIT_OPERAND_QUERY_REGEX)
-      .slice(1)
+    const [command, query]: (string | undefined)[] = line.trim().split(SPLIT_OPERAND_QUERY_REGEX).slice(1)
 
     if (command == null || command === '') {
       return cb(undefined, [keywords.map(entry => entry[0]), line])
@@ -165,10 +163,7 @@ async function runAsRegularNode() {
       return
     }
 
-    const [command, query]: (string | undefined)[] = input
-      .trim()
-      .split(SPLIT_OPERAND_QUERY_REGEX)
-      .slice(1)
+    const [command, query]: (string | undefined)[] = input.trim().split(SPLIT_OPERAND_QUERY_REGEX).slice(1)
 
     if (command == null) {
       console.log(chalk.red('Unknown command!'))
@@ -211,6 +206,9 @@ async function runAsRegularNode() {
       case 'ping':
         await commands.ping.execute(query)
         break
+      case 'version':
+        await commands.version.execute()
+        break
       default:
         console.log(chalk.red('Unknown command!'))
         break
@@ -251,7 +249,7 @@ async function main() {
     console.log(err.message + '\n')
     return
   }
-  
+
   try {
     node = await Hopr.create(options)
   } catch (err) {
@@ -259,11 +257,7 @@ async function main() {
     process.exit(1)
   }
 
-  console.log(
-    `\nAvailable under the following addresses:\n ${node.peerInfo.multiaddrs
-      .toArray()
-      .join('\n ')}\n`
-  )
+  console.log(`\nAvailable under the following addresses:\n ${node.peerInfo.multiaddrs.toArray().join('\n ')}\n`)
 
   if (options.bootstrapNode) {
     runAsBootstrapNode()

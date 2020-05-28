@@ -12,8 +12,7 @@ import PrintAddress from './printAddress'
 import PrintBalance from './printBalance'
 import SendMessage from './sendMessage'
 import StopNode from './stopNode'
-
-import type readline from 'readline'
+import Version from './version'
 
 export default class Commands {
   closeChannel: CloseChannel
@@ -27,6 +26,7 @@ export default class Commands {
   printBalance: PrintBalance
   sendMessage: SendMessage
   stopNode: StopNode
+  version: Version
 
   constructor(public node: Hopr<HoprCoreConnector>) {
     this.closeChannel = new CloseChannel(node)
@@ -40,5 +40,6 @@ export default class Commands {
     this.printBalance = new PrintBalance(node)
     this.sendMessage = new SendMessage(node)
     this.stopNode = new StopNode(node)
+    this.version = new Version()
   }
 }
