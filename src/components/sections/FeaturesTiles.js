@@ -2,10 +2,7 @@ import React from 'react'
 import classNames from 'classnames'
 import { SectionTilesProps } from '../../utils/SectionProps'
 import SectionHeader from './partials/SectionHeader'
-import { ReactComponent as DatabaseIcon } from 'svg-icon/dist/svg/awesome/database.svg'
-import { ReactComponent as GithubIcon } from 'svg-icon/dist/svg/simple/github.svg'
-import { ReactComponent as HeartIcon } from 'svg-icon/dist/svg/awesome/heart.svg'
-import { ReactComponent as IndustryIcon } from 'svg-icon/dist/svg/awesome/industry.svg'
+import Image from '../elements/Image'
 
 const propTypes = {
   ...SectionTilesProps.types,
@@ -62,7 +59,12 @@ class FeaturesTiles extends React.Component {
                 <div className="tiles-item-inner">
                   <div className="features-tiles-item-header">
                     <div className="features-tiles-item-image mb-16">
-                      <DatabaseIcon />
+                      <Image
+                        src={require('../../assets/images/icons/common-file-lock@140x140.png')}
+                        alt="File Lock Icon"
+                        width={56}
+                        height={56}
+                      />
                     </div>
                   </div>
                   <div className="features-tiles-item-content">
@@ -83,7 +85,12 @@ class FeaturesTiles extends React.Component {
                 <div className="tiles-item-inner">
                   <div className="features-tiles-item-header">
                     <div className="features-tiles-item-image mb-16">
-                      <GithubIcon />
+                      <Image
+                        src={require('../../assets/images/icons/user-signal@140x140.png')}
+                        alt="Sharing Icon"
+                        width={56}
+                        height={56}
+                      />
                     </div>
                   </div>
                   <div className="features-tiles-item-content">
@@ -104,7 +111,12 @@ class FeaturesTiles extends React.Component {
                 <div className="tiles-item-inner">
                   <div className="features-tiles-item-header">
                     <div className="features-tiles-item-image mb-16">
-                      <HeartIcon />
+                      <Image
+                        src={require('../../assets/images/icons/love-heart-keyhole@140x140.png')}
+                        alt="Heart Icon"
+                        width={56}
+                        height={56}
+                      />
                     </div>
                   </div>
                   <div className="features-tiles-item-content">
@@ -125,7 +137,12 @@ class FeaturesTiles extends React.Component {
                 <div className="tiles-item-inner">
                   <div className="features-tiles-item-header">
                     <div className="features-tiles-item-image mb-16">
-                      <IndustryIcon />
+                      <Image
+                        src={require('../../assets/images/icons/building-modern@140x140.png')}
+                        alt="Modern Building Icon"
+                        width={56}
+                        height={56}
+                      />
                     </div>
                   </div>
                   <div className="features-tiles-item-content">

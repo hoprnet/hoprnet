@@ -16,8 +16,7 @@
     "react": "^16.9.0",
     "react-dom": "^16.9.0",
     "react-router-dom": "^5.0.1",
-    "react-scripts": "3.1.1",
-    "svg-icon": "^0.8.2"
+    "react-scripts": "3.1.1"
   },
   "devDependencies": {
     "husky": "^4.2.5",

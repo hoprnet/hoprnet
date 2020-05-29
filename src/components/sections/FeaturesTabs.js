@@ -3,11 +3,7 @@ import classNames from 'classnames'
 import { SectionProps } from '../../utils/SectionProps'
 import SectionHeader from './partials/SectionHeader'
 import Tabs, { TabList, Tab } from './../elements/Tabs'
-import { ReactComponent as ShieldIcon } from 'svg-icon/dist/svg/awesome/shield.svg'
-import { ReactComponent as LockIcon } from 'svg-icon/dist/svg/awesome/lock.svg'
-import { ReactComponent as UserIcon } from 'svg-icon/dist/svg/awesome/user-secret.svg'
-import { ReactComponent as LightbulbIcon } from 'svg-icon/dist/svg/awesome/lightbulb-o.svg'
-import { ReactComponent as WrenchIcon } from 'svg-icon/dist/svg/awesome/wrench.svg'
+import Image from '../elements/Image'
 
 const propTypes = {
   ...SectionProps.types,
@@ -61,31 +57,37 @@ class FeaturesTabs extends React.Component {
               <TabList>
                 <Tab tabId="tab-a">
                   <div className="features-tabs-tab-image mb-12">
-                    <ShieldIcon />
+                    <Image src={require('../../assets/images/icons/shield@140x140.png')} alt="Shield Icon" />
                   </div>
                   <div className="text-color-high text-sm">Privacy Experts</div>
                 </Tab>
                 <Tab tabId="tab-b">
                   <div className="features-tabs-tab-image mb-12">
-                    <LockIcon />
+                    <Image src={require('../../assets/images/icons/lock-4@140x140.png')} alt="Lock Icon" />
                   </div>
                   <div className="text-color-high text-sm">Cryptographers</div>
                 </Tab>
                 <Tab tabId="tab-c">
                   <div className="features-tabs-tab-image mb-12">
-                    <UserIcon />
+                    <Image
+                      src={require('../../assets/images/icons/programming-team-chat-3@140x140.png')}
+                      alt="Programming Team Icon"
+                    />
                   </div>
                   <div className="text-color-high text-sm">Techies</div>
                 </Tab>
                 <Tab tabId="tab-d">
                   <div className="features-tabs-tab-image mb-12">
-                    <LightbulbIcon />
+                    <Image
+                      src={require('../../assets/images/icons/light-bulb-shine@140x140.png')}
+                      alt="Light Bulb Icon"
+                    />
                   </div>
                   <div className="text-color-high text-sm">Entrepreneurs</div>
                 </Tab>
                 <Tab tabId="tab-e">
                   <div className="features-tabs-tab-image mb-12">
-                    <WrenchIcon />
+                    <Image src={require('../../assets/images/icons/outdoors-mining@140x140.png')} alt="Pickaxe Icon" />
                   </div>
                   <div className="text-color-high text-sm">Miners & Relayers</div>
                 </Tab>
