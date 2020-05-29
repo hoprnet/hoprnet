@@ -36,20 +36,14 @@ class TeamAndInvestors extends React.Component {
     const innerClasses = classNames(
       'features-tiles-inner section-inner',
       topDivider && 'has-top-divider',
-      bottomDivider && 'has-bottom-divider'
+      bottomDivider && 'has-bottom-divider',
+      'teamAndInvestors-tiles-inner'
     )
 
     return (
       <section {...props} className={outerClasses}>
         <div className="container">
-          <div
-            className={innerClasses}
-            style={{
-              display: 'flex',
-              justifyContent: 'center',
-              flexDirection: 'row',
-            }}
-          >
+          <div className={innerClasses}>
             <div className="tiles-item">
               <div className="tiles-item-content center-content-mobile">
                 <a href="/HOPR/#team">
