@@ -30,7 +30,7 @@ const Contact = () => {
       <div className="container-xs">
         <SectionHeader
           data={{
-            title: 'You want more?',
+            title: 'Want more?',
             paragraph: 'Get in contact!',
           }}
           className="center-content"

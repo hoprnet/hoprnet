@@ -97,7 +97,7 @@ class Header extends React.Component {
                 </button>
                 <nav ref={this.nav} className={classNames('header-nav', this.state.isActive && 'is-active')}>
                   <div className="header-nav-inner">
-                    <ul className={classNames('list-reset text-xxs', navPosition && `header-nav-${navPosition}`)}>
+                    <ul className={classNames('list-reset text-ms', navPosition && `header-nav-${navPosition}`)}>
                       <li>
                         <Link to="/HOPR/" onClick={this.closeMenu}>
                           HOPR

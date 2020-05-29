@@ -15,3 +15,7 @@
 .features-tabs-inner .tab-list {
 	justify-content: space-evenly !important;
 }
+
+.features-tabs-inner .tab-list .tab {
+    min-width: 175px;
+}

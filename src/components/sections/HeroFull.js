@@ -71,7 +71,7 @@ class HeroFull extends React.Component {
             <div className="hero-figure reveal-from-bottom" data-reveal-delay="600">
               <Image
                 className="has-shadow"
-                src={require('./../../assets/images/hero-image.png')}
+                src={require('../../assets/images/hopr-illustration.png')}
                 alt="Hero"
                 width={896}
                 height={504}
