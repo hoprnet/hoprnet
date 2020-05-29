@@ -176,21 +176,3 @@
 # Helpers
 --------------------------------------------------------------*/
 @import "core/base/helpers";
-
-/*--------------------------------------------------------------
-# Custom
---------------------------------------------------------------*/
-
-.teamAndInvestors-tiles-inner {
-	display: flex;
-	justify-content: space-evenly;
-	flex-direction: row;
-}
-
-.teamAndInvestors-tiles-inner .tiles-item {
-	box-shadow: 6px 4px 20px 0px #888888;
-}
-
-.features-tabs-inner .tab-list {
-	justify-content: space-evenly !important;
-}

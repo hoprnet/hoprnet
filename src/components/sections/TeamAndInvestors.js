@@ -25,7 +25,7 @@ class TeamAndInvestors extends React.Component {
     } = this.props
 
     const outerClasses = classNames(
-      'features-tiles section center-content',
+      'section center-content',
       topOuterDivider && 'has-top-divider',
       bottomOuterDivider && 'has-bottom-divider',
       hasBgColor && 'has-bg-color',
@@ -34,7 +34,7 @@ class TeamAndInvestors extends React.Component {
     )
 
     const innerClasses = classNames(
-      'features-tiles-inner section-inner',
+      'section-inner',
       topDivider && 'has-top-divider',
       bottomDivider && 'has-bottom-divider',
       'teamAndInvestors-tiles-inner'
@@ -44,7 +44,7 @@ class TeamAndInvestors extends React.Component {
       <section {...props} className={outerClasses}>
         <div className="container">
           <div className={innerClasses}>
-            <div className="tiles-item">
+            <div className="tiles-item has-shadow">
               <div className="tiles-item-content center-content-mobile">
                 <a href="/HOPR/#team">
                   <h3 className="mt-0 mb-16 reveal-from-bottom" data-reveal-container=".tiles-item">
@@ -59,7 +59,7 @@ class TeamAndInvestors extends React.Component {
               </div>
             </div>
 
-            <div className="tiles-item">
+            <div className="tiles-item has-shadow">
               <div className="tiles-item-content center-content-mobile">
                 <a href="/HOPR/#investors">
                   <h3 className="mt-0 mb-16 reveal-from-bottom" data-reveal-container=".tiles-item">
