@@ -45,24 +45,24 @@ class TeamAndInvestors extends React.Component {
       <section {...props} className={outerClasses}>
         <div className="container">
           <div className={innerClasses}>
-            <div className="tiles-item has-shadow has-bg-color invert-color card">
+            <div className="tiles-item has-shadow has-bg-color invert-color card reveal-from-top">
               <div className="tiles-item-content center-content-mobile">
                 <a href="/HOPR/#team">
-                  <h3 className="mt-0 mb-0 reveal-from-bottom" data-reveal-container=".tiles-item">
+                  <h3 className="mt-0 mb-0" data-reveal-container=".tiles-item">
                     The people behind HOPR
                   </h3>
-                  <Image src={require('../../assets/images/cards/team-card-03.png')} />
+                  <Image src={require('../../assets/images/cards/team-card.png')} />
                 </a>
               </div>
             </div>
 
-            <div className="tiles-item has-shadow has-bg-color invert-color card">
+            <div className="tiles-item has-shadow has-bg-color invert-color card reveal-from-top">
               <div className="tiles-item-content center-content-mobile">
                 <a href="/HOPR/#investors">
-                  <h3 className="mt-0 mb-0 reveal-from-bottom" data-reveal-container=".tiles-item">
+                  <h3 className="mt-0 mb-0" data-reveal-container=".tiles-item">
                     The investors behind HOPR
                   </h3>
-                  <Image src={require('../../assets/images/cards/investors-card-01.png')} />
+                  <Image src={require('../../assets/images/cards/investors-card.png')} />
                 </a>
               </div>
             </div>
