@@ -23,7 +23,7 @@ const Contact = () => {
   // const isSuccess = status === 'success'
   const isError = badEmail || status === 'error'
   const disabled = isError || typeof email === 'undefined'
-  const href = `mailto:contact@hoprnet.io?from=${email}&subject=I am a X`
+  const href = `mailto:contact@hoprnet.io?from=${email}&subject=Contact`
 
   return (
     <GenericSection topDivider>
