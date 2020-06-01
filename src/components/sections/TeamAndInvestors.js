@@ -49,7 +49,8 @@ class TeamAndInvestors extends React.Component {
               <div className="tiles-item-content center-content-mobile">
                 <a href="/HOPR/#team">
                   <h3 className="mt-0 mb-0" data-reveal-container=".tiles-item">
-                    The people behind HOPR
+                    The people
+                    <br /> behind HOPR
                   </h3>
                   <Image src={require('../../assets/images/cards/team-card.png')} />
                 </a>
@@ -60,7 +61,8 @@ class TeamAndInvestors extends React.Component {
               <div className="tiles-item-content center-content-mobile">
                 <a href="/HOPR/#investors">
                   <h3 className="mt-0 mb-0" data-reveal-container=".tiles-item">
-                    The investors behind HOPR
+                    The investors
+                    <br /> behind HOPR
                   </h3>
                   <Image src={require('../../assets/images/cards/investors-card.png')} />
                 </a>
