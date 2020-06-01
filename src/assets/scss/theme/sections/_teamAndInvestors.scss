@@ -3,3 +3,9 @@
 	justify-content: space-around;
 	flex-direction: row;
 }
+
+@include media( '<medium' ) {
+	.teamAndInvestors-tiles-inner {
+		flex-direction: column;
+	}
+}
