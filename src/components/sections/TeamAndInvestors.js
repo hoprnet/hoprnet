@@ -1,6 +1,7 @@
 import React from 'react'
 import classNames from 'classnames'
 import { SectionTilesProps } from '../../utils/SectionProps'
+import Image from '../elements/Image'
 
 const propTypes = {
   ...SectionTilesProps.types,
@@ -44,33 +45,25 @@ class TeamAndInvestors extends React.Component {
       <section {...props} className={outerClasses}>
         <div className="container">
           <div className={innerClasses}>
-            <div className="tiles-item has-shadow">
+            <div className="tiles-item has-shadow has-bg-color invert-color card">
               <div className="tiles-item-content center-content-mobile">
                 <a href="/HOPR/#team">
-                  <h3 className="mt-0 mb-16 reveal-from-bottom" data-reveal-container=".tiles-item">
+                  <h3 className="mt-0 mb-0 reveal-from-bottom" data-reveal-container=".tiles-item">
                     The people behind HOPR
                   </h3>
+                  <Image src={require('../../assets/images/cards/team-card-03.png')} />
                 </a>
-                <p className="m-0 reveal-from-bottom" data-reveal-delay="100" data-reveal-container=".tiles-item">
-                  Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et
-                  dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut
-                  aliquip ex ea commodo consequat.
-                </p>
               </div>
             </div>
 
-            <div className="tiles-item has-shadow">
+            <div className="tiles-item has-shadow has-bg-color invert-color card">
               <div className="tiles-item-content center-content-mobile">
                 <a href="/HOPR/#investors">
-                  <h3 className="mt-0 mb-16 reveal-from-bottom" data-reveal-container=".tiles-item">
+                  <h3 className="mt-0 mb-0 reveal-from-bottom" data-reveal-container=".tiles-item">
                     The investors behind HOPR
                   </h3>
+                  <Image src={require('../../assets/images/cards/investors-card-01.png')} />
                 </a>
-                <p className="m-0 reveal-from-bottom" data-reveal-delay="100" data-reveal-container=".tiles-item">
-                  Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et
-                  dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut
-                  aliquip ex ea commodo consequat.
-                </p>
               </div>
             </div>
           </div>

@@ -75,6 +75,9 @@ class HeroFull extends React.Component {
                 alt="Hero"
                 width={896}
                 height={504}
+                style={{
+                  borderRadius: '15px',
+                }}
               />
             </div>
           </div>

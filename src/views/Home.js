@@ -13,8 +13,8 @@ class Home extends React.Component {
         <HeroFull />
         <FeaturesTabs id="built_for" hasBgColor invertColor redirect />
         <FeaturesTiles id="all_about" />
-        <Clients id="investors" />
-        <TeamAndInvestors id="team_and_investors" hasBgColor invertColor />
+        <Clients id="investors" topDivider />
+        <TeamAndInvestors id="team_and_investors" topDivider />
         <Contact id="contact" />
       </React.Fragment>
     )

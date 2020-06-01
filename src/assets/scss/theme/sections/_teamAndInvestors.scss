@@ -4,6 +4,16 @@
 	flex-direction: row;
 }
 
+.teamAndInvestors-tiles-inner .card {
+	padding: 30px;
+	margin: 10px;
+	border-radius: 15px;
+}
+
+.teamAndInvestors-tiles-inner .card:hover {
+	background-color: #164856;
+}
+
 @include media( '<medium' ) {
 	.teamAndInvestors-tiles-inner {
 		flex-direction: column;
