@@ -92,6 +92,15 @@ class FeaturesTabs extends React.Component {
                   </div>
                   <div className="text-color-high text-sm">Miners & Relayers</div>
                 </Tab>
+                <Tab tabId="tab-f" className={redirect ? 'is-active' : undefined}>
+                  <div className="features-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="250">
+                    <Image
+                      src={require('../../assets/images/icons/professions-man-office-1@140x140.png')}
+                      alt="Investor Icon"
+                    />
+                  </div>
+                  <div className="text-color-high text-sm">Investors</div>
+                </Tab>
               </TabList>
             </Tabs>
           </div>

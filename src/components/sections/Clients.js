@@ -50,7 +50,6 @@ class Clients extends React.Component {
                   alt="Binance Logo"
                   width={124}
                   height={24}
-                  style={{ filter: 'contrast(0)' }}
                 />
               </li>
               <li className="reveal-from-bottom" data-reveal-delay="150">
@@ -59,11 +58,10 @@ class Clients extends React.Component {
                   alt="Bank Frick Logo"
                   width={124}
                   height={24}
-                  style={{ filter: 'contrast(0)' }}
                 />
               </li>
               <li className="reveal-from-bottom" data-reveal-delay="300">
-                <span style={{ filter: 'contrast(0)', fontWeight: 'bold' }}>Become our partner</span>
+                <span>Become our partner</span>
               </li>
             </ul>
           </div>
