@@ -46,8 +46,7 @@ class FeaturesTiles extends React.Component {
 
     const sectionHeader = {
       title: 'HOPR is all about',
-      paragraph:
-        'Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum — semper quis lectus nulla at volutpat diam ut venenatis.',
+      paragraph: undefined,
     }
 
     return (
@@ -71,8 +70,8 @@ class FeaturesTiles extends React.Component {
                   <div className="features-tiles-item-content">
                     <h4 className="mt-0 mb-8">Enabling Data Privacy</h4>
                     <p className="m-0 text-sm">
-                      Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla
-                      pariatur. Excepteur sint occaecat cupidatat.
+                      In order to give people and companies the freedom to decide about the privacy level of their data,
+                      we are building the HOPR network.
                     </p>
                   </div>
                 </div>
@@ -97,8 +96,8 @@ class FeaturesTiles extends React.Component {
                   <div className="features-tiles-item-content">
                     <h4 className="mt-0 mb-8">Open Source Support</h4>
                     <p className="m-0 text-sm">
-                      Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla
-                      pariatur. Excepteur sint occaecat cupidatat.
+                      Our experts are actively supporting the blockchain community to make this space a better place,
+                      for the good of all of us.
                     </p>
                   </div>
                 </div>
@@ -123,8 +122,8 @@ class FeaturesTiles extends React.Component {
                   <div className="features-tiles-item-content">
                     <h4 className="mt-0 mb-8">Hackathons & Community</h4>
                     <p className="m-0 text-sm">
-                      Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla
-                      pariatur. Excepteur sint occaecat cupidatat.
+                      In order to grow our network and actively interact with the community, we will organize events
+                      (coming mid July 2020).
                     </p>
                   </div>
                 </div>
@@ -149,8 +148,8 @@ class FeaturesTiles extends React.Component {
                   <div className="features-tiles-item-content">
                     <h4 className="mt-0 mb-8">Your company & our ecosystem</h4>
                     <p className="m-0 text-sm">
-                      Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla
-                      pariatur. Excepteur sint occaecat cupidatat.
+                      HOPR is looking for partners who want to benefit from our network. If Data Privacy is important to
+                      you, get in contact with us.
                     </p>
                   </div>
                 </div>

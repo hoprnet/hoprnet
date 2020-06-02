@@ -44,22 +44,15 @@ class HeroFull extends React.Component {
       <section {...props} className={outerClasses}>
         <div className="container-sm">
           <div className={innerClasses}>
-            <div
-              className="hero-content"
-              // style={{
-              //   minHeight: '70vh',
-              //   display: 'flex',
-              //   flexDirection: 'column',
-              //   alignItems: 'center',
-              //   justifyContent: 'center',
-              // }}
-            >
+            <div className="hero-content">
               <h1 className="mt-0 mb-16 reveal-from-top" data-reveal-delay="150">
                 HOPR
               </h1>
               <div className="container-xs">
                 <p className="m-0 mb-32 reveal-from-top" data-reveal-delay="300">
-                  Everybody should have the right to decide about the privacy of their personal data.
+                  We care about Data Privacy.
+                  <br />
+                  This is why we build the HOPR network.
                 </p>
                 {/* <div className="reveal-from-top" data-reveal-delay="450">
                   <Button tag="a" color="primary" href="https://cruip.com/">
