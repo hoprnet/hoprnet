@@ -129,31 +129,33 @@ class FeaturesTiles extends React.Component {
                 </div>
               </div>
 
-              <div
-                className="tiles-item reveal-from-bottom"
-                data-reveal-container=".tiles-wrap"
-                data-reveal-delay="300"
-              >
-                <div className="tiles-item-inner">
-                  <div className="features-tiles-item-header">
-                    <div className="features-tiles-item-image mb-16">
-                      <Image
-                        src={require('../../assets/images/icons/building-modern@140x140.png')}
-                        alt="Modern Building Icon"
-                        width={56}
-                        height={56}
-                      />
+              <a href="mailto:rik.krieger@hoprnet.io?subject=Partnership">
+                <div
+                  className="tiles-item reveal-from-bottom"
+                  data-reveal-container=".tiles-wrap"
+                  data-reveal-delay="300"
+                >
+                  <div className="tiles-item-inner">
+                    <div className="features-tiles-item-header">
+                      <div className="features-tiles-item-image mb-16">
+                        <Image
+                          src={require('../../assets/images/icons/building-modern@140x140.png')}
+                          alt="Modern Building Icon"
+                          width={56}
+                          height={56}
+                        />
+                      </div>
+                    </div>
+                    <div className="features-tiles-item-content">
+                      <h4 className="mt-0 mb-8">Your company & our ecosystem</h4>
+                      <p className="m-0 text-sm">
+                        HOPR is looking for partners who want to benefit from our network. If Data Privacy is important
+                        to you, get in contact with us.
+                      </p>
                     </div>
                   </div>
-                  <div className="features-tiles-item-content">
-                    <h4 className="mt-0 mb-8">Your company & our ecosystem</h4>
-                    <p className="m-0 text-sm">
-                      HOPR is looking for partners who want to benefit from our network. If Data Privacy is important to
-                      you, get in contact with us.
-                    </p>
-                  </div>
                 </div>
-              </div>
+              </a>
             </div>
           </div>
         </div>

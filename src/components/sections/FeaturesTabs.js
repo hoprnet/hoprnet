@@ -77,13 +77,15 @@ class FeaturesTabs extends React.Component {
                   <div className="text-color-high text-sm">Techies</div>
                 </Tab>
                 <Tab tabId="tab-d" className={redirect ? 'is-active' : undefined}>
-                  <div className="features-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="200">
-                    <Image
-                      src={require('../../assets/images/icons/light-bulb-shine@140x140.png')}
-                      alt="Light Bulb Icon"
-                    />
-                  </div>
-                  <div className="text-color-high text-sm">Entrepreneurs</div>
+                  <a href="mailto:rik.krieger@hoprnet.io?subject=Partnership">
+                    <div className="features-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="200">
+                      <Image
+                        src={require('../../assets/images/icons/light-bulb-shine@140x140.png')}
+                        alt="Light Bulb Icon"
+                      />
+                    </div>
+                    <div className="text-color-high text-sm">Entrepreneurs</div>
+                  </a>
                 </Tab>
                 <Tab tabId="tab-e" className={redirect ? 'is-active' : undefined}>
                   <div className="features-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="250">
@@ -92,13 +94,15 @@ class FeaturesTabs extends React.Component {
                   <div className="text-color-high text-sm">Miners & Relayers</div>
                 </Tab>
                 <Tab tabId="tab-f" className={redirect ? 'is-active' : undefined}>
-                  <div className="features-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="250">
-                    <Image
-                      src={require('../../assets/images/icons/professions-man-office-1@140x140.png')}
-                      alt="Investor Icon"
-                    />
-                  </div>
-                  <div className="text-color-high text-sm">Investors</div>
+                  <a href="mailto:sebastian.buergel@hoprnet.io?subject=Investment">
+                    <div className="features-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="250">
+                      <Image
+                        src={require('../../assets/images/icons/professions-man-office-1@140x140.png')}
+                        alt="Investor Icon"
+                      />
+                    </div>
+                    <div className="text-color-high text-sm">Investors</div>
+                  </a>
                 </Tab>
               </TabList>
             </Tabs>

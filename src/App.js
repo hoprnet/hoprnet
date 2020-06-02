@@ -14,6 +14,15 @@ class App extends React.Component {
   componentDidMount() {
     document.body.classList.add('is-loaded')
     this.refs.scrollReveal.init()
+
+    // add analytics
+    let tracker = window.document.createElement('script')
+    let firstScript = window.document.getElementsByTagName('script')[0]
+    tracker.defer = true
+    tracker.setAttribute('site', 'DJJBUEUD')
+    tracker.setAttribute('spa', 'auto')
+    tracker.src = 'https://silkworm.hoprnet.io/script.js'
+    firstScript.parentNode.insertBefore(tracker, firstScript)
   }
 
   // Route change
