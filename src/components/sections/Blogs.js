@@ -85,7 +85,7 @@ class Blogs extends React.Component {
                   </div>
                   <div className="text-color-high text-sm">News Blog</div>
                 </Tab>
-                <Tab tabId="tab-e" className={redirect ? 'is-active' : undefined}>
+                {/* <Tab tabId="tab-e" className={redirect ? 'is-active' : undefined}>
                   <div className="blogs-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="250">
                     <Image
                       src={require('../../assets/images/icons/space-rocket-launch@140x140.png')}
@@ -93,7 +93,7 @@ class Blogs extends React.Component {
                     />
                   </div>
                   <div className="text-color-high text-sm">Launchpad Blog</div>
-                </Tab>
+                </Tab> */}
               </TabList>
             </Tabs>
           </div>

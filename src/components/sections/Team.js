@@ -44,9 +44,8 @@ class Team extends React.Component {
     const tilesClasses = classNames('tiles-wrap', pushLeft && 'push-left')
 
     const sectionHeader = {
-      title: 'The people behind HOPR',
-      paragraph:
-        'Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum — semper quis lectus nulla at volutpat diam ut venenatis.',
+      title: 'The team:',
+      paragraph: undefined,
     }
 
     return (
@@ -58,21 +57,21 @@ class Team extends React.Component {
               <div className="tiles-item reveal-from-bottom" data-reveal-container=".tiles-wrap">
                 <div className="tiles-item-inner">
                   <div className="team-item-header">
-                    <div className="team-item-image mb-24">
-                      <Image
-                        src={require('./../../assets/images/team-member-01.jpg')}
-                        alt="Team member 01"
-                        width={180}
-                        height={180}
-                      />
-                    </div>
+                    <a href="https://www.linkedin.com/in/scbuergel/" target="_blank" rel="noopener noreferrer">
+                      <div className="team-item-image mb-24">
+                        <Image
+                          src={require('./../../assets/images/team/sebastian_burgel.jpg')}
+                          alt="Team member 01"
+                          width={180}
+                          height={180}
+                        />
+                      </div>
+                    </a>
                   </div>
                   <div className="team-item-content">
-                    <h5 className="team-item-name mt-0 mb-4">Markus Hasinika</h5>
-                    <div className="team-item-role text-xs fw-500 mb-8">Founder & CEO</div>
-                    <p className="m-0 text-sm">
-                      Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod.
-                    </p>
+                    <h5 className="team-item-name mt-0 mb-4">Dr. Sebastian Bürgel</h5>
+                    <div className="team-item-role text-xs fw-500 mb-8">Co-Founder, Tech</div>
+                    {/* <p className="m-0 text-sm"></p> */}
                   </div>
                 </div>
               </div>
@@ -83,22 +82,26 @@ class Team extends React.Component {
                 data-reveal-delay="150"
               >
                 <div className="tiles-item-inner">
-                  <div className="team-item-header">
-                    <div className="team-item-image mb-24">
-                      <Image
-                        src={require('./../../assets/images/team-member-02.jpg')}
-                        alt="Team member 02"
-                        width={180}
-                        height={180}
-                      />
+                  <a
+                    href="https://www.linkedin.com/in/robert-kiel-176878161/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <div className="team-item-header">
+                      <div className="team-item-image mb-24">
+                        <Image
+                          src={require('./../../assets/images/team/robert_kiel.jpg')}
+                          alt="Team member 02"
+                          width={180}
+                          height={180}
+                        />
+                      </div>
                     </div>
-                  </div>
+                  </a>
                   <div className="team-item-content">
-                    <h5 className="team-item-name mt-0 mb-4">Markus Hasinika</h5>
-                    <div className="team-item-role text-xs fw-500 mb-8">Founder & CEO</div>
-                    <p className="m-0 text-sm">
-                      Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod.
-                    </p>
+                    <h5 className="team-item-name mt-0 mb-4">Robert Kiel</h5>
+                    <div className="team-item-role text-xs fw-500 mb-8">Co-Founder, Crypto</div>
+                    {/* <p className="m-0 text-sm"></p> */}
                   </div>
                 </div>
               </div>
@@ -109,22 +112,22 @@ class Team extends React.Component {
                 data-reveal-delay="300"
               >
                 <div className="tiles-item-inner">
-                  <div className="team-item-header">
-                    <div className="team-item-image mb-24">
-                      <Image
-                        src={require('./../../assets/images/team-member-03.jpg')}
-                        alt="Team member 03"
-                        width={180}
-                        height={180}
-                      />
+                  <a href="https://www.linkedin.com/in/rikkrieger/" target="_blank" rel="noopener noreferrer">
+                    <div className="team-item-header">
+                      <div className="team-item-image mb-24">
+                        <Image
+                          src={require('./../../assets/images/team/rik_krieger.jpg')}
+                          alt="Team member 03"
+                          width={180}
+                          height={180}
+                        />
+                      </div>
                     </div>
-                  </div>
+                  </a>
                   <div className="team-item-content">
-                    <h5 className="team-item-name mt-0 mb-4">Markus Hasinika</h5>
-                    <div className="team-item-role text-xs fw-500 mb-8">Founder & CEO</div>
-                    <p className="m-0 text-sm">
-                      Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod.
-                    </p>
+                    <h5 className="team-item-name mt-0 mb-4">Rik Krieger, eMBA</h5>
+                    <div className="team-item-role text-xs fw-500 mb-8">Co-Founder, Commercial</div>
+                    {/* <p className="m-0 text-sm"></p> */}
                   </div>
                 </div>
               </div>
@@ -135,22 +138,22 @@ class Team extends React.Component {
                 data-reveal-delay="450"
               >
                 <div className="tiles-item-inner">
-                  <div className="team-item-header">
-                    <div className="team-item-image mb-24">
-                      <Image
-                        src={require('./../../assets/images/team-member-04.jpg')}
-                        alt="Team member 04"
-                        width={180}
-                        height={180}
-                      />
+                  <a href="https://www.linkedin.com/in/jjperezaguinaga/" target="_blank" rel="noopener noreferrer">
+                    <div className="team-item-header">
+                      <div className="team-item-image mb-24">
+                        <Image
+                          src={require('./../../assets/images/team/jose_aguinaga.jpg')}
+                          alt="Team member 04"
+                          width={180}
+                          height={180}
+                        />
+                      </div>
                     </div>
-                  </div>
+                  </a>
                   <div className="team-item-content">
-                    <h5 className="team-item-name mt-0 mb-4">Markus Hasinika</h5>
-                    <div className="team-item-role text-xs fw-500 mb-8">Founder & CEO</div>
-                    <p className="m-0 text-sm">
-                      Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod.
-                    </p>
+                    <h5 className="team-item-name mt-0 mb-4">José Aguinaga</h5>
+                    <div className="team-item-role text-xs fw-500 mb-8">Head of Engineering</div>
+                    {/* <p className="m-0 text-sm"></p> */}
                   </div>
                 </div>
               </div>
@@ -161,22 +164,48 @@ class Team extends React.Component {
                 data-reveal-delay="600"
               >
                 <div className="tiles-item-inner">
-                  <div className="team-item-header">
-                    <div className="team-item-image mb-24">
-                      <Image
-                        src={require('./../../assets/images/team-member-05.jpg')}
-                        alt="Team member 05"
-                        width={180}
-                        height={180}
-                      />
+                  <a href="https://www.linkedin.com/in/stevennonis/" target="_blank" rel="noopener noreferrer">
+                    <div className="team-item-header">
+                      <div className="team-item-image mb-24">
+                        <Image
+                          src={require('./../../assets/images/team/steven_nonis.jpg')}
+                          alt="Team member 05"
+                          width={180}
+                          height={180}
+                        />
+                      </div>
                     </div>
-                  </div>
+                  </a>
                   <div className="team-item-content">
-                    <h5 className="team-item-name mt-0 mb-4">Markus Hasinika</h5>
-                    <div className="team-item-role text-xs fw-500 mb-8">Founder & CEO</div>
-                    <p className="m-0 text-sm">
-                      Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod.
-                    </p>
+                    <h5 className="team-item-name mt-0 mb-4">Steven Nonis</h5>
+                    <div className="team-item-role text-xs fw-500 mb-8">Fullstack Developer</div>
+                    {/* <p className="m-0 text-sm"></p> */}
+                  </div>
+                </div>
+              </div>
+
+              <div
+                className="tiles-item reveal-from-bottom"
+                data-reveal-container=".tiles-wrap"
+                data-reveal-delay="750"
+              >
+                <div className="tiles-item-inner">
+                  <a href="https://www.linkedin.com/in/scbuergel/" target="_blank" rel="noopener noreferrer">
+                    <div className="team-item-header">
+                      <div className="team-item-image mb-24">
+                        <Image
+                          src={require('./../../assets/images/team-member-06.jpg')}
+                          alt="Team member 06"
+                          width={180}
+                          height={180}
+                        />
+                      </div>
+                    </div>
+                  </a>
+                  <div className="team-item-content">
+                    <h5 className="team-item-name mt-0 mb-4">Kevin Leu</h5>
+                    <div className="team-item-role text-xs fw-500 mb-8">Head of Communication</div>
+                    {/* <p className="m-0 text-sm"></p> */}
                   </div>
                 </div>
               </div>
@@ -190,7 +219,7 @@ class Team extends React.Component {
                   <div className="team-item-header">
                     <div className="team-item-image mb-24">
                       <Image
-                        src={require('./../../assets/images/team-member-06.jpg')}
+                        src={require('./../../assets/images/team/rich_mcdowell.jpg')}
                         alt="Team member 06"
                         width={180}
                         height={180}
@@ -198,11 +227,9 @@ class Team extends React.Component {
                     </div>
                   </div>
                   <div className="team-item-content">
-                    <h5 className="team-item-name mt-0 mb-4">Markus Hasinika</h5>
-                    <div className="team-item-role text-xs fw-500 mb-8">Founder & CEO</div>
-                    <p className="m-0 text-sm">
-                      Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod.
-                    </p>
+                    <h5 className="team-item-name mt-0 mb-4">Rich McDowell</h5>
+                    <div className="team-item-role text-xs fw-500 mb-8">Content Creator</div>
+                    {/* <p className="m-0 text-sm"></p> */}
                   </div>
                 </div>
               </div>
