@@ -49,7 +49,7 @@ class TeamAndInvestors extends React.Component {
               <div className="tiles-item-content center-content-mobile">
                 <a href="/HOPR/#team">
                   <h3 className="mt-0 mb-0" data-reveal-container=".tiles-item">
-                    People behind HOPR
+                    Team
                   </h3>
                   <div className="has-shadow has-bg-color invert-color card" style={{ backgroundColor: '#53A3B9' }}>
                     <Image src={require('../../assets/images/cards/team-card.png')} />
@@ -62,7 +62,7 @@ class TeamAndInvestors extends React.Component {
               <div className="tiles-item-content center-content-mobile">
                 <a href="/HOPR/#investors">
                   <h3 className="mt-0 mb-0" data-reveal-container=".tiles-item">
-                    Investors behind HOPR
+                    Investors
                   </h3>
                   <div className="has-shadow has-bg-color invert-color card" style={{ backgroundColor: '#2E9AB9' }}>
                     <Image src={require('../../assets/images/cards/investors-card.png')} />

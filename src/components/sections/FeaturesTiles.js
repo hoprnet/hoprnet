@@ -129,7 +129,7 @@ class FeaturesTiles extends React.Component {
                 </div>
               </div>
 
-              <a href="mailto:rik.krieger@hoprnet.io?subject=Partnership">
+              <a href="mailto:rik.krieger@hoprnet.io?subject=Partnership" target="_blank" rel="noopener noreferrer">
                 <div
                   className="tiles-item reveal-from-bottom"
                   data-reveal-container=".tiles-wrap"

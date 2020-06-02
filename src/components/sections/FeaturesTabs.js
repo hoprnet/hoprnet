@@ -77,7 +77,7 @@ class FeaturesTabs extends React.Component {
                   <div className="text-color-high text-sm">Techies</div>
                 </Tab>
                 <Tab tabId="tab-d" className={redirect ? 'is-active' : undefined}>
-                  <a href="mailto:rik.krieger@hoprnet.io?subject=Partnership">
+                  <a href="mailto:rik.krieger@hoprnet.io?subject=Partnership" target="_blank" rel="noopener noreferrer">
                     <div className="features-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="200">
                       <Image
                         src={require('../../assets/images/icons/light-bulb-shine@140x140.png')}
@@ -94,7 +94,11 @@ class FeaturesTabs extends React.Component {
                   <div className="text-color-high text-sm">Miners & Relayers</div>
                 </Tab>
                 <Tab tabId="tab-f" className={redirect ? 'is-active' : undefined}>
-                  <a href="mailto:sebastian.buergel@hoprnet.io?subject=Investment">
+                  <a
+                    href="mailto:sebastian.buergel@hoprnet.io?subject=Investment"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
                     <div className="features-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="250">
                       <Image
                         src={require('../../assets/images/icons/professions-man-office-1@140x140.png')}

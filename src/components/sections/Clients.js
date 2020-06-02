@@ -1,7 +1,8 @@
 import React from 'react'
 import classNames from 'classnames'
-import { SectionProps } from '../../utils/SectionProps'
+import SectionHeader from '../sections/partials/SectionHeader'
 import Image from '../elements/Image'
+import { SectionProps } from '../../utils/SectionProps'
 
 const propTypes = {
   ...SectionProps.types,
@@ -43,10 +44,17 @@ class Clients extends React.Component {
       <section {...props} className={outerClasses}>
         <div className="container">
           <div className={innerClasses}>
+            <SectionHeader
+              data={{
+                title: 'Partners:',
+                paragraph: undefined,
+              }}
+              className="center-content"
+            />
             <ul className="list-reset">
               <li className="reveal-from-bottom">
                 <Image
-                  src={require('./../../assets/images/investor-binance.svg')}
+                  src={require('./../../assets/images/partners/binance.svg')}
                   alt="Binance Logo"
                   width={124}
                   height={24}
@@ -54,34 +62,34 @@ class Clients extends React.Component {
               </li>
               <li className="reveal-from-bottom" data-reveal-delay="150">
                 <Image
-                  src={require('./../../assets/images/investor-bank-frick.svg')}
+                  src={require('./../../assets/images/partners/bank-frick.svg')}
                   alt="Bank Frick Logo"
                   width={124}
                   height={24}
                 />
               </li>
               <li className="reveal-from-bottom" data-reveal-delay="150">
-                <Image src={require('./../../assets/images/investor-hbl.png')} alt="HBL Logo" width={124} height={24} />
+                <Image src={require('./../../assets/images/partners/hbl.png')} alt="HBL Logo" width={124} height={24} />
               </li>
               <li className="reveal-from-bottom" data-reveal-delay="150">
                 <Image
-                  src={require('./../../assets/images/investor-froriep.png')}
+                  src={require('./../../assets/images/partners/froriep.png')}
                   alt="Froriep Logo"
                   width={124}
                   height={24}
                 />
               </li>
-              <li className="reveal-from-bottom" data-reveal-delay="300">
-                <span>Become our partner</span>
-              </li>
               <li className="reveal-from-bottom" data-reveal-delay="150">
                 <Image
-                  src={require('./../../assets/images/investor-bitcoinsuisse.png')}
+                  src={require('./../../assets/images/partners/bitcoinsuisse.png')}
                   alt="Bitcoin Suisse Logo"
                   width={124}
                   height={24}
                 />
               </li>
+              {/* <li className="reveal-from-bottom" data-reveal-delay="300">
+                <span>Become our partner</span>
+              </li> */}
             </ul>
           </div>
         </div>

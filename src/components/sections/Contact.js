@@ -52,7 +52,14 @@ const Contact = () => {
               onChange={e => setEmail(e.target.value)}
               status={isError ? 'error' : undefined}
             >
-              <Button color="primary" tag={disabled ? 'div' : 'a'} href={href} disabled={disabled}>
+              <Button
+                color="primary"
+                tag={disabled ? 'div' : 'a'}
+                disabled={disabled}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 Send
               </Button>
             </Input>
