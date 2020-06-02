@@ -46,7 +46,7 @@ class Clients extends React.Component {
             <ul className="list-reset">
               <li className="reveal-from-bottom">
                 <Image
-                  src={require('./../../assets/images/client-binance.svg')}
+                  src={require('./../../assets/images/investor-binance.svg')}
                   alt="Binance Logo"
                   width={124}
                   height={24}
@@ -54,14 +54,33 @@ class Clients extends React.Component {
               </li>
               <li className="reveal-from-bottom" data-reveal-delay="150">
                 <Image
-                  src={require('./../../assets/images/client-bank-frick.svg')}
+                  src={require('./../../assets/images/investor-bank-frick.svg')}
                   alt="Bank Frick Logo"
+                  width={124}
+                  height={24}
+                />
+              </li>
+              <li className="reveal-from-bottom" data-reveal-delay="150">
+                <Image src={require('./../../assets/images/investor-hbl.png')} alt="HBL Logo" width={124} height={24} />
+              </li>
+              <li className="reveal-from-bottom" data-reveal-delay="150">
+                <Image
+                  src={require('./../../assets/images/investor-froriep.png')}
+                  alt="Froriep Logo"
                   width={124}
                   height={24}
                 />
               </li>
               <li className="reveal-from-bottom" data-reveal-delay="300">
                 <span>Become our partner</span>
+              </li>
+              <li className="reveal-from-bottom" data-reveal-delay="150">
+                <Image
+                  src={require('./../../assets/images/investor-bitcoinsuisse.png')}
+                  alt="Bitcoin Suisse Logo"
+                  width={124}
+                  height={24}
+                />
               </li>
             </ul>
           </div>

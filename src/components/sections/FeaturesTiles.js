@@ -45,7 +45,7 @@ class FeaturesTiles extends React.Component {
     const tilesClasses = classNames('tiles-wrap', pushLeft && 'push-left')
 
     const sectionHeader = {
-      title: 'HOPR is all about',
+      title: 'HOPR is:',
       paragraph: undefined,
     }
 

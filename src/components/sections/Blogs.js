@@ -13,7 +13,7 @@ const defaultProps = {
   ...SectionProps.defaults,
 }
 
-class FeaturesTabs extends React.Component {
+class Blogs extends React.Component {
   render() {
     const {
       className,
@@ -29,7 +29,7 @@ class FeaturesTabs extends React.Component {
     } = this.props
 
     const outerClasses = classNames(
-      'features-tabs section center-content',
+      'blogs-tabs section center-content',
       topOuterDivider && 'has-top-divider',
       bottomOuterDivider && 'has-bottom-divider',
       hasBgColor && 'has-bg-color',
@@ -38,13 +38,13 @@ class FeaturesTabs extends React.Component {
     )
 
     const innerClasses = classNames(
-      'features-tabs-inner section-inner',
+      'blogs-tabs-inner section-inner',
       topDivider && 'has-top-divider',
       bottomDivider && 'has-bottom-divider'
     )
 
     const sectionHeader = {
-      title: 'HOPR for:',
+      title: 'HOPR blogs:',
       paragraph: undefined,
     }
 
@@ -56,49 +56,43 @@ class FeaturesTabs extends React.Component {
             <Tabs active={!redirect ? 'tab-a' : undefined}>
               <TabList>
                 <Tab tabId="tab-a" className={redirect ? 'is-active' : undefined}>
-                  <div className="features-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="50">
+                  <div className="blogs-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="50">
                     <Image src={require('../../assets/images/icons/shield@140x140.png')} alt="Shield Icon" />
                   </div>
-                  <div className="text-color-high text-sm">Privacy Experts</div>
+                  <div className="text-color-high text-sm">Privacy Blog</div>
                 </Tab>
                 <Tab tabId="tab-b" className={redirect ? 'is-active' : undefined}>
-                  <div className="features-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="100">
+                  <div className="blogs-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="100">
                     <Image src={require('../../assets/images/icons/lock-4@140x140.png')} alt="Lock Icon" />
                   </div>
-                  <div className="text-color-high text-sm">Cryptographers</div>
+                  <div className="text-color-high text-sm">Crypto Blog</div>
                 </Tab>
                 <Tab tabId="tab-c" className={redirect ? 'is-active' : undefined}>
-                  <div className="features-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="150">
+                  <div className="blogs-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="150">
                     <Image
                       src={require('../../assets/images/icons/programming-team-chat-3@140x140.png')}
                       alt="Programming Team Icon"
                     />
                   </div>
-                  <div className="text-color-high text-sm">Techies</div>
+                  <div className="text-color-high text-sm">Tech + Blockchain Blog</div>
                 </Tab>
                 <Tab tabId="tab-d" className={redirect ? 'is-active' : undefined}>
-                  <div className="features-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="200">
+                  <div className="blogs-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="200">
                     <Image
                       src={require('../../assets/images/icons/light-bulb-shine@140x140.png')}
                       alt="Light Bulb Icon"
                     />
                   </div>
-                  <div className="text-color-high text-sm">Entrepreneurs</div>
+                  <div className="text-color-high text-sm">News Blog</div>
                 </Tab>
                 <Tab tabId="tab-e" className={redirect ? 'is-active' : undefined}>
-                  <div className="features-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="250">
-                    <Image src={require('../../assets/images/icons/outdoors-mining@140x140.png')} alt="Pickaxe Icon" />
-                  </div>
-                  <div className="text-color-high text-sm">Miners & Relayers</div>
-                </Tab>
-                <Tab tabId="tab-f" className={redirect ? 'is-active' : undefined}>
-                  <div className="features-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="250">
+                  <div className="blogs-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="250">
                     <Image
-                      src={require('../../assets/images/icons/professions-man-office-1@140x140.png')}
-                      alt="Investor Icon"
+                      src={require('../../assets/images/icons/space-rocket-launch@140x140.png')}
+                      alt="Pickaxe Icon"
                     />
                   </div>
-                  <div className="text-color-high text-sm">Investors</div>
+                  <div className="text-color-high text-sm">Launchpad Blog</div>
                 </Tab>
               </TabList>
             </Tabs>
@@ -109,7 +103,7 @@ class FeaturesTabs extends React.Component {
   }
 }
 
-FeaturesTabs.propTypes = propTypes
-FeaturesTabs.defaultProps = defaultProps
+Blogs.propTypes = propTypes
+Blogs.defaultProps = defaultProps
 
-export default FeaturesTabs
+export default Blogs
