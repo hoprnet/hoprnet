@@ -1,7 +1,6 @@
 import React from 'react'
 import classNames from 'classnames'
 import { SectionProps } from '../../utils/SectionProps'
-// import Button from "../elements/Button";
 import Image from '../elements/Image'
 
 const propTypes = {
@@ -54,11 +53,6 @@ class HeroFull extends React.Component {
                   <br />
                   This is why we build the HOPR network.
                 </p>
-                {/* <div className="reveal-from-top" data-reveal-delay="450">
-                  <Button tag="a" color="primary" href="https://cruip.com/">
-                    Pricing and plans
-                  </Button>
-                </div> */}
               </div>
             </div>
             <div className="hero-figure reveal-from-bottom" data-reveal-delay="600">

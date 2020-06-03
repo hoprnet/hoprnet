@@ -6,7 +6,7 @@ import Investors from '../components/sections/Investors'
 import Token from '../components/sections/Token'
 import Team from '../components/sections/Team'
 import Jobs from '../components/sections/Jobs'
-import Contact from '../components/sections/Contact'
+import ContactTabs from '../components/sections/ContactTabs'
 
 class HOPR extends React.Component {
   render() {
@@ -19,7 +19,7 @@ class HOPR extends React.Component {
         <Token id="token" />
         <Team id="team" hasBgColor invertColor />
         <Jobs id="jobs" />
-        <Contact id="contact" />
+        <ContactTabs id="contact" hasBgColor invertColor redirect />
       </React.Fragment>
     )
   }

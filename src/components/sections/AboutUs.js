@@ -1,6 +1,7 @@
 import React from 'react'
 import PropTypes from 'prop-types'
 import GenericSection from './GenericSection'
+import Image from '../elements/Image'
 import { SectionProps } from '../../utils/SectionProps'
 
 const propTypes = {
@@ -21,7 +22,7 @@ const AboutUs = props => {
           <h2 className="section-header mt-0 mb-0 reveal-from-top" data-reveal-delay="150">
             About us:
           </h2>
-          <div className="reveal-from-top" data-reveal-delay="300">
+          <div className="mb-32 reveal-from-top" data-reveal-delay="300">
             We're a team of highly motivated experts with a single shared goal:
             <br />
             universal data privacy.
@@ -32,6 +33,18 @@ const AboutUs = props => {
             <br />
             <br />
             Our vision is a world where privacy is available for anyone and everyone who wants it.
+          </div>
+          <div className="hero-figure reveal-from-bottom" data-reveal-delay="600">
+            <Image
+              className="has-shadow"
+              src={require('../../assets/images/hopr-illustration-small.png')}
+              alt="Hero"
+              width={896}
+              height={504}
+              style={{
+                borderRadius: '15px',
+              }}
+            />
           </div>
         </div>
       </div>
