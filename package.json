@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core-ethereum",
-  "version": "0.0.2-dev.b46cf2c",
+  "version": "0.0.4-dev.0c72cb4",
   "repository": "git@github.com:hoprnet/hopr-core-ethereum.git",
   "license": "LGPL-3.0-only",
   "types": "lib/index.d.ts",
@@ -10,7 +10,7 @@
     "test": "mocha --exit",
     "dev": "yarn clean && yarn build:types && tsc -w",
     "build:types": "typechain --target web3-v1 --outDir './src/tsc/web3' './node_modules/@hoprnet/hopr-ethereum/build/extracted/abis/*.json'",
-    "build": "yarn clean && yarn build:types && tsc && cp -R ./src/tsc/web3 ./lib/tsc/web3",
+    "build": "yarn clean && yarn build:types && tsc && cp -R ./src/tsc/web3 ./lib/tsc/web3 && cp ./src/ganache-core.d.ts ./lib/",
     "lint": "prettier --check .",
     "prepare": "yarn build"
   },
