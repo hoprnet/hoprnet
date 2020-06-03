@@ -71,7 +71,7 @@ export interface PeerStore {
 }
 
 export interface Registrar {
-  getConnection(peer: PeerInfo): Connection
+  getConnection(peer: PeerInfo): Connection | undefined
   handle(protocol: string, handler: Handler): void
 }
 

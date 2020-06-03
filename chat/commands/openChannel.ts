@@ -12,7 +12,7 @@ import chalk from 'chalk'
 
 import { checkPeerIdInput, isBootstrapNode } from '../utils'
 import { clearString, startDelayedInterval, u8aToHex } from '@hoprnet/hopr-utils'
-import { pubKeyToPeerId } from '@hoprnet/hopr-core/lib/src/utils'
+import { pubKeyToPeerId } from '@hoprnet/hopr-core/lib/utils'
 
 import readline from 'readline'
 

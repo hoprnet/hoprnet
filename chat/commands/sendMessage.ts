@@ -10,8 +10,8 @@ import type PeerInfo from 'peer-info'
 
 import { checkPeerIdInput, encodeMessage, isBootstrapNode } from '../utils'
 import { clearString } from '@hoprnet/hopr-utils'
-import { pubKeyToPeerId } from '@hoprnet/hopr-core/lib/src/utils'
-import { MAX_HOPS } from '@hoprnet/hopr-core/lib/src/constants'
+import { pubKeyToPeerId } from '@hoprnet/hopr-core/lib/utils'
+import { MAX_HOPS } from '@hoprnet/hopr-core/lib/constants'
 
 import readline from 'readline'
 

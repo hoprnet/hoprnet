@@ -9,7 +9,7 @@ import chalk from 'chalk'
 
 import { checkPeerIdInput } from '../utils'
 import { startDelayedInterval, u8aToHex } from '@hoprnet/hopr-utils'
-import { pubKeyToPeerId } from '@hoprnet/hopr-core/lib/src/utils'
+import { pubKeyToPeerId } from '@hoprnet/hopr-core/lib/utils'
 
 export default class CloseChannel implements AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {}

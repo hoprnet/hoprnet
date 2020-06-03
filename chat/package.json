@@ -1,10 +1,10 @@
 {
   "name": "@hoprnet/hopr-chat",
-  "version": "0.0.0",
+  "version": "1.0.0-rc",
   "description": "",
   "main": "index.ts",
   "scripts": {
-    "build": "yarn clean && tsc -p . --noEmit false",
+    "build": "yarn clean && tsc -p . --noEmit false && cp package.json lib",
     "clean": "rm -rf ./lib",
     "test": "mocha --exit || echo '⚠️  Currently no tests available'",
     "start": "node lib/index.js"
@@ -17,22 +17,22 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@hoprnet/hopr-core": "^0.4.5-dev.f7beb27",
-    "@hoprnet/hopr-core-connector-interface": "^1.0.1-0",
-    "@hoprnet/hopr-core-ethereum": "~0.0.3-dev.3102b43",
+    "@hoprnet/hopr-core": "0.5.4-natTraversal.rc",
+    "@hoprnet/hopr-core-connector-interface": "1.0.1-0",
+    "@hoprnet/hopr-core-ethereum": "0.0.3-dev.3102b43",
     "@hoprnet/hopr-demo-seeds": "1.0.1",
-    "@hoprnet/hopr-utils": "^0.1.3",
-    "bn.js": "^5.1.2",
-    "chalk": "^4.0.0",
-    "clear": "^0.1.0",
-    "dotenv": "^8.2.0",
-    "dotenv-expand": "^5.1.0",
-    "figlet": "^1.4.0",
-    "multihashes": "^0.4.19",
-    "peer-info": "^0.17.5",
-    "readline": "^1.3.0",
-    "rlp": "^2.2.4",
-    "typescript": "^3.9.3"
+    "@hoprnet/hopr-utils": "0.1.3",
+    "bn.js": "~5.1.2",
+    "chalk": "~4.0.0",
+    "clear": "~0.1.0",
+    "dotenv": "~8.2.0",
+    "dotenv-expand": "~5.1.0",
+    "figlet": "~1.4.0",
+    "multihashes": "~0.4.19",
+    "peer-info": "~0.17.5",
+    "readline": "~1.3.0",
+    "rlp": "~2.2.4",
+    "typescript": "~3.9.3"
   },
   "devDependencies": {
     "@types/node": ">=4.2.0 < 13"

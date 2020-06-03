@@ -62,9 +62,7 @@ export function createListener(
 
     trackConn(server, maConn)
 
-    if (handler) {
-      handler(conn)
-    }
+    handler?.call(conn)
 
     listener.emit('connection', conn)
   }) as Libp2pServer
