@@ -44,7 +44,7 @@ class Team extends React.Component {
     const tilesClasses = classNames('tiles-wrap', pushLeft && 'push-left')
 
     const sectionHeader = {
-      title: 'The team:',
+      title: 'Team:',
       paragraph: undefined,
     }
 
@@ -184,7 +184,7 @@ class Team extends React.Component {
                 </div>
               </div>
 
-              <div
+              {/* <div
                 className="tiles-item reveal-from-bottom"
                 data-reveal-container=".tiles-wrap"
                 data-reveal-delay="750"
@@ -205,10 +205,10 @@ class Team extends React.Component {
                   <div className="team-item-content">
                     <h5 className="team-item-name mt-0 mb-4">Kevin Leu</h5>
                     <div className="team-item-role text-xs fw-500 mb-8">Head of Communication</div>
-                    {/* <p className="m-0 text-sm"></p> */}
+                    <p className="m-0 text-sm"></p>
                   </div>
                 </div>
-              </div>
+              </div> */}
 
               <div
                 className="tiles-item reveal-from-bottom"

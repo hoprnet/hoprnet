@@ -2,6 +2,7 @@ import React from 'react'
 import classNames from 'classnames'
 import SectionHeader from '../sections/partials/SectionHeader'
 import Image from '../elements/Image'
+import Button from '../elements/Button'
 import { SectionProps } from '../../utils/SectionProps'
 
 const propTypes = {
@@ -54,10 +55,10 @@ class Clients extends React.Component {
             />
             <ul className="list-reset">
               <li className="reveal-from-bottom">
-                <a href="https://www.binance.com/en" target="_blank" rel="noopener noreferrer">
+                <a href="https://www.sedimentum.com/en/sedimentum-en/" target="_blank" rel="noopener noreferrer">
                   <Image
-                    src={require('./../../assets/images/partners/binance.svg')}
-                    alt="Binance Logo"
+                    src={require('./../../assets/images/partners/sedimentum.png')}
+                    alt="Sedimentum Logo"
                     width={124}
                     height={24}
                   />
@@ -105,9 +106,15 @@ class Clients extends React.Component {
               </li>
               {showQuestion ? (
                 <li className="reveal-from-bottom" data-reveal-delay="150">
-                  <a href="mailto:rik.krieger@hoprnet.io?subject=Partnership" target="_blank" rel="noopener noreferrer">
-                    <span>Want to become our partner?</span>
-                  </a>
+                  <Button
+                    color={invertColor ? 'secondary' : 'primary'}
+                    tag="a"
+                    href="mailto:rik.krieger@hoprnet.io?subject=Partnership"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Want to become our partner?
+                  </Button>
                 </li>
               ) : null}
             </ul>

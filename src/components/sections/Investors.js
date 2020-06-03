@@ -2,6 +2,7 @@ import React from 'react'
 import classNames from 'classnames'
 import SectionHeader from '../sections/partials/SectionHeader'
 import Image from '../elements/Image'
+import Button from '../elements/Button'
 import { SectionProps } from '../../utils/SectionProps'
 
 const propTypes = {
@@ -103,15 +104,18 @@ class Investors extends React.Component {
                   />
                 </a>
               </li> */}
+
               {showQuestion ? (
                 <li className="reveal-from-bottom" data-reveal-delay="150">
-                  <a
+                  <Button
+                    color={invertColor ? 'secondary' : 'primary'}
+                    tag="a"
                     href="mailto:sebastian.buergel@hoprnet.io?subject=Investment"
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    <span>Want to become an investor?</span>
-                  </a>
+                    Want to become an investor?
+                  </Button>
                 </li>
               ) : null}
             </ul>

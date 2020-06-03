@@ -56,25 +56,31 @@ class FeaturesTabs extends React.Component {
             <Tabs active={!redirect ? 'tab-a' : undefined}>
               <TabList>
                 <Tab tabId="tab-a" className={redirect ? 'is-active' : undefined}>
-                  <div className="features-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="50">
-                    <Image src={require('../../assets/images/icons/shield@140x140.png')} alt="Shield Icon" />
-                  </div>
-                  <div className="text-color-high text-sm">Privacy Experts</div>
+                  <a href="https://github.com/hoprnet" target="_blank" rel="noopener noreferrer">
+                    <div className="features-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="50">
+                      <Image src={require('../../assets/images/icons/shield@140x140.png')} alt="Shield Icon" />
+                    </div>
+                    <div className="text-color-high text-sm">Privacy Experts</div>
+                  </a>
                 </Tab>
                 <Tab tabId="tab-b" className={redirect ? 'is-active' : undefined}>
-                  <div className="features-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="100">
-                    <Image src={require('../../assets/images/icons/lock-4@140x140.png')} alt="Lock Icon" />
-                  </div>
-                  <div className="text-color-high text-sm">Cryptographers</div>
+                  <a href="https://github.com/hoprnet" target="_blank" rel="noopener noreferrer">
+                    <div className="features-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="100">
+                      <Image src={require('../../assets/images/icons/lock-4@140x140.png')} alt="Lock Icon" />
+                    </div>
+                    <div className="text-color-high text-sm">Cryptographers</div>
+                  </a>
                 </Tab>
                 <Tab tabId="tab-c" className={redirect ? 'is-active' : undefined}>
-                  <div className="features-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="150">
-                    <Image
-                      src={require('../../assets/images/icons/programming-team-chat-3@140x140.png')}
-                      alt="Programming Team Icon"
-                    />
-                  </div>
-                  <div className="text-color-high text-sm">Techies</div>
+                  <a href="https://github.com/hoprnet" target="_blank" rel="noopener noreferrer">
+                    <div className="features-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="150">
+                      <Image
+                        src={require('../../assets/images/icons/programming-team-chat-3@140x140.png')}
+                        alt="Programming Team Icon"
+                      />
+                    </div>
+                    <div className="text-color-high text-sm">Techies</div>
+                  </a>
                 </Tab>
                 <Tab tabId="tab-d" className={redirect ? 'is-active' : undefined}>
                   <a href="mailto:rik.krieger@hoprnet.io?subject=Partnership" target="_blank" rel="noopener noreferrer">
@@ -88,10 +94,15 @@ class FeaturesTabs extends React.Component {
                   </a>
                 </Tab>
                 <Tab tabId="tab-e" className={redirect ? 'is-active' : undefined}>
-                  <div className="features-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="250">
-                    <Image src={require('../../assets/images/icons/outdoors-mining@140x140.png')} alt="Pickaxe Icon" />
-                  </div>
-                  <div className="text-color-high text-sm">Miners & Relayers</div>
+                  <a href="/" target="_blank" rel="noopener noreferrer">
+                    <div className="features-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="250">
+                      <Image
+                        src={require('../../assets/images/icons/outdoors-mining@140x140.png')}
+                        alt="Pickaxe Icon"
+                      />
+                    </div>
+                    <div className="text-color-high text-sm">Miners & Relayers</div>
+                  </a>
                 </Tab>
                 <Tab tabId="tab-f" className={redirect ? 'is-active' : undefined}>
                   <a
