@@ -9,6 +9,7 @@ import LayoutDefault from './layouts/LayoutDefault'
 // Views
 import Home from './views/Home'
 import HOPR from './views/HOPR'
+import ForYou from './views/ForYou'
 
 class App extends React.Component {
   componentDidMount() {
@@ -39,7 +40,8 @@ class App extends React.Component {
         children={() => (
           <Switch>
             <AppRoute exact path="/" component={Home} layout={LayoutDefault} />
-            <AppRoute exact path="/HOPR" component={HOPR} layout={LayoutDefault} />
+            <AppRoute exact path="/hopr" component={HOPR} layout={LayoutDefault} />
+            <AppRoute exact path="/for_you" component={ForYou} layout={LayoutDefault} />
           </Switch>
         )}
       />

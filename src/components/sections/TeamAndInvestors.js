@@ -47,7 +47,7 @@ class TeamAndInvestors extends React.Component {
           <div className={innerClasses}>
             <div className="tiles-item reveal-from-top">
               <div className="tiles-item-content center-content-mobile">
-                <a href="/HOPR/#team">
+                <a href="/hopr/#team">
                   <h3 className="mt-0 mb-0" data-reveal-container=".tiles-item">
                     Team
                   </h3>
@@ -60,7 +60,7 @@ class TeamAndInvestors extends React.Component {
 
             <div className="tiles-item reveal-from-top">
               <div className="tiles-item-content center-content-mobile">
-                <a href="/HOPR/#investors">
+                <a href="/hopr/#investors">
                   <h3 className="mt-0 mb-0" data-reveal-container=".tiles-item">
                     Investors
                   </h3>

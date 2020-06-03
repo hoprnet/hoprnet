@@ -1,0 +1,21 @@
+.governance {
+  .container {
+    display: flex;
+    justify-content: space-around;
+    flex-direction: row;
+    align-items: center;
+
+    .column {
+      width: 40%;
+    }
+  }
+}
+
+@include media( '<large' ) {
+  .governance {
+    .container {
+      flex-direction: column;
+    }
+  }
+}
+  
