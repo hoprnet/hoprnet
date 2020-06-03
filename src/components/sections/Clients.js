@@ -22,6 +22,7 @@ class Clients extends React.Component {
       bottomDivider,
       hasBgColor,
       invertColor,
+      showQuestion,
       ...props
     } = this.props
 
@@ -53,43 +54,62 @@ class Clients extends React.Component {
             />
             <ul className="list-reset">
               <li className="reveal-from-bottom">
-                <Image
-                  src={require('./../../assets/images/partners/binance.svg')}
-                  alt="Binance Logo"
-                  width={124}
-                  height={24}
-                />
+                <a href="https://www.binance.com/en" target="_blank" rel="noopener noreferrer">
+                  <Image
+                    src={require('./../../assets/images/partners/binance.svg')}
+                    alt="Binance Logo"
+                    width={124}
+                    height={24}
+                  />
+                </a>
               </li>
               <li className="reveal-from-bottom" data-reveal-delay="150">
-                <Image
-                  src={require('./../../assets/images/partners/bank-frick.svg')}
-                  alt="Bank Frick Logo"
-                  width={124}
-                  height={24}
-                />
+                <a href="https://www.bankfrick.li/en/" target="_blank" rel="noopener noreferrer">
+                  <Image
+                    src={require('./../../assets/images/partners/bank-frick.svg')}
+                    alt="Bank Frick Logo"
+                    width={124}
+                    height={24}
+                  />
+                </a>
               </li>
               <li className="reveal-from-bottom" data-reveal-delay="150">
-                <Image src={require('./../../assets/images/partners/hbl.png')} alt="HBL Logo" width={124} height={24} />
+                <a href="https://www.hbl.ch/de/" target="_blank" rel="noopener noreferrer">
+                  <Image
+                    src={require('./../../assets/images/partners/hbl.png')}
+                    alt="HBL Logo"
+                    width={124}
+                    height={24}
+                  />
+                </a>
               </li>
               <li className="reveal-from-bottom" data-reveal-delay="150">
-                <Image
-                  src={require('./../../assets/images/partners/froriep.png')}
-                  alt="Froriep Logo"
-                  width={124}
-                  height={24}
-                />
+                <a href="https://www.froriep.com/de/" target="_blank" rel="noopener noreferrer">
+                  <Image
+                    src={require('./../../assets/images/partners/froriep.png')}
+                    alt="Froriep Logo"
+                    width={124}
+                    height={24}
+                  />
+                </a>
               </li>
               <li className="reveal-from-bottom" data-reveal-delay="150">
-                <Image
-                  src={require('./../../assets/images/partners/bitcoinsuisse.png')}
-                  alt="Bitcoin Suisse Logo"
-                  width={124}
-                  height={24}
-                />
+                <a href="https://www.bitcoinsuisse.com/" target="_blank" rel="noopener noreferrer">
+                  <Image
+                    src={require('./../../assets/images/partners/bitcoinsuisse.png')}
+                    alt="Bitcoin Suisse Logo"
+                    width={124}
+                    height={24}
+                  />
+                </a>
               </li>
-              {/* <li className="reveal-from-bottom" data-reveal-delay="300">
-                <span>Become our partner</span>
-              </li> */}
+              {showQuestion ? (
+                <li className="reveal-from-bottom" data-reveal-delay="150">
+                  <a href="mailto:rik.krieger@hoprnet.io?subject=Partnership" target="_blank" rel="noopener noreferrer">
+                    <span>Want to become our partner?</span>
+                  </a>
+                </li>
+              ) : null}
             </ul>
           </div>
         </div>

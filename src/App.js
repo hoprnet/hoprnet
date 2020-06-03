@@ -15,7 +15,7 @@ class App extends React.Component {
     document.body.classList.add('is-loaded')
     this.refs.scrollReveal.init()
 
-    // add analytics
+    // add silkworm analytics
     let tracker = window.document.createElement('script')
     let firstScript = window.document.getElementsByTagName('script')[0]
     tracker.defer = true
