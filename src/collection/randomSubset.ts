@@ -89,5 +89,5 @@ export function randomSubset<T>(array: T[], subsetSize: number, filter?: (candid
     result.push(array[index])
   }
 
-  return result
+  return result.length > 0 ? randomPermutation(result) : result
 }
