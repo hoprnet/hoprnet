@@ -1,5 +1,5 @@
 import secp256k1 from 'secp256k1'
-import crypto from 'crypto'
+import { randomBytes } from 'crypto'
 
 import { u8aXOR, u8aToHex, u8aConcat, PRG } from '@hoprnet/hopr-utils'
 import { MAX_HOPS } from '../../../constants'
@@ -71,7 +71,7 @@ export async function createHeader<Chain extends HoprCoreConnector>(
       secrets = []
 
       do {
-        privKey = crypto.randomBytes(PRIVATE_KEY_LENGTH)
+        privKey = randomBytes(PRIVATE_KEY_LENGTH)
       } while (!secp256k1.privateKeyVerify(privKey))
 
       header.alpha.set(secp256k1.publicKeyCreate(privKey), 0)
@@ -147,7 +147,7 @@ export async function createHeader<Chain extends HoprCoreConnector>(
 
         // @TODO filling the array might not be necessary
         if (paddingLength > 0) {
-          header.beta.fill(0, LAST_HOP_SIZE, paddingLength)
+          header.beta.set(randomBytes(paddingLength), LAST_HOP_SIZE)
         }
 
         u8aXOR(
@@ -220,7 +220,7 @@ export async function createHeader<Chain extends HoprCoreConnector>(
 
   checkPeerIds()
   const secrets = generateKeyShares()
-  const identifier = crypto.randomBytes(IDENTIFIER_SIZE)
+  const identifier = randomBytes(IDENTIFIER_SIZE)
   const filler = generateFiller(secrets)
   await createBetaAndGamma(secrets, filler, identifier)
 
