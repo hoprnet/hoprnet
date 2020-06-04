@@ -49,7 +49,7 @@ const Enabling = props => {
           </div>
         </div>
       </GenericSection>
-      <GenericSection {...props} hasBgColor invertColor>
+      <GenericSection {...props} hasBgColor invertColor id={undefined}>
         <div className="pt-32 center-content reveal-from-top" data-reveal-delay="300">
           This is how we do it: The HOPR protocol
           <br />

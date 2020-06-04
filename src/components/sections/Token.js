@@ -6,7 +6,7 @@ import Button from '../elements/Button'
 
 const emailCheck = new RegExp('[^@]+@[^@]+.[a-zA-Z]{2,6}')
 
-const Token = () => {
+const Token = props => {
   const [email, setEmail] = useState(undefined)
   const [badEmail, setBadEmail] = useState(false)
 
@@ -26,7 +26,7 @@ const Token = () => {
   const href = `mailto:contact@hoprnet.io?from=${email}&subject=Contact`
 
   return (
-    <GenericSection topDivider>
+    <GenericSection {...props} topDivider>
       <div className="container-xs">
         <SectionHeader
           data={{
