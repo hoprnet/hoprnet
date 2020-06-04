@@ -114,7 +114,7 @@ class Channel implements IChannel<HoprEthereum> {
   private _settlementWindow?: Moment
   private _channelId?: Hash
 
-  ticket = Ticket as typeof Types.Ticket
+  public ticket: typeof Types.Ticket
 
   constructor(public coreConnector: HoprEthereum, public counterparty: Uint8Array, signedChannel: SignedChannel) {
     this._signedChannel = signedChannel
@@ -131,6 +131,13 @@ class Channel implements IChannel<HoprEthereum> {
     this.onceClosed().then(async () => {
       return this.onClose()
     })
+
+    this.ticket = {
+      create: Ticket.create.bind(this),
+      SIZE: Ticket.SIZE,
+      submit: Ticket.submit.bind(this),
+      verify: Ticket.verify.bind(this),
+    }
   }
 
   // private async onceOpen() {

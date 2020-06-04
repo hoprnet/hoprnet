@@ -100,7 +100,7 @@ describe('test ticket generation and verification', function () {
     const preImage = randomBytes(32)
     const hash = await coreConnector.utils.hash(preImage)
 
-    const signedTicket = (await channel.ticket.create(channel, new Balance(1), new Hash(hash))) as SignedTicket
+    const signedTicket = (await channel.ticket.create(new Balance(1), new Hash(hash))) as SignedTicket
     assert(u8aEquals(await signedTicket.signer, coreConnector.self.publicKey), `Check that signer is recoverable`)
 
     const signedChannelCounterparty = await SignedChannel.create(coreConnector, undefined, { channel: channelType })
@@ -166,8 +166,8 @@ describe('test ticket generation and verification', function () {
 
     const hashA = await coreConnector.utils.hash(randomBytes(32))
     const hashB = await coreConnector.utils.hash(randomBytes(32))
-    const signedTicketA = (await channel.ticket.create(channel, new Balance(1), new Hash(hashA))) as SignedTicket
-    const signedTicketB = (await channel.ticket.create(channel, new Balance(1), new Hash(hashB))) as SignedTicket
+    const signedTicketA = (await channel.ticket.create(new Balance(1), new Hash(hashA))) as SignedTicket
+    const signedTicketB = (await channel.ticket.create(new Balance(1), new Hash(hashB))) as SignedTicket
 
     await Promise.all([
       Ticket.store(coreConnector, channelId, signedTicketA),

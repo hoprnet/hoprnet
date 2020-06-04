@@ -103,7 +103,7 @@ describe('test Channel class', function () {
     const preImage = randomBytes(32)
     const hash = await coreConnector.utils.hash(preImage)
 
-    const ticket = await channel.ticket.create(channel, new Balance(1), new Hash(hash))
+    const ticket = await channel.ticket.create(new Balance(1), new Hash(hash))
     assert(u8aEquals(await ticket.signer, coreConnector.self.publicKey), `Check that signer is recoverable`)
 
     const signedChannelCounterparty = await SignedChannel.create(coreConnector, undefined, { channel: channelType })
@@ -155,6 +155,6 @@ describe('test Channel class', function () {
       `Should reject when trying to set nonce twice.`
     )
 
-    assert(await counterpartysChannel.ticket.verify(counterpartysChannel, ticket), `Ticket signature must be valid.`)
+    assert(await counterpartysChannel.ticket.verify(ticket), `Ticket signature must be valid.`)
   })
 })

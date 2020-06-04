@@ -104,7 +104,7 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
   }
 
   static async create(
-    channel: ChannelInstance,
+    this: ChannelInstance,
     amount: Balance,
     challenge: Hash,
     arr?: {
@@ -112,11 +112,11 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
       offset: number
     }
   ): Promise<SignedTicket> {
-    const account = await channel.coreConnector.utils.pubKeyToAccountId(channel.counterparty)
-    const { hashedSecret } = await channel.coreConnector.hoprChannels.methods.accounts(u8aToHex(account)).call()
+    const account = await this.coreConnector.utils.pubKeyToAccountId(this.counterparty)
+    const { hashedSecret } = await this.coreConnector.hoprChannels.methods.accounts(u8aToHex(account)).call()
 
     const winProb = new Uint8ArrayE(new BN(new Uint8Array(Hash.SIZE).fill(0xff)).div(WIN_PROB).toArray('le', Hash.SIZE))
-    const channelId = await channel.channelId
+    const channelId = await this.channelId
 
     const signedTicket = new SignedTicket(arr)
 
@@ -136,7 +136,7 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
       }
     )
 
-    await sign(await ticket.hash, channel.coreConnector.self.privateKey, undefined, {
+    await sign(await ticket.hash, this.coreConnector.self.privateKey, undefined, {
       bytes: signedTicket.buffer,
       offset: signedTicket.signatureOffset,
     })
@@ -144,23 +144,23 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
     return signedTicket
   }
 
-  static async verify(channel: ChannelInstance, signedTicket: SignedTicket): Promise<boolean> {
+  static async verify(this: ChannelInstance, signedTicket: SignedTicket): Promise<boolean> {
     // @TODO: check if this is needed
     // if ((await channel.currentBalanceOfCounterparty).add(signedTicket.ticket.amount).lt(await channel.balance)) {
     //   return false
     // }
 
     try {
-      await channel.testAndSetNonce(signedTicket)
+      await this.testAndSetNonce(signedTicket)
     } catch {
       return false
     }
 
-    return verify(await signedTicket.ticket.hash, signedTicket.signature, await channel.offChainCounterparty)
+    return verify(await signedTicket.ticket.hash, signedTicket.signature, await this.offChainCounterparty)
   }
 
   // @TODO: implement submit
-  static async submit(channel: any, signedTicket: SignedTicket) {
+  static async submit(this: ChannelInstance, signedTicket: SignedTicket) {
     throw Error('not implemented')
   }
 }

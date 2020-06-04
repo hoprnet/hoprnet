@@ -30,11 +30,11 @@ declare class Ticket extends Uint8ArrayE implements Types.Ticket {
     get hash(): Promise<Hash>;
     static get SIZE(): number;
     getEmbeddedFunds(): BN;
-    static create(channel: ChannelInstance, amount: Balance, challenge: Hash, arr?: {
+    static create(this: ChannelInstance, amount: Balance, challenge: Hash, arr?: {
         bytes: ArrayBuffer;
         offset: number;
     }): Promise<SignedTicket>;
-    static verify(channel: ChannelInstance, signedTicket: SignedTicket): Promise<boolean>;
-    static submit(channel: any, signedTicket: SignedTicket): Promise<void>;
+    static verify(this: ChannelInstance, signedTicket: SignedTicket): Promise<boolean>;
+    static submit(this: ChannelInstance, signedTicket: SignedTicket): Promise<void>;
 }
 export default Ticket;
