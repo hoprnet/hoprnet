@@ -39,7 +39,7 @@ const ForYou = props => {
             In order to reach us, you can use following channels:
             <br />
             <br />
-            <FooterSocial />
+            <FooterSocial className="large" />
           </div>
         </div>
       </div>
