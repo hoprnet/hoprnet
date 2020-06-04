@@ -1,79 +1,59 @@
-import React, { useEffect } from 'react'
-import classNames from 'classnames'
+import React from 'react'
+import PropTypes from 'prop-types'
+import GenericSection from './GenericSection'
 import { SectionProps } from '../../utils/SectionProps'
-import SectionHeader from './partials/SectionHeader'
 
 const propTypes = {
+  children: PropTypes.node,
   ...SectionProps.types,
 }
 
 const defaultProps = {
+  children: null,
   ...SectionProps.defaults,
 }
 
-const fetchFeed = async () => {
-  return fetch('https://medium.com/feed/@SCBuergel', {
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-    },
-  }).then(res => res.json())
-}
+class Blog extends React.Component {
+  componentDidMount() {
+    // add pixelpoint script
+    let tracker = window.document.createElement('script')
+    let firstScript = window.document.getElementsByTagName('script')[0]
+    tracker.defer = true
+    tracker.src = 'https://medium-widget.pixelpoint.io/widget.js'
+    firstScript.parentNode.insertBefore(tracker, firstScript)
 
-const Blog = props => {
-  const {
-    id,
-    className,
-    topOuterDivider,
-    bottomOuterDivider,
-    topDivider,
-    bottomDivider,
-    hasBgColor,
-    invertColor,
-  } = props
-
-  const outerClasses = classNames(
-    'blog section center-content',
-    topOuterDivider && 'has-top-divider',
-    bottomOuterDivider && 'has-bottom-divider',
-    hasBgColor && 'has-bg-color',
-    invertColor && 'invert-color',
-    className
-  )
-
-  const innerClasses = classNames(
-    'blog-inner section-inner',
-    topDivider && 'has-top-divider',
-    bottomDivider && 'has-bottom-divider'
-  )
-
-  const sectionHeader = {
-    title: 'Blog',
-    paragraph: undefined,
+    tracker.onload = () => {
+      // eslint-disable-next-line
+      MediumWidget.Init({
+        renderTo: '#medium-widget',
+        params: {
+          resource: 'https://medium.com/@SCBuergel',
+          postsPerLine: 2,
+          limit: 4,
+          picture: 'big',
+          fields: ['description', 'author', 'publishAt'],
+          ratio: 'landscape',
+        },
+      })
+    }
   }
 
-  useEffect(() => {
-    fetchFeed().then(console.log)
-  }, [])
-
-  return (
-    <section id={id} className={outerClasses}>
-      <div className="container">
-        <div className={innerClasses}>
-          <SectionHeader data={sectionHeader} className="center-content" />
-          {/* <div
-            id="retainable-rss-embed"
-            data-rss="https://medium.com/feed/@SCBuergel"
-            data-maxcols="3"
-            data-layout="grid"
-            data-poststyle="inline"
-            data-readmore="Read the rest"
-            data-buttonclass="btn btn-primary"
-            data-offset="-100"
-          ></div> */}
+  render() {
+    return (
+      <GenericSection {...this.props}>
+        <div className="center-content">
+          <div className="container-ms">
+            <h2 className="section-header mt-0 mb-0 reveal-from-top" data-reveal-delay="150">
+              Blog:
+            </h2>
+            <div className="reveal-from-top" data-reveal-delay="300">
+              <div id="medium-widget" />
+            </div>
+          </div>
         </div>
-      </div>
-    </section>
-  )
+      </GenericSection>
+    )
+  }
 }
 
 Blog.propTypes = propTypes

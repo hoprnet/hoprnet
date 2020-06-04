@@ -108,11 +108,11 @@ class Header extends React.Component {
                           We Are
                         </Link>
                       </li>
-                      {/* <li>
+                      <li>
                         <Link to="/for_you" onClick={this.closeMenu}>
                           For You
                         </Link>
-                      </li> */}
+                      </li>
                     </ul>
                     {!hideSignin && (
                       <ul className="list-reset header-nav-right">
