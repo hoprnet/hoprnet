@@ -44,7 +44,7 @@ const OpenSource = props => {
                   <a href="https://github.com/libp2p/js-peer-id/pull/116">and</a>{' '}
                   <a href="https://github.com/libp2p/js-libp2p/pull/330">contributed</a>{' '}
                   <a href="https://github.com/libp2p/js-peer-info/pull/91">various</a>{' '}
-                  <a href="https://github.com/libp2p/js-peer-info/pull/89">improvements</a>
+                  <a href="https://github.com/libp2p/js-peer-info/pull/89">improvements</a>.
                 </li>
                 <li>
                   <a href="https://multiformats.io/">Multiformats</a> is a general-purpose value description format used
@@ -81,13 +81,14 @@ const OpenSource = props => {
             <div className="pt-32 reveal-from-top" data-reveal-delay="300">
               {youtubeIds.map(id => (
                 <iframe
+                  key={id}
                   title={id}
                   width="400"
                   height="225"
                   src={`https://www.youtube-nocookie.com/embed/${id}`}
-                  frameborder="0"
+                  frameBorder="0"
                   allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
-                  allowfullscreen
+                  allowFullScreen
                 />
               ))}
             </div>

@@ -1,73 +1,59 @@
-import React, { useState, useEffect } from 'react'
-import SectionHeader from '../sections/partials/SectionHeader'
-import GenericSection from '../sections/GenericSection'
-import Input from '../elements/Input'
-import Button from '../elements/Button'
+import React from 'react'
+import PropTypes from 'prop-types'
+import GenericSection from './GenericSection'
+import SectionHeader from './partials/SectionHeader'
+import { SectionProps } from '../../utils/SectionProps'
 
-const emailCheck = new RegExp('[^@]+@[^@]+.[a-zA-Z]{2,6}')
-
-const Token = props => {
-  const [email, setEmail] = useState(undefined)
-  const [badEmail, setBadEmail] = useState(false)
-
-  useEffect(() => {
-    if (typeof email === 'undefined') {
-      setBadEmail(false)
-    } else {
-      setBadEmail(!emailCheck.test(email))
-    }
-  }, [email])
-
-  const [status, setStatus] = useState(undefined)
-  // const isPending = status === 'pending'
-  // const isSuccess = status === 'success'
-  const isError = badEmail || status === 'error'
-  const disabled = isError || typeof email === 'undefined'
-  const href = `mailto:contact@hoprnet.io?from=${email}&subject=Contact`
-
-  return (
-    <GenericSection {...props} topDivider>
-      <div className="container-xs">
-        <SectionHeader
-          data={{
-            title: 'HOPR Token:',
-            paragraph: 'You want to know more about the sale of our Token, subscribe here:',
-          }}
-          className="center-content"
-        />
-        <form
-          style={{
-            maxWidth: '420px',
-            margin: '0 auto',
-          }}
-        >
-          <div className="mb-24">
-            <Input
-              type="email"
-              label="contact email"
-              placeholder="Your best email.."
-              formGroup="desktop"
-              labelHidden
-              value={email || ''}
-              onChange={e => setEmail(e.target.value)}
-              status={isError ? 'error' : undefined}
-            >
-              <Button
-                color="primary"
-                tag={disabled ? 'div' : 'a'}
-                disabled={disabled}
-                href={href}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Subscribe
-              </Button>
-            </Input>
-          </div>
-        </form>
-      </div>
-    </GenericSection>
-  )
+const propTypes = {
+  children: PropTypes.node,
+  ...SectionProps.types,
 }
+
+const defaultProps = {
+  children: null,
+  ...SectionProps.defaults,
+}
+
+class Token extends React.Component {
+  componentDidMount() {
+    // add jobbase iframe
+    let tracker = window.document.createElement('script')
+    let firstScript = window.document.getElementsByTagName('script')[0]
+    tracker.defer = true
+    tracker.src = 'https://app.mailjet.com/statics/js/iframeResizer.min.js'
+    firstScript.parentNode.insertBefore(tracker, firstScript)
+  }
+
+  render() {
+    return (
+      <GenericSection {...this.props}>
+        <div className="token center-content">
+          <div className="container-ms">
+            <SectionHeader
+              data={{
+                title: 'HOPR Token:',
+                paragraph: 'You want to know more about the sale of our Token, subscribe here:',
+              }}
+            />
+            <div className="iframe-container">
+              <iframe
+                title="mailjet"
+                src="https://app.mailjet.com/widget/iframe/5tV6/DH3"
+                className="mj-w-res-iframe"
+                scrolling="no"
+                frameBorder="0"
+                marginHeight="0"
+                marginWidth="0"
+              />
+            </div>
+          </div>
+        </div>
+      </GenericSection>
+    )
+  }
+}
+
+Token.propTypes = propTypes
+Token.defaultProps = defaultProps
 
 export default Token
