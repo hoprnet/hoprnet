@@ -3,6 +3,11 @@
 	.section-inner {
 		padding-top: $investors--padding-t__mobile;
 		padding-bottom: $investors--padding-b__mobile;
+
+		.question {
+			padding-top: 48px;
+			text-align: center;
+		}
 	}
 
 	.section-header {
@@ -33,6 +38,10 @@
 		.section-inner {
 			padding-top: $investors--padding-t__desktop;
 			padding-bottom: $investors--padding-b__desktop;
+
+			.question {
+				padding-top: 80px;
+			}
 		}
 
 		.section-header {

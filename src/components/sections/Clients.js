@@ -104,20 +104,20 @@ class Clients extends React.Component {
                   />
                 </a>
               </li>
-              {showQuestion ? (
-                <li className="reveal-from-bottom" data-reveal-delay="150">
-                  <Button
-                    color={invertColor ? 'secondary' : 'primary'}
-                    tag="a"
-                    href="mailto:rik.krieger@hoprnet.io?subject=Partnership"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Want to become our partner?
-                  </Button>
-                </li>
-              ) : null}
             </ul>
+            <div className="question">
+              {showQuestion ? (
+                <Button
+                  color={invertColor ? 'secondary' : 'primary'}
+                  tag="a"
+                  href="mailto:rik.krieger@hoprnet.io?subject=Partnership"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Want to become our partner?
+                </Button>
+              ) : null}
+            </div>
           </div>
         </div>
       </section>

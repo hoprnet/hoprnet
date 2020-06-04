@@ -104,21 +104,20 @@ class Investors extends React.Component {
                   />
                 </a>
               </li> */}
-
-              {showQuestion ? (
-                <li className="reveal-from-bottom" data-reveal-delay="150">
-                  <Button
-                    color={invertColor ? 'secondary' : 'primary'}
-                    tag="a"
-                    href="mailto:sebastian.buergel@hoprnet.io?subject=Investment"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Want to become an investor?
-                  </Button>
-                </li>
-              ) : null}
             </ul>
+            <div className="question">
+              {showQuestion ? (
+                <Button
+                  color={invertColor ? 'secondary' : 'primary'}
+                  tag="a"
+                  href="mailto:sebastian.buergel@hoprnet.io?subject=Investment"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Want to become an investor?
+                </Button>
+              ) : null}
+            </div>
           </div>
         </div>
       </section>

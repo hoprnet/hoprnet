@@ -3,7 +3,6 @@
     display: flex;
     justify-content: space-around;
     flex-direction: row;
-    align-items: center;
 
     .column {
       width: 40%;
@@ -15,6 +14,10 @@
   .governance {
     .container {
       flex-direction: column;
+
+      .column {
+        width: 100%;
+      }
     }
   }
 }

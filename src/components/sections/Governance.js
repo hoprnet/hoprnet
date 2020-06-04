@@ -30,12 +30,14 @@ const Governance = props => {
               Governments and corporations have been major innovations in governing and organizing human progress over
               the past millennia. But today more than ever, we need natively digital organizations to drive the next
               wave of inclusive innovation.
+              <br />
+              <br />
+              Open technology platforms rely on and enable communities instead of emperors and shareholders.
             </div>
             <div className="column">
-              Open technology platforms rely on and enable communities instead of emperors and shareholders. The recent
-              movement of Decentralized Autonomous Organizations (DAOs), provides participatory governance and economies
-              for the blockchain era. However, DAOs can only unleash their full potential if they also benefit from
-              established legal context.
+              The recent movement of Decentralized Autonomous Organizations (DAOs), provides participatory governance
+              and economies for the blockchain era. However, DAOs can only unleash their full potential if they also
+              benefit from established legal context.
               <br />
               <br />
               Therefore, at HOPR we pioneer decentralized, community-enabling governance - DeCEnGov - as a techno-legal
@@ -43,9 +45,9 @@ const Governance = props => {
               advantages of established legal bodies to govern collective efforts.
             </div>
           </div>
+          {/* <br />
           <br />
-          <br />
-          Link to FroRieb / DAO / DAA
+          Link to FroRieb / DAO / DAA */}
         </div>
       </div>
     </GenericSection>
