@@ -54,38 +54,39 @@ class Blogs extends React.Component {
           <div className={innerClasses}>
             <SectionHeader data={sectionHeader} className="center-content" />
             <Tabs active={!redirect ? 'tab-a' : undefined}>
-              <TabList>
-                <Tab tabId="tab-a" className={redirect ? 'is-active' : undefined}>
-                  <div className="blogs-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="50">
-                    <Image src={require('../../assets/images/icons/shield@140x140.png')} alt="Shield Icon" />
-                  </div>
-                  <div className="text-color-high text-sm">Privacy Blog</div>
-                </Tab>
-                <Tab tabId="tab-b" className={redirect ? 'is-active' : undefined}>
-                  <div className="blogs-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="100">
-                    <Image src={require('../../assets/images/icons/lock-4@140x140.png')} alt="Lock Icon" />
-                  </div>
-                  <div className="text-color-high text-sm">Crypto Blog</div>
-                </Tab>
-                <Tab tabId="tab-c" className={redirect ? 'is-active' : undefined}>
-                  <div className="blogs-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="150">
-                    <Image
-                      src={require('../../assets/images/icons/programming-team-chat-3@140x140.png')}
-                      alt="Programming Team Icon"
-                    />
-                  </div>
-                  <div className="text-color-high text-sm">Tech + Blockchain Blog</div>
-                </Tab>
-                <Tab tabId="tab-d" className={redirect ? 'is-active' : undefined}>
-                  <div className="blogs-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="200">
-                    <Image
-                      src={require('../../assets/images/icons/light-bulb-shine@140x140.png')}
-                      alt="Light Bulb Icon"
-                    />
-                  </div>
-                  <div className="text-color-high text-sm">News Blog</div>
-                </Tab>
-                {/* <Tab tabId="tab-e" className={redirect ? 'is-active' : undefined}>
+              <a href="/for_you#blog" target="_blank" rel="noopener noreferrer">
+                <TabList>
+                  <Tab tabId="tab-a" className={redirect ? 'is-active' : undefined}>
+                    <div className="blogs-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="50">
+                      <Image src={require('../../assets/images/icons/shield@140x140.png')} alt="Shield Icon" />
+                    </div>
+                    <div className="text-color-high text-sm">Privacy Blog</div>
+                  </Tab>
+                  <Tab tabId="tab-b" className={redirect ? 'is-active' : undefined}>
+                    <div className="blogs-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="100">
+                      <Image src={require('../../assets/images/icons/lock-4@140x140.png')} alt="Lock Icon" />
+                    </div>
+                    <div className="text-color-high text-sm">Crypto Blog</div>
+                  </Tab>
+                  <Tab tabId="tab-c" className={redirect ? 'is-active' : undefined}>
+                    <div className="blogs-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="150">
+                      <Image
+                        src={require('../../assets/images/icons/programming-team-chat-3@140x140.png')}
+                        alt="Programming Team Icon"
+                      />
+                    </div>
+                    <div className="text-color-high text-sm">Tech + Blockchain Blog</div>
+                  </Tab>
+                  <Tab tabId="tab-d" className={redirect ? 'is-active' : undefined}>
+                    <div className="blogs-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="200">
+                      <Image
+                        src={require('../../assets/images/icons/light-bulb-shine@140x140.png')}
+                        alt="Light Bulb Icon"
+                      />
+                    </div>
+                    <div className="text-color-high text-sm">News Blog</div>
+                  </Tab>
+                  {/* <Tab tabId="tab-e" className={redirect ? 'is-active' : undefined}>
                   <div className="blogs-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="250">
                     <Image
                       src={require('../../assets/images/icons/space-rocket-launch@140x140.png')}
@@ -94,7 +95,8 @@ class Blogs extends React.Component {
                   </div>
                   <div className="text-color-high text-sm">Launchpad Blog</div>
                 </Tab> */}
-              </TabList>
+                </TabList>
+              </a>
             </Tabs>
           </div>
         </div>
