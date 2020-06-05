@@ -28,15 +28,9 @@ To use **HOPR Chat,** run `docker pull hopr/chat` from your command line \(“cm
 
 ![Currently HOPR Chat is about ~0.5 GB, please be patient.](../../.gitbook/assets/render1591364106270.gif)
 
-To ensure your machine has successfully downloaded **HOPR Chat,** please run the following command.
+To ensure your machine has successfully downloaded **HOPR Chat,** run `docker images`.You will be shown the **HOPR Chat** image being installed locally, ready to be run.
 
-```text
-docker images
-```
-
-You will be shown the **HOPR Chat** image being installed locally.
-
-![HOPR Chat is distributed as a Docker image, which is retrieved from https://hub.docker.com/r/hopr/chat](../../.gitbook/assets/image.png)
+![HOPR Chat distributed as a Docker image](../../.gitbook/assets/image.png)
 
 ## Step 3 - **Running HOPR Chat**
 
