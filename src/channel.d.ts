@@ -68,7 +68,7 @@ declare namespace Channel {
    * @notice Takes the `coreConnector` instance and returns an async iterable duplex stream.
    * @param coreConnector coreConnector instance
    */
-  function handleOpeningRequest(...props: any[]): (source: AsyncIterable<Uint8Array>) => AsyncIterator<Uint8Array>
+  function handleOpeningRequest(...props: any[]): (source: AsyncIterable<Uint8Array>) => AsyncIterable<Uint8Array>
 }
 
 declare interface Channel {
