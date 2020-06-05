@@ -183,7 +183,7 @@ const OpenSource = props => {
               is built by the community for the community.
               <br />
               <br />
-              (coming soon mid July 2020)
+              (coming mid-July 2020)
             </div>
           </div>
         </div>

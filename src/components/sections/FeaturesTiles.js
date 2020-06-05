@@ -127,9 +127,9 @@ class FeaturesTiles extends React.Component {
                     <div className="features-tiles-item-content">
                       <h4 className="mt-0 mb-8">Hackathons & Community</h4>
                       <p className="m-0 text-sm">
-                        We're organizing events to grow our network and give back to the community.
+                        We're organizing events to grow our network and give back to the Community
                         <br />
-                        <span className="text-color-primary">(coming soon mid July 2020)</span>
+                        <span className="text-color-primary">(coming mid-July 2020)</span>.
                       </p>
                     </div>
                   </div>

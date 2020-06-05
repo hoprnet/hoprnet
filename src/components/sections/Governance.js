@@ -23,26 +23,23 @@ const Governance = props => {
           </h2>
           <div className="container reveal-from-top" data-reveal-delay="300">
             <div className="column">
-              At HOPR we are building the foundations of a more private and resilient next web. But to do so, we also
-              have to fundamentally challenge the economic power structures of today’s web.
+              At HOPR we're building the foundations for a more private and resilient web. But to succeed, we also need
+              to challenge the economic power structures that shackle today's web to unhealthy and unsustainable
+              business models.
               <br />
               <br />
-              Governments and corporations have been major innovations in governing and organizing human progress over
-              the past millennia. But today more than ever, we need natively digital organizations to drive the next
-              wave of inclusive innovation.
-              <br />
-              <br />
-              Open technology platforms rely on and enable communities instead of emperors and shareholders.
+              We need natively digital organizations to drive the next wave of inclusive innovation. Open technology
+              platforms rely on and enable communities instead of emperors and shareholders.
             </div>
             <div className="column">
               The recent movement of Decentralized Autonomous Organizations (DAOs), provides participatory governance
-              and economies for the blockchain era. However, DAOs can only unleash their full potential if they also
-              benefit from established legal context.
+              and economies for the blockchain era. However, DAOs cannot reach their full potential until they can
+              co-exist with existing legal frameworks.
               <br />
               <br />
-              Therefore, at HOPR we pioneer decentralized, community-enabling governance - DeCEnGov - as a techno-legal
-              framework that combines the dynamics of communities with the efficiencies of crypto networks and the
-              advantages of established legal bodies to govern collective efforts.
+              HOPR is pioneering decentralized, community-enabling governance (DeCEnGov) as a techno-legal framework
+              that combines the dynamics of communities with the efficiencies of crypto networks and the advantages of
+              established legal bodies to govern collective efforts.
             </div>
           </div>
         </div>
