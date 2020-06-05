@@ -28,6 +28,14 @@ To use **HOPR Chat,** execute the following command from your command line \(“
 
 To ensure your machine has successfully downloaded **HOPR Chat,** please run the following command.
 
+```text
+docker images
+```
+
+You will be shown the **HOPR Chat** image being installed locally.
+
+![HOPR Chat is distributed as a Docker image, which is retrieved from https://hub.docker.com/r/hopr/chat](../../.gitbook/assets/image.png)
+
 ## Step 3 - **Running HOPR Chat**
 
 To run **HOPR Chat,** please paste the following variables in your command line \(“cmd.exe”\) or Powershell terminal. This will provide the configuration variables needed for **HOPR Chat** to run successfully in your machine, such as the **Bootstrap Server** needed to initially relay **HOPR Chat** connections across the network users.
@@ -49,11 +57,11 @@ You can replace `HOPR_PASSWORD` for anything else, but ensure to always use the 
 After providing the configuration variables, you are ready to run **HOPR Chat.**
 
 ```text
-docker run -v %cd%/db:/app/db \
--e HOST_IPV4=$HOST_IPV4 \
--e BOOTSTRAP_SERVERS=$HOPR_BOOTSTRAP_NODE \
--e ETHEREUM_PROVIDER=$ETHEREUM_PROVIDER \
--p $PORTS -it $HOPR_DOCKER_IMAGE
+docker run -v %cd%/db:/app/db ^ 
+-e HOST_IPV4=0.0.0.0:9091 ^ 
+-e BOOTSTRAP_SERVERS=/dns4/ch-test-01.hoprnet.io/tcp/9091/p2p/16Uiu2HAmThyWP5YWutPmYk9yUZ48ryWyZ7Cf6pMTQduvHUS9sGE7 ^ 
+-e ETHEREUM_PROVIDER=wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36 ^ 
+-p 9091:9091 -it hopr/chat
 ```
 
 You will be welcomed by the following message.
