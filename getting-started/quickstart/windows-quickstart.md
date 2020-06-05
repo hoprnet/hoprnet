@@ -1,0 +1,96 @@
+---
+description: Get familiar with HOPR on your Windows computer.
+---
+
+# Windows Quickstart
+
+This quick start tutorial will show you how to use **HOPR** by installing **HOPR Chat** in your system using Docker. In this 5-minutes step-by-step guide, we will download Docker, run **HOPR Chat,** and send a message to another user connected to the **HOPR Network**.
+
+## Step 1 - Installing Docker in your machine
+
+Before anything, you need to install Docker Desktop in your machine. Depending in your Windows version, you might need to install [Docker Desktop](https://hub.docker.com/editions/community/docker-ce-desktop-windows/) \(Windows 10 Pro or over\) or [Docker Toolbox](https://docs.docker.com/toolbox/overview/) \(Windows 10 Home\). Please bear in mind that in order to get Docker running, your computer needs to have some minimal hardware requirements described in [here](https://docs.docker.com/toolbox/toolbox_install_windows/#step-1-check-your-version).
+
+### Installing Docker on Microsoft Windows 10 Professional or Enterprise
+
+1. Please go to LINK and download Docker Desktop in your computer.
+2. Follow-up the wizard steps to ensure you have everything up and running.
+3. Ensure the installation was successful by running the following commands.
+
+### Installing Docker on Microsoft Windows 10 Home
+
+1. Please go to LINK and download Docker Toolbox in your computer.
+2. Follow-up the wizard steps to ensure you have everything up and running.
+3. Ensure the installation was successful by running the following commands.
+
+## Step 2 - Downloading HOPR Chat image from Docker Hub
+
+To use **HOPR Chat,** execute the following command from your command line \(“cmd.exe”\) or Powershell terminal. Please bear in mind this process will take some time depending on your internet connection.
+
+To ensure your machine has successfully downloaded **HOPR Chat,** please run the following command.
+
+## Step 3 - **Running HOPR Chat**
+
+To run **HOPR Chat,** please paste the following variables in your command line \(“cmd.exe”\) or Powershell terminal. This will provide the configuration variables needed for **HOPR Chat** to run successfully in your machine, such as the **Bootstrap Server** needed to initially relay **HOPR Chat** connections across the network users.
+
+```text
+HOPR_PORT=9091 \
+HOPR_DOCKER_IMAGE=gcr.io/hoprassociation/hopr-core:latest \
+HOPR_BOOTSTRAP_NODE=/dns4/ch-test-01.hoprnet.io/tcp/9091/p2p/16Uiu2HAm2n7Lfn76Ex7JnesxXjCtoPbLA6S1Q3boEELETBCD9RKc \
+HOPR_PASSWORD=switzerland \
+INFURA_ID=f7240372c1b442a6885ce9bb825ebc36 \
+HOST_IPV4=0.0.0.0:$HOPR_PORT \
+BOOTSTRAP_SERVERS=$COUNTRY_BOOTSTRAP_NODE \
+ETHEREUM_PROVIDER=wss://kovan.infura.io/ws/v3/$INFURA_ID \
+PORTS=$HOPR_PORT:$HOPR_PORT
+```
+
+You can replace `HOPR_PASSWORD` for anything else, but ensure to always use the same password as this will be used by **HOPR Chat**. Furthermore, you can also use your own [Infura](https://infura.io/) credentials.
+
+After providing the configuration variables, you are ready to run **HOPR Chat.**
+
+```text
+docker run -v %cd%/db:/app/db \
+-e HOST_IPV4=$HOST_IPV4 \
+-e BOOTSTRAP_SERVERS=$HOPR_BOOTSTRAP_NODE \
+-e ETHEREUM_PROVIDER=$ETHEREUM_PROVIDER \
+-p $PORTS -it $HOPR_DOCKER_IMAGE
+```
+
+You will be welcomed by the following message.
+
+**Please copy your HOPR Chat account address,** as you will need it in further steps. **HOPR Chat** has been started bootstrapped successfully, now you need to fund your **HOPR Chat** account with some KETH, [Kovan’s Network](https://kovan-testnet.github.io/website/) testnet ETH tokens. 
+
+## Step 4 - Funding your HOPR Chat Account
+
+Since **HOPR Chat** uses the [Ethereum](https://ethereum.org/) Payment Channels to transfer **HOPR Tokens** as an economic incentive for **HOPR** users, your **HOPR Chat** account requires ETH and **HOPR Tokens**. At the time of writing, **HOPR Chat** works in the Kovan network, so you need the equivalent currency which is free to request in [Kovan's](https://faucet.kovan.network/) and [HOPR](https://faucet.hoprnet.io/) Faucet websites. To request Kovan ETH tokens you will need to have a [GitHub](https://github.com/) account.
+
+Copy your account from Step 3, and paste it in the following websites. 
+
+
+
+**HOPR Chat** will not fully initialise until your account has been funded with some Kovan ETH. After the tokens have landed in your account, you are ready to use **HOPR Chat.** Execute the same command shared in Step 3 to see the following screen.
+
+You verify your balance from your **HOPR Chat** account, execute the following command. Your **HOPR Chat** instance is ready to be used!
+
+## Step 5 - Sending a HOPR message
+
+With **HOPR Chat** up and running, you can now send messages to any connected nodes in the network. You can have another friend send you their address, or you can also start another **HOPR Chat** instance. You will need to follow Steps 3 and 4 in this new account in case you decide to go through, but you can also find **HOPR Chat** users in our [Telegram channel](https://t.me/hoprnet).
+
+First, ensure you have enough **HOPR Tokens** to send and receive messages.
+
+Next, ensure there are other individuals connected to the network.
+
+Finally, copy another connected user address and send a message to them.
+
+Congratulations! You have communicated with another individual using a privacy-preserving decentralised protocol. **HOPR Chat** is right now only a Proof-of-Concept but it can already show you the capabilities the protocol can have.
+
+## Troubleshooting
+
+In case you get a message about _Unable to connect to bootstrap node,_ please provide a different one from our IMPORTANT\_LINKS\_LINK page. For other issues, please see our COMMON\_ISSUES\_LINK.
+
+
+
+
+
+
+
