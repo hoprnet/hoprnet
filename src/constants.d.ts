@@ -9,4 +9,3 @@ export const NETWORK: string
 
 // Name of the chain, e.g. `ethereum` or `polkadot`
 export const CHAIN_NAME: string
-

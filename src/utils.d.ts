@@ -4,7 +4,7 @@ import type { AccountId, Hash, Signature, Balance } from './types'
  * Decides whether we take the role of partyA in the channel with `counterparty`.
  * @param self id of ourself
  * @param counterparty id of the counterparty
-*/
+ */
 export declare function isPartyA(self: AccountId, counterparty: AccountId): boolean
 
 /**
