@@ -18,8 +18,9 @@ declare namespace Channel {
    * The ticket MUST not have any value.
    * 
    * @param counterParty AccountId of the counterparty
+   * @param challenge Challenge for this ticket
    */
-  function createDummyChannelTicket(counterParty: AccountId): Promise<SignedTicket>
+  function createDummyChannelTicket(counterParty: AccountId, challenge: Hash, ...props: any[]): Promise<SignedTicket>
 
   /**
    * Checks whether the channel exists on-chain and off-chain, i.e. in our database.
