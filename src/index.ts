@@ -294,9 +294,9 @@ export default class HoprEthereum implements HoprCoreConnector {
           `Congratulations - your HOPR testnet node is ready to go!\n` +
             `Please fund your Ethereum Kovan account ${chalk.yellow(
               this.account.toHex()
-            )} with some Kovan ETH and Kovan HOPR test tokens\n` +
+            )} with some Kovan ETH and Kovan HOPR test tokens. You‘ll need both to send messages.\n` +
             `You can request Kovan ETH from ${chalk.blue('https://faucet.kovan.network')}\n` +
-            `For Kovan HOPR test tokens visit our Telegram channel at ${chalk.blue('https://t.me/hoprnet')}\n`
+            `For Kovan HOPR test tokens visit our Faucet at ${chalk.blue('https://faucet.hoprnet.io')}\n`
         )
         process.exit()
       }
