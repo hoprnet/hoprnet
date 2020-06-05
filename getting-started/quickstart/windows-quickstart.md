@@ -95,6 +95,16 @@ Congratulations! You have communicated with another individual using a privacy-p
 
 For **HOPR Chat** to work, you need to make sure you provide it with at least one **HOPR Chat** node in Bootstrap Mode. Anyone can spin a **HOPR Chat** in this mode by adding the flag `-b` at the end of the command. Feel free to use any \(or all\) of the following URLs as your `BOOTSTRAP_SERVERS` parameter in your **HOPR Chat** Docker image.
 
+* `/dns4/ch-test-01.hoprnet.io/tcp/9091/p2p/16Uiu2HAmThyWP5YWutPmYk9yUZ48ryWyZ7Cf6pMTQduvHUS9sGE7`
+* `/dns4/ch-test-02.hoprnet.io/tcp/9091/p2p/16Uiu2HAmBSzk28qQ8bfpwVgEjef4q51kGg8GjEk3MinyyTB2WTGn`
+* `/dns4/ch-test-03.hoprnet.io/tcp/9091/p2p/16Uiu2HAm4H1ZxPb9KkoYD928Smrjnr2igYP8vBFbZKs5B8gchTnT`
+
+These nodes are behind HOPR Services AG DNS registry. In case you want to directly access them without the DNS request, you can simply pass these directly.
+
+* `/ip4/34.65.237.196/tcp/9091/p2p/16Uiu2HAmThyWP5YWutPmYk9yUZ48ryWyZ7Cf6pMTQduvHUS9sGE7`
+* `/ip4/34.65.119.138/tcp/9091/p2p/16Uiu2HAmBSzk28qQ8bfpwVgEjef4q51kGg8GjEk3MinyyTB2WTGn`
+* `/ip4/34.65.120.13/tcp/9091/p2p/16Uiu2HAm4H1ZxPb9KkoYD928Smrjnr2igYP8vBFbZKs5B8gchTnT`
+
 
 
 
