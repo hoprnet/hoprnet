@@ -25,12 +25,12 @@ const OpenSource = props => {
             </h2>
             <div className="open-source reveal-from-top" data-reveal-delay="300">
               At HOPR we embrace and live the ethos of free and open source software. Especially when making claims
-              about privacy, it is important to us, that you can check and challenge every bit of our work.
+              about privacy, it's important that you can check and challenge every bit of our work.
               <br />
               <br />
-              But we want to take it further: Our vision of the web3 is an open and collaborative ecosystem. Therefore,
-              we walk the talk and contribute to a range of open source projects beyond our primary project, the HOPR
-              protocol:
+              But we want to take it further: we support the vision of Web 3.0 as an open and collaborative ecosystem.
+              Therefore, we walk the talk and contribute to a range of open source projects beyond our primary project,
+              the HOPR protocol:
               <br />
               <br />
               <ul>
@@ -39,7 +39,7 @@ const OpenSource = props => {
                     Libp2p
                   </a>{' '}
                   is a fundamental building block for a range of decentralized projects such as Ethereum, Filecoin,
-                  IPFS, Polkadot and many more, we solved{' '}
+                  IPFS, Polkadot and many more. We've solved{' '}
                   <a
                     className="underline"
                     href="https://github.com/libp2p/js-peer-id/pull/115"
@@ -101,7 +101,7 @@ const OpenSource = props => {
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    fixes and test
+                    fixes and testing
                   </a>
                   .
                 </li>

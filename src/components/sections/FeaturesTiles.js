@@ -71,8 +71,8 @@ class FeaturesTiles extends React.Component {
                     <div className="features-tiles-item-content">
                       <h4 className="mt-0 mb-8">Enabling Data Privacy</h4>
                       <p className="m-0 text-sm">
-                        In order to give people and companies the freedom to decide about the privacy level of their
-                        data, we are building the HOPR network.
+                        We're building the HOPR network to give people and companies control over their level of data
+                        privacy.
                       </p>
                     </div>
                   </div>
@@ -127,8 +127,9 @@ class FeaturesTiles extends React.Component {
                     <div className="features-tiles-item-content">
                       <h4 className="mt-0 mb-8">Hackathons & Community</h4>
                       <p className="m-0 text-sm">
-                        In order to grow our network and actively interact with the community, we will organize events{' '}
-                        <span className="text-color-primary">(coming soon mid July 2020)</span>.
+                        We're organizing events to grow our network and give back to the community.
+                        <br />
+                        <span className="text-color-primary">(coming soon mid July 2020)</span>
                       </p>
                     </div>
                   </div>
@@ -155,8 +156,8 @@ class FeaturesTiles extends React.Component {
                     <div className="features-tiles-item-content">
                       <h4 className="mt-0 mb-8">Your company & Our ecosystem</h4>
                       <p className="m-0 text-sm">
-                        HOPR is looking for partners who want to benefit from our network. If Data Privacy is important
-                        to you, get in contact with us.
+                        HOPR is looking for partners who want to benefit from our network. If data privacy is important
+                        to you, get in touch.
                       </p>
                     </div>
                   </div>

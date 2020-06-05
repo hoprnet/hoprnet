@@ -36,15 +36,19 @@ const Enabling = props => {
               />
             </div>
             <div className="pt-32 reveal-from-top" data-reveal-delay="300">
-              Today we are past the tipping point of privacy. The absence of privacy is not just an issue for private
-              individuals who suffer from data harvesting social media giants. Data privacy is major issue that requires
-              governmental interventions and compliance departments to reduce the impact of privacy.
+              We're past the tipping point for privacy. Lack of privacy isn't just a problem for individuals suffering
+              at the hands of data harvesting social media giants. Data privacy has become a major societal and economic
+              issue requiring government intervention and the creation of entire compliance departments.
               <br />
               <br />
-              GDPR, HIIPA, CCPA and other legal ordinances are attempting to retrospectively fix a broken underlying
-              privacy landscape. With HOPR we aim at changing this approach: We are building privacy infrastructure that
-              can be leveraged by corporations and private individuals alike, to build privacy-first applications and
-              services on the web or on-chain.
+              GDPR, HIIPA, CCPA and other regulation is like a band-aid on a broken leg. At HOPR, we're building the
+              foundations for a whole new approach: privacy infrastructure that can be used by corporations and
+              individuals to build privacy-first applications and services on the web or blockchain.
+              <br />
+              <br />
+              The HOPR protocol provides network-level and metadata privacy for every kind of data exchange. A mixnet
+              protects the identity of both sender and recipient by routing data via relayers who mix traffic and earn
+              HOPR tokens for their efforts.
             </div>
           </div>
         </div>

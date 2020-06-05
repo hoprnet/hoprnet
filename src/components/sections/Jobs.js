@@ -1,6 +1,7 @@
 import React from 'react'
 import PropTypes from 'prop-types'
 import GenericSection from './GenericSection'
+import SectionHeader from './partials/SectionHeader'
 import { SectionProps } from '../../utils/SectionProps'
 
 const propTypes = {
@@ -26,14 +27,16 @@ class Jobs extends React.Component {
   render() {
     return (
       <GenericSection {...this.props}>
-        <div className="center-content">
-          <div className="container-sm">
-            <h2 className="section-header mt-0 mb-0 reveal-from-top" data-reveal-delay="150">
-              Jobs:
-            </h2>
-            <div className="reveal-from-top" data-reveal-delay="300">
-              <div id="psJobWidget" />
-            </div>
+        <div className="container-sm">
+          <SectionHeader
+            data={{
+              title: 'Jobs:',
+              paragraph: 'Want to join our team?',
+            }}
+            className="center-content"
+          />
+          <div className="reveal-from-top" data-reveal-delay="300">
+            <div id="psJobWidget" />
           </div>
         </div>
       </GenericSection>

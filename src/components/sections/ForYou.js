@@ -21,7 +21,7 @@ const ForYou = props => {
       <div className="center-content">
         <div className="container-sm">
           <h2 className="section-header mt-0 mb-0 reveal-from-top" data-reveal-delay="150">
-            We are here for you:
+            We're here for you:
           </h2>
           <div className="mb-32 hero-figure reveal-from-top" data-reveal-delay="200">
             <Image
@@ -36,7 +36,7 @@ const ForYou = props => {
             />
           </div>
           <div className="pt-32 reveal-from-top" data-reveal-delay="300">
-            In order to reach us, you can use following channels:
+            You can reach us on any of these channels:
             <br />
             <br />
             <FooterSocial className="large" />

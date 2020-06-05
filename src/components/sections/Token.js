@@ -32,7 +32,7 @@ class Token extends React.Component {
             <SectionHeader
               data={{
                 title: 'HOPR Token:',
-                paragraph: 'You want to know more about the sale of our Token, subscribe here:',
+                paragraph: 'Want to know more about our token sale? Subscribe here:',
               }}
             />
             <div className="iframe-container">
