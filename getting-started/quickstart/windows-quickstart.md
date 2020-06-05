@@ -50,6 +50,8 @@ docker run -v %cd%/db:/app/db ^
 
 You will be welcomed by the following message.
 
+![HOPR Chat will prompt you to request funds online.](../../.gitbook/assets/image%20%282%29.png)
+
 **Please copy your HOPR Chat account address,** as you will need it in further steps. **HOPR Chat** has been started bootstrapped successfully, now you need to fund your **HOPR Chat** account with some KETH, [Kovan’s Network](https://kovan-testnet.github.io/website/) testnet ETH tokens. 
 
 ## Step 4 - Funding your HOPR Chat Account
