@@ -38,30 +38,14 @@ You will be shown the **HOPR Chat** image being installed locally.
 
 ## Step 3 - **Running HOPR Chat**
 
-To run **HOPR Chat,** please paste the following variables in your command line \(“cmd.exe”\) or Powershell terminal. This will provide the configuration variables needed for **HOPR Chat** to run successfully in your machine, such as the **Bootstrap Server** needed to initially relay **HOPR Chat** connections across the network users.
-
-```text
-HOPR_PORT=9091 \
-HOPR_DOCKER_IMAGE=gcr.io/hoprassociation/hopr-core:latest \
-HOPR_BOOTSTRAP_NODE=/dns4/ch-test-01.hoprnet.io/tcp/9091/p2p/16Uiu2HAm2n7Lfn76Ex7JnesxXjCtoPbLA6S1Q3boEELETBCD9RKc \
-HOPR_PASSWORD=switzerland \
-INFURA_ID=f7240372c1b442a6885ce9bb825ebc36 \
-HOST_IPV4=0.0.0.0:$HOPR_PORT \
-BOOTSTRAP_SERVERS=$COUNTRY_BOOTSTRAP_NODE \
-ETHEREUM_PROVIDER=wss://kovan.infura.io/ws/v3/$INFURA_ID \
-PORTS=$HOPR_PORT:$HOPR_PORT
-```
-
-You can replace `HOPR_PASSWORD` for anything else, but ensure to always use the same password as this will be used by **HOPR Chat**. Furthermore, you can also use your own [Infura](https://infura.io/) credentials.
-
-After providing the configuration variables, you are ready to run **HOPR Chat.**
+To run **HOPR Chat,** you only need to run the following command. You can replace `switzerland` for anything else, but ensure to always use the same password as this will be used by **HOPR Chat**. Furthermore, you can also use your own [Infura](https://infura.io/) credentials instead of the ones provided here, but ensure you use the Kovan provider.
 
 ```text
 docker run -v %cd%/db:/app/db ^ 
 -e HOST_IPV4=0.0.0.0:9091 ^ 
 -e BOOTSTRAP_SERVERS=/dns4/ch-test-01.hoprnet.io/tcp/9091/p2p/16Uiu2HAmThyWP5YWutPmYk9yUZ48ryWyZ7Cf6pMTQduvHUS9sGE7 ^ 
 -e ETHEREUM_PROVIDER=wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36 ^ 
--p 9091:9091 -it hopr/chat
+-p 9091:9091 -it hopr/chat -p switzerland
 ```
 
 You will be welcomed by the following message.
