@@ -28,7 +28,7 @@ class SectionHeader extends React.Component {
       <React.Fragment>
         {(data.title || data.paragraph) && (
           <div {...props} className={classes}>
-            <div className="container-xs">
+            <div className="container-sm">
               {children}
               {data.title && (
                 <Component className={classNames('mt-0', data.paragraph ? 'mb-16' : 'mb-0')}>{data.title}</Component>

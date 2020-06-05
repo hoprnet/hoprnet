@@ -17,7 +17,7 @@ const Governance = props => {
   return (
     <GenericSection {...props}>
       <div className="governance center-content">
-        <div className="container-ms">
+        <div className="container-sm">
           <h2 className="section-header mt-0 mb-0 reveal-from-top" data-reveal-delay="150">
             Governance:
           </h2>
@@ -45,9 +45,6 @@ const Governance = props => {
               advantages of established legal bodies to govern collective efforts.
             </div>
           </div>
-          {/* <br />
-          <br />
-          Link to FroRieb / DAO / DAA */}
         </div>
       </div>
     </GenericSection>

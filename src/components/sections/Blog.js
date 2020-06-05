@@ -27,11 +27,11 @@ class Blog extends React.Component {
       MediumWidget.Init({
         renderTo: '#medium-widget',
         params: {
-          resource: 'https://medium.com/@SCBuergel',
+          resource: 'https://medium.com/hoprnet',
           postsPerLine: 2,
           limit: 4,
           picture: 'big',
-          fields: ['description', 'author', 'publishAt'],
+          fields: ['author', 'publishAt'],
           ratio: 'landscape',
         },
       })
@@ -42,7 +42,7 @@ class Blog extends React.Component {
     return (
       <GenericSection {...this.props}>
         <div className="center-content">
-          <div className="container-ms">
+          <div className="container-sm">
             <h2 className="section-header mt-0 mb-0 reveal-from-top" data-reveal-delay="150">
               Blog:
             </h2>

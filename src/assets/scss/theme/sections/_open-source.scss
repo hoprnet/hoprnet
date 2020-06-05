@@ -2,8 +2,18 @@
   li {
     text-align: left;
   }
+}
 
-  a {
-    text-decoration: underline !important;
+#documentantion {
+  .description {
+    padding-bottom: 80px;
+  }
+}
+
+@include media( '<medium' ) {
+  #documentantion {
+    .description {
+      padding-bottom: 48px;
+    }
   }
 }

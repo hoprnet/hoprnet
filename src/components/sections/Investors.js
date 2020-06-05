@@ -51,7 +51,7 @@ class Investors extends React.Component {
                 title: 'Investors:',
                 paragraph: undefined,
               }}
-              className="center-content"
+              className="center-content header"
             />
             <ul className="list-reset">
               <li className="reveal-from-bottom">
@@ -105,8 +105,8 @@ class Investors extends React.Component {
                 </a>
               </li> */}
             </ul>
-            <div className="question">
-              {showQuestion ? (
+            {showQuestion ? (
+              <div className="question">
                 <Button
                   color={invertColor ? 'secondary' : 'primary'}
                   tag="a"
@@ -116,8 +116,8 @@ class Investors extends React.Component {
                 >
                   Want to become an investor?
                 </Button>
-              ) : null}
-            </div>
+              </div>
+            ) : null}
           </div>
         </div>
       </section>

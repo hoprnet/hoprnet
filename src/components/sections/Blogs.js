@@ -75,7 +75,7 @@ class Blogs extends React.Component {
                         alt="Programming Team Icon"
                       />
                     </div>
-                    <div className="text-color-high text-sm">Tech + Blockchain Blog</div>
+                    <div className="text-color-high text-sm">Tech Blog</div>
                   </Tab>
                   <Tab tabId="tab-d" className={redirect ? 'is-active' : undefined}>
                     <div className="blogs-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="200">

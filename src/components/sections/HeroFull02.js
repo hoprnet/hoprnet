@@ -58,7 +58,7 @@ class HeroFull extends React.Component {
         <div className="container-sm">
           <div className={innerClasses}>
             <div className="hero-content">
-              <div className="container-xs">
+              <div className="container-sm">
                 <h1 className="m-0 reveal-from-top">Engage Your Visitors with a beautiful template</h1>
               </div>
             </div>

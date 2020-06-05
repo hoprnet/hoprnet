@@ -72,7 +72,7 @@ class FeaturesTabs extends React.Component {
                   </a>
                 </Tab>
                 <Tab tabId="tab-c" className={redirect ? 'is-active' : undefined}>
-                  <a href="https://github.com/hoprnet" target="_blank" rel="noopener noreferrer">
+                  <a href="http://docs.hoprnet.io/" target="_blank" rel="noopener noreferrer">
                     <div className="features-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="150">
                       <Image
                         src={require('../../assets/images/icons/programming-team-chat-3@140x140.png')}
@@ -94,7 +94,7 @@ class FeaturesTabs extends React.Component {
                   </a>
                 </Tab>
                 <Tab tabId="tab-e" className={redirect ? 'is-active' : undefined}>
-                  <a href="/" target="_blank" rel="noopener noreferrer">
+                  <a href="http://docs.hoprnet.io/" target="_blank" rel="noopener noreferrer">
                     <div className="features-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="250">
                       <Image
                         src={require('../../assets/images/icons/outdoors-mining@140x140.png')}

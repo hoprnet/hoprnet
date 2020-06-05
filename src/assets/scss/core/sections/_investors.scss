@@ -1,22 +1,17 @@
 .investors {
-
 	.section-inner {
-		padding-top: $investors--padding-t__mobile;
-		padding-bottom: $investors--padding-b__mobile;
+		.header {
+			padding-bottom: 24px;
+		}
 
 		.question {
-			padding-top: 48px;
+			padding-top: 24px;
 			text-align: center;
 		}
-	}
-
-	.section-header {
-		padding-bottom: $investors-header--padding__mobile;
 	}
 }
 
 .investors-inner {
-
 	ul {
 		display: flex;
 		flex-wrap: wrap;
@@ -32,24 +27,18 @@
 }
 
 @include media( '>medium' ) {
-
 	.investors {
-
 		.section-inner {
-			padding-top: $investors--padding-t__desktop;
-			padding-bottom: $investors--padding-b__desktop;
+			.header {
+				padding-bottom: 40px;
+			}
 
 			.question {
-				padding-top: 80px;
+				padding-top: 40px;
 			}
 		}
 
-		.section-header {
-			padding-bottom: $investors-header--padding__desktop;
-		}
-
 		.investors-inner {
-
 			ul {
 				flex-direction: row;
 			}

@@ -28,7 +28,7 @@ class Token extends React.Component {
     return (
       <GenericSection {...this.props}>
         <div className="token center-content">
-          <div className="container-ms">
+          <div className="container-sm">
             <SectionHeader
               data={{
                 title: 'HOPR Token:',

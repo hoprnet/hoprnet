@@ -47,7 +47,7 @@ class HeroFull extends React.Component {
               <h1 className="mt-0 mb-16 reveal-from-top" data-reveal-delay="150">
                 HOPR
               </h1>
-              <div className="container-xs">
+              <div className="container-sm">
                 <p className="m-0 mb-32 reveal-from-top" data-reveal-delay="300">
                   We care about Data Privacy.
                   <br />

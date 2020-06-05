@@ -184,17 +184,17 @@ class Team extends React.Component {
                 </div>
               </div>
 
-              {/* <div
+              <div
                 className="tiles-item reveal-from-bottom"
                 data-reveal-container=".tiles-wrap"
                 data-reveal-delay="750"
               >
                 <div className="tiles-item-inner">
-                  <a href="https://www.linkedin.com/in/scbuergel/" target="_blank" rel="noopener noreferrer">
+                  <a href="https://www.linkedin.com/in/kevinleu/" target="_blank" rel="noopener noreferrer">
                     <div className="team-item-header">
                       <div className="team-item-image mb-24">
                         <Image
-                          src={require('./../../assets/images/team-member-06.jpg')}
+                          src={require('./../../assets/images/team/kevin-leu.jpg')}
                           alt="Team member 06"
                           width={180}
                           height={180}
@@ -208,7 +208,7 @@ class Team extends React.Component {
                     <p className="m-0 text-sm"></p>
                   </div>
                 </div>
-              </div> */}
+              </div>
 
               <div
                 className="tiles-item reveal-from-bottom"

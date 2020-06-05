@@ -27,7 +27,7 @@ const Contact = props => {
 
   return (
     <GenericSection {...props} topDivider>
-      <div className="container-xs">
+      <div className="container-sm">
         <SectionHeader
           data={{
             title: 'Want more?',

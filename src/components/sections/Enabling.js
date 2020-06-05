@@ -19,7 +19,7 @@ const Enabling = props => {
     <>
       <GenericSection {...props}>
         <div className="center-content">
-          <div className="container-ms">
+          <div className="container-sm">
             <h2 className="section-header mt-0 mb-0 reveal-from-top" data-reveal-delay="150">
               Enabling Data Privacy:
             </h2>
@@ -49,26 +49,32 @@ const Enabling = props => {
           </div>
         </div>
       </GenericSection>
-      <GenericSection {...props} hasBgColor invertColor id={undefined}>
-        <div className="pt-32 center-content reveal-from-top" data-reveal-delay="300">
-          This is how we do it: The HOPR protocol
-          <br />
-          <br />
-          At HOPR we focus on network-level and metadata privacy. To that end we develop the HOPR protocol which
-          provides privacy for any sort of data exchange.
-          <br />
-          <br />
-          HOPR is a mixnet that protects sender and recipient of a data packet beyond end-to-end encryption. This
-          privacy is established by indirectly routing data via multiple intermediate relay hops that mix traffic.
-          <br />
-          <br />
-          Relay mix nodes get rewarded for their work by getting paid in HOPR tokens. Our proof-of-relay mechanism
-          protects everyone from dishonest node operators extracting funds. The payments are handled via probabilistic
-          micropayments, our custom layer-2 scaling solution ontop of the Ethereum blockchain.
-          <br />
-          <br />
-          Thus HOPR provides economic incentives to run a global privacy network sustainably and at scale without
-          compromising on primacy.
+      <GenericSection {...props} id="how" hasBgColor invertColor>
+        <div className="center-content">
+          <div className="container-sm">
+            <h2 className="section-header mt-0 mb-0 reveal-from-top" data-reveal-delay="150">
+              How? The HOPR protocol:
+            </h2>
+            <div className="container reveal-from-top" data-reveal-delay="300">
+              <div className="column">
+                At HOPR we focus on network-level and metadata privacy. To that end we develop the HOPR protocol which
+                provides privacy for any sort of data exchange.
+                <br />
+                <br />
+                HOPR is a mixnet that protects sender and recipient of a data packet beyond end-to-end encryption. This
+                privacy is established by indirectly routing data via multiple intermediate relay hops that mix traffic.
+              </div>
+              <div className="column">
+                Relay mix nodes get rewarded for their work by getting paid in HOPR tokens. Our proof-of-relay mechanism
+                protects everyone from dishonest node operators extracting funds. The payments are handled via
+                probabilistic micropayments, our custom layer-2 scaling solution ontop of the Ethereum blockchain.
+                <br />
+                <br />
+                Thus HOPR provides economic incentives to run a global privacy network sustainably and at scale without
+                compromising on primacy.
+              </div>
+            </div>
+          </div>
         </div>
       </GenericSection>
     </>

@@ -1,13 +1,15 @@
 import React from 'react'
 import Blog from '../components/sections/Blog'
 import ForYou from '../components/sections/ForYou'
+import Videos from '../components/sections/Videos'
 
 class HOPR extends React.Component {
   render() {
     return (
       <React.Fragment>
         <ForYou id="for_you" />
-        <Blog id="blog" hasBgColor invertColor />
+        <Videos id="videos" hasBgColor invertColor />
+        <Blog id="blog" />
       </React.Fragment>
     )
   }
