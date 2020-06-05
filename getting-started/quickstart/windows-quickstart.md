@@ -4,7 +4,7 @@ description: Get familiar with HOPR on your Windows computer.
 
 # Windows Quickstart
 
-This quick start tutorial will show you how to use **HOPR** by installing **HOPR Chat** in your system using Docker. In this 5-minutes step-by-step guide, we will download Docker, run **HOPR Chat,** and send a message to another user connected to the **HOPR Network**.
+This quick start tutorial will show you how to use **HOPR** by installing **HOPR Chat** in your system using Docker. In this step-by-step guide, we will download Docker, run **HOPR Chat,** and send a message to another user connected to the **HOPR Network**.
 
 ## Step 1 - Installing Docker in your machine
 
@@ -25,6 +25,8 @@ Before anything, you need to install Docker Desktop in your machine. Depending i
 ## Step 2 - Downloading HOPR Chat image from Docker Hub
 
 To use **HOPR Chat,** execute the following command from your command line \(“cmd.exe”\) or Powershell terminal. Please bear in mind this process will take some time depending on your internet connection.
+
+
 
 To ensure your machine has successfully downloaded **HOPR Chat,** please run the following command.
 
@@ -60,11 +62,18 @@ Since **HOPR Chat** uses the [Ethereum](https://ethereum.org/) Payment Channels 
 
 Copy your account from Step 3, and paste it in the following websites. 
 
+* Kovan Network Faucet - [https://faucet.kovan.network/](https://faucet.kovan.network/)
+* HOPR Network Faucet - [https://faucet.hoprnet.io/](https://faucet.hoprnet.io/)
 
+**HOPR Chat** will not fully initialize until your account has been funded with some Kovan ETH and HOPR. After the tokens have landed in your account, you are ready to use **HOPR Chat.** Execute the same command shared in Step 3 to see the following screen.
 
-**HOPR Chat** will not fully initialise until your account has been funded with some Kovan ETH. After the tokens have landed in your account, you are ready to use **HOPR Chat.** Execute the same command shared in Step 3 to see the following screen.
+![HOPR Chat fully working after having its account funded](../../.gitbook/assets/image%20%283%29.png)
 
-You verify your balance from your **HOPR Chat** account, execute the following command. Your **HOPR Chat** instance is ready to be used!
+You verify your balance from your **HOPR Chat** account, execute the command `balance` to see the following screen:
+
+![HOPR Chat will tell you its balance in Kovan ETH and HOPR tokens](../../.gitbook/assets/image%20%284%29.png)
+
+Your **HOPR Chat** instance is ready to be used!
 
 ## Step 5 - Sending a HOPR message
 
