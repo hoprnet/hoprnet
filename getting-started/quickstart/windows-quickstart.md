@@ -78,6 +78,12 @@ Congratulations! You have communicated with another individual using a privacy-p
 
 ## Troubleshooting
 
+### Volume Access
+
+**HOPR Chat** requires write access to a working directory to store important data in your computer. If you didn't started your command line with elevated privileges, you might be prompted to give access to your current working directory.
+
+![Windows prompting access to write to your current directory](../../.gitbook/assets/image%20%281%29.png)
+
 In case you get a message about _Unable to connect to bootstrap node,_ please provide a different one from our IMPORTANT\_LINKS\_LINK page. For other issues, please see our COMMON\_ISSUES\_LINK.
 
 
