@@ -1,7 +1,7 @@
 import type { addresses } from '@hoprnet/hopr-ethereum';
 import Web3 from 'web3';
 import { LevelUp } from 'levelup';
-import HoprCoreConnector, { Types as ITypes, Channel as IChannel, Constants as IConstants } from '@hoprnet/hopr-core-connector-interface';
+import HoprCoreConnector, { Channel as IChannel } from '@hoprnet/hopr-core-connector-interface';
 import Ticket from './ticket';
 import Indexer from './indexer';
 import * as dbkeys from './dbKeys';
@@ -30,11 +30,13 @@ export default class HoprEthereum implements HoprCoreConnector {
     };
     private _status;
     private _initializing;
+    _onChainValuesInitialized: boolean;
     private _starting;
     private _stopping;
     private _nonce?;
     signTransaction: ReturnType<typeof utils.TransactionSigner>;
     log: ReturnType<typeof utils['Log']>;
+    channel: typeof IChannel;
     constructor(db: LevelUp, self: {
         privateKey: Uint8Array;
         publicKey: Uint8Array;
@@ -47,9 +49,8 @@ export default class HoprEthereum implements HoprCoreConnector {
     });
     readonly dbKeys: typeof dbkeys;
     readonly utils: typeof utils;
-    readonly types: typeof ITypes;
+    readonly types: typeof types;
     readonly constants: typeof constants;
-    readonly channel: typeof IChannel;
     readonly CHAIN_NAME = "HOPR on Ethereum";
     readonly ticket: typeof Ticket;
     readonly indexer: Indexer;
@@ -87,16 +88,10 @@ export default class HoprEthereum implements HoprCoreConnector {
      */
     initialize(): Promise<void>;
     /**
-     * Initializes node's account secret, if it doesn't exist
-     * it will generate one.
-     * @returns a promise resolved true if account secret is set correctly
-     */
-    initializeAccountSecret(): Promise<boolean>;
-    /**
      * Checks whether node has an account secret set onchain and offchain
      * @returns a promise resolved true if secret is set correctly
      */
-    checkAccountSecret(): Promise<boolean>;
+    checkAccountSecret(): Promise<void>;
     /**
      * generate and set account secret
      */
@@ -105,9 +100,9 @@ export default class HoprEthereum implements HoprCoreConnector {
      * Checks whether web3 connection is alive
      * @returns a promise resolved true if web3 connection is alive
      */
-    checkWeb3(): Promise<boolean>;
+    checkWeb3(): Promise<void>;
     private getDebugAccountSecret;
-    static readonly constants: typeof IConstants;
+    static get constants(): typeof constants;
     /**
      * Creates an uninitialised instance.
      *

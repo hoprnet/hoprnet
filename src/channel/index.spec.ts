@@ -69,7 +69,7 @@ describe('test Channel class', function () {
 
     preChannels.set(u8aToHex(channelId), channelType)
 
-    const channel = await Channel.create(
+    const channel = await Channel.create.call(
       coreConnector,
       counterpartysCoreConnector.self.publicKey,
       async () => counterpartysCoreConnector.self.onChainKeyPair.publicKey,
@@ -77,7 +77,7 @@ describe('test Channel class', function () {
       async () => {
         const result = await pipe(
           [(await SignedChannel.create(coreConnector, undefined, { channel: channelType })).subarray()],
-          Channel.handleOpeningRequest(counterpartysCoreConnector),
+          counterpartysCoreConnector.channel.handleOpeningRequest(),
           async (source: AsyncIterable<any>) => {
             let result: Uint8Array
             for await (const msg of source) {
@@ -97,6 +97,7 @@ describe('test Channel class', function () {
         })
       }
     )
+
 
     channels.set(u8aToHex(channelId), channelType)
 
@@ -118,7 +119,6 @@ describe('test Channel class', function () {
     )
 
     const dbChannels = (await counterpartysCoreConnector.channel.getAll(
-      counterpartysCoreConnector,
       async (arg: any) => arg,
       async (arg: any) => Promise.all(arg)
     )) as Channel[]
@@ -128,7 +128,7 @@ describe('test Channel class', function () {
       `Channel record should make it into the database and its db-key should lead to the AccountId of the counterparty.`
     )
 
-    const counterpartysChannel = await Channel.create(
+    const counterpartysChannel = await Channel.create.call(
       counterpartysCoreConnector,
       coreConnector.self.publicKey,
       () => Promise.resolve(coreConnector.self.onChainKeyPair.publicKey),
@@ -137,12 +137,11 @@ describe('test Channel class', function () {
     )
 
     assert(
-      await coreConnector.channel.isOpen(coreConnector, counterpartysCoreConnector.self.onChainKeyPair.publicKey),
+      await coreConnector.channel.isOpen(counterpartysCoreConnector.self.onChainKeyPair.publicKey),
       `Checks that party A considers the channel open.`
     )
     assert(
       await counterpartysCoreConnector.channel.isOpen(
-        counterpartysCoreConnector,
         coreConnector.self.onChainKeyPair.publicKey
       ),
       `Checks that party B considers the channel open.`

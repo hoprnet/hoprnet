@@ -2,22 +2,28 @@ import type { Channel as IChannel, Types } from '@hoprnet/hopr-core-connector-in
 import { u8aToHex, u8aXOR, stringToU8a, u8aEquals } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import {
-  SignedChannel,
-  Moment,
-  Hash,
   AccountId,
-  ChannelId,
   Balance,
   ChannelBalance,
-  Ticket,
-  State,
+  ChannelId,
+  Hash,
+  Moment,
   Public,
+  SignedChannel,
+  SignedTicket,
+  State,
+  Ticket,
   TicketEpoch,
 } from '../types'
 import { ChannelStatus } from '../types/channel'
 import { HASH_LENGTH, ERRORS } from '../constants'
 import { waitForConfirmation, waitFor, hash, getId, stateCountToStatus, cleanupPromiEvent } from '../utils'
 import type HoprEthereum from '..'
+
+import { Uint8ArrayE } from '../types/extended'
+import { randomBytes } from 'crypto'
+
+const WIN_PROB = new BN(1)
 
 async function getChannel(
   coreConnector: HoprEthereum,
@@ -109,7 +115,7 @@ const onClose = async (coreConnector: HoprEthereum, counterparty: Uint8Array) =>
   return coreConnector.db.del(Buffer.from(coreConnector.dbKeys.Channel(counterparty)))
 }
 
-class Channel implements IChannel<HoprEthereum> {
+class Channel implements IChannel {
   private _signedChannel: SignedChannel
   private _settlementWindow?: Moment
   private _channelId?: Hash
@@ -203,11 +209,12 @@ class Channel implements IChannel<HoprEthereum> {
 
     return new Promise<Hash>(async (resolve, reject) => {
       try {
-        const channelId = await this.coreConnector.utils.getId(
-          this.coreConnector.account,
-          await this.coreConnector.utils.pubKeyToAccountId(this.counterparty)
+        this._channelId = new ChannelId(
+          await this.coreConnector.utils.getId(
+            this.coreConnector.account,
+            await this.coreConnector.utils.pubKeyToAccountId(this.counterparty)
+          )
         )
-        this._channelId = new ChannelId(channelId)
       } catch (error) {
         return reject(error)
       }
@@ -223,8 +230,7 @@ class Channel implements IChannel<HoprEthereum> {
 
     return new Promise<Moment>(async (resolve, reject) => {
       try {
-        const channel = await this.channel
-        this._settlementWindow = new Moment(channel.closureTime)
+        this._settlementWindow = new Moment((await this.channel).closureTime)
       } catch (error) {
         return reject(error)
       }
@@ -257,8 +263,7 @@ class Channel implements IChannel<HoprEthereum> {
   get balance(): Promise<Balance> {
     return new Promise<Balance>(async (resolve, reject) => {
       try {
-        const channel = await this.channel
-        return resolve(new Balance(channel.deposit))
+        return resolve(new Balance((await this.channel).deposit))
       } catch (error) {
         return reject(error)
       }
@@ -268,8 +273,7 @@ class Channel implements IChannel<HoprEthereum> {
   get balance_a(): Promise<Balance> {
     return new Promise<Balance>(async (resolve, reject) => {
       try {
-        const channel = await this.channel
-        return resolve(new Balance(channel.partyABalance))
+        return resolve(new Balance((await this.channel).partyABalance))
       } catch (error) {
         return reject(error)
       }
@@ -279,10 +283,9 @@ class Channel implements IChannel<HoprEthereum> {
   get currentBalance(): Promise<Balance> {
     return new Promise<Balance>(async (resolve, reject) => {
       try {
-        const response = await this.coreConnector.hoprToken.methods
-          .balanceOf(u8aToHex(this.coreConnector.account))
-          .call()
-        return resolve(new Balance(response))
+        return resolve(
+          new Balance(await this.coreConnector.hoprToken.methods.balanceOf(u8aToHex(this.coreConnector.account)).call())
+        )
       } catch (error) {
         return reject(error)
       }
@@ -292,10 +295,13 @@ class Channel implements IChannel<HoprEthereum> {
   get currentBalanceOfCounterparty(): Promise<Balance> {
     return new Promise<Balance>(async (resolve, reject) => {
       try {
-        const response = await this.coreConnector.hoprToken.methods
-          .balanceOf(u8aToHex(await this.coreConnector.utils.pubKeyToAccountId(this.counterparty)))
-          .call()
-        return resolve(new Balance(response))
+        return resolve(
+          new Balance(
+            await this.coreConnector.hoprToken.methods
+              .balanceOf(u8aToHex(await this.coreConnector.utils.pubKeyToAccountId(this.counterparty)))
+              .call()
+          )
+        )
       } catch (error) {
         return reject(error)
       }
@@ -414,16 +420,16 @@ class Channel implements IChannel<HoprEthereum> {
     throw Error('Nonces must not be used twice.')
   }
 
-  static async isOpen(coreConnector: HoprEthereum, counterpartyPubKey: Uint8Array) {
-    const counterparty = await coreConnector.utils.pubKeyToAccountId(counterpartyPubKey)
-    const channelId = await coreConnector.utils.getId(coreConnector.account, counterparty).then((res) => new Hash(res))
+  static async isOpen(this: HoprEthereum, counterpartyPubKey: Uint8Array) {
+    const counterparty = await this.utils.pubKeyToAccountId(counterpartyPubKey)
+    const channelId = await this.utils.getId(this.account, counterparty).then((res) => new Hash(res))
 
     const [onChain, offChain]: [boolean, boolean] = await Promise.all([
-      getChannel(coreConnector, channelId).then((channel) => {
+      getChannel(this, channelId).then((channel) => {
         const state = Number(channel.stateCounter) % 10
         return state === ChannelStatus.OPEN || state === ChannelStatus.PENDING
       }),
-      coreConnector.db.get(Buffer.from(coreConnector.dbKeys.Channel(counterpartyPubKey))).then(
+      this.db.get(Buffer.from(this.dbKeys.Channel(counterpartyPubKey))).then(
         () => true,
         (err) => {
           if (err.notFound) {
@@ -437,8 +443,8 @@ class Channel implements IChannel<HoprEthereum> {
 
     if (onChain != offChain) {
       if (!onChain && offChain) {
-        coreConnector.log(`Channel ${u8aToHex(channelId)} exists off-chain but not on-chain, deleting data.`)
-        await onClose(coreConnector, counterpartyPubKey)
+        this.log(`Channel ${u8aToHex(channelId)} exists off-chain but not on-chain, deleting data.`)
+        await onClose(this, counterpartyPubKey)
       } else {
         throw Error(`Channel ${u8aToHex(channelId)} exists on-chain but not off-chain.`)
       }
@@ -447,27 +453,24 @@ class Channel implements IChannel<HoprEthereum> {
     return onChain && offChain
   }
 
-  static async increaseFunds(coreConnector: HoprEthereum, counterparty: AccountId, amount: Balance): Promise<void> {
+  static async increaseFunds(this: HoprEthereum, counterparty: AccountId, amount: Balance): Promise<void> {
     try {
-      if ((await coreConnector.accountBalance).lt(amount)) {
+      if ((await this.accountBalance).lt(amount)) {
         throw Error(ERRORS.OOF_HOPR)
       }
 
       await waitForConfirmation(
         (
-          await coreConnector.signTransaction(
-            coreConnector.hoprToken.methods.send(
-              coreConnector.hoprChannels.options.address,
+          await this.signTransaction(
+            this.hoprToken.methods.send(
+              this.hoprChannels.options.address,
               amount.toString(),
-              coreConnector.web3.eth.abi.encodeParameters(
-                ['address', 'address'],
-                [coreConnector.account.toHex(), counterparty.toHex()]
-              )
+              this.web3.eth.abi.encodeParameters(['address', 'address'], [this.account.toHex(), counterparty.toHex()])
             ),
             {
-              from: coreConnector.account.toHex(),
-              to: coreConnector.hoprToken.options.address,
-              nonce: await coreConnector.nonce,
+              from: this.account.toHex(),
+              to: this.hoprToken.options.address,
+              nonce: await this.nonce,
             }
           )
         ).send()
@@ -477,51 +480,99 @@ class Channel implements IChannel<HoprEthereum> {
     }
   }
 
+  static async createDummyChannelTicket(
+    this: HoprEthereum,
+    counterParty: AccountId,
+    challenge: Hash,
+    arr?: {
+      bytes: ArrayBuffer
+      offset: number
+    }
+  ): Promise<SignedTicket> {
+    const channelId = await this.utils.getId(
+      await this.utils.pubKeyToAccountId(this.self.onChainKeyPair.publicKey),
+      counterParty
+    )
+
+    // const account = await this.coreConnector.utils.pubKeyToAccountId(counterparty)
+    // const { hashedSecret } = await this.coreConnector.hoprChannels.methods.accounts(u8aToHex(account)).call()
+
+    const winProb = new Uint8ArrayE(new BN(new Uint8Array(Hash.SIZE).fill(0xff)).div(WIN_PROB).toArray('le', Hash.SIZE))
+    // const channelId = await this.channelId
+
+    const signedTicket = new SignedTicket(arr)
+
+    const ticket = new Ticket(
+      {
+        bytes: signedTicket.buffer,
+        offset: signedTicket.ticketOffset,
+      },
+      {
+        channelId,
+        challenge,
+        // @TODO set this dynamically
+        epoch: new TicketEpoch(0),
+        amount: new Balance(0),
+        winProb,
+        onChainSecret: new Uint8ArrayE(randomBytes(Hash.SIZE)),
+      }
+    )
+
+    await this.utils.sign(await ticket.hash, this.self.privateKey, undefined, {
+      bytes: signedTicket.buffer,
+      offset: signedTicket.signatureOffset,
+    })
+
+    return signedTicket
+  }
+
   static async create(
-    coreConnector: HoprEthereum,
+    this: HoprEthereum,
     counterpartyPubKey: Uint8Array,
     _getOnChainPublicKey: (counterparty: Uint8Array) => Promise<Uint8Array>,
     channelBalance?: ChannelBalance,
     sign?: (channelBalance: ChannelBalance) => Promise<SignedChannel>
   ): Promise<Channel> {
-    const counterparty = new AccountId(await coreConnector.utils.pubKeyToAccountId(counterpartyPubKey))
+    const counterparty = await this.utils.pubKeyToAccountId(counterpartyPubKey)
     let channel: Channel
     let signedChannel: SignedChannel
 
-    if (await this.isOpen(coreConnector, counterpartyPubKey)) {
-      const record = await coreConnector.db.get(Buffer.from(coreConnector.dbKeys.Channel(counterpartyPubKey)))
+    if (!this._onChainValuesInitialized) {
+      await this.initOnchainValues()
+    }
+
+    if (await this.channel.isOpen(counterpartyPubKey)) {
+      const record = await this.db.get(Buffer.from(this.dbKeys.Channel(counterpartyPubKey)))
       signedChannel = new SignedChannel({
         bytes: record.buffer,
         offset: record.byteOffset,
       })
-      channel = new Channel(coreConnector, counterpartyPubKey, signedChannel)
+      channel = new Channel(this, counterpartyPubKey, signedChannel)
     } else if (sign != null && channelBalance != null) {
       let amount: Balance
-      if (coreConnector.utils.isPartyA(coreConnector.account, counterparty)) {
+      if (this.utils.isPartyA(this.account, counterparty)) {
         amount = channelBalance.balance_a
       } else {
         amount = new Balance(channelBalance.balance.sub(channelBalance.balance_a))
       }
 
-      await Channel.increaseFunds(coreConnector, counterparty, amount)
+      await this.channel.increaseFunds(counterparty, amount)
 
       signedChannel = await sign(channelBalance)
-      channel = new Channel(coreConnector, counterpartyPubKey, signedChannel)
+
+      channel = new Channel(this, counterpartyPubKey, signedChannel)
 
       await waitForConfirmation(
         (
-          await coreConnector.signTransaction(coreConnector.hoprChannels.methods.openChannel(counterparty.toHex()), {
-            from: coreConnector.account.toHex(),
-            to: coreConnector.hoprChannels.options.address,
-            nonce: await coreConnector.nonce,
+          await this.signTransaction(this.hoprChannels.methods.openChannel(counterparty.toHex()), {
+            from: this.account.toHex(),
+            to: this.hoprChannels.options.address,
+            nonce: await this.nonce,
           })
         ).send()
       )
 
-      await coreConnector.db.put(
-        Buffer.from(coreConnector.dbKeys.Channel(counterpartyPubKey)),
-        Buffer.from(signedChannel)
-      )
+      await this.db.put(Buffer.from(this.dbKeys.Channel(counterpartyPubKey)), Buffer.from(signedChannel))
     } else {
       throw Error('Invalid input parameters.')
     }
@@ -530,16 +581,16 @@ class Channel implements IChannel<HoprEthereum> {
   }
 
   static getAll<T, R>(
-    coreConnector: HoprEthereum,
+    this: HoprEthereum,
     onData: (channel: Channel) => Promise<T>,
     onEnd: (promises: Promise<T>[]) => R
   ): Promise<R> {
     const promises: Promise<T>[] = []
     return new Promise<R>((resolve, reject) => {
-      coreConnector.db
+      this.db
         .createReadStream({
-          gte: Buffer.from(coreConnector.dbKeys.Channel(new Uint8Array(Hash.SIZE).fill(0x00))),
-          lte: Buffer.from(coreConnector.dbKeys.Channel(new Uint8Array(Hash.SIZE).fill(0xff))),
+          gte: Buffer.from(this.dbKeys.Channel(new Uint8Array(Hash.SIZE).fill(0x00))),
+          lte: Buffer.from(this.dbKeys.Channel(new Uint8Array(Hash.SIZE).fill(0xff))),
         })
         .on('error', (err) => reject(err))
         .on('data', ({ key, value }: { key: Buffer; value: Buffer }) => {
@@ -548,17 +599,16 @@ class Channel implements IChannel<HoprEthereum> {
             offset: value.byteOffset,
           })
 
-          promises.push(onData(new Channel(coreConnector, coreConnector.dbKeys.ChannelKeyParse(key), signedChannel)))
+          promises.push(onData(new Channel(this, this.dbKeys.ChannelKeyParse(key), signedChannel)))
         })
         .on('end', () => resolve(onEnd(promises)))
     })
   }
 
-  static async closeChannels(coreConnector: HoprEthereum): Promise<Balance> {
+  static async closeChannels(this: HoprEthereum): Promise<Balance> {
     const result = new BN(0)
 
-    return Channel.getAll(
-      coreConnector,
+    return this.channel.getAll(
       (channel: Channel) =>
         channel.initiateSettlement().then(() => {
           // @TODO: add balance
@@ -572,11 +622,9 @@ class Channel implements IChannel<HoprEthereum> {
     )
   }
 
-  static handleOpeningRequest(
-    coreConnector: HoprEthereum
-  ): (source: AsyncIterable<Uint8Array>) => AsyncIterator<Uint8Array> {
-    return (source) => {
-      return (async function* () {
+  static handleOpeningRequest(this: HoprEthereum): (source: AsyncIterable<Uint8Array>) => AsyncIterable<Uint8Array> {
+    return (source: AsyncIterable<Uint8Array>) =>
+      async function* () {
         for await (const _msg of source) {
           const msg = _msg.slice()
           const signedChannel = new SignedChannel({
@@ -585,32 +633,28 @@ class Channel implements IChannel<HoprEthereum> {
           })
 
           const counterpartyPubKey = await signedChannel.signer
-          const counterparty = new AccountId(await coreConnector.utils.pubKeyToAccountId(counterpartyPubKey))
+          const counterparty = new AccountId(await this.utils.pubKeyToAccountId(counterpartyPubKey))
           const channelBalance = signedChannel.channel.balance
 
-          if (coreConnector.utils.isPartyA(coreConnector.account, counterparty)) {
+          if (this.utils.isPartyA(this.account, counterparty)) {
             if (channelBalance.balance.sub(channelBalance.balance_a).gtn(0)) {
-              await Channel.increaseFunds(
-                coreConnector,
+              await this.channel.increaseFunds(
                 counterparty,
                 new Balance(channelBalance.balance.sub(channelBalance.balance_a))
               )
             }
           } else {
             if (channelBalance.balance_a.gtn(0)) {
-              await Channel.increaseFunds(coreConnector, counterparty, channelBalance.balance_a)
+              await this.channel.increaseFunds(counterparty, channelBalance.balance_a)
             }
           }
 
           // listen for opening event and update DB
-          onceOpen(coreConnector, coreConnector.account, counterparty).then(() =>
-            onOpen(coreConnector, counterpartyPubKey, signedChannel)
-          )
+          onceOpen(this, this.account, counterparty).then(() => onOpen(this, counterpartyPubKey, signedChannel))
 
           yield signedChannel.toU8a()
         }
-      })()
-    }
+      }.call(this)
   }
 }
 

@@ -1,7 +1,7 @@
 import type { Channel as IChannel, Types } from '@hoprnet/hopr-core-connector-interface';
-import { SignedChannel, Moment, Hash, AccountId, Balance, ChannelBalance, State } from '../types';
+import { AccountId, Balance, ChannelBalance, Hash, Moment, SignedChannel, SignedTicket, State } from '../types';
 import type HoprEthereum from '..';
-declare class Channel implements IChannel<HoprEthereum> {
+declare class Channel implements IChannel {
     coreConnector: HoprEthereum;
     counterparty: Uint8Array;
     private _signedChannel;
@@ -24,11 +24,15 @@ declare class Channel implements IChannel<HoprEthereum> {
     initiateSettlement(): Promise<void>;
     getPreviousChallenges(): Promise<Hash>;
     testAndSetNonce(signature: Uint8Array): Promise<void>;
-    static isOpen(coreConnector: HoprEthereum, counterpartyPubKey: Uint8Array): Promise<boolean>;
-    static increaseFunds(coreConnector: HoprEthereum, counterparty: AccountId, amount: Balance): Promise<void>;
-    static create(coreConnector: HoprEthereum, counterpartyPubKey: Uint8Array, _getOnChainPublicKey: (counterparty: Uint8Array) => Promise<Uint8Array>, channelBalance?: ChannelBalance, sign?: (channelBalance: ChannelBalance) => Promise<SignedChannel>): Promise<Channel>;
-    static getAll<T, R>(coreConnector: HoprEthereum, onData: (channel: Channel) => Promise<T>, onEnd: (promises: Promise<T>[]) => R): Promise<R>;
-    static closeChannels(coreConnector: HoprEthereum): Promise<Balance>;
-    static handleOpeningRequest(coreConnector: HoprEthereum): (source: AsyncIterable<Uint8Array>) => AsyncIterator<Uint8Array>;
+    static isOpen(this: HoprEthereum, counterpartyPubKey: Uint8Array): Promise<boolean>;
+    static increaseFunds(this: HoprEthereum, counterparty: AccountId, amount: Balance): Promise<void>;
+    static createDummyChannelTicket(this: HoprEthereum, counterParty: AccountId, challenge: Hash, arr?: {
+        bytes: ArrayBuffer;
+        offset: number;
+    }): Promise<SignedTicket>;
+    static create(this: HoprEthereum, counterpartyPubKey: Uint8Array, _getOnChainPublicKey: (counterparty: Uint8Array) => Promise<Uint8Array>, channelBalance?: ChannelBalance, sign?: (channelBalance: ChannelBalance) => Promise<SignedChannel>): Promise<Channel>;
+    static getAll<T, R>(this: HoprEthereum, onData: (channel: Channel) => Promise<T>, onEnd: (promises: Promise<T>[]) => R): Promise<R>;
+    static closeChannels(this: HoprEthereum): Promise<Balance>;
+    static handleOpeningRequest(this: HoprEthereum): (source: AsyncIterable<Uint8Array>) => AsyncIterable<Uint8Array>;
 }
 export default Channel;

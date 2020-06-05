@@ -3,7 +3,7 @@ import BN from 'bn.js'
 import { stringToU8a, u8aToHex } from '@hoprnet/hopr-utils'
 import { Hash, TicketEpoch, Balance, SignedTicket } from '.'
 import { Uint8ArrayE } from '../types/extended'
-import { sign, verify, hash } from '../utils'
+import { hash } from '../utils'
 import type ChannelInstance from '../channel'
 
 const WIN_PROB = new BN(1)
@@ -136,7 +136,7 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
       }
     )
 
-    await sign(await ticket.hash, this.coreConnector.self.privateKey, undefined, {
+    await this.coreConnector.utils.sign(await ticket.hash, this.coreConnector.self.privateKey, undefined, {
       bytes: signedTicket.buffer,
       offset: signedTicket.signatureOffset,
     })
@@ -156,7 +156,7 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
       return false
     }
 
-    return verify(await signedTicket.ticket.hash, signedTicket.signature, await this.offChainCounterparty)
+    return this.coreConnector.utils.verify(await signedTicket.ticket.hash, signedTicket.signature, await this.offChainCounterparty)
   }
 
   // @TODO: implement submit

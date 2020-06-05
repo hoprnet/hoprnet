@@ -68,7 +68,7 @@ describe('test ticket generation and verification', function () {
 
     const signedChannel = await SignedChannel.create(counterpartysCoreConnector, undefined, { channel: channelType })
 
-    const channel = await Channel.create(
+    const channel = await Channel.create.call(
       coreConnector,
       counterpartysCoreConnector.self.publicKey,
       async () => counterpartysCoreConnector.self.onChainKeyPair.publicKey,
@@ -76,7 +76,7 @@ describe('test ticket generation and verification', function () {
       async () => {
         const result = await pipe(
           [(await SignedChannel.create(coreConnector, undefined, { channel: channelType })).subarray()],
-          Channel.handleOpeningRequest(counterpartysCoreConnector),
+          counterpartysCoreConnector.channel.handleOpeningRequest(),
           async (source: AsyncIterable<any>) => {
             let result: Uint8Array
             for await (const msg of source) {
@@ -135,7 +135,7 @@ describe('test ticket generation and verification', function () {
 
     const signedChannel = await SignedChannel.create(counterpartysCoreConnector, undefined, { channel: channelType })
 
-    const channel = await Channel.create(
+    const channel = await Channel.create.call(
       coreConnector,
       counterpartysCoreConnector.self.publicKey,
       async () => counterpartysCoreConnector.self.onChainKeyPair.publicKey,
@@ -143,7 +143,7 @@ describe('test ticket generation and verification', function () {
       async () => {
         const result = await pipe(
           [(await SignedChannel.create(coreConnector, undefined, { channel: channelType })).subarray()],
-          Channel.handleOpeningRequest(counterpartysCoreConnector),
+          counterpartysCoreConnector.channel.handleOpeningRequest(),
           async (source: AsyncIterable<any>) => {
             let result: Uint8Array
             for await (const msg of source) {

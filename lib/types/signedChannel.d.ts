@@ -2,7 +2,7 @@ import type { Types } from '@hoprnet/hopr-core-connector-interface';
 import { Signature, Channel } from '.';
 import { Uint8ArrayE } from '../types/extended';
 import type HoprEthereum from '..';
-declare class SignedChannel extends Uint8ArrayE implements Types.SignedChannel<Channel, Signature> {
+declare class SignedChannel extends Uint8ArrayE implements Types.SignedChannel {
     private _signature?;
     private _channel?;
     constructor(arr?: {
