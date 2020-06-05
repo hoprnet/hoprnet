@@ -156,7 +156,11 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
       return false
     }
 
-    return this.coreConnector.utils.verify(await signedTicket.ticket.hash, signedTicket.signature, await this.offChainCounterparty)
+    return this.coreConnector.utils.verify(
+      await signedTicket.ticket.hash,
+      signedTicket.signature,
+      await this.offChainCounterparty
+    )
   }
 
   // @TODO: implement submit

@@ -98,7 +98,6 @@ describe('test Channel class', function () {
       }
     )
 
-
     channels.set(u8aToHex(channelId), channelType)
 
     const preImage = randomBytes(32)
@@ -141,9 +140,7 @@ describe('test Channel class', function () {
       `Checks that party A considers the channel open.`
     )
     assert(
-      await counterpartysCoreConnector.channel.isOpen(
-        coreConnector.self.onChainKeyPair.publicKey
-      ),
+      await counterpartysCoreConnector.channel.isOpen(coreConnector.self.onChainKeyPair.publicKey),
       `Checks that party B considers the channel open.`
     )
 
