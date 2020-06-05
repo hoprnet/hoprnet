@@ -12,15 +12,15 @@ Before anything, you need to install Docker Desktop in your machine. Depending i
 
 ### Installing Docker on Microsoft Windows 10 Professional or Enterprise
 
-1. Please go to LINK and download Docker Desktop in your computer.
-2. Follow-up the wizard steps to ensure you have everything up and running.
-3. Ensure the installation was successful by running the following commands.
+1. Please go to [Docker ](https://www.docker.com/products/docker-desktop)and download Docker Desktop in your computer.
+2. Follow-up the wizard steps to ensure Docker is installed.
+3. Ensure the installation was successful by running `docker ps`
 
 ### Installing Docker on Microsoft Windows 10 Home
 
-1. Please go to LINK and download Docker Toolbox in your computer.
-2. Follow-up the wizard steps to ensure you have everything up and running.
-3. Ensure the installation was successful by running the following commands.
+1. Go to [Docker Hub](https://docs.docker.com/toolbox/overview/) to download Docker Toolbox in your computer.
+2. Follow-up the wizard steps to ensure Docker is installed.
+3. Ensure the installation was successful by running `docker ps`
 
 ## Step 2 - Downloading HOPR Chat image from Docker Hub
 
@@ -46,7 +46,7 @@ docker run -v %cd%/db:/app/db ^
 
 You will be welcomed by the following message.
 
-![HOPR Chat will prompt you to request funds online.](../../.gitbook/assets/image%20%282%29.png)
+![HOPR Chat will prompt you to request funds online.](../../.gitbook/assets/image%20%285%29.png)
 
 **Please copy your HOPR Chat account address,** as you will need it in further steps. **HOPR Chat** has been started bootstrapped successfully, now you need to fund your **HOPR Chat** account with some KETH, [Kovan’s Network](https://kovan-testnet.github.io/website/) testnet ETH tokens. 
 
@@ -61,7 +61,7 @@ Copy your account from Step 3, and paste it in the following websites.
 
 **HOPR Chat** will not fully initialize until your account has been funded with some Kovan ETH and HOPR. After the tokens have landed in your account, you are ready to use **HOPR Chat.** Execute the same command shared in Step 3 to see the following screen.
 
-![HOPR Chat fully working after having its account funded](../../.gitbook/assets/image%20%283%29.png)
+![HOPR Chat fully working after having its account funded](../../.gitbook/assets/image%20%281%29.png)
 
 You verify your balance from your **HOPR Chat** account, execute the command `balance` to see the following screen:
 
@@ -73,23 +73,27 @@ Your **HOPR Chat** instance is ready to be used!
 
 With **HOPR Chat** up and running, you can now send messages to any connected nodes in the network. You can have another friend send you their address, or you can also start another **HOPR Chat** instance. You will need to follow Steps 3 and 4 in this new account in case you decide to go through, but you can also find **HOPR Chat** users in our [Telegram channel](https://t.me/hoprnet).
 
-First, ensure you have enough **HOPR Tokens** to send and receive messages.
+First, ensure you have enough **HOPR Tokens** to send and receive messages. Run `balance` to see the previous screen from Step 4. Now, let's ensure there are some nodes to talk to. To do so, run `crawl`, which will show you existing users you can talk to.
 
-Next, ensure there are other individuals connected to the network.
+![The crawl command will show you other connected nodes.](../../.gitbook/assets/image%20%283%29.png)
 
-Finally, copy another connected user address and send a message to them.
+To talk to other users, copy another connected user address and send a message to them with the `send` command. This will look something like `send 16Uiu2HAmCtWxx3Ky3ZjtWj1whkezdRvMAYKU9f57CRPj2FkPtWsD`, which will trigger **HOPR Chat** to prompt you for a message to send.
+
+![Your message will be sent privately through the HOPR network](../../.gitbook/assets/image%20%286%29.png)
 
 Congratulations! You have communicated with another individual using a privacy-preserving decentralised protocol. **HOPR Chat** is right now only a Proof-of-Concept but it can already show you the capabilities the protocol can have.
 
-## Troubleshooting
+## Additional Notes
 
-### Volume Access
+### Troubleshooting volume access
 
 **HOPR Chat** requires write access to a working directory to store important data in your computer. If you didn't started your command line with elevated privileges, you might be prompted to give access to your current working directory.
 
-![Windows prompting access to write to your current directory](../../.gitbook/assets/image%20%281%29.png)
+![Windows prompting access to write to your current directory](../../.gitbook/assets/image%20%282%29.png)
 
-In case you get a message about _Unable to connect to bootstrap node,_ please provide a different one from our IMPORTANT\_LINKS\_LINK page. For other issues, please see our COMMON\_ISSUES\_LINK.
+### Bootstrap Nodes
+
+For **HOPR Chat** to work, you need to make sure you provide it with at least one **HOPR Chat** node in Bootstrap Mode. Anyone can spin a **HOPR Chat** in this mode by adding the flag `-b` at the end of the command. Feel free to use any \(or all\) of the following URLs as your `BOOTSTRAP_SERVERS` parameter in your **HOPR Chat** Docker image.
 
 
 
