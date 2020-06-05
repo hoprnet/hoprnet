@@ -61,21 +61,21 @@ const Enabling = props => {
             </h2>
             <div className="container reveal-from-top" data-reveal-delay="300">
               <div className="column">
-                At HOPR we focus on network-level and metadata privacy. To that end we develop the HOPR protocol which
-                provides privacy for any sort of data exchange.
+                The HOPR protocol provides network-level and metadata privacy for every kind of data exchange. A mixnet
+                protects the identity of both sender and recipient by routing data via multiple intermediate relay hops
+                that mix traffic.
                 <br />
                 <br />
-                HOPR is a mixnet that protects sender and recipient of a data packet beyond end-to-end encryption. This
-                privacy is established by indirectly routing data via multiple intermediate relay hops that mix traffic.
+                Payments are handled via probabilistic micropayments, our custom layer-2 scaling solution on top of the
+                Ethereum blockchain.
               </div>
               <div className="column">
-                Relay mix nodes get rewarded for their work by getting paid in HOPR tokens. Our proof-of-relay mechanism
-                protects everyone from dishonest node operators extracting funds. The payments are handled via
-                probabilistic micropayments, our custom layer-2 scaling solution ontop of the Ethereum blockchain.
+                Relay mix nodes are rewarded for their work in HOPR tokens. Our proof-of-relay mechanism protects
+                everyone from dishonest behaviour.
                 <br />
                 <br />
-                Thus HOPR provides economic incentives to run a global privacy network sustainably and at scale without
-                compromising on primacy.
+                HOPR thus provides economic incentives to run a global privacy network sustainably and at scale without
+                compromising privacy.
               </div>
             </div>
           </div>
