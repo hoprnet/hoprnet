@@ -26,7 +26,7 @@ Before anything, you need to install Docker Desktop in your machine. Depending i
 
 To use **HOPR Chat,** execute the following command from your command line \(“cmd.exe”\) or Powershell terminal. Please bear in mind this process will take some time depending on your internet connection.
 
-
+![Currently HOPR Chat is about ~0.5 GB, please be patient.](../../.gitbook/assets/render1591364106270.gif)
 
 To ensure your machine has successfully downloaded **HOPR Chat,** please run the following command.
 
