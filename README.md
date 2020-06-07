@@ -1,5 +1,5 @@
 # HOPR
----
+
 ![Terraform](https://github.com/hoprnet/hopr-devops/workflows/Terraform/badge.svg)
 ![Node.js CI](https://github.com/hoprnet/hopr-core/workflows/Node.js%20CI/badge.svg)
 
