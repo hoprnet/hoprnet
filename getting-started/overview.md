@@ -6,7 +6,7 @@ description: A general introduction to the HOPR ecosystem.
 
 The HOPR ecosystem is a two-platform network with dynamic components powering its communication and incentivization mechanisms. 
 
-In one side, we have the **HOPR Core,** the privacy-networking module able to communicate and transfer messages securely. In the other side, we have a **Payment Gateway**, which is a Distributed Ledger Technology \(DLT\) or Blockchain infrastructure able to open payment channels on behalf of nodes running in the HOPR Network.
+In one side, we have the **HOPR Core,** the privacy-networking protocol able to communicate and transfer messages securely. In the other side, we have a **Payment Gateway**, which is a Distributed Ledger Technology \(DLT\) or Blockchain infrastructure able to open payment channels on behalf of nodes running in the HOPR Network.
 
 In its first implementation, HOPR relies on the **Ethereum Blockchain** as its first payment gateway using **Ethereum Smart Contracts.** Using Ethereum Smart Contracts**,** we can open **State Channels** on behalf of the relayers while forwarding messages. Senders of the messages then attach **$HOPR** tokens in their messages, which upon successful delivery, are deducted and paid to the relayers involved.
 
