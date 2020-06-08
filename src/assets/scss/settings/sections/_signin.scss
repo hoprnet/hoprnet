@@ -1,0 +1,10 @@
+// Login / Signup forms (core/sections/_signin.scss)
+$signin--padding-t__mobile: 		null;		// signin, top padding (mobile)
+$signin--padding-b__mobile: 		null;		// signin, bottom padding (mobile)
+$signin--padding-t__desktop: 		null;		// signin, top padding (desktop)
+$signin--padding-b__desktop: 		null;		// signin, bottom padding (desktop)
+$signin-header--padding__mobile: 	32px;		// signin header, bottom padding (mobile)
+$signin-header--padding__desktop:	48px;		// signin header, bottom padding (desktop)
+$signin-item--width: 				null;		// signin item, width
+$signin-item--inner-padding-v: 		0;			// signin item, inner top and bottom padding (it inherits $tiles-item--inner-padding-v unless you replace null with a new value)
+$signin-item--inner-padding-h: 		0;			// signin item, inner left and right padding (it inherits $tiles-item--inner-padding-h unless you replace null with a new value)
