@@ -49,6 +49,11 @@ class FeaturesTiles extends React.Component {
       paragraph: undefined,
     }
 
+    const sectionHeader2 = {
+      title: 'We want you to grow:',
+      paragraph: undefined,
+    }
+
     return (
       <section {...props} className={outerClasses}>
         <div className="container">
@@ -106,7 +111,10 @@ class FeaturesTiles extends React.Component {
                   </div>
                 </a>
               </div>
+            </div>
 
+            <SectionHeader data={sectionHeader2} className="center-content" />
+            <div className={tilesClasses}>
               <div
                 className="tiles-item reveal-from-bottom"
                 data-reveal-container=".tiles-wrap"
@@ -115,6 +123,7 @@ class FeaturesTiles extends React.Component {
                 <a href="/we_are#community" target="_blank" rel="noopener noreferrer">
                   <div className="tiles-item-inner">
                     <div className="features-tiles-item-header">
+                      <p className="mt-0 mb-24 text-sm">Personal</p>
                       <div className="features-tiles-item-image mb-16">
                         <Image
                           src={require('../../assets/images/icons/love-heart-keyhole@140x140.png')}
@@ -125,7 +134,7 @@ class FeaturesTiles extends React.Component {
                       </div>
                     </div>
                     <div className="features-tiles-item-content">
-                      <h4 className="mt-0 mb-8">Hackathons & Community</h4>
+                      <h4 className="mt-0 mb-8">Hackathons + Community</h4>
                       <p className="m-0 text-sm">
                         We're organizing events to grow our network and give back to the Community
                         <br />
@@ -144,6 +153,7 @@ class FeaturesTiles extends React.Component {
                 >
                   <div className="tiles-item-inner">
                     <div className="features-tiles-item-header">
+                      <p className="mt-0 mb-24 text-sm">Professional</p>
                       <div className="features-tiles-item-image mb-16">
                         <Image
                           src={require('../../assets/images/icons/building-modern@140x140.png')}
@@ -154,7 +164,7 @@ class FeaturesTiles extends React.Component {
                       </div>
                     </div>
                     <div className="features-tiles-item-content">
-                      <h4 className="mt-0 mb-8">Your company & Our ecosystem</h4>
+                      <h4 className="mt-0 mb-8">Your company</h4>
                       <p className="m-0 text-sm">
                         HOPR is looking for partners who want to benefit from our network. If data privacy is important
                         to you, get in touch.
