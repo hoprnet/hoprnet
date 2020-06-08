@@ -104,15 +104,6 @@ declare interface Signature extends Uint8Array {
 
 declare namespace SignedChannel {
   const SIZE: number
-
-  function create(
-    coreConnector: HoprCoreConnector,
-    arr?: { bytes: ArrayBuffer; offset: number },
-    struct?: {
-      channel: Channel
-      signature?: Signature
-    }
-  ): Promise<SignedChannel>
 }
 declare interface SignedChannel extends Uint8Array {
   channel: Channel

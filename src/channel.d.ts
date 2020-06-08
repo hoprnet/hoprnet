@@ -16,7 +16,7 @@ declare namespace Channel {
   /**
    * Creates a dummy ticket that is sent to the final recipient.
    * The ticket MUST not have any value.
-   * 
+   *
    * @param counterParty AccountId of the counterparty
    * @param challenge Challenge for this ticket
    */
@@ -27,9 +27,7 @@ declare namespace Channel {
    * Returns `true` if the channel exists on-chain AND off-chain.
    * @param counterparty AccountId of the counterparty
    */
-  function isOpen(
-    counterparty: AccountId
-  ): Promise<boolean>
+  function isOpen(counterparty: AccountId): Promise<boolean>
 
   /**
    * Opens a new payment channel and initializes the on-chain data.
@@ -45,10 +43,7 @@ declare namespace Channel {
    * @param onData applied on all channel instances
    * @param onEnd composes at the end the received data
    */
-  function getAll<T, R>(
-    onData: (channel: Channel, ...props: any[]) => Promise<T>,
-    onEnd: (promises: Promise<T>[], ...props: any[]) => R,
-  ): Promise<R>
+  function getAll<T, R>(onData: (channel: Channel, ...props: any[]) => Promise<T>, onEnd: (promises: Promise<T>[], ...props: any[]) => R): Promise<R>
 
   /**
    * Fetches all channel instances from the database and initiates a settlement on
@@ -56,11 +51,12 @@ declare namespace Channel {
    * @param props additional arguments
    */
   function closeChannels(): Promise<Balance>
-  
+
   /**
-   * 
-   * @param counterParty 
-   * @param amount 
+   * Increases the balance of the payment channel with the given counterparty
+   * by the given amount
+   * @param counterParty the counterparty of the channel
+   * @param amount the amount of tokens to put into the payment channel
    */
   function increaseFunds(counterParty: AccountId, amount: Balance): Promise<void>
 
@@ -70,6 +66,22 @@ declare namespace Channel {
    * @param coreConnector coreConnector instance
    */
   function handleOpeningRequest(...props: any[]): (source: AsyncIterable<Uint8Array>) => AsyncIterable<Uint8Array>
+
+  /**
+   * Create a signedChannel instance.
+   * @param arr array containing a signedChannel
+   * @param struct desired content of the signedChannel
+   */
+  function createSignedChannel(
+    arr?: {
+      bytes: ArrayBuffer
+      offset: number
+    },
+    struct?: {
+      channel: ChannelType
+      signature?: Signature
+    }
+  ): Promise<SignedChannel> 
 }
 
 declare interface Channel {
