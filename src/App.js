@@ -2,6 +2,7 @@ import React from 'react'
 import { withRouter, Switch } from 'react-router-dom'
 import AppRoute from './utils/AppRoute'
 import ScrollReveal from './utils/ScrollReveal'
+import ScrollToTop from './utils/ScrollToTop'
 
 // Layouts
 import LayoutDefault from './layouts/LayoutDefault'
@@ -36,17 +37,20 @@ class App extends React.Component {
 
   render() {
     return (
-      <ScrollReveal
-        ref="scrollReveal"
-        children={() => (
-          <Switch>
-            <AppRoute exact path="/" component={Home} layout={LayoutDefault} />
-            <AppRoute exact path="/hopr" component={HOPR} layout={LayoutDefault} />
-            <AppRoute exact path="/we_are" component={WeAre} layout={LayoutDefault} />
-            <AppRoute exact path="/for_you" component={ForYou} layout={LayoutDefault} />
-          </Switch>
-        )}
-      />
+      <>
+        <ScrollToTop />
+        <ScrollReveal
+          ref="scrollReveal"
+          children={() => (
+            <Switch>
+              <AppRoute exact path="/" component={Home} layout={LayoutDefault} />
+              <AppRoute exact path="/hopr" component={HOPR} layout={LayoutDefault} />
+              <AppRoute exact path="/we_are" component={WeAre} layout={LayoutDefault} />
+              <AppRoute exact path="/for_you" component={ForYou} layout={LayoutDefault} />
+            </Switch>
+          )}
+        />
+      </>
     )
   }
 }
