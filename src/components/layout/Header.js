@@ -73,10 +73,20 @@ class Header extends React.Component {
       hideSignin,
       bottomOuterDivider,
       bottomDivider,
+      hasBgColor,
+      invertColor,
+      sticky,
       ...props
     } = this.props
 
-    const classes = classNames('site-header', bottomOuterDivider && 'has-bottom-divider', className)
+    const classes = classNames(
+      'site-header has-shadow',
+      bottomOuterDivider && 'has-bottom-divider',
+      hasBgColor && 'has-bg-color',
+      invertColor && 'invert-color',
+      sticky && 'sticky',
+      className
+    )
 
     return (
       <header {...props} className={classes}>
