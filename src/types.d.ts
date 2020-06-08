@@ -109,6 +109,8 @@ declare interface SignedChannel extends Uint8Array {
   channel: Channel
   signature: Signature
   signer: Promise<Uint8Array>
+
+  verify(pubKey: Uint8Array): Promise<boolean>
 }
 
 declare namespace SignedTicket {
