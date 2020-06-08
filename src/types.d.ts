@@ -1,5 +1,4 @@
 import type BN from 'bn.js'
-import type HoprCoreConnector from '.'
 
 declare namespace AccountId {
   const SIZE: number
@@ -46,6 +45,11 @@ declare namespace Channel {
 }
 declare interface Channel {
   toU8a(): Uint8Array
+
+  sign(privKey: Uint8Array, pubKey: Uint8Array, arr?: {
+    bytes: ArrayBuffer,
+    offset: number
+  }): Promise<Signature>
 }
 
 declare namespace ChannelBalance {
@@ -131,6 +135,8 @@ declare interface SignedTicket extends Uint8Array {
   ticket: Ticket
   signature: Signature
   signer: Promise<Uint8Array>
+
+  verify(pubKey: Uint8Array): Promise<boolean>
 }
 
 declare namespace State {
@@ -154,6 +160,11 @@ declare interface Ticket {
   getEmbeddedFunds(): Balance
 
   toU8a(): Uint8Array
+
+  sign(privKey: Uint8Array, pubKey: Uint8Array, arr?: {
+    bytes: ArrayBuffer,
+    offset: number
+  }): Promise<Signature>
 }
 
 declare namespace TicketEpoch {
