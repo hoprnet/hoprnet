@@ -3,6 +3,7 @@ import { withRouter, Switch } from 'react-router-dom'
 import AppRoute from './utils/AppRoute'
 import ScrollReveal from './utils/ScrollReveal'
 import ScrollToTop from './utils/ScrollToTop'
+import insertScript from './utils/insertScript'
 
 // Layouts
 import LayoutDefault from './layouts/LayoutDefault'
@@ -19,13 +20,9 @@ class App extends React.Component {
     this.refs.scrollReveal.init()
 
     // add silkworm analytics
-    let tracker = window.document.createElement('script')
-    let firstScript = window.document.getElementsByTagName('script')[0]
-    tracker.defer = true
-    tracker.setAttribute('site', 'DJJBUEUD')
-    tracker.setAttribute('spa', 'auto')
-    tracker.src = 'https://silkworm.hoprnet.io/script.js'
-    firstScript.parentNode.insertBefore(tracker, firstScript)
+    const script = insertScript('https://silkworm.hoprnet.io/script.js')
+    script.setAttribute('site', 'DJJBUEUD')
+    script.setAttribute('spa', 'auto')
   }
 
   // Route change

@@ -3,6 +3,7 @@ import PropTypes from 'prop-types'
 import GenericSection from './GenericSection'
 import SectionHeader from './partials/SectionHeader'
 import { SectionProps } from '../../utils/SectionProps'
+import insertScript from '../../utils/insertScript'
 
 const propTypes = {
   children: PropTypes.node,
@@ -17,11 +18,7 @@ const defaultProps = {
 class Jobs extends React.Component {
   componentDidMount() {
     // add jobbase iframe
-    let tracker = window.document.createElement('script')
-    let firstScript = window.document.getElementsByTagName('script')[0]
-    tracker.defer = true
-    tracker.src = 'https://hoprnet.jobbase.io/widget/iframe.js'
-    firstScript.parentNode.insertBefore(tracker, firstScript)
+    insertScript('https://hoprnet.jobbase.io/widget/iframe.js')
   }
 
   render() {

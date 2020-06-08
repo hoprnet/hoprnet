@@ -2,6 +2,7 @@ import React from 'react'
 import PropTypes from 'prop-types'
 import GenericSection from './GenericSection'
 import { SectionProps } from '../../utils/SectionProps'
+import insertScript from '../../utils/insertScript'
 
 const propTypes = {
   children: PropTypes.node,
@@ -16,13 +17,9 @@ const defaultProps = {
 class Blog extends React.Component {
   componentDidMount() {
     // add pixelpoint script
-    let tracker = window.document.createElement('script')
-    let firstScript = window.document.getElementsByTagName('script')[0]
-    tracker.defer = true
-    tracker.src = 'https://medium-widget.pixelpoint.io/widget.js'
-    firstScript.parentNode.insertBefore(tracker, firstScript)
+    const script = insertScript('https://medium-widget.pixelpoint.io/widget.js')
 
-    tracker.onload = () => {
+    script.onload = () => {
       // eslint-disable-next-line
       MediumWidget.Init({
         renderTo: '#medium-widget',
