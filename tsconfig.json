@@ -9,7 +9,8 @@
     "strict": false,
     "resolveJsonModule": true,
     "experimentalDecorators": true,
-    "declaration": true
+    "declaration": true,
+    "sourceMap": true
   },
   "include": ["src/**/*"],
   "exclude": ["lib"]

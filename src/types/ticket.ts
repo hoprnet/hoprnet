@@ -1,12 +1,8 @@
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
-import { stringToU8a, u8aToHex } from '@hoprnet/hopr-utils'
-import { Hash, TicketEpoch, Balance, SignedTicket } from '.'
+import { Hash, TicketEpoch, Balance } from '.'
 import { Uint8ArrayE } from '../types/extended'
 import { hash } from '../utils'
-import type ChannelInstance from '../channel'
-
-const WIN_PROB = new BN(1)
 
 class Ticket extends Uint8ArrayE implements Types.Ticket {
   constructor(
@@ -101,71 +97,6 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
 
   getEmbeddedFunds() {
     return this.amount.mul(new BN(this.winProb)).div(new BN(new Uint8Array(Hash.SIZE).fill(0xff)))
-  }
-
-  static async create(
-    this: ChannelInstance,
-    amount: Balance,
-    challenge: Hash,
-    arr?: {
-      bytes: ArrayBuffer
-      offset: number
-    }
-  ): Promise<SignedTicket> {
-    const account = await this.coreConnector.utils.pubKeyToAccountId(this.counterparty)
-    const { hashedSecret } = await this.coreConnector.hoprChannels.methods.accounts(u8aToHex(account)).call()
-
-    const winProb = new Uint8ArrayE(new BN(new Uint8Array(Hash.SIZE).fill(0xff)).div(WIN_PROB).toArray('le', Hash.SIZE))
-    const channelId = await this.channelId
-
-    const signedTicket = new SignedTicket(arr)
-
-    const ticket = new Ticket(
-      {
-        bytes: signedTicket.buffer,
-        offset: signedTicket.ticketOffset,
-      },
-      {
-        channelId,
-        challenge,
-        // @TODO set this dynamically
-        epoch: new TicketEpoch(0),
-        amount: new Balance(amount.toString()),
-        winProb,
-        onChainSecret: new Uint8ArrayE(stringToU8a(hashedSecret)),
-      }
-    )
-
-    await this.coreConnector.utils.sign(await ticket.hash, this.coreConnector.self.privateKey, undefined, {
-      bytes: signedTicket.buffer,
-      offset: signedTicket.signatureOffset,
-    })
-
-    return signedTicket
-  }
-
-  static async verify(this: ChannelInstance, signedTicket: SignedTicket): Promise<boolean> {
-    // @TODO: check if this is needed
-    // if ((await channel.currentBalanceOfCounterparty).add(signedTicket.ticket.amount).lt(await channel.balance)) {
-    //   return false
-    // }
-
-    try {
-      await this.testAndSetNonce(signedTicket)
-    } catch {
-      return false
-    }
-
-    return this.coreConnector.utils.verify(
-      await signedTicket.ticket.hash,
-      signedTicket.signature,
-      await this.offChainCounterparty
-    )
-  }
-
-  // @TODO: implement submit
-  static async submit(this: ChannelInstance, signedTicket: SignedTicket) {
-    throw Error('not implemented')
   }
 }
 

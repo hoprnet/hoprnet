@@ -9,6 +9,7 @@ import { Await } from './tsc/utils'
 import { cleanupPromiEvent } from './utils'
 import { createNode, getPrivKeyData, createAccountAndFund } from './utils/testing'
 import * as configs from './config'
+import { randomBytes } from 'crypto'
 
 describe('test connector', function () {
   const ganache = new Ganache()
@@ -100,4 +101,84 @@ describe('test connector', function () {
       })
     })
   })
+})
+
+describe('test connector with 0 ETH and 0 HOPR', function () {
+  const ganache = new Ganache()
+  let owner: Await<ReturnType<typeof getPrivKeyData>>
+  let web3: Web3
+  let hoprToken: HoprToken
+  let connector: HoprEthereum
+
+  before(async function () {
+    this.timeout(60e3)
+
+    await ganache.start()
+    await migrate()
+
+    owner = await getPrivKeyData(randomBytes(32))
+    web3 = new Web3(configs.DEFAULT_URI)
+    hoprToken = new web3.eth.Contract(HoprTokenAbi as any, configs.TOKEN_ADDRESSES.private)
+    connector = await createNode(owner.privKey)
+
+    await connector.start()
+  })
+
+  after(async function () {
+    await connector.stop()
+    await ganache.stop()
+  })
+
+  it('should start the connector without any crypto assets', async function () {
+    assert(connector.started, 'Connector should have been started')
+
+    assert((await connector.accountBalance).isZero(), `HOPR balance must be zero`)
+
+    assert((await connector.accountNativeBalance).isZero(), `ETH balance must be zero`)
+  })
+
+  it('should create some 0-valued dummy tickets', async function () {
+    connector.channel.createDummyChannelTicket(
+      await connector.utils.pubKeyToAccountId(await connector.utils.privKeyToPubKey(randomBytes(32))),
+      new connector.types.Hash(randomBytes(32))
+    )
+  })
+
+  // @TODO: move this test to utils
+  // context('events', function () {
+  //   it('should clear events once resolved', function () {
+  //     let numberOfEvents = 0
+
+  //     const once = () => {
+  //       return cleanupPromiEvent(hoprToken.events.Transfer(), (event) => {
+  //         return new Promise((resolve, reject) => {
+  //           event
+  //             .on('data', (data) => {
+  //               numberOfEvents++
+  //               return resolve(data)
+  //             })
+  //             .on('error', reject)
+  //         })
+  //       })
+  //     }
+
+  //     return new Promise(async (resolve, reject) => {
+  //       try {
+  //         const receiver = await createAccountAndFund(web3, hoprToken, owner)
+
+  //         await Promise.all([
+  //           once(),
+  //           hoprToken.methods.transfer(receiver.address.toHex(), 1).send({ from: owner.address.toHex() }),
+  //           hoprToken.methods.transfer(receiver.address.toHex(), 1).send({ from: owner.address.toHex() }),
+  //         ])
+  //         await hoprToken.methods.transfer(receiver.address.toHex(), 1).send({ from: owner.address.toHex() })
+
+  //         assert.equal(numberOfEvents, 1, 'check cleanupPromiEvent')
+  //         return resolve()
+  //       } catch (err) {
+  //         return reject(err)
+  //       }
+  //     })
+  //   })
+  // })
 })

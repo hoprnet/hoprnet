@@ -9,10 +9,17 @@ import pipe from 'it-pipe'
 import Web3 from 'web3'
 import { HoprToken } from '../tsc/web3/HoprToken'
 import { Await } from '../tsc/utils'
-import { AccountId, Channel as ChannelType, Balance, ChannelBalance, Hash, SignedChannel, SignedTicket } from '../types'
-import { ChannelStatus } from '../types/channel'
+import {
+  AccountId,
+  Balance,
+  Channel as ChannelType,
+  ChannelStatus,
+  ChannelBalance,
+  Hash,
+  SignedTicket,
+  SignedChannel,
+} from '../types'
 import CoreConnector from '..'
-import Channel from '../channel'
 import Ticket from '.'
 import * as configs from '../config'
 
@@ -38,6 +45,10 @@ describe('test ticket generation and verification', function () {
     await ganache.stop()
   })
 
+  afterEach(async function () {
+    await Promise.all([counterpartysCoreConnector.stop(), coreConnector.stop()])
+  })
+
   beforeEach(async function () {
     funder = await getPrivKeyData(stringToU8a(configs.FUND_ACCOUNT_PRIVATE_KEY))
     const userA = await createAccountAndFund(web3, hoprToken, funder)
@@ -45,7 +56,6 @@ describe('test ticket generation and verification', function () {
 
     coreConnector = await createNode(userA.privKey)
     counterpartysCoreConnector = await createNode(userB.privKey)
-
     await coreConnector.db.clear()
     await counterpartysCoreConnector.db.clear()
   })
@@ -66,16 +76,17 @@ describe('test ticket generation and verification', function () {
       )
     )
 
-    const signedChannel = await SignedChannel.create(counterpartysCoreConnector, undefined, { channel: channelType })
+    const signedChannel = await counterpartysCoreConnector.channel.createSignedChannel(undefined, {
+      channel: channelType,
+    })
 
-    const channel = await Channel.create.call(
-      coreConnector,
+    const channel = await coreConnector.channel.create(
       counterpartysCoreConnector.self.publicKey,
       async () => counterpartysCoreConnector.self.onChainKeyPair.publicKey,
       signedChannel.channel.balance,
       async () => {
         const result = await pipe(
-          [(await SignedChannel.create(coreConnector, undefined, { channel: channelType })).subarray()],
+          [(await coreConnector.channel.createSignedChannel(undefined, { channel: channelType })).subarray()],
           counterpartysCoreConnector.channel.handleOpeningRequest(),
           async (source: AsyncIterable<any>) => {
             let result: Uint8Array
@@ -103,7 +114,9 @@ describe('test ticket generation and verification', function () {
     const signedTicket = (await channel.ticket.create(new Balance(1), new Hash(hash))) as SignedTicket
     assert(u8aEquals(await signedTicket.signer, coreConnector.self.publicKey), `Check that signer is recoverable`)
 
-    const signedChannelCounterparty = await SignedChannel.create(coreConnector, undefined, { channel: channelType })
+    const signedChannelCounterparty = await coreConnector.channel.createSignedChannel(undefined, {
+      channel: channelType,
+    })
     assert(
       u8aEquals(await signedChannelCounterparty.signer, coreConnector.self.publicKey),
       `Check that signer is recoverable.`
@@ -133,16 +146,17 @@ describe('test ticket generation and verification', function () {
       )
     )
 
-    const signedChannel = await SignedChannel.create(counterpartysCoreConnector, undefined, { channel: channelType })
+    const signedChannel = await counterpartysCoreConnector.channel.createSignedChannel(undefined, {
+      channel: channelType,
+    })
 
-    const channel = await Channel.create.call(
-      coreConnector,
+    const channel = await coreConnector.channel.create(
       counterpartysCoreConnector.self.publicKey,
       async () => counterpartysCoreConnector.self.onChainKeyPair.publicKey,
       signedChannel.channel.balance,
       async () => {
         const result = await pipe(
-          [(await SignedChannel.create(coreConnector, undefined, { channel: channelType })).subarray()],
+          [(await coreConnector.channel.createSignedChannel(undefined, { channel: channelType })).subarray()],
           counterpartysCoreConnector.channel.handleOpeningRequest(),
           async (source: AsyncIterable<any>) => {
             let result: Uint8Array

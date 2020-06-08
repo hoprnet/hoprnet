@@ -1,10 +1,10 @@
 import secp256k1 from 'secp256k1'
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import { u8aConcat } from '@hoprnet/hopr-utils'
-import { Signature, Channel } from '.'
+import Signature from './signature'
+import Channel from './channel'
 import { Uint8ArrayE } from '../types/extended'
-import { sign, verify } from '../utils'
-import type HoprEthereum from '..'
+import { verify } from '../utils'
 
 class SignedChannel extends Uint8ArrayE implements Types.SignedChannel {
   private _signature?: Signature
@@ -61,49 +61,12 @@ class SignedChannel extends Uint8ArrayE implements Types.SignedChannel {
     })
   }
 
-  async verify(coreConnector: HoprEthereum) {
-    return await verify(this.channel.toU8a(), this.signature, coreConnector.self.publicKey)
+  async verify(publicKey: Uint8Array) {
+    return await verify(this.channel.toU8a(), this.signature, publicKey)
   }
 
   static get SIZE() {
     return Signature.SIZE + Channel.SIZE
-  }
-
-  static async create(
-    coreConnector: HoprEthereum,
-    arr?: {
-      bytes: ArrayBuffer
-      offset: number
-    },
-    struct?: {
-      channel: Channel
-      signature?: Signature
-    }
-  ): Promise<SignedChannel> {
-    const emptySignatureArray = new Uint8Array(Signature.SIZE).fill(0x00)
-    let signedChannel: SignedChannel
-
-    if (typeof arr !== 'undefined') {
-      signedChannel = new SignedChannel(arr)
-    } else if (typeof struct !== 'undefined') {
-      signedChannel = new SignedChannel(undefined, {
-        channel: struct.channel,
-        signature:
-          struct.signature ||
-          new Signature({
-            bytes: emptySignatureArray.buffer,
-            offset: emptySignatureArray.byteOffset,
-          }),
-      })
-    } else {
-      throw Error(`Invalid input parameters.`)
-    }
-
-    if (signedChannel.signature.eq(emptySignatureArray)) {
-      signedChannel.set(await sign(await signedChannel.channel.hash, coreConnector.self.privateKey), 0)
-    }
-
-    return signedChannel
   }
 }
 

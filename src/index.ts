@@ -4,19 +4,20 @@ import Web3 from 'web3'
 import { LevelUp } from 'levelup'
 import HoprChannelsAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprChannels.json'
 import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
-import HoprCoreConnector, { Types as ITypes, Channel as IChannel } from '@hoprnet/hopr-core-connector-interface'
+import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import { u8aToHex, stringToU8a, u8aEquals } from '@hoprnet/hopr-utils'
 import chalk from 'chalk'
-import Channel from './channel'
+import { ChannelFactory } from './channel'
 import Ticket from './ticket'
+import types from './types'
 import Indexer from './indexer'
 import * as dbkeys from './dbKeys'
-import * as types from './types'
 import * as utils from './utils'
 import * as constants from './constants'
 import * as config from './config'
 import { HoprChannels } from './tsc/web3/HoprChannels'
 import { HoprToken } from './tsc/web3/HoprToken'
+import AccountId from './types/accountId'
 
 export default class HoprEthereum implements HoprCoreConnector {
   private _status: 'uninitialized' | 'initialized' | 'started' | 'stopped' = 'uninitialized'
@@ -32,7 +33,8 @@ export default class HoprEthereum implements HoprCoreConnector {
   public signTransaction: ReturnType<typeof utils.TransactionSigner>
   public log: ReturnType<typeof utils['Log']>
 
-  public channel: typeof IChannel
+  public channel: ChannelFactory
+  public types: types
 
   constructor(
     public db: LevelUp,
@@ -44,7 +46,7 @@ export default class HoprEthereum implements HoprCoreConnector {
         publicKey?: Uint8Array
       }
     },
-    public account: types.AccountId,
+    public account: AccountId,
     public web3: Web3,
     public network: addresses.Networks,
     public hoprChannels: HoprChannels,
@@ -53,15 +55,9 @@ export default class HoprEthereum implements HoprCoreConnector {
       debug: boolean
     }
   ) {
-    this.channel = {
-      isOpen: Channel.isOpen.bind(this),
-      increaseFunds: Channel.increaseFunds.bind(this),
-      createDummyChannelTicket: Channel.createDummyChannelTicket.bind(this),
-      create: Channel.create.bind(this),
-      getAll: Channel.getAll.bind(this),
-      closeChannels: Channel.closeChannels.bind(this),
-      handleOpeningRequest: Channel.handleOpeningRequest.bind(this),
-    }
+    this.types = new types()
+    this.channel = new ChannelFactory(this)
+
     this._onChainValuesInitialized = false
     this.signTransaction = utils.TransactionSigner(web3, self.privateKey)
     this.log = utils.Log()
@@ -69,7 +65,6 @@ export default class HoprEthereum implements HoprCoreConnector {
 
   readonly dbKeys = dbkeys
   readonly utils = utils
-  readonly types = types
   readonly constants = constants
   readonly CHAIN_NAME = 'HOPR on Ethereum'
   readonly ticket = Ticket
@@ -123,7 +118,7 @@ export default class HoprEthereum implements HoprCoreConnector {
     return this.hoprToken.methods
       .balanceOf(this.account.toHex())
       .call()
-      .then((res) => new types.Balance(res))
+      .then((res) => new this.types.Balance(res))
   }
 
   /**
@@ -131,7 +126,7 @@ export default class HoprEthereum implements HoprCoreConnector {
    * @returns a promise resolved to Balance
    */
   get accountNativeBalance() {
-    return this.web3.eth.getBalance(this.account.toHex()).then((res) => new types.NativeBalance(res))
+    return this.web3.eth.getBalance(this.account.toHex()).then((res) => new this.types.NativeBalance(res))
   }
 
   // get ticketEpoch(): Promise<TicketEpoch> {}
@@ -288,7 +283,7 @@ export default class HoprEthereum implements HoprCoreConnector {
         .call()
         .then((res) => stringToU8a(res.hashedSecret))
         .then((secret: Uint8Array) => {
-          if (u8aEquals(secret, new Uint8Array(types.Hash.SIZE).fill(0x00))) {
+          if (u8aEquals(secret, new Uint8Array(this.types.Hash.SIZE).fill(0x00))) {
             return undefined
           }
 
@@ -436,7 +431,7 @@ export default class HoprEthereum implements HoprCoreConnector {
 
     const web3 = new Web3(provider)
 
-    const account = new types.AccountId(address)
+    const account = new AccountId(address)
     const network = await utils.getNetworkId(web3)
 
     if (typeof config.CHANNELS_ADDRESSES[network] === 'undefined') {

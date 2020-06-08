@@ -1,15 +1,17 @@
 import type { addresses } from '@hoprnet/hopr-ethereum';
 import Web3 from 'web3';
 import { LevelUp } from 'levelup';
-import HoprCoreConnector, { Channel as IChannel } from '@hoprnet/hopr-core-connector-interface';
+import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface';
+import { ChannelFactory } from './channel';
 import Ticket from './ticket';
+import types from './types';
 import Indexer from './indexer';
 import * as dbkeys from './dbKeys';
-import * as types from './types';
 import * as utils from './utils';
 import * as constants from './constants';
 import { HoprChannels } from './tsc/web3/HoprChannels';
 import { HoprToken } from './tsc/web3/HoprToken';
+import AccountId from './types/accountId';
 export default class HoprEthereum implements HoprCoreConnector {
     db: LevelUp;
     self: {
@@ -20,7 +22,7 @@ export default class HoprEthereum implements HoprCoreConnector {
             publicKey?: Uint8Array;
         };
     };
-    account: types.AccountId;
+    account: AccountId;
     web3: Web3;
     network: addresses.Networks;
     hoprChannels: HoprChannels;
@@ -36,7 +38,8 @@ export default class HoprEthereum implements HoprCoreConnector {
     private _nonce?;
     signTransaction: ReturnType<typeof utils.TransactionSigner>;
     log: ReturnType<typeof utils['Log']>;
-    channel: typeof IChannel;
+    channel: ChannelFactory;
+    types: types;
     constructor(db: LevelUp, self: {
         privateKey: Uint8Array;
         publicKey: Uint8Array;
@@ -44,12 +47,11 @@ export default class HoprEthereum implements HoprCoreConnector {
             privateKey?: Uint8Array;
             publicKey?: Uint8Array;
         };
-    }, account: types.AccountId, web3: Web3, network: addresses.Networks, hoprChannels: HoprChannels, hoprToken: HoprToken, options: {
+    }, account: AccountId, web3: Web3, network: addresses.Networks, hoprChannels: HoprChannels, hoprToken: HoprToken, options: {
         debug: boolean;
     });
     readonly dbKeys: typeof dbkeys;
     readonly utils: typeof utils;
-    readonly types: typeof types;
     readonly constants: typeof constants;
     readonly CHAIN_NAME = "HOPR on Ethereum";
     readonly ticket: typeof Ticket;
@@ -62,12 +64,12 @@ export default class HoprEthereum implements HoprCoreConnector {
      * Returns the current balances of the account associated with this node (HOPR)
      * @returns a promise resolved to Balance
      */
-    get accountBalance(): Promise<types.Balance>;
+    get accountBalance(): Promise<import("./types/balance").default>;
     /**
      * Returns the current native balance (ETH)
      * @returns a promise resolved to Balance
      */
-    get accountNativeBalance(): Promise<types.NativeBalance>;
+    get accountNativeBalance(): Promise<import("./types/nativeBalance").default>;
     /**
      * Initialises the connector, e.g. connect to a blockchain node.
      */

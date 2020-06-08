@@ -1,5 +1,6 @@
-import type { Channel as IChannel, Types } from '@hoprnet/hopr-core-connector-interface';
-import { AccountId, Balance, ChannelBalance, Hash, Moment, SignedChannel, SignedTicket, State } from '../types';
+import type { Channel as IChannel } from '@hoprnet/hopr-core-connector-interface';
+import { AccountId, Balance, ChannelBalance, Channel as ChannelType, Hash, Moment, Signature, SignedChannel, SignedTicket, State } from '../types';
+import TicketFactory from './ticketFactory';
 import type HoprEthereum from '..';
 declare class Channel implements IChannel {
     coreConnector: HoprEthereum;
@@ -7,7 +8,7 @@ declare class Channel implements IChannel {
     private _signedChannel;
     private _settlementWindow?;
     private _channelId?;
-    ticket: typeof Types.Ticket;
+    ticket: TicketFactory;
     constructor(coreConnector: HoprEthereum, counterparty: Uint8Array, signedChannel: SignedChannel);
     private onceClosed;
     private onClose;
@@ -24,15 +25,27 @@ declare class Channel implements IChannel {
     initiateSettlement(): Promise<void>;
     getPreviousChallenges(): Promise<Hash>;
     testAndSetNonce(signature: Uint8Array): Promise<void>;
-    static isOpen(this: HoprEthereum, counterpartyPubKey: Uint8Array): Promise<boolean>;
-    static increaseFunds(this: HoprEthereum, counterparty: AccountId, amount: Balance): Promise<void>;
-    static createDummyChannelTicket(this: HoprEthereum, counterParty: AccountId, challenge: Hash, arr?: {
+}
+declare class ChannelFactory {
+    private coreConnector;
+    constructor(coreConnector: HoprEthereum);
+    increaseFunds(counterparty: AccountId, amount: Balance): Promise<void>;
+    isOpen(counterpartyPubKey: Uint8Array): Promise<boolean>;
+    createDummyChannelTicket(counterParty: AccountId, challenge: Hash, arr?: {
         bytes: ArrayBuffer;
         offset: number;
     }): Promise<SignedTicket>;
-    static create(this: HoprEthereum, counterpartyPubKey: Uint8Array, _getOnChainPublicKey: (counterparty: Uint8Array) => Promise<Uint8Array>, channelBalance?: ChannelBalance, sign?: (channelBalance: ChannelBalance) => Promise<SignedChannel>): Promise<Channel>;
-    static getAll<T, R>(this: HoprEthereum, onData: (channel: Channel) => Promise<T>, onEnd: (promises: Promise<T>[]) => R): Promise<R>;
-    static closeChannels(this: HoprEthereum): Promise<Balance>;
-    static handleOpeningRequest(this: HoprEthereum): (source: AsyncIterable<Uint8Array>) => AsyncIterable<Uint8Array>;
+    createSignedChannel(arr?: {
+        bytes: ArrayBuffer;
+        offset: number;
+    }, struct?: {
+        channel: ChannelType;
+        signature?: Signature;
+    }): Promise<SignedChannel>;
+    create(counterpartyPubKey: Uint8Array, _getOnChainPublicKey: (counterparty: Uint8Array) => Promise<Uint8Array>, channelBalance?: ChannelBalance, sign?: (channelBalance: ChannelBalance) => Promise<SignedChannel>): Promise<Channel>;
+    getAll<T, R>(onData: (channel: Channel) => Promise<T>, onEnd: (promises: Promise<T>[]) => R): Promise<R>;
+    closeChannels(): Promise<Balance>;
+    handleOpeningRequest(): (source: AsyncIterable<Uint8Array>) => AsyncIterable<Uint8Array>;
 }
+export { ChannelFactory };
 export default Channel;

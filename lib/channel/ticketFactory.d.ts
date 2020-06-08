@@ -1,7 +1,7 @@
 import { Hash, Balance, SignedTicket } from '../types';
-import type Channel from '.';
-declare class TicketUtils {
-    private _channel;
+import type Channel from '../channel';
+declare class TicketFactory {
+    channel: Channel;
     constructor(channel: Channel);
     create(amount: Balance, challenge: Hash, arr?: {
         bytes: ArrayBuffer;
@@ -11,4 +11,4 @@ declare class TicketUtils {
     submit(signedTicket: SignedTicket): Promise<void>;
     get SIZE(): number;
 }
-export default TicketUtils;
+export default TicketFactory;
