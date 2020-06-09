@@ -104,6 +104,6 @@ declare interface HoprCoreConnector {
 
 type HoprCoreConnectorStatic = typeof HoprCoreConnector
 
-export { Utils, DbKeys, Types, Channel, Constants, Indexer, HoprCoreConnectorStatic }
+export { Utils, Types, DbKeys, Constants, Channel, Tickets, Indexer, HoprCoreConnectorStatic }
 
 export default HoprCoreConnector
