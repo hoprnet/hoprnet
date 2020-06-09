@@ -13,10 +13,6 @@ class Signature extends Uint8ArrayE implements Types.Signature {
       recovery: number
     }
   ) {
-    if (arr == null && struct == null) {
-      throw Error(`Invalid constructor arguments.`)
-    }
-
     if (arr == null) {
       super(Signature.SIZE)
     } else {

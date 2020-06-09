@@ -3,6 +3,7 @@ import { u8aConcat } from '@hoprnet/hopr-utils'
 import secp256k1 from 'secp256k1'
 import { Signature, Ticket } from '../types'
 import { Uint8ArrayE } from '../types/extended'
+import { verify } from '../utils'
 
 class SignedTicket extends Uint8ArrayE implements Types.SignedTicket {
   private _ticket?: Ticket
@@ -14,8 +15,8 @@ class SignedTicket extends Uint8ArrayE implements Types.SignedTicket {
       offset: number
     },
     struct?: {
-      signature: Signature
-      ticket: Ticket
+      signature?: Signature
+      ticket?: Ticket
     }
   ) {
     if (arr == null) {
@@ -25,19 +26,21 @@ class SignedTicket extends Uint8ArrayE implements Types.SignedTicket {
     }
 
     if (struct != null) {
-      const ticket = struct.ticket.toU8a()
-
-      this.set(struct.signature, this.signatureOffset - this.byteOffset)
-      this._signature = struct.signature
-
-      if (ticket.length == Ticket.SIZE) {
-        this.set(struct.ticket, this.ticketOffset - this.byteOffset)
-      } else if (ticket.length < Ticket.SIZE) {
-        this.set(u8aConcat(ticket, new Uint8Array(Ticket.SIZE - ticket.length)), this.ticketOffset - this.byteOffset)
-      } else {
-        throw Error(`Ticket is too big by ${ticket.length - Ticket.SIZE} elements.`)
+      if (struct.signature != null) {
+        this.set(struct.signature, this.signatureOffset - this.byteOffset)
       }
-      this._ticket = struct.ticket
+
+      if (struct.ticket != null) {
+        const ticket = struct.ticket.toU8a()
+
+        if (ticket.length == Ticket.SIZE) {
+          this.set(ticket, this.ticketOffset - this.byteOffset)
+        } else if (ticket.length < Ticket.SIZE) {
+          this.set(u8aConcat(ticket, new Uint8Array(Ticket.SIZE - ticket.length)), this.ticketOffset - this.byteOffset)
+        } else {
+          throw Error(`Ticket is too big by ${ticket.length - Ticket.SIZE} elements.`)
+        }
+      }
     }
   }
 
@@ -74,12 +77,15 @@ class SignedTicket extends Uint8ArrayE implements Types.SignedTicket {
   get signer(): Promise<Uint8Array> {
     return new Promise(async (resolve, reject) => {
       try {
-        const signer = secp256k1.ecdsaRecover(this.signature.signature, this.signature.recovery, await this.ticket.hash)
-        return resolve(signer)
+        resolve(secp256k1.ecdsaRecover(this.signature.signature, this.signature.recovery, await this.ticket.hash))
       } catch (err) {
-        return reject(err)
+        reject(err)
       }
     })
+  }
+
+  async verify(pubKey: Uint8Array): Promise<boolean> {
+    return verify(await this.ticket.hash, this.signature, pubKey)
   }
 
   static get SIZE() {

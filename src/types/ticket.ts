@@ -2,7 +2,8 @@ import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
 import { Hash, TicketEpoch, Balance } from '.'
 import { Uint8ArrayE } from '../types/extended'
-import { hash } from '../utils'
+import { hash, sign } from '../utils'
+import { Signature } from '@hoprnet/hopr-core-connector-interface/src/types'
 
 class Ticket extends Uint8ArrayE implements Types.Ticket {
   constructor(
@@ -97,6 +98,17 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
 
   getEmbeddedFunds() {
     return this.amount.mul(new BN(this.winProb)).div(new BN(new Uint8Array(Hash.SIZE).fill(0xff)))
+  }
+
+  async sign(
+    privKey: Uint8Array,
+    pubKey: Uint8Array,
+    arr?: {
+      bytes: ArrayBuffer
+      offset: number
+    }
+  ): Promise<Signature> {
+    return await sign(await this.hash, privKey, undefined, arr)
   }
 }
 

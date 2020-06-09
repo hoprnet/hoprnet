@@ -2,7 +2,8 @@ import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import { u8aConcat } from '@hoprnet/hopr-utils'
 import { ChannelBalance, Moment } from '.'
 import { Uint8ArrayE } from '../types/extended'
-import { hash, stateCountToStatus } from '../utils'
+import { hash, stateCountToStatus, sign } from '../utils'
+import { Signature } from '@hoprnet/hopr-core-connector-interface/src/types'
 
 export enum ChannelStatus {
   UNINITIALISED,
@@ -52,6 +53,17 @@ class Channel extends Uint8ArrayE implements Types.Channel {
 
   get hash() {
     return hash(this.toU8a())
+  }
+
+  async sign(
+    privKey: Uint8Array,
+    pubKey: Uint8Array,
+    arr?: {
+      bytes: ArrayBuffer
+      offset: number
+    }
+  ): Promise<Signature> {
+    return await sign(await this.hash, privKey, undefined, arr)
   }
 
   static get SIZE() {

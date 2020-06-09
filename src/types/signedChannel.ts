@@ -1,6 +1,5 @@
 import secp256k1 from 'secp256k1'
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
-import { u8aConcat } from '@hoprnet/hopr-utils'
 import Signature from './signature'
 import Channel from './channel'
 import { Uint8ArrayE } from '../types/extended'
@@ -16,17 +15,29 @@ class SignedChannel extends Uint8ArrayE implements Types.SignedChannel {
       offset: number
     },
     struct?: {
-      signature: Signature
-      channel: Channel
+      signature?: Signature
+      channel?: Channel
     }
   ) {
-    if (arr != null && struct == null) {
-      super(arr.bytes, arr.offset, SignedChannel.SIZE)
-    } else if (arr == null && struct != null) {
-      super(u8aConcat(struct.signature, struct.channel))
+    if (arr == null) {
+      super(SignedChannel.SIZE)
     } else {
-      throw Error(`Invalid constructor arguments.`)
+      super(arr.bytes, arr.offset, SignedChannel.SIZE)
     }
+
+    if (struct != null) {
+      if (struct.channel != null) {
+        this.set(struct.channel.toU8a(), this.channelOffset - this.byteOffset)
+      }
+
+      if (struct.signature) {
+        this.set(struct.signature, this.signatureOffset - this.byteOffset)
+      }
+    }
+  }
+
+  get signatureOffset(): number {
+    return this.byteOffset
   }
 
   get signature() {
@@ -35,11 +46,15 @@ class SignedChannel extends Uint8ArrayE implements Types.SignedChannel {
 
       this._signature = new Signature({
         bytes: signature.buffer,
-        offset: signature.byteOffset,
+        offset: this.signatureOffset,
       })
     }
 
     return this._signature
+  }
+
+  get channelOffset(): number {
+    return this.byteOffset + Signature.SIZE
   }
 
   get channel() {
@@ -48,7 +63,7 @@ class SignedChannel extends Uint8ArrayE implements Types.SignedChannel {
 
       this._channel = new Channel({
         bytes: channel.buffer,
-        offset: channel.byteOffset,
+        offset: this.channelOffset,
       })
     }
 
@@ -56,13 +71,17 @@ class SignedChannel extends Uint8ArrayE implements Types.SignedChannel {
   }
 
   get signer(): Promise<Uint8Array> {
-    return this.channel.hash.then((channelHash) => {
-      return secp256k1.ecdsaRecover(this.signature.signature, this.signature.recovery, channelHash)
+    return new Promise<Uint8Array>(async (resolve, reject) => {
+      try {
+        resolve(secp256k1.ecdsaRecover(this.signature.signature, this.signature.recovery, await this.channel.hash))
+      } catch (err) {
+        reject(err)
+      }
     })
   }
 
   async verify(publicKey: Uint8Array) {
-    return await verify(this.channel.toU8a(), this.signature, publicKey)
+    return await verify(await this.channel.hash, this.signature, publicKey)
   }
 
   static get SIZE() {

@@ -1,6 +1,6 @@
 import assert from 'assert'
 import { randomBytes } from 'crypto'
-import { stringToU8a } from '@hoprnet/hopr-utils'
+import { stringToU8a, randomInteger } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import { AccountId, Ticket, Hash, TicketEpoch, Balance, Signature, SignedTicket } from '.'
 import * as utils from '../utils'
@@ -32,17 +32,24 @@ describe('test signedTicket construction', function () {
     const ticketData = await generateTicketData()
 
     const ticket = new Ticket(undefined, ticketData)
-    const signature = await utils.sign(await ticket.hash, userA).then((res) => {
-      return new Signature({
-        bytes: res.buffer,
-        offset: res.byteOffset,
-      })
+
+    const signature = new Signature()
+
+    await ticket.sign(userA, undefined, {
+      bytes: signature.buffer,
+      offset: signature.byteOffset,
     })
 
     const signedTicket = new SignedTicket(undefined, {
       signature,
       ticket,
     })
+
+    const userAPubKey = await utils.privKeyToPubKey(userA)
+
+    assert(await signedTicket.verify(userAPubKey))
+
+    assert(new Hash(await signedTicket.signer).eq(userAPubKey), 'signer incorrect')
 
     assert(signedTicket.ticket.channelId.eq(ticketData.channelId), 'wrong channelId')
     assert(signedTicket.ticket.challenge.eq(ticketData.challenge), 'wrong challenge')
@@ -56,21 +63,29 @@ describe('test signedTicket construction', function () {
     const ticketData = await generateTicketData()
 
     const ticket = new Ticket(undefined, ticketData)
-    const signature = await utils.sign(await ticket.hash, userA).then((res) => {
-      return new Signature({
-        bytes: res.buffer,
-        offset: res.byteOffset,
-      })
-    })
 
     const signedTicketA = new SignedTicket(undefined, {
-      signature,
       ticket,
     })
+
+    ticket.sign(userA, undefined, {
+      bytes: signedTicketA.buffer,
+      offset: signedTicketA.signatureOffset,
+    })
+
+    const userAPubKey = await utils.privKeyToPubKey(userA)
+
+    assert(await signedTicketA.verify(userAPubKey))
+
     const signedTicketB = new SignedTicket({
       bytes: signedTicketA.buffer,
       offset: signedTicketA.byteOffset,
     })
+
+    assert(await signedTicketB.verify(userAPubKey))
+
+    assert(new Hash(await signedTicketA.signer).eq(userAPubKey), 'signer incorrect')
+    assert(new Hash(await signedTicketB.signer).eq(userAPubKey), 'signer incorrect')
 
     assert(signedTicketB.ticket.channelId.eq(ticketData.channelId), 'wrong channelId')
     assert(signedTicketB.ticket.challenge.eq(ticketData.challenge), 'wrong challenge')
@@ -80,25 +95,44 @@ describe('test signedTicket construction', function () {
     assert(signedTicketB.ticket.onChainSecret.eq(ticketData.onChainSecret), 'wrong onChainSecret')
   })
 
-  it('should verify signedTicket', async function () {
+  it('should create new signedTicket out of continous memory', async function () {
     const ticketData = await generateTicketData()
+
     const ticket = new Ticket(undefined, ticketData)
 
-    const signature = await utils.sign(await ticket.hash, userA).then((res) => {
-      return new Signature({
-        bytes: res.buffer,
-        offset: res.byteOffset,
-      })
+    const signature = new Signature()
+
+    await ticket.sign(userA, undefined, {
+      bytes: signature.buffer,
+      offset: signature.byteOffset,
     })
 
-    const signedTicket = new SignedTicket(undefined, {
-      signature,
-      ticket,
-    })
+    const offset = randomInteger(1, 31)
 
-    const signer = new Hash(await signedTicket.signer)
+    const array = new Uint8Array(SignedTicket.SIZE + offset).fill(0x00)
+
+    const signedTicket = new SignedTicket(
+      {
+        bytes: array.buffer,
+        offset: array.byteOffset + offset,
+      },
+      {
+        ticket,
+        signature,
+      }
+    )
+
     const userAPubKey = await utils.privKeyToPubKey(userA)
 
-    assert(signer.eq(userAPubKey), 'signer incorrect')
+    assert(await signedTicket.verify(userAPubKey))
+
+    assert(new Hash(await signedTicket.signer).eq(userAPubKey), 'signer incorrect')
+
+    assert(signedTicket.ticket.channelId.eq(ticketData.channelId), 'wrong channelId')
+    assert(signedTicket.ticket.challenge.eq(ticketData.challenge), 'wrong challenge')
+    assert(signedTicket.ticket.epoch.eq(ticketData.epoch), 'wrong epoch')
+    assert(signedTicket.ticket.amount.eq(ticketData.amount), 'wrong amount')
+    assert(signedTicket.ticket.winProb.eq(ticketData.winProb), 'wrong winProb')
+    assert(signedTicket.ticket.onChainSecret.eq(ticketData.onChainSecret), 'wrong onChainSecret')
   })
 })
