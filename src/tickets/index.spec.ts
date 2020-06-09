@@ -13,7 +13,7 @@ import { AccountId, Channel as ChannelType, Balance, ChannelBalance, Hash, Signe
 import { ChannelStatus } from '../types/channel'
 import CoreConnector from '..'
 import Channel from '../channel'
-import Ticket from '.'
+import Tickets from '.'
 import * as configs from '../config'
 
 describe('test ticket generation and verification', function () {
@@ -109,7 +109,7 @@ describe('test ticket generation and verification', function () {
       `Check that signer is recoverable.`
     )
 
-    await Ticket.store(coreConnector, channelId, signedTicket)
+    await Tickets.store(coreConnector, channelId, signedTicket)
 
     const storedSignedTicket = new Uint8Array(
       await coreConnector.db.get(Buffer.from(coreConnector.dbKeys.Ticket(channelId, signedTicket.ticket.challenge)))
@@ -170,12 +170,12 @@ describe('test ticket generation and verification', function () {
     const signedTicketB = (await channel.ticket.create(channel, new Balance(1), new Hash(hashB))) as SignedTicket
 
     await Promise.all([
-      Ticket.store(coreConnector, channelId, signedTicketA),
-      Ticket.store(coreConnector, channelId, signedTicketB),
-      Ticket.store(coreConnector, new Hash(new Uint8Array(Hash.SIZE).fill(0x00)), signedTicketB),
+      Tickets.store(coreConnector, channelId, signedTicketA),
+      Tickets.store(coreConnector, channelId, signedTicketB),
+      Tickets.store(coreConnector, new Hash(new Uint8Array(Hash.SIZE).fill(0x00)), signedTicketB),
     ])
 
-    const storedSignedTickets = await Ticket.get(coreConnector, channelId)
+    const storedSignedTickets = await Tickets.get(coreConnector, channelId)
     assert(storedSignedTickets.size === 2, `Check getting signedTickets`)
 
     const storedSignedTicketA = storedSignedTickets.get(u8aToHex(signedTicketA.ticket.challenge))

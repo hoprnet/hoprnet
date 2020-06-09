@@ -2,7 +2,7 @@ import type { addresses } from '@hoprnet/hopr-ethereum';
 import Web3 from 'web3';
 import { LevelUp } from 'levelup';
 import HoprCoreConnector, { Types as ITypes, Channel as IChannel, Constants as IConstants } from '@hoprnet/hopr-core-connector-interface';
-import Ticket from './ticket';
+import Tickets from './tickets';
 import Indexer from './indexer';
 import * as dbkeys from './dbKeys';
 import * as types from './types';
@@ -51,7 +51,7 @@ export default class HoprEthereum implements HoprCoreConnector {
     readonly constants: typeof constants;
     readonly channel: typeof IChannel;
     readonly CHAIN_NAME = "HOPR on Ethereum";
-    readonly ticket: typeof Ticket;
+    readonly tickets: typeof Tickets;
     readonly indexer: Indexer;
     /**
      * @returns the current balances of the account associated with this node (HOPR)

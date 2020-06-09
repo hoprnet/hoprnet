@@ -12,7 +12,7 @@ import HoprCoreConnector, {
 import { u8aToHex, stringToU8a, u8aEquals } from '@hoprnet/hopr-utils'
 import chalk from 'chalk'
 import Channel from './channel'
-import Ticket from './ticket'
+import Tickets from './tickets'
 import Indexer from './indexer'
 import * as dbkeys from './dbKeys'
 import * as types from './types'
@@ -64,7 +64,7 @@ export default class HoprEthereum implements HoprCoreConnector {
   readonly constants = constants
   readonly channel = Channel as typeof IChannel
   readonly CHAIN_NAME = 'HOPR on Ethereum'
-  readonly ticket = Ticket
+  readonly tickets = Tickets
   readonly indexer = new Indexer(this)
 
   /**
