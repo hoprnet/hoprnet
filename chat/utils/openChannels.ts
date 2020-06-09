@@ -10,12 +10,23 @@ import { isBootstrapNode } from './isBootstrapNode'
  * Get node's peers.
  * @returns an array of peer ids
  */
-export function getPeers(node: Hopr<HoprCoreConnector>): PeerId[] {
-  return Array.from(node.peerStore.peers.values())
-    .map(peerInfo => peerInfo.id)
-    .filter(peerId => {
+export function getPeers(
+  node: Hopr<HoprCoreConnector>,
+  ops: {
+    noBootstrapNodes: boolean
+  } = {
+    noBootstrapNodes: false,
+  }
+): PeerId[] {
+  let peers = Array.from(node.peerStore.peers.values()).map(peerInfo => peerInfo.id)
+
+  if (ops.noBootstrapNodes) {
+    peers = peers.filter(peerId => {
       return !isBootstrapNode(node, peerId)
     })
+  }
+
+  return peers
 }
 
 /**
@@ -67,7 +78,9 @@ export async function getPartyOpenChannels(node: Hopr<HoprCoreConnector>, party:
 
   // get available nodes
   const peers = await Promise.all(
-    getPeers(node).map(async peer => {
+    getPeers(node, {
+      noBootstrapNodes: true,
+    }).map(async peer => {
       return {
         peer,
         accountId: await utils.pubKeyToAccountId(peer.pubKey.marshal()),

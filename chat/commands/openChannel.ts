@@ -116,7 +116,9 @@ export default class OpenChannel implements AbstractCommand {
 
   async complete(line: string, cb: (err: Error | undefined, hits: [string[], string]) => void, query?: string) {
     const peersWithOpenChannel = await getOpenChannels(this.node, this.node.peerInfo.id)
-    const allPeers = getPeers(this.node)
+    const allPeers = getPeers(this.node, {
+      noBootstrapNodes: true,
+    })
 
     const peers = allPeers
       // filter peers that we already have an open channel with

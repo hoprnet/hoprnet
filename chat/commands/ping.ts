@@ -4,7 +4,7 @@ import type AbstractCommand from './abstractCommand'
 
 import type PeerId from 'peer-id'
 
-import { checkPeerIdInput, isBootstrapNode } from '../utils'
+import { checkPeerIdInput, isBootstrapNode, getPeers } from '../utils'
 import chalk from 'chalk'
 
 export default class Ping implements AbstractCommand {
@@ -37,17 +37,12 @@ export default class Ping implements AbstractCommand {
   }
 
   complete(line: string, cb: (err: Error | undefined, hits: [string[], string]) => void, query?: string): void {
-    const peerInfos: string[] = []
-    for (const peerInfo of this.node.peerStore.peers.values()) {
-      if (!query || peerInfo.id.toB58String().startsWith(query)) {
-        peerInfos.push(peerInfo.id.toB58String())
-      }
-    }
+    const peerIds = getPeers(this.node).map(peerId => peerId.toB58String())
 
-    if (!peerInfos.length) {
+    if (!peerIds.length) {
       return cb(undefined, [[''], line])
     }
 
-    return cb(undefined, [peerInfos.map((peerInfo: string) => `ping ${peerInfo}`), line])
+    return cb(undefined, [peerIds.map((peerId: string) => `ping ${peerId}`), line])
   }
 }

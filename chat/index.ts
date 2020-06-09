@@ -1,7 +1,7 @@
 import dotenv from 'dotenv'
 // @ts-ignore
 const dotenvExpand = require('dotenv-expand')
-const packageJSON = require('./package.json');
+const packageJSON = require('./package.json')
 
 const env = dotenv.config()
 dotenvExpand(env)
@@ -109,10 +109,11 @@ function tabCompletion(commands: Commands) {
         await commands.openChannel.complete(line, cb, query)
         break
       case 'close':
-        await commands.closeChannel.complete(line, cb, query)
+        commands.closeChannel.complete(line, cb, query)
         break
       case 'ping': {
-        await commands.ping.complete(line, cb, query)
+        commands.ping.complete(line, cb, query)
+        break
       }
       default:
         const hits = keywords.reduce((acc: string[], keyword: [string, string]) => {

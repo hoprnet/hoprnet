@@ -68,7 +68,9 @@ export default class SendMessage implements AbstractCommand {
     cb: (err: Error | undefined, hits: [string[], string]) => void,
     query?: string
   ): Promise<void> {
-    const peerIds = getPeers(this.node).map(peerId => peerId.toB58String())
+    const peerIds = getPeers(this.node, {
+      noBootstrapNodes: true,
+    }).map(peerId => peerId.toB58String())
     const validPeerIds = query ? peerIds.filter(peerId => peerId.startsWith(query)) : peerIds
 
     if (!validPeerIds.length) {
