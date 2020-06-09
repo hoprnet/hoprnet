@@ -3,9 +3,10 @@ import type HoprCoreConnector from '.'
 
 declare namespace Tickets {
   /**
-   * Creates a Channel instance from the database.
-   * @param counterparty AccountId of the counterparty
-   * @param props additional arguments
+   * Stores signed ticket using channelId & challange.
+   * @param coreConnector coreConnector instance
+   * @param channelId channel ID hash
+   * @param signedTicket the signed ticket to store
    */
   function store<CoreConnector extends HoprCoreConnector, ConcreteTicket extends Ticket, ConcreteSignature extends Signature>(
     coreConnector: CoreConnector,
@@ -13,6 +14,12 @@ declare namespace Tickets {
     signedTicket: SignedTicket<ConcreteTicket, ConcreteSignature>
   ): Promise<void>
 
+  /**
+   * Get stored tickets.
+   * @param coreConnector coreConnector instance
+   * @param channelId channel ID hash
+   * @returns a promise that resolves to a Map of signed tickets keyed by the challange hex value.
+   */
   function get<CoreConnector extends HoprCoreConnector, ConcreteTicket extends Ticket, ConcreteSignature extends Signature>(
     coreConnector: CoreConnector,
     channelId: Hash
