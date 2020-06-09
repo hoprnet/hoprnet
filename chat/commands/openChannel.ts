@@ -1,5 +1,5 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import type { Types, Channel as ChannelInstance } from '@hoprnet/hopr-core-connector-interface'
+import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import type AbstractCommand from './abstractCommand'
 
 import BigNumber from 'bignumber.js'
@@ -10,10 +10,8 @@ import type PeerId from 'peer-id'
 
 import chalk from 'chalk'
 
-import { checkPeerIdInput, isBootstrapNode } from '../utils'
+import { checkPeerIdInput, getPeers, getOpenChannels } from '../utils'
 import { clearString, startDelayedInterval, u8aToHex } from '@hoprnet/hopr-utils'
-import { pubKeyToPeerId } from '@hoprnet/hopr-core/lib/utils'
-
 import readline from 'readline'
 
 export default class OpenChannel implements AbstractCommand {
@@ -71,7 +69,9 @@ export default class OpenChannel implements AbstractCommand {
       }
     } while (funds == null || funds.lte(0) || funds.gt(tokens) || funds.isNaN())
 
-    const channelFunding = new BN(funds.times(new BigNumber(10).pow(this.node.paymentChannels.types.Balance.DECIMALS)).toString())
+    const channelFunding = new BN(
+      funds.times(new BigNumber(10).pow(this.node.paymentChannels.types.Balance.DECIMALS)).toString()
+    )
 
     const isPartyA = this.node.paymentChannels.utils.isPartyA(
       await this.node.paymentChannels.utils.pubKeyToAccountId(this.node.peerInfo.id.pubKey.marshal()),
@@ -97,7 +97,10 @@ export default class OpenChannel implements AbstractCommand {
       await this.node.paymentChannels.channel.create(
         this.node.paymentChannels,
         counterparty.pubKey.marshal(),
-        async () => this.node.paymentChannels.utils.pubKeyToAccountId(await this.node.interactions.payments.onChainKey.interact(counterparty)),
+        async () =>
+          this.node.paymentChannels.utils.pubKeyToAccountId(
+            await this.node.interactions.payments.onChainKey.interact(counterparty)
+          ),
         channelBalance,
         (balance: Types.ChannelBalance): Promise<Types.SignedChannel<Types.Channel, Types.Signature>> =>
           this.node.interactions.payments.open.interact(counterparty, balance)
@@ -111,40 +114,25 @@ export default class OpenChannel implements AbstractCommand {
     unsubscribe()
   }
 
-  complete(line: string, cb: (err: Error | undefined, hits: [string[], string]) => void, query?: string) {
-    this.node.paymentChannels.channel.getAll(
-      this.node.paymentChannels,
-      async (channel: ChannelInstance<HoprCoreConnector>) => (await pubKeyToPeerId(await channel.offChainCounterparty)).toB58String(),
-      async (channelIds: Promise<string>[]) => {
-        let peerIdStringSet: Set<string>
+  async complete(line: string, cb: (err: Error | undefined, hits: [string[], string]) => void, query?: string) {
+    const peersWithOpenChannel = await getOpenChannels(this.node, this.node.peerInfo.id)
+    const allPeers = getPeers(this.node)
 
-        try {
-          peerIdStringSet = new Set<string>(await Promise.all(channelIds))
-        } catch (err) {
-          console.log(chalk.red(err.message))
-          return cb(undefined, [[''], line])
-        }
+    const peers = allPeers
+      // filter peers that we already have an open channel with
+      .filter(peer => {
+        return !peersWithOpenChannel.find(p => p.id.equals(peer.id))
+      })
+      // return peerId string
+      .map(peer => peer.toB58String())
 
-        const peers: string[] = []
-        for (const peerInfo of this.node.peerStore.peers.values()) {
-          if (isBootstrapNode(this.node, peerInfo.id)) {
-            continue
-          }
+    if (peers.length < 1) {
+      console.log(chalk.red(`\nDoesn't know any new node to open a payment channel with.`))
+      return cb(undefined, [[''], line])
+    }
 
-          if (!peerIdStringSet.has(peerInfo.id.toB58String())) {
-            peers.push(peerInfo.id.toB58String())
-          }
-        }
+    const hits = query ? peers.filter((peerId: string) => peerId.startsWith(query)) : peers
 
-        if (peers.length < 1) {
-          console.log(chalk.red(`\nDoesn't know any node to open a payment channel with.`))
-          return cb(undefined, [[''], line])
-        }
-
-        const hits = query ? peers.filter((peerId: string) => peerId.startsWith(query)) : peers
-
-        return cb(undefined, [hits.length ? hits.map((str: string) => `open ${str}`) : ['open'], line])
-      }
-    )
+    return cb(undefined, [hits.length ? hits.map((str: string) => `open ${str}`) : ['open'], line])
   }
 }
