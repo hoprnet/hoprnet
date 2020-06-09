@@ -23,14 +23,43 @@ declare namespace HoprCoreConnector {
 
 declare interface HoprCoreConnector {
   readonly started: boolean
-  readonly self: {
-    privateKey: Uint8Array
-    publicKey: Uint8Array
-    onChainKeyPair: {
-      privateKey?: Uint8Array
-      publicKey?: Uint8Array
+
+  readonly account: {
+    /**
+     * Returns the current (token) balance of the account associated with this node.
+     */
+    balance: Promise<Types.Balance>
+    /**
+     * Returns the current native balance (ex: ETH) of the account associated with this node.
+     */
+    nativeBalance: Promise<Types.NativeBalance>
+    /**
+     * Returns the current value of the reset counter
+     */
+    ticketEpoch: Promise<Types.TicketEpoch>
+    /**
+     * Returns the current value of the onChainSecret
+     */
+    onChainSecret: Promise<Types.Hash>
+    /**
+     * Returns the accounts address
+     */
+    address: Promise<Types.AccountId>
+    /**
+     * The accounts keys:
+     */
+    keys: {
+      onChain: {
+        privKey: Uint8Array,
+        pubKey: Uint8Array
+      },
+      offChain: {
+        privKey: Uint8Array,
+        pubKey: Uint8Array
+      }
     }
   }
+
   readonly db: LevelUp
   readonly nonce: Promise<number>
 
@@ -50,16 +79,6 @@ declare interface HoprCoreConnector {
    * @param nonce optional specify nonce of the account to run multiple queries simultaneously
    */
   initOnchainValues(nonce?: number): Promise<void>
-
-  /**
-   * Returns the current balances of the account associated with this node.
-   */
-  accountBalance: Promise<Types.Balance>
-
-  /**
-   * Returns the current native balance (ex: ETH) of the account associated with this node.
-   */
-  accountNativeBalance: Promise<Types.NativeBalance>
 
   /**
    * (Static) utils to use in the connector module
