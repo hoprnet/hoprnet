@@ -18,7 +18,13 @@ export const bash = (cmd: string): Promise<void> => {
       child.stdout.on('data', console.log)
       child.stderr.on('data', console.error)
 
-      child.on('exit', resolve)
+      child.on('exit', (code) => {
+        if (code === 0) {
+          resolve()
+        } else {
+          reject()
+        }
+      })
       child.on('error', reject)
     } catch (err) {
       reject(err)

@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-ethereum",
-  "version": "0.3.0",
+  "version": "0.3.2-dev.00cc125",
   "description": "On-chain logic for hopr.network",
   "homepage": "https://hopr.network",
   "repository": {
@@ -29,7 +29,7 @@
     "network": "ts-node -T ./scripts/cli.ts network",
     "test": "ts-node -T ./scripts/cli.ts test",
     "format": "prettier --check .",
-    "prepare": "yarn build"
+    "prepublish": "yarn build"
   },
   "husky": {
     "hooks": {
@@ -44,6 +44,7 @@
     "@truffle/debug-utils": "^4.1.1",
     "@truffle/hdwallet-provider": "^1.0.34",
     "bignumber.js": "^9.0.0",
+    "dotenv": "^8.2.0",
     "ganache-core": "^2.10.2",
     "truffle": "^5.1.23",
     "truffle-plugin-verify": "^0.3.10",

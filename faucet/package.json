@@ -1,0 +1,22 @@
+{
+  "name": "faucet",
+  "version": "0.3.3",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@hoprnet/hopr-ethereum": "0.3.2-dev.00cc125",
+    "next": "9.4.0",
+    "react": "16.13.1",
+    "react-dom": "16.13.1",
+    "web3": "^1.2.7",
+    "web3-utils": "^1.2.7"
+  },
+  "devDependencies": {
+    "@types/react": "^16.9.35",
+    "typescript": "^3.9.3"
+  }
+}

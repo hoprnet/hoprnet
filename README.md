@@ -66,7 +66,7 @@ yarn coverage
 
 # Migrating
 
-For public network migrations (rinkeby, kovan, etc), you will have to create a [truffle-secrets.json](./truffle-secrets.example.json) file within the root of the project, this file allows you to use your own mnemonic and infura api key securely.
+For public network migrations (rinkeby, kovan, etc), you will have to create a [.env](./.env.example) file within the root of the project, this file allows you to use your own mnemonic and infura api key securely.
 
 ```bash
 yarn network # starts a locally hosted network

@@ -21,4 +21,10 @@ import(`./operations/${operation}`)
 
     return fn(...rest)
   })
-  .catch(console.error)
+  .catch((error) => {
+    if (typeof error !== 'undefined') {
+      console.error(error)
+    }
+
+    process.exit(1)
+  })
