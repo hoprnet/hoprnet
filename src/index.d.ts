@@ -46,22 +46,25 @@ declare interface HoprCoreConnector {
      */
     address: Promise<Types.AccountId>
     /**
+     * The accounts nonce.
+     */
+    nonce: Promise<number>
+    /**
      * The accounts keys:
      */
     keys: {
       onChain: {
-        privKey: Uint8Array,
+        privKey: Uint8Array
         pubKey: Uint8Array
-      },
+      }
       offChain: {
-        privKey: Uint8Array,
+        privKey: Uint8Array
         pubKey: Uint8Array
       }
     }
   }
 
   readonly db: LevelUp
-  readonly nonce: Promise<number>
 
   /**
    * Initialises the connector, e.g. connect to a blockchain node.
