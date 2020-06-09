@@ -4,7 +4,7 @@ description: Get familiar with HOPR on your Windows computer.
 
 # Windows Quickstart
 
-This quick start tutorial will show you how to use **HOPR** by installing **HOPR Chat** in your system using Docker. In this step-by-step guide, we will download Docker, run **HOPR Chat,** and send a message to another user connected to the **HOPR Network**.
+This quick start tutorial will show you how to use **HOPR** by installing **HOPR Chat** in your system using Docker on a Windows computer. In this step-by-step guide, we will download Docker, run **HOPR Chat,** and send a message to another user connected to the **HOPR Network**.
 
 ## Step 1 - Installing Docker in your machine
 
@@ -26,7 +26,7 @@ Before anything, you need to install Docker Desktop in your machine. Depending i
 
 To use **HOPR Chat,** run `docker pull hopr/chat` from your command line \(“cmd.exe”\) or Powershell terminal. Please bear in mind this process will take some time depending on your internet connection.
 
-![Currently HOPR Chat is about ~0.5 GB, please be patient.](../../.gitbook/assets/render1591364106270.gif)
+![](../../.gitbook/assets/dockerinstall.gif)
 
 To ensure your machine has successfully downloaded **HOPR Chat,** run `docker images`.You will be shown the **HOPR Chat** image being installed locally, ready to be run.
 

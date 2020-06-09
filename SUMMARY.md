@@ -6,6 +6,7 @@
 
 * [Overview](getting-started/overview.md)
 * [Quickstart](getting-started/quickstart/README.md)
+  * [MacOS Quickstart](getting-started/quickstart/macos-quickstart.md)
   * [Windows Quickstart](getting-started/quickstart/windows-quickstart.md)
 
 ## Main Concepts
