@@ -5,6 +5,7 @@ import type * as Types from './types'
 import type * as DbKeys from './dbKeys'
 import type * as Constants from './constants'
 import type Indexer from './indexer'
+import type Tickets from './tickets'
 
 declare namespace HoprCoreConnector {
   /**
@@ -84,6 +85,11 @@ declare interface HoprCoreConnector {
    * Encapsulates payment channel between nodes.
    */
   readonly channel: typeof Channel
+
+  /**
+   * Store and query tickets.
+   */
+  readonly tickets: typeof Tickets
 
   /**
    * Returns an instance of Indexer.
