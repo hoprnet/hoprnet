@@ -5,11 +5,8 @@ import { pubKeyToAccountId } from './utils'
 import { stringToU8a } from '@hoprnet/hopr-utils'
 
 class Account {
-  private _nonce?: {
-    getTransactionCount: Promise<number>
-    virtualNonce?: number
-    nonce?: number
-  }
+  private _nonce?: number
+  private _nonceIterator: AsyncIterator<number>
 
   /**
    * The accounts keys:
@@ -35,43 +32,18 @@ class Account {
         pubKey,
       },
     }
+
+    this._nonceIterator = async function* () {
+      this._nonce = await this.coreConnector.web3.eth.getTransactionCount((await this.address).toHex())
+
+      while (true) {
+        yield this._nonce++
+      }
+    }.call(this)
   }
 
   get nonce(): Promise<number> {
-    return new Promise<number>(async (resolve, reject) => {
-      try {
-        let nonce: number | undefined
-
-        // 'first' call
-        if (typeof this._nonce === 'undefined') {
-          this._nonce = {
-            getTransactionCount: this.coreConnector.web3.eth.getTransactionCount((await this.address).toHex()),
-            virtualNonce: 0,
-            nonce: undefined,
-          }
-
-          nonce = await this._nonce.getTransactionCount
-        }
-        // called while 'first' call hasn't returned
-        else if (typeof this._nonce.nonce === 'undefined') {
-          this._nonce.virtualNonce += 1
-          const virtualNonce = this._nonce.virtualNonce
-
-          nonce = await this._nonce.getTransactionCount.then((count: number) => {
-            return count + virtualNonce
-          })
-        }
-        // called after 'first' call has returned
-        else {
-          nonce = this._nonce.nonce + 1
-        }
-
-        this._nonce.nonce = nonce
-        return resolve(nonce)
-      } catch (err) {
-        return reject(err.message)
-      }
-    })
+    return this._nonceIterator.next().then((res) => res.value)
   }
 
   get balance(): Promise<Balance> {
