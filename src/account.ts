@@ -5,7 +5,6 @@ import { pubKeyToAccountId } from './utils'
 import { stringToU8a } from '@hoprnet/hopr-utils'
 
 class Account {
-  private _nonce?: number
   private _address?: AccountId
   private _nonceIterator: AsyncIterator<number>
 
@@ -35,10 +34,10 @@ class Account {
     }
 
     this._nonceIterator = async function* () {
-      this._nonce = await this.coreConnector.web3.eth.getTransactionCount((await this.address).toHex())
+      let nonce = await this.coreConnector.web3.eth.getTransactionCount((await this.address).toHex())
 
       while (true) {
-        yield this._nonce++
+        yield nonce++
       }
     }.call(this)
   }

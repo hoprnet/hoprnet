@@ -375,7 +375,7 @@ export default class HoprEthereum implements HoprCoreConnector {
     const [network, publicKey] = await Promise.all([
       /* prettier-ignore */
       utils.getNetworkId(web3),
-      utils.privKeyToPubKey(privateKey)
+      utils.privKeyToPubKey(privateKey),
     ])
 
     if (typeof config.CHANNELS_ADDRESSES[network] === 'undefined') {
