@@ -64,7 +64,7 @@ class Clients extends React.Component {
                   />
                 </a>
               </li>
-              <li className="reveal-from-bottom" data-reveal-delay="150">
+              {/* <li className="reveal-from-bottom" data-reveal-delay="150">
                 <a href="https://www.bankfrick.li/en/" target="_blank" rel="noopener noreferrer">
                   <Image
                     src={require('./../../assets/images/partners/bank-frick.svg')}
@@ -73,7 +73,7 @@ class Clients extends React.Component {
                     height={24}
                   />
                 </a>
-              </li>
+              </li> */}
               <li className="reveal-from-bottom" data-reveal-delay="150">
                 <a href="https://www.hbl.ch/de/" target="_blank" rel="noopener noreferrer">
                   <Image
