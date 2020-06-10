@@ -12,13 +12,17 @@ First connect to the VPN or Wifi of your AVADO box, then do
 
 it will give you an IPFS hash as output
 
+Note: Usually you will develop locally using `docker-compose build` and `docker-compose up` untill your package works & use the building in the AVADO package format whenever you want to run the same on the AVADO box.
+
+
 ## Installing the package
 
 Either install it through the DappStore (and paste in the IPFS hash there)
+
 Note: this only works when the version has been increased - otherwise the Dappstore will not recognize it as a new version.
 
 
-Or go to `http://go.ava.do/install/<IPFS hash>` to force the version on the machine - this works even if you have not updatedthe version
+Or go to `http://go.ava.do/install/<IPFS hash>` to force the version on the machine - this works even if you have not updated the version number..
 
 
 ## updating the version 
