@@ -1,5 +1,5 @@
 import { Hash, Balance, SignedTicket } from '../types';
-import type Channel from '../channel';
+import type Channel from '.';
 declare class TicketFactory {
     channel: Channel;
     constructor(channel: Channel);

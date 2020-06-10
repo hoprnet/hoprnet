@@ -20,7 +20,9 @@ const generateChannelData = async () => {
   }
 }
 
-describe('test signedChannel construction', function () {
+describe('test signedChannel construction', async function () {
+  const userAPubKey = await utils.privKeyToPubKey(userA)
+
   it('should create new signedChannel using struct', async function () {
     const channelData = await generateChannelData()
 
@@ -34,8 +36,6 @@ describe('test signedChannel construction', function () {
       bytes: signedChannel.buffer,
       offset: signedChannel.signatureOffset,
     })
-
-    const userAPubKey = await utils.privKeyToPubKey(userA)
 
     assert(await signedChannel.verify(userAPubKey), 'signature must be valid')
 
@@ -64,8 +64,6 @@ describe('test signedChannel construction', function () {
       bytes: signedChannelA.buffer,
       offset: signedChannelA.byteOffset,
     })
-
-    const userAPubKey = await utils.privKeyToPubKey(userA)
 
     assert(await signedChannelA.verify(userAPubKey), 'signature must be valid')
     assert(new Hash(await signedChannelA.signer).eq(userAPubKey), 'signer incorrect')
@@ -103,8 +101,6 @@ describe('test signedChannel construction', function () {
         signature,
       }
     )
-
-    const userAPubKey = await utils.privKeyToPubKey(userA)
 
     assert(await signedChannel.verify(userAPubKey), 'signature must be valid')
 

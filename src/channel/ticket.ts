@@ -3,7 +3,7 @@ import { stringToU8a, u8aToHex } from '@hoprnet/hopr-utils'
 import { Hash, TicketEpoch, Balance, SignedTicket, Ticket } from '../types'
 
 import { Uint8ArrayE } from '../types/extended'
-import type Channel from '../channel'
+import type Channel from '.'
 
 const DEFAULT_WIN_PROB = new BN(1)
 
@@ -44,15 +44,10 @@ class TicketFactory {
       }
     )
 
-    await this.channel.coreConnector.utils.sign(
-      await ticket.hash,
-      this.channel.coreConnector.self.privateKey,
-      undefined,
-      {
-        bytes: signedTicket.buffer,
-        offset: signedTicket.signatureOffset,
-      }
-    )
+    await ticket.sign(this.channel.coreConnector.account.keys.onChain.privKey, undefined, {
+      bytes: signedTicket.buffer,
+      offset: signedTicket.signatureOffset,
+    })
 
     return signedTicket
   }
@@ -69,20 +64,12 @@ class TicketFactory {
       return false
     }
 
-    return this.channel.coreConnector.utils.verify(
-      await signedTicket.ticket.hash,
-      signedTicket.signature,
-      await this.channel.offChainCounterparty
-    )
+    return await signedTicket.verify(await this.channel.offChainCounterparty)
   }
 
   // @TODO: implement submit
   async submit(signedTicket: SignedTicket) {
     throw Error('not implemented')
-  }
-
-  get SIZE(): number {
-    return Ticket.SIZE
   }
 }
 

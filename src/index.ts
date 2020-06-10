@@ -8,7 +8,7 @@ import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import { u8aToHex, stringToU8a, u8aEquals } from '@hoprnet/hopr-utils'
 import chalk from 'chalk'
 import { ChannelFactory } from './channel'
-import Ticket from './ticket'
+import Tickets from './ticket'
 import types from './types'
 import Indexer from './indexer'
 import * as dbkeys from './dbKeys'
@@ -17,7 +17,7 @@ import * as constants from './constants'
 import * as config from './config'
 import { HoprChannels } from './tsc/web3/HoprChannels'
 import { HoprToken } from './tsc/web3/HoprToken'
-import AccountId from './types/accountId'
+import Account from './account'
 
 export default class HoprEthereum implements HoprCoreConnector {
   private _status: 'uninitialized' | 'initialized' | 'started' | 'stopped' = 'uninitialized'
@@ -25,41 +25,35 @@ export default class HoprEthereum implements HoprCoreConnector {
   public _onChainValuesInitialized: boolean
   private _starting: Promise<void>
   private _stopping: Promise<void>
-  private _nonce?: {
-    getTransactionCount: Promise<number>
-    virtualNonce?: number
-    nonce?: number
-  }
   public signTransaction: ReturnType<typeof utils.TransactionSigner>
   public log: ReturnType<typeof utils['Log']>
 
   public channel: ChannelFactory
   public types: types
+  public indexer: Indexer
+  public account: Account
+  public tickets: Tickets
 
   constructor(
     public db: LevelUp,
-    public self: {
-      privateKey: Uint8Array
-      publicKey: Uint8Array
-      onChainKeyPair: {
-        privateKey?: Uint8Array
-        publicKey?: Uint8Array
-      }
-    },
-    public account: AccountId,
     public web3: Web3,
     public network: addresses.Networks,
     public hoprChannels: HoprChannels,
     public hoprToken: HoprToken,
     public options: {
       debug: boolean
-    }
+    },
+    privateKey: Uint8Array,
+    publicKey: Uint8Array
   ) {
+    this.account = new Account(this, privateKey, publicKey)
+    this.indexer = new Indexer(this)
+    this.tickets = new Tickets(this)
     this.types = new types()
     this.channel = new ChannelFactory(this)
 
     this._onChainValuesInitialized = false
-    this.signTransaction = utils.TransactionSigner(web3, self.privateKey)
+    this.signTransaction = utils.TransactionSigner(web3, privateKey)
     this.log = utils.Log()
   }
 
@@ -67,67 +61,16 @@ export default class HoprEthereum implements HoprCoreConnector {
   readonly utils = utils
   readonly constants = constants
   readonly CHAIN_NAME = 'HOPR on Ethereum'
-  readonly ticket = Ticket
-  readonly indexer = new Indexer(this)
-
-  /**
-   * @returns the current balances of the account associated with this node (HOPR)
-   */
-  get nonce(): Promise<number> {
-    return new Promise<number>(async (resolve, reject) => {
-      try {
-        let nonce: number | undefined
-
-        // 'first' call
-        if (typeof this._nonce === 'undefined') {
-          this._nonce = {
-            getTransactionCount: this.web3.eth.getTransactionCount(this.account.toHex()),
-            virtualNonce: 0,
-            nonce: undefined,
-          }
-
-          nonce = await this._nonce.getTransactionCount
-        }
-        // called while 'first' call hasn't returned
-        else if (typeof this._nonce.nonce === 'undefined') {
-          this._nonce.virtualNonce += 1
-          const virtualNonce = this._nonce.virtualNonce
-
-          nonce = await this._nonce.getTransactionCount.then((count) => {
-            return count + virtualNonce
-          })
-        }
-        // called after 'first' call has returned
-        else {
-          nonce = this._nonce.nonce + 1
-        }
-
-        this._nonce.nonce = nonce
-        return resolve(nonce)
-      } catch (err) {
-        return reject(err.message)
-      }
-    })
-  }
 
   /**
    * Returns the current balances of the account associated with this node (HOPR)
    * @returns a promise resolved to Balance
    */
-  get accountBalance() {
-    return this.hoprToken.methods
-      .balanceOf(this.account.toHex())
-      .call()
-      .then((res) => new this.types.Balance(res))
-  }
 
   /**
    * Returns the current native balance (ETH)
    * @returns a promise resolved to Balance
    */
-  get accountNativeBalance() {
-    return this.web3.eth.getBalance(this.account.toHex()).then((res) => new this.types.NativeBalance(res))
-  }
 
   // get ticketEpoch(): Promise<TicketEpoch> {}
 
@@ -279,7 +222,7 @@ export default class HoprEthereum implements HoprCoreConnector {
     let [onChainSecret, offChainSecret] = await Promise.all([
       // get onChainSecret
       this.hoprChannels.methods
-        .accounts(this.account.toHex())
+        .accounts((await this.account.address).toHex())
         .call()
         .then((res) => stringToU8a(res.hashedSecret))
         .then((secret: Uint8Array) => {
@@ -312,9 +255,9 @@ export default class HoprEthereum implements HoprCoreConnector {
         await utils.waitForConfirmation(
           (
             await this.signTransaction(this.hoprChannels.methods.setHashedSecret(u8aToHex(offChainSecret)), {
-              from: this.account.toHex(),
+              from: (await this.account.address).toHex(),
               to: this.hoprChannels.options.address,
-              nonce: await this.nonce,
+              nonce: await this.account.nonce,
             })
           ).send()
         )
@@ -354,9 +297,9 @@ export default class HoprEthereum implements HoprCoreConnector {
       await utils.waitForConfirmation(
         (
           await this.signTransaction(this.hoprChannels.methods.setHashedSecret(u8aToHex(secret)), {
-            from: this.account.toHex(),
+            from: (await this.account.address).toHex(),
             to: this.hoprChannels.options.address,
-            nonce: nonce || (await this.nonce),
+            nonce: nonce || (await this.account.nonce),
           })
         ).send()
       ),
@@ -382,7 +325,7 @@ export default class HoprEthereum implements HoprCoreConnector {
   }
 
   private getDebugAccountSecret(): Uint8Array {
-    return createHash('sha256').update(this.self.publicKey).digest()
+    return createHash('sha256').update(this.account.keys.onChain.pubKey).digest()
   }
 
   static get constants() {
@@ -419,7 +362,6 @@ export default class HoprEthereum implements HoprCoreConnector {
     const providerUri = options?.provider || config.DEFAULT_URI
     const privateKey = usingSeed ? seed : stringToU8a(config.DEMO_ACCOUNTS[options.id])
     const publicKey = await utils.privKeyToPubKey(privateKey)
-    const address = await utils.pubKeyToAccountId(publicKey)
 
     const provider = new Web3.providers.WebsocketProvider(providerUri, {
       reconnect: {
@@ -431,7 +373,6 @@ export default class HoprEthereum implements HoprCoreConnector {
 
     const web3 = new Web3(provider)
 
-    const account = new AccountId(address)
     const network = await utils.getNetworkId(web3)
 
     if (typeof config.CHANNELS_ADDRESSES[network] === 'undefined') {
@@ -446,22 +387,15 @@ export default class HoprEthereum implements HoprCoreConnector {
 
     const coreConnector = new HoprEthereum(
       db,
-      {
-        privateKey,
-        publicKey,
-        onChainKeyPair: {
-          privateKey,
-          publicKey,
-        },
-      },
-      account,
       web3,
       network,
       hoprChannels,
       hoprToken,
-      { debug: options?.debug || false }
+      { debug: options?.debug || false },
+      privateKey,
+      publicKey
     )
-    coreConnector.log(`using ethereum address ${account.toHex()}`)
+    coreConnector.log(`using ethereum address ${(await coreConnector.account.address).toHex()}`)
 
     // begin initializing
     coreConnector.initialize().catch((err: Error) => {

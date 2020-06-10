@@ -3,7 +3,7 @@ import Web3 from 'web3';
 import { LevelUp } from 'levelup';
 import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface';
 import { ChannelFactory } from './channel';
-import Ticket from './ticket';
+import Tickets from './ticket';
 import types from './types';
 import Indexer from './indexer';
 import * as dbkeys from './dbKeys';
@@ -11,18 +11,9 @@ import * as utils from './utils';
 import * as constants from './constants';
 import { HoprChannels } from './tsc/web3/HoprChannels';
 import { HoprToken } from './tsc/web3/HoprToken';
-import AccountId from './types/accountId';
+import Account from './account';
 export default class HoprEthereum implements HoprCoreConnector {
     db: LevelUp;
-    self: {
-        privateKey: Uint8Array;
-        publicKey: Uint8Array;
-        onChainKeyPair: {
-            privateKey?: Uint8Array;
-            publicKey?: Uint8Array;
-        };
-    };
-    account: AccountId;
     web3: Web3;
     network: addresses.Networks;
     hoprChannels: HoprChannels;
@@ -40,36 +31,24 @@ export default class HoprEthereum implements HoprCoreConnector {
     log: ReturnType<typeof utils['Log']>;
     channel: ChannelFactory;
     types: types;
-    constructor(db: LevelUp, self: {
-        privateKey: Uint8Array;
-        publicKey: Uint8Array;
-        onChainKeyPair: {
-            privateKey?: Uint8Array;
-            publicKey?: Uint8Array;
-        };
-    }, account: AccountId, web3: Web3, network: addresses.Networks, hoprChannels: HoprChannels, hoprToken: HoprToken, options: {
+    indexer: Indexer;
+    account: Account;
+    tickets: Tickets;
+    constructor(db: LevelUp, web3: Web3, network: addresses.Networks, hoprChannels: HoprChannels, hoprToken: HoprToken, options: {
         debug: boolean;
-    });
+    }, privateKey: Uint8Array, publicKey: Uint8Array);
     readonly dbKeys: typeof dbkeys;
     readonly utils: typeof utils;
     readonly constants: typeof constants;
     readonly CHAIN_NAME = "HOPR on Ethereum";
-    readonly ticket: typeof Ticket;
-    readonly indexer: Indexer;
-    /**
-     * @returns the current balances of the account associated with this node (HOPR)
-     */
-    get nonce(): Promise<number>;
     /**
      * Returns the current balances of the account associated with this node (HOPR)
      * @returns a promise resolved to Balance
      */
-    get accountBalance(): Promise<import("./types/balance").default>;
     /**
      * Returns the current native balance (ETH)
      * @returns a promise resolved to Balance
      */
-    get accountNativeBalance(): Promise<import("./types/nativeBalance").default>;
     /**
      * Initialises the connector, e.g. connect to a blockchain node.
      */

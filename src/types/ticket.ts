@@ -110,6 +110,23 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
   ): Promise<Signature> {
     return await sign(await this.hash, privKey, undefined, arr)
   }
+
+  static create(
+    arr?: {
+      bytes: ArrayBuffer
+      offset: number
+    },
+    struct?: {
+      channelId: Hash
+      challenge: Hash
+      epoch: TicketEpoch
+      amount: Balance
+      winProb: Hash
+      onChainSecret: Hash
+    }
+  ) {
+    return new Ticket(arr, struct)
+  }
 }
 
 export default Ticket

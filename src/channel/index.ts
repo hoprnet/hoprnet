@@ -17,7 +17,7 @@ import {
   Ticket,
   TicketEpoch,
 } from '../types'
-import TicketFactory from './ticketFactory'
+import TicketFactory from './ticket'
 import { ChannelStatus } from '../types/channel'
 import { HASH_LENGTH, ERRORS } from '../constants'
 import { waitForConfirmation, waitFor, hash, getId, stateCountToStatus, cleanupPromiEvent } from '../utils'
@@ -155,7 +155,7 @@ class Channel implements IChannel {
   private async onceClosed() {
     return onceClosed(
       this.coreConnector,
-      this.coreConnector.account,
+      await this.coreConnector.account.address,
       await this.coreConnector.utils.pubKeyToAccountId(this.counterparty)
     )
   }
@@ -209,7 +209,7 @@ class Channel implements IChannel {
       try {
         this._channelId = new ChannelId(
           await this.coreConnector.utils.getId(
-            this.coreConnector.account,
+            await this.coreConnector.account.address,
             await this.coreConnector.utils.pubKeyToAccountId(this.counterparty)
           )
         )
@@ -237,25 +237,8 @@ class Channel implements IChannel {
     })
   }
 
-  get state(): Promise<State> {
-    return new Promise<State>(async (resolve, reject) => {
-      try {
-        const channel = await this.channel
-        const status = stateCountToStatus(Number(channel.stateCounter))
-
-        return resolve(
-          new State(undefined, {
-            // @TODO: implement this once on-chain channel secrets are added
-            secret: new Hash(new Uint8Array(Hash.SIZE).fill(0x0)),
-            // not needed
-            pubkey: new Public(new Uint8Array(Public.SIZE).fill(0x0)),
-            epoch: new TicketEpoch(status),
-          })
-        )
-      } catch (error) {
-        return reject(error)
-      }
-    })
+  get state(): Promise<ChannelType> {
+    return Promise.resolve(this._signedChannel.channel)
   }
 
   get balance(): Promise<Balance> {
@@ -282,7 +265,11 @@ class Channel implements IChannel {
     return new Promise<Balance>(async (resolve, reject) => {
       try {
         return resolve(
-          new Balance(await this.coreConnector.hoprToken.methods.balanceOf(u8aToHex(this.coreConnector.account)).call())
+          new Balance(
+            await this.coreConnector.hoprToken.methods
+              .balanceOf(u8aToHex(await this.coreConnector.account.address))
+              .call()
+          )
         )
       } catch (error) {
         return reject(error)
@@ -324,9 +311,9 @@ class Channel implements IChannel {
                 u8aToHex(await this.coreConnector.utils.pubKeyToAccountId(this.counterparty))
               ),
               {
-                from: this.coreConnector.account.toHex(),
+                from: (await this.coreConnector.account.address).toHex(),
                 to: this.coreConnector.hoprChannels.options.address,
-                nonce: await this.coreConnector.nonce,
+                nonce: await this.coreConnector.account.nonce,
               }
             )
           ).send()
@@ -352,9 +339,9 @@ class Channel implements IChannel {
                 u8aToHex(await this.coreConnector.utils.pubKeyToAccountId(this.counterparty))
               ),
               {
-                from: this.coreConnector.account.toHex(),
+                from: (await this.coreConnector.account.address).toHex(),
                 to: this.coreConnector.hoprChannels.options.address,
-                nonce: await this.coreConnector.nonce,
+                nonce: await this.coreConnector.account.nonce,
               }
             )
           ).send()
@@ -408,11 +395,12 @@ class Channel implements IChannel {
     try {
       await this.coreConnector.db.get(key)
     } catch (err) {
-      if (err.notFound == null || err.notFound != true) {
-        throw err
+      if (err.notFound) {
+        await this.coreConnector.db.put(key, new Uint8Array())
+        return
       }
-      await this.coreConnector.db.put(key, new Uint8Array())
-      return
+
+      throw err
     }
 
     throw Error('Nonces must not be used twice.')
@@ -424,7 +412,7 @@ class ChannelFactory {
 
   async increaseFunds(counterparty: AccountId, amount: Balance): Promise<void> {
     try {
-      if ((await this.coreConnector.accountBalance).lt(amount)) {
+      if ((await this.coreConnector.account.balance).lt(amount)) {
         throw Error(ERRORS.OOF_HOPR)
       }
 
@@ -436,13 +424,13 @@ class ChannelFactory {
               amount.toString(),
               this.coreConnector.web3.eth.abi.encodeParameters(
                 ['address', 'address'],
-                [this.coreConnector.account.toHex(), counterparty.toHex()]
+                [(await this.coreConnector.account.address).toHex(), counterparty.toHex()]
               )
             ),
             {
-              from: this.coreConnector.account.toHex(),
+              from: (await this.coreConnector.account.address).toHex(),
               to: this.coreConnector.hoprToken.options.address,
-              nonce: await this.coreConnector.nonce,
+              nonce: await this.coreConnector.account.nonce,
             }
           )
         ).send()
@@ -455,7 +443,7 @@ class ChannelFactory {
   async isOpen(counterpartyPubKey: Uint8Array) {
     const counterparty = await this.coreConnector.utils.pubKeyToAccountId(counterpartyPubKey)
     const channelId = await this.coreConnector.utils
-      .getId(this.coreConnector.account, counterparty)
+      .getId(await this.coreConnector.account.address, counterparty)
       .then((res) => new Hash(res))
 
     const [onChain, offChain]: [boolean, boolean] = await Promise.all([
@@ -499,7 +487,7 @@ class ChannelFactory {
       throw Error(`Challenge is not set`)
     }
     const channelId = await this.coreConnector.utils.getId(
-      await this.coreConnector.utils.pubKeyToAccountId(this.coreConnector.self.onChainKeyPair.publicKey),
+      await this.coreConnector.utils.pubKeyToAccountId(this.coreConnector.account.keys.onChain.pubKey),
       counterParty
     )
 
@@ -523,7 +511,7 @@ class ChannelFactory {
       }
     )
 
-    await this.coreConnector.utils.sign(await ticket.hash, this.coreConnector.self.privateKey, undefined, {
+    await this.coreConnector.utils.sign(await ticket.hash, this.coreConnector.account.keys.onChain.privKey, undefined, {
       bytes: signedTicket.buffer,
       offset: signedTicket.signatureOffset,
     })
@@ -561,10 +549,10 @@ class ChannelFactory {
     }
 
     if (signedChannel.signature.eq(emptySignatureArray)) {
-      signedChannel.set(
-        await this.coreConnector.utils.sign(await signedChannel.channel.hash, this.coreConnector.self.privateKey),
-        0
-      )
+      await struct.channel.sign(this.coreConnector.account.keys.onChain.privKey, undefined, {
+        bytes: signedChannel.buffer,
+        offset: signedChannel.signatureOffset,
+      })
     }
 
     return signedChannel
@@ -593,7 +581,7 @@ class ChannelFactory {
       channel = new Channel(this.coreConnector, counterpartyPubKey, signedChannel)
     } else if (sign != null && channelBalance != null) {
       let amount: Balance
-      if (this.coreConnector.utils.isPartyA(this.coreConnector.account, counterparty)) {
+      if (this.coreConnector.utils.isPartyA(await this.coreConnector.account.address, counterparty)) {
         amount = channelBalance.balance_a
       } else {
         amount = new Balance(channelBalance.balance.sub(channelBalance.balance_a))
@@ -610,9 +598,9 @@ class ChannelFactory {
           await this.coreConnector.signTransaction(
             this.coreConnector.hoprChannels.methods.openChannel(counterparty.toHex()),
             {
-              from: this.coreConnector.account.toHex(),
+              from: (await this.coreConnector.account.address).toHex(),
               to: this.coreConnector.hoprChannels.options.address,
-              nonce: await this.coreConnector.nonce,
+              nonce: await this.coreConnector.account.nonce,
             }
           )
         ).send()
@@ -683,7 +671,7 @@ class ChannelFactory {
           const counterparty = await this.coreConnector.utils.pubKeyToAccountId(counterpartyPubKey)
           const channelBalance = signedChannel.channel.balance
 
-          if (this.coreConnector.utils.isPartyA(this.coreConnector.account, counterparty)) {
+          if (this.coreConnector.utils.isPartyA(await this.coreConnector.account.address, counterparty)) {
             if (channelBalance.balance.sub(channelBalance.balance_a).gtn(0)) {
               await this.increaseFunds(counterparty, new Balance(channelBalance.balance.sub(channelBalance.balance_a)))
             }
@@ -694,7 +682,7 @@ class ChannelFactory {
           }
 
           // listen for opening event and update DB
-          onceOpen(this.coreConnector, this.coreConnector.account, counterparty).then(() =>
+          onceOpen(this.coreConnector, await this.coreConnector.account.address, counterparty).then(() =>
             onOpen(this.coreConnector, counterpartyPubKey, signedChannel)
           )
 

@@ -27,7 +27,9 @@ const generateTicketData = async () => {
   }
 }
 
-describe('test signedTicket construction', function () {
+describe('test signedTicket construction', async function () {
+  const userAPubKey = await utils.privKeyToPubKey(userA)
+
   it('should create new signedTicket using struct', async function () {
     const ticketData = await generateTicketData()
 
@@ -44,8 +46,6 @@ describe('test signedTicket construction', function () {
       signature,
       ticket,
     })
-
-    const userAPubKey = await utils.privKeyToPubKey(userA)
 
     assert(await signedTicket.verify(userAPubKey))
 
@@ -72,8 +72,6 @@ describe('test signedTicket construction', function () {
       bytes: signedTicketA.buffer,
       offset: signedTicketA.signatureOffset,
     })
-
-    const userAPubKey = await utils.privKeyToPubKey(userA)
 
     assert(await signedTicketA.verify(userAPubKey))
 
@@ -121,8 +119,6 @@ describe('test signedTicket construction', function () {
         signature,
       }
     )
-
-    const userAPubKey = await utils.privKeyToPubKey(userA)
 
     assert(await signedTicket.verify(userAPubKey))
 

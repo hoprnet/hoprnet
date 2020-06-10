@@ -87,6 +87,19 @@ class SignedChannel extends Uint8ArrayE implements Types.SignedChannel {
   static get SIZE() {
     return Signature.SIZE + Channel.SIZE
   }
+
+  static create(
+    arr?: {
+      bytes: ArrayBuffer
+      offset: number
+    },
+    struct?: {
+      signature?: Signature
+      channel?: Channel
+    }
+  ): SignedChannel {
+    return new SignedChannel(arr, struct)
+  }
 }
 
 export default SignedChannel

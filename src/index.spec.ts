@@ -45,7 +45,7 @@ describe('test connector', function () {
       const latestNonce = await web3.eth.getTransactionCount(owner.address.toHex())
       const results = await Promise.all(
         Array.from({ length: parallel }).map(async (_, expectedNonce) => {
-          const nonce = await connector.nonce
+          const nonce = await connector.account.nonce
           return nonce === latestNonce + expectedNonce
         })
       )
@@ -58,7 +58,7 @@ describe('test connector', function () {
 
     it('should generate next nonce', async function () {
       const latestNonce = await web3.eth.getTransactionCount(owner.address.toHex())
-      const nonce = await connector.nonce
+      const nonce = await connector.account.nonce
 
       assert.equal(nonce, latestNonce + parallel, 'incorrect next nonce')
     })
@@ -132,9 +132,9 @@ describe('test connector with 0 ETH and 0 HOPR', function () {
   it('should start the connector without any crypto assets', async function () {
     assert(connector.started, 'Connector should have been started')
 
-    assert((await connector.accountBalance).isZero(), `HOPR balance must be zero`)
+    assert((await connector.account.balance).isZero(), `HOPR balance must be zero`)
 
-    assert((await connector.accountNativeBalance).isZero(), `ETH balance must be zero`)
+    assert((await connector.account.nativeBalance).isZero(), `ETH balance must be zero`)
   })
 
   it('should create some 0-valued dummy tickets', async function () {

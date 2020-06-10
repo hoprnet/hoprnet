@@ -1,6 +1,6 @@
 import type { Channel as IChannel } from '@hoprnet/hopr-core-connector-interface';
-import { AccountId, Balance, ChannelBalance, Channel as ChannelType, Hash, Moment, Signature, SignedChannel, SignedTicket, State } from '../types';
-import TicketFactory from './ticketFactory';
+import { AccountId, Balance, ChannelBalance, Channel as ChannelType, Hash, Moment, Signature, SignedChannel, SignedTicket } from '../types';
+import TicketFactory from './ticket';
 import type HoprEthereum from '..';
 declare class Channel implements IChannel {
     coreConnector: HoprEthereum;
@@ -17,7 +17,7 @@ declare class Channel implements IChannel {
     get offChainCounterparty(): Promise<Uint8Array>;
     get channelId(): Promise<Hash>;
     get settlementWindow(): Promise<Moment>;
-    get state(): Promise<State>;
+    get state(): Promise<ChannelType>;
     get balance(): Promise<Balance>;
     get balance_a(): Promise<Balance>;
     get currentBalance(): Promise<Balance>;

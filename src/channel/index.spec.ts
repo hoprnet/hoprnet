@@ -72,8 +72,8 @@ describe('test Channel class', function () {
     })
 
     const channelId = await coreConnector.utils.getId(
-      new AccountId(coreConnector.self.onChainKeyPair.publicKey),
-      new AccountId(counterpartysCoreConnector.self.onChainKeyPair.publicKey)
+      new AccountId(coreConnector.account.keys.onChain.pubKey),
+      new AccountId(counterpartysCoreConnector.account.keys.onChain.pubKey)
     )
 
     const signedChannel = await counterpartysCoreConnector.channel.createSignedChannel(undefined, {
@@ -83,8 +83,8 @@ describe('test Channel class', function () {
     preChannels.set(u8aToHex(channelId), channelType)
 
     const channel = await coreConnector.channel.create(
-      counterpartysCoreConnector.self.publicKey,
-      async () => counterpartysCoreConnector.self.onChainKeyPair.publicKey,
+      counterpartysCoreConnector.account.keys.onChain.pubKey,
+      async () => counterpartysCoreConnector.account.keys.onChain.pubKey,
       signedChannel.channel.balance,
       async () => {
         const result = await pipe(
@@ -116,18 +116,21 @@ describe('test Channel class', function () {
     const hash = await coreConnector.utils.hash(preImage)
 
     const ticket = await channel.ticket.create(new Balance(1), new Hash(hash))
-    assert(u8aEquals(await ticket.signer, coreConnector.self.publicKey), `Check that signer is recoverable`)
+    assert(
+      u8aEquals(await ticket.signer, coreConnector.account.keys.onChain.pubKey),
+      `Check that signer is recoverable`
+    )
 
     const signedChannelCounterparty = await coreConnector.channel.createSignedChannel(undefined, {
       channel: channelType,
     })
     assert(
-      u8aEquals(await signedChannelCounterparty.signer, coreConnector.self.publicKey),
+      u8aEquals(await signedChannelCounterparty.signer, coreConnector.account.keys.onChain.pubKey),
       `Check that signer is recoverable.`
     )
 
     counterpartysCoreConnector.db.put(
-      Buffer.from(coreConnector.dbKeys.Channel(coreConnector.self.onChainKeyPair.publicKey)),
+      Buffer.from(coreConnector.dbKeys.Channel(coreConnector.account.keys.onChain.pubKey)),
       Buffer.from(signedChannelCounterparty)
     )
 
@@ -137,23 +140,23 @@ describe('test Channel class', function () {
     )) as Channel[]
 
     assert(
-      u8aEquals(dbChannels[0].counterparty, coreConnector.self.onChainKeyPair.publicKey),
+      u8aEquals(dbChannels[0].counterparty, coreConnector.account.keys.onChain.pubKey),
       `Channel record should make it into the database and its db-key should lead to the AccountId of the counterparty.`
     )
 
     const counterpartysChannel = await counterpartysCoreConnector.channel.create(
-      coreConnector.self.publicKey,
-      () => Promise.resolve(coreConnector.self.onChainKeyPair.publicKey),
+      coreConnector.account.keys.onChain.pubKey,
+      () => Promise.resolve(coreConnector.account.keys.onChain.pubKey),
       signedChannel.channel.balance,
       () => Promise.resolve(signedChannelCounterparty)
     )
 
     assert(
-      await coreConnector.channel.isOpen(counterpartysCoreConnector.self.onChainKeyPair.publicKey),
+      await coreConnector.channel.isOpen(counterpartysCoreConnector.account.keys.onChain.pubKey),
       `Checks that party A considers the channel open.`
     )
     assert(
-      await counterpartysCoreConnector.channel.isOpen(coreConnector.self.onChainKeyPair.publicKey),
+      await counterpartysCoreConnector.channel.isOpen(coreConnector.account.keys.onChain.pubKey),
       `Checks that party B considers the channel open.`
     )
 
