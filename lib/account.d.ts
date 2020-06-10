@@ -2,7 +2,7 @@ import HoprEthereum from '.';
 import { AccountId, Balance, Hash, NativeBalance, TicketEpoch } from './types';
 declare class Account {
     coreConnector: HoprEthereum;
-    private _nonce;
+    private _nonce?;
     /**
      * The accounts keys:
      */

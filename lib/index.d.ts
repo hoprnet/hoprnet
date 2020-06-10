@@ -26,7 +26,6 @@ export default class HoprEthereum implements HoprCoreConnector {
     _onChainValuesInitialized: boolean;
     private _starting;
     private _stopping;
-    private _nonce?;
     signTransaction: ReturnType<typeof utils.TransactionSigner>;
     log: ReturnType<typeof utils['Log']>;
     channel: ChannelFactory;
