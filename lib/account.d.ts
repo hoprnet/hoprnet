@@ -3,6 +3,8 @@ import { AccountId, Balance, Hash, NativeBalance, TicketEpoch } from './types';
 declare class Account {
     coreConnector: HoprEthereum;
     private _nonce?;
+    private _address?;
+    private _nonceIterator;
     /**
      * The accounts keys:
      */

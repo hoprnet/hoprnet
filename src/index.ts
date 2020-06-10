@@ -361,7 +361,6 @@ export default class HoprEthereum implements HoprCoreConnector {
 
     const providerUri = options?.provider || config.DEFAULT_URI
     const privateKey = usingSeed ? seed : stringToU8a(config.DEMO_ACCOUNTS[options.id])
-    const publicKey = await utils.privKeyToPubKey(privateKey)
 
     const provider = new Web3.providers.WebsocketProvider(providerUri, {
       reconnect: {
@@ -373,7 +372,11 @@ export default class HoprEthereum implements HoprCoreConnector {
 
     const web3 = new Web3(provider)
 
-    const network = await utils.getNetworkId(web3)
+    const [network, publicKey] = await Promise.all([
+      /* prettier-ignore */
+      utils.getNetworkId(web3),
+      utils.privKeyToPubKey(privateKey)
+    ])
 
     if (typeof config.CHANNELS_ADDRESSES[network] === 'undefined') {
       throw Error(`channel contract address from network ${network} not found`)

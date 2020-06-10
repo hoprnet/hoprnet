@@ -289,7 +289,7 @@ export function stateCountToStatus(stateCount: number): ChannelStatus {
 export function TransactionSigner(web3: Web3, privKey: Uint8Array) {
   const privKeyStr = new Hash(privKey).toHex()
 
-  return async function signTransaction<T extends any>(
+  return async function signTransaction<T>(
     // return of our contract method in web3.Contract instance
     txObject: TransactionObject<T>,
     // config put in .send

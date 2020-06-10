@@ -6,6 +6,7 @@ import { stringToU8a } from '@hoprnet/hopr-utils'
 
 class Account {
   private _nonce?: number
+  private _address?: AccountId
   private _nonceIterator: AsyncIterator<number>
 
   /**
@@ -100,7 +101,14 @@ class Account {
   }
 
   get address(): Promise<AccountId> {
-    return pubKeyToAccountId(this.keys.onChain.pubKey)
+    if (this._address) {
+      return Promise.resolve(this._address)
+    }
+
+    return pubKeyToAccountId(this.keys.onChain.pubKey).then((accountId: AccountId) => {
+      this._address = accountId
+      return this._address
+    })
   }
 }
 
