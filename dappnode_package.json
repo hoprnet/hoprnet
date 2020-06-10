@@ -1,0 +1,16 @@
+{
+  "name": "hopr-core.public.dappnode.eth",
+  "version": "0.0.1",
+  "description": "hopr-core client (public testnet)",
+  "avatar": "",
+  "type": "service",
+  "image": {
+    "path": "",
+    "hash": "",
+    "size": "",
+    "restart": "always"
+  },
+  "author": "AVADO",
+  "license": "(C)",
+  "dependencies": {}
+}

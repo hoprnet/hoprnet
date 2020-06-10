@@ -1,0 +1,5 @@
+version: '3.4'
+services:
+    avado-dnp-template.public.dappnode.eth:
+        image: 'avado-dnp-template.public.dappnode.eth:0.0.1'
+        build: ./build
