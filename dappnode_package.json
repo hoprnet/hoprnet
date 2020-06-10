@@ -1,10 +1,19 @@
 {
-  "name": "hopr-core.public.dappnode.eth",
+  "name": "hopr-core.avado.dnp.dappnode.eth",
   "version": "0.0.1",
   "description": "hopr-core client (public testnet)",
-  "avatar": "",
+  "avatar": "/ipfs/QmQGxeJHvH2XDZSbai7YSPNs8RfhT7aiaB1DYEbdCpMshk",
   "type": "service",
   "image": {
+    "volumes": [
+        "data:/data"
+      ],
+      "environment": [
+        "EXTRA-OPTS="
+      ],
+      "ports": [
+        "1111:1111/tcp"
+      ],
     "path": "",
     "hash": "",
     "size": "",

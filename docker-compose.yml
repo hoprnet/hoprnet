@@ -1,5 +1,13 @@
 version: '3.4'
+volumes:
+  data: {}
 services:
-    avado-dnp-template.public.dappnode.eth:
-        image: 'avado-dnp-template.public.dappnode.eth:0.0.1'
-        build: ./build
+  hopr-core.avado.dnp.dappnode.eth:
+    build:
+      context: .
+      dockerfile: ./build/Dockerfile
+    image: 'hopr-core.avado.dnp.dappnode.eth:0.0.1'
+    restart: always
+    volumes:
+      - 'data:/data'
+    dns: 172.33.1.2
