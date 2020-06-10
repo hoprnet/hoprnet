@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core-connector-interface",
-  "version": "1.2.0-testnet",
+  "version": "1.1.0-4-dev.04ebf30",
   "repository": "https://github.com/hoprnet/hopr-core-connector-interface.git",
   "homepage": "https://hopr.network",
   "author": "Robert Kiel <robert.kiel@validitylabs.org>",

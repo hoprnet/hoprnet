@@ -109,9 +109,9 @@ declare interface HoprCoreConnector {
   readonly channel: typeof Channel
 
   /**
-   * Stores and fetches received tickets from the database.
+   * Store and query tickets.
    */
-  readonly tickets: typeof Tickets
+  readonly tickets: Tickets
 
   /**
    * Returns an instance of Indexer.
@@ -126,6 +126,6 @@ declare interface HoprCoreConnector {
 
 type HoprCoreConnectorStatic = typeof HoprCoreConnector
 
-export { Utils, DbKeys, Types, Channel, Constants, Indexer, HoprCoreConnectorStatic }
+export { Utils, Types, DbKeys, Constants, Channel, Tickets, Indexer, HoprCoreConnectorStatic }
 
 export default HoprCoreConnector
