@@ -98,11 +98,11 @@ class SignedTicket extends Uint8ArrayE implements Types.SignedTicket {
       offset: number
     },
     struct?: {
-      signature: Signature
-      ticket: Ticket
+      signature?: Signature
+      ticket?: Ticket
     }
-  ): SignedTicket {
-    return new SignedTicket(arr, struct)
+  ): Promise<SignedTicket> {
+    return Promise.resolve(new SignedTicket(arr, struct))
   }
 }
 

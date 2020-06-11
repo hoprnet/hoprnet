@@ -25,6 +25,6 @@ declare class SignedChannel extends Uint8ArrayE implements Types.SignedChannel {
     }, struct?: {
         signature?: Signature;
         channel?: Channel;
-    }): SignedChannel;
+    }): Promise<SignedChannel>;
 }
 export default SignedChannel;

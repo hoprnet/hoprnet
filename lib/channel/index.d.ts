@@ -1,6 +1,6 @@
 import { AccountId, Balance, ChannelBalance, Channel as ChannelType, Hash, Signature, SignedChannel, SignedTicket } from '../types';
 import type HoprEthereum from '..';
-import Channel from './channelInstance';
+import Channel from './channel';
 import { OnChainChannel } from './types';
 declare class ChannelFactory {
     private coreConnector;

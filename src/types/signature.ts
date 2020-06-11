@@ -62,7 +62,7 @@ class Signature extends Uint8ArrayE implements Types.Signature {
       recovery: number
     }
   ) {
-    return new Signature(arr, struct)
+    return Promise.resolve(new Signature(arr, struct))
   }
 }
 

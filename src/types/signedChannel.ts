@@ -97,8 +97,8 @@ class SignedChannel extends Uint8ArrayE implements Types.SignedChannel {
       signature?: Signature
       channel?: Channel
     }
-  ): SignedChannel {
-    return new SignedChannel(arr, struct)
+  ): Promise<SignedChannel> {
+    return Promise.resolve(new SignedChannel(arr, struct))
   }
 }
 

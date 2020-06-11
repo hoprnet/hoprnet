@@ -22,8 +22,8 @@ declare class SignedTicket extends Uint8ArrayE implements Types.SignedTicket {
         bytes: ArrayBuffer;
         offset: number;
     }, struct?: {
-        signature: Signature;
-        ticket: Ticket;
-    }): SignedTicket;
+        signature?: Signature;
+        ticket?: Ticket;
+    }): Promise<SignedTicket>;
 }
 export default SignedTicket;

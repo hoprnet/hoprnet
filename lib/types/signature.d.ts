@@ -21,6 +21,6 @@ declare class Signature extends Uint8ArrayE implements Types.Signature {
     }, struct?: {
         signature: Uint8Array;
         recovery: number;
-    }): Signature;
+    }): Promise<Signature>;
 }
 export default Signature;

@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core-ethereum",
-  "version": "0.0.5-dev.2152f3d",
+  "version": "0.0.6-dev.b61a740",
   "repository": "git@github.com:hoprnet/hopr-core-ethereum.git",
   "license": "LGPL-3.0-only",
   "types": "lib/index.d.ts",
@@ -25,7 +25,7 @@
     "node": "^12"
   },
   "dependencies": {
-    "@hoprnet/hopr-core-connector-interface": "~1.1.0-4",
+    "@hoprnet/hopr-core-connector-interface": "~1.2.3-dev.3d51831",
     "@hoprnet/hopr-demo-seeds": "~1.0.1",
     "@hoprnet/hopr-ethereum": "~0.3.2-dev.00cc125",
     "@hoprnet/hopr-utils": "~0.1.3",
