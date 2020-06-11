@@ -21,7 +21,7 @@
     "node": "^12",
     "yarn": "^1.22"
   },
-  "homepage": "https://hopr.network",
+  "homepage": "https://hoprnet.io",
   "repository": {
     "type": "git",
     "url": "https://github.com/hoprnet/hopr-core.git"
