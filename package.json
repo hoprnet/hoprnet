@@ -25,7 +25,7 @@
     "node": "^12"
   },
   "dependencies": {
-    "@hoprnet/hopr-core-connector-interface": "~1.2.3-dev.3d51831",
+    "@hoprnet/hopr-core-connector-interface": "~1.2.3-dev.c56797a",
     "@hoprnet/hopr-demo-seeds": "~1.0.1",
     "@hoprnet/hopr-ethereum": "~0.3.2-dev.00cc125",
     "@hoprnet/hopr-utils": "~0.1.3",

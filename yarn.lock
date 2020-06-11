@@ -121,7 +121,7 @@
     "@ethersproject/constants" ">=5.0.0-beta.133"
     "@ethersproject/logger" ">=5.0.0-beta.137"
 
-"@hoprnet/hopr-core-connector-interface@~1.2.3-dev.3d51831":
+"@hoprnet/hopr-core-connector-interface@~1.2.3-dev.c56797a":
   version "1.2.3-dev.c56797a"
   resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-connector-interface/-/hopr-core-connector-interface-1.2.3-dev.c56797a.tgz#1cc38a232c7f58a973a1ebb8047b31317774a0a7"
   integrity sha512-qhybfJi6e31U6KgbkOjSaWKY40ap/Vd4mZERBUdTzw2lcP+d5bffvO/WYaJVyqWKIIDXue0M3vpTKKH/qviMHw==

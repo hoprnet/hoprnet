@@ -1,14 +1,12 @@
+import type IChannel from '.'
 import BN from 'bn.js'
-import { stringToU8a, u8aToHex } from '@hoprnet/hopr-utils'
+import { u8aToHex, u8aXOR } from '@hoprnet/hopr-utils'
 import { Hash, TicketEpoch, Balance, SignedTicket, Ticket } from '../types'
-
-import { Uint8ArrayE } from '../types/extended'
-import type Channel from '.'
 
 const DEFAULT_WIN_PROB = new BN(1)
 
 class TicketFactory {
-  constructor(public channel: Channel) {}
+  constructor(public channel: IChannel) {}
 
   async create(
     amount: Balance,
@@ -18,10 +16,7 @@ class TicketFactory {
       offset: number
     }
   ): Promise<SignedTicket> {
-    const account = await this.channel.coreConnector.utils.pubKeyToAccountId(this.channel.counterparty)
-    const { hashedSecret } = await this.channel.coreConnector.hoprChannels.methods.accounts(u8aToHex(account)).call()
-
-    const winProb = new Uint8ArrayE(
+    const winProb = new Hash(
       new BN(new Uint8Array(Hash.SIZE).fill(0xff)).div(DEFAULT_WIN_PROB).toArray('le', Hash.SIZE)
     )
     const channelId = await this.channel.channelId
@@ -36,11 +31,10 @@ class TicketFactory {
       {
         channelId,
         challenge,
-        // @TODO set this dynamically
-        epoch: new TicketEpoch(0),
+        epoch: new TicketEpoch(1), // @TODO: set this dynamically
         amount: new Balance(amount.toString()),
         winProb,
-        onChainSecret: new Uint8ArrayE(stringToU8a(hashedSecret)),
+        onChainSecret: new Hash(), // @TODO: set pre_image
       }
     )
 
@@ -67,9 +61,32 @@ class TicketFactory {
     return await signedTicket.verify(await this.channel.offChainCounterparty)
   }
 
-  // @TODO: implement submit
-  async submit(signedTicket: SignedTicket) {
-    throw Error('not implemented')
+  async submit(signedTicket: SignedTicket): Promise<void> {
+    const { hoprChannels, signTransaction, account, utils } = this.channel.coreConnector
+    const { ticket, signature } = signedTicket
+    const { r, s, v } = utils.getSignatureParameters(signature)
+    const counterPartySecret = u8aXOR(false, ticket.challenge, ticket.onChainSecret)
+
+    const transaction = await signTransaction(
+      hoprChannels.methods.redeemTicket(
+        u8aToHex(ticket.challenge),
+        u8aToHex(ticket.onChainSecret),
+        u8aToHex(counterPartySecret),
+        ticket.amount.toString(),
+        u8aToHex(ticket.winProb),
+        u8aToHex(r),
+        u8aToHex(s),
+        v
+      ),
+      {
+        from: (await account.address).toHex(),
+        to: hoprChannels.options.address,
+        nonce: (await account.nonce).valueOf(),
+      }
+    )
+
+    const receipt = await transaction.send()
+    console.log(receipt)
   }
 }
 

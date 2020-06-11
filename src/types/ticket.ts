@@ -1,9 +1,9 @@
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
+import { u8aConcat } from '@hoprnet/hopr-utils'
 import { Hash, TicketEpoch, Balance } from '.'
 import { Uint8ArrayE } from '../types/extended'
 import { hash, sign } from '../utils'
-import { Signature } from '@hoprnet/hopr-core-connector-interface/src/types'
 
 class Ticket extends Uint8ArrayE implements Types.Ticket {
   constructor(
@@ -89,7 +89,7 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
   }
 
   get hash(): Promise<Hash> {
-    return hash(this)
+    return hash(u8aConcat(this.challenge, this.onChainSecret, this.epoch.toU8a(), this.amount.toU8a(), this.winProb))
   }
 
   static get SIZE(): number {
@@ -107,7 +107,7 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
       bytes: ArrayBuffer
       offset: number
     }
-  ): Promise<Signature> {
+  ): Promise<Types.Signature> {
     return await sign(await this.hash, privKey, undefined, arr)
   }
 

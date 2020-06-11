@@ -1,9 +1,8 @@
 import { Ganache, migrate } from '@hoprnet/hopr-ethereum'
 import assert from 'assert'
-import { stringToU8a, u8aToHex, u8aEquals } from '@hoprnet/hopr-utils'
+import { stringToU8a, u8aToHex, u8aEquals, u8aXOR } from '@hoprnet/hopr-utils'
 import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
 import { getPrivKeyData, createAccountAndFund, createNode } from '../utils/testing'
-import { randomBytes } from 'crypto'
 import BN from 'bn.js'
 import pipe from 'it-pipe'
 import Web3 from 'web3'
@@ -51,8 +50,8 @@ describe('test Channel class', function () {
     preChannels.clear()
 
     funder = await getPrivKeyData(stringToU8a(configs.FUND_ACCOUNT_PRIVATE_KEY))
-    const userA = await createAccountAndFund(web3, hoprToken, funder)
-    const userB = await createAccountAndFund(web3, hoprToken, funder)
+    const userA = await createAccountAndFund(web3, hoprToken, funder, configs.DEMO_ACCOUNTS[1])
+    const userB = await createAccountAndFund(web3, hoprToken, funder, configs.DEMO_ACCOUNTS[2])
 
     coreConnector = await createNode(userA.privKey)
     counterpartysCoreConnector = await createNode(userB.privKey)
@@ -112,10 +111,14 @@ describe('test Channel class', function () {
 
     channels.set(u8aToHex(channelId), channelType)
 
-    const preImage = randomBytes(32)
-    const hash = await coreConnector.utils.hash(preImage)
+    let secret: Uint8Array
+    try {
+      secret = await coreConnector.db.get(Buffer.from(coreConnector.dbKeys.OnChainSecret()))
+    } catch (err) {
+      throw err
+    }
 
-    const ticket = await channel.ticket.create(new Balance(1), new Hash(hash))
+    const ticket = await channel.ticket.create(new Balance(1), new Hash())
     assert(
       u8aEquals(await ticket.signer, coreConnector.account.keys.onChain.pubKey),
       `Check that signer is recoverable`
