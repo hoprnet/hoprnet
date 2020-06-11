@@ -1,8 +1,8 @@
+import type IChannel from '.';
 import { Hash, Balance, SignedTicket } from '../types';
-import type Channel from '.';
 declare class TicketFactory {
-    channel: Channel;
-    constructor(channel: Channel);
+    channel: IChannel;
+    constructor(channel: IChannel);
     create(amount: Balance, challenge: Hash, arr?: {
         bytes: ArrayBuffer;
         offset: number;

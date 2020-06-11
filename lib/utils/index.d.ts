@@ -150,3 +150,11 @@ export declare function Log(prefixes?: string[]): Debug.Debugger;
  * @param fn a function to wait for
  */
 export declare function cleanupPromiEvent<E extends ContractEventEmitter<any>, R extends Promise<any>>(event: E, fn: (event: E) => R): Promise<R>;
+/**
+ * Get r,s,v values of a signature
+ */
+export declare function getSignatureParameters(signature: Signature): {
+    r: Uint8Array;
+    s: Uint8Array;
+    v: number;
+};

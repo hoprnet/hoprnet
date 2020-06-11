@@ -345,3 +345,14 @@ export async function cleanupPromiEvent<E extends ContractEventEmitter<any>, R e
 ): Promise<R> {
   return fn(event).finally(() => event.removeAllListeners())
 }
+
+/**
+ * Get r,s,v values of a signature
+ */
+export function getSignatureParameters(signature: Signature) {
+  return {
+    r: signature.signature.slice(0, 32),
+    s: signature.signature.slice(32, 64),
+    v: signature.recovery,
+  }
+}
