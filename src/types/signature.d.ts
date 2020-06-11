@@ -12,7 +12,7 @@ declare namespace Signature {
       recovery: number
       msgPrefix?: Uint8Array
     }
-  ): Signature
+  ): Promise<Signature>
 }
 declare interface Signature extends Uint8Array {
   onChainSignature: Uint8Array

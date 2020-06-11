@@ -10,8 +10,8 @@ declare namespace SignedTicket {
       offset: number
     },
     struct?: {
-      ticket: Ticket
-      signature: Signature
+      ticket?: Ticket
+      signature?: Signature
     }
   ): Promise<SignedTicket>
 }
