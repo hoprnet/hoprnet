@@ -2,7 +2,7 @@
   "name": "@hoprnet/hopr-ethereum",
   "version": "0.3.2-dev.00cc125",
   "description": "On-chain logic for hopr.network",
-  "homepage": "https://hopr.network",
+  "homepage": "https://hoprnet.io",
   "repository": {
     "type": "git",
     "url": "https://github.com/hoprnet/hopr-ethereum.git"
