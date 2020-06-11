@@ -15,7 +15,7 @@ const channelIdSubPrefix = encoder.encode('channelId-')
 const nonceSubPrefix = encoder.encode('nonce-')
 const ticketSubPrefix = encoder.encode('ticket-')
 const onChainSecretIntermediary = encoder.encode('onChainSecretIntermediary-')
-const confirmedBlockNumber = encoder.encode('confirmedBlockNumber-')
+const confirmedBlockNumber = encoder.encode('confirmedBlockNumber')
 
 const ON_CHAIN_SECRET_ITERATION_WIDTH = 4 // bytes
 
@@ -92,6 +92,10 @@ export function Nonce(channelId: Types.Hash, nonce: Types.Hash): Uint8Array {
     [SEPERATOR.length, SEPERATOR],
     [nonce.length, nonce],
   ])
+}
+
+export function OnChainSecret(): Uint8Array {
+  return OnChainSecretIntermediary(0)
 }
 
 export function OnChainSecretIntermediary(iteration: number): Uint8Array {
