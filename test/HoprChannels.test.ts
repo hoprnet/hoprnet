@@ -714,6 +714,7 @@ contract('HoprChannels', function ([accountA, accountB]) {
       expectEvent(response, 'SecretHashSet', {
         account: partyB,
         secretHash,
+        counter: '1',
       })
     })
 

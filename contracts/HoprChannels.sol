@@ -12,7 +12,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     using SafeMath for uint256;
 
     // an account has set a new secret hash
-    event SecretHashSet(address indexed account, bytes32 secretHash);
+    event SecretHashSet(address indexed account, bytes32 secretHash, uint256 counter);
 
     // the payment channel has been funded
     event FundedChannel(
@@ -99,7 +99,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         account.hashedSecret = hashedSecret;
         account.counter = account.counter += 1;
 
-        emit SecretHashSet(msg.sender, hashedSecret);
+        emit SecretHashSet(msg.sender, hashedSecret, account.counter);
     }
 
     /**
