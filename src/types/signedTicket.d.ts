@@ -3,13 +3,8 @@ import Ticket from './ticket'
 
 declare namespace SignedTicket {
   const SIZE: number
-}
-declare interface SignedTicket extends Uint8Array {
-  ticket: Ticket
-  signature: Signature
-  signer: Promise<Uint8Array>
 
-  create(
+  function create(
     arr?: {
       bytes: Uint8Array
       offset: number
@@ -18,7 +13,12 @@ declare interface SignedTicket extends Uint8Array {
       ticket: Ticket
       signature: Signature
     }
-  ): SignedTicket
+  ): Promise<SignedTicket>
+}
+declare interface SignedTicket extends Uint8Array {
+  ticket: Ticket
+  signature: Signature
+  signer: Promise<Uint8Array>
 
   verify(pubKey: Uint8Array): Promise<boolean>
 }

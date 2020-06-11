@@ -3,14 +3,8 @@ import Signature from './signature'
 
 declare namespace SignedChannel {
   const SIZE: number
-}
 
-declare interface SignedChannel extends Uint8Array {
-  channel: Channel
-  signature: Signature
-  signer: Promise<Uint8Array>
-
-  create(
+  function create(
     arr?: {
       bytes: Uint8Array
       offset: number
@@ -19,7 +13,13 @@ declare interface SignedChannel extends Uint8Array {
       ticket: Channel
       signature: Signature
     }
-  ): SignedChannel
+  ): Promise<SignedChannel>
+}
+
+declare interface SignedChannel extends Uint8Array {
+  channel: Channel
+  signature: Signature
+  signer: Promise<Uint8Array>
 
   verify(pubKey: Uint8Array): Promise<boolean>
 }
