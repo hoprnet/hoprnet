@@ -95,3 +95,16 @@ export async function createNode(privKey: Uint8Array): Promise<CoreConnector> {
     debug: true,
   })
 }
+
+/**
+ * Disconnect web3 as if it lost connection
+ * @param web3 Web3 instance
+ */
+export async function disconnectWeb3(web3: Web3): Promise<void> {
+  try {
+    // @ts-ignore
+    return web3.currentProvider.disconnect(4000)
+  } catch (err) {
+    // console.error(err)
+  }
+}

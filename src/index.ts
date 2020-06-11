@@ -63,18 +63,6 @@ export default class HoprEthereum implements HoprCoreConnector {
   readonly CHAIN_NAME = 'HOPR on Ethereum'
 
   /**
-   * Returns the current balances of the account associated with this node (HOPR)
-   * @returns a promise resolved to Balance
-   */
-
-  /**
-   * Returns the current native balance (ETH)
-   * @returns a promise resolved to Balance
-   */
-
-  // get ticketEpoch(): Promise<TicketEpoch> {}
-
-  /**
    * Initialises the connector, e.g. connect to a blockchain node.
    */
   async start() {
@@ -199,6 +187,8 @@ export default class HoprEthereum implements HoprCoreConnector {
           this.indexer.start(),
           // check account secret
           this.checkAccountSecret(),
+          // fetch ticketEpoch
+          this.account.ticketEpoch,
         ])
 
         this._status = 'initialized'

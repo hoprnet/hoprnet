@@ -123,7 +123,6 @@ class ChannelFactory {
       {
         channelId,
         challenge,
-        // @TODO set this dynamically
         epoch: new TicketEpoch(0),
         amount: new Balance(0),
         winProb,

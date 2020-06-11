@@ -132,8 +132,10 @@ export class HoprChannels extends Contract {
     SecretHashSet: ContractEvent<{
       account: string;
       secretHash: string;
+      counter: string;
       0: string;
       1: string;
+      2: string;
     }>;
     allEvents: (
       options?: EventOptions,

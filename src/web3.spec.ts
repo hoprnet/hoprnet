@@ -2,21 +2,12 @@ import assert from 'assert'
 import Web3 from 'web3'
 import { Ganache } from '@hoprnet/hopr-ethereum'
 import { time } from './utils'
+import { disconnectWeb3 } from './utils/testing'
 import * as configs from './config'
 
 describe('test web3 connect/reconnect', function () {
   const ganache = new Ganache()
   let web3: Web3
-
-  // disconnect provide, mimic behaviour when connection is lost
-  const disconnect = async () => {
-    try {
-      // @ts-ignore
-      return web3.currentProvider.disconnect(4000)
-    } catch (err) {
-      // console.error(err)
-    }
-  }
 
   beforeEach(async function () {
     await ganache.start()
@@ -39,7 +30,7 @@ describe('test web3 connect/reconnect', function () {
     const deferred = web3.eth.getBlockNumber()
 
     // disconnect
-    await disconnect()
+    await disconnectWeb3(web3)
 
     // wait for reponse
     const blockNumber = await deferred
@@ -56,7 +47,7 @@ describe('test web3 connect/reconnect', function () {
       sub.on('connected', function (result) {
         if (count === 0) {
           // trigger "unexpected" disconnect
-          disconnect()
+          disconnectWeb3(web3)
         } else if (count === 1) {
           // exit point
           assert(result)
@@ -85,7 +76,7 @@ describe('test web3 connect/reconnect', function () {
         .on('data', function (result) {
           if (count === 0) {
             // trigger "unexpected" disconnect
-            disconnect()
+            disconnectWeb3(web3)
           } else if (count === 1) {
             // exit point
             assert(result.parentHash)
@@ -112,7 +103,7 @@ describe('test web3 connect/reconnect', function () {
   //     })
   //   })
 
-  //   disconnect()
+  //   disconnectWeb3(web3)
 
   //   return p
   // })
@@ -128,7 +119,7 @@ describe('test web3 connect/reconnect', function () {
   //     sub.on('data', async function (result) {
   //       if (count === 0) {
   //         // trigger "unexpected" disconnect
-  //         await disconnect()
+  //         await disconnectWeb3(web3)
   //         await time.advanceBlock(web3)
   //       } else if (count === 1) {
   //         // exit point

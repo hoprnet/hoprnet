@@ -27,7 +27,7 @@
   "dependencies": {
     "@hoprnet/hopr-core-connector-interface": "~1.2.3-dev.c56797a",
     "@hoprnet/hopr-demo-seeds": "~1.0.1",
-    "@hoprnet/hopr-ethereum": "~0.3.2-dev.00cc125",
+    "@hoprnet/hopr-ethereum": "~0.3.4-dev.1848af4",
     "@hoprnet/hopr-utils": "~0.1.3",
     "bn.js": "^5.1.1",
     "chalk": "^4.0.0",

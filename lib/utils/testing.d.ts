@@ -38,3 +38,8 @@ export declare function createAccountAndFund(web3: Web3, hoprToken: HoprToken, f
  * @returns CoreConnector
  */
 export declare function createNode(privKey: Uint8Array): Promise<CoreConnector>;
+/**
+ * Disconnect web3 as if it lost connection
+ * @param web3 Web3 instance
+ */
+export declare function disconnectWeb3(web3: Web3): Promise<void>;

@@ -1,12 +1,14 @@
-import HoprEthereum from '.'
-
+import type HoprEthereum from '.'
+import { stringToU8a } from '@hoprnet/hopr-utils'
 import { AccountId, Balance, Hash, NativeBalance, TicketEpoch } from './types'
 import { pubKeyToAccountId } from './utils'
-import { stringToU8a } from '@hoprnet/hopr-utils'
+import { ContractEventEmitter } from './tsc/web3/types'
 
 class Account {
   private _address?: AccountId
   private _nonceIterator: AsyncIterator<number>
+  private _ticketEpoch: TicketEpoch
+  private _ticketEpochListener: ContractEventEmitter<any>
 
   /**
    * The accounts keys:
@@ -21,6 +23,7 @@ class Account {
       pubKey: Uint8Array
     }
   }
+
   constructor(public coreConnector: HoprEthereum, privKey: Uint8Array, pubKey: Uint8Array) {
     this.keys = {
       onChain: {
@@ -46,6 +49,10 @@ class Account {
     return this._nonceIterator.next().then((res) => res.value)
   }
 
+  /**
+   * Returns the current balances of the account associated with this node (HOPR)
+   * @returns a promise resolved to Balance
+   */
   get balance(): Promise<Balance> {
     return new Promise<Balance>(async (resolve, reject) => {
       try {
@@ -56,6 +63,10 @@ class Account {
     })
   }
 
+  /**
+   * Returns the current native balance (ETH)
+   * @returns a promise resolved to Balance
+   */
   get nativeBalance(): Promise<NativeBalance> {
     return new Promise(async (resolve, reject) => {
       try {
@@ -69,12 +80,41 @@ class Account {
   get ticketEpoch(): Promise<TicketEpoch> {
     return new Promise(async (resolve, reject) => {
       try {
-        resolve(
-          new TicketEpoch(
-            (await this.coreConnector.hoprChannels.methods.accounts((await this.address).toHex()).call()).counter
-          )
+        if (typeof this._ticketEpoch !== 'undefined') {
+          return resolve(this._ticketEpoch)
+        }
+
+        // listen for 'SecretHashSet' events and update 'ticketEpoch'
+        // on error, safely reset 'ticketEpoch' & event listener
+        this._ticketEpochListener = this.coreConnector.hoprChannels.events
+          .SecretHashSet({
+            fromBlock: 'latest',
+            filter: {
+              account: (await this.address).toHex(),
+            },
+          })
+          .on('data', (event) => {
+            this.coreConnector.log('new ticketEpoch', event.returnValues.counter)
+
+            this._ticketEpoch = new TicketEpoch(event.returnValues.counter)
+          })
+          .on('error', (error) => {
+            this.coreConnector.log('error listening to SecretHashSet events', error.message)
+
+            this._ticketEpochListener.removeAllListeners()
+            this._ticketEpoch = undefined
+          })
+
+        this._ticketEpoch = new TicketEpoch(
+          (await this.coreConnector.hoprChannels.methods.accounts((await this.address).toHex()).call()).counter
         )
+
+        resolve(this._ticketEpoch)
       } catch (err) {
+        // reset everything on unexpected error
+        this._ticketEpochListener.removeAllListeners()
+        this._ticketEpoch = undefined
+
         reject(err)
       }
     })

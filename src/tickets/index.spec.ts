@@ -183,8 +183,8 @@ describe('test ticket generation and verification', function () {
 
     const hashA = await coreConnector.utils.hash(randomBytes(32))
     const hashB = await coreConnector.utils.hash(randomBytes(32))
-    const signedTicketA = (await channel.ticket.create(new Balance(1), new Hash(hashA))) as SignedTicket
-    const signedTicketB = (await channel.ticket.create(new Balance(1), new Hash(hashB))) as SignedTicket
+    const signedTicketA = await channel.ticket.create(new Balance(1), new Hash(hashA))
+    const signedTicketB = await channel.ticket.create(new Balance(1), new Hash(hashB))
 
     await Promise.all([
       coreConnector.tickets.store(channelId, signedTicketA),
