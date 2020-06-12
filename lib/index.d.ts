@@ -12,6 +12,7 @@ import * as constants from './constants';
 import { HoprChannels } from './tsc/web3/HoprChannels';
 import { HoprToken } from './tsc/web3/HoprToken';
 import Account from './account';
+import HashedSecret from './hashedSecret';
 export default class HoprEthereum implements HoprCoreConnector {
     db: LevelUp;
     web3: Web3;
@@ -33,6 +34,7 @@ export default class HoprEthereum implements HoprCoreConnector {
     indexer: Indexer;
     account: Account;
     tickets: Tickets;
+    hashedSecret: HashedSecret;
     constructor(db: LevelUp, web3: Web3, network: addresses.Networks, hoprChannels: HoprChannels, hoprToken: HoprToken, options: {
         debug: boolean;
     }, privateKey: Uint8Array, publicKey: Uint8Array);
@@ -68,20 +70,10 @@ export default class HoprEthereum implements HoprCoreConnector {
      */
     initialize(): Promise<void>;
     /**
-     * Checks whether node has an account secret set onchain and offchain
-     * @returns a promise resolved true if secret is set correctly
-     */
-    checkAccountSecret(): Promise<void>;
-    /**
-     * generate and set account secret
-     */
-    setAccountSecret(nonce?: number): Promise<void>;
-    /**
      * Checks whether web3 connection is alive
      * @returns a promise resolved true if web3 connection is alive
      */
     checkWeb3(): Promise<void>;
-    private getDebugAccountSecret;
     static get constants(): typeof constants;
     /**
      * Creates an uninitialised instance.
