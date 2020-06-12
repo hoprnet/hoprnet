@@ -13,6 +13,7 @@ The combination of both schemes yields a construction that allows a sender to hi
 
 To hide who is communicating with whom, sender and receiver need other parties to help them hide this metadata. More precisely, sender and receiver will always rely on services provides by other parties. Perhaps due to their ideological beliefs, these parties may choose to deliver this service _for free_, which in this context mean that these parties pay any incurred costs. These costs include not only buying the necessary hardware but also recurring costs like electricity or bandwidth. In addition, there may also be [legal costs](https://trac.torproject.org/projects/tor/wiki/TorRelayGuide#Legalconsiderationsforexitrelayoperators) of dealing with abuse complaints.
 
-If there is **no incentive** to run a service that provides anonymity, people that use this network need to rely on altruistic parties who offer such a service for the greater good. Such parties certainly exist, but it is naive to count on them existing in large enough numbers to support a widespread and reliable network. This becomes especially problematic for anyone who relies on such a network or who wants to run an application on top of such a network at scale. 
+If there is **no incentive** to run a service that provides anonymity, people that use this network need to rely on altruistic parties who offer such a service for the greater good. Such parties certainly exist, but it is naive to count on them existing in large enough numbers to support a widespread and reliable network. This becomes especially problematic for anyone who relies on such a network or who wants to run an application on top of such a network at scale.
 
-It is therefore necessary to encourage participation by compensating the parties who provide anonymity as a service. 
+It is therefore necessary to encourage participation by compensating the parties who provide anonymity as a service.
+

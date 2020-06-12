@@ -28,8 +28,10 @@ To ensure your machine has successfully downloaded **HOPR Chat,** run `docker im
 
 ## Step 3 - **Running HOPR Chat**
 
-To run **HOPR Chat,** you only need to copy and paste the following command. You can replace `switzerland` for anything else, but ensure to always use the same password as this will be used by **HOPR Chat**. Furthermore, you can also use your own [Infura](https://infura.io/) credentials instead of the ones provided here, but ensure you use the Kovan provider.
+To run **HOPR Chat,** you only need to copy and paste the following command. You can replace `switzerland` for anything else, but ensure to always use the same password as this will be used by **HOPR Chat**. In case you see an `Unable to connect to Bootstrap node` message, use one of our other bootstrap nodes. Furthermore, you can also use your own [Infura](https://infura.io/) credentials instead of the ones provided here, but ensure you use the Kovan provider.
 
+{% tabs %}
+{% tab title="ch-01" %}
 ```text
 docker run -v $(pwd)/db:/app/db \
 -e HOST_IPV4=0.0.0.0:9091 \
@@ -37,6 +39,28 @@ docker run -v $(pwd)/db:/app/db \
 -e ETHEREUM_PROVIDER=wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36 \
 -p 9091:9091 -it hopr/chat -p switzerland
 ```
+{% endtab %}
+
+{% tab title="ch-02" %}
+```text
+docker run -v $(pwd)/db:/app/db \
+-e HOST_IPV4=0.0.0.0:9091 \
+-e BOOTSTRAP_SERVERS=/dns4/ch-test-02.hoprnet.io/tcp/9091/p2p/16Uiu2HAmBSzk28qQ8bfpwVgEjef4q51kGg8GjEk3MinyyTB2WTGn \
+-e ETHEREUM_PROVIDER=wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36 \
+-p 9091:9091 -it hopr/chat -p switzerland
+```
+{% endtab %}
+
+{% tab title="ch-03" %}
+```
+docker run -v $(pwd)/db:/app/db \
+-e HOST_IPV4=0.0.0.0:9091 \
+-e BOOTSTRAP_SERVERS=/dns4/ch-test-03.hoprnet.io/tcp/9091/p2p/16Uiu2HAm4H1ZxPb9KkoYD928Smrjnr2igYP8vBFbZKs5B8gchTnT \
+-e ETHEREUM_PROVIDER=wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36 \
+-p 9091:9091 -it hopr/chat -p switzerland
+```
+{% endtab %}
+{% endtabs %}
 
 You will be welcomed by **HOPR Chat**’s introductory screen which provides you with further instructions on how to move forward.
 
@@ -54,6 +78,40 @@ Copy your account from Step 3, and paste it in the following websites.
 * HOPR Network Faucet - [https://faucet.hoprnet.io/](https://faucet.hoprnet.io/)
 
 **HOPR Chat** will not fully initialise until your account has been funded with some Kovan ETH and HOPR. After the tokens have landed in your account, you are ready to use **HOPR Chat.** Execute the same command shared in Step 3 to see the following screen.
+
+![HOPR Chat will tell you its balance in Kovan ETH and HOPR tokens](../../.gitbook/assets/running_hopr_chat_w_balance.gif)
+
+Your **HOPR Chat** instance is ready to be used!
+
+## Step 5 - Sending a HOPR message
+
+With **HOPR Chat** up and running, you can now send messages to any connected nodes in the network. You can have another friend send you their address, or you can also start another **HOPR Chat** instance. You will need to follow Steps 3 and 4 in this new account in case you decide to go through, but you can also find **HOPR Chat** users in our [Telegram channel](https://t.me/hoprnet).
+
+First, ensure you have enough **HOPR Tokens** to send and receive messages. Run `balance` to see the previous screen from Step 4. Now, let's ensure there are some nodes to talk to. To do so, run `crawl`, which will show you existing users you can talk to.
+
+![The crawl command will show you other connected nodes.](../../.gitbook/assets/running_hopr_chat_and_crawling.gif)
+
+To talk to other users, copy another connected user address and send a message to them with the `send` command. This will look something like `send 16Uiu2HAmCtWxx3Ky3ZjtWj1whkezdRvMAYKU9f57CRPj2FkPtWsD`, which will trigger **HOPR Chat** to prompt you for a message to send.
+
+![Your message will be sent privately through the HOPR network](../../.gitbook/assets/running_hopr_chat_and_sending.gif)
+
+Congratulations! You have communicated with another individual using a privacy-preserving decentralised protocol. **HOPR Chat** is right now only a Proof-of-Concept but it can already show you the capabilities the protocol can have.
+
+## Additional Notes
+
+### Bootstrap Nodes
+
+For **HOPR Chat** to work, you need to make sure you provide it with at least one **HOPR Chat** node in Bootstrap Mode. Anyone can spin a **HOPR Chat** in this mode by adding the flag `-b` at the end of the command. Feel free to use any \(or all\) of the following URLs as your `BOOTSTRAP_SERVERS` parameter in your **HOPR Chat** Docker image.
+
+* `/dns4/ch-test-01.hoprnet.io/tcp/9091/p2p/16Uiu2HAmThyWP5YWutPmYk9yUZ48ryWyZ7Cf6pMTQduvHUS9sGE7`
+* `/dns4/ch-test-02.hoprnet.io/tcp/9091/p2p/16Uiu2HAmBSzk28qQ8bfpwVgEjef4q51kGg8GjEk3MinyyTB2WTGn`
+* `/dns4/ch-test-03.hoprnet.io/tcp/9091/p2p/16Uiu2HAm4H1ZxPb9KkoYD928Smrjnr2igYP8vBFbZKs5B8gchTnT`
+
+These nodes are behind HOPR Services AG DNS registry. In case you want to directly access them without the DNS request, you can simply pass these directly.
+
+* `/ip4/34.65.237.196/tcp/9091/p2p/16Uiu2HAmThyWP5YWutPmYk9yUZ48ryWyZ7Cf6pMTQduvHUS9sGE7`
+* `/ip4/34.65.119.138/tcp/9091/p2p/16Uiu2HAmBSzk28qQ8bfpwVgEjef4q51kGg8GjEk3MinyyTB2WTGn`
+* `/ip4/34.65.120.13/tcp/9091/p2p/16Uiu2HAm4H1ZxPb9KkoYD928Smrjnr2igYP8vBFbZKs5B8gchTnT`
 
 
 

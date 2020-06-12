@@ -4,7 +4,7 @@ description: A general introduction to the HOPR ecosystem.
 
 # Overview
 
-The HOPR ecosystem is a two-platform network with dynamic components powering its communication and incentivization mechanisms. 
+The HOPR ecosystem is a two-platform network with dynamic components powering its communication and incentivization mechanisms.
 
 **HOPR Core** is our privacy-networking protocol able to communicate and transfer messages securely. This is complemented by a **payment gateway**, which is a distributed ledger technology \(DLT\) or blockchain infrastructure able to open payment channels on behalf of nodes running in the HOPR Network.
 
