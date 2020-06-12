@@ -123,7 +123,6 @@ class ChannelFactory {
       {
         channelId,
         challenge,
-        // @TODO set this dynamically
         epoch: new TicketEpoch(0),
         amount: new Balance(0),
         winProb,
@@ -188,7 +187,7 @@ class ChannelFactory {
     let channel: Channel
     let signedChannel: SignedChannel
 
-    if (!this.coreConnector._onChainValuesInitialized) {
+    if (!this.coreConnector.hashedSecret._onChainValuesInitialized) {
       await this.coreConnector.initOnchainValues()
     }
 

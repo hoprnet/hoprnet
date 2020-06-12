@@ -10,7 +10,7 @@ import { u8aEquals, u8aToHex, stringToU8a } from '@hoprnet/hopr-utils'
 export const GIANT_STEP_WIDTH = 10000
 export const TOTAL_ITERATIONS = 100000
 class HashedSecret {
-  private _onChainValuesInitialized: boolean
+  public _onChainValuesInitialized: boolean
 
   constructor(private coreConnector: HoprEthereum) {
     this._onChainValuesInitialized = false
@@ -102,8 +102,6 @@ class HashedSecret {
         if (this.coreConnector.options.debug) {
           this.create()
           hasOffChainSecret = true
-        } else {
-          throw Error(`Key is present on-chain but not in our database.`)
         }
       }
     }

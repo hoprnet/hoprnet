@@ -4,7 +4,7 @@ export declare const GIANT_STEP_WIDTH = 10000;
 export declare const TOTAL_ITERATIONS = 100000;
 declare class HashedSecret {
     private coreConnector;
-    private _onChainValuesInitialized;
+    _onChainValuesInitialized: boolean;
     constructor(coreConnector: HoprEthereum);
     /**
      * generate and set account secret

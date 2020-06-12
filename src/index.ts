@@ -23,7 +23,6 @@ import HashedSecret from './hashedSecret'
 export default class HoprEthereum implements HoprCoreConnector {
   private _status: 'uninitialized' | 'initialized' | 'started' | 'stopped' = 'uninitialized'
   private _initializing: Promise<void>
-  public _onChainValuesInitialized: boolean
   private _starting: Promise<void>
   private _stopping: Promise<void>
   public signTransaction: ReturnType<typeof utils.TransactionSigner>
@@ -55,7 +54,6 @@ export default class HoprEthereum implements HoprCoreConnector {
     this.types = new types()
     this.channel = new ChannelFactory(this)
 
-    this._onChainValuesInitialized = false
     this.signTransaction = utils.TransactionSigner(web3, privateKey)
     this.log = utils.Log()
   }
@@ -64,18 +62,6 @@ export default class HoprEthereum implements HoprCoreConnector {
   readonly utils = utils
   readonly constants = constants
   readonly CHAIN_NAME = 'HOPR on Ethereum'
-
-  /**
-   * Returns the current balances of the account associated with this node (HOPR)
-   * @returns a promise resolved to Balance
-   */
-
-  /**
-   * Returns the current native balance (ETH)
-   * @returns a promise resolved to Balance
-   */
-
-  // get ticketEpoch(): Promise<TicketEpoch> {}
 
   /**
    * Initialises the connector, e.g. connect to a blockchain node.
@@ -166,13 +152,7 @@ export default class HoprEthereum implements HoprCoreConnector {
    * @param nonce optional specify nonce of the account to run multiple queries simultaneously
    */
   async initOnchainValues(nonce?: number): Promise<void> {
-    if (this._onChainValuesInitialized) {
-      return
-    }
-
     await this.hashedSecret.submit(nonce)
-
-    this._onChainValuesInitialized = true
   }
 
   /**

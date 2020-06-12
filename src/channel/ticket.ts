@@ -31,7 +31,7 @@ class TicketFactory {
       {
         channelId,
         challenge,
-        epoch: new TicketEpoch(1), // @TODO: set this dynamically
+        epoch: await this.channel.coreConnector.account.ticketEpoch,
         amount: new Balance(amount.toString()),
         winProb,
         onChainSecret: new Hash(), // @TODO: set pre_image

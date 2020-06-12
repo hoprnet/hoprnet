@@ -90,8 +90,21 @@ export async function createAccountAndFund(
  * @param privKey the private key of the connector
  * @returns CoreConnector
  */
-export async function createNode(privKey: Uint8Array): Promise<CoreConnector> {
+export async function createNode(privKey: Uint8Array, debug: boolean = true): Promise<CoreConnector> {
   return CoreConnector.create(new LevelUp(Memdown()), privKey, {
-    debug: true,
+    debug,
   })
+}
+
+/**
+ * Disconnect web3 as if it lost connection
+ * @param web3 Web3 instance
+ */
+export async function disconnectWeb3(web3: Web3): Promise<void> {
+  try {
+    // @ts-ignore
+    return web3.currentProvider.disconnect(4000)
+  } catch (err) {
+    // console.error(err)
+  }
 }

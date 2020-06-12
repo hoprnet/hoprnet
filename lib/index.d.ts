@@ -24,7 +24,6 @@ export default class HoprEthereum implements HoprCoreConnector {
     };
     private _status;
     private _initializing;
-    _onChainValuesInitialized: boolean;
     private _starting;
     private _stopping;
     signTransaction: ReturnType<typeof utils.TransactionSigner>;
@@ -42,14 +41,6 @@ export default class HoprEthereum implements HoprCoreConnector {
     readonly utils: typeof utils;
     readonly constants: typeof constants;
     readonly CHAIN_NAME = "HOPR on Ethereum";
-    /**
-     * Returns the current balances of the account associated with this node (HOPR)
-     * @returns a promise resolved to Balance
-     */
-    /**
-     * Returns the current native balance (ETH)
-     * @returns a promise resolved to Balance
-     */
     /**
      * Initialises the connector, e.g. connect to a blockchain node.
      */
