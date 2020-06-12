@@ -8,9 +8,7 @@ To get started with HOPR, we'll use **HOPR Chat**, a [REPL](https://en.wikipedia
 
 To use **HOPR Chat**, your system requires [Docker Desktop](https://www.docker.com/products/docker-desktop), a containerisation engine able to virtualise any application. To learn how to install Docker Desktop and **HOPR Chat** in your operating system, please use the following links.
 
+{% page-ref page="macos-quickstart.md" %}
+
 {% page-ref page="windows-quickstart.md" %}
-
-
-
-
 
