@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core-ethereum",
-  "version": "0.0.7-dev.a97f277",
+  "version": "0.0.8-dev.e9bc25b",
   "repository": "git@github.com:hoprnet/hopr-core-ethereum.git",
   "license": "LGPL-3.0-only",
   "types": "lib/index.d.ts",
