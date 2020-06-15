@@ -23,7 +23,7 @@ describe('test connector', function () {
 
     await ganache.start()
     await migrate()
-    await fund()
+    await fund(2)
 
     owner = await getPrivKeyData(stringToU8a(configs.FUND_ACCOUNT_PRIVATE_KEY))
     web3 = new Web3(configs.DEFAULT_URI)

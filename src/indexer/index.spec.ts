@@ -31,7 +31,7 @@ describe('test indexer', function () {
 
     await ganache.start()
     await migrate()
-    await fund()
+    await fund(4)
 
     web3 = new Web3(configs.DEFAULT_URI)
     hoprToken = new web3.eth.Contract(HoprTokenAbi as any, configs.TOKEN_ADDRESSES.private)
