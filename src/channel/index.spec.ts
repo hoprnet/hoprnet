@@ -1,6 +1,6 @@
 import { Ganache, migrate } from '@hoprnet/hopr-ethereum'
 import assert from 'assert'
-import { stringToU8a, u8aToHex, u8aEquals, u8aXOR } from '@hoprnet/hopr-utils'
+import { stringToU8a, u8aToHex, u8aEquals, durations } from '@hoprnet/hopr-utils'
 import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
 import { getPrivKeyData, createAccountAndFund, createNode } from '../utils/testing'
 import BN from 'bn.js'
@@ -62,6 +62,8 @@ describe('test Channel class', function () {
   })
 
   it('should create a channel', async function () {
+    this.timeout(durations.minutes(1))
+
     const channelType = new ChannelType(undefined, {
       balance: new ChannelBalance(undefined, {
         balance: new BN(123),

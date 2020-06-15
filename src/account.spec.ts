@@ -4,9 +4,8 @@ import type { Await } from './tsc/utils'
 import type CoreConnector from '.'
 import assert from 'assert'
 import Web3 from 'web3'
-import { randomBytes } from 'crypto'
 import { Ganache, migrate } from '@hoprnet/hopr-ethereum'
-import { stringToU8a, u8aToHex, durations } from '@hoprnet/hopr-utils'
+import { stringToU8a, durations } from '@hoprnet/hopr-utils'
 import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
 import HoprChannelsAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprChannels.json'
 import { getPrivKeyData, createAccountAndFund, createNode, disconnectWeb3 } from './utils/testing'
@@ -38,9 +37,10 @@ describe('test Account class', function () {
   })
 
   beforeEach(async function () {
+    this.timeout(durations.minutes(1))
     funder = await getPrivKeyData(stringToU8a(configs.FUND_ACCOUNT_PRIVATE_KEY))
     user = await createAccountAndFund(web3, hoprToken, funder, configs.DEMO_ACCOUNTS[1])
-    coreConnector = await createNode(user.privKey)
+    coreConnector = await createNode(user.privKey, false)
 
     // wait until it starts
     await coreConnector.start()
@@ -59,9 +59,7 @@ describe('test Account class', function () {
     })
 
     it('should be 2 after setting new secret', async function () {
-      await hoprChannels.methods.setHashedSecret(u8aToHex(randomBytes(32))).send({
-        from: (await coreConnector.account.address).toHex(),
-      })
+      this.timeout(durations.seconds(4))
 
       const ticketEpoch = await coreConnector.account.ticketEpoch
 
@@ -75,10 +73,6 @@ describe('test Account class', function () {
 
       // wait for reconnection
       await wait(durations.seconds(2))
-
-      await hoprChannels.methods.setHashedSecret(u8aToHex(randomBytes(32))).send({
-        from: (await coreConnector.account.address).toHex(),
-      })
 
       const ticketEpoch = await coreConnector.account.ticketEpoch
 

@@ -32,10 +32,8 @@ export declare function ChannelId(signatureHash: Types.Hash): Uint8Array;
  * @param nonce the nonce
  */
 export declare function Nonce(channelId: Types.Hash, nonce: Types.Hash): Uint8Array;
-/**
- * Returns the db-key under which the on-chain secret is saved.
- */
 export declare function OnChainSecret(): Uint8Array;
+export declare function OnChainSecretIntermediary(iteration: number): Uint8Array;
 /**
  * Returns the db-key under which the tickets are saved in the database.
  */

@@ -71,9 +71,9 @@ describe('test dbKeys', function () {
 
   it("should create 'OnChainSecret' key", function () {
     const result = dbKeys.OnChainSecret()
-    const expected = encoder.encode('payments-onChainSecret')
+    const expected = 'payments-onChainSecretIntermediary'
 
-    assert(u8aEquals(result, expected), 'check onChainSecret key creation')
+    assert(new TextDecoder().decode(result).startsWith(expected), 'check onChainSecret key creation')
   })
 
   it("should create 'Ticket' key", function () {

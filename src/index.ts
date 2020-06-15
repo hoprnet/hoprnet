@@ -18,11 +18,11 @@ import * as config from './config'
 import { HoprChannels } from './tsc/web3/HoprChannels'
 import { HoprToken } from './tsc/web3/HoprToken'
 import Account from './account'
+import HashedSecret from './hashedSecret'
 
 export default class HoprEthereum implements HoprCoreConnector {
   private _status: 'uninitialized' | 'initialized' | 'started' | 'stopped' = 'uninitialized'
   private _initializing: Promise<void>
-  public _onChainValuesInitialized: boolean
   private _starting: Promise<void>
   private _stopping: Promise<void>
   public signTransaction: ReturnType<typeof utils.TransactionSigner>
@@ -33,6 +33,7 @@ export default class HoprEthereum implements HoprCoreConnector {
   public indexer: Indexer
   public account: Account
   public tickets: Tickets
+  public hashedSecret: HashedSecret
 
   constructor(
     public db: LevelUp,
@@ -46,13 +47,13 @@ export default class HoprEthereum implements HoprCoreConnector {
     privateKey: Uint8Array,
     publicKey: Uint8Array
   ) {
+    this.hashedSecret = new HashedSecret(this)
     this.account = new Account(this, privateKey, publicKey)
     this.indexer = new Indexer(this)
     this.tickets = new Tickets(this)
     this.types = new types()
     this.channel = new ChannelFactory(this)
 
-    this._onChainValuesInitialized = false
     this.signTransaction = utils.TransactionSigner(web3, privateKey)
     this.log = utils.Log()
   }
@@ -151,13 +152,7 @@ export default class HoprEthereum implements HoprCoreConnector {
    * @param nonce optional specify nonce of the account to run multiple queries simultaneously
    */
   async initOnchainValues(nonce?: number): Promise<void> {
-    if (this._onChainValuesInitialized) {
-      return
-    }
-
-    await this.setAccountSecret(nonce)
-
-    this._onChainValuesInitialized = true
+    await this.hashedSecret.submit(nonce)
   }
 
   /**
@@ -186,9 +181,7 @@ export default class HoprEthereum implements HoprCoreConnector {
           // start channels indexing
           this.indexer.start(),
           // check account secret
-          this.checkAccountSecret(),
-          // fetch ticketEpoch
-          this.account.ticketEpoch,
+          this.hashedSecret.check(),
         ])
 
         this._status = 'initialized'
@@ -202,99 +195,6 @@ export default class HoprEthereum implements HoprCoreConnector {
       })
 
     return this._initializing
-  }
-
-  /**
-   * Checks whether node has an account secret set onchain and offchain
-   * @returns a promise resolved true if secret is set correctly
-   */
-  async checkAccountSecret(): Promise<void> {
-    let [onChainSecret, offChainSecret] = await Promise.all([
-      // get onChainSecret
-      this.hoprChannels.methods
-        .accounts((await this.account.address).toHex())
-        .call()
-        .then((res) => stringToU8a(res.hashedSecret))
-        .then((secret: Uint8Array) => {
-          if (u8aEquals(secret, new Uint8Array(this.types.Hash.SIZE).fill(0x00))) {
-            return undefined
-          }
-
-          return secret
-        }),
-      // get offChainSecret
-      this.db.get(Buffer.from(dbkeys.OnChainSecret())).catch((err) => {
-        if (err.notFound != true) {
-          throw err
-        }
-      }),
-    ])
-
-    // @TODO check with most recent exponent and fail if it is not equal
-    // if (!u8aEquals(onChainSecret, offChainSecret)) {
-    //   throw Error(`Inconsistency found. On-chain secret is set to ${u8aToHex(onChainSecret)} whilst off-chain secret is  ${u8aToHex(offChainSecret)}`)
-    // }
-
-    let hasOffChainSecret = typeof offChainSecret !== 'undefined'
-    let hasOnChainSecret = typeof onChainSecret !== 'undefined'
-
-    if (hasOffChainSecret !== hasOnChainSecret) {
-      if (hasOffChainSecret) {
-        this.log(`Key is present off-chain but not on-chain, submitting..`)
-        // @TODO this potentially dangerous because it increases the account counter
-        await utils.waitForConfirmation(
-          (
-            await this.signTransaction(this.hoprChannels.methods.setHashedSecret(u8aToHex(offChainSecret)), {
-              from: (await this.account.address).toHex(),
-              to: this.hoprChannels.options.address,
-              nonce: await this.account.nonce,
-            })
-          ).send()
-        )
-        hasOnChainSecret = true
-      } else {
-        this.log(`Key is present on-chain but not in our database.`)
-        if (this.options.debug) {
-          await this.db.put(Buffer.from(dbkeys.OnChainSecret()), Buffer.from(this.getDebugAccountSecret()))
-          hasOffChainSecret = true
-        } else {
-          throw Error(`Key is present on-chain but not in our database.`)
-        }
-      }
-    }
-
-    this._onChainValuesInitialized = hasOffChainSecret && hasOnChainSecret
-  }
-
-  /**
-   * generate and set account secret
-   */
-  async setAccountSecret(nonce?: number): Promise<void> {
-    let secret: Uint8Array
-    if (this.options.debug) {
-      secret = this.getDebugAccountSecret()
-    } else {
-      secret = new Uint8Array(randomBytes(32))
-    }
-
-    const dbPromise = this.db.put(Buffer.from(this.dbKeys.OnChainSecret()), Buffer.from(secret.slice()))
-
-    for (let i = 0; i < 500; i++) {
-      secret = await this.utils.hash(secret)
-    }
-
-    await Promise.all([
-      await utils.waitForConfirmation(
-        (
-          await this.signTransaction(this.hoprChannels.methods.setHashedSecret(u8aToHex(secret)), {
-            from: (await this.account.address).toHex(),
-            to: this.hoprChannels.options.address,
-            nonce: nonce || (await this.account.nonce),
-          })
-        ).send()
-      ),
-      dbPromise,
-    ])
   }
 
   /**
@@ -312,10 +212,6 @@ export default class HoprEthereum implements HoprCoreConnector {
     if (!isListening) {
       throw Error('web3 is not connected')
     }
-  }
-
-  private getDebugAccountSecret(): Uint8Array {
-    return createHash('sha256').update(this.account.keys.onChain.pubKey).digest()
   }
 
   static get constants() {

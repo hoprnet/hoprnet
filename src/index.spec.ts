@@ -1,6 +1,6 @@
 import assert from 'assert'
 import Web3 from 'web3'
-import { stringToU8a } from '@hoprnet/hopr-utils'
+import { stringToU8a, u8aEquals } from '@hoprnet/hopr-utils'
 import { Ganache, migrate, fund } from '@hoprnet/hopr-ethereum'
 import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
 import HoprEthereum from '.'
@@ -23,7 +23,7 @@ describe('test connector', function () {
 
     await ganache.start()
     await migrate()
-    await fund()
+    await fund(2)
 
     owner = await getPrivKeyData(stringToU8a(configs.FUND_ACCOUNT_PRIVATE_KEY))
     web3 = new Web3(configs.DEFAULT_URI)
@@ -138,10 +138,21 @@ describe('test connector with 0 ETH and 0 HOPR', function () {
   })
 
   it('should create some 0-valued dummy tickets', async function () {
-    connector.channel.createDummyChannelTicket(
-      await connector.utils.pubKeyToAccountId(await connector.utils.privKeyToPubKey(randomBytes(32))),
+    const counterparty = await connector.utils.privKeyToPubKey(randomBytes(32))
+
+    const dummyTicket = await connector.channel.createDummyChannelTicket(
+      await connector.utils.pubKeyToAccountId(counterparty),
       new connector.types.Hash(randomBytes(32))
     )
+
+    assert(dummyTicket.ticket.getEmbeddedFunds().isZero())
+
+    assert(
+      await dummyTicket.verify(connector.account.keys.onChain.pubKey),
+      `ticket must be verifyable under the sender's public key`
+    )
+
+    assert(u8aEquals(await dummyTicket.signer, connector.account.keys.onChain.pubKey), `signer must be recoverable`)
   })
 
   // @TODO: move this test to utils
