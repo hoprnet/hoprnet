@@ -10,7 +10,7 @@ declare namespace SignedChannel {
       offset: number
     },
     struct?: {
-      ticket?: Channel
+      channel?: Channel
       signature?: Signature
     }
   ): Promise<SignedChannel>
