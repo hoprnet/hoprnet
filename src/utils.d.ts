@@ -33,8 +33,17 @@ export declare function hash(msg: Uint8Array): Promise<Hash>
  * @param msg message to sign
  * @param privKey private key of the signer
  * @param pubKey public key of the signer
+ * @param arr optional memory for the signature
  */
-export declare function sign(msg: Uint8Array, privKey: Uint8Array, pubKey: Uint8Array): Promise<Signature>
+export declare function sign(
+  msg: Uint8Array,
+  privKey: Uint8Array,
+  pubKey: Uint8Array,
+  arr?: {
+    bytes: ArrayBuffer
+    offset: number
+  }
+): Promise<Signature>
 
 /**
  * Uses the native on-chain signature scheme to check a signature for its validity.
