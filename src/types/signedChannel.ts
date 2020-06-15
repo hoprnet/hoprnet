@@ -42,10 +42,8 @@ class SignedChannel extends Uint8ArrayE implements Types.SignedChannel {
 
   get signature() {
     if (this._signature == null) {
-      const signature = this.subarray(0, Signature.SIZE)
-
       this._signature = new Signature({
-        bytes: signature.buffer,
+        bytes: this.buffer,
         offset: this.signatureOffset,
       })
     }
@@ -59,10 +57,8 @@ class SignedChannel extends Uint8ArrayE implements Types.SignedChannel {
 
   get channel() {
     if (this._channel == null) {
-      const channel = this.subarray(Signature.SIZE, Signature.SIZE + Channel.SIZE)
-
       this._channel = new Channel({
-        bytes: channel.buffer,
+        bytes: this.buffer,
         offset: this.channelOffset,
       })
     }

@@ -8,6 +8,7 @@ import { verify } from '../utils'
 class SignedTicket extends Uint8ArrayE implements Types.SignedTicket {
   private _ticket?: Ticket
   private _signature?: Signature
+  private _signer?: Uint8Array
 
   constructor(
     arr?: {
@@ -75,11 +76,17 @@ class SignedTicket extends Uint8ArrayE implements Types.SignedTicket {
   }
 
   get signer(): Promise<Uint8Array> {
+    if (this._signer != null) {
+      return Promise.resolve(this._signer)
+    }
+
     return new Promise(async (resolve, reject) => {
       try {
-        resolve(secp256k1.ecdsaRecover(this.signature.signature, this.signature.recovery, await this.ticket.hash))
+        this._signer = secp256k1.ecdsaRecover(this.signature.signature, this.signature.recovery, await this.ticket.hash)
+
+        return resolve(this.signer)
       } catch (err) {
-        reject(err)
+        return reject(err)
       }
     })
   }

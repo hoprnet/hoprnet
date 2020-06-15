@@ -4,6 +4,7 @@ import { Uint8ArrayE } from '../types/extended';
 declare class SignedTicket extends Uint8ArrayE implements Types.SignedTicket {
     private _ticket?;
     private _signature?;
+    private _signer?;
     constructor(arr?: {
         bytes: ArrayBuffer;
         offset: number;
