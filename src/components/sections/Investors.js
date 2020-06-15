@@ -64,17 +64,17 @@ class Investors extends React.Component {
                   />
                 </a>
               </li>
-              {/* <li className="reveal-from-bottom" data-reveal-delay="150">
-                <a href="https://www.bankfrick.li/en/" target="_blank" rel="noopener noreferrer">
+              <li className="reveal-from-bottom" data-reveal-delay="150">
+                <a href="https://www.sparkdigitalcapital.com/" target="_blank" rel="noopener noreferrer">
                   <Image
-                    src={require('./../../assets/images/partners/bank-frick.svg')}
-                    alt="Bank Frick Logo"
+                    src={require('./../../assets/images/partners/sparklogo.png')}
+                    alt="Spark Logo"
                     width={124}
                     height={24}
                   />
                 </a>
               </li>
-              <li className="reveal-from-bottom" data-reveal-delay="150">
+              {/* <li className="reveal-from-bottom" data-reveal-delay="150">
                 <a href="https://www.hbl.ch/de/" target="_blank" rel="noopener noreferrer">
                   <Image
                     src={require('./../../assets/images/partners/hbl.png')}
