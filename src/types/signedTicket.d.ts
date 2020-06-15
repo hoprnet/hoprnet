@@ -6,7 +6,7 @@ declare namespace SignedTicket {
 
   function create(
     arr?: {
-      bytes: Uint8Array
+      bytes: ArrayBuffer
       offset: number
     },
     struct?: {
