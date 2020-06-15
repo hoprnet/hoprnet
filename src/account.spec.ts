@@ -4,9 +4,8 @@ import type { Await } from './tsc/utils'
 import type CoreConnector from '.'
 import assert from 'assert'
 import Web3 from 'web3'
-import { randomBytes } from 'crypto'
 import { Ganache, migrate } from '@hoprnet/hopr-ethereum'
-import { stringToU8a, u8aToHex, durations } from '@hoprnet/hopr-utils'
+import { stringToU8a, durations } from '@hoprnet/hopr-utils'
 import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
 import HoprChannelsAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprChannels.json'
 import { getPrivKeyData, createAccountAndFund, createNode, disconnectWeb3 } from './utils/testing'
@@ -38,6 +37,7 @@ describe('test Account class', function () {
   })
 
   beforeEach(async function () {
+    this.timeout(durations.minutes(1))
     funder = await getPrivKeyData(stringToU8a(configs.FUND_ACCOUNT_PRIVATE_KEY))
     user = await createAccountAndFund(web3, hoprToken, funder, configs.DEMO_ACCOUNTS[1])
     coreConnector = await createNode(user.privKey, false)
