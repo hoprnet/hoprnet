@@ -21,6 +21,9 @@ declare interface SignedChannel extends Uint8Array {
   signature: Signature
   signer: Promise<Uint8Array>
 
+  signatureOffset: number
+  channelOffset: number
+
   verify(pubKey: Uint8Array): Promise<boolean>
 }
 

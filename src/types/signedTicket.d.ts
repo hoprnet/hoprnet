@@ -20,6 +20,9 @@ declare interface SignedTicket extends Uint8Array {
   signature: Signature
   signer: Promise<Uint8Array>
 
+  ticketOffset: number
+  signatureOffset: number
+
   verify(pubKey: Uint8Array): Promise<boolean>
 }
 
