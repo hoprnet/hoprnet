@@ -320,7 +320,7 @@ class TCP {
 
     let answer = (await relayShaker.read())?.slice()
 
-    if (u8aEquals(answer, OK)) {
+    if (answer != null && u8aEquals(answer, OK)) {
       shaker.write(OK)
     } else {
       log(`Could not relay to peer ${counterparty.toB58String()} because we are unable to deliver packets.`)
@@ -330,7 +330,7 @@ class TCP {
     shaker.rest()
     relayShaker.rest()
 
-    if (u8aEquals(answer, OK)) {
+    if (answer != null && u8aEquals(answer, OK)) {
       pipe(shaker.stream, relayShaker.stream, shaker.stream)
 
       pipe(relayShaker.stream, shaker.stream, relayShaker.stream)
@@ -567,7 +567,7 @@ class TCP {
 
     shaker.rest()
 
-    if (!u8aEquals(answer, OK)) {
+    if (answer == null || !u8aEquals(answer, OK)) {
       throw Error(
         `Could not establish relayed connection to ${chalk.blue(destination.toB58String())} over relay ${relays[
           index
