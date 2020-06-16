@@ -1,11 +1,13 @@
 import BigNumber from 'bignumber.js'
-const BN = require('bn.js')
-const Web3 = require('web3')
+import BN from 'bn.js'
+import Web3 from 'web3'
+
+const web3 = new Web3()
 
 export const MAX_UINT256 = new BigNumber(2).pow(256).minus(1)
 
 export const keccak256 = (...args: { type: string; value: string | number }[]): string => {
-  return Web3.utils.soliditySha3(...args)
+  return Web3.utils.soliditySha3(...((args as unknown) as any))
 }
 
 export const signMessage = (web3: Web3, message: string, signerPrivKey: string) => {
