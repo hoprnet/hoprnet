@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core",
-  "version": "0.5.4-natTraversal.rc",
+  "version": "0.6.5-f9d1247",
   "description": "Privacy-preserving messaging protocol with incentivations for relay operators",
   "license": "GPL-3.0-only",
   "keywords": [

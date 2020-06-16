@@ -1,12 +1,5 @@
 {
   "compilerOptions": {
-    "baseUrl": ".",
-    "paths": {
-      "@hoprnet/hopr-core": ["src/"],
-      "@hoprnet/hopr-core/utils": ["src/utils"],
-      "@hoprnet/hopr-core/constants": ["src/constants"]
-    },
-    "resolveJsonModule": true,
     "esModuleInterop": true,
     "outDir": "./lib",
     "lib": ["es2020", "dom"],
@@ -16,5 +9,5 @@
     "sourceMap": true,
     "noEmit": true
   },
-  "include": ["src/**/*.ts", "chat/**/*.ts"]
+  "include": ["src/**/*.ts"]
 }
