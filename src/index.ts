@@ -38,6 +38,7 @@ export default class HoprEthereum implements HoprCoreConnector {
   constructor(
     public db: LevelUp,
     public web3: Web3,
+    public chainId: number,
     public network: addresses.Networks,
     public hoprChannels: HoprChannels,
     public hoprToken: HoprToken,
@@ -258,11 +259,12 @@ export default class HoprEthereum implements HoprCoreConnector {
 
     const web3 = new Web3(provider)
 
-    const [network, publicKey] = await Promise.all([
+    const [chainId, publicKey] = await Promise.all([
       /* prettier-ignore */
-      utils.getNetworkId(web3),
+      utils.getChainId(web3),
       utils.privKeyToPubKey(privateKey),
     ])
+    const network = utils.getNetworkName(chainId)
 
     if (typeof config.CHANNELS_ADDRESSES[network] === 'undefined') {
       throw Error(`channel contract address from network ${network} not found`)
@@ -277,6 +279,7 @@ export default class HoprEthereum implements HoprCoreConnector {
     const coreConnector = new HoprEthereum(
       db,
       web3,
+      chainId,
       network,
       hoprChannels,
       hoprToken,

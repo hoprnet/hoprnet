@@ -22,7 +22,8 @@ describe('test hashedSecret management', function () {
 
   async function generateConnector(): Promise<HoprEthereum> {
     let web3 = new Web3(configs.DEFAULT_URI)
-    const network = await Utils.getNetworkId(web3)
+    const chainId = await Utils.getChainId(web3)
+    const network = Utils.getNetworkName(chainId)
 
     const connector = ({
       signTransaction: Utils.TransactionSigner(web3, stringToU8a(NODE_SEEDS[0])),
