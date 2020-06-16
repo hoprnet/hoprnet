@@ -12,7 +12,7 @@
 yarn-error.log
 
 # Exclude db dir
-db
+db*
 
 # Exclude built files
 lib/

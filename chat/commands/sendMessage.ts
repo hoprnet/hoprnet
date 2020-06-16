@@ -34,16 +34,20 @@ export default class SendMessage implements AbstractCommand {
       return
     }
 
-    const manualIntermediateNodesQuestion = `Do you want to manually set the intermediate nodes? (${chalk.green(
-      'y'
-    )}, ${chalk.red('N')}): `
-    const manualIntermediateNodesAnswer = await new Promise<string>(resolve =>
-      rl.question(manualIntermediateNodesQuestion, resolve)
-    )
+    const manualPath = process.env.MULTIHOP
+      ? await (async () => {
+          const manualIntermediateNodesQuestion = `Do you want to manually set the intermediate nodes? (${chalk.green(
+            'y'
+          )}, ${chalk.red('N')}): `
+          const manualIntermediateNodesAnswer = await new Promise<string>(resolve =>
+            rl.question(manualIntermediateNodesQuestion, resolve)
+          )
 
-    clearString(manualIntermediateNodesQuestion + manualIntermediateNodesAnswer, rl)
+          clearString(manualIntermediateNodesQuestion + manualIntermediateNodesAnswer, rl)
 
-    const manualPath = (manualIntermediateNodesAnswer.toLowerCase().match(/^y(es)?$/i) || '').length
+          return (manualIntermediateNodesAnswer.toLowerCase().match(/^y(es)?$/i) || '').length >= 1
+        })()
+      : true
 
     const messageQuestion = `${chalk.yellow(`Type in your message and press ENTER to send:`)}\n`
     const message = await new Promise<string>(resolve => rl.question(messageQuestion, resolve))
@@ -54,7 +58,10 @@ export default class SendMessage implements AbstractCommand {
 
     try {
       if (manualPath) {
-        await this.node.sendMessage(encodeMessage(message), peerId, () => this.selectIntermediateNodes(rl, peerId))
+        await this.node.sendMessage(encodeMessage(message), peerId, async () => {
+          if (process.env.MULTIHOP) return this.selectIntermediateNodes(rl, peerId)
+          return []
+        })
       } else {
         await this.node.sendMessage(encodeMessage(message), peerId)
       }
