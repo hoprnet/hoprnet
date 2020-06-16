@@ -109,5 +109,5 @@ Congratulations! You have communicated with another individual using a privacy-p
 
 For **HOPR Chat** to work, you need to make sure you provide it with at least one **HOPR Chat** node in Bootstrap Mode. For more information about these nodes and which ones are available, please see our **Bootstrap Nodes** page.
 
-{% page-ref page="../../bootstrap-nodes.md" %}
+{% page-ref page="../bootstrap-nodes.md" %}
 
