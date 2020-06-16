@@ -1,4 +1,4 @@
-import { keccak256, signMessage } from './random'
+import { encode, signMessage } from './random'
 
 type IFund = (args: {
   web3: any
@@ -9,7 +9,7 @@ type IFund = (args: {
   notAfter: string
   signerPrivKey: string
 }) => {
-  hashedFund: string // return hashed alternative
+  encodedFund: string // return hashed alternative
   signature: string // signature of hashedTicket
   r: string
   s: string
@@ -20,18 +20,18 @@ type IFund = (args: {
   prepares fund payload
 */
 const Fund: IFund = ({ web3, stateCounter, initiator, deposit, partyAAmount, notAfter, signerPrivKey }) => {
-  const hashedFund = keccak256(
+  const encodedFund = encode([
     { type: 'uint256', value: stateCounter },
     { type: 'address', value: initiator },
     { type: 'uint256', value: deposit },
     { type: 'uint256', value: partyAAmount },
-    { type: 'uint256', value: notAfter }
-  )
+    { type: 'uint256', value: notAfter },
+  ])
 
-  const { signature, r, s, v } = signMessage(web3, hashedFund, signerPrivKey)
+  const { signature, r, s, v } = signMessage(web3, encodedFund, signerPrivKey)
 
   return {
-    hashedFund,
+    encodedFund,
     signature,
     r,
     s,

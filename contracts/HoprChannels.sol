@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC777/IERC777Recipient.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
+import "./utils/ECDSA.sol";
 
 
 contract HoprChannels is IERC777Recipient, ERC1820Implementer {
@@ -64,9 +65,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
 
     // TODO: update this when adding / removing states.
     uint8 constant NUMBER_OF_STATES = 4;
-
-    // used to protect against malleable signatures
-    uint256 constant HALF_CURVE_ORDER = uint256(0x7fffffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a0);
 
     IERC20 public token; // the token that will be used to settle payments
     uint256 public secsClosure; // seconds it takes to allow closing of channel after channel's -
@@ -174,17 +172,16 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             partyAAmount <= additionalDeposit,
             "HoprChannels: 'partyAAmount' must be strictly smaller than 'additionalDeposit'"
         );
-        require(
-            uint256(s) <= HALF_CURVE_ORDER,
-            "HoprChannels: found malleable signature, please insert a low-s signature"
-        );
         require(not_after >= now, "HoprChannels: signature must not be expired");
 
-        address counterparty = ecrecover(
-            prefixed(keccak256(abi.encodePacked(stateCounter, initiator, additionalDeposit, partyAAmount, not_after))),
-            v,
+        address counterparty = ECDSA.recover(
+            ECDSA.toEthSignedMessageHash(
+                "160",
+                abi.encode(stateCounter, initiator, additionalDeposit, partyAAmount, not_after)
+            ),
             r,
-            s
+            s,
+            v
         );
 
         require(initiator != counterparty, "HoprChannels: initiator and counterparty must not be the same");
@@ -257,6 +254,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      */
     function redeemTicket(
         bytes32 pre_image,
+        bytes32 channel_id,
         bytes32 secret_a,
         bytes32 secret_b,
         uint256 amount,
@@ -265,25 +263,20 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         bytes32 s,
         uint8 v
     ) public {
-        require(
-            uint256(s) <= HALF_CURVE_ORDER,
-            "HoprChannels: found malleable signature, please insert a low-s signature"
-        );
-
-        address recipient = msg.sender;
-        Account storage recipientAccount = accounts[recipient];
+        Account storage recipientAccount = accounts[msg.sender];
 
         bytes32 challenge = keccak256(abi.encodePacked(secret_a)) ^ keccak256(abi.encodePacked(secret_b));
 
-        bytes32 hashedTicket = prefixed(
-            keccak256(abi.encodePacked(challenge, pre_image, recipientAccount.counter, amount, win_prob))
+        bytes32 hashedTicket = ECDSA.toEthSignedMessageHash(
+            "192",
+            abi.encode(channel_id, challenge, pre_image, recipientAccount.counter, amount, win_prob)
         );
 
         require(uint256(hashedTicket) < uint256(win_prob), "HoprChannels: ticket must be a win");
 
         (address party_a, , Channel storage channel, ChannelStatus status) = getChannel(
-            recipient,
-            ecrecover(hashedTicket, v, r, s)
+            msg.sender,
+            ECDSA.recover(hashedTicket, r, s, v)
         );
 
         require(
@@ -298,7 +291,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
 
         recipientAccount.hashedSecret = pre_image;
 
-        if (recipient == party_a) {
+        if (msg.sender == party_a) {
             channel.partyABalance = channel.partyABalance.add(amount);
         } else {
             channel.partyABalance = channel.partyABalance.sub(amount);
@@ -458,13 +451,5 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      */
     function getChannelStatus(Channel memory channel) internal pure returns (ChannelStatus) {
         return ChannelStatus(channel.stateCounter.mod(10));
-    }
-
-    /**
-     * @notice builds a prefixed hash to mimic the behavior of eth_sign
-     * @param message bytes32 message to prefix
-     */
-    function prefixed(bytes32 message) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", message));
     }
 }

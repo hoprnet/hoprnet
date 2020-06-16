@@ -229,6 +229,7 @@ contract('HoprChannels', function ([accountA, accountB]) {
 
         await hoprChannels.redeemTicket(
           ticket.counterPartySecret,
+          ticket.channelId,
           ticket.porSecretA,
           ticket.porSecretB,
           ticket.amount,
@@ -272,6 +273,7 @@ contract('HoprChannels', function ([accountA, accountB]) {
 
         await hoprChannels.redeemTicket(
           ticket.counterPartySecret,
+          ticket.channelId,
           ticket.porSecretA,
           ticket.porSecretB,
           ticket.amount,
@@ -328,6 +330,7 @@ contract('HoprChannels', function ([accountA, accountB]) {
 
         await hoprChannels.redeemTicket(
           ticket.counterPartySecret,
+          ticket.channelId,
           ticket.porSecretA,
           ticket.porSecretB,
           ticket.amount,
@@ -550,6 +553,7 @@ contract('HoprChannels', function ([accountA, accountB]) {
 
           await hoprChannels.redeemTicket(
             ticket.counterPartySecret,
+            ticket.channelId,
             ticket.porSecretA,
             ticket.porSecretB,
             ticket.amount,
@@ -594,6 +598,7 @@ contract('HoprChannels', function ([accountA, accountB]) {
 
           await hoprChannels.redeemTicket(
             ticket.counterPartySecret,
+            ticket.channelId,
             ticket.porSecretA,
             ticket.porSecretB,
             ticket.amount,
@@ -650,6 +655,7 @@ contract('HoprChannels', function ([accountA, accountB]) {
 
           await hoprChannels.redeemTicket(
             ticket.counterPartySecret,
+            ticket.channelId,
             ticket.porSecretA,
             ticket.porSecretB,
             ticket.amount,
@@ -770,7 +776,7 @@ contract('HoprChannels', function ([accountA, accountB]) {
         winProbPercent: '100',
       })
 
-      const signer = recoverSigner(web3, ticket.hashedTicket, ticket.signature)
+      const signer = recoverSigner(web3, ticket.encodedTicket, ticket.signature)
       expect(signer).to.be.eq(partyA, 'wrong signer')
     })
 
@@ -785,7 +791,7 @@ contract('HoprChannels', function ([accountA, accountB]) {
         signerPrivKey: partyAPrivKey,
       })
 
-      const signer = recoverSigner(web3, fund.hashedFund, fund.signature)
+      const signer = recoverSigner(web3, fund.encodedFund, fund.signature)
       expect(signer).to.be.eq(partyA, 'wrong signer')
     })
 

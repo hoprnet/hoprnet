@@ -8,11 +8,11 @@ export const keccak256 = (...args: { type: string; value: string | number }[]): 
   return Web3.utils.soliditySha3(...args)
 }
 
-export const signMessage = (web3: any, message: string, signerPrivKey: string) => {
+export const signMessage = (web3: Web3, message: string, signerPrivKey: string) => {
   return web3.eth.accounts.sign(message, signerPrivKey)
 }
 
-export const recoverSigner = (web3: any, message: string, signature: string) => {
+export const recoverSigner = (web3: Web3, message: string, signature: string) => {
   return web3.eth.accounts.recover(message, signature, false)
 }
 
@@ -50,4 +50,21 @@ export const getChannelId = (partyA: string, partyB: string) => {
       value: partyB,
     }
   )
+}
+
+export const encode = (items: { type: string; value: string }[]): string => {
+  const { types, values } = items.reduce(
+    (result, item) => {
+      result.types.push(item.type)
+      result.values.push(item.value)
+
+      return result
+    },
+    {
+      types: [],
+      values: [],
+    }
+  )
+
+  return web3.eth.abi.encodeParameters(types, values)
 }
