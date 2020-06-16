@@ -70,6 +70,7 @@ class TicketFactory {
     const transaction = await signTransaction(
       hoprChannels.methods.redeemTicket(
         u8aToHex(ticket.challenge),
+        u8aToHex(ticket.channelId),
         u8aToHex(ticket.onChainSecret),
         u8aToHex(counterPartySecret),
         ticket.amount.toString(),
