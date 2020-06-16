@@ -10,7 +10,9 @@ declare class ChannelBalance extends Uint8ArrayE implements Types.ChannelBalance
         balance: BN | Balance;
         balance_a: BN | Balance;
     });
+    get balanceOffset(): number;
     get balance(): Balance;
+    get balanceAOffset(): number;
     get balance_a(): Balance;
     static get SIZE(): number;
     static create(arr?: {

@@ -15,21 +15,36 @@ class ChannelBalance extends Uint8ArrayE implements Types.ChannelBalance {
       balance_a: BN | Balance
     }
   ) {
-    if (arr != null && struct == null) {
+    if (arr != null) {
       super(arr.bytes, arr.offset, ChannelBalance.SIZE)
-    } else if (arr == null && struct != null) {
-      super(u8aConcat(new Balance(struct.balance.toString()).toU8a(), new Balance(struct.balance_a.toString()).toU8a()))
     } else {
-      throw Error(`Invalid constructor arguments.`)
+      super(ChannelBalance.SIZE)
+    }
+
+    if (struct != null) {
+      if (struct.balance != null) {
+        this.set(new Balance(struct.balance.toString()).toU8a(), this.balanceOffset - this.byteOffset)
+      }
+
+      if (struct.balance_a != null) {
+        this.set(new Balance(struct.balance_a.toString()).toU8a())
+      }
     }
   }
 
+  get balanceOffset() {
+    return this.byteOffset
+  }
   get balance(): Balance {
-    return new Balance(this.subarray(0, Balance.SIZE))
+    return new Balance(new Uint8Array(this.buffer, this.balanceOffset, Balance.SIZE))
+  }
+
+  get balanceAOffset() {
+    return this.byteOffset + Balance.SIZE
   }
 
   get balance_a(): Balance {
-    return new Balance(this.subarray(Balance.SIZE, Balance.SIZE + Balance.SIZE))
+    return new Balance(new Uint8Array(this.buffer, this.balanceAOffset, Balance.SIZE))
   }
 
   static get SIZE() {
