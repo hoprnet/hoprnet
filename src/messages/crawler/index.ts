@@ -2,7 +2,7 @@ import { CrawlResponse } from './resonse'
 
 enum CrawlStatus {
   OK,
-  FAIL
+  FAIL,
 }
 
 export { CrawlStatus, CrawlResponse }

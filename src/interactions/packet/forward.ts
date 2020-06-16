@@ -23,8 +23,7 @@ const MAX_PARALLEL_JOBS = 20
 const TWO_SECONDS = 2 * 1000
 const FORWARD_TIMEOUT = TWO_SECONDS
 
-class PacketForwardInteraction<Chain extends HoprCoreConnector>
-  implements AbstractInteraction<Chain> {
+class PacketForwardInteraction<Chain extends HoprCoreConnector> implements AbstractInteraction<Chain> {
   private tokens: Token[] = getTokens(MAX_PARALLEL_JOBS)
   private queue: Packet<Chain>[] = []
   private promises: Promise<void>[] = []
@@ -45,30 +44,28 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector>
       abort.abort()
     }, FORWARD_TIMEOUT)
 
-    struct = await this.node
-      .dialProtocol(counterparty, this.protocols[0], { signal })
-      .catch(async (err: Error) => {
-        const peerInfo = await this.node.peerRouting.findPeer(
-          PeerInfo.isPeerInfo(counterparty) ? counterparty.id : counterparty
+    struct = await this.node.dialProtocol(counterparty, this.protocols[0], { signal }).catch(async (err: Error) => {
+      const peerInfo = await this.node.peerRouting.findPeer(
+        PeerInfo.isPeerInfo(counterparty) ? counterparty.id : counterparty
+      )
+
+      try {
+        let result = await this.node.dialProtocol(peerInfo, this.protocols[0], { signal })
+        clearTimeout(timeout)
+        return result
+      } catch (err) {
+        clearTimeout(timeout)
+
+        this.node.log(
+          `Could not transfer packet to ${(PeerInfo.isPeerInfo(counterparty)
+            ? counterparty.id
+            : counterparty
+          ).toB58String()}. Error was: ${chalk.red(err.message)}.`
         )
 
-        try {
-          let result = await this.node.dialProtocol(peerInfo, this.protocols[0], { signal })
-          clearTimeout(timeout)
-          return result
-        } catch (err) {
-          clearTimeout(timeout)
-
-          this.node.log(
-            `Could not transfer packet to ${(PeerInfo.isPeerInfo(counterparty)
-              ? counterparty.id
-              : counterparty
-            ).toB58String()}. Error was: ${chalk.red(err.message)}.`
-          )
-
-          return
-        }
-      })
+        return
+      }
+    })
 
     await pipe(
       /* prettier-ignore */
@@ -143,10 +140,7 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector>
           challenge: receivedChallenge,
         })
 
-        await this.node.interactions.packet.acknowledgment.interact(
-          sender,
-          await ack.sign(this.node.peerInfo.id)
-        )
+        await this.node.interactions.packet.acknowledgment.interact(sender, await ack.sign(this.node.peerInfo.id))
       })
 
       if (this.node.peerInfo.id.isEqual(target)) {

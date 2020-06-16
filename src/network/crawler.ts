@@ -130,7 +130,10 @@ class Crawler<Chain extends HoprCoreConnector> {
               continue
             }
 
-            if (!contactedPeerIds.has(peerInfos[i].id.toB58String()) && !unContactedPeerIdSet.has(peerInfos[i].id.toB58String())) {
+            if (
+              !contactedPeerIds.has(peerInfos[i].id.toB58String()) &&
+              !unContactedPeerIdSet.has(peerInfos[i].id.toB58String())
+            ) {
               unContactedPeerIdSet.add(peerInfos[i].id.toB58String())
               unContactedPeerIdArray.push(peerInfos[i])
               this.node.peerStore.put(peerInfos[i])
@@ -209,9 +212,9 @@ class Crawler<Chain extends HoprCoreConnector> {
     })
 
     console.log(
-      `Crawling results:\n    ${chalk.yellow(`contacted nodes:`)}: ${contactedNodes}\n    ${chalk.green(`new nodes`)}: ${now - before} node${
-        now - before == 1 ? '' : 's'
-      }\n    total: ${now} node${now == 1 ? '' : 's'}`
+      `Crawling results:\n    ${chalk.yellow(`contacted nodes:`)}: ${contactedNodes}\n    ${chalk.green(
+        `new nodes`
+      )}: ${now - before} node${now - before == 1 ? '' : 's'}\n    total: ${now} node${now == 1 ? '' : 's'}`
     )
   }
 }

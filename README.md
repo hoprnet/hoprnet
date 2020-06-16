@@ -13,18 +13,18 @@ For further information about HOPR, please see our [online documentation](https:
 
 Our testnet is live, and its composed by two fundamental elements:
 
-* **Bootstrap Nodes**, online servers available in a Swiss datacenter running instances of **HOPR Chat** on *Bootstrap Mode*.
-* **Docker Image**, a ready to use [Docker](https://www.docker.com/) image allowing anyone to run **HOPR Chat**.
+- **Bootstrap Nodes**, online servers available in a Swiss datacenter running instances of **HOPR Chat** on _Bootstrap Mode_.
+- **Docker Image**, a ready to use [Docker](https://www.docker.com/) image allowing anyone to run **HOPR Chat**.
 
 ### Running HOPR Chat in Docker
 
 For Windows instructions, please follow our [Windows Quickstart](https://docs.hoprnet.io/home/getting-started/quickstart/windows-quickstart). If you have already Docker installed, you can just copy and paste the following command into your machine to get the application working.
 
 ```
-docker run -v %cd%/db:/app/db ^ 
--e HOST_IPV4=0.0.0.0:9091 ^ 
--e BOOTSTRAP_SERVERS=/dns4/ch-test-01.hoprnet.io/tcp/9091/p2p/16Uiu2HAmThyWP5YWutPmYk9yUZ48ryWyZ7Cf6pMTQduvHUS9sGE7 ^ 
--e ETHEREUM_PROVIDER=wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36 ^ 
+docker run -v %cd%/db:/app/db ^
+-e HOST_IPV4=0.0.0.0:9091 ^
+-e BOOTSTRAP_SERVERS=/dns4/ch-test-01.hoprnet.io/tcp/9091/p2p/16Uiu2HAmThyWP5YWutPmYk9yUZ48ryWyZ7Cf6pMTQduvHUS9sGE7 ^
+-e ETHEREUM_PROVIDER=wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36 ^
 -p 9091:9091 -it hopr/chat -p switzerland
 ```
 

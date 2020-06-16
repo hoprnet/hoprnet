@@ -19,7 +19,9 @@ export function pubKeyToPeerId(pubKey: Uint8Array | string): Promise<PeerId> {
   }
 
   if (pubKey.length != COMPRESSED_PUBLIC_KEY_LENGTH) {
-    throw Error(`Invalid public key. Expected a buffer of size ${COMPRESSED_PUBLIC_KEY_LENGTH} bytes. Got one of ${pubKey.length} bytes.`)
+    throw Error(
+      `Invalid public key. Expected a buffer of size ${COMPRESSED_PUBLIC_KEY_LENGTH} bytes. Got one of ${pubKey.length} bytes.`
+    )
   }
 
   const secp256k1PubKey = new libp2p_crypto.supportedKeys.secp256k1.Secp256k1PublicKey(Buffer.from(pubKey))

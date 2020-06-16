@@ -24,10 +24,7 @@ export function AcknowledgedTickets(publicKeyCounterparty: Uint8Array, id: Uint8
   ])
 }
 
-export function UnAcknowledgedTickets(
-  publicKeyCounterparty: Uint8Array,
-  id: Uint8Array
-): Uint8Array {
+export function UnAcknowledgedTickets(publicKeyCounterparty: Uint8Array, id: Uint8Array): Uint8Array {
   return allocationHelper([
     [TICKET_PREFIX.length, TICKET_PREFIX],
     [unAcknowledgedSubPrefix.length, unAcknowledgedSubPrefix],
@@ -46,10 +43,7 @@ export async function UnAcknowledgedTicketsParse(arg: Uint8Array): Promise<[Peer
       )
     ),
     arg.slice(
-      TICKET_PREFIX.length +
-        unAcknowledgedSubPrefix.length +
-        COMPRESSED_PUBLIC_KEY_LENGTH +
-        SEPERATOR.length,
+      TICKET_PREFIX.length + unAcknowledgedSubPrefix.length + COMPRESSED_PUBLIC_KEY_LENGTH + SEPERATOR.length,
       TICKET_PREFIX.length +
         unAcknowledgedSubPrefix.length +
         COMPRESSED_PUBLIC_KEY_LENGTH +

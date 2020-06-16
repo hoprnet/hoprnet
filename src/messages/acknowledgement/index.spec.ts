@@ -4,7 +4,7 @@ import { Acknowledgement } from '.'
 import { Challenge } from '../packet/challenge'
 import { u8aEquals } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
-import { Utils, Types } from '@hoprnet/hopr-core-polkadot'
+import { Utils, Types } from '@hoprnet/hopr-core-ethereum'
 import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import { randomBytes } from 'crypto'
 import secp256k1 from 'secp256k1'
@@ -13,7 +13,7 @@ describe('test acknowledgement generation', function () {
   it('should generate a valid acknowledgement', async function () {
     const paymentChannels = ({
       utils: Utils,
-      types: Types,
+      types: new Types(),
     } as unknown) as HoprCoreConnector
 
     const sender = await PeerId.create({

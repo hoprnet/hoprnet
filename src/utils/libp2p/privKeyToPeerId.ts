@@ -20,10 +20,15 @@ export function privKeyToPeerId(privKey: Uint8Array | string): Promise<PeerId> {
   }
 
   if (privKey.length != PRIVKEY_LENGTH) {
-    throw Error(`Invalid private key. Expected a buffer of size ${PRIVKEY_LENGTH} bytes. Got one of ${privKey.length} bytes.`)
+    throw Error(
+      `Invalid private key. Expected a buffer of size ${PRIVKEY_LENGTH} bytes. Got one of ${privKey.length} bytes.`
+    )
   }
 
-  const secp256k1PrivKey = new libp2p_crypto.supportedKeys.secp256k1.Secp256k1PrivateKey(Buffer.from(privKey), secp256k1.publicKeyCreate(privKey))
+  const secp256k1PrivKey = new libp2p_crypto.supportedKeys.secp256k1.Secp256k1PrivateKey(
+    Buffer.from(privKey),
+    secp256k1.publicKeyCreate(privKey)
+  )
 
   return PeerId.createFromPrivKey(secp256k1PrivKey.bytes)
 }

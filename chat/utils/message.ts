@@ -28,14 +28,14 @@ export function decodeMessage(
 
     return {
       latency: Date.now() - parseInt(time.toString('hex'), 16),
-      msg: msg.toString()
+      msg: msg.toString(),
     }
   } catch (err) {
     console.log(chalk.red(`Could not decode received message '${u8aToHex(encoded)}' Error was ${err.message}.`))
 
     return {
       latency: NaN,
-      msg: 'Error: Could not decode message'
+      msg: 'Error: Could not decode message',
     }
   }
 }

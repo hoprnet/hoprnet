@@ -55,17 +55,32 @@ describe('test crawler', function () {
   }
 
   it('should crawl the network and find some nodes', async function () {
-    const [Alice, Bob, Chris, Dave, Eve] = await Promise.all([generateNode(), generateNode(), generateNode(), generateNode(), generateNode()])
+    const [Alice, Bob, Chris, Dave, Eve] = await Promise.all([
+      generateNode(),
+      generateNode(),
+      generateNode(),
+      generateNode(),
+      generateNode(),
+    ])
 
-    await assert.rejects(() => Alice.network.crawler.crawl(), Error(`Unable to find enough other nodes in the network.`))
+    await assert.rejects(
+      () => Alice.network.crawler.crawl(),
+      Error(`Unable to find enough other nodes in the network.`)
+    )
 
     Alice.peerStore.put(Bob.peerInfo)
 
-    await assert.rejects(() => Alice.network.crawler.crawl(), Error(`Unable to find enough other nodes in the network.`))
+    await assert.rejects(
+      () => Alice.network.crawler.crawl(),
+      Error(`Unable to find enough other nodes in the network.`)
+    )
 
     Bob.peerStore.put(Chris.peerInfo)
 
-    await assert.rejects(() => Alice.network.crawler.crawl(), Error(`Unable to find enough other nodes in the network.`))
+    await assert.rejects(
+      () => Alice.network.crawler.crawl(),
+      Error(`Unable to find enough other nodes in the network.`)
+    )
 
     Chris.peerStore.put(Dave.peerInfo)
 

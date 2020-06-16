@@ -1,6 +1,14 @@
 import assert from 'assert'
-import { Header, deriveBlinding, deriveCipherParameters, deriveTagParameters, createMAC, deriveTicketKey, derivePRGParameters } from '.'
-import { Utils } from '@hoprnet/hopr-core-polkadot'
+import {
+  Header,
+  deriveBlinding,
+  deriveCipherParameters,
+  deriveTagParameters,
+  createMAC,
+  deriveTicketKey,
+  derivePRGParameters,
+} from '.'
+import { Utils } from '@hoprnet/hopr-core-ethereum'
 import PeerId from 'peer-id'
 import Hopr from '../../../'
 import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
@@ -8,7 +16,7 @@ import { randomBytes } from 'crypto'
 import secp256k1 from 'secp256k1'
 import { u8aEquals } from '@hoprnet/hopr-utils'
 
-describe('test creation & transformation of a header', async function() {
+describe('test creation & transformation of a header', async function () {
   async function createAndDecomposeHeader(
     node: Hopr<HoprCoreConnector>,
     peerIds: PeerId[]
@@ -34,14 +42,14 @@ describe('test creation & transformation of a header', async function() {
   function getNode(): Hopr<HoprCoreConnector> {
     const node = ({
       paymentChannels: {
-        utils: Utils
-      }
+        utils: Utils,
+      },
     } as unknown) as Hopr<HoprCoreConnector>
 
     return node
   }
 
-  it('should derive parameters', function() {
+  it('should derive parameters', function () {
     const secret = randomBytes(32)
     const alpha = randomBytes(32)
 
@@ -55,16 +63,25 @@ describe('test creation & transformation of a header', async function() {
     const prgParameters = derivePRGParameters(secretGroupElement)
 
     assert(
-      notEqualHelper([blinding, encryptionKey.iv, encryptionKey.key, tagParameter, mac, transactionKey, prgParameters.key, prgParameters.iv]),
+      notEqualHelper([
+        blinding,
+        encryptionKey.iv,
+        encryptionKey.key,
+        tagParameter,
+        mac,
+        transactionKey,
+        prgParameters.key,
+        prgParameters.iv,
+      ]),
       'Keys should all be with high probability different'
     )
   })
 
-  it('should create a header', async function() {
+  it('should create a header', async function () {
     const peerIds = await Promise.all([
       PeerId.create({ keyType: 'secp256k1' }),
       PeerId.create({ keyType: 'secp256k1' }),
-      PeerId.create({ keyType: 'secp256k1' })
+      PeerId.create({ keyType: 'secp256k1' }),
     ])
 
     const { header, identifier, secrets } = await createAndDecomposeHeader(getNode(), peerIds)
@@ -75,13 +92,19 @@ describe('test creation & transformation of a header', async function() {
     assert(header.verify(), `MAC should be valid`)
     header.extractHeaderInformation(true)
 
-    assert(u8aEquals(peerIds[2].pubKey.marshal(), header.address), `Decrypted address should be the same as the final recipient`)
+    assert(
+      u8aEquals(peerIds[2].pubKey.marshal(), header.address),
+      `Decrypted address should be the same as the final recipient`
+    )
 
     assert(u8aEquals(header.identifier, identifier), `Decrypted identifier should have the expected value`)
   })
 
-  it('should create a header with a path less than MAX_HOPS nodes', async function() {
-    const peerIds = await Promise.all([PeerId.create({ keyType: 'secp256k1' }), PeerId.create({ keyType: 'secp256k1' })])
+  it('should create a header with a path less than MAX_HOPS nodes', async function () {
+    const peerIds = await Promise.all([
+      PeerId.create({ keyType: 'secp256k1' }),
+      PeerId.create({ keyType: 'secp256k1' }),
+    ])
 
     const { header, identifier, secrets } = await createAndDecomposeHeader(getNode(), peerIds)
 
@@ -91,12 +114,15 @@ describe('test creation & transformation of a header', async function() {
     assert(header.verify(), `MAC must be valid`)
     header.extractHeaderInformation(true)
 
-    assert(u8aEquals(peerIds[1].pubKey.marshal(), header.address), `Decrypted address should be the same as the final recipient`)
+    assert(
+      u8aEquals(peerIds[1].pubKey.marshal(), header.address),
+      `Decrypted address should be the same as the final recipient`
+    )
 
     assert(u8aEquals(header.identifier, identifier), `Decrypted identifier should have the expected value`)
   })
 
-  it('should create a header with exactly two nodes', async function() {
+  it('should create a header with exactly two nodes', async function () {
     const peerIds = [await PeerId.create({ keyType: 'secp256k1' })]
 
     const { header, identifier, secrets } = await createAndDecomposeHeader(getNode(), peerIds)
@@ -107,7 +133,10 @@ describe('test creation & transformation of a header', async function() {
     assert(header.verify(), `MAC must be valid`)
     header.extractHeaderInformation(true)
 
-    assert(u8aEquals(peerIds[0].pubKey.marshal(), header.address), `Decrypted address should be the same as the final recipient`)
+    assert(
+      u8aEquals(peerIds[0].pubKey.marshal(), header.address),
+      `Decrypted address should be the same as the final recipient`
+    )
 
     assert(u8aEquals(header.identifier, identifier), `Decrypted identifier should have the expected value`)
   })

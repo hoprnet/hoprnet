@@ -38,18 +38,14 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector> extends 
     let struct: Handler
 
     try {
-      struct = await this.node
-        .dialProtocol(counterparty, this.protocols[0])
-        .catch(async (err: Error) => {
-          return this.node.peerRouting
-            .findPeer(counterparty)
-            .then((peerInfo: PeerInfo) => this.node.dialProtocol(peerInfo, this.protocols[0]))
-        })
+      struct = await this.node.dialProtocol(counterparty, this.protocols[0]).catch(async (err: Error) => {
+        return this.node.peerRouting
+          .findPeer(counterparty)
+          .then((peerInfo: PeerInfo) => this.node.dialProtocol(peerInfo, this.protocols[0]))
+      })
     } catch (err) {
       console.log(
-        `Could not transfer acknowledgement to ${counterparty.toB58String()}. Error was: ${chalk.red(
-          err.message
-        )}.`
+        `Could not transfer acknowledgement to ${counterparty.toB58String()}. Error was: ${chalk.red(err.message)}.`
       )
       return
     }

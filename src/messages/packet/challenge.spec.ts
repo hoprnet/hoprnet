@@ -1,6 +1,6 @@
 import assert from 'assert'
 import { Challenge } from './challenge'
-import { Utils, Types } from '@hoprnet/hopr-core-polkadot'
+import { Utils, Types } from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
 import PeerId from 'peer-id'
 import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
@@ -11,7 +11,7 @@ describe('test creation & verification of a challenge', function () {
   it('should create a verifiable challenge', async function () {
     const paymentChannels = ({
       utils: Utils,
-      types: Types,
+      types: new Types(),
     } as unknown) as HoprCoreConnector
 
     const secret = randomBytes(32)

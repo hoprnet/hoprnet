@@ -4,7 +4,7 @@ import PeerId from 'peer-id'
 import Multihash from 'multihashes'
 import bs58 from 'bs58'
 
-import { addPubKey } from '@hoprnet/hopr-core/lib/utils'
+import { addPubKey } from '@hoprnet/hopr-core/utils'
 
 /**
  * Takes the string representation of a peerId and checks whether it is a valid

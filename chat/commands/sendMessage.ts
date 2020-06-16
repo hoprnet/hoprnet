@@ -5,11 +5,10 @@ import type AbstractCommand from './abstractCommand'
 import chalk from 'chalk'
 
 import type PeerId from 'peer-id'
-import type PeerInfo from 'peer-info'
 
 import { checkPeerIdInput, encodeMessage, isBootstrapNode, getOpenChannels, getPeers } from '../utils'
 import { clearString } from '@hoprnet/hopr-utils'
-import { MAX_HOPS } from '@hoprnet/hopr-core/lib/constants'
+import { MAX_HOPS } from '@hoprnet/hopr-core/constants'
 
 import readline from 'readline'
 
@@ -39,7 +38,7 @@ export default class SendMessage implements AbstractCommand {
           const manualIntermediateNodesQuestion = `Do you want to manually set the intermediate nodes? (${chalk.green(
             'y'
           )}, ${chalk.red('N')}): `
-          const manualIntermediateNodesAnswer = await new Promise<string>(resolve =>
+          const manualIntermediateNodesAnswer = await new Promise<string>((resolve) =>
             rl.question(manualIntermediateNodesQuestion, resolve)
           )
 
@@ -50,7 +49,7 @@ export default class SendMessage implements AbstractCommand {
       : true
 
     const messageQuestion = `${chalk.yellow(`Type in your message and press ENTER to send:`)}\n`
-    const message = await new Promise<string>(resolve => rl.question(messageQuestion, resolve))
+    const message = await new Promise<string>((resolve) => rl.question(messageQuestion, resolve))
 
     clearString(messageQuestion + message, rl)
 
@@ -77,8 +76,8 @@ export default class SendMessage implements AbstractCommand {
   ): Promise<void> {
     const peerIds = getPeers(this.node, {
       noBootstrapNodes: true,
-    }).map(peerId => peerId.toB58String())
-    const validPeerIds = query ? peerIds.filter(peerId => peerId.startsWith(query)) : peerIds
+    }).map((peerId) => peerId.toB58String())
+    const validPeerIds = query ? peerIds.filter((peerId) => peerId.startsWith(query)) : peerIds
 
     if (!validPeerIds.length) {
       console.log(
@@ -91,7 +90,7 @@ export default class SendMessage implements AbstractCommand {
       return cb(undefined, [[''], line])
     }
 
-    return cb(undefined, [validPeerIds.map(peerId => `send ${peerId}`), line])
+    return cb(undefined, [validPeerIds.map((peerId) => `send ${peerId}`), line])
   }
 
   async selectIntermediateNodes(rl: readline.Interface, destination: PeerId): Promise<PeerId[]> {
@@ -104,7 +103,7 @@ export default class SendMessage implements AbstractCommand {
 
       const lastSelected = selected.length > 0 ? selected[selected.length - 1] : this.node.peerInfo.id
       const openChannels = await getOpenChannels(this.node, lastSelected)
-      const validPeers = openChannels.map(peer => peer.toB58String())
+      const validPeers = openChannels.map((peer) => peer.toB58String())
 
       if (validPeers.length === 0) {
         console.log(chalk.yellow(`No peers with open channels found, you may enter a peer manually.`))
@@ -121,12 +120,12 @@ export default class SendMessage implements AbstractCommand {
       rl.setPrompt('')
       // @ts-ignore
       rl.completer = (line: string, cb: (err: Error | undefined, hits: [string[], string]) => void) => {
-        return cb(undefined, [validPeers.filter(peerId => peerId.startsWith(line)), line])
+        return cb(undefined, [validPeers.filter((peerId) => peerId.startsWith(line)), line])
       }
 
       // wait for peerId to be selected
-      const peerId = await new Promise<PeerId | undefined>(resolve =>
-        rl.on('line', async query => {
+      const peerId = await new Promise<PeerId | undefined>((resolve) =>
+        rl.on('line', async (query) => {
           if (query == null || query === '\n' || query === '' || query.length == 0) {
             rl.removeAllListeners('line')
             return resolve(undefined)
@@ -157,7 +156,7 @@ export default class SendMessage implements AbstractCommand {
         console.log(chalk.yellow(`Peer selected is same as destination peer.`))
       }
       // check if peerId selected is already in the list
-      else if (selected.find(p => p.equals(peerId))) {
+      else if (selected.find((p) => p.equals(peerId))) {
         console.log(chalk.yellow(`Peer is already an intermediate peer.`))
       }
       // update list
@@ -175,7 +174,7 @@ export default class SendMessage implements AbstractCommand {
       // @ts-ignore
       rl.completer = oldCompleter
       // @ts-ignore
-      oldListeners.forEach(oldListener => rl.on('line', oldListener))
+      oldListeners.forEach((oldListener) => rl.on('line', oldListener))
     }
 
     return selected

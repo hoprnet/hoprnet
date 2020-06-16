@@ -2,7 +2,7 @@ import type Hopr from '../../'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 
 import type { Handler } from '../../network/transport/types'
- 
+
 import pipe from 'it-pipe'
 import chalk from 'chalk'
 
@@ -53,7 +53,9 @@ class Crawler<Chain extends HoprCoreConnector> implements AbstractInteraction<Ch
         }
       })
     } catch (err) {
-      this.node.log(`Could not ask node ${counterparty.id.toB58String()} for other nodes. Error was: ${chalk.red(err.message)}.`)
+      this.node.log(
+        `Could not ask node ${counterparty.id.toB58String()} for other nodes. Error was: ${chalk.red(err.message)}.`
+      )
       return []
     }
 

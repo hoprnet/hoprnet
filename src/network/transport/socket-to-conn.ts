@@ -81,12 +81,7 @@ export function socketToConn(
         // timeout, destroy it manually.
         const timeout = setTimeout(() => {
           const { host, port } = maConn.remoteAddr.toOptions()
-          log(
-            'timeout closing socket to %s:%s after %dms, destroying it manually',
-            host,
-            port,
-            Date.now() - start
-          )
+          log('timeout closing socket to %s:%s after %dms, destroying it manually', host, port, Date.now() - start)
 
           if (socket.destroyed) {
             log('%s:%s is already destroyed', host, port)

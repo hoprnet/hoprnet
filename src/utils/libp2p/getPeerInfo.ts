@@ -163,7 +163,7 @@ async function getPeerInfo(options: HoprOptions, db?: LevelUp): Promise<PeerInfo
     peerInfo = new PeerInfo(await getPeerId(options, db))
   }
 
-  addrs.forEach(addr => peerInfo.multiaddrs.add(addr.encapsulate(`/${NAME}/${peerInfo.id.toB58String()}`)))
+  addrs.forEach((addr: Multiaddr) => peerInfo.multiaddrs.add(addr.encapsulate(`/${NAME}/${peerInfo.id.toB58String()}`)))
 
   return peerInfo
 }

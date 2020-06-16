@@ -24,7 +24,7 @@ class Stun {
         await bindSocketToPort(socket, usePort)
       }
 
-      socket.on('message', async msg => {
+      socket.on('message', async (msg) => {
         const res = stun.createBlank()
 
         if (res.loadBuffer(msg)) {
@@ -38,7 +38,6 @@ class Stun {
             }
           }
         }
-
       })
 
       const req = stun.createBindingRequest(tid).setFingerprintAttribute()

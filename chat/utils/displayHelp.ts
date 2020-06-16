@@ -13,10 +13,7 @@ export function displayHelp() {
     }
 
     if (cli_options[i][2] != null) {
-      if (
-        cli_options[i][1] != null &&
-        cli_options[i][1].length + cli_options[i][2].length > secondOptionMaxLength
-      ) {
+      if (cli_options[i][1] != null && cli_options[i][1].length + cli_options[i][2].length > secondOptionMaxLength) {
         secondOptionMaxLength = cli_options[i][1].length + cli_options[i][2].length
       }
     } else {
@@ -28,8 +25,7 @@ export function displayHelp() {
 
   let str = ''
 
-  const offset =
-    firstOptionMaxLength + FIRST_OPTION_OFFSET + secondOptionMaxLength + SECOND_OPTION_OFFSET
+  const offset = firstOptionMaxLength + FIRST_OPTION_OFFSET + secondOptionMaxLength + SECOND_OPTION_OFFSET
 
   for (let i = 0; i < cli_options.length; i++) {
     str += (cli_options[i][0] || '').padEnd(firstOptionMaxLength + FIRST_OPTION_OFFSET, ' ')
@@ -53,8 +49,7 @@ export function displayHelp() {
           str += words[j]
           length += words[j].length
         } else {
-          str +=
-            '\n' + ''.padEnd(offset, ' ') + words[j]
+          str += '\n' + ''.padEnd(offset, ' ') + words[j]
           length = words[j].length
         }
 

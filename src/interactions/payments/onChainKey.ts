@@ -22,7 +22,7 @@ class OnChainKey<Chain extends HoprCoreConnector> implements AbstractInteraction
   handler(struct: Handler) {
     pipe(
       /* prettier-ignore */
-      [this.node.paymentChannels.self.onChainKeyPair.publicKey],
+      [this.node.paymentChannels.account.keys.onChain.pubKey],
       struct.stream
     )
   }

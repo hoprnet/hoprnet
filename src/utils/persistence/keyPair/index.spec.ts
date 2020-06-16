@@ -9,8 +9,8 @@ import assert from 'assert'
 
 import { randomInteger, u8aEquals } from '@hoprnet/hopr-utils'
 
-describe('test serialisation and deserialisation of encrypted keypair', function() {
-  it('should serialize and deserialize a keypair', async function() {
+describe('test serialisation and deserialisation of encrypted keypair', function () {
+  it('should serialize and deserialize a keypair', async function () {
     this.timeout(5000)
     const password = randomBytes(randomInteger(1, 33))
 
@@ -22,7 +22,10 @@ describe('test serialisation and deserialisation of encrypted keypair', function
     )
 
     const serializedKeyPair = await serializeKeyPair(peerId, password)
-    assert(u8aEquals((await deserializeKeyPair(serializedKeyPair, password)).marshal(), peerId.marshal()), 'PeerId must be recoverable from serialized peerId')
+    assert(
+      u8aEquals((await deserializeKeyPair(serializedKeyPair, password)).marshal(), peerId.marshal()),
+      'PeerId must be recoverable from serialized peerId'
+    )
 
     const [salt, mac, encodedCiphertext] = (decode(serializedKeyPair) as unknown) as [Buffer, Buffer, Buffer]
     try {

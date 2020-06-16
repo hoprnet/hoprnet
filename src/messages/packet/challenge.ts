@@ -19,6 +19,7 @@ export class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
   private _hashedKey: Uint8Array
   private _fee: BN
   private _counterparty: Uint8Array
+  private _challengeSignature: Types.Signature
 
   constructor(
     paymentChannels: Chain,
@@ -41,19 +42,25 @@ export class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
     this.paymentChannels = paymentChannels
   }
 
-  get challengeSignature(): Types.Signature {
+  get challengeSignatureOffset(): number {
+    return this.byteOffset
+  }
+
+  get challengeSignature(): Promise<Types.Signature> {
+    if (this._challengeSignature != null) {
+      return Promise.resolve(this._challengeSignature)
+    }
+
     return this.paymentChannels.types.Signature.create({
       bytes: this.buffer,
-      offset: this.byteOffset,
+      offset: this.challengeSignatureOffset,
     })
   }
 
-  set challengeSignature(signature: Types.Signature) {
-    this.set(signature, 0)
-  }
-
   get signatureHash(): Promise<Types.Hash> {
-    return this.paymentChannels.utils.hash(this.challengeSignature)
+    return new Promise(async (resolve, reject) => {
+      resolve(await this.paymentChannels.utils.hash(await this.challengeSignature))
+    })
   }
 
   static SIZE<Chain extends HoprCoreConnector>(paymentChannels: Chain): number {
@@ -101,16 +108,15 @@ export class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
       return Promise.resolve(this._counterparty)
     }
 
-    return new Promise<Uint8Array>(async resolve => {
+    return new Promise<Uint8Array>(async (resolve) => {
+      const challengeSignature = await this.challengeSignature
       resolve(
         secp256k1.ecdsaRecover(
-          this.challengeSignature.signature,
-          this.challengeSignature.recovery,
-          this.challengeSignature.msgPrefix != null && this.challengeSignature.msgPrefix.length > 0
-            ? await this.paymentChannels.utils.hash(
-                u8aConcat(this.challengeSignature.msgPrefix, await this.hash)
-              )
-            : await this.hash
+          challengeSignature.signature,
+          challengeSignature.recovery,
+          challengeSignature.msgPrefix != null && challengeSignature.msgPrefix.length > 0
+            ? await this.paymentChannels.utils.hash(u8aConcat(challengeSignature.msgPrefix, await this.hash))
+            : this.hash
         )
       )
     })
@@ -124,13 +130,10 @@ export class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
    */
   async sign(peerId: PeerId): Promise<Challenge<Chain>> {
     // const hashedChallenge = hash(Buffer.concat([this._hashedKey, this._fee.toBuffer('be', VALUE_LENGTH)], HASH_LENGTH + VALUE_LENGTH))
-    const signature = await this.paymentChannels.utils.sign(
-      await this.hash,
-      peerId.privKey.marshal(),
-      peerId.pubKey.marshal()
-    )
-
-    this.challengeSignature = signature
+    await this.paymentChannels.utils.sign(this.hash, peerId.privKey.marshal(), peerId.pubKey.marshal(), {
+      bytes: this.buffer,
+      offset: this.challengeSignatureOffset,
+    })
 
     return this
   }
@@ -157,7 +160,7 @@ export class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
     }
 
     if (arr == null) {
-      const tmp = new Uint8Array(Challenge.SIZE(hoprCoreConnector))
+      const tmp = new Uint8Array(this.SIZE(hoprCoreConnector))
 
       arr = {
         bytes: tmp.buffer,
@@ -186,10 +189,6 @@ export class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
       throw Error('Unable to verify challenge without a public key.')
     }
 
-    return this.paymentChannels.utils.verify(
-      this.hash,
-      this.challengeSignature,
-      peerId.pubKey.marshal()
-    )
+    return this.paymentChannels.utils.verify(this.hash, await this.challengeSignature, peerId.pubKey.marshal())
   }
 }

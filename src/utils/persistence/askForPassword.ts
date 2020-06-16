@@ -15,7 +15,7 @@ export function askForPassword(question: string): Promise<string> {
       {
         prompt: question + ' (Password will not be echoed.)\n  password:',
         silent: true,
-        edit: true
+        edit: true,
       },
       (err: any, pw: string) => {
         if (err) {

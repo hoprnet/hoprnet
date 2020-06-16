@@ -18,7 +18,7 @@ import {
   PRIVATE_KEY_LENGTH,
   KEY_LENGTH,
   IDENTIFIER_SIZE,
-  DESINATION_SIZE
+  DESINATION_SIZE,
 } from './parameters'
 import PeerId from 'peer-id'
 
@@ -68,7 +68,10 @@ export class Header<Chain extends HoprCoreConnector> extends Uint8Array {
   }
 
   get gamma(): Uint8Array {
-    return this.subarray(COMPRESSED_PUBLIC_KEY_LENGTH + BETA_LENGTH, COMPRESSED_PUBLIC_KEY_LENGTH + BETA_LENGTH + MAC_SIZE)
+    return this.subarray(
+      COMPRESSED_PUBLIC_KEY_LENGTH + BETA_LENGTH,
+      COMPRESSED_PUBLIC_KEY_LENGTH + BETA_LENGTH + MAC_SIZE
+    )
   }
 
   get address(): this['tmpData'] {
@@ -84,14 +87,19 @@ export class Header<Chain extends HoprCoreConnector> extends Uint8Array {
   }
 
   get encryptionKey(): this['tmpData'] {
-    return this.tmpData != null ? this.tmpData.subarray(ADDRESS_SIZE + KEY_LENGTH, ADDRESS_SIZE + PROVING_VALUES_SIZE) : undefined
+    return this.tmpData != null
+      ? this.tmpData.subarray(ADDRESS_SIZE + KEY_LENGTH, ADDRESS_SIZE + PROVING_VALUES_SIZE)
+      : undefined
   }
 
   get derivedSecret(): this['tmpData'] {
     return this.tmpData != null
       ? this.derivedSecretLastNode != null
         ? this.derivedSecretLastNode
-        : this.tmpData.subarray(ADDRESS_SIZE + PROVING_VALUES_SIZE, ADDRESS_SIZE + PROVING_VALUES_SIZE + COMPRESSED_PUBLIC_KEY_LENGTH)
+        : this.tmpData.subarray(
+            ADDRESS_SIZE + PROVING_VALUES_SIZE,
+            ADDRESS_SIZE + PROVING_VALUES_SIZE + COMPRESSED_PUBLIC_KEY_LENGTH
+          )
       : undefined
   }
 
@@ -121,7 +129,11 @@ export class Header<Chain extends HoprCoreConnector> extends Uint8Array {
       const { key, iv } = derivePRGParameters(this.derivedSecret)
 
       this.tmpData.set(
-        u8aXOR(false, this.beta.subarray(0, DESINATION_SIZE + IDENTIFIER_SIZE), PRG.createPRG(key, iv).digest(0, DESINATION_SIZE + IDENTIFIER_SIZE)),
+        u8aXOR(
+          false,
+          this.beta.subarray(0, DESINATION_SIZE + IDENTIFIER_SIZE),
+          PRG.createPRG(key, iv).digest(0, DESINATION_SIZE + IDENTIFIER_SIZE)
+        ),
         0
       )
     } else {
@@ -178,7 +190,7 @@ export class Header<Chain extends HoprCoreConnector> extends Uint8Array {
     node: Hopr<Chain>,
     peerIds: PeerId[],
     arr?: {
-      bytes: ArrayBuffer,
+      bytes: ArrayBuffer
       offset: number
     }
   ): Promise<{
@@ -190,10 +202,10 @@ export class Header<Chain extends HoprCoreConnector> extends Uint8Array {
       let tmpArray = new Uint8Array(Header.SIZE)
       arr = {
         bytes: tmpArray.buffer,
-        offset: tmpArray.byteOffset
+        offset: tmpArray.byteOffset,
       }
     }
-    
+
     const header = new Header<Chain>(arr)
     header.tmpData = header.beta.subarray(ADDRESS_SIZE + MAC_SIZE, PER_HOP_SIZE)
 
@@ -280,8 +292,5 @@ export function createMAC(secret: Uint8Array, msg: Uint8Array): Uint8Array {
 
   const key = hkdf(Buffer.from(secret), MAC_KEY_LENGTH, { salt: HASH_KEY_HMAC })
 
-  return crypto
-    .createHmac('sha256', key)
-    .update(msg)
-    .digest()
+  return crypto.createHmac('sha256', key).update(msg).digest()
 }

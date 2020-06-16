@@ -180,7 +180,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
    */
   async connectToBootstrapServers(): Promise<void> {
     const results = await Promise.all(
-      this.bootstrapServers.map(addr =>
+      this.bootstrapServers.map((addr: PeerInfo) =>
         this.dial(addr).then(
           () => true,
           () => false
@@ -188,7 +188,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
       )
     )
 
-    if (!results.some(online => online)) {
+    if (!results.some((online: boolean) => online)) {
       throw Error('Unable to connect to any bootstrap server.')
     }
   }

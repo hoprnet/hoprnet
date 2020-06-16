@@ -42,7 +42,7 @@ export default class OpenChannel implements AbstractCommand {
       await this.node.paymentChannels.utils.pubKeyToAccountId(counterparty.pubKey.marshal())
     )
 
-    const tokens = new BigNumber((await this.node.paymentChannels.accountBalance).toString()).div(
+    const tokens = new BigNumber((await this.node.paymentChannels.account.balance).toString()).div(
       new BigNumber(10).pow(this.node.paymentChannels.types.Balance.DECIMALS)
     )
     let funds: BigNumber, tmpFunds: string
@@ -52,14 +52,14 @@ export default class OpenChannel implements AbstractCommand {
     const exitQuestion = `Do you want to cancel (${chalk.green('Y')} / ${chalk.red('n')}) : `
 
     do {
-      tmpFunds = await new Promise<string>(resolve => rl.question(tokenQuestion, resolve))
+      tmpFunds = await new Promise<string>((resolve) => rl.question(tokenQuestion, resolve))
       try {
         funds = new BigNumber(tmpFunds)
       } catch {}
       clearString(tokenQuestion + tmpFunds, rl)
 
       if (tmpFunds.length == 0) {
-        let decision = await new Promise<string>(resolve => rl.question(exitQuestion, resolve))
+        let decision = await new Promise<string>((resolve) => rl.question(exitQuestion, resolve))
         if (decision.length == 0 || decision.match(/^y(es)?$/i)) {
           clearString(exitQuestion + decision, rl)
 
@@ -95,14 +95,13 @@ export default class OpenChannel implements AbstractCommand {
 
     try {
       await this.node.paymentChannels.channel.create(
-        this.node.paymentChannels,
         counterparty.pubKey.marshal(),
         async () =>
           this.node.paymentChannels.utils.pubKeyToAccountId(
             await this.node.interactions.payments.onChainKey.interact(counterparty)
           ),
         channelBalance,
-        (balance: Types.ChannelBalance): Promise<Types.SignedChannel<Types.Channel, Types.Signature>> =>
+        (balance: Types.ChannelBalance): Promise<Types.SignedChannel> =>
           this.node.interactions.payments.open.interact(counterparty, balance)
       )
 
@@ -120,13 +119,12 @@ export default class OpenChannel implements AbstractCommand {
       noBootstrapNodes: true,
     })
 
-    const peers = allPeers
-      // filter peers that we already have an open channel with
-      .filter(peer => {
-        return !peersWithOpenChannel.find(p => p.id.equals(peer.id))
-      })
-      // return peerId string
-      .map(peer => peer.toB58String())
+    const peers = allPeers.reduce((acc: string[], peer: PeerId) => {
+      if (!peersWithOpenChannel.find((p: PeerId) => p.id.equals(peer.id))) {
+        acc.push(peer.toB58String())
+      }
+      return acc
+    }, [])
 
     if (peers.length < 1) {
       console.log(chalk.red(`\nDoesn't know any new node to open a payment channel with.`))

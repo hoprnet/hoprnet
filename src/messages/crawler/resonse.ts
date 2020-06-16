@@ -26,13 +26,18 @@ class CrawlResponse extends Uint8Array {
         }
         super(u8aConcat(toU8a(struct.status, ENUM_LENGTH)))
       } else if (struct.status == CrawlStatus.OK) {
-        super(u8aConcat(toU8a(struct.status, ENUM_LENGTH), encode(struct.peerInfos.map((peerInfo: PeerInfo) => serializePeerInfo(peerInfo)))))
+        super(
+          u8aConcat(
+            toU8a(struct.status, ENUM_LENGTH),
+            encode(struct.peerInfos.map((peerInfo: PeerInfo) => serializePeerInfo(peerInfo)))
+          )
+        )
       } else {
         throw Error(`Invalid creation parameters.`)
       }
     }
   }
-  
+
   subarray(begin: number = 0, end?: number): Uint8Array {
     return new Uint8Array(this.buffer, begin, end != null ? end - begin : undefined)
   }

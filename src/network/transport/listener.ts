@@ -43,9 +43,9 @@ export function createListener(
 ): Listener {
   const listener = new EventEmitter() as Listener
 
-  const server = net.createServer(async socket => {
+  const server = net.createServer(async (socket) => {
     // Avoid uncaught errors caused by unstable connections
-    socket.on('error', err => error('socket error', err))
+    socket.on('error', (err) => error('socket error', err))
 
     let maConn: MultiaddrConnection
     let conn: Connection
@@ -69,7 +69,7 @@ export function createListener(
 
   server
     .on('listening', () => listener.emit('listening'))
-    .on('error', err => listener.emit('error', err))
+    .on('error', (err) => listener.emit('error', err))
     .on('close', () => listener.emit('close'))
 
   // Keep track of open connections to destroy in case of timeout
@@ -80,7 +80,7 @@ export function createListener(
 
     return new Promise((resolve, reject) => {
       server.__connections.forEach((maConn: MultiaddrConnection) => attemptClose(maConn))
-      server.close(err => (err ? reject(err) : resolve()))
+      server.close((err) => (err ? reject(err) : resolve()))
     })
   }
 
@@ -129,7 +129,7 @@ export function createListener(
       addrs = addrs.concat(getMultiaddrs('ip6', address.address, address.port))
     }
 
-    return addrs.map(ma => (peerId ? ma.encapsulate(`/p2p/${peerId}`) : ma))
+    return addrs.map((ma) => (peerId ? ma.encapsulate(`/p2p/${peerId}`) : ma))
   }
 
   return listener
@@ -141,7 +141,7 @@ function trackConn(server: Libp2pServer, maConn: MultiaddrConnection) {
 
   const untrackConn = () => {
     // @ts-ignore
-    server.__connections = server.__connections.filter(c => c !== maConn)
+    server.__connections = server.__connections.filter((c) => c !== maConn)
   }
 
   maConn.conn.once('close', untrackConn)

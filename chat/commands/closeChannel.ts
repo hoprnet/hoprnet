@@ -9,7 +9,7 @@ import chalk from 'chalk'
 
 import { checkPeerIdInput } from '../utils'
 import { startDelayedInterval, u8aToHex } from '@hoprnet/hopr-utils'
-import { pubKeyToPeerId } from '@hoprnet/hopr-core/lib/utils'
+import { pubKeyToPeerId } from '@hoprnet/hopr-core/utils'
 
 export default class CloseChannel implements AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {}
@@ -30,25 +30,27 @@ export default class CloseChannel implements AbstractCommand {
 
     const unsubscribe = startDelayedInterval(`Initiated settlement. Waiting for finalisation`)
 
-    let channel: ChannelInstance<HoprCoreConnector>
+    let channel: ChannelInstance
 
     try {
-      channel = await this.node.paymentChannels.channel.create(this.node.paymentChannels, peerId.pubKey.marshal(), async (counterparty: Uint8Array) =>
-        this.node.interactions.payments.onChainKey.interact(await pubKeyToPeerId(counterparty))
+      channel = await this.node.paymentChannels.channel.create(
+        peerId.pubKey.marshal(),
+        async (counterparty: Uint8Array) =>
+          this.node.interactions.payments.onChainKey.interact(await pubKeyToPeerId(counterparty))
       )
 
       await channel.initiateSettlement()
 
       console.log(
-        `${chalk.green(`Successfully closed channel`)} ${chalk.yellow(u8aToHex(await channel.channelId))}. Received ${chalk.magenta(new BN(0).toString())} ${
-          this.node.paymentChannels.types.Balance.SYMBOL
-        }.`
+        `${chalk.green(`Successfully closed channel`)} ${chalk.yellow(
+          u8aToHex(await channel.channelId)
+        )}. Received ${chalk.magenta(new BN(0).toString())} ${this.node.paymentChannels.types.Balance.SYMBOL}.`
       )
     } catch (err) {
       console.log(chalk.red(err.message))
     }
 
-    await new Promise(resolve =>
+    await new Promise((resolve) =>
       setTimeout(() => {
         unsubscribe()
         process.stdout.write('\n')
@@ -59,8 +61,7 @@ export default class CloseChannel implements AbstractCommand {
 
   complete(line: string, cb: (err: Error | undefined, hits: [string[], string]) => void, query?: string) {
     this.node.paymentChannels.channel.getAll(
-      this.node.paymentChannels,
-      async (channel: ChannelInstance<HoprCoreConnector>) => (await pubKeyToPeerId(await channel.offChainCounterparty)).toB58String(),
+      async (channel: ChannelInstance) => (await pubKeyToPeerId(await channel.offChainCounterparty)).toB58String(),
       async (peerIdPromises: Promise<string>[]) => {
         let peerIdStrings: string[]
         try {
@@ -71,7 +72,11 @@ export default class CloseChannel implements AbstractCommand {
         }
 
         if (peerIdStrings != null && peerIdStrings.length < 1) {
-          console.log(chalk.red(`\nCannot close any channel because there are not any open ones and/or channels were opened by a third party.`))
+          console.log(
+            chalk.red(
+              `\nCannot close any channel because there are not any open ones and/or channels were opened by a third party.`
+            )
+          )
           return cb(undefined, [[''], line])
         }
 

@@ -53,7 +53,9 @@ class Heartbeat<Chain extends HoprCoreConnector> implements AbstractInteraction<
     }, HEARTBEAT_TIMEOUT)
 
     struct = await this.node.dialProtocol(counterparty, this.protocols[0], { signal }).catch(async (err: Error) => {
-      const peerInfo = await this.node.peerRouting.findPeer(PeerInfo.isPeerInfo(counterparty) ? counterparty.id : counterparty)
+      const peerInfo = await this.node.peerRouting.findPeer(
+        PeerInfo.isPeerInfo(counterparty) ? counterparty.id : counterparty
+      )
 
       try {
         let result = await this.node.dialProtocol(peerInfo, this.protocols[0], { signal })

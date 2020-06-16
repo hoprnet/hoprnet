@@ -7,12 +7,13 @@ const Multiaddr = require('multiaddr')
 
 import { serializePeerInfo, deserializePeerInfo } from '.'
 
-describe('test peerInfo serialisation', function() {
-  it('should serialize and deserilize a peerInfo', async function() {
+describe('test peerInfo serialisation', function () {
+  it('should serialize and deserilize a peerInfo', async function () {
     const peerInfo = await PeerInfo.create(await PeerId.create({ keyType: 'secp256k1' }))
 
     assert(
-      (await deserializePeerInfo(Buffer.from(serializePeerInfo(peerInfo)))).id.toB58String() == peerInfo.id.toB58String(),
+      (await deserializePeerInfo(Buffer.from(serializePeerInfo(peerInfo)))).id.toB58String() ==
+        peerInfo.id.toB58String(),
       `Serialized peerInfo should be deserializable and id should match.`
     )
 
@@ -31,7 +32,9 @@ describe('test peerInfo serialisation', function() {
 
     const deserialized = await deserializePeerInfo(Buffer.from(serializePeerInfo(peerInfo)))
     assert(
-      deserialized.multiaddrs.has(testMultiaddr) && deserialized.multiaddrs.has(secondTestMultiaddr) && !deserialized.multiaddrs.has(thirdTestMultiaddr),
+      deserialized.multiaddrs.has(testMultiaddr) &&
+        deserialized.multiaddrs.has(secondTestMultiaddr) &&
+        !deserialized.multiaddrs.has(thirdTestMultiaddr),
       `Serialized peerInfo should be deserializable and multiaddrs should match.`
     )
   })

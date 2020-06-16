@@ -508,7 +508,7 @@ describe('should create a socket and connect to it', function () {
         {
           id: 0,
           ipv4: true,
-          timeoutIntentionallyOnWebRTC: new Promise(resolve => setTimeout(resolve, WEBRTC_TIMEOUT)),
+          timeoutIntentionallyOnWebRTC: new Promise((resolve) => setTimeout(resolve, WEBRTC_TIMEOUT)),
         },
         relay.peerInfo
       ),
@@ -516,7 +516,7 @@ describe('should create a socket and connect to it', function () {
         {
           id: 1,
           ipv6: true,
-          timeoutIntentionallyOnWebRTC: new Promise(resolve => setTimeout(resolve, WEBRTC_TIMEOUT)),
+          timeoutIntentionallyOnWebRTC: new Promise((resolve) => setTimeout(resolve, WEBRTC_TIMEOUT)),
         },
         relay.peerInfo
       ),

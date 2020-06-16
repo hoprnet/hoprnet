@@ -56,11 +56,16 @@ describe('check heartbeat mechanism', function () {
   }
 
   it('should initialise the heartbeat module and start the heartbeat functionality', async function () {
-    const [Alice, Bob, Chris, Dave] = await Promise.all([generateNode(), generateNode(), generateNode(), generateNode()])
+    const [Alice, Bob, Chris, Dave] = await Promise.all([
+      generateNode(),
+      generateNode(),
+      generateNode(),
+      generateNode(),
+    ])
 
     // Check whether our event listener is triggered by heartbeat interactions
     await Promise.all([
-      new Promise(async resolve => {
+      new Promise(async (resolve) => {
         Bob.network.heartbeat.once('beat', (peerId: PeerId) => {
           assert(Alice.peerInfo.id.isEqual(peerId), `Incoming connection must come from Alice`)
           resolve()
@@ -71,7 +76,7 @@ describe('check heartbeat mechanism', function () {
 
     // Check whether our event listener is triggered by `normal` interactions
     await Promise.all([
-      new Promise(async resolve => {
+      new Promise(async (resolve) => {
         Chris.network.heartbeat.once('beat', (peerId: PeerId) => {
           assert(Alice.peerInfo.id.isEqual(peerId), `Incoming connection must come from Alice`)
           resolve()

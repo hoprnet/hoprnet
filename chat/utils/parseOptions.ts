@@ -135,7 +135,7 @@ export async function parseOptions(): Promise<HoprOptions> {
     process.exit()
   }
 
-  if (!knownConnectors.some(connector => connector[1] == cli_options.network)) {
+  if (!knownConnectors.some((connector) => connector[1] == cli_options.network)) {
     console.log(`Unknown network! <${chalk.red(cli_options.network)}>\n`)
     await listConnectors.execute()
     return

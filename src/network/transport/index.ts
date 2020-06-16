@@ -338,7 +338,7 @@ class TCP {
   }
 
   handleWebRTC(srcBuffer: Pushable<Uint8Array>, sinkBuffer: Pushable<Uint8Array>): Promise<Connection> {
-    return new Promise<Connection>(async resolve => {
+    return new Promise<Connection>(async (resolve) => {
       let channel: SimplePeerInstance
       if (this._useOwnStunServers) {
         channel = new Peer({ wrtc, trickle: true, config: { iceServers: this.stunServers } })
@@ -766,7 +766,7 @@ class TCP {
   filter(multiaddrs: Multiaddr[]): Multiaddr[] {
     multiaddrs = Array.isArray(multiaddrs) ? multiaddrs : [multiaddrs]
 
-    return multiaddrs.filter(ma => {
+    return multiaddrs.filter((ma: Multiaddr) => {
       return mafmt.TCP.matches(ma.decapsulateCode(CODE_P2P)) || mafmt.P2P.matches(ma)
     })
   }

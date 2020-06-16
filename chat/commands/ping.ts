@@ -37,7 +37,7 @@ export default class Ping implements AbstractCommand {
   }
 
   complete(line: string, cb: (err: Error | undefined, hits: [string[], string]) => void, query?: string): void {
-    const peerIds = getPeers(this.node).map(peerId => peerId.toB58String())
+    const peerIds = getPeers(this.node).map((peerId) => peerId.toB58String())
 
     if (!peerIds.length) {
       return cb(undefined, [[''], line])

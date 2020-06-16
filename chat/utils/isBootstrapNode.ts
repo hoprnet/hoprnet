@@ -9,10 +9,10 @@ import type PeerId from 'peer-id'
  * @param peerId
  */
 export function isBootstrapNode(node: Hopr<HoprCoreConnector>, peerId: PeerId): boolean {
-    for (let i = 0; i < node.bootstrapServers.length; i++) {
-      if (peerId.isEqual(node.bootstrapServers[i].id)) {
-        return true
-      }
+  for (let i = 0; i < node.bootstrapServers.length; i++) {
+    if (peerId.isEqual(node.bootstrapServers[i].id)) {
+      return true
     }
-    return false
+  }
+  return false
 }

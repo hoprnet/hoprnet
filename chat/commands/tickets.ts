@@ -17,7 +17,7 @@ export default class Tickets implements AbstractCommand {
       return
     }
 
-    const signedTickets: Map<string, Types.SignedTicket<Types.Ticket, Types.Signature>> =
+    const signedTickets: Map<string, Types.SignedTicket> =
       // @ts-ignore
       // TODO: remove ignore once interface is updated
       await this.node.paymentChannels.ticket.get(this.node.paymentChannels, stringToU8a(query))
@@ -27,7 +27,7 @@ export default class Tickets implements AbstractCommand {
       return
     }
 
-    const table = Array.from(signedTickets.values()).map(signedTicket => {
+    const table = Array.from(signedTickets.values()).map((signedTicket) => {
       const ticket = signedTicket.ticket
 
       return {
@@ -41,8 +41,7 @@ export default class Tickets implements AbstractCommand {
 
   complete(line: string, cb: (err: Error | undefined, hits: [string[], string]) => void, query?: string) {
     this.node.paymentChannels.channel.getAll(
-      this.node.paymentChannels,
-      async (channel: ChannelInstance<HoprCoreConnector>) => u8aToHex(await channel.channelId),
+      async (channel: ChannelInstance) => u8aToHex(await channel.channelId),
       async (channelIdsPromise: Promise<string>[]) => {
         let channelIds: string[] = []
 

@@ -8,7 +8,7 @@ import {
   KEYPAIR_SCRYPT_PARAMS,
   KEYPAIR_IV_LENGTH,
   KEYPAIR_CIPHER_KEY_LENGTH,
-  KEYPAIR_MESSAGE_DIGEST_ALGORITHM
+  KEYPAIR_MESSAGE_DIGEST_ALGORITHM,
 } from '.'
 import { u8aEquals } from '@hoprnet/hopr-utils'
 
@@ -31,14 +31,7 @@ export async function deserializeKeyPair(encryptedSerializedKeyPair: Uint8Array,
 
   const key = scryptSync(password, salt, KEYPAIR_CIPHER_KEY_LENGTH, KEYPAIR_SCRYPT_PARAMS)
 
-  if (
-    !u8aEquals(
-      createHmac(KEYPAIR_MESSAGE_DIGEST_ALGORITHM, key)
-        .update(encodedCiphertext)
-        .digest(),
-      mac
-    )
-  ) {
+  if (!u8aEquals(createHmac(KEYPAIR_MESSAGE_DIGEST_ALGORITHM, key).update(encodedCiphertext).digest(), mac)) {
     throw Error(`Invalid MAC. Ciphertext might have been corrupted`)
   }
 

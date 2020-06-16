@@ -18,7 +18,9 @@ export default class ListConnectors implements AbstractCommand {
         import(knownConnectors[i][0]).then(
           () => {
             found++
-            str += `\n  ${chalk.yellow(knownConnectors[i][0])} ${chalk.gray('=>')} ./hopr -n ${chalk.green(knownConnectors[i][1])}`
+            str += `\n  ${chalk.yellow(knownConnectors[i][0])} ${chalk.gray('=>')} ./hopr -n ${chalk.green(
+              knownConnectors[i][1]
+            )}`
           },
           () => {}
         )
@@ -30,7 +32,9 @@ export default class ListConnectors implements AbstractCommand {
     if (found > 0) {
       console.log(str)
     } else {
-      console.log(chalk.red(`Could not find any connectors. Please make sure there is one available in 'node_modules'!`))
+      console.log(
+        chalk.red(`Could not find any connectors. Please make sure there is one available in 'node_modules'!`)
+      )
     }
   }
 
