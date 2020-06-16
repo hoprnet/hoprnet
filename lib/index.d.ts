@@ -16,6 +16,7 @@ import HashedSecret from './hashedSecret';
 export default class HoprEthereum implements HoprCoreConnector {
     db: LevelUp;
     web3: Web3;
+    chainId: number;
     network: addresses.Networks;
     hoprChannels: HoprChannels;
     hoprToken: HoprToken;
@@ -34,7 +35,7 @@ export default class HoprEthereum implements HoprCoreConnector {
     account: Account;
     tickets: Tickets;
     hashedSecret: HashedSecret;
-    constructor(db: LevelUp, web3: Web3, network: addresses.Networks, hoprChannels: HoprChannels, hoprToken: HoprToken, options: {
+    constructor(db: LevelUp, web3: Web3, chainId: number, network: addresses.Networks, hoprChannels: HoprChannels, hoprToken: HoprToken, options: {
         debug: boolean;
     }, privateKey: Uint8Array, publicKey: Uint8Array);
     readonly dbKeys: typeof dbkeys;

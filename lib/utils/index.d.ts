@@ -109,12 +109,19 @@ export declare function waitFor({ web3, network, getCurrentBlock, timestamp, }: 
     timestamp?: number;
 }): Promise<void>;
 /**
+ * Get chain ID.
+ *
+ * @param web3 a web3 instance
+ * @returns the chain ID
+ */
+export declare function getChainId(web3: Web3): Promise<number>;
+/**
  * Get current network's name.
  *
  * @param web3 a web3 instance
  * @returns the network's name
  */
-export declare function getNetworkId(web3: Web3): Promise<addresses.Networks>;
+export declare function getNetworkName(chainId: number): addresses.Networks;
 /**
  * Convert a state count (one received from on-chain),
  * to an enumarated representation.
