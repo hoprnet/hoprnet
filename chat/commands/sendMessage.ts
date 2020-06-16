@@ -8,7 +8,7 @@ import type PeerId from 'peer-id'
 
 import { checkPeerIdInput, encodeMessage, getOpenChannels, getPeers } from '../utils'
 import { clearString } from '@hoprnet/hopr-utils'
-import { MAX_HOPS } from '@hoprnet/hopr-core/constants'
+import { MAX_HOPS } from '@hoprnet/hopr-core/lib/constants'
 
 import readline from 'readline'
 

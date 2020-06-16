@@ -3,7 +3,7 @@ import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { Channel as ChannelInstance } from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import { u8aEquals } from '@hoprnet/hopr-utils'
-import { pubKeyToPeerId } from '@hoprnet/hopr-core/utils'
+import { pubKeyToPeerId } from '@hoprnet/hopr-core/lib/utils'
 import { isBootstrapNode } from './isBootstrapNode'
 
 /**
