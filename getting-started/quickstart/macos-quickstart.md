@@ -1,14 +1,23 @@
 ---
-description: Get familiar with HOPR on your Mac.
+description: Get familiar with HOPR on your Mac or Unix based system.
 ---
 
-# MacOS Quickstart
+# MacOS/Linux Quickstart
 
-This quick start tutorial will show you how to use **HOPR** by installing **HOPR Chat** in your system using Docker on a MacOS computer. In this step-by-step guide, we will download Docker, run **HOPR Chat,** and send a message to another user connected to the **HOPR Network**.
+This quick start tutorial will show you how to use **HOPR** by installing **HOPR Chat** in your system using Docker on a MacOS/Linux based computer. In this step-by-step guide, we will download Docker, run **HOPR Chat,** and send a message to another user connected to the **HOPR Network**.
 
 ## Step 1 - Installing Docker in your machine
 
-Before anything, you need to install [Docker Desktop](https://hub.docker.com/editions/community/docker-ce-desktop-mac/) on your machine. Docker is natively supported in MacOS, and will prompt any install requirements you might need.
+Before anything, you need to install [Docker Desktop](https://hub.docker.com/editions/community/docker-ce-desktop-mac/) on your machine. Docker is natively supported in MacOS/Linux, and will prompt any install requirements you might need depending on your operating system. Depending on your Linux distribution, you might need to follow  an additional steps as to ensure your computer is working properly with Docker.
+
+### Instructions for installing Docker in Linux
+
+Depending of your distribution, please follow the official guidelines on how to installing and run docker in your workstation.
+
+* [Installing Docker in Ubuntu](https://docs.docker.com/engine/install/ubuntu/)
+* [Installing Docker in Fedora](https://docs.docker.com/engine/install/fedora/)
+* [Installing Docker in Debian](https://docs.docker.com/engine/install/debian/)
+* [Installing Docker in CentOS](https://docs.docker.com/engine/install/centos/)
 
 ### Instructions for installing Docker in MacOS
 
@@ -31,31 +40,21 @@ To ensure your machine has successfully downloaded **HOPR Chat,** run `docker im
 To run **HOPR Chat,** you only need to copy and paste the following command. You can replace `switzerland` for anything else, but ensure to always use the same password as this will be used by **HOPR Chat**. In case you see an `Unable to connect to Bootstrap node` message, use one of our other bootstrap nodes. Furthermore, you can also use your own [Infura](https://infura.io/) credentials instead of the ones provided here, but ensure you use the Kovan provider.
 
 {% tabs %}
-{% tab title="ch-01" %}
+{% tab title="ch-t-01" %}
 ```text
 docker run -v $(pwd)/db:/app/db \
 -e HOST_IPV4=0.0.0.0:9091 \
--e BOOTSTRAP_SERVERS=/dns4/ch-test-01.hoprnet.io/tcp/9091/p2p/16Uiu2HAmThyWP5YWutPmYk9yUZ48ryWyZ7Cf6pMTQduvHUS9sGE7 \
+-e BOOTSTRAP_SERVERS=/dns4/ch-test-01.hoprnet.io/tcp/9091/p2p/16Uiu2HAmMUwDHzmFJaATzQPUFgzry5oxvSgWF2Vc553HCpekC4q \
 -e ETHEREUM_PROVIDER=wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36 \
 -p 9091:9091 -it hopr/chat -p switzerland
 ```
 {% endtab %}
 
-{% tab title="ch-02" %}
+{% tab title="ch-t-02" %}
 ```text
 docker run -v $(pwd)/db:/app/db \
 -e HOST_IPV4=0.0.0.0:9091 \
--e BOOTSTRAP_SERVERS=/dns4/ch-test-02.hoprnet.io/tcp/9091/p2p/16Uiu2HAmBSzk28qQ8bfpwVgEjef4q51kGg8GjEk3MinyyTB2WTGn \
--e ETHEREUM_PROVIDER=wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36 \
--p 9091:9091 -it hopr/chat -p switzerland
-```
-{% endtab %}
-
-{% tab title="ch-03" %}
-```
-docker run -v $(pwd)/db:/app/db \
--e HOST_IPV4=0.0.0.0:9091 \
--e BOOTSTRAP_SERVERS=/dns4/ch-test-03.hoprnet.io/tcp/9091/p2p/16Uiu2HAm4H1ZxPb9KkoYD928Smrjnr2igYP8vBFbZKs5B8gchTnT \
+-e BOOTSTRAP_SERVERS=/dns4/ch-test-02.hoprnet.io/tcp/9091/p2p/16Uiu2HAmVFVHwJs7EqeRUtY6EZTtv379CiwvJgdsDfmdywbKfgAq \
 -e ETHEREUM_PROVIDER=wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36 \
 -p 9091:9091 -it hopr/chat -p switzerland
 ```
@@ -101,17 +100,9 @@ Congratulations! You have communicated with another individual using a privacy-p
 
 ### Bootstrap Nodes
 
-For **HOPR Chat** to work, you need to make sure you provide it with at least one **HOPR Chat** node in Bootstrap Mode. Anyone can spin a **HOPR Chat** in this mode by adding the flag `-b` at the end of the command. Feel free to use any \(or all\) of the following URLs as your `BOOTSTRAP_SERVERS` parameter in your **HOPR Chat** Docker image.
+For **HOPR Chat** to work, you need to make sure you provide it with at least one **HOPR Chat** node in Bootstrap Mode. For more information about these nodes and which ones are available, please see our **Bootstrap Nodes** page.
 
-* `/dns4/ch-test-01.hoprnet.io/tcp/9091/p2p/16Uiu2HAmThyWP5YWutPmYk9yUZ48ryWyZ7Cf6pMTQduvHUS9sGE7`
-* `/dns4/ch-test-02.hoprnet.io/tcp/9091/p2p/16Uiu2HAmBSzk28qQ8bfpwVgEjef4q51kGg8GjEk3MinyyTB2WTGn`
-* `/dns4/ch-test-03.hoprnet.io/tcp/9091/p2p/16Uiu2HAm4H1ZxPb9KkoYD928Smrjnr2igYP8vBFbZKs5B8gchTnT`
-
-These nodes are behind HOPR Services AG DNS registry. In case you want to directly access them without the DNS request, you can simply pass these directly.
-
-* `/ip4/34.65.237.196/tcp/9091/p2p/16Uiu2HAmThyWP5YWutPmYk9yUZ48ryWyZ7Cf6pMTQduvHUS9sGE7`
-* `/ip4/34.65.119.138/tcp/9091/p2p/16Uiu2HAmBSzk28qQ8bfpwVgEjef4q51kGg8GjEk3MinyyTB2WTGn`
-* `/ip4/34.65.120.13/tcp/9091/p2p/16Uiu2HAm4H1ZxPb9KkoYD928Smrjnr2igYP8vBFbZKs5B8gchTnT`
+{% page-ref page="../../bootstrap-nodes.md" %}
 
 
 

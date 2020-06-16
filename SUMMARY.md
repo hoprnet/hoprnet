@@ -6,8 +6,9 @@
 
 * [Overview](getting-started/overview.md)
 * [Quickstart](getting-started/quickstart/README.md)
-  * [MacOS Quickstart](getting-started/quickstart/macos-quickstart.md)
+  * [MacOS/Linux Quickstart](getting-started/quickstart/macos-quickstart.md)
   * [Windows Quickstart](getting-started/quickstart/windows-quickstart.md)
+* [Bootstrap Nodes](bootstrap-nodes.md)
 
 ## Main Concepts
 
