@@ -1,0 +1,22 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Launch Program",
+      "skipFiles": ["<node_internals>/**"],
+      "program": "${workspaceFolder}/chat/lib/index.js",
+      "args": ["-p", "123456"],
+      "env": {
+        "HOST_IPV4": "0.0.0.0:9091",
+        "BOOTSTRAP_SERVERS": "/dns4/ch-test-01.hoprnet.io/tcp/9091/p2p/16Uiu2HAmMUwDHzmFJaATzQPUFgzry5oxvSgWF2Vc553HCpekC4qU",
+        "ETHEREUM_PROVIDER": "wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36"
+      },
+      "outFiles": ["${workspaceFolder}/**/*.js"]
+    }
+  ]
+}
