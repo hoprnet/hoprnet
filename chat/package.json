@@ -17,7 +17,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@hoprnet/hopr-core": "0.6.8-dev.94445bc",
+    "@hoprnet/hopr-core": "0.6.9-dev.bd0e3b5",
     "@hoprnet/hopr-core-connector-interface": "1.2.10-98e08f8",
     "@hoprnet/hopr-core-ethereum": "0.0.11-dev.a26255e",
     "@hoprnet/hopr-demo-seeds": "1.0.1",
