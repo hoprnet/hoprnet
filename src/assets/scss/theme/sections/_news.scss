@@ -1,0 +1,20 @@
+.news-item-title {
+
+    a {
+        color: get-color(dark, 1) !important;
+        text-decoration: none;
+    }
+}
+
+.news-item-more {
+    @include font-weight(header-link);
+
+    a {
+        color: get-color(dark, 1);
+        text-decoration: none;
+
+        &:hover {
+            color: get-color(primary, 1);
+        }
+    }
+}
