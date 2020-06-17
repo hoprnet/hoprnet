@@ -8,7 +8,6 @@ import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "./utils/ECDSA.sol";
 
-
 contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     using SafeMath for uint256;
 

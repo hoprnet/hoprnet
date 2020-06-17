@@ -4,7 +4,6 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/token/ERC777/ERC777.sol";
 import "./ERC777/ERC777Snapshot.sol";
 
-
 contract HoprToken is AccessControl, ERC777Snapshot {
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 

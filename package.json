@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-ethereum",
-  "version": "0.3.5-refactor.ea94b44",
+  "version": "0.3.6-refactor.3125357",
   "description": "On-chain logic for hopr.network",
   "homepage": "https://hoprnet.io",
   "repository": {
@@ -51,6 +51,7 @@
     "web3": "^1.2.7"
   },
   "devDependencies": {
+    "@hoprnet/hopr-testing": "0.1.2",
     "@types/chai": "^4.2.11",
     "@types/mocha": "^7.0.2",
     "@types/node": "^13.13.4",

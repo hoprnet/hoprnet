@@ -4,7 +4,6 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "./HoprToken.sol";
 
-
 /**
  * @dev A HOPR Faucet that is used in public testnets.
  * Anybody can mint tokens, but only an address with 'PAUSER_ROLE'

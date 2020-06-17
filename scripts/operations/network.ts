@@ -1,4 +1,4 @@
-import { Ganache } from './utils'
+import { Ganache } from '@hoprnet/hopr-testing'
 import networks from '../../truffle-networks.json'
 
 export default () => {
