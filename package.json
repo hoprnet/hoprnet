@@ -8,7 +8,7 @@
   "main": "lib/index.js",
   "scripts": {
     "clean": "rm -rf ./lib",
-    "test": "mocha",
+    "test": "mocha --parallel",
     "dev": "yarn clean && tsc -w",
     "build": "yarn clean && tsc -p . --noEmit false",
     "prepare": "yarn build"
@@ -26,22 +26,18 @@
   },
   "dependencies": {
     "bignumber.js": "^9.0.0",
-    "chalk": "^4.0.0",
+    "chalk": "^4.1.0",
     "strip-ansi": "^6.0.0"
   },
   "devDependencies": {
-    "@types/chai": "^4.2.11",
     "@types/mocha": "^7.0.2",
     "@types/node": "^12.12.8",
-    "@types/ramda": "^0.27.4",
-    "chai": "^4.2.0",
-    "husky": "^4.2.3",
+    "husky": "^4.2.5",
     "lint-staged": ">=10",
-    "mocha": "^7.0.1",
+    "mocha": "^8.0.1",
     "prettier": "^2.0.5",
-    "ramda": "^0.27.0",
-    "ts-node": "^8.8.2",
-    "typescript": "^3.8.2"
+    "ts-node": "^8.10.2",
+    "typescript": "^3.9.5"
   },
   "prettier": {
     "tabWidth": 2,
