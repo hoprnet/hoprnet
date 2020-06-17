@@ -1,7 +1,7 @@
 {
   "name": "@hoprnet/hopr-utils",
   "description": "HOPR-based utilities to process multiple data structures",
-  "version": "0.1.6-refactor.c80428a",
+  "version": "0.1.6-refactor.61df948",
   "repository": "git@github.com:hoprnet/hopr-utils.git",
   "license": "LGPL-3.0-only",
   "types": "lib/index.d.ts",
