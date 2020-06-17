@@ -89,9 +89,9 @@ jobs:
         run: |
           yarn policies set-version 1.19.2
           yarn install --frozen-lockfile
-        env:
+      - env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      - name: Publish to NPM Registry
+        name: Publish to NPM Registry
         run: |
           yarn policies set-version 1.19.2
           npm publish --access public
