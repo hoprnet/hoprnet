@@ -331,12 +331,6 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
    * @param nextNode the ID of the payment channel
    */
   async prepareDelivery(state, newState, nextNode): Promise<void> {
-    // console.log((await this.ticket).ticket.challenge, await this.node.paymentChannels.utils.hash(
-    //   u8aConcat(
-    //     deriveTicketLastKey(this.header.derivedSecret),
-    //     await this.node.paymentChannels.utils.hash(deriveTicketLastKeyBlinding(this.header.derivedSecret))
-    //   )
-    // ))
     if (
       !u8aEquals(
         await this.node.paymentChannels.utils.hash(deriveTicketLastKey(this.header.derivedSecret)),
@@ -345,22 +339,8 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     ) {
       throw Error('General error.')
     }
+
     this.message.encrypted = false
-
-    this.node.output(this.message)
-
-    // const challenges = [secp256k1.publicKeyCreate(Buffer.from(deriveTicketKey(this.header.derivedSecret)))]
-    // const previousChallenges = await (await node.paymentChannels.channel.create(node.paymentChannels, nextNode)).getPreviousChallenges()
-    // if (previousChallenges != null) challenges.push(Buffer.from(previousChallenges))
-    // if (state.channelKey) challenges.push(secp256k1.publicKeyCreate(state.channelKey))
-    // if (!this.ticket.curvePoint.equals(secp256k1.publicKeyCombine(challenges))) {
-    //   throw Error('General error.')
-    // }
-    // newState.channelKey = secp256k1.privateKeyTweakAdd(
-    //   state.channelKey || Buffer.alloc(PRIVATE_KEY_LENGTH, 0),
-    //   Buffer.from(deriveTicketKey(this.header.derivedSecret))
-    // )
-    // await node.paymentChannels.setState(nextNode, newState)
   }
 
   /**

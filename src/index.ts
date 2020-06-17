@@ -318,10 +318,10 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
 
     const start = Date.now()
     try {
-      this.interactions.network.heartbeat.interact(destination)
+      await this.interactions.network.heartbeat.interact(destination)
       return Date.now() - start
-    } catch {
-      throw Error('node unreachable')
+    } catch (err) {
+      throw Error(`node unreachable`)
     }
   }
 
