@@ -10,8 +10,8 @@
     "start": "node lib/index.js"
   },
   "engines": {
-    "node": "^12",
-    "yarn": "^1.22"
+    "node": "12.9.1",
+    "yarn": "1.19.2"
   },
   "keywords": [],
   "author": "",
