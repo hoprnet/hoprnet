@@ -4,9 +4,9 @@ import BN from 'bn.js'
 import { stringToU8a, randomInteger } from '@hoprnet/hopr-utils'
 import { AccountId, Ticket, Hash, TicketEpoch, Balance } from '.'
 import * as utils from '../utils'
-import { DEMO_ACCOUNTS } from '../config'
+import * as testconfigs from '../config.spec'
 
-const [userA, userB] = DEMO_ACCOUNTS.map((str) => new AccountId(stringToU8a(str)))
+const [userA, userB] = testconfigs.DEMO_ACCOUNTS.map((str: string) => new AccountId(stringToU8a(str)))
 const WIN_PROB = new BN(1)
 
 const generateTicketData = async () => {

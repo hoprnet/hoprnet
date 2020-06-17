@@ -20,6 +20,7 @@ import {
   SignedChannel,
 } from '../types'
 import CoreConnector from '..'
+import * as testconfigs from '../config.spec'
 import * as configs from '../config'
 
 describe('test ticket generation and verification', function () {
@@ -49,7 +50,7 @@ describe('test ticket generation and verification', function () {
   })
 
   beforeEach(async function () {
-    funder = await getPrivKeyData(stringToU8a(configs.FUND_ACCOUNT_PRIVATE_KEY))
+    funder = await getPrivKeyData(stringToU8a(testconfigs.FUND_ACCOUNT_PRIVATE_KEY))
     const userA = await createAccountAndFund(web3, hoprToken, funder)
     const userB = await createAccountAndFund(web3, hoprToken, funder)
 

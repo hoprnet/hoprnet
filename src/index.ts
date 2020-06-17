@@ -1,11 +1,9 @@
 import type { addresses } from '@hoprnet/hopr-ethereum'
-import { randomBytes, createHash } from 'crypto'
 import Web3 from 'web3'
 import { LevelUp } from 'levelup'
 import HoprChannelsAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprChannels.json'
 import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
 import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import { u8aToHex, stringToU8a, u8aEquals } from '@hoprnet/hopr-utils'
 import chalk from 'chalk'
 import { ChannelFactory } from './channel'
 import types from './types'
@@ -224,30 +222,16 @@ export default class HoprEthereum implements HoprCoreConnector {
    *
    * @param db database instance
    * @param seed that is used to derive that on-chain identity
-   * @param options.id Id of the demo account
    * @param options.provider provider URI that is used to connect to the blockchain
    * @param options.debug debug mode, will generate account secrets using account's public key
    * @returns a promise resolved to the connector
    */
   static async create(
     db: LevelUp,
-    seed?: Uint8Array,
+    seed: Uint8Array,
     options?: { id?: number; provider?: string; debug?: boolean }
   ): Promise<HoprEthereum> {
-    const usingSeed = typeof seed !== 'undefined'
-    const usingOptions = typeof options !== 'undefined'
-
-    if (!usingSeed && !usingOptions) {
-      throw Error("'seed' or 'options' must be provided")
-    }
-    if (usingOptions && typeof options.id !== 'undefined' && options.id > config.DEMO_ACCOUNTS.length) {
-      throw Error(
-        `Unable to find demo account for index '${options.id}'. Please make sure that you have specified enough demo accounts.`
-      )
-    }
-
     const providerUri = options?.provider || config.DEFAULT_URI
-    const privateKey = usingSeed ? seed : stringToU8a(config.DEMO_ACCOUNTS[options.id])
 
     const provider = new Web3.providers.WebsocketProvider(providerUri, {
       reconnect: {
@@ -262,7 +246,7 @@ export default class HoprEthereum implements HoprCoreConnector {
     const [chainId, publicKey] = await Promise.all([
       /* prettier-ignore */
       utils.getChainId(web3),
-      utils.privKeyToPubKey(privateKey),
+      utils.privKeyToPubKey(seed),
     ])
     const network = utils.getNetworkName(chainId)
 
@@ -284,7 +268,7 @@ export default class HoprEthereum implements HoprCoreConnector {
       hoprChannels,
       hoprToken,
       { debug: options?.debug || false },
-      privateKey,
+      seed,
       publicKey
     )
     coreConnector.log(`using ethereum address ${(await coreConnector.account.address).toHex()}`)

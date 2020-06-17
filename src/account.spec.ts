@@ -9,6 +9,7 @@ import { stringToU8a, durations } from '@hoprnet/hopr-utils'
 import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
 import HoprChannelsAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprChannels.json'
 import { getPrivKeyData, createAccountAndFund, createNode, disconnectWeb3 } from './utils/testing'
+import * as testconfigs from './config.spec'
 import * as configs from './config'
 import { wait } from './utils'
 
@@ -38,8 +39,8 @@ describe('test Account class', function () {
 
   beforeEach(async function () {
     this.timeout(durations.minutes(1))
-    funder = await getPrivKeyData(stringToU8a(configs.FUND_ACCOUNT_PRIVATE_KEY))
-    user = await createAccountAndFund(web3, hoprToken, funder, configs.DEMO_ACCOUNTS[1])
+    funder = await getPrivKeyData(stringToU8a(testconfigs.FUND_ACCOUNT_PRIVATE_KEY))
+    user = await createAccountAndFund(web3, hoprToken, funder, testconfigs.DEMO_ACCOUNTS[1])
     coreConnector = await createNode(user.privKey, false)
 
     // wait until it starts

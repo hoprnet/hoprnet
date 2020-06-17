@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core-ethereum",
-  "version": "0.0.9-dev.d783afb",
+  "version": "0.0.11-dev.a26255e",
   "repository": "git@github.com:hoprnet/hopr-core-ethereum.git",
   "license": "LGPL-3.0-only",
   "types": "lib/index.d.ts",
@@ -26,16 +26,13 @@
   },
   "dependencies": {
     "@hoprnet/hopr-core-connector-interface": "~1.2.8-dev.2cc80b1",
-    "@hoprnet/hopr-demo-seeds": "~1.0.1",
     "@hoprnet/hopr-ethereum": "~0.3.5-dev.be1aea6",
-    "@hoprnet/hopr-utils": "~0.1.3",
+    "@hoprnet/hopr-utils": "~0.1.4",
     "bn.js": "^5.1.2",
     "chalk": "^4.1.0",
     "debug": "^4.1.1",
-    "it-pipe": "^1.1.0",
     "keccak": "^3.0.0",
     "levelup": "^4.4.0",
-    "peer-id": "^0.13.12",
     "secp256k1": "^4.0.1",
     "web3": "^1.2.9",
     "web3-core": "^1.2.9",
@@ -45,6 +42,7 @@
     "web3-eth-contract": "^1.2.9"
   },
   "devDependencies": {
+    "@hoprnet/hopr-demo-seeds": "~1.0.1",
     "@types/debug": "^4.1.5",
     "@types/keccak": "^3.0.1",
     "@types/levelup": "^4.3.0",
@@ -53,6 +51,7 @@
     "@types/node": "^12.12.8",
     "@types/secp256k1": "^4.0.1",
     "husky": "^4.2.5",
+    "it-pipe": "^1.1.0",
     "memdown": "^5.1.0",
     "mocha": "^8.0.1",
     "prettier": "^2.0.5",

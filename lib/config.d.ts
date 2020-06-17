@@ -17,6 +17,4 @@ export declare const CHANNELS_ADDRESSES: {
     ropsten: string;
     morden: string;
 };
-export declare const FUND_ACCOUNT_PRIVATE_KEY: string;
-export declare const DEMO_ACCOUNTS: string[];
 export declare const MAX_CONFIRMATIONS = 8;

@@ -3,9 +3,9 @@ import BN from 'bn.js'
 import { stringToU8a, randomInteger } from '@hoprnet/hopr-utils'
 import { Channel, SignedChannel, ChannelBalance, Signature, Hash, ChannelStatus } from '.'
 import * as utils from '../utils'
-import { DEMO_ACCOUNTS } from '../config'
+import * as testconfigs from '../config.spec'
 
-const [userA] = DEMO_ACCOUNTS.map((str) => stringToU8a(str))
+const [userA] = testconfigs.DEMO_ACCOUNTS.map((str: string) => stringToU8a(str))
 
 const generateChannelData = async () => {
   const balance = new ChannelBalance(undefined, {

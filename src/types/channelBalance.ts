@@ -1,6 +1,5 @@
 import BN from 'bn.js'
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
-import { u8aConcat } from '@hoprnet/hopr-utils'
 import { Uint8ArrayE } from '../types/extended'
 import Balance from './balance'
 

@@ -19,6 +19,7 @@ import {
 } from '../types'
 import CoreConnector from '..'
 import Channel from '.'
+import * as testconfigs from '../config.spec'
 import * as configs from '../config'
 
 describe('test Channel class', function () {
@@ -49,9 +50,9 @@ describe('test Channel class', function () {
     channels.clear()
     preChannels.clear()
 
-    funder = await getPrivKeyData(stringToU8a(configs.FUND_ACCOUNT_PRIVATE_KEY))
-    const userA = await createAccountAndFund(web3, hoprToken, funder, configs.DEMO_ACCOUNTS[1])
-    const userB = await createAccountAndFund(web3, hoprToken, funder, configs.DEMO_ACCOUNTS[2])
+    funder = await getPrivKeyData(stringToU8a(testconfigs.FUND_ACCOUNT_PRIVATE_KEY))
+    const userA = await createAccountAndFund(web3, hoprToken, funder, testconfigs.DEMO_ACCOUNTS[1])
+    const userB = await createAccountAndFund(web3, hoprToken, funder, testconfigs.DEMO_ACCOUNTS[2])
 
     coreConnector = await createNode(userA.privKey)
     counterpartysCoreConnector = await createNode(userB.privKey)
