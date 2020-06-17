@@ -283,14 +283,23 @@ class TCP {
     const shaker = handshake(stream)
 
     let counterparty: PeerId
+    const pubKeySender = (await shaker.read())?.slice()
+
+    if (pubKeySender == null) {
+      log(
+        `Received empty message from peer ${chalk.yellow(connection.remotePeer.toB58String())} during connection setup`
+      )
+      shaker.write(FAIL)
+      return
+    }
 
     try {
-      counterparty = await pubKeyToPeerId((await shaker.read()).slice())
+      counterparty = await pubKeyToPeerId(pubKeySender)
     } catch (err) {
       log(
         `Peer ${chalk.yellow(
           connection.remotePeer.toB58String()
-        )} asked to establish relayed connection to invalid counterparty. Error was ${err}`
+        )} asked to establish relayed connection to invalid counterparty. Error was ${err}. Received message ${pubKeySender}`
       )
       shaker.write(FAIL)
       return
