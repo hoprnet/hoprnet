@@ -156,15 +156,14 @@
     web3-eth "^1.2.9"
     web3-eth-contract "^1.2.9"
 
-"@hoprnet/hopr-core@0.6.9-dev.bd0e3b5":
-  version "0.6.9-dev.bd0e3b5"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core/-/hopr-core-0.6.9-dev.bd0e3b5.tgz#d9e3cb09f3f06568f372de9d7f26c20e94d2b2c4"
-  integrity sha512-faYF51d8CJth0AZZLZFm4O5gGcMj3t66z8jkK775roEX/L4czmI8TmTV2szuaLXnrhWsTtNA7/syipWJaclfkQ==
+"@hoprnet/hopr-core@0.6.10-dev.477bb34":
+  version "0.6.10-dev.477bb34"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core/-/hopr-core-0.6.10-dev.477bb34.tgz#9d11b65977de097c057c42731c8dca33cc530cfd"
+  integrity sha512-daXOBn4Z0ooRSSLhWlBDjvKqQb3/Yb+TZxH4FTqdb2udXgDsncH4c64L30OkvFd9cs7VY6+JZ2NK+xy73M6myA==
   dependencies:
     "@hoprnet/hopr-core-connector-interface" "1.2.10-98e08f8"
     "@hoprnet/hopr-core-ethereum" "0.0.11-dev.a26255e"
     "@hoprnet/hopr-demo-seeds" "1.0.1"
-    "@hoprnet/hopr-ethereum" "0.4.0-testnet"
     "@hoprnet/hopr-utils" "0.1.4"
     "@nodeutils/defaults-deep" "~1.1.0"
     abort-controller "^3.0.0"
@@ -200,7 +199,7 @@
     simple-peer "~9.7.2"
     ts-node "^8.10.1"
     webrtc-stun "^3.0.0"
-    wrtc "0.4.5"
+    wrtc "0.4.4"
 
 "@hoprnet/hopr-demo-seeds@1.0.1":
   version "1.0.1"
@@ -208,24 +207,6 @@
   integrity sha512-KGIdLE1EAsKkaxVYRi0GnNcibtfqsQvEx6igyBEJvwtX5Rl+M/hPkSTb/54tS/S3xjatZh0JMczXvI6IGv6STg==
   dependencies:
     micro "^9.3.4"
-
-"@hoprnet/hopr-ethereum@0.4.0-testnet":
-  version "0.4.0-testnet"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-ethereum/-/hopr-ethereum-0.4.0-testnet.tgz#6e5a9143aa4b0d4c5a8e16574f663591e4abdc98"
-  integrity sha512-9uxJeI3sIkFZZj+guNHeJgcdMwVuI6Y08M2auSTVYJybUkiHKKc7XY/GVhcJQC6Rs/6oIJaGC89Y9zn01L6XZg==
-  dependencies:
-    "@hoprnet/hopr-demo-seeds" "1.0.1"
-    "@hoprnet/hopr-utils" "0.1.3"
-    "@openzeppelin/contracts" "^3.0.1"
-    "@openzeppelin/test-helpers" "^0.5.5"
-    "@truffle/debug-utils" "^4.1.1"
-    "@truffle/hdwallet-provider" "^1.0.34"
-    bignumber.js "^9.0.0"
-    ganache-core "^2.10.2"
-    truffle "^5.1.23"
-    truffle-plugin-verify "^0.3.10"
-    ts-node "^8.9.1"
-    web3 "^1.2.7"
 
 "@hoprnet/hopr-ethereum@~0.3.5-dev.be1aea6":
   version "0.3.5-dev.be1aea6"
@@ -9723,10 +9704,10 @@ wrappy@1:
   resolved "https://registry.yarnpkg.com/wrappy/-/wrappy-1.0.2.tgz#b5243d8f3ec1aa35f1364605bc0d1036e30ab69f"
   integrity sha1-tSQ9jz7BqjXxNkYFvA0QNuMKtp8=
 
-wrtc@0.4.5:
-  version "0.4.5"
-  resolved "https://registry.yarnpkg.com/wrtc/-/wrtc-0.4.5.tgz#6839540904bf38f13e6e3fb27ee1448e8458bbb6"
-  integrity sha512-AEqbxwz8LX9bRrSI8UTn6bFiGj8/28nguYJ0RTk1905HZwM8Rx16D1oX0FfJHWmYHEg5XhODGcVa33d9ORHFyw==
+wrtc@0.4.4:
+  version "0.4.4"
+  resolved "https://registry.yarnpkg.com/wrtc/-/wrtc-0.4.4.tgz#523bcec18ea91de5d8ee1ef11e5cbe4fcf7daf3d"
+  integrity sha512-ithsvEKqS6pIbzPiXgJXU4SjQHR7fSszDgGMOREW8j2S4N+ay05r4aYpUZJnsa1fr6o5efeQ/ikFiDXDl5YqeQ==
   dependencies:
     node-pre-gyp "^0.13.0"
   optionalDependencies:
