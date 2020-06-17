@@ -1,11 +1,10 @@
-import '../../types'
-
 import Hopr from '../..'
 import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 
 import HoprEthereum from '@hoprnet/hopr-core-ethereum'
 
-import { Ganache, migrate, fund } from '@hoprnet/hopr-ethereum'
+import { Ganache } from '@hoprnet/hopr-testing'
+import { migrate, fund } from '@hoprnet/hopr-ethereum'
 
 import assert from 'assert'
 
