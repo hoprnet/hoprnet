@@ -1,6 +1,6 @@
 import assert from 'assert'
 import Web3 from 'web3'
-import { Ganache } from '@hoprnet/hopr-ethereum'
+import { Ganache } from '@hoprnet/hopr-testing'
 import { time } from './utils'
 import { disconnectWeb3 } from './utils/testing'
 import * as configs from './config'

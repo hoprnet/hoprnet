@@ -1,4 +1,5 @@
-import { Ganache, migrate } from '@hoprnet/hopr-ethereum'
+import { Ganache } from '@hoprnet/hopr-testing'
+import { migrate } from '@hoprnet/hopr-ethereum'
 import assert from 'assert'
 import { u8aToHex, stringToU8a, u8aEquals } from '@hoprnet/hopr-utils'
 import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
@@ -61,6 +62,8 @@ describe('test ticket generation and verification', function () {
   })
 
   it('should store ticket', async function () {
+    this.timeout(5e3)
+
     const channelType = new ChannelType(undefined, {
       balance: new ChannelBalance(undefined, {
         balance: new BN(123),
@@ -135,6 +138,8 @@ describe('test ticket generation and verification', function () {
   })
 
   it('should store tickets, and retrieve them in a map', async function () {
+    this.timeout(5e3)
+
     const channelType = new ChannelType(undefined, {
       balance: new ChannelBalance(undefined, {
         balance: new BN(123),

@@ -1,4 +1,5 @@
-import { Ganache, migrate } from '@hoprnet/hopr-ethereum'
+import { Ganache } from '@hoprnet/hopr-testing'
+import { migrate } from '@hoprnet/hopr-ethereum'
 import assert from 'assert'
 import { stringToU8a, u8aToHex, u8aEquals, durations } from '@hoprnet/hopr-utils'
 import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
