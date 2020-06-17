@@ -4,7 +4,9 @@ import abortable, { AbortError } from 'abortable-iterator'
 import type { Socket } from 'net'
 import mafmt from 'mafmt'
 const errCode = require('err-code')
-const log = require('debug')('hopr-core:transport')
+
+import debug from 'debug'
+const log = debug('hopr-core:transport')
 import { socketToConn } from './socket-to-conn'
 
 import AbortController from 'abort-controller'
@@ -47,6 +49,7 @@ import type {
 
 import chalk from 'chalk'
 
+// @ts-ignore
 import bl = require('bl')
 import pushable, { Pushable } from 'it-pushable'
 
@@ -88,7 +91,6 @@ class TCP {
   private _registrar: Registrar
   private _peerInfo: PeerInfo
   private _handle: (protocols: string[] | string, handler: (connection: Handler) => void) => void
-  private _unhandle: (protocols: string[] | string) => void
   private relays?: PeerInfo[]
   private stunServers: { urls: string }[]
 
@@ -154,7 +156,6 @@ class TCP {
     this._useWebRTC = useWebRTC === undefined ? USE_WEBRTC : useWebRTC
     this._registrar = libp2p.registrar
     this._handle = libp2p.handle.bind(libp2p)
-    this._unhandle = libp2p.unhandle.bind(libp2p)
     this._dialer = libp2p.dialer
     this._peerInfo = libp2p.peerInfo
     this._upgrader = upgrader
@@ -203,8 +204,10 @@ class TCP {
 
     let sender: PeerId
 
+    const pubKeySender = (await shaker.read())?.slice()
+
     try {
-      sender = await pubKeyToPeerId((await shaker.read()).slice())
+      sender = await pubKeyToPeerId(pubKeySender)
     } catch (err) {
       log(`Could not decode sender peerId. Error was: ${err}`)
       shaker.write(FAIL)
@@ -262,6 +265,7 @@ class TCP {
           this._upgrader.upgradeInbound(this.relayToConn(relayConn)),
         ])
       } catch (err) {
+        log(err)
         return
       }
     } else {
@@ -304,6 +308,7 @@ class TCP {
         conn = await this._dialer.connectToPeer(new PeerInfo(counterparty), { signal: abort.signal })
       }
     } catch (err) {
+      log(err)
       clearTimeout(timeout)
       shaker.write(FAIL)
       shaker.rest()
@@ -623,10 +628,15 @@ class TCP {
         srcBuffer.end()
       }, WEBRTC_TIMEOUT)
 
-      conn = await Promise.race([
-        this.tryWebRTC(srcBuffer, sinkBuffer, destination, { signal: options.signal }),
-        this._upgrader.upgradeOutbound(this.relayToConn(relayConn)),
-      ])
+      try {
+        conn = await Promise.race([
+          this.tryWebRTC(srcBuffer, sinkBuffer, destination, { signal: options.signal }),
+          this._upgrader.upgradeOutbound(this.relayToConn(relayConn)),
+        ])
+      } catch (err) {
+        log(err)
+        throw err
+      }
     } else {
       let mySource = (async function* () {
         for await (const msg of shaker.stream.source) {
@@ -661,7 +671,12 @@ class TCP {
         connection: relayConnection,
       }
 
-      conn = await this._upgrader.upgradeOutbound(this.relayToConn(relayConn))
+      try {
+        conn = await this._upgrader.upgradeOutbound(this.relayToConn(relayConn))
+      } catch (err) {
+        log(err)
+        throw err
+      }
     }
 
     return conn
