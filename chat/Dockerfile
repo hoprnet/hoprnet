@@ -13,7 +13,7 @@ COPY yarn.lock ./
 
 # Install OS libs necessary by some packages during `npm i` (e.g.: node-canvas)
 RUN apk add --update \
-&& apk add --no-cache ffmpeg opus pixman cairo pango giflib ca-certificates \
+&& apk add --no-cache alsa-lib ffmpeg opus pixman cairo pango giflib ca-certificates \
 && apk add --no-cache --virtual .build-deps git curl build-base jpeg-dev pixman-dev \
 cairo-dev pango-dev pangomm-dev gcompat libjpeg-turbo-dev giflib-dev freetype-dev python g++ make \
 \
