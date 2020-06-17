@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core-connector-interface",
-  "version": "1.3.0-dfd7233",
+  "version": "1.3.1-refactor.76c9b25",
   "repository": "https://github.com/hoprnet/hopr-core-connector-interface.git",
   "homepage": "https://hoprnet.io",
   "license": "GPL-3.0-only",
