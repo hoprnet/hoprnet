@@ -165,7 +165,6 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
     }
 
     let connector = (await options.connector.create(db, options.peerInfo.id.privKey.marshal(), {
-      id: options.id,
       provider: options.provider,
       debug: options.debug,
     })) as CoreConnector
