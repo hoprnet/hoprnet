@@ -8,7 +8,10 @@
   "types": "lib/index.d.ts",
   "files": [
     "lib/",
-    "README.md"
+    "!lib/*.spec**",
+    "README.md",
+    "package.json",
+    "yarn.lock"
   ],
   "engines": {
     "node": "12.9.1",
@@ -18,7 +21,8 @@
     "build": "yarn clean && tsc -p . --noEmit false",
     "clean": "rm -rf ./lib",
     "test": "echo '✅ No tests needed'",
-    "lint": "prettier --check ."
+    "lint": "prettier --check .",
+    "prepare": "yarn build"
   },
   "dependencies": {
     "@hoprnet/hopr-demo-seeds": "^1.0.3-refactor.3ad82ff",
