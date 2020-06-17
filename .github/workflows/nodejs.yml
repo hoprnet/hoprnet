@@ -11,6 +11,7 @@ jobs:
     strategy:
       matrix:
         node-version: [12.9.1]
+        yarn-version: [1.19.2]
 
     steps:
       # Checkout, Cache and Setup Steps
@@ -31,9 +32,13 @@ jobs:
       - name: Install node modules
         if: steps.cache-modules.outputs.cache-hit != 'true'
         run: |
-          yarn policies set-version 1.19.2
+          yarn policies set-version ${{ matrix.yarn-version }}
           yarn install --frozen-lockfile
       - name: Build library
-        run: yarn build
+        run: |
+          yarn policies set-version ${{ matrix.yarn-version }}
+          yarn build
       - name: Test library
-        run: yarn test
+        run: |
+          yarn policies set-version ${{ matrix.yarn-version }}
+          yarn test
