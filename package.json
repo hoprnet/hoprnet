@@ -7,6 +7,10 @@
   "files": [
     "src/"
   ],
+  "engines": {
+    "node": "12.9.1",
+    "yarn": "1.19.2"
+  },
   "scripts": {
     "test": "echo '✅ No tests needed'",
     "build": "echo '✅ No build needed'",
