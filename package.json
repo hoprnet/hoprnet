@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-ethereum",
-  "version": "0.3.5-dev.be1aea6",
+  "version": "0.3.5-refactor.ea94b44",
   "description": "On-chain logic for hopr.network",
   "homepage": "https://hoprnet.io",
   "repository": {
@@ -18,8 +18,8 @@
     "migrations/"
   ],
   "engines": {
-    "yarn": "^1.19.2",
-    "node": "^12"
+    "yarn": "1.19.2",
+    "node": "12.9.1"
   },
   "scripts": {
     "build": "ts-node -T ./scripts/cli.ts build",
@@ -37,15 +37,14 @@
     }
   },
   "dependencies": {
-    "@hoprnet/hopr-demo-seeds": "1.0.1",
-    "@hoprnet/hopr-utils": "0.1.3",
+    "@hoprnet/hopr-demo-seeds": "1.0.3-refactor.3ad82ff",
+    "@hoprnet/hopr-utils": "0.1.6-refactor.61df948",
     "@openzeppelin/contracts": "^3.0.1",
     "@openzeppelin/test-helpers": "^0.5.5",
     "@truffle/debug-utils": "^4.1.1",
     "@truffle/hdwallet-provider": "^1.0.34",
     "bignumber.js": "^9.0.0",
     "dotenv": "^8.2.0",
-    "ganache-core": "^2.10.2",
     "truffle": "^5.1.23",
     "truffle-plugin-verify": "^0.3.10",
     "ts-node": "^8.9.1",
@@ -56,6 +55,7 @@
     "@types/mocha": "^7.0.2",
     "@types/node": "^13.13.4",
     "chai": "^4.2.0",
+    "ganache-core": "^2.10.2",
     "husky": "^4.2.5",
     "mocha": "^7.1.2",
     "prettier": "^2.0.5",

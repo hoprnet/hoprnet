@@ -15,7 +15,7 @@ build/
 types/truffle-contracts/
 
 # Coverage directory used by tools like istanbul
-coverage
+coverage*
 .coverage*
 coverage.json
 coverageEnv
