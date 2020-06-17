@@ -6,7 +6,7 @@
 
 import HoprCoreConnector from '.'
 import type { LevelUp } from 'levelup'
-import type { AccountId, Balance, Hash, SignedTicket, Ticket, Signature } from './types'
+import type { AccountId, Balance, Hash, SignedTicket } from './types'
 
 async function main() {
   const coreConnector = await HoprCoreConnector.create((undefined as unknown) as LevelUp)

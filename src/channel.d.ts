@@ -1,4 +1,4 @@
-import type { AccountId, Balance, Channel as ChannelType, ChannelBalance, Hash, Moment, Ticket, Signature, SignedChannel, SignedTicket } from './types'
+import type { AccountId, Balance, Channel as ChannelType, ChannelBalance, Hash, Moment, Signature, SignedChannel, SignedTicket } from './types'
 
 declare namespace Channel {
   /**

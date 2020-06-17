@@ -35,4 +35,3 @@ jobs:
         run: yarn build
       - name: Test library
         run: yarn test
-
