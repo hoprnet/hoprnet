@@ -9,7 +9,7 @@ import type { LevelUp } from 'levelup'
 import type { AccountId, Balance, Hash, SignedTicket } from './types'
 
 async function main() {
-  const coreConnector = await HoprCoreConnector.create((undefined as unknown) as LevelUp)
+  const coreConnector = await HoprCoreConnector.create((undefined as unknown) as LevelUp, (undefined as unknown) as Uint8Array)
 
   coreConnector.constants.CHAIN_NAME
 
