@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core",
-  "version": "0.6.8-dev.94445bc",
+  "version": "0.6.9-dev.bd0e3b5",
   "description": "Privacy-preserving messaging protocol with incentivations for relay operators",
   "license": "GPL-3.0-only",
   "keywords": [
@@ -76,7 +76,7 @@
     "simple-peer": "~9.7.2",
     "ts-node": "^8.10.1",
     "webrtc-stun": "^3.0.0",
-    "wrtc": "0.4.4"
+    "wrtc": "0.4.5"
   },
   "devDependencies": {
     "@types/bn.js": "^4.11.6",
