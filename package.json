@@ -21,8 +21,8 @@
     "yarn.lock"
   ],
   "engines": {
-    "yarn": "^1.22",
-    "node": "^12"
+    "node": "12.9.1",
+    "yarn": "1.19.2"
   },
   "dependencies": {
     "bignumber.js": "^9.0.0",
