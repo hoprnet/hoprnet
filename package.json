@@ -1,0 +1,15 @@
+{
+  "name": "@hoprnet/hopr-testing",
+  "version": "0.0.0",
+  "repository": "https://github.com/hoprnet/hopr-testing.git",
+  "homepage": "https://hoprnet.io/",
+  "license": "GPL-3.0-only",
+  "engines": {
+    "node": "12.9.1",
+    "yarn": "1.19.2"
+  },
+  "scripts": {
+    "test": "echo '✅ No tests needed'",
+    "build": "echo '✅ No build needed'"
+  }
+}
