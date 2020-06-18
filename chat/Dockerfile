@@ -1,11 +1,11 @@
 
 # -- BASE STAGE --------------------------------
 
-FROM node:12-alpine AS base
+FROM node:12.9.1-alpine AS base
 WORKDIR /src
 
-# use yarn 1.22.0
-ENV YARN_VERSION 1.22.0
+# use yarn 1.19.2
+ENV YARN_VERSION 1.19.2
 RUN yarn policies set-version $YARN_VERSION
 
 COPY package*.json ./
@@ -42,7 +42,7 @@ RUN yarn cache clean
 
 # -- RUNTIME STAGE --------------------------------
 
-FROM node:12-alpine AS runtime
+FROM node:12.9.1-alpine AS runtime
 
 ENV NODE_ENV 'production'
 WORKDIR /app
