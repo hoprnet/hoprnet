@@ -74,7 +74,7 @@
     "simple-peer": "~9.7.2",
     "ts-node": "^8.10.1",
     "webrtc-stun": "^3.0.0",
-    "wrtc": "0.4.4"
+    "wrtc": "0.4.5"
   },
   "devDependencies": {
     "@hoprnet/hopr-ethereum": "0.3.6-refactor.3125357",

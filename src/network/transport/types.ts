@@ -8,7 +8,7 @@ export interface DialOptions {
 }
 
 export type Stream = {
-  sink: (source: AsyncIterable<Uint8Array>) => void
+  sink: (source: AsyncIterable<Uint8Array>) => Promise<void>
   source: AsyncIterable<Uint8Array>
 }
 

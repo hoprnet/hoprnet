@@ -303,9 +303,7 @@ describe('should create a socket and connect to it', function () {
       errThrown = true
     }
 
-    assert(Date.now() - now >= RELAY_CIRCUIT_TIMEOUT, `Establishing connection must not fail before relay timeout`)
-
-    assert(errThrown, `Must throw error in case other node node is not reachable`)
+    assert(errThrown, `Must throw error in case other node is not reachable`)
 
     await Promise.all([
       /* prettier-ignore */
@@ -428,7 +426,7 @@ describe('should create a socket and connect to it', function () {
     // Try with abort controller
     const abort = new AbortController()
 
-    setTimeout(() => setImmediate(() => abort.abort()), 300)
+    abort.abort()
 
     try {
       await sender.dialProtocol(
@@ -436,11 +434,7 @@ describe('should create a socket and connect to it', function () {
         TEST_PROTOCOL,
         { signal: abort.signal }
       )
-    } catch (err) {
-      if (err.type !== 'aborted') {
-        throw err
-      }
-    }
+    } catch {}
 
     await Promise.all([
       sender.hangUp(new PeerInfo(counterparty.peerInfo.id)),
