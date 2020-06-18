@@ -2,12 +2,16 @@
   "name": "@hoprnet/hopr-chat",
   "version": "1.0.1-refactor.974dafd",
   "description": "",
-  "main": "index.ts",
+  "main": "src/index.ts",
   "scripts": {
-    "build": "yarn clean && tsc -p . --noEmit false && cp package.json lib",
-    "clean": "rm -rf ./lib",
+    "build": "yarn clean && tsc -p . --noEmit false",
+    "clean": "rimraf ./lib",
     "test": "mocha --exit || echo '⚠️  Currently no tests available'",
-    "start": "node lib/index.js"
+    "util:clean:all": "rimraf .alice .bob",
+    "util:create:alice": "mkdirp .alice && copyfiles -a lib/**/**/* .alice && copyfiles .env .alice/",
+    "util:create:bob": "mkdirp .bob && copyfiles -a lib/**/**/* .bob && copyfiles .env .bob/",
+    "start:alice": "yarn util:create:alice && cd .alice && cross-env HOST_IPV4=0.0.0.0:9091 node lib/index.js -p alice",
+    "start:bob": "yarn util:create:bob && cd .bob && cross-env HOST_IPV4=0.0.0.0:9092 node lib/index.js -p bob"
   },
   "engines": {
     "node": "12.9.1",
@@ -35,6 +39,10 @@
     "typescript": "^3.9.3"
   },
   "devDependencies": {
-    "@types/node": ">=4.2.0 < 13"
+    "@types/node": ">=4.2.0 < 13",
+    "copyfiles": "^2.3.0",
+    "cross-env": "^7.0.2",
+    "mkdirp": "^1.0.4",
+    "rimraf": "^3.0.2"
   }
 }

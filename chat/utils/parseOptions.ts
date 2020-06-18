@@ -10,9 +10,10 @@ import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 
 import ListConnctor from '../commands/listConnectors'
 
-import { decodeMessage, displayHelp } from '.'
+import { displayHelp } from './displayHelp'
+import { decodeMessage } from './message'
 
-import { knownConnectors } from '..'
+import { knownConnectors } from './knownConnectors'
 import type { HoprOptions } from '@hoprnet/hopr-core'
 
 const listConnectors = new ListConnctor()

@@ -1,4 +1,4 @@
-import { keywords } from '..'
+import { keywords } from '../utils/keywords'
 
 import chalk from 'chalk'
 

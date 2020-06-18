@@ -1,7 +1,7 @@
 import AbstractCommand from './abstractCommand'
 
 import chalk from 'chalk'
-import { knownConnectors } from '..'
+import { knownConnectors } from '../utils/knownConnectors'
 
 export default class ListConnectors implements AbstractCommand {
   /**

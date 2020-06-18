@@ -1,4 +1,4 @@
-import { cli_options } from '..'
+import { cli_options } from './cliOptions'
 
 const FIRST_OPTION_OFFSET = 1
 const SECOND_OPTION_OFFSET = 5

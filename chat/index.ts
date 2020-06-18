@@ -20,67 +20,14 @@ import type { HoprOptions } from '@hoprnet/hopr-core'
 import figlet from 'figlet'
 import clear from 'clear'
 
-import { parseOptions } from './utils'
+import { parseOptions, keywords } from './utils'
 import { clearString } from '@hoprnet/hopr-utils'
 import Commands from './commands'
 
 const SPLIT_OPERAND_QUERY_REGEX: RegExp = /([\w\-]+)(?:\s+)?([\w\s\-.]+)?/
 
-// Allowed keywords
-export const keywords: string[][] = [
-  ['open', 'opens a payment channel'],
-  ['send', 'sends a message to another party'],
-  ['quit', 'stops the node and terminates the process'],
-  ['crawl', 'crawls the network and tries to find other nodes'],
-  ['openChannels', 'lists all currently open channels'],
-  ['closeAll', 'closes all payment channel of this node'],
-  ['myAddress', 'shows the address of this node'],
-  ['balance', 'shows our current balance'],
-  ['listConnectors', 'lists all installed blockchain connectors'],
-  ['ping', 'pings another node to check its availability'],
-  ['version', 'shows the versions for `hopr-chat` and `hopr-core`'],
-  ['help', 'shows this help page'],
-  ['tickets', 'lists tickets of a channel'],
-].sort((a, b) => a[0].localeCompare(b[0], 'en', { sensitivity: 'base' }))
-
-// Allowed CLI options
-export const cli_options: string[][] = [
-  ['-b', '--bootstrapNode', undefined, 'starts HOPR as a bootstrap node'],
-  ['-n', '--network', '<connector>', 'starts HOPR with blockchain connector <connector>'],
-  ['-h', '--help', undefined, 'shows this help page'],
-  ['-l', '--listConnectors', undefined, 'shows all available connectors'],
-  ['-p', '--password', '<password>', 'start HOPR with <password>'],
-  ['-v', '--verbose', undefined, 'show debug info'],
-  [undefined, '--debug', undefined, 'run HOPR in debug mode [insecure, only used for development]'],
-  // ['<ID>', undefined, undefined, 'starts HOPR with a demo ID'],
-].sort((a, b) => {
-  let tmpA: string
-  let tmpB: string
-  if (a[0] === undefined) {
-    tmpA = a[1].slice(2)
-  } else {
-    tmpA = a[0].slice(1)
-  }
-
-  if (b[0] === undefined) {
-    tmpB = b[1].slice(2)
-  } else {
-    tmpB = b[0].slice(1)
-  }
-  return tmpA.localeCompare(tmpB, 'en', { sensitivity: 'base' })
-})
-
 // Name our process 'hopr'
 process.title = 'hopr'
-
-/**
- * Alphabetical list of known connectors.
- */
-export const knownConnectors = [
-  /* prettier-ignore */
-  ['@hoprnet/hopr-core-ethereum', 'ethereum'],
-  ['@hoprnet/hopr-core-polkadot', 'polkadot'],
-]
 
 let node: Hopr<HoprCoreConnector>
 
