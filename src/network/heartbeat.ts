@@ -1,6 +1,9 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '..'
 
+import debug from 'debug'
+const log = debug('hopr-core:heartbeat')
+
 import PeerId from 'peer-id'
 import type PeerInfo from 'peer-info'
 
@@ -63,6 +66,7 @@ class Heartbeat<Chain extends HoprCoreConnector> extends EventEmitter {
   }
 
   async checkNodes() {
+    log(`Checking nodes `)
     const promises: Promise<void>[] = []
 
     this.heap = this.heap.sort(this.comparator.bind(this))
@@ -100,7 +104,9 @@ class Heartbeat<Chain extends HoprCoreConnector> extends EventEmitter {
         } catch (err) {
           this.nodes.delete(this.heap[startIndex])
 
-          this.node.hangUp(currentPeerId)
+          await this.node.hangUp(currentPeerId)
+
+          log(`Deleted node ${currentPeerId.toB58String()}`)
         }
 
         startIndex = heapIndex
@@ -117,11 +123,13 @@ class Heartbeat<Chain extends HoprCoreConnector> extends EventEmitter {
   }
 
   start(): void {
+    log(`Heartbeat mechanism started`)
     this.interval = setInterval(this.checkNodes.bind(this), CHECK_INTERVAL)
   }
 
   stop(): void {
     clearInterval(this.interval)
+    log(`Heartbeat mechanism stopped`)
   }
 }
 
