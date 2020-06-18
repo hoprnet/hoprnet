@@ -97,4 +97,6 @@ jobs:
       - env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         name: Publish to NPM Registry
-        run: npm publish --access public
+        run: |
+          yarn policies set-version 1.19.2
+          npm publish --access public
