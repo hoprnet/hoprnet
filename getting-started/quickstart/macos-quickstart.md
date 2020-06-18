@@ -4,15 +4,15 @@ description: Get familiar with HOPR on your Mac or Unix based system.
 
 # MacOS/Linux Quickstart
 
-This quick start tutorial will show you how to use **HOPR** by installing **HOPR Chat** in your system using Docker on a MacOS/Linux based computer. In this step-by-step guide, we will download Docker, run **HOPR Chat,** and send a message to another user connected to the **HOPR Network**.
+This quickstart tutorial will show you how to use **HOPR** by installing **HOPR Chat** on your system using Docker on a MacOS/Linux-based computer. In this step-by-step guide, we will download Docker, run **HOPR Chat,** and send a message to another user connected to the **HOPR network**.
 
-## Step 1 - Installing Docker in your machine
+## Step 1 - Installing Docker on your machine
 
-Before anything, you need to install [Docker Desktop](https://hub.docker.com/editions/community/docker-ce-desktop-mac/) on your machine. Docker is natively supported in MacOS/Linux, and will prompt any install requirements you might need depending on your operating system. Depending on your Linux distribution, you might need to follow  an additional steps as to ensure your computer is working properly with Docker.
+Before doing anything else, you need to install [Docker Desktop](https://hub.docker.com/editions/community/docker-ce-desktop-mac/) on your machine. Docker is natively supported in MacOS/Linux, and will prompt you with any installation requirements, depending on your operating system. Depending on your Linux distribution, you might need to follow additional steps to ensure your computer works properly with Docker.
 
 ### Instructions for installing Docker in Linux
 
-Depending of your distribution, please follow the official guidelines on how to installing and run docker in your workstation.
+Depending of your distribution, please follow the official guidelines for how to install and run Docker on your workstation.
 
 * [Installing Docker in Ubuntu](https://docs.docker.com/engine/install/ubuntu/)
 * [Installing Docker in Fedora](https://docs.docker.com/engine/install/fedora/)
@@ -21,13 +21,13 @@ Depending of your distribution, please follow the official guidelines on how to 
 
 ### Instructions for installing Docker in MacOS
 
-1. Please go to [Docker Hub ](https://hub.docker.com/editions/community/docker-ce-desktop-mac/)and download Docker Desktop in your computer.
-2. Follow-up the wizard steps to ensure Docker is installed.
+1. Visit [Docker Hub ](https://hub.docker.com/editions/community/docker-ce-desktop-mac/)and download Docker Desktop to your computer.
+2. Follow the wizard steps to ensure Docker is installed.
 3. Ensure the installation was successful by running `docker ps` in your terminal.
 
 ## Step 2 - Downloading HOPR Chat image from Docker Hub
 
-To use **HOPR Chat,** run `docker pull hopr/chat` from your Terminal. Please bear in mind this process will take some time depending on your internet connection.
+To use **HOPR Chat,** run `docker pull hopr/chat` from your terminal. This process may take some time depending on your internet connection.
 
 ![Currently HOPR Chat is about ~0.5 GB, please be patient.](../../.gitbook/assets/docker_install_macos.gif)
 
@@ -84,17 +84,21 @@ Your **HOPR Chat** instance is ready to be used!
 
 ## Step 5 - Sending a HOPR message
 
-With **HOPR Chat** up and running, you can now send messages to any connected nodes in the network. You can have another friend send you their address, or you can also start another **HOPR Chat** instance. You will need to follow Steps 3 and 4 in this new account in case you decide to go through, but you can also find **HOPR Chat** users in our [Telegram channel](https://t.me/hoprnet).
+With **HOPR Chat** up and running, you can now send messages to any connected nodes in the network. You can either have a friend send you their address, or you can also start another **HOPR Chat** instance. If you choose to start a second instance, you will need to follow Steps 3 and 4 for this new account. You can also find **HOPR Chat** users in our [Telegram channel](https://t.me/hoprnet).
 
-First, ensure you have enough **HOPR Tokens** to send and receive messages. Run `balance` to see the previous screen from Step 4. Now, let's ensure there are some nodes to talk to. To do so, run `crawl`, which will show you existing users you can talk to.
+First, ensure you have enough **HOPR Tokens** to send and receive messages. Run `balance` to see the screen from Step 4.   
+  
+Now, let's find some nodes to talk to. To do this, run `crawl`, which will show you other users available to chat to.
 
 ![The crawl command will show you other connected nodes.](../../.gitbook/assets/running_hopr_chat_and_crawling.gif)
 
-To talk to other users, copy another connected user address and send a message to them with the `send` command. This will look something like `send 16Uiu2HAmCtWxx3Ky3ZjtWj1whkezdRvMAYKU9f57CRPj2FkPtWsD`, which will trigger **HOPR Chat** to prompt you for a message to send.
+To talk to other users, copy another connected user address and send a message to them with the `send` command. This will look something like: `send 16Uiu2HAmCtWxx3Ky3ZjtWj1whkezdRvMAYKU9f57CRPj2FkPtWsD`
+
+**HOPR Chat** will then prompt you for a message to send.
 
 ![Your message will be sent privately through the HOPR network](../../.gitbook/assets/running_hopr_chat_and_sending.gif)
 
-Congratulations! You have communicated with another individual using a privacy-preserving decentralised protocol. **HOPR Chat** is right now only a Proof-of-Concept but it can already show you the capabilities the protocol can have.
+Congratulations! You have communicated with another node using a privacy-preserving decentralised protocol. **HOPR Chat** is just a proof of concept right now, but you can already see the capabilities of the protocol.
 
 ## Additional Notes
 

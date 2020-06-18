@@ -1,16 +1,16 @@
 ---
-description: An introduction to Bootstrap Nodes inside HOPR Chat
+description: An introduction to bootstrap nodes inside HOPR Chat
 ---
 
 # Bootstrap Nodes
 
-In order to properly work, **HOPR Chat** relies in the concept of **Bootstrap Nodes**. These are nodes created with a `bootstrap` setting enabled, as to function only as relayers for other nodes in the ecosystem. Without **Bootstrap Nodes**, **HOPR Chat** will currently not work.
+**HOPR Chat** currently relies on **bootstrap nodes** to work. These are nodes created with the `bootstrap` setting enabled, functioning solely as relayers for other nodes in the network.
 
-**Bootstrap Nodes** are only mean to be an initial relayer of connection between nodes. This means that as soon as a communication between two or more **HOPR Chat** nodes has been stablished, a **Bootstrap Node** is node longer need to keep communicating to it.
+**Bootstrap nodes** are only meant to serve as an initial relayer between nodes. Once communication has been established between two or more **HOPR Chat** nodes, it is no longer necessary to communicate with a **bootstrap node**.
 
-As an analogy, you can think of **Bootstrap Nodes** as the guests that know everyone in a party. They can introduce you to other people, and then you can talk directly to them.
+As an analogy, think of **bootstrap nodes** as the hosts at a party. They introduce guests to each other, and those guests can then talk directly.
 
-To run **HOPR Chat** as a bootstrap node, you can just pass a `-b` flag to the running command.
+To run **HOPR Chat** as a bootstrap node, pass a `-b` flag to the run command.
 
 ## Available Bootstrap Nodes
 
