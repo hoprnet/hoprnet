@@ -2,7 +2,7 @@
   "name": "@hoprnet/hopr-testing",
   "version": "0.1.2",
   "repository": "https://github.com/hoprnet/hopr-testing.git",
-  "homepage": "https://hoprnet.io/",
+  "homepage": "https://hoprnet.org/",
   "license": "GPL-3.0-only",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
