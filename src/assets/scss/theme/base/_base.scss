@@ -5,3 +5,11 @@
 .sticky {
   position: fixed !important;
 }
+
+.img-to-white {
+  filter: brightness(0) invert(1);
+}
+
+.img-to-black {
+  filter: contrast(0) !important;
+}

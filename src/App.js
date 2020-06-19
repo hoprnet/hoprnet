@@ -13,6 +13,8 @@ import Home from './views/Home'
 import HOPR from './views/HOPR'
 import WeAre from './views/WeAre'
 import ForYou from './views/ForYou'
+import Node from './views/Node'
+import Sedimentum from './views/Sedimentum'
 
 class App extends React.Component {
   componentDidMount() {
@@ -44,6 +46,8 @@ class App extends React.Component {
               <AppRoute exact path="/hopr" component={HOPR} layout={LayoutDefault} />
               <AppRoute exact path="/we_are" component={WeAre} layout={LayoutDefault} />
               <AppRoute exact path="/for_you" component={ForYou} layout={LayoutDefault} />
+              <AppRoute exact path="/node" component={Node} layout={LayoutDefault} />
+              <AppRoute exact path="/sedimentum" component={Sedimentum} layout={LayoutDefault} />
             </Switch>
           )}
         />

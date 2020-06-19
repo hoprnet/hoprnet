@@ -9,6 +9,7 @@ class HOPR extends React.Component {
       <React.Fragment>
         <ForYou id="for_you" />
         <Videos id="videos" hasBgColor invertColor />
+        {/* News Component */}
         <Blog id="blog" />
       </React.Fragment>
     )
