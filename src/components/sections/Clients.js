@@ -42,6 +42,8 @@ class Clients extends React.Component {
       bottomDivider && 'has-bottom-divider'
     )
 
+    const imgClasses = classNames(invertColor ? 'img-to-white' : 'img-to-black')
+
     return (
       <section {...props} className={outerClasses}>
         <div className="container">
@@ -59,6 +61,7 @@ class Clients extends React.Component {
                   <Image
                     src={require('./../../assets/images/partners/sedimentum.png')}
                     alt="Sedimentum Logo"
+                    className={imgClasses}
                     width={124}
                     height={24}
                   />
@@ -69,6 +72,7 @@ class Clients extends React.Component {
                   <Image
                     src={require('./../../assets/images/partners/bank-frick.svg')}
                     alt="Bank Frick Logo"
+                    className={imgClasses}
                     width={124}
                     height={24}
                   />
@@ -79,6 +83,7 @@ class Clients extends React.Component {
                   <Image
                     src={require('./../../assets/images/partners/hbl.png')}
                     alt="HBL Logo"
+                    className={imgClasses}
                     width={124}
                     height={24}
                   />
@@ -89,6 +94,7 @@ class Clients extends React.Component {
                   <Image
                     src={require('./../../assets/images/partners/froriep.png')}
                     alt="Froriep Logo"
+                    className={imgClasses}
                     width={124}
                     height={24}
                   />
@@ -99,6 +105,7 @@ class Clients extends React.Component {
                   <Image
                     src={require('./../../assets/images/partners/bitcoinsuisse.png')}
                     alt="Bitcoin Suisse Logo"
+                    className={imgClasses}
                     width={124}
                     height={24}
                   />

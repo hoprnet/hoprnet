@@ -58,7 +58,7 @@ class TeamAndInvestors extends React.Component {
               </div>
             </div>
 
-            <div className="tiles-item reveal-from-top">
+            {/* <div className="tiles-item reveal-from-top">
               <div className="tiles-item-content center-content-mobile">
                 <a href="/hopr/#investors">
                   <h3 className="mt-0 mb-0" data-reveal-container=".tiles-item">
@@ -69,7 +69,7 @@ class TeamAndInvestors extends React.Component {
                   </div>
                 </a>
               </div>
-            </div>
+            </div> */}
           </div>
         </div>
       </section>

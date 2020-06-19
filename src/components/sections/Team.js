@@ -70,7 +70,7 @@ class Team extends React.Component {
                   </div>
                   <div className="team-item-content">
                     <h5 className="team-item-name mt-0 mb-4">Dr. Sebastian Bürgel</h5>
-                    <div className="team-item-role text-xs fw-500 mb-8">Co-Founder, Tech</div>
+                    <div className="team-item-role text-xs fw-500 mb-8">Founder</div>
                     {/* <p className="m-0 text-sm"></p> */}
                   </div>
                 </div>
@@ -204,7 +204,7 @@ class Team extends React.Component {
                   </a>
                   <div className="team-item-content">
                     <h5 className="team-item-name mt-0 mb-4">Kevin Leu</h5>
-                    <div className="team-item-role text-xs fw-500 mb-8">Head of Communication</div>
+                    <div className="team-item-role text-xs fw-500 mb-8">Head of Marketing</div>
                     <p className="m-0 text-sm"></p>
                   </div>
                 </div>

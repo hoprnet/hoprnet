@@ -138,7 +138,7 @@ class FeaturesTiles extends React.Component {
                       <p className="m-0 text-sm">
                         We're organizing events to grow our network and give back to the Community
                         <br />
-                        <span className="text-color-primary">(coming mid-July 2020)</span>.
+                        <span className="text-color-high">(coming mid-July 2020)</span>.
                       </p>
                     </div>
                   </div>
