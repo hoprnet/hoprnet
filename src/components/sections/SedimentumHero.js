@@ -32,7 +32,6 @@ const Sedimentum = props => {
           <div
             className="container-sm"
             style={{
-              height: '80vh',
               display: 'flex',
               justifyContent: 'center',
               alignItems: 'center',
@@ -43,8 +42,8 @@ const Sedimentum = props => {
                 className="has-shadow"
                 src={require('../../assets/images/partners/sedimentum.png')}
                 alt="Hero"
-                width={896 / 3.5}
-                height={504 / 3.5}
+                width={896}
+                height={504}
                 style={{
                   borderRadius: '15px',
                 }}
