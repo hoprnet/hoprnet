@@ -94,7 +94,7 @@ class Clients extends React.Component {
                   />
                 </a>
               </li>
-              <li className="reveal-from-bottom" data-reveal-delay="150">
+              {/* <li className="reveal-from-bottom" data-reveal-delay="150">
                 <a href="https://www.bitcoinsuisse.com/" target="_blank" rel="noopener noreferrer">
                   <Image
                     src={require('./../../assets/images/partners/bitcoinsuisse.png')}
@@ -103,7 +103,7 @@ class Clients extends React.Component {
                     height={24}
                   />
                 </a>
-              </li>
+              </li> */}
             </ul>
             {showQuestion ? (
               <div className="question">
