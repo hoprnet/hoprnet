@@ -126,15 +126,18 @@ const NodeHero = props => {
               </li>
             </ol>
 
-            <h4>(naturally, you can also install and run a HOPR node on a device of your choice)</h4>
+            <p style={{ color: '#53A3B9' }}>
+              (naturally, you can also install and run a HOPR node on a device of your choice)
+            </p>
           </div>
         </div>
       </GenericSection>
       <GenericSection id="bounties" {...evenSections}>
         <div className="center-content">
           <div className="container-sm">
-            Jump the waitlist:
             <h2 className="section-header mt-0 mb-0 reveal-from-top" data-reveal-delay="150">
+              <span style={{ color: '#53A3B9' }}>Jump the waitlist:</span>
+              <br />
               Gitcoin Bounties:
             </h2>
             Why wouldn't you get paid for developing open source software? Check out our bounties on Gitcoin - some are
