@@ -4,7 +4,7 @@ HOPR is a privacy-preserving messaging protocol that incentivizes users to parti
 
 ## hopr-website
 
-The official source code of [hoprnet.io](https://hoprnet.io/).
+The official source code of [hoprnet.org](https://hoprnet.org/).
 
 ### Deployment
 
