@@ -1,7 +1,7 @@
 {
   "name": "@hoprnet/hopr-ethereum",
   "version": "0.3.6-refactor.3125357",
-  "description": "On-chain logic for hopr.network",
+  "description": "On-chain logic for hoprnet.org",
   "homepage": "https://hoprnet.org",
   "repository": {
     "type": "git",

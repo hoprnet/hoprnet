@@ -12,7 +12,7 @@ export default function Home() {
 
       <main>
         <h1 className="title">
-          Welcome to the <a href="https://hopr.network/">HOPR</a> token faucet!
+          Welcome to the <a href="https://hoprnet.org/">HOPR</a> token faucet!
         </h1>
 
         <p className="description">This faucet will mint 100 HOPR tokens to your address.</p>

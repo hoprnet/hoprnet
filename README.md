@@ -4,7 +4,7 @@ HOPR is a privacy-preserving messaging protocol that incentivizes users to parti
 
 ## hopr-ethereum
 
-Hopr-ethereum contains the on-chain logic that is used to process payments for [HOPR.network](https://hopr.network) on the Ethereum blockchain.
+Hopr-ethereum contains the on-chain logic that is used to process payments for [hoprnet.org](https://hoprnet.org) on the Ethereum blockchain.
 
 ## Table of Contents
 
