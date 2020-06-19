@@ -32,7 +32,6 @@ const NodeHero = props => {
           <div
             className="container-sm"
             style={{
-              height: '80vh',
               display: 'flex',
               justifyContent: 'center',
               alignItems: 'center',
@@ -126,6 +125,8 @@ const NodeHero = props => {
                 a device of your choice)
               </li>
             </ol>
+
+            <h4>(naturally, you can also install and run a HOPR node on a device of your choice)</h4>
           </div>
         </div>
       </GenericSection>

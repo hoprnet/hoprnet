@@ -178,7 +178,7 @@ class Team extends React.Component {
                   </a>
                   <div className="team-item-content">
                     <h5 className="team-item-name mt-0 mb-4">Steven Nonis</h5>
-                    <div className="team-item-role text-xs fw-500 mb-8">Fullstack Developer</div>
+                    <div className="team-item-role text-xs fw-500 mb-8">Software Engineer</div>
                     {/* <p className="m-0 text-sm"></p> */}
                   </div>
                 </div>
