@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-chat",
-  "version": "1.0.1-refactor.974dafd",
+  "version": "1.1.0-testnet.690b97b",
   "description": "",
   "main": "src/index.ts",
   "scripts": {
@@ -9,7 +9,7 @@
     "clean:build": "rimraf ./build",
     "clean:dist": "rimraf ./dist",
     "clean:all": "yarn clean && yarn clean:dist && yarn util:clean:all",
-    "compile": "yarn clean:dist && yarn build && ncc build index.ts -o dist && copyfiles .env dist",
+    "compile": "yarn clean:dist && yarn build && ncc build index.ts -o dist && copyfiles .env hopr-chat.ps1 hopr-chat.sh hopr-chat.command dist",
     "test": "mocha --exit || echo '⚠️  Currently no tests available'",
     "util:clean:all": "rimraf .alice .bob",
     "util:create:alice": "mkdirp .alice && copyfiles -a lib/**/**/* .alice && copyfiles .env .alice/",

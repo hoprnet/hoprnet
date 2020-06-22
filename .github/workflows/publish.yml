@@ -2,6 +2,8 @@ name: Publish
 
 on:
   push:
+    branches:
+      - 'releases/**'
     tags:
       - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
 
@@ -33,6 +35,7 @@ jobs:
 
   build_chat:
     name: Build HOPR Chat
+    if: startsWith(github.ref, 'refs/heads/releases/')
     strategy:
       matrix:
         os: [macos-latest, ubuntu-latest, windows-latest]
@@ -81,6 +84,7 @@ jobs:
 
   publish_dist:
     name: Creates release with node binary per OS
+    if: startsWith(github.ref, 'refs/heads/releases/')
     runs-on: ubuntu-latest
     needs: [build_chat]
     steps:
@@ -96,10 +100,18 @@ jobs:
         uses: actions/download-artifact@master
         with:
           name: hopr-chat-nodebin-macos.zip
+      - name: Obtaining release from branch
+        shell: bash
+        run: echo "::set-env name=RELEASE_NAME::$(echo ${GITHUB_REF##*/})"
       - name: Release HOPR Chat binaries
         uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
+          tag_name: ${{ env.RELEASE_NAME }}
+          name: HOPR Chat - ${{ env.RELEASE_NAME }}
+          draft: false
+          prerelease: false
           files: |
             hopr-chat-nodebin-linux.zip
             hopr-chat-nodebin-windows.zip
