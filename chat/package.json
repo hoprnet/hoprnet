@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-chat",
-  "version": "1.1.0-testnet.f17a5eb",
+  "version": "1.1.1-testnet.9f98cc7",
   "description": "",
   "main": "src/index.ts",
   "scripts": {
@@ -8,8 +8,8 @@
     "clean:lib": "rimraf ./lib",
     "clean:build": "rimraf ./build",
     "clean:dist": "rimraf ./dist",
-    "clean:all": "yarn clean && yarn clean:dist && yarn util:clean:all",
-    "compile": "yarn clean:dist && yarn build && ncc build index.ts -o dist && copyfiles .env hopr-chat.ps1 hopr-chat.sh hopr-chat.command dist",
+    "clean:all": "yarn clean:lib && yarn clean:dist && yarn util:clean:all",
+    "compile": "yarn clean:dist && yarn build && ncc build index.ts -o dist && copyfiles .env hopr-chat.bat hopr-chat.sh hopr-chat.command dist",
     "test": "mocha --exit || echo '⚠️  Currently no tests available'",
     "util:clean:all": "rimraf .alice .bob",
     "util:create:alice": "mkdirp .alice && copyfiles -a lib/**/**/* .alice && copyfiles .env .alice/",
@@ -29,7 +29,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@hoprnet/hopr-core": "0.6.13-dev.4f49324",
+    "@hoprnet/hopr-core": "0.6.14-testnet.e37470a",
     "@hoprnet/hopr-core-connector-interface": "1.2.10-98e08f8",
     "@hoprnet/hopr-core-ethereum": "0.0.12-refactor.473415f",
     "@hoprnet/hopr-demo-seeds": "1.0.3-refactor.3ad82ff",
