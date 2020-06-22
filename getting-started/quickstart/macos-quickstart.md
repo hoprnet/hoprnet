@@ -6,17 +6,19 @@ description: Get familiar with HOPR on your Mac or Unix based system.
 
 This quick-start tutorial will show you how to use **HOPR** by installing **HOPR Chat** on your system using Docker or Nodejs on a MacOS/Linux-based computer. In this step-by-step guide, we will download the adequate software, run **HOPR Chat,** and send a message to another user connected to the **HOPR network**.
 
+Depending on your device capabilities, pick the method that works best for you. Using Docker is faster than using Nodejs, but has higher hardware and disk space requirements. In the other hand, Nodejs requires a bit more setup, but can be completed by even limited devices.
+
 ## Setting up your machine for HOPR Chat
 
 ### Using Docker
 
 The Docker setup allows you quickly get started with **HOPR Chat** without having to download any other software requirements in your machine. This allows you to quickly get started using the system, but has some hardware requirements to be aware of.
 
-To use Docker, you will need a device that supports hardware-level virtualisation: VT-x for Intel-based PCs and AMD-V for AMD processors. Most of the Mac and Linux machines support it out of the box.
+To use Docker, you will need a device that supports hardware-level virtualisation: VT-x for Intel-based PCs and AMD-V for AMD processors. Most of the Mac and Linux machines support it out of the box, so ensure you have enough memory \(e.g. 2 GB\) and disk space \(e.g. 1 GB\) before starting.
 
 #### How to Install Docker
 
-Before doing anything else, you need to install [Docker Desktop](https://hub.docker.com/editions/community/docker-ce-desktop-mac/) on your machine. Docker is natively supported in MacOS/Linux, and will prompt you with any installation requirements, depending on your operating system. Depending on your setup, you might need to follow additional steps to ensure your computer works properly with Docker.
+Before doing anything else, you need to install [Docker Desktop](https://hub.docker.com/editions/community/docker-ce-desktop-mac/) on your machine. Docker is natively supported in MacOS/Linux, and will prompt you with any additional requirements, depending on your operating system. Depending on your setup, you might need to follow additional steps to ensure your computer works properly with Docker.
 
 {% tabs %}
 {% tab title="Linux" %}
@@ -47,7 +49,7 @@ To ensure your machine has successfully downloaded **HOPR Chat,** run `docker im
 
 ### Using Nodejs
 
-The Nodejs setup allows you to run **HOPR Chat** as a nodejs application, ensuring your experience is a close as to the developer’s have when developing **HOPR Chat** and the **HOPR Core** protocol. Nodejs might require further software installation, but is able to be run in less hardware demanding machines.
+The Nodejs setup allows you to run **HOPR Chat** as a Nodejs application, ensuring your experience is a close as to the developer’s have when developing **HOPR Chat** and the **HOPR Core** protocol. Nodejs might require further software installation, but is able to be run in less hardware demanding machines, while taking considerable less space in comparison to Docker \(i.e. 50mb\).
 
 #### How to Install Nodejs using NVM
 
@@ -69,7 +71,7 @@ wget -qO- https://raw.githubusercontent.com/nvm-sh/nvm/v0.35.3/install.sh | bash
 {% endtab %}
 {% endtabs %}
 
-_Please bear in mind you might need to restart your terminal as to ensure you have loaded nvm properly._
+_Please bear in mind you might need to restart your terminal after running these commands._
 
 **Installing Nodejs**
 
@@ -77,11 +79,22 @@ After you have downloaded and setup nvm in your machine \(run `nvm ls` to ensure
 
 At the time of writing, **HOPR Chat** runs on Nodejs `>v12`. Specifically, **HOPR Chat** has been developed and tested in `v12.9.1`, so in case you run on any issues with **HOPR Chat,**  try switch to `v12.9.1` to see if those issues disappear.
 
+To install Nodejs with nvm, run the following
+
+```text
+$ nvm install v12.9.1
+$ nvm use v12.9.1
+```
+
+If everything was done properly, you can run `node --version` to see your current `node` version, alongside running basic commands as shown when running simply `node` in your terminal.
+
+![](../../.gitbook/assets/node.gif)
+
 ## **Running HOPR Chat** 
 
 ### **Using Docker**
 
-To run **HOPR Chat** via Docker**,** you only need to copy and paste the following command. You can replace `switzerland` for anything else, but ensure to always use the same password as this will be used by **HOPR Chat**. Furthermore, you can also use your own [Infura](https://infura.io/) credentials instead of the ones provided here, but ensure you use the Kovan provider, as currently **HOPR Core** Ethereum contracts are only deployed there.
+To run **HOPR Chat** via Docker**,** you need to copy and paste the following command. You can replace `switzerland` for anything else, but ensure to always use the same password as this will be used by **HOPR Chat**. Furthermore, you can also use your own [Infura](https://infura.io/) credentials instead of the ones provided here, but ensure you use the Kovan provider, as currently **HOPR Core** Ethereum contracts are only deployed there.
 
 {% tabs %}
 {% tab title="ch-t-01" %}
@@ -105,7 +118,7 @@ docker run -v $(pwd)/db:/app/db \
 {% endtab %}
 {% endtabs %}
 
-In case you see an `Unable to connect to Bootstrap node` message, use other bootstrap nodes \(marked as `ch-t-01` and `ch-t-02`\). You can learn more about Bootstrap Nodes in the following link.
+In case you see an `Unable to connect to Bootstrap node` message, use other bootstrap nodes \(marked as `ch-t-01` and `ch-t-02`\). You can learn more about Bootstrap Nodes in our page.
 
 {% page-ref page="../hopr-chat/bootstrap-nodes.md" %}
 
@@ -121,11 +134,29 @@ Depending on your configuration and version of **HOPR Chat**, you might need to 
 
 ### Using Nodejs
 
-To run **HOPR Chat** via Nodejs**,** you only need to download our pre-compiled binary for each version. You can find these binaries in our [Releases](https://github.com/hoprnet/hopr-core/releases) page inside a zip file.
+To run **HOPR Chat** via Nodejs**,** you need to download our pre-compiled binary for each version. You can find these binaries in our [Releases](https://github.com/hoprnet/hopr-core/releases) page inside a zip file. Version `1.1.0-testnet` used for generating this documentation is available [here](https://github.com/hoprnet/hopr-core/releases/tag/1.1.0-testnet.f17a5eb).
 
-![Please select the correct distribution for your operating system.](../../.gitbook/assets/image%20%287%29.png)
+![Please select the correct distribution for your operating system.](../../.gitbook/assets/image%20%288%29.png)
 
-These files have **HOPR Chat** pre-configured and compiled to work in your system. Click on the executable file inside that folder to see **HOPR Chat** up and running.
+These files have **HOPR Chat** pre-configured and compiled to work in your system. Click on the executable file inside that folder to see **HOPR Chat** up and running. Depending on your distribution, this file might be different.
+
+{% tabs %}
+{% tab title="Linux" %}
+On Linux, double-click or execute the file named `hopr-chat.sh`. Behind the scenes, it will run `node index.js` from the directory you are currently working, ensuring it has the configuration settings distributed with the binary.
+{% endtab %}
+
+{% tab title="macOS" %}
+On macOS, double-click or execute the file named `hopr-chat.command`. Behind the scenes, it will run `node index.js` from the directory you are currently working, ensuring it has the configuration settings distributed with the binary.
+{% endtab %}
+{% endtabs %}
+
+As soon as you double-click in the executable file, you will be welcomed by the **HOPR Chat** initial message, which might look different depending on your OS.
+
+{% hint style="info" %}
+Since **HOPR Chat** is being distributed as a Nodejs binary, the included pre-compiled binary might trigger some prompts in macos which you will need to accept and provided access through. To work around these issues, please see our Troubleshooting guide under the **HOPR Chat** page in the tutorial.
+{% endhint %}
+
+{% page-ref page="../hopr-chat/troubleshooting.md" %}
 
 ## Sending a HOPR message
 

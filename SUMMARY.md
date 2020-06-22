@@ -11,6 +11,7 @@
 * [HOPR Chat](getting-started/hopr-chat/README.md)
   * [Bootstrap Nodes](getting-started/hopr-chat/bootstrap-nodes.md)
   * [Funding account](getting-started/hopr-chat/funding-account.md)
+  * [Troubleshooting](getting-started/hopr-chat/troubleshooting.md)
 
 ## Main Concepts
 
