@@ -13,3 +13,5 @@ To use **HOPR Chat**, your workstation or device running it requires one of the 
 
 You can follow our Quickstart to learn how to install and use **HOPR Chat** in your system.
 
+![](../../.gitbook/assets/hopr-chat-demo.gif)
+
