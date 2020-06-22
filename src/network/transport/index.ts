@@ -457,13 +457,7 @@ class TCP {
       )
     }
 
-    try {
-      return await this.dialWithRelay(ma, potentialRelays, options)
-    } catch (err) {
-      if (err.type === 'aborted') {
-        throw err
-      }
-    }
+    return await this.dialWithRelay(ma, potentialRelays, options)
   }
 
   tryWebRTC(

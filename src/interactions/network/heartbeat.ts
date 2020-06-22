@@ -5,6 +5,9 @@ import type { AbstractInteraction } from '../abstractInteraction'
 import { randomBytes, createHash } from 'crypto'
 import { u8aEquals } from '@hoprnet/hopr-utils'
 
+import debug from 'debug'
+const log = debug('hopr-core:heartbeat')
+
 import AbortController from 'abort-controller'
 import pipe from 'it-pipe'
 
@@ -66,6 +69,11 @@ class Heartbeat<Chain extends HoprCoreConnector> implements AbstractInteraction<
         throw err
       }
     })
+
+    if (signal.aborted) {
+      log(`heartbeat interaction aborted`)
+      throw new Error()
+    }
 
     const challenge = randomBytes(16)
     const expectedResponse = createHash(HASH_FUNCTION).update(challenge).digest()

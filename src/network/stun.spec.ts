@@ -1,4 +1,4 @@
-import { Stun } from './stun'
+import Stun from './stun'
 import assert from 'assert'
 import { HoprOptions } from '..'
 
@@ -45,8 +45,6 @@ describe('test the STUN functionalities', function () {
     )
 
     assert.deepEqual(external2, external3)
-
-    console.log(external2, external3)
 
     assert(external2.address !== '127.0.0.1')
 

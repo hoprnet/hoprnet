@@ -72,6 +72,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
   public bootstrapServers: PeerInfo[]
 
   // @TODO add libp2p types
+  declare emit: (event: string, ...args: any[]) => void
   declare dial: (addr: Multiaddr | PeerInfo | PeerId, options?: { signal: AbortSignal }) => Promise<Handler>
   declare dialProtocol: (
     addr: Multiaddr | PeerInfo | PeerId,
@@ -82,6 +83,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
   declare peerInfo: PeerInfo
   declare peerStore: {
     has(peerInfo: PeerId): boolean
+    get(peerId: PeerId): PeerInfo | undefined
     put(peerInfo: PeerInfo, options?: { silent: boolean }): PeerInfo
     peers: Map<string, PeerInfo>
     remove(peer: PeerId): void
@@ -332,11 +334,11 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
    * @param destination instance of peerInfo that contains the peerId of the destination
    */
   async getIntermediateNodes(destination: PeerId): Promise<PeerId[]> {
-    const filter = (peerInfo: PeerInfo) =>
-      !peerInfo.id.isEqual(this.peerInfo.id) &&
-      !peerInfo.id.isEqual(destination) &&
+    const filter = (peer: string) =>
+      peer !== this.peerInfo.id.toB58String() &&
+      peer !== destination.toB58String() &&
       // exclude bootstrap server(s) from crawling results
-      !this.bootstrapServers.some((pInfo: PeerInfo) => pInfo.id.isEqual(peerInfo.id))
+      !this.bootstrapServers.some((pInfo: PeerInfo) => pInfo.id.toB58String() !== peer)
 
     try {
       await this.network.crawler.crawl(filter)

@@ -12,7 +12,7 @@ import { MultiaddrConnection, Connection, Upgrader } from './types'
 import Multiaddr from 'multiaddr'
 
 import type { Interface } from '../stun'
-import { Stun } from '../stun'
+import Stun from '../stun'
 
 export interface Libp2pServer extends Server {
   __connections: MultiaddrConnection[]

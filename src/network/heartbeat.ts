@@ -4,133 +4,130 @@ import type Hopr from '..'
 import debug from 'debug'
 const log = debug('hopr-core:heartbeat')
 
+import { getTokens, Token } from '../utils'
+
 import PeerId from 'peer-id'
-import type PeerInfo from 'peer-info'
 
+import { Entry } from './peerStore'
 import { EventEmitter } from 'events'
+import PeerInfo from 'peer-info'
+import { randomInteger } from '@hoprnet/hopr-utils'
 
-const ONE_MINUTE = 1 * 60 * 1000
-const FORTY_ONE_SECONDS = 41 * 1000
-
-const REFRESH_TIME = ONE_MINUTE
-const CHECK_INTERVAL = FORTY_ONE_SECONDS
+const REFRESH_TIME = 103 * 1000
+const CHECK_INTERVAL_LOWER_BOUND = 41 * 1000
+const CHECK_INTERVAL_UPPER_BOUND = 59 * 1000
 
 const MAX_PARALLEL_CONNECTIONS = 10
 
-type PeerIdString = string
-type PeerIdLastSeen = number
-
 class Heartbeat<Chain extends HoprCoreConnector> extends EventEmitter {
-  heap: string[] = []
-
-  nodes = new Map<PeerIdString, PeerIdLastSeen>()
-
   interval: any
+  timeout: any
 
   constructor(public node: Hopr<Chain>) {
     super()
 
-    this.node.on('peer:connect', (peerInfo: PeerInfo) => this.emit('beat', peerInfo.id))
-
-    super.on('beat', this.connectionListener)
+    this.node.on('peer:connect', this.connectionListener.bind(this))
+    super.on('beat', this.connectionListener.bind(this))
   }
 
-  private connectionListener(peer: PeerId) {
-    const peerIdString = peer.toB58String()
+  private connectionListener(peer: PeerId | PeerInfo) {
+    const peerIdString = (PeerId.isPeerId(peer) ? peer : peer.id).toB58String()
 
-    let found = this.nodes.get(peerIdString)
-
-    if (found == undefined) {
-      this.heap.push(peerIdString)
-    }
-
-    this.nodes.set(peerIdString, Date.now())
+    this.node.network.peerStore.push({
+      id: peerIdString,
+      lastSeen: Date.now(),
+    })
   }
 
-  private comparator(a: PeerIdString, b: PeerIdString) {
-    let lastSeenA = this.nodes.get(a)
-    let lastSeenB = this.nodes.get(b)
-
-    if (lastSeenA == lastSeenB) {
-      return 0
-    }
-    if (lastSeenA == undefined) {
-      return 1
-    }
-
-    if (lastSeenB == undefined) {
-      return -1
-    }
-
-    return lastSeenA < lastSeenB ? -1 : 1
-  }
-
-  async checkNodes() {
-    log(`Checking nodes `)
-    const promises: Promise<void>[] = []
-
-    this.heap = this.heap.sort(this.comparator.bind(this))
+  async checkNodes(): Promise<void> {
+    log(`Checking nodes`)
+    this.node.network.peerStore.peers.forEach((entry) => log(entry.id))
+    const promises: Promise<void>[] = Array.from({ length: MAX_PARALLEL_CONNECTIONS })
+    const tokens = getTokens(MAX_PARALLEL_CONNECTIONS)
 
     const THRESHOLD_TIME = Date.now() - REFRESH_TIME
 
-    // Remove non-existing nodes
-    let index = this.heap.length - 1
-    while (this.nodes.get(this.heap[index--]) == undefined) {
-      this.heap.pop()
-    }
+    const queryNode = async (peer: string, token: Token): Promise<void> => {
+      let nextToken: number
+      let nextPeer: Entry
 
-    let heapIndex = 0
+      while (
+        tokens.length > 0 &&
+        this.node.network.peerStore.peers.length > 0 &&
+        this.node.network.peerStore.top(1)[0].lastSeen < THRESHOLD_TIME
+      ) {
+        nextPeer = this.node.network.peerStore.pop()
 
-    const updateHeapIndex = (): void => {
-      while (heapIndex < this.heap.length) {
-        const lastSeen = this.nodes.get(this.heap[heapIndex])
+        nextToken = tokens.pop() as Token
 
-        if (lastSeen == undefined || lastSeen > THRESHOLD_TIME) {
-          heapIndex++
-          continue
+        if (promises[nextToken] != null) {
+          promises[nextToken].then(() => queryNode(nextPeer.id, nextToken))
+        } else {
+          promises[nextToken] = queryNode(nextPeer.id, nextToken)
+        }
+      }
+
+      let currentPeerId: PeerId
+
+      while (true) {
+        currentPeerId = PeerId.createFromB58String(peer)
+
+        try {
+          await this.node.interactions.network.heartbeat.interact(currentPeerId)
+
+          this.node.network.peerStore.push({
+            id: peer,
+            lastSeen: Date.now(),
+          })
+        } catch (err) {
+          await this.node.hangUp(currentPeerId)
+
+          log(`Deleted node ${peer}`)
+          log(`current nodes:`)
+          this.node.network.peerStore.peers.forEach((node: Entry) => log(node.id))
+        }
+
+        if (
+          this.node.network.peerStore.peers.length > 0 &&
+          this.node.network.peerStore.top(1)[0].lastSeen < THRESHOLD_TIME
+        ) {
+          peer = (this.node.network.peerStore.pop() as Entry).id
         } else {
           break
         }
       }
+
+      tokens.push(token)
     }
 
-    const queryNode = async (startIndex: number): Promise<void> => {
-      let currentPeerId: PeerId
-      while (startIndex < this.heap.length) {
-        currentPeerId = PeerId.createFromB58String(this.heap[startIndex])
-        try {
-          await this.node.interactions.network.heartbeat.interact(currentPeerId)
-          this.nodes.set(this.heap[startIndex], Date.now())
-        } catch (err) {
-          this.nodes.delete(this.heap[startIndex])
-
-          await this.node.hangUp(currentPeerId)
-
-          log(`Deleted node ${currentPeerId.toB58String()}`)
-        }
-
-        startIndex = heapIndex
-      }
-    }
-
-    updateHeapIndex()
-
-    while (promises.length < MAX_PARALLEL_CONNECTIONS && heapIndex < this.heap.length) {
-      promises.push(queryNode(heapIndex++))
+    if (
+      this.node.network.peerStore.peers.length > 0 &&
+      this.node.network.peerStore.top(1)[0].lastSeen < THRESHOLD_TIME
+    ) {
+      let token = tokens.pop() as Token
+      promises[token] = queryNode((this.node.network.peerStore.pop() as Entry).id, token)
     }
 
     await Promise.all(promises)
   }
 
+  setTimeout() {
+    this.timeout = setTimeout(async () => {
+      await this.checkNodes()
+      this.setTimeout()
+    }, randomInteger(CHECK_INTERVAL_LOWER_BOUND, CHECK_INTERVAL_UPPER_BOUND))
+  }
+
   start(): void {
+    this.setTimeout()
     log(`Heartbeat mechanism started`)
-    this.interval = setInterval(this.checkNodes.bind(this), CHECK_INTERVAL)
   }
 
   stop(): void {
+    clearTimeout(this.timeout)
     clearInterval(this.interval)
     log(`Heartbeat mechanism stopped`)
   }
 }
 
-export { Heartbeat }
+export default Heartbeat

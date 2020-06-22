@@ -20,6 +20,7 @@ import { Interactions } from '../interactions'
 import { Crawler } from './crawler'
 import { Crawler as CrawlerInteraction } from '../interactions/network/crawler'
 import Multiaddr from 'multiaddr'
+import PeerStore from './peerStore'
 
 describe('test crawler', function () {
   async function generateNode(): Promise<Hopr<HoprCoreConnector>> {
@@ -47,7 +48,10 @@ describe('test crawler', function () {
     new Interactions(node)
     node.network = {
       crawler: new Crawler(node),
+      peerStore: new PeerStore(node),
     } as Hopr<HoprCoreConnector>['network']
+
+    node.on('peer:connect', (peerInfo: PeerInfo) => node.peerStore.put(peerInfo))
 
     node.log = Debug(`${chalk.blue(node.peerInfo.id.toB58String())}: `)
 
@@ -68,26 +72,26 @@ describe('test crawler', function () {
       Error(`Unable to find enough other nodes in the network.`)
     )
 
-    Alice.peerStore.put(Bob.peerInfo)
+    Alice.emit('peer:connect', Bob.peerInfo)
 
     await assert.rejects(
       () => Alice.network.crawler.crawl(),
       Error(`Unable to find enough other nodes in the network.`)
     )
 
-    Bob.peerStore.put(Chris.peerInfo)
+    Bob.emit('peer:connect', Chris.peerInfo)
 
     await assert.rejects(
       () => Alice.network.crawler.crawl(),
       Error(`Unable to find enough other nodes in the network.`)
     )
 
-    Chris.peerStore.put(Dave.peerInfo)
+    Chris.emit('peer:connect', Dave.peerInfo)
 
     await assert.doesNotReject(() => Alice.network.crawler.crawl(), `Should find enough nodes.`)
 
-    Bob.peerStore.put(Alice.peerInfo)
-    Dave.peerStore.put(Eve.peerInfo)
+    Bob.emit('peer:connect', Alice.peerInfo)
+    Dave.emit('peer:connect', Eve.peerInfo)
 
     await assert.doesNotReject(() => Bob.network.crawler.crawl(), `Should find enough nodes.`)
 

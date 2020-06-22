@@ -124,4 +124,4 @@ function bindSocketToPort(socket: Socket, port = DEFAULT_STUN_PORT): Promise<voi
     socket.bind(port)
   })
 }
-export { Stun }
+export default Stun

@@ -3,6 +3,9 @@ import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 
 import type { Handler } from '../../network/transport/types'
 
+import debug from 'debug'
+const log = debug('hopr-core:crawler')
+
 import pipe from 'it-pipe'
 import chalk from 'chalk'
 
@@ -10,6 +13,7 @@ import type { AbstractInteraction } from '../abstractInteraction'
 
 import { PROTOCOL_CRAWLING } from '../../constants'
 import type PeerInfo from 'peer-info'
+import PeerId from 'peer-id'
 import AbortController from 'abort-controller'
 
 import { CrawlResponse, CrawlStatus } from '../../messages'
@@ -31,7 +35,7 @@ class Crawler<Chain extends HoprCoreConnector> implements AbstractInteraction<Ch
     )
   }
 
-  async interact(counterparty: PeerInfo): Promise<PeerInfo[]> {
+  async interact(counterparty: PeerId): Promise<PeerInfo[]> {
     let struct: Handler
 
     const abort = new AbortController()
@@ -41,7 +45,7 @@ class Crawler<Chain extends HoprCoreConnector> implements AbstractInteraction<Ch
 
     try {
       struct = await this.node.dialProtocol(counterparty, this.protocols[0], { signal }).catch(async (_: Error) => {
-        const peerInfo = await this.node.peerRouting.findPeer(counterparty.id)
+        const peerInfo = await this.node.peerRouting.findPeer(counterparty)
 
         try {
           let result = await this.node.dialProtocol(peerInfo, this.protocols[0], { signal })
@@ -54,8 +58,12 @@ class Crawler<Chain extends HoprCoreConnector> implements AbstractInteraction<Ch
       })
     } catch (err) {
       this.node.log(
-        `Could not ask node ${counterparty.id.toB58String()} for other nodes. Error was: ${chalk.red(err.message)}.`
+        `Could not ask node ${counterparty.toB58String()} for other nodes. Error was: ${chalk.red(err.message)}.`
       )
+      return []
+    }
+
+    if (signal.aborted) {
       return []
     }
 
@@ -67,7 +75,7 @@ class Crawler<Chain extends HoprCoreConnector> implements AbstractInteraction<Ch
   }
 }
 
-async function collect(source: Handler['stream']['source']) {
+async function collect(source: AsyncIterable<Uint8Array>) {
   const peerInfos = []
   for await (const encodedResponse of source) {
     let decodedResponse: any

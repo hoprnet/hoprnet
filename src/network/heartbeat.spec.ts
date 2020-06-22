@@ -10,13 +10,12 @@ import MPLEX = require('libp2p-mplex')
 // @ts-ignore
 import SECIO = require('libp2p-secio')
 
-import Debug from 'debug'
-import chalk from 'chalk'
-
 import Hopr from '..'
 import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import { Heartbeat as HeartbeatInteraction } from '../interactions/network/heartbeat'
-import { Heartbeat } from './heartbeat'
+
+import Heartbeat from './heartbeat'
+import PeerStore from './peerStore'
 
 import assert from 'assert'
 import Multiaddr from 'multiaddr'
@@ -34,12 +33,6 @@ describe('check heartbeat mechanism', function () {
 
     node.peerInfo.multiaddrs.add(Multiaddr('/ip4/0.0.0.0/tcp/0'))
 
-    await node.start()
-
-    node.peerRouting.findPeer = (_: PeerId): Promise<never> => {
-      return Promise.reject(Error('not implemented'))
-    }
-
     node.interactions = {
       network: {
         heartbeat: new HeartbeatInteraction(node),
@@ -48,9 +41,12 @@ describe('check heartbeat mechanism', function () {
 
     node.network = {
       heartbeat: new Heartbeat(node),
+      peerStore: new PeerStore(node),
     } as Hopr<HoprCoreConnector>['network']
 
-    node.log = Debug(`${chalk.blue(node.peerInfo.id.toB58String())}: `)
+    node.peerRouting.findPeer = (_: PeerId) => Promise.reject(Error('not implemented'))
+
+    await node.start()
 
     return (node as unknown) as Hopr<HoprCoreConnector>
   }
@@ -74,35 +70,30 @@ describe('check heartbeat mechanism', function () {
       Alice.interactions.network.heartbeat.interact(Bob.peerInfo),
     ])
 
-    // Check whether our event listener is triggered by `normal` interactions
-    await Promise.all([
-      new Promise(async (resolve) => {
-        Chris.network.heartbeat.once('beat', (peerId: PeerId) => {
-          assert(Alice.peerInfo.id.isEqual(peerId), `Incoming connection must come from Alice`)
-          resolve()
-        })
-      }),
-      Alice.dial(Chris.peerInfo),
-    ])
+    assert(
+      !Chris.network.peerStore.has(Alice.peerInfo.id.toB58String()),
+      `Chris should not know about Alice in the beginning.`
+    )
+
+    await Alice.dial(Chris.peerInfo)
 
     // Check that the internal state is as expected
-    assert(Alice.network.heartbeat.heap.includes(Chris.peerInfo.id.toB58String()), `Alice should know about Chris now.`)
-    assert(Alice.network.heartbeat.heap.includes(Bob.peerInfo.id.toB58String()), `Alice should know about Bob now.`)
-    assert(Chris.network.heartbeat.heap.includes(Alice.peerInfo.id.toB58String()), `Chris should know about Alice now.`)
-    assert(Bob.network.heartbeat.heap.includes(Alice.peerInfo.id.toB58String()), `Bob should know about Alice now.`)
+    assert(Alice.network.peerStore.has(Chris.peerInfo.id.toB58String()), `Alice should know about Chris now.`)
+    assert(Alice.network.peerStore.has(Bob.peerInfo.id.toB58String()), `Alice should know about Bob now.`)
+    assert(Chris.network.peerStore.has(Alice.peerInfo.id.toB58String()), `Chris should know about Alice now.`)
+    assert(Bob.network.peerStore.has(Alice.peerInfo.id.toB58String()), `Bob should know about Alice now.`)
 
     // Simulate a node failure
     await Chris.stop()
 
-    // Reset lastSeen times
-    for (const peerId of Alice.network.heartbeat.nodes.keys()) {
-      Alice.network.heartbeat.nodes.set(peerId, 0)
+    for (let i = 0; i < Alice.network.peerStore.peers.length; i++) {
+      Alice.network.peerStore.peers[i].lastSeen = 0
     }
 
     // Check whether a node failure gets detected
     await Alice.network.heartbeat.checkNodes()
 
-    assert(!Alice.network.heartbeat.nodes.has(Chris.peerInfo.id.toB58String()), `Alice should have removed Chris.`)
+    assert(!Alice.network.peerStore.has(Chris.peerInfo.id.toB58String()), `Alice should have removed Chris.`)
 
     await Promise.all([
       /* pretier-ignore */

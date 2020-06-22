@@ -1,9 +1,8 @@
-import type PeerInfo from 'peer-info'
-
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 
 import chalk from 'chalk'
+import PeerId from 'peer-id'
 
 import { isBootstrapNode } from '../utils'
 
@@ -17,7 +16,9 @@ export default class Crawl implements AbstractCommand {
    */
   async execute(): Promise<void> {
     try {
-      await this.node.network.crawler.crawl((peerInfo: PeerInfo) => !isBootstrapNode(this.node, peerInfo.id))
+      await this.node.network.crawler.crawl(
+        (peer: string) => !isBootstrapNode(this.node, PeerId.createFromB58String(peer))
+      )
     } catch (err) {
       console.log(chalk.red(err.message))
     }

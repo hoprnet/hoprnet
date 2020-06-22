@@ -3,17 +3,20 @@ import type Hopr from '..'
 import type { HoprOptions } from '..'
 
 import { Crawler } from './crawler'
-import { Heartbeat } from './heartbeat'
-import { Stun } from './stun'
+import Heartbeat from './heartbeat'
+import PeerStore from './peerStore'
+import Stun from './stun'
 
 class Network<Chain extends HoprCoreConnector> {
   public crawler: Crawler<Chain>
   public heartbeat: Heartbeat<Chain>
+  public peerStore: PeerStore<Chain>
   public stun?: Stun
 
   constructor(node: Hopr<Chain>, private options: HoprOptions) {
     this.crawler = new Crawler(node)
     this.heartbeat = new Heartbeat(node)
+    this.peerStore = new PeerStore(node)
 
     if (options.bootstrapNode) {
       this.stun = new Stun(options)
