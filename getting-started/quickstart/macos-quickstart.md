@@ -4,28 +4,38 @@ description: Get familiar with HOPR on your Mac or Unix based system.
 
 # MacOS/Linux Quickstart
 
-This quickstart tutorial will show you how to use **HOPR** by installing **HOPR Chat** on your system using Docker on a MacOS/Linux-based computer. In this step-by-step guide, we will download Docker, run **HOPR Chat,** and send a message to another user connected to the **HOPR network**.
+This quick-start tutorial will show you how to use **HOPR** by installing **HOPR Chat** on your system using Docker or Nodejs on a MacOS/Linux-based computer. In this step-by-step guide, we will download the adequate software, run **HOPR Chat,** and send a message to another user connected to the **HOPR network**.
 
-## Step 1 - Installing Docker on your machine
+## Setting up your machine for HOPR Chat
 
-Before doing anything else, you need to install [Docker Desktop](https://hub.docker.com/editions/community/docker-ce-desktop-mac/) on your machine. Docker is natively supported in MacOS/Linux, and will prompt you with any installation requirements, depending on your operating system. Depending on your Linux distribution, you might need to follow additional steps to ensure your computer works properly with Docker.
+### Using Docker
 
-### Instructions for installing Docker in Linux
+The Docker setup allows you quickly get started with **HOPR Chat** without having to download any other software requirements in your machine. This allows you to quickly get started using the system, but has some hardware requirements to be aware of.
 
+To use Docker, you will need a device that supports hardware-level virtualisation: VT-x for Intel-based PCs and AMD-V for AMD processors. Most of the Mac and Linux machines support it out of the box.
+
+#### How to Install Docker
+
+Before doing anything else, you need to install [Docker Desktop](https://hub.docker.com/editions/community/docker-ce-desktop-mac/) on your machine. Docker is natively supported in MacOS/Linux, and will prompt you with any installation requirements, depending on your operating system. Depending on your setup, you might need to follow additional steps to ensure your computer works properly with Docker.
+
+{% tabs %}
+{% tab title="Linux" %}
 Depending of your distribution, please follow the official guidelines for how to install and run Docker on your workstation.
 
 * [Installing Docker in Ubuntu](https://docs.docker.com/engine/install/ubuntu/)
 * [Installing Docker in Fedora](https://docs.docker.com/engine/install/fedora/)
 * [Installing Docker in Debian](https://docs.docker.com/engine/install/debian/)
 * [Installing Docker in CentOS](https://docs.docker.com/engine/install/centos/)
+{% endtab %}
 
-### Instructions for installing Docker in MacOS
-
+{% tab title="macOS" %}
 1. Visit [Docker Hub ](https://hub.docker.com/editions/community/docker-ce-desktop-mac/)and download Docker Desktop to your computer.
 2. Follow the wizard steps to ensure Docker is installed.
 3. Ensure the installation was successful by running `docker ps` in your terminal.
+{% endtab %}
+{% endtabs %}
 
-## Step 2 - Downloading HOPR Chat image from Docker Hub
+#### Downloading HOPR Chat image from Docker Hub
 
 To use **HOPR Chat,** run `docker pull hopr/chat` from your terminal. This process may take some time depending on your internet connection.
 
@@ -35,9 +45,43 @@ To ensure your machine has successfully downloaded **HOPR Chat,** run `docker im
 
 ![HOPR Chat distributed as a Docker image](../../.gitbook/assets/docker_images.gif)
 
-## Step 3 - **Running HOPR Chat**
+### Using Nodejs
 
-To run **HOPR Chat,** you only need to copy and paste the following command. You can replace `switzerland` for anything else, but ensure to always use the same password as this will be used by **HOPR Chat**. In case you see an `Unable to connect to Bootstrap node` message, use one of our other bootstrap nodes. Furthermore, you can also use your own [Infura](https://infura.io/) credentials instead of the ones provided here, but ensure you use the Kovan provider.
+The Nodejs setup allows you to run **HOPR Chat** as a nodejs application, ensuring your experience is a close as to the developer’s have when developing **HOPR Chat** and the **HOPR Core** protocol. Nodejs might require further software installation, but is able to be run in less hardware demanding machines.
+
+#### How to Install Nodejs using NVM
+
+To use Nodejs, we recommend installing [nvm](https://github.com/nvm-sh/nvm), a Nodejs version manager. This ensures we can install and uninstall as many versions of Nodejs as needed. Furthermore, it will help you installing any additional requirements \(if any\) for running Nodejs.
+
+To install nvm, please follow the instructions in their GitHub website, or run any of the following commands in your terminal instead \(will use nvm `v0.35.3`\) depending on whether you have `curl` or `wget` in your system.
+
+{% tabs %}
+{% tab title="cURL" %}
+```
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.35.3/install.sh | bash
+```
+{% endtab %}
+
+{% tab title="Wget" %}
+```text
+wget -qO- https://raw.githubusercontent.com/nvm-sh/nvm/v0.35.3/install.sh | bash
+```
+{% endtab %}
+{% endtabs %}
+
+_Please bear in mind you might need to restart your terminal as to ensure you have loaded nvm properly._
+
+**Installing Nodejs**
+
+After you have downloaded and setup nvm in your machine \(run `nvm ls` to ensure everything is in place\), now you need to install a specific version of Nodejs before running **HOPR Chat**.
+
+At the time of writing, **HOPR Chat** runs on Nodejs `>v12`. Specifically, **HOPR Chat** has been developed and tested in `v12.9.1`, so in case you run on any issues with **HOPR Chat,**  try switch to `v12.9.1` to see if those issues disappear.
+
+## **Running HOPR Chat** 
+
+### **Using Docker**
+
+To run **HOPR Chat** via Docker**,** you only need to copy and paste the following command. You can replace `switzerland` for anything else, but ensure to always use the same password as this will be used by **HOPR Chat**. Furthermore, you can also use your own [Infura](https://infura.io/) credentials instead of the ones provided here, but ensure you use the Kovan provider, as currently **HOPR Core** Ethereum contracts are only deployed there.
 
 {% tabs %}
 {% tab title="ch-t-01" %}
@@ -61,34 +105,37 @@ docker run -v $(pwd)/db:/app/db \
 {% endtab %}
 {% endtabs %}
 
-You will be welcomed by **HOPR Chat**’s introductory screen which provides you with further instructions on how to move forward.
+In case you see an `Unable to connect to Bootstrap node` message, use other bootstrap nodes \(marked as `ch-t-01` and `ch-t-02`\). You can learn more about Bootstrap Nodes in the following link.
 
-![HOPR Chat will prompt you to request funds online.](../../.gitbook/assets/hopr.gif)
+{% page-ref page="../hopr-chat/bootstrap-nodes.md" %}
 
-**Please copy your HOPR Chat account address,** as you will need it in further steps. **HOPR Chat** has been started bootstrapped successfully, now you need to fund your **HOPR Chat** account with some KETH, [Kovan’s Network](https://kovan-testnet.github.io/website/) testnet ETH tokens. 
+After running any of these commands, you will be welcomed by **HOPR Chat**’s introductory screen which provides you with further instructions.
 
-## Step 4 - Funding your HOPR Chat Account
+![](../../.gitbook/assets/hopr.gif)
 
-Since **HOPR Chat** uses the [Ethereum](https://ethereum.org/) Payment Channels to transfer **HOPR Tokens** as an economic incentive for **HOPR** users, your **HOPR Chat** account requires ETH and **HOPR Tokens**. At the time of writing, **HOPR Chat** works in the Kovan network, so you need the equivalent currency which is free to request in [Kovan's](https://faucet.kovan.network/) and [HOPR](https://faucet.hoprnet.io/) Faucet websites. To request Kovan ETH tokens you will need to have a [GitHub](https://github.com/) account.
+{% hint style="info" %}
+Depending on your configuration and version of **HOPR Chat**, you might need to fund your **HOPR Chat** account with some tokens. Please follow our “**Funding your account**” Page for those cases.
+{% endhint %}
 
-Copy your account from Step 3, and paste it in the following websites. 
+{% page-ref page="../hopr-chat/funding-account.md" %}
 
-* Kovan Network Faucet - [https://faucet.kovan.network/](https://faucet.kovan.network/)
-* HOPR Network Faucet - [https://faucet.hoprnet.io/](https://faucet.hoprnet.io/)
+### Using Nodejs
 
-**HOPR Chat** will not fully initialise until your account has been funded with some Kovan ETH and HOPR. After the tokens have landed in your account, you are ready to use **HOPR Chat.** Execute the same command shared in Step 3 to see the following screen.
+To run **HOPR Chat** via Nodejs**,** you only need to download our pre-compiled binary for each version. You can find these binaries in our [Releases](https://github.com/hoprnet/hopr-core/releases) page inside a zip file.
 
-![HOPR Chat will tell you its balance in Kovan ETH and HOPR tokens](../../.gitbook/assets/running_hopr_chat_w_balance.gif)
+![Please select the correct distribution for your operating system.](../../.gitbook/assets/image%20%287%29.png)
 
-Your **HOPR Chat** instance is ready to be used!
+These files have **HOPR Chat** pre-configured and compiled to work in your system. Click on the executable file inside that folder to see **HOPR Chat** up and running.
 
-## Step 5 - Sending a HOPR message
+## Sending a HOPR message
 
-With **HOPR Chat** up and running, you can now send messages to any connected nodes in the network. You can either have a friend send you their address, or you can also start another **HOPR Chat** instance. If you choose to start a second instance, you will need to follow Steps 3 and 4 for this new account. You can also find **HOPR Chat** users in our [Telegram channel](https://t.me/hoprnet).
+With **HOPR Chat** up and running, you can now send messages to any connected nodes in the network. You can either have a friend send you their address, or you can also start another **HOPR Chat** instance. You can also find **HOPR Chat** users in our [Telegram](https://t.me/hoprnet)
 
-First, ensure you have enough **HOPR Tokens** to send and receive messages. Run `balance` to see the screen from Step 4.   
-  
-Now, let's find some nodes to talk to. To do this, run `crawl`, which will show you other users available to chat to.
+{% hint style="info" %}
+In case you are using a version of **HOPR Chat** with **HOPR Core** `<v0.6.10`, please ensure you have enough **HOPR Tokens** to send and receive messages.
+{% endhint %}
+
+Now, let's find some nodes to talk to. To do this, run `crawl`, which will show you other users that are connected to the **HOPR Network** and are available to chat.
 
 ![The crawl command will show you other connected nodes.](../../.gitbook/assets/running_hopr_chat_and_crawling.gif)
 
@@ -100,13 +147,9 @@ To talk to other users, copy another connected user address and send a message t
 
 Congratulations! You have communicated with another node using a privacy-preserving decentralised protocol. **HOPR Chat** is just a proof of concept right now, but you can already see the capabilities of the protocol.
 
-## Additional Notes
+For more information about **HOPR Chat,** such as an introduction to Bootstrap Nodes, go to the **HOPR Chat** general page.
 
-### Bootstrap Nodes
-
-For **HOPR Chat** to work, you need to provide it with at least one **HOPR Chat** node in bootstrap mode. For more information about these nodes and which ones are available, please see our **bootstrap nodes** page.
-
-{% page-ref page="../bootstrap-nodes.md" %}
+{% page-ref page="../hopr-chat/" %}
 
 
 
