@@ -6,7 +6,7 @@
 
 * [Overview](getting-started/overview.md)
 * [HOPR Chat](getting-started/hopr-chat/README.md)
-  * [Quickstart](getting-started/hopr-chat/macos-quickstart.md)
+  * [Quickstart](getting-started/hopr-chat/quickstart.md)
   * [Bootstrap Nodes](getting-started/hopr-chat/bootstrap-nodes.md)
   * [Funding account](getting-started/hopr-chat/funding-account.md)
   * [Troubleshooting](getting-started/hopr-chat/troubleshooting.md)
