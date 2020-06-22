@@ -1,3 +1,4 @@
+# Personas
 .alice
 .bob
 .charlie
@@ -9,3 +10,10 @@ src/**/*.js
 
 # Dont ignore .env
 !.env
+
+# Dist/Build
+build
+dist
+
+# Zip Files
+*.zip

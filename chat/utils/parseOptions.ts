@@ -16,6 +16,8 @@ import { decodeMessage } from './message'
 import { knownConnectors } from './knownConnectors'
 import type { HoprOptions } from '@hoprnet/hopr-core'
 
+import { default as connector } from '@hoprnet/hopr-core-ethereum'
+
 const listConnectors = new ListConnctor()
 
 function parseHosts(): HoprOptions['hosts'] {
@@ -138,19 +140,6 @@ export async function parseOptions(): Promise<HoprOptions> {
 
   if (!knownConnectors.some((connector) => connector[1] == cli_options.network)) {
     console.log(`Unknown network! <${chalk.red(cli_options.network)}>\n`)
-    await listConnectors.execute()
-    return
-  }
-
-  let connector: typeof HoprCoreConnector
-  try {
-    connector = (await import(`@hoprnet/hopr-core-${cli_options.network}`)).default as typeof HoprCoreConnector
-  } catch (err) {
-    console.log(
-      `Could not find <${chalk.red(
-        `@hoprnet/hopr-core-${cli_options.network}`
-      )}>. Please make sure it is available under ./node_modules!\n`
-    )
     await listConnectors.execute()
     return
   }

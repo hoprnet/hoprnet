@@ -6,8 +6,9 @@ on:
       - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
 
 jobs:
-  setting_up:
+  setting_core_up:
     name: Setting project
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
       # Checkout, Cache and Setup Steps
@@ -24,29 +25,91 @@ jobs:
       # Installing library requirements
       - name: Install node modules
         if: steps.cache-modules.outputs.cache-hit != 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           yarn policies set-version 1.19.2
           yarn install --frozen-lockfile
 
-  build:
-    name: Create Release
-    runs-on: ubuntu-latest
-    needs: [setting_up]
+  build_chat:
+    name: Build HOPR Chat
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            displayName: linux
+          - os: windows-latest
+            displayName: windows
+          - os: macos-latest
+            displayName: macos
+      fail-fast: true
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
+      - uses: actions/setup-node@v1
+        with:
+          node-version: 12.9.1
+      - name: Setting yarn version
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: yarn policies set-version 1.19.2
+      - name: Cache node_modules
+        id: cache-modules
+        uses: actions/cache@v1
         with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
+          path: chat/node_modules
+          key: ${{ runner.OS }}-build-${{ hashFiles('chat/package.json') }}
+      - name: Install node modules
+        working-directory: chat
+        if: steps.cache-modules.outputs.cache-hit != 'true'
+        run: yarn install --frozen-lockfile
+      - name: Build project into nodejs app
+        working-directory: chat
+        run: yarn build
+      - name: Compile project into nodes bin
+        working-directory: chat
+        run: yarn compile
+      - name: Zip node binary for uploading
+        working-directory: chat
+        run: yarn zip:${{ matrix.displayName }}
+      - name: Upload to GitHub workflow artifacts store
+        uses: actions/upload-artifact@v2-preview
+        with:
+          name: hopr-chat-nodebin-${{ matrix.displayName }}.zip
+          path: chat/hopr-chat-nodebin-${{ matrix.displayName }}.zip
+
+  publish_dist:
+    name: Creates release with node binary per OS
+    runs-on: ubuntu-latest
+    needs: [build_chat]
+    steps:
+      - name: Get HOPR Chat (linux)
+        uses: actions/download-artifact@master
+        with:
+          name: hopr-chat-nodebin-linux.zip
+      - name: Get HOPR Chat (windows)
+        uses: actions/download-artifact@master
+        with:
+          name: hopr-chat-nodebin-windows.zip
+      - name: Get HOPR Chat (macos)
+        uses: actions/download-artifact@master
+        with:
+          name: hopr-chat-nodebin-macos.zip
+      - name: Release HOPR Chat binaries
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            hopr-chat-nodebin-linux.zip
+            hopr-chat-nodebin-windows.zip
+            hopr-chat-nodebin-macos.zip
 
   publish_gpr:
     name: Deploys to GPR
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
-    needs: [setting_up, build]
+    needs: [setting_core_up]
     steps:
       # Publishes to GPR
       - uses: actions/checkout@v2
@@ -64,20 +127,24 @@ jobs:
         run: npm config set //npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}
       - name: Install node modules
         if: steps.cache-modules.outputs.cache-hit != 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           yarn policies set-version 1.19.2
           yarn install --frozen-lockfile
-      - env:
+      - name: Publish to GitHub Packages
+        env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        name: Publish to GitHub Packages
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           yarn policies set-version 1.19.2
           npm publish
 
   publish_npm:
     name: Deploys to NPM
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
-    needs: [setting_up, build]
+    needs: [setting_core_up]
     steps:
       # Publishes to NPM
       - uses: actions/checkout@v2
@@ -93,12 +160,15 @@ jobs:
           key: ${{ runner.OS }}-build-${{ hashFiles('package.json') }}
       - name: Install node modules
         if: steps.cache-modules.outputs.cache-hit != 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           yarn policies set-version 1.19.2
           yarn install --frozen-lockfile
-      - env:
+      - name: Publish to NPM Registry
+        env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        name: Publish to NPM Registry
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           yarn policies set-version 1.19.2
           npm publish --access public
