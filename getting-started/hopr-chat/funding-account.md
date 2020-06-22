@@ -11,7 +11,7 @@ description: >-
 Initial versions of **HOPR Chat** required your to always have Kovan ETH \(KETH\) and Kovan HOPR Tokens \(HOPR\) to use the application. Since version `>0.6.10` of **HOPR Core**, these requirements had been waived whenever **Multihop** is disabled, which is the default for the application.
 
 {% hint style="info" %}
-The version of **HOPR Core** used by **HOPR Chat** will show up in your screen as soon as you start **HOPR Chat**.
+The version of **HOPR Core** used by **HOPR Chat** will show up in your screen as soon as you start **HOPR Chat**. Only versions under `0.6.10` will need funding to get started.
 {% endhint %}
 
 In case you are running a version of **HOPR Chat** that uses a minor version of **HOPR Core**, or you have the **Multihop** setting enabled \(disabled by default\), then please follow the next instructions on how to fund your **HOPR Chat** account.

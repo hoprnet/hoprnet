@@ -18,11 +18,11 @@ Since the version **HOPR Chat** that uses Nodejs to work has additional precompi
 
 {% embed url="https://player.vimeo.com/video/431443429" %}
 
+### When using the Docker image in Windows, HOPR Chat triggers a prompt inside my Windows PC about “Filesharing”.
 
+**HOPR Chat** requires write access to a working directory to store important data in your computer. If you didn't started your command line with elevated privileges, you might be prompted to give access to your current working directory.
 
-[  
-  
-](https://vimeo.com/431443429
+![Windows prompting access to write to your current directory](../../.gitbook/assets/image%20%282%29.png)
 
-)
+Clicking “Share It” will allow you to run **HOPR Chat** successfully.
 

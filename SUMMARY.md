@@ -5,10 +5,8 @@
 ## Getting started
 
 * [Overview](getting-started/overview.md)
-* [Quickstart](getting-started/quickstart/README.md)
-  * [MacOS/Linux Quickstart](getting-started/quickstart/macos-quickstart.md)
-  * [Windows Quickstart](getting-started/quickstart/windows-quickstart.md)
 * [HOPR Chat](getting-started/hopr-chat/README.md)
+  * [Quickstart](getting-started/hopr-chat/macos-quickstart.md)
   * [Bootstrap Nodes](getting-started/hopr-chat/bootstrap-nodes.md)
   * [Funding account](getting-started/hopr-chat/funding-account.md)
   * [Troubleshooting](getting-started/hopr-chat/troubleshooting.md)
