@@ -26,14 +26,15 @@
     "coverage": "ts-node -T ./scripts/cli.ts coverage",
     "fund": "ts-node -T ./scripts/cli.ts fund",
     "migrate": "ts-node -T ./scripts/cli.ts migrate",
+    "verify": "ts-node -T ./scripts/cli.ts verify",
     "network": "ts-node -T ./scripts/cli.ts network",
     "test": "ts-node -T ./scripts/cli.ts test",
-    "format": "prettier --check .",
+    "lint": "prettier --check .",
     "prepublish": "yarn build"
   },
   "husky": {
     "hooks": {
-      "pre-commit": "yarn format"
+      "pre-commit": "yarn lint"
     }
   },
   "dependencies": {
