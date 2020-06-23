@@ -1,5 +1,6 @@
 import { randomBytes } from 'crypto'
 
+const MAX_SAFE_INTEGER = 2147483647
 /**
  * @param start
  * @param end
@@ -23,17 +24,20 @@ export function randomInteger(start: number, end?: number): number {
   // Projects interval from [start, end) to [0, end - start)
   let interval = end == null ? start : end - start
 
-  if (interval >= Math.pow(2, 32)) {
+  if (interval > MAX_SAFE_INTEGER) {
     throw Error(`Not implemented`)
   }
 
-  const byteAmount = 32 - Math.clz32(interval - 1)
+  const bitAmount = 32 - Math.clz32(interval - 1)
 
-  let bytes = randomBytes(Math.max(byteAmount / 8, 1))
+  const byteAmount = Math.ceil(bitAmount / 8)
+
+  let bytes = randomBytes(byteAmount)
+
   let bitCounter = 0
   let byteCounter = 0
 
-  function nextBit(): number {
+  const nextBit = (): number => {
     let result = bytes[byteCounter] % 2
     bytes[byteCounter] = bytes[byteCounter] >> 1
     if (++bitCounter == 8) {
@@ -45,9 +49,11 @@ export function randomInteger(start: number, end?: number): number {
 
   let result = 0
   for (let i = 0; i < byteAmount; i++) {
-    if ((result | (1 << i)) < interval) {
-      if (nextBit() == 1) {
-        result |= 1 << i
+    for (let j = 0; j < 8; j++) {
+      if ((result | (1 << (i * 8 + j))) < interval) {
+        if (nextBit()) {
+          result |= 1 << (i * 8 + j)
+        }
       }
     }
   }
