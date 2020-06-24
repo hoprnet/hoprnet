@@ -1039,10 +1039,10 @@
   dependencies:
     micro "^9.3.4"
 
-"@hoprnet/hopr-ethereum@0.3.7-f69287a":
-  version "0.3.7-f69287a"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-ethereum/-/hopr-ethereum-0.3.7-f69287a.tgz#4ddaf5b1fda46b08b9fecb3426293139c650534f"
-  integrity sha512-ULCva5MCBUtknfHvT0ISPXG7t94k3TB56p8fKFZarQTJGNy28/OtekRliA1yTfrXy+IYmSCNrFJAjutcTgEXtg==
+"@hoprnet/hopr-ethereum@0.3.8-acc2253":
+  version "0.3.8-acc2253"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-ethereum/-/hopr-ethereum-0.3.8-acc2253.tgz#4a231ee3acdfdbc00c94e4d4a4239269d8c3b04f"
+  integrity sha512-ahnkR3FB8fIUzvMqCkwQXUEGtFj/IUmOuy62UN4qYbbdNnywo757Xa4vB2wRd/eVo/9HWaFLz4/JN163BZBjYg==
   dependencies:
     "@hoprnet/hopr-demo-seeds" "1.0.3-refactor.3ad82ff"
     "@hoprnet/hopr-utils" "0.1.6-refactor.61df948"

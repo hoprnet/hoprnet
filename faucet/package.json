@@ -8,7 +8,7 @@
     "start": "next start"
   },
   "dependencies": {
-    "@hoprnet/hopr-ethereum": "0.3.7-f69287a",
+    "@hoprnet/hopr-ethereum": "0.3.8-acc2253",
     "next": "9.4.0",
     "react": "16.13.1",
     "react-dom": "16.13.1",

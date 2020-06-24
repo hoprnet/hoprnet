@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-ethereum",
-  "version": "0.3.7-f69287a",
+  "version": "0.3.8-acc2253",
   "description": "On-chain logic for hoprnet.org",
   "homepage": "https://hoprnet.org",
   "repository": {
@@ -10,7 +10,7 @@
   "license": "LGPL-3.0-only",
   "main": "./build/lib/scripts/api.js",
   "files": [
-    "truffle-networks.json",
+    "truffle-networks.js",
     "truffle-config.js",
     "contracts/",
     "build/extracted/",
