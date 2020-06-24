@@ -137,6 +137,8 @@ declare interface Channel {
     /**
      * Submits a signed to the blockchain.
      * @param signedTicket a signed ticket
+     * @param secretA a signed ticket
+     * @param secretB a signed ticket
      */
     submit(signedTicket: SignedTicket, secretA: Uint8Array, secretB: Uint8Array): Promise<void>
   }
