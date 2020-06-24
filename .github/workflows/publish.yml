@@ -33,8 +33,27 @@ jobs:
           yarn policies set-version 1.19.2
           yarn install --frozen-lockfile
 
+  build_docker:
+    name: Build HOPR Chat Docker
+    if: startsWith(github.ref, 'refs/heads/releases/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Setup Google Cloud Credentials
+        uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
+        with:
+          version: '290.0.1'
+          service_account_key: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+          export_default_credentials: true
+      - name: Obtaining release from branch
+        shell: bash
+        run: echo "::set-env name=RELEASE_NAME::$(echo ${GITHUB_REF##*/})"
+      - name: Building Docker image using Google Cloud Build
+        working-directory: chat
+        run: gcloud builds submit --tag gcr.io/hoprassociation/hopr-core:${{ env.RELEASE_NAME }}
+
   build_chat:
-    name: Build HOPR Chat
+    name: Build HOPR Chat Binaries
     if: startsWith(github.ref, 'refs/heads/releases/')
     strategy:
       matrix:
@@ -76,7 +95,7 @@ jobs:
       - name: Zip node binary for uploading
         working-directory: chat
         run: yarn zip:${{ matrix.displayName }}
-      - name: Upload to GitHub workflow artifacts store
+      - name: Upload binaries to GitHub workflow artifacts store
         uses: actions/upload-artifact@v2-preview
         with:
           name: hopr-chat-nodebin-${{ matrix.displayName }}.zip
