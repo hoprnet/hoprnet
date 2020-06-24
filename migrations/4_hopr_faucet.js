@@ -3,7 +3,7 @@ const HoprToken = artifacts.require('HoprToken')
 const HoprFaucet = artifacts.require('HoprFaucet')
 
 module.exports = async (deployer, network, [account]) => {
-  const config = networks[network]
+  const config = networks[network.replace('-fork', '')]
   const token = await HoprToken.deployed()
 
   // deploy HoprFaucet only on dev networks & testnet networks

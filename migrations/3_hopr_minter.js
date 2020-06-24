@@ -4,7 +4,7 @@ const HoprMinter = artifacts.require('HoprMinter')
 const HoprToken = artifacts.require('HoprToken')
 
 module.exports = async (deployer, network, [account]) => {
-  const config = networks[network]
+  const config = networks[network.replace('-fork', '')]
   const token = await HoprToken.deployed()
   const maxAmount = web3.utils.toWei('100000000', 'ether')
   const duration = Math.floor(durations.days(365) / 1e3)

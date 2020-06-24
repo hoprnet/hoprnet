@@ -6,7 +6,7 @@ export const HOPR_TOKEN: { [key in Networks]: string } = {
   ropsten: undefined,
   rinkeby: undefined,
   goerli: undefined,
-  kovan: '0xc499E80d455cdF0F7926c89E500786f114C070de',
+  kovan: '0xDD78859E6714D045a31Caa0075C1523f6E08fFe1',
   private: '0x66DB78F4ADD912a6Cb92b672Dfa09028ecc3085E',
 }
 
@@ -16,7 +16,7 @@ export const HOPR_CHANNELS: { [key in Networks]: string } = {
   ropsten: undefined,
   rinkeby: undefined,
   goerli: undefined,
-  kovan: '0xcB16f5dC7c6b0EF4e665b8344FAE4642717F3B98',
+  kovan: '0x6eCe0EC9E5F408e664ACc397A8Ac7241841c6658',
   private: '0x902602174a9cEb452f60c09043BE5EBC52096200',
 }
 
@@ -36,6 +36,6 @@ export const HOPR_FAUCET: { [key in Networks]: string } = {
   ropsten: undefined,
   rinkeby: undefined,
   goerli: undefined,
-  kovan: '0x42C549678F71611Fd5aC05B30Fc256f054af4cdC',
+  kovan: '0x034869aaF67F09296303D2d42dceEc53F4F04533',
   private: '0x6c97048D67c39ADCe38bbB228fc1bA415fc8f096',
 }
