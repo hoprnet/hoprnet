@@ -48,6 +48,8 @@ jobs:
       - name: Obtaining release from branch
         shell: bash
         run: echo "::set-env name=RELEASE_NAME::$(echo ${GITHUB_REF##*/})"
+      - name: Set Project for Google Cloud HOPR Association
+        run: gcloud config set project ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
       - name: Building Docker image using Google Cloud Build
         working-directory: chat
         run: gcloud builds submit --tag gcr.io/hoprassociation/hopr-core:${{ env.RELEASE_NAME }}

@@ -13,9 +13,10 @@
       "args": ["-p", "123456"],
       "env": {
         "HOST_IPV4": "0.0.0.0:9091",
-        "BOOTSTRAP_SERVERS": "/dns4/ch-test-01.hoprnet.io/tcp/9091/p2p/16Uiu2HAmMUwDHzmFJaATzQPUFgzry5oxvSgWF2Vc553HCpekC4qU",
+        "BOOTSTRAP_SERVERS": "/ip4/34.65.69.76/tcp/9091/p2p/16Uiu2HAkv5CjUUbhLDRwkAK2krL8VUPC4qhG6RMCdYNvyx4c7n7t",
         "ETHEREUM_PROVIDER": "wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36"
       },
+      "console": "integratedTerminal",
       "outFiles": ["${workspaceFolder}/**/*.js"]
     }
   ]
