@@ -18,9 +18,20 @@ export const recoverSigner = (web3: Web3, message: string, signature: string) =>
   return web3.eth.accounts.recover(message, signature, false)
 }
 
-// inputs should be a bytes32 string e.g: "0x..."
-export const xorBytes32 = (a: string, b: string) => {
-  return `0x${new BN(a.slice(2), 16).xor(new BN(b.slice(2), 16)).toString(16)}`
+export const createChallage = (a: string, b: string): string => {
+  return keccak256({
+    type: 'bytes',
+    value: encode([
+      {
+        type: 'bytes32',
+        value: a,
+      },
+      {
+        type: 'bytes32',
+        value: b,
+      },
+    ]),
+  })
 }
 
 export const isPartyA = (accountA: string, accountB: string) => {

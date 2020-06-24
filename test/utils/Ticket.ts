@@ -1,5 +1,5 @@
 import BigNumber from 'bignumber.js'
-import { keccak256, xorBytes32, MAX_UINT256, encode, signMessage, getChannelId, getParties } from './random'
+import { keccak256, MAX_UINT256, encode, createChallage, signMessage, getChannelId, getParties } from './random'
 
 BigNumber.config({ EXPONENTIAL_AT: 1e9 })
 
@@ -22,8 +22,6 @@ type ITicket = (args: {
   counterPartySecret: string // return same as provided
   amount: string // return same as provided
   counter: number // return same as provided
-  hashedPorSecretA: string // return hashed alternative
-  hashedPorSecretB: string // return hashed alternative
   channelId: string // return channel ID
   challenge: string // return hashed alternative
   hashedCounterPartySecret: string // return hashed alternative
@@ -51,9 +49,7 @@ const Ticket: ITicket = ({
   winProbPercent,
 }) => {
   // proof of relay related hashes
-  const hashedPorSecretA = keccak256({ type: 'bytes32', value: porSecretA })
-  const hashedPorSecretB = keccak256({ type: 'bytes32', value: porSecretB })
-  const challenge = xorBytes32(hashedPorSecretA, hashedPorSecretB)
+  const challenge = createChallage(porSecretA, porSecretB)
 
   // proof of randomness related hashes
   const hashedCounterPartySecret = keccak256({
@@ -72,7 +68,7 @@ const Ticket: ITicket = ({
   const encodedTicket = encode([
     { type: 'bytes32', value: channelId },
     { type: 'bytes32', value: challenge },
-    { type: 'bytes32', value: counterPartySecret },
+    { type: 'bytes32', value: hashedCounterPartySecret },
     { type: 'uint256', value: counter },
     { type: 'uint256', value: amount },
     { type: 'bytes32', value: winProb },
@@ -88,8 +84,6 @@ const Ticket: ITicket = ({
     counterPartySecret,
     amount,
     counter,
-    hashedPorSecretA,
-    hashedPorSecretB,
     channelId,
     challenge,
     hashedCounterPartySecret,
