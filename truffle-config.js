@@ -2,7 +2,7 @@ require('ts-node/register')
 require('dotenv').config()
 const process = require('process')
 const HDWalletProvider = require('@truffle/hdwallet-provider')
-const networks = require('./truffle-networks.json')
+const networks = require('./truffle-networks')
 
 const { PRIVATE_KEY, INFURA, ETHERSCAN } = process.env
 const canMigrate = typeof PRIVATE_KEY !== 'undefined' && typeof INFURA !== 'undefined'

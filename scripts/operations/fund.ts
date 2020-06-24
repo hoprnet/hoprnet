@@ -1,7 +1,7 @@
 import Web3 from 'web3'
 import HoprTokenAbi from '../../build/extracted/abis/HoprToken.json'
-import networks from '../../truffle-networks.json'
 import { HOPR_TOKEN } from '../addresses'
+import networks from '../../truffle-networks'
 
 const AMOUNT = Web3.utils.toWei('1000000', 'ether')
 

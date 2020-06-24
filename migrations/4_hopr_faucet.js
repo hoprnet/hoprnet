@@ -1,15 +1,18 @@
+const networks = require('../truffle-networks')
 const HoprToken = artifacts.require('HoprToken')
 const HoprFaucet = artifacts.require('HoprFaucet')
 
 module.exports = async (deployer, network, [account]) => {
+  const config = networks[network]
   const token = await HoprToken.deployed()
 
-  if (['development', 'test', 'rinkeby', 'kovan'].includes(network)) {
+  // deploy HoprFaucet only on dev networks & testnet networks
+  if (config.network_type === 'development' || config.network_type === 'testnet') {
     await deployer.deploy(HoprFaucet, token.address)
   }
 
   // renounce all roles and give minter role to HoprFaucet
-  if (['rinkeby', 'kovan'].includes(network)) {
+  if (config.network_type === 'testnet') {
     const hoprFaucet = await HoprFaucet.deployed()
     const adminRole = await token.DEFAULT_ADMIN_ROLE()
     const minterRole = await token.MINTER_ROLE()

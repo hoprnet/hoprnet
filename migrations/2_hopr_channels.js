@@ -1,7 +1,5 @@
 require('@openzeppelin/test-helpers/configure')({ provider: web3.currentProvider, environment: 'truffle' })
-
 const { durations } = require('@hoprnet/hopr-utils')
-
 const HoprChannels = artifacts.require('HoprChannels')
 const HoprToken = artifacts.require('HoprToken')
 

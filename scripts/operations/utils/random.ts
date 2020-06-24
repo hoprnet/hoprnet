@@ -1,6 +1,5 @@
 import path from 'path'
 import { spawn } from 'child_process'
-import networks from '../../../truffle-networks.json'
 
 export const root = path.join(__dirname, '..', '..', '..')
 
@@ -32,16 +31,6 @@ export const bash = (cmd: string): Promise<void> => {
   })
 }
 
-export const getContractNames = () => {
-  return ['HoprChannels', 'HoprMinter', 'HoprToken']
-}
-
 export const getOperations = () => {
   return ['patch', 'build', 'coverage', 'fund', 'migrate', 'network', 'test', 'verify']
-}
-
-export const isLocalNetwork = (network: string) => {
-  return !!Object.entries(networks)
-    .filter(([, config]) => config.network_id === '*')
-    .find(([name]) => name === network)
 }

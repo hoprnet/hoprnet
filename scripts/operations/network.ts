@@ -1,5 +1,5 @@
 import { Ganache } from '@hoprnet/hopr-testing'
-import networks from '../../truffle-networks.json'
+import networks from '../../truffle-networks'
 
 export default () => {
   const ganache = new Ganache({
