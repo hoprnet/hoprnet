@@ -29,13 +29,13 @@ Our **Testnet Bootstrap Nodes** are fixed and deployed via our [GitHub DevOps re
 {% tabs %}
 {% tab title="ch-t-01" %}
 ```text
-/dns4/ch-test-01.hoprnet.io/tcp/9091/p2p/16Uiu2HAmMUwDHzmFJaATzQPUFgzry5oxvSgWF2Vc553HCpekC4qU
+/dns4/ch-test-01.hoprnet.io/tcp/9091/p2p/16Uiu2HAm5WUS1kv8p3uiSgZmz2uh427qr8jJZ8jrFCePHATaVgz2
 ```
 {% endtab %}
 
 {% tab title="ch-t-02" %}
 ```text
-/dns4/ch-test-02.hoprnet.io/tcp/9091/p2p/16Uiu2HAmVFVHwJs7EqeRUtY6EZTtv379CiwvJgdsDfmdywbKfgAq
+/dns4/ch-test-02.hoprnet.io/tcp/9091/p2p/16Uiu2HAmRD7iEEopoiHWz7NpsM4wwSc5yWpdSX3esb3kYkJNY1yn
 ```
 {% endtab %}
 {% endtabs %}
@@ -45,13 +45,13 @@ These nodes are behind HOPR Services AG DNS registry. In case you want to direct
 {% tabs %}
 {% tab title="ch-t-01 \(no-dns\)" %}
 ```text
-/ip4/34.65.36.154/tcp/9091/p2p/16Uiu2HAmMUwDHzmFJaATzQPUFgzry5oxvSgWF2Vc553HCpekC4qU
+/ip4/34.65.111.179/tcp/9091/p2p/16Uiu2HAm5WUS1kv8p3uiSgZmz2uh427qr8jJZ8jrFCePHATaVgz2
 ```
 {% endtab %}
 
 {% tab title="ch-t-02 \(no-dns\)" %}
 ```
-/ip4/34.65.198.231/tcp/9091/p2p/16Uiu2HAmVFVHwJs7EqeRUtY6EZTtv379CiwvJgdsDfmdywbKfgAq
+/ip4/34.65.141.74/tcp/9091/p2p/16Uiu2HAmRD7iEEopoiHWz7NpsM4wwSc5yWpdSX3esb3kYkJNY1yn
 ```
 {% endtab %}
 {% endtabs %}
