@@ -117,7 +117,7 @@ To run **HOPR Chat** via Docker**,** you need to copy and paste the following co
 ```text
 docker run -v $(pwd)/db:/app/db \
 -e HOST_IPV4=0.0.0.0:9091 \
--e BOOTSTRAP_SERVERS=/dns4/ch-test-01.hoprnet.io/tcp/9091/p2p/16Uiu2HAmMUwDHzmFJaATzQPUFgzry5oxvSgWF2Vc553HCpekC4q \
+-e BOOTSTRAP_SERVERS=/dns4/ch-test-01.hoprnet.io/tcp/9091/p2p/16Uiu2HAm5WUS1kv8p3uiSgZmz2uh427qr8jJZ8jrFCePHATaVgz2 \
 -e ETHEREUM_PROVIDER=wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36 \
 -p 9091:9091 -it hopr/chat -p switzerland
 ```
@@ -127,7 +127,7 @@ docker run -v $(pwd)/db:/app/db \
 ```text
 docker run -v $(pwd)/db:/app/db \
 -e HOST_IPV4=0.0.0.0:9091 \
--e BOOTSTRAP_SERVERS=/dns4/ch-test-02.hoprnet.io/tcp/9091/p2p/16Uiu2HAmVFVHwJs7EqeRUtY6EZTtv379CiwvJgdsDfmdywbKfgAq \
+-e BOOTSTRAP_SERVERS=/dns4/ch-test-02.hoprnet.io/tcp/9091/p2p/16Uiu2HAmRD7iEEopoiHWz7NpsM4wwSc5yWpdSX3esb3kYkJNY1yn \
 -e ETHEREUM_PROVIDER=wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36 \
 -p 9091:9091 -it hopr/chat -p switzerland
 ```
@@ -141,7 +141,7 @@ docker run -v $(pwd)/db:/app/db \
 ```text
 docker run -v %cd%/db:/app/db ^ 
 -e HOST_IPV4=0.0.0.0:9091 ^ 
--e BOOTSTRAP_SERVERS=/dns4/ch-test-01.hoprnet.io/tcp/9091/p2p/16Uiu2HAmMUwDHzmFJaATzQPUFgzry5oxvSgWF2Vc553HCpekC4qU ^ 
+-e BOOTSTRAP_SERVERS=/dns4/ch-test-01.hoprnet.io/tcp/9091/p2p/16Uiu2HAm5WUS1kv8p3uiSgZmz2uh427qr8jJZ8jrFCePHATaVgz2 ^ 
 -e ETHEREUM_PROVIDER=wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36 ^ 
 -p 9091:9091 -it hopr/chat -p switzerland
 ```
@@ -151,7 +151,7 @@ docker run -v %cd%/db:/app/db ^
 ```
 docker run -v %cd%/db:/app/db ^ 
 -e HOST_IPV4=0.0.0.0:9091 ^ 
--e BOOTSTRAP_SERVERS=/dns4/ch-test-02.hoprnet.io/tcp/9091/p2p/16Uiu2HAmVFVHwJs7EqeRUtY6EZTtv379CiwvJgdsDfmdywbKfgAq ^ 
+-e BOOTSTRAP_SERVERS=/dns4/ch-test-02.hoprnet.io/tcp/9091/p2p/16Uiu2HAmRD7iEEopoiHWz7NpsM4wwSc5yWpdSX3esb3kYkJNY1yn ^ 
 -e ETHEREUM_PROVIDER=wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36 ^ 
 -p 9091:9091 -it hopr/chat -p switzerland
 ```
