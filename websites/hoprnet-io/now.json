@@ -3,7 +3,7 @@
     "alias": "hoprnet.io",
     "scope": "hoprnet",
     "builds": [
-        {"src": "package.json", "use": "@now/static-build"}
+        {"src": "package.json", "use": "@now/static"}
     ],
     "routes": [
         {"src": "^/static/(.*)", "dest": "/static/$1"},
