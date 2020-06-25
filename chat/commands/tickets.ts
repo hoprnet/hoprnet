@@ -1,9 +1,10 @@
+import BN from 'bn.js'
+import chalk from 'chalk'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { Types, Channel as ChannelInstance } from '@hoprnet/hopr-core-connector-interface'
-import type AbstractCommand from './abstractCommand'
 import type Hopr from '@hoprnet/hopr-core'
-import chalk from 'chalk'
-import { u8aToHex, stringToU8a } from '@hoprnet/hopr-utils'
+import { u8aToHex, stringToU8a, moveDecimalPoint } from '@hoprnet/hopr-utils'
+import type AbstractCommand from './abstractCommand'
 
 export default class Tickets implements AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {}
@@ -12,31 +13,45 @@ export default class Tickets implements AbstractCommand {
    * @param query channelId string to send message to
    */
   async execute(query?: string): Promise<void> {
-    if (!query) {
-      console.log(chalk.red(`\nChannel ID not provided.`))
-      return
-    }
+    const { Balance } = this.node.paymentChannels.types
 
-    const signedTickets: Map<string, Types.SignedTicket> =
-      // @ts-ignore
-      // TODO: remove ignore once interface is updated
-      await this.node.paymentChannels.ticket.get(this.node.paymentChannels, stringToU8a(query))
+    const signedTickets: Map<string, Types.SignedTicket> = await this.node.paymentChannels.tickets.get(
+      stringToU8a(query)
+    )
 
     if (signedTickets.size === 0) {
       console.log(chalk.yellow(`\nNo tickets found.`))
       return
     }
 
-    const table = Array.from(signedTickets.values()).map((signedTicket) => {
-      const ticket = signedTicket.ticket
+    const result = Array.from(signedTickets.values()).reduce<{
+      tickets: {
+        'amount (HOPR)': string
+      }[]
+      total: BN
+    }>(
+      (result, signedTicket) => {
+        result.tickets.push({
+          'amount (HOPR)': moveDecimalPoint(signedTicket.ticket.amount.toString(), Balance.DECIMALS * -1).toString(),
+        })
+        result.total = result.total.add(signedTicket.ticket.amount)
 
-      return {
-        id: u8aToHex(ticket.channelId),
-        amount: ticket.amount.toString(),
+        return result
+      },
+      {
+        tickets: [],
+        total: new BN(0),
       }
-    })
+    )
 
-    console.table(table)
+    console.table(result.tickets)
+    console.log('Found', result.tickets.length, 'unredeemed tickets in channel ID', chalk.blue(query))
+    console.log(
+      'You will receive',
+      chalk.yellow(moveDecimalPoint(result.total.toString(), Balance.DECIMALS * -1).toString()),
+      'HOPR',
+      'once you redeem them.'
+    )
   }
 
   complete(line: string, cb: (err: Error | undefined, hits: [string[], string]) => void, query?: string) {
