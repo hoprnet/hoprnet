@@ -8,6 +8,7 @@ import { BlockTransactionString } from 'web3-eth'
 import Web3 from 'web3'
 import BN from 'bn.js'
 import Debug from 'debug'
+import { u8aConcat } from '@hoprnet/hopr-utils'
 import { AccountId, Signature, Hash } from '../types'
 import { ContractEventEmitter } from '../tsc/web3/types'
 import { ChannelStatus } from '../types/channel'
@@ -368,4 +369,14 @@ export function getSignatureParameters(
     s: signature.signature.slice(32, 64),
     v: signature.recovery,
   }
+}
+
+/**
+ * Create a challange by concatinating and then hashing the secrets.
+ * @param secretA
+ * @param secretB
+ * @returns a promise that resolves to a hash
+ */
+export async function createChallage(secretA: Uint8Array, secretB: Uint8Array): Promise<Hash> {
+  return hash(u8aConcat(secretA, secretB))
 }

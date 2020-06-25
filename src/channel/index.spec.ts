@@ -1,23 +1,17 @@
+import { randomBytes } from 'crypto'
 import { Ganache } from '@hoprnet/hopr-testing'
 import { migrate } from '@hoprnet/hopr-ethereum'
 import assert from 'assert'
 import { stringToU8a, u8aToHex, u8aEquals, durations } from '@hoprnet/hopr-utils'
 import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
 import { getPrivKeyData, createAccountAndFund, createNode } from '../utils/testing'
+import { createChallage } from '../utils'
 import BN from 'bn.js'
 import pipe from 'it-pipe'
 import Web3 from 'web3'
 import { HoprToken } from '../tsc/web3/HoprToken'
 import { Await } from '../tsc/utils'
-import {
-  AccountId,
-  Balance,
-  Channel as ChannelType,
-  ChannelStatus,
-  ChannelBalance,
-  Hash,
-  SignedChannel,
-} from '../types'
+import { AccountId, Balance, Channel as ChannelType, ChannelStatus, ChannelBalance, SignedChannel } from '../types'
 import CoreConnector from '..'
 import Channel from '.'
 import * as testconfigs from '../config.spec'
@@ -48,6 +42,8 @@ describe('test Channel class', function () {
   })
 
   beforeEach(async function () {
+    this.timeout(10e3)
+
     channels.clear()
     preChannels.clear()
 
@@ -56,7 +52,12 @@ describe('test Channel class', function () {
     const userB = await createAccountAndFund(web3, hoprToken, funder, testconfigs.DEMO_ACCOUNTS[2])
 
     coreConnector = await createNode(userA.privKey)
+    await coreConnector.initOnchainValues()
+    await coreConnector.start()
+
     counterpartysCoreConnector = await createNode(userB.privKey)
+    await counterpartysCoreConnector.initOnchainValues()
+    await counterpartysCoreConnector.start()
   })
 
   afterEach(async function () {
@@ -115,16 +116,13 @@ describe('test Channel class', function () {
 
     channels.set(u8aToHex(channelId), channelType)
 
-    let secret: Uint8Array
-    try {
-      secret = await coreConnector.db.get(Buffer.from(coreConnector.dbKeys.OnChainSecret()))
-    } catch (err) {
-      throw err
-    }
+    const secretA = randomBytes(32)
+    const secretB = randomBytes(32)
+    const challange = await createChallage(secretA, secretB)
 
-    const ticket = await channel.ticket.create(new Balance(1), new Hash())
+    const signedTicket = await channel.ticket.create(new Balance(1), challange)
     assert(
-      u8aEquals(await ticket.signer, coreConnector.account.keys.onChain.pubKey),
+      u8aEquals(await signedTicket.signer, coreConnector.account.keys.onChain.pubKey),
       `Check that signer is recoverable`
     )
 
@@ -174,6 +172,14 @@ describe('test Channel class', function () {
       `Should reject when trying to set nonce twice.`
     )
 
-    assert(await counterpartysChannel.ticket.verify(ticket), `Ticket signature must be valid.`)
+    assert(await counterpartysChannel.ticket.verify(signedTicket), `Ticket signature must be valid.`)
+
+    await counterpartysChannel.ticket.submit(signedTicket, secretA, secretB)
+    const hashedSecret = await counterpartysChannel.coreConnector.hoprChannels.methods
+      .accounts((await counterpartysChannel.coreConnector.account.address).toHex())
+      .call()
+      .then((res) => res.hashedSecret)
+
+    assert.notEqual(hashedSecret, signedTicket.ticket.onChainSecret.toHex(), 'Ticket redemption failed.')
   })
 })

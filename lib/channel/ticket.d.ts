@@ -8,6 +8,6 @@ declare class TicketFactory {
         offset: number;
     }): Promise<SignedTicket>;
     verify(signedTicket: SignedTicket): Promise<boolean>;
-    submit(signedTicket: SignedTicket): Promise<void>;
+    submit(signedTicket: SignedTicket, secretA: Uint8Array, secretB: Uint8Array): Promise<void>;
 }
 export default TicketFactory;

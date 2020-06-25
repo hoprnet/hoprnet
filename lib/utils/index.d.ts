@@ -165,3 +165,10 @@ export declare function getSignatureParameters(signature: Signature): {
     s: Uint8Array;
     v: number;
 };
+/**
+ * Create a challange by concatinating and then hashing the secrets.
+ * @param secretA
+ * @param secretB
+ * @returns a promise that resolves to a hash
+ */
+export declare function createChallage(secretA: Uint8Array, secretB: Uint8Array): Promise<Hash>;

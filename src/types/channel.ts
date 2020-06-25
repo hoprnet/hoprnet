@@ -52,7 +52,7 @@ class Channel extends Uint8ArrayE implements Types.Channel {
   }
 
   get hash() {
-    return hash(this.toU8a())
+    return hash(this)
   }
 
   async sign(

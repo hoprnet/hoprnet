@@ -1,9 +1,38 @@
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
-import { u8aConcat } from '@hoprnet/hopr-utils'
-import { Hash, TicketEpoch, Balance } from '.'
+import { stringToU8a, u8aToHex } from '@hoprnet/hopr-utils'
+import { Hash, TicketEpoch, Balance, Signature } from '.'
 import { Uint8ArrayE } from '../types/extended'
-import { hash, sign } from '../utils'
+import { sign } from '../utils'
+//
+import Web3 from 'web3'
+const web3 = new Web3()
+
+/**
+ * Given a message, prefix it with "\x19Ethereum Signed Message:\n" and return it's hash
+ * @param msg the message to hash
+ * @returns a hash
+ */
+function toEthSignedMessageHash(msg: string): Hash {
+  return new Hash(stringToU8a(web3.eth.accounts.hashMessage(msg)))
+}
+
+function encode(items: { type: string; value: string }[]): string {
+  const { types, values } = items.reduce(
+    (result, item) => {
+      result.types.push(item.type)
+      result.values.push(item.value)
+
+      return result
+    },
+    {
+      types: [],
+      values: [],
+    }
+  )
+
+  return web3.eth.abi.encodeParameters(types, values)
+}
 
 class Ticket extends Uint8ArrayE implements Types.Ticket {
   constructor(
@@ -88,8 +117,17 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
     return new Hash(new Uint8Array(this.buffer, this.onChainSecretOffset, Hash.SIZE))
   }
 
-  get hash(): Promise<Hash> {
-    return hash(u8aConcat(this.challenge, this.onChainSecret, this.epoch.toU8a(), this.amount.toU8a(), this.winProb))
+  get hash() {
+    const encodedTicket = encode([
+      { type: 'bytes32', value: u8aToHex(this.channelId) },
+      { type: 'bytes32', value: u8aToHex(this.challenge) },
+      { type: 'bytes32', value: u8aToHex(this.onChainSecret) },
+      { type: 'uint256', value: this.epoch.toString() },
+      { type: 'uint256', value: this.amount.toString() },
+      { type: 'bytes32', value: u8aToHex(this.winProb) },
+    ])
+
+    return toEthSignedMessageHash(encodedTicket)
   }
 
   static get SIZE(): number {
@@ -107,8 +145,8 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
       bytes: ArrayBuffer
       offset: number
     }
-  ): Promise<Types.Signature> {
-    return await sign(await this.hash, privKey, undefined, arr)
+  ): Promise<Signature> {
+    return sign(this.hash, privKey, undefined, arr)
   }
 
   static create(

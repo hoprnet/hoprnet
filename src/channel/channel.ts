@@ -1,9 +1,8 @@
 import type { Channel as IChannel } from '@hoprnet/hopr-core-connector-interface'
-import { u8aToHex, u8aXOR } from '@hoprnet/hopr-utils'
+import { u8aToHex } from '@hoprnet/hopr-utils'
 import { Balance, ChannelId, Channel as ChannelType, Hash, Moment, SignedChannel } from '../types'
 import TicketFactory from './ticket'
 import { ChannelStatus } from '../types/channel'
-import { HASH_LENGTH } from '../constants'
 import { waitForConfirmation, waitFor, hash } from '../utils'
 
 import type HoprEthereum from '..'
@@ -238,34 +237,9 @@ class Channel implements IChannel {
     }
   }
 
+  // @TODO: remove this, no longer needed
   async getPreviousChallenges(): Promise<Hash> {
-    let pubKeys: Uint8Array[] = []
-
-    return new Promise<Hash>(async (resolve, reject) => {
-      this.coreConnector.db
-        .createReadStream({
-          gte: Buffer.from(
-            this.coreConnector.dbKeys.Challenge(await this.channelId, new Uint8Array(HASH_LENGTH).fill(0x00))
-          ),
-          lte: Buffer.from(
-            this.coreConnector.dbKeys.Challenge(await this.channelId, new Uint8Array(HASH_LENGTH).fill(0xff))
-          ),
-        })
-        .on('error', (err) => reject(err))
-        .on('data', ({ key, ownKeyHalf }: { key: Buffer; ownKeyHalf: Buffer }) => {
-          const challenge = this.coreConnector.dbKeys.ChallengeKeyParse(key)[1]
-
-          // @TODO: replace this by proper EC-arithmetic once it's implemented in `hopr-core`
-          pubKeys.push(new Uint8Array(u8aXOR(false, challenge, new Uint8Array(ownKeyHalf))))
-        })
-        .on('end', () => {
-          if (pubKeys.length > 0) {
-            return resolve(new Hash(u8aXOR(false, ...pubKeys)))
-          }
-
-          resolve()
-        })
-    })
+    return new Hash()
   }
 
   async testAndSetNonce(signature: Uint8Array): Promise<void> {
