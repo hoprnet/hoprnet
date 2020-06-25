@@ -2,6 +2,11 @@
     "version": 2,
     "alias": "hoprnet.io",
     "scope": "hoprnet",
-    "builds": [{"src": "build/**", "use": "@now/static"}],
-    "routes": [{"src": "/(.*)", "dest": "build/index.html"}]
+    "builds": [
+        {"src": "package.json", "use": "@now/static-build"}
+    ],
+    "routes": [
+        {"src": "^/static/(.*)", "dest": "/static/$1"},
+        {"src": ".*", "dest": "/index.html"}
+    ]
   }
