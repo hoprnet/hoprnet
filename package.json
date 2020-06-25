@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core",
-  "version": "0.6.14-testnet.e37470a",
+  "version": "0.6.15-testnet.45efa6f",
   "description": "Privacy-preserving messaging protocol with incentivations for relay operators",
   "license": "GPL-3.0-only",
   "keywords": [
@@ -80,8 +80,8 @@
   "devDependencies": {
     "@hoprnet/hopr-ethereum": "0.3.6-refactor.3125357",
     "@hoprnet/hopr-testing": "0.1.2",
-    "@types/bn.js": "^4.11.6",
     "@types/bl": "^2.1.0",
+    "@types/bn.js": "^4.11.6",
     "@types/bs58": "^4.0.1",
     "@types/clear": "^0.1.0",
     "@types/debug": "^4.1.5",
