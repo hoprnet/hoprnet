@@ -33,5 +33,3 @@ jobs:
         run: yarn install --frozen-lockfile
       - name: Build library
         run: yarn build
-      - name: Test library
-        run: yarn test

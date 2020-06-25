@@ -1,0 +1,49 @@
+{
+  "name": "@hoprnet/hopr-website.hoprnet.io",
+  "version": "1.0.1",
+  "private": true,
+  "scripts": {
+    "start": "craco start",
+    "build": "CI=false craco build",
+    "test": "CI=true craco test",
+    "eject": "craco eject",
+    "format": "prettier --check ."
+  },
+  "dependencies": {
+    "@craco/craco": "^5.6.4",
+    "@hoprnet/hopr-website.components": "1.0.0",
+    "classnames": "^2.2.6",
+    "lodash": "^4.17.15",
+    "node-sass": "^4.12.0",
+    "react": "^16.9.0",
+    "react-dom": "^16.9.0",
+    "react-router-dom": "^5.0.1",
+    "react-scripts": "3.1.1"
+  },
+  "devDependencies": {
+    "husky": "^4.2.5",
+    "prettier": "^2.0.5"
+  },
+  "eslintConfig": {
+    "extends": "react-app"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "prettier": {
+    "printWidth": 120,
+    "semi": false,
+    "singleQuote": true,
+    "quoteProps": "consistent",
+    "arrowParens": "avoid"
+  }
+}
