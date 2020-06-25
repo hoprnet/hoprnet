@@ -2,8 +2,8 @@ import net, { AddressInfo, Server } from 'net'
 import EventEmitter from 'events'
 import debug from 'debug'
 
-const log = debug('libp2p:tcp:listener')
-const error = debug('libp2p:tcp:listener:error')
+const log = debug('hopr-core:transport:listener')
+const error = debug('hopr-core:transport:listener:error')
 
 import { socketToConn } from './socket-to-conn'
 import { CODE_P2P } from './constants'
@@ -97,12 +97,19 @@ export function createListener(
 
     return new Promise(async (resolve, reject) => {
       externalIp = await Stun.getExternalIP(
-        {
-          hostname: 'stun.l.google.com',
-          port: 19302,
-        },
+        [
+          {
+            hostname: 'stun.l.google.com',
+            port: 19302,
+          },
+          {
+            hostname: 'stun.1und1.de',
+            port: 3478,
+          },
+        ],
         ma.toOptions().port
       )
+
       const options = multiaddrToNetConfig(listeningAddr)
       server.listen(options, (err?: Error) => {
         if (err) return reject(err)
@@ -123,7 +130,14 @@ export function createListener(
     // Because TCP will only return the IPv6 version
     // we need to capture from the passed multiaddr
     if (listeningAddr.toString().startsWith('/ip4')) {
-      addrs.push(Multiaddr(`/ip4/${externalIp.address}/tcp/${externalIp.port}`))
+      if (externalIp.port == null) {
+        console.log(`Attention: Bidirectional NAT detected. Publishing no public ip address to the DHT`)
+        if (peerId != null) {
+          addrs.push(Multiaddr(''))
+        }
+      } else {
+        addrs.push(Multiaddr(`/ip4/${externalIp.address}/tcp/${externalIp.port}`))
+      }
       addrs.push(...getMultiaddrs('ip4', address.address, address.port))
     } else if (address.family === 'IPv6') {
       addrs = addrs.concat(getMultiaddrs('ip6', address.address, address.port))

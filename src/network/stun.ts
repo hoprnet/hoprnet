@@ -4,45 +4,88 @@ import { HoprOptions } from '..'
 
 import { DEFAULT_STUN_PORT } from '../constants'
 
+import { durations } from '@hoprnet/hopr-utils'
+
 export type Interface = {
   family: 'IPv4' | 'IPv6'
   port: number
   address: string
 }
 
+const STUN_TIMEOUT = durations.seconds(1)
+
 class Stun {
   private socket: Socket
 
   constructor(private options: HoprOptions) {}
 
-  static getExternalIP(address: { hostname: string; port: number }, usePort?: number): Promise<Interface> {
+  static getExternalIP(addresses: { hostname: string; port: number }[], usePort?: number): Promise<Interface> {
     return new Promise<Interface>(async (resolve, reject) => {
+      let attr: Interface
+
+      const timeout = setTimeout(async () => {
+        await releaseSocketFromPort(socket)
+
+        if (attr != null) {
+          resolve(attr)
+        } else {
+          reject(new Error(`Timeout during STUN request.`))
+        }
+      }, STUN_TIMEOUT)
       const socket = dgram.createSocket({ type: 'udp4' })
-      const tid = stun.generateTransactionId()
+      const tids = []
+
+      for (let i = 0; i < addresses.length; i++) {
+        tids.push(stun.generateTransactionId())
+      }
 
       if (usePort !== undefined) {
         await bindSocketToPort(socket, usePort)
       }
 
-      socket.on('message', async (msg) => {
+      const onMessage = async (msg: Buffer) => {
         const res = stun.createBlank()
 
+        const logBackup = console.log
+        console.log = () => {}
         if (res.loadBuffer(msg)) {
-          if (res.isBindingResponseSuccess({ transactionId: tid })) {
-            const attr = res.getXorMappedAddressAttribute() as Interface
+          if (
+            tids.some((tid, index, array) => {
+              if (res.isBindingResponseSuccess({ transactionId: tid, fingerprint: true })) {
+                array.splice(index, 1)
+                return true
+              }
+              return false
+            })
+          ) {
+            const receivedAttr = res.getXorMappedAddressAttribute() as Interface
 
-            if (attr) {
-              await releaseSocketFromPort(socket)
+            if (receivedAttr) {
+              if (attr == null) {
+                attr = receivedAttr
+              } else if (attr.port != receivedAttr.port) {
+                attr.port = undefined
+              }
 
-              resolve(attr)
+              if (tids.length == 0) {
+                socket.removeListener('message', onMessage)
+                await releaseSocketFromPort(socket)
+                clearTimeout(timeout)
+                resolve(attr)
+              }
             }
           }
         }
-      })
+        console.log = logBackup
+      }
 
-      const req = stun.createBindingRequest(tid).setFingerprintAttribute()
+      socket.on('message', onMessage)
 
-      socket.send(req.toBuffer(), address.port, address.hostname)
+      for (let i = 0; i < addresses.length; i++) {
+        const req = stun.createBindingRequest(tids[i]).setFingerprintAttribute()
+
+        socket.send(req.toBuffer(), addresses[i].port, addresses[i].hostname)
+      }
     })
   }
 
@@ -93,7 +136,7 @@ function releaseSocketFromPort(socket: Socket) {
     }
 
     const onError = (err?: Error) => {
-      socket.removeListener('close', onClose)
+      socket.removeAllListeners()
       reject(err)
     }
 

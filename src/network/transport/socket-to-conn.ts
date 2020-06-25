@@ -1,6 +1,7 @@
 import abortable from 'abortable-iterator'
 import debug from 'debug'
 const log = debug('libp2p:tcp:socket')
+const error = debug('libp2p:tcp:socket:error')
 
 // @ts-ignore
 import toIterable = require('stream-to-it')
@@ -10,6 +11,20 @@ import { CLOSE_TIMEOUT } from './constants'
 import { MultiaddrConnection } from './types'
 import type Multiaddr from 'multiaddr'
 import type { Socket } from 'net'
+
+function toWebrtcMultiaddr(address: undefined | string, port: undefined | number) {
+  if (!address || !port) {
+    return undefined
+  }
+
+  try {
+    return toMultiaddr(address, port)
+  } catch (err) {
+    error(err)
+    // Account for mdns hostnames, just make it a local ip for now
+    return toMultiaddr('0.0.0.0', port)
+  }
+}
 
 // Convert a socket into a MultiaddrConnection
 // https://github.com/libp2p/interface-transport#multiaddrconnection
@@ -55,7 +70,7 @@ export function socketToConn(
           // If the source errored the socket will already have been destroyed by
           // toIterable.duplex(). If the socket errored it will already be
           // destroyed. There's nothing to do here except log the error & return.
-          log(err)
+          error(err)
         }
       }
     },
@@ -64,10 +79,10 @@ export function socketToConn(
 
     conn: socket,
 
-    localAddr: options.localAddr || toMultiaddr(socket.localAddress, socket.localPort),
+    localAddr: options.localAddr || toWebrtcMultiaddr(socket.localAddress, socket.localPort),
 
     // If the remote address was passed, use it - it may have the peer ID encapsulated
-    remoteAddr: options.remoteAddr || toMultiaddr(socket.remoteAddress, socket.remotePort),
+    remoteAddr: options.remoteAddr || toWebrtcMultiaddr(socket.remoteAddress, socket.remotePort),
 
     timeline: { open: Date.now() },
 
@@ -80,11 +95,16 @@ export function socketToConn(
         // Attempt to end the socket. If it takes longer to close than the
         // timeout, destroy it manually.
         const timeout = setTimeout(() => {
-          const { host, port } = maConn.remoteAddr.toOptions()
-          log('timeout closing socket to %s:%s after %dms, destroying it manually', host, port, Date.now() - start)
+          const cOptions = maConn.remoteAddr?.toOptions()
+          log(
+            'timeout closing socket to %s:%s after %dms, destroying it manually',
+            cOptions?.host,
+            cOptions?.port,
+            Date.now() - start
+          )
 
           if (socket.destroyed) {
-            log('%s:%s is already destroyed', host, port)
+            log('%s:%s is already destroyed', cOptions?.host, cOptions?.port)
           } else {
             socket.destroy()
           }
@@ -95,7 +115,10 @@ export function socketToConn(
         socket.once('close', () => clearTimeout(timeout))
         socket.end((err?: Error) => {
           maConn.timeline.close = Date.now()
-          if (err) return reject(err)
+          if (err) {
+            error(err)
+            return reject(err)
+          }
           resolve()
         })
       })
