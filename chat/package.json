@@ -15,8 +15,8 @@
     "util:create:alice": "mkdirp .alice && copyfiles -a lib/**/**/* .alice && copyfiles .env .alice/",
     "util:create:bob": "mkdirp .bob && copyfiles -a lib/**/**/* .bob && copyfiles .env .bob/",
     "start": "node lib/index.js",
-    "start:alice": "yarn util:create:alice && cd .alice && cross-env HOST_IPV4=0.0.0.0:9091 node lib/index.js -p alice",
-    "start:bob": "yarn util:create:bob && cd .bob && cross-env HOST_IPV4=0.0.0.0:9092 node lib/index.js -p bob",
+    "start:alice": "yarn util:create:alice && cd .alice && cross-env HOST_IPV4=0.0.0.0:9091 node lib/index.js -p alice 2>log.alice.txt",
+    "start:bob": "yarn util:create:bob && cd .bob && cross-env HOST_IPV4=0.0.0.0:9092 node lib/index.js -p bob 2>log.bob.txt",
     "zip:windows": "bestzip hopr-chat-nodebin-windows.zip dist",
     "zip:macos": "bestzip hopr-chat-nodebin-macos.zip dist",
     "zip:linux": "bestzip hopr-chat-nodebin-linux.zip dist"

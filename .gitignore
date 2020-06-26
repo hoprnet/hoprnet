@@ -23,3 +23,6 @@ lib/
 
 # Exclude .env
 .env
+
+# Exclude logs
+*.log

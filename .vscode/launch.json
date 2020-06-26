@@ -10,11 +10,12 @@
       "name": "Launch Program",
       "skipFiles": ["<node_internals>/**"],
       "program": "${workspaceFolder}/chat/lib/index.js",
-      "args": ["-p", "123456"],
+      "args": ["-p", "123456", "2>log.txt"],
       "env": {
         "HOST_IPV4": "0.0.0.0:9091",
-        "BOOTSTRAP_SERVERS": "/ip4/34.65.69.76/tcp/9091/p2p/16Uiu2HAkv5CjUUbhLDRwkAK2krL8VUPC4qhG6RMCdYNvyx4c7n7t",
-        "ETHEREUM_PROVIDER": "wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36"
+        "BOOTSTRAP_SERVERS": "/ip4/34.65.114.152/tcp/9091/p2p/16Uiu2HAmQrtY26aYgLBUMjhw9qvZABKYTdncHR5VD4MDrMLVSpkp",
+        "ETHEREUM_PROVIDER": "wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36",
+        "DEBUG": "hopr-core:transport"
       },
       "console": "integratedTerminal",
       "outFiles": ["${workspaceFolder}/**/*.js"]
