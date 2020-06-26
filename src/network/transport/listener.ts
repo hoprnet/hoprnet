@@ -96,19 +96,23 @@ export function createListener(
     }
 
     return new Promise(async (resolve, reject) => {
-      externalIp = await Stun.getExternalIP(
-        [
-          {
-            hostname: 'stun.l.google.com',
-            port: 19302,
-          },
-          {
-            hostname: 'stun.1und1.de',
-            port: 3478,
-          },
-        ],
-        ma.toOptions().port
-      )
+      try {
+        externalIp = await Stun.getExternalIP(
+          [
+            {
+              hostname: 'stun.l.google.com',
+              port: 19302,
+            },
+            {
+              hostname: 'stun.1und1.de',
+              port: 3478,
+            },
+          ],
+          ma.toOptions().port
+        )
+      } catch (err) {
+        error(err)
+      }
 
       const options = multiaddrToNetConfig(listeningAddr)
       server.listen(options, (err?: Error) => {
@@ -130,14 +134,17 @@ export function createListener(
     // Because TCP will only return the IPv6 version
     // we need to capture from the passed multiaddr
     if (listeningAddr.toString().startsWith('/ip4')) {
-      if (externalIp.port == null) {
-        console.log(`Attention: Bidirectional NAT detected. Publishing no public ip address to the DHT`)
-        if (peerId != null) {
-          addrs.push(Multiaddr(''))
+      if (externalIp != null) {
+        if (externalIp.port == null) {
+          console.log(`Attention: Bidirectional NAT detected. Publishing no public ip address to the DHT`)
+          if (peerId != null) {
+            addrs.push(Multiaddr(''))
+          }
+        } else {
+          addrs.push(Multiaddr(`/ip4/${externalIp.address}/tcp/${externalIp.port}`))
         }
-      } else {
-        addrs.push(Multiaddr(`/ip4/${externalIp.address}/tcp/${externalIp.port}`))
       }
+
       addrs.push(...getMultiaddrs('ip4', address.address, address.port))
     } else if (address.family === 'IPv6') {
       addrs = addrs.concat(getMultiaddrs('ip6', address.address, address.port))

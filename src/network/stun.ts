@@ -12,7 +12,7 @@ export type Interface = {
   address: string
 }
 
-const STUN_TIMEOUT = durations.seconds(1)
+const STUN_TIMEOUT = durations.seconds(2)
 
 class Stun {
   private socket: Socket
