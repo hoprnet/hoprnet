@@ -192,7 +192,7 @@ On macOS, double-click or execute the file named `hopr-chat.command`. Behind the
 {% endtab %}
 
 {% tab title="Windows 10" %}
-On macOS, right-click or execute the file named `hopr-chat.ps1` and select the option “Run with Powershell”. Behind the scenes, it will run `node index.js` from the directory you are currently working, ensuring it has the configuration settings distributed with the binary.
+On Windows, double-click the file named `hopr-chat.bat` or right-click and select the option “Run with Powershell”. A prompt from Windows Defender might request your permission to run it. Behind the scenes, it will run `node index.js` from the directory you are currently working, ensuring it has the configuration settings distributed with the binary.
 {% endtab %}
 {% endtabs %}
 
