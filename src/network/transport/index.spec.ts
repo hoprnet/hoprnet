@@ -769,6 +769,22 @@ describe('should create a socket and connect to it', function () {
     filteredMultiaddr = TransportModule.filter([ip6Multiaddr])
     assert(filteredMultiaddr.length == 1 && filteredMultiaddr[0].equals(ip6Multiaddr))
   })
+
+  it('should establish connections to the relay and then connect "directly" via a p2p address', async function () {
+    const relay = await generateNode({ id: 2, ipv4: true, ipv6: true })
+
+    const [sender, counterparty] = await Promise.all([
+      generateNode({ id: 0, ipv4: true }, relay.peerInfo),
+      generateNode({ id: 1, ipv6: true }, relay.peerInfo),
+    ])
+
+    await sender.dial(relay.peerInfo)
+    await counterparty.dial(relay.peerInfo)
+
+    await sender.dial(Multiaddr(`/p2p/${counterparty.peerInfo.id.toB58String()}`))
+
+    await Promise.all([relay.stop(), sender.stop(), counterparty.stop()])
+  })
 })
 
 /**

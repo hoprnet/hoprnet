@@ -412,24 +412,26 @@ class TCP {
     options = options || {}
 
     let error: Error
-    try {
-      return await this.dialDirectly(ma, options)
-    } catch (err) {
-      if (err.type === 'aborted') {
-        throw err
+    if (['ip4', 'ip6', 'dns4', 'dns6'].includes(ma.protoNames()[0])) {
+      try {
+        return await this.dialDirectly(ma, options)
+      } catch (err) {
+        if (err.type === 'aborted') {
+          throw err
+        }
+        error = err
       }
-      error = err
     }
-
-    const destination = PeerId.createFromCID(ma.getPeerId())
 
     if (this.relays === undefined) {
       throw Error(
-        `Could not connect ${chalk.yellow(
-          ma.toString()
-        )} because there was no relay defined. Connection error was:\n${error}`
+        `Could not connect ${chalk.yellow(ma.toString())} because there was no relay defined.${
+          error != null ? ` Connection error was:\n${error}` : ''
+        }`
       )
     }
+
+    const destination = PeerId.createFromCID(ma.getPeerId())
 
     // Check whether we know some relays that we can use
     const potentialRelays = this.relays?.filter((peerInfo: PeerInfo) => !peerInfo.id.isEqual(destination))
@@ -438,7 +440,9 @@ class TCP {
       throw Error(
         `Destination ${chalk.yellow(
           ma.toString()
-        )} cannot be accessed and directly and there is no other relay node known. Connection error was:\n${error}`
+        )} cannot be accessed and directly and there is no other relay node known.${
+          error != null ? ` Connection error was:\n${error}` : ''
+        }`
       )
     }
 
