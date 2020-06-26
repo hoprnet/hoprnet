@@ -240,11 +240,11 @@ class TCP {
 
       try {
         conn = await Promise.race([
-          this.handleWebRTC(srcBuffer, sinkBuffer).then((conn: Connection) => {
+          this.handleWebRTC(srcBuffer, sinkBuffer).then(async (rawSocket: Socket) => {
             clearTimeout(timeout)
             srcBuffer.end()
             sinkBuffer.end()
-            return conn
+            return await this._upgrader.upgradeInbound(socketToConn(rawSocket))
           }),
           this._upgrader.upgradeInbound(this.relayToConn(relayConn)),
         ])
@@ -347,8 +347,8 @@ class TCP {
     }
   }
 
-  handleWebRTC(srcBuffer: Pushable<Uint8Array>, sinkBuffer: Pushable<Uint8Array>): Promise<Connection> {
-    return new Promise<Connection>(async (resolve) => {
+  handleWebRTC(srcBuffer: Pushable<Uint8Array>, sinkBuffer: Pushable<Uint8Array>): Promise<Socket> {
+    return new Promise<Socket>(async (resolve) => {
       let channel: SimplePeerInstance
       if (this._useOwnStunServers) {
         channel = new Peer({ wrtc, trickle: true, config: { iceServers: this.stunServers } })
@@ -356,7 +356,7 @@ class TCP {
         channel = new Peer({ wrtc, trickle: true })
       }
 
-      const done = async (err?: Error, conn?: Connection) => {
+      const done = async (err?: Error) => {
         channel.removeListener('connect', onConnect)
         channel.removeListener('error', onError)
         channel.removeListener('signal', onSignal)
@@ -365,7 +365,7 @@ class TCP {
           await this._timeoutIntentionallyOnWebRTC
         } else {
           if (!err && !this._failIntentionallyOnWebRTC) {
-            resolve(conn)
+            setImmediate(resolve, (channel as unknown) as Socket)
           }
         }
       }
@@ -376,7 +376,7 @@ class TCP {
 
       const onConnect = async () => {
         log(`WebRTC counterparty connection established`)
-        done(undefined, await this._upgrader.upgradeInbound(socketToConn((channel as unknown) as Socket)))
+        done()
       }
 
       const onError = (err?: Error) => {
@@ -450,14 +450,14 @@ class TCP {
     sinkBuffer: Pushable<Uint8Array>,
     counterparty: PeerId,
     options?: { signal: AbortSignal }
-  ): Promise<Connection> {
+  ): Promise<Socket> {
     log(`Trying WebRTC with peer ${counterparty.toB58String()}`)
 
     if (options.signal && options.signal.aborted) {
       throw new AbortError()
     }
 
-    return new Promise<Connection>(async (resolve, reject) => {
+    return new Promise<Socket>(async (resolve, reject) => {
       let channel: SimplePeerInstance
 
       if (this._useOwnStunServers) {
@@ -475,7 +475,7 @@ class TCP {
         })
       }
 
-      const done = async (err?: Error, conn?: Connection) => {
+      const done = async (err?: Error) => {
         channel.removeListener('connect', onConnect)
         channel.removeListener('error', onError)
         channel.removeListener('signal', onSignal)
@@ -487,7 +487,7 @@ class TCP {
         options.signal?.removeEventListener('abort', onAbort)
 
         if (!err && !this._failIntentionallyOnWebRTC) {
-          resolve(conn)
+          setImmediate(resolve, (channel as unknown) as Socket)
         }
       }
 
@@ -498,23 +498,14 @@ class TCP {
       }
 
       const onSignal = (data: string): void => {
-        if (options.signal?.aborted) {
-          return
+        if (!options.signal?.aborted) {
+          sinkBuffer.push(this._encoder.encode(JSON.stringify(data)))
         }
-        sinkBuffer.push(this._encoder.encode(JSON.stringify(data)))
       }
 
       const onConnect = async (): Promise<void> => {
         log(`WebRTC connection with ${counterparty.toB58String()} was successful`)
-        done(
-          undefined,
-          await this._upgrader.upgradeOutbound(
-            socketToConn((channel as unknown) as Socket, {
-              signal: options.signal,
-              remoteAddr: Multiaddr(`/p2p/${counterparty.toB58String()}`),
-            })
-          )
-        )
+        done()
       }
 
       const onError = (err?: Error) => {
@@ -522,7 +513,7 @@ class TCP {
         done(err)
       }
 
-      if (options.signal && options.signal.aborted) {
+      if (options.signal?.aborted) {
         return reject(new AbortError())
       }
 
@@ -641,12 +632,19 @@ class TCP {
 
       try {
         conn = await Promise.race([
-          this.tryWebRTC(srcBuffer, sinkBuffer, destination, { signal: options.signal }).then((conn: Connection) => {
-            clearTimeout(timeout)
-            srcBuffer.end()
-            sinkBuffer.end()
-            return conn
-          }),
+          this.tryWebRTC(srcBuffer, sinkBuffer, destination, { signal: options.signal }).then(
+            async (rawSocket: Socket) => {
+              clearTimeout(timeout)
+              srcBuffer.end()
+              sinkBuffer.end()
+              return await this._upgrader.upgradeOutbound(
+                socketToConn(rawSocket, {
+                  signal: options.signal,
+                  remoteAddr: Multiaddr(`/p2p/${destination.toB58String()}`),
+                })
+              )
+            }
+          ),
           this._upgrader.upgradeOutbound(this.relayToConn(relayConn)),
         ])
       } catch (err) {
