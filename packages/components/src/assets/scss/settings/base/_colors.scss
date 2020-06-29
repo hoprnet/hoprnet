@@ -2,33 +2,33 @@
 
 // The color palette
 $palette: (
-	light: (
-		1: #FFFFFF,
-		2: #F9FAFC,
-		3: #E9ECF8
+  light: (
+    1: #ffffff,
+    2: #f9fafc,
+    3: #e9ecf8,
+  ),
+  dark: (
+    1: #003a4b,
+    2: #164856,
+    3: #e9ecf8,
+  ),
+  primary: (
+    1: #005a73,
+    2: #53a3b9,
+    3: #2e9ab9,
+    4: #e9ecf8,
+  ),
+  secondary: (
+    1: #e9ecf8,
+    2: #2e9ab9,
+    3: #53a3b9,
+    4: #005a73,
 	),
-	dark: (
-		1: #003A4B,
-		2: #164856,
-		3: #E9ECF8
-	),
-	primary: (
-		1: #005A73,
-		2: #53A3B9,
-		3: #2E9AB9,
-		4: #E9ECF8
- 	),
-	secondary: (
-		1: #E9ECF8,
-		2: #2E9AB9,
-		3: #53A3B9,
-		4: #005A73,
-	),
-	alert: (
-		error: #FF6F66,
-		warning: #FFCD6E,
-		success: #2E9AB9
-	)
+  alert: (
+    error: #ff6f66,
+    warning: #ffcd6e,
+    success: #2e9ab9,
+  ),
 );
 
 // Base typography: color

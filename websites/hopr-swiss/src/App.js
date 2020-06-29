@@ -9,7 +9,6 @@ import LayoutDefault from './layouts/LayoutDefault'
 import Home from './views/Home'
 import HOPR from './views/HOPR'
 import WeAre from './views/WeAre'
-import ForYou from './views/ForYou'
 
 const { AppRoute, ScrollReveal, ScrollToTop, insertScript } = utils
 const { Disclaimer } = views
@@ -43,7 +42,6 @@ class App extends React.Component {
               <AppRoute exact path="/" component={Home} layout={LayoutDefault} />
               <AppRoute exact path="/hopr" component={HOPR} layout={LayoutDefault} />
               <AppRoute exact path="/we_are" component={WeAre} layout={LayoutDefault} />
-              <AppRoute exact path="/for_you" component={ForYou} layout={LayoutDefault} />
               <AppRoute exact path="/disclaimer" component={Disclaimer} layout={LayoutDefault} />
             </Switch>
           )}

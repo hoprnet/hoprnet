@@ -242,6 +242,8 @@ const ProfilesAssociation = () => {
         </div>
       </div>
 
+      {!isCompany && <p>HOPR is a digital commons</p>}
+
       <div className="tiles-item reveal-from-bottom" data-reveal-container=".tiles-wrap" data-reveal-delay="300">
         <div className="tiles-item-inner">
           <a href="https://hopr.swiss/hopr/#team/" target="_blank" rel="noopener noreferrer">
@@ -249,7 +251,7 @@ const ProfilesAssociation = () => {
               <div className="team-item-image mb-24 ">
                 <Image
                   src={require('./../assets/images/logo.png')}
-                  alt="HOPR Services LTD Avatars"
+                  alt="HOPR Services AG Avatars"
                   width={180}
                   height={180}
                 />
@@ -257,7 +259,7 @@ const ProfilesAssociation = () => {
             </div>
           </a>
           <div className="team-item-content">
-            <h5 className="team-item-name mt-0 mb-4">HOPR Services LTD</h5>
+            <h5 className="team-item-name mt-0 mb-4">HOPR Services AG</h5>
             <div className="team-item-role text-xs fw-500 mb-8">Platform development</div>
           </div>
         </div>
