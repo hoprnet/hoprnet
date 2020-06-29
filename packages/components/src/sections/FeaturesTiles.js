@@ -115,71 +115,75 @@ class FeaturesTiles extends React.Component {
               </div>
             </div>
 
-            <SectionHeader data={sectionHeader2} className="center-content" />
-            <div className={tilesClasses}>
-              <div
-                className="tiles-item reveal-from-bottom"
-                data-reveal-container=".tiles-wrap"
-                data-reveal-delay="200"
-              >
-                <a href="/we_are#community">
-                  <div className="tiles-item-inner">
-                    <div className="features-tiles-item-header">
-                      <p className="mt-0 mb-24 text-sm">Personal</p>
-                      <div className="features-tiles-item-image mb-16">
-                        <Image
-                          src={require('../assets/images/icons/love-heart-keyhole@140x140.png')}
-                          alt="Heart Icon"
-                          width={56}
-                          height={56}
-                        />
+            {!isCompany && (
+              <>
+                <SectionHeader data={sectionHeader2} className="center-content" />
+                <div className={tilesClasses}>
+                  <div
+                    className="tiles-item reveal-from-bottom"
+                    data-reveal-container=".tiles-wrap"
+                    data-reveal-delay="200"
+                  >
+                    <a href="/we_are#community">
+                      <div className="tiles-item-inner">
+                        <div className="features-tiles-item-header">
+                          <p className="mt-0 mb-24 text-sm">Personal</p>
+                          <div className="features-tiles-item-image mb-16">
+                            <Image
+                              src={require('../assets/images/icons/love-heart-keyhole@140x140.png')}
+                              alt="Heart Icon"
+                              width={56}
+                              height={56}
+                            />
+                          </div>
+                        </div>
+                        <div className="features-tiles-item-content">
+                          <h4 className="mt-0 mb-8">Hackathons + Community</h4>
+                          <p className="m-0 text-sm">
+                            We're organizing events to grow our network and give back to the Community
+                            <br />
+                            <span className="text-color-high">(coming mid-July 2020)</span>.
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                    <div className="features-tiles-item-content">
-                      <h4 className="mt-0 mb-8">Hackathons + Community</h4>
-                      <p className="m-0 text-sm">
-                        We're organizing events to grow our network and give back to the Community
-                        <br />
-                        <span className="text-color-high">(coming mid-July 2020)</span>.
-                      </p>
-                    </div>
+                    </a>
                   </div>
-                </a>
-              </div>
 
-              <a
-                href={isCompany ? 'mailto:rik.krieger@hoprnet.io?subject=Partnership' : undefined}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <div
-                  className="tiles-item reveal-from-bottom"
-                  data-reveal-container=".tiles-wrap"
-                  data-reveal-delay="300"
-                >
-                  <div className="tiles-item-inner">
-                    <div className="features-tiles-item-header">
-                      <p className="mt-0 mb-24 text-sm">Professional</p>
-                      <div className="features-tiles-item-image mb-16">
-                        <Image
-                          src={require('../assets/images/icons/building-modern@140x140.png')}
-                          alt="Modern Building Icon"
-                          width={56}
-                          height={56}
-                        />
+                  <a
+                    href={isCompany ? 'mailto:rik.krieger@hoprnet.io?subject=Partnership' : undefined}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <div
+                      className="tiles-item reveal-from-bottom"
+                      data-reveal-container=".tiles-wrap"
+                      data-reveal-delay="300"
+                    >
+                      <div className="tiles-item-inner">
+                        <div className="features-tiles-item-header">
+                          <p className="mt-0 mb-24 text-sm">Professional</p>
+                          <div className="features-tiles-item-image mb-16">
+                            <Image
+                              src={require('../assets/images/icons/building-modern@140x140.png')}
+                              alt="Modern Building Icon"
+                              width={56}
+                              height={56}
+                            />
+                          </div>
+                        </div>
+                        <div className="features-tiles-item-content">
+                          <h4 className="mt-0 mb-8">Your company</h4>
+                          <p className="m-0 text-sm">
+                            HOPR is looking for partners who want to benefit from our network. If data privacy is
+                            important to you, get in touch.
+                          </p>
+                        </div>
                       </div>
                     </div>
-                    <div className="features-tiles-item-content">
-                      <h4 className="mt-0 mb-8">Your company</h4>
-                      <p className="m-0 text-sm">
-                        HOPR is looking for partners who want to benefit from our network. If data privacy is important
-                        to you, get in touch.
-                      </p>
-                    </div>
-                  </div>
+                  </a>
                 </div>
-              </a>
-            </div>
+              </>
+            )}
           </div>
         </div>
       </section>

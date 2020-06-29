@@ -11,6 +11,8 @@ const defaultProps = {
   ...SectionProps.defaults,
 }
 
+const isCompany = process.env.REACT_APP_IS_COMPANY === 'TRUE'
+
 class HeroFull extends React.Component {
   render() {
     const {
@@ -45,13 +47,19 @@ class HeroFull extends React.Component {
           <div className={innerClasses}>
             <div className="hero-content">
               <h1 className="mt-0 mb-16 reveal-from-top" data-reveal-delay="150">
-                HOPR
+                {isCompany ? 'HOPR Services' : 'HOPR'}
               </h1>
               <div className="container-sm">
                 <p className="m-0 mb-32 reveal-from-top" data-reveal-delay="300">
-                  We care about data privacy.
-                  <br />
-                  That's why we're building the HOPR network.
+                  {isCompany ? (
+                    "We're proud to build the HOPR network for the HOPR Association."
+                  ) : (
+                    <>
+                      We care about data privacy.
+                      <br />
+                      That's why we're building the HOPR network.
+                    </>
+                  )}
                 </p>
               </div>
             </div>

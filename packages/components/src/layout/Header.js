@@ -22,6 +22,8 @@ const defaultProps = {
   bottomDivider: false,
 }
 
+const isCompany = process.env.REACT_APP_IS_COMPANY === 'TRUE'
+
 class Header extends React.Component {
   state = {
     isActive: false,
@@ -118,11 +120,13 @@ class Header extends React.Component {
                           We Are
                         </Link>
                       </li>
-                      <li>
-                        <Link to="/for_you" onClick={this.closeMenu}>
-                          For You
-                        </Link>
-                      </li>
+                      {!isCompany && (
+                        <li>
+                          <Link to="/for_you" onClick={this.closeMenu}>
+                            For You
+                          </Link>
+                        </li>
+                      )}
                     </ul>
                     {!hideSignin && (
                       <ul className="list-reset header-nav-right">
