@@ -176,7 +176,7 @@ Depending on your configuration and version of **HOPR Chat**, you might need to 
 
 ### Using Nodejs
 
-To run **HOPR Chat** via Nodejs**,** you need to download our pre-compiled binary for each version. You can find these binaries in our [Releases](https://github.com/hoprnet/hopr-core/releases) page inside a zip file. Version `1.1.0-testnet` used for generating this documentation is available [here](https://github.com/hoprnet/hopr-core/releases/tag/1.1.0-testnet.f17a5eb).
+To run **HOPR Chat** via Nodejs**,** you need to download our pre-compiled binary for each version. You can find these binaries in our [Releases](https://github.com/hoprnet/hopr-core/releases) page inside a zip file. Version `1.1.4-dev` used for generating this documentation is available [here](https://github.com/hoprnet/hopr-core/releases/tag/1.1.4-dev.64c3c2b).
 
 ![Please select the correct distribution for your operating system.](../../.gitbook/assets/image%20%288%29.png)
 
