@@ -11,6 +11,8 @@ const defaultProps = {
   ...SectionTilesProps.defaults,
 }
 
+const isCompany = process.env.REACT_APP_IS_COMPANY === 'TRUE'
+
 class TeamAndInvestors extends React.Component {
   render() {
     const {
@@ -57,15 +59,31 @@ class TeamAndInvestors extends React.Component {
                 </a>
               </div>
             </div>
-            <div className="tiles-item reveal-from-top">
-              <div className="tiles-item-content center-content-mobile">
-                HOPR is a digital commons built by and for an open community that has no single owner or single point of
-                failure. At the same time delivery of complex software projects needs commitment and accountability.
-                <br />
-                Therefore the HOPR Association provided a first grant to the HOPR Services AG to develop and support a
-                first version of the HOPR protocol in Typescript to bootstrap the ecosystem.
+
+            {isCompany ? null : (
+              // <div className="tiles-item reveal-from-top">
+              //   <div className="tiles-item-content center-content-mobile">
+              //     <a href="/hopr/#investors">
+              //       <h3 className="mt-0 mb-0" data-reveal-container=".tiles-item">
+              //         Investors
+              //       </h3>
+              //       <div className="has-shadow has-bg-color invert-color card" style={{ backgroundColor: '#2E9AB9' }}>
+              //         <Image src={require('../assets/images/cards/investors-card.png')} />
+              //       </div>
+              //     </a>
+              //   </div>
+              // </div>
+              <div className="tiles-item reveal-from-top">
+                <div className="tiles-item-content center-content-mobile">
+                  HOPR is a digital commons built by and for an open community that has no single owner or single point
+                  of failure. At the same time delivery of complex software projects needs commitment and
+                  accountability.
+                  <br />
+                  Therefore the HOPR Association provided a first grant to the HOPR Services AG to develop and support a
+                  first version of the HOPR protocol in Typescript to bootstrap the ecosystem.
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </section>
