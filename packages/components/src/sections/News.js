@@ -59,7 +59,7 @@ class News extends React.Component {
                 <div className="tiles-item-inner has-shadow">
                   <figure className="news-item-image m-0">
                     <Image
-                      src={require('./../assets/images/news-image-01.jpg')}
+                      src={require('./../assets/images/team/jose_aguinaga.jpg')}
                       alt="News 01"
                       width={344}
                       height={194}
@@ -87,7 +87,7 @@ class News extends React.Component {
                 <div className="tiles-item-inner has-shadow">
                   <figure className="news-item-image m-0">
                     <Image
-                      src={require('./../assets/images/news-image-02.jpg')}
+                      src={require('./../assets/images/team/jose_aguinaga.jpg')}
                       alt="News 02"
                       width={344}
                       height={194}
@@ -115,7 +115,7 @@ class News extends React.Component {
                 <div className="tiles-item-inner has-shadow">
                   <figure className="news-item-image m-0">
                     <Image
-                      src={require('./../assets/images/news-image-03.jpg')}
+                      src={require('./../assets/images/team/jose_aguinaga.jpg')}
                       alt="News 03"
                       width={344}
                       height={194}

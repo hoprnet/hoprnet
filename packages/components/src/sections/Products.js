@@ -12,6 +12,8 @@ const defaultProps = {
   ...SectionTilesProps.defaults,
 }
 
+const isCompany = process.env.REACT_APP_IS_COMPANY === 'TRUE'
+
 class Products extends React.Component {
   render() {
     const {
@@ -44,14 +46,14 @@ class Products extends React.Component {
     const tilesClasses = classNames('tiles-wrap', pushLeft && 'push-left')
 
     const sectionHeader = {
-      title: 'Products:',
+      title: isCompany ? 'Products' : 'Use Cases',
       paragraph: (
         <>
           <p>
             HOPR keeps any exchange of data private.
             <br />
             The{' '}
-            <a href="/we_are#how" target="_blank" rel="noopener noreferrer">
+            <a href="/we_are#how">
               <span className="text-color-high">HOPR protocol</span>
             </a>{' '}
             is a layer-0 privacy foundation for anyone to{' '}
@@ -93,7 +95,7 @@ class Products extends React.Component {
                     </div>
                   </div>
                   <div className="features-tiles-item-content">
-                    <h4 className="mt-0 mb-24">Connect devices and clouds:</h4>
+                    <h4 className="mt-0 mb-24">Connect devices and clouds</h4>
                     <ol>
                       <li>
                         exchange health data between{' '}
@@ -136,7 +138,7 @@ class Products extends React.Component {
                     </div>
                   </div>
                   <div className="features-tiles-item-content">
-                    <h4 className="mt-0 mb-24">Make crypto assets private:</h4>
+                    <h4 className="mt-0 mb-24">Make crypto assets private</h4>
                     <ol>
                       <li>
                         complement{' '}
@@ -180,7 +182,7 @@ class Products extends React.Component {
                     </div>
                   </div>
                   <div className="features-tiles-item-content">
-                    <h4 className="mt-0 mb-24">Digitalization without privacy concerns:</h4>
+                    <h4 className="mt-0 mb-24">Digitalization without privacy concerns</h4>
                     <ol>
                       <li>securely access private documents</li>
                       <li>

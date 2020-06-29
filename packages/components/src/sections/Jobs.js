@@ -15,6 +15,8 @@ const defaultProps = {
   ...SectionProps.defaults,
 }
 
+const isCompany = process.env.REACT_APP_IS_COMPANY === 'TRUE'
+
 class Jobs extends React.Component {
   componentDidMount() {
     // add jobbase iframe
@@ -27,8 +29,8 @@ class Jobs extends React.Component {
         <div className="container-sm">
           <SectionHeader
             data={{
-              title: 'Jobs:',
-              paragraph: 'Want to join our team?',
+              title: 'Jobs',
+              paragraph: isCompany ? 'Want to join our team?' : 'Companies building the HOPR ecosystem',
             }}
             className="center-content"
           />

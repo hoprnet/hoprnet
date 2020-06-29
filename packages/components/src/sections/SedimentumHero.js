@@ -1,6 +1,7 @@
 import React from 'react'
 import PropTypes from 'prop-types'
 import GenericSection from './GenericSection'
+import SedimentumTestimonial from './SedimentumTestimonial'
 import Image from '../elements/Image'
 import { SectionProps } from '../utils/SectionProps'
 
@@ -40,16 +41,17 @@ const Sedimentum = props => {
             <div className="mb-32 hero-figure reveal-from-top" data-reveal-delay="200">
               <Image
                 className="has-shadow"
-                src={require('../assets/images/partners/sedimentum.png')}
+                src={require('../assets/images/partners/sedimentum_colored.jpg')}
                 alt="Hero"
-                width={896}
-                height={504}
+                width={896 * 0.7}
+                height={504 * 0.7}
                 style={{
                   borderRadius: '15px',
                 }}
               />
             </div>
           </div>
+          <SedimentumTestimonial />
         </div>
       </GenericSection>
       <GenericSection id="video" {...oddSections}>
@@ -209,29 +211,31 @@ const Sedimentum = props => {
               display: 'flex',
               justifyContent: 'center',
               alignItems: 'center',
+              flexDirection: 'column',
             }}
           >
             <div className="mb-32 hero-figure reveal-from-top" data-reveal-delay="200">
               <Image
                 className="has-shadow"
-                src={require('../assets/images/partners/sedimentum.png')}
+                src={require('../assets/images/partners/sedimentum_colored.jpg')}
                 alt="Hero"
-                width={896 / 3.5}
-                height={504 / 3.5}
+                width={896 / 2}
+                height={504 / 2}
                 style={{
                   borderRadius: '15px',
                 }}
               />
-              <div className="mt-32" style={{ textAlign: 'left' }}>
-                Contact Sedimentum
+            </div>
+            <div className="mt-32" style={{ display: 'flex', width: '100%', justifyContent: 'space-evenly' }}>
+              <div style={{ textAlign: 'left' }}>
+                Contact Sedimentum AG
                 <br />
                 <br />
-                Call: +41 78 878 33 29
-                <br />
-                Sumpfstrasse 26, Postfach, 6302 Zug, Switzerland
+                Sumpfstrasse 26, 6302 Zug
                 <br />
                 Email: info@sedimentum.com
               </div>
+              <div>job portal</div>
             </div>
           </div>
         </div>

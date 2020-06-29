@@ -13,6 +13,8 @@ const defaultProps = {
   ...SectionProps.defaults,
 }
 
+const isCompany = process.env.REACT_APP_IS_COMPANY === 'TRUE'
+
 class FeaturesTabs extends React.Component {
   render() {
     const {
@@ -44,7 +46,7 @@ class FeaturesTabs extends React.Component {
     )
 
     const sectionHeader = {
-      title: 'HOPR for:',
+      title: 'HOPR for',
       paragraph: undefined,
     }
 
@@ -72,7 +74,7 @@ class FeaturesTabs extends React.Component {
                   </a>
                 </Tab>
                 <Tab tabId="tab-c" className={redirect ? 'is-active' : undefined}>
-                  <a href="http://docs.hoprnet.io/" target="_blank" rel="noopener noreferrer">
+                  <a href="http://docs.hoprnet.org/" target="_blank" rel="noopener noreferrer">
                     <div className="features-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="150">
                       <Image
                         src={require('../assets/images/icons/programming-team-chat-3@140x140.png')}
@@ -83,7 +85,11 @@ class FeaturesTabs extends React.Component {
                   </a>
                 </Tab>
                 <Tab tabId="tab-d" className={redirect ? 'is-active' : undefined}>
-                  <a href="mailto:rik.krieger@hoprnet.io?subject=Partnership" target="_blank" rel="noopener noreferrer">
+                  <a
+                    href={isCompany ? 'mailto:rik.krieger@hoprnet.io?subject=Partnership' : undefined}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
                     <div className="features-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="200">
                       <Image
                         src={require('../assets/images/icons/light-bulb-shine@140x140.png')}
@@ -94,11 +100,11 @@ class FeaturesTabs extends React.Component {
                   </a>
                 </Tab>
                 <Tab tabId="tab-e" className={redirect ? 'is-active' : undefined}>
-                  <a href="http://docs.hoprnet.io/" target="_blank" rel="noopener noreferrer">
+                  <a href="http://docs.hoprnet.org/" target="_blank" rel="noopener noreferrer">
                     <div className="features-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="250">
                       <Image src={require('../assets/images/icons/outdoors-mining@140x140.png')} alt="Pickaxe Icon" />
                     </div>
-                    <div className="text-color-high text-sm">Miners & Relayers</div>
+                    <div className="text-color-high text-sm">Miners & Stakers</div>
                   </a>
                 </Tab>
                 <Tab tabId="tab-f" className={redirect ? 'is-active' : undefined}>

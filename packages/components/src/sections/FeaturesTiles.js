@@ -12,6 +12,8 @@ const defaultProps = {
   ...SectionTilesProps.defaults,
 }
 
+const isCompany = process.env.REACT_APP_IS_COMPANY === 'TRUE'
+
 class FeaturesTiles extends React.Component {
   render() {
     const {
@@ -45,12 +47,12 @@ class FeaturesTiles extends React.Component {
     const tilesClasses = classNames('tiles-wrap', pushLeft && 'push-left')
 
     const sectionHeader = {
-      title: 'HOPR is:',
+      title: 'HOPR is',
       paragraph: undefined,
     }
 
     const sectionHeader2 = {
-      title: 'We want you to grow:',
+      title: 'We want you to grow',
       paragraph: undefined,
     }
 
@@ -61,7 +63,7 @@ class FeaturesTiles extends React.Component {
             <SectionHeader data={sectionHeader} className="center-content" />
             <div className={tilesClasses}>
               <div className="tiles-item reveal-from-bottom" data-reveal-container=".tiles-wrap">
-                <a href="/we_are#enabling_data_privacy" target="_blank" rel="noopener noreferrer">
+                <a href="/we_are#enabling_data_privacy">
                   <div className="tiles-item-inner">
                     <div className="features-tiles-item-header">
                       <div className="features-tiles-item-image mb-16">
@@ -89,7 +91,7 @@ class FeaturesTiles extends React.Component {
                 data-reveal-container=".tiles-wrap"
                 data-reveal-delay="100"
               >
-                <a href="/we_are#open_source_support" target="_blank" rel="noopener noreferrer">
+                <a href="/we_are#open_source_support">
                   <div className="tiles-item-inner">
                     <div className="features-tiles-item-header">
                       <div className="features-tiles-item-image mb-16">
@@ -120,7 +122,7 @@ class FeaturesTiles extends React.Component {
                 data-reveal-container=".tiles-wrap"
                 data-reveal-delay="200"
               >
-                <a href="/we_are#community" target="_blank" rel="noopener noreferrer">
+                <a href="/we_are#community">
                   <div className="tiles-item-inner">
                     <div className="features-tiles-item-header">
                       <p className="mt-0 mb-24 text-sm">Personal</p>
@@ -145,7 +147,11 @@ class FeaturesTiles extends React.Component {
                 </a>
               </div>
 
-              <a href="mailto:rik.krieger@hoprnet.io?subject=Partnership" target="_blank" rel="noopener noreferrer">
+              <a
+                href={isCompany ? 'mailto:rik.krieger@hoprnet.io?subject=Partnership' : undefined}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 <div
                   className="tiles-item reveal-from-bottom"
                   data-reveal-container=".tiles-wrap"

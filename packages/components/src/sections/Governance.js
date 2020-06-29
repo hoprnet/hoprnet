@@ -19,7 +19,7 @@ const Governance = props => {
       <div className="governance center-content">
         <div className="container-sm">
           <h2 className="section-header mt-0 mb-0 reveal-from-top" data-reveal-delay="150">
-            Governance:
+            Governance
           </h2>
           <div className="container reveal-from-top" data-reveal-delay="300">
             <div className="column">

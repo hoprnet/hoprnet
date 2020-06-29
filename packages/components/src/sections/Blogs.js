@@ -44,7 +44,7 @@ class Blogs extends React.Component {
     )
 
     const sectionHeader = {
-      title: 'HOPR blogs:',
+      title: 'HOPR blogs',
       paragraph: undefined,
     }
 
@@ -54,7 +54,7 @@ class Blogs extends React.Component {
           <div className={innerClasses}>
             <SectionHeader data={sectionHeader} className="center-content" />
             <Tabs active={!redirect ? 'tab-a' : undefined}>
-              <a href="/for_you#blog" target="_blank" rel="noopener noreferrer">
+              <a href="/for_you#blog">
                 <TabList>
                   <Tab tabId="tab-a" className={redirect ? 'is-active' : undefined}>
                     <div className="blogs-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="50">

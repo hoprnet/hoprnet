@@ -21,7 +21,7 @@ const Enabling = props => {
         <div className="center-content">
           <div className="container-sm">
             <h2 className="section-header mt-0 mb-0 reveal-from-top" data-reveal-delay="150">
-              Enabling Data Privacy:
+              Enabling Data Privacy
             </h2>
             <div className="mb-32 hero-figure reveal-from-top" data-reveal-delay="200">
               <Image
@@ -57,7 +57,7 @@ const Enabling = props => {
         <div className="center-content">
           <div className="container-sm">
             <h2 className="section-header mt-0 mb-0 reveal-from-top" data-reveal-delay="150">
-              How? The HOPR protocol:
+              How? The HOPR protocol
             </h2>
             <div className="container reveal-from-top" data-reveal-delay="300">
               <div className="column">

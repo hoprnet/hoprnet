@@ -5,15 +5,14 @@ on:
     branches:
       - master
   pull_request:
-    branches:
-      - master
+    branches: [master, develop]
 
 jobs:
   website:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        site: [hoprnet-io, hoprnet-org]
+        site: [hopr-swiss, hoprnet-org]
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v1

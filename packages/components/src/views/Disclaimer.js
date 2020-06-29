@@ -1,17 +1,16 @@
 import React from 'react'
 import { sections } from '@hoprnet/hopr-website.components'
 
-const { NodeHero, RequestTestnet } = sections
+const { Disclaimer } = sections
 
-class Node extends React.Component {
+class Home extends React.Component {
   render() {
     return (
       <React.Fragment>
-        <NodeHero />
-        <RequestTestnet hasBgColor invertColor />
+        <Disclaimer />
       </React.Fragment>
     )
   }
 }
 
-export default Node
+export default Home

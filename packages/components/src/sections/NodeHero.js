@@ -71,7 +71,8 @@ const NodeHero = props => {
         <div className="center-content">
           <div className="container-sm">
             <h2 className="section-header mt-0 mb-0 reveal-from-top" data-reveal-delay="150">
-              Mining PC:
+              Get your own HOPR mini PC
+              <h4>Earn HOPR token for supporting the network</h4>
             </h2>
             <div className="container reveal-from-top" data-reveal-delay="300">
               The HOPR privacy network relies on a globally distributed network of mix nodes. To support and rapidly
@@ -95,7 +96,7 @@ const NodeHero = props => {
         /> */}
             <iframe
               title="Order a HOPR node"
-              src="https://docs.google.com/forms/d/e/1FAIpQLSc-3tJTsrJtxFD4B9DwaY6V3165Z0sicut4yb9D4NryqsRJhQ/viewform?embedded=true"
+              src="https://docs.google.com/forms/d/e/1FAIpQLSc-3tJTsrJtxFD4B9DwaY6V3165Z0sicut4yb9D4NryqsRJhQ/viewform?embedded=true&hl=en"
               width="700"
               height="650"
               frameBorder="0"
@@ -111,7 +112,7 @@ const NodeHero = props => {
         <div className="center-content">
           <div className="container-sm">
             <h2 className="section-header mt-0 mb-0 reveal-from-top" data-reveal-delay="150">
-              REMARKS:
+              REMARKS
             </h2>
 
             <ol style={{ textAlign: 'left' }}>
@@ -136,9 +137,9 @@ const NodeHero = props => {
         <div className="center-content">
           <div className="container-sm">
             <h2 className="section-header mt-0 mb-0 reveal-from-top" data-reveal-delay="150">
-              <span style={{ color: '#53A3B9' }}>Jump the waitlist:</span>
+              <span style={{ color: '#53A3B9' }}>Jump the waitlist</span>
               <br />
-              Gitcoin Bounties:
+              Gitcoin Bounties
             </h2>
             Why wouldn't you get paid for developing open source software? Check out our bounties on Gitcoin - some are
             fairly beginner-friendly while some require more in-depth knowledge of the HOPR protocol. HOPR is built by
@@ -153,7 +154,7 @@ const NodeHero = props => {
         <div className="center-content">
           <div className="container-sm">
             <h2 className="section-header mt-0 mb-0 reveal-from-top" data-reveal-delay="150">
-              Enabling Data Privacy:
+              Enabling Data Privacy
             </h2>
             We're past the tipping point for privacy. Lack of privacy isn't just a problem for individuals suffering at
             the hands of data harvesting social media giants. Data privacy has become a major societal and economic
