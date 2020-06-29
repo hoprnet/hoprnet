@@ -30,7 +30,7 @@ const Contact = props => {
       <div className="container-sm">
         <SectionHeader
           data={{
-            title: 'Want more? Get in touch:',
+            title: 'Want more? Get in touch!',
             paragraph: undefined,
           }}
           className="center-content"

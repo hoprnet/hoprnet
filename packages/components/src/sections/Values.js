@@ -44,7 +44,7 @@ class Values extends React.Component {
     const tilesClasses = classNames('tiles-wrap', pushLeft && 'push-left')
 
     const sectionHeader = {
-      title: 'Our HOPR Values:',
+      title: 'Our HOPR Values',
       paragraph: undefined,
     }
 

@@ -28,7 +28,7 @@ class Token extends React.Component {
           <div className="container-sm">
             <SectionHeader
               data={{
-                title: 'HOPR Token:',
+                title: 'HOPR Token',
                 paragraph: 'Want to know more about our token sale? Subscribe here:',
               }}
             />

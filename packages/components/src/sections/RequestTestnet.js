@@ -28,7 +28,7 @@ class RequestTestnet extends React.Component {
             />
             <iframe
               title="Request Testnet Access"
-              src="https://docs.google.com/forms/d/e/1FAIpQLScnOP3NqdL-5bmDKlmAfhhyx4DG7PZ7ji5UhRuMVhbhG1e6Cg/viewform?embedded=true"
+              src="https://docs.google.com/forms/d/e/1FAIpQLScnOP3NqdL-5bmDKlmAfhhyx4DG7PZ7ji5UhRuMVhbhG1e6Cg/viewform?embedded=true&hl=en"
               width="700"
               height="650"
               frameBorder="0"

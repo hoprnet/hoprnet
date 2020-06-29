@@ -1,6 +1,6 @@
 {
     "version": 2,
-    "alias": "hoprnet.io",
+    "alias": "hopr.swiss",
     "scope": "hoprnet",
     "builds": [{"src": "build/**", "use": "@now/static"}],
     "routes": [

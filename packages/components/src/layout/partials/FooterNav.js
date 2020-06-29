@@ -9,24 +9,21 @@ const FooterNav = ({ className, ...props }) => {
     <nav {...props} className={classes}>
       <ul className="list-reset">
         <li>
-          <Link to="/HOPR/#contact" target="_blank" rel="noopener noreferrer">
-            Contact
-          </Link>
+          <Link to="/HOPR/#contact">Contact</Link>
         </li>
         <li>
-          <Link to="/HOPR/#about" target="_blank" rel="noopener noreferrer">
-            About us
-          </Link>
+          <Link to="/HOPR/#about">About us</Link>
         </li>
         {/* <li>
-          <Link to="/faqs/" target="_blank" rel="noopener noreferrer">
+          <Link to="/faqs/" >
             FAQ's
           </Link>
         </li> */}
         <li>
-          <Link to="/for_you/#for_you" target="_blank" rel="noopener noreferrer">
-            Support
-          </Link>
+          <Link to="/for_you/#for_you">Support</Link>
+        </li>
+        <li>
+          <Link to="/disclaimer">Disclaimer</Link>
         </li>
       </ul>
     </nav>

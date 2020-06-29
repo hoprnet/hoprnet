@@ -8,7 +8,7 @@ class Node extends React.Component {
     return (
       <React.Fragment>
         <NodeHero />
-        <RequestTestnet hasBgColor invertColor />
+        {/* <RequestTestnet hasBgColor invertColor /> */}
       </React.Fragment>
     )
   }

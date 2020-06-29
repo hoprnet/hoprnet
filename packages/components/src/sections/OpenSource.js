@@ -21,7 +21,7 @@ const OpenSource = props => {
         <div className="center-content">
           <div className="container-sm">
             <h2 className="section-header mt-0 mb-0 reveal-from-top" data-reveal-delay="150">
-              Open Source Support:
+              Open Source Support
             </h2>
             <div className="open-source reveal-from-top" data-reveal-delay="300">
               At HOPR we embrace and live the ethos of free and open source software. Especially when making claims
@@ -148,7 +148,7 @@ const OpenSource = props => {
         <div className="center-content">
           <div className="container-sm">
             <h2 className="section-header mt-0 mb-0 reveal-from-top" data-reveal-delay="150">
-              Documentation:
+              Documentation
             </h2>
             <div className="description reveal-from-top" data-reveal-delay="300">
               Find out more on how to join the HOPR network, run your own node and dive deeper into how to BUIDL with
@@ -157,7 +157,7 @@ const OpenSource = props => {
             <Button
               color={props.invertColor ? 'secondary' : 'primary'}
               tag="a"
-              href="http://docs.hoprnet.io/"
+              href="http://docs.hoprnet.org/"
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -170,7 +170,7 @@ const OpenSource = props => {
         <div className="center-content">
           <div className="container-sm">
             <h2 className="section-header mt-0 mb-0 reveal-from-top" data-reveal-delay="150">
-              Gitcoin Bounties:
+              Gitcoin Bounties
             </h2>
             <div className="reveal-from-top" data-reveal-delay="300">
               Why wouldn't you get paid for developing open source software?

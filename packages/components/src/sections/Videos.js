@@ -21,7 +21,7 @@ const Videos = props => {
       <div className="center-content">
         <div className="container-sm">
           <h2 className="section-header mt-0 mb-0 reveal-from-top" data-reveal-delay="150">
-            Videos:
+            Videos
           </h2>
           <div className="reveal-from-top" data-reveal-delay="300">
             {youtubeIds.map(id => (

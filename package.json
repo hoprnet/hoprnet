@@ -7,11 +7,10 @@
   ],
   "scripts": {
     "bootstrap": "lerna bootstrap --use-workspaces",
-    "start:hoprnet.io": "lerna exec --scope @hoprnet/hopr-website.hoprnet.io -- yarn start",
+    "start:hopr.swiss": "lerna exec --scope @hoprnet/hopr-website.hopr.swiss -- yarn start",
     "start:hoprnet.org": "lerna exec --scope @hoprnet/hopr-website.hoprnet.org -- yarn start",
     "clean": "lerna clean",
-    "build": "lerna exec --parallel --scope @hoprnet/hopr-website.hoprnet* -- yarn build"
-    
+    "build": "lerna exec --parallel --scope @hoprnet/hopr-website.hopr* -- yarn build"
   },
   "devDependencies": {
     "lerna": "^3.22.1"
