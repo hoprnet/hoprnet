@@ -242,7 +242,7 @@ const ProfilesAssociation = () => {
         </div>
       </div>
 
-      {/* {!isCompany && <p>HOPR is a digital commons</p>} */}
+      {!isCompany && <div style={{ width: '100%' }}>HOPR is a digital commons</div>}
 
       <div className="tiles-item reveal-from-bottom" data-reveal-container=".tiles-wrap" data-reveal-delay="300">
         <div className="tiles-item-inner">

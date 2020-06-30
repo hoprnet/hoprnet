@@ -6,7 +6,7 @@ import { createBrowserHistory } from 'history'
 import App from './App'
 import * as serviceWorker from './serviceWorker'
 
-import '@hoprnet/hopr-website.components/src/assets/scss/style.scss'
+import '@hoprnet/hopr-website.components/src/assets/scss/hopr_swiss.scss'
 
 const history = createBrowserHistory()
 
