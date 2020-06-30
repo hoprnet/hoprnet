@@ -242,7 +242,11 @@ const ProfilesAssociation = () => {
         </div>
       </div>
 
-      {!isCompany && <div style={{ width: '100%' }}>HOPR is a digital commons</div>}
+      {!isCompany && (
+        <div className="mt-24" style={{ width: '100%' }}>
+          The HOPR protocol is a digital commons that is currently being built by HOPR Services AG
+        </div>
+      )}
 
       <div className="tiles-item reveal-from-bottom" data-reveal-container=".tiles-wrap" data-reveal-delay="300">
         <div className="tiles-item-inner">
