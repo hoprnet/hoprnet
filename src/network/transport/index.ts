@@ -16,6 +16,8 @@ import AbortController from 'abort-controller'
 // @ts-ignore
 import handshake = require('it-handshake')
 
+import myHandshake from './handshake'
+
 // @ts-ignore
 import libp2p = require('libp2p')
 
@@ -35,7 +37,7 @@ import Peer, { Instance as SimplePeerInstance } from 'simple-peer'
 import wrtc = require('wrtc')
 
 import { pubKeyToPeerId } from '../../utils'
-import { u8aEquals } from '@hoprnet/hopr-utils'
+import { u8aEquals, u8aConcat } from '@hoprnet/hopr-utils'
 
 import type {
   Connection,
@@ -60,9 +62,6 @@ const WEBRTC = '/hopr/webrtc/0.0.1'
 
 const OK = new TextEncoder().encode('OK')
 const FAIL = new TextEncoder().encode('FAIL')
-
-const WEBRTC_TRAFFIC_PREFIX = 1
-const REMAINING_TRAFFIC_PREFIX = 0
 
 /**
  * @class TCP
@@ -227,11 +226,7 @@ class TCP {
       const sinkBuffer = pushable<Uint8Array>()
       const srcBuffer = pushable<Uint8Array>()
 
-      const relayConn = {
-        stream: toAnnotatedStream(shaker.stream, sinkBuffer, srcBuffer),
-        counterparty: sender,
-        connection,
-      }
+      const stream = myHandshake(shaker.stream, sinkBuffer, srcBuffer)
 
       const timeout = setTimeout(() => {
         srcBuffer.end()
@@ -239,25 +234,41 @@ class TCP {
       }, WEBRTC_TIMEOUT)
 
       try {
-        conn = await Promise.race([
-          this.handleWebRTC(srcBuffer, sinkBuffer).then(async (rawSocket: Socket) => {
-            clearTimeout(timeout)
-            srcBuffer.end()
-            sinkBuffer.end()
-            return await this._upgrader.upgradeInbound(socketToConn(rawSocket))
-          }),
-          this._upgrader.upgradeInbound(this.relayToConn(relayConn)),
-        ])
-      } catch (err) {
+        pipe(shaker.stream, stream.webRtcStream)
+        pipe(stream.webRtcStream, shaker.stream)
+
+        console.log(`here after piping streams`)
+        let socket = await this.handleWebRTC(srcBuffer, sinkBuffer)
+
         clearTimeout(timeout)
-        error(err)
         srcBuffer.end()
         sinkBuffer.end()
-        return
+
+        conn = await this._upgrader.upgradeInbound(
+          socketToConn(socket, {
+            remoteAddr: Multiaddr(`/p2p/${sender.toB58String()}`),
+            localAddr: Multiaddr(`/p2p/${this._peerInfo.id.toB58String()}`),
+          })
+        )
+      } catch {
+        clearTimeout(timeout)
+        srcBuffer.end()
+        sinkBuffer.end()
+
+        conn = await this._upgrader
+          .upgradeInbound(
+            this.relayToConn({
+              stream: stream.relayStream,
+              counterparty: sender,
+              connection,
+            })
+          )
+          .catch()
       }
     } else {
+      const stream = myHandshake(shaker.stream, undefined, undefined)
       const relayConn = {
-        stream: toAnnotatedStream(shaker.stream, undefined, undefined),
+        stream: stream.relayStream,
         counterparty: sender,
         connection,
       }
@@ -371,6 +382,7 @@ class TCP {
       }
 
       const onSignal = (msg: string) => {
+        console.log('sending', msg)
         sinkBuffer.push(this._encoder.encode(JSON.stringify(msg)))
       }
 
@@ -392,7 +404,8 @@ class TCP {
         srcBuffer,
         async (source: AsyncIterable<Uint8Array>) => {
           for await (const msg of source) {
-            if (msg) {
+            console.log('receiving', msg)
+            if (msg != null) {
               channel.signal(JSON.parse(this._decoder.decode(msg.slice())))
             }
           }
@@ -457,7 +470,7 @@ class TCP {
   ): Promise<Socket> {
     log(`Trying WebRTC with peer ${counterparty.toB58String()}`)
 
-    if (options.signal && options.signal.aborted) {
+    if (options.signal?.aborted) {
       throw new AbortError()
     }
 
@@ -503,6 +516,7 @@ class TCP {
 
       const onSignal = (data: string): void => {
         if (!options.signal?.aborted) {
+          console.log('sending', data)
           sinkBuffer.push(this._encoder.encode(JSON.stringify(data)))
         }
       }
@@ -534,7 +548,9 @@ class TCP {
         srcBuffer,
         async (source: AsyncIterable<Uint8Array>) => {
           for await (const msg of source) {
-            if (msg) {
+            console.log('received message', msg)
+
+            if (msg != null) {
               channel.signal(JSON.parse(this._decoder.decode(msg.slice())))
             }
           }
@@ -614,11 +630,7 @@ class TCP {
       const sinkBuffer = pushable<Uint8Array>()
       const srcBuffer = pushable<Uint8Array>()
 
-      const relayConn = {
-        stream: toAnnotatedStream(shaker.stream, sinkBuffer, srcBuffer, { signal: options.signal }),
-        counterparty: destination,
-        connection: relayConnection,
-      }
+      const stream = myHandshake(shaker.stream, sinkBuffer, srcBuffer, { signal: options.signal })
 
       if (options.signal?.aborted) {
         try {
@@ -629,38 +641,50 @@ class TCP {
         throw new AbortError()
       }
 
-      const timeout = setTimeout(() => {
-        srcBuffer.end()
-        sinkBuffer.end()
-      }, WEBRTC_TIMEOUT)
-
       try {
-        conn = await Promise.race([
-          this.tryWebRTC(srcBuffer, sinkBuffer, destination, { signal: options.signal }).then(
-            async (rawSocket: Socket) => {
-              clearTimeout(timeout)
-              srcBuffer.end()
-              sinkBuffer.end()
-              return await this._upgrader.upgradeOutbound(
-                socketToConn(rawSocket, {
-                  signal: options.signal,
-                  remoteAddr: Multiaddr(`/p2p/${destination.toB58String()}`),
-                })
-              )
-            }
-          ),
-          this._upgrader.upgradeOutbound(this.relayToConn(relayConn)),
-        ])
+        const timeout = setTimeout(() => {
+          srcBuffer.end()
+          sinkBuffer.end()
+        }, WEBRTC_TIMEOUT)
+
+        try {
+          pipe(shaker.stream, stream.webRtcStream)
+          pipe(stream.webRtcStream, shaker.stream)
+
+          console.log(`after piping send streams`)
+          let socket = await this.tryWebRTC(srcBuffer, sinkBuffer, destination, { signal: options.signal })
+
+          clearTimeout(timeout)
+          srcBuffer.end()
+          sinkBuffer.end()
+
+          conn = await this._upgrader.upgradeOutbound(
+            socketToConn(socket, {
+              signal: options.signal,
+              remoteAddr: Multiaddr(`/p2p/${destination.toB58String()}`),
+              localAddr: Multiaddr(`/p2p/${this._peerInfo.id.toB58String()}`),
+            })
+          )
+        } catch {
+          clearTimeout(timeout)
+          srcBuffer.end()
+          sinkBuffer.end()
+
+          conn = await this._upgrader.upgradeOutbound(
+            this.relayToConn({
+              stream: stream.relayStream,
+              counterparty: destination,
+              connection: relayConnection,
+            })
+          )
+        }
       } catch (err) {
         error(err)
-        clearTimeout(timeout)
-        srcBuffer.end()
-        sinkBuffer.end()
-        throw err
+        return
       }
     } else {
       const relayConn = {
-        stream: toAnnotatedStream(shaker.stream, undefined, undefined, { signal: options.signal }),
+        stream: myHandshake(shaker.stream, undefined, undefined, { signal: options.signal }).relayStream,
         counterparty: destination,
         connection: relayConnection,
       }
@@ -789,65 +813,6 @@ class TCP {
     return multiaddrs.filter((ma: Multiaddr) => {
       return mafmt.TCP.matches(ma.decapsulateCode(CODE_P2P)) || mafmt.P2P.matches(ma)
     })
-  }
-}
-
-function toAnnotatedStream(
-  stream: Stream,
-  sinkBuffer: Pushable<Uint8Array> | undefined,
-  srcBuffer: Pushable<Uint8Array> | undefined,
-  options?: { signal: AbortSignal }
-) {
-  return {
-    sink: async (source: AsyncIterable<Uint8Array>) => {
-      if (options != null && options.signal) {
-        source = abortable(source, options.signal)
-      }
-
-      try {
-        await stream.sink(
-          // @ts-ignore
-          (async function* () {
-            if (sinkBuffer != null) {
-              for await (const msg of sinkBuffer) {
-                if (msg == null) {
-                  continue
-                }
-                // @ts-ignore
-                yield new bl([new Uint8Array([WEBRTC_TRAFFIC_PREFIX]), msg])
-              }
-            }
-
-            for await (const msg of source) {
-              if (msg == null) {
-                continue
-              }
-              // @ts-ignore
-              yield new bl([new Uint8Array([REMAINING_TRAFFIC_PREFIX]), msg])
-            }
-          })()
-        )
-      } catch (err) {
-        if (err.type !== 'aborted') {
-          error(err)
-        }
-      }
-    },
-    source: (async function* () {
-      let source = options != null && options.signal ? abortable(stream.source, options.signal) : stream.source
-
-      for await (const msg of source) {
-        if (msg == null) {
-          continue
-        }
-
-        if (msg.slice(0, 1)[0] == REMAINING_TRAFFIC_PREFIX) {
-          yield msg.slice(1)
-        } else if (srcBuffer != null && msg.slice(0, 1)[0] == WEBRTC_TRAFFIC_PREFIX) {
-          srcBuffer.push(msg.slice(1))
-        }
-      }
-    })(),
   }
 }
 
