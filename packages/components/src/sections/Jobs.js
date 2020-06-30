@@ -30,7 +30,10 @@ class Jobs extends React.Component {
           <SectionHeader
             data={{
               title: 'Jobs',
-              paragraph: isCompany ? 'Want to join our team?' : 'Companies building the HOPR ecosystem',
+              paragraph:
+                this.props.forceIsCompany || isCompany
+                  ? 'Want to join our team?'
+                  : 'Companies building the HOPR ecosystem',
             }}
             className="center-content"
           />

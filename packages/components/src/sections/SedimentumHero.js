@@ -235,7 +235,7 @@ const Sedimentum = props => {
                 <br />
                 Email: info@sedimentum.com
               </div>
-              <div>job portal</div>
+              {/* <div>job portal</div> */}
             </div>
           </div>
         </div>
