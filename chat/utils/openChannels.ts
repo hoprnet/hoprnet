@@ -1,7 +1,7 @@
-import type PeerId from 'peer-id'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { Channel as ChannelInstance } from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
+import PeerId from 'peer-id'
 import { u8aEquals } from '@hoprnet/hopr-utils'
 import { pubKeyToPeerId } from '@hoprnet/hopr-core/lib/utils'
 import { isBootstrapNode } from './isBootstrapNode'
@@ -18,7 +18,7 @@ export function getPeers(
     noBootstrapNodes: false,
   }
 ): PeerId[] {
-  let peers = Array.from(node.peerStore.peers.values()).map((peerInfo) => peerInfo.id)
+  let peers = node.network.peerStore.peers.map((peer) => PeerId.createFromB58String(peer.id))
 
   if (ops.noBootstrapNodes) {
     peers = peers.filter((peerId) => {
