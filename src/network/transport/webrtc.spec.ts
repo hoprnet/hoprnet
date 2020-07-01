@@ -4,6 +4,13 @@ import pushable from 'it-pushable'
 import pipe from 'it-pipe'
 
 import upgradeToWebRtc from './webrtc'
+import { randomBytes } from 'crypto'
+
+import assert from 'assert'
+
+import { u8aEquals } from '@hoprnet/hopr-utils'
+
+import toIterable = require('stream-to-it')
 
 describe('test webRTC upgrade with custom handshake', function () {
   it('should use the extended stream and use it to feed WebRTC', async function () {
@@ -71,10 +78,48 @@ describe('test webRTC upgrade with custom handshake', function () {
       Alice
     )
 
-    await Promise.all([
-      upgradeToWebRtc(webRTCsendAlice, webRTCrecvAlice, { initiator: true }),
-      upgradeToWebRtc(webRTCsendBob, webRTCrecvBob),
-    ])
+    const [channelAlice, channelBob] = (
+      await Promise.all([
+        upgradeToWebRtc(webRTCsendAlice, webRTCrecvAlice, { initiator: true }),
+        upgradeToWebRtc(webRTCsendBob, webRTCrecvBob),
+      ])
+    ).map(toIterable.duplex)
+
+    let messageForBobReceived = false
+    const messageForBob = randomBytes(41)
+
+    let messageForAliceReceived = false
+    const messageForAlice = randomBytes(23)
+
+    const pipeAlicePromise = pipe(
+      // prettier-ignore
+      [messageForBob],
+      channelAlice,
+      async (source: AsyncIterable<Uint8Array>) => {
+        for await (const msg of source) {
+          if (u8aEquals(msg, messageForAlice)) {
+            messageForAliceReceived = true
+          }
+        }
+      }
+    )
+
+    const pipeBobPromise = pipe(
+      // prettier-ignore
+      [messageForAlice],
+      channelBob,
+      async (source: AsyncIterable<Uint8Array>) => {
+        for await (const msg of source) {
+          if (u8aEquals(msg, messageForBob)) {
+            messageForBobReceived = true
+          }
+        }
+      }
+    )
+
+    await Promise.all([pipeAlicePromise, pipeBobPromise])
+
+    assert(messageForBobReceived && messageForAliceReceived, ``)
 
     AliceBob.end()
     BobAlice.end()

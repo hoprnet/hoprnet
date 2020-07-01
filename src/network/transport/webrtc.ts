@@ -10,6 +10,7 @@ const log = debug('hopr-core:transport')
 
 import pipe from 'it-pipe'
 
+// @ts-ignore
 import wrtc = require('wrtc')
 
 const _encoder = new TextEncoder()
@@ -102,7 +103,7 @@ export default function upgradetoWebRTC(
 
     options?.signal?.addEventListener('abort', onAbort)
 
-    await pipe(
+    pipe(
       /* prettier-ignore */
       srcBuffer,
       async (source: AsyncIterable<Uint8Array>) => {
