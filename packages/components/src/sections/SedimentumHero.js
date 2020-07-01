@@ -43,8 +43,8 @@ const Sedimentum = props => {
                 className="has-shadow"
                 src={require('../assets/images/partners/sedimentum_colored.jpg')}
                 alt="Hero"
-                width={896 * 0.7}
-                height={504 * 0.7}
+                width={896 * 0.5}
+                height={504 * 0.5}
                 style={{
                   borderRadius: '15px',
                 }}
@@ -52,27 +52,25 @@ const Sedimentum = props => {
             </div>
           </div>
           <SedimentumTestimonial />
-        </div>
-      </GenericSection>
-      <GenericSection id="video" {...oddSections}>
-        <div className="center-content">
-          <div className="container-sm">
-            <h2 className="section-header mt-0 mb-0 reveal-from-top" data-reveal-delay="150">
-              SEDIMENTUM MAKES LIVING SAFE
-            </h2>
-            <div className="container reveal-from-top mb-24" data-reveal-delay="300">
-              Sedimentum develops the first contactless solution for fall and emergency detection in healthcare without
-              compromising privacy.
+          <div className="center-content" id="video">
+            <div className="container-sm">
+              <h2 className="section-header mt-0 mb-0 reveal-from-top" data-reveal-delay="150">
+                SEDIMENTUM MAKES LIVING SAFE
+              </h2>
+              <div className="container reveal-from-top mb-24" data-reveal-delay="300">
+                Sedimentum develops the first contactless solution for fall and emergency detection in healthcare
+                without compromising privacy.
+              </div>
+              <iframe
+                title="Sedimentum's safe-living device - how it works"
+                width="800"
+                height="450"
+                src="https://www.youtube-nocookie.com/embed/S0_pH615RUY"
+                frameBorder="0"
+                allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
             </div>
-            <iframe
-              title="Sedimentum's safe-living device - how it works"
-              width="800"
-              height="450"
-              src="https://www.youtube-nocookie.com/embed/S0_pH615RUY"
-              frameBorder="0"
-              allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            />
           </div>
         </div>
       </GenericSection>
@@ -204,38 +202,37 @@ const Sedimentum = props => {
       </GenericSection>
       <GenericSection id="contact" {...oddSections}>
         <div className="center-content">
-          <div
-            className="container-sm"
-            style={{
-              height: '80vh',
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              flexDirection: 'column',
-            }}
-          >
-            <div className="mb-32 hero-figure reveal-from-top" data-reveal-delay="200">
+          <div className="contact-container container-sm">
+            <div className="ta-l ">
               <Image
                 className="has-shadow"
                 src={require('../assets/images/partners/sedimentum_colored.jpg')}
                 alt="Hero"
-                width={896 / 2}
-                height={504 / 2}
-                style={{
-                  borderRadius: '15px',
-                }}
+                width="350px"
               />
+              <br />
+              Contact Sedimentum AG
+              <br />
+              <br />
+              Sumpfstrasse 26, 6302 Zug
+              <br />
+              Email:{' '}
+              <a href="mailto:info@sedimentum.com" target="_blank" rel="noopener noreferrer" className="underline">
+                info@sedimentum.com
+              </a>
             </div>
-            <div className="mt-32" style={{ display: 'flex', width: '100%', justifyContent: 'space-evenly' }}>
-              <div style={{ textAlign: 'left' }}>
-                Contact Sedimentum AG
-                <br />
-                <br />
-                Sumpfstrasse 26, 6302 Zug
-                <br />
-                Email: info@sedimentum.com
-              </div>
-              {/* <div>job portal</div> */}
+            <div className="ta-l">
+              <Image className="has-shadow" src={require('../assets/images/logo.png')} alt="Hero" width="200px" />
+              <br />
+              Contact HOPR
+              <br />
+              <br />
+              Hardturmstrasse 161, 8005 Zürich
+              <br />
+              Email:{' '}
+              <a href="mailto:partner@hoprnet.io" target="_blank" rel="noopener noreferrer" className="underline">
+                partner@hoprnet.io
+              </a>
             </div>
           </div>
         </div>
