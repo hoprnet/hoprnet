@@ -149,13 +149,12 @@ describe('test handshake stream implementation', function () {
       }
     )
 
-    console.log('here')
     await Promise.all([relayPipeAliceBob, relayPipeBobAlice])
 
     assert(relayMessageBobreceived && relayMessageAlicereceived, `both parties must receive a fake relayed message`)
   })
 
-  it('should create a downgraded stream without any further WebRTC interaction', async function () {
+  it('should create a downgraded stream without any further WebRTC interactions', async function () {
     const AliceBob = pushable<Uint8Array>()
     const BobAlice = pushable<Uint8Array>()
 
@@ -164,6 +163,7 @@ describe('test handshake stream implementation', function () {
         for await (const msg of source) {
           AliceBob.push(msg)
         }
+        AliceBob.end()
       },
       source: (async function* () {
         for await (const msg of BobAlice) {
@@ -178,6 +178,7 @@ describe('test handshake stream implementation', function () {
         for await (const msg of source) {
           BobAlice.push(msg)
         }
+        BobAlice.end()
       },
       source: (async function* () {
         for await (const msg of AliceBob) {
@@ -190,37 +191,41 @@ describe('test handshake stream implementation', function () {
     const streamAlice = myHandshake(Alice, undefined, undefined)
     const streamBob = myHandshake(Bob, undefined, undefined)
 
-    pipe(
-      // prettier-ignore
-      [new Uint8Array([0, 4, 5, 6])],
-      streamAlice.relayStream
-    )
+    let relayMessageBobreceived = false
+    const relayMessageForBob = randomBytes(23)
 
-    pipe(
-      // prettier-ignore
-      streamBob.relayStream,
-      async (source: Uint8Array) => {
-        for await (const msg of source) {
-          console.log(`Bob received:`, msg)
-        }
-      }
-    )
+    let relayMessageAlicereceived = false
+    const relayMessageForAlice = randomBytes(41)
 
-    pipe(
+    const relayPipeAliceBob = pipe(
       // prettier-ignore
-      [new Uint8Array([0, 1, 2, 3])],
-      streamBob.relayStream
-    )
-
-    pipe(
-      // prettier-ignore
+      [relayMessageForBob],
       streamAlice.relayStream,
-      async (source: Uint8Array) => {
+      async (source: AsyncIterable<Uint8Array>) => {
         for await (const msg of source) {
-          console.log(`Alice received:`, msg)
+          if (u8aEquals(msg, relayMessageForAlice)) {
+            relayMessageAlicereceived = true
+          }
         }
       }
     )
+
+    const relayPipeBobAlice = pipe(
+      // prettier-ignore
+      [relayMessageForAlice],
+      streamBob.relayStream,
+      async (source: AsyncIterable<Uint8Array>) => {
+        for await (const msg of source) {
+          if (u8aEquals(msg, relayMessageForBob)) {
+            relayMessageBobreceived = true
+          }
+        }
+      }
+    )
+
+    await Promise.all([relayPipeAliceBob, relayPipeBobAlice])
+
+    assert(relayMessageBobreceived && relayMessageAlicereceived, `both parties must receive a fake relayed message`)
   })
 
   it('should create a stream that uses on one side WebRTC buffer and downgrade that stream to the base stream', async function () {
@@ -232,6 +237,7 @@ describe('test handshake stream implementation', function () {
         for await (const msg of source) {
           AliceBob.push(msg)
         }
+        AliceBob.end()
       },
       source: (async function* () {
         for await (const msg of BobAlice) {
@@ -246,6 +252,7 @@ describe('test handshake stream implementation', function () {
         for await (const msg of source) {
           BobAlice.push(msg)
         }
+        BobAlice.end()
       },
       source: (async function* () {
         for await (const msg of AliceBob) {
@@ -277,36 +284,40 @@ describe('test handshake stream implementation', function () {
       webRTCrecvAlice.end()
     }, 100)
 
-    pipe(
-      // prettier-ignore
-      [new Uint8Array([0, 4, 5, 6])],
-      streamAlice.relayStream
-    )
+    let relayMessageBobreceived = false
+    const relayMessageForBob = randomBytes(23)
 
-    pipe(
-      // prettier-ignore
-      streamBob.relayStream,
-      async (source: Uint8Array) => {
-        for await (const msg of source) {
-          console.log(`Bob received:`, msg)
-        }
-      }
-    )
+    let relayMessageAlicereceived = false
+    const relayMessageForAlice = randomBytes(41)
 
-    pipe(
+    const relayPipeAliceBob = pipe(
       // prettier-ignore
-      [new Uint8Array([0, 1, 2, 3])],
-      streamBob.relayStream
-    )
-
-    pipe(
-      // prettier-ignore
+      [relayMessageForBob],
       streamAlice.relayStream,
-      async (source: Uint8Array) => {
+      async (source: AsyncIterable<Uint8Array>) => {
         for await (const msg of source) {
-          console.log(`Alice received:`, msg)
+          if (u8aEquals(msg, relayMessageForAlice)) {
+            relayMessageAlicereceived = true
+          }
         }
       }
     )
+
+    const relayPipeBobAlice = pipe(
+      // prettier-ignore
+      [relayMessageForAlice],
+      streamBob.relayStream,
+      async (source: AsyncIterable<Uint8Array>) => {
+        for await (const msg of source) {
+          if (u8aEquals(msg, relayMessageForBob)) {
+            relayMessageBobreceived = true
+          }
+        }
+      }
+    )
+
+    await Promise.all([relayPipeAliceBob, relayPipeBobAlice])
+
+    assert(relayMessageBobreceived && relayMessageAlicereceived, `both parties must receive a fake relayed message`)
   })
 })
