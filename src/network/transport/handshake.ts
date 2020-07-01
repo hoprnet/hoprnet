@@ -12,9 +12,9 @@ const error = debug('hopr-core:transport:error')
 
 export default function myHandshake(
   stream: Stream,
-  sinkBuffer: Pushable<Uint8Array> | undefined,
-  srcBuffer: Pushable<Uint8Array> | undefined,
-  options?: { signal: AbortSignal }
+  webRTCsendBuffer: Pushable<Uint8Array> | undefined,
+  webRTCrecvBuffer: Pushable<Uint8Array> | undefined,
+  options?: { signal?: AbortSignal }
 ): {
   relayStream: Stream
   webRtcStream: Stream
@@ -25,16 +25,17 @@ export default function myHandshake(
 
   let webRTCused = false
 
+  let sinkPromise
   const webRtcStream = {
-    async sink(source: AsyncIterable<Uint8Array>) {
+    sink(source: AsyncIterable<Uint8Array>) {
       webRTCused = webRTCused || true
 
       try {
-        await stream.sink(
+        sinkPromise = stream.sink(
           // @ts-ignore
           (async function* () {
-            if (sinkBuffer != null) {
-              for await (const msg of sinkBuffer) {
+            if (webRTCsendBuffer != null) {
+              for await (const msg of webRTCsendBuffer) {
                 if (msg == null) {
                   continue
                 }
@@ -57,23 +58,25 @@ export default function myHandshake(
 
       // let source = options != null && options.signal ? abortable(stream.source, options.signal) : stream.source
 
+      let doneWithWebRTC = false
       for await (const msg of stream.source) {
         if (msg == null) {
           continue
         }
 
-        switch (msg.slice(0, 1)[0]) {
-          case WEBRTC_TRAFFIC_PREFIX:
-            srcBuffer.push(msg.slice(1))
-            break
-          case REMAINING_TRAFFIC_PREFIX:
-            connector.push(msg.slice(1))
-            break
+        if (!doneWithWebRTC && msg.slice(0, 1)[0] == WEBRTC_TRAFFIC_PREFIX) {
+          webRTCrecvBuffer.push(msg.slice(1))
+        } else if (msg.slice(0, 1)[0] == REMAINING_TRAFFIC_PREFIX) {
+          if (!doneWithWebRTC) {
+            doneWithWebRTC = true
+            webRTCrecvBuffer.end()
+          }
+
+          connector.push(msg.slice(1))
         }
       }
 
       connector.end()
-      srcBuffer.end()
     })(),
   }
   const relayStream = {
@@ -89,9 +92,10 @@ export default function myHandshake(
       })()
 
       if (webRTCused) {
-        sinkBuffer.end()
+        webRTCsendBuffer.end()
 
         sourcePromise.resolve(sink)
+        return sinkPromise
       } else {
         return stream.sink(sink)
       }
@@ -116,6 +120,7 @@ export default function myHandshake(
   return {
     // @ts-ignore
     relayStream,
+    // @ts-ignore
     webRtcStream,
   }
 }

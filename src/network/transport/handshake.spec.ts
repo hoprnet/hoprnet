@@ -3,6 +3,10 @@ import pushable from 'it-pushable'
 
 import myHandshake from './handshake'
 
+import assert from 'assert'
+import { u8aEquals } from '@hoprnet/hopr-utils'
+import { randomBytes } from 'crypto'
+
 describe('test handshake stream implementation', function () {
   it('should create a stream and upgrade it', async function () {
     const AliceBob = pushable<Uint8Array>()
@@ -13,6 +17,7 @@ describe('test handshake stream implementation', function () {
         for await (const msg of source) {
           AliceBob.push(msg)
         }
+        AliceBob.end()
       },
       source: (async function* () {
         for await (const msg of BobAlice) {
@@ -27,6 +32,7 @@ describe('test handshake stream implementation', function () {
         for await (const msg of source) {
           BobAlice.push(msg)
         }
+        BobAlice.end()
       },
       source: (async function* () {
         for await (const msg of AliceBob) {
@@ -74,12 +80,20 @@ describe('test handshake stream implementation', function () {
       webRTCrecvAlice.end()
     }, 100)
 
+    let webRTCmessageBobreceived = false
+    const webRTCmessageForBob = randomBytes(23)
+
+    let webRTCmessageAlicereceived = false
+    const webRTCmessageForAlice = randomBytes(41)
+
     const pipePromiseBobAlice = pipe(
       // prettier-ignore
       webRTCrecvAlice,
       async (source: AsyncIterable<Uint8Array>) => {
         for await (const msg of source) {
-          console.log('from webRTC recv buffer', msg)
+          if (u8aEquals(msg, webRTCmessageForAlice)) {
+            webRTCmessageAlicereceived = true
+          }
         }
       }
     )
@@ -89,50 +103,56 @@ describe('test handshake stream implementation', function () {
       webRTCrecvBob,
       async (source: AsyncIterable<Uint8Array>) => {
         for await (const msg of source) {
-          console.log('from webRTC recv buffer', msg)
+          if (u8aEquals(msg, webRTCmessageForBob)) {
+            webRTCmessageBobreceived = true
+          }
         }
       }
     )
 
-    webRTCsendAlice.push(new Uint8Array([23, 27]))
-    webRTCsendAlice.push(new Uint8Array([24, 28]))
-
-    webRTCsendBob.push(new Uint8Array([33, 37]))
-    webRTCsendBob.push(new Uint8Array([34, 38]))
+    webRTCsendAlice.push(webRTCmessageForBob)
+    webRTCsendBob.push(webRTCmessageForAlice)
 
     await Promise.all([pipePromiseBobAlice, pipePromiseAliceBob])
 
-    pipe(
-      // prettier-ignore
-      [new Uint8Array([0, 4, 5, 6])],
-      streamAlice.relayStream
-    )
+    assert(webRTCmessageBobreceived && webRTCmessageAlicereceived, `both parties should receive a fake WebRTC message`)
 
-    pipe(
-      // prettier-ignore
-      streamBob.relayStream,
-      async (source: Uint8Array) => {
-        for await (const msg of source) {
-          console.log(`Bob received:`, msg)
-        }
-      }
-    )
+    let relayMessageBobreceived = false
+    const relayMessageForBob = randomBytes(23)
 
-    pipe(
-      // prettier-ignore
-      [new Uint8Array([0, 1, 2, 3])],
-      streamBob.relayStream
-    )
+    let relayMessageAlicereceived = false
+    const relayMessageForAlice = randomBytes(41)
 
-    pipe(
+    const relayPipeAliceBob = pipe(
       // prettier-ignore
+      [relayMessageForBob],
       streamAlice.relayStream,
-      async (source: Uint8Array) => {
+      async (source: AsyncIterable<Uint8Array>) => {
         for await (const msg of source) {
-          console.log(`Alice received:`, msg)
+          if (u8aEquals(msg, relayMessageForAlice)) {
+            relayMessageAlicereceived = true
+          }
         }
       }
     )
+
+    const relayPipeBobAlice = pipe(
+      // prettier-ignore
+      [relayMessageForAlice],
+      streamBob.relayStream,
+      async (source: AsyncIterable<Uint8Array>) => {
+        for await (const msg of source) {
+          if (u8aEquals(msg, relayMessageForBob)) {
+            relayMessageBobreceived = true
+          }
+        }
+      }
+    )
+
+    console.log('here')
+    await Promise.all([relayPipeAliceBob, relayPipeBobAlice])
+
+    assert(relayMessageBobreceived && relayMessageAlicereceived, `both parties must receive a fake relayed message`)
   })
 
   it('should create a downgraded stream without any further WebRTC interaction', async function () {
