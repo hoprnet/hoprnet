@@ -51,7 +51,7 @@ class Testimonial extends React.Component {
               <div
                 className="tiles-item-inner has-shadow"
                 style={{
-                  maxWidth: '500px',
+                  maxWidth: '900px',
                 }}
               >
                 <div className="testimonial-item-header mb-16">
