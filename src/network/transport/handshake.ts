@@ -86,9 +86,8 @@ export default function myHandshake(
         })()
       )
     },
-    source: connector
+    source: connector,
   }
-  
 
   return {
     // @ts-ignore
