@@ -51,31 +51,31 @@ describe('test webRTC upgrade with custom handshake', function () {
     const webRTCsendBob = pushable<Uint8Array>()
     const webRTCrecvBob = pushable<Uint8Array>()
 
-    const streamAlice = myHandshake(Alice, webRTCsendAlice, webRTCrecvAlice)
-    const streamBob = myHandshake(Bob, webRTCsendBob, webRTCrecvBob)
+    const streamAlice = myHandshake(webRTCsendAlice, webRTCrecvAlice)
+    const streamBob = myHandshake(webRTCsendBob, webRTCrecvBob)
 
     pipe(
       // prettier-ignore
-      Alice,
-      streamAlice.webRtcStream
+      Alice.source,
+      streamAlice.webRtcStream.source
     )
 
     pipe(
       // prettier-ignore
-      streamBob.webRtcStream,
-      Bob
+      streamBob.webRtcStream.sink,
+      Bob.sink
     )
 
     pipe(
       // prettier-ignore
-      Bob,
-      streamBob.webRtcStream
+      Bob.source,
+      streamBob.webRtcStream.source
     )
 
     pipe(
       // prettier-ignore
-      streamAlice.webRtcStream,
-      Alice
+      streamAlice.webRtcStream.sink,
+      Alice.sink
     )
 
     const [channelAlice, channelBob] = (

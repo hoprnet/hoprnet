@@ -31,28 +31,29 @@ export default function upgradetoWebRTC(
   return new Promise<Socket>(async (resolve, reject) => {
     let webRTCconfig: SimplePeerOptions
 
-    if (this._useOwnStunServers) {
-      webRTCconfig = {
-        wrtc,
-        initiator: options?.initiator,
-        trickle: true,
-        // @ts-ignore
-        allowHalfTrickle: true,
-        config: { iceServers: this.stunServers },
-      }
-    } else {
-      webRTCconfig = {
-        wrtc,
-        initiator: options?.initiator,
-        trickle: true,
-        // @ts-ignore
-        allowHalfTrickle: true,
-      }
+    // if (this._useOwnStunServers) {
+    //   webRTCconfig = {
+    //     wrtc,
+    //     initiator: options?.initiator,
+    //     trickle: true,
+    //     // @ts-ignore
+    //     allowHalfTrickle: true,
+    //     config: { iceServers: this.stunServers },
+    //   }
+    // } else {
+    webRTCconfig = {
+      wrtc,
+      initiator: options?.initiator || false,
+      trickle: true,
+      // @ts-ignore
+      allowHalfTrickle: true,
     }
+    // }
 
     const channel = new Peer(webRTCconfig)
 
     const done = async (err?: Error) => {
+      console.log('done called', err)
       channel.removeListener('connect', onConnect)
       channel.removeListener('error', onError)
       channel.removeListener('signal', onSignal)
@@ -76,13 +77,15 @@ export default function upgradetoWebRTC(
 
     const onSignal = (data: string): void => {
       if (options?.signal?.aborted) {
+        console.log('aborted')
         return
       }
 
+      console.log('sending')
       sinkBuffer.push(_encoder.encode(JSON.stringify(data)))
     }
 
-    const onConnect = async (): Promise<void> => {
+    const onConnect = (): void => {
       done()
     }
 
@@ -108,6 +111,12 @@ export default function upgradetoWebRTC(
       srcBuffer,
       async (source: AsyncIterable<Uint8Array>) => {
         for await (const msg of source) {
+          if (options?.initiator) {
+            console.log('initiator receiving')
+          } else {
+            console.log('counterparty receiving')
+          }
+
           if (msg == null) {
             continue
           }

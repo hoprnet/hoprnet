@@ -11,7 +11,6 @@ const log = debug('hopr-core:transport')
 const error = debug('hopr-core:transport:error')
 
 export default function myHandshake(
-  stream: Stream,
   webRTCsendBuffer: Pushable<Uint8Array> | undefined,
   webRTCrecvBuffer: Pushable<Uint8Array> | undefined,
   options?: { signal?: AbortSignal }
@@ -25,51 +24,43 @@ export default function myHandshake(
 
   let webRTCused = false
 
-  let sinkPromise
   const webRtcStream = {
-    sink(source: AsyncIterable<Uint8Array>) {
+    sink: (source: AsyncIterable<Uint8Array>) => {
       webRTCused = webRTCused || true
 
-      try {
-        sinkPromise = stream.sink(
-          // @ts-ignore
-          (async function* () {
-            if (webRTCsendBuffer != null) {
-              for await (const msg of webRTCsendBuffer) {
-                if (msg == null) {
-                  continue
-                }
-                yield u8aConcat(new Uint8Array([WEBRTC_TRAFFIC_PREFIX]), msg.slice())
-              }
+      return (async function* () {
+        if (webRTCsendBuffer != null) {
+          for await (const msg of webRTCsendBuffer) {
+            if (msg == null) {
+              continue
             }
-
-            const source = await sourcePromise.promise
-            yield* source
-          })()
-        )
-      } catch (err) {
-        if (err.type !== 'aborted') {
-          error(err)
+            console.log(`sending msg`, msg)
+            yield u8aConcat(new Uint8Array([WEBRTC_TRAFFIC_PREFIX]), msg.slice())
+          }
         }
-      }
+
+        const source = await sourcePromise.promise
+        yield* source
+      })()
     },
-    source: (async function* () {
+    source: async (source: AsyncIterable<Uint8Array>) => {
       webRTCused = webRTCused || true
 
-      // let source = options != null && options.signal ? abortable(stream.source, options.signal) : stream.source
+      console.log(`source triggered`, source)
 
       let doneWithWebRTC = false
-      for await (const msg of stream.source) {
+
+      for await (const msg of source) {
         if (msg == null) {
           continue
         }
 
         if (!doneWithWebRTC && msg.slice(0, 1)[0] == WEBRTC_TRAFFIC_PREFIX) {
-          webRTCrecvBuffer.push(msg.slice(1))
+          webRTCrecvBuffer?.push(msg.slice(1))
         } else if (msg.slice(0, 1)[0] == REMAINING_TRAFFIC_PREFIX) {
           if (!doneWithWebRTC) {
             doneWithWebRTC = true
-            webRTCrecvBuffer.end()
+            webRTCrecvBuffer?.end()
           }
 
           connector.push(msg.slice(1))
@@ -77,45 +68,27 @@ export default function myHandshake(
       }
 
       connector.end()
-    })(),
+    },
   }
   const relayStream = {
-    async sink(source: AsyncIterable<Uint8Array>) {
-      let sink = (async function* () {
-        for await (const msg of source) {
-          if (msg == null) {
-            continue
+    sink: async (source: AsyncIterable<Uint8Array>) => {
+      webRTCsendBuffer?.end()
+
+      sourcePromise.resolve(
+        (async function* () {
+          for await (const msg of source) {
+            if (msg == null) {
+              continue
+            }
+
+            yield u8aConcat(new Uint8Array([REMAINING_TRAFFIC_PREFIX]), msg.slice())
           }
-
-          yield u8aConcat(new Uint8Array([REMAINING_TRAFFIC_PREFIX]), msg.slice())
-        }
-      })()
-
-      if (webRTCused) {
-        webRTCsendBuffer.end()
-
-        sourcePromise.resolve(sink)
-        return sinkPromise
-      } else {
-        return stream.sink(sink)
-      }
+        })()
+      )
     },
-    source: (async function* () {
-      if (webRTCused) {
-        yield* connector
-      } else {
-        for await (const msg of stream.source) {
-          if (msg == null) {
-            continue
-          }
-
-          if (msg.slice(0, 1)[0] == REMAINING_TRAFFIC_PREFIX) {
-            yield msg.slice(1)
-          }
-        }
-      }
-    })(),
+    source: connector
   }
+  
 
   return {
     // @ts-ignore

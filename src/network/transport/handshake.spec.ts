@@ -7,40 +7,12 @@ import assert from 'assert'
 import { u8aEquals } from '@hoprnet/hopr-utils'
 import { randomBytes } from 'crypto'
 
+import Pair = require('it-pair')
+
 describe('test handshake stream implementation', function () {
   it('should create a stream and upgrade it', async function () {
-    const AliceBob = pushable<Uint8Array>()
-    const BobAlice = pushable<Uint8Array>()
-
-    const Alice = {
-      sink: async (source: AsyncIterable<Uint8Array>) => {
-        for await (const msg of source) {
-          AliceBob.push(msg)
-        }
-        AliceBob.end()
-      },
-      source: (async function* () {
-        for await (const msg of BobAlice) {
-          console.log(`Alice received:`, msg)
-          yield msg
-        }
-      })(),
-    }
-
-    const Bob = {
-      sink: async (source: AsyncIterable<Uint8Array>) => {
-        for await (const msg of source) {
-          BobAlice.push(msg)
-        }
-        BobAlice.end()
-      },
-      source: (async function* () {
-        for await (const msg of AliceBob) {
-          console.log(`Bob received:`, msg)
-          yield msg
-        }
-      })(),
-    }
+    const AliceBob = Pair()
+    const BobAlice = Pair()
 
     const webRTCsendAlice = pushable<Uint8Array>()
     const webRTCrecvAlice = pushable<Uint8Array>()
@@ -48,32 +20,34 @@ describe('test handshake stream implementation', function () {
     const webRTCsendBob = pushable<Uint8Array>()
     const webRTCrecvBob = pushable<Uint8Array>()
 
-    const streamAlice = myHandshake(Alice, webRTCsendAlice, webRTCrecvAlice)
-    const streamBob = myHandshake(Bob, webRTCsendBob, webRTCrecvBob)
+    const streamAlice = myHandshake(webRTCsendAlice, webRTCrecvAlice)
+    const streamBob = myHandshake(webRTCsendBob, webRTCrecvBob)
 
     pipe(
       // prettier-ignore
-      Alice,
-      streamAlice.webRtcStream
+      BobAlice.source,
+      streamAlice.webRtcStream.source
     )
 
     pipe(
       // prettier-ignore
-      streamBob.webRtcStream,
-      Bob
+      streamAlice.webRtcStream.sink,
+      AliceBob.sink
     )
 
     pipe(
       // prettier-ignore
-      Bob,
-      streamBob.webRtcStream
+      AliceBob.source,
+      streamBob.webRtcStream.source
     )
 
     pipe(
       // prettier-ignore
-      streamAlice.webRtcStream,
-      Alice
+      streamBob.webRtcStream.sink,
+      BobAlice.sink
     )
+
+    await new Promise((resolve) => setTimeout(resolve, 100))
 
     setTimeout(() => {
       webRTCrecvBob.end()
@@ -85,6 +59,9 @@ describe('test handshake stream implementation', function () {
 
     let webRTCmessageAlicereceived = false
     const webRTCmessageForAlice = randomBytes(41)
+
+    setImmediate(() => webRTCsendAlice.push(webRTCmessageForBob))
+    setImmediate(() => webRTCsendBob.push(webRTCmessageForAlice))
 
     const pipePromiseBobAlice = pipe(
       // prettier-ignore
@@ -110,9 +87,6 @@ describe('test handshake stream implementation', function () {
       }
     )
 
-    webRTCsendAlice.push(webRTCmessageForBob)
-    webRTCsendBob.push(webRTCmessageForAlice)
-
     await Promise.all([pipePromiseBobAlice, pipePromiseAliceBob])
 
     assert(webRTCmessageBobreceived && webRTCmessageAlicereceived, `both parties should receive a fake WebRTC message`)
@@ -123,10 +97,15 @@ describe('test handshake stream implementation', function () {
     let relayMessageAlicereceived = false
     const relayMessageForAlice = randomBytes(41)
 
-    const relayPipeAliceBob = pipe(
+    pipe(
       // prettier-ignore
       [relayMessageForBob],
-      streamAlice.relayStream,
+      streamAlice.relayStream.sink
+    )
+
+    const relayPipeAliceBob = pipe(
+      // prettier-ignore
+      streamAlice.relayStream.source,
       async (source: AsyncIterable<Uint8Array>) => {
         for await (const msg of source) {
           if (u8aEquals(msg, relayMessageForAlice)) {
@@ -136,10 +115,15 @@ describe('test handshake stream implementation', function () {
       }
     )
 
-    const relayPipeBobAlice = pipe(
+    pipe(
       // prettier-ignore
       [relayMessageForAlice],
-      streamBob.relayStream,
+      streamBob.relayStream.sink
+    )
+
+    const relayPipeBobAlice = pipe(
+      // prettier-ignore
+      streamBob.relayStream.source,
       async (source: AsyncIterable<Uint8Array>) => {
         for await (const msg of source) {
           if (u8aEquals(msg, relayMessageForBob)) {
@@ -155,41 +139,11 @@ describe('test handshake stream implementation', function () {
   })
 
   it('should create a downgraded stream without any further WebRTC interactions', async function () {
-    const AliceBob = pushable<Uint8Array>()
-    const BobAlice = pushable<Uint8Array>()
+    const AliceBob = Pair()
+    const BobAlice = Pair()
 
-    const Alice = {
-      sink: async (source: AsyncIterable<Uint8Array>) => {
-        for await (const msg of source) {
-          AliceBob.push(msg)
-        }
-        AliceBob.end()
-      },
-      source: (async function* () {
-        for await (const msg of BobAlice) {
-          console.log(`Alice received:`, msg)
-          yield msg
-        }
-      })(),
-    }
-
-    const Bob = {
-      sink: async (source: AsyncIterable<Uint8Array>) => {
-        for await (const msg of source) {
-          BobAlice.push(msg)
-        }
-        BobAlice.end()
-      },
-      source: (async function* () {
-        for await (const msg of AliceBob) {
-          console.log(`Bob received:`, msg)
-          yield msg
-        }
-      })(),
-    }
-
-    const streamAlice = myHandshake(Alice, undefined, undefined)
-    const streamBob = myHandshake(Bob, undefined, undefined)
+    const streamAlice = myHandshake(undefined, undefined)
+    const streamBob = myHandshake(undefined, undefined)
 
     let relayMessageBobreceived = false
     const relayMessageForBob = randomBytes(23)
@@ -197,10 +151,39 @@ describe('test handshake stream implementation', function () {
     let relayMessageAlicereceived = false
     const relayMessageForAlice = randomBytes(41)
 
-    const relayPipeAliceBob = pipe(
+    pipe(
+      // prettier-ignore
+      BobAlice.source,
+      streamAlice.webRtcStream.source
+    )
+
+    pipe(
+      // prettier-ignore
+      streamAlice.webRtcStream.sink,
+      AliceBob.sink
+    )
+
+    pipe(
+      // prettier-ignore
+      AliceBob.source,
+      streamBob.webRtcStream.source
+    )
+
+    pipe(
+      // prettier-ignore
+      streamBob.webRtcStream.sink,
+      BobAlice.sink
+    )
+
+    pipe(
       // prettier-ignore
       [relayMessageForBob],
-      streamAlice.relayStream,
+      streamAlice.relayStream.sink
+    )
+
+    const relayPipeAliceBob = pipe(
+      // prettier-ignore
+      streamAlice.relayStream.source,
       async (source: AsyncIterable<Uint8Array>) => {
         for await (const msg of source) {
           if (u8aEquals(msg, relayMessageForAlice)) {
@@ -210,10 +193,15 @@ describe('test handshake stream implementation', function () {
       }
     )
 
-    const relayPipeBobAlice = pipe(
+    pipe(
       // prettier-ignore
       [relayMessageForAlice],
-      streamBob.relayStream,
+      streamBob.relayStream.sink
+    )
+
+    const relayPipeBobAlice = pipe(
+      // prettier-ignore
+      streamBob.relayStream.source,
       async (source: AsyncIterable<Uint8Array>) => {
         for await (const msg of source) {
           if (u8aEquals(msg, relayMessageForBob)) {
@@ -229,55 +217,37 @@ describe('test handshake stream implementation', function () {
   })
 
   it('should create a stream that uses on one side WebRTC buffer and downgrade that stream to the base stream', async function () {
-    const AliceBob = pushable<Uint8Array>()
-    const BobAlice = pushable<Uint8Array>()
-
-    const Alice = {
-      sink: async (source: AsyncIterable<Uint8Array>) => {
-        for await (const msg of source) {
-          AliceBob.push(msg)
-        }
-        AliceBob.end()
-      },
-      source: (async function* () {
-        for await (const msg of BobAlice) {
-          console.log(`Alice received:`, msg)
-          yield msg
-        }
-      })(),
-    }
-
-    const Bob = {
-      sink: async (source: AsyncIterable<Uint8Array>) => {
-        for await (const msg of source) {
-          BobAlice.push(msg)
-        }
-        BobAlice.end()
-      },
-      source: (async function* () {
-        for await (const msg of AliceBob) {
-          console.log(`Bob received:`, msg)
-          yield msg
-        }
-      })(),
-    }
+    const AliceBob = Pair()
+    const BobAlice = Pair()
 
     const webRTCsendAlice = pushable<Uint8Array>()
     const webRTCrecvAlice = pushable<Uint8Array>()
 
-    const streamAlice = myHandshake(Alice, webRTCsendAlice, webRTCrecvAlice)
-    const streamBob = myHandshake(Bob, undefined, undefined)
+    const streamAlice = myHandshake(webRTCsendAlice, webRTCrecvAlice)
+    const streamBob = myHandshake(undefined, undefined)
 
     pipe(
       // prettier-ignore
-      Alice,
-      streamAlice.webRtcStream
+      BobAlice.source,
+      streamAlice.webRtcStream.source
     )
 
     pipe(
       // prettier-ignore
-      streamAlice.webRtcStream,
-      Alice
+      streamAlice.webRtcStream.sink,
+      AliceBob.sink
+    )
+
+    pipe(
+      // prettier-ignore
+      AliceBob.source,
+      streamBob.webRtcStream.source
+    )
+
+    pipe(
+      // prettier-ignore
+      streamBob.webRtcStream.sink,
+      BobAlice.sink
     )
 
     setTimeout(() => {
