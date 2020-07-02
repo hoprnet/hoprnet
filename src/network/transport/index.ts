@@ -31,9 +31,6 @@ import PeerId from 'peer-id'
 
 import pipe from 'it-pipe'
 
-// @ts-ignore
-import wrtc = require('wrtc')
-
 import { pubKeyToPeerId } from '../../utils'
 import { u8aEquals } from '@hoprnet/hopr-utils'
 
@@ -57,7 +54,6 @@ import upgradeToWebRTC from './webrtc'
 
 const RELAY_REGISTER = '/hopr/relay-register/0.0.1'
 const DELIVERY_REGISTER = '/hopr/delivery-register/0.0.1'
-const WEBRTC = '/hopr/webrtc/0.0.1'
 
 const OK = new TextEncoder().encode('OK')
 const FAIL = new TextEncoder().encode('FAIL')
@@ -210,7 +206,10 @@ class TCP {
 
     if (this._useWebRTC) {
       try {
-        let socket = await upgradeToWebRTC(webRTCsendBuffer, webRTCrecvBuffer)
+        let socket = await upgradeToWebRTC(webRTCsendBuffer, webRTCrecvBuffer, {
+          _timeoutIntentionallyOnWebRTC: this._timeoutIntentionallyOnWebRTC,
+          _failIntentionallyOnWebRTC: this._failIntentionallyOnWebRTC,
+        })
 
         webRTCrecvBuffer.end()
         webRTCsendBuffer.end()
@@ -378,7 +377,11 @@ class TCP {
       webRTCsendBuffer = pushable<Uint8Array>()
       webRTCrecvBuffer = pushable<Uint8Array>()
 
-      socketPromise = upgradeToWebRTC(webRTCsendBuffer, webRTCrecvBuffer, { initiator: true })
+      socketPromise = upgradeToWebRTC(webRTCsendBuffer, webRTCrecvBuffer, {
+        initiator: true,
+        _timeoutIntentionallyOnWebRTC: this._timeoutIntentionallyOnWebRTC,
+        _failIntentionallyOnWebRTC: this._failIntentionallyOnWebRTC,
+      })
     }
 
     const destination = PeerId.createFromCID(ma.getPeerId())

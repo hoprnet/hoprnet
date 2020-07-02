@@ -22,6 +22,10 @@ export default function upgradetoWebRTC(
   options?: {
     initiator?: boolean
     signal?: AbortSignal
+    // ONLY FOR TESTING
+    _timeoutIntentionallyOnWebRTC?: Promise<void>
+    _failIntentionallyOnWebRTC?: boolean
+    // END ONLY FOR TESTING
   }
 ): Promise<Socket> {
   if (options?.signal?.aborted) {
@@ -58,8 +62,8 @@ export default function upgradetoWebRTC(
       channel.removeListener('error', onError)
       channel.removeListener('signal', onSignal)
 
-      if (this._timeoutIntentionallyOnWebRTC !== undefined) {
-        await this._timeoutIntentionallyOnWebRTC
+      if (options?._timeoutIntentionallyOnWebRTC !== undefined) {
+        await options?._timeoutIntentionallyOnWebRTC
       }
 
       options?.signal?.removeEventListener('abort', onAbort)
