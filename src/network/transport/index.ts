@@ -16,23 +16,20 @@ import AbortController from 'abort-controller'
 // @ts-ignore
 import handshake = require('it-handshake')
 
+import myHandshake from './handshake'
+
 // @ts-ignore
 import libp2p = require('libp2p')
 
 import { createListener, Listener } from './listener'
 import { multiaddrToNetConfig } from './utils'
-import { USE_WEBRTC, CODE_P2P, RELAY_CIRCUIT_TIMEOUT, USE_OWN_STUN_SERVERS, WEBRTC_TIMEOUT } from './constants'
+import { USE_WEBRTC, CODE_P2P, RELAY_CIRCUIT_TIMEOUT, USE_OWN_STUN_SERVERS } from './constants'
 
 import Multiaddr from 'multiaddr'
 import PeerInfo from 'peer-info'
 import PeerId from 'peer-id'
 
 import pipe from 'it-pipe'
-
-import Peer, { Instance as SimplePeerInstance } from 'simple-peer'
-
-// @ts-ignore
-import wrtc = require('wrtc')
 
 import { pubKeyToPeerId } from '../../utils'
 import { u8aEquals } from '@hoprnet/hopr-utils'
@@ -51,24 +48,22 @@ import type {
 
 import chalk from 'chalk'
 
-import bl from 'bl'
 import pushable, { Pushable } from 'it-pushable'
+
+import upgradeToWebRTC from './webrtc'
 
 const RELAY_REGISTER = '/hopr/relay-register/0.0.1'
 const DELIVERY_REGISTER = '/hopr/delivery-register/0.0.1'
-const WEBRTC = '/hopr/webrtc/0.0.1'
 
 const OK = new TextEncoder().encode('OK')
 const FAIL = new TextEncoder().encode('FAIL')
-
-const WEBRTC_TRAFFIC_PREFIX = 1
-const REMAINING_TRAFFIC_PREFIX = 0
 
 /**
  * @class TCP
  */
 class TCP {
   get [Symbol.toStringTag]() {
+    // @TODO change this to sth more meaningful
     return 'TCP'
   }
 
@@ -85,9 +80,6 @@ class TCP {
   private _handle: (protocols: string[] | string, handler: (connection: Handler) => void) => void
   private relays?: PeerInfo[]
   private stunServers: { urls: string }[]
-
-  private _encoder: TextEncoder
-  private _decoder: TextDecoder
 
   private connHandler: ConnHandler
 
@@ -152,50 +144,11 @@ class TCP {
     this._peerInfo = libp2p.peerInfo
     this._upgrader = upgrader
 
-    this._encoder = new TextEncoder()
-    this._decoder = new TextDecoder()
-
     this._handle(RELAY_REGISTER, this.handleRelay.bind(this))
     this._handle(DELIVERY_REGISTER, this.handleDelivery.bind(this))
-    this._handle(WEBRTC, this.handleWebRTC.bind(this))
   }
 
-  private relayToConn({
-    connection,
-    stream,
-    counterparty,
-  }: {
-    connection: Connection
-    stream: Stream
-    counterparty: PeerId
-  }): MultiaddrConnection {
-    const maConn: MultiaddrConnection = {
-      ...stream,
-      conn: stream,
-      localAddr: Multiaddr(`/p2p/${this._peerInfo.id.toB58String()}`),
-      remoteAddr: Multiaddr(`/p2p/${counterparty.toB58String()}`),
-      close: async (err?: Error) => {
-        if (err !== undefined) {
-          error(err)
-        }
-
-        try {
-          await connection.close()
-        } catch (err) {
-          error(err)
-        }
-
-        maConn.timeline.close = Date.now()
-      },
-      timeline: {
-        open: Date.now(),
-      },
-    }
-
-    return maConn
-  }
-
-  async handleDelivery({ stream, connection }: Handler) {
+  async handleRelayConnection(stream: Stream): Promise<{ stream: Stream; counterparty: PeerId }> {
     let shaker = handshake(stream)
 
     let sender: PeerId
@@ -221,49 +174,75 @@ class TCP {
     shaker.write(OK)
     shaker.rest()
 
+    return { stream: shaker.stream, counterparty: sender }
+  }
+
+  async handleDelivery({ stream, connection }: Handler) {
+    const relayStream = await this.handleRelayConnection(stream)
+
     let conn: Connection
 
+    let webRTCsendBuffer: Pushable<Uint8Array>
+    let webRTCrecvBuffer: Pushable<Uint8Array>
+
     if (this._useWebRTC) {
-      const sinkBuffer = pushable<Uint8Array>()
-      const srcBuffer = pushable<Uint8Array>()
+      webRTCsendBuffer = pushable<Uint8Array>()
+      webRTCrecvBuffer = pushable<Uint8Array>()
+    }
 
-      const relayConn = {
-        stream: toAnnotatedStream(shaker.stream, sinkBuffer, srcBuffer),
-        counterparty: sender,
-        connection,
-      }
+    const myStream = myHandshake(webRTCsendBuffer, webRTCrecvBuffer)
 
-      const timeout = setTimeout(() => {
-        srcBuffer.end()
-        sinkBuffer.end()
-      }, WEBRTC_TIMEOUT)
+    pipe(
+      // prettier-ignore
+      relayStream.stream.source,
+      myStream.webRtcStream.source
+    )
 
+    pipe(
+      // prettier-ignore
+      myStream.webRtcStream.sink,
+      relayStream.stream.sink
+    )
+
+    if (this._useWebRTC) {
       try {
-        conn = await Promise.race([
-          this.handleWebRTC(srcBuffer, sinkBuffer).then(async (rawSocket: Socket) => {
-            clearTimeout(timeout)
-            srcBuffer.end()
-            sinkBuffer.end()
-            return await this._upgrader.upgradeInbound(socketToConn(rawSocket))
-          }),
-          this._upgrader.upgradeInbound(this.relayToConn(relayConn)),
-        ])
+        let socket = await upgradeToWebRTC(webRTCsendBuffer, webRTCrecvBuffer, {
+          _timeoutIntentionallyOnWebRTC: this._timeoutIntentionallyOnWebRTC,
+          _failIntentionallyOnWebRTC: this._failIntentionallyOnWebRTC,
+        })
+
+        webRTCrecvBuffer.end()
+        webRTCsendBuffer.end()
+
+        conn = await this._upgrader.upgradeInbound(
+          socketToConn(socket, {
+            remoteAddr: Multiaddr(`/p2p/${relayStream.counterparty.toB58String()}`),
+            localAddr: Multiaddr(`/p2p/${this._peerInfo.id.toB58String()}`),
+          })
+        )
       } catch (err) {
-        clearTimeout(timeout)
         error(err)
-        srcBuffer.end()
-        sinkBuffer.end()
-        return
+
+        webRTCrecvBuffer.end()
+        webRTCsendBuffer.end()
+
+        conn = await this._upgrader.upgradeInbound(
+          this.relayToConn({
+            stream: myStream.relayStream,
+            counterparty: relayStream.counterparty,
+            connection,
+          })
+        )
       }
     } else {
-      const relayConn = {
-        stream: toAnnotatedStream(shaker.stream, undefined, undefined),
-        counterparty: sender,
-        connection,
-      }
-
       try {
-        conn = await this._upgrader.upgradeInbound(this.relayToConn(relayConn))
+        conn = await this._upgrader.upgradeInbound(
+          this.relayToConn({
+            stream: myStream.relayStream,
+            counterparty: relayStream.counterparty,
+            connection,
+          })
+        )
       } catch (err) {
         error(err)
         return
@@ -271,134 +250,6 @@ class TCP {
     }
 
     this.connHandler?.call(conn)
-  }
-
-  async handleRelay({ stream, connection }: Handler) {
-    const shaker = handshake(stream)
-
-    let counterparty: PeerId
-    const pubKeySender = (await shaker.read())?.slice()
-
-    if (pubKeySender == null) {
-      log(
-        `Received empty message from peer ${chalk.yellow(connection.remotePeer.toB58String())} during connection setup`
-      )
-      shaker.write(FAIL)
-      return
-    }
-
-    try {
-      counterparty = await pubKeyToPeerId(pubKeySender)
-    } catch (err) {
-      log(
-        `Peer ${chalk.yellow(
-          connection.remotePeer.toB58String()
-        )} asked to establish relayed connection to invalid counterparty. Error was ${err}. Received message ${pubKeySender}`
-      )
-      shaker.write(FAIL)
-      return
-    }
-
-    const abort = new AbortController()
-
-    const timeout = setTimeout(() => abort.abort(), RELAY_CIRCUIT_TIMEOUT)
-
-    let conn: Connection
-    try {
-      conn = this._registrar.getConnection(new PeerInfo(counterparty))
-
-      if (!conn) {
-        conn = await this._dialer.connectToPeer(new PeerInfo(counterparty), { signal: abort.signal })
-      }
-    } catch (err) {
-      error(`Could not establish connection to ${counterparty.toB58String()}. Error was: ${err.message}`)
-      clearTimeout(timeout)
-      shaker.write(FAIL)
-      shaker.rest()
-      return
-    }
-
-    const { stream: deliveryStream } = await conn.newStream([DELIVERY_REGISTER])
-
-    clearTimeout(timeout)
-
-    const relayShaker = handshake(deliveryStream)
-
-    relayShaker.write(connection.remotePeer.pubKey.marshal())
-
-    let answer = (await relayShaker.read())?.slice()
-
-    if (answer != null && u8aEquals(answer, OK)) {
-      shaker.write(OK)
-
-      shaker.rest()
-      relayShaker.rest()
-
-      pipe(shaker.stream, relayShaker.stream, shaker.stream)
-
-      pipe(relayShaker.stream, shaker.stream, relayShaker.stream)
-    } else {
-      log(`Could not relay to peer ${counterparty.toB58String()} because we are unable to deliver packets.`)
-
-      shaker.write(FAIL)
-
-      shaker.rest()
-      relayShaker.rest()
-    }
-  }
-
-  handleWebRTC(srcBuffer: Pushable<Uint8Array>, sinkBuffer: Pushable<Uint8Array>): Promise<Socket> {
-    return new Promise<Socket>(async (resolve) => {
-      let channel: SimplePeerInstance
-      if (this._useOwnStunServers) {
-        channel = new Peer({ wrtc, trickle: true, config: { iceServers: this.stunServers } })
-      } else {
-        channel = new Peer({ wrtc, trickle: true })
-      }
-
-      const done = async (err?: Error) => {
-        channel.removeListener('connect', onConnect)
-        channel.removeListener('error', onError)
-        channel.removeListener('signal', onSignal)
-
-        if (this._timeoutIntentionallyOnWebRTC !== undefined) {
-          await this._timeoutIntentionallyOnWebRTC
-        } else {
-          if (!err && !this._failIntentionallyOnWebRTC) {
-            setImmediate(resolve, (channel as unknown) as Socket)
-          }
-        }
-      }
-
-      const onSignal = (msg: string) => {
-        sinkBuffer.push(this._encoder.encode(JSON.stringify(msg)))
-      }
-
-      const onConnect = async () => {
-        log(`WebRTC counterparty connection established`)
-        done()
-      }
-
-      const onError = (err?: Error) => {
-        done(err)
-      }
-
-      channel.on('signal', onSignal)
-      channel.once('connect', onConnect)
-      channel.once('error', onConnect)
-
-      await pipe(
-        /* prettier-ignore */
-        srcBuffer,
-        async (source: AsyncIterable<Uint8Array>) => {
-          for await (const msg of source) {
-            if (msg) {
-              channel.signal(JSON.parse(this._decoder.decode(msg.slice())))
-            }
-          }
-        }
-      )
-    })
   }
 
   /**
@@ -449,101 +300,7 @@ class TCP {
     return await this.dialWithRelay(ma, potentialRelays, options)
   }
 
-  tryWebRTC(
-    srcBuffer: Pushable<Uint8Array>,
-    sinkBuffer: Pushable<Uint8Array>,
-    counterparty: PeerId,
-    options?: { signal: AbortSignal }
-  ): Promise<Socket> {
-    log(`Trying WebRTC with peer ${counterparty.toB58String()}`)
-
-    if (options.signal && options.signal.aborted) {
-      throw new AbortError()
-    }
-
-    return new Promise<Socket>(async (resolve, reject) => {
-      let channel: SimplePeerInstance
-
-      if (this._useOwnStunServers) {
-        channel = new Peer({
-          wrtc,
-          initiator: true,
-          trickle: true,
-          config: { iceServers: this.stunServers },
-        })
-      } else {
-        channel = new Peer({
-          wrtc,
-          initiator: true,
-          trickle: true,
-        })
-      }
-
-      const done = async (err?: Error) => {
-        channel.removeListener('connect', onConnect)
-        channel.removeListener('error', onError)
-        channel.removeListener('signal', onSignal)
-
-        if (this._timeoutIntentionallyOnWebRTC !== undefined) {
-          await this._timeoutIntentionallyOnWebRTC
-        }
-
-        options.signal?.removeEventListener('abort', onAbort)
-
-        if (!err && !this._failIntentionallyOnWebRTC) {
-          setImmediate(resolve, (channel as unknown) as Socket)
-        }
-      }
-
-      const onAbort = () => {
-        channel.destroy()
-
-        setImmediate(reject)
-      }
-
-      const onSignal = (data: string): void => {
-        if (!options.signal?.aborted) {
-          sinkBuffer.push(this._encoder.encode(JSON.stringify(data)))
-        }
-      }
-
-      const onConnect = async (): Promise<void> => {
-        log(`WebRTC connection with ${counterparty.toB58String()} was successful`)
-        done()
-      }
-
-      const onError = (err?: Error) => {
-        log(`WebRTC with peer ${counterparty.toB58String()} failed. Error was: ${err}`)
-        done(err)
-      }
-
-      if (options.signal?.aborted) {
-        return reject(new AbortError())
-      }
-
-      channel.on('signal', onSignal)
-
-      channel.once('error', onError)
-
-      channel.once('connect', onConnect)
-
-      options.signal?.addEventListener('abort', onAbort)
-
-      await pipe(
-        /* prettier-ignore */
-        srcBuffer,
-        async (source: AsyncIterable<Uint8Array>) => {
-          for await (const msg of source) {
-            if (msg) {
-              channel.signal(JSON.parse(this._decoder.decode(msg.slice())))
-            }
-          }
-        }
-      )
-    })
-  }
-
-  async dialWithRelay(ma: Multiaddr, relays: PeerInfo[], options?: DialOptions): Promise<Connection> {
+  async establishRelayedConnection(ma: Multiaddr, relays: PeerInfo[], options?: DialOptions) {
     const destination = PeerId.createFromCID(ma.getPeerId())
 
     if (options.signal?.aborted) {
@@ -587,7 +344,12 @@ class TCP {
 
     shaker.write(destination.pubKey.marshal())
 
-    let answer = (await shaker.read())?.slice()
+    let answer: Buffer | undefined
+    try {
+      answer = (await shaker.read())?.slice()
+    } catch (err) {
+      error(err)
+    }
 
     shaker.rest()
 
@@ -599,83 +361,99 @@ class TCP {
       )
     }
 
+    return {
+      stream: shaker.stream,
+      baseConn: relayConnection,
+    }
+  }
+
+  async dialWithRelay(ma: Multiaddr, relays: PeerInfo[], options?: DialOptions): Promise<Connection> {
+    let webRTCsendBuffer: Pushable<Uint8Array>
+    let webRTCrecvBuffer: Pushable<Uint8Array>
+
+    let socketPromise: Promise<Socket>
+
+    if (this._useWebRTC) {
+      webRTCsendBuffer = pushable<Uint8Array>()
+      webRTCrecvBuffer = pushable<Uint8Array>()
+
+      socketPromise = upgradeToWebRTC(webRTCsendBuffer, webRTCrecvBuffer, {
+        initiator: true,
+        _timeoutIntentionallyOnWebRTC: this._timeoutIntentionallyOnWebRTC,
+        _failIntentionallyOnWebRTC: this._failIntentionallyOnWebRTC,
+      })
+    }
+
+    const destination = PeerId.createFromCID(ma.getPeerId())
+
+    const relayConnection = await this.establishRelayedConnection(ma, relays, options)
+
     let conn: Connection
 
-    if (options.signal?.aborted) {
+    if (options?.signal?.aborted) {
       try {
-        await relayConnection.close()
+        await relayConnection.baseConn.close()
       } catch (err) {
         error(err)
       }
+
+      if (this._useWebRTC) {
+        webRTCsendBuffer?.end()
+        webRTCrecvBuffer?.end()
+      }
+
       throw new AbortError()
     }
 
+    const stream = myHandshake(webRTCsendBuffer, webRTCrecvBuffer, { signal: options.signal })
+
+    pipe(
+      // prettier-ignore
+      relayConnection.stream.source,
+      stream.webRtcStream.source
+    )
+
+    pipe(
+      // prettier-ignore
+      stream.webRtcStream.sink,
+      relayConnection.stream.sink
+    )
+
     if (this._useWebRTC) {
-      const sinkBuffer = pushable<Uint8Array>()
-      const srcBuffer = pushable<Uint8Array>()
-
-      const relayConn = {
-        stream: toAnnotatedStream(shaker.stream, sinkBuffer, srcBuffer, { signal: options.signal }),
-        counterparty: destination,
-        connection: relayConnection,
-      }
-
-      if (options.signal?.aborted) {
-        try {
-          await relayConnection.close()
-        } catch (err) {
-          error(err)
-        }
-        throw new AbortError()
-      }
-
-      const timeout = setTimeout(() => {
-        srcBuffer.end()
-        sinkBuffer.end()
-      }, WEBRTC_TIMEOUT)
-
       try {
-        conn = await Promise.race([
-          this.tryWebRTC(srcBuffer, sinkBuffer, destination, { signal: options.signal }).then(
-            async (rawSocket: Socket) => {
-              clearTimeout(timeout)
-              srcBuffer.end()
-              sinkBuffer.end()
-              return await this._upgrader.upgradeOutbound(
-                socketToConn(rawSocket, {
-                  signal: options.signal,
-                  remoteAddr: Multiaddr(`/p2p/${destination.toB58String()}`),
-                })
-              )
-            }
-          ),
-          this._upgrader.upgradeOutbound(this.relayToConn(relayConn)),
-        ])
+        let socket = await socketPromise
+
+        webRTCsendBuffer.end()
+        webRTCrecvBuffer.end()
+
+        conn = await this._upgrader.upgradeOutbound(
+          socketToConn(socket, {
+            signal: options.signal,
+            remoteAddr: Multiaddr(`/p2p/${destination.toB58String()}`),
+            localAddr: Multiaddr(`/p2p/${this._peerInfo.id.toB58String()}`),
+          })
+        )
       } catch (err) {
-        error(err)
-        clearTimeout(timeout)
-        srcBuffer.end()
-        sinkBuffer.end()
-        throw err
+        webRTCsendBuffer.end()
+        webRTCrecvBuffer.end()
+
+        conn = await this._upgrader.upgradeOutbound(
+          this.relayToConn({
+            stream: stream.relayStream,
+            counterparty: destination,
+            connection: relayConnection.baseConn,
+          })
+        )
       }
     } else {
-      const relayConn = {
-        stream: toAnnotatedStream(shaker.stream, undefined, undefined, { signal: options.signal }),
-        counterparty: destination,
-        connection: relayConnection,
-      }
-
-      if (options.signal?.aborted) {
-        try {
-          await relayConnection.close()
-        } catch (err) {
-          error(err)
-        }
-        throw new AbortError()
-      }
-
       try {
-        conn = await this._upgrader.upgradeOutbound(this.relayToConn(relayConn))
+        conn = await this._upgrader.upgradeOutbound(
+          this.relayToConn({
+            stream: stream.relayStream,
+            counterparty: destination,
+            connection: relayConnection.baseConn,
+          })
+        )
       } catch (err) {
         error(err)
         throw err
@@ -790,64 +568,154 @@ class TCP {
       return mafmt.TCP.matches(ma.decapsulateCode(CODE_P2P)) || mafmt.P2P.matches(ma)
     })
   }
-}
 
-function toAnnotatedStream(
-  stream: Stream,
-  sinkBuffer: Pushable<Uint8Array> | undefined,
-  srcBuffer: Pushable<Uint8Array> | undefined,
-  options?: { signal: AbortSignal }
-) {
-  return {
-    sink: async (source: AsyncIterable<Uint8Array>) => {
-      if (options != null && options.signal) {
-        source = abortable(source, options.signal)
+  async handleRelay({ stream, connection }: Handler) {
+    const shaker = handshake(stream)
+
+    let counterparty: PeerId
+    let pubKeySender: Buffer | undefined
+
+    try {
+      pubKeySender = (await shaker.read())?.slice()
+    } catch (err) {
+      error(err)
+    }
+
+    if (pubKeySender == null) {
+      error(
+        `Received empty message from peer ${chalk.yellow(connection.remotePeer.toB58String())} during connection setup`
+      )
+      shaker.write(FAIL)
+      shaker.rest()
+      return
+    }
+
+    try {
+      counterparty = await pubKeyToPeerId(pubKeySender)
+    } catch (err) {
+      log(
+        `Peer ${chalk.yellow(
+          connection.remotePeer.toB58String()
+        )} asked to establish relayed connection to invalid counterparty. Error was ${err}. Received message ${pubKeySender}`
+      )
+      shaker.write(FAIL)
+      return
+    }
+
+    const abort = new AbortController()
+
+    const timeout = setTimeout(() => abort.abort(), RELAY_CIRCUIT_TIMEOUT)
+
+    let conn: Connection
+    try {
+      conn = this._registrar.getConnection(new PeerInfo(counterparty))
+
+      if (!conn) {
+        conn = await this._dialer.connectToPeer(new PeerInfo(counterparty), { signal: abort.signal })
       }
+    } catch (err) {
+      error(`Could not establish connection to ${counterparty.toB58String()}. Error was: ${err.message}`)
+      clearTimeout(timeout)
+      shaker.write(FAIL)
+      shaker.rest()
+      return
+    }
 
-      try {
-        await stream.sink(
-          // @ts-ignore
-          (async function* () {
-            if (sinkBuffer != null) {
-              for await (const msg of sinkBuffer) {
-                if (msg == null) {
-                  continue
-                }
-                // @ts-ignore
-                yield new bl([new Uint8Array([WEBRTC_TRAFFIC_PREFIX]), msg])
-              }
-            }
+    const { stream: deliveryStream } = await conn.newStream([DELIVERY_REGISTER])
 
-            for await (const msg of source) {
-              if (msg == null) {
-                continue
-              }
-              // @ts-ignore
-              yield new bl([new Uint8Array([REMAINING_TRAFFIC_PREFIX]), msg])
-            }
-          })()
-        )
-      } catch (err) {
-        if (err.type !== 'aborted') {
+    clearTimeout(timeout)
+
+    const relayShaker = handshake(deliveryStream)
+
+    relayShaker.write(connection.remotePeer.pubKey.marshal())
+
+    let answer: Buffer | undefined
+    try {
+      answer = (await relayShaker.read())?.slice()
+    } catch (err) {
+      error(err)
+    }
+
+    if (answer == null || !u8aEquals(answer, OK)) {
+      error(`Could not relay to peer ${counterparty.toB58String()} because we are unable to deliver packets.`)
+
+      shaker.write(FAIL)
+
+      shaker.rest()
+      relayShaker.rest()
+
+      return
+    }
+
+    shaker.write(OK)
+
+    shaker.rest()
+    relayShaker.rest()
+
+    pipe(
+      // prettier-ignore
+      shaker.stream,
+      // (source: AsyncIterable<Uint8Array>) => {
+      //   return (async function* () {
+      //     for await (const msg of source) {
+      //       console.log(`forwarding msg`, msg)
+      //       yield msg
+      //     }
+      //   })()
+      // },
+      relayShaker.stream
+    )
+
+    pipe(
+      // prettier-ignore
+      relayShaker.stream,
+      // (source: AsyncIterable<Uint8Array>) => {
+      //   return (async function* () {
+      //     for await (const msg of source) {
+      //       console.log(`forwarding msg`, msg)
+      //       yield msg
+      //     }
+      //   })()
+      // },
+      shaker.stream
+    )
+
+    relayShaker.stream
+  }
+
+  private relayToConn({
+    connection,
+    stream,
+    counterparty,
+  }: {
+    connection: Connection
+    stream: Stream
+    counterparty: PeerId
+  }): MultiaddrConnection {
+    const maConn: MultiaddrConnection = {
+      ...stream,
+      conn: stream,
+      localAddr: Multiaddr(`/p2p/${this._peerInfo.id.toB58String()}`),
+      remoteAddr: Multiaddr(`/p2p/${counterparty.toB58String()}`),
+      async close(err?: Error) {
+        if (err !== undefined) {
           error(err)
         }
-      }
-    },
-    source: (async function* () {
-      let source = options != null && options.signal ? abortable(stream.source, options.signal) : stream.source
 
-      for await (const msg of source) {
-        if (msg == null) {
-          continue
+        try {
+          await connection.close()
+        } catch (err) {
+          error(err)
         }
 
-        if (msg.slice(0, 1)[0] == REMAINING_TRAFFIC_PREFIX) {
-          yield msg.slice(1)
-        } else if (srcBuffer != null && msg.slice(0, 1)[0] == WEBRTC_TRAFFIC_PREFIX) {
-          srcBuffer.push(msg.slice(1))
-        }
-      }
-    })(),
+        maConn.timeline.close = Date.now()
+      },
+      timeline: {
+        open: Date.now(),
+      },
+    }
+
+    return maConn
   }
 }
 

@@ -75,7 +75,7 @@ export function socketToConn(
       }
     },
 
-    source: options.signal ? abortable(source, options.signal) : source,
+    source, //: options.signal ? abortable(source, options.signal) : source,
 
     conn: socket,
 
