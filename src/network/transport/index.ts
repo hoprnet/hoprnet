@@ -371,39 +371,26 @@ class TCP {
     let webRTCsendBuffer: Pushable<Uint8Array>
     let webRTCrecvBuffer: Pushable<Uint8Array>
 
-    let socketPromise: Promise<Socket>
-
-    if (this._useWebRTC) {
-      webRTCsendBuffer = pushable<Uint8Array>()
-      webRTCrecvBuffer = pushable<Uint8Array>()
-
-      socketPromise = upgradeToWebRTC(webRTCsendBuffer, webRTCrecvBuffer, {
-        initiator: true,
-        _timeoutIntentionallyOnWebRTC: this._timeoutIntentionallyOnWebRTC,
-        _failIntentionallyOnWebRTC: this._failIntentionallyOnWebRTC,
-      })
-    }
-
     const destination = PeerId.createFromCID(ma.getPeerId())
 
     const relayConnection = await this.establishRelayedConnection(ma, relays, options)
 
     let conn: Connection
 
-    if (options?.signal?.aborted) {
-      try {
-        await relayConnection.baseConn.close()
-      } catch (err) {
-        error(err)
-      }
+    // if (options?.signal?.aborted) {
+    //   try {
+    //     await relayConnection.baseConn.close()
+    //   } catch (err) {
+    //     error(err)
+    //   }
 
-      if (this._useWebRTC) {
-        webRTCsendBuffer?.end()
-        webRTCrecvBuffer?.end()
-      }
+    //   if (this._useWebRTC) {
+    //     webRTCsendBuffer?.end()
+    //     webRTCrecvBuffer?.end()
+    //   }
 
-      throw new AbortError()
-    }
+    //   throw new AbortError()
+    // }
 
     const stream = myHandshake(webRTCsendBuffer, webRTCrecvBuffer, { signal: options.signal })
 
@@ -421,7 +408,14 @@ class TCP {
 
     if (this._useWebRTC) {
       try {
-        let socket = await socketPromise
+        webRTCsendBuffer = pushable<Uint8Array>()
+        webRTCrecvBuffer = pushable<Uint8Array>()
+
+        let socket = await upgradeToWebRTC(webRTCsendBuffer, webRTCrecvBuffer, {
+          initiator: true,
+          _timeoutIntentionallyOnWebRTC: this._timeoutIntentionallyOnWebRTC,
+          _failIntentionallyOnWebRTC: this._failIntentionallyOnWebRTC,
+        })
 
         webRTCsendBuffer.end()
         webRTCrecvBuffer.end()
@@ -656,6 +650,13 @@ class TCP {
     pipe(
       // prettier-ignore
       shaker.stream,
+      // (source: AsyncIterable<Uint8Array>) => {
+      //   return (async function* () {
+      //     for await (const msg of source) {
+      //       console.log(new TextDecoder().decode(msg))
+      //     }
+      //   })()
+      // },
       relayShaker.stream
     )
 

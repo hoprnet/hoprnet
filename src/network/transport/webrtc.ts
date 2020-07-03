@@ -56,14 +56,16 @@ export default function upgradetoWebRTC(
 
     const channel = new Peer(webRTCconfig)
 
+    let timeout: any
+
     const onTimeout = () => {
       clearTimeout(timeout)
       channel.destroy()
 
-      setImmediate(reject)
+      reject()
     }
 
-    const timeout = setTimeout(onTimeout, 700)
+    timeout = setTimeout(onTimeout, 700)
 
     const done = async (err?: Error) => {
       clearTimeout(timeout)
@@ -80,7 +82,9 @@ export default function upgradetoWebRTC(
       options?.signal?.removeEventListener('abort', onAbort)
 
       if (!err && !this._failIntentionallyOnWebRTC) {
-        setImmediate(resolve, (channel as unknown) as Socket)
+        resolve((channel as unknown) as Socket)
+      } else {
+        reject(err)
       }
     }
 
