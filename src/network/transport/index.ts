@@ -573,13 +573,20 @@ class TCP {
     const shaker = handshake(stream)
 
     let counterparty: PeerId
-    const pubKeySender = (await shaker.read())?.slice()
+    let pubKeySender: Buffer | undefined
+
+    try {
+      pubKeySender = (await shaker.read())?.slice()
+    } catch (err) {
+      error(err)
+    }
 
     if (pubKeySender == null) {
-      log(
+      error(
         `Received empty message from peer ${chalk.yellow(connection.remotePeer.toB58String())} during connection setup`
       )
       shaker.write(FAIL)
+      shaker.rest()
       return
     }
 
@@ -622,49 +629,58 @@ class TCP {
 
     relayShaker.write(connection.remotePeer.pubKey.marshal())
 
-    let answer = (await relayShaker.read())?.slice()
+    let answer: Buffer | undefined
+    try {
+      answer = (await relayShaker.read())?.slice()
+    } catch (err) {
+      error(err)
+    }
 
-    if (answer != null && u8aEquals(answer, OK)) {
-      shaker.write(OK)
-
-      shaker.rest()
-      relayShaker.rest()
-
-      pipe(
-        // prettier-ignore
-        shaker.stream,
-        // (source: AsyncIterable<Uint8Array>) => {
-        //   return (async function* () {
-        //     for await (const msg of source) {
-        //       console.log(`forwarding msg`, msg)
-        //       yield msg
-        //     }
-        //   })()
-        // },
-        relayShaker.stream
-      )
-
-      pipe(
-        // prettier-ignore
-        relayShaker.stream,
-        // (source: AsyncIterable<Uint8Array>) => {
-        //   return (async function* () {
-        //     for await (const msg of source) {
-        //       console.log(`forwarding msg`, msg)
-        //       yield msg
-        //     }
-        //   })()
-        // },
-        shaker.stream
-      )
-    } else {
-      log(`Could not relay to peer ${counterparty.toB58String()} because we are unable to deliver packets.`)
+    if (answer == null || !u8aEquals(answer, OK)) {
+      error(`Could not relay to peer ${counterparty.toB58String()} because we are unable to deliver packets.`)
 
       shaker.write(FAIL)
 
       shaker.rest()
       relayShaker.rest()
+
+      return
     }
+
+    shaker.write(OK)
+
+    shaker.rest()
+    relayShaker.rest()
+
+    pipe(
+      // prettier-ignore
+      shaker.stream,
+      // (source: AsyncIterable<Uint8Array>) => {
+      //   return (async function* () {
+      //     for await (const msg of source) {
+      //       console.log(`forwarding msg`, msg)
+      //       yield msg
+      //     }
+      //   })()
+      // },
+      relayShaker.stream
+    )
+
+    pipe(
+      // prettier-ignore
+      relayShaker.stream,
+      // (source: AsyncIterable<Uint8Array>) => {
+      //   return (async function* () {
+      //     for await (const msg of source) {
+      //       console.log(`forwarding msg`, msg)
+      //       yield msg
+      //     }
+      //   })()
+      // },
+      shaker.stream
+    )
+
+    relayShaker.stream
   }
 
   private relayToConn({
