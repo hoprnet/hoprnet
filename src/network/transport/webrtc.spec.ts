@@ -12,38 +12,12 @@ import { u8aEquals } from '@hoprnet/hopr-utils'
 
 import toIterable = require('stream-to-it')
 
+import Pair = require('it-pair')
+
 describe('test webRTC upgrade with custom handshake', function () {
   it('should use the extended stream and use it to feed WebRTC', async function () {
-    const AliceBob = pushable<Uint8Array>()
-    const BobAlice = pushable<Uint8Array>()
-
-    const Alice = {
-      sink: async (source: AsyncIterable<Uint8Array>) => {
-        for await (const msg of source) {
-          AliceBob.push(msg)
-        }
-      },
-      source: (async function* () {
-        for await (const msg of BobAlice) {
-          console.log(`Alice received:`, msg)
-          yield msg
-        }
-      })(),
-    }
-
-    const Bob = {
-      sink: async (source: AsyncIterable<Uint8Array>) => {
-        for await (const msg of source) {
-          BobAlice.push(msg)
-        }
-      },
-      source: (async function* () {
-        for await (const msg of AliceBob) {
-          console.log(`Bob received:`, msg)
-          yield msg
-        }
-      })(),
-    }
+    const AliceBob = Pair()
+    const BobAlice = Pair()
 
     const webRTCsendAlice = pushable<Uint8Array>()
     const webRTCrecvAlice = pushable<Uint8Array>()
@@ -56,26 +30,26 @@ describe('test webRTC upgrade with custom handshake', function () {
 
     pipe(
       // prettier-ignore
-      Alice.source,
+      BobAlice.source,
       streamAlice.webRtcStream.source
     )
 
     pipe(
       // prettier-ignore
       streamBob.webRtcStream.sink,
-      Bob.sink
+      BobAlice.sink
     )
 
     pipe(
       // prettier-ignore
-      Bob.source,
+      AliceBob.source,
       streamBob.webRtcStream.source
     )
 
     pipe(
       // prettier-ignore
       streamAlice.webRtcStream.sink,
-      Alice.sink
+      AliceBob.sink
     )
 
     const [channelAlice, channelBob] = (
@@ -119,9 +93,6 @@ describe('test webRTC upgrade with custom handshake', function () {
 
     await Promise.all([pipeAlicePromise, pipeBobPromise])
 
-    assert(messageForBobReceived && messageForAliceReceived, ``)
-
-    AliceBob.end()
-    BobAlice.end()
+    assert(messageForBobReceived && messageForAliceReceived, `Alice and Bob should have received the right message`)
   })
 })

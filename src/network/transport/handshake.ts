@@ -1,5 +1,5 @@
 import type { Stream } from './types'
-import { WEBRTC_TRAFFIC_PREFIX, REMAINING_TRAFFIC_PREFIX } from './constants'
+import { WEBRTC_TRAFFIC_PREFIX, REMAINING_TRAFFIC_PREFIX, WEBRTC_TIMEOUT } from './constants'
 import defer from 'p-defer'
 import type { Pushable } from 'it-pushable'
 import pushable from 'it-pushable'
@@ -30,13 +30,19 @@ export default function myHandshake(
 
       return (async function* () {
         if (webRTCsendBuffer != null) {
+          const timeout = setTimeout(() => {
+            webRTCsendBuffer.end()
+          }, WEBRTC_TIMEOUT)
+
           for await (const msg of webRTCsendBuffer) {
             if (msg == null) {
               continue
             }
-            console.log(`sending msg`, msg)
+
             yield u8aConcat(new Uint8Array([WEBRTC_TRAFFIC_PREFIX]), msg.slice())
           }
+
+          clearTimeout(timeout)
         }
 
         const source = await sourcePromise.promise
@@ -45,8 +51,6 @@ export default function myHandshake(
     },
     source: async (source: AsyncIterable<Uint8Array>) => {
       webRTCused = webRTCused || true
-
-      console.log(`source triggered`, source)
 
       let doneWithWebRTC = false
 

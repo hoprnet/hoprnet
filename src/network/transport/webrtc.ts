@@ -56,8 +56,19 @@ export default function upgradetoWebRTC(
 
     const channel = new Peer(webRTCconfig)
 
+    const onTimeout = () => {
+      clearTimeout(timeout)
+      channel.destroy()
+
+      setImmediate(reject)
+    }
+
+    const timeout = setTimeout(onTimeout, 700)
+
     const done = async (err?: Error) => {
-      console.log('done called', err)
+      clearTimeout(timeout)
+
+      channel.removeListener('iceTimeout', onTimeout)
       channel.removeListener('connect', onConnect)
       channel.removeListener('error', onError)
       channel.removeListener('signal', onSignal)
@@ -85,7 +96,6 @@ export default function upgradetoWebRTC(
         return
       }
 
-      console.log('sending')
       sinkBuffer.push(_encoder.encode(JSON.stringify(data)))
     }
 
@@ -108,6 +118,8 @@ export default function upgradetoWebRTC(
 
     channel.once('connect', onConnect)
 
+    channel.once('iceTimeout', onTimeout)
+
     options?.signal?.addEventListener('abort', onAbort)
 
     pipe(
@@ -115,12 +127,6 @@ export default function upgradetoWebRTC(
       srcBuffer,
       async (source: AsyncIterable<Uint8Array>) => {
         for await (const msg of source) {
-          if (options?.initiator) {
-            console.log('initiator receiving')
-          } else {
-            console.log('counterparty receiving')
-          }
-
           if (msg == null) {
             continue
           }

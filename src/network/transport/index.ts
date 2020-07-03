@@ -633,28 +633,28 @@ class TCP {
       pipe(
         // prettier-ignore
         shaker.stream,
-        (source: AsyncIterable<Uint8Array>) => {
-          return (async function* () {
-            for await (const msg of source) {
-              console.log(`forwarding msg`, msg)
-              yield msg
-            }
-          })()
-        },
+        // (source: AsyncIterable<Uint8Array>) => {
+        //   return (async function* () {
+        //     for await (const msg of source) {
+        //       console.log(`forwarding msg`, msg)
+        //       yield msg
+        //     }
+        //   })()
+        // },
         relayShaker.stream
       )
 
       pipe(
         // prettier-ignore
         relayShaker.stream,
-        (source: AsyncIterable<Uint8Array>) => {
-          return (async function* () {
-            for await (const msg of source) {
-              console.log(`forwarding msg`, msg)
-              yield msg
-            }
-          })()
-        },
+        // (source: AsyncIterable<Uint8Array>) => {
+        //   return (async function* () {
+        //     for await (const msg of source) {
+        //       console.log(`forwarding msg`, msg)
+        //       yield msg
+        //     }
+        //   })()
+        // },
         shaker.stream
       )
     } else {
