@@ -66,8 +66,8 @@ class Testimonial extends React.Component {
                 </div>
                 <div className="testimonial-item-content">
                   <p className="text-sm mb-0">
-                    — For Sedimentum data privacy is everything. Our customers are healthcare institutions and strict
-                    data privacy requirements are necessary in that field. Sedimentum protects and supports life in a
+                    For Sedimentum data privacy is everything. Our customers are healthcare institutions and strict data
+                    privacy requirements are necessary in that field. Sedimentum protects and supports life in a
                     privacy-preserving manner and the metadata protection of HOPR, who ensures that our customers' data
                     is being relayed from point-to-point securely and privately, is one crucial component to achieve
                     high failproof privacy guarantees. With HOPR we have found the right partner, who shares the same
