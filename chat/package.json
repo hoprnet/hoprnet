@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-chat",
-  "version": "1.1.5-dev.dcc4b19",
+  "version": "1.1.6-dev.65e3d09",
   "description": "",
   "main": "src/index.ts",
   "scripts": {
