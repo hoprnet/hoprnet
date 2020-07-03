@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-chat",
-  "version": "1.1.3-dev.510badd",
+  "version": "1.1.4-dev.64c3c2b",
   "description": "",
   "main": "src/index.ts",
   "scripts": {
@@ -15,8 +15,8 @@
     "util:create:alice": "mkdirp .alice && copyfiles -a lib/**/**/* .alice && copyfiles .env .alice/",
     "util:create:bob": "mkdirp .bob && copyfiles -a lib/**/**/* .bob && copyfiles .env .bob/",
     "start": "node lib/index.js",
-    "start:alice": "yarn util:create:alice && cd .alice && cross-env HOST_IPV4=0.0.0.0:9091 node lib/index.js -p alice",
-    "start:bob": "yarn util:create:bob && cd .bob && cross-env HOST_IPV4=0.0.0.0:9092 node lib/index.js -p bob",
+    "start:alice": "yarn util:create:alice && cd .alice && cross-env HOST_IPV4=0.0.0.0:9091 node lib/index.js -p alice 2>log.alice.txt",
+    "start:bob": "yarn util:create:bob && cd .bob && cross-env HOST_IPV4=0.0.0.0:9092 node lib/index.js -p bob 2>log.bob.txt",
     "zip:windows": "bestzip hopr-chat-nodebin-windows.zip dist",
     "zip:macos": "bestzip hopr-chat-nodebin-macos.zip dist",
     "zip:linux": "bestzip hopr-chat-nodebin-linux.zip dist"
@@ -29,7 +29,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@hoprnet/hopr-core": "0.6.15-testnet.45efa6f",
+    "@hoprnet/hopr-core": "0.6.16",
     "@hoprnet/hopr-core-connector-interface": "1.2.10-98e08f8",
     "@hoprnet/hopr-core-ethereum": "0.0.12-refactor.473415f",
     "@hoprnet/hopr-demo-seeds": "1.0.3-refactor.3ad82ff",

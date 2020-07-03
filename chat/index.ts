@@ -192,7 +192,7 @@ function runAsBootstrapNode() {
 async function main() {
   clear()
   console.log(
-    figlet.textSync('HOPRnet.eth', {
+    figlet.textSync('HOPR Chat', {
       horizontalLayout: 'fitted',
     })
   )

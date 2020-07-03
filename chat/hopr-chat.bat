@@ -1,1 +1,1 @@
-node index.js
+node index.js 2>log.txt

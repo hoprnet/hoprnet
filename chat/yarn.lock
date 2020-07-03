@@ -156,10 +156,10 @@
     web3-eth "^1.2.9"
     web3-eth-contract "^1.2.9"
 
-"@hoprnet/hopr-core@0.6.15-testnet.45efa6f":
-  version "0.6.15-testnet.45efa6f"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core/-/hopr-core-0.6.15-testnet.45efa6f.tgz#fd07f12e291cb471a2336367b5a916c6f873867c"
-  integrity sha512-Sz/Log5dP6Rm15JeqkWBw6D5Y14loTQrui+5rIOCnK9UkfiMvRUsdH5/UpQOsZQIDBrWZdgtxa+OoPeM0vRsqA==
+"@hoprnet/hopr-core@0.6.16":
+  version "0.6.16"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core/-/hopr-core-0.6.16.tgz#4d92338b0a85a9f4c2216910d0f2a6b174186dcd"
+  integrity sha512-iWlxarbf3ajWcy0EjS8oMSTAfA7kiO3WfceDaSo4aGxvWb/dYrhfTbNWqsqF3uUTPSGTsiP+AmPA0t4nEwILVw==
   dependencies:
     "@hoprnet/hopr-core-connector-interface" "1.3.1-refactor.76c9b25"
     "@hoprnet/hopr-core-ethereum" "0.0.12-refactor.473415f"
