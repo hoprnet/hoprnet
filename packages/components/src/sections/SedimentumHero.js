@@ -41,17 +41,17 @@ const Sedimentum = props => {
             <div className="mb-32 hero-figure reveal-from-top" data-reveal-delay="200">
               <Image
                 className="has-shadow"
-                src={require('../assets/images/partners/sedimentum_colored.jpg')}
+                src={require('../assets/images/partners/sedimentum_colored_transparent.png')}
                 alt="Hero"
                 width={896 * 0.5}
                 height={504 * 0.5}
                 style={{
                   borderRadius: '15px',
+                  padding: '50px',
                 }}
               />
             </div>
           </div>
-          <SedimentumTestimonial />
           <div className="center-content" id="video">
             <div className="container-sm">
               <h2 className="section-header mt-0 mb-0 reveal-from-top" data-reveal-delay="150">
@@ -72,6 +72,7 @@ const Sedimentum = props => {
               />
             </div>
           </div>
+          <SedimentumTestimonial />
         </div>
       </GenericSection>
       <GenericSection id="how" {...evenSections}>
