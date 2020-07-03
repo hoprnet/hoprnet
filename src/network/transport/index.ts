@@ -357,7 +357,7 @@ class TCP {
       throw Error(
         `Could not establish relayed connection to ${chalk.blue(destination.toB58String())} over relay ${relays[
           index
-        ].id.toB58String()}`
+        ].id.toB58String()}. Answer was: <${new TextDecoder().decode(answer)}>`
       )
     }
 
@@ -599,6 +599,7 @@ class TCP {
         )} asked to establish relayed connection to invalid counterparty. Error was ${err}. Received message ${pubKeySender}`
       )
       shaker.write(FAIL)
+      shaker.rest()
       return
     }
 
@@ -655,28 +656,12 @@ class TCP {
     pipe(
       // prettier-ignore
       shaker.stream,
-      // (source: AsyncIterable<Uint8Array>) => {
-      //   return (async function* () {
-      //     for await (const msg of source) {
-      //       console.log(`forwarding msg`, msg)
-      //       yield msg
-      //     }
-      //   })()
-      // },
       relayShaker.stream
     )
 
     pipe(
       // prettier-ignore
       relayShaker.stream,
-      // (source: AsyncIterable<Uint8Array>) => {
-      //   return (async function* () {
-      //     for await (const msg of source) {
-      //       console.log(`forwarding msg`, msg)
-      //       yield msg
-      //     }
-      //   })()
-      // },
       shaker.stream
     )
 
