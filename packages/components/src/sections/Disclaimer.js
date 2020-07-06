@@ -4,6 +4,8 @@ import GenericSection from './GenericSection'
 import Image from '../elements/Image'
 import { SectionProps } from '../utils/SectionProps'
 
+const isCompany = process.env.REACT_APP_IS_COMPANY === 'TRUE'
+
 const propTypes = {
   children: PropTypes.node,
   ...SectionProps.types,
@@ -38,7 +40,9 @@ const Disclaimer = props => {
             Imprint/Disclaimer
             <br />
             <br />
-            This website is operated by HOPR, c/o Froriep Legal AG, Bellerivestrasse 201, 8008 Zürich, Switzerland.
+            {isCompany
+              ? 'This website is operated by HOPR Services AG, Rebbergstrasse 33, 8706 Meilen, Switzerland.'
+              : 'This website is operated by HOPR, c/o Froriep Legal AG, Bellerivestrasse 201, 8008 Zürich, Switzerland.'}
             <br />
             By using our website, you accept and agree to be bound and abide by the following terms and conditions. If
             you do not want to agree to these terms and conditions, you must not access or use our website.
