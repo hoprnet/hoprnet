@@ -5,6 +5,8 @@ import { ReactComponent as Telegram } from '../../assets/images/icons/telegram.s
 import { ReactComponent as Linkedin } from '../../assets/images/icons/linkedin.svg'
 import { ReactComponent as Github } from '../../assets/images/icons/github.svg'
 
+const isCompany = process.env.REACT_APP_IS_COMPANY === 'TRUE'
+
 const FooterSocial = ({ className, ...props }) => {
   const classes = classNames('footer-social', className)
 
@@ -22,7 +24,11 @@ const FooterSocial = ({ className, ...props }) => {
           </a>
         </li>
         <li>
-          <a href="https://www.linkedin.com/company/hoprnet" target="_blank" rel="noopener noreferrer">
+          <a
+            href={`https://www.linkedin.com/company/${isCompany ? 'hoprswiss' : 'hoprnet'}`}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
             <Linkedin />
           </a>
         </li>

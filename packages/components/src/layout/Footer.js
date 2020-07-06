@@ -15,6 +15,8 @@ const defaultProps = {
   topDivider: false,
 }
 
+const isCompany = process.env.REACT_APP_IS_COMPANY === 'TRUE'
+
 class Footer extends React.Component {
   render() {
     const { className, topOuterDivider, topDivider, ...props } = this.props
@@ -35,7 +37,9 @@ class Footer extends React.Component {
             </div>
             <div className="footer-bottom space-between text-xxs invert-order-desktop">
               <FooterNav />
-              <div className="footer-copyright">&copy; 2020 HOPR Association, all rights reserved</div>
+              <div className="footer-copyright">
+                &copy; 2020 HOPR {isCompany ? 'Services AG' : 'Association'}, all rights reserved
+              </div>
             </div>
           </div>
         </div>
