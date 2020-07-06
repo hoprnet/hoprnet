@@ -107,7 +107,7 @@
     "extension": [
       "ts"
     ],
-    "spec": "src/network/transport/*.spec.ts",
+    "spec": "src/**/*.spec.ts",
     "require": "ts-node/register"
   },
   "prettier": {

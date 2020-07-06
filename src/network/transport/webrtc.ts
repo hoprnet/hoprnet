@@ -7,11 +7,14 @@ import Peer, { Options as SimplePeerOptions } from 'simple-peer'
 
 import debug from 'debug'
 const log = debug('hopr-core:transport')
+const error = debug('hopr-core:transport:error')
 
 import pipe from 'it-pipe'
 
 // @ts-ignore
 import wrtc = require('wrtc')
+import { WEBRTC_TIMEOUT } from './constants'
+import { randomBytes } from 'crypto'
 
 const _encoder = new TextEncoder()
 const _decoder = new TextDecoder()
@@ -25,6 +28,7 @@ export default function upgradetoWebRTC(
     // ONLY FOR TESTING
     _timeoutIntentionallyOnWebRTC?: Promise<void>
     _failIntentionallyOnWebRTC?: boolean
+    _answerIntentionallyWithIncorrectMessages?: boolean
     // END ONLY FOR TESTING
   }
 ): Promise<Socket> {
@@ -62,10 +66,10 @@ export default function upgradetoWebRTC(
       clearTimeout(timeout)
       channel.destroy()
 
-      reject()
+      reject(new Error('timeout'))
     }
 
-    timeout = setTimeout(onTimeout, 700)
+    timeout = setTimeout(() => onTimeout(), WEBRTC_TIMEOUT)
 
     const done = async (err?: Error) => {
       clearTimeout(timeout)
@@ -81,26 +85,30 @@ export default function upgradetoWebRTC(
 
       options?.signal?.removeEventListener('abort', onAbort)
 
-      if (!err && !this._failIntentionallyOnWebRTC) {
-        resolve((channel as unknown) as Socket)
-      } else {
+      if (err || options?._failIntentionallyOnWebRTC) {
         reject(err)
+      } else {
+        resolve((channel as unknown) as Socket)
       }
     }
 
     const onAbort = () => {
       channel.destroy()
+      clearTimeout(timeout)
 
-      setImmediate(reject)
+      reject()
     }
 
     const onSignal = (data: string): void => {
       if (options?.signal?.aborted) {
-        console.log('aborted')
         return
       }
 
-      sinkBuffer.push(_encoder.encode(JSON.stringify(data)))
+      if (options?._answerIntentionallyWithIncorrectMessages) {
+        sinkBuffer.push(randomBytes(31))
+      } else {
+        sinkBuffer.push(_encoder.encode(JSON.stringify(data)))
+      }
     }
 
     const onConnect = (): void => {
@@ -139,7 +147,12 @@ export default function upgradetoWebRTC(
             return
           }
 
-          channel.signal(JSON.parse(_decoder.decode(msg.slice())))
+          try {
+            channel.signal(JSON.parse(_decoder.decode(msg.slice())))
+          } catch (err) {
+            error(err)
+            continue
+          }
         }
       }
     )

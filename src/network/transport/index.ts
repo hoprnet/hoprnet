@@ -70,8 +70,9 @@ class TCP {
   private _useWebRTC: boolean
   private _useOwnStunServers: boolean
   // ONLY FOR TESTING
-  private _failIntentionallyOnWebRTC: boolean
+  private _failIntentionallyOnWebRTC?: boolean
   private _timeoutIntentionallyOnWebRTC?: Promise<void>
+  private _answerIntentionallyWithIncorrectMessages?: boolean
   // END ONLY FOR TESTING
   private _upgrader: Upgrader
   private _dialer: Dialer
@@ -91,6 +92,7 @@ class TCP {
     useOwnStunServers,
     failIntentionallyOnWebRTC,
     timeoutIntentionallyOnWebRTC,
+    answerIntentionallyWithIncorrectMessages,
   }: {
     upgrader: Upgrader
     libp2p: libp2p
@@ -99,6 +101,7 @@ class TCP {
     useOwnStunServers?: boolean
     failIntentionallyOnWebRTC?: boolean
     timeoutIntentionallyOnWebRTC?: Promise<void>
+    answerIntentionallyWithIncorrectMessages?: boolean
   }) {
     if (!upgrader) {
       throw new Error('An upgrader must be provided. See https://github.com/libp2p/interface-transport#upgrader.')
@@ -135,6 +138,7 @@ class TCP {
     }
 
     this._timeoutIntentionallyOnWebRTC = timeoutIntentionallyOnWebRTC
+    this._answerIntentionallyWithIncorrectMessages = answerIntentionallyWithIncorrectMessages
     this._failIntentionallyOnWebRTC = failIntentionallyOnWebRTC || false
     this._useOwnStunServers = useOwnStunServers === undefined ? USE_OWN_STUN_SERVERS : useOwnStunServers
     this._useWebRTC = useWebRTC === undefined ? USE_WEBRTC : useWebRTC
@@ -209,6 +213,7 @@ class TCP {
         let socket = await upgradeToWebRTC(webRTCsendBuffer, webRTCrecvBuffer, {
           _timeoutIntentionallyOnWebRTC: this._timeoutIntentionallyOnWebRTC,
           _failIntentionallyOnWebRTC: this._failIntentionallyOnWebRTC,
+          _answerIntentionallyWithIncorrectMessages: this._answerIntentionallyWithIncorrectMessages,
         })
 
         webRTCrecvBuffer.end()
@@ -221,7 +226,7 @@ class TCP {
           })
         )
       } catch (err) {
-        error(err)
+        error(`error while handling: ${err}`)
 
         webRTCrecvBuffer.end()
         webRTCsendBuffer.end()
@@ -303,7 +308,7 @@ class TCP {
   async establishRelayedConnection(ma: Multiaddr, relays: PeerInfo[], options?: DialOptions) {
     const destination = PeerId.createFromCID(ma.getPeerId())
 
-    if (options.signal?.aborted) {
+    if (options?.signal?.aborted) {
       throw new AbortError()
     }
 
@@ -329,7 +334,7 @@ class TCP {
       )
     }
 
-    if (options.signal?.aborted) {
+    if (options?.signal?.aborted) {
       try {
         await relayConnection.close()
       } catch (err) {
@@ -377,22 +382,22 @@ class TCP {
 
     let conn: Connection
 
-    // if (options?.signal?.aborted) {
-    //   try {
-    //     await relayConnection.baseConn.close()
-    //   } catch (err) {
-    //     error(err)
-    //   }
+    if (options?.signal?.aborted) {
+      try {
+        await relayConnection.baseConn.close()
+      } catch (err) {
+        error(err)
+      }
 
-    //   if (this._useWebRTC) {
-    //     webRTCsendBuffer?.end()
-    //     webRTCrecvBuffer?.end()
-    //   }
+      throw new AbortError()
+    }
 
-    //   throw new AbortError()
-    // }
+    if (this._useWebRTC) {
+      webRTCsendBuffer = pushable<Uint8Array>()
+      webRTCrecvBuffer = pushable<Uint8Array>()
+    }
 
-    const stream = myHandshake(webRTCsendBuffer, webRTCrecvBuffer, { signal: options.signal })
+    const stream = myHandshake(webRTCsendBuffer, webRTCrecvBuffer, { signal: options?.signal })
 
     pipe(
       // prettier-ignore
@@ -408,13 +413,11 @@ class TCP {
 
     if (this._useWebRTC) {
       try {
-        webRTCsendBuffer = pushable<Uint8Array>()
-        webRTCrecvBuffer = pushable<Uint8Array>()
-
         let socket = await upgradeToWebRTC(webRTCsendBuffer, webRTCrecvBuffer, {
           initiator: true,
           _timeoutIntentionallyOnWebRTC: this._timeoutIntentionallyOnWebRTC,
           _failIntentionallyOnWebRTC: this._failIntentionallyOnWebRTC,
+          _answerIntentionallyWithIncorrectMessages: this._answerIntentionallyWithIncorrectMessages,
         })
 
         webRTCsendBuffer.end()
@@ -428,6 +431,7 @@ class TCP {
           })
         )
       } catch (err) {
+        error(`error while dialling: ${err}`)
         webRTCsendBuffer.end()
         webRTCrecvBuffer.end()
 
@@ -650,13 +654,6 @@ class TCP {
     pipe(
       // prettier-ignore
       shaker.stream,
-      // (source: AsyncIterable<Uint8Array>) => {
-      //   return (async function* () {
-      //     for await (const msg of source) {
-      //       console.log(new TextDecoder().decode(msg))
-      //     }
-      //   })()
-      // },
       relayShaker.stream
     )
 
@@ -665,8 +662,6 @@ class TCP {
       relayShaker.stream,
       shaker.stream
     )
-
-    relayShaker.stream
   }
 
   private relayToConn({
