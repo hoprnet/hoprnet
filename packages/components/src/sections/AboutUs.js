@@ -45,6 +45,13 @@ const AboutUs = props => {
             <br />
             <br />
             Our vision is a world where privacy is available for anyone and everyone who wants it.
+            <br />
+            <br />
+            Learn more about the team that buidls the HOPR network{' '}
+            <a href="https://hopr.swiss/hopr#team" target="_blank" rel="noopener noreferrer" className="underline">
+              here
+            </a>
+            .
           </div>
         </div>
       </div>
