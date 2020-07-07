@@ -247,7 +247,7 @@ const ProfilesAssociation = () => {
           The HOPR protocol is a digital commons that is currently being built by HOPR Services AG.
           <br />
           Find out more about the HOPR Services AG team{' '}
-          <a href="https://hopr.swiss/hopr#team" target="_blank" rel="noopener noreferrer" className="underline">
+          <a href="https://hopr.swiss/who-is-HOPR#team" target="_blank" rel="noopener noreferrer" className="underline">
             here
           </a>
           .
@@ -256,7 +256,7 @@ const ProfilesAssociation = () => {
 
       <div className="tiles-item reveal-from-bottom" data-reveal-container=".tiles-wrap" data-reveal-delay="300">
         <div className="tiles-item-inner">
-          <a href="https://hopr.swiss/hopr#team" target="_blank" rel="noopener noreferrer">
+          <a href="https://hopr.swiss/who-is-HOPR#team" target="_blank" rel="noopener noreferrer">
             <div className="team-item-header">
               <div className="team-item-image mb-24 ">
                 <Image
