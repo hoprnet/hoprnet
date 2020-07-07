@@ -244,7 +244,13 @@ const ProfilesAssociation = () => {
 
       {!isCompany && (
         <div className="mt-24" style={{ width: '100%' }}>
-          The HOPR protocol is a digital commons that is currently being built by HOPR Services AG
+          The HOPR protocol is a digital commons that is currently being built by HOPR Services AG.
+          <br />
+          Find out more about the HOPR Services AG team{' '}
+          <a href="https://hopr.swiss/hopr#team" target="_blank" rel="noopener noreferrer" className="underline">
+            here
+          </a>
+          .
         </div>
       )}
 
