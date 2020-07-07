@@ -111,7 +111,7 @@ class Header extends React.Component {
                   <div className="header-nav-inner">
                     <ul className={classNames('list-reset text-ms', navPosition && `header-nav-${navPosition}`)}>
                       <li>
-                        <Link to="/who-is-HOPR" onClick={this.closeMenu}>
+                        <Link to={isCompany ? '/hopr' : '/who-is-HOPR'} onClick={this.closeMenu}>
                           ABOUT US
                         </Link>
                       </li>
