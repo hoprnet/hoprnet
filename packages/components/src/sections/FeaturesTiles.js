@@ -63,7 +63,7 @@ class FeaturesTiles extends React.Component {
             <SectionHeader data={sectionHeader} className="center-content" />
             <div className={tilesClasses}>
               <div className="tiles-item reveal-from-bottom" data-reveal-container=".tiles-wrap">
-                <a href="/we_are#enabling_data_privacy">
+                <a href="/layer0-data-privacy#enabling_data_privacy">
                   <div className="tiles-item-inner">
                     <div className="features-tiles-item-header">
                       <div className="features-tiles-item-image mb-16">
@@ -91,7 +91,7 @@ class FeaturesTiles extends React.Component {
                 data-reveal-container=".tiles-wrap"
                 data-reveal-delay="100"
               >
-                <a href="/we_are#open_source_support">
+                <a href="/layer0-data-privacy#open_source_support">
                   <div className="tiles-item-inner">
                     <div className="features-tiles-item-header">
                       <div className="features-tiles-item-image mb-16">
@@ -124,7 +124,7 @@ class FeaturesTiles extends React.Component {
                     data-reveal-container=".tiles-wrap"
                     data-reveal-delay="200"
                   >
-                    <a href="/we_are#community">
+                    <a href="/layer0-data-privacy#community">
                       <div className="tiles-item-inner">
                         <div className="features-tiles-item-header">
                           <p className="mt-0 mb-24 text-sm">Personal</p>

@@ -172,6 +172,29 @@ const NodeHero = props => {
           </div>
         </div>
       </GenericSection>
+      <GenericSection id="privacy_form" {...evenSections}>
+        <div className="center-content">
+          <div className="container-sm">
+            {/* <SectionHeader
+          data={{
+            title: 'HOPR node order:',
+            paragraph: undefined,
+          }}
+        /> */}
+            <iframe
+              title="HOPR Defenders of Privacy"
+              src="https://docs.google.com/forms/d/e/1FAIpQLSeEM5Mmx-R0JAx164gP9X64QMCFUD-azmfZgyOR0wb1bP8PfA/viewform?embedded=true&hl=en"
+              width="700"
+              height="650"
+              frameBorder="0"
+              marginHeight="0"
+              marginWidth="0"
+            >
+              Loading…
+            </iframe>
+          </div>
+        </div>
+      </GenericSection>
     </>
   )
 }

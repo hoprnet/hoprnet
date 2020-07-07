@@ -116,7 +116,7 @@ const Ecosystem = props => {
               <div style={{ backgroundColor: '#53A3B9' }}>
                 <h4>Beach Level:</h4>
                 Tackle our technical bounties on{' '}
-                <a href="/we_are#bounties" className="underline">
+                <a href="/layer0-data-privacy#bounties" className="underline">
                   Gitcoin
                 </a>{' '}
                 and receive $ + HOPR Token
@@ -124,7 +124,7 @@ const Ecosystem = props => {
               <div style={{ backgroundColor: '#164856' }}>
                 <h4>Alpine Level:</h4>
                 Hack your project and get rewarded during an upcoming HOPR Hackathon{' '}
-                <a href="/we_are#bounties" className="underline">
+                <a href="/layer0-data-privacy#bounties" className="underline">
                   Gitcoin
                 </a>
               </div>

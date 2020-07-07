@@ -17,9 +17,9 @@ class App extends React.Component {
     document.body.classList.add('is-loaded')
     this.refs.scrollReveal.init()
 
-    // add silkworm analytics
-    const script = insertScript('https://silkworm.hoprnet.io/script.js')
-    script.setAttribute('site', 'DJJBUEUD')
+    // add fathom analytics
+    const script = insertScript('https://coyote.hopr.swiss/script.js')
+    script.setAttribute('site', 'OXJHRYAB')
     script.setAttribute('spa', 'auto')
   }
 

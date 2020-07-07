@@ -24,18 +24,6 @@ const Disclaimer = props => {
           <h2 className="section-header mt-0 mb-0 reveal-from-top" data-reveal-delay="150">
             Disclaimer
           </h2>
-          <div className="mb-32 hero-figure reveal-from-top" data-reveal-delay="200">
-            <Image
-              className="has-shadow"
-              src={require('../assets/images/disclaimer.jpg')}
-              alt="disclaimer"
-              width={896 / 10}
-              height={504 / 10}
-              style={{
-                borderRadius: '15px',
-              }}
-            />
-          </div>
           <div className="pt-32 ta-l reveal-from-top" data-reveal-delay="300">
             Imprint/Disclaimer
             <br />

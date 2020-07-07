@@ -65,7 +65,7 @@ class Products extends React.Component {
             HOPR keeps any exchange of data private.
             <br />
             The{' '}
-            <a href="/we_are#how">
+            <a href="/layer0-data-privacy#how">
               <span className="text-color-high">HOPR protocol</span>
             </a>{' '}
             is a layer-0 privacy foundation for anyone to{' '}
