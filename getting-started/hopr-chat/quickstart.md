@@ -86,3 +86,5 @@ Running these commands will show you a similar screen as the following one. Cong
 Share your address with the `myAddress` command to other people and send messages with `send $ADDRESS`. You can find other people connected using `crawl`, although sometimes it might take a bit to load. Use the `tab` to autocomplete addresses and commands, and quit the application running `quit`.
 {% endhint %}
 
+For more detailed instructions, go to the next page, where you can find more specific instructions on how to get started with the Developer's Setup.
+
