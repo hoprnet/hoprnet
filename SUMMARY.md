@@ -7,7 +7,7 @@
 * [Overview](getting-started/overview.md)
 * [HOPR Chat](getting-started/hopr-chat/README.md)
   * [Quickstart](getting-started/hopr-chat/quickstart.md)
-  * [Setup](getting-started/hopr-chat/setup.md)
+  * [Developer Setup](getting-started/hopr-chat/setup.md)
   * [Releases](getting-started/hopr-chat/releases.md)
   * [Bootstrap Nodes](getting-started/hopr-chat/bootstrap-nodes.md)
   * [Funding account](getting-started/hopr-chat/funding-account.md)
