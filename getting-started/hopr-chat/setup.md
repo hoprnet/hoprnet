@@ -14,7 +14,7 @@ Depending on your device capabilities, pick the method that will work best for y
 
 ### Using Docker
 
-Using Docker  allows you quickly get started with **HOPR Chat** without having to download any other software. However, there are hardware requirements you should be aware of.
+Using Docker allows you quickly get started with **HOPR Chat** without having to download any other software. However, there are hardware requirements you should be aware of.
 
 To use Docker, you will need a device that supports hardware-level virtualisation: VT-x for Intel-based PCs and AMD-V for AMD processors. Most Mac and Linux machines support this out of the box,  but for PC you will need to make sure it's turned on and perhaps enable it in the BIOS settings. It will be different for different BIOS, just look for VT-x / AMD-V switch.
 
@@ -41,13 +41,13 @@ Depending of your distribution, please follow the official guidelines for how to
 {% endtab %}
 
 {% tab title="Windows 10 Home" %}
-1. Go to [Docker Hub](https://docs.docker.com/toolbox/overview/) to download **Docker Toolbox** in your computer.
+1. Go to [Docker Hub](https://docs.docker.com/toolbox/overview/) to download **Docker Toolbox** to your computer.
 2. Follow-up the wizard steps to ensure Docker is installed.
 3. Ensure the installation was successful by running `docker ps`
 {% endtab %}
 
 {% tab title="Windows 10 Pro" %}
-1. Go to [Docker ](https://www.docker.com/products/docker-desktop)and download **Docker Desktop** in your computer.
+1. Go to [Docker ](https://www.docker.com/products/docker-desktop)and download **Docker Desktop** to your computer.
 2. Follow-up the wizard steps to ensure Docker is installed.
 3. Ensure the installation was successful by running `docker ps`
 {% endtab %}
@@ -59,19 +59,19 @@ Once Docker is up and running, you need to download a valid **HOPR Chat** Docker
 
 ![Currently HOPR Chat is about ~0.5 GB, please be patient.](../../.gitbook/assets/docker_install_macos.gif)
 
-To ensure your machine has successfully downloaded **HOPR Chat,** run `docker images`.You will be shown the **HOPR Chat** image being installed locally, ready to be run.
+To ensure your machine has successfully downloaded **HOPR Chat,** run `docker images`. You will be shown the **HOPR Chat** image being installed locally, ready to be run.
 
 ![HOPR Chat distributed as a Docker image](../../.gitbook/assets/docker_images.gif)
 
-### Using Nodejs
+### Using Node.js
 
-The Nodejs setup allows you to run **HOPR Chat** as a Nodejs application, ensuring your experience is a close as to the developer’s have when developing **HOPR Chat** and the **HOPR Core** protocol. Nodejs might require further software installation, but is able to be run in less hardware demanding machines, while taking considerable less space in comparison to Docker \(i.e. 50mb\).
+Using Node.js allows you to run **HOPR Chat** as a Node.js application, ensuring your experience is as close as possible to the one the developers had when developing **HOPR Chat** and the **HOPR Core** protocol. Node.js might require further software installation, but is can be run on machines with lower hardware specifications. It also takes up considerably less space than Docker \(approx. 50MB vs approx. 1GB\).
 
-#### How to Install Nodejs using NVM
+#### How to Install Node.js using nvm
 
-To use Nodejs, we recommend installing [nvm](https://github.com/nvm-sh/nvm), a Nodejs version manager. This ensures we can install and uninstall as many versions of Nodejs as needed. Furthermore, it will help you installing any additional requirements \(if any\) for running Nodejs. In case of Windows, you will need [nvm-windows](https://github.com/coreybutler/nvm-windows), which is its PC equivalent.
+To use Node.js, we recommend installing [nvm](https://github.com/nvm-sh/nvm), a Node.js version manager. This ensures we can install and uninstall as many versions of Node.js as needed. It will also help if you have any additional installation requirements for running Node.js. If you're using Windows, you will need [nvm-windows](https://github.com/coreybutler/nvm-windows), which is its PC equivalent.
 
-To install nvm in Linux or macos, please follow the instructions in their [GitHub website](https://github.com/nvm-sh/nvm), or run any of the following commands in your terminal instead \(will use nvm `v0.35.3`\) depending on whether you have `curl` or `wget` in your system. 
+To install nvm on Linux or macOS, please follow the instructions on their [GitHub website](https://github.com/nvm-sh/nvm), or run any of the following commands in your terminal instead \(we will use nvm `v0.35.3`\) depending on whether you have `curl` or `wget` in your system. 
 
 {% tabs %}
 {% tab title="cURL" %}
@@ -87,15 +87,15 @@ wget -qO- https://raw.githubusercontent.com/nvm-sh/nvm/v0.35.3/install.sh | bash
 {% endtab %}
 {% endtabs %}
 
-For Windows, download nvm-windows latest binary available in their [releases](https://github.com/coreybutler/nvm-windows/releases) page.
+For Windows, download the nvm-windows latest binary, available on their [releases](https://github.com/coreybutler/nvm-windows/releases) page.
 
-**Installing Nodejs**
+**Installing Node.js**
 
-After you have downloaded and setup nvm in your machine \(run `nvm ls` to ensure everything is in place\), now you need to install a specific version of Nodejs before running **HOPR Chat**.
+Once you have downloaded and set up nvm on your machine \(run `nvm ls` to ensure everything is in place\), you will need to install a specific version of Node.js before running **HOPR Chat**.
 
-At the time of writing, **HOPR Chat** runs on Nodejs `>v12`. Specifically, **HOPR Chat** has been developed and tested in `v12.9.1`, so in case you run on any issues with **HOPR Chat,**  try switch to `v12.9.1` to see if those issues disappear.
+At the time of writing, **HOPR Chat** runs on Nodejs `>v12`. Specifically, **HOPR Chat** has been developed and tested in `v12.9.1` \(so if you run into any issues with **HOPR Chat,** try switching to `v12.9.1` to see if they disappear\).
 
-To install Nodejs with nvm, run the following in your Terminal, Bash or Powershell.
+To install Node.js with nvm, run the following in your Terminal, Bash or Powershell.
 
 ```text
 $ nvm install v12.9.1
@@ -110,7 +110,7 @@ If everything was done properly, you can run `node --version` to see your curren
 
 ### **Using Docker**
 
-To run **HOPR Chat** via Docker**,** you need to copy and paste the following command. You can replace `switzerland` for anything else, but ensure to always use the same password as this will be used by **HOPR Chat**. Furthermore, you can also use your own [Infura](https://infura.io/) credentials instead of the ones provided here, but ensure you use the Kovan provider, as currently **HOPR Core** Ethereum contracts are only deployed there.
+To run **HOPR Chat** via Docker**,** you need to copy and paste the following command. You can replace `switzerland` with anything else, but make sure you always use the same password as this will be used by **HOPR Chat**. You can also use your own [Infura](https://infura.io/) credentials instead of the ones provided here, but ensure you use the Kovan provider, as the **HOPR Core** Ethereum contracts are currently only deployed there.
 
 #### macOS/Linux commands
 
@@ -162,23 +162,23 @@ docker run -v %cd%/db:/app/db ^
 
 You will be welcomed by the following message.
 
-In case you see an `Unable to connect to Bootstrap node` message, use other bootstrap nodes \(marked as `ch-t-01` and `ch-t-02`\). You can learn more about Bootstrap Nodes in our page.
+If you get an `Unable to connect to Bootstrap node` message, use one of the other bootstrap nodes \(marked as `ch-t-01` and `ch-t-02`\). You can learn more about Bootstrap Nodes on the page linked below.
 
 {% page-ref page="bootstrap-nodes.md" %}
 
-After running any of these commands, you will be welcomed by **HOPR Chat**’s introductory screen which provides you with further instructions.
+After running any of these commands, you will be welcomed by **HOPR Chat**’s introductory screen, which provides you with further instructions.
 
 ![](../../.gitbook/assets/hopr.gif)
 
 {% hint style="info" %}
-Depending on your configuration and version of **HOPR Chat**, you might need to fund your **HOPR Chat** account with some tokens. Please follow our “**Funding your account**” Page for those cases.
+Depending on your configuration and version of **HOPR Chat**, you might need to fund your **HOPR Chat** account with some tokens. If so, please visit the “**Funding your account**” page below.
 {% endhint %}
 
 {% page-ref page="funding-account.md" %}
 
-### Using Nodejs
+### Using Node.js
 
-To run **HOPR Chat** via Nodejs**,** you need to download our pre-compiled binary for each version. You can find these binaries in our [Releases](https://github.com/hoprnet/hopr-core/releases) page inside a zip file. Version `1.1.4-dev` used for generating this documentation is available [here](https://github.com/hoprnet/hopr-core/releases/tag/1.1.4-dev.64c3c2b).
+To run **HOPR Chat** via Node.js**,** you need to download our pre-compiled binary for each version. You can find these binaries in our [Releases](https://github.com/hoprnet/hopr-core/releases) page inside a zip file. Version `1.1.4-dev` used for generating this documentation is available [here](https://github.com/hoprnet/hopr-core/releases/tag/1.1.4-dev.64c3c2b).
 
 ![Please select the correct distribution for your operating system.](../../.gitbook/assets/image%20%288%29.png)
 
@@ -198,10 +198,10 @@ On Windows, double-click the file named `hopr-chat.bat` or right-click and selec
 {% endtab %}
 {% endtabs %}
 
-As soon as you double-click in the executable file, you will be welcomed by the **HOPR Chat** initial message, which might look different depending on your OS. A password will be required, and every time you run **HOPR Chat** it will prompt it again.
+As soon as you double-click the executable file, you will be welcomed by the **HOPR Chat** initial message, which might look different depending on your OS. A password will be required, and every time you run **HOPR Chat** it will prompt you for the password again.
 
 {% hint style="info" %}
-Since **HOPR Chat** is being distributed as a Nodejs binary, the included pre-compiled binary [might trigger some prompts in macos](https://docs.hoprnet.io/home/getting-started/hopr-chat/troubleshooting) which you will need to accept and provided access through. To work around these issues, please see our Troubleshooting guide under the **HOPR Chat** page in the tutorial.
+Since **HOPR Chat** is being distributed as a Node.js binary, the included pre-compiled binary [might trigger some prompts in macOS](https://docs.hoprnet.io/home/getting-started/hopr-chat/troubleshooting) which you will need to accept and provide access for. To work around these issues, please see our Troubleshooting guide.
 {% endhint %}
 
 {% page-ref page="troubleshooting.md" %}
