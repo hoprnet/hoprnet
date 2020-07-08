@@ -165,9 +165,10 @@ class Crawler<Chain extends HoprCoreConnector> {
 
     this.printStatsAndErrors(contactedPeerIds, errors, current, before)
 
-    if (!isDone()) {
-      throw Error(`Unable to find enough other nodes in the network.`)
-    }
+    // @TODO re-enable this once routing is done properly.
+    // if (!isDone()) {
+    //   throw Error(`Unable to find enough other nodes in the network.`)
+    // }
   }
 
   handleCrawlRequest() {
