@@ -4,9 +4,11 @@ description: >-
   Setup
 ---
 
-# Developer Setup
+# Advanced Setup
 
-This detailed setup will show you how to use **HOPR** by installing **HOPR Chat** on your system using Docker or Nodejs on your computer. In this step-by-step guide, we will download the adequate software, run **HOPR Chat,** and send a message to another user in the **HOPR network,** in the same way the developers of **HOPR Chat** do.
+This setup will show you how to use **HOPR** by installing **HOPR Chat** on your system using Docker or Nodejs on your computer. In this step-by-step guide, we will download the adequate software, run **HOPR Chat,** and send a message to another user in the **HOPR network,** in the same way the developers of **HOPR Chat** do. For a faster quick start, use our Quickstart guide.
+
+{% page-ref page="quickstart.md" %}
 
 Depending on your device capabilities, pick the method that works best for you. Using Docker is faster than using Nodejs, but has higher hardware and disk space requirements. In the other hand, Nodejs requires a bit more setup, but can be completed by even limited devices.
 
