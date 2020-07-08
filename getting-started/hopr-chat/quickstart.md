@@ -87,15 +87,15 @@ Go to our [GitHub Releases Page](https://github.com/hoprnet/hopr-core/releases) 
 
 {% tabs %}
 {% tab title="Windows" %}
-* [Download the latest Windows release.](https://github.com/hoprnet/hopr-core/releases/download/1.1.6-dev.c992f25/hopr-chat-nodebin-windows.zip)
+* [Download the latest Windows release.](https://github.com/hoprnet/hopr-core/releases/download/1.1.6-testnet.c7aea14/hopr-chat-nodebin-windows.zip)
 {% endtab %}
 
 {% tab title="MacOS" %}
-* [Download the latest macOS release.](https://github.com/hoprnet/hopr-core/releases/download/1.1.6-dev.c992f25/hopr-chat-nodebin-macos.zip)
+* [Download the latest macOS release.](https://github.com/hoprnet/hopr-core/releases/download/1.1.6-testnet.c7aea14/hopr-chat-nodebin-macos.zip)
 {% endtab %}
 
 {% tab title="Linux" %}
-* [Download the latest Linux release.](https://github.com/hoprnet/hopr-core/releases/download/1.1.6-dev.c992f25/hopr-chat-nodebin-linux.zip)
+* [Download the latest Linux release.](https://github.com/hoprnet/hopr-core/releases/download/1.1.6-testnet.c7aea14/hopr-chat-nodebin-linux.zip)
 {% endtab %}
 {% endtabs %}
 
@@ -120,6 +120,12 @@ For Windows, double-click on the file named `hopr-chat` with `.bat` extension an
 For macOS, double-click on the file named `hopr-chat.command` with `.command` extension and described as `Terminal shell script` on its Kind attribute.
 
 ![HOPR Chat Executable for macOS](../../.gitbook/assets/image%20%2812%29.png)
+
+When opening the `hopr-chat.command` file, you will be prompted by `Gatekeeper`, the security mechanism from macos, that the application has been downloaded by a non-recognised URL. This is a security mecanism activated by default in macos.
+
+To go ahead, you will need to tell `Gatekeeper` that the application is to be trusted. To do so, open `Security & Privacy` in your `System Preferences` and click `Open Anyway`under the `General` tab. This will prompt `Gatekeeper` to ask you again to open **HOPR Chat** with an option to actually run it. Select `Open` and you will see **HOPR Chat** in your screen.
+
+![](../../.gitbook/assets/hopr_macos_gatekeeper.webp)
 {% endtab %}
 
 {% tab title="Linux" %}
