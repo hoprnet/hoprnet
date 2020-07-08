@@ -171,7 +171,7 @@ const Community = props => (
     <div className="center-content">
       <div className="container-sm">
         <h2 className="section-header mt-0 mb-0 reveal-from-top" data-reveal-delay="150">
-          Gitcoin Bounties
+          Work on Bounties
         </h2>
         <div className="reveal-from-top" data-reveal-delay="300">
           Why wouldn't you get paid for developing open source software?

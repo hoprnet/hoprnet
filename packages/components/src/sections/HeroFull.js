@@ -46,9 +46,9 @@ class HeroFull extends React.Component {
         <div className="container-sm">
           <div className={innerClasses}>
             <div className="hero-content">
-              <h1 className="mt-0 mb-16 reveal-from-top" data-reveal-delay="150">
+              {/* <h1 className="mt-0 mb-16 reveal-from-top" data-reveal-delay="150">
                 {isCompany ? 'HOPR Services' : 'HOPR'}
-              </h1>
+              </h1> */}
               <div className="container-sm">
                 <p className="m-0 mb-32 reveal-from-top" data-reveal-delay="300">
                   {isCompany ? (
@@ -66,8 +66,8 @@ class HeroFull extends React.Component {
             <div className="hero-figure reveal-from-bottom" data-reveal-delay="600">
               <Image
                 className="has-shadow"
-                src={require('../assets/images/hopr-illustration.png')}
-                alt="Hero"
+                src={require('../assets/images/Layer0-Medical-Data-Privacy-Blockchain.png')}
+                alt="image of layer0 data privacy blockchain solution for Web3"
                 width={896}
                 height={504}
                 style={{
