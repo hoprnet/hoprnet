@@ -25,8 +25,8 @@ const AboutUs = props => {
           <div className="mb-32 hero-figure reveal-from-top" data-reveal-delay="200">
             <Image
               className="has-shadow"
-              src={require('../assets/images/hopr-illustration-small.png')}
-              alt="Hero"
+              src={require('../assets/images/Web3-Data-Privacy.png')}
+              alt="image of Web3 data privacy and protection"
               width={896}
               height={504}
               style={{

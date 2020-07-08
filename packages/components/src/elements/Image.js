@@ -32,6 +32,8 @@ class Image extends React.Component {
   }
 
   handlePlaceholder = (img, placeholder) => {
+    const displayBefore = img.style.display
+
     img.style.display = 'none'
     img.before(placeholder)
     placeholder.src = this.placeholderSrc(img.getAttribute('width') || 0, img.getAttribute('height') || 0)
@@ -42,7 +44,7 @@ class Image extends React.Component {
 
     img.addEventListener('load', () => {
       placeholder.remove()
-      img.style.display = ''
+      img.style.display = displayBefore
       this.setState({
         isLoaded: true,
       })

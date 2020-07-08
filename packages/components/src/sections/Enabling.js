@@ -26,8 +26,8 @@ const Enabling = props => {
             <div className="mb-32 hero-figure reveal-from-top" data-reveal-delay="200">
               <Image
                 className="has-shadow"
-                src={require('../assets/images/hopr-illustration-small.png')}
-                alt="Hero"
+                src={require('../assets/images/Web3-Data-Privacy.png')}
+                alt="image of Web3 data privacy and protection"
                 width={896}
                 height={504}
                 style={{
@@ -41,7 +41,7 @@ const Enabling = props => {
               issue requiring government intervention and the creation of entire compliance departments.
               <br />
               <br />
-              GDPR, HIIPA, CCPA and other regulation is like a band-aid on a broken leg. At HOPR, we're building the
+              GDPR, HIPAA, CCPA and other regulation is like a band-aid on a broken leg. At HOPR, we're building the
               foundations for a whole new approach: privacy infrastructure that can be used by corporations and
               individuals to build privacy-first applications and services on the web or blockchain.
               <br />

@@ -43,8 +43,8 @@ const NodeHero = props => {
             <div className="mb-32 hero-figure reveal-from-top" data-reveal-delay="200">
               <Image
                 className="has-shadow"
-                src={require('../assets/images/hopr-illustration-small.png')}
-                alt="Hero"
+                src={require('../assets/images/Web3-Data-Privacy.png')}
+                alt="image of Web3 data privacy and protection"
                 width={896}
                 height={504}
                 style={{
@@ -95,8 +95,8 @@ const NodeHero = props => {
           }}
         /> */}
             <iframe
-              title="Order a HOPR node"
-              src="https://docs.google.com/forms/d/e/1FAIpQLSc-3tJTsrJtxFD4B9DwaY6V3165Z0sicut4yb9D4NryqsRJhQ/viewform?embedded=true&hl=en"
+              title="HOPR Defenders of Privacy"
+              src="https://docs.google.com/forms/d/e/1FAIpQLSeEM5Mmx-R0JAx164gP9X64QMCFUD-azmfZgyOR0wb1bP8PfA/viewform?embedded=true&hl=en"
               width="700"
               height="650"
               frameBorder="0"
@@ -117,11 +117,11 @@ const NodeHero = props => {
 
             <ol style={{ textAlign: 'left' }}>
               <li>
-                Add your name to ensure you are one of the first to be notified about details of HOPR nodes, including
+                Add your email to ensure you are one of the first to be notified about details of HOPR nodes, including
                 availability, specifications, price, and shipment dates.
               </li>
               <li>
-                Subscribing does NOT guarantee delivery of a HOPR node. You will receive an email in mid-July, after
+                Subscribing does NOT guarantee delivery of a HOPR node. You will receive an email in mid-August, after
                 which you will be able to purchase a HOPR node. (naturally, you can also install and run a HOPR node on
                 a device of your choice)
               </li>
@@ -139,11 +139,14 @@ const NodeHero = props => {
             <h2 className="section-header mt-0 mb-0 reveal-from-top" data-reveal-delay="150">
               <span style={{ color: '#53A3B9' }}>Jump the waitlist</span>
               <br />
-              Gitcoin Bounties
+              Work on Bounties
             </h2>
-            Why wouldn't you get paid for developing open source software? Check out our bounties on Gitcoin - some are
-            fairly beginner-friendly while some require more in-depth knowledge of the HOPR protocol. HOPR is built by
-            the community for the community <span className="text-color-high">(coming mid-July 2020)</span>.
+            Why wouldn't you get paid for supporting open source software? Check out our bounties that we post on our{' '}
+            <a href="https://t.me/hoprnet" target="_blank" rel="noopener noreferrer" className="underline">
+              Telegram channel
+            </a>{' '}
+            or Gitcoin - some are fairly beginner-friendly while some require more in-depth knowledge of the HOPR
+            protocol. HOPR is built by the community for the community.
             <br />
             <br />
             The positive side-effect. Participating in Bounties makes you end up on top of the waitlist.
@@ -161,7 +164,7 @@ const NodeHero = props => {
             issue requiring government intervention and the creation of entire compliance departments.
             <br />
             <br />
-            GDPR, HIIPA, CCPA and other regulation is like a band-aid on a broken leg. At HOPR, we're building the
+            GDPR, HIPAA, CCPA and other regulation is like a band-aid on a broken leg. At HOPR, we're building the
             foundations for a whole new approach: privacy infrastructure that can be used by corporations and
             individuals to build privacy-first applications and services on the web or blockchain.
             <br />
@@ -169,29 +172,6 @@ const NodeHero = props => {
             The HOPR protocol provides network-level and metadata privacy for every kind of data exchange. A mixnet
             protects the identity of both sender and recipient by routing data via relayers who mix traffic and earn
             HOPR tokens for their efforts.
-          </div>
-        </div>
-      </GenericSection>
-      <GenericSection id="privacy_form" {...evenSections}>
-        <div className="center-content">
-          <div className="container-sm">
-            {/* <SectionHeader
-          data={{
-            title: 'HOPR node order:',
-            paragraph: undefined,
-          }}
-        /> */}
-            <iframe
-              title="HOPR Defenders of Privacy"
-              src="https://docs.google.com/forms/d/e/1FAIpQLSeEM5Mmx-R0JAx164gP9X64QMCFUD-azmfZgyOR0wb1bP8PfA/viewform?embedded=true&hl=en"
-              width="700"
-              height="650"
-              frameBorder="0"
-              marginHeight="0"
-              marginWidth="0"
-            >
-              Loading…
-            </iframe>
           </div>
         </div>
       </GenericSection>
