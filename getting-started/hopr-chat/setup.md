@@ -1,26 +1,24 @@
 ---
-description: >-
-  Get familiar with HOPR by using HOPR Chat in your system using the Developer
-  Setup
+description: Learn  advanced setup information for using HOPR Chat on your system
 ---
 
 # Advanced Setup
 
-This setup will show you how to use **HOPR** by installing **HOPR Chat** on your system using Docker or Nodejs on your computer. In this step-by-step guide, we will download the adequate software, run **HOPR Chat,** and send a message to another user in the **HOPR network,** in the same way the developers of **HOPR Chat** do. For a faster quick start, use our Quickstart guide.
+This setup guide will show you how to use **HOPR** by installing **HOPR Chat** on your system using Docker or Node.js. In this step-by-step guide, we will download the necessary software, run **HOPR Chat,** and send a message to another user in the **HOPR network,** in the same way the developers of **HOPR Chat** do. For a faster quick start, use our Quickstart guide.
 
 {% page-ref page="quickstart.md" %}
 
-Depending on your device capabilities, pick the method that works best for you. Using Docker is faster than using Nodejs, but has higher hardware and disk space requirements. In the other hand, Nodejs requires a bit more setup, but can be completed by even limited devices.
+Depending on your device capabilities, pick the method that will work best for you. Using Docker is faster than using Node.js, but has higher hardware and disk space requirements. On the other hand, Node.js requires a bit more setup, but can be completed by even limited devices.
 
 ## Setting up your machine for HOPR Chat
 
 ### Using Docker
 
-The Docker setup allows you quickly get started with **HOPR Chat** without having to download any other software requirements in your machine. This allows you to quickly get started using the system, but has some hardware requirements to be aware of.
+Using Docker  allows you quickly get started with **HOPR Chat** without having to download any other software. However, there are hardware requirements you should be aware of.
 
-To use Docker, you will need a device that supports hardware-level virtualisation: VT-x for Intel-based PCs and AMD-V for AMD processors. Most of the Mac and Linux machines support it out of the box,  but for PC you will need to make sure it's turned on and perhaps enable it in the BIOS settings. It will be different for different BIOS, just look for VT-x / AMD-V switch.
+To use Docker, you will need a device that supports hardware-level virtualisation: VT-x for Intel-based PCs and AMD-V for AMD processors. Most Mac and Linux machines support this out of the box,  but for PC you will need to make sure it's turned on and perhaps enable it in the BIOS settings. It will be different for different BIOS, just look for VT-x / AMD-V switch.
 
-Additionally, ensure you have enough memory \(e.g. 2 GB\) and disk space \(e.g. 1 GB\) before starting.
+Additionally, ensure you have enough memory \(approx. 2 GB\) and disk space \(approx. 1 GB\) before starting.
 
 #### How to Install Docker
 
