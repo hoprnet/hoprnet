@@ -1,18 +1,49 @@
-import React from 'react'
-import { Document, Page, pdfjs } from 'react-pdf'
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.js`;
-import 'react-pdf/dist/Page/AnnotationLayer.css';
+import React, { useState, useRef } from 'react';
+import { usePdf } from '@mikecousins/react-pdf';
 
-const EmbedPdf = ({ src, ...props }) => {
+const EmbedPdf = ({ src }) => {
+  const [page, setPage] = useState(1);
+  const canvasRef = useRef(null);
+
+  const { pdfDocument } = usePdf({
+    file: src,
+    page,
+    canvasRef,
+    scale: 2
+  });
+
   return (
-    <Document file={src}>
-      <Page />
-    </Document>
-  )
-}
-
-const EmbedPdf = () => {
-  return <h1>hello</h1>
+    <div style={{
+      display: "flex",
+      justifyContent: "flex-start",
+      width: "100vw",
+      alignItems: "center",
+      flexDirection: "column",
+      marginTop: "50px",
+    }}>
+      {!pdfDocument && <span>Loading...</span>}
+      <canvas ref={canvasRef} width="842" height="595" />
+      {Boolean(pdfDocument && pdfDocument.numPages) && (
+        <nav>
+          <ul className="pager">
+            <li className="previous">
+              <button disabled={page === 1} onClick={() => setPage(page - 1)}>
+                Previous
+              </button>
+            </li>
+            <li className="next">
+              <button
+                disabled={page === pdfDocument.numPages}
+                onClick={() => setPage(page + 1)}
+              >
+                Next
+              </button>
+            </li>
+          </ul>
+        </nav>
+      )}
+    </div>
+  );
 }
 
 export default EmbedPdf
