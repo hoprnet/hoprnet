@@ -4,9 +4,19 @@ pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/$
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 
 const EmbedPdf = ({ src, ...props }) => {
+  const [numPages, setNumPages] = React.useState(null);
+  const [pageNumber, setPageNumber] = React.useState(1);
+
+  function onDocumentLoadSuccess({ numPages }) {
+    setNumPages(numPages);
+  }
+
   return (
-    <Document file={src}>
-      <Page />
+    <Document
+      file={src}
+      onLoadSuccess={onDocumentLoadSuccess}
+    >
+      <Page pageNumber={pageNumber} />
     </Document>
   )
 }
