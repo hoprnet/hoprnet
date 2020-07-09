@@ -15,7 +15,7 @@ import Sedimentum from './views/Sedimentum'
 import Ecosystem from './views/Ecosystem'
 
 const { AppRoute, ScrollReveal, ScrollToTop, insertScript } = utils
-const { Disclaimer } = views
+const { Disclaimer, Pdf } = views
 
 class App extends React.Component {
   componentDidMount() {
@@ -51,6 +51,24 @@ class App extends React.Component {
               <AppRoute exact path="/sedimentum" component={Sedimentum} layout={LayoutDefault} />
               <AppRoute exact path="/disclaimer" component={Disclaimer} layout={LayoutDefault} />
               <AppRoute exact path="/ecosystem" component={Ecosystem} layout={LayoutDefault} />
+              <AppRoute
+                exact
+                path="/Chinese-Language-Binance-HOPR-Press-Release"
+                component={Pdf('Chinese Binance HOPR Press Release.pdf')}
+                layout={LayoutDefault}
+              />
+              <AppRoute
+                exact
+                path="/Korean-Language-Binance-HOPR-Press-Release"
+                component={Pdf('Korean Binance HOPR Press Release.pdf')}
+                layout={LayoutDefault}
+              />
+              <AppRoute
+                exact
+                path="/Japanese-Language-Binance-HOPR-Press-Release"
+                component={Pdf('Japanese Binance HOPR Press Release.pdf')}
+                layout={LayoutDefault}
+              />
             </Switch>
           )}
         />

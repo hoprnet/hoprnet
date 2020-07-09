@@ -12,6 +12,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@mikecousins/react-pdf": "^5.5.1",
     "classnames": "^2.2.6",
     "prop-types": "^15.7.2",
     "react": "^16.13.1"

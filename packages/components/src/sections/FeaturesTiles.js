@@ -150,7 +150,7 @@ class FeaturesTiles extends React.Component {
                   </div>
 
                   <a
-                    href={isCompany ? 'mailto:rik.krieger@hoprnet.io?subject=Partnership' : undefined}
+                    href={isCompany ? 'mailto:rik.krieger@hoprnet.org?subject=Partnership' : undefined}
                     target="_blank"
                     rel="noopener noreferrer"
                   >

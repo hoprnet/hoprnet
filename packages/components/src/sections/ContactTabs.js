@@ -95,7 +95,7 @@ class ContactTabs extends React.Component {
                   </Tab>
                   <Tab tabId="tab-d" className={redirect ? 'is-active' : undefined}>
                     <a
-                      href={isCompany ? 'mailto:rik.krieger@hoprnet.io?subject=Partnership' : undefined}
+                      href={isCompany ? 'mailto:rik.krieger@hoprnet.org?subject=Partnership' : undefined}
                       target="_blank"
                       rel="noopener noreferrer"
                     >
@@ -118,7 +118,7 @@ class ContactTabs extends React.Component {
                   </Tab>
                   <Tab tabId="tab-f" className={redirect ? 'is-active' : undefined}>
                     <a
-                      href="mailto:sebastian.buergel@hoprnet.io?subject=Investment"
+                      href="mailto:sebastian.buergel@hoprnet.org?subject=Investment"
                       target="_blank"
                       rel="noopener noreferrer"
                     >
