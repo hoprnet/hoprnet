@@ -3,7 +3,7 @@ import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 
 import assert from 'assert'
 
-import PeerStore from './peerStore'
+import PeerStore, { BLACKLIST_TIMEOUT } from './peerStore'
 import PeerInfo from 'peer-info'
 
 import { EventEmitter } from 'events'
@@ -21,6 +21,7 @@ function generateNode() {
 describe('test PeerStore', function () {
   const peerStore = new PeerStore(generateNode())
   it('should push and pop elements', function () {
+    assert(peerStore.length == 0, 'peerStore must be empty')
     peerStore.push({
       id: '1',
       lastSeen: Date.now(),
@@ -53,5 +54,61 @@ describe('test PeerStore', function () {
       peerStore.top(1)[0].id === '2',
       `After removing the most recently seen peer, the less recently seen peer should be at top.`
     )
+
+    peerStore.pop()
+
+    assert(peerStore.length == 0, `peerStore must be empty`)
+  })
+
+  it('should push, pop and blacklist peers', function () {
+    assert(peerStore.length == 0, 'peerStore must be empty')
+
+    peerStore.wipeBlacklist()
+
+    peerStore.blacklistPeer('1')
+
+    assert(peerStore.deletedPeers.length == 1, `blacklist must contain the just blacklisted node`)
+
+    peerStore.push({
+      id: '1',
+      lastSeen: Date.now(),
+    })
+
+    assert(peerStore.length == 0, `adding a blacklisted peers must not change the peerStore`)
+
+    peerStore.wipeBlacklist()
+
+    // @ts-ignore
+    assert(peerStore.deletedPeers.length == 0, `blacklist must be empty now`)
+
+    peerStore.push({
+      id: '1',
+      lastSeen: Date.now(),
+    })
+
+    peerStore.blacklistPeer('1')
+
+    // @ts-ignore
+    assert(
+      peerStore.length == 0 && peerStore.deletedPeers.length == 1,
+      `peer must have been removed from peerStore and added to deletedPeers`
+    )
+
+    peerStore.blacklistPeer('1')
+
+    assert(peerStore.deletedPeers.length == 1, `peer must not be added twice to the blacklist`)
+
+    peerStore.blacklistPeer('2')
+
+    peerStore.deletedPeers[0].deletedAt -= BLACKLIST_TIMEOUT + 1
+
+    peerStore.blacklistPeer('3')
+
+    // @ts-ignore
+    assert(peerStore.deletedPeers.length == 2, `the cleanup process should have removed the first node`)
+
+    peerStore.wipeBlacklist()
+    // @ts-ignore
+    assert(peerStore.deletedPeers.length == 0 && peerStore.peers.length == 0, `blacklist must be empty and there must be no nodes in the peerStore`)
   })
 })
