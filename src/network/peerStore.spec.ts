@@ -108,7 +108,10 @@ describe('test PeerStore', function () {
     assert(peerStore.deletedPeers.length == 2, `the cleanup process should have removed the first node`)
 
     peerStore.wipeBlacklist()
-    // @ts-ignore
-    assert(peerStore.deletedPeers.length == 0 && peerStore.peers.length == 0, `blacklist must be empty and there must be no nodes in the peerStore`)
+    assert(
+      // @ts-ignore
+      peerStore.deletedPeers.length == 0 && peerStore.peers.length == 0,
+      `blacklist must be empty and there must be no nodes in the peerStore`
+    )
   })
 })
