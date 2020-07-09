@@ -20,7 +20,7 @@ import { Interactions } from '../interactions'
 import { Crawler } from './crawler'
 import { Crawler as CrawlerInteraction } from '../interactions/network/crawler'
 import Multiaddr from 'multiaddr'
-import PeerStore from './peerStore'
+import PeerStore, { BLACKLIST_TIMEOUT, BlacklistedEntry } from './peerStore'
 
 describe('test crawler', function () {
   async function generateNode(): Promise<Hopr<HoprCoreConnector>> {
@@ -67,33 +67,84 @@ describe('test crawler', function () {
       generateNode(),
     ])
 
-    await assert.rejects(
-      () => Alice.network.crawler.crawl(),
-      Error(`Unable to find enough other nodes in the network.`)
-    )
+    await Alice.network.crawler.crawl()
+
+    // await assert.rejects(
+    //   () => Alice.network.crawler.crawl(),
+    //   Error(`Unable to find enough other nodes in the network.`)
+    // )
 
     Alice.emit('peer:connect', Bob.peerInfo)
 
-    await assert.rejects(
-      () => Alice.network.crawler.crawl(),
-      Error(`Unable to find enough other nodes in the network.`)
-    )
+    await Alice.network.crawler.crawl()
+
+    assert(Alice.network.peerStore.has(Bob.peerInfo.id.toB58String()))
+    // await assert.rejects(
+    //   () => Alice.network.crawler.crawl(),
+    //   Error(`Unable to find enough other nodes in the network.`)
+    // )
 
     Bob.emit('peer:connect', Chris.peerInfo)
 
-    await assert.rejects(
-      () => Alice.network.crawler.crawl(),
-      Error(`Unable to find enough other nodes in the network.`)
-    )
+    await Alice.network.crawler.crawl()
+
+    assert(Alice.network.peerStore.has(Bob.peerInfo.id.toB58String()))
+    assert(Alice.network.peerStore.has(Chris.peerInfo.id.toB58String()))
+
+    // await assert.rejects(
+    //   () => Alice.network.crawler.crawl(),
+    //   Error(`Unable to find enough other nodes in the network.`)
+    // )
 
     Chris.emit('peer:connect', Dave.peerInfo)
 
-    await assert.doesNotReject(() => Alice.network.crawler.crawl(), `Should find enough nodes.`)
+    await Alice.network.crawler.crawl()
+
+    assert(Alice.network.peerStore.has(Bob.peerInfo.id.toB58String()))
+    assert(Alice.network.peerStore.has(Chris.peerInfo.id.toB58String()))
+    assert(Alice.network.peerStore.has(Dave.peerInfo.id.toB58String()))
 
     Bob.emit('peer:connect', Alice.peerInfo)
     Dave.emit('peer:connect', Eve.peerInfo)
 
-    await assert.doesNotReject(() => Bob.network.crawler.crawl(), `Should find enough nodes.`)
+    await Bob.network.crawler.crawl()
+
+    // Simulate node failure
+    await Bob.stop()
+
+    assert(Chris.network.peerStore.has(Bob.peerInfo.id.toB58String()), 'Chris should know about Bob')
+
+    // Simulates a heartbeat run that kicks out Bob
+    Alice.network.peerStore.blacklistPeer(Bob.peerInfo.id.toB58String())
+
+    await Alice.network.crawler.crawl()
+
+    assert(
+      !Alice.network.peerStore.has(Bob.peerInfo.id.toB58String()),
+      'Alice should not add Bob to her peerStore after blacklisting him'
+    )
+
+    assert(
+      Alice.network.peerStore.deletedPeers.some((entry: BlacklistedEntry) => entry.id === Bob.peerInfo.id.toB58String())
+    )
+
+    // Remove Bob from blacklist
+    Alice.network.peerStore.deletedPeers[0].deletedAt -= BLACKLIST_TIMEOUT + 1
+
+    Alice.emit('peer:connect', Chris.peerInfo)
+
+    await Alice.network.crawler.crawl()
+
+    assert(Alice.network.peerStore.deletedPeers.length == 0)
+
+    // Alice.network.peerStore.push({
+    //   id: Bob.peerInfo.id.toB58String(),
+    //   lastSeen: Date.now()
+    // })
+
+    await new Promise((resolve) => setTimeout(resolve, 50))
+
+    assert(Alice.network.peerStore.has(Bob.peerInfo.id.toB58String()))
 
     await Promise.all([
       /* prettier-ignore */

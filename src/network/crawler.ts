@@ -36,6 +36,8 @@ class Crawler<Chain extends HoprCoreConnector> {
 
     log(`Crawling started`)
 
+    this.node.network.peerStore.cleanupBlacklist()
+
     unContactedPeers.push(...this.node.network.peerStore.peers.map((entry) => entry.id))
 
     if (comparator != null) {
@@ -123,6 +125,7 @@ class Crawler<Chain extends HoprCoreConnector> {
           if (peerInfos != null && Array.isArray(peerInfos)) {
             for (let i = 0; i < peerInfos.length; i++) {
               const peerString = peerInfos[i].id.toB58String()
+
               if (peerInfos[i].id.isEqual(this.node.peerInfo.id)) {
                 continue
               }
@@ -204,7 +207,7 @@ class Crawler<Chain extends HoprCoreConnector> {
 
   printStatsAndErrors(contactedPeerIds: Set<string>, errors: Error[], now: number, before: number) {
     if (errors.length > 0) {
-      console.log(
+      log(
         `Errors while crawling:${errors.reduce((acc, err) => {
           acc += `\n\t${chalk.red(err.message)}`
           return acc

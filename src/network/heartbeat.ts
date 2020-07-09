@@ -82,9 +82,13 @@ class Heartbeat<Chain extends HoprCoreConnector> extends EventEmitter {
         } catch (err) {
           await this.node.hangUp(currentPeerId)
 
+          this.node.network.peerStore.blacklistPeer(peer)
+
+          // ONLY FOR TESTING
           log(`Deleted node ${peer}`)
           log(`current nodes:`)
           this.node.network.peerStore.peers.forEach((node: Entry) => log(node.id))
+          // END ONLY FOR TESTING
         }
 
         if (

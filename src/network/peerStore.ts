@@ -50,6 +50,9 @@ class PeerStore<Chain extends HoprCoreConnector> {
   }
 
   push(entry: Entry): number {
+    const THRESHOLD_TIMEOUT = Date.now() - BLACKLIST_TIMEOUT
+    this.cleanupBlacklist(THRESHOLD_TIMEOUT)
+
     const blacklistIndex = this.deletedPeers.findIndex((e: BlacklistedEntry) => e.id === entry.id)
 
     if (blacklistIndex >= 0) {
@@ -60,9 +63,6 @@ class PeerStore<Chain extends HoprCoreConnector> {
       )
       return this.peers.length
     }
-
-    const THRESHOLD_TIMEOUT = Date.now() - BLACKLIST_TIMEOUT
-    this.cleanupBlacklist(THRESHOLD_TIMEOUT)
 
     const index = this.peers.findIndex((e: Entry) => e.id === entry.id)
     if (index >= 0) {
@@ -139,7 +139,7 @@ class PeerStore<Chain extends HoprCoreConnector> {
     return this.peers.length
   }
 
-  private cleanupBlacklist(THRESHOLD_TIMEOUT: number) {
+  cleanupBlacklist(THRESHOLD_TIMEOUT: number = Date.now() - BLACKLIST_TIMEOUT) {
     while (
       this.deletedPeers.length > 0 &&
       heap.heaptop(this.deletedPeers, 1, this.compareBlackList)[0].deletedAt < THRESHOLD_TIMEOUT
