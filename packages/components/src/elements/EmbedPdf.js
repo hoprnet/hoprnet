@@ -11,8 +11,4 @@ const EmbedPdf = ({ src, ...props }) => {
   )
 }
 
-const EmbedPdf = () => {
-  return <h1>hello</h1>
-}
-
 export default EmbedPdf

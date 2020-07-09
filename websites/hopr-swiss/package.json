@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "start": "craco start",
-    "build": "CI=false craco build",
+    "build": "GENERATE_SOURCEMAP=false CI=false craco build",
     "test": "CI=true craco test",
     "eject": "craco eject",
     "format": "prettier --check ."
