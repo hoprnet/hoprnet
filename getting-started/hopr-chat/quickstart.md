@@ -116,7 +116,7 @@ For Windows, double-click  the file named `hopr-chat` with `.bat` extension and 
 ![HOPR Chat executable for Windows Binary](../../.gitbook/assets/image%20%289%29.png)
 {% endtab %}
 
-{% tab title="macOS" %}
+{% tab title="MacOS" %}
 For macOS, double-click on the file named `hopr-chat.command` with `.command` extension and described as `Terminal shell script` in its Kind attribute.
 
 ![HOPR Chat Executable for macOS](../../.gitbook/assets/image%20%2812%29.png)
