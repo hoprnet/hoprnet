@@ -3,8 +3,8 @@
   "version": "1.0.1",
   "private": true,
   "scripts": {
-    "start": "craco start",
-    "build": "CI=false craco build",
+    "start": "GENERATE_SOURCEMAP=false CI=false node --max-old-space-size=8192 ./node_modules/.bin/craco start",
+    "build": "GENERATE_SOURCEMAP=false CI=false craco build",
     "test": "CI=true craco test",
     "eject": "craco eject",
     "format": "prettier --check ."
@@ -14,11 +14,13 @@
     "@hoprnet/hopr-website.components": "1.0.0",
     "classnames": "^2.2.6",
     "lodash": "^4.17.15",
+    "lodash.throttle": "^4.1.1",
     "node-sass": "^4.12.0",
     "react": "^16.9.0",
     "react-dom": "^16.9.0",
     "react-router-dom": "^5.0.1",
-    "react-scripts": "3.1.1"
+    "react-scripts": "3.1.1",
+    "react-sizeme": "^2.6.12"
   },
   "devDependencies": {
     "husky": "^4.2.5",

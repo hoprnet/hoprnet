@@ -1,49 +1,82 @@
-import React, { useState, useRef } from 'react';
-import { usePdf } from '@mikecousins/react-pdf';
+import React from 'react'
+import { SizeMe } from 'react-sizeme'
+import { Document, Page, pdfjs } from 'react-pdf'
+pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.js`;
+import 'react-pdf/dist/Page/AnnotationLayer.css';
 
-const EmbedPdf = ({ src }) => {
-  const [page, setPage] = useState(1);
-  const canvasRef = useRef(null);
+class EmbedPdf extends React.Component {
+  constructor(props) {
+    super(props);
 
-  const { pdfDocument } = usePdf({
-    file: src,
-    page,
-    canvasRef,
-    scale: 2
-  });
+    this.state = {
+      pageNumber: 1,
+      numPages: null,
+    }
+  }
 
-  return (
-    <div style={{
-      display: "flex",
-      justifyContent: "flex-start",
-      width: "100vw",
-      alignItems: "center",
-      flexDirection: "column",
-      marginTop: "50px",
-    }}>
-      {!pdfDocument && <span>Loading...</span>}
-      <canvas ref={canvasRef} width="842" height="595" />
-      {Boolean(pdfDocument && pdfDocument.numPages) && (
-        <nav>
-          <ul className="pager">
-            <li className="previous">
-              <button disabled={page === 1} onClick={() => setPage(page - 1)}>
+  onDocumentLoadSuccess = ({ numPages }) => {
+    this.setState({ numPages });
+  }
+
+  previousPage = () => {
+    const { pageNumber } = this.state
+
+    this.setState({
+      pageNumber: pageNumber - 1
+    })
+  }
+
+  nextPage = () => {
+    const { pageNumber } = this.state
+
+    this.setState({
+      pageNumber: pageNumber + 1
+    })
+  }
+
+  render() {
+    const { src } = this.props;
+    const { pageNumber, numPages } = this.state;
+
+    return (
+      <SizeMe
+        monitorHeight
+        refreshRate={500}
+        refreshMode={"debounce"}
+        render={({ size }) => (
+          <div className="pdfContainer">
+            <Document
+              file={src}
+              onLoadSuccess={this.onDocumentLoadSuccess}
+            >
+              <Page width={size.width} pageNumber={pageNumber} />
+            </Document>
+            <div
+              className="mb-24 pdfPages"
+            >
+              <p>
+                Page {pageNumber || (numPages ? 1 : '--')} of {numPages || '--'}
+              </p>
+              <button
+                type="button"
+                disabled={pageNumber <= 1}
+                onClick={this.previousPage}
+              >
                 Previous
               </button>
-            </li>
-            <li className="next">
               <button
-                disabled={page === pdfDocument.numPages}
-                onClick={() => setPage(page + 1)}
+                type="button"
+                disabled={pageNumber >= numPages}
+                onClick={this.nextPage}
               >
                 Next
               </button>
-            </li>
-          </ul>
-        </nav>
-      )}
-    </div>
-  );
+            </div>
+          </div>
+        )}
+      />
+    )
+  }
 }
 
 export default EmbedPdf
