@@ -117,7 +117,7 @@ class Investors extends React.Component {
                 <Button
                   color={invertColor ? 'secondary' : 'primary'}
                   tag="a"
-                  href="mailto:sebastian.buergel@hoprnet.io?subject=Investment"
+                  href="mailto:sebastian.buergel@hoprnet.org?subject=Investment"
                   target="_blank"
                   rel="noopener noreferrer"
                 >

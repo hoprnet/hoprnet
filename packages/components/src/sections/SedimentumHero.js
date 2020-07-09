@@ -231,8 +231,8 @@ const Sedimentum = props => {
               Hardturmstrasse 161, 8005 Zürich
               <br />
               Email:{' '}
-              <a href="mailto:partner@hoprnet.io" target="_blank" rel="noopener noreferrer" className="underline">
-                partner@hoprnet.io
+              <a href="mailto:partner@hoprnet.org" target="_blank" rel="noopener noreferrer" className="underline">
+                partner@hoprnet.org
               </a>
             </div>
           </div>
