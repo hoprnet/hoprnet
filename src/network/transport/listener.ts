@@ -62,7 +62,7 @@ export function createListener(
 
     trackConn(server, maConn)
 
-    handler?.call(conn)
+    handler?.(conn)
 
     listener.emit('connection', conn)
   }) as Libp2pServer
@@ -97,6 +97,7 @@ export function createListener(
 
     return new Promise(async (resolve, reject) => {
       try {
+        // @TODO replace this with our own STUN servers
         externalIp = await Stun.getExternalIP(
           [
             {

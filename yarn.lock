@@ -5225,7 +5225,7 @@ libp2p-secio@^0.12.5:
     peer-id "^0.13.6"
     protons "^1.0.2"
 
-libp2p-tcp@^0.14.1:
+libp2p-tcp@^0.14.1, libp2p-tcp@^0.14.5:
   version "0.14.5"
   resolved "https://registry.yarnpkg.com/libp2p-tcp/-/libp2p-tcp-0.14.5.tgz#a0a9e5afa49e874d436c9ba5334f30124786d8bc"
   integrity sha512-BLTtCe7jMYCfzrY1j4KAa3iByMZD5fgkH1bQ0WNCn/ye3w5mDemEgOT6+4p8/wuv2e0QXldGRB/DHUqB8lyNFw==
