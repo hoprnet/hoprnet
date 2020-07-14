@@ -19,7 +19,7 @@
   },
   "engines": {
     "node": "12.9.1",
-    "yarn": "1.19.2"
+    "yarn": "1"
   },
   "homepage": "https://hoprnet.org",
   "repository": {
@@ -30,7 +30,7 @@
     "hopr": "ts-node -T chat/index.ts",
     "build": "yarn clean && tsc -p . --noEmit false",
     "clean": "rm -rf ./lib",
-    "test": "mocha --exit",
+    "test": "jest --forceExit",
     "prepublishOnly": "yarn build",
     "lint": "prettier --check .",
     "lint:fix": "prettier --write ."
@@ -89,27 +89,35 @@
     "@types/debug": "^4.1.5",
     "@types/err-code": "^2.0.0",
     "@types/figlet": "^1.2.0",
+    "@types/jest": "^26.0.3",
     "@types/leveldown": "^4.0.2",
     "@types/levelup": "^4.3.0",
     "@types/memdown": "^3.0.0",
-    "@types/mocha": "^7.0.2",
     "@types/node": "~12",
     "@types/read": "^0.0.28",
     "@types/secp256k1": "~4.0.1",
     "@types/simple-peer": "^9.6.0",
     "husky": "^4.2.5",
+    "jest": "^26.1.0",
     "libp2p-tcp": "^0.14.5",
     "memdown": "^5.1.0",
-    "mocha": "^8.0.1",
     "prettier": "^2.0.5",
+    "ts-jest": "^26.1.1",
     "typescript": "^3.9.2"
   },
-  "mocha": {
-    "extension": [
+  "jest": {
+    "moduleFileExtensions": [
+      "js",
+      "json",
       "ts"
     ],
-    "spec": "src/**/*.spec.ts",
-    "require": "ts-node/register"
+    "rootDir": "src",
+    "testRegex": ".spec.ts$",
+    "transform": {
+      "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "coverageDirectory": "../coverage",
+    "testEnvironment": "node"
   },
   "prettier": {
     "tabWidth": 2,

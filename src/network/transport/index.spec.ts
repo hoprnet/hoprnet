@@ -29,7 +29,7 @@ import { RELAY_CIRCUIT_TIMEOUT, WEBRTC_TIMEOUT } from './constants'
 const TEST_PROTOCOL = `/test/0.0.1`
 
 describe('should create a socket and connect to it', function () {
-  this.timeout(RELAY_CIRCUIT_TIMEOUT * 3)
+  jest.setTimeout(RELAY_CIRCUIT_TIMEOUT * 3)
 
   async function generateNode(
     options: {
@@ -248,7 +248,7 @@ describe('should create a socket and connect to it', function () {
   })
 
   it('must not establish a relayed connection to a non-existing node', async function () {
-    this.timeout(RELAY_CIRCUIT_TIMEOUT * 2)
+    jest.setTimeout(RELAY_CIRCUIT_TIMEOUT * 2)
 
     const relay = await generateNode({ id: 2, ipv4: true })
 
@@ -424,7 +424,7 @@ describe('should create a socket and connect to it', function () {
   })
 
   it('should set up a relayed connection and fail while upgrading to WebRTC due to falsy messages', async function () {
-    this.timeout(durations.seconds(20))
+    jest.setTimeout(durations.seconds(20))
     const relay = await generateNode({ id: 2, ipv4: true, ipv6: true })
 
     const [sender, counterparty] = await Promise.all([
@@ -641,7 +641,7 @@ describe('should create a socket and connect to it', function () {
   })
 
   it('should set up a relayed connection with p2p Multiaddr with sender that does not support WebRTC', async function () {
-    this.timeout(15 * 1000)
+    jest.setTimeout(15 * 1000)
     const relay = await generateNode({ id: 2, ipv4: true, ipv6: true })
 
     const now = Date.now()

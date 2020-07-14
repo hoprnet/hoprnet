@@ -1,0 +1,14 @@
+syntax = "proto3";
+package ping;
+
+service Ping {
+  rpc Ping (PingRequest) returns (PingResponse);
+}
+
+message PingRequest {
+  string peerId = 1;
+}
+
+message PingResponse {
+  int32 latency = 1;
+}

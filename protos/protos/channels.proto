@@ -1,0 +1,51 @@
+syntax = "proto3";
+package channels;
+
+service Channels {
+  rpc GetChannels (GetChannelsRequest) returns (GetChannelsResponse);
+  rpc GetChannelInfo (GetChannelInfoRequest) returns (GetChannelInfoResponse);
+  rpc OpenChannel (OpenChannelRequest) returns (OpenChannelResponse);
+  rpc CloseChannel (CloseChannelRequest) returns (CloseChannelResponse);
+}
+
+message GetChannelsRequest {}
+
+message GetChannelsResponse {
+  repeated string channels = 1;
+}
+
+
+message GetChannelInfoRequest {
+  string channelId = 1;
+}
+
+message GetChannelInfoResponse {
+  enum State {
+    UNKNOWN = 0;
+    UNINITIALISED = 1;
+    FUNDED = 2;
+    OPEN = 3;
+    PENDING = 4;
+  }
+
+  State state = 1;
+  string balance = 2;
+}
+
+
+message OpenChannelRequest {
+  string peerId = 1;
+}
+
+message OpenChannelResponse {
+  string channelId = 1;
+}
+
+
+message CloseChannelRequest {
+  string channelId = 1;
+}
+
+message CloseChannelResponse {
+  string channelId = 1;
+}

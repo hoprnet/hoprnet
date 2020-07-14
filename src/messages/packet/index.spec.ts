@@ -49,17 +49,17 @@ const GANACHE_URI = `ws://127.0.0.1:9545`
 describe('test packet composition and decomposition', function () {
   let testnet: Ganache
 
-  before(async function () {
-    this.timeout(durations.seconds(30))
+  beforeEach(async function () {
+    jest.setTimeout(durations.seconds(30))
     testnet = await startTestnet()
   })
 
-  after(async function () {
+  afterEach(async function () {
     await testnet.stop()
   })
 
   it('should create packets and decompose them', async function () {
-    this.timeout(durations.seconds(25))
+    jest.setTimeout(durations.seconds(25))
 
     const nodes = [await generateNode(0), await generateNode(1), await generateNode(2), await generateNode(3)]
 

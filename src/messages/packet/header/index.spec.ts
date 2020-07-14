@@ -16,7 +16,7 @@ import { randomBytes } from 'crypto'
 import secp256k1 from 'secp256k1'
 import { u8aEquals } from '@hoprnet/hopr-utils'
 
-describe('test creation & transformation of a header', async function () {
+describe('test creation & transformation of a header', function () {
   async function createAndDecomposeHeader(
     node: Hopr<HoprCoreConnector>,
     peerIds: PeerId[]

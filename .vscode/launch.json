@@ -7,7 +7,7 @@
     {
       "type": "node",
       "request": "launch",
-      "name": "Launch Program",
+      "name": "HOPR Chat",
       "skipFiles": ["<node_internals>/**"],
       "program": "${workspaceFolder}/chat/lib/index.js",
       "args": ["-p", "123456", "2>log.txt"],
@@ -18,7 +18,16 @@
         "DEBUG": "hopr-core:transport"
       },
       "console": "integratedTerminal",
-      "outFiles": ["${workspaceFolder}/**/*.js"]
+      "outFiles": ["${workspaceFolder}/chat/**/*.js"]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "HOPR Server",
+      "skipFiles": ["<node_internals>/**"],
+      "program": "${workspaceFolder}/server/dist/main.js",
+      "console": "integratedTerminal",
+      "outFiles": ["${workspaceFolder}/server/**/*.js"]
     }
   ]
 }

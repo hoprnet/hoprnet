@@ -10,7 +10,7 @@
     "clean:dist": "rimraf ./dist",
     "clean:all": "yarn clean:lib && yarn clean:dist && yarn util:clean:all",
     "compile": "yarn clean:dist && yarn build && ncc build index.ts -o dist && copyfiles .env hopr-chat.bat hopr-chat.sh hopr-chat.command dist",
-    "test": "mocha --exit || echo '⚠️  Currently no tests available'",
+    "test": "jest || echo '⚠️  Currently no tests available'",
     "util:clean:all": "rimraf .alice .bob",
     "util:create:alice": "mkdirp .alice && copyfiles -a lib/**/**/* .alice && copyfiles .env .alice/",
     "util:create:bob": "mkdirp .bob && copyfiles -a lib/**/**/* .bob && copyfiles .env .bob/",

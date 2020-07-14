@@ -88,7 +88,7 @@ describe('should create a socket and connect to it', function () {
   }
 
   it('should create a node and exchange messages', async function () {
-    this.timeout(durations.seconds(5))
+    jest.setTimeout(durations.seconds(5))
 
     let i = 1
 

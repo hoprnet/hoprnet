@@ -1,0 +1,12 @@
+syntax = "proto3";
+package shutdown;
+
+service Shutdown {
+  rpc Shutdown (ShutdownRequest) returns (ShutdownResponse);
+}
+
+message ShutdownRequest {}
+
+message ShutdownResponse {
+  int32 timestamp = 1;
+}
