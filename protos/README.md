@@ -2,38 +2,48 @@
 
 HOPR is a privacy-preserving messaging **protocol** which enables the creation of a secure communication network via relay nodes powered by economic incentives using digital tokens.
 
-## Protos
-
-See an overview of the protos [here](./doc/protos.md)
-
 ## Testing
 
-Testing is done by trying to generate proto stubs for node and web, if building fails then it means something is wrong with our protos.
-Ideally, we can improve this to also include linting, etc.
+Testing is done by trying to generate proto stubs for node and web, if building fails then it means something is wrong with our protos, ideally, we can improve this to also include linting and breaking change detection.
 
-## Notes
+## Protos Architecture
 
-### Libraries
+```
+Stage 0 - describe        GET   /status ({} => { id, multi_addresses, cpu_usage, connected_nodes })
+Stage 0 - describe        GET   /version ({} => { version, components_version })
+Stage 0 - quit            POST  /shutdown ({} => { timestamp })
+Stage 0 - ping            POST  /ping ({peerId} => { pingReceipt:latency })
+Stage 0 - .env            POST  /settings ({Settings:bootstrap_servers, is_using_cover_traffic})
 
-- [grpc-js](https://github.com/grpc/grpc-node/tree/master/packages/grpc-js)
-  - our is it to use JS implementantion since the native one is [deprecated](https://grpc.io/blog/grpc-js-1.0/#should-i-use-grpcgrpc-js-or-grpc), see [comparison](https://github.com/grpc/grpc-node/blob/master/PACKAGE-COMPARISON.md). Unfortunately at the moment we use grpc-native since nestjs doesn't support grpc-js
-- [protoc-gen-doc](https://github.com/pseudomuto/protoc-gen-doc)
+Stage 1 - balance         GET   /balance/native ({} => { amount })
+Stage 1 - balance         GET   /balance/hopr ({} => { amount })
+Stage 1 - myAddress       GET   /address/native ({} => { amount })
+Stage 1 - myAddress       GET   /address/hopr ({} => { amount })
 
-### General Guidelines
+Stage 2.a - listChannel   GET   /channels ({} => { open_channel[] })
+Stage 2.a - openChannel   POST  /channels ({peerId} => channelTxReceipt:{channelId,...})
+Stage 2.a - listChannel   GET   /channels/:channelId ({channelId} => { state, balance, ... })
+Stage 2.a - closeChannel  POST  /channels/:channelId/close ({channelId} => channelTxReceipt)
+Stage 2.b - crawl         POST  /crawl ({} => connected_nodes[])
+Stage 2.b - listen*       POST  /listen ({} => EventHandler) // e.g. on.message(..., fn)
+Stage 2.b - send          POST  /send ({peerID, payload, [intermediatePeerIds[], timeout]} => txReceipt)
 
-- [Status codes and their use in gRPC](https://github.com/grpc/grpc/blob/master/doc/statuscodes.md)
-- [HTTP to gRPC Status Code Mapping](https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md)
-- [gRPC Errors - A handy guide to gRPC errors.](https://github.com/avinassh/grpc-errors)
-- [GCP API Design Guide](https://cloud.google.com/apis/design)
+Stage 3 - transfer*       POST  /transfer/native ({address, amount} => txReceipt)
+Stage 3 - transfer*       POST  /transfer/hopr ({address,amount} => txReceipt)
+```
 
-### Testing Guidelines
+You can also check out a more detailed overview [here](./doc/protos.md).
 
-- [How to write unit tests for gRPC C client.](https://github.com/grpc/grpc/blob/master/doc/unit_testing.md)
+## Workflow
 
-### Extra
+1. add a new `.proto` file in `protos` folder
+2. running `yarn build` will generate `grpc-node` stubs and `grpc-web` stubs (currenlty web3 stubs are not bundled with their dependancies)
+3. you may consum the proto stubs by using:
 
-- [GRPC Health Checking Protocol](https://github.com/grpc/grpc/blob/master/doc/health-checking.md)
-- [GRPC Technical Documentation](https://github.com/grpc/grpc/tree/master/doc)
-- [Google's protos](https://github.com/googleapis/googleapis/tree/master/google)
-- [buf](https://buf.build/)
-- [awesome-grpc](https://github.com/grpc-ecosystem/awesome-grpc)
+```javascript
+// for node
+import { VersionRequest } from '@hoprnet/hopr-protos/node/version_pb'
+
+// for web
+import { VersionRequest } from '@hoprnet/hopr-protos/web/version_pb'
+```

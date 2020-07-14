@@ -138,7 +138,7 @@
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| GetNativeAddress | [GetNativeAddressRequest](#address.GetNativeAddressRequest) | [GetNativeAddressResponse](#address.GetNativeAddressResponse) | ex: ethereum address |
+| GetNativeAddress | [GetNativeAddressRequest](#address.GetNativeAddressRequest) | [GetNativeAddressResponse](#address.GetNativeAddressResponse) | example: ethereum address |
 | GetHoprAddress | [GetHoprAddressRequest](#address.GetHoprAddressRequest) | [GetHoprAddressResponse](#address.GetHoprAddressResponse) |  |
 
  
@@ -215,7 +215,7 @@
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| GetNativeBalance | [GetNativeBalanceRequest](#balance.GetNativeBalanceRequest) | [GetNativeBalanceResponse](#balance.GetNativeBalanceResponse) | ex: ether |
+| GetNativeBalance | [GetNativeBalanceRequest](#balance.GetNativeBalanceRequest) | [GetNativeBalanceResponse](#balance.GetNativeBalanceResponse) | example: ETHER |
 | GetHoprBalance | [GetHoprBalanceRequest](#balance.GetHoprBalanceRequest) | [GetHoprBalanceResponse](#balance.GetHoprBalanceResponse) |  |
 
  
@@ -571,10 +571,10 @@
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| ip | [string](#string) |  |  |
-| load | [float](#float) |  |  |
+| id | [string](#string) |  |  |
+| multi_addresses | [string](#string) | repeated |  |
+| connected_nodes | [int32](#int32) |  |  |
 | cpu_usage | [float](#float) |  |  |
-| connected_notes | [int32](#int32) |  | number of connected notes |
 
 
 
