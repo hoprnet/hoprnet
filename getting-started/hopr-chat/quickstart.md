@@ -208,12 +208,18 @@ Share your address with the myAddress command to other people. Your HOPR Address
 
 You can send messages to other users with the send command. To use it, type `send` followed by a **HOPR Address** you want to send a message to. So for instance, to send a message to `16Uiu2HAm62VfBkydtQVtKMUaNC3Upe7rYehGu3eLjFAqrxX1vxsx`, you would need to type `send 16Uiu2HAm62VfBkydtQVtKMUaNC3Upe7rYehGu3eLjFAqrxX1vxsx`. Afterwards, you can type whatever message you want to send to that **HOPR Node.**
 
+{% hint style="info" %}
+To send a message to another **HOPR Node,** you first need another individual‘s **HOPR Address** to send a message. You can jump to our Telegram to ask other HOPR users to share their **HOPR Address**.
+{% endhint %}
+
+Assuming someone gives you the address `16Uiu2HAmVnjSZeEwKvWxGS4cbZyNgnTzXzU3tRQNAeapJFgeyoBR`, sending a message to them would require you to first write `send`, pasting the the address \(either pressing `Ctrl+V` in Windows or `⌘v` in MacOS\) and then press `Enter`. This would look as follows:
+
 ```text
 > send 16Uiu2HAmVnjSZeEwKvWxGS4cbZyNgnTzXzU3tRQNAeapJFgeyoBR
 Type in your message and press ENTER to send:
 ```
 
-After typing your message, make sure to press `Enter`. Your message will be sent anonymously to the recipient of the **HOPR Address**. A prompt like the following will show:
+After typing your message, make sure to press `Enter` again. Your message will be sent anonymously to the recipient of the **HOPR Address**. A prompt like the following will show:
 
 ```text
 Sending message to 16Uiu2HAmVnjSZeEwKvWxGS4cbZyNgnTzXzU3tRQNAeapJFgeyoBR ...
