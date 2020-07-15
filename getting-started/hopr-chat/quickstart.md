@@ -56,9 +56,9 @@ To install Node.js, double-click the file you just downloaded to start the insta
 
 ### Test Node.js 
 
-To check that Node.js was successfully installed, we will run a simple command with Node.js which will output the version number. To do this, we will use your operating system's default  _command line interpreter application_ \(“CLI”\) to run a command to see Node.js version.
+To check that Node.js was successfully installed, we will run a simple command with Node.js which will output the version number. To do this, we will use your Operating System's `Terminal` to run a command to see the Node.js version.
 
-#### Opening interactive prompt application \(Terminal or Powershell\)
+#### Opening Terminal \(Powershell in Windows\)
 
 {% tabs %}
 {% tab title="Windows" %}
@@ -74,7 +74,7 @@ First open your `Powershell` application. To do this, you'll need to:
 {% tab title="MacOS" %}
 First open your `Terminal` application. To do this, you'll need to:
 
-1. Press `CMD + Space` to open the `Spotlight Search` option.
+1. Press `⌘Space` to open the `Spotlight Search` option.
 2. Type “Terminal” until the app `Terminal` shows up.
 3. Press `Enter` to open it. A prompt for you to type will show up.
 
@@ -82,27 +82,25 @@ First open your `Terminal` application. To do this, you'll need to:
 {% endtab %}
 
 {% tab title="Linux" %}
-First open your `Terminal` application. To do this, you'll need to open your task manager or applications menu and look for `Terminal`. The application might look different depending on your operating system and/or Linux version.
+The `Terminal` application might look different depending on your operating system and/or Linux version. Please Google for the specific instructions according to your distribution.
 {% endtab %}
 {% endtabs %}
 
 #### Running node version command
 
-After your CLI is open, please type the following command in the prompt and press `Enter`.
+After your `Terminal` or `Powershell` is open, please type `node -v` in the prompt and press `Enter`. Ensure there's an empty space between the words `node` and `-v`
 
-```bash
-node -v
-```
+![Type &#x201C;node -v&#x201D; to find your node version. It should show v12.18.2](../../.gitbook/assets/node-version.gif)
 
 If your screen shows `v12.18.2` you are ready to go!
 
-## Step 2 - Download HOPR Chat
+## Step 2 - Get HOPR Chat
 
-With Node.js successfully installed on your system, you're ready to download **HOPR Chat**. 
+With Node.js successfully installed on your system, you're ready to download **HOPR Chat,** which is distributed as a zip file.
 
 ### Download HOPR Chat
 
-Download the latest version of HOPR Chat by clicking in the following link.
+Download the latest version of **HOPR Chat** by clicking in the following link.
 
 {% tabs %}
 {% tab title="Windows" %}
@@ -124,9 +122,27 @@ You can see all our releases in our GitHub [releases](https://github.com/hoprnet
 
 ### Extracting HOPR Chat
 
-Right now, **HOPR Chat** is distributed as a .zip file, so you will need to “unzip” its contents first. In some operating systems \(e.g., macOS\), you can just double click on the .zip file to do this. For Windows, select the option “Extract All” in the File Explorer to extract **HOPR Chat** files.
+Right now, **HOPR Chat** is distributed as a .zip file, so you will need to “unzip” its contents first.
+
+{% tabs %}
+{% tab title="Windows" %}
+For Windows, select the option “Extract All” in the File Explorer to extract **HOPR Chat** files.
 
 ![](../../.gitbook/assets/downloading_hopr_bin.webp)
+{% endtab %}
+
+{% tab title="MacOS" %}
+For MacOS, just double click on the `.zip` file you downloaded to see the contents of the **HOPR Chat** application. You can also do this from your Browser.
+{% endtab %}
+
+{% tab title="Linux" %}
+In Linux, you need to use `unzip` or similar utility to extract the contents to run **HOPR Chat.** Use your Linux distribution package manager to install and afterwards run in your `Terminal` application the following command in the directory you downloaded **HOPR Chat.**
+
+```bash
+$ unzip hopr-chat-nodebin-linux.zip
+```
+{% endtab %}
+{% endtabs %}
 
 ## Step 3 - Run HOPR Chat
 
