@@ -10,6 +10,10 @@ This setup guide will show you how to use **HOPR** by installing **HOPR Chat** o
 
 Depending on your device capabilities, pick the method that will work best for you. Using Docker is faster than using Node.js, but has higher hardware and disk space requirements. On the other hand, Node.js requires a bit more setup, but can be completed by even limited devices.
 
+{% hint style="danger" %}
+As changes are continuous in our codebase, please bear in mind some of this documentation might be outdated and errors might occur. Our [Telegram](https://t.me/hoprnet) channel is currently the best channel to be up to date with the latest developments of the **HOPR Chat**, **HOPR** and the **HOPR Network.**
+{% endhint %}
+
 ## Setting up your machine for HOPR Chat
 
 ### Using Docker
