@@ -4,20 +4,14 @@ import { ParserService } from './parser/parser.service'
 import { CoreService } from './core.service'
 
 @Module({
-  providers: [ParserService, CoreService],
+  providers: [ConfigService, ParserService, CoreService],
   exports: [CoreService],
 })
 export class CoreModule implements OnModuleInit, OnModuleDestroy {
-  constructor(private configService: ConfigService, private coreService: CoreService) {}
+  constructor(private coreService: CoreService) {}
 
   async onModuleInit(): Promise<void> {
-    await this.coreService.start({
-      debug: this.configService.get('debug'),
-      id: this.configService.get('id'),
-      bootstrapNode: this.configService.get('bootstrapNode'),
-      host: this.configService.get('host'),
-      bootstrapServers: this.configService.get('bootstrapServers'),
-    })
+    await this.coreService.start()
   }
 
   async onModuleDestroy(): Promise<void> {

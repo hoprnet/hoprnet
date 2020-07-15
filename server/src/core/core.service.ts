@@ -1,4 +1,6 @@
 import { Injectable } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
+import { default as dotenvParseVariables } from 'dotenv-parse-variables'
 import { default as connector } from '@hoprnet/hopr-core-ethereum'
 import Hopr from '@hoprnet/hopr-core'
 import type { HoprOptions } from '@hoprnet/hopr-core'
@@ -7,6 +9,7 @@ import { u8aToHex, moveDecimalPoint } from '@hoprnet/hopr-utils'
 import { ParserService } from './parser/parser.service'
 import PeerInfo from 'peer-info'
 import PeerId from 'peer-id'
+import { mustBeStarted } from './core.utils'
 
 export type StartOptions = {
   debug?: boolean
@@ -20,31 +23,39 @@ export type StartOptions = {
 export class CoreService {
   private node: Hopr<HoprCoreConnector>
 
-  constructor(private parserService: ParserService) {}
+  constructor(private configService: ConfigService, private parserService: ParserService) {}
 
   get started(): boolean {
     return !!this.node
   }
 
   // @TODO: handle if already starting
-  async start(customOptions?: StartOptions): Promise<void> {
+  async start(): Promise<void> {
     if (this.started) return
 
+    const envOptions = dotenvParseVariables({
+      debug: this.configService.get('DEBUG'),
+      id: this.configService.get('ID'),
+      bootstrapNode: this.configService.get('BOOTSTRAP_NODE'),
+      host: this.configService.get('CORE_HOST'),
+      bootstrapServers: this.configService.get('BOOTSTRAP_SERVERS'),
+    }) as StartOptions
+
     const options: HoprOptions = {
-      id: customOptions.id,
-      debug: customOptions.debug ?? true,
-      bootstrapNode: customOptions.bootstrapNode ?? false,
+      id: envOptions.id,
+      debug: envOptions.debug ?? true,
+      bootstrapNode: envOptions.bootstrapNode ?? false,
       network: 'ethereum',
       connector,
       bootstrapServers: await Promise.all<PeerInfo>(
         (
-          customOptions.bootstrapServers ?? [
+          envOptions.bootstrapServers ?? [
             '/ip4/34.65.177.154/tcp/9091/p2p/16Uiu2HAm4FcroWGzc9yhDAsKSGC8W9yoDKiQBnAGK5aQdqJWmior',
           ]
         ).map((multiaddr) => this.parserService.parseBootstrap(multiaddr) as Promise<PeerInfo>),
       ),
       provider: 'wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36',
-      hosts: (await this.parserService.parseHost(customOptions.host ?? '0.0.0.0:9091')) as HoprOptions['hosts'],
+      hosts: (await this.parserService.parseHost(envOptions.host ?? '0.0.0.0:9091')) as HoprOptions['hosts'],
       password: 'switzerland',
       output: this.parserService.outputFunctor(),
     }
@@ -67,18 +78,13 @@ export class CoreService {
     }
   }
 
+  @mustBeStarted()
   async getStatus(): Promise<{
     id: string
     multiAddresses: string[]
     connectedNodes: number
   }> {
-    // @TODO: turn this into a decorator
-    if (!this.started) {
-      throw Error('HOPR node is not started')
-    }
-
     try {
-      // @TODO: cache this result
       await this.node.network.crawler.crawl()
     } catch {}
 
@@ -94,16 +100,12 @@ export class CoreService {
     }
   }
 
+  @mustBeStarted()
   async getPing(
     peerId: string,
   ): Promise<{
     latency: number
   }> {
-    // @TODO: turn this into a decorator
-    if (!this.started) {
-      throw Error('HOPR node is not started')
-    }
-
     console.log('peerId', peerId)
 
     const latency = await this.node.ping(new PeerId(peerId))
@@ -113,11 +115,8 @@ export class CoreService {
     }
   }
 
+  @mustBeStarted()
   async getBalance(type: 'native' | 'hopr'): Promise<string> {
-    if (!this.started) {
-      throw Error('HOPR node is not started')
-    }
-
     const { paymentChannels } = this.node
     const { Balance, NativeBalance } = paymentChannels.types
 
@@ -132,11 +131,8 @@ export class CoreService {
     }
   }
 
+  @mustBeStarted()
   async getAddress(type: 'native' | 'hopr'): Promise<string> {
-    if (!this.started) {
-      throw Error('HOPR node is not started')
-    }
-
     if (type === 'native') {
       return this.node.paymentChannels.utils.pubKeyToAccountId(this.node.peerInfo.id.pubKey.marshal()).then(u8aToHex)
     } else {

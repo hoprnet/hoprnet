@@ -58,19 +58,19 @@ jobs:
       # Build and Test
       - name: Install node modules
         working-directory: ${{ env.workDir }}
-        if: steps.cache-modules.outputs.cache-hit != true && steps.filter.outputs[matrix.repository] == true
+        if: steps.cache-modules.outputs.cache-hit != 'true' && steps.filter.outputs[matrix.repository] == 'true'
         run: |
           yarn policies set-version ${{ matrix.yarn-version }}
           yarn install --frozen-lockfile
       - name: Build library
         working-directory: ${{ env.workDir }}
-        if: steps.filter.outputs[matrix.repository] == true
+        if: steps.filter.outputs[matrix.repository] == 'true'
         run: |
           yarn policies set-version ${{ matrix.yarn-version }}
           yarn build
       - name: Test library
         working-directory: ${{ env.workDir }}
-        if: steps.filter.outputs[matrix.repository] == true
+        if: steps.filter.outputs[matrix.repository] == 'true'
         run: |
           yarn policies set-version ${{ matrix.yarn-version }}
           yarn test

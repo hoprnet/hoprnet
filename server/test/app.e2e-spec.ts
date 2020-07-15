@@ -32,10 +32,10 @@ describe('GRPC transport', () => {
           isGlobal: true,
           load: [
             () => ({
-              debug: true,
-              id: appId,
-              bootstrapNode: true,
-              host: '0.0.0.0:9091',
+              DEBUG: true,
+              ID: appId,
+              BOOTSTRAP_NODE: true,
+              CORE_HOST: '0.0.0.0:9091',
             }),
           ],
         }),
