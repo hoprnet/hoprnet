@@ -58,11 +58,11 @@ To install Node.js, double-click the file you just downloaded to start the insta
 
 To check that Node.js was successfully installed, we will run a simple command with Node.js which will output the version number. To do this, we will use your Operating System's `Terminal` to run a command to see the Node.js version.
 
-#### Opening Terminal \(Powershell in Windows\)
+#### Opening Terminal
 
 {% tabs %}
 {% tab title="Windows" %}
-First open your `Powershell` application. To do this, you'll need to:
+In Windows, we'll open the `Powershell` application. To do this, you'll need to:
 
 1. Click the `Search Bar` at the bottom of the `Windows Menu`.
 2. Type “Powershell” until the app `Windows Powershell` shows up.
@@ -72,7 +72,7 @@ First open your `Powershell` application. To do this, you'll need to:
 {% endtab %}
 
 {% tab title="MacOS" %}
-First open your `Terminal` application. To do this, you'll need to:
+Follow the next instructions to open the `Terminal` application:
 
 1. Press `⌘Space` to open the `Spotlight Search` option.
 2. Type “Terminal” until the app `Terminal` shows up.
