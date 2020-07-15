@@ -93,7 +93,6 @@ export class GrpcController {
     try {
       return this.grpcService.getNativeAddress()
     } catch (err) {
-      console.error(err)
       throw new RpcException({
         code: STATUS.INTERNAL,
         message: err,
@@ -106,7 +105,6 @@ export class GrpcController {
     try {
       return this.grpcService.getHoprAddress()
     } catch (err) {
-      console.error(err)
       throw new RpcException({
         code: STATUS.INTERNAL,
         message: err,

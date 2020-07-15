@@ -106,9 +106,7 @@ export class CoreService {
   ): Promise<{
     latency: number
   }> {
-    console.log('peerId', peerId)
-
-    const latency = await this.node.ping(new PeerId(peerId))
+    const latency = await this.node.ping(PeerId.createFromB58String(peerId))
 
     return {
       latency,
