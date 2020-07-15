@@ -110,15 +110,15 @@ Download the latest version of **HOPR Chat** by clicking in the following link.
 
 {% tabs %}
 {% tab title="Windows" %}
-[Download the latest Windows release.](https://github.com/hoprnet/hopr-core/releases/download/1.1.6-testnet.c7aea14/hopr-chat-nodebin-windows.zip)
+[Download the latest Windows release.](https://github.com/hoprnet/hopr-core/releases/download/1.1.9-testnet/hopr-chat-nodebin-windows.zip)
 {% endtab %}
 
 {% tab title="MacOS" %}
-[Download the latest macOS release.](https://github.com/hoprnet/hopr-core/releases/download/1.1.6-testnet.c7aea14/hopr-chat-nodebin-macos.zip)
+[Download the latest macOS release.](https://github.com/hoprnet/hopr-core/releases/download/1.1.9-testnet/hopr-chat-nodebin-macos.zip)
 {% endtab %}
 
 {% tab title="Linux" %}
-[Download the latest Linux release.](https://github.com/hoprnet/hopr-core/releases/download/1.1.6-testnet.c7aea14/hopr-chat-nodebin-linux.zip)
+[Download the latest Linux release.](https://github.com/hoprnet/hopr-core/releases/download/1.1.9-testnet/hopr-chat-nodebin-linux.zip)
 {% endtab %}
 {% endtabs %}
 
