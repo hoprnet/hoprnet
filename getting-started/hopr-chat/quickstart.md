@@ -146,7 +146,7 @@ $ unzip hopr-chat-nodebin-linux.zip
 
 ## Step 3 - Run HOPR Chat
 
-How you run **HOPR Chat** depends on your operating system \(OS\). We are distributing different files depending on the OS you are running. Please read the next instructions to know which file to click.
+**HOPR Chat** is an interactive chat application. To run, you need to click on the executable you previously extracted in the last step.
 
 {% tabs %}
 {% tab title="Windows" %}
@@ -178,33 +178,39 @@ Running these commands will bring up a screen similar the one shown below. Congr
 
 ![HOPR Chat Running](../../.gitbook/assets/hopr-chat-demo.gif)
 
-## Step 4 - Exploring HOPR Chat
+## Step 4 - Get your HOPR Address
 
-With **HOPR Chat** up and running, you are now ready to type and communicate with other users on the **HOPR Network.** Use any of the following commands to learn more about **HOPR Chat** and how to send messages to other users.
+With **HOPR Chat** up and running, you are now ready to type and communicate with other users on the **HOPR Network.** To do so, you need to get your **HOPR Address.** To do so, write `myAddress` and press `Enter` inside **HOPR Chat.** Something like the following will show up:
 
-{% tabs %}
-{% tab title="myAddress" %}
-Share your address with the `myAddress` command to other people. Your **HOPR Address**  starts with `16Uiu2` and it’s the only thing other people need to know to send you messages. Use a separate channel to share your **HOPR Address** with your friends.
-{% endtab %}
+```text
+> myAddress
+ethereum:  0x9e95cdcb480f133b0c1af70613d1488ee01bf53e
+HOPR:      16Uiu2HAm34oK6EyA2SuFo9rHXpm5Kwy6C8MeJ26JaRFBzgdQqVpZ
+```
 
-{% tab title="send" %}
-You can send messages to other users with the `send` command. To use it, write “send” followed by a **HOPR Address** you want to send a message to. So for instance, to send a message to `16Uiu2HAm62VfBkydtQVtKMUaNC3Upe7rYehGu3eLjFAqrxX1vxsx`, you would need to type `send 16Uiu2HAm62VfBkydtQVtKMUaNC3Upe7rYehGu3eLjFAqrxX1vxsx`.   
-  
-You can also write `send`, and then press the “Tab” key to see who you can send a message to.
-{% endtab %}
+Share your address with the myAddress command to other people. Your HOPR Address  starts with 16Uiu2 and it’s the only thing other people need to know to send you messages. Use a separate channel to share your HOPR Address with your friends.
 
-{% tab title="crawl" %}
-You can find other people connected using `crawl`, although sometimes it might take a while to complete. Bear in mind that sometimes disconnected addresses will show up during crawl.
-{% endtab %}
+## Step 5 - Send messages to other HOPR Nodes
 
-{% tab title="help" %}
-If you want to see more information about **HOPR Chat** and other additional commands available, you can use the `help` command to give you an overview of the application.
-{% endtab %}
+You can send messages to other users with the send command. To use it, type `send` followed by a **HOPR Address** you want to send a message to. So for instance, to send a message to `16Uiu2HAm62VfBkydtQVtKMUaNC3Upe7rYehGu3eLjFAqrxX1vxsx`, you would need to type `send 16Uiu2HAm62VfBkydtQVtKMUaNC3Upe7rYehGu3eLjFAqrxX1vxsx`. Afterwards, you can type whatever message you want to send to that **HOPR Node.**
 
-{% tab title="quit" %}
-Typing `quit` will exit the **HOPR Chat** application.
-{% endtab %}
-{% endtabs %}
+```text
+> send 16Uiu2HAmVnjSZeEwKvWxGS4cbZyNgnTzXzU3tRQNAeapJFgeyoBR
+Type in your message and press ENTER to send:
+```
 
-Inside **HOPR Chat** you can press the “Tab” key to autocomplete addresses and commands. For more detailed instructions, go to the next page, where you can find more specific instructions on how to get started with the Advanced Setup.
+After typing your message, make sure to press `Enter`. Your message will be sent anonymously to the recipient of the **HOPR Address**. A prompt like the following will show:
+
+```text
+Sending message to 16Uiu2HAmVnjSZeEwKvWxGS4cbZyNgnTzXzU3tRQNAeapJFgeyoBR ...
+---------- New Packet ----------
+Destination    : 16Uiu2HAmVnjSZeEwKvWxGS4cbZyNgnTzXzU3tRQNAeapJFgeyoBR
+--------------------------------
+```
+
+#### Congratulations! You have successfully sent a message to the **HOPR Network**. Your message has been relayed and packaged securely and privately.
+
+## Next Steps
+
+To learn more about our network, please go to our **Main Concepts** section. You can also learn how to connect to a different network by going to our **Advanced Setup.** For more information and updates about the **HOPR Network**, please follow our [Twitter](https://twitter.com/hoprnet). For questions and additional information, please go to our [Telegram](https://t.me/hoprnet) channel. 
 
