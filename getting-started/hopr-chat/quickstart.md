@@ -4,7 +4,23 @@ description: Step and step guide to quickly start using HOPR Chat
 
 # Quickstart
 
-This quickstart guide will help you to quickly install **HOPR Chat** and its dependencies so you can quickly connect to the **HOPR Network.** Please follow the step-by-step instructions to ensure everything works properly.
+### Before Getting Started
+
+This quickstart guide will help you to quickly install **HOPR Chat** and its dependencies so you can quickly connect to the **HOPR Network.** Please follow the step-by-step instructions to ensure everything works properly. As instructions might be different depending on your Operating System \(e.g. Windows, MacOS, Linux\), our instructions will be shown under “Tabs” like the following:
+
+{% tabs %}
+{% tab title="Windows" %}
+In some cases, you will need to run commands and instructions as an Administrator. Ensure you have Administrator access, and a working Internet connection. Firewall prompts might show up, which only requires you to accept them on request.
+{% endtab %}
+
+{% tab title="MacOS" %}
+For MacOS, we will sometimes give you Keyboard shortcuts to help you navigate the system. We will describe these shortcuts with a combination of keys such as `⌘c` to described the `Command` key followed by the `c` key \(a common shortcut for copying content\). For instance, in this guide we'll make use of the `Spotlight Search`, which you can quickly access by pressing `⌘Space`, which will allow you to quickly look for applications.
+{% endtab %}
+
+{% tab title="Linux" %}
+All commands for Linux users will be assumed to be executed in the `Terminal` of your Linux distribution. As access to your `Terminal` might vary depending on your distribution, please make sure beforehand you know how to access your `Terminal` before continuing this tutorial.
+{% endtab %}
+{% endtabs %}
 
 ## Step 1 - Install Node.js
 
