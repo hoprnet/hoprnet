@@ -138,7 +138,11 @@ For Windows, select the option “Extract All” in the File Explorer to extract
 {% endtab %}
 
 {% tab title="MacOS" %}
-For MacOS, just double click on the `.zip` file you downloaded to see the contents of the **HOPR Chat** application. You can also do this from your Browser.
+For MacOS, just double click on the `.zip` file you downloaded to see the contents of the **HOPR Chat** application. 
+
+![HOPR Chat contents of the extracted content should look as follows.](../../.gitbook/assets/hopr-macos-contents.webp)
+
+You can also do this from your Browser by just clicking the tab that shows up the downloaded folder.
 {% endtab %}
 
 {% tab title="Linux" %}
@@ -147,6 +151,10 @@ In Linux, you need to use `unzip` or similar utility to extract the contents to 
 ```bash
 $ unzip hopr-chat-nodebin-linux.zip
 ```
+
+The contents fo the extracted folder should look as follows:
+
+![HOPR Chat contents extracted as seen in a Linux terminal using the ls command](../../.gitbook/assets/hopr-linux-contents.webp)
 {% endtab %}
 {% endtabs %}
 
@@ -156,17 +164,17 @@ $ unzip hopr-chat-nodebin-linux.zip
 
 {% tabs %}
 {% tab title="Windows" %}
-For Windows, double-click  the file named `hopr-chat` with `.bat` extension and described as `Windows Batch File` in its Type attribute.
+For Windows, double-click the file named `start-hopr-chat` with `.bat` extension and described as `Windows Batch File` in its Type attribute.
 
-![HOPR Chat executable for Windows Binary](../../.gitbook/assets/image%20%289%29.png)
+![HOPR Chat executable file for Windows.](../../.gitbook/assets/image%20%2814%29.png)
 {% endtab %}
 
 {% tab title="MacOS" %}
-For macOS, double-click on the file named `hopr-chat.command` with `.command` extension and described as `Terminal shell script` in its Kind attribute.
+For macOS, double-click on the file named `start-hopr-chat.command` with `.command` extension and described as `Terminal shell script` in its Kind attribute.
 
-![HOPR Chat Executable for macOS](../../.gitbook/assets/image%20%2812%29.png)
+![HOPR Chat executable as seen in MacOS](../../.gitbook/assets/hopr-macos-contents.webp)
 
-When opening the `hopr-chat.command` file, you will be prompted by `Gatekeeper`, the security mechanism from macos, that the application has been downloaded by a non-recognised URL. This is a security mecanism activated by default in macos.
+When opening the `start-hopr-chat.command` file, you will be prompted by `Gatekeeper`, the security mechanism from macOS, that the application has been downloaded by a non-recognised URL. This is a security mechanism activated by default in macOS.
 
 To go ahead, you will need to tell `Gatekeeper` that the application is to be trusted. To do so, open `Security & Privacy` in your `System Preferences` and click `Open Anyway`under the `General` tab. This will prompt `Gatekeeper` to ask you again to open **HOPR Chat** with an option to actually run it. Select `Open` and you will see **HOPR Chat** in your screen.
 
@@ -174,15 +182,15 @@ To go ahead, you will need to tell `Gatekeeper` that the application is to be tr
 {% endtab %}
 
 {% tab title="Linux" %}
-For Linux-based systems, execute the file named `hopr-chat.sh` with `.sh` extension and provided with executable permissions on your directory.
+For Linux-based systems, execute the file named `start-hopr-chat.sh` with `.sh` extension and provided with executable permissions on your directory.
 
-![HOPR Chat Executable for Linux](../../.gitbook/assets/image%20%2811%29.png)
+![HOPR Chat executable as seen in a Linux terminal](../../.gitbook/assets/hopr-linux-contents.webp)
 {% endtab %}
 {% endtabs %}
 
 Running these commands will bring up a screen similar the one shown below. Congratulations! You are now running **HOPR Chat**.
 
-![HOPR Chat Running](../../.gitbook/assets/hopr-chat-demo.gif)
+![HOPR Chat Testnet up and running.](../../.gitbook/assets/hopr-chat-testnet.gif)
 
 ## Step 4 - Get your HOPR Address
 
