@@ -208,7 +208,16 @@ Destination    : 16Uiu2HAmVnjSZeEwKvWxGS4cbZyNgnTzXzU3tRQNAeapJFgeyoBR
 --------------------------------
 ```
 
-#### Congratulations! You have successfully sent a message to the **HOPR Network**. Your message has been relayed and packaged securely and privately.
+The recipient of the **HOPR Address** will receive something like the following:
+
+```text
+===== New message ======
+Message: Welcome to the HOPR Network.
+Latency: 23577 ms
+========================
+```
+
+#### Congratulations! You have successfully sent a message to the **HOPR Network**. Your message has been relayed and packaged securely and privately across the internet.
 
 ## Next Steps
 
