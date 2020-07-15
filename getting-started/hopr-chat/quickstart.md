@@ -28,22 +28,25 @@ Node.js is a JavaScript runtime built on Google Chrome's V8 JavaScript engine, w
 
 ### Download Node.js
 
-Go to the official [Node.js website](https://nodejs.org/en/) and download version `12.18.2 LTS`.
+Click the following link to download node.js version `12.18.2 LTS` in your computer:
 
 {% tabs %}
 {% tab title="Windows" %}
-* [Click here to download Node.js version 12.18.2 LTS for Windows \(64 bits\)](https://nodejs.org/dist/v12.18.2/node-v12.18.2-x64.msi)
-* [Click here to download Node.js version 12.18.2 LTS for Windows \(32 bits\)](https://nodejs.org/dist/v12.18.2/node-v12.18.2-x86.msi)
+[Click here to download Node.js version 12.18.2 LTS for Windows \(64 bits\)](https://nodejs.org/dist/v12.18.2/node-v12.18.2-x64.msi)
 {% endtab %}
 
 {% tab title="MacOS" %}
-* [Click here to download Node.js version 12.18.2 LTS for macOS](https://nodejs.org/dist/v12.18.2/node-v12.18.2.pkg)
+[Click here to download Node.js version 12.18.2 LTS for macOS](https://nodejs.org/dist/v12.18.2/node-v12.18.2.pkg)
 {% endtab %}
 
 {% tab title="Linux" %}
 For Linux-based operating systems, please go to the official [Downloads](https://nodejs.org/en/download/) page of Node.js or see the instructions for installing Node.js using a [Package Manager](https://nodejs.org/en/download/package-manager/).
 {% endtab %}
 {% endtabs %}
+
+{% hint style="info" %}
+You can also go to the official Node.js website to [download](https://nodejs.org/en/download/) the installer.
+{% endhint %}
 
 ### Install Node.js
 
@@ -99,21 +102,25 @@ With Node.js successfully installed on your system, you're ready to download **H
 
 ### Download HOPR Chat
 
-Go to our [GitHub Releases Page](https://github.com/hoprnet/hopr-core/releases) and download the latest version.
+Download the latest version of HOPR Chat by clicking in the following link.
 
 {% tabs %}
 {% tab title="Windows" %}
-* [Download the latest Windows release.](https://github.com/hoprnet/hopr-core/releases/download/1.1.6-testnet.c7aea14/hopr-chat-nodebin-windows.zip)
+[Download the latest Windows release.](https://github.com/hoprnet/hopr-core/releases/download/1.1.6-testnet.c7aea14/hopr-chat-nodebin-windows.zip)
 {% endtab %}
 
 {% tab title="MacOS" %}
-* [Download the latest macOS release.](https://github.com/hoprnet/hopr-core/releases/download/1.1.6-testnet.c7aea14/hopr-chat-nodebin-macos.zip)
+[Download the latest macOS release.](https://github.com/hoprnet/hopr-core/releases/download/1.1.6-testnet.c7aea14/hopr-chat-nodebin-macos.zip)
 {% endtab %}
 
 {% tab title="Linux" %}
-* [Download the latest Linux release.](https://github.com/hoprnet/hopr-core/releases/download/1.1.6-testnet.c7aea14/hopr-chat-nodebin-linux.zip)
+[Download the latest Linux release.](https://github.com/hoprnet/hopr-core/releases/download/1.1.6-testnet.c7aea14/hopr-chat-nodebin-linux.zip)
 {% endtab %}
 {% endtabs %}
+
+{% hint style="info" %}
+You can see all our releases in our GitHub [releases](https://github.com/hoprnet/hopr-core/releases) page.
+{% endhint %}
 
 ### Extracting HOPR Chat
 
