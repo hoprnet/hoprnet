@@ -6,7 +6,13 @@ description: Step and step guide to quickly start using HOPR Chat
 
 ### Before Getting Started
 
-This quickstart guide will help you to quickly install **HOPR Chat** and its dependencies so you can quickly connect to the **HOPR Network.** Please follow the step-by-step instructions to ensure everything works properly. As instructions might be different depending on your Operating System \(e.g. Windows, MacOS, Linux\), our instructions will be shown under “Tabs” like the following:
+This quickstart guide will help you to quickly install **HOPR Chat** and its dependencies so you can quickly connect to the **HOPR Network.** Please follow the step-by-step instructions to ensure everything works properly. 
+
+{% hint style="warning" %}
+Please bear in mind **HOPR Chat**, **HOPR** and the **HOPR Network** are not ready for production yet. Its current usage should only be limited for testing only.
+{% endhint %}
+
+As instructions might be different depending on your Operating System \(e.g. Windows, MacOS, Linux\), our instructions will be shown under “Tabs” like the following:
 
 {% tabs %}
 {% tab title="Windows" %}
