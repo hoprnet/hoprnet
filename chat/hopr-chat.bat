@@ -1,1 +1,0 @@
-node index.js 2>log.txt

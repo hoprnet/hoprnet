@@ -13,7 +13,7 @@ src/**/*.js
 
 # Dist/Build
 build
-dist
+hopr-chat
 
 # Zip Files
 *.zip

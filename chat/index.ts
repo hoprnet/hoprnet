@@ -221,7 +221,9 @@ async function main() {
     process.exit(1)
   }
 
-  console.log(`\nAvailable under the following addresses:\n ${node.peerInfo.multiaddrs.toArray().join('\n ')}\n`)
+  console.log('Successfully started HOPR Chat.\n');
+  console.log(`Your HOPR Chat node is available in the following addresses:\n ${node.peerInfo.multiaddrs.toArray().join('\n ')}\n`)
+  console.log('Use the “help” command to see which commands are available.\n');
 
   if (options.bootstrapNode) {
     runAsBootstrapNode()
