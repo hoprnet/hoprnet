@@ -2,11 +2,11 @@ syntax = "proto3";
 package ping;
 
 service Ping {
-  rpc Ping (PingRequest) returns (PingResponse);
+  rpc GetPing (PingRequest) returns (PingResponse);
 }
 
 message PingRequest {
-  string peerId = 1;
+  string peer_id = 1;
 }
 
 message PingResponse {

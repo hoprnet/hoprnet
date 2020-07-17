@@ -1,3 +1,4 @@
+import { EventEmitter } from 'events'
 import { Injectable } from '@nestjs/common'
 import multiaddr from 'multiaddr'
 import PeerId from 'peer-id'
@@ -67,11 +68,14 @@ export class ParserService {
     })
   }
 
-  outputFunctor(): (encoded: Uint8Array) => Message {
+  outputFunctor(events: EventEmitter): (encoded: Uint8Array) => Message {
     return (encoded: Uint8Array): Message => {
       const [messageBuffer, latencyBuffer] = decode(encoded) as [Buffer, Buffer]
       const message = messageBuffer.toString()
       const latency = Date.now() - parseInt(latencyBuffer.toString('hex'), 16)
+
+      events.emit('message', messageBuffer)
+
       return { message, latency }
     }
   }

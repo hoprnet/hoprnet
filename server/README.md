@@ -12,6 +12,7 @@ HOPR is a privacy-preserving messaging **protocol** which enables the creation o
 6. Wait until temrinal displays `HOPR Core Node Started`
 7. Call `getStatus` using `gcurl -f ./node_modules/@hoprnet/hopr-protos/protos/status.proto --host 127.0.0.1:50051 --input '{}' --short status:Status:getStatus`
 8. First `getStatus` call might take a minute to respond, you should receive a minified json response like:
+
 ```json
 {
   "id": "16Uiu2HAm6rVeEmviiSoX67H5fqkTQq2ZyP2QSRwrmtEuTU9pWeKj",

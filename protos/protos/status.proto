@@ -11,5 +11,4 @@ message StatusResponse {
   string id = 1;
   repeated string multi_addresses = 2;
   int32 connected_nodes = 3;
-  float cpu_usage = 4;
 }

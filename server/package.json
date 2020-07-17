@@ -29,7 +29,7 @@
     "@hoprnet/hopr-core": "0.6.16",
     "@hoprnet/hopr-core-connector-interface": "1.2.10-98e08f8",
     "@hoprnet/hopr-core-ethereum": "0.0.12-refactor.473415f",
-    "@hoprnet/hopr-protos": "^0.0.7-381e08e",
+    "@hoprnet/hopr-protos": "^0.0.9-97c8c3e",
     "@hoprnet/hopr-utils": "^0.1.7-c598e77",
     "@nestjs/common": "^7.0.0",
     "@nestjs/config": "^0.5.0",
@@ -47,10 +47,12 @@
     "read-pkg-up": "^7.0.1",
     "reflect-metadata": "^0.1.13",
     "rimraf": "^3.0.2",
-    "rlp": "^2.2.5",
-    "rxjs": "^6.5.4"
+    "rlp": "^2.2.6",
+    "rxjs": "^6.6.0"
   },
   "devDependencies": {
+    "@hoprnet/hopr-ethereum": "^0.3.9-120748b",
+    "@hoprnet/hopr-testing": "^0.1.2",
     "@nestjs/cli": "^7.0.0",
     "@nestjs/schematics": "^7.0.0",
     "@nestjs/testing": "^7.0.0",
