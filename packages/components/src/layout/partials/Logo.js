@@ -12,7 +12,15 @@ const Logo = ({ className, ...props }) => {
     <div {...props} className={classes}>
       <Link to="/">
         <div style={{ display: 'flex' }}>
-          <Image src={require('../../assets/images/logo.png')} alt="Logo" width={32} height={32} className="mr-12" />
+          <div style={{ width: '100%' }}>
+            <Image
+              src={require('../../assets/images/logo.png')}
+              alt="HOPR Logo"
+              height="auto"
+              width="32px"
+              className="mr-12"
+            />
+          </div>
           <span className="h4 p-0 m-0">{isCompany ? 'HOPR Services' : 'HOPR'}</span>
         </div>
       </Link>
