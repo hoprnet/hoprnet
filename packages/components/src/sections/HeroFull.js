@@ -55,9 +55,12 @@ class HeroFull extends React.Component {
                     "We're proud to build the HOPR network for the HOPR Association."
                   ) : (
                     <>
-                      We care about data privacy.
+                      <h4>Changing Data Privacy for the Good</h4>
+                      A free, open source, network-level blockchain protocol that protects metadata privacy for every
+                      type of data exchange.
                       <br />
-                      That's why we're building the HOPR network.
+                      HOPR introduces the first-ever open incentivized mixnet, where anyone can earn tokens for staking
+                      and running nodes.
                     </>
                   )}
                 </p>

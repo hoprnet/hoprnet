@@ -1,13 +1,14 @@
 import React from 'react'
 import { sections } from '@hoprnet/hopr-website.components'
 
-const { HeroFull, Products, FeaturesTabs, FeaturesTiles, Blogs, Clients, TeamAndInvestors, Contact } = sections
+const { HeroFull, News, Products, FeaturesTabs, FeaturesTiles, Blogs, Clients, TeamAndInvestors, Contact } = sections
 
 class Home extends React.Component {
   render() {
     return (
       <React.Fragment>
         <HeroFull />
+        <News id="news" />
         <Products id="products" hasBgColor invertColor redirect />
         <FeaturesTabs id="built_for" redirect />
         <FeaturesTiles id="all_about" hasBgColor invertColor />

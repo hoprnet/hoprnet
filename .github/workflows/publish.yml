@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        site: [hopr-swiss, hoprnet-org]
+        site: [hoprnet-org]
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v1
@@ -23,7 +23,7 @@ jobs:
         uses: actions/cache@v1
         with:
           path: node_modules
-          key: ${{ matrix.site }}-build-${{ hashFiles('package.json') }}
+          key: ${{ runner.OS }}-build-${{ hashFiles('**/package.json') }}
       - name: Install node modules
         if: steps.cache-modules.outputs.cache-hit != 'true'
         env:

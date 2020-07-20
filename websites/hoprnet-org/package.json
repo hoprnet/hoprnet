@@ -3,8 +3,8 @@
   "version": "1.0.1",
   "private": true,
   "scripts": {
-    "start": "GENERATE_SOURCEMAP=false CI=false node --max-old-space-size=8192 ./node_modules/.bin/craco start",
-    "build": "GENERATE_SOURCEMAP=false CI=false craco build",
+    "start": "CI=false node ./node_modules/.bin/craco start",
+    "build": "CI=false craco build",
     "test": "CI=true craco test",
     "eject": "craco eject",
     "format": "prettier --check ."
@@ -19,7 +19,7 @@
     "react": "^16.9.0",
     "react-dom": "^16.9.0",
     "react-router-dom": "^5.0.1",
-    "react-scripts": "3.1.1",
+    "react-scripts": "3.2.0",
     "react-sizeme": "^2.6.12"
   },
   "devDependencies": {
