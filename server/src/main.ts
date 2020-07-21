@@ -8,12 +8,12 @@ async function bootstrap() {
   console.log(':: HOPR Server Starting ::')
 
   const configService = new ConfigService()
-  const host = configService.get('SERVER_HOST')
+  const host = configService.get('SERVER_HOST') || '0.0.0.0:50051'
 
   const app = await NestFactory.createMicroservice<MicroserviceOptions>(AppModule, {
     transport: Transport.GRPC,
     options: {
-      url: host || '0.0.0.0:50051',
+      url: host,
       package: PROTO_PACKAGES,
       protoPath: PROTO_FILES,
       loader: {
@@ -23,7 +23,7 @@ async function bootstrap() {
   })
 
   await app.listenAsync()
-  console.log(':: HOPR Server Started ::')
+  console.log(`:: HOPR Server Started at ${host} ::`)
 }
 
 bootstrap()
