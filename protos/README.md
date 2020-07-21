@@ -31,7 +31,7 @@ Stage 3 - transfer*       POST  /transfer/native ({ address,  amount } => { txHa
 Stage 3 - transfer*       POST  /transfer/hopr ({ address, amount } => { txHash })
 ```
 
-You can also check out a more detailed overview [here](./doc/protos.md).
+You can also check out a more detailed overview [here](./docs/protos.md).
 
 ## Workflow
 
@@ -46,3 +46,7 @@ import { VersionRequest } from '@hoprnet/hopr-protos/node/version_pb'
 // for web
 import { VersionRequest } from '@hoprnet/hopr-protos/web/version_pb'
 ```
+
+## Generating docs
+
+You can take a look at [generateDocs](./scripts/generateDocs.sh) script on how to generate docs.

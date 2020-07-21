@@ -33,11 +33,23 @@
   
     - [Channels](#channels.Channels)
   
+- [listen.proto](#listen.proto)
+    - [ListenRequest](#listen.ListenRequest)
+    - [ListenResponse](#listen.ListenResponse)
+  
+    - [Listen](#listen.Listen)
+  
 - [ping.proto](#ping.proto)
     - [PingRequest](#ping.PingRequest)
     - [PingResponse](#ping.PingResponse)
   
     - [Ping](#ping.Ping)
+  
+- [send.proto](#send.proto)
+    - [SendRequest](#send.SendRequest)
+    - [SendResponse](#send.SendResponse)
+  
+    - [Send](#send.Send)
   
 - [settings.proto](#settings.proto)
     - [UpdateSettingsRequest](#ping.UpdateSettingsRequest)
@@ -382,6 +394,62 @@
 
 
 
+<a name="listen.proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## listen.proto
+
+
+
+<a name="listen.ListenRequest"></a>
+
+### ListenRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| peer_id | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="listen.ListenResponse"></a>
+
+### ListenResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| payload | [bytes](#bytes) |  |  |
+
+
+
+
+
+ 
+
+ 
+
+ 
+
+
+<a name="listen.Listen"></a>
+
+### Listen
+
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| Listen | [ListenRequest](#listen.ListenRequest) | [ListenResponse](#listen.ListenResponse) stream |  |
+
+ 
+
+
+
 <a name="ping.proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
@@ -397,7 +465,7 @@
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| peerId | [string](#string) |  |  |
+| peer_id | [string](#string) |  |  |
 
 
 
@@ -432,7 +500,64 @@
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| Ping | [PingRequest](#ping.PingRequest) | [PingResponse](#ping.PingResponse) |  |
+| GetPing | [PingRequest](#ping.PingRequest) | [PingResponse](#ping.PingResponse) |  |
+
+ 
+
+
+
+<a name="send.proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## send.proto
+
+
+
+<a name="send.SendRequest"></a>
+
+### SendRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| peer_id | [string](#string) |  |  |
+| payload | [bytes](#bytes) |  |  |
+
+
+
+
+
+
+<a name="send.SendResponse"></a>
+
+### SendResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| intermediate_peer_ids | [string](#string) | repeated |  |
+
+
+
+
+
+ 
+
+ 
+
+ 
+
+
+<a name="send.Send"></a>
+
+### Send
+
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| Send | [SendRequest](#send.SendRequest) | [SendResponse](#send.SendResponse) |  |
 
  
 
@@ -574,7 +699,6 @@
 | id | [string](#string) |  |  |
 | multi_addresses | [string](#string) | repeated |  |
 | connected_nodes | [int32](#int32) |  |  |
-| cpu_usage | [float](#float) |  |  |
 
 
 

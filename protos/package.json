@@ -6,6 +6,7 @@
     "web/",
     "web-src/",
     "protos/",
+    "docs/",
     "README.md"
   ],
   "license": "GPL-3.0-only",
