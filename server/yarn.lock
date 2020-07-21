@@ -593,10 +593,10 @@
     ts-node "^8.9.1"
     web3 "^1.2.7"
 
-"@hoprnet/hopr-protos@^0.0.9-97c8c3e":
-  version "0.0.9-97c8c3e"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-protos/-/hopr-protos-0.0.9-97c8c3e.tgz#09ae2f99ef045527d6b70623547539440d626c87"
-  integrity sha512-mskx/+tbSzcKsaSzwvDFp91UuZaERQAVbiqMuqXl2//fvvm1x0qUMiC4RmZc6jLWqpU59lpzit0cFcWg3wQM8g==
+"@hoprnet/hopr-protos@^0.0.9-docs.39fd32b":
+  version "0.0.9-docs.39fd32b"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-protos/-/hopr-protos-0.0.9-docs.39fd32b.tgz#174a88d02dee1af81a97943e3dae963fd25cb688"
+  integrity sha512-b6G35oLxwchvLSPLAQt6fNFnRBCvvX8efLJ7R2/lpJud6FXggad5ZrJZ280MN2e4LBjPCjcJlyzT7qNlEQDr6A==
 
 "@hoprnet/hopr-testing@^0.1.2":
   version "0.1.2"

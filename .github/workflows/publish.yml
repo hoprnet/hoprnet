@@ -209,10 +209,21 @@ jobs:
             hopr-chat-nodebin-macos.zip
 
   # protos
+  generate_protos_docs:
+    name: Generate docs using protoc-gen-doc
+    if: startsWith(github.ref, 'refs/heads/releases/protos')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Run protoc-gen-doc
+        working-directory: protos
+        run: bash ./scripts/generateDocs.sh
+
   setting_protos_up:
     name: Setting up protos
     if: startsWith(github.ref, 'refs/heads/releases/protos')
     runs-on: ubuntu-latest
+    needs: [generate_protos_docs]
     steps:
       # Checkout, Cache and Setup Steps
       - uses: actions/checkout@v2
