@@ -63,7 +63,7 @@ class News extends React.Component {
                       rel="noopener noreferrer"
                     >
                       <Image
-                        src={require('./../assets/images/partners/binance_labs.png')}
+                        src={require('./../assets/images/partners/coindesk.png')}
                         alt="Binance Labs Logo"
                         width={344}
                         height={194}
@@ -75,9 +75,9 @@ class News extends React.Component {
                       {/* <h3 className="news-item-title h4 mt-0 mb-8">
                         <a href="https://labs.binance.com/">How to build anything</a>
                       </h3> */}
-                      <p className="mb-16 text-sm">
+                      <p className="mb-16 text-sm quote">
                         Binance Labs, the incubation and seed funding arm of the world’s largest crypto exchange, has
-                        made its first investment this year, backing decentralized privacy startup HOPR.”
+                        made its first investment this year, backing decentralized privacy startup HOPR.
                       </p>
                     </div>
                     <div className="news-item-more text-xs mb-8">
@@ -115,7 +115,7 @@ class News extends React.Component {
                       {/* <h3 className="news-item-title h4 mt-0 mb-8">
                         <a href="https://cruip.com">How to build anything</a>
                       </h3> */}
-                      <p className="mb-16 text-sm">
+                      <p className="mb-16 text-sm quote">
                         The privacy-focused network allows users to run HOPR nodes, stake and get rewards with HOPR
                         tokens while providing privacy for Web 3.
                       </p>
@@ -155,7 +155,7 @@ class News extends React.Component {
                       {/* <h3 className="news-item-title h4 mt-0 mb-8">
                         <a href="https://cruip.com">How to build anything</a>
                       </h3> */}
-                      <p className="mb-16 text-sm">
+                      <p className="mb-16 text-sm quote">
                         From award-winning blockchain hackers, Silicon Valley tech veterans and a bold vision that could
                         become a reality in Switzerland.
                       </p>

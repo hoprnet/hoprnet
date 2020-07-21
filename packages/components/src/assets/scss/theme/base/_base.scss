@@ -13,3 +13,11 @@
 .img-to-black {
   filter: contrast(0) !important;
 }
+
+.quote {
+  font-style: italic;
+}
+.quote:before,
+.quote:after {
+  content: '"';
+}
