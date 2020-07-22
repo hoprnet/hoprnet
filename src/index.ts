@@ -28,7 +28,7 @@ const getHoprAddress = (): Promise<string> => {
   })
 }
 
-const sendMessage = (hoprAddress: string, message: IMessage): Promise<void> => {
+const sendMessage = (recepientAddress: string, message: IMessage): Promise<void> => {
   let client: SendClient
 
   return new Promise((resolve, reject) => {
@@ -36,7 +36,7 @@ const sendMessage = (hoprAddress: string, message: IMessage): Promise<void> => {
       client = SetupClient(SendClient)
 
       const req = new SendRequest()
-      req.setPeerId(hoprAddress)
+      req.setPeerId(recepientAddress)
       req.setPayload(Message.fromJson(message).toU8a())
 
       client.send(req, (err) => {
