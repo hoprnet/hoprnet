@@ -1,0 +1,68 @@
+{
+  "name": "@hoprnet/chat-bot",
+  "version": "0.0.1",
+  "description": "",
+  "author": "",
+  "private": true,
+  "license": "GPL-3.0-only",
+  "scripts": {
+    "prebuild": "rimraf dist",
+    "build": "tsc",
+    "build:dev": "tsc -W",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+    "start": "node dist/index.js",
+    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:cov": "jest --coverage",
+    "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand"
+  },
+  "engines": {
+    "node": "12.9.1",
+    "yarn": "1"
+  },
+  "dependencies": {
+    "@grpc/proto-loader": "^0.5.4",
+    "@hoprnet/hopr-protos": "^0.0.9-docs.39fd32b",
+    "@hoprnet/hopr-utils": "^0.1.7-c598e77",
+    "dotenv": "^8.2.0",
+    "dotenv-parse-variables": "^0.3.0",
+    "google-protobuf": "^3.12.2",
+    "grpc": "^1.24.3",
+    "rimraf": "^3.0.2",
+    "rxjs": "^6.6.0"
+  },
+  "devDependencies": {
+    "@types/dotenv": "^8.2.0",
+    "@types/dotenv-parse-variables": "^0.2.0",
+    "@types/express": "^4.17.3",
+    "@types/jest": "26.0.3",
+    "@types/node": "~12",
+    "@typescript-eslint/eslint-plugin": "3.0.2",
+    "@typescript-eslint/parser": "3.0.2",
+    "eslint": "7.1.0",
+    "eslint-config-prettier": "^6.10.0",
+    "eslint-plugin-import": "^2.20.1",
+    "jest": "26.0.1",
+    "prettier": "^2.0.5",
+    "ts-jest": "26.1.0",
+    "ts-loader": "^6.2.1",
+    "ts-node": "^8.6.2",
+    "tsconfig-paths": "^3.9.0",
+    "typescript": "^3.7.4"
+  },
+  "jest": {
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
+    "rootDir": "src",
+    "testRegex": ".spec.ts$",
+    "transform": {
+      "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "coverageDirectory": "coverage",
+    "testEnvironment": "node"
+  }
+}
