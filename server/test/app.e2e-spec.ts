@@ -22,7 +22,7 @@ import { ChannelsClient } from '@hoprnet/hopr-protos/node/channels_grpc_pb'
 import {
   OpenChannelRequest,
   GetChannelsRequest,
-  GetChannelInfoRequest,
+  GetChannelDataRequest,
   CloseChannelRequest,
 } from '@hoprnet/hopr-protos/node/channels_pb'
 import { SendClient } from '@hoprnet/hopr-protos/node/send_grpc_pb'
@@ -249,14 +249,13 @@ describe('GRPC transport', () => {
     const client = SetupClient(ChannelsClient, 'alice')
 
     const req = new OpenChannelRequest()
-    // @TODO: update 'setPeerid' to 'setPeerId'
-    req.setPeerid(NODES.bob.hoprAddress)
+    req.setPeerId(NODES.bob.hoprAddress)
 
     client.openChannel(req, (err, res) => {
       expect(err).toBeFalsy()
 
       const data = res.toObject()
-      expect(data.channelid).toBe(aliceAndBobChannelId)
+      expect(data.channelId).toBe(aliceAndBobChannelId)
 
       client.close()
       done()
@@ -281,11 +280,10 @@ describe('GRPC transport', () => {
   it('should get channel information', async (done) => {
     const client = SetupClient(ChannelsClient, 'alice')
 
-    const req = new GetChannelInfoRequest()
-    // @TODO: update 'setChannelid' to 'setChannelId'
-    req.setChannelid(aliceAndBobChannelId)
+    const req = new GetChannelDataRequest()
+    req.setChannelId(aliceAndBobChannelId)
 
-    client.getChannelInfo(req, (err, res) => {
+    client.getChannelData(req, (err, res) => {
       expect(err).toBeFalsy()
 
       const data = res.toObject()
@@ -304,14 +302,13 @@ describe('GRPC transport', () => {
     const client = SetupClient(ChannelsClient, 'alice')
 
     const req = new CloseChannelRequest()
-    // @TODO: update 'setChannelid' to 'setChannelId'
-    req.setChannelid(aliceAndBobChannelId)
+    req.setChannelId(aliceAndBobChannelId)
 
     client.closeChannel(req, (err, res) => {
       expect(err).toBeFalsy()
 
       const data = res.toObject()
-      expect(data.channelid).toBe(aliceAndBobChannelId)
+      expect(data.channelId).toBe(aliceAndBobChannelId)
 
       client.close()
       done()

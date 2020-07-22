@@ -33,7 +33,7 @@ export class CoreService {
   constructor(private configService: ConfigService, private parserService: ParserService) {}
 
   @mustBeStarted()
-  private async getChannel(channelId: string) {
+  private async findChannel(channelId: string) {
     const channels = await this.getChannels()
     const channel = channels.find((channel) => {
       return channel.channelId === channelId
@@ -73,7 +73,7 @@ export class CoreService {
         (
           envOptions.bootstrapServers ?? [
             '/ip4/34.65.237.196/tcp/9091/p2p/16Uiu2HAm1pyd27aNRqx7icG5uDBKNFDwvwaEg2vuAUEtLN1pRa5X',
-            '/ip4/34.65.139.63/tcp/9091/p2p/16Uiu2HAmR2va1xavPsYRrpCVnjvcUr1Jqjf9UjywdyPxeZ5Z3eLZ'
+            '/ip4/34.65.139.63/tcp/9091/p2p/16Uiu2HAmR2va1xavPsYRrpCVnjvcUr1Jqjf9UjywdyPxeZ5Z3eLZ',
           ]
         ).map((multiaddr) => this.parserService.parseBootstrap(multiaddr) as Promise<PeerInfo>),
       ),
@@ -191,15 +191,14 @@ export class CoreService {
     )
   }
 
-  // @TODO: rename 'getChannelInfo' to 'getChannel'
   @mustBeStarted()
-  async getChannelInfo(
+  async getChannelData(
     channelId: string,
   ): Promise<{
     balance: string
     state: number
   }> {
-    const channel = await this.getChannel(channelId)
+    const channel = await this.findChannel(channelId)
 
     return {
       balance: channel.balance,
@@ -256,7 +255,7 @@ export class CoreService {
   // @TODO: improve proto: should return txHash
   @mustBeStarted()
   async closeChannel(channelId: string): Promise<string> {
-    const channel = await this.getChannel(channelId)
+    const channel = await this.findChannel(channelId)
 
     await channel.instance.initiateSettlement()
 
@@ -274,7 +273,7 @@ export class CoreService {
   }): Promise<{
     intermediatePeerIds: string[]
   }> {
-    // @TODO: this should be done by hopr-core
+    // @TODO: this should be done by hopr-core?
     const message = rlp.encode([payload, Date.now()])
 
     await this.node.sendMessage(message, PeerId.createFromB58String(peerId), async () => [])
@@ -284,7 +283,6 @@ export class CoreService {
     }
   }
 
-  // @TODO: support filter by peerId, hopr-core needs refactor
   @mustBeStarted()
   async listen({ peerId }: { peerId?: string }): Promise<EventEmitter> {
     return this.events

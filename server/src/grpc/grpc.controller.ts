@@ -11,8 +11,8 @@ import { GetNativeAddressResponse, GetHoprAddressResponse } from '@hoprnet/hopr-
 import { GetNativeBalanceResponse, GetHoprBalanceResponse } from '@hoprnet/hopr-protos/node/balance_pb'
 import {
   GetChannelsResponse,
-  GetChannelInfoRequest,
-  GetChannelInfoResponse,
+  GetChannelDataRequest,
+  GetChannelDataResponse,
   OpenChannelRequest,
   OpenChannelResponse,
   CloseChannelResponse,
@@ -134,12 +134,10 @@ export class GrpcController {
     }
   }
 
-  // @TODO: rename 'getChannelInfo' to 'getChannel'
-  // @TODO: rename 'req.channelid' to 'channelId'
   @GrpcMethod('Channels')
-  async getChannelInfo(req: GetChannelInfoRequest.AsObject): Promise<GetChannelInfoResponse.AsObject> {
+  async getChannelData(req: GetChannelDataRequest.AsObject): Promise<GetChannelDataResponse.AsObject> {
     try {
-      return this.grpcService.getChannel(req)
+      return this.grpcService.getChannelData(req)
     } catch (err) {
       throw new RpcException({
         code: STATUS.INTERNAL,
@@ -148,7 +146,6 @@ export class GrpcController {
     }
   }
 
-  // @TODO: rename 'req.peerid' to 'peerId'
   @GrpcMethod('Channels')
   async openChannel(req: OpenChannelRequest.AsObject): Promise<OpenChannelResponse.AsObject> {
     try {
@@ -161,7 +158,6 @@ export class GrpcController {
     }
   }
 
-  // @TODO: rename 'req.channelid' to 'channelId'
   @GrpcMethod('Channels')
   async closeChannel(req: CloseChannelRequest.AsObject): Promise<CloseChannelResponse.AsObject> {
     try {

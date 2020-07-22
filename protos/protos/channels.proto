@@ -3,7 +3,8 @@ package channels;
 
 service Channels {
   rpc GetChannels (GetChannelsRequest) returns (GetChannelsResponse);
-  rpc GetChannelInfo (GetChannelInfoRequest) returns (GetChannelInfoResponse);
+  // unable to name this 'GetChannel' because it's already used by the stub
+  rpc GetChannelData (GetChannelDataRequest) returns (GetChannelDataResponse);
   rpc OpenChannel (OpenChannelRequest) returns (OpenChannelResponse);
   rpc CloseChannel (CloseChannelRequest) returns (CloseChannelResponse);
 }
@@ -15,11 +16,11 @@ message GetChannelsResponse {
 }
 
 
-message GetChannelInfoRequest {
-  string channelId = 1;
+message GetChannelDataRequest {
+  string channel_id = 1;
 }
 
-message GetChannelInfoResponse {
+message GetChannelDataResponse {
   enum State {
     UNKNOWN = 0;
     UNINITIALISED = 1;
@@ -34,18 +35,19 @@ message GetChannelInfoResponse {
 
 
 message OpenChannelRequest {
-  string peerId = 1;
+  string peer_id = 1;
+  string amount = 2;
 }
 
 message OpenChannelResponse {
-  string channelId = 1;
+  string channel_id = 1;
 }
 
 
 message CloseChannelRequest {
-  string channelId = 1;
+  string channel_id = 1;
 }
 
 message CloseChannelResponse {
-  string channelId = 1;
+  string channel_id = 1;
 }
