@@ -15,5 +15,5 @@ export const generateRandomSentence = (): string => {
   const color = getRandomItemFromList(words.colors)
   const animal = getRandomItemFromList(words.animals)
 
-  return `Hello ${adjective} ${color} ${animal}`
+  return `${adjective} ${color} ${animal}`
 }

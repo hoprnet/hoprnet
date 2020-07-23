@@ -93,7 +93,7 @@ const start = async () => {
 
         sendMessage(message.from, {
           from: hoprAddress,
-          text: generateRandomSentence(),
+          text: `: Hello ${generateRandomSentence()}`,
         })
       } catch (err) {
         console.error(err)
