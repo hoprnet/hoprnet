@@ -6,7 +6,7 @@ import { GetHoprAddressRequest } from '@hoprnet/hopr-protos/node/address_pb'
 import { ListenClient } from '@hoprnet/hopr-protos/node/listen_grpc_pb'
 import { ListenRequest, ListenResponse } from '@hoprnet/hopr-protos/node/listen_pb'
 import { Message, IMessage } from './message'
-import { SetupClient } from './utils'
+import { SetupClient, generateRandomSentence } from './utils'
 import { API_URL } from './env'
 
 const getHoprAddress = (): Promise<string> => {
@@ -42,6 +42,7 @@ const sendMessage = (recepientAddress: string, message: IMessage): Promise<void>
       client.send(req, (err) => {
         if (err) return reject(err)
 
+        console.log(`-> ${recepientAddress}: ${message.text}`)
         client.close()
         resolve()
       })
@@ -82,19 +83,21 @@ const start = async () => {
 
   stream
     .on('data', (data) => {
-      const [messageBuffer] = data.array
-      const res = new ListenResponse()
-      res.setPayload(messageBuffer)
+      try {
+        const [messageBuffer] = data.array
+        const res = new ListenResponse()
+        res.setPayload(messageBuffer)
 
-      const message = new Message(res.getPayload_asU8()).toJson()
-      console.log(`- ${message.from} says: ${message.text}`)
+        const message = new Message(res.getPayload_asU8()).toJson()
+        console.log(`<- ${message.from}: ${message.text}`)
 
-      setTimeout(() => {
         sendMessage(message.from, {
           from: hoprAddress,
-          text: 'hello',
+          text: generateRandomSentence(),
         })
-      }, 1e3)
+      } catch (err) {
+        console.error(err)
+      }
     })
     .on('error', (err) => {
       console.error(err)

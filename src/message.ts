@@ -19,12 +19,17 @@ export class Message extends Uint8Array {
   }
 
   toJson(): IMessage {
-    const from = this.subarray(0, 53)
-    const text = this.subarray(53, this.length)
+    try {
+      const from = this.subarray(0, 53)
+      const text = this.subarray(53, this.length)
 
-    return {
-      from: textDecoder.decode(from),
-      text: textDecoder.decode(text),
+      return {
+        from: textDecoder.decode(from),
+        text: textDecoder.decode(text),
+      }
+    } catch (err) {
+      console.error(err)
+      throw Error('Unable to decode message')
     }
   }
 

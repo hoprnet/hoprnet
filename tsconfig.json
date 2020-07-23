@@ -9,6 +9,7 @@
     "removeComments": true,
     "emitDecoratorMetadata": true,
     "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
     "target": "es2019",
     "sourceMap": true,
     "outDir": "dist",
