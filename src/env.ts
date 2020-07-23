@@ -1,11 +1,24 @@
 import dotenv from 'dotenv'
 import dotenvParse from 'dotenv-parse-variables'
 
-const result = dotenv.config()
-if (result.error) {
-  throw result.error
+let parsed: {
+  API_URL: string
+} = {
+  API_URL: '127.0.0.1:50051',
 }
 
-dotenvParse(result.parsed) as Record<string, any>
+try {
+  const result = dotenv.config()
+  if (!result.error) {
+    for (const k in result.parsed) {
+      process.env[k] = result.parsed[k]
+    }
+  }
+} catch {}
 
-export const API_URL: string = process.env.API_URL ?? '127.0.0.1:50051'
+parsed = {
+  ...parsed,
+  ...(dotenvParse(process.env) as typeof parsed),
+}
+
+export const API_URL = parsed.API_URL

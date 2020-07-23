@@ -1,3 +1,4 @@
+import { API_URL } from './env'
 import type { ClientReadableStream } from 'grpc'
 import { SendClient } from '@hoprnet/hopr-protos/node/send_grpc_pb'
 import { SendRequest } from '@hoprnet/hopr-protos/node/send_pb'
@@ -7,7 +8,6 @@ import { ListenClient } from '@hoprnet/hopr-protos/node/listen_grpc_pb'
 import { ListenRequest, ListenResponse } from '@hoprnet/hopr-protos/node/listen_pb'
 import { Message, IMessage } from './message'
 import { SetupClient, generateRandomSentence } from './utils'
-import { API_URL } from './env'
 
 const getHoprAddress = (): Promise<string> => {
   let client: AddressClient
