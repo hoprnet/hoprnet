@@ -8,6 +8,13 @@ services:
       - '9091:9091'
     environment:
       - BOOTSTRAP_SERVERS=/ip4/34.65.82.167/tcp/9091/p2p/16Uiu2HAm6VH37RG1R4P8hGV1Px7MneMtNc6PNPewNxCsj1HsDLXW,/ip4/34.65.111.179/tcp/9091/p2p/16Uiu2HAmPyq9Gw93VWdS3pgmyAWg2UNnrgZoYKPDUMbKDsWhzuvb
+    volumes:
+      - /app/db
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:50051']
+      interval: 30s
+      timeout: 10s
+      retries: 5
   chat-bot:
     image: gcr.io/hoprassociation/chat-bot
     restart: always
