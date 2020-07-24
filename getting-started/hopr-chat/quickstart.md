@@ -6,7 +6,7 @@ description: Step and step guide to quickly start using HOPR Chat
 
 ### Before Getting Started
 
-This quickstart guide will help you to quickly install **HOPR Chat** and its dependencies so you can quickly connect to the **HOPR Network.** Please follow the step-by-step instructions to ensure everything works properly. 
+This quickstart guide will help you to quickly install **HOPR Chat** and its dependencies so you can quickly connect to the **HOPR Network.** Please follow the step-by-step instructions to ensure everything works properly.
 
 {% hint style="warning" %}
 **HOPR Chat**, **HOPR** and the **HOPR Network** are early stage technologies. The currently available early test versions are meant for the brave explorers who are here to build the future of a more private Web3 together with us. Do not rely on HOPR to protect your privacy or assets just yet!
@@ -60,7 +60,7 @@ To install Node.js, double-click the file you just downloaded to start the insta
 
 ![](../../.gitbook/assets/windows_install_nodejs.webp)
 
-### Test Node.js 
+### Test Node.js
 
 To check that Node.js was successfully installed, we will run a simple command with Node.js which will output the version number. To do this, we will use your Operating System's `Terminal` to run a command to see the Node.js version.
 
@@ -138,7 +138,7 @@ For Windows, select the option “Extract All” in the File Explorer to extract
 {% endtab %}
 
 {% tab title="MacOS" %}
-For MacOS, just double click on the `.zip` file you downloaded to see the contents of the **HOPR Chat** application. 
+For MacOS, just double click on the `.zip` file you downloaded to see the contents of the **HOPR Chat** application.
 
 ![HOPR Chat contents of the extracted content should look as follows.](../../.gitbook/assets/hopr-macos-contents.webp)
 
@@ -202,7 +202,7 @@ ethereum:  0x9e95cdcb480f133b0c1af70613d1488ee01bf53e
 HOPR:      16Uiu2HAm34oK6EyA2SuFo9rHXpm5Kwy6C8MeJ26JaRFBzgdQqVpZ
 ```
 
-Share your address with the myAddress command to other people. Your HOPR Address  starts with 16Uiu2 and it’s the only thing other people need to know to send you messages. Use a separate channel to share your HOPR Address with your friends.
+Share your address with the myAddress command to other people. Your HOPR Address starts with 16Uiu2 and it’s the only thing other people need to know to send you messages. Use a separate channel to share your HOPR Address with your friends.
 
 ## Step 5 - Send Messages to Other HOPR Nodes
 
@@ -241,6 +241,7 @@ Latency: 23577 ms
 
 ## Next Steps
 
-To learn more about our network, please go to our **Main Concepts** section. You can also learn how to connect to a different network by going to our **Advanced Setup.** For more information and updates about the **HOPR Network**, please follow our [Twitter](https://twitter.com/hoprnet). For questions and additional information, please go to our [Telegram](https://t.me/hoprnet) channel. 
+To learn more about our network, please go to our **Main Concepts** section. You can also learn how to connect to a different network by going to our **Advanced Setup.** For more information and updates about the **HOPR Network**, please follow our [Twitter](https://twitter.com/hoprnet). For questions and additional information, please go to our [Telegram](https://t.me/hoprnet) channel.
 
 If you do not want to receive HOPR messages anymore, you can just close the terminal window in which you have HOPR Chat running. To **uninstall** just delete the `HOPR Chat` folder containing the program you were running.
+

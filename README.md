@@ -4,9 +4,9 @@ description: Win the battle to regain privacy.
 
 # HOPR
 
-HOPR \(pronounced ˈhɑpər\) is a **privacy-preserving messaging protocol** and a **decentralised network** with **economic incentives on a blockchain**.
+HOPR \(pronounced 'hopper'\) is a **privacy-preserving messaging protocol** and a **decentralized network** with **economic incentives on a blockchain**.
 
-HOPR provides privacy by relaying messages via several relay nodes to the recipient, which “hop” through different nodes connected in the network. These messages use the [Sphinx package format](https://cypherpunks.ca/~iang/pubs/Sphinx_Oakland09.pdf) to avoid leaking any data about their contents.
+HOPR provides privacy by relaying messages through multiple “hops” via different relay nodes connected to the network. These messages use the [Sphinx packet format](https://cypherpunks.ca/~iang/pubs/Sphinx_Oakland09.pdf) to avoid leaking any data about their contents, the sender or the recipient.
 
 The HOPR network relies on multiple individuals running instances of the [HOPR Core Service \(HP-CS\)](https://github.com/hoprnet/hopr-core) over a public-available infrastructure. The HP-CS runs in multiple devices and operating systems over the internet.
 
