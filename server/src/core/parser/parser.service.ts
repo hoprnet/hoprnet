@@ -74,6 +74,7 @@ export class ParserService {
       const message = messageBuffer.toString()
       const latency = Date.now() - parseInt(latencyBuffer.toString('hex'), 16)
 
+      console.log('received message', messageBuffer.toString('hex'))
       events.emit('message', messageBuffer)
 
       return { message, latency }

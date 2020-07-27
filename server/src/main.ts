@@ -23,6 +23,7 @@ async function bootstrap() {
   })
 
   app.enableShutdownHooks()
+
   await app.listenAsync()
   console.log(`:: HOPR Server Started at ${host} ::`)
 }
@@ -31,10 +32,10 @@ bootstrap()
 
 process.on('unhandledRejection', (error: Error) => {
   console.error(error)
-  process.exit(1)
+  // process.exit(1)
 })
 
 process.on('uncaughtException', (error: Error) => {
   console.error(error)
-  process.exit(1)
+  // process.exit(1)
 })

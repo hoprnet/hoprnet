@@ -483,6 +483,11 @@
   resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-connector-interface/-/hopr-core-connector-interface-1.3.1-refactor.76c9b25.tgz#ba8307e3193d6c7b2e192d6a45b9ad81920faf19"
   integrity sha512-r0NWZyJe5oPAGI6CKrSAKuR1NWMZxgLgpY/kEVdBTTgc/ujAWCvmZVb/GE3wsKgo0AkLWvxxHPIiV7l++EP8rw==
 
+"@hoprnet/hopr-core-connector-interface@1.3.2-35127fb":
+  version "1.3.2-35127fb"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-connector-interface/-/hopr-core-connector-interface-1.3.2-35127fb.tgz#b9add3499f6425df90bc53d5aaf0d486766a8503"
+  integrity sha512-J2n7AJLM8c1+kMP1Se7zC+/PCQ6umiUsOgjp8YZlYbXLc6h1I9nP3F7LMe8FrHDR9ZUbthSyipwadicZjR0bJg==
+
 "@hoprnet/hopr-core-ethereum@0.0.12-refactor.473415f":
   version "0.0.12-refactor.473415f"
   resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-ethereum/-/hopr-core-ethereum-0.0.12-refactor.473415f.tgz#d64b6f0776fe192587f3418801a1c19122074a57"
@@ -504,15 +509,15 @@
     web3-eth "^1.2.9"
     web3-eth-contract "^1.2.9"
 
-"@hoprnet/hopr-core@0.6.16":
-  version "0.6.16"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core/-/hopr-core-0.6.16.tgz#4d92338b0a85a9f4c2216910d0f2a6b174186dcd"
-  integrity sha512-iWlxarbf3ajWcy0EjS8oMSTAfA7kiO3WfceDaSo4aGxvWb/dYrhfTbNWqsqF3uUTPSGTsiP+AmPA0t4nEwILVw==
+"@hoprnet/hopr-core@0.6.18":
+  version "0.6.18"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core/-/hopr-core-0.6.18.tgz#a1fd40d31718bed34f8226157c4da7df2e215c2b"
+  integrity sha512-lC+XcclbdKH1IAdqeXRueWc5qIZ7f4pXJpEeNHyT9bt69Njovj4OuBk+hqOjw53VrijawhMVESQ1a5wZ87O0bw==
   dependencies:
-    "@hoprnet/hopr-core-connector-interface" "1.3.1-refactor.76c9b25"
+    "@hoprnet/hopr-core-connector-interface" "1.3.2-35127fb"
     "@hoprnet/hopr-core-ethereum" "0.0.12-refactor.473415f"
     "@hoprnet/hopr-demo-seeds" "1.0.3-refactor.3ad82ff"
-    "@hoprnet/hopr-utils" "0.1.6-refactor.61df948"
+    "@hoprnet/hopr-utils" "0.1.7-c598e77"
     "@nodeutils/defaults-deep" "~1.1.0"
     abort-controller "^3.0.0"
     bignumber.js "^9.0.0"
@@ -528,6 +533,7 @@
     getopts "~2.2.5"
     heap-js "^2.1.1"
     it-handshake "^1.0.1"
+    it-pair "^1.0.0"
     it-pipe "^1.1.0"
     it-pushable "^1.4.0"
     leveldown "~5.6.0"
@@ -540,13 +546,14 @@
     libp2p-websockets "~0.13.6"
     multiaddr "^7.4.3"
     multihashes "~0.4.19"
-    peer-id "~0.13.12"
+    p-defer "^3.0.0"
+    peer-id "~0.13.13"
     peer-info "~0.17.5"
     read "~1.0.7"
     rlp "~2.2.5"
     secp256k1 "~4.0.1"
     simple-peer "~9.7.2"
-    ts-node "^8.10.1"
+    ts-node "^8.10.2"
     webrtc-stun "^3.0.0"
     wrtc "0.4.5"
 
@@ -615,7 +622,7 @@
     chalk "^4.1.0"
     strip-ansi "^6.0.0"
 
-"@hoprnet/hopr-utils@^0.1.7-c598e77":
+"@hoprnet/hopr-utils@0.1.7-c598e77", "@hoprnet/hopr-utils@^0.1.7-c598e77":
   version "0.1.7-c598e77"
   resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-0.1.7-c598e77.tgz#9f78b0131fd548b93e8e7f13aef23e5ee2ccb3e1"
   integrity sha512-B1iMxj6ycMzdhFQrqrAe5JuADVy/hBv0QrUAAx7cluZWkl1K1/tVnjZ7UBlyCE8J5NGzSlVtdAhrU3aPcksdqw==
@@ -10128,7 +10135,7 @@ pbkdf2@^3.0.17, pbkdf2@^3.0.3, pbkdf2@^3.0.9:
     safe-buffer "^5.0.1"
     sha.js "^2.4.8"
 
-peer-id@^0.13.11, peer-id@^0.13.13, peer-id@^0.13.6, peer-id@~0.13.12, peer-id@~0.13.2, peer-id@~0.13.5:
+peer-id@^0.13.11, peer-id@^0.13.13, peer-id@^0.13.6, peer-id@~0.13.13, peer-id@~0.13.2, peer-id@~0.13.5:
   version "0.13.13"
   resolved "https://registry.yarnpkg.com/peer-id/-/peer-id-0.13.13.tgz#63c3561f1e602ec9d7a205103488256d59dd299a"
   integrity sha512-5FpBXN6PDTcHs51gkHWPf0OIQZAO3Z10i6lWc+GaoxTU4bQHtsoKFnhxoXo5Ze04JblpzIrtowkluLSCLP1WYg==
@@ -12253,7 +12260,7 @@ ts-loader@^6.2.1:
     micromatch "^4.0.0"
     semver "^6.0.0"
 
-ts-node@^8.10.1, ts-node@^8.6.2, ts-node@^8.9.1:
+ts-node@^8.10.2, ts-node@^8.6.2, ts-node@^8.9.1:
   version "8.10.2"
   resolved "https://registry.yarnpkg.com/ts-node/-/ts-node-8.10.2.tgz#eee03764633b1234ddd37f8db9ec10b75ec7fb8d"
   integrity sha512-ISJJGgkIpDdBhWVu3jufsWpK3Rzo7bdiIXJjQc0ynKxVOVcg2oIrf2H2cejminGrptVc6q6/uynAHNCuWGbpVA==
