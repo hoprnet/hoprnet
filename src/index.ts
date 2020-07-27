@@ -23,6 +23,7 @@ const getHoprAddress = (): Promise<string> => {
         resolve(res.getAddress())
       })
     } catch (err) {
+      client.close()
       reject(err)
     }
   })
@@ -47,6 +48,7 @@ const sendMessage = (recepientAddress: string, message: IMessage): Promise<void>
         resolve()
       })
     } catch (err) {
+      client.close()
       reject(err)
     }
   })

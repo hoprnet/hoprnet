@@ -19,7 +19,7 @@ describe('test Message', () => {
       text,
     })
 
-    expect(message.toU8a()).toEqual(buffer)
+    expect(message.toU8a()).toStrictEqual(buffer)
   })
 
   it('should initialize Message from buffer', () => {
