@@ -22,14 +22,14 @@
 - [channels.proto](#channels.proto)
     - [CloseChannelRequest](#channels.CloseChannelRequest)
     - [CloseChannelResponse](#channels.CloseChannelResponse)
-    - [GetChannelInfoRequest](#channels.GetChannelInfoRequest)
-    - [GetChannelInfoResponse](#channels.GetChannelInfoResponse)
+    - [GetChannelDataRequest](#channels.GetChannelDataRequest)
+    - [GetChannelDataResponse](#channels.GetChannelDataResponse)
     - [GetChannelsRequest](#channels.GetChannelsRequest)
     - [GetChannelsResponse](#channels.GetChannelsResponse)
     - [OpenChannelRequest](#channels.OpenChannelRequest)
     - [OpenChannelResponse](#channels.OpenChannelResponse)
   
-    - [GetChannelInfoResponse.State](#channels.GetChannelInfoResponse.State)
+    - [GetChannelDataResponse.State](#channels.GetChannelDataResponse.State)
   
     - [Channels](#channels.Channels)
   
@@ -249,7 +249,7 @@
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| channelId | [string](#string) |  |  |
+| channel_id | [string](#string) |  |  |
 
 
 
@@ -264,37 +264,37 @@
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| channelId | [string](#string) |  |  |
+| channel_id | [string](#string) |  |  |
 
 
 
 
 
 
-<a name="channels.GetChannelInfoRequest"></a>
+<a name="channels.GetChannelDataRequest"></a>
 
-### GetChannelInfoRequest
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| channelId | [string](#string) |  |  |
-
-
-
-
-
-
-<a name="channels.GetChannelInfoResponse"></a>
-
-### GetChannelInfoResponse
+### GetChannelDataRequest
 
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| state | [GetChannelInfoResponse.State](#channels.GetChannelInfoResponse.State) |  |  |
+| channel_id | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="channels.GetChannelDataResponse"></a>
+
+### GetChannelDataResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| state | [GetChannelDataResponse.State](#channels.GetChannelDataResponse.State) |  |  |
 | balance | [string](#string) |  |  |
 
 
@@ -335,7 +335,8 @@
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| peerId | [string](#string) |  |  |
+| peer_id | [string](#string) |  |  |
+| amount | [string](#string) |  |  |
 
 
 
@@ -350,7 +351,7 @@
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| channelId | [string](#string) |  |  |
+| channel_id | [string](#string) |  |  |
 
 
 
@@ -359,9 +360,9 @@
  
 
 
-<a name="channels.GetChannelInfoResponse.State"></a>
+<a name="channels.GetChannelDataResponse.State"></a>
 
-### GetChannelInfoResponse.State
+### GetChannelDataResponse.State
 
 
 | Name | Number | Description |
@@ -386,7 +387,7 @@
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
 | GetChannels | [GetChannelsRequest](#channels.GetChannelsRequest) | [GetChannelsResponse](#channels.GetChannelsResponse) |  |
-| GetChannelInfo | [GetChannelInfoRequest](#channels.GetChannelInfoRequest) | [GetChannelInfoResponse](#channels.GetChannelInfoResponse) |  |
+| GetChannelData | [GetChannelDataRequest](#channels.GetChannelDataRequest) | [GetChannelDataResponse](#channels.GetChannelDataResponse) | unable to name this &#39;GetChannel&#39; because it&#39;s already used by the stub |
 | OpenChannel | [OpenChannelRequest](#channels.OpenChannelRequest) | [OpenChannelResponse](#channels.OpenChannelResponse) |  |
 | CloseChannel | [CloseChannelRequest](#channels.CloseChannelRequest) | [CloseChannelResponse](#channels.CloseChannelResponse) |  |
 
@@ -480,7 +481,7 @@
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| latency | [int32](#int32) |  |  |
+| latency | [int32](#int32) |  | milliseconds |
 
 
 
@@ -594,7 +595,7 @@
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| latency | [int32](#int32) |  |  |
+| latency | [int32](#int32) |  | milliseconds |
 
 
 
@@ -645,7 +646,7 @@
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| timestamp | [int32](#int32) |  |  |
+| timestamp | [int32](#int32) |  | seconds |
 
 
 

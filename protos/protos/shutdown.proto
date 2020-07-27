@@ -8,5 +8,6 @@ service Shutdown {
 message ShutdownRequest {}
 
 message ShutdownResponse {
+  // seconds
   int32 timestamp = 1;
 }

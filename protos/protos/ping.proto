@@ -10,5 +10,6 @@ message PingRequest {
 }
 
 message PingResponse {
+  // milliseconds
   int32 latency = 1;
 }

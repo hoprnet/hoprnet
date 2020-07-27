@@ -12,5 +12,6 @@ message UpdateSettingsRequest {
 }
 
 message UpdateSettingsResponse {
+  // milliseconds
   int32 latency = 1;
 }
