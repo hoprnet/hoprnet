@@ -2,12 +2,7 @@ import type { Stream } from './types'
 import { WEBRTC_TRAFFIC_PREFIX, REMAINING_TRAFFIC_PREFIX, WEBRTC_TIMEOUT } from './constants'
 import defer from 'p-defer'
 import type { Pushable } from 'it-pushable'
-import { u8aConcat } from '@hoprnet/hopr-utils'
-
-import debug from 'debug'
-
-const log = debug('hopr-core:transport')
-const error = debug('hopr-core:transport:error')
+import BL from 'bl'
 
 export default function myHandshake(
   webRTCsendBuffer: Pushable<Uint8Array> | undefined,
@@ -40,7 +35,7 @@ export default function myHandshake(
               continue
             }
 
-            yield u8aConcat(new Uint8Array([WEBRTC_TRAFFIC_PREFIX]), msg.slice())
+            yield new BL([new Uint8Array([WEBRTC_TRAFFIC_PREFIX]) as Buffer, msg as Buffer])
           }
 
           clearTimeout(timeout)
@@ -87,7 +82,7 @@ export default function myHandshake(
               continue
             }
 
-            yield u8aConcat(new Uint8Array([REMAINING_TRAFFIC_PREFIX]), msg.slice())
+            yield (new BL([new Uint8Array([REMAINING_TRAFFIC_PREFIX]) as Buffer, msg as Buffer]) as unknown) as Buffer
           }
         })()
       )
