@@ -25,6 +25,8 @@ import { privKeyToPeerId } from '../../utils'
 import { durations, u8aEquals } from '@hoprnet/hopr-utils'
 import { assert } from 'console'
 
+import defer from 'p-defer'
+
 const TEST_PROTOCOL = `/test/0.0.1`
 
 const privKeys = [randomBytes(32), randomBytes(32), randomBytes(32)]
@@ -88,8 +90,128 @@ describe('should create a socket and connect to it', function () {
   }
 
   it('should create a node and exchange messages', async function () {
-    jest.setTimeout(durations.seconds(5))
+    let testMessagesEchoed = false
+    let testMessagesReplied = false
+    let thirdBatchEchoed = false
 
+    let waitingForSecondBatch = defer<void>()
+
+    let [sender, relay, counterparty] = await Promise.all([
+      generateNode({ id: 0, ipv4: true }),
+      generateNode({ id: 1, ipv4: true }),
+      generateNode({
+        id: 2,
+        ipv4: true,
+        connHandler: (handler: Handler & { counterparty: PeerId }) => {
+          pipe(
+            /* prettier-ignore */
+            handler.stream,
+            (source: AsyncIterable<Uint8Array>) => {
+              return (async function* () {
+                for (let i = 0; i < 2; i++) {
+                  let msg = (await source[Symbol.asyncIterator]().next()).value?.slice()
+
+                  assert(msg[0] == i + 1, 'Counterparty must receive all test messages in the right order')
+
+                  yield msg
+                }
+
+                testMessagesEchoed = true
+
+                await new Promise((resolve) => setTimeout(resolve, 100))
+
+                yield new Uint8Array([3])
+                yield new Uint8Array([4])
+
+                for (let i = 0; i < 2; i++) {
+                  let msg = (await source[Symbol.asyncIterator]().next()).value?.slice()
+
+                  assert(msg[0] == i + 5, 'Counterparty must receive all test messages in the right order')
+                }
+
+                thirdBatchEchoed = true
+
+                waitingForSecondBatch.resolve()
+              })()
+            },
+            handler.stream
+          )
+        },
+      }),
+    ])
+
+    // Make sure that the nodes know each other
+    await Promise.all([sender.dial(relay.peerInfo), counterparty.dial(relay.peerInfo)])
+
+    const { stream } = await sender.relay.establishRelayedConnection(
+      Multiaddr(`/p2p/${counterparty.peerInfo.id.toB58String()}`),
+      [relay.peerInfo]
+    )
+
+    await pipe(
+      /* prettier-ignore */
+      (async function * () {
+        yield new Uint8Array([1])
+
+        yield new Uint8Array([2])
+      })(),
+      stream,
+      async (source: AsyncIterable<Uint8Array>) => {
+        for (let i = 0; i < 2; i++) {
+          let msg = (await source[Symbol.asyncIterator]().next()).value?.slice()
+
+          assert(msg[0] == i + 1, 'Sender must receive echoed messages')
+        }
+
+        testMessagesReplied = true
+      }
+    )
+
+    await sender.stop()
+
+    const waiting = defer()
+
+    sender = await generateNode({
+      id: 0,
+      ipv4: true,
+      connHandler: async (handler: Handler & { counterparty: PeerId }) => {
+        pipe(
+          /* prettier-ignore */
+          handler.stream,
+          async (source: AsyncIterable<Uint8Array>) => {
+            for (let i = 0; i < 2; i++) {
+              let msg = (await source[Symbol.asyncIterator]().next()).value?.slice()
+
+              assert(msg[0] == i + 3, `Sender must receive all test messages in the right order.`)
+            }
+
+            waiting.resolve()
+          }
+        )
+
+        await new Promise((resolve) => setTimeout(resolve, 100))
+
+        pipe(
+          (async function* () {
+            yield new Uint8Array([5])
+
+            yield new Uint8Array([6])
+          })(),
+          handler.stream
+        )
+      },
+    })
+
+    await sender.dial(relay.peerInfo)
+
+    await Promise.all([waiting.promise, waitingForSecondBatch.promise])
+
+    assert(testMessagesEchoed && testMessagesReplied && thirdBatchEchoed)
+
+    await Promise.all([sender.stop(), relay.stop(), counterparty.stop()])
+  })
+
+  it('should create a node and exchange messages', async function () {
     let i = 1
 
     let firstBatchEchoed = false
@@ -97,6 +219,8 @@ describe('should create a socket and connect to it', function () {
     let thirdBatchEchoed = false
 
     let messagesReceived = false
+
+    const waiting = defer<void>()
 
     let [sender, relay, counterparty] = await Promise.all([
       generateNode({ id: 0, ipv4: true }),
@@ -136,7 +260,7 @@ describe('should create a socket and connect to it', function () {
       [relay.peerInfo]
     )
 
-    const pipePromise = pipe(
+    pipe(
       // prettier-ignore
       (async function* () {
         yield new Uint8Array([i++])
@@ -185,8 +309,6 @@ describe('should create a socket and connect to it', function () {
 
         await new Promise(resolve => setTimeout(resolve, 500))
 
-        // yield new Uint8Array([i++])
-
         await counterparty.stop()
 
         counterparty = await generateNode({
@@ -218,10 +340,10 @@ describe('should create a socket and connect to it', function () {
         await counterparty.dial(relay.peerInfo)
 
         yield new Uint8Array([i++])
+        yield new Uint8Array([i++])
 
         await new Promise(resolve => setTimeout(resolve, 500))
 
-        yield new Uint8Array([i++])
         return
       })(),
       stream,
@@ -240,12 +362,13 @@ describe('should create a socket and connect to it', function () {
             i++
           } else if (i == 6 && u8aEquals(msg.slice(), new Uint8Array([6]))) {
             messagesReceived = true
+            waiting.resolve()
           }
         }
       }
     )
 
-    await new Promise((resolve) => setTimeout(resolve, durations.seconds(4)))
+    await waiting.promise
 
     assert(
       firstBatchEchoed && secondBatchEchoed && thirdBatchEchoed,
