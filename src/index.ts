@@ -34,6 +34,7 @@ import { Handler } from './network/transport/types'
 
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { HoprCoreConnectorStatic } from '@hoprnet/hopr-core-connector-interface'
+import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 
 import { Interactions } from './interactions'
 import * as DbKeys from './dbKeys'
@@ -52,7 +53,7 @@ export type HoprOptions = {
   id?: number
   bootstrapNode?: boolean
   network: string
-  connector: HoprCoreConnectorStatic
+  connector?: HoprCoreConnectorStatic
   bootstrapServers?: PeerInfo[]
   provider: string
   output?: (encoded: Uint8Array) => void
@@ -154,7 +155,8 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
    * @param options the parameters
    */
   static async create<CoreConnector extends HoprCoreConnector>(options: HoprOptions): Promise<Hopr<CoreConnector>> {
-    const db = options.db || Hopr.openDatabase(`db`, options.connector.constants, options)
+    const Connector = options.connector ?? HoprCoreEthereum
+    const db = options.db || Hopr.openDatabase(`db`, Connector.constants, options)
 
     options.peerInfo = options.peerInfo || (await getPeerInfo(options, db))
 
@@ -166,7 +168,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
       throw Error(`Cannot start node without a bootstrap server`)
     }
 
-    let connector = (await options.connector.create(db, options.peerInfo.id.privKey.marshal(), {
+    let connector = (await Connector.create(db, options.peerInfo.id.privKey.marshal(), {
       provider: options.provider,
       debug: options.debug,
     })) as CoreConnector

@@ -6,8 +6,6 @@ import PeerId from 'peer-id'
 
 import Multiaddr from 'multiaddr'
 
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-
 import ListConnctor from '../commands/listConnectors'
 
 import { displayHelp } from './displayHelp'
@@ -15,8 +13,6 @@ import { decodeMessage } from './message'
 
 import { knownConnectors } from './knownConnectors'
 import type { HoprOptions } from '@hoprnet/hopr-core'
-
-import { default as connector } from '@hoprnet/hopr-core-ethereum'
 
 const listConnectors = new ListConnctor()
 
@@ -183,7 +179,6 @@ export async function parseOptions(): Promise<HoprOptions> {
     debug: cli_options.debug || false,
     bootstrapNode: cli_options.bootstrapNode,
     network: cli_options.network,
-    connector,
     bootstrapServers: [...bootstrapServerMap.values()],
     provider: process.env[`${cli_options.network.toUpperCase()}_PROVIDER`],
     output(encoded: Uint8Array) {

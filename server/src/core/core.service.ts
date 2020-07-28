@@ -2,7 +2,6 @@ import { EventEmitter } from 'events'
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { default as dotenvParseVariables } from 'dotenv-parse-variables'
-import { default as connector } from '@hoprnet/hopr-core-ethereum'
 import Hopr from '@hoprnet/hopr-core'
 import type { HoprOptions } from '@hoprnet/hopr-core'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
@@ -89,7 +88,6 @@ export class CoreService {
       debug: options.debug,
       bootstrapNode: options.bootstrapNode,
       network: options.network,
-      connector,
       bootstrapServers: await Promise.all<PeerInfo>(
         options.bootstrapServers.map((multiaddr) => this.parserService.parseBootstrap(multiaddr) as Promise<PeerInfo>),
       ),

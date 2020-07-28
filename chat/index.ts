@@ -1,7 +1,6 @@
 import dotenv from 'dotenv'
 // @ts-ignore
 const dotenvExpand = require('dotenv-expand')
-const packageJSON = require('./package.json')
 
 const env = dotenv.config()
 dotenvExpand(env)
@@ -23,6 +22,7 @@ import clear from 'clear'
 import { parseOptions, keywords } from './utils'
 import { clearString } from '@hoprnet/hopr-utils'
 import Commands from './commands'
+import dependencies from './utils/dependancies'
 
 const SPLIT_OPERAND_QUERY_REGEX: RegExp = /([\w\-]+)(?:\s+)?([\w\s\-.]+)?/
 
@@ -198,11 +198,11 @@ async function main() {
   )
   console.log(`Welcome to ${chalk.bold('HOPR')}!\n`)
 
-  console.log(`Chat Version: ${chalk.bold(packageJSON.version)}`)
-  console.log(`Core Version: ${chalk.bold(packageJSON.dependencies['@hoprnet/hopr-core'])}`)
-  console.log(`Core Ethereum Version: ${chalk.bold(packageJSON.dependencies['@hoprnet/hopr-core-ethereum'])}`)
-  console.log(`Utils Version: ${chalk.bold(packageJSON.dependencies['@hoprnet/hopr-utils'])}`)
-  console.log(`Connector Version: ${chalk.bold(packageJSON.dependencies['@hoprnet/hopr-core-connector-interface'])}\n`)
+  console.log(`Chat Version: ${chalk.bold(dependencies['@hoprnet/hopr-chat'])}`)
+  console.log(`Core Version: ${chalk.bold(dependencies['@hoprnet/hopr-core'])}`)
+  console.log(`Core Ethereum Version: ${chalk.bold(dependencies['@hoprnet/hopr-core-ethereum'])}`)
+  console.log(`Utils Version: ${chalk.bold(dependencies['@hoprnet/hopr-utils'])}`)
+  console.log(`Connector Version: ${chalk.bold(dependencies['@hoprnet/hopr-core-connector-interface'])}\n`)
 
   console.log(`Bootstrap Servers: ${chalk.bold(process.env['BOOTSTRAP_SERVERS'])}\n`)
 
