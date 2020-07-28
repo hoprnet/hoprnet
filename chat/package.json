@@ -29,10 +29,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@hoprnet/hopr-core": "0.6.18",
+    "@hoprnet/hopr-core": "0.6.21",
     "@hoprnet/hopr-core-connector-interface": "1.3.2-35127fb",
-    "@hoprnet/hopr-core-ethereum": "0.0.12-refactor.473415f",
-    "@hoprnet/hopr-demo-seeds": "1.0.3-refactor.3ad82ff",
     "@hoprnet/hopr-utils": "0.1.7-c598e77",
     "@zeit/ncc": "^0.22.3",
     "bn.js": "~5.1.2",
@@ -43,6 +41,7 @@
     "figlet": "~1.4.0",
     "multihashes": "~0.4.19",
     "peer-info": "~0.17.5",
+    "read-pkg-up": "^7.0.1",
     "readline": "~1.3.0",
     "rlp": "~2.2.5",
     "typescript": "^3.9.3"

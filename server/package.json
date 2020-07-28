@@ -26,9 +26,8 @@
   },
   "dependencies": {
     "@grpc/proto-loader": "^0.5.4",
-    "@hoprnet/hopr-core": "0.6.18",
+    "@hoprnet/hopr-core": "0.6.21",
     "@hoprnet/hopr-core-connector-interface": "1.3.2-35127fb",
-    "@hoprnet/hopr-core-ethereum": "0.0.12-refactor.473415f",
     "@hoprnet/hopr-utils": "0.1.7-c598e77",
     "@hoprnet/hopr-protos": "^0.0.11-12296a7",
     "@nestjs/common": "^7.0.0",
