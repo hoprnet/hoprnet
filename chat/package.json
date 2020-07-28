@@ -40,16 +40,16 @@
     "clear": "~0.1.0",
     "dotenv": "~8.2.0",
     "dotenv-expand": "~5.1.0",
-    "figlet": "~1.4.0",
+    "figlet": "~1.5.0",
     "multihashes": "~0.4.19",
     "peer-info": "~0.17.5",
     "readline": "~1.3.0",
     "rlp": "~2.2.5",
-    "typescript": "^3.9.3"
+    "typescript": "^3.9.7"
   },
   "devDependencies": {
     "@types/node": ">=4.2.0 < 13",
-    "bestzip": "^2.1.5",
+    "bestzip": "^2.1.6",
     "copyfiles": "^2.3.0",
     "cross-env": "^7.0.2",
     "mkdirp": "^1.0.4",

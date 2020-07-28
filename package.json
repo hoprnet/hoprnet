@@ -30,7 +30,7 @@
     "hopr": "ts-node -T chat/index.ts",
     "build": "yarn clean && tsc -p . --noEmit false",
     "clean": "rm -rf ./lib",
-    "test": "jest --forceExit",
+    "test": "jest --runInBand --forceExit",
     "prepublishOnly": "yarn build",
     "lint": "prettier --check .",
     "lint:fix": "prettier --write ."
@@ -46,16 +46,13 @@
     "bl": "^4.0.2",
     "bs58": "^4.0.1",
     "chalk": "~4.1.0",
-    "clear": "^0.1.0",
     "debug": "^4.1.1",
     "dotenv": "~8.2.0",
     "dotenv-expand": "^5.1.0",
-    "figlet": "^1.4.0",
     "futoin-hkdf": "~1.3.2",
     "getopts": "~2.2.5",
     "heap-js": "^2.1.1",
     "it-handshake": "^1.0.1",
-    "it-pair": "^1.0.0",
     "it-pipe": "^1.1.0",
     "it-pushable": "^1.4.0",
     "leveldown": "~5.6.0",
@@ -72,12 +69,12 @@
     "peer-id": "~0.13.13",
     "peer-info": "~0.17.5",
     "read": "~1.0.7",
-    "rlp": "~2.2.5",
+    "rlp": "~2.2.6",
     "secp256k1": "~4.0.1",
     "simple-peer": "~9.7.2",
     "ts-node": "^8.10.2",
     "webrtc-stun": "^3.0.0",
-    "wrtc": "0.4.5"
+    "wrtc": "0.4.6"
   },
   "devDependencies": {
     "@hoprnet/hopr-ethereum": "0.3.9-120748b",
@@ -85,11 +82,10 @@
     "@types/bl": "^2.1.0",
     "@types/bn.js": "^4.11.6",
     "@types/bs58": "^4.0.1",
-    "@types/clear": "^0.1.0",
     "@types/debug": "^4.1.5",
     "@types/err-code": "^2.0.0",
     "@types/figlet": "^1.2.0",
-    "@types/jest": "^26.0.3",
+    "@types/jest": "^26.0.7",
     "@types/leveldown": "^4.0.2",
     "@types/levelup": "^4.3.0",
     "@types/memdown": "^3.0.0",
@@ -98,12 +94,13 @@
     "@types/secp256k1": "~4.0.1",
     "@types/simple-peer": "^9.6.0",
     "husky": "^4.2.5",
+    "it-pair": "^1.0.0",
     "jest": "^26.1.0",
-    "libp2p-tcp": "^0.14.5",
+    "libp2p-tcp": "^0.14.6",
     "memdown": "^5.1.0",
     "prettier": "^2.0.5",
-    "ts-jest": "^26.1.1",
-    "typescript": "^3.9.2"
+    "ts-jest": "^26.1.4",
+    "typescript": "^3.9.7"
   },
   "jest": {
     "moduleFileExtensions": [
@@ -117,7 +114,8 @@
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "maxConcurrency": 1
   },
   "prettier": {
     "tabWidth": 2,

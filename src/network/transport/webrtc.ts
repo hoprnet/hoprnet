@@ -86,6 +86,7 @@ export default function upgradetoWebRTC(
       options?.signal?.removeEventListener('abort', onAbort)
 
       if (err || options?._failIntentionallyOnWebRTC) {
+        channel.destroy()
         reject(err)
       } else {
         resolve((channel as unknown) as Socket)
