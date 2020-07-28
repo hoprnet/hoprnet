@@ -1,5 +1,5 @@
 import net from 'net'
-import abortable, { AbortError } from 'abortable-iterator'
+import { AbortError } from 'abortable-iterator'
 
 import type { Socket } from 'net'
 import mafmt from 'mafmt'
@@ -11,11 +11,6 @@ const error = debug('hopr-core:transport:error')
 
 import { socketToConn } from './socket-to-conn'
 
-import AbortController from 'abort-controller'
-
-// @ts-ignore
-import handshake = require('it-handshake')
-
 import myHandshake from './handshake'
 
 // @ts-ignore
@@ -23,7 +18,7 @@ import libp2p = require('libp2p')
 
 import { createListener, Listener } from './listener'
 import { multiaddrToNetConfig } from './utils'
-import { USE_WEBRTC, CODE_P2P, USE_OWN_STUN_SERVERS, OK, FAIL, DELIVERY_REGISTER, RELAY_REGISTER } from './constants'
+import { USE_WEBRTC, CODE_P2P, USE_OWN_STUN_SERVERS } from './constants'
 
 import Multiaddr from 'multiaddr'
 import PeerInfo from 'peer-info'
@@ -31,20 +26,7 @@ import PeerId from 'peer-id'
 
 import pipe from 'it-pipe'
 
-import { pubKeyToPeerId } from '../../utils'
-import { u8aEquals } from '@hoprnet/hopr-utils'
-
-import type {
-  Connection,
-  Upgrader,
-  DialOptions,
-  Registrar,
-  Dialer,
-  ConnHandler,
-  Handler,
-  Stream,
-  MultiaddrConnection,
-} from './types'
+import type { Connection, Upgrader, DialOptions, ConnHandler, Handler, Stream, MultiaddrConnection } from './types'
 
 import chalk from 'chalk'
 
@@ -71,8 +53,6 @@ class TCP {
   private _answerIntentionallyWithIncorrectMessages?: boolean
   // END ONLY FOR TESTING
   private _upgrader: Upgrader
-  private _dialer: Dialer
-  private _registrar: Registrar
   private _peerInfo: PeerInfo
   private _handle: (protocols: string[] | string, handler: (connection: Handler) => void) => void
   private relays?: PeerInfo[]
@@ -140,9 +120,7 @@ class TCP {
     this._failIntentionallyOnWebRTC = failIntentionallyOnWebRTC || false
     this._useOwnStunServers = useOwnStunServers === undefined ? USE_OWN_STUN_SERVERS : useOwnStunServers
     this._useWebRTC = useWebRTC === undefined ? USE_WEBRTC : useWebRTC
-    this._registrar = libp2p.registrar
     this._handle = libp2p.handle.bind(libp2p)
-    this._dialer = libp2p.dialer
     this._peerInfo = libp2p.peerInfo
     this._upgrader = upgrader
 
@@ -155,9 +133,17 @@ class TCP {
     let webRTCsendBuffer: Pushable<Uint8Array>
     let webRTCrecvBuffer: Pushable<Uint8Array>
 
+    let socket: Promise<net.Socket>
+
     if (this._useWebRTC) {
       webRTCsendBuffer = pushable<Uint8Array>()
       webRTCrecvBuffer = pushable<Uint8Array>()
+
+      socket = upgradeToWebRTC(webRTCsendBuffer, webRTCrecvBuffer, {
+        _timeoutIntentionallyOnWebRTC: this._timeoutIntentionallyOnWebRTC,
+        _failIntentionallyOnWebRTC: this._failIntentionallyOnWebRTC,
+        _answerIntentionallyWithIncorrectMessages: this._answerIntentionallyWithIncorrectMessages,
+      })
     }
 
     const myStream = myHandshake(webRTCsendBuffer, webRTCrecvBuffer)
@@ -176,17 +162,13 @@ class TCP {
 
     if (this._useWebRTC) {
       try {
-        let socket = await upgradeToWebRTC(webRTCsendBuffer, webRTCrecvBuffer, {
-          _timeoutIntentionallyOnWebRTC: this._timeoutIntentionallyOnWebRTC,
-          _failIntentionallyOnWebRTC: this._failIntentionallyOnWebRTC,
-          _answerIntentionallyWithIncorrectMessages: this._answerIntentionallyWithIncorrectMessages,
-        })
+        let _socket = await socket
 
         webRTCrecvBuffer.end()
         webRTCsendBuffer.end()
 
         conn = await this._upgrader.upgradeInbound(
-          socketToConn(socket, {
+          socketToConn(_socket, {
             remoteAddr: Multiaddr(`/p2p/${counterparty.toB58String()}`),
             localAddr: Multiaddr(`/p2p/${this._peerInfo.id.toB58String()}`),
           })
@@ -291,9 +273,18 @@ class TCP {
       throw new AbortError()
     }
 
+    let socket: Promise<net.Socket>
+
     if (this._useWebRTC) {
       webRTCsendBuffer = pushable<Uint8Array>()
       webRTCrecvBuffer = pushable<Uint8Array>()
+
+      socket = upgradeToWebRTC(webRTCsendBuffer, webRTCrecvBuffer, {
+        initiator: true,
+        _timeoutIntentionallyOnWebRTC: this._timeoutIntentionallyOnWebRTC,
+        _failIntentionallyOnWebRTC: this._failIntentionallyOnWebRTC,
+        _answerIntentionallyWithIncorrectMessages: this._answerIntentionallyWithIncorrectMessages,
+      })
     }
 
     const stream = myHandshake(webRTCsendBuffer, webRTCrecvBuffer, { signal: options?.signal })
@@ -312,18 +303,13 @@ class TCP {
 
     if (this._useWebRTC) {
       try {
-        let socket = await upgradeToWebRTC(webRTCsendBuffer, webRTCrecvBuffer, {
-          initiator: true,
-          _timeoutIntentionallyOnWebRTC: this._timeoutIntentionallyOnWebRTC,
-          _failIntentionallyOnWebRTC: this._failIntentionallyOnWebRTC,
-          _answerIntentionallyWithIncorrectMessages: this._answerIntentionallyWithIncorrectMessages,
-        })
+        let _socket = await socket
 
         webRTCsendBuffer.end()
         webRTCrecvBuffer.end()
 
         conn = await this._upgrader.upgradeOutbound(
-          socketToConn(socket, {
+          socketToConn(_socket, {
             signal: options.signal,
             remoteAddr: Multiaddr(`/p2p/${destination.toB58String()}`),
             localAddr: Multiaddr(`/p2p/${this._peerInfo.id.toB58String()}`),

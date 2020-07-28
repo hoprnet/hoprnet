@@ -307,15 +307,19 @@ class Relay {
       }
 
       while (!obj.aborted) {
-        const msg = (await streamSource[Symbol.asyncIterator]().next()).value
+        let result = await streamSource[Symbol.asyncIterator]().next()
+
+        if (result.done) {
+          break
+        }
 
         // @TODO handle empty messages
 
         if (obj.aborted) {
-          obj.cache = msg
+          obj.cache = result.value
           break
         } else {
-          yield msg
+          yield result.value
         }
       }
 

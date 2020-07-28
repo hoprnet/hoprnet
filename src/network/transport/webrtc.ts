@@ -1,5 +1,5 @@
 import type { Pushable } from 'it-pushable'
-import abortable, { AbortError } from 'abortable-iterator'
+import { AbortError } from 'abortable-iterator'
 
 import type { Socket } from 'net'
 

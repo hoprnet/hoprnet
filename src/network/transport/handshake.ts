@@ -2,7 +2,6 @@ import type { Stream } from './types'
 import { WEBRTC_TRAFFIC_PREFIX, REMAINING_TRAFFIC_PREFIX, WEBRTC_TIMEOUT } from './constants'
 import defer from 'p-defer'
 import type { Pushable } from 'it-pushable'
-import pushable from 'it-pushable'
 import { u8aConcat } from '@hoprnet/hopr-utils'
 
 import debug from 'debug'
@@ -20,9 +19,11 @@ export default function myHandshake(
 } {
   const sourcePromise = defer<AsyncIterable<Uint8Array>>()
 
-  const connector = pushable<Uint8Array>()
-
   let webRTCused = false
+
+  let cache: Uint8Array
+  let sinkPromise = defer<void>()
+  let deferredSource: AsyncIterable<Uint8Array>
 
   const webRtcStream = {
     sink: (source: AsyncIterable<Uint8Array>) => {
@@ -54,24 +55,25 @@ export default function myHandshake(
 
       let doneWithWebRTC = false
 
-      for await (const msg of source) {
-        if (msg == null) {
-          continue
+      while (!doneWithWebRTC) {
+        let result = await source[Symbol.asyncIterator]().next()
+
+        if (result.done) {
+          break
         }
 
-        if (!doneWithWebRTC && msg.slice(0, 1)[0] == WEBRTC_TRAFFIC_PREFIX) {
+        let msg = result.value.slice()
+        if (msg[0] == WEBRTC_TRAFFIC_PREFIX) {
           webRTCrecvBuffer?.push(msg.slice(1))
-        } else if (msg.slice(0, 1)[0] == REMAINING_TRAFFIC_PREFIX) {
-          if (!doneWithWebRTC) {
-            doneWithWebRTC = true
-            webRTCrecvBuffer?.end()
-          }
+        } else if (msg[0] == REMAINING_TRAFFIC_PREFIX) {
+          doneWithWebRTC = true
+          webRTCrecvBuffer?.end()
 
-          connector.push(msg.slice(1))
+          cache = msg.slice(1)
+          deferredSource = source
+          sinkPromise.resolve()
         }
       }
-
-      connector.end()
     },
   }
   const relayStream = {
@@ -90,7 +92,21 @@ export default function myHandshake(
         })()
       )
     },
-    source: connector,
+    source: (async function* () {
+      await sinkPromise.promise
+
+      if (cache != null) {
+        yield cache
+      }
+
+      for await (const msg of deferredSource) {
+        let _msg = msg.slice()
+
+        if (_msg.slice(0, 1)[0] == REMAINING_TRAFFIC_PREFIX) {
+          yield _msg.slice(1)
+        }
+      }
+    })(),
   }
 
   return {
