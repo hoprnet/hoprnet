@@ -17,7 +17,7 @@ const defaultProps = {
 const AboutUs = props => {
   return (
     <GenericSection {...props}>
-      <div className="center-content">
+      <div className="center-content whole-page">
         <div className="container-sm">
           <p className="section-header mt-0 mb-0 reveal-from-top big-title" data-reveal-delay="150">
             Independent, Incorruptible, And Indestructible
