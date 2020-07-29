@@ -29,7 +29,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@hoprnet/hopr-core": "0.6.21",
+    "@hoprnet/hopr-core": "0.6.22",
     "@hoprnet/hopr-core-connector-interface": "1.3.2-35127fb",
     "@hoprnet/hopr-utils": "0.1.7-c598e77",
     "@zeit/ncc": "^0.22.3",

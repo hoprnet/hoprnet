@@ -2,6 +2,8 @@ import chalk from 'chalk'
 import PeerInfo from 'peer-info'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 
+import AbortController from 'abort-controller'
+
 import debug from 'debug'
 const log = debug('hopr-core:crawler')
 
@@ -13,174 +15,212 @@ import type Hopr from '..'
 
 import { CrawlResponse, CrawlStatus } from '../messages'
 import PeerId from 'peer-id'
+import type { Connection } from './transport/types'
+import type { Entry } from './peerStore'
 
-const MAX_PARALLEL_REQUESTS = 4
+const MAX_PARALLEL_REQUESTS = 7
+export const CRAWL_TIMEOUT = 1 * 1000
 
 class Crawler<Chain extends HoprCoreConnector> {
-  constructor(public node: Hopr<Chain>) {}
+  constructor(
+    public node: Hopr<Chain>,
+    private options?: {
+      timeoutIntentionally?: boolean
+    }
+  ) {}
 
   /**
    *
    * @param comparator
    */
   async crawl(comparator?: (peer: string) => boolean): Promise<void> {
-    const errors: Error[] = []
+    return new Promise(async (resolve) => {
+      let aborted = false
 
-    // fast non-inclusion check
-    const contactedPeerIds = new Set<string>() // @TODO could be replaced by a bloom filter
+      const errors: Error[] = []
 
-    let unContactedPeers: string[] = [] // @TODO add new peerIds lazily
+      // fast non-inclusion check
+      const contactedPeerIds = new Set<string>() // @TODO could be replaced by a bloom filter
 
-    let before = 0 // store state before crawling
-    let current = 0 // store current state
+      let unContactedPeers: string[] = [] // @TODO add new peerIds lazily
 
-    log(`Crawling started`)
+      let before = 0 // store state before crawling
+      let current = 0 // store current state
 
-    this.node.network.peerStore.cleanupBlacklist()
+      const abort = new AbortController()
 
-    unContactedPeers.push(...this.node.network.peerStore.peers.map((entry) => entry.id))
+      const timeout = setTimeout(() => {
+        aborted = true
 
-    if (comparator != null) {
-      for (let i = 0; i < unContactedPeers.length; i++) {
-        if (comparator(unContactedPeers[i])) {
-          before += 1
-        }
-      }
-    } else {
-      before = unContactedPeers.length
-    }
+        abort.abort()
 
-    current = before
+        this.printStatsAndErrors(contactedPeerIds, errors, current, before)
 
-    const tokens: Token[] = getTokens(MAX_PARALLEL_REQUESTS)
+        resolve()
+      }, CRAWL_TIMEOUT)
 
-    /**
-     * Check if we're finished
-     */
-    const isDone = (): boolean => contactedPeerIds.size >= MAX_HOPS && current >= MAX_HOPS
+      log(`Crawling started`)
 
-    /**
-     * Returns a random node and removes it from the array.
-     */
-    const removeRandomNode = (): string => {
-      if (unContactedPeers.length == 0) {
-        throw Error(`Cannot pick a random node because there are none.`)
-      }
+      this.node.network.peerStore.cleanupBlacklist()
 
-      const index = randomInteger(0, unContactedPeers.length)
+      unContactedPeers.push(...this.node.network.peerStore.peers.map((entry: Entry) => entry.id))
 
-      if (index == unContactedPeers.length - 1) {
-        return unContactedPeers.pop() as string
-      }
-
-      const selected: string = unContactedPeers[index]
-      unContactedPeers[index] = unContactedPeers.pop() as string
-
-      return selected
-    }
-
-    /**
-     * Stores the crawling "threads"
-     */
-    const promises: Promise<void>[] = Array.from({ length: MAX_PARALLEL_REQUESTS })
-
-    /**
-     * Connect to another peer and returns a promise that resolves to all received nodes
-     * that were previously unknown.
-     *
-     * @param peerInfo PeerInfo of the peer that is queried
-     */
-    const queryNode = async (peer: string, token: Token): Promise<void> => {
-      let peerInfos: PeerInfo[]
-
-      if (isDone()) {
-        tokens.push(token)
-        return
-      }
-
-      // Start additional "threads"
-      while (tokens.length > 0 && unContactedPeers.length > 0) {
-        const token: Token = tokens.pop() as Token
-        const currentNode = removeRandomNode()
-
-        if (promises[token] != null) {
-          /**
-           * @TODO remove this and make sure that the Promise is always
-           * already resolved.
-           */
-          promises[token].then(() => queryNode(currentNode, token))
-        } else {
-          promises[token] = queryNode(currentNode, token)
-        }
-      }
-
-      while (true) {
-        contactedPeerIds.add(peer)
-
-        try {
-          peerInfos = await this.node.interactions.network.crawler.interact(PeerId.createFromB58String(peer))
-        } catch (err) {
-          errors.push(err)
-        } finally {
-          if (peerInfos != null && Array.isArray(peerInfos)) {
-            for (let i = 0; i < peerInfos.length; i++) {
-              const peerString = peerInfos[i].id.toB58String()
-
-              if (peerInfos[i].id.isEqual(this.node.peerInfo.id)) {
-                continue
-              }
-
-              if (!contactedPeerIds.has(peerString) && !unContactedPeers.includes(peerString)) {
-                unContactedPeers.push(peerString)
-
-                if (comparator == null || comparator(peerString)) {
-                  current++
-                }
-
-                this.node.network.peerStore.push({
-                  id: peerString,
-                  lastSeen: 0,
-                })
-                this.node.peerStore.put(peerInfos[i])
-              }
-            }
+      if (comparator != null) {
+        for (let i = 0; i < unContactedPeers.length; i++) {
+          if (comparator(unContactedPeers[i])) {
+            before += 1
           }
         }
-
-        if (unContactedPeers.length > 0 && !isDone()) {
-          peer = removeRandomNode()
-        } else {
-          break
-        }
+      } else {
+        before = unContactedPeers.length
       }
 
-      tokens.push(token)
-    }
+      current = before
 
-    if (unContactedPeers.length > 0) {
-      let token = tokens.pop()
-      promises[token] = queryNode(removeRandomNode(), token)
-    }
+      const tokens: Token[] = getTokens(MAX_PARALLEL_REQUESTS)
 
-    if (!isDone()) {
-      await Promise.all(promises)
-    }
+      /**
+       * Check if we're finished
+       */
+      const isDone = (): boolean => aborted || (contactedPeerIds.size >= MAX_HOPS && current >= MAX_HOPS)
 
-    this.printStatsAndErrors(contactedPeerIds, errors, current, before)
+      /**
+       * Returns a random node and removes it from the array.
+       */
+      const removeRandomNode = (): string => {
+        if (unContactedPeers.length == 0) {
+          throw Error(`Cannot pick a random node because there are none.`)
+        }
 
-    // @TODO re-enable this once routing is done properly.
-    // if (!isDone()) {
-    //   throw Error(`Unable to find enough other nodes in the network.`)
-    // }
+        const index = randomInteger(0, unContactedPeers.length)
+
+        if (index == unContactedPeers.length - 1) {
+          return unContactedPeers.pop() as string
+        }
+
+        const selected: string = unContactedPeers[index]
+        unContactedPeers[index] = unContactedPeers.pop() as string
+
+        return selected
+      }
+
+      /**
+       * Stores the crawling "threads"
+       */
+      const promises: Promise<void>[] = Array.from({ length: MAX_PARALLEL_REQUESTS })
+
+      /**
+       * Connect to another peer and returns a promise that resolves to all received nodes
+       * that were previously unknown.
+       */
+      const queryNode = async (peer: string, token: Token): Promise<void> => {
+        let peerInfos: PeerInfo[]
+
+        if (isDone()) {
+          promises[token] = undefined
+          tokens.push(token)
+          return
+        }
+
+        // Start additional "threads"
+        while (tokens.length > 0 && unContactedPeers.length > 0) {
+          const token: Token = tokens.pop() as Token
+
+          promises[token] = queryNode(removeRandomNode(), token)
+        }
+
+        while (true) {
+          contactedPeerIds.add(peer)
+
+          try {
+            log(`querying ${chalk.blue(peer)}`)
+            peerInfos = await this.node.interactions.network.crawler.interact(PeerId.createFromB58String(peer), {
+              signal: abort.signal,
+            })
+            log(
+              `received [${peerInfos.map((p) => chalk.blue(p.id.toB58String())).join(', ')}] from peer ${chalk.blue(
+                peer
+              )}`
+            )
+          } catch (err) {
+            peerInfos = undefined
+            errors.push(err)
+            continue
+          }
+
+          for (let i = 0; i < peerInfos.length; i++) {
+            const peerString = peerInfos[i].id.toB58String()
+
+            if (peerInfos[i].id.isEqual(this.node.peerInfo.id)) {
+              continue
+            }
+
+            if (!contactedPeerIds.has(peerString) && !unContactedPeers.includes(peerString)) {
+              unContactedPeers.push(peerString)
+
+              let beforeInserting = this.node.network.peerStore.length
+              this.node.network.peerStore.push({
+                id: peerString,
+                lastSeen: 0,
+              })
+
+              if (comparator == null || comparator(peerString)) {
+                current = current + this.node.network.peerStore.length - beforeInserting
+              }
+              this.node.peerStore.put(peerInfos[i])
+            }
+          }
+
+          if (unContactedPeers.length == 0 || isDone()) {
+            break
+          }
+
+          peer = removeRandomNode()
+        }
+
+        promises[token] = undefined
+        tokens.push(token)
+      }
+
+      if (unContactedPeers.length > 0) {
+        let token = tokens.pop()
+        promises[token] = queryNode(removeRandomNode(), token)
+      }
+
+      if (!isDone()) {
+        await Promise.all(promises)
+      }
+
+      if (!aborted) {
+        clearTimeout(timeout)
+
+        this.printStatsAndErrors(contactedPeerIds, errors, current, before)
+
+        resolve()
+      }
+
+      // @TODO re-enable this once routing is done properly.
+      // if (!isDone()) {
+      //   throw Error(`Unable to find enough other nodes in the network.`)
+      // }
+    })
   }
 
-  handleCrawlRequest() {
-    return function* (this: Crawler<Chain>) {
-      const filter = (entry: { id: string }) => entry.id !== this.node.peerInfo.id.toB58String()
-
+  handleCrawlRequest(conn?: Connection) {
+    return async function* (this: Crawler<Chain>) {
       const amountOfNodes = Math.min(CRAWLING_RESPONSE_NODES, this.node.network.peerStore.peers.length)
 
-      const selectedNodes = randomSubset(this.node.network.peerStore.peers, amountOfNodes, filter)
+      const selectedNodes = randomSubset(
+        this.node.network.peerStore.peers,
+        amountOfNodes,
+        (entry: Entry) =>
+          entry.id !== this.node.peerInfo.id.toB58String() &&
+          (conn == null || entry.id !== conn.remotePeer.toB58String())
+      )
+
+      if (this.options?.timeoutIntentionally) {
+        await new Promise((resolve) => setTimeout(resolve, CRAWL_TIMEOUT + 100))
+      }
 
       if (selectedNodes.length > 0) {
         yield new CrawlResponse(undefined, {

@@ -18,8 +18,6 @@ import AbortController from 'abort-controller'
 
 import { CrawlResponse, CrawlStatus } from '../../messages'
 
-const CRAWL_TIMEOUT = 1 * 1000
-
 class Crawler<Chain extends HoprCoreConnector> implements AbstractInteraction<Chain> {
   protocols: string[] = [PROTOCOL_CRAWLING]
 
@@ -30,69 +28,64 @@ class Crawler<Chain extends HoprCoreConnector> implements AbstractInteraction<Ch
   handler(struct: Handler) {
     pipe(
       /* prettier-ignore */
-      this.node.network.crawler.handleCrawlRequest(),
+      this.node.network.crawler.handleCrawlRequest(struct.connection),
       struct.stream
     )
   }
 
-  async interact(counterparty: PeerId): Promise<PeerInfo[]> {
-    let struct: Handler
+  interact(counterparty: PeerId, options: { signal: AbortSignal }): Promise<PeerInfo[]> {
+    return new Promise<PeerInfo[]>(async (resolve) => {
+      let resolved = false
+      const onAbort = () => {
+        options.signal.removeEventListener('abort', onAbort)
 
-    const abort = new AbortController()
-    const signal = abort.signal
-
-    const timeout = setTimeout(abort.abort.bind(abort), CRAWL_TIMEOUT)
-
-    try {
-      struct = await this.node.dialProtocol(counterparty, this.protocols[0], { signal }).catch(async (_: Error) => {
-        const peerInfo = await this.node.peerRouting.findPeer(counterparty)
-
-        try {
-          let result = await this.node.dialProtocol(peerInfo, this.protocols[0], { signal })
-          clearTimeout(timeout)
-          return result
-        } catch (err) {
-          clearTimeout(timeout)
-          throw err
+        if (!resolved) {
+          resolve([])
+          resolved = true
         }
-      })
-    } catch (err) {
-      this.node.log(
-        `Could not ask node ${counterparty.toB58String()} for other nodes. Error was: ${chalk.red(err.message)}.`
-      )
-      return []
-    }
+      }
+      options.signal.addEventListener('abort', () => resolve([]))
 
-    if (signal.aborted) {
-      return []
-    }
+      let struct: Handler
 
-    return await pipe(
-      /** prettier-ignore */
-      struct.stream,
-      collect
-    )
+      try {
+        struct = await this.node
+          .dialProtocol(counterparty, this.protocols[0], { signal: options.signal })
+          .catch(async (_: Error) => {
+            const peerInfo = await this.node.peerRouting.findPeer(counterparty)
+
+            return await this.node.dialProtocol(peerInfo, this.protocols[0], { signal: options.signal })
+          })
+      } catch (err) {
+        log(`Could not ask node ${counterparty.toB58String()} for other nodes. Error was: ${chalk.red(err.message)}.`)
+
+        if (!resolved) {
+          return resolve([])
+        }
+        return
+      }
+
+      const peerInfos = []
+      for await (const encodedResponse of struct.stream.source) {
+        let decodedResponse: any
+        try {
+          decodedResponse = new CrawlResponse(encodedResponse.slice())
+        } catch {
+          continue
+        }
+
+        if (decodedResponse.status !== CrawlStatus.OK) {
+          continue
+        }
+
+        peerInfos.push(...(await decodedResponse.peerInfos))
+      }
+
+      if (!resolved) {
+        return resolve(peerInfos)
+      }
+    })
   }
-}
-
-async function collect(source: AsyncIterable<Uint8Array>) {
-  const peerInfos = []
-  for await (const encodedResponse of source) {
-    let decodedResponse: any
-    try {
-      decodedResponse = new CrawlResponse(encodedResponse.slice())
-    } catch {
-      continue
-    }
-
-    if (decodedResponse.status !== CrawlStatus.OK) {
-      continue
-    }
-
-    peerInfos.push(...(await decodedResponse.peerInfos))
-  }
-
-  return peerInfos
 }
 
 export { Crawler }

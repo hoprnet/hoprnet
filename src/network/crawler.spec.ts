@@ -17,13 +17,13 @@ import chalk from 'chalk'
 import Hopr from '..'
 import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import { Interactions } from '../interactions'
-import { Crawler } from './crawler'
+import { Crawler, CRAWL_TIMEOUT } from './crawler'
 import { Crawler as CrawlerInteraction } from '../interactions/network/crawler'
 import Multiaddr from 'multiaddr'
 import PeerStore, { BLACKLIST_TIMEOUT, BlacklistedEntry } from './peerStore'
 
 describe('test crawler', function () {
-  async function generateNode(): Promise<Hopr<HoprCoreConnector>> {
+  async function generateNode(options?: { timeoutIntentionally: boolean }): Promise<Hopr<HoprCoreConnector>> {
     const node = (await libp2p.create({
       peerInfo: await PeerInfo.create(await PeerId.create({ keyType: 'secp256k1' })),
       modules: {
@@ -47,7 +47,7 @@ describe('test crawler', function () {
 
     new Interactions(node)
     node.network = {
-      crawler: new Crawler(node),
+      crawler: new Crawler(node, options),
       peerStore: new PeerStore(node),
     } as Hopr<HoprCoreConnector>['network']
 
@@ -153,6 +153,58 @@ describe('test crawler', function () {
       Chris.stop(),
       Dave.stop(),
       Eve.stop(),
+    ])
+  })
+
+  it('should crawl the network and timeout while crawling', async function () {
+    let timeoutCorrectly = false
+    let before = Date.now()
+    const [Alice, Bob, Chris] = await Promise.all([
+      generateNode(),
+      generateNode({
+        timeoutIntentionally: true,
+      }),
+      generateNode({
+        timeoutIntentionally: true,
+      }),
+    ])
+
+    await Alice.network.crawler.crawl()
+
+    // await assert.rejects(
+    //   () => Alice.network.crawler.crawl(),
+    //   Error(`Unable to find enough other nodes in the network.`)
+    // )
+
+    Alice.emit('peer:connect', Bob.peerInfo)
+
+    await Alice.network.crawler.crawl()
+
+    Bob.emit('peer:connect', Chris.peerInfo)
+
+    await Alice.network.crawler.crawl()
+
+    await new Promise((resolve) => setTimeout(resolve, 100))
+
+    await Bob.stop()
+
+    await Alice.network.crawler.crawl()
+
+    await new Promise((resolve) => setTimeout(resolve, 200))
+
+    timeoutCorrectly = true
+
+    const after = Date.now() - before
+    assert(
+      timeoutCorrectly && after < 3 * CRAWL_TIMEOUT && after >= 2 * CRAWL_TIMEOUT,
+      `Crawling should timeout correctly`
+    )
+
+    await Promise.all([
+      /* prettier-ignore */
+      Alice.stop(),
+      Bob.stop(),
+      Chris.stop(),
     ])
   })
 })

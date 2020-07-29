@@ -214,10 +214,10 @@
     web3-eth "^1.2.9"
     web3-eth-contract "^1.2.9"
 
-"@hoprnet/hopr-core@0.6.21":
-  version "0.6.21"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core/-/hopr-core-0.6.21.tgz#4f89d5f26f3fb12734497219e23c450d2ab3314c"
-  integrity sha512-so0ivfIIvypCP5oLrw/4QQM7I+91VCCxXp2N0/2HA1uxZbjAJeZYqi9xpu16ohtuoHVNXiXF0HEtvI187p0+3g==
+"@hoprnet/hopr-core@0.6.22":
+  version "0.6.22"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core/-/hopr-core-0.6.22.tgz#924a0e297487cdd4f1a8ff1d98e938b088e21146"
+  integrity sha512-x0Z+xeuxWyD+ukaXYmyVfxrjOjKadhy8ND/sx0heQPWzLyOf4pTVMZfHfQXEqAUOrpHs/E4qS/6U4i7RmKeEUg==
   dependencies:
     "@hoprnet/hopr-core-connector-interface" "1.3.2-35127fb"
     "@hoprnet/hopr-core-ethereum" "0.0.12-refactor.473415f"
@@ -229,16 +229,13 @@
     bl "^4.0.2"
     bs58 "^4.0.1"
     chalk "~4.1.0"
-    clear "^0.1.0"
     debug "^4.1.1"
     dotenv "~8.2.0"
     dotenv-expand "^5.1.0"
-    figlet "^1.4.0"
     futoin-hkdf "~1.3.2"
     getopts "~2.2.5"
     heap-js "^2.1.1"
     it-handshake "^1.0.1"
-    it-pair "^1.0.0"
     it-pipe "^1.1.0"
     it-pushable "^1.4.0"
     leveldown "~5.6.0"
@@ -255,12 +252,12 @@
     peer-id "~0.13.13"
     peer-info "~0.17.5"
     read "~1.0.7"
-    rlp "~2.2.5"
+    rlp "~2.2.6"
     secp256k1 "~4.0.1"
     simple-peer "~9.7.2"
     ts-node "^8.10.2"
     webrtc-stun "^3.0.0"
-    wrtc "0.4.5"
+    wrtc "0.4.6"
 
 "@hoprnet/hopr-demo-seeds@1.0.3-refactor.3ad82ff":
   version "1.0.3-refactor.3ad82ff"
@@ -595,9 +592,9 @@
   integrity sha512-rr+OQyAjxze7GgWrSaJwydHStIhHq2lvY3BOC2Mj7KnzI7XK0Uw1TOOdI9lDoajEbSWLiYgoo4f1R51erQfhPQ==
 
 "@types/node@*":
-  version "14.0.26"
-  resolved "https://registry.yarnpkg.com/@types/node/-/node-14.0.26.tgz#22a3b8a46510da8944b67bfc27df02c34a35331c"
-  integrity sha512-W+fpe5s91FBGE0pEa0lnqGLL4USgpLgs4nokw16SrBBco/gQxuua7KnArSEOd5iaMqbbSHV10vUDkJYJJqpXKA==
+  version "14.0.27"
+  resolved "https://registry.yarnpkg.com/@types/node/-/node-14.0.27.tgz#a151873af5a5e851b51b3b065c9e63390a9e0eb1"
+  integrity sha512-kVrqXhbclHNHGu9ztnAwSncIgJv/FaxmzXJvGXNdcCpV1b8u1/Mi6z6m0vwy0LzKeXFTPLH0NzwmoJ3fNCIq0g==
 
 "@types/node@>=4.2.0 < 13", "@types/node@^12.12.6":
   version "12.12.53"
@@ -1441,7 +1438,7 @@ clean-stack@^2.0.0:
   resolved "https://registry.yarnpkg.com/clean-stack/-/clean-stack-2.2.0.tgz#ee8472dbb129e727b31e8a10a427dee9dfe4008b"
   integrity sha512-4diC9HaTE+KRAMWhDhrGOECgWZxoevMc5TlkObMqNSsVU62PYzXZ/SMTjzyGAFF1YusgxGcSWTEXBhp0CPwQ1A==
 
-clear@^0.1.0, clear@~0.1.0:
+clear@~0.1.0:
   version "0.1.0"
   resolved "https://registry.yarnpkg.com/clear/-/clear-0.1.0.tgz#b81b1e03437a716984fd7ac97c87d73bdfe7048a"
   integrity sha512-qMjRnoL+JDPJHeLePZJuao6+8orzHMGP04A8CdwCNsKhRbOnKRjefxONR7bwILT3MHecxKBjHkKL/tkZ8r4Uzw==
@@ -2285,7 +2282,7 @@ eth-json-rpc-errors@^1.0.1:
   dependencies:
     fast-safe-stringify "^2.0.6"
 
-eth-json-rpc-errors@^2.0.1, eth-json-rpc-errors@^2.0.2:
+eth-json-rpc-errors@^2.0.2:
   version "2.0.2"
   resolved "https://registry.yarnpkg.com/eth-json-rpc-errors/-/eth-json-rpc-errors-2.0.2.tgz#c1965de0301fe941c058e928bebaba2e1285e3c4"
   integrity sha512-uBCRM2w2ewusRHGxN8JhcuOb2RN3ueAOYH/0BhqdFmQkZx5lj5+fLKTz0mIVOzd4FG5/kUksCzCD7eTEim6gaA==
@@ -2359,6 +2356,13 @@ eth-query@^2.1.0, eth-query@^2.1.2:
   dependencies:
     json-rpc-random-id "^1.0.0"
     xtend "^4.0.1"
+
+eth-rpc-errors@^2.1.1:
+  version "2.1.1"
+  resolved "https://registry.yarnpkg.com/eth-rpc-errors/-/eth-rpc-errors-2.1.1.tgz#00a7d6c8a9c864a8ab7d0356be20964e5bee4b13"
+  integrity sha512-MY3zAa5ZF8hvgQu1HOF9agaK5GgigBRGpTJ8H0oVlE0NqMu13CW6syyjLXdeIDCGQTbUeHliU1z9dVmvMKx1Tg==
+  dependencies:
+    fast-safe-stringify "^2.0.6"
 
 eth-sig-util@^1.4.2:
   version "1.4.2"
@@ -2754,7 +2758,7 @@ fetch-ponyfill@^4.0.0:
   dependencies:
     node-fetch "~1.7.1"
 
-figlet@^1.4.0, figlet@~1.5.0:
+figlet@~1.5.0:
   version "1.5.0"
   resolved "https://registry.yarnpkg.com/figlet/-/figlet-1.5.0.tgz#2db4d00a584e5155a96080632db919213c3e003c"
   integrity sha512-ZQJM4aifMpz6H19AW1VqvZ7l4pOE9p7i/3LyxgO2kp+PO/VcDYNqIHEMtkccqIhTXMKci4kjueJr/iCQEaT/Ww==
@@ -3167,9 +3171,9 @@ heap@~0.2.6:
   integrity sha1-CH4fELBGky/IWU3Z5tN4r8nR5aw=
 
 highlight.js@^9.12.0, highlight.js@^9.15.8:
-  version "9.18.1"
-  resolved "https://registry.yarnpkg.com/highlight.js/-/highlight.js-9.18.1.tgz#ed21aa001fe6252bb10a3d76d47573c6539fe13c"
-  integrity sha512-OrVKYz70LHsnCgmbXctv/bfuvntIKDz177h0Co37DQ5jamGZLVmoCVMtjMtNZY3X9DrCcKfklHPNeA0uPZhSJg==
+  version "9.18.3"
+  resolved "https://registry.yarnpkg.com/highlight.js/-/highlight.js-9.18.3.tgz#a1a0a2028d5e3149e2380f8a865ee8516703d634"
+  integrity sha512-zBZAmhSupHIl5sITeMqIJnYCDfAEc3Gdkqj65wC1lpI468MMQeeQkhcIAvk+RylAkxrCcI9xy9piHiXeQ1BdzQ==
 
 highlightjs-solidity@^1.0.17:
   version "1.0.17"
@@ -3793,13 +3797,11 @@ json-parse-better-errors@^1.0.1:
   integrity sha512-mrqyZKfX5EhL7hvqcV6WG1yYjnjeuYDzDhhcAAUrq8Po85NBQBJP+ZDUT75qZQ98IkUoBqdkExkukOU7Ts2wrw==
 
 json-rpc-engine@^5.1.3:
-  version "5.1.8"
-  resolved "https://registry.yarnpkg.com/json-rpc-engine/-/json-rpc-engine-5.1.8.tgz#5ba0147ce571899bbaa7133ffbc05317c34a3c7f"
-  integrity sha512-vTBSDEPJV1fPAsbm2g5sEuPjsgLdiab2f1CTn2PyRr8nxggUpA996PDlNQDsM0gnrA99F8KIBLq2nIKrOFl1Mg==
+  version "5.2.0"
+  resolved "https://registry.yarnpkg.com/json-rpc-engine/-/json-rpc-engine-5.2.0.tgz#0ea1162f56de53a41d47a4995168b56dc82bbf47"
+  integrity sha512-F9xjrIjMqPNCxzk9jtOgJMs9mt+80p03IbJALnO278grtSU+Sh/fSqb7gNk/gwlTxavO2+ABKenyz4ZP3kwKIQ==
   dependencies:
-    async "^2.0.1"
-    eth-json-rpc-errors "^2.0.1"
-    promise-to-callback "^1.0.0"
+    eth-rpc-errors "^2.1.1"
     safe-event-emitter "^1.0.1"
 
 json-rpc-random-id@^1.0.0, json-rpc-random-id@^1.0.1:
@@ -5680,7 +5682,7 @@ ripemd160@^2.0.0, ripemd160@^2.0.1:
     hash-base "^3.0.0"
     inherits "^2.0.1"
 
-rlp@^2.0.0, rlp@^2.2.3, rlp@~2.2.5:
+rlp@^2.0.0, rlp@^2.2.3, rlp@~2.2.5, rlp@~2.2.6:
   version "2.2.6"
   resolved "https://registry.yarnpkg.com/rlp/-/rlp-2.2.6.tgz#c80ba6266ac7a483ef1e69e8e2f056656de2fb2c"
   integrity sha512-HAfAmL6SDYNWPUOJNrM500x4Thn4PZsEy5pijPh40U9WfNk0z15hUYzO9xVIMAdIHdFtD8CBDHd75Td1g36Mjg==
@@ -7122,10 +7124,10 @@ wrappy@1:
   resolved "https://registry.yarnpkg.com/wrappy/-/wrappy-1.0.2.tgz#b5243d8f3ec1aa35f1364605bc0d1036e30ab69f"
   integrity sha1-tSQ9jz7BqjXxNkYFvA0QNuMKtp8=
 
-wrtc@0.4.5:
-  version "0.4.5"
-  resolved "https://registry.yarnpkg.com/wrtc/-/wrtc-0.4.5.tgz#6839540904bf38f13e6e3fb27ee1448e8458bbb6"
-  integrity sha512-AEqbxwz8LX9bRrSI8UTn6bFiGj8/28nguYJ0RTk1905HZwM8Rx16D1oX0FfJHWmYHEg5XhODGcVa33d9ORHFyw==
+wrtc@0.4.6:
+  version "0.4.6"
+  resolved "https://registry.yarnpkg.com/wrtc/-/wrtc-0.4.6.tgz#909ace2cffd34e11633d4e1c20527510a12e7b5b"
+  integrity sha512-4uD+oFoY2yuo3AV9fum3cXUXR6v8YQHZlqBrKkCRGjW1BvKrVHtLNH4UaNLBLiJu9DL89WqUWmbzsQ9RxMzANw==
   dependencies:
     node-pre-gyp "^0.13.0"
   optionalDependencies:
