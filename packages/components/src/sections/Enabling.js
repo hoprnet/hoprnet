@@ -18,12 +18,12 @@ const Enabling = props => {
   return (
     <>
       <GenericSection {...props}>
-        <div className="center-content">
+        <div className="center-content whole-page">
           <div className="container-sm">
-            <h2 className="section-header mt-0 mb-0 reveal-from-top" data-reveal-delay="150">
+            <h2 className="section-header mt-0 mb-0 reveal-from-top big-title" data-reveal-delay="150">
               Enabling Data Privacy
             </h2>
-            <div className="mb-32 hero-figure reveal-from-top" data-reveal-delay="200">
+            {/* <div className="mb-32 hero-figure reveal-from-top" data-reveal-delay="200">
               <Image
                 className="has-shadow"
                 src={require('../assets/images/Web3-Data-Privacy.png')}
@@ -34,21 +34,20 @@ const Enabling = props => {
                   borderRadius: '15px',
                 }}
               />
-            </div>
+            </div> */}
             <div className="pt-32 reveal-from-top" data-reveal-delay="300">
-              We're past the tipping point for privacy. Lack of privacy isn't just a problem for individuals suffering
-              at the hands of data harvesting social media giants. Data privacy has become a major societal and economic
-              issue requiring government intervention and the creation of entire compliance departments.
+              Everything we do, we get tracked–often without even knowing it. And this data is then used to influence us
+              and our decisions. We believe that everyone should have the chance to make their own decisions in their
+              lives, as freely and uninfluenced as possible. HOPR has set out to protect your privacy, data, and
+              ultimately, your identity.
               <br />
               <br />
-              GDPR, HIPAA, CCPA and other regulation is like a band-aid on a broken leg. At HOPR, we're building the
-              foundations for a whole new approach: privacy infrastructure that can be used by corporations and
-              individuals to build privacy-first applications and services on the web or blockchain.
+              The speed of innovation is increasing on a daily basis and so is the amount of data harvested about us. We
+              have the dream that digitalization can improve our lives without costing us all of our privacy. We have
+              the dream that everyone can own their personal data again.
               <br />
               <br />
-              The HOPR protocol provides network-level and metadata privacy for every kind of data exchange. A mixnet
-              protects the identity of both sender and recipient by routing data via relayers who mix traffic and earn
-              HOPR tokens for their efforts.
+              Your data, your decision.
             </div>
           </div>
         </div>
@@ -57,7 +56,7 @@ const Enabling = props => {
         <div className="center-content">
           <div className="container-sm">
             <h2 className="section-header mt-0 mb-0 reveal-from-top" data-reveal-delay="150">
-              How? The HOPR protocol
+              How? The HOPR Protocol
             </h2>
             <div className="container reveal-from-top" data-reveal-delay="300">
               <div className="column">
@@ -74,8 +73,8 @@ const Enabling = props => {
                 everyone from dishonest behaviour.
                 <br />
                 <br />
-                HOPR thus provides economic incentives to run a global privacy network sustainably and at scale without
-                compromising privacy.
+                HOPR thus provides economic incentives to run a global privacy network sustainably - and at scale -
+                without compromising privacy.
               </div>
             </div>
           </div>

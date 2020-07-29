@@ -44,7 +44,7 @@ class News extends React.Component {
     const tilesClasses = classNames('tiles-wrap', pushLeft && 'push-left')
 
     const sectionHeader = {
-      title: 'In the News',
+      title: 'In The News',
       paragraph: undefined,
     }
 
@@ -55,7 +55,7 @@ class News extends React.Component {
             <SectionHeader data={sectionHeader} className="center-content reveal-from-bottom" />
             <div className={tilesClasses}>
               <div className="tiles-item reveal-from-bottom">
-                <div className="tiles-item-inner has-shadow">
+                <div className="tiles-item-inner">
                   <div className="news-item-image m-0 mb-12">
                     <a
                       href="https://www.coindesk.com/binance-labs-leads-1m-seed-round-in-crypto-tor-alternative-hopr"
@@ -85,7 +85,7 @@ class News extends React.Component {
                         href="https://www.coindesk.com/binance-labs-leads-1m-seed-round-in-crypto-tor-alternative-hopr"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="underline"
+                        className="text-color-high underline"
                       >
                         Read more
                       </a>
@@ -95,7 +95,7 @@ class News extends React.Component {
               </div>
 
               <div className="tiles-item reveal-from-bottom" data-reveal-delay="200">
-                <div className="tiles-item-inner has-shadow">
+                <div className="tiles-item-inner">
                   <div className="news-item-image m-0 mb-12">
                     <a
                       href="https://cointelegraph.com/news/hopr-data-privacy-testnet-to-launch-following-investment-by-binance"
@@ -125,7 +125,7 @@ class News extends React.Component {
                         href="https://cointelegraph.com/news/hopr-data-privacy-testnet-to-launch-following-investment-by-binance"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="underline"
+                        className="text-color-high underline"
                       >
                         Read more
                       </a>
@@ -135,7 +135,7 @@ class News extends React.Component {
               </div>
 
               <div className="tiles-item reveal-from-bottom" data-reveal-delay="400">
-                <div className="tiles-item-inner has-shadow">
+                <div className="tiles-item-inner">
                   <div className="news-item-image m-0 mb-12">
                     <a
                       href="https://www.moneytoday.ch/news/das-schweizer-tech-startup-hopr-sammelt-1-million-dollar-ein-binance-labs-fuehrt-die-investitionsru/"
@@ -165,7 +165,7 @@ class News extends React.Component {
                         href="https://www.moneytoday.ch/news/das-schweizer-tech-startup-hopr-sammelt-1-million-dollar-ein-binance-labs-fuehrt-die-investitionsru/"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="underline"
+                        className="text-color-high underline"
                       >
                         Read more
                       </a>

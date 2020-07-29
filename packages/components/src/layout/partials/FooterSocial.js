@@ -8,20 +8,22 @@ import { ReactComponent as Youtube } from '../../assets/images/icons/youtube.svg
 
 const isCompany = process.env.REACT_APP_IS_COMPANY === 'TRUE'
 
-const FooterSocial = ({ className, ...props }) => {
+const FooterSocial = ({ className, invertColor, ...props }) => {
   const classes = classNames('footer-social', className)
+  // TODO: fix this
+  const style = invertColor ? { fill: '#000050' } : { fill: 'white' }
 
   return (
     <div {...props} className={classes}>
       <ul className="list-reset">
         <li>
           <a href="https://twitter.com/hoprnet" target="_blank" rel="noopener noreferrer">
-            <Twitter />
+            <Twitter style={style} />
           </a>
         </li>
         <li>
           <a href="https://t.me/hoprnet" target="_blank" rel="noopener noreferrer">
-            <Telegram />
+            <Telegram style={style} />
           </a>
         </li>
         <li>
@@ -30,17 +32,17 @@ const FooterSocial = ({ className, ...props }) => {
             target="_blank"
             rel="noopener noreferrer"
           >
-            <Linkedin />
+            <Linkedin style={style} />
           </a>
         </li>
         <li>
           <a href="https://github.com/hoprnet" target="_blank" rel="noopener noreferrer">
-            <Github />
+            <Github style={style} />
           </a>
         </li>
         <li>
           <a href="https://www.youtube.com/channel/UC2DzUtC90LXdW7TfT3igasA" target="_blank" rel="noopener noreferrer">
-            <Youtube />
+            <Youtube style={style} />
           </a>
         </li>
       </ul>

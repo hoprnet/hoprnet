@@ -46,7 +46,7 @@ class FeaturesTabs extends React.Component {
     )
 
     const sectionHeader = {
-      title: 'HOPR for',
+      title: 'HOPR For',
       paragraph: undefined,
     }
 
@@ -62,7 +62,7 @@ class FeaturesTabs extends React.Component {
                     <div className="features-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="50">
                       <Image src={require('../assets/images/icons/shield@140x140.png')} alt="Shield Icon" />
                     </div>
-                    <div className="text-color-high text-sm">Privacy Experts</div>
+                    <div className="text-sm text-color-default">Privacy Experts</div>
                   </a>
                 </Tab>
                 <Tab tabId="tab-b" className={redirect ? 'is-active' : undefined}>
@@ -70,7 +70,7 @@ class FeaturesTabs extends React.Component {
                     <div className="features-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="100">
                       <Image src={require('../assets/images/icons/lock-4@140x140.png')} alt="Lock Icon" />
                     </div>
-                    <div className="text-color-high text-sm">Cryptographers</div>
+                    <div className="text-sm text-color-default">Cryptographers</div>
                   </a>
                 </Tab>
                 <Tab tabId="tab-c" className={redirect ? 'is-active' : undefined}>
@@ -81,7 +81,7 @@ class FeaturesTabs extends React.Component {
                         alt="Programming Team Icon"
                       />
                     </div>
-                    <div className="text-color-high text-sm">Techies</div>
+                    <div className="text-sm text-color-default">Techies</div>
                   </a>
                 </Tab>
                 <Tab tabId="tab-d" className={redirect ? 'is-active' : undefined}>
@@ -96,7 +96,7 @@ class FeaturesTabs extends React.Component {
                         alt="Light Bulb Icon"
                       />
                     </div>
-                    <div className="text-color-high text-sm">Entrepreneurs</div>
+                    <div className="text-sm text-color-default">Entrepreneurs</div>
                   </a>
                 </Tab>
                 <Tab tabId="tab-e" className={redirect ? 'is-active' : undefined}>
@@ -104,7 +104,7 @@ class FeaturesTabs extends React.Component {
                     <div className="features-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="250">
                       <Image src={require('../assets/images/icons/outdoors-mining@140x140.png')} alt="Pickaxe Icon" />
                     </div>
-                    <div className="text-color-high text-sm">Miners & Stakers</div>
+                    <div className="text-sm text-color-default">Miners & Stakers</div>
                   </a>
                 </Tab>
                 <Tab tabId="tab-f" className={redirect ? 'is-active' : undefined}>
@@ -119,7 +119,7 @@ class FeaturesTabs extends React.Component {
                         alt="Investor Icon"
                       />
                     </div>
-                    <div className="text-color-high text-sm">Investors</div>
+                    <div className="text-sm text-color-default">Investors</div>
                   </a>
                 </Tab>
               </TabList>

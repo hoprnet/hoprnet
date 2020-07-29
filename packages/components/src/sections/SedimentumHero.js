@@ -223,7 +223,12 @@ const Sedimentum = props => {
               </a>
             </div>
             <div className="ta-l">
-              <Image className="has-shadow" src={require('../assets/images/logo.png')} alt="Hero" width="200px" />
+              <Image
+                className="has-shadow"
+                src={require('../assets/images/logo_gradient.png')}
+                alt="Hero"
+                width="200px"
+              />
               <br />
               Contact HOPR
               <br />

@@ -47,12 +47,12 @@ class FeaturesTiles extends React.Component {
     const tilesClasses = classNames('tiles-wrap', pushLeft && 'push-left')
 
     const sectionHeader = {
-      title: 'HOPR is',
+      title: 'HOPR Is',
       paragraph: undefined,
     }
 
     const sectionHeader2 = {
-      title: 'We want you to grow',
+      title: 'We Want You To Grow',
       paragraph: undefined,
     }
 
@@ -106,8 +106,8 @@ class FeaturesTiles extends React.Component {
                     <div className="features-tiles-item-content">
                       <h4 className="mt-0 mb-8">Open Source Support</h4>
                       <p className="m-0 text-sm">
-                        Our experts are actively supporting the blockchain community to make this space a better place,
-                        for the good of all of us.
+                        The HOPR community fights for the digital privacy of the future. Everybody can become a part of
+                        our movement.
                       </p>
                     </div>
                   </div>
@@ -140,9 +140,17 @@ class FeaturesTiles extends React.Component {
                         <div className="features-tiles-item-content">
                           <h4 className="mt-0 mb-8">Hackathons + Community</h4>
                           <p className="m-0 text-sm">
-                            We're organizing events to grow our network and give back to the Community
+                            From testnet game sessions to reward bounties, join our Telegram to become part of our
+                            growing community.
                             <br />
-                            <span className="text-color-high">(coming mid-July 2020)</span>.
+                            <a
+                              href="https://t.me/hoprnet"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="underline"
+                            >
+                              Telegram
+                            </a>
                           </p>
                         </div>
                       </div>
@@ -174,8 +182,8 @@ class FeaturesTiles extends React.Component {
                         <div className="features-tiles-item-content">
                           <h4 className="mt-0 mb-8">Your company</h4>
                           <p className="m-0 text-sm">
-                            HOPR is looking for partners who want to benefit from our network. If data privacy is
-                            important to you, get in touch.
+                            HOPR is providing worry-free privacy to everyone. Reach out to us if you and your customers
+                            deserve the best.
                           </p>
                         </div>
                       </div>

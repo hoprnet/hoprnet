@@ -44,7 +44,7 @@ class Blogs extends React.Component {
     )
 
     const sectionHeader = {
-      title: 'HOPR blogs',
+      title: 'HOPR Blogs',
       paragraph: undefined,
     }
 
@@ -60,13 +60,13 @@ class Blogs extends React.Component {
                     <div className="blogs-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="50">
                       <Image src={require('../assets/images/icons/shield@140x140.png')} alt="Shield Icon" />
                     </div>
-                    <div className="text-color-high text-sm">Privacy Blog</div>
+                    <div className="text-sm">Privacy Blog</div>
                   </Tab>
                   <Tab tabId="tab-b" className={redirect ? 'is-active' : undefined}>
                     <div className="blogs-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="100">
                       <Image src={require('../assets/images/icons/lock-4@140x140.png')} alt="Lock Icon" />
                     </div>
-                    <div className="text-color-high text-sm">Crypto Blog</div>
+                    <div className="text-sm">Crypto Blog</div>
                   </Tab>
                   <Tab tabId="tab-c" className={redirect ? 'is-active' : undefined}>
                     <div className="blogs-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="150">
@@ -75,7 +75,7 @@ class Blogs extends React.Component {
                         alt="Programming Team Icon"
                       />
                     </div>
-                    <div className="text-color-high text-sm">Tech Blog</div>
+                    <div className="text-sm">Tech Blog</div>
                   </Tab>
                   <Tab tabId="tab-d" className={redirect ? 'is-active' : undefined}>
                     <div className="blogs-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="200">
@@ -84,7 +84,7 @@ class Blogs extends React.Component {
                         alt="Light Bulb Icon"
                       />
                     </div>
-                    <div className="text-color-high text-sm">News Blog</div>
+                    <div className="text-sm">News Blog</div>
                   </Tab>
                   {/* <Tab tabId="tab-e" className={redirect ? 'is-active' : undefined}>
                   <div className="blogs-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="250">
@@ -93,7 +93,7 @@ class Blogs extends React.Component {
                       alt="Pickaxe Icon"
                     />
                   </div>
-                  <div className="text-color-high text-sm">Launchpad Blog</div>
+                  <div className="text-sm">Launchpad Blog</div>
                 </Tab> */}
                 </TabList>
               </a>

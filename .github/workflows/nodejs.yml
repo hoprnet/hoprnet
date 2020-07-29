@@ -7,6 +7,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        site: [hoprnet-org]
 
     steps:
       # Checkout, Cache and Setup Steps
@@ -28,5 +31,6 @@ jobs:
         run: |
           yarn install --frozen-lockfile
           yarn bootstrap
-      - name: Build websites
+      - name: Prebuild website for production
+        working-directory: websites/${{ matrix.site }}
         run: yarn build

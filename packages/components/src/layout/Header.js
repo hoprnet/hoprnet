@@ -82,7 +82,7 @@ class Header extends React.Component {
     } = this.props
 
     const classes = classNames(
-      'site-header has-shadow',
+      'site-header ',
       bottomOuterDivider && 'has-bottom-divider',
       hasBgColor && 'has-bg-color',
       invertColor && 'invert-color',
@@ -91,7 +91,7 @@ class Header extends React.Component {
     )
 
     return (
-      <header {...props} className={classes}>
+      <header {...props} className={classes} style={{ backgroundColor: 'white' }}>
         <div className="container">
           <div className={classNames('site-header-inner', bottomDivider && 'has-bottom-divider')}>
             <Logo />
@@ -111,19 +111,23 @@ class Header extends React.Component {
                   <div className="header-nav-inner">
                     <ul className={classNames('list-reset text-ms', navPosition && `header-nav-${navPosition}`)}>
                       <li>
-                        <Link to="/who-is-HOPR" onClick={this.closeMenu}>
+                        <Link to="/who-is-HOPR" onClick={this.closeMenu} style={{ textDecoration: 'none' }}>
                           ABOUT US
                         </Link>
                       </li>
                       {!isCompany && (
                         <>
                           <li>
-                            <Link to="/layer0-data-privacy" onClick={this.closeMenu}>
+                            <Link to="/layer0-data-privacy" onClick={this.closeMenu} style={{ textDecoration: 'none' }}>
                               TECHNOLOGY
                             </Link>
                           </li>
                           <li>
-                            <Link to="/do-business-with-HOPR" onClick={this.closeMenu}>
+                            <Link
+                              to="/do-business-with-HOPR"
+                              onClick={this.closeMenu}
+                              style={{ textDecoration: 'none' }}
+                            >
                               BLOG
                             </Link>
                           </li>

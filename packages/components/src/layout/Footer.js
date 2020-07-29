@@ -21,11 +21,7 @@ class Footer extends React.Component {
   render() {
     const { className, topOuterDivider, topDivider, ...props } = this.props
 
-    const classes = classNames(
-      'site-footer invert-color center-content-mobile',
-      topOuterDivider && 'has-top-divider',
-      className
-    )
+    const classes = classNames('site-footer center-content-mobile', topOuterDivider && 'has-top-divider', className)
 
     return (
       <footer {...props} className={classes}>
