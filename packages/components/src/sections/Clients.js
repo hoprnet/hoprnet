@@ -59,7 +59,7 @@ class Clients extends React.Component {
               className="center-content header"
             />
             <ul className="list-reset">
-              <li className="reveal-from-bottom">
+              <li className="reveal-from-top">
                 <a href="https://www.sedimentum.com/en/sedimentum-en/" target="_blank" rel="noopener noreferrer">
                   <Image
                     src={require('../assets/images/partners/sedimentum.png')}
@@ -70,7 +70,7 @@ class Clients extends React.Component {
                   />
                 </a>
               </li>
-              {/* <li className="reveal-from-bottom" data-reveal-delay="150">
+              {/* <li className="reveal-from-top" data-reveal-delay="150">
                 <a href="https://www.bankfrick.li/en/" target="_blank" rel="noopener noreferrer">
                   <Image
                     src={require('./../assets/images/partners/bank-frick.svg')}
@@ -81,7 +81,7 @@ class Clients extends React.Component {
                   />
                 </a>
               </li> */}
-              {/* <li className="reveal-from-bottom" data-reveal-delay="150">
+              {/* <li className="reveal-from-top" data-reveal-delay="150">
                 <a href="https://www.hbl.ch/de/" target="_blank" rel="noopener noreferrer">
                   <Image
                     src={require('./../assets/images/partners/hbl.png')}
@@ -92,7 +92,7 @@ class Clients extends React.Component {
                   />
                 </a>
               </li> */}
-              <li className="reveal-from-bottom" data-reveal-delay="150">
+              <li className="reveal-from-top" data-reveal-delay="150">
                 <a href="https://www.froriep.com/de/" target="_blank" rel="noopener noreferrer">
                   <Image
                     src={require('../assets/images/partners/froriep.png')}
@@ -103,7 +103,7 @@ class Clients extends React.Component {
                   />
                 </a>
               </li>
-              {/* <li className="reveal-from-bottom" data-reveal-delay="150">
+              {/* <li className="reveal-from-top" data-reveal-delay="150">
                 <a href="https://www.bitcoinsuisse.com/" target="_blank" rel="noopener noreferrer">
                   <Image
                     src={require('./../assets/images/partners/bitcoinsuisse.png')}

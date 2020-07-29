@@ -37,7 +37,7 @@ const Governance = props => {
               co-exist with existing legal frameworks.
               <br />
               <br />
-              HOPR is pioneering decentralized, community-enabling governance (DeCEnGov) as a techno-legal framework
+              HOPR is pioneering decentralized, community-enabling governance (DecenGov) as a techno-legal framework
               that combines the dynamics of communities with the efficiencies of crypto networks and the advantages of
               established legal bodies to govern collective efforts.
             </div>

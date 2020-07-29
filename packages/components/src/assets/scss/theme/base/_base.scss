@@ -7,7 +7,7 @@
 }
 
 .img-to-white {
-  filter: brightness(0) invert(1);
+  filter: brightness(0) invert(0.5);
 }
 
 .img-to-black {
@@ -20,4 +20,8 @@
 .quote:before,
 .quote:after {
   content: '"';
+}
+
+.whole-page {
+  height: 100vh;
 }

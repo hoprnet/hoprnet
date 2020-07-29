@@ -1,10 +1,10 @@
 .team {
-	img {
-		border-radius: 15px;
-		filter: grayscale(1);
-	}
+  img {
+    border-radius: 15px;
+    filter: grayscale(1);
+  }
 
-	.team-item-role {
-		color: get-color(primary, 2);
-	}
+  .team-item-role {
+    color: get-color(named, 2);
+  }
 }

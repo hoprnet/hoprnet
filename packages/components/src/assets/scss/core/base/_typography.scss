@@ -312,3 +312,12 @@ strong {
 		@include font-size(bquote-desktop);
 	}
 }
+
+.big-title {
+	font-size: 100px;
+	line-height: normal !important;
+
+	@include media('<medium') {
+		font-size: 25px;
+	}
+}

@@ -93,7 +93,7 @@ class Values extends React.Component {
                   <div className="features-tiles-item-content">
                     <h4 className="mt-0 mb-24">CURIOUS PIONEER</h4>
                     We want to improve the privacy standards of the digital world and are always looking for new ways to
-                    do so. We boldly go new ways. And when we find a suitable way, we do everything we can, to make it
+                    do so. We boldly go new ways. And when we find a suitable way, we do everything we can to make it
                     work for our community and society.
                   </div>
                 </div>

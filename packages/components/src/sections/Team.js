@@ -247,7 +247,12 @@ const ProfilesAssociation = () => {
           The HOPR protocol is a digital commons that is currently being built by HOPR Services AG.
           <br />
           Find out more about the HOPR Services AG team{' '}
-          <a href="https://hopr.swiss/who-is-HOPR#team" target="_blank" rel="noopener noreferrer" className="underline">
+          <a
+            href="https://hopr.swiss/who-is-HOPR#team"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-color-high underline"
+          >
             here
           </a>
           .
@@ -260,7 +265,7 @@ const ProfilesAssociation = () => {
             <div className="team-item-header">
               <div className="team-item-image mb-24 ">
                 <Image
-                  src={require('./../assets/images/logo.png')}
+                  src={require('./../assets/images/logo_old.png')}
                   alt="HOPR Services AG Avatars"
                   width={180}
                   height={180}
@@ -310,7 +315,7 @@ class Team extends React.Component {
     const tilesClasses = classNames('tiles-wrap', pushLeft && 'push-left')
 
     const sectionHeader = {
-      title: isCompany ? 'Team' : 'Board of Association',
+      title: isCompany ? 'Team' : 'Board Of Association',
       paragraph: undefined,
     }
 

@@ -27,7 +27,7 @@ class HeroFull extends React.Component {
     } = this.props
 
     const outerClasses = classNames(
-      'hero section center-content',
+      'hero section center-content whole-page',
       topOuterDivider && 'has-top-divider',
       bottomOuterDivider && 'has-bottom-divider',
       hasBgColor && 'has-bg-color',
@@ -55,14 +55,14 @@ class HeroFull extends React.Component {
                     "We're proud to build the HOPR network for the HOPR Association."
                   ) : (
                     <>
-                      <h3>Changing Data Privacy For The Good</h3>
+                      <h2 className="big-title pb-32">Changing Data Privacy For Good</h2>
                       The HOPR protocol ensures everyone has control of their privacy, data, and identity.
                     </>
                   )}
                 </p>
               </div>
             </div>
-            <div className="hero-figure reveal-from-bottom" data-reveal-delay="600">
+            {/* <div className="hero-figure reveal-from-bottom" data-reveal-delay="600">
               <Image
                 className="has-shadow"
                 src={require('../assets/images/Layer0-Medical-Data-Privacy-Blockchain.png')}
@@ -73,7 +73,7 @@ class HeroFull extends React.Component {
                   borderRadius: '15px',
                 }}
               />
-            </div>
+            </div> */}
           </div>
         </div>
       </section>

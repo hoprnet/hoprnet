@@ -62,11 +62,14 @@ class Products extends React.Component {
       ) : (
         <>
           <p>
+            Your data, your decision.
+            <br />
+            <br />
             HOPR keeps any exchange of data private.
             <br />
             The{' '}
             <a href="/layer0-data-privacy#how">
-              <span className="text-color-high">HOPR protocol</span>
+              <span className="text-color-high underline">HOPR protocol</span>
             </a>{' '}
             is a layer-0 privacy foundation for anyone to{' '}
             <a
@@ -74,7 +77,7 @@ class Products extends React.Component {
               target="_blank"
               rel="noopener noreferrer"
             >
-              <span className="text-color-high">buidl</span>
+              <span className="text-color-high underline">buidl</span>
             </a>{' '}
             on.
           </p>
@@ -111,15 +114,15 @@ class Products extends React.Component {
                     {!isCompany && (
                       <ol>
                         <li>
-                          exchange health data between{' '}
+                          Exchange health data between{' '}
                           <a href="https://www.sedimentum.com/" target="_blank" rel="noopener noreferrer">
                             <span className="text-color-high underline">hospitals and off-site computing centers</span>
                           </a>
                           , compliant with data privacy regulations (GDPR, HIPAA, CCPA)
                         </li>
-                        <li>connect IoT devices to the cloud without revealing the device’s owner or location</li>
+                        <li>Connect IoT devices to the cloud without revealing the device’s owner or location</li>
                         <li>
-                          securely process data via{' '}
+                          Securely process data via{' '}
                           <a
                             href="https://www.media.mit.edu/projects/distributed-learning-and-collaborative-learning-1/overview/"
                             target="_blank"
@@ -156,20 +159,20 @@ class Products extends React.Component {
                     {!isCompany && (
                       <ol>
                         <li>
-                          complement{' '}
+                          Complement{' '}
                           <a href="https://tornado.cash/" target="_blank" rel="noopener noreferrer">
                             <span className="text-color-high underline">on-chain privacy</span>
                           </a>{' '}
                           with HOPR's network-level privacy for truly confidential transactions
                         </li>
                         <li>
-                          create trustless and privacy-first{' '}
+                          Create trustless and privacy-first{' '}
                           <a href="http://biconomy.io/" target="_blank" rel="noopener noreferrer">
                             <span className="text-color-high underline">layer-2 scaling solutions</span>
                           </a>
                         </li>
                         <li>
-                          facilitate the exchange of{' '}
+                          Facilitate the exchange of{' '}
                           <a href="https://openvasp.org/" target="_blank" rel="noopener noreferrer">
                             <span className="text-color-high underline">confidential financial data</span>
                           </a>{' '}
@@ -201,16 +204,16 @@ class Products extends React.Component {
                     <h4 className="mt-0 mb-24">Digitalization without privacy concerns</h4>
                     {!isCompany && (
                       <ol>
-                        <li>securely access private documents</li>
+                        <li>Securely access private documents</li>
                         <li>
                           <a href="https://matrix.org/" target="_blank" rel="noopener noreferrer">
-                            <span className="text-color-high underline">chat in private</span>
+                            <span className="text-color-high underline">Chat in private</span>
                           </a>
                           , so not even the provider knows who you’re talking to
                         </li>
                         <li>
                           <a href="https://www.sherpany.com/en/" target="_blank" rel="noopener noreferrer">
-                            <span className="text-color-high underline">manage your organization</span>
+                            <span className="text-color-high underline">Manage your organization</span>
                           </a>{' '}
                           securely from anywhere, including your home office
                         </li>

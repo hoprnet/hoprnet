@@ -14,14 +14,14 @@ const Logo = ({ className, ...props }) => {
         <div style={{ display: 'flex' }}>
           <div style={{ width: '100%' }}>
             <Image
-              src={require('../../assets/images/logo.png')}
+              src={require('../../assets/images/logo_gradient.png')}
               alt="HOPR Logo"
               height="auto"
-              width="32px"
+              width="100px"
               className="mr-12"
             />
           </div>
-          <span className="h4 p-0 m-0">{isCompany ? 'HOPR Services' : 'HOPR'}</span>
+          <span className="h4 p-0 m-0">{isCompany ? 'HOPR Services' : undefined}</span>
         </div>
       </Link>
     </div>
