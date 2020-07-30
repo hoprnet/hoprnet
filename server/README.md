@@ -1,6 +1,8 @@
-# HOPR
+# HOPR Web Server
 
 HOPR is a privacy-preserving messaging **protocol** which enables the creation of a secure communication network via relay nodes powered by economic incentives using digital tokens.
+
+HOPR Web Server is a gRPC server powered by Nest.js able to wrap a HOPR Node via a protobuf enabled API.
 
 ## Installing
 
