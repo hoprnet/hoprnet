@@ -20,9 +20,9 @@ const ForYou = props => {
     <GenericSection {...props}>
       <div className="center-content">
         <div className="container-sm">
-          <h2 className="section-header mt-0 mb-0 reveal-from-top" data-reveal-delay="150">
+          <p className="section-header mt-0 mb-0 reveal-from-top big-title" data-reveal-delay="150">
             Join The HOPR Community
-          </h2>
+          </p>
           {/* <div className="mb-32 hero-figure reveal-from-top" data-reveal-delay="200">
             <Image
               className="has-shadow"

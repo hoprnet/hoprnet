@@ -27,7 +27,7 @@ class HeroFull extends React.Component {
     } = this.props
 
     const outerClasses = classNames(
-      'hero section center-content whole-page',
+      'hero section center-content',
       topOuterDivider && 'has-top-divider',
       bottomOuterDivider && 'has-bottom-divider',
       hasBgColor && 'has-bg-color',
@@ -55,7 +55,7 @@ class HeroFull extends React.Component {
                     "We're proud to build the HOPR network for the HOPR Association."
                   ) : (
                     <>
-                      <h2 className="big-title pb-32">Changing Data Privacy For Good</h2>
+                      <p className="big-title pb-32">Changing Data Privacy For Good</p>
                       The HOPR protocol ensures everyone has control of their privacy, data, and identity.
                     </>
                   )}

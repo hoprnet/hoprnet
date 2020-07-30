@@ -26,7 +26,7 @@ class Blog extends React.Component {
         params: {
           resource: 'https://medium.com/hoprnet',
           postsPerLine: 2,
-          limit: 4,
+          limit: undefined,
           picture: 'big',
           fields: ['author', 'publishAt'],
           ratio: 'landscape',
