@@ -27,7 +27,7 @@ class Roadmap extends React.Component {
     } = this.props
 
     const outerClasses = classNames(
-      'roadmap section',
+      'roadmap section cursor',
       topOuterDivider && 'has-top-divider',
       bottomOuterDivider && 'has-bottom-divider',
       hasBgColor && 'has-bg-color',

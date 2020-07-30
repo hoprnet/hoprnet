@@ -28,7 +28,7 @@ class SignupForm extends React.Component {
     } = this.props
 
     const outerClasses = classNames(
-      'signin section',
+      'signin section cursor',
       topOuterDivider && 'has-top-divider',
       bottomOuterDivider && 'has-bottom-divider',
       hasBgColor && 'has-bg-color',

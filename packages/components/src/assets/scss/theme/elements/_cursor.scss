@@ -1,0 +1,15 @@
+@function getCursorUri($color, $r) {
+  @return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' height='64' width='64'%3E%3Ccircle cx='32' cy='32' r='#{$r}' fill='#{$color}' /%3E%3C/svg%3E%0A";
+}
+
+.cursor:not(.invert-color) {
+  cursor: url(getCursorUri('%23ffffa0', 20)) 32 32, auto !important;
+}
+
+.cursor.invert-color {
+  cursor: url(getCursorUri('%23000', 20)) 32 32, auto !important;
+}
+
+a {
+  cursor: url(getCursorUri('%230000b4', 15)) 32 32, auto !important;
+}

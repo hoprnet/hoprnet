@@ -31,7 +31,7 @@ class ContactTabs extends React.Component {
     } = this.props
 
     const outerClasses = classNames(
-      'contact-tabs section center-content',
+      'contact-tabs section center-content cursor',
       topOuterDivider && 'has-top-divider',
       bottomOuterDivider && 'has-bottom-divider',
       hasBgColor && 'has-bg-color',

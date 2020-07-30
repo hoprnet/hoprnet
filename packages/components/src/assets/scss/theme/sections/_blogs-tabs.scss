@@ -12,6 +12,20 @@
   filter: invert(1);
 }
 
+.blogs-tabs-tab-image-reversed {
+  display: inline-flex;
+  border-radius: 50%;
+  background: get-color(named, 1);
+  box-shadow: 0 2px 4px rgba(get-color(dark, 1), 0.32);
+}
+
+.blogs-tabs-tab-image-reversed img {
+  width: 80px;
+  height: 80px;
+  margin: 15px !important;
+  // filter: invert(1);
+}
+
 .blogs-tabs-inner .tab-list {
   justify-content: space-evenly !important;
 }

@@ -27,7 +27,7 @@ class Testimonial extends React.Component {
     } = this.props
 
     const outerClasses = classNames(
-      'testimonial section',
+      'testimonial section cursor',
       topOuterDivider && 'has-top-divider',
       bottomOuterDivider && 'has-bottom-divider',
       hasBgColor && 'has-bg-color',

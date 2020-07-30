@@ -27,7 +27,7 @@ class HeroFull extends React.Component {
     } = this.props
 
     const outerClasses = classNames(
-      'hero section center-content whole-page',
+      'hero section center-content cursor',
       topOuterDivider && 'has-top-divider',
       bottomOuterDivider && 'has-bottom-divider',
       hasBgColor && 'has-bg-color',

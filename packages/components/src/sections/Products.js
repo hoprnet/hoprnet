@@ -29,7 +29,7 @@ class Products extends React.Component {
     } = this.props
 
     const outerClasses = classNames(
-      'products section center-content',
+      'products section center-content cursor',
       topOuterDivider && 'has-top-divider',
       bottomOuterDivider && 'has-bottom-divider',
       hasBgColor && 'has-bg-color',
