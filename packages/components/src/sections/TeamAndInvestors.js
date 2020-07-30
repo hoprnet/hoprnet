@@ -53,12 +53,7 @@ class TeamAndInvestors extends React.Component {
                   <h3 className="mt-0 mb-0" data-reveal-container=".tiles-item">
                     Team
                   </h3>
-                  <div
-                    className="has-shadow has-bg-color invert-color card"
-                    style={{
-                      backgroundColor: isCompany ? '#5f0220' : '#53A3B9',
-                    }}
-                  >
+                  <div className="has-shadow has-bg-color invert-color card">
                     <Image
                       className={isCompany ? 'img-to-white' : undefined}
                       src={
