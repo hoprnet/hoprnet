@@ -39,7 +39,7 @@ export function renderHoprLogo() {
   v2.forEach((line) => {
     console.log(
       line.replace(/\<span style="color:\#([0-9A-F]+);"\>(.)\<\/span\>/g, (match, p1, p2) =>
-        chalk.bgHex('ffffa0').hex(p1)(p2)
+        chalk.bold.bgHex('ffffa0').hex(p1)(p2)
       )
     )
   })
