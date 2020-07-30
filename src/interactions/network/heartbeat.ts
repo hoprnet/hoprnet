@@ -3,10 +3,10 @@ import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { AbstractInteraction } from '../abstractInteraction'
 
 import { randomBytes, createHash } from 'crypto'
-import { u8aEquals } from '@hoprnet/hopr-utils'
+import { u8aEquals, durations } from '@hoprnet/hopr-utils'
 
 import debug from 'debug'
-const log = debug('hopr-core:heartbeat')
+const error = debug('hopr-core:heartbeat:error')
 
 import AbortController from 'abort-controller'
 import pipe from 'it-pipe'
@@ -14,87 +14,96 @@ import pipe from 'it-pipe'
 import { PROTOCOL_HEARTBEAT } from '../../constants'
 import type { Stream, Connection, Handler } from '../../network/transport/types'
 
-import PeerInfo from 'peer-info'
 import type PeerId from 'peer-id'
 
 const HASH_FUNCTION = 'blake2s256'
 
-const TWO_SECONDS = 2 * 1000
-const HEARTBEAT_TIMEOUT = TWO_SECONDS
+export const HEARTBEAT_TIMEOUT = durations.seconds(2)
 
 class Heartbeat<Chain extends HoprCoreConnector> implements AbstractInteraction<Chain> {
   protocols: string[] = [PROTOCOL_HEARTBEAT]
 
-  constructor(public node: Hopr<Chain>) {
+  constructor(
+    public node: Hopr<Chain>,
+    private options?: {
+      timeoutIntentionally?: boolean
+    }
+  ) {
     this.node.handle(this.protocols, this.handler.bind(this))
   }
 
   handler(struct: { connection: Connection; stream: Stream }) {
-    let events = this.node.network.heartbeat
     pipe(
       struct.stream,
       (source: any) => {
-        return (async function* () {
+        return async function* (this: Heartbeat<Chain>) {
+          if (this.options?.timeoutIntentionally) {
+            await new Promise((resolve) => setTimeout(resolve, HEARTBEAT_TIMEOUT + 100))
+          }
+
           for await (const msg of source) {
-            events.emit('beat', struct.connection.remotePeer)
+            this.node.network.heartbeat.emit('beat', struct.connection.remotePeer)
             yield createHash(HASH_FUNCTION).update(msg.slice()).digest()
           }
-        })()
+        }.call(this)
       },
       struct.stream
     )
   }
 
-  async interact(counterparty: PeerInfo | PeerId): Promise<void> {
-    let struct: Handler
+  async interact(counterparty: PeerId): Promise<void> {
+    return new Promise<void>(async (resolve, reject) => {
+      let struct: Handler
+      let aborted = false
 
-    const abort = new AbortController()
-    const signal = abort.signal
+      const abort = new AbortController()
 
-    const timeout = setTimeout(() => {
-      abort.abort()
-    }, HEARTBEAT_TIMEOUT)
-
-    struct = await this.node.dialProtocol(counterparty, this.protocols[0], { signal }).catch(async (err: Error) => {
-      const peerInfo = await this.node.peerRouting.findPeer(
-        PeerInfo.isPeerInfo(counterparty) ? counterparty.id : counterparty
-      )
+      const timeout = setTimeout(() => {
+        aborted = true
+        abort.abort()
+        reject(Error(`Timeout while querying ${counterparty.toB58String()}.`))
+      }, HEARTBEAT_TIMEOUT)
 
       try {
-        let result = await this.node.dialProtocol(peerInfo, this.protocols[0], { signal })
-        clearTimeout(timeout)
-        return result
+        struct = await this.node
+          .dialProtocol(counterparty, this.protocols[0], { signal: abort.signal })
+          .catch(async (err: Error) => {
+            const peerInfo = await this.node.peerRouting.findPeer(counterparty)
+
+            return await this.node.dialProtocol(peerInfo, this.protocols[0], { signal: abort.signal })
+          })
       } catch (err) {
         clearTimeout(timeout)
-        throw err
+        error(err)
+        return reject()
       }
-    })
 
-    if (signal.aborted) {
-      log(`heartbeat interaction aborted`)
-      throw new Error()
-    }
+      if (aborted) {
+        return
+      }
 
-    const challenge = randomBytes(16)
-    const expectedResponse = createHash(HASH_FUNCTION).update(challenge).digest()
+      const challenge = randomBytes(16)
+      const expectedResponse = createHash(HASH_FUNCTION).update(challenge).digest()
 
-    await pipe(
-      /** prettier-ignore */
-      [challenge],
-      struct.stream,
-      async (source: AsyncIterable<Uint8Array>) => {
-        let done = false
-        for await (const msg of source) {
-          if (done == true) {
-            continue
-          }
-
-          if (u8aEquals(msg, expectedResponse)) {
-            done = true
+      await pipe(
+        /** prettier-ignore */
+        [challenge],
+        struct.stream,
+        async (source: AsyncIterable<Uint8Array>) => {
+          for await (const msg of source) {
+            if (u8aEquals(msg, expectedResponse)) {
+              break
+            }
           }
         }
+      )
+
+      clearTimeout(timeout)
+
+      if (!aborted) {
+        resolve()
       }
-    )
+    })
   }
 }
 

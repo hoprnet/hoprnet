@@ -2,8 +2,10 @@ import { PROTOCOL_STRING } from '../../constants'
 import { Packet } from '../../messages/packet'
 import { Acknowledgement } from '../../messages/acknowledgement'
 
+import debug from 'debug'
+const log = debug('hopr-core:forward')
+
 import type PeerId from 'peer-id'
-import PeerInfo from 'peer-info'
 import chalk from 'chalk'
 
 import AbortController from 'abort-controller'
@@ -15,13 +17,12 @@ import pipe from 'it-pipe'
 
 import type { Handler } from '../../network/transport/types'
 
-import { randomInteger } from '@hoprnet/hopr-utils'
+import { randomInteger, durations } from '@hoprnet/hopr-utils'
 import { getTokens, Token } from '../../utils'
 
 const MAX_PARALLEL_JOBS = 20
 
-const TWO_SECONDS = 2 * 1000
-const FORWARD_TIMEOUT = TWO_SECONDS
+const FORWARD_TIMEOUT = durations.seconds(3)
 
 class PacketForwardInteraction<Chain extends HoprCoreConnector> implements AbstractInteraction<Chain> {
   private tokens: Token[] = getTokens(MAX_PARALLEL_JOBS)
@@ -34,55 +35,59 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
     this.node.handle(this.protocols, this.handler.bind(this))
   }
 
-  async interact(counterparty: PeerInfo | PeerId, packet: Packet<Chain>): Promise<void> {
-    let struct: Handler
+  async interact(counterparty: PeerId, packet: Packet<Chain>): Promise<void> {
+    return new Promise(async (resolve, reject) => {
+      let aborted = false
+      let struct: Handler
 
-    const abort = new AbortController()
-    const signal = abort.signal
+      const abort = new AbortController()
 
-    const timeout = setTimeout(() => {
-      abort.abort()
-    }, FORWARD_TIMEOUT)
-
-    struct = await this.node.dialProtocol(counterparty, this.protocols[0], { signal }).catch(async (err: Error) => {
-      const peerInfo = await this.node.peerRouting.findPeer(
-        PeerInfo.isPeerInfo(counterparty) ? counterparty.id : counterparty
-      )
+      const timeout = setTimeout(() => {
+        aborted = true
+        abort.abort()
+        reject(Error(`Timeout while establishing a connection to ${counterparty.toB58String()}.`))
+      }, FORWARD_TIMEOUT)
 
       try {
-        let result = await this.node.dialProtocol(peerInfo, this.protocols[0], { signal })
-        clearTimeout(timeout)
-        return result
+        struct = await this.node
+          .dialProtocol(counterparty, this.protocols[0], { signal: abort.signal })
+          .catch(async (err: Error) => {
+            const peerInfo = await this.node.peerRouting.findPeer(counterparty)
+
+            return await this.node.dialProtocol(peerInfo, this.protocols[0], { signal: abort.signal })
+          })
       } catch (err) {
+        log(`Could not transfer packet to ${counterparty.toB58String()}. Error was: ${chalk.red(err.message)}.`)
+
         clearTimeout(timeout)
 
-        this.node.log(
-          `Could not transfer packet to ${(PeerInfo.isPeerInfo(counterparty)
-            ? counterparty.id
-            : counterparty
-          ).toB58String()}. Error was: ${chalk.red(err.message)}.`
+        return reject(
+          Error(`Failed to send packet to ${counterparty.toB58String()}. Increase log level for further information.`)
         )
+      }
 
-        return
+      clearTimeout(timeout)
+
+      pipe(
+        /* prettier-ignore */
+        [packet],
+        struct.stream
+      )
+
+      if (!aborted) {
+        resolve()
       }
     })
-
-    await pipe(
-      /* prettier-ignore */
-      [packet.subarray()],
-      struct.stream
-    )
   }
 
   handler(struct: Handler): void {
-    let packet: Packet<Chain>
     pipe(
       /* pretttier-ignore */
       struct.stream,
       async (source: AsyncIterable<Uint8Array>): Promise<void> => {
         for await (const msg of source) {
           const arr = msg.slice()
-          packet = new Packet(this.node, {
+          const packet = new Packet(this.node, {
             bytes: arr.buffer,
             offset: arr.byteOffset,
           })
@@ -91,17 +96,8 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
 
           if (this.tokens.length > 0) {
             const token = this.tokens.pop() as Token
-            if (this.promises[token] != null) {
-              /**
-               * @TODO remove this and make sure that the Promise is always
-               * already resolved.
-               */
-              await this.promises[token]
 
-              this.promises[token] = this.handlePacket(token)
-            } else {
-              this.handlePacket(token)
-            }
+            this.promises[token] = this.handlePacket(token)
           }
         }
       }
@@ -150,6 +146,7 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
       }
     }
 
+    this.promises[token] = undefined
     this.tokens.push(token)
   }
 }

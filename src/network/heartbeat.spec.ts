@@ -52,12 +52,16 @@ describe('check heartbeat mechanism', function () {
   }
 
   it('should initialise the heartbeat module and start the heartbeat functionality', async function () {
-    const [Alice, Bob, Chris, Dave] = await Promise.all([
-      generateNode(),
+    const [Alice, Bob, Chris] = await Promise.all([
+      /* prettier-ignore */
       generateNode(),
       generateNode(),
       generateNode(),
     ])
+
+    await new Promise((resolve) => setTimeout(resolve, 100))
+
+    await Alice.dial(Bob.peerInfo)
 
     // Check whether our event listener is triggered by heartbeat interactions
     await Promise.all([
@@ -67,7 +71,7 @@ describe('check heartbeat mechanism', function () {
           resolve()
         })
       }),
-      Alice.interactions.network.heartbeat.interact(Bob.peerInfo),
+      Alice.interactions.network.heartbeat.interact(Bob.peerInfo.id),
     ])
 
     assert(

@@ -15,7 +15,7 @@ import chalk from 'chalk'
 
 import Hopr from '../..'
 import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import { Heartbeat } from './heartbeat'
+import { Heartbeat, HEARTBEAT_TIMEOUT } from './heartbeat'
 
 import assert from 'assert'
 import Multiaddr from 'multiaddr'
@@ -23,7 +23,7 @@ import Multiaddr from 'multiaddr'
 import { EventEmitter } from 'events'
 
 describe('check heartbeat mechanism', function () {
-  async function generateNode(): Promise<Hopr<HoprCoreConnector>> {
+  async function generateNode(options?: { timeoutIntentionally?: boolean }): Promise<Hopr<HoprCoreConnector>> {
     const node = (await libp2p.create({
       peerInfo: await PeerInfo.create(await PeerId.create({ keyType: 'secp256k1' })),
       modules: {
@@ -43,7 +43,7 @@ describe('check heartbeat mechanism', function () {
 
     node.interactions = {
       network: {
-        heartbeat: new Heartbeat(node),
+        heartbeat: new Heartbeat(node, options),
       },
     } as Hopr<HoprCoreConnector>['interactions']
 
@@ -57,7 +57,15 @@ describe('check heartbeat mechanism', function () {
   }
 
   it('should dispatch a heartbeat', async function () {
-    const [Alice, Bob] = await Promise.all([generateNode(), generateNode()])
+    const [Alice, Bob] = await Promise.all([
+      /* prettier-ignore */
+      generateNode(),
+      generateNode(),
+    ])
+
+    await new Promise((resolve) => setTimeout(resolve, 100))
+
+    await Alice.dial(Bob.peerInfo)
 
     await Promise.all([
       new Promise((resolve) => {
@@ -66,8 +74,32 @@ describe('check heartbeat mechanism', function () {
           resolve()
         })
       }),
-      Alice.interactions.network.heartbeat.interact(Bob.peerInfo),
+      Alice.interactions.network.heartbeat.interact(Bob.peerInfo.id),
     ])
+
+    await Promise.all([Alice.stop(), Bob.stop()])
+  })
+
+  it('should trigger a heartbeat timeout', async function () {
+    const [Alice, Bob] = await Promise.all([
+      /* prettier-ignore */
+      generateNode(),
+      generateNode({ timeoutIntentionally: true }),
+    ])
+
+    await new Promise((resolve) => setTimeout(resolve, 100))
+
+    await Alice.dial(Bob.peerInfo)
+
+    let errorThrown = false
+    let before = Date.now()
+    try {
+      await Alice.interactions.network.heartbeat.interact(Bob.peerInfo.id)
+    } catch (err) {
+      errorThrown = true
+    }
+
+    assert(errorThrown && Date.now() - before >= HEARTBEAT_TIMEOUT, 'Should reach a timeout')
 
     await Promise.all([Alice.stop(), Bob.stop()])
   })

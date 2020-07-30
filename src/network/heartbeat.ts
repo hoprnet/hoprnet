@@ -48,23 +48,15 @@ class Heartbeat<Chain extends HoprCoreConnector> extends EventEmitter {
     const THRESHOLD_TIME = Date.now() - REFRESH_TIME
 
     const queryNode = async (peer: string, token: Token): Promise<void> => {
-      let nextToken: number
-      let nextPeer: Entry
-
       while (
         tokens.length > 0 &&
         this.node.network.peerStore.peers.length > 0 &&
         this.node.network.peerStore.top(1)[0].lastSeen < THRESHOLD_TIME
       ) {
-        nextPeer = this.node.network.peerStore.pop()
+        let nextPeer = this.node.network.peerStore.pop() as Entry
+        let token = tokens.pop() as Token
 
-        nextToken = tokens.pop() as Token
-
-        if (promises[nextToken] != null) {
-          promises[nextToken].then(() => queryNode(nextPeer.id, nextToken))
-        } else {
-          promises[nextToken] = queryNode(nextPeer.id, nextToken)
-        }
+        promises[token] = queryNode(nextPeer.id, token)
       }
 
       let currentPeerId: PeerId
@@ -101,6 +93,7 @@ class Heartbeat<Chain extends HoprCoreConnector> extends EventEmitter {
         }
       }
 
+      promises[token] = undefined
       tokens.push(token)
     }
 

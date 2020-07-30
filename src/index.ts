@@ -285,12 +285,13 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
             return reject(err)
           }
 
-          this.interactions.packet.acknowledgment.once(
-            u8aToHex(this.dbKeys.UnAcknowledgedTickets(path[0].pubKey.marshal(), packet.challenge.hash)),
-            () => {
-              resolve()
-            }
-          )
+          const unAcknowledgedDBKey = this.dbKeys.UnAcknowledgedTickets(path[0].pubKey.marshal(), packet.challenge.hash)
+
+          await this.db.put(Buffer.from(unAcknowledgedDBKey), Buffer.from(''))
+
+          this.interactions.packet.acknowledgment.once(u8aToHex(unAcknowledgedDBKey), () => {
+            resolve()
+          })
 
           try {
             await this.interactions.packet.forward.interact(path[0], packet)
