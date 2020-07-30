@@ -16,13 +16,13 @@ import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import Hopr from '@hoprnet/hopr-core'
 import type { HoprOptions } from '@hoprnet/hopr-core'
 
-import figlet from 'figlet'
 import clear from 'clear'
 
 import { parseOptions, keywords } from './utils'
 import { clearString } from '@hoprnet/hopr-utils'
 import Commands from './commands'
 import dependencies from './utils/dependancies'
+import { renderHoprLogo } from './logo'
 
 const SPLIT_OPERAND_QUERY_REGEX: RegExp = /([\w\-]+)(?:\s+)?([\w\s\-.]+)?/
 
@@ -191,11 +191,7 @@ function runAsBootstrapNode() {
 
 async function main() {
   clear()
-  console.log(
-    figlet.textSync('HOPR Chat', {
-      horizontalLayout: 'fitted',
-    })
-  )
+  renderHoprLogo()
   console.log(`Welcome to ${chalk.bold('HOPR')}!\n`)
 
   console.log(`Chat Version: ${chalk.bold(dependencies['@hoprnet/hopr-chat'])}`)
