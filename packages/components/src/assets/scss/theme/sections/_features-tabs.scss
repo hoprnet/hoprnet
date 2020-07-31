@@ -9,7 +9,20 @@
   width: 45px;
   height: 45px;
   margin: 15px !important;
-  filter: invert(1);
+  filter: brightness(0) invert(1);
+}
+
+.features-tabs-tab-image-reversed {
+  display: inline-flex;
+  border-radius: 50%;
+  background: get-color(named, 1);
+  box-shadow: 0 2px 4px rgba(get-color(dark, 1), 0.32);
+}
+
+.features-tabs-tab-image-reversed img {
+  width: 80px;
+  height: 80px;
+  margin: 15px !important;
 }
 
 .features-tabs-inner .tab-list {

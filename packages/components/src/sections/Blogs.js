@@ -29,7 +29,7 @@ class Blogs extends React.Component {
     } = this.props
 
     const outerClasses = classNames(
-      'blogs-tabs section center-content',
+      'blogs-tabs section center-content cursor',
       topOuterDivider && 'has-top-divider',
       bottomOuterDivider && 'has-bottom-divider',
       hasBgColor && 'has-bg-color',
@@ -54,49 +54,55 @@ class Blogs extends React.Component {
           <div className={innerClasses}>
             <SectionHeader data={sectionHeader} className="center-content" />
             <Tabs active={!redirect ? 'tab-a' : undefined}>
-              <a href="/do-business-with-HOPR#blog">
-                <TabList>
-                  <Tab tabId="tab-a" className={redirect ? 'is-active' : undefined}>
-                    <div className="blogs-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="50">
-                      <Image src={require('../assets/images/icons/shield@140x140.png')} alt="Shield Icon" />
+              <TabList>
+                <Tab tabId="tab-a" className={redirect ? 'is-active' : undefined}>
+                  <a href="/do-business-with-HOPR#blog">
+                    <div className="blogs-tabs-tab-image-reversed mb-12 reveal-fade" data-reveal-offset="50">
+                      <Image src={require('../assets/images/icons/with-yellow-ball/shield.png')} alt="Shield Icon" />
                     </div>
-                    <div className="text-sm">Privacy Blog</div>
-                  </Tab>
-                  <Tab tabId="tab-b" className={redirect ? 'is-active' : undefined}>
-                    <div className="blogs-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="100">
-                      <Image src={require('../assets/images/icons/lock-4@140x140.png')} alt="Lock Icon" />
+                    <div className="text-color-default text-sm">Privacy Blog</div>
+                  </a>
+                </Tab>
+                <Tab tabId="tab-b" className={redirect ? 'is-active' : undefined}>
+                  <a href="/do-business-with-HOPR#blog">
+                    <div className="blogs-tabs-tab-image-reversed mb-12 reveal-fade" data-reveal-offset="100">
+                      <Image src={require('../assets/images/icons/with-yellow-ball/lock-4.png')} alt="Lock Icon" />
                     </div>
-                    <div className="text-sm">Crypto Blog</div>
-                  </Tab>
-                  <Tab tabId="tab-c" className={redirect ? 'is-active' : undefined}>
-                    <div className="blogs-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="150">
+                    <div className="text-color-default text-sm">Crypto Blog</div>
+                  </a>
+                </Tab>
+                <Tab tabId="tab-c" className={redirect ? 'is-active' : undefined}>
+                  <a href="/do-business-with-HOPR#blog">
+                    <div className="blogs-tabs-tab-image-reversed mb-12 reveal-fade" data-reveal-offset="150">
                       <Image
-                        src={require('../assets/images/icons/programming-team-chat-3@140x140.png')}
+                        src={require('../assets/images/icons/with-yellow-ball/programming-team-chat-3.png')}
                         alt="Programming Team Icon"
                       />
                     </div>
-                    <div className="text-sm">Tech Blog</div>
-                  </Tab>
-                  <Tab tabId="tab-d" className={redirect ? 'is-active' : undefined}>
-                    <div className="blogs-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="200">
+                    <div className="text-color-default text-sm">Tech Blog</div>
+                  </a>
+                </Tab>
+                <Tab tabId="tab-d" className={redirect ? 'is-active' : undefined}>
+                  <a href="/do-business-with-HOPR#blog">
+                    <div className="blogs-tabs-tab-image-reversed mb-12 reveal-fade" data-reveal-offset="200">
                       <Image
-                        src={require('../assets/images/icons/light-bulb-shine@140x140.png')}
+                        src={require('../assets/images/icons/with-yellow-ball/light-bulb-shine.png')}
                         alt="Light Bulb Icon"
                       />
                     </div>
-                    <div className="text-sm">News Blog</div>
-                  </Tab>
-                  {/* <Tab tabId="tab-e" className={redirect ? 'is-active' : undefined}>
-                  <div className="blogs-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="250">
+                    <div className="text-color-default text-sm">News Blog</div>
+                  </a>
+                </Tab>
+                {/* <Tab tabId="tab-e" className={redirect ? 'is-active' : undefined}>
+                  <div className="blogs-tabs-tab-image-reversed mb-12 reveal-fade" data-reveal-offset="250">
                     <Image
-                      src={require('../assets/images/icons/space-rocket-launch@140x140.png')}
+                      src={require('../assets/images/icons/with-yellow-ball/space-rocket-launch.png')}
                       alt="Pickaxe Icon"
                     />
                   </div>
-                  <div className="text-sm">Launchpad Blog</div>
+                  <div className="text-color-default text-sm">Launchpad Blog</div>
                 </Tab> */}
-                </TabList>
-              </a>
+              </TabList>
             </Tabs>
           </div>
         </div>

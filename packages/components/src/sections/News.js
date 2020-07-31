@@ -27,7 +27,7 @@ class News extends React.Component {
     } = this.props
 
     const outerClasses = classNames(
-      'news section',
+      'news section cursor',
       topOuterDivider && 'has-top-divider',
       bottomOuterDivider && 'has-bottom-divider',
       hasBgColor && 'has-bg-color',

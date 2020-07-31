@@ -25,11 +25,12 @@ class Products extends React.Component {
       hasBgColor,
       invertColor,
       pushLeft,
+      redirect,
       ...props
     } = this.props
 
     const outerClasses = classNames(
-      'products section center-content',
+      'products section center-content cursor',
       topOuterDivider && 'has-top-divider',
       bottomOuterDivider && 'has-bottom-divider',
       hasBgColor && 'has-bg-color',
@@ -102,7 +103,7 @@ class Products extends React.Component {
                   <div className="features-tiles-item-header">
                     <div className="features-tiles-item-image mb-16">
                       <Image
-                        src={require('../assets/images/icons/cloud-data-transfer@140x140.png')}
+                        src={require('../assets/images/icons/with-blue-stroke/cloud-data-transfer.png')}
                         alt="File Lock Icon"
                         width={56}
                         height={56}
@@ -147,7 +148,7 @@ class Products extends React.Component {
                   <div className="features-tiles-item-header">
                     <div className="features-tiles-item-image mb-16">
                       <Image
-                        src={require('../assets/images/icons/iris-scan-lock@140x140.png')}
+                        src={require('../assets/images/icons/with-blue-stroke/iris-scan-lock.png')}
                         alt="Sharing Icon"
                         width={56}
                         height={56}
@@ -193,7 +194,7 @@ class Products extends React.Component {
                   <div className="features-tiles-item-header">
                     <div className="features-tiles-item-image mb-16">
                       <Image
-                        src={require('../assets/images/icons/hierarchy-8@140x140.png')}
+                        src={require('../assets/images/icons/with-blue-stroke/hierarchy-8.png')}
                         alt="Sharing Icon"
                         width={56}
                         height={56}

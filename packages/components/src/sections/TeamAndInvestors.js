@@ -28,7 +28,7 @@ class TeamAndInvestors extends React.Component {
     } = this.props
 
     const outerClasses = classNames(
-      'section center-content',
+      'section center-content cursor',
       topOuterDivider && 'has-top-divider',
       bottomOuterDivider && 'has-bottom-divider',
       hasBgColor && 'has-bg-color',
@@ -58,7 +58,7 @@ class TeamAndInvestors extends React.Component {
                       className={isCompany ? 'img-to-white' : undefined}
                       src={
                         isCompany
-                          ? require('../assets/images/icons/multiple-users-1@140x140.png')
+                          ? require('../assets/images/icons/original/multiple-users-1.png')
                           : require('../assets/images/cards/team-card.png')
                       }
                     />

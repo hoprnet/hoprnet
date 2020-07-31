@@ -28,7 +28,7 @@ class GenericSection extends React.Component {
     } = this.props
 
     const outerClasses = classNames(
-      'section',
+      'section cursor',
       topOuterDivider && 'has-top-divider',
       bottomOuterDivider && 'has-bottom-divider',
       hasBgColor && 'has-bg-color',

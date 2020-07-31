@@ -16,8 +16,7 @@ const Logo = ({ className, ...props }) => {
             <Image
               src={require('../../assets/images/logo_gradient.png')}
               alt="HOPR Logo"
-              height="auto"
-              width="100px"
+              width={100}
               className="mr-12"
             />
           </div>

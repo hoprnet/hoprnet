@@ -82,7 +82,7 @@ class Header extends React.Component {
     } = this.props
 
     const classes = classNames(
-      'site-header ',
+      'site-header cursor',
       bottomOuterDivider && 'has-bottom-divider',
       hasBgColor && 'has-bg-color',
       invertColor && 'invert-color',
