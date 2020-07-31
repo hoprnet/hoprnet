@@ -117,7 +117,7 @@ class Pricing extends React.Component {
     } = this.props
 
     const outerClasses = classNames(
-      'pricing section',
+      'pricing section cursor',
       topOuterDivider && 'has-top-divider',
       bottomOuterDivider && 'has-bottom-divider',
       hasBgColor && 'has-bg-color',

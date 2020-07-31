@@ -27,7 +27,7 @@ class HeroFull extends React.Component {
     } = this.props
 
     const outerClasses = classNames(
-      'hero section center-content',
+      'hero section center-content cursor',
       topOuterDivider && 'has-top-divider',
       bottomOuterDivider && 'has-bottom-divider',
       hasBgColor && 'has-bg-color',
@@ -50,16 +50,20 @@ class HeroFull extends React.Component {
                 {isCompany ? 'HOPR Services' : 'HOPR'}
               </h1> */}
               <div className="container-sm">
-                <p className="m-0 mb-32 reveal-from-top" data-reveal-delay="300">
-                  {isCompany ? (
-                    "We're proud to build the HOPR network for the HOPR Association."
-                  ) : (
-                    <>
-                      <p className="big-title pb-32">Changing Data Privacy For Good</p>
+                {isCompany ? (
+                  <p className="m-0 mb-32 reveal-from-top" data-reveal-delay="300">
+                    We're proud to build the HOPR network for the HOPR Association.
+                  </p>
+                ) : (
+                  <>
+                    <p className="m-0 mb-32 reveal-from-top big-title pb-32" data-reveal-delay="300">
+                      Changing Data Privacy For Good
+                    </p>
+                    <p className="reveal-from-top" data-reveal-delay="350">
                       The HOPR protocol ensures everyone has control of their privacy, data, and identity.
-                    </>
-                  )}
-                </p>
+                    </p>
+                  </>
+                )}
               </div>
             </div>
             {/* <div className="hero-figure reveal-from-bottom" data-reveal-delay="600">

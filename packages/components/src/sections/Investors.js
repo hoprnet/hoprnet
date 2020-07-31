@@ -28,7 +28,7 @@ class Investors extends React.Component {
     } = this.props
 
     const outerClasses = classNames(
-      'clients section reveal-fade',
+      'clients section reveal-fade cursor',
       topOuterDivider && 'has-top-divider',
       bottomOuterDivider && 'has-bottom-divider',
       hasBgColor && 'has-bg-color',

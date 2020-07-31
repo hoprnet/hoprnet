@@ -44,7 +44,7 @@ const Ecosystem = props => {
                       <p className="mt-0 mb-24 text-sm">Personal</p>
                       <div className="features-tiles-item-image mb-16">
                         <Image
-                          src={require('../assets/images/icons/love-heart-keyhole@140x140.png')}
+                          src={require('../assets/images/icons/with-blue-stroke/love-heart-keyhole.png')}
                           alt="Heart Icon"
                           width={56}
                           height={56}
@@ -70,7 +70,7 @@ const Ecosystem = props => {
                       <p className="mt-0 mb-24 text-sm">Professional</p>
                       <div className="features-tiles-item-image mb-16">
                         <Image
-                          src={require('../assets/images/icons/building-modern@140x140.png')}
+                          src={require('../assets/images/icons/with-blue-stroke/building-modern.png')}
                           alt="Modern Building Icon"
                           width={56}
                           height={56}
@@ -97,7 +97,7 @@ const Ecosystem = props => {
             <div className="header section-header reveal-from-top" data-reveal-delay="150">
               <div className="features-tiles-item-image">
                 <Image
-                  src={require('../assets/images/icons/love-heart-keyhole@140x140.png')}
+                  src={require('../assets/images/icons/with-blue-stroke/love-heart-keyhole.png')}
                   alt="Heart Icon"
                   width={56}
                   height={56}
@@ -142,7 +142,7 @@ const Ecosystem = props => {
             <div className="header section-header reveal-from-top" data-reveal-delay="150">
               <div className="features-tiles-item-image">
                 <Image
-                  src={require('../assets/images/icons/building-modern@140x140.png')}
+                  src={require('../assets/images/icons/with-blue-stroke/building-modern.png')}
                   alt="Modern Building Icon"
                   width={56}
                   height={56}
@@ -161,7 +161,10 @@ const Ecosystem = props => {
               <TabList>
                 <Tab tabId="tab-a" className="is-active">
                   <div className="blogs-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="50">
-                    <Image src={require('../assets/images/icons/ambulance-call@140x140.png')} alt="Call Icon" />
+                    <Image
+                      src={require('../assets/images/icons/with-blue-stroke/ambulance-call.png')}
+                      alt="Call Icon"
+                    />
                   </div>
                   <p>(Level 3)</p>
                   <div className="fw-700">Personal Contact</div>
@@ -169,7 +172,10 @@ const Ecosystem = props => {
                 </Tab>
                 <Tab tabId="tab-b" className="is-active">
                   <div className="blogs-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="100">
-                    <Image src={require('../assets/images/icons/server-settings@140x140.png')} alt="Lock Icon" />
+                    <Image
+                      src={require('../assets/images/icons/with-blue-stroke/server-settings.png')}
+                      alt="Lock Icon"
+                    />
                   </div>
                   <p>(Level 2)</p>
                   <div className="fw-700">HOPR Node</div>
@@ -178,7 +184,7 @@ const Ecosystem = props => {
                 <Tab tabId="tab-c" className="is-active">
                   <div className="blogs-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="150">
                     <Image
-                      src={require('../assets/images/icons/monetization-sponsor@140x140.png')}
+                      src={require('../assets/images/icons/with-blue-stroke/monetization-sponsor.png')}
                       alt="Programming Team Icon"
                     />
                   </div>

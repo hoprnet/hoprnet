@@ -27,7 +27,7 @@ class Values extends React.Component {
     } = this.props
 
     const outerClasses = classNames(
-      'values section center-content',
+      'values section center-content cursor',
       topOuterDivider && 'has-top-divider',
       bottomOuterDivider && 'has-bottom-divider',
       hasBgColor && 'has-bg-color',
@@ -57,9 +57,9 @@ class Values extends React.Component {
               <div className="tiles-item reveal-from-bottom" data-reveal-container=".tiles-wrap">
                 <div className="tiles-item-inner">
                   <div className="features-tiles-item-header">
-                    <div className="features-tiles-item-image mb-16">
+                    <div className="features-tiles-item-image-reversed mb-16">
                       <Image
-                        src={require('../assets/images/icons/protection-shield@140x140.png')}
+                        src={require('../assets/images/icons/with-yellow-ball/protection-shield.png')}
                         alt="File Lock Icon"
                         width={56}
                         height={56}
@@ -81,9 +81,9 @@ class Values extends React.Component {
               >
                 <div className="tiles-item-inner">
                   <div className="features-tiles-item-header">
-                    <div className="features-tiles-item-image mb-16">
+                    <div className="features-tiles-item-image-reversed mb-16">
                       <Image
-                        src={require('../assets/images/icons/light-bulb-shine@140x140.png')}
+                        src={require('../assets/images/icons/with-yellow-ball/light-bulb-shine.png')}
                         alt="Sharing Icon"
                         width={56}
                         height={56}
@@ -106,9 +106,9 @@ class Values extends React.Component {
               >
                 <div className="tiles-item-inner">
                   <div className="features-tiles-item-header">
-                    <div className="features-tiles-item-image mb-16">
+                    <div className="features-tiles-item-image-reversed mb-16">
                       <Image
-                        src={require('../assets/images/icons/multiple-users-1@140x140.png')}
+                        src={require('../assets/images/icons/with-yellow-ball/multiple-users-1.png')}
                         alt="Sharing Icon"
                         width={56}
                         height={56}

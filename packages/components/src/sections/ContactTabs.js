@@ -31,7 +31,7 @@ class ContactTabs extends React.Component {
     } = this.props
 
     const outerClasses = classNames(
-      'contact-tabs section center-content',
+      'contact-tabs section center-content cursor',
       topOuterDivider && 'has-top-divider',
       bottomOuterDivider && 'has-bottom-divider',
       hasBgColor && 'has-bg-color',
@@ -69,7 +69,7 @@ class ContactTabs extends React.Component {
                   <Tab tabId="tab-a" className={redirect ? 'is-active' : undefined}>
                     <a href="https://github.com/hoprnet" target="_blank" rel="noopener noreferrer">
                       <div className="features-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="50">
-                        <Image src={require('../assets/images/icons/shield@140x140.png')} alt="Shield Icon" />
+                        <Image src={require('../assets/images/icons/with-blue-stroke/shield.png')} alt="Shield Icon" />
                       </div>
                       <div className="text-sm">Privacy Experts</div>
                     </a>
@@ -77,7 +77,7 @@ class ContactTabs extends React.Component {
                   <Tab tabId="tab-b" className={redirect ? 'is-active' : undefined}>
                     <a href="https://github.com/hoprnet" target="_blank" rel="noopener noreferrer">
                       <div className="features-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="100">
-                        <Image src={require('../assets/images/icons/lock-4@140x140.png')} alt="Lock Icon" />
+                        <Image src={require('../assets/images/icons/with-blue-stroke/lock-4.png')} alt="Lock Icon" />
                       </div>
                       <div className="text-sm">Cryptographers</div>
                     </a>
@@ -86,7 +86,7 @@ class ContactTabs extends React.Component {
                     <a href="https://docs.hoprnet.org/" target="_blank" rel="noopener noreferrer">
                       <div className="features-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="150">
                         <Image
-                          src={require('../assets/images/icons/programming-team-chat-3@140x140.png')}
+                          src={require('../assets/images/icons/with-blue-stroke/programming-team-chat-3.png')}
                           alt="Programming Team Icon"
                         />
                       </div>
@@ -101,7 +101,7 @@ class ContactTabs extends React.Component {
                     >
                       <div className="features-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="200">
                         <Image
-                          src={require('../assets/images/icons/light-bulb-shine@140x140.png')}
+                          src={require('../assets/images/icons/with-blue-stroke/light-bulb-shine.png')}
                           alt="Light Bulb Icon"
                         />
                       </div>
@@ -111,7 +111,10 @@ class ContactTabs extends React.Component {
                   <Tab tabId="tab-e" className={redirect ? 'is-active' : undefined}>
                     <a href="http://docs.hoprnet.org/" target="_blank" rel="noopener noreferrer">
                       <div className="features-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="250">
-                        <Image src={require('../assets/images/icons/outdoors-mining@140x140.png')} alt="Pickaxe Icon" />
+                        <Image
+                          src={require('../assets/images/icons/with-blue-stroke/outdoors-mining.png')}
+                          alt="Pickaxe Icon"
+                        />
                       </div>
                       <div className="text-sm">Miners & Stakers</div>
                     </a>
@@ -124,7 +127,7 @@ class ContactTabs extends React.Component {
                     >
                       <div className="features-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="250">
                         <Image
-                          src={require('../assets/images/icons/professions-man-office-1@140x140.png')}
+                          src={require('../assets/images/icons/with-blue-stroke/professions-man-office-1.png')}
                           alt="Investor Icon"
                         />
                       </div>

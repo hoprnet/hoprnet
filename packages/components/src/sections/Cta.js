@@ -29,7 +29,7 @@ class Cta extends React.Component {
     } = this.props
 
     const outerClasses = classNames(
-      'cta section center-content-mobile',
+      'cta section center-content-mobile cursor',
       topOuterDivider && 'has-top-divider',
       bottomOuterDivider && 'has-bottom-divider',
       hasBgColor && 'has-bg-color',

@@ -30,7 +30,7 @@ class FeaturesTiles extends React.Component {
     } = this.props
 
     const outerClasses = classNames(
-      'features-tiles section center-content',
+      'features-tiles section center-content cursor',
       topOuterDivider && 'has-top-divider',
       bottomOuterDivider && 'has-bottom-divider',
       hasBgColor && 'has-bg-color',
@@ -63,27 +63,27 @@ class FeaturesTiles extends React.Component {
             <SectionHeader data={sectionHeader} className="center-content" />
             <div className={tilesClasses}>
               <div className="tiles-item reveal-from-bottom" data-reveal-container=".tiles-wrap">
-                <a href="/layer0-data-privacy#enabling_data_privacy">
-                  <div className="tiles-item-inner">
-                    <div className="features-tiles-item-header">
+                <div className="tiles-item-inner">
+                  <div className="features-tiles-item-header">
+                    <a href="/layer0-data-privacy#enabling_data_privacy">
                       <div className="features-tiles-item-image mb-16">
                         <Image
-                          src={require('../assets/images/icons/common-file-lock@140x140.png')}
+                          src={require('../assets/images/icons/with-blue-stroke/common-file-lock.png')}
                           alt="File Lock Icon"
                           width={56}
                           height={56}
                         />
                       </div>
-                    </div>
-                    <div className="features-tiles-item-content">
-                      <h4 className="mt-0 mb-8">Enabling Data Privacy</h4>
-                      <p className="m-0 text-sm">
-                        We're building the HOPR network to give people and companies control over their level of data
-                        privacy.
-                      </p>
-                    </div>
+                    </a>
                   </div>
-                </a>
+                  <div className="features-tiles-item-content">
+                    <h4 className="mt-0 mb-8">Enabling Data Privacy</h4>
+                    <p className="m-0 text-sm">
+                      We're building the HOPR network to give people and companies control over their level of data
+                      privacy.
+                    </p>
+                  </div>
+                </div>
               </div>
 
               <div
@@ -91,27 +91,27 @@ class FeaturesTiles extends React.Component {
                 data-reveal-container=".tiles-wrap"
                 data-reveal-delay="100"
               >
-                <a href="/layer0-data-privacy#open_source_support">
-                  <div className="tiles-item-inner">
-                    <div className="features-tiles-item-header">
+                <div className="tiles-item-inner">
+                  <div className="features-tiles-item-header">
+                    <a href="/layer0-data-privacy#open_source_support">
                       <div className="features-tiles-item-image mb-16">
                         <Image
-                          src={require('../assets/images/icons/user-signal@140x140.png')}
+                          src={require('../assets/images/icons/with-blue-stroke/user-signal.png')}
                           alt="Sharing Icon"
                           width={56}
                           height={56}
                         />
                       </div>
-                    </div>
-                    <div className="features-tiles-item-content">
-                      <h4 className="mt-0 mb-8">Open Source Support</h4>
-                      <p className="m-0 text-sm">
-                        The HOPR community fights for the digital privacy of the future. Everybody can become a part of
-                        our movement.
-                      </p>
-                    </div>
+                    </a>
                   </div>
-                </a>
+                  <div className="features-tiles-item-content">
+                    <h4 className="mt-0 mb-8">Open Source Support</h4>
+                    <p className="m-0 text-sm">
+                      The HOPR community fights for the digital privacy of the future. Everybody can become a part of
+                      our movement.
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -124,71 +124,71 @@ class FeaturesTiles extends React.Component {
                     data-reveal-container=".tiles-wrap"
                     data-reveal-delay="200"
                   >
-                    <a href="/layer0-data-privacy#community">
-                      <div className="tiles-item-inner">
+                    <div className="tiles-item-inner">
+                      <a href="/layer0-data-privacy#community">
                         <div className="features-tiles-item-header">
                           <p className="mt-0 mb-24 text-sm">Personal</p>
                           <div className="features-tiles-item-image mb-16">
                             <Image
-                              src={require('../assets/images/icons/love-heart-keyhole@140x140.png')}
+                              src={require('../assets/images/icons/with-blue-stroke/love-heart-keyhole.png')}
                               alt="Heart Icon"
                               width={56}
                               height={56}
                             />
                           </div>
                         </div>
-                        <div className="features-tiles-item-content">
-                          <h4 className="mt-0 mb-8">Hackathons + Community</h4>
-                          <p className="m-0 text-sm">
-                            From testnet game sessions to reward bounties, join our Telegram to become part of our
-                            growing community.
-                            <br />
-                            <a
-                              href="https://t.me/hoprnet"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="underline"
-                            >
-                              Telegram
-                            </a>
-                          </p>
-                        </div>
+                      </a>
+                      <div className="features-tiles-item-content">
+                        <h4 className="mt-0 mb-8">Hackathons + Community</h4>
+                        <p className="m-0 text-sm">
+                          From testnet game sessions to reward bounties, join our{' '}
+                          <a
+                            href="https://t.me/hoprnet"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-color-high underline"
+                          >
+                            Telegram
+                          </a>{' '}
+                          to become part of our growing community.
+                          <br />
+                        </p>
                       </div>
-                    </a>
+                    </div>
                   </div>
 
-                  <a
-                    href={isCompany ? 'mailto:rik.krieger@hoprnet.org?subject=Partnership' : undefined}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <div
+                    className="tiles-item reveal-from-bottom"
+                    data-reveal-container=".tiles-wrap"
+                    data-reveal-delay="300"
                   >
-                    <div
-                      className="tiles-item reveal-from-bottom"
-                      data-reveal-container=".tiles-wrap"
-                      data-reveal-delay="300"
-                    >
-                      <div className="tiles-item-inner">
-                        <div className="features-tiles-item-header">
+                    <div className="tiles-item-inner">
+                      <div className="features-tiles-item-header">
+                        <a
+                          href={isCompany ? 'mailto:rik.krieger@hoprnet.org?subject=Partnership' : undefined}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
                           <p className="mt-0 mb-24 text-sm">Professional</p>
                           <div className="features-tiles-item-image mb-16">
                             <Image
-                              src={require('../assets/images/icons/building-modern@140x140.png')}
+                              src={require('../assets/images/icons/with-blue-stroke/building-modern.png')}
                               alt="Modern Building Icon"
                               width={56}
                               height={56}
                             />
                           </div>
-                        </div>
-                        <div className="features-tiles-item-content">
-                          <h4 className="mt-0 mb-8">Your company</h4>
-                          <p className="m-0 text-sm">
-                            HOPR is providing worry-free privacy to everyone. Reach out to us if you and your customers
-                            deserve the best.
-                          </p>
-                        </div>
+                        </a>
+                      </div>
+                      <div className="features-tiles-item-content">
+                        <h4 className="mt-0 mb-8">Your company</h4>
+                        <p className="m-0 text-sm">
+                          HOPR is providing worry-free privacy to everyone. Reach out to us if you and your customers
+                          deserve the best.
+                        </p>
                       </div>
                     </div>
-                  </a>
+                  </div>
                 </div>
               </>
             )}
