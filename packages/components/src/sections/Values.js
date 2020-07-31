@@ -59,7 +59,7 @@ class Values extends React.Component {
                   <div className="features-tiles-item-header">
                     <div className="features-tiles-item-image-reversed mb-16">
                       <Image
-                        src={require('../assets/images/icons/protection-shield-yellow-@140x140.png')}
+                        src={require('../assets/images/icons/with-yellow-ball/protection-shield.png')}
                         alt="File Lock Icon"
                         width={56}
                         height={56}
@@ -83,7 +83,7 @@ class Values extends React.Component {
                   <div className="features-tiles-item-header">
                     <div className="features-tiles-item-image-reversed mb-16">
                       <Image
-                        src={require('../assets/images/icons/light-bulb-shine-yellow-@140x140.png')}
+                        src={require('../assets/images/icons/with-yellow-ball/light-bulb-shine.png')}
                         alt="Sharing Icon"
                         width={56}
                         height={56}
@@ -108,7 +108,7 @@ class Values extends React.Component {
                   <div className="features-tiles-item-header">
                     <div className="features-tiles-item-image-reversed mb-16">
                       <Image
-                        src={require('../assets/images/icons/multiple-users-1-yellow-@140x140.png')}
+                        src={require('../assets/images/icons/with-yellow-ball/multiple-users-1.png')}
                         alt="Sharing Icon"
                         width={56}
                         height={56}

@@ -58,7 +58,7 @@ class Blogs extends React.Component {
                 <Tab tabId="tab-a" className={redirect ? 'is-active' : undefined}>
                   <a href="/do-business-with-HOPR#blog">
                     <div className="blogs-tabs-tab-image-reversed mb-12 reveal-fade" data-reveal-offset="50">
-                      <Image src={require('../assets/images/icons/shield-yellow-@140x140.png')} alt="Shield Icon" />
+                      <Image src={require('../assets/images/icons/with-yellow-ball/shield.png')} alt="Shield Icon" />
                     </div>
                     <div className="text-color-default text-sm">Privacy Blog</div>
                   </a>
@@ -66,7 +66,7 @@ class Blogs extends React.Component {
                 <Tab tabId="tab-b" className={redirect ? 'is-active' : undefined}>
                   <a href="/do-business-with-HOPR#blog">
                     <div className="blogs-tabs-tab-image-reversed mb-12 reveal-fade" data-reveal-offset="100">
-                      <Image src={require('../assets/images/icons/lock-4-yellow-@140x140.png')} alt="Lock Icon" />
+                      <Image src={require('../assets/images/icons/with-yellow-ball/lock-4.png')} alt="Lock Icon" />
                     </div>
                     <div className="text-color-default text-sm">Crypto Blog</div>
                   </a>
@@ -75,7 +75,7 @@ class Blogs extends React.Component {
                   <a href="/do-business-with-HOPR#blog">
                     <div className="blogs-tabs-tab-image-reversed mb-12 reveal-fade" data-reveal-offset="150">
                       <Image
-                        src={require('../assets/images/icons/programming-team-chat-3-yellow-@140x140.png')}
+                        src={require('../assets/images/icons/with-yellow-ball/programming-team-chat-3.png')}
                         alt="Programming Team Icon"
                       />
                     </div>
@@ -86,7 +86,7 @@ class Blogs extends React.Component {
                   <a href="/do-business-with-HOPR#blog">
                     <div className="blogs-tabs-tab-image-reversed mb-12 reveal-fade" data-reveal-offset="200">
                       <Image
-                        src={require('../assets/images/icons/light-bulb-shine-yellow-@140x140.png')}
+                        src={require('../assets/images/icons/with-yellow-ball/light-bulb-shine.png')}
                         alt="Light Bulb Icon"
                       />
                     </div>
@@ -96,7 +96,7 @@ class Blogs extends React.Component {
                 {/* <Tab tabId="tab-e" className={redirect ? 'is-active' : undefined}>
                   <div className="blogs-tabs-tab-image-reversed mb-12 reveal-fade" data-reveal-offset="250">
                     <Image
-                      src={require('../assets/images/icons/space-rocket-launch@140x140.png')}
+                      src={require('../assets/images/icons/with-yellow-ball/space-rocket-launch.png')}
                       alt="Pickaxe Icon"
                     />
                   </div>

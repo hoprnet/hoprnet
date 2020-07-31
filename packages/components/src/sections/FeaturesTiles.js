@@ -68,7 +68,7 @@ class FeaturesTiles extends React.Component {
                     <a href="/layer0-data-privacy#enabling_data_privacy">
                       <div className="features-tiles-item-image mb-16">
                         <Image
-                          src={require('../assets/images/icons/common-file-lock@140x140.png')}
+                          src={require('../assets/images/icons/with-blue-stroke/common-file-lock.png')}
                           alt="File Lock Icon"
                           width={56}
                           height={56}
@@ -96,7 +96,7 @@ class FeaturesTiles extends React.Component {
                     <a href="/layer0-data-privacy#open_source_support">
                       <div className="features-tiles-item-image mb-16">
                         <Image
-                          src={require('../assets/images/icons/user-signal@140x140.png')}
+                          src={require('../assets/images/icons/with-blue-stroke/user-signal.png')}
                           alt="Sharing Icon"
                           width={56}
                           height={56}
@@ -130,7 +130,7 @@ class FeaturesTiles extends React.Component {
                           <p className="mt-0 mb-24 text-sm">Personal</p>
                           <div className="features-tiles-item-image mb-16">
                             <Image
-                              src={require('../assets/images/icons/love-heart-keyhole@140x140.png')}
+                              src={require('../assets/images/icons/with-blue-stroke/love-heart-keyhole.png')}
                               alt="Heart Icon"
                               width={56}
                               height={56}
@@ -172,7 +172,7 @@ class FeaturesTiles extends React.Component {
                           <p className="mt-0 mb-24 text-sm">Professional</p>
                           <div className="features-tiles-item-image mb-16">
                             <Image
-                              src={require('../assets/images/icons/building-modern@140x140.png')}
+                              src={require('../assets/images/icons/with-blue-stroke/building-modern.png')}
                               alt="Modern Building Icon"
                               width={56}
                               height={56}

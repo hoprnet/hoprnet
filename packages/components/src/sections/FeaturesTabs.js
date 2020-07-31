@@ -60,7 +60,7 @@ class FeaturesTabs extends React.Component {
                 <Tab tabId="tab-a" className={redirect ? 'is-active' : undefined}>
                   <a href="https://github.com/hoprnet" target="_blank" rel="noopener noreferrer">
                     <div className="features-tabs-tab-image-reversed mb-12 reveal-fade" data-reveal-offset="50">
-                      <Image src={require('../assets/images/icons/shield-yellow-@140x140.png')} alt="Shield Icon" />
+                      <Image src={require('../assets/images/icons/with-yellow-ball/shield.png')} alt="Shield Icon" />
                     </div>
                     <div className="text-sm text-color-default">Privacy Experts</div>
                   </a>
@@ -68,7 +68,7 @@ class FeaturesTabs extends React.Component {
                 <Tab tabId="tab-b" className={redirect ? 'is-active' : undefined}>
                   <a href="https://github.com/hoprnet" target="_blank" rel="noopener noreferrer">
                     <div className="features-tabs-tab-image-reversed mb-12 reveal-fade" data-reveal-offset="100">
-                      <Image src={require('../assets/images/icons/lock-4-yellow-@140x140.png')} alt="Lock Icon" />
+                      <Image src={require('../assets/images/icons/with-yellow-ball/lock-4.png')} alt="Lock Icon" />
                     </div>
                     <div className="text-sm text-color-default">Cryptographers</div>
                   </a>
@@ -77,7 +77,7 @@ class FeaturesTabs extends React.Component {
                   <a href="http://docs.hoprnet.org/" target="_blank" rel="noopener noreferrer">
                     <div className="features-tabs-tab-image-reversed mb-12 reveal-fade" data-reveal-offset="150">
                       <Image
-                        src={require('../assets/images/icons/programming-team-chat-3-yellow-@140x140.png')}
+                        src={require('../assets/images/icons/with-yellow-ball/programming-team-chat-3.png')}
                         alt="Programming Team Icon"
                       />
                     </div>
@@ -92,7 +92,7 @@ class FeaturesTabs extends React.Component {
                   >
                     <div className="features-tabs-tab-image-reversed mb-12 reveal-fade" data-reveal-offset="200">
                       <Image
-                        src={require('../assets/images/icons/light-bulb-shine-yellow-@140x140.png')}
+                        src={require('../assets/images/icons/with-yellow-ball/light-bulb-shine.png')}
                         alt="Light Bulb Icon"
                       />
                     </div>
@@ -103,7 +103,7 @@ class FeaturesTabs extends React.Component {
                   <a href="http://docs.hoprnet.org/" target="_blank" rel="noopener noreferrer">
                     <div className="features-tabs-tab-image-reversed mb-12 reveal-fade" data-reveal-offset="250">
                       <Image
-                        src={require('../assets/images/icons/outdoors-mining-yellow-@140x140.png')}
+                        src={require('../assets/images/icons/with-yellow-ball/outdoors-mining.png')}
                         alt="Pickaxe Icon"
                       />
                     </div>
@@ -118,7 +118,7 @@ class FeaturesTabs extends React.Component {
                   >
                     <div className="features-tabs-tab-image-reversed mb-12 reveal-fade" data-reveal-offset="250">
                       <Image
-                        src={require('../assets/images/icons/professions-man-office-1-yellow-@140x140.png')}
+                        src={require('../assets/images/icons/with-yellow-ball/professions-man-office-1.png')}
                         alt="Investor Icon"
                       />
                     </div>
