@@ -35,12 +35,18 @@ export const v2 = [
   `<span style="color:#7FFFFFFF;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7FFFFFFF;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7FFFFFFF;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span><span style="color:#7EFDFDFD;"> </span>`,
 ]
 
+export const BACKGROUND_COLOR = 'ffffa0'
+
 export function renderHoprLogo() {
   v2.forEach((line) => {
-    console.log(
-      line.replace(/\<span style="color:\#([0-9A-F]+);"\>(.)\<\/span\>/g, (match, p1, p2) =>
-        chalk.bold.bgHex('ffffa0').hex(p1)(p2)
-      )
+    let str = line.replace(/\<span style="color:\#([0-9A-F]+);"\>(.)\<\/span\>/g, (match, p1, p2) =>
+      chalk.bold.bgHex(BACKGROUND_COLOR).hex(p1)(p2)
     )
+
+    for (let i = 0; i < process.stdout.columns - 80; i++) {
+      str += chalk.bgHex(BACKGROUND_COLOR)(' ')
+    }
+
+    console.log(str)
   })
 }
