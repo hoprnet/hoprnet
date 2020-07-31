@@ -7,6 +7,65 @@ pragma solidity ^0.6.0;
  * of the private keys of a given address.
  */
 library ECDSA {
+    // y^2 = x^3 + 7 mod p, where p is FIELD_ORDER
+    uint256 constant FIELD_ORDER = 0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f;
+
+    uint256 constant CURVE_ORDER = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141;
+    uint256 constant HALF_CURVE_ORDER = (CURVE_ORDER - 1) / 2;
+
+    /**
+     * @dev Decompresses a compressed elliptic curve point and
+     * returns the uncompressed version.
+     * @notice secp256k1: y^2 = x^3 + 7 (mod p)
+     * "Converts from (x, true / false) to (x,y)"
+     */
+    function decompress(uint256 x, bool odd) internal returns (bytes32, bytes32) {
+        uint256 tempY = mulmod(x, x, FIELD_ORDER);
+
+        tempY = mulmod(tempY, x, FIELD_ORDER);
+        tempY = addmod(tempY, 7, FIELD_ORDER);
+
+        uint256 sqrtExponent = (FIELD_ORDER + 1) / 4;
+
+        uint256 y;
+
+        /* solhint-disable no-inline-assembly */
+        assembly {
+            // free memory pointer
+            let memPtr := mload(0x40)
+
+            // length of base, exponent, modulus
+            mstore(memPtr, 0x20)
+            mstore(add(memPtr, 0x20), 0x20)
+            mstore(add(memPtr, 0x40), 0x20)
+
+            // assign base, exponent, modulus
+            mstore(add(memPtr, 0x60), tempY)
+            mstore(add(memPtr, 0x80), sqrtExponent)
+            mstore(add(memPtr, 0xa0), FIELD_ORDER)
+
+            // call the precompiled contract BigModExp (0x05)
+            let success := call(gas(), 0x05, 0x0, memPtr, 0xc0, memPtr, 0x20)
+
+            switch success
+                case 0 {
+                    revert(0x0, 0x0)
+                }
+                default {
+                    y := mload(memPtr)
+                }
+        }
+        /* solhint-enable no-inline-assembly */
+
+        bool isOdd = y % 2 == 1;
+
+        if ((isOdd && !odd) || (!isOdd && odd)) {
+            y = FIELD_ORDER - y;
+        }
+
+        return (bytes32(x), bytes32(y));
+    }
+
     /**
      * @dev Returns the address that signed a hashed message (`hash`) with
      * `signature`. This address can then be used for verification purposes.
@@ -36,7 +95,7 @@ library ECDSA {
         // with 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141 - s1 and flip v from 27 to 28 or
         // vice versa. If your library also generates signatures with 0/1 for v instead 27/28, add 27 to v to accept
         // these malleable signatures as well.
-        if (uint256(s) > 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0) {
+        if (uint256(s) > HALF_CURVE_ORDER) {
             revert("ECDSA: invalid signature 's' value");
         }
 
