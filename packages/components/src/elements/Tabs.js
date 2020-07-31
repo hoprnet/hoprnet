@@ -26,7 +26,7 @@ const Tab = ({ tabId, className, ...props }) => {
       {({ activeId, changeTab }) => (
         <li
           {...props}
-          className={classNames('tab', activeId === tabId && 'is-active', className)}
+          className={classNames('tab cursor', activeId === tabId && 'is-active', className)}
           role="tab"
           aria-controls={tabId}
           onClick={() => changeTab(tabId)}

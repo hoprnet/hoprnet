@@ -25,6 +25,7 @@ class Products extends React.Component {
       hasBgColor,
       invertColor,
       pushLeft,
+      redirect,
       ...props
     } = this.props
 
