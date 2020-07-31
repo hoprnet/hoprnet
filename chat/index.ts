@@ -196,7 +196,6 @@ async function main() {
 
   console.log(`Chat Version: ${chalk.bold(dependencies['@hoprnet/hopr-chat'])}`)
   console.log(`Core Version: ${chalk.bold(dependencies['@hoprnet/hopr-core'])}`)
-  console.log(`Core Ethereum Version: ${chalk.bold(dependencies['@hoprnet/hopr-core-ethereum'])}`)
   console.log(`Utils Version: ${chalk.bold(dependencies['@hoprnet/hopr-utils'])}`)
   console.log(`Connector Version: ${chalk.bold(dependencies['@hoprnet/hopr-core-connector-interface'])}\n`)
 
