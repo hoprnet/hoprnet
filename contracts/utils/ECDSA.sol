@@ -14,6 +14,15 @@ library ECDSA {
     uint256 constant HALF_CURVE_ORDER = (CURVE_ORDER - 1) / 2;
 
     /**
+     * @dev Converts a raw public key, given as a compressed EC-point to
+     * an Ethereum address.
+     */
+    function pubKeyToEthereumAddress(uint256 compressedX, bool odd) internal returns (address) {
+        (bytes32 x, bytes32 y) = decompress(compressedX, odd);
+        return address(bytes20(bytes32(keccak256(abi.encodePacked(x, y)) << 96)));
+    }
+
+    /**
      * @dev Decompresses a compressed elliptic curve point and
      * returns the uncompressed version.
      * @notice secp256k1: y^2 = x^3 + 7 (mod p)
