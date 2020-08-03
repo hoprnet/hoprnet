@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        site: [hoprnet-org]
+        site: [hopr-swiss]
 
     steps:
       # Checkout, Cache and Setup Steps
