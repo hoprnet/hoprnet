@@ -12,31 +12,10 @@ jobs:
       matrix:
         node-version: [12.9.1]
         yarn-version: [1.19.2]
-        # if you add items into this list, update "steps.filter" too
-        # repository: ['core', 'protos', 'server']
-        repository: ['protos', 'server']
-
     steps:
       # Checkout, Cache, Filter, Setup Envs and Steps
       - name: Checkout repository
         uses: actions/checkout@v2
-      - uses: dorny/paths-filter@v2.2.0
-        id: filter
-        with:
-          filters: |
-            core:
-              - '**/*'
-              - '!protos'
-              - '!server'
-            protos:
-              - 'protos/**/*'
-            server:
-              - 'server/**/*'
-      - id: set-core-env
-        if: matrix.repository == 'core'
-        run: |
-          echo "::set-env name=pkgPath::package.json"
-          echo "::set-env name=workDir::"
       - id: set-subrepo-env
         if: matrix.repository != 'core'
         run: |
