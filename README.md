@@ -5,38 +5,15 @@
 
 HOPR is a privacy-preserving messaging **protocol** which enables the creation of a secure communication network via relay nodes powered by economic incentives using digital tokens.
 
-This repository is the source code of the TypeScript implementation ([`hopr-core`](https://www.npmjs.com/package/@hoprnet/hopr-core)) of HOPR. It also hosts the source code of its first live interactive Proof-of-Concept for HOPR’s testnet, [HOPR Chat](https://hub.docker.com/r/hopr/chat), an interactive command line utility able to connect and send messages to other users.
+This repository is the source code of the TypeScript implementation ([`hopr-core`](https://www.npmjs.com/package/@hoprnet/hopr-core)) of HOPR.
 
 For further information about HOPR, please see our [online documentation](https://docs.hoprnet.io/home/).
 
 ## Testnet
 
-Our testnet is live, and its composed by two fundamental elements:
+Our testnet is live, and its composed of:
 
-- **Bootstrap Nodes**, online servers available in a Swiss datacenter running instances of **HOPR Chat** on _Bootstrap Mode_.
-- **Docker Image**, a ready to use [Docker](https://www.docker.com/) image allowing anyone to run **HOPR Chat**.
-
-### Running HOPR Chat in Docker
-
-For Windows instructions, please follow our [Windows Quickstart](https://docs.hoprnet.io/home/getting-started/quickstart/windows-quickstart). If you have already Docker installed, you can just copy and paste the following command into your machine to get the application working.
-
-```
-docker run -v %cd%/db:/app/db ^
--e HOST_IPV4=0.0.0.0:9091 ^
--e BOOTSTRAP_SERVERS=/dns4/ch-test-01.hoprnet.io/tcp/9091/p2p/16Uiu2HAmThyWP5YWutPmYk9yUZ48ryWyZ7Cf6pMTQduvHUS9sGE7 ^
--e ETHEREUM_PROVIDER=wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36 ^
--p 9091:9091 -it hopr/chat -p switzerland
-```
-
-For Mac or Linux Users, the command is as follows
-
-```
-docker run -v $(pwd)/db:/app/db \
--e HOST_IPV4=0.0.0.0:9091 \
--e BOOTSTRAP_SERVERS=/ip4/34.65.237.196/tcp/9091/p2p/16Uiu2HAmThyWP5YWutPmYk9yUZ48ryWyZ7Cf6pMTQduvHUS9sGE7 \
--e ETHEREUM_PROVIDER=wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36 \
--p 9091:9091 -it gcr.io/hoprassociation/hopr-core:latest -p switzerland
-```
+- **Bootstrap Nodes**, online servers available in a Swiss datacenter running instances of [HOPR Chat](https://github.com/hoprnet/hopr-chat) on _Bootstrap Mode_.
 
 All our development is done in our [development branch](https://github.com/hoprnet/hopr-core/tree/develop).
 

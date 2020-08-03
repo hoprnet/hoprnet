@@ -13,8 +13,8 @@ jobs:
         node-version: [12.9.1]
         yarn-version: [1.19.2]
         # if you add items into this list, update "steps.filter" too
-        # repository: ['core', 'chat', 'protos', 'server']
-        repository: ['chat', 'protos', 'server']
+        # repository: ['core', 'protos', 'server']
+        repository: ['protos', 'server']
 
     steps:
       # Checkout, Cache, Filter, Setup Envs and Steps
@@ -26,11 +26,8 @@ jobs:
           filters: |
             core:
               - '**/*'
-              - '!chat'
               - '!protos'
               - '!server'
-            chat:
-              - 'chat/**/*'
             protos:
               - 'protos/**/*'
             server:
