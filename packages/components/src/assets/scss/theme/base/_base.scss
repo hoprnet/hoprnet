@@ -7,7 +7,11 @@
 }
 
 .img-to-white {
-  filter: brightness(0) invert(0.5);
+  filter: brightness(0) invert(1);
+}
+
+.img-to-grey {
+  filter: brightness(0) invert(0.3);
 }
 
 .img-to-black {

@@ -1,7 +1,7 @@
 .features-tiles-item-image {
   display: inline-flex;
   border-radius: 15%;
-  background: get-color(named, 3);
+  // background: $hopr_dark_blue;
   box-shadow: 0 2px 4px rgba(get-color(dark, 1), 0.12);
 }
 
@@ -9,13 +9,13 @@
   width: 45px;
   height: 45px;
   margin: 15px !important;
-  filter: brightness(0) invert(1);
+  // filter: brightness(0) invert(1);
 }
 
 .features-tiles-item-image-reversed {
   display: inline-flex;
   border-radius: 15%;
-  background: get-color(named, 1);
+  background: $hopr_white;
   box-shadow: 0 2px 4px rgba(get-color(dark, 1), 0.12);
 }
 
