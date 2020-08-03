@@ -1,0 +1,32 @@
+import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface';
+import type Hopr from '@hoprnet/hopr-core';
+import CloseChannel from './closeChannel';
+import Crawl from './crawl';
+import ListCommands from './listCommands';
+import ListConnectors from './listConnectors';
+import ListOpenChannels from './listOpenChannels';
+import OpenChannel from './openChannel';
+import Ping from './ping';
+import PrintAddress from './printAddress';
+import PrintBalance from './printBalance';
+import SendMessage from './sendMessage';
+import StopNode from './stopNode';
+import Version from './version';
+import Tickets from './tickets';
+export default class Commands {
+    node: Hopr<HoprCoreConnector>;
+    closeChannel: CloseChannel;
+    crawl: Crawl;
+    listCommands: ListCommands;
+    listConnectors: ListConnectors;
+    listOpenChannels: ListOpenChannels;
+    openChannel: OpenChannel;
+    ping: Ping;
+    printAddress: PrintAddress;
+    printBalance: PrintBalance;
+    sendMessage: SendMessage;
+    stopNode: StopNode;
+    version: Version;
+    tickets: Tickets;
+    constructor(node: Hopr<HoprCoreConnector>);
+}
