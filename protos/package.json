@@ -1,21 +1,19 @@
 {
   "name": "@hoprnet/hopr-protos",
-  "version": "0.0.11-12296a7",
+  "version": "0.0.12",
   "files": [
     "node/",
     "web/",
-    "web-src/",
     "protos/",
     "docs/",
     "README.md"
   ],
   "license": "GPL-3.0-only",
   "scripts": {
-    "build": "yarn build:protos && yarn build:web",
-    "build:web": "rimraf web && microbundle --entry web-src/**/*.js --output web --target web --compress --external none",
+    "build": "yarn build:protos",
     "build:protos": "yarn build:protos:node && yarn build:protos:web",
     "build:protos:node": "rimraf node && mkdirp node && node ./scripts/generateNode.js",
-    "build:protos:web": "rimraf web-src && mkdirp web-src && node ./scripts/generateWeb.js",
+    "build:protos:web": "rimraf web && mkdirp web && node ./scripts/generateWeb.js",
     "fix:types": "replace 'from \"grpc\"' 'from \"@grpc/grpc-js\"' . -r --include=\"*.d.ts\"",
     "test": "yarn build:protos",
     "prepublishOnly": "yarn build"
@@ -38,7 +36,9 @@
     "singleQuote": true,
     "printWidth": 120
   },
-  "dependencies": {},
+  "dependencies": {
+    "google-protobuf": "^3.12.2"
+  },
   "devDependencies": {
     "@types/google-protobuf": "^3.7.2",
     "@types/node": "^12.11.0",
@@ -46,13 +46,14 @@
     "grpc-tools": "^1.9.0",
     "microbundle": "^0.12.2",
     "mkdirp": "^1.0.4",
+    "protoc-gen-grpc-web": "^1.2.0",
     "replace": "^1.2.0",
     "rimraf": "^3.0.2",
     "ts-protoc-gen": "^0.12.0",
     "typescript": "^3.9.7"
   },
   "peerDependencies": {
-    "google-protobuf": "^3.12.2",
-    "grpc": "^1.24.3"
+    "grpc": "^1.24.3",
+    "grpc-web": "^1.2.0"
   }
 }
