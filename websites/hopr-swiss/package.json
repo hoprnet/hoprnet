@@ -3,8 +3,8 @@
   "version": "1.1.0",
   "private": true,
   "scripts": {
-    "start": "CI=false node ./node_modules/.bin/craco start",
-    "build": "CI=false craco build",
+    "start": "GENERATE_SOURCEMAP=false CI=false node ./node_modules/.bin/craco start",
+    "build": "GENERATE_SOURCEMAP=false CI=false craco build",
     "test": "CI=true craco test",
     "eject": "craco eject",
     "format": "prettier --check ."
