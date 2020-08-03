@@ -45,7 +45,7 @@ class Clients extends React.Component {
       bottomDivider && 'has-bottom-divider'
     )
 
-    const imgClasses = classNames(invertColor ? 'img-to-white' : 'img-to-black')
+    const imgClasses = classNames(invertColor ? 'img-to-grey' : 'img-to-black')
 
     return (
       <section {...props} className={outerClasses}>

@@ -65,6 +65,7 @@ class News extends React.Component {
                       <Image
                         src={require('./../assets/images/partners/coindesk.png')}
                         alt="Binance Labs Logo"
+                        className="img-to-grey"
                         width={344}
                         height={194}
                       />
@@ -105,6 +106,7 @@ class News extends React.Component {
                       <Image
                         src={require('./../assets/images/partners/cointelegraph.png')}
                         alt="Cointelegraph Logo"
+                        className="img-to-grey"
                         width={344}
                         height={194}
                       />
@@ -145,6 +147,7 @@ class News extends React.Component {
                       <Image
                         src={require('./../assets/images/partners/moneytoday.png')}
                         alt="Moneytoday.ch Logo"
+                        className="img-to-grey"
                         width={344}
                         height={194}
                       />

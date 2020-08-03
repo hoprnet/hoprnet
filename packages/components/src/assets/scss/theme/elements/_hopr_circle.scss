@@ -1,0 +1,88 @@
+@keyframes animateCircle {
+  0% {
+    opacity: 1;
+    transform: translate(0%, 50%) scale(0.5);
+  }
+  15% {
+    opacity: 1;
+    transform: translate(0%, 50%) scale(0.5);
+  }
+  30% {
+    opacity: 1;
+    transform: translate(20%, 0%) scale(0.25);
+  }
+  45% {
+    opacity: 1;
+    transform: translate(40%, 50%) scale(0.25);
+  }
+  60% {
+    opacity: 1;
+    transform: translate(60%, 0%) scale(0.1);
+  }
+  75% {
+    opacity: 1;
+    transform: translate(80%, 50%) scale(0.025);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(80%, 100%) scale(0.005);
+  }
+}
+
+// branding agency animation
+// @keyframes animateCircle {
+//   0% {
+//     opacity: 1;
+//     transform: translate(10%, 10%) scale(1);
+//   }
+//   25% {
+//     opacity: 1;
+//     transform: translate(10%, 10%) scale(1);
+//   }
+//   35% {
+//     opacity: 1;
+//     transform: translate(10%, 10%) scale(0.5);
+//   }
+//   50% {
+//     opacity: 1;
+//     transform: translate(100%, -20%) scale(0.5);
+//   }
+//   75% {
+//     opacity: 1;
+//     transform: translate(0%, 20%) scale(0.5);
+//   }
+//   95% {
+//     opacity: 1;
+//     transform: translate(0%, 20%) scale(0.005);
+//   }
+//   96% {
+//     opacity: 0;
+//   }
+//   100% {
+//     visibility: hidden;
+//     opacity: 0;
+//   }
+// }
+
+.hoprCircle {
+  position: absolute;
+  margin-left: -600px;
+  left: 50%;
+  opacity: 0;
+  z-index: 15;
+
+  .container {
+    fill: $hopr_yellow;
+  }
+}
+
+@include media('>=medium') {
+  .hoprCircleAnimation {
+    animation-name: animateCircle;
+    transform-origin: center center;
+    animation-duration: 6s;
+    animation-fill-mode: forwards;
+    animation-iteration-count: 1;
+    // animation-iteration-count: infinite;
+  }
+}

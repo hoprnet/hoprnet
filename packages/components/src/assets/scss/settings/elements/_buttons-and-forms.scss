@@ -11,7 +11,7 @@ $button--color: (
 	button-dark: 		get-color(light, 1),
 	button-primary: 	get-color(light, 1),
 	button-secondary:	get-color(light, 1),
-	button-disabled: 	get-color(named, 1)
+	button-disabled: 	$hopr_white
 );
 
 // Buttons: background color
@@ -63,7 +63,7 @@ $button-loading--thickness:		2px;		// button loading spinner, stroke width (.but
 
 // Forms: color
 $form--color: (
-	input: 						get-color(named, 2),
+	input: 						$hopr_grey,
 	input-placeholder:		 	get-color(dark, 2),
 	label: 						get-color(dark, 2),
     check-radio: 				get-color(dark, 3),

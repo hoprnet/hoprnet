@@ -4,20 +4,20 @@
 $color: (
 	heading:				get-color(dark, 2),
 	base: 					get-color(dark, 2),
-	high-contrast: 			get-color(named, 4),
-	mid-contrast: 			get-color(named, 5),
-	low-contrast: 			get-color(named, 6),
-	primary:				get-color(named, 1),
-	secondary:				get-color(named, 1),
+	high-contrast: 			$hopr_bright_blue,
+	mid-contrast: 			$hopr_steel_blue,
+	low-contrast: 			$hopr_sky_blue,
+	primary:				$hopr_white,
+	secondary:				$hopr_white,
 	error:					get-color(alert, error),
 	warning:				get-color(alert, warning),
 	success:				get-color(alert, success),
 	// ↓ Inverted colors
 	heading-inverse:		get-color(light, 2),
 	base-inverse:			get-color(dark, 2),
-	high-contrast-inverse: 	get-color(named, 4),
-	mid-contrast-inverse: 	get-color(named, 5),
-	low-contrast-inverse: 	get-color(named, 6)
+	high-contrast-inverse: 	$hopr_bright_blue,
+	mid-contrast-inverse: 	$hopr_steel_blue,
+	low-contrast-inverse: 	$hopr_sky_blue
 );
 
 // Borders and dividers: color
@@ -30,16 +30,16 @@ $border--color: (
 $icon--color: (
 	hamburger:				get-color(dark, 2),			// hamburger icon
 	accordion:				get-color(primary, 1),		// accordion icon
-	social: 				get-color(named, 1),		// social icons
-	social-hover: 			get-color(named, 1),		// social icons (:hover)
+	social: 				$hopr_white,		// social icons
+	social-hover: 			$hopr_white,		// social icons (:hover)
 	modal:					get-color(dark, 3),			// modal icon
 	modal-hover:			get-color(dark, 2),			// modal icon (:hover)
     news-more:			    get-color(primary, 2),		// news - read more link arrow    
 	// ↓ Inverted colors
 	hamburger-inverse:		get-color(light, 2),		// hamburger icon
 	accordion-inverse:		get-color(light, 2),		// accordion icon
-	social-inverse: 				get-color(named, 3),		// social icons
-	social-hover-inverse: 			get-color(named, 3),		// social icons (:hover)
+	social-inverse: 				$hopr_dark_blue,		// social icons
+	social-hover-inverse: 			$hopr_dark_blue,		// social icons (:hover)
 );
 
 // Misc elements: background color
