@@ -13,8 +13,12 @@ export default class Tickets implements AbstractCommand {
    * @param query channelId string to send message to
    */
   async execute(query?: string): Promise<void> {
-    const { Balance } = this.node.paymentChannels.types
+    if (!query) {
+      console.log(chalk.red('This command takes a channel ID as a parameter'))
+      return
+    }
 
+    const { Balance } = this.node.paymentChannels.types
     const signedTickets: Map<string, Types.SignedTicket> = await this.node.paymentChannels.tickets.get(
       stringToU8a(query)
     )

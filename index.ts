@@ -111,7 +111,6 @@ async function runAsRegularNode() {
 
   rl.on('line', async (input: string) => {
     if (input == null || input == '') {
-      console.log(chalk.red('Unknown command!'))
       rl.prompt()
       return
     }
@@ -119,7 +118,6 @@ async function runAsRegularNode() {
     const [command, query]: (string | undefined)[] = input.trim().split(SPLIT_OPERAND_QUERY_REGEX).slice(1)
 
     if (command == null) {
-      console.log(chalk.red('Unknown command!'))
       rl.prompt()
       return
     }
@@ -218,7 +216,7 @@ async function main() {
 
   console.log('Successfully started HOPR Chat.\n')
   console.log(
-    `Your HOPR Chat node is available in the following addresses:\n ${node.peerInfo.multiaddrs.toArray().join('\n ')}\n`
+    `Your HOPR Chat node is available at the following addresses:\n ${node.peerInfo.multiaddrs.toArray().join('\n ')}\n`
   )
   console.log('Use the “help” command to see which commands are available.\n')
 
