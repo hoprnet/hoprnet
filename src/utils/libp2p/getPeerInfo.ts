@@ -124,7 +124,7 @@ async function recoverIdentity(serializedKeyPair: Uint8Array, pw?: string): Prom
   }
 
   while (!done) {
-    pw = await askForPassword('Please type in the passwort that was used to encrypt to key.')
+    pw = await askForPassword('Please type in the password that was used to encrypt to key.')
 
     try {
       peerId = await deserializeKeyPair(serializedKeyPair, new TextEncoder().encode(pw))
