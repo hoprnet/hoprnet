@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-demo-seeds",
-  "version": "1.0.1",
+  "version": "1.0.4",
   "description": "Demo seeds for HOPR testing",
   "license": "GPL-3.0-only",
   "scripts": {
@@ -19,12 +19,12 @@
     "messaging"
   ],
   "engines": {
-    "node": "^12",
-    "yarn": "^1.22"
+    "node": ">= 12.9.1",
+    "yarn": ">= 1.19.2"
   },
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
-  "homepage": "https://hoprnet.io",
+  "homepage": "https://hoprnet.org",
   "repository": {
     "type": "git",
     "url": "https://github.com/hoprnet/hopr-demo-seeds.git"

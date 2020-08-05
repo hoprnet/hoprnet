@@ -6,3 +6,6 @@
 
 # Exclude node stuff
 **/node_modules
+
+# Build stuff
+lib
