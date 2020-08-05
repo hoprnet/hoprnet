@@ -28,3 +28,7 @@ lib/
 # Exclude logs
 *.log
 log.txt
+
+# Exclude bin files
+hopr-chat
+*.zip

@@ -9,11 +9,12 @@
     "clean:build": "rimraf ./build",
     "clean:hopr-chat": "rimraf ./hopr-chat",
     "clean:all": "yarn clean:lib && yarn clean:hopr-chat && yarn util:clean:all",
-    "compile": "yarn clean:hopr-chat && yarn build && ncc build index.ts -o hopr-chat && copyfiles .env.develop .env.testnet .env start-hopr-chat.bat start-hopr-chat.sh start-hopr-chat.command hopr-chat",
+    "compile": "yarn clean:hopr-chat && yarn build && ncc build index.ts -o hopr-chat && copyfiles package.json .env.example start-hopr-chat.bat start-hopr-chat.sh start-hopr-chat.command hopr-chat && yarn util:compile",
     "test": "jest || echo '⚠️  Currently no tests available'",
     "util:clean:all": "rimraf .alice .bob",
     "util:create:alice": "mkdirp .alice && copyfiles -a lib/**/**/* .alice && copyfiles .env .alice/",
     "util:create:bob": "mkdirp .bob && copyfiles -a lib/**/**/* .bob && copyfiles .env .bob/",
+    "util:compile": "mkdirp hopr-chat/hopr-core && copyfiles node_modules/@hoprnet/hopr-core/package.json hopr-chat/hopr-core && move-file hopr-chat/.env.example hopr-chat/.env",
     "start": "node lib/index.js",
     "start:alice": "yarn util:create:alice && cd .alice && cross-env HOST_IPV4=0.0.0.0:9091 node lib/index.js -p alice 2>log.alice.txt",
     "start:bob": "yarn util:create:bob && cd .bob && cross-env HOST_IPV4=0.0.0.0:9092 node lib/index.js -p bob 2>log.bob.txt",
@@ -53,6 +54,7 @@
     "copyfiles": "^2.3.0",
     "cross-env": "^7.0.2",
     "mkdirp": "^1.0.4",
+    "move-file-cli": "^2.0.0",
     "rimraf": "^3.0.2"
   }
 }
