@@ -1,7 +1,7 @@
 {
   "name": "@hoprnet/hopr-chat",
-  "version": "1.2.0-develop",
-  "description": "",
+  "version": "1.2.1",
+  "description": "Interactive chat PoC for HOPR Protocol",
   "main": "src/index.ts",
   "scripts": {
     "build": "yarn clean:lib && tsc -p . --noEmit false",
