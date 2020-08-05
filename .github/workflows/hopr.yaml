@@ -69,10 +69,12 @@ jobs:
         run: git push --delete origin ${{ steps.get_version.outputs.version }}
       - name: Echo version tag
         run: 'echo "Version to Publish: ${{ steps.get_version.outputs.version }}"'
+      - name: Update package version
+        uses: technote-space/package-version-check-action@v1
       - name: Publish to NPM Registry
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           yarn policies set-version 1.19.2
-          npx np ${{ steps.get_version.outputs.version}} --any-branch --access public
+          npm publish --access public
