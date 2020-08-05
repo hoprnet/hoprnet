@@ -10,8 +10,8 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [12.9.1]
-        yarn-version: [1.19.2]
+        node-version: [12.9.1, 14.x]
+        yarn-version: [1.19.2, 14.x]
 
     steps:
       # Checkout, Cache and Setup Steps
