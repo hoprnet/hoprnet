@@ -1,73 +1,47 @@
 name: HOPR Workflow
-on:
-  push:
-    branches:
-      - 'feature/**'
-    tags:
-      - 'v*'
-  pull_request:
-    branches: [master, develop]
+on: [push, pull_request]
 
 jobs:
   build:
-    name: Build & Test
+    name: Build, Test
     runs-on: ubuntu-latest
 
     strategy:
       matrix:
-        node-version: [12.9.1]
-        yarn-version: [1.19.2]
+        node-version: [12.x, 14.x]
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v2
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node-version }}
       - name: Cache node_modules
         id: cache-modules
         uses: actions/cache@v1
         with:
           path: node_modules
-          key: ${{ runner.OS }}-build-${{ hashFiles(env.pkgPath) }}
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v1
-        with:
-          node-version: ${{ matrix.node-version }}
+          key: ${{ runner.OS }}-${{ matrix.node-version }}-build-${{ hashFiles(env.pkgPath) }}
       - name: Install node modules
         working-directory: ${{ env.workDir }}
-        if: steps.cache-modules.outputs.cache-hit != 'true' && steps.filter.outputs[matrix.repository] == 'true'
+        if: steps.cache-modules.outputs.cache-hit != 'true'
         run: |
-          yarn policies set-version ${{ matrix.yarn-version }}
           yarn install --frozen-lockfile
       - name: Build library
         working-directory: ${{ env.workDir }}
-        if: steps.filter.outputs[matrix.repository] == 'true'
         run: |
-          yarn policies set-version ${{ matrix.yarn-version }}
           yarn build
       - name: Test library
         working-directory: ${{ env.workDir }}
-        if: steps.filter.outputs[matrix.repository] == 'true'
         run: |
-          yarn policies set-version ${{ matrix.yarn-version }}
           yarn test
 
-  publish_core_npm:
-    if: startsWith(github.ref, 'refs/tags/')
+  publish:
+    name: Publish (NPM, Github)
 
-    name: Publish (NPM)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    needs: build
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-node@v1
-        with:
-          node-version: 12.9.1
-          registry-url: https://registry.npmjs.org/
-      - name: Update package version
-        uses: technote-space/package-version-check-action@v1
-      - name: Publish to NPM Registry
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          yarn policies set-version 1.19.2
-          npm publish --access public
+      - uses: actions/merge-release@v4.0.7
