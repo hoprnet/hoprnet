@@ -44,4 +44,5 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/merge-release@v4.0.7
+      - uses: mikeal/merge-release@v4.0.7
+
