@@ -3,15 +3,14 @@ name: Publish
 on:
   push:
     branches:
-      - 'releases/**'
+      - 'debug/**'
     tags:
       - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
 
 jobs:
   # core
-  setting_core_up:
-    name: Setting up core
-    if: startsWith(github.ref, 'refs/tags/')
+  setting_up:
+    name: Setting up chat
     runs-on: ubuntu-latest
     steps:
       # Checkout, Cache and Setup Steps
@@ -37,7 +36,6 @@ jobs:
   # chat
   build_chat_docker:
     name: Build HOPR Chat Docker
-    if: startsWith(github.ref, 'refs/heads/releases/chat')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -53,12 +51,10 @@ jobs:
       - name: Set Project for Google Cloud HOPR Association
         run: gcloud config set project ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
       - name: Building Docker image using Google Cloud Build
-        working-directory: chat
-        run: gcloud builds submit --tag gcr.io/hoprassociation/hopr-core:${{ env.RELEASE_NAME }}
+        run: gcloud builds submit --tag gcr.io/hoprassociation/hopr-chat:${{ env.RELEASE_NAME }}
 
   build_chat_binaries:
     name: Build HOPR Chat Binaries
-    if: startsWith(github.ref, 'refs/heads/releases/chat')
     strategy:
       matrix:
         os: [macos-latest, ubuntu-latest, windows-latest]
@@ -84,43 +80,38 @@ jobs:
         id: cache-modules
         uses: actions/cache@v1
         with:
-          path: chat/node_modules
-          key: ${{ runner.OS }}-build-${{ hashFiles('chat/package.json') }}
+          path: node_modules
+          key: ${{ runner.OS }}-build-${{ hashFiles('package.json') }}
       - name: Install node modules
-        working-directory: chat
         if: steps.cache-modules.outputs.cache-hit != 'true'
         run: yarn install --frozen-lockfile
       - name: Build project into nodejs app
-        working-directory: chat
         run: yarn build
       - name: Compile project into nodes bin
-        working-directory: chat
         run: yarn compile
       - name: Zip node binary for uploading
-        working-directory: chat
         run: yarn zip:${{ matrix.displayName }}
       - name: Upload binaries to GitHub workflow artifacts store
-        uses: actions/upload-artifact@v2-preview
+        uses: actions/upload-artifact@v2
         with:
           name: hopr-chat-nodebin-${{ matrix.displayName }}.zip
-          path: chat/hopr-chat-nodebin-${{ matrix.displayName }}.zip
+          path: hopr-chat-nodebin-${{ matrix.displayName }}.zip
 
   publish_chat_dist:
     name: Creates release with node binary per OS
-    if: startsWith(github.ref, 'refs/heads/releases/chat')
     runs-on: ubuntu-latest
     needs: [build_chat_binaries]
     steps:
       - name: Get HOPR Chat (linux)
-        uses: actions/download-artifact@master
+        uses: actions/download-artifact@v2
         with:
           name: hopr-chat-nodebin-linux.zip
       - name: Get HOPR Chat (windows)
-        uses: actions/download-artifact@master
+        uses: actions/download-artifact@v2
         with:
           name: hopr-chat-nodebin-windows.zip
       - name: Get HOPR Chat (macos)
-        uses: actions/download-artifact@master
+        uses: actions/download-artifact@v2
         with:
           name: hopr-chat-nodebin-macos.zip
       - name: Obtaining release from branch
