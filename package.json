@@ -14,8 +14,8 @@
     "yarn.lock"
   ],
   "engines": {
-    "node": "12.9.1",
-    "yarn": "1.19.2"
+    "node": ">=12.9.1",
+    "yarn": ">=1.19.2"
   },
   "scripts": {
     "build": "yarn clean && tsc -p . --noEmit false",
