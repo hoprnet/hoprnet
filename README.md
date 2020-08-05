@@ -1,10 +1,13 @@
-# HOPR Chat
-![Node.js CI](https://github.com/hoprnet/hopr-chat/workflows/Node.js%20CI/badge.svg)
+<p align="center"><a href="https://vuejs.org" target="_blank" rel="noopener noreferrer"><img width="100" src="https://github.com/hoprnet/hopr-assets/blob/master/v1/logo/hopr_logo_padded.png?raw=true" alt="HOPR Logo"></a></p>
+<p align="center">
+  <a href="https://github.com/hoprnet/hopr-core/actions?query=workflow%3A%22Node.js+CI%22"><img src="https://github.com/hoprnet/hopr-chat/workflows/Node.js%20CI/badge.svg" alt="Build Status"></a>
+</p>
+<h2 align="center">HOPR Chat</h2>
 
 HOPR Chat is a proof of concept and demo application, showing of the
-capabilities of the [HOPR](https://github.com/hoprnet/hopr-core) network.
+capabilities of the [HOPR](https://github.com/hoprnet/hopr-core) protocol, allow you to start a **HOPR Node** and connect to the **HOPR Network**.
 
-[docker image](https://hub.docker.com/r/hopr/chat)
+[Docker image](https://hub.docker.com/r/hopr/chat)
 
 ## Running
 
