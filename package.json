@@ -25,7 +25,7 @@
     "prepare": "yarn build"
   },
   "dependencies": {
-    "@hoprnet/hopr-demo-seeds": "^1.0.3-refactor.3ad82ff",
+    "@hoprnet/hopr-demo-seeds": "hoprnet/hopr-demo-seeds#develop",
     "ganache-core": "^2.10.2"
   },
   "devDependencies": {
