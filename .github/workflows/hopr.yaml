@@ -62,13 +62,6 @@ jobs:
         with:
           node-version: 12.9.1
           registry-url: https://registry.npmjs.org/
-      - name: Get version tag
-        id: get_version
-        run: echo ::set-output name=version::${GITHUB_REF#refs/tags/}
-      - name: Delete version tag
-        run: git push --delete origin ${{ steps.get_version.outputs.version }}
-      - name: Echo version tag
-        run: 'echo "Version to Publish: ${{ steps.get_version.outputs.version }}"'
       - name: Update package version
         uses: technote-space/package-version-check-action@v1
       - name: Publish to NPM Registry
