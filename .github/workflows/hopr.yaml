@@ -44,5 +44,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: mikeal/merge-release@v4.0.7
-
+      - name: Automated releases for npm packages.
+        uses: mikeal/merge-release@v4.0.7
+        working-directory: ${{ env.workDir }}
