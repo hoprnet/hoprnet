@@ -7,7 +7,11 @@
 HOPR Chat is a proof of concept and demo application, showing of the
 capabilities of the [HOPR](https://github.com/hoprnet/hopr-core) protocol, allow you to start a **HOPR Node** and connect to the **HOPR Network**.
 
-[Docker image](https://hub.docker.com/r/hopr/chat)
+## Docker Images
+
+- Stable - [Docker Hub](https://hub.docker.com/r/hopr/chat)
+- Alpha - [Google Registry](https://gcr.io/hoprassociation/hopr-chat)
+
 
 ## Running
 

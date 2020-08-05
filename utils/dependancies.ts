@@ -9,10 +9,15 @@ const corePkg = readPkgUp.sync({
   cwd: join(__dirname, '..', 'node_modules', '@hoprnet', 'hopr-core'),
 })
 
-console.log(pkg.packageJson)
-console.log(corePkg.packageJson)
+const runtimePkg = readPkgUp.sync({
+  cwd: join(__dirname, '.'),
+})
 
-export default {
+const runtimeCorePkg = readPkgUp.sync({
+  cwd: join(__dirname, '.', 'hopr-core'),
+})
+
+const dependencies = ((pkg, corePkg) => ({
   // chat
   '@hoprnet/hopr-chat': pkg.packageJson.version,
   '@hoprnet/hopr-core': pkg.packageJson.dependencies['@hoprnet/hopr-core'],
@@ -20,4 +25,6 @@ export default {
   '@hoprnet/hopr-core-connector-interface': pkg.packageJson.dependencies['@hoprnet/hopr-core-connector-interface'],
   // core
   '@hoprnet/hopr-core-ethereum': corePkg.packageJson.dependencies['@hoprnet/hopr-core-ethereum'],
-}
+}))(pkg || runtimePkg, corePkg || runtimeCorePkg)
+
+export default dependencies;
