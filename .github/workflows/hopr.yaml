@@ -73,4 +73,4 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           yarn policies set-version 1.19.2
-          np ${{ steps.get_version.outputs.version}} --access public
+          npx np ${{ steps.get_version.outputs.version}} --access public
