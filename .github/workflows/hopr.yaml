@@ -1,7 +1,10 @@
+name: HOPR Workflow
 on:
   push:
     branches:
       - 'feature/**'
+    tags:
+      - 'v*'
   pull_request:
     branches: [master, develop]
 
