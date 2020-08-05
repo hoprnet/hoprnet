@@ -56,28 +56,29 @@ export function randomSubset<T>(array: T[], subsetSize: number, filter?: (candid
   let chosen = new Set<number>()
   let found: boolean
   let breakUp = false
+  let arrLength = array.length
 
   let index: number
   for (let i = 0; i < subsetSize && !breakUp; i++) {
-    index = randomInteger(0, array.length)
+    index = randomInteger(0, arrLength)
 
     found = false
 
     do {
       while (chosen.has(index) || notChosen.has(index)) {
-        index = (index + 1) % array.length
+        index = (index + 1) % arrLength
       }
 
       if (filter != null && !filter(array[index])) {
         notChosen.add(index)
-        index = (index + 1) % array.length
+        index = (index + 1) % arrLength
         found = false
       } else {
         chosen.add(index)
         found = true
       }
 
-      if (notChosen.size + chosen.size == array.length) {
+      if (notChosen.size + chosen.size == arrLength) {
         breakUp = true
         break
       }
@@ -89,5 +90,6 @@ export function randomSubset<T>(array: T[], subsetSize: number, filter?: (candid
     result.push(array[index])
   }
 
-  return result
+  // Reshuffle items from (ordered) Set
+  return result.length > 0 ? randomPermutation(result) : result
 }

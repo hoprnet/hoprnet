@@ -1,6 +1,5 @@
 import { u8aAllocate } from './allocate'
-import { range } from 'ramda'
-import { expect } from 'chai'
+import { randomInteger } from '../randomInteger'
 
 describe('test u8aAllocate spec', function () {
   const BUFFER_LENGTH = 10
@@ -11,7 +10,8 @@ describe('test u8aAllocate spec', function () {
 
   it('should not throw an error if the added page is smaller than the given offset', () => {
     const offset = BUFFER_LENGTH / 2
-    const arrayHalfPage = new Uint8Array(range(0, offset))
-    expect(() => u8aAllocate({ page, offset }, arrayHalfPage)).to.not.throw()
+    const arrayHalfPage = new Uint8Array(randomInteger(0, offset))
+    
+    u8aAllocate({ page, offset }, arrayHalfPage)
   })
 })
