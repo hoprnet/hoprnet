@@ -5,7 +5,7 @@ import Substack from '../elements/Substack'
 
 const Contact = props => {
   return (
-    <GenericSection {...props} topDivider>
+    <GenericSection {...props}>
       <div className="container-sm">
         <SectionHeader
           data={{

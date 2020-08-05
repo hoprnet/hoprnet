@@ -10,6 +10,12 @@
   cursor: url(getCursorUri('%23000050', 16)) 16 16, auto !important;
 }
 
+// overwrite various cursors
+
 a {
+  cursor: url(getCursorUri('%230000b4', 16)) 16 16, auto !important;
+}
+
+.accordion-header {
   cursor: url(getCursorUri('%230000b4', 16)) 16 16, auto !important;
 }
