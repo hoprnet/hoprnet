@@ -52,15 +52,15 @@
 
 // Text color
 .text-color-high {
-	color: color(high-contrast);
+	color: color(high-contrast) !important;
 }
 
 .text-color-mid {
-	color: color(mid-contrast);
+	color: color(mid-contrast) !important;
 }
 
 .text-color-low {
-	color: color(low-contrast);
+	color: color(low-contrast) !important;
 }
 
 .text-color-primary {

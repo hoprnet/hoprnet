@@ -1,4 +1,4 @@
-@keyframes animateCircle {
+@keyframes bounceCircle {
   0% {
     opacity: 1;
     transform: translate(0%, 50%) scale(0.5);
@@ -29,44 +29,48 @@
   }
 }
 
-// branding agency animation
-// @keyframes animateCircle {
-//   0% {
-//     opacity: 1;
-//     transform: translate(10%, 10%) scale(1);
-//   }
-//   25% {
-//     opacity: 1;
-//     transform: translate(10%, 10%) scale(1);
-//   }
-//   35% {
-//     opacity: 1;
-//     transform: translate(10%, 10%) scale(0.5);
-//   }
-//   50% {
-//     opacity: 1;
-//     transform: translate(100%, -20%) scale(0.5);
-//   }
-//   75% {
-//     opacity: 1;
-//     transform: translate(0%, 20%) scale(0.5);
-//   }
-//   95% {
-//     opacity: 1;
-//     transform: translate(0%, 20%) scale(0.005);
-//   }
-//   96% {
-//     opacity: 0;
-//   }
-//   100% {
-//     visibility: hidden;
-//     opacity: 0;
-//   }
-// }
+@keyframes slideCircle {
+  0% {
+    opacity: 1;
+    transform: translate(0%, 0%) scale(0.3);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(40%, 50%) scale(0.3);
+  }
+  60% {
+    opacity: 1;
+    transform: translate(40%, 50%) scale(0.3);
+  }
+  95% {
+    opacity: 1;
+    transform: translate(100%, 20%) scale(0.3);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(100%, 0%) scale(0.3);
+  }
+}
+
+@mixin bounceAnimation() {
+  transform-origin: center center;
+  animation-duration: 6s;
+  animation-fill-mode: forwards;
+  animation-iteration-count: 1;
+  animation-name: bounceCircle;
+}
+
+@mixin slideAnimation() {
+  transform-origin: center center;
+  animation-duration: 3s;
+  animation-fill-mode: forwards;
+  animation-iteration-count: 1;
+  animation-name: slideCircle;
+}
 
 .hoprCircle {
   position: absolute;
-  margin-left: -600px;
+  margin-left: -50%;
   left: 50%;
   opacity: 0;
   z-index: 15;
@@ -76,13 +80,12 @@
   }
 }
 
-@include media('>=medium') {
-  .hoprCircleAnimation {
-    animation-name: animateCircle;
-    transform-origin: center center;
-    animation-duration: 6s;
-    animation-fill-mode: forwards;
-    animation-iteration-count: 1;
-    // animation-iteration-count: infinite;
+.hoprCircleAnimation {
+  @include media('>=medium') {
+    @include bounceAnimation();
+  }
+
+  @include media('<=small') {
+    @include slideAnimation();
   }
 }
