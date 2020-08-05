@@ -10,8 +10,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [12.9.1]
-        yarn-version: [1.19.2]
+        node-version: [12.x, 14.x]
 
     steps:
       # Checkout, Cache and Setup Steps
@@ -22,7 +21,7 @@ jobs:
         uses: actions/cache@v1
         with:
           path: node_modules
-          key: ${{ runner.OS }}-build-${{ hashFiles('package.json') }}
+          key: ${{ runner.OS }}-build-${{ hashFiles('package-lock.json') }}
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v1
         with:

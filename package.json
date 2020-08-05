@@ -18,8 +18,8 @@
     "migrations/"
   ],
   "engines": {
-    "yarn": "1.19.2",
-    "node": "12.9.1"
+    "yarn": ">= 1.19.2",
+    "node": ">= 12.9.1"
   },
   "scripts": {
     "build": "ts-node -T ./scripts/cli.ts build",
