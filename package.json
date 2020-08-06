@@ -52,7 +52,7 @@
     "web3": "^1.2.7"
   },
   "devDependencies": {
-    "@hoprnet/hopr-testing": "0.1.2",
+    "@hoprnet/hopr-testing": "0.2.0",
     "@types/chai": "^4.2.11",
     "@types/mocha": "^7.0.2",
     "@types/node": "^13.13.4",
