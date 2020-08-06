@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-server",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "gRPC Server wrapper around HOPR Node",
   "license": "GPL-3.0-only",
   "main": "dist/main.js",
