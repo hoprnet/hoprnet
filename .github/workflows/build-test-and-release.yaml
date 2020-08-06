@@ -52,6 +52,17 @@ jobs:
         with:
           node-version: '12'
           registry-url: https://registry.npmjs.org/
+      - name: Cache node_modules
+        id: cache-modules
+        uses: actions/cache@v1
+        with:
+          path: node_modules
+          key: ${{ runner.OS }}-${{ matrix.node-version }}-build-${{ hashFiles(env.pkgPath) }}
+      - name: Install node modules
+        working-directory: ${{ env.workDir }}
+        if: steps.cache-modules.outputs.cache-hit != 'true'
+        run: |
+          yarn install --frozen-lockfile
       - name: Use Master
         run: git fetch origin && git checkout master
       - name: Set name / email for commit
@@ -88,6 +99,17 @@ jobs:
         with:
           node-version: '12'
           registry-url: https://registry.npmjs.org/
+      - name: Cache node_modules
+        id: cache-modules
+        uses: actions/cache@v1
+        with:
+          path: node_modules
+          key: ${{ runner.OS }}-${{ matrix.node-version }}-build-${{ hashFiles(env.pkgPath) }}
+      - name: Install node modules
+        working-directory: ${{ env.workDir }}
+        if: steps.cache-modules.outputs.cache-hit != 'true'
+        run: |
+          yarn install --frozen-lockfile
       - name: Use Master
         run: git fetch origin && git checkout master
       - name: Set name / email for commit
@@ -125,6 +147,17 @@ jobs:
         with:
           node-version: '12'
           registry-url: https://registry.npmjs.org/
+      - name: Cache node_modules
+        id: cache-modules
+        uses: actions/cache@v1
+        with:
+          path: node_modules
+          key: ${{ runner.OS }}-${{ matrix.node-version }}-build-${{ hashFiles(env.pkgPath) }}
+      - name: Install node modules
+        working-directory: ${{ env.workDir }}
+        if: steps.cache-modules.outputs.cache-hit != 'true'
+        run: |
+          yarn install --frozen-lockfile
       - name: Use Master
         run: git fetch origin && git checkout master
       - name: Set name / email for commit
