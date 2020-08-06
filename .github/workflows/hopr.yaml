@@ -40,7 +40,7 @@ jobs:
     name: Publish Minor Version Bump(NPM, Github)
     needs: build
 
-    if: github.event_name == 'pull_request' && matrix.node-version == '12.x' # && github.ref == 'refs/heads/master' && contains(github.event.pull_request.labels.*.name, 'minor')
+    if: github.event_name == 'pull_request' # && github.ref == 'refs/heads/master' && contains(github.event.pull_request.labels.*.name, 'minor')
 
     runs-on: ubuntu-latest
     steps:
