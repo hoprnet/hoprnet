@@ -49,6 +49,8 @@ jobs:
         run: git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Versioning robot"
       - name: Bump package.json
         run: npm version minor
+      - name: Show Diff
+        run: git diff
       - name: Commit back to master
         run: git fetch origin && git pull origin master && git push origin HEAD:master
 
