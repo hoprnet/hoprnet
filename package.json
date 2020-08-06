@@ -46,7 +46,7 @@
     "@truffle/hdwallet-provider": "^1.0.34",
     "bignumber.js": "^9.0.0",
     "dotenv": "^8.2.0",
-    "truffle": "^5.1.23",
+    "truffle": "^5.1.25",
     "truffle-plugin-verify": "^0.3.10",
     "ts-node": "^8.9.1",
     "web3": "^1.2.7"
