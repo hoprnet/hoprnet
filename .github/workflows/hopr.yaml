@@ -36,17 +36,22 @@ jobs:
         run: |
           yarn test
 
-  publish:
-    name: Publish (NPM, Github)
-
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+  publish_minor:
+    name: Publish Minor Version Bump(NPM, Github)
     needs: build
-    runs-on: ubuntu-latest
 
+    #if: github.event_name == 'push' && github.ref == 'refs/heads/master' && contains(github.event.pull_request.labels.*.name, 'minor')
+
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: Automated releases for npm packages.
-        uses: mikeal/merge-release@v4.0.7
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Bump package.json
+        run: npm version minor
+      - name: Commit back to master
+        run: git push origin master
+
+      #- name: NPM Publish
+      #  run: npm publish
+      #  env:
+      #    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #    NPM_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
