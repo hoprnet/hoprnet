@@ -50,7 +50,7 @@ jobs:
       - name: Bump package.json
         run: npm version minor
       - name: Commit back to master
-        run: git fetch origin && git push origin master
+        run: git fetch origin && git push origin HEAD:master
 
       #- name: NPM Publish
       #  run: npm publish
