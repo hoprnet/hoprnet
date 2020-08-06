@@ -1,10 +1,13 @@
 {
   "name": "@hoprnet/hopr-server",
   "version": "0.0.1",
-  "description": "",
-  "author": "",
-  "private": true,
+  "description": "gRPC Server wrapper around HOPR Node",
   "license": "GPL-3.0-only",
+  "files": [
+    "dist",
+    "package.json",
+    "README.md"
+  ],
   "scripts": {
     "prebuild": "rimraf dist",
     "build": "nest build",
