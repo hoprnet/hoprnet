@@ -14,13 +14,11 @@ const FooterNav = ({ className, ...props }) => {
         <li>
           <Link to="/who-is-HOPR#about">About us</Link>
         </li>
-        {/* <li>
-          <Link to="/faqs/" >
-            FAQ's
-          </Link>
-        </li> */}
         <li>
-          <Link to="/do-business-with-HOPR#for_you">Support</Link>
+          <Link to="/support">Support</Link>
+        </li>
+        <li>
+          <Link to="/support#faq">FAQ</Link>
         </li>
         <li>
           <Link to="/disclaimer">Disclaimer</Link>

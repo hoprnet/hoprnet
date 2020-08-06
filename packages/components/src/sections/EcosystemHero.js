@@ -37,7 +37,7 @@ const Ecosystem = props => {
             </h2>
 
             <div className="cards-container">
-              <div className="mb-32 reveal-from-left" data-reveal-delay="200" style={{ backgroundColor: '#003A4B' }}>
+              <div className="mb-32 reveal-from-left" data-reveal-delay="200" style={{ backgroundColor: '#000050' }}>
                 <a href="#personal">
                   <div className="tiles-item-inner">
                     <div className="features-tiles-item-header">
@@ -63,7 +63,7 @@ const Ecosystem = props => {
                 </a>
               </div>
 
-              <div className="mb-32 reveal-from-left" data-reveal-delay="200" style={{ backgroundColor: '#005A73' }}>
+              <div className="mb-32 reveal-from-left" data-reveal-delay="200" style={{ backgroundColor: '#000050' }}>
                 <a href="#professional">
                   <div className="tiles-item-inner">
                     <div className="features-tiles-item-header">
@@ -113,7 +113,7 @@ const Ecosystem = props => {
             </div>
 
             <div className="cards-container mt-32">
-              <div style={{ backgroundColor: '#53A3B9' }}>
+              <div className="card">
                 <h4>Beach Level:</h4>
                 Tackle our technical bounties on{' '}
                 <a href="/layer0-data-privacy#bounties" className="underline">
@@ -121,15 +121,15 @@ const Ecosystem = props => {
                 </a>{' '}
                 and receive $ + HOPR Token
               </div>
-              <div style={{ backgroundColor: '#164856' }}>
+              <div className="card">
                 <h4>Alpine Level:</h4>
                 Hack your project and get rewarded during an upcoming HOPR Hackathon{' '}
                 <a href="/layer0-data-privacy#bounties" className="underline">
                   Gitcoin
                 </a>
               </div>
-              <div style={{ backgroundColor: 'white', color: 'rgb(22, 72, 86)' }}>
-                <h4 style={{ color: 'rgb(22, 72, 86)' }}>Moon Level:</h4>
+              <div className="card">
+                <h4>Moon Level:</h4>
                 More exciting opportunities: Coming up September 2020
               </div>
             </div>
@@ -142,7 +142,7 @@ const Ecosystem = props => {
             <div className="header section-header reveal-from-top" data-reveal-delay="150">
               <div className="features-tiles-item-image">
                 <Image
-                  src={require('../assets/images/icons/with-blue-stroke/building-modern.png')}
+                  src={require('../assets/images/icons/with-yellow-ball/building-modern.png')}
                   alt="Modern Building Icon"
                   width={56}
                   height={56}
@@ -162,7 +162,7 @@ const Ecosystem = props => {
                 <Tab tabId="tab-a" className="is-active">
                   <div className="blogs-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="50">
                     <Image
-                      src={require('../assets/images/icons/with-blue-stroke/ambulance-call.png')}
+                      src={require('../assets/images/icons/with-yellow-ball/ambulance-call.png')}
                       alt="Call Icon"
                     />
                   </div>
@@ -173,7 +173,7 @@ const Ecosystem = props => {
                 <Tab tabId="tab-b" className="is-active">
                   <div className="blogs-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="100">
                     <Image
-                      src={require('../assets/images/icons/with-blue-stroke/server-settings.png')}
+                      src={require('../assets/images/icons/with-yellow-ball/server-settings.png')}
                       alt="Lock Icon"
                     />
                   </div>
@@ -184,7 +184,7 @@ const Ecosystem = props => {
                 <Tab tabId="tab-c" className="is-active">
                   <div className="blogs-tabs-tab-image mb-12 reveal-fade" data-reveal-offset="150">
                     <Image
-                      src={require('../assets/images/icons/with-blue-stroke/monetization-sponsor.png')}
+                      src={require('../assets/images/icons/with-yellow-ball/monetization-sponsor.png')}
                       alt="Programming Team Icon"
                     />
                   </div>

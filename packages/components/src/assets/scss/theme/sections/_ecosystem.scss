@@ -48,6 +48,12 @@
       height: 300px;
       border-radius: 60px;
       padding: 20px;
+      background-color: $hopr_dark_blue;
+
+      color: white !important;
+      * {
+        color: white !important;
+      }
     }
   }
 
