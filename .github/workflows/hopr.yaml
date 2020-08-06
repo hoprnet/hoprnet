@@ -36,17 +36,60 @@ jobs:
         run: |
           yarn test
 
-  publish:
-    name: Publish (NPM, Github)
-
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+  publish_minor:
+    name: Publish Minor Version Bump in Master (NPM, Github)
     needs: build
-    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true && !contains(github.event.pull_request.labels.*.name, 'major') && !contains(github.event.pull_request.labels.*.name, 'patch')
 
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: Automated releases for npm packages.
-        uses: mikeal/merge-release@v4.0.7
+      - name: Use Master
+        run: git fetch origin && git checkout master
+      - name: Set name / email for commit
+        run: git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Versioning robot"
+      - name: Bump package.json
+        run: npm version minor
+      - name: Commit back to master
+        run: git push origin master
+      - name: NPM Publish
+        run: npm publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Github release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+
+  publish_major:
+    name: Publish Major Version Bump in Master (NPM, Github)
+    needs: build
+    if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'major')
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Use Master
+        run: git fetch origin && git checkout master
+      - name: Set name / email for commit
+        run: git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Versioning robot"
+      - name: Bump package.json
+        run: npm version major
+      - name: Commit back to master
+        run: git push origin master
+      - name: NPM Publish
+        run: npm publish
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Github release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
