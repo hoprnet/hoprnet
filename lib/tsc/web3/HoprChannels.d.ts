@@ -70,6 +70,7 @@ export class HoprChannels extends Contract {
 
     redeemTicket(
       pre_image: string | number[],
+      channel_id: string | number[],
       secret_a: string | number[],
       secret_b: string | number[],
       amount: number | string,
@@ -132,8 +133,10 @@ export class HoprChannels extends Contract {
     SecretHashSet: ContractEvent<{
       account: string;
       secretHash: string;
+      counter: string;
       0: string;
       1: string;
+      2: string;
     }>;
     allEvents: (
       options?: EventOptions,

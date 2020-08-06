@@ -1,6 +1,7 @@
 import type { Types } from '@hoprnet/hopr-core-connector-interface';
 import { ChannelBalance, Moment } from '.';
 import { Uint8ArrayE } from '../types/extended';
+import { Signature } from '@hoprnet/hopr-core-connector-interface/src/types';
 export declare enum ChannelStatus {
     UNINITIALISED = 0,
     FUNDING = 1,
@@ -21,6 +22,10 @@ declare class Channel extends Uint8ArrayE implements Types.Channel {
     get stateCounter(): number;
     get status(): ChannelStatus;
     get hash(): Promise<import("./hash").default>;
+    sign(privKey: Uint8Array, pubKey: Uint8Array, arr?: {
+        bytes: ArrayBuffer;
+        offset: number;
+    }): Promise<Signature>;
     static get SIZE(): number;
     static createFunded(balance: ChannelBalance): Channel;
     static createActive(balance: ChannelBalance): Channel;

@@ -1,11 +1,13 @@
 import assert from 'assert'
 import BN from 'bn.js'
 import Web3 from 'web3'
-import { Ganache, migrate, fund } from '@hoprnet/hopr-ethereum'
+import { Ganache } from '@hoprnet/hopr-testing'
+import { migrate, fund } from '@hoprnet/hopr-ethereum'
 import { durations } from '@hoprnet/hopr-utils'
 import { stringToU8a } from '@hoprnet/hopr-utils'
 import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
 import HoprChannelsAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprChannels.json'
+import * as testconfigs from '../config.spec'
 import * as configs from '../config'
 import { getParties, time, wait } from '../utils'
 import { Account, getPrivKeyData, createAccountAndFund, createNode } from '../utils/testing'
@@ -31,19 +33,19 @@ describe('test indexer', function () {
 
     await ganache.start()
     await migrate()
-    await fund()
+    await fund(4)
 
     web3 = new Web3(configs.DEFAULT_URI)
     hoprToken = new web3.eth.Contract(HoprTokenAbi as any, configs.TOKEN_ADDRESSES.private)
     hoprChannels = new web3.eth.Contract(HoprChannelsAbi as any, configs.CHANNELS_ADDRESSES.private)
 
-    userA = await getPrivKeyData(stringToU8a(configs.FUND_ACCOUNT_PRIVATE_KEY))
+    userA = await getPrivKeyData(stringToU8a(testconfigs.FUND_ACCOUNT_PRIVATE_KEY))
     // userA < userB
-    userB = await createAccountAndFund(web3, hoprToken, userA, configs.DEMO_ACCOUNTS[1])
+    userB = await createAccountAndFund(web3, hoprToken, userA, testconfigs.DEMO_ACCOUNTS[1])
     // userC < userA
-    userC = await createAccountAndFund(web3, hoprToken, userA, configs.DEMO_ACCOUNTS[2])
+    userC = await createAccountAndFund(web3, hoprToken, userA, testconfigs.DEMO_ACCOUNTS[2])
     //
-    userD = await createAccountAndFund(web3, hoprToken, userA, configs.DEMO_ACCOUNTS[3])
+    userD = await createAccountAndFund(web3, hoprToken, userA, testconfigs.DEMO_ACCOUNTS[3])
     connector = await createNode(userA.privKey)
 
     await connector.start()

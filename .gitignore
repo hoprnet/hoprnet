@@ -19,3 +19,6 @@ src/tsc/web3
 # Exclude built tests
 lib/**/*.spec.js
 lib/**/*.spec.d.ts
+
+# Exclude sourcemap
+lib/**/*.js.map

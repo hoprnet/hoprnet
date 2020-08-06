@@ -109,12 +109,19 @@ export declare function waitFor({ web3, network, getCurrentBlock, timestamp, }: 
     timestamp?: number;
 }): Promise<void>;
 /**
+ * Get chain ID.
+ *
+ * @param web3 a web3 instance
+ * @returns the chain ID
+ */
+export declare function getChainId(web3: Web3): Promise<number>;
+/**
  * Get current network's name.
  *
  * @param web3 a web3 instance
  * @returns the network's name
  */
-export declare function getNetworkId(web3: Web3): Promise<addresses.Networks>;
+export declare function getNetworkName(chainId: number): addresses.Networks;
 /**
  * Convert a state count (one received from on-chain),
  * to an enumarated representation.
@@ -130,8 +137,8 @@ export declare function stateCountToStatus(stateCount: number): ChannelStatus;
  * @param privKey the private key to sign transactions with
  * @returns signer
  */
-export declare function TransactionSigner(web3: Web3, privKey: Uint8Array): <T extends unknown>(txObject: TransactionObject<T>, txConfig: TransactionConfig) => Promise<{
-    send: () => PromiEvent<import("web3-core-helpers").TransactionRevertInstructionError | TransactionReceipt>;
+export declare function TransactionSigner(web3: Web3, privKey: Uint8Array): <T>(txObject: TransactionObject<T>, txConfig: TransactionConfig) => Promise<{
+    send: () => PromiEvent<TransactionReceipt>;
     transactionHash: string;
 }>;
 /**
@@ -150,3 +157,18 @@ export declare function Log(prefixes?: string[]): Debug.Debugger;
  * @param fn a function to wait for
  */
 export declare function cleanupPromiEvent<E extends ContractEventEmitter<any>, R extends Promise<any>>(event: E, fn: (event: E) => R): Promise<R>;
+/**
+ * Get r,s,v values of a signature
+ */
+export declare function getSignatureParameters(signature: Signature): {
+    r: Uint8Array;
+    s: Uint8Array;
+    v: number;
+};
+/**
+ * Create a challange by concatinating and then hashing the secrets.
+ * @param secretA
+ * @param secretB
+ * @returns a promise that resolves to a hash
+ */
+export declare function createChallage(secretA: Uint8Array, secretB: Uint8Array): Promise<Hash>;

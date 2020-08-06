@@ -1,12 +1,11 @@
 import secp256k1 from 'secp256k1'
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
-import { u8aConcat } from '@hoprnet/hopr-utils'
-import { Signature, Channel } from '.'
+import Signature from './signature'
+import Channel from './channel'
 import { Uint8ArrayE } from '../types/extended'
-import { sign, verify } from '../utils'
-import type HoprEthereum from '..'
+import { verify } from '../utils'
 
-class SignedChannel extends Uint8ArrayE implements Types.SignedChannel<Channel, Signature> {
+class SignedChannel extends Uint8ArrayE implements Types.SignedChannel {
   private _signature?: Signature
   private _channel?: Channel
 
@@ -16,39 +15,51 @@ class SignedChannel extends Uint8ArrayE implements Types.SignedChannel<Channel, 
       offset: number
     },
     struct?: {
-      signature: Signature
-      channel: Channel
+      signature?: Signature
+      channel?: Channel
     }
   ) {
-    if (arr != null && struct == null) {
-      super(arr.bytes, arr.offset, SignedChannel.SIZE)
-    } else if (arr == null && struct != null) {
-      super(u8aConcat(struct.signature, struct.channel))
+    if (arr == null) {
+      super(SignedChannel.SIZE)
     } else {
-      throw Error(`Invalid constructor arguments.`)
+      super(arr.bytes, arr.offset, SignedChannel.SIZE)
     }
+
+    if (struct != null) {
+      if (struct.channel != null) {
+        this.set(struct.channel.toU8a(), this.channelOffset - this.byteOffset)
+      }
+
+      if (struct.signature) {
+        this.set(struct.signature, this.signatureOffset - this.byteOffset)
+      }
+    }
+  }
+
+  get signatureOffset(): number {
+    return this.byteOffset
   }
 
   get signature() {
     if (this._signature == null) {
-      const signature = this.subarray(0, Signature.SIZE)
-
       this._signature = new Signature({
-        bytes: signature.buffer,
-        offset: signature.byteOffset,
+        bytes: this.buffer,
+        offset: this.signatureOffset,
       })
     }
 
     return this._signature
   }
 
+  get channelOffset(): number {
+    return this.byteOffset + Signature.SIZE
+  }
+
   get channel() {
     if (this._channel == null) {
-      const channel = this.subarray(Signature.SIZE, Signature.SIZE + Channel.SIZE)
-
       this._channel = new Channel({
-        bytes: channel.buffer,
-        offset: channel.byteOffset,
+        bytes: this.buffer,
+        offset: this.channelOffset,
       })
     }
 
@@ -56,54 +67,34 @@ class SignedChannel extends Uint8ArrayE implements Types.SignedChannel<Channel, 
   }
 
   get signer(): Promise<Uint8Array> {
-    return this.channel.hash.then((channelHash) => {
-      return secp256k1.ecdsaRecover(this.signature.signature, this.signature.recovery, channelHash)
+    return new Promise<Uint8Array>(async (resolve, reject) => {
+      try {
+        resolve(secp256k1.ecdsaRecover(this.signature.signature, this.signature.recovery, await this.channel.hash))
+      } catch (err) {
+        reject(err)
+      }
     })
   }
 
-  async verify(coreConnector: HoprEthereum) {
-    return await verify(this.channel.toU8a(), this.signature, coreConnector.self.publicKey)
+  async verify(publicKey: Uint8Array) {
+    return await verify(await this.channel.hash, this.signature, publicKey)
   }
 
   static get SIZE() {
     return Signature.SIZE + Channel.SIZE
   }
 
-  static async create(
-    coreConnector: HoprEthereum,
+  static create(
     arr?: {
       bytes: ArrayBuffer
       offset: number
     },
     struct?: {
-      channel: Channel
       signature?: Signature
+      channel?: Channel
     }
   ): Promise<SignedChannel> {
-    const emptySignatureArray = new Uint8Array(Signature.SIZE).fill(0x00)
-    let signedChannel: SignedChannel
-
-    if (typeof arr !== 'undefined') {
-      signedChannel = new SignedChannel(arr)
-    } else if (typeof struct !== 'undefined') {
-      signedChannel = new SignedChannel(undefined, {
-        channel: struct.channel,
-        signature:
-          struct.signature ||
-          new Signature({
-            bytes: emptySignatureArray.buffer,
-            offset: emptySignatureArray.byteOffset,
-          }),
-      })
-    } else {
-      throw Error(`Invalid input parameters.`)
-    }
-
-    if (signedChannel.signature.eq(emptySignatureArray)) {
-      signedChannel.set(await sign(await signedChannel.channel.hash, coreConnector.self.privateKey), 0)
-    }
-
-    return signedChannel
+    return Promise.resolve(new SignedChannel(arr, struct))
   }
 }
 

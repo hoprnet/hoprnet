@@ -21,7 +21,7 @@ jobs:
         uses: actions/cache@v1
         with:
           path: node_modules
-          key: ${{ runner.OS }}-build-${{ hashFiles('package.json') }}
+          key: ${{ runner.OS }}-build-${{ hashFiles('package-lock.json') }}
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v1
         with:
@@ -30,8 +30,14 @@ jobs:
       # Building and testing library
       - name: Install node modules
         if: steps.cache-modules.outputs.cache-hit != 'true'
-        run: yarn install --frozen-lockfile
+        run: |
+          yarn policies set-version ${{ matrix.yarn-version }}
+          yarn install --frozen-lockfile
       - name: Build library
-        run: yarn build
+        run: |
+          yarn policies set-version ${{ matrix.yarn-version }}
+          yarn build
       - name: Test library
-        run: yarn test
+        run: |
+          yarn policies set-version ${{ matrix.yarn-version }}
+          yarn test

@@ -1,12 +1,38 @@
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
 import { stringToU8a, u8aToHex } from '@hoprnet/hopr-utils'
-import { Hash, TicketEpoch, Balance, SignedTicket } from '.'
+import { Hash, TicketEpoch, Balance, Signature } from '.'
 import { Uint8ArrayE } from '../types/extended'
-import { sign, verify, hash } from '../utils'
-import type ChannelInstance from '../channel'
+import { sign } from '../utils'
+//
+import Web3 from 'web3'
+const web3 = new Web3()
 
-const WIN_PROB = new BN(1)
+/**
+ * Given a message, prefix it with "\x19Ethereum Signed Message:\n" and return it's hash
+ * @param msg the message to hash
+ * @returns a hash
+ */
+function toEthSignedMessageHash(msg: string): Hash {
+  return new Hash(stringToU8a(web3.eth.accounts.hashMessage(msg)))
+}
+
+function encode(items: { type: string; value: string }[]): string {
+  const { types, values } = items.reduce(
+    (result, item) => {
+      result.types.push(item.type)
+      result.values.push(item.value)
+
+      return result
+    },
+    {
+      types: [],
+      values: [],
+    }
+  )
+
+  return web3.eth.abi.encodeParameters(types, values)
+}
 
 class Ticket extends Uint8ArrayE implements Types.Ticket {
   constructor(
@@ -91,8 +117,17 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
     return new Hash(new Uint8Array(this.buffer, this.onChainSecretOffset, Hash.SIZE))
   }
 
-  get hash(): Promise<Hash> {
-    return hash(this)
+  get hash() {
+    const encodedTicket = encode([
+      { type: 'bytes32', value: u8aToHex(this.channelId) },
+      { type: 'bytes32', value: u8aToHex(this.challenge) },
+      { type: 'bytes32', value: u8aToHex(this.onChainSecret) },
+      { type: 'uint256', value: this.epoch.toString() },
+      { type: 'uint256', value: this.amount.toString() },
+      { type: 'bytes32', value: u8aToHex(this.winProb) },
+    ])
+
+    return toEthSignedMessageHash(encodedTicket)
   }
 
   static get SIZE(): number {
@@ -103,65 +138,32 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
     return this.amount.mul(new BN(this.winProb)).div(new BN(new Uint8Array(Hash.SIZE).fill(0xff)))
   }
 
-  static async create(
-    channel: ChannelInstance,
-    amount: Balance,
-    challenge: Hash,
+  async sign(
+    privKey: Uint8Array,
+    pubKey: Uint8Array,
     arr?: {
       bytes: ArrayBuffer
       offset: number
     }
-  ): Promise<SignedTicket> {
-    const account = await channel.coreConnector.utils.pubKeyToAccountId(channel.counterparty)
-    const { hashedSecret } = await channel.coreConnector.hoprChannels.methods.accounts(u8aToHex(account)).call()
-
-    const winProb = new Uint8ArrayE(new BN(new Uint8Array(Hash.SIZE).fill(0xff)).div(WIN_PROB).toArray('le', Hash.SIZE))
-    const channelId = await channel.channelId
-
-    const signedTicket = new SignedTicket(arr)
-
-    const ticket = new Ticket(
-      {
-        bytes: signedTicket.buffer,
-        offset: signedTicket.ticketOffset,
-      },
-      {
-        channelId,
-        challenge,
-        // @TODO set this dynamically
-        epoch: new TicketEpoch(0),
-        amount: new Balance(amount.toString()),
-        winProb,
-        onChainSecret: new Uint8ArrayE(stringToU8a(hashedSecret)),
-      }
-    )
-
-    await sign(await ticket.hash, channel.coreConnector.self.privateKey, undefined, {
-      bytes: signedTicket.buffer,
-      offset: signedTicket.signatureOffset,
-    })
-
-    return signedTicket
+  ): Promise<Signature> {
+    return sign(this.hash, privKey, undefined, arr)
   }
 
-  static async verify(channel: ChannelInstance, signedTicket: SignedTicket): Promise<boolean> {
-    // @TODO: check if this is needed
-    // if ((await channel.currentBalanceOfCounterparty).add(signedTicket.ticket.amount).lt(await channel.balance)) {
-    //   return false
-    // }
-
-    try {
-      await channel.testAndSetNonce(signedTicket)
-    } catch {
-      return false
+  static create(
+    arr?: {
+      bytes: ArrayBuffer
+      offset: number
+    },
+    struct?: {
+      channelId: Hash
+      challenge: Hash
+      epoch: TicketEpoch
+      amount: Balance
+      winProb: Hash
+      onChainSecret: Hash
     }
-
-    return verify(await signedTicket.ticket.hash, signedTicket.signature, await channel.offChainCounterparty)
-  }
-
-  // @TODO: implement submit
-  static async submit(channel: any, signedTicket: SignedTicket) {
-    throw Error('not implemented')
+  ) {
+    return new Ticket(arr, struct)
   }
 }
 

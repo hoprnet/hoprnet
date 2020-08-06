@@ -13,10 +13,6 @@ class Signature extends Uint8ArrayE implements Types.Signature {
       recovery: number
     }
   ) {
-    if (arr == null && struct == null) {
-      throw Error(`Invalid constructor arguments.`)
-    }
-
     if (arr == null) {
       super(Signature.SIZE)
     } else {
@@ -66,7 +62,7 @@ class Signature extends Uint8ArrayE implements Types.Signature {
       recovery: number
     }
   ) {
-    return new Signature(arr, struct)
+    return Promise.resolve(new Signature(arr, struct))
   }
 }
 

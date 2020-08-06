@@ -1,6 +1,7 @@
 /*
   Helper functions which generate database keys
 */
+import { toU8a } from '@hoprnet/hopr-utils'
 import { Hash, AccountId } from './types'
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 
@@ -13,8 +14,10 @@ const challengeSubPrefix = encoder.encode('challenge-')
 const channelIdSubPrefix = encoder.encode('channelId-')
 const nonceSubPrefix = encoder.encode('nonce-')
 const ticketSubPrefix = encoder.encode('ticket-')
-const onChainSecret = encoder.encode('onChainSecret')
+const onChainSecretIntermediary = encoder.encode('onChainSecretIntermediary-')
 const confirmedBlockNumber = encoder.encode('confirmedBlockNumber')
+
+const ON_CHAIN_SECRET_ITERATION_WIDTH = 4 // bytes
 
 /**
  * Returns the db-key under which the channel is saved.
@@ -91,13 +94,16 @@ export function Nonce(channelId: Types.Hash, nonce: Types.Hash): Uint8Array {
   ])
 }
 
-/**
- * Returns the db-key under which the on-chain secret is saved.
- */
 export function OnChainSecret(): Uint8Array {
+  return OnChainSecretIntermediary(0)
+}
+
+export function OnChainSecretIntermediary(iteration: number): Uint8Array {
   return allocationHelper([
     [PREFIX.length, PREFIX],
-    [onChainSecret.length, onChainSecret],
+    [onChainSecretIntermediary.length, onChainSecretIntermediary],
+    [SEPERATOR.length, SEPERATOR],
+    [ON_CHAIN_SECRET_ITERATION_WIDTH, toU8a(iteration, ON_CHAIN_SECRET_ITERATION_WIDTH)],
   ])
 }
 

@@ -1,18 +1,20 @@
-import { Ganache, migrate } from '@hoprnet/hopr-ethereum'
+import { randomBytes } from 'crypto'
+import { Ganache } from '@hoprnet/hopr-testing'
+import { migrate } from '@hoprnet/hopr-ethereum'
 import assert from 'assert'
-import { stringToU8a, u8aToHex, u8aEquals } from '@hoprnet/hopr-utils'
+import { stringToU8a, u8aToHex, u8aEquals, durations } from '@hoprnet/hopr-utils'
 import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
 import { getPrivKeyData, createAccountAndFund, createNode } from '../utils/testing'
-import { randomBytes } from 'crypto'
+import { createChallage } from '../utils'
 import BN from 'bn.js'
 import pipe from 'it-pipe'
 import Web3 from 'web3'
 import { HoprToken } from '../tsc/web3/HoprToken'
 import { Await } from '../tsc/utils'
-import { AccountId, Channel as ChannelType, Balance, ChannelBalance, Hash, SignedChannel } from '../types'
-import { ChannelStatus } from '../types/channel'
+import { AccountId, Balance, Channel as ChannelType, ChannelStatus, ChannelBalance, SignedChannel } from '../types'
 import CoreConnector from '..'
 import Channel from '.'
+import * as testconfigs from '../config.spec'
 import * as configs from '../config'
 
 describe('test Channel class', function () {
@@ -40,18 +42,31 @@ describe('test Channel class', function () {
   })
 
   beforeEach(async function () {
+    this.timeout(10e3)
+
     channels.clear()
     preChannels.clear()
 
-    funder = await getPrivKeyData(stringToU8a(configs.FUND_ACCOUNT_PRIVATE_KEY))
-    const userA = await createAccountAndFund(web3, hoprToken, funder)
-    const userB = await createAccountAndFund(web3, hoprToken, funder)
+    funder = await getPrivKeyData(stringToU8a(testconfigs.FUND_ACCOUNT_PRIVATE_KEY))
+    const userA = await createAccountAndFund(web3, hoprToken, funder, testconfigs.DEMO_ACCOUNTS[1])
+    const userB = await createAccountAndFund(web3, hoprToken, funder, testconfigs.DEMO_ACCOUNTS[2])
 
     coreConnector = await createNode(userA.privKey)
+    await coreConnector.initOnchainValues()
+    await coreConnector.start()
+
     counterpartysCoreConnector = await createNode(userB.privKey)
+    await counterpartysCoreConnector.initOnchainValues()
+    await counterpartysCoreConnector.start()
+  })
+
+  afterEach(async function () {
+    await Promise.all([coreConnector.stop(), counterpartysCoreConnector.stop()])
   })
 
   it('should create a channel', async function () {
+    this.timeout(durations.minutes(1))
+
     const channelType = new ChannelType(undefined, {
       balance: new ChannelBalance(undefined, {
         balance: new BN(123),
@@ -61,23 +76,24 @@ describe('test Channel class', function () {
     })
 
     const channelId = await coreConnector.utils.getId(
-      new AccountId(coreConnector.self.onChainKeyPair.publicKey),
-      new AccountId(counterpartysCoreConnector.self.onChainKeyPair.publicKey)
+      new AccountId(coreConnector.account.keys.onChain.pubKey),
+      new AccountId(counterpartysCoreConnector.account.keys.onChain.pubKey)
     )
 
-    const signedChannel = await SignedChannel.create(counterpartysCoreConnector, undefined, { channel: channelType })
+    const signedChannel = await counterpartysCoreConnector.channel.createSignedChannel(undefined, {
+      channel: channelType,
+    })
 
     preChannels.set(u8aToHex(channelId), channelType)
 
-    const channel = await Channel.create(
-      coreConnector,
-      counterpartysCoreConnector.self.publicKey,
-      async () => counterpartysCoreConnector.self.onChainKeyPair.publicKey,
+    const channel = await coreConnector.channel.create(
+      counterpartysCoreConnector.account.keys.onChain.pubKey,
+      async () => counterpartysCoreConnector.account.keys.onChain.pubKey,
       signedChannel.channel.balance,
       async () => {
         const result = await pipe(
-          [(await SignedChannel.create(coreConnector, undefined, { channel: channelType })).subarray()],
-          Channel.handleOpeningRequest(counterpartysCoreConnector),
+          [(await coreConnector.channel.createSignedChannel(undefined, { channel: channelType })).subarray()],
+          counterpartysCoreConnector.channel.handleOpeningRequest(),
           async (source: AsyncIterable<any>) => {
             let result: Uint8Array
             for await (const msg of source) {
@@ -100,51 +116,52 @@ describe('test Channel class', function () {
 
     channels.set(u8aToHex(channelId), channelType)
 
-    const preImage = randomBytes(32)
-    const hash = await coreConnector.utils.hash(preImage)
+    const secretA = randomBytes(32)
+    const secretB = randomBytes(32)
+    const challange = await createChallage(secretA, secretB)
 
-    const ticket = await channel.ticket.create(channel, new Balance(1), new Hash(hash))
-    assert(u8aEquals(await ticket.signer, coreConnector.self.publicKey), `Check that signer is recoverable`)
-
-    const signedChannelCounterparty = await SignedChannel.create(coreConnector, undefined, { channel: channelType })
+    const signedTicket = await channel.ticket.create(new Balance(1), challange)
     assert(
-      u8aEquals(await signedChannelCounterparty.signer, coreConnector.self.publicKey),
+      u8aEquals(await signedTicket.signer, coreConnector.account.keys.onChain.pubKey),
+      `Check that signer is recoverable`
+    )
+
+    const signedChannelCounterparty = await coreConnector.channel.createSignedChannel(undefined, {
+      channel: channelType,
+    })
+    assert(
+      u8aEquals(await signedChannelCounterparty.signer, coreConnector.account.keys.onChain.pubKey),
       `Check that signer is recoverable.`
     )
 
     counterpartysCoreConnector.db.put(
-      Buffer.from(coreConnector.dbKeys.Channel(coreConnector.self.onChainKeyPair.publicKey)),
+      Buffer.from(coreConnector.dbKeys.Channel(coreConnector.account.keys.onChain.pubKey)),
       Buffer.from(signedChannelCounterparty)
     )
 
     const dbChannels = (await counterpartysCoreConnector.channel.getAll(
-      counterpartysCoreConnector,
       async (arg: any) => arg,
       async (arg: any) => Promise.all(arg)
     )) as Channel[]
 
     assert(
-      u8aEquals(dbChannels[0].counterparty, coreConnector.self.onChainKeyPair.publicKey),
+      u8aEquals(dbChannels[0].counterparty, coreConnector.account.keys.onChain.pubKey),
       `Channel record should make it into the database and its db-key should lead to the AccountId of the counterparty.`
     )
 
-    const counterpartysChannel = await Channel.create(
-      counterpartysCoreConnector,
-      coreConnector.self.publicKey,
-      () => Promise.resolve(coreConnector.self.onChainKeyPair.publicKey),
+    const counterpartysChannel = await counterpartysCoreConnector.channel.create(
+      coreConnector.account.keys.onChain.pubKey,
+      () => Promise.resolve(coreConnector.account.keys.onChain.pubKey),
       signedChannel.channel.balance,
       () => Promise.resolve(signedChannelCounterparty)
     )
 
     assert(
-      await coreConnector.channel.isOpen(coreConnector, counterpartysCoreConnector.self.onChainKeyPair.publicKey),
+      await coreConnector.channel.isOpen(counterpartysCoreConnector.account.keys.onChain.pubKey),
       `Checks that party A considers the channel open.`
     )
     assert(
-      await counterpartysCoreConnector.channel.isOpen(
-        counterpartysCoreConnector,
-        coreConnector.self.onChainKeyPair.publicKey
-      ),
+      await counterpartysCoreConnector.channel.isOpen(coreConnector.account.keys.onChain.pubKey),
       `Checks that party B considers the channel open.`
     )
 
@@ -155,6 +172,14 @@ describe('test Channel class', function () {
       `Should reject when trying to set nonce twice.`
     )
 
-    assert(await counterpartysChannel.ticket.verify(counterpartysChannel, ticket), `Ticket signature must be valid.`)
+    assert(await counterpartysChannel.ticket.verify(signedTicket), `Ticket signature must be valid.`)
+
+    await counterpartysChannel.ticket.submit(signedTicket, secretA, secretB)
+    const hashedSecret = await counterpartysChannel.coreConnector.hoprChannels.methods
+      .accounts((await counterpartysChannel.coreConnector.account.address).toHex())
+      .call()
+      .then((res) => res.hashedSecret)
+
+    assert.notEqual(hashedSecret, signedTicket.ticket.onChainSecret.toHex(), 'Ticket redemption failed.')
   })
 })
