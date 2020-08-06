@@ -37,10 +37,9 @@ jobs:
           yarn test
 
   publish_minor:
-    name: Publish Minor Version Bump(NPM, Github)
+    name: Publish Minor Version Bump in Master (NPM, Github)
     needs: build
-
-    if: github.event_name == 'pull_request' # && contains(github.event.pull_request.labels.*.name, 'minor')
+    if: github.event_name == 'pull_request' # && github.event.action == 'closed' && github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'minor')
 
     runs-on: ubuntu-latest
     steps:
@@ -53,9 +52,15 @@ jobs:
         run: npm version minor
       - name: Commit back to master
         run: git push origin master
-
-      #- name: NPM Publish
-      #  run: npm publish
-      #  env:
-      #    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #    NPM_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: NPM Publish
+        run: npm publish
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Github release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
