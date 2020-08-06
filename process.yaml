@@ -1,0 +1,10 @@
+apps:
+  - script: ./dist/server.js
+    min_uptime: 10000
+    name: "hopr-server"
+    instances: 1
+  - script: ./dist/index.js
+    name: "hopr-bot"
+    instances: 1
+    env:
+      API_URL: 127.0.0.1

@@ -9,6 +9,7 @@
     "prebuild": "rimraf dist",
     "build": "tsc",
     "build:dev": "tsc -W",
+    "dev": "ts-node src/index.ts",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "node dist/index.js",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
@@ -19,16 +20,19 @@
   },
   "engines": {
     "node": "12.9.1",
-    "yarn": "1"
+    "yarn": "1.19.2"
   },
   "dependencies": {
     "@grpc/proto-loader": "^0.5.4",
     "@hoprnet/hopr-protos": "^0.0.9-docs.39fd32b",
+    "@hoprnet/hopr-server": "^0.0.1",
     "@hoprnet/hopr-utils": "^0.1.7-c598e77",
     "dotenv": "^8.2.0",
     "dotenv-parse-variables": "^0.3.0",
+    "global": "^4.4.0",
     "google-protobuf": "^3.12.2",
     "grpc": "^1.24.3",
+    "pm2": "^4.4.0",
     "rimraf": "^3.0.2"
   },
   "devDependencies": {
@@ -46,7 +50,7 @@
     "prettier": "^2.0.5",
     "ts-jest": "26.1.0",
     "ts-loader": "^6.2.1",
-    "ts-node": "^8.6.2",
+    "ts-node": "^8.10.2",
     "tsconfig-paths": "^3.9.0",
     "typescript": "^3.7.4"
   },
