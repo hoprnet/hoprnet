@@ -24,5 +24,6 @@ The HOPR protocol comes with some requirements that must be met by chains that p
 This holds also for all other blockchain that rely on Bitcoin Script and / or come with a very restrictive instruction limit.
 
 ## Implementors (in alphabetical order):
+
 - [Ethereum](https://ethereum.org), see [`hopr-core-ethereum`](https://github.com/hoprnet/hopr-core-ethereum)
 - [Polkadot](https://polkadot.network), see [`hopr-core-polkadot`](https://github.com/hoprnet/hopr-core-polkadot)

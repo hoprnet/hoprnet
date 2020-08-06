@@ -5,6 +5,7 @@ import type * as Types from './types'
 import type * as DbKeys from './dbKeys'
 import type * as Constants from './constants'
 import type Indexer from './indexer'
+import type Tickets from './tickets'
 
 declare namespace HoprCoreConnector {
   /**
@@ -12,26 +13,58 @@ declare namespace HoprCoreConnector {
    *
    * @param db database instance
    * @param seed that is used to derive that on-chain identity
-   * @param options.id Id of the demo account
-   * @param options.uri URI that is used to connect to the blockchain
+   * @param options.provider URI that is used to connect to the blockchain
+   * @param options.debug run connector in debug mode if set to true
    */
-  function create(db: LevelUp, seed?: Uint8Array, options?: { id?: number; provider?: string; debug?: boolean }): Promise<HoprCoreConnector>
+  function create(db: LevelUp, seed: Uint8Array, options?: { provider?: string; debug?: boolean }): Promise<HoprCoreConnector>
 
   const constants: typeof Constants
 }
 
 declare interface HoprCoreConnector {
   readonly started: boolean
-  readonly self: {
-    privateKey: Uint8Array
-    publicKey: Uint8Array
-    onChainKeyPair: {
-      privateKey?: Uint8Array
-      publicKey?: Uint8Array
+
+  readonly account: {
+    /**
+     * Returns the current (token) balance of the account associated with this node.
+     */
+    balance: Promise<Types.Balance>
+    /**
+     * Returns the current native balance (ex: ETH) of the account associated with this node.
+     */
+    nativeBalance: Promise<Types.NativeBalance>
+    /**
+     * Returns the current value of the reset counter
+     */
+    ticketEpoch: Promise<Types.TicketEpoch>
+    /**
+     * Returns the current value of the onChainSecret
+     */
+    onChainSecret: Promise<Types.Hash>
+    /**
+     * Returns the accounts address
+     */
+    address: Promise<Types.AccountId>
+    /**
+     * The accounts nonce.
+     */
+    nonce: Promise<number>
+    /**
+     * The accounts keys:
+     */
+    keys: {
+      onChain: {
+        privKey: Uint8Array
+        pubKey: Uint8Array
+      }
+      offChain: {
+        privKey: Uint8Array
+        pubKey: Uint8Array
+      }
     }
   }
+
   readonly db: LevelUp
-  readonly nonce: Promise<number>
 
   /**
    * Initialises the connector, e.g. connect to a blockchain node.
@@ -49,16 +82,6 @@ declare interface HoprCoreConnector {
    * @param nonce optional specify nonce of the account to run multiple queries simultaneously
    */
   initOnchainValues(nonce?: number): Promise<void>
-
-  /**
-   * Returns the current balances of the account associated with this node.
-   */
-  accountBalance: Promise<Types.Balance>
-
-  /**
-   * Returns the current native balance (ex: ETH) of the account associated with this node.
-   */
-  accountNativeBalance: Promise<Types.NativeBalance>
 
   /**
    * (Static) utils to use in the connector module
@@ -86,6 +109,11 @@ declare interface HoprCoreConnector {
   readonly channel: typeof Channel
 
   /**
+   * Store and query tickets.
+   */
+  readonly tickets: Tickets
+
+  /**
    * Returns an instance of Indexer.
    */
   readonly indexer?: Indexer
@@ -98,6 +126,6 @@ declare interface HoprCoreConnector {
 
 type HoprCoreConnectorStatic = typeof HoprCoreConnector
 
-export { Utils, DbKeys, Types, Channel, Constants, Indexer, HoprCoreConnectorStatic }
+export { Utils, Types, DbKeys, Constants, Channel, Tickets, Indexer, HoprCoreConnectorStatic }
 
 export default HoprCoreConnector
