@@ -1,6 +1,7 @@
 name: HOPR Workflow
 on:
-  push
+  push:
+    branches: '*'
   pull_request:
     types: [closed]
 
