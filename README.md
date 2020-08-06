@@ -48,11 +48,11 @@ The server is able to recognise and process a `.env` file located at the root of
 ```json
 {
   "components_version": {
-    "0": "@hoprnet/hopr-core,0.0.9-97c8c3e",
-    "1": "@hoprnet/hopr-core-connector-interface,",
-    "2": "@hoprnet/hopr-core-ethereum,",
-    "3": "@hoprnet/hopr-utils,",
-    "4": "@hoprnet/hopr-core-connector-interface,"
+    "0": "@hoprnet/hopr-core,0.6.21",
+    "1": "@hoprnet/hopr-core-connector-interface,1.3.2-35127fb",
+    "2": "@hoprnet/hopr-core-ethereum,0.0.12-refactor.473415f",
+    "3": "@hoprnet/hopr-utils,0.1.7-c598e77",
+    "4": "@hoprnet/hopr-core-connector-interface,1.3.2-35127fb"
   },
   "version": "0.0.1"
 }
@@ -106,22 +106,19 @@ Server B should be setup in a different directory from server A.
 ## Gotchas
 
 - `BloomRPC` will sometime insert default input data when calling certain methods, for example with `Send` it will insert:
+
 ```json
 {
   "peer_id": "316a50f5-4801-4065-bb73-5c602d594ccf",
   "payload": {
     "type": "Buffer",
-    "data": [
-      72,
-      101,
-      108,
-      108,
-      111
-    ]
+    "data": [72, 101, 108, 108, 111]
   }
 }
 ```
+
 which is incompatible with our server, the right input is:
+
 ```json
 {
   "peer_id": "16Uiu2HAm6rVeEmviiSoX67H5fqkTQq2ZyP2QSRwrmtEuTU9pWeKj",

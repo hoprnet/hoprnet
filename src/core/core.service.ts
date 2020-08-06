@@ -72,9 +72,10 @@ export class CoreService {
       debug: envOptions.debug ?? false,
       bootstrapNode: envOptions.bootstrapNode ?? false,
       network: 'ethereum',
+      // using testnet bootstrap servers
       bootstrapServers: envOptions.bootstrapServers ?? [
-        '/ip4/34.65.237.196/tcp/9091/p2p/16Uiu2HAm1pyd27aNRqx7icG5uDBKNFDwvwaEg2vuAUEtLN1pRa5X',
-        '/ip4/34.65.139.63/tcp/9091/p2p/16Uiu2HAmR2va1xavPsYRrpCVnjvcUr1Jqjf9UjywdyPxeZ5Z3eLZ',
+        '/ip4/34.65.82.167/tcp/9091/p2p/16Uiu2HAm6VH37RG1R4P8hGV1Px7MneMtNc6PNPewNxCsj1HsDLXW',
+        '/ip4/34.65.111.179/tcp/9091/p2p/16Uiu2HAmPyq9Gw93VWdS3pgmyAWg2UNnrgZoYKPDUMbKDsWhzuvb',
       ],
       provider: envOptions.provider ?? 'wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36',
       host: envOptions.host ?? '0.0.0.0:9091',
