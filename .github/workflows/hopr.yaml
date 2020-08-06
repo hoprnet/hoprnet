@@ -40,11 +40,13 @@ jobs:
     name: Publish Minor Version Bump(NPM, Github)
     needs: build
 
-    #if: github.event_name == 'push' && github.ref == 'refs/heads/master' && contains(github.event.pull_request.labels.*.name, 'minor')
+    if: github.event_name == 'pull_request' # && github.ref == 'refs/heads/master' && contains(github.event.pull_request.labels.*.name, 'minor')
 
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+      - name: Set name / email for commit
+        run: git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Versioning robot"
       - name: Bump package.json
         run: npm version minor
       - name: Commit back to master
