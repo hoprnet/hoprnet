@@ -9,13 +9,13 @@ yarn-error.log
 .vscode/
 
 # Exclude solidity builds
-build/contracts/
+build/
 
 # Exclude typechain builds
 types/truffle-contracts/
 
 # Coverage directory used by tools like istanbul
-coverage
+coverage*
 .coverage*
 coverage.json
 coverageEnv
@@ -27,5 +27,5 @@ pids
 allFiredEvents
 scTopics
 
-# Exclude truffle-config secrets
-truffle-secrets.json
+# Exclude secrets
+.env

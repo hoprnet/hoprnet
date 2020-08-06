@@ -3,6 +3,7 @@
     "esModuleInterop": true,
     "outDir": "./build/lib",
     "noImplicitAny": false,
+    "allowJs": true,
     "lib": ["es2020", "dom"],
     "module": "commonjs",
     "target": "es2019",

@@ -1,5 +1,5 @@
 import BigNumber from 'bignumber.js'
-import { keccak256, xorBytes32, signMessage, MAX_UINT256 } from './random'
+import { keccak256, MAX_UINT256, encode, createChallage, signMessage, getChannelId, getParties } from './random'
 
 BigNumber.config({ EXPONENTIAL_AT: 1e9 })
 
@@ -22,13 +22,12 @@ type ITicket = (args: {
   counterPartySecret: string // return same as provided
   amount: string // return same as provided
   counter: number // return same as provided
-  hashedPorSecretA: string // return hashed alternative
-  hashedPorSecretB: string // return hashed alternative
+  channelId: string // return channel ID
   challenge: string // return hashed alternative
   hashedCounterPartySecret: string // return hashed alternative
   winProb: string // return winProb in bytes32
-  hashedTicket: string // return hashed alternative
-  signature: string // signature of hashedTicket
+  encodedTicket: string // return hashed alternative
+  signature: string // signature of encodedTicket
   r: string
   s: string
   v: string
@@ -50,9 +49,7 @@ const Ticket: ITicket = ({
   winProbPercent,
 }) => {
   // proof of relay related hashes
-  const hashedPorSecretA = keccak256({ type: 'bytes32', value: porSecretA })
-  const hashedPorSecretB = keccak256({ type: 'bytes32', value: porSecretB })
-  const challenge = xorBytes32(hashedPorSecretA, hashedPorSecretB)
+  const challenge = createChallage(porSecretA, porSecretB)
 
   // proof of randomness related hashes
   const hashedCounterPartySecret = keccak256({
@@ -65,15 +62,19 @@ const Ticket: ITicket = ({
     new BigNumber(winProbPercent).multipliedBy(MAX_UINT256).dividedBy(100).toString()
   )
 
-  const hashedTicket = keccak256(
+  const { partyA, partyB } = getParties(accountA, accountB)
+  const channelId = getChannelId(partyA, partyB)
+
+  const encodedTicket = encode([
+    { type: 'bytes32', value: channelId },
     { type: 'bytes32', value: challenge },
-    { type: 'bytes32', value: counterPartySecret },
+    { type: 'bytes32', value: hashedCounterPartySecret },
     { type: 'uint256', value: counter },
     { type: 'uint256', value: amount },
-    { type: 'bytes32', value: winProb }
-  )
+    { type: 'bytes32', value: winProb },
+  ])
 
-  const { signature, r, s, v } = signMessage(web3, hashedTicket, signerPrivKey)
+  const { signature, r, s, v } = signMessage(web3, encodedTicket, signerPrivKey)
 
   return {
     accountA,
@@ -83,12 +84,11 @@ const Ticket: ITicket = ({
     counterPartySecret,
     amount,
     counter,
-    hashedPorSecretA,
-    hashedPorSecretB,
+    channelId,
     challenge,
     hashedCounterPartySecret,
     winProb,
-    hashedTicket,
+    encodedTicket,
     signature,
     r,
     s,

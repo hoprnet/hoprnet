@@ -1,13 +1,12 @@
 require('ts-node/register')
+require('dotenv').config()
+const process = require('process')
 const HDWalletProvider = require('@truffle/hdwallet-provider')
-const networks = require('./truffle-networks.json')
+const networks = require('./truffle-networks')
 
-let secrets
-try {
-  secrets = require('./truffle-secrets.json')
-} catch (error) {
-  console.log('truffle-secrets not found!')
-}
+const { PRIVATE_KEY, INFURA, ETHERSCAN } = process.env
+const canMigrate = typeof PRIVATE_KEY !== 'undefined' && typeof INFURA !== 'undefined'
+// const canVerify = typeof ETHERSCAN !== 'undefined'
 
 module.exports = {
   networks: {
@@ -26,14 +25,14 @@ module.exports = {
       ...networks.soliditycoverage,
     },
 
-    rinkeby: secrets && {
+    rinkeby: canMigrate && {
       ...networks.rinkeby,
-      provider: () => new HDWalletProvider(secrets.mnemonic, `https://rinkeby.infura.io/v3/${secrets.infura}`),
+      provider: () => new HDWalletProvider(PRIVATE_KEY, `https://rinkeby.infura.io/v3/${INFURA}`),
     },
 
-    kovan: secrets && {
+    kovan: canMigrate && {
       ...networks.kovan,
-      provider: () => new HDWalletProvider(secrets.mnemonic, `https://kovan.infura.io/v3/${secrets.infura}`),
+      provider: () => new HDWalletProvider(PRIVATE_KEY, `https://kovan.infura.io/v3/${INFURA}`),
     },
   },
 
@@ -56,11 +55,9 @@ module.exports = {
     },
   },
 
-  api_keys: secrets
-    ? {
-        etherscan: secrets.etherscan,
-      }
-    : undefined,
+  api_keys: {
+    etherscan: ETHERSCAN,
+  },
 
   plugins: ['solidity-coverage', 'truffle-plugin-verify'],
 }

@@ -1,5 +1,6 @@
-import { Ganache, bash } from './utils'
-import networks from '../../truffle-networks.json'
+import { Ganache } from '@hoprnet/hopr-testing'
+import { bash } from './utils'
+import networks from '../../truffle-networks'
 
 export default async () => {
   const ganache = new Ganache({

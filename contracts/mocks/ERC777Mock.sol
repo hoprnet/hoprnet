@@ -3,7 +3,6 @@ pragma solidity ^0.6.0;
 import "@openzeppelin/contracts/GSN/Context.sol";
 import "@openzeppelin/contracts/token/ERC777/ERC777.sol";
 
-
 contract ERC777Mock is Context, ERC777 {
     constructor(
         address initialHolder,

@@ -5,7 +5,6 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "./HoprToken.sol";
 
-
 contract HoprMinter is Ownable {
     using SafeMath for uint256;
 

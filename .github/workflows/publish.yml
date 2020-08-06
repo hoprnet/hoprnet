@@ -14,7 +14,7 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v1
         with:
-          node-version: 12
+          node-version: 12.9.1
       - name: Cache node_modules
         id: cache-modules
         uses: actions/cache@v1
@@ -24,7 +24,9 @@ jobs:
       # Installing library requirements
       - name: Install node modules
         if: steps.cache-modules.outputs.cache-hit != 'true'
-        run: yarn install --frozen-lockfile
+        run: |
+          yarn policies set-version 1.19.2
+          yarn install --frozen-lockfile
 
   build:
     name: Create Release
@@ -48,7 +50,7 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v1
         with:
-          node-version: 12
+          node-version: 12.9.1
           registry-url: 'https://npm.pkg.github.com'
       - name: Cache node_modules
         id: cache-modules
@@ -60,11 +62,15 @@ jobs:
         run: npm config set //npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}
       - name: Install node modules
         if: steps.cache-modules.outputs.cache-hit != 'true'
-        run: yarn install --frozen-lockfile
+        run: |
+          yarn policies set-version 1.19.2
+          yarn install --frozen-lockfile
       - env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         name: Publish to GitHub Packages
-        run: npm publish
+        run: |
+          yarn policies set-version 1.19.2
+          npm publish
 
   publish_npm:
     name: Deploys to NPM
@@ -74,7 +80,7 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v1
         with:
-          node-version: 12
+          node-version: 12.9.1
           registry-url: https://registry.npmjs.org/
       - name: Cache node_modules
         id: cache-modules
@@ -84,8 +90,12 @@ jobs:
           key: ${{ runner.OS }}-build-${{ hashFiles('package.json') }}
       - name: Install node modules
         if: steps.cache-modules.outputs.cache-hit != 'true'
-        run: yarn install --frozen-lockfile
+        run: |
+          yarn policies set-version 1.19.2
+          yarn install --frozen-lockfile
       - env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         name: Publish to NPM Registry
-        run: npm publish --access public
+        run: |
+          yarn policies set-version 1.19.2
+          npm publish --access public

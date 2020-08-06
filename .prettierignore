@@ -9,3 +9,8 @@ coverageEnv
 
 # Exclude typechain builds
 types/truffle-contracts
+
+# next.js
+.next/
+.vercel/
+out/

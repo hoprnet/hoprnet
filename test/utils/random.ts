@@ -1,24 +1,37 @@
 import BigNumber from 'bignumber.js'
-const BN = require('bn.js')
-const Web3 = require('web3')
+import BN from 'bn.js'
+import Web3 from 'web3'
+
+const web3 = new Web3()
 
 export const MAX_UINT256 = new BigNumber(2).pow(256).minus(1)
 
 export const keccak256 = (...args: { type: string; value: string | number }[]): string => {
-  return Web3.utils.soliditySha3(...args)
+  return Web3.utils.soliditySha3(...((args as unknown) as any))
 }
 
-export const signMessage = (web3: any, message: string, signerPrivKey: string) => {
+export const signMessage = (web3: Web3, message: string, signerPrivKey: string) => {
   return web3.eth.accounts.sign(message, signerPrivKey)
 }
 
-export const recoverSigner = (web3: any, message: string, signature: string) => {
+export const recoverSigner = (web3: Web3, message: string, signature: string) => {
   return web3.eth.accounts.recover(message, signature, false)
 }
 
-// inputs should be a bytes32 string e.g: "0x..."
-export const xorBytes32 = (a: string, b: string) => {
-  return `0x${new BN(a.slice(2), 16).xor(new BN(b.slice(2), 16)).toString(16)}`
+export const createChallage = (a: string, b: string): string => {
+  return keccak256({
+    type: 'bytes',
+    value: encode([
+      {
+        type: 'bytes32',
+        value: a,
+      },
+      {
+        type: 'bytes32',
+        value: b,
+      },
+    ]),
+  })
 }
 
 export const isPartyA = (accountA: string, accountB: string) => {
@@ -50,4 +63,21 @@ export const getChannelId = (partyA: string, partyB: string) => {
       value: partyB,
     }
   )
+}
+
+export const encode = (items: { type: string; value: string }[]): string => {
+  const { types, values } = items.reduce(
+    (result, item) => {
+      result.types.push(item.type)
+      result.values.push(item.value)
+
+      return result
+    },
+    {
+      types: [],
+      values: [],
+    }
+  )
+
+  return web3.eth.abi.encodeParameters(types, values)
 }

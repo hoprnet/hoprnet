@@ -5,11 +5,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const web3_1 = __importDefault(require("web3"));
 const HoprToken_json_1 = __importDefault(require("../../build/extracted/abis/HoprToken.json"));
-const truffle_networks_json_1 = __importDefault(require("../../truffle-networks.json"));
+const addresses_1 = require("../addresses");
+const truffle_networks_1 = __importDefault(require("../../truffle-networks"));
 const AMOUNT = web3_1.default.utils.toWei('1000000', 'ether');
 exports.default = async (amount) => {
-    const web3 = new web3_1.default(`ws://${truffle_networks_json_1.default.development.host}:${truffle_networks_json_1.default.development.port}`);
-    const hoprToken = new web3.eth.Contract(HoprToken_json_1.default, '0x66DB78F4ADD912a6Cb92b672Dfa09028ecc3085E');
+    const web3 = new web3_1.default(`ws://${truffle_networks_1.default.development.host}:${truffle_networks_1.default.development.port}`);
+    const hoprToken = new web3.eth.Contract(HoprToken_json_1.default, addresses_1.HOPR_TOKEN.private);
     const accounts = await web3.eth.getAccounts();
     const owner = accounts[0];
     if (amount && amount > accounts.length) {
