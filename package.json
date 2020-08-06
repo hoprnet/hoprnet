@@ -14,8 +14,8 @@
     "yarn.lock"
   ],
   "engines": {
-    "node": "12.9.1",
-    "yarn": "1.19.2"
+    "node": ">=12.9.1",
+    "yarn": ">=1.19.2"
   },
   "scripts": {
     "build": "yarn clean && tsc -p . --noEmit false",
@@ -25,7 +25,7 @@
     "prepare": "yarn build"
   },
   "dependencies": {
-    "@hoprnet/hopr-demo-seeds": "^1.0.3-refactor.3ad82ff",
+    "@hoprnet/hopr-demo-seeds": "1.8.0",
     "ganache-core": "^2.10.2"
   },
   "devDependencies": {
