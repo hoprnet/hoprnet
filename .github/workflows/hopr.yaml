@@ -45,12 +45,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+      - name: Use Master
+        run: git fetch origin && git checkout master
       - name: Set name / email for commit
         run: git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Versioning robot"
       - name: Bump package.json
         run: npm version minor
       - name: Commit back to master
-        run: git fetch origin && git diff && git pull origin master --ff-only  && git push origin HEAD:master
+        run: git push origin master
 
       #- name: NPM Publish
       #  run: npm publish
