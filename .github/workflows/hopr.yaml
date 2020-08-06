@@ -56,11 +56,8 @@ jobs:
         run: npm version minor
       - name: Commit back to master
         run: git push origin master
-      - name: NPM Publish
-        run: npm publish
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Push a tag
+        run: (PACKAGE_VERSION=$(node -p -e "require('./package.json').version"); git tag $PACKAGE_VERSION && git push origin $PACKAGE_VERSION)
       - name: Github release
         uses: actions/create-release@v1
         env:
@@ -68,6 +65,11 @@ jobs:
         with:
           tag_name: ${{ github.ref }}
           release_name: Release ${{ github.ref }}
+      - name: NPM Publish
+        run: npm publish
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   publish_major:
     name: Publish Major Version Bump in Master (NPM, Github)
@@ -85,11 +87,7 @@ jobs:
         run: npm version major
       - name: Commit back to master
         run: git push origin master
-      - name: NPM Publish
-        run: npm publish
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      
       - name: Github release
         uses: actions/create-release@v1
         env:
@@ -97,3 +95,8 @@ jobs:
         with:
           tag_name: ${{ github.ref }}
           release_name: Release ${{ github.ref }}
+      - name: NPM Publish
+        run: npm publish
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
