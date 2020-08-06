@@ -9,6 +9,9 @@ import { u8aEquals, u8aToHex, stringToU8a } from '@hoprnet/hopr-utils'
 
 export const GIANT_STEP_WIDTH = 10000
 export const TOTAL_ITERATIONS = 100000
+
+export const HASHED_SECRET_WIDTH = 27
+
 class HashedSecret {
   public _onChainValuesInitialized: boolean
 
@@ -22,6 +25,7 @@ class HashedSecret {
   async submit(nonce?: number): Promise<void> {
     const hashedSecret = await this.create()
 
+    // @TODO call init() before
     await this.coreConnector.utils.waitForConfirmation(
       (
         await this.coreConnector.signTransaction(
@@ -113,7 +117,10 @@ class HashedSecret {
    * Returns a deterministic secret that is used in debug mode.
    */
   private getDebugAccountSecret(): Uint8Array {
-    return createHash('sha256').update(this.coreConnector.account.keys.onChain.pubKey).digest()
+    return createHash('sha256')
+      .update(this.coreConnector.account.keys.onChain.pubKey)
+      .digest()
+      .slice(0, HASHED_SECRET_WIDTH)
   }
 
   /**
@@ -122,7 +129,7 @@ class HashedSecret {
    */
   async create(): Promise<Hash> {
     let onChainSecret = new Hash(
-      this.coreConnector.options.debug ? this.getDebugAccountSecret() : randomBytes(Hash.SIZE)
+      this.coreConnector.options.debug ? this.getDebugAccountSecret() : randomBytes(HASHED_SECRET_WIDTH)
     )
     let onChainSecretIntermediary = onChainSecret
     let dbBatch = this.coreConnector.db.batch()
@@ -134,7 +141,9 @@ class HashedSecret {
           Buffer.from(onChainSecretIntermediary)
         )
       }
-      onChainSecretIntermediary = await this.coreConnector.utils.hash(onChainSecretIntermediary)
+      onChainSecretIntermediary = new Hash(
+        (await this.coreConnector.utils.hash(onChainSecretIntermediary)).slice(0, HASHED_SECRET_WIDTH)
+      )
     }
 
     await dbBatch.write()
@@ -177,7 +186,7 @@ class HashedSecret {
       }
 
       for (let i = 0; i < upperBound - closestIntermediary; i++) {
-        hashedIntermediary = await this.coreConnector.utils.hash(intermediary)
+        hashedIntermediary = await this.coreConnector.utils.hash(intermediary.slice(0, HASHED_SECRET_WIDTH))
         if (u8aEquals(hashedIntermediary, hash)) {
           found = true
           index = closestIntermediary + i
