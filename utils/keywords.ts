@@ -8,6 +8,7 @@ export const keywords: string[][] = [
   ['closeAll', 'closes all payment channel of this node'],
   ['myAddress', 'shows the address of this node'],
   ['balance', 'shows our current balance'],
+  ['includeRecipient', 'preprends your address to all messages'],
   ['listConnectors', 'lists all installed blockchain connectors'],
   ['ping', 'pings another node to check its availability'],
   ['version', 'shows the versions for `hopr-chat` and `hopr-core`'],
