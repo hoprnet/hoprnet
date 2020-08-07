@@ -6,7 +6,7 @@ import chalk from 'chalk'
 
 import type PeerId from 'peer-id'
 
-import { checkPeerIdInput, encodeMessage, getOpenChannels, getPeers } from '../utils'
+import { checkPeerIdInput, encodeMessage, getOpenChannels, getPeers, settings } from '../utils'
 import { clearString } from '@hoprnet/hopr-utils'
 import { MAX_HOPS } from '@hoprnet/hopr-core/lib/constants'
 
@@ -48,8 +48,12 @@ export default class SendMessage implements AbstractCommand {
         })()
       : true
 
-    const messageQuestion = `${chalk.yellow(`Type in your message and press ENTER to send:`)}\n`
-    const message = await new Promise<string>((resolve) => rl.question(messageQuestion, resolve))
+    const messageQuestion = `${chalk.yellow(`Type your message and press ENTER to send:`)}\n`
+    const parsedMessage = await new Promise<string>((resolve) => rl.question(messageQuestion, resolve))
+
+    const message = settings.includeRecipient ?
+      (myAddress => `${myAddress}:${parsedMessage}`)(this.node.peerInfo.id.toB58String()) :
+      parsedMessage;
 
     clearString(messageQuestion + message, rl)
 

@@ -147,7 +147,9 @@ async function runAsRegularNode() {
       case 'send':
         await commands.sendMessage.execute(rl, query)
         break
-
+      case 'includeRecipient':
+        await commands.includeRecipient.execute(rl)
+        break
       case 'listConnectors':
         await commands.listConnectors.execute()
         break
