@@ -1,0 +1,26 @@
+{
+  "name": "hopr-admin",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "git@github.com:hoprnet/hopr-admin.git",
+  "author": "Peter Braden (HOPR) <peter.braden@hoprnet.org>",
+  "scripts": {
+    "build": "yarn clean && tsc -p .",
+    "clean": "rm -rf ./lib",
+    "test": "jest --runInBand --forceExit",
+    "prepublishOnly": "yarn build",
+    "lint": "prettier --check .",
+    "lint:fix": "prettier --write ."
+  },
+  "license": "",
+  "devDependencies": {
+    "husky": "^4.2.5",
+    "it-pair": "^1.0.0",
+    "jest": "^26.1.0",
+    "libp2p-tcp": "^0.14.6",
+    "memdown": "^5.1.0",
+    "prettier": "^2.0.5",
+    "ts-jest": "^26.1.4",
+    "typescript": "^3.9.7"
+  }
+}
