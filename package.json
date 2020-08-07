@@ -10,7 +10,8 @@
     "test": "jest --runInBand --forceExit",
     "prepublishOnly": "yarn build",
     "lint": "prettier --check .",
-    "lint:fix": "prettier --write ."
+    "lint:fix": "prettier --write .",
+    "server": "yarn install && yarn build && node lib/server.js"
   },
   "license": "",
   "dependencies": {

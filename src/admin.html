@@ -1,0 +1,41 @@
+<html>
+  <head>
+    <title>HOPR Admin</title>
+<style>
+code {
+  display: block;
+  border: 1px solid #eee;
+}
+.connecting {
+  background-color: #fee;
+  color: red;
+  border: 1px solid red;
+}
+
+</style>
+<script>
+
+
+
+window.onload = function(){
+
+  var logs = document.querySelector('#log')
+  var client = new WebSocket('ws://localhost:3000');
+
+  client.onmessage = function(event) {
+    logs.classList.remove('connecting')
+    logs.textContent = event.data
+    console.log(event)
+  }
+
+}
+</script>
+  </head>
+  <body>
+    <pre>
+    <code id="log" class="connecting">
+      Connecting...
+    </code>
+    </pre>
+  </body>
+</html>
