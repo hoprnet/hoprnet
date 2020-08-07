@@ -13,6 +13,9 @@
     "lint:fix": "prettier --write ."
   },
   "license": "",
+  "dependencies": {
+    "@hoprnet/hopr-core": "0.6.21"
+  },
   "devDependencies": {
     "husky": "^4.2.5",
     "it-pair": "^1.0.0",
