@@ -14,7 +14,7 @@
   },
   "license": "",
   "dependencies": {
-    "@hoprnet/hopr-core": "0.6.21"
+    "@hoprnet/hopr-core": "0.6.23"
   },
   "devDependencies": {
     "husky": "^4.2.5",
@@ -24,6 +24,7 @@
     "memdown": "^5.1.0",
     "prettier": "^2.0.5",
     "ts-jest": "^26.1.4",
-    "typescript": "^3.9.7"
+    "typescript": "^3.9.7",
+    "@types/node": ">=4.2.0 < 13"
   }
 }
