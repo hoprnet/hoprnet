@@ -11,7 +11,7 @@ const start = async () => {
 
   // Adding bots
   bounceBot(hoprAddress);
-  randoBot(hoprAddress);
+  // randoBot(hoprAddress);
 }
 
 start().catch((err) => {
