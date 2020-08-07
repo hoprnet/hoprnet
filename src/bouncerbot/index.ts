@@ -1,6 +1,6 @@
-import { getMessageStream, sendMessage } from './utils'
+import { getMessageStream, sendMessage } from '../utils'
 import { ListenResponse } from '@hoprnet/hopr-protos/node/listen_pb'
-import { Message } from './message'
+import { Message } from '../message'
 
 
 const directory = {}
@@ -13,8 +13,8 @@ const messages = [
   'I don’t know what to tell you. I’m sure if you hang around long enough, someone will help you out'
 ] 
 
-export const bounceBot = async (hoprAddress) => {
-  const botName = '🥊 Bouncebot (v2)'
+export const bouncerBot = async (hoprAddress) => {
+  const botName = '🥊 Bouncerbot (v2)'
   console.log(`${botName} has been added`);
 
   const { client, stream } = await getMessageStream()
@@ -30,7 +30,13 @@ export const bounceBot = async (hoprAddress) => {
         console.log(`${botName} <- ${message.from}: ${message.text}`)
 
         let response;
-        if (message.text.match(/party?$/i)) {
+        /*
+        * We check whether the message has the word “party” in it. If it
+        * does then we respond with some of the predefined messages. After the
+        * first “party” message then we can skip the check by ensuring we
+        * have stored a message from a person at least once.
+        */
+        if (message.text.match(/party?$/i) || directory[message.from]) {
           // Bounce bot gets messages and stores how many times has been reached.
           directory[message.from] = (directory[message.from] || 0) + 1
           response = directory[message.from] > messages.length ?

@@ -1,16 +1,27 @@
+import getopts from 'getopts'
 import { API_URL } from './env'
-import { bounceBot } from './bouncebot'
-import { randoBot } from './randobot'
+import { bouncerBot } from './bouncerbot'
 import { getHoprAddress  } from './utils'
 
+const options = getopts(process.argv.slice(2), {
+  string: ['bot'],
+  alias: {
+    b: 'bot',
+  },
+  default: {
+    bot: 'randobot',
+  },
+})
 
 const start = async () => {
   console.log(`Connecting to ${API_URL}`)
   const hoprAddress = await getHoprAddress()
   console.log(`My HOPR address is ${hoprAddress}`)
 
+  console.log('Options', options);
+
   // Adding bots
-  bounceBot(hoprAddress);
+  bouncerBot(hoprAddress);
   // randoBot(hoprAddress);
 }
 
