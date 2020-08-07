@@ -4,11 +4,12 @@ import BN from 'bn.js'
 import chalk from 'chalk'
 import { Subscription } from 'web3-core-subscriptions'
 import { BlockHeader } from 'web3-eth'
-import { u8aToNumber, stringToU8a } from '@hoprnet/hopr-utils'
+import { u8aToNumber, stringToU8a, u8aConcat, u8aToHex } from '@hoprnet/hopr-utils'
 import { AccountId, ChannelEntry } from '../types'
 import { getParties, Log } from '../utils'
 import { MAX_CONFIRMATIONS } from '../config'
 import { ContractEventEmitter, ContractEventLog } from '../tsc/web3/types'
+import createKeccakHash from 'keccak'
 
 // we save up some memory by only caching the event data we use
 type LightEvent<E extends ContractEventLog<any>> = Pick<
@@ -16,8 +17,8 @@ type LightEvent<E extends ContractEventLog<any>> = Pick<
   'event' | 'blockNumber' | 'transactionHash' | 'transactionIndex' | 'logIndex' | 'returnValues'
 >
 type Channel = { partyA: AccountId; partyB: AccountId; channelEntry: ChannelEntry }
-type OpenedChannelEvent = LightEvent<ContractEventLog<{ opener: string; counterParty: string }>>
-type ClosedChannelEvent = LightEvent<ContractEventLog<{ closer: string; counterParty: string }>>
+type OpenedChannelEvent = LightEvent<ContractEventLog<{ opener: Uint8Array; counterparty: Uint8Array }>>
+type ClosedChannelEvent = LightEvent<ContractEventLog<{ closer: Uint8Array; counterparty: Uint8Array }>>
 
 const SMALLEST_ACCOUNT = new Uint8Array(AccountId.SIZE).fill(0x00)
 const BIGGEST_ACCOUNT = new Uint8Array(AccountId.SIZE).fill(0xff)
@@ -73,11 +74,9 @@ class Indexer implements IIndexer {
    */
   private async getLatestConfirmedBlockNumber(): Promise<number> {
     try {
-      const blockNumber = await this.connector.db
-        .get(Buffer.from(this.connector.dbKeys.ConfirmedBlockNumber()))
-        .then((res) => {
-          return u8aToNumber(res)
-        })
+      const blockNumber = u8aToNumber(
+        await this.connector.db.get(Buffer.from(this.connector.dbKeys.ConfirmedBlockNumber()))
+      )
 
       return blockNumber
     } catch (err) {
@@ -97,16 +96,15 @@ class Indexer implements IIndexer {
   public async has(partyA: AccountId, partyB: AccountId): Promise<boolean> {
     const { dbKeys, db } = this.connector
 
-    return db.get(Buffer.from(dbKeys.ChannelEntry(partyA, partyB))).then(
-      () => true,
-      (err) => {
-        if (err.notFound) {
-          return false
-        } else {
-          throw err
-        }
+    try {
+      await db.get(Buffer.from(dbKeys.ChannelEntry(partyA, partyB)))
+    } catch (err) {
+      if (err.notFound) {
+        return false
       }
-    )
+    }
+
+    return true
   }
 
   /**
@@ -154,27 +152,25 @@ class Indexer implements IIndexer {
   private async getSingle(partyA: AccountId, partyB: AccountId): Promise<Channel | undefined> {
     const { dbKeys, db } = this.connector
 
-    return db.get(Buffer.from(dbKeys.ChannelEntry(partyA, partyB))).then(
-      (value) => {
-        const channelEntry = new ChannelEntry({
-          bytes: value,
-          offset: value.byteOffset,
-        })
-
-        return {
-          partyA,
-          partyB,
-          channelEntry,
-        }
-      },
-      (err) => {
-        if (err.notFound) {
-          return undefined
-        } else {
-          throw err
-        }
+    let _entry: Uint8Array
+    try {
+      _entry = await db.get(Buffer.from(dbKeys.ChannelEntry(partyA, partyB)))
+    } catch (err) {
+      if (err.notFound) {
+        return
       }
-    )
+    }
+
+    const channelEntry = new ChannelEntry({
+      bytes: _entry,
+      offset: _entry.byteOffset,
+    })
+
+    return {
+      partyA,
+      partyB,
+      channelEntry,
+    }
   }
 
   /**
@@ -262,8 +258,8 @@ class Indexer implements IIndexer {
   }
 
   private async onOpenedChannel(event: OpenedChannelEvent): Promise<void> {
-    const opener = new AccountId(stringToU8a(event.returnValues.opener))
-    const counterParty = new AccountId(stringToU8a(event.returnValues.counterParty))
+    const opener = new AccountId(event.returnValues.opener)
+    const counterParty = new AccountId(event.returnValues.counterparty)
     const [partyA, partyB] = getParties(opener, counterParty)
 
     const newChannelEntry = new ChannelEntry(undefined, {
@@ -285,8 +281,8 @@ class Indexer implements IIndexer {
   }
 
   private async onClosedChannel(event: ClosedChannelEvent): Promise<void> {
-    const closer = new AccountId(stringToU8a(event.returnValues.closer))
-    const counterParty = new AccountId(stringToU8a(event.returnValues.counterParty))
+    const closer = new AccountId(event.returnValues.closer)
+    const counterParty = new AccountId(event.returnValues.counterparty)
     const [partyA, partyB] = getParties(closer, counterParty)
     const newChannelEntry = new ChannelEntry(undefined, {
       blockNumber: new BN(event.blockNumber),
@@ -327,6 +323,7 @@ class Indexer implements IIndexer {
     }
 
     this.starting = new Promise(async (resolve, reject) => {
+      let rejected = false
       try {
         const onChainBlockNumber = await this.connector.web3.eth.getBlockNumber()
         let fromBlock = await this.getLatestConfirmedBlockNumber()
@@ -345,19 +342,35 @@ class Indexer implements IIndexer {
             this.onNewBlock(block)
           })
 
-        this.openedChannelEvent = this.connector.hoprChannels.events
-          .OpenedChannel({
-            fromBlock,
+        // this.openedChannelEvent
+        const foo = this.connector.web3.eth
+          .subscribe('logs', {
+            address: this.connector.hoprChannels.options.address,
+            topics: [this.getTopic0('OpenedChannel(uint,uint)')],
           })
-          .on('error', (err) => reject(err))
+          .on('error', (err) => {
+            if (!rejected) {
+              rejected = true
+              reject(err)
+            }
+          })
           .on('data', (_event) => {
-            const event: LightEvent<typeof _event> = {
-              event: _event.event,
+            const event: OpenedChannelEvent = {
+              event: 'OpenedChannel',
               blockNumber: _event.blockNumber,
               transactionHash: _event.transactionHash,
               transactionIndex: _event.transactionIndex,
               logIndex: _event.logIndex,
-              returnValues: _event.returnValues,
+              returnValues: {
+                opener: u8aConcat(
+                  new Uint8Array([((2 + parseInt(_event.topics[0].slice(64, 66), 16)) >> 1) % 2]),
+                  stringToU8a(_event.topics[1])
+                ),
+                counterparty: u8aConcat(
+                  new Uint8Array([(2 + parseInt(_event.topics[0].slice(64, 66), 16)) % 2]),
+                  stringToU8a(_event.topics[1])
+                ),
+              },
             }
 
             if (isConfirmedBlock(event.blockNumber, onChainBlockNumber)) {
@@ -367,19 +380,35 @@ class Indexer implements IIndexer {
             }
           })
 
-        this.closedChannelEvent = this.connector.hoprChannels.events
-          .ClosedChannel({
-            fromBlock,
+        // this.closedChannelEvent
+        const bar = this.connector.web3.eth
+          .subscribe('logs', {
+            address: this.connector.hoprChannels.options.address,
+            topics: [this.getTopic0('ClosedChannel(uint,uint,uint,uint)')],
           })
-          .on('error', (err) => reject(err))
+          .on('error', (err) => {
+            if (!rejected) {
+              rejected = true
+              reject(err)
+            }
+          })
           .on('data', (_event) => {
-            const event: LightEvent<typeof _event> = {
-              event: _event.event,
+            const event: ClosedChannelEvent = {
+              event: 'ClosedChannel',
               blockNumber: _event.blockNumber,
               transactionHash: _event.transactionHash,
               transactionIndex: _event.transactionIndex,
               logIndex: _event.logIndex,
-              returnValues: _event.returnValues,
+              returnValues: {
+                closer: u8aConcat(
+                  new Uint8Array([((2 + parseInt(_event.topics[0].slice(64, 66), 16)) >> 1) % 2]),
+                  stringToU8a(_event.topics[1])
+                ),
+                counterparty: u8aConcat(
+                  new Uint8Array([(2 + parseInt(_event.topics[0].slice(64, 66), 16)) % 2]),
+                  stringToU8a(_event.topics[1])
+                ),
+              },
             }
 
             if (isConfirmedBlock(event.blockNumber, onChainBlockNumber)) {
@@ -447,6 +476,18 @@ class Indexer implements IIndexer {
     })
 
     return this.stopping
+  }
+
+  private getTopic0(eventName: string): string[] {
+    const rawTopic0 = createKeccakHash('keccak256').update(eventName).digest()
+
+    const topics = []
+
+    for (let i = 0; i < 4; i++) {
+      topics.push(u8aToHex(u8aConcat(rawTopic0.slice(0, 31), new Uint8Array([((rawTopic0[31] >> 2) << 2) | i]))))
+    }
+
+    return topics
   }
 }
 
