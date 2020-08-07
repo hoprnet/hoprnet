@@ -137,14 +137,14 @@ const items = [
       </>
     ),
   },
-  {
-    title: 'What does Binance get in return for contributing?',
-    paragraph: `We can't share details but the early contributors of the project (including Binance Labs) were purchasing HOPR tokens.`,
-  },
-  {
-    title: 'Why did HOPR only raise a $1M funding round? Are you still accepting funds?',
-    paragraph: `We didn't want to take more money than was needed, so we have been very strategic in the funding amount and who we have accepted funding from. We are very excited about our current group of funders and apologize for turning down many others. It's about finding the right fit. While we are not seeking more funding right now, we can never say never.`,
-  },
+  // {
+  //   title: 'What does Binance get in return for contributing?',
+  //   paragraph: `We can't share details but the early contributors of the project (including Binance Labs) were purchasing HOPR tokens.`,
+  // },
+  // {
+  //   title: 'Why did HOPR only raise a $1M funding round? Are you still accepting funds?',
+  //   paragraph: `We didn't want to take more money than was needed, so we have been very strategic in the funding amount and who we have accepted funding from. We are very excited about our current group of funders and apologize for turning down many others. It's about finding the right fit. While we are not seeking more funding right now, we can never say never.`,
+  // },
   {
     title: 'How do I become part of the HOPR team? Are you hiring?',
     paragraph: (

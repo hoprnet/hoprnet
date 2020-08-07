@@ -5,6 +5,7 @@ import { ReactComponent as Telegram } from '../../assets/images/icons/telegram.s
 import { ReactComponent as Linkedin } from '../../assets/images/icons/linkedin.svg'
 import { ReactComponent as Github } from '../../assets/images/icons/github.svg'
 import { ReactComponent as Youtube } from '../../assets/images/icons/youtube.svg'
+import { ReactComponent as Discord } from '../../assets/images/icons/discord.svg'
 
 const isCompany = process.env.REACT_APP_IS_COMPANY === 'TRUE'
 
@@ -43,6 +44,11 @@ const FooterSocial = ({ className, invertColor, ...props }) => {
         <li>
           <a href="https://www.youtube.com/channel/UC2DzUtC90LXdW7TfT3igasA" target="_blank" rel="noopener noreferrer">
             <Youtube style={style} />
+          </a>
+        </li>
+        <li>
+          <a href="https://discord.gg/a3zFXM" target="_blank" rel="noopener noreferrer">
+            <Discord style={style} />
           </a>
         </li>
       </ul>

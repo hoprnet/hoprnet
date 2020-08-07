@@ -1,18 +1,7 @@
 import React from 'react'
 import { sections, elements } from '@hoprnet/hopr-website.components'
 
-const {
-  HeroFull,
-  News,
-  Products,
-  FeaturesTabs,
-  FeaturesTiles,
-  Blogs,
-  Clients,
-  TeamAndInvestors,
-  FAQ,
-  Contact,
-} = sections
+const { HeroFull, News, Products, FeaturesTabs, FeaturesTiles, Blogs, Clients, TeamAndInvestors, Contact } = sections
 const { HoprCircle } = elements
 
 class Home extends React.Component {
@@ -28,8 +17,7 @@ class Home extends React.Component {
         <Blogs id="blogs" redirect />
         <Clients id="investors" hasBgColor invertColor />
         <TeamAndInvestors id="team_and_investors" />
-        <FAQ id="faq" hasBgColor invertColor />
-        <Contact id="contact" />
+        <Contact id="contact" topDivider />
       </React.Fragment>
     )
   }
