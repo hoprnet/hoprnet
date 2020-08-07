@@ -1,9 +1,7 @@
 import { API_URL } from './env'
-import { ListenResponse } from '@hoprnet/hopr-protos/node/listen_pb'
-import { Message } from './message'
 import { bounceBot } from './bouncebot'
 import { randoBot } from './randobot'
-import { SetupClient, getHoprAddress, sendMessage, getMessageStream  } from './utils'
+import { getHoprAddress  } from './utils'
 
 
 const start = async () => {
@@ -16,4 +14,7 @@ const start = async () => {
   randoBot(hoprAddress);
 }
 
-start().catch(console.error)
+start().catch((err) => {
+  console.error('Fatal Error:', err)
+  process.exit();
+})

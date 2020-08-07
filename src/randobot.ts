@@ -1,6 +1,6 @@
 import { getMessageStream, sendMessage } from './utils'
 import { ListenResponse } from '@hoprnet/hopr-protos/node/listen_pb'
-import { Message, IMessage } from './message'
+import { Message } from './message'
 import { generateRandomSentence } from './utils'
 
 
