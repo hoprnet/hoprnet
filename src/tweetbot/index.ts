@@ -24,7 +24,7 @@ enum STATUS {
 
 enum MESSAGES {
   INTRO = `Hi! I’m TweetBot! Nice to meet you. How’re you doing?`,
-  RULES = `First, send a tweet tagging @hoprnet which includes #HOPRGames and your HOPR node address. Then me the URL and I’ll get you some DAI!'`,
+  RULES = `First, send a tweet tagging @hoprnet which includes #HOPRGames and your HOPR node address. Then send me the URL. If you're one of the first 30 participants, I’ll get you some DAI!'`,
   NO_TWEET = 'Sorry... I couldn’t find a tweet in your message! Try again!',
   NO_HOPR_ACCOUNT = 'Hmm... that’s certainly a tweet, but I can’t see @hoprnet in it!',
   NO_HOPR_HASHTAG = 'Hey! That’s a neat tweet, but it doesn’t include the #HOPRGames tag!',
