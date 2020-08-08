@@ -27,6 +27,7 @@
     "@hoprnet/hopr-protos": "^0.0.9-docs.39fd32b",
     "@hoprnet/hopr-server": "^0.0.1",
     "@hoprnet/hopr-utils": "^0.1.7-c598e77",
+    "@hoprnet/twitter-api-client": "^0.1.7",
     "dotenv": "^8.2.0",
     "dotenv-parse-variables": "^0.3.0",
     "global": "^4.4.0",

@@ -17,7 +17,12 @@ const start = async () => {
       const bouncerbot = await import("./bouncerbot");
       bouncerbot.default(hoprAddress);
       break;
-    } 
+    }
+    case 'tweetbot': {
+      const tweetbot = await import("./tweetbot");
+      tweetbot.default(hoprAddress);
+      break; 
+    }
   }
 }
 
