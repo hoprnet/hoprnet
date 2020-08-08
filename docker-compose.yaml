@@ -12,7 +12,7 @@ services:
     volumes:
       - /app/db
   chat-bot:
-    image: gcr.io/hoprassociation/chat-bot
+    image: gcr.io/hoprassociation/hopr-chatbot/client
     restart: always
     depends_on:
       - 'server'

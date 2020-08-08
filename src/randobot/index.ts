@@ -4,7 +4,7 @@ import { Message } from '../message'
 import { generateRandomSentence } from '../utils'
 
 
-export const randoBot = async (hoprAddress) => {
+export default async (hoprAddress) => {
   const botName = '🃏 Randobot'
   console.log(`${botName} has been added`);
 

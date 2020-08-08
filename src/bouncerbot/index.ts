@@ -13,7 +13,7 @@ const messages = [
   'I don’t know what to tell you. I’m sure if you hang around long enough, someone will help you out'
 ] 
 
-export const bouncerBot = async (hoprAddress) => {
+export default async (hoprAddress) => {
   const botName = '🥊 Bouncerbot (v2)'
   console.log(`${botName} has been added`);
 

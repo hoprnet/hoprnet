@@ -3,8 +3,10 @@ import dotenvParse from 'dotenv-parse-variables'
 
 let parsed: {
   API_URL: string
+  BOT_NAME: string
 } = {
   API_URL: '127.0.0.1:50051',
+  BOT_NAME: 'randobot'
 }
 
 try {
@@ -22,3 +24,4 @@ parsed = {
 }
 
 export const API_URL = parsed.API_URL
+export const BOT_NAME = parsed.BOT_NAME
