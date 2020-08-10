@@ -39,7 +39,7 @@ var appendLog = function(msg){
 var connect = function(){
   var logs = document.querySelector('.logs')
   console.log("Connecting ...")
-  var client = new WebSocket('ws://localhost:3000');
+  var client = new WebSocket('ws://' + window.location.host);
   console.log("Web socket created")
 
   client.onopen = function(){
