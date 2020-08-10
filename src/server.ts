@@ -11,6 +11,8 @@ import path from 'path'
 import ws from 'ws'
 import http from 'http'
 
+const CRAWL_TIMEOUT = 100_000 // ~15 mins
+
 let NODE: Hopr<HoprCoreConnector>;
 let debugLog = debug('hopr-admin')
 
@@ -144,10 +146,19 @@ async function main() {
      logs.log("Failed to crawl")
      logs.log(err)
     }
-    setTimeout(periodicCrawl, 10_000)
+    setTimeout(periodicCrawl, CRAWL_TIMEOUT)
   }
-
   periodicCrawl()
+
+  async function reportMemoryUsage(){
+    const used = process.memoryUsage();
+    const usage = process.resourceUsage();
+    logs.log(
+    `[ Process stats: mem ${used.rss / 1024}k (max: ${usage.maxRSS / 1024}k) ` +
+    `cputime: ${usage.userCPUTime} ]`)
+    setTimeout(reportMemoryUsage, 10_000);
+  }
+  reportMemoryUsage()
 
   // Static file server
   var app = express()

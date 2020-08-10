@@ -22,7 +22,6 @@ body {
   overflow-y: scroll;
 }
 .connecting {
-  display: block;
   background-color: #ffffa0; /* HOPR Yellow */
   color: red;
 }
@@ -38,7 +37,7 @@ var appendLog = function(msg){
 }
 
 var connect = function(){
-  var logs = document.querySelector('#log')
+  var logs = document.querySelector('.logs')
   console.log("Connecting ...")
   var client = new WebSocket('ws://localhost:3000');
   console.log("Web socket created")
@@ -46,7 +45,6 @@ var connect = function(){
   client.onopen = function(){
     console.log("Web socket opened")
     logs.classList.remove('connecting')
-    logs.textContent = "" 
   }
 
   client.onmessage = function(event) {
@@ -79,12 +77,8 @@ window.onload = function(){
 </script>
   </head>
   <body>
-    <div class='logs'>
-    <pre>
-    <code id="log" class="connecting">
-      Connecting...
-    </code>
-    </pre>
+    <div class='logs' class="connecting">
+    <pre><code id="log">Connecting...</code></pre>
     </div>
   </body>
 </html>
