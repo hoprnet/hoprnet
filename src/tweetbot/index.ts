@@ -23,16 +23,16 @@ enum STATUS {
 }
 
 enum MESSAGES {
-  INTRO = `Hi! I am tweet bot! Nice to meet you. How’re you doing?`,
-  RULES = `Send me a Tweet with #HOPRGames, your HOPR Node Address and tagging @hoprnet and I’ll get you some DAI!'`,
+  INTRO = `Hi! I’m TweetBot! Nice to meet you. How’re you doing?`,
+  RULES = `First, send a tweet tagging @hoprnet which includes #HOPRGames and your HOPR node address. Then send me the URL. If you're one of the first 30 successful bounty hunters, you'll get 10 DAI!'`,
   NO_TWEET = 'Sorry... I couldn’t find a tweet in your message! Try again!',
-  NO_HOPR_ACCOUNT = 'Oh.. that’s a tweet indeed, but I can’t see @hoprnet in it!',
-  NO_HOPR_HASHTAG = 'Hey! That’s a neat tweet, but doesn’t include the #HOPRGames tag!',
-  NO_HOPR_ADDRESS = 'Good tweet! Do not forget to include your HOPR Node Address though :)',
-  NO_HOPR_ADDRESS_MISMATCH = 'Sorry! You can only send your tweet from a node you own. Nice try tho!',
-  ALREADY_WINNER = 'You already won! Please do not forget to fill the form https://forms.gle/YZrrrBeT8r9qG78K6 to get your reward',
-  SUCCESS = `Congratulations! Please fill our form https://forms.gle/YZrrrBeT8r9qG78K6 to get your reward.`,
-  FAILURE = 'Ah... something went wrong. Make sure to use the full https URL'
+  NO_HOPR_ACCOUNT = 'Hmm... that’s certainly a tweet, but I can’t see @hoprnet in it!',
+  NO_HOPR_HASHTAG = 'Hey! That’s a neat tweet, but it doesn’t include the #HOPRGames tag!',
+  NO_HOPR_ADDRESS = 'Good tweet! Don’t forget to include your HOPR node address though :)',
+  NO_HOPR_ADDRESS_MISMATCH = 'Sorry! You can only send your tweet from a node you control. Nice try tho!',
+  ALREADY_WINNER = 'You already won! Please don’t forget to fill in the form https://forms.gle/YZrrrBeT8r9qG78K6 to claim your reward',
+  SUCCESS = `Congratulations! And thanks for supporting HOPR! Please fill our form https://forms.gle/YZrrrBeT8r9qG78K6 to get your reward.`,
+  FAILURE = 'Hmm... something went wrong. Make sure you send me the full URL, including https.'
 }
 
 export default async (hoprAddress) => {
@@ -113,7 +113,7 @@ export default async (hoprAddress) => {
         * our tweet bot a bit easier.
         */
         if (message.text.match(/winners?$/i)) {
-          response = `So far we got ${winners.length} winners.`
+          response = `So far we’ve had ${winners.length} winners.`
         }
         if (message.text.match(/winners\ [0-9]?$/i)) {
           const [input] = message.text.match(/winners\ [0-9]?$/i);
