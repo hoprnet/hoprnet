@@ -1,3 +1,6 @@
 [submodule "docs"]
 	path = docs
 	url = https://github.com/hoprnet/hopr-documentation.git
+[submodule "assets"]
+	path = assets
+	url = https://github.com/hoprnet/hopr-assets.git
