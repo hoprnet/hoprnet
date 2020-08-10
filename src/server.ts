@@ -14,29 +14,36 @@ import http from 'http'
 let NODE: Hopr<HoprCoreConnector>;
 let debugLog = debug('hopr-admin')
 
-type Connection = ws.WebSocket
+type Socket = ws
 
 class LogStream {
   private messages: string[] = []
-  private connections: Connection[] = []
+  private connections: Socket[] = []
 
   constructor(){
   }
 
-  subscribe(sock: ws.Socket){
+  subscribe(sock: Socket){
     this.connections.push(sock);
     sock.send(this.messages.join('\n'))
   }
 
   log(...args: string[]){
-    debugLog(...args)
+    // @ts-ignore
+    debugLog(...args) 
+
     this.messages.push(args.join(' '))
-    this.connections.forEach((conn: Connection, i: number) => {
-      if (conn.readyState == ws.WebSocket.OPEN) {
+    if (this.messages.length > 100){ // Avoid memory leak
+      this.messages.splice(0, this.messages.length - 100); // delete elements from start
+    }
+
+
+    this.connections.forEach((conn: Socket, i: number) => {
+      if (conn.readyState == ws.OPEN) {
         conn.send(args.join(' '))
       } else {
         // Handle bad connections:
-        if (conn.readyState != ws.WebSocket.CONNECTING) {
+        if (conn.readyState !== ws.CONNECTING) {
           // Only other possible states are closing or closed
           this.connections.splice(i, 1)
         }

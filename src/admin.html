@@ -2,29 +2,44 @@
   <head>
     <title>HOPR Admin</title>
 <style>
-code {
+body {
+  background: linear-gradient(#000050, #0000b4); /* Dark Blue to bright blue */
+  color: #b4f0ff; /* Sky Blue */
+  height: 100vh;
+}
+.logs {
   display: block;
-  border: 1px solid #eee;
+  border: 1px solid #3c64a5; /* Steel Blue */
+  background-color: #b4f0ff; /* Sky Blue */
+  color: #000050; /* Dark Blue */
   padding: 1rem;
-  position: absolute;
-  top: 1rem;
+  margin: 1rem;
+  position: fixed; 
+  top: 1rem; 
   bottom: 1rem;
   left: 1rem;
   right: 1rem;
+  overflow-y: scroll;
 }
 .connecting {
-  background-color: #fee;
+  display: block;
+  background-color: #ffffa0; /* HOPR Yellow */
   color: red;
-  border: 1px solid red;
 }
 
 </style>
 <script>
 
 
-var connect = function(){
-  console.log("Connecting ...")
+var appendLog = function(msg){
   var logs = document.querySelector('#log')
+  logs.textContent = logs.textContent + '\n'+ msg
+  logs.scrollIntoView({block: 'end', behaviour: 'smooth'});
+}
+
+var connect = function(){
+  var logs = document.querySelector('#log')
+  console.log("Connecting ...")
   var client = new WebSocket('ws://localhost:3000');
   console.log("Web socket created")
 
@@ -35,7 +50,7 @@ var connect = function(){
   }
 
   client.onmessage = function(event) {
-    logs.textContent = event.data
+    appendLog(event.data)
     console.log(event)
   }
 
@@ -46,7 +61,7 @@ var connect = function(){
   client.onclose = function(){
     console.log("Web socket closed")
     logs.classList.add('connecting')
-    logs.textContent = "Lost Connection, attempting to reconnect..."
+    appendLog(" --- < Lost Connection, attempting to reconnect... > ---")
     setTimeout(function(){
       try {
         connect()
@@ -64,10 +79,12 @@ window.onload = function(){
 </script>
   </head>
   <body>
+    <div class='logs'>
     <pre>
     <code id="log" class="connecting">
       Connecting...
     </code>
     </pre>
+    </div>
   </body>
 </html>
