@@ -1,8 +1,7 @@
 {
-  "name": "hopr-core.avado.dnp.dappnode.eth",
+  "name": "hopr.avado.dnp.dappnode.eth",
   "version": "0.0.1",
-  "description": "hopr-core client (public testnet)",
-  "shortDescription": "hopr-core client (public testnet)",
+  "description": "hopr node (public testnet)",
   "avatar": "/ipfs/QmQGxeJHvH2XDZSbai7YSPNs8RfhT7aiaB1DYEbdCpMshk",
   "type": "service",
   "chain": "ethereum",
@@ -18,8 +17,8 @@
       "1111:1111/tcp",
       "3000:3000/tcp"
     ],
-    "path": "hopr-core.avado.dnp.dappnode.eth_0.0.1.tar.xz",
-    "hash": "/ipfs/QmYKEub6k186V4MwS9de1Ce1ThtH8uVsEAYToWRmXc85MG",
+    "path": "hopr.avado.dnp.dappnode.eth_0.0.1.tar.xz",
+    "hash": "/ipfs/QmfJUaXkDTftKAP8bx83FiYZTF5YrLRfWPXtBWYocz9Lj6",
     "size": 367083264,
     "restart": "always"
   },

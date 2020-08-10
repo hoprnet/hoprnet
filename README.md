@@ -1,4 +1,4 @@
-# AVADO-DNP-HOPR-core
+# AVADO-DNP-HOPR
 
 ## Prerequisites
 
