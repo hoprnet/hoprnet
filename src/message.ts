@@ -21,7 +21,7 @@ export class Message extends Uint8Array {
   toJson(): IMessage {
     try {
       const from = this.subarray(0, 53)
-      const text = this.subarray(53, this.length)
+      const text = this.subarray(54, this.length)
 
       return {
         from: textDecoder.decode(from),
