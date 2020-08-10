@@ -5,5 +5,19 @@
     "uploadedTo": {
       "dappnode": "Mon, 10 Aug 2020 13:02:05 GMT"
     }
+  },
+  "0.0.2": {
+    "hash": "/ipfs/QmSnLNj4teyHkWyqHRGwRsZfiV7WuUYD5jKzBuF48iramT",
+    "type": "manifest",
+    "uploadedTo": {
+      "dappnode": "Mon, 10 Aug 2020 14:25:18 GMT"
+    }
+  },
+  "0.0.3": {
+    "hash": "/ipfs/QmW1aHnix2MmymSet3aQ2zpq4NQKcmzDWjcwwhUDh7vLbN",
+    "type": "manifest",
+    "uploadedTo": {
+      "dappnode": "Mon, 10 Aug 2020 14:53:57 GMT"
+    }
   }
 }
