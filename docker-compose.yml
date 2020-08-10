@@ -10,4 +10,6 @@ services:
     restart: always
     volumes:
       - 'data:/data'
+    ports:
+      - 3000:3000
     dns: 172.33.1.2
