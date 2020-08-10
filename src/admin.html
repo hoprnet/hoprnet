@@ -5,6 +5,12 @@
 code {
   display: block;
   border: 1px solid #eee;
+  padding: 1rem;
+  position: absolute;
+  top: 1rem;
+  bottom: 1rem;
+  left: 1rem;
+  right: 1rem;
 }
 .connecting {
   background-color: #fee;
@@ -16,18 +22,44 @@ code {
 <script>
 
 
-
-window.onload = function(){
-
+var connect = function(){
+  console.log("Connecting ...")
   var logs = document.querySelector('#log')
   var client = new WebSocket('ws://localhost:3000');
+  console.log("Web socket created")
+
+  client.onopen = function(){
+    console.log("Web socket opened")
+    logs.classList.remove('connecting')
+    logs.textContent = "" 
+  }
 
   client.onmessage = function(event) {
-    logs.classList.remove('connecting')
     logs.textContent = event.data
     console.log(event)
   }
 
+  client.onerror = function(error){
+    console.log("Connection error:", error)
+  }
+
+  client.onclose = function(){
+    console.log("Web socket closed")
+    logs.classList.add('connecting')
+    logs.textContent = "Lost Connection, attempting to reconnect..."
+    setTimeout(function(){
+      try {
+        connect()
+        console.log("connection")
+      } catch (e){
+        console.log("Error connecting", e)
+      }
+    }, 1000);
+  }
+}
+
+window.onload = function(){
+  connect();
 }
 </script>
   </head>

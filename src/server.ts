@@ -12,12 +12,40 @@ import ws from 'ws'
 import http from 'http'
 
 let NODE: Hopr<HoprCoreConnector>;
-let log = debug('hopr-admin')
+let debugLog = debug('hopr-admin')
 
-let MESSAGE_BUFFER = ""
-const logMessage = function(message){
-  MESSAGE_BUFFER += "\n" + message
+type Connection = ws.WebSocket
+
+class LogStream {
+  private messages: string[] = []
+  private connections: Connection[] = []
+
+  constructor(){
+  }
+
+  subscribe(sock: ws.Socket){
+    this.connections.push(sock);
+    sock.send(this.messages.join('\n'))
+  }
+
+  log(...args: string[]){
+    debugLog(...args)
+    this.messages.push(args.join(' '))
+    this.connections.forEach((conn: Connection, i: number) => {
+      if (conn.readyState == ws.WebSocket.OPEN) {
+        conn.send(args.join(' '))
+      } else {
+        // Handle bad connections:
+        if (conn.readyState != ws.WebSocket.CONNECTING) {
+          // Only other possible states are closing or closed
+          this.connections.splice(i, 1)
+        }
+
+      }
+    })
+  }
 }
+
 
 
 // DEFAULT VALUES FOR NOW
@@ -27,9 +55,12 @@ const provider =
   "wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36";
 const bootstrapAddresses =
   (process.env.HOPR_BOOTSTRAP_SERVERS ||
-  "/ip4/34.65.82.167/tcp/9091/p2p/16Uiu2HAm6VH37RG1R4P8hGV1Px7MneMtNc6PNPewNxCsj1HsDLXW,/ip4/34.65.111.179/tcp/9091/p2p/16Uiu2HAmPyq9Gw93VWdS3pgmyAWg2UNnrgZoYKPDUMbKDsWhzuvb").replace(' ', '').split(',');
+  ["/ip4/34.65.82.167/tcp/9091/p2p/16Uiu2HAm6VH37RG1R4P8hGV1Px7MneMtNc6PNPewNxCsj1HsDLXW",
+    "/ip4/34.65.111.179/tcp/9091/p2p/16Uiu2HAmPyq9Gw93VWdS3pgmyAWg2UNnrgZoYKPDUMbKDsWhzuvb"]);
 const host = process.env.HOPR_HOST || "0.0.0.0:9091"; // Default IPv4
 
+// TODO this should probably be shared between chat and this, and live in a
+// utils module.
 function parseHosts(): HoprOptions['hosts'] {
   const hosts: HoprOptions['hosts'] = {}
   if (host !== undefined) {
@@ -50,6 +81,7 @@ function parseHosts(): HoprOptions['hosts'] {
 async function main() {
   let addr: Multiaddr;
   let bootstrapServerMap = new Map<string, PeerInfo>();
+  let logs = new LogStream()
 
   if (bootstrapAddresses.length == 0) {
     throw new Error(
@@ -78,14 +110,17 @@ async function main() {
     hosts: parseHosts(),
     password: process.env.HOPR_PASSWORD || 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' // TODO!!!
   };
-  debug(options)
-  logMessage('Creating HOPR Node')
-  logMessage('- bootstrapServers : ' + Array.from(bootstrapServerMap.values()).join(', '));
+
+  debugLog(options)
+  logs.log('Creating HOPR Node')
+  logs.log('- network : ' + network);
+  logs.log('- bootstrapServers : ' + Array.from(bootstrapServerMap.values()).join(', '));
+
   NODE = await Hopr.create(options);
-  logMessage('Created HOPR Node')
+  logs.log('Created HOPR Node')
 
   NODE.on("peer:connect", (peer: PeerInfo) => {
-    logMessage(`Incoming connection from ${peer.id.toB58String()}.`);
+    logs.log(`Incoming connection from ${peer.id.toB58String()}.`);
   });
 
   process.once("exit", async () => {
@@ -94,13 +129,18 @@ async function main() {
   });
 
 
-  const flushMessages = function(sock){
-    sock.send(MESSAGE_BUFFER)
+  async function periodicCrawl(){
+    try {
+      await NODE.network.crawler.crawl()
+      logs.log('Crawled network')
+    } catch (err) {
+     logs.log("Failed to crawl")
+     logs.log(err)
+    }
+    setTimeout(periodicCrawl, 10_000)
   }
-  const messageLoop = function(sock){
-    flushMessages(sock);
-    setTimeout(messageLoop.bind(undefined, sock), 100)
-  }
+
+  periodicCrawl()
 
   // Static file server
   var app = express()
@@ -113,8 +153,8 @@ async function main() {
 
   const wsServer = new ws.Server({ server: server });
   wsServer.on('connection', socket => {
-    socket.on('message', message => console.log(message));
-    messageLoop(socket)
+    socket.on('message', message => debugLog("Message from client", message));
+    logs.subscribe(socket)
   });
 
   server.listen(process.env.HOPR_ADMIN_PORT || 3000)
