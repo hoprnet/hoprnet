@@ -1,0 +1,5 @@
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  args: [ 'build', '-f', 'chatbot.Dockerfile', '-t', 'gcr.io/hoprassociation/hopr-chatbot', '.' ]
+images:
+- 'gcr.io/hoprassociation/hopr-chatbot'

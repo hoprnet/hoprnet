@@ -1,10 +1,10 @@
-import { getMessageStream, sendMessage } from './utils'
+import { getMessageStream, sendMessage } from '../utils'
 import { ListenResponse } from '@hoprnet/hopr-protos/node/listen_pb'
-import { Message } from './message'
-import { generateRandomSentence } from './utils'
+import { Message } from '../message'
+import { generateRandomSentence } from '../utils'
 
 
-export const randoBot = async (hoprAddress) => {
+export default async (hoprAddress) => {
   const botName = '🃏 Randobot'
   console.log(`${botName} has been added`);
 

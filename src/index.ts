@@ -1,6 +1,4 @@
-import { API_URL } from './env'
-import { bounceBot } from './bouncebot'
-import { randoBot } from './randobot'
+import { API_URL, BOT_NAME } from './env'
 import { getHoprAddress  } from './utils'
 
 
@@ -9,9 +7,23 @@ const start = async () => {
   const hoprAddress = await getHoprAddress()
   console.log(`My HOPR address is ${hoprAddress}`)
 
-  // Adding bots
-  bounceBot(hoprAddress);
-  randoBot(hoprAddress);
+  switch(BOT_NAME) {
+    case 'randobot': {
+      const randobot = await import("./randobot");
+      randobot.default(hoprAddress);
+      break;
+    }
+    case 'bouncerbot': {
+      const bouncerbot = await import("./bouncerbot");
+      bouncerbot.default(hoprAddress);
+      break;
+    }
+    case 'tweetbot': {
+      const tweetbot = await import("./tweetbot");
+      tweetbot.default(hoprAddress);
+      break; 
+    }
+  }
 }
 
 start().catch((err) => {
