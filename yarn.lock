@@ -4499,6 +4499,11 @@ react-refresh@0.8.3:
   resolved "https://registry.yarnpkg.com/react-refresh/-/react-refresh-0.8.3.tgz#721d4657672d400c5e3c75d063c4a85fb2d5d68f"
   integrity sha512-X8jZHc7nCMjaCqoU+V2I0cOhNW+QMBwSUkeXnTi8IPe6zaRWfn60ZzvFDZqWPfmSJfjub7dDW1SP0jaHWLu/hg==
 
+react-tracked@^1.4.1:
+  version "1.4.1"
+  resolved "https://registry.yarnpkg.com/react-tracked/-/react-tracked-1.4.1.tgz#fcfa2a6b686ecdda5158cd55c012804e8e24bf6c"
+  integrity sha512-gfQjOtyKBpgt137N199SKjRYhC2Nfs4fRu5nMAJO96U2daJGW1SKIRhWZzm0z0kRWaBN+htAtNVs2aPTMe5Kvg==
+
 react@16.13.1:
   version "16.13.1"
   resolved "https://registry.yarnpkg.com/react/-/react-16.13.1.tgz#2e818822f1a9743122c063d6410d85c1e3afe48e"

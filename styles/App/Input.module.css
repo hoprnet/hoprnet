@@ -1,0 +1,8 @@
+.container {
+  display: flex;
+  height: 5vh;
+}
+
+.input {
+  flex: 1;
+}

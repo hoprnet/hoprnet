@@ -4,12 +4,11 @@ import {
   ListenRequest,
   ListenResponse,
 } from "@hoprnet/hopr-protos/web/listen_pb";
-import { API_URL } from "../env";
 
-export const listenToMessages = async (): Promise<
-  ClientReadableStream<ListenResponse>
-> => {
-  const client = new ListenPromiseClient(API_URL);
+export const listenToMessages = async (
+  apiUrl: string
+): Promise<ClientReadableStream<ListenResponse>> => {
+  const client = new ListenPromiseClient(apiUrl);
 
   return client.listen(new ListenRequest());
 };
