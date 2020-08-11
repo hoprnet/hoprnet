@@ -4,7 +4,14 @@
 **HOPR** is a privacy-preserving messaging **protocol** which enables the creation of a secure communication network via relay nodes powered by economic incentives using digital tokens. **HOPR Chatbot** is a proof-of-concept aimed to showcase the capabilities of a **HOPR Node** by using our gRPC-enabled **HOPR Server**, which listens to messages and replies to the recipients of them, whenever their address is included in the original message.
 
 ## Overview
-**HOPR Chatbot** is a `node.js` application that connects to an instance of a `hopr-server`, and listens to any calls done against such server. Upon receiving a message with a valid recipient, it provides an answer given the bot that is currently loaded. At the time of writing, **HOPR Chatbot** dynamically loads bots based in the `ENV` given, and each bot has different capabilities.
+**HOPR Chatbot** is a `node.js` application that connects to an instance of a [**HOPR Server**](https://github.com/hoprnet/hopr-server), and listens to any calls done against such server. Upon receiving a message with a valid recipient, it provides an answer given the bot that is currently loaded. At the time of writing, **HOPR Chatbot** dynamically loads bots based in the `ENV` given, and each bot has different capabilities.
+
+### Existing Bots
+- [🃏  Randobot](./src/randobot/index.ts): Generates random words when messaged.
+- [🐦  Tweetbot](./src/tweetbot/index.ts): Asks for a tweet including your address, #HOPRGames and @hoprnet in it.
+
+### Bots in Progress
+- [🥊  Bouncerbot](./src/bouncerbot/index.ts): Blocks you from entering a “party”, but will give you some hints to enter afterwards. See [issue](https://github.com/hoprnet/hopr-chatbot/issues/9).
 
 ## Requirements
 
@@ -51,7 +58,7 @@ HOPR:      16Uiu2HAkwsN4GVHQr1szVurz6u4V6uB9ZJacey471Pg2nTxHvP47
 > 16Uiu2HAkwsN4GVHQr1szVurz6u4V6uB9ZJacey471Pg2nTxHvP47hello world
 ```
 
-**< 1.3.0**
+**>=1.3.0**
 ```terminal
 # call includeRecipient
 > includeRecipient
