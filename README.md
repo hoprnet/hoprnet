@@ -1,25 +1,113 @@
-# HOPR Web Server
+<!-- INTRODUCTION -->
+<p align="center">
+  <a href="https://hoprnet.org" target="_blank" rel="noopener noreferrer">
+    <img width="100" src="https://github.com/hoprnet/hopr-assets/blob/master/v1/logo/hopr_logo_padded.png?raw=true" alt="HOPR Logo">
+  </a>
+  
+  <!-- Title Placeholder -->
+  <h3 align="center">HOPR Server</h3>
+  <p align="center">
+    Nest.js based gRPC-enabled server.
+  </p>
+  <p align="center">
+	  HOPR Server is a TypeScript-coded, gRPC server that allows developers to interact with a HOPR Node via a protobuf enabled API. Powered by the **HOPR Network** and the [HOPR Association](https://hoprnet.org/).
+  </p>
+</p>
 
-HOPR is a privacy-preserving messaging **protocol** which enables the creation of a secure communication network via relay nodes powered by economic incentives using digital tokens.
+<!-- BADGES -->
+<p align="center">
+  <!-- <a href="#"><img src="https://img.shields.io/static/v1?label=change&message=me&color=yellow" alt="Replace Me"></a> -->
+  ![Node.js CI](https://github.com/hoprnet/hopr-server/workflows/Node.js%20CI/badge.svg)
+</p>
 
-HOPR Web Server is a gRPC server powered by Nest.js able to wrap a HOPR Node via a protobuf enabled API.
+<!-- TABLE OF CONTENTS -->
+## Table of Contents
 
-## Installing
+* [Overview](#overview)
+  * [Technologies](#technologies)
+* [Getting Started](#getting-started)
+  * [Prerequisites](#prerequisites)
+  * [Installation](#installation)
+* [Usage](#usage)
+  * [Environment Variables](#environment-variables)
+* [Roadmap](#roadmap)
+* [Additional Information](#additional-information)
+* [Contributors](#contributors)
+* [Contact](#contact)
 
-1. Clone repository: `git clone https://github.com/hoprnet/hopr-core.git`
-2. Navigate to the server's subdirectory: `cd server`
-3. Install dependancies: `yarn`
+<!-- OVERVIEW -->
+## Overview
 
-## Running and stopping the server
+**HOPR Server** functions as a wrapper for a **HOPR Node**. Upon  start, it will automatically spin a **HOPR Node** listening to port `9091` and create a gRPC-ready interface listening to port `50051` which automatically connects to the **HOPR Network** using the `BOOTSTRAP_SERVERS` defined.
 
-1. Start server: `yarn start`
-2. Once you see `:: HOPR Core Node Started ::`, it means that the server is ready to accept requests.
+To interact with **HOPR Server**, you need to use [**HOPR Protos**](https://github.com/hoprnet/hopr-protos), the *Protobuf* implementation of the **HOPR Protocol** which exposes its API via gRPC. **HOPR Protos** can be installed and used via `nom` by installing the [distribution package](https://www.npmjs.com/package/@hoprnet/hopr-protos).
 
-To `stop` the server, you need press `ctrl+c` on your terminal window, this will stop the server gracefully.
+### Technologies
+* [HOPR Core](https://github.com/hoprnet/hopr-core)
+* [typescript](https://www.typescriptlang.org/)
+* [nest.js](https://nestjs.com/)
+* [protocol buffers](https://developers.google.com/protocol-buffers)
 
-## Environment Variables
+<!-- GETTING STARTED -->
+## Getting Started
 
-The server is able to recognise and process a `.env` file located at the root of the project.
+To get a local copy up and running follow these simple steps. In case you just want to have a runnable version of **HOPR Server**, you can use our [Docker Image](#docker-image) to quickly start the server.
+
+### Prerequisites
+
+This is an example of how to list things you need to use the software and how to install them.
+
+* [node.js v>=12](https://nodejs.org/)
+* [yarn](https://yarnpkg.com/)
+* [docker](https://www.docker.com/) (optional)
+
+### Installation
+ 
+1. Clone the repo
+```sh
+git clone https://github.com/hoprnet/hopr-server.git
+```
+2. Install NPM packages
+```sh
+yarn
+```
+
+### Docker Image
+
+#### Pull latest version
+```sh
+docker pull gcr.io/hoprassociation/hopr-server
+```
+
+#### Run latest version
+```sh
+docker run -p 50051:50051 -p 9091:9091 -it gcr.io/hoprassociation/hopr-server
+```
+
+#### Run latest version w/specific `BOOTSTRAP_SERVERS`
+```sh
+docker run \
+  -p 50051:50051 -p 9091:9091 \
+  -e BOOTSTRAP_SERVERS=/ip4/34.65.75.45/tcp/9091/p2p/16Uiu2HAm2cjqsDMmprtN2QKaq3LJrq3YK7vtdbQQFsxGrhLRoYsy,/ip4/34.65.177.154/tcp/9091/p2p/16Uiu2HAm9C4oJPeRkdXnYxtXzFpDqpcCbWLsgNW4irrCLZTJ7cBd \
+  -it gcr.io/hoprassociation/hopr-server
+```
+
+<!-- USAGE EXAMPLES -->
+## Usage
+
+Upon installing, you can run `yarn start` to start the server which will use `ts-node`. Once you see `:: HOPR Core Node Started ::`, it means that the server has successfully connected to the **HOPR Network** using the defined `BOOTSTRAP_SERVERS` and is ready to accept requests.
+
+In case you are looking to distribute the application, you can precompile it using `yarn build`, which will compile the `nest.js` TypeScript files and create a `dist` folder, which can then be used by `node` directly.
+
+### Commands
+1. `yarn start` - Starts **HOPR Server** in `dev` mode.
+2. `yarn build` - Builds **HOPR Server** for production.
+
+_For more information about the HOPR Network, please refer to the [Documentation](https://docs.hoprnet.org)_
+
+### Environment Variables
+
+The following environment variables can be stored and used in an `.env` file located at the root of the project.
 
 | Name              | Description                                                  | Type             | Example                           |
 | :---------------- | :----------------------------------------------------------- | :--------------- | :-------------------------------- |
@@ -30,17 +118,22 @@ The server is able to recognise and process a `.env` file located at the root of
 | CORE_HOST         | passed to hopr-core: hopr-core HOST url                      | string           | 0.0.0.0:9091                      |
 | BOOTSTRAP_SERVERS | passed to hopr-core: a list of bootstap server to connect to | array of strings | [src](./src/core/core.service.ts) |
 
-## Query the server using [BloomRPC](https://github.com/uw-labs/bloomrpc) (Recommended)
+<!-- ROADMAP -->
+## Roadmap
 
-1. Download and install [BloomRPC](https://github.com/uw-labs/bloomrpc/releases)
-2. BloomRPC requires us to:
-   1. import the `.proto` files that are used by our server
-   2. set our server url `127.0.0.1:50051` so it knows where to send requests to
-3. import `.proto` files by click on the top-left "+" icon and navigating to `node_modules/@hoprnet/hopr-protos/protos` select all `.proto` files
-4. after importing the available methods should be visible on the left panel
-5. set server url in the input at top-center to `127.0.0.1:50051`
+See the [issues](https://github.com/hoprnet/hopr-server/issues) for a list of proposed features (and known issues).
 
-### Quering
+<!-- ADDITIONAL INFORMATION -->
+## Additional Information
+
+### Query the server using [BloomRPC](https://github.com/uw-labs/bloomrpc) (Recommended)
+
+1. Download and install [BloomRPC](https://github.com/uw-labs/bloomrpc/releases).
+2. Download the `.proto` [files](https://github.com/hoprnet/hopr-protos) that are used by our server.
+3. Import `.proto` files by clicking on the top-left `+` icon and navigating to previously downloaded files.
+4. Set the server url in the input at top-center to `127.0.0.1:50051`
+
+#### Quering
 
 1. Select on of the unary methods from the left panel, for example: `version.proto -> version.Version -> GetVersion`
 2. Click "play" (▶️), you should get a response of something like:
@@ -58,16 +151,16 @@ The server is able to recognise and process a `.env` file located at the root of
 }
 ```
 
-### Sending & Listening to messages
+#### Sending & Listening to messages
 
-In this example, you will need to run two servers (server A and server B), one for sending a message and another for listening.
-Server B should be setup in a different directory from server A.
+In this example, you will need to run two servers (server `A` and server `B`), one for sending a message and another for listening.
+Server `B` needs to be setup in a different directory from server `A`, as a **HOPR Node** creates a `db` directory which can not be shared between different instances.
 
-1. Start server A: `yarn start`
-2. Start server B: `SERVER_HOST=0.0.0.0:50052 CORE_HOST=0.0.0.0:9092 yarn start`
+1. Start server `A`: `yarn start`
+2. Start server `B`: `SERVER_HOST=0.0.0.0:50052 CORE_HOST=0.0.0.0:9092 yarn start`
 3. Call `GetStatus` for both servers using BloomRPC, take note of their ids
-4. Call `Listen` on server B, `peer_id` is optional and can be removed, example input: `{}`
-5. Call `Send` on server A, example input can be:
+4. Call `Listen` on server `B`, `peer_id` is optional and can be removed, example input: `{}`
+5. Call `Send` on server `A`, example input can be:
 
 ```json
 {
@@ -76,18 +169,15 @@ Server B should be setup in a different directory from server A.
 }
 ```
 
-6. Server B should have received a message
+6. Server `B` should have received the message as a payload.
 
-## Query the server using [gCURL](https://github.com/nikunjy/pcurl)
+### Querying the server using [gCURL](https://github.com/nikunjy/pcurl)
 
-1. Install [gCURL](https://github.com/nikunjy/pcurl) using `npm install -g gcurl`
-2. Clone this project `git clone https://github.com/hoprnet/hopr-core.git`
-3. Go to `protos` folder `cd protos`
-4. Install dependancies using `yarn`
-5. Start GRPC server `yarn start`
-6. Wait until temrinal displays `HOPR Core Node Started`
-7. Call `getStatus` using `gcurl -f ./node_modules/@hoprnet/hopr-protos/protos/status.proto --host 127.0.0.1:50051 --input '{}' --short status:Status:getStatus`
-8. First `getStatus` call might take a minute to respond, you should receive a minified json response like:
+1. Install [gCURL](https://github.com/nikunjy/pcurl) using `npm install -g gcurl` or `yarn global add curl`.
+2. Start the server `yarn start`
+3. Wait until terminal displays `:: HOPR Core Node Started ::`
+4. Call `getStatus` using `gcurl -f ./node_modules/@hoprnet/hopr-protos/protos/status.proto --host 127.0.0.1:50051 --input '{}' --short status:Status:getStatus`
+5. First `getStatus` call might take a minute to respond, you should receive a minified json response like:
 
 ```json
 {
@@ -103,9 +193,9 @@ Server B should be setup in a different directory from server A.
 }
 ```
 
-## Gotchas
+### Considerations
 
-- `BloomRPC` will sometime insert default input data when calling certain methods, for example with `Send` it will insert:
+- `BloomRPC` will sometimes insert default input data when calling certain methods, for example with `Send` it will insert:
 
 ```json
 {
@@ -126,6 +216,30 @@ which is incompatible with our server, the right input is:
 }
 ```
 
-- First `GetStatus` might take a long time respond, this is because internally we do a `crawl`, tracking issue [here](https://github.com/hoprnet/hopr-core/issues/156).
+- Before calling `Send` you should call `GetStatus`, as the **HOPR node** might need to “discover” the other node from the network before it is able to send a message. Avoiding to do so might result in a `Timeout` error.
 
-- Before calling `Send` you should call `GetStatus`
+### Links
+- [ ] [License](./LICENSE.md)
+- [ ] [Changelog](./CHANGELOG.md)
+- [ ] [Contribution Guidelines](./CONTRIBUTING.md)
+- [ ] [Issues](./issues)
+- [ ] [Codeowners](./CODEOWNERS.md)
+
+<!-- CONTRIBUTORS -->
+## Contributors
+
+This project has been possible thanks to the support of the following individuals:
+
+* [@jjperezaguinaga](https://github.com/jjperezaguinaga)
+* [@nionis](https://github.com/nionis)
+* [@peterbraden](https://github.com/peterbraden)
+
+<!-- CONTACT -->
+## Contact
+- Twitter - https://twitter.com/hoprnet
+- Telegram - https://t.me/hoprnet
+- Medium - https://medium.com/hoprnet
+- Reddit - https://www.reddit.com/r/HOPR/
+- Email - contact@hoprnet.org
+- Discord - https://discord.gg/5FWSfq7
+- Youtube - https://www.youtube.com/channel/UC2DzUtC90LXdW7TfT3igasA
