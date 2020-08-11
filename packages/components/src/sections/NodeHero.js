@@ -2,6 +2,7 @@ import React from 'react'
 import PropTypes from 'prop-types'
 import GenericSection from './GenericSection'
 import Image from '../elements/Image'
+import Button from '../elements/Button'
 import { SectionProps } from '../utils/SectionProps'
 
 const propTypes = {
@@ -64,7 +65,7 @@ const NodeHero = props => {
                     well! Check out{' '}
                     <a
                       href="https://docs.hoprnet.org/home/getting-started/hopr-chat"
-                      className="text-high-color underline"
+                      className="text-color-high underline"
                       target="_blank"
                       rel="noopener noreferrer"
                     >
@@ -88,12 +89,39 @@ const NodeHero = props => {
                   </div>
                 </div>
                 <div className="features-tiles-item-content">
-                  <h4 className="mt-0 mb-8">HOPR Hardware Node</h4>
+                  <h4 className="mt-0 mb-8">HOPR Node PC</h4>
                   <p className="m-0 text-sm">
-                    Order our limited supply of initial HOPR Node PCs now! Following our coverage in Coindesk and
-                    Cointelegraph, our wait list reached almost 400 people, which surprised even us! However, we are
-                    only making an initial 100 node PCs available, so we highly recommend ordering now.
+                    Order our limited supply of initial HOPR Node PCs now! Following our coverage in{' '}
+                    <a
+                      href="https://www.coindesk.com/binance-labs-leads-1m-seed-round-in-crypto-tor-alternative-hopr"
+                      className="text-color-high underline"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Coindesk
+                    </a>{' '}
+                    and{' '}
+                    <a
+                      href="https://cointelegraph.com/news/hopr-data-privacy-testnet-to-launch-following-investment-by-binance"
+                      className="text-color-high underline"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Cointelegraph
+                    </a>
+                    , our wait list reached almost 400 people, which surprised even us! However, we are only making an
+                    initial 100 node PCs available, so we highly recommend ordering now.
                   </p>
+                  <Button
+                    tag="a"
+                    color="primary"
+                    className="mt-32"
+                    href="https://ava.do/checkout/hopr"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    ORDER NOW
+                  </Button>
                 </div>
               </div>
             </div>
@@ -104,13 +132,13 @@ const NodeHero = props => {
         <div className="center-content">
           <div className="container">
             <h2 className="section-header mt-0 mb-0 reveal-from-top" data-reveal-delay="300">
-              Specifications
+              Specifications of HOPR Node PC
             </h2>
             <p className="reveal-from-top" data-reveal-delay="350">
-              The HOPR Node is a pre-configured version of the{' '}
+              The HOPR Node PC is a pre-configured version of the{' '}
               <a
                 href="https://ava.do/avado-i2"
-                className="text-high-color underline"
+                className="text-color-high underline"
                 target="_blank"
                 rel="noopener noreferrer"
               >
@@ -118,14 +146,14 @@ const NodeHero = props => {
               </a>
               , a plug-and-play blockchain-ready node. It has high specifications (8GB RAM, Intel Pentium 4415) with
               upgraded SSD storage (1TB), making it more than powerful enough to install and run an Ethereum full node.
-              The HOPR Node contains the first release of HOPR Alpha, a layer-0 privacy software able to connect to the
-              HOPR Network. The HOPR Node is ready to use: just connect it to your router! You can also use it to run
-              other kinds of nodes, making it a viable IPFS, Filecoin, or ETH2 node.
+              The HOPR Node PC contains the first release of HOPR Alpha, a layer-0 privacy software able to connect to
+              the HOPR Network. The HOPR Node PC is ready to use: just connect it to your router! You can also use it to
+              run other kinds of nodes, making it a viable IPFS, Filecoin, or ETH2 node.
             </p>
           </div>
         </div>
       </GenericSection>
-      <GenericSection id="checkout" {...evenSections}>
+      {/* <GenericSection id="checkout" {...evenSections}>
         <div className="center-content">
           <div className="container">
             <h2 className="section-header mt-0 mb-0 reveal-from-top" data-reveal-delay="300">
@@ -147,7 +175,7 @@ const NodeHero = props => {
             </p>
           </div>
         </div>
-      </GenericSection>
+      </GenericSection> */}
     </>
   )
 }

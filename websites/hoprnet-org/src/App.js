@@ -14,6 +14,7 @@ import Node from './views/Node'
 import Sedimentum from './views/Sedimentum'
 import Ecosystem from './views/Ecosystem'
 import Support from './views/Support'
+import NotFound from './views/NotFound'
 
 const { AppRoute, ScrollReveal, ScrollToTop, insertScript } = utils
 const { Disclaimer, Pdf } = views
@@ -71,6 +72,7 @@ class App extends React.Component {
                 component={Pdf('Japanese Binance HOPR Press Release.pdf')}
                 layout={LayoutDefault}
               />
+              <AppRoute component={NotFound} layout={LayoutDefault} />
             </Switch>
           )}
         />

@@ -53,13 +53,13 @@ class TeamAndInvestors extends React.Component {
                   <h3 className="mt-0 mb-0" data-reveal-container=".tiles-item">
                     Team
                   </h3>
-                  <div className="has-shadow has-bg-color invert-color card">
+                  <div className={`has-shadow ${isCompany ? 'has-bg-color invert-color card' : ''}`}>
                     <Image
                       className={isCompany ? 'img-to-white' : undefined}
                       src={
                         isCompany
                           ? require('../assets/images/icons/original/multiple-users-1.png')
-                          : require('../assets/images/cards/team-card.png')
+                          : require('../assets/images/cards/team-card-with-blue-stroke.png')
                       }
                     />
                   </div>
