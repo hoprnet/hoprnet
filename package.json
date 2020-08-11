@@ -26,7 +26,7 @@
   },
   "dependencies": {
     "@hoprnet/hopr-ethereum": "hoprnet/hopr-ethereum#feature/change-internal-channel-representation",
-    "@hoprnet/hopr-utils": "0.1.6-refactor.61df948",
+    "@hoprnet/hopr-utils": "^0.3",
     "bn.js": "^5.1.2",
     "chalk": "^4.1.0",
     "debug": "^4.1.1",
@@ -41,7 +41,7 @@
     "web3-eth-contract": "^1.2.9"
   },
   "devDependencies": {
-    "@hoprnet/hopr-core-connector-interface": "1.4.0",
+    "@hoprnet/hopr-core-connector-interface": "1.4.1",
     "@hoprnet/hopr-demo-seeds": "1.8.0",
     "@hoprnet/hopr-testing": "0.1.2",
     "@types/debug": "^4.1.5",

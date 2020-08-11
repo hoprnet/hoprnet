@@ -1,6 +1,6 @@
 import type { addresses } from '@hoprnet/hopr-ethereum'
 import Web3 from 'web3'
-import { LevelUp } from 'levelup'
+import type { LevelUp } from 'levelup'
 import HoprChannelsAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprChannels.json'
 import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
 import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
