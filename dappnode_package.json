@@ -17,11 +17,14 @@
       "3000:3000/tcp"
     ],
     "path": "hopr.avado.dnp.dappnode.eth_0.0.3.tar.xz",
-    "hash": "/ipfs/QmbjU66KUFWS56vmboR1FYMCjeBxTwtxSQjATCzNKQKX2f",
-    "size": 367531864,
+    "hash": "/ipfs/QmNP2o8LywK3jd3stFQGFP46CmQeCDeUnsGch3Q6WKynvv",
+    "size": 366107452,
     "restart": "always"
   },
   "author": "HOPR",
   "license": "(C)",
-  "dependencies": {}
+  "dependencies": {},
+  "links": {
+    "OnboardingWizard": "http://my.hopr.avado.dnp.dappnode.eth:3000"
+  }
 }
