@@ -10,8 +10,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [12.9.1]
-        yarn-version: [1.19.2]
+        node-version: [12.x]
         # if you add items into this list, update "steps.filter" too
         repository: ['core', 'protos']
 

@@ -7,13 +7,14 @@ describe('test the STUN functionalities', function () {
     const node = new Stun(options)
 
     if (options.bootstrapNode) {
-      await node.startServer()
+      await node.startServer(0)
     }
 
     return node
   }
 
   it('should launch a STUN server and connect to it', async function () {
+    console.log('!!!')
     const bootstrap = await generateNode({
       bootstrapNode: true,
       hosts: {

@@ -410,24 +410,19 @@
     "@ethersproject/rlp" "^5.0.0"
     "@ethersproject/signing-key" "^5.0.0"
 
-"@hoprnet/hopr-core-connector-interface@1.3.1-refactor.76c9b25":
-  version "1.3.1-refactor.76c9b25"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-connector-interface/-/hopr-core-connector-interface-1.3.1-refactor.76c9b25.tgz#ba8307e3193d6c7b2e192d6a45b9ad81920faf19"
-  integrity sha512-r0NWZyJe5oPAGI6CKrSAKuR1NWMZxgLgpY/kEVdBTTgc/ujAWCvmZVb/GE3wsKgo0AkLWvxxHPIiV7l++EP8rw==
+"@hoprnet/hopr-core-connector-interface@1.4.0":
+  version "1.4.0"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-connector-interface/-/hopr-core-connector-interface-1.4.0.tgz#329315d715cbacce4492599d8f6f6cf16b615a44"
+  integrity sha512-a4dt3UAszXUTrkl59nl8/R65ai3KwQqwkwJk0Ke1M+K+v8HDVTDgTLzAGWaOKoC7AQsNrVDDGOs1/iTQFwvyMg==
 
-"@hoprnet/hopr-core-connector-interface@1.3.2-35127fb":
-  version "1.3.2-35127fb"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-connector-interface/-/hopr-core-connector-interface-1.3.2-35127fb.tgz#b9add3499f6425df90bc53d5aaf0d486766a8503"
-  integrity sha512-J2n7AJLM8c1+kMP1Se7zC+/PCQ6umiUsOgjp8YZlYbXLc6h1I9nP3F7LMe8FrHDR9ZUbthSyipwadicZjR0bJg==
-
-"@hoprnet/hopr-core-ethereum@0.0.12-refactor.473415f":
-  version "0.0.12-refactor.473415f"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-ethereum/-/hopr-core-ethereum-0.0.12-refactor.473415f.tgz#d64b6f0776fe192587f3418801a1c19122074a57"
-  integrity sha512-v/qZA4mdBqAklNdZ4bxqLV9yR84iuTO/aKEOEbxGrLoV7zNRNsjSknSiFSGBMQo8aBTNHW9UYpUfPXgaHTkgrg==
+"@hoprnet/hopr-core-ethereum@0.0.12":
+  version "0.0.12"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-ethereum/-/hopr-core-ethereum-0.0.12.tgz#1b5b136c09020668444bd7c81006f04466d091cd"
+  integrity sha512-9dGd8jKig6vhuCqd6jQgKUcJNvmP6ZRVSFYInD8KILWJkgYV+Amm6jlwIqJ2DNqT2hRuGycbFHkQxUXgN0Xbfw==
   dependencies:
-    "@hoprnet/hopr-core-connector-interface" "1.3.1-refactor.76c9b25"
-    "@hoprnet/hopr-ethereum" "0.3.6-refactor.3125357"
-    "@hoprnet/hopr-utils" "0.1.6-refactor.61df948"
+    "@hoprnet/hopr-core-connector-interface" "1.4.0"
+    "@hoprnet/hopr-ethereum" "0.4.2"
+    "@hoprnet/hopr-utils" "0.3.0"
     bn.js "^5.1.2"
     chalk "^4.1.0"
     debug "^4.1.1"
@@ -441,70 +436,43 @@
     web3-eth "^1.2.9"
     web3-eth-contract "^1.2.9"
 
-"@hoprnet/hopr-demo-seeds@1.0.3-refactor.3ad82ff", "@hoprnet/hopr-demo-seeds@^1.0.3-refactor.3ad82ff":
-  version "1.0.3-refactor.3ad82ff"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-demo-seeds/-/hopr-demo-seeds-1.0.3-refactor.3ad82ff.tgz#f292908a36bfb5937a328a911d05282e33cba0ba"
-  integrity sha512-cij4CETUq/P6Y0wBYoHM3hjhY/Ysz3iyg7vCpnpdYq2guoscz8pzuQ7ZzUTvlTda7snDDdlOEucTwMFj0WzM9A==
+"@hoprnet/hopr-demo-seeds@1.8", "@hoprnet/hopr-demo-seeds@1.8.0":
+  version "1.8.0"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-demo-seeds/-/hopr-demo-seeds-1.8.0.tgz#918381b6ace214758b043b59637d20dd23ec6019"
+  integrity sha512-Ua40p6ajlwCjbBFP+cjFiAyH50ldhY7vF3Ek7ifV8qI6NZemHHjwESnwqZ6N6u4zIppc3YycxuI8MYxSCQFtqw==
   dependencies:
     micro "^9.3.4"
 
-"@hoprnet/hopr-ethereum@0.3.6-refactor.3125357":
-  version "0.3.6-refactor.3125357"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-ethereum/-/hopr-ethereum-0.3.6-refactor.3125357.tgz#e66f03c74d7aab74622ea8a6f339871e8fedbafb"
-  integrity sha512-HFzm/IJcL2FrG6ZR06woqwEJbeMOaZw10AGFAjULJ/gKHGollmqG3Xi2Ib80lf3QoVYG9SUKSsVXs09bdfaswQ==
+"@hoprnet/hopr-ethereum@0.4.2":
+  version "0.4.2"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-ethereum/-/hopr-ethereum-0.4.2.tgz#1ebbcebffe81b2fb062cf7040e1975273a12a3b7"
+  integrity sha512-ycTUOgYZf+jKQW2KgsUTS2tmuXqKzEKsLPoxKNigCPSPlcmRjxxpRDsHzQaZynIFUZbYE8k95NBX1E1/C9dOrw==
   dependencies:
-    "@hoprnet/hopr-demo-seeds" "1.0.3-refactor.3ad82ff"
-    "@hoprnet/hopr-utils" "0.1.6-refactor.61df948"
+    "@hoprnet/hopr-demo-seeds" "1.8"
+    "@hoprnet/hopr-utils" "0.3.0"
     "@openzeppelin/contracts" "^3.0.1"
     "@openzeppelin/test-helpers" "^0.5.5"
     "@truffle/debug-utils" "^4.1.1"
     "@truffle/hdwallet-provider" "^1.0.34"
     bignumber.js "^9.0.0"
     dotenv "^8.2.0"
-    truffle "^5.1.23"
+    truffle "^5.1.25"
     truffle-plugin-verify "^0.3.10"
     ts-node "^8.9.1"
     web3 "^1.2.7"
 
-"@hoprnet/hopr-ethereum@0.3.9-120748b":
-  version "0.3.9-120748b"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-ethereum/-/hopr-ethereum-0.3.9-120748b.tgz#bfa18eede81d561350d600f169e951b1f64eb41c"
-  integrity sha512-fsBFvgSRVTh6CvkYZus8oGgnmSrhTCloXLcPxntDdx/cK8Nqk3V4jMWZImQnZzhTJGk0LVn17zcLNm4nUJ+POw==
+"@hoprnet/hopr-testing@0.2.0":
+  version "0.2.0"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-testing/-/hopr-testing-0.2.0.tgz#3b4a464ede58f3f5f36f0620088cc8a479dc6328"
+  integrity sha512-dPA90oBlJf0b+Jp6T1x0izKZWLzer9uuulLPMofizbclJ7fBLZ0vV+8QxdqCb2qarluIhUBZphy13rUvm/ZUkg==
   dependencies:
-    "@hoprnet/hopr-demo-seeds" "1.0.3-refactor.3ad82ff"
-    "@hoprnet/hopr-utils" "0.1.6-refactor.61df948"
-    "@openzeppelin/contracts" "^3.0.1"
-    "@openzeppelin/test-helpers" "^0.5.5"
-    "@truffle/debug-utils" "^4.1.1"
-    "@truffle/hdwallet-provider" "^1.0.34"
-    bignumber.js "^9.0.0"
-    dotenv "^8.2.0"
-    truffle "^5.1.23"
-    truffle-plugin-verify "^0.3.10"
-    ts-node "^8.9.1"
-    web3 "^1.2.7"
-
-"@hoprnet/hopr-testing@0.1.2":
-  version "0.1.2"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-testing/-/hopr-testing-0.1.2.tgz#f33b549090c40e02d54a81888a086811c4787cb0"
-  integrity sha512-Le7IyyPT2E1Rex7QHNA6djwHTGWBtwiakJMiYE5K8CMYtRz+WHspy2Ld2fwfkDo/4mNRe5zgvq0rt4KOY3KKOQ==
-  dependencies:
-    "@hoprnet/hopr-demo-seeds" "^1.0.3-refactor.3ad82ff"
+    "@hoprnet/hopr-demo-seeds" "1.8.0"
     ganache-core "^2.10.2"
 
-"@hoprnet/hopr-utils@0.1.6-refactor.61df948":
-  version "0.1.6-refactor.61df948"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-0.1.6-refactor.61df948.tgz#9e1897c08894f2267458045b1f40057af4a708d8"
-  integrity sha512-gvN1k3xb9tF5NZp+tMwKU6gS6QqlCKyqIJ4r9AkHtBpgD8Wa/vhDAVyGjH3HDwiBXOPDhfhtkNZNJ1WJnBHoFQ==
-  dependencies:
-    bignumber.js "^9.0.0"
-    chalk "^4.1.0"
-    strip-ansi "^6.0.0"
-
-"@hoprnet/hopr-utils@0.1.7-c598e77":
-  version "0.1.7-c598e77"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-0.1.7-c598e77.tgz#9f78b0131fd548b93e8e7f13aef23e5ee2ccb3e1"
-  integrity sha512-B1iMxj6ycMzdhFQrqrAe5JuADVy/hBv0QrUAAx7cluZWkl1K1/tVnjZ7UBlyCE8J5NGzSlVtdAhrU3aPcksdqw==
+"@hoprnet/hopr-utils@0.3.0":
+  version "0.3.0"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-0.3.0.tgz#31c6510d9adcc1f63fe3b72075ee7c383ef48b8f"
+  integrity sha512-whfmbE/DfKSpmeDNGyOOwHZfzTufsvtmJCFTkI7y5jt4/570AbaR3+Q2dFfNR1Zj1IHXVpC2JjVUaYk8ZiS3gg==
   dependencies:
     bignumber.js "^9.0.0"
     chalk "^4.1.0"
@@ -525,6 +493,15 @@
   version "0.1.2"
   resolved "https://registry.yarnpkg.com/@istanbuljs/schema/-/schema-0.1.2.tgz#26520bf09abe4a5644cd5414e37125a8954241dd"
   integrity sha512-tsAQNx32a8CoFhjhijUIhI4kccIAgmGhy8LZMZgGfmXcpMbPRUqn5LWmgRttILi6yeGmBJd2xsPkFMs0PzgPCw==
+
+"@jest/console@^24.9.0":
+  version "24.9.0"
+  resolved "https://registry.yarnpkg.com/@jest/console/-/console-24.9.0.tgz#79b1bc06fb74a8cfb01cbdedf945584b1b9707f0"
+  integrity sha512-Zuj6b8TnKXi3q4ymac8EQfc3ea/uhLeCGThFqXeC8H9/raaH8ARPUTdId+XyGd03Z4In0/VjD2OYFcBF09fNLQ==
+  dependencies:
+    "@jest/source-map" "^24.9.0"
+    chalk "^2.0.1"
+    slash "^2.0.0"
 
 "@jest/console@^26.2.0":
   version "26.2.0"
@@ -582,6 +559,15 @@
     "@types/node" "*"
     jest-mock "^26.2.0"
 
+"@jest/fake-timers@^24.9.0":
+  version "24.9.0"
+  resolved "https://registry.yarnpkg.com/@jest/fake-timers/-/fake-timers-24.9.0.tgz#ba3e6bf0eecd09a636049896434d306636540c93"
+  integrity sha512-eWQcNa2YSwzXWIMC5KufBh3oWRIijrQFROsIqt6v/NS9Io/gknw1jsAC9c+ih/RQX4A3O7SeWAhQeN0goKhT9A==
+  dependencies:
+    "@jest/types" "^24.9.0"
+    jest-message-util "^24.9.0"
+    jest-mock "^24.9.0"
+
 "@jest/fake-timers@^26.2.0":
   version "26.2.0"
   resolved "https://registry.yarnpkg.com/@jest/fake-timers/-/fake-timers-26.2.0.tgz#b485c57dc4c74d61406a339807a9af4bac74b75a"
@@ -635,6 +621,15 @@
   optionalDependencies:
     node-notifier "^7.0.0"
 
+"@jest/source-map@^24.9.0":
+  version "24.9.0"
+  resolved "https://registry.yarnpkg.com/@jest/source-map/-/source-map-24.9.0.tgz#0e263a94430be4b41da683ccc1e6bffe2a191714"
+  integrity sha512-/Xw7xGlsZb4MJzNDgB7PW5crou5JqWiBQaz6xyPd3ArOg2nfn/PunV8+olXbbEZzNl591o5rWKE9BRDaFAuIBg==
+  dependencies:
+    callsites "^3.0.0"
+    graceful-fs "^4.1.15"
+    source-map "^0.6.0"
+
 "@jest/source-map@^26.1.0":
   version "26.1.0"
   resolved "https://registry.yarnpkg.com/@jest/source-map/-/source-map-26.1.0.tgz#a6a020d00e7d9478f4b690167c5e8b77e63adb26"
@@ -643,6 +638,15 @@
     callsites "^3.0.0"
     graceful-fs "^4.2.4"
     source-map "^0.6.0"
+
+"@jest/test-result@^24.9.0":
+  version "24.9.0"
+  resolved "https://registry.yarnpkg.com/@jest/test-result/-/test-result-24.9.0.tgz#11796e8aa9dbf88ea025757b3152595ad06ba0ca"
+  integrity sha512-XEFrHbBonBJ8dGp2JmF8kP/nQI/ImPpygKHwQ/SY+es59Z3L5PI4Qb9TQQMAEeYsThG1xF0k6tmG0tIKATNiiA==
+  dependencies:
+    "@jest/console" "^24.9.0"
+    "@jest/types" "^24.9.0"
+    "@types/istanbul-lib-coverage" "^2.0.0"
 
 "@jest/test-result@^26.2.0":
   version "26.2.0"
@@ -685,6 +689,15 @@
     slash "^3.0.0"
     source-map "^0.6.1"
     write-file-atomic "^3.0.0"
+
+"@jest/types@^24.9.0":
+  version "24.9.0"
+  resolved "https://registry.yarnpkg.com/@jest/types/-/types-24.9.0.tgz#63cb26cb7500d069e5a389441a7c6ab5e909fc59"
+  integrity sha512-XKK7ze1apu5JWQ5eZjHITP66AX+QsLlbaJRBGYr8pNzwcAE2JVkwnf0yqjHTsDRcjR0mujy/NmZMXw5kl+kGBw==
+  dependencies:
+    "@types/istanbul-lib-coverage" "^2.0.0"
+    "@types/istanbul-reports" "^1.1.1"
+    "@types/yargs" "^13.0.0"
 
 "@jest/types@^25.5.0":
   version "25.5.0"
@@ -1177,6 +1190,13 @@
   version "15.0.0"
   resolved "https://registry.yarnpkg.com/@types/yargs-parser/-/yargs-parser-15.0.0.tgz#cb3f9f741869e20cce330ffbeb9271590483882d"
   integrity sha512-FA/BWv8t8ZWJ+gEOnLLd8ygxH/2UFbAvgEonyfN6yWGLKc7zVjbpl2Y4CTjid9h2RfgPP6SEt6uHwEOply00yw==
+
+"@types/yargs@^13.0.0":
+  version "13.0.10"
+  resolved "https://registry.yarnpkg.com/@types/yargs/-/yargs-13.0.10.tgz#e77bf3fc73c781d48c2eb541f87c453e321e5f4b"
+  integrity sha512-MU10TSgzNABgdzKvQVW1nuuT+sgBMWeXNc3XOs5YXV5SDAK+PPja2eUuBNB9iqElu03xyEDqlnGw0jgl4nbqGQ==
+  dependencies:
+    "@types/yargs-parser" "*"
 
 "@types/yargs@^15.0.0":
   version "15.0.5"
@@ -2687,7 +2707,7 @@ chalk@^1.1.3:
     strip-ansi "^3.0.0"
     supports-color "^2.0.0"
 
-chalk@^2.0.0, chalk@^2.3.2, chalk@^2.4.2:
+chalk@^2.0.0, chalk@^2.0.1, chalk@^2.3.1, chalk@^2.3.2, chalk@^2.4.2:
   version "2.4.2"
   resolved "https://registry.yarnpkg.com/chalk/-/chalk-2.4.2.tgz#cd42541677a54333cf541a49108c1432b44c9424"
   integrity sha512-Mti+f9lpJNcwF4tWV8/OrTTtF1gZi+f8FqlyAdouralcFWFQWF2+NgCHShjkCb+IFBLq9buZwE1xckQU4peSuQ==
@@ -5045,7 +5065,7 @@ got@^7.1.0:
     url-parse-lax "^1.0.0"
     url-to-options "^1.0.1"
 
-graceful-fs@^4.1.10, graceful-fs@^4.1.2, graceful-fs@^4.1.6, graceful-fs@^4.2.0, graceful-fs@^4.2.4:
+graceful-fs@^4.1.10, graceful-fs@^4.1.15, graceful-fs@^4.1.2, graceful-fs@^4.1.6, graceful-fs@^4.2.0, graceful-fs@^4.2.4:
   version "4.2.4"
   resolved "https://registry.yarnpkg.com/graceful-fs/-/graceful-fs-4.2.4.tgz#2256bde14d3632958c465ebc96dc467ca07a29fb"
   integrity sha512-WjKPNJF79dtJAVniUlGGWHYGz2jWxT6VhN/4m1NdkbZ2nOsEF+cI1Edgql5zCRhs/VsQYRvrXctxktVXZUkixw==
@@ -6225,6 +6245,20 @@ jest-matcher-utils@^26.2.0:
     jest-get-type "^26.0.0"
     pretty-format "^26.2.0"
 
+jest-message-util@^24.9.0:
+  version "24.9.0"
+  resolved "https://registry.yarnpkg.com/jest-message-util/-/jest-message-util-24.9.0.tgz#527f54a1e380f5e202a8d1149b0ec872f43119e3"
+  integrity sha512-oCj8FiZ3U0hTP4aSui87P4L4jC37BtQwUMqk+zk/b11FR19BJDeZsZAvIHutWnmtw7r85UmR3CEWZ0HWU2mAlw==
+  dependencies:
+    "@babel/code-frame" "^7.0.0"
+    "@jest/test-result" "^24.9.0"
+    "@jest/types" "^24.9.0"
+    "@types/stack-utils" "^1.0.1"
+    chalk "^2.0.1"
+    micromatch "^3.1.10"
+    slash "^2.0.0"
+    stack-utils "^1.0.1"
+
 jest-message-util@^26.2.0:
   version "26.2.0"
   resolved "https://registry.yarnpkg.com/jest-message-util/-/jest-message-util-26.2.0.tgz#757fbc1323992297092bb9016a71a2eb12fd22ea"
@@ -6238,6 +6272,13 @@ jest-message-util@^26.2.0:
     micromatch "^4.0.2"
     slash "^3.0.0"
     stack-utils "^2.0.2"
+
+jest-mock@^24.9.0:
+  version "24.9.0"
+  resolved "https://registry.yarnpkg.com/jest-mock/-/jest-mock-24.9.0.tgz#c22835541ee379b908673ad51087a2185c13f1c6"
+  integrity sha512-3BEYN5WbSq9wd+SyLDES7AHnjH9A/ROBwmz7l2y+ol+NtSFO8DYiEBzoO1CeFc9a8DYy10EO4dDFVv/wN3zl1w==
+  dependencies:
+    "@jest/types" "^24.9.0"
 
 jest-mock@^26.2.0:
   version "26.2.0"
@@ -6346,6 +6387,14 @@ jest-serializer@^26.2.0:
     "@types/node" "*"
     graceful-fs "^4.2.4"
 
+jest-silent-reporter@^0.2.1:
+  version "0.2.1"
+  resolved "https://registry.yarnpkg.com/jest-silent-reporter/-/jest-silent-reporter-0.2.1.tgz#554dd62b800989cdbcfba22bf30a1c0db6ad289c"
+  integrity sha512-nEO3oOFHtEXFjlRCbJOlvEWA7ZHyyyvMsU4WHuAhinYBOI4PiX1EIbsZfQZ/cxHcYliHBU9zY8bPxMPdBGksYw==
+  dependencies:
+    chalk "^2.3.1"
+    jest-util "^24.0.0"
+
 jest-snapshot@^26.2.1:
   version "26.2.1"
   resolved "https://registry.yarnpkg.com/jest-snapshot/-/jest-snapshot-26.2.1.tgz#e8f30b8b2a07c6e00354c64559e91ae8ee08b25e"
@@ -6378,6 +6427,24 @@ jest-util@26.x, jest-util@^26.2.0:
     graceful-fs "^4.2.4"
     is-ci "^2.0.0"
     micromatch "^4.0.2"
+
+jest-util@^24.0.0:
+  version "24.9.0"
+  resolved "https://registry.yarnpkg.com/jest-util/-/jest-util-24.9.0.tgz#7396814e48536d2e85a37de3e4c431d7cb140162"
+  integrity sha512-x+cZU8VRmOJxbA1K5oDBdxQmdq0OIdADarLxk0Mq+3XS4jgvhG/oKGWcIDCtPG0HgjxOYvF+ilPJQsAyXfbNOg==
+  dependencies:
+    "@jest/console" "^24.9.0"
+    "@jest/fake-timers" "^24.9.0"
+    "@jest/source-map" "^24.9.0"
+    "@jest/test-result" "^24.9.0"
+    "@jest/types" "^24.9.0"
+    callsites "^3.0.0"
+    chalk "^2.0.1"
+    graceful-fs "^4.1.15"
+    is-ci "^2.0.0"
+    mkdirp "^0.5.1"
+    slash "^2.0.0"
+    source-map "^0.6.0"
 
 jest-validate@^26.2.0:
   version "26.2.0"
@@ -7399,7 +7466,7 @@ micro@^9.3.4:
     is-stream "1.1.0"
     raw-body "2.3.2"
 
-micromatch@^3.1.4:
+micromatch@^3.1.10, micromatch@^3.1.4:
   version "3.1.10"
   resolved "https://registry.yarnpkg.com/micromatch/-/micromatch-3.1.10.tgz#70859bc95c9840952f359a068a3fc49f9ecfac23"
   integrity sha512-MWikgl9n9M3w+bpsY3He8L+w9eF9338xRl8IAO5viDizwSzziFEyUzo2xrrloB64ADbTf8uA8vRqqttDTOmccg==
@@ -9460,6 +9527,11 @@ slash@^1.0.0:
   resolved "https://registry.yarnpkg.com/slash/-/slash-1.0.0.tgz#c41f2f6c39fc16d1cd17ad4b5d896114ae470d55"
   integrity sha1-xB8vbDn8FtHNF61LXYlhFK5HDVU=
 
+slash@^2.0.0:
+  version "2.0.0"
+  resolved "https://registry.yarnpkg.com/slash/-/slash-2.0.0.tgz#de552851a1759df3a8f206535442f5ec4ddeab44"
+  integrity sha512-ZYKh3Wh2z1PpEXWr0MpSBZ0V6mZHAQfYevttO11c51CaWjGTaadiKZ+wVt1PbMlDV5qhMFslpZCemhwOK7C89A==
+
 slash@^3.0.0:
   version "3.0.0"
   resolved "https://registry.yarnpkg.com/slash/-/slash-3.0.0.tgz#6539be870c165adbd5240220dbe361f1bc4d4634"
@@ -9619,6 +9691,11 @@ sshpk@^1.7.0:
     jsbn "~0.1.0"
     safer-buffer "^2.0.2"
     tweetnacl "~0.14.0"
+
+stack-utils@^1.0.1:
+  version "1.0.2"
+  resolved "https://registry.yarnpkg.com/stack-utils/-/stack-utils-1.0.2.tgz#33eba3897788558bebfc2db059dc158ec36cebb8"
+  integrity sha512-MTX+MeG5U994cazkjd/9KNAapsHnibjMLnfXodlkXw76JEea0UiNzrqidzo1emMwk7w5Qhc9jd4Bn9TBb1MFwA==
 
 stack-utils@^2.0.2:
   version "2.0.2"
@@ -10123,7 +10200,7 @@ truffle-plugin-verify@^0.3.10:
     querystring "0.2.0"
     sol-merger "3.0.1"
 
-truffle@^5.1.23:
+truffle@^5.1.25:
   version "5.1.37"
   resolved "https://registry.yarnpkg.com/truffle/-/truffle-5.1.37.tgz#5ded8798e7db1079c2bd4e9278a2e8bed913b4ab"
   integrity sha512-ONIrN/OjtWgPl/qe74lcoUXZm3b04Omq8sbsPuMF7w/8uOx7/sufxd99UfKInxjCZnryD2tQHdYQbNvoXyvpgQ==
