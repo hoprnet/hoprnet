@@ -4,7 +4,6 @@
   "description": "hopr node (public testnet)",
   "avatar": "/ipfs/QmQGxeJHvH2XDZSbai7YSPNs8RfhT7aiaB1DYEbdCpMshk",
   "type": "service",
-  "chain": "ethereum",
   "autoupdate": true,
   "image": {
     "volumes": [
@@ -27,7 +26,9 @@
   },
   "author": "HOPR",
   "license": "(C)",
-  "dependencies": {},
+  "dependencies": {
+    "ethchain-geth.public.dappnode.eth": ">=10.0.7",
+  },
   "links": {
     "OnboardingWizard": "http://my.hopr.avado.dnp.dappnode.eth:3000"
   }
