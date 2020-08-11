@@ -1,44 +1,52 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import styles from "../../styles/App/Input.module.css";
 import store from "../../utils/store";
 
 export default function Input(props: { peerId?: string }) {
   const [state, dispatch] = store.useTracked();
-  const [peerId, setPeerId] = useState(undefined);
+  const [peerId, setPeerId] = useState("");
   const [message, setMessage] = useState("");
-  const [anonymous, setAnonymous] = useState(!props.peerId);
+  const [anonymous, setAnonymous] = useState(true);
+
+  let hasPeerId = !!props.peerId;
+  useEffect(() => {
+    hasPeerId = !!props.peerId;
+    setAnonymous(!hasPeerId);
+  }, [props.peerId]);
 
   return (
-    <div className={styles.container}>
+    <div className={`${styles.container} section`}>
       {!props.peerId ? (
         <input
           placeholder="peer id"
           className={styles.input}
-          defaultValue={peerId}
+          value={peerId}
           onChange={(e) => setPeerId(e.target.value)}
-        ></input>
+        />
       ) : undefined}
       <input
         placeholder="message"
         className={styles.input}
-        defaultValue={message}
+        value={message}
         onChange={(e) => setMessage(e.target.value)}
-      ></input>
-      <div className={styles.checkbox}>
-        anonymous:
-        <input
-          type="checkbox"
-          defaultChecked={anonymous}
-          onClick={() => setAnonymous(!anonymous)}
-        ></input>
-      </div>
+      />
+      {!hasPeerId && (
+        <div className={styles.checkbox}>
+          <span>anonymous</span>
+          <input
+            type="checkbox"
+            checked={anonymous}
+            onChange={(e) => setAnonymous(e.target.checked)}
+          />
+        </div>
+      )}
       <button
         className="clickable"
         onClick={() => {
           store.methods.sendMessage(
             state,
             dispatch,
-            peerId ?? props.peerId,
+            peerId === "" ? props.peerId : peerId,
             message,
             anonymous
           );

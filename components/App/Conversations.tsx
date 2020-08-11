@@ -9,21 +9,23 @@ export default function Conversations(props: {
   const peerIds = Array.from(state.conversations.keys());
 
   return (
-    <div className={`${styles.container} section`}>
+    <div className={styles.container}>
       <div className={styles.list}>
         {peerIds.map((peerId) => {
           const display =
-            peerId === "" ? "Anonymous" : `..${peerId.substr(-6)}`;
+            peerId === "" ? "Anonymous" : `..${peerId.substr(-8)}`;
           const selected = peerId === props.selected;
 
           return (
-            <p
+            <div
               key={peerId}
-              className={`clickable ${selected ? styles.clicked : ""}`}
+              className={`clickable ${selected ? styles.clicked : ""} ${
+                styles.conversation
+              }`}
               onClick={() => props.setSelected(peerId)}
             >
               {display}
-            </p>
+            </div>
           );
         })}
       </div>

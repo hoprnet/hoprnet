@@ -25,13 +25,14 @@ a {
   text-decoration: none;
 }
 
-input {
-}
-
 .section {
   padding: 0px 20px 0px 20px;
 }
 
 .clickable {
   cursor: pointer;
+}
+
+.img-to-white {
+  filter: invert(1);
 }
