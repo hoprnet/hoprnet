@@ -7,7 +7,7 @@
   <!-- Title Placeholder -->
   <h3 align="center">HOPR Server</h3>
   <p align="center">
-    Nest.js based gRPC-enabled server.
+	<code>Nest.js-based gRPC-enabled server.</code>
   </p>
   <p align="center">
 	  HOPR Server is a TypeScript-coded, gRPC server that allows developers to interact with a HOPR Node via a protobuf enabled API. Powered by the <b>HOPR Network</b> and the <a href="https://hoprnet.org" target="_blank" rel="noopener noreferrer">HOPR Association</a>
