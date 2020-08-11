@@ -10,14 +10,13 @@
     Nest.js based gRPC-enabled server.
   </p>
   <p align="center">
-	  HOPR Server is a TypeScript-coded, gRPC server that allows developers to interact with a HOPR Node via a protobuf enabled API. Powered by the **HOPR Network** and the [HOPR Association](https://hoprnet.org/).
+	  HOPR Server is a TypeScript-coded, gRPC server that allows developers to interact with a HOPR Node via a protobuf enabled API. Powered by the <b>HOPR Network</b> and the <a href="https://hoprnet.org" target="_blank" rel="noopener noreferrer">HOPR Association</a>
   </p>
 </p>
 
 <!-- BADGES -->
 <p align="center">
-  <!-- <a href="#"><img src="https://img.shields.io/static/v1?label=change&message=me&color=yellow" alt="Replace Me"></a> -->
-  ![Node.js CI](https://github.com/hoprnet/hopr-server/workflows/Node.js%20CI/badge.svg)
+  <a href="#"><img src="https://github.com/hoprnet/hopr-server/workflows/Node.js%20CI/badge.svg" alt="Build"></a>
 </p>
 
 <!-- TABLE OF CONTENTS -->
