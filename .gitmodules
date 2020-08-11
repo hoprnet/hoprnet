@@ -1,0 +1,3 @@
+[submodule "build/hopr-admin"]
+	path = build/hopr-admin
+	url = git@github.com:hoprnet/hopr-admin.git
