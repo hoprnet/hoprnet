@@ -1,7 +1,8 @@
-import { getMessageStream, sendMessage, getRandomItemFromList } from '../utils'
+import { sendMessage, getRandomItemFromList } from '../utils'
+import { IMessage } from '../message'
 import { ListenResponse } from '@hoprnet/hopr-protos/node/listen_pb'
 import { TweetMessage } from '../twitter'
-import { Message } from '../message'
+import { Bot } from '../bot'
 import response from './response.json'
 
 
@@ -11,79 +12,56 @@ enum NodeStates {
   InGuestList,
 }
 
-class Bouncebot {
+export class Bouncebot implements Bot{
   botName: string
-  hoprAddress: string
+  address: string
   status: Map<string, NodeStates>
 
-  constructor(hoprAddress: string) {
-    this.hoprAddress = hoprAddress
+  constructor(address: string) {
+    this.address = address
     this.botName = '🥊 Bouncebot'
     this.status = new Map<string, NodeStates>()
     console.log(`${this.botName} has been added`)
   }
 
-  async init() {
-    const { client, stream } = await getMessageStream()
-    stream
-    .on('data', (data) => {
-      try {
-        const [messageBuffer] = data.array
-        const res = new ListenResponse()
-        res.setPayload(messageBuffer)
-        const message = new Message(res.getPayload_asU8()).toJson()
-        this.handleMessage(message)
-      } catch (err) {
-        console.error(err)
-      }
-    })
-    .on('error', (err) => {
-      console.error(err)
-    })
-    .on('end', () => {
-      client.close()
-    })
-  }
-
-  handleMessage(message) {
+  handleMessage(message: IMessage) {
     console.log(`${this.botName} <- ${message.from}: ${message.text}`)
 
-    if (message.text === 'Party') {
+    if (this.status.get(message.from) == NodeStates.RequiresProof)
+      this.handleRequiresProof(message)
+    else if (message.text === 'Party') {
       if (this.status.has(message.from)) { 
         switch (this.status.get(message.from)) {
            case NodeStates.IsHinted:
              this.handleIsHinted(message)
-             break;
-           case NodeStates.RequiresProof:
-             this.handleRequiresProof(message)
-             break;
+             break
            case NodeStates.InGuestList:
              this.handleGuest(message)
-             break;
+             break
          } 
       } else this.handleNew(message)
     } else {
       sendMessage(message.from, {
-        from: this.hoprAddress,
+        from: this.address,
         text: ` ${this.botName} isn’t amused...`,
       })
     }
   }
 
-  handleRequiresProof(message) {
-    const tweet = new TweetMessage(message)
+  async handleRequiresProof(message) {
+    const tweet = new TweetMessage(message.text)
     await tweet.fetch()
     // check if the the tweet is valid
     if (tweet.hashtags('hoprgames')) {
       sendMessage(message.from, {
-        from: this.hoprAddress,
+        from: this.address,
         text: getRandomItemFromList(response['tweetSuccess']),
       })
       this.status.set(message.from, NodeStates.InGuestList)
       setTimeout(this.welcomeUser.bind(this), 2000, message)
     } else {
       sendMessage(message.from, {
-        from: this.hoprAddress,
+        from: this.address,
         text: getRandomItemFromList(response['tweetFailure']),
       })
     }
@@ -91,7 +69,7 @@ class Bouncebot {
 
   handleIsHinted(message) {
     sendMessage(message.from, {
-      from: this.hoprAddress,
+      from: this.address,
       text: getRandomItemFromList(response['isHinted']),
     })
     this.status.set(message.from, NodeStates.RequiresProof)
@@ -99,14 +77,14 @@ class Bouncebot {
 
   handleGuest(message) {
     sendMessage(message.from, {
-      from: this.hoprAddress,
+      from: this.address,
       text: getRandomItemFromList(response['isGuest']),
     })  
   }
 
   handleNew(message) {
     sendMessage(message.from, {
-      from: this.hoprAddress,
+      from: this.address,
       text: getRandomItemFromList(response['isNewUser']),
     })
     setTimeout(this.hintUser.bind(this), 5000, message)
@@ -114,22 +92,16 @@ class Bouncebot {
 
   welcomeUser(message) {
     sendMessage(message.from, {
-      from: this.hoprAddress,
+      from: this.address,
       text: response['guestWelcome']
     })
   }
 
   hintUser(message) {
     sendMessage(message.from, {
-        from: this.hoprAddress,
+        from: this.address,
         text: response['hint'],
       })
     this.status.set(message.from, NodeStates.IsHinted)
   }
-
-}
-
-export default async (hoprAddress) => {
-  const bot = new Bouncebot(hoprAddress)
-  await bot.init()
 }

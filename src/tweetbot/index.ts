@@ -1,7 +1,8 @@
-import { getMessageStream, sendMessage } from '../utils'
+import { sendMessage } from '../utils'
 import { ListenResponse } from '@hoprnet/hopr-protos/node/listen_pb'
 import { TweetMessage } from '../twitter'
-import { Message } from '../message'
+import { Bot } from '../bot'
+import { IMessage } from '../message'
 
 const directory = {}
 const winners = []
@@ -26,101 +27,90 @@ enum MESSAGES {
   FAILURE = 'Hmm... something went wrong. Make sure you send me the full URL, including https.'
 }
 
-export default async (hoprAddress) => {
-  const botName = '🐦 Tweetbot'
-  console.log(`${botName} has been added`);
 
-  const { client, stream } = await getMessageStream()
+export class Tweetbot implements Bot {
+  botName: string
+  address: string
 
-  stream
-    .on('data', async (data) => {
-      try {
-        const [messageBuffer] = data.array
-        const res = new ListenResponse()
-        res.setPayload(messageBuffer)
+  constructor(address: string) {
+    this.address = address
+    this.botName = '🐦 Tweetbot'
+    console.log(`${this.botName} has been added`)
+  }
 
-        const message = new Message(res.getPayload_asU8()).toJson()
-        console.log(`${botName} <- ${message.from}: ${message.text}`)
+  async handleMessage(message: IMessage) {
+    console.log(`${this.botName} <- ${message.from}: ${message.text}`)
+    let response;
+    /*
+    * We do a few checks on the messages received by the user.
+    * First time (i.e. STATUS.NEW_PARTICIPANT)
+    * 
+    */
+    if (!directory[message.from] || directory[message.from] === STATUS.NEW_PARTICIPANT) {
+      directory[message.from] = STATUS.INTRODUCED
+      response = MESSAGES.INTRO
+    } else if (message.text.match(/rules?$/i) || directory[message.from] === STATUS.INTRODUCED) {
+      directory[message.from] = STATUS.RULES_GIVEN
+      response = MESSAGES.RULES
+    } else if (message.text.match(/https:\/\/twitter.com.*?$/i)) {
+      const tweet = new TweetMessage(message.text)
+      await tweet.fetch()
 
-        let response;
-        /*
-        * We do a few checks on the messages received by the user.
-        * First time (i.e. STATUS.NEW_PARTICIPANT)
-        * 
-        */
-        if (!directory[message.from] || directory[message.from] === STATUS.NEW_PARTICIPANT) {
-          directory[message.from] = STATUS.INTRODUCED
-          response = MESSAGES.INTRO
-        } else if (message.text.match(/rules?$/i) || directory[message.from] === STATUS.INTRODUCED) {
-          directory[message.from] = STATUS.RULES_GIVEN
-          response = MESSAGES.RULES
-        } else if (message.text.match(/https:\/\/twitter.com.*?$/i)) {
-          const tweet = new TweetMessage(message.text)
-          await tweet.fetch()
+      console.log(`${this.botName} <- ${message.from}: Obtained tweet with ID ${tweet.id}`)
+      console.log(`${this.botName} <- ${message.from}: Obtained tweet with Text ${tweet.content}`)
+      console.log(`${this.botName} <- ${message.from}: Obtained tweet with Hashtags ${JSON.stringify(tweet.hashtags)}`)
+      console.log(`${this.botName} <- ${message.from}: Obtained tweet with User Mentions ${JSON.stringify(tweet.user_mentions)}`)
 
-          console.log(`${botName} <- ${message.from}: Obtained tweet with ID ${tweet.id}`)
-          console.log(`${botName} <- ${message.from}: Obtained tweet with Text ${tweet.content}`)
-          console.log(`${botName} <- ${message.from}: Obtained tweet with Hashtags ${JSON.stringify(tweet.hashtags)}`)
-          console.log(`${botName} <- ${message.from}: Obtained tweet with User Mentions ${JSON.stringify(tweet.user_mentions)}`)
-
-          if (tweet.hashtags('hoprgames')) {
-            if(tweet.hasMention('hasMention')) {
-              if(tweet.content.match(/16Uiu2HA.*?$/i)) {
-                const [participantHOPRAddress_regexed] = tweet.content.match(/16Uiu2HA.*?$/i)
-                const participantHOPRAddress = participantHOPRAddress_regexed.substr(0, 53)
-                if(participantHOPRAddress === message.from) {
-                  if(winners.includes(message.from)) {
-                    response = MESSAGES.ALREADY_WINNER;
-                  } else {
-                    winners.push(message.from);
-                    response = MESSAGES
-                  }
-                } else {
-                  response = MESSAGES.NO_HOPR_ADDRESS_MISMATCH;
-                }
+      if (tweet.hashtags('hoprgames')) {
+        if(tweet.hasMention('hasMention')) {
+          if(tweet.content.match(/16Uiu2HA.*?$/i)) {
+            const [participantHOPRAddress_regexed] = tweet.content.match(/16Uiu2HA.*?$/i)
+            const participantHOPRAddress = participantHOPRAddress_regexed.substr(0, 53)
+            if(participantHOPRAddress === message.from) {
+              if(winners.includes(message.from)) {
+                response = MESSAGES.ALREADY_WINNER;
               } else {
-                response = MESSAGES.NO_HOPR_ADDRESS
+                winners.push(message.from);
+                response = MESSAGES
               }
-              response = MESSAGES.SUCCESS
             } else {
-              console.log(`${botName} <- ${message.from}: No @hoprnet in Tweet ${tweet.id}: ${JSON.stringify(tweet.user_mentions)}`)
-              response = MESSAGES.NO_HOPR_ACCOUNT 
+              response = MESSAGES.NO_HOPR_ADDRESS_MISMATCH;
             }
           } else {
-            console.log(`${botName} <- ${message.from}: No #HOPRgames in Tweet ${tweet.id}: ${JSON.stringify(tweet.hashtags)}`)
-            response = MESSAGES.NO_HOPR_HASHTAG
+            response = MESSAGES.NO_HOPR_ADDRESS
           }
+          response = MESSAGES.SUCCESS
         } else {
-          response = MESSAGES.FAILURE
+          console.log(`${this.botName} <- ${message.from}: No @hoprnet in Tweet ${tweet.id}: ${JSON.stringify(tweet.user_mentions)}`)
+          response = MESSAGES.NO_HOPR_ACCOUNT 
         }
-
-        /*
-        * Some administrative commands to make the interaction with
-        * our tweet bot a bit easier.
-        */
-        if (message.text.match(/winners?$/i)) {
-          response = `So far we’ve had ${winners.length} winners.`
-        }
-        if (message.text.match(/winners\ [0-9]?$/i)) {
-          const [input] = message.text.match(/winners\ [0-9]?$/i);
-          const [_, index] = input.split(' ');
-          response = ~~index > winners.length ?
-            `Winner #${index}: ${winners[~~index]}` :
-            'Sorry, that winner doesn’t exist'
-        }
-
-        sendMessage(message.from, {
-          from: hoprAddress,
-          text: ` ${response}`,
-        })
-      } catch (err) {
-        console.error(err)
+      } else {
+        console.log(`${this.botName} <- ${message.from}: No #HOPRgames in Tweet ${tweet.id}: ${JSON.stringify(tweet.hashtags)}`)
+        response = MESSAGES.NO_HOPR_HASHTAG
       }
+    } else {
+      response = MESSAGES.FAILURE
+    }
+
+    /*
+    * Some administrative commands to make the interaction with
+    * our tweet bot a bit easier.
+    */
+    if (message.text.match(/winners?$/i)) {
+      response = `So far we’ve had ${winners.length} winners.`
+    }
+    if (message.text.match(/winners\ [0-9]?$/i)) {
+      const [input] = message.text.match(/winners\ [0-9]?$/i);
+      const [_, index] = input.split(' ');
+      response = ~~index > winners.length ?
+        `Winner #${index}: ${winners[~~index]}` :
+        'Sorry, that winner doesn’t exist'
+    }
+
+    sendMessage(message.from, {
+      from: this.address,
+      text: ` ${response}`,
     })
-    .on('error', (err) => {
-      console.error(err)
-    })
-    .on('end', () => {
-      client.close()
-    })
+  }
 }
+

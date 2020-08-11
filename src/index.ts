@@ -1,5 +1,6 @@
 import { API_URL, BOT_NAME } from './env'
 import { getHoprAddress  } from './utils'
+import { setupBot, Bot } from './bot'
 
 
 const start = async () => {
@@ -7,26 +8,25 @@ const start = async () => {
   const hoprAddress = await getHoprAddress()
   console.log(`My HOPR address is ${hoprAddress}`)
 
+  let bot: Bot
   switch(BOT_NAME) {
-    case 'randobot': {
-      const randobot = await import("./randobot");
-      randobot.default(hoprAddress);
-      break;
-    }
-    case 'bouncerbot': {
-      const bouncerbot = await import("./bouncerbot");
-      bouncerbot.default(hoprAddress);
-      break;
-    }
-    case 'tweetbot': {
-      const tweetbot = await import("./tweetbot");
-      tweetbot.default(hoprAddress);
-      break; 
-    }
+    case 'randobot': 
+      const { Randombot } = await import("./randobot")
+      bot = new Randombot(hoprAddress)
+      break
+    case 'bouncerbot':
+      const { Bouncebot } = await import("./bouncerbot")
+      bot = new Bouncebot(hoprAddress)
+      break
+    case 'tweetbot':
+      const { Tweetbot } = await import("./tweetbot")
+      bot = new Tweetbot(hoprAddress)
+      break
   }
+  await setupBot(bot)
 }
 
 start().catch((err) => {
   console.error('Fatal Error:', err)
-  process.exit();
+  process.exit()
 })
