@@ -138,6 +138,12 @@ async function main() {
   });
 
 
+  async function connectionReport(){
+    logs.log(`[ Connected to: ${NODE.peerStore.peers.size} peers ]`)
+    setTimeout(connectionReport, 10_000);
+  }
+  connectionReport()
+
   async function periodicCrawl(){
     try {
       await NODE.network.crawler.crawl()
