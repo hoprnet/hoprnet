@@ -40,7 +40,7 @@ describe('test dbKeys', function () {
     const result = dbKeys.Challenge(channelId, challenge)
     const expected = u8aConcat(encoder.encode('payments-challenge-'), channelId, encoder.encode('-'), challenge)
 
-    assert(u8aEquals(result, expected), 'check challange key creation')
+    assert(u8aEquals(result, expected), 'check challenge key creation')
   })
 
   it("should parse 'Challenge' key", function () {
@@ -49,8 +49,8 @@ describe('test dbKeys', function () {
     const expected1 = channelId
     const expected2 = challenge
 
-    assert(u8aEquals(result1, expected1), 'check challange key parsing')
-    assert(u8aEquals(result2, expected2), 'check challange key parsing')
+    assert(u8aEquals(result1, expected1), 'check challenge key parsing')
+    assert(u8aEquals(result2, expected2), 'check challenge key parsing')
   })
 
   it("should create 'ChannelId' key", function () {

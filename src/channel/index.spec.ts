@@ -5,7 +5,7 @@ import assert from 'assert'
 import { stringToU8a, u8aToHex, u8aEquals, durations } from '@hoprnet/hopr-utils'
 import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
 import { getPrivKeyData, createAccountAndFund, createNode } from '../utils/testing.spec'
-import { createChallage } from '../utils'
+import { createChallenge } from '../utils'
 import BN from 'bn.js'
 import pipe from 'it-pipe'
 import Web3 from 'web3'
@@ -118,9 +118,9 @@ describe('test Channel class', function () {
 
     const secretA = randomBytes(32)
     const secretB = randomBytes(32)
-    const challange = await createChallage(secretA, secretB)
+    const challenge = await createChallenge(secretA, secretB)
 
-    const signedTicket = await channel.ticket.create(new Balance(1), challange)
+    const signedTicket = await channel.ticket.create(new Balance(1), challenge)
     assert(
       u8aEquals(await signedTicket.signer, coreConnector.account.keys.onChain.pubKey),
       `Check that signer is recoverable`

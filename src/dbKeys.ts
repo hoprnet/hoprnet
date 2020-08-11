@@ -100,10 +100,10 @@ export function Challenge(channelId: Types.Hash, challenge: Types.Hash): Uint8Ar
 export function ChallengeKeyParse(arr: Uint8Array): [Hash, Hash] {
   const channelIdStart = PREFIX.length + challengeSubPrefix.length
   const channelIdEnd = channelIdStart + Hash.SIZE
-  const challangeStart = channelIdEnd + SEPERATOR.length
-  const challangeEnd = challangeStart + Hash.SIZE
+  const challengeStart = channelIdEnd + SEPERATOR.length
+  const challengeEnd = challengeStart + Hash.SIZE
 
-  return [new Hash(arr.slice(channelIdStart, channelIdEnd)), new Hash(arr.slice(challangeStart, challangeEnd))]
+  return [new Hash(arr.slice(channelIdStart, channelIdEnd)), new Hash(arr.slice(challengeStart, challengeEnd))]
 }
 
 /**
