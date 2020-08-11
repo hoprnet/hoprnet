@@ -91,22 +91,22 @@ describe('test dbKeys', function () {
   })
 
   it("should create 'ChannelEntry' key", function () {
-    const result = dbKeys.ChannelEntry(userA.address, userB.address)
+    const result = dbKeys.ChannelEntry(userA.pubKey, userB.pubKey)
     const expected = u8aConcat(
       encoder.encode('payments-channelEntry-'),
-      userA.address,
+      userA.pubKey,
       encoder.encode('-'),
-      userB.address
+      userB.pubKey
     )
 
     assert(u8aEquals(result, expected), 'check channelEntry key creation')
   })
 
   it("should parse 'ChannelEntry' key", function () {
-    const key = u8aConcat(encoder.encode('payments-channelEntry-'), userA.address, encoder.encode('-'), userB.address)
+    const key = u8aConcat(encoder.encode('payments-channelEntry-'), userA.pubKey, encoder.encode('-'), userB.pubKey)
     const [result1, result2] = dbKeys.ChannelEntryParse(key)
-    const expected1 = userA.address
-    const expected2 = userB.address
+    const expected1 = userA.pubKey
+    const expected2 = userB.pubKey
 
     assert(u8aEquals(result1, expected1), 'check channelEntry key parsing')
     assert(u8aEquals(result2, expected2), 'check channelEntry key parsing')

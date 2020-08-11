@@ -8,6 +8,10 @@ class AccountId extends BYTES32 implements Types.AccountId {
     return ADDRESS_LENGTH
   }
 
+  get NAME() {
+    return 'AccountId'
+  }
+
   toHex() {
     return Web3.utils.toChecksumAddress(super.toHex())
   }
