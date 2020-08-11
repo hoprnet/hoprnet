@@ -1,19 +1,10 @@
 import { getMessageStream, sendMessage } from '../utils'
 import { ListenResponse } from '@hoprnet/hopr-protos/node/listen_pb'
+import { TweetMessage } from '../twitter'
 import { Message } from '../message'
-import { TWITTER_API_ACCESS_TOKEN, TWITTER_API_KEY, TWITTER_API_SECRET, TWITTER_API_ACCESS_TOKEN_SECRET } from '../env'
-import TwitterClient from '@hoprnet/twitter-api-client';
-
 
 const directory = {}
 const winners = []
-
-const twitterClient = new TwitterClient({
-  apiKey: TWITTER_API_KEY,
-  apiSecret: TWITTER_API_SECRET,
-  accessToken: TWITTER_API_ACCESS_TOKEN,
-  accessTokenSecret: TWITTER_API_ACCESS_TOKEN_SECRET,
-});
 
 enum STATUS {
   NEW_PARTICIPANT = 0,
@@ -64,23 +55,18 @@ export default async (hoprAddress) => {
           directory[message.from] = STATUS.RULES_GIVEN
           response = MESSAGES.RULES
         } else if (message.text.match(/https:\/\/twitter.com.*?$/i)) {
-          const [tweet] = message.text.match(/https:\/\/twitter.com.*?$/i)
-          const tweetId = (tweet_regexed => tweet_regexed.pop())(tweet.split('/') || [])
+          const tweet = new TweetMessage(message.text)
+          await tweet.fetch()
 
-          console.log(`${botName} <- ${message.from}: Obtained tweet with ID ${tweetId}`)
+          console.log(`${botName} <- ${message.from}: Obtained tweet with ID ${tweet.id}`)
+          console.log(`${botName} <- ${message.from}: Obtained tweet with Text ${tweet.content}`)
+          console.log(`${botName} <- ${message.from}: Obtained tweet with Hashtags ${JSON.stringify(tweet.hashtags)}`)
+          console.log(`${botName} <- ${message.from}: Obtained tweet with User Mentions ${JSON.stringify(tweet.user_mentions)}`)
 
-          const data = await twitterClient.tweets.statusesShowById({ id: tweetId })
-          const { hashtags, user_mentions } = data.entities
-          const tweetContent = data.text;
-
-          console.log(`${botName} <- ${message.from}: Obtained tweet with Text ${tweetContent}`)
-          console.log(`${botName} <- ${message.from}: Obtained tweet with Hashtags ${JSON.stringify(hashtags)}`)
-          console.log(`${botName} <- ${message.from}: Obtained tweet with User Mentions ${JSON.stringify(user_mentions)}`)
-
-          if (hashtags.some(hashtag => (hashtag.text as string).toLowerCase() === 'hoprgames')) {
-            if(user_mentions.some(user => (user.screen_name as string).toLowerCase() === 'hoprnet')) {
-              if(tweetContent.match(/16Uiu2HA.*?$/i)) {
-                const [participantHOPRAddress_regexed] = tweetContent.match(/16Uiu2HA.*?$/i)
+          if (tweet.hashtags('hoprgames')) {
+            if(tweet.hasMention('hasMention')) {
+              if(tweet.content.match(/16Uiu2HA.*?$/i)) {
+                const [participantHOPRAddress_regexed] = tweet.content.match(/16Uiu2HA.*?$/i)
                 const participantHOPRAddress = participantHOPRAddress_regexed.substr(0, 53)
                 if(participantHOPRAddress === message.from) {
                   if(winners.includes(message.from)) {
@@ -97,11 +83,11 @@ export default async (hoprAddress) => {
               }
               response = MESSAGES.SUCCESS
             } else {
-              console.log(`${botName} <- ${message.from}: No @hoprnet in Tweet ${tweetId}: ${JSON.stringify(user_mentions)}`)
+              console.log(`${botName} <- ${message.from}: No @hoprnet in Tweet ${tweet.id}: ${JSON.stringify(tweet.user_mentions)}`)
               response = MESSAGES.NO_HOPR_ACCOUNT 
             }
           } else {
-            console.log(`${botName} <- ${message.from}: No #HOPRgames in Tweet ${tweetId}: ${JSON.stringify(hashtags)}`)
+            console.log(`${botName} <- ${message.from}: No #HOPRgames in Tweet ${tweet.id}: ${JSON.stringify(tweet.hashtags)}`)
             response = MESSAGES.NO_HOPR_HASHTAG
           }
         } else {

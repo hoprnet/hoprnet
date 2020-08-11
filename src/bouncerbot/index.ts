@@ -1,5 +1,6 @@
 import { getMessageStream, sendMessage, getRandomItemFromList } from '../utils'
 import { ListenResponse } from '@hoprnet/hopr-protos/node/listen_pb'
+import { TweetMessage } from '../twitter'
 import { Message } from '../message'
 import response from './response.json'
 
@@ -70,9 +71,10 @@ class Bouncebot {
   }
 
   handleRequiresProof(message) {
-    let check = true
+    const tweet = new TweetMessage(message)
+    await tweet.fetch()
     // check if the the tweet is valid
-    if (check) {
+    if (tweet.hashtags('hoprgames')) {
       sendMessage(message.from, {
         from: this.hoprAddress,
         text: getRandomItemFromList(response['tweetSuccess']),
