@@ -4,7 +4,7 @@ import { u8aConcat, u8aEquals } from '@hoprnet/hopr-utils'
 import { Hash, ChannelId } from './types'
 import * as dbKeys from './dbKeys'
 import { getId } from './utils'
-import { getPrivKeyData } from './utils/testing'
+import { getPrivKeyData } from './utils/testing.spec'
 import { Await } from './tsc/utils'
 
 const encoder = new TextEncoder()

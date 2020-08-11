@@ -10,7 +10,7 @@ import HoprChannelsAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprCha
 import * as testconfigs from '../config.spec'
 import * as configs from '../config'
 import { time, wait, isPartyA } from '../utils'
-import { Account, getPrivKeyData, createAccountAndFund, createNode } from '../utils/testing'
+import { Account, getPrivKeyData, createAccountAndFund, createNode } from '../utils/testing.spec'
 import { HoprToken } from '../tsc/web3/HoprToken'
 import { HoprChannels } from '../tsc/web3/HoprChannels'
 import type CoreConnector from '..'

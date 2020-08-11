@@ -65,9 +65,12 @@ describe('test hashedSecret management', function () {
       errThrown = true
     }
 
+    assert(errThrown == shouldThrow, `Must throw an error if, and only if, it is expected.`)
+
     if (shouldThrow) {
       assert(errThrown, `Must throw an error`)
     } else {
+      assert(result != null, `Pre-image must have been derivable from the database.`)
       assert(
         u8aEquals((await connector.utils.hash(result.preImage)).slice(0, HASHED_SECRET_WIDTH), hash) &&
           index == result.index + 1
