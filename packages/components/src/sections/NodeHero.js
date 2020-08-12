@@ -40,6 +40,10 @@ const NodeHero = props => {
               gratitude, as you’ll earn upcoming HOPR token incentives (coming Q4!) from our plug-and-earn mixnet node
               PC.
             </p>
+            <p className="reveal-from-top" data-reveal-delay="400">
+              HOPR makes no profit from the first-of-its-kind custom node PC. Instead, we thank you for helping ensure a
+              decentralized Web3 future, where everyone has control of their own data.
+            </p>
           </div>
         </div>
       </GenericSection>
@@ -59,17 +63,17 @@ const NodeHero = props => {
                   </div>
                 </div>
                 <div className="features-tiles-item-content">
-                  <h4 className="mt-0 mb-8">Github</h4>
+                  <h4 className="mt-0 mb-8">Run Your Own Metal</h4>
                   <p className="m-0 text-sm">
-                    If you want to run a node without the HOPR Node PC, that’s perfectly acceptable and possible as
-                    well! Check out{' '}
+                    If you want to run a node on your own hardware without the HOPR Node PC, that’s perfectly acceptable
+                    and possible as well! Check out our{' '}
                     <a
                       href="https://docs.hoprnet.org/home/getting-started/hopr-chat"
                       className="text-color-high underline"
                       target="_blank"
                       rel="noopener noreferrer"
                     >
-                      docs.hoprnet.org
+                      GitBook instructions
                     </a>{' '}
                     for details on how to install.
                   </p>
@@ -89,7 +93,7 @@ const NodeHero = props => {
                   </div>
                 </div>
                 <div className="features-tiles-item-content">
-                  <h4 className="mt-0 mb-8">HOPR Node PC</h4>
+                  <h4 className="mt-0 mb-8">Your HOPR Hardware Node</h4>
                   <p className="m-0 text-sm">
                     Order our limited supply of initial HOPR Node PCs now! Following our coverage in{' '}
                     <a
