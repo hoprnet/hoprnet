@@ -982,25 +982,25 @@
     "@types/yargs" "^15.0.0"
     chalk "^4.0.0"
 
-"@linkdrop/contracts@^1.1.4":
-  version "1.1.4"
-  resolved "https://registry.yarnpkg.com/@linkdrop/contracts/-/contracts-1.1.4.tgz#bd15f43fbb67006068d5136fe071422ac4d2bd78"
-  integrity sha512-7jIqHk4iEA3JKBgyUhqpiYQ+gLYwH52pdEXiNAmY+U1GCkmz6UC4AJM21v79XURK94NC3Shca3p4hv0eQliAYA==
+"@linkdrop/contracts@^1.1.6":
+  version "1.1.6"
+  resolved "https://registry.yarnpkg.com/@linkdrop/contracts/-/contracts-1.1.6.tgz#bb3abf2859e2b239f488b63095d349bec100200b"
+  integrity sha512-zsLw2cj6S72hQ7C1IpaIU7EeXCGrLjsNEiALClLOrcBfNtMSYAaZNQkFJXdLW5QWIwu8JLQoD4B65y5J/xJ1aw==
   dependencies:
-    "@linkdrop/sdk" "^1.1.4"
+    "@linkdrop/sdk" "^1.1.6"
     ethereum-waffle "^2.0.14"
     ethers "^4.0.27"
     openzeppelin-solidity "^2.2.0"
     solc "^0.5.10"
 
-"@linkdrop/sdk@1.1.4", "@linkdrop/sdk@^1.1.4":
-  version "1.1.4"
-  resolved "https://registry.yarnpkg.com/@linkdrop/sdk/-/sdk-1.1.4.tgz#031d43a16cfda140b567421e0f4e89d7c53262b5"
-  integrity sha512-Zkfgy0pUrltk4VZehCGpnMsazWyHBZcA1fQpCQf9BS0aPOBHcJNZYxrvOFUS85HWtcMFgbHzyRePZHfkw3f9Xw==
+"@linkdrop/sdk@1.1.6", "@linkdrop/sdk@^1.1.6":
+  version "1.1.6"
+  resolved "https://registry.yarnpkg.com/@linkdrop/sdk/-/sdk-1.1.6.tgz#eb63bab4e451f48d6ecead9be45ae16ab5903eff"
+  integrity sha512-f/dH2FwkCT2y9J0+u5dt7ROQLh7wuVKr5aJU/r7gvhZQcvOBdPAGtD+BkfiXSpmaJJfSFDg/v8PJthPWUb2PEQ==
   dependencies:
-    "@linkdrop/contracts" "^1.1.4"
+    "@linkdrop/contracts" "^1.1.6"
     axios "^0.18.1"
-    ethereumjs-wallet "^1.0.0"
+    ethereumjs-wallet "^0.6.3"
     ethers "^4.0.27"
 
 "@nestjs/common@^7.0.0":
@@ -5509,20 +5509,6 @@ ethereumjs-wallet@^0.6.3:
     randombytes "^2.0.6"
     safe-buffer "^5.1.2"
     scryptsy "^1.2.1"
-    utf8 "^3.0.0"
-    uuid "^3.3.2"
-
-ethereumjs-wallet@^1.0.0:
-  version "1.0.0"
-  resolved "https://registry.yarnpkg.com/ethereumjs-wallet/-/ethereumjs-wallet-1.0.0.tgz#d6e2d7eddadbbf3d171050c1324eaec5b2981ecb"
-  integrity sha512-2zE4pxEL/ssTmBpYpf9ZE63lQ19aC8ANpprxC4+R7+/Q5n/YvPlKLzJEkkofiaPL12fHKlmjrB3FOXqLl6I3Rw==
-  dependencies:
-    aes-js "^3.1.1"
-    bs58check "^2.1.2"
-    ethereum-cryptography "^0.1.3"
-    ethereumjs-util "^7.0.2"
-    randombytes "^2.0.6"
-    scrypt-js "^3.0.1"
     utf8 "^3.0.0"
     uuid "^3.3.2"
 
