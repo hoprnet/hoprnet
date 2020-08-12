@@ -10,6 +10,7 @@ import fs from 'fs'
 import path from 'path'
 import ws from 'ws'
 import http from 'http'
+import { encode, decode } from 'rlp'
 
 const CRAWL_TIMEOUT = 100_000 // ~15 mins
 
@@ -31,10 +32,11 @@ class LogStream {
   }
 
   log(...args: string[]){
+    const msg = `[${new Date().toISOString()}] ${args.join(' ')}`
     // @ts-ignore
     debugLog(...args) 
 
-    this.messages.push(args.join(' '))
+    this.messages.push(msg)
     if (this.messages.length > 100){ // Avoid memory leak
       this.messages.splice(0, this.messages.length - 100); // delete elements from start
     }
@@ -42,7 +44,7 @@ class LogStream {
 
     this.connections.forEach((conn: Socket, i: number) => {
       if (conn.readyState == ws.OPEN) {
-        conn.send(args.join(' '))
+        conn.send(msg)
       } else {
         // Handle bad connections:
         if (conn.readyState !== ws.CONNECTING) {
@@ -110,6 +112,19 @@ async function main() {
     peerInfo.multiaddrs.add(addr);
     bootstrapServerMap.set(addr.getPeerId(), peerInfo);
   }
+  
+  function logMessageToNode(msg: Uint8Array){
+    logs.log("#### NODE RECEIVED MESSAGE ####")
+    try {
+      let [decoded, time] = decode(msg) as [Buffer, Buffer]
+      logs.log("Message:", decoded.toString())
+      logs.log("Latency:", Date.now() - parseInt(time.toString('hex'), 16) + 'ms')
+    } catch (err) {
+      logs.log("Could not decode message", err)
+      logs.log(msg.toString())
+    }
+  }
+
 
   let options: HoprOptions = {
     debug: Boolean(process.env.DEBUG),
@@ -117,13 +132,14 @@ async function main() {
     bootstrapServers: [...bootstrapServerMap.values()],
     provider,
     hosts: parseHosts(),
+    output: logMessageToNode,
     password: process.env.HOPR_PASSWORD || 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' // TODO!!!
   };
 
   debugLog(options)
   logs.log('Creating HOPR Node')
   logs.log('- network : ' + network);
-  logs.log('- bootstrapServers : ' + Array.from(bootstrapServerMap.values()).join(', '));
+  logs.log('- bootstrapServers : ' + bootstrapAddresses.join(', '));
 
   NODE = await Hopr.create(options);
   logs.log('Created HOPR Node')
@@ -139,7 +155,8 @@ async function main() {
 
 
   async function connectionReport(){
-    logs.log(`[ Connected to: ${NODE.peerStore.peers.size} peers ]`)
+    logs.log(`Node is connected at ${NODE.peerInfo.id.toB58String()}`)
+    logs.log(`Connected to: ${NODE.peerStore.peers.size} peers`)
     setTimeout(connectionReport, 10_000);
   }
   connectionReport()
@@ -160,8 +177,8 @@ async function main() {
     const used = process.memoryUsage();
     const usage = process.resourceUsage();
     logs.log(
-    `[ Process stats: mem ${used.rss / 1024}k (max: ${usage.maxRSS / 1024}k) ` +
-    `cputime: ${usage.userCPUTime} ]`)
+    `Process stats: mem ${used.rss / 1024}k (max: ${usage.maxRSS / 1024}k) ` +
+    `cputime: ${usage.userCPUTime}`)
     setTimeout(reportMemoryUsage, 10_000);
   }
   reportMemoryUsage()

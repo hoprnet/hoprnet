@@ -70,7 +70,7 @@ var connect = function(){
   client.onclose = function(){
     console.log('Web socket closed')
     logs.classList.add('connecting')
-    appendLog(' --- < Lost Connection, attempting to reconnect... > ---)
+    appendLog(' --- < Lost Connection, attempting to reconnect... > ---')
     setTimeout(function(){
       try {
         connect()
