@@ -4,9 +4,9 @@ volumes:
 services:
   hopr.avado.dnp.dappnode.eth:
     build:
-      context: .
-      dockerfile: ./build/Dockerfile
-    image: 'hopr.avado.dnp.dappnode.eth:0.0.6'
+      context: build
+      dockerfile: ./Dockerfile
+    image: 'hopr.avado.dnp.dappnode.eth:0.0.8'
     restart: always
     volumes:
       - 'data:/data'

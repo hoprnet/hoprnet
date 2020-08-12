@@ -1,6 +1,6 @@
 {
   "name": "hopr.avado.dnp.dappnode.eth",
-  "version": "0.0.6",
+  "version": "0.0.8",
   "description": "hopr node (public testnet)",
   "avatar": "/ipfs/QmQGxeJHvH2XDZSbai7YSPNs8RfhT7aiaB1DYEbdCpMshk",
   "type": "service",
@@ -12,21 +12,23 @@
     "environment": [
       "DEBUG=hopr*",
       "HOPR_NETWORK=ETHEREUM",
-      "HOPR_ETHEREUM_PROVIDER=wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36",
+      "HOPR_ETHEREUM_PROVIDER=ws://my.ethchain-geth.public.dappnode.eth:8546",
       "HOPR_BOOTSTRAP_SERVERS=/ip4/34.65.82.167/tcp/9091/p2p/16Uiu2HAm6VH37RG1R4P8hGV1Px7MneMtNc6PNPewNxCsj1HsDLXW,/ip4/34.65.111.179/tcp/9091/p2p/16Uiu2HAmPyq9Gw93VWdS3pgmyAWg2UNnrgZoYKPDUMbKDsWhzuvb",
       "HOPR_HOST=0.0.0.0:9091"
     ],
     "ports": [
       "3000:3000/tcp"
     ],
-    "path": "hopr.avado.dnp.dappnode.eth_0.0.6.tar.xz",
-    "hash": "/ipfs/QmQwyYuvhUdg9LPkU73hJogSCdiNmeUX6P44D2GfijPEfJ",
-    "size": 361466400,
+    "path": "hopr.avado.dnp.dappnode.eth_0.0.8.tar.xz",
+    "hash": "/ipfs/QmWYymvU8EpL11jRjx1Kw2uyA9fcdn7aLdQBcgUGdzpGER",
+    "size": 361049100,
     "restart": "always"
   },
   "author": "HOPR",
   "license": "(C)",
-  "dependencies": {},
+  "dependencies": {
+    "ethchain-geth.public.dappnode.eth": "QmUXyN676JcdakoX9LhcusPkb9NmCTb5uDBbDZF8pJ2YNh"
+  },
   "links": {
     "OnboardingWizard": "http://my.hopr.avado.dnp.dappnode.eth:3000"
   }
