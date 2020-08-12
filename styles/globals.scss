@@ -1,3 +1,5 @@
+@import "./utils/breakpoints.scss";
+
 /* HOPR palette */
 :root {
   --hopr-white: white;
@@ -26,7 +28,11 @@ a {
 }
 
 .section {
-  padding: 0px 20px 0px 20px;
+  padding: 0px 5px 0px 5px;
+
+  @include md {
+    padding: 0px 20px 0px 20px;
+  }
 }
 
 .clickable {

@@ -51,16 +51,18 @@ const methods: {
 
     stream.on("data", (res) => {
       const message = new MessageBuffer(res.getPayload_asU8());
-      const { from: counterParty } = message.toJson();
+      const { from } = message.toJson();
       const id = pseudoRandomId();
 
       dispatch({
         type: "ADD_MESSAGE",
-        counterParty,
         id,
+        counterParty: from,
+        anonymous: from === "",
+        sendByMe: false,
+        message,
         createdAt: new Date(),
         status: "SUCCESS",
-        message,
       });
     });
   },
@@ -103,11 +105,13 @@ const methods: {
 
     dispatch({
       type: "ADD_MESSAGE",
-      counterParty,
       id,
+      counterParty,
+      anonymous,
+      sendByMe: true,
+      message,
       createdAt: new Date(),
       status: "SENDING",
-      message,
     });
   },
 };

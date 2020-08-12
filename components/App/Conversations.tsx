@@ -1,4 +1,4 @@
-import styles from "../../styles/App/Conversations.module.css";
+import styles from "../../styles/App/Conversations.module.scss";
 import { store } from "../../utils";
 
 export default function Conversations(props: {
@@ -13,7 +13,7 @@ export default function Conversations(props: {
       <div className={styles.list}>
         {peerIds.map((peerId) => {
           const display =
-            peerId === "" ? "Anonymous" : `..${peerId.substr(-8)}`;
+            peerId === "" ? "Anonymous" : `..${peerId.substr(-7)}`;
           const selected = peerId === props.selected;
 
           return (

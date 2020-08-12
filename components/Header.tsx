@@ -1,5 +1,5 @@
 import { useState } from "react";
-import styles from "../styles/Header.module.css";
+import styles from "../styles/Header.module.scss";
 import Connect from "./Connect";
 import store from "../utils/store";
 
@@ -16,9 +16,9 @@ export default function Header() {
         {popupOpened ? (
           <Connect onConnect={() => togglePopup(false)} />
         ) : (
-          <div className="statusContainer">
-            <span className="address">{state.hoprAddress}</span>{" "}
-            <span className="status">{state.connection}</span>
+          <div className={styles.statusContainer}>
+            <span className={styles.address}>{state.hoprAddress}</span>{" "}
+            <span className={styles.status}>{state.connection}</span>
           </div>
         )}
         <span

@@ -1,5 +1,5 @@
 import classNames from "classnames";
-import styles from "../styles/Footer.module.css";
+import styles from "../styles/Footer.module.scss";
 
 export default function Footer() {
   return (

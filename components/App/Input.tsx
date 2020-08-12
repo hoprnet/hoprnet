@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import styles from "../../styles/App/Input.module.css";
+import styles from "../../styles/App/Input.module.scss";
 import store from "../../utils/store";
 
 export default function Input(props: { peerId?: string }) {

@@ -4,9 +4,13 @@ import { API_URL } from "../env";
 import IMessageBuffer from "../message";
 
 export type IMessage = {
+  id: string;
+  counterParty: string;
+  anonymous: boolean;
+  sendByMe: boolean;
+  message: IMessageBuffer;
   createdAt: Date;
   status: "SENDING" | "SUCCESS" | "FAILED";
-  message: IMessageBuffer;
 };
 
 export const initialState: {
@@ -18,7 +22,7 @@ export const initialState: {
   apiUrl: API_URL,
   connection: "DISCONNECTED",
   hoprAddress: undefined,
-  conversations: new Map([["", new Map()]]), // initialize with an anonymous entry
+  conversations: new Map([["", new Map()]]), // add anonymous conversation
 };
 
 export type IActions =
@@ -37,18 +41,14 @@ export type IActions =
       type: "SET_HOPR_ADDRESS";
       hoprAddress: typeof initialState["hoprAddress"];
     }
-  | {
+  | ({
       type: "ADD_MESSAGE";
-      counterParty: string;
       id: string;
-      createdAt: Date;
-      status: IMessage["status"];
-      message: IMessage["message"];
-    }
+    } & IMessage)
   | {
       type: "UPDATE_MESSAGE_STATUS";
-      counterParty: string;
       id: string;
+      counterParty: string;
       status: IMessage["status"];
     };
 
@@ -75,9 +75,13 @@ export const reducer = (
 
       // update conversation
       conversation.set(action.id, {
+        id: action.id,
+        counterParty: action.counterParty,
+        anonymous: action.anonymous,
+        sendByMe: action.sendByMe,
+        message: action.message,
         createdAt: action.createdAt,
         status: action.status,
-        message: action.message,
       });
 
       // update conversations

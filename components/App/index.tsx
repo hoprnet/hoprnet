@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import styles from "../../styles/App/index.module.css";
+import styles from "../../styles/App/index.module.scss";
 import Conversations from "./Conversations";
 import Chat from "./Chat";
 import Input from "./Input";
