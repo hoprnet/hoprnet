@@ -1,6 +1,7 @@
 import { API_URL, BOT_NAME } from './env'
 import { getHoprAddress  } from './utils'
 import { setupBot, Bot } from './bot'
+import { pay } from './linkdrop'
 
 
 const start = async () => {
@@ -24,6 +25,11 @@ const start = async () => {
       break
   }
   await setupBot(bot)
+  try {
+    await pay()
+  } catch(err) {
+    console.log(err)
+  }
 }
 
 start().catch((err) => {
