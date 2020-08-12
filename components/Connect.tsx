@@ -1,4 +1,4 @@
-import styles from "../styles/Connect.module.css";
+import styles from "../styles/Connect.module.scss";
 import { store } from "../utils";
 
 export default function Connect(props: { onConnect?: () => any }) {

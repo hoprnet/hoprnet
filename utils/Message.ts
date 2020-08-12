@@ -6,6 +6,10 @@ export type IMessage = {
   text: string;
 };
 
+/**
+ * @param str a hopr address
+ * @returns true if `str` is a hopr address
+ */
 const isHoprAddress = (str: string): boolean => {
   if (!str.match(/16Uiu2HA.*?$/i)) return false;
 
@@ -21,6 +25,10 @@ class Message extends Uint8Array {
     return new Uint8Array(this);
   }
 
+  /**
+   * Parse Uint8Array and return the contents of the message.
+   * If the first 53 bytes of the array are a valid hopr address, it will return the hopr address.
+   */
   toJson(): IMessage {
     try {
       let from: string;

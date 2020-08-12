@@ -5,6 +5,10 @@ import {
   ListenResponse,
 } from "@hoprnet/hopr-protos/web/listen_pb";
 
+/**
+ *
+ * @returns a readable stream
+ */
 export const listenToMessages = async (
   apiUrl: string
 ): Promise<ClientReadableStream<ListenResponse>> => {

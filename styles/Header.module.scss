@@ -1,12 +1,13 @@
+@import "./utils/breakpoints.scss";
+
 .container {
   display: flex;
   flex-direction: row;
   justify-content: space-between;
   align-items: center;
-  width: 100%;
-  height: 100px;
   color: var(--hopr-white);
   background-color: var(--hopr-dark-blue);
+  height: 10vh;
 }
 
 .settings {
@@ -14,6 +15,18 @@
   flex-direction: row;
   justify-content: space-between;
   align-items: center;
+}
+
+.logo > h1 {
+  font-size: 1rem;
+}
+
+.address {
+  display: none;
+
+  @include md {
+    display: initial;
+  }
 }
 
 .cogwheel {
