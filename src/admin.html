@@ -49,12 +49,12 @@ var appendLog = function(msg){
 
 var connect = function(){
   var logs = document.querySelector('.logs')
-  console.log("Connecting ...")
+  console.log('Connecting ...')
   var client = new WebSocket('ws://' + window.location.host);
-  console.log("Web socket created")
+  console.log('Web socket created')
 
   client.onopen = function(){
-    console.log("Web socket opened")
+    console.log('Web socket opened')
     logs.classList.remove('connecting')
   }
 
@@ -64,19 +64,19 @@ var connect = function(){
   }
 
   client.onerror = function(error){
-    console.log("Connection error:", error)
+    console.log('Connection error:', error)
   }
 
   client.onclose = function(){
-    console.log("Web socket closed")
+    console.log('Web socket closed')
     logs.classList.add('connecting')
-    appendLog(" --- < Lost Connection, attempting to reconnect... > ---")
+    appendLog(' --- < Lost Connection, attempting to reconnect... > ---)
     setTimeout(function(){
       try {
         connect()
-        console.log("connection")
+        console.log('connection')
       } catch (e){
-        console.log("Error connecting", e)
+        console.log('Error connecting', e)
       }
     }, 1000);
   }
@@ -89,22 +89,22 @@ window.onload = function(){
   </head>
   <body>
     <div class='logo'>
-      <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="0 0 196 196" style="enable-background:new 0 0 196 196;" xml:space="preserve">
-  <circle cx="98" cy="98" r="98"/ fill="#FFFFA0" />
-  <linearGradient id="G" gradientUnits="userSpaceOnUse" x1="102" y1="163.0232" x2="102" y2="57.4945">
-    <stop  offset="0" style="stop-color:#0000B4"/>
-    <stop  offset="9.090910e-03" style="stop-color:#0000B4"/>
-    <stop  offset="1" style="stop-color:#000050"/>
+      <svg version='1.1' xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' x='0px' y='0px' viewBox='0 0 196 196' style='enable-background:new 0 0 196 196;' xml:space='preserve'>
+  <circle cx='98' cy='98' r='98' fill='#FFFFA0' />
+  <linearGradient id='G' gradientUnits='userSpaceOnUse' x1='102' y1='163.0232' x2='102' y2='57.4945'>
+    <stop offset='0' style='stop-color:#0000B4' />
+    <stop offset='9.090910e-03' style='stop-color:#0000B4' />
+    <stop offset='1' style='stop-color:#000050' />
   </linearGradient>
-  <path fill="url(#G)" d="M115.9,61.7c-1.1-0.1-2.2-0.2-3.3-0.2c-8.2,0-16.3,3.3-23.5,9.8c-3.4,3-6.5,6.6-9.4,10.8
+  <path fill='url(#G)' d='M115.9,61.7c-1.1-0.1-2.2-0.2-3.3-0.2c-8.2,0-16.3,3.3-23.5,9.8c-3.4,3-6.5,6.6-9.4,10.8
     c-0.5-15.6-1.4-32.2-2.9-49.1H55.6c4.5,47.7,4,89.3,3.2,125.8h0c0,0.1,0,0.1,0,0.2h21c0.6-36.6,9.8-60,23.3-72.1
-    c3.6-3.3,7.2-4.7,10.5-4.4c16.6,1.8,14,53.6,12.7,76.5h21c0.9-16.9,1.9-37.5-0.5-55.5C143.3,77.6,132.9,63.6,115.9,61.7z"/>
+    c3.6-3.3,7.2-4.7,10.5-4.4c16.6,1.8,14,53.6,12.7,76.5h21c0.9-16.9,1.9-37.5-0.5-55.5C143.3,77.6,132.9,63.6,115.9,61.7z'/>
       </svg>
     </div>
     <h1>HOPR Logs [TESTNET NODE]</h1>
 
-    <div class='logs' class="connecting">
-    <pre><code id="log">Connecting...</code></pre>
+    <div class='logs' class='connecting'>
+    <pre><code id='log'>Connecting...</code></pre>
     </div>
   </body>
 </html>
