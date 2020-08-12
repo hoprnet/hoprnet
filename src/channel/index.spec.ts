@@ -93,7 +93,7 @@ describe('test Channel class', function () {
       async () => {
         const result = await pipe(
           [(await coreConnector.channel.createSignedChannel(undefined, { channel: channelType })).subarray()],
-          counterpartysCoreConnector.channel.handleOpeningRequest(),
+          counterpartysCoreConnector.channel.handleOpeningRequest,
           async (source: AsyncIterable<any>) => {
             let result: Uint8Array
             for await (const msg of source) {

@@ -98,10 +98,6 @@ export function decodeOpenedChannelEvent(_event: Log) {
 }
 
 export function decodeClosedChannelEvent(_event: Log) {
-  console.log(_event, {
-    partyAAmount: new BN(_event.data.slice(-128, -64), 16),
-    partyBAmount: new BN(_event.data.slice(-64), 16),
-  })
   return {
     event: 'ClosedChannel',
     blockNumber: _event.blockNumber,

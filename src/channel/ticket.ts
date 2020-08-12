@@ -2,6 +2,7 @@ import type IChannel from '.'
 import BN from 'bn.js'
 import { u8aToHex, stringToU8a, u8aConcat } from '@hoprnet/hopr-utils'
 import { Hash, TicketEpoch, Balance, SignedTicket, Ticket } from '../types'
+import { pubKeyToAccountId } from '../utils'
 
 const DEFAULT_WIN_PROB = new BN(1)
 
@@ -20,16 +21,14 @@ class TicketFactory {
       new BN(new Uint8Array(Hash.SIZE).fill(0xff)).div(DEFAULT_WIN_PROB).toArray('le', Hash.SIZE)
     )
     const channelId = await this.channel.channelId
-    const counterParty = await this.channel.coreConnector.utils
-      .pubKeyToAccountId(this.channel.counterparty)
-      .then((res) => res.toHex())
+    const counterParty = (await pubKeyToAccountId(this.channel.counterparty)).toHex()
 
     const { onChainSecret, epoch } = await this.channel.coreConnector.hoprChannels.methods
       .accounts(counterParty)
       .call()
       .then((res) => {
         return {
-          onChainSecret: new Hash(stringToU8a(res.hashedSecret)),
+          onChainSecret: stringToU8a(res.hashedSecret),
           epoch: new TicketEpoch(Number(res.counter)),
         }
       })
@@ -81,7 +80,6 @@ class TicketFactory {
 
     const preImage = await this.channel.coreConnector.hashedSecret.getPreimage(ticket.onChainSecret)
 
-    console.log('pre_image', preImage)
     const transaction = await signTransaction(
       hoprChannels.methods.redeemTicket(
         u8aToHex(preImage.preImage),

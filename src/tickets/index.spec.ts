@@ -1,7 +1,7 @@
 import { Ganache } from '@hoprnet/hopr-testing'
 import { migrate } from '@hoprnet/hopr-ethereum'
 import assert from 'assert'
-import { u8aToHex, stringToU8a, u8aEquals } from '@hoprnet/hopr-utils'
+import { u8aToHex, stringToU8a, u8aEquals, durations } from '@hoprnet/hopr-utils'
 import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
 import { getPrivKeyData, createAccountAndFund, createNode } from '../utils/testing.spec'
 import { randomBytes } from 'crypto'
@@ -11,7 +11,6 @@ import Web3 from 'web3'
 import { HoprToken } from '../tsc/web3/HoprToken'
 import { Await } from '../tsc/utils'
 import {
-  AccountId,
   Balance,
   Channel as ChannelType,
   ChannelStatus,
@@ -20,6 +19,7 @@ import {
   SignedTicket,
   SignedChannel,
 } from '../types'
+import { HASHED_SECRET_WIDTH } from '../hashedSecret'
 import CoreConnector from '..'
 import * as testconfigs from '../config.spec'
 import * as configs from '../config'
@@ -33,7 +33,7 @@ describe('test ticket generation and verification', function () {
   let funder: Await<ReturnType<typeof getPrivKeyData>>
 
   before(async function () {
-    this.timeout(60e3)
+    this.timeout(durations.seconds(60))
 
     await ganache.start()
     await migrate()
@@ -51,46 +51,63 @@ describe('test ticket generation and verification', function () {
   })
 
   beforeEach(async function () {
-    funder = await getPrivKeyData(stringToU8a(testconfigs.FUND_ACCOUNT_PRIVATE_KEY))
-    const userA = await createAccountAndFund(web3, hoprToken, funder)
-    const userB = await createAccountAndFund(web3, hoprToken, funder)
+    this.timeout(durations.seconds(10))
 
-    coreConnector = await createNode(userA.privKey)
-    counterpartysCoreConnector = await createNode(userB.privKey)
-    await coreConnector.db.clear()
-    await counterpartysCoreConnector.db.clear()
+    funder = await getPrivKeyData(stringToU8a(testconfigs.FUND_ACCOUNT_PRIVATE_KEY))
+
+    const [userA, userB] = await Promise.all([
+      createAccountAndFund(web3, hoprToken, funder),
+      createAccountAndFund(web3, hoprToken, funder),
+    ])
+
+    ;[coreConnector, counterpartysCoreConnector] = await Promise.all([
+      createNode(userA.privKey),
+      createNode(userB.privKey),
+    ])
+
+    await Promise.all([
+      // prettier-ignore
+      coreConnector.db.clear(),
+      counterpartysCoreConnector.db.clear(),
+    ])
+
+    await Promise.all([
+      // prettier-ignore
+      coreConnector.initOnchainValues(),
+      counterpartysCoreConnector.initOnchainValues(),
+    ])
   })
 
   it('should store ticket', async function () {
-    this.timeout(5e3)
+    this.timeout(durations.seconds(5))
 
-    const channelType = new ChannelType(undefined, {
-      balance: new ChannelBalance(undefined, {
-        balance: new BN(123),
-        balance_a: new BN(122),
-      }),
-      status: ChannelStatus.FUNDING,
+    const balance = new ChannelBalance(undefined, {
+      balance: new BN(123),
+      balance_a: new BN(122),
     })
 
-    const channelId = new Hash(
-      await coreConnector.utils.getId(
-        new AccountId(coreConnector.account.keys.onChain.pubKey),
-        new AccountId(counterpartysCoreConnector.account.keys.onChain.pubKey)
-      )
+    const channelId = await coreConnector.utils.getId(
+      await coreConnector.account.address,
+      await counterpartysCoreConnector.account.address
     )
-
-    const signedChannel = await counterpartysCoreConnector.channel.createSignedChannel(undefined, {
-      channel: channelType,
-    })
 
     const channel = await coreConnector.channel.create(
       counterpartysCoreConnector.account.keys.onChain.pubKey,
       async () => counterpartysCoreConnector.account.keys.onChain.pubKey,
-      signedChannel.channel.balance,
-      async () => {
+      balance,
+      async (balance: ChannelBalance) => {
         const result = await pipe(
-          [(await coreConnector.channel.createSignedChannel(undefined, { channel: channelType })).subarray()],
-          counterpartysCoreConnector.channel.handleOpeningRequest(),
+          [
+            (
+              await coreConnector.channel.createSignedChannel(undefined, {
+                channel: new ChannelType(undefined, {
+                  balance,
+                  status: ChannelStatus.FUNDING,
+                }),
+              })
+            ).subarray(),
+          ],
+          counterpartysCoreConnector.channel.handleOpeningRequest.bind(counterpartysCoreConnector.channel),
           async (source: AsyncIterable<any>) => {
             let result: Uint8Array
             for await (const msg of source) {
@@ -111,21 +128,14 @@ describe('test ticket generation and verification', function () {
       }
     )
 
-    const preImage = randomBytes(32)
-    const hash = await coreConnector.utils.hash(preImage)
+    const preImage = randomBytes(27)
+    const hash = (await coreConnector.utils.hash(preImage)).slice(0, HASHED_SECRET_WIDTH)
 
     const signedTicket = (await channel.ticket.create(new Balance(1), new Hash(hash))) as SignedTicket
+
     assert(
       u8aEquals(await signedTicket.signer, coreConnector.account.keys.onChain.pubKey),
       `Check that signer is recoverable`
-    )
-
-    const signedChannelCounterparty = await coreConnector.channel.createSignedChannel(undefined, {
-      channel: channelType,
-    })
-    assert(
-      u8aEquals(await signedChannelCounterparty.signer, coreConnector.account.keys.onChain.pubKey),
-      `Check that signer is recoverable.`
     )
 
     await coreConnector.tickets.store(channelId, signedTicket)
@@ -140,37 +150,37 @@ describe('test ticket generation and verification', function () {
   it('should store tickets, and retrieve them in a map', async function () {
     this.timeout(5e3)
 
-    const channelType = new ChannelType(undefined, {
-      balance: new ChannelBalance(undefined, {
-        balance: new BN(123),
-        balance_a: new BN(122),
-      }),
-      status: ChannelStatus.FUNDING,
+    const balance = new ChannelBalance(undefined, {
+      balance: new BN(123),
+      balance_a: new BN(122),
     })
 
-    const channelId = new Hash(
-      await coreConnector.utils.getId(
-        new AccountId(coreConnector.account.keys.onChain.pubKey),
-        new AccountId(counterpartysCoreConnector.account.keys.onChain.pubKey)
-      )
+    const channelId = await coreConnector.utils.getId(
+      await coreConnector.account.address,
+      await counterpartysCoreConnector.account.address
     )
-
-    const signedChannel = await counterpartysCoreConnector.channel.createSignedChannel(undefined, {
-      channel: channelType,
-    })
 
     const channel = await coreConnector.channel.create(
       counterpartysCoreConnector.account.keys.onChain.pubKey,
       async () => counterpartysCoreConnector.account.keys.onChain.pubKey,
-      signedChannel.channel.balance,
-      async () => {
+      balance,
+      async (balance: ChannelBalance) => {
         const result = await pipe(
-          [(await coreConnector.channel.createSignedChannel(undefined, { channel: channelType })).subarray()],
-          counterpartysCoreConnector.channel.handleOpeningRequest(),
+          [
+            (
+              await coreConnector.channel.createSignedChannel(undefined, {
+                channel: new ChannelType(undefined, {
+                  balance,
+                  status: ChannelStatus.FUNDING,
+                }),
+              })
+            ).subarray(),
+          ],
+          counterpartysCoreConnector.channel.handleOpeningRequest.bind(counterpartysCoreConnector.channel),
           async (source: AsyncIterable<any>) => {
-            let result: Uint8Array
+            let result: Uint8Array | undefined
             for await (const msg of source) {
-              if (result! == null) {
+              if (result == null) {
                 result = msg.slice()
                 return result
               } else {

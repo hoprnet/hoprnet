@@ -20,8 +20,8 @@ class Tickets {
     return new Promise(async (resolve, reject) => {
       this.coreConnector.db
         .createReadStream({
-          gte: Buffer.from(this.coreConnector.dbKeys.Ticket(channelId, new Uint8Array(SignedTicket.SIZE).fill(0x00))),
-          lte: Buffer.from(this.coreConnector.dbKeys.Ticket(channelId, new Uint8Array(SignedTicket.SIZE).fill(0xff))),
+          gte: Buffer.from(this.coreConnector.dbKeys.Ticket(channelId, new Uint8Array(Hash.SIZE).fill(0x00))),
+          lte: Buffer.from(this.coreConnector.dbKeys.Ticket(channelId, new Uint8Array(Hash.SIZE).fill(0xff))),
         })
         .on('error', (err) => reject(err))
         .on('data', ({ value }: { value: Buffer }) => {

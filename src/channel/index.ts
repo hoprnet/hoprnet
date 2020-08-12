@@ -15,7 +15,7 @@ import {
 } from '../types'
 import { ChannelStatus } from '../types/channel'
 import { ERRORS } from '../constants'
-import { waitForConfirmation, getId, events } from '../utils'
+import { waitForConfirmation, getId, events, pubKeyToAccountId, sign, isPartyA } from '../utils'
 
 import type HoprEthereum from '..'
 import Channel from './channel'
@@ -63,10 +63,8 @@ class ChannelFactory {
   }
 
   async isOpen(counterpartyPubKey: Uint8Array) {
-    const counterparty = await this.coreConnector.utils.pubKeyToAccountId(counterpartyPubKey)
-    const channelId = await this.coreConnector.utils
-      .getId(await this.coreConnector.account.address, counterparty)
-      .then((res) => new Hash(res))
+    const counterparty = await pubKeyToAccountId(counterpartyPubKey)
+    const channelId = new Hash(await getId(await this.coreConnector.account.address, counterparty))
 
     const [onChain, offChain]: [boolean, boolean] = await Promise.all([
       this.coreConnector.channel.getOnChainState(channelId).then((channel: OnChainChannel) => {
@@ -98,7 +96,7 @@ class ChannelFactory {
   }
 
   async createDummyChannelTicket(
-    counterParty: AccountId,
+    counterparty: AccountId,
     challenge: Hash,
     arr?: {
       bytes: ArrayBuffer
@@ -108,10 +106,7 @@ class ChannelFactory {
     if (!challenge) {
       throw Error(`Challenge is not set`)
     }
-    const channelId = await this.coreConnector.utils.getId(
-      await this.coreConnector.utils.pubKeyToAccountId(this.coreConnector.account.keys.onChain.pubKey),
-      counterParty
-    )
+    const channelId = await getId(await pubKeyToAccountId(this.coreConnector.account.keys.onChain.pubKey), counterparty)
 
     const winProb = new Uint8ArrayE(new BN(new Uint8Array(Hash.SIZE).fill(0xff)).div(WIN_PROB).toArray('le', Hash.SIZE))
 
@@ -132,7 +127,7 @@ class ChannelFactory {
       }
     )
 
-    await this.coreConnector.utils.sign(await ticket.hash, this.coreConnector.account.keys.onChain.privKey, undefined, {
+    await sign(await ticket.hash, this.coreConnector.account.keys.onChain.privKey, undefined, {
       bytes: signedTicket.buffer,
       offset: signedTicket.signatureOffset,
     })
@@ -185,7 +180,7 @@ class ChannelFactory {
     channelBalance?: ChannelBalance,
     sign?: (channelBalance: ChannelBalance) => Promise<SignedChannel>
   ): Promise<Channel> {
-    const counterparty = await this.coreConnector.utils.pubKeyToAccountId(counterpartyPubKey)
+    const counterparty = await pubKeyToAccountId(counterpartyPubKey)
     let channel: Channel
     let signedChannel: SignedChannel
 
@@ -202,13 +197,15 @@ class ChannelFactory {
       channel = new Channel(this.coreConnector, counterpartyPubKey, signedChannel)
     } else if (sign != null && channelBalance != null) {
       let amount: Balance
-      if (this.coreConnector.utils.isPartyA(await this.coreConnector.account.address, counterparty)) {
+      if (isPartyA(await this.coreConnector.account.address, counterparty)) {
         amount = channelBalance.balance_a
       } else {
         amount = new Balance(channelBalance.balance.sub(channelBalance.balance_a))
       }
 
       await this.increaseFunds(counterparty, amount)
+
+      console.log('here')
 
       signedChannel = await sign(channelBalance)
 
@@ -278,40 +275,37 @@ class ChannelFactory {
     )
   }
 
-  handleOpeningRequest(): (source: AsyncIterable<Uint8Array>) => AsyncIterable<Uint8Array> {
-    return (source: AsyncIterable<Uint8Array>) =>
-      async function* (this: ChannelFactory) {
-        for await (const _msg of source) {
-          const msg = _msg.slice()
-          const signedChannel = new SignedChannel({
-            bytes: msg.buffer,
-            offset: msg.byteOffset,
-          })
+  handleOpeningRequest(source: AsyncIterable<Uint8Array>) {
+    return async function* (this: ChannelFactory) {
+      for await (const _msg of source) {
+        const msg = _msg.slice()
+        const signedChannel = new SignedChannel({
+          bytes: msg.buffer,
+          offset: msg.byteOffset,
+        })
 
-          const counterpartyPubKey = await signedChannel.signer
-          const counterparty = await this.coreConnector.utils.pubKeyToAccountId(counterpartyPubKey)
-          const channelBalance = signedChannel.channel.balance
+        const counterpartyPubKey = await signedChannel.signer
+        const counterparty = await pubKeyToAccountId(counterpartyPubKey)
+        const channelBalance = signedChannel.channel.balance
 
-          if (this.coreConnector.utils.isPartyA(await this.coreConnector.account.address, counterparty)) {
-            if (channelBalance.balance.sub(channelBalance.balance_a).gtn(0)) {
-              await this.increaseFunds(counterparty, new Balance(channelBalance.balance.sub(channelBalance.balance_a)))
-            }
-          } else {
-            if (channelBalance.balance_a.gtn(0)) {
-              await this.increaseFunds(counterparty, channelBalance.balance_a)
-            }
+        if (isPartyA(await this.coreConnector.account.address, counterparty)) {
+          if (channelBalance.balance.sub(channelBalance.balance_a).gtn(0)) {
+            await this.increaseFunds(counterparty, new Balance(channelBalance.balance.sub(channelBalance.balance_a)))
           }
-
-          // listen for opening event and update DB
-          this.coreConnector.channel
-            .onceOpen(new Public(this.coreConnector.account.keys.onChain.pubKey), new Public(counterpartyPubKey))
-            .then(() => this.coreConnector.channel.saveOffChainState(counterpartyPubKey, signedChannel))
-
-          await this.coreConnector.channel.saveOffChainState(counterpartyPubKey, signedChannel)
-
-          yield signedChannel.toU8a()
+        } else {
+          if (channelBalance.balance_a.gtn(0)) {
+            await this.increaseFunds(counterparty, channelBalance.balance_a)
+          }
         }
-      }.call(this)
+
+        // listen for opening event and update DB
+        this.coreConnector.channel
+          .onceOpen(new Public(this.coreConnector.account.keys.onChain.pubKey), new Public(counterpartyPubKey))
+          .then(() => this.coreConnector.channel.saveOffChainState(counterpartyPubKey, signedChannel))
+
+        yield signedChannel.toU8a()
+      }
+    }.call(this)
   }
 
   getOffChainState(counterparty: Uint8Array): Promise<SignedChannel> {
@@ -347,10 +341,7 @@ class ChannelFactory {
           const event = events.decodeOpenedChannelEvent(data)
 
           const { opener, counterparty } = event.returnValues
-          const _channelId = await this.coreConnector.utils.getId(
-            await opener.toAccountId(),
-            await counterparty.toAccountId()
-          )
+          const _channelId = await getId(await opener.toAccountId(), await counterparty.toAccountId())
 
           if (!u8aEquals(_channelId, channelId)) {
             return
@@ -381,10 +372,7 @@ class ChannelFactory {
           const event = events.decodeClosedChannelEvent(data)
 
           const { closer, counterparty } = event.returnValues
-          const _channelId = await this.coreConnector.utils.getId(
-            await closer.toAccountId(),
-            await counterparty.toAccountId()
-          )
+          const _channelId = await getId(await closer.toAccountId(), await counterparty.toAccountId())
 
           if (!u8aEquals(_channelId, channelId)) {
             return

@@ -1,7 +1,7 @@
 import assert from 'assert'
 import { randomBytes } from 'crypto'
 import BN from 'bn.js'
-import { stringToU8a, randomInteger } from '@hoprnet/hopr-utils'
+import { stringToU8a, randomInteger, u8aEquals } from '@hoprnet/hopr-utils'
 import { AccountId, Ticket, Hash, TicketEpoch, Balance } from '.'
 import * as utils from '../utils'
 import * as testconfigs from '../config.spec'
@@ -15,7 +15,7 @@ const generateTicketData = async () => {
   const epoch = new TicketEpoch(0)
   const amount = new Balance(15)
   const winProb = new Hash(new BN(new Uint8Array(Hash.SIZE).fill(0xff)).div(WIN_PROB).toArray('le', Hash.SIZE))
-  const onChainSecret = new Hash(randomBytes(32))
+  const onChainSecret = new Hash(randomBytes(27))
 
   return {
     channelId,
@@ -38,7 +38,7 @@ describe('test ticket construction', function () {
     assert(ticket.epoch.eq(ticketData.epoch), 'wrong epoch')
     assert(ticket.amount.eq(ticketData.amount), 'wrong amount')
     assert(ticket.winProb.eq(ticketData.winProb), 'wrong winProb')
-    assert(ticket.onChainSecret.eq(ticketData.onChainSecret), 'wrong onChainSecret')
+    assert(u8aEquals(ticket.onChainSecret, ticketData.onChainSecret), 'wrong onChainSecret')
   })
 
   it('should create new ticket using array', async function () {
@@ -55,7 +55,7 @@ describe('test ticket construction', function () {
     assert(ticketB.epoch.eq(ticketData.epoch), 'wrong epoch')
     assert(ticketB.amount.eq(ticketData.amount), 'wrong amount')
     assert(ticketB.winProb.eq(ticketData.winProb), 'wrong winProb')
-    assert(ticketB.onChainSecret.eq(ticketData.onChainSecret), 'wrong onChainSecret')
+    assert(u8aEquals(ticketB.onChainSecret, ticketData.onChainSecret), 'wrong onChainSecret')
   })
 
   it('should create new ticket out of continous memory', async function () {
@@ -77,6 +77,6 @@ describe('test ticket construction', function () {
     assert(ticket.epoch.eq(ticketData.epoch), 'wrong epoch')
     assert(ticket.amount.eq(ticketData.amount), 'wrong amount')
     assert(ticket.winProb.eq(ticketData.winProb), 'wrong winProb')
-    assert(ticket.onChainSecret.eq(ticketData.onChainSecret), 'wrong onChainSecret')
+    assert(u8aEquals(ticket.onChainSecret, ticketData.onChainSecret), 'wrong onChainSecret')
   })
 })
