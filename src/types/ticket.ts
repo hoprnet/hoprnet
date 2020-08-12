@@ -3,7 +3,8 @@ import BN from 'bn.js'
 import { stringToU8a, u8aToHex } from '@hoprnet/hopr-utils'
 import { Hash, TicketEpoch, Balance, Signature } from '.'
 import { Uint8ArrayE } from '../types/extended'
-import { sign } from '../utils'
+import { sign, hash } from '../utils'
+import { HASHED_SECRET_WIDTH } from '../hashedSecret'
 //
 import Web3 from 'web3'
 const web3 = new Web3()
@@ -113,21 +114,23 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
     return this.byteOffset + Hash.SIZE + Hash.SIZE + TicketEpoch.SIZE + Balance.SIZE + Hash.SIZE
   }
 
-  get onChainSecret(): Hash {
-    return new Hash(new Uint8Array(this.buffer, this.onChainSecretOffset, Hash.SIZE))
+  get onChainSecret() {
+    return new Uint8Array(this.buffer, this.onChainSecretOffset, HASHED_SECRET_WIDTH)
   }
 
-  get hash() {
-    const encodedTicket = encode([
-      { type: 'bytes32', value: u8aToHex(this.channelId) },
-      { type: 'bytes32', value: u8aToHex(this.challenge) },
-      { type: 'bytes32', value: u8aToHex(this.onChainSecret) },
-      { type: 'uint256', value: this.epoch.toString() },
-      { type: 'uint256', value: this.amount.toString() },
-      { type: 'bytes32', value: u8aToHex(this.winProb) },
-    ])
+  get hash(): Promise<Hash> {
+    return new Promise<Hash>(async (resolve) => {
+      const encodedTicket = encode([
+        { type: 'bytes32', value: u8aToHex(this.channelId) },
+        { type: 'bytes32', value: u8aToHex(await hash(this.challenge)) },
+        { type: 'bytes32', value: u8aToHex(this.onChainSecret) },
+        { type: 'uint256', value: this.epoch.toString() },
+        { type: 'uint256', value: this.amount.toString() },
+        { type: 'bytes32', value: u8aToHex(this.winProb) },
+      ])
 
-    return toEthSignedMessageHash(encodedTicket)
+      resolve(toEthSignedMessageHash(encodedTicket))
+    })
   }
 
   static get SIZE(): number {
@@ -146,7 +149,7 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
       offset: number
     }
   ): Promise<Signature> {
-    return sign(this.hash, privKey, undefined, arr)
+    return sign(await this.hash, privKey, undefined, arr)
   }
 
   static create(

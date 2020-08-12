@@ -4,7 +4,7 @@ import { Hash } from './types'
 import Debug from 'debug'
 const log = Debug('hopr-core-ethereum:hashedSecret')
 
-import { randomBytes, createHash } from 'crypto'
+import { randomBytes } from 'crypto'
 import { u8aEquals, u8aToHex, stringToU8a, u8aConcat } from '@hoprnet/hopr-utils'
 import { publicKeyConvert } from 'secp256k1'
 
@@ -138,10 +138,11 @@ class HashedSecret {
       .accounts((await this.coreConnector.account.address).toHex())
       .call()
 
-    return createHash('sha256')
-      .update(u8aConcat(new Uint8Array([parseInt(account.counter)]), this.coreConnector.account.keys.onChain.pubKey))
-      .digest()
-      .slice(0, HASHED_SECRET_WIDTH)
+    return (
+      await this.coreConnector.utils.hash(
+        u8aConcat(new Uint8Array([parseInt(account.counter)]), this.coreConnector.account.keys.onChain.pubKey)
+      )
+    ).slice(0, HASHED_SECRET_WIDTH)
   }
 
   /**
@@ -149,9 +150,10 @@ class HashedSecret {
    * into the database.
    */
   async create(): Promise<Uint8Array> {
-    let onChainSecret = new Hash(
-      this.coreConnector.options.debug ? await this.getDebugAccountSecret() : randomBytes(HASHED_SECRET_WIDTH)
-    )
+    let onChainSecret = this.coreConnector.options.debug
+      ? await this.getDebugAccountSecret()
+      : new Hash(randomBytes(HASHED_SECRET_WIDTH))
+
     let onChainSecretIntermediary = onChainSecret
     let dbBatch = this.coreConnector.db.batch()
 

@@ -1,6 +1,6 @@
 import type IChannel from '.'
 import BN from 'bn.js'
-import { u8aToHex, stringToU8a } from '@hoprnet/hopr-utils'
+import { u8aToHex, stringToU8a, u8aConcat } from '@hoprnet/hopr-utils'
 import { Hash, TicketEpoch, Balance, SignedTicket, Ticket } from '../types'
 
 const DEFAULT_WIN_PROB = new BN(1)
@@ -79,16 +79,14 @@ class TicketFactory {
     const { ticket, signature } = signedTicket
     const { r, s, v } = utils.getSignatureParameters(signature)
 
-    const pre_image = await this.channel.coreConnector.hashedSecret
-      .getPreimage(ticket.onChainSecret)
-      .then((res) => res.preImage)
+    const preImage = await this.channel.coreConnector.hashedSecret.getPreimage(ticket.onChainSecret)
 
+    console.log('pre_image', preImage)
     const transaction = await signTransaction(
       hoprChannels.methods.redeemTicket(
-        u8aToHex(pre_image),
+        u8aToHex(preImage.preImage),
         u8aToHex(ticket.channelId),
-        u8aToHex(secretA),
-        u8aToHex(secretB),
+        u8aToHex(await utils.hash(u8aConcat(secretA, secretB))),
         ticket.amount.toString(),
         u8aToHex(ticket.winProb),
         u8aToHex(r),

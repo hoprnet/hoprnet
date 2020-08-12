@@ -6,7 +6,7 @@ import { Subscription } from 'web3-core-subscriptions'
 import { BlockHeader } from 'web3-eth'
 import { u8aToNumber, stringToU8a, u8aConcat, u8aToHex } from '@hoprnet/hopr-utils'
 import { ChannelEntry, Public } from '../types'
-import { Log, isPartyA } from '../utils'
+import { Log, isPartyA, events } from '../utils'
 import { MAX_CONFIRMATIONS } from '../config'
 import { ContractEventLog } from '../tsc/web3/types'
 import createKeccakHash from 'keccak'
@@ -372,7 +372,7 @@ class Indexer implements IIndexer {
           .subscribe('logs', {
             address: this.connector.hoprChannels.options.address,
             fromBlock,
-            topics: [this.getTopic0('OpenedChannel(uint,uint)')],
+            topics: events.OpenedChannelTopics(undefined, undefined),
           })
           .on('error', (err) => {
             if (!rejected) {
@@ -386,7 +386,7 @@ class Indexer implements IIndexer {
           .subscribe('logs', {
             address: this.connector.hoprChannels.options.address,
             fromBlock,
-            topics: [this.getTopic0('ClosedChannel(uint,uint,uint,uint)')],
+            topics: events.ClosedChannelTopics(undefined, undefined),
           })
           .on('error', (err) => {
             if (!rejected) {
@@ -448,40 +448,8 @@ class Indexer implements IIndexer {
     return this.stopping
   }
 
-  private getTopic0(eventName: string): string[] {
-    const rawTopic0 = createKeccakHash('keccak256').update(eventName).digest()
-
-    const topics = []
-
-    for (let i = 0; i < 4; i++) {
-      topics.push(u8aToHex(u8aConcat(rawTopic0.slice(0, 31), new Uint8Array([((rawTopic0[31] >> 2) << 2) | i]))))
-    }
-
-    return topics
-  }
-
   private processOpenedChannelEvent(_event: OnChainLog, onChainBlockNumber: number) {
-    const event: OpenedChannelEvent = {
-      event: 'OpenedChannel',
-      blockNumber: _event.blockNumber,
-      transactionHash: _event.transactionHash,
-      transactionIndex: _event.transactionIndex,
-      logIndex: _event.logIndex,
-      returnValues: {
-        opener: new Public(
-          u8aConcat(
-            new Uint8Array([2 + ((parseInt(_event.topics[0].slice(64, 66), 16) >> 1) % 2)]),
-            stringToU8a(_event.topics[1])
-          )
-        ),
-        counterparty: new Public(
-          u8aConcat(
-            new Uint8Array([2 + (parseInt(_event.topics[0].slice(64, 66), 16) % 2)]),
-            stringToU8a(_event.topics[2])
-          )
-        ),
-      },
-    }
+    const event: OpenedChannelEvent = events.decodeOpenedChannelEvent(_event)
 
     if (isConfirmedBlock(event.blockNumber, onChainBlockNumber)) {
       this.onOpenedChannel(event)
@@ -492,31 +460,7 @@ class Indexer implements IIndexer {
   }
 
   private processClosedChannelEvent(_event: OnChainLog, onChainBlockNumber: number) {
-    const args = this.connector.web3.eth.abi.decodeParameters(['uint256', 'uint256'], _event.data)
-
-    const event: ClosedChannelEvent = {
-      event: 'ClosedChannel',
-      blockNumber: _event.blockNumber,
-      transactionHash: _event.transactionHash,
-      transactionIndex: _event.transactionIndex,
-      logIndex: _event.logIndex,
-      returnValues: {
-        closer: new Public(
-          u8aConcat(
-            new Uint8Array([2 + ((parseInt(_event.topics[0].slice(64, 66), 16) >> 1) % 2)]),
-            stringToU8a(_event.topics[1])
-          )
-        ),
-        counterparty: new Public(
-          u8aConcat(
-            new Uint8Array([2 + (parseInt(_event.topics[0].slice(64, 66), 16) % 2)]),
-            stringToU8a(_event.topics[2])
-          )
-        ),
-        partyAAmount: args[0],
-        partyBAmount: args[1],
-      },
-    }
+    const event: ClosedChannelEvent = events.decodeClosedChannelEvent(_event)
 
     if (isConfirmedBlock(event.blockNumber, onChainBlockNumber)) {
       this.onClosedChannel(event)

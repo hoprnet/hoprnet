@@ -1,4 +1,4 @@
-import { u8aToHex, stringToU8a, u8aEquals } from '@hoprnet/hopr-utils'
+import { u8aToHex, u8aEquals } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import {
   AccountId,
@@ -6,6 +6,7 @@ import {
   ChannelBalance,
   Channel as ChannelType,
   Hash,
+  Public,
   Signature,
   SignedChannel,
   SignedTicket,
@@ -14,7 +15,7 @@ import {
 } from '../types'
 import { ChannelStatus } from '../types/channel'
 import { ERRORS } from '../constants'
-import { waitForConfirmation, getId, cleanupPromiEvent } from '../utils'
+import { waitForConfirmation, getId, events } from '../utils'
 
 import type HoprEthereum from '..'
 import Channel from './channel'
@@ -24,6 +25,7 @@ import { randomBytes } from 'crypto'
 
 import { CHANNEL_STATES } from './constants'
 import { OnChainChannel } from './types'
+import { Log } from 'web3-core'
 
 const WIN_PROB = new BN(1)
 
@@ -302,8 +304,10 @@ class ChannelFactory {
 
           // listen for opening event and update DB
           this.coreConnector.channel
-            .onceOpen(await this.coreConnector.account.address, counterparty)
+            .onceOpen(new Public(this.coreConnector.account.keys.onChain.pubKey), new Public(counterpartyPubKey))
             .then(() => this.coreConnector.channel.saveOffChainState(counterpartyPubKey, signedChannel))
+
+          await this.coreConnector.channel.saveOffChainState(counterpartyPubKey, signedChannel)
 
           yield signedChannel.toU8a()
         }
@@ -329,74 +333,68 @@ class ChannelFactory {
     return this.coreConnector.hoprChannels.methods.channels(channelId.toHex()).call()
   }
 
-  async onceOpen(self: AccountId, counterparty: AccountId) {
-    const channelId = await getId(self, counterparty)
+  async onceOpen(self: Public, counterparty: Public) {
+    const channelId = await getId(await self.toAccountId(), await counterparty.toAccountId())
 
-    return cleanupPromiEvent(
-      this.coreConnector.hoprChannels.events.OpenedChannel({
-        filter: {
-          opener: [self.toHex(), counterparty.toHex()],
-          counterParty: [self.toHex(), counterparty.toHex()],
-        },
-      }),
-      (event) => {
-        return new Promise<{
-          opener: string
-          counterParty: string
-        }>((resolve, reject) => {
-          event
-            .on('data', async (data) => {
-              const { opener, counterParty } = data.returnValues
-              const _channelId = await this.coreConnector.utils.getId(
-                new AccountId(stringToU8a(opener)),
-                new AccountId(stringToU8a(counterParty))
-              )
+    return new Promise((resolve, reject) => {
+      const subscription = this.coreConnector.web3.eth.subscribe('logs', {
+        address: this.coreConnector.hoprChannels.options.address,
+        topics: events.OpenedChannelTopics(self, counterparty, true),
+      })
 
-              if (!u8aEquals(_channelId, channelId)) {
-                return
-              }
+      subscription
+        .on('data', async (data: Log) => {
+          const event = events.decodeOpenedChannelEvent(data)
 
-              return resolve(data.returnValues)
-            })
-            .on('error', reject)
+          const { opener, counterparty } = event.returnValues
+          const _channelId = await this.coreConnector.utils.getId(
+            await opener.toAccountId(),
+            await counterparty.toAccountId()
+          )
+
+          if (!u8aEquals(_channelId, channelId)) {
+            return
+          }
+
+          await subscription.unsubscribe()
+          return resolve(event.returnValues)
         })
-      }
-    )
+        .on('error', reject)
+    })
   }
 
-  async onceClosed(self: AccountId, counterparty: AccountId) {
-    const channelId = await getId(self, counterparty)
-
-    return cleanupPromiEvent(
-      this.coreConnector.hoprChannels.events.ClosedChannel({
-        filter: {
-          closer: [self.toHex(), counterparty.toHex()],
-          counterParty: [self.toHex(), counterparty.toHex()],
-        },
-      }),
-      (event) => {
-        return new Promise<{
-          closer: string
-          counterParty: string
-        }>((resolve, reject) => {
-          event
-            .on('data', async (data) => {
-              const { closer, counterParty } = data.returnValues
-              const _channelId = await this.coreConnector.utils.getId(
-                new AccountId(stringToU8a(closer)),
-                new AccountId(stringToU8a(counterParty))
-              )
-
-              if (!u8aEquals(_channelId, channelId)) {
-                return
-              }
-
-              resolve(data.returnValues)
-            })
-            .on('error', reject)
-        })
-      }
+  async onceClosed(self: Public, counterparty: Public) {
+    const channelId = await getId(
+      // prettier-ignore
+      await self.toAccountId(),
+      await counterparty.toAccountId()
     )
+
+    return new Promise((resolve, reject) => {
+      const subscription = this.coreConnector.web3.eth.subscribe('logs', {
+        address: this.coreConnector.hoprChannels.options.address,
+        topics: events.ClosedChannelTopics(self, counterparty, true),
+      })
+
+      subscription
+        .on('data', async (data: Log) => {
+          const event = events.decodeClosedChannelEvent(data)
+
+          const { closer, counterparty } = event.returnValues
+          const _channelId = await this.coreConnector.utils.getId(
+            await closer.toAccountId(),
+            await counterparty.toAccountId()
+          )
+
+          if (!u8aEquals(_channelId, channelId)) {
+            return
+          }
+
+          await subscription.unsubscribe()
+          return resolve(event.returnValues)
+        })
+        .on('error', reject)
+    })
   }
 }
 

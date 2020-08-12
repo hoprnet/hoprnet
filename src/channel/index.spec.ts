@@ -180,6 +180,6 @@ describe('test Channel class', function () {
       .call()
       .then((res) => res.hashedSecret)
 
-    assert.notEqual(hashedSecret, signedTicket.ticket.onChainSecret.toHex(), 'Ticket redemption failed.')
+    assert.notEqual(hashedSecret, u8aToHex(signedTicket.ticket.onChainSecret), 'Ticket redemption failed.')
   })
 })
