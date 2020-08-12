@@ -63,7 +63,7 @@ const provider =
   process.env.HOPR_ETHEREUM_PROVIDER ||
   "wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36";
 const bootstrapAddresses =
-  (process.env.HOPR_BOOTSTRAP_SERVERS.split(',') ||
+  (process.env.HOPR_BOOTSTRAP_SERVERS ? process.env.HOPR_BOOTSTRAP_SERVERS.split(',') :
   ["/ip4/34.65.82.167/tcp/9091/p2p/16Uiu2HAm6VH37RG1R4P8hGV1Px7MneMtNc6PNPewNxCsj1HsDLXW",
     "/ip4/34.65.111.179/tcp/9091/p2p/16Uiu2HAmPyq9Gw93VWdS3pgmyAWg2UNnrgZoYKPDUMbKDsWhzuvb"]);
 const host = process.env.HOPR_HOST || "0.0.0.0:9091"; // Default IPv4
