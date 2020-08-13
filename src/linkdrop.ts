@@ -11,8 +11,16 @@ const linkdropSDK = new LinkdropSDK({
   jsonRpcUrl: `https://rinkeby.infura.io/v3/${INFURA_PROJECT_ID}`,
 })
 
+const fees = 2000000000000000
 
 export async function payDai(amount: number, expirationHrs: number = 1.0) {
+    const proxyAddress = linkdropSDK.getProxyAddress(0)
+    const txHash = await linkdropSDK.topup({ 
+        signingKeyOrWallet : PRIVATE_KEY,
+        proxyAddress: proxyAddress,
+        weiAmount: fees, 
+    })
+
     const expirationTime = Math.round(+new Date() /1000) + (3600 * expirationHrs)
     const {
       url,
