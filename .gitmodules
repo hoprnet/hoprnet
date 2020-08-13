@@ -4,3 +4,24 @@
 [submodule "assets"]
 	path = assets
 	url = https://github.com/hoprnet/hopr-assets.git
+[submodule "core"]
+	path = core
+	url = https://github.com/hoprnet/hopr-core.git
+[submodule "whitepaper"]
+	path = whitepaper
+	url = https://github.com/hoprnet/hopr-whitepaper.git
+[submodule "server"]
+	path = server
+	url = https://github.com/hoprnet/hopr-server.git
+[submodule "chat"]
+	path = chat
+	url = https://github.com/hoprnet/hopr-chat.git
+[submodule "protos"]
+	path = protos
+	url = https://github.com/hoprnet/hopr-protos.git
+[submodule "chatbot"]
+	path = chatbot
+	url = https://github.com/hoprnet/hopr-chatbot.git
+[submodule "devops"]
+	path = devops
+	url = https://github.com/hoprnet/hopr-devops.git
