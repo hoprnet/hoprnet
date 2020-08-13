@@ -1,8 +1,8 @@
 {
   "name": "@hoprnet/hopr-ethereum",
-  "version": "0.4.2",
-  "description": "On-chain logic for hopr.network",
-  "homepage": "https://hopr.network",
+  "version": "0.4.0",
+  "description": "On-chain logic for hoprnet.org",
+  "homepage": "https://hoprnet.org",
   "repository": {
     "type": "git",
     "url": "https://github.com/hoprnet/hopr-ethereum.git"
@@ -46,27 +46,29 @@
     "@truffle/hdwallet-provider": "^1.0.34",
     "bignumber.js": "^9.0.0",
     "dotenv": "^8.2.0",
-    "truffle": "^5.1.25",
-    "truffle-plugin-verify": "^0.3.10",
-    "ts-node": "^8.9.1",
-    "web3": "^1.2.7"
+    "secp256k1": "4.0.2",
+    "truffle": "^5.1.23",
+    "truffle-plugin-verify": "^0.3.11",
+    "ts-node": "^8.10.2",
+    "web3": "^1.2.11"
   },
   "devDependencies": {
     "@hoprnet/hopr-testing": "0.2.0",
     "@types/chai": "^4.2.11",
-    "@types/mocha": "^7.0.2",
-    "@types/node": "^13.13.4",
+    "@types/mocha": "^8.0.1",
+    "@types/node": "~12",
+    "@types/secp256k1": "^4.0.1",
     "chai": "^4.2.0",
     "ganache-core": "^2.10.2",
     "husky": "^4.2.5",
-    "mocha": "^7.1.2",
+    "mocha": "^8.1.0",
     "prettier": "^2.0.5",
-    "prettier-plugin-solidity": "^1.0.0-alpha.49",
-    "solhint": "^2.3.1",
-    "solidity-coverage": "^0.7.4",
+    "prettier-plugin-solidity": "^1.0.0-alpha.55",
+    "solhint": "^3.1.0",
+    "solidity-coverage": "^0.7.9",
     "truffle-typings": "^1.0.8",
     "typechain": "^1.0.5",
     "typechain-target-truffle": "^1.0.2",
-    "typescript": "^3.8.3"
+    "typescript": "^3.9"
   }
 }

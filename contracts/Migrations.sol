@@ -1,5 +1,7 @@
 pragma solidity ^0.6.0;
 
+// SPDX-License-Identifier: LGPL-3.0-only
+
 contract Migrations {
     address public owner;
     uint256 public last_completed_migration;

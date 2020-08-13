@@ -1,5 +1,7 @@
 pragma solidity ^0.6.0;
 
+// SPDX-License-Identifier: LGPL-3.0-only
+
 /**
  * @dev Elliptic Curve Digital Signature Algorithm (ECDSA) operations.
  *
@@ -14,25 +16,35 @@ library ECDSA {
     uint256 constant HALF_CURVE_ORDER = (CURVE_ORDER - 1) / 2;
 
     /**
-     * @dev Converts a raw public key, given as a compressed EC-point to
-     * an Ethereum address.
+     * @dev Computes the Ethereum address from a public key given as an
+     * uncompressed EC-point.
      */
-    function pubKeyToEthereumAddress(uint256 compressedX, bool odd) internal returns (address) {
-        (bytes32 x, bytes32 y) = decompress(compressedX, odd);
+    function pubKeyToEthereumAddress(uint256 x, uint256 y) internal pure returns (address) {
+        require(validate(x, y), "Point must be on the curve.");
         return address(bytes20(bytes32(keccak256(abi.encodePacked(x, y)) << 96)));
+    }
+
+    /**
+     * @dev Computes the Ethereum address from a public key given as a
+     * compressed EC-point.
+     */
+    function compressedPubKeyToEthereumAddress(uint256 compressedX, uint8 odd) internal returns (address) {
+        (uint256 x, uint256 y) = decompress(compressedX, odd);
+        return pubKeyToEthereumAddress(x, y);
+    }
+
+    function compress(uint256 x, uint256 y) internal pure returns (uint256, uint8) {
+        return (x, uint8(y % 2));
     }
 
     /**
      * @dev Decompresses a compressed elliptic curve point and
      * returns the uncompressed version.
      * @notice secp256k1: y^2 = x^3 + 7 (mod p)
-     * "Converts from (x, true / false) to (x,y)"
+     * "Converts from (x, 1 / 0) to (x,y)"
      */
-    function decompress(uint256 x, bool odd) internal returns (bytes32, bytes32) {
-        uint256 tempY = mulmod(x, x, FIELD_ORDER);
-
-        tempY = mulmod(tempY, x, FIELD_ORDER);
-        tempY = addmod(tempY, 7, FIELD_ORDER);
+    function decompress(uint256 x, uint8 odd) internal returns (uint256, uint256) {
+        uint256 sqrY = addmod(7, mulmod(mulmod(x, x, FIELD_ORDER), x, FIELD_ORDER), FIELD_ORDER);
 
         uint256 sqrtExponent = (FIELD_ORDER + 1) / 4;
 
@@ -49,7 +61,7 @@ library ECDSA {
             mstore(add(memPtr, 0x40), 0x20)
 
             // assign base, exponent, modulus
-            mstore(add(memPtr, 0x60), tempY)
+            mstore(add(memPtr, 0x60), sqrY)
             mstore(add(memPtr, 0x80), sqrtExponent)
             mstore(add(memPtr, 0xa0), FIELD_ORDER)
 
@@ -68,11 +80,19 @@ library ECDSA {
 
         bool isOdd = y % 2 == 1;
 
-        if ((isOdd && !odd) || (!isOdd && odd)) {
+        if ((isOdd && odd == 0) || (!isOdd && odd == 1)) {
             y = FIELD_ORDER - y;
         }
 
-        return (bytes32(x), bytes32(y));
+        return (x, y);
+    }
+
+    function validate(uint256 x, uint256 y) public pure returns (bool) {
+        uint256 rightHandSide = addmod(7, mulmod(mulmod(x, x, FIELD_ORDER), x, FIELD_ORDER), FIELD_ORDER);
+
+        uint256 leftHandSide = mulmod(y, y, FIELD_ORDER);
+
+        return leftHandSide == rightHandSide;
     }
 
     /**

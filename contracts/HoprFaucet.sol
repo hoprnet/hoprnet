@@ -1,5 +1,7 @@
 pragma solidity ^0.6.0;
 
+// SPDX-License-Identifier: LGPL-3.0-only
+
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "./HoprToken.sol";
