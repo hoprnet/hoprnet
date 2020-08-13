@@ -3,15 +3,13 @@
     "esModuleInterop": true,
     "outDir": "./lib",
     "noImplicitAny": true,
-    "lib": ["es2020", "dom"],
+    "lib": ["es2019", "dom"],
     "module": "commonjs",
     "target": "es2019",
-    "strict": false,
     "resolveJsonModule": true,
     "experimentalDecorators": true,
     "declaration": true,
     "sourceMap": true
   },
-  "include": ["src/**/*"],
-  "exclude": ["lib"]
+  "include": ["src/**/*.ts"]
 }

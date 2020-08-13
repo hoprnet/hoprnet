@@ -4,8 +4,8 @@ import { migrate } from '@hoprnet/hopr-ethereum'
 import assert from 'assert'
 import { stringToU8a, u8aToHex, u8aEquals, durations } from '@hoprnet/hopr-utils'
 import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
-import { getPrivKeyData, createAccountAndFund, createNode } from '../utils/testing'
-import { createChallage } from '../utils'
+import { getPrivKeyData, createAccountAndFund, createNode } from '../utils/testing.spec'
+import { createChallenge } from '../utils'
 import BN from 'bn.js'
 import pipe from 'it-pipe'
 import Web3 from 'web3'
@@ -93,7 +93,7 @@ describe('test Channel class', function () {
       async () => {
         const result = await pipe(
           [(await coreConnector.channel.createSignedChannel(undefined, { channel: channelType })).subarray()],
-          counterpartysCoreConnector.channel.handleOpeningRequest(),
+          counterpartysCoreConnector.channel.handleOpeningRequest,
           async (source: AsyncIterable<any>) => {
             let result: Uint8Array
             for await (const msg of source) {
@@ -118,9 +118,9 @@ describe('test Channel class', function () {
 
     const secretA = randomBytes(32)
     const secretB = randomBytes(32)
-    const challange = await createChallage(secretA, secretB)
+    const challenge = await createChallenge(secretA, secretB)
 
-    const signedTicket = await channel.ticket.create(new Balance(1), challange)
+    const signedTicket = await channel.ticket.create(new Balance(1), challenge)
     assert(
       u8aEquals(await signedTicket.signer, coreConnector.account.keys.onChain.pubKey),
       `Check that signer is recoverable`
@@ -180,6 +180,6 @@ describe('test Channel class', function () {
       .call()
       .then((res) => res.hashedSecret)
 
-    assert.notEqual(hashedSecret, signedTicket.ticket.onChainSecret.toHex(), 'Ticket redemption failed.')
+    assert.notEqual(hashedSecret, u8aToHex(signedTicket.ticket.onChainSecret), 'Ticket redemption failed.')
   })
 })

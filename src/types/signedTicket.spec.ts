@@ -1,6 +1,6 @@
 import assert from 'assert'
 import { randomBytes } from 'crypto'
-import { stringToU8a, randomInteger } from '@hoprnet/hopr-utils'
+import { stringToU8a, randomInteger, u8aEquals } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import { AccountId, Ticket, Hash, TicketEpoch, Balance, Signature, SignedTicket } from '.'
 import * as utils from '../utils'
@@ -15,7 +15,7 @@ const generateTicketData = async () => {
   const epoch = new TicketEpoch(0)
   const amount = new Balance(15)
   const winProb = new Hash(new BN(new Uint8Array(Hash.SIZE).fill(0xff)).div(WIN_PROB).toArray('le', Hash.SIZE))
-  const onChainSecret = new Hash(randomBytes(32))
+  const onChainSecret = new Hash(randomBytes(27))
 
   return {
     channelId,
@@ -56,7 +56,7 @@ describe('test signedTicket construction', async function () {
     assert(signedTicket.ticket.epoch.eq(ticketData.epoch), 'wrong epoch')
     assert(signedTicket.ticket.amount.eq(ticketData.amount), 'wrong amount')
     assert(signedTicket.ticket.winProb.eq(ticketData.winProb), 'wrong winProb')
-    assert(signedTicket.ticket.onChainSecret.eq(ticketData.onChainSecret), 'wrong onChainSecret')
+    assert(u8aEquals(signedTicket.ticket.onChainSecret, ticketData.onChainSecret), 'wrong onChainSecret')
   })
 
   it('should create new signedTicket using array', async function () {
@@ -90,7 +90,7 @@ describe('test signedTicket construction', async function () {
     assert(signedTicketB.ticket.epoch.eq(ticketData.epoch), 'wrong epoch')
     assert(signedTicketB.ticket.amount.eq(ticketData.amount), 'wrong amount')
     assert(signedTicketB.ticket.winProb.eq(ticketData.winProb), 'wrong winProb')
-    assert(signedTicketB.ticket.onChainSecret.eq(ticketData.onChainSecret), 'wrong onChainSecret')
+    assert(u8aEquals(signedTicketB.ticket.onChainSecret, ticketData.onChainSecret), 'wrong onChainSecret')
   })
 
   it('should create new signedTicket out of continous memory', async function () {
@@ -129,6 +129,6 @@ describe('test signedTicket construction', async function () {
     assert(signedTicket.ticket.epoch.eq(ticketData.epoch), 'wrong epoch')
     assert(signedTicket.ticket.amount.eq(ticketData.amount), 'wrong amount')
     assert(signedTicket.ticket.winProb.eq(ticketData.winProb), 'wrong winProb')
-    assert(signedTicket.ticket.onChainSecret.eq(ticketData.onChainSecret), 'wrong onChainSecret')
+    assert(u8aEquals(signedTicket.ticket.onChainSecret, ticketData.onChainSecret), 'wrong onChainSecret')
   })
 })

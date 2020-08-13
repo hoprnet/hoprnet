@@ -25,15 +25,14 @@
     "yarn": ">=1.19.2"
   },
   "dependencies": {
-    "@hoprnet/hopr-core-connector-interface": "1.4.0",
-    "@hoprnet/hopr-ethereum": "0.4.2",
-    "@hoprnet/hopr-utils": "0.3.0",
+    "@hoprnet/hopr-ethereum": "^1.0.0",
+    "@hoprnet/hopr-utils": "^0.3",
     "bn.js": "^5.1.2",
     "chalk": "^4.1.0",
     "debug": "^4.1.1",
+    "heap-js": "^2.1.1",
     "keccak": "^3.0.0",
-    "levelup": "^4.4.0",
-    "secp256k1": "^4.0.1",
+    "secp256k1": "^4.0.2",
     "web3": "^1.2.9",
     "web3-core": "^1.2.9",
     "web3-core-helpers": "^1.2.9",
@@ -42,8 +41,9 @@
     "web3-eth-contract": "^1.2.9"
   },
   "devDependencies": {
+    "@hoprnet/hopr-core-connector-interface": "1.5.1",
     "@hoprnet/hopr-demo-seeds": "1.8.0",
-    "@hoprnet/hopr-testing": "0.2.0",
+    "@hoprnet/hopr-testing": "0.1.2",
     "@types/debug": "^4.1.5",
     "@types/keccak": "^3.0.1",
     "@types/levelup": "^4.3.0",
@@ -53,6 +53,7 @@
     "@types/secp256k1": "^4.0.1",
     "husky": "^4.2.5",
     "it-pipe": "^1.1.0",
+    "levelup": "^4.4.0",
     "memdown": "^5.1.0",
     "mocha": "^8.0.1",
     "prettier": "^2.0.5",

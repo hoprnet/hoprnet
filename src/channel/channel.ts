@@ -1,6 +1,6 @@
 import type { Channel as IChannel } from '@hoprnet/hopr-core-connector-interface'
 import { u8aToHex } from '@hoprnet/hopr-utils'
-import { Balance, ChannelId, Channel as ChannelType, Hash, Moment, SignedChannel } from '../types'
+import { Balance, ChannelId, Channel as ChannelType, Hash, Moment, Public, SignedChannel } from '../types'
 import TicketFactory from './ticket'
 import { ChannelStatus } from '../types/channel'
 import { waitForConfirmation, waitFor, hash } from '../utils'
@@ -37,8 +37,8 @@ class Channel implements IChannel {
 
   private async onceClosed() {
     return this.coreConnector.channel.onceClosed(
-      await this.coreConnector.account.address,
-      await this.coreConnector.utils.pubKeyToAccountId(this.counterparty)
+      new Public(this.coreConnector.account.keys.onChain.pubKey),
+      new Public(this.counterparty)
     )
   }
 

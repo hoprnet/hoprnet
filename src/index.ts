@@ -1,9 +1,9 @@
 import type { addresses } from '@hoprnet/hopr-ethereum'
 import Web3 from 'web3'
-import { LevelUp } from 'levelup'
+import type { LevelUp } from 'levelup'
 import HoprChannelsAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprChannels.json'
 import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
-import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
+import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import chalk from 'chalk'
 import { ChannelFactory } from './channel'
 import types from './types'
@@ -13,16 +13,16 @@ import * as dbkeys from './dbKeys'
 import * as utils from './utils'
 import * as constants from './constants'
 import * as config from './config'
-import { HoprChannels } from './tsc/web3/HoprChannels'
-import { HoprToken } from './tsc/web3/HoprToken'
+import type { HoprChannels } from './tsc/web3/HoprChannels'
+import type { HoprToken } from './tsc/web3/HoprToken'
 import Account from './account'
 import HashedSecret from './hashedSecret'
 
 export default class HoprEthereum implements HoprCoreConnector {
   private _status: 'uninitialized' | 'initialized' | 'started' | 'stopped' = 'uninitialized'
-  private _initializing: Promise<void>
-  private _starting: Promise<void>
-  private _stopping: Promise<void>
+  private _initializing?: Promise<void>
+  private _starting?: Promise<void>
+  private _stopping?: Promise<void>
   public signTransaction: ReturnType<typeof utils.TransactionSigner>
   public log: ReturnType<typeof utils['Log']>
 

@@ -14,8 +14,9 @@ import { ContractEventEmitter } from '../tsc/web3/types'
 import { ChannelStatus } from '../types/channel'
 import * as constants from '../constants'
 import * as time from './time'
+import * as events from './events'
 
-export { time }
+export { time, events }
 
 /**
  * @param self our node's accountId
@@ -319,6 +320,10 @@ export function TransactionSigner(web3: Web3, privKey: Uint8Array) {
     )
 
     function send() {
+      if (signedTransaction.rawTransaction == null) {
+        throw Error(`Cannot process transaction because Web3.js did not give us the raw transaction.`)
+      }
+
       return web3.eth.sendSignedTransaction(signedTransaction.rawTransaction)
     }
 
@@ -372,11 +377,11 @@ export function getSignatureParameters(
 }
 
 /**
- * Create a challange by concatinating and then hashing the secrets.
+ * Create a challenge by concatinating and then hashing the secrets.
  * @param secretA
  * @param secretB
  * @returns a promise that resolves to a hash
  */
-export async function createChallage(secretA: Uint8Array, secretB: Uint8Array): Promise<Hash> {
+export async function createChallenge(secretA: Uint8Array, secretB: Uint8Array): Promise<Hash> {
   return hash(u8aConcat(secretA, secretB))
 }

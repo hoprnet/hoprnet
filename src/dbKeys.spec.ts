@@ -4,7 +4,7 @@ import { u8aConcat, u8aEquals } from '@hoprnet/hopr-utils'
 import { Hash, ChannelId } from './types'
 import * as dbKeys from './dbKeys'
 import { getId } from './utils'
-import { getPrivKeyData } from './utils/testing'
+import { getPrivKeyData } from './utils/testing.spec'
 import { Await } from './tsc/utils'
 
 const encoder = new TextEncoder()
@@ -40,7 +40,7 @@ describe('test dbKeys', function () {
     const result = dbKeys.Challenge(channelId, challenge)
     const expected = u8aConcat(encoder.encode('payments-challenge-'), channelId, encoder.encode('-'), challenge)
 
-    assert(u8aEquals(result, expected), 'check challange key creation')
+    assert(u8aEquals(result, expected), 'check challenge key creation')
   })
 
   it("should parse 'Challenge' key", function () {
@@ -49,8 +49,8 @@ describe('test dbKeys', function () {
     const expected1 = channelId
     const expected2 = challenge
 
-    assert(u8aEquals(result1, expected1), 'check challange key parsing')
-    assert(u8aEquals(result2, expected2), 'check challange key parsing')
+    assert(u8aEquals(result1, expected1), 'check challenge key parsing')
+    assert(u8aEquals(result2, expected2), 'check challenge key parsing')
   })
 
   it("should create 'ChannelId' key", function () {
@@ -91,22 +91,22 @@ describe('test dbKeys', function () {
   })
 
   it("should create 'ChannelEntry' key", function () {
-    const result = dbKeys.ChannelEntry(userA.address, userB.address)
+    const result = dbKeys.ChannelEntry(userA.pubKey, userB.pubKey)
     const expected = u8aConcat(
       encoder.encode('payments-channelEntry-'),
-      userA.address,
+      userA.pubKey,
       encoder.encode('-'),
-      userB.address
+      userB.pubKey
     )
 
     assert(u8aEquals(result, expected), 'check channelEntry key creation')
   })
 
   it("should parse 'ChannelEntry' key", function () {
-    const key = u8aConcat(encoder.encode('payments-channelEntry-'), userA.address, encoder.encode('-'), userB.address)
+    const key = u8aConcat(encoder.encode('payments-channelEntry-'), userA.pubKey, encoder.encode('-'), userB.pubKey)
     const [result1, result2] = dbKeys.ChannelEntryParse(key)
-    const expected1 = userA.address
-    const expected2 = userB.address
+    const expected1 = userA.pubKey
+    const expected2 = userB.pubKey
 
     assert(u8aEquals(result1, expected1), 'check channelEntry key parsing')
     assert(u8aEquals(result2, expected2), 'check channelEntry key parsing')

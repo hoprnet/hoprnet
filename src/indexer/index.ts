@@ -4,23 +4,28 @@ import BN from 'bn.js'
 import chalk from 'chalk'
 import { Subscription } from 'web3-core-subscriptions'
 import { BlockHeader } from 'web3-eth'
-import { u8aToNumber, stringToU8a } from '@hoprnet/hopr-utils'
-import { AccountId, ChannelEntry } from '../types'
-import { getParties, Log } from '../utils'
+import { u8aToNumber, stringToU8a, u8aConcat, u8aToHex } from '@hoprnet/hopr-utils'
+import { ChannelEntry, Public } from '../types'
+import { Log, isPartyA, events } from '../utils'
 import { MAX_CONFIRMATIONS } from '../config'
-import { ContractEventEmitter, ContractEventLog } from '../tsc/web3/types'
+import { ContractEventLog } from '../tsc/web3/types'
+import createKeccakHash from 'keccak'
+import { Log as OnChainLog } from 'web3-core'
+import Heap from 'heap-js'
 
 // we save up some memory by only caching the event data we use
 type LightEvent<E extends ContractEventLog<any>> = Pick<
   E,
   'event' | 'blockNumber' | 'transactionHash' | 'transactionIndex' | 'logIndex' | 'returnValues'
 >
-type Channel = { partyA: AccountId; partyB: AccountId; channelEntry: ChannelEntry }
-type OpenedChannelEvent = LightEvent<ContractEventLog<{ opener: string; counterParty: string }>>
-type ClosedChannelEvent = LightEvent<ContractEventLog<{ closer: string; counterParty: string }>>
+type Channel = { partyA: Public; partyB: Public; channelEntry: ChannelEntry }
+export type OpenedChannelEvent = LightEvent<ContractEventLog<{ opener: Public; counterparty: Public }>>
+export type ClosedChannelEvent = LightEvent<
+  ContractEventLog<{ closer: Public; counterparty: Public; partyAAmount?: BN; partyBAmount?: BN }>
+>
 
-const SMALLEST_ACCOUNT = new Uint8Array(AccountId.SIZE).fill(0x00)
-const BIGGEST_ACCOUNT = new Uint8Array(AccountId.SIZE).fill(0xff)
+const SMALLEST_PUBLIC_KEY = new Public(u8aConcat(new Uint8Array([0x02]), new Uint8Array(32).fill(0x00)))
+const BIGGEST_PUBLIC_KEY = new Public(u8aConcat(new Uint8Array([0x03]), new Uint8Array(32).fill(0xff)))
 
 /**
  * @returns a custom event id for logging purposes.
@@ -57,12 +62,12 @@ function isConfirmedBlock(blockNumber: number, onChainBlockNumber: number): bool
 class Indexer implements IIndexer {
   private log = Log(['channels'])
   private status: 'started' | 'stopped' = 'stopped'
-  private unconfirmedEvents = new Map<string, OpenedChannelEvent | ClosedChannelEvent>()
-  private starting: Promise<any>
-  private stopping: Promise<any>
-  private newBlockEvent: Subscription<BlockHeader>
-  private openedChannelEvent: ContractEventEmitter<any> | undefined
-  private closedChannelEvent: ContractEventEmitter<any> | undefined
+  private unconfirmedEvents: (OpenedChannelEvent | ClosedChannelEvent)[] = []
+  private starting?: Promise<boolean>
+  private stopping?: Promise<boolean>
+  private newBlockEvent?: Subscription<BlockHeader>
+  private openedChannelEvent?: Subscription<OnChainLog>
+  private closedChannelEvent?: Subscription<OnChainLog>
 
   constructor(private connector: HoprEthereum) {}
 
@@ -73,13 +78,7 @@ class Indexer implements IIndexer {
    */
   private async getLatestConfirmedBlockNumber(): Promise<number> {
     try {
-      const blockNumber = await this.connector.db
-        .get(Buffer.from(this.connector.dbKeys.ConfirmedBlockNumber()))
-        .then((res) => {
-          return u8aToNumber(res)
-        })
-
-      return blockNumber
+      return u8aToNumber(await this.connector.db.get(Buffer.from(this.connector.dbKeys.ConfirmedBlockNumber())))
     } catch (err) {
       if (err.notFound == null) {
         throw err
@@ -94,19 +93,18 @@ class Indexer implements IIndexer {
    *
    * @returns promise that resolves to true or false
    */
-  public async has(partyA: AccountId, partyB: AccountId): Promise<boolean> {
+  public async has(partyA: Public, partyB: Public): Promise<boolean> {
     const { dbKeys, db } = this.connector
 
-    return db.get(Buffer.from(dbKeys.ChannelEntry(partyA, partyB))).then(
-      () => true,
-      (err) => {
-        if (err.notFound) {
-          return false
-        } else {
-          throw err
-        }
+    try {
+      await db.get(Buffer.from(dbKeys.ChannelEntry(partyA, partyB)))
+    } catch (err) {
+      if (err.notFound) {
+        return false
       }
-    )
+    }
+
+    return true
   }
 
   /**
@@ -115,19 +113,19 @@ class Indexer implements IIndexer {
    *
    * @returns promise that resolves to a list of channel entries
    */
-  private async getAll(party?: AccountId): Promise<Channel[]> {
+  private async getAll(party?: Public): Promise<Channel[]> {
     const { dbKeys, db } = this.connector
     const channels: Channel[] = []
 
-    return new Promise((resolve, reject) => {
+    return await new Promise<Channel[]>((resolve, reject) => {
       db.createReadStream({
-        gte: Buffer.from(dbKeys.ChannelEntry(SMALLEST_ACCOUNT, SMALLEST_ACCOUNT)),
-        lte: Buffer.from(dbKeys.ChannelEntry(BIGGEST_ACCOUNT, BIGGEST_ACCOUNT)),
+        gte: Buffer.from(dbKeys.ChannelEntry(SMALLEST_PUBLIC_KEY, SMALLEST_PUBLIC_KEY)),
+        lte: Buffer.from(dbKeys.ChannelEntry(BIGGEST_PUBLIC_KEY, BIGGEST_PUBLIC_KEY)),
       })
         .on('error', (err) => reject(err))
         .on('data', ({ key, value }: { key: Buffer; value: Buffer }) => {
           const [partyA, partyB] = dbKeys.ChannelEntryParse(key)
-          if (party && !party.eq(partyA) && !party.eq(partyB)) {
+          if (party != null && !(party.eq(partyA) || party.eq(partyB))) {
             return
           }
 
@@ -137,8 +135,8 @@ class Indexer implements IIndexer {
           })
 
           channels.push({
-            partyA: new AccountId(partyA),
-            partyB: new AccountId(partyB),
+            partyA,
+            partyB,
             channelEntry,
           })
         })
@@ -151,30 +149,32 @@ class Indexer implements IIndexer {
    *
    * @returns promise that resolves to a channel entry or undefined if not found
    */
-  private async getSingle(partyA: AccountId, partyB: AccountId): Promise<Channel | undefined> {
+  private async getSingle(partyA: Public, partyB: Public): Promise<Channel | undefined> {
     const { dbKeys, db } = this.connector
 
-    return db.get(Buffer.from(dbKeys.ChannelEntry(partyA, partyB))).then(
-      (value) => {
-        const channelEntry = new ChannelEntry({
-          bytes: value,
-          offset: value.byteOffset,
-        })
-
-        return {
-          partyA,
-          partyB,
-          channelEntry,
-        }
-      },
-      (err) => {
-        if (err.notFound) {
-          return undefined
-        } else {
-          throw err
-        }
+    let _entry: Uint8Array | undefined
+    try {
+      _entry = await db.get(Buffer.from(dbKeys.ChannelEntry(partyA, partyB)))
+    } catch (err) {
+      if (err.notFound) {
+        return
       }
-    )
+    }
+
+    if (_entry == null || _entry.length == 0) {
+      return
+    }
+
+    const channelEntry = new ChannelEntry({
+      bytes: _entry,
+      offset: _entry.byteOffset,
+    })
+
+    return {
+      partyA,
+      partyB,
+      channelEntry,
+    }
   }
 
   /**
@@ -189,15 +189,11 @@ class Indexer implements IIndexer {
    * @param query
    * @returns promise that resolves to a list of channel entries
    */
-  public async get(query?: { partyA?: AccountId; partyB?: AccountId }): Promise<Channel[]> {
-    const hasQuery = typeof query !== 'undefined'
-    const hasPartyA = hasQuery && typeof query.partyA !== 'undefined'
-    const hasPartyB = hasQuery && typeof query.partyB !== 'undefined'
-
-    if (!hasQuery) {
+  public async get(query?: { partyA?: Public; partyB?: Public }): Promise<Channel[]> {
+    if (query == null) {
       // query not provided, get all channels
       return this.getAll()
-    } else if (hasPartyA && hasPartyB) {
+    } else if (query.partyA != null && query.partyB != null) {
       // both parties provided, get channel
       const entry = await this.getSingle(query.partyA, query.partyB)
 
@@ -208,18 +204,18 @@ class Indexer implements IIndexer {
       }
     } else {
       // only one of the parties provided, get all open channels of party
-      return this.getAll(hasPartyA ? query.partyA : query.partyB)
+      return this.getAll(query.partyA != null ? query.partyA : query.partyB)
     }
   }
 
-  private async store(partyA: AccountId, partyB: AccountId, channelEntry: ChannelEntry): Promise<void> {
+  private async store(partyA: Public, partyB: Public, channelEntry: ChannelEntry): Promise<void> {
     const { dbKeys, db } = this.connector
     const { blockNumber, logIndex, transactionIndex } = channelEntry
     this.log(
       `storing channel ${partyA.toHex()}-${partyB.toHex()}:${blockNumber.toString()}-${transactionIndex.toString()}-${logIndex.toString()}`
     )
 
-    return db.batch([
+    return await db.batch([
       {
         type: 'put',
         key: Buffer.from(dbKeys.ChannelEntry(partyA, partyB)),
@@ -234,8 +230,8 @@ class Indexer implements IIndexer {
   }
 
   // delete a channel
-  private async delete(partyA: AccountId, partyB: AccountId): Promise<void> {
-    this.log(`deleting channel ${partyA.toHex()}-${partyB.toHex()}`)
+  private async delete(partyA: Public, partyB: Public): Promise<void> {
+    this.log(`deleting channel ${u8aToHex(partyA)}-${u8aToHex(partyB)}`)
 
     const { dbKeys, db } = this.connector
 
@@ -244,14 +240,24 @@ class Indexer implements IIndexer {
     return db.del(key)
   }
 
-  private async onNewBlock(block: BlockHeader) {
-    const confirmedEvents = Array.from(this.unconfirmedEvents.values()).filter((event) => {
-      return isConfirmedBlock(event.blockNumber, block.number)
-    })
+  private compareUnconfirmedEvents(
+    a: OpenedChannelEvent | ClosedChannelEvent,
+    b: OpenedChannelEvent | ClosedChannelEvent
+  ): number {
+    return a.blockNumber - b.blockNumber
+  }
 
-    for (const event of confirmedEvents) {
-      const id = getEventId(event)
-      this.unconfirmedEvents.delete(id)
+  private async onNewBlock(block: BlockHeader) {
+    while (
+      this.unconfirmedEvents.length > 0 &&
+      isConfirmedBlock(
+        Heap.heaptop(this.unconfirmedEvents, 1, this.compareUnconfirmedEvents)[0].blockNumber,
+        block.number
+      )
+    ) {
+      const event = Heap.heappop(this.unconfirmedEvents, this.compareUnconfirmedEvents) as
+        | OpenedChannelEvent
+        | ClosedChannelEvent
 
       if (event.event === 'OpenedChannel') {
         this.onOpenedChannel(event as OpenedChannelEvent)
@@ -262,9 +268,15 @@ class Indexer implements IIndexer {
   }
 
   private async onOpenedChannel(event: OpenedChannelEvent): Promise<void> {
-    const opener = new AccountId(stringToU8a(event.returnValues.opener))
-    const counterParty = new AccountId(stringToU8a(event.returnValues.counterParty))
-    const [partyA, partyB] = getParties(opener, counterParty)
+    let partyA: Public, partyB: Public
+
+    if (isPartyA(await event.returnValues.opener.toAccountId(), await event.returnValues.counterparty.toAccountId())) {
+      partyA = event.returnValues.opener
+      partyB = event.returnValues.counterparty
+    } else {
+      partyA = event.returnValues.counterparty
+      partyB = event.returnValues.opener
+    }
 
     const newChannelEntry = new ChannelEntry(undefined, {
       blockNumber: new BN(event.blockNumber),
@@ -285,9 +297,16 @@ class Indexer implements IIndexer {
   }
 
   private async onClosedChannel(event: ClosedChannelEvent): Promise<void> {
-    const closer = new AccountId(stringToU8a(event.returnValues.closer))
-    const counterParty = new AccountId(stringToU8a(event.returnValues.counterParty))
-    const [partyA, partyB] = getParties(closer, counterParty)
+    let partyA: Public, partyB: Public
+
+    if (isPartyA(await event.returnValues.closer.toAccountId(), await event.returnValues.counterparty.toAccountId())) {
+      partyA = event.returnValues.closer
+      partyB = event.returnValues.counterparty
+    } else {
+      partyA = event.returnValues.counterparty
+      partyB = event.returnValues.closer
+    }
+
     const newChannelEntry = new ChannelEntry(undefined, {
       blockNumber: new BN(event.blockNumber),
       transactionIndex: new BN(event.transactionIndex),
@@ -305,7 +324,7 @@ class Indexer implements IIndexer {
       return
     }
 
-    this.delete(partyA, partyB)
+    await this.delete(partyA, partyB)
   }
 
   /**
@@ -326,7 +345,8 @@ class Indexer implements IIndexer {
       return true
     }
 
-    this.starting = new Promise(async (resolve, reject) => {
+    this.starting = new Promise<boolean>(async (resolve, reject) => {
+      let rejected = false
       try {
         const onChainBlockNumber = await this.connector.web3.eth.getBlockNumber()
         let fromBlock = await this.getLatestConfirmedBlockNumber()
@@ -340,54 +360,41 @@ class Indexer implements IIndexer {
 
         this.newBlockEvent = this.connector.web3.eth
           .subscribe('newBlockHeaders')
-          .on('error', (err) => reject(err))
-          .on('data', (block) => {
-            this.onNewBlock(block)
+          .on('error', (err) => {
+            if (!rejected) {
+              rejected = true
+              reject(err)
+            }
           })
+          .on('data', (block) => this.onNewBlock(block))
 
-        this.openedChannelEvent = this.connector.hoprChannels.events
-          .OpenedChannel({
+        this.openedChannelEvent = this.connector.web3.eth
+          .subscribe('logs', {
+            address: this.connector.hoprChannels.options.address,
             fromBlock,
+            topics: events.OpenedChannelTopics(undefined, undefined),
           })
-          .on('error', (err) => reject(err))
-          .on('data', (_event) => {
-            const event: LightEvent<typeof _event> = {
-              event: _event.event,
-              blockNumber: _event.blockNumber,
-              transactionHash: _event.transactionHash,
-              transactionIndex: _event.transactionIndex,
-              logIndex: _event.logIndex,
-              returnValues: _event.returnValues,
-            }
-
-            if (isConfirmedBlock(event.blockNumber, onChainBlockNumber)) {
-              this.onOpenedChannel(event)
-            } else {
-              this.unconfirmedEvents.set(getEventId(event), event)
+          .on('error', (err) => {
+            if (!rejected) {
+              rejected = true
+              reject(err)
             }
           })
+          .on('data', (_event: OnChainLog) => this.processOpenedChannelEvent(_event, onChainBlockNumber))
 
-        this.closedChannelEvent = this.connector.hoprChannels.events
-          .ClosedChannel({
+        this.closedChannelEvent = this.connector.web3.eth
+          .subscribe('logs', {
+            address: this.connector.hoprChannels.options.address,
             fromBlock,
+            topics: events.ClosedChannelTopics(undefined, undefined),
           })
-          .on('error', (err) => reject(err))
-          .on('data', (_event) => {
-            const event: LightEvent<typeof _event> = {
-              event: _event.event,
-              blockNumber: _event.blockNumber,
-              transactionHash: _event.transactionHash,
-              transactionIndex: _event.transactionIndex,
-              logIndex: _event.logIndex,
-              returnValues: _event.returnValues,
-            }
-
-            if (isConfirmedBlock(event.blockNumber, onChainBlockNumber)) {
-              this.onClosedChannel(event)
-            } else {
-              this.unconfirmedEvents.set(getEventId(event), event)
+          .on('error', (err) => {
+            if (!rejected) {
+              rejected = true
+              reject(err)
             }
           })
+          .on('data', (_event) => this.processClosedChannelEvent(_event, onChainBlockNumber))
 
         this.status = 'started'
         this.log(chalk.green('Indexer started!'))
@@ -412,27 +419,19 @@ class Indexer implements IIndexer {
   public async stop(): Promise<boolean> {
     this.log(`Stopping indexer...`)
 
-    if (typeof this.starting !== 'undefined') {
+    if (this.starting != null) {
       throw Error('cannot stop while starting')
-    } else if (typeof this.stopping !== 'undefined') {
+    } else if (this.stopping != undefined) {
       return this.stopping
     } else if (this.status === 'stopped') {
       return true
     }
 
-    this.stopping = new Promise((resolve) => {
+    this.stopping = new Promise<boolean>((resolve) => {
       try {
-        if (typeof this.newBlockEvent !== 'undefined') {
-          this.newBlockEvent.unsubscribe()
-        }
-        if (typeof this.openedChannelEvent !== 'undefined') {
-          this.openedChannelEvent.removeAllListeners()
-        }
-        if (typeof this.closedChannelEvent !== 'undefined') {
-          this.closedChannelEvent.removeAllListeners()
-        }
-
-        this.unconfirmedEvents.clear()
+        this.newBlockEvent?.unsubscribe()
+        this.openedChannelEvent?.unsubscribe()
+        this.closedChannelEvent?.unsubscribe()
 
         this.status = 'stopped'
         this.log(chalk.green('Indexer stopped!'))
@@ -447,6 +446,28 @@ class Indexer implements IIndexer {
     })
 
     return this.stopping
+  }
+
+  private processOpenedChannelEvent(_event: OnChainLog, onChainBlockNumber: number) {
+    const event: OpenedChannelEvent = events.decodeOpenedChannelEvent(_event)
+
+    if (isConfirmedBlock(event.blockNumber, onChainBlockNumber)) {
+      this.onOpenedChannel(event)
+    } else {
+      // @TODO add membership with bloom filter to check before adding event to heap
+      Heap.heappush(this.unconfirmedEvents, event, this.compareUnconfirmedEvents)
+    }
+  }
+
+  private processClosedChannelEvent(_event: OnChainLog, onChainBlockNumber: number) {
+    const event: ClosedChannelEvent = events.decodeClosedChannelEvent(_event)
+
+    if (isConfirmedBlock(event.blockNumber, onChainBlockNumber)) {
+      this.onClosedChannel(event)
+    } else {
+      // @TODO add membership with bloom filter to check before adding event to heap
+      Heap.heappush(this.unconfirmedEvents, event, this.compareUnconfirmedEvents)
+    }
   }
 }
 

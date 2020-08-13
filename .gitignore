@@ -11,10 +11,14 @@
 .packages-cache
 yarn-error.log
 
+# Exclude OSX stuff
 **/.DS_Store
 
 # typechain types generated
 src/tsc/web3
+
+# Typescript builds
+lib/
 
 # Exclude built tests
 lib/**/*.spec.js

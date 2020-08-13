@@ -2,7 +2,7 @@
   Helper functions which generate database keys
 */
 import { toU8a } from '@hoprnet/hopr-utils'
-import { Hash, AccountId } from './types'
+import { Hash, Public } from './types'
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 
 const encoder = new TextEncoder()
@@ -40,6 +40,45 @@ export function ChannelKeyParse(arr: Uint8Array): Uint8Array {
 }
 
 /**
+ * Returns the db-key under which the latest confirmed block number is saved in the database.
+ */
+export function ConfirmedBlockNumber(): Uint8Array {
+  return allocationHelper([
+    [PREFIX.length, PREFIX],
+    [confirmedBlockNumber.length, confirmedBlockNumber],
+  ])
+}
+
+/**
+ * Returns the db-key under which channel entries are saved.
+ * @param partyA the accountId of partyA
+ * @param partyB the accountId of partyB
+ */
+export function ChannelEntry(partyA: Types.Public, partyB: Types.Public): Uint8Array {
+  return allocationHelper([
+    [PREFIX.length, PREFIX],
+    [channelEntrySubPrefix.length, channelEntrySubPrefix],
+    [Public.SIZE, partyA],
+    [SEPERATOR.length, SEPERATOR],
+    [Public.SIZE, partyB],
+  ])
+}
+
+/**
+ * Reconstructs parties from a channel entry db-key.
+ * @param arr a challenge db-key
+ * @returns an array containing partyA's and partyB's accountIds
+ */
+export function ChannelEntryParse(arr: Uint8Array): [Public, Public] {
+  const partyAStart = PREFIX.length + channelEntrySubPrefix.length
+  const partyAEnd = partyAStart + Public.SIZE
+  const partyBStart = partyAEnd + SEPERATOR.length
+  const partyBEnd = partyBStart + Public.SIZE
+
+  return [new Public(arr.slice(partyAStart, partyAEnd)), new Public(arr.slice(partyBStart, partyBEnd))]
+}
+
+/**
  * Returns the db-key under which the challenge is saved.
  * @param channelId channelId of the channel
  * @param challenge challenge to save
@@ -48,9 +87,9 @@ export function Challenge(channelId: Types.Hash, challenge: Types.Hash): Uint8Ar
   return allocationHelper([
     [PREFIX.length, PREFIX],
     [challengeSubPrefix.length, challengeSubPrefix],
-    [channelId.length, channelId],
+    [Hash.SIZE, channelId],
     [SEPERATOR.length, SEPERATOR],
-    [challenge.length, challenge],
+    [Hash.SIZE, challenge],
   ])
 }
 
@@ -61,10 +100,10 @@ export function Challenge(channelId: Types.Hash, challenge: Types.Hash): Uint8Ar
 export function ChallengeKeyParse(arr: Uint8Array): [Hash, Hash] {
   const channelIdStart = PREFIX.length + challengeSubPrefix.length
   const channelIdEnd = channelIdStart + Hash.SIZE
-  const challangeStart = channelIdEnd + SEPERATOR.length
-  const challangeEnd = challangeStart + Hash.SIZE
+  const challengeStart = channelIdEnd + SEPERATOR.length
+  const challengeEnd = challengeStart + Hash.SIZE
 
-  return [new Hash(arr.slice(channelIdStart, channelIdEnd)), new Hash(arr.slice(challangeStart, challangeEnd))]
+  return [new Hash(arr.slice(channelIdStart, channelIdEnd)), new Hash(arr.slice(challengeStart, challengeEnd))]
 }
 
 /**
@@ -75,7 +114,7 @@ export function ChannelId(signatureHash: Types.Hash): Uint8Array {
   return allocationHelper([
     [PREFIX.length, PREFIX],
     [channelIdSubPrefix.length, channelIdSubPrefix],
-    [signatureHash.length, signatureHash],
+    [Hash.SIZE, signatureHash],
   ])
 }
 
@@ -88,9 +127,9 @@ export function Nonce(channelId: Types.Hash, nonce: Types.Hash): Uint8Array {
   return allocationHelper([
     [PREFIX.length, PREFIX],
     [nonceSubPrefix.length, nonceSubPrefix],
-    [channelId.length, channelId],
+    [Hash.SIZE, channelId],
     [SEPERATOR.length, SEPERATOR],
-    [nonce.length, nonce],
+    [Hash.SIZE, nonce],
   ])
 }
 
@@ -114,49 +153,10 @@ export function Ticket(channelId: Types.Hash, challenge: Types.Hash): Uint8Array
   return allocationHelper([
     [PREFIX.length, PREFIX],
     [ticketSubPrefix.length, ticketSubPrefix],
-    [channelId.length, channelId],
+    [Hash.SIZE, channelId],
     [SEPERATOR.length, SEPERATOR],
-    [challenge.length, challenge],
+    [Hash.SIZE, challenge],
   ])
-}
-
-/**
- * Returns the db-key under which the latest confirmed block number is saved in the database.
- */
-export function ConfirmedBlockNumber(): Uint8Array {
-  return allocationHelper([
-    [PREFIX.length, PREFIX],
-    [confirmedBlockNumber.length, confirmedBlockNumber],
-  ])
-}
-
-/**
- * Returns the db-key under which channel entries are saved.
- * @param partyA the accountId of partyA
- * @param partyB the accountId of partyB
- */
-export function ChannelEntry(partyA: Types.AccountId, partyB: Types.AccountId): Uint8Array {
-  return allocationHelper([
-    [PREFIX.length, PREFIX],
-    [channelEntrySubPrefix.length, channelEntrySubPrefix],
-    [partyA.length, partyA],
-    [SEPERATOR.length, SEPERATOR],
-    [partyB.length, partyB],
-  ])
-}
-
-/**
- * Reconstructs parties from a channel entry db-key.
- * @param arr a challenge db-key
- * @returns an array containing partyA's and partyB's accountIds
- */
-export function ChannelEntryParse(arr: Uint8Array): [Types.AccountId, Types.AccountId] {
-  const partyAStart = PREFIX.length + channelEntrySubPrefix.length
-  const partyAEnd = partyAStart + AccountId.SIZE
-  const partyBStart = partyAEnd + SEPERATOR.length
-  const partyBEnd = partyBStart + AccountId.SIZE
-
-  return [new AccountId(arr.slice(partyAStart, partyAEnd)), new AccountId(arr.slice(partyBStart, partyBEnd))]
 }
 
 function allocationHelper(arr: [number, Uint8Array][]): Uint8Array {
