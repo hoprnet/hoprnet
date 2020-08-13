@@ -20,7 +20,7 @@ export class Bouncebot implements Bot{
 
   constructor(address: string) {
     this.address = address
-    this.botName = '🥊 Bouncebot'
+    this.botName = '🥊 Bouncerbot'
     this.status = new Map<string, NodeStates>()
     console.log(`${this.botName} has been added`)
   }
@@ -34,7 +34,7 @@ export class Bouncebot implements Bot{
         console.error(`Error while checking proof: ${err}`)
         sendMessage(message.from, {
           from: this.address,
-          text: ` seems like you missed it this time try again!!..`,
+          text: ` That doesn’t look like a tweet, err, proof! Try again with a valid one.`,
         }) 
       }
     }
@@ -61,7 +61,7 @@ export class Bouncebot implements Bot{
     const tweet = new TweetMessage(message.text)
     await tweet.fetch()
     // check if the the tweet is valid
-    if (tweet.hashtags('hoprgames')) {
+    if (tweet.hashtags.includes(hashtag => hashtag.text.toLowercase() === 'hoprgames')) {
       sendMessage(message.from, {
         from: this.address,
         text: getRandomItemFromList(response['tweetSuccess']),
@@ -96,7 +96,7 @@ export class Bouncebot implements Bot{
       from: this.address,
       text: getRandomItemFromList(response['isNewUser']),
     })
-    setTimeout(this.hintUser.bind(this), 5000, message)
+    setTimeout(this.hintUser.bind(this), 10000, message)
   }
 
   async welcomeUser(message) {

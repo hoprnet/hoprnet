@@ -28,9 +28,12 @@ export class TweetMessage {
     async fetch() {
         const data = await twitterClient.tweets.statusesShowById({ id: this.id })
         this.hashtags = data.entities.hashtags
-        this.user_mentions = data.entities
+        this.user_mentions = data.entities.user_mentions
         this.content = data.text
         this.hasfetched = true
+        console.log('Obtained the following hashtags', this.hashtags);
+        console.log('Obtained the following user_mentions', this.user_mentions);
+        console.log('Obtained the following content', this.content);
     }
 
     hasTag(tag: string): boolean {
