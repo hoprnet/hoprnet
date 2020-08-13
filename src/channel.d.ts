@@ -1,4 +1,4 @@
-import type { AccountId, Balance, Channel as ChannelType, ChannelBalance, Hash, Moment, Signature, SignedChannel, SignedTicket } from './types'
+import type { AccountId, Balance, Channel as ChannelType, ChannelBalance, Hash, Moment, Public, Signature, SignedChannel, SignedTicket } from './types'
 
 declare namespace Channel {
   /**
@@ -8,7 +8,7 @@ declare namespace Channel {
    */
   function create(
     offChainCounterparty: Uint8Array,
-    getOnChainPublicKey: (counterparty: Uint8Array) => Promise<Uint8Array>,
+    getOnChainPublicKey: (counterparty: Uint8Array) => Promise<Public>,
     channelBalance?: ChannelBalance,
     sign?: (channelBalance: ChannelBalance) => Promise<SignedChannel>
   ): Promise<Channel>
@@ -65,7 +65,7 @@ declare namespace Channel {
    * @notice Takes the `coreConnector` instance and returns an async iterable duplex stream.
    * @param coreConnector coreConnector instance
    */
-  function handleOpeningRequest(...props: any[]): (source: AsyncIterable<Uint8Array>) => AsyncIterable<Uint8Array>
+  function handleOpeningRequest(source: AsyncIterable<Uint8Array>): AsyncIterable<Uint8Array>
 
   /**
    * Create a signedChannel instance.

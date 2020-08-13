@@ -1,13 +1,13 @@
-import { AccountId } from './types'
+import { Public } from './types'
 
 type ChannelEntry = {
-  partyA: AccountId
-  partyB: AccountId
+  partyA: Public
+  partyB: Public
 }
 
 declare interface Indexer {
-  has(partyA: AccountId, partyB: AccountId): Promise<boolean>
-  get(query?: { partyA?: AccountId; partyB?: AccountId }): Promise<ChannelEntry[]>
+  has(partyA: Public, partyB: Public): Promise<boolean>
+  get(query?: { partyA?: Public; partyB?: Public }): Promise<ChannelEntry[]>
 }
 
 export { ChannelEntry }
