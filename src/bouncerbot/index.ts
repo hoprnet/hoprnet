@@ -100,15 +100,11 @@ export class Bouncebot implements Bot{
   }
 
   async welcomeUser(message) {
-    sendMessage(message.from, {
-      from: this.address,
-      text: response['guestWelcome']
-    })
     const payUrl = await payDai(10.0) 
     console.log(`Payment link generated: ${payUrl}`)
     sendMessage(message.from, {
       from: this.address,
-      text: payUrl,
+      text: response['guestWelcome'] + payUrl
     })
   }
 
