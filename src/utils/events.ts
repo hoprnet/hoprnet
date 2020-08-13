@@ -11,30 +11,31 @@ export function OpenedChannelTopics(
   opener?: Public,
   counterparty?: Public,
   bidirectional?: boolean
-): (string | string[])[] {
-  return getTopics(bidirectional, rawOpenedChannelTopic, opener, counterparty)
+): (undefined | string | string[])[] {
+  return getTopics(rawOpenedChannelTopic, opener, counterparty, bidirectional)
 }
 
 export function ClosedChannelTopics(
   closer?: Public,
   counterparty?: Public,
   bidirectional?: boolean
-): (string | string[])[] {
-  return getTopics(bidirectional, rawClosedChannelTopic, closer, counterparty)
+): (undefined | string | string[])[] {
+  return getTopics(rawClosedChannelTopic, closer, counterparty, bidirectional)
 }
 
 function getTopics(
-  bidirectional: boolean,
   rawTopic: Uint8Array,
   first?: Public,
-  second?: Public
-): (string | string[])[] {
+  second?: Public,
+  bidirectional?: boolean
+): (undefined | string | string[])[] {
+  if (bidirectional && (first == null || second == null)) {
+    throw Error(`Bidirectional property can only be used if 'first' and 'second' are set`)
+  }
+
   const topic0 = []
 
-  if (
-    (first == null && second == null) ||
-    (bidirectional && first != null && second != null && first[0] % 4 != second[0] % 4)
-  ) {
+  if ((first == null && second == null) || (bidirectional && first[0] % 4 != second[0] % 4)) {
     for (let i = 0; i < 4; i++) {
       topic0.push(getTopic0(rawTopic, (i >> 1) % 2, i % 2))
     }

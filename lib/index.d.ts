@@ -1,7 +1,7 @@
 import type { addresses } from '@hoprnet/hopr-ethereum';
 import Web3 from 'web3';
-import { LevelUp } from 'levelup';
-import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface';
+import type { LevelUp } from 'levelup';
+import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface';
 import { ChannelFactory } from './channel';
 import types from './types';
 import Tickets from './tickets';
@@ -9,8 +9,8 @@ import Indexer from './indexer';
 import * as dbkeys from './dbKeys';
 import * as utils from './utils';
 import * as constants from './constants';
-import { HoprChannels } from './tsc/web3/HoprChannels';
-import { HoprToken } from './tsc/web3/HoprToken';
+import type { HoprChannels } from './tsc/web3/HoprChannels';
+import type { HoprToken } from './tsc/web3/HoprToken';
 import Account from './account';
 import HashedSecret from './hashedSecret';
 export default class HoprEthereum implements HoprCoreConnector {
@@ -24,9 +24,9 @@ export default class HoprEthereum implements HoprCoreConnector {
         debug: boolean;
     };
     private _status;
-    private _initializing;
-    private _starting;
-    private _stopping;
+    private _initializing?;
+    private _starting?;
+    private _stopping?;
     signTransaction: ReturnType<typeof utils.TransactionSigner>;
     log: ReturnType<typeof utils['Log']>;
     channel: ChannelFactory;

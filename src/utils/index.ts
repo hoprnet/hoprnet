@@ -320,6 +320,10 @@ export function TransactionSigner(web3: Web3, privKey: Uint8Array) {
     )
 
     function send() {
+      if (signedTransaction.rawTransaction == null) {
+        throw Error(`Cannot process transaction because Web3.js did not give us the raw transaction.`)
+      }
+
       return web3.eth.sendSignedTransaction(signedTransaction.rawTransaction)
     }
 

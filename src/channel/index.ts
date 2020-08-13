@@ -27,6 +27,8 @@ import { CHANNEL_STATES } from './constants'
 import { OnChainChannel } from './types'
 import { Log } from 'web3-core'
 
+const EMPTY_SIGNATURE = new Uint8Array(Signature.SIZE).fill(0x00)
+
 const WIN_PROB = new BN(1)
 
 class ChannelFactory {
@@ -145,27 +147,10 @@ class ChannelFactory {
       signature?: Signature
     }
   ): Promise<SignedChannel> {
-    const emptySignatureArray = new Uint8Array(Signature.SIZE).fill(0x00)
-    let signedChannel: SignedChannel
+    const signedChannel = new SignedChannel(arr, struct)
 
-    if (typeof arr !== 'undefined') {
-      signedChannel = new SignedChannel(arr)
-    } else if (typeof struct !== 'undefined') {
-      signedChannel = new SignedChannel(undefined, {
-        channel: struct.channel,
-        signature:
-          struct.signature ||
-          new Signature({
-            bytes: emptySignatureArray.buffer,
-            offset: emptySignatureArray.byteOffset,
-          }),
-      })
-    } else {
-      throw Error(`Invalid input parameters.`)
-    }
-
-    if (signedChannel.signature.eq(emptySignatureArray)) {
-      await struct.channel.sign(this.coreConnector.account.keys.onChain.privKey, undefined, {
+    if (signedChannel.signature.eq(EMPTY_SIGNATURE)) {
+      await signedChannel.channel.sign(this.coreConnector.account.keys.onChain.privKey, undefined, {
         bytes: signedChannel.buffer,
         offset: signedChannel.signatureOffset,
       })
@@ -204,8 +189,6 @@ class ChannelFactory {
       }
 
       await this.increaseFunds(counterparty, amount)
-
-      console.log('here')
 
       signedChannel = await sign(channelBalance)
 

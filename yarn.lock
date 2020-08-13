@@ -183,23 +183,24 @@
     "@ethersproject/rlp" "^5.0.0"
     "@ethersproject/signing-key" "^5.0.0"
 
-"@hoprnet/hopr-core-connector-interface@1.4.1":
-  version "1.4.1"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-connector-interface/-/hopr-core-connector-interface-1.4.1.tgz#266f31a0c93db18489feb8846790a5809c0e81f1"
-  integrity sha512-sAP234pzd7xJ9qrt5cZHX9B2g0kRIq8oRPcDn0b9myPSS8xP9RjW95jTx6ukCXYV+2qMKDKkFWWX8DNnWiqTng==
+"@hoprnet/hopr-core-connector-interface@1.5.1":
+  version "1.5.1"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-connector-interface/-/hopr-core-connector-interface-1.5.1.tgz#d18550195b3bac06fcbceeac2c9b2763d5e2aa4d"
+  integrity sha512-fUZp081wBZ/sedCE+n5FaTXyPZSriF3QtVAIodSeEs6nKBkcbStIioBCdJdeHMm24h0JYzXCvIgFLDDqKmcwHw==
 
-"@hoprnet/hopr-demo-seeds@1.8.0", "@hoprnet/hopr-demo-seeds@^1.0.3-refactor.3ad82ff":
+"@hoprnet/hopr-demo-seeds@1.8", "@hoprnet/hopr-demo-seeds@1.8.0", "@hoprnet/hopr-demo-seeds@^1.0.3-refactor.3ad82ff":
   version "1.8.0"
   resolved "https://registry.yarnpkg.com/@hoprnet/hopr-demo-seeds/-/hopr-demo-seeds-1.8.0.tgz#918381b6ace214758b043b59637d20dd23ec6019"
   integrity sha512-Ua40p6ajlwCjbBFP+cjFiAyH50ldhY7vF3Ek7ifV8qI6NZemHHjwESnwqZ6N6u4zIppc3YycxuI8MYxSCQFtqw==
   dependencies:
     micro "^9.3.4"
 
-"@hoprnet/hopr-ethereum@hoprnet/hopr-ethereum#feature/change-internal-channel-representation":
-  version "0.4.0"
-  resolved "https://codeload.github.com/hoprnet/hopr-ethereum/tar.gz/95a3a65f0878f1fdaf18f9147a60ed5fb872253f"
+"@hoprnet/hopr-ethereum@^1.0.0":
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-ethereum/-/hopr-ethereum-1.0.0.tgz#c8e6664c173d94ead357bf62e3670f6569d3f232"
+  integrity sha512-hSfY3FL8uatrD9xahLyTqGRmvuK/3wE+TaIDip1tC01BFBhEBzghunL96P2GW562ZGr+/6XCezzYINUPEtaCaw==
   dependencies:
-    "@hoprnet/hopr-demo-seeds" "1.8.0"
+    "@hoprnet/hopr-demo-seeds" "1.8"
     "@hoprnet/hopr-utils" "0.3.0"
     "@openzeppelin/contracts" "^3.0.1"
     "@openzeppelin/test-helpers" "^0.5.5"

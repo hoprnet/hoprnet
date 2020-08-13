@@ -9,7 +9,8 @@ import { AccountId, Signature, Hash } from '../types';
 import { ContractEventEmitter } from '../tsc/web3/types';
 import { ChannelStatus } from '../types/channel';
 import * as time from './time';
-export { time };
+import * as events from './events';
+export { time, events };
 /**
  * @param self our node's accountId
  * @param counterparty counterparty's accountId
@@ -166,9 +167,9 @@ export declare function getSignatureParameters(signature: Signature): {
     v: number;
 };
 /**
- * Create a challange by concatinating and then hashing the secrets.
+ * Create a challenge by concatinating and then hashing the secrets.
  * @param secretA
  * @param secretB
  * @returns a promise that resolves to a hash
  */
-export declare function createChallage(secretA: Uint8Array, secretB: Uint8Array): Promise<Hash>;
+export declare function createChallenge(secretA: Uint8Array, secretB: Uint8Array): Promise<Hash>;

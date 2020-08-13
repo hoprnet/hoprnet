@@ -6,12 +6,10 @@
     "lib": ["es2019", "dom"],
     "module": "commonjs",
     "target": "es2019",
-    "strict": false,
     "resolveJsonModule": true,
     "experimentalDecorators": true,
     "declaration": true,
     "sourceMap": true
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["**/*.spec.ts"]
+  "include": ["src/**/*.ts"]
 }

@@ -26,10 +26,14 @@ export class HoprChannels extends Contract {
     accounts(
       arg0: string
     ): TransactionObject<{
+      accountX: string;
       hashedSecret: string;
       counter: string;
+      oddY: string;
       0: string;
       1: string;
+      2: string;
+      3: string;
     }>;
 
     canImplementInterfaceForAddress(
@@ -56,33 +60,38 @@ export class HoprChannels extends Contract {
 
     setHashedSecret(hashedSecret: string | number[]): TransactionObject<void>;
 
+    init(
+      senderX: number | string,
+      senderY: number | string,
+      hashedSecret: string | number[]
+    ): TransactionObject<void>;
+
     fundChannelWithSig(
-      stateCounter: number | string,
       additionalDeposit: number | string,
       partyAAmount: number | string,
-      not_after: number | string,
+      notAfter: number | string,
+      stateCounter: number | string,
       r: string | number[],
       s: string | number[],
       v: number | string
     ): TransactionObject<void>;
 
-    openChannel(counterParty: string): TransactionObject<void>;
+    openChannel(counterparty: string): TransactionObject<void>;
 
     redeemTicket(
-      pre_image: string | number[],
-      channel_id: string | number[],
-      secret_a: string | number[],
-      secret_b: string | number[],
+      preImage: string | number[],
+      channelId: string | number[],
+      hashedSecretASecretB: string | number[],
       amount: number | string,
-      win_prob: string | number[],
+      winProb: string | number[],
       r: string | number[],
       s: string | number[],
       v: number | string
-    ): TransactionObject<void>;
+    ): TransactionObject<string>;
 
-    initiateChannelClosure(counterParty: string): TransactionObject<void>;
+    initiateChannelClosure(counterparty: string): TransactionObject<void>;
 
-    claimChannelClosure(counterParty: string): TransactionObject<void>;
+    claimChannelClosure(counterparty: string): TransactionObject<void>;
 
     tokensReceived(
       operator: string,
@@ -94,42 +103,6 @@ export class HoprChannels extends Contract {
     ): TransactionObject<void>;
   };
   events: {
-    ClosedChannel: ContractEvent<{
-      closer: string;
-      counterParty: string;
-      partyAAmount: string;
-      partyBAmount: string;
-      0: string;
-      1: string;
-      2: string;
-      3: string;
-    }>;
-    FundedChannel: ContractEvent<{
-      funder: string;
-      recipient: string;
-      counterParty: string;
-      recipientAmount: string;
-      counterPartyAmount: string;
-      0: string;
-      1: string;
-      2: string;
-      3: string;
-      4: string;
-    }>;
-    InitiatedChannelClosure: ContractEvent<{
-      initiator: string;
-      counterParty: string;
-      closureTime: string;
-      0: string;
-      1: string;
-      2: string;
-    }>;
-    OpenedChannel: ContractEvent<{
-      opener: string;
-      counterParty: string;
-      0: string;
-      1: string;
-    }>;
     SecretHashSet: ContractEvent<{
       account: string;
       secretHash: string;

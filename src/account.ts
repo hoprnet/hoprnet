@@ -7,8 +7,8 @@ import { ContractEventEmitter } from './tsc/web3/types'
 class Account {
   private _address?: AccountId
   private _nonceIterator: AsyncIterator<number>
-  private _ticketEpoch: TicketEpoch
-  private _ticketEpochListener: ContractEventEmitter<any>
+  private _ticketEpoch?: TicketEpoch
+  private _ticketEpochListener?: ContractEventEmitter<any>
 
   /**
    * The accounts keys:
@@ -36,7 +36,7 @@ class Account {
       },
     }
 
-    this._nonceIterator = async function* () {
+    this._nonceIterator = async function* (this: Account) {
       let nonce = await this.coreConnector.web3.eth.getTransactionCount((await this.address).toHex())
 
       while (true) {
@@ -80,7 +80,7 @@ class Account {
   get ticketEpoch(): Promise<TicketEpoch> {
     return new Promise(async (resolve, reject) => {
       try {
-        if (typeof this._ticketEpoch !== 'undefined') {
+        if (this._ticketEpoch != null) {
           return resolve(this._ticketEpoch)
         }
 
@@ -101,7 +101,7 @@ class Account {
           .on('error', (error) => {
             this.coreConnector.log('error listening to SecretHashSet events', error.message)
 
-            this._ticketEpochListener.removeAllListeners()
+            this._ticketEpochListener?.removeAllListeners()
             this._ticketEpoch = undefined
           })
 
@@ -112,7 +112,7 @@ class Account {
         resolve(this._ticketEpoch)
       } catch (err) {
         // reset everything on unexpected error
-        this._ticketEpochListener.removeAllListeners()
+        this._ticketEpochListener?.removeAllListeners()
         this._ticketEpoch = undefined
 
         reject(err)

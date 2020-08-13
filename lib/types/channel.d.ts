@@ -22,7 +22,7 @@ declare class Channel extends Uint8ArrayE implements Types.Channel {
     get stateCounter(): number;
     get status(): ChannelStatus;
     get hash(): Promise<import("./hash").default>;
-    sign(privKey: Uint8Array, pubKey: Uint8Array, arr?: {
+    sign(privKey: Uint8Array, pubKey: Uint8Array | undefined, arr?: {
         bytes: ArrayBuffer;
         offset: number;
     }): Promise<Signature>;

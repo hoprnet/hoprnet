@@ -20,9 +20,9 @@ import HashedSecret from './hashedSecret'
 
 export default class HoprEthereum implements HoprCoreConnector {
   private _status: 'uninitialized' | 'initialized' | 'started' | 'stopped' = 'uninitialized'
-  private _initializing: Promise<void>
-  private _starting: Promise<void>
-  private _stopping: Promise<void>
+  private _initializing?: Promise<void>
+  private _starting?: Promise<void>
+  private _stopping?: Promise<void>
   public signTransaction: ReturnType<typeof utils.TransactionSigner>
   public log: ReturnType<typeof utils['Log']>
 

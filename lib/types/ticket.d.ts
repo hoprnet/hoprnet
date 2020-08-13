@@ -25,11 +25,11 @@ declare class Ticket extends Uint8ArrayE implements Types.Ticket {
     get winProbOffset(): number;
     get winProb(): Hash;
     get onChainSecretOffset(): number;
-    get onChainSecret(): Hash;
-    get hash(): Hash;
+    get onChainSecret(): Uint8Array;
+    get hash(): Promise<Hash>;
     static get SIZE(): number;
     getEmbeddedFunds(): BN;
-    sign(privKey: Uint8Array, pubKey: Uint8Array, arr?: {
+    sign(privKey: Uint8Array, pubKey: Uint8Array | undefined, arr?: {
         bytes: ArrayBuffer;
         offset: number;
     }): Promise<Signature>;

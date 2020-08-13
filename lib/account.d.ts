@@ -4,8 +4,8 @@ declare class Account {
     coreConnector: HoprEthereum;
     private _address?;
     private _nonceIterator;
-    private _ticketEpoch;
-    private _ticketEpochListener;
+    private _ticketEpoch?;
+    private _ticketEpochListener?;
     /**
      * The accounts keys:
      */
