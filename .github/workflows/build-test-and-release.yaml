@@ -20,12 +20,12 @@ jobs:
         uses: actions/setup-node@v1
         with:
           node-version: ${{ matrix.node-version }}
-      #     - name: Cache node_modules
-      #       id: cache-modules
-      #       uses: actions/cache@v1
-      #       with:
-      #         path: node_modules
-      #         key: ${{ runner.OS }}-${{ matrix.node-version }}-build-${{ hashFiles(env.pkgPath) }}
+      - name: Cache node_modules
+        id: cache-modules
+        uses: actions/cache@v1
+        with:
+          path: node_modules
+          key: ${{ runner.OS }}-${{ matrix.node-version }}-build-${{ hashFiles('**/package-lock.json') }}
       - name: Install node modules
         working-directory: ${{ env.workDir }}
         #       if: steps.cache-modules.outputs.cache-hit != 'true'
