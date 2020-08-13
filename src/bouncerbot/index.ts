@@ -61,7 +61,7 @@ export class Bouncebot implements Bot{
     const tweet = new TweetMessage(message.text)
     await tweet.fetch()
     // check if the the tweet is valid
-    if (tweet.hashtags.includes(hashtag => hashtag.text.toLowercase() === 'hoprgames')) {
+    if (tweet.hashtags.some(hashtag => hashtag.text.toLowerCase() === 'hoprgames')) {
       sendMessage(message.from, {
         from: this.address,
         text: getRandomItemFromList(response['tweetSuccess']),
