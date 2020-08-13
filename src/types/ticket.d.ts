@@ -20,7 +20,7 @@ declare interface Ticket {
 
   sign(
     privKey: Uint8Array,
-    pubKey: Uint8Array,
+    pubKey: Uint8Array | undefined,
     arr?: {
       bytes: ArrayBuffer
       offset: number
