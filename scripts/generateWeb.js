@@ -1,15 +1,15 @@
 const path = require('path')
 const { execFile } = require('child_process')
-const { ROOT, PROTOC_GEN_TS, protos } = require('./utils')
+const { ROOT, PROTOC_GEN_GRPC_WEB, protos } = require('./utils')
 
-const OUTPUT_DIR = path.join(ROOT, 'web-src')
+const OUTPUT_DIR = path.join(ROOT, 'web')
 
 const args = [
   'grpc_tools_node_protoc',
   `--proto_path=protos`,
-  `--plugin=protoc-gen-ts=${PROTOC_GEN_TS}`,
+  `--plugin=protoc-gen-grpc-web=${PROTOC_GEN_GRPC_WEB}`,
   `--js_out=import_style=commonjs,binary:${OUTPUT_DIR}`,
-  `--ts_out=service=grpc-web:${OUTPUT_DIR}`,
+  `--grpc-web_out=import_style=commonjs+dts,mode=grpcwebtext:${OUTPUT_DIR}`,
   ...protos,
 ]
 

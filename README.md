@@ -36,8 +36,9 @@ You can also check out a more detailed overview [here](./docs/protos.md).
 ## Workflow
 
 1. add a new `.proto` file in `protos` folder
-2. running `yarn build` will generate `grpc-node` stubs and `grpc-web` stubs (currenlty web3 stubs are not bundled with their dependancies)
-3. you may consum the proto stubs by using:
+2. running `yarn build` will generate [grpc-node](https://github.com/grpc/grpc-node/tree/grpc@1.24.x/packages/grpc-native-core) stubs and [grpc-web](https://github.com/grpc/grpc-web) stubs
+
+example:
 
 ```javascript
 // for node
@@ -50,3 +51,13 @@ import { VersionRequest } from '@hoprnet/hopr-protos/web/version_pb'
 ## Generating docs
 
 You can take a look at [generateDocs](./scripts/generateDocs.sh) script on how to generate docs.
+
+## Notes on @grpc/grpc-js
+
+Eventually we will have to switch to [@grpc/grpc-js](https://github.com/grpc/grpc-node/tree/master/packages/grpc-js) since [@grpc/grpc-native-core](https://github.com/grpc/grpc-node/tree/grpc@1.24.x/packages/grpc-native-core) is being [deprecated](https://github.com/grpc/grpc-node/blob/master/PACKAGE-COMPARISON.md).
+
+We can do that once these issues are closed [1](https://github.com/nestjs/nest/issues/4799), [2](https://github.com/improbable-eng/ts-protoc-gen/issues/226).
+
+## Gotchas
+
+- web stubs are not bundled with their dependancies

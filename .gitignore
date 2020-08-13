@@ -15,15 +15,13 @@ yarn-error.log
 # Exclude db dir
 db*
 
-# Exclude built files
-lib/
+# Exclude build files
+node/
+web/
+web-src/
 
 # Exclude vim swap files
 *.swp
 
 # Exclude .env
 .env
-
-# Exclude logs
-*.log
-log.txt
