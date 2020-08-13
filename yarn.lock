@@ -1003,10 +1003,10 @@
     lodash "^4.17.19"
     to-fast-properties "^2.0.0"
 
-"@hoprnet/hopr-protos@^0.0.12":
-  version "0.0.12"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-protos/-/hopr-protos-0.0.12.tgz#677590269af3f024f3b7b12d5452b1f5d2e29cb1"
-  integrity sha512-rfz74pZs0DfBMN3GOoUv9pjcKdXgbo7R9VcsHlT4yzmZde/ikQBp/SLLt6W/cshEi6wAM6zD9FxJM89Jsf5PBA==
+"@hoprnet/hopr-protos@^0.0.13":
+  version "0.0.13"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-protos/-/hopr-protos-0.0.13.tgz#e63333178055581f2736cdd8da348dfb36ee6b14"
+  integrity sha512-fv1FC8mPqijDCJHPG6yULKZ93dlDRx7XxUYyNg9TY0OigHOcQg9ZQw7VPTwRiz33zyEzs+RKGcCebpQ/QbEdrQ==
   dependencies:
     google-protobuf "^3.12.2"
 
