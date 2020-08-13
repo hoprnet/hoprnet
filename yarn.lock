@@ -527,10 +527,10 @@
   dependencies:
     "@types/node" "*"
 
-"@types/mocha@^7.0.2":
-  version "7.0.2"
-  resolved "https://registry.yarnpkg.com/@types/mocha/-/mocha-7.0.2.tgz#b17f16cf933597e10d6d78eae3251e692ce8b0ce"
-  integrity sha512-ZvO2tAcjmMi8V/5Z3JsyofMe3hasRcaw88cto5etSVMwVQfeivGAlEYmaQgceUSVYFofVjT+ioHsATjdWcFt1w==
+"@types/mocha@^8.0.2":
+  version "8.0.2"
+  resolved "https://registry.yarnpkg.com/@types/mocha/-/mocha-8.0.2.tgz#cdd160767c5a445bedef94ea8cfc8ab760fff42b"
+  integrity sha512-5cv8rmqT3KX9XtWDvSgGYfS4OwrKM2eei90GWLnTYz+AXRiBv5uYcKBjnkQ4katNvfYk3+o2bHGZUsDhdcoUyg==
 
 "@types/node@*":
   version "14.0.27"
