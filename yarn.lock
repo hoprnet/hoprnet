@@ -188,7 +188,7 @@
   resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-connector-interface/-/hopr-core-connector-interface-1.5.1.tgz#d18550195b3bac06fcbceeac2c9b2763d5e2aa4d"
   integrity sha512-fUZp081wBZ/sedCE+n5FaTXyPZSriF3QtVAIodSeEs6nKBkcbStIioBCdJdeHMm24h0JYzXCvIgFLDDqKmcwHw==
 
-"@hoprnet/hopr-demo-seeds@1.8", "@hoprnet/hopr-demo-seeds@1.8.0", "@hoprnet/hopr-demo-seeds@^1.0.3-refactor.3ad82ff":
+"@hoprnet/hopr-demo-seeds@1.8", "@hoprnet/hopr-demo-seeds@1.8.0":
   version "1.8.0"
   resolved "https://registry.yarnpkg.com/@hoprnet/hopr-demo-seeds/-/hopr-demo-seeds-1.8.0.tgz#918381b6ace214758b043b59637d20dd23ec6019"
   integrity sha512-Ua40p6ajlwCjbBFP+cjFiAyH50ldhY7vF3Ek7ifV8qI6NZemHHjwESnwqZ6N6u4zIppc3YycxuI8MYxSCQFtqw==
@@ -214,12 +214,12 @@
     ts-node "^8.10.2"
     web3 "^1.2.11"
 
-"@hoprnet/hopr-testing@0.1.2":
-  version "0.1.2"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-testing/-/hopr-testing-0.1.2.tgz#f33b549090c40e02d54a81888a086811c4787cb0"
-  integrity sha512-Le7IyyPT2E1Rex7QHNA6djwHTGWBtwiakJMiYE5K8CMYtRz+WHspy2Ld2fwfkDo/4mNRe5zgvq0rt4KOY3KKOQ==
+"@hoprnet/hopr-testing@0.2.0":
+  version "0.2.0"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-testing/-/hopr-testing-0.2.0.tgz#3b4a464ede58f3f5f36f0620088cc8a479dc6328"
+  integrity sha512-dPA90oBlJf0b+Jp6T1x0izKZWLzer9uuulLPMofizbclJ7fBLZ0vV+8QxdqCb2qarluIhUBZphy13rUvm/ZUkg==
   dependencies:
-    "@hoprnet/hopr-demo-seeds" "^1.0.3-refactor.3ad82ff"
+    "@hoprnet/hopr-demo-seeds" "1.8.0"
     ganache-core "^2.10.2"
 
 "@hoprnet/hopr-utils@0.3.0", "@hoprnet/hopr-utils@^0.3":
