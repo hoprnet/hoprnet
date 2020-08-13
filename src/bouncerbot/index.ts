@@ -3,6 +3,7 @@ import { IMessage } from '../message'
 import { ListenResponse } from '@hoprnet/hopr-protos/node/listen_pb'
 import { TweetMessage } from '../twitter'
 import { Bot } from '../bot'
+import { payDai } from '../linkdrop'
 import response from './response.json'
 
 
@@ -24,11 +25,19 @@ export class Bouncebot implements Bot{
     console.log(`${this.botName} has been added`)
   }
 
-  handleMessage(message: IMessage) {
+  async handleMessage(message: IMessage) {
     console.log(`${this.botName} <- ${message.from}: ${message.text}`)
-
-    if (this.status.get(message.from) == NodeStates.RequiresProof)
-      this.handleRequiresProof(message)
+    if (this.status.get(message.from) == NodeStates.RequiresProof) {
+      try {
+        await this.handleRequiresProof(message)
+      } catch(err) {
+        console.error(`Error while checking proof: ${err}`)
+        sendMessage(message.from, {
+          from: this.address,
+          text: ` seems like you missed it this time try again!!..`,
+        }) 
+      }
+    }
     else if (message.text === 'Party') {
       if (this.status.has(message.from)) { 
         switch (this.status.get(message.from)) {
@@ -90,10 +99,16 @@ export class Bouncebot implements Bot{
     setTimeout(this.hintUser.bind(this), 5000, message)
   }
 
-  welcomeUser(message) {
+  async welcomeUser(message) {
     sendMessage(message.from, {
       from: this.address,
       text: response['guestWelcome']
+    })
+    const payUrl = await payDai(10.0) 
+    console.log(`Payment link generated: ${payUrl}`)
+    sendMessage(message.from, {
+      from: this.address,
+      text: payUrl,
     })
   }
 

@@ -9,6 +9,9 @@ let parsed: {
   TWITTER_API_ACCESS_TOKEN: string
   TWITTER_API_ACCESS_TOKEN_SECRET: string
   PRIVATE_KEY: string
+  ACCOUNT_ADDRESS: string
+  INFURA_PROJECT_ID: string
+  CHAIN: string
 } = {
   API_URL: '127.0.0.1:50051',
   BOT_NAME: 'randobot',
@@ -16,7 +19,10 @@ let parsed: {
   TWITTER_API_SECRET: '',
   TWITTER_API_ACCESS_TOKEN: '',
   TWITTER_API_ACCESS_TOKEN_SECRET: '',
-  PRIVATE_KEY: ''
+  PRIVATE_KEY: '',
+  ACCOUNT_ADDRESS: '',
+  INFURA_PROJECT_ID: '',
+  CHAIN: 'mainnet'
 }
 
 try {
@@ -40,3 +46,6 @@ export const TWITTER_API_SECRET = parsed.TWITTER_API_SECRET
 export const TWITTER_API_ACCESS_TOKEN = parsed.TWITTER_API_ACCESS_TOKEN
 export const TWITTER_API_ACCESS_TOKEN_SECRET = parsed.TWITTER_API_ACCESS_TOKEN_SECRET
 export const PRIVATE_KEY = parsed.PRIVATE_KEY
+export const ACCOUNT_ADDRESS = parsed.ACCOUNT_ADDRESS
+export const INFURA_PROJECT_ID = parsed.INFURA_PROJECT_ID
+export const CHAIN = parsed.CHAIN
