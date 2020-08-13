@@ -49,8 +49,8 @@ const NodeHero = props => {
       </GenericSection>
       <GenericSection {...evenSections}>
         <div className="center-content">
-          <div className="container" style={{ display: 'flex' }}>
-            <div className="mb-32 reveal-from-left" data-reveal-delay="200" style={{ flex: 1 }}>
+          <div className="container node-hero-features-tiles-container">
+            <div className="mb-32 reveal-from-left" data-reveal-delay="200">
               <div className="tiles-item-inner">
                 <div className="features-tiles-item-header">
                   <div className="features-tiles-item-image mb-16">
@@ -80,7 +80,7 @@ const NodeHero = props => {
                 </div>
               </div>
             </div>
-            <div className="mb-32 reveal-from-left" data-reveal-delay="250" style={{ flex: 1 }}>
+            <div className="mb-32 reveal-from-left" data-reveal-delay="250">
               <div className="tiles-item-inner">
                 <div className="features-tiles-item-header">
                   <div className="features-tiles-item-image mb-16">
