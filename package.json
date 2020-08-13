@@ -44,7 +44,7 @@
   "devDependencies": {
     "@hoprnet/hopr-core-connector-interface": "1.5.1",
     "@hoprnet/hopr-demo-seeds": "1.8.0",
-    "@hoprnet/hopr-testing": "0.1.2",
+    "@hoprnet/hopr-testing": "0.2.0",
     "@types/debug": "^4.1.5",
     "@types/keccak": "^3.0.1",
     "@types/levelup": "^4.3.0",
