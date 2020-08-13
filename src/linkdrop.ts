@@ -1,8 +1,7 @@
-import { PRIVATE_KEY, INFURA_PROJECT_ID, ACCOUNT_ADDRESS, CHAIN } from './env'
+import { PRIVATE_KEY, INFURA_PROJECT_ID, ACCOUNT_ADDRESS, CHAIN, DAI_ADDRESS } from './env'
 import LinkdropSDK from '@linkdrop/sdk'
 import TinyURL from 'tinyurl'
 
-const daiAddress = '0x5592EC0cfb4dbc12D3aB100b257153436a1f0FEa'
 const factoryAddress = '0xBa051891B752ecE3670671812486fe8dd34CC1c8'
 
 const linkdropSDK = new LinkdropSDK({
@@ -11,6 +10,7 @@ const linkdropSDK = new LinkdropSDK({
   chain: CHAIN,
   jsonRpcUrl: `https://rinkeby.infura.io/v3/${INFURA_PROJECT_ID}`,
 })
+
 
 export async function payDai(amount: number, expirationHrs: number = 1.0) {
     const expirationTime = Math.round(+new Date() /1000) + (3600 * expirationHrs)
@@ -22,7 +22,7 @@ export async function payDai(amount: number, expirationHrs: number = 1.0) {
     } = await linkdropSDK.generateLink({
       signingKeyOrWallet: PRIVATE_KEY,
       weiAmount: 0, 
-      tokenAddress: daiAddress, 
+      tokenAddress: '0x' + DAI_ADDRESS, 
       tokenAmount:  (amount * 10e17).toString(), 
       expirationTime: expirationTime,
       campaignId: 0

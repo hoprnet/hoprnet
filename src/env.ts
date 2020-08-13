@@ -12,6 +12,7 @@ let parsed: {
   ACCOUNT_ADDRESS: string
   INFURA_PROJECT_ID: string
   CHAIN: string
+  DAI_ADDRESS: string
 } = {
   API_URL: '127.0.0.1:50051',
   BOT_NAME: 'randobot',
@@ -22,7 +23,8 @@ let parsed: {
   PRIVATE_KEY: '',
   ACCOUNT_ADDRESS: '',
   INFURA_PROJECT_ID: '',
-  CHAIN: 'mainnet'
+  CHAIN: 'mainnet',
+  DAI_ADDRESS: '6b175474e89094c44da98b954eedeac495271d0f',
 }
 
 try {
@@ -49,3 +51,4 @@ export const PRIVATE_KEY = parsed.PRIVATE_KEY
 export const ACCOUNT_ADDRESS = parsed.ACCOUNT_ADDRESS
 export const INFURA_PROJECT_ID = parsed.INFURA_PROJECT_ID
 export const CHAIN = parsed.CHAIN
+export const DAI_ADDRESS = parsed.DAI_ADDRESS
