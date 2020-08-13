@@ -136,7 +136,7 @@ describe('test hashedSecret management', function () {
   })
 
   it('should generate a hashed secret and recover a pre-Image', async function () {
-    this.timeout(durations.seconds(18))
+    this.timeout(durations.seconds(22))
     await connector.hashedSecret.create()
 
     for (let i = 0; i < TOTAL_ITERATIONS / GIANT_STEP_WIDTH; i++) {

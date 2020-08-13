@@ -5,6 +5,7 @@
   "license": "LGPL-3.0-only",
   "types": "lib/index.d.ts",
   "main": "lib/index.js",
+  "homepage": "https://hoprnet.org",
   "scripts": {
     "clean": "rm -rf ./lib",
     "test": "mocha --exit",
@@ -43,12 +44,12 @@
   "devDependencies": {
     "@hoprnet/hopr-core-connector-interface": "1.5.1",
     "@hoprnet/hopr-demo-seeds": "1.8.0",
-    "@hoprnet/hopr-testing": "0.1.2",
+    "@hoprnet/hopr-testing": "0.2.0",
     "@types/debug": "^4.1.5",
     "@types/keccak": "^3.0.1",
     "@types/levelup": "^4.3.0",
     "@types/memdown": "^3.0.0",
-    "@types/mocha": "^7.0.2",
+    "@types/mocha": "^8.0.2",
     "@types/node": "^12.12.8",
     "@types/secp256k1": "^4.0.1",
     "husky": "^4.2.5",
