@@ -12,7 +12,7 @@ jobs:
       matrix:
         node-version: [12.x]
         # if you add items into this list, update "steps.filter" too
-        repository: ['core', 'protos']
+        repository: ['core']
 
     steps:
       # Checkout, Cache, Filter, Setup Envs and Steps
@@ -24,9 +24,6 @@ jobs:
           filters: |
             core:
               - '**/*'
-              - '!protos'
-            protos:
-              - 'protos/**/*'
       - id: set-core-env
         if: matrix.repository == 'core'
         run: |
