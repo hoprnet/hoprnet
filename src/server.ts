@@ -11,6 +11,10 @@ import path from 'path'
 import ws from 'ws'
 import http from 'http'
 import { encode, decode } from 'rlp'
+// @ts-ignore
+import Multihash from 'multihashes'
+import bs58 from 'bs58'
+import { addPubKey } from '@hoprnet/hopr-core/lib/utils'
 
 const CRAWL_TIMEOUT = 100_000 // ~15 mins
 
@@ -59,6 +63,35 @@ class LogStream {
 
 
 
+
+
+/**
+ * TEMPORARY HACK - copy pasted from
+ * https://github.com/hoprnet/hopr-chat/blob/master/utils/checkPeerId.ts
+ *
+ *
+ * Takes the string representation of a peerId and checks whether it is a valid
+ * peerId, i. e. it is a valid base58 encoding.
+ * It then generates a PeerId instance and returns it.
+ *
+ * @param query query that contains the peerId
+ */
+export async function checkPeerIdInput(query: string): Promise<PeerId> {
+  let peerId: PeerId
+
+  try {
+    // Throws an error if the Id is invalid
+    Multihash.decode(bs58.decode(query))
+
+    peerId = await addPubKey(PeerId.createFromB58String(query))
+  } catch (err) {
+    throw Error(`Invalid peerId. ${err.message}`)
+  }
+
+  return peerId
+}
+
+
 // DEFAULT VALUES FOR NOW
 const network = process.env.HOPR_NETWORK || "ETHEREUM";
 const provider =
@@ -90,8 +123,9 @@ function parseHosts(): HoprOptions['hosts'] {
 }
 
 
+const SEND_REGEX = /^send ([a-zA-Z0-9]{53}) (.*)$/
 
-function setupAdminServer(logs: LogStream){
+function setupAdminServer(logs: LogStream, onMessage: (msg: string) => void){
   var app = express()
   app.get('/', function(req, res){
     res.set('Content-Type', 'text/html')
@@ -102,12 +136,16 @@ function setupAdminServer(logs: LogStream){
 
   const wsServer = new ws.Server({ server: server });
   wsServer.on('connection', socket => {
-    socket.on('message', message => debugLog("Message from client", message));
+    socket.on('message', message => {
+      debugLog("Message from client", message)
+      onMessage(message.toString())
+    });
     logs.subscribe(socket)
   });
 
-  server.listen(process.env.HOPR_ADMIN_PORT || 3000)
-  logs.log('Admin server listening on ', server.address.toString())
+  const port = process.env.HOPR_ADMIN_PORT || 3000
+  server.listen(port)
+  logs.log('Admin server listening on port '+ port)
 }
 
 async function main() {
@@ -115,8 +153,29 @@ async function main() {
   let bootstrapServerMap = new Map<string, PeerInfo>();
   let logs = new LogStream()
 
+  async function onMessage(message: string){
+    logs.log("Command received: ", message);
+    let match = message.match(SEND_REGEX)
+    let peerId: PeerId
+    if (match) {
+      if (NODE) {
+        logs.log("SEND MESSAGE TO", match[1])
+        logs.log("MESSAGE: ", match[2])
+        peerId = await checkPeerIdInput(match[1])
 
-  setupAdminServer(logs);
+        NODE.sendMessage(encode([match[2], Date.now()]), peerId).then( () => {
+
+        })
+      } else {
+        logs.log("Cannot perform command - node is not connected - please wait for connection")
+      }
+    } else {
+      logs.log("BAD COMMAND: at the moment we only support 'send <address> <message>'")
+    }
+
+  }
+
+  setupAdminServer(logs, onMessage);
 
   if (bootstrapAddresses.length == 0) {
     throw new Error(
@@ -146,7 +205,6 @@ async function main() {
       logs.log(msg.toString())
     }
   }
-
 
   let options: HoprOptions = {
     debug: Boolean(process.env.DEBUG),

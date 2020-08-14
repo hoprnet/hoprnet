@@ -19,7 +19,7 @@ body {
   margin: 0;
   position: fixed; 
   top: 4rem; 
-  bottom: 2rem;
+  bottom: 5rem;
   left: 2rem;
   right: 2rem;
   overflow-y: scroll;
@@ -37,9 +37,30 @@ body {
   z-index:5;
 }
 
+.send {
+  position: fixed;
+  bottom: 0rem;
+  left: 0rem;
+  right: 0rem;
+  background-color:  #000050;
+  color: #b4f0ff;
+  border-top: 1px solid #b4f0ff;
+}
+
+.send input {
+  background: transparent;
+  color: #b4f0ff;
+  border: none;
+  width:100%;
+  padding: 1rem;
+  font-family: monospace;
+  font-size: 1.2rem;
+}
+
 </style>
 <script>
 
+var prevLog = ""
 
 var appendLog = function(msg){
   var logs = document.querySelector('#log')
@@ -56,6 +77,22 @@ var connect = function(){
   client.onopen = function(){
     console.log('Web socket opened')
     logs.classList.remove('connecting')
+
+    document.querySelector('#command').onkeydown = function(e) {
+      if (e.keyCode == 13 ) { // enter 
+        var text = e.originalTarget.value 
+        console.log("Command: ", text)
+        if (text.length > 0) {
+          client.send(text)
+          prevLog = text
+          e.originalTarget.value = ""
+        }
+      }
+      if (e.keyCode == 38) { // Up Arrow
+        e.originalTarget.value = prevLog
+      }
+    }
+
   }
 
   client.onmessage = function(event) {
@@ -102,9 +139,11 @@ window.onload = function(){
       </svg>
     </div>
     <h1>HOPR Logs [TESTNET NODE]</h1>
-
     <div class='logs' class='connecting'>
     <pre><code id='log'>Connecting...</code></pre>
+    </div>
+    <div class='send'>
+      <input id="command" type="text" placeholder="send <ADDRESS> <MESSAGE>" /> 
     </div>
   </body>
 </html>
