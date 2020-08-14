@@ -21,27 +21,22 @@ jobs:
         uses: actions/cache@v1
         with:
           path: node_modules
-          key: ${{ runner.OS }}-build-${{ hashFiles(env.pkgPath) }}
+          key: ${{ runner.OS }}-build-${{ hashFiles(package.json) }}
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v1
         with:
           node-version: ${{ matrix.node-version }}
       # Build and Test
       - name: Install node modules
-        working-directory: ${{ env.workDir }}
-        if: steps.cache-modules.outputs.cache-hit != 'true' && steps.filter.outputs[matrix.repository] == 'true'
+        if: steps.cache-modules.outputs.cache-hit != 'true'
         run: |
           yarn policies set-version ${{ matrix.yarn-version }}
           yarn install --frozen-lockfile
       - name: Build library
-        working-directory: ${{ env.workDir }}
-        if: steps.filter.outputs[matrix.repository] == 'true'
         run: |
           yarn policies set-version ${{ matrix.yarn-version }}
           yarn build
       - name: Test library
-        working-directory: ${{ env.workDir }}
-        if: steps.filter.outputs[matrix.repository] == 'true'
         run: |
           yarn policies set-version ${{ matrix.yarn-version }}
           yarn test
