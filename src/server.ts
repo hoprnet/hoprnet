@@ -89,17 +89,40 @@ function parseHosts(): HoprOptions['hosts'] {
   return hosts
 }
 
+
+
+function setupAdminServer(logs: LogStream){
+  var app = express()
+  app.get('/', function(req, res){
+    res.set('Content-Type', 'text/html')
+    res.send(fs.readFileSync(path.resolve('./src/admin.html')))
+  })
+
+  const server = http.createServer(app);
+
+  const wsServer = new ws.Server({ server: server });
+  wsServer.on('connection', socket => {
+    socket.on('message', message => debugLog("Message from client", message));
+    logs.subscribe(socket)
+  });
+
+  server.listen(process.env.HOPR_ADMIN_PORT || 3000)
+  logs.log('Admin server listening on ', server.address.toString())
+}
+
 async function main() {
   let addr: Multiaddr;
   let bootstrapServerMap = new Map<string, PeerInfo>();
   let logs = new LogStream()
+
+
+  setupAdminServer(logs);
 
   if (bootstrapAddresses.length == 0) {
     throw new Error(
       "Invalid bootstrap servers. Cannot start HOPR without a bootstrap node"
     );
   }
-
   for (let i = 0; i < bootstrapAddresses.length; i++) {
     addr = Multiaddr(bootstrapAddresses[i].trim());
     let peerInfo = bootstrapServerMap.get(addr.getPeerId());
@@ -108,7 +131,6 @@ async function main() {
         PeerId.createFromB58String(addr.getPeerId())
       );
     }
-
     peerInfo.multiaddrs.add(addr);
     bootstrapServerMap.set(addr.getPeerId(), peerInfo);
   }
@@ -136,7 +158,6 @@ async function main() {
     password: process.env.HOPR_PASSWORD || 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' // TODO!!!
   };
 
-  debugLog(options)
   logs.log('Creating HOPR Node')
   logs.log('- network : ' + network);
   logs.log('- bootstrapServers : ' + bootstrapAddresses.join(', '));
@@ -182,23 +203,6 @@ async function main() {
     setTimeout(reportMemoryUsage, 10_000);
   }
   reportMemoryUsage()
-
-  // Static file server
-  var app = express()
-  app.get('/', function(req, res){
-    res.set('Content-Type', 'text/html')
-    res.send(fs.readFileSync(path.resolve('./src/admin.html')))
-  })
-
-  const server = http.createServer(app);
-
-  const wsServer = new ws.Server({ server: server });
-  wsServer.on('connection', socket => {
-    socket.on('message', message => debugLog("Message from client", message));
-    logs.subscribe(socket)
-  });
-
-  server.listen(process.env.HOPR_ADMIN_PORT || 3000)
 }
 
 main();
