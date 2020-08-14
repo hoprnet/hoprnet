@@ -13,15 +13,15 @@ jobs:
         node-version: [12.9.1]
         yarn-version: [1.19.2]
     steps:
-      # Checkout, Cache, Filter, Setup Envs and Steps
-      - name: Checkout repository
+      # Checkout, Cache
+      - name: Checkout
         uses: actions/checkout@v2
       - name: Cache node_modules
         id: cache-modules
         uses: actions/cache@v1
         with:
           path: node_modules
-          key: ${{ runner.OS }}-build-${{ hashFiles(package.json) }}
+          key: ${{ runner.OS }}-build-${{ hashFiles('package.json') }}
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v1
         with:
