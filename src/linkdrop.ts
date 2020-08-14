@@ -1,4 +1,10 @@
-import { PRIVATE_KEY, INFURA_PROJECT_ID, ACCOUNT_ADDRESS, CHAIN, DAI_ADDRESS } from './env'
+import { 
+  PRIVATE_KEY, 
+  INFURA_PROJECT_ID, 
+  ACCOUNT_ADDRESS, 
+  CHAIN, DAI_ADDRESS, 
+  CAMPAIGN_ID 
+} from './env'
 import LinkdropSDK from '@linkdrop/sdk'
 import TinyURL from 'tinyurl'
 
@@ -13,8 +19,18 @@ const linkdropSDK = new LinkdropSDK({
 
 const fees = 2000000000000000
 
+export async function setupPayDai(amount) {
+  const proxyAddress = linkdropSDK.getProxyAddress(CAMPAIGN_ID)
+  await linkdropSDK.approve({ 
+      signingKeyOrWallet: PRIVATE_KEY,
+      proxyAddress: proxyAddress,
+      tokenAddress: '0x' + DAI_ADDRESS,
+      tokenAmount: (amount * 10e17).toString()
+  })
+}
+
 export async function payDai(amount: number, expirationHrs: number = 1.0) {
-    const proxyAddress = linkdropSDK.getProxyAddress(0)
+    const proxyAddress = linkdropSDK.getProxyAddress(CAMPAIGN_ID)
     const txHash = await linkdropSDK.topup({ 
         signingKeyOrWallet : PRIVATE_KEY,
         proxyAddress: proxyAddress,
@@ -33,7 +49,7 @@ export async function payDai(amount: number, expirationHrs: number = 1.0) {
       tokenAddress: '0x' + DAI_ADDRESS, 
       tokenAmount:  (amount * 10e17).toString(), 
       expirationTime: expirationTime,
-      campaignId: 0
+      campaignId: CAMPAIGN_ID
     })
     return await TinyURL.shorten(url)
 }

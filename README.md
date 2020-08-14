@@ -28,6 +28,10 @@ HOPR:      16Uiu2HAkwsN4GVHQr1szVurz6u4V6uB9ZJacey471Pg2nTxHvP47
 > 16Uiu2HAkwsN4GVHQr1szVurz6u4V6uB9ZJacey471Pg2nTxHvP47hello world
 ```
 
+## Setup
+* to setup the payment channel munually create a campaign at [linkdrop](https://dashboard.linkdrop.io/). Choose the same account and erc20 token address that you provide in the .env file. Make sure it is a campaign id is 1 to perform one to one transactions multiple times. You can choose any other campaign id but then the payment channel would be generated only for the number of links decided on the time of campaign creation. 
+* copy the .env.example to .env and add the required variables.
+
 ## Start
 
 1. Install dependancies: `yarn`
