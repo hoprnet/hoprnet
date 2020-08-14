@@ -1,10 +1,17 @@
 {
   "name": "@hoprnet/hopr-server",
-  "version": "0.0.1",
-  "description": "",
-  "author": "",
-  "private": true,
+  "version": "0.0.2",
+  "description": "gRPC Server wrapper around HOPR Node",
   "license": "GPL-3.0-only",
+  "main": "dist/main.js",
+  "files": [
+    "dist",
+    "package.json",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "prebuild": "rimraf dist",
     "build": "nest build",
@@ -22,7 +29,7 @@
   },
   "engines": {
     "node": "12.9.1",
-    "yarn": "1"
+    "yarn": "1.19.2"
   },
   "dependencies": {
     "@grpc/proto-loader": "^0.5.4",
