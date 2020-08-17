@@ -6,10 +6,13 @@ services:
     build:
       context: build
       dockerfile: ./Dockerfile
-    image: 'hopr.avado.dnp.dappnode.eth:0.0.13'
+    image: 'hopr.avado.dnp.dappnode.eth:0.0.14'
     restart: always
     volumes:
       - 'data:/data'
     ports:
       - '3000:3000'
-    dns: 172.33.1.2
+      - '53:53'
+    dns:
+      - 172.33.1.2
+      - 8.8.8.8

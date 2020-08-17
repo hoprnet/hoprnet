@@ -1,6 +1,6 @@
 {
   "name": "hopr.avado.dnp.dappnode.eth",
-  "version": "0.0.13",
+  "version": "0.0.14",
   "description": "hopr node (public testnet)",
   "avatar": "/ipfs/QmX8oTreTovBjr3QmV4UT5nfNbjYxJJJy3dswYVgcYattE",
   "type": "service",
@@ -15,9 +15,9 @@
     "ports": [
       "3000:3000/tcp"
     ],
-    "path": "hopr.avado.dnp.dappnode.eth_0.0.13.tar.xz",
-    "hash": "/ipfs/QmYvG4yhom2efLnH6VCL7jABt3VzEhbZ9wWWvHQ4KKu4HQ",
-    "size": 366795676,
+    "path": "",
+    "hash": "",
+    "size": "",
     "restart": "always"
   },
   "author": "HOPR",
