@@ -66,7 +66,8 @@
     "hash": "/ipfs/QmXnHS9fwvcPmSCk4iUX8XcMGDFNjJ7aWamcoSTxG91YG4",
     "type": "manifest",
     "uploadedTo": {
-      "dappnode": "Thu, 13 Aug 2020 08:07:09 GMT"
+      "dappnode": "Thu, 13 Aug 2020 08:07:09 GMT",
+      "http://23.254.227.151:5001": "Thu, 13 Aug 2020 10:06:36 GMT"
     }
   }
 }
