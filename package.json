@@ -11,22 +11,19 @@
     "test": "mocha --exit",
     "dev": "yarn clean && yarn build:types && tsc -w",
     "build:types": "typechain --target web3-v1 --outDir './src/tsc/web3' './node_modules/@hoprnet/hopr-ethereum/build/extracted/abis/*.json'",
-    "build": "yarn clean && yarn build:types && tsc && cp -R ./src/tsc/web3 ./lib/tsc/web3 && cp ./src/ganache-core.d.ts ./lib/",
+    "build": "yarn clean && yarn build:types && ./scripts/build.sh",
     "lint": "prettier --check .",
     "prepare": "yarn build"
   },
   "files": [
-    "!**/*.spec.ts",
-    "src/",
     "lib/",
     "README.md"
   ],
   "engines": {
-    "node": ">=12.9.1",
-    "yarn": ">=1.19.2"
+    "node": "12",
+    "yarn": "1"
   },
   "dependencies": {
-    "@hoprnet/hopr-ethereum": "^1.0.0",
     "@hoprnet/hopr-utils": "^0.3",
     "bn.js": "^5.1.2",
     "chalk": "^4.1.0",
@@ -34,16 +31,17 @@
     "heap-js": "^2.1.1",
     "keccak": "^3.0.0",
     "secp256k1": "^4.0.2",
-    "web3": "^1.2.9",
-    "web3-core": "^1.2.9",
-    "web3-core-helpers": "^1.2.9",
-    "web3-core-subscriptions": "^1.2.9",
-    "web3-eth": "^1.2.9",
-    "web3-eth-contract": "^1.2.9"
+    "web3": "^1.2.11",
+    "web3-core": "^1.2.11",
+    "web3-core-helpers": "^1.2.11",
+    "web3-core-subscriptions": "^1.2.11",
+    "web3-eth": "^1.2.11",
+    "web3-eth-contract": "^1.2.11"
   },
   "devDependencies": {
     "@hoprnet/hopr-core-connector-interface": "1.5.1",
     "@hoprnet/hopr-demo-seeds": "1.8.0",
+    "@hoprnet/hopr-ethereum": "^1.0.0",
     "@hoprnet/hopr-testing": "0.2.0",
     "@types/debug": "^4.1.5",
     "@types/keccak": "^3.0.1",

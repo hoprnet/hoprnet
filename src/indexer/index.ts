@@ -4,12 +4,11 @@ import BN from 'bn.js'
 import chalk from 'chalk'
 import { Subscription } from 'web3-core-subscriptions'
 import { BlockHeader } from 'web3-eth'
-import { u8aToNumber, stringToU8a, u8aConcat, u8aToHex } from '@hoprnet/hopr-utils'
+import { u8aToNumber, u8aConcat, u8aToHex } from '@hoprnet/hopr-utils'
 import { ChannelEntry, Public } from '../types'
 import { Log, isPartyA, events } from '../utils'
 import { MAX_CONFIRMATIONS } from '../config'
 import { ContractEventLog } from '../tsc/web3/types'
-import createKeccakHash from 'keccak'
 import { Log as OnChainLog } from 'web3-core'
 import Heap from 'heap-js'
 
@@ -125,6 +124,7 @@ class Indexer implements IIndexer {
         .on('error', (err) => reject(err))
         .on('data', ({ key, value }: { key: Buffer; value: Buffer }) => {
           const [partyA, partyB] = dbKeys.ChannelEntryParse(key)
+
           if (party != null && !(party.eq(partyA) || party.eq(partyB))) {
             return
           }
@@ -195,13 +195,8 @@ class Indexer implements IIndexer {
       return this.getAll()
     } else if (query.partyA != null && query.partyB != null) {
       // both parties provided, get channel
-      const entry = await this.getSingle(query.partyA, query.partyB)
-
-      if (typeof entry === 'undefined') {
-        return []
-      } else {
-        return [entry]
-      }
+      const channel = await this.getSingle(query.partyA, query.partyB)
+      return channel == null ? [] : [channel]
     } else {
       // only one of the parties provided, get all open channels of party
       return this.getAll(query.partyA != null ? query.partyA : query.partyB)
@@ -211,6 +206,7 @@ class Indexer implements IIndexer {
   private async store(partyA: Public, partyB: Public, channelEntry: ChannelEntry): Promise<void> {
     const { dbKeys, db } = this.connector
     const { blockNumber, logIndex, transactionIndex } = channelEntry
+
     this.log(
       `storing channel ${partyA.toHex()}-${partyB.toHex()}:${blockNumber.toString()}-${transactionIndex.toString()}-${logIndex.toString()}`
     )

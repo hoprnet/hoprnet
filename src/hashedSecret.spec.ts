@@ -15,6 +15,7 @@ import * as testconfigs from './config.spec'
 import * as configs from './config'
 import HoprChannelsAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprChannels.json'
 import Account from './account'
+import { addresses } from '@hoprnet/hopr-ethereum'
 
 describe('test hashedSecret management', function () {
   this.timeout(durations.seconds(7))
@@ -25,7 +26,7 @@ describe('test hashedSecret management', function () {
   async function generateConnector(): Promise<HoprEthereum> {
     let web3 = new Web3(configs.DEFAULT_URI)
     const chainId = await Utils.getChainId(web3)
-    const network = Utils.getNetworkName(chainId)
+    const network = Utils.getNetworkName(chainId) as addresses.Networks
 
     const connector = ({
       signTransaction: Utils.TransactionSigner(web3, stringToU8a(NODE_SEEDS[0])),

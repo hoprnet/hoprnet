@@ -1,4 +1,4 @@
-import type { addresses } from '@hoprnet/hopr-ethereum'
+import * as addresses from '../ethereum/addresses'
 import type { TransactionObject } from '../tsc/web3/types'
 import assert from 'assert'
 import { publicKeyConvert, publicKeyCreate, ecdsaSign, ecdsaRecover, ecdsaVerify } from 'secp256k1'

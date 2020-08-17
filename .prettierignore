@@ -3,3 +3,6 @@ lib
 
 # typechain types generated
 src/tsc/web3
+
+# Ethereum contract ABI
+src/ethereum

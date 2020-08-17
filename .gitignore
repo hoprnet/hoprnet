@@ -20,9 +20,5 @@ src/tsc/web3
 # Typescript builds
 lib/
 
-# Exclude built tests
-lib/**/*.spec.js
-lib/**/*.spec.d.ts
-
-# Exclude sourcemap
-lib/**/*.js.map
+# Ethereum artifacts
+src/ethereum
