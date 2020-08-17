@@ -83,5 +83,12 @@
     "uploadedTo": {
       "dappnode": "Mon, 17 Aug 2020 13:26:08 GMT"
     }
+  },
+  "0.0.15": {
+    "hash": "/ipfs/QmfU8Xi5RXTygV47tN7ZsF4Env1LmF51P4MSan9C2i571M",
+    "type": "manifest",
+    "uploadedTo": {
+      "dappnode": "Mon, 17 Aug 2020 14:04:51 GMT"
+    }
   }
 }
