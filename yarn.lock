@@ -522,6 +522,16 @@
     chalk "^4.1.0"
     strip-ansi "^6.0.0"
 
+"@hoprnet/hopr-utils@0.4.0":
+  version "0.4.0"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-0.4.0.tgz#b0ff6029917cbf898ec9dd9a731e2b828dd5e837"
+  integrity sha512-HQd3Dfp4C269/lJXnY7XW7zVGqlMDzrlZF7lIl/MDCkWgtA03V98N4lhK4ttU7D58m9Vobx7E1ktJQF09wE3cA==
+  dependencies:
+    bignumber.js "^9.0.0"
+    chalk "^4.1.0"
+    peer-info "^0.17.5"
+    strip-ansi "^6.0.0"
+
 "@istanbuljs/load-nyc-config@^1.0.0":
   version "1.1.0"
   resolved "https://registry.yarnpkg.com/@istanbuljs/load-nyc-config/-/load-nyc-config-1.1.0.tgz#fd3db1d59ecf7cf121e80650bb86712f9b55eced"
@@ -7223,7 +7233,7 @@ peer-id@^0.13.11, peer-id@^0.13.6, peer-id@~0.13.13, peer-id@~0.13.2, peer-id@~0
     multihashes "^1.0.1"
     protons "^1.0.2"
 
-peer-info@^0.17.0, peer-info@~0.17.0, peer-info@~0.17.5:
+peer-info@^0.17.0, peer-info@^0.17.5, peer-info@~0.17.0, peer-info@~0.17.5:
   version "0.17.5"
   resolved "https://registry.yarnpkg.com/peer-info/-/peer-info-0.17.5.tgz#80afc709e03069cf94a29d8fcfa0426140fa7b69"
   integrity sha512-ebbbnvdCnb0onWuW+QNXO4KvLPuQ+kih3zezhov2uxHqA6VLbtzMUyQ06IHtwYLr50AYYWyBOSn17g4zEBsFpw==
