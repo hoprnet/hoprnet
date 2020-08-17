@@ -21,7 +21,7 @@ export async function getBootstrapAddresses(addrs?: string): Promise<ServerMap> 
     addresses = process.env.HOPR_BOOTSTRAP_SERVERS.split(',')
   }  else {
     // Fall back to DNS
-    let records = await dns.promises.resolveTxt('_dnsaddr.bootstrap.develop.hoprnet.org')
+    let records = await dns.promises.resolveTxt('_dnsaddr.bootstrap.hoprnet.org')
     addresses = records.map(r => r[0].replace('dnsaddr=', ''))
   }
 
