@@ -6,6 +6,7 @@ import type * as DbKeys from './dbKeys'
 import type * as Constants from './constants'
 import type Indexer from './indexer'
 import type Tickets from './tickets'
+import PathFinder from './path'
 
 declare namespace HoprCoreConnector {
   /**
@@ -116,7 +117,12 @@ declare interface HoprCoreConnector {
   /**
    * Returns an instance of Indexer.
    */
-  readonly indexer?: Indexer
+  readonly indexer: Indexer
+
+  /**
+   * Instance of the path finding algortihm
+   */
+  readonly path: PathFinder
 
   /**
    * Returns unique information about the connector.

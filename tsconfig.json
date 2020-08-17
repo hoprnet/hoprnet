@@ -3,10 +3,10 @@
     "esModuleInterop": true,
     "noEmit": true,
     "noImplicitAny": true,
-    "lib": ["es2020", "dom"],
+    "lib": ["es2019", "dom"],
     "module": "commonjs",
     "target": "es2019",
     "strict": true
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*.ts"]
 }
