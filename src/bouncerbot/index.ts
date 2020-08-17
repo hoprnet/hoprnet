@@ -38,7 +38,7 @@ export class Bouncebot implements Bot{
         }) 
       }
     }
-    else if (message.text === 'Party') {
+    else if (message.text.toLowerCase() === 'party') {
       if (this.status.has(message.from)) { 
         switch (this.status.get(message.from)) {
            case NodeStates.IsHinted:
@@ -61,7 +61,7 @@ export class Bouncebot implements Bot{
     const tweet = new TweetMessage(message.text)
     await tweet.fetch()
     // check if the the tweet is valid
-    if (tweet.hashtags.some(hashtag => hashtag.text.toLowerCase() === 'hoprgames')) {
+    if (tweet.hasTag('hoprgames') && tweet.hasMention('hoprnet') && tweet.hasSameHOPRNode(message.from)) {
       sendMessage(message.from, {
         from: this.address,
         text: getRandomItemFromList(response['tweetSuccess']),

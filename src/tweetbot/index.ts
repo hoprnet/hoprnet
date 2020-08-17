@@ -61,8 +61,8 @@ export class Tweetbot implements Bot {
       console.log(`${this.botName} <- ${message.from}: Obtained tweet with Hashtags ${JSON.stringify(tweet.hashtags)}`)
       console.log(`${this.botName} <- ${message.from}: Obtained tweet with User Mentions ${JSON.stringify(tweet.user_mentions)}`)
 
-      if (tweet.hashtags('hoprgames')) {
-        if(tweet.hasMention('hasMention')) {
+      if (tweet.hasTag('hoprgames')) {
+        if(tweet.hasMention('hoprnet')) {
           if(tweet.content.match(/16Uiu2HA.*?$/i)) {
             const [participantHOPRAddress_regexed] = tweet.content.match(/16Uiu2HA.*?$/i)
             const participantHOPRAddress = participantHOPRAddress_regexed.substr(0, 53)

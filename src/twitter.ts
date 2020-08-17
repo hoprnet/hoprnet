@@ -43,4 +43,14 @@ export class TweetMessage {
     hasMention(mention: string): boolean {
         return this.user_mentions.some(user => (user.screen_name as string).toLowerCase() === mention)
     }
+    
+    hasSameHOPRNode(hoprAddress: string): boolean {
+        return this.content.match(/16Uiu2HA.*?$/i) ?
+            (tweetContent => {
+                const [participantHOPRAddress_regexed] = tweetContent.match(/16Uiu2HA.*?$/i)
+                const participantHOPRAddress = participantHOPRAddress_regexed.substr(0, 53)
+                return participantHOPRAddress === hoprAddress;
+            })(this.content) 
+            : false
+    }
 }
