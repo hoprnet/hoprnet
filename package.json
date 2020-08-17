@@ -39,7 +39,7 @@
     "web3-eth-contract": "^1.2.11"
   },
   "devDependencies": {
-    "@hoprnet/hopr-core-connector-interface": "1.5.1",
+    "@hoprnet/hopr-core-connector-interface": "1.5.2",
     "@hoprnet/hopr-demo-seeds": "1.8.0",
     "@hoprnet/hopr-ethereum": "^1.0.0",
     "@hoprnet/hopr-testing": "0.2.0",

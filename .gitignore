@@ -8,7 +8,7 @@
 .vscode
 
 # Exclude yarn stuff
-.packages-cache
+**/.packages-cache
 yarn-error.log
 
 # Exclude OSX stuff
@@ -18,7 +18,7 @@ yarn-error.log
 src/tsc/web3
 
 # Typescript builds
-lib/
+lib
 
 # Ethereum artifacts
 src/ethereum
