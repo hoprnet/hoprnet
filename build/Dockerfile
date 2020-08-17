@@ -8,5 +8,6 @@ WORKDIR /usr/src/app/hopr-admin
 RUN rm -r .git && git init # Yarn is broken https://github.com/yarnpkg/yarn/issues/7537
 RUN yarn policies set-version 1.19.2
 RUN yarn
+RUN rm -rf db # If we somehow added a database entry, kill it or we share a peer id
 
 ENTRYPOINT cd /usr/src/app/hopr-admin && yarn run server
