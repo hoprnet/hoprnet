@@ -63,11 +63,18 @@
     }
   },
   "0.0.10": {
-    "hash": "/ipfs/QmXnHS9fwvcPmSCk4iUX8XcMGDFNjJ7aWamcoSTxG91YG4",
+    "hash": "/ipfs/QmaoPrJTE4hcGRXjg8SWcMbKYMK1Gxx6LYjWK1pAcqhZPt",
     "type": "manifest",
     "uploadedTo": {
       "dappnode": "Thu, 13 Aug 2020 08:07:09 GMT",
       "http://23.254.227.151:5001": "Thu, 13 Aug 2020 10:06:36 GMT"
+    }
+  },
+  "0.0.13": {
+    "hash": "/ipfs/QmaGvPkU9xTDLjPAMpbnGTn9buYmoJjS4femm5hdYp33wP",
+    "type": "manifest",
+    "uploadedTo": {
+      "dappnode": "Mon, 17 Aug 2020 07:32:31 GMT"
     }
   }
 }
