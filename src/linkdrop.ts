@@ -14,11 +14,12 @@ const linkdropSDK = new LinkdropSDK({
   linkdropMasterAddress: '0x' + ACCOUNT_ADDRESS,
   factoryAddress: factoryAddress,
   chain: CHAIN,
-  jsonRpcUrl: `https://rinkeby.infura.io/v3/${INFURA_PROJECT_ID}`,
+  jsonRpcUrl: `https://${CHAIN}.infura.io/v3/${INFURA_PROJECT_ID}`,
 })
 
 const fees = 2000000000000000
 
+//@TODO Only call setup setupPayDai if DAI is actually needed
 export async function setupPayDai(amount) {
   const proxyAddress = linkdropSDK.getProxyAddress(CAMPAIGN_ID)
   await linkdropSDK.approve({ 
@@ -29,13 +30,15 @@ export async function setupPayDai(amount) {
   })
 }
 
-export async function payDai(amount: number, expirationHrs: number = 1.0) {
+export async function payDai(amount: number, expirationHrs: number = 24.0) {
+    /* @TODO Call proxy address only if needed
     const proxyAddress = linkdropSDK.getProxyAddress(CAMPAIGN_ID)
     const txHash = await linkdropSDK.topup({ 
         signingKeyOrWallet : PRIVATE_KEY,
         proxyAddress: proxyAddress,
         weiAmount: fees, 
     })
+    */
 
     const expirationTime = Math.round(+new Date() /1000) + (3600 * expirationHrs)
     const {
@@ -44,10 +47,14 @@ export async function payDai(amount: number, expirationHrs: number = 1.0) {
       linkKey,
       linkdropSignerSignature
     } = await linkdropSDK.generateLink({
-      signingKeyOrWallet: PRIVATE_KEY,
-      weiAmount: 0, 
-      tokenAddress: '0x' + DAI_ADDRESS, 
-      tokenAmount:  (amount * 10e17).toString(), 
+      // @TODO Remove Private Key if we using manual campaign
+      // signingKeyOrWallet: PRIVATE_KEY,
+      signingKeyOrWallet: '0x44f42bf8a133aac7dbf50baf1d5dd67ebad64a376330c058029aaa04c688e465',
+      weiAmount: 1000000000000000000,
+      tokenAddress: '0x0000000000000000000000000000000000000000',
+      //@TODO Restore tokenAddress for DAI
+      // tokenAddress: '0x' + DAI_ADDRESS,
+      tokenAmount: 0,
       expirationTime: expirationTime,
       campaignId: CAMPAIGN_ID
     })
