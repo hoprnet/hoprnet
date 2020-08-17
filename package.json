@@ -16,6 +16,7 @@
   "license": "",
   "dependencies": {
     "@hoprnet/hopr-core": "0.6.23",
+    "@hoprnet/hopr-utils": "0.4.0",
     "@types/bs58": "^4.0.1",
     "bs58": "^4.0.1",
     "multihashes": "^3.0.1"
