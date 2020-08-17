@@ -33,6 +33,7 @@
     "@types/bn.js": "^4.11.6",
     "@types/levelup": "^4.3.0",
     "husky": "^4.2.5",
-    "prettier": "^2.0.5"
+    "prettier": "^2.0.5",
+    "typescript": "3.9"
   }
 }
