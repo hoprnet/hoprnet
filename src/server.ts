@@ -198,7 +198,7 @@ async function main() {
 
   logs.log('Creating HOPR Node')
   logs.log('- network : ' + network);
-  logs.log('- bootstrapServers : ' + Array.from(options.bootstrapServers!.keys()).join(','));
+  logs.log('- bootstrapServers : ' + Array.from(options.bootstrapServers || []).map(x => x.id.toB58String()).join(','));
 
   NODE = await Hopr.create(options);
   logs.log('Created HOPR Node')
