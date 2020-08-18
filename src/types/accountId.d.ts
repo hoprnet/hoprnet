@@ -1,9 +1,11 @@
-declare namespace AccountId {
-  const SIZE: number
-}
+declare interface AccountIdStatic {
+  readonly SIZE: number
 
-declare interface AccountId extends Uint8Array {
   new (accountId: Uint8Array, ...props: any[]): AccountId
 }
+
+declare interface AccountId extends Uint8Array {}
+
+declare var AccountId: AccountIdStatic
 
 export default AccountId

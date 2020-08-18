@@ -8,7 +8,7 @@ import type Indexer from './indexer'
 import type Tickets from './tickets'
 import PathFinder from './path'
 
-declare namespace HoprCoreConnector {
+declare interface HoprCoreConnectorStatic {
   /**
    * Creates an uninitialised instance.
    *
@@ -17,9 +17,9 @@ declare namespace HoprCoreConnector {
    * @param options.provider URI that is used to connect to the blockchain
    * @param options.debug run connector in debug mode if set to true
    */
-  function create(db: LevelUp, seed: Uint8Array, options?: { provider?: string; debug?: boolean }): Promise<HoprCoreConnector>
+  create(db: LevelUp, seed: Uint8Array, options?: { provider?: string; debug?: boolean }): Promise<HoprCoreConnector>
 
-  const constants: typeof Constants
+  readonly constants: typeof Constants
 }
 
 declare interface HoprCoreConnector {
@@ -130,7 +130,7 @@ declare interface HoprCoreConnector {
   readonly describe?: any
 }
 
-type HoprCoreConnectorStatic = typeof HoprCoreConnector
+declare var HoprCoreConnector: HoprCoreConnectorStatic
 
 export { Utils, Types, DbKeys, Constants, Channel, Tickets, Indexer, HoprCoreConnectorStatic }
 

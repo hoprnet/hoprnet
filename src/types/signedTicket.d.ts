@@ -1,10 +1,10 @@
 import Signature from './signature'
 import Ticket from './ticket'
 
-declare namespace SignedTicket {
-  const SIZE: number
+declare interface SignedTicketStatic {
+  readonly SIZE: number
 
-  function create(
+  create(
     arr?: {
       bytes: ArrayBuffer
       offset: number
@@ -15,6 +15,7 @@ declare namespace SignedTicket {
     }
   ): Promise<SignedTicket>
 }
+
 declare interface SignedTicket extends Uint8Array {
   ticket: Ticket
   signature: Signature
@@ -25,5 +26,7 @@ declare interface SignedTicket extends Uint8Array {
 
   verify(pubKey: Uint8Array): Promise<boolean>
 }
+
+declare var SignedTicket: SignedTicketStatic
 
 export default SignedTicket

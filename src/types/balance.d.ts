@@ -1,20 +1,23 @@
 import BN from 'bn.js'
 
-declare namespace Balance {
-  const SIZE: number
+declare interface BalanceStatic {
+  readonly SIZE: number
 
   /**
    * Abbreviation of the currency, e.g. `HOPR`
    */
-  const SYMBOL: string
+  readonly SYMBOL: string
 
   /**
    * Decimals of the currency, e.g. 18
    */
-  const DECIMALS: number
-}
-declare interface Balance extends BN {
+  readonly DECIMALS: number
+
   new (balance: BN, ...props: any[]): Balance
 }
+
+declare interface Balance extends BN {}
+
+declare var Balance: BalanceStatic
 
 export default Balance

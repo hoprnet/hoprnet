@@ -2,13 +2,14 @@ import ChannelBalance from './channelBalance'
 import Moment from './moment'
 import Signature from './signature'
 
-declare namespace Channel {
-  function createFunded(channelBalance: ChannelBalance): Channel
+declare interface ChannelStatic {
+  createFunded(channelBalance: ChannelBalance): Channel
 
-  function createActive(channelBalance: ChannelBalance): Channel
+  createActive(channelBalance: ChannelBalance): Channel
 
-  function createPending(pending: Moment, balance: ChannelBalance): Channel
+  createPending(pending: Moment, balance: ChannelBalance): Channel
 }
+
 declare interface Channel {
   toU8a(): Uint8Array
 
@@ -21,5 +22,7 @@ declare interface Channel {
     }
   ): Promise<Signature>
 }
+
+declare var Channel: ChannelStatic
 
 export default Channel

@@ -1,7 +1,7 @@
-declare namespace Signature {
-  const SIZE: number
+declare interface SignatureStatic {
+  readonly SIZE: number
 
-  function create(
+  create(
     arr?: {
       bytes: ArrayBuffer
       offset: number
@@ -20,5 +20,7 @@ declare interface Signature extends Uint8Array {
   recovery: number
   msgPrefix: Uint8Array
 }
+
+declare var Signature: SignatureStatic
 
 export default Signature

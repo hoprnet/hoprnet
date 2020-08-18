@@ -1,20 +1,23 @@
 import BN from 'bn.js'
 
-declare namespace NativeBalance {
-  const SIZE: number
+declare interface NativeBalanceStatic {
+  readonly SIZE: number
 
   /**
    * Abbreviation of the currency, e.g. `ETH`
    */
-  const SYMBOL: string
+  readonly SYMBOL: string
 
   /**
    * Decimals of the currency, e.g. 18
    */
-  const DECIMALS: number
-}
-declare interface NativeBalance extends BN {
+  readonly DECIMALS: number
+
   new (nativeBalance: BN, ...props: any[]): NativeBalance
 }
+
+declare interface NativeBalance extends BN {}
+
+declare var NativeBalance: NativeBalanceStatic
 
 export default NativeBalance
