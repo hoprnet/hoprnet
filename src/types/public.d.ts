@@ -5,6 +5,8 @@ declare namespace Public {
 }
 
 declare interface Public extends Uint8Array {
+  new (public: Uint8Array, ...props: any[]): Public
+
   toAccountId(): Promise<AccountId>
 }
 

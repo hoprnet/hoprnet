@@ -1,4 +1,4 @@
-import Balance from './balance'
+import BN from 'bn.js'
 
 declare namespace NativeBalance {
   const SIZE: number
@@ -13,6 +13,8 @@ declare namespace NativeBalance {
    */
   const DECIMALS: number
 }
-declare interface NativeBalance extends Balance {}
+declare interface NativeBalance extends BN {
+  new (nativeBalance: BN, ...props: any[]): NativeBalance
+}
 
 export default NativeBalance
