@@ -17,7 +17,10 @@
   },
   "files": [
     "lib/",
-    "README.md"
+    "!*.spec.ts",
+    "!*.spec.d.ts",
+    "!*.spec.js",
+    "!*.spec.js.map"
   ],
   "engines": {
     "node": "12",
