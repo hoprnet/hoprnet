@@ -5,7 +5,11 @@
   "homepage": "https://hoprnet.org",
   "license": "GPL-3.0-only",
   "files": [
-    "src/"
+    "src/",
+    "!*.spec.ts",
+    "!*.spec.d.ts",
+    "!*.spec.js",
+    "!*.spec.js.map"
   ],
   "engines": {
     "node": ">=12.9.1",
