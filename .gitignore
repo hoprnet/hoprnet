@@ -3,3 +3,6 @@ node_modules/
 
 # Exclude OSX stuff
 **/.DS_Store
+
+# Exclude any built npm packages
+*.tgz
