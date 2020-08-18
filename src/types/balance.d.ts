@@ -13,6 +13,8 @@ declare namespace Balance {
    */
   const DECIMALS: number
 }
-declare interface Balance extends BN {}
+declare interface Balance extends BN {
+  new (balance: BN, ...props: any[]): Balance
+}
 
 export default Balance
