@@ -16,7 +16,9 @@ declare interface BalanceStatic {
   new (balance: BN, ...props: any[]): Balance
 }
 
-declare interface Balance extends BN {}
+declare interface Balance extends BN {
+  toU8a(): Uint8Array
+}
 
 declare var Balance: BalanceStatic
 

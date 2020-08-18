@@ -4,7 +4,9 @@ declare interface MomentStatic {
   readonly SIZE: number
   new (moment: BN, ...props: any[]): Moment
 }
-declare interface Moment extends BN {}
+declare interface Moment extends BN {
+  toU8a(): Uint8Array
+}
 
 declare var Moment: MomentStatic
 

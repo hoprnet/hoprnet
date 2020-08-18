@@ -16,7 +16,9 @@ declare interface NativeBalanceStatic {
   new (nativeBalance: BN, ...props: any[]): NativeBalance
 }
 
-declare interface NativeBalance extends BN {}
+declare interface NativeBalance extends BN {
+  toU8a(): Uint8Array
+}
 
 declare var NativeBalance: NativeBalanceStatic
 
