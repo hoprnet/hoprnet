@@ -20,9 +20,11 @@ import clear from 'clear'
 
 import { parseOptions, keywords } from './utils'
 import { clearString } from '@hoprnet/hopr-utils'
-import Commands from './commands'
+import { Commands } from './commands'
 import dependencies from './utils/dependancies'
 import { renderHoprLogo } from './logo'
+
+export * as commands from './commands'
 
 const SPLIT_OPERAND_QUERY_REGEX: RegExp = /([\w\-]+)(?:\s+)?([\w\s\-.]+)?/
 
@@ -228,4 +230,7 @@ async function main() {
   }
 }
 
-main()
+// If module is run as main (ie. from command line)
+if (typeof module !== 'undefined' && !module.parent) {
+  main()
+}

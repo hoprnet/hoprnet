@@ -11,7 +11,7 @@
     "clean:zip": "rimraf *.zip",
     "clean:all": "yarn clean:lib && yarn clean:hopr-chat && yarn util:clean:all && yarn clean:zip",
     "compile": "yarn clean:hopr-chat && ncc build index.ts -o hopr-chat && copyfiles package.json .env.example start-hopr-chat.bat start-hopr-chat.sh start-hopr-chat.command hopr-chat && yarn util:compile",
-    "test": "jest || echo '⚠️  Currently no tests available'",
+    "test": "jest",
     "util:clean:all": "rimraf .alice .bob",
     "util:create:alice": "mkdirp .alice && copyfiles -a lib/**/**/* .alice && copyfiles .env .alice/",
     "util:create:bob": "mkdirp .bob && copyfiles -a lib/**/**/* .bob && copyfiles .env .bob/",
@@ -51,13 +51,31 @@
   },
   "devDependencies": {
     "@types/clear": "^0.1.0",
+    "@types/jest": "^26.0.10",
     "@types/node": ">=4.2.0 < 13",
     "bestzip": "^2.1.6",
     "copyfiles": "^2.3.0",
     "cross-env": "^7.0.2",
+    "jest": "^26.4.0",
     "mkdirp": "^1.0.4",
     "move-file-cli": "^2.0.0",
     "rimraf": "^3.0.2",
+    "ts-jest": "^26.2.0",
     "ts-node": "^8.10.2"
+  },
+  "jest": {
+    "verbose": true,
+    "moduleFileExtensions": [
+      "ts",
+      "js",
+      "json"
+    ],
+    "testPathIgnorePatterns": ["<rootDir>/lib", "node_modules"],
+    "testRegex": ".spec.ts$",
+    "transform": {
+      "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "coverageDirectory": "../coverage",
+    "testEnvironment": "node"
   }
 }

@@ -16,7 +16,7 @@ import Version from './version'
 import Tickets from './tickets'
 import IncludeRecipient from './includeRecipient'
 
-export default class Commands {
+export class Commands {
   closeChannel: CloseChannel
   crawl: Crawl
   listCommands: ListCommands
