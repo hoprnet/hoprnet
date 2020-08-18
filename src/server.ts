@@ -137,6 +137,10 @@ function setupAdminServer(logs: LogStream, onMessage: (msg: string) => void){
       debugLog("Message from client", message)
       onMessage(message.toString())
     });
+    socket.on('error', err => {
+      debugLog('Error', err)
+      logs.log('Websocket error', err.toString())
+    })
     logs.subscribe(socket)
   });
 

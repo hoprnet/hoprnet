@@ -80,16 +80,16 @@ var connect = function(){
 
     document.querySelector('#command').onkeydown = function(e) {
       if (e.keyCode == 13 ) { // enter 
-        var text = e.originalTarget.value 
+        var text = e.target.value 
         console.log("Command: ", text)
         if (text.length > 0) {
           client.send(text)
           prevLog = text
-          e.originalTarget.value = ""
+          e.target.value = ""
         }
       }
       if (e.keyCode == 38) { // Up Arrow
-        e.originalTarget.value = prevLog
+        e.target.value = prevLog
       }
     }
 
