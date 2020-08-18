@@ -13,7 +13,7 @@ class Public extends BYTES32 implements Types.Public {
     return pubKeyToAccountId(this)
   }
 
-  static get SIZE() {
+  static get SIZE(): number {
     return COMPRESSED_PUBLIC_KEY_LENGTH
   }
 

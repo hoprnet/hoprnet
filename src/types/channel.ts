@@ -66,11 +66,11 @@ class Channel extends Uint8ArrayE implements Types.Channel {
     return await sign(await this.hash, privKey, undefined, arr)
   }
 
-  static get SIZE() {
+  static get SIZE(): number {
     return ChannelBalance.SIZE + 1
   }
 
-  static createFunded(balance: ChannelBalance) {
+  static createFunded(balance: ChannelBalance): Channel {
     return new Channel(undefined, {
       balance,
       status: ChannelStatus.FUNDING,

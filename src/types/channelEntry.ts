@@ -45,7 +45,7 @@ class ChannelEntry extends Uint8ArrayE {
     return new BNE(this.subarray(UINT256.SIZE * 2, UINT256.SIZE * 3))
   }
 
-  static get SIZE() {
+  static get SIZE(): number {
     return UINT256.SIZE * 3
   }
 }

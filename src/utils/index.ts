@@ -6,10 +6,9 @@ import createKeccakHash from 'keccak'
 import { PromiEvent, TransactionReceipt, TransactionConfig } from 'web3-core'
 import { BlockTransactionString } from 'web3-eth'
 import Web3 from 'web3'
-import BN from 'bn.js'
 import Debug from 'debug'
 import { u8aConcat } from '@hoprnet/hopr-utils'
-import { AccountId, Signature, Hash } from '../types'
+import { AccountId, Balance, Hash, Signature } from '../types'
 import { ContractEventEmitter } from '../tsc/web3/types'
 import { ChannelStatus } from '../types/channel'
 import * as constants from '../constants'
@@ -146,9 +145,9 @@ export async function verify(msg: Uint8Array, signature: Signature, pubKey: Uint
  * @param targetUnit
  * @returns a BN instance of the resulted conversion
  */
-export function convertUnit(amount: BN, sourceUnit: 'eth', targetUnit: 'wei'): BN
-export function convertUnit(amount: BN, sourceUnit: 'wei', targetUnit: 'eth'): BN
-export function convertUnit(amount: BN, sourceUnit: 'eth' | 'wei', targetUnit: 'eth' | 'wei'): BN {
+export function convertUnit(amount: Balance, sourceUnit: 'eth', targetUnit: 'wei'): Balance
+export function convertUnit(amount: Balance, sourceUnit: 'wei', targetUnit: 'eth'): Balance
+export function convertUnit(amount: Balance, sourceUnit: 'eth' | 'wei', targetUnit: 'eth' | 'wei'): Balance {
   assert(['eth', 'wei'].includes(sourceUnit), 'not implemented')
 
   if (sourceUnit === 'eth') {

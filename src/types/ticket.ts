@@ -114,8 +114,8 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
     return this.byteOffset + Hash.SIZE + Hash.SIZE + TicketEpoch.SIZE + Balance.SIZE + Hash.SIZE
   }
 
-  get onChainSecret() {
-    return new Uint8Array(this.buffer, this.onChainSecretOffset, HASHED_SECRET_WIDTH)
+  get onChainSecret(): Hash {
+    return new Hash(new Uint8Array(this.buffer, this.onChainSecretOffset, HASHED_SECRET_WIDTH))
   }
 
   get hash(): Promise<Hash> {
@@ -137,8 +137,8 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
     return Hash.SIZE + Hash.SIZE + TicketEpoch.SIZE + Balance.SIZE + Hash.SIZE + Hash.SIZE
   }
 
-  getEmbeddedFunds() {
-    return this.amount.mul(new BN(this.winProb)).div(new BN(new Uint8Array(Hash.SIZE).fill(0xff)))
+  getEmbeddedFunds(): Balance {
+    return new Balance(this.amount.mul(new BN(this.winProb)).div(new BN(new Uint8Array(Hash.SIZE).fill(0xff))))
   }
 
   async sign(
@@ -165,7 +165,7 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
       winProb: Hash
       onChainSecret: Hash
     }
-  ) {
+  ): Ticket {
     return new Ticket(arr, struct)
   }
 }

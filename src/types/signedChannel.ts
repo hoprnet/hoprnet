@@ -40,7 +40,7 @@ class SignedChannel extends Uint8ArrayE implements Types.SignedChannel {
     return this.byteOffset
   }
 
-  get signature() {
+  get signature(): Signature {
     if (this._signature == null) {
       this._signature = new Signature({
         bytes: this.buffer,
@@ -55,7 +55,7 @@ class SignedChannel extends Uint8ArrayE implements Types.SignedChannel {
     return this.byteOffset + Signature.SIZE
   }
 
-  get channel() {
+  get channel(): Channel {
     if (this._channel == null) {
       this._channel = new Channel({
         bytes: this.buffer,
@@ -76,11 +76,11 @@ class SignedChannel extends Uint8ArrayE implements Types.SignedChannel {
     })
   }
 
-  async verify(publicKey: Uint8Array) {
+  async verify(publicKey: Uint8Array): Promise<boolean> {
     return await verify(await this.channel.hash, this.signature, publicKey)
   }
 
-  static get SIZE() {
+  static get SIZE(): number {
     return Signature.SIZE + Channel.SIZE
   }
 

@@ -31,14 +31,14 @@ class ChannelBalance extends Uint8ArrayE implements Types.ChannelBalance {
     }
   }
 
-  get balanceOffset() {
+  get balanceOffset(): number {
     return this.byteOffset
   }
   get balance(): Balance {
     return new Balance(new Uint8Array(this.buffer, this.balanceOffset, Balance.SIZE))
   }
 
-  get balanceAOffset() {
+  get balanceAOffset(): number {
     return this.byteOffset + Balance.SIZE
   }
 
@@ -46,7 +46,7 @@ class ChannelBalance extends Uint8ArrayE implements Types.ChannelBalance {
     return new Balance(new Uint8Array(this.buffer, this.balanceAOffset, Balance.SIZE))
   }
 
-  static get SIZE() {
+  static get SIZE(): number {
     return Balance.SIZE + Balance.SIZE
   }
 
@@ -59,7 +59,7 @@ class ChannelBalance extends Uint8ArrayE implements Types.ChannelBalance {
       balance: Balance
       balance_a: Balance
     }
-  ) {
+  ): ChannelBalance {
     return new ChannelBalance(arr, struct)
   }
 }

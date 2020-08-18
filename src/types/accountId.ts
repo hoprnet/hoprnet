@@ -4,15 +4,15 @@ import { BYTES32 } from './solidity'
 import { ADDRESS_LENGTH } from '../constants'
 
 class AccountId extends BYTES32 implements Types.AccountId {
-  static get SIZE() {
+  static get SIZE(): number {
     return ADDRESS_LENGTH
   }
 
-  get NAME() {
+  get NAME(): string {
     return 'AccountId'
   }
 
-  toHex() {
+  toHex(): string {
     return Web3.utils.toChecksumAddress(super.toHex())
   }
 }
