@@ -13,6 +13,7 @@ import { decodeMessage } from './message'
 
 import { knownConnectors } from './knownConnectors'
 import type { HoprOptions } from '@hoprnet/hopr-core'
+import { getBootstrapAddresses } from  '@hoprnet/hopr-utils'
 
 const listConnectors = new ListConnctor()
 
@@ -140,31 +141,11 @@ export async function parseOptions(): Promise<HoprOptions> {
     return
   }
 
-  if (!cli_options.bootstrapNode && process.env.BOOTSTRAP_SERVERS == null) {
-    console.log(chalk.red('Cannot start HOPR without a bootstrap node'))
-  }
-
   let addr: Multiaddr
   let bootstrapServerMap = new Map<string, PeerInfo>()
 
   if (!cli_options.bootstrapNode) {
-    const bootstrapAddresses = process.env.BOOTSTRAP_SERVERS.split(',')
-
-    if (bootstrapAddresses.length == 0) {
-      console.log(chalk.red('Invalid bootstrap servers. Cannot start HOPR without a bootstrap node'))
-    }
-
-    for (let i = 0; i < bootstrapAddresses.length; i++) {
-      addr = Multiaddr(bootstrapAddresses[i].trim())
-
-      let peerInfo = bootstrapServerMap.get(addr.getPeerId())
-      if (peerInfo == null) {
-        peerInfo = await PeerInfo.create(PeerId.createFromB58String(addr.getPeerId()))
-      }
-
-      peerInfo.multiaddrs.add(addr)
-      bootstrapServerMap.set(addr.getPeerId(), peerInfo)
-    }
+    bootstrapServerMap = await getBootstrapAddresses()
   }
 
   if (process.env[`${cli_options.network.toUpperCase()}_PROVIDER`] === undefined) {

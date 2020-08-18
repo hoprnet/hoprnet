@@ -194,13 +194,6 @@ async function main() {
   renderHoprLogo()
   console.log(`Welcome to ${chalk.bold('HOPR')}!\n`)
 
-  console.log(`Chat Version: ${chalk.bold(dependencies['@hoprnet/hopr-chat'])}`)
-  console.log(`Core Version: ${chalk.bold(dependencies['@hoprnet/hopr-core'])}`)
-  console.log(`Utils Version: ${chalk.bold(dependencies['@hoprnet/hopr-utils'])}`)
-  console.log(`Connector Version: ${chalk.bold(dependencies['@hoprnet/hopr-core-connector-interface'])}\n`)
-
-  console.log(`Bootstrap Servers: ${chalk.bold(process.env['BOOTSTRAP_SERVERS'])}\n`)
-
   let options: HoprOptions
   try {
     options = await parseOptions()
@@ -208,6 +201,12 @@ async function main() {
     console.log(err.message + '\n')
     return
   }
+
+  console.log(`Chat Version: ${chalk.bold(dependencies['@hoprnet/hopr-chat'])}`)
+  console.log(`Core Version: ${chalk.bold(dependencies['@hoprnet/hopr-core'])}`)
+  console.log(`Utils Version: ${chalk.bold(dependencies['@hoprnet/hopr-utils'])}`)
+  console.log(`Connector Version: ${chalk.bold(dependencies['@hoprnet/hopr-core-connector-interface'])}\n`)
+  console.log(`Bootstrap Servers: ${chalk.bold(options.bootstrapServers.map(x => x.id.toB58String()))}\n`)
 
   try {
     node = await Hopr.create(options)
