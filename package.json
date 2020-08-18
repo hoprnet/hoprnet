@@ -15,7 +15,8 @@
     "contracts/",
     "build/extracted/",
     "build/lib/",
-    "migrations/"
+    "migrations/",
+    "!*.test.ts"
   ],
   "engines": {
     "yarn": ">= 1.19.2",
