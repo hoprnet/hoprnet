@@ -47,7 +47,7 @@ const FooterSocial = ({ className, invertColor, ...props }) => {
           </a>
         </li>
         <li>
-          <a href="https://discord.gg/a3zFXM" target="_blank" rel="noopener noreferrer">
+          <a href="https://discord.gg/dEAWC4G" target="_blank" rel="noopener noreferrer">
             <Discord style={style} />
           </a>
         </li>

@@ -60,7 +60,7 @@ class Clients extends React.Component {
             />
             <ul className="list-reset">
               <li className="reveal-from-top">
-                <a href="https://www.sedimentum.com/en/sedimentum-en/" target="_blank" rel="noopener noreferrer">
+                <a href="https://www.sedimentum.com/" target="_blank" rel="noopener noreferrer">
                   <Image
                     src={require('../assets/images/partners/sedimentum.png')}
                     alt="Sedimentum Logo"
