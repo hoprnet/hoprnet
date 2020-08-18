@@ -27,7 +27,7 @@
     "yarn": "1"
   },
   "dependencies": {
-    "@hoprnet/hopr-utils": "^0.3",
+    "@hoprnet/hopr-utils": "^0.4.0",
     "bn.js": "^5.1.2",
     "chalk": "^4.1.0",
     "debug": "^4.1.1",
@@ -42,7 +42,7 @@
     "web3-eth-contract": "^1.2.11"
   },
   "devDependencies": {
-    "@hoprnet/hopr-core-connector-interface": "1.5.2",
+    "@hoprnet/hopr-core-connector-interface": "1.5.5",
     "@hoprnet/hopr-demo-seeds": "1.8.0",
     "@hoprnet/hopr-ethereum": "^1.0.0",
     "@hoprnet/hopr-testing": "0.2.0",
@@ -50,7 +50,7 @@
     "@types/keccak": "^3.0.1",
     "@types/levelup": "^4.3.0",
     "@types/memdown": "^3.0.0",
-    "@types/mocha": "^8.0.2",
+    "@types/mocha": "^8.0.3",
     "@types/node": "^12.12.8",
     "@types/secp256k1": "^4.0.1",
     "husky": "^4.2.5",

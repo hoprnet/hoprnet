@@ -22,3 +22,6 @@ lib
 
 # Ethereum artifacts
 src/ethereum
+
+# Exclude any built npm packages
+*.tgz
