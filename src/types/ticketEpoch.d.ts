@@ -1,12 +1,14 @@
 import type BN from 'bn.js'
 
-declare namespace TicketEpoch {
-  const SIZE: number
+declare interface TicketEpochStatic {
+  readonly SIZE: number
+
+  new (ticketEpoch: BN, ...props: any[]): TicketEpoch
 }
 declare interface TicketEpoch extends BN {
-  new (ticketEpoch: BN, ...props: any[]): TicketEpoch
-
   toU8a(): Uint8Array
 }
+
+declare var TicketEpoch: TicketEpochStatic
 
 export default TicketEpoch

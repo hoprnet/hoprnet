@@ -1,10 +1,10 @@
 import Channel from './channel'
 import Signature from './signature'
 
-declare namespace SignedChannel {
-  const SIZE: number
+declare interface SignedChannelStatic {
+  readonly SIZE: number
 
-  function create(
+  create(
     arr?: {
       bytes: ArrayBuffer
       offset: number
@@ -26,5 +26,7 @@ declare interface SignedChannel extends Uint8Array {
 
   verify(pubKey: Uint8Array): Promise<boolean>
 }
+
+declare var SignedChannel: SignedChannelStatic
 
 export default SignedChannel

@@ -3,8 +3,8 @@ import Hash from './hash'
 import Signature from './signature'
 import TicketEpoch from './ticketEpoch'
 
-declare namespace Ticket {
-  const SIZE: number
+declare interface TicketStatic {
+  readonly SIZE: number
 }
 declare interface Ticket {
   channelId: Hash
@@ -27,5 +27,7 @@ declare interface Ticket {
     }
   ): Promise<Signature>
 }
+
+declare var Ticket: TicketStatic
 
 export default Ticket

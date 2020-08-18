@@ -1,10 +1,10 @@
 import BN from 'bn.js'
 import Balance from './balance'
 
-declare namespace ChannelBalance {
-  const SIZE: number
+declare interface ChannelBalanceStatic {
+  readonly SIZE: number
 
-  function create(
+  create(
     arr?: {
       bytes: ArrayBuffer
       offset: number
@@ -21,5 +21,6 @@ declare interface ChannelBalance {
 
   toU8a(): Uint8Array
 }
+declare var ChannelBalance: ChannelBalanceStatic
 
 export default ChannelBalance

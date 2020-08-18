@@ -1,12 +1,12 @@
 import type { AccountId, Balance, Channel as ChannelType, ChannelBalance, Hash, Moment, Public, Signature, SignedChannel, SignedTicket } from './types'
 
-declare namespace Channel {
+declare interface ChannelStatic {
   /**
    * Creates a Channel instance from the database.
    * @param counterparty AccountId of the counterparty
    * @param props additional arguments
    */
-  function create(
+  create(
     offChainCounterparty: Uint8Array,
     getOnChainPublicKey: (counterparty: Uint8Array) => Promise<Public>,
     channelBalance?: ChannelBalance,
@@ -20,14 +20,14 @@ declare namespace Channel {
    * @param counterParty AccountId of the counterparty
    * @param challenge Challenge for this ticket
    */
-  function createDummyChannelTicket(counterParty: AccountId, challenge: Hash, ...props: any[]): Promise<SignedTicket>
+  createDummyChannelTicket(counterParty: AccountId, challenge: Hash, ...props: any[]): Promise<SignedTicket>
 
   /**
    * Checks whether the channel exists on-chain and off-chain, i.e. in our database.
    * Returns `true` if the channel exists on-chain AND off-chain.
    * @param counterparty AccountId of the counterparty
    */
-  function isOpen(counterparty: AccountId): Promise<boolean>
+  isOpen(counterparty: AccountId): Promise<boolean>
 
   /**
    * Opens a new payment channel and initializes the on-chain data.
@@ -43,14 +43,14 @@ declare namespace Channel {
    * @param onData applied on all channel instances
    * @param onEnd composes at the end the received data
    */
-  function getAll<T, R>(onData: (channel: Channel, ...props: any[]) => Promise<T>, onEnd: (promises: Promise<T>[], ...props: any[]) => R): Promise<R>
+  getAll<T, R>(onData: (channel: Channel, ...props: any[]) => Promise<T>, onEnd: (promises: Promise<T>[], ...props: any[]) => R): Promise<R>
 
   /**
    * Fetches all channel instances from the database and initiates a settlement on
    * each of them.
    * @param props additional arguments
    */
-  function closeChannels(): Promise<Balance>
+  closeChannels(): Promise<Balance>
 
   /**
    * Increases the balance of the payment channel with the given counterparty
@@ -58,21 +58,21 @@ declare namespace Channel {
    * @param counterParty the counterparty of the channel
    * @param amount the amount of tokens to put into the payment channel
    */
-  function increaseFunds(counterParty: AccountId, amount: Balance): Promise<void>
+  increaseFunds(counterParty: AccountId, amount: Balance): Promise<void>
 
   /**
    * Handles a channel opening request.
    * @notice Takes the `coreConnector` instance and returns an async iterable duplex stream.
    * @param coreConnector coreConnector instance
    */
-  function handleOpeningRequest(source: AsyncIterable<Uint8Array>): AsyncIterable<Uint8Array>
+  handleOpeningRequest(source: AsyncIterable<Uint8Array>): AsyncIterable<Uint8Array>
 
   /**
    * Create a signedChannel instance.
    * @param arr array containing a signedChannel
    * @param struct desired content of the signedChannel
    */
-  function createSignedChannel(
+  createSignedChannel(
     arr?: {
       bytes: ArrayBuffer
       offset: number
@@ -158,5 +158,7 @@ declare interface Channel {
    */
   getPreviousChallenges(): Promise<Hash>
 }
+
+declare var Channel: ChannelStatic
 
 export default Channel

@@ -1,10 +1,11 @@
 import BN from 'bn.js'
 
-declare namespace Moment {
-  const SIZE: number
-}
-declare interface Moment extends BN {
+declare interface MomentStatic {
+  readonly SIZE: number
   new (moment: BN, ...props: any[]): Moment
 }
+declare interface Moment extends BN {}
+
+declare var Moment: MomentStatic
 
 export default Moment
