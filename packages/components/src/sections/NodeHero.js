@@ -113,7 +113,7 @@ const NodeHero = props => {
                     >
                       Cointelegraph
                     </a>
-                    , our wait list reached almost 400 people, which surprised even us! However, we are only making an
+                    , our wait list reached several hundred, which surprised even us! However, we are only making an
                     initial 100 node PCs available, so we highly recommend ordering now.
                   </p>
                   <Button
