@@ -1,7 +1,7 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import type { AutoCompleteResult } from './abstractCommand'
-import { AbstractCommand } from './abstractCommand'
+import { AbstractCommand, GlobalState } from './abstractCommand'
 import CloseChannel from './closeChannel'
 import Crawl from './crawl'
 import ListCommands from './listCommands'
@@ -23,8 +23,15 @@ export const SPLIT_OPERAND_QUERY_REGEX: RegExp = /([\w\-]+)(?:\s+)?([\w\s\-.]+)?
 export class Commands {
   readonly commands: AbstractCommand[]
   private commandMap: Map<string, AbstractCommand>
+  private state: GlobalState
 
   constructor(public node: Hopr<HoprCoreConnector>, rl?: readline.Interface) {
+    this.state = {
+      includeRecipient: false,
+      aliases: new Map()
+    }
+
+
     this.commands = [
       new CloseChannel(node),
       new Crawl(node),
@@ -70,7 +77,7 @@ export class Commands {
     let cmd = this.find(command)
     
     if (cmd){
-      await cmd.execute(query)
+      await cmd.execute(query, this.state)
       return true
     }
     return false

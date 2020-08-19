@@ -1,13 +1,13 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import type { AutoCompleteResult } from './abstractCommand'
-import { AbstractCommand } from './abstractCommand'
+import { AbstractCommand, GlobalState } from './abstractCommand'
 
 import chalk from 'chalk'
 
 import type PeerId from 'peer-id'
 
-import { checkPeerIdInput, encodeMessage, getOpenChannels, getPeers, settings } from '../utils'
+import { checkPeerIdInput, encodeMessage, getOpenChannels, getPeers } from '../utils'
 import { clearString } from '@hoprnet/hopr-utils'
 import { MAX_HOPS } from '@hoprnet/hopr-core/lib/constants'
 
@@ -25,7 +25,7 @@ export default class SendMessage extends AbstractCommand {
    * Encapsulates the functionality that is executed once the user decides to send a message.
    * @param query peerId string to send message to
    */
-  async execute( query?: string): Promise<void> {
+  async execute(query: string, settings: GlobalState): Promise<void> {
     if (query == null) {
       console.log(chalk.red(`Invalid arguments. Expected 'send <peerId>'. Received '${query}'`))
       return
