@@ -1,55 +1,34 @@
 import { 
-  PRIVATE_KEY, 
-  INFURA_PROJECT_ID, 
-  ACCOUNT_ADDRESS, 
-  CHAIN, DAI_ADDRESS, 
-  CAMPAIGN_ID 
+  LINKDROP_PRIVATE_KEY,
+  LINKDROP_ACCOUNT_ADDRESS,
+  LINKDROP_CHAIN,
+  LINKDROP_CAMPAIGN_ID,
+  LINKDROP_CAMPAIGN_AMOUNT_PER_LINK_IN_WEI
 } from './env'
 import LinkdropSDK from '@linkdrop/sdk'
 import TinyURL from 'tinyurl'
 
+
 const factoryAddress = '0xBa051891B752ecE3670671812486fe8dd34CC1c8'
 
 const linkdropSDK = new LinkdropSDK({
-  linkdropMasterAddress: '0x' + ACCOUNT_ADDRESS,
+  linkdropMasterAddress: '0x' + LINKDROP_ACCOUNT_ADDRESS,
   factoryAddress: factoryAddress,
-  chain: CHAIN,
-  jsonRpcUrl: `https://rinkeby.infura.io/v3/${INFURA_PROJECT_ID}`,
+  chain: LINKDROP_CHAIN,
+  jsonRpcUrl: `https://dai.poa.network`,
 })
 
-const fees = 2000000000000000
-
-export async function setupPayDai(amount) {
-  const proxyAddress = linkdropSDK.getProxyAddress(CAMPAIGN_ID)
-  await linkdropSDK.approve({ 
-      signingKeyOrWallet: PRIVATE_KEY,
-      proxyAddress: proxyAddress,
-      tokenAddress: '0x' + DAI_ADDRESS,
-      tokenAmount: (amount * 10e17).toString()
-  })
-}
-
-export async function payDai(amount: number, expirationHrs: number = 1.0) {
-    const proxyAddress = linkdropSDK.getProxyAddress(CAMPAIGN_ID)
-    const txHash = await linkdropSDK.topup({ 
-        signingKeyOrWallet : PRIVATE_KEY,
-        proxyAddress: proxyAddress,
-        weiAmount: fees, 
-    })
-
+export async function payDai(expirationHrs: number = 24.0) {
     const expirationTime = Math.round(+new Date() /1000) + (3600 * expirationHrs)
     const {
       url,
-      linkId,
-      linkKey,
-      linkdropSignerSignature
     } = await linkdropSDK.generateLink({
-      signingKeyOrWallet: PRIVATE_KEY,
-      weiAmount: 0, 
-      tokenAddress: '0x' + DAI_ADDRESS, 
-      tokenAmount:  (amount * 10e17).toString(), 
+      signingKeyOrWallet: LINKDROP_PRIVATE_KEY,
+      weiAmount: `${LINKDROP_CAMPAIGN_AMOUNT_PER_LINK_IN_WEI}`,
+      tokenAddress: '0x0000000000000000000000000000000000000000',
+      tokenAmount: 0,
       expirationTime: expirationTime,
-      campaignId: CAMPAIGN_ID
+      campaignId: LINKDROP_CAMPAIGN_ID
     })
     return await TinyURL.shorten(url)
 }

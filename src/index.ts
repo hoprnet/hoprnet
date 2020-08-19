@@ -1,7 +1,7 @@
 import { API_URL, BOT_NAME } from './env'
 import { getHoprAddress  } from './utils'
 import { setupBot, Bot } from './bot'
-import { setupPayDai, payDai } from './linkdrop'
+import { payDai } from './linkdrop'
 
 
 const start = async () => {
@@ -24,7 +24,6 @@ const start = async () => {
       bot = new Tweetbot(hoprAddress)
       break
   }
-  await setupPayDai(10)
   await setupBot(bot)
 }
 

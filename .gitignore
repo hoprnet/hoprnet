@@ -43,6 +43,8 @@ lib/
 
 # Exclude .env
 .env
+.env*
+!.env.example
 
 # Hopr Node
 db
