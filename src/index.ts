@@ -25,7 +25,7 @@ const start = async () => {
       break
   }
   // await setupBot(bot)
-  console.log(await payDai(2))
+  console.log(await payDai())
 }
 
 start().catch((err) => {
