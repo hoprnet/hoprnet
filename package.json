@@ -41,7 +41,6 @@
     "@hoprnet/hopr-core-ethereum": "0.2.1",
     "@hoprnet/hopr-demo-seeds": "1.8.0",
     "@hoprnet/hopr-utils": "^0.4.0",
-    "@nodeutils/defaults-deep": "~1.1.0",
     "abort-controller": "^3.0.0",
     "bl": "^4.0.2",
     "chalk": "~4.1.0",

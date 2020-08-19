@@ -729,13 +729,6 @@
     "@types/yargs" "^15.0.0"
     chalk "^4.0.0"
 
-"@nodeutils/defaults-deep@~1.1.0":
-  version "1.1.0"
-  resolved "https://registry.yarnpkg.com/@nodeutils/defaults-deep/-/defaults-deep-1.1.0.tgz#bb1124dc8d7ce0bc5da1d668ace58149258ef20b"
-  integrity sha1-uxEk3I184LxdodZorOWBSSWO8gs=
-  dependencies:
-    lodash "^4.15.0"
-
 "@openzeppelin/contract-loader@^0.4.0":
   version "0.4.0"
   resolved "https://registry.yarnpkg.com/@openzeppelin/contract-loader/-/contract-loader-0.4.0.tgz#c28c05d09df94c634d968ed175b5777dfc675872"

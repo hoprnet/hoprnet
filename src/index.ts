@@ -6,12 +6,8 @@ import MPLEX = require('libp2p-mplex')
 import KadDHT = require('libp2p-kad-dht')
 // @ts-ignore
 import SECIO = require('libp2p-secio')
-// import { WebRTCv4, WebRTCv6 } = require('./network/natTraversal')
 
 import TCP from './network/transport'
-
-// @ts-ignore
-import defaultsDeep = require('@nodeutils/defaults-deep')
 
 import { Packet } from './messages/packet'
 import { PACKET_SIZE, MAX_HOPS } from './constants'
@@ -104,40 +100,35 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
    * @param provider
    */
   constructor(options: HoprOptions, public db: LevelUp, public paymentChannels: Chain) {
-    super(
-      defaultsDeep(
-        {
-          peerInfo: options.peerInfo,
+    super({
+      peerInfo: options.peerInfo,
+
+      // Disable libp2p-switch protections for the moment
+      switch: {
+        denyTTL: 1,
+        denyAttempts: Infinity,
+      },
+      // The libp2p modules for this libp2p bundle
+      modules: {
+        transport: [TCP],
+        streamMuxer: [MPLEX],
+        connEncryption: [SECIO],
+        dht: KadDHT,
+      },
+      config: {
+        transport: {
+          TCP: {
+            bootstrapServers: options.bootstrapServers,
+          },
         },
-        {
-          // Disable libp2p-switch protections for the moment
-          switch: {
-            denyTTL: 1,
-            denyAttempts: Infinity,
-          },
-          // The libp2p modules for this libp2p bundle
-          modules: {
-            transport: [TCP],
-            streamMuxer: [MPLEX],
-            connEncryption: [SECIO],
-            dht: KadDHT,
-          },
-          config: {
-            transport: {
-              TCP: {
-                bootstrapServers: options.bootstrapServers,
-              },
-            },
-            dht: {
-              enabled: true,
-            },
-            relay: {
-              enabled: false,
-            },
-          },
-        }
-      )
-    )
+        dht: {
+          enabled: true,
+        },
+        relay: {
+          enabled: false,
+        },
+      },
+    })
 
     this.output = options.output || console.log
     this.bootstrapServers = options.bootstrapServers || []

@@ -1,7 +1,7 @@
 import secp256k1 from 'secp256k1'
 import { randomBytes } from 'crypto'
 
-import { u8aXOR, u8aToHex, u8aConcat, PRG } from '@hoprnet/hopr-utils'
+import { u8aXOR, u8aConcat, PRG } from '@hoprnet/hopr-utils'
 import { MAX_HOPS } from '../../../constants'
 
 import {
@@ -12,7 +12,6 @@ import {
   deriveTicketKey,
   deriveTicketKeyBlinding,
   deriveTicketLastKey,
-  deriveTicketLastKeyBlinding,
   createMAC,
 } from './index'
 
@@ -196,15 +195,6 @@ export async function createHeader<Chain extends HoprCoreConnector>(
 
       header.gamma.set(createMAC(secrets[i - 1], header.beta), 0)
     }
-  }
-
-  function toString(header: Header<Chain>, secrets: Uint8Array[]): string {
-    return peerIds.reduce((str, peerId, index) => {
-      str += `\nsecret[${index}]: ${u8aToHex(
-        secrets[index]
-      )}\npeerId[${index}]: ${peerId.toB58String()}\npeerId[${index}] pubkey: ${u8aToHex(peerId.pubKey.marshal())}`
-      return str
-    }, header.toString())
   }
 
   checkPeerIds()
