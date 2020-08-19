@@ -90,5 +90,11 @@ describe('Commands', () => {
     expect(mockNode.network.crawler.crawl).toHaveBeenCalled()
 
   })
+
+  it('help', async () => {
+    let mockNode: any = jest.fn()
+    let cmds = new mod.Commands(mockNode)
+    expect(await cmds.execute('help')).toMatch(/help/)
+  })
 })
 
