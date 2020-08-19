@@ -5,6 +5,16 @@ import { AppModule } from './app.module'
 import { HOPR_PROTOS_FOLDER_DIR, PROTO_PACKAGES, PROTO_FILES } from './constants'
 
 async function bootstrap() {
+  process.on('unhandledRejection', (error: Error) => {
+    console.error(error)
+    // process.exit(1)
+  })
+
+  process.on('uncaughtException', (error: Error) => {
+    console.error(error)
+    // process.exit(1)
+  })
+
   console.log(':: HOPR Server Starting ::')
 
   const configService = new ConfigService()
@@ -28,14 +38,8 @@ async function bootstrap() {
   console.log(`:: HOPR Server Started at ${host} ::`)
 }
 
-bootstrap()
+// If module is run as main (ie. from command line)
+if (typeof module !== 'undefined' && !module.parent) {
+  bootstrap()
+}
 
-process.on('unhandledRejection', (error: Error) => {
-  console.error(error)
-  // process.exit(1)
-})
-
-process.on('uncaughtException', (error: Error) => {
-  console.error(error)
-  // process.exit(1)
-})
