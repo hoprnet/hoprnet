@@ -1,6 +1,6 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
-import type { AutoCompleteResult } from './abstractCommand'
+import type { AutoCompleteResult, CommandResponse } from './abstractCommand'
 import { AbstractCommand, GlobalState } from './abstractCommand'
 
 import chalk from 'chalk'
@@ -13,13 +13,41 @@ import { MAX_HOPS } from '@hoprnet/hopr-core/lib/constants'
 
 import readline from 'readline'
 
-export default class SendMessage extends AbstractCommand {
-  constructor(public node: Hopr<HoprCoreConnector>, public rl: readline.Interface) {
+
+abstract class SendMessageBase extends AbstractCommand {
+  constructor(public node: Hopr<HoprCoreConnector>) {
     super()
   }
 
   name() { return 'send' }
   help() { return 'sends a message to another party'}
+
+  async autocomplete(query: string, line: string): Promise<AutoCompleteResult> {
+    const peerIds = getPeers(this.node, {
+      noBootstrapNodes: true,
+    }).map((peerId) => peerId.toB58String())
+    const validPeerIds = query ? peerIds.filter((peerId) => peerId.startsWith(query)) : peerIds
+
+    if (!validPeerIds.length) {
+      console.log(
+        chalk.red(
+          `\nDoesn't know any other node except apart from bootstrap node${
+            this.node.bootstrapServers.length == 1 ? '' : 's'
+          }!`
+        )
+      )
+      return [[''], line]
+    }
+
+    return [validPeerIds.map((peerId) => `send ${peerId}`), line]
+  }
+
+}
+
+export class SendMessageFancy extends SendMessageBase {
+  constructor(public node: Hopr<HoprCoreConnector>, public rl: readline.Interface) {
+    super(node)
+  }
 
   /**
    * Encapsulates the functionality that is executed once the user decides to send a message.
@@ -77,26 +105,6 @@ export default class SendMessage extends AbstractCommand {
     } catch (err) {
       console.log(chalk.red(err.message))
     }
-  }
-
-  async autocomplete(query: string, line: string): Promise<AutoCompleteResult> {
-    const peerIds = getPeers(this.node, {
-      noBootstrapNodes: true,
-    }).map((peerId) => peerId.toB58String())
-    const validPeerIds = query ? peerIds.filter((peerId) => peerId.startsWith(query)) : peerIds
-
-    if (!validPeerIds.length) {
-      console.log(
-        chalk.red(
-          `\nDoesn't know any other node except apart from bootstrap node${
-            this.node.bootstrapServers.length == 1 ? '' : 's'
-          }!`
-        )
-      )
-      return [[''], line]
-    }
-
-    return [validPeerIds.map((peerId) => `send ${peerId}`), line]
   }
 
   async selectIntermediateNodes(rl: readline.Interface, destination: PeerId): Promise<PeerId[]> {
@@ -186,3 +194,37 @@ export default class SendMessage extends AbstractCommand {
     return selected
   }
 }
+
+export class SendMessage extends SendMessageBase {
+  async execute(query: string, settings: GlobalState): Promise<CommandResponse> {
+    if (query == null) {
+      return `Invalid arguments. Expected 'send <peerId> <message>'. Received '${query}'`
+    }
+
+    let peerIdString: (string | undefined) = query.trim().split(' ')[0]
+    let msg = query.trim().split(' ').slice(1).join(' ')
+    console.log("!!!", peerIdString, msg, query)
+
+    let peerId: PeerId
+    try {
+      peerId = await checkPeerIdInput(peerIdString)
+    } catch (err) {
+      return err.message
+    }
+
+    const message = settings.includeRecipient ?
+      (myAddress => `${myAddress}:${msg}`)(this.node.peerInfo.id.toB58String()) :
+      msg;
+
+
+    console.log(`Sending message to ${chalk.blue(query)} ...`)
+
+    try {
+      await this.node.sendMessage(encodeMessage(message), peerId)
+    } catch (err) {
+      console.log(chalk.red(err.message))
+    }
+  }
+
+}
+

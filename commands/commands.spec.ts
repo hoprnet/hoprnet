@@ -30,7 +30,6 @@ describe('Commands', () => {
     let mockNode: any = jest.fn()
     let cmds = new mod.Commands(mockNode)
 
-    console.log(await cmds.execute('settings'))
     let ir = await cmds.execute('settings includeRecipient')
     expect(ir).toMatch(/false/)
     await cmds.execute('includeRecipient true')
@@ -39,6 +38,16 @@ describe('Commands', () => {
     await cmds.execute('includeRecipient false')
     ir = await cmds.execute('settings includeRecipient')
     expect(ir).toMatch(/false/)
+  })
+
+  it('send message', async () => {
+    let mockNode: any = jest.fn()
+    let cmds = new mod.Commands(mockNode)
+
+    console.log(
+      await cmds.execute('send 16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7 Hello, world')
+    )
+
   })
 })
 

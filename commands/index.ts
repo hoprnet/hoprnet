@@ -11,15 +11,13 @@ import OpenChannel from './openChannel'
 import Ping from './ping'
 import PrintAddress from './printAddress'
 import PrintBalance from './printBalance'
-import SendMessage from './sendMessage'
+import { SendMessageFancy, SendMessage } from './sendMessage'
 import StopNode from './stopNode'
 import Version from './version'
 import Tickets from './tickets'
 import { IncludeRecipient, IncludeRecipientFancy } from './includeRecipient'
 import Settings from './settings'
 import readline from 'readline'
-
-export const SPLIT_OPERAND_QUERY_REGEX: RegExp = /([\w\-]+)(?:\s+)?([\w\s\-.]+)?/
 
 export class Commands {
   readonly commands: AbstractCommand[]
@@ -31,7 +29,6 @@ export class Commands {
       includeRecipient: false,
       aliases: new Map()
     }
-
 
     this.commands = [
       new CloseChannel(node),
@@ -49,11 +46,13 @@ export class Commands {
 
     if(rl) {
       this.commands.push(new OpenChannel(node, rl))
-      this.commands.push(new SendMessage(node, rl))
+      this.commands.push(new SendMessageFancy(node, rl))
       this.commands.push(new IncludeRecipientFancy(node, rl))
     } else {
+      this.commands.push(new SendMessage(node))
       this.commands.push(new IncludeRecipient())
     }
+
     this.commandMap = new Map()
     for (let command of this.commands) {
       if (this.commandMap.has(command.name())){
@@ -72,7 +71,9 @@ export class Commands {
   }
   
   public async execute(message: string): Promise<CommandResponse> {
-    const [command, query]: (string | undefined)[] = message.trim().split(SPLIT_OPERAND_QUERY_REGEX).slice(1)
+    const split: (string | undefined)[] = message.trim().split(/\s+/)
+    const command = split[0]
+    const query = split.slice(1).join(' ')
 
     if (command == null) {
       return undefined;
@@ -83,6 +84,7 @@ export class Commands {
     if (cmd){
       return await cmd.execute(query || '', this.state)
     }
+    console.log("NO COMMAND", cmd)
     // TODO!!
     return undefined
   }
@@ -93,7 +95,7 @@ export class Commands {
       return [this.allCommands(), message]
     }
 
-    const [command, query]: (string | undefined)[] = message.trim().split(SPLIT_OPERAND_QUERY_REGEX).slice(1)
+    const [command, query]: (string | undefined)[] = message.trim().split(/\s+/).slice(0)
     const cmd = await this.find(command)
     if (cmd) {
       return cmd.autocomplete(query, message)
