@@ -1,13 +1,17 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
-import type AbstractCommand from './abstractCommand'
+import { AbstractCommand } from './abstractCommand'
 
 import chalk from 'chalk'
 
 import { u8aToHex } from '@hoprnet/hopr-utils'
 
-export default class PrintAddress implements AbstractCommand {
-  constructor(public node: Hopr<HoprCoreConnector>) {}
+export default class PrintAddress extends AbstractCommand {
+  constructor(public node: Hopr<HoprCoreConnector>) {
+    super()
+  }
+  name() { return 'myAddress'}
+  help() { return 'shows the address of this node' }
 
   /**
    * Prints the name of the network we are using and the
@@ -24,9 +28,5 @@ export default class PrintAddress implements AbstractCommand {
         /* prettier-ignore */
         `${'HOPR:'.padEnd(prefixLength, ' ')}${chalk.green(this.node.peerInfo.id.toB58String())}`
     )
-  }
-
-  complete(line: string, cb: (err: Error | undefined, hits: [string[], string]) => void): void {
-    cb(undefined, [[''], line])
   }
 }

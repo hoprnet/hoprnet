@@ -4,11 +4,15 @@ import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { Types, Channel as ChannelInstance } from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import { u8aToHex, stringToU8a, moveDecimalPoint } from '@hoprnet/hopr-utils'
-import type AbstractCommand from './abstractCommand'
+import { AbstractCommand } from './abstractCommand'
+import type { AutoCompleteResult } from './abstractCommand'
 
-export default class Tickets implements AbstractCommand {
-  constructor(public node: Hopr<HoprCoreConnector>) {}
-
+export default class Tickets extends AbstractCommand {
+  constructor(public node: Hopr<HoprCoreConnector>) {
+    super()
+  }
+  name() { return 'tickets'}
+  help() { return 'lists tickets of a channel'}
   /**
    * @param query channelId string to send message to
    */
@@ -58,28 +62,26 @@ export default class Tickets implements AbstractCommand {
     )
   }
 
-  complete(line: string, cb: (err: Error | undefined, hits: [string[], string]) => void, query?: string) {
-    this.node.paymentChannels.channel.getAll(
-      async (channel: ChannelInstance) => u8aToHex(await channel.channelId),
-      async (channelIdsPromise: Promise<string>[]) => {
-        let channelIds: string[] = []
+  async autocomplete(query: string, line: string): Promise<AutoCompleteResult> {
+    let channelIds: string[] = []
 
-        try {
-          channelIds = await Promise.all(channelIdsPromise)
-        } catch (err) {
-          console.log(chalk.red(err.message))
-          return cb(undefined, [[''], line])
-        }
+    try {
+      channelIds = await this.node.paymentChannels.channel.getAll(
+        async (channel: ChannelInstance) => u8aToHex(await channel.channelId),
+        async (channelIdsPromise: Promise<string>[]) => (await Promise.all(channelIdsPromise))
+      )
+    } catch (err) {
+      console.log(chalk.red(err.message))
+      return [[''], line]
+    }
 
-        if (channelIds.length < 1) {
-          console.log(chalk.red(`\nNo open channels found.`))
-          return cb(undefined, [[''], line])
-        }
+    if (channelIds.length < 1) {
+      console.log(chalk.red(`\nNo open channels found.`))
+      return [[''], line]
+    }
 
-        const hits = query ? channelIds.filter((channelId: string) => channelId.startsWith(query)) : channelIds
+    const hits = query ? channelIds.filter((channelId: string) => channelId.startsWith(query)) : channelIds
 
-        return cb(undefined, [hits.length ? hits.map((str: string) => `tickets ${str}`) : ['tickets'], line])
-      }
-    )
+    return [hits.length ? hits.map((str: string) => `tickets ${str}`) : ['tickets'], line]
   }
 }

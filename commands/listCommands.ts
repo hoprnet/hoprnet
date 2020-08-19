@@ -1,32 +1,36 @@
-import { keywords } from '../utils/keywords'
-
 import chalk from 'chalk'
 
-import AbstractCommand from './abstractCommand'
+import { AbstractCommand } from './abstractCommand'
 
-export default class ListCommands implements AbstractCommand {
+export default class ListCommands extends AbstractCommand {
+  constructor(private getCommands: () => AbstractCommand[]){
+    super()
+  }
+
+  name(){
+    return 'help'
+  }
+
+  help(){
+    return 'shows this help page'
+  }
+
   execute() {
-    let maxLength = 0
-    for (let i = 0; i < keywords.length; i++) {
-      if (keywords[i][0].length > maxLength) {
-        maxLength = keywords[i][0].length
-      }
-    }
+    let names = this.getCommands().map(x => x.name())
+    let helps = this.getCommands().map(x => x.help())
+
+    let maxLength = Math.max(...names.map(x => x.length))
 
     let str = ''
-    for (let i = 0; i < keywords.length; i++) {
-      str += chalk.yellow(('  ' + keywords[i][0]).padEnd(maxLength + 6, ' '))
-      str += keywords[i][1]
+    for (let i = 0; i < names.length; i++) {
+      str += chalk.yellow(('  ' + names[i]).padEnd(maxLength + 6, ' '))
+      str += helps[i]
 
-      if (i < keywords.length - 1) {
+      if (i < names.length - 1) {
         str += '\n'
       }
     }
 
     console.log(str)
-  }
-
-  complete(line: string, cb: (err: Error | undefined, hits: [string[], string]) => void): void {
-    cb(undefined, [[''], line])
   }
 }

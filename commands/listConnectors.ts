@@ -1,9 +1,12 @@
-import AbstractCommand from './abstractCommand'
+import { AbstractCommand } from './abstractCommand'
 
 import chalk from 'chalk'
 import { knownConnectors } from '../utils/knownConnectors'
 
-export default class ListConnectors implements AbstractCommand {
+export default class ListConnectors extends AbstractCommand {
+
+  name() { return 'listConnectors' }
+  help() { return 'lists all installed blockchain connectors' }
   /**
    * Check which connectors are present right now.
    * @notice triggered by the CLI
@@ -36,9 +39,5 @@ export default class ListConnectors implements AbstractCommand {
         chalk.red(`Could not find any connectors. Please make sure there is one available in 'node_modules'!`)
       )
     }
-  }
-
-  complete(line: string, cb: (err: Error | undefined, hits: [string[], string]) => void): void {
-    cb(undefined, [[''], line])
   }
 }

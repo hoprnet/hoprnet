@@ -12,7 +12,6 @@ describe('Commands', () => {
     expect(mod.Commands).toBeDefined()
     let cmds = new mod.Commands(mockNode)
     expect(cmds).toBeTruthy()
-    expect(cmds.crawl).toBeTruthy()
   })
 
   it('ping', async () => {
@@ -22,7 +21,7 @@ describe('Commands', () => {
     let mockPeerId = '16Uiu2HAkyXRaL7fKu4qcjaKuo4WXizrpK63Ltd6kG2tH6oSV58AW'
 
     let cmds = new mod.Commands(mockNode)
-    await cmds.ping.execute(mockPeerId)
+    await cmds.execute(`ping  ${mockPeerId}`)
     expect(mockNode.ping).toHaveBeenCalled()
 
   })

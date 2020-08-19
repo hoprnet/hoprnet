@@ -18,7 +18,7 @@ import type { HoprOptions } from '@hoprnet/hopr-core'
 
 import clear from 'clear'
 
-import { parseOptions, keywords } from './utils'
+import { parseOptions } from './utils'
 import { clearString } from '@hoprnet/hopr-utils'
 import { Commands } from './commands'
 import dependencies from './utils/dependancies'
@@ -26,70 +26,26 @@ import { renderHoprLogo } from './logo'
 
 export * as commands from './commands'
 
-const SPLIT_OPERAND_QUERY_REGEX: RegExp = /([\w\-]+)(?:\s+)?([\w\s\-.]+)?/
-
 // Name our process 'hopr'
 process.title = 'hopr'
 
 let node: Hopr<HoprCoreConnector>
 
-/**
- * Completes a given input with possible endings. Used for convenience.
- *
- * @param line the current input
- * @param cb to returns the suggestions
- */
-function tabCompletion(commands: Commands) {
-  return async (line: string, cb: (err: Error | undefined, hits: [string[], string]) => void) => {
-    if (line == null || line == '') {
-      return cb(undefined, [keywords.map((entry) => entry[0]), line])
-    }
-
-    const [command, query]: (string | undefined)[] = line.trim().split(SPLIT_OPERAND_QUERY_REGEX).slice(1)
-
-    if (command == null || command === '') {
-      return cb(undefined, [keywords.map((entry) => entry[0]), line])
-    }
-
-    switch (command.trim()) {
-      case 'send':
-        await commands.sendMessage.complete(line, cb, query)
-        break
-      case 'open':
-        await commands.openChannel.complete(line, cb, query)
-        break
-      case 'close':
-        commands.closeChannel.complete(line, cb, query)
-        break
-      case 'ping': {
-        commands.ping.complete(line, cb, query)
-        break
-      }
-      case 'tickets': {
-        await commands.tickets.complete(line, cb, query)
-      }
-      default:
-        const hits = keywords.reduce((acc: string[], keyword: [string, string]) => {
-          if (keyword[0].startsWith(line)) {
-            acc.push(keyword[0])
-          }
-
-          return acc
-        }, [])
-
-        return cb(undefined, [hits.length ? hits : keywords.map((keyword) => keyword[0]), line])
-    }
-  }
-}
 
 async function runAsRegularNode() {
-  const commands = new Commands(node)
+  let commands: Commands;
 
   let rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
-    completer: tabCompletion(commands),
+    // See readline for explanation of this signature.
+    completer: async (line: string, cb: (err: Error | undefined, hits: [string[], string]) => void) => {
+      let results = await commands.autocomplete(line)
+      cb(undefined, results);
+    }
   })
+
+  commands = new Commands(node, rl)
 
   rl.on('SIGINT', async () => {
     const question = `Are you sure you want to exit? (${chalk.green('y')}, ${chalk.red('N')}): `
@@ -98,14 +54,14 @@ async function runAsRegularNode() {
 
     if (answer.match(/^y(es)?$/i)) {
       clearString(question, rl)
-      await commands.stopNode.execute()
+      await commands.execute('quit')
       return
     }
     rl.prompt()
   })
 
   rl.once('close', async () => {
-    await commands.stopNode.execute()
+    await commands.execute('quit')
     return
   })
 
@@ -116,62 +72,10 @@ async function runAsRegularNode() {
       rl.prompt()
       return
     }
-
-    const [command, query]: (string | undefined)[] = input.trim().split(SPLIT_OPERAND_QUERY_REGEX).slice(1)
-
-    if (command == null) {
-      rl.prompt()
-      return
+    let executed = await commands.execute(input)
+    if (!executed) {
+      console.log(chalk.red('Unknown command!'))
     }
-
-    switch (command.trim()) {
-      case 'balance':
-        await commands.printBalance.execute()
-        break
-      case 'close':
-        await commands.closeChannel.execute(query)
-        break
-      case 'crawl':
-        await commands.crawl.execute()
-        break
-      case 'help':
-        commands.listCommands.execute()
-        break
-      case 'quit':
-        await commands.stopNode.execute()
-        break
-      case 'openChannels':
-        await commands.listOpenChannels.execute()
-        break
-      case 'open':
-        await commands.openChannel.execute(rl, query)
-        break
-      case 'send':
-        await commands.sendMessage.execute(rl, query)
-        break
-      case 'includeRecipient':
-        await commands.includeRecipient.execute(rl)
-        break
-      case 'listConnectors':
-        await commands.listConnectors.execute()
-        break
-      case 'myAddress':
-        await commands.printAddress.execute()
-        break
-      case 'ping':
-        await commands.ping.execute(query)
-        break
-      case 'version':
-        await commands.version.execute()
-        break
-      case 'tickets':
-        await commands.tickets.execute(query)
-        break
-      default:
-        console.log(chalk.red('Unknown command!'))
-        break
-    }
-
     rl.prompt()
   })
 

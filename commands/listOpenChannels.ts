@@ -4,13 +4,18 @@ import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { Channel as ChannelInstance } from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 
-import AbstractCommand from './abstractCommand'
+import { AbstractCommand } from './abstractCommand'
 
 import { pubKeyToPeerId } from '@hoprnet/hopr-core/lib/utils'
 import { u8aToHex } from '@hoprnet/hopr-utils'
 
-export default class ListOpenChannels implements AbstractCommand {
-  constructor(public node: Hopr<HoprCoreConnector>) {}
+export default class ListOpenChannels extends AbstractCommand {
+  constructor(public node: Hopr<HoprCoreConnector>) {
+    super()
+  }
+
+  name() { return 'openChannels' }
+  help() { return 'lists all currently open channels' }
   /**
    * Lists all channels that we have with other nodes. Triggered from the CLI.
    */
@@ -48,9 +53,5 @@ export default class ListOpenChannels implements AbstractCommand {
       console.log(chalk.red(err.message))
       return
     }
-  }
-
-  complete(line: string, cb: (err: Error | undefined, hits: [string[], string]) => void): void {
-    cb(undefined, [[''], line])
   }
 }

@@ -1,6 +1,7 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
-import type AbstractCommand from './abstractCommand'
+import type { AutoCompleteResult } from './abstractCommand'
+import { AbstractCommand } from './abstractCommand'
 
 import chalk from 'chalk'
 
@@ -12,14 +13,19 @@ import { MAX_HOPS } from '@hoprnet/hopr-core/lib/constants'
 
 import readline from 'readline'
 
-export default class SendMessage implements AbstractCommand {
-  constructor(public node: Hopr<HoprCoreConnector>) {}
+export default class SendMessage extends AbstractCommand {
+  constructor(public node: Hopr<HoprCoreConnector>, public rl: readline.Interface) {
+    super()
+  }
+
+  name() { return 'send' }
+  help() { return 'sends a message to another party'}
 
   /**
    * Encapsulates the functionality that is executed once the user decides to send a message.
    * @param query peerId string to send message to
    */
-  async execute(rl: readline.Interface, query?: string): Promise<void> {
+  async execute( query?: string): Promise<void> {
     if (query == null) {
       console.log(chalk.red(`Invalid arguments. Expected 'send <peerId>'. Received '${query}'`))
       return
@@ -39,30 +45,30 @@ export default class SendMessage implements AbstractCommand {
             'y'
           )}, ${chalk.red('N')}): `
           const manualIntermediateNodesAnswer = await new Promise<string>((resolve) =>
-            rl.question(manualIntermediateNodesQuestion, resolve)
+            this.rl.question(manualIntermediateNodesQuestion, resolve)
           )
 
-          clearString(manualIntermediateNodesQuestion + manualIntermediateNodesAnswer, rl)
+          clearString(manualIntermediateNodesQuestion + manualIntermediateNodesAnswer, this.rl)
 
           return (manualIntermediateNodesAnswer.toLowerCase().match(/^y(es)?$/i) || '').length >= 1
         })()
       : true
 
     const messageQuestion = `${chalk.yellow(`Type your message and press ENTER to send:`)}\n`
-    const parsedMessage = await new Promise<string>((resolve) => rl.question(messageQuestion, resolve))
+    const parsedMessage = await new Promise<string>((resolve) => this.rl.question(messageQuestion, resolve))
 
     const message = settings.includeRecipient ?
       (myAddress => `${myAddress}:${parsedMessage}`)(this.node.peerInfo.id.toB58String()) :
       parsedMessage;
 
-    clearString(messageQuestion + message, rl)
+    clearString(messageQuestion + message, this.rl)
 
     console.log(`Sending message to ${chalk.blue(query)} ...`)
 
     try {
       if (manualPath) {
         await this.node.sendMessage(encodeMessage(message), peerId, async () => {
-          if (process.env.MULTIHOP) return this.selectIntermediateNodes(rl, peerId)
+          if (process.env.MULTIHOP) return this.selectIntermediateNodes(this.rl, peerId)
           return []
         })
       } else {
@@ -73,11 +79,7 @@ export default class SendMessage implements AbstractCommand {
     }
   }
 
-  async complete(
-    line: string,
-    cb: (err: Error | undefined, hits: [string[], string]) => void,
-    query?: string
-  ): Promise<void> {
+  async autocomplete(query: string, line: string): Promise<AutoCompleteResult> {
     const peerIds = getPeers(this.node, {
       noBootstrapNodes: true,
     }).map((peerId) => peerId.toB58String())
@@ -91,10 +93,10 @@ export default class SendMessage implements AbstractCommand {
           }!`
         )
       )
-      return cb(undefined, [[''], line])
+      return [[''], line]
     }
 
-    return cb(undefined, [validPeerIds.map((peerId) => `send ${peerId}`), line])
+    return [validPeerIds.map((peerId) => `send ${peerId}`), line]
   }
 
   async selectIntermediateNodes(rl: readline.Interface, destination: PeerId): Promise<PeerId[]> {
