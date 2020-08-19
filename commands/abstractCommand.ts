@@ -1,3 +1,4 @@
+import type PeerId from 'peer-id'
 
 export type AutoCompleteResult = [string[], string] 
 
@@ -5,7 +6,7 @@ export type CommandResponse = string | void
 
 export type GlobalState = {
   includeRecipient: boolean
-  aliases: Map<string, string>
+  aliases: Map<string, PeerId>
 }
 
 // REPL Command

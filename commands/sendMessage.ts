@@ -13,7 +13,6 @@ import { MAX_HOPS } from '@hoprnet/hopr-core/lib/constants'
 
 import readline from 'readline'
 
-
 abstract class SendMessageBase extends AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {
     super()
@@ -22,6 +21,12 @@ abstract class SendMessageBase extends AbstractCommand {
   name() { return 'send' }
   help() { return 'sends a message to another party'}
 
+  async _checkPeerId(id: string, settings: GlobalState): Promise<PeerId> {
+    if (settings.aliases.has(id)){
+      return settings.aliases.get(id)
+    }
+    return await checkPeerIdInput(id)
+  }
 
   async _sendMessage(settings: GlobalState, recipient: PeerId, msg: string): Promise<void>{
     const message = settings.includeRecipient ?
@@ -74,10 +79,9 @@ export class SendMessageFancy extends SendMessageBase {
 
     let peerId: PeerId
     try {
-      peerId = await checkPeerIdInput(query)
+      peerId = await this._checkPeerId(query, settings)
     } catch (err) {
       console.log(chalk.red(err.message))
-      return
     }
 
     const manualPath = process.env.MULTIHOP
@@ -219,7 +223,7 @@ export class SendMessage extends SendMessageBase {
 
     let peerId: PeerId
     try {
-      peerId = await checkPeerIdInput(peerIdString)
+      peerId = await this._checkPeerId(peerIdString, settings)
     } catch (err) {
       return err.message
     }

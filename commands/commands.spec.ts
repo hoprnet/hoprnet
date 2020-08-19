@@ -47,5 +47,22 @@ describe('Commands', () => {
     await cmds.execute('send 16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7 Hello, world')
     expect(mockNode.sendMessage).toHaveBeenCalled()
   })
+
+  it('alias addresses', async () => {
+    let mockNode: any = jest.fn()
+    mockNode.sendMessage = jest.fn()
+    let cmds = new mod.Commands(mockNode)
+
+    let aliases = await cmds.execute('settings alias')
+    expect(aliases).toEqual('')
+
+    await cmds.execute('alias 16Uiu2HAmQDFS8a4Bj5PGaTqQLME5SZTRNikz9nUPT3G4T6YL9o7V test')
+
+    aliases = await cmds.execute('settings alias')
+    expect(aliases).toMatch(/test/)
+    await cmds.execute('send test Hello, world')
+    expect(mockNode.sendMessage).toHaveBeenCalled()
+
+  })
 })
 

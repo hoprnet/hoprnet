@@ -21,8 +21,17 @@ export default class Settings extends AbstractCommand {
     let out = ''
 
     for (let key of Object.keys(filtered)){
+      if (filtered[key] instanceof Map && filtered[key].size == 0) {
+        continue
+      }
       out += key.padEnd(maxLength + 6)
-      out += filtered[key]
+
+      if (filtered[key] instanceof Map){
+        for (let k of filtered[key].keys())
+          out += `${k}=${filtered[key].get(k).toB58String()}, `
+      } else {
+        out += filtered[key]
+      }
       out += '\n'
     }
     return out

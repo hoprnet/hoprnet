@@ -18,6 +18,7 @@ import Tickets from './tickets'
 import { IncludeRecipient, IncludeRecipientFancy } from './includeRecipient'
 import Settings from './settings'
 import readline from 'readline'
+import { Alias } from './alias'
 
 export class Commands {
   readonly commands: AbstractCommand[]
@@ -42,6 +43,7 @@ export class Commands {
       new Version(),
       new Tickets(node),
       new Settings(),
+      new Alias(),
     ]
 
     if(rl) {
