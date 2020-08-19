@@ -19,7 +19,7 @@ import type { Handler } from '../../network/transport/types'
 import EventEmitter from 'events'
 
 import { PROTOCOL_ACKNOWLEDGEMENT } from '../../constants'
-import { u8aToHex, durations, u8aEquals } from '@hoprnet/hopr-utils'
+import { u8aToHex, durations } from '@hoprnet/hopr-utils'
 import { pubKeyToPeerId } from '../../utils'
 
 const ACKNOWLEDGEMENT_TIMEOUT = durations.seconds(2)

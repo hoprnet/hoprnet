@@ -97,6 +97,7 @@ class Stun {
     } else if (this.options.hosts.ip6 !== undefined) {
       return dgram.createSocket({ type: 'udp6', ipv6Only: true })
     }
+    throw Error(`Cannot create STUN socket due to invalid configuration.`)
   }
 
   async startServer(port = undefined) {

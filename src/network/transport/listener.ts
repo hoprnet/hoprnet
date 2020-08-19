@@ -134,7 +134,7 @@ export function createListener(
 
     // Because TCP will only return the IPv6 version
     // we need to capture from the passed multiaddr
-    if (listeningAddr.toString().startsWith('/ip4')) {
+    if (listeningAddr?.toString().startsWith('/ip4')) {
       if (externalIp != null) {
         if (externalIp.port == null) {
           console.log(`Attention: Bidirectional NAT detected. Publishing no public ip address to the DHT`)

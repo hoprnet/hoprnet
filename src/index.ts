@@ -254,11 +254,9 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
    */
   async sendMessage(
     msg: Uint8Array,
-    destination: PeerId | PeerInfo,
+    destination: PeerId,
     getIntermediateNodesManually?: () => Promise<PeerId[]>
   ): Promise<void> {
-    const destinationId = PeerInfo.isPeerInfo(destination) ? destination.id : destination
-
     const promises: Promise<void>[] = []
 
     for (let n = 0; n < msg.length / PACKET_SIZE; n++) {
@@ -268,10 +266,10 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
           if (getIntermediateNodesManually != undefined) {
             path = await getIntermediateNodesManually()
           } else {
-            path = await this.getIntermediateNodes(destinationId)
+            path = await this.getIntermediateNodes(destination)
           }
 
-          path.push(destinationId)
+          path.push(destination)
 
           let packet: Packet<Chain>
           try {

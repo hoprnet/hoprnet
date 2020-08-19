@@ -24,7 +24,7 @@ jobs:
         uses: actions/cache@v1
         with:
           path: node_modules
-          key: ${{ runner.OS }}-build-${{ hashFiles('package.json') }}
+          key: ${{ runner.OS }}-build-${{ hashFiles('**/yarn.lock') }}
       # Installing library requirements
       - name: Install node modules
         if: steps.cache-modules.outputs.cache-hit != 'true'

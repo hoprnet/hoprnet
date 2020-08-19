@@ -9,7 +9,7 @@ import type { AbstractInteraction } from '../abstractInteraction'
 import type { Handler } from '../../network/transport/types'
 
 import { PROTOCOL_PAYMENT_CHANNEL } from '../../constants'
-import PeerInfo from 'peer-info'
+import type PeerInfo from 'peer-info'
 import type PeerId from 'peer-id'
 
 class Opening<Chain extends HoprCoreConnector> implements AbstractInteraction<Chain> {
@@ -23,26 +23,25 @@ class Opening<Chain extends HoprCoreConnector> implements AbstractInteraction<Ch
     pipe(
       /** prettier-ignore */
       struct.stream,
-      this.node.paymentChannels.channel.handleOpeningRequest(this.node.paymentChannels),
+      this.node.paymentChannels.channel.handleOpeningRequest.bind(this.node.paymentChannels.channel),
       struct.stream
     )
   }
 
-  async interact(counterparty: PeerInfo | PeerId, channelBalance: Types.ChannelBalance): Promise<Types.SignedChannel> {
+  async interact(counterparty: PeerId, channelBalance: Types.ChannelBalance): Promise<Types.SignedChannel> {
     let struct: Handler
 
     try {
       struct = await this.node.dialProtocol(counterparty, this.protocols[0]).catch(async (_: Error) => {
         return this.node.peerRouting
-          .findPeer(PeerInfo.isPeerInfo(counterparty) ? counterparty.id : counterparty)
+          .findPeer(counterparty)
           .then((peerInfo: PeerInfo) => this.node.dialProtocol(peerInfo, this.protocols[0]))
       })
     } catch (err) {
       throw Error(
-        `Tried to open a payment channel but could not connect to ${(PeerInfo.isPeerInfo(counterparty)
-          ? counterparty.id
-          : counterparty
-        ).toB58String()}. Error was: ${err.message}`
+        `Tried to open a payment channel but could not connect to ${counterparty.toB58String()}. Error was: ${
+          err.message
+        }`
       )
     }
 

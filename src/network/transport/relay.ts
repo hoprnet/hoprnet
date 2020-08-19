@@ -28,7 +28,7 @@ type ConnectionContext = {
   deferredPromise: defer.DeferredPromise<AsyncIterable<Uint8Array>>
   sinkDefer: defer.DeferredPromise<void> | undefined
   aborted: boolean
-  cache: Uint8Array
+  cache: Uint8Array | undefined
   id: PeerId
   source: Stream['source']
 }
@@ -39,9 +39,9 @@ class Relay {
   private _handle: (protocols: string[] | string, handler: (connection: Handler) => void) => void
   private on: (event: 'peer:connect', handler: (peer: PeerInfo) => void) => void
 
-  private connHandler: (conn: Handler & { counterparty: PeerId }) => void
+  private connHandler: (conn: Handler & { counterparty: PeerId }) => void | undefined
 
-  constructor(libp2p: libp2p, _connHandler: (conn: Handler) => void) {
+  constructor(libp2p: libp2p, _connHandler?: (conn: Handler) => void) {
     this._dialer = libp2p.dialer
     this._registrar = libp2p.registrar
 
@@ -54,7 +54,7 @@ class Relay {
     this._handle(DELIVERY_REGISTER, this.handleRelayConnection.bind(this))
   }
 
-  async handleRelayConnection(conn: Handler): Promise<{ stream: Stream; counterparty: PeerId; conn: Connection }> {
+  async handleRelayConnection(conn: Handler): Promise<void> {
     let shaker = handshake(conn.stream)
 
     let sender: PeerId
@@ -169,7 +169,7 @@ class Relay {
 
     if (pubKeySender == null) {
       error(
-        `Received empty message from peer ${chalk.yellow(connection.remotePeer.toB58String())} during connection setup`
+        `Received empty message from peer ${chalk.yellow(connection?.remotePeer.toB58String())} during connection setup`
       )
       shaker.write(FAIL)
       shaker.rest()
@@ -181,7 +181,7 @@ class Relay {
     } catch (err) {
       error(
         `Peer ${chalk.yellow(
-          connection.remotePeer.toB58String()
+          connection?.remotePeer.toB58String()
         )} asked to establish relayed connection to invalid counterparty. Error was ${err}. Received message ${pubKeySender}`
       )
       shaker.write(FAIL)
@@ -190,7 +190,7 @@ class Relay {
     }
 
     // @TODO
-    if (connection.remotePeer != null && counterparty.isEqual(connection.remotePeer)) {
+    if (connection?.remotePeer != null && counterparty.isEqual(connection.remotePeer)) {
       shaker.write(FAIL)
       shaker.rest()
       return
@@ -248,7 +248,7 @@ class Relay {
           yield* source
         }
       })(),
-      id: connection.remotePeer,
+      id: connection?.remotePeer,
     }
 
     this.on('peer:connect', async (peer: PeerInfo) => {
@@ -261,7 +261,7 @@ class Relay {
           )
         )
         await this.updateConnection(counterpartyConn, initiatorConn, true)
-      } else if (peer.id.isEqual(connection.remotePeer)) {
+      } else if (peer.id.isEqual(connection?.remotePeer)) {
         log(
           chalk.yellow(
             `overwriting sender connection. sender: ${chalk.blue(

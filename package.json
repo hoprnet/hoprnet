@@ -12,14 +12,17 @@
   "types": "lib/index.d.ts",
   "files": [
     "lib/",
-    "README.md"
+    "!*.spec.ts",
+    "!*.spec.d.ts",
+    "!*.spec.js",
+    "!*.spec.js.map"
   ],
   "publishConfig": {
     "access": "public"
   },
   "engines": {
-    "node": ">=12.9.1",
-    "yarn": ">=1"
+    "node": "12",
+    "yarn": "1"
   },
   "homepage": "https://hoprnet.org",
   "repository": {
@@ -35,10 +38,9 @@
     "lint:fix": "prettier --write ."
   },
   "dependencies": {
-    "@hoprnet/hopr-core-connector-interface": "1.4.0",
-    "@hoprnet/hopr-core-ethereum": "0.0.12",
+    "@hoprnet/hopr-core-ethereum": "0.2.1",
     "@hoprnet/hopr-demo-seeds": "1.8.0",
-    "@hoprnet/hopr-utils": "0.3.0",
+    "@hoprnet/hopr-utils": "^0.4.0",
     "@nodeutils/defaults-deep": "~1.1.0",
     "abort-controller": "^3.0.0",
     "bl": "^4.0.2",
@@ -59,7 +61,7 @@
     "multiaddr": "^7.4.3",
     "multihashes": "~0.4.19",
     "p-defer": "^3.0.0",
-    "peer-id": "~0.13.13",
+    "peer-id": "~0.13",
     "peer-info": "~0.17.5",
     "read": "~1.0.7",
     "rlp": "~2.2.6",
@@ -69,8 +71,9 @@
     "wrtc": "0.4.6"
   },
   "devDependencies": {
-    "@hoprnet/hopr-ethereum": "0.4.2",
-    "@hoprnet/hopr-testing": "0.2.0",
+    "@hoprnet/hopr-core-connector-interface": "1.5.5",
+    "@hoprnet/hopr-ethereum": "^1.0.0",
+    "@hoprnet/hopr-testing": "0.2",
     "@types/bl": "^2.1.0",
     "@types/debug": "^4.1.5",
     "@types/jest": "^26.0.7",

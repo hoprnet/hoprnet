@@ -349,7 +349,7 @@ class TCP {
   async dialDirectly(ma: Multiaddr, options?: DialOptions): Promise<Connection> {
     log(`[${chalk.blue(this._peerInfo.id.toB58String())}] dailing ${chalk.yellow(ma.toString())} directly`)
     const socket = await this._connect(ma, options)
-    const maConn = socketToConn(socket, { remoteAddr: ma, signal: options.signal })
+    const maConn = socketToConn(socket, { remoteAddr: ma, signal: options?.signal })
 
     log('new outbound connection %s', maConn.remoteAddr)
     const conn = await this._upgrader.upgradeOutbound(maConn)

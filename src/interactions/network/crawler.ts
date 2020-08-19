@@ -14,7 +14,6 @@ import type { AbstractInteraction } from '../abstractInteraction'
 import { PROTOCOL_CRAWLING } from '../../constants'
 import type PeerInfo from 'peer-info'
 import PeerId from 'peer-id'
-import AbortController from 'abort-controller'
 
 import { CrawlResponse, CrawlStatus } from '../../messages'
 

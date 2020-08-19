@@ -52,7 +52,7 @@ export function socketToConn(
   const maConn: MultiaddrConnection = {
     async sink(source) {
       if (options.signal) {
-        source = abortable(source, options.signal)
+        source = abortable(source, options?.signal)
       }
 
       try {

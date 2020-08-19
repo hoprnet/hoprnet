@@ -4,21 +4,10 @@ import chalk from 'chalk'
 import PeerId from 'peer-id'
 const RELAY_FEE = 10
 
-function fromWei(arg: any, unit: any) {
-  return arg.toString()
-}
-
 import { pubKeyToPeerId } from '../../utils'
 import { u8aConcat, u8aEquals } from '@hoprnet/hopr-utils'
 
-import {
-  Header,
-  deriveTicketKey,
-  deriveTicketKeyBlinding,
-  deriveTagParameters,
-  deriveTicketLastKey,
-  deriveTicketLastKeyBlinding,
-} from './header'
+import { Header, deriveTicketKey, deriveTicketKeyBlinding, deriveTagParameters, deriveTicketLastKey } from './header'
 import { Challenge } from './challenge'
 import { PacketTag } from '../../dbKeys'
 import Message from './message'
@@ -225,7 +214,15 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
         (_channelBalance: Types.ChannelBalance) => node.interactions.payments.open.interact(path[0], channelBalance)
       )
 
-      packet._ticket = await channel.ticket.create(fee, ticketChallenge, {
+      const newFee = {
+        toU8a() {
+          return fee.toBuffer('be', 32)
+        },
+      }
+
+      // log(Object.getOwnPropertyNames(newFee))
+      // @ts-ignore
+      packet._ticket = await channel.ticket.create(newFee, ticketChallenge, {
         bytes: packet.buffer,
         offset: packet.ticketOffset,
       })
@@ -241,36 +238,6 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     }
 
     return packet
-  }
-
-  /**
-   * Tries to get a previous transaction from the database. If there's no such one,
-   * listen to the channel opening event for some time and throw an error if the
-   * was not opened within `OPENING_TIMEOUT` ms.
-   *
-   * @param channelId ID of the channel
-   */
-  async getPreviousTransaction(channelId: Uint8Array, state) {
-    // const recordState = node.paymentChannels.TransactionRecordState
-    // switch (state.state) {
-    //   case recordState.OPENING:
-    //     state = await new Promise((resolve, reject) =>
-    //       setTimeout(
-    //         (() => {
-    //           const eventListener = node.paymentChannels.onceOpened(channelId, resolve)
-    //           return () => {
-    //             eventListener.removeListener(resolve)
-    //             reject(Error(`Sender didn't send payment channel opening request for channel ${chalk.yellow(channelId.toString())} in time.`))
-    //           }
-    //         })(),
-    //         OPENING_TIMEOUT
-    //       )
-    //     )
-    //   case recordState.OPEN:
-    //     return state.lastTransaction
-    //   default:
-    //     throw Error(`Invalid state of payment channel ${chalk.yellow(channelId.toString())}. Got '${state.state}'`)
-    // }
   }
 
   /**
@@ -374,26 +341,9 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       Buffer.from(await this.ticket)
     )
 
-    // const challenges = [secp256k1.publicKeyCreate(Buffer.from(deriveTicketKey(this.header.derivedSecret))), this.header.hashedKeyHalf]
-    // let previousChallenges = await (await node.paymentChannels.channel.create(node.paymentChannels, await node.paymentChannels.utils.pubKeyToAccountId(target.pubKey.marshal()))).getPreviousChallenges()
-
-    // if (previousChallenges != null) {
-    //   challenges.push(previousChallenges)
-    // }
-
-    // if (state.channelKey) {
-    //   challenges.push(secp256k1.publicKeyCreate(state.channelKey))
-    // }
-
-    // if (!this.ticket.curvePoint.equals(secp256k1.publicKeyCombine(challenges.map((challenge: Uint8Array) => Buffer.from(challenge))))) {
-    //   throw Error('General error.')
-    // }
-
     const receivedMoney = (await this.ticket).ticket.getEmbeddedFunds()
 
     const forwardedFunds = receivedMoney.isub(new BN(RELAY_FEE, 10))
-
-    console.log(`receivedMoney`, forwardedFunds.toNumber())
 
     if (forwardedFunds.gtn(0)) {
       const channelBalance = this.node.paymentChannels.types.ChannelBalance.create(undefined, {
@@ -408,10 +358,20 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
         (_channelBalance: Types.ChannelBalance) => this.node.interactions.payments.open.interact(target, channelBalance)
       )
 
-      this._ticket = await channel.ticket.create(forwardedFunds, this.header.encryptionKey, {
-        bytes: this.buffer,
-        offset: this.ticketOffset,
-      })
+      const newFee = {
+        toU8a() {
+          return forwardedFunds.toBuffer('be', 32)
+        },
+      }
+      this._ticket = await channel.ticket.create(
+        // @ts-ignore
+        newFee,
+        this.header.encryptionKey,
+        {
+          bytes: this.buffer,
+          offset: this.ticketOffset,
+        }
+      )
     } else if (forwardedFunds.isZero()) {
       this._ticket = await this.node.paymentChannels.channel.createDummyChannelTicket(
         await this.node.paymentChannels.utils.pubKeyToAccountId(target.pubKey.marshal()),
@@ -426,14 +386,10 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     }
 
     this.node.log(
-      `Received ${chalk.magenta(`${fromWei(receivedMoney, 'ether').toString()} ETH`)} on channel ${chalk.yellow(
-        channelId.toString()
-      )}.`
+      `Received ${chalk.magenta(
+        `${this.node.paymentChannels.utils.convertUnit(receivedMoney, 'wei', 'ether').toString()} ETH`
+      )} on channel ${chalk.yellow(channelId.toString())}.`
     )
-
-    // if (receivedMoney.lt(RELAY_FEE)) {
-    //   throw Error('Bad transaction.')
-    // }
 
     this.header.transformForNextNode()
 
