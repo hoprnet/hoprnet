@@ -81,14 +81,13 @@ export class Commands {
       return undefined;
     }
 
-    let cmd = this.find(command)
-    
+    let cmd = this.find(command) 
+
     if (cmd){
       return await cmd.execute(query || '', this.state)
     }
-    console.log("NO COMMAND", cmd)
-    // TODO!!
-    return undefined
+
+    return 'Unknown command!'
   }
 
   public async autocomplete(message: string): Promise<AutoCompleteResult> {
