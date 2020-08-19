@@ -42,12 +42,10 @@ describe('Commands', () => {
 
   it('send message', async () => {
     let mockNode: any = jest.fn()
+    mockNode.sendMessage = jest.fn()
     let cmds = new mod.Commands(mockNode)
-
-    console.log(
-      await cmds.execute('send 16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7 Hello, world')
-    )
-
+    await cmds.execute('send 16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7 Hello, world')
+    expect(mockNode.sendMessage).toHaveBeenCalled()
   })
 })
 

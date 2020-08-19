@@ -22,6 +22,19 @@ abstract class SendMessageBase extends AbstractCommand {
   name() { return 'send' }
   help() { return 'sends a message to another party'}
 
+
+  async _sendMessage(settings: GlobalState, recipient: PeerId, msg: string): Promise<void>{
+    const message = settings.includeRecipient ?
+      (myAddress => `${myAddress}:${msg}`)(this.node.peerInfo.id.toB58String()) :
+      msg;
+
+    try {
+      return await this.node.sendMessage(encodeMessage(message), recipient)
+    } catch (err) {
+      console.log(chalk.red(err.message))
+    }
+  }
+
   async autocomplete(query: string, line: string): Promise<AutoCompleteResult> {
     const peerIds = getPeers(this.node, {
       noBootstrapNodes: true,
@@ -203,7 +216,6 @@ export class SendMessage extends SendMessageBase {
 
     let peerIdString: (string | undefined) = query.trim().split(' ')[0]
     let msg = query.trim().split(' ').slice(1).join(' ')
-    console.log("!!!", peerIdString, msg, query)
 
     let peerId: PeerId
     try {
@@ -211,19 +223,7 @@ export class SendMessage extends SendMessageBase {
     } catch (err) {
       return err.message
     }
-
-    const message = settings.includeRecipient ?
-      (myAddress => `${myAddress}:${msg}`)(this.node.peerInfo.id.toB58String()) :
-      msg;
-
-
-    console.log(`Sending message to ${chalk.blue(query)} ...`)
-
-    try {
-      await this.node.sendMessage(encodeMessage(message), peerId)
-    } catch (err) {
-      console.log(chalk.red(err.message))
-    }
+    this._sendMessage(settings, peerId, msg)
   }
 
 }
