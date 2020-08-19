@@ -72,8 +72,13 @@ async function runAsRegularNode() {
       rl.prompt()
       return
     }
-    let executed = await commands.execute(input)
-    if (!executed) {
+
+    try {
+      let result = await commands.execute(input)
+      if (result) {
+        console.log(result)
+      }
+    } catch (e) {
       console.log(chalk.red('Unknown command!'))
     }
     rl.prompt()

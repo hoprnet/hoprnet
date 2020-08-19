@@ -1,7 +1,7 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import type { AutoCompleteResult } from './abstractCommand'
-import { AbstractCommand, GlobalState } from './abstractCommand'
+import { AbstractCommand, GlobalState, CommandResponse } from './abstractCommand'
 import CloseChannel from './closeChannel'
 import Crawl from './crawl'
 import ListCommands from './listCommands'
@@ -15,7 +15,8 @@ import SendMessage from './sendMessage'
 import StopNode from './stopNode'
 import Version from './version'
 import Tickets from './tickets'
-import IncludeRecipient from './includeRecipient'
+import { IncludeRecipient, IncludeRecipientFancy } from './includeRecipient'
+import Settings from './settings'
 import readline from 'readline'
 
 export const SPLIT_OPERAND_QUERY_REGEX: RegExp = /([\w\-]+)(?:\s+)?([\w\s\-.]+)?/
@@ -43,12 +44,15 @@ export class Commands {
       new StopNode(node),
       new Version(),
       new Tickets(node),
+      new Settings(),
     ]
 
     if(rl) {
       this.commands.push(new OpenChannel(node, rl))
       this.commands.push(new SendMessage(node, rl))
-      this.commands.push(new IncludeRecipient(node, rl))
+      this.commands.push(new IncludeRecipientFancy(node, rl))
+    } else {
+      this.commands.push(new IncludeRecipient())
     }
     this.commandMap = new Map()
     for (let command of this.commands) {
@@ -67,20 +71,20 @@ export class Commands {
     return this.commandMap.get(command.trim())
   }
   
-  public async execute(message: string): Promise<boolean> {
+  public async execute(message: string): Promise<CommandResponse> {
     const [command, query]: (string | undefined)[] = message.trim().split(SPLIT_OPERAND_QUERY_REGEX).slice(1)
 
     if (command == null) {
-      return true;
+      return undefined;
     }
 
     let cmd = this.find(command)
     
     if (cmd){
-      await cmd.execute(query, this.state)
-      return true
+      return await cmd.execute(query || '', this.state)
     }
-    return false
+    // TODO!!
+    return undefined
   }
 
   public async autocomplete(message: string): Promise<AutoCompleteResult> {

@@ -23,8 +23,22 @@ describe('Commands', () => {
     let cmds = new mod.Commands(mockNode)
     await cmds.execute(`ping  ${mockPeerId}`)
     expect(mockNode.ping).toHaveBeenCalled()
-
   })
 
+
+  it('commands can save state', async () => {
+    let mockNode: any = jest.fn()
+    let cmds = new mod.Commands(mockNode)
+
+    console.log(await cmds.execute('settings'))
+    let ir = await cmds.execute('settings includeRecipient')
+    expect(ir).toMatch(/false/)
+    await cmds.execute('includeRecipient true')
+    ir = await cmds.execute('settings includeRecipient')
+    expect(ir).toMatch(/true/)
+    await cmds.execute('includeRecipient false')
+    ir = await cmds.execute('settings includeRecipient')
+    expect(ir).toMatch(/false/)
+  })
 })
 
