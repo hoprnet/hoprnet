@@ -102,5 +102,22 @@ describe('Commands', () => {
     let cmds = new mod.Commands(mockNode)
     expect(await cmds.execute('listConnectors')).toMatch(/ethereum/)
   })
+
+  it('myAddress', async() => {
+    let mockNode: any = jest.fn()
+    mockNode.paymentChannels = jest.fn()
+    mockNode.paymentChannels.constants = jest.fn()
+    mockNode.paymentChannels.utils = jest.fn()
+    mockNode.paymentChannels.utils.pubKeyToAccountId = jest.fn(() => "")
+    mockNode.paymentChannels.constants.CHAIN_NAME = "2CHAINZ"
+    mockNode.peerInfo = jest.fn()
+    mockNode.peerInfo.id = jest.fn()
+    mockNode.peerInfo.id.toB58String= jest.fn()
+    mockNode.peerInfo.id.pubKey = jest.fn()
+    mockNode.peerInfo.id.pubKey.marshal = jest.fn()
+
+    let cmds = new mod.Commands(mockNode)
+    expect(await cmds.execute('myAddress')).toMatch(/HOPR/)
+  })
 })
 

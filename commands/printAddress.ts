@@ -18,15 +18,13 @@ export default class PrintAddress extends AbstractCommand {
    * identity that we have on that chain.
    * @notice triggered by the CLI
    */
-  async execute(): Promise<void> {
+  async execute(): Promise<string> {
     const prefixLength = Math.max(this.node.paymentChannels.constants.CHAIN_NAME.length, 'HOPR'.length) + 3
 
-    console.log(
-      `${(this.node.paymentChannels.constants.CHAIN_NAME + ':').padEnd(prefixLength, ' ')}${chalk.green(
+    return `${(this.node.paymentChannels.constants.CHAIN_NAME + ':').padEnd(prefixLength, ' ')}${chalk.green(
         u8aToHex(await this.node.paymentChannels.utils.pubKeyToAccountId(this.node.peerInfo.id.pubKey.marshal()))
       )}\n` +
         /* prettier-ignore */
         `${'HOPR:'.padEnd(prefixLength, ' ')}${chalk.green(this.node.peerInfo.id.toB58String())}`
-    )
   }
 }
