@@ -20,3 +20,7 @@ export function setNode(node: Hopr<HoprCoreConnector>) {
 export function getNode(): Hopr<HoprCoreConnector> | undefined {
   return NODE
 }
+
+export function resetNodeForTests(){
+  NODE = undefined
+}

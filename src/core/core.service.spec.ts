@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config'
 import { CoreService } from './core.service'
 import { ParserService } from './parser/parser.service'
 import { setNode } from '../main' 
+import { resetNodeForTests } from './hoprnode'
 
 describe('CoreService', () => {
   let service: CoreService
@@ -38,5 +39,6 @@ describe('We should be able to inject our own HOPR node into this nest stuff',  
     service.stop()
 
     expect(mockNode.stop).toHaveBeenCalled()
+    resetNodeForTests()
   })
 })
