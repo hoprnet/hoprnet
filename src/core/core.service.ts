@@ -14,6 +14,7 @@ import * as rlp from 'rlp'
 import { ParserService } from './parser/parser.service'
 import { mustBeStarted, getMyOpenChannels } from './core.utils'
 import { pubKeyToPeerId } from '@hoprnet/hopr-core/lib/utils' // @TODO: expose unofficial API
+import { getNode, setNode } from './hoprnode'
 
 export type StartOptions = {
   debug?: boolean
@@ -53,53 +54,60 @@ export class CoreService {
   async start(): Promise<void> {
     if (this.started) return
 
-    const envOptions = dotenvParseVariables({
-      debug: this.configService.get('DEBUG'),
-      id: this.configService.get('ID'),
-      bootstrapNode: this.configService.get('BOOTSTRAP_NODE'),
-      host: this.configService.get('CORE_HOST'),
-      bootstrapServers: this.configService.get('BOOTSTRAP_SERVERS'),
-      provider: this.configService.get('PROVIDER'),
-    }) as StartOptions
+    if (getNode()) {
+      // node exists
+      this.node = getNode()
+    } else {
+        const envOptions = dotenvParseVariables({
+          debug: this.configService.get('DEBUG'),
+          id: this.configService.get('ID'),
+          bootstrapNode: this.configService.get('BOOTSTRAP_NODE'),
+          host: this.configService.get('CORE_HOST'),
+          bootstrapServers: this.configService.get('BOOTSTRAP_SERVERS'),
+          provider: this.configService.get('PROVIDER'),
+        }) as StartOptions
 
-    // if only one server is provided, parser will parse it into a string
-    if (typeof envOptions.bootstrapServers === 'string') {
-      envOptions.bootstrapServers = [envOptions.bootstrapServers]
-    }
+        // if only one server is provided, parser will parse it into a string
+        if (typeof envOptions.bootstrapServers === 'string') {
+          envOptions.bootstrapServers = [envOptions.bootstrapServers]
+        }
 
-    const options = {
-      id: envOptions.id,
-      debug: envOptions.debug ?? false,
-      bootstrapNode: envOptions.bootstrapNode ?? false,
-      network: 'ethereum',
-      // using testnet bootstrap servers
-      bootstrapServers: envOptions.bootstrapServers ?? [
-        '/ip4/34.65.82.167/tcp/9091/p2p/16Uiu2HAm6VH37RG1R4P8hGV1Px7MneMtNc6PNPewNxCsj1HsDLXW',
-        '/ip4/34.65.111.179/tcp/9091/p2p/16Uiu2HAmPyq9Gw93VWdS3pgmyAWg2UNnrgZoYKPDUMbKDsWhzuvb',
-      ],
-      provider: envOptions.provider ?? 'wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36',
-      host: envOptions.host ?? '0.0.0.0:9091',
-      password: 'switzerland',
-    }
+        const options = {
+          id: envOptions.id,
+          debug: envOptions.debug ?? false,
+          bootstrapNode: envOptions.bootstrapNode ?? false,
+          network: 'ethereum',
+          // using testnet bootstrap servers
+          bootstrapServers: envOptions.bootstrapServers ?? [
+            '/ip4/34.65.82.167/tcp/9091/p2p/16Uiu2HAm6VH37RG1R4P8hGV1Px7MneMtNc6PNPewNxCsj1HsDLXW',
+            '/ip4/34.65.111.179/tcp/9091/p2p/16Uiu2HAmPyq9Gw93VWdS3pgmyAWg2UNnrgZoYKPDUMbKDsWhzuvb',
+          ],
+          provider: envOptions.provider ?? 'wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36',
+          host: envOptions.host ?? '0.0.0.0:9091',
+          password: 'switzerland',
+        }
 
-    console.log(':: HOPR Options ::', options)
-    console.log(':: Starting HOPR Core Node ::')
-    this.node = await Hopr.create({
-      id: options.id,
-      debug: options.debug,
-      bootstrapNode: options.bootstrapNode,
-      network: options.network,
-      bootstrapServers: await Promise.all<PeerInfo>(
-        options.bootstrapServers.map((multiaddr) => this.parserService.parseBootstrap(multiaddr) as Promise<PeerInfo>),
-      ),
-      provider: options.provider,
-      hosts: (await this.parserService.parseHost(options.host)) as HoprOptions['hosts'],
-      password: options.password,
-      // @TODO: deprecate this, refactor hopr-core to not expect an output function
-      output: this.parserService.outputFunctor(this.events),
-    })
-    console.log(':: HOPR Core Node Started ::')
-  }
+        console.log(':: HOPR Options ::', options)
+        console.log(':: Starting HOPR Core Node ::')
+        setNode(await Hopr.create({
+          id: options.id,
+          debug: options.debug,
+          bootstrapNode: options.bootstrapNode,
+          network: options.network,
+          bootstrapServers: await Promise.all<PeerInfo>(
+            options.bootstrapServers.map((multiaddr) => this.parserService.parseBootstrap(multiaddr) as Promise<PeerInfo>),
+          ),
+          provider: options.provider,
+          hosts: (await this.parserService.parseHost(options.host)) as HoprOptions['hosts'],
+          password: options.password,
+          // @TODO: deprecate this, refactor hopr-core to not expect an output function
+          output: this.parserService.outputFunctor(this.events),
+        }))
+        this.node = getNode()
+        console.log(':: HOPR Core Node Started ::')
+      }
+    } 
+
 
   // @TODO: handle if already stopping
   async stop(): Promise<{ timestamp: number }> {

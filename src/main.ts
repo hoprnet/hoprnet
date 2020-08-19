@@ -4,7 +4,9 @@ import { Transport, MicroserviceOptions } from '@nestjs/microservices'
 import { AppModule } from './app.module'
 import { HOPR_PROTOS_FOLDER_DIR, PROTO_PACKAGES, PROTO_FILES } from './constants'
 
-async function bootstrap() {
+export { setNode } from './core/hoprnode'
+
+export async function startServer() {
   process.on('unhandledRejection', (error: Error) => {
     console.error(error)
     // process.exit(1)
@@ -40,6 +42,6 @@ async function bootstrap() {
 
 // If module is run as main (ie. from command line)
 if (typeof module !== 'undefined' && !module.parent) {
-  bootstrap()
+  startServer()
 }
 
