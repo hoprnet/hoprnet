@@ -1,63 +1,118 @@
-import { getMessageStream, sendMessage } from '../utils'
+import { sendMessage, getRandomItemFromList } from '../utils'
+import { IMessage } from '../message'
 import { ListenResponse } from '@hoprnet/hopr-protos/node/listen_pb'
-import { Message } from '../message'
+import { TweetMessage } from '../twitter'
+import { Bot } from '../bot'
+import { payDai } from '../linkdrop'
+import response from './response.json'
 
 
-const directory = {}
+enum NodeStates {
+  IsHinted,
+  RequiresProof,
+  InGuestList,
+}
 
-const messages = [
-  'Oh, you here for the DAI party?',
-  'I see. I don’t see you in the guest list. Only people on the guest list get past me. Get out of here.',
-  'I don’t know what to tell you. If you ain’t on the list, you ain’t coming in',
-  'This party’s for social media influencers only. Scram',
-  'I don’t know what to tell you. I’m sure if you hang around long enough, someone will help you out'
-] 
+export class Bouncebot implements Bot{
+  botName: string
+  address: string
+  status: Map<string, NodeStates>
 
-export default async (hoprAddress) => {
-  const botName = '🥊 Bouncerbot (v2)'
-  console.log(`${botName} has been added`);
+  constructor(address: string) {
+    this.address = address
+    this.botName = '🥊 Bouncerbot'
+    this.status = new Map<string, NodeStates>()
+    console.log(`${this.botName} has been added`)
+  }
 
-  const { client, stream } = await getMessageStream()
-
-  stream
-    .on('data', (data) => {
+  async handleMessage(message: IMessage) {
+    console.log(`${this.botName} <- ${message.from}: ${message.text}`)
+    if (this.status.get(message.from) == NodeStates.RequiresProof) {
       try {
-        const [messageBuffer] = data.array
-        const res = new ListenResponse()
-        res.setPayload(messageBuffer)
-
-        const message = new Message(res.getPayload_asU8()).toJson()
-        console.log(`${botName} <- ${message.from}: ${message.text}`)
-
-        let response;
-        /*
-        * We check whether the message has the word “party” in it. If it
-        * does then we respond with some of the predefined messages. After the
-        * first “party” message then we can skip the check by ensuring we
-        * have stored a message from a person at least once.
-        */
-        if (message.text.match(/party?$/i) || directory[message.from]) {
-          // Bounce bot gets messages and stores how many times has been reached.
-          directory[message.from] = (directory[message.from] || 0) + 1
-          response = directory[message.from] > messages.length ?
-            'Stop messaging me until you get into the guest list. Maybe wait in line?' :
-            messages[directory[message.from] - 1]
-        } else {
-          response = 'What do you want? I don’t understand...'
-        }
-
+        await this.handleRequiresProof(message)
+      } catch(err) {
+        console.error(`Error while checking proof: ${err}`)
         sendMessage(message.from, {
-          from: hoprAddress,
-          text: ` ${response}`,
-        })
-      } catch (err) {
-        console.error(err)
+          from: this.address,
+          text: ` That doesn’t look like a tweet, err, proof! Try again with a valid one.`,
+        }) 
       }
+    }
+    else if (message.text.toLowerCase() === 'party') {
+      if (this.status.has(message.from)) { 
+        switch (this.status.get(message.from)) {
+           case NodeStates.IsHinted:
+             this.handleIsHinted(message)
+             break
+           case NodeStates.InGuestList:
+             this.handleGuest(message)
+             break
+         } 
+      } else this.handleNew(message)
+    } else {
+      sendMessage(message.from, {
+        from: this.address,
+        text: ` ${this.botName} isn’t amused...`,
+      })
+    }
+  }
+
+  async handleRequiresProof(message) {
+    const tweet = new TweetMessage(message.text)
+    await tweet.fetch()
+    // check if the the tweet is valid
+    if (tweet.hasTag('hoprgames') && tweet.hasMention('hoprnet') && tweet.hasSameHOPRNode(message.from)) {
+      sendMessage(message.from, {
+        from: this.address,
+        text: getRandomItemFromList(response['tweetSuccess']),
+      })
+      this.status.set(message.from, NodeStates.InGuestList)
+      setTimeout(this.welcomeUser.bind(this), 2000, message)
+    } else {
+      sendMessage(message.from, {
+        from: this.address,
+        text: getRandomItemFromList(response['tweetFailure']),
+      })
+    }
+  }
+
+  handleIsHinted(message) {
+    sendMessage(message.from, {
+      from: this.address,
+      text: getRandomItemFromList(response['isHinted']),
     })
-    .on('error', (err) => {
-      console.error(err)
+    this.status.set(message.from, NodeStates.RequiresProof)
+  }
+
+  handleGuest(message) {
+    sendMessage(message.from, {
+      from: this.address,
+      text: getRandomItemFromList(response['isGuest']),
+    })  
+  }
+
+  handleNew(message) {
+    sendMessage(message.from, {
+      from: this.address,
+      text: getRandomItemFromList(response['isNewUser']),
     })
-    .on('end', () => {
-      client.close()
+    setTimeout(this.hintUser.bind(this), 10000, message)
+  }
+
+  async welcomeUser(message) {
+    const payUrl = await payDai()
+    console.log(`Payment link generated: ${payUrl}`)
+    sendMessage(message.from, {
+      from: this.address,
+      text: response['guestWelcome'] + payUrl
     })
+  }
+
+  hintUser(message) {
+    sendMessage(message.from, {
+        from: this.address,
+        text: response['hint'],
+      })
+    this.status.set(message.from, NodeStates.IsHinted)
+  }
 }

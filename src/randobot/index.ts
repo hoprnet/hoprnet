@@ -1,37 +1,24 @@
-import { getMessageStream, sendMessage } from '../utils'
-import { ListenResponse } from '@hoprnet/hopr-protos/node/listen_pb'
-import { Message } from '../message'
+import { sendMessage } from '../utils'
+import { Bot } from '../bot'
+import { IMessage } from '../message'
 import { generateRandomSentence } from '../utils'
 
 
-export default async (hoprAddress) => {
-  const botName = '🃏 Randobot'
-  console.log(`${botName} has been added`);
+export class Randombot implements Bot {
+  botName: string
+  address: string
 
-  const { client, stream } = await getMessageStream()
+  constructor(address: string) {
+    this.address = address
+    this.botName = '🃏 Randobot'
+    console.log(`${this.botName} has been added`)
+  }
 
-  stream
-    .on('data', (data) => {
-      try {
-        const [messageBuffer] = data.array
-        const res = new ListenResponse()
-        res.setPayload(messageBuffer)
-
-        const message = new Message(res.getPayload_asU8()).toJson()
-        console.log(`${botName} <- ${message.from}: ${message.text}`)
-
-        sendMessage(message.from, {
-          from: hoprAddress,
-          text: ` ${botName} says ${generateRandomSentence()}`,
-        })
-      } catch (err) {
-        console.error(err)
-      }
+  handleMessage(message: IMessage) {
+    console.log(`${this.botName} <- ${message.from}: ${message.text}`)
+    sendMessage(message.from, {
+      from: this.address,
+      text: ` ${this.botName} says ${generateRandomSentence()}`,
     })
-    .on('error', (err) => {
-      console.error(err)
-    })
-    .on('end', () => {
-      client.close()
-    })
+  }
 }

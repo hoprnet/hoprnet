@@ -35,6 +35,11 @@ Right now, we have a `Dockerfile` that bundles bot a `hopr-server` and a `hopr-c
 
 ## Additional information
 
+### LinkDrop Setup
+* To setup LinkDrop, you have to manually create a campaign at [linkdrop](https://dashboard.linkdrop.io/). Choose the same account and erc20 token address that you provide in the .env file. Make sure it is a campaign id is 1 to perform one to one transactions multiple times. You can choose any other campaign id but then the payment channel would be generated only for the number of links decided on the time of campaign creation.
+
+* Copy the .env.example to .env and add the required variables.
+
 ### Payload format
 
 In order for the bot to know to which address it should send a reply back to, we need to include the sender's address in the payload.

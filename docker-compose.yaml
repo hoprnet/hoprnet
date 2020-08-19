@@ -8,7 +8,7 @@ services:
       - '50051:50051'
       - '9091:9091'
     environment:
-      - BOOTSTRAP_SERVERS=/ip4/34.65.82.167/tcp/9091/p2p/16Uiu2HAm6VH37RG1R4P8hGV1Px7MneMtNc6PNPewNxCsj1HsDLXW,/ip4/34.65.111.179/tcp/9091/p2p/16Uiu2HAmPyq9Gw93VWdS3pgmyAWg2UNnrgZoYKPDUMbKDsWhzuvb
+      - BOOTSTRAP_SERVERS=/ip4/34.65.75.45/tcp/9091/p2p/16Uiu2HAm2cjqsDMmprtN2QKaq3LJrq3YK7vtdbQQFsxGrhLRoYsy,/ip4/34.65.177.154/tcp/9091/p2p/16Uiu2HAm9C4oJPeRkdXnYxtXzFpDqpcCbWLsgNW4irrCLZTJ7cBd
     volumes:
       - /app/db
   chat-bot:
