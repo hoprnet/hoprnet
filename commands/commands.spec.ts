@@ -14,6 +14,14 @@ describe('Commands', () => {
     expect(cmds).toBeTruthy()
   })
 
+  it('responds to nonsense commands', async () => {
+    let mockNode: any = jest.fn()
+    expect(mod.Commands).toBeDefined()
+    let cmds = new mod.Commands(mockNode)
+
+    expect(await cmds.execute('not-a-real-command')).toMatch(/unknown command/i)
+  })
+
   it('ping', async () => {
     let mockNode: any = jest.fn()
     mockNode.bootstrapServers = []
@@ -63,6 +71,13 @@ describe('Commands', () => {
     await cmds.execute('send test Hello, world')
     expect(mockNode.sendMessage).toHaveBeenCalled()
 
+  })
+
+  it('version', async () => {
+
+    let mockNode: any = jest.fn()
+    let cmds = new mod.Commands(mockNode)
+    expect(await cmds.execute('version')).toMatch(/hopr-core/)
   })
 })
 

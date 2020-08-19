@@ -27,15 +27,16 @@ export default class Ping extends AbstractCommand {
       return chalk.red(err.message)
     } 
 
+    let out = ''
     if (isBootstrapNode(this.node, peerId)) {
-      console.log(chalk.gray(`Pinging the bootstrap node ...`))
+      out += chalk.gray(`Pinging the bootstrap node ...`) + '\n'
     }
 
     try {
       const latency = await this.node.ping(peerId)
-      return `Pong received in: ${chalk.magenta(String(latency))}ms`
+      return `${out}Pong received in: ${chalk.magenta(String(latency))}ms`
     } catch (err) {
-      return `Could not ping node. Error was: ${chalk.red(err.message)}`
+      return `${out}Could not ping node. Error was: ${chalk.red(err.message)}`
     }
   }
 
