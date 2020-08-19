@@ -11,7 +11,7 @@ export default class ListConnectors extends AbstractCommand {
    * Check which connectors are present right now.
    * @notice triggered by the CLI
    */
-  async execute(): Promise<void> {
+  async execute(): Promise<string> {
     let str = 'Available connectors:'
     let found = 0
 
@@ -33,11 +33,9 @@ export default class ListConnectors extends AbstractCommand {
     await Promise.all(promises)
 
     if (found > 0) {
-      console.log(str)
+      return str
     } else {
-      console.log(
-        chalk.red(`Could not find any connectors. Please make sure there is one available in 'node_modules'!`)
-      )
+      return chalk.red(`Could not find any connectors. Please make sure there is one available in 'node_modules'!`)
     }
   }
 }

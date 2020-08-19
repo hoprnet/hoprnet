@@ -96,5 +96,11 @@ describe('Commands', () => {
     let cmds = new mod.Commands(mockNode)
     expect(await cmds.execute('help')).toMatch(/help/)
   })
+
+  it('listConnectors', async() => {
+    let mockNode: any = jest.fn()
+    let cmds = new mod.Commands(mockNode)
+    expect(await cmds.execute('listConnectors')).toMatch(/ethereum/)
+  })
 })
 

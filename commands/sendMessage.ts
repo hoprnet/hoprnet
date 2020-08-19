@@ -21,6 +21,7 @@ abstract class SendMessageBase extends AbstractCommand {
   name() { return 'send' }
   help() { return 'sends a message to another party'}
 
+  // Throws if peerid is invalid
   async _checkPeerId(id: string, settings: GlobalState): Promise<PeerId> {
     if (settings.aliases.has(id)){
       return settings.aliases.get(id)
@@ -59,8 +60,28 @@ abstract class SendMessageBase extends AbstractCommand {
 
     return [validPeerIds.map((peerId) => `send ${peerId}`), line]
   }
+}
+
+export class SendMessage extends SendMessageBase {
+  async execute(query: string, settings: GlobalState): Promise<CommandResponse> {
+    if (query == null) {
+      return `Invalid arguments. Expected 'send <peerId> <message>'. Received '${query}'`
+    }
+
+    let peerIdString: (string | undefined) = query.trim().split(' ')[0]
+    let msg = query.trim().split(' ').slice(1).join(' ')
+
+    let peerId: PeerId
+    try {
+      peerId = await this._checkPeerId(peerIdString, settings)
+    } catch (err) {
+      return err.message
+    }
+    this._sendMessage(settings, peerId, msg)
+  }
 
 }
+
 
 export class SendMessageFancy extends SendMessageBase {
   constructor(public node: Hopr<HoprCoreConnector>, public rl: readline.Interface) {
@@ -210,25 +231,5 @@ export class SendMessageFancy extends SendMessageBase {
 
     return selected
   }
-}
-
-export class SendMessage extends SendMessageBase {
-  async execute(query: string, settings: GlobalState): Promise<CommandResponse> {
-    if (query == null) {
-      return `Invalid arguments. Expected 'send <peerId> <message>'. Received '${query}'`
-    }
-
-    let peerIdString: (string | undefined) = query.trim().split(' ')[0]
-    let msg = query.trim().split(' ').slice(1).join(' ')
-
-    let peerId: PeerId
-    try {
-      peerId = await this._checkPeerId(peerIdString, settings)
-    } catch (err) {
-      return err.message
-    }
-    this._sendMessage(settings, peerId, msg)
-  }
-
 }
 
