@@ -74,10 +74,21 @@ describe('Commands', () => {
   })
 
   it('version', async () => {
-
     let mockNode: any = jest.fn()
     let cmds = new mod.Commands(mockNode)
     expect(await cmds.execute('version')).toMatch(/hopr-core/)
+  })
+
+  it('crawl', async () => {
+    let mockNode: any = jest.fn()
+    mockNode.network = jest.fn()
+    mockNode.network.crawler = jest.fn()
+    mockNode.network.crawler.crawl = jest.fn()
+
+    let cmds = new mod.Commands(mockNode)
+    expect(await cmds.execute('crawl')).toBeFalsy()
+    expect(mockNode.network.crawler.crawl).toHaveBeenCalled()
+
   })
 })
 
