@@ -24,8 +24,7 @@ const start = async () => {
       bot = new Tweetbot(hoprAddress)
       break
   }
-  // await setupBot(bot)
-  console.log(await payDai())
+  await setupBot(bot)
 }
 
 start().catch((err) => {
