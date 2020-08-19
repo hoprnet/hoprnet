@@ -14,14 +14,13 @@ export class Alias extends AbstractCommand {
     }
     const id = match[1]
     const name = match[2]
-    let peerId
+
     try {
-      peerId = await checkPeerIdInput(id)
+      let peerId = await checkPeerIdInput(id)
+      settings.aliases.set(name, peerId)
     } catch (e) {
-      console.log(e)
-      return
+      return e
     }
-    settings.aliases.set(name, peerId)
   }
 }
 

@@ -21,7 +21,7 @@ describe('Commands', () => {
     let mockPeerId = '16Uiu2HAkyXRaL7fKu4qcjaKuo4WXizrpK63Ltd6kG2tH6oSV58AW'
 
     let cmds = new mod.Commands(mockNode)
-    await cmds.execute(`ping  ${mockPeerId}`)
+    expect(await cmds.execute(`ping  ${mockPeerId}`)).toMatch(/pong/i)
     expect(mockNode.ping).toHaveBeenCalled()
   })
 
