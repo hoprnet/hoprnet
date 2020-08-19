@@ -7,7 +7,7 @@ import type { HoprOptions } from '@hoprnet/hopr-core'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import type { Channel } from '@hoprnet/hopr-core-connector-interface'
-import { u8aToHex, moveDecimalPoint } from '@hoprnet/hopr-utils'
+import { u8aToHex, moveDecimalPoint, getBootstrapAddresses } from '@hoprnet/hopr-utils'
 import PeerInfo from 'peer-info'
 import PeerId from 'peer-id'
 import * as rlp from 'rlp'
@@ -78,10 +78,7 @@ export class CoreService {
           bootstrapNode: envOptions.bootstrapNode ?? false,
           network: 'ethereum',
           // using testnet bootstrap servers
-          bootstrapServers: envOptions.bootstrapServers ?? [
-            '/ip4/34.65.82.167/tcp/9091/p2p/16Uiu2HAm6VH37RG1R4P8hGV1Px7MneMtNc6PNPewNxCsj1HsDLXW',
-            '/ip4/34.65.111.179/tcp/9091/p2p/16Uiu2HAmPyq9Gw93VWdS3pgmyAWg2UNnrgZoYKPDUMbKDsWhzuvb',
-          ],
+          bootstrapServers: [... (await getBootstrapAddresses(envOptions.bootstrapServers.join(','))).values()],
           provider: envOptions.provider ?? 'wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36',
           host: envOptions.host ?? '0.0.0.0:9091',
           password: 'switzerland',
@@ -94,9 +91,7 @@ export class CoreService {
           debug: options.debug,
           bootstrapNode: options.bootstrapNode,
           network: options.network,
-          bootstrapServers: await Promise.all<PeerInfo>(
-            options.bootstrapServers.map((multiaddr) => this.parserService.parseBootstrap(multiaddr) as Promise<PeerInfo>),
-          ),
+          bootstrapServers: options.bootstrapServers,
           provider: options.provider,
           hosts: (await this.parserService.parseHost(options.host)) as HoprOptions['hosts'],
           password: options.password,
