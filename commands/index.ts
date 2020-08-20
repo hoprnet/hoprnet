@@ -1,7 +1,7 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import type { AutoCompleteResult } from './abstractCommand'
-import { AbstractCommand } from './abstractCommand'
+import { AbstractCommand, GlobalState, CommandResponse } from './abstractCommand'
 import CloseChannel from './closeChannel'
 import Crawl from './crawl'
 import ListCommands from './listCommands'
@@ -11,20 +11,26 @@ import OpenChannel from './openChannel'
 import Ping from './ping'
 import PrintAddress from './printAddress'
 import PrintBalance from './printBalance'
-import SendMessage from './sendMessage'
+import { SendMessageFancy, SendMessage } from './sendMessage'
 import StopNode from './stopNode'
 import Version from './version'
 import Tickets from './tickets'
-import IncludeRecipient from './includeRecipient'
+import { IncludeRecipient, IncludeRecipientFancy } from './includeRecipient'
+import Settings from './settings'
 import readline from 'readline'
-
-export const SPLIT_OPERAND_QUERY_REGEX: RegExp = /([\w\-]+)(?:\s+)?([\w\s\-.]+)?/
+import { Alias } from './alias'
 
 export class Commands {
   readonly commands: AbstractCommand[]
   private commandMap: Map<string, AbstractCommand>
+  private state: GlobalState
 
   constructor(public node: Hopr<HoprCoreConnector>, rl?: readline.Interface) {
+    this.state = {
+      includeRecipient: false,
+      aliases: new Map()
+    }
+
     this.commands = [
       new CloseChannel(node),
       new Crawl(node),
@@ -36,13 +42,19 @@ export class Commands {
       new StopNode(node),
       new Version(),
       new Tickets(node),
+      new Settings(),
+      new Alias(),
     ]
 
     if(rl) {
       this.commands.push(new OpenChannel(node, rl))
-      this.commands.push(new SendMessage(node, rl))
-      this.commands.push(new IncludeRecipient(node, rl))
+      this.commands.push(new SendMessageFancy(node, rl))
+      this.commands.push(new IncludeRecipientFancy(node, rl))
+    } else {
+      this.commands.push(new SendMessage(node))
+      this.commands.push(new IncludeRecipient())
     }
+
     this.commandMap = new Map()
     for (let command of this.commands) {
       if (this.commandMap.has(command.name())){
@@ -60,20 +72,22 @@ export class Commands {
     return this.commandMap.get(command.trim())
   }
   
-  public async execute(message: string): Promise<boolean> {
-    const [command, query]: (string | undefined)[] = message.trim().split(SPLIT_OPERAND_QUERY_REGEX).slice(1)
+  public async execute(message: string): Promise<CommandResponse> {
+    const split: (string | undefined)[] = message.trim().split(/\s+/)
+    const command = split[0]
+    const query = split.slice(1).join(' ')
 
     if (command == null) {
-      return true;
+      return undefined;
     }
 
-    let cmd = this.find(command)
-    
+    let cmd = this.find(command) 
+
     if (cmd){
-      await cmd.execute(query)
-      return true
+      return await cmd.execute(query || '', this.state)
     }
-    return false
+
+    return 'Unknown command!'
   }
 
   public async autocomplete(message: string): Promise<AutoCompleteResult> {
@@ -82,7 +96,7 @@ export class Commands {
       return [this.allCommands(), message]
     }
 
-    const [command, query]: (string | undefined)[] = message.trim().split(SPLIT_OPERAND_QUERY_REGEX).slice(1)
+    const [command, query]: (string | undefined)[] = message.trim().split(/\s+/).slice(0)
     const cmd = await this.find(command)
     if (cmd) {
       return cmd.autocomplete(query, message)

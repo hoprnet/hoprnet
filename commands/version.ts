@@ -6,7 +6,7 @@ export default class Version extends AbstractCommand {
   name() { return 'version' }
   help() { return 'shows the versions for `hopr-chat` and `hopr-core`' }
 
-  async execute() {
-    console.log(this.#display)
+  async execute(): Promise<string>{
+    return this.#display
   }
 }

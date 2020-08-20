@@ -21,13 +21,13 @@ export default class Crawl extends AbstractCommand {
   /**
    * Crawls the network to check for other nodes. Triggered by the CLI.
    */
-  async execute(): Promise<void> {
+  async execute(): Promise<string | void> {
     try {
       await this.node.network.crawler.crawl(
         (peer: string) => !isBootstrapNode(this.node, PeerId.createFromB58String(peer))
       )
     } catch (err) {
-      console.log(chalk.red(err.message))
+      chalk.red(err.message)
     }
   }
 }

@@ -1,12 +1,23 @@
-import { AbstractCommand } from './abstractCommand'
+import { AbstractCommand, GlobalState } from './abstractCommand'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import chalk from 'chalk'
 import readline from 'readline'
 import { clearString } from '@hoprnet/hopr-utils'
-import { settings } from '../utils'
 
-export default class IncludeRecipient extends AbstractCommand {
+export class IncludeRecipient extends AbstractCommand {
+  name() { return 'includeRecipient' }
+  help() { return 'preprends your address to all messages' }
+
+  async execute(query: string, settings: GlobalState): Promise<string | void> {
+    if (!query.match(/true|false/i)){
+      return "includeRecipient takes an argument 'true' or 'false'"
+    }
+    settings.includeRecipient = !!query.match(/true/i)
+  }
+}
+
+export class IncludeRecipientFancy extends AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>, public rl: readline.Interface) {
     super()
   }
@@ -14,7 +25,7 @@ export default class IncludeRecipient extends AbstractCommand {
   name() { return 'includeRecipient' }
   help() { return 'preprends your address to all messages' }
 
-  async execute(): Promise<void> {
+  async execute(query: string, settings: GlobalState): Promise<void> {
     const question = `Are you sure you want to include your address in your messages? (${chalk.green('y')}, ${chalk.red('N')}): `
     const answer = await new Promise<string>((resolve) => this.rl.question(question, resolve))
 
@@ -25,3 +36,5 @@ export default class IncludeRecipient extends AbstractCommand {
     console.log(`You have set your “includeRecipient” settings to ${ settings.includeRecipient ? chalk.green('yes') : chalk.red('no') }`)
   }
 }
+
+

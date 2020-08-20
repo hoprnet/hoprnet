@@ -15,29 +15,28 @@ export default class Ping extends AbstractCommand {
   name() { return 'ping' }
   help() { return 'pings another node to check its availability' }
 
-  async execute(query?: string): Promise<void> {
+  async execute(query?: string): Promise<string> {
     if (query == null) {
-      console.log(chalk.red(`Invalid arguments. Expected 'ping <peerId>'. Received '${query}'`))
-      return
+      return `Invalid arguments. Expected 'ping <peerId>'. Received '${query}'`
     }
 
     let peerId: PeerId
     try {
       peerId = await checkPeerIdInput(query)
     } catch (err) {
-      console.log(chalk.red(err.message))
-      return
-    }
+      return chalk.red(err.message)
+    } 
 
+    let out = ''
     if (isBootstrapNode(this.node, peerId)) {
-      console.log(chalk.gray(`Pinging the bootstrap node ...`))
+      out += chalk.gray(`Pinging the bootstrap node ...`) + '\n'
     }
 
     try {
       const latency = await this.node.ping(peerId)
-      console.log(`Pong received in:`, chalk.magenta(String(latency)), `ms`)
+      return `${out}Pong received in: ${chalk.magenta(String(latency))}ms`
     } catch (err) {
-      console.log(`Could not ping node. Error was: ${chalk.red(err.message)}`)
+      return `${out}Could not ping node. Error was: ${chalk.red(err.message)}`
     }
   }
 

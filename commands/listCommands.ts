@@ -15,7 +15,7 @@ export default class ListCommands extends AbstractCommand {
     return 'shows this help page'
   }
 
-  execute() {
+  execute(): string {
     let names = this.getCommands().map(x => x.name())
     let helps = this.getCommands().map(x => x.help())
 
@@ -31,6 +31,6 @@ export default class ListCommands extends AbstractCommand {
       }
     }
 
-    console.log(str)
+    return str
   }
 }
