@@ -18,3 +18,7 @@
 * [Background](main-concepts/background.md)
 * [Technical Description](main-concepts/technical-description.md)
 
+## Community
+
+* [HOPR Games](community/hopr-games.md)
+
