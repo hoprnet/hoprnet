@@ -45,14 +45,16 @@ export abstract class SendMessageBase extends AbstractCommand {
     const peerIds = getPeers(this.node, {
       noBootstrapNodes: true,
     }).map((peerId) => peerId.toB58String())
-  
     const allIds = peerIds.concat(Array.from(state.aliases.keys()))
 
     if (!query){
-      return [allIds, line]
+      return [allIds, query]
     }
-
-    return [allIds.filter((peerId) => peerId.startsWith(query)).map((peerId) => `send ${peerId}`), line]
+    let filtered = allIds.filter((peerId) => peerId.startsWith(query))
+    if (!filtered.length){
+      return [[''], query] // Readline can't handle empty results
+    }
+    return [filtered.map((peerId) => `send ${peerId}`), line]
   }
 }
 
@@ -97,6 +99,7 @@ export class SendMessageFancy extends SendMessageBase {
       peerId = await this._checkPeerId(query, settings)
     } catch (err) {
       console.log(chalk.red(err.message))
+      return
     }
 
     const manualPath = process.env.MULTIHOP
