@@ -20,7 +20,7 @@ export abstract class AbstractCommand {
   // Run the command with optional argument
   abstract execute(query: string, state: GlobalState): CommandResponse | Promise<CommandResponse>
 
-  async autocomplete(query: string, line: string): Promise<AutoCompleteResult | undefined> {
+  async autocomplete(query: string, line: string, state: GlobalState): Promise<AutoCompleteResult | undefined> {
     return [[''], line] // default is no further results, end the query there, based on the whole line
   }
 }

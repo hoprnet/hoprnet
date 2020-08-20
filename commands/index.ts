@@ -92,7 +92,7 @@ export class Commands {
     return 'Unknown command!'
   }
 
-  public async autocomplete(message: string): Promise<AutoCompleteResult> {
+  public async autocomplete(message: string, line: string, state: GlobalState): Promise<AutoCompleteResult> {
     // If the line is empty, we show all possible commands as results.
     if (message == null || message == '') {
       return [this.allCommands(), message]
@@ -101,7 +101,7 @@ export class Commands {
     const [command, query]: (string | undefined)[] = message.trim().split(/\s+/).slice(0)
     const cmd = await this.find(command)
     if (cmd) {
-      return cmd.autocomplete(query, message)
+      return cmd.autocomplete(query, message, this.state)
     }
     // Command not found - try assuming it's an incomplete command
     const hits = this.allCommands().reduce((acc: string[], name: string) => {
