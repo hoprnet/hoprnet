@@ -9,14 +9,14 @@ description: Step and step guide to quickly start using HOPR Chat
 This quickstart guide will help you to quickly install **HOPR Chat** and its dependencies so you can quickly connect to the **HOPR Network.** Please follow the step-by-step instructions to ensure everything works properly.
 
 {% hint style="warning" %}
-**HOPR Chat**, **HOPR** and the **HOPR Network** are early stage technologies. The currently available early test versions are meant for the brave explorers who are here to build the future of a more private Web3 together with us. Do not rely on HOPR to protect your privacy or assets just yet!
+**HOPR Chat**, **HOPR** and the **HOPR Network** are early-stage technologies. The currently available early test versions are meant for the brave explorers who are here to build the future of a more private Web3 together with us. Do not rely on HOPR to protect your privacy or assets just yet!
 {% endhint %}
 
 As instructions might be different depending on your Operating System \(e.g. Windows, MacOS, Linux\), our instructions will be shown under “Tabs” like the following:
 
 {% tabs %}
 {% tab title="Windows" %}
-In some cases, you will need to run commands and instructions as an Administrator. Ensure you have Administrator access, and a working Internet connection. Firewall prompts might show up, which only requires you to accept them on request.
+In some cases, you will need to run commands and instructions as an Administrator. Ensure you have Administrator access and a working Internet connection. Firewall prompts might show up, which only requires you to accept them on request.
 {% endtab %}
 
 {% tab title="MacOS" %}
@@ -202,11 +202,13 @@ ethereum:  0x9e95cdcb480f133b0c1af70613d1488ee01bf53e
 HOPR:      16Uiu2HAm34oK6EyA2SuFo9rHXpm5Kwy6C8MeJ26JaRFBzgdQqVpZ
 ```
 
-Share your address with the myAddress command to other people. Your HOPR Address starts with 16Uiu2 and it’s the only thing other people need to know to send you messages. Use a separate channel to share your HOPR Address with your friends.
+Share your address shown by the `myAddress` command to other people. Your HOPR Address starts with `16Uiu2` and it’s the only thing other people need to know to send you messages. Use a separate channel to share your HOPR Address with your friends.
 
 ## Step 5 - Send Messages to Other HOPR Nodes
 
-You can send a message to other users with the `send` command, to send multiple messages, repeat the following steps. Type `send` followed by a **HOPR Address** you want to send a message to. So for instance, to send a message to `16Uiu2HAm62VfBkydtQVtKMUaNC3Upe7rYehGu3eLjFAqrxX1vxsx`, you would need to type `send 16Uiu2HAm62VfBkydtQVtKMUaNC3Upe7rYehGu3eLjFAqrxX1vxsx` followed by pressing `Enter`. Afterwards, you can type whatever message you want to send to that **HOPR Node.** and again send your message by hitting `Enter`.
+You can send a message to other users with the `send` command, to send multiple messages, just repeat the following steps multiple times.
+
+To send a message, type `send` followed by a **HOPR Address** you want to send a message to. So for instance, to send a message to `16Uiu2HAm62VfBkydtQVtKMUaNC3Upe7rYehGu3eLjFAqrxX1vxsx`, you would need to type `send 16Uiu2HAm62VfBkydtQVtKMUaNC3Upe7rYehGu3eLjFAqrxX1vxsx` followed by pressing `Enter`. Afterwards, you can type whatever message you want to send to that **HOPR Node.** and again send your message by hitting `Enter`.
 
 {% hint style="info" %}
 To send a message to another **HOPR Node,** you first need another individual‘s **HOPR Address** to send a message. You can jump to our Telegram to ask other HOPR users to share their **HOPR Address**.

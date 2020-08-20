@@ -12,11 +12,13 @@ Our latest Node binary can be found in [https://github.com/hoprnet/hopr-core/rel
 {% endtab %}
 
 {% tab title="Docker" %}
-Our latest Docker image can be found in [https://hub.docker.com/r/hopr/chat](https://hub.docker.com/r/hopr/chat). To download it inside your workstation after installing Docker, run the following command.
+Our stable Docker registry can be found in [https://hub.docker.com/r/hopr/chat](https://hub.docker.com/r/hopr/chat). Our develop Docker registry is on [https://gcr.io/hoprassociation/hopr-chat](https://gcr.io/hoprassociation/hopr-chat). To download a stable Docker image inside your workstation after installing Docker, you can run the following command.
 
 ```text
 docker pull hopr/chat
 ```
 {% endtab %}
 {% endtabs %}
+
+
 

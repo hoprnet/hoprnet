@@ -1,5 +1,5 @@
 ---
-description: Learn  advanced setup information for using HOPR Chat on your system
+description: Learn the advanced setup information for using HOPR Chat on your system
 ---
 
 # Advanced Setup
@@ -8,7 +8,7 @@ This setup guide will show you how to use **HOPR** by installing **HOPR Chat** o
 
 {% page-ref page="quickstart.md" %}
 
-Depending on your device capabilities, pick the method that will work best for you. Using Docker is faster than using Node.js, but has higher hardware and disk space requirements. On the other hand, Node.js requires a bit more setup, but can be completed by even limited devices.
+Depending on your device capabilities, pick the method that will work best for you. Using Docker is faster than using Node.js, but has higher hardware and disk space requirements, as well as some virtualization settings enabled. On the other hand, Node.js requires a bit more setup, but can be completed by even limited devices.
 
 {% hint style="danger" %}
 As changes are continuous in our codebase, please bear in mind some of this documentation might be outdated and errors might occur. Our [Telegram](https://t.me/hoprnet) channel is currently the best channel to be up to date with the latest developments of the **HOPR Chat**, **HOPR** and the **HOPR Network.**
@@ -67,6 +67,10 @@ To ensure your machine has successfully downloaded **HOPR Chat,** run `docker im
 
 ![HOPR Chat distributed as a Docker image](../../.gitbook/assets/docker_images.gif)
 
+{% hint style="info" %}
+Docker images can quickly go out of date. We recommend reviewing which are the latest images available to be used before downloading one. You can see all our available images and their publication date in our public [Docker registry](https://gcr.io/hoprassociation/hopr-chat). 
+{% endhint %}
+
 ### Using Node.js
 
 Using Node.js allows you to run **HOPR Chat** as a Node.js application, ensuring your experience is as close as possible to the one the developers had when developing **HOPR Chat** and the **HOPR Core** protocol. Node.js might require further software installation, but is can be run on machines with lower hardware specifications. It also takes up considerably less space than Docker \(approx. 50MB vs approx. 1GB\).
@@ -123,7 +127,7 @@ To run **HOPR Chat** via Docker**,** you need to copy and paste the following co
 ```text
 docker run -v $(pwd)/db:/app/db \
 -e HOST_IPV4=0.0.0.0:9091 \
--e BOOTSTRAP_SERVERS=/dns4/ch-test-01.hoprnet.io/tcp/9091/p2p/16Uiu2HAm5WUS1kv8p3uiSgZmz2uh427qr8jJZ8jrFCePHATaVgz2 \
+-e BOOTSTRAP_SERVERS=/ip4/34.65.219.148/tcp/9091/p2p/16Uiu2HAkwSEiK819yvnG84pNFsqXkpFX4uiCaNSwADnmYeAfctRn \
 -e ETHEREUM_PROVIDER=wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36 \
 -p 9091:9091 -it hopr/chat -p switzerland
 ```
@@ -133,7 +137,7 @@ docker run -v $(pwd)/db:/app/db \
 ```text
 docker run -v $(pwd)/db:/app/db \
 -e HOST_IPV4=0.0.0.0:9091 \
--e BOOTSTRAP_SERVERS=/dns4/ch-test-02.hoprnet.io/tcp/9091/p2p/16Uiu2HAmRD7iEEopoiHWz7NpsM4wwSc5yWpdSX3esb3kYkJNY1yn \
+-e BOOTSTRAP_SERVERS=/ip4/34.65.148.229/tcp/9091/p2p/16Uiu2HAmRsp3VBLcyPfTBkJYEwS47bewxWqqm4sEpJEtPBLeV93n \
 -e ETHEREUM_PROVIDER=wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36 \
 -p 9091:9091 -it hopr/chat -p switzerland
 ```
@@ -147,7 +151,7 @@ docker run -v $(pwd)/db:/app/db \
 ```text
 docker run -v %cd%/db:/app/db ^ 
 -e HOST_IPV4=0.0.0.0:9091 ^ 
--e BOOTSTRAP_SERVERS=/dns4/ch-test-01.hoprnet.io/tcp/9091/p2p/16Uiu2HAm5WUS1kv8p3uiSgZmz2uh427qr8jJZ8jrFCePHATaVgz2 ^ 
+-e BOOTSTRAP_SERVERS=/ip4/34.65.219.148/tcp/9091/p2p/16Uiu2HAkwSEiK819yvnG84pNFsqXkpFX4uiCaNSwADnmYeAfctRn ^ 
 -e ETHEREUM_PROVIDER=wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36 ^ 
 -p 9091:9091 -it hopr/chat -p switzerland
 ```
@@ -157,7 +161,7 @@ docker run -v %cd%/db:/app/db ^
 ```
 docker run -v %cd%/db:/app/db ^ 
 -e HOST_IPV4=0.0.0.0:9091 ^ 
--e BOOTSTRAP_SERVERS=/dns4/ch-test-02.hoprnet.io/tcp/9091/p2p/16Uiu2HAmRD7iEEopoiHWz7NpsM4wwSc5yWpdSX3esb3kYkJNY1yn ^ 
+-e BOOTSTRAP_SERVERS=/ip4/34.65.148.229/tcp/9091/p2p/16Uiu2HAmRsp3VBLcyPfTBkJYEwS47bewxWqqm4sEpJEtPBLeV93n ^ 
 -e ETHEREUM_PROVIDER=wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36 ^ 
 -p 9091:9091 -it hopr/chat -p switzerland
 ```
@@ -166,13 +170,35 @@ docker run -v %cd%/db:/app/db ^
 
 You will be welcomed by the following message.
 
-If you get an `Unable to connect to Bootstrap node` message, use one of the other bootstrap nodes \(marked as `ch-t-01` and `ch-t-02`\). You can learn more about Bootstrap Nodes on the page linked below.
+![](../../.gitbook/assets/hopr.gif)
+
+If you get an `Unable to connect to Bootstrap node` message, use other bootstrap nodes. Our bootstrap nodes are available as `TXT` records behind our `hoprnet.org` domain, so you can see them using the `dig` command in any linux computer.
+
+```text
+dig -t TXT _dnsaddr.bootstrap.testnet.hoprnet.org
+```
+
+This will return an output with some Bootstrap Nodes address:
+
+```text
+;; ANSWER SECTION:
+_dnsaddr.bootstrap.testnet.hoprnet.org. 299 IN TXT "dnsaddr=/ip4/34.65.219.148/tcp/9091/p2p/16Uiu2HAkwSEiK819yvnG84pNFsqXkpFX4uiCaNSwADnmYeAfctRn"
+_dnsaddr.bootstrap.testnet.hoprnet.org. 299 IN TXT "dnsaddr=/ip4/34.65.148.229/tcp/9091/p2p/16Uiu2HAmRsp3VBLcyPfTBkJYEwS47bewxWqqm4sEpJEtPBLeV93n"
+```
+
+You can then replace `BOOTSTRAP_SERVERS` value with `/ip4/34.65.219.148/tcp/9091/p2p/16Uiu2HAkwSEiK819yvnG84pNFsqXkpFX4uiCaNSwADnmYeAfctRn` or both values displayed \(a comma is needed if you put both\).
+
+{% hint style="warning" %}
+At the time of writing, Bootstrap Nodes are not able to connect to each other, which means connecting via Bootstrap Node 1 will not allow you to connect to **HOPR Nodes** that use Bootstrap Node 2. Ideally, you use as many Bootstrap Nodes as possible to have a bigger access to the network.
+
+Bootstrap Nodes are maintained by the **HOPR Association,** and can change w/o previous notice during our Testnet Period. You can replace `testnet` for `develop` in the `dig` command to see our Develop Bootstrap Nodes, but those are restarted every week. You can always see the status of our current deployed nodes in [https://status.hoprnet.org/](https://status.hoprnet.org/).
+{% endhint %}
+
+You can learn more about Bootstrap Nodes on the page linked below.
 
 {% page-ref page="bootstrap-nodes.md" %}
 
-After running any of these commands, you will be welcomed by **HOPR Chat**’s introductory screen, which provides you with further instructions.
-
-![](../../.gitbook/assets/hopr.gif)
+After running any of these commands, you will be welcomed by **HOPR Chat**’s introductory screen, which provides you with further instructions on how to send messages to other users connected to the network. Under the wraps, **HOPR Chat** runs also a **HOPR Node**, which listens to port `9091` to incoming connections from other **HOPR Node** users.
 
 {% hint style="info" %}
 Depending on your configuration and version of **HOPR Chat**, you might need to fund your **HOPR Chat** account with some tokens. If so, please visit the “**Funding your account**” page below.
@@ -182,7 +208,9 @@ Depending on your configuration and version of **HOPR Chat**, you might need to 
 
 ### Using Node.js
 
-To run **HOPR Chat** via Node.js**,** you need to download our pre-compiled binary for each version. You can find these binaries in our [Releases](https://github.com/hoprnet/hopr-core/releases) page inside a zip file. Version `1.1.4-dev` used for generating this documentation is available [here](https://github.com/hoprnet/hopr-core/releases/tag/1.1.4-dev.64c3c2b).
+#### Binary Releases
+
+To run **HOPR Chat** via Node.js**,** you can simply download our pre-compiled binary for each version. You can find these binaries in our [Releases](https://github.com/hoprnet/hopr-core/releases) page inside a zip file.
 
 ![Please select the correct distribution for your operating system.](../../.gitbook/assets/image%20%288%29.png)
 
@@ -202,13 +230,23 @@ On Windows, double-click the file named `hopr-chat.bat` or right-click and selec
 {% endtab %}
 {% endtabs %}
 
-As soon as you double-click the executable file, you will be welcomed by the **HOPR Chat** initial message, which might look different depending on your OS. A password will be required, and every time you run **HOPR Chat** it will prompt you for the password again.
+As soon as you double-click the executable file, you will be welcomed by the **HOPR Chat** initial message, which might look different depending on your OS. Latest releases include a default password, but normally, a password will be required to lock your **HOPR Node**, and every time you run **HOPR Chat** it will prompt you for the password again.
 
 {% hint style="info" %}
 Since **HOPR Chat** is being distributed as a Node.js binary, the included pre-compiled binary [might trigger some prompts in macOS](https://docs.hoprnet.io/home/getting-started/hopr-chat/troubleshooting) which you will need to accept and provide access for. To work around these issues, please see our Troubleshooting guide.
 {% endhint %}
 
 {% page-ref page="troubleshooting.md" %}
+
+#### From source
+
+You can always run **HOPR Chat** from our source code. To do so, you need to clone our [GitHub repository](https://github.com/hoprnet/hopr-chat) with **HOPR Chat** source code.
+
+```text
+git clone git@github.com:hoprnet/hopr-chat.git
+```
+
+For more information on how to compile and run **HOPR Chat** yourself, please see our project's [README](https://github.com/hoprnet/hopr-chat/blob/master/README.md).
 
 ## Sending a HOPR message
 

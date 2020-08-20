@@ -27,7 +27,7 @@ Copy your account from Step 3, and paste it in the following websites.
 * Kovan Network Faucet - [https://faucet.kovan.network/](https://faucet.kovan.network/)
 * HOPR Network Faucet - [https://faucet.hoprnet.io/](https://faucet.hoprnet.io/)
 
-{% hint style="info" %}
+{% hint style="warning" %}
 Kovan **HOPR Tokens** change depending on the contract used for your version of **HOPR Chat.** In case your account is not displayed your newly minted **HOPR Tokens**, ping us in [Telegram Chat](https://t.me/hoprnet) to provide you with some support.
 {% endhint %}
 
