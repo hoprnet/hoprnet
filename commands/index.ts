@@ -92,7 +92,7 @@ export class Commands {
     return 'Unknown command!'
   }
 
-  public async autocomplete(message: string, line: string, state: GlobalState): Promise<AutoCompleteResult> {
+  public async autocomplete(message: string): Promise<AutoCompleteResult> {
     // If the line is empty, we show all possible commands as results.
     if (message == null || message == '') {
       return [this.allCommands(), message]

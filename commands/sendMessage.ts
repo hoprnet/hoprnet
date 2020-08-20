@@ -41,17 +41,18 @@ export abstract class SendMessageBase extends AbstractCommand {
     }
   }
 
-  async autocomplete(query: string, line: string): Promise<AutoCompleteResult> {
+  async autocomplete(query: string, line: string, state: GlobalState): Promise<AutoCompleteResult> {
     const peerIds = getPeers(this.node, {
       noBootstrapNodes: true,
     }).map((peerId) => peerId.toB58String())
-    const validPeerIds = query ? peerIds.filter((peerId) => peerId.startsWith(query)) : peerIds
+  
+    const allIds = peerIds.concat(Array.from(state.aliases.keys()))
 
-    if (!validPeerIds.length) {
-      return [[''], line]
+    if (!query){
+      return [allIds, line]
     }
 
-    return [validPeerIds.map((peerId) => `send ${peerId}`), line]
+    return [allIds.filter((peerId) => peerId.startsWith(query)).map((peerId) => `send ${peerId}`), line]
   }
 }
 

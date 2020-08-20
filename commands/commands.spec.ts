@@ -57,20 +57,6 @@ describe('Commands', () => {
     expect(await cmds.execute('send unknown-alias Hello, world')).toMatch(/invalid/i)
   })
 
-  it('autocomplete sendmessage', async() => {
-    let mockNode: any = jest.fn()
-    mockNode.sendMessage = jest.fn()
-    mockNode.bootstrapServers = []
-    mockNode.network = jest.fn()
-    mockNode.network.peerStore = jest.fn()
-    mockNode.network.peerStore.peers = [{id: '16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7' }]
-
-    let cmds = new mod.Commands(mockNode)
-    expect((await cmds.autocomplete('send 16Ui'))[0][0]).toMatch(/16U/)
-    expect((await cmds.autocomplete('send foo'))[0][0]).toBe("")
-
-  })
-
   it('alias addresses', async () => {
     let mockNode: any = jest.fn()
     mockNode.sendMessage = jest.fn()
@@ -157,6 +143,23 @@ describe('Commands', () => {
     await cmds.execute('alias 16Uiu2HAmQDFS8a4Bj5PGaTqQLME5SZTRNikz9nUPT3G4T6YL9o7V test2')
     await cmds.execute('multisend test2')
     expect(mockReadline.question).toHaveBeenCalled()
+  })
+
+  it('autocomplete sendmessage', async() => {
+    let mockNode: any = jest.fn()
+    mockNode.sendMessage = jest.fn()
+    mockNode.bootstrapServers = []
+    mockNode.network = jest.fn()
+    mockNode.network.peerStore = jest.fn()
+    mockNode.network.peerStore.peers = [{id: '16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7' }]
+
+    let cmds = new mod.Commands(mockNode)
+    expect((await cmds.autocomplete('send 16Ui'))[0][0]).toMatch(/send 16U/)
+    expect((await cmds.autocomplete('send foo'))[0].length).toBe(0)
+
+    await cmds.execute('alias 16Uiu2HAmQDFS8a4Bj5PGaTqQLME5SZTRNikz9nUPT3G4T6YL9o7V test')
+
+    expect((await cmds.autocomplete('send t'))[0][0]).toBe("send test")
   })
 })
 
