@@ -48,13 +48,6 @@ export abstract class SendMessageBase extends AbstractCommand {
     const validPeerIds = query ? peerIds.filter((peerId) => peerId.startsWith(query)) : peerIds
 
     if (!validPeerIds.length) {
-      console.log(
-        chalk.red(
-          `\nDoesn't know any other node except apart from bootstrap node${
-            this.node.bootstrapServers.length == 1 ? '' : 's'
-          }!`
-        )
-      )
       return [[''], line]
     }
 

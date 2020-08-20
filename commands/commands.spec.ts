@@ -65,10 +65,9 @@ describe('Commands', () => {
     mockNode.network.peerStore = jest.fn()
     mockNode.network.peerStore.peers = [{id: '16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7' }]
 
-
     let cmds = new mod.Commands(mockNode)
-
     expect((await cmds.autocomplete('send 16Ui'))[0][0]).toMatch(/16U/)
+    expect((await cmds.autocomplete('send foo'))[0][0]).toBe("")
 
   })
 
