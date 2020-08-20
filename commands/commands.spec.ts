@@ -54,6 +54,9 @@ describe('Commands', () => {
     let cmds = new mod.Commands(mockNode)
     await cmds.execute('send 16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7 Hello, world')
     expect(mockNode.sendMessage).toHaveBeenCalled()
+
+    expect(await cmds.execute('send unknown-alias Hello, world')).toMatch(/invalid/i)
+  
   })
 
   it('alias addresses', async () => {
