@@ -12,6 +12,7 @@ import Ping from './ping'
 import PrintAddress from './printAddress'
 import PrintBalance from './printBalance'
 import { SendMessageFancy, SendMessage } from './sendMessage'
+import { MultiSendMessage } from './multisend'
 import StopNode from './stopNode'
 import Version from './version'
 import Tickets from './tickets'
@@ -49,6 +50,7 @@ export class Commands {
     if(rl) {
       this.commands.push(new OpenChannel(node, rl))
       this.commands.push(new SendMessageFancy(node, rl))
+      this.commands.push(new MultiSendMessage(node, rl))
       this.commands.push(new IncludeRecipientFancy(node, rl))
     } else {
       this.commands.push(new SendMessage(node))

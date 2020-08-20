@@ -13,7 +13,7 @@ import { MAX_HOPS } from '@hoprnet/hopr-core/lib/constants'
 
 import readline from 'readline'
 
-abstract class SendMessageBase extends AbstractCommand {
+export abstract class SendMessageBase extends AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {
     super()
   }

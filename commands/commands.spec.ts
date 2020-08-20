@@ -119,5 +119,31 @@ describe('Commands', () => {
     let cmds = new mod.Commands(mockNode)
     expect(await cmds.execute('myAddress')).toMatch(/HOPR/)
   })
+
+  it('multisend', async() => {
+
+    let seq = 0
+    let mockNode: any = jest.fn()
+    mockNode.sendMessage = jest.fn()
+    let mockReadline: any = jest.fn()
+
+    mockReadline.question = jest.fn((question, resolve) => {
+      if (seq == 0){
+        expect(question).toEqual('>')
+        resolve('hello')
+        seq++
+      } else {
+        expect(mockNode.sendMessage).toHaveBeenCalled()
+        expect(question).toEqual('>')
+        resolve('quit')
+      }
+    })
+
+    let cmds = new mod.Commands(mockNode, mockReadline)
+
+    await cmds.execute('alias 16Uiu2HAmQDFS8a4Bj5PGaTqQLME5SZTRNikz9nUPT3G4T6YL9o7V test2')
+    await cmds.execute('multisend test2')
+    expect(mockReadline.question).toHaveBeenCalled()
+  })
 })
 
