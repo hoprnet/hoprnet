@@ -12,6 +12,15 @@ capabilities of the [HOPR](https://github.com/hoprnet/hopr-core) protocol, allow
 - Stable - [Docker Hub](https://hub.docker.com/r/hopr/chat)
 - Alpha - [Google Registry](https://gcr.io/hoprassociation/hopr-chat)
 
+## Installing
+```
+yarn
+```
+
+### Compiling
+```
+yarn build
+```
 
 ## Running
 

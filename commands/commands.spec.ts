@@ -70,7 +70,6 @@ describe('Commands', () => {
     expect(aliases).toMatch(/test/)
     await cmds.execute('send test Hello, world')
     expect(mockNode.sendMessage).toHaveBeenCalled()
-
   })
 
   it('version', async () => {
