@@ -54,9 +54,22 @@ describe('Commands', () => {
     let cmds = new mod.Commands(mockNode)
     await cmds.execute('send 16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7 Hello, world')
     expect(mockNode.sendMessage).toHaveBeenCalled()
-
     expect(await cmds.execute('send unknown-alias Hello, world')).toMatch(/invalid/i)
-  
+  })
+
+  it('autocomplete sendmessage', async() => {
+    let mockNode: any = jest.fn()
+    mockNode.sendMessage = jest.fn()
+    mockNode.bootstrapServers = []
+    mockNode.network = jest.fn()
+    mockNode.network.peerStore = jest.fn()
+    mockNode.network.peerStore.peers = [{id: '16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7' }]
+
+
+    let cmds = new mod.Commands(mockNode)
+
+    expect((await cmds.autocomplete('send 16Ui'))[0][0]).toMatch(/16U/)
+
   })
 
   it('alias addresses', async () => {
