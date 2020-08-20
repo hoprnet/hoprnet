@@ -128,13 +128,12 @@ describe('Commands', () => {
     let mockReadline: any = jest.fn()
 
     mockReadline.question = jest.fn((question, resolve) => {
+      expect(question).toEqual('send >')
       if (seq == 0){
-        expect(question).toEqual('>')
         resolve('hello')
         seq++
       } else {
         expect(mockNode.sendMessage).toHaveBeenCalled()
-        expect(question).toEqual('>')
         resolve('quit')
       }
     })

@@ -23,11 +23,15 @@ export class MultiSendMessage extends SendMessageBase {
   }
 
   private async repl(recipient: PeerId, settings: GlobalState): Promise<void>{
-    const message = await new Promise<string>(resolve => this.rl.question('>', resolve))
+    readline.clearLine(process.stdout, 0)
+    const message = await new Promise<string>(resolve => this.rl.question('send >', resolve))
     if (message === 'quit') {
       return;
     } else {
-      await this._sendMessage(settings, recipient, message)
+      if (message) {
+        await this._sendMessage(settings, recipient, message)
+        console.log('[sending ...]')
+      }
       await this.repl(recipient, settings);
     }
   }
