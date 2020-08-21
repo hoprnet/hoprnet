@@ -24,7 +24,7 @@ export abstract class SendMessageBase extends AbstractCommand {
   // Throws if peerid is invalid
   async _checkPeerId(id: string, settings: GlobalState): Promise<PeerId> {
     if (settings.aliases.has(id)){
-      return settings.aliases.get(id)
+      return settings.aliases.get(id)!
     }
     return await checkPeerIdInput(id)
   }
@@ -169,6 +169,7 @@ export class SendMessageFancy extends SendMessageBase {
             peerId = await checkPeerIdInput(query)
           } catch (err) {
             console.log(chalk.red(err.message))
+            return
           }
 
           readline.moveCursor(process.stdout, -rl.line, -1)

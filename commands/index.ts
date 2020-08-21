@@ -70,7 +70,7 @@ export class Commands {
     return Array.from(this.commandMap.keys())
   }
 
-  public find(command: string): AbstractCommand {
+  public find(command: string): AbstractCommand | undefined {
     return this.commandMap.get(command.trim())
   }
   

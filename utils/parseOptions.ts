@@ -98,7 +98,7 @@ export async function parseOptions(): Promise<HoprOptions> {
     process.exit(0)
   }
 
-  let id: number
+  let id: number | undefined
   for (let i = 0; i < cli_options._.length; i++) {
     try {
       const int = parseInt(cli_options._[i])
@@ -138,7 +138,7 @@ export async function parseOptions(): Promise<HoprOptions> {
   if (!knownConnectors.some((connector) => connector[1] == cli_options.network)) {
     console.log(`Unknown network! <${chalk.red(cli_options.network)}>\n`)
     await listConnectors.execute()
-    return
+    throw new Error('Cannot launch without a network')
   }
 
   let addr: Multiaddr
@@ -148,7 +148,8 @@ export async function parseOptions(): Promise<HoprOptions> {
     bootstrapServerMap = await getBootstrapAddresses()
   }
 
-  if (process.env[`${cli_options.network.toUpperCase()}_PROVIDER`] === undefined) {
+  const provider = process.env[`${cli_options.network.toUpperCase()}_PROVIDER`]
+  if (provider === undefined) {
     throw Error(
       `Could not find any connector for ${chalk.magenta(cli_options.network)}. Please specify ${chalk.yellow(
         `${cli_options.network.toUpperCase()}_PROVIDER`
@@ -156,12 +157,13 @@ export async function parseOptions(): Promise<HoprOptions> {
     )
   }
 
+
   let options: HoprOptions = {
     debug: cli_options.debug || false,
     bootstrapNode: cli_options.bootstrapNode,
     network: cli_options.network,
     bootstrapServers: [...bootstrapServerMap.values()],
-    provider: process.env[`${cli_options.network.toUpperCase()}_PROVIDER`],
+    provider: provider,
     output(encoded: Uint8Array) {
       const { latency, msg } = decodeMessage(encoded)
 
