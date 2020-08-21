@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-chat",
-  "version": "1.4.2",
+  "version": "1.5.0",
   "description": "Interactive chat PoC for HOPR Protocol",
   "main": "src/index.ts",
   "scripts": {
@@ -70,7 +70,10 @@
       "js",
       "json"
     ],
-    "testPathIgnorePatterns": ["<rootDir>/lib", "node_modules"],
+    "testPathIgnorePatterns": [
+      "<rootDir>/lib",
+      "node_modules"
+    ],
     "testRegex": ".spec.ts$",
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
