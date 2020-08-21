@@ -42,10 +42,19 @@ class LogStream {
     sock.send(this.messages.join('\n'))
   }
 
+
   log(...args: string[]){
     const msg = `[${new Date().toISOString()}] ${args.join(' ')}`
-    // @ts-ignore
-    debugLog(...args) 
+    this._log(msg)
+  }
+
+  logFullLine(...args: string[]){
+    const msg = `${args.join(' ')}`
+    this._log(msg)
+  }
+
+  _log(msg: string){
+    debugLog(msg) 
 
     this.messages.push(msg)
     if (this.messages.length > 100){ // Avoid memory leak
@@ -139,10 +148,10 @@ function setupAdminServer(logs: LogStream, node: Hopr<HoprCoreConnector>){
   wsServer.on('connection', socket => {
     socket.on('message', message => {
       debugLog("Message from client", message)
-      logs.log(`\n admin > ${message}`)
+      logs.logFullLine(`admin > ${message}`)
       cmds.execute(message.toString()).then( (resp) => {
         if (resp) {
-          logs.log('\n' + resp)
+          logs.logFullLine(resp)
         }
       })
       // TODO
