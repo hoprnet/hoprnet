@@ -42,7 +42,7 @@ For further informations on how to run **HOPR Chat** using Docker, please see ou
 
 To contribute to the project, please follow the next steps to learn how to install the source code's dependencies, compile the project from scratch, and run it locally from your computer.
 
-## Install depedencies
+### Install depedencies
 ```
 yarn
 ```
@@ -52,7 +52,7 @@ yarn
 yarn build
 ```
 
-## Run application
+### Run application
 
 ```
 HOST_IPV4=0.0.0.0:9091
