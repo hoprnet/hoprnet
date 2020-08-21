@@ -18,6 +18,8 @@ export class Bouncebot implements Bot{
   timestamp: Date
   twitterTimestamp: Date
   status: Map<string, NodeStates>
+  messagesCounter: Map<string, number>
+  winners: Map<string, boolean>
 
   constructor(address: string, timestamp: Date, twitterTimestamp: Date) {
     this.address = address
@@ -25,6 +27,8 @@ export class Bouncebot implements Bot{
     this.twitterTimestamp = twitterTimestamp
     this.botName = '🥊 Bouncerbot'
     this.status = new Map<string, NodeStates>()
+    this.messagesCounter = new Map<string, number>()
+    this.winners = new Map<string, boolean>()
     console.log(`${this.botName} has been added`)
   }
 
@@ -115,7 +119,9 @@ export class Bouncebot implements Bot{
       from: this.address,
       text: getRandomItemFromList(response['isNewUser']),
     })
-    setTimeout(this.hintUser.bind(this), 10000, message)
+    this.messagesCounter.set(message.from, (this.messagesCounter.get(message.from) || 0) + 1)
+    console.log(`Messages from ${message.from} so far are ${this.messagesCounter.get(message.from)}`)
+    if(this.messagesCounter.get(message.from) > 3) { setTimeout(this.hintUser.bind(this), 5000, message) }
   }
 
   async welcomeUser(message) {
@@ -128,10 +134,11 @@ export class Bouncebot implements Bot{
   }
 
   hintUser(message) {
+    console.log(`Hinting ${message.from} about the party...`)
     sendMessage(message.from, {
         from: this.address,
         text: response['hint'],
-      })
+      }, true)
     this.status.set(message.from, NodeStates.IsHinted)
   }
 }

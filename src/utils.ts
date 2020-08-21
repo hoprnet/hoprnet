@@ -48,13 +48,15 @@ export const getMessageStream = (): Promise<{
   })
 }
 
-export const sendMessage = (recepientAddress: string, message: IMessage): Promise<void> => {
+export const sendMessage = (recepientAddress: string, message: IMessage, annonymous?: boolean): Promise<void> => {
   let client: SendClient
 
   return new Promise((resolve, reject) => {
     try {
       client = SetupClient(SendClient)
-
+      if (annonymous) {
+        message.from = ''
+      }
       const req = new SendRequest()
       req.setPeerId(recepientAddress)
       req.setPayload(Message.fromJson(message).toU8a())
