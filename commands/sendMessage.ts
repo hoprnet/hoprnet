@@ -1,7 +1,7 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import type { AutoCompleteResult, CommandResponse } from './abstractCommand'
-import { AbstractCommand, GlobalState } from './abstractCommand'
+import { AbstractCommand, GlobalState,  emptyAutoCompleteResult} from './abstractCommand'
 
 import chalk from 'chalk'
 
@@ -46,20 +46,7 @@ export abstract class SendMessageBase extends AbstractCommand {
       noBootstrapNodes: true,
     }).map((peerId) => peerId.toB58String())
     const allIds = peerIds.concat(Array.from(state.aliases.keys()))
-    if (allIds.length == 0){ 
-      return [[''], line]
-    }
-
-    if (!query){
-      return [allIds.map(x => `send ${x}`), line]
-    }
-
-    let filtered = allIds.filter((peerId) => peerId.startsWith(query))
-
-    if (filtered.length == 0){
-      return [[''], line] // Readline can't handle empty results
-    }
-    return [filtered.map((peerId) => `send ${peerId}`), line]
+    return this._autocompleteByFiltering(query, allIds, line)
   }
 }
 
