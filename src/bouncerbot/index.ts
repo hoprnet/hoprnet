@@ -1,6 +1,5 @@
 import { sendMessage, getRandomItemFromList } from '../utils'
 import { IMessage } from '../message'
-import { ListenResponse } from '@hoprnet/hopr-protos/node/listen_pb'
 import { TweetMessage } from '../twitter'
 import { Bot } from '../bot'
 import { payDai } from '../linkdrop'
@@ -16,10 +15,12 @@ enum NodeStates {
 export class Bouncebot implements Bot{
   botName: string
   address: string
+  timestamp: Date
   status: Map<string, NodeStates>
 
-  constructor(address: string) {
+  constructor(address: string, timestamp: Date) {
     this.address = address
+    this.timestamp = timestamp
     this.botName = '🥊 Bouncerbot'
     this.status = new Map<string, NodeStates>()
     console.log(`${this.botName} has been added`)

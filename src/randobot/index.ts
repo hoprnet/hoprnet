@@ -7,9 +7,11 @@ import { generateRandomSentence } from '../utils'
 export class Randombot implements Bot {
   botName: string
   address: string
+  timestamp: Date
 
-  constructor(address: string) {
+  constructor(address: string, timestamp: Date) {
     this.address = address
+    this.timestamp = timestamp
     this.botName = '🃏 Randobot'
     console.log(`${this.botName} has been added`)
   }

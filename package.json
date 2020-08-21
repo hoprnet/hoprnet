@@ -36,7 +36,8 @@
     "grpc": "^1.24.3",
     "pm2": "^4.4.0",
     "rimraf": "^3.0.2",
-    "tinyurl": "1.1.7"
+    "tinyurl": "1.1.7",
+    "wait-for-stuff": "^1.4.0"
   },
   "devDependencies": {
     "@types/dotenv": "^8.2.0",

@@ -4,6 +4,7 @@ import dotenvParse from 'dotenv-parse-variables'
 let parsed: {
   API_URL: string
   BOT_NAME: string
+  BOT_TIMESTAMP: number
   TWITTER_API_KEY: string
   TWITTER_API_SECRET: string
   TWITTER_API_ACCESS_TOKEN: string
@@ -17,6 +18,7 @@ let parsed: {
 } = {
   API_URL: '127.0.0.1:50051',
   BOT_NAME: 'randobot',
+  BOT_TIMESTAMP: undefined,
   TWITTER_API_KEY: '',
   TWITTER_API_SECRET: '',
   TWITTER_API_ACCESS_TOKEN: '',
@@ -45,6 +47,7 @@ parsed = {
 
 export const API_URL = parsed.API_URL
 export const BOT_NAME = parsed.BOT_NAME
+export const BOT_TIMESTAMP = parsed.BOT_TIMESTAMP
 export const TWITTER_API_KEY = parsed.TWITTER_API_KEY
 export const TWITTER_API_SECRET = parsed.TWITTER_API_SECRET
 export const TWITTER_API_ACCESS_TOKEN = parsed.TWITTER_API_ACCESS_TOKEN
