@@ -21,5 +21,6 @@
 ## Community
 
 * [HOPR Games](community/hopr-games/README.md)
-  * [Bounties](community/hopr-games/bounties.md)
+  * [Bounties](community/hopr-games/bounties/README.md)
+    * [Bouncer Bot](community/hopr-games/bounties/bouncer-bot.md)
 
