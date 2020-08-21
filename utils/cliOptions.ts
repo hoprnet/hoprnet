@@ -1,4 +1,5 @@
 // Allowed CLI options
+// @ts-ignore
 export const cli_options: string[][] = [
   ['-b', '--bootstrapNode', undefined, 'starts HOPR as a bootstrap node'],
   ['-n', '--network', '<connector>', 'starts HOPR with blockchain connector <connector>'],
@@ -12,12 +13,14 @@ export const cli_options: string[][] = [
   let tmpA: string
   let tmpB: string
   if (a[0] === undefined) {
+    // @ts-ignore
     tmpA = a[1].slice(2)
   } else {
     tmpA = a[0].slice(1)
   }
 
   if (b[0] === undefined) {
+    // @ts-ignore
     tmpB = b[1].slice(2)
   } else {
     tmpB = b[0].slice(1)

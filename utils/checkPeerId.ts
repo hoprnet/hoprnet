@@ -1,6 +1,7 @@
 import chalk from 'chalk'
 
 import PeerId from 'peer-id'
+// @ts-ignore
 import Multihash from 'multihashes'
 import bs58 from 'bs58'
 
