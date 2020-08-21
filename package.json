@@ -50,6 +50,7 @@
     "typescript": "^3.9.7"
   },
   "devDependencies": {
+    "@tsconfig/node12": "^1.0.7",
     "@types/clear": "^0.1.0",
     "@types/jest": "^26.0.10",
     "@types/node": ">=4.2.0 < 13",

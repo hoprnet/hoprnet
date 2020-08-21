@@ -21,8 +21,8 @@ import clear from 'clear'
 import { parseOptions } from './utils'
 import { clearString } from '@hoprnet/hopr-utils'
 import { Commands } from './commands'
-import dependencies from './utils/dependancies'
 import { renderHoprLogo } from './logo'
+import pkg from './package.json'
 
 export * as commands from './commands'
 
@@ -109,11 +109,11 @@ async function main() {
     return
   }
 
-  console.log(`Chat Version: ${chalk.bold(dependencies['@hoprnet/hopr-chat'])}`)
-  console.log(`Core Version: ${chalk.bold(dependencies['@hoprnet/hopr-core'])}`)
-  console.log(`Utils Version: ${chalk.bold(dependencies['@hoprnet/hopr-utils'])}`)
-  console.log(`Connector Version: ${chalk.bold(dependencies['@hoprnet/hopr-core-connector-interface'])}\n`)
-  console.log(`Bootstrap Servers: ${chalk.bold(options.bootstrapServers.map(x => x.id.toB58String()))}\n`)
+  console.log(`Chat Version: ${chalk.bold(pkg.version)}`)
+  console.log(`Core Version: ${chalk.bold(pkg.dependencies['@hoprnet/hopr-core'])}`)
+  console.log(`Utils Version: ${chalk.bold(pkg.dependencies['@hoprnet/hopr-utils'])}`)
+  console.log(`Connector Version: ${chalk.bold(pkg.dependencies['@hoprnet/hopr-core-connector-interface'])}\n`)
+  console.log(`Bootstrap Servers: ${(chalk.bold((options.bootstrapServers || []).map((x:PeerInfo) => x.id.toB58String())))}\n`)
 
   try {
     node = await Hopr.create(options)

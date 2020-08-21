@@ -32,7 +32,7 @@ export abstract class AbstractCommand {
     if (allResults.length == 0){ 
       return emptyAutoCompleteResult(line)
     }
-    const response = x => `${this.name()} ${x}`
+    const response = (x: string) => `${this.name()} ${x}`
     if (!query){ // If the query is an empty string, we show all options.
       return [allResults.map(response), line]
     }
@@ -57,6 +57,8 @@ export abstract class AbstractCommand {
     if (!match){
       return [usage]
     }
+
+    //@ts-ignore : The first element is a string|undefined, but typing this is a nightmare
     return [undefined].concat(parameters.map((x, i) => match[i + 1]))
 
   }
