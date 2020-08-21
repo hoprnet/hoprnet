@@ -11,7 +11,7 @@ capabilities of the [HOPR](https://github.com/hoprnet/hopr-core) protocol, allow
 
 ### From releases
 
-Go to [Releases](./releases) to install the application from a pre-compiled binary. For further instructions on how to do so, please read our [quick start](https://docs.hoprnet.org/home/getting-started/hopr-chat/quickstart) guide or for more experienced users try the [advanced setup](https://docs.hoprnet.org/home/getting-started/hopr-chat/setup).
+Go to [Releases](https://github.com/hoprnet/hopr-chat/releases) to install the application from a pre-compiled binary. For further instructions on how to do so, please read our [quick start](https://docs.hoprnet.org/home/getting-started/hopr-chat/quickstart) guide or for more experienced users try the [advanced setup](https://docs.hoprnet.org/home/getting-started/hopr-chat/setup).
 
 ### From docker images
 
