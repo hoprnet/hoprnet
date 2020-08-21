@@ -9,14 +9,6 @@ capabilities of the [HOPR](https://github.com/hoprnet/hopr-core) protocol, allow
 
 ## Installing
 
-### From source code
-
-To install **HOPR Chat** from source code, clone this repository:
-
-```
-git clone git@github.com:hoprnet/hopr-chat.git
-```
-
 ### From releases
 
 Go to [Releases](./releases) to install the application from a pre-compiled binary. For further instructions on how to do so, please read our [quick start](https://docs.hoprnet.org/home/getting-started/hopr-chat/quickstart) guide or for more experienced users try the [advanced setup](https://docs.hoprnet.org/home/getting-started/hopr-chat/setup).
@@ -37,6 +29,14 @@ docker run -v $(pwd)/db:/app/db \
 ```
 
 For further informations on how to run **HOPR Chat** using Docker, please see our [advanced setup](https://docs.hoprnet.org/home/getting-started/hopr-chat/setup).
+
+### From source code
+
+To install **HOPR Chat** from source code, clone this repository:
+
+```
+git clone git@github.com:hoprnet/hopr-chat.git
+```
 
 ## Development
 
