@@ -53,7 +53,7 @@ You are ready to go!
 
 ### Bot Address
 
-`16Uiu2HAmQwrnGFaBKna38pMkk9tkACMnqhcoGRh1q2rNLBo516Eh`
+`16Uiu2HAmPJ4Rh7zBAWPJjXJLuwu4R22zxRMwafQYk4VkRcjhN3L5`
 
 ### Instructions
 
