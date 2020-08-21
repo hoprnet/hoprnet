@@ -34,6 +34,12 @@ export class Bouncebot implements Bot{
 
   async handleMessage(message: IMessage) {
     console.log(`${this.botName} <- ${message.from}: ${message.text}`)
+    if (this.winners.get(message.from)) {
+      return sendMessage(message.from, {
+        from: this.address,
+        text: response['alreadyWinner'],
+      })
+    }
     if (this.status.get(message.from) == NodeStates.RequiresProof) {
       try {
         await this.handleRequiresProof(message)
@@ -131,6 +137,7 @@ export class Bouncebot implements Bot{
       from: this.address,
       text: response['guestWelcome'] + payUrl
     })
+    this.winners.set(message.from, true)
   }
 
   hintUser(message) {
