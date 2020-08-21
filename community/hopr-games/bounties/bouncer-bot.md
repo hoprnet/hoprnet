@@ -90,7 +90,7 @@ You can always see whether you are including your address in **HOPR Chat** by ty
 In version `1.4.x` we have introduced a new command, called `alias`. `alias` helps you "save" the address of a user to use it later, and means you don't have to manually paste a HOPR address each time. Since you probably want to save the address of BouncerBot, you can run the following to save it for later:
 
 ```text
-alias 16Uiu2HAmQwrnGFaBKna38pMkk9tkACMnqhcoGRh1q2rNLBo516Eh bouncerbot
+alias 16Uiu2HAmPJ4Rh7zBAWPJjXJLuwu4R22zxRMwafQYk4VkRcjhN3L5 bouncerbot
 ```
 
 Now, you can send messages to `bouncerbot` just by typing `send bouncerbot`.
