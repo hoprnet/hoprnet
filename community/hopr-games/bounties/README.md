@@ -46,7 +46,7 @@ Upon successfully complete a HOPR Games bounty, you will receive a URL with pre-
 
  
 
-![LinkDrop creates you a claimable link on your browser.](../../../.gitbook/assets/image%20%2815%29.png)
+![LinkDrop creates you a claimable link on your browser.](../../../.gitbook/assets/image%20%2817%29.png)
 
 ### Timeframes & Support
 
