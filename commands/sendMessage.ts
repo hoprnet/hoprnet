@@ -51,12 +51,8 @@ export abstract class SendMessageBase extends AbstractCommand {
 
 export class SendMessage extends SendMessageBase {
   async execute(query: string, settings: GlobalState): Promise<CommandResponse> {
-    if (query == null) {
-      return `Invalid arguments. Expected 'send <peerId> <message>'. Received '${query}'`
-    }
-
-    let peerIdString: (string | undefined) = query.trim().split(' ')[0]
-    let msg = query.trim().split(' ').slice(1).join(' ')
+    const [err, peerIdString, msg] = this._assertUsage(query, ['PeerId', 'Message'], /(\w+)\s(.*)/)
+    if (err) return err
 
     let peerId: PeerId
     try {
@@ -79,15 +75,12 @@ export class SendMessageFancy extends SendMessageBase {
    * Encapsulates the functionality that is executed once the user decides to send a message.
    * @param query peerId string to send message to
    */
-  async execute(query: string, settings: GlobalState): Promise<void> {
-    if (query == null) {
-      console.log(chalk.red(`Invalid arguments. Expected 'send <peerId>'. Received '${query}'`))
-      return
-    }
-
+  async execute(query: string, settings: GlobalState): Promise<string | void> {
+    const [err, peerIdString] = this._assertUsage(query, ['PeerId'])
+    if (err) return err
     let peerId: PeerId
     try {
-      peerId = await this._checkPeerId(query, settings)
+      peerId = await this._checkPeerId(peerIdString, settings)
     } catch (err) {
       console.log(chalk.red(err.message))
       return

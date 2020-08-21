@@ -45,11 +45,15 @@ export abstract class AbstractCommand {
 
 
   // returns [error, ...params]
-  protected _assertUsage(query: string, parameters: string[]): string[] {
-    const test = new RegExp(parameters.map(x => '(\\w+)' ).join('\\s')) 
+  protected _assertUsage(query: string, parameters: string[], test?: RegExp): string[] {
     const usage = parameters.map(x => `<${x}>`).join(' ')
+    if (!query && parameters.length) {
+      return [`usage: ${this.name} ${usage}`]
+    }
+    if (!test) {
+      test = new RegExp(parameters.map(x => '(\\w+)' ).join('\\s')) 
+    }
     const match = test.exec(query)
-    console.log(test, usage, match)
     if (!match){
       return [`usage: ${this.name} ${usage}`]
     }
