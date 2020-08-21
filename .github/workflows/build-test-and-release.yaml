@@ -73,7 +73,7 @@ jobs:
       - name: Build library
         working-directory: ${{ env.workDir }}
         run: |
-          yarn policies set-version ${{ matrix.yarn-version }}
+          yarn policies set-version 1.19.2
           yarn build
       - name: Set name / email for commit
         run: git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Versioning robot"
@@ -126,7 +126,7 @@ jobs:
       - name: Build library
         working-directory: ${{ env.workDir }}
         run: |
-          yarn policies set-version ${{ matrix.yarn-version }}
+          yarn policies set-version 1.19.2
           yarn build
       - name: Set name / email for commit
         run: git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Versioning robot"
@@ -179,7 +179,7 @@ jobs:
       - name: Build library
         working-directory: ${{ env.workDir }}
         run: |
-          yarn policies set-version ${{ matrix.yarn-version }}
+          yarn policies set-version 1.19.2
           yarn build
       - name: Set name / email for commit
         run: git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Versioning robot"
