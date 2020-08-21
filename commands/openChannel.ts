@@ -59,9 +59,7 @@ export default class OpenChannel extends AbstractCommand {
 
     do {
       tmpFunds = await new Promise<string>((resolve) => this.rl.question(tokenQuestion, resolve))
-      try {
-        funds = new BigNumber(tmpFunds)
-      } catch {}
+      funds = new BigNumber(tmpFunds)
       clearString(tokenQuestion + tmpFunds, this.rl)
 
       if (tmpFunds.length == 0) {

@@ -10,6 +10,7 @@ export default class Settings extends AbstractCommand {
     if (query) {
       for (let c of Object.keys(settings)){
         if (c.startsWith(query)){
+          // @ts-ignore
           filtered[c] = settings[c] 
         }
       }
