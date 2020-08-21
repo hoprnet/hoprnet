@@ -56,6 +56,8 @@ jobs:
         with:
           node-version: '12.9.1'
           registry-url: https://registry.npmjs.org/
+      - name: Use Master
+        run: git fetch origin && git checkout master
       - name: Cache node_modules
         id: cache-modules
         uses: actions/cache@v1
@@ -68,8 +70,11 @@ jobs:
         run: |
           yarn policies set-version 1.19.2
           yarn install --frozen-lockfile
-      - name: Use Master
-        run: git fetch origin && git checkout master
+      - name: Build library
+        working-directory: ${{ env.workDir }}
+        run: |
+          yarn policies set-version ${{ matrix.yarn-version }}
+          yarn build
       - name: Set name / email for commit
         run: git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Versioning robot"
       - name: Bump package.json
@@ -104,6 +109,8 @@ jobs:
         with:
           node-version: '12.9.1'
           registry-url: https://registry.npmjs.org/
+      - name: Use Master
+        run: git fetch origin && git checkout master
       - name: Cache node_modules
         id: cache-modules
         uses: actions/cache@v1
@@ -116,8 +123,11 @@ jobs:
         run: |
           yarn policies set-version 1.19.2 
           yarn install --frozen-lockfile
-      - name: Use Master
-        run: git fetch origin && git checkout master
+      - name: Build library
+        working-directory: ${{ env.workDir }}
+        run: |
+          yarn policies set-version ${{ matrix.yarn-version }}
+          yarn build
       - name: Set name / email for commit
         run: git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Versioning robot"
       - name: Bump package.json
@@ -152,6 +162,8 @@ jobs:
         with:
           node-version: '12.9.1'
           registry-url: https://registry.npmjs.org/
+      - name: Use Master
+        run: git fetch origin && git checkout master
       - name: Cache node_modules
         id: cache-modules
         uses: actions/cache@v1
@@ -164,8 +176,11 @@ jobs:
         run: |
           yarn policies set-version 1.19.2
           yarn install --frozen-lockfile
-      - name: Use Master
-        run: git fetch origin && git checkout master
+      - name: Build library
+        working-directory: ${{ env.workDir }}
+        run: |
+          yarn policies set-version ${{ matrix.yarn-version }}
+          yarn build
       - name: Set name / email for commit
         run: git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Versioning robot"
       - name: Bump package.json
