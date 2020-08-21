@@ -20,6 +20,7 @@ export class Bouncebot implements Bot{
   status: Map<string, NodeStates>
   messagesCounter: Map<string, number>
   winners: Map<string, boolean>
+  winnersTwitter: Map<string, boolean>
 
   constructor(address: string, timestamp: Date, twitterTimestamp: Date) {
     this.address = address
@@ -29,6 +30,7 @@ export class Bouncebot implements Bot{
     this.status = new Map<string, NodeStates>()
     this.messagesCounter = new Map<string, number>()
     this.winners = new Map<string, boolean>()
+    this.winnersTwitter = new Map<string, boolean>()
     console.log(`${this.botName} has been added`)
   }
 
@@ -73,6 +75,18 @@ export class Bouncebot implements Bot{
   async handleRequiresProof(message) {
     const tweet = new TweetMessage(message.text)
     await tweet.fetch()
+    if (this.winnersTwitter.get(tweet.screen_name)) {
+      return sendMessage(message.from, {
+        from: this.address,
+        text: response['alreadyTwitterWinner'],
+      })
+    }
+    if (tweet.isBlackListed(tweet.screen_name)) {
+      return sendMessage(message.from, {
+        from: this.address,
+        text: response['blacklisted'],
+      })
+    }
     if (!tweet.isAfterTimestamp(this.twitterTimestamp)) {
       return sendMessage(message.from, {
         from: this.address,
@@ -102,6 +116,7 @@ export class Bouncebot implements Bot{
       text: getRandomItemFromList(response['tweetSuccess']),
     })
     this.status.set(message.from, NodeStates.InGuestList)
+    this.winnersTwitter.set(tweet.screen_name, true)
     setTimeout(this.welcomeUser.bind(this), 2000, message)
   }
 
