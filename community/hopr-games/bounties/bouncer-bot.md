@@ -15,12 +15,26 @@ Go to [https://github.com/hoprnet/hopr-chat/releases/tag/v1.4.2](https://github.
 
 {% tab title="AVADO" %}
 Using your DAppStore manager, paste `QmZPsazCHREvYnGbFfDVXDSXh5AtTRrzHUGbi4eN7CejXH` to download and install the HOPR Node DAppNode app.
+
+**Note for AVADO/DAppNode users.**
+
+The existing version of **HOPR Node** available in the store is a bit limited, and does not have yet all the features the normal client has. We are working to sync the **HOPR Node** client with our existing **HOPR Chat** application. In the meantime, to participate with the bounty, you need to manually include your address as the command `includeRecipient` isn't available at the moment in your node. To do so, just add your address into the "message" section, followed by a colon \(`:`\).
+
+![An example on how to send a message from a HOPR Node in an AVADO/DAppNode](../../../.gitbook/assets/image%20%2819%29.png)
+
+The bot responses will show up in your terminal logs. 
+
+![](../../../.gitbook/assets/image%20%2820%29.png)
+
+Follow the instructions and do not hesitate to reach us in [Telegram](http://t.me/hoprnet) for questions.
 {% endtab %}
 
 {% tab title="HOPR Node PC" %}
 You are ready to go!
 {% endtab %}
 {% endtabs %}
+
+
 
 #### Additional Requirements
 
@@ -86,6 +100,4 @@ Now, you can send messages to `bouncerbot` just by typing `send bouncerbot`.
 Time to get into the party! Message `bouncerbot` to try and enter the party. It might take multiple tries before you can get in. Good luck!
 
 ![](https://media.giphy.com/media/xT5LMWSMSsE5lji9LW/giphy.gif)
-
-
 
