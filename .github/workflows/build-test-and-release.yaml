@@ -114,6 +114,7 @@ jobs:
         working-directory: ${{ env.workDir }}
         if: steps.cache-modules.outputs.cache-hit != 'true'
         run: |
+          yarn policies set-version ${{ matrix.yarn-version }}
           yarn install --frozen-lockfile
       - name: Use Master
         run: git fetch origin && git checkout master
