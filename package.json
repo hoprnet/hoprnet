@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-chat",
-  "version": "1.3.1",
+  "version": "1.4.2",
   "description": "Interactive chat PoC for HOPR Protocol",
   "main": "src/index.ts",
   "scripts": {
