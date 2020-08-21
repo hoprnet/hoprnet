@@ -6,13 +6,21 @@ description: 'HOPR Games Bounty #3 - Can you get into the party?'
 
 ### Requirements
 
-**Windows, Linux, MacOS users**
+{% tabs %}
+{% tab title="Windows, Linux, MacOS" %}
+Go to [https://github.com/hoprnet/hopr-chat/releases/tag/v1.4.2](https://github.com/hoprnet/hopr-chat/releases/tag/v1.4.2) and download the HOPR Chat file corresponding to your operating system. Follow our Quick start guide if you have any troubles.
 
-* HOPR Chat - [https://github.com/hoprnet/hopr-chat/releases/tag/v1.4.0](https://github.com/hoprnet/hopr-chat/releases/tag/v1.4.0)
+{% page-ref page="../../../getting-started/hopr-chat/quickstart.md" %}
+{% endtab %}
 
-**HOPR Node PC, AVADO users**
+{% tab title="AVADO" %}
+Using your DAppStore manager, paste `QmZPsazCHREvYnGbFfDVXDSXh5AtTRrzHUGbi4eN7CejXH` to download and install the HOPR Node DAppNode app.
+{% endtab %}
 
-* HOPR Node - `QmZPsazCHREvYnGbFfDVXDSXh5AtTRrzHUGbi4eN7CejXH`
+{% tab title="HOPR Node PC" %}
+You are ready to go!
+{% endtab %}
+{% endtabs %}
 
 #### Additional Requirements
 
