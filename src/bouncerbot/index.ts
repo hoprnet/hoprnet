@@ -41,7 +41,7 @@ export class Bouncebot implements Bot{
         }) 
       }
     }
-    else if (message.text.toLowerCase() === 'party') {
+    else if (message.text.match(/.*?\b(party)/i)) {
       if (this.status.has(message.from)) { 
         switch (this.status.get(message.from)) {
            case NodeStates.IsHinted:
