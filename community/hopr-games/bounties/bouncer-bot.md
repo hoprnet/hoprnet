@@ -61,29 +61,29 @@ Next, fire up **HOPR Chat**! You should be able to see a prompt to showcase ever
 
 **Time to identify yourself**
 
-Before entering the party, you need to identify yourself. To do so, run the command `includeRecipient` which will embed your address to all messages you send.
+Before entering the party, you need to identify yourself. To do so, run the command `includeRecipient` which will embed your address before all messages you send.
 
 {% hint style="warning" %}
-Make sure you run `includeRecipient` before going forward! Without doing so, BouncerBot will not be able to reach you back.
+Make sure you run `includeRecipient` before proceeding! Otherwise, BouncerBot will not be able to reply to you.
 {% endhint %}
 
-You can always see whether you are including your settings in **HOPR Chat** by typing `settings`. 
+You can always see whether you are including your address in **HOPR Chat** by typing `settings`. 
 
 ![](../../../.gitbook/assets/image%20%2816%29.png)
 
 **Name the bot**
 
-On version `1.4.x` we have introduced a new command, called `alias`. `alias` helps you "save" the address of a user to use it later. Since you probably want to save the address of BouncerBot, you can run the following to save it for later:
+In version `1.4.x` we have introduced a new command, called `alias`. `alias` helps you "save" the address of a user to use it later, and means you don't have to manually paste a HOPR address each time. Since you probably want to save the address of BouncerBot, you can run the following to save it for later:
 
 ```text
 alias 16Uiu2HAmQwrnGFaBKna38pMkk9tkACMnqhcoGRh1q2rNLBo516Eh bouncerbot
 ```
 
-Now, `bouncerbot` is available for all your send messages.
+Now, you can send messages to `bouncerbot` just by typing `send bouncerbot`.
 
 **Try to get into the party**
 
-Time to get into the party! Message `bouncerbot` to try and enter to the party. You might need to give multiple tries before going forward. Good luck!
+Time to get into the party! Message `bouncerbot` to try and enter the party. It might take multiple tries before you can get in. Good luck!
 
 ![](https://media.giphy.com/media/xT5LMWSMSsE5lji9LW/giphy.gif)
 
