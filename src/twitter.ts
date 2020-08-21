@@ -1,4 +1,4 @@
-import { TWITTER_API_ACCESS_TOKEN, TWITTER_API_KEY, TWITTER_API_SECRET, TWITTER_API_ACCESS_TOKEN_SECRET } from './env'
+import { TWITTER_API_ACCESS_TOKEN, TWITTER_API_KEY, TWITTER_API_SECRET, TWITTER_API_ACCESS_TOKEN_SECRET, TWITTER_TIMESTAMP } from './env'
 import TwitterClient from '@hoprnet/twitter-api-client'
 
 const twitterClient = new TwitterClient({
@@ -12,6 +12,7 @@ const twitterClient = new TwitterClient({
 export class TweetMessage {
     url: string
     id: string
+    created_at: Date
     hasfetched: boolean
     hashtags: any
     user_mentions: any
@@ -30,10 +31,16 @@ export class TweetMessage {
         this.hashtags = data.entities.hashtags
         this.user_mentions = data.entities.user_mentions
         this.content = data.text
+        this.created_at = new Date(data.created_at)
         this.hasfetched = true
-        console.log('Obtained the following hashtags', this.hashtags);
-        console.log('Obtained the following user_mentions', this.user_mentions);
-        console.log('Obtained the following content', this.content);
+        console.log(`The tweet was created on ${this.created_at}`)
+        console.log('The tweet has following hashtags', this.hashtags);
+        console.log('The tweet has following user_mentions', this.user_mentions);
+        console.log('Here is the tweet', this.content);
+    }
+
+    isAfterTimestamp(timestamp: Date): boolean {
+        return this.created_at > timestamp
     }
 
     hasTag(tag: string): boolean {

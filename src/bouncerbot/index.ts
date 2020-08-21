@@ -16,11 +16,13 @@ export class Bouncebot implements Bot{
   botName: string
   address: string
   timestamp: Date
+  twitterTimestamp: Date
   status: Map<string, NodeStates>
 
-  constructor(address: string, timestamp: Date) {
+  constructor(address: string, timestamp: Date, twitterTimestamp: Date) {
     this.address = address
     this.timestamp = timestamp
+    this.twitterTimestamp = twitterTimestamp
     this.botName = '🥊 Bouncerbot'
     this.status = new Map<string, NodeStates>()
     console.log(`${this.botName} has been added`)
@@ -61,20 +63,36 @@ export class Bouncebot implements Bot{
   async handleRequiresProof(message) {
     const tweet = new TweetMessage(message.text)
     await tweet.fetch()
-    // check if the the tweet is valid
-    if (tweet.hasTag('hoprgames') && tweet.hasMention('hoprnet') && tweet.hasSameHOPRNode(message.from)) {
-      sendMessage(message.from, {
+    if (!tweet.isAfterTimestamp(this.twitterTimestamp)) {
+      return sendMessage(message.from, {
         from: this.address,
-        text: getRandomItemFromList(response['tweetSuccess']),
-      })
-      this.status.set(message.from, NodeStates.InGuestList)
-      setTimeout(this.welcomeUser.bind(this), 2000, message)
-    } else {
-      sendMessage(message.from, {
-        from: this.address,
-        text: getRandomItemFromList(response['tweetFailure']),
-      })
+        text: getRandomItemFromList(response['tweetIsOld']),
+      }) 
     }
+    if (!tweet.hasTag('hoprgames')) {
+      return sendMessage(message.from, {
+        from: this.address,
+        text: getRandomItemFromList(response['tweetHasNoTag']),
+      })
+    } 
+    if(!tweet.hasMention('hoprnet')) {
+      return sendMessage(message.from, {
+        from: this.address,
+        text: getRandomItemFromList(response['tweetHasNoMention']),
+      })
+    } 
+    if(!tweet.hasSameHOPRNode(message.from)) {
+      return sendMessage(message.from, {
+        from: this.address,
+        text: getRandomItemFromList(response['tweetHasWrongNode']),
+      })
+    } 
+    sendMessage(message.from, {
+      from: this.address,
+      text: getRandomItemFromList(response['tweetSuccess']),
+    })
+    this.status.set(message.from, NodeStates.InGuestList)
+    setTimeout(this.welcomeUser.bind(this), 2000, message)
   }
 
   handleIsHinted(message) {

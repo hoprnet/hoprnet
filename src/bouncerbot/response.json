@@ -9,6 +9,18 @@
     "tweetSuccess": [
         " Huh. \nSorry, guess I missed you the first time. \nGo on inside. \nSomeone will turn up soon to show you around."
     ],
+    "tweetHasNoTag": [
+        " Ah, do not forget to include the #HOPRGames tag in your tweet."
+    ],
+    "tweetHasNoMention": [
+        " Oh, we really need you to mention @hoprnet in your tweet!"
+    ],
+    "tweetHasWrongNode": [
+        " That doesn‘t seem to be your HOPR Address... You are not trying to use someone else‘s tweet right?"
+    ],
+    "tweetIsOld": [
+        " Oh... that tweet seems awfully old. Maybe try with a new one!"
+    ],
     "tweetFailure": [
         " Mmm... something went wrong with your tweet. Are you sure it has HOPRGames, @hoprnet and YOUR node address?"
     ],

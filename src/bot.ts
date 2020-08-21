@@ -7,6 +7,7 @@ export interface Bot {
     botName: string
     address: string
     timestamp: Date
+    twitterTimestamp: Date
     handleMessage(message: IMessage)
 }
 
@@ -34,8 +35,8 @@ const listen = async (bot: Bot) => {
 }
 
 export async function setupBot(bot: Bot) {
-  const timestamp = bot.timestamp;
-  console.log(`Starting bot at ${timestamp}`)
-  wait.for.date(timestamp);
+  console.log(`Starting bot at ${bot.timestamp}`)
+  console.log(`Listening to Tweets created after ${bot.twitterTimestamp}`)
+  wait.for.date(bot.timestamp);
   await listen(bot);
 } 
