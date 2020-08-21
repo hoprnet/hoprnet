@@ -126,6 +126,7 @@ describe('Commands', () => {
     let mockNode: any = jest.fn()
     mockNode.sendMessage = jest.fn()
     let mockReadline: any = jest.fn()
+    mockReadline.write = jest.fn()
 
     mockReadline.question = jest.fn((question, resolve) => {
       expect(question).toEqual('send >')

@@ -1,8 +1,8 @@
 import type PeerId from 'peer-id'
+import chalk from 'chalk'
 
 export type AutoCompleteResult = [string[], string] 
 export const emptyAutoCompleteResult = (line: string):AutoCompleteResult => [[''], line]
-
 export type CommandResponse = string | void
 
 export type GlobalState = {
@@ -46,16 +46,16 @@ export abstract class AbstractCommand {
 
   // returns [error, ...params]
   protected _assertUsage(query: string, parameters: string[], test?: RegExp): string[] {
-    const usage = parameters.map(x => `<${x}>`).join(' ')
+    const usage = chalk.red(`usage: ${parameters.map(x => `<${x}>`).join(' ')}`)
     if (!query && parameters.length) {
-      return [`usage: ${this.name} ${usage}`]
+      return [usage]
     }
     if (!test) {
       test = new RegExp(parameters.map(x => '(\\w+)' ).join('\\s')) 
     }
     const match = test.exec(query)
     if (!match){
-      return [`usage: ${this.name} ${usage}`]
+      return [usage]
     }
     return [undefined].concat(parameters.map((x, i) => match[i + 1]))
 

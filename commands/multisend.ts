@@ -6,6 +6,8 @@ import type Hopr from '@hoprnet/hopr-core'
 import readline from 'readline'
 import chalk from 'chalk'
 import type PeerId from 'peer-id'
+import { getPeersIdsAsString } from '../utils'
+import { clearString } from '@hoprnet/hopr-utils'
 
 export class MultiSendMessage extends SendMessageBase {
   constructor(public node: Hopr<HoprCoreConnector>, public rl: readline.Interface) {
@@ -16,10 +18,9 @@ export class MultiSendMessage extends SendMessageBase {
   help() { return 'sends multiple messages to another party, "quit" exits.'}
 
   private async checkArgs(query: string, settings: GlobalState): Promise<PeerId> {
-    if (query == null) {
-      throw new Error(`Invalid arguments. Usage: 'multisend <peerId>'.`)
-    }
-    return await this._checkPeerId(query, settings)
+    const [err, id] = this._assertUsage(query, ['PeerId'])
+    if (err) throw new Error(err)
+    return await this._checkPeerId(id, settings)
   }
 
   private async repl(recipient: PeerId, settings: GlobalState): Promise<void>{
@@ -29,8 +30,11 @@ export class MultiSendMessage extends SendMessageBase {
       return;
     } else {
       if (message) {
+        clearString(message, this.rl)
+        this.rl.pause()
+        console.log(`[sending message "${message}"]`)
         await this._sendMessage(settings, recipient, message)
-        console.log('[sending ...]')
+        this.rl.resume()
       }
       await this.repl(recipient, settings);
     }
@@ -45,6 +49,13 @@ export class MultiSendMessage extends SendMessageBase {
       return chalk.red(err.message)
     }
     await this.repl(peerId, settings)
+  }
+
+  async autocomplete(query: string, line: string, state: GlobalState): Promise<AutoCompleteResult> {
+    const allIds = getPeersIdsAsString(this.node, {
+      noBootstrapNodes: true,
+    }).concat(Array.from(state.aliases.keys()))
+    return this._autocompleteByFiltering(query, allIds, line)
   }
 
 }
