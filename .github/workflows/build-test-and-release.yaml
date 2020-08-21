@@ -102,7 +102,7 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v1
         with:
-          node-version: '12'
+          node-version: '12.9.1'
           registry-url: https://registry.npmjs.org/
       - name: Cache node_modules
         id: cache-modules
@@ -114,6 +114,7 @@ jobs:
         working-directory: ${{ env.workDir }}
         if: steps.cache-modules.outputs.cache-hit != 'true'
         run: |
+          yarn policies set-version ${{ matrix.yarn-version }}
           yarn install --frozen-lockfile
       - name: Use Master
         run: git fetch origin && git checkout master
@@ -131,7 +132,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - uses: actions/setup-node@v1
         with:
-          node-version: 12
+          node-version: 12.9.1
           registry-url: 'https://npm.pkg.github.com'
       - name: Publish to GPR
         run: npm config set //npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }} && npm publish
@@ -149,7 +150,7 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v1
         with:
-          node-version: '12'
+          node-version: '12.9.1'
           registry-url: https://registry.npmjs.org/
       - name: Cache node_modules
         id: cache-modules
@@ -179,7 +180,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - uses: actions/setup-node@v1
         with:
-          node-version: 12
+          node-version: 12.9.1
           registry-url: 'https://npm.pkg.github.com'
       - name: Publish to GPR
         run: npm config set //npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }} && npm publish
