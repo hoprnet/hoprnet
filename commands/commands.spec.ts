@@ -54,6 +54,7 @@ describe('Commands', () => {
     let cmds = new mod.Commands(mockNode)
     await cmds.execute('send 16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7 Hello, world')
     expect(mockNode.sendMessage).toHaveBeenCalled()
+    expect(await cmds.execute('send unknown-alias Hello, world')).toMatch(/invalid/i)
   })
 
   it('alias addresses', async () => {
@@ -70,7 +71,6 @@ describe('Commands', () => {
     expect(aliases).toMatch(/test/)
     await cmds.execute('send test Hello, world')
     expect(mockNode.sendMessage).toHaveBeenCalled()
-
   })
 
   it('version', async () => {
@@ -118,6 +118,51 @@ describe('Commands', () => {
 
     let cmds = new mod.Commands(mockNode)
     expect(await cmds.execute('myAddress')).toMatch(/HOPR/)
+  })
+
+  it('multisend', async() => {
+
+    let seq = 0
+    let mockNode: any = jest.fn()
+    mockNode.sendMessage = jest.fn()
+    let mockReadline: any = jest.fn()
+    mockReadline.write = jest.fn()
+    mockReadline.pause = jest.fn()
+    mockReadline.resume = jest.fn()
+
+    mockReadline.question = jest.fn((question, resolve) => {
+      expect(question).toEqual('send >')
+      if (seq == 0){
+        resolve('hello')
+        seq++
+      } else {
+        expect(mockNode.sendMessage).toHaveBeenCalled()
+        resolve('quit')
+      }
+    })
+
+    let cmds = new mod.Commands(mockNode, mockReadline)
+
+    await cmds.execute('alias 16Uiu2HAmQDFS8a4Bj5PGaTqQLME5SZTRNikz9nUPT3G4T6YL9o7V test2')
+    await cmds.execute('multisend test2')
+    expect(mockReadline.question).toHaveBeenCalled()
+  })
+
+  it('autocomplete sendmessage', async() => {
+    let mockNode: any = jest.fn()
+    mockNode.sendMessage = jest.fn()
+    mockNode.bootstrapServers = []
+    mockNode.network = jest.fn()
+    mockNode.network.peerStore = jest.fn()
+    mockNode.network.peerStore.peers = [{id: '16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7' }]
+
+    let cmds = new mod.Commands(mockNode)
+    expect((await cmds.autocomplete('send 16Ui'))[0][0]).toMatch(/send 16U/)
+    expect((await cmds.autocomplete('send foo'))[0][0]).toBe('')
+
+    await cmds.execute('alias 16Uiu2HAmQDFS8a4Bj5PGaTqQLME5SZTRNikz9nUPT3G4T6YL9o7V test')
+
+    expect((await cmds.autocomplete('send t'))[0][0]).toBe("send test")
   })
 })
 

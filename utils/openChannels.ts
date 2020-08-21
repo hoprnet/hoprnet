@@ -29,6 +29,17 @@ export function getPeers(
   return peers
 }
 
+export function getPeersIdsAsString(
+  node: Hopr<HoprCoreConnector>,
+  ops: {
+    noBootstrapNodes: boolean
+  } = {
+    noBootstrapNodes: false,
+  }
+): string[]{
+  return getPeers(node, ops).map(peerId => peerId.toB58String())
+}
+
 /**
  * Get node's open channels by looking into connector's DB.
  * @returns a promise that resolves to an array of peer ids

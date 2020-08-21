@@ -12,6 +12,7 @@ import Ping from './ping'
 import PrintAddress from './printAddress'
 import PrintBalance from './printBalance'
 import { SendMessageFancy, SendMessage } from './sendMessage'
+import { MultiSendMessage } from './multisend'
 import StopNode from './stopNode'
 import Version from './version'
 import Tickets from './tickets'
@@ -43,12 +44,13 @@ export class Commands {
       new Version(),
       new Tickets(node),
       new Settings(),
-      new Alias(),
+      new Alias(node),
     ]
 
     if(rl) {
       this.commands.push(new OpenChannel(node, rl))
       this.commands.push(new SendMessageFancy(node, rl))
+      this.commands.push(new MultiSendMessage(node, rl))
       this.commands.push(new IncludeRecipientFancy(node, rl))
     } else {
       this.commands.push(new SendMessage(node))
@@ -99,7 +101,7 @@ export class Commands {
     const [command, query]: (string | undefined)[] = message.trim().split(/\s+/).slice(0)
     const cmd = await this.find(command)
     if (cmd) {
-      return cmd.autocomplete(query, message)
+      return cmd.autocomplete(query, message, this.state)
     }
     // Command not found - try assuming it's an incomplete command
     const hits = this.allCommands().reduce((acc: string[], name: string) => {

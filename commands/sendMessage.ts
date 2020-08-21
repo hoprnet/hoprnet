@@ -1,19 +1,19 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import type { AutoCompleteResult, CommandResponse } from './abstractCommand'
-import { AbstractCommand, GlobalState } from './abstractCommand'
+import { AbstractCommand, GlobalState,  emptyAutoCompleteResult} from './abstractCommand'
 
 import chalk from 'chalk'
 
 import type PeerId from 'peer-id'
 
-import { checkPeerIdInput, encodeMessage, getOpenChannels, getPeers } from '../utils'
+import { checkPeerIdInput, encodeMessage, getOpenChannels, getPeersIdsAsString } from '../utils'
 import { clearString } from '@hoprnet/hopr-utils'
 import { MAX_HOPS } from '@hoprnet/hopr-core/lib/constants'
 
 import readline from 'readline'
 
-abstract class SendMessageBase extends AbstractCommand {
+export abstract class SendMessageBase extends AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {
     super()
   }
@@ -41,35 +41,18 @@ abstract class SendMessageBase extends AbstractCommand {
     }
   }
 
-  async autocomplete(query: string, line: string): Promise<AutoCompleteResult> {
-    const peerIds = getPeers(this.node, {
+  async autocomplete(query: string, line: string, state: GlobalState): Promise<AutoCompleteResult> {
+    const allIds = getPeersIdsAsString(this.node, {
       noBootstrapNodes: true,
-    }).map((peerId) => peerId.toB58String())
-    const validPeerIds = query ? peerIds.filter((peerId) => peerId.startsWith(query)) : peerIds
-
-    if (!validPeerIds.length) {
-      console.log(
-        chalk.red(
-          `\nDoesn't know any other node except apart from bootstrap node${
-            this.node.bootstrapServers.length == 1 ? '' : 's'
-          }!`
-        )
-      )
-      return [[''], line]
-    }
-
-    return [validPeerIds.map((peerId) => `send ${peerId}`), line]
+    }).concat(Array.from(state.aliases.keys()))
+    return this._autocompleteByFiltering(query, allIds, line)
   }
 }
 
 export class SendMessage extends SendMessageBase {
   async execute(query: string, settings: GlobalState): Promise<CommandResponse> {
-    if (query == null) {
-      return `Invalid arguments. Expected 'send <peerId> <message>'. Received '${query}'`
-    }
-
-    let peerIdString: (string | undefined) = query.trim().split(' ')[0]
-    let msg = query.trim().split(' ').slice(1).join(' ')
+    const [err, peerIdString, msg] = this._assertUsage(query, ['PeerId', 'Message'], /(\w+)\s(.*)/)
+    if (err) return err
 
     let peerId: PeerId
     try {
@@ -92,17 +75,15 @@ export class SendMessageFancy extends SendMessageBase {
    * Encapsulates the functionality that is executed once the user decides to send a message.
    * @param query peerId string to send message to
    */
-  async execute(query: string, settings: GlobalState): Promise<void> {
-    if (query == null) {
-      console.log(chalk.red(`Invalid arguments. Expected 'send <peerId>'. Received '${query}'`))
-      return
-    }
-
+  async execute(query: string, settings: GlobalState): Promise<string | void> {
+    const [err, peerIdString] = this._assertUsage(query, ['PeerId'])
+    if (err) return err
     let peerId: PeerId
     try {
-      peerId = await this._checkPeerId(query, settings)
+      peerId = await this._checkPeerId(peerIdString, settings)
     } catch (err) {
       console.log(chalk.red(err.message))
+      return
     }
 
     const manualPath = process.env.MULTIHOP
