@@ -52,7 +52,7 @@ export class Bouncebot implements Bot{
     } else {
       sendMessage(message.from, {
         from: this.address,
-        text: ` ${this.botName} isn’t amused...`,
+        text: ` No loitering! I'm ${this.botName}, and if you want to get inside you'll need to tell me why you're here.`,
       })
     }
   }
