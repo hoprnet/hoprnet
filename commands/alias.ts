@@ -3,8 +3,6 @@ import { checkPeerIdInput, getPeersIdsAsString } from '../utils'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 
-const COMMAND_FORMAT = /([A-Za-z0-9]{53})\s([A-Za-z0-9]*)/
-
 export class Alias extends AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {
     super()
@@ -14,12 +12,8 @@ export class Alias extends AbstractCommand {
   help() { return 'alias an address with a more memorable name' }
 
   async execute(query: string, settings: GlobalState): Promise<string | void> {
-    const match = COMMAND_FORMAT.exec(query)
-    if (!match){
-      return "usage: alias <PeerId> <Name>"
-    }
-    const id = match[1]
-    const name = match[2]
+    const [err, id, name] = this._assertUsage(query, ['PeerId', 'Name'])
+    if (err) return err
 
     try {
       let peerId = await checkPeerIdInput(id)

@@ -42,4 +42,18 @@ export abstract class AbstractCommand {
     }
     return [filtered.map(response), line]
   }
+
+
+  // returns [error, ...params]
+  protected _assertUsage(query: string, parameters: string[]): string[] {
+    const test = new RegExp(parameters.map(x => '(\\w+)' ).join('\\s')) 
+    const usage = parameters.map(x => `<${x}>`).join(' ')
+    const match = test.exec(query)
+    console.log(test, usage, match)
+    if (!match){
+      return [`usage: ${this.name} ${usage}`]
+    }
+    return [undefined].concat(parameters.map((x, i) => match[i + 1]))
+
+  }
 }
