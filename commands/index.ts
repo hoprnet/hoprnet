@@ -44,7 +44,7 @@ export class Commands {
       new Version(),
       new Tickets(node),
       new Settings(),
-      new Alias(),
+      new Alias(node),
     ]
 
     if(rl) {

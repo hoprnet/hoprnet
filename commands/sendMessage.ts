@@ -7,7 +7,7 @@ import chalk from 'chalk'
 
 import type PeerId from 'peer-id'
 
-import { checkPeerIdInput, encodeMessage, getOpenChannels, getPeers } from '../utils'
+import { checkPeerIdInput, encodeMessage, getOpenChannels, getPeersIdsAsString } from '../utils'
 import { clearString } from '@hoprnet/hopr-utils'
 import { MAX_HOPS } from '@hoprnet/hopr-core/lib/constants'
 
@@ -42,10 +42,9 @@ export abstract class SendMessageBase extends AbstractCommand {
   }
 
   async autocomplete(query: string, line: string, state: GlobalState): Promise<AutoCompleteResult> {
-    const peerIds = getPeers(this.node, {
+    const allIds = getPeersIdsAsString(this.node, {
       noBootstrapNodes: true,
-    }).map((peerId) => peerId.toB58String())
-    const allIds = peerIds.concat(Array.from(state.aliases.keys()))
+    }).concat(Array.from(state.aliases.keys()))
     return this._autocompleteByFiltering(query, allIds, line)
   }
 }
