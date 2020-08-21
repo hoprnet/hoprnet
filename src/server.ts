@@ -16,6 +16,12 @@ import Multihash from 'multihashes'
 import bs58 from 'bs58'
 import { addPubKey } from '@hoprnet/hopr-core/lib/utils'
 import { getBootstrapAddresses } from "@hoprnet/hopr-utils"
+import { commands } from '@hoprnet/hopr-chat'
+
+import chalk from 'chalk'
+
+// @ts-ignore
+chalk.level = 0 // We need bare strings
 
 const CRAWL_TIMEOUT = 100_000 // ~15 mins
 
@@ -119,10 +125,8 @@ function parseHosts(): HoprOptions['hosts'] {
   return hosts
 }
 
-
-const SEND_REGEX = /^send ([a-zA-Z0-9]{53}) (.*)$/
-
-function setupAdminServer(logs: LogStream, onMessage: (msg: string) => void){
+function setupAdminServer(logs: LogStream, node: Hopr<HoprCoreConnector>){
+  let cmds = new commands.Commands(node)
   var app = express()
   app.get('/', function(req, res){
     res.set('Content-Type', 'text/html')
@@ -135,7 +139,13 @@ function setupAdminServer(logs: LogStream, onMessage: (msg: string) => void){
   wsServer.on('connection', socket => {
     socket.on('message', message => {
       debugLog("Message from client", message)
-      onMessage(message.toString())
+      logs.log(`\n admin > ${message}`)
+      cmds.execute(message.toString()).then( (resp) => {
+        if (resp) {
+          logs.log('\n' + resp)
+        }
+      })
+      // TODO
     });
     socket.on('error', err => {
       debugLog('Error', err)
@@ -153,43 +163,6 @@ async function main() {
   let addr: Multiaddr;
   let logs = new LogStream()
 
-  async function onMessage(message: string){
-    logs.log("Command received: ", message);
-    let match = message.match(SEND_REGEX)
-    let peerId: PeerId
-    if (match) {
-      if (NODE) {
-        logs.log("SEND MESSAGE TO", match[1])
-        logs.log("MESSAGE: ", match[2])
-        peerId = await checkPeerIdInput(match[1])
-
-        NODE.sendMessage(encode([match[2], Date.now()]), peerId).then( () => {
-
-        })
-      } else {
-        logs.log("Cannot perform command - node is not connected - please wait for connection")
-      }
-    } else {
-      logs.log("BAD COMMAND: at the moment we only support 'send <address> <message>'")
-    }
-
-  }
-
-  setupAdminServer(logs, onMessage);
-
-  
-  function logMessageToNode(msg: Uint8Array){
-    logs.log("#### NODE RECEIVED MESSAGE ####")
-    try {
-      let [decoded, time] = decode(msg) as [Buffer, Buffer]
-      logs.log("Message:", decoded.toString())
-      logs.log("Latency:", Date.now() - parseInt(time.toString('hex'), 16) + 'ms')
-    } catch (err) {
-      logs.log("Could not decode message", err)
-      logs.log(msg.toString())
-    }
-  }
-
   let options: HoprOptions = {
     debug: Boolean(process.env.DEBUG),
     network,
@@ -206,6 +179,23 @@ async function main() {
 
   NODE = await Hopr.create(options);
   logs.log('Created HOPR Node')
+
+
+  setupAdminServer(logs, NODE);
+
+  
+  function logMessageToNode(msg: Uint8Array){
+    logs.log("#### NODE RECEIVED MESSAGE ####")
+    try {
+      let [decoded, time] = decode(msg) as [Buffer, Buffer]
+      logs.log("Message:", decoded.toString())
+      logs.log("Latency:", Date.now() - parseInt(time.toString('hex'), 16) + 'ms')
+    } catch (err) {
+      logs.log("Could not decode message", err)
+      logs.log(msg.toString())
+    }
+  }
+
 
   NODE.on("peer:connect", (peer: PeerInfo) => {
     logs.log(`Incoming connection from ${peer.id.toB58String()}.`);
