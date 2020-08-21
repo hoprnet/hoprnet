@@ -14,7 +14,7 @@ capabilities of the [HOPR](https://github.com/hoprnet/hopr-core) protocol, allow
 To install **HOPR Chat** from source code, clone this repository:
 
 ```
-git@github.com:hoprnet/hopr-chat.git
+git clone git@github.com:hoprnet/hopr-chat.git
 ```
 
 ### From releases
