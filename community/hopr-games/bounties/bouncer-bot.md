@@ -53,7 +53,9 @@ You are ready to go!
 
 ### Bot Address
 
-`16Uiu2HAmPJ4Rh7zBAWPJjXJLuwu4R22zxRMwafQYk4VkRcjhN3L5`
+1st Session - `16Uiu2HAmPJ4Rh7zBAWPJjXJLuwu4R22zxRMwafQYk4VkRcjhN3L5`
+
+2nd Session - `16Uiu2HAm74fuLiKiWahfK7S8JyL3keSoZXHx9W2FzQGRJtWn15Mb`
 
 ### Instructions
 
