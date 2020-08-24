@@ -260,7 +260,7 @@ class Crawler<Chain extends HoprCoreConnector> {
       contactedNodes += `\n        ${peerId}`
     })
 
-    console.log(
+    log(
       `Crawling results:\n    ${chalk.yellow(`contacted nodes:`)}: ${contactedNodes}\n    ${chalk.green(
         `new nodes`
       )}: ${now - before} node${now - before == 1 ? '' : 's'}\n    total: ${now} node${now == 1 ? '' : 's'}`

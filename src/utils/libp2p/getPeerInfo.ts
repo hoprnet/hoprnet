@@ -4,6 +4,8 @@ import { keys } from 'libp2p-crypto'
 import { LevelUp } from 'levelup'
 import chalk from 'chalk'
 import { deserializeKeyPair, serializeKeyPair, askForPassword, privKeyToPeerId } from '..'
+import debug from 'debug'
+const log = debug('hopr-core:libp2p')
 
 import { NODE_SEEDS, BOOTSTRAP_SEEDS } from '@hoprnet/hopr-demo-seeds'
 
@@ -119,7 +121,7 @@ async function recoverIdentity(serializedKeyPair: Uint8Array, pw?: string): Prom
       peerId = await deserializeKeyPair(serializedKeyPair, new TextEncoder().encode(pw))
       done = true
     } catch (err) {
-      console.log(`Could not recover id from database with given password. Please type it in manually.`)
+      log(`Could not recover id from database with given password. Please type it in manually.`)
     }
   }
 
@@ -132,7 +134,7 @@ async function recoverIdentity(serializedKeyPair: Uint8Array, pw?: string): Prom
     } catch {}
   }
 
-  console.log(`Successfully recovered ${chalk.blue((peerId as PeerId).toB58String())} from database.`)
+  log(`Successfully recovered ${chalk.blue((peerId as PeerId).toB58String())} from database.`)
 
   return peerId as PeerId
 }

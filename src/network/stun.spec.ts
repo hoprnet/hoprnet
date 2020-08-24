@@ -14,7 +14,6 @@ describe('test the STUN functionalities', function () {
   }
 
   it('should launch a STUN server and connect to it', async function () {
-    console.log('!!!')
     const bootstrap = await generateNode({
       bootstrapNode: true,
       hosts: {
