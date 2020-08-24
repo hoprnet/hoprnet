@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events'
-import { Injectable } from '@nestjs/common'
+import { Injectable, Inject } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { default as dotenvParseVariables } from 'dotenv-parse-variables'
 import Hopr from '@hoprnet/hopr-core'
@@ -27,10 +27,9 @@ export type StartOptions = {
 
 @Injectable()
 export class CoreService {
-  private node: Hopr<HoprCoreConnector>
   private events = new EventEmitter()
 
-  constructor(private configService: ConfigService, private parserService: ParserService) {}
+  constructor(private configService: ConfigService, private parserService: ParserService, @Inject('HoprNode') private node?: Hopr<HoprCoreConnector>) {}
 
   @mustBeStarted()
   private async findChannel(channelId: string) {
@@ -97,7 +96,7 @@ export class CoreService {
 
       console.log(':: HOPR Options ::', options)
       console.log(':: Starting HOPR Core Node ::')
-      setNode(await Hopr.create({
+      setNode(this.node || await Hopr.create({
         id: options.id,
         debug: options.debug,
         bootstrapNode: options.bootstrapNode,
