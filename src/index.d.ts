@@ -6,7 +6,7 @@ import type * as DbKeys from './dbKeys'
 import type * as Constants from './constants'
 import type Indexer from './indexer'
 import type Tickets from './tickets'
-import PathFinder from './path'
+import PathSelection from './pathSelection'
 
 declare interface HoprCoreConnectorStatic {
   /**
@@ -122,7 +122,7 @@ declare interface HoprCoreConnector {
   /**
    * Instance of the path finding algortihm
    */
-  readonly path: PathFinder
+  readonly path: PathSelection
 
   /**
    * Returns unique information about the connector.
