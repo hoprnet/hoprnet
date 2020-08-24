@@ -123,6 +123,11 @@ class Header extends React.Component {
                             </Link>
                           </li>
                           <li>
+                            <Link to="/node" onClick={this.closeMenu} style={{ textDecoration: 'none' }}>
+                              Order Node PC
+                            </Link>
+                          </li>
+                          <li>
                             <Link
                               to="/do-business-with-HOPR"
                               onClick={this.closeMenu}
