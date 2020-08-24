@@ -38,7 +38,7 @@ class Heartbeat<Chain extends HoprCoreConnector> implements AbstractInteraction<
       (source: any) => {
         return async function* (this: Heartbeat<Chain>) {
           if (this.options?.timeoutIntentionally) {
-            await new Promise((resolve) => setTimeout(resolve, HEARTBEAT_TIMEOUT + 100))
+            return await new Promise((resolve) => setTimeout(resolve, HEARTBEAT_TIMEOUT + 100))
           }
 
           for await (const msg of source) {

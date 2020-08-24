@@ -7,7 +7,7 @@ describe('test the STUN functionalities', function () {
     const node = new Stun(options)
 
     if (options.bootstrapNode) {
-      await node.startServer(0)
+      await node.startServer(3480)
     }
 
     return node
@@ -24,7 +24,7 @@ describe('test the STUN functionalities', function () {
     const external = await Stun.getExternalIP([
       {
         hostname: '127.0.0.1',
-        port: 3478,
+        port: 3480,
       },
     ])
 

@@ -14,8 +14,8 @@ import { PACKET_SIZE, MAX_HOPS } from './constants'
 
 import { Network } from './network'
 
-import { addPubKey, getPeerInfo } from './utils'
-import { randomSubset, createDirectoryIfNotExists, u8aToHex } from '@hoprnet/hopr-utils'
+import { addPubKey, getPeerInfo, pubKeyToPeerId } from './utils'
+import { createDirectoryIfNotExists, u8aToHex } from '@hoprnet/hopr-utils'
 
 import levelup, { LevelUp } from 'levelup'
 import leveldown from 'leveldown'
@@ -58,6 +58,8 @@ export type HoprOptions = {
     ip6?: NetOptions
   }
 }
+
+const MAX_ITERATIONS_PATH_SELECTION = 2000
 
 export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
   public interactions: Interactions<Chain>
@@ -326,21 +328,22 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
    * @param destination instance of peerInfo that contains the peerId of the destination
    */
   async getIntermediateNodes(destination: PeerId): Promise<PeerId[]> {
-    const filter = (peer: string) =>
-      peer !== this.peerInfo.id.toB58String() &&
-      peer !== destination.toB58String() &&
-      // exclude bootstrap server(s) from crawling results
-      !this.bootstrapServers.some((pInfo: PeerInfo) => pInfo.id.toB58String() !== peer)
+    const start = new this.paymentChannels.types.Public(this.peerInfo.id.pubKey.marshal())
+    const exclude = [
+      destination.pubKey.marshal(),
+      ...this.bootstrapServers.map((pInfo) => pInfo.id.pubKey.marshal()),
+    ].map((pubKey) => new this.paymentChannels.types.Public(pubKey))
 
-    try {
-      await this.network.crawler.crawl(filter)
-    } catch {}
-
-    const array = []
-    for (const peerInfo of this.peerStore.peers.values()) {
-      array.push(peerInfo)
-    }
-    return randomSubset(array, MAX_HOPS - 1, filter).map((peerInfo: PeerInfo) => peerInfo.id)
+    return await Promise.all(
+      (
+        await this.paymentChannels.path.findPath(
+          start,
+          MAX_HOPS,
+          MAX_ITERATIONS_PATH_SELECTION,
+          (node) => !exclude.includes(node)
+        )
+      ).map((pubKey) => pubKeyToPeerId(pubKey))
+    )
   }
 
   static openDatabase(
