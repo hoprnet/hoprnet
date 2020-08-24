@@ -5,40 +5,88 @@ import { Public } from '../types'
 
 import Path from '.'
 
-const PRIV_KEY_SIZE = 32
+function gcd(a: number, b: number) {
+  a = Math.abs(a)
+  b = Math.abs(b)
 
-const NODE_COUNT = 10
-const EDGE_COUNT = 10
+  if (b > a) {
+    var temp = a
+    a = b
+    b = temp
+  }
 
-async function generateGraph() {
+  while (true) {
+    if (b == 0) return a
+    a %= b
+    if (a == 0) return b
+    b %= a
+  }
+}
+
+function findGenerator(nodesCount: number, previousGenerator?: number) {
+  for (let i = previousGenerator != null ? previousGenerator + 1 : 2; i < nodesCount; i++) {
+    if (gcd(i, nodesCount) == 1) {
+      return i
+    }
+  }
+  return -1
+}
+
+async function generateGraph(nodesCount: number) {
   const nodes = []
-  for (let i = 0; i < NODE_COUNT; i++) {
+
+  for (let i = 0; i < nodesCount; i++) {
     nodes.push(await Public.fromPrivKey(randomBytes(32)))
   }
 
   const edges = new Map<Public, Public[]>()
 
-  for (let i = 0; i < EDGE_COUNT; i++) {
-    const a = nodes[i % NODE_COUNT]
-    const b = nodes[(i + 4) % NODE_COUNT]
+  if (nodesCount <= 1) {
+    return { nodes, edges }
+  }
+
+  if (nodesCount == 2) {
+    edges.set(nodes[0], [nodes[1]])
+    edges.set(nodes[1], [nodes[0]])
+
+    return { nodes, edges }
+  }
+
+  // find generators
+  let generator = findGenerator(nodesCount)
+  let secondGenerator = findGenerator(nodesCount, generator)
+  let thirdGenerator = findGenerator(nodesCount, secondGenerator)
+
+  console.log(generator, secondGenerator, thirdGenerator, nodesCount)
+
+  if (generator < 0) {
+    throw Error(`Failed to find generator`)
+  }
+
+  // This should generate a fully connected network
+  for (let i = 0; i < nodesCount; i++) {
+    const a = nodes[i % nodesCount]
+    const b = nodes[(i + generator) % nodesCount]
+    const c = nodes[(i + secondGenerator) % nodesCount]
+    const d = nodes[(i + thirdGenerator) % nodesCount]
 
     const nodesFromA = edges.get(a) || []
-    nodesFromA.push(b)
+    nodesFromA.push(b, c, d)
     edges.set(a, nodesFromA)
-
-    const nodesFromB = edges.get(b) || []
-    nodesFromB.push(a)
-    edges.set(b, nodesFromB)
   }
 
   return { nodes, edges }
 }
 
-function generateConnector(nodes: Public[], edges: Map<Public, Public[]>) {
+function generateConnector(edges: Map<Public, Public[]>) {
   const connector = ({
     indexer: {
-      get({ partyA }: { partyA: Public }) {
-        const connectedNodes = edges.get(partyA)
+      get({ partyA }: { partyA: Public }, filter?: (node: Public) => boolean) {
+        let connectedNodes = edges.get(partyA)
+
+        if (filter != null) {
+          connectedNodes = connectedNodes.filter(filter)
+        }
 
         if (connectedNodes == null) {
           return Promise.resolve([])
@@ -59,20 +107,39 @@ function generateConnector(nodes: Public[], edges: Map<Public, Public[]>) {
   return connector
 }
 
-function checkGraph(path: Public[], edges: Map<Public, Public[]>) {
+function validPath(path: Public[], edges: Map<Public, Public[]>) {
   for (let i = 0; i < path.length - 1; i++) {
-    const edge = edges.get(path[i])
-    assert(edge != null && edge.includes(path[i + 1]))
+    const edgeSet = edges.get(path[i])
+
+    if (edgeSet == null || !edgeSet.includes(path[i + 1])) {
+      return false
+    }
   }
+
+  return true
+}
+
+function noCircles(path: Public[]) {
+  for (let i = 1; i < path.length; i++) {
+    if (path.slice(0, i).includes(path[i]) || path.slice(i + 1).includes(path[i])) {
+      return false
+    }
+  }
+
+  return true
 }
 
 describe('test pathfinder', function () {
   it('should find a path', async function () {
-    const { nodes, edges } = await generateGraph()
+    const { nodes, edges } = await generateGraph(101)
 
-    const connector = generateConnector(nodes, edges)
+    const connector = generateConnector(edges)
 
-    const path = await connector.path.findPath(nodes[0], 4)
-    checkGraph(path, edges)
+    const path = await connector.path.findPath(nodes[0], 8)
+
+    assert(
+      path.length == 8 && noCircles(path) && validPath(path, edges),
+      'Should find a valid acyclic path that goes through all nodes'
+    )
   })
 })

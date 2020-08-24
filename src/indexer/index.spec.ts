@@ -484,5 +484,41 @@ describe('test indexer', function () {
       assert.equal(allChannels.length, 1, 'check Channels.onOpenedChannel logIndex')
       assert.equal(allChannels[0].channelEntry.logIndex.toNumber(), 2, 'check Channels.onOpenedChannel logIndex')
     })
+
+    it('should filter channels', async function () {
+      // @ts-ignore
+      await connector.indexer.onOpenedChannel({
+        returnValues: {
+          opener: new Public(userA.pubKey),
+          counterparty: new Public(userB.pubKey),
+        },
+        blockNumber: 1,
+        transactionIndex: 0,
+        logIndex: 2,
+      })
+
+      // @ts-ignore
+      await connector.indexer.onOpenedChannel({
+        returnValues: {
+          opener: new Public(userB.pubKey),
+          counterparty: new Public(userC.pubKey),
+        },
+        blockNumber: 1,
+        transactionIndex: 0,
+        logIndex: 3,
+      })
+
+      const filter1 = (node: Public) => !node.eq(userA.pubKey)
+      const filter2 = (node: Public) => node.eq(userA.pubKey)
+
+      const allChannelsFilter1 = await connector.indexer.get(undefined, filter1)
+      const allChannelsFilter2 = await connector.indexer.get(undefined, filter2)
+
+      assert.equal(allChannelsFilter1.length, 1, 'check filter function')
+      assert.equal(allChannelsFilter2.length, 0, 'check filter function')
+
+      const allChannelsFilter3 = await connector.indexer.get({ partyA: new Public(userB.pubKey) }, filter1)
+      assert.equal(allChannelsFilter3.length, 1, 'check filter function')
+    })
   })
 })

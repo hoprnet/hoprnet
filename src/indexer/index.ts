@@ -112,7 +112,7 @@ class Indexer implements IIndexer {
    *
    * @returns promise that resolves to a list of channel entries
    */
-  private async getAll(party?: Public): Promise<Channel[]> {
+  private async getAll(party: Public | undefined, filter?: (node: Public) => boolean): Promise<Channel[]> {
     const { dbKeys, db } = this.connector
     const channels: Channel[] = []
 
@@ -125,7 +125,11 @@ class Indexer implements IIndexer {
         .on('data', ({ key, value }: { key: Buffer; value: Buffer }) => {
           const [partyA, partyB] = dbKeys.ChannelEntryParse(key)
 
-          if (party != null && !(party.eq(partyA) || party.eq(partyB))) {
+          console.log(filter != null, filter != null && filter(partyA) && filter(partyB))
+          if (
+            (party != null && !(party.eq(partyA) || party.eq(partyB))) ||
+            (filter != null && !(filter(partyA) && filter(partyB)))
+          ) {
             return
           }
 
@@ -189,17 +193,24 @@ class Indexer implements IIndexer {
    * @param query
    * @returns promise that resolves to a list of channel entries
    */
-  public async get(query?: { partyA?: Public; partyB?: Public }): Promise<Channel[]> {
+  public async get(
+    query?: { partyA?: Public; partyB?: Public },
+    filter?: (node: Public) => boolean
+  ): Promise<Channel[]> {
     if (query == null) {
       // query not provided, get all channels
-      return this.getAll()
+      return this.getAll(undefined, filter)
     } else if (query.partyA != null && query.partyB != null) {
+      if (filter != null) {
+        throw Error(`Applying a filter on precise queries is not supported.`)
+      }
       // both parties provided, get channel
       const channel = await this.getSingle(query.partyA, query.partyB)
-      return channel == null ? [] : [channel]
+
+      return channel != null ? [channel] : []
     } else {
       // only one of the parties provided, get all open channels of party
-      return this.getAll(query.partyA != null ? query.partyA : query.partyB)
+      return this.getAll(query.partyA != null ? query.partyA : query.partyB, filter)
     }
   }
 
