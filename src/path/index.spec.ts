@@ -129,13 +129,15 @@ function noCircles(path: Public[]) {
   return true
 }
 
+const MAX_ITERATIONS = 1000
+
 describe('test pathfinder', function () {
   it('should find a path', async function () {
     const { nodes, edges } = await generateGraph(101)
 
     const connector = generateConnector(edges)
 
-    const path = await connector.path.findPath(nodes[0], 8)
+    const path = await connector.path.findPath(nodes[0], 8, MAX_ITERATIONS)
 
     assert(
       path.length == 8 && noCircles(path) && validPath(path, edges),

@@ -5,28 +5,6 @@ import { randomInteger } from '@hoprnet/hopr-utils'
 
 type Path = Public[]
 
-/**
- * returns a - b, "a without b", assuming
- * |a| >> |b|, "a much larger than b"
- * @param a
- * @param b
- */
-function without(a: Public[], b: Public[], filter?: (node: Public) => boolean): Public[] {
-  const toDelete: number[] = []
-
-  for (let i = 0; i < a.length; i++) {
-    if (b.includes(a[i]) || (filter != null && !filter(a[i]))) {
-      toDelete.push(i)
-    }
-  }
-
-  for (let i = 0; i < toDelete.length; i++) {
-    a.splice(toDelete[i] - i, 1)
-  }
-
-  return a
-}
-
 class PathFinder {
   constructor(private coreConnector: HoprEthereum) {}
 
@@ -64,20 +42,18 @@ class PathFinder {
 
       const lastNode = currentPath[currentPath.length - 1]
 
-      const newNodes = (await this.coreConnector.indexer.get({ partyA: lastNode })).map((channel) => {
+      const newNodes = (
+        await this.coreConnector.indexer.get(
+          { partyA: lastNode },
+          (node: Public) => !currentPath.includes(node) && (filter == null || filter(node))
+        )
+      ).map((channel) => {
         if (lastNode.eq(channel.partyA)) {
           return channel.partyB
         } else {
           return channel.partyA
         }
       })
-
-      if (newNodes.length == 0) {
-        queue.pop()
-        continue
-      }
-
-      without(newNodes, currentPath, filter)
 
       if (newNodes.length == 0) {
         queue.pop()
