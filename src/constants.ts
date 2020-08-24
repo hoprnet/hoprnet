@@ -20,20 +20,8 @@ export const PROTOCOL_CRAWLING = `/${PROTOCOL_NAME}/crawl/0.0.1`
 
 export const PROTOCOL_PAYMENT_CHANNEL = `/${PROTOCOL_NAME}/payment/open/0.0.1`
 
-export const PROTOCOL_DELIVER_PUBKEY = `/${PROTOCOL_NAME}/pubKey/0.0.1`
-
 export const PROTOCOL_ONCHAIN_KEY = `/${PROTOCOL_NAME}/onChainKey/0.0.1`
 
-export const PROTOCOL_SETTLE_CHANNEL = `/${PROTOCOL_NAME}/payment/settle/0.0.1`
-
-export const PROTOCOL_STUN = `/${PROTOCOL_NAME}/stun/0.0.1`
-
 export const PROTOCOL_HEARTBEAT = `/${PROTOCOL_NAME}/heartbeat/0.0.1`
-
-export const PROTOCOL_WEBRTC_TURN_REQUEST = `/${PROTOCOL_NAME}/webrtc_turn_request/0.0.1`
-
-export const PROTOCOL_WEBRTC_TURN = `/${PROTOCOL_NAME}/webrtc_turn/0.0.1`
-
-export const PROTOCOL_FORWARD = `/${PROTOCOL_NAME}/forward/0.0.1`
 
 export const DEFAULT_STUN_PORT = 3478
