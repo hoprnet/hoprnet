@@ -244,38 +244,39 @@ const ProfilesAssociation = () => {
 
       {!isCompany && (
         <div className="mt-24" style={{ width: '100%' }}>
-          The HOPR protocol is a digital commons that is currently being built by HOPR Services AG.
-          <br />
-          Find out more about the HOPR Services AG team{' '}
-          <a
+          The HOPR protocol is a digital commons that is currently being built by <a
             href="https://hopr.swiss/who-is-HOPR#team"
             target="_blank"
             rel="noopener noreferrer"
             className="text-color-high underline"
           >
-            here
+            HOPR Services AG
           </a>
           .
         </div>
       )}
 
-      <div className="tiles-item reveal-from-bottom" data-reveal-container=".tiles-wrap" data-reveal-delay="300">
+      {/* <div className="tiles-item reveal-from-bottom" data-reveal-container=".tiles-wrap" data-reveal-delay="300">
         <div className="tiles-item-inner">
-          <a href="https://hopr.swiss/who-is-HOPR#team" target="_blank" rel="noopener noreferrer">
-            <div className="team-item-header">
-              <div className="team-item-image mb-24 ">
-                <Image
-                  src={require('./../assets/images/logo_old.png')}
-                  alt="HOPR Services AG Avatars"
-                  width={180}
-                  height={180}
-                />
-              </div>
-            </div>
-          </a>
           <div className="team-item-content">
             <h5 className="team-item-name mt-0 mb-4">HOPR Services AG</h5>
             <div className="team-item-role text-xs fw-500 mb-8">Platform development</div>
+          </div>
+        </div>
+      </div> */}
+
+      <div className="tiles-item reveal-from-bottom mt-32" data-reveal-container=".tiles-wrap" data-reveal-delay="300">
+        <div className="tiles-item-inner">
+          <div className="team-item-content">
+            <h5 className="team-item-name mt-0 mb-12">Grant Receivers</h5>
+            <div className="team-item-role text-xs fw-500 mb-8">
+              <ul>
+                <li>Avado, CH</li>
+                <li>Empathy PR, US</li>
+                <li>S.N. NONI CORPORATION LTD, CY</li>
+                <li>The Wandering Editor, UK</li>
+              </ul>
+            </div>
           </div>
         </div>
       </div>

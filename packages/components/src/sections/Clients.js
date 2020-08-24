@@ -59,44 +59,44 @@ class Clients extends React.Component {
               className="center-content header"
             />
             <ul className="list-reset">
-              <li className="reveal-from-top">
-                <a href="https://www.sedimentum.com/" target="_blank" rel="noopener noreferrer">
+              <li className="reveal-from-top" data-reveal-delay="150">
+                <a href="https://ava.do/" target="_blank" rel="noopener noreferrer">
                   <Image
-                    src={require('../assets/images/partners/sedimentum.png')}
-                    alt="Sedimentum Logo"
+                    src={require('./../assets/images/partners/avado.svg')}
+                    alt="Avado Logo"
                     className={imgClasses}
                     width={124}
                     height={24}
                   />
                 </a>
               </li>
-              {/* <li className="reveal-from-top" data-reveal-delay="150">
-                <a href="https://www.bankfrick.li/en/" target="_blank" rel="noopener noreferrer">
-                  <Image
-                    src={require('./../assets/images/partners/bank-frick.svg')}
-                    alt="Bank Frick Logo"
-                    className={imgClasses}
-                    width={124}
-                    height={24}
-                  />
-                </a>
-              </li> */}
-              {/* <li className="reveal-from-top" data-reveal-delay="150">
-                <a href="https://www.hbl.ch/de/" target="_blank" rel="noopener noreferrer">
-                  <Image
-                    src={require('./../assets/images/partners/hbl.png')}
-                    alt="HBL Logo"
-                    className={imgClasses}
-                    width={124}
-                    height={24}
-                  />
-                </a>
-              </li> */}
               <li className="reveal-from-top" data-reveal-delay="150">
                 <a href="https://www.froriep.com/de/" target="_blank" rel="noopener noreferrer">
                   <Image
                     src={require('../assets/images/partners/froriep.png')}
                     alt="Froriep Logo"
+                    className={imgClasses}
+                    width={124}
+                    height={24}
+                  />
+                </a>
+              </li>
+              <li className="reveal-from-top" data-reveal-delay="150">
+                <a href="https://elrond.com/" target="_blank" rel="noopener noreferrer">
+                  <Image
+                    src={require('./../assets/images/partners/elrond.png')}
+                    alt="Elrond Logo"
+                    className={imgClasses}
+                    width={124}
+                    height={24}
+                  />
+                </a>
+              </li>
+              <li className="reveal-from-top">
+                <a href="https://www.sedimentum.com/" target="_blank" rel="noopener noreferrer">
+                  <Image
+                    src={require('../assets/images/partners/sedimentum.png')}
+                    alt="Sedimentum Logo"
                     className={imgClasses}
                     width={124}
                     height={24}
