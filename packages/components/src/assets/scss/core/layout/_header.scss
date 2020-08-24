@@ -85,7 +85,7 @@
 	display: none;
 }
 
-@include media( '<=medium' ) {
+@include media( '<large' ) {
 
 	.header-nav-toggle {
 		display: block;

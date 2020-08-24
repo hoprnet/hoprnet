@@ -6,5 +6,10 @@
 
   .team-item-role {
     color: $hopr_grey;
+
+    ul {
+      list-style: none;
+      padding: 0 0;
+    }
   }
 }
