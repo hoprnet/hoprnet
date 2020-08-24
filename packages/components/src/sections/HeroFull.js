@@ -1,7 +1,7 @@
 import React from 'react'
 import classNames from 'classnames'
 import { SectionProps } from '../utils/SectionProps'
-import Image from '../elements/Image'
+import Button from '../elements/Button'
 
 const propTypes = {
   ...SectionProps.types,
@@ -55,15 +55,29 @@ class HeroFull extends React.Component {
                     We're proud to build the HOPR network for the HOPR Association.
                   </p>
                 ) : (
-                  <>
-                    <p className="m-0 mb-32 reveal-from-top big-title pb-32" data-reveal-delay="300">
-                      Changing Data Privacy For Good
-                    </p>
-                    <p className="reveal-from-top" data-reveal-delay="350">
-                      The HOPR protocol ensures everyone has control of their privacy, data, and identity.
-                    </p>
-                  </>
-                )}
+                    <>
+                      <p className="m-0 mb-32 reveal-from-top big-title pb-32" data-reveal-delay="300">
+                        Changing Data Privacy For Good
+                      </p>
+                      {/* <div className="order_circle">
+                        Order a HOPR Node PC
+                      </div>*/}
+                      <p className="m-0 mb-32 reveal-from-top" data-reveal-delay="350">
+                        The HOPR protocol ensures everyone has control of their privacy, data, and identity.
+                      </p>
+                      <Button
+                        color="primary"
+                        tag="a"
+                        href="/node"
+                        target="_blank"
+                        className="reveal-from-top"
+                        rel="noopener noreferrer"
+                        data-reveal-delay="400"
+                      >
+                        Order a HOPR Node PC
+                      </Button>
+                    </>
+                  )}
               </div>
             </div>
             {/* <div className="hero-figure reveal-from-bottom" data-reveal-delay="600">
