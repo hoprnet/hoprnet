@@ -8,6 +8,7 @@ service Send {
 message SendRequest {
   string peer_id = 1;
   bytes payload = 2;
+  repeated string intermediate_peer_ids = 3;
 }
 
 message SendResponse {
