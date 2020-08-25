@@ -7,9 +7,11 @@ import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 
 @Module({})
 export class AppModule {
-  static register(options: {
-    node?: Hopr<HoprCoreConnector>
-  } = {}): DynamicModule {
+  static register(
+    options: {
+      node?: Hopr<HoprCoreConnector>
+    } = {},
+  ): DynamicModule {
     return {
       module: AppModule,
       imports: [
@@ -18,7 +20,7 @@ export class AppModule {
         }),
         NodeModule.register({
           node: options.node,
-          isGlobal: true
+          isGlobal: true,
         }),
         GrpcModule,
       ],

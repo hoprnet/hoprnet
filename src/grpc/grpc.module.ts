@@ -9,4 +9,4 @@ import { GrpcController } from './grpc.controller'
   providers: [GrpcService],
   controllers: [GrpcController],
 })
-export class GrpcModule { }
+export class GrpcModule {}

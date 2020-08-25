@@ -14,7 +14,7 @@ import * as rlp from 'rlp'
 import { ParserService } from './parser/parser.service'
 import { mustBeStarted, getMyOpenChannels } from './core.utils'
 import { pubKeyToPeerId } from '@hoprnet/hopr-core/lib/utils' // @TODO: expose unofficial API
-import { PROVIDER_NAME as HOPR_NODE_PROVIDER } from "../node.module"
+import { PROVIDER_NAME as HOPR_NODE_PROVIDER } from '../node.module'
 
 export type StartOptions = {
   debug?: boolean
@@ -29,7 +29,11 @@ export type StartOptions = {
 export class CoreService {
   private events = new EventEmitter()
 
-  constructor(private configService: ConfigService, private parserService: ParserService, @Optional() @Inject(HOPR_NODE_PROVIDER) private node: Hopr<HoprCoreConnector>) { }
+  constructor(
+    private configService: ConfigService,
+    private parserService: ParserService,
+    @Optional() @Inject(HOPR_NODE_PROVIDER) private node: Hopr<HoprCoreConnector>,
+  ) {}
 
   @mustBeStarted()
   private async findChannel(channelId: string) {
@@ -52,8 +56,7 @@ export class CoreService {
   // @TODO: handle if already starting
   async start(): Promise<void> {
     if (this.started) return
-    if (typeof this.node !== "undefined") return
-
+    if (typeof this.node !== 'undefined') return
 
     const envOptions = dotenvParseVariables({
       debug: this.configService.get('DEBUG'),
@@ -73,8 +76,10 @@ export class CoreService {
     // At the moment, if it's run as a bootstrap node, we shouldn't add
     // boostrap nodes.
     if (!envOptions.bootstrapNode) {
-      console.log(":: Starting a server ::", envOptions)
-      const bootstrapServerMap = await getBootstrapAddresses(envOptions.bootstrapServers ? envOptions.bootstrapServers.join(',') : undefined)
+      console.log(':: Starting a server ::', envOptions)
+      const bootstrapServerMap = await getBootstrapAddresses(
+        envOptions.bootstrapServers ? envOptions.bootstrapServers.join(',') : undefined,
+      )
       bootstrapServers = [...bootstrapServerMap.values()]
     } else {
       bootstrapServers = []
@@ -108,9 +113,7 @@ export class CoreService {
       output: this.parserService.outputFunctor(this.events),
     })
     console.log(':: HOPR Core Node Started ::')
-
   }
-
 
   // @TODO: handle if already stopping
   async stop(): Promise<{ timestamp: number }> {
@@ -133,7 +136,7 @@ export class CoreService {
   }> {
     try {
       await this.node.network.crawler.crawl()
-    } catch { }
+    } catch {}
 
     const id = this.node.peerInfo.id.toB58String()
     const multiAddresses = this.node.peerInfo.multiaddrs.toArray().map((multiaddr) => multiaddr.toString())
@@ -253,14 +256,14 @@ export class CoreService {
       undefined,
       selfIsPartyA
         ? {
-          balance: channelFunding,
-          balance_a: channelFunding,
-        }
+            balance: channelFunding,
+            balance_a: channelFunding,
+          }
         : {
-          balance: channelFunding,
-          // @ts-ignore
-          balance_a: new Balance(0),
-        },
+            balance: channelFunding,
+            // @ts-ignore
+            balance_a: new Balance(0),
+          },
     )
 
     await connector.channel.create(

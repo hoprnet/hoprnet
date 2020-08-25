@@ -8,7 +8,7 @@ import { ParserService } from './parser/parser.service'
   exports: [CoreService],
 })
 export class CoreModule implements OnModuleInit, OnModuleDestroy {
-  constructor(private coreService: CoreService) { }
+  constructor(private coreService: CoreService) {}
 
   async onModuleInit(): Promise<void> {
     await this.coreService.start()

@@ -22,19 +22,22 @@ export async function startServer(node?: Hopr<HoprCoreConnector>) {
   const configService = new ConfigService()
   const host = configService.get('SERVER_HOST') || '0.0.0.0:50051'
 
-  const app = await NestFactory.createMicroservice<MicroserviceOptions>(AppModule.register({
-    node
-  }), {
-    transport: Transport.GRPC,
-    options: {
-      url: host,
-      package: PROTO_PACKAGES,
-      protoPath: PROTO_FILES,
-      loader: {
-        includeDirs: [HOPR_PROTOS_FOLDER_DIR],
+  const app = await NestFactory.createMicroservice<MicroserviceOptions>(
+    AppModule.register({
+      node,
+    }),
+    {
+      transport: Transport.GRPC,
+      options: {
+        url: host,
+        package: PROTO_PACKAGES,
+        protoPath: PROTO_FILES,
+        loader: {
+          includeDirs: [HOPR_PROTOS_FOLDER_DIR],
+        },
       },
     },
-  })
+  )
 
   app.enableShutdownHooks()
 
@@ -46,4 +49,3 @@ export async function startServer(node?: Hopr<HoprCoreConnector>) {
 if (typeof module !== 'undefined' && !module.parent) {
   startServer()
 }
-
