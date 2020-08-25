@@ -108,14 +108,16 @@ export class GrpcService {
     }))
   }
 
-  async send({ peerId, payload }: SendRequest.AsObject): Promise<SendResponse.AsObject> {
+  // @ts-ignore
+  async send({ peerId, payload, intermediatePeerIds }: SendRequest.AsObject): Promise<SendResponse.AsObject> {
     // if payload is a string, convert it to a Uint8Array
     if (typeof payload === 'string') {
       payload = stringToU8a(payload)
     }
 
-    return this.coreService.send({ peerId, payload }).then(() => ({
-      intermediatePeerIdsList: [],
+    // @ts-ignore
+    return this.coreService.send({ peerId, payload, intermediatePeerIds: intermediatePeerIds ?? [] }).then((res) => ({
+      intermediatePeerIds: res.intermediatePeerIds,
     }))
   }
 
