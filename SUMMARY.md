@@ -13,10 +13,13 @@
   * [Funding account](getting-started/hopr-chat/funding-account.md)
   * [Troubleshooting](getting-started/hopr-chat/troubleshooting.md)
 
-## Main Concepts
+## Resources
 
-* [Background](main-concepts/background.md)
-* [Technical Description](main-concepts/technical-description.md)
+* [Glossary](resources/glossary.md)
+
+## Core Concepts
+
+* [Protocol, Network and Token](core-concepts/background.md)
 
 ## Community
 
