@@ -19,7 +19,7 @@
 
 ## Core Concepts
 
-* [Protocol, Network and Token](core-concepts/background.md)
+* [Protocol, Network and Token](core-concepts/protocol-network-token.md)
 
 ## Community
 
