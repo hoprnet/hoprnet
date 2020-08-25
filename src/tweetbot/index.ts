@@ -31,9 +31,13 @@ enum MESSAGES {
 export class Tweetbot implements Bot {
   botName: string
   address: string
+  timestamp: Date
+  twitterTimestamp: Date
 
-  constructor(address: string) {
+  constructor(address: string, timestamp: Date, twitterTimestamp: Date) {
     this.address = address
+    this.timestamp = timestamp
+    this.twitterTimestamp = twitterTimestamp
     this.botName = '🐦 Tweetbot'
     console.log(`${this.botName} has been added`)
   }

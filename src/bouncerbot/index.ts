@@ -1,6 +1,5 @@
 import { sendMessage, getRandomItemFromList } from '../utils'
 import { IMessage } from '../message'
-import { ListenResponse } from '@hoprnet/hopr-protos/node/listen_pb'
 import { TweetMessage } from '../twitter'
 import { Bot } from '../bot'
 import { payDai } from '../linkdrop'
@@ -16,17 +15,33 @@ enum NodeStates {
 export class Bouncebot implements Bot{
   botName: string
   address: string
+  timestamp: Date
+  twitterTimestamp: Date
   status: Map<string, NodeStates>
+  messagesCounter: Map<string, number>
+  winners: Map<string, boolean>
+  winnersTwitter: Map<string, boolean>
 
-  constructor(address: string) {
+  constructor(address: string, timestamp: Date, twitterTimestamp: Date) {
     this.address = address
+    this.timestamp = timestamp
+    this.twitterTimestamp = twitterTimestamp
     this.botName = '🥊 Bouncerbot'
     this.status = new Map<string, NodeStates>()
+    this.messagesCounter = new Map<string, number>()
+    this.winners = new Map<string, boolean>()
+    this.winnersTwitter = new Map<string, boolean>()
     console.log(`${this.botName} has been added`)
   }
 
   async handleMessage(message: IMessage) {
     console.log(`${this.botName} <- ${message.from}: ${message.text}`)
+    if (this.winners.get(message.from)) {
+      return sendMessage(message.from, {
+        from: this.address,
+        text: response['alreadyWinner'],
+      })
+    }
     if (this.status.get(message.from) == NodeStates.RequiresProof) {
       try {
         await this.handleRequiresProof(message)
@@ -38,7 +53,7 @@ export class Bouncebot implements Bot{
         }) 
       }
     }
-    else if (message.text.toLowerCase() === 'party') {
+    else if (message.text.match(/.*?\b(party)/i)) {
       if (this.status.has(message.from)) { 
         switch (this.status.get(message.from)) {
            case NodeStates.IsHinted:
@@ -60,20 +75,49 @@ export class Bouncebot implements Bot{
   async handleRequiresProof(message) {
     const tweet = new TweetMessage(message.text)
     await tweet.fetch()
-    // check if the the tweet is valid
-    if (tweet.hasTag('hoprgames') && tweet.hasMention('hoprnet') && tweet.hasSameHOPRNode(message.from)) {
-      sendMessage(message.from, {
+    if (this.winnersTwitter.get(tweet.screen_name)) {
+      return sendMessage(message.from, {
         from: this.address,
-        text: getRandomItemFromList(response['tweetSuccess']),
-      })
-      this.status.set(message.from, NodeStates.InGuestList)
-      setTimeout(this.welcomeUser.bind(this), 2000, message)
-    } else {
-      sendMessage(message.from, {
-        from: this.address,
-        text: getRandomItemFromList(response['tweetFailure']),
+        text: response['alreadyTwitterWinner'],
       })
     }
+    if (tweet.isBlackListed(tweet.screen_name)) {
+      return sendMessage(message.from, {
+        from: this.address,
+        text: response['blacklisted'],
+      })
+    }
+    if (!tweet.isAfterTimestamp(this.twitterTimestamp)) {
+      return sendMessage(message.from, {
+        from: this.address,
+        text: getRandomItemFromList(response['tweetIsOld']),
+      }) 
+    }
+    if (!tweet.hasTag('hoprgames')) {
+      return sendMessage(message.from, {
+        from: this.address,
+        text: getRandomItemFromList(response['tweetHasNoTag']),
+      })
+    } 
+    if(!tweet.hasMention('hoprnet')) {
+      return sendMessage(message.from, {
+        from: this.address,
+        text: getRandomItemFromList(response['tweetHasNoMention']),
+      })
+    } 
+    if(!tweet.hasSameHOPRNode(message.from)) {
+      return sendMessage(message.from, {
+        from: this.address,
+        text: getRandomItemFromList(response['tweetHasWrongNode']),
+      })
+    } 
+    sendMessage(message.from, {
+      from: this.address,
+      text: getRandomItemFromList(response['tweetSuccess']),
+    })
+    this.status.set(message.from, NodeStates.InGuestList)
+    this.winnersTwitter.set(tweet.screen_name, true)
+    setTimeout(this.welcomeUser.bind(this), 2000, message)
   }
 
   handleIsHinted(message) {
@@ -96,7 +140,9 @@ export class Bouncebot implements Bot{
       from: this.address,
       text: getRandomItemFromList(response['isNewUser']),
     })
-    setTimeout(this.hintUser.bind(this), 10000, message)
+    this.messagesCounter.set(message.from, (this.messagesCounter.get(message.from) || 0) + 1)
+    console.log(`Messages from ${message.from} so far are ${this.messagesCounter.get(message.from)}`)
+    if(this.messagesCounter.get(message.from) > 3) { setTimeout(this.hintUser.bind(this), 5000, message) }
   }
 
   async welcomeUser(message) {
@@ -106,13 +152,15 @@ export class Bouncebot implements Bot{
       from: this.address,
       text: response['guestWelcome'] + payUrl
     })
+    this.winners.set(message.from, true)
   }
 
   hintUser(message) {
+    console.log(`Hinting ${message.from} about the party...`)
     sendMessage(message.from, {
         from: this.address,
         text: response['hint'],
-      })
+      }, true)
     this.status.set(message.from, NodeStates.IsHinted)
   }
 }
