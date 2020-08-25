@@ -283,7 +283,7 @@ export class CoreService {
   async closeChannel(channelId: string): Promise<string> {
     const channel = await this.findChannel(channelId)
 
-    await channel.instance.initiateSettlement()
+    channel.instance.initiateSettlement()
 
     return channelId
   }
@@ -293,19 +293,23 @@ export class CoreService {
   async send({
     peerId,
     payload,
+    intermediatePeerIds,
   }: {
     peerId: string
     payload: Uint8Array
+    intermediatePeerIds: string[]
   }): Promise<{
     intermediatePeerIds: string[]
   }> {
-    // @TODO: this should be done by hopr-core?
+    // @TODO: should this be done by hopr-core?
     const message = rlp.encode([payload, Date.now()])
 
-    await this.node.sendMessage(message, PeerId.createFromB58String(peerId), async () => [])
+    await this.node.sendMessage(message, PeerId.createFromB58String(peerId), async () =>
+      intermediatePeerIds.map((str) => PeerId.createFromB58String(str)),
+    )
 
     return {
-      intermediatePeerIds: [],
+      intermediatePeerIds,
     }
   }
 

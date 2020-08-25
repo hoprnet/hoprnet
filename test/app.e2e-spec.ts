@@ -5,6 +5,7 @@ import { INestApplication } from '@nestjs/common'
 import { Transport } from '@nestjs/microservices'
 import { Ganache } from '@hoprnet/hopr-testing'
 import { migrate, fund } from '@hoprnet/hopr-ethereum'
+import { durations } from '@hoprnet/hopr-utils'
 import * as grpc from 'grpc'
 import { AppModule } from '../src/app.module'
 import { HOPR_PROTOS_FOLDER_DIR, PROTO_PACKAGES, PROTO_FILES } from '../src/constants'
@@ -114,7 +115,7 @@ describe('GRPC transport', () => {
     // setup blockchain, migrate contracts, fund accounts
     await ganache.start()
     await migrate()
-    await fund(Object.keys(NODES).length)
+    await fund()
 
     bootstrap = await SetupServer(
       {
@@ -295,27 +296,7 @@ describe('GRPC transport', () => {
     })
   })
 
-  // @TODO: requires fix on hopr-core-ethereum,
-  // currently h-c-e awaits until the settlement period is over,
-  // then it closes the channel
-  it.skip("should close Alice's and Bob's channel", async (done) => {
-    const client = SetupClient(ChannelsClient, 'alice')
-
-    const req = new CloseChannelRequest()
-    req.setChannelId(aliceAndBobChannelId)
-
-    client.closeChannel(req, (err, res) => {
-      expect(err).toBeFalsy()
-
-      const data = res.toObject()
-      expect(data.channelId).toBe(aliceAndBobChannelId)
-
-      client.close()
-      done()
-    })
-  })
-
-  it('alice should send a message to bob', async (done) => {
+  it('alice should send a message to bob using no intermediate nodes', async (done) => {
     const client = SetupClient(SendClient, 'alice')
 
     const req = new SendRequest()
@@ -327,6 +308,25 @@ describe('GRPC transport', () => {
 
       const data = res.toObject()
       expect(data.intermediatePeerIdsList).toHaveLength(0)
+
+      client.close()
+      done()
+    })
+  })
+
+  it('alice should send a message to bob using 1 intermediate node', async (done) => {
+    const client = SetupClient(SendClient, 'alice')
+
+    const req = new SendRequest()
+    req.setPeerId(NODES.bob.hoprAddress)
+    req.setPayload(aliceToBobMessage)
+    req.setIntermediatePeerIdsList([NODES.bootstrap.hoprAddress])
+
+    client.send(req, (err, res) => {
+      expect(err).toBeFalsy()
+
+      const data = res.toObject()
+      expect(data.intermediatePeerIdsList).toHaveLength(1)
 
       client.close()
       done()
@@ -362,6 +362,24 @@ describe('GRPC transport', () => {
       expect(err).toBeFalsy()
 
       bob.close()
+    })
+  })
+
+  // @TODO: return transaction hash
+  it("should close Alice's and Bob's channel", async (done) => {
+    const client = SetupClient(ChannelsClient, 'alice')
+
+    const req = new CloseChannelRequest()
+    req.setChannelId(aliceAndBobChannelId)
+
+    client.closeChannel(req, (err, res) => {
+      expect(err).toBeFalsy()
+
+      const data = res.toObject()
+      expect(data.channelId).toBe(aliceAndBobChannelId)
+
+      client.close()
+      done()
     })
   })
 
