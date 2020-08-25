@@ -6,13 +6,13 @@ description: Step and step guide to quickly start using HOPR Chat
 
 ### Before Getting Started
 
-This quickstart guide will help you to quickly install **HOPR Chat** and its dependencies so you can quickly connect to the **HOPR Network.** Please follow the step-by-step instructions to ensure everything works properly.
+This quick-start guide will help you to quickly install **HOPR Chat** and its dependencies so you can quickly connect to the **HOPR Network.** Please follow the step-by-step instructions to ensure everything works.
 
 {% hint style="warning" %}
-**HOPR Chat**, **HOPR** and the **HOPR Network** are early-stage technologies. The currently available early test versions are meant for the brave explorers who are here to build the future of a more private Web3 together with us. Do not rely on HOPR to protect your privacy or assets just yet!
+**HOPR**, **HOPR Chat** and the **HOPR Network** are early-stage technologies. The currently available early test versions are meant for the brave explorers who are here to build the future of a more private Web3 together with us. Do not rely on HOPR to protect your privacy or assets just yet!
 {% endhint %}
 
-As instructions might be different depending on your Operating System \(e.g. Windows, MacOS, Linux\), our instructions will be shown under “Tabs” like the following:
+As instructions might be different depending on your Operating System \(e.g. Windows, MacOS, Linux\), our instructions will be shown under “Tabs” like the following ones. Please select your Operating System before continue reading the guide.
 
 {% tabs %}
 {% tab title="Windows" %}
@@ -34,7 +34,7 @@ Node.js is a JavaScript runtime built on Google Chrome's V8 JavaScript engine, w
 
 ### Download Node.js
 
-Click the following link to download node.js version `12.18.2 LTS` in your computer:
+Click the following link to download Node.js version `12.18.2 LTS` in your computer:
 
 {% tabs %}
 {% tab title="Windows" %}
@@ -208,10 +208,10 @@ Share your address shown by the `myAddress` command to other people. Your HOPR A
 
 You can send a message to other users with the `send` command, to send multiple messages, just repeat the following steps multiple times.
 
-To send a message, type `send` followed by a **HOPR Address** you want to send a message to. So for instance, to send a message to `16Uiu2HAm62VfBkydtQVtKMUaNC3Upe7rYehGu3eLjFAqrxX1vxsx`, you would need to type `send 16Uiu2HAm62VfBkydtQVtKMUaNC3Upe7rYehGu3eLjFAqrxX1vxsx` followed by pressing `Enter`. Afterwards, you can type whatever message you want to send to that **HOPR Node.** and again send your message by hitting `Enter`.
+To send a message, type `send` followed by a **HOPR Address** you want to send a message to. So for instance, to send a message to `16Uiu2HAm62VfBkydtQVtKMUaNC3Upe7rYehGu3eLjFAqrxX1vxsx`, you would need to type `send 16Uiu2HAm62VfBkydtQVtKMUaNC3Upe7rYehGu3eLjFAqrxX1vxsx` followed by pressing `Enter`. Afterwards, you can type whatever message you want to send to that **HOPR Node;** after you have completed your message, send it by hitting `Enter`.
 
 {% hint style="info" %}
-To send a message to another **HOPR Node,** you first need another individual‘s **HOPR Address** to send a message. You can jump to our Telegram to ask other HOPR users to share their **HOPR Address**.
+To send a message to another **HOPR Node,** you first need another individual‘s **HOPR Address** to send a message. You can jump to our Telegram to ask other HOPR users to share their **HOPR Address**. You can see available connected nodes by pressing the key “Tab” after typing `send`, which also functions as an auto-complete \(i.e. shows you possible addresses every time you press the “Tab” key\). For questions, please reach us via [Telegram](https://t.me/hoprnet).
 {% endhint %}
 
 Assuming someone gives you the address `16Uiu2HAmVnjSZeEwKvWxGS4cbZyNgnTzXzU3tRQNAeapJFgeyoBR`, sending a message to them would require you to first write `send`, pasting the the address \(either pressing `Ctrl+V` in Windows or `⌘v` in MacOS\) and then press `Enter`. This would look as follows:
@@ -221,7 +221,7 @@ Assuming someone gives you the address `16Uiu2HAmVnjSZeEwKvWxGS4cbZyNgnTzXzU3tRQ
 Type in your message and press ENTER to send:
 ```
 
-After typing your message, make sure to press `Enter` again. Your message will be sent anonymously to the recipient of the **HOPR Address** and dissappear from your screen. A prompt like the following will show:
+After typing your message, make sure to press `Enter` again. Your message will be sent anonymously to the recipient of the **HOPR Address** and disappear from your screen. A prompt like the following will show:
 
 ```text
 Sending message to 16Uiu2HAmVnjSZeEwKvWxGS4cbZyNgnTzXzU3tRQNAeapJFgeyoBR ...
@@ -243,7 +243,7 @@ Latency: 23577 ms
 
 ## Next Steps
 
-To learn more about our network, please go to our **Main Concepts** section. You can also learn how to connect to a different network by going to our **Advanced Setup.** For more information and updates about the **HOPR Network**, please follow our [Twitter](https://twitter.com/hoprnet). For questions and additional information, please go to our [Telegram](https://t.me/hoprnet) channel.
+To learn more about our network, please go to our **Core Concepts** section. You can also learn how to connect to a different network by going to our **Advanced Setup.** For more information and updates about the **HOPR Network**, please follow our [Twitter](https://twitter.com/hoprnet). For questions and additional information, please go to our [Telegram](https://t.me/hoprnet) channel.
 
-If you do not want to receive HOPR messages anymore, you can just close the terminal window in which you have HOPR Chat running. To **uninstall** just delete the `HOPR Chat` folder containing the program you were running.
+If you do not want to connect to the **HOPR Network** anymore, you can just close the terminal window in which you have **HOPR Chat** running. To **uninstall** just delete the `HOPR Chat` folder you downloaded.
 
