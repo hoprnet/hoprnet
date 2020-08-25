@@ -8,6 +8,8 @@ import type Indexer from './indexer'
 import type Tickets from './tickets'
 import PathSelection from './pathSelection'
 
+export type Currencies = 'NATIVE' | 'HOPR'
+
 declare interface HoprCoreConnectorStatic {
   /**
    * Creates an uninitialised instance.
@@ -83,6 +85,14 @@ declare interface HoprCoreConnector {
    * @param nonce optional specify nonce of the account to run multiple queries simultaneously
    */
   initOnchainValues(nonce?: number): Promise<void>
+
+  /**
+   * Withdraw the connector's native currency or HOPR tokens.
+   * @param currency specify currency to withdraw
+   * @param recipient specify the recipient who will receive the native currency or HOPR tokens
+   * @param amount specify the amount that will be withdrawn
+   */
+  withdraw(currency: Currencies, recipient: string, amount: string): Promise<string>
 
   /**
    * (Static) utils to use in the connector module
