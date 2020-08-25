@@ -56,9 +56,8 @@ export class TweetMessage {
     }
 
     isBlackListed(screen_name: string): boolean {
-        console.log([TWITTER_BLACKLISTED], screen_name)
-        console.log([TWITTER_BLACKLISTED].includes(screen_name))
-        return [TWITTER_BLACKLISTED].includes(screen_name)
+        const alreadyParticipants = TWITTER_BLACKLISTED.split(',')
+        return alreadyParticipants.includes(screen_name)
     }
 
     hasEnoughFollowers(followers_count: number): boolean {
