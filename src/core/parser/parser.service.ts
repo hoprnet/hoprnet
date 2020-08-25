@@ -40,19 +40,6 @@ class Host {
 
 @Injectable()
 export class ParserService {
-  async parseBootstrap(bootstrapServer: string): Promise<ParserError | PeerInfo> {
-    const bootstrapMultiAddress = multiaddr(bootstrapServer.trim())
-    const peerId = bootstrapMultiAddress.getPeerId()
-    const translatedPeerId = PeerId.createFromB58String(peerId)
-    const peerInfoCreationResponse = await PeerInfo.create(translatedPeerId).catch((err) => {
-      return { message: err }
-    })
-    if (peerInfoCreationResponse instanceof PeerInfo) {
-      peerInfoCreationResponse.multiaddrs.add(bootstrapMultiAddress)
-    }
-    return peerInfoCreationResponse
-  }
-
   parseHost(host: string): Promise<ParserError | HoprOptions['hosts']> {
     return new Promise((resolve, reject) => {
       try {

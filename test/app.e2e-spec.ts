@@ -70,7 +70,7 @@ const SetupServer = async (serverOps: Record<string, any>, env: Record<string, a
         isGlobal: true,
         load: [() => env],
       }),
-      AppModule,
+      AppModule.register(),
     ],
   }).compile()
 

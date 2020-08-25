@@ -1,7 +1,7 @@
 import { Module, OnModuleInit, OnModuleDestroy } from '@nestjs/common'
+import { CoreService } from './core.service'
 import { ConfigService } from '@nestjs/config'
 import { ParserService } from './parser/parser.service'
-import { CoreService } from './core.service'
 
 @Module({
   providers: [ConfigService, ParserService, CoreService],
