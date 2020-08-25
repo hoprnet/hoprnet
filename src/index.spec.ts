@@ -2,6 +2,7 @@ import assert from 'assert'
 import Web3 from 'web3'
 import { stringToU8a, u8aEquals } from '@hoprnet/hopr-utils'
 import { Ganache } from '@hoprnet/hopr-testing'
+import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
 import { migrate, fund } from '@hoprnet/hopr-ethereum'
 import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
 import HoprEthereum from '.'
@@ -194,4 +195,57 @@ describe('test connector with 0 ETH and 0 HOPR', function () {
   //     })
   //   })
   // })
+})
+
+describe('test withdraw', function () {
+  const ganache = new Ganache()
+  let web3: Web3
+  let hoprToken: HoprToken
+  let connector: HoprEthereum
+  let alice: Await<ReturnType<typeof getPrivKeyData>>
+  let bob: Await<ReturnType<typeof getPrivKeyData>>
+
+  before(async function () {
+    this.timeout(60e3)
+
+    await ganache.start()
+    await migrate()
+    await fund(1)
+
+    alice = await getPrivKeyData(stringToU8a(NODE_SEEDS[0]))
+    bob = await getPrivKeyData(randomBytes(32))
+
+    web3 = new Web3(configs.DEFAULT_URI)
+    hoprToken = new web3.eth.Contract(HoprTokenAbi as any, configs.TOKEN_ADDRESSES.private)
+    connector = await createNode(alice.privKey)
+
+    await hoprToken.methods.mint(alice.address.toHex(), 100, '0x0', '0x0').send({
+      from: alice.address.toHex(),
+    })
+
+    await connector.start()
+  })
+
+  after(async function () {
+    await connector.stop()
+    await ganache.stop()
+  })
+
+  it('should withdraw 1 wei (ETH)', async function () {
+    const txHash = await connector.withdraw('NATIVE', bob.address.toHex(), '1')
+    // const balance = await web3.eth.getBalance(bob.address.toHex())
+    // console.log("balance", balance)
+
+    assert(txHash.length > 0, 'no transaction hash received')
+    // assert(balance === "1", "balance is not correct")
+  })
+
+  it('should withdraw 1 wei (HOPR)', async function () {
+    const txHash = await connector.withdraw('HOPR', bob.address.toHex(), '1')
+    // const balance = await hoprToken.methods.balanceOf(bob.address.toHex()).call()
+    // console.log("balance", balance)
+
+    assert(txHash.length > 0, 'no transaction hash received')
+    // assert(balance === "1", "balance is not correct")
+  })
 })
