@@ -133,7 +133,7 @@ function releaseSocketFromPort(socket: Socket) {
   return new Promise((resolve, reject) => {
     const onClose = () => {
       socket.removeListener('error', onError)
-      setImmediate(resolve)
+      resolve()
     }
 
     const onError = (err?: Error) => {

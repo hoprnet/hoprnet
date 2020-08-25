@@ -52,9 +52,8 @@ describe('test packet composition and decomposition', function () {
   let testnet: Ganache
 
   beforeEach(async function () {
-    jest.setTimeout(durations.seconds(30))
     testnet = await startTestnet()
-  })
+  }, durations.seconds(30))
 
   afterEach(async function () {
     await testnet.stop()
