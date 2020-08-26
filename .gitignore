@@ -18,3 +18,6 @@ lib
 
 # Exclude filesystem test
 src/fs/filesystem_test
+
+# Exclude vim swap files
+.*
