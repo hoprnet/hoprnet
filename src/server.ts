@@ -16,6 +16,7 @@ import Multihash from 'multihashes'
 import bs58 from 'bs58'
 import { addPubKey } from '@hoprnet/hopr-core/lib/utils'
 import { getBootstrapAddresses } from "@hoprnet/hopr-utils"
+import { startServer } from '@hoprnet/hopr-server'
 
 const CRAWL_TIMEOUT = 100_000 // ~15 mins
 
@@ -216,6 +217,10 @@ async function main() {
     return;
   });
 
+  // Start HOPR server
+  if (true) { // TODO cli flag
+    startServer(NODE)
+  }
 
   async function connectionReport(){
     logs.log(`Node is connected at ${NODE.peerInfo.id.toB58String()}`)
