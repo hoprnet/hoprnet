@@ -57,8 +57,6 @@ async function generateGraph(nodesCount: number) {
   let secondGenerator = findGenerator(nodesCount, generator)
   let thirdGenerator = findGenerator(nodesCount, secondGenerator)
 
-  console.log(generator, secondGenerator, thirdGenerator, nodesCount)
-
   if (generator < 0) {
     throw Error(`Failed to find generator`)
   }
