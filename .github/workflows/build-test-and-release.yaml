@@ -38,11 +38,11 @@ jobs:
         run: |
           yarn policies set-version ${{ matrix.yarn-version }}
           yarn build
-      - name: Test library
-        working-directory: ${{ env.workDir }}
-        run: |
-          yarn policies set-version ${{ matrix.yarn-version }}
-          yarn test
+#      - name: Test library
+#        working-directory: ${{ env.workDir }}
+#        run: |
+#          yarn policies set-version ${{ matrix.yarn-version }}
+#          yarn test
 
 
 #  publish_minor:
