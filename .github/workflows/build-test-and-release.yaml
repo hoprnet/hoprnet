@@ -13,6 +13,7 @@ jobs:
     strategy:
       matrix:
         node-version: [12.9.1]
+        yarn-version: [1.19.2]
 
     steps:
       - uses: actions/checkout@v2
@@ -30,14 +31,17 @@ jobs:
         working-directory: ${{ env.workDir }}
         if: steps.cache-modules.outputs.cache-hit != 'true'
         run: |
+          yarn policies set-version ${{ matrix.yarn-version }}
           yarn install --frozen-lockfile
       - name: Build library
         working-directory: ${{ env.workDir }}
         run: |
+          yarn policies set-version ${{ matrix.yarn-version }}
           yarn build
       - name: Test library
         working-directory: ${{ env.workDir }}
         run: |
+          yarn policies set-version ${{ matrix.yarn-version }}
           yarn test
 
 
