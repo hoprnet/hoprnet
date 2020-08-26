@@ -583,10 +583,10 @@
     ts-node "^8.9.1"
     web3 "^1.2.7"
 
-"@hoprnet/hopr-protos@^0.0.14":
-  version "0.0.14"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-protos/-/hopr-protos-0.0.14.tgz#8f1db2e1c49bf069c08df662da1777569da2e31a"
-  integrity sha512-EIKygpiNYsACwDXPDvTGhYh8ApclfRzTm7xpopz5BI9lDIqsV2vb5+KDD11ZWuyPjjP0QW39F/9EW2vpk1Q6dg==
+"@hoprnet/hopr-protos@^0.1.0":
+  version "0.1.0"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-protos/-/hopr-protos-0.1.0.tgz#9018d7ee58a3e72131661695f69e75db113ac121"
+  integrity sha512-bg0PlxLdFk3f6/zLtPQSUAB9sUNIYhwPFgtr4EOfG/hlCaGCKNBaSCvkD+RnV0Fbk0N/isRS0QxT+S7/+J8rsQ==
   dependencies:
     google-protobuf "^3.12.2"
 
