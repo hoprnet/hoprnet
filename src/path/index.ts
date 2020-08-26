@@ -36,7 +36,6 @@ class PathFinder {
       const currentPath = queue.peek() as Path
 
       if (currentPath.length == targetLength) {
-        console.log(`iterations`, iterations)
         return currentPath
       }
 

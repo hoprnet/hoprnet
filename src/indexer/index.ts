@@ -125,7 +125,6 @@ class Indexer implements IIndexer {
         .on('data', ({ key, value }: { key: Buffer; value: Buffer }) => {
           const [partyA, partyB] = dbKeys.ChannelEntryParse(key)
 
-          console.log(filter != null, filter != null && filter(partyA) && filter(partyB))
           if (
             (party != null && !(party.eq(partyA) || party.eq(partyB))) ||
             (filter != null && !(filter(partyA) && filter(partyB)))

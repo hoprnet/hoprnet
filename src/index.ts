@@ -3,6 +3,7 @@ import Web3 from 'web3'
 import type { LevelUp } from 'levelup'
 import HoprChannelsAbi from './ethereum/abi/HoprChannels.json'
 import HoprTokenAbi from './ethereum/abi/HoprToken.json'
+import type { Currencies } from '@hoprnet/hopr-core-connector-interface'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import chalk from 'chalk'
 import { ChannelFactory } from './channel'
@@ -214,6 +215,35 @@ export default class HoprEthereum implements HoprCoreConnector {
     if (!isListening) {
       throw Error('web3 is not connected')
     }
+  }
+
+  withdraw(currency: Currencies, recipient: string, amount: string): Promise<string> {
+    return new Promise<string>(async (resolve, reject) => {
+      try {
+        if (currency === 'NATIVE') {
+          this.web3.eth
+            .sendTransaction({
+              from: (await this.account.address).toHex(),
+              to: recipient,
+              nonce: await this.account.nonce,
+              value: amount,
+            })
+            .on('transactionHash', (txHash) => resolve(txHash))
+            .catch((err) => reject(err))
+        } else {
+          const tx = await this.signTransaction(this.hoprToken.methods.transfer(recipient, amount), {
+            from: (await this.account.address).toHex(),
+            to: this.hoprChannels.options.address,
+            nonce: await this.account.nonce,
+          })
+
+          tx.send()
+          resolve(tx.transactionHash)
+        }
+      } catch (err) {
+        reject(err)
+      }
+    })
   }
 
   static get constants() {
