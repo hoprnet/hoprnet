@@ -8,6 +8,7 @@
     "docs/",
     "README.md"
   ],
+  "main": "index.js",
   "license": "GPL-3.0-only",
   "scripts": {
     "build": "yarn build:protos",
