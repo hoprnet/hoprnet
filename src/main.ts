@@ -6,22 +6,15 @@ import { HOPR_PROTOS_FOLDER_DIR, PROTO_PACKAGES, PROTO_FILES } from './constants
 import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import Hopr from '@hoprnet/hopr-core'
 
-export async function startServer(node?: Hopr<HoprCoreConnector>) {
-  process.on('unhandledRejection', (error: Error) => {
-    console.error(error)
-    // process.exit(1)
-  })
 
-  process.on('uncaughtException', (error: Error) => {
-    console.error(error)
-    // process.exit(1)
-  })
+export type ServerOpts = {
+  host: string
 
+}
+
+export async function startServer(node?: Hopr<HoprCoreConnector>, opts?: ServerOpts) {
   console.log(':: HOPR Server Starting ::')
-
-  const configService = new ConfigService()
-  const host = configService.get('SERVER_HOST') || '0.0.0.0:50051'
-
+  const host = opts ? opts.host : '0.0.0.0:50051'
   const app = await NestFactory.createMicroservice<MicroserviceOptions>(
     AppModule.register({
       node,
@@ -40,12 +33,20 @@ export async function startServer(node?: Hopr<HoprCoreConnector>) {
   )
 
   app.enableShutdownHooks()
-
   await app.listenAsync()
   console.log(`:: HOPR Server Started at ${host} ::`)
 }
 
 // If module is run as main (ie. from command line)
 if (typeof module !== 'undefined' && !module.parent) {
+  process.on('unhandledRejection', (error: Error) => {
+    console.error(error)
+    // process.exit(1)
+  })
+
+  process.on('uncaughtException', (error: Error) => {
+    console.error(error)
+    // process.exit(1)
+  })
   startServer()
 }
