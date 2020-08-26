@@ -1,5 +1,6 @@
 import { TWITTER_API_ACCESS_TOKEN, TWITTER_API_KEY, TWITTER_API_SECRET, TWITTER_API_ACCESS_TOKEN_SECRET, TWITTER_BLACKLISTED } from './env'
 import TwitterClient from '@hoprnet/twitter-api-client'
+import tweetMock from './tweetMock.json'
 
 const twitterClient = new TwitterClient({
   apiKey: TWITTER_API_KEY,
@@ -8,10 +9,20 @@ const twitterClient = new TwitterClient({
   accessTokenSecret: TWITTER_API_ACCESS_TOKEN_SECRET,
 })
 
+export class TweetState {
+    hasMention: boolean = false
+    hasTag: boolean = false
+    sameNode: boolean = false
+  
+    public isValid() {
+      return this.hasTag && this.hasMention && this.sameNode
+    }
+  }
 
 export class TweetMessage {
     url: string
     id: string
+    status: TweetState
     created_at: Date
     screen_name: string
     hasfetched: boolean
@@ -28,8 +39,9 @@ export class TweetMessage {
         this.hasfetched = false
     }
 
-    async fetch() {
-        const data = await twitterClient.tweets.statusesShowById({ id: this.id })
+    async fetch(options?:{mock: boolean}) {
+        this.status = new TweetState()
+        const data = options.mock ? tweetMock: await twitterClient.tweets.statusesShowById({ id: this.id })
         this.hashtags = data.entities.hashtags
         this.user_mentions = data.entities.user_mentions
         this.content = data.text

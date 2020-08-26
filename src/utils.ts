@@ -64,7 +64,7 @@ export const sendMessage = (recepientAddress: string, message: IMessage, annonym
       client.send(req, (err) => {
         if (err) return reject(err)
 
-        console.log(`-> ${recepientAddress}: ${message.text}`)
+        console.log(`-> ${recepientAddress}:${message.text}`)
         client.close()
         resolve()
       })

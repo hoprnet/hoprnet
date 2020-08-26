@@ -25,6 +25,9 @@ const start = async () => {
       const { Tweetbot } = await import("./tweetbot")
       bot = new Tweetbot(hoprAddress, timestamp, twitterTimestamp)
       break
+    case 'coverbot':
+      const { Coverbot } = await import("./coverbot")
+      bot = new Coverbot(hoprAddress, timestamp, twitterTimestamp)
   }
   await setupBot(bot)
 }
