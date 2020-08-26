@@ -24,9 +24,10 @@
   },
   "dependencies": {
     "@grpc/proto-loader": "^0.5.4",
+    "@hoprnet/hopr-core-ethereum": "^0.3.0",
     "@hoprnet/hopr-protos": "^0.0.9-docs.39fd32b",
     "@hoprnet/hopr-server": "^0.0.1",
-    "@hoprnet/hopr-utils": "^0.1.7-c598e77",
+    "@hoprnet/hopr-utils": "^0.5.2",
     "@hoprnet/twitter-api-client": "^0.1.7",
     "@linkdrop/sdk": "1.1.6",
     "dotenv": "^8.2.0",
@@ -37,7 +38,8 @@
     "pm2": "^4.4.0",
     "rimraf": "^3.0.2",
     "tinyurl": "1.1.7",
-    "wait-for-stuff": "^1.4.0"
+    "wait-for-stuff": "^1.4.0",
+    "web3": "^1.2.11"
   },
   "devDependencies": {
     "@types/dotenv": "^8.2.0",

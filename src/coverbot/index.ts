@@ -1,7 +1,11 @@
 import { sendMessage } from '../utils'
+import Web3 from 'web3';
 import { Bot } from '../bot'
 import { IMessage } from '../message'
 import { TweetMessage, TweetState } from '../twitter'
+//@TODO: Isolate these utilities to avoid importing the entire package
+import { convertPubKeyFromB58String, u8aToHex } from '@hoprnet/hopr-utils'
+import { Utils } from '@hoprnet/hopr-core-ethereum'
 
 
 enum NodeStates {
@@ -77,7 +81,7 @@ export class Coverbot implements Bot {
       const tweet = new TweetMessage(message.text)
       this.tweets.set(message.from, tweet)
 
-      //@TODO: Remove mock for development
+      //@TODO: Remove mock for production to ensure we process tweets.
       /*
       * Careful, it seems that the twitter API truncates some of the text
       * content, so if something isn't in the first 100 characters, it might
@@ -85,7 +89,7 @@ export class Coverbot implements Bot {
       */
       await tweet.fetch({ mock: true })
 
-      if (tweet.hasTag('hoprgames')) {
+      if (tweet.hasTag('hoprnetwork')) {
         tweet.status.hasTag = true
       }
       if(tweet.hasMention('hoprnet')) {
@@ -96,6 +100,15 @@ export class Coverbot implements Bot {
       }
 
       if (tweet.status.isValid()) {
+        const pubkey = await convertPubKeyFromB58String(message.from)
+        const nodeEthereumAddress = u8aToHex(await Utils.pubKeyToAccountId(pubkey.marshal()))
+        const xdaiWeb3 = new Web3(new Web3.providers.HttpProvider('https://dai.poa.network'));
+        const balance = await xdaiWeb3.eth.getBalance(nodeEthereumAddress)
+
+        //@TODO: Move this to an environment variable or read from a contract
+        const XDAI_THRESHOLD = 1
+        console.log(`The xDAI balance of the ${nodeEthereumAddress} is ${Web3.utils.fromWei(balance)}`)
+
         return NodeStates.tweetVerificationSucceeded
       } else {
         return NodeStates.tweetVerificationFailed
