@@ -5,11 +5,6 @@ import PeerInfo from "peer-info";
 import PeerId from "peer-id";
 import Multiaddr from "multiaddr";
 import debug from 'debug'
-import express from 'express'
-import fs from 'fs'
-import path from 'path'
-import ws from 'ws'
-import http from 'http'
 import { encode, decode } from 'rlp'
 // @ts-ignore
 import Multihash from 'multihashes'
@@ -18,6 +13,7 @@ import { addPubKey } from '@hoprnet/hopr-core/lib/utils'
 import { getBootstrapAddresses } from "@hoprnet/hopr-utils"
 import { commands } from '@hoprnet/hopr-chat'
 import {LogStream, Socket} from './logs'
+import { setupAdminServer } from './admin'
 
 import chalk from 'chalk'
 
@@ -27,7 +23,7 @@ chalk.level = 0 // We need bare strings
 const CRAWL_TIMEOUT = 100_000 // ~15 mins
 
 let NODE: Hopr<HoprCoreConnector>;
-let debugLog = debug('hopr-admin')
+let debugLog = debug('hoprd')
 
 /**
  * TEMPORARY HACK - copy pasted from
@@ -82,39 +78,6 @@ function parseHosts(): HoprOptions['hosts'] {
   return hosts
 }
 
-function setupAdminServer(logs: LogStream, node: Hopr<HoprCoreConnector>){
-  let cmds = new commands.Commands(node)
-  var app = express()
-  app.get('/', function(req, res){
-    res.set('Content-Type', 'text/html')
-    res.send(fs.readFileSync(path.resolve('./src/admin.html')))
-  })
-
-  const server = http.createServer(app);
-
-  const wsServer = new ws.Server({ server: server });
-  wsServer.on('connection', socket => {
-    socket.on('message', message => {
-      debugLog("Message from client", message)
-      logs.logFullLine(`admin > ${message}`)
-      cmds.execute(message.toString()).then( (resp) => {
-        if (resp) {
-          logs.logFullLine(resp)
-        }
-      })
-      // TODO
-    });
-    socket.on('error', err => {
-      debugLog('Error', err)
-      logs.log('Websocket error', err.toString())
-    })
-    logs.subscribe(socket)
-  });
-
-  const port = process.env.HOPR_ADMIN_PORT || 3000
-  server.listen(port)
-  logs.log('Admin server listening on port '+ port)
-}
 
 async function main() {
   let addr: Multiaddr;

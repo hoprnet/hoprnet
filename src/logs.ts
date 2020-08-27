@@ -3,7 +3,7 @@ import debug from 'debug'
 
 export type Socket = ws
 
-let debugLog = debug('hopr-admin')
+let debugLog = debug('hoprd')
 
 const MAX_MESSAGES_CACHED = 100
 
@@ -18,7 +18,6 @@ export class LogStream {
     this.connections.push(sock);
     sock.send(this.messages.join('\n'))
   }
-
 
   log(...args: string[]){
     const msg = `[${new Date().toISOString()}] ${args.join(' ')}`
