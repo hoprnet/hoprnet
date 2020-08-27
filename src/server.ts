@@ -49,7 +49,17 @@ export async function checkPeerIdInput(query: string): Promise<PeerId> {
 }
 
 const argv = (
-  yargs.option('admin', {
+  yargs
+  .option('network', {
+    describe: 'Which network to run the HOPR node on',
+    default: 'ETHEREUM',
+    choices: ['ETHEREUM']
+  })
+  .option('host', {
+    describe: 'The network host to run the HOPR node on.',
+    default: '0.0.0.0:9091'
+  })
+  .option('admin', {
     boolean: true,
     describe: 'Run an admin interface on localhost:3000',
     default: false
@@ -58,23 +68,23 @@ const argv = (
     boolean: true,
     describe: 'Run a gRPC interface',
     default: false
-  }).argv
+  })
+  .wrap(Math.min(120, yargs.terminalWidth()))
+  .argv
 )
 
 
 // DEFAULT VALUES FOR NOW
-const network = process.env.HOPR_NETWORK || "ETHEREUM";
 const provider =
   process.env.HOPR_ETHEREUM_PROVIDER ||
   "wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36";
-const host = process.env.HOPR_HOST || "0.0.0.0:9091"; // Default IPv4
 
 // TODO this should probably be shared between chat and this, and live in a
 // utils module.
 function parseHosts(): HoprOptions['hosts'] {
   const hosts: HoprOptions['hosts'] = {}
-  if (host !== undefined) {
-    const str = host.replace(/\/\/.+/, '').trim()
+  if (argv.host !== undefined) {
+    const str = argv.host.replace(/\/\/.+/, '').trim()
     const params = str.match(/([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})\:([0-9]{1,6})/)
     if (params == null || params.length != 3) {
       throw Error(`Invalid IPv4 host. Got ${str}`)
@@ -108,7 +118,7 @@ async function main() {
 
   let options: HoprOptions = {
     debug: Boolean(process.env.DEBUG),
-    network,
+    network: argv.network,
     bootstrapServers: [... (await getBootstrapAddresses()).values()],
     provider,
     hosts: parseHosts(),
@@ -117,7 +127,7 @@ async function main() {
   };
 
   logs.log('Creating HOPR Node')
-  logs.log('- network : ' + network);
+  logs.log('- network : ' + argv.network);
   logs.log('- bootstrapServers : ' + Array.from(options.bootstrapServers || []).map(x => x.id.toB58String()).join(','));
 
   node = await Hopr.create(options);
