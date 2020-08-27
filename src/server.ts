@@ -15,6 +15,8 @@ import { commands } from '@hoprnet/hopr-chat'
 import {LogStream, Socket} from './logs'
 import { setupAdminServer, periodicCrawl } from './admin'
 import chalk from 'chalk'
+import * as yargs from 'yargs';
+import { startServer } from '@hoprnet/hopr-server'
 
 // @ts-ignore
 chalk.level = 0 // We need bare strings
@@ -45,6 +47,19 @@ export async function checkPeerIdInput(query: string): Promise<PeerId> {
 
   return peerId
 }
+
+const argv = (
+  yargs.option('admin', {
+    boolean: true,
+    describe: 'Run an admin interface on localhost:3000',
+    default: false
+  })
+  .option('grpc', {
+    boolean: true,
+    describe: 'Run a gRPC interface',
+    default: false
+  }).argv
+)
 
 
 // DEFAULT VALUES FOR NOW
@@ -79,6 +94,18 @@ async function main() {
   let addr: Multiaddr;
   let logs = new LogStream()
 
+  function logMessageToNode(msg: Uint8Array){
+    logs.log("#### NODE RECEIVED MESSAGE ####")
+    try {
+      let [decoded, time] = decode(msg) as [Buffer, Buffer]
+      logs.log("Message:", decoded.toString())
+      logs.log("Latency:", Date.now() - parseInt(time.toString('hex'), 16) + 'ms')
+    } catch (err) {
+      logs.log("Could not decode message", err)
+      logs.log(msg.toString())
+    }
+  }
+
   let options: HoprOptions = {
     debug: Boolean(process.env.DEBUG),
     network,
@@ -95,19 +122,6 @@ async function main() {
 
   node = await Hopr.create(options);
   logs.log('Created HOPR Node')
-  setupAdminServer(logs, node);
-  
-  function logMessageToNode(msg: Uint8Array){
-    logs.log("#### NODE RECEIVED MESSAGE ####")
-    try {
-      let [decoded, time] = decode(msg) as [Buffer, Buffer]
-      logs.log("Message:", decoded.toString())
-      logs.log("Latency:", Date.now() - parseInt(time.toString('hex'), 16) + 'ms')
-    } catch (err) {
-      logs.log("Could not decode message", err)
-      logs.log(msg.toString())
-    }
-  }
 
   node.on("peer:connect", (peer: PeerInfo) => {
     logs.log(`Incoming connection from ${peer.id.toB58String()}.`);
@@ -115,8 +129,17 @@ async function main() {
 
   process.once("exit", async () => {
     await node.down();
+    logs.log('Process exiting')
     return;
   });
-}
 
+  if (argv.admin) {
+    setupAdminServer(logs, node);
+  }
+
+  if (argv.grpc) {
+    // Start HOPR server
+    startServer(node)
+  }
+}
 main();
