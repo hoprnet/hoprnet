@@ -55,6 +55,10 @@ const argv = (
     default: 'ETHEREUM',
     choices: ['ETHEREUM']
   })
+  .option('provider', {
+    describe: 'A provider url for the Network you specified',
+    default: "wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36"
+  })
   .option('host', {
     describe: 'The network host to run the HOPR node on.',
     default: '0.0.0.0:9091'
@@ -69,15 +73,13 @@ const argv = (
     describe: 'Run a gRPC interface',
     default: false
   })
+  .option('password', {
+    describe: 'A password to encrypt your keys',
+    default: ''
+  })
   .wrap(Math.min(120, yargs.terminalWidth()))
   .argv
 )
-
-
-// DEFAULT VALUES FOR NOW
-const provider =
-  process.env.HOPR_ETHEREUM_PROVIDER ||
-  "wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36";
 
 // TODO this should probably be shared between chat and this, and live in a
 // utils module.
@@ -120,10 +122,10 @@ async function main() {
     debug: Boolean(process.env.DEBUG),
     network: argv.network,
     bootstrapServers: [... (await getBootstrapAddresses()).values()],
-    provider,
+    provider: argv.provider,
     hosts: parseHosts(),
     output: logMessageToNode,
-    password: process.env.HOPR_PASSWORD || 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' // TODO!!!
+    password: argv.password || 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' // TODO!!!
   };
 
   logs.log('Creating HOPR Node')
