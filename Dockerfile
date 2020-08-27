@@ -29,10 +29,12 @@ RUN yarn install --build-from-source --frozen-lockfile
 # -- BUILD STAGE --------------------------------
 
 FROM base as build
-COPY . .
-RUN yarn build
-RUN npm prune --production --no-audit
-RUN yarn cache clean
+COPY src src
+COPY tsconfig.json tsconfig.json
+
+RUN yarn build 
+#RUN npm prune --production --no-audit
+#RUN yarn cache clean
 
 # -- RUNTIME STAGE ------------------------------\
 
@@ -63,21 +65,19 @@ RUN yarn global add pm2
 ENV NODE_ENV 'production'
 WORKDIR /app
 
-
 # Server
 COPY --from=build /hoprd/lib/server.js /app/server.js
+COPY --from=build /hoprd/node_modules /app/node_modules
+COPY --from=build /hoprd/package.json /app/package.json
 
 # Envoy
-COPY --from=build /hoprd/envoy/envoy.yaml.tmpl /app/envoy/envoy.yaml.tmpl
-COPY --from=build /hoprd/envoy/docker-entrypoint.sh /app/envoy/envoy.sh
-
+COPY envoy/envoy.yaml.tmpl /app/envoy/envoy.yaml.tmpl
+COPY envoy/docker-entrypoint.sh /app/envoy/envoy.sh
 # PM2
-COPY --from=build /hoprd/process.yaml /app/process.yaml
+COPY process.yaml /app/process.yaml
 
 
-RUN rm -rf db # If we somehow added a database entry, kill it or we share a peer id
 #VOLUME ["/app/db"]
-
 
 EXPOSE 9091
 EXPOSE 50051
