@@ -71,18 +71,26 @@ COPY --from=build /hoprd/node_modules /app/node_modules
 COPY --from=build /hoprd/package.json /app/package.json
 
 # Envoy
-COPY envoy/envoy.yaml.tmpl /app/envoy/envoy.yaml.tmpl
-COPY envoy/docker-entrypoint.sh /app/envoy/envoy.sh
+COPY envoy/envoy.yaml /app/envoy/envoy.yaml
+COPY envoy/envoy.sh /app/envoy/envoy.sh
 # PM2
 COPY process.yaml /app/process.yaml
 
-
 #VOLUME ["/app/db"]
 
+# Hopr-server gRPC
 EXPOSE 9091
+
+## ??
 EXPOSE 50051
+
+# Envoy -> Hopr-server
 EXPOSE 8080
-EXPOSE 8081
+
+# Envoy Error log
+EXPOSE 8081 
+
+# Admin web server
 EXPOSE 3000
 CMD ["pm2-runtime", "process.yaml"]
 

@@ -6,4 +6,4 @@ apps:
       name: "proxy"
       instances: 1
       env:
-        SERVICE_ADDRESS: 127.0.0.1
+        SERVICE_ADDRESS: 0.0.0.0

@@ -20,7 +20,9 @@ static_resources:
             - name: local_service
               domains: ["*"]
               routes:
-              - match: { prefix: "/" }
+              - match: 
+                  prefix: "/"
+                  grpc: {}
                 route:
                   cluster: echo_service
                   max_grpc_timeout: 0s
@@ -41,4 +43,4 @@ static_resources:
     type: logical_dns
     http2_protocol_options: {}
     lb_policy: round_robin
-    hosts: [{ socket_address: { address: ${SERVICE_ADDRESS}, port_value: 50051 }}]
+    hosts: [{ socket_address: { address: 0.0.0.0, port_value: 50051 }}]
