@@ -64,6 +64,14 @@ const NodeStateResponses = {
     Your node does not have at least ${XDAI_THRESHOLD} xDAI. Currently, your node has ${xDaiBalance} xDAI.
 
     To participate in our incentivized network, please make sure to add the missing amount of xDAI.
+  `,
+  [NodeStates.xdaiBalanceSucceeded]: (xDaiBalance: number) => `\n
+    Your node has ${xDaiBalance} xDAI. You are ready to go!
+
+    In short, our bot will open a payment channel and slowly send you messages which will increase your
+    xHOPR token balance. Please keep your balance, tweet and node running to continue getting xHOPR tokens.
+
+    Thank you for participating in our incentivized network!
   `
 }
 
@@ -150,9 +158,11 @@ export class Coverbot implements Bot {
             this._sendMessageFromBot(message.from, NodeStateResponses[xDaiBalanceNodeState](balance))
             break;
           case NodeStates.xdaiBalanceSucceeded:
-            console.log('Haz moneyz indeed')
+            //@TODO Register node into list of verified nodes and start loop.
+            this._sendMessageFromBot(message.from, NodeStateResponses[xDaiBalanceNodeState](balance))
             break;
         }
+        this._sendMessageFromBot(message.from, BotResponses[BotCommands.status](xDaiBalanceNodeState))
         break;
     }
     this._sendMessageFromBot(message.from, BotResponses[BotCommands.status](nodeState))
