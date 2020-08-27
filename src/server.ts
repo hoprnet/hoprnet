@@ -14,13 +14,10 @@ import { getBootstrapAddresses } from "@hoprnet/hopr-utils"
 import { commands } from '@hoprnet/hopr-chat'
 import {LogStream, Socket} from './logs'
 import { setupAdminServer, periodicCrawl } from './admin'
-
 import chalk from 'chalk'
 
 // @ts-ignore
 chalk.level = 0 // We need bare strings
-
-let NODE: Hopr<HoprCoreConnector>;
 let debugLog = debug('hoprd')
 
 /**
@@ -78,6 +75,7 @@ function parseHosts(): HoprOptions['hosts'] {
 
 
 async function main() {
+  let node: Hopr<HoprCoreConnector>;
   let addr: Multiaddr;
   let logs = new LogStream()
 
@@ -95,10 +93,9 @@ async function main() {
   logs.log('- network : ' + network);
   logs.log('- bootstrapServers : ' + Array.from(options.bootstrapServers || []).map(x => x.id.toB58String()).join(','));
 
-  NODE = await Hopr.create(options);
+  node = await Hopr.create(options);
   logs.log('Created HOPR Node')
-
-  setupAdminServer(logs, NODE);
+  setupAdminServer(logs, node);
   
   function logMessageToNode(msg: Uint8Array){
     logs.log("#### NODE RECEIVED MESSAGE ####")
@@ -112,12 +109,12 @@ async function main() {
     }
   }
 
-  NODE.on("peer:connect", (peer: PeerInfo) => {
+  node.on("peer:connect", (peer: PeerInfo) => {
     logs.log(`Incoming connection from ${peer.id.toB58String()}.`);
   });
 
   process.once("exit", async () => {
-    await NODE.down();
+    await node.down();
     return;
   });
 }
