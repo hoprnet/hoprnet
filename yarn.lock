@@ -410,7 +410,7 @@
     "@ethersproject/rlp" "^5.0.3"
     "@ethersproject/signing-key" "^5.0.4"
 
-"@hoprnet/hopr-chat@1.10.0":
+"@hoprnet/hopr-chat@^1.10.0":
   version "1.10.0"
   resolved "https://registry.yarnpkg.com/@hoprnet/hopr-chat/-/hopr-chat-1.10.0.tgz#02ac7ef75642ba4d98a5308f8d0792c1889222a5"
   integrity sha512-OI0zdCuQAI3rfORZ/jmzeM1eluBh/Nw+r49i0uGIBhLfxVFvIrgvKqfir97GS3jaZlOB0R4wkdRgVZMmus2fvQ==

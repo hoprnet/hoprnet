@@ -15,7 +15,7 @@
   },
   "license": "",
   "dependencies": {
-    "@hoprnet/hopr-chat": "1.10.0",
+    "@hoprnet/hopr-chat": "^1.10.0",
     "@hoprnet/hopr-core": "0.6.23",
     "@hoprnet/hopr-utils": "0.4.0",
     "@types/bs58": "^4.0.1",
