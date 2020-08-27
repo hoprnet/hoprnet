@@ -44,4 +44,36 @@ export function setupAdminServer(logs: LogStream, node: Hopr<HoprCoreConnector>)
   const port = process.env.HOPR_ADMIN_PORT || 3000
   server.listen(port)
   logs.log('Admin server listening on port '+ port)
+
+  // Setup some noise
+  connectionReport(node, logs)
+  periodicCrawl(node, logs)
+  reportMemoryUsage(logs)
+}
+
+const CRAWL_TIMEOUT = 100_000 // ~15 mins
+export async function periodicCrawl(node: Hopr<HoprCoreConnector>, logs: LogStream){
+  try {
+    await node.network.crawler.crawl()
+    logs.log('Crawled network')
+  } catch (err) {
+   logs.log("Failed to crawl")
+   logs.log(err)
+  }
+  setTimeout(() => periodicCrawl(node, logs), CRAWL_TIMEOUT)
+}
+
+export async function reportMemoryUsage(logs: LogStream){
+  const used = process.memoryUsage();
+  const usage = process.resourceUsage();
+  logs.log(
+  `Process stats: mem ${used.rss / 1024}k (max: ${usage.maxRSS / 1024}k) ` +
+  `cputime: ${usage.userCPUTime}`)
+  setTimeout(reportMemoryUsage, 10_000);
+}
+
+export async function connectionReport(node: Hopr<HoprCoreConnector>, logs: LogStream){
+  logs.log(`Node is connected at ${node.peerInfo.id.toB58String()}`)
+  logs.log(`Connected to: ${node.peerStore.peers.size} peers`)
+  setTimeout(connectionReport, 10_000);
 }

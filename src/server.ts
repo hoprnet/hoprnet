@@ -13,14 +13,12 @@ import { addPubKey } from '@hoprnet/hopr-core/lib/utils'
 import { getBootstrapAddresses } from "@hoprnet/hopr-utils"
 import { commands } from '@hoprnet/hopr-chat'
 import {LogStream, Socket} from './logs'
-import { setupAdminServer } from './admin'
+import { setupAdminServer, periodicCrawl } from './admin'
 
 import chalk from 'chalk'
 
 // @ts-ignore
 chalk.level = 0 // We need bare strings
-
-const CRAWL_TIMEOUT = 100_000 // ~15 mins
 
 let NODE: Hopr<HoprCoreConnector>;
 let debugLog = debug('hoprd')
@@ -100,9 +98,7 @@ async function main() {
   NODE = await Hopr.create(options);
   logs.log('Created HOPR Node')
 
-
   setupAdminServer(logs, NODE);
-
   
   function logMessageToNode(msg: Uint8Array){
     logs.log("#### NODE RECEIVED MESSAGE ####")
@@ -116,7 +112,6 @@ async function main() {
     }
   }
 
-
   NODE.on("peer:connect", (peer: PeerInfo) => {
     logs.log(`Incoming connection from ${peer.id.toB58String()}.`);
   });
@@ -125,36 +120,6 @@ async function main() {
     await NODE.down();
     return;
   });
-
-
-  async function connectionReport(){
-    logs.log(`Node is connected at ${NODE.peerInfo.id.toB58String()}`)
-    logs.log(`Connected to: ${NODE.peerStore.peers.size} peers`)
-    setTimeout(connectionReport, 10_000);
-  }
-  connectionReport()
-
-  async function periodicCrawl(){
-    try {
-      await NODE.network.crawler.crawl()
-      logs.log('Crawled network')
-    } catch (err) {
-     logs.log("Failed to crawl")
-     logs.log(err)
-    }
-    setTimeout(periodicCrawl, CRAWL_TIMEOUT)
-  }
-  periodicCrawl()
-
-  async function reportMemoryUsage(){
-    const used = process.memoryUsage();
-    const usage = process.resourceUsage();
-    logs.log(
-    `Process stats: mem ${used.rss / 1024}k (max: ${usage.maxRSS / 1024}k) ` +
-    `cputime: ${usage.userCPUTime}`)
-    setTimeout(reportMemoryUsage, 10_000);
-  }
-  reportMemoryUsage()
 }
 
 main();
