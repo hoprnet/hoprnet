@@ -415,10 +415,10 @@
   resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-connector-interface/-/hopr-core-connector-interface-1.7.1.tgz#fee80b0e954a8606dfd9d8cb53102606a9e66b64"
   integrity sha512-lDTOTpOOyE9PrXo0TPv1Rw7BcOndSj4+CISCAyB1/Nby/2yGtZbm65IPOcngWUYrCgXQMuxrc/AR3pFIQ6eV5w==
 
-"@hoprnet/hopr-core-ethereum@0.3.1-xdai":
-  version "0.3.1-xdai"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-ethereum/-/hopr-core-ethereum-0.3.1-xdai.tgz#aafc75b8bea94bb342254bc7114545fcd9d8c19a"
-  integrity sha512-CveRsAoocgrcsYqbrkAmHB57o/kOcaofynvBmqd2pvxnBvnBg3WkA6WyE7Cwrr73XuMCV+9bHdqxzR8/0AdCMQ==
+"@hoprnet/hopr-core-ethereum@0.3.2-xdai":
+  version "0.3.2-xdai"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-ethereum/-/hopr-core-ethereum-0.3.2-xdai.tgz#63b4a669d574b9c410c1e7cc2983819287d75bfd"
+  integrity sha512-UDN2aAJJDknbuh3+VePjsthnTE4i/WqJxsCCPlCO/XMzKU/fD180a3M1QJ3b0nDKLYIa0LmomjYNDV0QEHyWYw==
   dependencies:
     "@hoprnet/hopr-utils" "^0.4.0"
     bn.js "^5.1.2"
