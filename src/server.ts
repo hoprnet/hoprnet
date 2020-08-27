@@ -17,6 +17,7 @@ import bs58 from 'bs58'
 import { addPubKey } from '@hoprnet/hopr-core/lib/utils'
 import { getBootstrapAddresses } from "@hoprnet/hopr-utils"
 import { commands } from '@hoprnet/hopr-chat'
+import {LogStream, Socket} from './logs'
 
 import chalk from 'chalk'
 
@@ -27,59 +28,6 @@ const CRAWL_TIMEOUT = 100_000 // ~15 mins
 
 let NODE: Hopr<HoprCoreConnector>;
 let debugLog = debug('hopr-admin')
-
-type Socket = ws
-
-class LogStream {
-  private messages: string[] = []
-  private connections: Socket[] = []
-
-  constructor(){
-  }
-
-  subscribe(sock: Socket){
-    this.connections.push(sock);
-    sock.send(this.messages.join('\n'))
-  }
-
-
-  log(...args: string[]){
-    const msg = `[${new Date().toISOString()}] ${args.join(' ')}`
-    this._log(msg)
-  }
-
-  logFullLine(...args: string[]){
-    const msg = `${args.join(' ')}`
-    this._log(msg)
-  }
-
-  _log(msg: string){
-    debugLog(msg) 
-
-    this.messages.push(msg)
-    if (this.messages.length > 100){ // Avoid memory leak
-      this.messages.splice(0, this.messages.length - 100); // delete elements from start
-    }
-
-
-    this.connections.forEach((conn: Socket, i: number) => {
-      if (conn.readyState == ws.OPEN) {
-        conn.send(msg)
-      } else {
-        // Handle bad connections:
-        if (conn.readyState !== ws.CONNECTING) {
-          // Only other possible states are closing or closed
-          this.connections.splice(i, 1)
-        }
-
-      }
-    })
-  }
-}
-
-
-
-
 
 /**
  * TEMPORARY HACK - copy pasted from
