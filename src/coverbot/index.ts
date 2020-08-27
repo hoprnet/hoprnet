@@ -8,10 +8,15 @@ import { convertPubKeyFromB58String, u8aToHex } from '@hoprnet/hopr-utils'
 import { Utils } from '@hoprnet/hopr-core-ethereum'
 
 
+//@TODO: Move this to an environment variable or read from a contract
+const XDAI_THRESHOLD = 0.001
+
 enum NodeStates {
   newUnverifiedNode = 'UNVERIFIED',
   tweetVerificationFailed = 'FAILED_TWITTER_VERIFICATION',
-  tweetVerificationSucceeded = 'SUCCEEDED_TWITTER_VERIFICATION'
+  tweetVerificationSucceeded = 'SUCCEEDED_TWITTER_VERIFICATION',
+  xdaiBalanceFailed = 'FAILED_XDAI_BALANCE_VERIFICATION',
+  xdaiBalanceSucceeded = 'SUCCEEDED_XDAI_BALANCE_VERIFICATION'
 }
 
 enum BotCommands {
@@ -47,6 +52,18 @@ const NodeStateResponses = {
     3. Includes your node: ${tweetStatus.sameNode}
 
     Please try again with a different tweet.
+  `,
+  [NodeStates.tweetVerificationSucceeded]: `\n
+    Your tweet has succeeded verification. Please do no delete this tweet, as we will
+    use it multiple times to verify and connect to your node.
+
+    We’ll now proceed to check that your HOPR Ethereum address has at least ${XDAI_THRESHOLD} xDAI.
+    If you need xDAI, you always swap DAI to xDAI using https://dai-bridge.poa.network/.
+  `,
+  [NodeStates.xdaiBalanceFailed]: (xDaiBalance: number) => `\n
+    Your node does not have at least ${XDAI_THRESHOLD} xDAI. Currently, your node has ${xDaiBalance} xDAI.
+
+    To participate in our incentivized network, please make sure to add the missing amount of xDAI.
   `
 }
 
@@ -75,6 +92,17 @@ export class Coverbot implements Bot {
     })
   }
 
+  protected async _verifyBalance(message: IMessage): Promise<[number, NodeStates]> {
+    const pubkey = await convertPubKeyFromB58String(message.from)
+    const nodeEthereumAddress = u8aToHex(await Utils.pubKeyToAccountId(pubkey.marshal()))
+    const xdaiWeb3 = new Web3(new Web3.providers.HttpProvider('https://dai.poa.network'));
+    const weiBalance = await xdaiWeb3.eth.getBalance(nodeEthereumAddress)
+    const balance = +Web3.utils.fromWei(weiBalance)
+
+    
+    return balance >= XDAI_THRESHOLD ? [balance, NodeStates.xdaiBalanceSucceeded] : [balance, NodeStates.xdaiBalanceFailed]
+  }
+
   protected async _parseMessage(message: IMessage): Promise<NodeStates> {
     if (message.text.match(/https:\/\/twitter.com.*?$/i)) {
 
@@ -98,21 +126,7 @@ export class Coverbot implements Bot {
       if(tweet.hasSameHOPRNode(message.from)) {
         tweet.status.sameNode = true
       }
-
-      if (tweet.status.isValid()) {
-        const pubkey = await convertPubKeyFromB58String(message.from)
-        const nodeEthereumAddress = u8aToHex(await Utils.pubKeyToAccountId(pubkey.marshal()))
-        const xdaiWeb3 = new Web3(new Web3.providers.HttpProvider('https://dai.poa.network'));
-        const balance = await xdaiWeb3.eth.getBalance(nodeEthereumAddress)
-
-        //@TODO: Move this to an environment variable or read from a contract
-        const XDAI_THRESHOLD = 1
-        console.log(`The xDAI balance of the ${nodeEthereumAddress} is ${Web3.utils.fromWei(balance)}`)
-
-        return NodeStates.tweetVerificationSucceeded
-      } else {
-        return NodeStates.tweetVerificationFailed
-      }
+      return tweet.status.isValid() ? NodeStates.tweetVerificationSucceeded : NodeStates.tweetVerificationFailed
     }
     return NodeStates.newUnverifiedNode;
   }
@@ -127,6 +141,19 @@ export class Coverbot implements Bot {
         break;
       case NodeStates.tweetVerificationFailed:
         this._sendMessageFromBot(message.from, NodeStateResponses[nodeState](this.tweets.get(message.from).status))
+        break;
+      case NodeStates.tweetVerificationSucceeded:
+        this._sendMessageFromBot(message.from, NodeStateResponses[nodeState])
+        const [balance, xDaiBalanceNodeState] = await this._verifyBalance(message)
+        switch(xDaiBalanceNodeState) {
+          case NodeStates.xdaiBalanceFailed:
+            this._sendMessageFromBot(message.from, NodeStateResponses[xDaiBalanceNodeState](balance))
+            break;
+          case NodeStates.xdaiBalanceSucceeded:
+            console.log('Haz moneyz indeed')
+            break;
+        }
+        break;
     }
     this._sendMessageFromBot(message.from, BotResponses[BotCommands.status](nodeState))
   }
