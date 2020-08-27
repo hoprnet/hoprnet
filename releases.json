@@ -99,5 +99,13 @@
       "dappnode": "Tue, 18 Aug 2020 15:02:45 GMT",
       "http://23.254.227.151:5001": "Tue, 18 Aug 2020 15:08:35 GMT"
     }
+  },
+  "0.0.18": {
+    "hash": "/ipfs/QmZE4iTxciLn7MWhirGT7xUpXKfqVrhMFT9wkBkxguMHtT",
+    "type": "manifest",
+    "uploadedTo": {
+      "dappnode": "Thu, 20 Aug 2020 15:00:24 GMT",
+      "http://23.254.227.151:5001": "Thu, 20 Aug 2020 15:13:09 GMT"
+    }
   }
 }
