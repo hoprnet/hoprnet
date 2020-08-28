@@ -13,11 +13,18 @@ jobs:
         run: |
           cd hoprd
           git fetch
-          git checkout avado
+          git checkout -b avado
           git pull origin avado
       - name: Build Docker
         run: |
           docker-compose build
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Install Dappnodesdk
+        run: sudo npm install -g @dappnode/dappnodesdk
       - name: Bump Dappnode version
         run: dappnodesdk increase minor
       - name: Build on dappnode
