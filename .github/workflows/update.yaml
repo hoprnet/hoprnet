@@ -1,0 +1,19 @@
+name: Update AVADO Node
+
+on: workflow_dispatch
+
+jobs: 
+  build:
+    name: Build for Avado
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Checkout submodule
+        run: |
+          cd hoprd
+          git checkout avado
+          git pull origin avado
+
+
+
