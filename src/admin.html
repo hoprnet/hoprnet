@@ -56,6 +56,13 @@ body {
   font-family: monospace;
   font-size: 1.2rem;
 }
+.send input:disabled {
+  background: #000050;
+  opacity: 0.9;
+}
+input:disabled::placeholder {
+  color: transparent;
+}
 
 </style>
 <script>
@@ -77,6 +84,8 @@ var connect = function(){
   client.onopen = function(){
     console.log('Web socket opened')
     logs.classList.remove('connecting')
+    document.querySelector('#command').disabled = false
+    document.querySelector('#command').focus()
 
     document.querySelector('#command').onkeydown = function(e) {
       if (e.keyCode == 13 ) { // enter 
@@ -107,6 +116,7 @@ var connect = function(){
   client.onclose = function(){
     console.log('Web socket closed')
     logs.classList.add('connecting')
+    document.querySelector('#command').disabled = true
     appendLog(' --- < Lost Connection, attempting to reconnect... > ---')
     setTimeout(function(){
       try {
@@ -143,7 +153,7 @@ window.onload = function(){
     <pre><code id='log'>Connecting...</code></pre>
     </div>
     <div class='send'>
-      <input id="command" type="text" placeholder="type 'help' for full list of commands" /> 
+      <input id="command" type="text" disabled="true" placeholder="type 'help' for full list of commands" /> 
     </div>
   </body>
 </html>
