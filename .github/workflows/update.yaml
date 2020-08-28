@@ -14,7 +14,7 @@ jobs:
           cd hoprd
           git fetch
           git checkout -b avado
-          git pull origin avado
+          git pull origin avado --no-rebase
       - name: Build Docker
         run: |
           docker-compose build
