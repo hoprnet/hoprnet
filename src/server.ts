@@ -5,82 +5,22 @@ import PeerInfo from "peer-info";
 import PeerId from "peer-id";
 import Multiaddr from "multiaddr";
 import debug from 'debug'
-import express from 'express'
-import fs from 'fs'
-import path from 'path'
-import ws from 'ws'
-import http from 'http'
 import { encode, decode } from 'rlp'
 // @ts-ignore
 import Multihash from 'multihashes'
 import bs58 from 'bs58'
 import { addPubKey } from '@hoprnet/hopr-core/lib/utils'
 import { getBootstrapAddresses } from "@hoprnet/hopr-utils"
-import { startServer } from '@hoprnet/hopr-server'
 import { commands } from '@hoprnet/hopr-chat'
-
+import {LogStream, Socket} from './logs'
+import { setupAdminServer, periodicCrawl } from './admin'
 import chalk from 'chalk'
+import * as yargs from 'yargs';
+import { startServer } from '@hoprnet/hopr-server'
 
 // @ts-ignore
 chalk.level = 0 // We need bare strings
-
-const CRAWL_TIMEOUT = 100_000 // ~15 mins
-
-let NODE: Hopr<HoprCoreConnector>;
-let debugLog = debug('hopr-admin')
-
-type Socket = ws
-
-class LogStream {
-  private messages: string[] = []
-  private connections: Socket[] = []
-
-  constructor(){
-  }
-
-  subscribe(sock: Socket){
-    this.connections.push(sock);
-    sock.send(this.messages.join('\n'))
-  }
-
-
-  log(...args: string[]){
-    const msg = `[${new Date().toISOString()}] ${args.join(' ')}`
-    this._log(msg)
-  }
-
-  logFullLine(...args: string[]){
-    const msg = `${args.join(' ')}`
-    this._log(msg)
-  }
-
-  _log(msg: string){
-    debugLog(msg) 
-
-    this.messages.push(msg)
-    if (this.messages.length > 100){ // Avoid memory leak
-      this.messages.splice(0, this.messages.length - 100); // delete elements from start
-    }
-
-
-    this.connections.forEach((conn: Socket, i: number) => {
-      if (conn.readyState == ws.OPEN) {
-        conn.send(msg)
-      } else {
-        // Handle bad connections:
-        if (conn.readyState !== ws.CONNECTING) {
-          // Only other possible states are closing or closed
-          this.connections.splice(i, 1)
-        }
-
-      }
-    })
-  }
-}
-
-
-
-
+let debugLog = debug('hoprd')
 
 /**
  * TEMPORARY HACK - copy pasted from
@@ -108,20 +48,45 @@ export async function checkPeerIdInput(query: string): Promise<PeerId> {
   return peerId
 }
 
-
-// DEFAULT VALUES FOR NOW
-const network = process.env.HOPR_NETWORK || "ETHEREUM";
-const provider =
-  process.env.HOPR_ETHEREUM_PROVIDER ||
-  "wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36";
-const host = process.env.HOPR_HOST || "0.0.0.0:9091"; // Default IPv4
+const argv = (
+  yargs
+  .option('network', {
+    describe: 'Which network to run the HOPR node on',
+    default: 'ETHEREUM',
+    choices: ['ETHEREUM']
+  })
+  .option('provider', {
+    describe: 'A provider url for the Network you specified',
+    default: "wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36"
+  })
+  .option('host', {
+    describe: 'The network host to run the HOPR node on.',
+    default: '0.0.0.0:9091'
+  })
+  .option('admin', {
+    boolean: true,
+    describe: 'Run an admin interface on localhost:3000',
+    default: false
+  })
+  .option('grpc', {
+    boolean: true,
+    describe: 'Run a gRPC interface',
+    default: false
+  })
+  .option('password', {
+    describe: 'A password to encrypt your keys',
+    default: ''
+  })
+  .wrap(Math.min(120, yargs.terminalWidth()))
+  .argv
+)
 
 // TODO this should probably be shared between chat and this, and live in a
 // utils module.
 function parseHosts(): HoprOptions['hosts'] {
   const hosts: HoprOptions['hosts'] = {}
-  if (host !== undefined) {
-    const str = host.replace(/\/\/.+/, '').trim()
+  if (argv.host !== undefined) {
+    const str = argv.host.replace(/\/\/.+/, '').trim()
     const params = str.match(/([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})\:([0-9]{1,6})/)
     if (params == null || params.length != 3) {
       throw Error(`Invalid IPv4 host. Got ${str}`)
@@ -135,65 +100,12 @@ function parseHosts(): HoprOptions['hosts'] {
   return hosts
 }
 
-function setupAdminServer(logs: LogStream, node: Hopr<HoprCoreConnector>){
-  let cmds = new commands.Commands(node)
-  var app = express()
-  app.get('/', function(req, res){
-    res.set('Content-Type', 'text/html')
-    res.send(fs.readFileSync(path.resolve('./src/admin.html')))
-  })
-
-  const server = http.createServer(app);
-
-  const wsServer = new ws.Server({ server: server });
-  wsServer.on('connection', socket => {
-    socket.on('message', message => {
-      debugLog("Message from client", message)
-      logs.logFullLine(`admin > ${message}`)
-      cmds.execute(message.toString()).then( (resp) => {
-        if (resp) {
-          logs.logFullLine(resp)
-        }
-      })
-      // TODO
-    });
-    socket.on('error', err => {
-      debugLog('Error', err)
-      logs.log('Websocket error', err.toString())
-    })
-    logs.subscribe(socket)
-  });
-
-  const port = process.env.HOPR_ADMIN_PORT || 3000
-  server.listen(port)
-  logs.log('Admin server listening on port '+ port)
-}
 
 async function main() {
+  let node: Hopr<HoprCoreConnector>;
   let addr: Multiaddr;
   let logs = new LogStream()
 
-  let options: HoprOptions = {
-    debug: Boolean(process.env.DEBUG),
-    network,
-    bootstrapServers: [... (await getBootstrapAddresses()).values()],
-    provider,
-    hosts: parseHosts(),
-    output: logMessageToNode,
-    password: process.env.HOPR_PASSWORD || 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' // TODO!!!
-  };
-
-  logs.log('Creating HOPR Node')
-  logs.log('- network : ' + network);
-  logs.log('- bootstrapServers : ' + Array.from(options.bootstrapServers || []).map(x => x.id.toB58String()).join(','));
-
-  NODE = await Hopr.create(options);
-  logs.log('Created HOPR Node')
-
-
-  setupAdminServer(logs, NODE);
-
-  
   function logMessageToNode(msg: Uint8Array){
     logs.log("#### NODE RECEIVED MESSAGE ####")
     try {
@@ -206,49 +118,40 @@ async function main() {
     }
   }
 
+  let options: HoprOptions = {
+    debug: Boolean(process.env.DEBUG),
+    network: argv.network,
+    bootstrapServers: [... (await getBootstrapAddresses()).values()],
+    provider: argv.provider,
+    hosts: parseHosts(),
+    output: logMessageToNode,
+    password: argv.password || 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' // TODO!!!
+  };
 
-  NODE.on("peer:connect", (peer: PeerInfo) => {
+  logs.log('Creating HOPR Node')
+  logs.log('- network : ' + argv.network);
+  logs.log('- bootstrapServers : ' + Array.from(options.bootstrapServers || []).map(x => x.id.toB58String()).join(','));
+
+  node = await Hopr.create(options);
+  logs.log('Created HOPR Node')
+
+  node.on("peer:connect", (peer: PeerInfo) => {
     logs.log(`Incoming connection from ${peer.id.toB58String()}.`);
   });
 
   process.once("exit", async () => {
-    await NODE.down();
+    await node.down();
+    logs.log('Process exiting')
     return;
   });
 
-  // Start HOPR server
-  if (true) { // TODO cli flag
-    startServer(NODE)
+  if (argv.admin) {
+    setupAdminServer(logs, node);
   }
 
-  async function connectionReport(){
-    logs.log(`Node is connected at ${NODE.peerInfo.id.toB58String()}`)
-    logs.log(`Connected to: ${NODE.peerStore.peers.size} peers`)
-    setTimeout(connectionReport, 10_000);
+  if (argv.grpc) {
+    // Start HOPR server
+    startServer(node)
   }
-  connectionReport()
-
-  async function periodicCrawl(){
-    try {
-      await NODE.network.crawler.crawl()
-      logs.log('Crawled network')
-    } catch (err) {
-     logs.log("Failed to crawl")
-     logs.log(err)
-    }
-    setTimeout(periodicCrawl, CRAWL_TIMEOUT)
-  }
-  periodicCrawl()
-
-  async function reportMemoryUsage(){
-    const used = process.memoryUsage();
-    const usage = process.resourceUsage();
-    logs.log(
-    `Process stats: mem ${used.rss / 1024}k (max: ${usage.maxRSS / 1024}k) ` +
-    `cputime: ${usage.userCPUTime}`)
-    setTimeout(reportMemoryUsage, 10_000);
-  }
-  reportMemoryUsage()
 }
-
 main();
