@@ -12,8 +12,16 @@ jobs:
       - name: Checkout submodule
         run: |
           cd hoprd
+          git fetch
           git checkout avado
           git pull origin avado
+      - name: Build Docker
+        run: |
+          docker-compose build
+      - name: Bump Dappnode version
+        run: dappnodesdk increase minor
+      - name: Build on dappnode
+        run: dappnodesdk build
 
 
 
