@@ -66,7 +66,8 @@ ENV NODE_ENV 'production'
 WORKDIR /app
 
 # Server
-COPY --from=build /hoprd/lib/server.js /app/server.js
+COPY --from=build /hoprd/lib/ /app/
+COPY --from=build /hoprd/src/admin.html /app/src/admin.html
 COPY --from=build /hoprd/node_modules /app/node_modules
 COPY --from=build /hoprd/package.json /app/package.json
 
@@ -78,19 +79,17 @@ COPY process.yaml /app/process.yaml
 
 #VOLUME ["/app/db"]
 
-# Hopr-server gRPC
+#? Hopr-server gRPC
 EXPOSE 9091
-
-## ??
+# Hopr-server gRPC
 EXPOSE 50051
-
 # Envoy -> Hopr-server
 EXPOSE 8080
 
 # Envoy Error log
-EXPOSE 8081 
-
+EXPOSE 8081
 # Admin web server
 EXPOSE 3000
+
 CMD ["pm2-runtime", "process.yaml"]
 
