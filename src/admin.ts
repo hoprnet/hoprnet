@@ -69,11 +69,11 @@ export async function reportMemoryUsage(logs: LogStream){
   logs.log(
   `Process stats: mem ${used.rss / 1024}k (max: ${usage.maxRSS / 1024}k) ` +
   `cputime: ${usage.userCPUTime}`)
-  setTimeout(reportMemoryUsage, 10_000);
+  setTimeout(() => reportMemoryUsage(logs), 10_000);
 }
 
 export async function connectionReport(node: Hopr<HoprCoreConnector>, logs: LogStream){
   logs.log(`Node is connected at ${node.peerInfo.id.toB58String()}`)
   logs.log(`Connected to: ${node.peerStore.peers.size} peers`)
-  setTimeout(connectionReport, 10_000);
+  setTimeout(() => connectionReport(node, logs), 10_000);
 }
