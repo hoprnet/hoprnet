@@ -20,9 +20,18 @@ jobs:
       - name: Abort if there are no changes
         working-directory: hoprd
         run: |
-          CHANGES=${git log --since="1 hour ago"  | wc -l}
-          echo $CHANGES
-          if [$CHANGES -eq "0"]; then exit 1; fi; 
+          CHANGES=${git log --since="1 hour ago"}
+          echo "::debug::$CHANGES"
+          CHGL=${echo $CHANGES | wc -l}
+          if [$CHGL -eq "0"]; then
+            echo "::debug::No changes in last hour"
+            exit 1;
+          fi
+          CIREGEX='^CI:'
+          if [$CHANGES =~ $CIREGEX]; then
+            echo "::debug::Release less than an hour ago"
+          fi
+
       - name: Build Docker
         run: |
           docker-compose build
@@ -35,7 +44,7 @@ jobs:
       - name: Bump Dappnode version
         run: dappnodesdk increase minor
       - name: Build on dappnode
-        run: dappnodesdk build --provider http://23.254.227.151:5001 
+        run: sudo dappnodesdk build --provider http://23.254.227.151:5001 
       - name: Commit changes back
         run: |
           git add dappnode_package.json docker-compose.yml releases.json
