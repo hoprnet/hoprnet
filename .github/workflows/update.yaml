@@ -21,6 +21,7 @@ jobs:
           path: hoprd
           ref: 'avado'
       - name: Abort if there are no changes
+        working-directory: hoprd
         run: |
           CHANGES=git log --since="1 hour ago"  | wc -l
           echo $CHANGES

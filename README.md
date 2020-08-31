@@ -10,7 +10,7 @@ The deploy should happen automatically through a github action.
 
 ### Prerequisites
 
-`sudo npm install -g @dappnode/dappnodesdk`
+`sudo npm install -g @dappnode/dappnodesdk@0.2.9-beta.0`
 
 ### building the package
 
