@@ -11,11 +11,11 @@ export default class PrintBalance extends AbstractCommand {
   }
 
   name() {
-    return 'print'
+    return 'balance'
   }
 
   help():string {
-    return 'shows our current balance'
+    return 'shows our current native and hopr balance'
   }
 
   /**

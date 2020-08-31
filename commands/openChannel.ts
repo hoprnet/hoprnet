@@ -98,12 +98,11 @@ export default class OpenChannel extends AbstractCommand {
     const unsubscribe = startDelayedInterval(`Submitted transaction. Waiting for confirmation`)
 
     try {
+      const counterPartyPubKey = counterparty.pubKey.marshal()
+
       await this.node.paymentChannels.channel.create(
-        counterparty.pubKey.marshal(),
-        async () =>
-          this.node.paymentChannels.utils.pubKeyToAccountId(
-            await this.node.interactions.payments.onChainKey.interact(counterparty)
-          ),
+        counterPartyPubKey,
+        async () => this.node.interactions.payments.onChainKey.interact(counterparty),
         channelBalance,
         (balance: Types.ChannelBalance): Promise<Types.SignedChannel> =>
           this.node.interactions.payments.open.interact(counterparty, balance)

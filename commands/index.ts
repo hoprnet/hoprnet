@@ -1,6 +1,6 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
-import type { AutoCompleteResult } from './abstractCommand'
+import { AutoCompleteResult } from './abstractCommand'
 import { AbstractCommand, GlobalState, CommandResponse } from './abstractCommand'
 import CloseChannel from './closeChannel'
 import Crawl from './crawl'
@@ -18,6 +18,7 @@ import Version from './version'
 import Tickets from './tickets'
 import { IncludeRecipient, IncludeRecipientFancy } from './includeRecipient'
 import Settings from './settings'
+import Withdraw from './withdraw'
 import readline from 'readline'
 import { Alias } from './alias'
 
@@ -40,11 +41,13 @@ export class Commands {
       new ListOpenChannels(node),
       new Ping(node),
       new PrintAddress(node),
+      new PrintBalance(node),
       new StopNode(node),
       new Version(),
       new Tickets(node),
       new Settings(),
       new Alias(node),
+      new Withdraw(node),
     ]
 
     if(rl) {
@@ -94,13 +97,13 @@ export class Commands {
 
   public async autocomplete(message: string): Promise<AutoCompleteResult> {
     // If the line is empty, we show all possible commands as results.
-    if (message == null || message == '') {
+    if (!message) {
       return [this.allCommands(), message]
     }
 
     const [command, query]: (string | undefined)[] = message.trim().split(/\s+/).slice(0)
-    const cmd = await this.find(command)
-    if (cmd) {
+    const cmd = this.find(command)
+    if (cmd && typeof cmd.autocomplete !== "undefined") {
       return cmd.autocomplete(query, message, this.state)
     }
     // Command not found - try assuming it's an incomplete command
