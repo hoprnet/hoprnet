@@ -10,11 +10,12 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Checkout submodule
-        working-directory: hoprd
-        run: |
-          git fetch origin
-          git checkout avado
-          git pull origin avado --no-rebase
+        uses: actions/checkout@v2.0.0
+        with:
+          token: '${{ secrets.GITHUB_PAT }}'
+          repository: hoprnet/hoprd
+          path: hoprd
+          ref: 'avado'
       - name: Build Docker
         run: |
           docker-compose build
