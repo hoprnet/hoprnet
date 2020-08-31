@@ -18,7 +18,6 @@ jobs:
       - name: Build Docker
         run: |
           docker-compose build
-
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v1
         with:
@@ -28,7 +27,7 @@ jobs:
       - name: Bump Dappnode version
         run: dappnodesdk increase minor
       - name: Build on dappnode
-        run: dappnodesdk build
+        run: dappnodesdk build --provider http://23.254.227.151:5001 
 
 
 
