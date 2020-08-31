@@ -3,7 +3,7 @@ name: Update AVADO Node
 on: 
   schedule:
     - cron: '0 * * * *'
-  repository_dispatch:
+  workflow_dispatch:
     types: just-do-it
 
 
