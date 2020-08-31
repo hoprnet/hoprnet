@@ -10,10 +10,10 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Checkout submodule
+        working-directory: hoprd
         run: |
-          cd hoprd
-          git fetch
-          git checkout -b avado
+          git fetch origin
+          git checkout avado
           git pull origin avado --no-rebase
       - name: Build Docker
         run: |
