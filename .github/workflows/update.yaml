@@ -1,12 +1,14 @@
 name: Update AVADO Node
 
-on: workflow_dispatch
+on: 
+  schedule:
+    cron: '0 * * * *'
+
 
 jobs: 
   build:
     name: Build for Avado
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v2
       - name: Checkout submodule
@@ -15,6 +17,11 @@ jobs:
           repository: hoprnet/hoprd
           path: hoprd
           ref: 'avado'
+      - name: Abort if there are no changes
+        run: |
+          CHANGES=git log --since="1 hour ago"  | wc -l
+          echo $CHANGES
+          if [$CHANGES -eq "0"]; exit 1; fi; 
       - name: Build Docker
         run: |
           docker-compose build
