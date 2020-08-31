@@ -2,7 +2,6 @@ import * as root from '../index'
 const mod = root.commands
 
 describe('Commands', () => {
-
   it('can import commands', () => {
     expect(mod).toBeDefined()
   }) 
@@ -46,15 +45,6 @@ describe('Commands', () => {
     await cmds.execute('includeRecipient false')
     ir = await cmds.execute('settings includeRecipient')
     expect(ir).toMatch(/false/)
-  })
-
-  it('send message', async () => {
-    let mockNode: any = jest.fn()
-    mockNode.sendMessage = jest.fn()
-    let cmds = new mod.Commands(mockNode)
-    await cmds.execute('send 16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7 Hello, world')
-    expect(mockNode.sendMessage).toHaveBeenCalled()
-    expect(await cmds.execute('send unknown-alias Hello, world')).toMatch(/invalid/i)
   })
 
   it('alias addresses', async () => {
@@ -120,8 +110,33 @@ describe('Commands', () => {
     expect(await cmds.execute('myAddress')).toMatch(/HOPR/)
   })
 
-  it('multisend', async() => {
+  it('send message', async () => {
+    let mockNode: any = jest.fn()
+    mockNode.sendMessage = jest.fn()
+    let cmds = new mod.Commands(mockNode)
+    await cmds.execute('send 16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7 Hello, world')
+    expect(mockNode.sendMessage).toHaveBeenCalled()
+    expect(await cmds.execute('send unknown-alias Hello, world')).toMatch(/invalid/i)
+  })
 
+  it('autocomplete sendmessage', async() => {
+    let mockNode: any = jest.fn()
+    mockNode.sendMessage = jest.fn()
+    mockNode.bootstrapServers = []
+    mockNode.network = jest.fn()
+    mockNode.network.peerStore = jest.fn()
+    mockNode.network.peerStore.peers = [{id: '16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7' }]
+
+    let cmds = new mod.Commands(mockNode)
+    expect((await cmds.autocomplete('send 16Ui'))[0][0]).toMatch(/send 16U/)
+    expect((await cmds.autocomplete('send foo'))[0][0]).toBe(undefined)
+
+    await cmds.execute('alias 16Uiu2HAmQDFS8a4Bj5PGaTqQLME5SZTRNikz9nUPT3G4T6YL9o7V test')
+
+    expect((await cmds.autocomplete('send t'))[0][0]).toBe("send test")
+  })
+
+  it('multisend', async() => {
     let seq = 0
     let mockNode: any = jest.fn()
     mockNode.sendMessage = jest.fn()
@@ -148,21 +163,19 @@ describe('Commands', () => {
     expect(mockReadline.question).toHaveBeenCalled()
   })
 
-  it('autocomplete sendmessage', async() => {
+  it('withdraw', async () => {
     let mockNode: any = jest.fn()
-    mockNode.sendMessage = jest.fn()
-    mockNode.bootstrapServers = []
-    mockNode.network = jest.fn()
-    mockNode.network.peerStore = jest.fn()
-    mockNode.network.peerStore.peers = [{id: '16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7' }]
+    mockNode.paymentChannels = jest.fn()
+    mockNode.paymentChannels.types = jest.fn()
+    mockNode.paymentChannels.types.Balance = jest.fn()
+    mockNode.paymentChannels.types.NativeBalance = jest.fn()
+    mockNode.paymentChannels.withdraw = jest.fn()
 
     let cmds = new mod.Commands(mockNode)
-    expect((await cmds.autocomplete('send 16Ui'))[0][0]).toMatch(/send 16U/)
-    expect((await cmds.autocomplete('send foo'))[0][0]).toBe('')
+    expect((await cmds.autocomplete('withdraw'))[0][0]).toMatch(/recipient \(blockchain address\)/)
 
-    await cmds.execute('alias 16Uiu2HAmQDFS8a4Bj5PGaTqQLME5SZTRNikz9nUPT3G4T6YL9o7V test')
-
-    expect((await cmds.autocomplete('send t'))[0][0]).toBe("send test")
+    await cmds.execute('withdraw 0x123 native 1')
+    expect(mockNode.paymentChannels.withdraw).toHaveBeenCalled()
   })
 })
 
