@@ -122,5 +122,12 @@
     "uploadedTo": {
       "dappnode": "Fri, 28 Aug 2020 10:13:04 GMT"
     }
+  },
+  "0.2.0": {
+    "hash": "/ipfs/QmTTE8j8MUSt2if18nyNKzJMVPrJJH88MYFq5LVaZL1MrP",
+    "type": "manifest",
+    "uploadedTo": {
+      "http://23.254.227.151:5001": "Mon, 31 Aug 2020 10:31:08 GMT"
+    }
   }
 }
