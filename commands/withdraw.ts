@@ -1,22 +1,22 @@
 import type HoprCoreConnector from "@hoprnet/hopr-core-connector-interface";
 import type { Currencies } from "@hoprnet/hopr-core-connector-interface";
 import type Hopr from "@hoprnet/hopr-core";
-import {
-  startDelayedInterval,
-  moveDecimalPoint,
-  convertPubKeyFromB58String,
-  u8aToHex,
-} from "@hoprnet/hopr-utils";
 import chalk from "chalk";
-import { AbstractCommand } from "./abstractCommand";
-import { checkPeerIdInput } from "../utils";
+import { startDelayedInterval, moveDecimalPoint } from "@hoprnet/hopr-utils";
+import { AbstractCommand, AutoCompleteResult } from "./abstractCommand";
+
+const _arguments = [
+  "recipient (blockchain address)",
+  "currency (native, hopr)",
+  "amount (ETH, HOPR)",
+];
 
 export default class Withdraw extends AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {
     super();
   }
 
-  name() {
+  name(): string {
     return "withdraw";
   }
 
@@ -24,28 +24,38 @@ export default class Withdraw extends AbstractCommand {
     return "withdraw native or hopr to a specified recipient";
   }
 
+  async autocomplete(query?: string): Promise<AutoCompleteResult> {
+    return [_arguments, query ?? ""];
+  }
+
+  /**
+   * Will throw if any of the arguments are incorrect.
+   */
   private async checkArgs(
     query: string
   ): Promise<{
     recipient: string;
     currency: Currencies;
     amount: string;
+    weiAmount: string;
   }> {
+    const { NativeBalance, Balance } = this.node.paymentChannels.types;
+
     const [err, recipient, currencyRaw, amount] = this._assertUsage(query, [
-      "recipient",
-      "currency",
-      "amount",
+      "recipient (blockchain address)",
+      "currency (native, hopr)",
+      "amount (ETH, HOPR)",
     ]);
 
     if (err) {
       throw new Error(err);
     }
 
-    await checkPeerIdInput(recipient);
+    // @TODO: validate recipient address
 
-    const currency = currencyRaw.toLowerCase();
+    const currency = currencyRaw.toUpperCase() as Currencies;
 
-    if (!["NATIVE", "HOPR"].includes(currency.toUpperCase())) {
+    if (!["NATIVE", "HOPR"].includes(currency)) {
       throw new Error(
         `Incorrect currency provided: '${currency}', correct options are: 'native', 'hopr'.`
       );
@@ -53,10 +63,16 @@ export default class Withdraw extends AbstractCommand {
       throw new Error(`Incorrect amount provided: '${amount}'.`);
     }
 
+    const weiAmount =
+      currency === "NATIVE"
+        ? moveDecimalPoint(amount, NativeBalance.DECIMALS)
+        : moveDecimalPoint(amount, Balance.DECIMALS);
+
     return {
       recipient,
-      currency: currency.toUpperCase() as Currencies,
+      currency,
       amount,
+      weiAmount,
     };
   }
 
@@ -65,21 +81,28 @@ export default class Withdraw extends AbstractCommand {
    * @notice triggered by the CLI
    */
   async execute(query?: string): Promise<void> {
-    const dispose = startDelayedInterval("Withdrawing");
+    let dispose: ReturnType<typeof startDelayedInterval> | undefined;
 
     try {
-      const { recipient, currency, amount } = await this.checkArgs(query ?? "");
+      const { recipient, currency, amount, weiAmount } = await this.checkArgs(
+        query ?? ""
+      );
       const { paymentChannels } = this.node;
-      const pubKey = await convertPubKeyFromB58String(recipient);
-      const address = await paymentChannels.utils.pubKeyToAccountId(
-        pubKey.marshal()
+      const { NativeBalance, Balance } = paymentChannels.types;
+      const symbol =
+        currency === "NATIVE" ? NativeBalance.SYMBOL : Balance.SYMBOL;
+
+      dispose = startDelayedInterval(
+        `Withdrawing ${amount} ${symbol} to ${recipient}`
       );
 
-      await paymentChannels.withdraw(currency, u8aToHex(address), amount);
+      await paymentChannels.withdraw(currency, recipient, weiAmount);
     } catch (err) {
       console.log(chalk.red(err.message));
     }
 
-    dispose();
+    if (typeof dispose !== "undefined") {
+      dispose();
+    }
   }
 }
