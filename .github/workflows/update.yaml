@@ -28,7 +28,7 @@ jobs:
             exit 1;
           fi
           CIREGEX='^CI:'
-          if [ $CHANGES =~ $CIREGEX ]; then
+          if [[ $CHANGES =~ $CIREGEX ]]; then
             echo "::debug::Release less than an hour ago"
             exit 1;
           fi
