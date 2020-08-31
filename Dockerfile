@@ -77,7 +77,7 @@ COPY envoy/envoy.sh /app/envoy/envoy.sh
 # PM2
 COPY process.yaml /app/process.yaml
 
-#VOLUME ["/app/db"]
+VOLUME ["/app/db"]
 
 #? Hopr-server gRPC
 EXPOSE 9091
