@@ -7,6 +7,8 @@ let debugLog = debug('hoprd')
 
 const MAX_MESSAGES_CACHED = 100
 
+// 
+// @implements LoggerService of nestjs
 export class LogStream {
   private messages: string[] = []
   private connections: Socket[] = []
@@ -22,6 +24,22 @@ export class LogStream {
   log(...args: string[]){
     const msg = `[${new Date().toISOString()}] ${args.join(' ')}`
     this._log(msg)
+  }
+
+  error(message: string, trace: string) {
+    this.log(message)
+  }
+
+  warn(message: string) {
+    this.log('WARN', message)
+  }
+
+  debug(message: string) {
+    this.log('DEBUG', message)
+  }
+
+  verbose(message: string) {
+    this.log('VERBOSE', message)
   }
 
   logFullLine(...args: string[]){

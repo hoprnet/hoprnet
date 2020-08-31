@@ -11,7 +11,7 @@
     "prepublishOnly": "yarn build",
     "lint": "prettier --check .",
     "lint:fix": "prettier --write .",
-    "server": "yarn install && yarn build && node lib/server.js"
+    "dev": "yarn install && yarn build && node lib/index.js"
   },
   "license": "",
   "dependencies": {
@@ -39,5 +39,23 @@
     "prettier": "^2.0.5",
     "ts-jest": "^26.1.4",
     "typescript": "^3.9.7"
+  },
+  "jest": {
+    "verbose": true,
+    "moduleFileExtensions": [
+      "ts",
+      "js",
+      "json"
+    ],
+    "testPathIgnorePatterns": [
+      "<rootDir>/lib",
+      "node_modules"
+    ],
+    "testRegex": ".spec.ts$",
+    "transform": {
+      "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "coverageDirectory": "../coverage",
+    "testEnvironment": "node"
   }
 }
