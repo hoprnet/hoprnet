@@ -24,8 +24,7 @@ import { pubKeyToPeerId } from '../../utils'
 
 const ACKNOWLEDGEMENT_TIMEOUT = durations.seconds(2)
 
-class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
-  extends EventEmitter
+class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector> extends EventEmitter
   implements AbstractInteraction<Chain> {
   protocols: string[] = [PROTOCOL_ACKNOWLEDGEMENT]
 
