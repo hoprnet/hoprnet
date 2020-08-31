@@ -20,9 +20,9 @@ jobs:
       - name: Abort if there are no changes
         working-directory: hoprd
         run: |
-          CHANGES=git log --since="1 hour ago"  | wc -l
+          CHANGES=${git log --since="1 hour ago"  | wc -l}
           echo $CHANGES
-          if [$CHANGES -eq "0"]; exit 1; fi; 
+          if [$CHANGES -eq "0"]; then exit 1; fi; 
       - name: Build Docker
         run: |
           docker-compose build
