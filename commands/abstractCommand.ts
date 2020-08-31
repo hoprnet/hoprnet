@@ -2,7 +2,7 @@ import type PeerId from 'peer-id'
 import chalk from 'chalk'
 
 export type AutoCompleteResult = [string[], string] 
-export const emptyAutoCompleteResult = (line: string):AutoCompleteResult => [[], line]
+export const emptyAutoCompleteResult = (line: string):AutoCompleteResult => [[''], line]
 export type CommandResponse = string | void
 
 export type GlobalState = {
