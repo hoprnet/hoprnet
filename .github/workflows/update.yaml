@@ -30,7 +30,7 @@ jobs:
       - name: Abort if already released
         run: |
           CHANGES=$(git log --since='1 hour ago')
-          CIREGEX='^CI:'
+          CIREGEX='CI:'
           if [[ $CHANGES =~ $CIREGEX ]]; then
             echo '::debug:: Release less than an hour ago'
             exit 1;
