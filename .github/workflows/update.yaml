@@ -4,6 +4,7 @@ on:
   schedule:
     - cron: '0 * * * *'
   repository_dispatch:
+    types: just-do-it
 
 
 
