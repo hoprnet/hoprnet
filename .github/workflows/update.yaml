@@ -23,7 +23,7 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - name: Install Dappnodesdk
-        run: sudo npm install -g @dappnode/dappnodesdk
+        run: sudo npm install -g @dappnode/dappnodesdk@0.2.9-beta.0
       - name: Bump Dappnode version
         run: dappnodesdk increase minor
       - name: Build on dappnode

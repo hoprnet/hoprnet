@@ -1,10 +1,18 @@
 # AVADO-DNP-HOPR
 
-## Prerequisites
+## Deploy
+
+The deploy should happen automatically through a github action.
+
+---
+
+## Old instructions
+
+### Prerequisites
 
 `sudo npm install -g @dappnode/dappnodesdk`
 
-## building the package
+### building the package
 
 First connect to the VPN or Wifi of your AVADO box, then do
 
@@ -15,7 +23,7 @@ it will give you an IPFS hash as output
 Note: Usually you will develop locally using `docker-compose build` and `docker-compose up` untill your package works & use the building in the AVADO package format whenever you want to run the same on the AVADO box.
 
 
-## Installing the package
+### Installing the package
 
 Either install it through the DappStore (and paste in the IPFS hash there)
 
@@ -25,7 +33,7 @@ Note: this only works when the version has been increased - otherwise the Dappst
 Or go to `http://go.ava.do/install/<IPFS hash>` to force the version on the machine - this works even if you have not updated the version number..
 
 
-## updating the version 
+### updating the version 
 
 ```
 dappnodesdk increase patch
