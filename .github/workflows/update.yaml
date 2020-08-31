@@ -20,9 +20,9 @@ jobs:
       - name: Abort if there are no changes
         working-directory: hoprd
         run: |
-          CHANGES=${git log --since='1 hour ago'}
+          CHANGES=$(git log --since='1 hour ago')
           echo "::debug::$CHANGES"
-          CHGL=${echo $CHANGES | wc -l}
+          CHGL=$(echo $CHANGES | wc -l)
           if [$CHGL -eq "0"]; then
             echo "::debug::No changes in last hour"
             exit 1;
