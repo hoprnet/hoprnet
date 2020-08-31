@@ -21,18 +21,20 @@ jobs:
         working-directory: hoprd
         run: |
           CHANGES=$(git log --since='1 hour ago')
-          echo "::debug::$CHANGES"
+          echo "::debug:: $CHANGES"
           CHGL=$(echo $CHANGES | wc -l)
           if [ $CHGL -eq "0" ] ; then
-            echo "::debug::No changes in last hour"
+            echo '::debug:: No changes in last hour'
             exit 1;
           fi
+      - name: Abort if already released
+        run: |
+          CHANGES=$(git log --since='1 hour ago')
           CIREGEX='^CI:'
           if [[ $CHANGES =~ $CIREGEX ]]; then
-            echo "::debug::Release less than an hour ago"
+            echo '::debug:: Release less than an hour ago'
             exit 1;
           fi
-
       - name: Build Docker
         run: |
           docker-compose build
