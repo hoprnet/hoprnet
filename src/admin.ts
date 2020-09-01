@@ -9,11 +9,36 @@ import fs from 'fs'
 import ws from 'ws'
 import path from 'path'
 import debug from 'debug'
+import { parse } from 'url'
+import next from 'next'
+
 
 let debugLog = debug('hoprd:admin')
 
-export function setupAdminServer(logs: LogStream, node: Hopr<HoprCoreConnector>){
+export async function setupAdminServer(logs: LogStream, node: Hopr<HoprCoreConnector>){
   let cmds = new commands.Commands(node)
+
+  const dev = process.env.NODE_ENV !== 'production'
+  const app = next({ dev })
+  const handle = app.getRequestHandler()
+  await app.prepare()
+
+  const server = http.createServer((req, res) => {
+    // Be sure to pass `true` as the second argument to `url.parse`.
+    // This tells it to parse the query portion of the URL.
+    const parsedUrl = parse(req.url || '', true)
+    const { pathname, query } = parsedUrl
+
+    if (pathname === '/a') {
+      app.render(req, res, '/a', query)
+    } else if (pathname === '/b') {
+      app.render(req, res, '/b', query)
+    } else {
+      handle(req, res, parsedUrl)
+    }
+  }).listen(3000)
+
+/*
   var app = express()
   app.get('/', function(req, res){
     res.set('Content-Type', 'text/html')
@@ -21,6 +46,7 @@ export function setupAdminServer(logs: LogStream, node: Hopr<HoprCoreConnector>)
   })
 
   const server = http.createServer(app);
+*/
 
   const wsServer = new ws.Server({ server: server });
   wsServer.on('connection', socket => {

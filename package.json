@@ -23,6 +23,7 @@
     "@types/clear": "^0.1.0",
     "bs58": "^4.0.1",
     "multihashes": "^3.0.1",
+    "next": "^9.5.2",
     "yargs": "^15.4.1"
   },
   "devDependencies": {
