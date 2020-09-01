@@ -169,9 +169,8 @@ class ChannelFactory {
     let channel: Channel
     let signedChannel: SignedChannel
 
-    if (!this.coreConnector.hashedSecret._onChainValuesInitialized) {
-      await this.coreConnector.initOnchainValues()
-    }
+    const hashedSecret = await this.coreConnector.hashedSecret.check()
+    if (!hashedSecret.initialized) await this.coreConnector.initOnchainValues()
 
     if (await this.isOpen(counterpartyPubKey)) {
       const record = await this.coreConnector.db.get(Buffer.from(this.coreConnector.dbKeys.Channel(counterpartyPubKey)))

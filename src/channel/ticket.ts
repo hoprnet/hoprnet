@@ -78,7 +78,7 @@ class TicketFactory {
     const { ticket, signature } = signedTicket
     const { r, s, v } = utils.getSignatureParameters(signature)
 
-    const preImage = await this.channel.coreConnector.hashedSecret.getPreimage(ticket.onChainSecret)
+    const preImage = await this.channel.coreConnector.hashedSecret.findPreImage(ticket.onChainSecret)
 
     const transaction = await signTransaction(
       hoprChannels.methods.redeemTicket(

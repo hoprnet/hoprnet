@@ -1,5 +1,5 @@
 import HoprEthereum from '.'
-import { Hash } from './types'
+import { Hash, PreImage } from './types'
 
 import Debug from 'debug'
 const log = Debug('hopr-core-ethereum:hashedSecret')
@@ -10,146 +10,68 @@ import { publicKeyConvert } from 'secp256k1'
 
 export const GIANT_STEP_WIDTH = 10000
 export const TOTAL_ITERATIONS = 100000
-
 export const HASHED_SECRET_WIDTH = 27
+export const EMPTY_HASHED_SECRET = new Uint8Array(HASHED_SECRET_WIDTH).fill(0x00)
 
 class HashedSecret {
-  public _onChainValuesInitialized: boolean
+  constructor(private coreConnector: HoprEthereum) {}
 
-  constructor(private coreConnector: HoprEthereum) {
-    this._onChainValuesInitialized = false
+  /**
+   * @returns a promise that resolves to a Hash if secret is found
+   */
+  private async getOnChainSecret(): Promise<Hash | undefined> {
+    const address = (await this.coreConnector.account.address).toHex()
+
+    return this.coreConnector.hoprChannels.methods
+      .accounts(address)
+      .call()
+      .then((res) => {
+        const hashedSecret = stringToU8a(res.hashedSecret)
+
+        // true if this string is an empty bytes32
+        if (u8aEquals(hashedSecret, EMPTY_HASHED_SECRET)) {
+          return undefined
+        }
+
+        return new Hash(hashedSecret)
+      })
   }
 
-  async submitFromDatabase(nonce?: number) {
-    log(`Key is present off-chain but not on-chain, submitting..`)
-    let hashedSecret: Uint8Array = await this.coreConnector.db.get(
-      Buffer.from(this.coreConnector.dbKeys.OnChainSecretIntermediary(TOTAL_ITERATIONS - GIANT_STEP_WIDTH))
+  /**
+   * @returns a promise that resolves to a Hash if secret is found
+   */
+  private async getOffChainSecret(): Promise<Hash | undefined> {
+    try {
+      return await this.coreConnector.db.get(Buffer.from(this.coreConnector.dbKeys.OnChainSecret()))
+    } catch {
+      return undefined
+    }
+  }
+
+  /**
+   * @returns a deterministic secret that is used in debug mode
+   */
+  private async getDebugAccountSecret(): Promise<Hash> {
+    const account = await this.coreConnector.hoprChannels.methods
+      .accounts((await this.coreConnector.account.address).toHex())
+      .call()
+
+    return new Hash(
+      (
+        await this.coreConnector.utils.hash(
+          u8aConcat(new Uint8Array([parseInt(account.counter)]), this.coreConnector.account.keys.onChain.pubKey)
+        )
+      ).slice(0, HASHED_SECRET_WIDTH)
     )
-    for (let i = 0; i < GIANT_STEP_WIDTH; i++) {
-      hashedSecret = await this.coreConnector.utils.hash(hashedSecret.slice(0, HASHED_SECRET_WIDTH))
-    }
-
-    await this._submit(hashedSecret, nonce)
-  }
-  /**
-   * generate and set account secret
-   */
-  async submit(nonce?: number): Promise<void> {
-    await this._submit(await this.create(), nonce)
-
-    this._onChainValuesInitialized = true
-  }
-
-  private async _submit(hashedSecret: Uint8Array, nonce?: number) {
-    const account = await this.coreConnector.hoprChannels.methods
-      .accounts((await this.coreConnector.account.address).toHex())
-      .call()
-
-    if (account.accountX == null || ['0', '0x', '0x'.padEnd(66, '0')].includes(account.accountX)) {
-      const uncompressedPubKey = publicKeyConvert(this.coreConnector.account.keys.onChain.pubKey, false).slice(1)
-
-      await this.coreConnector.utils.waitForConfirmation(
-        (
-          await this.coreConnector.signTransaction(
-            this.coreConnector.hoprChannels.methods.init(
-              u8aToHex(uncompressedPubKey.slice(0, 32)),
-              u8aToHex(uncompressedPubKey.slice(32, 64)),
-              u8aToHex(hashedSecret)
-            ),
-            {
-              from: (await this.coreConnector.account.address).toHex(),
-              to: this.coreConnector.hoprChannels.options.address,
-              nonce: nonce || (await this.coreConnector.account.nonce),
-            }
-          )
-        ).send()
-      )
-    } else {
-      // @TODO this is potentially dangerous because it increases the account counter
-      await this.coreConnector.utils.waitForConfirmation(
-        (
-          await this.coreConnector.signTransaction(
-            this.coreConnector.hoprChannels.methods.setHashedSecret(u8aToHex(hashedSecret)),
-            {
-              from: (await this.coreConnector.account.address).toHex(),
-              to: this.coreConnector.hoprChannels.options.address,
-              nonce: nonce || (await this.coreConnector.account.nonce),
-            }
-          )
-        ).send()
-      )
-    }
   }
 
   /**
-   * Checks whether node has an account secret set onchain and offchain
-   * @returns a promise resolved true if secret is set correctly
+   * Creates a random secret OR a deterministic one if running in debug mode,
+   * it will then loop X amount of times, on each loop we hash the previous result.
+   * We store the last result.
+   * @returns a promise that resolves to a Hash if secret is found
    */
-  async check(): Promise<void> {
-    let [onChainSecret, offChainSecret] = await Promise.all([
-      // get onChainSecret
-      this.coreConnector.hoprChannels.methods
-        .accounts((await this.coreConnector.account.address).toHex())
-        .call()
-        .then((res) => {
-          const hashedSecret = stringToU8a(res.hashedSecret)
-          if (u8aEquals(hashedSecret, new Uint8Array(HASHED_SECRET_WIDTH).fill(0x00))) {
-            return undefined
-          }
-
-          return new Hash(hashedSecret)
-        }),
-      // get offChainSecret
-      this.coreConnector.db.get(Buffer.from(this.coreConnector.dbKeys.OnChainSecret())).catch((err) => {
-        if (err.notFound != true) {
-          throw err
-        }
-      }),
-    ])
-
-    let hasOffChainSecret = offChainSecret != null
-    let hasOnChainSecret = onChainSecret != null
-
-    if (hasOffChainSecret && hasOnChainSecret) {
-      // make sure that we are able to recover the pre-image
-      await this.getPreimage(onChainSecret)
-    } else if (hasOffChainSecret != hasOnChainSecret) {
-      if (hasOffChainSecret) {
-        await this.submitFromDatabase()
-        hasOnChainSecret = true
-      } else {
-        log(`Key is present on-chain but not in our database.`)
-        if (this.coreConnector.options.debug) {
-          log(`DEBUG mode: Writing debug secret to database`)
-          await this.create()
-          hasOffChainSecret = true
-        }
-      }
-    }
-
-    this._onChainValuesInitialized = hasOffChainSecret && hasOnChainSecret
-  }
-
-  /**
-   * Returns a deterministic secret that is used in debug mode.
-   */
-  private async getDebugAccountSecret(): Promise<Uint8Array> {
-    const account = await this.coreConnector.hoprChannels.methods
-      .accounts((await this.coreConnector.account.address).toHex())
-      .call()
-
-    return (
-      await this.coreConnector.utils.hash(
-        u8aConcat(new Uint8Array([parseInt(account.counter)]), this.coreConnector.account.keys.onChain.pubKey)
-      )
-    ).slice(0, HASHED_SECRET_WIDTH)
-  }
-
-  /**
-   * Creates the on-chain secret and stores the intermediate values
-   * into the database.
-   */
-  async create(): Promise<Uint8Array> {
+  private async createAndStoreSecretOffChain(): Promise<Hash> {
     let onChainSecret = this.coreConnector.options.debug
       ? await this.getDebugAccountSecret()
       : new Hash(randomBytes(HASHED_SECRET_WIDTH))
@@ -175,11 +97,68 @@ class HashedSecret {
   }
 
   /**
+   * Store secret onchain.
+   */
+  private async storeSecretOnChain(secret: Hash, nonce?: number): Promise<void> {
+    const account = await this.coreConnector.hoprChannels.methods
+      .accounts((await this.coreConnector.account.address).toHex())
+      .call()
+
+    const _nonce = nonce ? nonce : await this.coreConnector.account.nonce
+
+    if (account.accountX == null || ['0', '0x', '0x'.padEnd(66, '0')].includes(account.accountX)) {
+      const uncompressedPubKey = publicKeyConvert(this.coreConnector.account.keys.onChain.pubKey, false).slice(1)
+
+      await this.coreConnector.utils.waitForConfirmation(
+        (
+          await this.coreConnector.signTransaction(
+            this.coreConnector.hoprChannels.methods.init(
+              u8aToHex(uncompressedPubKey.slice(0, 32)),
+              u8aToHex(uncompressedPubKey.slice(32, 64)),
+              u8aToHex(secret)
+            ),
+            {
+              from: (await this.coreConnector.account.address).toHex(),
+              to: this.coreConnector.hoprChannels.options.address,
+              nonce: _nonce,
+            }
+          )
+        ).send()
+      )
+    } else {
+      // @TODO this is potentially dangerous because it increases the account counter
+      await this.coreConnector.utils.waitForConfirmation(
+        (
+          await this.coreConnector.signTransaction(
+            this.coreConnector.hoprChannels.methods.setHashedSecret(u8aToHex(secret)),
+            {
+              from: (await this.coreConnector.account.address).toHex(),
+              to: this.coreConnector.hoprChannels.options.address,
+              nonce: _nonce,
+            }
+          )
+        ).send()
+      )
+    }
+  }
+
+  private async calcOnChainSecretFromDb(): Promise<Hash> {
+    let hashedSecret: Uint8Array = await this.coreConnector.db.get(
+      Buffer.from(this.coreConnector.dbKeys.OnChainSecretIntermediary(TOTAL_ITERATIONS - GIANT_STEP_WIDTH))
+    )
+    for (let i = 0; i < GIANT_STEP_WIDTH; i++) {
+      hashedSecret = (await this.coreConnector.utils.hash(hashedSecret)).slice(0, HASHED_SECRET_WIDTH)
+    }
+
+    return new Hash(hashedSecret)
+  }
+
+  /**
    * Tries to find a pre-image for the given hash by using the intermediate
    * values from the database.
    * @param hash the hash to find a preImage for
    */
-  async getPreimage(hash: Uint8Array): Promise<{ preImage: Hash; index: number }> {
+  public async findPreImage(hash: Uint8Array): Promise<{ preImage: PreImage; index: number }> {
     if (hash.length != HASHED_SECRET_WIDTH) {
       throw Error(
         `Invalid length. Expected a Uint8Array with ${HASHED_SECRET_WIDTH} elements but got one with ${hash.length}`
@@ -229,10 +208,77 @@ class HashedSecret {
     } while (!found && closestIntermediary >= 0)
 
     if (!found) {
-      throw Error('notFound')
+      throw Error('Preimage not found')
     }
 
-    return { preImage: new Hash(intermediary), index }
+    return { preImage: new PreImage(intermediary), index }
+  }
+
+  /**
+   * Check whether our secret exists and matches our onchain secret.
+   * Both onChain and offChain secret must be present and matching.
+   * @returns a promise that resolves to a true if everything is ok
+   */
+  public async check(): Promise<{
+    initialized: boolean
+    onChainSecret?: Hash
+    offChainSecret?: Hash
+  }> {
+    const [onChainSecret, offChainSecret] = await Promise.all([this.getOnChainSecret(), this.getOffChainSecret()])
+    const bothEmpty = typeof onChainSecret === 'undefined' && typeof offChainSecret === 'undefined'
+    const bothExist = !bothEmpty && typeof onChainSecret !== 'undefined' && typeof offChainSecret !== 'undefined'
+
+    // both are empty
+    if (bothEmpty) {
+      return { initialized: false }
+    }
+    // both exist
+    else if (bothExist) {
+      try {
+        await this.findPreImage(onChainSecret)
+        return { initialized: true, onChainSecret, offChainSecret }
+      } catch (err) {
+        log(err)
+        return { initialized: false, onChainSecret, offChainSecret }
+      }
+    }
+    // only one of them exists
+    else {
+      return { initialized: false, onChainSecret, offChainSecret }
+    }
+  }
+
+  /**
+   * Initializes hashedSecret.
+   */
+  public async initialize(nonce?: number): Promise<void> {
+    const { initialized, onChainSecret, offChainSecret } = await this.check()
+    if (initialized) {
+      log(`Secret is initialized.`)
+      return
+    }
+
+    const bothEmpty = typeof onChainSecret === 'undefined' && typeof offChainSecret === 'undefined'
+    const bothExist = !bothEmpty && typeof onChainSecret !== 'undefined' && typeof offChainSecret !== 'undefined'
+    const onlyOnChain = !bothEmpty && !bothExist && typeof onChainSecret !== 'undefined'
+
+    if (bothEmpty) {
+      log(`Secret not found, initializing..`)
+    } else if (bothExist) {
+      log(`Secret is found but failed to find preimage, reinitializing..`)
+    } else if (onlyOnChain) {
+      log(`Secret is present on-chain but not off-chain, reinitializing..`)
+    } else {
+      log(`Secret is present off-chain but not on-chain, submitting..`)
+    }
+
+    if (bothEmpty || bothExist || onlyOnChain) {
+      const offChainSecret = await this.createAndStoreSecretOffChain()
+      await this.storeSecretOnChain(offChainSecret, nonce)
+    } else {
+      const onChainSecret = await this.calcOnChainSecretFromDb()
+      await this.storeSecretOnChain(onChainSecret, nonce)
+    }
   }
 }
 
