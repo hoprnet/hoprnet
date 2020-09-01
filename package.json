@@ -15,7 +15,7 @@
   },
   "license": "",
   "dependencies": {
-    "@hoprnet/hopr-chat": "^1.10.0",
+    "@hoprnet/hopr-chat": "^1.11.0-xdai",
     "@hoprnet/hopr-core": "0.6.29-xdai",
     "@hoprnet/hopr-server": "^0.2.3-xdai",
     "@hoprnet/hopr-utils": "0.4.0",
