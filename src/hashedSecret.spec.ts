@@ -17,7 +17,7 @@ import HoprChannelsAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprCha
 import Account from './account'
 import { addresses } from '@hoprnet/hopr-ethereum'
 
-describe('test hashedSecret management', function () {
+describe('test hashedSecret', function () {
   this.timeout(durations.seconds(7))
   const ganache = new Ganache()
   let connector: HoprEthereum
@@ -60,7 +60,7 @@ describe('test hashedSecret management', function () {
     let result,
       errThrown = false
     try {
-      result = await connector.hashedSecret.getPreimage(hash)
+      result = await connector.hashedSecret.findPreImage(hash)
     } catch (err) {
       errThrown = true
     }
@@ -80,7 +80,7 @@ describe('test hashedSecret management', function () {
 
   context('random pre-image', function () {
     before(async function () {
-      this.timeout(60e3)
+      this.timeout(durations.minutes(1))
       await ganache.start()
       await migrate()
       await fund(1)
@@ -93,9 +93,7 @@ describe('test hashedSecret management', function () {
     })
 
     it('should publish a hashed secret', async function () {
-      await connector.hashedSecret.check()
-
-      await connector.hashedSecret.submit()
+      await connector.hashedSecret.initialize()
 
       let onChainHash = new Types.Hash(
         stringToU8a(
@@ -103,7 +101,7 @@ describe('test hashedSecret management', function () {
         )
       )
 
-      let preImage = await connector.hashedSecret.getPreimage(onChainHash)
+      let preImage = await connector.hashedSecret.findPreImage(onChainHash)
 
       assert(u8aEquals((await connector.utils.hash(preImage.preImage)).slice(0, HASHED_SECRET_WIDTH), onChainHash))
 
@@ -124,7 +122,7 @@ describe('test hashedSecret management', function () {
 
       assert(!u8aEquals(onChainHash, updatedOnChainHash), `new and old onChainSecret must not be the same`)
 
-      let updatedPreImage = await connector.hashedSecret.getPreimage(updatedOnChainHash)
+      let updatedPreImage = await connector.hashedSecret.findPreImage(updatedOnChainHash)
 
       assert(!u8aEquals(preImage.preImage, updatedPreImage.preImage), `new and old pre-image must not be the same`)
 
@@ -137,33 +135,34 @@ describe('test hashedSecret management', function () {
     })
 
     // Commented due expensive operations
-    // it('should generate a hashed secret and recover a pre-Image', async function () {
-    //   this.timeout(durations.seconds(22))
-    //   await connector.hashedSecret.create()
+    it.skip('should generate a hashed secret and recover a pre-Image', async function () {
+      this.timeout(durations.seconds(22))
+      await connector.hashedSecret.initialize()
 
-    //   for (let i = 0; i < TOTAL_ITERATIONS / GIANT_STEP_WIDTH; i++) {
-    //     assert(
-    //       (await connector.db.get(Buffer.from(connector.dbKeys.OnChainSecretIntermediary(i * GIANT_STEP_WIDTH)))) != null
-    //     )
-    //   }
+      for (let i = 0; i < TOTAL_ITERATIONS / GIANT_STEP_WIDTH; i++) {
+        assert(
+          (await connector.db.get(Buffer.from(connector.dbKeys.OnChainSecretIntermediary(i * GIANT_STEP_WIDTH)))) !=
+            null
+        )
+      }
 
-    //   const masterSecret = await connector.db.get(Buffer.from(connector.dbKeys.OnChainSecretIntermediary(0)))
+      const masterSecret = await connector.db.get(Buffer.from(connector.dbKeys.OnChainSecretIntermediary(0)))
 
-    //   await checkIndex(1, masterSecret, false)
+      await checkIndex(1, masterSecret, false)
 
-    //   await checkIndex(randomInteger(1, TOTAL_ITERATIONS), masterSecret, false)
+      await checkIndex(randomInteger(1, TOTAL_ITERATIONS), masterSecret, false)
 
-    //   await checkIndex(TOTAL_ITERATIONS, masterSecret, false)
+      await checkIndex(TOTAL_ITERATIONS, masterSecret, false)
 
-    //   await checkIndex(0, masterSecret, true)
+      await checkIndex(0, masterSecret, true)
 
-    //   await checkIndex(TOTAL_ITERATIONS + 1, masterSecret, true)
-    // })
+      await checkIndex(TOTAL_ITERATIONS + 1, masterSecret, true)
+    })
   })
 
   context('deterministic debug pre-image', function () {
     before(async function () {
-      this.timeout(60e3)
+      this.timeout(durations.minutes(1))
       await ganache.start()
       await migrate()
       await fund(1)
@@ -176,9 +175,7 @@ describe('test hashedSecret management', function () {
     })
 
     it('should publish a hashed secret', async function () {
-      await connector.hashedSecret.check()
-
-      await connector.hashedSecret.submit()
+      await connector.hashedSecret.initialize()
 
       let onChainHash = new Types.Hash(
         stringToU8a(
@@ -186,7 +183,7 @@ describe('test hashedSecret management', function () {
         )
       )
 
-      let preImage = await connector.hashedSecret.getPreimage(onChainHash)
+      let preImage = await connector.hashedSecret.findPreImage(onChainHash)
 
       assert(u8aEquals((await connector.utils.hash(preImage.preImage)).slice(0, HASHED_SECRET_WIDTH), onChainHash))
 
@@ -207,7 +204,7 @@ describe('test hashedSecret management', function () {
 
       assert(!u8aEquals(onChainHash, updatedOnChainHash), `new and old onChainSecret must not be the same`)
 
-      let updatedPreImage = await connector.hashedSecret.getPreimage(updatedOnChainHash)
+      let updatedPreImage = await connector.hashedSecret.findPreImage(updatedOnChainHash)
 
       assert(!u8aEquals(preImage.preImage, updatedPreImage.preImage), `new and old pre-image must not be the same`)
 
@@ -217,6 +214,56 @@ describe('test hashedSecret management', function () {
           updatedOnChainHash
         )
       )
+    })
+  })
+
+  context('integration', function () {
+    before(async function () {
+      this.timeout(durations.minutes(1))
+      await ganache.start()
+      await migrate()
+      await fund(1)
+
+      connector = await generateConnector()
+    })
+
+    after(async function () {
+      await ganache.stop()
+    })
+
+    it('should initialize hashedSecret', async function () {
+      assert(!(await connector.hashedSecret.check()).initialized, "hashedSecret shouldn't be initialized")
+
+      await connector.hashedSecret.initialize()
+      assert((await connector.hashedSecret.check()).initialized, 'hashedSecret should be initialized')
+    })
+
+    it('should already be initialized', async function () {
+      await connector.hashedSecret.initialize()
+      assert((await connector.hashedSecret.check()).initialized, 'hashedSecret should be initialized')
+    })
+
+    it('should reinitialize hashedSecret when off-chain secret is missing', async function () {
+      connector.db = LevelUp(Memdown())
+
+      await connector.hashedSecret.initialize()
+      assert((await connector.hashedSecret.check()).initialized, 'hashedSecret should be initialized')
+    })
+
+    it('should submit hashedSecret when on-chain secret is missing', async function () {
+      const db = connector.db
+
+      this.timeout(durations.minutes(1))
+      await ganache.stop()
+      await ganache.start()
+      await migrate()
+      await fund(1)
+
+      connector = await generateConnector()
+      connector.db = db
+
+      await connector.hashedSecret.initialize()
+      assert((await connector.hashedSecret.check()).initialized, 'hashedSecret should be initialized')
     })
   })
 })

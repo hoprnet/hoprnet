@@ -155,7 +155,7 @@ export default class HoprEthereum implements HoprCoreConnector {
    * @param nonce optional specify nonce of the account to run multiple queries simultaneously
    */
   async initOnchainValues(nonce?: number): Promise<void> {
-    await this.hashedSecret.submit(nonce)
+    await this.hashedSecret.initialize(nonce)
   }
 
   /**
@@ -183,8 +183,6 @@ export default class HoprEthereum implements HoprCoreConnector {
           this.checkWeb3(),
           // start channels indexing
           this.indexer.start(),
-          // check account secret
-          this.hashedSecret.check(),
         ])
 
         this._status = 'initialized'
