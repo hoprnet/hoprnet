@@ -6,12 +6,13 @@
   "author": "Peter Braden (HOPR) <peter.braden@hoprnet.org>",
   "scripts": {
     "build": "rm -rf ./lib && tsc --project ./tsconfig.json",
+    "buildAdmin": "next build hopr-admin",
     "clean": "rm -rf ./lib",
     "test": "jest --runInBand --forceExit",
     "prepublishOnly": "yarn build",
     "lint": "prettier --check .",
     "lint:fix": "prettier --write .",
-    "server": "yarn install && yarn build && node lib/server.js"
+    "dev": "yarn install && yarn build && yarn buildAdmin && node lib/server.js --admin"
   },
   "license": "",
   "dependencies": {

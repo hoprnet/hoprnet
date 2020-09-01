@@ -18,24 +18,14 @@ let debugLog = debug('hoprd:admin')
 export async function setupAdminServer(logs: LogStream, node: Hopr<HoprCoreConnector>){
   let cmds = new commands.Commands(node)
 
-  const app = next({ dev: true, dir: './hopr-admin' })
+  const app = next({ dev: true, dir: path.resolve('./hopr-admin/')})
   const handle = app.getRequestHandler()
   await app.prepare()
 
   const server = http.createServer((req, res) => {
-    // Be sure to pass `true` as the second argument to `url.parse`.
-    // This tells it to parse the query portion of the URL.
     const parsedUrl = parse(req.url || '', true)
-    const { pathname, query } = parsedUrl
-
-    if (pathname === '/a') {
-      app.render(req, res, '/a', query)
-    } else if (pathname === '/b') {
-      app.render(req, res, '/b', query)
-    } else {
-      handle(req, res, parsedUrl)
-    }
-  }).listen(3000)
+    handle(req, res, parsedUrl)
+  })
 
 /*
   var app = express()

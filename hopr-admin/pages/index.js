@@ -67,9 +67,7 @@ function browser(){
     }
   }
 
-  window.onload = function(){
-    connect();
-  }
+  connect();
 }
 
 export default function Home() {
