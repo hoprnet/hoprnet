@@ -18,8 +18,7 @@ let debugLog = debug('hoprd:admin')
 export async function setupAdminServer(logs: LogStream, node: Hopr<HoprCoreConnector>){
   let cmds = new commands.Commands(node)
 
-  const dev = process.env.NODE_ENV !== 'production'
-  const app = next({ dev })
+  const app = next({ dev: true, dir: './hopr-admin' })
   const handle = app.getRequestHandler()
   await app.prepare()
 
