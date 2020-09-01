@@ -1,7 +1,10 @@
+import React, { useEffect, useState } from "react";
 import Head from 'next/head'
 import styles from '../styles/Home.module.css'
+import Logo from '../components/logo'
 
 function browser(){
+  console.log("Mounting")
   var prevLog = ""
 
   var appendLog = function(msg){
@@ -70,16 +73,32 @@ function browser(){
 }
 
 export default function Home() {
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      browser()
+    }
+  }, [])
+
   return (
     <div className={styles.container}>
+
+      <Head>
+        <title>HOPR Admin</title>
+      </Head>
+
       <div className='logo'>
+        <Logo />
       </div>
+
       <h1>HOPR Logs [TESTNET NODE]</h1>
+
       <div className='logs connecting'>
         <pre>
           <code id='log'>Connecting...</code>
         </pre>
       </div>
+
       <div className='send'>
         <input id="command"
           type="text"
