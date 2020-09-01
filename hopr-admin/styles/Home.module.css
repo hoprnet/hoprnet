@@ -1,123 +1,54 @@
-.container {
-  min-height: 100vh;
-  padding: 0 0.5rem;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-}
-
-.main {
-  padding: 5rem 0;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-}
-
-.footer {
-  width: 100%;
-  height: 100px;
-  border-top: 1px solid #eaeaea;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.footer img {
-  margin-left: 0.5rem;
-}
-
-.footer a {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.title a {
-  color: #0070f3;
-  text-decoration: none;
-}
-
-.title a:hover,
-.title a:focus,
-.title a:active {
-  text-decoration: underline;
-}
-
-.title {
+.logs {
+  display: block;
+  border: 1px solid #3c64a5; /* Steel Blue */
+  background-color: #b4f0ff; /* Sky Blue */
+  color: #000050; /* Dark Blue */
+  padding: 1rem;
   margin: 0;
-  line-height: 1.15;
-  font-size: 4rem;
+  position: fixed; 
+  top: 4rem; 
+  bottom: 5rem;
+  left: 2rem;
+  right: 2rem;
+  overflow-y: scroll;
 }
-
-.title,
-.description {
-  text-align: center;
+.connecting {
+  background-color: #ffffa0; /* HOPR Yellow */
+  color: red;
 }
-
-.description {
-  line-height: 1.5;
-  font-size: 1.5rem;
-}
-
-.code {
-  background: #fafafa;
-  border-radius: 5px;
-  padding: 0.75rem;
-  font-size: 1.1rem;
-  font-family: Menlo, Monaco, Lucida Console, Liberation Mono, DejaVu Sans Mono,
-    Bitstream Vera Sans Mono, Courier New, monospace;
-}
-
-.grid {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-
-  max-width: 800px;
-  margin-top: 3rem;
-}
-
-.card {
-  margin: 1rem;
-  flex-basis: 45%;
-  padding: 1.5rem;
-  text-align: left;
-  color: inherit;
-  text-decoration: none;
-  border: 1px solid #eaeaea;
-  border-radius: 10px;
-  transition: color 0.15s ease, border-color 0.15s ease;
-}
-
-.card:hover,
-.card:focus,
-.card:active {
-  color: #0070f3;
-  border-color: #0070f3;
-}
-
-.card h3 {
-  margin: 0 0 1rem 0;
-  font-size: 1.5rem;
-}
-
-.card p {
-  margin: 0;
-  font-size: 1.25rem;
-  line-height: 1.5;
-}
-
 .logo {
-  height: 1em;
+  width: 100px;
+  height: 100px;
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index:5;
 }
 
-@media (max-width: 600px) {
-  .grid {
-    width: 100%;
-    flex-direction: column;
-  }
+.send {
+  position: fixed;
+  bottom: 0rem;
+  left: 0rem;
+  right: 0rem;
+  background-color:  #000050;
+  color: #b4f0ff;
+  border-top: 1px solid #b4f0ff;
 }
+
+.send input {
+  background: transparent;
+  color: #b4f0ff;
+  border: none;
+  width:100%;
+  padding: 1rem;
+  font-family: monospace;
+  font-size: 1.2rem;
+}
+.send input:disabled {
+  background: #000050;
+  opacity: 0.9;
+}
+.send input:disabled::placeholder {
+  color: transparent;
+}
+
