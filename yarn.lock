@@ -1393,10 +1393,10 @@
   dependencies:
     google-protobuf "^3.12.2"
 
-"@hoprnet/hopr-server@^0.1.0":
-  version "0.1.0"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-server/-/hopr-server-0.1.0.tgz#e6200c31496dce8091c44d96ff3002f1947801fc"
-  integrity sha512-jkaSWSOqISlBHYYcmlKHo9m2I+A4EwL1/RYmNwbAR94Tb7q6EqYZs/P+8q/UMfHvg+hUdu/e1Rnqt/SNXMPXkg==
+"@hoprnet/hopr-server@^0.2.0":
+  version "0.2.0"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-server/-/hopr-server-0.2.0.tgz#97aac148860e1cdcea161f6971c41907d63b0649"
+  integrity sha512-DTG9CQMnhOMhn3diuZAYbDVxl1f1hniIKjh8TZiMuYwBQon0cfLP27GoEZ1u6FSRC0idGeal3sHclU3nryHv2w==
   dependencies:
     "@grpc/proto-loader" "^0.5.4"
     "@hoprnet/hopr-core" "0.6.23"
