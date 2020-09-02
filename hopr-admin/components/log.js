@@ -19,7 +19,7 @@ export function LogLine(props){
   }
 
   return (
-    <div className={styles.logline}>
+    <div key={props.value.ts} className={styles.logline}>
       <time>{ props.value.ts.slice(11) }</time>
       <pre>{ msg }</pre>
     </div>
@@ -34,7 +34,7 @@ export function Logs(props){
     container.current.scrollIntoView({block: 'end', behaviour: 'smooth'});
   })
 
-  let cls = styles.logs + (props.connecting ? styles.connecting : '')
+  let cls = styles.logs + ' ' + (props.connecting ? styles.connecting : '')
   return (
       <div className={cls}>
         <div ref={container}>

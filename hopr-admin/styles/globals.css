@@ -1,7 +1,7 @@
+html {height: 100%;}
 body {
   background: linear-gradient(#000050, #0000b4); /* Dark Blue to bright blue */
   color: #b4f0ff; /* Sky Blue */
-  height: 100vh;
   font-family: monospace;
   padding: 0 2rem;
   overflow: hidden;

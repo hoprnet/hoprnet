@@ -18,7 +18,14 @@ let debugLog = debug('hoprd:admin')
 export async function setupAdminServer(logs: LogStream, node: Hopr<HoprCoreConnector>){
   let cmds = new commands.Commands(node)
 
-  const app = next({ dev: true, dir: path.resolve('./hopr-admin/')})
+  const app = next({ 
+    dev: true,
+    dir: path.resolve('./hopr-admin/'), 
+    conf: {
+      devIndicators: {
+        autoPrerender: false
+      }
+    }})
   const handle = app.getRequestHandler()
   await app.prepare()
 

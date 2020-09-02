@@ -52,11 +52,10 @@ export default function Home() {
           <h2>Connected Peers ({peers.length})</h2>
           <div className={styles.connectedPeersList}>
             { peers.map( x => (
-              <div className={styles.peer}>
+              <div className={styles.peer} key={x}>
                 <Jazzicon
                   diameter={40}
                   address={x}
-                  key={x}
                   className={styles.peerIcon}
                 />
                 <div>{x}</div>
