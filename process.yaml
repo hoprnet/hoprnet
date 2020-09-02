@@ -1,6 +1,6 @@
 apps:
-    - script: ./server.js
-      name: "server"
+    - script: ./index.js
+      name: "dev"
       instances: 1
       args: "--admin --grpc"
     - script: ./envoy/envoy.sh
