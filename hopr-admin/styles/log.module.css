@@ -1,0 +1,27 @@
+.logs {
+  display: block;
+  border: 1px solid #3c64a5; /* Steel Blue */
+  background-color: #b4f0ff; /* Sky Blue */
+  color: #000050; /* Dark Blue */
+  padding: 1rem;
+  margin: 0;
+  position: fixed; 
+  top: 4rem; 
+  bottom: 5rem;
+  left: 2rem;
+  right: 2rem;
+  overflow-y: scroll;
+}
+.connecting {
+  background-color: #ffffa0; /* HOPR Yellow */
+  color: red;
+}
+
+.logline {
+
+}
+
+.logline time {
+  opacity: 0.3;
+  padding: 0.2;
+}

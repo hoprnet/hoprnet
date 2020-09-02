@@ -1,7 +1,13 @@
 import React, { useEffect, useState, useRef } from "react";
+import styles from '../styles/log.module.css'
 
 export function LogLine(props){
-  return props.value
+  return (
+    <div className={styles.logline}>
+      <time>{ props.value.ts.slice(11) }</time>
+      <pre><code>{ props.value.msg }</code></pre>
+    </div>
+  )
 }
 
 
@@ -12,14 +18,12 @@ export function Logs(props){
     container.current.scrollIntoView({block: 'end', behaviour: 'smooth'});
   })
 
-  let cls = props.connecting ? 'logs connecting' : 'logs'
+  let cls = styles.logs + (props.connecting ? styles.connecting : '')
   return (
       <div className={cls}>
-        <pre>
-          <code id='log' ref={container}>
-          { props.messages.map(x => <LogLine value={x} />) }
-          </code>
-        </pre>
+        <div ref={container}>
+        { props.messages.map(x => <LogLine value={x} />) }
+        </div>
       </div>
   )
 }

@@ -25,11 +25,7 @@ export default function Home() {
       <Head>
         <title>HOPR Admin</title>
       </Head>
-
-      <div className='logo'>
-        <Logo />
-      </div>
-
+      <Logo />
       <h1>HOPR Logs [TESTNET NODE]</h1>
 
       <Logs messages={messages} connecting={connecting} />

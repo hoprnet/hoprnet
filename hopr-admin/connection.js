@@ -16,7 +16,7 @@ export class Connection {
   }
 
   appendMessage(event) {
-    this.messages.push(event.data)
+    this.messages.push(JSON.parse(event.data))
     this.setMessages(this.messages.slice(0)) // Need a clone
   }
 
