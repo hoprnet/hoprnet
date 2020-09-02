@@ -13,6 +13,8 @@ type Message = {
   ts: string
 }
 
+// 
+// @implements LoggerService of nestjs
 export class LogStream {
   private messages: Message[] = []
   private connections: Socket[] = []
@@ -28,6 +30,22 @@ export class LogStream {
   log(...args: string[]){
     const msg = {type: 'log', msg: `${args.join(' ')}`, ts: new Date().toISOString()}
     this._log(msg)
+  }
+
+  error(message: string, trace: string) {
+    this.log(message)
+  }
+
+  warn(message: string) {
+    this.log('WARN', message)
+  }
+
+  debug(message: string) {
+    this.log('DEBUG', message)
+  }
+
+  verbose(message: string) {
+    this.log('VERBOSE', message)
   }
 
   logFullLine(...args: string[]){
