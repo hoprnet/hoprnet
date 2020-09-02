@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core",
-  "version": "0.6.29-xdai",
+  "version": "0.6.30-xdai",
   "description": "Privacy-preserving messaging protocol with incentivations for relay operators",
   "license": "GPL-3.0-only",
   "keywords": [
@@ -38,7 +38,7 @@
     "lint:fix": "prettier --write ."
   },
   "dependencies": {
-    "@hoprnet/hopr-core-ethereum": "0.4.1-xdai",
+    "@hoprnet/hopr-core-ethereum": "0.4.2-xdai",
     "@hoprnet/hopr-demo-seeds": "1.8.0",
     "@hoprnet/hopr-utils": "^0.4.0",
     "abort-controller": "^3.0.0",
