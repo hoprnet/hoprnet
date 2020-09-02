@@ -2,79 +2,26 @@ import React, { useEffect, useState } from "react";
 import Head from 'next/head'
 import styles from '../styles/Home.module.css'
 import Logo from '../components/logo'
+import { Logs } from '../components/log'
+import { Connection } from '../connection'
+import dynamic from "next/dynamic";
 
-function browser(){
-  console.log("Mounting")
-  var prevLog = ""
+const Jazzicon = dynamic(() => import("../components/jazzicon"), { ssr: false });
 
-  var appendLog = function(msg){
-    var logs = document.querySelector('#log')
-    logs.textContent = logs.textContent + '\n'+ msg
-    logs.scrollIntoView({block: 'end', behaviour: 'smooth'});
-  }
 
-  var connect = function(){
-    var logs = document.querySelector('.logs')
-    console.log('Connecting ...')
-    var client = new WebSocket('ws://' + window.location.host);
-    console.log('Web socket created')
-
-    client.onopen = function(){
-      console.log('Web socket opened')
-      logs.classList.remove('connecting')
-      document.querySelector('#command').disabled = false
-      document.querySelector('#command').focus()
-
-      document.querySelector('#command').onkeydown = function(e) {
-        if (e.keyCode == 13 ) { // enter 
-          var text = e.target.value 
-          console.log("Command: ", text)
-          if (text.length > 0) {
-            client.send(text)
-            prevLog = text
-            e.target.value = ""
-          }
-        }
-        if (e.keyCode == 38) { // Up Arrow
-          e.target.value = prevLog
-        }
-      }
-
-    }
-
-    client.onmessage = function(event) {
-      appendLog(event.data)
-      console.log(event)
-    }
-
-    client.onerror = function(error){
-      console.log('Connection error:', error)
-    }
-
-    client.onclose = function(){
-      console.log('Web socket closed')
-      logs.classList.add('connecting')
-      document.querySelector('#command').disabled = true
-      appendLog(' --- < Lost Connection, attempting to reconnect... > ---')
-      setTimeout(function(){
-        try {
-          connect()
-          console.log('connection')
-        } catch (e){
-          console.log('Error connecting', e)
-        }
-      }, 1000);
-    }
-  }
-
-  connect();
-}
 
 export default function Home() {
+  let connection
+
+  const [showConnected, setShowConnected] = useState(false)
+  const [connecting, setConnecting] = useState(true);
+  const [messages, setMessages] = useState([]); // The fetish for immutability in react means this will be slower than a mutable array..
+  const [peers, setConnectedPeers] = useState([]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      browser()
+      connection = new Connection(setConnecting, setMessages, setConnectedPeers)
+      return Connection.disconnect
     }
   }, [])
 
@@ -85,24 +32,38 @@ export default function Home() {
         <title>HOPR Admin</title>
       </Head>
 
-      <div className='logo'>
-        <Logo />
-      </div>
-
+      <Logo
+        onClick={() => setShowConnected(!showConnected)}
+        />
       <h1>HOPR Logs [TESTNET NODE]</h1>
 
-      <div className='logs connecting'>
-        <pre>
-          <code id='log'>Connecting...</code>
-        </pre>
-      </div>
+      <Logs messages={messages} connecting={connecting} />
 
       <div className='send'>
         <input id="command"
           type="text"
-          disabled={true}
+          disabled={connecting}
+          autoFocus
           placeholder="type 'help' for full list of commands" /> 
       </div>
+
+      { showConnected && 
+        <div className={styles.connectedPeers}>
+          <h2>Connected Peers ({peers.length})</h2>
+          <div className={styles.connectedPeersList}>
+            { peers.map( x => (
+              <div className={styles.peer} key={x}>
+                <Jazzicon
+                  diameter={40}
+                  address={x}
+                  className={styles.peerIcon}
+                />
+                <div>{x}</div>
+              </div>
+            )) }
+          </div>
+        </div>
+      }
     </div>
   )
 }

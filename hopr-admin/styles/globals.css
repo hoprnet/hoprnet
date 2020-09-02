@@ -1,39 +1,11 @@
+html {height: 100%;}
 body {
   background: linear-gradient(#000050, #0000b4); /* Dark Blue to bright blue */
   color: #b4f0ff; /* Sky Blue */
-  height: 100vh;
   font-family: monospace;
   padding: 0 2rem;
   overflow: hidden;
 }
-
-.logs {
-  display: block;
-  border: 1px solid #3c64a5; /* Steel Blue */
-  background-color: #b4f0ff; /* Sky Blue */
-  color: #000050; /* Dark Blue */
-  padding: 1rem;
-  margin: 0;
-  position: fixed; 
-  top: 4rem; 
-  bottom: 5rem;
-  left: 2rem;
-  right: 2rem;
-  overflow-y: scroll;
-}
-.connecting {
-  background-color: #ffffa0; /* HOPR Yellow */
-  color: red;
-}
-.logo {
-  width: 100px;
-  height: 100px;
-  position: fixed;
-  top: 1rem;
-  right: 1rem;
-  z-index:5;
-}
-
 .send {
   position: fixed;
   bottom: 0rem;
