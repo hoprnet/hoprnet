@@ -46,3 +46,6 @@ lib/
 
 # Exclude .env
 .env
+
+# Exclude built npm packages
+*.tgz
