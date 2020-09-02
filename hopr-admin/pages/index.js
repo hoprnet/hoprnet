@@ -4,6 +4,7 @@ import styles from '../styles/Home.module.css'
 import Logo from '../components/logo'
 import { Logs } from '../components/log'
 import { Connection } from '../connection'
+import Jazzicon from '../components/jazzicon'
 
 
 export default function Home() {
@@ -37,6 +38,10 @@ export default function Home() {
           disabled={connecting}
           autoFocus
           placeholder="type 'help' for full list of commands" /> 
+      </div>
+
+      <div className='connected'>
+        { peers.map( x => <Jazzicon address={x} /> ) }
       </div>
     </div>
   )
