@@ -151,7 +151,7 @@ async function main() {
 
   if (argv.grpc) {
     // Start HOPR server
-    startServer(node)
+    startServer(node, {logger: logs})
   }
 }
 

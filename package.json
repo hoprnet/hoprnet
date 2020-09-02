@@ -6,23 +6,29 @@
   "author": "Peter Braden (HOPR) <peter.braden@hoprnet.org>",
   "scripts": {
     "build": "rm -rf ./lib && tsc --project ./tsconfig.json",
+    "buildAdmin": "next build hopr-admin",
     "clean": "rm -rf ./lib",
     "test": "jest --runInBand --forceExit",
     "prepublishOnly": "yarn build",
     "lint": "prettier --check .",
     "lint:fix": "prettier --write .",
-    "server": "yarn install && yarn build && node lib/server.js"
+    "dev": "yarn install && yarn build && yarn buildAdmin && node lib/index.js --admin"
   },
   "license": "",
   "dependencies": {
     "@hoprnet/hopr-chat": "^1.10.0",
     "@hoprnet/hopr-core": "0.6.23",
-    "@hoprnet/hopr-server": "^0.1.0",
+    "@hoprnet/hopr-server": "^0.2.0",
     "@hoprnet/hopr-utils": "0.4.0",
     "@types/bs58": "^4.0.1",
     "@types/clear": "^0.1.0",
     "bs58": "^4.0.1",
+    "jazzicon": "^1.5.0",
     "multihashes": "^3.0.1",
+    "next": "^9.5.2",
+    "react": "16.13.1",
+    "react-dom": "16.13.1",
+    "tiny-hashes": "^1.0.1",
     "yargs": "^15.4.1"
   },
   "devDependencies": {
@@ -39,5 +45,23 @@
     "prettier": "^2.0.5",
     "ts-jest": "^26.1.4",
     "typescript": "^3.9.7"
+  },
+  "jest": {
+    "verbose": true,
+    "moduleFileExtensions": [
+      "ts",
+      "js",
+      "json"
+    ],
+    "testPathIgnorePatterns": [
+      "<rootDir>/lib",
+      "node_modules"
+    ],
+    "testRegex": ".spec.ts$",
+    "transform": {
+      "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "coverageDirectory": "../coverage",
+    "testEnvironment": "node"
   }
 }
