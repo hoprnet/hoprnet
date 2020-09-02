@@ -9,6 +9,11 @@
   max-height: 50vh;
   overflow-y: scroll;
 }
+
+.connectedPeers h2 {
+  text-align:center;
+}
+
 .peer {
   display: flex;
   justify-content: space-around;
