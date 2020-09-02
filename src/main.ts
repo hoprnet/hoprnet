@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core'
 import { ConfigService } from '@nestjs/config'
+import { LoggerService } from '@nestjs/common';
 import { Transport, MicroserviceOptions } from '@nestjs/microservices'
 import { AppModule } from './app.module'
 import { HOPR_PROTOS_FOLDER_DIR, PROTO_PACKAGES, PROTO_FILES } from './constants'
@@ -8,19 +9,20 @@ import Hopr from '@hoprnet/hopr-core'
 
 
 export type ServerOpts = {
-  host: string
-
+  host?: string,
+  logger?: LoggerService,
 }
 
 export async function startServer(node?: Hopr<HoprCoreConnector>, opts?: ServerOpts) {
   console.log(':: HOPR Server Starting ::')
-  const host = opts ? opts.host : '0.0.0.0:50051'
+  const host = (opts && opts.host) ? opts.host : '0.0.0.0:50051'
   const app = await NestFactory.createMicroservice<MicroserviceOptions>(
     AppModule.register({
       node,
     }),
     {
       transport: Transport.GRPC,
+      logger: (opts && opts.logger) ? opts.logger : undefined,
       options: {
         url: host,
         package: PROTO_PACKAGES,
