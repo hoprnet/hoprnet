@@ -28,8 +28,8 @@
     "test:e2e": "jest --config ./test/jest-e2e.json --forceExit --runInBand"
   },
   "engines": {
-    "node": "12.9.1",
-    "yarn": "1.19.2"
+    "node": "12",
+    "yarn": "1"
   },
   "dependencies": {
     "@grpc/proto-loader": "^0.5.4",
