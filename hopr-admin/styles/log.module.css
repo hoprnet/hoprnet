@@ -18,14 +18,20 @@
 }
 
 .logline {
-
+  display: flex;
+  justify-content: space-between;
 }
 
 .logline time {
+  font-size: 0.7rem;
+  display: block;
   opacity: 0.3;
+  text-align:right;
+  order: 2;
 }
 
 .logline pre {
   padding: 0.2rem;
   margin: 0;
+  order: 1;
 }
