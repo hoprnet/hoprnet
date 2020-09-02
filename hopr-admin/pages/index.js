@@ -11,10 +11,11 @@ export default function Home() {
 
   const [connecting, setConnecting] = useState(true);
   const [messages, setMessages] = useState([]); // The fetish for immutability in react means this will be slower than a mutable array..
+  const [peers, setConnectedPeers] = useState([]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      connection = new Connection(setConnecting, setMessages)
+      connection = new Connection(setConnecting, setMessages, setConnectedPeers)
       return Connection.disconnect
     }
   }, [])

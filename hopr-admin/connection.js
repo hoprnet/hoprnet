@@ -2,22 +2,38 @@
  * Maintain a websocket connection
  */
 
+const MAX_MESSAGES_CACHED = 50
+
 export class Connection {
-  messages = []
+  logs = []
   prevLog = ""
 
   constructor(
     setConnecting,
-    setMessages
+    setMessages,
+    setConnectedPeers
   ){
     this.setConnecting = setConnecting
     this.setMessages = setMessages
+    this.setConnectedPeers = setConnectedPeers
     this.connect()
   }
 
   appendMessage(event) {
-    this.messages.push(JSON.parse(event.data))
-    this.setMessages(this.messages.slice(0)) // Need a clone
+    try {
+      const msg = JSON.parse(event.data)
+      if (msg.type == 'log') {
+        if (this.logs.length > MAX_MESSAGES_CACHED){ // Avoid memory leak
+          this.logs.splice(0, this.logs.length - MAX_MESSAGES_CACHED); // delete elements from start
+        }
+        this.logs.push(msg)
+        this.setMessages(this.logs.slice(0)) // Need a clone
+      } else if (msg.type == 'connected'){
+        this.setConnectedPeers(msg.msg.split(','))
+      }
+    } catch (e) {
+      console.log("ERR", e)
+    }
   }
 
   connect() {

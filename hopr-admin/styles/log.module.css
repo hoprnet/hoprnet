@@ -23,5 +23,9 @@
 
 .logline time {
   opacity: 0.3;
-  padding: 0.2;
+}
+
+.logline pre {
+  padding: 0.2rem;
+  margin: 0;
 }
