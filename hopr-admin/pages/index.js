@@ -4,12 +4,16 @@ import styles from '../styles/Home.module.css'
 import Logo from '../components/logo'
 import { Logs } from '../components/log'
 import { Connection } from '../connection'
-import Jazzicon from '../components/jazzicon'
+import dynamic from "next/dynamic";
+
+const Jazzicon = dynamic(() => import("../components/jazzicon"), { ssr: false });
+
 
 
 export default function Home() {
   let connection
 
+  const [showConnected, setShowConnected] = useState(false)
   const [connecting, setConnecting] = useState(true);
   const [messages, setMessages] = useState([]); // The fetish for immutability in react means this will be slower than a mutable array..
   const [peers, setConnectedPeers] = useState([]);
@@ -27,7 +31,10 @@ export default function Home() {
       <Head>
         <title>HOPR Admin</title>
       </Head>
-      <Logo />
+
+      <Logo
+        onClick={() => setShowConnected(!showConnected)}
+        />
       <h1>HOPR Logs [TESTNET NODE]</h1>
 
       <Logs messages={messages} connecting={connecting} />
@@ -40,9 +47,24 @@ export default function Home() {
           placeholder="type 'help' for full list of commands" /> 
       </div>
 
-      <div className='connected'>
-        { peers.map( x => <Jazzicon address={x} /> ) }
-      </div>
+      { showConnected && 
+        <div className={styles.connectedPeers}>
+          <h2>Connected Peers ({peers.length})</h2>
+          <div className={styles.connectedPeersList}>
+            { peers.map( x => (
+              <div className={styles.peer}>
+                <Jazzicon
+                  diameter={40}
+                  address={x}
+                  key={x}
+                  className={styles.peerIcon}
+                />
+                <div>{x}</div>
+              </div>
+            )) }
+          </div>
+        </div>
+      }
     </div>
   )
 }

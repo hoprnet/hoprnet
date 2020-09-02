@@ -1,12 +1,10 @@
-// Copy pasted from
+// Hacks based on
 // https://github.com/MetaMask/metamask-extension/blob/develop/ui/app/components/ui/jazzicon/jazzicon.component.js
-// cb995d6
 import React, { createRef, PureComponent } from 'react'
 import PropTypes from 'prop-types'
+import dynamic from "next/dynamic";
 import jazzicon from 'jazzicon'
-import iconFactoryGenerator from '../../../../lib/icon-factory'
-
-const iconFactory = iconFactoryGenerator(jazzicon)
+import md5 from 'tiny-hashes/md5';
 
 /**
  * Wrapper around the jazzicon library to return a React component, as the library returns an
@@ -49,9 +47,12 @@ export default class Jazzicon extends PureComponent {
   }
 
   appendJazzicon () {
-    const { address, diameter } = this.props
-    const image = iconFactory.iconForAddress(address, diameter)
-    this.container.current.appendChild(image)
+    if (typeof window !== 'undefined') {
+      const { address, diameter } = this.props
+      // NB: 'goodenough' transform between B58 string and js int
+      const image = jazzicon(diameter, parseInt(md5(address).slice(-10), 16))
+      this.container.current.appendChild(image)
+    }
   }
 
   render () {

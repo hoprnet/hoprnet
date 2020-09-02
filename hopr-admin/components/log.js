@@ -10,7 +10,6 @@ export function LogLine(props){
 
   let lastIndex = 0
   while ((match = ID_REGEX.exec(raw)) !== null){
-    console.log(">> match", match)
     msg.push(match.input.slice(lastIndex, match.index))
     msg.push(<abbr title={match[0]}>{match[0].slice(48)}</abbr>)
     lastIndex = match.index + match[0].length
@@ -18,7 +17,6 @@ export function LogLine(props){
   if (msg.length == 0) {
     msg = raw // No matches
   }
-  console.log("!!", msg)
 
   return (
     <div className={styles.logline}>
