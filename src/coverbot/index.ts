@@ -10,6 +10,7 @@ import { Utils } from '@hoprnet/hopr-core-ethereum'
 
 //@TODO: Move this to an environment variable or read from a contract
 const XDAI_THRESHOLD = 0.001
+const VERIFICATION_CYCLE_IN_MS = 1000
 
 enum NodeStates {
   newUnverifiedNode = 'UNVERIFIED',
@@ -83,6 +84,9 @@ export class Coverbot implements Bot {
   tweets: Map<string, TweetMessage>
   twitterTimestamp: Date
 
+  verifiedNodes: Set<TweetMessage>
+  verificationTimeout: NodeJS.Timeout;
+
   constructor(address: string, timestamp: Date, twitterTimestamp: Date) {
     this.address = address
     this.timestamp = timestamp
@@ -91,6 +95,11 @@ export class Coverbot implements Bot {
     this.twitterTimestamp = twitterTimestamp
     this.botName = '💰 Coverbot'
     console.log(`${this.botName} has been added`)
+    this.verificationTimeout = setInterval(this._verificationCycle.bind(this), VERIFICATION_CYCLE_IN_MS)
+  }
+
+  protected _verificationCycle() {
+    console.log('Verifying nodes...')
   }
 
   protected _sendMessageFromBot(recipient, message) {
@@ -103,45 +112,43 @@ export class Coverbot implements Bot {
   protected async _verifyBalance(message: IMessage): Promise<[number, NodeStates]> {
     const pubkey = await convertPubKeyFromB58String(message.from)
     const nodeEthereumAddress = u8aToHex(await Utils.pubKeyToAccountId(pubkey.marshal()))
+    //@TODO: Move this from hardcoded POA network to ENV_PROVIDER
     const xdaiWeb3 = new Web3(new Web3.providers.HttpProvider('https://dai.poa.network'));
     const weiBalance = await xdaiWeb3.eth.getBalance(nodeEthereumAddress)
     const balance = +Web3.utils.fromWei(weiBalance)
 
-    
     return balance >= XDAI_THRESHOLD ? [balance, NodeStates.xdaiBalanceSucceeded] : [balance, NodeStates.xdaiBalanceFailed]
   }
 
-  protected async _parseMessage(message: IMessage): Promise<NodeStates> {
-    if (message.text.match(/https:\/\/twitter.com.*?$/i)) {
+  protected async _verifyTweet(message: IMessage): Promise<[TweetMessage, NodeStates]> {
+    const tweet = new TweetMessage(message.text)
+    this.tweets.set(message.from, tweet)
 
-      const tweet = new TweetMessage(message.text)
-      this.tweets.set(message.from, tweet)
+    //@TODO: Remove mock for production to ensure we process tweets.
+    /*
+    * Careful, it seems that the twitter API truncates some of the text
+    * content, so if something isn't in the first 100 characters, it might
+    * be left out of the parser.
+    */
+    await tweet.fetch({ mock: true })
 
-      //@TODO: Remove mock for production to ensure we process tweets.
-      /*
-      * Careful, it seems that the twitter API truncates some of the text
-      * content, so if something isn't in the first 100 characters, it might
-      * be left out of the parser.
-      */
-      await tweet.fetch({ mock: true })
-
-      if (tweet.hasTag('hoprnetwork')) {
-        tweet.status.hasTag = true
-      }
-      if(tweet.hasMention('hoprnet')) {
-        tweet.status.hasMention = true
-      }
-      if(tweet.hasSameHOPRNode(message.from)) {
-        tweet.status.sameNode = true
-      }
-      return tweet.status.isValid() ? NodeStates.tweetVerificationSucceeded : NodeStates.tweetVerificationFailed
+    if (tweet.hasTag('hoprnetwork')) {
+      tweet.status.hasTag = true
     }
-    return NodeStates.newUnverifiedNode;
+    if(tweet.hasMention('hoprnet')) {
+      tweet.status.hasMention = true
+    }
+    if(tweet.hasSameHOPRNode(message.from)) {
+      tweet.status.sameNode = true
+    }
+    return tweet.status.isValid() ? [tweet, NodeStates.tweetVerificationSucceeded] : [tweet, NodeStates.tweetVerificationFailed]
   }
 
   async handleMessage(message: IMessage) {
     console.log(`${this.botName} <- ${message.from}: ${message.text}`)
-    const nodeState = await this._parseMessage(message);
+    const [tweet, nodeState] = message.text.match(/https:\/\/twitter.com.*?$/i) ?
+      await this._verifyTweet(message) :
+      [undefined, NodeStates.newUnverifiedNode];
 
     switch(nodeState) {
       case NodeStates.newUnverifiedNode:
@@ -158,7 +165,8 @@ export class Coverbot implements Bot {
             this._sendMessageFromBot(message.from, NodeStateResponses[xDaiBalanceNodeState](balance))
             break;
           case NodeStates.xdaiBalanceSucceeded:
-            //@TODO Register node into list of verified nodes and start loop.
+            //@TODO Add this to a persistent store
+            this.verifiedNodes.add(tweet)
             this._sendMessageFromBot(message.from, NodeStateResponses[xDaiBalanceNodeState](balance))
             break;
         }

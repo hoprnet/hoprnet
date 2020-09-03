@@ -24,9 +24,9 @@
   },
   "dependencies": {
     "@grpc/proto-loader": "^0.5.4",
-    "@hoprnet/hopr-core-ethereum": "^0.3.0",
-    "@hoprnet/hopr-protos": "^0.0.9-docs.39fd32b",
-    "@hoprnet/hopr-server": "^0.0.1",
+    "@hoprnet/hopr-core-ethereum": "0.4.1-xdai",
+    "@hoprnet/hopr-protos": "0.1.0",
+    "@hoprnet/hopr-server": "0.2.3-xdai",
     "@hoprnet/hopr-utils": "^0.5.2",
     "@hoprnet/twitter-api-client": "^0.1.7",
     "@linkdrop/sdk": "1.1.6",

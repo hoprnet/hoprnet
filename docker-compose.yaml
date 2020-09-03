@@ -2,13 +2,15 @@ version: '3.1'
 
 services:
   server:
-    image: gcr.io/hoprassociation/hopr-server
+    image: gcr.io/hoprassociation/hopr-server:v0.2.4-xdai
     restart: always
     ports:
       - '50051:50051'
       - '9091:9091'
     environment:
-      - BOOTSTRAP_SERVERS=/ip4/34.65.219.148/tcp/9091/p2p/16Uiu2HAkwSEiK819yvnG84pNFsqXkpFX4uiCaNSwADnmYeAfctRn,/ip4/34.65.148.229/tcp/9091/p2p/16Uiu2HAmRsp3VBLcyPfTBkJYEwS47bewxWqqm4sEpJEtPBLeV93n
+      - PROVIDER=wss://xdai.poanetwork.dev/wss
+      - BOOTSTRAP_SERVERS=/ip4/34.65.158.118/tcp/9091/p2p/16Uiu2HAmNqLm83bwMq9KQEZEWHcbsHQfBkbpZx4eVSoDG4Mp6yfX
+      - DEBUG=hopr*
     volumes:
       - /app/db
   chat-bot:
