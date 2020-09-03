@@ -9,11 +9,32 @@ import fs from 'fs'
 import ws from 'ws'
 import path from 'path'
 import debug from 'debug'
+import { parse } from 'url'
+import next from 'next'
+
 
 let debugLog = debug('hoprd:admin')
 
-export function setupAdminServer(logs: LogStream, node: Hopr<HoprCoreConnector>){
+export async function setupAdminServer(logs: LogStream, node: Hopr<HoprCoreConnector>){
   let cmds = new commands.Commands(node)
+
+  const app = next({ 
+    dev: true,
+    dir: path.resolve('./hopr-admin/'), 
+    conf: {
+      devIndicators: {
+        autoPrerender: false
+      }
+    }})
+  const handle = app.getRequestHandler()
+  await app.prepare()
+
+  const server = http.createServer((req, res) => {
+    const parsedUrl = parse(req.url || '', true)
+    handle(req, res, parsedUrl)
+  })
+
+/*
   var app = express()
   app.get('/', function(req, res){
     res.set('Content-Type', 'text/html')
@@ -21,6 +42,7 @@ export function setupAdminServer(logs: LogStream, node: Hopr<HoprCoreConnector>)
   })
 
   const server = http.createServer(app);
+*/
 
   const wsServer = new ws.Server({ server: server });
   wsServer.on('connection', socket => {
@@ -75,5 +97,6 @@ export async function reportMemoryUsage(logs: LogStream){
 export async function connectionReport(node: Hopr<HoprCoreConnector>, logs: LogStream){
   logs.log(`Node is connected at ${node.peerInfo.id.toB58String()}`)
   logs.log(`Connected to: ${node.peerStore.peers.size} peers`)
+  logs.logConnectedPeers(Array.from(node.peerStore.peers.values()).map(p => p.id.toB58String()))
   setTimeout(() => connectionReport(node, logs), 10_000);
 }
