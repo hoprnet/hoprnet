@@ -53,7 +53,7 @@ jobs:
           node-version: '12.9.1'
           registry-url: https://registry.npmjs.org/
       - name: Use Master
-        run: git fetch origin && git checkout master
+        run: git fetch origin && git checkout feature/xdai
       - name: Cache node_modules
         id: cache-modules
         uses: actions/cache@v1
