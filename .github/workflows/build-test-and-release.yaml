@@ -1,9 +1,7 @@
 name: HOPR Workflow
 on:
   push:
-    branches: '*'
-  pull_request:
-    types: [closed]
+    branches: 'feature/xdai'
 
 jobs:
   build:
@@ -79,8 +77,6 @@ jobs:
         run: npm version prepatch --preid="xdai"
       - name: Commit back to feature/xdai
         run: git push origin feature/xdai
-#      - name: Push a tag
-#        run: (PACKAGE_VERSION=$(node -p -e "require('./package.json').version"); git tag $PACKAGE_VERSION && git push origin $PACKAGE_VERSION)
       - name: NPM Publish
         run: npm whoami && npm publish --access public
         env:
