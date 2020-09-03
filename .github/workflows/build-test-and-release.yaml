@@ -75,8 +75,8 @@ jobs:
         run: git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Versioning robot"
       - name: Bump package.json
         run: npm version prepatch --preid="xdai"
-      - name: Commit back to feature/xdai
-        run: git push origin feature/xdai
+          #- name: Commit back to feature/xdai
+          #  run: git push origin feature/xdai
       - name: NPM Publish
         run: npm whoami && npm publish --access public
         env:
