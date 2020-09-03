@@ -1,19 +1,22 @@
 .container {
-  min-height: 100vh;
-  padding: 0 0.5rem;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
+  padding: 0.5rem;
+  font-family: monospace;
 }
 
 .main {
-  padding: 5rem 0;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
+  font-size: 1.5rem;
+  border: 1px solid #333;
+  border-radius: 1rem;
+  margin: 1rem;
+  padding: 1rem;
+  max-width: 40rem;
+}
+.main h2 {
+  text-align: center;
+  margin: 0;
+}
+.main li {
+  padding-bottom: 1rem;
 }
 
 .footer {
@@ -47,14 +50,10 @@
 }
 
 .title {
+  text-align: left;
   margin: 0;
   line-height: 1.15;
-  font-size: 4rem;
-}
-
-.title,
-.description {
-  text-align: center;
+  font-size: 2rem;
 }
 
 .description {
