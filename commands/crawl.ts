@@ -26,6 +26,7 @@ export default class Crawl extends AbstractCommand {
       await this.node.network.crawler.crawl(
         (peer: string) => !isBootstrapNode(this.node, PeerId.createFromB58String(peer))
       )
+      return `Crawled network, connected to ${this.node.peerStore.peers.size} peers`
     } catch (err) {
       chalk.red(err.message)
     }
