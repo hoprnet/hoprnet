@@ -7,6 +7,7 @@ import Crawl from './crawl'
 import ListCommands from './listCommands'
 import ListConnectors from './listConnectors'
 import ListOpenChannels from './listOpenChannels'
+import ListConnectedPeers from './list-connected'
 import OpenChannel from './openChannel'
 import Ping from './ping'
 import PrintAddress from './printAddress'
@@ -38,6 +39,7 @@ export class Commands {
       new Crawl(node),
       new ListCommands(() => this.commands),
       new ListConnectors(),
+      new ListConnectedPeers(node),
       new ListOpenChannels(node),
       new Ping(node),
       new PrintAddress(node),
