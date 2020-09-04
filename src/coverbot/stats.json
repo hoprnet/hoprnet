@@ -1,7 +1,1 @@
-{
-  "address": "loading",
-  "available": 0,
-  "locked": 0,
-  "claimed": 0,
-  "connected": []
-}
+{"address":"16Uiu2HAm82bL74gNDbfddRmxje7Jqhqya5ESCgyL9i2RMhWdpuWb","balance":"790436000000000","available":0,"locked":0,"claimed":0,"connected":[{"id":"16Uiu2HAkvtUjtCGcFDLc3ywdm3ViqbFwfZMcQWrJf7ewU266qWgf","tweetId":"1296805357772320768","tweetUrl":"https://twitter.com/jjperezaguinaga/status/1296805357772320768"}],"refreshed":"2020-09-04T14:31:35.245Z"}

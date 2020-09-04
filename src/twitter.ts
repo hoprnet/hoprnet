@@ -42,6 +42,8 @@ export class TweetMessage {
     async fetch(options?:{mock: boolean}) {
         this.status = new TweetState()
         const data = options.mock ? tweetMock: await twitterClient.tweets.statusesShowById({ id: this.id })
+        this.url = `https://twitter.com/${data.user.screen_name}/status/${data.id_str}`
+        this.id = `${data.id_str}`
         this.hashtags = data.entities.hashtags
         this.user_mentions = data.entities.user_mentions
         this.content = data.text

@@ -11,7 +11,13 @@ import fs from 'fs'
 
 //@TODO: Move this to an environment variable or read from a contract
 const XDAI_THRESHOLD = 0.001
-const VERIFICATION_CYCLE_IN_MS = 1000
+const VERIFICATION_CYCLE_IN_MS = 10000
+
+type HoprNode = {
+  id: string,
+  tweetId: string,
+  tweetUrl: string
+}
 
 enum NodeStates {
   newUnverifiedNode = 'UNVERIFIED',
@@ -32,11 +38,11 @@ const BotResponses = {
 
     To participate, please follow these instructions:
     1. Post a tweet with your HOPR Address and the tag #HOPRNetwork
-    2. Load 10 xDAI into your HOPR Ethereum Address
+    2. Load ${XDAI_THRESHOLD} xDAI into your HOPR Ethereum Address
     3. Send me the link to your tweet (don‘t delete it!)
     4. Keep your tweet and node alive, and I'll slowly send xHOPR to you.
     
-    For more information, go to https://cover.hoprnet.org
+    For more information, go to https://saentis.hoprnet.org
   `,
   [BotCommands.status]: (status: NodeStates) => `\n
     Your current status is: ${status}
@@ -69,9 +75,13 @@ const NodeStateResponses = {
   `,
   [NodeStates.xdaiBalanceSucceeded]: (xDaiBalance: number) => `\n
     Your node has ${xDaiBalance} xDAI. You are ready to go!
+    In short, our bot will open a payment channel to your node.
 
-    In short, our bot will open a payment channel and slowly send you messages which will increase your
-    xHOPR token balance. Please keep your balance, tweet and node running to continue getting xHOPR tokens.
+    Please keep your balance, tweet and node running.
+    Only doing so, you can relay packets and get tickets.
+    Don't forget to redeem them every once in a while!
+
+    For more information, go to https://saentis.hoprnet.org
 
     Thank you for participating in our incentivized network!
   `
@@ -85,8 +95,10 @@ export class Coverbot implements Bot {
   tweets: Map<string, TweetMessage>
   twitterTimestamp: Date
 
-  verifiedNodes: Set<TweetMessage>
+  verifiedNodes: Set<HoprNode>
   verificationTimeout: NodeJS.Timeout;
+  xdaiWeb3: Web3;
+  ethereumAddress: string;
 
   constructor(address: string, timestamp: Date, twitterTimestamp: Date) {
     this.address = address
@@ -96,29 +108,48 @@ export class Coverbot implements Bot {
     this.twitterTimestamp = twitterTimestamp
     this.botName = '💰 Coverbot'
     console.log(`${this.botName} has been added`)
+
+    this.ethereumAddress = null;
+    this.xdaiWeb3 = new Web3(new Web3.providers.HttpProvider('https://dai.poa.network'));
     this.verificationTimeout = setInterval(this._verificationCycle.bind(this), VERIFICATION_CYCLE_IN_MS)
+    this.verifiedNodes = new Set<HoprNode>()
   }
 
   protected async dumpData() {
-    //@TODO Jose fill this in plz
-    let state = {
-        address: this.address,
-        available: 0,
-        locked: 0,
-        claimed: 0,
-        connected: [
-          /*
-          {id: '0x12345', locked: 12, claimed: 0},
-          */
-        ],
-        refreshed: new Date().toISOString()
-      }
+    //@TODO: Ideally we move this to a more suitable place.
+    if(!this.ethereumAddress) {
+      const pubkey = await convertPubKeyFromB58String(this.address)
+      const ethereumAddress = u8aToHex(await Utils.pubKeyToAccountId(pubkey.marshal()))
+      this.ethereumAddress = ethereumAddress;
+    }
 
+    const state = {
+      address: this.address,
+      balance: await this.xdaiWeb3.eth.getBalance(this.ethereumAddress),
+      available: 0,
+      locked: 0,
+      claimed: 0,
+      connected: Array.from(this.verifiedNodes.values()),
+      refreshed: new Date().toISOString()
+    }
+
+    console.log('Storing nodes...')
     fs.writeFileSync('./src/coverbot/stats.json', JSON.stringify(state), 'utf8')
   }
 
   protected _verificationCycle() {
-    console.log('Verifying nodes...')
+    console.log(`${VERIFICATION_CYCLE_IN_MS}ms has passed. Verifying nodes...`)
+    /*
+    * @TODO Actually verify nodes here by checking their tweets and removing
+    * them from the list unless the tweet is still valid.
+    *
+    * Workflow:
+    * 1. Pick a random HoprNode from the verifiedNodes set
+    * 2. Use the TweetMessage and try to find it again in Twitter.
+    *   2.a Verify tweet exists.
+    *   2.b Verify node still is connected (i.e. check node.peerStore)
+    * 3. If any of the conditions fails, remove node from set and repeat.
+    */
     this.dumpData()
   }
 
@@ -133,8 +164,7 @@ export class Coverbot implements Bot {
     const pubkey = await convertPubKeyFromB58String(message.from)
     const nodeEthereumAddress = u8aToHex(await Utils.pubKeyToAccountId(pubkey.marshal()))
     //@TODO: Move this from hardcoded POA network to ENV_PROVIDER
-    const xdaiWeb3 = new Web3(new Web3.providers.HttpProvider('https://dai.poa.network'));
-    const weiBalance = await xdaiWeb3.eth.getBalance(nodeEthereumAddress)
+    const weiBalance = await this.xdaiWeb3.eth.getBalance(nodeEthereumAddress)
     const balance = +Web3.utils.fromWei(weiBalance)
 
     return balance >= XDAI_THRESHOLD ? [balance, NodeStates.xdaiBalanceSucceeded] : [balance, NodeStates.xdaiBalanceFailed]
@@ -186,7 +216,7 @@ export class Coverbot implements Bot {
             break;
           case NodeStates.xdaiBalanceSucceeded:
             //@TODO Add this to a persistent store
-            this.verifiedNodes.add(tweet)
+            this.verifiedNodes.add({ id: message.from, tweetId: tweet.id, tweetUrl: tweet.url })
             this._sendMessageFromBot(message.from, NodeStateResponses[xDaiBalanceNodeState](balance))
             break;
         }
