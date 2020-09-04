@@ -33,7 +33,7 @@ function HomeContent({
   }
 
   return (
-    <div className={styles.container}>
+    <>
       <Head>
         <title>HOPR Incentivized Testnet on xDAI</title>
       </Head>
@@ -94,7 +94,7 @@ function HomeContent({
         <br /><br />
         Updated: {refreshed}
       </footer>
-    </div>
+    </>
   )
 }
 
