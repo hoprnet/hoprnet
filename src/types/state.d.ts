@@ -1,8 +1,11 @@
+import type BN from 'bn.js'
+
 declare interface StateStatic {
   readonly SIZE: number
-}
 
-declare interface State extends Uint8Array {
+  new (State: BN, ...props: any[]): State
+}
+declare interface State extends BN {
   toU8a(): Uint8Array
 }
 
