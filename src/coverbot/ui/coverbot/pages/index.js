@@ -91,9 +91,9 @@ export default function Home({
         <section className={styles.instructions}>
           <h2>Instructions</h2>
           <ol>
-            <li>Download <a href="#">HOPR Node Saentis</a> and run it.</li>
+            <li>Download <a href="https://github.com/hoprnet/hopr-chat/releases">HOPR Node Säntis</a> and run it.</li>
             <li>Send <strong>10 xDAI</strong> to your node</li>
-            <li><a href="#">Tweet</a> your HOPR node address with the tag <strong>#HOPRNetwork</strong> and <strong>@hoprnet</strong></li>
+            <li><a href="https://twitter.com">Tweet</a> your HOPR node address with the tag <strong>#HOPRNetwork</strong> and <strong>@hoprnet</strong></li>
             <li>Send a message with your tweet to the Cover Node address:
               <br />
               <strong onClick={addressOnClick} className={styles.address}>
