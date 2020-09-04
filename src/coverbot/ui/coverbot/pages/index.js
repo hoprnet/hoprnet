@@ -1,7 +1,8 @@
 import Head from 'next/head'
 import styles from '../styles/Home.module.css'
 import Logo from '../components/logo'
-import {useRef} from 'react'
+import { useRef, useState } from 'react'
+import useSWR from 'swr'
 
 function ConnectedNode({id, locked, claimed}){
   return (
@@ -13,37 +14,7 @@ function ConnectedNode({id, locked, claimed}){
   )
 }
 
-export async function getServerSideProps() {
-  return {
-    props: {
-      address: '0x1234567891012',
-      available: 123.00,
-      locked: 2.00,
-      claimed: 123.00,
-      connected: [
-        {id: '0x12345', locked: 12, claimed: 0},
-        {id: '0x32345', locked: 42, claimed: 7},
-        {id: '0x12345', locked: 12, claimed: 0},
-        {id: '0x12345', locked: 12, claimed: 0},
-        {id: '0x12345', locked: 12, claimed: 0},
-        {id: '0x12345', locked: 12, claimed: 0},
-        {id: '0x12345', locked: 12, claimed: 0},
-        {id: '0x12345', locked: 12, claimed: 0},
-        {id: '0x12345', locked: 12, claimed: 0},
-        {id: '0x32345', locked: 42, claimed: 7},
-        {id: '0x32345', locked: 42, claimed: 7},
-        {id: '0x32345', locked: 42, claimed: 7},
-        {id: '0x32345', locked: 42, claimed: 7},
-        {id: '0x32345', locked: 42, claimed: 7},
-        {id: '0x32345', locked: 42, claimed: 7},
-        {id: '0x32345', locked: 42, claimed: 7},
-      ],
-      refreshed: new Date().toISOString()
-    }
-  }
-}
-
-export default function Home({
+function HomeContent({
   address,
   available,
   locked,
@@ -125,4 +96,19 @@ export default function Home({
       </footer>
     </div>
   )
+}
+
+const fetcher = (...args) => fetch(...args).then(res => res.json())
+
+export async function getStaticProps() {
+  let api = require('./api/stats')
+  return { props: api.get() } // NextJS makes this stupidly complicated
+}
+
+export default function Home(props){
+  let {data, error } = useSWR('/api/stats', fetcher, { initialData: props || null, refreshInterval: 5000 });
+  if (!data || !Object.keys(data).length) { // SWR inits to {} with initalData = undefined :(
+    return <div>...</div>
+  }
+  return (<HomeContent {...data} />)
 }
