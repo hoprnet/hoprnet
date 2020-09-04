@@ -100,6 +100,7 @@ export class Coverbot implements Bot {
   }
 
   protected async dumpData() {
+    //@TODO Jose fill this in plz
     let state = {
         address: this.address,
         available: 0,
