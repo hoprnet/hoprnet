@@ -23,7 +23,22 @@ export async function getServerSideProps() {
       connected: [
         {id: '0x12345', locked: 12, claimed: 0},
         {id: '0x32345', locked: 42, claimed: 7},
-      ]
+        {id: '0x12345', locked: 12, claimed: 0},
+        {id: '0x12345', locked: 12, claimed: 0},
+        {id: '0x12345', locked: 12, claimed: 0},
+        {id: '0x12345', locked: 12, claimed: 0},
+        {id: '0x12345', locked: 12, claimed: 0},
+        {id: '0x12345', locked: 12, claimed: 0},
+        {id: '0x12345', locked: 12, claimed: 0},
+        {id: '0x32345', locked: 42, claimed: 7},
+        {id: '0x32345', locked: 42, claimed: 7},
+        {id: '0x32345', locked: 42, claimed: 7},
+        {id: '0x32345', locked: 42, claimed: 7},
+        {id: '0x32345', locked: 42, claimed: 7},
+        {id: '0x32345', locked: 42, claimed: 7},
+        {id: '0x32345', locked: 42, claimed: 7},
+      ],
+      refreshed: new Date().toISOString()
     }
   }
 }
@@ -33,7 +48,8 @@ export default function Home({
   available,
   locked,
   claimed,
-  connected
+  connected,
+  refreshed
 }) {
 
   let addressOnClick = () => {
@@ -60,13 +76,13 @@ export default function Home({
         <div className={styles.stats}>
           <h2>xHOPR Tokens</h2>
           <div>
-            <span className='green'>{available}</span> Available
+            <strong className='green'>{available}</strong> Available
           </div>
           <div>
-            <span className='blue'>{locked}</span> Locked
+            <strong className='blue'>{locked}</strong> Locked
           </div>
           <div>
-            <span className='red'>{claimed}</span> Claimed
+            <strong className='red'>{claimed}</strong> Claimed
           </div>
         </div>
       </header>
@@ -103,6 +119,9 @@ export default function Home({
       </main>
 
       <footer className={styles.footer}>
+        Thanks for helping us create the <a href="https://hoprnet.org/">HOPR</a> network.
+        <br /><br />
+        Updated: {refreshed}
       </footer>
     </div>
   )
