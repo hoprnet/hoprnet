@@ -1,17 +1,8 @@
+import fs from 'fs'
+
 export function get(){
-  let initialState = {
-      address: '',
-      available: 0,
-      locked: 0,
-      claimed: 0,
-      connected: [
-        /*
-        {id: '0x12345', locked: 12, claimed: 0},
-        */
-      ],
-      refreshed: new Date().toISOString()
-    }
-  return initialState 
+  let data = JSON.parse(fs.readFileSync("../../stats.json", 'utf8'))
+  return data 
 }
 
 export default (req, res) => {

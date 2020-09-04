@@ -6,6 +6,7 @@ import { TweetMessage, TweetState } from '../twitter'
 //@TODO: Isolate these utilities to avoid importing the entire package
 import { convertPubKeyFromB58String, u8aToHex } from '@hoprnet/hopr-utils'
 import { Utils } from '@hoprnet/hopr-core-ethereum'
+import fs from 'fs'
 
 
 //@TODO: Move this to an environment variable or read from a contract
@@ -98,8 +99,26 @@ export class Coverbot implements Bot {
     this.verificationTimeout = setInterval(this._verificationCycle.bind(this), VERIFICATION_CYCLE_IN_MS)
   }
 
+  protected async dumpData() {
+    let state = {
+        address: this.address,
+        available: 0,
+        locked: 0,
+        claimed: 0,
+        connected: [
+          /*
+          {id: '0x12345', locked: 12, claimed: 0},
+          */
+        ],
+        refreshed: new Date().toISOString()
+      }
+
+    fs.writeFileSync('./stats.json', JSON.stringify(state), 'utf8')
+  }
+
   protected _verificationCycle() {
     console.log('Verifying nodes...')
+    this.dumpData()
   }
 
   protected _sendMessageFromBot(recipient, message) {
