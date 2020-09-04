@@ -3,7 +3,31 @@
   font-family: monospace;
 }
 
+.header {
+  display: flex;
+}
+
+.title {
+  max-width: 20rem;
+}
+
+
+.title {
+  text-align: left;
+  margin: 0;
+  line-height: 1.15;
+  font-size: 2rem;
+}
+
+.stats {
+  
+}
+
 .main {
+  display: flex;
+}
+
+.main section {
   font-size: 1.5rem;
   border: 1px solid #333;
   border-radius: 1rem;
@@ -17,6 +41,19 @@
 }
 .main li {
   padding-bottom: 1rem;
+}
+
+.conerr {
+  text-align: center;
+  color: red;
+}
+
+.connode {
+  padding: 0.5rem;
+}
+.connode span {
+  display: inline-block;
+  padding: 0 0 0 2rem ;
 }
 
 .footer {
@@ -38,23 +75,6 @@
   align-items: center;
 }
 
-.title a {
-  color: #0070f3;
-  text-decoration: none;
-}
-
-.title a:hover,
-.title a:focus,
-.title a:active {
-  text-decoration: underline;
-}
-
-.title {
-  text-align: left;
-  margin: 0;
-  line-height: 1.15;
-  font-size: 2rem;
-}
 
 .description {
   line-height: 1.5;
@@ -79,6 +99,18 @@
   max-width: 800px;
   margin-top: 3rem;
 }
+
+.address {
+  cursor:pointer;
+  display: block;
+  text-align: center;
+  padding: 1rem;
+}
+
+.address:hover {
+  background-color: #FFFFA0;
+}
+
 
 .card {
   margin: 1rem;

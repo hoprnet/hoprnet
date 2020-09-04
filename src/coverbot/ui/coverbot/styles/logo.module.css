@@ -1,10 +1,12 @@
 .logo {
   width: 100px;
   height: 100px;
+  /*
   position: fixed;
   top: 1rem;
   right: 1rem;
   z-index:5;
+  */
 }
 
 .logo:hover {
