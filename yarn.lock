@@ -462,12 +462,31 @@
     web3-eth "^1.2.11"
     web3-eth-contract "^1.2.11"
 
-"@hoprnet/hopr-core@0.6.29-xdai":
-  version "0.6.29-xdai"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core/-/hopr-core-0.6.29-xdai.tgz#23971263744a760a66dc70831343d5244486cb39"
-  integrity sha512-NJl+yJbC21XrWEKeyYwRXKEvSZjz9aLxzLasbJ+IWadAJuec9C2oNSoi3XQqrK8brFxH8T/ASo3eIiWOE4UWZQ==
+"@hoprnet/hopr-core-ethereum@0.4.2-xdai":
+  version "0.4.2-xdai"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-ethereum/-/hopr-core-ethereum-0.4.2-xdai.tgz#13c53249631c8bc5ed208b63e32ec08066fcf914"
+  integrity sha512-mjBRxxyqEIt/+y1nc/DbtvrBBYo8sRwof7n+KuDtgfLOI1/XnNx1Jb9rc3TseZKlh+Y7gj7XddQ+zdcpuBhpyg==
   dependencies:
-    "@hoprnet/hopr-core-ethereum" "0.4.1-xdai"
+    "@hoprnet/hopr-utils" "^0.4.0"
+    bn.js "^5.1.2"
+    chalk "^4.1.0"
+    debug "^4.1.1"
+    heap-js "^2.1.1"
+    keccak "^3.0.0"
+    secp256k1 "^4.0.2"
+    web3 "^1.2.11"
+    web3-core "^1.2.11"
+    web3-core-helpers "^1.2.11"
+    web3-core-subscriptions "^1.2.11"
+    web3-eth "^1.2.11"
+    web3-eth-contract "^1.2.11"
+
+"@hoprnet/hopr-core@0.6.30-xdai":
+  version "0.6.30-xdai"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core/-/hopr-core-0.6.30-xdai.tgz#ea39a504755544fe1cfa2d9b7a2b62ed777e1d65"
+  integrity sha512-VlWYrDOgs0QtUp69s3Wk6z2G+eQVDZckMsrxOm6Cf+sZDQnryGCNU+83D8W3HMU00VayiGgkxOsCCcTG2guO0Q==
+  dependencies:
+    "@hoprnet/hopr-core-ethereum" "0.4.2-xdai"
     "@hoprnet/hopr-demo-seeds" "1.8.0"
     "@hoprnet/hopr-utils" "^0.4.0"
     abort-controller "^3.0.0"
@@ -512,13 +531,13 @@
   dependencies:
     google-protobuf "^3.12.2"
 
-"@hoprnet/hopr-server@0.2.3-xdai":
-  version "0.2.3-xdai"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-server/-/hopr-server-0.2.3-xdai.tgz#071ed7cae0e2da3b234305cbadd8f24bf125a85d"
-  integrity sha512-KPMCuT0cREW5cFMQD2sErFhj4JU1Yt3mz6bMSTqkG+UQ8MeF4a/GL5mDSzPlyR6BdyERo9xZ0iLTpww6jMuSEQ==
+"@hoprnet/hopr-server@0.2.4-xdai":
+  version "0.2.4-xdai"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-server/-/hopr-server-0.2.4-xdai.tgz#31ddac7903dfe52d2b988c3cc42914a81ed3b4c3"
+  integrity sha512-q1dcEtBENkg545hkYyZ8p3o3KtWusYQnPDRymL34RbQUI0fsmfa9w2LkBtXPvqHu+kU33DnBX15HwVjsVDaTGA==
   dependencies:
     "@grpc/proto-loader" "^0.5.4"
-    "@hoprnet/hopr-core" "0.6.29-xdai"
+    "@hoprnet/hopr-core" "0.6.30-xdai"
     "@hoprnet/hopr-core-connector-interface" "1.7.1"
     "@hoprnet/hopr-protos" "^0.1.0"
     "@hoprnet/hopr-utils" "0.4.0"
@@ -537,7 +556,6 @@
     peer-info "^0.17.5"
     read-pkg-up "^7.0.1"
     reflect-metadata "^0.1.13"
-    rimraf "^3.0.2"
     rlp "^2.2.6"
     rxjs "^6.6.0"
 

@@ -49,3 +49,5 @@ lib/
 # Hopr Node
 db
 
+# Stats for coverbot
+stats.json
