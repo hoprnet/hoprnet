@@ -1,12 +1,8 @@
-.container {
-  padding: 0.5rem;
-  font-family: monospace;
-}
-
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding: 2rem 0;
 }
 
 .title {
@@ -22,6 +18,7 @@
   font-size: 2rem;
   flex-grow: 1;
   text-align: right;
+  margin-right: 5rem;
 }
 .stats h2 {
   margin: 0;
@@ -30,17 +27,19 @@
 
 .main {
   display: flex;
+  justify-content: space-between;
+  height: 100%;
 }
 
 .main section {
   font-size: 1.5rem;
-  border: 1px solid #333;
+  border: 1px solid #CCC;
   border-radius: 1rem;
-  margin: 1rem;
   padding: 1rem;
-  max-width: 40rem;
+  margin: 0 1rem;
   overflow: scroll;
-  height: 75vh;
+  flex:1 1;
+  max-height: 75vh;
 }
 .main h2 {
   text-align: center;
@@ -69,6 +68,7 @@
   border-top: 1px solid #eaeaea;
   text-align: center;
   padding: 1rem;
+  margin-top:3rem;
 }
 
 .address {
