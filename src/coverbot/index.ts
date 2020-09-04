@@ -113,7 +113,7 @@ export class Coverbot implements Bot {
         refreshed: new Date().toISOString()
       }
 
-    fs.writeFileSync('./stats.json', JSON.stringify(state), 'utf8')
+    fs.writeFileSync('./src/coverbot/stats.json', JSON.stringify(state), 'utf8')
   }
 
   protected _verificationCycle() {
