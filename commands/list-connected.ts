@@ -18,9 +18,6 @@ export default class ListConnectedPeers extends AbstractCommand {
     return 'list the other connected HOPR nodes '
   }
 
-  /**
-   * Crawls the network to check for other nodes. Triggered by the CLI.
-   */
   async execute(): Promise<string | void> {
     let peers = Array.from(this.node.peerStore.peers.values())
     if (peers.length == 0) {
