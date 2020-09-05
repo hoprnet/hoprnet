@@ -14,6 +14,9 @@ declare interface Ticket {
   winProb: Hash
   onChainSecret: Hash
 
+  // computed properties
+  hash: Promise<Hash>
+
   getEmbeddedFunds(): Balance
 
   toU8a(): Uint8Array
