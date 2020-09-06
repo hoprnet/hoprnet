@@ -41,7 +41,7 @@ export class TweetMessage {
 
     async fetch(options?:{mock: boolean}) {
         this.status = new TweetState()
-        const data = options.mock ? tweetMock: await twitterClient.tweets.statusesShowById({ id: this.id })
+        const data = (options && options.mock) ? tweetMock : await twitterClient.tweets.statusesShowById({ id: this.id })
         this.url = `https://twitter.com/${data.user.screen_name}/status/${data.id_str}`
         this.id = `${data.id_str}`
         this.hashtags = data.entities.hashtags
@@ -77,6 +77,16 @@ export class TweetMessage {
     hasEnoughFollowers(followers_count: number): boolean {
         //@TODO Move this to an env variable for later usage
         return followers_count > 100
+    }
+
+    getHOPRNode(): string   {
+        return this.content.match(/16Uiu2HA.*?$/i) ?
+            (tweetContent => {
+                const [participantHOPRAddress_regexed] = tweetContent.match(/16Uiu2HA.*?$/i)
+                const participantHOPRAddress = participantHOPRAddress_regexed.substr(0, 53)
+                return participantHOPRAddress;
+            })(this.content)
+            : ''
     }
     
     hasSameHOPRNode(hoprAddress: string): boolean {

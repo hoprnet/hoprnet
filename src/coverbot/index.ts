@@ -24,19 +24,20 @@ enum NodeStates {
   tweetVerificationFailed = 'FAILED_TWITTER_VERIFICATION',
   tweetVerificationSucceeded = 'SUCCEEDED_TWITTER_VERIFICATION',
   xdaiBalanceFailed = 'FAILED_XDAI_BALANCE_VERIFICATION',
-  xdaiBalanceSucceeded = 'SUCCEEDED_XDAI_BALANCE_VERIFICATION'
+  xdaiBalanceSucceeded = 'SUCCEEDED_XDAI_BALANCE_VERIFICATION',
+  verifiedNode = 'VERIFIED'
 }
 
 enum BotCommands {
   rules,
-  status
+  status,
+  verify
 }
 
 const BotResponses = {
   [BotCommands.rules]: `\n
     Welcome to the xHOPR incentivized network.
 
-    To participate, please follow these instructions:
     1. Post a tweet with your HOPR Address and the tag #HOPRNetwork
     2. Load ${XDAI_THRESHOLD} xDAI into your HOPR Ethereum Address
     3. Send me the link to your tweet (don‘t delete it!)
@@ -46,6 +47,9 @@ const BotResponses = {
   `,
   [BotCommands.status]: (status: NodeStates) => `\n
     Your current status is: ${status}
+  `,
+  [BotCommands.verify]: `\n
+    Verifying if your node is still up...
   `
 }
 
@@ -84,6 +88,10 @@ const NodeStateResponses = {
     For more information, go to https://saentis.hoprnet.org
 
     Thank you for participating in our incentivized network!
+  `,
+  [NodeStates.verifiedNode]: `\n
+    Congratulations! I’ll shortly use you as a cover traffic node
+    and pay you in xHOPR tokens for your service.
   `
 }
 
@@ -95,7 +103,8 @@ export class Coverbot implements Bot {
   tweets: Map<string, TweetMessage>
   twitterTimestamp: Date
 
-  verifiedNodes: Set<HoprNode>
+  verifiedHoprNodes: Map<string, HoprNode>
+
   verificationTimeout: NodeJS.Timeout;
   xdaiWeb3: Web3;
   ethereumAddress: string;
@@ -112,7 +121,8 @@ export class Coverbot implements Bot {
     this.ethereumAddress = null;
     this.xdaiWeb3 = new Web3(new Web3.providers.HttpProvider('https://dai.poa.network'));
     this.verificationTimeout = setInterval(this._verificationCycle.bind(this), VERIFICATION_CYCLE_IN_MS)
-    this.verifiedNodes = new Set<HoprNode>()
+
+    this.verifiedHoprNodes = new Map<string, HoprNode>()
   }
 
   protected async dumpData() {
@@ -129,7 +139,7 @@ export class Coverbot implements Bot {
       available: 0,
       locked: 0,
       claimed: 0,
-      connected: Array.from(this.verifiedNodes.values()),
+      connected: Array.from(this.verifiedHoprNodes.values()),
       refreshed: new Date().toISOString()
     }
 
@@ -137,19 +147,42 @@ export class Coverbot implements Bot {
     fs.writeFileSync('./src/coverbot/stats.json', JSON.stringify(state), 'utf8')
   }
 
-  protected _verificationCycle() {
+  protected async _sendMessageOpeningChannels(recipient, message, intermediatePeers) {
+    return sendMessage(recipient, {
+      from: this.address,
+      text: message,
+    }, true, intermediatePeers)
+  }
+
+  protected async _verificationCycle() {
     console.log(`${VERIFICATION_CYCLE_IN_MS}ms has passed. Verifying nodes...`)
-    /*
-    * @TODO Actually verify nodes here by checking their tweets and removing
-    * them from the list unless the tweet is still valid.
-    *
-    * Workflow:
-    * 1. Pick a random HoprNode from the verifiedNodes set
-    * 2. Use the TweetMessage and try to find it again in Twitter.
-    *   2.a Verify tweet exists.
-    *   2.b Verify node still is connected (i.e. check node.peerStore)
-    * 3. If any of the conditions fails, remove node from set and repeat.
-    */
+
+    const _verifiedNodes = Array.from(this.verifiedHoprNodes.values());
+    const randomIndex = Math.floor(Math.random() * _verifiedNodes.length);
+    console.log('Random index', randomIndex);
+    const hoprNode: HoprNode = _verifiedNodes[randomIndex]
+    console.log('Trying to verify:', hoprNode);
+
+    try {
+      const tweet = new TweetMessage(hoprNode.tweetUrl)
+      await tweet.fetch()
+      const _hoprNodeAddress = tweet.getHOPRNode()
+      if (_hoprNodeAddress.length === 0) {
+        // We got no HOPR Node here.
+        this.verifiedHoprNodes.delete(hoprNode.id)
+      } else {
+        this._sendMessageFromBot(_hoprNodeAddress, BotResponses[BotCommands.verify])
+        //@TODO: We need to actually be able to get a message back from the user instead of waiting.
+        setTimeout(async () => {
+          this._sendMessageFromBot(_hoprNodeAddress, NodeStateResponses[NodeStates.verifiedNode])
+          this._sendMessageOpeningChannels(this.address, `Packet relayed by ${_hoprNodeAddress}`, [_hoprNodeAddress])
+        }, VERIFICATION_CYCLE_IN_MS/2)
+      }
+    } catch (err) {
+      console.log('Err:', err);
+      // Something failed. We better remove node.
+      this.verifiedHoprNodes.delete(hoprNode.id)
+    }
     this.dumpData()
   }
 
@@ -216,7 +249,7 @@ export class Coverbot implements Bot {
             break;
           case NodeStates.xdaiBalanceSucceeded:
             //@TODO Add this to a persistent store
-            this.verifiedNodes.add({ id: message.from, tweetId: tweet.id, tweetUrl: tweet.url })
+            this.verifiedHoprNodes.set(message.from, { id: message.from, tweetId: tweet.id, tweetUrl: tweet.url })
             this._sendMessageFromBot(message.from, NodeStateResponses[xDaiBalanceNodeState](balance))
             break;
         }
