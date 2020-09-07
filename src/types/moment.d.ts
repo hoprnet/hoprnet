@@ -2,7 +2,8 @@ import BN from 'bn.js'
 
 declare interface MomentStatic {
   readonly SIZE: number
-  new (moment: BN, ...props: any[]): Moment
+
+  new (moment: BN | number, ...props: any[]): Moment
 }
 declare interface Moment extends BN {
   toU8a(): Uint8Array

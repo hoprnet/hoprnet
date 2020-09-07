@@ -13,7 +13,7 @@ declare interface BalanceStatic {
    */
   readonly DECIMALS: number
 
-  new (balance: BN, ...props: any[]): Balance
+  new (balance: BN | number, ...props: any[]): Balance
 }
 
 declare interface Balance extends BN {
