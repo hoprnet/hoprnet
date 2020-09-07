@@ -1,4 +1,6 @@
 import * as grpc from 'grpc'
+import { GetHoprBalanceRequest } from '@hoprnet/hopr-protos/node/balance_pb'
+import { BalanceClient } from '@hoprnet/hopr-protos/node/balance_grpc_pb'
 import { GetHoprAddressRequest } from '@hoprnet/hopr-protos/node/address_pb'
 import { ListenClient } from '@hoprnet/hopr-protos/node/listen_grpc_pb'
 import { AddressClient } from '@hoprnet/hopr-protos/node/address_grpc_pb'
@@ -70,6 +72,26 @@ export const sendMessage = (recepientAddress: string, message: IMessage, annonym
         console.log(`-> ${recepientAddress}:${message.text}`)
         client.close()
         resolve()
+      })
+    } catch (err) {
+      client.close()
+      reject(err)
+    }
+  })
+}
+
+export const getHoprBalance = (): Promise<string> => {
+  let client: BalanceClient
+
+  return new Promise((resolve, reject) => {
+    try {
+      client = SetupClient(BalanceClient)
+
+      client.getHoprBalance(new GetHoprBalanceRequest(), (err, res) => {
+        if (err) return reject(err)
+
+        client.close()
+        resolve(res.getAmount())
       })
     } catch (err) {
       client.close()

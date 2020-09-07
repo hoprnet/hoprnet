@@ -1,4 +1,4 @@
-import { sendMessage } from '../utils'
+import { sendMessage, getHoprBalance } from '../utils'
 import Web3 from 'web3';
 import { Bot } from '../bot'
 import { IMessage } from '../message'
@@ -149,13 +149,12 @@ export class Coverbot implements Bot {
     }
 
     const state = {
-      hoprCoverbotAddress: this._getEthereumAddressFromHOPRAddress(this.address),
+      hoprCoverbotAddress: await this._getEthereumAddressFromHOPRAddress(this.address),
       hoprChannelContract: HOPR_CHANNELS[this.network],
       address: this.address,
       balance: await this.xdaiWeb3.eth.getBalance(this.ethereumAddress),
-      available: 0,
-      locked: 0,
-      claimed: 0,
+      available: await getHoprBalance(),
+      locked: 0, //@TODO: Retrieve balances from open channels.
       connected: Array.from(this.verifiedHoprNodes.values()),
       refreshed: new Date().toISOString()
     }
