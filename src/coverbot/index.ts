@@ -148,6 +148,7 @@ export class Coverbot implements Bot {
     console.log('Storing nodes...')
     let pth = process.env.STATS_FILE
     fs.writeFileSync(pth, JSON.stringify(state), 'utf8')
+    console.log("Stored", pth)
   }
 
   protected async _sendMessageOpeningChannels(recipient, message, intermediatePeers) {

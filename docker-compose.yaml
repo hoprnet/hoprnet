@@ -24,8 +24,7 @@ services:
       - API_URL=server:50051
       - STATS_FILE=/appdata/stats.json
     volumes:
-      - ./appdata:/appdata
-
+      - appdata:/appdata
   coverbot-ui:
     build:
       context: src/coverbot/ui/coverbot
@@ -36,4 +35,8 @@ services:
     environment:
       - STATS_FILE=/appdata/stats.json
     volumes:
-      - ./appdata:/appdata
+      - appdata:/appdata
+    ports:
+      - '3000:3000'
+volumes:
+  appdata:

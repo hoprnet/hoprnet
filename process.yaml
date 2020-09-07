@@ -7,4 +7,4 @@ apps:
     name: "hopr-bot"
     instances: 1
     env:
-      API_URL: 127.0.0.1:50051
+      API_URL: server:50051
