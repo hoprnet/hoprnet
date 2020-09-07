@@ -28,7 +28,7 @@
     "@hoprnet/hopr-protos": "0.1.0",
     "@hoprnet/hopr-server": "0.2.4-xdai",
     "@hoprnet/hopr-utils": "^0.5.2",
-    "@hoprnet/twitter-api-client": "^0.1.7",
+    "@hoprnet/twitter-api-client": "^0.1.8",
     "@linkdrop/sdk": "1.1.6",
     "dotenv": "^8.2.0",
     "dotenv-parse-variables": "^0.3.0",

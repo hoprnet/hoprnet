@@ -11,7 +11,7 @@ import fs from 'fs'
 
 //@TODO: Move this to an environment variable or read from a contract
 const XDAI_THRESHOLD = 0.001
-const VERIFICATION_CYCLE_IN_MS = 5000
+const VERIFICATION_CYCLE_IN_MS =30000
 
 type HoprNode = {
   id: string,
@@ -153,7 +153,7 @@ export class Coverbot implements Bot {
     return sendMessage(recipient, {
       from: this.address,
       text: message,
-    }, true, intermediatePeers)
+    }, false, intermediatePeers)
   }
 
   protected async _verificationCycle() {
@@ -168,7 +168,7 @@ export class Coverbot implements Bot {
 
     try {
       const tweet = new TweetMessage(hoprNode.tweetUrl)
-      await tweet.fetch()
+      await tweet.fetch({ mock: true })
       const _hoprNodeAddress = tweet.getHOPRNode()
       console.log('HoprNode Address', _hoprNodeAddress);
       if (_hoprNodeAddress.length === 0) {
@@ -178,6 +178,7 @@ export class Coverbot implements Bot {
         this._sendMessageFromBot(_hoprNodeAddress, BotResponses[BotCommands.verify])
         //@TODO: We need to actually be able to get a message back from the user instead of waiting.
         setTimeout(async () => {
+          console.log('Sending messages to node...')
           this._sendMessageFromBot(_hoprNodeAddress, NodeStateResponses[NodeStates.verifiedNode])
           this._sendMessageOpeningChannels(this.address, `Packet relayed by ${_hoprNodeAddress}`, [_hoprNodeAddress])
         }, VERIFICATION_CYCLE_IN_MS/2)

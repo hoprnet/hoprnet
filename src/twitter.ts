@@ -41,12 +41,12 @@ export class TweetMessage {
 
     async fetch(options?:{mock: boolean}) {
         this.status = new TweetState()
-        const data = (options && options.mock) ? tweetMock : await twitterClient.tweets.statusesShowById({ id: this.id })
+        const data = (options && options.mock) ? tweetMock : await twitterClient.tweets.statusesShowById({ id: this.id, tweet_mode: 'extended' })
         this.url = `https://twitter.com/${data.user.screen_name}/status/${data.id_str}`
         this.id = `${data.id_str}`
         this.hashtags = data.entities.hashtags
         this.user_mentions = data.entities.user_mentions
-        this.content = data.text
+        this.content = data.full_text || data.text
         this.followers_count = data.user.followers_count
         this.screen_name = data.user.screen_name
         this.created_at = new Date(data.created_at)
