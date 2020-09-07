@@ -12,7 +12,7 @@ services:
       - BOOTSTRAP_SERVERS=/ip4/34.65.158.118/tcp/9091/p2p/16Uiu2HAmNqLm83bwMq9KQEZEWHcbsHQfBkbpZx4eVSoDG4Mp6yfX
       - DEBUG=hopr*
     volumes:
-      - /app/db
+      - ./db:/app/db
   chat-bot:
     build:
       context: .
@@ -27,7 +27,7 @@ services:
       - STATS_FILE=/appdata/stats.json
       - BOT_NAME=coverbot
     volumes:
-      - appdata:/appdata
+      - ./appdata:/appdata
   coverbot-ui:
     build:
       context: src/coverbot/ui/coverbot
@@ -38,8 +38,6 @@ services:
     environment:
       - STATS_FILE=/appdata/stats.json
     volumes:
-      - appdata:/appdata
+      - ./appdata:/appdata
     ports:
       - '3000:3000'
-volumes:
-  appdata:
