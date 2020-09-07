@@ -1,4 +1,16 @@
-import type { AccountId, Balance, Channel as ChannelType, ChannelBalance, Hash, Moment, Public, Signature, SignedChannel, SignedTicket, State } from './types'
+import type {
+  AccountId,
+  Balance,
+  Channel as ChannelType,
+  ChannelBalance,
+  Hash,
+  Moment,
+  Public,
+  Signature,
+  SignedChannel,
+  SignedTicket,
+  ChannelState,
+} from './types'
 
 declare interface ChannelStatic {
   /**
@@ -39,7 +51,7 @@ declare interface ChannelStatic {
 
   /**
    * Fetches all channel instances from the database and applies first `onData` and
-   * then `onEnd` on the received nstances.
+   * then `onEnd` on the received instances.
    * @param onData applied on all channel instances
    * @param onEnd composes at the end the received data
    */
@@ -92,7 +104,7 @@ declare interface Channel {
   readonly settlementWindow: Promise<Moment>
 
   // Current state of the channel, i.e. `FUNDED`
-  readonly state: Promise<State>
+  readonly state: Promise<ChannelState>
 
   // Current balance of partyA
   readonly balance_a: Promise<Balance>

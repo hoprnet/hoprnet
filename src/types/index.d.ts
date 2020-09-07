@@ -2,6 +2,7 @@ import AccountId from './accountId'
 import Balance from './balance'
 import Channel from './channel'
 import ChannelBalance from './channelBalance'
+import ChannelState from './channelState'
 import Hash from './hash'
 import Moment from './moment'
 import NativeBalance from './nativeBalance'
@@ -13,4 +14,20 @@ import SignedTicket from './signedTicket'
 import Ticket from './ticket'
 import TicketEpoch from './ticketEpoch'
 
-export { AccountId, Balance, Channel, ChannelBalance, Hash, Moment, NativeBalance, Public, State, Signature, SignedChannel, SignedTicket, Ticket, TicketEpoch }
+export {
+  AccountId,
+  Balance,
+  Channel,
+  ChannelBalance,
+  ChannelState,
+  Hash,
+  Moment,
+  NativeBalance,
+  Public,
+  State,
+  Signature,
+  SignedChannel,
+  SignedTicket,
+  Ticket,
+  TicketEpoch,
+}
