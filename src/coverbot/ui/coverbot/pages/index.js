@@ -35,10 +35,10 @@ function TwitterIcon(){
   )
 }
 
-function ConnectedNode({id, tweetUrl}){
+function ConnectedNode({id, address, tweetUrl}){
   return (
     <div className={styles.connode}>
-      <BSLink id={0}><strong>{ id }</strong></BSLink>
+      <BSLink id={address}><strong>{ id }</strong></BSLink>
       <a href={tweetUrl}><TwitterIcon /></a>
     </div>
   )
