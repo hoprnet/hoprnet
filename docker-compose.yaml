@@ -2,7 +2,7 @@ version: '3.1'
 
 services:
   server:
-    image: gcr.io/hoprassociation/hopr-server:v0.2.4-xdai
+    image: gcr.io/hoprassociation/hopr-server:v0.2.5-xdai
     restart: always
     ports:
       - '50051:50051'
