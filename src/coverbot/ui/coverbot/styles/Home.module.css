@@ -57,7 +57,14 @@
 .connode {
   padding: 0.5rem;
 }
-.connode span {
+
+.connode strong {
+  font-size: 1.2rem;
+  overflow: ellipsis;
+  overflow-wrap: anywhere;
+}
+
+.connode span, .connode a {
   display: inline-block;
   padding: 0 0 0 2rem ;
 }
@@ -77,6 +84,7 @@
   text-align: center;
   padding: 1rem;
   font-size: 1.2rem;
+  overflow-wrap: anywhere;
 }
           
 .address:hover {
