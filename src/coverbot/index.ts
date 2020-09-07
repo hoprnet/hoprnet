@@ -1,4 +1,4 @@
-import { sendMessage, getHoprBalance } from '../utils'
+import { sendMessage, getHoprBalance, getHOPRNodeAddressFromContent } from '../utils'
 import Web3 from 'web3';
 import { Bot } from '../bot'
 import { IMessage } from '../message'
@@ -8,13 +8,8 @@ import { convertPubKeyFromB58String, u8aToHex } from '@hoprnet/hopr-utils'
 import { Utils } from '@hoprnet/hopr-core-ethereum'
 import fs from 'fs'
 import { Networks, HOPR_CHANNELS } from '@hoprnet/hopr-core-ethereum/lib/ethereum/addresses';
+import { COVERBOT_DEBUG_MODE, COVERBOT_CHAIN_PROVIDER, COVERBOT_VERIFICATION_CYCLE_IN_MS, COVERBOT_XDAI_THRESHOLD } from '../env'
 
-
-//@TODO: Move this to an environment variable or read from a contract
-const COVERBOT_XDAI_THRESHOLD = 0.001
-const COVERBOT_VERIFICATION_CYCLE_IN_MS =30000
-const COVERBOT_DEBUG_MODE = true
-const COVERBOT_CHAIN_PROVIDER = "https://dai.poa.network"
 
 const { fromWei } = Web3.utils;
 
@@ -257,7 +252,8 @@ export class Coverbot implements Bot {
     console.log(`${this.botName} <- ${message.from}: ${message.text}`)
     if(message.from === this.address) {
       // We have done a round trip, avoid sending more messages to eternally loop messages across the network.
-      return console.log(`Successful Relay: ${message.text}`)
+      const relayerAddress = getHOPRNodeAddressFromContent(message.text)
+      return console.log(`Successful Relay: ${relayerAddress}`)
     }
 
     const [tweet, nodeState] = message.text.match(/https:\/\/twitter.com.*?$/i) ?

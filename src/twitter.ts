@@ -1,6 +1,7 @@
 import { TWITTER_API_ACCESS_TOKEN, TWITTER_API_KEY, TWITTER_API_SECRET, TWITTER_API_ACCESS_TOKEN_SECRET, TWITTER_BLACKLISTED } from './env'
 import TwitterClient from '@hoprnet/twitter-api-client'
 import tweetMock from './tweetMock.json'
+import { getHOPRNodeAddressFromContent } from './utils'
 
 const twitterClient = new TwitterClient({
   apiKey: TWITTER_API_KEY,
@@ -80,15 +81,7 @@ export class TweetMessage {
     }
 
     getHOPRNode(): string   {
-        console.log('Tweet Content', this.content)
-        return this.content.match(/16Uiu2HA.*?$/i) ?
-            (tweetContent => {
-                const [participantHOPRAddress_regexed] = tweetContent.match(/16Uiu2HA.*?$/i)
-                const participantHOPRAddress = participantHOPRAddress_regexed.substr(0, 53)
-                console.log('HoprAddress', participantHOPRAddress)
-                return participantHOPRAddress;
-            })(this.content)
-            : ''
+        return getHOPRNodeAddressFromContent(this.content);
     }
     
     hasSameHOPRNode(hoprAddress: string): boolean {
