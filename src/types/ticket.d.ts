@@ -5,6 +5,20 @@ import TicketEpoch from './ticketEpoch'
 
 declare interface TicketStatic {
   readonly SIZE: number
+
+  create(
+    arr?: {
+      bytes: ArrayBuffer
+      offset: number
+    },
+    struct?: {
+      channelId: Hash
+      challenge: Hash
+      epoch: TicketEpoch
+      amount: Balance
+      winProb: Hash
+    }
+  ): Ticket
 }
 declare interface Ticket {
   channelId: Hash
