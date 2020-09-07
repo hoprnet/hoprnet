@@ -80,10 +80,12 @@ export class TweetMessage {
     }
 
     getHOPRNode(): string   {
+        console.log('Tweet Content', this.content)
         return this.content.match(/16Uiu2HA.*?$/i) ?
             (tweetContent => {
                 const [participantHOPRAddress_regexed] = tweetContent.match(/16Uiu2HA.*?$/i)
                 const participantHOPRAddress = participantHOPRAddress_regexed.substr(0, 53)
+                console.log('HoprAddress', participantHOPRAddress)
                 return participantHOPRAddress;
             })(this.content)
             : ''

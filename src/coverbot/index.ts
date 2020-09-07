@@ -11,7 +11,7 @@ import fs from 'fs'
 
 //@TODO: Move this to an environment variable or read from a contract
 const XDAI_THRESHOLD = 0.001
-const VERIFICATION_CYCLE_IN_MS = 10000
+const VERIFICATION_CYCLE_IN_MS = 5000
 
 type HoprNode = {
   id: string,
@@ -133,6 +133,8 @@ export class Coverbot implements Bot {
       this.ethereumAddress = ethereumAddress;
     }
 
+    console.log('Checking dump...', Array.from(this.verifiedHoprNodes.values()))
+
     const state = {
       address: this.address,
       balance: await this.xdaiWeb3.eth.getBalance(this.ethereumAddress),
@@ -158,6 +160,7 @@ export class Coverbot implements Bot {
     console.log(`${VERIFICATION_CYCLE_IN_MS}ms has passed. Verifying nodes...`)
 
     const _verifiedNodes = Array.from(this.verifiedHoprNodes.values());
+    console.log('Verified nodes', _verifiedNodes);
     const randomIndex = Math.floor(Math.random() * _verifiedNodes.length);
     console.log('Random index', randomIndex);
     const hoprNode: HoprNode = _verifiedNodes[randomIndex]
@@ -167,6 +170,7 @@ export class Coverbot implements Bot {
       const tweet = new TweetMessage(hoprNode.tweetUrl)
       await tweet.fetch()
       const _hoprNodeAddress = tweet.getHOPRNode()
+      console.log('HoprNode Address', _hoprNodeAddress);
       if (_hoprNodeAddress.length === 0) {
         // We got no HOPR Node here.
         this.verifiedHoprNodes.delete(hoprNode.id)
@@ -183,7 +187,8 @@ export class Coverbot implements Bot {
       // Something failed. We better remove node.
       this.verifiedHoprNodes.delete(hoprNode.id)
     }
-    this.dumpData()
+    console.log("Checking logs", Array.from(this.verifiedHoprNodes.values()));
+    this.dumpData.call(this)
   }
 
   protected _sendMessageFromBot(recipient, message) {
@@ -249,7 +254,7 @@ export class Coverbot implements Bot {
             break;
           case NodeStates.xdaiBalanceSucceeded:
             //@TODO Add this to a persistent store
-            this.verifiedHoprNodes.set(message.from, { id: message.from, tweetId: tweet.id, tweetUrl: tweet.url })
+            this.verifiedHoprNodes.set(message.from, {id: message.from, tweetId: tweet.id, tweetUrl: tweet.url })
             this._sendMessageFromBot(message.from, NodeStateResponses[xDaiBalanceNodeState](balance))
             break;
         }
