@@ -6,7 +6,7 @@ import useSWR from 'swr'
 
 
 function BSLink({id, children}){
-  return (<a href={'https://blockscout.com/poa/xdai/address/' + id + '/transactions'}>
+  return (<a target="_blank" href={'https://blockscout.com/poa/xdai/address/' + id + '/transactions'}>
     { children }</a>)
 }
 
@@ -39,7 +39,7 @@ function ConnectedNode({id, address, tweetUrl}){
   return (
     <div className={styles.connode}>
       <BSLink id={address}><strong>{ id }</strong></BSLink>
-      <a href={tweetUrl}><TwitterIcon /></a>
+      <a target="_blank" href={tweetUrl}><TwitterIcon /></a>
     </div>
   )
 }
