@@ -13,7 +13,7 @@ declare interface NativeBalanceStatic {
    */
   readonly DECIMALS: number
 
-  new (nativeBalance: BN, ...props: any[]): NativeBalance
+  new (nativeBalance: BN | number, ...props: any[]): NativeBalance
 }
 
 declare interface NativeBalance extends BN {
