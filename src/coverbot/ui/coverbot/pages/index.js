@@ -49,6 +49,8 @@ function HomeContent({
   available,
   locked,
   connected,
+  hoprChannelContract,
+  hoprCoverbotAddress,
   refreshed
 }) {
 
@@ -76,10 +78,10 @@ function HomeContent({
 
         <div className={styles.stats}>
           <div>
-            <BSLink id={0}><strong>HOPR Channel:</strong>0x123456...</BSLink>
+            <BSLink id={hoprChannelContract}><strong>HOPR Channel:</strong>{ hoprChannelContract.slice(0, 8) }...</BSLink>
           </div>
           <div>
-            <BSLink id={0}><strong>HOPR Coverbot:</strong>0x123456...</BSLink>
+            <BSLink id={hoprCoverbotAddress}><strong>HOPR Coverbot:</strong>{ hoprCoverbotAddress.slice(0, 8) }...</BSLink>
           </div>
         </div>
 
