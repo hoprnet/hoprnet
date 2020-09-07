@@ -100,7 +100,7 @@ function HomeContent({
 
 const fetcher = (...args) => fetch(...args).then(res => res.json())
 
-export async function getStaticProps() {
+export async function getServerSideProps() {
   let api = require('./api/stats')
   return { props: api.get() } // NextJS makes this stupidly complicated
 }
