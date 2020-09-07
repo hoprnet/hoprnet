@@ -86,12 +86,12 @@ function HomeContent({
         </div>
 
         <div className={styles.stats}>
-          <h2>xHOPR Tokens</h2>
+          <h2>Balance</h2>
           <div>
-            <strong className='green'>{available}</strong> Available
+            <strong className='green'>{available}</strong> xHOPR Available
           </div>
           <div>
-            <strong className='blue'>{locked}</strong> Locked
+            <strong className='blue'>{locked}</strong> xHOPR Locked
           </div>
         </div>
       </header>
