@@ -2,7 +2,7 @@ import { randomBytes } from 'crypto'
 import { Ganache } from '@hoprnet/hopr-testing'
 import { migrate } from '@hoprnet/hopr-ethereum'
 import assert from 'assert'
-import { stringToU8a, u8aToHex, u8aEquals, durations } from '@hoprnet/hopr-utils'
+import { stringToU8a, u8aToHex, u8aEquals, u8aConcat, durations } from '@hoprnet/hopr-utils'
 import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
 import { getPrivKeyData, createAccountAndFund, createNode } from '../utils/testing.spec'
 import { createChallenge } from '../utils'
@@ -179,7 +179,10 @@ describe('test Channel class', function () {
       .call()
       .then((res) => res.hashedSecret)
 
-    await counterpartysChannel.ticket.submit(signedTicket, secretA, secretB)
+    await counterpartysChannel.ticket.submit(
+      signedTicket,
+      await counterpartysCoreConnector.utils.hash(u8aConcat(secretA, secretB))
+    )
 
     const hashedSecretAfter = await counterpartysChannel.coreConnector.hoprChannels.methods
       .accounts((await counterpartysChannel.coreConnector.account.address).toHex())

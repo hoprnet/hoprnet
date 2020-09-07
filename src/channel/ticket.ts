@@ -67,7 +67,7 @@ class TicketFactory {
     return await signedTicket.verify(await this.channel.offChainCounterparty)
   }
 
-  async submit(signedTicket: SignedTicket, secretA: Uint8Array, secretB: Uint8Array): Promise<void> {
+  async submit(signedTicket: SignedTicket, hashedSecretASecretB: Hash): Promise<void> {
     const { hoprChannels, signTransaction, account, utils } = this.channel.coreConnector
     const { ticket, signature } = signedTicket
     const { r, s, v } = utils.getSignatureParameters(signature)
@@ -83,7 +83,7 @@ class TicketFactory {
       hoprChannels.methods.redeemTicket(
         u8aToHex(preImage.preImage),
         u8aToHex(ticket.channelId),
-        u8aToHex(await utils.hash(u8aConcat(secretA, secretB))),
+        u8aToHex(hashedSecretASecretB),
         ticket.amount.toString(),
         u8aToHex(ticket.winProb),
         u8aToHex(r),
