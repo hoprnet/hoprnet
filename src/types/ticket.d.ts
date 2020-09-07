@@ -12,7 +12,6 @@ declare interface Ticket {
   epoch: TicketEpoch
   amount: Balance
   winProb: Hash
-  onChainSecret: Hash
 
   // computed properties
   hash: Promise<Hash>
