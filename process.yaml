@@ -6,5 +6,3 @@ apps:
   - script: ./dist/index.js
     name: "hopr-bot"
     instances: 1
-    env:
-      API_URL: server:50051

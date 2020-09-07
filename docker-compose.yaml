@@ -1,29 +1,15 @@
 version: '3.1'
 
 services:
-  server:
-    image: gcr.io/hoprassociation/hopr-server:v0.2.5-xdai
-    restart: always
-    ports:
-      - '50051:50051'
-      - '9091:9091'
-    environment:
-      - PROVIDER=wss://xdai.poanetwork.dev/wss
-      - BOOTSTRAP_SERVERS=/ip4/34.65.158.118/tcp/9091/p2p/16Uiu2HAmNqLm83bwMq9KQEZEWHcbsHQfBkbpZx4eVSoDG4Mp6yfX
-      - DEBUG=hopr*
-    volumes:
-      - ./db:/app/db
   chat-bot:
     build:
       context: .
       dockerfile: chatbot.Dockerfile
     restart: always
-    depends_on:
-      - 'server'
     env_file:
       - .env
     environment:
-      - API_URL=server:50051
+      - API_URL=34.65.96.1:50051
       - STATS_FILE=/appdata/stats.json
       - BOT_NAME=coverbot
     volumes:
