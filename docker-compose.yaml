@@ -20,9 +20,12 @@ services:
     restart: always
     depends_on:
       - 'server'
+    env_file:
+      - .env
     environment:
       - API_URL=server:50051
       - STATS_FILE=/appdata/stats.json
+      - BOT_NAME=coverbot
     volumes:
       - appdata:/appdata
   coverbot-ui:
