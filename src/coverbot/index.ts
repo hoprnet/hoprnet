@@ -16,6 +16,8 @@ const COVERBOT_VERIFICATION_CYCLE_IN_MS =30000
 const COVERBOT_DEBUG_MODE = true
 const COVERBOT_CHAIN_PROVIDER = "https://dai.poa.network"
 
+const { fromWei } = Web3.utils;
+
 type HoprNode = {
   id: string,
   address: string,
@@ -152,8 +154,8 @@ export class Coverbot implements Bot {
       hoprCoverbotAddress: await this._getEthereumAddressFromHOPRAddress(this.address),
       hoprChannelContract: HOPR_CHANNELS[this.network],
       address: this.address,
-      balance: await this.xdaiWeb3.eth.getBalance(this.ethereumAddress),
-      available: await getHoprBalance(),
+      balance: fromWei(await this.xdaiWeb3.eth.getBalance(this.ethereumAddress)),
+      available: fromWei(await getHoprBalance()),
       locked: 0, //@TODO: Retrieve balances from open channels.
       connected: Array.from(this.verifiedHoprNodes.values()),
       refreshed: new Date().toISOString()
