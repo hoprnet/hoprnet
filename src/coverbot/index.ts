@@ -149,6 +149,7 @@ export class Coverbot implements Bot {
     }
 
     const state = {
+      hoprCoverbotAddress: this._getEthereumAddressFromHOPRAddress(this.address),
       hoprChannelContract: HOPR_CHANNELS[this.network],
       address: this.address,
       balance: await this.xdaiWeb3.eth.getBalance(this.ethereumAddress),
