@@ -32,7 +32,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@hoprnet/hopr-core": "0.6.29-xdai",
+    "@hoprnet/hopr-core": "0.6.32-xdai",
     "@hoprnet/hopr-core-connector-interface": "1.7.1",
     "@hoprnet/hopr-utils": "0.5.2",
     "@zeit/ncc": "^0.22.3",
