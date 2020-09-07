@@ -146,7 +146,9 @@ export class Coverbot implements Bot {
     }
 
     console.log('Storing nodes...')
-    fs.writeFileSync('./src/coverbot/stats.json', JSON.stringify(state), 'utf8')
+    let pth = process.env.STATS_FILE
+    fs.writeFileSync(pth, JSON.stringify(state), 'utf8')
+    console.log("Stored", pth)
   }
 
   protected async _sendMessageOpeningChannels(recipient, message, intermediatePeers) {
@@ -159,12 +161,16 @@ export class Coverbot implements Bot {
   protected async _verificationCycle() {
     console.log(`${VERIFICATION_CYCLE_IN_MS}ms has passed. Verifying nodes...`)
 
+    this.dumpData()
     const _verifiedNodes = Array.from(this.verifiedHoprNodes.values());
     console.log('Verified nodes', _verifiedNodes);
     const randomIndex = Math.floor(Math.random() * _verifiedNodes.length);
     console.log('Random index', randomIndex);
     const hoprNode: HoprNode = _verifiedNodes[randomIndex]
     console.log('Trying to verify:', hoprNode);
+    if (!hoprNode) {
+      return;
+    }
 
     try {
       const tweet = new TweetMessage(hoprNode.tweetUrl)
@@ -189,7 +195,6 @@ export class Coverbot implements Bot {
       this.verifiedHoprNodes.delete(hoprNode.id)
     }
     console.log("Checking logs", Array.from(this.verifiedHoprNodes.values()));
-    this.dumpData.call(this)
   }
 
   protected _sendMessageFromBot(recipient, message) {
