@@ -196,6 +196,7 @@ describe('test hashedSecret', function () {
           })
         ).send()
       )
+
       let updatedOnChainHash = new Types.Hash(
         stringToU8a(
           (await connector.hoprChannels.methods.accounts((await connector.account.address).toHex()).call()).hashedSecret

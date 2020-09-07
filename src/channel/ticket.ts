@@ -73,7 +73,7 @@ class TicketFactory {
     const { r, s, v } = utils.getSignatureParameters(signature)
 
     const onChainSecret = await this.channel.coreConnector.hoprChannels.methods
-      .accounts((await pubKeyToAccountId(await signedTicket.signer)).toString())
+      .accounts(u8aToHex(await this.channel.coreConnector.account.address))
       .call()
       .then((res) => new Hash(stringToU8a(res.hashedSecret)))
 

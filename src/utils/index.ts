@@ -382,5 +382,5 @@ export function getSignatureParameters(
  * @returns a promise that resolves to a hash
  */
 export async function createChallenge(secretA: Uint8Array, secretB: Uint8Array): Promise<Hash> {
-  return hash(u8aConcat(secretA, secretB))
+  return hash(await hash(u8aConcat(secretA, secretB)))
 }

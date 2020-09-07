@@ -111,7 +111,7 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
     return new Promise<Hash>(async (resolve) => {
       const encodedTicket = encode([
         { type: 'bytes32', value: u8aToHex(this.channelId) },
-        { type: 'bytes32', value: u8aToHex(await hash(this.challenge)) },
+        { type: 'bytes32', value: u8aToHex(this.challenge) },
         { type: 'uint256', value: this.epoch.toString() },
         { type: 'uint256', value: this.amount.toString() },
         { type: 'bytes32', value: u8aToHex(this.winProb) },
@@ -122,7 +122,7 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
   }
 
   static get SIZE(): number {
-    return Hash.SIZE + Hash.SIZE + TicketEpoch.SIZE + Balance.SIZE + Hash.SIZE + Hash.SIZE
+    return Hash.SIZE + Hash.SIZE + TicketEpoch.SIZE + Balance.SIZE + Hash.SIZE
   }
 
   getEmbeddedFunds(): Balance {

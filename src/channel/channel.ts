@@ -118,6 +118,8 @@ class Channel implements IChannel {
     })
   }
 
+  // @TODO
+  // @ts-ignore
   get state(): Promise<ChannelType> {
     return Promise.resolve(this._signedChannel.channel)
   }

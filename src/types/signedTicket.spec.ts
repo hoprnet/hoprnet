@@ -1,6 +1,6 @@
 import assert from 'assert'
 import { randomBytes } from 'crypto'
-import { stringToU8a, randomInteger, u8aEquals } from '@hoprnet/hopr-utils'
+import { stringToU8a, randomInteger } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import { AccountId, Ticket, Hash, TicketEpoch, Balance, Signature, SignedTicket } from '.'
 import * as utils from '../utils'

@@ -28,7 +28,9 @@ export default class HoprEthereum implements HoprCoreConnector {
   public signTransaction: ReturnType<typeof utils.TransactionSigner>
   public log: ReturnType<typeof utils['Log']>
 
+  // @ts-ignore
   public channel: ChannelFactory
+  // @ts-ignore
   public types: types
   public indexer: Indexer
   public account: Account
