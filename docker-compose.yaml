@@ -14,9 +14,26 @@ services:
     volumes:
       - /app/db
   chat-bot:
-    image: gcr.io/hoprassociation/hopr-chatbot/client
+    build:
+      context: .
+      dockerfile: chatbot.Dockerfile
     restart: always
     depends_on:
       - 'server'
     environment:
       - API_URL=server:50051
+      - STATS_FILE=/appdata/stats.json
+    volumes:
+      - ./appdata:/appdata
+
+  coverbot-ui:
+    build:
+      context: src/coverbot/ui/coverbot
+      dockerfile: coverbot-ui.Dockerfile
+    restart: always
+    depends_on:
+      - 'chat-bot'
+    environment:
+      - STATS_FILE=/appdata/stats.json
+    volumes:
+      - ./appdata:/appdata
