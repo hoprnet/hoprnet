@@ -38,7 +38,6 @@ describe('test ticket construction', function () {
     assert(ticket.epoch.eq(ticketData.epoch), 'wrong epoch')
     assert(ticket.amount.eq(ticketData.amount), 'wrong amount')
     assert(ticket.winProb.eq(ticketData.winProb), 'wrong winProb')
-    assert(u8aEquals(ticket.onChainSecret, ticketData.onChainSecret), 'wrong onChainSecret')
   })
 
   it('should create new ticket using array', async function () {
@@ -55,7 +54,6 @@ describe('test ticket construction', function () {
     assert(ticketB.epoch.eq(ticketData.epoch), 'wrong epoch')
     assert(ticketB.amount.eq(ticketData.amount), 'wrong amount')
     assert(ticketB.winProb.eq(ticketData.winProb), 'wrong winProb')
-    assert(u8aEquals(ticketB.onChainSecret, ticketData.onChainSecret), 'wrong onChainSecret')
   })
 
   it('should create new ticket out of continous memory', async function () {
@@ -77,6 +75,5 @@ describe('test ticket construction', function () {
     assert(ticket.epoch.eq(ticketData.epoch), 'wrong epoch')
     assert(ticket.amount.eq(ticketData.amount), 'wrong amount')
     assert(ticket.winProb.eq(ticketData.winProb), 'wrong winProb')
-    assert(u8aEquals(ticket.onChainSecret, ticketData.onChainSecret), 'wrong onChainSecret')
   })
 })

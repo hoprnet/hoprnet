@@ -125,7 +125,6 @@ class ChannelFactory {
         epoch: new TicketEpoch(0),
         amount: new Balance(0),
         winProb,
-        onChainSecret: new Uint8ArrayE(randomBytes(Hash.SIZE)),
       }
     )
 

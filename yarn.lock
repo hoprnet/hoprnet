@@ -183,10 +183,10 @@
     "@ethersproject/rlp" "^5.0.0"
     "@ethersproject/signing-key" "^5.0.0"
 
-"@hoprnet/hopr-core-connector-interface@1.7.1":
-  version "1.7.1"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-connector-interface/-/hopr-core-connector-interface-1.7.1.tgz#fee80b0e954a8606dfd9d8cb53102606a9e66b64"
-  integrity sha512-lDTOTpOOyE9PrXo0TPv1Rw7BcOndSj4+CISCAyB1/Nby/2yGtZbm65IPOcngWUYrCgXQMuxrc/AR3pFIQ6eV5w==
+"@hoprnet/hopr-core-connector-interface@1.9.0":
+  version "1.9.0"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-connector-interface/-/hopr-core-connector-interface-1.9.0.tgz#d200e2df4fe07f5ca27cf26114915c958b3e2366"
+  integrity sha512-RouK7vP7zJ0IrNUwP0blNLrN9QyFqNRcKvtW6m5pFIBbi6t/7p0GDQDe8wqqC32CC6XJTJVYR6rX5pn7piHWVw==
 
 "@hoprnet/hopr-demo-seeds@1.8", "@hoprnet/hopr-demo-seeds@1.8.0":
   version "1.8.0"
@@ -231,15 +231,17 @@
     chalk "^4.1.0"
     strip-ansi "^6.0.0"
 
-"@hoprnet/hopr-utils@^0.4.0":
-  version "0.4.0"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-0.4.0.tgz#b0ff6029917cbf898ec9dd9a731e2b828dd5e837"
-  integrity sha512-HQd3Dfp4C269/lJXnY7XW7zVGqlMDzrlZF7lIl/MDCkWgtA03V98N4lhK4ttU7D58m9Vobx7E1ktJQF09wE3cA==
+"@hoprnet/hopr-utils@^0.5.2":
+  version "0.5.2"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-0.5.2.tgz#711885c1ae1d10b8b5ded68b7152101e2e3022de"
+  integrity sha512-wcGbDvVNa21MwZwU2dWlukNS3J2E42tj4JNkD93qaqScgqTfpZHyVdxr6HwjSRuWcJqT4OI5Mke3MmEx6gs1lA==
   dependencies:
     bignumber.js "^9.0.0"
     chalk "^4.1.0"
+    libp2p-crypto "^0.17.9"
     peer-info "^0.17.5"
     strip-ansi "^6.0.0"
+    typestub-multihashes "^0.0.4"
 
 "@openzeppelin/contract-loader@^0.4.0":
   version "0.4.0"
@@ -3840,10 +3842,10 @@ he@1.2.0, he@^1.1.1:
   resolved "https://registry.yarnpkg.com/he/-/he-1.2.0.tgz#84ae65fa7eafb165fddb61566ae14baf05664f0f"
   integrity sha512-F/1DnUGPopORZi0ni+CvrCgHQ5FyEAHRLSApuYWMmrbSwoN2Mn/7k+Gl38gJnR7yyDZk6WLXwiGod1JOWNDKGw==
 
-heap-js@^2.1.1:
-  version "2.1.1"
-  resolved "https://registry.yarnpkg.com/heap-js/-/heap-js-2.1.1.tgz#d8f7367d6b22ca415f17b0a4f4de7c1bb69ac982"
-  integrity sha512-hqBidw0lY8sDMy5PUHbY+P4KZcGM2ArnnY3SqSkNoI14RJfhik7Bse3zHzSh6ZYXEUxBj/7nEdQUrpXtf+OYYQ==
+heap-js@^2.1.2:
+  version "2.1.2"
+  resolved "https://registry.yarnpkg.com/heap-js/-/heap-js-2.1.2.tgz#f438145d24082b078a9a35d91e03511ccad48176"
+  integrity sha512-urRBDI/0ol7m3OS/ZzvB5+Ym9i4zwlzTACSHMrGmTgh1xcrB1AX6lmeWW6u5rrS5YHHMYClta35/LUPZhjPH9Q==
 
 heap@0.2.6:
   version "0.2.6"
@@ -4611,7 +4613,7 @@ levelup@^4.4.0:
     level-supports "~1.0.0"
     xtend "~4.0.0"
 
-libp2p-crypto@^0.17.7:
+libp2p-crypto@^0.17.7, libp2p-crypto@^0.17.9:
   version "0.17.9"
   resolved "https://registry.yarnpkg.com/libp2p-crypto/-/libp2p-crypto-0.17.9.tgz#2d2cd0b852c6a54d4d33f10be6ca8856c2d24870"
   integrity sha512-nH3vTfQ4UqhZ1SORTP7HOsmFdJBs604Qy0Xi3IFFtU6ofYt+rFAZ2QNgo4MH1ZTT38/LEM374N9K7yzj1IQm0g==
@@ -5130,7 +5132,7 @@ multicodec@^1.0.0, multicodec@^1.0.1, multicodec@^1.0.4:
     buffer "^5.6.0"
     varint "^5.0.0"
 
-multihashes@^0.4.15, multihashes@~0.4.15:
+multihashes@^0.4.14, multihashes@^0.4.15, multihashes@~0.4.15:
   version "0.4.21"
   resolved "https://registry.yarnpkg.com/multihashes/-/multihashes-0.4.21.tgz#dc02d525579f334a7909ade8a122dabb58ccfcb5"
   integrity sha512-uVSvmeCWf36pU2nB4/1kzYZjsXD9vofZKpgudqkceYY5g2aZZXJ5r9lxuzoRLl1OAp28XljXsEJ/X/85ZsKmKw==
@@ -6811,6 +6813,13 @@ typescript@^3.9:
   version "3.9.7"
   resolved "https://registry.yarnpkg.com/typescript/-/typescript-3.9.7.tgz#98d600a5ebdc38f40cb277522f12dc800e9e25fa"
   integrity sha512-BLbiRkiBzAwsjut4x/dsibSTB6yWpwT5qWmC2OfuCg3GgVQCSgMs4vEctYPhsaGtd0AeuuHMkjZ2h2WG8MSzRw==
+
+typestub-multihashes@^0.0.4:
+  version "0.0.4"
+  resolved "https://registry.yarnpkg.com/typestub-multihashes/-/typestub-multihashes-0.0.4.tgz#601e41cc588c051984d93e21edee6638d439d83e"
+  integrity sha512-De7NTQ6CpXRSe/mZe89k0V+RopeEAUH/jRMj093E/j8cX8wKoilo7ySbEzGWxmFu4jO2Y5DA+FrOXIYmIOvurA==
+  dependencies:
+    multihashes "^0.4.14"
 
 typewise-core@^1.2, typewise-core@^1.2.0:
   version "1.2.0"

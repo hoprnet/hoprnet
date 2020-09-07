@@ -4,8 +4,7 @@ import { stringToU8a, u8aToHex } from '@hoprnet/hopr-utils'
 import { Hash, TicketEpoch, Balance, Signature } from '.'
 import { Uint8ArrayE } from '../types/extended'
 import { sign, hash } from '../utils'
-import { HASHED_SECRET_WIDTH } from '../hashedSecret'
-//
+
 import Web3 from 'web3'
 const web3 = new Web3()
 
@@ -47,7 +46,6 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
       epoch: TicketEpoch
       amount: Balance
       winProb: Hash
-      onChainSecret: Hash
     }
   ) {
     if (arr == null && struct == null) {
@@ -66,7 +64,6 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
       this.set(struct.epoch.toU8a(), this.epochOffset - this.byteOffset)
       this.set(struct.amount.toU8a(), this.amountOffset - this.byteOffset)
       this.set(struct.winProb, this.winProbOffset - this.byteOffset)
-      this.set(struct.onChainSecret, this.onChainSecretOffset - this.byteOffset)
     }
   }
 
@@ -110,20 +107,11 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
     return new Hash(new Uint8Array(this.buffer, this.winProbOffset, Hash.SIZE))
   }
 
-  get onChainSecretOffset(): number {
-    return this.byteOffset + Hash.SIZE + Hash.SIZE + TicketEpoch.SIZE + Balance.SIZE + Hash.SIZE
-  }
-
-  get onChainSecret(): Hash {
-    return new Hash(new Uint8Array(this.buffer, this.onChainSecretOffset, HASHED_SECRET_WIDTH))
-  }
-
   get hash(): Promise<Hash> {
     return new Promise<Hash>(async (resolve) => {
       const encodedTicket = encode([
         { type: 'bytes32', value: u8aToHex(this.channelId) },
         { type: 'bytes32', value: u8aToHex(await hash(this.challenge)) },
-        { type: 'bytes32', value: u8aToHex(this.onChainSecret) },
         { type: 'uint256', value: this.epoch.toString() },
         { type: 'uint256', value: this.amount.toString() },
         { type: 'bytes32', value: u8aToHex(this.winProb) },
@@ -163,7 +151,6 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
       epoch: TicketEpoch
       amount: Balance
       winProb: Hash
-      onChainSecret: Hash
     }
   ): Ticket {
     return new Ticket(arr, struct)
