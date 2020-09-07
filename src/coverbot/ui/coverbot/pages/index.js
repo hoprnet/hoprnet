@@ -78,10 +78,10 @@ function HomeContent({
 
         <div className={styles.stats}>
           <div>
-            <BSLink id={hoprChannelContract}><strong>HOPR Channel:</strong>{ hoprChannelContract.slice(0, 8) }...</BSLink>
+            <BSLink id={hoprChannelContract}><strong>Channel:</strong>{ hoprChannelContract.slice(0, 8) }...</BSLink>
           </div>
           <div>
-            <BSLink id={hoprCoverbotAddress}><strong>HOPR Coverbot:</strong>{ hoprCoverbotAddress.slice(0, 8) }...</BSLink>
+            <BSLink id={hoprCoverbotAddress}><strong>Coverbot:</strong>{ hoprCoverbotAddress.slice(0, 8) }...</BSLink>
           </div>
         </div>
 
