@@ -240,6 +240,11 @@ export class Coverbot implements Bot {
 
   async handleMessage(message: IMessage) {
     console.log(`${this.botName} <- ${message.from}: ${message.text}`)
+    if(message.from === this.address) {
+      // We have done a round trip, avoid sending more messages to eternally loop messages across the network.
+      return console.log(`Successful Relay: ${message.text}`)
+    }
+
     const [tweet, nodeState] = message.text.match(/https:\/\/twitter.com.*?$/i) ?
       await this._verifyTweet(message) :
       [undefined, NodeStates.newUnverifiedNode];

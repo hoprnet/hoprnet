@@ -1,7 +1,7 @@
 version: '3.1'
 
 services:
-  chat-bot:
+  coverbot:
     build:
       context: .
       dockerfile: chatbot.Dockerfile
@@ -20,7 +20,7 @@ services:
       dockerfile: coverbot-ui.Dockerfile
     restart: always
     depends_on:
-      - 'chat-bot'
+      - 'coverbot'
     environment:
       - STATS_FILE=/appdata/stats.json
     volumes:
