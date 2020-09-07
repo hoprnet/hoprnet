@@ -7,12 +7,14 @@ import { TweetMessage, TweetState } from '../twitter'
 import { convertPubKeyFromB58String, u8aToHex } from '@hoprnet/hopr-utils'
 import { Utils } from '@hoprnet/hopr-core-ethereum'
 import fs from 'fs'
+import { Networks, HOPR_CHANNELS } from '@hoprnet/hopr-core-ethereum/lib/ethereum/addresses';
 
 
 //@TODO: Move this to an environment variable or read from a contract
 const COVERBOT_XDAI_THRESHOLD = 0.001
 const COVERBOT_VERIFICATION_CYCLE_IN_MS =30000
 const COVERBOT_DEBUG_MODE = true
+const COVERBOT_CHAIN_PROVIDER = "https://dai.poa.network"
 
 type HoprNode = {
   id: string,
@@ -110,6 +112,8 @@ export class Coverbot implements Bot {
   verificationTimeout: NodeJS.Timeout;
   xdaiWeb3: Web3;
   ethereumAddress: string;
+  chainId: number;
+  network: Networks;
 
   constructor(address: string, timestamp: Date, twitterTimestamp: Date) {
     this.address = address
@@ -121,7 +125,10 @@ export class Coverbot implements Bot {
     console.log(`${this.botName} has been added`)
 
     this.ethereumAddress = null;
-    this.xdaiWeb3 = new Web3(new Web3.providers.HttpProvider('https://dai.poa.network'));
+    this.chainId = null;
+    this.network = null;
+
+    this.xdaiWeb3 = new Web3(new Web3.providers.HttpProvider(COVERBOT_CHAIN_PROVIDER));
     this.verificationTimeout = setInterval(this._verificationCycle.bind(this), COVERBOT_VERIFICATION_CYCLE_IN_MS)
 
     this.verifiedHoprNodes = new Map<string, HoprNode>()
@@ -136,10 +143,13 @@ export class Coverbot implements Bot {
   protected async dumpData() {
     //@TODO: Ideally we move this to a more suitable place.
     if(!this.ethereumAddress) {
+      this.chainId = await Utils.getChainId(this.xdaiWeb3)
+      this.network = Utils.getNetworkName(this.chainId) as Networks
       this.ethereumAddress = await this._getEthereumAddressFromHOPRAddress(this.address)
     }
 
     const state = {
+      hoprChannelContract: HOPR_CHANNELS[this.network],
       address: this.address,
       balance: await this.xdaiWeb3.eth.getBalance(this.ethereumAddress),
       available: 0,
