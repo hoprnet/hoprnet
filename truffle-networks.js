@@ -6,6 +6,7 @@
  * @property {number=} port
  * @property {number=} gas
  * @property {number=} gasPrice
+ * @property {boolean=} noVerify
  */
 
 /** @type {Object.<string, Network>} */
@@ -39,5 +40,19 @@ module.exports = {
     network_type: 'testnet',
     gas: 6500000,
     gasPrice: 1000000000,
+  },
+  solkol: {
+    network_id: '77',
+    network_type: 'testnet',
+    gas: 6500000,
+    gasPrice: 1000000000,
+    noVerify: true,
+  },
+  xdai: {
+    network_id: '100',
+    network_type: 'testnet',
+    gas: 6500000,
+    gasPrice: 1000000000,
+    noVerify: true,
   },
 }

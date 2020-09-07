@@ -1,12 +1,18 @@
 import { IncomingMessage, ServerResponse } from 'http'
 import { parse as parseUrl } from 'url'
 import { addresses } from '@hoprnet/hopr-ethereum'
-import networksConfig from '@hoprnet/hopr-ethereum/truffle-networks.json'
+import networksConfig from '@hoprnet/hopr-ethereum/truffle-networks.js'
 import HoprFaucetAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprFaucet.json'
 import Web3 from 'web3'
 
 const { isAddress, toChecksumAddress, toWei } = Web3.utils
 const { PRIVATE_KEY, INFURA } = process.env
+
+const getProvider = (network: addresses.Networks): string => {
+  if (['kovan'].includes(network)) return `https://${network}.infura.io/v3/${INFURA}`
+  else if (network === 'xdai') return 'https://xdai.poanetwork.dev'
+  else return `ws://${networksConfig.development.host}:${networksConfig.development.port}`
+}
 
 export default async (req: IncomingMessage, res: ServerResponse) => {
   try {
@@ -36,12 +42,8 @@ export default async (req: IncomingMessage, res: ServerResponse) => {
     // waitForConfirmation
     const waitForConfirmation = query.waitForConfirmation === 'true'
 
-    const isPrivate = network === 'private'
-
     // infura url
-    const url = isPrivate
-      ? `ws://${networksConfig.development.host}:${networksConfig.development.port}`
-      : `https://${network}.infura.io/v3/${INFURA}`
+    const url = getProvider(network)
 
     // initialize web3
     const web3 = new Web3(url)

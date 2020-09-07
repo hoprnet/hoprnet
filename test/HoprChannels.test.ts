@@ -45,6 +45,9 @@ contract('HoprChannels', function ([accountA, accountB]) {
   const reset = async () => {
     hoprToken = await HoprToken.new()
 
+    const minterRole = await hoprToken.MINTER_ROLE()
+    await hoprToken.grantRole(minterRole, accountA)
+
     // mint supply
     await hoprToken.mint(partyA, web3.utils.toWei('100', 'ether'), '0x00', '0x00')
     await hoprToken.mint(partyB, web3.utils.toWei('100', 'ether'), '0x00', '0x00')

@@ -249,18 +249,11 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         bytes32 challenge = keccak256(abi.encodePacked(hashedSecretASecretB));
 
         bytes32 hashedTicket = ECDSA.toEthSignedMessageHash(
-            "192",
-            abi.encodePacked(
-                channelId,
-                challenge,
-                bytes32(recipientAccount.hashedSecret),
-                uint256(recipientAccount.counter),
-                amount,
-                winProb
-            )
+            "160",
+            abi.encodePacked(channelId, challenge, uint256(recipientAccount.counter), amount, winProb)
         );
 
-        bytes32 luck = keccak256(abi.encode(hashedTicket, preImage));
+        bytes32 luck = keccak256(abi.encode(hashedTicket, preImage, hashedSecretASecretB));
 
         require(uint256(luck) < uint256(winProb), "HoprChannels: ticket must be a win");
 

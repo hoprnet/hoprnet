@@ -13,19 +13,25 @@ import "./HoprToken.sol";
  */
 contract HoprFaucet is AccessControl, Pausable {
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
+    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+    bool public restrictMinting;
     HoprToken public hoprToken;
 
-    constructor(address _hoprToken) public {
+    constructor(address _hoprToken, bool _restrictMinting) public {
         hoprToken = HoprToken(_hoprToken);
+        restrictMinting = _restrictMinting;
 
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _setupRole(PAUSER_ROLE, msg.sender);
     }
 
     /**
      * @dev Mints tokens
      */
     function mint(address account, uint256 amount) external whenNotPaused {
+        if (restrictMinting) {
+            require(hasRole(MINTER_ROLE, msg.sender), "HoprFaucet: caller does not have minter role");
+        }
+
         hoprToken.mint(account, amount, "", "");
     }
 

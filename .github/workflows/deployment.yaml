@@ -6,8 +6,8 @@ on:
       - release/*
 
 jobs:
-  deploy_kovan:
-    name: Deploy Contracts to Kovan
+  deploy:
+    name: Deploy Contracts
     runs-on: ubuntu-latest
     steps:
       # Checkout, Cache and Setup Steps
@@ -40,11 +40,11 @@ jobs:
           yarn policies set-version 1.19.2
           yarn build
       # Deploy contracts
-      - name: Deploy to Kovan
+      - name: Deploy to xDai
         env:
-          PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+          PRIVATE_KEY: ${{ secrets.SAENTIS_DEPLOYER_KEY }}
           INFURA: ${{ secrets.INFURA }}
           ETHERSCAN: ${{ secrets.ETHERSCAN }}
         run: |
           yarn policies set-version 1.19.2
-          yarn migrate kovan
+          yarn migrate xdai

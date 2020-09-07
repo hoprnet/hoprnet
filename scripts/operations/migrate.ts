@@ -7,7 +7,8 @@ export default async (network: string = 'development') => {
 
   const config = networks[network]
 
-  if (config.network_type === 'mainnet') {
+  if (config.noVerify) return
+  else if (config.network_type === 'mainnet') {
     await verify(network, 'HoprToken', 'HoprChannels', 'HoprMinter')
   } else if (config.network_type === 'testnet') {
     await verify(network, 'HoprToken', 'HoprChannels', 'HoprFaucet')

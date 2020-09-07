@@ -34,6 +34,18 @@ module.exports = {
       ...networks.kovan,
       provider: () => new HDWalletProvider(PRIVATE_KEY, `https://kovan.infura.io/v3/${INFURA}`),
     },
+
+    // block explorer: https://blockscout.com/poa/sokol
+    solkol: canMigrate && {
+      ...networks.solkol,
+      provider: () => new HDWalletProvider(PRIVATE_KEY, 'https://sokol.poa.network'),
+    },
+
+    // block explorer: https://blockscout.com/poa/core
+    xdai: canMigrate && {
+      ...networks.xdai,
+      provider: () => new HDWalletProvider(PRIVATE_KEY, 'https://xdai.poanetwork.dev'),
+    },
   },
 
   // default mocha options
