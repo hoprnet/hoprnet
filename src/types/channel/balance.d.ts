@@ -1,5 +1,5 @@
 import BN from 'bn.js'
-import Balance from './balance'
+import Balance from '../balance'
 
 declare interface ChannelBalanceStatic {
   readonly SIZE: number
