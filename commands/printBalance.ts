@@ -22,7 +22,7 @@ export default class PrintBalance extends AbstractCommand {
    * Prints the balance of our account.
    * @notice triggered by the CLI
    */
-  async execute(): Promise<void> {
+  async execute(): Promise<string> {
     const { paymentChannels } = this.node
     const { Balance, NativeBalance } = paymentChannels.types
 
@@ -33,7 +33,7 @@ export default class PrintBalance extends AbstractCommand {
       return moveDecimalPoint(b.toString(), NativeBalance.DECIMALS * -1)
     })
 
-    console.log(
+    return (
       [
         `Account Balance: ${chalk.magenta(balance)} ${Balance.SYMBOL}`,
         `Account Native Balance: ${chalk.magenta(nativeBalance)} ${NativeBalance.SYMBOL}`,

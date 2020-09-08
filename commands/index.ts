@@ -49,7 +49,8 @@ export class Commands {
       new Tickets(node),
       new Settings(),
       new Alias(node),
-      new Withdraw(node),
+      // new Withdraw(node), // PB: Disabled as it uses console.log, which won't
+      // work with hoprd.
     ]
 
     if(rl) {
