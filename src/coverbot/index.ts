@@ -164,6 +164,9 @@ export class Coverbot implements Bot {
 
     this.verifiedHoprNodes = new Map<string, HoprNode>()
     this.relayTimeouts = new Map<string, NodeJS.Timeout>()
+
+    console.log('📦 Setting up “database”')
+    this.dumpData()
   }
 
   private async _getEthereumAddressFromHOPRAddress(hoprAddress: string): Promise<string> {
