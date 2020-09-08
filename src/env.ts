@@ -40,7 +40,7 @@ let parsed: {
   COVERBOT_XDAI_THRESHOLD: 0.001,
   COVERBOT_VERIFICATION_CYCLE_IN_MS: 30000,
   COVERBOT_DEBUG_MODE: true,
-  COVERBOT_CHAIN_PROVIDER: "https://dai.poa.network"
+  COVERBOT_CHAIN_PROVIDER: 'https://dai.poa.network'
 }
 
 try {
