@@ -163,6 +163,7 @@ describe('Commands', () => {
     expect(mockReadline.question).toHaveBeenCalled()
   })
 
+  /*
   it('withdraw', async () => {
     let mockNode: any = jest.fn()
     mockNode.paymentChannels = jest.fn()
@@ -177,5 +178,7 @@ describe('Commands', () => {
     await cmds.execute('withdraw 0x123 native 1')
     expect(mockNode.paymentChannels.withdraw).toHaveBeenCalled()
   })
+  */
+
 })
 
