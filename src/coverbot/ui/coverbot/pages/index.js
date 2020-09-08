@@ -51,6 +51,7 @@ function HomeContent({
   connected,
   hoprChannelContract,
   hoprCoverbotAddress,
+  env,
   refreshed
 }) {
 
@@ -68,7 +69,6 @@ function HomeContent({
       <Head>
         <title>HOPR Incentivized Testnet on xDAI</title>
       </Head>
-
 
       <header className={styles.header}>
         <Logo />
@@ -101,7 +101,7 @@ function HomeContent({
           <h2>Instructions</h2>
           <ol>
             <li>Download <a href="https://github.com/hoprnet/hopr-chat/releases">HOPR Node Säntis</a> and run it.</li>
-            <li>Send <strong>10 xDAI</strong> to your node</li>
+            <li>Send <strong>{ env.COVERBOT_XDAI_THRESHOLD } xDAI</strong> to your node</li>
             <li><a href="https://twitter.com">Tweet</a> your HOPR node address with the tag <strong>#HOPRNetwork</strong> and <strong>@hoprnet</strong></li>
             <li>Send a message with your tweet to the Cover Node address:
               <br />
