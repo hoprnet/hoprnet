@@ -5,8 +5,8 @@ import type * as Types from './types'
 import type * as DbKeys from './dbKeys'
 import type * as Constants from './constants'
 import type Indexer from './indexer'
-import type Tickets from './tickets'
-import PathSelection from './pathSelection'
+import type { Tickets } from './tickets'
+import type PathSelection from './pathSelection'
 
 export type Currencies = 'NATIVE' | 'HOPR'
 
@@ -122,7 +122,7 @@ declare interface HoprCoreConnector {
   /**
    * Store and query tickets.
    */
-  readonly tickets: Tickets
+  readonly tickets: typeof Tickets
 
   /**
    * Returns an instance of Indexer.

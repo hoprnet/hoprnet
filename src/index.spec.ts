@@ -6,7 +6,8 @@
 
 import HoprCoreConnector from '.'
 import type { LevelUp } from 'levelup'
-import type { Balance, Hash, SignedTicket, Public } from './types'
+import type { Balance, Hash, Public } from './types'
+import { StoredTicket } from './tickets/storedTicket'
 
 async function main() {
   const coreConnector = await HoprCoreConnector.create((undefined as unknown) as LevelUp, (undefined as unknown) as Uint8Array)
@@ -18,8 +19,8 @@ async function main() {
   coreConnector.start()
 
   coreConnector.indexer?.has((undefined as unknown) as Public, (undefined as unknown) as Public)
-  coreConnector.tickets.get(new Uint8Array())
-  coreConnector.tickets.store(new Uint8Array(), (undefined as unknown) as SignedTicket)
+  coreConnector.tickets.get((undefined as unknown) as Public)
+  coreConnector.tickets.store((undefined as unknown) as Public, (undefined as unknown) as StoredTicket)
 
   coreConnector.indexer?.has((undefined as unknown) as Public, (undefined as unknown) as Public)
 

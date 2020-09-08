@@ -1,16 +1,4 @@
-import type {
-  AccountId,
-  Balance,
-  Channel as ChannelType,
-  ChannelBalance,
-  Hash,
-  Moment,
-  Public,
-  Signature,
-  SignedChannel,
-  SignedTicket,
-  ChannelState,
-} from './types'
+import type { AccountId, Balance, Channel as ChannelType, ChannelBalance, Hash, Moment, Public, Signature, SignedChannel, SignedTicket } from './types'
 
 declare interface ChannelStatic {
   /**
@@ -103,8 +91,8 @@ declare interface Channel {
   // Timestamp once the channel can be settled
   readonly settlementWindow: Promise<Moment>
 
-  // Current state of the channel, i.e. `FUNDED`
-  readonly state: Promise<ChannelState>
+  // Current state of the channel, i.e. `FUNDED` with `1 HOPR / 3 HOPR`
+  readonly state: Promise<Channel>
 
   // Current balance of partyA
   readonly balance_a: Promise<Balance>
@@ -163,12 +151,6 @@ declare interface Channel {
    * Initiates a settlement for this channel.
    */
   initiateSettlement(): Promise<void>
-
-  /**
-   * Fetches all unresolved, previous challenges from the database that
-   * have occured in this channel.
-   */
-  getPreviousChallenges(): Promise<Hash>
 }
 
 declare var Channel: ChannelStatic
