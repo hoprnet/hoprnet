@@ -1,4 +1,4 @@
-import { sendMessage, getHoprBalance, getHOPRNodeAddressFromContent } from '../utils'
+import { sendMessage, getHoprBalance, getHOPRNodeAddressFromContent, getStatus } from '../utils'
 import Web3 from 'web3';
 import { Bot } from '../bot'
 import { IMessage } from '../message'
@@ -102,6 +102,10 @@ const NodeStateResponses = {
   [NodeStates.verifiedNode]: `\n
     Verification Successful! I’ll shortly use you as a cover traffic node
     and pay you in xHOPR tokens for your service.
+
+    For more information, go to https://saentis.hoprnet.org
+
+    Thank you for participating in our incentivized network!
   `,
   [NodeStates.relayingNodeFailed]: `\n
     Relaying failed. We can reach you, but you can’t reach us...
@@ -183,7 +187,10 @@ export class Coverbot implements Bot {
       this.ethereumAddress = await this._getEthereumAddressFromHOPRAddress(this.address)
     }
 
+    const connectedNodes = await getStatus()
+
     const state = {
+      connectedNodes,
       env: {
         COVERBOT_CHAIN_PROVIDER,
         COVERBOT_DEBUG_MODE,

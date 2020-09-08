@@ -1,6 +1,8 @@
 import * as grpc from 'grpc'
 import { GetHoprBalanceRequest } from '@hoprnet/hopr-protos/node/balance_pb'
 import { BalanceClient } from '@hoprnet/hopr-protos/node/balance_grpc_pb'
+import { StatusRequest } from '@hoprnet/hopr-protos/node/status_pb'
+import { StatusClient } from '@hoprnet/hopr-protos/node/status_grpc_pb'
 import { GetHoprAddressRequest } from '@hoprnet/hopr-protos/node/address_pb'
 import { ListenClient } from '@hoprnet/hopr-protos/node/listen_grpc_pb'
 import { AddressClient } from '@hoprnet/hopr-protos/node/address_grpc_pb'
@@ -83,6 +85,26 @@ export const sendMessage = (recepientAddress: string, message: IMessage, annonym
         console.log(`-> ${recepientAddress}:${message.text}`)
         client.close()
         resolve()
+      })
+    } catch (err) {
+      client.close()
+      reject(err)
+    }
+  })
+}
+
+export const getStatus = (): Promise<number> => {
+  let client: StatusClient
+
+  return new Promise((resolve, reject) => {
+    try {
+      client = SetupClient(StatusClient)
+
+      client.getStatus(new StatusRequest(), (err, res) => {
+        if (err) return reject(err)
+
+        client.close()
+        resolve(res.getConnectedNodes())
       })
     } catch (err) {
       client.close()
