@@ -9,6 +9,8 @@ declare interface ChannelStatic {
   createActive(channelBalance: ChannelBalance): Channel
 
   createPending(pending: Moment, balance: ChannelBalance): Channel
+
+  SIZE: number
 }
 
 declare interface Channel {

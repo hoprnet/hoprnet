@@ -92,7 +92,7 @@ declare interface Channel {
   readonly settlementWindow: Promise<Moment>
 
   // Current state of the channel, i.e. `FUNDED` with `1 HOPR / 3 HOPR`
-  readonly state: Promise<Channel>
+  readonly state: Promise<ChannelType>
 
   // Current balance of partyA
   readonly balance_a: Promise<Balance>

@@ -3,10 +3,19 @@ import BN from 'bn.js'
 declare interface ChannelStateStatic {
   readonly SIZE: number
 
-  new (channelState: BN | number, ...props: any[]): ChannelState
+  new (
+    arr: {
+      bytes: ArrayBuffer
+      offset: number
+    },
+    struct: {
+      state: number
+    },
+    ...props: any[]
+  ): ChannelState
 }
-declare interface ChannelState extends BN {
-  toU8a(): Uint8Array
+declare interface ChannelState extends Uint8Array {
+  toBN(): BN
 }
 
 declare var ChannelState: ChannelStateStatic
