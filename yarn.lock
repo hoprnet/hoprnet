@@ -393,10 +393,10 @@
     "@ethersproject/rlp" "^5.0.0"
     "@ethersproject/signing-key" "^5.0.0"
 
-"@hoprnet/hopr-core-connector-interface@1.7.1":
-  version "1.7.1"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-connector-interface/-/hopr-core-connector-interface-1.7.1.tgz#fee80b0e954a8606dfd9d8cb53102606a9e66b64"
-  integrity sha512-lDTOTpOOyE9PrXo0TPv1Rw7BcOndSj4+CISCAyB1/Nby/2yGtZbm65IPOcngWUYrCgXQMuxrc/AR3pFIQ6eV5w==
+"@hoprnet/hopr-core-connector-interface@1.9.3":
+  version "1.9.3"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-connector-interface/-/hopr-core-connector-interface-1.9.3.tgz#2a895163caff4a2787c750199900f28b0a9c16cd"
+  integrity sha512-aMMjUdPR5m7jI8VYBbFXoQ+i1kgNhQN4y0CTUNCdV+YlbdsmL8PUYIWeps9LP9fZL1C286gHhgu5pwtrqrV/Ow==
 
 "@hoprnet/hopr-core-ethereum@0.4.4-xdai":
   version "0.4.4-xdai"
