@@ -2,6 +2,8 @@ import * as grpc from 'grpc'
 import { GetHoprBalanceRequest } from '@hoprnet/hopr-protos/node/balance_pb'
 import { BalanceClient } from '@hoprnet/hopr-protos/node/balance_grpc_pb'
 import { StatusRequest } from '@hoprnet/hopr-protos/node/status_pb'
+import { WithdrawClient } from '@hoprnet/hopr-protos/node/withdraw_grpc_pb'
+import { WithdrawHoprRequest } from '@hoprnet/hopr-protos/node/withdraw_pb'
 import { StatusClient } from '@hoprnet/hopr-protos/node/status_grpc_pb'
 import { GetHoprAddressRequest } from '@hoprnet/hopr-protos/node/address_pb'
 import { ListenClient } from '@hoprnet/hopr-protos/node/listen_grpc_pb'
@@ -83,6 +85,27 @@ export const sendMessage = (recepientAddress: string, message: IMessage, annonym
         if (err) return reject(err)
 
         console.log(`-> ${recepientAddress}:${message.text}`)
+        client.close()
+        resolve()
+      })
+    } catch (err) {
+      client.close()
+      reject(err)
+    }
+  })
+}
+
+export const sendXHOPR = (recipient: string, amount: number) => {
+  let client: WithdrawClient
+
+  return new Promise((resolve, reject) => {
+    try {
+      client = SetupClient(WithdrawClient)
+      const req = new WithdrawHoprRequest()
+      req.setRecipient(recipient)
+      req.setAmount(`${amount}`)
+      client.withdrawHopr(req, (err, res) => {
+        if (err) return reject(err)
         client.close()
         resolve()
       })

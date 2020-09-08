@@ -1,4 +1,4 @@
-import { sendMessage, getHoprBalance, getHOPRNodeAddressFromContent, getStatus } from '../utils'
+import { sendMessage, getHoprBalance, getHOPRNodeAddressFromContent, getStatus, sendXHOPR } from '../utils'
 import Web3 from 'web3';
 import { Bot } from '../bot'
 import { IMessage } from '../message'
@@ -359,8 +359,8 @@ export class Coverbot implements Bot {
       this.relayTimeouts.delete(relayerAddress)
 
       // 4.
-      //@TODO: Actually pay the node.
-      console.log(`About to pay some sweet xHOPR to ${relayerAddress}`)
+      await sendXHOPR(await this._getEthereumAddressFromHOPRAddress(relayerAddress), 10)
+      this._sendMessageFromBot(relayerAddress, NodeStateResponses[NodeStates.verifiedNode])
 
       // 1.
       return;
