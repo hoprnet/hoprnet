@@ -12,6 +12,7 @@ import { COVERBOT_DEBUG_MODE, COVERBOT_CHAIN_PROVIDER, COVERBOT_VERIFICATION_CYC
 
 
 const { fromWei } = Web3.utils;
+const RELAY_VERIFICATION_CYCLE_IN_MS = COVERBOT_VERIFICATION_CYCLE_IN_MS/2
 
 type HoprNode = {
   id: string,
@@ -26,6 +27,10 @@ enum NodeStates {
   tweetVerificationSucceeded = 'SUCCEEDED_TWITTER_VERIFICATION',
   xdaiBalanceFailed = 'FAILED_XDAI_BALANCE_VERIFICATION',
   xdaiBalanceSucceeded = 'SUCCEEDED_XDAI_BALANCE_VERIFICATION',
+  relayingNodeFailed = 'FAILED_RELAYING_PACKET',
+  relayingNodeInProgress = 'IN_PROGRESS_RELAYING_PACKET',
+  relayingNodeSucceded = 'SUCCEEDED_RELAYING_PACKET',
+  onlineNode = 'ONLINE',
   verifiedNode = 'VERIFIED'
 }
 
@@ -90,9 +95,31 @@ const NodeStateResponses = {
 
     Thank you for participating in our incentivized network!
   `,
+  [NodeStates.onlineNode]: `\n
+    Node Online! Relaying a message to verify your ability to
+    send messages to other nodes in the network.
+  `,
   [NodeStates.verifiedNode]: `\n
-    Congratulations! I’ll shortly use you as a cover traffic node
+    Verification Successful! I’ll shortly use you as a cover traffic node
     and pay you in xHOPR tokens for your service.
+  `,
+  [NodeStates.relayingNodeFailed]: `\n
+    Relaying failed. We can reach you, but you can’t reach us...
+    Sadly this means other nodes in the network might not be able to
+    reach you, so we‘ll remove from our network node.
+
+    Thanks for participating! Drop by our Telegram (https://t.me/hoprnet)
+    for more information.
+  `,
+  [NodeStates.relayingNodeInProgress]: `\n
+    Relaying in progress. We have received your message and are now
+    waiting for a packet we are trying to relay on you. Please wait
+    until we receive your packet or ${RELAY_VERIFICATION_CYCLE_IN_MS/1000}seconds
+    pass out. Thank you for your patience!
+  `,
+  [NodeStates.relayingNodeSucceded]: `\n
+    Relaying successful! We have obtained a packet annonymously from you,
+    and are ready to go through the next verification process.
   `
 }
 
@@ -105,8 +132,9 @@ export class Coverbot implements Bot {
   twitterTimestamp: Date
 
   verifiedHoprNodes: Map<string, HoprNode>
-
+  relayTimeouts: Map<string, NodeJS.Timeout>
   verificationTimeout: NodeJS.Timeout;
+
   xdaiWeb3: Web3;
   ethereumAddress: string;
   chainId: number;
@@ -121,6 +149,12 @@ export class Coverbot implements Bot {
     this.botName = '💰 Coverbot'
     console.log(`${this.botName} has been added`)
 
+    console.log(`⚡️ Network: ${COVERBOT_CHAIN_PROVIDER}`)
+    console.log(`💸 Threshold: ${COVERBOT_XDAI_THRESHOLD}`)
+    console.log(`🐛 Debug Mode: ${COVERBOT_DEBUG_MODE}`)
+    console.log(`👀 Verification Cycle: ${COVERBOT_VERIFICATION_CYCLE_IN_MS}`)
+    console.log(`🔍 Relaying Cycle: ${RELAY_VERIFICATION_CYCLE_IN_MS}`)
+
     this.ethereumAddress = null;
     this.chainId = null;
     this.network = null;
@@ -129,6 +163,7 @@ export class Coverbot implements Bot {
     this.verificationTimeout = setInterval(this._verificationCycle.bind(this), COVERBOT_VERIFICATION_CYCLE_IN_MS)
 
     this.verifiedHoprNodes = new Map<string, HoprNode>()
+    this.relayTimeouts = new Map<string, NodeJS.Timeout>()
   }
 
   private async _getEthereumAddressFromHOPRAddress(hoprAddress: string): Promise<string> {
@@ -146,6 +181,12 @@ export class Coverbot implements Bot {
     }
 
     const state = {
+      env: {
+        COVERBOT_CHAIN_PROVIDER,
+        COVERBOT_DEBUG_MODE,
+        COVERBOT_VERIFICATION_CYCLE_IN_MS,
+        COVERBOT_XDAI_THRESHOLD
+      },
       hoprCoverbotAddress: await this._getEthereumAddressFromHOPRAddress(this.address),
       hoprChannelContract: HOPR_CHANNELS[this.network],
       address: this.address,
@@ -171,10 +212,13 @@ export class Coverbot implements Bot {
     console.log(`${COVERBOT_VERIFICATION_CYCLE_IN_MS}ms has passed. Verifying nodes...`)
 
     this.dumpData()
+
     const _verifiedNodes = Array.from(this.verifiedHoprNodes.values());
     const randomIndex = Math.floor(Math.random() * _verifiedNodes.length);
     const hoprNode: HoprNode = _verifiedNodes[randomIndex]
+
     if (!hoprNode) {
+      console.log('No node found. Skipping...')
       return;
     }
 
@@ -183,27 +227,42 @@ export class Coverbot implements Bot {
       await tweet.fetch({ mock: COVERBOT_DEBUG_MODE })
       const _hoprNodeAddress = tweet.getHOPRNode()
       if (_hoprNodeAddress.length === 0) {
-        // We got no HOPR Node here.
+        // We got no HOPR Node here. Remove and update.
         this.verifiedHoprNodes.delete(hoprNode.id)
+        this.dumpData()
       } else {
         this._sendMessageFromBot(_hoprNodeAddress, BotResponses[BotCommands.verify])
         /*
-        * @TODO: Ideally we wait until we get the packet back before we try to open the payment channel.
-        * Right now we are “sending and forgetting”, as we do not wait for the message back.
-        * To fix this, under the `handle` message we can detect messages that came from us but were
-        * relayed as a way to verify connection. Also, it would be important to ensure the content sent
-        * could only be generated by us. For the time being, we are just “hoping” the messages get by.
+        * We switched from “send and forget” to “send and listen”
+        * 1. We inmediately send the message, saving the node internally
+        * 2. We wait RELAY_VERIFICATION_CYCLE_IN_MS seconds for the relay to get back.
+        * 3. If we don't get the message back before RELAY_VERIFICATION_CYCLE_IN_MS,
+        *    then we remove the node from the verification table and redump data.
+        * 4. If we DO get the message back, then we go and execute the payout function.
         */
-        setTimeout(async () => {
-          console.log('Sending messages to node...')
-          this._sendMessageFromBot(_hoprNodeAddress, NodeStateResponses[NodeStates.verifiedNode])
-          this._sendMessageOpeningChannels(this.address, ` Packet relayed by ${_hoprNodeAddress}`, [_hoprNodeAddress])
-        }, COVERBOT_VERIFICATION_CYCLE_IN_MS/2)
+        console.log(`Relaying node ${_hoprNodeAddress}, checking in ${RELAY_VERIFICATION_CYCLE_IN_MS}`)
+        this._sendMessageFromBot(_hoprNodeAddress, NodeStateResponses[NodeStates.onlineNode])
+        this._sendMessageOpeningChannels(this.address, ` Packet relayed by ${_hoprNodeAddress}`, [_hoprNodeAddress])
+        this.relayTimeouts.set(_hoprNodeAddress, setTimeout(() => {
+          /*
+          * The timeout passed, and we didn‘t get the message back.
+          * 1. Internally log that this is the case.
+          * 2. Let the node that we couldn't get our response back in time.
+          * 3. Remove from timeout so they can try again somehow.
+          * 4. Remove from our verified node and write to the stats.json
+          */
+          console.log(`No response from ${_hoprNodeAddress}. Removing as valid node.`)
+          this._sendMessageFromBot(_hoprNodeAddress, NodeStateResponses[NodeStates.relayingNodeFailed])
+          this.relayTimeouts.delete(_hoprNodeAddress)
+          this.verifiedHoprNodes.delete(_hoprNodeAddress)
+          this.dumpData()
+        }, RELAY_VERIFICATION_CYCLE_IN_MS))
       }
     } catch (err) {
       console.log('Err:', err);
-      // Something failed. We better remove node.
+      // Something failed. We better remove node and update.
       this.verifiedHoprNodes.delete(hoprNode.id)
+      this.dumpData()
     }
   }
 
@@ -217,7 +276,6 @@ export class Coverbot implements Bot {
   protected async _verifyBalance(message: IMessage): Promise<[number, NodeStates]> {
     const pubkey = await convertPubKeyFromB58String(message.from)
     const nodeEthereumAddress = u8aToHex(await Utils.pubKeyToAccountId(pubkey.marshal()))
-    //@TODO: Move this from hardcoded POA network to ENV_PROVIDER
     const weiBalance = await this.xdaiWeb3.eth.getBalance(nodeEthereumAddress)
     const balance = +Web3.utils.fromWei(weiBalance)
 
@@ -228,7 +286,6 @@ export class Coverbot implements Bot {
     const tweet = new TweetMessage(message.text)
     this.tweets.set(message.from, tweet)
 
-    //@TODO: Remove mock for production to ensure we process tweets.
     /*
     * Careful, it seems that the twitter API truncates some of the text
     * content, so if something isn't in the first 100 characters, it might
@@ -250,10 +307,54 @@ export class Coverbot implements Bot {
 
   async handleMessage(message: IMessage) {
     console.log(`${this.botName} <- ${message.from}: ${message.text}`)
+
     if(message.from === this.address) {
-      // We have done a round trip, avoid sending more messages to eternally loop messages across the network.
+      /*
+      * We have done a succeful round trip!
+      * 1. Lets avoid sending more messages to eternally loop
+      *    messages across the network by returning within this if.
+      * 2. Let's notify the user about the successful relay.
+      * 3. Let's recover the timeout from our relayerTimeout
+      *    and clear it before it removes the node.
+      * 4. Let's pay the good node some sweet xHOPR for being alive
+      *    and relaying messages successfully.
+      */
       const relayerAddress = getHOPRNodeAddressFromContent(message.text)
-      return console.log(`Successful Relay: ${relayerAddress}`)
+
+      // 2.
+      console.log(`Successful Relay: ${relayerAddress}`)
+      this._sendMessageFromBot(message.from, NodeStateResponses[NodeStates.relayingNodeSucceded])
+
+      // 3.
+      const relayerTimeout = this.relayTimeouts.get(relayerAddress)
+      clearTimeout(relayerTimeout)
+      this.relayTimeouts.delete(relayerAddress)
+
+      // 4.
+      //@TODO: Actually pay the node.
+      console.log(`About to pay some sweet xHOPR to ${message.from}`)
+
+      // 1.
+      return;
+    }
+
+    if(this.relayTimeouts.get(message.from)) {
+      /*
+      * There‘s a particular case where someone can send us a message while
+      * we are trying to relay them a package. We'll skip the entire process
+      * if this is the case, as the timeout will clear them out.
+      *
+      * 1. Detect if we have someone waiting for timeout (this if).
+      * 2. If so, then quickly return them a message telling we are waiting.
+      * 3. Return as to avoid going through the entire process again.
+      *
+      */
+
+      // 2.
+      this._sendMessageFromBot(message.from, NodeStateResponses[NodeStates.relayingNodeInProgress])
+
+      // 3.
+      return;
     }
 
     const [tweet, nodeState] = message.text.match(/https:\/\/twitter.com.*?$/i) ?
@@ -275,7 +376,6 @@ export class Coverbot implements Bot {
             this._sendMessageFromBot(message.from, NodeStateResponses[xDaiBalanceNodeState](balance))
             break;
           case NodeStates.xdaiBalanceSucceeded:
-            //@TODO Add this to a persistent store
             this.verifiedHoprNodes.set(message.from, {
               id: message.from,
               tweetId: tweet.id,

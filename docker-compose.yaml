@@ -12,6 +12,10 @@ services:
       - API_URL=34.65.96.1:50051
       - STATS_FILE=/appdata/stats.json
       - BOT_NAME=coverbot
+      - COVERBOT_XDAI_THRESHOLD=0.001
+      - COVERBOT_VERIFICATION_CYCLE_IN_MS=30000
+      - COVERBOT_DEBUG_MODE=false
+      - COVERBOT_CHAIN_PROVIDER="https://dai.poa.network"
     volumes:
       - ./appdata:/appdata
   coverbot-ui:
