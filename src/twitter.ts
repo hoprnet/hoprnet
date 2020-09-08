@@ -41,6 +41,7 @@ export class TweetMessage {
     }
 
     async fetch(options?:{mock: boolean}) {
+        console.log('Using Mock:', options);
         this.status = new TweetState()
         const data = (options && options.mock) ? tweetMock : await twitterClient.tweets.statusesShowById({ id: this.id, tweet_mode: 'extended' })
         this.url = `https://twitter.com/${data.user.screen_name}/status/${data.id_str}`
