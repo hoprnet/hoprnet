@@ -133,7 +133,7 @@ export class Coverbot implements Bot {
 
   verifiedHoprNodes: Map<string, HoprNode>
   relayTimeouts: Map<string, NodeJS.Timeout>
-  verificationTimeout: NodeJS.Timeout;
+  verificationTimeout: NodeJS.Timeout
 
   xdaiWeb3: Web3;
   ethereumAddress: string;
@@ -225,6 +225,11 @@ export class Coverbot implements Bot {
       return;
     }
 
+    if (this.relayTimeouts.get(hoprNode.id)) {
+      console.log('Node selected is going through relaying. Skipping...')
+      return;
+    }
+
     try {
       const tweet = new TweetMessage(hoprNode.tweetUrl)
       await tweet.fetch({ mock: COVERBOT_DEBUG_MODE })
@@ -237,27 +242,44 @@ export class Coverbot implements Bot {
         this._sendMessageFromBot(_hoprNodeAddress, BotResponses[BotCommands.verify])
         /*
         * We switched from “send and forget” to “send and listen”
-        * 1. We inmediately send the message, saving the node internally
-        * 2. We wait RELAY_VERIFICATION_CYCLE_IN_MS seconds for the relay to get back.
-        * 3. If we don't get the message back before RELAY_VERIFICATION_CYCLE_IN_MS,
-        *    then we remove the node from the verification table and redump data.
-        * 4. If we DO get the message back, then we go and execute the payout function.
+        * 1. We inmediately send a message to user, telling them we find them online.
+        * 2. We use them as a relayer, expecting to get our message later.
+        * 3. We save a timeout, to fail the node if the relayed package doesnt come back.
+        * 4. We wait RELAY_VERIFICATION_CYCLE_IN_MS seconds for the relay to get back.
+        *    4.1 If we don't get the message back before RELAY_VERIFICATION_CYCLE_IN_MS,
+        *        then we remove the node from the verification table and redump data.
+        *    4.2 If we DO get the message back, then we go and execute the payout function.
         */
+
+        // 1.
         console.log(`Relaying node ${_hoprNodeAddress}, checking in ${RELAY_VERIFICATION_CYCLE_IN_MS}`)
         this._sendMessageFromBot(_hoprNodeAddress, NodeStateResponses[NodeStates.onlineNode])
+
+        // 2.
         this._sendMessageOpeningChannels(this.address, ` Packet relayed by ${_hoprNodeAddress}`, [_hoprNodeAddress])
+
+        // 3.
         this.relayTimeouts.set(_hoprNodeAddress, setTimeout(() => {
+          // 4.1
           /*
           * The timeout passed, and we didn‘t get the message back.
-          * 1. Internally log that this is the case.
-          * 2. Let the node that we couldn't get our response back in time.
-          * 3. Remove from timeout so they can try again somehow.
-          * 4. Remove from our verified node and write to the stats.json
+          * 4.1.1 Internally log that this is the case.
+          * 4.1.2 Let the node that we couldn't get our response back in time.
+          * 4.1.3 Remove from timeout so they can try again somehow.
+          * 4.1.4 Remove from our verified node and write to the stats.json
           */
+
+          // 4.1.1
           console.log(`No response from ${_hoprNodeAddress}. Removing as valid node.`)
+
+          // 4.1.2
           this._sendMessageFromBot(_hoprNodeAddress, NodeStateResponses[NodeStates.relayingNodeFailed])
+
+          // 4.1.3
           this.relayTimeouts.delete(_hoprNodeAddress)
           this.verifiedHoprNodes.delete(_hoprNodeAddress)
+
+          // 4.1.4
           this.dumpData()
         }, RELAY_VERIFICATION_CYCLE_IN_MS))
       }
@@ -290,11 +312,6 @@ export class Coverbot implements Bot {
     const tweet = new TweetMessage(message.text)
     this.tweets.set(message.from, tweet)
 
-    /*
-    * Careful, it seems that the twitter API truncates some of the text
-    * content, so if something isn't in the first 100 characters, it might
-    * be left out of the parser.
-    */
     await tweet.fetch({ mock: COVERBOT_DEBUG_MODE })
 
     if (tweet.hasTag('hoprnetwork')) {
@@ -327,7 +344,7 @@ export class Coverbot implements Bot {
 
       // 2.
       console.log(`Successful Relay: ${relayerAddress}`)
-      this._sendMessageFromBot(message.from, NodeStateResponses[NodeStates.relayingNodeSucceded])
+      this._sendMessageFromBot(relayerAddress, NodeStateResponses[NodeStates.relayingNodeSucceded])
 
       // 3.
       const relayerTimeout = this.relayTimeouts.get(relayerAddress)
@@ -336,7 +353,7 @@ export class Coverbot implements Bot {
 
       // 4.
       //@TODO: Actually pay the node.
-      console.log(`About to pay some sweet xHOPR to ${message.from}`)
+      console.log(`About to pay some sweet xHOPR to ${relayerAddress}`)
 
       // 1.
       return;
