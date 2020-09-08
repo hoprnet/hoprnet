@@ -105,11 +105,11 @@ const NodeStateResponses = {
   `,
   [NodeStates.relayingNodeFailed]: `\n
     Relaying failed. We can reach you, but you can’t reach us...
-    Sadly this means other nodes in the network might not be able to
-    reach you, so we‘ll remove from our network node.
+    This could mean other errors though, so you always try again.
 
-    Thanks for participating! Drop by our Telegram (https://t.me/hoprnet)
-    for more information.
+    For more information, go to https://saentis.hoprnet.org
+
+    Drop by our Telegram (https://t.me/hoprnet) for any questions.
   `,
   [NodeStates.relayingNodeInProgress]: `\n
     Relaying in progress. We have received your message and are now
@@ -286,6 +286,7 @@ export class Coverbot implements Bot {
   }
 
   protected async _verifyTweet(message: IMessage): Promise<[TweetMessage, NodeStates]> {
+    //@TODO: Catch error here.
     const tweet = new TweetMessage(message.text)
     this.tweets.set(message.from, tweet)
 
