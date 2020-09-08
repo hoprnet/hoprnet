@@ -1261,12 +1261,12 @@
     lodash.camelcase "^4.3.0"
     protobufjs "^6.8.6"
 
-"@hoprnet/hopr-chat@1.11.3-xdai.0":
-  version "1.11.3-xdai.0"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-chat/-/hopr-chat-1.11.3-xdai.0.tgz#f28dbb96c6a3b3a3c6ebb7d5ec0cead6dce7d034"
-  integrity sha512-zH2KkNvz/oHMUQ0bbIjUXs1TzYRoXpr5ZDR3qgH+ndYyM788aoBBWFLegIw9Ibqjg9eo47QEjBCOI6oUHoNbpQ==
+"@hoprnet/hopr-chat@1.5.4-xdai.0":
+  version "1.5.4-xdai.0"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-chat/-/hopr-chat-1.5.4-xdai.0.tgz#492541a442c668f68a04ca4670e6d3077a874a6d"
+  integrity sha512-c7rGRQ9FaRajDNQyYaKxxby706PuQTnIVoNfNBF2ulMWy7aVm7pLoPxnT/Y6SWW/G8kGxZLdxpWhtDgi4nWgGg==
   dependencies:
-    "@hoprnet/hopr-core" "0.6.29-xdai"
+    "@hoprnet/hopr-core" "0.6.32-xdai"
     "@hoprnet/hopr-core-connector-interface" "1.7.1"
     "@hoprnet/hopr-utils" "0.5.2"
     "@zeit/ncc" "^0.22.3"
@@ -1287,44 +1287,6 @@
   resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-connector-interface/-/hopr-core-connector-interface-1.7.1.tgz#fee80b0e954a8606dfd9d8cb53102606a9e66b64"
   integrity sha512-lDTOTpOOyE9PrXo0TPv1Rw7BcOndSj4+CISCAyB1/Nby/2yGtZbm65IPOcngWUYrCgXQMuxrc/AR3pFIQ6eV5w==
 
-"@hoprnet/hopr-core-ethereum@0.4.1-xdai":
-  version "0.4.1-xdai"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-ethereum/-/hopr-core-ethereum-0.4.1-xdai.tgz#28035e0c46d883e6736e665e4a839d4401296940"
-  integrity sha512-R8jL6eJ7Kbvu+xgrdPhHh3bzlkTQE/x5k24H3+T2MO1XChVdwbHP3t19+s3JBs5xx/8bO3zBtIK/zqjhXn9nvw==
-  dependencies:
-    "@hoprnet/hopr-utils" "^0.4.0"
-    bn.js "^5.1.2"
-    chalk "^4.1.0"
-    debug "^4.1.1"
-    heap-js "^2.1.1"
-    keccak "^3.0.0"
-    secp256k1 "^4.0.2"
-    web3 "^1.2.11"
-    web3-core "^1.2.11"
-    web3-core-helpers "^1.2.11"
-    web3-core-subscriptions "^1.2.11"
-    web3-eth "^1.2.11"
-    web3-eth-contract "^1.2.11"
-
-"@hoprnet/hopr-core-ethereum@0.4.2-xdai":
-  version "0.4.2-xdai"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-ethereum/-/hopr-core-ethereum-0.4.2-xdai.tgz#13c53249631c8bc5ed208b63e32ec08066fcf914"
-  integrity sha512-mjBRxxyqEIt/+y1nc/DbtvrBBYo8sRwof7n+KuDtgfLOI1/XnNx1Jb9rc3TseZKlh+Y7gj7XddQ+zdcpuBhpyg==
-  dependencies:
-    "@hoprnet/hopr-utils" "^0.4.0"
-    bn.js "^5.1.2"
-    chalk "^4.1.0"
-    debug "^4.1.1"
-    heap-js "^2.1.1"
-    keccak "^3.0.0"
-    secp256k1 "^4.0.2"
-    web3 "^1.2.11"
-    web3-core "^1.2.11"
-    web3-core-helpers "^1.2.11"
-    web3-core-subscriptions "^1.2.11"
-    web3-eth "^1.2.11"
-    web3-eth-contract "^1.2.11"
-
 "@hoprnet/hopr-core-ethereum@0.4.4-xdai":
   version "0.4.4-xdai"
   resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-ethereum/-/hopr-core-ethereum-0.4.4-xdai.tgz#3f8ec0e49af52b4601bb4f936c652a9cfcbf0058"
@@ -1343,78 +1305,6 @@
     web3-core-subscriptions "^1.2.11"
     web3-eth "^1.2.11"
     web3-eth-contract "^1.2.11"
-
-"@hoprnet/hopr-core@0.6.29-xdai":
-  version "0.6.29-xdai"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core/-/hopr-core-0.6.29-xdai.tgz#23971263744a760a66dc70831343d5244486cb39"
-  integrity sha512-NJl+yJbC21XrWEKeyYwRXKEvSZjz9aLxzLasbJ+IWadAJuec9C2oNSoi3XQqrK8brFxH8T/ASo3eIiWOE4UWZQ==
-  dependencies:
-    "@hoprnet/hopr-core-ethereum" "0.4.1-xdai"
-    "@hoprnet/hopr-demo-seeds" "1.8.0"
-    "@hoprnet/hopr-utils" "^0.4.0"
-    abort-controller "^3.0.0"
-    bl "^4.0.2"
-    chalk "~4.1.0"
-    debug "^4.1.1"
-    futoin-hkdf "~1.3.2"
-    heap-js "^2.1.1"
-    it-handshake "^1.0.1"
-    it-pipe "^1.1.0"
-    it-pushable "^1.4.0"
-    leveldown "~5.6.0"
-    levelup "~4.4.0"
-    libp2p "~0.27.8"
-    libp2p-crypto "~0.17.6"
-    libp2p-kad-dht "~0.18.7"
-    libp2p-mplex "~0.9.5"
-    libp2p-secio "^0.12.5"
-    multiaddr "^7.4.3"
-    multihashes "~0.4.19"
-    p-defer "^3.0.0"
-    peer-id "~0.13"
-    peer-info "~0.17.5"
-    read "~1.0.7"
-    rlp "~2.2.6"
-    secp256k1 "~4.0.1"
-    simple-peer "~9.7.2"
-    webrtc-stun "^3.0.0"
-    wrtc "0.4.6"
-
-"@hoprnet/hopr-core@0.6.30-xdai":
-  version "0.6.30-xdai"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core/-/hopr-core-0.6.30-xdai.tgz#ea39a504755544fe1cfa2d9b7a2b62ed777e1d65"
-  integrity sha512-VlWYrDOgs0QtUp69s3Wk6z2G+eQVDZckMsrxOm6Cf+sZDQnryGCNU+83D8W3HMU00VayiGgkxOsCCcTG2guO0Q==
-  dependencies:
-    "@hoprnet/hopr-core-ethereum" "0.4.2-xdai"
-    "@hoprnet/hopr-demo-seeds" "1.8.0"
-    "@hoprnet/hopr-utils" "^0.4.0"
-    abort-controller "^3.0.0"
-    bl "^4.0.2"
-    chalk "~4.1.0"
-    debug "^4.1.1"
-    futoin-hkdf "~1.3.2"
-    heap-js "^2.1.1"
-    it-handshake "^1.0.1"
-    it-pipe "^1.1.0"
-    it-pushable "^1.4.0"
-    leveldown "~5.6.0"
-    levelup "~4.4.0"
-    libp2p "~0.27.8"
-    libp2p-crypto "~0.17.6"
-    libp2p-kad-dht "~0.18.7"
-    libp2p-mplex "~0.9.5"
-    libp2p-secio "^0.12.5"
-    multiaddr "^7.4.3"
-    multihashes "~0.4.19"
-    p-defer "^3.0.0"
-    peer-id "~0.13"
-    peer-info "~0.17.5"
-    read "~1.0.7"
-    rlp "~2.2.6"
-    secp256k1 "~4.0.1"
-    simple-peer "~9.7.2"
-    webrtc-stun "^3.0.0"
-    wrtc "0.4.6"
 
 "@hoprnet/hopr-core@0.6.32-xdai":
   version "0.6.32-xdai"
@@ -1466,13 +1356,13 @@
   dependencies:
     google-protobuf "^3.12.2"
 
-"@hoprnet/hopr-server@^0.2.4-xdai":
-  version "0.2.4-xdai"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-server/-/hopr-server-0.2.4-xdai.tgz#31ddac7903dfe52d2b988c3cc42914a81ed3b4c3"
-  integrity sha512-q1dcEtBENkg545hkYyZ8p3o3KtWusYQnPDRymL34RbQUI0fsmfa9w2LkBtXPvqHu+kU33DnBX15HwVjsVDaTGA==
+"@hoprnet/hopr-server@^0.2.5-xdai":
+  version "0.2.5-xdai"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-server/-/hopr-server-0.2.5-xdai.tgz#2d4b57686650571d10f5ac99e40b004e638f7523"
+  integrity sha512-vun/5qROj3psn8ue8j9rLkE/yYIJQPd5fSn65FLbQ8JCSEs/iiluNPRDfQgh8ZE9M18HVxGXfIFcgcgXmUzjtw==
   dependencies:
     "@grpc/proto-loader" "^0.5.4"
-    "@hoprnet/hopr-core" "0.6.30-xdai"
+    "@hoprnet/hopr-core" "0.6.32-xdai"
     "@hoprnet/hopr-core-connector-interface" "1.7.1"
     "@hoprnet/hopr-protos" "^0.1.0"
     "@hoprnet/hopr-utils" "0.4.0"
