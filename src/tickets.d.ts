@@ -1,18 +1,18 @@
-import type { SignedTicket, Hash } from './types'
+import type { Public, AcknowledgedTicket } from './types'
 
 declare interface Tickets {
   /**
-   * Stores signed ticket using channelId & challange.
-   * @param channelId channel ID hash
-   * @param signedTicket the signed ticket to store
+   * Retrieves all tickets.
+   * @returns a map of acknowledged tickets keyed by the tickets' database key
    */
-  get(channelId: Hash): Promise<Map<string, SignedTicket>>
+  getAll(): Promise<Map<string, AcknowledgedTicket>>
+
   /**
-   * Get stored tickets.
-   * @param channelId channel ID hash
-   * @returns a promise that resolves to a Map of signed tickets keyed by the challange hex value.
+   * Retrieves all tickets created for counterParty.
+   * @param counterPartyPubKey counterParty's public key
+   * @returns a map of acknowledged tickets keyed by the tickets' challange
    */
-  store(channelId: Hash, signedTicket: SignedTicket): Promise<void>
+  get(counterPartyPubKey: Public): Promise<Map<string, AcknowledgedTicket>>
 }
 
 export default Tickets

@@ -18,8 +18,6 @@ async function main() {
   coreConnector.start()
 
   coreConnector.indexer?.has((undefined as unknown) as Public, (undefined as unknown) as Public)
-  coreConnector.tickets.get(new Uint8Array())
-  coreConnector.tickets.store(new Uint8Array(), (undefined as unknown) as SignedTicket)
 
   coreConnector.indexer?.has((undefined as unknown) as Public, (undefined as unknown) as Public)
 
