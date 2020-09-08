@@ -55,4 +55,4 @@ export function AcknowledgedTicket(counterPartyPubKey: Public, challenge: Hash):
  * @param arr a AcknowledgedTicket db-key
  * @param props additional arguments
  */
-export function AcknowledgedTicket(arr: Uint8Array): [Public, Hash]
+export function AcknowledgedTicketParse(arr: Uint8Array): [Public, Hash]
