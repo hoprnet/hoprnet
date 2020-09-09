@@ -158,6 +158,7 @@ async function main() {
   }
 
   try {
+    throw new Error('test')
     node = await Hopr.create(options);
     logs.log('Created HOPR Node')
 
@@ -180,9 +181,9 @@ async function main() {
       adminServer.registerNode(node)
     }
   } catch (e){
-    logs.log("Node failed to start:")
-    logs.log(e)
     console.log(e)
+    logs.log("Node failed to start:")
+    logs.logFatalError('' + e)
   }
 }
 

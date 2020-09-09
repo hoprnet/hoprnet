@@ -36,6 +36,12 @@ export class LogStream {
     this.log(message)
   }
 
+  logFatalError(message: string) {
+    this.log(message)
+    const msg = {type:'fatal-error', msg: message, ts: new Date().toISOString()}
+    this._log(msg)
+  }
+
   warn(message: string) {
     this.log('WARN', message)
   }
