@@ -10,6 +10,7 @@ services:
     restart: always
     volumes:
       - 'data:/data'
+      - 'db:/app/db'
     ports:
       - '3000:3000'
       - '53:53'
