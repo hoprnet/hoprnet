@@ -1,90 +1,95 @@
 import BigNumber from 'bignumber.js'
-import { keccak256, MAX_UINT256, encode, createChallenge, signMessage, getChannelId, getParties } from './random'
+import { keccak256, MAX_UINT256, createChallenge, signMessage, getChannelId } from './random'
 
 BigNumber.config({ EXPONENTIAL_AT: 1e9 })
-
-type ITicket = (args: {
-  web3: any
-  accountA: string
-  accountB: string
-  porSecret: string // needs to be bytes32
-  signerPrivKey: string
-  counterPartySecret: string // needs to be bytes32
-  amount: string
-  counter: number
-  winProbPercent: string // max 100
-}) => {
-  accountA: string // return same as provided
-  accountB: string // return same as provided
-  porSecret: string // return same as provided
-  counterPartySecret: string // return same as provided
-  amount: string // return same as provided
-  counter: number // return same as provided
-  channelId: string // return channel ID
-  challenge: string // return hashed alternative
-  hashedCounterPartySecret: string // return hashed alternative
-  winProb: string // return winProb in bytes32
-  encodedTicket: string // return hashed alternative
-  signature: string // signature of encodedTicket
-  r: string
-  s: string
-  v: string
-}
 
 /*
   prepares ticket payload
 */
-const Ticket: ITicket = ({
+const Ticket = ({
   web3,
-  accountA,
-  accountB,
+  sender,
+  receiver,
   porSecret,
   signerPrivKey,
-  counterPartySecret,
   amount,
   counter,
   winProbPercent,
-}) => {
+  counterPartySecret,
+}: {
+  web3: any
+  sender: string
+  receiver: string
+  porSecret: string // needs to be bytes32
+  signerPrivKey: string
+  amount: string
+  counter: number
+  winProbPercent: string // max 100
+  counterPartySecret?: string // needs to be bytes32
+}): {
+  channelId: string // return channel ID
+  challenge: string // return hashed alternative
+  winProb: string // return winProb in bytes32
+  encodedTicket: string // return hashed alternative
+  signature: string // signature of encodedTicket
+  porSecret: string // same as input
+  amount: string // same as input
+  hashedCounterPartySecret?: string // return hashed alternative
+  counterPartySecret?: string // same as input
+  r: string
+  s: string
+  v: string
+} => {
   // proof of relay related hashes
   const challenge = createChallenge(porSecret)
 
   // proof of randomness related hashes
-  const hashedCounterPartySecret = keccak256({
-    type: 'bytes27',
-    value: counterPartySecret,
-  }).slice(0, 56)
+  let hashedCounterPartySecret: string
+  if (counterPartySecret != null) {
+    hashedCounterPartySecret = keccak256({
+      type: 'bytes27',
+      value: counterPartySecret,
+    }).slice(0, 56)
+  }
 
   // calculate win probability in bytes32
   const winProb = web3.utils.numberToHex(
     new BigNumber(winProbPercent).multipliedBy(MAX_UINT256).dividedBy(100).toString()
   )
 
-  const { partyA, partyB } = getParties(accountA, accountB)
-  const channelId = getChannelId(partyA, partyB)
+  const channelId = getChannelId(sender, receiver)
 
-  const encodedTicket = encode([
-    { type: 'bytes32', value: channelId },
-    { type: 'bytes32', value: challenge },
-    { type: 'uint32', value: counter },
-    { type: 'uint256', value: amount },
-    { type: 'bytes32', value: winProb },
-  ])
+  const raw: [string, string, number][] = [
+    [receiver, 'bytes', 20],
+    [challenge, 'bytes', 32],
+    [counter, 'number', 3],
+    [amount, 'number', 12],
+    [winProb, 'bytes', 32],
+  ]
+
+  const encodedTicket = raw
+    .reduce((acc, entry) => {
+      switch (entry[1]) {
+        case 'bytes':
+          return acc + (entry[0] as string).replace(/0x/, '').padStart(entry[2] * 2, '0')
+        case 'number':
+          return acc + new BigNumber(entry[0]).toString(16).padStart(entry[2] * 2, '0')
+      }
+    }, '0x')
+    .toLowerCase()
 
   const { signature, r, s, v } = signMessage(web3, encodedTicket, signerPrivKey)
 
   return {
-    accountA,
-    accountB,
-    porSecret,
-    counterPartySecret,
-    amount,
-    counter,
     channelId,
     challenge,
-    hashedCounterPartySecret,
     winProb,
     encodedTicket,
     signature,
+    porSecret,
+    amount,
+    counterPartySecret,
+    hashedCounterPartySecret,
     r,
     s,
     v,

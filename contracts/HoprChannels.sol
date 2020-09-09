@@ -57,6 +57,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     // store channels' state e.g: channels[hash(party_a, party_b)]
     mapping(bytes32 => Channel) public channels;
 
+    mapping(bytes32 => bool) public redeemedTickets;
+
     constructor(IERC20 _token, uint256 _secsClosure) public {
         token = _token;
 
@@ -236,22 +238,23 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      */
     function redeemTicket(
         bytes32 preImage,
-        bytes32 channelId,
         bytes32 hashedSecretASecretB,
         uint256 amount,
         bytes32 winProb,
         bytes32 r,
         bytes32 s,
         uint8 v
-    ) public returns (bytes memory) {
+    ) external {
         Account storage recipientAccount = accounts[msg.sender];
 
         bytes32 challenge = keccak256(abi.encodePacked(hashedSecretASecretB));
 
         bytes32 hashedTicket = ECDSA.toEthSignedMessageHash(
-            "160",
-            abi.encodePacked(channelId, challenge, uint256(recipientAccount.counter), amount, winProb)
+            "99",
+            abi.encodePacked(msg.sender, challenge, uint24(recipientAccount.counter), uint96(amount), winProb)
         );
+
+        require(!redeemedTickets[hashedTicket], "Ticket must not be used twice");
 
         bytes32 luck = keccak256(abi.encode(hashedTicket, preImage, hashedSecretASecretB));
 
@@ -278,6 +281,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         );
 
         recipientAccount.hashedSecret = bytes27(preImage);
+
+        redeemedTickets[hashedTicket] = true;
 
         if (msg.sender == partyA) {
             require(channel.partyABalance + amount < (1 << 96), "HoprChannels: Invalid amount");

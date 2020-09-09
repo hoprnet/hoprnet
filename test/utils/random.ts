@@ -47,14 +47,27 @@ export const getParties = (accountA: string, accountB: string) => {
 }
 
 export const getChannelId = (partyA: string, partyB: string) => {
+  if (isPartyA(partyA, partyB)) {
+    return keccak256(
+      {
+        type: 'address',
+        value: partyA,
+      },
+      {
+        type: 'address',
+        value: partyB,
+      }
+    )
+  }
+
   return keccak256(
     {
       type: 'address',
-      value: partyA,
+      value: partyB,
     },
     {
       type: 'address',
-      value: partyB,
+      value: partyA,
     }
   )
 }
