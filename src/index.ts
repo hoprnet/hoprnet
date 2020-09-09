@@ -13,7 +13,7 @@ import { addPubKey } from '@hoprnet/hopr-core/lib/utils'
 import { getBootstrapAddresses } from "@hoprnet/hopr-utils"
 import { commands } from '@hoprnet/hopr-chat'
 import {LogStream, Socket} from './logs'
-import { setupAdminServer, periodicCrawl } from './admin'
+import { AdminServer } from './admin'
 import chalk from 'chalk'
 import * as yargs from 'yargs';
 import { startServer } from '@hoprnet/hopr-server'
@@ -132,7 +132,7 @@ async function generateNodeOptions(logs: LogStream): Promise<HoprOptions> {
   };
 
 
-  logs.log(JSON.stringify(options))
+  //logs.log(JSON.stringify(options))
   return options
 }
 
@@ -141,7 +141,14 @@ async function main() {
   let node: Hopr<HoprCoreConnector>;
   let addr: Multiaddr;
   let logs = new LogStream()
+  let adminServer = undefined
 
+  if (argv.admin) {
+    // We need to setup the admin server before the HOPR node
+    // as if the HOPR node fails, we need to put an error message up.
+    adminServer = new AdminServer(logs);
+    await adminServer.setup()
+  }
 
   logs.log('Creating HOPR Node')
   let options = await generateNodeOptions(logs)
@@ -163,13 +170,14 @@ async function main() {
     return;
   });
 
-  if (argv.admin) {
-    setupAdminServer(logs, node);
-  }
 
   if (argv.grpc) {
     // Start HOPR server
     startServer(node, {logger: logs})
+  }
+
+  if (adminServer) {
+    adminServer.registerNode(node)
   }
 }
 main();
