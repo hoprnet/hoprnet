@@ -6,8 +6,7 @@
 
 import HoprCoreConnector from '.'
 import type { LevelUp } from 'levelup'
-import type { Balance, Hash, Public } from './types'
-import { StoredTicket } from './tickets/storedTicket'
+import type { Balance, Hash, Public, AcknowledgedTicket } from './types'
 
 async function main() {
   const coreConnector = await HoprCoreConnector.create((undefined as unknown) as LevelUp, (undefined as unknown) as Uint8Array)
@@ -16,15 +15,16 @@ async function main() {
 
   coreConnector.types.AccountId.SIZE
 
-  coreConnector.start()
+  await coreConnector.start()
 
-  coreConnector.indexer?.has((undefined as unknown) as Public, (undefined as unknown) as Public)
-  coreConnector.tickets.get((undefined as unknown) as Public)
-  coreConnector.tickets.store((undefined as unknown) as Public, (undefined as unknown) as StoredTicket)
+  await coreConnector.indexer?.has((undefined as unknown) as Public, (undefined as unknown) as Public)
+  await coreConnector.tickets.get((undefined as unknown) as Public)
+  await coreConnector.tickets.getAll()
+  await coreConnector.tickets.store((undefined as unknown) as Public, (undefined as unknown) as AcknowledgedTicket)
 
-  coreConnector.indexer?.has((undefined as unknown) as Public, (undefined as unknown) as Public)
+  await coreConnector.indexer?.has((undefined as unknown) as Public, (undefined as unknown) as Public)
 
-  coreConnector.utils.hash(new Uint8Array(123).fill(0x00))
+  await coreConnector.utils.hash(new Uint8Array(123).fill(0x00))
 
   const channel = await coreConnector.channel.create(new Uint8Array(), () => Promise.resolve((undefined as unknown) as Public))
 
