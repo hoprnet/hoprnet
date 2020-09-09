@@ -1,8 +1,9 @@
-import type { Public, AcknowledgedTicket } from './types'
+import type { Public } from '../types'
+import type AcknowledgedTicket from './acknowledgedTicket'
 
 declare interface TicketsStatic {
   /**
-   * Get all ackmowledged tickets from of the payment channel with
+   * Get all ackmowledged tickets of the payment channel with
    * counterparty.
    * @param counterparty
    */
@@ -12,14 +13,14 @@ declare interface TicketsStatic {
    * Retrieves all tickets.
    * @returns a map of acknowledged tickets keyed by the tickets' database key
    */
-  getAll(): Promise<Map<string, AcknowledgedTicket>>
+  getAll(): Promise<AcknowledgedTicket[]>
 
   /**
    * Retrieves all tickets created for counterParty.
    * @param counterPartyPubKey counterParty's public key
    * @returns a map of acknowledged tickets keyed by the tickets' challange
    */
-  store(counterparty: Public, signedTicket: AcknowledgedTicket): Promise<void>
+  store(counterparty: Public, ticket: AcknowledgedTicket): Promise<void>
 }
 
 declare var Tickets: TicketsStatic

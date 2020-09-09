@@ -1,4 +1,4 @@
-import type { AccountId, Hash, Public } from './types'
+import type { AccountId, Hash } from './types'
 
 /**
  * Returns the db-key under which the channel is saved.
@@ -44,15 +44,3 @@ export function Nonce(channelId: Hash, nonce: Hash): Uint8Array
  * Returns the db-key under which the on-chain secret is saved.
  */
 export function OnChainSecret(): Uint8Array
-
-/**
- * Returns the db-key under which the tickets are saved in the database.
- */
-export function AcknowledgedTicket(counterPartyPubKey: Public, challenge: Hash): Uint8Array
-
-/**
- * Reconstructs counterPartyPubKey and the specified challenge from a AcknowledgedTicket db-key.
- * @param arr a AcknowledgedTicket db-key
- * @param props additional arguments
- */
-export function AcknowledgedTicketParse(arr: Uint8Array): [Public, Hash]
