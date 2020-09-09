@@ -29,3 +29,6 @@ scTopics
 
 # Exclude secrets
 .env
+
+# Exclude built npm packages
+*.tgz
