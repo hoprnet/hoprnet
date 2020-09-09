@@ -3,10 +3,11 @@ apps:
       name: "dev"
       instances: 1
       args: "--admin --grpc"
+      env:
+        HOPR_BOOTSTRAP_ADDRESS: _dnsaddr.bootstrap.xdai.testnet.hoprnet.org
     - script: ./envoy/envoy.sh
       name: "proxy"
       instances: 1
       env:
         SERVICE_ADDRESS: 0.0.0.0
-        HOPR_BOOTSTRAP_ADDRESS: _dnsaddr.bootstrap.xdai.testnet.hoprnet.org
 
