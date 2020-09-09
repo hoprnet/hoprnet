@@ -5,6 +5,9 @@ import dns from 'dns'
 
 type ServerMap = Map<string, PeerInfo>
 
+
+const BOOTSTRAP_ADDRESS = process.env.HOPR_BOOTSTRAP_ADDRESS || '_dnsaddr.bootstrap.testnet.hoprnet.org'
+
 /** Load Bootstrap node addresses.
 *   - If a string of comma separated multiaddrs is passed, use this first
 *   - If there are ENV Variables, use them second
@@ -21,7 +24,7 @@ export async function getBootstrapAddresses(addrs?: string): Promise<ServerMap> 
     addresses = process.env.HOPR_BOOTSTRAP_SERVERS.split(',')
   }  else {
     // Fall back to DNS
-    let records = await dns.promises.resolveTxt('_dnsaddr.bootstrap.testnet.hoprnet.org')
+    let records = await dns.promises.resolveTxt(BOOTSTRAP_ADDRESS)
     addresses = records.map(r => r[0].replace('dnsaddr=', ''))
   }
 
