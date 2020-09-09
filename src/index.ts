@@ -158,7 +158,6 @@ async function main() {
   }
 
   try {
-    throw new Error('test')
     node = await Hopr.create(options);
     logs.log('Created HOPR Node')
 
