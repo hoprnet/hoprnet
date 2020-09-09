@@ -8,4 +8,5 @@ apps:
       instances: 1
       env:
         SERVICE_ADDRESS: 0.0.0.0
-        BOOTSTRAP_SERVERS: /ip4/34.65.158.118/tcp/9091/p2p/16Uiu2HAmNqLm83bwMq9KQEZEWHcbsHQfBkbpZx4eVSoDG4Mp6yfX
+        HOPR_BOOTSTRAP_ADDRESS: _dnsaddr.bootstrap.xdai.testnet.hoprnet.org
+
