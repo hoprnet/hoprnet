@@ -12,8 +12,8 @@
     "!*.spec.js.map"
   ],
   "engines": {
-    "node": ">=12.9.1",
-    "yarn": ">=1.19.2"
+    "node": "12",
+    "yarn": "1"
   },
   "scripts": {
     "test": "echo '✅ No tests needed'",

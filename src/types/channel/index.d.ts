@@ -1,6 +1,7 @@
-import ChannelBalance from './channelBalance'
-import Moment from './moment'
-import Signature from './signature'
+import { Moment, Hash, Signature } from '..'
+
+import ChannelBalance from './balance'
+import ChannelState from './state'
 
 declare interface ChannelStatic {
   createFunded(channelBalance: ChannelBalance): Channel
@@ -8,6 +9,8 @@ declare interface ChannelStatic {
   createActive(channelBalance: ChannelBalance): Channel
 
   createPending(pending: Moment, balance: ChannelBalance): Channel
+
+  SIZE: number
 }
 
 declare interface Channel {
@@ -21,8 +24,21 @@ declare interface Channel {
       offset: number
     }
   ): Promise<Signature>
+
+  balance: ChannelBalance
+
+  pending?: Moment
+
+  isFunded: boolean
+  isActive: boolean
+  isPending: boolean
+
+  rawState: ChannelState
+
+  // computed properties
+  hash: Promise<Hash>
 }
 
 declare var Channel: ChannelStatic
 
-export default Channel
+export { Channel, ChannelBalance, ChannelState }

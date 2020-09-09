@@ -44,8 +44,3 @@ export function Nonce(channelId: Hash, nonce: Hash): Uint8Array
  * Returns the db-key under which the on-chain secret is saved.
  */
 export function OnChainSecret(): Uint8Array
-
-/**
- * Returns the db-key under which the tickets are saved in the database.
- */
-export function Ticket(channelId: Hash, challenge: Hash): Uint8Array
