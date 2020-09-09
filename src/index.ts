@@ -157,27 +157,32 @@ async function main() {
     process.exit(0)
   }
 
-  node = await Hopr.create(options);
-  logs.log('Created HOPR Node')
+  try {
+    node = await Hopr.create(options);
+    logs.log('Created HOPR Node')
 
-  node.on("peer:connect", (peer: PeerInfo) => {
-    logs.log(`Incoming connection from ${peer.id.toB58String()}.`);
-  });
+    node.on("peer:connect", (peer: PeerInfo) => {
+      logs.log(`Incoming connection from ${peer.id.toB58String()}.`);
+    });
 
-  process.once("exit", async () => {
-    await node.down();
-    logs.log('Process exiting')
-    return;
-  });
+    process.once("exit", async () => {
+      await node.down();
+      logs.log('Process exiting')
+      return;
+    });
 
+    if (argv.grpc) {
+      // Start HOPR server
+      startServer(node, {logger: logs})
+    }
 
-  if (argv.grpc) {
-    // Start HOPR server
-    startServer(node, {logger: logs})
-  }
-
-  if (adminServer) {
-    adminServer.registerNode(node)
+    if (adminServer) {
+      adminServer.registerNode(node)
+    }
+  } catch (e){
+    logs.log("Node failed to start:")
+    logs.log(e)
+    console.log(e)
   }
 }
 main();
