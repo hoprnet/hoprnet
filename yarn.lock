@@ -1261,10 +1261,10 @@
     lodash.camelcase "^4.3.0"
     protobufjs "^6.8.6"
 
-"@hoprnet/hopr-chat@1.5.4-xdai.0":
-  version "1.5.4-xdai.0"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-chat/-/hopr-chat-1.5.4-xdai.0.tgz#492541a442c668f68a04ca4670e6d3077a874a6d"
-  integrity sha512-c7rGRQ9FaRajDNQyYaKxxby706PuQTnIVoNfNBF2ulMWy7aVm7pLoPxnT/Y6SWW/G8kGxZLdxpWhtDgi4nWgGg==
+"@hoprnet/hopr-chat@1.12.3-xdai.0":
+  version "1.12.3-xdai.0"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-chat/-/hopr-chat-1.12.3-xdai.0.tgz#2040212e0f63bce557c42c781f753bfa4dbde41b"
+  integrity sha512-uYUWEFco5TTvx/k3EZYNbU6MxgCYfMNOJWrxZtc8MuOkoVr73kC3xPpeEv12rTy5yKiwkHOsewhIhk1JY5s77Q==
   dependencies:
     "@hoprnet/hopr-core" "0.6.32-xdai"
     "@hoprnet/hopr-core-connector-interface" "1.7.1"
@@ -1398,6 +1398,18 @@
   version "0.5.2"
   resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-0.5.2.tgz#711885c1ae1d10b8b5ded68b7152101e2e3022de"
   integrity sha512-wcGbDvVNa21MwZwU2dWlukNS3J2E42tj4JNkD93qaqScgqTfpZHyVdxr6HwjSRuWcJqT4OI5Mke3MmEx6gs1lA==
+  dependencies:
+    bignumber.js "^9.0.0"
+    chalk "^4.1.0"
+    libp2p-crypto "^0.17.9"
+    peer-info "^0.17.5"
+    strip-ansi "^6.0.0"
+    typestub-multihashes "^0.0.4"
+
+"@hoprnet/hopr-utils@0.6.0":
+  version "0.6.0"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-0.6.0.tgz#ef004febd57638583531845413f77319ca345bdd"
+  integrity sha512-eiwdsbIsF63D/eJhG9ddFXihFVaBQz9R8lWhrPpcqNGK1d+v9PSKXJyTKZhp7J/ubH4LClG/un7z+avuzIbYtQ==
   dependencies:
     bignumber.js "^9.0.0"
     chalk "^4.1.0"
