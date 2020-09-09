@@ -7,7 +7,9 @@ services:
     image: 'hopr.avado.dnp.dappnode.eth:0.6.0'
     restart: always
     volumes:
-      - 'db:/app/db'
+      - type: volume
+        source: db
+        target: /app/db
     ports:
       - '3000:3000'
       - '53:53'
