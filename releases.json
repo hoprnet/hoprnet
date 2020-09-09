@@ -185,5 +185,12 @@
     "uploadedTo": {
       "http://23.254.227.151:5001": "Wed, 09 Sep 2020 14:23:59 GMT"
     }
+  },
+  "0.11.0": {
+    "hash": "/ipfs/QmatcFo9VZMeiVsyTQexfZShiatrWAApeoZcZnUvytb8G7",
+    "type": "manifest",
+    "uploadedTo": {
+      "http://23.254.227.151:5001": "Wed, 09 Sep 2020 15:06:57 GMT"
+    }
   }
 }
