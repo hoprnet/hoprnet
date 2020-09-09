@@ -13,7 +13,7 @@ import { addPubKey } from '@hoprnet/hopr-core/lib/utils'
 import { getBootstrapAddresses } from "@hoprnet/hopr-utils"
 import { commands } from '@hoprnet/hopr-chat'
 import {LogStream, Socket} from './logs'
-import { setupAdminServer, periodicCrawl } from './admin'
+import { AdminServer } from './admin'
 import chalk from 'chalk'
 import * as yargs from 'yargs';
 import { startServer } from '@hoprnet/hopr-server'
@@ -77,6 +77,11 @@ const argv = (
     describe: 'A password to encrypt your keys',
     default: ''
   })
+  .option('dryRun', {
+    boolean: true,
+    describe: 'List all the options used to run the HOPR node, but quit instead of starting',
+    default: false
+  })
   .wrap(Math.min(120, yargs.terminalWidth()))
   .argv
 )
@@ -101,10 +106,8 @@ function parseHosts(): HoprOptions['hosts'] {
 }
 
 
-async function main() {
-  let node: Hopr<HoprCoreConnector>;
-  let addr: Multiaddr;
-  let logs = new LogStream()
+
+async function generateNodeOptions(logs: LogStream): Promise<HoprOptions> {
 
   function logMessageToNode(msg: Uint8Array){
     logs.log("#### NODE RECEIVED MESSAGE ####")
@@ -128,9 +131,31 @@ async function main() {
     password: argv.password || 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' // TODO!!!
   };
 
+
+  //logs.log(JSON.stringify(options))
+  return options
+}
+
+
+async function main() {
+  let node: Hopr<HoprCoreConnector>;
+  let addr: Multiaddr;
+  let logs = new LogStream()
+  let adminServer = undefined
+
+  if (argv.admin) {
+    // We need to setup the admin server before the HOPR node
+    // as if the HOPR node fails, we need to put an error message up.
+    adminServer = new AdminServer(logs);
+    await adminServer.setup()
+  }
+
   logs.log('Creating HOPR Node')
-  logs.log('- network : ' + argv.network);
-  logs.log('- bootstrapServers : ' + Array.from(options.bootstrapServers || []).map(x => x.id.toB58String()).join(','));
+  let options = await generateNodeOptions(logs)
+  if (argv.dryRun) {
+    console.log(JSON.stringify(options, undefined, 2))
+    process.exit(0)
+  }
 
   node = await Hopr.create(options);
   logs.log('Created HOPR Node')
@@ -145,13 +170,14 @@ async function main() {
     return;
   });
 
-  if (argv.admin) {
-    setupAdminServer(logs, node);
-  }
 
   if (argv.grpc) {
     // Start HOPR server
     startServer(node, {logger: logs})
+  }
+
+  if (adminServer) {
+    adminServer.registerNode(node)
   }
 }
 

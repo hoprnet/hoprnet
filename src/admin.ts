@@ -11,66 +11,76 @@ import path from 'path'
 import debug from 'debug'
 import { parse } from 'url'
 import next from 'next'
+import type {Server} from 'http'
 
 
 let debugLog = debug('hoprd:admin')
 
-export async function setupAdminServer(logs: LogStream, node: Hopr<HoprCoreConnector>){
-  let cmds = new commands.Commands(node)
+export class AdminServer {
+  private app: any
+  private server: Server | undefined
+  private node: Hopr<HoprCoreConnector> | undefined
+  private port: number
+  private wsServer: any
+  private cmds: any
 
-  const app = next({ 
-    dev: true,
-    dir: path.resolve('./hopr-admin/'), 
-    conf: {
-      devIndicators: {
-        autoPrerender: false
-      }
-    }})
-  const handle = app.getRequestHandler()
-  await app.prepare()
+  constructor(private logs: LogStream){
+    this.port = process.env.HOPR_ADMIN_PORT ? parseInt(process.env.HOPR_ADMIN_PORT) : 3000
+  }
 
-  const server = http.createServer((req, res) => {
-    const parsedUrl = parse(req.url || '', true)
-    handle(req, res, parsedUrl)
-  })
-
-/*
-  var app = express()
-  app.get('/', function(req, res){
-    res.set('Content-Type', 'text/html')
-    res.send(fs.readFileSync(path.resolve('./src/admin.html')))
-  })
-
-  const server = http.createServer(app);
-*/
-
-  const wsServer = new ws.Server({ server: server });
-  wsServer.on('connection', socket => {
-    socket.on('message', message => {
-      debugLog("Message from client", message)
-      logs.logFullLine(`admin > ${message}`)
-      cmds.execute(message.toString()).then( (resp) => {
-        if (resp) {
-          logs.logFullLine(resp)
+  async setup(){
+    this.app = next({ 
+      dev: true,
+      dir: path.resolve('./hopr-admin/'), 
+      conf: {
+        devIndicators: {
+          autoPrerender: false
         }
+      }})
+      const handle = this.app.getRequestHandler()
+      await this.app.prepare()
+
+      this.server = http.createServer((req, res) => {
+        const parsedUrl = parse(req.url || '', true)
+        handle(req, res, parsedUrl)
       })
-      // TODO
+
+      this.wsServer = new ws.Server({ server: this.server });
+
+      this.wsServer.on('connection', (socket: any) => {
+        socket.on('message', (message: string) => {
+          debugLog("Message from client", message)
+          this.logs.logFullLine(`admin > ${message}`)
+          if (this.cmds) {
+            this.cmds.execute(message.toString()).then( (resp:any) => {
+              if (resp) {
+                this.logs.logFullLine(resp)
+              }
+            })
+          }
+          // TODO
+        });
+      socket.on('error', (err: string) => {
+        debugLog('Error', err)
+        this.logs.log('Websocket error', err.toString())
+      })
+      this.logs.subscribe(socket)
     });
-    socket.on('error', err => {
-      debugLog('Error', err)
-      logs.log('Websocket error', err.toString())
-    })
-    logs.subscribe(socket)
-  });
 
-  const port = process.env.HOPR_ADMIN_PORT || 3000
-  server.listen(port)
-  logs.log('Admin server listening on port '+ port)
+    this.server.listen(this.port)
+    this.logs.log('Admin server listening on port '+ this.port)
 
-  // Setup some noise
-  connectionReport(node, logs)
-  periodicCrawl(node, logs)
-  reportMemoryUsage(logs)
+
+  }
+
+  registerNode(node: Hopr<HoprCoreConnector>){
+    this.node = node
+    this.cmds = new commands.Commands(node)
+    // Setup some noise
+    connectionReport(this.node, this.logs)
+    periodicCrawl(this.node, this.logs)
+    reportMemoryUsage(this.logs)
+  }
 }
 
 const CRAWL_TIMEOUT = 100_000 // ~15 mins
