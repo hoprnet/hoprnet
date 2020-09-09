@@ -77,6 +77,11 @@ const argv = (
     describe: 'A password to encrypt your keys',
     default: ''
   })
+  .option('dryRun', {
+    boolean: true,
+    describe: 'List all the options used to run the HOPR node, but quit instead of starting',
+    default: false
+  })
   .wrap(Math.min(120, yargs.terminalWidth()))
   .argv
 )
@@ -101,10 +106,8 @@ function parseHosts(): HoprOptions['hosts'] {
 }
 
 
-async function main() {
-  let node: Hopr<HoprCoreConnector>;
-  let addr: Multiaddr;
-  let logs = new LogStream()
+
+async function generateNodeOptions(logs: LogStream): Promise<HoprOptions> {
 
   function logMessageToNode(msg: Uint8Array){
     logs.log("#### NODE RECEIVED MESSAGE ####")
@@ -128,9 +131,24 @@ async function main() {
     password: argv.password || 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' // TODO!!!
   };
 
+
+  logs.log(JSON.stringify(options))
+  return options
+}
+
+
+async function main() {
+  let node: Hopr<HoprCoreConnector>;
+  let addr: Multiaddr;
+  let logs = new LogStream()
+
+
   logs.log('Creating HOPR Node')
-  logs.log('- network : ' + argv.network);
-  logs.log('- bootstrapServers : ' + Array.from(options.bootstrapServers || []).map(x => x.id.toB58String()).join(','));
+  let options = await generateNodeOptions(logs)
+  if (argv.dryRun) {
+    console.log(JSON.stringify(options, undefined, 2))
+    process.exit(0)
+  }
 
   node = await Hopr.create(options);
   logs.log('Created HOPR Node')
