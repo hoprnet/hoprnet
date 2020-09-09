@@ -359,7 +359,7 @@ export class Coverbot implements Bot {
       this.relayTimeouts.delete(relayerAddress)
 
       // 4.
-      await sendXHOPR(await this._getEthereumAddressFromHOPRAddress(relayerAddress), 1000000000)
+      await sendXHOPR(await this._getEthereumAddressFromHOPRAddress(relayerAddress), 10000000000)
       this._sendMessageFromBot(relayerAddress, NodeStateResponses[NodeStates.verifiedNode])
 
       // 1.
