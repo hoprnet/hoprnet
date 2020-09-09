@@ -28,6 +28,7 @@ jobs:
             exit 1;
           fi
       - name: Abort if already released
+        if: github.event_name == 'schedule'
         run: |
           CHANGES=$(git log --since='1 hour ago')
           CIREGEX='CI:'
