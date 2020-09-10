@@ -275,7 +275,7 @@ export class Coverbot implements Bot {
           * 4.1.1 Internally log that this is the case.
           * 4.1.2 Let the node that we couldn't get our response back in time.
           * 4.1.3 Remove from timeout so they can try again somehow.
-          * 4.1.4 Remove from our verified node and write to the stats.json
+          * NB: DELETED BY PB AFTER CHAT 10/9 [4.1.4 Remove from our verified node and write to the stats.json]
           */
 
           // 4.1.1
@@ -286,14 +286,15 @@ export class Coverbot implements Bot {
 
           // 4.1.3
           this.relayTimeouts.delete(_hoprNodeAddress)
-          this.verifiedHoprNodes.delete(_hoprNodeAddress)
 
           // 4.1.4
-          this.dumpData()
+          //this.verifiedHoprNodes.delete(_hoprNodeAddress)
+          //this.dumpData()
         }, RELAY_VERIFICATION_CYCLE_IN_MS))
       }
     } catch (err) {
       console.log('Err:', err);
+
       // Something failed. We better remove node and update.
       this.verifiedHoprNodes.delete(hoprNode.id)
       this.dumpData()
