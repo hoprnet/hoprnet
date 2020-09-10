@@ -5,6 +5,7 @@ apps:
       args: "--admin --grpc"
       env:
         HOPR_BOOTSTRAP_ADDRESS: _dnsaddr.bootstrap.xdai.testnet.hoprnet.org
+        ETHEREUM_PROVIDER: wss://xdai.poanetwork.dev/wss
     - script: ./envoy/envoy.sh
       name: "proxy"
       instances: 1
