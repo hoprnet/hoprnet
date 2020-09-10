@@ -258,7 +258,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
 
         bytes32 luck = keccak256(abi.encode(hashedTicket, preImage, hashedSecretASecretB));
 
-        require(uint256(luck) < uint256(winProb), "HoprChannels: ticket must be a win");
+        require(uint256(luck) <= uint256(winProb), "HoprChannels: ticket must be a win");
 
         (address partyA, , Channel storage channel, ChannelStatus status) = getChannel(
             msg.sender,
