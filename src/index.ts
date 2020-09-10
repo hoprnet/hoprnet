@@ -69,6 +69,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
   public output: (arr: Uint8Array) => void
   public isBootstrapNode: boolean
   public bootstrapServers: PeerInfo[]
+  public initializedWithOptions: HoprOptions
 
   // @TODO add libp2p types
   declare emit: (event: string, ...args: any[]) => void
@@ -132,6 +133,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
       },
     })
 
+    this.initializedWithOptions = options
     this.output = options.output || console.log
     this.bootstrapServers = options.bootstrapServers || []
     this.isBootstrapNode = options.bootstrapNode || false
