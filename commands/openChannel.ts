@@ -28,18 +28,16 @@ export default class OpenChannel extends AbstractCommand {
    * with another party.
    * @param query peerId string to send message to
    */
-  async execute(query?: string): Promise<void> {
+  async execute(query?: string): Promise<string | void> {
     if (query == null || query == '') {
-      console.log(chalk.red(`Invalid arguments. Expected 'open <peerId>'. Received '${query}'`))
-      return
+      return (chalk.red(`Invalid arguments. Expected 'open <peerId>'. Received '${query}'`))
     }
 
     let counterparty: PeerId
     try {
       counterparty = await checkPeerIdInput(query)
     } catch (err) {
-      console.log(err.message)
-      return
+      return err.message
     }
 
     const channelId = await this.node.paymentChannels.utils.getId(
@@ -108,9 +106,9 @@ export default class OpenChannel extends AbstractCommand {
           this.node.interactions.payments.open.interact(counterparty, balance)
       )
 
-      console.log(`${chalk.green(`Successfully opened channel`)} ${chalk.yellow(u8aToHex(channelId))}`)
+      return `${chalk.green(`Successfully opened channel`)} ${chalk.yellow(u8aToHex(channelId))}`
     } catch (err) {
-      console.log(chalk.red(err.message))
+      return chalk.red(err.message)
     }
 
     unsubscribe()
