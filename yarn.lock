@@ -1261,10 +1261,10 @@
     lodash.camelcase "^4.3.0"
     protobufjs "^6.8.6"
 
-"@hoprnet/hopr-chat@1.12.4-xdai.0":
-  version "1.12.4-xdai.0"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-chat/-/hopr-chat-1.12.4-xdai.0.tgz#e961fa38db13b66f8adc3289202ce485c7944faf"
-  integrity sha512-918yBj7DU2goU2UMZiMq5R3ll98//fzKed8rX5XfarG7g8x3UB2zrMrpd1TsTJdv1a0prKv8srolppWtEfG4Hw==
+"@hoprnet/hopr-chat@1.12.5-xdai.0":
+  version "1.12.5-xdai.0"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-chat/-/hopr-chat-1.12.5-xdai.0.tgz#19c09d639ba343c59520c18b4e2283f13006ee3b"
+  integrity sha512-16lgvfxrm3SNQkz5xXHYmLAs550r9NlkQ4nk2dW8cfxK24/QOICyPUVEhE3ZE5lWcRw4JVdCD4JS5G7mmITMZg==
   dependencies:
     "@hoprnet/hopr-core" "0.6.32-xdai"
     "@hoprnet/hopr-core-connector-interface" "1.7.1"
