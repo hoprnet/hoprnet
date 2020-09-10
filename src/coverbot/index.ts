@@ -383,9 +383,13 @@ export class Coverbot implements Bot {
       return;
     }
 
-    const [tweet, nodeState] = message.text.match(/https:\/\/twitter.com.*?$/i) ?
-      await this._verifyTweet(message) :
-      [undefined, NodeStates.newUnverifiedNode];
+
+    let tweet, nodeState
+    if (message.text.match(/https:\/\/twitter.com.*?$/i)){
+      [tweet, nodeState] = await this._verifyTweet(message)
+    } else {
+      [tweet, nodeState] = [undefined, NodeStates.newUnverifiedNode];
+    }
 
     switch(nodeState) {
       case NodeStates.newUnverifiedNode:
