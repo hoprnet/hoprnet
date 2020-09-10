@@ -1,6 +1,8 @@
 import Head from 'next/head'
 import styles from '../styles/Home.module.css'
 import Logo from '../components/logo'
+import CopyIcon from '../components/icons/copy'
+import TwitterIcon from '../components/icons/twitter'
 import { useRef, useState } from 'react'
 import useSWR from 'swr'
 
@@ -8,31 +10,6 @@ import useSWR from 'swr'
 function BSLink({id, children}){
   return (<a target="_blank" href={'https://blockscout.com/poa/xdai/address/' + id + '/transactions'}>
     { children }</a>)
-}
-
-function TwitterIcon(){
-  return (
-  <svg 
-    width={20} viewBox="328 355 335 276" xmlns="http://www.w3.org/2000/svg">
-    <path d="
-      M 630, 425
-      A 195, 195 0 0 1 331, 600
-      A 142, 142 0 0 0 428, 570
-      A  70,  70 0 0 1 370, 523
-      A  70,  70 0 0 0 401, 521
-      A  70,  70 0 0 1 344, 455
-      A  70,  70 0 0 0 372, 460
-      A  70,  70 0 0 1 354, 370
-      A 195, 195 0 0 0 495, 442
-      A  67,  67 0 0 1 611, 380
-      A 117, 117 0 0 0 654, 363
-      A  65,  65 0 0 1 623, 401
-      A 117, 117 0 0 0 662, 390
-      A  65,  65 0 0 1 630, 425
-      Z"
-      style={{fill:"#3BA9EE"}}/>
-  </svg>
-  )
 }
 
 function ConnectedNode({id, address, tweetUrl}){
@@ -68,6 +45,7 @@ function HomeContent({
     <>
       <Head>
         <title>HOPR Incentivized Testnet on xDAI</title>
+        <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
       </Head>
 
       <header className={styles.header}>
@@ -101,12 +79,18 @@ function HomeContent({
           <h2>Instructions</h2>
           <ol>
             <li>Download <a href="https://github.com/hoprnet/hopr-chat/releases">HOPR Node Säntis</a> and run it.</li>
-            <li>Send <strong>{ parseFloat(env ? env.COVERBOT_XDAI_THRESHOLD : 0) + 0.001 } xDAI</strong> to your node</li>
-            <li><a href="https://twitter.com">Tweet</a> your HOPR node address with the tag <strong>#HOPRNetwork</strong> and <strong>@hoprnet</strong></li>
-            <li>Send a message with your tweet to the Cover Node address:
+            <li>Send <strong>{ Math.max(parseFloat(env ? env.COVERBOT_XDAI_THRESHOLD : 0), 0.01) } xDAI</strong> to your node</li>
+            <li>In <strong>hopr-chat</strong> enable recipient by using <strong>includeRecipient</strong> command</li>
+            <li>
+              <>
+                Tweet your HOPR node address with the tag <strong>#HOPRNetwork</strong> and <strong>@hoprnet</strong>{" "}
+                <a href="https://twitter.com/intent/tweet?ref_src=twsrc%5Etfw" className="twitter-hashtag-button" data-text="Signing up to earn $HOPR on the #HOPRnetwork. My @hoprnet address is: " data-related="hoprnet" data-show-count="false">Tweet #hoprnetwork</a>
+              </>
+            </li>
+            <li>Send a message with your tweet to the Cover Node address using the <strong>send</strong> command:
               <br />
               <strong onClick={addressOnClick} className={styles.address}>
-                { address }
+                { address } <CopyIcon />
               </strong>
             </li>
             <li>Wait for the Cover bot to send you a message</li>
