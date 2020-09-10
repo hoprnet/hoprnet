@@ -22,6 +22,7 @@ import Settings from './settings'
 import Withdraw from './withdraw'
 import readline from 'readline'
 import { Alias } from './alias'
+import { Info } from './info'
 
 export class Commands {
   readonly commands: AbstractCommand[]
@@ -37,6 +38,7 @@ export class Commands {
     this.commands = [
       new CloseChannel(node),
       new Crawl(node),
+      new Info(node),
       new ListCommands(() => this.commands),
       new ListConnectors(),
       new ListConnectedPeers(node),
