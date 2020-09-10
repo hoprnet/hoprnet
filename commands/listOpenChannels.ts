@@ -19,7 +19,7 @@ export default class ListOpenChannels extends AbstractCommand {
   /**
    * Lists all channels that we have with other nodes. Triggered from the CLI.
    */
-  async execute(): Promise<void> {
+  async execute(): Promise<string | void> {
     let str = `${chalk.yellow('ChannelId:'.padEnd(66, ' '))} - ${chalk.blue('PeerId:')}\n`
 
     try {
@@ -47,11 +47,9 @@ export default class ListOpenChannels extends AbstractCommand {
           return
         }
       )
-      console.log(str)
-      return
+      return str
     } catch (err) {
-      console.log(chalk.red(err.message))
-      return
+      return chalk.red(err.message)
     }
   }
 }
