@@ -88,8 +88,6 @@ const NodeStateResponses = {
     In short, our bot will open a payment channel to your node.
 
     Please keep your balance, tweet and node running.
-    Only doing so, you can relay packets and get tickets.
-    Don't forget to redeem them every once in a while!
 
     For more information, go to https://saentis.hoprnet.org
 
