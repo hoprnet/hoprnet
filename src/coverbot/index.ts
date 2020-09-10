@@ -125,6 +125,10 @@ const NodeStateResponses = {
   `
 }
 
+const VERIFY_MESSAGE = `\n
+Thanks, let me take a look at that...
+`
+
 export class Coverbot implements Bot {
   botName: string
   address: string
@@ -386,9 +390,10 @@ export class Coverbot implements Bot {
 
     let tweet, nodeState
     if (message.text.match(/https:\/\/twitter.com.*?$/i)){
-      [tweet, nodeState] = await this._verifyTweet(message)
+      this._sendMessageFromBot(message.from, VERIFY_MESSAGE)
+      ;[tweet, nodeState] = await this._verifyTweet(message)
     } else {
-      [tweet, nodeState] = [undefined, NodeStates.newUnverifiedNode];
+      ;[tweet, nodeState] = [undefined, NodeStates.newUnverifiedNode];
     }
 
     switch(nodeState) {
