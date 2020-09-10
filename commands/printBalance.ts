@@ -34,9 +34,10 @@ export default class PrintBalance extends AbstractCommand {
     })
 
     return (
+      // TODO: Revert this
       [
-        `Account Balance: ${chalk.magenta(balance)} ${Balance.SYMBOL}`,
-        `Account Native Balance: ${chalk.magenta(nativeBalance)} ${NativeBalance.SYMBOL}`,
+        `Account Balance: ${chalk.magenta(balance)} xHOPR`, // ${Balance.SYMBOL}`,
+        `Account Native Balance: ${chalk.magenta(nativeBalance)} xDAI`, // ${NativeBalance.SYMBOL}`,
       ].join('\n')
     )
   }
