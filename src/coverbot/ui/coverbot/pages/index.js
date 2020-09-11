@@ -6,6 +6,7 @@ import TwitterIcon from '../components/icons/twitter'
 import { useState, useEffect } from 'react'
 import useSWR from 'swr'
 import db from '../utils/db'
+import { HOPR_ENVIRONMENT } from '../utils/env'
 
 function BSLink({ id, children }) {
   return (
@@ -58,7 +59,7 @@ function HomeContent({
   const [score, setScore] = useState([])
 
   useEffect(() => {
-    db.ref('/develop/score')
+    db.ref(`/${HOPR_ENVIRONMENT}/score`)
       .orderByValue()
       .on('value', (snapshot) => {
         const result = snapshot.val()
