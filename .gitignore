@@ -51,3 +51,6 @@ db
 
 # Stats for coverbot
 stats.json
+
+# service accounts
+service-account.json

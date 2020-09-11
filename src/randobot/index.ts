@@ -3,7 +3,6 @@ import { Bot } from '../bot'
 import { IMessage } from '../message'
 import { generateRandomSentence } from '../utils'
 
-
 export class Randombot implements Bot {
   botName: string
   address: string
