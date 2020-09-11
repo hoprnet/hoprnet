@@ -63,7 +63,7 @@ function HomeContent({
       .on('value', (snapshot) => {
         const result = snapshot.val()
         setScore(
-          Object.entries(result).map(([address, score]) => ({
+          Object.entries(result || {}).map(([address, score]) => ({
             address,
             score,
           })),
