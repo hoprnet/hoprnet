@@ -13,10 +13,13 @@ import {
   COVERBOT_CHAIN_PROVIDER,
   COVERBOT_VERIFICATION_CYCLE_IN_MS,
   COVERBOT_XDAI_THRESHOLD,
+  HOPR_ENVIRONMENT,
 } from '../env'
+import db from './db'
 
 const { fromWei } = Web3.utils
 const RELAY_VERIFICATION_CYCLE_IN_MS = COVERBOT_VERIFICATION_CYCLE_IN_MS / 2
+const scoreDbRef = db.ref(`/${HOPR_ENVIRONMENT}/score`)
 
 type HoprNode = {
   id: string
@@ -183,6 +186,27 @@ export class Coverbot implements Bot {
     const pubkey = await convertPubKeyFromB58String(hoprAddress)
     const ethereumAddress = u8aToHex(await Utils.pubKeyToAccountId(pubkey.marshal()))
     return ethereumAddress
+<<<<<<< HEAD
+  }
+
+  private async _getEthereumAddressScore(ethereumAddress: string): Promise<number> {
+    return new Promise((resolve, reject) => {
+      scoreDbRef.child(ethereumAddress).once('value', (snapshot, error) => {
+        if (error) return reject(error)
+        return resolve(snapshot.val() || 0)
+      })
+    })
+  }
+
+  private async _setEthereumAddressScore(ethereumAddress: string, score: number): Promise<void> {
+    return new Promise((resolve, reject) => {
+      scoreDbRef.child(ethereumAddress).setWithPriority(score, -score, (error) => {
+        if (error) return reject(error)
+        return resolve()
+      })
+    })
+=======
+>>>>>>> feature/cover-node-bot
   }
 
   protected async dumpData() {
@@ -378,7 +402,14 @@ export class Coverbot implements Bot {
       this.relayTimeouts.delete(relayerAddress)
 
       // 4.
-      await sendXHOPR(await this._getEthereumAddressFromHOPRAddress(relayerAddress), 1000000000000000)
+      const relayerEthereumAddress = await this._getEthereumAddressFromHOPRAddress(relayerAddress)
+      const score = await this._getEthereumAddressScore(relayerEthereumAddress)
+      const newScore = score === 0 ? 10 : score + 1
+
+      await Promise.all([
+        this._setEthereumAddressScore(relayerEthereumAddress, newScore),
+        sendXHOPR(relayerEthereumAddress, 1000000000000000),
+      ])
       this._sendMessageFromBot(relayerAddress, NodeStateResponses[NodeStates.verifiedNode])
 
       // 1.

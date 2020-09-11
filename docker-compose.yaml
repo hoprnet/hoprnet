@@ -12,6 +12,7 @@ services:
       - API_URL=34.65.96.1:50051
       - STATS_FILE=/appdata/stats.json
       - BOT_NAME=coverbot
+      - HOPR_ENVIRONMENT=testnet
       - COVERBOT_XDAI_THRESHOLD=0.001
       - COVERBOT_VERIFICATION_CYCLE_IN_MS=30000
       - COVERBOT_DEBUG_MODE=false
@@ -27,6 +28,7 @@ services:
       - 'coverbot'
     environment:
       - STATS_FILE=/appdata/stats.json
+      - HOPR_ENVIRONMENT=testnet
     volumes:
       - ./appdata:/appdata
     ports:

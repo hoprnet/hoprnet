@@ -3,8 +3,9 @@ import styles from '../styles/Home.module.css'
 import Logo from '../components/logo'
 import CopyIcon from '../components/icons/copy'
 import TwitterIcon from '../components/icons/twitter'
-import { useRef, useState } from 'react'
+import { useState, useEffect } from 'react'
 import useSWR from 'swr'
+import db from '../utils/db'
 
 function BSLink({ id, children }) {
   return (
@@ -27,6 +28,14 @@ function ConnectedNode({ id, address, tweetUrl }) {
   )
 }
 
+function ScoredNode({ address, score }) {
+  return (
+    <div className={styles.connode}>
+      <strong>{address}</strong>-{score}
+    </div>
+  )
+}
+
 function HomeContent({
   address,
   available,
@@ -45,6 +54,22 @@ function HomeContent({
     document.execCommand('copy')
     document.body.removeChild(addressClicker)
   }
+
+  const [score, setScore] = useState([])
+
+  useEffect(() => {
+    db.ref('/develop/score')
+      .orderByValue()
+      .on('value', (snapshot) => {
+        const result = snapshot.val()
+        setScore(
+          Object.entries(result).map(([address, score]) => ({
+            address,
+            score,
+          })),
+        )
+      })
+  }, [])
 
   return (
     <>
@@ -121,6 +146,16 @@ function HomeContent({
             <li>Wait for the Cover bot to send you a message</li>
             <li>You have received xHOPR tokens!</li>
           </ol>
+        </section>
+
+        <section>
+          <h2>Leaderboard</h2>
+          {score.length == 0 && (
+            <p className={styles.conerr}>
+              <em>No nodes scored...</em>
+            </p>
+          )}
+          {score.length > 0 && score.map((n) => <ScoredNode {...n} />)}
         </section>
 
         <section>
