@@ -1,5 +1,6 @@
 {
   "name": "@hoprnet/hopr-utils",
+  "homepage": "https://hoprnet.org",
   "description": "HOPR-based utilities to process multiple data structures",
   "version": "0.6.0",
   "repository": "git@github.com:hoprnet/hopr-utils.git",
@@ -15,7 +16,7 @@
   },
   "files": [
     "lib/",
-    "!lib/*.spec**",
+    "!lib/**/*.spec.*",
     "README.md",
     "package.json",
     "yarn.lock"
@@ -33,7 +34,7 @@
     "typestub-multihashes": "^0.0.4"
   },
   "devDependencies": {
-    "@types/mocha": "^7.0.2",
+    "@types/mocha": "^8.0.3",
     "@types/node": "^12.12.8",
     "husky": "^4.2.5",
     "lint-staged": ">=10",

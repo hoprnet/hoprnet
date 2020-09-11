@@ -21,3 +21,6 @@ src/fs/filesystem_test
 
 # Exclude vim swap files
 .*
+
+# Exclude built npm packages
+*.tgz
