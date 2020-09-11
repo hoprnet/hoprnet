@@ -1,5 +1,3 @@
-import chalk from 'chalk'
-
 export interface NetOptions {
   ip: string
   port: number
@@ -17,7 +15,7 @@ export function parseHosts(): Hosts {
     const str = process.env['HOST_IPV4'].replace(/\/\/.+/, '').trim()
     const params = str.match(/([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})\:([0-9]{1,6})/)
     if (params == null || params.length != 3) {
-      throw Error(`Invalid IPv4 host. Got ${chalk.yellow(str)}`)
+      throw Error(`Invalid IPv4 host. Got <${str}>`)
     }
 
     hosts.ip4 = {
@@ -43,7 +41,7 @@ export function parseHosts(): Hosts {
       /\[([0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}|[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:\:[0-9a-fA-F]{1,4}|[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:\:[0-9a-fA-F]{1,4}|[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:\:[0-9a-fA-F]{1,4}|[0-9a-fA-F]{1,4}\:\:[0-9a-fA-F]{1,4}|\:\:[0-9a-fA-F]{1,4}|\:\:)\]\:([0-9]{1,6})/
     )
     if (params == null || params.length != 3) {
-      throw Error(`Invalid IPv6 host. Got ${chalk.yellow(str)}`)
+      throw Error(`Invalid IPv6 host. Got <${str}>`)
     }
 
     hosts.ip6 = {
