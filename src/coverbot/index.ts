@@ -186,6 +186,7 @@ export class Coverbot implements Bot {
     const pubkey = await convertPubKeyFromB58String(hoprAddress)
     const ethereumAddress = u8aToHex(await Utils.pubKeyToAccountId(pubkey.marshal()))
     return ethereumAddress
+<<<<<<< HEAD
   }
 
   private async _getEthereumAddressScore(ethereumAddress: string): Promise<number> {
@@ -204,6 +205,8 @@ export class Coverbot implements Bot {
         return resolve()
       })
     })
+=======
+>>>>>>> feature/cover-node-bot
   }
 
   protected async dumpData() {
