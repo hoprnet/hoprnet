@@ -91,20 +91,23 @@ function HomeContent({
           <div>
             <strong className="green">{parseFloat(available).toFixed(4)}</strong> xHOPR Available
           </div>
-          <div>
+          {/* <div>
             <strong className="blue">{locked}</strong> xHOPR Locked
-          </div>
+          </div> */}
         </div>
       </header>
 
       <section className={styles.intro}>
-          <p>Welcome to HOPR Säntis testnet! Follow the instructions below to start earning points. 
-            There are HOPR token prizes for the 20 highest scorers, along with 10 random prizes. 
-            The testnet will run until 14th September</p>
-          <p>Click <a href="https://docs.hoprnet.org/home/getting-started/saentis-testnet">here</a> for
-            more information about the testnet and HOPR. Join our <a href="https://discord.gg/wUSYqpD">Discord</a> for support and feedback.</p>
+        <p>
+          Welcome to HOPR Säntis testnet! Follow the instructions below to start earning points. There are HOPR token
+          prizes for the 20 highest scorers, along with 10 random prizes. The testnet will run until 14th September
+        </p>
+        <p>
+          Click <a href="https://docs.hoprnet.org/home/getting-started/saentis-testnet">here</a> for more information
+          about the testnet and HOPR. Join our <a href="https://discord.gg/wUSYqpD">Discord</a> for support and
+          feedback.
+        </p>
       </section>
-      
 
       <main className={styles.main}>
         <section className={styles.instructions}>
@@ -115,7 +118,10 @@ function HomeContent({
             </li>
             <li>
               Send <strong>{Math.max(parseFloat(env ? env.COVERBOT_XDAI_THRESHOLD : 0), 0.01)} xDAI</strong> to your
-              node
+              node, you can get xDAI from ETH on xdai.io or ping us on{' '}
+              <a href="t.me/hoprnet" target="_blank" rel="noreferrer">
+                Telegram
+              </a>
             </li>
             <li>
               In <strong>hopr-chat</strong> enable recipient by using <strong>includeRecipient</strong> command
@@ -157,7 +163,6 @@ function HomeContent({
             {score.length > 0 && score.map((n) => <ScoredNode {...n} />)}
           </div>
 
-
           <div>
             <h2>Connected HOPR nodes</h2>
             {connected.length == 0 && (
@@ -185,7 +190,6 @@ function HomeContent({
             </BSLink>
           </div>
         </div>
-
         Thanks for helping us create the <a href="https://hoprnet.org/">HOPR</a> network.
         <br />
         <br />
