@@ -460,13 +460,12 @@
   dependencies:
     micro "^9.3.4"
 
-"@hoprnet/hopr-utils@0.5.2":
-  version "0.5.2"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-0.5.2.tgz#711885c1ae1d10b8b5ded68b7152101e2e3022de"
-  integrity sha512-wcGbDvVNa21MwZwU2dWlukNS3J2E42tj4JNkD93qaqScgqTfpZHyVdxr6HwjSRuWcJqT4OI5Mke3MmEx6gs1lA==
+"@hoprnet/hopr-utils@0.6.1":
+  version "0.6.1"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-0.6.1.tgz#4fc08cc39f88ef6566db154bf4e73010905c09b7"
+  integrity sha512-p9n3ILRRA62QCGyC3qfVdr3HB6yYNInD96DWNVcWI1KCGQsA8dVwiBiTzP3Q0TeiFhrZcQvynZMUhCDyH2C0yA==
   dependencies:
     bignumber.js "^9.0.0"
-    chalk "^4.1.0"
     libp2p-crypto "^0.17.9"
     peer-info "^0.17.5"
     strip-ansi "^6.0.0"
