@@ -16,7 +16,6 @@ import { Message, IMessage } from './message'
 import { API_URL } from './env'
 import * as words from './words'
 
-
 export const SetupClient = <T extends typeof grpc.Client>(Client: T): InstanceType<T> => {
   return (new Client(API_URL, grpc.credentials.createInsecure()) as unknown) as InstanceType<T>
 }
@@ -26,14 +25,14 @@ export const getRandomItemFromList = <T>(items: T[]): T => {
 }
 
 export const getHOPRNodeAddressFromContent = (content: string): string => {
-  return content.match(/16Uiu2HA.*?$/i) ?
-      (content => {
-          const [HOPRAddress_regexed] = content.match(/16Uiu2HA.*?$/i)
-          const HOPRAddress = HOPRAddress_regexed.substr(0, 53)
-          console.log('HoprAddress', HOPRAddress)
-          return HOPRAddress;
+  return content.match(/16Uiu2HA.*?$/i)
+    ? ((content) => {
+        const [HOPRAddress_regexed] = content.match(/16Uiu2HA.*?$/i)
+        const HOPRAddress = HOPRAddress_regexed.substr(0, 53)
+        console.log('HoprAddress', HOPRAddress)
+        return HOPRAddress
       })(content)
-      : ''
+    : ''
 }
 
 export const generateRandomSentence = (): string => {
@@ -65,7 +64,12 @@ export const getMessageStream = (): Promise<{
   })
 }
 
-export const sendMessage = (recepientAddress: string, message: IMessage, annonymous?: boolean, intermediatePeers?: Array<string>): Promise<void> => {
+export const sendMessage = (
+  recepientAddress: string,
+  message: IMessage,
+  annonymous?: boolean,
+  intermediatePeers?: Array<string>,
+): Promise<void> => {
   let client: SendClient
 
   return new Promise((resolve, reject) => {
@@ -175,4 +179,3 @@ export const getHoprAddress = (): Promise<string> => {
     }
   })
 }
-

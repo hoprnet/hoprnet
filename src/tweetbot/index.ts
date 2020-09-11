@@ -11,7 +11,7 @@ enum STATUS {
   NEW_PARTICIPANT = 0,
   INTRODUCED = 1,
   RULES_GIVEN = 2,
-  BOUNTY_COMPLETED = 3
+  BOUNTY_COMPLETED = 3,
 }
 
 enum MESSAGES {
@@ -24,9 +24,8 @@ enum MESSAGES {
   NO_HOPR_ADDRESS_MISMATCH = 'Sorry! You can only send your tweet from a node you control. Nice try tho!',
   ALREADY_WINNER = 'You already won! Please don’t forget to fill in the form https://forms.gle/YZrrrBeT8r9qG78K6 to claim your reward',
   SUCCESS = `Congratulations! And thanks for supporting HOPR! Please fill our form https://forms.gle/YZrrrBeT8r9qG78K6 to get your reward.`,
-  FAILURE = 'Hmm... something went wrong. Make sure you send me the full URL, including https.'
+  FAILURE = 'Hmm... something went wrong. Make sure you send me the full URL, including https.',
 }
-
 
 export class Tweetbot implements Bot {
   botName: string
@@ -44,12 +43,12 @@ export class Tweetbot implements Bot {
 
   async handleMessage(message: IMessage) {
     console.log(`${this.botName} <- ${message.from}: ${message.text}`)
-    let response;
+    let response
     /*
-    * We do a few checks on the messages received by the user.
-    * First time (i.e. STATUS.NEW_PARTICIPANT)
-    * 
-    */
+     * We do a few checks on the messages received by the user.
+     * First time (i.e. STATUS.NEW_PARTICIPANT)
+     *
+     */
     if (!directory[message.from] || directory[message.from] === STATUS.NEW_PARTICIPANT) {
       directory[message.from] = STATUS.INTRODUCED
       response = MESSAGES.INTRO
@@ -63,33 +62,41 @@ export class Tweetbot implements Bot {
       console.log(`${this.botName} <- ${message.from}: Obtained tweet with ID ${tweet.id}`)
       console.log(`${this.botName} <- ${message.from}: Obtained tweet with Text ${tweet.content}`)
       console.log(`${this.botName} <- ${message.from}: Obtained tweet with Hashtags ${JSON.stringify(tweet.hashtags)}`)
-      console.log(`${this.botName} <- ${message.from}: Obtained tweet with User Mentions ${JSON.stringify(tweet.user_mentions)}`)
+      console.log(
+        `${this.botName} <- ${message.from}: Obtained tweet with User Mentions ${JSON.stringify(tweet.user_mentions)}`,
+      )
 
       if (tweet.hasTag('hoprgames')) {
-        if(tweet.hasMention('hoprnet')) {
-          if(tweet.content.match(/16Uiu2HA.*?$/i)) {
+        if (tweet.hasMention('hoprnet')) {
+          if (tweet.content.match(/16Uiu2HA.*?$/i)) {
             const [participantHOPRAddress_regexed] = tweet.content.match(/16Uiu2HA.*?$/i)
             const participantHOPRAddress = participantHOPRAddress_regexed.substr(0, 53)
-            if(participantHOPRAddress === message.from) {
-              if(winners.includes(message.from)) {
-                response = MESSAGES.ALREADY_WINNER;
+            if (participantHOPRAddress === message.from) {
+              if (winners.includes(message.from)) {
+                response = MESSAGES.ALREADY_WINNER
               } else {
-                winners.push(message.from);
+                winners.push(message.from)
                 response = MESSAGES
               }
             } else {
-              response = MESSAGES.NO_HOPR_ADDRESS_MISMATCH;
+              response = MESSAGES.NO_HOPR_ADDRESS_MISMATCH
             }
           } else {
             response = MESSAGES.NO_HOPR_ADDRESS
           }
           response = MESSAGES.SUCCESS
         } else {
-          console.log(`${this.botName} <- ${message.from}: No @hoprnet in Tweet ${tweet.id}: ${JSON.stringify(tweet.user_mentions)}`)
-          response = MESSAGES.NO_HOPR_ACCOUNT 
+          console.log(
+            `${this.botName} <- ${message.from}: No @hoprnet in Tweet ${tweet.id}: ${JSON.stringify(
+              tweet.user_mentions,
+            )}`,
+          )
+          response = MESSAGES.NO_HOPR_ACCOUNT
         }
       } else {
-        console.log(`${this.botName} <- ${message.from}: No #HOPRgames in Tweet ${tweet.id}: ${JSON.stringify(tweet.hashtags)}`)
+        console.log(
+          `${this.botName} <- ${message.from}: No #HOPRgames in Tweet ${tweet.id}: ${JSON.stringify(tweet.hashtags)}`,
+        )
         response = MESSAGES.NO_HOPR_HASHTAG
       }
     } else {
@@ -97,18 +104,16 @@ export class Tweetbot implements Bot {
     }
 
     /*
-    * Some administrative commands to make the interaction with
-    * our tweet bot a bit easier.
-    */
+     * Some administrative commands to make the interaction with
+     * our tweet bot a bit easier.
+     */
     if (message.text.match(/winners?$/i)) {
       response = `So far we’ve had ${winners.length} winners.`
     }
     if (message.text.match(/winners\ [0-9]?$/i)) {
-      const [input] = message.text.match(/winners\ [0-9]?$/i);
-      const [_, index] = input.split(' ');
-      response = ~~index > winners.length ?
-        `Winner #${index}: ${winners[~~index]}` :
-        'Sorry, that winner doesn’t exist'
+      const [input] = message.text.match(/winners\ [0-9]?$/i)
+      const [_, index] = input.split(' ')
+      response = ~~index > winners.length ? `Winner #${index}: ${winners[~~index]}` : 'Sorry, that winner doesn’t exist'
     }
 
     sendMessage(message.from, {
@@ -117,4 +122,3 @@ export class Tweetbot implements Bot {
     })
   }
 }
-

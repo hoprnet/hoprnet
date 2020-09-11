@@ -10,7 +10,7 @@
     "build": "tsc",
     "build:dev": "tsc -W",
     "dev": "ts-node src/index.ts",
-    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+    "format": "prettier --write \"src/**/*.(ts|js)\" \"test/**/*.ts\"",
     "start": "node dist/index.js",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",

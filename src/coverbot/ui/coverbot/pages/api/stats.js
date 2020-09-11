@@ -1,10 +1,10 @@
 import fs from 'fs'
 
-export function get(){
+export function get() {
   try {
-    let pth = process.env.STATS_FILE 
+    let pth = process.env.STATS_FILE
     let data = JSON.parse(fs.readFileSync(pth, 'utf8'))
-    return data 
+    return data
   } catch (e) {
     console.log(e)
     return {}
