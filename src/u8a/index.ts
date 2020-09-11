@@ -14,3 +14,4 @@ export * from './toHex'
 export * from './u8aToNumber'
 
 export * from './equals'
+export * from './u8aCompare'
