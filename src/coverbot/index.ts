@@ -20,6 +20,8 @@ import db from './db'
 const { fromWei } = Web3.utils
 const RELAY_VERIFICATION_CYCLE_IN_MS = COVERBOT_VERIFICATION_CYCLE_IN_MS / 2
 const scoreDbRef = db.ref(`/${HOPR_ENVIRONMENT}/score`)
+const stateDbRef = db.ref(`/${HOPR_ENVIRONMENT}/state`)
+
 
 type HoprNode = {
   id: string
@@ -136,6 +138,7 @@ const VERIFY_MESSAGE = `\n
 Thanks, let me take a look at that...
 `
 
+
 export class Coverbot implements Bot {
   botName: string
   address: string
@@ -152,6 +155,7 @@ export class Coverbot implements Bot {
   ethereumAddress: string
   chainId: number
   network: Networks
+  loadedDb: boolean
 
   constructor(address: string, timestamp: Date, twitterTimestamp: Date) {
     this.address = address
@@ -160,6 +164,7 @@ export class Coverbot implements Bot {
     this.tweets = new Map<string, TweetMessage>()
     this.twitterTimestamp = twitterTimestamp
     this.botName = '💰 Coverbot'
+    this.loadedDb = false;
     console.log(`${this.botName} has been added`)
 
     console.log(`⚡️ Network: ${COVERBOT_CHAIN_PROVIDER}`)
@@ -177,9 +182,7 @@ export class Coverbot implements Bot {
 
     this.verifiedHoprNodes = new Map<string, HoprNode>()
     this.relayTimeouts = new Map<string, NodeJS.Timeout>()
-
-    console.log('📦 Setting up “database”')
-    this.dumpData()
+    this.loadData()
   }
 
   private async _getEthereumAddressFromHOPRAddress(hoprAddress: string): Promise<string> {
@@ -187,6 +190,8 @@ export class Coverbot implements Bot {
     const ethereumAddress = u8aToHex(await Utils.pubKeyToAccountId(pubkey.marshal()))
     return ethereumAddress
   }
+
+
 
   private async _getEthereumAddressScore(ethereumAddress: string): Promise<number> {
     return new Promise((resolve, reject) => {
@@ -201,6 +206,29 @@ export class Coverbot implements Bot {
     return new Promise((resolve, reject) => {
       scoreDbRef.child(ethereumAddress).setWithPriority(score, -score, (error) => {
         if (error) return reject(error)
+        return resolve()
+      })
+    })
+  }
+
+
+  private async loadData(): Promise<void>{
+    return new Promise((resolve, reject) => {
+      stateDbRef.once('value', (snapshot, error) => {
+        if (error) return reject(error)
+        if (!snapshot.exists()) {
+          console.log("DB doesn't exist")
+          return resolve()
+        }
+        const state = snapshot.val()
+        console.log("Loading data", state)
+        if (!state.connected){
+          console.log("No connected")
+          return resolve()
+        }
+        this.verifiedHoprNodes = new Map<string, HoprNode>()
+        state.connected.forEach(n => this.verifiedHoprNodes.set(n.id, n))
+        this.loadedDb = true;
         return resolve()
       })
     })
@@ -234,8 +262,17 @@ export class Coverbot implements Bot {
       refreshed: new Date().toISOString(),
     }
 
+    // TODO kill this:
     let pth = process.env.STATS_FILE
     fs.writeFileSync(pth, JSON.stringify(state), 'utf8')
+
+    return new Promise((resolve, reject) => {
+      stateDbRef.set(state, (error) => {
+        if (error) return reject(error)
+        console.log("Saved data")
+        return resolve()
+      })
+    })
   }
 
   protected async _sendMessageOpeningChannels(recipient, message, intermediatePeers) {
@@ -251,9 +288,13 @@ export class Coverbot implements Bot {
   }
 
   protected async _verificationCycle() {
+    if (!this.loadedDb) {
+      await this.loadData()
+    }
+
     console.log(`${COVERBOT_VERIFICATION_CYCLE_IN_MS}ms has passed. Verifying nodes...`)
 
-    this.dumpData()
+    await this.dumpData()
 
     const _verifiedNodes = Array.from(this.verifiedHoprNodes.values())
     const randomIndex = Math.floor(Math.random() * _verifiedNodes.length)
@@ -276,7 +317,7 @@ export class Coverbot implements Bot {
       if (_hoprNodeAddress.length === 0) {
         // We got no HOPR Node here. Remove and update.
         this.verifiedHoprNodes.delete(hoprNode.id)
-        this.dumpData()
+        await this.dumpData()
       } else {
         this._sendMessageFromBot(_hoprNodeAddress, BotResponses[BotCommands.verify])
         /*
