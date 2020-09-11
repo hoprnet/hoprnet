@@ -7,28 +7,40 @@
 
 .title {
   max-width: 25rem;
-  flex-grow: 0;
   text-align: left;
   margin: 0 1rem;
   line-height: 1.15;
   font-size: 2rem;
 }
+.h1 {
+  display: flex;
+  align-items: center;
+}
 
 .stats {
-  font-size: 2rem;
-  flex-grow: 1;
   text-align: right;
-  margin-right: 5rem;
+  font-size: 2rem;
 }
 .stats h2 {
   margin: 0;
   font-size: 2rem;
 }
 
+
+.intro {
+  font-size: 1.4rem;
+  max-width: 50rem;
+  margin: 4rem auto;
+
+}
+
 .main {
   display: flex;
   justify-content: space-between;
   height: 100%;
+}
+.padBottom {
+  padding-bottom: 2rem;
 }
 
 .main section {

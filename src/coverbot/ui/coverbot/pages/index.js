@@ -80,34 +80,31 @@ function HomeContent({
       </Head>
 
       <header className={styles.header}>
-        <Logo />
-        <h1 className={styles.title}>HOPR Incentivized Testnet on xDAI</h1>
-
-        <div className={styles.stats}>
-          <div>
-            <BSLink id={hoprChannelContract}>
-              <strong>Channel:</strong>
-              {hoprChannelContract && hoprChannelContract.slice(0, 8)}...
-            </BSLink>
-          </div>
-          <div>
-            <BSLink id={hoprCoverbotAddress}>
-              <strong>Coverbot:</strong>
-              {hoprCoverbotAddress && hoprCoverbotAddress.slice(0, 8)}...
-            </BSLink>
-          </div>
+        <div className={styles.h1}>
+          <Logo />
+          <h1 className={styles.title}>
+            <a href="https://hoprnet.org">HOPR</a> Incentivized Testnet on xDAI
+          </h1>
         </div>
 
         <div className={styles.stats}>
-          <h2>Balance</h2>
           <div>
-            <strong className="green">{available}</strong> xHOPR Available
+            <strong className="green">{parseFloat(available).toFixed(4)}</strong> xHOPR Available
           </div>
           <div>
             <strong className="blue">{locked}</strong> xHOPR Locked
           </div>
         </div>
       </header>
+
+      <section className={styles.intro}>
+          <p>Welcome to HOPR Säntis testnet! Follow the instructions below to start earning points. 
+            There are HOPR token prizes for the 20 highest scorers, along with 10 random prizes. 
+            The testnet will run until 14th September</p>
+          <p>Click <a href="https://docs.hoprnet.org/home/getting-started/saentis-testnet">here</a> for
+            more information about the testnet and HOPR. Join our <a href="https://discord.gg/wUSYqpD">Discord</a> for support and feedback.</p>
+      </section>
+      
 
       <main className={styles.main}>
         <section className={styles.instructions}>
@@ -150,27 +147,45 @@ function HomeContent({
         </section>
 
         <section>
-          <h2>Leaderboard</h2>
-          {score.length == 0 && (
-            <p className={styles.conerr}>
-              <em>No nodes scored...</em>
-            </p>
-          )}
-          {score.length > 0 && score.map((n) => <ScoredNode {...n} />)}
-        </section>
+          <div className={styles.padBottom}>
+            <h2>Leaderboard</h2>
+            {score.length == 0 && (
+              <p className={styles.conerr}>
+                <em>No nodes scored...</em>
+              </p>
+            )}
+            {score.length > 0 && score.map((n) => <ScoredNode {...n} />)}
+          </div>
 
-        <section>
-          <h2>Connected HOPR nodes</h2>
-          {connected.length == 0 && (
-            <p className={styles.conerr}>
-              <em>No nodes connected...</em>
-            </p>
-          )}
-          {connected.length > 0 && connected.map((n) => <ConnectedNode {...n} />)}
+
+          <div>
+            <h2>Connected HOPR nodes</h2>
+            {connected.length == 0 && (
+              <p className={styles.conerr}>
+                <em>No nodes connected...</em>
+              </p>
+            )}
+            {connected.length > 0 && connected.map((n) => <ConnectedNode {...n} />)}
+          </div>
         </section>
       </main>
 
       <footer className={styles.footer}>
+        <div>
+          <div>
+            <BSLink id={hoprChannelContract}>
+              <strong>Channel:</strong>
+              {hoprChannelContract && hoprChannelContract.slice(0, 8)}...
+            </BSLink>
+          </div>
+          <div>
+            <BSLink id={hoprCoverbotAddress}>
+              <strong>Coverbot:</strong>
+              {hoprCoverbotAddress && hoprCoverbotAddress.slice(0, 8)}...
+            </BSLink>
+          </div>
+        </div>
+
         Thanks for helping us create the <a href="https://hoprnet.org/">HOPR</a> network.
         <br />
         <br />
