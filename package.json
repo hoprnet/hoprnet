@@ -27,7 +27,6 @@
   },
   "dependencies": {
     "bignumber.js": "^9.0.0",
-    "chalk": "^4.1.0",
     "libp2p-crypto": "^0.17.9",
     "peer-info": "^0.17.5",
     "strip-ansi": "^6.0.0",
