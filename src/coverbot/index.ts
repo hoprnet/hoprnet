@@ -51,14 +51,15 @@ enum BotCommands {
 
 const BotResponses = {
   [BotCommands.rules]: `\n
-    Welcome to the xHOPR incentivized network.
+    Welcome to the xHOPR incentivized network!
 
-    1. Post a tweet with your HOPR Address and the tag #HOPRNetwork
-    2. Load ${COVERBOT_XDAI_THRESHOLD} xDAI into your HOPR Ethereum Address
-    3. Send me the link to your tweet (don‘t delete it!)
-    4. Keep your tweet and node alive, and I'll slowly send xHOPR to you.
+    1. Load ${COVERBOT_XDAI_THRESHOLD} xDAI into your HOPR Ethereum Address
+    2. Post a tweet with your HOPR Address and the tag #HOPRNetwork
+    3. Send me the link to your tweet (don't delete it!)
+    4. Keep your tweet and node online, and I'll slowly send xHOPR to you.
+    5. Every time you're chosen to relay a message, you'll score a point!
     
-    For more information, go to https://saentis.hoprnet.org
+    For more information and to see the current scoreboard, visit https://saentis.hoprnet.org
   `,
   [BotCommands.status]: (status: NodeStates) => `\n
     Your current status is: ${status}
@@ -71,43 +72,44 @@ const BotResponses = {
 const NodeStateResponses = {
   [NodeStates.newUnverifiedNode]: BotResponses[BotCommands.rules],
   [NodeStates.tweetVerificationFailed]: (tweetStatus: TweetState) => `\n
-    Your tweet has failed the verification. Please make sure to follow the rules.
+    Your tweet has failed the verification. Please make sure you've included everything.
 
     Here is the current status of your tweet:
     1. Tagged @hoprnet: ${tweetStatus.hasMention}
     2. Used #HOPRNetwork: ${tweetStatus.hasTag}
-    3. Includes your node: ${tweetStatus.sameNode}
+    3. Includes this node address: ${tweetStatus.sameNode}
 
     Please try again with a different tweet.
   `,
   [NodeStates.tweetVerificationSucceeded]: `\n
-    Your tweet has succeeded verification. Please do no delete this tweet, as we will
+    Your tweet has passed verification. Please do no delete this tweet, as I'll
     use it multiple times to verify and connect to your node.
 
-    We’ll now proceed to check that your HOPR Ethereum address has at least ${COVERBOT_XDAI_THRESHOLD} xDAI.
+    I’ll now check that your HOPR Ethereum address has at least ${COVERBOT_XDAI_THRESHOLD} xDAI.
     If you need xDAI, you always swap DAI to xDAI using https://dai-bridge.poa.network/.
   `,
   [NodeStates.xdaiBalanceFailed]: (xDaiBalance: number) => `\n
     Your node does not have at least ${COVERBOT_XDAI_THRESHOLD} xDAI. Currently, your node has ${xDaiBalance} xDAI.
 
-    To participate in our incentivized network, please make sure to add the missing amount of xDAI.
+    To participate in our incentivized network, please send the missing amount of xDAI to your node.
   `,
   [NodeStates.xdaiBalanceSucceeded]: (xDaiBalance: number) => `\n
-    Your node has ${xDaiBalance} xDAI. You are ready to go!
-    In short, our bot will open a payment channel to your node.
+    Your node has ${xDaiBalance} xDAI. You're ready to go!
 
-    Please keep your balance, tweet and node running.
+    Soon I'll open a payment channel to your node.
+
+    Please keep your balance topped up, and your tweet and node online.
 
     For more information, go to https://saentis.hoprnet.org
 
     Thank you for participating in our incentivized network!
   `,
   [NodeStates.onlineNode]: `\n
-    Node Online! Relaying a message to verify your ability to
+    Node online! Relaying a message to verify your ability to
     send messages to other nodes in the network.
   `,
   [NodeStates.verifiedNode]: `\n
-    Verification Successful! I’ll shortly use you as a cover traffic node
+    Verification successful! I’ll shortly use you as a cover traffic node
     and pay you in xHOPR tokens for your service.
 
     For more information, go to https://saentis.hoprnet.org
@@ -115,22 +117,23 @@ const NodeStateResponses = {
     Thank you for participating in our incentivized network!
   `,
   [NodeStates.relayingNodeFailed]: `\n
-    Relaying failed. We can reach you, but you can’t reach us...
-    This could mean other errors though, so you always try again.
+    Relaying failed. I can reach you, but you can’t reach me...
+    
+    This could mean other errors though, so please keep trying.
 
     For more information, go to https://saentis.hoprnet.org
 
-    Drop by our Telegram (https://t.me/hoprnet) for any questions.
+    Visit our Telegram (https://t.me/hoprnet) for any questions.
   `,
   [NodeStates.relayingNodeInProgress]: `\n
-    Relaying in progress. We have received your message and are now
-    waiting for a packet we are trying to relay on you. Please wait
-    until we receive your packet or ${RELAY_VERIFICATION_CYCLE_IN_MS / 1000}seconds
-    pass out. Thank you for your patience!
+    Relaying in progress. I've received your message and I'm now
+    waiting for a packet I'm trying to relay via your node. Please wait
+    until I receive your packet or ${RELAY_VERIFICATION_CYCLE_IN_MS / 1000}seconds
+    elapse. Thank you for your patience!
   `,
   [NodeStates.relayingNodeSucceded]: `\n
-    Relaying successful! We have obtained a packet annonymously from you,
-    and are ready to go through the next verification process.
+    Relaying successful! I've obtained a packet anonymously from you,
+    and we can move to the next verification step.
   `,
 }
 
