@@ -59,12 +59,11 @@ const BotResponses = {
     Welcome to the xHOPR incentivized network!
 
     1. Load ${COVERBOT_XDAI_THRESHOLD} xDAI into your HOPR Ethereum Address
-    2. Post a tweet with your HOPR Address and the tag #HOPRNetwork
-    3. Send me the link to your tweet (don't delete it!)
-    4. Keep your tweet and node online, and I'll slowly send xHOPR to you.
-    5. Every time you're chosen to relay a message, you'll score a point!
+    2. Send me the link to a tweet with your HOPR Address and the tag #HOPRNetwork
+    3. Keep your tweet and node online, and I'll slowly send xHOPR to you.
+    4. Every time you're chosen to relay a message, you'll score a point!
     
-    For more information and to see the current scoreboard, visit https://saentis.hoprnet.org
+    For more information, visit https://saentis.hoprnet.org.
   `,
   [BotCommands.status]: (status: NodeStates) => `\n
     Your current status is: ${status}
