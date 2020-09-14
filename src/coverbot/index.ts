@@ -355,7 +355,7 @@ export class Coverbot implements Bot {
              */
 
             // 4.1.1
-            console.log(`No response from ${_hoprNodeAddress}. Removing as valid node.`)
+            console.log(`No response from ${_hoprNodeAddress}.`) // Removing as valid node.`)
 
             // 4.1.2
             this._sendMessageFromBot(_hoprNodeAddress, NodeStateResponses[NodeStates.relayingNodeFailed])
