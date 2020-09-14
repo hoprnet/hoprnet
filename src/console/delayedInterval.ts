@@ -1,4 +1,3 @@
-import chalk from 'chalk'
 import { durations } from '../time'
 
 /**
@@ -9,9 +8,9 @@ import { durations } from '../time'
 export function startDelayedInterval(msg: string): () => void {
   let interval: NodeJS.Timeout | number
   let timeout = setTimeout(() => {
-    process.stdout.write(`${chalk.green(msg)}\n`)
+    process.stdout.write(`<${msg}>\n`)
     interval = setInterval(() => {
-      process.stdout.write(chalk.green('.'))
+      process.stdout.write('.')
     }, durations.seconds(1))
   }, durations.seconds(2))
 
