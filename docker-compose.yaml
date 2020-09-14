@@ -4,6 +4,9 @@ services:
   nginx:
     image: nginx:latest
     container_name: production_nginx
+    restart: always
+    depends_on:
+      - 'coverbot-ui'
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf
       - ./selfsigned.crt:/etc/cert.crt
