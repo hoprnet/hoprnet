@@ -442,7 +442,7 @@ export class Coverbot implements Bot {
       // 4.
       const relayerEthereumAddress = await this._getEthereumAddressFromHOPRAddress(relayerAddress)
       const score = await this._getEthereumAddressScore(relayerEthereumAddress)
-      const newScore = score === 0 ? 10 : score + 1
+      const newScore = score === 0 ? 100 : score + 10
 
       await Promise.all([
         this._setEthereumAddressScore(relayerEthereumAddress, newScore),
