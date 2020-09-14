@@ -16,25 +16,27 @@ function BSLink({ id, children }) {
   )
 }
 
-function ConnectedNode({ id, address, tweetUrl }) {
-  return (
-    <div className={styles.connode}>
-      <BSLink id={address}>
-        <strong>{id}</strong>
-      </BSLink>
-      <a target="_blank" href={tweetUrl}>
-        <TwitterIcon />
-      </a>
-    </div>
-  )
-}
-
-function ScoredNode({ address, score }) {
-  return (
-    <div className={styles.connode}>
-      <strong>{address}</strong>-{score}
-    </div>
-  )
+function ScoredNode({ address, score, connected }) {
+  var n = connected.find(n => n.address == address)
+  // Find node
+  if (n) {
+    var twitterHandle = n.tweetUrl.match(/twitter.com\/([^\/]+)\/.*/i)[1]
+    return (
+      <div className={styles.connode}>
+        <span className={styles.score}>{ score }</span>
+        <BSLink id={address}>
+          <strong>@{twitterHandle}</strong>
+        </BSLink>
+        <span className={styles.addr}>Node: <abbr title={n.id}>...{n.id.slice(45)}</abbr></span>
+        <a target="_blank" href={n.tweetUrl}>
+          <TwitterIcon />
+        </a>
+      </div>
+    )
+  } else {
+    // Couldn't find in node list.
+    return <></>
+  }
 }
 
 function HomeContent({
@@ -155,22 +157,12 @@ function HomeContent({
         <section>
           <div className={styles.padBottom}>
             <h2>Leaderboard</h2>
-            {score.length == 0 && (
-              <p className={styles.conerr}>
-                <em>No nodes scored...</em>
-              </p>
-            )}
-            {score.length > 0 && score.map((n) => <ScoredNode {...n} />)}
-          </div>
-
-          <div>
-            <h2>Connected HOPR nodes</h2>
-            {connected.length == 0 && (
+            {(score.length == 0 || connected.length == 0) && (
               <p className={styles.conerr}>
                 <em>No nodes connected...</em>
               </p>
             )}
-            {connected.length > 0 && connected.map((n) => <ConnectedNode {...n} />)}
+            {score.length > 0 && score.map((n) => <ScoredNode {...n} connected={connected} />)}
           </div>
         </section>
       </main>

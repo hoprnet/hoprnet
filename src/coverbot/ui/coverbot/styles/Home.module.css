@@ -34,6 +34,14 @@
 
 }
 
+
+
+.score {
+  color: green; 
+  font-size: 2rem;
+
+}
+
 .main {
   display: flex;
   justify-content: space-between;
@@ -67,7 +75,9 @@
 }
 
 .connode {
+  display: flex;
   padding: 0.5rem;
+  align-items: center;
 }
 
 .connode strong {
@@ -77,8 +87,11 @@
 }
 
 .connode span, .connode a {
-  display: inline-block;
-  padding: 0 0 0 2rem ;
+  padding: 0 0 0 1rem ;
+}
+
+.addr{
+ font-size: 1rem;
 }
 
 .footer {
