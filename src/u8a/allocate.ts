@@ -17,8 +17,7 @@ export function u8aAllocate({ page, offset }: MemoryPage, ...list: (Uint8Array |
   const listLength = list.length
   for (let i = 0; i < listLength; i++) {
     if (list[i] !== undefined) {
-      // @ts-ignore
-      totalLength += list[i].length
+      totalLength += (list[i] as Uint8Array).length
     }
   }
 
@@ -37,10 +36,8 @@ export function u8aAllocate({ page, offset }: MemoryPage, ...list: (Uint8Array |
 
   for (let i = 0; i < listLength; i++) {
     if (list[i] !== undefined) {
-      // @ts-ignore
-      result.set(list[i], pageOffset)
-      // @ts-ignore
-      pageOffset += list[i].length
+      result.set(list[i] as Uint8Array, pageOffset)
+      pageOffset += (list[i] as Uint8Array).length
     }
   }
 
