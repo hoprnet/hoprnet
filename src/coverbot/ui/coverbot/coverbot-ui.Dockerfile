@@ -1,12 +1,14 @@
 FROM node:alpine
 
+ARG HOPR_ENVIRONMENT
+
 WORKDIR /usr/app
 COPY package.json .
 RUN yarn install
 COPY . .
 
 VOLUME /appdata
-RUN STATS_FILE=/appdata/stats.json NEXT_PUBLIC_HOPR_ENVIRONMENT=testnet yarn run build
+RUN STATS_FILE=/appdata/stats.json NEXT_PUBLIC_HOPR_ENVIRONMENT=$HOPR_ENVIRONMENT yarn run build
 
 EXPOSE 80
 EXPOSE 3000
