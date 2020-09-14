@@ -109,10 +109,12 @@ declare interface Channel {
      * Constructs a ticket to use in a probabilistic payment channel.
      * @param amount amount of funds to include
      * @param challenge a challenge that has to be solved be the redeemer
+     * @param winProb probability for the generated ticket to be a win
      */
     create(
       amount: Balance,
       challenge: Hash,
+      winProb: number | undefined,
       arr?: {
         bytes: ArrayBuffer
         offset: number
