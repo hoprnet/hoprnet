@@ -1,7 +1,7 @@
 version: '3.1'
 
 services:
-  nginx: 
+  nginx:
     image: nginx:latest
     container_name: production_nginx
     volumes:
@@ -33,12 +33,13 @@ services:
     build:
       context: src/coverbot/ui/coverbot
       dockerfile: coverbot-ui.Dockerfile
+      args:
+        - HOPR_ENVIRONMENT=develop
     restart: always
     depends_on:
       - 'coverbot'
     environment:
       - STATS_FILE=/appdata/stats.json
-      - NEXT_PUBLIC_HOPR_ENVIRONMENT=develop
     volumes:
       - ./appdata:/appdata
     ports:

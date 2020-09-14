@@ -19,9 +19,9 @@ import db from './db'
 
 const { fromWei } = Web3.utils
 const RELAY_VERIFICATION_CYCLE_IN_MS = COVERBOT_VERIFICATION_CYCLE_IN_MS / 2
+const RELAY_HOPR_REWARD = 1000000000000000 // 0.001 HOPR
 const scoreDbRef = db.ref(`/${HOPR_ENVIRONMENT}/score`)
 const stateDbRef = db.ref(`/${HOPR_ENVIRONMENT}/state`)
-
 
 type HoprNode = {
   id: string
@@ -47,6 +47,11 @@ enum BotCommands {
   rules,
   status,
   verify,
+}
+
+enum ScoreRewards {
+  verified = 100,
+  relayed = 10,
 }
 
 const BotResponses = {
@@ -141,7 +146,6 @@ const VERIFY_MESSAGE = `\n
 Thanks, let me take a look at that...
 `
 
-
 export class Coverbot implements Bot {
   botName: string
   address: string
@@ -167,7 +171,7 @@ export class Coverbot implements Bot {
     this.tweets = new Map<string, TweetMessage>()
     this.twitterTimestamp = twitterTimestamp
     this.botName = '💰 Coverbot'
-    this.loadedDb = false;
+    this.loadedDb = false
     console.log(`${this.botName} has been added`)
 
     console.log(`⚡️ Network: ${COVERBOT_CHAIN_PROVIDER}`)
@@ -194,8 +198,6 @@ export class Coverbot implements Bot {
     return ethereumAddress
   }
 
-
-
   private async _getEthereumAddressScore(ethereumAddress: string): Promise<number> {
     return new Promise((resolve, reject) => {
       scoreDbRef.child(ethereumAddress).once('value', (snapshot, error) => {
@@ -214,8 +216,7 @@ export class Coverbot implements Bot {
     })
   }
 
-
-  private async loadData(): Promise<void>{
+  private async loadData(): Promise<void> {
     return new Promise((resolve, reject) => {
       stateDbRef.once('value', (snapshot, error) => {
         if (error) return reject(error)
@@ -224,14 +225,14 @@ export class Coverbot implements Bot {
           return resolve()
         }
         const state = snapshot.val()
-        console.log("Loading data", state)
-        if (!state.connected){
-          console.log("No connected")
+        console.log('Loading data', state)
+        if (!state.connected) {
+          console.log('No connected')
           return resolve()
         }
         this.verifiedHoprNodes = new Map<string, HoprNode>()
-        state.connected.forEach(n => this.verifiedHoprNodes.set(n.id, n))
-        this.loadedDb = true;
+        state.connected.forEach((n) => this.verifiedHoprNodes.set(n.id, n))
+        this.loadedDb = true
         return resolve()
       })
     })
@@ -272,7 +273,7 @@ export class Coverbot implements Bot {
     return new Promise((resolve, reject) => {
       stateDbRef.set(state, (error) => {
         if (error) return reject(error)
-        console.log("Saved data")
+        console.log('Saved data')
         return resolve()
       })
     })
@@ -445,11 +446,11 @@ export class Coverbot implements Bot {
       // 4.
       const relayerEthereumAddress = await this._getEthereumAddressFromHOPRAddress(relayerAddress)
       const score = await this._getEthereumAddressScore(relayerEthereumAddress)
-      const newScore = score === 0 ? 100 : score + 10
+      const newScore = score + ScoreRewards.relayed
 
       await Promise.all([
         this._setEthereumAddressScore(relayerEthereumAddress, newScore),
-        sendXHOPR(relayerEthereumAddress, 1000000000000000),
+        sendXHOPR(relayerEthereumAddress, RELAY_HOPR_REWARD),
       ])
       this._sendMessageFromBot(relayerAddress, NodeStateResponses[NodeStates.verifiedNode])
 
@@ -498,15 +499,24 @@ export class Coverbot implements Bot {
           case NodeStates.xdaiBalanceFailed:
             this._sendMessageFromBot(message.from, NodeStateResponses[xDaiBalanceNodeState](balance))
             break
-          case NodeStates.xdaiBalanceSucceeded:
+          case NodeStates.xdaiBalanceSucceeded: {
+            const ethAddress = await this._getEthereumAddressFromHOPRAddress(message.from)
+
             this.verifiedHoprNodes.set(message.from, {
               id: message.from,
               tweetId: tweet.id,
               tweetUrl: tweet.url,
-              address: await this._getEthereumAddressFromHOPRAddress(message.from),
+              address: ethAddress,
             })
+
+            const score = await this._getEthereumAddressScore(ethAddress)
+            if (score === 0) {
+              await this._setEthereumAddressScore(ethAddress, ScoreRewards.verified)
+            }
+
             this._sendMessageFromBot(message.from, NodeStateResponses[xDaiBalanceNodeState](balance))
             break
+          }
         }
         this._sendMessageFromBot(message.from, BotResponses[BotCommands.status](xDaiBalanceNodeState))
         break
