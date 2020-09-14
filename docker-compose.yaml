@@ -28,7 +28,7 @@ services:
       - 'coverbot'
     environment:
       - STATS_FILE=/appdata/stats.json
-      - HOPR_ENVIRONMENT=develop
+      - NEXT_PUBLIC_HOPR_ENVIRONMENT=develop
     volumes:
       - ./appdata:/appdata
     ports:
