@@ -245,7 +245,15 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         bytes32 s,
         uint8 v
     ) external {
+        require(amount > 0, "HoprChannels: amount must be strictly greater than zero");
+        require(amount < (1 << 96), "HoprChannels: Invalid amount");
+
         Account storage recipientAccount = accounts[msg.sender];
+
+        require(
+            recipientAccount.hashedSecret == bytes27(keccak256(abi.encodePacked(bytes27(preImage)))),
+            "HoprChannels: Given value is not a pre-image of the stored on-chain secret"
+        );
 
         bytes32 challenge = keccak256(abi.encodePacked(hashedSecretASecretB));
 
@@ -270,14 +278,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         require(
             status == ChannelStatus.OPEN || status == ChannelStatus.PENDING,
             "HoprChannels: channel must be 'OPEN' or 'PENDING'"
-        );
-
-        require(amount > 0, "HoprChannels: amount must be strictly greater than zero");
-        require(amount < (1 << 96), "HoprChannels: Invalid amount");
-
-        require(
-            recipientAccount.hashedSecret == bytes27(keccak256(abi.encodePacked(bytes27(preImage)))),
-            "HoprChannels: given value is not a pre-image of the stored on-chain secret"
         );
 
         recipientAccount.hashedSecret = bytes27(preImage);

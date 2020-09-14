@@ -891,7 +891,7 @@ contract('HoprChannels', function ([accountA, accountB]) {
           ticket.s,
           ticket.v
         ),
-        'Ticket must not be used twice.'
+        'HoprChannels: Given value is not a pre-image of the stored on-chain secret'
       )
     })
 
