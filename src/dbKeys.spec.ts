@@ -1,7 +1,7 @@
 import assert from 'assert'
 import { randomBytes } from 'crypto'
 import { u8aConcat, u8aEquals } from '@hoprnet/hopr-utils'
-import { Hash, ChannelId } from './types'
+import { Hash } from './types'
 import * as dbKeys from './dbKeys'
 import { getId } from './utils'
 import { getPrivKeyData } from './utils/testing.spec'
@@ -12,13 +12,13 @@ const encoder = new TextEncoder()
 describe('test dbKeys', function () {
   let userA: Await<ReturnType<typeof getPrivKeyData>>
   let userB: Await<ReturnType<typeof getPrivKeyData>>
-  let channelId: ChannelId
+  let channelId: Hash
   const challenge = new Hash(randomBytes(32))
 
   before(async () => {
     userA = await getPrivKeyData(randomBytes(32))
     userB = await getPrivKeyData(randomBytes(32))
-    channelId = new ChannelId(await getId(userA.address, userB.address))
+    channelId = await getId(userA.address, userB.address)
   })
 
   it("should create 'Channel' key", function () {
@@ -76,11 +76,21 @@ describe('test dbKeys', function () {
     assert(new TextDecoder().decode(result).startsWith(expected), 'check onChainSecret key creation')
   })
 
-  it("should create 'Ticket' key", function () {
-    const result = dbKeys.Ticket(channelId, challenge)
-    const expected = u8aConcat(encoder.encode('payments-ticket-'), channelId, encoder.encode('-'), challenge)
+  it("should create 'AcknowledgedTicket' key", function () {
+    const result = dbKeys.AcknowledgedTicket(userA.pubKey, challenge)
+    const expected = u8aConcat(encoder.encode('tickets-acknowledged-'), userA.pubKey, encoder.encode('-'), challenge)
 
-    assert(u8aEquals(result, expected), 'check ticket key creation')
+    assert(u8aEquals(result, expected), 'check AcknowledgedTicket key creation')
+  })
+
+  it("should parse 'AcknowledgedTicket' key", function () {
+    const key = u8aConcat(encoder.encode('tickets-acknowledged-'), userA.pubKey, encoder.encode('-'), challenge)
+    const [result1, result2] = dbKeys.AcknowledgedTicketParse(key)
+    const expected1 = userA.pubKey
+    const expected2 = challenge
+
+    assert(u8aEquals(result1, expected1), 'check AcknowledgedTicket key parsing')
+    assert(u8aEquals(result2, expected2), 'check AcknowledgedTicket key parsing')
   })
 
   it("should create 'ConfirmedBlockNumber' key", function () {

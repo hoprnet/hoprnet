@@ -1,12 +1,15 @@
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
 import { stringToU8a, u8aToHex } from '@hoprnet/hopr-utils'
-import { Hash, TicketEpoch, Balance, Signature } from '.'
+import { AccountId, Balance, Hash, Signature, TicketEpoch } from '.'
 import { Uint8ArrayE } from '../types/extended'
-import { sign, hash } from '../utils'
+import { sign } from '../utils'
 
 import Web3 from 'web3'
 const web3 = new Web3()
+
+const EPOCH_SIZE = 3
+const AMOUNT_SIZE = 12
 
 /**
  * Given a message, prefix it with "\x19Ethereum Signed Message:\n" and return it's hash
@@ -17,23 +20,6 @@ function toEthSignedMessageHash(msg: string): Hash {
   return new Hash(stringToU8a(web3.eth.accounts.hashMessage(msg)))
 }
 
-function encode(items: { type: string; value: string }[]): string {
-  const { types, values } = items.reduce(
-    (result, item) => {
-      result.types.push(item.type)
-      result.values.push(item.value)
-
-      return result
-    },
-    {
-      types: [],
-      values: [],
-    }
-  )
-
-  return web3.eth.abi.encodeParameters(types, values)
-}
-
 class Ticket extends Uint8ArrayE implements Types.Ticket {
   constructor(
     arr?: {
@@ -41,7 +27,7 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
       offset: number
     },
     struct?: {
-      channelId: Hash
+      counterparty: AccountId
       challenge: Hash
       epoch: TicketEpoch
       amount: Balance
@@ -59,24 +45,24 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
     }
 
     if (struct != null) {
-      this.set(struct.channelId, this.channelIdOffset - this.byteOffset)
+      this.set(struct.counterparty, this.counterpartyOffset - this.byteOffset)
       this.set(struct.challenge, this.challengeOffset - this.byteOffset)
-      this.set(struct.epoch.toU8a(), this.epochOffset - this.byteOffset)
-      this.set(struct.amount.toU8a(), this.amountOffset - this.byteOffset)
+      this.set(new Uint8Array(struct.epoch.toBuffer('be', EPOCH_SIZE)), this.epochOffset - this.byteOffset)
+      this.set(new Uint8Array(struct.amount.toBuffer('be', AMOUNT_SIZE)), this.amountOffset - this.byteOffset)
       this.set(struct.winProb, this.winProbOffset - this.byteOffset)
     }
   }
 
-  get channelIdOffset(): number {
+  get counterpartyOffset(): number {
     return this.byteOffset
   }
 
-  get channelId(): Hash {
-    return new Hash(new Uint8Array(this.buffer, this.channelIdOffset, Hash.SIZE))
+  get counterparty(): AccountId {
+    return new AccountId(new Uint8Array(this.buffer, this.counterpartyOffset, AccountId.SIZE))
   }
 
   get challengeOffset(): number {
-    return this.byteOffset + Hash.SIZE
+    return this.byteOffset + AccountId.SIZE
   }
 
   get challenge(): Hash {
@@ -84,23 +70,23 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
   }
 
   get epochOffset(): number {
-    return this.byteOffset + Hash.SIZE + Hash.SIZE
+    return this.byteOffset + AccountId.SIZE + Hash.SIZE
   }
 
   get epoch(): TicketEpoch {
-    return new TicketEpoch(new Uint8Array(this.buffer, this.epochOffset, TicketEpoch.SIZE))
+    return new TicketEpoch(new Uint8Array(this.buffer, this.epochOffset, EPOCH_SIZE))
   }
 
   get amountOffset(): number {
-    return this.byteOffset + Hash.SIZE + Hash.SIZE + TicketEpoch.SIZE
+    return this.byteOffset + AccountId.SIZE + Hash.SIZE + EPOCH_SIZE
   }
 
   get amount(): Balance {
-    return new Balance(new Uint8Array(this.buffer, this.amountOffset, Balance.SIZE))
+    return new Balance(new Uint8Array(this.buffer, this.amountOffset, AMOUNT_SIZE))
   }
 
   get winProbOffset(): number {
-    return this.byteOffset + Hash.SIZE + Hash.SIZE + TicketEpoch.SIZE + Balance.SIZE
+    return this.byteOffset + AccountId.SIZE + Hash.SIZE + EPOCH_SIZE + AMOUNT_SIZE
   }
 
   get winProb(): Hash {
@@ -108,21 +94,11 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
   }
 
   get hash(): Promise<Hash> {
-    return new Promise<Hash>(async (resolve) => {
-      const encodedTicket = encode([
-        { type: 'bytes32', value: u8aToHex(this.channelId) },
-        { type: 'bytes32', value: u8aToHex(this.challenge) },
-        { type: 'uint256', value: this.epoch.toString() },
-        { type: 'uint256', value: this.amount.toString() },
-        { type: 'bytes32', value: u8aToHex(this.winProb) },
-      ])
-
-      resolve(toEthSignedMessageHash(encodedTicket))
-    })
+    return Promise.resolve(toEthSignedMessageHash(u8aToHex(this)))
   }
 
   static get SIZE(): number {
-    return Hash.SIZE + Hash.SIZE + TicketEpoch.SIZE + Balance.SIZE + Hash.SIZE
+    return AccountId.SIZE + Hash.SIZE + EPOCH_SIZE + AMOUNT_SIZE + Hash.SIZE
   }
 
   getEmbeddedFunds(): Balance {
@@ -146,7 +122,7 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
       offset: number
     },
     struct?: {
-      channelId: Hash
+      counterparty: AccountId
       challenge: Hash
       epoch: TicketEpoch
       amount: Balance

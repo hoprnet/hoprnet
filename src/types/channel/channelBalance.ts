@@ -1,7 +1,7 @@
 import BN from 'bn.js'
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
-import { Uint8ArrayE } from '../types/extended'
-import Balance from './balance'
+import { Uint8ArrayE } from '../extended'
+import Balance from '../balance'
 
 class ChannelBalance extends Uint8ArrayE implements Types.ChannelBalance {
   constructor(
@@ -21,10 +21,7 @@ class ChannelBalance extends Uint8ArrayE implements Types.ChannelBalance {
     }
 
     if (struct != null) {
-      if (struct.balance != null) {
-        this.set(new Balance(struct.balance.toString()).toU8a(), this.balanceOffset - this.byteOffset)
-      }
-
+      ChannelBalance
       if (struct.balance_a != null) {
         this.set(new Balance(struct.balance_a.toString()).toU8a(), this.balanceAOffset - this.byteOffset)
       }

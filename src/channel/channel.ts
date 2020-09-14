@@ -1,6 +1,6 @@
 import type { Channel as IChannel } from '@hoprnet/hopr-core-connector-interface'
 import { u8aToHex } from '@hoprnet/hopr-utils'
-import { Balance, ChannelId, Channel as ChannelType, Hash, Moment, Public, SignedChannel } from '../types'
+import { Balance, Channel as ChannelType, Hash, Moment, Public, SignedChannel } from '../types'
 import TicketFactory from './ticket'
 import { ChannelStatus } from '../types/channel'
 import { waitForConfirmation, waitFor, hash } from '../utils'
@@ -33,21 +33,6 @@ class Channel implements IChannel {
     })
 
     this.ticket = new TicketFactory(this)
-  }
-
-  private async onceClosed() {
-    return this.coreConnector.channel.onceClosed(
-      new Public(this.coreConnector.account.keys.onChain.pubKey),
-      new Public(this.counterparty)
-    )
-  }
-
-  // private async onOpen(): Promise<void> {
-  //   return onOpen(this.coreConnector, this.counterparty, this._signedChannel)
-  // }
-
-  private async onClose(): Promise<void> {
-    return this.coreConnector.channel.deleteOffChainState(this.counterparty)
   }
 
   private get channel(): Promise<OnChainChannel> {
@@ -88,7 +73,7 @@ class Channel implements IChannel {
 
     return new Promise<Hash>(async (resolve, reject) => {
       try {
-        this._channelId = new ChannelId(
+        this._channelId = new Hash(
           await this.coreConnector.utils.getId(
             await this.coreConnector.account.address,
             await this.coreConnector.utils.pubKeyToAccountId(this.counterparty)
@@ -118,8 +103,6 @@ class Channel implements IChannel {
     })
   }
 
-  // @TODO
-  // @ts-ignore
   get state(): Promise<ChannelType> {
     return Promise.resolve(this._signedChannel.channel)
   }
@@ -229,6 +212,21 @@ class Channel implements IChannel {
             )
           ).send()
         )
+      } else if (status === ChannelStatus.PENDING) {
+        await waitForConfirmation(
+          (
+            await this.coreConnector.signTransaction(
+              this.coreConnector.hoprChannels.methods.claimChannelClosure(
+                u8aToHex(await this.coreConnector.utils.pubKeyToAccountId(this.counterparty))
+              ),
+              {
+                from: (await this.coreConnector.account.address).toHex(),
+                to: this.coreConnector.hoprChannels.options.address,
+                nonce: await this.coreConnector.account.nonce,
+              }
+            )
+          ).send()
+        )
       } else {
         await this.onceClosed()
       }
@@ -239,19 +237,14 @@ class Channel implements IChannel {
     }
   }
 
-  // @TODO: remove this, no longer needed
-  async getPreviousChallenges(): Promise<Hash> {
-    return new Hash()
-  }
-
   async testAndSetNonce(signature: Uint8Array): Promise<void> {
     const key = new Hash(this.coreConnector.dbKeys.Nonce(await this.channelId, await hash(signature))).toHex()
 
     try {
-      await this.coreConnector.db.get(key)
+      await this.coreConnector.db.get(Buffer.from(key))
     } catch (err) {
       if (err.notFound) {
-        await this.coreConnector.db.put(key, new Uint8Array())
+        await this.coreConnector.db.put(Buffer.from(key), Buffer.from(''))
         return
       }
 
@@ -259,6 +252,21 @@ class Channel implements IChannel {
     }
 
     throw Error('Nonces must not be used twice.')
+  }
+
+  private async onceClosed() {
+    return this.coreConnector.channel.onceClosed(
+      new Public(this.coreConnector.account.keys.onChain.pubKey),
+      new Public(this.counterparty)
+    )
+  }
+
+  // private async onOpen(): Promise<void> {
+  //   return onOpen(this.coreConnector, this.counterparty, this._signedChannel)
+  // }
+
+  private async onClose(): Promise<void> {
+    return this.coreConnector.channel.deleteOffChainState(this.counterparty)
   }
 }
 

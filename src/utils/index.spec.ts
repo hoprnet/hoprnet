@@ -29,18 +29,18 @@ const generatePair = () => {
   }
 }
 
-const generateMsg = () => {
-  return randomBytes(32)
-}
+const generateMsg = () => randomBytes(32)
 
 describe('test utils', function () {
   it('should hash values', async function () {
     const testMsg = new Uint8Array([0, 0, 0, 0])
 
-    assert.deepEqual(
-      await utils.hash(testMsg),
-      /* prettier-ignore */
-      new Uint8Array([232,231,118,38,88,111,115,185,85,54,76,123,75,191,11,183,247,104,94,189,64,232,82,177,100,99,58,74,203,211,36,76])
+    assert(
+      u8aEquals(
+        await utils.hash(testMsg),
+        /* prettier-ignore */
+        new Uint8Array([232,231,118,38,88,111,115,185,85,54,76,123,75,191,11,183,247,104,94,189,64,232,82,177,100,99,58,74,203,211,36,76])
+      )
     )
   })
 
@@ -75,5 +75,12 @@ describe('test utils', function () {
     const address = await utils.pubKeyToAccountId(pair.pubKey)
 
     assert(u8aEquals(address, pair.address))
+  })
+
+  it('should compute the winning probability properly', function () {
+    for (let i = 0; i < 10; i++) {
+      let rnd = Math.random()
+      assert(Math.abs(utils.computeWinningProbability(rnd)[0] / 255) - rnd < 1 / 256)
+    }
   })
 })

@@ -5,31 +5,19 @@ import { u8aToHex, stringToU8a, u8aEquals, durations } from '@hoprnet/hopr-utils
 import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
 import { getPrivKeyData, createAccountAndFund, createNode } from '../utils/testing.spec'
 import { randomBytes } from 'crypto'
-import BN from 'bn.js'
-import pipe from 'it-pipe'
 import Web3 from 'web3'
 import { HoprToken } from '../tsc/web3/HoprToken'
 import { Await } from '../tsc/utils'
-import {
-  Balance,
-  Channel as ChannelType,
-  ChannelStatus,
-  ChannelBalance,
-  Hash,
-  SignedTicket,
-  SignedChannel,
-} from '../types'
-import { HASHED_SECRET_WIDTH } from '../hashedSecret'
+import { AcknowledgedTicket, Public } from '../types'
 import CoreConnector from '..'
 import * as testconfigs from '../config.spec'
 import * as configs from '../config'
 
-describe('test ticket generation and verification', function () {
+describe('test storing and retrieving tickets', function () {
   const ganache = new Ganache()
   let web3: Web3
   let hoprToken: HoprToken
   let coreConnector: CoreConnector
-  let counterpartysCoreConnector: CoreConnector
   let funder: Await<ReturnType<typeof getPrivKeyData>>
 
   before(async function () {
@@ -47,7 +35,7 @@ describe('test ticket generation and verification', function () {
   })
 
   afterEach(async function () {
-    await Promise.all([counterpartysCoreConnector.stop(), coreConnector.stop()])
+    await coreConnector.stop()
   })
 
   beforeEach(async function () {
@@ -55,166 +43,124 @@ describe('test ticket generation and verification', function () {
 
     funder = await getPrivKeyData(stringToU8a(testconfigs.FUND_ACCOUNT_PRIVATE_KEY))
 
-    const [userA, userB] = await Promise.all([
-      createAccountAndFund(web3, hoprToken, funder),
-      createAccountAndFund(web3, hoprToken, funder),
-    ])
+    const userA = await createAccountAndFund(web3, hoprToken, funder)
 
-    ;[coreConnector, counterpartysCoreConnector] = await Promise.all([
-      createNode(userA.privKey),
-      createNode(userB.privKey),
-    ])
-
-    await Promise.all([
-      // prettier-ignore
-      coreConnector.db.clear(),
-      counterpartysCoreConnector.db.clear(),
-    ])
-
-    await Promise.all([
-      // prettier-ignore
-      coreConnector.initOnchainValues(),
-      counterpartysCoreConnector.initOnchainValues(),
-    ])
+    coreConnector = await createNode(userA.privKey)
+    await coreConnector.db.clear()
+    await coreConnector.initOnchainValues()
   })
+
+  const createAcknowledgedTicket = (
+    _counterPartyPubKey?: Public,
+    _ackTicket?: AcknowledgedTicket
+  ): [Public, AcknowledgedTicket] => {
+    const counterPartyPubKey = _counterPartyPubKey ?? new Public(randomBytes(Public.SIZE))
+    const array = _ackTicket ?? randomBytes(AcknowledgedTicket.SIZE(coreConnector))
+
+    return [
+      counterPartyPubKey,
+      new AcknowledgedTicket(coreConnector, {
+        bytes: array.buffer,
+        offset: array.byteOffset,
+      }),
+    ]
+  }
 
   it('should store ticket', async function () {
-    this.timeout(durations.seconds(5))
+    const [counterPartyPubKey, ackTicket] = createAcknowledgedTicket()
 
-    const balance = new ChannelBalance(undefined, {
-      balance: new BN(123),
-      balance_a: new BN(122),
-    })
+    await coreConnector.tickets.store(counterPartyPubKey, ackTicket)
 
-    const channelId = await coreConnector.utils.getId(
-      await coreConnector.account.address,
-      await counterpartysCoreConnector.account.address
-    )
-
-    const channel = await coreConnector.channel.create(
-      counterpartysCoreConnector.account.keys.onChain.pubKey,
-      async () => counterpartysCoreConnector.account.keys.onChain.pubKey,
-      balance,
-      async (balance: ChannelBalance) => {
-        const result = await pipe(
-          [
-            (
-              await coreConnector.channel.createSignedChannel(undefined, {
-                channel: new ChannelType(undefined, {
-                  balance,
-                  status: ChannelStatus.FUNDING,
-                }),
-              })
-            ).subarray(),
-          ],
-          counterpartysCoreConnector.channel.handleOpeningRequest.bind(counterpartysCoreConnector.channel),
-          async (source: AsyncIterable<any>) => {
-            let result: Uint8Array
-            for await (const msg of source) {
-              if (result! == null) {
-                result = msg.slice()
-                return result
-              } else {
-                continue
-              }
-            }
-          }
+    const storedAckTicket = new Uint8Array(
+      await coreConnector.db.get(
+        Buffer.from(
+          coreConnector.dbKeys.AcknowledgedTicket(counterPartyPubKey, (await ackTicket.signedTicket).ticket.challenge)
         )
-
-        return new SignedChannel({
-          bytes: result.buffer,
-          offset: result.byteOffset,
-        })
-      }
+      )
     )
 
-    const preImage = randomBytes(27)
-    const hash = (await coreConnector.utils.hash(preImage)).slice(0, HASHED_SECRET_WIDTH)
-
-    const signedTicket = (await channel.ticket.create(new Balance(1), new Hash(hash))) as SignedTicket
-
-    assert(
-      u8aEquals(await signedTicket.signer, coreConnector.account.keys.onChain.pubKey),
-      `Check that signer is recoverable`
-    )
-
-    await coreConnector.tickets.store(channelId, signedTicket)
-
-    const storedSignedTicket = new Uint8Array(
-      await coreConnector.db.get(Buffer.from(coreConnector.dbKeys.Ticket(channelId, signedTicket.ticket.challenge)))
-    )
-
-    assert(u8aEquals(signedTicket, storedSignedTicket), `Check that signedTicket is stored correctly`)
+    assert(u8aEquals(ackTicket, storedAckTicket), `check that AcknowledgedTicket is stored correctly`)
   })
 
-  it('should store tickets, and retrieve them in a map', async function () {
-    this.timeout(5e3)
-
-    const balance = new ChannelBalance(undefined, {
-      balance: new BN(123),
-      balance_a: new BN(122),
-    })
-
-    const channelId = await coreConnector.utils.getId(
-      await coreConnector.account.address,
-      await counterpartysCoreConnector.account.address
-    )
-
-    const channel = await coreConnector.channel.create(
-      counterpartysCoreConnector.account.keys.onChain.pubKey,
-      async () => counterpartysCoreConnector.account.keys.onChain.pubKey,
-      balance,
-      async (balance: ChannelBalance) => {
-        const result = await pipe(
-          [
-            (
-              await coreConnector.channel.createSignedChannel(undefined, {
-                channel: new ChannelType(undefined, {
-                  balance,
-                  status: ChannelStatus.FUNDING,
-                }),
-              })
-            ).subarray(),
-          ],
-          counterpartysCoreConnector.channel.handleOpeningRequest.bind(counterpartysCoreConnector.channel),
-          async (source: AsyncIterable<any>) => {
-            let result: Uint8Array | undefined
-            for await (const msg of source) {
-              if (result == null) {
-                result = msg.slice()
-                return result
-              } else {
-                continue
-              }
-            }
-          }
-        )
-
-        return new SignedChannel({
-          bytes: result.buffer,
-          offset: result.byteOffset,
-        })
-      }
-    )
-
-    const hashA = await coreConnector.utils.hash(randomBytes(32))
-    const hashB = await coreConnector.utils.hash(randomBytes(32))
-    const signedTicketA = await channel.ticket.create(new Balance(1), new Hash(hashA))
-    const signedTicketB = await channel.ticket.create(new Balance(1), new Hash(hashB))
+  it('should store tickets, and retrieve tickets for only counterPartyPubKey1', async function () {
+    const [counterPartyPubKey1, ackTicket1] = createAcknowledgedTicket()
+    const [, ackTicket2] = createAcknowledgedTicket(counterPartyPubKey1)
+    const [counterPartyPubKey3, ackTicket3] = createAcknowledgedTicket()
 
     await Promise.all([
-      coreConnector.tickets.store(channelId, signedTicketA),
-      coreConnector.tickets.store(channelId, signedTicketB),
-      coreConnector.tickets.store(new Hash(new Uint8Array(Hash.SIZE).fill(0x00)), signedTicketB),
+      coreConnector.tickets.store(counterPartyPubKey1, ackTicket1),
+      coreConnector.tickets.store(counterPartyPubKey1, ackTicket2),
+      coreConnector.tickets.store(counterPartyPubKey3, ackTicket3),
     ])
 
-    const storedSignedTickets = await coreConnector.tickets.get(channelId)
-    assert(storedSignedTickets.size === 2, `Check getting signedTickets`)
+    const storedAckTickets = await coreConnector.tickets.get(counterPartyPubKey1)
 
-    const storedSignedTicketA = storedSignedTickets.get(u8aToHex(signedTicketA.ticket.challenge))
-    assert(u8aEquals(signedTicketA, storedSignedTicketA), `Check that signedTicketA is stored correctly`)
+    assert(storedAckTickets.size === 2, `check getting ackTickets`)
+    assert(
+      u8aEquals(ackTicket1, storedAckTickets.get(u8aToHex((await ackTicket1.signedTicket).ticket.challenge))),
+      `check that ackTicket1 is stored correctly`
+    )
+    assert(
+      u8aEquals(ackTicket2, storedAckTickets.get(u8aToHex((await ackTicket2.signedTicket).ticket.challenge))),
+      `check that ackTicket2 is stored correctly`
+    )
+  })
 
-    const storedSignedTicketB = storedSignedTickets.get(u8aToHex(signedTicketB.ticket.challenge))
-    assert(u8aEquals(signedTicketB, storedSignedTicketB), `Check that signedTicketB is stored correctly`)
+  it('should store tickets, and retrieve them all', async function () {
+    const [counterPartyPubKey1, ackTicket1] = createAcknowledgedTicket()
+    const [counterPartyPubKey2, ackTicket2] = createAcknowledgedTicket()
+    const [counterPartyPubKey3, ackTicket3] = createAcknowledgedTicket()
+
+    await Promise.all([
+      coreConnector.tickets.store(counterPartyPubKey1, ackTicket1),
+      coreConnector.tickets.store(counterPartyPubKey2, ackTicket2),
+      coreConnector.tickets.store(counterPartyPubKey3, ackTicket3),
+    ])
+
+    const storedAckTickets = await coreConnector.tickets.getAll()
+
+    assert(storedAckTickets.size === 3, `check getting all ackTickets`)
+    assert(
+      u8aEquals(
+        ackTicket1,
+        storedAckTickets.get(
+          u8aToHex(
+            coreConnector.dbKeys.AcknowledgedTicket(
+              counterPartyPubKey1,
+              (await ackTicket1.signedTicket).ticket.challenge
+            )
+          )
+        )
+      ),
+      `check that ackTicket1 is stored correctly`
+    )
+    assert(
+      u8aEquals(
+        ackTicket2,
+        storedAckTickets.get(
+          u8aToHex(
+            coreConnector.dbKeys.AcknowledgedTicket(
+              counterPartyPubKey2,
+              (await ackTicket2.signedTicket).ticket.challenge
+            )
+          )
+        )
+      ),
+      `check that ackTicket2 is stored correctly`
+    )
+    assert(
+      u8aEquals(
+        ackTicket3,
+        storedAckTickets.get(
+          u8aToHex(
+            coreConnector.dbKeys.AcknowledgedTicket(
+              counterPartyPubKey3,
+              (await ackTicket3.signedTicket).ticket.challenge
+            )
+          )
+        )
+      ),
+      `check that ackTicket3 is stored correctly`
+    )
   })
 })

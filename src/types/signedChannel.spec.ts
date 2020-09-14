@@ -1,7 +1,8 @@
 import assert from 'assert'
 import BN from 'bn.js'
 import { stringToU8a, randomInteger } from '@hoprnet/hopr-utils'
-import { Channel, SignedChannel, ChannelBalance, Signature, Hash, ChannelStatus } from '.'
+import { Channel, ChannelBalance, ChannelStatus, ChannelState } from './channel'
+import { SignedChannel, Signature, Hash } from '.'
 import * as utils from '../utils'
 import * as testconfigs from '../config.spec'
 
@@ -12,21 +13,19 @@ const generateChannelData = async () => {
     balance: new BN(10),
     balance_a: new BN(2),
   })
-  const status = ChannelStatus.UNINITIALISED
+  const state = new ChannelState(undefined, { state: ChannelStatus.UNINITIALISED })
 
-  return {
+  return new Channel(undefined, {
+    state,
     balance,
-    status,
-  }
+  })
 }
 
 describe('test signedChannel construction', async function () {
   const userAPubKey = await utils.privKeyToPubKey(userA)
 
   it('should create new signedChannel using struct', async function () {
-    const channelData = await generateChannelData()
-
-    const channel = new Channel(undefined, channelData)
+    const channel = await generateChannelData()
 
     const signedChannel = new SignedChannel(undefined, {
       channel,
@@ -41,14 +40,13 @@ describe('test signedChannel construction', async function () {
 
     assert(new Hash(await signedChannel.signer).eq(userAPubKey), 'signer incorrect')
 
-    assert(signedChannel.channel.balance.eq(channelData.balance), 'wrong balance')
-    assert(new BN(signedChannel.channel.status).eq(new BN(channelData.status)), 'wrong status')
+    assert(signedChannel.channel.balance.eq(channel.balance), 'wrong balance')
+    assert(new BN(signedChannel.channel._status).eq(new BN(channel._status)), 'wrong status')
   })
 
   it('should create new signedChannel using array', async function () {
-    const channelData = await generateChannelData()
+    const channel = await generateChannelData()
 
-    const channel = new Channel(undefined, channelData)
     const signature = new Signature()
 
     await channel.sign(userA, undefined, {
@@ -71,14 +69,12 @@ describe('test signedChannel construction', async function () {
     assert(await signedChannelB.verify(userAPubKey), 'signature must be valid')
     assert(new Hash(await signedChannelB.signer).eq(userAPubKey), 'signer incorrect')
 
-    assert(signedChannelB.channel.balance.eq(channelData.balance), 'wrong balance')
-    assert(new BN(signedChannelB.channel.status).eq(new BN(channelData.status)), 'wrong status')
+    assert(signedChannelB.channel.balance.eq(channel.balance), 'wrong balance')
+    assert(new BN(signedChannelB.channel._status).eq(new BN(channel._status)), 'wrong status')
   })
 
   it('should create new signedChannel out of continous memory', async function () {
-    const channelData = await generateChannelData()
-
-    const channel = new Channel(undefined, channelData)
+    const channel = await generateChannelData()
 
     const signature = new Signature()
 
@@ -106,7 +102,7 @@ describe('test signedChannel construction', async function () {
 
     assert(new Hash(await signedChannel.signer).eq(userAPubKey), 'signer incorrect')
 
-    assert(signedChannel.channel.balance.eq(channelData.balance), 'wrong balance')
-    assert(new BN(signedChannel.channel.status).eq(new BN(channelData.status)), 'wrong status')
+    assert(signedChannel.channel.balance.eq(channel.balance), 'wrong balance')
+    assert(new BN(signedChannel.channel._status).eq(new BN(channel._status)), 'wrong status')
   })
 })

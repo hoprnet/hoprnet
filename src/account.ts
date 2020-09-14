@@ -1,14 +1,18 @@
 import type HoprEthereum from '.'
-import { stringToU8a } from '@hoprnet/hopr-utils'
+import { stringToU8a, u8aEquals } from '@hoprnet/hopr-utils'
 import { AccountId, Balance, Hash, NativeBalance, TicketEpoch } from './types'
 import { pubKeyToAccountId } from './utils'
 import { ContractEventEmitter } from './tsc/web3/types'
+
+import { HASHED_SECRET_WIDTH } from './hashedSecret'
+export const EMPTY_HASHED_SECRET = new Uint8Array(HASHED_SECRET_WIDTH).fill(0x00)
 
 class Account {
   private _address?: AccountId
   private _nonceIterator: AsyncIterator<number>
   private _ticketEpoch?: TicketEpoch
   private _ticketEpochListener?: ContractEventEmitter<any>
+  private _onChainSecret?: Hash
 
   /**
    * The accounts keys:
@@ -45,6 +49,10 @@ class Account {
     }.call(this)
   }
 
+  async stop() {
+    this._ticketEpochListener.removeAllListeners()
+  }
+
   get nonce(): Promise<number> {
     return this._nonceIterator.next().then((res) => res.value)
   }
@@ -78,45 +86,21 @@ class Account {
   }
 
   get ticketEpoch(): Promise<TicketEpoch> {
-    return new Promise(async (resolve, reject) => {
-      try {
-        if (this._ticketEpoch != null) {
-          return resolve(this._ticketEpoch)
-        }
+    if (this._ticketEpoch != null) {
+      return Promise.resolve(this._ticketEpoch)
+    }
 
-        // listen for 'SecretHashSet' events and update 'ticketEpoch'
-        // on error, safely reset 'ticketEpoch' & event listener
-        this._ticketEpochListener = this.coreConnector.hoprChannels.events
-          .SecretHashSet({
-            fromBlock: 'latest',
-            filter: {
-              account: (await this.address).toHex(),
-            },
-          })
-          .on('data', (event) => {
-            this.coreConnector.log('new ticketEpoch', event.returnValues.counter)
+    this.attachAccountDataListener()
 
-            this._ticketEpoch = new TicketEpoch(event.returnValues.counter)
-          })
-          .on('error', (error) => {
-            this.coreConnector.log('error listening to SecretHashSet events', error.message)
+    return this.address.then((address) => {
+      return this.coreConnector.hoprChannels.methods
+        .accounts(address.toHex())
+        .call()
+        .then((res) => {
+          this._ticketEpoch = new TicketEpoch(res.counter)
 
-            this._ticketEpochListener?.removeAllListeners()
-            this._ticketEpoch = undefined
-          })
-
-        this._ticketEpoch = new TicketEpoch(
-          (await this.coreConnector.hoprChannels.methods.accounts((await this.address).toHex()).call()).counter
-        )
-
-        resolve(this._ticketEpoch)
-      } catch (err) {
-        // reset everything on unexpected error
-        this._ticketEpochListener?.removeAllListeners()
-        this._ticketEpoch = undefined
-
-        reject(err)
-      }
+          return this._ticketEpoch
+        })
     })
   }
 
@@ -124,18 +108,28 @@ class Account {
    * Returns the current value of the onChainSecret
    */
   get onChainSecret(): Promise<Hash> {
-    return new Promise<Hash>(async (resolve, reject) => {
-      try {
-        resolve(
-          new Hash(
-            stringToU8a(
-              (await this.coreConnector.hoprChannels.methods.accounts((await this.address).toHex()).call()).hashedSecret
-            )
-          )
-        )
-      } catch (err) {
-        reject(err)
-      }
+    if (this._onChainSecret != null) {
+      return Promise.resolve(this._onChainSecret)
+    }
+
+    this.attachAccountDataListener()
+
+    return this.address.then((address) => {
+      return this.coreConnector.hoprChannels.methods
+        .accounts(address.toHex())
+        .call()
+        .then((res) => {
+          const hashedSecret = stringToU8a(res.hashedSecret)
+
+          // true if this string is an empty bytes32
+          if (u8aEquals(hashedSecret, EMPTY_HASHED_SECRET)) {
+            return undefined
+          }
+
+          this._onChainSecret = new Hash(hashedSecret)
+
+          return this._onChainSecret
+        })
     })
   }
 
@@ -148,6 +142,37 @@ class Account {
       this._address = accountId
       return this._address
     })
+  }
+
+  private async attachAccountDataListener() {
+    if (this._ticketEpochListener == null) {
+      // listen for 'SecretHashSet' events and update 'ticketEpoch'
+      // on error, safely reset 'ticketEpoch' & event listener
+      try {
+        this._ticketEpochListener = this.coreConnector.hoprChannels.events
+          .SecretHashSet({
+            fromBlock: 'latest',
+            filter: {
+              account: (await this.address).toHex(),
+            },
+          })
+          .on('data', (event) => {
+            this.coreConnector.log('new ticketEpoch', event.returnValues.counter)
+
+            this._ticketEpoch = new TicketEpoch(event.returnValues.counter)
+            this._onChainSecret = new Hash(stringToU8a(event.returnValues.secretHash), Hash.SIZE)
+          })
+          .on('error', (error) => {
+            this.coreConnector.log('error listening to SecretHashSet events', error.message)
+
+            this._ticketEpochListener?.removeAllListeners()
+            this._ticketEpoch = undefined
+          })
+      } catch (err) {
+        this.coreConnector.log(err)
+        this._ticketEpochListener?.removeAllListeners()
+      }
+    }
   }
 }
 

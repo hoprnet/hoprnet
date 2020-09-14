@@ -13,7 +13,8 @@ const channelEntrySubPrefix = encoder.encode('channelEntry-')
 const challengeSubPrefix = encoder.encode('challenge-')
 const channelIdSubPrefix = encoder.encode('channelId-')
 const nonceSubPrefix = encoder.encode('nonce-')
-const ticketSubPrefix = encoder.encode('ticket-')
+const ticketSubPrefix = encoder.encode('tickets-')
+const acknowledgedSubPrefix = encoder.encode('acknowledged-')
 const onChainSecretIntermediary = encoder.encode('onChainSecretIntermediary-')
 const confirmedBlockNumber = encoder.encode('confirmedBlockNumber')
 
@@ -149,14 +150,31 @@ export function OnChainSecretIntermediary(iteration: number): Uint8Array {
 /**
  * Returns the db-key under which the tickets are saved in the database.
  */
-export function Ticket(channelId: Types.Hash, challenge: Types.Hash): Uint8Array {
+export function AcknowledgedTicket(counterPartyPubKey: Types.Public, challange: Types.Hash): Uint8Array {
   return allocationHelper([
-    [PREFIX.length, PREFIX],
     [ticketSubPrefix.length, ticketSubPrefix],
-    [Hash.SIZE, channelId],
+    [acknowledgedSubPrefix.length, acknowledgedSubPrefix],
+    [counterPartyPubKey.length, counterPartyPubKey],
     [SEPERATOR.length, SEPERATOR],
-    [Hash.SIZE, challenge],
+    [challange.length, challange],
   ])
+}
+
+/**
+ * Reconstructs counterPartyPubKey and the specified challenge from a AcknowledgedTicket db-key.
+ * @param arr a AcknowledgedTicket db-key
+ * @param props additional arguments
+ */
+export function AcknowledgedTicketParse(arr: Uint8Array): [Public, Hash] {
+  const counterPartyPubKeyStart = ticketSubPrefix.length + acknowledgedSubPrefix.length
+  const counterPartyPubKeyEnd = counterPartyPubKeyStart + Public.SIZE
+  const challengeStart = counterPartyPubKeyEnd + SEPERATOR.length
+  const challengeEnd = challengeStart + Hash.SIZE
+
+  return [
+    new Public(arr.slice(counterPartyPubKeyStart, counterPartyPubKeyEnd)),
+    new Hash(arr.slice(challengeStart, challengeEnd)),
+  ]
 }
 
 function allocationHelper(arr: [number, Uint8Array][]): Uint8Array {

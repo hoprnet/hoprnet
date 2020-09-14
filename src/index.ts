@@ -28,9 +28,7 @@ export default class HoprEthereum implements HoprCoreConnector {
   public signTransaction: ReturnType<typeof utils.TransactionSigner>
   public log: ReturnType<typeof utils['Log']>
 
-  // @ts-ignore
   public channel: ChannelFactory
-  // @ts-ignore
   public types: types
   public indexer: Indexer
   public account: Account
@@ -134,6 +132,7 @@ export default class HoprEthereum implements HoprCoreConnector {
         }
 
         await this.indexer.stop()
+        await this.account.stop()
 
         this._status = 'stopped'
         this.log(chalk.green('Connector stopped'))
@@ -157,7 +156,12 @@ export default class HoprEthereum implements HoprCoreConnector {
    * @param nonce optional specify nonce of the account to run multiple queries simultaneously
    */
   async initOnchainValues(nonce?: number): Promise<void> {
-    await this.hashedSecret.initialize(nonce)
+    try {
+      await this.hashedSecret.initialize(nonce)
+    } catch (err) {
+      this.log(chalk.red('Unable to submit secret'))
+      this.log(chalk.red(err.message))
+    }
   }
 
   /**
@@ -233,7 +237,7 @@ export default class HoprEthereum implements HoprCoreConnector {
         } else {
           const tx = await this.signTransaction(this.hoprToken.methods.transfer(recipient, amount), {
             from: (await this.account.address).toHex(),
-            to: this.hoprChannels.options.address,
+            to: this.hoprToken.options.address,
             nonce: await this.account.nonce,
           })
 
@@ -244,10 +248,6 @@ export default class HoprEthereum implements HoprCoreConnector {
         reject(err)
       }
     })
-  }
-
-  static get constants() {
-    return constants
   }
 
   /**
@@ -304,7 +304,14 @@ export default class HoprEthereum implements HoprCoreConnector {
       seed,
       publicKey
     )
-    coreConnector.log(`using ethereum address ${(await coreConnector.account.address).toHex()}`)
+    coreConnector.log(`using blockchain address ${(await coreConnector.account.address).toHex()}`)
+
+    const account = (await coreConnector.account.address).toHex()
+    coreConnector.log(`using blockchain address ${account}`)
+
+    if (+(await web3.eth.getBalance(account)) === 0) {
+      throw Error(`account has no funds, please add some on ${account}`)
+    }
 
     // begin initializing
     coreConnector.initialize().catch((err: Error) => {
@@ -313,6 +320,10 @@ export default class HoprEthereum implements HoprCoreConnector {
     coreConnector.start()
 
     return coreConnector
+  }
+
+  static get constants() {
+    return constants
   }
 }
 

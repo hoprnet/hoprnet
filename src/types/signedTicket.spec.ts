@@ -3,14 +3,12 @@ import { randomBytes } from 'crypto'
 import { stringToU8a, randomInteger } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import { AccountId, Ticket, Hash, TicketEpoch, Balance, Signature, SignedTicket } from '.'
-import * as utils from '../utils'
+import { pubKeyToAccountId, privKeyToPubKey } from '../utils'
 import * as testconfigs from '../config.spec'
 
-const [userA, userB] = testconfigs.DEMO_ACCOUNTS.map((str: string) => new AccountId(stringToU8a(str)))
 const WIN_PROB = new BN(1)
 
-const generateTicketData = async () => {
-  const channelId = new Hash(await utils.getId(userA, userB))
+const generateTicketData = async (receiver: AccountId) => {
   const challenge = new Hash(randomBytes(32))
   const epoch = new TicketEpoch(0)
   const amount = new Balance(15)
@@ -18,7 +16,7 @@ const generateTicketData = async () => {
   const onChainSecret = new Hash(randomBytes(27))
 
   return {
-    channelId,
+    counterparty: receiver,
     challenge,
     epoch,
     amount,
@@ -28,16 +26,24 @@ const generateTicketData = async () => {
 }
 
 describe('test signedTicket construction', async function () {
-  const userAPubKey = await utils.privKeyToPubKey(userA)
+  const [userA, userB] = await Promise.all(
+    testconfigs.DEMO_ACCOUNTS.slice(0, 2).map(
+      async (str: string) => await pubKeyToAccountId(await privKeyToPubKey(stringToU8a(str)))
+    )
+  )
+
+  const [userAPrivKey, userBPrivKey] = testconfigs.DEMO_ACCOUNTS.slice(0, 2).map((str: string) => stringToU8a(str))
+
+  const userAPubKey = await privKeyToPubKey(stringToU8a(testconfigs.DEMO_ACCOUNTS[0]))
 
   it('should create new signedTicket using struct', async function () {
-    const ticketData = await generateTicketData()
+    const ticketData = await generateTicketData(userB)
 
     const ticket = new Ticket(undefined, ticketData)
 
     const signature = new Signature()
 
-    await ticket.sign(userA, undefined, {
+    await ticket.sign(userAPrivKey, undefined, {
       bytes: signature.buffer,
       offset: signature.byteOffset,
     })
@@ -51,15 +57,19 @@ describe('test signedTicket construction', async function () {
 
     assert(new Hash(await signedTicket.signer).eq(userAPubKey), 'signer incorrect')
 
-    assert(signedTicket.ticket.channelId.eq(ticketData.channelId), 'wrong channelId')
+    assert(signedTicket.ticket.counterparty.eq(userB), 'wrong counterparty')
     assert(signedTicket.ticket.challenge.eq(ticketData.challenge), 'wrong challenge')
     assert(signedTicket.ticket.epoch.eq(ticketData.epoch), 'wrong epoch')
     assert(signedTicket.ticket.amount.eq(ticketData.amount), 'wrong amount')
     assert(signedTicket.ticket.winProb.eq(ticketData.winProb), 'wrong winProb')
+
+    signedTicket[randomInteger(1, SignedTicket.SIZE)] = randomBytes(1)[0]
+
+    assert(!(await signedTicket.verify(userAPubKey)), 'tweaked signature should not be valid')
   })
 
   it('should create new signedTicket using array', async function () {
-    const ticketData = await generateTicketData()
+    const ticketData = await generateTicketData(userB)
 
     const ticket = new Ticket(undefined, ticketData)
 
@@ -67,7 +77,7 @@ describe('test signedTicket construction', async function () {
       ticket,
     })
 
-    ticket.sign(userA, undefined, {
+    ticket.sign(userAPrivKey, undefined, {
       bytes: signedTicketA.buffer,
       offset: signedTicketA.signatureOffset,
     })
@@ -84,21 +94,29 @@ describe('test signedTicket construction', async function () {
     assert(new Hash(await signedTicketA.signer).eq(userAPubKey), 'signer incorrect')
     assert(new Hash(await signedTicketB.signer).eq(userAPubKey), 'signer incorrect')
 
-    assert(signedTicketB.ticket.channelId.eq(ticketData.channelId), 'wrong channelId')
+    assert(signedTicketB.ticket.counterparty.eq(userB), 'wrong counterparty')
     assert(signedTicketB.ticket.challenge.eq(ticketData.challenge), 'wrong challenge')
     assert(signedTicketB.ticket.epoch.eq(ticketData.epoch), 'wrong epoch')
     assert(signedTicketB.ticket.amount.eq(ticketData.amount), 'wrong amount')
     assert(signedTicketB.ticket.winProb.eq(ticketData.winProb), 'wrong winProb')
+
+    signedTicketA[randomInteger(1, SignedTicket.SIZE)] = randomBytes(1)[0]
+
+    assert(!(await signedTicketA.verify(userAPubKey)), 'tweaked signature should not be valid')
+
+    signedTicketB[randomInteger(1, SignedTicket.SIZE)] = randomBytes(1)[0]
+
+    assert(!(await signedTicketB.verify(userAPubKey)), 'tweaked signature should not be valid')
   })
 
   it('should create new signedTicket out of continous memory', async function () {
-    const ticketData = await generateTicketData()
+    const ticketData = await generateTicketData(userB)
 
     const ticket = new Ticket(undefined, ticketData)
 
     const signature = new Signature()
 
-    await ticket.sign(userA, undefined, {
+    await ticket.sign(userAPrivKey, undefined, {
       bytes: signature.buffer,
       offset: signature.byteOffset,
     })
@@ -122,10 +140,14 @@ describe('test signedTicket construction', async function () {
 
     assert(new Hash(await signedTicket.signer).eq(userAPubKey), 'signer incorrect')
 
-    assert(signedTicket.ticket.channelId.eq(ticketData.channelId), 'wrong channelId')
+    assert(signedTicket.ticket.counterparty.eq(userB), 'wrong counterparty')
     assert(signedTicket.ticket.challenge.eq(ticketData.challenge), 'wrong challenge')
     assert(signedTicket.ticket.epoch.eq(ticketData.epoch), 'wrong epoch')
     assert(signedTicket.ticket.amount.eq(ticketData.amount), 'wrong amount')
     assert(signedTicket.ticket.winProb.eq(ticketData.winProb), 'wrong winProb')
+
+    signedTicket[randomInteger(1, SignedTicket.SIZE)] = randomBytes(1)[0]
+
+    assert(!(await signedTicket.verify(userAPubKey)), 'tweaked signature should not be valid')
   })
 })
