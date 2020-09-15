@@ -192,58 +192,11 @@ Running these commands will bring up a screen similar the one shown below. Congr
 
 ![HOPR Chat Testnet up and running.](../../.gitbook/assets/hopr-chat-testnet.gif)
 
-## Step 4 - Get Your HOPR Address
-
-With **HOPR Chat** up and running, you are now ready to type and communicate with other users on the **HOPR Network.** To do so, you need to get your **HOPR Address.** To do so, write `myAddress` and press `Enter` inside **HOPR Chat.** Something like the following will show up:
-
-```text
-> myAddress
-ethereum:  0x9e95cdcb480f133b0c1af70613d1488ee01bf53e
-HOPR:      16Uiu2HAm34oK6EyA2SuFo9rHXpm5Kwy6C8MeJ26JaRFBzgdQqVpZ
-```
-
-Share your address shown by the `myAddress` command to other people. Your HOPR Address starts with `16Uiu2` and it’s the only thing other people need to know to send you messages. Use a separate channel to share your HOPR Address with your friends.
-
-## Step 5 - Send Messages to Other HOPR Nodes
-
-You can send a message to other users with the `send` command, to send multiple messages, just repeat the following steps multiple times.
-
-To send a message, type `send` followed by a **HOPR Address** you want to send a message to. So for instance, to send a message to `16Uiu2HAm62VfBkydtQVtKMUaNC3Upe7rYehGu3eLjFAqrxX1vxsx`, you would need to type `send 16Uiu2HAm62VfBkydtQVtKMUaNC3Upe7rYehGu3eLjFAqrxX1vxsx` followed by pressing `Enter`. Afterwards, you can type whatever message you want to send to that **HOPR Node;** after you have completed your message, send it by hitting `Enter`.
-
-{% hint style="info" %}
-To send a message to another **HOPR Node,** you first need another individual‘s **HOPR Address** to send a message. You can jump to our Telegram to ask other HOPR users to share their **HOPR Address**. You can see available connected nodes by pressing the key “Tab” after typing `send`, which also functions as an auto-complete \(i.e. shows you possible addresses every time you press the “Tab” key\). For questions, please reach us via [Telegram](https://t.me/hoprnet).
-{% endhint %}
-
-Assuming someone gives you the address `16Uiu2HAmVnjSZeEwKvWxGS4cbZyNgnTzXzU3tRQNAeapJFgeyoBR`, sending a message to them would require you to first write `send`, pasting the the address \(either pressing `Ctrl+V` in Windows or `⌘v` in MacOS\) and then press `Enter`. This would look as follows:
-
-```text
-> send 16Uiu2HAmVnjSZeEwKvWxGS4cbZyNgnTzXzU3tRQNAeapJFgeyoBR
-Type in your message and press ENTER to send:
-```
-
-After typing your message, make sure to press `Enter` again. Your message will be sent anonymously to the recipient of the **HOPR Address** and disappear from your screen. A prompt like the following will show:
-
-```text
-Sending message to 16Uiu2HAmVnjSZeEwKvWxGS4cbZyNgnTzXzU3tRQNAeapJFgeyoBR ...
----------- New Packet ----------
-Destination    : 16Uiu2HAmVnjSZeEwKvWxGS4cbZyNgnTzXzU3tRQNAeapJFgeyoBR
---------------------------------
-```
-
-The recipient of the **HOPR Address** will receive something like the following:
-
-```text
-===== New message ======
-Message: Welcome to the HOPR Network.
-Latency: 23577 ms
-========================
-```
-
-#### Congratulations! You have successfully sent a message to the **HOPR Network**. Your message has been relayed and packaged securely and privately across the internet.
+## 
 
 ## Next Steps
 
-To learn more about our network, please go to our **Core Concepts** section. You can also learn how to connect to a different network by going to our **Advanced Setup.** For more information and updates about the **HOPR Network**, please follow our [Twitter](https://twitter.com/hoprnet). For questions and additional information, please go to our [Telegram](https://t.me/hoprnet) channel.
+To get started with the Säntis incentivized testnet, visit the **Funding Your Node** page. To learn more about our network, please go to our **Core Concepts** section. You can also learn how to connect to a different network by going to our **Advanced Setup.** For more information and updates about the **HOPR Network**, please follow our [Twitter](https://twitter.com/hoprnet). For questions and additional information, please go to our [Telegram](https://t.me/hoprnet) channel.
 
 If you do not want to connect to the **HOPR Network** anymore, you can just close the terminal window in which you have **HOPR Chat** running. To **uninstall** just delete the `HOPR Chat` folder you downloaded.
 
