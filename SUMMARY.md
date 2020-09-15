@@ -5,21 +5,27 @@
 ## Getting started
 
 * [Overview](getting-started/overview.md)
-* [HOPR Chat](getting-started/hopr-chat/README.md)
-  * [Quickstart](getting-started/hopr-chat/quickstart.md)
-  * [Advanced Setup](getting-started/hopr-chat/setup.md)
-  * [Bootstrap Nodes](getting-started/hopr-chat/bootstrap-nodes.md)
-  * [Releases](getting-started/hopr-chat/releases.md)
-  * [Funding account](getting-started/hopr-chat/funding-account.md)
-  * [Troubleshooting](getting-started/hopr-chat/troubleshooting.md)
+* [Säntis Testnet](getting-started/saentis-testnet/README.md)
+  * [First Time User Quickstart](getting-started/saentis-testnet/quickstart.md)
+  * [Advanced Setup](getting-started/saentis-testnet/setup.md)
+  * [Säntis for Previous Users](getting-started/saentis-testnet/getting-started.md)
+  * [Funding Your Node](getting-started/saentis-testnet/funding-your-node.md)
+  * [CoverBot](getting-started/saentis-testnet/coverbot.md)
+  * [xHOPR Tokens](getting-started/saentis-testnet/xhopr-tokens.md)
+  * [Scoreboard and Prizes](getting-started/saentis-testnet/the-scoreboard.md)
+  * [Troubleshooting](getting-started/saentis-testnet/troubleshooting.md)
 
 ## Resources
 
 * [Glossary](resources/glossary.md)
+* [Releases](resources/releases.md)
 
 ## Core Concepts
 
 * [Protocol, Network and Token](core-concepts/protocol-network-token.md)
+* [HOPR Chat](core-concepts/hopr-chat/README.md)
+  * [Troubleshooting](core-concepts/hopr-chat/troubleshooting.md)
+* [Bootstrap Nodes](core-concepts/bootstrap-nodes.md)
 
 ## Community
 

@@ -10,7 +10,7 @@ description: 'HOPR Games Bounty #3 - Can you get into the party?'
 {% tab title="Windows, Linux, MacOS" %}
 Go to [https://github.com/hoprnet/hopr-chat/releases/tag/v1.4.2](https://github.com/hoprnet/hopr-chat/releases/tag/v1.4.2) and download the HOPR Chat file corresponding to your operating system. Follow our Quick start guide if you have any troubles.
 
-{% page-ref page="../../../getting-started/hopr-chat/quickstart.md" %}
+{% page-ref page="../../../getting-started/saentis-testnet/quickstart.md" %}
 {% endtab %}
 
 {% tab title="AVADO" %}
