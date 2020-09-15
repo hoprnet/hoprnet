@@ -1,13 +1,13 @@
 import net from 'net'
 import { AbortError } from 'abortable-iterator'
-
 import type { Socket } from 'net'
 import mafmt from 'mafmt'
 import errCode from 'err-code'
-
 import debug from 'debug'
+
 const log = debug('hopr-core:transport')
 const error = debug('hopr-core:transport:error')
+const verbose = debug('hopr-core:verbose:transport')
 
 import { socketToConn } from './socket-to-conn'
 
@@ -47,20 +47,20 @@ class TCP {
 
   private _useWebRTC: boolean
   private _useOwnStunServers: boolean
-  // ONLY FOR TESTING
-  private _failIntentionallyOnWebRTC?: boolean
-  private _timeoutIntentionallyOnWebRTC?: Promise<void>
-  private _answerIntentionallyWithIncorrectMessages?: boolean
-  // END ONLY FOR TESTING
   private _upgrader: Upgrader
   private _peerInfo: PeerInfo
   private _handle: (protocols: string[] | string, handler: (connection: Handler) => void) => void
   private relays?: PeerInfo[]
   private stunServers: { urls: string }[]
-
   private _relay: Relay
-
   private connHandler: ConnHandler
+
+  // ONLY FOR TESTING
+  private _failIntentionallyOnWebRTC?: boolean
+  private _timeoutIntentionallyOnWebRTC?: Promise<void>
+  private _answerIntentionallyWithIncorrectMessages?: boolean
+  // END ONLY FOR TESTING
+  
 
   constructor({
     upgrader,
@@ -125,6 +125,7 @@ class TCP {
     this._upgrader = upgrader
 
     this._relay = new Relay(libp2p, this.handleDelivery.bind(this))
+    verbose('Created TCP stack', this.stunServers)
   }
 
   async handleDelivery({ stream, connection, counterparty }: Handler & { counterparty: PeerId }) {
@@ -166,15 +167,18 @@ class TCP {
 
         webRTCrecvBuffer.end()
         webRTCsendBuffer.end()
+        const addr = counterparty.toB58String()
+        verbose('upgraded to webRTC, now attempting upgrade to direct conn', addr)
 
         conn = await this._upgrader.upgradeInbound(
           socketToConn(_socket, {
-            remoteAddr: Multiaddr(`/p2p/${counterparty.toB58String()}`),
+            remoteAddr: Multiaddr(`/p2p/${addr}`),
             localAddr: Multiaddr(`/p2p/${this._peerInfo.id.toB58String()}`),
           })
         )
       } catch (err) {
-        error(`error while handling: ${err}`)
+        verbose('error while upgrading to webrtc direct connection', err.type)
+        //error(`error while handling: ${err}`)
 
         webRTCrecvBuffer.end()
         webRTCsendBuffer.end()
@@ -218,12 +222,18 @@ class TCP {
     let error: Error
     if (['ip4', 'ip6', 'dns4', 'dns6'].includes(ma.protoNames()[0])) {
       try {
+        verbose('attempting to dial directly', ma)
         return await this.dialDirectly(ma, options)
       } catch (err) {
-        if (err.type === 'aborted') {
+        if (err.type === 'timeout') {
+          // expected case, continue
+          error = err
+        } else {
+          // Unexpected error, ie:
+          // type === aborted
+          verbose('Dial directly unexpected error', err)
           throw err
         }
-        error = err
       }
     }
 
@@ -250,6 +260,7 @@ class TCP {
       )
     }
 
+    verbose('dialing with relay ', ma)
     return await this.dialWithRelay(ma, potentialRelays, options)
   }
 
