@@ -2,7 +2,7 @@ import BN from 'bn.js'
 import chalk from 'chalk'
 
 import PeerId from 'peer-id'
-const RELAY_FEE = 10
+const RELAY_FEE = 1
 
 import { pubKeyToPeerId } from '../../utils'
 import { u8aConcat, u8aEquals } from '@hoprnet/hopr-utils'
@@ -203,8 +203,8 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
 
     if (secrets.length > 1) {
       const channelBalance = node.paymentChannels.types.ChannelBalance.create(undefined, {
-        balance: new BN(12345),
-        balance_a: new BN(123),
+        balance: new BN(2000),
+        balance_a: new BN(1000),
       })
 
       const channel = await node.paymentChannels.channel.create(

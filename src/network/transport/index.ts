@@ -49,7 +49,6 @@ class TCP {
   private _timeoutIntentionallyOnWebRTC?: Promise<void>
   private _answerIntentionallyWithIncorrectMessages?: boolean
   // END ONLY FOR TESTING
-  
 
   constructor({
     upgrader,
@@ -118,7 +117,7 @@ class TCP {
   }
 
   async handleDelivery({ stream, connection, counterparty }: Handler & { counterparty: PeerId }) {
-    verbose('handle delivery')
+    verbose('handle delivery', connection.remoteAddr, counterparty.id)
     let conn: Connection
 
     let webRTCsendBuffer: Pushable<Uint8Array>
@@ -130,7 +129,7 @@ class TCP {
       webRTCsendBuffer = pushable<Uint8Array>()
       webRTCrecvBuffer = pushable<Uint8Array>()
 
-      verbose('attempting to upgrade to webRTC fron a delivery')
+      verbose('attempting to upgrade to webRTC from a delivery', connection.remoteAddr)
       socket = upgradeToWebRTC(webRTCsendBuffer, webRTCrecvBuffer, {
         _timeoutIntentionallyOnWebRTC: this._timeoutIntentionallyOnWebRTC,
         _failIntentionallyOnWebRTC: this._failIntentionallyOnWebRTC,
@@ -225,7 +224,7 @@ class TCP {
         } else {
           // Unexpected error, ie:
           // type === aborted
-          verbose('Dial directly unexpected error', err)
+          verbose(`Dial directly unexpected error ${err}`)
           throw err
         }
       }
@@ -383,6 +382,7 @@ class TCP {
       const rawSocket = net.connect(cOpts)
 
       const onError = (err: Error) => {
+        verbose('Error connecting:', err)
         err.message = `connection error ${cOpts.host}:${cOpts.port}: ${err.message}`
         done(err)
       }

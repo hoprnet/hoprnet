@@ -209,6 +209,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
     })
 
     await this.paymentChannels?.start()
+    await this.paymentChannels?.initOnchainValues()
 
     await this.network.start()
 

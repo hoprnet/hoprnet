@@ -61,9 +61,9 @@ export default function upgradetoWebRTC(
     let timeout: NodeJS.Timeout
 
     const onTimeout = () => {
+      verbose('Timeout upgrading to webrtc', channel.address())
       clearTimeout(timeout)
       channel.destroy()
-      verbose('Timeout upgrading to webrtc', channel.address())
       reject(new Error('timeout'))
     }
 
