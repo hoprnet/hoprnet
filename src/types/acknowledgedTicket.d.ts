@@ -1,5 +1,5 @@
-import type HoprCoreConnector from '../'
-import { Hash, SignedTicket } from '../types'
+import type HoprCoreConnector from '..'
+import { Hash, SignedTicket } from '.'
 
 declare interface AcknowledgedTicketStatic {
   readonly SIZE: number
