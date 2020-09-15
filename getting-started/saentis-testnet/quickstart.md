@@ -1,5 +1,5 @@
 ---
-description: Step by step guide to quickly start using HOPR Chat on the Säntis testnet
+description: Step-by-step guide to quickly start using HOPR Chat on the Säntis testnet
 ---
 
 # First Time User Quickstart
@@ -12,7 +12,7 @@ This quick-start guide will help you to quickly install **HOPR Chat** and its de
 **HOPR**, **HOPR Chat** and the **HOPR Network** are early-stage technologies. The currently available early test versions are meant for the brave explorers who are here to build the future of a more private Web3 together with us. Do not rely on HOPR to protect your privacy or assets just yet!
 {% endhint %}
 
-As instructions might be different depending on your Operating System \(e.g. Windows, MacOS, Linux\), our instructions will be shown under “Tabs” like the following ones. Please select your Operating System before continue reading the guide.
+As instructions might be different depending on your operating system \(e.g., Windows, MacOS, Linux\), our instructions will be shown under “Tabs” like the following ones. Please select your operating system before continue reading the guide.
 
 {% tabs %}
 {% tab title="Windows" %}
