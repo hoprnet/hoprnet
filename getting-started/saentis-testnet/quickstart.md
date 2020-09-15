@@ -8,7 +8,7 @@ description: Step-by-step guide to quickly start using HOPR Chat on the Säntis 
 If Säntis is your first time using HOPR, you'll need to install a few things first. This guide will walk you through all the steps. If you've already used HOPR before, click [**here**](getting-started.md) for instructions on how to update to the latest version.
 {% endhint %}
 
-### Before Getting Started
+### Before You Start
 
 This quick-start guide will help you to quickly install **HOPR Chat** and its dependencies so you can quickly connect to the **HOPR Network.** Please follow the step-by-step instructions to ensure everything works.
 

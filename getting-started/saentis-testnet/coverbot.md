@@ -10,7 +10,25 @@ To participate in the testnet, you'll need to register with CoverBot. Make sure 
 CoverBot is the latest in a series of bots running on the HOPR network which will be familiar from participants in our regular bounties and gaming sessions. We'll be adding more bots to Säntis as the testnet progresses, including more ways to earn points.
 {% endhint %}
 
-### Step 1: Send a Tweet
+### Step 1: Find Your HOPR Address
+
+With **HOPR Chat** up and running, you are now ready to type and communicate with other users on the **HOPR Network**, including the bot which oversees the testnet.   
+  
+Communication is achieved using **HOPR Addresses.** To find your node's address, type `myAddress` and press `Enter` inside **HOPR Chat.** Something like the following will show up:
+
+```text
+> myAddress
+ethereum:  0x9e95cdcb480f133b0c1af70613d1488ee01bf53e
+HOPR:      16Uiu2HAm34oK6EyA2SuFo9rHXpm5Kwy6C8MeJ26JaRFBzgdQqVpZ
+```
+
+{% hint style="info" %}
+There are two addresses associated with your node: the Ethereum address is used to fund your account and pay for gas fees on the blockchain, the HOPR address is where you'll send messages and receive HOPR tokens.  
+  
+For the purposes of the testnet, Ethereum is actually xDAI and HOPR is actually xHOPR.
+{% endhint %}
+
+### Step 2: Send a Tweet
 
 First, you need to send a tweet which will be used to verify your participation in the network. The bot will be able to read this tweet and check your eligibility. This is just a basic check to prevent people from entering multiple times.
 
@@ -26,7 +44,7 @@ The bot should be able to parse any tweet which includes these three things, so 
 **Don't delete this tweet!** The CoverBot will continuously check that the tweet associated with your address still exists. If the check fails, your address will be removed from the bot's database and you won't be able to earn any more points.
 {% endhint %}
 
-### Step 2: Turn On includeRecipient
+### Step 3: Turn On includeRecipient
 
 The HOPR network is fully anonymous by default. That means no-one can see who you're sending messages to, not even the recipient.  
   
@@ -36,7 +54,7 @@ Type `includeRecipient`and then type `y` to confirm. From now on, every message 
 
 ![](../../.gitbook/assets/include-recipient.png)
 
-### Step 3: Register With The Bot
+### Step 4: Register With The Bot
 
 Now that you've sent your tweet, and turned on `includeRecipient`, you need to register with the bot. Copy the full URL of your tweet and send it as a message in HOPR Chat to the bot.  
   
@@ -48,7 +66,7 @@ Type `send 16Uiu2HAmAdZNE1VqtbPt4uk9rTypbifLG9eesb8PVb5NjAywGQ4j` then press Ent
 If this is the first time you've registered this node / tweet in the testnet, you'll receive 100 points!
 {% endhint %}
 
-### Step 4: Stay Online to Earn Points!
+### Step 5: Stay Online to Earn Points!
 
 Now that your address is whitelisted with the bot, you can score points by relaying cover traffic and receiving xHOPR tokens.  
   
