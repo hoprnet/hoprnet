@@ -1,9 +1,10 @@
-import fs from 'fs'
+import db from '../../utils/db'
+import { HOPR_ENVIRONMENT } from '../../utils/env'
 
-export function get() {
+export async function get() {
   try {
-    let pth = process.env.STATS_FILE
-    let data = JSON.parse(fs.readFileSync(pth, 'utf8'))
+    const snapshot = await db.ref(`/${HOPR_ENVIRONMENT}/state`).once('value')
+    const data = snapshot.val()
     return data
   } catch (e) {
     console.log(e)
@@ -11,7 +12,7 @@ export function get() {
   }
 }
 
-export default (req, res) => {
+export default async (req, res) => {
   res.statusCode = 200
   res.json(get())
 }

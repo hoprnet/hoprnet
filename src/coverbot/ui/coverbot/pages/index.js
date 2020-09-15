@@ -78,7 +78,7 @@ function HomeContent({
     <>
       <Head>
         <title>HOPR Incentivized Testnet on xDAI</title>
-        <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
+        <script async src="https://platform.twitter.com/widgets.js" charSet="utf-8"></script>
       </Head>
 
       <header className={styles.header}>
@@ -162,7 +162,7 @@ function HomeContent({
                 <em>No nodes connected...</em>
               </p>
             )}
-            {score.length > 0 && score.map((n) => <ScoredNode {...n} connected={connected} />)}
+            {score.length > 0 && score.map((n) => <ScoredNode key={n.address} {...n} connected={connected} />)}
           </div>
         </section>
       </main>
@@ -191,18 +191,13 @@ function HomeContent({
   )
 }
 
-const fetcher = (...args) => fetch(...args).then((res) => res.json())
-
 export async function getServerSideProps() {
   let api = require('./api/stats')
-  return { props: api.get() } // NextJS makes this stupidly complicated
+  const props = await api.get()
+  console.log("API", props);
+  return { props } // NextJS makes this stupidly complicated
 }
 
 export default function Home(props) {
-  let { data, error } = useSWR('/api/stats', fetcher, { initialData: props || null, refreshInterval: 5000 })
-  if (!data || !Object.keys(data).length) {
-    // SWR inits to {} with initalData = undefined :(
-    return <div>...</div>
-  }
-  return <HomeContent {...data} />
+  return <HomeContent {...props} />
 }
