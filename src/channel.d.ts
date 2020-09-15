@@ -1,3 +1,4 @@
+import AcknowledgedTicket from './tickets/acknowledgedTicket'
 import type { AccountId, Balance, Channel as ChannelType, ChannelBalance, Hash, Moment, Public, Signature, SignedChannel, SignedTicket } from './types'
 
 declare interface ChannelStatic {
@@ -142,7 +143,7 @@ declare interface Channel {
      * @param secretA a signed ticket
      * @param secretB a signed ticket
      */
-    submit(signedTicket: SignedTicket, secretA: Uint8Array, secretB: Uint8Array): Promise<void>
+    submit(ticket: AcknowledgedTicket): Promise<void>
   }
 
   readonly counterparty: AccountId
