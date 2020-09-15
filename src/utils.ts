@@ -29,7 +29,7 @@ export const getHOPRNodeAddressFromContent = (content: string): string => {
     ? ((content) => {
         const [HOPRAddress_regexed] = content.match(/16Uiu2HA.*?$/i)
         const HOPRAddress = HOPRAddress_regexed.substr(0, 53)
-        console.log('HoprAddress', HOPRAddress)
+        console.log(`[ utils ] getHOPRNodeAddressFromContent - Obtained hoprAddress ${HOPRAddress} from ${content}`)
         return HOPRAddress
       })(content)
     : ''

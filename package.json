@@ -36,7 +36,7 @@
     "global": "^4.4.0",
     "google-protobuf": "^3.12.2",
     "grpc": "^1.24.3",
-    "pm2": "^4.4.0",
+    "pm2": "^4.4.1",
     "rimraf": "^3.0.2",
     "tinyurl": "1.1.7",
     "wait-for-stuff": "^1.4.0",

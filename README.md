@@ -28,12 +28,6 @@ We have bundled a working version of [**HOPR Server**](https://github.com/hoprne
 1. Install dependancies: `yarn`
 2. Start bot: `API_URL=127.0.0.1:50051 yarn start`
 
-#### Coverbot
-
-Coverbot needs specific instructions to learn where the stats.json file will be based. Use the `STATS_FILE` env variable.
-
-`STATS_FILE=src/coverbot/stats.json yarn dev`
-
 ## Deployment
 
 Right now, we have a `Dockerfile` that bundles bot a `hopr-server` and a `hopr-chatbot` instance by relying on `pm2` to manage both process. This practice is [frown upon in the Docker ecosystem](https://docs.docker.com/config/containers/multi-service_container/), but simplifies our deployment process. To build such image, you can simply do `docker build -f chatbot.Dockerfile . -t hoprnet/chatbot:latest`.

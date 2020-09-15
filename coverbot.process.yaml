@@ -1,0 +1,18 @@
+apps:
+  - script: ./dist/server.js
+    name: "hopr-server"
+    instances: 1
+    env:
+      PROVIDER: wss://xdai.poanetwork.dev/wss
+      BOOTSTRAP_SERVERS: /ip4/34.65.158.118/tcp/9091/p2p/16Uiu2HAmPfsujNJ6bdm6kmD5Dsoev43AAojMcYqa7A1tTvju4iGS
+  - script: ./dist/index.js
+    name: "hopr-bot"
+    instances: 1
+    env:
+      API_URL: 127.0.0.1:50051
+      BOT_NAME: coverbot
+      HOPR_ENVIRONMENT: develop
+      COVERBOT_XDAI_THRESHOLD: 0.001
+      COVERBOT_VERIFICATION_CYCLE_IN_MS: 10000
+      COVERBOT_DEBUG_MODE: false
+      COVERBOT_CHAIN_PROVIDER: https://dai.poa.network

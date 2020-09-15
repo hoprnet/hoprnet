@@ -224,7 +224,6 @@ export class Coverbot implements Bot {
           return resolve()
         }
         const state = snapshot.val()
-        console.log('Loading data', state)
         if (!state.connected) {
           console.log('No connected')
           return resolve()
@@ -265,14 +264,10 @@ export class Coverbot implements Bot {
       refreshed: new Date().toISOString(),
     }
 
-    // TODO kill this:
-    let pth = process.env.STATS_FILE
-    fs.writeFileSync(pth, JSON.stringify(state), 'utf8')
-
     return new Promise((resolve, reject) => {
       stateDbRef.set(state, (error) => {
-        if (error) return reject(error)
-        console.log('Saved data')
+        if (error) return reject(error);
+        console.log(`Saved data in our Database at ${state.refreshed}`)
         return resolve()
       })
     })
@@ -317,12 +312,17 @@ export class Coverbot implements Bot {
       const tweet = new TweetMessage(hoprNode.tweetUrl)
       await tweet.fetch({ mock: COVERBOT_DEBUG_MODE })
       const _hoprNodeAddress = tweet.getHOPRNode()
+      
       if (_hoprNodeAddress.length === 0) {
         // We got no HOPR Node here. Remove and update.
         this.verifiedHoprNodes.delete(hoprNode.id)
         await this.dumpData()
       } else {
-        this._sendMessageFromBot(_hoprNodeAddress, BotResponses[BotCommands.verify])
+        await this._sendMessageFromBot(_hoprNodeAddress, BotResponses[BotCommands.verify])
+          .catch(err => {
+            console.log(`Trying to reach ${_hoprNodeAddress} failed.`)
+            throw new Error(err) 
+          })
         /*
          * We switched from “send and forget” to “send and listen”
          * 1. We inmediately send a message to user, telling them we find them online.
@@ -351,7 +351,7 @@ export class Coverbot implements Bot {
              * 4.1.1 Internally log that this is the case.
              * 4.1.2 Let the node that we couldn't get our response back in time.
              * 4.1.3 Remove from timeout so they can try again somehow.
-             * NB: DELETED BY PB AFTER CHAT 10/9 [4.1.4 Remove from our verified node and write to the stats.json]
+             * NB: DELETED BY PB AFTER CHAT 10/9 [4.1.4 Remove from our verified node and write to the database]
              */
 
             // 4.1.1
@@ -370,11 +370,12 @@ export class Coverbot implements Bot {
         )
       }
     } catch (err) {
-      console.log('Err:', err)
+      console.log('[ _verificationCycle ] Error caught - ', err);
 
       // Something failed. We better remove node and update.
-      this.verifiedHoprNodes.delete(hoprNode.id)
-      this.dumpData()
+      // @TODO: Clean this up, removed for now to ask users to try again.
+      // this.verifiedHoprNodes.delete(hoprNode.id)
+      // this.dumpData()
     }
   }
 

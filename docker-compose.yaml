@@ -1,19 +1,6 @@
 version: '3.1'
 
 services:
-  nginx:
-    image: nginx:latest
-    container_name: production_nginx
-    restart: always
-    depends_on:
-      - 'coverbot-ui'
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf
-      - ./selfsigned.crt:/etc/cert.crt
-      - ./selfsigned.key:/etc/cert.key
-    ports:
-      - 80:80
-      - 443:443
   coverbot:
     build:
       context: .
@@ -23,15 +10,12 @@ services:
       - .env
     environment:
       - API_URL=34.65.96.1:50051
-      - STATS_FILE=/appdata/stats.json
       - BOT_NAME=coverbot
       - HOPR_ENVIRONMENT=develop
       - COVERBOT_XDAI_THRESHOLD=0.001
       - COVERBOT_VERIFICATION_CYCLE_IN_MS=60000
       - COVERBOT_DEBUG_MODE=false
       - COVERBOT_CHAIN_PROVIDER=https://dai.poa.network
-    volumes:
-      - ./appdata:/appdata
   coverbot-ui:
     build:
       context: src/coverbot/ui/coverbot
@@ -41,9 +25,5 @@ services:
     restart: always
     depends_on:
       - 'coverbot'
-    environment:
-      - STATS_FILE=/appdata/stats.json
-    volumes:
-      - ./appdata:/appdata
     ports:
       - '3000'

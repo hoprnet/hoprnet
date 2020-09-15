@@ -2,4 +2,4 @@
 
 ## Development
 
-`STATS_FILE=../../stats.json HOPR_ENVIRONMENT=develop yarn dev`
+`yarn dev`

@@ -61,10 +61,6 @@ export class TweetMessage {
     this.screen_name = data.user.screen_name
     this.created_at = new Date(data.created_at)
     this.hasfetched = true
-    console.log(`The tweet was created on ${this.created_at}`)
-    console.log('The tweet has following hashtags', this.hashtags)
-    console.log('The tweet has following user_mentions', this.user_mentions)
-    console.log('Here is the tweet', this.content)
   }
 
   isAfterTimestamp(timestamp: Date): boolean {
