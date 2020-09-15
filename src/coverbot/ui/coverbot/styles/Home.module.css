@@ -26,20 +26,15 @@
   font-size: 2rem;
 }
 
-
 .intro {
   font-size: 1.4rem;
   max-width: 50rem;
   margin: 4rem auto;
-
 }
 
-
-
 .score {
-  color: green; 
+  color: green;
   font-size: 2rem;
-
 }
 
 .main {
@@ -53,12 +48,12 @@
 
 .main section {
   font-size: 1.5rem;
-  border: 1px solid #CCC;
+  border: 1px solid #ccc;
   border-radius: 1rem;
   padding: 1rem;
   margin: 0 1rem;
   overflow: scroll;
-  flex:1 1;
+  flex: 1 1;
   max-height: 75vh;
 }
 .main h2 {
@@ -86,12 +81,13 @@
   overflow-wrap: anywhere;
 }
 
-.connode span, .connode a {
-  padding: 0 0 0 1rem ;
+.connode span,
+.connode a {
+  padding: 0 0 0 1rem;
 }
 
-.addr{
- font-size: 1rem;
+.addr {
+  font-size: 1rem;
 }
 
 .footer {
@@ -100,18 +96,22 @@
   border-top: 1px solid #eaeaea;
   text-align: center;
   padding: 1rem;
-  margin-top:3rem;
+  margin-top: 3rem;
 }
 
 .address {
-  cursor:pointer;
+  cursor: pointer;
   display: block;
   text-align: center;
   padding: 1rem;
   font-size: 1.2rem;
   overflow-wrap: anywhere;
 }
-          
+
 .address:hover {
-  background-color: #FFFFA0;
+  background-color: #ffffa0;
+}
+
+.address:active {
+  background-color: white;
 }

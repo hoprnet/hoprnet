@@ -17,17 +17,19 @@ function BSLink({ id, children }) {
 }
 
 function ScoredNode({ address, score, connected }) {
-  var n = connected.find(n => n.address == address)
+  var n = connected.find((n) => n.address == address)
   // Find node
   if (n) {
     var twitterHandle = n.tweetUrl.match(/twitter.com\/([^\/]+)\/.*/i)[1]
     return (
       <div className={styles.connode}>
-        <span className={styles.score}>{ score }</span>
+        <span className={styles.score}>{score}</span>
         <BSLink id={address}>
           <strong>@{twitterHandle}</strong>
         </BSLink>
-        <span className={styles.addr}>Node: <abbr title={n.id}>...{n.id.slice(45)}</abbr></span>
+        <span className={styles.addr}>
+          Node: <abbr title={n.id}>...{n.id.slice(45)}</abbr>
+        </span>
         <a target="_blank" href={n.tweetUrl}>
           <TwitterIcon />
         </a>
@@ -102,7 +104,7 @@ function HomeContent({
       <section className={styles.intro}>
         <p>
           Welcome to HOPR Säntis testnet! Follow the instructions below to start earning points. There are HOPR token
-          prizes for the 20 highest scorers, along with 10 random prizes. The testnet will run until 14th September
+          prizes for the 20 highest scorers, along with 10 random prizes. The testnet will run until October 6th
         </p>
         <p>
           Click <a href="https://docs.hoprnet.org/home/getting-started/saentis-testnet">here</a> for more information
@@ -116,21 +118,34 @@ function HomeContent({
           <h2>Instructions</h2>
           <ol>
             <li>
-              Download <a href="https://github.com/hoprnet/hopr-chat/releases">HOPR Node Säntis</a> and run it.
+              Visit our <a href="https://docs.hoprnet.org/home/getting-started/saentis-testnet/quickstart">docs</a> to
+              install the latest version of the HOPR node.
             </li>
             <li>
-              Send <strong>{Math.max(parseFloat(env ? env.COVERBOT_XDAI_THRESHOLD : 0), 0.01)} xDAI</strong> to your
-              node, you can get xDAI from ETH on xdai.io or ping us on{' '}
+              Send <strong>{Math.max(parseFloat(env ? env.COVERBOT_XDAI_THRESHOLD : 0), 0.01)} xDAI</strong> to your{' '}
+              <a
+                href="https://docs.hoprnet.org/home/getting-started/saentis-testnet/funding-your-node"
+                target="_blank"
+                rel="noreferrer"
+              >
+                node
+              </a>
+              . You can get xDAI from ETH on{' '}
+              <a href="//xdai.io" target="_blank" rel="noreferrer">
+                xdai.io
+              </a>{' '}
+              or ping us on{' '}
               <a href="t.me/hoprnet" target="_blank" rel="noreferrer">
                 Telegram
               </a>
+              .
             </li>
             <li>
-              In <strong>hopr-chat</strong> enable recipient by using <strong>includeRecipient</strong> command
+              In HOPR Chat, type <strong>myAddress</strong> to find your node address.
             </li>
             <li>
               <>
-                Tweet your HOPR node address with the tag <strong>#HOPRNetwork</strong> and <strong>@hoprnet</strong>{' '}
+                Tweet your HOPR node address with the tag <strong>#HOPRNetwork</strong> and <strong>@hoprnet</strong>.{' '}
                 <a
                   href="https://twitter.com/intent/tweet?ref_src=twsrc%5Etfw"
                   className="twitter-hashtag-button"
@@ -143,14 +158,25 @@ function HomeContent({
               </>
             </li>
             <li>
-              Send a message with your tweet to the Cover Node address using the <strong>send</strong> command:
+              In HOPR Chat, type <strong>includeRecipient</strong> and then "y" so the bot can respond.
+            </li>
+            <li>
+              Send a message with your tweet to the{' '}
+              <a
+                href="https://docs.hoprnet.org/home/getting-started/saentis-testnet/coverbot"
+                target="_blank"
+                rel="noreferrer"
+              >
+                CoverBot
+              </a>{' '}
+              using the <strong>send</strong> command:
               <br />
               <strong onClick={addressOnClick} className={styles.address}>
                 {address} <CopyIcon />
               </strong>
             </li>
-            <li>Wait for the Cover bot to send you a message</li>
-            <li>You have received xHOPR tokens!</li>
+            <li>Wait for a message from CoverBot verifying your tweet.</li>
+            <li>You have scored points! Keep your node online to earn more!</li>
           </ol>
         </section>
 
