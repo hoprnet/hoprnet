@@ -4,37 +4,26 @@ import type { Socket } from 'net'
 import mafmt from 'mafmt'
 import errCode from 'err-code'
 import debug from 'debug'
+import { socketToConn } from './socket-to-conn'
+import myHandshake from './handshake'
+// @ts-ignore
+import libp2p = require('libp2p')
+import { createListener, Listener } from './listener'
+import { multiaddrToNetConfig } from './utils'
+import { USE_WEBRTC, CODE_P2P, USE_OWN_STUN_SERVERS } from './constants'
+import Multiaddr from 'multiaddr'
+import PeerInfo from 'peer-info'
+import PeerId from 'peer-id'
+import pipe from 'it-pipe'
+import type { Connection, Upgrader, DialOptions, ConnHandler, Handler, Stream, MultiaddrConnection } from './types'
+import chalk from 'chalk'
+import pushable, { Pushable } from 'it-pushable'
+import upgradeToWebRTC from './webrtc'
+import Relay from './relay'
 
 const log = debug('hopr-core:transport')
 const error = debug('hopr-core:transport:error')
 const verbose = debug('hopr-core:verbose:transport')
-
-import { socketToConn } from './socket-to-conn'
-
-import myHandshake from './handshake'
-
-// @ts-ignore
-import libp2p = require('libp2p')
-
-import { createListener, Listener } from './listener'
-import { multiaddrToNetConfig } from './utils'
-import { USE_WEBRTC, CODE_P2P, USE_OWN_STUN_SERVERS } from './constants'
-
-import Multiaddr from 'multiaddr'
-import PeerInfo from 'peer-info'
-import PeerId from 'peer-id'
-
-import pipe from 'it-pipe'
-
-import type { Connection, Upgrader, DialOptions, ConnHandler, Handler, Stream, MultiaddrConnection } from './types'
-
-import chalk from 'chalk'
-
-import pushable, { Pushable } from 'it-pushable'
-
-import upgradeToWebRTC from './webrtc'
-
-import Relay from './relay'
 
 /**
  * @class TCP
@@ -129,6 +118,7 @@ class TCP {
   }
 
   async handleDelivery({ stream, connection, counterparty }: Handler & { counterparty: PeerId }) {
+    verbose('handle delivery')
     let conn: Connection
 
     let webRTCsendBuffer: Pushable<Uint8Array>
@@ -140,6 +130,7 @@ class TCP {
       webRTCsendBuffer = pushable<Uint8Array>()
       webRTCrecvBuffer = pushable<Uint8Array>()
 
+      verbose('attempting to upgrade to webRTC fron a delivery')
       socket = upgradeToWebRTC(webRTCsendBuffer, webRTCrecvBuffer, {
         _timeoutIntentionallyOnWebRTC: this._timeoutIntentionallyOnWebRTC,
         _failIntentionallyOnWebRTC: this._failIntentionallyOnWebRTC,
@@ -176,9 +167,10 @@ class TCP {
             localAddr: Multiaddr(`/p2p/${this._peerInfo.id.toB58String()}`),
           })
         )
+
+        verbose('Established a direct webRTC connection')
       } catch (err) {
-        verbose('error while upgrading to webrtc direct connection', err.type)
-        //error(`error while handling: ${err}`)
+        verbose(`error while upgrading to webrtc direct connection ${err}`)
 
         webRTCrecvBuffer.end()
         webRTCsendBuffer.end()
@@ -200,8 +192,10 @@ class TCP {
             connection,
           })
         )
+        verbose('Established a relayed webRTC connection')
       } catch (err) {
-        error(err)
+        verbose('Error upgrading to a relayed webRTC connection', err)
+        //error(err)
         return
       }
     }
@@ -290,6 +284,7 @@ class TCP {
       webRTCsendBuffer = pushable<Uint8Array>()
       webRTCrecvBuffer = pushable<Uint8Array>()
 
+      verbose('attempting to upgrade a relay dial to webRTC')
       socket = upgradeToWebRTC(webRTCsendBuffer, webRTCrecvBuffer, {
         initiator: true,
         _timeoutIntentionallyOnWebRTC: this._timeoutIntentionallyOnWebRTC,
@@ -358,14 +353,13 @@ class TCP {
   }
 
   async dialDirectly(ma: Multiaddr, options?: DialOptions): Promise<Connection> {
-    log(`[${chalk.blue(this._peerInfo.id.toB58String())}] dailing ${chalk.yellow(ma.toString())} directly`)
+    log(`[${chalk.blue(this._peerInfo.id.toB58String())}] dialing ${chalk.yellow(ma.toString())} directly`)
     const socket = await this._connect(ma, options)
     const maConn = socketToConn(socket, { remoteAddr: ma, signal: options?.signal })
 
-    log('new outbound connection %s', maConn.remoteAddr)
+    log('new outbound direct connection %s', maConn.remoteAddr)
     const conn = await this._upgrader.upgradeOutbound(maConn)
-
-    log('outbound connection %s upgraded', maConn.remoteAddr)
+    log('outbound direct connection %s upgraded', maConn.remoteAddr)
     return conn
   }
 
@@ -458,6 +452,7 @@ class TCP {
   filter(multiaddrs: Multiaddr[]): Multiaddr[] {
     multiaddrs = Array.isArray(multiaddrs) ? multiaddrs : [multiaddrs]
 
+    verbose('filtering multiaddrs')
     return multiaddrs.filter((ma: Multiaddr) => {
       return mafmt.TCP.matches(ma.decapsulateCode(CODE_P2P)) || mafmt.P2P.matches(ma)
     })

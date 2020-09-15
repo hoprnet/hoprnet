@@ -6,6 +6,7 @@ import AbortController from 'abort-controller'
 
 import debug from 'debug'
 const log = debug('hopr-core:crawler')
+const verbose = debug('hopr-core:verbose:crawler')
 
 import { getTokens } from '../utils'
 import { randomSubset, randomInteger } from '@hoprnet/hopr-utils'
@@ -34,6 +35,7 @@ class Crawler<Chain extends HoprCoreConnector> {
    * @param comparator
    */
   async crawl(comparator?: (peer: string) => boolean): Promise<void> {
+    verbose('creating a crawl')
     return new Promise(async (resolve) => {
       let aborted = false
 
@@ -52,10 +54,9 @@ class Crawler<Chain extends HoprCoreConnector> {
       const timeout = setTimeout(() => {
         aborted = true
 
+        verbose('aborting crawl due to timeout')
         abort.abort()
-
         this.printStatsAndErrors(contactedPeerIds, errors, current, before)
-
         resolve()
       }, CRAWL_TIMEOUT)
 
@@ -196,6 +197,7 @@ class Crawler<Chain extends HoprCoreConnector> {
 
         this.printStatsAndErrors(contactedPeerIds, errors, current, before)
 
+        verbose('crawl complete')
         resolve()
       }
 
@@ -207,6 +209,7 @@ class Crawler<Chain extends HoprCoreConnector> {
   }
 
   handleCrawlRequest(conn?: Connection) {
+    verbose('crawl requested')
     return async function* (this: Crawler<Chain>) {
       const amountOfNodes = Math.min(CRAWLING_RESPONSE_NODES, this.node.network.peerStore.peers.length)
 

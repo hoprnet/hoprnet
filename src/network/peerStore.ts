@@ -7,6 +7,7 @@ import { durations } from '@hoprnet/hopr-utils'
 
 import debug from 'debug'
 const log = debug('hopr-core:peerStore')
+const verbose = debug('hopr-core:verbose:peerStore')
 
 export type Entry = {
   id: string
@@ -50,6 +51,7 @@ class PeerStore<Chain extends HoprCoreConnector> {
   }
 
   push(entry: Entry): number {
+    verbose('adding', entry.id)
     const THRESHOLD_TIMEOUT = Date.now() - BLACKLIST_TIMEOUT
     this.cleanupBlacklist(THRESHOLD_TIMEOUT)
 
@@ -93,6 +95,7 @@ class PeerStore<Chain extends HoprCoreConnector> {
   }
 
   blacklistPeer(peer: string): number {
+    verbose('blacklisting', peer)
     const entry = {
       id: peer,
       deletedAt: Date.now(),
@@ -132,6 +135,7 @@ class PeerStore<Chain extends HoprCoreConnector> {
   }
 
   wipeBlacklist(): void {
+    verbose('wiping blacklist')
     this.deletedPeers = []
   }
 
