@@ -4,6 +4,8 @@ description: 'More information about CoverBot, one of the bots overseeing the SÃ
 
 # CoverBot
 
+To participate in the testnet, you'll need to communicate with CoverBot. Make sure you've completed the previous setup sections and have funded your node with 0.01 xDAI.
+
 {% hint style="info" %}
 CoverBot is the latest in a series of bots running on the HOPR network which will be familiar from participants in our regular bounties and gaming sessions. We'll be adding more bots to SÃ¤ntis as the testnet progresses, including more ways to earn points.
 {% endhint %}
