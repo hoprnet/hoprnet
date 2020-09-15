@@ -12,9 +12,9 @@ Säntis will run from 3pm CET on Tuesday 15th September 2020 until 3pm CET on Tu
   
 If this is your first time using HOPR, please see our [quickstart guide](https://docs.hoprnet.org/getting-started/quickstart) for first-time users, or read the advanced setup guide,  
   
-If you already have HOPR Chat installed or a HOPR PC Node, head to [https://saentis.hoprnet.org](https://saentis.hoprnet.org) to get started, or click [here](https://docs.hoprnet.org/home/getting-started/saentis-testnet/getting-started) for more detailed instructions.   
+If you already have HOPR Chat installed or a HOPR PC Node, head to [https://saentis.hoprnet.org](https://saentis.hoprnet.org) to get started, or click [here](getting-started.md) for more detailed instructions.   
   
-If you're having difficulty, check out the **Troubleshooting** page or talk to us on our [Discord channel](https://discord.gg/wUSYqpD).
+If you're having difficulty, check out the [**Troubleshooting**](troubleshooting.md) page or talk to us on our [Discord channel](https://discord.gg/wUSYqpD).
 
 ![The S&#xE4;ntis web interface](../../.gitbook/assets/saentis-ui%20%281%29.png)
 

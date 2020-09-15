@@ -196,7 +196,7 @@ Running these commands will bring up a screen similar the one shown below. Congr
 
 ## Next Steps
 
-To get started with the Säntis incentivized testnet, visit the **Funding Your Node** page. To learn more about our network, please go to our **Core Concepts** section. You can also learn how to connect to a different network by going to our **Advanced Setup.** For more information and updates about the **HOPR Network**, please follow our [Twitter](https://twitter.com/hoprnet). For questions and additional information, please go to our [Telegram](https://t.me/hoprnet) channel.
+To get started with the Säntis incentivized testnet, visit the [**Funding Your Node**](funding-your-node.md) page. To learn more about our network, please go to our **Core Concepts** section. You can also learn how to connect to a different network by going to our [**Advanced Setup**](setup.md)**.** For more information and updates about the **HOPR Network**, please follow our [Twitter](https://twitter.com/hoprnet). For questions and additional information, please go to our [Telegram](https://t.me/hoprnet) channel.
 
 If you do not want to connect to the **HOPR Network** anymore, you can just close the terminal window in which you have **HOPR Chat** running. To **uninstall** just delete the `HOPR Chat` folder you downloaded.
 
