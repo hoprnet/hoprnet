@@ -262,18 +262,18 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             abi.encodePacked(msg.sender, challenge, uint24(recipientAccount.counter), uint96(amount), winProb)
         );
 
-        require(!redeemedTickets[hashedTicket], "Ticket must not be used twice");
-
-        bytes32 luck = keccak256(abi.encode(hashedTicket, preImage, hashedSecretASecretB));
-
-        require(uint256(luck) <= uint256(winProb), "HoprChannels: ticket must be a win");
-
         (address partyA, , Channel storage channel, ChannelStatus status) = getChannel(
             msg.sender,
             ECDSA.recover(hashedTicket, r, s, v)
         );
 
         require(channel.stateCounter != uint24(0), "HoprChannels: Channel does not exist");
+
+        require(!redeemedTickets[hashedTicket], "Ticket must not be used twice");
+
+        bytes32 luck = keccak256(abi.encodePacked(hashedTicket, bytes27(preImage), hashedSecretASecretB));
+
+        require(uint256(luck) <= uint256(winProb), "HoprChannels: ticket must be a win");
 
         require(
             status == ChannelStatus.OPEN || status == ChannelStatus.PENDING,
