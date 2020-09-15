@@ -6,7 +6,7 @@
 
 * [Overview](getting-started/overview.md)
 * [Säntis Testnet](getting-started/saentis-testnet/README.md)
-  * [First Time User Quickstart](getting-started/saentis-testnet/quickstart.md)
+  * [First Time Users](getting-started/saentis-testnet/quickstart.md)
   * [Säntis for Previous Users](getting-started/saentis-testnet/getting-started.md)
   * [Funding Your Node](getting-started/saentis-testnet/funding-your-node.md)
   * [CoverBot](getting-started/saentis-testnet/coverbot.md)

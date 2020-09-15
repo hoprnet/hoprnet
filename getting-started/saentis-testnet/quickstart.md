@@ -2,7 +2,7 @@
 description: Step-by-step guide to quickly start using HOPR Chat on the Säntis testnet
 ---
 
-# First Time User Quickstart
+# First Time Users
 
 ### Before Getting Started
 

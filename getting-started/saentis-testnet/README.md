@@ -10,7 +10,7 @@ Connect a node to Säntis to help us test the network, find bugs, learn how HOPR
 
 Säntis will run from 3pm CET on Tuesday 15th September 2020 until 3pm CET on Tuesday 6th October 2020.  
   
-If this is your first time using HOPR, please see our [quickstart guide](https://docs.hoprnet.org/getting-started/quickstart) for first-time users, or read the advanced setup guide,  
+If this is your first time using HOPR, please see our [quickstart guide](quickstart.md) for first-time users, or read the advanced setup guide,  
   
 If you already have HOPR Chat installed or a HOPR PC Node, head to [https://saentis.hoprnet.org](https://saentis.hoprnet.org) to get started, or click [here](getting-started.md) for more detailed instructions.   
   
