@@ -152,12 +152,12 @@ class TCP {
     )
 
     if (this._useWebRTC) {
+      const addr = counterparty.toB58String()
       try {
         let _socket = await socket
 
         webRTCrecvBuffer.end()
         webRTCsendBuffer.end()
-        const addr = counterparty.toB58String()
         verbose('upgraded to webRTC, now attempting upgrade to direct conn', addr)
 
         conn = await this._upgrader.upgradeInbound(
@@ -169,11 +169,12 @@ class TCP {
 
         verbose('Established a direct webRTC connection')
       } catch (err) {
-        verbose(`error while upgrading to webrtc direct connection ${err}`)
+        verbose(`error while upgrading to webrtc direct connection ${err}: ${addr}`)
 
         webRTCrecvBuffer.end()
         webRTCsendBuffer.end()
 
+        verbose('falling back to relayed connection')
         conn = await this._upgrader.upgradeInbound(
           this.relayToConn({
             stream: myStream.relayStream,
@@ -451,7 +452,6 @@ class TCP {
    */
   filter(multiaddrs: Multiaddr[]): Multiaddr[] {
     multiaddrs = Array.isArray(multiaddrs) ? multiaddrs : [multiaddrs]
-
     verbose('filtering multiaddrs')
     return multiaddrs.filter((ma: Multiaddr) => {
       return mafmt.TCP.matches(ma.decapsulateCode(CODE_P2P)) || mafmt.P2P.matches(ma)

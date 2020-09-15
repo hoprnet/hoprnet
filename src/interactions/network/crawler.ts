@@ -5,6 +5,7 @@ import type { Handler } from '../../network/transport/types'
 
 import debug from 'debug'
 const log = debug('hopr-core:crawler')
+const verbose = debug('hopr-core:verbose:crawl-interaction')
 
 import pipe from 'it-pipe'
 import chalk from 'chalk'
@@ -33,6 +34,7 @@ class Crawler<Chain extends HoprCoreConnector> implements AbstractInteraction<Ch
   }
 
   interact(counterparty: PeerId, options: { signal: AbortSignal }): Promise<PeerInfo[]> {
+    verbose('crawl', counterparty)
     return new Promise<PeerInfo[]>(async (resolve) => {
       let resolved = false
       const onAbort = () => {

@@ -4,6 +4,7 @@ import debug from 'debug'
 
 const log = debug('hopr-core:transport:listener')
 const error = debug('hopr-core:transport:listener:error')
+const verbose = debug('hopr-core:verbose:listener:error')
 
 import { socketToConn } from './socket-to-conn'
 import { CODE_P2P } from './constants'
@@ -55,6 +56,7 @@ export function createListener(
       conn = await upgrader.upgradeInbound(maConn)
     } catch (err) {
       error('inbound connection failed', err)
+      verbose('Connection failure with:', maConn.remoteAddr)
       return attemptClose(maConn)
     }
 
