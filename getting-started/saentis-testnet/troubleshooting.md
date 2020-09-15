@@ -18,7 +18,7 @@ If your node is offline for long enough, the bot will remove your address from i
 
 ### **I can't connect to the CoverBot**
 
-If you can't connect to the CoverBot, you may need to enable port forwarding in your router.
+If you can't connect to the CoverBot, you may need to enable port forwarding on **port 9091** in your router.
 
 ### **CoverBot won't recognize my tweet**
 
