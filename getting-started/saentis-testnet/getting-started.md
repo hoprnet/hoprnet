@@ -54,16 +54,16 @@ The node will ask you to send 0.1 xDAI to your account. This is a typo. You only
 Next, you need to send xDAI to your HOPR node. You currently need 0.01 xDAI in your node address to participate in the testnet. If your node doesn't have enough xDAI, HOPR Chat will not start.
 
 {% hint style="info" %}
-xDAI is a USD stablecoin, so 0.01 xDAI is worth around 1 cent.
+xDAI is a USD stablecoin, so 0.01 xDAI is worth around 1 cent. It costs xDAI to open payment channels and perform certain other testnet actions, but 0.01 is more than enough.
 {% endhint %}
 
-If your node is unfunded, you can find your HOPR address by simply starting the HOPR Chat client. HOPR Chat will recognize that your node is unfunded, and won't proceed. It will tell you your address, so you can send xDAI.
+If your node is unfunded, you can find your HOPR address by simply starting the HOPR Chat client. HOPR Chat will recognize that your node is unfunded, and won't proceed. It will tell you your address, so you can send xDAI. Once your node is funded, you can find your address by typing `myAddress`.
 
 ![](../../.gitbook/assets/no-funds.png)
 
 If you need more instructions on how to buy and send xDAI, see the next section: **Funding Your Node**
 
-Otherwise, please proceed to the CoverBot section
+Otherwise, please proceed to the [**CoverBot**](coverbot.md) section.
 
 {% hint style="info" %}
 We're working on allowing withdrawals from your HOPR node, but for now you should consider the xDAI you send to your node irretrievable. We don't recommend sending more than the minimum xDAI to your node. Having more will not affect your score or the rate at which you receive xHOPR.

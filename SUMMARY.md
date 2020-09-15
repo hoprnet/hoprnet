@@ -9,16 +9,10 @@
   * [First Time Users](getting-started/saentis-testnet/quickstart.md)
   * [Säntis for Previous Users](getting-started/saentis-testnet/getting-started.md)
   * [Funding Your Node](getting-started/saentis-testnet/funding-your-node.md)
-  * [CoverBot](getting-started/saentis-testnet/coverbot.md)
-  * [xHOPR Tokens](getting-started/saentis-testnet/xhopr-tokens.md)
+  * [Registering with CoverBot](getting-started/saentis-testnet/coverbot.md)
   * [Scoreboard and Prizes](getting-started/saentis-testnet/the-scoreboard.md)
   * [Advanced Setup](getting-started/saentis-testnet/setup.md)
   * [Troubleshooting](getting-started/saentis-testnet/troubleshooting.md)
-
-## Resources
-
-* [Glossary](resources/glossary.md)
-* [Releases](resources/releases.md)
 
 ## Core Concepts
 
@@ -27,6 +21,12 @@
   * [Troubleshooting](core-concepts/hopr-chat/troubleshooting.md)
 * [Bootstrap Nodes](core-concepts/bootstrap-nodes.md)
 * [Cover Traffic](core-concepts/cover-traffic.md)
+* [xHOPR Tokens](core-concepts/xhopr-tokens.md)
+
+## Resources
+
+* [Glossary](resources/glossary.md)
+* [Releases](resources/releases.md)
 
 ## Community
 
