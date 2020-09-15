@@ -4,7 +4,7 @@ description: Funding your node with xDAI to participate in the testnet
 
 # Funding Your Node
 
-The Säntis testnet is being hosted on xDAI Chain, a sidechain of Ethereum. In order to participate in the testnet, you'll need to fund your node with a small amount of xDAI.  
+The Säntis testnet is being hosted on xDAI Chain, a sidechain of Ethereum. In order to participate in the testnet, you'll need to fund your node with 0.01 xDAI.  
   
 First, you'll need to load some ETH into your Ethereum wallet. [MetaMask](https://metamask.io/) is one of the most widely supported wallets, but there are other options.
 
