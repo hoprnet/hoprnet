@@ -11,22 +11,13 @@ import { CrawlResponse, CrawlStatus } from '../messages'
 import PeerId from 'peer-id'
 import type { Connection } from './transport/types'
 import type { Entry } from './peerStore'
-import { PRIVATE_NETS } from '../filters'
+import { peerHasOnlyPublicAddresses, peerHasOnlyPrivateAddresses, PRIVATE_NETS } from '../filters'
 import debug from 'debug'
 const log = debug('hopr-core:crawler')
 const verbose = debug('hopr-core:verbose:crawler')
 
 const MAX_PARALLEL_REQUESTS = 7
 export const CRAWL_TIMEOUT = 1 * 1000
-
-const peerHasOnlyPrivateAddresses = (peer: PeerInfo): boolean => {
-  return !(peer.multiaddrs.toArray().filter((ma) => !ma.nodeAddress().address.match(PRIVATE_NETS)).length > 0)
-}
-
-const peerHasOnlyPublicAddresses = (peer: PeerInfo): boolean => {
-  // None of a peer's addresses match public
-  return !(peer.multiaddrs.toArray().filter((ma) => ma.nodeAddress().address.match(PRIVATE_NETS)).length > 0)
-}
 
 class Crawler<Chain extends HoprCoreConnector> {
   constructor(

@@ -21,9 +21,13 @@ import { Crawler, CRAWL_TIMEOUT } from './crawler'
 import { Crawler as CrawlerInteraction } from '../interactions/network/crawler'
 import Multiaddr from 'multiaddr'
 import PeerStore, { BLACKLIST_TIMEOUT, BlacklistedEntry } from './peerStore'
+import { CrawlResponse, CrawlStatus } from '../messages'
 
 describe('test crawler', function () {
-  async function generateNode(options?: { timeoutIntentionally: boolean }): Promise<Hopr<HoprCoreConnector>> {
+  async function generateNode(
+    options?: { timeoutIntentionally: boolean },
+    addr = '/ip4/0.0.0.0/tcp/0'
+  ): Promise<Hopr<HoprCoreConnector>> {
     const node = (await libp2p.create({
       peerInfo: await PeerInfo.create(await PeerId.create({ keyType: 'secp256k1' })),
       modules: {
@@ -33,7 +37,7 @@ describe('test crawler', function () {
       },
     })) as Hopr<HoprCoreConnector>
 
-    node.peerInfo.multiaddrs.add(Multiaddr('/ip4/0.0.0.0/tcp/0'))
+    node.peerInfo.multiaddrs.add(Multiaddr(addr))
 
     await node.start()
 
@@ -177,19 +181,12 @@ describe('test crawler', function () {
     // )
 
     Alice.emit('peer:connect', Bob.peerInfo)
-
     await Alice.network.crawler.crawl()
-
     Bob.emit('peer:connect', Chris.peerInfo)
-
     await Alice.network.crawler.crawl()
-
     await new Promise((resolve) => setTimeout(resolve, 100))
-
     await Bob.stop()
-
     await Alice.network.crawler.crawl()
-
     await new Promise((resolve) => setTimeout(resolve, 200))
 
     timeoutCorrectly = true
