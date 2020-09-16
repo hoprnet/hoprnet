@@ -11,6 +11,3 @@ apps:
     env:
       API_URL: 127.0.0.1:50051
       BOT_NAME: coverbot
-      HOPR_ENVIRONMENT: develop
-    env_production:
-      HOPR_ENVIRONMENT: testnet
