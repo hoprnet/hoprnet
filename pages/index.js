@@ -118,11 +118,10 @@ function HomeContent({
           <h2>Instructions</h2>
           <ol>
             <li>
-              Visit our <a href="https://docs.hoprnet.org/home/getting-started/saentis-testnet/quickstart">docs</a> to
-              install the latest version of the HOPR node.
+              Install the latest version of <a href="https://docs.hoprnet.org/home/getting-started/saentis-testnet/quickstart">HOPR Chat</a>, which will spin up a HOPR node.
             </li>
             <li>
-              Send <strong>{Math.max(parseFloat(env ? env.COVERBOT_XDAI_THRESHOLD : 0), 0.01)} xDAI</strong> to your{' '}
+              Send <strong>{Math.max(parseFloat(env ? env.COVERBOT_XDAI_THRESHOLD : 0), 0.02)} xDAI</strong> to your{' '}
               <a
                 href="https://docs.hoprnet.org/home/getting-started/saentis-testnet/funding-your-node"
                 target="_blank"
@@ -141,7 +140,7 @@ function HomeContent({
               .
             </li>
             <li>
-              In HOPR Chat, type <strong>myAddress</strong> to find your node address.
+              In your HOPR node, type <strong>myAddress</strong> to find your node address.
             </li>
             <li>
               <>
@@ -158,7 +157,7 @@ function HomeContent({
               </>
             </li>
             <li>
-              In HOPR Chat, type <strong>includeRecipient</strong> and then "y" so the bot can respond.
+              In your HOPR node, type <strong>includeRecipient</strong> and then "y" so the bot can respond.
             </li>
             <li>
               Send a message with your tweet to the{' '}
@@ -212,6 +211,7 @@ function HomeContent({
         <br />
         <br />
         Last Updated: {refreshed}
+        <script src="https://panther.hoprnet.org/script.js" site="LCFGMVKB" defer></script>
       </footer>
     </>
   )
