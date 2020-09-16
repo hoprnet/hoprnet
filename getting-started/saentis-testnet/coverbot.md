@@ -58,7 +58,7 @@ Type `includeRecipient`and then type `y` to confirm. From now on, every message 
 
 Now that you've sent your tweet, and turned on `includeRecipient`, you need to register with the bot. Copy the full URL of your tweet and send it as a message in HOPR Chat to the bot.  
   
-Type `send 16Uiu2HAmAdZNE1VqtbPt4uk9rTypbifLG9eesb8PVb5NjAywGQ4j` then press Enter. Now paste the URL of your tweet and press Enter again. The bot will now check your tweet and will send you a verification message if you're successful.
+Type `send 16Uiu2HAmRE4fVtp8dF6H62NzRcx6LGUTL5fBRTdnAfZXjveP5Kz9` then press Enter. Now paste the URL of your tweet and press Enter again. The bot will now check your tweet and will send you a verification message if you're successful.
 
 ![](../../.gitbook/assets/verification-1.png)
 
