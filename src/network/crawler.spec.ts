@@ -17,7 +17,7 @@ import chalk from 'chalk'
 import Hopr from '..'
 import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import { Interactions } from '../interactions'
-import { Crawler, CRAWL_TIMEOUT } from './crawler'
+import { Crawler, CRAWL_TIMEOUT, shouldIncludePeerInCrawlResponse } from './crawler'
 import { Crawler as CrawlerInteraction } from '../interactions/network/crawler'
 import Multiaddr from 'multiaddr'
 import PeerStore, { BLACKLIST_TIMEOUT, BlacklistedEntry } from './peerStore'
@@ -203,5 +203,17 @@ describe('test crawler', function () {
       Bob.stop(),
       Chris.stop(),
     ])
+  })
+  it('shouldIncludePeerInCrawlResponse', async () => {
+    let m = (s) => new Multiaddr(s)
+    let p = async (s) => {
+      let x = await PeerInfo.create(await PeerId.create({ keyType: 'secp256k1' }))
+      x.multiaddrs.add(m(s))
+      return x
+    }
+
+    assert(shouldIncludePeerInCrawlResponse(await p('/ip4/123.4.5.6/tcp/5000'), m('/ip4/12.34.56.7/tcp/5000')))
+    assert(shouldIncludePeerInCrawlResponse(await p('/ip4/127.0.0.1/tcp/1000'), m('/ip4/127.0.0.1/tcp/5000')))
+    assert(!shouldIncludePeerInCrawlResponse(await p('/ip4/127.0.0.1/tcp/5000'), m('/ip4/12.34.56.7/tcp/5000')))
   })
 })

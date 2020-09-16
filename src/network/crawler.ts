@@ -13,11 +13,25 @@ import type { Connection } from './transport/types'
 import type { Entry } from './peerStore'
 import { peerHasOnlyPublicAddresses, peerHasOnlyPrivateAddresses, PRIVATE_NETS } from '../filters'
 import debug from 'debug'
+import Multiaddr from 'multiaddr'
 const log = debug('hopr-core:crawler')
 const verbose = debug('hopr-core:verbose:crawler')
 
 const MAX_PARALLEL_REQUESTS = 7
 export const CRAWL_TIMEOUT = 1 * 1000
+
+export const shouldIncludePeerInCrawlResponse = (peer: PeerInfo, you: Multiaddr): boolean => {
+  if (!you.nodeAddress().address.match(PRIVATE_NETS)) {
+    // We are being requested a crawl from a node that is on a remote
+    // network, so it does not benefit them for us to give them addresses
+    // on our private network, therefore let's first filter these out.
+    if (peerHasOnlyPrivateAddresses(peer)) {
+      verbose('rejecting peer from crawl results as it only has private addresses, and the requesting node is remote')
+      return false // Reject peer
+    }
+  }
+  return true
+}
 
 class Crawler<Chain extends HoprCoreConnector> {
   constructor(
@@ -242,20 +256,7 @@ class Crawler<Chain extends HoprCoreConnector> {
           }
           return result
         })
-        .filter((peer) => {
-          if (!conn.remoteAddr.nodeAddress().address.match(PRIVATE_NETS)) {
-            // We are being requested a crawl from a node that is on a remote
-            // network, so it does not benefit them for us to give them addresses
-            // on our private network, therefore let's first filter these out.
-            if (peerHasOnlyPrivateAddresses(peer)) {
-              verbose(
-                'rejecting peer from crawl results as it only has private addresses, and the requesting node is remote'
-              )
-              return false // Reject peer
-            }
-          }
-          return true
-        })
+        .filter((peer) => shouldIncludePeerInCrawlResponse(peer, conn.remoteAddr))
 
       if (selectedNodes.length > 0) {
         yield new CrawlResponse(undefined, {
