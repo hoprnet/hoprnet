@@ -2,7 +2,7 @@ import type HoprCoreConnector from "@hoprnet/hopr-core-connector-interface";
 import type { Currencies } from "@hoprnet/hopr-core-connector-interface";
 import type Hopr from "@hoprnet/hopr-core";
 import chalk from "chalk";
-import { startDelayedInterval, moveDecimalPoint } from "@hoprnet/hopr-utils";
+import { moveDecimalPoint } from "@hoprnet/hopr-utils";
 import { AbstractCommand, AutoCompleteResult } from "./abstractCommand";
 
 const _arguments = [
@@ -80,29 +80,18 @@ export default class Withdraw extends AbstractCommand {
    * Withdraws native or hopr balance.
    * @notice triggered by the CLI
    */
-  async execute(query?: string): Promise<void> {
-    let dispose: ReturnType<typeof startDelayedInterval> | undefined;
-
+  async execute(query?: string): Promise<string> {
     try {
       const { recipient, currency, amount, weiAmount } = await this.checkArgs(
         query ?? ""
       );
       const { paymentChannels } = this.node;
       const { NativeBalance, Balance } = paymentChannels.types;
-      const symbol =
-        currency === "NATIVE" ? NativeBalance.SYMBOL : Balance.SYMBOL;
-
-      dispose = startDelayedInterval(
-        `Withdrawing ${amount} ${symbol} to ${recipient}`
-      );
-
+      const symb = currency === "NATIVE" ? NativeBalance.SYMBOL : Balance.SYMBOL;
       await paymentChannels.withdraw(currency, recipient, weiAmount);
+      return `Withdrawn ${amount} ${symb} to ${recipient}`
     } catch (err) {
-      console.log(chalk.red(err.message));
-    }
-
-    if (typeof dispose !== "undefined") {
-      dispose();
+      return chalk.red(err.message)
     }
   }
 }

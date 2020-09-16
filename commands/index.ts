@@ -22,6 +22,7 @@ import Settings from './settings'
 import Withdraw from './withdraw'
 import readline from 'readline'
 import { Alias } from './alias'
+import { Info } from './info'
 
 export class Commands {
   readonly commands: AbstractCommand[]
@@ -37,6 +38,7 @@ export class Commands {
     this.commands = [
       new CloseChannel(node),
       new Crawl(node),
+      new Info(node),
       new ListCommands(() => this.commands),
       new ListConnectors(),
       new ListConnectedPeers(node),
@@ -49,8 +51,7 @@ export class Commands {
       new Tickets(node),
       new Settings(),
       new Alias(node),
-      // new Withdraw(node), // PB: Disabled as it uses console.log, which won't
-      // work with hoprd.
+      new Withdraw(node),
     ]
 
     if(rl) {
