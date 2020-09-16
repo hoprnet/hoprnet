@@ -1,25 +1,32 @@
 import chalk from 'chalk'
 import PeerInfo from 'peer-info'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-
 import AbortController from 'abort-controller'
-
-import debug from 'debug'
-const log = debug('hopr-core:crawler')
-
 import { getTokens } from '../utils'
 import { randomSubset, randomInteger } from '@hoprnet/hopr-utils'
 import type { Token } from '../utils'
 import { MAX_HOPS, CRAWLING_RESPONSE_NODES } from '../constants'
 import type Hopr from '..'
-
 import { CrawlResponse, CrawlStatus } from '../messages'
 import PeerId from 'peer-id'
 import type { Connection } from './transport/types'
 import type { Entry } from './peerStore'
+import { PRIVATE_NETS } from '../filters'
+import debug from 'debug'
+const log = debug('hopr-core:crawler')
+const verbose = debug('hopr-core:verbose:crawler')
 
 const MAX_PARALLEL_REQUESTS = 7
 export const CRAWL_TIMEOUT = 1 * 1000
+
+const peerHasOnlyPrivateAddresses = (peer: PeerInfo): boolean => {
+  return !(peer.multiaddrs.toArray().filter((ma) => !ma.nodeAddress().address.match(PRIVATE_NETS)).length > 0)
+}
+
+const peerHasOnlyPublicAddresses = (peer: PeerInfo): boolean => {
+  // None of a peer's addresses match public
+  return !(peer.multiaddrs.toArray().filter((ma) => ma.nodeAddress().address.match(PRIVATE_NETS)).length > 0)
+}
 
 class Crawler<Chain extends HoprCoreConnector> {
   constructor(
@@ -134,9 +141,23 @@ class Crawler<Chain extends HoprCoreConnector> {
 
           try {
             log(`querying ${chalk.blue(peer)}`)
-            peerInfos = await this.node.interactions.network.crawler.interact(PeerId.createFromB58String(peer), {
+            const peerId = PeerId.createFromB58String(peer)
+            peerInfos = await this.node.interactions.network.crawler.interact(peerId, {
               signal: abort.signal,
             })
+
+            const peerInfo = this.node.peerStore.get(peerId)
+            if (peerInfo && peerHasOnlyPublicAddresses(peerInfo)) {
+              // The node we are connecting to is on a remote network
+              // and gives us addresses on a private network, then they are
+              // not going to work for us. We should filter these out when we are
+              // requested for a crawl, but in this instance they have given us
+              // some anyway.
+              peerInfos = peerInfos.filter((p) => {
+                !peerHasOnlyPrivateAddresses(p)
+              })
+            }
+
             log(
               `received [${peerInfos.map((p) => chalk.blue(p.id.toB58String())).join(', ')}] from peer ${chalk.blue(
                 peer
@@ -210,6 +231,10 @@ class Crawler<Chain extends HoprCoreConnector> {
     return async function* (this: Crawler<Chain>) {
       const amountOfNodes = Math.min(CRAWLING_RESPONSE_NODES, this.node.network.peerStore.peers.length)
 
+      if (this.options?.timeoutIntentionally) {
+        await new Promise((resolve) => setTimeout(resolve, CRAWL_TIMEOUT + 100))
+      }
+
       const selectedNodes = randomSubset(
         this.node.network.peerStore.peers,
         amountOfNodes,
@@ -217,25 +242,34 @@ class Crawler<Chain extends HoprCoreConnector> {
           entry.id !== this.node.peerInfo.id.toB58String() &&
           (conn == null || entry.id !== conn.remotePeer.toB58String())
       )
-
-      if (this.options?.timeoutIntentionally) {
-        await new Promise((resolve) => setTimeout(resolve, CRAWL_TIMEOUT + 100))
-      }
+        .map((peer) => {
+          // convert peerId to peerInfo
+          const found = this.node.peerStore.get(PeerId.createFromB58String(peer.id))
+          const result = new PeerInfo(PeerId.createFromB58String(peer.id))
+          if (found) {
+            found.multiaddrs.forEach((ma) => result.multiaddrs.add(ma))
+          }
+          return result
+        })
+        .filter((peer) => {
+          if (!conn.remoteAddr.nodeAddress().address.match(PRIVATE_NETS)) {
+            // We are being requested a crawl from a node that is on a remote
+            // network, so it does not benefit them for us to give them addresses
+            // on our private network, therefore let's first filter these out.
+            if (peerHasOnlyPrivateAddresses(peer)) {
+              verbose(
+                'rejecting peer from crawl results as it only has private addresses, and the requesting node is remote'
+              )
+              return false // Reject peer
+            }
+          }
+          return true
+        })
 
       if (selectedNodes.length > 0) {
         yield new CrawlResponse(undefined, {
           status: CrawlStatus.OK,
-          peerInfos: selectedNodes.map((peer) => {
-            const result = new PeerInfo(PeerId.createFromB58String(peer.id))
-
-            const found = this.node.peerStore.get(PeerId.createFromB58String(peer.id))
-
-            if (found) {
-              found.multiaddrs.forEach((ma) => result.multiaddrs.add(ma))
-            }
-
-            return result
-          }),
+          peerInfos: selectedNodes,
         })
       } else {
         yield new CrawlResponse(undefined, {

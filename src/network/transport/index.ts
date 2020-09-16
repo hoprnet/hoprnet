@@ -36,6 +36,7 @@ import upgradeToWebRTC from './webrtc'
 
 import Relay from './relay'
 
+const PRIVATE_NETS = /(^127\.)|(^10\.)|(^172\.1[6-9]\.)|(^172\.2[0-9]\.)|(^172\.3[0-1]\.)|(^192\.168\.)/
 /**
  * @class TCP
  */
@@ -205,6 +206,27 @@ class TCP {
     this.connHandler?.(conn)
   }
 
+  private filterUnrealisticAddresses(ma: Multiaddr): boolean {
+    if (ma.getPeerId() === this._peerInfo.id.toB58String()) {
+      log('Tried to dial self, skipping.')
+      return false
+    }
+
+    if (ma.nodeAddress().address.match(PRIVATE_NETS)) {
+      if (
+        this._peerInfo.multiaddrs
+          .toArray()
+          .map((x) => x.nodeAddress())
+          .filter((x) => x.address == ma.nodeAddress().address) // Same private network
+          .filter((x) => x.port == ma.nodeAddress().port).length // Same port // Therefore dialing self.
+      ) {
+        log(`Tried to dial host on same private net / port - aborting: ${ma.toString()}`)
+        return false
+      }
+    }
+    return true
+  }
+
   /**
    * @async
    * @param {Multiaddr} ma
@@ -213,7 +235,18 @@ class TCP {
    * @returns {Connection} An upgraded Connection
    */
   async dial(ma: Multiaddr, options?: DialOptions): Promise<Connection> {
+    if (!this.filterUnrealisticAddresses(ma)) {
+      return new Promise((r, x) => x('Filtering unrealistic address'))
+    }
+
     options = options || {}
+
+    if (ma.getPeerId() === this._peerInfo.id.toB58String()) {
+      // Somehow we can get in the situation where we have our own id as the
+      // remote peer - we should filter these out (and also TODO find out why)
+      log('Tried to dial self, skipping.')
+      return new Promise((r, x) => x('Not going to dial self'))
+    }
 
     let error: Error
     if (['ip4', 'ip6', 'dns4', 'dns6'].includes(ma.protoNames()[0])) {
