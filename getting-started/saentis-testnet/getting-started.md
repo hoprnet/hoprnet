@@ -12,7 +12,7 @@ To start using the testnet and making your way up the leaderboard, you'll need t
   
 There are two ways to connect to the testnet:
 
-* With the HOPR Chat client
+* With the HOPR Chat app
 * Using a HOPR Node PC or other hardware node
 
 #### Connecting Using HOPR Chat
@@ -44,15 +44,15 @@ If you have a HOPR Node PC, it should automatically updated to the latest versio
 ![](../../.gitbook/assets/avado-no-funds.png)
 
 {% hint style="warning" %}
-The node will ask you to send 0.1 xDAI to your account. This is a typo. You only need to send 0.01 xDAI. Apologies, and we'll update this in the next version.
+The node will ask you to send 0.1 xDAI to your account. This is a typo. You only need to send 0.02 xDAI. Apologies, and we'll update this in the next version.
 {% endhint %}
 
 ### Step 2: Fund Your Node
 
-Next, you need to send xDAI to your HOPR node. You currently need 0.01 xDAI in your node address to participate in the testnet. If your node doesn't have enough xDAI, HOPR Chat will not start.
+Next, you need to send xDAI to your HOPR node. You currently need 0.02 xDAI in your node address to participate in the testnet. If your node doesn't have enough xDAI, HOPR Chat will not start.
 
 {% hint style="info" %}
-xDAI is a USD stablecoin, so 0.01 xDAI is worth around 1 cent. It costs xDAI to open payment channels and perform certain other testnet actions, but 0.01 is more than enough.
+xDAI is a USD stablecoin, so 0.02 xDAI is worth around 2 cents. It costs xDAI to open payment channels and perform certain other testnet actions, but 0.02 is more than enough.
 {% endhint %}
 
 If your node is unfunded, you can find your HOPR address by simply starting the HOPR Chat client. HOPR Chat will recognize that your node is unfunded, and won't proceed. It will tell you your address, so you can send xDAI. Once your node is funded, you can find your address by typing `myAddress`.
