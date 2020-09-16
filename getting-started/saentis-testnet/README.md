@@ -8,7 +8,7 @@ Säntis is an incentivized HOPR testnet which will run on [xDAI Chain](https://w
   
 Connect a node to Säntis to help us test the network, find bugs, and learn how HOPR works. You'll also earn points which can win you a share of 100,000 HOPR tokens when mainnet launches later in the year.
 
-Säntis will run from 6pm CET on Wednesday 16th September 2020 until 3pm CET on Tuesday 6th October 2020.  
+Säntis will run from 5pm CEST on Wednesday 16th September 2020 until 5pm CEST on Tuesday 6th October 2020.  
   
 If this is your first time using HOPR, please see our [**setup guide**](quickstart.md) for first-time users.  
   
