@@ -90,9 +90,9 @@ export class TweetMessage {
   }
 
   hasSameHOPRNode(hoprAddress: string): boolean {
-    return this.content.match(/16Uiu2HA.*?$/i)
+    return this.content.match(/16Uiu2HA.*?$/is)
       ? ((tweetContent) => {
-          const [participantHOPRAddress_regexed] = tweetContent.match(/16Uiu2HA.*?$/i)
+          const [participantHOPRAddress_regexed] = tweetContent.match(/16Uiu2HA.*?$/is)
           const participantHOPRAddress = participantHOPRAddress_regexed.substr(0, 53)
           return participantHOPRAddress === hoprAddress
         })(this.content)
