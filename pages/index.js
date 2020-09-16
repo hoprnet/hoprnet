@@ -211,7 +211,7 @@ function HomeContent({
         Thanks for helping us create the <a href="https://hoprnet.org/">HOPR</a> network.
         <br />
         <br />
-        Updated: {refreshed}
+        Last Updated: {refreshed}
       </footer>
     </>
   )
