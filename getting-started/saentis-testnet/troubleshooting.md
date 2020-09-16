@@ -8,6 +8,30 @@ The Säntis testnet is still an early version of the HOPR network. One major goa
   
 Here are some common issues you might run into, along with suggested solutions.
 
+### **I can't connect to the CoverBot**
+
+If you can't connect to the CoverBot, you may need to enable port forwarding on **port 9091** in your router.  
+  
+To access your router, you'll need to find its IP address.
+
+{% tabs %}
+{% tab title="Windows" %}
+In Windows, open Command Prompt by typing `cmd` in the search bar. In the terminal, type `ipconfig`. Your router's IP will be listed under `Default Gateway`.
+{% endtab %}
+
+{% tab title="MacOS" %}
+In the Apple menu visit **System Preferences**, then **Network** then **Advanced Settings**. Select the **TCP/IP** tab and you should see the IP address listed under "Router"
+{% endtab %}
+
+{% tab title="Linux" %}
+In most Linux distributions, you can click the Network icon, then Connection Information \(or something like it\) and you will see the IP address next to "Default Gateway" or "Default Route"
+{% endtab %}
+{% endtabs %}
+
+Once you have your router's IP address, enter it into a browser to access your router settings. You will probably need the router admin password, which is usually found on the back.  
+  
+Router settings vary by model, but you should find port forwarding in the settings menu. Make a new rule with your device's IP address and Port 9091 as both the start and end of the port range.
+
 ### **HOPR Chat won't start**
 
 Make sure you're using the latest version of HOPR Chat. If you're getting an error message about funding your node, you'll need to send 0.02 xDAI to the address in the message to proceed.
@@ -15,10 +39,6 @@ Make sure you're using the latest version of HOPR Chat. If you're getting an err
 ### **My node went offline, and now I'm not getting points**
 
 If your node is offline for long enough, the bot will remove your address from its database. Just send it the URL with your tweet again and you'll be added back and will start earning points again
-
-### **I can't connect to the CoverBot**
-
-If you can't connect to the CoverBot, you may need to enable port forwarding on **port 9091** in your router.
 
 ### **CoverBot won't recognize my tweet**
 
