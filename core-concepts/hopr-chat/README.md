@@ -1,10 +1,10 @@
 ---
-description: Additional information and details about HOPR Chat.
+description: Additional information and details about the HOPR Chat node app.
 ---
 
 # HOPR Chat
 
-To get started with HOPR, we'll use **HOPR Chat**, a [REPL](https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop) proof-of-concept command-line utility the HOPR team has put together to showcase HOPR’s capabilities as a privacy-preserving communication protocol. **HOPR Chat** allows you to communicate anonymously with other users running **HOPR Chat** on their machines. Under the hood, **HOPR Chat** runs a **HOPR Node** to communicate with other **HOPR Chat** users.
+To get started with HOPR, we'll use the **HOPR Chat node app**, a [REPL](https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop) proof-of-concept command-line utility the HOPR team has put together to showcase HOPR’s capabilities as a privacy-preserving communication protocol. **HOPR Chat** allows you to communicate anonymously with other users running **HOPR Node** on their machines. Under the hood, **HOPR Chat** runs a **HOPR node** to communicate with other **HOPR** users.
 
 To use **HOPR Chat**, your workstation or device running it requires one of the following pieces of software:
 
