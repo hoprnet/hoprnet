@@ -1,2 +1,5 @@
-# hopr-leaderboard
-Leaderboard showcasing the progress of users connected to our network
+# Coverbot UI
+
+## Development
+
+`FIREBASE_API_KEY=AIzaSy... yarn dev`
