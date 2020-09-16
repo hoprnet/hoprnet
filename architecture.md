@@ -3,18 +3,14 @@
 NB. This is a work in progress to document how and why the code is structured in
 the way it is.
 
-
-
-
 ## Networking
-
 
 ### Transport
 
 See `./src/network/transport`
 
 We use a [custom transport layer](https://github.com/libp2p/interface-transport)
-with libp2p. 
+with libp2p.
 
 It is a mixture of [TCP](https://github.com/libp2p/js-libp2p-tcp) and
 [webRTC star](https://github.com/libp2p/js-libp2p-webrtc-star) with a
@@ -30,6 +26,3 @@ This is necessary as we have the following constraints:
 A lot of the complexity in this area of the code derives from the many different
 coding styles used in the various libraries we must interact with, namely event
 streams and asynchronous generator functions.
-
-
-
