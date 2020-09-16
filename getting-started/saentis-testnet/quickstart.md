@@ -114,15 +114,15 @@ Download the latest version of **HOPR Chat** by clicking in the following link.
 
 {% tabs %}
 {% tab title="Windows" %}
-[Download the latest Windows release.](https://github.com/hoprnet/hopr-chat/releases/download/v1.6.0-saentis/hopr-chat-nodebin-windows.zip)
+[Download the latest Windows release.](https://github.com/hoprnet/hopr-chat/releases/download/v1.13.0-saentis.testnet/hopr-chat-nodebin-windows.zip)
 {% endtab %}
 
 {% tab title="MacOS" %}
-[Download the latest macOS release.](https://github.com/hoprnet/hopr-chat/releases/download/v1.6.0-saentis/hopr-chat-nodebin-macos.zip)
+[Download the latest macOS release.](https://github.com/hoprnet/hopr-chat/releases/download/v1.13.0-saentis.testnet/hopr-chat-nodebin-macos.zip)
 {% endtab %}
 
 {% tab title="Linux" %}
-[Download the latest Linux release.](https://github.com/hoprnet/hopr-chat/releases/download/v1.6.0-saentis/hopr-chat-nodebin-linux.zip)
+[Download the latest Linux release.](https://github.com/hoprnet/hopr-chat/releases/download/v1.13.0-saentis.testnet/hopr-chat-nodebin-linux.zip)
 {% endtab %}
 {% endtabs %}
 

@@ -23,15 +23,15 @@ To connect using HOPR Chat, you'll need to download the latest version.
 
 {% tabs %}
 {% tab title="Windows" %}
-[Download the latest Windows release](https://github.com/hoprnet/hopr-chat/releases/download/v1.6.0-saentis/hopr-chat-nodebin-windows.zip)
+[Download the latest Windows release](https://github.com/hoprnet/hopr-chat/releases/download/v1.13.0-saentis.testnet/hopr-chat-nodebin-windows.zip)
 {% endtab %}
 
 {% tab title="MacOS" %}
-[Download the latest MacOS release](https://github.com/hoprnet/hopr-chat/releases/download/v1.6.0-saentis/hopr-chat-nodebin-macos.zip)
+[Download the latest MacOS release](https://github.com/hoprnet/hopr-chat/releases/download/v1.13.0-saentis.testnet/hopr-chat-nodebin-macos.zip)
 {% endtab %}
 
 {% tab title="Linux" %}
-[Download the latest Linux release](https://github.com/hoprnet/hopr-chat/releases/download/v1.6.0-saentis/hopr-chat-nodebin-linux.zip)
+[Download the latest Linux release](https://github.com/hoprnet/hopr-chat/releases/download/v1.13.0-saentis.testnet/hopr-chat-nodebin-linux.zip)
 {% endtab %}
 {% endtabs %}
 
