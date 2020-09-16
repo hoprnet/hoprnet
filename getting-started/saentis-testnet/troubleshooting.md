@@ -10,7 +10,7 @@ Here are some common issues you might run into, along with suggested solutions.
 
 ### **HOPR Chat won't start**
 
-Make sure you're using the latest version of HOPR Chat. If you're getting an error message about funding your node, you'll need to send 0.01 xDAI to the address in the message to proceed.
+Make sure you're using the latest version of HOPR Chat. If you're getting an error message about funding your node, you'll need to send 0.02 xDAI to the address in the message to proceed.
 
 ### **My node went offline, and now I'm not getting points**
 
