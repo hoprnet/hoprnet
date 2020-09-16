@@ -14,11 +14,11 @@ If Säntis is your first time using HOPR, you'll need to install a few things fi
 
 To connect to the **HOPR network**, you will need a **HOPR node** and an **app** to communicate with it. This quick-start guide will walk you through installing the **HOPR Chat** app and its dependencies so you can quickly connect to the **HOPR network.** Please follow the step-by-step instructions to ensure everything works.
 
-{% hint style="warning" %}
-**HOPR**, **HOPR Chat** and the **HOPR Network** are early-stage technologies. The currently available early test versions are meant for the brave explorers who are here to build the future of a more private Web3 together with us. Do not rely on HOPR to protect your privacy or assets just yet!
+{% hint style="danger" %}
+**HOPR**, **HOPR Chat** and the **HOPR network** are early-stage technologies. The currently available early test versions are meant for the brave explorers who are here to build the future of a more private Web3 together with us. Do not rely on HOPR to protect your privacy or assets just yet!
 {% endhint %}
 
-As instructions might be different depending on your operating system \(e.g., Windows, MacOS, Linux\), our instructions will be shown under “Tabs” like the following ones. Please select your operating system before continuing with the guide.
+As instructions might vary depending on your operating system \(e.g., Windows, MacOS, Linux\), our instructions will be shown under “Tabs” like the following ones. Please select your operating system before continuing with the guide.
 
 {% tabs %}
 {% tab title="Windows" %}
@@ -30,13 +30,13 @@ For MacOS, we will sometimes give you Keyboard shortcuts to help you navigate th
 {% endtab %}
 
 {% tab title="Linux" %}
-All commands for Linux users will be assumed to be executed in the `Terminal` of your Linux distribution. As access to your `Terminal` might vary depending on your distribution, please make sure beforehand you know how to access your `Terminal` before continuing this tutorial.
+All commands for Linux users will be assumed to be executed in the `Terminal` of your Linux distribution. As access to your `Terminal` can vary depending on your distribution, please make sure you know how to access your `Terminal` before continuing this tutorial.
 {% endtab %}
 {% endtabs %}
 
 ## Step 1 - Install Node.js
 
-Node.js is a JavaScript runtime built on Google Chrome's V8 JavaScript engine, which powers many modern web applications. Node.js allows users to run web applications with the same technology browsers use to run webpages, but from your local computer. Since **HOPR Chat** runs using JavaScript, we first need to download and install Node.js on your machine to use it.
+Node.js is a JavaScript runtime built on Google Chrome's V8 JavaScript engine, which powers many modern web applications. Node.js allows users to run web applications with the same technology browsers use to run webpages, but from your local computer. Since **HOPR Chat** runs using JavaScript, we first need to download and install Node.js on your machine.
 
 ### Download Node.js
 

@@ -27,6 +27,6 @@ At the end of the testnet, the top 20 scoring testnet participants will be eligi
 There will also be 10 random prizes or 1,000 HOPR awarded to participants who did not score in the top 20.
 
 {% hint style="info" %}
-Säntis will integrate with the next season of HOPR Games, which will launch very soon. Follow our Telegram, Twitter and Discord for more information about ways to earn more points and xDAI!
+Säntis will integrate with the next season of HOPR Games, which will launch very soon. Follow our Telegram, Twitter and Discord for more information about ways to earn more points and xDAI. There may even be opportunities to expand the prize fund and prize distribution!
 {% endhint %}
 

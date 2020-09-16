@@ -14,7 +14,7 @@ CoverBot is the latest in a series of bots running on the HOPR network which wil
 
 With your node up and running, you are now ready to type and communicate with other users on the **HOPR Network**, including the bot which oversees the testnet.   
   
-Communication is achieved using **HOPR Addresses.** To find your node's address, type `myAddress` and press `Enter` inside **HOPR Chat** or your **HOPR Node PC** app**.** Something like the following will show up:
+Communication is achieved using **HOPR addresses.** To find your node's address, type `myAddress` and press `Enter` inside **HOPR Chat** or your **HOPR Node PC** app**.** Something like the following will show up:
 
 ```text
 > myAddress
@@ -77,7 +77,9 @@ If the CoverBot selects your address, you'll receive an xHOPR token and 10 point
 ![](../../.gitbook/assets/verification-2.png)
 
 {% hint style="info" %}
-The more your node is online, the greater your chance of scoring points, so try to maximize your node uptime. But if your node does go offline, you can re-register with the bot by sending it your tweet again.
+The more your node is online, the greater your chance of scoring points, so try to maximize your node uptime.  
+  
+More ways to earn points will be introduced as the testnet proceeds.
 {% endhint %}
 
 
