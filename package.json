@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "cross-env NEXT_PUBLIC_HOPR_ENVIRONMENT=develop next dev",
-    "build": "next build",
+    "build": "cross-env NEXT_PUBLIC_HOPR_ENVIRONMENT=$NEXT_PUBLIC_HOPR_ENVIRONMENT next build",
     "start": "next start"
   },
   "dependencies": {
