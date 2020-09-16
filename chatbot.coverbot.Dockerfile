@@ -63,4 +63,4 @@ EXPOSE 50051
 
 VOLUME ["/app/db"]
 
-CMD ["pm2-runtime", "start", "coverbot.process.yaml", "--env", "$NODE_ENV"]
+ENTRYPOINT ["pm2-runtime", "start", "coverbot.process.yaml"]

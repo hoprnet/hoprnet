@@ -12,15 +12,5 @@ apps:
       API_URL: 127.0.0.1:50051
       BOT_NAME: coverbot
       HOPR_ENVIRONMENT: develop
-      COVERBOT_XDAI_THRESHOLD: 0.001
-      COVERBOT_VERIFICATION_CYCLE_IN_MS: 10000
-      COVERBOT_DEBUG_MODE: true
-      COVERBOT_CHAIN_PROVIDER: https://dai.poa.network
     env_production:
-      API_URL: 127.0.0.1:50051
-      BOT_NAME: coverbot
       HOPR_ENVIRONMENT: testnet
-      COVERBOT_XDAI_THRESHOLD: 0.001
-      COVERBOT_VERIFICATION_CYCLE_IN_MS: 30000
-      COVERBOT_DEBUG_MODE: false
-      COVERBOT_CHAIN_PROVIDER: https://dai.poa.network

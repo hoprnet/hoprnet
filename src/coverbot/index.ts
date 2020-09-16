@@ -6,7 +6,6 @@ import { TweetMessage, TweetState } from '../twitter'
 //@TODO: Isolate these utilities to avoid importing the entire package
 import { convertPubKeyFromB58String, u8aToHex } from '@hoprnet/hopr-utils'
 import { Utils } from '@hoprnet/hopr-core-ethereum'
-import fs from 'fs'
 import { Networks, HOPR_CHANNELS } from '@hoprnet/hopr-core-ethereum/lib/ethereum/addresses'
 import {
   COVERBOT_DEBUG_MODE,
@@ -318,7 +317,7 @@ export class Coverbot implements Bot {
         this.verifiedHoprNodes.delete(hoprNode.id)
         await this.dumpData()
       } else {
-        await this._sendMessageFromBot(_hoprNodeAddress, BotResponses[BotCommands.verify])
+        this._sendMessageFromBot(_hoprNodeAddress, BotResponses[BotCommands.verify])
           .catch(err => {
             console.log(`Trying to reach ${_hoprNodeAddress} failed.`)
             throw new Error(err) 
@@ -452,6 +451,7 @@ export class Coverbot implements Bot {
         this._setEthereumAddressScore(relayerEthereumAddress, newScore),
         sendXHOPR(relayerEthereumAddress, RELAY_HOPR_REWARD),
       ])
+      console.log(`xHOPR tokens sent to ${relayerAddress}`)
       this._sendMessageFromBot(relayerAddress, NodeStateResponses[NodeStates.verifiedNode])
 
       // 1.
