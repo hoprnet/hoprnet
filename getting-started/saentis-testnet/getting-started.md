@@ -4,9 +4,7 @@ description: Getting started with Säntis
 
 # Säntis for Previous Users
 
-If you've already run HOPR Chat before, you can connect to Säntis in no time.  
-  
-To get started as quickly as possible, visit https://saentis.hoprnet.org and follow the instructions there. If you need more help, this short guide will take you through the process step by step.
+If you've already run HOPR Chat before, you can connect to Säntis in no time.
 
 ### Step 1: Connect to the HOPR Network
 
