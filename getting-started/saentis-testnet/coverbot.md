@@ -4,7 +4,7 @@ description: 'More information about CoverBot, one of the bots overseeing the SÃ
 
 # Registering with CoverBot
 
-To participate in the testnet, you'll need to register with CoverBot. Make sure you've completed the previous setup sections and have funded your node with 0.01 xDAI.
+To participate in the testnet, you'll need to register with CoverBot and open a payment channel. This will cost a very small amount of xDAI. Make sure you've completed the previous setup sections and have funded your node with 0.02 xDAI \(around $0.02\).
 
 {% hint style="info" %}
 CoverBot is the latest in a series of bots running on the HOPR network which will be familiar from participants in our regular bounties and gaming sessions. We'll be adding more bots to SÃ¤ntis as the testnet progresses, including more ways to earn points.
@@ -12,9 +12,9 @@ CoverBot is the latest in a series of bots running on the HOPR network which wil
 
 ### Step 1: Find Your HOPR Address
 
-With **HOPR Chat** up and running, you are now ready to type and communicate with other users on the **HOPR Network**, including the bot which oversees the testnet.   
+With your node up and running, you are now ready to type and communicate with other users on the **HOPR Network**, including the bot which oversees the testnet.   
   
-Communication is achieved using **HOPR Addresses.** To find your node's address, type `myAddress` and press `Enter` inside **HOPR Chat.** Something like the following will show up:
+Communication is achieved using **HOPR Addresses.** To find your node's address, type `myAddress` and press `Enter` inside **HOPR Chat** or your **HOPR Node PC** app**.** Something like the following will show up:
 
 ```text
 > myAddress

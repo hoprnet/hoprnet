@@ -4,7 +4,7 @@ description: Funding your node with xDAI to participate in the testnet
 
 # Funding Your Node
 
-The Säntis testnet is being hosted on xDAI Chain, a sidechain of Ethereum. In order to participate in the testnet, you'll need to fund your node with 0.01 xDAI.  
+The Säntis testnet is being hosted on xDAI Chain, a sidechain of Ethereum. In order to participate in the testnet, you'll need to fund your node with 0.02 xDAI.  
   
 First, you'll need to load some ETH into your Ethereum wallet. [MetaMask](https://metamask.io/) is one of the most widely supported wallets, but there are other options.
 
@@ -14,7 +14,7 @@ Next, you'll need to convert some ETH into xDAI. There are several tools you can
 
 Finally, you'll need to send some xDAI to your node. Because xDAI is a separate chain, you'll need to change the network settings in MetaMask. [The xDAI docs have a step-by-step guide for this](https://www.xdaichain.com/for-users/wallets/metamask/metamask-setup).  
   
-Once you've sent xDAI to your node, restart HOPR Chat and the client will automatically detect your balance and allow you to proceed.  
+Once you've sent xDAI to your node, restart **HOPR Chat** or your **HOPR PC Node**. When your node restarts, your balance will be automatically detected and you can proceed to the [registration stage](coverbot.md).  
   
 Later, you can check your balance by typing `balance`\(because the HOPR mainnet will run on the Ethereum mainchain, you'll currently see your balance described as ETH rather than xDAI\).
 

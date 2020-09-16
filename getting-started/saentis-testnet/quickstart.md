@@ -1,5 +1,7 @@
 ---
-description: Step-by-step guide to quickly start using HOPR Chat on the Säntis testnet
+description: >-
+  A step-by-step guide to getting a HOPR node running on the Säntis testnet,
+  using the HOPR Chat node app
 ---
 
 # First Time Users
@@ -10,7 +12,7 @@ If Säntis is your first time using HOPR, you'll need to install a few things fi
 
 ### Before You Start
 
-This quick-start guide will help you to quickly install **HOPR Chat** and its dependencies so you can quickly connect to the **HOPR Network.** Please follow the step-by-step instructions to ensure everything works.
+To connect to the **HOPR network**, you will need a **HOPR node** and an **app** to communicate with it. This quick-start guide will walk you through installing the **HOPR Chat** app and its dependencies so you can quickly connect to the **HOPR network.** Please follow the step-by-step instructions to ensure everything works.
 
 {% hint style="warning" %}
 **HOPR**, **HOPR Chat** and the **HOPR Network** are early-stage technologies. The currently available early test versions are meant for the brave explorers who are here to build the future of a more private Web3 together with us. Do not rely on HOPR to protect your privacy or assets just yet!
@@ -106,7 +108,7 @@ If your screen shows `v12.18.2` you are ready to go!
 
 ## Step 2 - Get HOPR Chat
 
-With Node.js successfully installed on your system, you're ready to download **HOPR Chat,** which is distributed as a zip file.
+With Node.js successfully installed on your system, you're ready to download **HOPR Chat,** which is distributed as a zip file. **HOPR Chat** will automatically spin up a **HOPR node** and will allow you to control that node and send data to other **HOPR users** and the various **HOPR bots**.
 
 ### Download HOPR Chat
 
