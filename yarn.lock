@@ -417,10 +417,10 @@
     web3-eth "^1.2.11"
     web3-eth-contract "^1.2.11"
 
-"@hoprnet/hopr-core@0.6.32-xdai":
-  version "0.6.32-xdai"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core/-/hopr-core-0.6.32-xdai.tgz#3c396bedec7a04c3544b90fdd29c5a22fefb0516"
-  integrity sha512-OURJ75mXU1Pyx0R565beEGt4BRxU2sKfOMULsbL0/dQbIE9Wrd1cPKK8bf3IC09nomob7uW+xkn9aTiiDDMs1Q==
+"@hoprnet/hopr-core@0.6.33":
+  version "0.6.33"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core/-/hopr-core-0.6.33.tgz#fcc1ced5039de0dc27160bee1489d9f48bb381e2"
+  integrity sha512-nlTQcj3isgbN1yWRf36g/yWpd9AwWBhZKGy9t8CEaN+TYKUCILgsadtwq/oAzKb0DJhoJNDDgfg10W19LKTt9g==
   dependencies:
     "@hoprnet/hopr-core-ethereum" "0.4.4-xdai"
     "@hoprnet/hopr-demo-seeds" "1.8.0"
