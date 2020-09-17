@@ -180,9 +180,9 @@ async function main() {
       adminServer.registerNode(node)
     }
   } catch (e){
-    logs.log("Node failed to start:")
-    logs.log(e)
     console.log(e)
+    logs.log("Node failed to start:")
+    logs.logFatalError('' + e)
   }
 }
 main();
