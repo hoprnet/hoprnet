@@ -1,5 +1,17 @@
 steps:
 - name: 'gcr.io/cloud-builders/docker'
-  args: [ 'build', '-f', 'chatbot.Dockerfile', '-t', 'gcr.io/hoprassociation/hopr-chatbot', '.' ]
+  args: ['build',
+        # @TODO: Make Dynamic
+        # '--build-arg',
+        # 'CHATBOT_ECOSYSTEM_FILE=${_BOT_TYPE_1}.process.yaml',
+         '-f',
+         # @TODO: Replace for dynamic
+         # 'chatbot.Dockerfile',
+         'chatbot.coverbot.Dockerfile',
+         '-t',
+         'gcr.io/hoprassociation/hopr-chatbot/${_BOT_TYPE_1}',
+         '.']
+substitutions:
+  _BOT_TYPE_1: coverbot
 images:
-- 'gcr.io/hoprassociation/hopr-chatbot'
+- 'gcr.io/hoprassociation/hopr-chatbot/${_BOT_TYPE_1}'

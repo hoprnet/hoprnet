@@ -1,20 +1,29 @@
 version: '3.1'
 
 services:
-  server:
-    image: gcr.io/hoprassociation/hopr-server
+  coverbot:
+    build:
+      context: .
+      dockerfile: chatbot.Dockerfile
     restart: always
-    ports:
-      - '50051:50051'
-      - '9091:9091'
+    env_file:
+      - .env
     environment:
-      - BOOTSTRAP_SERVERS=/ip4/34.65.219.148/tcp/9091/p2p/16Uiu2HAkwSEiK819yvnG84pNFsqXkpFX4uiCaNSwADnmYeAfctRn,/ip4/34.65.148.229/tcp/9091/p2p/16Uiu2HAmRsp3VBLcyPfTBkJYEwS47bewxWqqm4sEpJEtPBLeV93n
-    volumes:
-      - /app/db
-  chat-bot:
-    image: gcr.io/hoprassociation/hopr-chatbot/client
+      - API_URL=34.65.96.1:50051
+      - BOT_NAME=coverbot
+      - HOPR_ENVIRONMENT=develop
+      - COVERBOT_XDAI_THRESHOLD=0.001
+      - COVERBOT_VERIFICATION_CYCLE_IN_MS=60000
+      - COVERBOT_DEBUG_MODE=false
+      - COVERBOT_CHAIN_PROVIDER=https://dai.poa.network
+  coverbot-ui:
+    build:
+      context: src/coverbot/ui/coverbot
+      dockerfile: coverbot-ui.Dockerfile
+      args:
+        - HOPR_ENVIRONMENT=develop
     restart: always
     depends_on:
-      - 'server'
-    environment:
-      - API_URL=server:50051
+      - 'coverbot'
+    ports:
+      - '3000'

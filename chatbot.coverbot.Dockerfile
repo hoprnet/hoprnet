@@ -43,7 +43,8 @@ RUN yarn cache clean
 
 FROM node:12.9.1-buster AS runtime
 
-ARG CHATBOT_ECOSYSTEM_FILE
+# @TODO: Make this dynamic
+# ARG CHATBOT_ECOSYSTEM_FILE
 
 # install yarn
 RUN yarn global add pm2
@@ -55,11 +56,11 @@ COPY --from=build /src/node_modules /app/node_modules
 COPY --from=build /src/package.json /app/package.json
 COPY --from=build /src/tsconfig.json /app/tsconfig.json
 COPY --from=build /src/dist /app/dist
-COPY --from=build /src/$CHATBOT_ECOSYSTEM_FILE /app/$CHATBOT_ECOSYSTEM_FILE
+COPY --from=build /src/coverbot.process.yaml /app/coverbot.process.yaml
 
 EXPOSE 9091
 EXPOSE 50051
 
 VOLUME ["/app/db"]
 
-CMD ["pm2-runtime", "start", "$CHATBOT_ECOSYSTEM_FILE", "--env", "$NODE_ENV"]
+ENTRYPOINT ["pm2-runtime", "start", "coverbot.process.yaml"]

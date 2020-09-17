@@ -49,3 +49,5 @@ lib/
 # Hopr Node
 db
 
+# service accounts
+service-account.json
