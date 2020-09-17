@@ -32,3 +32,8 @@ log.txt
 # Exclude bin files
 hopr-chat
 *.zip
+
+# Exclude alice bob charlie
+.alice
+.bob
+.charlie

@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-chat",
-  "version": "1.12.0",
+  "version": "1.13.0-saentis.testnet",
   "description": "Interactive chat PoC for HOPR Protocol",
   "main": "lib/index.js",
   "scripts": {
@@ -32,9 +32,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@hoprnet/hopr-core": "0.6.23",
-    "@hoprnet/hopr-core-connector-interface": "1.3.2-35127fb",
-    "@hoprnet/hopr-utils": "0.4.0",
+    "@hoprnet/hopr-core": "0.6.32-xdai",
+    "@hoprnet/hopr-core-connector-interface": "1.7.1",
+    "@hoprnet/hopr-utils": "0.6.1",
     "@zeit/ncc": "^0.22.3",
     "bn.js": "~5.1.2",
     "chalk": "~4.1.0",
