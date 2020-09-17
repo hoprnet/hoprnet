@@ -7,7 +7,6 @@
   ],
   "scripts": {
     "bootstrap": "lerna bootstrap --use-workspaces",
-    "start:hopr.swiss": "lerna exec --scope @hoprnet/hopr-website.hopr.swiss -- yarn start",
     "start:hoprnet.org": "lerna exec --scope @hoprnet/hopr-website.hoprnet.org -- yarn start",
     "clean": "lerna clean",
     "build": "lerna exec --parallel --scope @hoprnet/hopr-website.hopr* -- yarn build"
