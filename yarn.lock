@@ -410,15 +410,15 @@
     "@ethersproject/rlp" "^5.0.0"
     "@ethersproject/signing-key" "^5.0.0"
 
-"@hoprnet/hopr-core-connector-interface@1.5.6":
-  version "1.5.6"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-connector-interface/-/hopr-core-connector-interface-1.5.6.tgz#ded55ed9b041efcfe3da6e2c37eb330fa5bebac1"
-  integrity sha512-3wbVxCq22O0l0dqHzEZ1IVP27Q6TuG122yPRbctso3hGdr0L98QTvTvaHIRkDKKS7SNbc4uqwdT/zDobLTaxXw==
+"@hoprnet/hopr-core-connector-interface@1.7.1":
+  version "1.7.1"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-connector-interface/-/hopr-core-connector-interface-1.7.1.tgz#fee80b0e954a8606dfd9d8cb53102606a9e66b64"
+  integrity sha512-lDTOTpOOyE9PrXo0TPv1Rw7BcOndSj4+CISCAyB1/Nby/2yGtZbm65IPOcngWUYrCgXQMuxrc/AR3pFIQ6eV5w==
 
-"@hoprnet/hopr-core-ethereum@0.2.2":
-  version "0.2.2"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-ethereum/-/hopr-core-ethereum-0.2.2.tgz#070536d9520000bf83119ce8f8570804a55c7782"
-  integrity sha512-rdKWrgVGxk5Pj7x9IaU585LxfKplwRfhVQ7HaZItgTDnfTn2hcypyOnDxuNDIwBF2Qx7AwgqxhKqn2nPAQwlPg==
+"@hoprnet/hopr-core-ethereum@0.4.4-xdai":
+  version "0.4.4-xdai"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-ethereum/-/hopr-core-ethereum-0.4.4-xdai.tgz#3f8ec0e49af52b4601bb4f936c652a9cfcbf0058"
+  integrity sha512-OSY2FwF1vuxN823zqJNj5lXApoRlqTjO1/HxKvRf19ZE6kfF1gk/MTN7SL+G3bjMVoWSF6Rg3+KIBSrkdj/ibw==
   dependencies:
     "@hoprnet/hopr-utils" "^0.4.0"
     bn.js "^5.1.2"
@@ -441,10 +441,10 @@
   dependencies:
     micro "^9.3.4"
 
-"@hoprnet/hopr-ethereum@^1.0.0":
-  version "1.0.0"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-ethereum/-/hopr-ethereum-1.0.0.tgz#c8e6664c173d94ead357bf62e3670f6569d3f232"
-  integrity sha512-hSfY3FL8uatrD9xahLyTqGRmvuK/3wE+TaIDip1tC01BFBhEBzghunL96P2GW562ZGr+/6XCezzYINUPEtaCaw==
+"@hoprnet/hopr-ethereum@^1.1.2-xdai":
+  version "1.1.2-xdai"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-ethereum/-/hopr-ethereum-1.1.2-xdai.tgz#128c70f5dfb17a28d15e2bc45bb591355a55af2b"
+  integrity sha512-61gLsgxHj3iprUmuRaIGButL4WboFfiwkbmTu/olP/fj7CzErjvJTxEg1DVdSzCpviZUCmUnQzfaO/tia+Mtmw==
   dependencies:
     "@hoprnet/hopr-demo-seeds" "1.8"
     "@hoprnet/hopr-utils" "0.3.0"
