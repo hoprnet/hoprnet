@@ -32,9 +32,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@hoprnet/hopr-core": "0.6.33",
-    "@hoprnet/hopr-core-connector-interface": "1.7.1",
-    "@hoprnet/hopr-utils": "0.6.1",
+    "@hoprnet/hopr-core": "0.6.34",
+    "@hoprnet/hopr-core-connector-interface": "1.10.3",
+    "@hoprnet/hopr-utils": "0.6.2",
     "@zeit/ncc": "^0.22.3",
     "bn.js": "~5.1.2",
     "chalk": "~4.1.0",
