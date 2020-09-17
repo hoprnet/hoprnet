@@ -6,9 +6,9 @@ import Debug from 'debug'
 const log = Debug('hopr-core-ethereum:hashedSecret')
 
 import { randomBytes } from 'crypto'
-import { u8aEquals, u8aToHex, stringToU8a, u8aConcat } from '@hoprnet/hopr-utils'
+import { u8aEquals, u8aToHex, u8aConcat } from '@hoprnet/hopr-utils'
 import { publicKeyConvert } from 'secp256k1'
-import { SignedTicket, AcknowledgedTicket } from './types'
+import { AcknowledgedTicket } from './types'
 
 export const GIANT_STEP_WIDTH = 10000
 export const TOTAL_ITERATIONS = 100000
@@ -20,7 +20,7 @@ export type PreImageResult = {
 }
 
 class HashedSecret {
-  private _hashedSecretIterator: AsyncGenerator<Hash, Hash, AcknowledgedTicket>
+  private _hashedSecretIterator: AsyncGenerator<boolean, boolean, AcknowledgedTicket>
   constructor(private coreConnector: HoprEthereum) {
     this._hashedSecretIterator = async function* () {
       let ticket: AcknowledgedTicket = yield
@@ -40,19 +40,21 @@ class HashedSecret {
         ) {
           currentPreImage = this.findPreImage(tmp.preImage)
 
+          ticket.preImage = tmp.preImage
+
           if (tmp.index == 0) {
             // @TODO dispatch call of next hashedSecret submit
-            return tmp.preImage
+            return true
           } else {
-            yield tmp.preImage
+            yield true
           }
 
           tmp = await currentPreImage
         } else {
-          yield
+          yield false
         }
 
-        ticket = yield
+        ticket = yield false
       }
     }.call(this)
   }
@@ -267,7 +269,7 @@ class HashedSecret {
     return { preImage: new Hash(intermediary), index }
   }
 
-  public async reserveIfIsWinning(ticket: AcknowledgedTicket): Promise<Hash | void> {
+  public async reserveIfIsWinning(ticket: AcknowledgedTicket): Promise<boolean> {
     await this._hashedSecretIterator.next()
 
     return (await this._hashedSecretIterator.next(ticket)).value

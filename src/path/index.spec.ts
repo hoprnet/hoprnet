@@ -2,26 +2,9 @@ import assert from 'assert'
 import type HoprEthereum from '..'
 import { randomBytes } from 'crypto'
 import { Public } from '../types'
+import { gcd } from '@hoprnet/hopr-utils'
 
 import Path from '.'
-
-function gcd(a: number, b: number) {
-  a = Math.abs(a)
-  b = Math.abs(b)
-
-  if (b > a) {
-    var temp = a
-    a = b
-    b = temp
-  }
-
-  while (true) {
-    if (b == 0) return a
-    a %= b
-    if (a == 0) return b
-    b %= a
-  }
-}
 
 function findGenerator(nodesCount: number, previousGenerator?: number) {
   for (let i = previousGenerator != null ? previousGenerator + 1 : 2; i < nodesCount; i++) {

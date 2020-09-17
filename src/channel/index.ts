@@ -20,17 +20,21 @@ import type HoprEthereum from '..'
 import Channel from './channel'
 
 import { Uint8ArrayE } from '../types/extended'
-import { randomBytes } from 'crypto'
 
 import { CHANNEL_STATES } from './constants'
 import { OnChainChannel } from './types'
 import { Log } from 'web3-core'
+import { TicketStatic } from './ticket'
 
 const EMPTY_SIGNATURE = new Uint8Array(Signature.SIZE).fill(0x00)
 const WIN_PROB = new BN(1)
 
 class ChannelFactory {
-  constructor(private coreConnector: HoprEthereum) {}
+  public tickets: TicketStatic
+
+  constructor(private coreConnector: HoprEthereum) {
+    this.tickets = new TicketStatic(coreConnector)
+  }
 
   async increaseFunds(counterparty: AccountId, amount: Balance): Promise<void> {
     try {

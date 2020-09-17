@@ -21,9 +21,12 @@ class ChannelBalance extends Uint8ArrayE implements Types.ChannelBalance {
     }
 
     if (struct != null) {
-      ChannelBalance
       if (struct.balance_a != null) {
         this.set(new Balance(struct.balance_a.toString()).toU8a(), this.balanceAOffset - this.byteOffset)
+      }
+
+      if (struct.balance != null) {
+        this.set(new Balance(struct.balance.toString()).toU8a(), this.balanceOffset - this.byteOffset)
       }
     }
   }

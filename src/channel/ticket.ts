@@ -1,10 +1,61 @@
 import type IChannel from '.'
-import BN from 'bn.js'
-import { u8aToHex, stringToU8a } from '@hoprnet/hopr-utils'
-import { Hash, TicketEpoch, Balance, SignedTicket, Ticket } from '../types'
-import { pubKeyToAccountId } from '../utils'
+import { u8aToHex } from '@hoprnet/hopr-utils'
+import { Hash, TicketEpoch, Balance, SignedTicket, Ticket, AcknowledgedTicket } from '../types'
+import { pubKeyToAccountId, computeWinningProbability, isWinningTicket, checkChallenge } from '../utils'
+import assert from 'assert'
+import type HoprEthereum from '..'
 
-const DEFAULT_WIN_PROB = new BN(1)
+const DEFAULT_WIN_PROB = 1
+
+class TicketStatic {
+  constructor(public coreConnector: HoprEthereum) {}
+
+  async submit(ticket: AcknowledgedTicket): Promise<void> {
+    const { hoprChannels, signTransaction, account, utils } = this.coreConnector
+    const { r, s, v } = utils.getSignatureParameters((await ticket.signedTicket).signature)
+
+    assert(
+      await checkChallenge((await ticket.signedTicket).ticket.challenge, ticket.response),
+      'checks that the given response fulfills the challenge that has been signed by counterparty'
+    )
+
+    const onChainSecret = await this.coreConnector.account.onChainSecret
+
+    const preImage = (await this.coreConnector.hashedSecret.findPreImage(onChainSecret)).preImage
+
+    assert(
+      await isWinningTicket(
+        await (await ticket.signedTicket).ticket.hash,
+        ticket.response,
+        preImage,
+        (await ticket.signedTicket).ticket.winProb
+      )
+    )
+
+    const transaction = await signTransaction(
+      hoprChannels.methods.redeemTicket(
+        u8aToHex(preImage),
+        u8aToHex(ticket.response),
+        (await ticket.signedTicket).ticket.amount.toString(),
+        u8aToHex((await ticket.signedTicket).ticket.winProb),
+        u8aToHex(r),
+        u8aToHex(s),
+        v + 27
+      ),
+      {
+        from: (await account.address).toHex(),
+        to: hoprChannels.options.address,
+        nonce: (await account.nonce).valueOf(),
+      }
+    )
+
+    ticket.redeemed = true
+
+    await transaction.send()
+
+    this.coreConnector.account.updateLocalState(preImage)
+  }
+}
 
 class TicketFactory {
   constructor(public channel: IChannel) {}
@@ -12,14 +63,14 @@ class TicketFactory {
   async create(
     amount: Balance,
     challenge: Hash,
+    winProb: number = DEFAULT_WIN_PROB,
     arr?: {
       bytes: ArrayBuffer
       offset: number
     }
   ): Promise<SignedTicket> {
-    const winProb = new Hash(
-      new BN(new Uint8Array(Hash.SIZE).fill(0xff)).div(DEFAULT_WIN_PROB).toArray('le', Hash.SIZE)
-    )
+    const ticketWinProb = new Hash(computeWinningProbability(winProb))
+
     const counterparty = await pubKeyToAccountId(this.channel.counterparty)
 
     const epoch = await this.channel.coreConnector.hoprChannels.methods
@@ -39,7 +90,7 @@ class TicketFactory {
         challenge,
         epoch,
         amount,
-        winProb,
+        winProb: ticketWinProb,
       }
     )
 
@@ -65,38 +116,7 @@ class TicketFactory {
 
     return await signedTicket.verify(await this.channel.offChainCounterparty)
   }
-
-  async submit(signedTicket: SignedTicket, hashedSecretASecretB: Hash): Promise<void> {
-    const { hoprChannels, signTransaction, account, utils } = this.channel.coreConnector
-    const { ticket, signature } = signedTicket
-    const { r, s, v } = utils.getSignatureParameters(signature)
-
-    const onChainSecret = await this.channel.coreConnector.hoprChannels.methods
-      .accounts(u8aToHex(await this.channel.coreConnector.account.address))
-      .call()
-      .then((res) => new Hash(stringToU8a(res.hashedSecret)))
-
-    const preImage = await this.channel.coreConnector.hashedSecret.findPreImage(onChainSecret)
-
-    const transaction = await signTransaction(
-      hoprChannels.methods.redeemTicket(
-        u8aToHex(preImage.preImage),
-        u8aToHex(hashedSecretASecretB),
-        ticket.amount.toString(),
-        u8aToHex(ticket.winProb),
-        u8aToHex(r),
-        u8aToHex(s),
-        v + 27
-      ),
-      {
-        from: (await account.address).toHex(),
-        to: hoprChannels.options.address,
-        nonce: (await account.nonce).valueOf(),
-      }
-    )
-
-    await transaction.send()
-  }
 }
 
+export { TicketStatic }
 export default TicketFactory

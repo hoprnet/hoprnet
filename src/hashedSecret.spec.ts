@@ -4,7 +4,7 @@ import * as DbKeys from './dbKeys'
 import * as Utils from './utils'
 import * as Types from './types'
 import PreImage, { GIANT_STEP_WIDTH, TOTAL_ITERATIONS, HASHED_SECRET_WIDTH } from './hashedSecret'
-import { randomInteger, u8aEquals, durations, stringToU8a, u8aToHex } from '@hoprnet/hopr-utils'
+import { randomInteger, u8aEquals, durations, stringToU8a } from '@hoprnet/hopr-utils'
 import Memdown from 'memdown'
 import LevelUp from 'levelup'
 import { Ganache } from '@hoprnet/hopr-testing'
@@ -17,6 +17,8 @@ import HoprChannelsAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprCha
 import Account from './account'
 import { addresses } from '@hoprnet/hopr-ethereum'
 import { randomBytes } from 'crypto'
+
+const EMPTY_HASHED_SECRET = new Uint8Array(HASHED_SECRET_WIDTH).fill(0x00)
 
 describe('test hashedSecret', function () {
   this.timeout(durations.seconds(7))
@@ -221,53 +223,63 @@ describe('test hashedSecret', function () {
     })
 
     it('should reserve a preImage for tickets with 100% winning probabilty resp. should not reserve for 0% winning probability', async function () {
-      const firstTicket = {
-        signedTicket: Promise.resolve({
+      const firstTicket = new Types.AcknowledgedTicket(connector, undefined, {
+        signedTicket: {
           ticket: {
             hash: Promise.resolve(new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))),
             winProb: Utils.computeWinningProbability(1),
           },
-        }) as Promise<Types.SignedTicket>,
+        } as Types.SignedTicket,
         response: new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff)),
-      } as Types.AcknowledgedTicket
+      })
 
-      const firstPreImage = await connector.hashedSecret.reserveIfIsWinning(firstTicket)
+      assert(
+        await connector.hashedSecret.reserveIfIsWinning(firstTicket),
+        'ticket with 100% winning probability must always be a win'
+      )
 
-      const secondPreImage = await connector.hashedSecret.reserveIfIsWinning(firstTicket)
+      const firstPreImage = new Types.Hash(new Uint8Array(HASHED_SECRET_WIDTH))
+      firstPreImage.set(firstTicket.preImage)
+
+      assert(
+        await connector.hashedSecret.reserveIfIsWinning(firstTicket),
+        'ticket with 100% winning probability must always be a win'
+      )
+
+      const secondPreImage = new Types.Hash(new Uint8Array(HASHED_SECRET_WIDTH))
+      secondPreImage.set(firstTicket.preImage)
 
       assert(
         firstPreImage != null &&
           secondPreImage != null &&
-          !(firstPreImage as Types.Hash).eq(secondPreImage as Types.Hash) &&
-          u8aEquals(
-            (await Utils.hash(secondPreImage as Types.Hash)).slice(0, HASHED_SECRET_WIDTH),
-            firstPreImage as Types.Hash
-          )
+          !firstPreImage.eq(secondPreImage) &&
+          u8aEquals((await Utils.hash(secondPreImage)).slice(0, HASHED_SECRET_WIDTH), firstPreImage)
       )
 
-      const notWinnigTicket = {
-        signedTicket: Promise.resolve({
+      const notWinnigTicket = new Types.AcknowledgedTicket(connector, undefined, {
+        signedTicket: {
           ticket: {
             hash: Promise.resolve(new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))),
             winProb: Utils.computeWinningProbability(0),
           },
-        }) as Promise<Types.SignedTicket>,
+        } as Types.SignedTicket,
         response: new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff)),
-      } as Types.AcknowledgedTicket
+      })
 
-      const thirdAttempt = await connector.hashedSecret.reserveIfIsWinning(notWinnigTicket)
-
-      assert(thirdAttempt == null, `Ticket with winning probability of 0 should not be a win`)
-
-      const fourthAttempt = await connector.hashedSecret.reserveIfIsWinning(firstTicket)
+      assert(!(await connector.hashedSecret.reserveIfIsWinning(notWinnigTicket)), 'falsy ticket should not be a win')
 
       assert(
-        fourthAttempt != null &&
-          !(fourthAttempt as Types.Hash).eq(secondPreImage as Types.Hash) &&
-          u8aEquals(
-            (await Utils.hash(fourthAttempt as Types.Hash)).slice(0, HASHED_SECRET_WIDTH),
-            secondPreImage as Types.Hash
-          )
+        await connector.hashedSecret.reserveIfIsWinning(firstTicket),
+        'ticket with 100% winning probability must always be a win'
+      )
+
+      const fourthPreImage = new Types.Hash(new Uint8Array(HASHED_SECRET_WIDTH))
+      fourthPreImage.set(firstTicket.preImage)
+
+      assert(
+        fourthPreImage != null &&
+          !fourthPreImage.eq(secondPreImage) &&
+          u8aEquals((await Utils.hash(fourthPreImage)).slice(0, HASHED_SECRET_WIDTH), secondPreImage)
       )
     })
 
@@ -276,27 +288,25 @@ describe('test hashedSecret', function () {
 
       let ticket: Types.AcknowledgedTicket
 
-      let preImage: Types.Hash | void
-
       for (let i = 0; i < ATTEMPTS; i++) {
-        ticket = {
-          signedTicket: Promise.resolve({
+        ticket = new Types.AcknowledgedTicket(connector, undefined, {
+          signedTicket: {
             ticket: {
               hash: Promise.resolve(new Types.Hash(randomBytes(Types.Hash.SIZE))),
               winProb: Utils.computeWinningProbability(Math.random()),
             },
-          }) as Promise<Types.SignedTicket>,
+          } as Types.SignedTicket,
           response: new Types.Hash(randomBytes(Types.Hash.SIZE)),
-        } as Types.AcknowledgedTicket
+        })
 
-        preImage = await connector.hashedSecret.reserveIfIsWinning(ticket)
+        await connector.hashedSecret.reserveIfIsWinning(ticket)
 
-        if (preImage != null) {
+        if (!u8aEquals(ticket.preImage, EMPTY_HASHED_SECRET)) {
           assert(
             await Utils.isWinningTicket(
               await (await ticket.signedTicket).ticket.hash,
               ticket.response,
-              preImage as Types.Hash,
+              ticket.preImage,
               (await ticket.signedTicket).ticket.winProb
             )
           )

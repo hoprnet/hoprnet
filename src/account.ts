@@ -144,6 +144,10 @@ class Account {
     })
   }
 
+  updateLocalState(onChainSecret: Hash) {
+    this._onChainSecret = onChainSecret
+  }
+
   private async attachAccountDataListener() {
     if (this._ticketEpochListener == null) {
       // listen for 'SecretHashSet' events and update 'ticketEpoch'
