@@ -20,34 +20,50 @@
 </p>
 
 <!-- TABLE OF CONTENTS -->
+
 ## Table of Contents
 
-* [Overview](#overview)
-  * [Technologies](#technologies)
-* [Getting Started](#getting-started)
-  * [Prerequisites](#prerequisites)
-  * [Installation](#installation)
-* [Usage](#usage)
-  * [Environment Variables](#environment-variables)
-* [Roadmap](#roadmap)
-* [Additional Information](#additional-information)
-* [Contributors](#contributors)
-* [Contact](#contact)
+- [Table of Contents](#table-of-contents)
+- [Overview](#overview)
+  - [Technologies](#technologies)
+- [Getting Started](#getting-started)
+  - [Prerequisites](#prerequisites)
+  - [Installation](#installation)
+  - [Docker Image](#docker-image)
+    - [Pull latest version](#pull-latest-version)
+    - [Run latest version](#run-latest-version)
+    - [Run latest version w/specific `BOOTSTRAP_SERVERS`](#run-latest-version-wspecific-bootstrapservers)
+- [Usage](#usage)
+  - [Commands](#commands)
+  - [Environment Variables](#environment-variables)
+- [Roadmap](#roadmap)
+- [Additional Information](#additional-information)
+  - [Query the server using BloomRPC (Recommended)](#query-the-server-using-bloomrpc-recommended)
+    - [Quering](#quering)
+    - [Sending & Listening to messages](#sending--listening-to-messages)
+  - [Querying the server using gCURL](#querying-the-server-using-gcurl)
+  - [Considerations](#considerations)
+  - [Links](#links)
+- [Contributors](#contributors)
+- [Contact](#contact)
 
 <!-- OVERVIEW -->
+
 ## Overview
 
-**HOPR Server** functions as a wrapper for a **HOPR Node**. Upon  start, it will automatically spin a **HOPR Node** listening to port `9091` and create a gRPC-ready interface listening to port `50051` which automatically connects to the **HOPR Network** using the `BOOTSTRAP_SERVERS` defined.
+**HOPR Server** functions as a wrapper for a **HOPR Node**. Upon start, it will automatically spin a **HOPR Node** listening to port `9091` and create a gRPC-ready interface listening to port `50051` which automatically connects to the **HOPR Network** using the `BOOTSTRAP_SERVERS` defined.
 
-To interact with **HOPR Server**, you need to use [**HOPR Protos**](https://github.com/hoprnet/hopr-protos), the *Protobuf* implementation of the **HOPR Protocol** which exposes its API via gRPC. **HOPR Protos** can be installed and used via `nom` by installing the [distribution package](https://www.npmjs.com/package/@hoprnet/hopr-protos).
+To interact with **HOPR Server**, you need to use [**HOPR Protos**](https://github.com/hoprnet/hopr-protos), the _Protobuf_ implementation of the **HOPR Protocol** which exposes its API via gRPC. **HOPR Protos** can be installed and used via `nom` by installing the [distribution package](https://www.npmjs.com/package/@hoprnet/hopr-protos).
 
 ### Technologies
-* [HOPR Core](https://github.com/hoprnet/hopr-core)
-* [typescript](https://www.typescriptlang.org/)
-* [nest.js](https://nestjs.com/)
-* [protocol buffers](https://developers.google.com/protocol-buffers)
+
+- [HOPR Core](https://github.com/hoprnet/hopr-core)
+- [typescript](https://www.typescriptlang.org/)
+- [nest.js](https://nestjs.com/)
+- [protocol buffers](https://developers.google.com/protocol-buffers)
 
 <!-- GETTING STARTED -->
+
 ## Getting Started
 
 To get a local copy up and running follow these simple steps. In case you just want to have a runnable version of **HOPR Server**, you can use our [Docker Image](#docker-image) to quickly start the server.
@@ -56,17 +72,20 @@ To get a local copy up and running follow these simple steps. In case you just w
 
 This is an example of how to list things you need to use the software and how to install them.
 
-* [node.js v>=12](https://nodejs.org/)
-* [yarn](https://yarnpkg.com/)
-* [docker](https://www.docker.com/) (optional)
+- [node.js v>=12](https://nodejs.org/)
+- [yarn](https://yarnpkg.com/)
+- [docker](https://www.docker.com/) (optional)
 
 ### Installation
- 
+
 1. Clone the repo
+
 ```sh
 git clone https://github.com/hoprnet/hopr-server.git
 ```
+
 2. Install NPM packages
+
 ```sh
 yarn
 ```
@@ -74,16 +93,19 @@ yarn
 ### Docker Image
 
 #### Pull latest version
+
 ```sh
 docker pull gcr.io/hoprassociation/hopr-server
 ```
 
 #### Run latest version
+
 ```sh
 docker run -p 50051:50051 -p 9091:9091 -it gcr.io/hoprassociation/hopr-server
 ```
 
 #### Run latest version w/specific `BOOTSTRAP_SERVERS`
+
 ```sh
 docker run \
   -p 50051:50051 -p 9091:9091 \
@@ -92,6 +114,7 @@ docker run \
 ```
 
 <!-- USAGE EXAMPLES -->
+
 ## Usage
 
 Upon installing, you can run `yarn start` to start the server which will use `ts-node`. Once you see `:: HOPR Core Node Started ::`, it means that the server has successfully connected to the **HOPR Network** using the defined `BOOTSTRAP_SERVERS` and is ready to accept requests.
@@ -99,6 +122,7 @@ Upon installing, you can run `yarn start` to start the server which will use `ts
 In case you are looking to distribute the application, you can precompile it using `yarn build`, which will compile the `nest.js` TypeScript files and create a `dist` folder, which can then be used by `node` directly.
 
 ### Commands
+
 1. `yarn start` - Starts **HOPR Server** in `dev` mode.
 2. `yarn build` - Builds **HOPR Server** for production.
 
@@ -108,21 +132,24 @@ _For more information about the HOPR Network, please refer to the [Documentation
 
 The following environment variables can be stored and used in an `.env` file located at the root of the project.
 
-| Name              | Description                                                  | Type             | Example                           |
-| :---------------- | :----------------------------------------------------------- | :--------------- | :-------------------------------- |
-| SERVER_HOST       | server HOST url                                              | string           | 0.0.0.0:50051                     |
-| DEBUG             | passed to hopr-core: run in debug mode                       | boolean          | TRUE                              |
-| ID                | passed to hopr-core: demo account ID                         | integer          | 1                                 |
-| BOOTSTRAP_NODE    | passed to hopr-core: TRUE if node is a boostrap node         | boolean          | FALSE                             |
-| CORE_HOST         | passed to hopr-core: hopr-core HOST url                      | string           | 0.0.0.0:9091                      |
-| BOOTSTRAP_SERVERS | passed to hopr-core: a list of bootstap server to connect to | array of strings | [src](./src/core/core.service.ts) |
+| Name              | Description                                                  | Type             | Example                                                      |
+| :---------------- | :----------------------------------------------------------- | :--------------- | :----------------------------------------------------------- |
+| SERVER_HOST       | server HOST url                                              | string           | 0.0.0.0:50051                                                |
+| DEBUG_MODE        | passed to hopr-core: run in debug mode                       | boolean          | TRUE                                                         |
+| ID                | passed to hopr-core: demo account ID                         | integer          | 1                                                            |
+| BOOTSTRAP_NODE    | passed to hopr-core: TRUE if node is a boostrap node         | boolean          | FALSE                                                        |
+| CORE_HOST         | passed to hopr-core: hopr-core HOST url                      | string           | 0.0.0.0:9091                                                 |
+| BOOTSTRAP_SERVERS | passed to hopr-core: a list of bootstap server to connect to | array of strings | [src](./src/core/core.service.ts)                            |
+| PROVIDER          | passed to hopr-core: blockchain endpoint                     | string           | wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36 |
 
 <!-- ROADMAP -->
+
 ## Roadmap
 
 See the [issues](https://github.com/hoprnet/hopr-server/issues) for a list of proposed features (and known issues).
 
 <!-- ADDITIONAL INFORMATION -->
+
 ## Additional Information
 
 ### Query the server using [BloomRPC](https://github.com/uw-labs/bloomrpc) (Recommended)
@@ -218,6 +245,7 @@ which is incompatible with our server, the right input is:
 - Before calling `Send` you should call `GetStatus`, as the **HOPR node** might need to “discover” the other node from the network before it is able to send a message. Avoiding to do so might result in a `Timeout` error.
 
 ### Links
+
 - [ ] [License](./LICENSE.md)
 - [ ] [Changelog](./CHANGELOG.md)
 - [ ] [Contribution Guidelines](./CONTRIBUTING.md)
@@ -225,16 +253,19 @@ which is incompatible with our server, the right input is:
 - [ ] [Codeowners](./CODEOWNERS.md)
 
 <!-- CONTRIBUTORS -->
+
 ## Contributors
 
 This project has been possible thanks to the support of the following individuals:
 
-* [@jjperezaguinaga](https://github.com/jjperezaguinaga)
-* [@nionis](https://github.com/nionis)
-* [@peterbraden](https://github.com/peterbraden)
+- [@jjperezaguinaga](https://github.com/jjperezaguinaga)
+- [@nionis](https://github.com/nionis)
+- [@peterbraden](https://github.com/peterbraden)
 
 <!-- CONTACT -->
+
 ## Contact
+
 - Twitter - https://twitter.com/hoprnet
 - Telegram - https://t.me/hoprnet
 - Medium - https://medium.com/hoprnet

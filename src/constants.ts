@@ -13,5 +13,6 @@ export const PROTO_PACKAGES = [
   'channels',
   'send',
   'listen',
+  'withdraw',
 ]
 export const PROTO_FILES = PROTO_PACKAGES.map((pkg) => `${pkg}.proto`)

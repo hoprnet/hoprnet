@@ -20,6 +20,12 @@ import {
 } from '@hoprnet/hopr-protos/node/channels_pb'
 import { SendRequest, SendResponse } from '@hoprnet/hopr-protos/node/send_pb'
 import { ListenRequest } from '@hoprnet/hopr-protos/node/listen_pb'
+import {
+  WithdrawNativeRequest,
+  WithdrawHoprRequest,
+  WithdrawNativeResponse,
+  WithdrawHoprResponse,
+} from '@hoprnet/hopr-protos/node/withdraw_pb'
 
 @Injectable()
 export class GrpcService {
@@ -123,5 +129,13 @@ export class GrpcService {
 
   async listen({ peerId }: ListenRequest.AsObject): Promise<EventEmitter> {
     return this.coreService.listen({ peerId })
+  }
+
+  async withdrawNative(req: WithdrawNativeRequest.AsObject): Promise<WithdrawNativeResponse.AsObject> {
+    return this.coreService.withdraw({ currency: 'NATIVE', recipient: req.recipient, amount: req.amount })
+  }
+
+  async withdrawHopr(req: WithdrawHoprRequest.AsObject): Promise<WithdrawHoprResponse.AsObject> {
+    return this.coreService.withdraw({ currency: 'HOPR', recipient: req.recipient, amount: req.amount })
   }
 }

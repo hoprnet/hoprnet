@@ -20,6 +20,12 @@ import {
 } from '@hoprnet/hopr-protos/node/channels_pb'
 import { SendRequest, SendResponse } from '@hoprnet/hopr-protos/node/send_pb'
 import { ListenRequest, ListenResponse } from '@hoprnet/hopr-protos/node/listen_pb'
+import {
+  WithdrawNativeRequest,
+  WithdrawHoprRequest,
+  WithdrawNativeResponse,
+  WithdrawHoprResponse,
+} from '@hoprnet/hopr-protos/node/withdraw_pb'
 
 // @TODO: capture errors and turn them into GRPC errors
 @Controller('grpc')
@@ -195,5 +201,29 @@ export class GrpcController {
     })
 
     return subject.asObservable()
+  }
+
+  @GrpcMethod('Withdraw')
+  async withdrawNative(req: WithdrawNativeRequest.AsObject): Promise<WithdrawNativeResponse.AsObject> {
+    try {
+      return this.grpcService.withdrawNative(req)
+    } catch (err) {
+      throw new RpcException({
+        code: STATUS.INTERNAL,
+        message: err,
+      })
+    }
+  }
+
+  @GrpcMethod('Withdraw')
+  async withdrawHopr(req: WithdrawHoprRequest.AsObject): Promise<WithdrawHoprResponse.AsObject> {
+    try {
+      return this.grpcService.withdrawHopr(req)
+    } catch (err) {
+      throw new RpcException({
+        code: STATUS.INTERNAL,
+        message: err,
+      })
+    }
   }
 }

@@ -96,16 +96,16 @@ export function getMyOpenChannels(node: Hopr<HoprCoreConnector>): Promise<Channe
  * @returns a promise that resolves to an array of peer ids in which we have open channels with
  */
 export async function getPartyOpenChannels(node: Hopr<HoprCoreConnector>, party: PeerId): Promise<PeerId[]> {
-  const { indexer, utils } = node.paymentChannels
-  const partyAccountId = await utils.pubKeyToAccountId(party.pubKey.marshal())
+  const { indexer, utils, types } = node.paymentChannels
+  const partyPublicKey = new types.Public(party.pubKey.marshal())
 
   // get indexed open channels
   const channels = await indexer.get({
-    partyA: partyAccountId,
+    partyA: partyPublicKey,
   })
   // get the counterparty of each channel
   const channelAccountIds = channels.map((channel) => {
-    return u8aEquals(channel.partyA, partyAccountId) ? channel.partyB : channel.partyA
+    return u8aEquals(channel.partyA, partyPublicKey) ? channel.partyB : channel.partyA
   })
 
   // get available nodes

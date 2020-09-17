@@ -5,10 +5,8 @@ import { default as dotenvParseVariables } from 'dotenv-parse-variables'
 import Hopr from '@hoprnet/hopr-core'
 import type { HoprOptions } from '@hoprnet/hopr-core'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import type { Types } from '@hoprnet/hopr-core-connector-interface'
-import type { Channel } from '@hoprnet/hopr-core-connector-interface'
-import { u8aToHex, moveDecimalPoint, getBootstrapAddresses } from '@hoprnet/hopr-utils'
-import PeerInfo from 'peer-info'
+import type { Channel, Types, Currencies } from '@hoprnet/hopr-core-connector-interface'
+import { u8aToHex, getBootstrapAddresses } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import * as rlp from 'rlp'
 import { ParserService } from './parser/parser.service'
@@ -17,7 +15,7 @@ import { pubKeyToPeerId } from '@hoprnet/hopr-core/lib/utils' // @TODO: expose u
 import { PROVIDER_NAME as HOPR_NODE_PROVIDER } from '../node.module'
 
 export type StartOptions = {
-  debug?: boolean
+  debug_mode?: boolean
   id?: number
   bootstrapNode?: boolean
   host?: string
@@ -59,7 +57,7 @@ export class CoreService {
     if (typeof this.node !== 'undefined') return
 
     const envOptions = dotenvParseVariables({
-      debug: this.configService.get('DEBUG'),
+      debug_mode: this.configService.get('DEBUG_MODE'),
       id: this.configService.get('ID'),
       bootstrapNode: this.configService.get('BOOTSTRAP_NODE'),
       host: this.configService.get('CORE_HOST'),
@@ -87,7 +85,7 @@ export class CoreService {
 
     const options = {
       id: envOptions.id,
-      debug: envOptions.debug ?? false,
+      debug: envOptions.debug_mode ?? false,
       bootstrapNode: envOptions.bootstrapNode ?? false,
       network: 'ethereum',
       // using testnet bootstrap servers
@@ -100,19 +98,23 @@ export class CoreService {
     console.log(':: HOPR Options ::', options)
     console.log(':: Starting HOPR Core Node ::')
 
-    this.node = await Hopr.create({
-      id: options.id,
-      debug: options.debug,
-      bootstrapNode: options.bootstrapNode,
-      network: options.network,
-      bootstrapServers: options.bootstrapServers,
-      provider: options.provider,
-      hosts: (await this.parserService.parseHost(options.host)) as HoprOptions['hosts'],
-      password: options.password,
-      // @TODO: deprecate this, refactor hopr-core to not expect an output function
-      output: this.parserService.outputFunctor(this.events),
-    })
-    console.log(':: HOPR Core Node Started ::')
+    try {
+      this.node = await Hopr.create({
+        id: options.id,
+        debug: options.debug,
+        bootstrapNode: options.bootstrapNode,
+        network: options.network,
+        bootstrapServers: options.bootstrapServers,
+        provider: options.provider,
+        hosts: (await this.parserService.parseHost(options.host)) as HoprOptions['hosts'],
+        password: options.password,
+        // @TODO: deprecate this, refactor hopr-core to not expect an output function
+        output: this.parserService.outputFunctor(this.events),
+      })
+      console.log(':: HOPR Core Node Started ::')
+    } catch (err) {
+      console.log(`${err}`)
+    }
   }
 
   // @TODO: handle if already stopping
@@ -166,16 +168,11 @@ export class CoreService {
   @mustBeStarted()
   async getBalance(type: 'native' | 'hopr'): Promise<string> {
     const { paymentChannels } = this.node
-    const { Balance, NativeBalance } = paymentChannels.types
 
     if (type === 'native') {
-      return paymentChannels.account.nativeBalance.then((b) => {
-        return moveDecimalPoint(b.toString(), NativeBalance.DECIMALS * -1)
-      })
+      return (await paymentChannels.account.nativeBalance).toString()
     } else {
-      return paymentChannels.account.balance.then((b) => {
-        return moveDecimalPoint(b.toString(), Balance.DECIMALS * -1)
-      })
+      return (await paymentChannels.account.balance).toString()
     }
   }
 
@@ -268,7 +265,7 @@ export class CoreService {
 
     await connector.channel.create(
       counterPartyPubKey,
-      async () => pubKeyToAccountId(await this.node.interactions.payments.onChainKey.interact(counterParty)),
+      async () => this.node.interactions.payments.onChainKey.interact(counterParty),
       channelBalance,
       (balance: Types.ChannelBalance): Promise<Types.SignedChannel> => {
         return this.node.interactions.payments.open.interact(counterParty, balance)
@@ -316,5 +313,20 @@ export class CoreService {
   @mustBeStarted()
   async listen({ peerId }: { peerId?: string }): Promise<EventEmitter> {
     return this.events
+  }
+
+  @mustBeStarted()
+  async withdraw({
+    currency,
+    recipient,
+    amount,
+  }: {
+    currency: Currencies
+    recipient: string
+    amount: string
+  }): Promise<Record<string, any>> {
+    await this.node.paymentChannels.withdraw(currency, recipient, amount)
+
+    return {}
   }
 }

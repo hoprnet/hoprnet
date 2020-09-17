@@ -6,6 +6,7 @@ import { AppModule } from './app.module'
 import { HOPR_PROTOS_FOLDER_DIR, PROTO_PACKAGES, PROTO_FILES } from './constants'
 import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import Hopr from '@hoprnet/hopr-core'
+import dotenvParseVariables from 'dotenv-parse-variables'
 
 
 export type ServerOpts = {
@@ -50,5 +51,10 @@ if (typeof module !== 'undefined' && !module.parent) {
     console.error(error)
     // process.exit(1)
   })
-  startServer()
+
+  const envOptions = dotenvParseVariables({
+    host: process.env.SERVER_HOST,
+  }) as ServerOpts
+
+  startServer(undefined, envOptions)
 }
