@@ -1,5 +1,4 @@
-import type { Public } from '../types'
-import type AcknowledgedTicket from './acknowledgedTicket'
+import type { AcknowledgedTicket, Public } from './types'
 
 // @TODO: still under development, might be moved to `hopr-core`
 declare interface TicketsStatic {

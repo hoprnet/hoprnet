@@ -1,4 +1,4 @@
-import AcknowledgedTicket from './tickets/acknowledgedTicket'
+import AcknowledgedTicket from './types/acknowledgedTicket'
 import type { AccountId, Balance, Channel as ChannelType, ChannelBalance, Hash, Moment, Public, Signature, SignedChannel, SignedTicket } from './types'
 
 declare interface ChannelStatic {
