@@ -393,10 +393,10 @@
     "@ethersproject/rlp" "^5.0.0"
     "@ethersproject/signing-key" "^5.0.0"
 
-"@hoprnet/hopr-core-connector-interface@1.7.1":
-  version "1.7.1"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-connector-interface/-/hopr-core-connector-interface-1.7.1.tgz#fee80b0e954a8606dfd9d8cb53102606a9e66b64"
-  integrity sha512-lDTOTpOOyE9PrXo0TPv1Rw7BcOndSj4+CISCAyB1/Nby/2yGtZbm65IPOcngWUYrCgXQMuxrc/AR3pFIQ6eV5w==
+"@hoprnet/hopr-core-connector-interface@1.10.3":
+  version "1.10.3"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-connector-interface/-/hopr-core-connector-interface-1.10.3.tgz#6d392336d39113fbadba3c396ee5f83c36e8047b"
+  integrity sha512-4o2eqdxIQxo8gadncSlXwOxmp6iSthH5L0F7UYykNYcnQiAHvcP0gCpLpi+UVsddR2WtTIxItYEI93gXXmAc7A==
 
 "@hoprnet/hopr-core-ethereum@0.4.4-xdai":
   version "0.4.4-xdai"
@@ -417,10 +417,10 @@
     web3-eth "^1.2.11"
     web3-eth-contract "^1.2.11"
 
-"@hoprnet/hopr-core@0.6.33":
-  version "0.6.33"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core/-/hopr-core-0.6.33.tgz#fcc1ced5039de0dc27160bee1489d9f48bb381e2"
-  integrity sha512-nlTQcj3isgbN1yWRf36g/yWpd9AwWBhZKGy9t8CEaN+TYKUCILgsadtwq/oAzKb0DJhoJNDDgfg10W19LKTt9g==
+"@hoprnet/hopr-core@0.6.34":
+  version "0.6.34"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core/-/hopr-core-0.6.34.tgz#875842aeb61b0724ded0b90a3c0c66caa51b6a8f"
+  integrity sha512-cgLc/+CbMUVC5tZOc0uBlckhEmDYynj49DOXNOvrnNRdEAFK2eDvEwFZRWVBJiRlTseAR5a9mD2RijMK70rvnw==
   dependencies:
     "@hoprnet/hopr-core-ethereum" "0.4.4-xdai"
     "@hoprnet/hopr-demo-seeds" "1.8.0"
@@ -460,10 +460,10 @@
   dependencies:
     micro "^9.3.4"
 
-"@hoprnet/hopr-utils@0.6.1":
-  version "0.6.1"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-0.6.1.tgz#4fc08cc39f88ef6566db154bf4e73010905c09b7"
-  integrity sha512-p9n3ILRRA62QCGyC3qfVdr3HB6yYNInD96DWNVcWI1KCGQsA8dVwiBiTzP3Q0TeiFhrZcQvynZMUhCDyH2C0yA==
+"@hoprnet/hopr-utils@0.6.2":
+  version "0.6.2"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-0.6.2.tgz#3705531edb7f2f42bf83e1c0d93409f24da4701f"
+  integrity sha512-vizzOSzom7v8thkGm+Y+6eQGNhlYEprYRQznWTrR7TUhQYn4VoFZ/Hu4T1O76dPN0W3BVm6Xc1clatfz0Fo5tw==
   dependencies:
     bignumber.js "^9.0.0"
     libp2p-crypto "^0.17.9"
