@@ -17,13 +17,14 @@ export default class Tickets extends AbstractCommand {
    * @param query channelId string to send message to
    */
   async execute(query?: string): Promise<void> {
+    /*
     if (!query) {
       console.log(chalk.red('This command takes a channel ID as a parameter'))
       return
     }
 
     const { Balance } = this.node.paymentChannels.types
-    const signedTickets: Map<string, Types.SignedTicket> = await this.node.paymentChannels.tickets.get(
+    const signedTickets: Map<string, Types.AcknowledgedTicket> = await this.node.paymentChannels.tickets.get(
       stringToU8a(query)
     )
 
@@ -60,6 +61,7 @@ export default class Tickets extends AbstractCommand {
       'HOPR',
       'once you redeem them.'
     )
+    */
   }
 
   async autocomplete(query: string, line: string): Promise<AutoCompleteResult> {
