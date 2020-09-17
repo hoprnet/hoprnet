@@ -441,13 +441,13 @@
   dependencies:
     micro "^9.3.4"
 
-"@hoprnet/hopr-ethereum@^1.1.2-xdai":
-  version "1.1.2-xdai"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-ethereum/-/hopr-ethereum-1.1.2-xdai.tgz#128c70f5dfb17a28d15e2bc45bb591355a55af2b"
-  integrity sha512-61gLsgxHj3iprUmuRaIGButL4WboFfiwkbmTu/olP/fj7CzErjvJTxEg1DVdSzCpviZUCmUnQzfaO/tia+Mtmw==
+"@hoprnet/hopr-ethereum@^1.5.0":
+  version "1.5.0"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-ethereum/-/hopr-ethereum-1.5.0.tgz#f8cc3d3495ead1496ca6a7badc999e3562ed54e7"
+  integrity sha512-cuxPnJBScBSs8AorY3qotFUiYEhnO/iQLm3vD2965qJBoMnUnI1+cE45tiiZe4vmWXKLXINZQ2QiWmQHtyrZ/g==
   dependencies:
     "@hoprnet/hopr-demo-seeds" "1.8"
-    "@hoprnet/hopr-utils" "0.3.0"
+    "@hoprnet/hopr-utils" "0.5.2"
     "@openzeppelin/contracts" "^3.0.1"
     "@openzeppelin/test-helpers" "^0.5.5"
     "@truffle/debug-utils" "^4.1.1"
@@ -468,14 +468,17 @@
     "@hoprnet/hopr-demo-seeds" "1.8.0"
     ganache-core "^2.10.2"
 
-"@hoprnet/hopr-utils@0.3.0":
-  version "0.3.0"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-0.3.0.tgz#31c6510d9adcc1f63fe3b72075ee7c383ef48b8f"
-  integrity sha512-whfmbE/DfKSpmeDNGyOOwHZfzTufsvtmJCFTkI7y5jt4/570AbaR3+Q2dFfNR1Zj1IHXVpC2JjVUaYk8ZiS3gg==
+"@hoprnet/hopr-utils@0.5.2":
+  version "0.5.2"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-0.5.2.tgz#711885c1ae1d10b8b5ded68b7152101e2e3022de"
+  integrity sha512-wcGbDvVNa21MwZwU2dWlukNS3J2E42tj4JNkD93qaqScgqTfpZHyVdxr6HwjSRuWcJqT4OI5Mke3MmEx6gs1lA==
   dependencies:
     bignumber.js "^9.0.0"
     chalk "^4.1.0"
+    libp2p-crypto "^0.17.9"
+    peer-info "^0.17.5"
     strip-ansi "^6.0.0"
+    typestub-multihashes "^0.0.4"
 
 "@hoprnet/hopr-utils@^0.4.0":
   version "0.4.0"
@@ -6944,7 +6947,7 @@ levn@~0.3.0:
     prelude-ls "~1.1.2"
     type-check "~0.3.2"
 
-libp2p-crypto@^0.17.3, libp2p-crypto@^0.17.6, libp2p-crypto@^0.17.7, libp2p-crypto@~0.17.1, libp2p-crypto@~0.17.6:
+libp2p-crypto@^0.17.3, libp2p-crypto@^0.17.6, libp2p-crypto@^0.17.7, libp2p-crypto@^0.17.9, libp2p-crypto@~0.17.1, libp2p-crypto@~0.17.6:
   version "0.17.9"
   resolved "https://registry.yarnpkg.com/libp2p-crypto/-/libp2p-crypto-0.17.9.tgz#2d2cd0b852c6a54d4d33f10be6ca8856c2d24870"
   integrity sha512-nH3vTfQ4UqhZ1SORTP7HOsmFdJBs604Qy0Xi3IFFtU6ofYt+rFAZ2QNgo4MH1ZTT38/LEM374N9K7yzj1IQm0g==
@@ -7721,7 +7724,7 @@ multicodec@^1.0.0, multicodec@^1.0.1, multicodec@^1.0.4:
     buffer "^5.6.0"
     varint "^5.0.0"
 
-multihashes@^0.4.15, multihashes@~0.4.15, multihashes@~0.4.19:
+multihashes@^0.4.14, multihashes@^0.4.15, multihashes@~0.4.15, multihashes@~0.4.19:
   version "0.4.21"
   resolved "https://registry.yarnpkg.com/multihashes/-/multihashes-0.4.21.tgz#dc02d525579f334a7909ade8a122dabb58ccfcb5"
   integrity sha512-uVSvmeCWf36pU2nB4/1kzYZjsXD9vofZKpgudqkceYY5g2aZZXJ5r9lxuzoRLl1OAp28XljXsEJ/X/85ZsKmKw==
@@ -10321,6 +10324,13 @@ typescript@^3.9.7:
   version "3.9.7"
   resolved "https://registry.yarnpkg.com/typescript/-/typescript-3.9.7.tgz#98d600a5ebdc38f40cb277522f12dc800e9e25fa"
   integrity sha512-BLbiRkiBzAwsjut4x/dsibSTB6yWpwT5qWmC2OfuCg3GgVQCSgMs4vEctYPhsaGtd0AeuuHMkjZ2h2WG8MSzRw==
+
+typestub-multihashes@^0.0.4:
+  version "0.0.4"
+  resolved "https://registry.yarnpkg.com/typestub-multihashes/-/typestub-multihashes-0.0.4.tgz#601e41cc588c051984d93e21edee6638d439d83e"
+  integrity sha512-De7NTQ6CpXRSe/mZe89k0V+RopeEAUH/jRMj093E/j8cX8wKoilo7ySbEzGWxmFu4jO2Y5DA+FrOXIYmIOvurA==
+  dependencies:
+    multihashes "^0.4.14"
 
 typewise-core@^1.2, typewise-core@^1.2.0:
   version "1.2.0"
