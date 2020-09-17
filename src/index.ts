@@ -35,6 +35,8 @@ import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import { Interactions } from './interactions'
 import * as DbKeys from './dbKeys'
 
+const verbose = Debug('hopr-core:verbose')
+
 interface NetOptions {
   ip: string
   port: number
@@ -258,6 +260,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
         new Promise<void>(async (resolve, reject) => {
           let path: PeerId[]
           if (getIntermediateNodesManually != undefined) {
+            verbose('manually creating path')
             path = await getIntermediateNodesManually()
           } else {
             path = await this.getIntermediateNodes(destination)
@@ -266,6 +269,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
           path.push(destination)
 
           let packet: Packet<Chain>
+          verbose('creating packet with path', path.join(', \n'))
           try {
             packet = await Packet.create(
               /* prettier-ignore */
@@ -339,7 +343,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
       (
         await this.paymentChannels.path.findPath(
           start,
-          MAX_HOPS,
+          MAX_HOPS - 1, // Need a hop for destination node
           MAX_ITERATIONS_PATH_SELECTION,
           (node) => !exclude.includes(node)
         )
