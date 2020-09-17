@@ -83,6 +83,16 @@ declare interface ChannelStatic {
       signature?: Signature
     }
   ): Promise<SignedChannel>
+
+  tickets: {
+    /**
+     * Submits a signed ticket to the blockchain.
+     * @param signedTicket a signed ticket
+     * @param secretA a signed ticket
+     * @param secretB a signed ticket
+     */
+    submit(ticket: AcknowledgedTicket): Promise<void>
+  }
 }
 
 declare interface Channel {
@@ -136,14 +146,6 @@ declare interface Channel {
      * @param props additional arguments
      */
     // aggregate(channel: any, tickets: Ticket[], ...props: any[]): Promise<Ticket>
-
-    /**
-     * Submits a signed to the blockchain.
-     * @param signedTicket a signed ticket
-     * @param secretA a signed ticket
-     * @param secretB a signed ticket
-     */
-    submit(ticket: AcknowledgedTicket): Promise<void>
   }
 
   readonly counterparty: AccountId
