@@ -20,6 +20,8 @@ import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import Hopr from '../../../'
 
 import PeerId from 'peer-id'
+import Debug from 'debug'
+const log = Debug('hopr-core:packet:header')
 
 import {
   PRIVATE_KEY_LENGTH,
@@ -39,6 +41,7 @@ export async function createHeader<Chain extends HoprCoreConnector>(
 ) {
   function checkPeerIds() {
     if (peerIds.length > MAX_HOPS) {
+      log('Exceeded max hops')
       throw Error(`Expected at most ${MAX_HOPS} but got ${peerIds.length}`)
     }
 
