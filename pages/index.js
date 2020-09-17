@@ -37,7 +37,15 @@ function ScoredNode({ address, score, connected }) {
     )
   } else {
     // Couldn't find in node list.
-    return <></>
+    return (
+      <div className={styles.connode}>
+        <span>(Unable to Relay)</span>
+        <span className={styles.score}>{score}</span>
+        <span className={styles.addr}>
+          Node: <abbr title={address}>...{address.slice(10)}</abbr>
+        </span>
+      </div>
+    )
   }
 }
 
@@ -46,6 +54,7 @@ function HomeContent({
   available,
   locked,
   connected,
+  connectedNodes,
   hoprChannelContract,
   hoprCoverbotAddress,
   env,
@@ -182,6 +191,7 @@ function HomeContent({
         <section>
           <div className={styles.padBottom}>
             <h2>Leaderboard</h2>
+            <h3 style={{"paddingLeft": "20px"}} >{ connected.length } verified | {score.length} registered | {connectedNodes} connected</h3>
             {(score.length == 0 || connected.length == 0) && (
               <p className={styles.conerr}>
                 <em>No nodes connected...</em>
