@@ -206,14 +206,9 @@ describe('test crawler', function () {
   })
   it('shouldIncludePeerInCrawlResponse', async () => {
     let m = (s) => new Multiaddr(s)
-    let p = async (s) => {
-      let x = await PeerInfo.create(await PeerId.create({ keyType: 'secp256k1' }))
-      x.multiaddrs.add(m(s))
-      return x
-    }
 
-    assert(shouldIncludePeerInCrawlResponse(await p('/ip4/123.4.5.6/tcp/5000'), m('/ip4/12.34.56.7/tcp/5000')))
-    assert(shouldIncludePeerInCrawlResponse(await p('/ip4/127.0.0.1/tcp/1000'), m('/ip4/127.0.0.1/tcp/5000')))
-    assert(!shouldIncludePeerInCrawlResponse(await p('/ip4/127.0.0.1/tcp/5000'), m('/ip4/12.34.56.7/tcp/5000')))
+    assert(shouldIncludePeerInCrawlResponse(m('/ip4/123.4.5.6/tcp/5000'), m('/ip4/12.34.56.7/tcp/5000')))
+    assert(shouldIncludePeerInCrawlResponse(m('/ip4/127.0.0.1/tcp/1000'), m('/ip4/127.0.0.1/tcp/5000')))
+    assert(!shouldIncludePeerInCrawlResponse(m('/ip4/127.0.0.1/tcp/5000'), m('/ip4/12.34.56.7/tcp/5000')))
   })
 })
