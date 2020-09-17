@@ -25,7 +25,7 @@ const ProfilesCompany = () => {
               <div className="team-item-image mb-24">
                 <Image
                   src={require('./../assets/images/team/sebastian_burgel.jpg')}
-                  alt="Team member 01"
+                  alt="Image of Dr. Sebastian Bürgel"
                   width={180}
                   height={180}
                 />
@@ -47,7 +47,7 @@ const ProfilesCompany = () => {
               <div className="team-item-image mb-24">
                 <Image
                   src={require('./../assets/images/team/robert_kiel.jpg')}
-                  alt="Team member 02"
+                  alt="Image of Robert Kiel"
                   width={180}
                   height={180}
                 />
@@ -69,7 +69,7 @@ const ProfilesCompany = () => {
               <div className="team-item-image mb-24">
                 <Image
                   src={require('./../assets/images/team/rik_krieger.jpg')}
-                  alt="Team member 03"
+                  alt="Image of Rik Krieger, eMBA"
                   width={180}
                   height={180}
                 />
@@ -84,6 +84,28 @@ const ProfilesCompany = () => {
         </div>
       </div>
 
+      <div className="tiles-item reveal-from-bottom" data-reveal-container=".tiles-wrap" data-reveal-delay="300">
+        <div className="tiles-item-inner">
+          <a href="https://www.linkedin.com/in/meredith55/" target="_blank" rel="noopener noreferrer">
+            <div className="team-item-header">
+              <div className="team-item-image mb-24">
+                <Image
+                  src={require('./../assets/images/team/meredith_bachma.jpg')}
+                  alt="Image of Meredith Bachman"
+                  width={180}
+                  height={180}
+                />
+              </div>
+            </div>
+          </a>
+          <div className="team-item-content">
+            <h5 className="team-item-name mt-0 mb-4">Meredith Bachman</h5>
+            <div className="team-item-role text-xs fw-500 mb-8">Graphic Designer</div>
+            {/* <p className="m-0 text-sm"></p> */}
+          </div>
+        </div>
+      </div>
+
       <div className="tiles-item reveal-from-bottom" data-reveal-container=".tiles-wrap" data-reveal-delay="450">
         <div className="tiles-item-inner">
           <a href="https://www.linkedin.com/in/jjperezaguinaga/" target="_blank" rel="noopener noreferrer">
@@ -91,7 +113,7 @@ const ProfilesCompany = () => {
               <div className="team-item-image mb-24">
                 <Image
                   src={require('./../assets/images/team/jose_aguinaga.jpg')}
-                  alt="Team member 04"
+                  alt="Image of José Aguinaga"
                   width={180}
                   height={180}
                 />
@@ -113,7 +135,7 @@ const ProfilesCompany = () => {
               <div className="team-item-image mb-24">
                 <Image
                   src={require('./../assets/images/team/steven_nonis.jpg')}
-                  alt="Team member 05"
+                  alt="Image of Steven Nonis"
                   width={180}
                   height={180}
                 />
@@ -128,6 +150,28 @@ const ProfilesCompany = () => {
         </div>
       </div>
 
+      <div className="tiles-item reveal-from-bottom" data-reveal-container=".tiles-wrap" data-reveal-delay="600">
+        <div className="tiles-item-inner">
+          <a href="https://www.linkedin.com/in/peterbraden/" target="_blank" rel="noopener noreferrer">
+            <div className="team-item-header">
+              <div className="team-item-image mb-24">
+                <Image
+                  src={require('./../assets/images/team/peter_braden.jpg')}
+                  alt="Image of Peter Braden"
+                  width={180}
+                  height={180}
+                />
+              </div>
+            </div>
+          </a>
+          <div className="team-item-content">
+            <h5 className="team-item-name mt-0 mb-4">Peter Braden</h5>
+            <div className="team-item-role text-xs fw-500 mb-8">Software Engineer</div>
+            {/* <p className="m-0 text-sm"></p> */}
+          </div>
+        </div>
+      </div>
+
       <div className="tiles-item reveal-from-bottom" data-reveal-container=".tiles-wrap" data-reveal-delay="750">
         <div className="tiles-item-inner">
           <a href="https://www.linkedin.com/in/kevinleu/" target="_blank" rel="noopener noreferrer">
@@ -135,7 +179,7 @@ const ProfilesCompany = () => {
               <div className="team-item-image mb-24">
                 <Image
                   src={require('./../assets/images/team/kevin-leu.jpg')}
-                  alt="Team member 06"
+                  alt="Image of Kevin Leu"
                   width={180}
                   height={180}
                 />
@@ -156,7 +200,7 @@ const ProfilesCompany = () => {
             <div className="team-item-image mb-24">
               <Image
                 src={require('./../assets/images/team/rich_mcdowell.jpg')}
-                alt="Team member 06"
+                alt="Image of Rich Mcdowell"
                 width={180}
                 height={180}
               />
@@ -244,7 +288,8 @@ const ProfilesAssociation = () => {
 
       {!isCompany && (
         <div className="mt-24" style={{ width: '100%' }}>
-          The HOPR protocol is a digital commons that is currently being built by <a
+          The HOPR protocol is a digital commons that is currently being built by{' '}
+          <a
             href="https://hopr.swiss/who-is-HOPR#team"
             target="_blank"
             rel="noopener noreferrer"
