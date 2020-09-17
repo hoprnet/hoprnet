@@ -84,7 +84,7 @@ class FeaturesSplit extends React.Component {
                 >
                   <Image
                     className="has-shadow"
-                    src={require('./../assets/images/team/jose_aguinaga.jpg')}
+                    src={require('./../assets/images/team/jose_aguinaga.webp')}
                     alt="Features split 01"
                     width={528}
                     height={396}
@@ -113,7 +113,7 @@ class FeaturesSplit extends React.Component {
                 >
                   <Image
                     className="has-shadow"
-                    src={require('./../assets/images/team/jose_aguinaga.jpg')}
+                    src={require('./../assets/images/team/jose_aguinaga.webp')}
                     alt="Features split 02"
                     width={528}
                     height={396}
@@ -142,7 +142,7 @@ class FeaturesSplit extends React.Component {
                 >
                   <Image
                     className="has-shadow"
-                    src={require('./../assets/images/team/jose_aguinaga.jpg')}
+                    src={require('./../assets/images/team/jose_aguinaga.webp')}
                     alt="Features split 03"
                     width={528}
                     height={396}

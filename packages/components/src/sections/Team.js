@@ -24,7 +24,7 @@ const ProfilesCompany = () => {
             <a href="https://www.linkedin.com/in/scbuergel/" target="_blank" rel="noopener noreferrer">
               <div className="team-item-image mb-24">
                 <Image
-                  src={require('./../assets/images/team/sebastian_burgel.jpg')}
+                  src={require('./../assets/images/team/sebastian_burgel.webp')}
                   alt="Image of Dr. Sebastian Bürgel"
                   width={180}
                   height={180}
@@ -46,7 +46,7 @@ const ProfilesCompany = () => {
             <div className="team-item-header">
               <div className="team-item-image mb-24">
                 <Image
-                  src={require('./../assets/images/team/robert_kiel.jpg')}
+                  src={require('./../assets/images/team/robert_kiel.webp')}
                   alt="Image of Robert Kiel"
                   width={180}
                   height={180}
@@ -68,7 +68,7 @@ const ProfilesCompany = () => {
             <div className="team-item-header">
               <div className="team-item-image mb-24">
                 <Image
-                  src={require('./../assets/images/team/rik_krieger.jpg')}
+                  src={require('./../assets/images/team/rik_krieger.webp')}
                   alt="Image of Rik Krieger, eMBA"
                   width={180}
                   height={180}
@@ -90,7 +90,7 @@ const ProfilesCompany = () => {
             <div className="team-item-header">
               <div className="team-item-image mb-24">
                 <Image
-                  src={require('./../assets/images/team/meredith_bachma.jpg')}
+                  src={require('./../assets/images/team/meredith_bachma.webp')}
                   alt="Image of Meredith Bachman"
                   width={180}
                   height={180}
@@ -112,7 +112,7 @@ const ProfilesCompany = () => {
             <div className="team-item-header">
               <div className="team-item-image mb-24">
                 <Image
-                  src={require('./../assets/images/team/jose_aguinaga.jpg')}
+                  src={require('./../assets/images/team/jose_aguinaga.webp')}
                   alt="Image of José Aguinaga"
                   width={180}
                   height={180}
@@ -134,7 +134,7 @@ const ProfilesCompany = () => {
             <div className="team-item-header">
               <div className="team-item-image mb-24">
                 <Image
-                  src={require('./../assets/images/team/steven_nonis.jpg')}
+                  src={require('./../assets/images/team/steven_nonis.webp')}
                   alt="Image of Steven Nonis"
                   width={180}
                   height={180}
@@ -156,7 +156,7 @@ const ProfilesCompany = () => {
             <div className="team-item-header">
               <div className="team-item-image mb-24">
                 <Image
-                  src={require('./../assets/images/team/peter_braden.jpg')}
+                  src={require('./../assets/images/team/peter_braden.webp')}
                   alt="Image of Peter Braden"
                   width={180}
                   height={180}
@@ -178,7 +178,7 @@ const ProfilesCompany = () => {
             <div className="team-item-header">
               <div className="team-item-image mb-24">
                 <Image
-                  src={require('./../assets/images/team/kevin-leu.jpg')}
+                  src={require('./../assets/images/team/kevin-leu.webp')}
                   alt="Image of Kevin Leu"
                   width={180}
                   height={180}
@@ -226,7 +226,7 @@ const ProfilesAssociation = () => {
             <a href="https://www.linkedin.com/in/scbuergel/" target="_blank" rel="noopener noreferrer">
               <div className="team-item-image mb-24">
                 <Image
-                  src={require('./../assets/images/team/sebastian_burgel.jpg')}
+                  src={require('./../assets/images/team/sebastian_burgel.webp')}
                   alt="Image of Dr. Sebastian Bürgel"
                   width={180}
                   height={180}
