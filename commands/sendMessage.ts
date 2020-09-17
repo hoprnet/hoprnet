@@ -35,7 +35,11 @@ export abstract class SendMessageBase extends AbstractCommand {
       msg;
 
     try {
-      return await this.node.sendMessage(encodeMessage(message), recipient)
+      return await this.node.sendMessage(
+        encodeMessage(message),
+        recipient, 
+        async () => [] // MULTIHOP not supported
+      )
     } catch (err) {
       console.log(chalk.red(err.message))
     }
