@@ -60,7 +60,7 @@ class Testimonial extends React.Component {
                   <div className="testimonial-item-header mb-16">
                     <div className="testimonial-item-image">
                       <Image
-                        src={require('./../assets/images/team/jose_aguinaga.jpg')}
+                        src={require('./../assets/images/team/jose_aguinaga.webp')}
                         alt="Testimonial 01"
                         width={48}
                         height={48}
@@ -94,7 +94,7 @@ class Testimonial extends React.Component {
                   <div className="testimonial-item-header mb-16">
                     <div className="testimonial-item-image">
                       <Image
-                        src={require('./../assets/images/team/jose_aguinaga.jpg')}
+                        src={require('./../assets/images/team/jose_aguinaga.webp')}
                         alt="Testimonial 02"
                         width={48}
                         height={48}
@@ -128,7 +128,7 @@ class Testimonial extends React.Component {
                   <div className="testimonial-item-header mb-16">
                     <div className="testimonial-item-image">
                       <Image
-                        src={require('./../assets/images/team/jose_aguinaga.jpg')}
+                        src={require('./../assets/images/team/jose_aguinaga.webp')}
                         alt="Testimonial 03"
                         width={48}
                         height={48}
