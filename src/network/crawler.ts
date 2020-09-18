@@ -20,7 +20,7 @@ import type { Connection } from './transport/types'
 import type { Entry } from './peerStore'
 
 const MAX_PARALLEL_REQUESTS = 7
-export const CRAWL_TIMEOUT = 1 * 1000
+export const CRAWL_TIMEOUT = 6 * 1000
 
 class Crawler<Chain extends HoprCoreConnector> {
   constructor(
