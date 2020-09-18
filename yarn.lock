@@ -393,21 +393,21 @@
     "@ethersproject/rlp" "^5.0.0"
     "@ethersproject/signing-key" "^5.0.0"
 
-"@hoprnet/hopr-core-connector-interface@1.10.3":
-  version "1.10.3"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-connector-interface/-/hopr-core-connector-interface-1.10.3.tgz#6d392336d39113fbadba3c396ee5f83c36e8047b"
-  integrity sha512-4o2eqdxIQxo8gadncSlXwOxmp6iSthH5L0F7UYykNYcnQiAHvcP0gCpLpi+UVsddR2WtTIxItYEI93gXXmAc7A==
+"@hoprnet/hopr-core-connector-interface@1.10.5":
+  version "1.10.5"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-connector-interface/-/hopr-core-connector-interface-1.10.5.tgz#66dccf0e9c464fc026273d3afc4b46028e2e15ca"
+  integrity sha512-z3K66WbjKtAv52UmLCMpsSmHLk9N0WDnPVaMC7qw4z1QCUtjVYu2JGlzLKSPLE/ZI5lBRoOXWnYjD7Ux6t5i4w==
 
-"@hoprnet/hopr-core-ethereum@0.4.4-xdai":
-  version "0.4.4-xdai"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-ethereum/-/hopr-core-ethereum-0.4.4-xdai.tgz#3f8ec0e49af52b4601bb4f936c652a9cfcbf0058"
-  integrity sha512-OSY2FwF1vuxN823zqJNj5lXApoRlqTjO1/HxKvRf19ZE6kfF1gk/MTN7SL+G3bjMVoWSF6Rg3+KIBSrkdj/ibw==
+"@hoprnet/hopr-core-ethereum@0.5.1":
+  version "0.5.1"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-ethereum/-/hopr-core-ethereum-0.5.1.tgz#e7ce457d6c13d83ebe969d405466bcb1f532106e"
+  integrity sha512-hH0/lS+ooBMAT74YxRcNIlldYR7AUIDoH52lC+pG0q01lSdNt99u3E5kmYeM9LnBW3JHe0I0w5OsWzNM5sVL8w==
   dependencies:
-    "@hoprnet/hopr-utils" "^0.4.0"
+    "@hoprnet/hopr-utils" "^0.6.2"
     bn.js "^5.1.2"
     chalk "^4.1.0"
     debug "^4.1.1"
-    heap-js "^2.1.1"
+    heap-js "^2.1.2"
     keccak "^3.0.0"
     secp256k1 "^4.0.2"
     web3 "^1.2.11"
@@ -417,14 +417,14 @@
     web3-eth "^1.2.11"
     web3-eth-contract "^1.2.11"
 
-"@hoprnet/hopr-core@0.6.34":
-  version "0.6.34"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core/-/hopr-core-0.6.34.tgz#875842aeb61b0724ded0b90a3c0c66caa51b6a8f"
-  integrity sha512-cgLc/+CbMUVC5tZOc0uBlckhEmDYynj49DOXNOvrnNRdEAFK2eDvEwFZRWVBJiRlTseAR5a9mD2RijMK70rvnw==
+"@hoprnet/hopr-core@0.6.35":
+  version "0.6.35"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core/-/hopr-core-0.6.35.tgz#c08533f8ed77a56d48eb160077d4db3a69bf6641"
+  integrity sha512-Yr0gy1AdBgvlYlI6Mgrf1pudc2fAsBKaq0SFlyuT0L1LZOBkw2vNWbGaShw7FOmTFKGXZMPzAI95kxgVYo+EVg==
   dependencies:
-    "@hoprnet/hopr-core-ethereum" "0.4.4-xdai"
+    "@hoprnet/hopr-core-ethereum" "0.5.1"
     "@hoprnet/hopr-demo-seeds" "1.8.0"
-    "@hoprnet/hopr-utils" "^0.4.0"
+    "@hoprnet/hopr-utils" "^0.6.2"
     abort-controller "^3.0.0"
     bl "^4.0.2"
     chalk "~4.1.0"
@@ -460,7 +460,7 @@
   dependencies:
     micro "^9.3.4"
 
-"@hoprnet/hopr-utils@0.6.2":
+"@hoprnet/hopr-utils@0.6.2", "@hoprnet/hopr-utils@^0.6.2":
   version "0.6.2"
   resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-0.6.2.tgz#3705531edb7f2f42bf83e1c0d93409f24da4701f"
   integrity sha512-vizzOSzom7v8thkGm+Y+6eQGNhlYEprYRQznWTrR7TUhQYn4VoFZ/Hu4T1O76dPN0W3BVm6Xc1clatfz0Fo5tw==
@@ -470,16 +470,6 @@
     peer-info "^0.17.5"
     strip-ansi "^6.0.0"
     typestub-multihashes "^0.0.4"
-
-"@hoprnet/hopr-utils@^0.4.0":
-  version "0.4.0"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-0.4.0.tgz#b0ff6029917cbf898ec9dd9a731e2b828dd5e837"
-  integrity sha512-HQd3Dfp4C269/lJXnY7XW7zVGqlMDzrlZF7lIl/MDCkWgtA03V98N4lhK4ttU7D58m9Vobx7E1ktJQF09wE3cA==
-  dependencies:
-    bignumber.js "^9.0.0"
-    chalk "^4.1.0"
-    peer-info "^0.17.5"
-    strip-ansi "^6.0.0"
 
 "@istanbuljs/load-nyc-config@^1.0.0":
   version "1.1.0"
@@ -3090,6 +3080,11 @@ heap-js@^2.1.1:
   version "2.1.1"
   resolved "https://registry.yarnpkg.com/heap-js/-/heap-js-2.1.1.tgz#d8f7367d6b22ca415f17b0a4f4de7c1bb69ac982"
   integrity sha512-hqBidw0lY8sDMy5PUHbY+P4KZcGM2ArnnY3SqSkNoI14RJfhik7Bse3zHzSh6ZYXEUxBj/7nEdQUrpXtf+OYYQ==
+
+heap-js@^2.1.2:
+  version "2.1.2"
+  resolved "https://registry.yarnpkg.com/heap-js/-/heap-js-2.1.2.tgz#f438145d24082b078a9a35d91e03511ccad48176"
+  integrity sha512-urRBDI/0ol7m3OS/ZzvB5+Ym9i4zwlzTACSHMrGmTgh1xcrB1AX6lmeWW6u5rrS5YHHMYClta35/LUPZhjPH9Q==
 
 heap@~0.2.6:
   version "0.2.6"
