@@ -16,6 +16,7 @@ import { Network } from './network'
 
 import { addPubKey, getPeerInfo, pubKeyToPeerId } from './utils'
 import { createDirectoryIfNotExists, u8aToHex } from '@hoprnet/hopr-utils'
+import { existsSync } from 'fs'
 
 import levelup, { LevelUp } from 'levelup'
 import leveldown from 'leveldown'
@@ -371,6 +372,10 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
       }
     }
 
+    verbose('using db at ', dbPath)
+    if (!existsSync(dbPath)) {
+      verbose('db does not exist, creating')
+    }
     createDirectoryIfNotExists(dbPath)
     return levelup(leveldown(dbPath))
   }
