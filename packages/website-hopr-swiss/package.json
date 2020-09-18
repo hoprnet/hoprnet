@@ -1,18 +1,49 @@
 {
-  "name": "root",
+  "name": "@hoprnet/hopr-website.hopr.swiss",
+  "version": "1.1.0",
   "private": true,
-  "workspaces": [
-    "packages/*",
-    "websites/*"
-  ],
   "scripts": {
-    "bootstrap": "lerna bootstrap --use-workspaces",
-    "start:hopr.swiss": "lerna exec --scope @hoprnet/hopr-website.hopr.swiss -- yarn start",
-    "start:hoprnet.org": "lerna exec --scope @hoprnet/hopr-website.hoprnet.org -- yarn start",
-    "clean": "lerna clean",
-    "build": "lerna exec --parallel --scope @hoprnet/hopr-website.hopr* -- yarn build"
+    "start": "GENERATE_SOURCEMAP=false CI=false node ./node_modules/.bin/craco start",
+    "build": "GENERATE_SOURCEMAP=false CI=false craco build",
+    "test": "CI=true craco test",
+    "eject": "craco eject",
+    "format": "prettier --check ."
+  },
+  "dependencies": {
+    "@hoprnet/assets": "0.0.0",
+    "@craco/craco": "^5.6.4",
+    "classnames": "^2.2.6",
+    "lodash": "^4.17.15",
+    "node-sass": "^4.12.0",
+    "react": "^16.9.0",
+    "react-dom": "^16.9.0",
+    "react-router-dom": "^5.0.1",
+    "react-scripts": "3.2.0"
   },
   "devDependencies": {
-    "lerna": "^3.22.1"
+    "husky": "^4.2.5",
+    "prettier": "^2.0.5"
+  },
+  "eslintConfig": {
+    "extends": "react-app"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "prettier": {
+    "printWidth": 120,
+    "semi": false,
+    "singleQuote": true,
+    "quoteProps": "consistent",
+    "arrowParens": "avoid"
   }
 }
