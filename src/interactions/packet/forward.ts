@@ -22,7 +22,7 @@ import { getTokens, Token } from '../../utils'
 
 const MAX_PARALLEL_JOBS = 20
 
-const FORWARD_TIMEOUT = durations.seconds(3)
+const FORWARD_TIMEOUT = durations.seconds(6)
 
 class PacketForwardInteraction<Chain extends HoprCoreConnector> implements AbstractInteraction<Chain> {
   private tokens: Token[] = getTokens(MAX_PARALLEL_JOBS)

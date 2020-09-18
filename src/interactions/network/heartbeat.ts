@@ -18,7 +18,7 @@ import type PeerId from 'peer-id'
 
 const HASH_FUNCTION = 'blake2s256'
 
-export const HEARTBEAT_TIMEOUT = durations.seconds(2)
+export const HEARTBEAT_TIMEOUT = durations.seconds(6)
 
 class Heartbeat<Chain extends HoprCoreConnector> implements AbstractInteraction<Chain> {
   protocols: string[] = [PROTOCOL_HEARTBEAT]
