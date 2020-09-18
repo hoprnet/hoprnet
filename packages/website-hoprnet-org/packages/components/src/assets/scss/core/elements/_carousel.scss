@@ -1,0 +1,87 @@
+.carousel-item {
+
+	// This if for measuring height
+	&.is-loading {
+
+		&:not(.is-active) {
+			display: block;
+			position: absolute;
+			visibility: hidden;
+			opacity: 0;
+		}
+	}
+
+    &:not(.is-active) {
+        display: none !important;
+    }
+}
+
+.carousel-bullets {
+    display: inline-flex;
+}
+
+.carousel-bullet {
+    display: block;
+	position: relative;
+    width: $carousel-bullet--outer-width;
+    height: $carousel-bullet--outer-height;
+    padding: 0;
+    cursor: pointer;
+    line-height: 0;
+    border: none;
+	background: transparent;
+
+	&::before {
+		content: '';
+		position: absolute;
+		left: ( $carousel-bullet--outer-width - $carousel-bullet--width ) / 2;
+		top: ( $carousel-bullet--outer-height - $carousel-bullet--height ) / 2;
+		background: color-icon(carousel-button);
+		width: $carousel-bullet--width;
+		height: $carousel-bullet--height;
+		border-radius: $carousel-bullet--radius;
+		transition: background .25s ease;
+	}
+
+    &:focus {
+        outline: none;
+    }
+
+    &.is-active {
+
+		&::before {
+        	background: color-icon(carousel-button-active);
+		}
+    }
+
+    &:hover {
+
+		&::before {
+        	background: color-icon(carousel-button-hover);
+		}
+    }
+}
+
+.invert-color {
+
+	.carousel-bullet {
+
+		&::before {
+			background: color-icon(carousel-button-inverse);
+		}
+
+	    &.is-active {
+
+			&::before {
+	        	background: color-icon(carousel-button-active-inverse);
+			}
+	    }
+
+	    &:hover {
+
+			&::before {
+	        	background: color-icon(carousel-button-hover-inverse);
+			}
+	    }
+	}
+}
