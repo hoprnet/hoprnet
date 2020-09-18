@@ -15,6 +15,7 @@ import Sedimentum from './views/Sedimentum'
 import Ecosystem from './views/Ecosystem'
 import Support from './views/Support'
 import NotFound from './views/NotFound'
+import Partners from './views/Partners'
 
 const { AppRoute, ScrollReveal, ScrollToTop, insertScript } = utils
 const { Disclaimer, Pdf } = views
@@ -54,6 +55,7 @@ class App extends React.Component {
               <AppRoute exact path="/disclaimer" component={Disclaimer} layout={LayoutDefault} />
               <AppRoute exact path="/ecosystem" component={Ecosystem} layout={LayoutDefault} />
               <AppRoute exact path="/support" component={Support} layout={LayoutDefault} />
+              <AppRoute exact path="/partners" component={Partners} layout={LayoutDefault} />
               <AppRoute
                 exact
                 path="/Chinese-Language-Binance-HOPR-Press-Release"
