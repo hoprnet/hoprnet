@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core-ethereum",
-  "version": "0.4.5-xdai",
+  "version": "0.5.0",
   "repository": "git@github.com:hoprnet/hopr-core-ethereum.git",
   "license": "LGPL-3.0-only",
   "types": "lib/index.d.ts",
