@@ -1,0 +1,10 @@
+.tiles-item {
+
+    .has-shadow {
+        box-shadow: 0 8px 16px rgba(get-color(dark, 1), .16);
+       
+        &.tiles-item-inner {
+            background: linear-gradient(0deg, get-color(light, 2) 0, get-color(light, 1) 100%);
+        }
+    }
+}

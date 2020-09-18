@@ -1,0 +1,40 @@
+// Tabs (core/elements/_tabs.scss)
+$tabs-item--padding-h:      24px;		// tabs item, left and right padding
+$tabs-item--padding-v:      8px;        // tabs item, top and bottom padding
+$tabs-panel--padding-h:     null;       // tabs panel, left and right padding
+$tabs-panel--padding-v:     24px;       // tabs panel, top and bottom padding
+$tabs-item--line-width:     1px;        // tabs list divider, line width
+
+// Color
+$tabs--color: (
+	tabs-item: 					get-color(dark, 3),
+	tabs-item-active:       	get-color(primary, 1),
+	// ↓ Inverted colors
+	tabs-item-inverse: 			get-color(dark, 3),
+	tabs-item-active-inverse: 	get-color(light, 1)
+);
+
+// Line color
+$tabs-border--color: (
+	tabs-line: 					get-color(light, 3),
+	tabs-line-active:       	get-color(primary, 1),
+	// ↓ Inverted colors
+	tabs-line-inverse: 			get-color(dark, 3),
+	tabs-line-active-inverse: 	get-color(light, 1)
+);
+
+// Tabs: font size
+$tabs--size: (
+	tabs-item:	'eta'
+);
+
+// Tabs: font weight
+$tabs--weight: (
+	tabs-item: 	500
+);
+
+// Don't change line below!
+$color:         map-push($color, $tabs--color);
+$border--color: map-push($border--color, $tabs-border--color);
+$font--size:    map-push($font--size, $tabs--size);
+$font--weight:  map-push($font--weight, $tabs--weight);
