@@ -6,6 +6,7 @@ import AbortController from 'abort-controller'
 
 import debug from 'debug'
 const log = debug('hopr-core:crawler')
+const verbose = debug('hopr-core:verbose:crawler')
 
 import { getTokens } from '../utils'
 import { randomSubset, randomInteger } from '@hoprnet/hopr-utils'
@@ -34,6 +35,7 @@ class Crawler<Chain extends HoprCoreConnector> {
    * @param comparator
    */
   async crawl(comparator?: (peer: string) => boolean): Promise<void> {
+    verbose('creating a crawl')
     return new Promise(async (resolve) => {
       let aborted = false
 
@@ -44,18 +46,16 @@ class Crawler<Chain extends HoprCoreConnector> {
 
       let unContactedPeers: string[] = [] // @TODO add new peerIds lazily
 
-      let before = 0 // store state before crawling
-      let current = 0 // store current state
+      let before = 0 // number of peers before crawling
+      let current = 0 // current number of peers
 
       const abort = new AbortController()
 
       const timeout = setTimeout(() => {
         aborted = true
-
+        verbose('aborting crawl due to timeout')
         abort.abort()
-
         this.printStatsAndErrors(contactedPeerIds, errors, current, before)
-
         resolve()
       }, CRAWL_TIMEOUT)
 
@@ -64,6 +64,7 @@ class Crawler<Chain extends HoprCoreConnector> {
       this.node.network.peerStore.cleanupBlacklist()
 
       unContactedPeers.push(...this.node.network.peerStore.peers.map((entry: Entry) => entry.id))
+      verbose(`added ${unContactedPeers.length} peers to crawl list`)
 
       if (comparator != null) {
         for (let i = 0; i < unContactedPeers.length; i++) {
@@ -71,6 +72,7 @@ class Crawler<Chain extends HoprCoreConnector> {
             before += 1
           }
         }
+        verbose('comparator passed; number of peers before: ', before)
       } else {
         before = unContactedPeers.length
       }
@@ -86,6 +88,7 @@ class Crawler<Chain extends HoprCoreConnector> {
 
       /**
        * Returns a random node and removes it from the array.
+       * Swaps in the last element of the array with the element removed.
        */
       const removeRandomNode = (): string => {
         if (unContactedPeers.length == 0) {
@@ -143,6 +146,7 @@ class Crawler<Chain extends HoprCoreConnector> {
               )}`
             )
           } catch (err) {
+            verbose('error querying peer', err)
             peerInfos = undefined
             errors.push(err)
             continue
@@ -196,6 +200,7 @@ class Crawler<Chain extends HoprCoreConnector> {
 
         this.printStatsAndErrors(contactedPeerIds, errors, current, before)
 
+        verbose('crawl complete')
         resolve()
       }
 
@@ -207,6 +212,7 @@ class Crawler<Chain extends HoprCoreConnector> {
   }
 
   handleCrawlRequest(conn?: Connection) {
+    verbose('crawl requested')
     return async function* (this: Crawler<Chain>) {
       const amountOfNodes = Math.min(CRAWLING_RESPONSE_NODES, this.node.network.peerStore.peers.length)
 

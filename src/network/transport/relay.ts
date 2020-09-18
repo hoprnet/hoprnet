@@ -1,6 +1,7 @@
 import debug from 'debug'
 const log = debug('hopr-core:transport')
 const error = debug('hopr-core:transport:error')
+const verbose = debug('hopr-core:verbose:transport:error')
 
 import AbortController from 'abort-controller'
 import { AbortError } from 'abortable-iterator'
