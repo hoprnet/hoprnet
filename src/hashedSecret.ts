@@ -20,44 +20,7 @@ export type PreImageResult = {
 }
 
 class HashedSecret {
-  private _hashedSecretIterator: AsyncGenerator<boolean, boolean, AcknowledgedTicket>
-  constructor(private coreConnector: HoprEthereum) {
-    this._hashedSecretIterator = async function* () {
-      let ticket: AcknowledgedTicket = yield
-
-      let currentPreImage: Promise<PreImageResult> = this.findPreImage((await this.getOnChainSecret()) as Hash)
-
-      let tmp: PreImageResult = await currentPreImage
-
-      while (true) {
-        if (
-          await isWinningTicket(
-            await (await ticket.signedTicket).ticket.hash,
-            ticket.response,
-            tmp.preImage,
-            (await ticket.signedTicket).ticket.winProb
-          )
-        ) {
-          currentPreImage = this.findPreImage(tmp.preImage)
-
-          ticket.preImage = tmp.preImage
-
-          if (tmp.index == 0) {
-            // @TODO dispatch call of next hashedSecret submit
-            return true
-          } else {
-            yield true
-          }
-
-          tmp = await currentPreImage
-        } else {
-          yield false
-        }
-
-        ticket = yield false
-      }
-    }.call(this)
-  }
+  constructor(private coreConnector: HoprEthereum) {}
 
   /**
    * @returns a promise that resolves to a Hash if secret is found
@@ -267,12 +230,6 @@ class HashedSecret {
     }
 
     return { preImage: new Hash(intermediary), index }
-  }
-
-  public async reserveIfIsWinning(ticket: AcknowledgedTicket): Promise<boolean> {
-    await this._hashedSecretIterator.next()
-
-    return (await this._hashedSecretIterator.next(ticket)).value
   }
 
   /**

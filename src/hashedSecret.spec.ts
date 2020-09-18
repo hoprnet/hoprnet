@@ -234,7 +234,7 @@ describe('test hashedSecret', function () {
       })
 
       assert(
-        await connector.hashedSecret.reserveIfIsWinning(firstTicket),
+        await connector.account.reservePreImageIfIsWinning(firstTicket),
         'ticket with 100% winning probability must always be a win'
       )
 
@@ -242,7 +242,7 @@ describe('test hashedSecret', function () {
       firstPreImage.set(firstTicket.preImage)
 
       assert(
-        await connector.hashedSecret.reserveIfIsWinning(firstTicket),
+        await connector.account.reservePreImageIfIsWinning(firstTicket),
         'ticket with 100% winning probability must always be a win'
       )
 
@@ -266,10 +266,10 @@ describe('test hashedSecret', function () {
         response: new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff)),
       })
 
-      assert(!(await connector.hashedSecret.reserveIfIsWinning(notWinnigTicket)), 'falsy ticket should not be a win')
+      assert(!(await connector.account.reservePreImageIfIsWinning(notWinnigTicket)), 'falsy ticket should not be a win')
 
       assert(
-        await connector.hashedSecret.reserveIfIsWinning(firstTicket),
+        await connector.account.reservePreImageIfIsWinning(firstTicket),
         'ticket with 100% winning probability must always be a win'
       )
 
@@ -299,7 +299,7 @@ describe('test hashedSecret', function () {
           response: new Types.Hash(randomBytes(Types.Hash.SIZE)),
         })
 
-        await connector.hashedSecret.reserveIfIsWinning(ticket)
+        await connector.account.reservePreImageIfIsWinning(ticket)
 
         if (!u8aEquals(ticket.preImage, EMPTY_HASHED_SECRET)) {
           assert(

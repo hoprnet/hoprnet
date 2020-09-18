@@ -1,11 +1,14 @@
 import type IChannel from '.'
-import { u8aToHex } from '@hoprnet/hopr-utils'
+import { u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
 import { Hash, TicketEpoch, Balance, SignedTicket, Ticket, AcknowledgedTicket } from '../types'
 import { pubKeyToAccountId, computeWinningProbability, isWinningTicket, checkChallenge } from '../utils'
 import assert from 'assert'
 import type HoprEthereum from '..'
+import { HASHED_SECRET_WIDTH } from '../hashedSecret'
 
 const DEFAULT_WIN_PROB = 1
+
+const EMPTY_PRE_IMAGE = new Uint8Array(HASHED_SECRET_WIDTH).fill(0x00)
 
 class TicketStatic {
   constructor(public coreConnector: HoprEthereum) {}
@@ -19,22 +22,21 @@ class TicketStatic {
       'checks that the given response fulfills the challenge that has been signed by counterparty'
     )
 
-    const onChainSecret = await this.coreConnector.account.onChainSecret
-
-    const preImage = (await this.coreConnector.hashedSecret.findPreImage(onChainSecret)).preImage
-
+    if (u8aEquals(ticket.preImage, EMPTY_PRE_IMAGE)) {
+      throw Error(`PreImage is empty. Please set the preImage before submitting.`)
+    }
     assert(
       await isWinningTicket(
         await (await ticket.signedTicket).ticket.hash,
         ticket.response,
-        preImage,
+        ticket.preImage,
         (await ticket.signedTicket).ticket.winProb
       )
     )
 
     const transaction = await signTransaction(
       hoprChannels.methods.redeemTicket(
-        u8aToHex(preImage),
+        u8aToHex(ticket.preImage),
         u8aToHex(ticket.response),
         (await ticket.signedTicket).ticket.amount.toString(),
         u8aToHex((await ticket.signedTicket).ticket.winProb),
@@ -53,7 +55,7 @@ class TicketStatic {
 
     await transaction.send()
 
-    this.coreConnector.account.updateLocalState(preImage)
+    this.coreConnector.account.updateLocalState(ticket.preImage)
   }
 }
 

@@ -161,6 +161,11 @@ describe('test Channel class', function () {
       `Checks that party B considers the channel open.`
     )
 
+    assert(
+      await counterpartysCoreConnector.account.reservePreImageIfIsWinning(firstAckedTicket),
+      `ticket must be winning`
+    )
+
     await channel.testAndSetNonce(new Uint8Array(1).fill(0xff)), `Should be able to set nonce.`
 
     assert.rejects(
@@ -205,7 +210,7 @@ describe('test Channel class', function () {
 
       assert(await counterpartysChannel.ticket.verify(nextSignedTicket), `Ticket signature must be valid.`)
 
-      if (await counterpartysCoreConnector.hashedSecret.reserveIfIsWinning(ackedTicket)) {
+      if (await counterpartysCoreConnector.account.reservePreImageIfIsWinning(ackedTicket)) {
         console.log(`ticket submitted`)
         await counterpartysCoreConnector.channel.tickets.submit(ackedTicket)
 

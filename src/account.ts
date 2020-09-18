@@ -1,8 +1,9 @@
 import type HoprEthereum from '.'
 import { stringToU8a, u8aEquals } from '@hoprnet/hopr-utils'
-import { AccountId, Balance, Hash, NativeBalance, TicketEpoch } from './types'
-import { pubKeyToAccountId } from './utils'
+import { AccountId, AcknowledgedTicket, Balance, Hash, NativeBalance, TicketEpoch } from './types'
+import { isWinningTicket, pubKeyToAccountId } from './utils'
 import { ContractEventEmitter } from './tsc/web3/types'
+import { PreImageResult } from './hashedSecret'
 
 import { HASHED_SECRET_WIDTH } from './hashedSecret'
 export const EMPTY_HASHED_SECRET = new Uint8Array(HASHED_SECRET_WIDTH).fill(0x00)
@@ -10,6 +11,8 @@ export const EMPTY_HASHED_SECRET = new Uint8Array(HASHED_SECRET_WIDTH).fill(0x00
 class Account {
   private _address?: AccountId
   private _nonceIterator: AsyncIterator<number>
+  private _preImageIterator: AsyncGenerator<boolean, boolean, AcknowledgedTicket>
+
   private _ticketEpoch?: TicketEpoch
   private _ticketEpochListener?: ContractEventEmitter<any>
   private _onChainSecret?: Hash
@@ -45,6 +48,44 @@ class Account {
 
       while (true) {
         yield nonce++
+      }
+    }.call(this)
+
+    this._preImageIterator = async function* (this: Account) {
+      let ticket: AcknowledgedTicket = yield
+
+      let currentPreImage: Promise<PreImageResult> = this.coreConnector.hashedSecret.findPreImage(
+        await this.onChainSecret
+      )
+
+      let tmp: PreImageResult = await currentPreImage
+
+      while (true) {
+        if (
+          await isWinningTicket(
+            await (await ticket.signedTicket).ticket.hash,
+            ticket.response,
+            tmp.preImage,
+            (await ticket.signedTicket).ticket.winProb
+          )
+        ) {
+          currentPreImage = this.coreConnector.hashedSecret.findPreImage(tmp.preImage)
+
+          ticket.preImage = tmp.preImage
+
+          if (tmp.index == 0) {
+            // @TODO dispatch call of next hashedSecret submit
+            return true
+          } else {
+            yield true
+          }
+
+          tmp = await currentPreImage
+        } else {
+          yield false
+        }
+
+        ticket = yield false
       }
     }.call(this)
   }
@@ -131,6 +172,16 @@ class Account {
           return this._onChainSecret
         })
     })
+  }
+
+  /**
+   * Reserve a preImage for the given ticket if it is a winning ticket.
+   * @param ticket the acknowledged ticket
+   */
+  async reservePreImageIfIsWinning(ticket: AcknowledgedTicket) {
+    await this._preImageIterator.next()
+
+    return (await this._preImageIterator.next(ticket)).value
   }
 
   get address(): Promise<AccountId> {
