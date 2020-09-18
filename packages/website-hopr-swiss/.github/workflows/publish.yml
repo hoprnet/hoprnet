@@ -9,36 +9,41 @@ on:
 
 jobs:
   website:
+    name: Build HOPR Swiss website
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        site: [hoprnet-org]
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/setup-node@v1
+      - name: Setup Google Cloud Credentials
+        uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
         with:
-          node-version: 12.9.1
-      - name: Cache node_modules
-        id: cache-modules
-        uses: actions/cache@v1
+          version: '290.0.1'
+          service_account_key: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+          export_default_credentials: true
+      - name: Set Project for Google Cloud HOPR Association
+        run: gcloud config set project ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
+      - name: Building Docker image using Google Cloud Build
+        run: gcloud builds submit --tag "gcr.io/hoprassociation/hopr-websites/hopr-swiss:$GITHUB_SHA"
+
+  deploy:
+    name: Deploy HOPR Swiss website
+    runs-on: ubuntu-latest
+    needs: [website]
+    steps:
+      - uses: actions/checkout@v2
+      - name: Setup Google Cloud Credentials
+        uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
         with:
-          path: node_modules
-          key: ${{ runner.OS }}-build-${{ hashFiles('**/package.json') }}
-      - name: Install node modules
-        if: steps.cache-modules.outputs.cache-hit != 'true'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          yarn install --frozen-lockfile
-          yarn bootstrap
-      - name: Prebuild website for production
-        working-directory: websites/${{ matrix.site }}
-        run: yarn build
-      - name: Deploy website to Vercel (staging)
+          version: '290.0.1'
+          service_account_key: ${{ secrets.GOOGLE_HOPRASSOCIATION_CLOUD_RUN }}
+          export_default_credentials: true
+      - name: Set Project for Google Cloud HOPR Association
+        run: gcloud config set project ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
+      - name: Deploy (preview)
         if: github.ref != 'refs/heads/master'
-        working-directory: websites/${{ matrix.site }}
-        run: npx now -t ${{ secrets.NOW_DEPLOYMENT_TOKEN }} -A now.json -c --scope hoprnet
-      - name: Deploy website to Vercel (production)
-        if: github.ref == 'refs/heads/master'
-        working-directory: websites/${{ matrix.site }}
-        run: npx now -t ${{ secrets.NOW_DEPLOYMENT_TOKEN }} -A now.json -c --scope hoprnet --prod
+        run: |-
+          gcloud run deploy hopr-swiss-dev \
+            --quiet \
+            --region us-central1 \
+            --image "gcr.io/hoprassociation/hopr-websites/hopr-swiss:$GITHUB_SHA" \
+            --platform "managed" \
+            --allow-unauthenticated
