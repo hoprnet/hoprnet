@@ -1,4 +1,4 @@
-import { CrawlResponse } from './resonse'
+import { CrawlResponse } from './response'
 
 enum CrawlStatus {
   OK,

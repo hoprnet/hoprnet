@@ -285,7 +285,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
             return reject(err)
           }
 
-          const unAcknowledgedDBKey = this.dbKeys.UnAcknowledgedTickets(path[0].pubKey.marshal(), packet.challenge.hash)
+          const unAcknowledgedDBKey = this.dbKeys.UnAcknowledgedTickets(packet.challenge.hash)
 
           await this.db.put(Buffer.from(unAcknowledgedDBKey), Buffer.from(''))
 

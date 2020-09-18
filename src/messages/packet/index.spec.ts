@@ -1,7 +1,7 @@
 import Hopr from '../..'
-import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
+import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 
-import HoprEthereum from '@hoprnet/hopr-core-ethereum'
+import HoprEthereum, { Types } from '@hoprnet/hopr-core-ethereum'
 
 import { Ganache } from '@hoprnet/hopr-testing'
 import { migrate, fund } from '@hoprnet/hopr-ethereum'
@@ -16,6 +16,7 @@ import LevelUp from 'levelup'
 import MemDown from 'memdown'
 
 import Debug from 'debug'
+import { ACKNOWLEDGED_TICKET_INDEX_LENGTH } from '../../dbKeys'
 const log = Debug(`hopr-core:testing`)
 
 const TWO_SECONDS = durations.seconds(2)
@@ -102,6 +103,40 @@ describe('test packet composition and decomposition', function () {
     }
 
     await Promise.all(msgReceivedPromises)
+
+    await new Promise((resolve) => setTimeout(resolve, 700))
+
+    for (let i = 0; i < nodes.length; i++) {
+      const tickets = []
+
+      await new Promise((resolve) =>
+        nodes[i].db
+          .createValueStream({
+            gte: Buffer.from(nodes[i].dbKeys.AcknowledgedTickets(Buffer.alloc(ACKNOWLEDGED_TICKET_INDEX_LENGTH, 0x00))),
+            lt: Buffer.from(nodes[i].dbKeys.AcknowledgedTickets(Buffer.alloc(ACKNOWLEDGED_TICKET_INDEX_LENGTH, 0xff))),
+          })
+          .on('data', (data: Buffer) => {
+            const acknowledged = nodes[i].paymentChannels.types.AcknowledgedTicket.create(nodes[i].paymentChannels)
+            acknowledged.set(data)
+
+            tickets.push(acknowledged)
+          })
+          .on('end', resolve)
+      )
+
+      if (tickets.length == 0) {
+        continue
+      }
+
+      console.log(tickets.length)
+
+      for (let k = 0; k < tickets.length; k++) {
+        console.log((await tickets[k].signedTicket).ticket.amount)
+        // @ts-ignore
+        await nodes[i].paymentChannels.channel.tickets.submit(tickets[k])
+        console.log(`ticket submitted`)
+      }
+    }
 
     log(`after Promise.all`)
 

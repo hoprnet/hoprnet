@@ -13,7 +13,7 @@ const KEY_LENGTH = 32
  * the proposed funds in case the the next downstream node responds with an
  * inappropriate acknowledgement.
  */
-export class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
+class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
   // private : Uint8Array
   private paymentChannels: Chain
   private _hashedKey: Uint8Array
@@ -192,3 +192,5 @@ export class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
     return this.paymentChannels.utils.verify(this.hash, await this.challengeSignature, peerId.pubKey.marshal())
   }
 }
+
+export { Challenge }

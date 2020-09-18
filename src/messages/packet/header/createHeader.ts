@@ -179,9 +179,11 @@ export async function createHeader<Chain extends HoprCoreConnector>(
            */
           header.beta.set(
             await node.paymentChannels.utils.hash(
-              u8aConcat(
-                deriveTicketKey(secrets[i]),
-                await node.paymentChannels.utils.hash(deriveTicketKeyBlinding(secrets[i + 1]))
+              await node.paymentChannels.utils.hash(
+                u8aConcat(
+                  deriveTicketKey(secrets[i]),
+                  await node.paymentChannels.utils.hash(deriveTicketKeyBlinding(secrets[i + 1]))
+                )
               )
             ),
             ADDRESS_SIZE + MAC_SIZE + KEY_LENGTH

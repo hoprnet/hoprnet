@@ -5,7 +5,7 @@ import { toLengthPrefixedU8a, lengthPrefixedToU8a, PRP } from '@hoprnet/hopr-uti
 
 export const PADDING = new TextEncoder().encode('PADDING')
 
-export default class Message extends Uint8Array {
+class Message extends Uint8Array {
   public encrypted: boolean
   constructor(
     _encrypted: boolean,
@@ -93,3 +93,5 @@ export default class Message extends Uint8Array {
     return this
   }
 }
+
+export default Message
