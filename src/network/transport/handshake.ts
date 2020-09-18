@@ -4,9 +4,20 @@ import defer from 'p-defer'
 import type { Pushable } from 'it-pushable'
 import BL from 'bl'
 
+import debug from 'debug'
+const verbose = debug('hopr-core:verbose:transport:handshake')
+
+/*
+ * This is glue to join together the mixed metaphors of libp2p and webrtc.
+ *
+ * as long as we want to, use the relayed connection
+ * if we have a direct connection, use that one
+ * otherwise, keep using the relayed connection
+ *
+ */
 export default function myHandshake(
-  webRTCsendBuffer: Pushable<Uint8Array> | undefined,
-  webRTCrecvBuffer: Pushable<Uint8Array> | undefined,
+  webRTCsendBuffer: Pushable<Uint8Array> | undefined, // sendBuffer sends from webrtc to socket
+  webRTCrecvBuffer: Pushable<Uint8Array> | undefined, // recvBuffer receives from the socket and delivers to WebRTC
   options?: { signal?: AbortSignal }
 ): {
   relayStream: Stream
@@ -27,6 +38,7 @@ export default function myHandshake(
       return (async function* () {
         if (webRTCsendBuffer != null) {
           const timeout = setTimeout(() => {
+            verbose('WebRTC took too long to setup, falling back')
             webRTCsendBuffer.end()
           }, WEBRTC_TIMEOUT)
 
@@ -41,6 +53,8 @@ export default function myHandshake(
           clearTimeout(timeout)
         }
 
+        // The following promise is a mutex, we wait for it to resolve and
+        // pass it's resulting generator out.
         const source = await sourcePromise.promise
         yield* source
       })()
@@ -64,7 +78,7 @@ export default function myHandshake(
           doneWithWebRTC = true
           webRTCrecvBuffer?.end()
 
-          cache = msg.slice(1)
+          cache = msg.slice(1) // NB: This coerces the bufferlist into a buffer
           deferredSource = source
           sinkPromise.resolve()
         }

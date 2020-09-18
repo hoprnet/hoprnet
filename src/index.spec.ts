@@ -18,6 +18,7 @@ describe('test hopr-core', function () {
     const node = await HoprCore.create({
       debug: true,
       bootstrapNode: true,
+      dbPath: process.cwd() + '/testdb',
       network: 'ethereum',
       provider: 'ws://127.0.0.1:9545',
       hosts: {
