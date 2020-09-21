@@ -6,7 +6,7 @@ import { ReactComponent as Linkedin } from '../../assets/images/icons/linkedin.s
 import { ReactComponent as Github } from '../../assets/images/icons/github.svg'
 import { ReactComponent as Youtube } from '../../assets/images/icons/youtube.svg'
 
-const isCompany = process.env.REACT_APP_IS_COMPANY === 'TRUE'
+const isCompany = true
 
 const FooterSocial = ({ className, ...props }) => {
   const classes = classNames('footer-social', className)

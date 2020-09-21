@@ -14,7 +14,7 @@ const defaultProps = {
 }
 
 console.log(process.env)
-const isCompany = process.env.REACT_APP_IS_COMPANY === 'TRUE'
+const isCompany = false
 
 class Clients extends React.Component {
   render() {

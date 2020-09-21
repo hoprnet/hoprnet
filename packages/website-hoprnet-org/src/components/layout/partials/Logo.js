@@ -3,7 +3,7 @@ import classNames from 'classnames'
 import { Link } from 'react-router-dom'
 import Image from '../../elements/Image'
 
-const isCompany = process.env.REACT_APP_IS_COMPANY === 'TRUE'
+const isCompany = false
 
 const Logo = ({ className, ...props }) => {
   const classes = classNames('brand', className)

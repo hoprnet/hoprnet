@@ -22,7 +22,7 @@ const defaultProps = {
   bottomDivider: false,
 }
 
-const isCompany = process.env.REACT_APP_IS_COMPANY === 'TRUE'
+const isCompany = false
 
 class Header extends React.Component {
   state = {

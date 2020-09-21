@@ -15,7 +15,7 @@ const defaultProps = {
   topDivider: false,
 }
 
-const isCompany = process.env.REACT_APP_IS_COMPANY === 'TRUE'
+const isCompany = true
 
 class Footer extends React.Component {
   render() {

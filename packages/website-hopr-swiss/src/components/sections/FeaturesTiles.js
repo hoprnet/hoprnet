@@ -12,7 +12,7 @@ const defaultProps = {
   ...SectionTilesProps.defaults,
 }
 
-const isCompany = process.env.REACT_APP_IS_COMPANY === 'TRUE'
+const isCompany = true
 
 class FeaturesTiles extends React.Component {
   render() {
