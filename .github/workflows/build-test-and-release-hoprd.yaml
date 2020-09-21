@@ -5,13 +5,14 @@ on:
   pull_request:
     types: [closed]
 
+defaults:
+  run:
+    working-directory: packages/hoprd
+
 jobs:
   build:
     name: Build, Test
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: packages/hoprd
 
     strategy:
       matrix:
