@@ -31,7 +31,7 @@ const Ecosystem = props => {
         <div className="center-content">
           <div className="container">
             <h2 className="m-0 mb-32 reveal-from-top big-title pb-32" data-reveal-delay="150">
-              Your Next Generation Data Privacy
+              Next Generation Data Privacy
             </h2>
 
             <p className="m-0 mb-32 reveal-from-top" data-reveal-delay="200">
