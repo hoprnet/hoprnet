@@ -51,9 +51,10 @@
     "tsconfig-paths": "^3.9.0",
     "typescript": "^3.7.4"
   },
-  "workspaces": [
-    "packages/*"
-  ],
+  "workspaces": {
+    "packages": ["packages/*"],
+    "nohoist": ["**/jest", "**/mocha"]
+  },
   "dependencies": {
     "@hoprnet/assets": "file:packages/assets",
     "@hoprnet/hopr-chat": "file:packages/chat",
