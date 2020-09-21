@@ -1,4 +1,4 @@
-name: Chat: Build, test, release?
+name: Chat - Build, test, release?
 on:
   push:
     branches: '*'
