@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "esModuleInterop": true,
+    "outDir": "./lib",
+    "lib": ["es2019", "dom"],
+    "module": "commonjs",
+    "target": "es2019",
+    "declaration": true,
+    "sourceMap": true
+  },
+  "include": ["src/**/*.ts"]
+}
