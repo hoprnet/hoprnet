@@ -38,7 +38,6 @@ jobs:
           yarn policies set-version ${{ matrix.yarn-version }}
           yarn install --frozen-lockfile
       - name: Build library
-        working-directory: ${{ env.workDir }}
         run: |
           yarn policies set-version ${{ matrix.yarn-version }}
           yarn build
