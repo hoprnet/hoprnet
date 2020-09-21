@@ -17,6 +17,10 @@ import Hopr from '../../'
 
 import HoprCoreConnector, { Types } from '@hoprnet/hopr-core-connector-interface'
 import { UnacknowledgedTicket } from '../ticket'
+import debug from 'debug'
+
+const log = debug('hopr-core:message:packet')
+const verbose = debug('hopr-core:verbose:message:packet')
 
 /**
  * Encapsulates the internal representation of a packet
@@ -171,12 +175,12 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
 
     const fee = new BN(secrets.length - 1, 10).imul(new BN(RELAY_FEE, 10))
 
-    console.log('---------- New Packet ----------')
+    log('---------- New Packet ----------')
     path
       .slice(0, Math.max(0, path.length - 1))
-      .forEach((peerId, index) => console.log(`Intermediate ${index} : ${chalk.blue(peerId.toB58String())}`))
-    console.log(`Destination    : ${chalk.blue(path[path.length - 1].toB58String())}`)
-    console.log('--------------------------------')
+      .forEach((peerId, index) => log(`Intermediate ${index} : ${chalk.blue(peerId.toB58String())}`))
+    log(`Destination    : ${chalk.blue(path[path.length - 1].toB58String())}`)
+    log('--------------------------------')
 
     packet._challenge = await Challenge.create(
       node.paymentChannels,
@@ -210,7 +214,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
         balance_a: new BN(5000),
       })
 
-      console.log(`before creating channel`)
+      log(`before creating channel`)
 
       const channel = await node.paymentChannels.channel.create(
         path[0].pubKey.marshal(),
@@ -253,11 +257,13 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     this.header.deriveSecret(this.node.peerInfo.id.privKey.marshal())
 
     if (await this.testAndSetTag(this.node.db)) {
-      throw Error('General error.')
+      verbose('Error setting tag')
+      throw Error('Error setting tag')
     }
 
     if (!this.header.verify()) {
-      throw Error('General error.')
+      verbose('Error verifying header', this.header)
+      throw Error('Error verifying header')
     }
 
     this.header.extractHeaderInformation()
@@ -299,7 +305,8 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
         (await this.ticket).ticket.challenge
       )
     ) {
-      throw Error('General error.')
+      verbose('Error preparing delivery')
+      throw Error('Error preparing delivery')
     }
 
     this.message.encrypted = false
@@ -323,7 +330,8 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
         (await this.ticket).ticket.challenge
       )
     ) {
-      throw Error('General error.')
+      verbose('Error preparing to forward')
+      throw Error('Error preparing forward')
     }
 
     const channelIdOutgoing = await this.node.paymentChannels.utils.getId(
@@ -336,7 +344,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       secretA: deriveTicketKey(this.header.derivedSecret),
     })
 
-    console.log(
+    log(
       `During forward: storing hashedKey`,
       u8aToHex(this.header.hashedKeyHalf),
       `we are ${this.node.peerInfo.id.toB58String()}`
@@ -386,7 +394,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       throw Error(`Cannot forward ${forwardedFunds.toNumber()}`)
     }
 
-    this.node.log(
+    log(
       `Received ${chalk.magenta(
         `${this.node.paymentChannels.utils.convertUnit(receivedMoney, 'wei', 'ether').toString()} ETH`
       )} on channel ${chalk.yellow(channelIdOutgoing.toString())}.`

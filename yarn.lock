@@ -468,7 +468,7 @@
     "@hoprnet/hopr-demo-seeds" "1.8.0"
     ganache-core "^2.10.2"
 
-"@hoprnet/hopr-utils@0.5.2", "@hoprnet/hopr-utils@^0.5.2":
+"@hoprnet/hopr-utils@0.5.2":
   version "0.5.2"
   resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-0.5.2.tgz#711885c1ae1d10b8b5ded68b7152101e2e3022de"
   integrity sha512-wcGbDvVNa21MwZwU2dWlukNS3J2E42tj4JNkD93qaqScgqTfpZHyVdxr6HwjSRuWcJqT4OI5Mke3MmEx6gs1lA==
@@ -5188,11 +5188,6 @@ he@1.2.0, he@^1.1.1:
   version "1.2.0"
   resolved "https://registry.yarnpkg.com/he/-/he-1.2.0.tgz#84ae65fa7eafb165fddb61566ae14baf05664f0f"
   integrity sha512-F/1DnUGPopORZi0ni+CvrCgHQ5FyEAHRLSApuYWMmrbSwoN2Mn/7k+Gl38gJnR7yyDZk6WLXwiGod1JOWNDKGw==
-
-heap-js@^2.1.2:
-  version "2.1.2"
-  resolved "https://registry.yarnpkg.com/heap-js/-/heap-js-2.1.2.tgz#f438145d24082b078a9a35d91e03511ccad48176"
-  integrity sha512-urRBDI/0ol7m3OS/ZzvB5+Ym9i4zwlzTACSHMrGmTgh1xcrB1AX6lmeWW6u5rrS5YHHMYClta35/LUPZhjPH9Q==
 
 heap-js@^2.1.2:
   version "2.1.2"
