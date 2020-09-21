@@ -31,7 +31,7 @@ jobs:
         if: steps.cache-modules.outputs.cache-hit != 'true'
         run: |
           yarn policies set-version ${{ matrix.yarn-version }}
-          yarn install --frozen-lockfile
+          yarn install 
       - name: Install dependencies
         run: |
           yarn policies set-version ${{ matrix.yarn-version }}
