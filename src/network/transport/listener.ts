@@ -100,10 +100,7 @@ export function createListener(
     return new Promise(async (resolve, reject) => {
       try {
         // @TODO replace this with our own STUN servers
-        externalIp = await Stun.getExternalIP(
-          STUN_SERVERS,
-          ma.toOptions().port
-        )
+        externalIp = await Stun.getExternalIP(STUN_SERVERS, ma.toOptions().port)
       } catch (err) {
         error(err)
       }
