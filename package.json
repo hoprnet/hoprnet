@@ -30,13 +30,8 @@
     "bestzip": "^2.1.6",
     "copyfiles": "^2.3.0",
     "cross-env": "^7.0.2",
-    "eslint": "7.1.0",
-    "eslint-config-prettier": "^6.10.0",
-    "eslint-plugin-import": "^2.20.1",
     "husky": "^4.2.5",
     "it-pair": "^1.0.0",
-    "jest": "26.0.1",
-    "jest-silent-reporter": "^0.2.1",
     "lerna": "^3.22.1",
     "libp2p-tcp": "^0.14.6",
     "memdown": "^5.1.0",
@@ -45,15 +40,12 @@
     "prettier": "^2.0.5",
     "rimraf": "^3.0.2",
     "supertest": "^4.0.2",
-    "ts-jest": "26.1.0",
-    "ts-loader": "^6.2.1",
-    "ts-node": "^8.6.2",
     "tsconfig-paths": "^3.9.0",
     "typescript": "^3.7.4"
   },
   "workspaces": {
     "packages": ["packages/*"],
-    "nohoist": ["**/jest", "**/mocha"]
+    "nohoist": ["**/jest", "**/mocha", "**/react", "**/eslint", "**/ts-node"]
   },
   "dependencies": {
     "@hoprnet/assets": "file:packages/assets",

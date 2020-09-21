@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "start": "CI=false node ./node_modules/.bin/craco start",
-    "build": "CI=false craco build",
+    "_build": "CI=false craco build",
     "test": "CI=true craco test",
     "eject": "craco eject",
     "format": "prettier --check ."
