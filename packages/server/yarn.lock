@@ -584,17 +584,6 @@
     strip-ansi "^6.0.0"
     typestub-multihashes "^0.0.4"
 
-"@hoprnet/hopr-utils@0.6.2":
-  version "0.6.2"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-0.6.2.tgz#3705531edb7f2f42bf83e1c0d93409f24da4701f"
-  integrity sha512-vizzOSzom7v8thkGm+Y+6eQGNhlYEprYRQznWTrR7TUhQYn4VoFZ/Hu4T1O76dPN0W3BVm6Xc1clatfz0Fo5tw==
-  dependencies:
-    bignumber.js "^9.0.0"
-    libp2p-crypto "^0.17.9"
-    peer-info "^0.17.5"
-    strip-ansi "^6.0.0"
-    typestub-multihashes "^0.0.4"
-
 "@hoprnet/hopr-utils@^0.4.0":
   version "0.4.0"
   resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-0.4.0.tgz#b0ff6029917cbf898ec9dd9a731e2b828dd5e837"
