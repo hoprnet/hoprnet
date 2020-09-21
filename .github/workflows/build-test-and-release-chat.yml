@@ -1,9 +1,13 @@
-name: HOPR Workflow
+name: Chat: Build, test, release?
 on:
   push:
     branches: '*'
   pull_request:
     types: [closed]
+
+defaults:
+  run:
+    working-directory: packages/chat
 
 jobs:
   build:
@@ -28,18 +32,15 @@ jobs:
           path: node_modules
           key: ${{ runner.OS }}-${{ matrix.node-version }}-build-${{ hashFiles('.') }}
       - name: Install node modules
-        working-directory: ${{ env.workDir }}
         if: steps.cache-modules.outputs.cache-hit != 'true'
         run: |
           yarn policies set-version ${{ matrix.yarn-version }}
           yarn install --frozen-lockfile
       - name: Build library
-        working-directory: ${{ env.workDir }}
         run: |
           yarn policies set-version ${{ matrix.yarn-version }}
           yarn build
       - name: Test library
-        working-directory: ${{ env.workDir }}
         run: |
           yarn policies set-version ${{ matrix.yarn-version }}
           yarn test
@@ -65,13 +66,11 @@ jobs:
           path: node_modules
           key: ${{ runner.OS }}-${{ matrix.node-version }}-build-${{ hashFiles(env.pkgPath) }}
       - name: Install node modules
-        working-directory: ${{ env.workDir }}
         if: steps.cache-modules.outputs.cache-hit != 'true'
         run: |
           yarn policies set-version 1.19.2
           yarn install --frozen-lockfile
       - name: Build library
-        working-directory: ${{ env.workDir }}
         run: |
           yarn policies set-version 1.19.2
           yarn build
@@ -118,13 +117,11 @@ jobs:
           path: node_modules
           key: ${{ runner.OS }}-${{ matrix.node-version }}-build-${{ hashFiles(env.pkgPath) }}
       - name: Install node modules
-        working-directory: ${{ env.workDir }}
         if: steps.cache-modules.outputs.cache-hit != 'true'
         run: |
           yarn policies set-version 1.19.2 
           yarn install --frozen-lockfile
       - name: Build library
-        working-directory: ${{ env.workDir }}
         run: |
           yarn policies set-version 1.19.2
           yarn build
@@ -171,13 +168,11 @@ jobs:
           path: node_modules
           key: ${{ runner.OS }}-${{ matrix.node-version }}-build-${{ hashFiles(env.pkgPath) }}
       - name: Install node modules
-        working-directory: ${{ env.workDir }}
         if: steps.cache-modules.outputs.cache-hit != 'true'
         run: |
           yarn policies set-version 1.19.2
           yarn install --frozen-lockfile
       - name: Build library
-        working-directory: ${{ env.workDir }}
         run: |
           yarn policies set-version 1.19.2
           yarn build
