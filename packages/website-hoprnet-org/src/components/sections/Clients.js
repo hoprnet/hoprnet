@@ -103,17 +103,17 @@ class Clients extends React.Component {
                   />
                 </a>
               </li>
-              {/* <li className="reveal-from-top" data-reveal-delay="150">
-                <a href="https://www.bitcoinsuisse.com/" target="_blank" rel="noopener noreferrer">
+              <li className="reveal-from-top" data-reveal-delay="150">
+                <a href="https://www.swiss-medtech.ch/en" target="_blank" rel="noopener noreferrer">
                   <Image
-                    src={require('@hoprnet/assets/images/partners/bitcoinsuisse.png')}
-                    alt="Bitcoin Suisse Logo"
+                    src={require('@hoprnet/assets/images/partners/swiss_medtech.png')}
+                    alt="Swiss Medtech Logo"
                     className={imgClasses}
-                    width={124}
-                    height={24}
+                    width={124 * 1.75}
+                    height={24 * 1.75}
                   />
                 </a>
-              </li> */}
+              </li>
             </ul>
             {showQuestion ? (
               <div className="question">

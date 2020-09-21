@@ -199,15 +199,15 @@ const ProfilesCompany = () => {
           <div className="team-item-header">
             <div className="team-item-image mb-24">
               <Image
-                src={require('@hoprnet/assets/images/team/rich_mcdowell.png')}
-                alt="Image of Rich Mcdowell"
+                src={require('@hoprnet/assets/images/team/the_wandering_editor.png')}
+                alt="Image of The Wandering Editor"
                 width={180}
                 height={180}
               />
             </div>
           </div>
           <div className="team-item-content">
-            <h5 className="team-item-name mt-0 mb-4">Rich McDowell</h5>
+            <h5 className="team-item-name mt-0 mb-4">The Wandering Editor</h5>
             <div className="team-item-role text-xs fw-500 mb-8">Content Creator</div>
             {/* <p className="m-0 text-sm"></p> */}
           </div>
