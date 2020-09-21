@@ -123,7 +123,7 @@ const Ecosystem = props => {
               data-reveal-delay="250"
               color="primary"
               tag="a"
-              href="https://docs.google.com/document/d/1ntuhp5oJU55M8ShBNw1kw6p2p62HST3x33UYu0CZUHg/edit?usp=sharing"
+              href="https://docs.google.com/forms/d/e/1FAIpQLSfpw9alXYGO4WvWS8HTF-5keGk_OFshrIIcGzifhfuWs7IN7g/viewform"
               target="_blank"
               rel="noopener noreferrer"
             >
