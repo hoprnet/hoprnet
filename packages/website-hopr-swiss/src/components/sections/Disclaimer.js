@@ -4,7 +4,7 @@ import GenericSection from './GenericSection'
 import Image from '../elements/Image'
 import { SectionProps } from '../utils/SectionProps'
 
-const isCompany = process.env.REACT_APP_IS_COMPANY === 'TRUE'
+const isCompany = true
 
 const propTypes = {
   children: PropTypes.node,

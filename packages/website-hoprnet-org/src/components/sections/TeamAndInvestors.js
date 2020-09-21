@@ -11,7 +11,7 @@ const defaultProps = {
   ...SectionTilesProps.defaults,
 }
 
-const isCompany = process.env.REACT_APP_IS_COMPANY === 'TRUE'
+const isCompany = false
 
 class TeamAndInvestors extends React.Component {
   render() {

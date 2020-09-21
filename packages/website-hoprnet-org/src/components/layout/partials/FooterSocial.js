@@ -7,7 +7,7 @@ import { ReactComponent as Github } from '../../assets/images/icons/github.svg'
 import { ReactComponent as Youtube } from '../../assets/images/icons/youtube.svg'
 import { ReactComponent as Discord } from '../../assets/images/icons/discord.svg'
 
-const isCompany = process.env.REACT_APP_IS_COMPANY === 'TRUE'
+const isCompany = false
 
 const FooterSocial = ({ className, invertColor, ...props }) => {
   const classes = classNames('footer-social', className)

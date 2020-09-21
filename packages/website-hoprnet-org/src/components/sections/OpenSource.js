@@ -14,7 +14,7 @@ const defaultProps = {
   ...SectionProps.defaults,
 }
 
-const isCompany = process.env.REACT_APP_IS_COMPANY === 'TRUE'
+const isCompany = false
 
 const OpenSourceSupport = props => (
   <GenericSection {...props}>

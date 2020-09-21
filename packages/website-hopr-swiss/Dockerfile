@@ -7,7 +7,6 @@ RUN yarn policies set-version $YARN_VERSION
 # Install app dependencies
 COPY . .
 RUN yarn install --frozen-lockfile
-RUN yarn bootstrap
 
 ### Build stage
 
@@ -21,7 +20,7 @@ RUN yarn cache clean
 ### Run stage
 
 FROM nginx:1.17.8-alpine
-COPY --from=build /websites/hopr-swiss/build /usr/share/nginx/html
+COPY --from=build /build /usr/share/nginx/html
 RUN rm /etc/nginx/conf.d/default.conf
 COPY nginx/nginx.conf /etc/nginx/conf.d
 EXPOSE 80

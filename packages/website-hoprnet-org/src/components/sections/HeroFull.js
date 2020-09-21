@@ -11,7 +11,7 @@ const defaultProps = {
   ...SectionProps.defaults,
 }
 
-const isCompany = process.env.REACT_APP_IS_COMPANY === 'TRUE'
+const isCompany = false
 
 class HeroFull extends React.Component {
   render() {
@@ -55,29 +55,29 @@ class HeroFull extends React.Component {
                     We're proud to build the HOPR network for the HOPR Association.
                   </p>
                 ) : (
-                    <>
-                      <p className="m-0 mb-32 reveal-from-top big-title pb-32" data-reveal-delay="300">
-                        Changing Data Privacy For Good
-                      </p>
-                      {/* <div className="order_circle">
+                  <>
+                    <p className="m-0 mb-32 reveal-from-top big-title pb-32" data-reveal-delay="300">
+                      Changing Data Privacy For Good
+                    </p>
+                    {/* <div className="order_circle">
                         Order a HOPR Node PC
                       </div>*/}
-                      <p className="m-0 mb-32 reveal-from-top" data-reveal-delay="350">
-                        The HOPR protocol ensures everyone has control of their privacy, data, and identity.
-                      </p>
-                      <Button
-                        color="primary"
-                        tag="a"
-                        href="/node"
-                        target="_blank"
-                        className="reveal-from-top"
-                        rel="noopener noreferrer"
-                        data-reveal-delay="400"
-                      >
-                        Order a HOPR Node PC
-                      </Button>
-                    </>
-                  )}
+                    <p className="m-0 mb-32 reveal-from-top" data-reveal-delay="350">
+                      The HOPR protocol ensures everyone has control of their privacy, data, and identity.
+                    </p>
+                    <Button
+                      color="primary"
+                      tag="a"
+                      href="/node"
+                      target="_blank"
+                      className="reveal-from-top"
+                      rel="noopener noreferrer"
+                      data-reveal-delay="400"
+                    >
+                      Order a HOPR Node PC
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
             {/* <div className="hero-figure reveal-from-bottom" data-reveal-delay="600">

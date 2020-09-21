@@ -15,7 +15,7 @@ const defaultProps = {
   ...SectionProps.defaults,
 }
 
-const isCompany = process.env.REACT_APP_IS_COMPANY === 'TRUE'
+const isCompany = false
 
 class Jobs extends React.Component {
   componentDidMount() {
