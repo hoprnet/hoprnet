@@ -32,7 +32,6 @@ jobs:
           path: node_modules
           key: ${{ runner.OS }}-${{ matrix.node-version }}-build-${{ hashFiles('**/yarn.lock') }}
       - name: Install node modules
-        working-directory: ${{ env.workDir }}
         if: steps.cache-modules.outputs.cache-hit != 'true'
         run: |
           yarn policies set-version ${{ matrix.yarn-version }}
@@ -42,7 +41,6 @@ jobs:
           yarn policies set-version ${{ matrix.yarn-version }}
           yarn build
 #      - name: Test library
-#        working-directory: ${{ env.workDir }}
 #        run: |
 #          yarn policies set-version ${{ matrix.yarn-version }}
 #          yarn test
@@ -67,7 +65,6 @@ jobs:
 #          path: node_modules
 #          key: ${{ runner.OS }}-${{ matrix.node-version }}-build-${{ hashFiles(env.pkgPath) }}
 #      - name: Install node modules
-#        working-directory: ${{ env.workDir }}
 #        if: steps.cache-modules.outputs.cache-hit != 'true'
 #        run: |
 #          yarn install --frozen-lockfile
@@ -114,7 +111,6 @@ jobs:
 #          path: node_modules
 #          key: ${{ runner.OS }}-${{ matrix.node-version }}-build-${{ hashFiles(env.pkgPath) }}
 #      - name: Install node modules
-#        working-directory: ${{ env.workDir }}
 #        if: steps.cache-modules.outputs.cache-hit != 'true'
 #        run: |
 #          yarn install --frozen-lockfile
@@ -161,7 +157,6 @@ jobs:
 #          path: node_modules
 #          key: ${{ runner.OS }}-${{ matrix.node-version }}-build-${{ hashFiles(env.pkgPath) }}
 #      - name: Install node modules
-#        working-directory: ${{ env.workDir }}
 #        if: steps.cache-modules.outputs.cache-hit != 'true'
 #        run: |
 #          yarn install --frozen-lockfile
