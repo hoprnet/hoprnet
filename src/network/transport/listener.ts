@@ -150,12 +150,12 @@ export function createListener(
 }
 
 function trackConn(server: Libp2pServer, maConn: MultiaddrConnection) {
-  // @ts-ignore
   server.__connections.push(maConn)
+  verbose(`currently tracking ${server.__connections.length} connections ++`)
 
   const untrackConn = () => {
-    // @ts-ignore
     server.__connections = server.__connections.filter((c) => c !== maConn)
+    verbose(`currently tracking ${server.__connections.length} connections --`)
   }
 
   maConn.conn.once('close', untrackConn)
