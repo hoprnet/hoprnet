@@ -1,0 +1,42 @@
+name: Lerna integration - build everything together. 
+on:
+  push:
+    branches: '*'
+  pull_request:
+    types: [closed]
+
+jobs:
+  build:
+    name: Build, Test
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [12.9.1]
+        yarn-version: [1.19.2]
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Cache node_modules
+        id: cache-modules
+        uses: actions/cache@v1
+        with:
+          path: node_modules
+          key: ${{ runner.OS }}-${{ matrix.node-version }}-build-${{ hashFiles('.') }}
+      - name: Install node modules
+        if: steps.cache-modules.outputs.cache-hit != 'true'
+        run: |
+          yarn policies set-version ${{ matrix.yarn-version }}
+          yarn install --frozen-lockfile
+      - name: Install dependencies
+        run: |
+          yarn policies set-version ${{ matrix.yarn-version }}
+          lerna bootstrap
+      - name: Build
+        run: |
+          yarn policies set-version ${{ matrix.yarn-version }}
+          lerna run build
