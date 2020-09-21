@@ -1,12 +1,14 @@
 import Head from 'next/head'
 import styles from '../styles/Home.module.css'
-import Logo from '../components/logo'
+import Logo from '../components/Logo/Logo'
 import CopyIcon from '../components/icons/copy'
 import TwitterIcon from '../components/icons/twitter'
 import { useState, useEffect } from 'react'
 import useSWR from 'swr'
 import db from '../utils/db'
 import { HOPR_ENVIRONMENT } from '../utils/env'
+import { default as Footer } from '../components/Footer/Footer'
+import { default as Header } from '../components/Header/Header'
 
 function BSLink({ id, children }) {
   return (
@@ -92,23 +94,7 @@ function HomeContent({
         <script async src="https://platform.twitter.com/widgets.js" charSet="utf-8"></script>
       </Head>
 
-      <header className={styles.header}>
-        <div className={styles.h1}>
-          <Logo />
-          <h1 className={styles.title}>
-            <a href="https://hoprnet.org">HOPR</a> Incentivized Testnet on xDAI
-          </h1>
-        </div>
-
-        <div className={styles.stats}>
-          <div>
-            <strong className="green">{parseFloat(available).toFixed(4)}</strong> xHOPR Available
-          </div>
-          {/* <div>
-            <strong className="blue">{locked}</strong> xHOPR Locked
-          </div> */}
-        </div>
-      </header>
+      <Header {...{available}} />
 
       <section className={styles.intro}>
         <p>
@@ -202,30 +188,12 @@ function HomeContent({
         </section>
       </main>
 
-      <footer className={styles.footer}>
-        <div>
-          <div>
-            <BSLink id={hoprChannelContract}>
-              <strong>Channel:</strong>
-              {hoprChannelContract && hoprChannelContract.slice(0, 8)}...
-            </BSLink>
-          </div>
-          <div>
-            <BSLink id={hoprCoverbotAddress}>
-              <strong>Coverbot:</strong>
-              {hoprCoverbotAddress && hoprCoverbotAddress.slice(0, 8)}...
-            </BSLink>
-          </div>
-        </div>
-        Thanks for helping us create the <a href="https://hoprnet.org/">HOPR</a> network.
-        <br />
-        <br />
-        Last Updated: {refreshed}
-        <script src="https://panther.hoprnet.org/script.js" site="LCFGMVKB" defer></script>
-      </footer>
+      <Footer {...{ hoprChannelContract, hoprCoverbotAddress, styles, refreshed }} />
     </>
   )
 }
+
+const fetcher = (...args) => fetch(...args).then((res) => res.json())
 
 export async function getServerSideProps() {
   let api = require('./api/stats')
@@ -235,5 +203,10 @@ export async function getServerSideProps() {
 }
 
 export default function Home(props) {
-  return <HomeContent {...props} />
+  let { data, error } = useSWR('/api/stats', fetcher, { initialData: props || null, refreshInterval: 5000 })
+  if (!data || !Object.keys(data).length) {
+    // SWR inits to {} with initalData = undefined :(
+    return <div>...</div>
+  }
+  return <HomeContent {...data} />
 }
