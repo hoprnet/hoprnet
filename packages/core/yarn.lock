@@ -410,30 +410,6 @@
     "@ethersproject/rlp" "^5.0.0"
     "@ethersproject/signing-key" "^5.0.0"
 
-"@hoprnet/hopr-core-connector-interface@1.10.5":
-  version "1.10.5"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-connector-interface/-/hopr-core-connector-interface-1.10.5.tgz#66dccf0e9c464fc026273d3afc4b46028e2e15ca"
-  integrity sha512-z3K66WbjKtAv52UmLCMpsSmHLk9N0WDnPVaMC7qw4z1QCUtjVYu2JGlzLKSPLE/ZI5lBRoOXWnYjD7Ux6t5i4w==
-
-"@hoprnet/hopr-core-ethereum@0.5.1":
-  version "0.5.1"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-ethereum/-/hopr-core-ethereum-0.5.1.tgz#e7ce457d6c13d83ebe969d405466bcb1f532106e"
-  integrity sha512-hH0/lS+ooBMAT74YxRcNIlldYR7AUIDoH52lC+pG0q01lSdNt99u3E5kmYeM9LnBW3JHe0I0w5OsWzNM5sVL8w==
-  dependencies:
-    "@hoprnet/hopr-utils" "^0.6.2"
-    bn.js "^5.1.2"
-    chalk "^4.1.0"
-    debug "^4.1.1"
-    heap-js "^2.1.2"
-    keccak "^3.0.0"
-    secp256k1 "^4.0.2"
-    web3 "^1.2.11"
-    web3-core "^1.2.11"
-    web3-core-helpers "^1.2.11"
-    web3-core-subscriptions "^1.2.11"
-    web3-eth "^1.2.11"
-    web3-eth-contract "^1.2.11"
-
 "@hoprnet/hopr-demo-seeds@1.8", "@hoprnet/hopr-demo-seeds@1.8.0":
   version "1.8.0"
   resolved "https://registry.yarnpkg.com/@hoprnet/hopr-demo-seeds/-/hopr-demo-seeds-1.8.0.tgz#918381b6ace214758b043b59637d20dd23ec6019"
@@ -475,17 +451,6 @@
   dependencies:
     bignumber.js "^9.0.0"
     chalk "^4.1.0"
-    libp2p-crypto "^0.17.9"
-    peer-info "^0.17.5"
-    strip-ansi "^6.0.0"
-    typestub-multihashes "^0.0.4"
-
-"@hoprnet/hopr-utils@^0.6.2":
-  version "0.6.2"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-0.6.2.tgz#3705531edb7f2f42bf83e1c0d93409f24da4701f"
-  integrity sha512-vizzOSzom7v8thkGm+Y+6eQGNhlYEprYRQznWTrR7TUhQYn4VoFZ/Hu4T1O76dPN0W3BVm6Xc1clatfz0Fo5tw==
-  dependencies:
-    bignumber.js "^9.0.0"
     libp2p-crypto "^0.17.9"
     peer-info "^0.17.5"
     strip-ansi "^6.0.0"
@@ -9262,7 +9227,7 @@ scryptsy@^1.2.1:
   dependencies:
     pbkdf2 "^3.0.3"
 
-secp256k1@4.0.2, secp256k1@^4.0.0, secp256k1@^4.0.1, secp256k1@^4.0.2, secp256k1@~4.0.2:
+secp256k1@4.0.2, secp256k1@^4.0.0, secp256k1@^4.0.1, secp256k1@~4.0.2:
   version "4.0.2"
   resolved "https://registry.yarnpkg.com/secp256k1/-/secp256k1-4.0.2.tgz#15dd57d0f0b9fdb54ac1fa1694f40e5e9a54f4a1"
   integrity sha512-UDar4sKvWAksIlfX3xIaQReADn+WFnHvbVujpcbr+9Sf/69odMwy2MUsz5CKLQgX9nsIyrjuxL2imVyoNHa3fg==
@@ -10610,7 +10575,7 @@ web3-core-helpers@1.2.1:
     web3-eth-iban "1.2.1"
     web3-utils "1.2.1"
 
-web3-core-helpers@1.2.11, web3-core-helpers@^1.2.11:
+web3-core-helpers@1.2.11:
   version "1.2.11"
   resolved "https://registry.yarnpkg.com/web3-core-helpers/-/web3-core-helpers-1.2.11.tgz#84c681ed0b942c0203f3b324a245a127e8c67a99"
   integrity sha512-PEPoAoZd5ME7UfbnCZBdzIerpe74GEvlwT4AjOmHeCVZoIFk7EqvOZDejJHt+feJA6kMVTdd0xzRNN295UhC1A==
@@ -10727,7 +10692,7 @@ web3-core-subscriptions@1.2.1:
     underscore "1.9.1"
     web3-core-helpers "1.2.1"
 
-web3-core-subscriptions@1.2.11, web3-core-subscriptions@^1.2.11:
+web3-core-subscriptions@1.2.11:
   version "1.2.11"
   resolved "https://registry.yarnpkg.com/web3-core-subscriptions/-/web3-core-subscriptions-1.2.11.tgz#beca908fbfcb050c16f45f3f0f4c205e8505accd"
   integrity sha512-qEF/OVqkCvQ7MPs1JylIZCZkin0aKK9lDxpAtQ1F8niEDGFqn7DT8E/vzbIa0GsOjL2fZjDhWJsaW+BSoAW1gg==
@@ -10755,7 +10720,7 @@ web3-core@1.2.1:
     web3-core-requestmanager "1.2.1"
     web3-utils "1.2.1"
 
-web3-core@1.2.11, web3-core@^1.2.11:
+web3-core@1.2.11:
   version "1.2.11"
   resolved "https://registry.yarnpkg.com/web3-core/-/web3-core-1.2.11.tgz#1043cacc1becb80638453cc5b2a14be9050288a7"
   integrity sha512-CN7MEYOY5ryo5iVleIWRE3a3cZqVaLlIbIzDPsvQRUfzYnvzZQRZBm9Mq+ttDi2STOOzc1MKylspz/o3yq/LjQ==
@@ -10874,7 +10839,7 @@ web3-eth-contract@1.2.1:
     web3-eth-abi "1.2.1"
     web3-utils "1.2.1"
 
-web3-eth-contract@1.2.11, web3-eth-contract@^1.2.11:
+web3-eth-contract@1.2.11:
   version "1.2.11"
   resolved "https://registry.yarnpkg.com/web3-eth-contract/-/web3-eth-contract-1.2.11.tgz#917065902bc27ce89da9a1da26e62ef663663b90"
   integrity sha512-MzYuI/Rq2o6gn7vCGcnQgco63isPNK5lMAan2E51AJLknjSLnOxwNY3gM8BcKoy4Z+v5Dv00a03Xuk78JowFow==
@@ -11025,7 +10990,7 @@ web3-eth@1.2.1:
     web3-net "1.2.1"
     web3-utils "1.2.1"
 
-web3-eth@1.2.11, web3-eth@^1.2.11:
+web3-eth@1.2.11:
   version "1.2.11"
   resolved "https://registry.yarnpkg.com/web3-eth/-/web3-eth-1.2.11.tgz#4c81fcb6285b8caf544058fba3ae802968fdc793"
   integrity sha512-REvxW1wJ58AgHPcXPJOL49d1K/dPmuw4LjPLBPStOVkQjzDTVmJEIsiLwn2YeuNDd4pfakBwT8L3bz1G1/wVsQ==
