@@ -1,0 +1,86 @@
+{
+  "name": "@hoprnet/hopr-core-ethereum",
+  "version": "0.5.1",
+  "repository": "git@github.com:hoprnet/hopr-core-ethereum.git",
+  "license": "LGPL-3.0-only",
+  "types": "lib/index.d.ts",
+  "main": "lib/index.js",
+  "homepage": "https://hoprnet.org",
+  "scripts": {
+    "clean": "rm -rf ./lib",
+    "test": "mocha --exit",
+    "dev": "yarn clean && yarn build:types && tsc -w",
+    "build:types": "typechain --target web3-v1 --outDir './src/tsc/web3' './node_modules/@hoprnet/hopr-ethereum/build/extracted/abis/*.json'",
+    "build": "yarn clean && yarn build:types && ./scripts/build.sh",
+    "lint": "prettier --check .",
+    "prepare": "yarn build"
+  },
+  "files": [
+    "lib/",
+    "!*.spec.ts",
+    "!*.spec.d.ts",
+    "!*.spec.js",
+    "!*.spec.js.map"
+  ],
+  "engines": {
+    "node": "12",
+    "yarn": "1"
+  },
+  "dependencies": {
+    "@hoprnet/hopr-utils": "^0.6.2",
+    "bn.js": "^5.1.2",
+    "chalk": "^4.1.0",
+    "debug": "^4.1.1",
+    "heap-js": "^2.1.2",
+    "keccak": "^3.0.0",
+    "secp256k1": "^4.0.2",
+    "web3": "^1.2.11",
+    "web3-core": "^1.2.11",
+    "web3-core-helpers": "^1.2.11",
+    "web3-core-subscriptions": "^1.2.11",
+    "web3-eth": "^1.2.11",
+    "web3-eth-contract": "^1.2.11"
+  },
+  "devDependencies": {
+    "@hoprnet/hopr-core-connector-interface": "1.10.5",
+    "@hoprnet/hopr-demo-seeds": "1.8.0",
+    "@hoprnet/hopr-ethereum": "^1.4.3",
+    "@hoprnet/hopr-testing": "0.2.0",
+    "@types/debug": "^4.1.5",
+    "@types/keccak": "^3.0.1",
+    "@types/levelup": "^4.3.0",
+    "@types/memdown": "^3.0.0",
+    "@types/mocha": "^8.0.3",
+    "@types/node": "^12.12.8",
+    "@types/secp256k1": "^4.0.1",
+    "husky": "^4.2.5",
+    "it-pipe": "^1.1.0",
+    "levelup": "^4.4.0",
+    "memdown": "^5.1.0",
+    "mocha": "^8.0.1",
+    "prettier": "^2.0.5",
+    "ts-generator": "^0.0.8",
+    "ts-node": "^8.10.2",
+    "typechain": "^1.0.5",
+    "typechain-target-web3-v1": "^1.0.4",
+    "typescript": "^3.9"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "yarn lint"
+    }
+  },
+  "prettier": {
+    "tabWidth": 2,
+    "semi": false,
+    "singleQuote": true,
+    "printWidth": 120
+  },
+  "mocha": {
+    "extension": [
+      "ts"
+    ],
+    "spec": "src/**/*.spec.ts",
+    "require": "ts-node/register"
+  }
+}
