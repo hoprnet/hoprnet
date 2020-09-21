@@ -18,9 +18,9 @@
       "headers": { "Location": "/do-business-with-HOPR" }
     },
     {
-      "src": "/partners",
+      "src": "/partner",
       "status": 307,
-      "headers": { "Location": "/partner" }
+      "headers": { "Location": "/partners" }
     }
   ]
 }
