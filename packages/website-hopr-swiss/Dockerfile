@@ -7,7 +7,6 @@ RUN yarn policies set-version $YARN_VERSION
 # Install app dependencies
 COPY . .
 RUN yarn install --frozen-lockfile
-RUN yarn bootstrap
 
 ### Build stage
 
