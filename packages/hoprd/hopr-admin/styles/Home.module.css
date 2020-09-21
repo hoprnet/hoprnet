@@ -1,0 +1,25 @@
+.connectedPeers {
+  background-color:  #000050;
+  border: 1rem solid #0000b4;
+  position: fixed;
+  padding: 1rem 3rem;
+  top: 15vw;
+  left: 15vw;
+  right: 15vw;
+  max-height: 50vh;
+  overflow-y: scroll;
+}
+
+.connectedPeers h2 {
+  text-align:center;
+}
+
+.peer {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+}
+.peerIcon {
+  display: block;
+  padding: 0.1rem;
+}

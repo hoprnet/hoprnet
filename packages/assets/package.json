@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/assets",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Static assets to be reused by various projects",
   "main": "index.js",
   "files": [
