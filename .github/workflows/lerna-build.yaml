@@ -21,14 +21,7 @@ jobs:
         uses: actions/setup-node@v1
         with:
           node-version: ${{ matrix.node-version }}
-      - name: Cache node_modules
-        id: cache-modules
-        uses: actions/cache@v1
-        with:
-          path: node_modules
-          key: ${{ runner.OS }}-${{ matrix.node-version }}-build-${{ hashFiles('.') }}
       - name: Install node modules
-        if: steps.cache-modules.outputs.cache-hit != 'true'
         run: |
           yarn policies set-version ${{ matrix.yarn-version }}
           yarn install 
