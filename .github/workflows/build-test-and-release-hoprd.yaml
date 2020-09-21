@@ -1,4 +1,4 @@
-name: HOPR Workflow
+name: HOPRD - Build, test, release?
 on:
   push:
     branches: '*'
