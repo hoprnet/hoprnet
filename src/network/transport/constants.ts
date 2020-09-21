@@ -21,3 +21,14 @@ export const FAIL = new TextEncoder().encode('FAIL')
 
 export const RELAY_REGISTER = '/hopr/relay-register/0.0.1'
 export const DELIVERY_REGISTER = '/hopr/delivery-register/0.0.1'
+
+export const STUN_SERVERS = [
+  {
+    hostname: 'stun.l.google.com',
+    port: 19302,
+  },
+  {
+    hostname: 'stun.1und1.de',
+    port: 3478,
+  },
+]

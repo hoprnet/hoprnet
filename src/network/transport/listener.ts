@@ -7,7 +7,7 @@ const error = debug('hopr-core:transport:listener:error')
 const verbose = debug('hopr-core:verbose:listener:error')
 
 import { socketToConn } from './socket-to-conn'
-import { CODE_P2P } from './constants'
+import { CODE_P2P, STUN_SERVERS } from './constants'
 import { getMultiaddrs, multiaddrToNetConfig } from './utils'
 import { MultiaddrConnection, Connection, Upgrader } from './types'
 import Multiaddr from 'multiaddr'
@@ -32,7 +32,7 @@ export interface Listener extends EventEmitter {
  */
 async function attemptClose(maConn: MultiaddrConnection) {
   try {
-    maConn && (await maConn.close())
+    await maConn?.close()
   } catch (err) {
     error('an error occurred closing the connection', err)
   }
@@ -101,16 +101,7 @@ export function createListener(
       try {
         // @TODO replace this with our own STUN servers
         externalIp = await Stun.getExternalIP(
-          [
-            {
-              hostname: 'stun.l.google.com',
-              port: 19302,
-            },
-            {
-              hostname: 'stun.1und1.de',
-              port: 3478,
-            },
-          ],
+          STUN_SERVERS,
           ma.toOptions().port
         )
       } catch (err) {
@@ -139,11 +130,13 @@ export function createListener(
     if (listeningAddr?.toString().startsWith('/ip4')) {
       if (externalIp != null) {
         if (externalIp.port == null) {
+          verbose('Bidirectional NAT: ', listeningAddr?.toString(), peerId?.toString())
           console.log(`Attention: Bidirectional NAT detected. Publishing no public ip address to the DHT`)
           if (peerId != null) {
             addrs.push(Multiaddr(''))
           }
         } else {
+          verbose('Adding address', externalIp.address, externalIp.port)
           addrs.push(Multiaddr(`/ip4/${externalIp.address}/tcp/${externalIp.port}`))
         }
       }
