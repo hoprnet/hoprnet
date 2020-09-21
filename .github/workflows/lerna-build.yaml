@@ -35,8 +35,8 @@ jobs:
       - name: Install dependencies
         run: |
           yarn policies set-version ${{ matrix.yarn-version }}
-          lerna bootstrap
+          node_modules/.bin/lerna bootstrap
       - name: Build
         run: |
           yarn policies set-version ${{ matrix.yarn-version }}
-          lerna run build
+          node_modules/.bin/lerna run build
