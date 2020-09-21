@@ -16,7 +16,6 @@
       "src": "/for_you",
       "status": 301,
       "headers": { "Location": "/do-business-with-HOPR" }
-    },
-    { "src": "/(.*)", "headers": { "cache-control": "s-maxage=0" }, "dest": "build/index.html" }
+    }
   ]
 }
