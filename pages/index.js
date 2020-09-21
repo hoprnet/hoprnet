@@ -6,6 +6,7 @@ import TwitterIcon from '../components/icons/twitter'
 import { useState, useEffect } from 'react'
 import useSWR from 'swr'
 import db from '../utils/db'
+import api from '../utils/api'
 import { HOPR_ENVIRONMENT } from '../utils/env'
 import { default as Footer } from '../components/Footer/Footer'
 import { default as Header } from '../components/Header/Header'
@@ -52,15 +53,15 @@ function ScoredNode({ address, score, connected }) {
 }
 
 function HomeContent({
-  address,
-  available,
-  locked,
-  connected,
-  connectedNodes,
-  hoprChannelContract,
-  hoprCoverbotAddress,
-  env,
-  refreshed,
+  address = '0x000...',
+  available = 0,
+  locked = 0,
+  connected = [],
+  connectedNodes = [],
+  hoprChannelContract = '0x000...',
+  hoprCoverbotAddress = '0x000...',
+  env = {},
+  refreshed = new Date().toString(),
 }) {
   let addressOnClick = () => {
     let addressClicker = document.createElement('textarea')
@@ -195,18 +196,12 @@ function HomeContent({
 
 const fetcher = (...args) => fetch(...args).then((res) => res.json())
 
-export async function getServerSideProps() {
-  let api = require('./api/stats')
-  const props = await api.get()
-  console.log("API", props);
-  return { props } // NextJS makes this stupidly complicated
+export async function getServerSideProps() { 
+  const stats = await api.getStats()
+  return { props: stats }
 }
 
 export default function Home(props) {
-  let { data, error } = useSWR('/api/stats', fetcher, { initialData: props || null, refreshInterval: 5000 })
-  if (!data || !Object.keys(data).length) {
-    // SWR inits to {} with initalData = undefined :(
-    return <div>...</div>
-  }
+  const { data, error } = useSWR('/api/stats', fetcher, { initialData: props || {}, refreshInterval: 5000 })
   return <HomeContent {...data} />
 }
