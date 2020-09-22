@@ -1,7 +1,6 @@
-import { getMessageStream } from './utils'
 import { IMessage, Message } from './message'
-import { ListenResponse } from '@hoprnet/hopr-protos/node/listen_pb'
 import wait from 'wait-for-stuff'
+import Core from './core'
 
 export interface Bot {
   botName: string
@@ -11,32 +10,25 @@ export interface Bot {
   handleMessage(message: IMessage)
 }
 
-const listen = async (bot: Bot) => {
-  console.log('Ready to listen to my HOPR node')
-  const { client, stream } = await getMessageStream()
-  stream
-    .on('data', (data) => {
-      try {
-        const [messageBuffer] = data.array
-        const res = new ListenResponse()
-        res.setPayload(messageBuffer)
-        const message = new Message(res.getPayload_asU8()).toJson()
-        bot.handleMessage(message)
-      } catch (err) {
-        console.error(err)
-      }
+const listen = async (bot: Bot, node: Core) => {
+  console.log('[ Chatbot ] listen | Ready to listen to my HOPR node')
+
+  node.events.on('message', (decoded: Buffer) => {
+    const message = new Message(new Uint8Array(decoded))
+    const parsedMessage = message.toJson()
+    const response = bot.handleMessage.call(bot, parsedMessage)
+    console.log('[ Chatbot ] listen:message | Bot Response', response);
+    node.send({ 
+      peerId: parsedMessage.from,
+      payload: Message.fromJson({ from: bot.address, text: ` ${response}` }).toU8a(),
+      intermediatePeerIds: []
     })
-    .on('error', (err) => {
-      console.error(err)
-    })
-    .on('end', () => {
-      client.close()
-    })
+  })
 }
 
-export async function setupBot(bot: Bot) {
+export async function setupBot(bot: Bot, node: Core) {
   console.log(`Starting bot at ${bot.timestamp}`)
   console.log(`Listening to Tweets created after ${bot.twitterTimestamp}`)
   wait.for.date(bot.timestamp)
-  await listen(bot)
+  await listen(bot, node)
 }

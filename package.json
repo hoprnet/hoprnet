@@ -24,6 +24,8 @@
   },
   "dependencies": {
     "@grpc/proto-loader": "^0.5.4",
+    "@hoprnet/hopr-core": "0.6.32-xdai",
+    "@hoprnet/hopr-core-connector-interface": "1.7.1",
     "@hoprnet/hopr-core-ethereum": "0.4.4-xdai",
     "@hoprnet/hopr-protos": "0.1.0",
     "@hoprnet/hopr-server": "0.2.5-xdai",
