@@ -173,6 +173,7 @@ export class Coverbot implements Bot {
     console.log(`${this.botName} has been added`)
 
     console.log(`⚡️ Network: ${COVERBOT_CHAIN_PROVIDER}`)
+    console.log(`⚡️ Environment: ${HOPR_ENVIRONMENT}`)
     console.log(`💸 Threshold: ${COVERBOT_XDAI_THRESHOLD}`)
     console.log(`🐛 Debug Mode: ${COVERBOT_DEBUG_MODE}`)
     console.log(`👀 Verification Cycle: ${COVERBOT_VERIFICATION_CYCLE_IN_MS}`)
