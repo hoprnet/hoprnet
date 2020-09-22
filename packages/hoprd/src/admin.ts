@@ -31,7 +31,7 @@ export class AdminServer {
   async setup(){
     this.app = next({ 
       dev: true,
-      dir: path.resolve('./hopr-admin/'), 
+      dir: path.resolve(__dirname, '../hopr-admin/'), 
       conf: {
         devIndicators: {
           autoPrerender: false

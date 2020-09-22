@@ -1,0 +1,40 @@
+name: Lerna integration - build everything together and test 
+on:
+  push:
+    branches: '*'
+  pull_request:
+    types: [closed]
+
+jobs:
+  build:
+    name: Build, Test
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [12.9.1]
+        yarn-version: [1.19.2]
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Install node modules
+        run: |
+          yarn policies set-version ${{ matrix.yarn-version }}
+          yarn install 
+      - name: Install dependencies
+        run: |
+          yarn policies set-version ${{ matrix.yarn-version }}
+          node_modules/.bin/lerna bootstrap
+      - name: Link locally 
+        run: |
+          node_modules/.bin/lerna link --force-local
+      - name: Build
+        run: |
+          node_modules/.bin/lerna run build
+      - name: Build
+        run: |
+          node_modules/.bin/lerna run test

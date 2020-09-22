@@ -22,5 +22,8 @@
       "status": 307,
       "headers": { "Location": "/partners" }
     }
-  ]
+  ],
+  "github": {
+    "silent": true
+  }
 }

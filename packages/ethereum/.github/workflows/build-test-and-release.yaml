@@ -54,7 +54,7 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v1
         with:
-          node-version: '12.9.1'
+          node-version: 12
           registry-url: https://registry.npmjs.org/
       - name: Use Master
         run: git fetch origin && git checkout master
@@ -73,7 +73,6 @@ jobs:
       - name: Build library
         working-directory: ${{ env.workDir }}
         run: |
-          yarn policies set-version 1.19.2
           yarn build
       - name: Set name / email for commit
         run: git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Versioning robot"
@@ -107,7 +106,7 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v1
         with:
-          node-version: '12.9.1'
+          node-version: 12
           registry-url: https://registry.npmjs.org/
       - name: Use Master
         run: git fetch origin && git checkout master
@@ -126,7 +125,6 @@ jobs:
       - name: Build library
         working-directory: ${{ env.workDir }}
         run: |
-          yarn policies set-version 1.19.2
           yarn build
       - name: Set name / email for commit
         run: git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Versioning robot"
@@ -150,7 +148,6 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-
   publish_patch:
     name: Publish Patch Version Bump in Master (NPM, Github)
     needs: build
@@ -160,7 +157,7 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v1
         with:
-          node-version: '12.9.1'
+          node-version: 12
           registry-url: https://registry.npmjs.org/
       - name: Use Master
         run: git fetch origin && git checkout master
@@ -179,7 +176,6 @@ jobs:
       - name: Build library
         working-directory: ${{ env.workDir }}
         run: |
-          yarn policies set-version 1.19.2
           yarn build
       - name: Set name / email for commit
         run: git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Versioning robot"
@@ -202,4 +198,3 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-

@@ -1,7 +1,19 @@
 {
   "name": "root",
   "private": true,
+  "scripts": {
+    "chat": "node packages/chat/lib/index.js",
+    "hoprd": "node packages/hoprd/lib/index.js"
+  },
   "devDependencies": {
     "lerna": "^3.22.1"
+  },
+  "__workspaces": {
+    "packages": [
+      "packages/*"
+    ],
+    "nohoist": [
+      "**"
+    ]
   }
 }
