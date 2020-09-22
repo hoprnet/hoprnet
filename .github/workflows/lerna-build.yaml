@@ -31,9 +31,9 @@ jobs:
       - name: Build
         run: |
           node_modules/.bin/lerna run build
-          #- name: Test
-          #run: |
-          #node_modules/.bin/lerna run test
+      - name: Test
+        run: |
+          node_modules/.bin/lerna run test
 
 #
 #  publish_minor:
