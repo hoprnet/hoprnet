@@ -1,4 +1,4 @@
-name: Lerna integration - build everything together and test 
+name: Integration Task - build everything together and test, publish?
 on:
   push:
     branches: '*'
