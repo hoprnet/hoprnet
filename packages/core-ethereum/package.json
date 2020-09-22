@@ -11,7 +11,7 @@
     "test": "mocha --exit",
     "dev": "yarn clean && yarn build:types && tsc -w",
     "build:types": "typechain --target web3-v1 --outDir './src/tsc/web3' './node_modules/@hoprnet/hopr-ethereum/build/extracted/abis/*.json'",
-    "build": "yarn clean && yarn build:types && ./scripts/build.sh",
+    "build": "yarn clean && yarn build:types && $PWD/scripts/build.sh",
     "lint": "prettier --check .",
     "prepare": "yarn build"
   },
@@ -28,6 +28,7 @@
   },
   "dependencies": {
     "@hoprnet/hopr-utils": "^1.17.0-alpha.0",
+    "@hoprnet/hopr-ethereum": "^1.17.0-alpha.0",
     "bn.js": "^5.1.2",
     "chalk": "^4.1.0",
     "debug": "^4.1.1",
@@ -44,7 +45,6 @@
   "devDependencies": {
     "@hoprnet/hopr-core-connector-interface": "^1.17.0-alpha.0",
     "@hoprnet/hopr-demo-seeds": "1.8.0",
-    "@hoprnet/hopr-ethereum": "^1.17.0-alpha.0",
     "@hoprnet/hopr-testing": "^1.17.0-alpha.0",
     "@types/debug": "^4.1.5",
     "@types/keccak": "^3.0.1",
