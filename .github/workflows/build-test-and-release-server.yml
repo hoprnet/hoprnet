@@ -1,4 +1,4 @@
-name: HOPRD - Build, test, release?
+name: Server - build, test, release? 
 on:
   push:
     branches: '*'
@@ -7,7 +7,7 @@ on:
 
 defaults:
   run:
-    working-directory: packages/hoprd
+    working-directory: packages/server
 
 jobs:
   build:
@@ -40,12 +40,11 @@ jobs:
         run: |
           yarn policies set-version ${{ matrix.yarn-version }}
           yarn build
-#      - name: Test library
-#        run: |
-#          yarn policies set-version ${{ matrix.yarn-version }}
-#          yarn test
-
-
+      - name: Test library
+        run: |
+          yarn policies set-version ${{ matrix.yarn-version }}
+          yarn test
+#
 #  publish_minor:
 #    name: Publish Minor Version Bump in Master (NPM, Github)
 #    needs: build
@@ -56,8 +55,10 @@ jobs:
 #      - uses: actions/checkout@v2
 #      - uses: actions/setup-node@v1
 #        with:
-#          node-version: '12'
+#          node-version: '12.9.1'
 #          registry-url: https://registry.npmjs.org/
+#      - name: Use Master
+#        run: git fetch origin && git checkout master
 #      - name: Cache node_modules
 #        id: cache-modules
 #        uses: actions/cache@v1
@@ -67,9 +68,12 @@ jobs:
 #      - name: Install node modules
 #        if: steps.cache-modules.outputs.cache-hit != 'true'
 #        run: |
+#          yarn policies set-version 1.19.2
 #          yarn install --frozen-lockfile
-#      - name: Use Master
-#        run: git fetch origin && git checkout master
+#      - name: Build library
+#        run: |
+#          yarn policies set-version 1.19.2
+#          yarn build
 #      - name: Set name / email for commit
 #        run: git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Versioning robot"
 #      - name: Bump package.json
@@ -102,8 +106,10 @@ jobs:
 #      - uses: actions/checkout@v2
 #      - uses: actions/setup-node@v1
 #        with:
-#          node-version: '12'
+#          node-version: '12.9.1'
 #          registry-url: https://registry.npmjs.org/
+#      - name: Use Master
+#        run: git fetch origin && git checkout master
 #      - name: Cache node_modules
 #        id: cache-modules
 #        uses: actions/cache@v1
@@ -113,9 +119,12 @@ jobs:
 #      - name: Install node modules
 #        if: steps.cache-modules.outputs.cache-hit != 'true'
 #        run: |
+#          yarn policies set-version 1.19.2
 #          yarn install --frozen-lockfile
-#      - name: Use Master
-#        run: git fetch origin && git checkout master
+#      - name: Build library
+#        run: |
+#          yarn policies set-version 1.19.2
+#          yarn build
 #      - name: Set name / email for commit
 #        run: git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Versioning robot"
 #      - name: Bump package.json
@@ -138,18 +147,20 @@ jobs:
 #          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 #          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 #
+#
 #  publish_patch:
 #    name: Publish Patch Version Bump in Master (NPM, Github)
 #    needs: build
 #    if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'Patch Version')
-#
 #    runs-on: ubuntu-latest
 #    steps:
 #      - uses: actions/checkout@v2
 #      - uses: actions/setup-node@v1
 #        with:
-#          node-version: '12'
+#          node-version: '12.9.1'
 #          registry-url: https://registry.npmjs.org/
+#      - name: Use Master
+#        run: git fetch origin && git checkout master
 #      - name: Cache node_modules
 #        id: cache-modules
 #        uses: actions/cache@v1
@@ -159,9 +170,12 @@ jobs:
 #      - name: Install node modules
 #        if: steps.cache-modules.outputs.cache-hit != 'true'
 #        run: |
+#          yarn policies set-version 1.19.2
 #          yarn install --frozen-lockfile
-#      - name: Use Master
-#        run: git fetch origin && git checkout master
+#      - name: Build library
+#        run: |
+#          yarn policies set-version 1.19.2
+#          yarn build
 #      - name: Set name / email for commit
 #        run: git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Versioning robot"
 #      - name: Bump package.json
@@ -183,3 +197,4 @@ jobs:
 #        env:
 #          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 #          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#
