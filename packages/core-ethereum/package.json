@@ -12,8 +12,7 @@
     "dev": "yarn clean && yarn build:types && tsc -w",
     "build:types": "typechain --target web3-v1 --outDir './src/tsc/web3' './node_modules/@hoprnet/hopr-ethereum/build/extracted/abis/*.json'",
     "build": "yarn clean && yarn build:types && ./scripts/build.sh",
-    "lint": "prettier --check .",
-    "prepare": "yarn build"
+    "lint": "prettier --check ."
   },
   "files": [
     "lib/",
