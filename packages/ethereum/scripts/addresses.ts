@@ -9,7 +9,7 @@ export const HOPR_TOKEN: { [key in Networks]: string } = {
   kovan: '0xDD78859E6714D045a31Caa0075C1523f6E08fFe1',
   private: '0x66DB78F4ADD912a6Cb92b672Dfa09028ecc3085E',
   solkol: undefined,
-  xdai: '0x3Cd4B4D97dCad4eE772BC4f0fB0e7605fC86A85b',
+  xdai: '0x12481c3Ed97b32D94E71C2039DBC44432ADD39a0',
 }
 
 export const HOPR_CHANNELS: { [key in Networks]: string } = {
@@ -21,7 +21,7 @@ export const HOPR_CHANNELS: { [key in Networks]: string } = {
   kovan: '0x6eCe0EC9E5F408e664ACc397A8Ac7241841c6658',
   private: '0x0a67180CF519aDF27f1FD32F7255bBa00B536FC6',
   solkol: undefined,
-  xdai: '0x83cA7023c4B1EDB137E1d87B3D05F20fbF6c893B',
+  xdai: '0x75E35d2Db3193670C8a55308180C2c3aD63A6ab5',
 }
 
 export const HOPR_MINTER: { [key in Networks]: string } = {
@@ -45,5 +45,5 @@ export const HOPR_FAUCET: { [key in Networks]: string } = {
   kovan: '0x034869aaF67F09296303D2d42dceEc53F4F04533',
   private: '0x2E2c8a6710cb5168ec3362a9c1280E2A1FBf0B5E',
   solkol: undefined,
-  xdai: '0xD899eE3109E643B1dCDFFB3ca8D60D129104E042',
+  xdai: '0x522de7D16aF21A255D2bC6EB24e6F9d93bD307a1',
 }
