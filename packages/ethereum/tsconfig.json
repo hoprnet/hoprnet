@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "esModuleInterop": true,
+    "outDir": "./build/lib",
+    "noImplicitAny": false,
+    "allowJs": true,
+    "lib": ["es2019", "dom"],
+    "module": "commonjs",
+    "target": "es2019",
+    "resolveJsonModule": true,
+    "experimentalDecorators": true,
+    "declaration": true,
+    "typeRoots": ["./node_modules/@types", "./types"],
+    "types": ["node", "truffle-contracts"]
+  },
+  "include": ["scripts/**/*.ts"],
+  "exclude": ["test/openzeppelin-contracts"]
+}

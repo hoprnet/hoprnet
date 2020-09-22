@@ -1,0 +1,34 @@
+# Exclude node.js module directory
+node_modules/
+
+# Exclude yarn stuff
+.packages-cache
+yarn-error.log
+
+# Exclude IDE stuff
+.vscode/
+
+# Exclude solidity builds
+build/
+
+# Exclude typechain builds
+types/truffle-contracts/
+
+# Coverage directory used by tools like istanbul
+coverage*
+.coverage*
+coverage.json
+coverageEnv
+
+# Exclude runtime data
+pids
+*.pid
+*.seed
+allFiredEvents
+scTopics
+
+# Exclude secrets
+.env
+
+# Exclude built npm packages
+*.tgz
