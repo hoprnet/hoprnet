@@ -15,7 +15,7 @@ class Home extends React.Component {
         <FeaturesTabs id="built_for" redirect />
         <FeaturesTiles id="all_about" hasBgColor invertColor />
         <Blogs id="blogs" redirect />
-        <Clients id="investors" hasBgColor invertColor />
+        <Clients id="investors" hasBgColor invertColor showQuestion />
         <TeamAndInvestors id="team_and_investors" />
         <Contact id="contact" topDivider />
       </React.Fragment>

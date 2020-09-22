@@ -104,7 +104,7 @@ const Ecosystem = props => {
         <div className="center-content">
           <div className="container">
             <h2 className="section-header mt-0 mb-0 reveal-from-top" data-reveal-delay="150">
-              Using The HOPR Protocol
+              Become a Partner
             </h2>
 
             <p className="m-0 mb-32 reveal-from-top" data-reveal-delay="200">
@@ -126,6 +126,7 @@ const Ecosystem = props => {
               href="https://docs.google.com/forms/d/e/1FAIpQLSfpw9alXYGO4WvWS8HTF-5keGk_OFshrIIcGzifhfuWs7IN7g/viewform"
               target="_blank"
               rel="noopener noreferrer"
+              style={{ fontSize: '25px' }}
             >
               APPLY HERE
             </Button>
