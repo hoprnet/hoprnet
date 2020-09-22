@@ -6,6 +6,7 @@
     "module": "commonjs",
     "target": "es2019",
     "declaration": true,
+    "skipLibCheck": true,
     "sourceMap": true
   },
   "include": ["src/**/*.ts"]

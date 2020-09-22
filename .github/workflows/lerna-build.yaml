@@ -29,6 +29,9 @@ jobs:
         run: |
           yarn policies set-version ${{ matrix.yarn-version }}
           node_modules/.bin/lerna bootstrap
+      - name: Link locally 
+        run: |
+          node_modules/.bin/lerna link --force-local
       - name: Build
         run: |
           yarn policies set-version ${{ matrix.yarn-version }}
