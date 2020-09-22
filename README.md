@@ -28,6 +28,9 @@ yarn                      # Install tooling
 lerna bootstrap           # Installs all dependencies
 lerna link --force-local  # Link local dependencies
 lerna run build           # builds code
+
+# Run Hoprd
+yarn run hoprd --admin --grpc
 ```
 
 ## HOPR ecosystem
