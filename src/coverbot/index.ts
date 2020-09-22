@@ -1,4 +1,4 @@
-import { sendMessage, getHoprBalance, getHOPRNodeAddressFromContent, getStatus, sendXHOPR } from '../utils'
+import { getHOPRNodeAddressFromContent } from '../utils'
 import Web3 from 'web3'
 import { Bot } from '../bot'
 import { IMessage } from '../message'
@@ -244,7 +244,8 @@ export class Coverbot implements Bot {
       this.ethereumAddress = await this._getEthereumAddressFromHOPRAddress(this.address)
     }
 
-    const connectedNodes = await getStatus()
+    // @TODO Replace for actual connected nodes.
+    const connectedNodes = -1
 
     const state = {
       connectedNodes,
@@ -258,7 +259,7 @@ export class Coverbot implements Bot {
       hoprChannelContract: HOPR_CHANNELS[this.network],
       address: this.address,
       balance: fromWei(await this.xdaiWeb3.eth.getBalance(this.ethereumAddress)),
-      available: fromWei(await getHoprBalance()),
+      available: -1, //@TODO Replace for actual balance - fromWei(await getHoprBalance()),
       locked: 0, //@TODO: Retrieve balances from open channels.
       connected: Array.from(this.verifiedHoprNodes.values()),
       refreshed: new Date().toISOString(),
@@ -274,15 +275,16 @@ export class Coverbot implements Bot {
   }
 
   protected async _sendMessageOpeningChannels(recipient, message, intermediatePeers) {
-    return sendMessage(
-      recipient,
-      {
-        from: this.address,
-        text: message,
-      },
-      false,
-      intermediatePeers,
-    )
+    //@TODO Replace for actually sending a message
+    // return sendMessage(
+    //   recipient,
+    //   {
+    //     from: this.address,
+    //     text: message,
+    //   },
+    //   false,
+    //   intermediatePeers,
+    // )
   }
 
   protected async _verificationCycle() {
@@ -319,10 +321,11 @@ export class Coverbot implements Bot {
         await this.dumpData()
       } else {
         this._sendMessageFromBot(_hoprNodeAddress, BotResponses[BotCommands.verify])
-          .catch(err => {
-            console.log(`Trying to reach ${_hoprNodeAddress} failed.`)
-            throw new Error(err) 
-          })
+          // @TODO Actually catch error
+          // .catch(err => {
+          //   console.log(`Trying to reach ${_hoprNodeAddress} failed.`)
+          //   throw new Error(err) 
+          // })
         /*
          * We switched from “send and forget” to “send and listen”
          * 1. We inmediately send a message to user, telling them we find them online.
@@ -380,10 +383,11 @@ export class Coverbot implements Bot {
   }
 
   protected _sendMessageFromBot(recipient, message) {
-    return sendMessage(recipient, {
-      from: this.address,
-      text: message,
-    })
+    // @TODO Actually send message.
+    // return sendMessage(recipient, {
+    //   from: this.address,
+    //   text: message,
+    // })
   }
 
   protected async _verifyBalance(message: IMessage): Promise<[number, NodeStates]> {
@@ -450,7 +454,8 @@ export class Coverbot implements Bot {
 
       await Promise.all([
         this._setEthereumAddressScore(relayerEthereumAddress, newScore),
-        sendXHOPR(relayerEthereumAddress, RELAY_HOPR_REWARD),
+        // @TODO: Actually send tokens.
+        // sendXHOPR(relayerEthereumAddress, RELAY_HOPR_REWARD),
       ])
       console.log(`xHOPR tokens sent to ${relayerAddress}`)
       this._sendMessageFromBot(relayerAddress, NodeStateResponses[NodeStates.verifiedNode])

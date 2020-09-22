@@ -6,6 +6,8 @@ WORKDIR /src
 ENV YARN_VERSION 1.19.2
 RUN yarn policies set-version $YARN_VERSION
 
+RUN apk add --no-cache git
+
 COPY package*.json ./
 COPY yarn.lock ./
 

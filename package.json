@@ -23,12 +23,9 @@
     "yarn": "1.19.2"
   },
   "dependencies": {
-    "@grpc/proto-loader": "^0.5.4",
     "@hoprnet/hopr-core": "0.6.32-xdai",
     "@hoprnet/hopr-core-connector-interface": "1.7.1",
     "@hoprnet/hopr-core-ethereum": "0.4.4-xdai",
-    "@hoprnet/hopr-protos": "0.1.0",
-    "@hoprnet/hopr-server": "0.2.5-xdai",
     "@hoprnet/hopr-utils": "^0.5.2",
     "@hoprnet/twitter-api-client": "^0.1.8",
     "@linkdrop/sdk": "1.1.6",
@@ -36,9 +33,6 @@
     "dotenv-parse-variables": "^0.3.0",
     "firebase-admin": "^9.1.1",
     "global": "^4.4.0",
-    "google-protobuf": "^3.12.2",
-    "grpc": "^1.24.3",
-    "pm2": "^4.4.1",
     "rimraf": "^3.0.2",
     "tinyurl": "1.1.7",
     "wait-for-stuff": "^1.4.0",

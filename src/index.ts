@@ -1,5 +1,4 @@
 import { API_URL, BOT_NAME, BOT_TIMESTAMP, TWITTER_TIMESTAMP } from './env'
-import { getHoprAddress } from './utils'
 import { setupBot, Bot } from './bot'
 import { payDai } from './linkdrop'
 import Core from './core'

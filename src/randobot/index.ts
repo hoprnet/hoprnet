@@ -1,4 +1,3 @@
-import { sendMessage } from '../utils'
 import { Bot } from '../bot'
 import { IMessage } from '../message'
 import { generateRandomSentence } from '../utils'
