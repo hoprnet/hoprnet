@@ -38,6 +38,7 @@
     "printWidth": 120
   },
   "dependencies": {
+    "grpc": "^1.24.3",
     "google-protobuf": "^3.12.2"
   },
   "devDependencies": {
@@ -54,7 +55,6 @@
     "typescript": "^3.9.7"
   },
   "peerDependencies": {
-    "grpc": "^1.24.3",
     "grpc-web": "^1.2.0"
   }
 }
