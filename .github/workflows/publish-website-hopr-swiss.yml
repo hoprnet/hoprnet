@@ -4,12 +4,12 @@ on:
   push:
     branches:
       - master
-  pull_request:
-    branches: "*"
+    paths:
+      - 'websites/website-hopr-swiss/**'
 
 defaults:
   run:
-    working-directory: packages/website-hopr-swiss
+    working-directory: websites/website-hopr-swiss
 
 jobs:
   website:

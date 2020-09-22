@@ -30,7 +30,8 @@
     "verify": "ts-node -T ./scripts/cli.ts verify",
     "network": "ts-node -T ./scripts/cli.ts network",
     "test": "ts-node -T ./scripts/cli.ts test",
-    "lint": "prettier --check ."
+    "lint": "prettier --check .",
+    "prepare": "yarn build"
   },
   "husky": {
     "hooks": {
