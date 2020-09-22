@@ -5,10 +5,10 @@ echo $PWD
 
 
 # Make the smart contract ABI available to our Typescript sources
-cp -R ./node_modules/@hoprnet/hopr-ethereum/build/extracted/abis/*.json ./src/ethereum/abi;
+cp -R ../ethereum/build/extracted/abis/*.json ./src/ethereum/abi;
 
 # Make our smart contract addresses available to our Typescript sources
-cp ./node_modules/@hoprnet/hopr-ethereum/build/lib/scripts/addresses.* ./src/ethereum
+cp ../ethereum/build/lib/scripts/addresses.* ./src/ethereum
 
 # Compile our Typescript sources
 yarn run tsc;
