@@ -28,7 +28,7 @@ jobs:
       - name: Install dependencies and link locally
         run: |
           yarn policies set-version ${{ matrix.yarn-version }}
-          node_modules/.bin/lerna bootstrap --no-prepublish --force-local
+          node_modules/.bin/lerna bootstrap --ignore-prepublish --force-local
       - name: Build
         run: |
           node_modules/.bin/lerna run build
