@@ -14,6 +14,22 @@
   </p>
 </p>
 
+
+## Instructions
+
+### Using a prebuilt binary
+
+TODO
+
+### Developing with this repository
+
+```sh
+yarn                      # Install tooling
+lerna bootstrap           # Installs all dependencies
+lerna link --force-local  # Link local dependencies
+lerna run build           # builds code
+```
+
 ## HOPR ecosystem
 
 - **Core**: HOPR Protocol definition and source code.
