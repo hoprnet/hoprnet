@@ -1,6 +1,9 @@
 {
   "name": "root",
   "private": true,
+  "scripts": {
+    "hoprd": "node packages/hoprd/lib/index.js"
+  },
   "devDependencies": {
     "lerna": "^3.22.1"
   },
