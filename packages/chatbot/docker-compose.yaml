@@ -1,0 +1,29 @@
+version: '3.1'
+
+services:
+  coverbot:
+    build:
+      context: .
+      dockerfile: chatbot.Dockerfile
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - API_URL=34.65.96.1:50051
+      - BOT_NAME=coverbot
+      - HOPR_ENVIRONMENT=develop
+      - COVERBOT_XDAI_THRESHOLD=0.001
+      - COVERBOT_VERIFICATION_CYCLE_IN_MS=60000
+      - COVERBOT_DEBUG_MODE=false
+      - COVERBOT_CHAIN_PROVIDER=https://dai.poa.network
+  coverbot-ui:
+    build:
+      context: src/coverbot/ui/coverbot
+      dockerfile: coverbot-ui.Dockerfile
+      args:
+        - HOPR_ENVIRONMENT=develop
+    restart: always
+    depends_on:
+      - 'coverbot'
+    ports:
+      - '3000'

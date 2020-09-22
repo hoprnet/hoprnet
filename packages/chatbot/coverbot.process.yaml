@@ -1,0 +1,12 @@
+apps:
+  - script: ./dist/server.js
+    name: "hopr-server"
+    instances: 1
+    env:
+      PROVIDER: wss://xdai.poanetwork.dev/wss
+  - script: ./dist/index.js
+    name: "hopr-bot"
+    instances: 1
+    env:
+      API_URL: 127.0.0.1:50051
+      BOT_NAME: coverbot
