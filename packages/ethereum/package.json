@@ -1,0 +1,75 @@
+{
+  "name": "@hoprnet/hopr-ethereum",
+  "version": "1.5.0",
+  "description": "On-chain logic for hoprnet.org",
+  "homepage": "https://hoprnet.org",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hoprnet/hopr-ethereum.git"
+  },
+  "license": "LGPL-3.0-only",
+  "main": "./build/lib/scripts/api.js",
+  "files": [
+    "truffle-networks.js",
+    "truffle-config.js",
+    "contracts/",
+    "build/extracted/",
+    "build/lib/",
+    "migrations/",
+    "!*.test.ts"
+  ],
+  "engines": {
+    "yarn": "1",
+    "node": "12"
+  },
+  "scripts": {
+    "build": "ts-node -T ./scripts/cli.ts build",
+    "coverage": "ts-node -T ./scripts/cli.ts coverage",
+    "fund": "ts-node -T ./scripts/cli.ts fund",
+    "migrate": "ts-node -T ./scripts/cli.ts migrate",
+    "verify": "ts-node -T ./scripts/cli.ts verify",
+    "network": "ts-node -T ./scripts/cli.ts network",
+    "test": "ts-node -T ./scripts/cli.ts test",
+    "lint": "prettier --check .",
+    "prepublish": "yarn build"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "yarn lint"
+    }
+  },
+  "dependencies": {
+    "@hoprnet/hopr-demo-seeds": "1.8",
+    "@hoprnet/hopr-utils": "0.5.2",
+    "@openzeppelin/contracts": "^3.0.1",
+    "@openzeppelin/test-helpers": "^0.5.5",
+    "@truffle/debug-utils": "^4.1.1",
+    "@truffle/hdwallet-provider": "^1.0.34",
+    "bignumber.js": "^9.0.0",
+    "dotenv": "^8.2.0",
+    "secp256k1": "4.0.2",
+    "truffle": "^5.1.23",
+    "truffle-plugin-verify": "^0.3.11",
+    "ts-node": "^8.10.2",
+    "web3": "^1.2.11"
+  },
+  "devDependencies": {
+    "@hoprnet/hopr-testing": "0.2.0",
+    "@types/chai": "^4.2.11",
+    "@types/mocha": "^8.0.1",
+    "@types/node": "~12",
+    "@types/secp256k1": "^4.0.1",
+    "chai": "^4.2.0",
+    "ganache-core": "^2.10.2",
+    "husky": "^4.2.5",
+    "mocha": "^8.1.0",
+    "prettier": "^2.0.5",
+    "prettier-plugin-solidity": "^1.0.0-alpha.55",
+    "solhint": "^3.1.0",
+    "solidity-coverage": "^0.7.9",
+    "truffle-typings": "^1.0.8",
+    "typechain": "^1.0.5",
+    "typechain-target-truffle": "^1.0.2",
+    "typescript": "^3.9"
+  }
+}
