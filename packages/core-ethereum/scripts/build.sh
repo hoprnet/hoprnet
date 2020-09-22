@@ -1,6 +1,8 @@
 [ ! -d "./src/ethereum" ] && mkdir ./src/ethereum
 [ ! -d "./src/ethereum/abi" ] && mkdir ./src/ethereum/abi
 
+echo $PWD
+
 # Make the smart contract ABI available to our Typescript sources
 cp -R ./node_modules/@hoprnet/hopr-ethereum/build/extracted/abis/*.json ./src/ethereum/abi;
 
