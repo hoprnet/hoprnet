@@ -1,0 +1,48 @@
+{
+  "name": "@hoprnet/hopr-testing",
+  "version": "0.2.0",
+  "repository": "https://github.com/hoprnet/hopr-testing.git",
+  "homepage": "https://hoprnet.org/",
+  "license": "GPL-3.0-only",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "files": [
+    "lib/",
+    "!lib/*.spec**",
+    "README.md",
+    "package.json",
+    "yarn.lock"
+  ],
+  "engines": {
+    "node": ">=12.9.1",
+    "yarn": ">=1.19.2"
+  },
+  "scripts": {
+    "build": "yarn clean && tsc -p . --noEmit false",
+    "clean": "rm -rf ./lib",
+    "test": "echo '✅ No tests needed'",
+    "lint": "prettier --check .",
+    "prepare": "yarn build"
+  },
+  "dependencies": {
+    "@hoprnet/hopr-demo-seeds": "1.8.0",
+    "ganache-core": "^2.10.2"
+  },
+  "devDependencies": {
+    "@types/node": "^13.13.4",
+    "husky": "^4.2.5",
+    "prettier": "^2.0.5",
+    "typescript": "^3.8.3"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "yarn lint"
+    }
+  },
+  "prettier": {
+    "tabWidth": 2,
+    "semi": false,
+    "singleQuote": true,
+    "printWidth": 120
+  }
+}
