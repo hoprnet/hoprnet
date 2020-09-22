@@ -11,7 +11,5 @@
     "access": "public"
   },
   "scripts": {
-    "build": "echo 'Nothing to build'",
-    "test": "echo 'Nothing to test'"
   }
 }

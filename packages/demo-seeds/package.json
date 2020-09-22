@@ -5,7 +5,6 @@
   "license": "GPL-3.0-only",
   "scripts": {
     "start": "micro",
-    "test": "echo '✅ No tests needed'",
     "build": "tsc -d -p .",
     "prepare": "yarn build"
   },
