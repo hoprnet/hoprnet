@@ -1,4 +1,5 @@
 echo $PWD
+ls ../ethereum
 
 [ ! -d "./src/ethereum" ] && mkdir ./src/ethereum
 [ ! -d "./src/ethereum/abi" ] && mkdir ./src/ethereum/abi
