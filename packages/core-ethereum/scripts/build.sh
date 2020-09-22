@@ -13,8 +13,5 @@ yarn run tsc;
 # Copy generated TypeChain files into lib folder
 cp -R ./src/tsc/web3 ./lib/tsc/web3;
 
-# Copy Ganache workaround
-cp ./src/ganache-core.d.ts ./lib;
-
 # Copy smart contract addresses
 cp -R src/ethereum/addresses.* ./lib/ethereum

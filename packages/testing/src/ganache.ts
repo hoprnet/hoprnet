@@ -16,10 +16,7 @@ const DEFAULT_OPS: Ganache.IServerOptions = {
 }
 
 class CustomGanache {
-  private server: {
-    listen: (port: number, cb: (err: Error, blockchain: any) => void) => void
-    close: (cb: (err: Error) => void) => void
-  }
+  private server: ReturnType<typeof Ganache.server>
   private ops: Ganache.IServerOptions
 
   constructor(customOps: Ganache.IServerOptions = {}) {
@@ -35,9 +32,7 @@ class CustomGanache {
 
       this.server = Ganache.server(this.ops)
 
-      this.server.listen(this.ops.port, (err) => {
-        if (err) return reject(err.message)
-
+      this.server.listen(this.ops.port, () => {
         const url = `${this.ops.ws ? 'ws' : 'http'}://127.0.0.1:${this.ops.port}`
         console.log(`Network ready at ${url}`)
         return resolve(this)

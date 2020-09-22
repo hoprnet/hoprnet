@@ -46,8 +46,8 @@
   },
   "dependencies": {
     "@grpc/proto-loader": "^0.5.4",
-    "@hoprnet/hopr-core": "0.6.34",
-    "@hoprnet/hopr-core-connector-interface": "1.10.3",
+    "@hoprnet/hopr-core": "0.6.35",
+    "@hoprnet/hopr-core-connector-interface": "1.10.5",
     "@hoprnet/hopr-protos": "^0.1.0",
     "@hoprnet/hopr-utils": "0.6.2",
     "@nestjs/common": "^7.0.0",
@@ -69,8 +69,8 @@
     "rxjs": "^6.6.0"
   },
   "devDependencies": {
-    "@hoprnet/hopr-ethereum": "^1.5.0",
-    "@hoprnet/hopr-testing": "^0.2.0",
+    "@hoprnet/hopr-ethereum": "1.5.0",
+    "@hoprnet/hopr-testing": "0.2.0",
     "@nestjs/cli": "^7.0.0",
     "@nestjs/schematics": "^7.0.0",
     "@nestjs/testing": "^7.0.0",
