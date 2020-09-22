@@ -32,7 +32,7 @@
   "scripts": {
     "build": "yarn clean && tsc -p .",
     "clean": "rm -rf ./lib",
-    "test": "jest --runInBand --forceExit",
+    "__test": "jest --runInBand --forceExit",
     "prepublishOnly": "yarn build",
     "lint": "prettier --check .",
     "lint:fix": "prettier --write ."
