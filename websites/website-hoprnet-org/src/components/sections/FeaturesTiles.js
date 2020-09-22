@@ -183,8 +183,16 @@ class FeaturesTiles extends React.Component {
                       <div className="features-tiles-item-content">
                         <h4 className="mt-0 mb-8">Your company</h4>
                         <p className="m-0 text-sm">
-                          HOPR is providing worry-free privacy to everyone. Reach out to us if you and your customers
-                          deserve the best.
+                          HOPR is providing worry-free privacy to everyone.{' '}
+                          <a
+                            href="/partners"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-color-high underline"
+                          >
+                            Reach out to us
+                          </a>{' '}
+                          if you and your customers deserve the best.
                         </p>
                       </div>
                     </div>
