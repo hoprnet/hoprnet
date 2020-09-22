@@ -5,11 +5,11 @@ on:
     branches:
       - master
     paths:
-      - 'packages/website-hopr-swiss/**'
+      - 'websites/website-hopr-swiss/**'
 
 defaults:
   run:
-    working-directory: packages/website-hopr-swiss
+    working-directory: websites/website-hopr-swiss
 
 jobs:
   website:
