@@ -1,4 +1,4 @@
-name: Lerna integration - build everything together. 
+name: Lerna integration - build everything together and test 
 on:
   push:
     branches: '*'
@@ -34,5 +34,7 @@ jobs:
           node_modules/.bin/lerna link --force-local
       - name: Build
         run: |
-          yarn policies set-version ${{ matrix.yarn-version }}
           node_modules/.bin/lerna run build
+      - name: Build
+        run: |
+          node_modules/.bin/lerna run test
