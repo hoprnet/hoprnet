@@ -31,7 +31,7 @@ const listen = async (bot: Bot, node: Core) => {
 }
 
 export async function setupBot(bot: Bot, node: Core) {
-  log(`- setupBot | Starting bot at ${bot.timestamp}`)
+  log(`- setupBot | Starting bot at ${bot.timestamp} for node ${await node.address('hopr')}`)
   log(`- setupBot | Listening to Tweets created after ${bot.twitterTimestamp}`)
   wait.for.date(bot.timestamp)
   await listen(bot, node)

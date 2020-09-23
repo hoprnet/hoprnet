@@ -18,7 +18,12 @@ import db from './db'
 import { BotCommands, NodeStates, ScoreRewards } from './state'
 import { RELAY_VERIFICATION_CYCLE_IN_MS } from './constants'
 import { BotResponses, NodeStateResponses } from './responses'
+import { HoprNode } from './coverbot'
+import debug from 'debug'
 
+
+const log = debug('hopr-chatbot:coverbot')
+const error = debug('hopr-chatbot:coverbot:error')
 const { fromWei } = Web3.utils
 
 const scoreDbRef = db.ref(`/${HOPR_ENVIRONMENT}/score`)
@@ -50,14 +55,14 @@ export class Coverbot implements Bot {
     this.twitterTimestamp = twitterTimestamp
     this.botName = '💰 Coverbot'
     this.loadedDb = false
-    console.log(`${this.botName} has been added`)
 
-    console.log(`⚡️ Network: ${COVERBOT_CHAIN_PROVIDER}`)
-    console.log(`⚡️ Environment: ${HOPR_ENVIRONMENT}`)
-    console.log(`💸 Threshold: ${COVERBOT_XDAI_THRESHOLD}`)
-    console.log(`🐛 Debug Mode: ${COVERBOT_DEBUG_MODE}`)
-    console.log(`👀 Verification Cycle: ${COVERBOT_VERIFICATION_CYCLE_IN_MS}`)
-    console.log(`🔍 Relaying Cycle: ${RELAY_VERIFICATION_CYCLE_IN_MS}`)
+    log(`- constructor | ${this.botName} has been added`)
+    log(`- constructor | ⚡️ Network: ${COVERBOT_CHAIN_PROVIDER}`)
+    log(`- constructor | ⚡️ Environment: ${HOPR_ENVIRONMENT}`)
+    log(`- constructor | 💸 Threshold: ${COVERBOT_XDAI_THRESHOLD}`)
+    log(`- constructor | 🐛 Debug Mode: ${COVERBOT_DEBUG_MODE}`)
+    log(`- constructor | 👀 Verification Cycle: ${COVERBOT_VERIFICATION_CYCLE_IN_MS}`)
+    log(`- constructor | 🔍 Relaying Cycle: ${RELAY_VERIFICATION_CYCLE_IN_MS}`)
 
     this.ethereumAddress = null
     this.chainId = null

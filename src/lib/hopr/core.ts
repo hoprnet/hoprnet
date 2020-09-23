@@ -9,6 +9,7 @@ import debug from 'debug'
 
 
 const log = debug('hopr-chatbot:core')
+const error = debug('hopr-chatbot:core:error')
 
 export default class Core {
   public events: EventEmitter
@@ -37,8 +38,8 @@ export default class Core {
       log('- functor | Latency', Date.now() - parseInt(time.toString('hex'), 16) + 'ms')
       this.events.emit('message', decoded)
     } catch (err) {
-      log.error('- functor | Error: Could not decode message', err)
-      log.error('- functor | Error: Message', msg.toString())
+      error('- functor | Error: Could not decode message', err)
+      error('- functor | Error: Message', msg.toString())
     }
   }
 
@@ -65,7 +66,7 @@ export default class Core {
       this.started = true
       log('- start | Started HOPR Node')
     } catch (err) {
-      log.error('- start | Error: Unable to start node', err)
+      error('- start | Error: Unable to start node', err)
     }
   }
 
