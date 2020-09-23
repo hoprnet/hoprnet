@@ -116,8 +116,7 @@ async function recoverIdentity(serializedKeyPair: Uint8Array, pw?: string): Prom
 
   if (pw !== undefined) {
     try {
-      peerId = await deserializeKeyPair(serializedKeyPair, new TextEncoder().encode(pw))
-      done = true
+      return await deserializeKeyPair(serializedKeyPair, new TextEncoder().encode(pw))
     } catch (err) {
       log(`Could not recover id from database with given password. Please type it in manually.`)
     }

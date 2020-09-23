@@ -3,21 +3,39 @@ import styles from '../styles/log.module.css'
 import dynamic from "next/dynamic";
 
 const Jazzicon = dynamic(() => import("../components/jazzicon"), { ssr: false });
+const Jazzicon = dynamic(() => import("../components/jazzicon"), { ssr: false });
 
-const ID_REGEX = /(\w{53})/g
+export function AbbreviatedId({id}){
+  let [expanded, setExpanded] = useState(false)
+  if (expanded) {
+    return <span className={styles.logId}>{id}</span>
+  }
+  return (<abbr
+            className={styles.logId}
+            title={id}
+            onClick={e=>setExpanded(true)}
+            >{id.slice(48)}</abbr>)
+}
 
 export function LogLine(props){
+  console.log(props)
   let raw = props.value.msg
   let msg = []
   let ids = []
   let match
 
   let lastIndex = 0
-  while ((match = ID_REGEX.exec(raw)) !== null){
+  const idRegex = /(\w{53})/g // NB: Cannot be global variable, has state!
+
+  while ((match = idRegex.exec(raw)) !== null){
+    console.log(">", match, msg, )
     ids.push(match[0])
     msg.push(match.input.slice(lastIndex, match.index))
-    msg.push(<abbr title={match[0]}>{match[0].slice(48)}</abbr>)
+    msg.push(<AbbreviatedId id={match[0]} />)
     lastIndex = match.index + match[0].length
+  }
+  if (lastIndex != raw.length) {
+    msg.push(raw.slice(lastIndex))
   }
   if (msg.length == 0) {
     msg = raw // No matches
