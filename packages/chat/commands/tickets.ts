@@ -1,22 +1,10 @@
-import BN from "bn.js";
 import chalk from "chalk";
 import type HoprCoreConnector from "@hoprnet/hopr-core-connector-interface";
 import type { Types } from "@hoprnet/hopr-core-connector-interface";
 import type Hopr from "@hoprnet/hopr-core";
-import {
-  u8aToHex,
-  moveDecimalPoint,
-  convertPubKeyFromPeerId,
-} from "@hoprnet/hopr-utils";
-import { GlobalState } from "./abstractCommand";
-import type { AutoCompleteResult } from "./abstractCommand";
+import { moveDecimalPoint } from "@hoprnet/hopr-utils";
 import { SendMessageBase } from "./sendMessage";
-import type PeerId from "peer-id";
-import {
-  getMyOpenChannels,
-  countSignedTickets,
-  getSignedTickets,
-} from "../utils";
+import { countSignedTickets, getSignedTickets } from "../utils";
 
 export default class Tickets extends SendMessageBase {
   constructor(public node: Hopr<HoprCoreConnector>) {
@@ -28,134 +16,40 @@ export default class Tickets extends SendMessageBase {
   }
 
   help() {
-    return "lists tickets of a channel";
-  }
-
-  private async checkArgs(
-    query: string,
-    settings: GlobalState
-  ): Promise<PeerId> {
-    const [err, peerId] = this._assertUsage(query, ["PeerId"]);
-    if (err) throw new Error(err);
-    return await this._checkPeerId(peerId, settings);
+    return "lists information about redeemed and unredeemed tickets";
   }
 
   /**
    * @param query channelId to query tickets for
    */
-  public async execute(query: string, settings: GlobalState): Promise<void> {
+  public async execute(): Promise<string | void> {
     try {
-      const { Public, Balance } = this.node.paymentChannels.types;
+      const { Balance } = this.node.paymentChannels.types;
 
-      const peerId = await this.checkArgs(query, settings);
-      const pubKey = await convertPubKeyFromPeerId(peerId).then((res) => {
-        return new Public(res.marshal());
-      });
+      const results = await this.node
+        .getAcknowledgedTickets()
+        .then((tickets) => {
+          return tickets.filter((ticket) => !ticket.ackTicket.redeemed);
+        });
 
-      const ackTickets = await this.node.paymentChannels.tickets.get(pubKey);
-      console.log("ackTickets", ackTickets.size);
-
-      if (ackTickets.size === 0) {
-        console.log(chalk.yellow(`\nNo tickets found.`));
-        return;
+      if (results.length === 0) {
+        return "No tickets found.";
       }
 
-      const { redeemed, unredeemed } = Array.from(ackTickets.values()).reduce(
-        (result, ackTicket) => {
-          if (ackTicket.redeemed) result.redeemed.push(ackTicket);
-          else result.unredeemed.push(ackTicket);
+      const ackTickets = results.map((o) => o.ackTicket);
 
-          return result;
-        },
-        {
-          redeemed: [],
-          unredeemed: [],
-        } as {
-          redeemed: Types.AcknowledgedTicket[];
-          unredeemed: Types.AcknowledgedTicket[];
-        }
-      );
-
-      const redeemedResults = countSignedTickets(
-        await getSignedTickets(redeemed)
-      );
       const unredeemedResults = countSignedTickets(
-        await getSignedTickets(unredeemed)
+        await getSignedTickets(ackTickets)
       );
 
-      console.table(unredeemedResults.tickets);
-      console.log(
-        "Found",
-        unredeemedResults.tickets.length,
-        "unredeemed tickets for peer",
-        chalk.blue(query)
-      );
-      console.log(
-        "You will receive",
-        chalk.yellow(
-          moveDecimalPoint(
-            unredeemedResults.total.toString(),
-            Balance.DECIMALS * -1
-          ).toString()
-        ),
-        "HOPR",
-        "once you redeem them."
-      );
+      const unredeemedAmount = moveDecimalPoint(
+        unredeemedResults.total.toString(),
+        Balance.DECIMALS * -1
+      ).toString();
 
-      console.table(redeemedResults.tickets);
-      console.log(
-        "Found",
-        redeemedResults.tickets.length,
-        "redeemed tickets for peer",
-        chalk.blue(query)
-      );
+      return `Found ${unredeemedResults.tickets.length} unredeemed tickets with a sum of ${unredeemedAmount} HOPR.`;
     } catch (err) {
-      console.log(err);
+      chalk.red(err.message);
     }
-  }
-
-  public async autocomplete(
-    query: string,
-    line: string
-  ): Promise<AutoCompleteResult> {
-    const myAddress = await this.node.paymentChannels.account.address;
-    let channelIds: string[] = [];
-
-    try {
-      const counterParties = await getMyOpenChannels(this.node);
-      channelIds = await Promise.all(
-        counterParties.map(async (counterParty) => {
-          const pubKey = (
-            await convertPubKeyFromPeerId(counterParty)
-          ).marshal();
-          const address = await this.node.paymentChannels.utils.pubKeyToAccountId(
-            pubKey
-          );
-          const channelId = await this.node.paymentChannels.utils.getId(
-            myAddress,
-            address
-          );
-
-          return u8aToHex(channelId);
-        })
-      );
-    } catch (err) {
-      console.log(chalk.red(err.message));
-      return [[""], line];
-    }
-
-    if (channelIds.length === 0) {
-      console.log(chalk.red(`\nNo open channels found.`));
-      return [[""], line];
-    }
-
-    const hits = query
-      ? channelIds.filter((channelId: string) => channelId.startsWith(query))
-      : channelIds;
-
-    return [
-      hits.length ? hits.map((str: string) => `tickets ${str}`) : ["tickets"],
-      line,
-    ];
   }
 }

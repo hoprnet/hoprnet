@@ -8,7 +8,6 @@ import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import chalk from 'chalk'
 import { ChannelFactory } from './channel'
 import types from './types'
-import Tickets from './tickets'
 import Indexer from './indexer'
 import * as dbkeys from './dbKeys'
 import * as utils from './utils'
@@ -32,7 +31,6 @@ export default class HoprEthereum implements HoprCoreConnector {
   public types: types
   public indexer: Indexer
   public account: Account
-  public tickets: Tickets
   public hashedSecret: HashedSecret
   public path: Path
 
@@ -52,7 +50,6 @@ export default class HoprEthereum implements HoprCoreConnector {
     this.hashedSecret = new HashedSecret(this)
     this.account = new Account(this, privateKey, publicKey)
     this.indexer = new Indexer(this)
-    this.tickets = new Tickets(this)
     this.types = new types()
     this.channel = new ChannelFactory(this)
     this.path = new Path(this)

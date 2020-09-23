@@ -32,7 +32,7 @@ import PeerInfo from 'peer-info'
 import { Handler } from './network/transport/types'
 
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import type { HoprCoreConnectorStatic } from '@hoprnet/hopr-core-connector-interface'
+import type { HoprCoreConnectorStatic, Types } from '@hoprnet/hopr-core-connector-interface'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 
 import { Interactions } from './interactions'
@@ -402,5 +402,50 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
     }
     createDirectoryIfNotExists(dbPath)
     return levelup(leveldown(dbPath))
+  }
+
+  /**
+   * Get all acknowledged tickets
+   * @returns an array of all acknowledged tickets
+   */
+  async getAcknowledgedTickets(): Promise<
+    {
+      ackTicket: Types.AcknowledgedTicket
+      index: Uint8Array
+    }[]
+  > {
+    const { AcknowledgedTicket } = this.paymentChannels.types
+    const acknowledgedTicketSize = AcknowledgedTicket.SIZE(this.paymentChannels)
+    let promises: {
+      ackTicket: Types.AcknowledgedTicket
+      index: Uint8Array
+    }[] = []
+
+    return new Promise((resolve, reject) => {
+      this.db
+        .createReadStream({
+          gte: Buffer.from(this.dbKeys.AcknowledgedTickets(new Uint8Array(0x00))),
+        })
+        .on('error', (err) => reject(err))
+        .on('data', ({ key, value }: { key: Buffer; value: Buffer }) => {
+          if (value.buffer.byteLength !== acknowledgedTicketSize) return
+
+          const index = this.dbKeys.AcknowledgedTicketsParse(key)
+          const ackTicket = AcknowledgedTicket.create(this.paymentChannels, {
+            bytes: value.buffer,
+            offset: value.byteOffset,
+          })
+
+          promises.push({
+            ackTicket,
+            index,
+          })
+        })
+        .on('end', () => resolve(Promise.all(promises)))
+    })
+  }
+
+  async updateAcknowledgedTicket(ackTicket: Types.AcknowledgedTicket, index: Uint8Array): Promise<void> {
+    await this.db.put(Buffer.from(this.dbKeys.AcknowledgedTickets(index)), Buffer.from(ackTicket))
   }
 }

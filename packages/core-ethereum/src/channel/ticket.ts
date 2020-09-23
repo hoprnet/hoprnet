@@ -51,8 +51,6 @@ class TicketStatic {
       }
     )
 
-    ticket.redeemed = true
-
     await transaction.send()
 
     this.coreConnector.account.updateLocalState(ticket.preImage)
