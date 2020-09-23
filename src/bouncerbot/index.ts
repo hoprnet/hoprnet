@@ -1,9 +1,14 @@
-import { sendMessage, getRandomItemFromList } from '../utils'
+import { getRandomItemFromList } from '../utils'
 import { IMessage } from '../message'
 import { TweetMessage } from '../twitter'
 import { Bot } from '../bot'
 import { payDai } from '../linkdrop'
 import response from './response.json'
+
+const sendMessage = (from: string, message: IMessage, annonymous?: boolean) => {
+  //@TODO Replace for actually sending message.
+  console.log('Sending Message...')
+}
 
 enum NodeStates {
   IsHinted,
