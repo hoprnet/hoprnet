@@ -1,13 +1,14 @@
 import type { Pushable } from 'it-pushable'
 import { AbortError } from 'abortable-iterator'
 import type { Socket } from 'net'
-import Peer, { Options as SimplePeerOptions } from 'simple-peer'
+import Peer from 'simple-peer'
 import debug from 'debug'
 import pipe from 'it-pipe'
 // @ts-ignore
 import wrtc = require('wrtc')
 import { WEBRTC_TIMEOUT } from './constants'
 import { randomBytes } from 'crypto'
+import type Multiaddr from 'multiaddr'
 
 const log = debug('hopr-core:transport')
 const error = debug('hopr-core:transport:error')
@@ -27,6 +28,7 @@ export default function upgradetoWebRTC(
     _failIntentionallyOnWebRTC?: boolean
     _answerIntentionallyWithIncorrectMessages?: boolean
     // END ONLY FOR TESTING
+    stunServers?: Multiaddr[]
   }
 ): Promise<Socket> {
   if (options?.signal?.aborted) {
@@ -35,26 +37,20 @@ export default function upgradetoWebRTC(
   }
 
   return new Promise<Socket>(async (resolve, reject) => {
-    let webRTCconfig: SimplePeerOptions
-
-    // if (this._useOwnStunServers) {
-    //   webRTCconfig = {
-    //     wrtc,
-    //     initiator: options?.initiator,
-    //     trickle: true,
-    //     // @ts-ignore
-    //     allowHalfTrickle: true,
-    //     config: { iceServers: this.stunServers },
-    //   }
-    // } else {
-    webRTCconfig = {
+    let webRTCconfig = {
       wrtc,
       initiator: options?.initiator || false,
       trickle: true,
       // @ts-ignore
       allowHalfTrickle: true,
+      config: {
+        iceServers: options?.stunServers?.map((ma: Multiaddr) => {
+          const options = ma.toOptions()
+
+          return { urls: `stun:${options.host}:${options.port}` }
+        }),
+      },
     }
-    // }
 
     const channel = new Peer(webRTCconfig)
 

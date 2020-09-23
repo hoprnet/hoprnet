@@ -25,10 +25,10 @@ jobs:
       - name: Install node modules
         run: |
           yarn policies set-version ${{ matrix.yarn-version }}
-          yarn install
+          yarn install --frozen-lockfile
       - name: Install dependencies and link locally
         run: |
-          node_modules/.bin/lerna bootstrap --ignore-prepublish --force-local
+          node_modules/.bin/lerna bootstrap --ignore-prepublish --force-local -- --frozen-lockfile
       - name: Build
         run: |
           node_modules/.bin/lerna run build
