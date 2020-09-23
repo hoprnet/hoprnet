@@ -21,6 +21,7 @@ import assert from 'assert'
 import Multiaddr from 'multiaddr'
 
 import { EventEmitter } from 'events'
+import { durations } from '@hoprnet/hopr-utils'
 
 describe('check heartbeat mechanism', function () {
   async function generateNode(options?: { timeoutIntentionally?: boolean }): Promise<Hopr<HoprCoreConnector>> {
@@ -51,8 +52,6 @@ describe('check heartbeat mechanism', function () {
       heartbeat: new EventEmitter(),
     } as Hopr<HoprCoreConnector>['network']
 
-    node.log = Debug(`${chalk.blue(node.peerInfo.id.toB58String())}: `)
-
     return (node as unknown) as Hopr<HoprCoreConnector>
   }
 
@@ -80,27 +79,26 @@ describe('check heartbeat mechanism', function () {
     await Promise.all([Alice.stop(), Bob.stop()])
   })
 
-  it('should trigger a heartbeat timeout', async function () {
-    const [Alice, Bob] = await Promise.all([
-      /* prettier-ignore */
-      generateNode(),
-      generateNode({ timeoutIntentionally: true }),
-    ])
+  it(
+    'should trigger a heartbeat timeout',
+    async function () {
+      const [Alice, Bob] = await Promise.all([
+        /* prettier-ignore */
+        generateNode(),
+        generateNode({ timeoutIntentionally: true }),
+      ])
+      await new Promise((resolve) => setTimeout(resolve, 100))
+      await Alice.dial(Bob.peerInfo)
+      let errorThrown = false
+      let before = Date.now()
+      try {
+        await Alice.interactions.network.heartbeat.interact(Bob.peerInfo.id)
+      } catch (err) {
+        errorThrown = true
+      }
 
-    await new Promise((resolve) => setTimeout(resolve, 100))
+      assert(errorThrown && Date.now() - before >= HEARTBEAT_TIMEOUT, 'Should reach a timeout')
 
-    await Alice.dial(Bob.peerInfo)
-
-    let errorThrown = false
-    let before = Date.now()
-    try {
-      await Alice.interactions.network.heartbeat.interact(Bob.peerInfo.id)
-    } catch (err) {
-      errorThrown = true
-    }
-
-    assert(errorThrown && Date.now() - before >= HEARTBEAT_TIMEOUT, 'Should reach a timeout')
-
-    await Promise.all([Alice.stop(), Bob.stop()])
+      await Promise.all([Alice.stop(), Bob.stop()])
   })
 })

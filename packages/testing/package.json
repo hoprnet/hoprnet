@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-testing",
-  "version": "1.17.0-alpha.0",
+  "version": "1.17.0-alpha.3",
   "repository": "https://github.com/hoprnet/hopr-testing.git",
   "homepage": "https://hoprnet.org/",
   "license": "GPL-3.0-only",
@@ -20,7 +20,6 @@
   "scripts": {
     "build": "yarn clean && tsc -p . --noEmit false",
     "clean": "rm -rf ./lib",
-    "test": "echo '✅ No tests needed'",
     "lint": "prettier --check .",
     "prepare": "yarn build"
   },

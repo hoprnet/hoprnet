@@ -8,6 +8,7 @@ export const CODE_CIRCUIT = 290
 export const CLOSE_TIMEOUT = 6000
 export const RELAY_CIRCUIT_TIMEOUT = 6000
 export const USE_OWN_STUN_SERVERS = false
+
 export const USE_WEBRTC = true
 export const WEBRTC_TRAFFIC_PREFIX = 1
 export const REMAINING_TRAFFIC_PREFIX = 0
@@ -15,6 +16,7 @@ export const WEBRTC_TIMEOUT = 2400
 
 export const OK = new TextEncoder().encode('OK')
 export const FAIL = new TextEncoder().encode('FAIL')
+export const FAIL_COULD_NOT_REACH_COUNTERPARTY = new TextEncoder().encode('FAIL_COULD_NOT_REACH_COUNTERPARTY')
 
 export const RELAY_REGISTER = `/hopr/relay-register/${VERSION}`
 export const DELIVERY_REGISTER = `/hopr/delivery-register/${VERSION}`

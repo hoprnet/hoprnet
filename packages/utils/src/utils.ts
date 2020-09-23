@@ -7,4 +7,4 @@ export function timer(fn: () => void): number {
   return end
 }
 
-export const MAX_EXECUTION_TIME_FOR_CONCAT_IN_MS = 1
+export const MAX_EXECUTION_TIME_FOR_CONCAT_IN_MS = 100

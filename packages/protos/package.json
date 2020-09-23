@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-protos",
-  "version": "1.17.0-alpha.0",
+  "version": "1.17.0-alpha.3",
   "files": [
     "node/",
     "web/",
@@ -38,7 +38,8 @@
     "printWidth": 120
   },
   "dependencies": {
-    "google-protobuf": "^3.12.2"
+    "google-protobuf": "^3.12.2",
+    "grpc": "^1.24.3"
   },
   "devDependencies": {
     "@types/google-protobuf": "^3.7.2",
@@ -54,7 +55,6 @@
     "typescript": "^3.9.7"
   },
   "peerDependencies": {
-    "grpc": "^1.24.3",
     "grpc-web": "^1.2.0"
   }
 }

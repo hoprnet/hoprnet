@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core-connector-interface",
-  "version": "1.17.0-alpha.0",
+  "version": "1.17.0-alpha.3",
   "repository": "https://github.com/hoprnet/hopr-core-connector-interface.git",
   "homepage": "https://hoprnet.org",
   "license": "GPL-3.0-only",
@@ -16,8 +16,6 @@
     "yarn": "1"
   },
   "scripts": {
-    "test": "echo '✅ No tests needed'",
-    "build": "echo '✅ No build needed'",
     "lint": "prettier --check ."
   },
   "types": "src/index.d.ts",

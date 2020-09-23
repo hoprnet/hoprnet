@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/assets",
-  "version": "1.17.0-alpha.0",
+  "version": "1.17.0-alpha.3",
   "description": "Contains various HOPR assets like images, videos, and more",
   "license": "GPL-3.0-only",
   "main": "index.js",
@@ -10,8 +10,5 @@
   "publishConfig": {
     "access": "public"
   },
-  "scripts": {
-    "build": "echo 'Nothing to build'",
-    "test": "echo 'Nothing to test'"
-  }
+  "scripts": {}
 }

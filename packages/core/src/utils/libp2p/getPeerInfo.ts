@@ -15,8 +15,6 @@ import Multiaddr from 'multiaddr'
 
 import { KeyPair } from '../../dbKeys'
 
-import { NAME } from '../../constants'
-
 /**
  * Assemble the addresses that we are using
  */
@@ -165,7 +163,7 @@ async function getPeerInfo(options: HoprOptions, db?: LevelUp): Promise<PeerInfo
     peerInfo = new PeerInfo(await getPeerId(options, db))
   }
 
-  addrs.forEach((addr: Multiaddr) => peerInfo.multiaddrs.add(addr.encapsulate(`/${NAME}/${peerInfo.id.toB58String()}`)))
+  addrs.forEach((addr: Multiaddr) => peerInfo.multiaddrs.add(addr.encapsulate(`/p2p/${peerInfo.id.toB58String()}`)))
 
   return peerInfo
 }
