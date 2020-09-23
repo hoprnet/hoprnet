@@ -3,7 +3,6 @@ import styles from '../styles/log.module.css'
 import dynamic from "next/dynamic";
 
 const Jazzicon = dynamic(() => import("../components/jazzicon"), { ssr: false });
-const Jazzicon = dynamic(() => import("../components/jazzicon"), { ssr: false });
 
 export function AbbreviatedId({id}){
   let [expanded, setExpanded] = useState(false)
