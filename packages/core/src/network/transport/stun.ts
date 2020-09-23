@@ -1,8 +1,9 @@
 import * as stun from 'webrtc-stun'
-
 import type { Socket, RemoteInfo } from 'dgram'
-
 import Multiaddr from 'multiaddr'
+import debug from 'debug'
+
+const verbose = debug('hopr-core:verbose:transport:stun')
 
 export type Interface = {
   family: 'IPv4' | 'IPv6'
@@ -10,9 +11,10 @@ export type Interface = {
   address: string
 }
 
-export const STUN_TIMEOUT = 500
+export const STUN_TIMEOUT = 1000
 
 export function handleStunRequest(socket: Socket, data: Buffer, rinfo: RemoteInfo): void {
+  verbose('Handle stun request')
   const req = stun.createBlank()
 
   // if msg is valid STUN message
@@ -38,6 +40,7 @@ export function getExternalIp(
   address: string
 }> {
   return new Promise((resolve, reject) => {
+    verbose('External IP for', multiAddrs.map(m => m.toString()).join(','))
     const tids = Array.from({ length: multiAddrs.length }).map(stun.generateTransactionId)
 
     let result: {
@@ -83,6 +86,10 @@ export function getExternalIp(
       }
     }
     socket.on('message', msgHandler)
+    socket.on('error', (err) => {
+      verbose("Err:", err)
+      reject(err)
+    })
 
     multiAddrs.forEach((ma: Multiaddr, index: number) => {
       const nodeAddress = ma.nodeAddress()
@@ -95,13 +102,13 @@ export function getExternalIp(
       socket.send(res.toBuffer(), parseInt(nodeAddress.port, 10), nodeAddress.address)
     })
 
-    timeout = (setTimeout(() => {
+    timeout = setTimeout(() => {
       finished = true
       if (result == null) {
         reject(Error(`Timeout. Could not complete STUN request in time.`))
       } else {
         resolve(result)
       }
-    }, STUN_TIMEOUT) as unknown) as NodeJS.Timeout
+    }, STUN_TIMEOUT)
   })
 }
