@@ -4,10 +4,15 @@ import { getExternalIp, handleStunRequest } from './stun'
 import Multiaddr from 'multiaddr'
 import assert from 'assert'
 
+const TIMEOUT = 1000
+
 describe('test STUN', function () {
-  it('should perform a STUN request', async function () {
-    const bindPromises: Promise<void>[] = []
-    const servers = Array.from({ length: 4 }).map((_) => {
+  let client
+  let servers
+  let bindPromises: Promise<void>[] = []
+
+  beforeAll(() => {
+    servers = Array.from({ length: 4 }).map((_) => {
       const server = dgram.createSocket('udp6')
 
       bindPromises.push(
@@ -20,13 +25,17 @@ describe('test STUN', function () {
       return server
     })
 
-    const client = dgram.createSocket('udp6')
+    client = dgram.createSocket('udp6')
 
     bindPromises.push(
       new Promise<void>((resolve) => client.once('listening', resolve))
     )
 
     client.bind()
+
+  })
+
+  it('should perform a STUN request', async function () {
 
     await Promise.all(bindPromises)
 
@@ -38,10 +47,10 @@ describe('test STUN', function () {
       client.address().port == result.port &&
         (client.address().address === result.address || client.address().address.concat('1') === result.address)
     )
+  })
 
+  afterAll(() => {
     servers.forEach((server) => server.close())
     client.close()
-
-    await new Promise((resolve) => setTimeout(() => resolve(), 140))
-  })
+  });
 })

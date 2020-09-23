@@ -10,7 +10,7 @@ export type Interface = {
   address: string
 }
 
-export const STUN_TIMEOUT = 500
+export const STUN_TIMEOUT = 1000
 
 export function handleStunRequest(socket: Socket, data: Buffer, rinfo: RemoteInfo): void {
   const req = stun.createBlank()
@@ -95,13 +95,13 @@ export function getExternalIp(
       socket.send(res.toBuffer(), parseInt(nodeAddress.port, 10), nodeAddress.address)
     })
 
-    timeout = (setTimeout(() => {
+    timeout = setTimeout(() => {
       finished = true
       if (result == null) {
         reject(Error(`Timeout. Could not complete STUN request in time.`))
       } else {
         resolve(result)
       }
-    }, STUN_TIMEOUT) as unknown) as NodeJS.Timeout
+    }, STUN_TIMEOUT)
   })
 }
