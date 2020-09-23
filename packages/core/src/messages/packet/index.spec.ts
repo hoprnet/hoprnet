@@ -1,7 +1,7 @@
 import Hopr from '../..'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 
-import HoprEthereum, { Types } from '@hoprnet/hopr-core-ethereum'
+import HoprEthereum from '@hoprnet/hopr-core-ethereum'
 
 import { Ganache } from '@hoprnet/hopr-testing'
 import { migrate, fund } from '@hoprnet/hopr-ethereum'
@@ -60,88 +60,92 @@ describe('test packet composition and decomposition', function () {
     await testnet.stop()
   })
 
-  it('should create packets and decompose them', async function () {
-    jest.setTimeout(durations.seconds(25))
+  it(
+    'should create packets and decompose them',
+    async function () {
+      const nodes = await Promise.all(Array.from({ length: MAX_HOPS + 1 }).map((_value, index) => generateNode(index)))
 
-    const nodes = await Promise.all(Array.from({ length: MAX_HOPS + 1 }).map((_value, index) => generateNode(index)))
+      connectionHelper(nodes)
 
-    connectionHelper(nodes)
+      const testMessages: Uint8Array[] = []
 
-    const testMessages: Uint8Array[] = []
-
-    for (let i = 0; i < MAX_HOPS; i++) {
-      testMessages.push(new TextEncoder().encode(`test message #${i}`))
-    }
-
-    let msgReceivedPromises = []
-
-    for (let i = 1; i <= MAX_HOPS; i++) {
-      msgReceivedPromises.push(receiveChecker(testMessages.slice(i - 1, i), nodes[i]))
-      await nodes[0].sendMessage(testMessages[i - 1], nodes[i].peerInfo.id, async () =>
-        nodes.slice(1, i).map((node) => node.peerInfo.id)
-      )
-    }
-
-    const timeout = setTimeout(() => {
-      assert.fail(`No message received`)
-    }, TWO_SECONDS)
-
-    await Promise.all(msgReceivedPromises)
-
-    clearTimeout(timeout)
-
-    cleanUpReceiveChecker(nodes)
-
-    msgReceivedPromises = []
-
-    msgReceivedPromises.push(receiveChecker(testMessages.slice(1, 3), nodes[nodes.length - 1]))
-
-    for (let i = 1; i <= MAX_HOPS - 1; i++) {
-      await nodes[i].sendMessage(testMessages[i], nodes[nodes.length - 1].peerInfo.id, async () =>
-        nodes.slice(i + 1, nodes.length - 1).map((node) => node.peerInfo.id)
-      )
-    }
-
-    await Promise.all(msgReceivedPromises)
-
-    await new Promise((resolve) => setTimeout(resolve, 700))
-
-    for (let i = 0; i < nodes.length; i++) {
-      const tickets = []
-
-      await new Promise((resolve) =>
-        nodes[i].db
-          .createValueStream({
-            gte: Buffer.from(nodes[i].dbKeys.AcknowledgedTickets(Buffer.alloc(ACKNOWLEDGED_TICKET_INDEX_LENGTH, 0x00))),
-            lt: Buffer.from(nodes[i].dbKeys.AcknowledgedTickets(Buffer.alloc(ACKNOWLEDGED_TICKET_INDEX_LENGTH, 0xff))),
-          })
-          .on('data', (data: Buffer) => {
-            const acknowledged = nodes[i].paymentChannels.types.AcknowledgedTicket.create(nodes[i].paymentChannels)
-            acknowledged.set(data)
-
-            tickets.push(acknowledged)
-          })
-          .on('end', resolve)
-      )
-
-      if (tickets.length == 0) {
-        continue
+      for (let i = 0; i < MAX_HOPS; i++) {
+        testMessages.push(new TextEncoder().encode(`test message #${i}`))
       }
 
-      console.log(tickets.length)
+      let msgReceivedPromises = []
 
-      for (let k = 0; k < tickets.length; k++) {
-        console.log((await tickets[k].signedTicket).ticket.amount)
-        // @ts-ignore
-        await nodes[i].paymentChannels.channel.tickets.submit(tickets[k])
-        console.log(`ticket submitted`)
+      for (let i = 1; i <= MAX_HOPS; i++) {
+        msgReceivedPromises.push(receiveChecker(testMessages.slice(i - 1, i), nodes[i]))
+        await nodes[0].sendMessage(testMessages[i - 1], nodes[i].peerInfo.id, async () =>
+          nodes.slice(1, i).map((node) => node.peerInfo.id)
+        )
       }
-    }
 
-    log(`after Promise.all`)
+      const timeout = setTimeout(() => {
+        assert.fail(`No message received`)
+      }, TWO_SECONDS)
 
-    await Promise.all(nodes.map((node: Hopr<HoprEthereum>) => node.stop()))
-  })
+      await Promise.all(msgReceivedPromises)
+
+      clearTimeout(timeout)
+
+      cleanUpReceiveChecker(nodes)
+
+      msgReceivedPromises = []
+
+      msgReceivedPromises.push(receiveChecker(testMessages.slice(1, 3), nodes[nodes.length - 1]))
+
+      for (let i = 1; i <= MAX_HOPS - 1; i++) {
+        await nodes[i].sendMessage(testMessages[i], nodes[nodes.length - 1].peerInfo.id, async () =>
+          nodes.slice(i + 1, nodes.length - 1).map((node) => node.peerInfo.id)
+        )
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 700))
+
+      for (let i = 0; i < nodes.length; i++) {
+        const tickets = []
+
+        await new Promise((resolve) =>
+          nodes[i].db
+            .createValueStream({
+              gte: Buffer.from(
+                nodes[i].dbKeys.AcknowledgedTickets(Buffer.alloc(ACKNOWLEDGED_TICKET_INDEX_LENGTH, 0x00))
+              ),
+              lt: Buffer.from(
+                nodes[i].dbKeys.AcknowledgedTickets(Buffer.alloc(ACKNOWLEDGED_TICKET_INDEX_LENGTH, 0xff))
+              ),
+            })
+            .on('data', (data: Buffer) => {
+              const acknowledged = nodes[i].paymentChannels.types.AcknowledgedTicket.create(nodes[i].paymentChannels)
+              acknowledged.set(data)
+
+              tickets.push(acknowledged)
+            })
+            .on('end', resolve)
+        )
+
+        if (tickets.length == 0) {
+          continue
+        }
+
+        console.log(tickets.length)
+
+        for (let k = 0; k < tickets.length; k++) {
+          console.log((await tickets[k].signedTicket).ticket.amount)
+          // @ts-ignore
+          await nodes[i].paymentChannels.channel.tickets.submit(tickets[k])
+          console.log(`ticket submitted`)
+        }
+      }
+
+      log(`after Promise.all`)
+
+      await Promise.all(nodes.map((node: Hopr<HoprEthereum>) => node.stop()))
+    },
+    durations.seconds(25)
+  )
 })
 
 /**

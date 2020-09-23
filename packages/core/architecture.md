@@ -26,3 +26,13 @@ This is necessary as we have the following constraints:
 A lot of the complexity in this area of the code derives from the many different
 coding styles used in the various libraries we must interact with, namely event
 streams and asynchronous generator functions.
+
+@TODO Questions:
+
+- What are the reasons not to use multiple libp2p transports and upgrade with a
+  libp2p switch?
+
+#### Listener
+
+Listener maintains a TCP and UDP socket and will listen to specified multiaddrs.
+It will trigger handler when messages arrive.

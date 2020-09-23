@@ -34,7 +34,7 @@ class Crawler<Chain extends HoprCoreConnector> implements AbstractInteraction<Ch
   }
 
   interact(counterparty: PeerId, options: { signal: AbortSignal }): Promise<PeerInfo[]> {
-    verbose('crawl', counterparty)
+    verbose('crawl interact', counterparty.toB58String())
     return new Promise<PeerInfo[]>(async (resolve) => {
       let resolved = false
       const onAbort = () => {
