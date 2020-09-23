@@ -57,9 +57,9 @@ describe('check listening to sockets', function () {
   it('should create two servers and exchange messages', async function () {
     const AMOUNT_OF_NODES = 2
 
-    let msgReceived = Array.from({ length: AMOUNT_OF_NODES }).map((_) => ({
-      received: Defer(),
-    }))
+    const ATTEMPTS = 5
+
+    let msgReceived: { received: DeferredPromise<void> }[]
 
     const listeners = await Promise.all(
       Array.from({ length: AMOUNT_OF_NODES }).map(async (_, index) => {
@@ -88,85 +88,46 @@ describe('check listening to sockets', function () {
       })
     )
 
-    await Promise.all([
-      new Promise((resolve) => {
-        const socket = net.createConnection(
-          {
-            host: '127.0.0.1',
-            port: 9090,
-          },
-          () => {
-            socket.write(Buffer.from('test'), () => {
-              socket.end()
-              resolve()
-            })
-          }
-        )
-      }),
-      new Promise((resolve) => {
-        const socket = net.createConnection(
-          {
-            host: '::1',
-            port: 9091,
-          },
-          () => {
-            socket.write(Buffer.from('test'), () => {
-              socket.end()
-              resolve()
-            })
-          }
-        )
-      }),
-    ])
+    for (let i = 0; i < ATTEMPTS; i++) {
+      msgReceived = Array.from({ length: AMOUNT_OF_NODES }).map((_) => ({
+        received: Defer(),
+      }))
 
-    await Promise.all(msgReceived.map((received) => received.received.promise))
-
-    console.log(`after send`)
-
-    msgReceived = Array.from({ length: AMOUNT_OF_NODES }).map((_) => ({
-      received: Defer(),
-    }))
-
-    await Promise.all([
-      new Promise((resolve) => {
-        const socket = net.createConnection(
-          {
-            host: '::1',
-            port: 9090,
-          },
-          () => {
-            socket.write(Buffer.from('test'), () => {
-              socket.end()
-              resolve()
-            })
-          }
-        )
-      }),
-      new Promise((resolve) => {
-        const socket = net.createConnection(
-          {
-            host: '127.0.0.1',
-            port: 9091,
-          },
-          () => {
-            socket.write(Buffer.from('test'), () => {
-              socket.end()
-              resolve()
-            })
-          }
-        )
-      }),
-    ])
-
-    await Promise.all(msgReceived.map((received) => received.received.promise))
+      await Promise.all([
+        new Promise((resolve) => {
+          const socket = net.createConnection(
+            {
+              host: '127.0.0.1',
+              port: 9090 + (i % 2),
+            },
+            () => {
+              socket.write(Buffer.from('test'), () => {
+                socket.end()
+                resolve()
+              })
+            }
+          )
+        }),
+        new Promise((resolve) => {
+          const socket = net.createConnection(
+            {
+              host: '::1',
+              port: 9090 + ((i + 1) % 2),
+            },
+            () => {
+              socket.write(Buffer.from('test'), () => {
+                socket.end()
+                resolve()
+              })
+            }
+          )
+        }),
+        Promise.all(msgReceived.map((received) => received.received.promise)),
+      ])
+    }
 
     await Promise.all(listeners.map((listener) => listener.close()))
 
     await new Promise((resolve) => setTimeout(resolve, 200))
-
-    assert(
-      msgReceived.every((msg) => msg.received),
-      'Should receive all messages'
-    )
   })
 })
