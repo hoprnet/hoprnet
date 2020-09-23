@@ -12,6 +12,8 @@ import debug from 'debug'
 import { parse } from 'url'
 import next from 'next'
 import type {Server} from 'http'
+import stripAnsi from 'strip-ansi'
+
 
 
 let debugLog = debug('hoprd:admin')
@@ -54,6 +56,8 @@ export class AdminServer {
           if (this.cmds) {
             this.cmds.execute(message.toString()).then( (resp:any) => {
               if (resp) {
+                // Strings may have ansi stuff in it, get rid of it:
+                resp = stripAnsi(resp)
                 this.logs.logFullLine(resp)
               }
             })

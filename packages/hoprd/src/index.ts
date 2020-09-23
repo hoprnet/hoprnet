@@ -18,8 +18,6 @@ import chalk from 'chalk'
 import * as yargs from 'yargs';
 import { startServer } from '@hoprnet/hopr-server'
 
-// @ts-ignore
-chalk.level = 0 // We need bare strings
 let debugLog = debug('hoprd')
 
 /**
