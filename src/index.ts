@@ -14,7 +14,7 @@ const start = async () => {
   const timestamp = BOT_TIMESTAMP ? new Date(+BOT_TIMESTAMP) : new Date(Date.now())
   const twitterTimestamp = TWITTER_TIMESTAMP ? new Date(+TWITTER_TIMESTAMP) : new Date(Date.now())
 
-  log(`HOPR address is ${hoprAddress}`)
+  log(`- start | HOPR address: ${hoprAddress}`)
 
   let bot: Bot
   switch (BOT_NAME) {
