@@ -1,6 +1,10 @@
 import { IMessage, Message } from '../message/message'
 import wait from 'wait-for-stuff'
 import Core from '../lib/hopr/core'
+import debug from 'debug'
+
+
+const log = debug('hopr-chatbot:bot')
 
 export interface Bot {
   botName: string
@@ -11,13 +15,13 @@ export interface Bot {
 }
 
 const listen = async (bot: Bot, node: Core) => {
-  console.log('[ Chatbot ] listen | Ready to listen to my HOPR node')
+  log('- listen | Ready to listen to my HOPR node')
 
   node.events.on('message', (decoded: Buffer) => {
     const message = new Message(new Uint8Array(decoded))
     const parsedMessage = message.toJson()
     const response = bot.handleMessage.call(bot, parsedMessage)
-    console.log('[ Chatbot ] listen:message | Bot Response', response)
+    log('- listen:message | Bot Response', response)
     node.send({
       peerId: parsedMessage.from,
       payload: Message.fromJson({ from: bot.address, text: ` ${response}` }).toU8a(),
@@ -27,8 +31,8 @@ const listen = async (bot: Bot, node: Core) => {
 }
 
 export async function setupBot(bot: Bot, node: Core) {
-  console.log(`Starting bot at ${bot.timestamp}`)
-  console.log(`Listening to Tweets created after ${bot.twitterTimestamp}`)
+  log(`- setupBot | Starting bot at ${bot.timestamp}`)
+  log(`- setupBot | Listening to Tweets created after ${bot.twitterTimestamp}`)
   wait.for.date(bot.timestamp)
   await listen(bot, node)
 }
