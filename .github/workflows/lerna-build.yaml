@@ -46,7 +46,7 @@ jobs:
           !contains(github.event.pull_request.labels.*.name, 'Patch Version')
         run: | # TODO: Assert master branch,
           git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Versioning robot"
-          node_modules/.bin/lerna version prerelease --preid "alpha"
+          node_modules/.bin/lerna version prerelease --preid "alpha" --yes
           git push origin master
           (PACKAGE_VERSION=$(node -p -e "require('./package.json').version"); git tag $PACKAGE_VERSION && git push origin $PACKAGE_VERSION)
           npm whoami && npm publish --access public
