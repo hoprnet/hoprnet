@@ -1,6 +1,10 @@
 import { BOT_NAME, BOT_TIMESTAMP, TWITTER_TIMESTAMP } from './utils/env'
 import { setupBot, Bot } from './bots/bot'
 import Core from './lib/hopr/core'
+import debug from 'debug'
+
+
+const log = debug('hopr-chatbot:start')
 
 const start = async () => {
   const node = await new Core()
@@ -10,7 +14,7 @@ const start = async () => {
   const timestamp = BOT_TIMESTAMP ? new Date(+BOT_TIMESTAMP) : new Date(Date.now())
   const twitterTimestamp = TWITTER_TIMESTAMP ? new Date(+TWITTER_TIMESTAMP) : new Date(Date.now())
 
-  console.log(`My HOPR address is ${hoprAddress}`)
+  log(`HOPR address is ${hoprAddress}`)
 
   let bot: Bot
   switch (BOT_NAME) {
@@ -34,6 +38,6 @@ const start = async () => {
 }
 
 start().catch((err) => {
-  console.error('Fatal Error:', err)
+  log.error('Fatal Error:', err)
   process.exit()
 })

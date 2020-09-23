@@ -1,4 +1,8 @@
 import * as words from '../bots/randobot/words'
+import debug from 'debug'
+
+
+const log = debug('hopr-chatbot:utils')
 
 export const getRandomItemFromList = <T>(items: T[]): T => {
   return items[Math.floor(Math.random() * items.length)]
@@ -9,7 +13,7 @@ export const getHOPRNodeAddressFromContent = (content: string): string => {
     ? ((content) => {
         const [HOPRAddress_regexed] = content.match(/16Uiu2HA.*?$/i)
         const HOPRAddress = HOPRAddress_regexed.substr(0, 53)
-        console.log(`[ utils ] getHOPRNodeAddressFromContent - Obtained hoprAddress ${HOPRAddress} from ${content}`)
+        log(` - getHOPRNodeAddressFromContent - Obtained hoprAddress ${HOPRAddress} from ${content}`)
         return HOPRAddress
       })(content)
     : ''

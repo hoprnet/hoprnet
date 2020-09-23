@@ -5,7 +5,10 @@ import { getBootstrapAddresses, u8aToHex } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import { EventEmitter } from 'events'
 import { encode, decode } from 'rlp'
-import { Message } from '../../message/message'
+import debug from 'debug'
+
+
+const log = debug('hopr-chatbot:core')
 
 export default class Core {
   public events: EventEmitter
@@ -27,15 +30,15 @@ export default class Core {
   }
 
   private _functor(msg: Uint8Array) {
-    console.log('[ Chatbot ] - functor | Received message')
+    log('- functor | Received message')
     try {
       const [decoded, time] = decode(msg) as [Buffer, Buffer]
-      console.log('[ Chatbot ] - functor | Message', decoded.toString())
-      console.log('[ Chatbot ] - functor | Latency', Date.now() - parseInt(time.toString('hex'), 16) + 'ms')
+      log('- functor | Message', decoded.toString())
+      log('- functor | Latency', Date.now() - parseInt(time.toString('hex'), 16) + 'ms')
       this.events.emit('message', decoded)
     } catch (err) {
-      console.error('[ Chatbot ] - functor | Error: Could not decode message', err)
-      console.error('[ Chatbot ] - functor | Error: Message', msg.toString())
+      log.error('- functor | Error: Could not decode message', err)
+      log.error('- functor | Error: Message', msg.toString())
     }
   }
 
@@ -53,16 +56,16 @@ export default class Core {
 
   async start(): Promise<void> {
     try {
-      console.log('[ Chatbot ] - start | Creating HOPR Node')
+      log('- start | Creating HOPR Node')
       this.node = await Hopr.create({
         ...this.options,
         bootstrapServers: [...(await getBootstrapAddresses()).values()],
       })
-      console.log('[ Chatbot ] - start | Created HOPR Node')
+      log('- start | Created HOPR Node')
       this.started = true
-      console.log('[ Chatbot ] - start | Started HOPR Node')
+      log('- start | Started HOPR Node')
     } catch (err) {
-      console.error('[ Chatbot ] - start | Error: Unable to start node', err)
+      log.error('- start | Error: Unable to start node', err)
     }
   }
 
