@@ -26,6 +26,8 @@
   width: 50%;
   text-align: left;
   margin: auto;
+  font-weight: bold;
+  color: $hopr_bright_blue;
 }
 
 @include media('<medium') {

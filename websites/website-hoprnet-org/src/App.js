@@ -51,7 +51,7 @@ class App extends React.Component {
               <AppRoute exact path="/layer0-data-privacy" component={WeAre} layout={LayoutDefault} />
               <AppRoute exact path="/do-business-with-HOPR" component={ForYou} layout={LayoutDefault} />
               <AppRoute exact path="/node" component={Node} layout={LayoutDefault} />
-              <AppRoute exact path="/sedimentum" component={Sedimentum} layout={LayoutDefault} />
+              {/* <AppRoute exact path="/sedimentum" component={Sedimentum} layout={LayoutDefault} /> */}
               <AppRoute exact path="/disclaimer" component={Disclaimer} layout={LayoutDefault} />
               <AppRoute exact path="/ecosystem" component={Ecosystem} layout={LayoutDefault} />
               <AppRoute exact path="/support" component={Support} layout={LayoutDefault} />
