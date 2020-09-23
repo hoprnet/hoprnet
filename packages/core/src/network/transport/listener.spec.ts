@@ -26,32 +26,38 @@ describe('check listening to sockets', function () {
     return socket
   }
   it('should successfully recreate the socket', async function () {
-    // let listener: Listener
-    // const peerId = await PeerId.create({ keyType: 'secp256k1' })
-    // // Create objects to pass boolean by reference and NOT by value
-    // const msgReceived = [
-    //   {
-    //     msgReceived: Defer<void>(),
-    //   },
-    //   {
-    //     msgReceived: Defer<void>(),
-    //   },
-    // ]
-    // const stunServers = [await startStunServer(9391, msgReceived[0]), await startStunServer(9392, msgReceived[1])]
-    // for (let i = 0; i < 2; i++) {
-    //   listener = new Listener(() => {}, (undefined as unknown) as Upgrader, [
-    //     Multiaddr(`/ip4/127.0.0.1/udp/${stunServers[0].address().port}`),
-    //     Multiaddr(`/ip4/127.0.0.1/udp/${stunServers[1].address().port}`),
-    //   ])
-    //   await listener.listen(Multiaddr(`/ip4/127.0.0.1/tcp/9390/p2p/${peerId.toB58String()}`))
-    //   await listener.close()
-    // }
-    // await Promise.all(msgReceived.map((received) => received.msgReceived.promise))
-    // stunServers.forEach((server) => server.close())
-    // assert(
-    //   msgReceived[0].msgReceived && msgReceived[1].msgReceived,
-    //   `Stun Server must have received messages from both Listener instances.`
-    // )
+    let listener: Listener
+    const peerId = await PeerId.create({ keyType: 'secp256k1' })
+    // Create objects to pass boolean by reference and NOT by value
+    const msgReceived = [
+      {
+        msgReceived: Defer<void>(),
+      },
+      {
+        msgReceived: Defer<void>(),
+      },
+    ]
+
+    const stunServers = [await startStunServer(9391, msgReceived[0]), await startStunServer(9392, msgReceived[1])]
+
+    for (let i = 0; i < 2; i++) {
+      listener = new Listener(() => {}, (undefined as unknown) as Upgrader, [
+        Multiaddr(`/ip4/127.0.0.1/udp/${stunServers[0].address().port}`),
+        Multiaddr(`/ip4/127.0.0.1/udp/${stunServers[1].address().port}`),
+      ])
+      await listener.listen(Multiaddr(`/ip4/127.0.0.1/tcp/9390/p2p/${peerId.toB58String()}`))
+      await listener.close()
+    }
+
+    await Promise.all(msgReceived.map((received) => received.msgReceived.promise))
+
+    await Promise.all(stunServers.map((s) => new Promise((resolve) => s.close(resolve))))
+
+    await new Promise(resolve => setTimeout(resolve, 200))
+    assert(
+      msgReceived[0].msgReceived && msgReceived[1].msgReceived,
+      `Stun Server must have received messages from both Listener instances.`
+    )
   })
 
   it('should create two TCP sockets and exchange messages', async function () {
