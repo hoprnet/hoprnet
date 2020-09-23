@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/assets",
-  "version": "1.17.0-alpha.5",
+  "version": "1.17.0-alpha.6",
   "description": "Contains various HOPR assets like images, videos, and more",
   "license": "GPL-3.0-only",
   "main": "index.js",
