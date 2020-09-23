@@ -48,7 +48,7 @@ jobs:
           git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Versioning robot"
           node_modules/.bin/lerna version prerelease --preid "alpha" --yes
           git push origin master
-          node_modules/.bin/lerna publish from-package
+          node_modules/.bin/lerna publish from-package --yes
           #(PACKAGE_VERSION=$(node -p -e "require('./package.json').version"); git tag $PACKAGE_VERSION && git push origin $PACKAGE_VERSION)
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -65,7 +65,7 @@ jobs:
           git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Versioning robot"
           node_modules/.bin/lerna version major --yes
           git push origin master
-          node_modules/.bin/lerna publish from-package
+          node_modules/.bin/lerna publish from-package --yes
           #(PACKAGE_VERSION=$(node -p -e "require('./package.json').version"); git tag $PACKAGE_VERSION && git push origin $PACKAGE_VERSION)
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -82,7 +82,7 @@ jobs:
           git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Versioning robot"
           node_modules/.bin/lerna version minor --yes
           git push origin master
-          node_modules/.bin/lerna publish from-package
+          node_modules/.bin/lerna publish from-package --yes
           #(PACKAGE_VERSION=$(node -p -e "require('./package.json').version"); git tag $PACKAGE_VERSION && git push origin $PACKAGE_VERSION)
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -99,7 +99,7 @@ jobs:
           git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Versioning robot"
           node_modules/.bin/lerna version patch --yes
           git push origin master
-          node_modules/.bin/lerna publish from-package
+          node_modules/.bin/lerna publish from-package --yes
           #(PACKAGE_VERSION=$(node -p -e "require('./package.json').version"); git tag $PACKAGE_VERSION && git push origin $PACKAGE_VERSION)
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
