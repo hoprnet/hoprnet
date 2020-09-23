@@ -1,7 +1,7 @@
 import { getHOPRNodeAddressFromContent } from '../../utils/utils'
 import Web3 from 'web3'
 import { Bot } from '../bot'
-import { IMessage } from '../../message'
+import { IMessage } from '../../message/message'
 import { TweetMessage, TweetState } from '../../lib/twitter/twitter'
 //@TODO: Isolate these utilities to avoid importing the entire package
 import { convertPubKeyFromB58String, u8aToHex } from '@hoprnet/hopr-utils'

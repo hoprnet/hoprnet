@@ -1,6 +1,6 @@
 import { Bot } from '../bot'
-import { IMessage } from '../message'
-import { generateRandomSentence } from '../utils'
+import { IMessage } from '../../message/message'
+import { generateRandomSentence } from '../../utils/utils'
 
 export class Randombot implements Bot {
   botName: string

@@ -1,6 +1,6 @@
-import { IMessage, Message } from './message'
+import { IMessage, Message } from '../message/message'
 import wait from 'wait-for-stuff'
-import Core from './core'
+import Core from '../lib/hopr/core'
 
 export interface Bot {
   botName: string

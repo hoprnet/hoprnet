@@ -1,5 +1,5 @@
 import { getRandomItemFromList } from '../../utils/utils'
-import { IMessage } from '../../message'
+import { IMessage } from '../../message/message'
 import { TweetMessage } from '../../lib/twitter/twitter'
 import { Bot } from '../bot'
 import { payDai } from '../../lib/linkdrop'
