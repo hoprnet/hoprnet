@@ -13,14 +13,15 @@ import { PacketTag } from '../../dbKeys'
 import Message from './message'
 import { LevelUp } from 'levelup'
 
+import Debug from 'debug'
+
 import Hopr from '../../'
 
 import HoprCoreConnector, { Types } from '@hoprnet/hopr-core-connector-interface'
 import { UnacknowledgedTicket } from '../ticket'
-import debug from 'debug'
 
-const log = debug('hopr-core:message:packet')
-const verbose = debug('hopr-core:verbose:message:packet')
+const log = Debug('hopr-core:message:packet')
+const verbose = Debug('hopr-core:verbose:message:packet')
 
 /**
  * Encapsulates the internal representation of a packet

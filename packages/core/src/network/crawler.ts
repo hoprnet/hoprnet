@@ -11,14 +11,14 @@ import { CrawlResponse, CrawlStatus } from '../messages'
 import PeerId from 'peer-id'
 import type { Connection } from './transport/types'
 import type { Entry } from './peerStore'
-import { peerHasOnlyPublicAddresses, peerHasOnlyPrivateAddresses, isOnPrivateNet, PRIVATE_NETS } from '../filters'
+import { peerHasOnlyPublicAddresses, isOnPrivateNet, PRIVATE_NETS } from '../filters'
 import debug from 'debug'
 import Multiaddr from 'multiaddr'
 const log = debug('hopr-core:crawler')
 const verbose = debug('hopr-core:verbose:crawler')
 
 const MAX_PARALLEL_REQUESTS = 7
-export const CRAWL_TIMEOUT = 6 * 1000
+export const CRAWL_TIMEOUT = 2 * 1000
 
 export const shouldIncludePeerInCrawlResponse = (peer: Multiaddr, them: Multiaddr): boolean => {
   // We are being requested a crawl from a node that is on a remote network, so

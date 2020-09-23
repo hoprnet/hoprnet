@@ -7,10 +7,11 @@ const error = debug('libp2p:tcp:socket:error')
 import toIterable = require('stream-to-it')
 // @ts-ignore
 import toMultiaddr = require('libp2p-utils/src/ip-port-to-multiaddr')
-import { CLOSE_TIMEOUT } from './constants'
 import { MultiaddrConnection } from './types'
 import type Multiaddr from 'multiaddr'
 import type { Socket } from 'net'
+
+const SOCKET_CLOSE_TIMEOUT = 2000
 
 function toWebrtcMultiaddr(address: undefined | string, port: undefined | number) {
   if (!address || !port) {
@@ -110,7 +111,7 @@ export function socketToConn(
           }
 
           resolve()
-        }, CLOSE_TIMEOUT)
+        }, SOCKET_CLOSE_TIMEOUT)
 
         socket.once('close', () => clearTimeout(timeout))
         socket.end((err?: Error) => {
@@ -119,6 +120,7 @@ export function socketToConn(
             error(err)
             return reject(err)
           }
+
           resolve()
         })
       })

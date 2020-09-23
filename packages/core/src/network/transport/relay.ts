@@ -18,12 +18,19 @@ import PeerId from 'peer-id'
 // @ts-ignore
 import libp2p = require('libp2p')
 
-import { RELAY_CIRCUIT_TIMEOUT, RELAY_REGISTER, OK, FAIL, DELIVERY_REGISTER } from './constants'
+import {
+  RELAY_CIRCUIT_TIMEOUT,
+  RELAY_REGISTER,
+  OK,
+  FAIL,
+  FAIL_COULD_NOT_REACH_COUNTERPARTY,
+  DELIVERY_REGISTER,
+} from './constants'
 
 import { pubKeyToPeerId } from '../../utils'
 import { u8aEquals } from '@hoprnet/hopr-utils'
 
-import type { Connection, DialOptions, Registrar, Dialer, Handler, Stream } from './types'
+import type { Connection, DialOptions, Registrar, Dialer, Handler, Stream, PeerRouting } from './types'
 
 type ConnectionContext = {
   deferredPromise: defer.DeferredPromise<AsyncIterable<Uint8Array>>
@@ -38,6 +45,9 @@ class Relay {
   private _dialer: Dialer
   private _registrar: Registrar
   private _handle: (protocols: string[] | string, handler: (connection: Handler) => void) => void
+  private _dht: { peerRouting: PeerRouting } | undefined
+  private _peerInfo: PeerInfo
+
   private on: (event: 'peer:connect', handler: (peer: PeerInfo) => void) => void
 
   private connHandler: (conn: Handler & { counterparty: PeerId }) => void | undefined
@@ -45,6 +55,8 @@ class Relay {
   constructor(libp2p: libp2p, _connHandler?: (conn: Handler) => void) {
     this._dialer = libp2p.dialer
     this._registrar = libp2p.registrar
+    this._dht = libp2p._dht
+    this._peerInfo = libp2p.peerInfo
 
     this.connHandler = _connHandler
 
@@ -96,16 +108,34 @@ class Relay {
       throw new AbortError()
     }
 
+    const potentialRelays = relays.filter((relay: PeerInfo) => !relay.id.equals(this._peerInfo.id))
+
+    if (potentialRelays.length == 0) {
+      throw Error(`Could not establish relayed connection without any valid relays`)
+    }
+
     let [relayConnection, index] = await Promise.race(
-      relays.map(
-        async (relay: PeerInfo, index: number): Promise<[Connection, number]> => {
-          let relayConnection = this._registrar.getConnection(relay)
+      potentialRelays.map(
+        (relay: PeerInfo, index: number): Promise<[Connection, number]> => {
+          return new Promise<[Connection, number]>(async (resolve) => {
+            let relayConnection = this._registrar.getConnection(relay)
 
-          if (!relayConnection) {
-            relayConnection = await this._dialer.connectToPeer(relay, { signal: options?.signal })
-          }
+            if (!relayConnection) {
+              relayConnection = await this._dialer
+                .connectToPeer(relay, { signal: options?.signal })
+                .catch(async (err) => {
+                  if (this._dht != null && (options == null || options.signal == null || !options.signal.aborted)) {
+                    relay = await this._dht.peerRouting.findPeer(relay.id)
 
-          return [relayConnection, index]
+                    return this._dialer.connectToPeer(relay, { signal: options?.signal })
+                  }
+
+                  throw Error(`Could not reach relay node. Error was ${err}`)
+                })
+            }
+
+            resolve([relayConnection, index])
+          })
         }
       )
     )
@@ -200,7 +230,7 @@ class Relay {
     const deliveryStream = await this.establishForwarding(counterparty)
 
     if (!deliveryStream) {
-      shaker.write(FAIL)
+      shaker.write(FAIL_COULD_NOT_REACH_COUNTERPARTY)
 
       shaker.rest()
 
@@ -333,7 +363,9 @@ class Relay {
   async establishForwarding(counterparty: PeerId) {
     let timeout: any
 
-    let newConn = this._registrar.getConnection(new PeerInfo(counterparty))
+    let cParty = new PeerInfo(counterparty)
+
+    let newConn = this._registrar.getConnection(cParty)
 
     if (!newConn) {
       const abort = new AbortController()
@@ -341,7 +373,15 @@ class Relay {
       timeout = setTimeout(() => abort.abort(), RELAY_CIRCUIT_TIMEOUT)
 
       try {
-        newConn = await this._dialer.connectToPeer(new PeerInfo(counterparty), { signal: abort.signal })
+        newConn = await this._dialer.connectToPeer(cParty, { signal: abort.signal }).catch(async (err) => {
+          if (this._dht != null && !abort.signal.aborted) {
+            cParty = await this._dht.peerRouting.findPeer(cParty.id)
+
+            return this._dialer.connectToPeer(cParty, { signal: abort.signal })
+          }
+
+          throw Error(`Could not connect to counterparty. Error was: ${err}`)
+        })
       } catch (err) {
         clearTimeout(timeout)
         error(err)

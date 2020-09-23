@@ -1,6 +1,5 @@
 import secp256k1 from 'secp256k1'
 import { randomBytes } from 'crypto'
-
 import { u8aXOR, u8aConcat, PRG } from '@hoprnet/hopr-utils'
 import { MAX_HOPS } from '../../../constants'
 
@@ -16,12 +15,11 @@ import {
 } from './index'
 
 import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-
 import Hopr from '../../../'
-
 import PeerId from 'peer-id'
 import Debug from 'debug'
 const log = Debug('hopr-core:packet:header')
+const verbose = Debug(`hopr-core:verbose:packet:header`)
 
 import {
   PRIVATE_KEY_LENGTH,
