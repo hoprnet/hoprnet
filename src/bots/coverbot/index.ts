@@ -1,8 +1,8 @@
-import { getHOPRNodeAddressFromContent } from '../utils'
+import { getHOPRNodeAddressFromContent } from '../../utils/utils'
 import Web3 from 'web3'
 import { Bot } from '../bot'
-import { IMessage } from '../message'
-import { TweetMessage, TweetState } from '../twitter'
+import { IMessage } from '../../message'
+import { TweetMessage, TweetState } from '../../lib/twitter/twitter'
 //@TODO: Isolate these utilities to avoid importing the entire package
 import { convertPubKeyFromB58String, u8aToHex } from '@hoprnet/hopr-utils'
 import { Utils } from '@hoprnet/hopr-core-ethereum'
@@ -13,7 +13,7 @@ import {
   COVERBOT_VERIFICATION_CYCLE_IN_MS,
   COVERBOT_XDAI_THRESHOLD,
   HOPR_ENVIRONMENT,
-} from '../env'
+} from '../../utils/env'
 import db from './db'
 
 const { fromWei } = Web3.utils
@@ -267,7 +267,7 @@ export class Coverbot implements Bot {
 
     return new Promise((resolve, reject) => {
       stateDbRef.set(state, (error) => {
-        if (error) return reject(error);
+        if (error) return reject(error)
         console.log(`Saved data in our Database at ${state.refreshed}`)
         return resolve()
       })
@@ -314,18 +314,18 @@ export class Coverbot implements Bot {
       const tweet = new TweetMessage(hoprNode.tweetUrl)
       await tweet.fetch({ mock: COVERBOT_DEBUG_MODE })
       const _hoprNodeAddress = tweet.getHOPRNode()
-      
+
       if (_hoprNodeAddress.length === 0) {
         // We got no HOPR Node here. Remove and update.
         this.verifiedHoprNodes.delete(hoprNode.id)
         await this.dumpData()
       } else {
         this._sendMessageFromBot(_hoprNodeAddress, BotResponses[BotCommands.verify])
-          // @TODO Actually catch error
-          // .catch(err => {
-          //   console.log(`Trying to reach ${_hoprNodeAddress} failed.`)
-          //   throw new Error(err) 
-          // })
+        // @TODO Actually catch error
+        // .catch(err => {
+        //   console.log(`Trying to reach ${_hoprNodeAddress} failed.`)
+        //   throw new Error(err)
+        // })
         /*
          * We switched from “send and forget” to “send and listen”
          * 1. We inmediately send a message to user, telling them we find them online.
@@ -373,7 +373,7 @@ export class Coverbot implements Bot {
         )
       }
     } catch (err) {
-      console.log('[ _verificationCycle ] Error caught - ', err);
+      console.log('[ _verificationCycle ] Error caught - ', err)
 
       // Something failed. We better remove node and update.
       // @TODO: Clean this up, removed for now to ask users to try again.

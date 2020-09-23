@@ -1,6 +1,6 @@
-import { TweetMessage } from '../twitter'
+import { TweetMessage } from '../../lib/twitter/twitter'
 import { Bot } from '../bot'
-import { IMessage } from '../message'
+import { IMessage } from '../../message'
 
 const directory = {}
 const winners = []

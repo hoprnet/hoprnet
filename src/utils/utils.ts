@@ -1,6 +1,4 @@
-import { Message, IMessage } from './message'
-import { API_URL } from './env'
-import * as words from './words'
+import * as words from '../bots/randobot/words'
 
 export const getRandomItemFromList = <T>(items: T[]): T => {
   return items[Math.floor(Math.random() * items.length)]

@@ -1,8 +1,8 @@
-import { getRandomItemFromList } from '../utils'
-import { IMessage } from '../message'
-import { TweetMessage } from '../twitter'
+import { getRandomItemFromList } from '../../utils/utils'
+import { IMessage } from '../../message'
+import { TweetMessage } from '../../lib/twitter/twitter'
 import { Bot } from '../bot'
-import { payDai } from '../linkdrop'
+import { payDai } from '../../lib/linkdrop'
 import response from './response.json'
 
 const sendMessage = (from: string, message: IMessage, annonymous?: boolean) => {

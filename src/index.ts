@@ -5,12 +5,12 @@ import Core from './core'
 
 const start = async () => {
   const node = await new Core()
-  await node.start();
-  const hoprAddress = await node.address('hopr');
+  await node.start()
+  const hoprAddress = await node.address('hopr')
 
   const timestamp = BOT_TIMESTAMP ? new Date(+BOT_TIMESTAMP) : new Date(Date.now())
   const twitterTimestamp = TWITTER_TIMESTAMP ? new Date(+TWITTER_TIMESTAMP) : new Date(Date.now())
-  
+
   console.log(`My HOPR address is ${hoprAddress}`)
 
   let bot: Bot

@@ -18,6 +18,6 @@ export class Randombot implements Bot {
 
   handleMessage(message: IMessage) {
     console.log(`${this.botName} <- ${message.from}: ${message.text}`)
-    return generateRandomSentence();
+    return generateRandomSentence()
   }
 }

@@ -17,11 +17,11 @@ const listen = async (bot: Bot, node: Core) => {
     const message = new Message(new Uint8Array(decoded))
     const parsedMessage = message.toJson()
     const response = bot.handleMessage.call(bot, parsedMessage)
-    console.log('[ Chatbot ] listen:message | Bot Response', response);
-    node.send({ 
+    console.log('[ Chatbot ] listen:message | Bot Response', response)
+    node.send({
       peerId: parsedMessage.from,
       payload: Message.fromJson({ from: bot.address, text: ` ${response}` }).toU8a(),
-      intermediatePeerIds: []
+      intermediatePeerIds: [],
     })
   })
 }
