@@ -102,7 +102,6 @@ export function getExternalIp(
       socket.send(res.toBuffer(), parseInt(nodeAddress.port, 10), nodeAddress.address)
     })
 
-    /*
     timeout = setTimeout(() => {
       finished = true
       if (result == null) {
@@ -111,6 +110,5 @@ export function getExternalIp(
         resolve(result)
       }
     }, STUN_TIMEOUT)
-    */
   })
 }
