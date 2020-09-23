@@ -57,7 +57,7 @@ describe('check listening to sockets', function () {
   it('should create two servers and exchange messages', async function () {
     const AMOUNT_OF_NODES = 2
 
-    const msgReceived = Array.from({ length: AMOUNT_OF_NODES }).map((_) => ({
+    let msgReceived = Array.from({ length: AMOUNT_OF_NODES }).map((_) => ({
       received: Defer(),
     }))
 
@@ -72,6 +72,8 @@ describe('check listening to sockets', function () {
 
         const listener = new Listener(
           (conn: Connection) => {
+            // @ts-ignore
+            conn.conn.end()
             msgReceived[index].received.resolve()
           },
           ({
@@ -80,7 +82,7 @@ describe('check listening to sockets', function () {
           stunServers
         )
 
-        await listener.listen(Multiaddr(`/ip4/127.0.0.1/tcp/${9090 + index}/p2p/${peerId.toB58String()}`))
+        await listener.listen(Multiaddr(`/ip6/::/tcp/${9090 + index}/p2p/${peerId.toB58String()}`))
 
         return listener
       })
@@ -95,7 +97,46 @@ describe('check listening to sockets', function () {
           },
           () => {
             socket.write(Buffer.from('test'), () => {
-              socket.destroy()
+              socket.end()
+              resolve()
+            })
+          }
+        )
+      }),
+      new Promise((resolve) => {
+        const socket = net.createConnection(
+          {
+            host: '::1',
+            port: 9091,
+          },
+          () => {
+            socket.write(Buffer.from('test'), () => {
+              socket.end()
+              resolve()
+            })
+          }
+        )
+      }),
+    ])
+
+    await Promise.all(msgReceived.map((received) => received.received.promise))
+
+    console.log(`after send`)
+
+    msgReceived = Array.from({ length: AMOUNT_OF_NODES }).map((_) => ({
+      received: Defer(),
+    }))
+
+    await Promise.all([
+      new Promise((resolve) => {
+        const socket = net.createConnection(
+          {
+            host: '::1',
+            port: 9090,
+          },
+          () => {
+            socket.write(Buffer.from('test'), () => {
+              socket.end()
               resolve()
             })
           }
@@ -109,7 +150,7 @@ describe('check listening to sockets', function () {
           },
           () => {
             socket.write(Buffer.from('test'), () => {
-              socket.destroy()
+              socket.end()
               resolve()
             })
           }
