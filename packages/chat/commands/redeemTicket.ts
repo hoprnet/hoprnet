@@ -1,15 +1,11 @@
-import BN from "bn.js";
 import chalk from "chalk";
 import type HoprCoreConnector from "@hoprnet/hopr-core-connector-interface";
-import type {
-  Types,
-  Channel as ChannelInstance,
-} from "@hoprnet/hopr-core-connector-interface";
+import type { Channel as ChannelInstance } from "@hoprnet/hopr-core-connector-interface";
 import type Hopr from "@hoprnet/hopr-core";
-import { u8aToHex, stringToU8a, moveDecimalPoint } from "@hoprnet/hopr-utils";
+import { u8aToHex } from "@hoprnet/hopr-utils";
 import { AbstractCommand } from "./abstractCommand";
 import type { AutoCompleteResult } from "./abstractCommand";
-import { countSignedTickets, getSignedTickets } from "../utils";
+import { getSignedTickets } from "../utils";
 
 export default class RedeemTicket extends AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {
@@ -35,7 +31,7 @@ export default class RedeemTicket extends AbstractCommand {
    * @param query a ticket challange
    */
   async execute(query?: string): Promise<void> {
-    const challange = this.checkArgs(query ?? "");
+    const challange = await this.checkArgs(query ?? "");
     const { paymentChannels } = this.node;
 
     const ackTickets = await paymentChannels.tickets.getAll();
@@ -43,7 +39,9 @@ export default class RedeemTicket extends AbstractCommand {
       Array.from(ackTickets.values())
     );
 
-    const signedTicket = signedTickets.get(query);
+    const signedTicket = signedTickets.find((signedTicket) => {
+      return u8aToHex(signedTicket.ticket.challenge) === challange;
+    });
 
     if (!signedTicket) {
       console.log(chalk.yellow(`\nTicket not found.`));

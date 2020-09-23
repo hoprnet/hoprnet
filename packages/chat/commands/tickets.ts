@@ -44,69 +44,74 @@ export default class Tickets extends SendMessageBase {
    * @param query channelId to query tickets for
    */
   public async execute(query: string, settings: GlobalState): Promise<void> {
-    const peerId = await this.checkArgs(query, settings);
-    const pubKey = await convertPubKeyFromPeerId(peerId).then((res) => {
-      return new Public(res.marshal());
-    });
+    try {
+      const { Public, Balance } = this.node.paymentChannels.types;
 
-    const { Public, Balance } = this.node.paymentChannels.types;
+      const peerId = await this.checkArgs(query, settings);
+      const pubKey = await convertPubKeyFromPeerId(peerId).then((res) => {
+        return new Public(res.marshal());
+      });
 
-    const ackTickets = await this.node.paymentChannels.tickets.get(pubKey);
+      const ackTickets = await this.node.paymentChannels.tickets.get(pubKey);
+      console.log("ackTickets", ackTickets.size);
 
-    if (ackTickets.size === 0) {
-      console.log(chalk.yellow(`\nNo tickets found.`));
-      return;
-    }
-
-    const { redeemed, unredeemed } = Array.from(ackTickets.values()).reduce(
-      (result, ackTicket) => {
-        if (ackTicket.redeemed) result.redeemed.push(ackTicket);
-        else result.unredeemed.push(ackTicket);
-
-        return result;
-      },
-      {
-        redeemed: [],
-        unredeemed: [],
-      } as {
-        redeemed: Types.AcknowledgedTicket[];
-        unredeemed: Types.AcknowledgedTicket[];
+      if (ackTickets.size === 0) {
+        console.log(chalk.yellow(`\nNo tickets found.`));
+        return;
       }
-    );
 
-    const redeemedResults = countSignedTickets(
-      await getSignedTickets(redeemed)
-    );
-    const unredeemedResults = countSignedTickets(
-      await getSignedTickets(unredeemed)
-    );
+      const { redeemed, unredeemed } = Array.from(ackTickets.values()).reduce(
+        (result, ackTicket) => {
+          if (ackTicket.redeemed) result.redeemed.push(ackTicket);
+          else result.unredeemed.push(ackTicket);
 
-    console.table(unredeemedResults.tickets);
-    console.log(
-      "Found",
-      unredeemedResults.tickets.length,
-      "unredeemed tickets for peer",
-      chalk.blue(query)
-    );
-    console.log(
-      "You will receive",
-      chalk.yellow(
-        moveDecimalPoint(
-          unredeemedResults.total.toString(),
-          Balance.DECIMALS * -1
-        ).toString()
-      ),
-      "HOPR",
-      "once you redeem them."
-    );
+          return result;
+        },
+        {
+          redeemed: [],
+          unredeemed: [],
+        } as {
+          redeemed: Types.AcknowledgedTicket[];
+          unredeemed: Types.AcknowledgedTicket[];
+        }
+      );
 
-    console.table(redeemedResults.tickets);
-    console.log(
-      "Found",
-      redeemedResults.tickets.length,
-      "redeemed tickets for peer",
-      chalk.blue(query)
-    );
+      const redeemedResults = countSignedTickets(
+        await getSignedTickets(redeemed)
+      );
+      const unredeemedResults = countSignedTickets(
+        await getSignedTickets(unredeemed)
+      );
+
+      console.table(unredeemedResults.tickets);
+      console.log(
+        "Found",
+        unredeemedResults.tickets.length,
+        "unredeemed tickets for peer",
+        chalk.blue(query)
+      );
+      console.log(
+        "You will receive",
+        chalk.yellow(
+          moveDecimalPoint(
+            unredeemedResults.total.toString(),
+            Balance.DECIMALS * -1
+          ).toString()
+        ),
+        "HOPR",
+        "once you redeem them."
+      );
+
+      console.table(redeemedResults.tickets);
+      console.log(
+        "Found",
+        redeemedResults.tickets.length,
+        "redeemed tickets for peer",
+        chalk.blue(query)
+      );
+    } catch (err) {
+      console.log(err);
+    }
   }
 
   public async autocomplete(
