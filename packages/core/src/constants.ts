@@ -5,7 +5,8 @@ export const MAX_HOPS = 3
 export const MARSHALLED_PUBLIC_KEY_SIZE = 37
 export const NAME = 'ipfs' // 'hopr'
 
-export const VERSION = require('../package.json').version.split('.')[0] + '.x.x' // Version on major versions only
+const packageVersion = require('../package.json').version.split('.')
+export const VERSION = packageVersion[0] + '.'+ packageVersion[0] +'.0' // Version on major versions only
 const PROTOCOL_NAME = 'hopr'
 
 export const PROTOCOL_STRING = `/${PROTOCOL_NAME}/msg/${VERSION}`
