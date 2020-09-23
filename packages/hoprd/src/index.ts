@@ -55,7 +55,7 @@ const argv = (
   })
   .option('provider', {
     describe: 'A provider url for the Network you specified',
-    default: "wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36"
+    default: "wss://xdai.poanetwork.dev/wss"
   })
   .option('host', {
     describe: 'The network host to run the HOPR node on.',

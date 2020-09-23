@@ -30,6 +30,7 @@ RUN yarn install --build-from-source --frozen-lockfile
 
 FROM base as build
 COPY src src
+COPY hopr-admin hopr-admin
 COPY tsconfig.json tsconfig.json
 
 RUN yarn build 
@@ -67,7 +68,7 @@ WORKDIR /app
 
 # Server
 COPY --from=build /hoprd/lib/ /app/
-COPY --from=build /hoprd/src/admin.html /app/src/admin.html
+COPY --from=build /hoprd/hopr-admin /app/hopr-admin
 COPY --from=build /hoprd/node_modules /app/node_modules
 COPY --from=build /hoprd/package.json /app/package.json
 
