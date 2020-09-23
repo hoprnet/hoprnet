@@ -1,18 +1,13 @@
 import myHandshake from './handshake'
-
 import pushable from 'it-pushable'
 import pipe from 'it-pipe'
-
 import upgradeToWebRtc from './webrtc'
 import { randomBytes } from 'crypto'
-
 import assert from 'assert'
-
 import { u8aEquals } from '@hoprnet/hopr-utils'
-
 import toIterable = require('stream-to-it')
-
 import Pair = require('it-pair')
+import {once} from 'events'
 
 describe('test webRTC upgrade with custom handshake', function () {
   it('should use the extended stream and use it to feed WebRTC', async function () {
@@ -100,9 +95,13 @@ describe('test webRTC upgrade with custom handshake', function () {
 
     preChannelAlice.destroy()
     preChannelBob.destroy()
+    await once(preChannelAlice, 'close')
+    await once(preChannelBob, 'close')
 
     assert(messageForBobReceived && messageForAliceReceived, `Alice and Bob should have received the right message`)
-
-    await new Promise((resolve) => setTimeout(resolve))
+  })
+  afterAll(async () => {
+    // Wait for sockets to clear
+    await new Promise((resolve) => setTimeout(resolve, 1000))
   })
 })
