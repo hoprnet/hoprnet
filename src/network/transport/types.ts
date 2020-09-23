@@ -2,6 +2,9 @@ import type PeerId from 'peer-id'
 import type PeerInfo from 'peer-info'
 import type Multiaddr from 'multiaddr'
 
+import type { EventEmitter } from 'events'
+import type { Server } from 'net'
+
 export interface DialOptions {
   signal?: AbortSignal
   relay?: PeerId | PeerInfo
@@ -80,3 +83,13 @@ export interface Dialer {
 }
 
 export type ConnHandler = (conn: Connection) => void
+
+export interface Libp2pServer extends Server {
+  __connections: MultiaddrConnection[]
+}
+
+export interface Listener extends EventEmitter {
+  close(): void
+  listen(ma: Multiaddr): Promise<void>
+  getAddrs(): Multiaddr[]
+}

@@ -22,7 +22,7 @@ import Relay from './relay'
 import { randomBytes } from 'crypto'
 
 import { privKeyToPeerId } from '../../utils'
-import { durations, u8aEquals } from '@hoprnet/hopr-utils'
+import { u8aEquals } from '@hoprnet/hopr-utils'
 import { assert } from 'console'
 
 import defer from 'p-defer'
@@ -236,7 +236,6 @@ describe('should create a socket and connect to it', function () {
               return (async function* () {
                 let i = 1
                 for await (const msg of source) {
-                  // console.log(`echoing 0`, msg)
                   if (u8aEquals(msg.slice(), new Uint8Array([1]))) {
                     i++
                   } else if (i == 2 && u8aEquals(msg.slice(), new Uint8Array([2]))) {
@@ -286,13 +285,12 @@ describe('should create a socket and connect to it', function () {
                 return (async function * () {
                   let i = 1
                   for await (const msg of source) {
-                    console.log(`echoing 1st`, msg)
                     if (u8aEquals(msg.slice(), new Uint8Array([3]))) {
                       i++
                     } else if (i == 2 && u8aEquals(msg.slice(), new Uint8Array([4]))) {
                       secondBatchEchoed = true
                     }
-                    
+
                     yield msg
                   }
                 })()
@@ -327,7 +325,6 @@ describe('should create a socket and connect to it', function () {
                     } else if (i == 2 && u8aEquals(msg.slice(), new Uint8Array([6]))) {
                       thirdBatchEchoed = true
                     }
-                    console.log(`echoing 2nd`, msg)
                     yield msg
                   }
                 })()
@@ -379,17 +376,60 @@ describe('should create a socket and connect to it', function () {
 
     await Promise.all([sender.stop(), relay.stop(), counterparty.stop()])
   })
-})
 
-/**
- * Informs each node about the others existence.
- * @param nodes Hopr nodes
- */
-function connectionHelper(nodes: libp2p[]) {
-  for (let i = 0; i < nodes.length; i++) {
-    for (let j = i + 1; j < nodes.length; j++) {
-      nodes[i].peerStore.put(nodes[j].peerInfo)
-      nodes[j].peerStore.put(nodes[i].peerInfo)
+  it(`should connect to unknown nodes using DHT queries`, async function () {
+    let [sender, relay, counterparty] = await Promise.all([
+      generateNode({ id: 0, ipv4: true }),
+      generateNode({ id: 1, ipv4: true }),
+      generateNode({ id: 2, ipv4: true }),
+    ])
+
+    let relayQueried = false
+    let counterpartyQueried = false
+    const findPeer = async (id: PeerId): Promise<PeerInfo> => {
+      if (id.equals(sender.peerInfo.id)) {
+        return Promise.resolve(sender.peerInfo)
+      } else if (id.equals(relay.peerInfo.id)) {
+        relayQueried = true
+        return Promise.resolve(relay.peerInfo)
+      } else if (id.equals(counterparty.peerInfo.id)) {
+        counterpartyQueried = true
+        return Promise.resolve(counterparty.peerInfo)
+      } else {
+        throw Error(`unknonw node`)
+      }
     }
-  }
-}
+
+    sender.relay._dht = { peerRouting: { findPeer } }
+
+    relay.relay._dht = { peerRouting: { findPeer } }
+
+    await sender.relay.establishRelayedConnection(Multiaddr(`/p2p/${counterparty.peerInfo.id.toB58String()}`), [
+      new PeerInfo(relay.peerInfo.id),
+    ])
+
+    assert(relayQueried, `Sender must have queried DHT for relay node`)
+    assert(counterpartyQueried, `Relay node must have queried DHT for counterparty`)
+
+    await Promise.all([sender.stop(), relay.stop(), counterparty.stop()])
+  })
+
+  it('should not use itself as relay node', async function () {
+    let [sender, counterparty] = await Promise.all([
+      generateNode({ id: 0, ipv4: true }),
+      generateNode({ id: 2, ipv4: true }),
+    ])
+
+    let errThrown = false
+
+    try {
+      await sender.relay.establishRelayedConnection(Multiaddr(`/p2p/${counterparty.peerInfo.id.toB58String()}`), [
+        sender.peerInfo,
+      ])
+    } catch (err) {
+      errThrown = true
+    }
+
+    assert(errThrown, `Must throw an error if there is no other opportunity than calling ourself`)
+  })
+})
