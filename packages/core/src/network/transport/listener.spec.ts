@@ -37,13 +37,13 @@ describe('check listening to sockets', function () {
     //     msgReceived: Defer<void>(),
     //   },
     // ]
-    // const stunServers = [await startStunServer(9091, msgReceived[0]), await startStunServer(9092, msgReceived[1])]
+    // const stunServers = [await startStunServer(9391, msgReceived[0]), await startStunServer(9392, msgReceived[1])]
     // for (let i = 0; i < 2; i++) {
     //   listener = new Listener(() => {}, (undefined as unknown) as Upgrader, [
     //     Multiaddr(`/ip4/127.0.0.1/udp/${stunServers[0].address().port}`),
     //     Multiaddr(`/ip4/127.0.0.1/udp/${stunServers[1].address().port}`),
     //   ])
-    //   await listener.listen(Multiaddr(`/ip4/127.0.0.1/tcp/9090/p2p/${peerId.toB58String()}`))
+    //   await listener.listen(Multiaddr(`/ip4/127.0.0.1/tcp/9390/p2p/${peerId.toB58String()}`))
     //   await listener.close()
     // }
     // await Promise.all(msgReceived.map((received) => received.msgReceived.promise))
@@ -67,7 +67,7 @@ describe('check listening to sockets', function () {
 
         const stunServers = []
         for (let i = 0; i < AMOUNT_OF_NODES; i++) {
-          stunServers.push(Multiaddr(`/ip4/127.0.0.1/udp/${9090 + i}`))
+          stunServers.push(Multiaddr(`/ip4/127.0.0.1/udp/${9390 + i}`))
         }
 
         const listener = new Listener(
@@ -80,7 +80,7 @@ describe('check listening to sockets', function () {
           stunServers
         )
 
-        await listener.listen(Multiaddr(`/ip4/127.0.0.1/tcp/${9090 + index}/p2p/${peerId.toB58String()}`))
+        await listener.listen(Multiaddr(`/ip4/127.0.0.1/tcp/${9390 + index}/p2p/${peerId.toB58String()}`))
 
         return listener
       })
@@ -91,7 +91,7 @@ describe('check listening to sockets', function () {
         const socket = net.createConnection(
           {
             host: '127.0.0.1',
-            port: 9090,
+            port: 9390,
           },
           () => {
             socket.write(Buffer.from('test'), () => {
@@ -105,7 +105,7 @@ describe('check listening to sockets', function () {
         const socket = net.createConnection(
           {
             host: '127.0.0.1',
-            port: 9091,
+            port: 9391,
           },
           () => {
             socket.write(Buffer.from('test'), () => {
