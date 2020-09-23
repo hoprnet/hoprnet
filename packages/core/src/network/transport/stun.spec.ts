@@ -57,5 +57,6 @@ describe('test STUN', function () {
      )
     client.close()
     await once(client, 'close')
+    await new Promise(resolve => setTimeout(() => resolve(), 500));
   });
 })
