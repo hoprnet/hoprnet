@@ -1,0 +1,10 @@
+apps:
+    - script: ./server.js
+      name: "server"
+      instances: 1
+      args: "--admin --grpc"
+    - script: ./envoy/envoy.sh
+      name: "proxy"
+      instances: 1
+      env:
+        SERVICE_ADDRESS: 0.0.0.0
