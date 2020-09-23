@@ -25,8 +25,8 @@
     "zip:linux": "yarn clean:zip && rimraf ./hopr-chat/start-hopr-chat.bat ./hopr-chat/start-hopr-chat.command && bestzip hopr-chat-nodebin-linux.zip hopr-chat"
   },
   "engines": {
-    "node": "12.9.1",
-    "yarn": "1.19.2"
+    "node": ">=12.9.1",
+    "yarn": ">=1.19.2"
   },
   "keywords": [],
   "author": "",

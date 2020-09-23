@@ -1,7 +1,7 @@
 name: Integration Task - build everything together and test, publish?
 on:
   push:
-    branches: '*'
+    branches: "*"
   pull_request:
     types: [closed]
 
@@ -12,8 +12,8 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [12.9.1]
-        yarn-version: [1.19.2]
+        node-version: [12]
+        yarn-version: [1]
 
     steps:
       - uses: actions/checkout@v2
@@ -51,8 +51,8 @@ jobs:
           (PACKAGE_VERSION=$(node -p -e "require('./package.json').version"); git tag $PACKAGE_VERSION && git push origin $PACKAGE_VERSION)
           npm whoami && npm publish --access public
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
+          NODE_AUTH_TOKEN:
+            ${{ secrets.NPM_TOKEN }}
 
             #  publish_minor:
             # name: Publish Minor Version Bump in Master (NPM, Github)
@@ -93,7 +93,7 @@ jobs:
 #      - name: Install node modules
 #        if: steps.cache-modules.outputs.cache-hit != 'true'
 #        run: |
-#          yarn policies set-version 1.19.2 
+#          yarn policies set-version 1.19.2
 #          yarn install --frozen-lockfile
 #      - name: Build library
 #        run: |
