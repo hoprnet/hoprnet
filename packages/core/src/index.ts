@@ -10,7 +10,7 @@ import SECIO = require('libp2p-secio')
 import TCP from './network/transport'
 
 import { Packet } from './messages/packet'
-import { PACKET_SIZE, MAX_HOPS } from './constants'
+import { PACKET_SIZE, MAX_HOPS, VERSION } from './constants'
 
 import { Network } from './network'
 
@@ -146,6 +146,10 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
 
     this.interactions = new Interactions(this)
     this.network = new Network(this, options)
+
+    verbose('# STARTED NODE')
+    verbose('ID', this.peerInfo.id.toB58String())
+    verbose('Protocol version', VERSION)
     this._debug = options.debug
   }
 
