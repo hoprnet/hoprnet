@@ -36,11 +36,16 @@ jobs:
         run: |
           node_modules/.bin/lerna run test --stream
 
-      - name: Publish minor version
-        if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true && !contains(github.event.pull_request.labels.*.name, 'Major Version') && !contains(github.event.pull_request.labels.*.name, 'Patch Version')
+      - name: Publish prerelease version
+        if: github.event_name == 'pull_request' && \
+            github.event.action == 'closed' && \
+            github.event.pull_request.merged == true && \
+            !contains(github.event.pull_request.labels.*.name, 'Major Version') && \
+            !contains(github.event.pull_request.labels.*.name, 'Minor Version') && \
+            !contains(github.event.pull_request.labels.*.name, 'Patch Version')
         run: | # TODO: Assert master branch,
           git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Versioning robot"
-          lerna version minor
+          lerna version prerelease --preid "alpha"
           git push origin master
           (PACKAGE_VERSION=$(node -p -e "require('./package.json').version"); git tag $PACKAGE_VERSION && git push origin $PACKAGE_VERSION)
           npm whoami && npm publish --access public
