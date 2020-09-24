@@ -30,7 +30,9 @@ import {
 import { pubKeyToPeerId } from '../../utils'
 import { u8aEquals } from '@hoprnet/hopr-utils'
 
-import type { Connection, DialOptions, Registrar, Dialer, Handler, Stream, PeerRouting } from './types'
+import { RelayContext } from './relayContext'
+
+import type { DialOptions, Registrar, Dialer, Handler, Stream, PeerRouting } from './types'
 
 type ConnectionContext = {
   deferredPromise: defer.DeferredPromise<AsyncIterable<Uint8Array>>
@@ -52,6 +54,8 @@ class Relay {
 
   private connHandler: (conn: Handler & { counterparty: PeerId }) => void | undefined
 
+  private _streams: Map<string, Map<string, RelayContext>>
+
   constructor(libp2p: libp2p, _connHandler?: (conn: Handler) => void) {
     this._dialer = libp2p.dialer
     this._registrar = libp2p.registrar
@@ -66,6 +70,8 @@ class Relay {
     this._handle(RELAY_REGISTER, this.handleRelay.bind(this))
     this._handle(DELIVERY_REGISTER, this.handleRelayConnection.bind(this))
   }
+
+  async handleReRegister() {}
 
   async handleRelayConnection(conn: Handler): Promise<void> {
     let shaker = handshake(conn.stream)
@@ -111,14 +117,11 @@ class Relay {
     const potentialRelays = relays.filter((relay: PeerInfo) => !relay.id.equals(this._peerInfo.id))
 
     if (potentialRelays.length == 0) {
-      throw Error(`Filtered list of relays and there is no one left to establish a connection`)
+      throw Error(`Filtered list of relays and there is no one left to establish a connection. `)
     }
 
-    let relayConnection: Connection
-    let relayIndex: number
-
     for (let i = 0; i < potentialRelays.length; i++) {
-      relayConnection = this._registrar.getConnection(potentialRelays[i])
+      let relayConnection = this._registrar.getConnection(potentialRelays[i])
 
       if (relayConnection == null) {
         try {
@@ -153,14 +156,6 @@ class Relay {
       }
 
       if (relayConnection == null) {
-        if (i == potentialRelays.length) {
-          throw Error(
-            `Unable to establish a connection to any known relay node. Tried ${chalk.yellow(
-              relays.map((relay: PeerInfo) => relay.id.toB58String()).join(`, `)
-            )}`
-          )
-        }
-
         continue
       }
 
@@ -186,7 +181,7 @@ class Relay {
       if (answer == null || !u8aEquals(answer, OK)) {
         throw Error(
           `Could not establish relayed connection to ${chalk.blue(destination.toB58String())} over relay ${relays[
-            relayIndex
+            i
           ].id.toB58String()}. Answer was: <${new TextDecoder().decode(answer)}>`
         )
       }
@@ -196,6 +191,12 @@ class Relay {
         connection: relayConnection,
       }
     }
+
+    throw Error(
+      `Unable to establish a connection to any known relay node. Tried ${chalk.yellow(
+        potentialRelays.map((potentialRelay: PeerInfo) => potentialRelay.id.toB58String()).join(`, `)
+      )}`
+    )
   }
 
   async handleRelay({ stream, connection }: Handler) {
@@ -233,15 +234,16 @@ class Relay {
     }
 
     // @TODO
-    if (connection?.remotePeer != null && counterparty.isEqual(connection.remotePeer)) {
+    if (connection?.remotePeer != null && counterparty.equals(connection.remotePeer)) {
       shaker.write(FAIL)
       shaker.rest()
       return
     }
 
-    const deliveryStream = await this.establishForwarding(counterparty)
+    const deliveryStream = (await this.establishForwarding(counterparty)) as Stream
 
-    if (!deliveryStream) {
+    if (deliveryStream == null) {
+      // @TODO end deliveryStream
       shaker.write(FAIL_COULD_NOT_REACH_COUNTERPARTY)
 
       shaker.rest()
@@ -253,72 +255,133 @@ class Relay {
 
     shaker.rest()
 
-    const toSender = shaker.stream
+    const toSender = shaker.stream as Stream
     const toCounterparty = deliveryStream
 
-    const counterpartyConn: ConnectionContext = {
-      deferredPromise: defer<AsyncIterable<Uint8Array>>(),
-      sinkDefer: undefined,
-      aborted: false,
-      cache: undefined,
-      source: (async function* () {
-        yield* toCounterparty.source
+    this.updateContext(
+      this._peerInfo.id.toB58String(),
+      counterparty.toB58String(),
+      deliveryStream.source as any,
+      toSender.sink
+    )
 
-        while (true) {
-          let source = await counterpartyConn.deferredPromise.promise
+    this.updateContext(
+      counterparty.toB58String(),
+      this._peerInfo.id.toB58String(),
+      toSender.source as any,
+      deliveryStream.sink
+    )
 
-          counterpartyConn.deferredPromise = defer<AsyncIterable<Uint8Array>>()
+    // let foundCounterparty = this._streams.get(counterparty.toB58String())
 
-          yield* source
-        }
-      })(),
-      id: counterparty,
+    // if (foundCounterparty == null) {
+    //   foundCounterparty = new Map<string, RelayContext>()
+    // }
+
+    // const ctxCounterparty = new RelayContext(toCounterparty.source as any)
+
+    // foundCounterparty.set(this._peerInfo.id.toB58String(), ctxCounterparty)
+
+    // this._streams.set(counterparty.toB58String(), foundCounterparty)
+
+    // let foundSender = this._streams.get(this._peerInfo.id.toB58String())
+
+    // if (foundSender == null) {
+    //   foundSender = new Map<string, RelayContext>()
+    // }
+
+    // const ctxCounterparty = new RelayContext(deliveryStream.source as any)
+
+    // foundSender.set(counterparty.toB58String(), ctxCounterparty)
+
+    // this._streams.set(this._peerInfo.id.toB58String(), foundSender)
+
+    // toSender.sink(ctxCounterparty.source)
+
+    // const counterpartyConn: ConnectionContext = {
+    //   deferredPromise: defer<AsyncIterable<Uint8Array>>(),
+    //   sinkDefer: undefined,
+    //   aborted: false,
+    //   cache: undefined,
+    //   source: (async function* () {
+    //     yield* toCounterparty.source
+
+    //     while (true) {
+    //       let source = await counterpartyConn.deferredPromise.promise
+
+    //       counterpartyConn.deferredPromise = defer<AsyncIterable<Uint8Array>>()
+
+    //       yield* source
+    //     }
+    //   })(),
+    //   id: counterparty,
+    // }
+
+    // const initiatorConn: ConnectionContext = {
+    //   deferredPromise: defer<AsyncIterable<Uint8Array>>(),
+    //   sinkDefer: undefined,
+    //   aborted: false,
+    //   cache: undefined,
+    //   source: (async function* () {
+    //     yield* toSender.source
+
+    //     while (true) {
+    //       let source = await initiatorConn.deferredPromise.promise
+
+    //       initiatorConn.deferredPromise = defer<AsyncIterable<Uint8Array>>()
+
+    //       yield* source
+    //     }
+    //   })(),
+    //   id: connection?.remotePeer,
+    // }
+
+    // this.on('peer:connect', async (peer: PeerInfo) => {
+    //   if (peer.id.equals(counterparty)) {
+    //     log(
+    //       chalk.yellow(
+    //         `overwriting counterparty connection. sender: ${chalk.blue(
+    //           initiatorConn.id.toB58String()
+    //         )} counterparty: ${chalk.blue(counterpartyConn.id.toB58String())}`
+    //       )
+    //     )
+    //     await this.updateConnection(counterpartyConn, initiatorConn, true)
+    //   } else if (peer.id.equals(connection?.remotePeer)) {
+    //     log(
+    //       chalk.yellow(
+    //         `overwriting sender connection. sender: ${chalk.blue(
+    //           initiatorConn.id.toB58String()
+    //         )} counterparty: ${chalk.blue(counterpartyConn.id.toB58String())}`
+    //       )
+    //     )
+    //     await this.updateConnection(initiatorConn, counterpartyConn, false)
+    //   }
+    // })
+
+    // toCounterparty.sink(this.forward(counterpartyConn, initiatorConn.source))
+
+    // toSender.sink(this.forward(initiatorConn, counterpartyConn.source))
+  }
+
+  async updateContext(
+    to: string,
+    from: string,
+    newSource: AsyncGenerator<Uint8Array>,
+    sink: (stream: AsyncIterable<Uint8Array>) => Promise<void>
+  ) {
+    let found = this._streams.get(to)
+
+    if (found == null) {
+      found = new Map<string, RelayContext>()
     }
 
-    const initiatorConn: ConnectionContext = {
-      deferredPromise: defer<AsyncIterable<Uint8Array>>(),
-      sinkDefer: undefined,
-      aborted: false,
-      cache: undefined,
-      source: (async function* () {
-        yield* toSender.source
+    const ctx = new RelayContext(newSource)
 
-        while (true) {
-          let source = await initiatorConn.deferredPromise.promise
+    found.set(from, ctx)
 
-          initiatorConn.deferredPromise = defer<AsyncIterable<Uint8Array>>()
+    this._streams.set(this._peerInfo.id.toB58String(), found)
 
-          yield* source
-        }
-      })(),
-      id: connection?.remotePeer,
-    }
-
-    this.on('peer:connect', async (peer: PeerInfo) => {
-      if (peer.id.isEqual(counterparty)) {
-        log(
-          chalk.yellow(
-            `overwriting counterparty connection. sender: ${chalk.blue(
-              initiatorConn.id.toB58String()
-            )} counterparty: ${chalk.blue(counterpartyConn.id.toB58String())}`
-          )
-        )
-        await this.updateConnection(counterpartyConn, initiatorConn, true)
-      } else if (peer.id.isEqual(connection?.remotePeer)) {
-        log(
-          chalk.yellow(
-            `overwriting sender connection. sender: ${chalk.blue(
-              initiatorConn.id.toB58String()
-            )} counterparty: ${chalk.blue(counterpartyConn.id.toB58String())}`
-          )
-        )
-        await this.updateConnection(initiatorConn, counterpartyConn, false)
-      }
-    })
-
-    toCounterparty.sink(this.forward(counterpartyConn, initiatorConn.source))
-
-    toSender.sink(this.forward(initiatorConn, counterpartyConn.source))
+    sink(ctx.source)
   }
 
   async updateConnection(reconnected: ConnectionContext, existing: ConnectionContext, senderToCounterparty: boolean) {
