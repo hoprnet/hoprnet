@@ -20,6 +20,7 @@ import { RELAY_VERIFICATION_CYCLE_IN_MS } from './constants'
 import { BotResponses, NodeStateResponses } from './responses'
 import { HoprNode } from './coverbot'
 import debug from 'debug'
+import Core from '../../lib/hopr/core'
 
 
 const log = debug('hopr-chatbot:coverbot')
@@ -30,6 +31,7 @@ const scoreDbRef = db.ref(`/${HOPR_ENVIRONMENT}/score`)
 const stateDbRef = db.ref(`/${HOPR_ENVIRONMENT}/state`)
 
 export class Coverbot implements Bot {
+  node: Core
   botName: string
   address: string
   timestamp: Date
@@ -47,7 +49,8 @@ export class Coverbot implements Bot {
   network: Networks
   loadedDb: boolean
 
-  constructor(address: string, timestamp: Date, twitterTimestamp: Date) {
+  constructor(node: Core, address: string, timestamp: Date, twitterTimestamp: Date) {
+    this.node = node
     this.address = address
     this.timestamp = timestamp
     this.status = new Map<string, NodeStates>()
@@ -57,8 +60,8 @@ export class Coverbot implements Bot {
     this.loadedDb = false
 
     log(`- constructor | ${this.botName} has been added`)
-    log(`- constructor | ⚡️ Network: ${COVERBOT_CHAIN_PROVIDER}`)
-    log(`- constructor | ⚡️ Environment: ${HOPR_ENVIRONMENT}`)
+    log(`- constructor | ⛓ EVM Network: ${COVERBOT_CHAIN_PROVIDER}`)
+    log(`- constructor | 📦 DB Environment: ${HOPR_ENVIRONMENT}`)
     log(`- constructor | 💸 Threshold: ${COVERBOT_XDAI_THRESHOLD}`)
     log(`- constructor | 🐛 Debug Mode: ${COVERBOT_DEBUG_MODE}`)
     log(`- constructor | 👀 Verification Cycle: ${COVERBOT_VERIFICATION_CYCLE_IN_MS}`)
@@ -129,8 +132,7 @@ export class Coverbot implements Bot {
       this.ethereumAddress = await this._getEthereumAddressFromHOPRAddress(this.address)
     }
 
-    // @TODO Replace for actual connected nodes.
-    const connectedNodes = -1
+    const connectedNodes = this.node.listConnectedPeers()
 
     const state = {
       connectedNodes,
@@ -144,7 +146,7 @@ export class Coverbot implements Bot {
       hoprChannelContract: HOPR_CHANNELS[this.network],
       address: this.address,
       balance: fromWei(await this.xdaiWeb3.eth.getBalance(this.ethereumAddress)),
-      available: -1, //@TODO Replace for actual balance - fromWei(await getHoprBalance()),
+      available: fromWei(await this.node.getHoprBalance()),
       locked: 0, //@TODO: Retrieve balances from open channels.
       connected: Array.from(this.verifiedHoprNodes.values()),
       refreshed: new Date().toISOString(),
@@ -159,17 +161,19 @@ export class Coverbot implements Bot {
     })
   }
 
-  protected async _sendMessageOpeningChannels(recipient, message, intermediatePeers) {
-    //@TODO Replace for actually sending a message
-    // return sendMessage(
-    //   recipient,
-    //   {
-    //     from: this.address,
-    //     text: message,
-    //   },
-    //   false,
-    //   intermediatePeers,
-    // )
+  protected _sendMessageFromBot(recipient, message) {
+    return this.node.send({
+        peerId: recipient,
+        payload: message
+    })
+  }
+
+  protected async _sendMessageOpeningChannels(recipient, message, intermediatePeerIds) {
+    return this.node.send({
+        peerId: recipient,
+        payload: message,
+        intermediatePeerIds
+    })
   }
 
   protected async _verificationCycle() {
@@ -206,11 +210,10 @@ export class Coverbot implements Bot {
         await this.dumpData()
       } else {
         this._sendMessageFromBot(_hoprNodeAddress, BotResponses[BotCommands.verify])
-        // @TODO Actually catch error
-        // .catch(err => {
-        //   console.log(`Trying to reach ${_hoprNodeAddress} failed.`)
-        //   throw new Error(err)
-        // })
+        .catch(err => {
+          console.log(`Trying to reach ${_hoprNodeAddress} failed.`)
+          throw new Error(err)
+        })
         /*
          * We switched from “send and forget” to “send and listen”
          * 1. We inmediately send a message to user, telling them we find them online.
@@ -265,14 +268,6 @@ export class Coverbot implements Bot {
       // this.verifiedHoprNodes.delete(hoprNode.id)
       // this.dumpData()
     }
-  }
-
-  protected _sendMessageFromBot(recipient, message) {
-    // @TODO Actually send message.
-    // return sendMessage(recipient, {
-    //   from: this.address,
-    //   text: message,
-    // })
   }
 
   protected async _verifyBalance(message: IMessage): Promise<[number, NodeStates]> {

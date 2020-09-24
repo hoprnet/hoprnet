@@ -71,14 +71,24 @@ export default class Core {
   }
 
   @Core.mustBeStarted()
+  async getHoprBalance(): Promise<string> {
+      return (await this.node.paymentChannels.account.balance).toString()
+  }
+
+  @Core.mustBeStarted()
+  listConnectedPeers(): number {
+      return Array.from(this.node.peerStore.peers.values()).length
+  }
+
+  @Core.mustBeStarted()
   async send({
     peerId,
     payload,
-    intermediatePeerIds,
+    intermediatePeerIds = [],
   }: {
     peerId: string
     payload: Uint8Array
-    intermediatePeerIds: string[]
+    intermediatePeerIds?: string[]
   }): Promise<{
     intermediatePeerIds: string[]
   }> {

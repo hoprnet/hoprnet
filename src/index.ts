@@ -37,7 +37,7 @@ const main = async () => {
       break
     case 'coverbot':
       const { Coverbot } = await import('./bots/coverbot')
-      bot = new Coverbot(hoprAddress, timestamp, twitterTimestamp)
+      bot = new Coverbot(node, hoprAddress, timestamp, twitterTimestamp)
   }
   log(`- main | Bot Created: ${bot.botName}`)
   log(`- main | Setting up Bot on Node`)
