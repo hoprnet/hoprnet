@@ -31,9 +31,16 @@ export class AdminServer {
   }
 
   async setup(){
+    let adminPath = path.resolve(__dirname, '../hopr-admin/') 
+    if (!fs.existsSync(adminPath)) {
+      // In Docker
+      adminPath = path.resolve(__dirname, './hopr-admin')
+    }
+    debugLog('using', adminPath)
+
     this.app = next({ 
       dev: true,
-      dir: path.resolve(__dirname, '../hopr-admin/'), 
+      dir: adminPath, 
       conf: {
         devIndicators: {
           autoPrerender: false
