@@ -92,6 +92,7 @@ class TicketStatic {
       )
 
       await transaction.send()
+      ticket.redeemed = true
       this.coreConnector.account.updateLocalState(ticket.preImage)
 
       this.coreConnector.log('Successfully submitted ticket', ticketChallenge)
