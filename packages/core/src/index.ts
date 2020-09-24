@@ -412,7 +412,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
    * Get all acknowledged tickets
    * @returns an array of all acknowledged tickets
    */
-  async getAcknowledgedTickets(): Promise<
+  public async getAcknowledgedTickets(): Promise<
     {
       ackTicket: Types.AcknowledgedTicket
       index: Uint8Array
@@ -449,7 +449,63 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
     })
   }
 
-  async updateAcknowledgedTicket(ackTicket: Types.AcknowledgedTicket, index: Uint8Array): Promise<void> {
+  /**
+   * Update Acknowledged Ticket in database
+   * @param ackTicket Uint8Array
+   * @param index Uint8Array
+   */
+  public async updateAcknowledgedTicket(ackTicket: Types.AcknowledgedTicket, index: Uint8Array): Promise<void> {
     await this.db.put(Buffer.from(this.dbKeys.AcknowledgedTickets(index)), Buffer.from(ackTicket))
+  }
+
+  /**
+   * Delete Acknowledged Ticket in database
+   * @param index Uint8Array
+   */
+  public async deleteAcknowledgedTicket(index: Uint8Array): Promise<void> {
+    await this.db.del(Buffer.from(this.dbKeys.AcknowledgedTickets(index)))
+  }
+
+  /**
+   * Submit Acknowledged Ticket and update database
+   * @param ackTicket Uint8Array
+   * @param index Uint8Array
+   */
+  public async submitAcknowledgedTicket(
+    ackTicket: Types.AcknowledgedTicket,
+    index: Uint8Array
+  ): Promise<
+    | {
+        status: 'SUCCESS'
+        receipt: string
+      }
+    | {
+        status: 'FAILURE'
+        message: string
+      }
+    | {
+        status: 'ERROR'
+        error: Error | string
+      }
+  > {
+    try {
+      const result = await this.paymentChannels.channel.tickets.submit(ackTicket, index)
+
+      if (result.status === 'SUCCESS') {
+        ackTicket.redeemed = true
+        await this.updateAcknowledgedTicket(ackTicket, index)
+      } else if (result.status === 'FAILURE') {
+        await this.deleteAcknowledgedTicket(index)
+      } else if (result.status === 'ERROR') {
+        await this.deleteAcknowledgedTicket(index)
+      }
+
+      return result
+    } catch (err) {
+      return {
+        status: 'ERROR',
+        error: err,
+      }
+    }
   }
 }

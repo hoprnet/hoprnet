@@ -19,11 +19,8 @@ export default class RedeemTickets extends AbstractCommand {
   /**
    * @param query a ticket challange
    */
-  async execute(query?: string): Promise<string | void> {
+  async execute(): Promise<string | void> {
     try {
-      const amount = Number(query ?? 1);
-      if (isNaN(amount)) throw Error(`Amount passed is invalid ${amount}.`);
-
       // get only unredeemed tickets
       const results = await this.node
         .getAcknowledgedTickets()
@@ -37,14 +34,13 @@ export default class RedeemTickets extends AbstractCommand {
 
       let redeemedTickets = 0;
       for (const { ackTicket, index } of results) {
-        try {
-          // @TODO: handle when a ticketRedeemption fails due to network, etc
-          ackTicket.redeemed = true;
-          await this.node.updateAcknowledgedTicket(ackTicket, index);
-          await this.node.paymentChannels.channel.tickets.submit(ackTicket);
+        const result = await this.node.submitAcknowledgedTicket(
+          ackTicket,
+          index
+        );
+
+        if (result.status === "SUCCESS") {
           redeemedTickets++;
-        } catch {
-          // @TODO: handle this error
         }
       }
 
