@@ -72,7 +72,7 @@ class TCP {
       throw new Error('Transport module needs access to libp2p.')
     }
 
-    if (bootstrapServers !== undefined && bootstrapServers.length > 0) {
+    if (bootstrapServers?.length > 0) {
       this.relays = bootstrapServers.filter(
         (peerInfo: PeerInfo) => peerInfo !== undefined && !libp2p.peerInfo.id.isEqual(peerInfo.id)
       )
