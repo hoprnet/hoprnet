@@ -2,11 +2,7 @@
   "name": "@hoprnet/hopr-utils",
   "homepage": "https://hoprnet.org",
   "description": "HOPR-based utilities to process multiple data structures",
-<<<<<<< HEAD
-  "version": "1.17.0",
-=======
   "version": "1.17.0-alpha.10",
->>>>>>> dce308f46b36a0eb4de244e809a7a0aa83a301df
   "repository": "git@github.com:hoprnet/hopr-utils.git",
   "license": "LGPL-3.0-only",
   "types": "lib/index.d.ts",
