@@ -111,78 +111,90 @@ class Relay {
     const potentialRelays = relays.filter((relay: PeerInfo) => !relay.id.equals(this._peerInfo.id))
 
     if (potentialRelays.length == 0) {
-      throw Error(`Could not establish relayed connection without any valid relays`)
+      throw Error(`Filtered list of relays and there is no one left to establish a connection`)
     }
 
-    let [relayConnection, index] = await Promise.race(
-      potentialRelays.map(
-        (relay: PeerInfo, index: number): Promise<[Connection, number]> => {
-          return new Promise<[Connection, number]>(async (resolve) => {
-            let relayConnection = this._registrar.getConnection(relay)
+    let relayConnection: Connection
+    let relayIndex: number
 
-            if (!relayConnection) {
-              relayConnection = await this._dialer
-                .connectToPeer(relay, { signal: options?.signal })
-                .catch(async (err) => {
-                  if (this._dht != null && (options == null || options.signal == null || !options.signal.aborted)) {
-                    relay = await this._dht.peerRouting.findPeer(relay.id)
+    for (let i = 0; i < potentialRelays.length; i++) {
+      relayConnection = this._registrar.getConnection(potentialRelays[i])
 
-                    return this._dialer.connectToPeer(relay, { signal: options?.signal })
-                  }
+      if (relayConnection == null) {
+        try {
+          relayConnection = await this._dialer.connectToPeer(potentialRelays[i], { signal: options?.signal })
+        } catch (err) {
+          log(`Could not reach potential relay ${potentialRelays[i].id.toB58String()}. Error was: ${err}`)
+          if (this._dht != null && (options == null || options.signal == null || !options.signal.aborted)) {
+            let newAddress = await this._dht.peerRouting.findPeer(potentialRelays[i].id)
 
-                  throw Error(`Could not reach relay node. Error was ${err}`)
-                })
+            try {
+              relayConnection = await this._dialer.connectToPeer(newAddress, { signal: options?.signal })
+            } catch (err) {
+              log(
+                `Dialling potential relay ${potentialRelays[
+                  i
+                ].id.toB58String()} after querying DHT failed. Error was ${err}`
+              )
             }
-
-            resolve([relayConnection, index])
-          })
+          }
         }
-      )
-    )
 
-    if (!relayConnection) {
-      throw Error(
-        `Unable to establish a connection to any known relay node. Tried ${chalk.yellow(
-          relays.map((relay: PeerInfo) => relay.id.toB58String()).join(`, `)
-        )}`
-      )
-    }
+        if (options?.signal?.aborted) {
+          if (relayConnection != null) {
+            try {
+              await relayConnection.close()
+            } catch (err) {
+              error(err)
+            }
+          }
+          throw new AbortError()
+        }
+      }
 
-    if (options?.signal?.aborted) {
+      if (relayConnection == null) {
+        if (i == potentialRelays.length) {
+          throw Error(
+            `Unable to establish a connection to any known relay node. Tried ${chalk.yellow(
+              relays.map((relay: PeerInfo) => relay.id.toB58String()).join(`, `)
+            )}`
+          )
+        }
+
+        continue
+      }
+
+      let shaker: any
       try {
-        await relayConnection.close()
+        shaker = handshake((await relayConnection.newStream([RELAY_REGISTER])).stream)
+      } catch (err) {
+        error(`failed to establish stream with ${potentialRelays[i].id.toB58String()}. Error was: ${err}`)
+        continue
+      }
+
+      shaker.write(destination.pubKey.marshal())
+
+      let answer: Buffer | undefined
+      try {
+        answer = (await shaker.read())?.slice()
       } catch (err) {
         error(err)
       }
-      throw new AbortError()
-    }
 
-    let { stream } = await relayConnection.newStream([RELAY_REGISTER])
+      shaker.rest()
 
-    const shaker = handshake(stream)
+      if (answer == null || !u8aEquals(answer, OK)) {
+        throw Error(
+          `Could not establish relayed connection to ${chalk.blue(destination.toB58String())} over relay ${relays[
+            relayIndex
+          ].id.toB58String()}. Answer was: <${new TextDecoder().decode(answer)}>`
+        )
+      }
 
-    shaker.write(destination.pubKey.marshal())
-
-    let answer: Buffer | undefined
-    try {
-      answer = (await shaker.read())?.slice()
-    } catch (err) {
-      error(err)
-    }
-
-    shaker.rest()
-
-    if (answer == null || !u8aEquals(answer, OK)) {
-      throw Error(
-        `Could not establish relayed connection to ${chalk.blue(destination.toB58String())} over relay ${relays[
-          index
-        ].id.toB58String()}. Answer was: <${new TextDecoder().decode(answer)}>`
-      )
-    }
-
-    return {
-      stream: shaker.stream,
-      connection: relayConnection,
+      return {
+        stream: shaker.stream,
+        connection: relayConnection,
+      }
     }
   }
 
