@@ -160,8 +160,6 @@ class Channel implements IChannel {
   }
 
   async initiateSettlement(): Promise<void> {
-    // @TODO check out whether we can cache this.channel is some way
-    let channel = await this.channel
     const status = await this.status
 
     try {
@@ -174,34 +172,6 @@ class Channel implements IChannel {
           (
             await this.coreConnector.signTransaction(
               this.coreConnector.hoprChannels.methods.initiateChannelClosure(
-                u8aToHex(await this.coreConnector.utils.pubKeyToAccountId(this.counterparty))
-              ),
-              {
-                from: (await this.coreConnector.account.address).toHex(),
-                to: this.coreConnector.hoprChannels.options.address,
-                nonce: await this.coreConnector.account.nonce,
-              }
-            )
-          ).send()
-        )
-
-        channel = await this.coreConnector.channel.getOnChainState(await this.channelId)
-
-        await waitFor({
-          web3: this.coreConnector.web3,
-          network: this.coreConnector.network,
-          getCurrentBlock: async () => {
-            return this.coreConnector.web3.eth.getBlockNumber().then((blockNumber) => {
-              return this.coreConnector.web3.eth.getBlock(blockNumber)
-            })
-          },
-          timestamp: Number(channel.closureTime) * 1e3,
-        })
-
-        await waitForConfirmation(
-          (
-            await this.coreConnector.signTransaction(
-              this.coreConnector.hoprChannels.methods.claimChannelClosure(
                 u8aToHex(await this.coreConnector.utils.pubKeyToAccountId(this.counterparty))
               ),
               {
@@ -227,11 +197,9 @@ class Channel implements IChannel {
             )
           ).send()
         )
-      } else {
-        await this.onceClosed()
-      }
 
-      await this.onClose()
+        await this.onClose()
+      }
     } catch (error) {
       throw error
     }
