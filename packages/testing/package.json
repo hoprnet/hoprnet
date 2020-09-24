@@ -1,6 +1,10 @@
 {
   "name": "@hoprnet/hopr-testing",
+<<<<<<< HEAD
   "version": "1.17.0",
+=======
+  "version": "1.17.0-alpha.10",
+>>>>>>> dce308f46b36a0eb4de244e809a7a0aa83a301df
   "repository": "https://github.com/hoprnet/hopr-testing.git",
   "homepage": "https://hoprnet.org/",
   "license": "GPL-3.0-only",
