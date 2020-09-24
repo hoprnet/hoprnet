@@ -6,6 +6,7 @@ apps:
       env:
         HOPR_BOOTSTRAP_ADDRESS: _dnsaddr.bootstrap.monterosa.develop.hoprnet.org
         ETHEREUM_PROVIDER: wss://xdai.poanetwork.dev/wss
+        NEXT_TELEMETRY_DISABLED: 1
     - script: ./envoy/envoy.sh
       name: "proxy"
       instances: 1
