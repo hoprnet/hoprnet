@@ -43,3 +43,8 @@
   height: 15px;
   flex: 0 0 auto;
 }
+
+.logId {
+  cursor: pointer;
+  font-weight: bold;
+}
