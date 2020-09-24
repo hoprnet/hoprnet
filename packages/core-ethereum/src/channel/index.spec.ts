@@ -177,7 +177,7 @@ describe('test Channel class', function () {
 
     const hashedSecretBefore = await counterpartysChannel.coreConnector.account.onChainSecret
 
-    await counterpartysCoreConnector.channel.tickets.submit(firstAckedTicket)
+    await counterpartysCoreConnector.channel.tickets.submit(firstAckedTicket, new Uint8Array())
 
     const hashedSecretAfter = await counterpartysChannel.coreConnector.account.onChainSecret
 
@@ -185,7 +185,10 @@ describe('test Channel class', function () {
 
     let errThrown = false
     try {
-      await counterpartysCoreConnector.channel.tickets.submit(firstAckedTicket)
+      const result = await counterpartysCoreConnector.channel.tickets.submit(firstAckedTicket, new Uint8Array())
+      if (result.status === 'ERROR' || result.status === 'FAILURE') {
+        errThrown = true
+      }
     } catch (err) {
       errThrown = true
     }
@@ -212,7 +215,7 @@ describe('test Channel class', function () {
 
       if (await counterpartysCoreConnector.account.reservePreImageIfIsWinning(ackedTicket)) {
         console.log(`ticket submitted`)
-        await counterpartysCoreConnector.channel.tickets.submit(ackedTicket)
+        await counterpartysCoreConnector.channel.tickets.submit(ackedTicket, new Uint8Array())
 
         assert(ackedTicket.redeemed, 'ticket should get marked as redeemed')
       }
