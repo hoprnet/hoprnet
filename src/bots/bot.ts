@@ -11,6 +11,7 @@ export interface Bot {
   address: string
   timestamp: Date
   twitterTimestamp: Date
+  automaticResponse?: boolean
   handleMessage(message: IMessage)
 }
 
@@ -22,7 +23,7 @@ const listen = async (bot: Bot, node: Core) => {
     const parsedMessage = message.toJson()
     const response = bot.handleMessage.call(bot, parsedMessage)
     log('- listen:message | Bot Response', response)
-    node.send({
+    bot.automaticResponse && node.send({
       peerId: parsedMessage.from,
       payload: Message.fromJson({ from: bot.address, text: ` ${response}` }).toU8a(),
       intermediatePeerIds: [],

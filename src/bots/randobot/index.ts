@@ -7,12 +7,14 @@ import debug from 'debug'
 const log = debug('hopr-chatbot:randobot')
 
 export class Randombot implements Bot {
+  automaticResponse: boolean
   botName: string
   address: string
   timestamp: Date
   twitterTimestamp: Date
 
   constructor(address: string, timestamp: Date, twitterTimestamp: Date) {
+    this.automaticResponse = true
     this.address = address
     this.timestamp = timestamp
     this.twitterTimestamp = twitterTimestamp
