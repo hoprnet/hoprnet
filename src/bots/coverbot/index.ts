@@ -13,6 +13,7 @@ import {
   COVERBOT_VERIFICATION_CYCLE_IN_MS,
   COVERBOT_XDAI_THRESHOLD,
   HOPR_ENVIRONMENT,
+  COVERBOT_DEBUG_HOPR_ADDRESS,
 } from '../../utils/env'
 import db from './db'
 import { BotCommands, NodeStates, ScoreRewards } from './state'
@@ -161,18 +162,14 @@ export class Coverbot implements Bot {
     })
   }
 
-  protected _sendMessageFromBot(recipient, message) {
-    return this.node.send({
-        peerId: recipient,
-        payload: message
-    })
-  }
-
-  protected async _sendMessageOpeningChannels(recipient, message, intermediatePeerIds) {
+  protected _sendMessageFromBot(recipient, message, intermediatePeerIds = [], includeRecipient = true) {
+    log(`- sendMessageFromBot | Sending ${intermediatePeerIds.length} hop message to ${recipient}`)
+    log(`- sendMessageFromBot | Message: ${message}`)
     return this.node.send({
         peerId: recipient,
         payload: message,
-        intermediatePeerIds
+        intermediatePeerIds,
+        includeRecipient
     })
   }
 
@@ -202,7 +199,7 @@ export class Coverbot implements Bot {
     try {
       const tweet = new TweetMessage(hoprNode.tweetUrl)
       await tweet.fetch({ mock: COVERBOT_DEBUG_MODE })
-      const _hoprNodeAddress = tweet.getHOPRNode()
+      const _hoprNodeAddress = tweet.getHOPRNode({ mock: COVERBOT_DEBUG_MODE, hoprNode: COVERBOT_DEBUG_HOPR_ADDRESS })
 
       if (_hoprNodeAddress.length === 0) {
         // We got no HOPR Node here. Remove and update.
@@ -230,7 +227,7 @@ export class Coverbot implements Bot {
         this._sendMessageFromBot(_hoprNodeAddress, NodeStateResponses[NodeStates.onlineNode])
 
         // 2.
-        this._sendMessageOpeningChannels(this.address, ` Packet relayed by ${_hoprNodeAddress}`, [_hoprNodeAddress])
+        this._sendMessageFromBot(this.address, ` Relaying package to ${_hoprNodeAddress}`, [_hoprNodeAddress])
 
         // 3.
         this.relayTimeouts.set(
@@ -297,13 +294,16 @@ export class Coverbot implements Bot {
     if (tweet.hasSameHOPRNode(message.from) || COVERBOT_DEBUG_MODE) {
       tweet.status.sameNode = true
     }
+
+    COVERBOT_DEBUG_MODE && tweet.validateTweetStatus()
+
     return tweet.status.isValid()
       ? [tweet, NodeStates.tweetVerificationSucceeded]
       : [tweet, NodeStates.tweetVerificationFailed]
   }
 
   async handleMessage(message: IMessage) {
-    console.log(`${this.botName} <- ${message.from}: ${message.text}`)
+    log(`- handleMessage | ${this.botName} <- ${message.from}: ${message.text}`)
 
     if (message.from === this.address) {
       /*

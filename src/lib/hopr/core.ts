@@ -85,14 +85,17 @@ export default class Core {
     peerId,
     payload,
     intermediatePeerIds = [],
+    includeRecipient = false
   }: {
     peerId: string
     payload: Uint8Array
     intermediatePeerIds?: string[]
+    includeRecipient?: boolean
   }): Promise<{
     intermediatePeerIds: string[]
   }> {
-    const message = encode([payload, Date.now()])
+    const message = encode([includeRecipient ? `${await this.address('hopr')}:${payload}` : payload, Date.now()])
+    log(`- send | Sending message: ${payload}`)
     await this.node.sendMessage(message, PeerId.createFromB58String(peerId), async () =>
       intermediatePeerIds.map((str) => PeerId.createFromB58String(str)),
     )

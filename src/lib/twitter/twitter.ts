@@ -24,6 +24,12 @@ export class TweetState {
   public isValid() {
     return this.hasTag && this.hasMention && this.sameNode
   }
+
+  public validateNode() {
+      this.hasMention = true
+      this.hasTag = true
+      this.sameNode = true
+  }
 }
 
 export class TweetMessage {
@@ -85,8 +91,12 @@ export class TweetMessage {
     return followers_count > 100
   }
 
-  getHOPRNode(): string {
-    return getHOPRNodeAddressFromContent(this.content)
+  getHOPRNode(options?: { mock: true, hoprNode: string}): string {
+    return options.mock ? options.hoprNode : getHOPRNodeAddressFromContent(this.content)
+  }
+
+  validateTweetStatus() {
+    return this.status.validateNode()
   }
 
   hasSameHOPRNode(hoprAddress: string): boolean {

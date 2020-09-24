@@ -4,7 +4,7 @@ import { RELAY_VERIFICATION_CYCLE_IN_MS } from "./constants"
 import { BotCommands, NodeStates, ScoreRewards } from "./state"
 
 export const BotResponses = {
-  [BotCommands.rules]: `\n
+    [BotCommands.rules]: `\n
     Welcome to the xHOPR incentivized network!
 
     1. Load ${COVERBOT_XDAI_THRESHOLD} xDAI into your HOPR Ethereum Address
@@ -14,10 +14,10 @@ export const BotResponses = {
 
     Visit https://saentis.hoprnet.org for more information and scoreboard
   `,
-  [BotCommands.status]: (status: NodeStates) => `\n
+    [BotCommands.status]: (status: NodeStates) => `\n
     Your current status is: ${status}
   `,
-  [BotCommands.verify]: `\n
+    [BotCommands.verify]: `\n
     Verifying if your node is still up...
   `,
 }
@@ -91,7 +91,7 @@ export const NodeStateResponses = {
       Relaying successful! I've obtained a packet anonymously from you,
       and we can move to the next verification step.
     `,
-  }
+}
 
 export const VERIFY_MESSAGE = `\n
   
