@@ -113,12 +113,9 @@ export class Coverbot implements Bot {
           return resolve()
         }
         const state = snapshot.val()
-        if (!state.connected) {
-          console.log('No connected')
-          return resolve()
-        }
+        const connected = state.connected || []
         this.verifiedHoprNodes = new Map<string, HoprNode>()
-        state.connected.forEach((n) => this.verifiedHoprNodes.set(n.id, n))
+        connected.forEach((n) => this.verifiedHoprNodes.set(n.id, n))
         this.loadedDb = true
         return resolve()
       })
