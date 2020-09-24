@@ -48,5 +48,8 @@
   },
   "dependencies": {
     "micro": "^9.3.4"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
