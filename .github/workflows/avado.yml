@@ -1,0 +1,41 @@
+name: Update AVADO Node
+
+on:
+  push:
+    branches: "*"
+  pull_request:
+    types: [closed]
+
+defaults:
+  run:
+    working-directory: packages/avado
+
+jobs:
+  build:
+    name: Build for Avado
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Build Docker
+        run: |
+          docker-compose build
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: 12.9.1
+      - name: Install Dappnodesdk
+        run: sudo npm install -g @dappnode/dappnodesdk@0.2.9-beta.0
+      - name: Bump Dappnode version
+        run: dappnodesdk increase minor
+      - name: Build on dappnode
+        run: sudo dappnodesdk build --provider http://23.254.227.151:5001 
+      - name: Set name / email for commit
+        run: git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Versioning robot"
+      - name: Commit changes back
+        run: |
+          git add dappnode_package.json docker-compose.yml releases.json
+          git commit -m "Avado CI: new release"
+          git push origin master
+
+
+
