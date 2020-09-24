@@ -1,89 +1,55 @@
-import BN from 'bn.js'
-import chalk from 'chalk'
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import type { Types, Channel as ChannelInstance } from '@hoprnet/hopr-core-connector-interface'
-import type Hopr from '@hoprnet/hopr-core'
-import { u8aToHex, stringToU8a, moveDecimalPoint } from '@hoprnet/hopr-utils'
-import { AbstractCommand } from './abstractCommand'
-import type { AutoCompleteResult } from './abstractCommand'
+import chalk from "chalk";
+import type HoprCoreConnector from "@hoprnet/hopr-core-connector-interface";
+import type { Types } from "@hoprnet/hopr-core-connector-interface";
+import type Hopr from "@hoprnet/hopr-core";
+import { moveDecimalPoint } from "@hoprnet/hopr-utils";
+import { SendMessageBase } from "./sendMessage";
+import { countSignedTickets, getSignedTickets } from "../utils";
 
-export default class Tickets extends AbstractCommand {
+export default class Tickets extends SendMessageBase {
   constructor(public node: Hopr<HoprCoreConnector>) {
-    super()
+    super(node);
   }
-  name() { return 'tickets'}
-  help() { return 'lists tickets of a channel'}
+
+  name() {
+    return "tickets";
+  }
+
+  help() {
+    return "lists information about redeemed and unredeemed tickets";
+  }
+
   /**
-   * @param query channelId string to send message to
+   * @param query channelId to query tickets for
    */
-  async execute(query?: string): Promise<void> {
-    /*
-    if (!query) {
-      console.log(chalk.red('This command takes a channel ID as a parameter'))
-      return
-    }
-
-    const { Balance } = this.node.paymentChannels.types
-    const signedTickets: Map<string, Types.AcknowledgedTicket> = await this.node.paymentChannels.tickets.get(
-      stringToU8a(query)
-    )
-
-    if (signedTickets.size === 0) {
-      console.log(chalk.yellow(`\nNo tickets found.`))
-      return
-    }
-
-    const result = Array.from(signedTickets.values()).reduce<{
-      tickets: {
-        'amount (HOPR)': string
-      }[]
-      total: BN
-    }>(
-      (result, signedTicket) => {
-        result.tickets.push({
-          'amount (HOPR)': moveDecimalPoint(signedTicket.ticket.amount.toString(), Balance.DECIMALS * -1).toString(),
-        })
-        result.total = result.total.add(signedTicket.ticket.amount)
-
-        return result
-      },
-      {
-        tickets: [],
-        total: new BN(0),
-      }
-    )
-
-    console.table(result.tickets)
-    console.log('Found', result.tickets.length, 'unredeemed tickets in channel ID', chalk.blue(query))
-    console.log(
-      'You will receive',
-      chalk.yellow(moveDecimalPoint(result.total.toString(), Balance.DECIMALS * -1).toString()),
-      'HOPR',
-      'once you redeem them.'
-    )
-    */
-  }
-
-  async autocomplete(query: string, line: string): Promise<AutoCompleteResult> {
-    let channelIds: string[] = []
-
+  public async execute(): Promise<string | void> {
     try {
-      channelIds = await this.node.paymentChannels.channel.getAll(
-        async (channel: ChannelInstance) => u8aToHex(await channel.channelId),
-        async (channelIdsPromise: Promise<string>[]) => (await Promise.all(channelIdsPromise))
-      )
+      const { Balance } = this.node.paymentChannels.types;
+
+      const results = await this.node
+        .getAcknowledgedTickets()
+        .then((tickets) => {
+          return tickets.filter((ticket) => !ticket.ackTicket.redeemed);
+        });
+
+      if (results.length === 0) {
+        return "No tickets found.";
+      }
+
+      const ackTickets = results.map((o) => o.ackTicket);
+
+      const unredeemedResults = countSignedTickets(
+        await getSignedTickets(ackTickets)
+      );
+
+      const unredeemedAmount = moveDecimalPoint(
+        unredeemedResults.total.toString(),
+        Balance.DECIMALS * -1
+      ).toString();
+
+      return `Found ${unredeemedResults.tickets.length} unredeemed tickets with a sum of ${unredeemedAmount} HOPR.`;
     } catch (err) {
-      console.log(chalk.red(err.message))
-      return [[''], line]
+      chalk.red(err.message);
     }
-
-    if (channelIds.length < 1) {
-      console.log(chalk.red(`\nNo open channels found.`))
-      return [[''], line]
-    }
-
-    const hits = query ? channelIds.filter((channelId: string) => channelId.startsWith(query)) : channelIds
-
-    return [hits.length ? hits.map((str: string) => `tickets ${str}`) : ['tickets'], line]
   }
 }

@@ -22,6 +22,10 @@ export function AcknowledgedTickets(index: Uint8Array): Uint8Array {
   ])
 }
 
+export function AcknowledgedTicketsParse(arr: Uint8Array): Uint8Array {
+  return arr.slice(TICKET_PREFIX.length + acknowledgedSubPrefix.length, arr.length)
+}
+
 export function AcknowledgedTicketCounter() {
   return allocationHelper([
     [TICKET_PREFIX.length, TICKET_PREFIX],

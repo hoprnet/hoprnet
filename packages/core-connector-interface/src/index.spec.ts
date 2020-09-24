@@ -18,9 +18,6 @@ async function main() {
   await coreConnector.start()
 
   await coreConnector.indexer?.has((undefined as unknown) as Public, (undefined as unknown) as Public)
-  await coreConnector.tickets.get((undefined as unknown) as Public)
-  await coreConnector.tickets.getAll()
-  await coreConnector.tickets.store((undefined as unknown) as Public, (undefined as unknown) as AcknowledgedTicket)
 
   await coreConnector.indexer?.has((undefined as unknown) as Public, (undefined as unknown) as Public)
 

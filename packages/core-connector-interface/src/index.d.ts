@@ -5,7 +5,6 @@ import type * as Types from './types'
 import type * as DbKeys from './dbKeys'
 import type * as Constants from './constants'
 import type Indexer from './indexer'
-import type { Tickets } from './tickets'
 import type PathSelection from './pathSelection'
 
 export type Currencies = 'NATIVE' | 'HOPR'
@@ -130,11 +129,6 @@ declare interface HoprCoreConnector {
   readonly channel: typeof Channel
 
   /**
-   * Store and query tickets.
-   */
-  readonly tickets: typeof Tickets
-
-  /**
    * Returns an instance of Indexer.
    */
   readonly indexer: Indexer
@@ -152,6 +146,6 @@ declare interface HoprCoreConnector {
 
 declare var HoprCoreConnector: HoprCoreConnectorStatic
 
-export { Utils, Types, DbKeys, Constants, Channel, Tickets, Indexer, HoprCoreConnectorStatic }
+export { Utils, Types, DbKeys, Constants, Channel, Indexer, HoprCoreConnectorStatic }
 
 export default HoprCoreConnector

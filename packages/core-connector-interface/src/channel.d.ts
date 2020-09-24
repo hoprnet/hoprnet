@@ -91,7 +91,23 @@ declare interface ChannelStatic {
      * @param secretA a signed ticket
      * @param secretB a signed ticket
      */
-    submit(ticket: AcknowledgedTicket): Promise<void>
+    submit(
+      ticket: AcknowledgedTicket,
+      ticketIndex: Uint8Array
+    ): Promise<
+      | {
+          status: 'SUCCESS'
+          receipt: string
+        }
+      | {
+          status: 'FAILURE'
+          message: string
+        }
+      | {
+          status: 'ERROR'
+          error: Error | string
+        }
+    >
   }
 }
 
