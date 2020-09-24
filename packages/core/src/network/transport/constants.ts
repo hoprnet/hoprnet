@@ -7,7 +7,6 @@ export const CODE_CIRCUIT = 290
 // Time to wait for a connection to close gracefully before destroying it manually
 export const CLOSE_TIMEOUT = 6000
 export const RELAY_CIRCUIT_TIMEOUT = 6000
-export const USE_OWN_STUN_SERVERS = false
 
 export const USE_WEBRTC = true
 export const WEBRTC_TRAFFIC_PREFIX = 1
@@ -20,14 +19,4 @@ export const FAIL_COULD_NOT_REACH_COUNTERPARTY = new TextEncoder().encode('FAIL_
 
 export const RELAY_REGISTER = `/hopr/relay-register/${VERSION}`
 export const DELIVERY_REGISTER = `/hopr/delivery-register/${VERSION}`
-
-export const STUN_SERVERS = [
-  {
-    hostname: 'stun.l.google.com',
-    port: 19302,
-  },
-  {
-    hostname: 'stun.1und1.de',
-    port: 3478,
-  },
-]
+export const DELIVERY_REREGISTER = `/hopr/delivery-reregister/${VERSION}`
