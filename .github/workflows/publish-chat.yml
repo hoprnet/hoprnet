@@ -98,6 +98,8 @@ jobs:
         run: |
           yarn zip:${{ matrix.displayName }}
           ls -la
+      - name: Assert file
+        run: if [ ! -f "hopr-chat-nodebin-${{ matrix.displayName }}.zip"] then exit 1; fi
       - name: Upload binaries to GitHub workflow artifacts store
         uses: actions/upload-artifact@v2
         with:
