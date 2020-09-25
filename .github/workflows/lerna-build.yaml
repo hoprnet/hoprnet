@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    name: Build, Test
+    name: Build, Test, Publish etc
     runs-on: ubuntu-latest
 
     strategy:
@@ -124,7 +124,7 @@ jobs:
           github.event.action == 'closed' &&
           github.event.pull_request.merged == true 
         run: |
-          (PACKAGE_VERSION=$(node -p -e "require('./package.json').version"); git tag v$PACKAGE_VERSION && git push origin $PACKAGE_VERSION)
+          (PACKAGE_VERSION=$(node -p -e "require('./package.json').version"); git tag v$PACKAGE_VERSION && git push origin v$PACKAGE_VERSION)
 
       - name: Build Avado
         if: |

@@ -20,9 +20,9 @@
     "start": "node lib/index.js",
     "start:alice": "yarn util:create:alice && cd .alice && cross-env HOST_IPV4=0.0.0.0:9091 node lib/index.js -p alice 2>log.alice.txt",
     "start:bob": "yarn util:create:bob && cd .bob && cross-env HOST_IPV4=0.0.0.0:9092 node lib/index.js -p bob 2>log.bob.txt",
-    "zip:windows": "yarn clean:zip && rimraf ./hopr-chat/start-hopr-chat.command ./hopr-chat/start-hopr-chat.sh && bestzip hopr-chat-nodebin-windows.zip hopr-chat",
-    "zip:macos": "yarn clean:zip && rimraf ./hopr-chat/start-hopr-chat.bat ./hopr-chat/start-hopr-chat.sh && bestzip hopr-chat-nodebin-macos.zip hopr-chat",
-    "zip:linux": "yarn clean:zip && rimraf ./hopr-chat/start-hopr-chat.bat ./hopr-chat/start-hopr-chat.command && bestzip hopr-chat-nodebin-linux.zip hopr-chat"
+    "zip:windows": "yarn clean:zip && rimraf ./hopr-chat/start-hopr-chat.command ./hopr-chat/start-hopr-chat.sh && bestzip hopr-chat-nodebin-windows.zip .",
+    "zip:macos": "yarn clean:zip && rimraf ./hopr-chat/start-hopr-chat.bat ./hopr-chat/start-hopr-chat.sh && bestzip hopr-chat-nodebin-macos.zip .",
+    "zip:linux": "yarn clean:zip && rimraf ./hopr-chat/start-hopr-chat.bat ./hopr-chat/start-hopr-chat.command && bestzip hopr-chat-nodebin-linux.zip ."
   },
   "engines": {
     "node": "12",
