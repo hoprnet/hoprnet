@@ -95,7 +95,9 @@ jobs:
       - name: Compile project into nodes bin
         run: yarn compile
       - name: Zip node binary for uploading
-        run: yarn zip:${{ matrix.displayName }}
+        run: |
+          yarn zip:${{ matrix.displayName }}
+          ls -la
       - name: Upload binaries to GitHub workflow artifacts store
         uses: actions/upload-artifact@v2
         with:
