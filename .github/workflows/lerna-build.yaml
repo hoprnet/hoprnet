@@ -116,7 +116,7 @@ jobs:
         if: |
           github.event_name == 'pull_request' &&
           github.event.action == 'closed' &&
-          github.event.pull_request.merged == true &&
+          github.event.pull_request.merged == true 
         run: npm config set //npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }} && npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
