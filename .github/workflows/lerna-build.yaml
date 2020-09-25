@@ -244,8 +244,7 @@ jobs:
         with:
           node-version: 12.9.1
       - name: Get version from package.json
-        run: |
-          PACKAGE_VERSION=$(node -p -e "require('./package.json').version") echo "::set-env name=RELEASE::$PACKAGE_VERSION"
+        run: echo ::set-env name=RELEASE::$(node -p -e "require('./packages/chat/package.json').version")
       - name: Release HOPR Chat binaries
         uses: softprops/action-gh-release@v1
         env:
