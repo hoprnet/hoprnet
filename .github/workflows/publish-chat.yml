@@ -122,8 +122,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ github.ref }}
-          name: HOPR Chat - ${{ github.ref }}
+          tag_name: ${{ github.sha }}
+          name: HOPR Chat - ${{ github.sha }}
           draft: false
           prerelease: false
           files: |
