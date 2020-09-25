@@ -39,6 +39,7 @@
     "bignumber.js": "^9.0.0",
     "bn.js": "~5.1.2",
     "bs58": "^4.0.1",
+    "bufferutil": "^4.0.1",
     "chalk": "~4.1.0",
     "clear": "~0.1.0",
     "dotenv": "~8.2.0",
@@ -48,7 +49,8 @@
     "peer-info": "~0.17.5",
     "readline": "~1.3.0",
     "rlp": "~2.2.5",
-    "typescript": "^3.9.7"
+    "typescript": "^3.9.7",
+    "utf-8-validate": "^5.0.2"
   },
   "devDependencies": {
     "@tsconfig/node12": "^1.0.7",

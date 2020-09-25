@@ -142,6 +142,7 @@ jobs:
           git add dappnode_package.json docker-compose.yml releases.json
           git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Versioning robot"
           git commit -m "Avado CI: new release"
+          git pull origin master
           git push origin master
 
   # chat
@@ -229,6 +230,8 @@ jobs:
     needs: [build_chat_binaries]
     steps:
       - uses: actions/checkout@v2
+      - name: Update from master
+        run: git pull origin master
       - uses: actions/setup-node@v1
         with:
           node-version: 12.9.1
