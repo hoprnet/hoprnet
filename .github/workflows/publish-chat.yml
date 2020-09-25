@@ -95,16 +95,13 @@ jobs:
       - name: Compile project into nodes bin
         run: yarn compile
       - name: Zip node binary for uploading
-        run: |
-          yarn zip:${{ matrix.displayName }}
-          ls -la
-      - name: Assert file
-        run: if [ ! -f "hopr-chat-nodebin-${{ matrix.displayName }}.zip"] then exit 1; fi
+        run: yarn zip:${{ matrix.displayName }}
       - name: Upload binaries to GitHub workflow artifacts store
         uses: actions/upload-artifact@v2
         with:
           name: hopr-chat-nodebin-${{ matrix.displayName }}.zip
-          path: hopr-chat-nodebin-${{ matrix.displayName }}.zip
+          path: packages/chat/hopr-chat-nodebin-${{ matrix.displayName }}.zip
+          if-no-files-found: error 
 
   publish_chat_dist:
     name: Creates release with node binary per OS
