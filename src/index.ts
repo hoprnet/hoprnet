@@ -15,6 +15,7 @@ const main = async () => {
   const node = await new Core()
   await node.start()
   const hoprAddress = await node.address('hopr')
+  const nativeAddress = await node.address('native')
   const hoprBalance = fromWei(await node.getHoprBalance())
   const balance = fromWei(await node.getBalance())
 
@@ -41,7 +42,7 @@ const main = async () => {
       break
     case 'coverbot':
       const { Coverbot } = await import('./bots/coverbot')
-      bot = new Coverbot({node, balance, hoprBalance}, hoprAddress, timestamp, twitterTimestamp)
+      bot = new Coverbot({node, balance, hoprBalance}, nativeAddress, hoprAddress, timestamp, twitterTimestamp)
   }
   log(`- main | Bot Created: ${bot.botName}`)
   log(`- main | Setting up Bot on Node`)

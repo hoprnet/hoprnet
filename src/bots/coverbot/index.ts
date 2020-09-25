@@ -36,6 +36,7 @@ export class Coverbot implements Bot {
   initialBalance: string
   initialHoprBalance: string
   botName: string
+  nativeAddress: string
   address: string
   timestamp: Date
   status: Map<string, NodeStates>
@@ -52,11 +53,12 @@ export class Coverbot implements Bot {
   network: Networks
   loadedDb: boolean
 
-  constructor({node, hoprBalance, balance}: BalancedHoprNode, address: string, timestamp: Date, twitterTimestamp: Date) {
+  constructor({node, hoprBalance, balance}: BalancedHoprNode, nativeAddress: string, address: string, timestamp: Date, twitterTimestamp: Date) {
     this.node = node
     this.initialBalance = balance
     this.initialHoprBalance = hoprBalance
     this.address = address
+    this.nativeAddress = nativeAddress
     this.timestamp = timestamp
     this.status = new Map<string, NodeStates>()
     this.tweets = new Map<string, TweetMessage>()
@@ -65,6 +67,8 @@ export class Coverbot implements Bot {
     this.loadedDb = false
 
     log(`- constructor | ${this.botName} has been added`)
+    log(`- constructor | 🏠 HOPR Address: ${this.address}`)
+    log(`- constructor | 🏡 Native Address: ${this.nativeAddress}`)
     log(`- constructor | ⛓ EVM Network: ${COVERBOT_CHAIN_PROVIDER}`)
     log(`- constructor | 📦 DB Environment: ${HOPR_ENVIRONMENT}`)
     log(`- constructor | 💸 Threshold: ${COVERBOT_XDAI_THRESHOLD}`)

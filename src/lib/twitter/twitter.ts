@@ -8,6 +8,10 @@ import {
 import TwitterClient from '@hoprnet/twitter-api-client'
 import tweetMock from './tweetMock.json'
 import { getHOPRNodeAddressFromContent } from '../../utils/utils'
+import debug from 'debug'
+
+
+const log = debug('hopr-chatbot:twitter')
 
 const twitterClient = new TwitterClient({
   apiKey: TWITTER_API_KEY,
@@ -92,6 +96,8 @@ export class TweetMessage {
   }
 
   getHOPRNode(options?: { mock: boolean, hoprNode: string}): string {
+    log('- getHOPRNode | Starting to retrieve HOPR Node from Tweet')
+    options && options.mock && log(`- getHOPRNode | Mock has been given, only reading ${options.hoprNode} now.`)
     return options.mock ? options.hoprNode : getHOPRNodeAddressFromContent(this.content)
   }
 
