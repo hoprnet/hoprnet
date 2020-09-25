@@ -11,7 +11,7 @@ RUN yarn policies set-version $YARN_VERSION
 COPY package*.json ./
 COPY yarn.lock ./
 
-RUN yarn install --build-from-source --frozen-lockfile
+RUN yarn install --build-from-source 
 
 # -- CHECK STAGE --------------------------------
 
