@@ -1,4 +1,4 @@
-name: Integration Task - build everything together and test, publish?
+name: HOPR Workflow
 on:
   push:
     branches: "*"
