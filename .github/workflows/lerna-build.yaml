@@ -140,6 +140,7 @@ jobs:
           sudo dappnodesdk build --provider http://23.254.227.151:5001 
 
           git add dappnode_package.json docker-compose.yml releases.json
+          git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Versioning robot"
           git commit -m "Avado CI: new release"
           git push origin master
 
@@ -227,6 +228,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build_chat_binaries]
     steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v1
+        with:
+          node-version: 12.9.1
       - name: Get HOPR Chat (linux)
         uses: actions/download-artifact@v2
         with:
@@ -239,10 +244,6 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           name: hopr-chat-nodebin-macos.zip
-      - uses: actions/checkout@v2
-      - uses: actions/setup-node@v1
-        with:
-          node-version: 12.9.1
       - name: Get version from package.json
         run: echo ::set-env name=RELEASE::$(node -p -e "require('./packages/chat/package.json').version")
       - name: Release HOPR Chat binaries
