@@ -17,7 +17,7 @@ import {
 } from '../../utils/env'
 import db from './db'
 import { BotCommands, NodeStates, ScoreRewards } from './state'
-import { RELAY_VERIFICATION_CYCLE_IN_MS } from './constants'
+import { RELAY_VERIFICATION_CYCLE_IN_MS, RELAY_HOPR_REWARD } from './constants'
 import { BotResponses, NodeStateResponses } from './responses'
 import { BalancedHoprNode, HoprNode } from './coverbot'
 import debug from 'debug'
@@ -355,8 +355,7 @@ export class Coverbot implements Bot {
 
       await Promise.all([
         this._setEthereumAddressScore(relayerEthereumAddress, newScore),
-        // @TODO: Actually send tokens.
-        // sendXHOPR(relayerEthereumAddress, RELAY_HOPR_REWARD),
+        this.node.withdraw({ currency: 'HOPR', recipient: relayerEthereumAddress, amount: `${RELAY_HOPR_REWARD}`}),
       ])
       console.log(`xHOPR tokens sent to ${relayerAddress}`)
       this._sendMessageFromBot(relayerAddress, NodeStateResponses[NodeStates.verifiedNode])

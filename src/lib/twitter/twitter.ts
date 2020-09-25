@@ -91,7 +91,7 @@ export class TweetMessage {
     return followers_count > 100
   }
 
-  getHOPRNode(options?: { mock: true, hoprNode: string}): string {
+  getHOPRNode(options?: { mock: boolean, hoprNode: string}): string {
     return options.mock ? options.hoprNode : getHOPRNodeAddressFromContent(this.content)
   }
 

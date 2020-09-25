@@ -1,6 +1,6 @@
 import Hopr from '@hoprnet/hopr-core'
 import type { HoprOptions } from '@hoprnet/hopr-core'
-import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
+import HoprCoreConnector, { Currencies } from '@hoprnet/hopr-core-connector-interface'
 import { getBootstrapAddresses, u8aToHex } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import { EventEmitter } from 'events'
@@ -83,6 +83,19 @@ export default class Core {
   @Core.mustBeStarted()
   getBootstrapServers(): string {
       return this.node.bootstrapServers.map(node => node.id.toB58String()).join(',')
+  }
+
+  @Core.mustBeStarted()
+  async withdraw({
+    currency,
+    recipient,
+    amount,
+  }: {
+    currency: Currencies
+    recipient: string
+    amount: string
+  }): Promise<string> {
+      return await this.node.paymentChannels.withdraw(currency, recipient, amount)
   }
 
   @Core.mustBeStarted()
