@@ -183,6 +183,7 @@ jobs:
         with:
           node-version: 12.9.1
       - name: Setting yarn version
+        working-directory: packages/avado
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: yarn policies set-version 1.19.2
@@ -193,13 +194,17 @@ jobs:
           path: node_modules
           key: ${{ runner.OS }}-build-${{ hashFiles('package.json') }}
       - name: Install node modules
+        working-directory: packages/avado
         if: steps.cache-modules.outputs.cache-hit != 'true'
         run: yarn install
       - name: Build project into nodejs app
+        working-directory: packages/avado
         run: yarn build
       - name: Compile project into nodes bin
         run: yarn compile
+        working-directory: packages/avado
       - name: Zip node binary for uploading
+        working-directory: packages/avado
         run: yarn zip:${{ matrix.displayName }}
       - name: Upload binaries to GitHub workflow artifacts store
         uses: actions/upload-artifact@v2
