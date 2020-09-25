@@ -122,6 +122,10 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Push a tag
+        run: |
+          (PACKAGE_VERSION=$(node -p -e "require('./package.json').version"); git tag v$PACKAGE_VERSION && git push origin $PACKAGE_VERSION)
+
       - name: Build Avado
         if: |
           github.event_name == 'pull_request' &&
