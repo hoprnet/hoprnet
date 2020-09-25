@@ -1,12 +1,15 @@
 import Head from 'next/head'
 import styles from '../styles/Home.module.css'
-import Logo from '../components/logo'
+import Logo from '../components/Logo/Logo'
 import CopyIcon from '../components/icons/copy'
 import TwitterIcon from '../components/icons/twitter'
 import { useState, useEffect } from 'react'
 import useSWR from 'swr'
 import db from '../utils/db'
+import api from '../utils/api'
 import { HOPR_ENVIRONMENT } from '../utils/env'
+import { default as Footer } from '../components/Footer/Footer'
+import { default as Header } from '../components/Header/Header'
 
 function BSLink({ id, children }) {
   return (
@@ -37,19 +40,28 @@ function ScoredNode({ address, score, connected }) {
     )
   } else {
     // Couldn't find in node list.
-    return <></>
+    return (
+      <div className={styles.connode}>
+        <span>(Unable to Relay)</span>
+        <span className={styles.score}>{score}</span>
+        <span className={styles.addr}>
+          Node: <abbr title={address}>...{address.slice(10)}</abbr>
+        </span>
+      </div>
+    )
   }
 }
 
 function HomeContent({
-  address,
-  available,
-  locked,
-  connected,
-  hoprChannelContract,
-  hoprCoverbotAddress,
-  env,
-  refreshed,
+  address = '0x000...',
+  available = 0,
+  locked = 0,
+  connected = [],
+  connectedNodes = [],
+  hoprChannelContract = '0x000...',
+  hoprCoverbotAddress = '0x000...',
+  env = {},
+  refreshed = new Date().toString(),
 }) {
   let addressOnClick = () => {
     let addressClicker = document.createElement('textarea')
@@ -83,23 +95,7 @@ function HomeContent({
         <script async src="https://platform.twitter.com/widgets.js" charSet="utf-8"></script>
       </Head>
 
-      <header className={styles.header}>
-        <div className={styles.h1}>
-          <Logo />
-          <h1 className={styles.title}>
-            <a href="https://hoprnet.org">HOPR</a> Incentivized Testnet on xDAI
-          </h1>
-        </div>
-
-        <div className={styles.stats}>
-          <div>
-            <strong className="green">{parseFloat(available).toFixed(4)}</strong> xHOPR Available
-          </div>
-          {/* <div>
-            <strong className="blue">{locked}</strong> xHOPR Locked
-          </div> */}
-        </div>
-      </header>
+      <Header {...{available}} />
 
       <section className={styles.intro}>
         <p>
@@ -182,6 +178,7 @@ function HomeContent({
         <section>
           <div className={styles.padBottom}>
             <h2>Leaderboard</h2>
+            <h3 style={{"paddingLeft": "20px"}} >{ connected.length } verified | {score.length} registered | {connectedNodes} connected</h3>
             {(score.length == 0 || connected.length == 0) && (
               <p className={styles.conerr}>
                 <em>No nodes connected...</em>
@@ -192,38 +189,19 @@ function HomeContent({
         </section>
       </main>
 
-      <footer className={styles.footer}>
-        <div>
-          <div>
-            <BSLink id={hoprChannelContract}>
-              <strong>Channel:</strong>
-              {hoprChannelContract && hoprChannelContract.slice(0, 8)}...
-            </BSLink>
-          </div>
-          <div>
-            <BSLink id={hoprCoverbotAddress}>
-              <strong>Coverbot:</strong>
-              {hoprCoverbotAddress && hoprCoverbotAddress.slice(0, 8)}...
-            </BSLink>
-          </div>
-        </div>
-        Thanks for helping us create the <a href="https://hoprnet.org/">HOPR</a> network.
-        <br />
-        <br />
-        Last Updated: {refreshed}
-        <script src="https://panther.hoprnet.org/script.js" site="LCFGMVKB" defer></script>
-      </footer>
+      <Footer {...{ hoprChannelContract, hoprCoverbotAddress, styles, refreshed }} />
     </>
   )
 }
 
-export async function getServerSideProps() {
-  let api = require('./api/stats')
-  const props = await api.get()
-  console.log("API", props);
-  return { props } // NextJS makes this stupidly complicated
+const fetcher = (...args) => fetch(...args).then((res) => res.json())
+
+export async function getServerSideProps() { 
+  const stats = await api.getStats()
+  return { props: stats }
 }
 
 export default function Home(props) {
-  return <HomeContent {...props} />
+  const { data, error } = useSWR('/api/stats', fetcher, { initialData: props || {}, refreshInterval: 5000 })
+  return <HomeContent {...data} />
 }
