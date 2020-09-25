@@ -100,6 +100,8 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: hopr-chat-nodebin-${{ matrix.displayName }}.zip
+          path: hopr-chat-nodebin-${{ matrix.displayName }}.zip
+          if-no-files-found: error 
 
   publish_chat_dist:
     name: Creates release with node binary per OS
