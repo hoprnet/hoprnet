@@ -1,4 +1,7 @@
+import { u8aEquals } from '@hoprnet/hopr-utils'
 import Defer, { DeferredPromise } from 'p-defer'
+
+import { RELAY_PAYLOAD_PREFIX, RELAY_STATUS_PREFIX, STOP } from './constants'
 
 class RelayContext {
   private _defer: DeferredPromise<AsyncGenerator<Uint8Array>>
@@ -52,10 +55,24 @@ class RelayContext {
         }
 
         if (msgReceived) {
-          yield (await msg).value
+          const received = (await msg).value?.slice()
+
+          if (u8aEquals(received.slice(0, 1), RELAY_STATUS_PREFIX)) {
+            if (u8aEquals(received.slice(1), STOP)) {
+              console.log(`STOP received`)
+              break
+            } else {
+              throw Error(`Invalid status message. Got <${received.slice(1)}>`)
+            }
+          } else if (u8aEquals(received.slice(0, 1), RELAY_PAYLOAD_PREFIX)) {
+            console.log(`relaying message <${new TextDecoder().decode((await msg).value.slice())}>`)
+            yield (await msg).value.slice(1)
+          }
+
           msgReceived = false
         }
       }
+      console.log(`after relay context return `)
     }.call(this)
   }
 

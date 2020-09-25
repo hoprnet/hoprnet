@@ -85,6 +85,7 @@ class TCP {
 
           switch (opts.family) {
             case 'ipv6':
+              // We do not use STUN for IPv6 for the moment
               break
             case 'ipv4':
               this.stunServers.push(multiaddrs[j])
