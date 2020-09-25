@@ -7,6 +7,11 @@ on:
     tags:
       - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
 
+
+defaults:
+  run:
+    working-directory: packages/chat 
+
 jobs:
   # core
   setting_up:
