@@ -36,7 +36,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           yarn policies set-version 1.19.2
-          yarn install --frozen-lockfile
+          yarn install
 
   # chat
   build_chat_docker:
@@ -89,7 +89,7 @@ jobs:
           key: ${{ runner.OS }}-build-${{ hashFiles('package.json') }}
       - name: Install node modules
         if: steps.cache-modules.outputs.cache-hit != 'true'
-        run: yarn install --frozen-lockfile
+        run: yarn install
       - name: Build project into nodejs app
         run: yarn build
       - name: Compile project into nodes bin
