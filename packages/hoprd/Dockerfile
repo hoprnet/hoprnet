@@ -24,6 +24,7 @@ ENV YARN_VERSION 1.19.2
 RUN yarn policies set-version $YARN_VERSION
 COPY package.json .
 COPY yarn.lock .
+RUN yarn config set registry https://npm.pkg.github.com/ 
 RUN yarn install --build-from-source
 
 # -- BUILD STAGE --------------------------------

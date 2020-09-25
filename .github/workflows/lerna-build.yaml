@@ -104,7 +104,25 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Build Avado 
+      - uses: actions/setup-node@v1
+        if: |
+          github.event_name == 'pull_request' &&
+          github.event.action == 'closed' &&
+          github.event.pull_request.merged == true &&
+        with:
+          node-version: '12.9.1'
+          registry-url: 'https://npm.pkg.github.com'
+      - name: Publish to GPR
+        if: |
+          github.event_name == 'pull_request' &&
+          github.event.action == 'closed' &&
+          github.event.pull_request.merged == true &&
+        run: npm config set //npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }} && npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Avado
         if: |
           github.event_name == 'pull_request' &&
           github.event.action == 'closed' &&
@@ -120,12 +138,3 @@ jobs:
           git commit -m "Avado CI: new release"
           git push origin master
 
-#      - uses: actions/setup-node@v1
-#        with:
-#          node-version: '12.9.1'
-#          registry-url: 'https://npm.pkg.github.com'
-#      - name: Publish to GPR
-#        run: npm config set //npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }} && npm publish
-#        env:
-#          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
