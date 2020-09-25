@@ -76,6 +76,16 @@ export default class Core {
   }
 
   @Core.mustBeStarted()
+  async getBalance(): Promise<string> {
+      return (await this.node.paymentChannels.account.nativeBalance).toString()
+  }
+
+  @Core.mustBeStarted()
+  getBootstrapServers(): string {
+      return this.node.bootstrapServers.map(node => node.id.toB58String()).join(',')
+  }
+
+  @Core.mustBeStarted()
   listConnectedPeers(): number {
       return Array.from(this.node.peerStore.peers.values()).length
   }

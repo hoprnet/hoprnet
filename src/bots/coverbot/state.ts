@@ -13,9 +13,9 @@ export enum NodeStates {
 }
 
 export enum BotCommands {
-  rules,
-  status,
-  verify,
+  rules = 'RULES',
+  status = 'STATUS',
+  verify = 'VERIFY',
 }
 
 export enum ScoreRewards {

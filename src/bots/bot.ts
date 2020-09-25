@@ -5,6 +5,7 @@ import debug from 'debug'
 
 
 const log = debug('hopr-chatbot:bot')
+const error = debug('hopr-chatbot:bot:error')
 
 export interface Bot {
   botName: string
@@ -21,6 +22,9 @@ const listen = async (bot: Bot, node: Core) => {
   node.events.on('message', (decoded: Buffer) => {
     const message = new Message(new Uint8Array(decoded))
     const parsedMessage = message.toJson()
+    if (!parsedMessage.from) {
+      error('- listen:message | Someone forgot to includeRecipient...')
+    }
     const response = bot.handleMessage.call(bot, parsedMessage)
     log('- listen:message | Bot Response', response)
     bot.automaticResponse && node.send({
