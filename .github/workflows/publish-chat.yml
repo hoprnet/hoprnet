@@ -102,6 +102,7 @@ jobs:
           name: hopr-chat-nodebin-${{ matrix.displayName }}.zip
           path: hopr-chat-nodebin-${{ matrix.displayName }}.zip
           if-no-files-found: error 
+        working-directory: packages/chat 
 
   publish_chat_dist:
     name: Creates release with node binary per OS
