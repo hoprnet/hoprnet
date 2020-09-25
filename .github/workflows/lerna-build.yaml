@@ -100,13 +100,13 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Push a tag
-        if: |
-          github.event_name == 'pull_request' &&
-          github.event.action == 'closed' &&
-          github.event.pull_request.merged == true 
-        run: |
-          (PACKAGE_VERSION=$(node -p -e "require('./package.json').version"); git tag v$PACKAGE_VERSION && git push origin v$PACKAGE_VERSION)
+            #- name: Push a tag
+            #if: |
+            #github.event_name == 'pull_request' &&
+            #github.event.action == 'closed' &&
+            #github.event.pull_request.merged == true 
+            #run: |
+            #(PACKAGE_VERSION=$(node -p -e "require('./package.json').version"); git tag v$PACKAGE_VERSION && git push origin v$PACKAGE_VERSION)
 
       - name: Publish to GPR
         if: |
