@@ -245,14 +245,14 @@ jobs:
           node-version: 12.9.1
       - name: Get version from package.json
         run: |
-          PACKAGE_VERSION=$(node -p -e "require('./package.json').version") echo $PACKAGE_VERSION
+          PACKAGE_VERSION=$(node -p -e "require('./package.json').version") echo "::set-env name=RELEASE::$PACKAGE_VERSION"
       - name: Release HOPR Chat binaries
         uses: softprops/action-gh-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: release-${{ github.sha }}
-          name: HOPR Chat - ${{ github.sha }}
+          tag_name: ${{ RELEASE }}
+          name: HOPR Chat - ${{ RELEASE }}
           draft: false
           prerelease: false
           files: |
