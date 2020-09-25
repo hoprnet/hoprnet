@@ -123,13 +123,13 @@ jobs:
   avado:
     name: Build Avado
     runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'pull_request' &&
+      github.event.action == 'closed' &&
+      github.event.pull_request.merged == true
     needs: [build]
     steps:
       - name: Build Avado
-        if: |
-          github.event_name == 'pull_request' &&
-          github.event.action == 'closed' &&
-          github.event.pull_request.merged == true
         working-directory: packages/avado
         run: |
           docker-compose build
@@ -145,6 +145,10 @@ jobs:
   build_chat_docker:
     name: Build HOPR Chat Docker
     runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'pull_request' &&
+      github.event.action == 'closed' &&
+      github.event.pull_request.merged == true
     needs: [build]
     steps:
       - uses: actions/checkout@v2
@@ -164,6 +168,10 @@ jobs:
 
   build_chat_binaries:
     name: Build HOPR Chat Binaries
+    if: |
+      github.event_name == 'pull_request' &&
+      github.event.action == 'closed' &&
+      github.event.pull_request.merged == true
     needs: [build]
     strategy:
       matrix:
