@@ -72,10 +72,10 @@ class RelayConnection implements MultiaddrConnection {
   async sink(source: AsyncIterable<Uint8Array>) {
     return (async function* () {
       for await (const msg of source) {
-        yield new BL([(RELAY_PAYLOAD_PREFIX as unknown) as BL, (msg as unknown) as BL]) as unknown as Uint8Array
+        yield (new BL([(RELAY_PAYLOAD_PREFIX as unknown) as BL, (msg as unknown) as BL]) as unknown) as Uint8Array
       }
 
-      yield new BL([(RELAY_STATUS_PREFIX as unknown) as BL, (STOP as unknown) as BL]) as unknown as Uint8Array
+      yield (new BL([(RELAY_STATUS_PREFIX as unknown) as BL, (STOP as unknown) as BL]) as unknown) as Uint8Array
     })()
   }
 
