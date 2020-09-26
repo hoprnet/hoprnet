@@ -11,11 +11,12 @@ import HOPR from './views/HOPR'
 import WeAre from './views/WeAre'
 import ForYou from './views/ForYou'
 import Node from './views/Node'
-import Sedimentum from './views/Sedimentum'
+// import Sedimentum from './views/Sedimentum'
 import Ecosystem from './views/Ecosystem'
 import Support from './views/Support'
 import NotFound from './views/NotFound'
 import Partners from './views/Partners'
+import Setup from './views/Setup'
 
 const { AppRoute, ScrollReveal, ScrollToTop, insertScript } = utils
 const { Disclaimer, Pdf } = views
@@ -56,6 +57,7 @@ class App extends React.Component {
               <AppRoute exact path="/ecosystem" component={Ecosystem} layout={LayoutDefault} />
               <AppRoute exact path="/support" component={Support} layout={LayoutDefault} />
               <AppRoute exact path="/partners" component={Partners} layout={LayoutDefault} />
+              <AppRoute exact path="/setup" component={Setup} layout={LayoutDefault} />
               <AppRoute
                 exact
                 path="/Chinese-Language-Binance-HOPR-Press-Release"
