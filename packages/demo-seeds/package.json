@@ -1,11 +1,10 @@
 {
   "name": "@hoprnet/hopr-demo-seeds",
-  "version": "1.17.0-alpha.0",
+  "version": "1.17.0-alpha.35",
   "description": "Demo seeds for HOPR testing",
   "license": "GPL-3.0-only",
   "scripts": {
     "start": "micro",
-    "test": "echo '✅ No tests needed'",
     "build": "tsc -d -p .",
     "prepare": "yarn build"
   },
@@ -49,5 +48,8 @@
   },
   "dependencies": {
     "micro": "^9.3.4"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

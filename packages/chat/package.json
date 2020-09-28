@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-chat",
-  "version": "1.17.0-alpha.0",
+  "version": "1.17.0-alpha.35",
   "description": "Interactive chat PoC for HOPR Protocol",
   "main": "lib/index.js",
   "scripts": {
@@ -25,20 +25,21 @@
     "zip:linux": "yarn clean:zip && rimraf ./hopr-chat/start-hopr-chat.bat ./hopr-chat/start-hopr-chat.command && bestzip hopr-chat-nodebin-linux.zip hopr-chat"
   },
   "engines": {
-    "node": "12.9.1",
-    "yarn": "1.19.2"
+    "node": "12",
+    "yarn": "1"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@hoprnet/hopr-core": "^1.17.0-alpha.0",
-    "@hoprnet/hopr-core-connector-interface": "^1.17.0-alpha.0",
-    "@hoprnet/hopr-utils": "^1.17.0-alpha.0",
+    "@hoprnet/hopr-core": "^1.17.0-alpha.35",
+    "@hoprnet/hopr-core-connector-interface": "^1.17.0-alpha.35",
+    "@hoprnet/hopr-utils": "^1.17.0-alpha.35",
     "@zeit/ncc": "^0.22.3",
     "bignumber.js": "^9.0.0",
     "bn.js": "~5.1.2",
     "bs58": "^4.0.1",
+    "bufferutil": "^4.0.1",
     "chalk": "~4.1.0",
     "clear": "~0.1.0",
     "dotenv": "~8.2.0",
@@ -48,7 +49,8 @@
     "peer-info": "~0.17.5",
     "readline": "~1.3.0",
     "rlp": "~2.2.5",
-    "typescript": "^3.9.7"
+    "typescript": "^3.9.7",
+    "utf-8-validate": "^5.0.2"
   },
   "devDependencies": {
     "@tsconfig/node12": "^1.0.7",
@@ -84,5 +86,8 @@
     },
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

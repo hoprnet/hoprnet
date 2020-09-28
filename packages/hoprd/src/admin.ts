@@ -12,6 +12,8 @@ import debug from 'debug'
 import { parse } from 'url'
 import next from 'next'
 import type {Server} from 'http'
+import stripAnsi from 'strip-ansi'
+
 
 
 let debugLog = debug('hoprd:admin')
@@ -29,9 +31,16 @@ export class AdminServer {
   }
 
   async setup(){
+    let adminPath = path.resolve(__dirname, '../hopr-admin/') 
+    if (!fs.existsSync(adminPath)) {
+      // In Docker
+      adminPath = path.resolve(__dirname, './hopr-admin')
+    }
+    debugLog('using', adminPath)
+
     this.app = next({ 
       dev: true,
-      dir: path.resolve(__dirname, '../hopr-admin/'), 
+      dir: adminPath, 
       conf: {
         devIndicators: {
           autoPrerender: false
@@ -54,6 +63,8 @@ export class AdminServer {
           if (this.cmds) {
             this.cmds.execute(message.toString()).then( (resp:any) => {
               if (resp) {
+                // Strings may have ansi stuff in it, get rid of it:
+                resp = stripAnsi(resp)
                 this.logs.logFullLine(resp)
               }
             })
@@ -105,8 +116,6 @@ export async function reportMemoryUsage(logs: LogStream){
 }
 
 export async function connectionReport(node: Hopr<HoprCoreConnector>, logs: LogStream){
-  logs.log(`Node is connected at ${node.peerInfo.id.toB58String()}`)
-  logs.log(`Connected to: ${node.peerStore.peers.size} peers`)
   logs.logConnectedPeers(Array.from(node.peerStore.peers.values()).map(p => p.id.toB58String()))
   setTimeout(() => connectionReport(node, logs), 10_000);
 }

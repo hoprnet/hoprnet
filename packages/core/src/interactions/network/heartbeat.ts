@@ -14,7 +14,7 @@ const error = debug('hopr-core:heartbeat:error')
 const verbose = debug('hopr-core:verbose:heartbeat')
 const HASH_FUNCTION = 'blake2s256'
 
-export const HEARTBEAT_TIMEOUT = durations.seconds(6)
+export const HEARTBEAT_TIMEOUT = durations.seconds(3)
 
 class Heartbeat<Chain extends HoprCoreConnector> implements AbstractInteraction<Chain> {
   protocols: string[] = [PROTOCOL_HEARTBEAT]
@@ -50,6 +50,12 @@ class Heartbeat<Chain extends HoprCoreConnector> implements AbstractInteraction<
 
   async interact(counterparty: PeerId): Promise<void> {
     return new Promise<void>(async (resolve, reject) => {
+      // There is an assumption here that we 'know' how to contact this peer
+      // and therefore we are immediately trying to dial, rather than checking
+      // our peerRouting info first.
+      //
+      // NB. This is a false assumption for 'ping' and we therefore trigger
+      // errors.
       let struct: Handler
       let aborted = false
 
@@ -58,7 +64,7 @@ class Heartbeat<Chain extends HoprCoreConnector> implements AbstractInteraction<
       const timeout = setTimeout(() => {
         aborted = true
         abort.abort()
-        verbose('heartbeat timeout')
+        verbose(`heartbeat timeout while querying ${counterparty.toB58String()}`)
         reject(Error(`Timeout while querying ${counterparty.toB58String()}.`))
       }, HEARTBEAT_TIMEOUT)
 
@@ -66,11 +72,13 @@ class Heartbeat<Chain extends HoprCoreConnector> implements AbstractInteraction<
         struct = await this.node
           .dialProtocol(counterparty, this.protocols[0], { signal: abort.signal })
           .catch(async (err: Error) => {
-            verbose('heartbeat connection error', err)
+            verbose(`heartbeat connection error ${err.name} while dialing ${counterparty.toB58String()} (initial)`)
             const peerInfo = await this.node.peerRouting.findPeer(counterparty)
+            //verbose('trying with peer info', peerInfo)
             return await this.node.dialProtocol(peerInfo, this.protocols[0], { signal: abort.signal })
           })
       } catch (err) {
+        verbose(`heartbeat connection error ${err.name} while dialing ${counterparty.toB58String()} (subsequent)`)
         clearTimeout(timeout)
         error(err)
         return reject()
