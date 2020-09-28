@@ -1,7 +1,7 @@
 import { Controller } from '@nestjs/common'
 import { GrpcMethod, RpcException } from '@nestjs/microservices'
-import { status as STATUS } from 'grpc'
 import { Subject, Observable } from 'rxjs'
+import { grpc } from '@hoprnet/hopr-protos'
 import { GrpcService } from './grpc.service'
 import { StatusResponse } from '@hoprnet/hopr-protos/node/status_pb'
 import { VersionResponse } from '@hoprnet/hopr-protos/node/version_pb'
@@ -26,6 +26,8 @@ import {
   WithdrawNativeResponse,
   WithdrawHoprResponse,
 } from '@hoprnet/hopr-protos/node/withdraw_pb'
+
+const STATUS = grpc.status
 
 // @TODO: capture errors and turn them into GRPC errors
 @Controller('grpc')

@@ -5,7 +5,6 @@ import { INestApplication } from '@nestjs/common'
 import { Transport } from '@nestjs/microservices'
 import { Ganache } from '@hoprnet/hopr-testing'
 import { migrate, fund } from '@hoprnet/hopr-ethereum'
-import * as grpc from 'grpc'
 import { AppModule } from '../src/app.module'
 import { HOPR_PROTOS_FOLDER_DIR, PROTO_PACKAGES, PROTO_FILES } from '../src/constants'
 import { VersionRequest } from '@hoprnet/hopr-protos/node/version_pb'
@@ -25,6 +24,7 @@ import {
   GetChannelDataRequest,
   CloseChannelRequest,
 } from '@hoprnet/hopr-protos/node/channels_pb'
+import { grpc } from '@hoprnet/hopr-protos'
 import { SendClient } from '@hoprnet/hopr-protos/node/send_grpc_pb'
 import { SendRequest } from '@hoprnet/hopr-protos/node/send_pb'
 import { ListenClient } from '@hoprnet/hopr-protos/node/listen_grpc_pb'
@@ -97,9 +97,16 @@ const SetupServer = async (serverOps: Record<string, any>, env: Record<string, a
   return app
 }
 
+/*
 const SetupClient = <T extends typeof grpc.Client>(Client: T, server: keyof typeof NODES): InstanceType<T> => {
   return (new Client(NODES[server].serverHost, grpc.credentials.createInsecure()) as unknown) as InstanceType<T>
 }
+*/
+
+const SetupClient = (Client, server): any => {
+  return (new Client(NODES[server].serverHost, grpc.credentials.createInsecure()))
+}
+
 
 // @TODO: fix open handles
 describe('GRPC transport', () => {

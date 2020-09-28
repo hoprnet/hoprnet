@@ -45,7 +45,7 @@
     "yarn": "1"
   },
   "dependencies": {
-    "@grpc/proto-loader": "^0.5.4",
+    "@grpc/proto-loader": "0.5.5",
     "@hoprnet/hopr-core": "^1.17.0-alpha.35",
     "@hoprnet/hopr-core-connector-interface": "^1.17.0-alpha.35",
     "@hoprnet/hopr-protos": "^1.17.0-alpha.35",
@@ -58,7 +58,6 @@
     "class-validator": "^0.12.2",
     "dotenv-parse-variables": "^0.3.0",
     "google-protobuf": "^3.12.2",
-    "grpc": "^1.24.3",
     "multiaddr": "^7.5.0",
     "parse-ip-port": "^1.0.0",
     "peer-id": "^0.13.13",
