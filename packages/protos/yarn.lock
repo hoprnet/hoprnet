@@ -2176,7 +2176,7 @@ grpc-tools@^1.9.0:
   dependencies:
     node-pre-gyp "^0.15.0"
 
-grpc@^1.24.3:
+grpc@1.24.3:
   version "1.24.3"
   resolved "https://registry.yarnpkg.com/grpc/-/grpc-1.24.3.tgz#92efe28dfc1250dca179b8133e40b4f2341473d9"
   integrity sha512-EDemzuZTfhM0hgrXqC4PtR76O3t+hTIYJYR5vgiW0yt2WJqo4mhxUqZUirzUQz34Psz7dbLp38C6Cl7Ij2vXRQ==
