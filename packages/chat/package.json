@@ -87,6 +87,12 @@
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
   },
+  "prettier": {
+    "tabWidth": 2,
+    "semi": false,
+    "singleQuote": true,
+    "printWidth": 120
+  },
   "publishConfig": {
     "access": "public"
   }
