@@ -11,13 +11,13 @@
   "main": "index.js",
   "license": "GPL-3.0-only",
   "scripts": {
-    "build": "npm build:protos",
-    "build:protos": "npm build:protos:node && npm build:protos:web",
+    "build": "npm run build:protos",
+    "build:protos": "npm run build:protos:node && npm run build:protos:web",
     "build:protos:node": "rimraf node && mkdirp node && node ./scripts/generateNode.js",
     "build:protos:web": "rimraf web && mkdirp web && node ./scripts/generateWeb.js",
     "fix:types": "replace 'from \"grpc\"' 'from \"@grpc/grpc-js\"' . -r --include=\"*.d.ts\"",
-    "test": "npm build:protos",
-    "prepublishOnly": "npm build"
+    "test": "npm run build:protos",
+    "prepublishOnly": "npm run build"
   },
   "publishConfig": {
     "access": "public"

@@ -18,10 +18,10 @@
     "npm": ">=1.19.2"
   },
   "scripts": {
-    "build": "npm clean && tsc -p . --noEmit false",
+    "build": "npm run clean && tsc -p . --noEmit false",
     "clean": "rm -rf ./lib",
     "lint": "prettier --check .",
-    "prepare": "npm build"
+    "prepare": "npm run build"
   },
   "dependencies": {
     "@hoprnet/hopr-demo-seeds": "1.8.0",
@@ -35,7 +35,7 @@
   },
   "husky": {
     "hooks": {
-      "pre-commit": "npm lint"
+      "pre-commit": "npm run lint"
     }
   },
   "prettier": {

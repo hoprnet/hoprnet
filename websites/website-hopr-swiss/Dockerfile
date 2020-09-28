@@ -2,20 +2,20 @@
 FROM node:12.9.1-alpine AS base
 
 ENV YARN_VERSION 1.19.2
-RUN yarn policies set-version $YARN_VERSION
+RUN npm policies set-version $YARN_VERSION
 
 # Install app dependencies
 COPY . .
-RUN yarn install --frozen-lockfile
+RUN npm install --frozen-lockfile
 
 ### Build stage
 
 FROM base as build
 
 COPY . .
-RUN yarn build
+RUN npm build
 RUN npm prune --production --no-audit
-RUN yarn cache clean
+RUN npm cache clean
 
 ### Run stage
 

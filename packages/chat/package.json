@@ -4,13 +4,13 @@
   "description": "Interactive chat PoC for HOPR Protocol",
   "main": "lib/index.js",
   "scripts": {
-    "build": "npm clean:lib && tsc -p . --noEmit false",
+    "build": "npm run clean:lib && tsc -p . --noEmit false",
     "clean:lib": "rimraf ./lib",
     "clean:build": "rimraf ./build",
     "clean:hopr-chat": "rimraf ./hopr-chat",
     "clean:zip": "rimraf *.zip",
-    "clean:all": "npm clean:lib && npm clean:hopr-chat && npm util:clean:all && npm clean:zip",
-    "compile": "npm clean:hopr-chat && ncc build index.ts -o hopr-chat && copyfiles package.json .env.demo start-hopr-chat.bat start-hopr-chat.sh start-hopr-chat.command hopr-chat && npm util:compile",
+    "clean:all": "npm run clean:lib && npm run clean:hopr-chat && npm run util:clean:all && npm run clean:zip",
+    "compile": "npm run clean:hopr-chat && ncc build index.ts -o hopr-chat && copyfiles package.json .env.demo start-hopr-chat.bat start-hopr-chat.sh start-hopr-chat.command hopr-chat && npm run util:compile",
     "test": "jest",
     "util:clean:all": "rimraf .alice .bob",
     "util:create:alice": "mkdirp .alice && copyfiles -a lib/**/**/* .alice && copyfiles .env .alice/",
@@ -18,15 +18,14 @@
     "util:compile": "copyfiles node_modules/@hoprnet/hopr-core hopr-chat && move-file hopr-chat/.env.demo hopr-chat/.env",
     "dev": "ts-node index.ts",
     "start": "node lib/index.js",
-    "start:alice": "npm util:create:alice && cd .alice && cross-env HOST_IPV4=0.0.0.0:9091 node lib/index.js -p alice 2>log.alice.txt",
-    "start:bob": "npm util:create:bob && cd .bob && cross-env HOST_IPV4=0.0.0.0:9092 node lib/index.js -p bob 2>log.bob.txt",
-    "zip:windows": "npm clean:zip && rimraf ./hopr-chat/start-hopr-chat.command ./hopr-chat/start-hopr-chat.sh && bestzip hopr-chat-nodebin-windows.zip hopr-chat",
-    "zip:macos": "npm clean:zip && rimraf ./hopr-chat/start-hopr-chat.bat ./hopr-chat/start-hopr-chat.sh && bestzip hopr-chat-nodebin-macos.zip hopr-chat",
-    "zip:linux": "npm clean:zip && rimraf ./hopr-chat/start-hopr-chat.bat ./hopr-chat/start-hopr-chat.command && bestzip hopr-chat-nodebin-linux.zip hopr-chat"
+    "start:alice": "npm run util:create:alice && cd .alice && cross-env HOST_IPV4=0.0.0.0:9091 node lib/index.js -p alice 2>log.alice.txt",
+    "start:bob": "npm run util:create:bob && cd .bob && cross-env HOST_IPV4=0.0.0.0:9092 node lib/index.js -p bob 2>log.bob.txt",
+    "zip:windows": "npm run clean:zip && rimraf ./hopr-chat/start-hopr-chat.command ./hopr-chat/start-hopr-chat.sh && bestzip hopr-chat-nodebin-windows.zip hopr-chat",
+    "zip:macos": "npm run clean:zip && rimraf ./hopr-chat/start-hopr-chat.bat ./hopr-chat/start-hopr-chat.sh && bestzip hopr-chat-nodebin-macos.zip hopr-chat",
+    "zip:linux": "npm run clean:zip && rimraf ./hopr-chat/start-hopr-chat.bat ./hopr-chat/start-hopr-chat.command && bestzip hopr-chat-nodebin-linux.zip hopr-chat"
   },
   "engines": {
-    "node": "12",
-    "npm": "1"
+    "node": "12"
   },
   "keywords": [],
   "author": "",

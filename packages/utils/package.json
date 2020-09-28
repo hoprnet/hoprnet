@@ -10,9 +10,9 @@
   "scripts": {
     "clean": "rm -rf ./lib",
     "test": "mocha --parallel",
-    "dev": "npm clean && tsc -w",
-    "build": "npm clean && tsc -p . --noEmit false",
-    "prepare": "npm build"
+    "dev": "npm run clean && tsc -w",
+    "build": "npm run clean && tsc -p . --noEmit false",
+    "prepare": "npm run build"
   },
   "files": [
     "lib/",

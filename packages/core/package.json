@@ -30,10 +30,10 @@
     "url": "https://github.com/hoprnet/hopr-core.git"
   },
   "scripts": {
-    "build": "npm clean && tsc -p .",
+    "build": "npm run clean && tsc -p .",
     "clean": "rm -rf ./lib",
     "test": "for i in {1..5}; do jest --runInBand --forceExit; done",
-    "prepublishOnly": "npm build",
+    "prepublishOnly": "npm run build",
     "lint": "prettier --check .",
     "lint:fix": "prettier --write ."
   },
@@ -118,7 +118,7 @@
   },
   "husky": {
     "hooks": {
-      "pre-commit": "npm lint:fix"
+      "pre-commit": "npm run lint:fix"
     }
   }
 }

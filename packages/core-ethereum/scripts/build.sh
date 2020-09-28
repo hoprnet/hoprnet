@@ -12,7 +12,7 @@ cp -R ../ethereum/build/extracted/abis/*.json ./src/ethereum/abi;
 cp ../ethereum/build/lib/scripts/addresses.* ./src/ethereum
 
 # Compile our Typescript sources
-npm run tsc;
+node_modules/.bin/tsc;
 
 # Copy generated TypeChain files into lib folder
 cp -R ./src/tsc/web3 ./lib/tsc/web3;

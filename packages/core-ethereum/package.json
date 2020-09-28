@@ -9,11 +9,11 @@
   "scripts": {
     "clean": "rm -rf ./lib",
     "test": "mocha --exit",
-    "dev": "npm clean && npm build:types && tsc -w",
+    "dev": "npm run clean && npm run build:types && tsc -w",
     "build:types": "typechain --target web3-v1 --outDir './src/tsc/web3' './node_modules/@hoprnet/hopr-ethereum/build/extracted/abis/*.json'",
-    "build": "npm clean && npm build:types && $PWD/scripts/build.sh",
+    "build": "npm run clean && npm run build:types && $PWD/scripts/build.sh",
     "lint": "prettier --check .",
-    "prepare": "npm build"
+    "prepare": "npm run build"
   },
   "files": [
     "lib/",
@@ -67,7 +67,7 @@
   },
   "husky": {
     "hooks": {
-      "pre-commit": "npm lint"
+      "pre-commit": "npm run lint"
     }
   },
   "prettier": {

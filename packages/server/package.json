@@ -18,8 +18,8 @@
   },
   "scripts": {
     "clean": "rimraf dist",
-    "clean:all": "npm util:clean:all && npm clean",
-    "prebuild": "npm clean",
+    "clean:all": "npm run util:clean:all && npm run clean",
+    "prebuild": "npm run clean",
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "util:clean:all": "rimraf .alice .bob .charlie",
@@ -27,9 +27,9 @@
     "util:create:bob": "mkdirp .bob && copyfiles -a dist/**/**/**/* .bob && copyfiles .env .bob/",
     "util:create:charlie": "mkdirp .charlie && copyfiles -a dist/**/**/**/* .charlie && copyfiles .env .charlie/",
     "start": "nest start",
-    "start:alice": "npm util:create:alice && cd .alice && cross-env SERVER_HOST=0.0.0.0:50051 CORE_HOST=0.0.0.0:9091 node dist/main.js",
-    "start:bob": "npm util:create:bob && cd .bob && cross-env SERVER_HOST=0.0.0.0:50052 CORE_HOST=0.0.0.0:9092 node dist/main.js",
-    "start:charlie": "npm util:create:charlie && cd .charlie && cross-env SERVER_HOST=0.0.0.0:50053 CORE_HOST=0.0.0.0:9093 node dist/main.js",
+    "start:alice": "npm run util:create:alice && cd .alice && cross-env SERVER_HOST=0.0.0.0:50051 CORE_HOST=0.0.0.0:9091 node dist/main.js",
+    "start:bob": "npm run util:create:bob && cd .bob && cross-env SERVER_HOST=0.0.0.0:50052 CORE_HOST=0.0.0.0:9092 node dist/main.js",
+    "start:charlie": "npm run util:create:charlie && cd .charlie && cross-env SERVER_HOST=0.0.0.0:50053 CORE_HOST=0.0.0.0:9093 node dist/main.js",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
@@ -41,8 +41,7 @@
     "test:e2e": "jest --config ./test/jest-e2e.json --forceExit --runInBand"
   },
   "engines": {
-    "node": "12",
-    "npm": "1"
+    "node": "12"
   },
   "dependencies": {
     "@grpc/proto-loader": "^0.5.4",
