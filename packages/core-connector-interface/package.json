@@ -12,7 +12,7 @@
     "!*.spec.js.map"
   ],
   "engines": {
-    "node": "12",
+    "node": "12"
   },
   "scripts": {
     "lint": "prettier --check ."

@@ -23,8 +23,7 @@
     "!*.spec.js.map"
   ],
   "engines": {
-    "node": "12",
-    "npm": "1"
+    "node": "12"
   },
   "dependencies": {
     "@hoprnet/hopr-ethereum": "^1.17.0-alpha.37",
