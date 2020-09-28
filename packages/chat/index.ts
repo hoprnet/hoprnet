@@ -1,6 +1,7 @@
 import dotenv from 'dotenv'
 // @ts-ignore
 const dotenvExpand = require('dotenv-expand')
+const isValidUTF8 = require('utf-8-validate');
 
 const env = dotenv.config()
 dotenvExpand(env)

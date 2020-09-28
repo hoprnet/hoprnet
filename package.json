@@ -5,6 +5,10 @@
     "lerna:bootstrap": "lerna bootstrap",
     "lerna:link": "lerna link --force-local",
     "lerna:build": "lerna run build",
+    "lerna:clean": "lerna clean",
+    "chat:build": "lerna exec --scope @hoprnet/hopr-chat -- yarn build",
+    "chat:compile": "lerna exec --scope @hoprnet/hopr-chat -- yarn compile",
+    "chat:zip:linux": "lerna exec --scope @hoprnet/hopr-chat -- yarn zip:linux",
     "chat": "node packages/chat/lib/index.js",
     "hoprd": "node packages/hoprd/lib/index.js"
   },
