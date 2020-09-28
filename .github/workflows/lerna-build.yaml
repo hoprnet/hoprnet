@@ -13,7 +13,6 @@ jobs:
     strategy:
       matrix:
         node-version: [12]
-        yarn-version: [1]
 
     steps:
       - uses: actions/checkout@v2
@@ -24,8 +23,7 @@ jobs:
           registry-url: https://registry.npmjs.org/
       - name: Install node modules
         run: |
-          yarn policies set-version ${{ matrix.yarn-version }}
-          yarn install --frozen-lockfile
+          npm install --frozen-lockfile
       - name: Install dependencies and link locally
         run: |
           node_modules/.bin/lerna bootstrap --ignore-prepublish --force-local -- --frozen-lockfile
@@ -193,11 +191,6 @@ jobs:
       - uses: actions/setup-node@v1
         with:
           node-version: 12.9.1
-      - name: Setting yarn version
-        working-directory: packages/chat
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: yarn policies set-version 1.19.2
       - name: Cache node_modules
         id: cache-modules
         uses: actions/cache@v1
@@ -207,16 +200,16 @@ jobs:
       - name: Install node modules
         working-directory: packages/chat
         if: steps.cache-modules.outputs.cache-hit != 'true'
-        run: yarn install
+        run: npm install
       - name: Build project into nodejs app
         working-directory: packages/chat
-        run: yarn build
+        run: npm run build
       - name: Compile project into nodes bin
-        run: yarn compile
+        run: npm run compile
         working-directory: packages/chat
       - name: Zip node binary for uploading
         working-directory: packages/chat
-        run: yarn zip:${{ matrix.displayName }}
+        run: npm run zip:${{ matrix.displayName }}
       - name: Upload binaries to GitHub workflow artifacts store
         uses: actions/upload-artifact@v2
         with:

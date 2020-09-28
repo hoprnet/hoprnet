@@ -19,7 +19,6 @@
     "!*.test.ts"
   ],
   "engines": {
-    "npm": "1",
     "node": "12"
   },
   "scripts": {
@@ -31,12 +30,7 @@
     "network": "ts-node -T ./scripts/cli.ts network",
     "test": "ts-node -T ./scripts/cli.ts test",
     "lint": "prettier --check .",
-    "prepare": "npm build"
-  },
-  "husky": {
-    "hooks": {
-      "pre-commit": "npm lint"
-    }
+    "prepare": "npm run build"
   },
   "dependencies": {
     "@hoprnet/hopr-demo-seeds": "1.8.0",

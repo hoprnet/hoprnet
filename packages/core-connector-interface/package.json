@@ -13,7 +13,6 @@
   ],
   "engines": {
     "node": "12",
-    "npm": "1"
   },
   "scripts": {
     "lint": "prettier --check ."
@@ -28,7 +27,7 @@
   },
   "husky": {
     "hooks": {
-      "pre-commit": "npm lint"
+      "pre-commit": "npm run lint"
     }
   },
   "devDependencies": {
