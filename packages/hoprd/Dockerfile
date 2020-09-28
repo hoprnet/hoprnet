@@ -21,10 +21,10 @@ RUN apt-get update && \
     wget
 
 ENV YARN_VERSION 1.19.2
-RUN yarn policies set-version $YARN_VERSION
+RUN npm policies set-version $YARN_VERSION
 COPY package.json .
-COPY yarn.lock .
-RUN yarn install --build-from-source
+COPY npm.lock .
+RUN npm install --build-from-source
 
 # -- BUILD STAGE --------------------------------
 
@@ -33,9 +33,9 @@ COPY src src
 COPY hopr-admin hopr-admin
 COPY tsconfig.json tsconfig.json
 
-RUN yarn build 
+RUN npm build 
 #RUN npm prune --production --no-audit
-#RUN yarn cache clean
+#RUN npm cache clean
 
 # -- RUNTIME STAGE ------------------------------\
 
@@ -60,8 +60,8 @@ RUN add-apt-repository \
 
 RUN apt-get update && apt-get install -y getenvoy-envoy
 
-# install yarn
-RUN yarn global add pm2
+# install npm
+RUN npm global add pm2
 
 ENV NODE_ENV 'production'
 WORKDIR /app

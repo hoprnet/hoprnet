@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - HOPR uses its own STUN servers 🚀
 - Use WebRTC over UDP by default and let WebRTC decide which transport protocol will be used
-- `yarn demo` spawns its own mini-testnet, including bootstrap server and persistent blockchain
+- `npm demo` spawns its own mini-testnet, including bootstrap server and persistent blockchain
 
 ### Changed
 

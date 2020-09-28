@@ -36,7 +36,7 @@ You can also check out a more detailed overview [here](./docs/protos.md).
 ## Workflow
 
 1. add a new `.proto` file in `protos` folder
-2. running `yarn build` will generate [grpc-node](https://github.com/grpc/grpc-node/tree/grpc@1.24.x/packages/grpc-native-core) stubs and [grpc-web](https://github.com/grpc/grpc-web) stubs
+2. running `npm build` will generate [grpc-node](https://github.com/grpc/grpc-node/tree/grpc@1.24.x/packages/grpc-native-core) stubs and [grpc-web](https://github.com/grpc/grpc-web) stubs
 
 example:
 

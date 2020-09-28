@@ -22,7 +22,7 @@
   },
   "engines": {
     "node": "12",
-    "yarn": "1"
+    "npm": "1"
   },
   "homepage": "https://hoprnet.org",
   "repository": {
@@ -30,10 +30,10 @@
     "url": "https://github.com/hoprnet/hopr-core.git"
   },
   "scripts": {
-    "build": "yarn clean && tsc -p .",
+    "build": "npm clean && tsc -p .",
     "clean": "rm -rf ./lib",
     "test": "for i in {1..5}; do jest --runInBand --forceExit; done",
-    "prepublishOnly": "yarn build",
+    "prepublishOnly": "npm build",
     "lint": "prettier --check .",
     "lint:fix": "prettier --write ."
   },
@@ -118,7 +118,7 @@
   },
   "husky": {
     "hooks": {
-      "pre-commit": "yarn lint:fix"
+      "pre-commit": "npm lint:fix"
     }
   }
 }

@@ -4,14 +4,14 @@
 FROM node:12.9.1-buster AS base
 WORKDIR /src
 
-# use yarn 1.19.2
+# use npm 1.19.2
 ENV YARN_VERSION 1.19.2
-RUN yarn policies set-version $YARN_VERSION
+RUN npm policies set-version $YARN_VERSION
 
 COPY package*.json ./
-COPY yarn.lock ./
+COPY npm.lock ./
 
-RUN yarn install --build-from-source 
+RUN npm install --build-from-source 
 
 # -- CHECK STAGE --------------------------------
 
@@ -21,16 +21,16 @@ ARG CI
 ENV CI $CI
 
 COPY . .
-RUN yarn test
+RUN npm test
 
 # -- BUILD STAGE --------------------------------
 
 FROM base AS build
 
 COPY . .
-RUN yarn build
+RUN npm build
 RUN npm prune --production --no-audit
-RUN yarn cache clean
+RUN npm cache clean
 
 # -- RUNTIME STAGE --------------------------------
 

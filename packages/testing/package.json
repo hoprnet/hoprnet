@@ -11,17 +11,17 @@
     "!lib/*.spec**",
     "README.md",
     "package.json",
-    "yarn.lock"
+    "npm.lock"
   ],
   "engines": {
     "node": ">=12.9.1",
-    "yarn": ">=1.19.2"
+    "npm": ">=1.19.2"
   },
   "scripts": {
-    "build": "yarn clean && tsc -p . --noEmit false",
+    "build": "npm clean && tsc -p . --noEmit false",
     "clean": "rm -rf ./lib",
     "lint": "prettier --check .",
-    "prepare": "yarn build"
+    "prepare": "npm build"
   },
   "dependencies": {
     "@hoprnet/hopr-demo-seeds": "1.8.0",
@@ -35,7 +35,7 @@
   },
   "husky": {
     "hooks": {
-      "pre-commit": "yarn lint"
+      "pre-commit": "npm lint"
     }
   },
   "prettier": {

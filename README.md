@@ -24,13 +24,13 @@ TODO
 ### Developing with this repository
 
 ```sh
-yarn                      # Install tooling
+npm                      # Install tooling
 lerna bootstrap           # Installs all dependencies
 lerna link --force-local  # Link local dependencies
 lerna run build           # builds code
 
 # Run Hoprd
-yarn run hoprd --admin --grpc
+npm run hoprd --admin --grpc
 ```
 
 ## HOPR ecosystem

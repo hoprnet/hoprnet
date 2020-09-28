@@ -4,10 +4,10 @@ FROM node:12.9.1-buster AS base
 WORKDIR /src
 
 ENV YARN_VERSION 1.19.2
-RUN yarn policies set-version $YARN_VERSION
+RUN npm policies set-version $YARN_VERSION
 
 COPY package*.json ./
-COPY yarn.lock ./
+COPY npm.lock ./
 
 RUN apt-get update && \
     apt-get install -y \
@@ -18,7 +18,7 @@ RUN apt-get update && \
     cmake \
     wget
 
-RUN yarn install --build-from-source --frozen-lockfile
+RUN npm install --build-from-source --frozen-lockfile
 
 # -- CHECK STAGE --------------------------------
 
@@ -28,16 +28,16 @@ RUN yarn install --build-from-source --frozen-lockfile
 # ENV CI $CI
 
 # COPY . .
-# RUN yarn test
+# RUN npm test
 
 # -- BUILD STAGE --------------------------------
 
 FROM base as build
 
 COPY . .
-RUN yarn build
+RUN npm build
 RUN npm prune --production --no-audit
-RUN yarn cache clean
+RUN npm cache clean
 
 # -- RUNTIME STAGE ------------------------------\
 
@@ -62,8 +62,8 @@ RUN add-apt-repository \
 
 RUN apt-get update && apt-get install -y getenvoy-envoy
 
-# install yarn
-RUN yarn global add pm2
+# install npm
+RUN npm global add pm2
 
 ENV NODE_ENV 'production'
 WORKDIR /app

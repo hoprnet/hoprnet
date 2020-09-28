@@ -44,12 +44,12 @@ To contribute to the project, please follow the next steps to learn how to insta
 
 ### Install depedencies
 ```
-yarn
+npm
 ```
 
 ### Compiling source code
 ```
-yarn build
+npm build
 ```
 
 ### Run application
@@ -57,7 +57,7 @@ yarn build
 ```
 HOST_IPV4=0.0.0.0:9091
 ETHEREUM_PROVIDER=wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36
-yarn start
+npm start
 ```
 
 When the service is running you can type `help` to see a full list of commands.

@@ -10,20 +10,20 @@
   "scripts": {
     "clean": "rm -rf ./lib",
     "test": "mocha --parallel",
-    "dev": "yarn clean && tsc -w",
-    "build": "yarn clean && tsc -p . --noEmit false",
-    "prepare": "yarn build"
+    "dev": "npm clean && tsc -w",
+    "build": "npm clean && tsc -p . --noEmit false",
+    "prepare": "npm build"
   },
   "files": [
     "lib/",
     "!lib/**/*.spec.*",
     "README.md",
     "package.json",
-    "yarn.lock"
+    "npm.lock"
   ],
   "engines": {
     "node": ">=12.9.1",
-    "yarn": ">=1.19.2"
+    "npm": ">=1.19.2"
   },
   "dependencies": {
     "bignumber.js": "^9.0.0",

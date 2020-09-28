@@ -73,7 +73,7 @@ To get a local copy up and running follow these simple steps. In case you just w
 This is an example of how to list things you need to use the software and how to install them.
 
 - [node.js v>=12](https://nodejs.org/)
-- [yarn](https://yarnpkg.com/)
+- [npm](https://npmpkg.com/)
 - [docker](https://www.docker.com/) (optional)
 
 ### Installation
@@ -87,7 +87,7 @@ git clone https://github.com/hoprnet/hopr-server.git
 2. Install NPM packages
 
 ```sh
-yarn
+npm
 ```
 
 ### Docker Image
@@ -117,14 +117,14 @@ docker run \
 
 ## Usage
 
-Upon installing, you can run `yarn start` to start the server which will use `ts-node`. Once you see `:: HOPR Core Node Started ::`, it means that the server has successfully connected to the **HOPR Network** using the defined `BOOTSTRAP_SERVERS` and is ready to accept requests.
+Upon installing, you can run `npm start` to start the server which will use `ts-node`. Once you see `:: HOPR Core Node Started ::`, it means that the server has successfully connected to the **HOPR Network** using the defined `BOOTSTRAP_SERVERS` and is ready to accept requests.
 
-In case you are looking to distribute the application, you can precompile it using `yarn build`, which will compile the `nest.js` TypeScript files and create a `dist` folder, which can then be used by `node` directly.
+In case you are looking to distribute the application, you can precompile it using `npm build`, which will compile the `nest.js` TypeScript files and create a `dist` folder, which can then be used by `node` directly.
 
 ### Commands
 
-1. `yarn start` - Starts **HOPR Server** in `dev` mode.
-2. `yarn build` - Builds **HOPR Server** for production.
+1. `npm start` - Starts **HOPR Server** in `dev` mode.
+2. `npm build` - Builds **HOPR Server** for production.
 
 _For more information about the HOPR Network, please refer to the [Documentation](https://docs.hoprnet.org)_
 
@@ -182,8 +182,8 @@ See the [issues](https://github.com/hoprnet/hopr-server/issues) for a list of pr
 In this example, you will need to run two servers (server `A` and server `B`), one for sending a message and another for listening.
 Server `B` needs to be setup in a different directory from server `A`, as a **HOPR Node** creates a `db` directory which can not be shared between different instances.
 
-1. Start server `A`: `yarn start`
-2. Start server `B`: `SERVER_HOST=0.0.0.0:50052 CORE_HOST=0.0.0.0:9092 yarn start`
+1. Start server `A`: `npm start`
+2. Start server `B`: `SERVER_HOST=0.0.0.0:50052 CORE_HOST=0.0.0.0:9092 npm start`
 3. Call `GetStatus` for both servers using BloomRPC, take note of their ids
 4. Call `Listen` on server `B`, `peer_id` is optional and can be removed, example input: `{}`
 5. Call `Send` on server `A`, example input can be:
@@ -199,8 +199,8 @@ Server `B` needs to be setup in a different directory from server `A`, as a **HO
 
 ### Querying the server using [gCURL](https://github.com/nikunjy/pcurl)
 
-1. Install [gCURL](https://github.com/nikunjy/pcurl) using `npm install -g gcurl` or `yarn global add curl`.
-2. Start the server `yarn start`
+1. Install [gCURL](https://github.com/nikunjy/pcurl) using `npm install -g gcurl` or `npm global add curl`.
+2. Start the server `npm start`
 3. Wait until terminal displays `:: HOPR Core Node Started ::`
 4. Call `getStatus` using `gcurl -f ./node_modules/@hoprnet/hopr-protos/protos/status.proto --host 127.0.0.1:50051 --input '{}' --short status:Status:getStatus`
 5. First `getStatus` call might take a minute to respond, you should receive a minified json response like:

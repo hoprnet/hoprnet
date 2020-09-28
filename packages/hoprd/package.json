@@ -9,10 +9,10 @@
     "buildAdmin": "next build hopr-admin",
     "clean": "rm -rf ./lib",
     "test": "jest --runInBand --forceExit",
-    "prepublishOnly": "yarn build",
+    "prepublishOnly": "npm build",
     "lint": "prettier --check .",
     "lint:fix": "prettier --write .",
-    "dev": "yarn install && yarn build && yarn buildAdmin && node lib/index.js --admin"
+    "dev": "npm install && npm build && npm buildAdmin && node lib/index.js --admin"
   },
   "license": "",
   "dependencies": {

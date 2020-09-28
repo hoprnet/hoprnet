@@ -6,7 +6,7 @@
   "scripts": {
     "start": "micro",
     "build": "tsc -d -p .",
-    "prepare": "yarn build"
+    "prepare": "npm build"
   },
   "files": [
     "lib",
@@ -19,7 +19,7 @@
   ],
   "engines": {
     "node": ">= 12.9.1",
-    "yarn": ">= 1.19.2"
+    "npm": ">= 1.19.2"
   },
   "main": "lib/index.js",
   "types": "lib/index.d.ts",

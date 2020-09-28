@@ -11,13 +11,13 @@
   "main": "index.js",
   "license": "GPL-3.0-only",
   "scripts": {
-    "build": "yarn build:protos",
-    "build:protos": "yarn build:protos:node && yarn build:protos:web",
+    "build": "npm build:protos",
+    "build:protos": "npm build:protos:node && npm build:protos:web",
     "build:protos:node": "rimraf node && mkdirp node && node ./scripts/generateNode.js",
     "build:protos:web": "rimraf web && mkdirp web && node ./scripts/generateWeb.js",
     "fix:types": "replace 'from \"grpc\"' 'from \"@grpc/grpc-js\"' . -r --include=\"*.d.ts\"",
-    "test": "yarn build:protos",
-    "prepublishOnly": "yarn build"
+    "test": "npm build:protos",
+    "prepublishOnly": "npm build"
   },
   "publishConfig": {
     "access": "public"
@@ -29,7 +29,7 @@
   },
   "engines": {
     "node": ">=12.9.1",
-    "yarn": "1"
+    "npm": "1"
   },
   "prettier": {
     "tabWidth": 2,
