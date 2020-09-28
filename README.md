@@ -25,9 +25,9 @@ TODO
 
 ```sh
 yarn                      # Install tooling
-lerna bootstrap           # Installs all dependencies
-lerna link --force-local  # Link local dependencies
-lerna run build           # builds code
+yarn lerna:bootstrap      # Installs all dependencies
+yarn lerna:link           # Link local dependencies
+yarn lerna:build          # builds code
 
 # Run Hoprd
 yarn run hoprd --admin --grpc

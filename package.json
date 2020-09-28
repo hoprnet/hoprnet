@@ -2,6 +2,9 @@
   "name": "root",
   "private": true,
   "scripts": {
+    "lerna:bootstrap": "lerna bootstrap",
+    "lerna:link": "lerna link --force-local",
+    "lerna:build": "lerna run build",
     "chat": "node packages/chat/lib/index.js",
     "hoprd": "node packages/hoprd/lib/index.js"
   },
