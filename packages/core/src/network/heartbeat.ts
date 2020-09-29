@@ -8,13 +8,11 @@ import { Entry } from './peerStore'
 import { EventEmitter } from 'events'
 import PeerInfo from 'peer-info'
 import { randomInteger } from '@hoprnet/hopr-utils'
+import {HEARTBEAT_REFRESH_TIME, HEARTBEAT_INTERVAL_LOWER_BOUND, HEARTBEAT_INTERVAL_UPPER_BOUND, MAX_PARALLEL_CONNECTIONS} from '../constants'
+
 
 const log = debug('hopr-core:heartbeat')
 
-const REFRESH_TIME = 103 * 1000
-const CHECK_INTERVAL_LOWER_BOUND = 41 * 1000
-const CHECK_INTERVAL_UPPER_BOUND = 59 * 1000
-const MAX_PARALLEL_CONNECTIONS = 10
 
 class Heartbeat<Chain extends HoprCoreConnector> extends EventEmitter {
   timeout: any
@@ -40,12 +38,14 @@ class Heartbeat<Chain extends HoprCoreConnector> extends EventEmitter {
   }
 
   async checkNodes(): Promise<void> {
+
     log(`Checking nodes`)
     this.networkPeers.debugLog()
+
     const promises: Promise<void>[] = Array.from({ length: MAX_PARALLEL_CONNECTIONS })
     const tokens = getTokens(MAX_PARALLEL_CONNECTIONS)
 
-    const THRESHOLD_TIME = Date.now() - REFRESH_TIME
+    const THRESHOLD_TIME = Date.now() - HEARTBEAT_REFRESH_TIME
 
     const queryNode = async (peer: string, token: Token): Promise<void> => {
       while (
@@ -72,7 +72,6 @@ class Heartbeat<Chain extends HoprCoreConnector> extends EventEmitter {
           })
         } catch (err) {
           await this.node.hangUp(currentPeerId)
-
           this.networkPeers.blacklistPeer(peer)
 
           // ONLY FOR TESTING
@@ -104,7 +103,7 @@ class Heartbeat<Chain extends HoprCoreConnector> extends EventEmitter {
     this.timeout = setTimeout(async () => {
       await this.checkNodes()
       this.setTimeout()
-    }, randomInteger(CHECK_INTERVAL_LOWER_BOUND, CHECK_INTERVAL_UPPER_BOUND))
+    }, randomInteger(HEARTBEAT_INTERVAL_LOWER_BOUND, HEARTBEAT_INTERVAL_UPPER_BOUND))
   }
 
   start(): void {
