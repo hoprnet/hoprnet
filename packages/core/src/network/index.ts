@@ -10,7 +10,7 @@ import Stun from './stun'
 class Network<Chain extends HoprCoreConnector> {
   public crawler: Crawler<Chain>
   public heartbeat: Heartbeat<Chain>
-  public peerStore: PeerStore<Chain>
+  public peerStore: PeerStore
   public stun?: Stun
 
   constructor(node: Hopr<Chain>, private options: HoprOptions) {

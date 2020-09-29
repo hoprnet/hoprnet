@@ -1,5 +1,3 @@
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import type Hopr from '..'
 import heap from 'heap-js'
 
 import type PeerInfo from 'peer-info'
@@ -21,7 +19,7 @@ export type BlacklistedEntry = {
 
 export const BLACKLIST_TIMEOUT = durations.seconds(47)
 
-class PeerStore<Chain extends HoprCoreConnector> {
+class PeerStore {
   peers: Entry[]
 
   deletedPeers: BlacklistedEntry[]
