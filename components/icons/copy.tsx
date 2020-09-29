@@ -16,5 +16,5 @@ export default function Copy() {
         </g>
       </g>
     </svg>
-  )
+  );
 }

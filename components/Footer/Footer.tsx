@@ -1,11 +1,7 @@
-import BlockscoutLink from '../BlockscoutLink';
-import styles from './Footer.module.css';
+import BlockscoutLink from "../BlockscoutLink";
+import styles from "./Footer.module.css";
 
-const Footer = ({
-  hoprChannelContract,
-  hoprCoverbotAddress,
-  refreshed,
-}) => {
+const Footer = ({ hoprChannelContract, hoprCoverbotAddress, refreshed }) => {
   return (
     <footer className={styles.footer}>
       <div>
@@ -36,4 +32,4 @@ const Footer = ({
   );
 };
 
-export default Footer
+export default Footer;

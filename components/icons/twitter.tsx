@@ -1,6 +1,10 @@
 export default function Twitter() {
   return (
-    <svg width={20} viewBox="328 355 335 276" xmlns="http://www.w3.org/2000/svg">
+    <svg
+      width={20}
+      viewBox="328 355 335 276"
+      xmlns="http://www.w3.org/2000/svg"
+    >
       <path
         d="
       M 630, 425
@@ -18,8 +22,8 @@ export default function Twitter() {
       A 117, 117 0 0 0 662, 390
       A  65,  65 0 0 1 630, 425
       Z"
-        style={{ fill: '#3BA9EE' }}
+        style={{ fill: "#3BA9EE" }}
       />
     </svg>
-  )
+  );
 }

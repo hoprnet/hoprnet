@@ -9,4 +9,4 @@ function BlockscoutLink({ id, children }) {
   );
 }
 
-export default BlockscoutLink
+export default BlockscoutLink;

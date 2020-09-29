@@ -6,9 +6,15 @@
     "dev": "cross-env NEXT_PUBLIC_HOPR_ENVIRONMENT=develop next dev",
     "dev:testnet": "cross-env NEXT_PUBLIC_HOPR_ENVIRONMENT=testnet next dev",
     "build": "cross-env NEXT_PUBLIC_HOPR_ENVIRONMENT=$NEXT_PUBLIC_HOPR_ENVIRONMENT next build",
+    "type-check": "tsc",
+    "lint": "eslint '*/**/*.{js,ts,tsx}' --quiet --fix",
     "start": "next start"
   },
   "dependencies": {
+    "@chakra-ui/core": "^0.8.0",
+    "@emotion/core": "^10.0.35",
+    "@emotion/styled": "^10.0.27",
+    "emotion-theming": "^10.0.27",
     "firebase": "^7.20.0",
     "isomorphic-unfetch": "^3.0.0",
     "next": "9.5.3",
@@ -17,6 +23,17 @@
     "swr": "^0.3.2"
   },
   "devDependencies": {
-    "cross-env": "^7.0.2"
+    "cross-env": "^7.0.2",
+    "@types/node": "^12.12.21",
+    "@types/react": "^16.9.16",
+    "@types/react-dom": "^16.9.4",
+    "@typescript-eslint/eslint-plugin": "^3.4.0",
+    "@typescript-eslint/parser": "^3.4.0",
+    "eslint": "^7.3.1",
+    "eslint-config-prettier": "^6.11.0",
+    "eslint-plugin-prettier": "^3.1.4",
+    "eslint-plugin-react": "^7.20.0",
+    "prettier": "^2.0.5",
+    "typescript": "3.7.3"
   }
 }
