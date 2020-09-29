@@ -66,7 +66,7 @@ class RelayContext {
             }
           } else if (u8aEquals(received.slice(0, 1), RELAY_PAYLOAD_PREFIX)) {
             console.log(`relaying message <${new TextDecoder().decode((await msg).value.slice())}>`)
-            yield (await msg).value.slice(1)
+            yield (await msg).value
           }
 
           msgReceived = false
