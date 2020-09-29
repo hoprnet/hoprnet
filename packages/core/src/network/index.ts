@@ -25,7 +25,7 @@ class Network<Chain extends HoprCoreConnector> {
     })
 
     if (options.bootstrapNode) {
-      this.stun = new Stun(options)
+      this.stun = new Stun(options.hosts)
     }
   }
 
