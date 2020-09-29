@@ -341,7 +341,7 @@ export class Coverbot implements Bot {
       const relayerAddress = getHOPRNodeAddressFromContent(message.text)
 
       // 2.
-      console.log(`Successful Relay: ${relayerAddress}`)
+      log(`- handleMessage | Successful Relay: ${relayerAddress}`)
       this._sendMessageFromBot(relayerAddress, NodeStateResponses[NodeStates.relayingNodeSucceded])
       .catch(err => {
         error(`Trying to send ${NodeStates.relayingNodeSucceded} message to ${relayerAddress} failed.`)
