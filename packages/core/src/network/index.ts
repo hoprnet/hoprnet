@@ -8,13 +8,13 @@ import Heartbeat from './heartbeat'
 import PeerStore from './peerStore'
 import Stun from './stun'
 
-class Network<Chain extends HoprCoreConnector> {
+class Network {
   public crawler: Crawler
   public heartbeat: Heartbeat
   public peerStore: PeerStore
   public stun?: Stun
 
-  constructor(node: Hopr<Chain>, private options: HoprOptions) {
+  constructor(node: Hopr<any>, private options: HoprOptions) {
     this.peerStore = new PeerStore(node.peerStore.peers.values())
     this.heartbeat = new Heartbeat(this.peerStore, node.interactions.network.heartbeat, node.hangUp)
     this.crawler = new Crawler(node.peerInfo.id, this.peerStore, node.interactions.network.crawler, node.peerStore)

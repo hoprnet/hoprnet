@@ -77,7 +77,7 @@ export type PeerStore = {
 
 export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
   public interactions: Interactions<Chain>
-  public network: Network<Chain>
+  public network: Network
   public dbKeys = DbKeys
   public output: (arr: Uint8Array) => void
   public isBootstrapNode: boolean
