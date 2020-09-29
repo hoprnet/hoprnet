@@ -10,24 +10,28 @@ interface PairType<T> {
 const TIMEOUT_LOWER_BOUND = 450
 const TIMEOUT_UPPER_BOUND = 650
 
+// @ts-ignore
 const Pair: <T>() => PairType<T> = require('it-pair')
 
 describe('test relay connection', function () {
-  it('should initiate a relayConnection and exchange a demo message', async function () {
+  it('should initiate a relayConnection and let the receiver close the connection prematurely', async function () {
     const AliceBob = Pair<Uint8Array>()
     const BobAlice = Pair<Uint8Array>()
+
     const a = new RelayConnection({
       stream: {
         sink: AliceBob.sink,
         source: BobAlice.source,
       },
     })
+
     const b = new RelayConnection({
       stream: {
         sink: BobAlice.sink,
         source: AliceBob.source,
       },
     })
+
     a.sink(
       (async function* () {
         let i = 0
@@ -37,6 +41,7 @@ describe('test relay connection', function () {
         }
       })()
     )
+
     setTimeout(() => setImmediate(() => b.close()), randomInteger(TIMEOUT_LOWER_BOUND, TIMEOUT_UPPER_BOUND))
 
     for await (const msg of b.source) {
@@ -46,6 +51,7 @@ describe('test relay connection', function () {
     for await (const msg of a.source) {
       throw Error(`there should be no message`)
     }
+
     await new Promise((resolve) => setTimeout(resolve, 50))
 
     assert(
@@ -62,7 +68,7 @@ describe('test relay connection', function () {
     assert(b.destroyed && a.destroyed, `both parties must have marked the connection as destroyed`)
   })
 
-  it('should initiate a relayConnection and exchange a demo message', async function () {
+  it('should initiate a relayConnection and close the connection by the sender prematurely', async function () {
     const AliceBob = Pair<Uint8Array>()
     const BobAlice = Pair<Uint8Array>()
 
@@ -110,7 +116,7 @@ describe('test relay connection', function () {
     assert(b.destroyed && a.destroyed, `both parties must have marked the connection as destroyed`)
   })
 
-  it('should initiate a relayConnection and exchange a demo message', async function () {
+  it('should initiate a relayConnection and exchange messages and destroy the connection after a random timeout', async function () {
     const AliceBob = Pair<Uint8Array>()
     const BobAlice = Pair<Uint8Array>()
 
@@ -207,7 +213,6 @@ describe('test relay connection', function () {
         }
 
         //@ts-ignore
-
         msgA = a.source.next().then(aFunction)
       }
 
