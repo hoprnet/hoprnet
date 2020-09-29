@@ -1,6 +1,7 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '..'
 
+import NetworkPeerStore from './peerStore'
 import debug from 'debug'
 const log = debug('hopr-core:heartbeat')
 
@@ -23,7 +24,11 @@ class Heartbeat<Chain extends HoprCoreConnector> extends EventEmitter {
   interval: any
   timeout: any
 
-  constructor(public node: Hopr<Chain>) {
+  constructor(
+    public node: Hopr<Chain>,
+    private networkPeers: NetworkPeerStore
+    ) {
+
     super()
 
     this.node.on('peer:connect', this.connectionListener.bind(this))
@@ -33,7 +38,7 @@ class Heartbeat<Chain extends HoprCoreConnector> extends EventEmitter {
   private connectionListener(peer: PeerId | PeerInfo) {
     const peerIdString = (PeerId.isPeerId(peer) ? peer : peer.id).toB58String()
 
-    this.node.network.peerStore.push({
+    this.networkPeers.push({
       id: peerIdString,
       lastSeen: Date.now(),
     })
@@ -41,7 +46,7 @@ class Heartbeat<Chain extends HoprCoreConnector> extends EventEmitter {
 
   async checkNodes(): Promise<void> {
     log(`Checking nodes`)
-    this.node.network.peerStore.peers.forEach((entry) => log(entry.id))
+    this.networkPeers.debugLog()
     const promises: Promise<void>[] = Array.from({ length: MAX_PARALLEL_CONNECTIONS })
     const tokens = getTokens(MAX_PARALLEL_CONNECTIONS)
 
@@ -50,10 +55,10 @@ class Heartbeat<Chain extends HoprCoreConnector> extends EventEmitter {
     const queryNode = async (peer: string, token: Token): Promise<void> => {
       while (
         tokens.length > 0 &&
-        this.node.network.peerStore.peers.length > 0 &&
-        this.node.network.peerStore.top(1)[0].lastSeen < THRESHOLD_TIME
+        this.networkPeers.peers.length > 0 &&
+        this.networkPeers.top(1)[0].lastSeen < THRESHOLD_TIME
       ) {
-        let nextPeer = this.node.network.peerStore.pop() as Entry
+        let nextPeer = this.networkPeers.pop() as Entry
         let token = tokens.pop() as Token
 
         promises[token] = queryNode(nextPeer.id, token)
@@ -67,27 +72,23 @@ class Heartbeat<Chain extends HoprCoreConnector> extends EventEmitter {
         try {
           await this.node.interactions.network.heartbeat.interact(currentPeerId)
 
-          this.node.network.peerStore.push({
+          this.networkPeers.push({
             id: peer,
             lastSeen: Date.now(),
           })
         } catch (err) {
           await this.node.hangUp(currentPeerId)
 
-          this.node.network.peerStore.blacklistPeer(peer)
+          this.networkPeers.blacklistPeer(peer)
 
           // ONLY FOR TESTING
           log(`Deleted node ${peer}`)
-          log(`current nodes:`)
-          this.node.network.peerStore.peers.forEach((node: Entry) => log(node.id))
+          this.networkPeers.debugLog()
           // END ONLY FOR TESTING
         }
 
-        if (
-          this.node.network.peerStore.peers.length > 0 &&
-          this.node.network.peerStore.top(1)[0].lastSeen < THRESHOLD_TIME
-        ) {
-          peer = (this.node.network.peerStore.pop() as Entry).id
+        if (this.networkPeers.updatedSince(THRESHOLD_TIME)) {
+          peer = this.networkPeers.pop().id
         } else {
           break
         }
@@ -97,12 +98,9 @@ class Heartbeat<Chain extends HoprCoreConnector> extends EventEmitter {
       tokens.push(token)
     }
 
-    if (
-      this.node.network.peerStore.peers.length > 0 &&
-      this.node.network.peerStore.top(1)[0].lastSeen < THRESHOLD_TIME
-    ) {
+    if (this.networkPeers.updatedSince(THRESHOLD_TIME)) {
       let token = tokens.pop() as Token
-      promises[token] = queryNode((this.node.network.peerStore.pop() as Entry).id, token)
+      promises[token] = queryNode(this.networkPeers.pop().id, token)
     }
 
     await Promise.all(promises)

@@ -39,9 +39,11 @@ describe('check heartbeat mechanism', function () {
       },
     } as Hopr<HoprCoreConnector>['interactions']
 
+    let nps = new PeerStore(node.peerStore.peers.values())
+
     node.network = {
-      heartbeat: new Heartbeat(node),
-      peerStore: new PeerStore(node.peerStore.peers.values()),
+      heartbeat: new Heartbeat(node, nps),
+      peerStore: nps,
     } as Hopr<HoprCoreConnector>['network']
 
     node.peerRouting.findPeer = (_: PeerId) => Promise.reject(Error('not implemented'))

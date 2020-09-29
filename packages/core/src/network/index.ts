@@ -14,8 +14,8 @@ class Network<Chain extends HoprCoreConnector> {
   public stun?: Stun
 
   constructor(node: Hopr<Chain>, private options: HoprOptions) {
-    this.heartbeat = new Heartbeat(node)
     this.peerStore = new PeerStore(node.peerStore.peers.values())
+    this.heartbeat = new Heartbeat(node, this.peerStore)
     this.crawler = new Crawler(node, this.peerStore)
 
     node.on('peer:connect', this.peerStore.onPeerConnect.bind(this.peerStore))

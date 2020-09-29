@@ -151,6 +151,18 @@ class PeerStore {
       heap.heappop(this.deletedPeers, this.compareBlackList)
     }
   }
+
+  public debugLog(){
+    log(`current nodes:`)
+    this.peers.forEach((node: Entry) => log(node.id))
+  }
+
+  updatedSince(ts){
+    return (
+      this.peers.length > 0 &&
+      this.top(1)[0].lastSeen < ts 
+    )
+  }
 }
 
 export default PeerStore
