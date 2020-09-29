@@ -34,10 +34,6 @@ class RelayConnection implements MultiaddrConnection {
 
     this._defer = Defer()
 
-    this._defer.promise.then(() => {
-      console.log(`promise resolved`)
-    })
-
     this._destroyed = false
     this._sinkTriggered = false
 
@@ -48,28 +44,31 @@ class RelayConnection implements MultiaddrConnection {
       let itDone = false
 
       this._defer.promise.then(() => {
-        console.log(`source promise resolved`)
-
         itDone = true
       })
 
-      let msg: Promise<IteratorResult<Uint8Array, Uint8Array | void>>
+      function msgFunction({ done, value }) {
+        msgReceived = true
+
+        if (done) {
+          itDone = true
+        }
+        return { done, value }
+      }
+
+      let msg: Promise<IteratorResult<Uint8Array, Uint8Array | void>> = (this._stream.source as AsyncGenerator<
+        Uint8Array,
+        Uint8Array | void
+      >)
+        .next()
+        .then(msgFunction)
 
       while (true) {
-        msg = (this._stream.source as AsyncGenerator<Uint8Array, Uint8Array | void>).next()
-
         await Promise.race([
-          msg.then(({ done }) => {
-            msgReceived = true
-
-            if (done) {
-              itDone = true
-            }
-          }),
+          // prettier-ignore
+          msg,
           this._defer.promise,
         ])
-
-        console.log(`itDone`, itDone, `msgReceived`, msgReceived)
 
         if (msgReceived) {
           msgReceived = false
@@ -79,6 +78,7 @@ class RelayConnection implements MultiaddrConnection {
           if (_received == null) {
             // change this to `return` to end the stream
             // once we receive an empty message
+            console.log(`empty message`)
             continue
           }
 
@@ -87,8 +87,15 @@ class RelayConnection implements MultiaddrConnection {
           if (u8aEquals(received.slice(0, 1), RELAY_PAYLOAD_PREFIX)) {
             if (itDone) {
               this._destroyed = true
+              console.log(`returned`)
               return received.slice(1)
             } else {
+              msg = (this._stream.source as AsyncGenerator<
+                Uint8Array,
+                Uint8Array | void
+              >)
+                .next()
+                .then(msgFunction)
               yield received.slice(1)
             }
           } else if (u8aEquals(received.slice(0, 1), RELAY_STATUS_PREFIX)) {
@@ -129,15 +136,15 @@ class RelayConnection implements MultiaddrConnection {
   }
 
   sink(source: AsyncIterable<Uint8Array>): Promise<void> {
+    this._sinkTriggered = true
+
     return this._stream.sink(
       async function* (this: RelayConnection) {
-        this._sinkTriggered = true
-
         let msgReceived = false
         let itDone = false
 
         this._defer.promise.then(() => {
-          console.log(`promise resolved`)
+          console.log(`sink promise resolved`)
           itDone = true
         })
 
@@ -196,10 +203,12 @@ class RelayConnection implements MultiaddrConnection {
     )
   }
 
-  async close(err?: Error) {
+  close(err?: Error): Promise<void> {
     this._defer.resolve()
 
     this.timeline.close = Date.now()
+
+    return Promise.resolve()
   }
 }
 
