@@ -1,27 +1,22 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '..'
-
 import NetworkPeerStore from './peerStore'
 import debug from 'debug'
-const log = debug('hopr-core:heartbeat')
-
 import { getTokens, Token } from '../utils'
-
 import PeerId from 'peer-id'
-
 import { Entry } from './peerStore'
 import { EventEmitter } from 'events'
 import PeerInfo from 'peer-info'
 import { randomInteger } from '@hoprnet/hopr-utils'
 
+const log = debug('hopr-core:heartbeat')
+
 const REFRESH_TIME = 103 * 1000
 const CHECK_INTERVAL_LOWER_BOUND = 41 * 1000
 const CHECK_INTERVAL_UPPER_BOUND = 59 * 1000
-
 const MAX_PARALLEL_CONNECTIONS = 10
 
 class Heartbeat<Chain extends HoprCoreConnector> extends EventEmitter {
-  interval: any
   timeout: any
 
   constructor(
@@ -55,10 +50,9 @@ class Heartbeat<Chain extends HoprCoreConnector> extends EventEmitter {
     const queryNode = async (peer: string, token: Token): Promise<void> => {
       while (
         tokens.length > 0 &&
-        this.networkPeers.peers.length > 0 &&
-        this.networkPeers.top(1)[0].lastSeen < THRESHOLD_TIME
+        this.networkPeers.updatedSince(THRESHOLD_TIME)
       ) {
-        let nextPeer = this.networkPeers.pop() as Entry
+        let nextPeer = this.networkPeers.pop()
         let token = tokens.pop() as Token
 
         promises[token] = queryNode(nextPeer.id, token)
@@ -120,7 +114,6 @@ class Heartbeat<Chain extends HoprCoreConnector> extends EventEmitter {
 
   stop(): void {
     clearTimeout(this.timeout)
-    clearInterval(this.interval)
     log(`Heartbeat mechanism stopped`)
   }
 }
