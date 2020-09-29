@@ -4,10 +4,14 @@ import {
   TWITTER_API_SECRET,
   TWITTER_API_ACCESS_TOKEN_SECRET,
   TWITTER_BLACKLISTED,
-} from './env'
+} from '../../utils/env'
 import TwitterClient from '@hoprnet/twitter-api-client'
 import tweetMock from './tweetMock.json'
-import { getHOPRNodeAddressFromContent } from './utils'
+import { getHOPRNodeAddressFromContent } from '../../utils/utils'
+import debug from 'debug'
+
+
+const log = debug('hopr-chatbot:twitter')
 
 const twitterClient = new TwitterClient({
   apiKey: TWITTER_API_KEY,
@@ -23,6 +27,12 @@ export class TweetState {
 
   public isValid() {
     return this.hasTag && this.hasMention && this.sameNode
+  }
+
+  public validateNode() {
+      this.hasMention = true
+      this.hasTag = true
+      this.sameNode = true
   }
 }
 
@@ -85,8 +95,14 @@ export class TweetMessage {
     return followers_count > 100
   }
 
-  getHOPRNode(): string {
-    return getHOPRNodeAddressFromContent(this.content)
+  getHOPRNode(options?: { mock: boolean, hoprNode: string}): string {
+    log('- getHOPRNode | Starting to retrieve HOPR Node from Tweet')
+    options && options.mock && log(`- getHOPRNode | Mock has been given, only reading ${options.hoprNode} now.`)
+    return options.mock ? options.hoprNode : getHOPRNodeAddressFromContent(this.content)
+  }
+
+  validateTweetStatus() {
+    return this.status.validateNode()
   }
 
   hasSameHOPRNode(hoprAddress: string): boolean {

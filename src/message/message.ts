@@ -1,5 +1,10 @@
 import { TextEncoder, TextDecoder } from 'util'
 import { u8aConcat } from '@hoprnet/hopr-utils'
+import debug from 'debug'
+
+
+const log = debug('hopr-chatbot:message')
+const error = debug('hopr-chatbot:message:error')
 
 const textEncoder = new TextEncoder()
 const textDecoder = new TextDecoder()
@@ -28,8 +33,7 @@ export class Message extends Uint8Array {
         text: textDecoder.decode(text),
       }
     } catch (err) {
-      console.error(err)
-      throw Error('Unable to decode message')
+      error(err)
     }
   }
 

@@ -4,7 +4,7 @@ import {
   LINKDROP_CHAIN,
   LINKDROP_CAMPAIGN_ID,
   LINKDROP_CAMPAIGN_AMOUNT_PER_LINK_IN_WEI,
-} from './env'
+} from '../utils/env'
 import LinkdropSDK from '@linkdrop/sdk'
 import TinyURL from 'tinyurl'
 

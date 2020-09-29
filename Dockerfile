@@ -1,10 +1,19 @@
 # -- BASE STAGE --------------------------------
-FROM node:12.9.1-alpine AS base
+FROM node:12.9.1-buster AS base
 WORKDIR /src
 
 # use yarn 1.19.2
 ENV YARN_VERSION 1.19.2
 RUN yarn policies set-version $YARN_VERSION
+
+RUN apt-get update && \
+    apt-get install -y \
+    libssl-dev \
+    ca-certificates \
+    fuse \
+    gcc \
+    cmake \
+    wget
 
 COPY package*.json ./
 COPY yarn.lock ./
@@ -21,7 +30,7 @@ RUN npm prune --production --no-audit
 RUN yarn cache clean
 
 # -- RUNTIME STAGE ------------------------------
-FROM node:12.9.1-alpine AS runtime
+FROM node:12.9.1-buster AS runtime
 
 ENV NODE_ENV 'production'
 WORKDIR /app
