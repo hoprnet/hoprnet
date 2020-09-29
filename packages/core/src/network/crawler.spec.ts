@@ -47,9 +47,12 @@ describe('test crawler', function () {
     } as Hopr<HoprCoreConnector>['interactions']
 
     new Interactions(node)
+    let nps = new PeerStore(node.peerStore.peers.values())
+    node.on('peer:connect', nps.onPeerConnect.bind(nps))
+
     node.network = {
-      crawler: new Crawler(node, node.network.peerStore, options),
-      peerStore: new PeerStore(node.peerStore.peers.values()),
+      crawler: new Crawler(node, nps, options),
+      peerStore: nps,
     } as Hopr<HoprCoreConnector>['network']
 
     node.on('peer:connect', (peerInfo: PeerInfo) => node.peerStore.put(peerInfo))
