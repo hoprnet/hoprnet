@@ -2,10 +2,9 @@ name: Publish Website hopr.swiss
 
 on:
   push:
-    branches:
-      - master
+    branches: "*"
     paths:
-      - 'websites/website-hopr-swiss/**'
+      - "websites/website-hopr-swiss/**"
 
 defaults:
   run:
