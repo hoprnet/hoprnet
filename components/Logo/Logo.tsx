@@ -1,7 +1,8 @@
-import styles from "./Logo.module.css";
+import styles from './Logo.module.css'
+import { Image } from '@chakra-ui/core'
 
 const Logo = () => {
-  return <img src="/hopr.png" alt="HOPR Logo" className={styles.logo} />;
-};
+  return <Image src="/hopr.png" alt="HOPR Logo" className={styles.logo} />
+}
 
-export default Logo;
+export default Logo

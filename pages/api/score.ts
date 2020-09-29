@@ -1,6 +1,7 @@
-import { getScore } from "../../utils/api";
+import { getScore } from '../../utils/api'
+import { NextApiRequest, NextApiResponse } from 'next'
 
-export default async (req, res) => {
-  res.statusCode = 200;
-  res.json(await getScore());
-};
+export default async (_req: NextApiRequest, res: NextApiResponse) => {
+  res.statusCode = 200
+  res.json(await getScore())
+}

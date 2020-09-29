@@ -1,27 +1,46 @@
-import styles from "./Header.module.css";
-import Logo from "../Logo/Logo";
+import { Badge, Box } from '@chakra-ui/core'
+import styles from './Header.module.css'
+import Logo from '../Logo/Logo'
 
-const Header = ({ available }) => {
+interface HeaderProps {
+  available: string
+  locked: string
+}
+
+const Header: React.FC<HeaderProps> = ({ available = '', locked = '' }: HeaderProps) => {
   return (
     <header className={styles.header}>
-      <div className={styles.h1}>
-        <Logo />
+      <Box className={styles.h1}>
+        <a href="https://hoprnet.org">
+          <Logo />
+        </a>
         <h1 className={styles.title}>
-          <a href="https://hoprnet.org">HOPR</a> Incentivized Testnet on xDAI
+          HOPR Incentivized Testnet
+          <Badge style={{ marginLeft: '10px' }}>xDAI Network</Badge>
         </h1>
-      </div>
-
-      <div className={styles.stats}>
-        <div>
-          <strong className="green">{parseFloat(available).toFixed(4)}</strong>{" "}
-          xHOPR Available
-        </div>
-        {/* <div>
-            <strong className="blue">{locked}</strong> xHOPR Locked
-          </div> */}
-      </div>
+      </Box>
+      <Box d="flex" className={styles.stats}>
+        <Box>
+          <p>
+            <strong className="green">{available.length > 1 ? parseFloat(available).toFixed(4) : '0.00'}</strong> xHOPR
+            Available
+          </p>
+          <p>
+            <strong className="blue">{locked.length > 1 ? parseFloat(locked).toFixed(4) : '0.00'}</strong> xHOPR Sent
+          </p>
+        </Box>
+        <Box ml="10px">
+          <p>
+            <strong className="green">{available.length > 1 ? parseFloat(available).toFixed(4) : '0.00'}</strong> Payout
+            Time
+          </p>
+          <p>
+            <strong className="blue">{locked.length > 1 ? parseFloat(locked).toFixed(4) : '0.00'}</strong> Payout Value
+          </p>
+        </Box>
+      </Box>
     </header>
-  );
-};
+  )
+}
 
-export default Header;
+export default Header

@@ -1,8 +1,12 @@
-import styles from "../styles/logo.module.css";
+import styles from '../styles/logo.module.css'
 
-export default function Logo(props) {
+interface LogoSVGProps {
+  onClick: React.MouseEventHandler<HTMLDivElement>
+}
+
+export default function LogoSVG({ onClick }: LogoSVGProps) {
   return (
-    <div className={styles.logo} onClick={props.onClick}>
+    <div className={styles.logo} onClick={onClick}>
       <svg
         version="1.1"
         xmlns="http://www.w3.org/2000/svg"
@@ -10,21 +14,14 @@ export default function Logo(props) {
         x="0px"
         y="0px"
         viewBox="0 0 196 196"
-        style={{ enableBackground: "new 0 0 196 196" } as React.CSSProperties}
+        style={{ enableBackground: 'new 0 0 196 196' } as React.CSSProperties}
         xmlSpace="preserve"
       >
         <circle cx="98" cy="98" r="98" fill="#FFFFA0" />
-        <linearGradient
-          id="G"
-          gradientUnits="userSpaceOnUse"
-          x1="102"
-          y1="163.0232"
-          x2="102"
-          y2="57.4945"
-        >
-          <stop offset="0" style={{ stopColor: "#0000B4" }} />
-          <stop offset="9.090910e-03" style={{ stopColor: "#0000B4" }} />
-          <stop offset="1" style={{ stopColor: "#000050" }} />
+        <linearGradient id="G" gradientUnits="userSpaceOnUse" x1="102" y1="163.0232" x2="102" y2="57.4945">
+          <stop offset="0" style={{ stopColor: '#0000B4' }} />
+          <stop offset="9.090910e-03" style={{ stopColor: '#0000B4' }} />
+          <stop offset="1" style={{ stopColor: '#000050' }} />
         </linearGradient>
         <path
           fill="url(#G)"
@@ -34,5 +31,5 @@ export default function Logo(props) {
         />
       </svg>
     </div>
-  );
+  )
 }

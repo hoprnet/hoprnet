@@ -1,8 +1,8 @@
 .header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  padding: 2rem 1rem 0;
+  align-items: left;
+  padding: 1rem 2rem;
 }
 
 .header .title {
@@ -20,7 +20,7 @@
 
 .header .stats {
   text-align: right;
-  font-size: 2rem;
+  font-size: 1.2rem;
 }
 
 .header .stats h2 {
