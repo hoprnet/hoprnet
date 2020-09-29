@@ -34,20 +34,22 @@ class PeerStore<Chain extends HoprCoreConnector> {
     return b.deletedAt - a.deletedAt
   }
 
-  constructor(node: Hopr<Chain>) {
+  constructor(existingPeers: IterableIterator<PeerInfo>) {
     this.peers = []
     this.deletedPeers = []
 
-    for (const peerInfo of node.peerStore.peers.values()) {
+    for (const peerInfo of existingPeers) {
       this.peers.push({
         id: peerInfo.id.toB58String(),
         lastSeen: 0,
       })
     }
 
-    node.on('peer:connect', (peerInfo: PeerInfo) => this.push({ id: peerInfo.id.toB58String(), lastSeen: Date.now() }))
-
     heap.heapify(this.peers, this.compare)
+  }
+
+  onPeerConnect(peerInfo: PeerInfo) {
+    this.push({ id: peerInfo.id.toB58String(), lastSeen: Date.now() })
   }
 
   push(entry: Entry): number {

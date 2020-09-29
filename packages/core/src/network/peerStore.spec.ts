@@ -8,18 +8,9 @@ import PeerInfo from 'peer-info'
 
 import { EventEmitter } from 'events'
 
-function generateNode() {
-  class Dummy extends EventEmitter {
-    peerStore = {
-      peers: new Map<string, PeerInfo>(),
-    }
-  }
-
-  return (new Dummy() as unknown) as Hopr<HoprCoreConnector>
-}
-
 describe('test PeerStore', function () {
-  const peerStore = new PeerStore(generateNode())
+  const empty = [][Symbol.iterator]()
+  const peerStore = new PeerStore(empty)
   it('should push and pop elements', function () {
     assert(peerStore.length == 0, 'peerStore must be empty')
     peerStore.push({

@@ -2,6 +2,7 @@
   "name": "root",
   "private": true,
   "scripts": {
+    "core:test": "cd packages/core && yarn build && yarn test",
     "chat": "node packages/chat/lib/index.js",
     "hoprd": "node packages/hoprd/lib/index.js"
   },
