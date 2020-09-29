@@ -48,7 +48,7 @@ describe('test crawler', function () {
 
     new Interactions(node)
     node.network = {
-      crawler: new Crawler(node, options),
+      crawler: new Crawler(node, node.network.peerStore, options),
       peerStore: new PeerStore(node.peerStore.peers.values()),
     } as Hopr<HoprCoreConnector>['network']
 

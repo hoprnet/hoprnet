@@ -11,6 +11,7 @@ import { CrawlResponse, CrawlStatus } from '../messages'
 import PeerId from 'peer-id'
 import type { Connection } from './transport/types'
 import type { Entry } from './peerStore'
+import NetworkPeerStore from './peerStore'
 import { peerHasOnlyPublicAddresses, isOnPrivateNet, PRIVATE_NETS } from '../filters'
 import debug from 'debug'
 import Multiaddr from 'multiaddr'
@@ -34,6 +35,7 @@ export const shouldIncludePeerInCrawlResponse = (peer: Multiaddr, them: Multiadd
 class Crawler<Chain extends HoprCoreConnector> {
   constructor(
     public node: Hopr<Chain>,
+    private networkPeers: NetworkPeerStore,
     private options?: {
       timeoutIntentionally?: boolean
     }
@@ -70,9 +72,9 @@ class Crawler<Chain extends HoprCoreConnector> {
 
       log(`Crawling started`)
 
-      this.node.network.peerStore.cleanupBlacklist()
+      this.networkPeers.cleanupBlacklist()
 
-      unContactedPeers.push(...this.node.network.peerStore.peers.map((entry: Entry) => entry.id))
+      unContactedPeers.push(...this.networkPeers.peers.map((entry: Entry) => entry.id))
       verbose(`added ${unContactedPeers.length} peers to crawl list`)
 
       if (comparator != null) {
@@ -189,14 +191,14 @@ class Crawler<Chain extends HoprCoreConnector> {
             if (!contactedPeerIds.has(peerString) && !unContactedPeers.includes(peerString)) {
               unContactedPeers.push(peerString)
 
-              let beforeInserting = this.node.network.peerStore.length
-              this.node.network.peerStore.push({
+              let beforeInserting = this.networkPeers.length
+              this.networkPeers.push({
                 id: peerString,
                 lastSeen: 0,
               })
 
               if (comparator == null || comparator(peerString)) {
-                current = current + this.node.network.peerStore.length - beforeInserting
+                current = current + this.networkPeers.length - beforeInserting
               }
               this.node.peerStore.put(peerInfos[i])
             }
@@ -241,14 +243,14 @@ class Crawler<Chain extends HoprCoreConnector> {
   handleCrawlRequest(conn?: Connection) {
     verbose('crawl requested')
     return async function* (this: Crawler<Chain>) {
-      const amountOfNodes = Math.min(CRAWLING_RESPONSE_NODES, this.node.network.peerStore.peers.length)
+      const amountOfNodes = Math.min(CRAWLING_RESPONSE_NODES, this.networkPeers.peers.length)
 
       if (this.options?.timeoutIntentionally) {
         await new Promise((resolve) => setTimeout(resolve, CRAWL_TIMEOUT + 100))
       }
 
       const selectedNodes = randomSubset(
-        this.node.network.peerStore.peers,
+        this.networkPeers.peers,
         amountOfNodes,
         (entry: Entry) =>
           entry.id !== this.node.peerInfo.id.toB58String() &&

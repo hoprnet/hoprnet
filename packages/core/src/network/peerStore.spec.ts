@@ -1,6 +1,3 @@
-import type Hopr from '..'
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-
 import assert from 'assert'
 
 import PeerStore, { BLACKLIST_TIMEOUT } from './peerStore'
