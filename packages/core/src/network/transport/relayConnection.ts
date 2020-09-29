@@ -19,6 +19,7 @@ class RelayConnection implements MultiaddrConnection {
   public remoteAddr: Multiaddr
 
   public source: AsyncIterable<Uint8Array>
+  public sink: (source: AsyncIterable<Uint8Array>) => Promise<void>
 
   public conn: Stream
 
@@ -88,67 +89,68 @@ class RelayConnection implements MultiaddrConnection {
         }
       }
     }.call(this)
+
+    this.sink = (source: AsyncIterable<Uint8Array>): Promise<void> => {
+      this._sinkTriggered = true
+  
+      return this._stream.sink(
+        async function* (this: RelayConnection) {
+          const promise = this._defer.promise.then(() => {
+            return { done: true, value: undefined }
+          })
+  
+          while (true) {
+            let { done, value } = await Promise.race([
+              // prettier-ignore
+              // @ts-ignore
+              source.next(),
+              promise,
+            ])
+  
+            if (value != null) {
+              let _received = value.slice()
+  
+              if (done) {
+                if (_received != null) {
+                  yield new BL([(RELAY_PAYLOAD_PREFIX as unknown) as BL, (_received as unknown) as BL])
+                }
+  
+                this._destroyed = true
+  
+                return (new BL([
+                  (RELAY_STATUS_PREFIX as unknown) as BL,
+                  (STOP as unknown) as BL,
+                ]) as unknown) as Uint8Array
+              } else {
+                if (_received == null) {
+                  // @TODO change this to `return` to end the stream
+                  // once we receive an empty message
+                  continue
+                }
+  
+                yield new BL([(RELAY_PAYLOAD_PREFIX as unknown) as BL, (_received as unknown) as BL])
+              }
+            } else if (done) {
+              if (!this._destroyed) {
+                this._destroyed = true
+  
+                return (new BL([
+                  (RELAY_STATUS_PREFIX as unknown) as BL,
+                  (STOP as unknown) as BL,
+                ]) as unknown) as Uint8Array
+              }
+  
+              return
+            }
+          }
+        }.call(this)
+      )
+    }
+  
   }
 
   get destroyed(): boolean {
     return this._destroyed
-  }
-
-  sink(source: AsyncIterable<Uint8Array>): Promise<void> {
-    this._sinkTriggered = true
-
-    return this._stream.sink(
-      async function* (this: RelayConnection) {
-        const promise = this._defer.promise.then(() => {
-          return { done: true, value: undefined }
-        })
-
-        while (true) {
-          let { done, value } = await Promise.race([
-            // prettier-ignore
-            // @ts-ignore
-            source.next(),
-            promise,
-          ])
-
-          if (value != null) {
-            let _received = value.slice()
-
-            if (done) {
-              if (_received != null) {
-                yield new BL([(RELAY_PAYLOAD_PREFIX as unknown) as BL, (_received as unknown) as BL])
-              }
-
-              this._destroyed = true
-
-              return (new BL([
-                (RELAY_STATUS_PREFIX as unknown) as BL,
-                (STOP as unknown) as BL,
-              ]) as unknown) as Uint8Array
-            } else {
-              if (_received == null) {
-                // @TODO change this to `return` to end the stream
-                // once we receive an empty message
-                continue
-              }
-
-              yield new BL([(RELAY_PAYLOAD_PREFIX as unknown) as BL, (_received as unknown) as BL])
-            }
-          } else if (done) {
-            if (!this._destroyed) {
-              this._destroyed = true
-
-              return (new BL([
-                (RELAY_STATUS_PREFIX as unknown) as BL,
-                (STOP as unknown) as BL,
-              ]) as unknown) as Uint8Array
-            }
-
-            return
-          }
-        }
-      }.call(this)
-    )
   }
 
   close(err?: Error): Promise<void> {

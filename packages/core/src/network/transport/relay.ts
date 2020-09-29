@@ -26,8 +26,6 @@ import {
   FAIL_COULD_NOT_REACH_COUNTERPARTY,
   DELIVERY_REGISTER,
   RELAY_PAYLOAD_PREFIX,
-  RELAY_STATUS_PREFIX,
-  STOP,
 } from './constants'
 
 import { pubKeyToPeerId } from '../../utils'
@@ -35,21 +33,28 @@ import { u8aEquals } from '@hoprnet/hopr-utils'
 
 import { RelayContext } from './relayContext'
 
-import type { Connection, Dialer, DialOptions, Handler, PeerRouting, Registrar, Stream } from './types'
+import type {
+  Connection,
+  Dialer,
+  DialOptions,
+  Handler,
+  MultiaddrConnection,
+  PeerRouting,
+  Registrar,
+  Stream,
+} from './types'
+import { RelayConnection } from './relayConnection'
 
 class Relay {
   private _dialer: Dialer
   private _registrar: Registrar
   private _dht: { peerRouting: PeerRouting } | undefined
   private _peerInfo: PeerInfo
-
-  private on: (event: 'peer:connect', handler: (peer: PeerInfo) => void) => void
-
-  private connHandler: (conn: Handler & { counterparty: PeerId }) => void | undefined
-
   private _streams: Map<string, Map<string, RelayContext>>
 
-  constructor(libp2p: libp2p, _connHandler?: (conn: Handler) => void) {
+  private connHandler: (conn: MultiaddrConnection) => void | undefined
+
+  constructor(libp2p: libp2p, _connHandler?: (conn: MultiaddrConnection) => void) {
     this._dialer = libp2p.dialer
     this._registrar = libp2p.registrar
     this._dht = libp2p._dht
@@ -59,13 +64,15 @@ class Relay {
 
     this._streams = new Map<string, Map<string, RelayContext>>()
 
-    this.on = libp2p.on.bind(libp2p)
-
     libp2p.handle(RELAY_REGISTER, this.handleRelay.bind(this))
     libp2p.handle(DELIVERY_REGISTER, this.handleRelayConnection.bind(this))
   }
 
-  async establishRelayedConnection(ma: Multiaddr, relays: PeerInfo[], options?: DialOptions): Promise<Handler> {
+  async establishRelayedConnection(
+    ma: Multiaddr,
+    relays: PeerInfo[],
+    options?: DialOptions
+  ): Promise<MultiaddrConnection> {
     const destination = PeerId.createFromCID(ma.getPeerId())
 
     if (options?.signal?.aborted) {
@@ -95,24 +102,7 @@ class Relay {
         continue
       }
 
-      return {
-        stream: {
-          async sink(source: AsyncIterable<Uint8Array>) {
-            stream.sink(
-              (async function* () {
-                for await (const msg of source) {
-                  yield (new BL([
-                    (RELAY_PAYLOAD_PREFIX as unknown) as BL,
-                    (msg as unknown) as BL,
-                  ]) as unknown) as Uint8Array
-                }
-              })()
-            )
-          },
-          source: stream.source,
-        },
-        connection: relayConnection,
-      }
+      return new RelayConnection({ stream })
     }
 
     throw Error(
@@ -125,37 +115,16 @@ class Relay {
   async handleReRegister() {}
 
   async handleRelayConnection(conn: Handler): Promise<void> {
-    let shaker = handshake(conn.stream)
+    const stream = await this.handleHandshake(conn.stream)
 
-    let sender: PeerId
-
-    let pubKeySender: Buffer | undefined
-    try {
-      pubKeySender = (await shaker.read())?.slice()
-    } catch (err) {
-      error(err)
-    }
-
-    if (pubKeySender == null) {
-      error(`Received empty message. Ignoring connection ...`)
-      shaker.write(FAIL)
-      shaker.rest()
+    if (stream == null) {
       return
     }
 
-    try {
-      sender = await pubKeyToPeerId(pubKeySender)
-    } catch (err) {
-      error(`Could not decode sender peerId. Error was: ${err}`)
-      shaker.write(FAIL)
-      shaker.rest()
-      return
-    }
+    const result = new RelayConnection({ stream })
 
-    shaker.write(OK)
-    shaker.rest()
-
-    this.connHandler?.({ stream: shaker.stream, connection: conn.connection, counterparty: sender })
+     
+    this.connHandler?.(result)
   }
 
   private async connectToRelay(relay: PeerInfo, options?: DialOptions): Promise<Connection> {
@@ -222,10 +191,42 @@ class Relay {
     return shaker.stream
   }
 
+  private async handleHandshake(stream: Stream): Promise<Stream> {
+    let shaker = handshake(stream)
+
+    let pubKeySender: Buffer | undefined
+    try {
+      pubKeySender = (await shaker.read())?.slice()
+    } catch (err) {
+      error(err)
+    }
+
+    if (pubKeySender == null) {
+      error(`Received empty message. Ignoring connection ...`)
+      shaker.write(FAIL)
+      shaker.rest()
+      return
+    }
+
+    let sender: PeerId
+    try {
+      sender = await pubKeyToPeerId(pubKeySender)
+    } catch (err) {
+      error(`Could not decode sender peerId. Error was: ${err}`)
+      shaker.write(FAIL)
+      shaker.rest()
+      return
+    }
+
+    shaker.write(OK)
+    shaker.rest()
+
+    return shaker.stream
+  }
+
   private async handleRelay({ stream, connection }: Handler) {
     const shaker = handshake(stream)
 
-    let counterparty: PeerId
     let pubKeySender: Buffer | undefined
 
     try {
@@ -243,6 +244,7 @@ class Relay {
       return
     }
 
+    let counterparty: PeerId
     try {
       counterparty = await pubKeyToPeerId(pubKeySender)
     } catch (err) {

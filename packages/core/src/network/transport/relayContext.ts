@@ -82,34 +82,3 @@ class RelayContext {
 }
 
 export { RelayContext }
-
-// +---------+
-// |TEST CODE|
-// +---------+
-// let iteration = 0
-// function getGenerator(): AsyncGenerator<Uint8Array> {
-//   return (async function* () {
-//     let i = 0
-//     for (; i < 23; i++) {
-//       yield new TextEncoder().encode(`iteration ${iteration} - msg no. ${i}`)
-//       await new Promise((resolve) => setTimeout(resolve, 123))
-//     }
-
-//     return `iteration ${iteration} - msg no. ${i + 1}`
-//   })()
-// }
-
-// async function main() {
-//   const ctx = new RelayContext(getGenerator())
-
-//   setInterval(() => {
-//     ctx.update(getGenerator())
-//     iteration++
-//   }, 1234)
-
-//   for await (const msg of ctx.source) {
-//     console.log(new TextDecoder().decode(msg))
-//   }
-// }
-
-// main()

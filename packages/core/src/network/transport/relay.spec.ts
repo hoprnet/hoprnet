@@ -12,7 +12,7 @@ import TCP from 'libp2p-tcp'
 
 import PeerId from 'peer-id'
 
-import { Handler } from './types'
+import { Handler, MultiaddrConnection } from './types'
 
 import Multiaddr from 'multiaddr'
 import PeerInfo from 'peer-info'
@@ -23,8 +23,6 @@ import { randomBytes } from 'crypto'
 
 import { privKeyToPeerId } from '../../utils'
 import { u8aEquals } from '@hoprnet/hopr-utils'
-import { assert } from 'console'
-
 import defer from 'p-defer'
 
 const TEST_PROTOCOL = `/test/0.0.1`
@@ -36,7 +34,7 @@ describe('should create a socket and connect to it', function () {
     id: number
     ipv4?: boolean
     ipv6?: boolean
-    connHandler?: (conn: Handler & { counterparty: PeerId }) => void
+    connHandler?: (conn: MultiaddrConnection) => void
   }): Promise<libp2p> {
     const peerInfo = new PeerInfo(await privKeyToPeerId(privKeys[options.id]))
 
@@ -102,10 +100,10 @@ describe('should create a socket and connect to it', function () {
       generateNode({
         id: 2,
         ipv4: true,
-        connHandler: (handler: Handler & { counterparty: PeerId }) => {
+        connHandler: (conn: MultiaddrConnection) => {
           pipe(
             /* prettier-ignore */
-            handler.stream,
+            conn,
             (source: AsyncIterable<Uint8Array>) => {
               return (async function* () {
                 for await (const msg of source) {
@@ -114,7 +112,7 @@ describe('should create a socket and connect to it', function () {
                 }
               })()
             },
-            handler.stream
+            conn
           )
         },
       }),
@@ -123,7 +121,7 @@ describe('should create a socket and connect to it', function () {
     // Make sure that the nodes know each other
     await Promise.all([sender.dial(relay.peerInfo), counterparty.dial(relay.peerInfo)])
 
-    const { stream } = await sender.relay.establishRelayedConnection(
+    const conn = await sender.relay.establishRelayedConnection(
       Multiaddr(`/p2p/${counterparty.peerInfo.id.toB58String()}`),
       [relay.peerInfo]
     )
@@ -137,8 +135,9 @@ describe('should create a socket and connect to it', function () {
 
         yield new TextEncoder().encode(`second message`)
       })(),
-      stream,
+      conn,
       async (source: AsyncIterable<Uint8Array>) => {
+        setTimeout(() => setImmediate(() => conn.close()), 200)
         for await (const msg of source) {
           console.log(`received <${new TextDecoder().decode(msg.slice())}>`)
         }
