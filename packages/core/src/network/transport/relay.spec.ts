@@ -42,13 +42,13 @@ describe('should create a socket and connect to it', function () {
 
     if (options.ipv4) {
       peerInfo.multiaddrs.add(
-        Multiaddr(`/ip4/127.0.0.1/tcp/${9090 + 2 * options.id}`).encapsulate(`/p2p/${peerInfo.id.toB58String()}`)
+        Multiaddr(`/ip4/127.0.0.1/tcp/${9490 + 2 * options.id}`).encapsulate(`/p2p/${peerInfo.id.toB58String()}`)
       )
     }
 
     if (options.ipv6) {
       peerInfo.multiaddrs.add(
-        Multiaddr(`/ip6/::1/tcp/${9090 + 2 * options.id + 1}`).encapsulate(`/p2p/${peerInfo.id.toB58String()}`)
+        Multiaddr(`/ip6/::1/tcp/${9490 + 2 * options.id + 1}`).encapsulate(`/p2p/${peerInfo.id.toB58String()}`)
       )
     }
 
