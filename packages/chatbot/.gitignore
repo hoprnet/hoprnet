@@ -37,6 +37,7 @@ lerna-debug.log*
 
 # Exclude built files
 lib/
+!src/lib
 
 # Exclude vim swap files
 *.swp
@@ -45,6 +46,7 @@ lib/
 .env
 .env*
 !.env.example
+!.env.*.encrypted.txt
 
 # Hopr Node
 db

@@ -1,8 +1,6 @@
-import { sendMessage } from '../utils'
-import { ListenResponse } from '@hoprnet/hopr-protos/node/listen_pb'
-import { TweetMessage } from '../twitter'
+import { TweetMessage } from '../../lib/twitter/twitter'
 import { Bot } from '../bot'
-import { IMessage } from '../message'
+import { IMessage } from '../../message/message'
 
 const directory = {}
 const winners = []
@@ -116,9 +114,10 @@ export class Tweetbot implements Bot {
       response = ~~index > winners.length ? `Winner #${index}: ${winners[~~index]}` : 'Sorry, that winner doesn’t exist'
     }
 
-    sendMessage(message.from, {
-      from: this.address,
-      text: ` ${response}`,
-    })
+    // @TODO Actually send message
+    // sendMessage(message.from, {
+    //   from: this.address,
+    //   text: ` ${response}`,
+    // })
   }
 }

@@ -1,8 +1,8 @@
-import { sendMessage, getHoprBalance, getHOPRNodeAddressFromContent, getStatus, sendXHOPR } from '../utils'
+import { getHOPRNodeAddressFromContent } from '../../utils/utils'
 import Web3 from 'web3'
 import { Bot } from '../bot'
-import { IMessage } from '../message'
-import { TweetMessage, TweetState } from '../twitter'
+import { IMessage } from '../../message/message'
+import { TweetMessage, TweetState } from '../../lib/twitter/twitter'
 //@TODO: Isolate these utilities to avoid importing the entire package
 import { convertPubKeyFromB58String, u8aToHex } from '@hoprnet/hopr-utils'
 import { Utils } from '@hoprnet/hopr-core-ethereum'
@@ -13,139 +13,30 @@ import {
   COVERBOT_VERIFICATION_CYCLE_IN_MS,
   COVERBOT_XDAI_THRESHOLD,
   HOPR_ENVIRONMENT,
-} from '../env'
+  COVERBOT_DEBUG_HOPR_ADDRESS,
+} from '../../utils/env'
 import db from './db'
+import { BotCommands, NodeStates, ScoreRewards } from './state'
+import { RELAY_VERIFICATION_CYCLE_IN_MS, RELAY_HOPR_REWARD } from './constants'
+import { BotResponses, NodeStateResponses } from './responses'
+import { BalancedHoprNode, HoprNode } from './coverbot'
+import debug from 'debug'
+import Core from '../../lib/hopr/core'
 
+
+const log = debug('hopr-chatbot:coverbot')
+const error = debug('hopr-chatbot:coverbot:error')
 const { fromWei } = Web3.utils
-const RELAY_VERIFICATION_CYCLE_IN_MS = COVERBOT_VERIFICATION_CYCLE_IN_MS / 2
-const RELAY_HOPR_REWARD = 1000000000000000 // 0.001 HOPR
+
 const scoreDbRef = db.ref(`/${HOPR_ENVIRONMENT}/score`)
 const stateDbRef = db.ref(`/${HOPR_ENVIRONMENT}/state`)
 
-type HoprNode = {
-  id: string
-  address: string
-  tweetId: string
-  tweetUrl: string
-}
-
-enum NodeStates {
-  newUnverifiedNode = 'UNVERIFIED',
-  tweetVerificationFailed = 'FAILED_TWITTER_VERIFICATION',
-  tweetVerificationSucceeded = 'SUCCEEDED_TWITTER_VERIFICATION',
-  xdaiBalanceFailed = 'FAILED_XDAI_BALANCE_VERIFICATION',
-  xdaiBalanceSucceeded = 'SUCCEEDED_XDAI_BALANCE_VERIFICATION',
-  relayingNodeFailed = 'FAILED_RELAYING_PACKET',
-  relayingNodeInProgress = 'IN_PROGRESS_RELAYING_PACKET',
-  relayingNodeSucceded = 'SUCCEEDED_RELAYING_PACKET',
-  onlineNode = 'ONLINE',
-  verifiedNode = 'VERIFIED',
-}
-
-enum BotCommands {
-  rules,
-  status,
-  verify,
-}
-
-enum ScoreRewards {
-  verified = 100,
-  relayed = 10,
-}
-
-const BotResponses = {
-  [BotCommands.rules]: `\n
-    Welcome to the xHOPR incentivized network!
-
-    1. Load ${COVERBOT_XDAI_THRESHOLD} xDAI into your HOPR Ethereum Address
-    2. Post a tweet with your HOPR Address and the tag #HOPRNetwork
-    3. Send me the link to your tweet (don't delete it!)
-    4. Every time you're chosen to relay a message, you'll score ${ScoreRewards.relayed} points and receive xHOPR!
-
-    Visit https://saentis.hoprnet.org for more information and scoreboard
-  `,
-  [BotCommands.status]: (status: NodeStates) => `\n
-    Your current status is: ${status}
-  `,
-  [BotCommands.verify]: `\n
-    Verifying if your node is still up...
-  `,
-}
-
-const NodeStateResponses = {
-  [NodeStates.newUnverifiedNode]: BotResponses[BotCommands.rules],
-  [NodeStates.tweetVerificationFailed]: (tweetStatus: TweetState) => `\n
-    Your tweet has failed the verification. Please make sure you've included everything.
-
-    Here is the current status of your tweet:
-    1. Tagged @hoprnet: ${tweetStatus.hasMention}
-    2. Used #HOPRNetwork: ${tweetStatus.hasTag}
-    3. Includes this node address: ${tweetStatus.sameNode}
-
-    Please try again with a different tweet.
-  `,
-  [NodeStates.tweetVerificationSucceeded]: `\n
-    Your tweet has passed verification. Please do no delete this tweet, as I'll
-    use it multiple times to verify and connect to your node.
-
-    I’ll now check that your HOPR Ethereum address has at least ${COVERBOT_XDAI_THRESHOLD} xDAI.
-    If you need xDAI, you always swap DAI to xDAI using https://dai-bridge.poa.network/.
-  `,
-  [NodeStates.xdaiBalanceFailed]: (xDaiBalance: number) => `\n
-    Your node does not have at least ${COVERBOT_XDAI_THRESHOLD} xDAI. Currently, your node has ${xDaiBalance} xDAI.
-
-    To participate in our incentivized network, please send the missing amount of xDAI to your node.
-  `,
-  [NodeStates.xdaiBalanceSucceeded]: (xDaiBalance: number) => `\n
-    Your node has ${xDaiBalance} xDAI. You're ready to go!
-
-    Soon I'll open a payment channel to your node.
-
-    Please keep your balance topped up, and your tweet and node online.
-
-    For more information, go to https://saentis.hoprnet.org
-
-    Thank you for participating in our incentivized network!
-  `,
-  [NodeStates.onlineNode]: `\n
-    Node online! Relaying a message to verify your ability to
-    send messages to other nodes in the network.
-  `,
-  [NodeStates.verifiedNode]: `\n
-    Verification successful! I’ll shortly use you as a cover traffic node
-    and pay you in xHOPR tokens for your service.
-
-    For more information, go to https://saentis.hoprnet.org
-
-    Thank you for participating in our incentivized network!
-  `,
-  [NodeStates.relayingNodeFailed]: `\n
-    Relaying failed. I can reach you, but you can’t reach me...
-    
-    This could mean other errors though, so please keep trying.
-
-    For more information, go to https://saentis.hoprnet.org
-
-    Visit our Telegram (https://t.me/hoprnet) for any questions.
-  `,
-  [NodeStates.relayingNodeInProgress]: `\n
-    Relaying in progress. I've received your message and I'm now
-    waiting for a packet I'm trying to relay via your node. Please wait
-    until I receive your packet or ${RELAY_VERIFICATION_CYCLE_IN_MS / 1000}seconds
-    elapse. Thank you for your patience!
-  `,
-  [NodeStates.relayingNodeSucceded]: `\n
-    Relaying successful! I've obtained a packet anonymously from you,
-    and we can move to the next verification step.
-  `,
-}
-
-const VERIFY_MESSAGE = `\n
-Thanks, let me take a look at that...
-`
-
 export class Coverbot implements Bot {
+  node: Core
+  initialBalance: string
+  initialHoprBalance: string
   botName: string
+  nativeAddress: string
   address: string
   timestamp: Date
   status: Map<string, NodeStates>
@@ -162,22 +53,30 @@ export class Coverbot implements Bot {
   network: Networks
   loadedDb: boolean
 
-  constructor(address: string, timestamp: Date, twitterTimestamp: Date) {
+  constructor({node, hoprBalance, balance}: BalancedHoprNode, nativeAddress: string, address: string, timestamp: Date, twitterTimestamp: Date) {
+    this.node = node
+    this.initialBalance = balance
+    this.initialHoprBalance = hoprBalance
     this.address = address
+    this.nativeAddress = nativeAddress
     this.timestamp = timestamp
     this.status = new Map<string, NodeStates>()
     this.tweets = new Map<string, TweetMessage>()
     this.twitterTimestamp = twitterTimestamp
     this.botName = '💰 Coverbot'
     this.loadedDb = false
-    console.log(`${this.botName} has been added`)
 
-    console.log(`⚡️ Network: ${COVERBOT_CHAIN_PROVIDER}`)
-    console.log(`⚡️ Environment: ${HOPR_ENVIRONMENT}`)
-    console.log(`💸 Threshold: ${COVERBOT_XDAI_THRESHOLD}`)
-    console.log(`🐛 Debug Mode: ${COVERBOT_DEBUG_MODE}`)
-    console.log(`👀 Verification Cycle: ${COVERBOT_VERIFICATION_CYCLE_IN_MS}`)
-    console.log(`🔍 Relaying Cycle: ${RELAY_VERIFICATION_CYCLE_IN_MS}`)
+    log(`- constructor | ${this.botName} has been added`)
+    log(`- constructor | 🏠 HOPR Address: ${this.address}`)
+    log(`- constructor | 🏡 Native Address: ${this.nativeAddress}`)
+    log(`- constructor | ⛓ EVM Network: ${COVERBOT_CHAIN_PROVIDER}`)
+    log(`- constructor | 📦 DB Environment: ${HOPR_ENVIRONMENT}`)
+    log(`- constructor | 💸 Threshold: ${COVERBOT_XDAI_THRESHOLD}`)
+    log(`- constructor | 💰 Native Balance: ${this.initialBalance}`)
+    log(`- constructor | 💵 HOPR Balance: ${this.initialHoprBalance}`)
+    log(`- constructor | 🐛 Debug Mode: ${COVERBOT_DEBUG_MODE}`)
+    log(`- constructor | 👀 Verification Cycle: ${COVERBOT_VERIFICATION_CYCLE_IN_MS}`)
+    log(`- constructor | 🔍 Relaying Cycle: ${RELAY_VERIFICATION_CYCLE_IN_MS}`)
 
     this.ethereumAddress = null
     this.chainId = null
@@ -216,20 +115,20 @@ export class Coverbot implements Bot {
   }
 
   private async loadData(): Promise<void> {
+    log(`- loadData | Loading data from our Database`)
     return new Promise((resolve, reject) => {
       stateDbRef.once('value', (snapshot, error) => {
         if (error) return reject(error)
         if (!snapshot.exists()) {
-          console.log("DB doesn't exist")
+          log(`- loadData | Database hasn’t been created`)
           return resolve()
         }
         const state = snapshot.val()
-        if (!state.connected) {
-          console.log('No connected')
-          return resolve()
-        }
+        const connected = state.connected || []
+        log(`- loadData | Loaded ${connected.length} nodes from our Database`)
         this.verifiedHoprNodes = new Map<string, HoprNode>()
-        state.connected.forEach((n) => this.verifiedHoprNodes.set(n.id, n))
+        connected.forEach((n) => this.verifiedHoprNodes.set(n.id, n))
+        log(`- loadData | Updated ${Array.from(this.verifiedHoprNodes.values()).length} verified nodes in memory`)
         this.loadedDb = true
         return resolve()
       })
@@ -237,6 +136,7 @@ export class Coverbot implements Bot {
   }
 
   protected async dumpData() {
+    log(`- dumpData | Starting dumping data in Database`)
     //@TODO: Ideally we move this to a more suitable place.
     if (!this.ethereumAddress) {
       this.chainId = await Utils.getChainId(this.xdaiWeb3)
@@ -244,7 +144,8 @@ export class Coverbot implements Bot {
       this.ethereumAddress = await this._getEthereumAddressFromHOPRAddress(this.address)
     }
 
-    const connectedNodes = await getStatus()
+    const connectedNodes = this.node.listConnectedPeers()
+    log(`- loadData | Detected ${connectedNodes} in the network w/bootstrap servers ${this.node.getBootstrapServers()}`)
 
     const state = {
       connectedNodes,
@@ -258,7 +159,7 @@ export class Coverbot implements Bot {
       hoprChannelContract: HOPR_CHANNELS[this.network],
       address: this.address,
       balance: fromWei(await this.xdaiWeb3.eth.getBalance(this.ethereumAddress)),
-      available: fromWei(await getHoprBalance()),
+      available: fromWei(await this.node.getHoprBalance()),
       locked: 0, //@TODO: Retrieve balances from open channels.
       connected: Array.from(this.verifiedHoprNodes.values()),
       refreshed: new Date().toISOString(),
@@ -266,23 +167,22 @@ export class Coverbot implements Bot {
 
     return new Promise((resolve, reject) => {
       stateDbRef.set(state, (error) => {
-        if (error) return reject(error);
-        console.log(`Saved data in our Database at ${state.refreshed}`)
+        if (error) return reject(error)
+        log(`- dumpData | Saved data in our Database at ${state.refreshed}`)
         return resolve()
       })
     })
   }
 
-  protected async _sendMessageOpeningChannels(recipient, message, intermediatePeers) {
-    return sendMessage(
-      recipient,
-      {
-        from: this.address,
-        text: message,
-      },
-      false,
-      intermediatePeers,
-    )
+  protected _sendMessageFromBot(recipient, message, intermediatePeerIds = [], includeRecipient = true) {
+    log(`- sendMessageFromBot | Sending ${intermediatePeerIds.length} hop message to ${recipient}`)
+    log(`- sendMessageFromBot | Message: ${message}`)
+    return this.node.send({
+        peerId: recipient,
+        payload: message,
+        intermediatePeerIds,
+        includeRecipient
+    })
   }
 
   protected async _verificationCycle() {
@@ -290,7 +190,8 @@ export class Coverbot implements Bot {
       await this.loadData()
     }
 
-    console.log(`${COVERBOT_VERIFICATION_CYCLE_IN_MS}ms has passed. Verifying nodes...`)
+    log(`- verificationCycle | ${COVERBOT_VERIFICATION_CYCLE_IN_MS}ms has passed. Verifying nodes...`)
+    COVERBOT_DEBUG_MODE && log(`- verificationCycle | DEBUG mode activated, looking for ${COVERBOT_DEBUG_HOPR_ADDRESS}`)
 
     await this.dumpData()
 
@@ -299,30 +200,30 @@ export class Coverbot implements Bot {
     const hoprNode: HoprNode = _verifiedNodes[randomIndex]
 
     if (!hoprNode) {
-      console.log('No node found. Skipping...')
+      log(`- verificationCycle | No node from our memory. Skipping...`)
       return
     }
 
     if (this.relayTimeouts.get(hoprNode.id)) {
-      console.log('Node selected is going through relaying. Skipping...')
+      log(`- verificationCycle | Node ${hoprNode.id} selected is going through relaying. Skipping...`)
       return
     }
 
     try {
+      log(`- verificationCycle | Verifying node process, looking for tweet ${hoprNode.tweetUrl}`)
       const tweet = new TweetMessage(hoprNode.tweetUrl)
       await tweet.fetch({ mock: COVERBOT_DEBUG_MODE })
-      const _hoprNodeAddress = tweet.getHOPRNode()
-      
+      const _hoprNodeAddress = tweet.getHOPRNode({ mock: COVERBOT_DEBUG_MODE, hoprNode: COVERBOT_DEBUG_HOPR_ADDRESS })
+
       if (_hoprNodeAddress.length === 0) {
-        // We got no HOPR Node here. Remove and update.
-        this.verifiedHoprNodes.delete(hoprNode.id)
+        log(`- verificationCycle | No node has been found from our tweet w/content ${tweet.content}`)
+        // this.verifiedHoprNodes.delete(hoprNode.id)
         await this.dumpData()
       } else {
         this._sendMessageFromBot(_hoprNodeAddress, BotResponses[BotCommands.verify])
-          .catch(err => {
-            console.log(`Trying to reach ${_hoprNodeAddress} failed.`)
-            throw new Error(err) 
-          })
+        .catch(err => {
+          error(`Trying to send ${BotCommands.verify} message to ${_hoprNodeAddress} failed.`)
+        })
         /*
          * We switched from “send and forget” to “send and listen”
          * 1. We inmediately send a message to user, telling them we find them online.
@@ -337,9 +238,15 @@ export class Coverbot implements Bot {
         // 1.
         console.log(`Relaying node ${_hoprNodeAddress}, checking in ${RELAY_VERIFICATION_CYCLE_IN_MS}`)
         this._sendMessageFromBot(_hoprNodeAddress, NodeStateResponses[NodeStates.onlineNode])
+        .catch(err => {
+          error(`Trying to send ${NodeStates.onlineNode} message to ${_hoprNodeAddress} failed.`)
+        })
 
         // 2.
-        this._sendMessageOpeningChannels(this.address, ` Packet relayed by ${_hoprNodeAddress}`, [_hoprNodeAddress])
+        this._sendMessageFromBot(this.address, ` Relaying package to ${_hoprNodeAddress}`, [_hoprNodeAddress])
+        .catch(err => {
+          error(`Trying to send RELAY message to ${_hoprNodeAddress} failed.`)
+        })
 
         // 3.
         this.relayTimeouts.set(
@@ -359,6 +266,9 @@ export class Coverbot implements Bot {
 
             // 4.1.2
             this._sendMessageFromBot(_hoprNodeAddress, NodeStateResponses[NodeStates.relayingNodeFailed])
+            .catch(err => {
+              error(`Trying to send ${NodeStates.relayingNodeFailed} message to ${_hoprNodeAddress} failed.`)
+            })
 
             // 4.1.3
             this.relayTimeouts.delete(_hoprNodeAddress)
@@ -370,20 +280,13 @@ export class Coverbot implements Bot {
         )
       }
     } catch (err) {
-      console.log('[ _verificationCycle ] Error caught - ', err);
+      console.log('[ _verificationCycle ] Error caught - ', err)
 
       // Something failed. We better remove node and update.
       // @TODO: Clean this up, removed for now to ask users to try again.
       // this.verifiedHoprNodes.delete(hoprNode.id)
       // this.dumpData()
     }
-  }
-
-  protected _sendMessageFromBot(recipient, message) {
-    return sendMessage(recipient, {
-      from: this.address,
-      text: message,
-    })
   }
 
   protected async _verifyBalance(message: IMessage): Promise<[number, NodeStates]> {
@@ -413,13 +316,16 @@ export class Coverbot implements Bot {
     if (tweet.hasSameHOPRNode(message.from) || COVERBOT_DEBUG_MODE) {
       tweet.status.sameNode = true
     }
+
+    COVERBOT_DEBUG_MODE && tweet.validateTweetStatus()
+
     return tweet.status.isValid()
       ? [tweet, NodeStates.tweetVerificationSucceeded]
       : [tweet, NodeStates.tweetVerificationFailed]
   }
 
   async handleMessage(message: IMessage) {
-    console.log(`${this.botName} <- ${message.from}: ${message.text}`)
+    log(`- handleMessage | ${this.botName} <- ${message.from}: ${message.text}`)
 
     if (message.from === this.address) {
       /*
@@ -435,8 +341,11 @@ export class Coverbot implements Bot {
       const relayerAddress = getHOPRNodeAddressFromContent(message.text)
 
       // 2.
-      console.log(`Successful Relay: ${relayerAddress}`)
+      log(`- handleMessage | Successful Relay: ${relayerAddress}`)
       this._sendMessageFromBot(relayerAddress, NodeStateResponses[NodeStates.relayingNodeSucceded])
+      .catch(err => {
+        error(`Trying to send ${NodeStates.relayingNodeSucceded} message to ${relayerAddress} failed.`)
+      })
 
       // 3.
       const relayerTimeout = this.relayTimeouts.get(relayerAddress)
@@ -450,7 +359,7 @@ export class Coverbot implements Bot {
 
       await Promise.all([
         this._setEthereumAddressScore(relayerEthereumAddress, newScore),
-        sendXHOPR(relayerEthereumAddress, RELAY_HOPR_REWARD),
+        this.node.withdraw({ currency: 'HOPR', recipient: relayerEthereumAddress, amount: `${RELAY_HOPR_REWARD}`}),
       ])
       console.log(`xHOPR tokens sent to ${relayerAddress}`)
       this._sendMessageFromBot(relayerAddress, NodeStateResponses[NodeStates.verifiedNode])
@@ -473,6 +382,9 @@ export class Coverbot implements Bot {
 
       // 2.
       this._sendMessageFromBot(message.from, NodeStateResponses[NodeStates.relayingNodeInProgress])
+      .catch(err => {
+        error(`Trying to send ${NodeStates.relayingNodeInProgress} message to ${message.from} failed.`)
+      })
 
       // 3.
       return
@@ -480,7 +392,10 @@ export class Coverbot implements Bot {
 
     let tweet, nodeState
     if (message.text.match(/https:\/\/twitter.com.*?$/i)) {
-      this._sendMessageFromBot(message.from, VERIFY_MESSAGE)
+      this._sendMessageFromBot(message.from, NodeStateResponses[NodeStates.tweetVerificationInProgress])
+      .catch(err => {
+        error(`Trying to send ${NodeStates.tweetVerificationFailed} message to ${message.from} failed.`)
+      })
       ;[tweet, nodeState] = await this._verifyTweet(message)
     } else {
       ;[tweet, nodeState] = [undefined, NodeStates.newUnverifiedNode]
@@ -489,16 +404,28 @@ export class Coverbot implements Bot {
     switch (nodeState) {
       case NodeStates.newUnverifiedNode:
         this._sendMessageFromBot(message.from, NodeStateResponses[nodeState])
+        .catch(err => {
+          error(`Trying to send ${nodeState} message to ${message.from} failed.`)
+        })
         break
       case NodeStates.tweetVerificationFailed:
         this._sendMessageFromBot(message.from, NodeStateResponses[nodeState](this.tweets.get(message.from).status))
+        .catch(err => {
+          error(`Trying to send ${nodeState} message to ${message.from} failed.`)
+        })
         break
       case NodeStates.tweetVerificationSucceeded:
         this._sendMessageFromBot(message.from, NodeStateResponses[nodeState])
+        .catch(err => {
+          error(`Trying to send ${nodeState} message to ${message.from} failed.`)
+        })
         const [balance, xDaiBalanceNodeState] = await this._verifyBalance(message)
         switch (xDaiBalanceNodeState) {
           case NodeStates.xdaiBalanceFailed:
             this._sendMessageFromBot(message.from, NodeStateResponses[xDaiBalanceNodeState](balance))
+            .catch(err => {
+              error(`Trying to send ${xDaiBalanceNodeState} message to ${message.from} failed.`)
+            })
             break
           case NodeStates.xdaiBalanceSucceeded: {
             const ethAddress = await this._getEthereumAddressFromHOPRAddress(message.from)
@@ -516,12 +443,21 @@ export class Coverbot implements Bot {
             }
 
             this._sendMessageFromBot(message.from, NodeStateResponses[xDaiBalanceNodeState](balance))
+            .catch(err => {
+              error(`Trying to send ${xDaiBalanceNodeState} message to ${message.from} failed.`)
+            })
             break
           }
         }
         this._sendMessageFromBot(message.from, BotResponses[BotCommands.status](xDaiBalanceNodeState))
+        .catch(err => {
+          error(`Trying to send ${BotCommands.status} message to ${message.from} failed.`)
+        })
         break
     }
     this._sendMessageFromBot(message.from, BotResponses[BotCommands.status](nodeState))
+    .catch(err => {
+      error(`Trying to send ${BotCommands.status} message to ${message.from} failed.`)
+    })
   }
 }

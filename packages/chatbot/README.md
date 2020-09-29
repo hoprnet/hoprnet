@@ -4,14 +4,17 @@
 **HOPR** is a privacy-preserving messaging **protocol** which enables the creation of a secure communication network via relay nodes powered by economic incentives using digital tokens. **HOPR Chatbot** is a proof-of-concept aimed to showcase the capabilities of a **HOPR Node** by using our gRPC-enabled **HOPR Server**, which listens to messages and replies to the recipients of them, whenever their address is included in the original message.
 
 ## Overview
+
 **HOPR Chatbot** is a `node.js` application that connects to an instance of a [**HOPR Server**](https://github.com/hoprnet/hopr-server), and listens to any calls done against such server. Upon receiving a message with a valid recipient, it provides an answer given the bot that is currently loaded. At the time of writing, **HOPR Chatbot** dynamically loads bots based in the `ENV` given, and each bot has different capabilities.
 
 ### Existing Bots
-- [🃏  Randobot](./src/randobot/index.ts): Generates random words when messaged.
-- [🐦  Tweetbot](./src/tweetbot/index.ts): Asks for a tweet including your address, #HOPRGames and @hoprnet in it.
+
+- [🃏 Randobot](./src/randobot/index.ts): Generates random words when messaged.
+- [🐦 Tweetbot](./src/tweetbot/index.ts): Asks for a tweet including your address, #HOPRGames and @hoprnet in it.
 
 ### Bots in Progress
-- [🥊  Bouncerbot](./src/bouncerbot/index.ts): Blocks you from entering a “party”, but will give you some hints to enter afterwards. See [issue](https://github.com/hoprnet/hopr-chatbot/issues/9).
+
+- [🥊 Bouncerbot](./src/bouncerbot/index.ts): Blocks you from entering a “party”, but will give you some hints to enter afterwards. See [issue](https://github.com/hoprnet/hopr-chatbot/issues/9).
 
 ## Requirements
 
@@ -21,6 +24,7 @@
 ## Setup
 
 ### HOPR Server
+
 We have bundled a working version of [**HOPR Server**](https://github.com/hoprnet/hopr-server) in this repository as a `docker-compose.yml`. Just run `docker-compose up server` to get an instance running locally at `127.0.0.1:50051`.
 
 ### Chatbot
@@ -32,13 +36,13 @@ We have bundled a working version of [**HOPR Server**](https://github.com/hoprne
 
 Right now, we have a `Dockerfile` that bundles bot a `hopr-server` and a `hopr-chatbot` instance by relying on `pm2` to manage both process. This practice is [frown upon in the Docker ecosystem](https://docs.docker.com/config/containers/multi-service_container/), but simplifies our deployment process. To build such image, you can simply do `docker build -f chatbot.Dockerfile . -t hoprnet/chatbot:latest`.
 
-
 ## Additional information
 
 ### LinkDrop Setup
-* To setup LinkDrop, you have to manually create a campaign at [linkdrop](https://dashboard.linkdrop.io/). Choose the same account and erc20 token address that you provide in the .env file. Make sure it is a campaign id is 1 to perform one to one transactions multiple times. You can choose any other campaign id but then the payment channel would be generated only for the number of links decided on the time of campaign creation.
 
-* Copy the .env.example to .env and add the required variables.
+- To setup LinkDrop, you have to manually create a campaign at [linkdrop](https://dashboard.linkdrop.io/). Choose the same account and erc20 token address that you provide in the .env file. Make sure it is a campaign id is 1 to perform one to one transactions multiple times. You can choose any other campaign id but then the payment channel would be generated only for the number of links decided on the time of campaign creation.
+
+- Copy the .env.example to .env and add the required variables.
 
 ### Payload format
 
@@ -51,6 +55,7 @@ As of version `1.3.0` of [**HOPR Chat**](https://github.com/hoprnet/hopr-chat), 
 #### Example (using hopr-chat)
 
 **<1.3.0**
+
 ```terminal
 # find out your address
 > myAddress
@@ -64,6 +69,7 @@ HOPR:      16Uiu2HAkwsN4GVHQr1szVurz6u4V6uB9ZJacey471Pg2nTxHvP47
 ```
 
 **>=1.3.0**
+
 ```terminal
 # call includeRecipient
 > includeRecipient
