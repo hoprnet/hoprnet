@@ -15,7 +15,7 @@ import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import { Heartbeat as HeartbeatInteraction } from '../interactions/network/heartbeat'
 
 import Heartbeat from './heartbeat'
-import PeerStore from './peerStore'
+import NetworkPeerStore from './peerStore'
 import { Network } from './index'
 
 import assert from 'assert'
@@ -105,5 +105,25 @@ describe('check heartbeat mechanism', function () {
       Alice.stop(),
       Bob.stop(),
     ])
+  })
+})
+
+describe('unit test heartbeat', () => {
+  let heartbeat
+  let hangUp = async () => {}
+  let interaction: HeartbeatInteraction = ({} as unknown) as HeartbeatInteraction
+
+  beforeEach(() => {
+    const empty = [][Symbol.iterator]()
+    heartbeat = new Heartbeat(
+      new NetworkPeerStore(empty),
+      interaction,
+      hangUp
+    )
+  })
+
+  it('check nodes is noop with empty store', async () => {
+    await heartbeat.checkNodes()
+
   })
 })
