@@ -51,7 +51,7 @@ describe('test crawler', function () {
     node.on('peer:connect', nps.onPeerConnect.bind(nps))
 
     node.network = {
-      crawler: new Crawler(node, nps, options),
+      crawler: new Crawler(node.peerInfo.id, nps, node.interactions.network.crawler, node.peerStore, options),
       peerStore: nps,
     } as Hopr<HoprCoreConnector>['network']
 

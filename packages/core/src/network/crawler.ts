@@ -15,6 +15,9 @@ import NetworkPeerStore from './peerStore'
 import { peerHasOnlyPublicAddresses, isOnPrivateNet, PRIVATE_NETS } from '../filters'
 import debug from 'debug'
 import Multiaddr from 'multiaddr'
+import { Crawler as CrawlInteraction } from '../interactions/network/crawler'
+import { PeerStore } from '../index'
+
 const log = debug('hopr-core:crawler')
 const verbose = debug('hopr-core:verbose:crawler')
 
@@ -34,8 +37,10 @@ export const shouldIncludePeerInCrawlResponse = (peer: Multiaddr, them: Multiadd
 
 class Crawler<Chain extends HoprCoreConnector> {
   constructor(
-    public node: Hopr<Chain>,
+    private id: PeerId,
     private networkPeers: NetworkPeerStore,
+    private crawlInteraction: CrawlInteraction<any>,
+    private peerStore: PeerStore,
     private options?: {
       timeoutIntentionally?: boolean
     }
@@ -149,11 +154,11 @@ class Crawler<Chain extends HoprCoreConnector> {
           try {
             log(`querying ${chalk.blue(peer)}`)
             const peerId = PeerId.createFromB58String(peer)
-            peerInfos = await this.node.interactions.network.crawler.interact(peerId, {
+            peerInfos = await this.crawlInteraction.interact(peerId, {
               signal: abort.signal,
             })
 
-            const peerInfo = this.node.peerStore.get(peerId)
+            const peerInfo = this.peerStore.get(peerId)
             if (peerInfo && peerHasOnlyPublicAddresses(peerInfo)) {
               // The node we are connecting to is on a remote network
               // and gives us addresses on a private network, then they are
@@ -184,7 +189,7 @@ class Crawler<Chain extends HoprCoreConnector> {
           for (let i = 0; i < peerInfos.length; i++) {
             const peerString = peerInfos[i].id.toB58String()
 
-            if (peerInfos[i].id.isEqual(this.node.peerInfo.id)) {
+            if (peerInfos[i].id.isEqual(this.id)) {
               continue
             }
 
@@ -200,7 +205,7 @@ class Crawler<Chain extends HoprCoreConnector> {
               if (comparator == null || comparator(peerString)) {
                 current = current + this.networkPeers.length - beforeInserting
               }
-              this.node.peerStore.put(peerInfos[i])
+              this.peerStore.put(peerInfos[i])
             }
           }
 
@@ -253,11 +258,11 @@ class Crawler<Chain extends HoprCoreConnector> {
         this.networkPeers.peers,
         amountOfNodes,
         (entry: Entry) =>
-          entry.id !== this.node.peerInfo.id.toB58String() &&
+          entry.id !== this.id.toB58String() &&
           (conn == null || entry.id !== conn.remotePeer.toB58String())
       ).map((peer) => {
         // convert peerId to peerInfo
-        const found = this.node.peerStore.get(PeerId.createFromB58String(peer.id))
+        const found = this.peerStore.get(PeerId.createFromB58String(peer.id))
         const result = new PeerInfo(PeerId.createFromB58String(peer.id))
         if (found) {
           found.multiaddrs

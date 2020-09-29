@@ -67,6 +67,14 @@ export type HoprOptions = {
 
 const MAX_ITERATIONS_PATH_SELECTION = 2000
 
+export type PeerStore = {
+  has(peerInfo: PeerId): boolean
+  get(peerId: PeerId): PeerInfo | undefined
+  put(peerInfo: PeerInfo, options?: { silent: boolean }): PeerInfo
+  peers: Map<string, PeerInfo>
+  remove(peer: PeerId): void
+}
+
 export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
   public interactions: Interactions<Chain>
   public network: Network<Chain>
@@ -89,13 +97,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
   ) => Promise<Handler>
   declare hangUp: (addr: PeerInfo | PeerId | Multiaddr | string) => Promise<void>
   declare peerInfo: PeerInfo
-  declare peerStore: {
-    has(peerInfo: PeerId): boolean
-    get(peerId: PeerId): PeerInfo | undefined
-    put(peerInfo: PeerInfo, options?: { silent: boolean }): PeerInfo
-    peers: Map<string, PeerInfo>
-    remove(peer: PeerId): void
-  }
+  declare peerStore: PeerStore
   declare peerRouting: {
     findPeer: (addr: PeerId) => Promise<PeerInfo>
   }
