@@ -40,66 +40,28 @@ class RelayConnection implements MultiaddrConnection {
     this._stream = stream
 
     this.source = async function* (this: RelayConnection) {
-      let msgReceived = false
-      let itDone = false
-
-      this._defer.promise.then(() => {
-        itDone = true
-      })
-
-      function msgFunction({ done, value }) {
-        msgReceived = true
-
-        if (done) {
-          itDone = true
-        }
-        return { done, value }
-      }
-
-      let msg: Promise<IteratorResult<Uint8Array, Uint8Array | void>> = (this._stream.source as AsyncGenerator<
-        Uint8Array,
-        Uint8Array | void
-      >)
-        .next()
-        .then(msgFunction)
+      const promise = this._defer.promise.then(() => ({ done: true, value: undefined }))
 
       while (true) {
-        await Promise.race([
+        let { done, value } = await Promise.race([
           // prettier-ignore
-          msg,
-          this._defer.promise,
+          // @ts-ignore
+          this._stream.source.next(),
+          promise,
         ])
 
-        if (msgReceived) {
-          msgReceived = false
-
-          const _received = (await msg).value
-
-          if (_received == null) {
-            // change this to `return` to end the stream
-            // once we receive an empty message
-            console.log(`empty message`)
-            continue
-          }
-
-          const received = (_received as Uint8Array).slice()
+        if (value != null) {
+          const received = (value as Uint8Array).slice()
 
           if (u8aEquals(received.slice(0, 1), RELAY_PAYLOAD_PREFIX)) {
-            if (itDone) {
+            if (done) {
               this._destroyed = true
-              console.log(`returned`)
               return received.slice(1)
             } else {
-              msg = (this._stream.source as AsyncGenerator<
-                Uint8Array,
-                Uint8Array | void
-              >)
-                .next()
-                .then(msgFunction)
               yield received.slice(1)
             }
           } else if (u8aEquals(received.slice(0, 1), RELAY_STATUS_PREFIX)) {
-            if (u8aEquals(received.slice(1), STOP) || itDone) {
+            if (u8aEquals(received.slice(1), STOP) || done) {
               this._destroyed = true
               return
             } else {
@@ -108,9 +70,7 @@ class RelayConnection implements MultiaddrConnection {
           } else {
             error(`Received invalid prefix <${received.slice(1)}. Dropping message.`)
           }
-        }
-
-        if (itDone) {
+        } else if (done) {
           if (!this._destroyed) {
             if (!this._sinkTriggered) {
               this._stream.sink(
@@ -124,7 +84,6 @@ class RelayConnection implements MultiaddrConnection {
             }
             this._destroyed = true
           }
-          console.log(`inside last if statement`, `this._sinkTriggered`, this._sinkTriggered)
           return
         }
       }
@@ -140,38 +99,22 @@ class RelayConnection implements MultiaddrConnection {
 
     return this._stream.sink(
       async function* (this: RelayConnection) {
-        let msgReceived = false
-        let itDone = false
-
-        this._defer.promise.then(() => {
-          console.log(`sink promise resolved`)
-          itDone = true
+        const promise = this._defer.promise.then(() => {
+          return { done: true, value: undefined }
         })
 
-        let msg: Promise<IteratorResult<Uint8Array, Uint8Array | void>>
-
         while (true) {
-          msg = (source as AsyncGenerator<Uint8Array, Uint8Array | void>).next()
-
-          await Promise.race([
-            msg.then(({ done }) => {
-              msgReceived = true
-
-              if (done) {
-                itDone = true
-              }
-            }),
-            this._defer.promise,
+          let { done, value } = await Promise.race([
+            // prettier-ignore
+            // @ts-ignore
+            source.next(),
+            promise,
           ])
 
-          console.log(`sink`, `itDone`, itDone, `msgReceived`, msgReceived)
+          if (value != null) {
+            let _received = value.slice()
 
-          if (msgReceived) {
-            msgReceived = false
-
-            let _received = (await msg).value
-
-            if (itDone) {
+            if (done) {
               if (_received != null) {
                 yield new BL([(RELAY_PAYLOAD_PREFIX as unknown) as BL, (_received as unknown) as BL])
               }
@@ -191,12 +134,17 @@ class RelayConnection implements MultiaddrConnection {
 
               yield new BL([(RELAY_PAYLOAD_PREFIX as unknown) as BL, (_received as unknown) as BL])
             }
-          }
+          } else if (done) {
+            if (!this._destroyed) {
+              this._destroyed = true
 
-          if (itDone && !this._destroyed) {
-            this._destroyed = true
+              return (new BL([
+                (RELAY_STATUS_PREFIX as unknown) as BL,
+                (STOP as unknown) as BL,
+              ]) as unknown) as Uint8Array
+            }
 
-            return (new BL([(RELAY_STATUS_PREFIX as unknown) as BL, (STOP as unknown) as BL]) as unknown) as Uint8Array
+            return
           }
         }
       }.call(this)
