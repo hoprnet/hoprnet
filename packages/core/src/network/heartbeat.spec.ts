@@ -110,13 +110,17 @@ describe('check heartbeat mechanism', function () {
 
 describe('unit test heartbeat', () => {
   let heartbeat
-  let hangUp = async () => {}
-  let interaction: HeartbeatInteraction = ({} as unknown) as HeartbeatInteraction
+  let hangUp = jest.fn(async () => {})
+  let peers
+  let interaction = {
+    interact: jest.fn(() => {})
+  } as any
 
   beforeEach(() => {
     const empty = [][Symbol.iterator]()
+    peers = new NetworkPeerStore(empty),
     heartbeat = new Heartbeat(
-      new NetworkPeerStore(empty),
+      peers,
       interaction,
       hangUp
     )
@@ -124,6 +128,21 @@ describe('unit test heartbeat', () => {
 
   it('check nodes is noop with empty store', async () => {
     await heartbeat.checkNodes()
+    expect(hangUp.mock.calls.length).toBe(0)
+    expect(interaction.interact.mock.calls.length).toBe(0)
+  })
 
+  it('check nodes is noop with only new peers', async () => {
+    peers.push({id: 'a', lastSeen: Date.now()})
+    await heartbeat.checkNodes()
+    expect(hangUp.mock.calls.length).toBe(0)
+    expect(interaction.interact.mock.calls.length).toBe(0)
+  })
+
+  it('check nodes interacts with an old peer', async () => {
+    peers.push({id: '16Uiu2HAmShu5QQs3LKEXjzmnqcT8E3YqyxKtVTurWYp8caM5jYJw', lastSeen: 0})
+    await heartbeat.checkNodes()
+    expect(hangUp.mock.calls.length).toBe(0)
+    expect(interaction.interact.mock.calls.length).toBe(1)
   })
 })
