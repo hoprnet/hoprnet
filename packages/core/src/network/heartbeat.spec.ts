@@ -42,7 +42,7 @@ describe('check heartbeat mechanism', function () {
     let nps = new PeerStore(node.peerStore.peers.values())
 
     node.network = {
-      heartbeat: new Heartbeat(node, nps),
+      heartbeat: new Heartbeat(nps, node.interactions.network.heartbeat, node.hangUp),
       peerStore: nps,
     } as Hopr<HoprCoreConnector>['network']
 

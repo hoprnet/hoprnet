@@ -1,6 +1,7 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '..'
 import type { HoprOptions } from '..'
+import type PeerInfo from 'peer-info'
 
 import { Crawler } from './crawler'
 import Heartbeat from './heartbeat'
@@ -15,10 +16,13 @@ class Network<Chain extends HoprCoreConnector> {
 
   constructor(node: Hopr<Chain>, private options: HoprOptions) {
     this.peerStore = new PeerStore(node.peerStore.peers.values())
-    this.heartbeat = new Heartbeat(node, this.peerStore)
+    this.heartbeat = new Heartbeat(this.peerStore, node.interactions.network.heartbeat, node.hangUp)
     this.crawler = new Crawler(node, this.peerStore)
 
-    node.on('peer:connect', this.peerStore.onPeerConnect.bind(this.peerStore))
+    node.on('peer:connect',  (peerInfo: PeerInfo) => {
+      this.peerStore.onPeerConnect(peerInfo)
+      this.heartbeat.connectionListener(peerInfo)
+    })
 
     if (options.bootstrapNode) {
       this.stun = new Stun(options)

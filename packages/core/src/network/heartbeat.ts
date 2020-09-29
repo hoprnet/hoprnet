@@ -9,6 +9,7 @@ import { EventEmitter } from 'events'
 import PeerInfo from 'peer-info'
 import { randomInteger } from '@hoprnet/hopr-utils'
 import {HEARTBEAT_REFRESH_TIME, HEARTBEAT_INTERVAL_LOWER_BOUND, HEARTBEAT_INTERVAL_UPPER_BOUND, MAX_PARALLEL_CONNECTIONS} from '../constants'
+import { Heartbeat as HeartbeatInteraction } from '../interactions/network/heartbeat'
 
 
 const log = debug('hopr-core:heartbeat')
@@ -18,17 +19,16 @@ class Heartbeat<Chain extends HoprCoreConnector> extends EventEmitter {
   timeout: any
 
   constructor(
-    public node: Hopr<Chain>,
-    private networkPeers: NetworkPeerStore
+    private networkPeers: NetworkPeerStore,
+    private interaction: HeartbeatInteraction<Chain>,
+    private hangUp: (addr: PeerId) => Promise<void>
     ) {
 
     super()
-
-    this.node.on('peer:connect', this.connectionListener.bind(this))
     super.on('beat', this.connectionListener.bind(this))
   }
 
-  private connectionListener(peer: PeerId | PeerInfo) {
+  connectionListener(peer: PeerId | PeerInfo) {
     const peerIdString = (PeerId.isPeerId(peer) ? peer : peer.id).toB58String()
 
     this.networkPeers.push({
@@ -64,14 +64,14 @@ class Heartbeat<Chain extends HoprCoreConnector> extends EventEmitter {
         currentPeerId = PeerId.createFromB58String(peer)
 
         try {
-          await this.node.interactions.network.heartbeat.interact(currentPeerId)
+          await this.interaction.interact(currentPeerId)
 
           this.networkPeers.push({
             id: peer,
             lastSeen: Date.now(),
           })
         } catch (err) {
-          await this.node.hangUp(currentPeerId)
+          await this.hangUp(currentPeerId)
           this.networkPeers.blacklistPeer(peer)
 
           // ONLY FOR TESTING
