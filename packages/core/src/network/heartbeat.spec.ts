@@ -16,6 +16,7 @@ import { Heartbeat as HeartbeatInteraction } from '../interactions/network/heart
 
 import Heartbeat from './heartbeat'
 import PeerStore from './peerStore'
+import { Network } from './index'
 
 import assert from 'assert'
 import Multiaddr from 'multiaddr'
@@ -32,6 +33,7 @@ describe('check heartbeat mechanism', function () {
     })) as Hopr<HoprCoreConnector>
 
     node.peerInfo.multiaddrs.add(Multiaddr('/ip4/0.0.0.0/tcp/0'))
+    node.hangUp = async (id) => {}
 
     node.interactions = {
       network: {
@@ -39,14 +41,11 @@ describe('check heartbeat mechanism', function () {
       },
     } as Hopr<HoprCoreConnector>['interactions']
 
-    let nps = new PeerStore(node.peerStore.peers.values())
 
-    node.network = {
-      heartbeat: new Heartbeat(nps, node.interactions.network.heartbeat, node.hangUp),
-      peerStore: nps,
-    } as Hopr<HoprCoreConnector>['network']
+    node.network = new Network(node, {} as any)
 
     node.peerRouting.findPeer = (_: PeerId) => Promise.reject(Error('not implemented'))
+
 
     await node.start()
 
