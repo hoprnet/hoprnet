@@ -1,12 +1,10 @@
 import chalk from 'chalk'
 import PeerInfo from 'peer-info'
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import AbortController from 'abort-controller'
 import { getTokens } from '../utils'
 import { randomSubset, randomInteger } from '@hoprnet/hopr-utils'
 import type { Token } from '../utils'
 import { MAX_HOPS, CRAWLING_RESPONSE_NODES } from '../constants'
-import type Hopr from '..'
 import { CrawlResponse, CrawlStatus } from '../messages'
 import PeerId from 'peer-id'
 import type { Connection } from './transport/types'
@@ -35,7 +33,7 @@ export const shouldIncludePeerInCrawlResponse = (peer: Multiaddr, them: Multiadd
   return true
 }
 
-class Crawler<Chain extends HoprCoreConnector> {
+class Crawler {
   constructor(
     private id: PeerId,
     private networkPeers: NetworkPeerStore,
@@ -247,7 +245,7 @@ class Crawler<Chain extends HoprCoreConnector> {
 
   handleCrawlRequest(conn?: Connection) {
     verbose('crawl requested')
-    return async function* (this: Crawler<Chain>) {
+    return async function* (this: Crawler) {
       const amountOfNodes = Math.min(CRAWLING_RESPONSE_NODES, this.networkPeers.peers.length)
 
       if (this.options?.timeoutIntentionally) {
