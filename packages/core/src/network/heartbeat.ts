@@ -1,5 +1,3 @@
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import type Hopr from '..'
 import NetworkPeerStore from './peerStore'
 import debug from 'debug'
 import { getTokens, Token } from '../utils'
@@ -15,12 +13,12 @@ import { Heartbeat as HeartbeatInteraction } from '../interactions/network/heart
 const log = debug('hopr-core:heartbeat')
 
 
-class Heartbeat<Chain extends HoprCoreConnector> extends EventEmitter {
+class Heartbeat extends EventEmitter {
   timeout: any
 
   constructor(
     private networkPeers: NetworkPeerStore,
-    private interaction: HeartbeatInteraction<Chain>,
+    private interaction: HeartbeatInteraction,
     private hangUp: (addr: PeerId) => Promise<void>
     ) {
 
