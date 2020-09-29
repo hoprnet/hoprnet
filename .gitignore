@@ -46,6 +46,7 @@ lib/
 .env
 .env*
 !.env.example
+!.env.*.encrypted.txt
 
 # Hopr Node
 db
