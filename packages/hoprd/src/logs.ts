@@ -37,7 +37,6 @@ export class LogStream {
   }
 
   logFatalError(message: string) {
-    this.log(message)
     const msg = {type:'fatal-error', msg: message, ts: new Date().toISOString()}
     this._log(msg)
   }
