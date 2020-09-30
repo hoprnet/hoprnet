@@ -153,7 +153,7 @@ async function getPeerInfo(options: HoprOptions, db?: LevelUp): Promise<PeerInfo
     throw Error('Invalid input parameter. Please set a valid peerInfo or pass a database handle.')
   }
 
-  // const addrs = await getAddrs(options)
+  const addrs = await getAddrs(options)
 
   let peerInfo: PeerInfo
   if (options.peerInfo != null) {
@@ -162,7 +162,7 @@ async function getPeerInfo(options: HoprOptions, db?: LevelUp): Promise<PeerInfo
     peerInfo = new PeerInfo(await getPeerId(options, db))
   }
 
-  // addrs.forEach((addr: Multiaddr) => peerInfo.multiaddrs.add(addr.encapsulate(`/p2p/${peerInfo.id.toB58String()}`)))
+  addrs.forEach((addr: Multiaddr) => peerInfo.multiaddrs.add(addr.encapsulate(`/p2p/${peerInfo.id.toB58String()}`)))
 
   return peerInfo
 }
