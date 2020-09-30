@@ -124,7 +124,7 @@ class Header extends React.Component {
                           </li>
                           <li>
                             <Link to="/node" onClick={this.closeMenu} style={{ textDecoration: 'none' }}>
-                              Order HOPR Node PC
+                              JOIN TESTNET
                             </Link>
                           </li>
                           <li>

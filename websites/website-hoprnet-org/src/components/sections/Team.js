@@ -381,7 +381,7 @@ class Team extends React.Component {
                 <Button
                   color={props.invertColor ? 'secondary' : 'primary'}
                   tag="a"
-                  href="https://docs.google.com/forms/d/e/1FAIpQLScXMsEYPyuFM_6Hvc5MGUXzhXcV3z5vNO19-IMeYpW43Y5Q2A/viewform?usp=sf_link&hl=en"
+                  href="https://docs.google.com/forms/d/e/1FAIpQLSeiZ76QfvcbpbBJk-DJDE5IfYmzkuUfUOM-j4btBviTbBNn2w/viewform?usp=sf_link&hl=en"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
