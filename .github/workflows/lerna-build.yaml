@@ -1,7 +1,7 @@
 name: HOPR Workflow
 on:
   push:
-    branches: ["*"]
+    branches: ["**"]
   pull_request:
     types: [closed]
 
