@@ -27,7 +27,6 @@ class Crawler<Chain extends HoprCoreConnector> implements AbstractInteraction {
 
   handler(struct: Handler) {
     pipe(
-      /* prettier-ignore */
       this.node.network.crawler.handleCrawlRequest(struct.connection),
       struct.stream
     )

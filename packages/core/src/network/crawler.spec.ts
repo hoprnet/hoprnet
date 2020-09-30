@@ -37,13 +37,23 @@ describe('test crawler', function () {
 
     await node.start()
 
-    node.peerRouting.findPeer = (_: PeerId) => Promise.reject('not implemented')
-
     node.interactions = {
       network: {
-        crawler: new CrawlerInteraction(node),
+        crawler: new CrawlerInteraction(node)
+          /*
+          interact: async (peer) => {
+            return Promise.resolve(
+              node.network.peerStore.peers.map(
+                x => new PeerInfo(PeerId.createFromB58String((x.id)))
+              )
+            )
+          }
+        }
+          */
       },
-    } as Hopr<HoprCoreConnector>['interactions']
+    } as any as Hopr<HoprCoreConnector>['interactions']
+
+
     node.on('peer:connect', (peerInfo: PeerInfo) => node.peerStore.put(peerInfo))
 
     node.network = new Network(node, node.interactions, {} as any, {crawl: options})
@@ -60,36 +70,18 @@ describe('test crawler', function () {
     ])
 
     await Alice.network.crawler.crawl()
-
-    // await assert.rejects(
-    //   () => Alice.network.crawler.crawl(),
-    //   Error(`Unable to find enough other nodes in the network.`)
-    // )
-
     Alice.emit('peer:connect', Bob.peerInfo)
-
     await Alice.network.crawler.crawl()
 
     assert(Alice.network.peerStore.has(Bob.peerInfo.id.toB58String()))
-    // await assert.rejects(
-    //   () => Alice.network.crawler.crawl(),
-    //   Error(`Unable to find enough other nodes in the network.`)
-    // )
 
     Bob.emit('peer:connect', Chris.peerInfo)
-
     await Alice.network.crawler.crawl()
 
     assert(Alice.network.peerStore.has(Bob.peerInfo.id.toB58String()))
     assert(Alice.network.peerStore.has(Chris.peerInfo.id.toB58String()))
 
-    // await assert.rejects(
-    //   () => Alice.network.crawler.crawl(),
-    //   Error(`Unable to find enough other nodes in the network.`)
-    // )
-
     Chris.emit('peer:connect', Dave.peerInfo)
-
     await Alice.network.crawler.crawl()
 
     assert(Alice.network.peerStore.has(Bob.peerInfo.id.toB58String()))
@@ -103,19 +95,15 @@ describe('test crawler', function () {
 
     // Simulate node failure
     await Bob.stop()
-
     assert(Chris.network.peerStore.has(Bob.peerInfo.id.toB58String()), 'Chris should know about Bob')
-
     // Simulates a heartbeat run that kicks out Bob
     Alice.network.peerStore.blacklistPeer(Bob.peerInfo.id.toB58String())
-
     await Alice.network.crawler.crawl()
 
     assert(
       !Alice.network.peerStore.has(Bob.peerInfo.id.toB58String()),
       'Alice should not add Bob to her peerStore after blacklisting him'
     )
-
     assert(
       Alice.network.peerStore.deletedPeers.some((entry: BlacklistedEntry) => entry.id === Bob.peerInfo.id.toB58String())
     )

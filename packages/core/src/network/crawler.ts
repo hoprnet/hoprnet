@@ -243,34 +243,38 @@ class Crawler {
     })
   }
 
-  handleCrawlRequest(conn?: Connection) {
+  async answerCrawl(callerId: PeerId, callerAddress: Multiaddr): Promise<PeerInfo[]>{
+    if (this.options?.timeoutIntentionally) {
+      await new Promise((resolve) => setTimeout(resolve, CRAWL_TIMEOUT + 100))
+    }
+
+    const amountOfNodes = Math.min(CRAWLING_RESPONSE_NODES, this.networkPeers.peers.length)
+
+    const selectedNodes = randomSubset(
+      this.networkPeers.peers,
+      amountOfNodes,
+      (entry: Entry) =>
+        entry.id !== this.id.toB58String() &&
+        (entry.id !== callerId.toB58String())
+    ).map((peer) => {
+      // convert peerId to peerInfo
+      const found = this.peerStore.get(PeerId.createFromB58String(peer.id))
+      const result = new PeerInfo(PeerId.createFromB58String(peer.id))
+      if (found) {
+        found.multiaddrs
+          .toArray()
+          .filter((ma) => shouldIncludePeerInCrawlResponse(ma, callerAddress))
+          .forEach((ma) => result.multiaddrs.add(ma))
+      }
+      return result
+    })
+    return selectedNodes
+  }
+
+  handleCrawlRequest(conn: Connection) {
     verbose('crawl requested')
     return async function* (this: Crawler) {
-      const amountOfNodes = Math.min(CRAWLING_RESPONSE_NODES, this.networkPeers.peers.length)
-
-      if (this.options?.timeoutIntentionally) {
-        await new Promise((resolve) => setTimeout(resolve, CRAWL_TIMEOUT + 100))
-      }
-
-      const selectedNodes = randomSubset(
-        this.networkPeers.peers,
-        amountOfNodes,
-        (entry: Entry) =>
-          entry.id !== this.id.toB58String() &&
-          (conn == null || entry.id !== conn.remotePeer.toB58String())
-      ).map((peer) => {
-        // convert peerId to peerInfo
-        const found = this.peerStore.get(PeerId.createFromB58String(peer.id))
-        const result = new PeerInfo(PeerId.createFromB58String(peer.id))
-        if (found) {
-          found.multiaddrs
-            .toArray()
-            .filter((ma) => shouldIncludePeerInCrawlResponse(ma, conn.remoteAddr))
-            .forEach((ma) => result.multiaddrs.add(ma))
-        }
-        return result
-      })
-
+      const selectedNodes = await this.answerCrawl(conn.remotePeer, conn.remoteAddr)
       if (selectedNodes.length > 0) {
         yield new CrawlResponse(undefined, {
           status: CrawlStatus.OK,
