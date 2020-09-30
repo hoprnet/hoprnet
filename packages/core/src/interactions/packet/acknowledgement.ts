@@ -30,7 +30,7 @@ const ACKNOWLEDGEMENT_TIMEOUT = durations.seconds(2)
 
 class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
   extends EventEmitter
-  implements AbstractInteraction<Chain> {
+  implements AbstractInteraction {
   protocols: string[] = [PROTOCOL_ACKNOWLEDGEMENT]
 
   constructor(public node: Hopr<Chain>) {

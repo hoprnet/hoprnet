@@ -12,7 +12,7 @@ import { PROTOCOL_PAYMENT_CHANNEL } from '../../constants'
 import type PeerInfo from 'peer-info'
 import type PeerId from 'peer-id'
 
-class Opening<Chain extends HoprCoreConnector> implements AbstractInteraction<Chain> {
+class Opening<Chain extends HoprCoreConnector> implements AbstractInteraction {
   protocols: string[] = [PROTOCOL_PAYMENT_CHANNEL]
 
   constructor(public node: Hopr<Chain>) {

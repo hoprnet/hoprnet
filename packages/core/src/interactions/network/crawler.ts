@@ -18,7 +18,7 @@ import PeerId from 'peer-id'
 
 import { CrawlResponse, CrawlStatus } from '../../messages'
 
-class Crawler<Chain extends HoprCoreConnector> implements AbstractInteraction<Chain> {
+class Crawler<Chain extends HoprCoreConnector> implements AbstractInteraction {
   protocols: string[] = [PROTOCOL_CRAWLING]
 
   constructor(public node: Hopr<Chain>) {

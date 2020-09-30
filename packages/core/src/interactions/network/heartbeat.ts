@@ -16,7 +16,7 @@ const HASH_FUNCTION = 'blake2s256'
 
 export const HEARTBEAT_TIMEOUT = durations.seconds(3)
 
-class Heartbeat implements AbstractInteraction<any> {
+class Heartbeat implements AbstractInteraction {
   protocols: string[] = [PROTOCOL_HEARTBEAT]
 
   constructor(
