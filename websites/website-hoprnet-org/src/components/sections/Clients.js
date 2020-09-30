@@ -68,8 +68,8 @@ class Clients extends React.Component {
                     src={require('@hoprnet/assets/images/partners/avado.svg')}
                     alt="Avado Logo"
                     className={imgClasses}
-                    width={124}
                     height={24}
+                    width={124}
                   />
                 </a>
               </li>
@@ -83,8 +83,8 @@ class Clients extends React.Component {
                     src={require('@hoprnet/assets/images/partners/froriep.png')}
                     alt="Froriep Logo"
                     className={imgClasses}
-                    width={124}
                     height={24}
+                    width={124}
                   />
                 </a>
               </li>
@@ -98,8 +98,8 @@ class Clients extends React.Component {
                     src={require('@hoprnet/assets/images/partners/elrond.png')}
                     alt="Elrond Logo"
                     className={imgClasses}
-                    width={124}
                     height={24}
+                    width={124}
                   />
                 </a>
               </li>
@@ -113,8 +113,8 @@ class Clients extends React.Component {
                     src={require('@hoprnet/assets/images/partners/sedimentum.png')}
                     alt="Sedimentum Logo"
                     className={imgClasses}
-                    width={124}
                     height={24}
+                    width={124}
                   />
                 </a>
               </li>
@@ -124,8 +124,8 @@ class Clients extends React.Component {
                     src={require('@hoprnet/assets/images/partners/swiss_medtech.png')}
                     alt="Swiss Medtech Logo"
                     className={imgClasses}
-                    width={124 * 1.75}
-                    height={24 * 1.75}
+                    height={24}
+                    width={124}
                   />
                 </a>
               </li>
@@ -139,8 +139,8 @@ class Clients extends React.Component {
                     src={require('@hoprnet/assets/images/partners/xdai.png')}
                     alt="xDAI Logo"
                     className={imgClasses}
-                    width={124}
-                    height={24}
+                    height={24 * 0.5}
+                    width={124 * 0.5}
                   />
                 </a>
               </li>
@@ -150,8 +150,8 @@ class Clients extends React.Component {
                     src={require('@hoprnet/assets/images/partners/health_tech_cluster.png')}
                     alt="Health Tech Cluster Logo"
                     className={imgClasses}
-                    width={124}
                     height={24}
+                    width={124}
                   />
                 </a>
               </li>
@@ -161,8 +161,8 @@ class Clients extends React.Component {
                     src={require('@hoprnet/assets/images/partners/swiss_healthcare_startups.png')}
                     alt="Swiss Healthcare Startups Logo"
                     className={imgClasses}
-                    width={124}
                     height={24}
+                    width={124}
                   />
                 </a>
               </li>
