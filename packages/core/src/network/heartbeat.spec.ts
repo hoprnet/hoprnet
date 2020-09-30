@@ -42,7 +42,7 @@ describe('check heartbeat mechanism', function () {
     } as Hopr<HoprCoreConnector>['interactions']
 
 
-    node.network = new Network(node, {} as any)
+    node.network = new Network(node, node.interactions, {} as any)
 
     node.peerRouting.findPeer = (_: PeerId) => Promise.reject(Error('not implemented'))
 

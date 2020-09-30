@@ -1,5 +1,5 @@
 // @ts-ignore
-import libp2p = require('libp2p')
+import LibP2P = require('libp2p')
 // @ts-ignore
 import MPLEX = require('libp2p-mplex')
 // @ts-ignore
@@ -75,7 +75,28 @@ export type PeerStore = {
   remove(peer: PeerId): void
 }
 
-export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
+declare class LibP2P {
+  // @TODO add libp2p types
+  emit: (event: string, ...args: any[]) => void;
+  dial: (addr: Multiaddr | PeerInfo | PeerId, options?: { signal: AbortSignal }) => Promise<Handler>;
+  dialProtocol: (
+    addr: Multiaddr | PeerInfo | PeerId,
+    protocol: string,
+    options?: { signal: AbortSignal }
+  ) => Promise<Handler>;
+  hangUp: (addr: PeerInfo | PeerId | Multiaddr | string) => Promise<void>;
+  peerInfo: PeerInfo;
+  peerStore: PeerStore;
+  peerRouting: {
+    findPeer: (addr: PeerId) => Promise<PeerInfo>
+  };
+  handle: (protocol: string[], handler: (struct: { connection: any; stream: any }) => void) => void;
+  on: (str: string, handler: (...props: any[]) => void) => void;
+  start (): Promise<any>;
+  stop (): Promise<void>;
+}
+
+class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
   public interactions: Interactions<Chain>
   public network: Network
   public dbKeys = DbKeys
@@ -87,23 +108,6 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
   // Allows us to construct HOPR with falsy options
   public _debug: boolean
 
-  // @TODO add libp2p types
-  declare emit: (event: string, ...args: any[]) => void
-  declare dial: (addr: Multiaddr | PeerInfo | PeerId, options?: { signal: AbortSignal }) => Promise<Handler>
-  declare dialProtocol: (
-    addr: Multiaddr | PeerInfo | PeerId,
-    protocol: string,
-    options?: { signal: AbortSignal }
-  ) => Promise<Handler>
-  declare hangUp: (addr: PeerInfo | PeerId | Multiaddr | string) => Promise<void>
-  declare peerInfo: PeerInfo
-  declare peerStore: PeerStore
-  declare peerRouting: {
-    findPeer: (addr: PeerId) => Promise<PeerInfo>
-  }
-  declare handle: (protocol: string[], handler: (struct: { connection: any; stream: any }) => void) => void
-  declare on: (str: string, handler: (...props: any[]) => void) => void
-
   /**
    * @constructor
    *
@@ -111,6 +115,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
    * @param provider
    */
   constructor(options: HoprOptions, public db: LevelUp, public paymentChannels: Chain) {
+    //@ts-ignore
     super({
       peerInfo: options.peerInfo,
 
@@ -147,7 +152,7 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
     this.isBootstrapNode = options.bootstrapNode || false
 
     this.interactions = new Interactions(this)
-    this.network = new Network(this, options)
+    this.network = new Network(this, this.interactions, options)
 
     verbose('# STARTED NODE')
     verbose('ID', this.peerInfo.id.toB58String())
@@ -511,3 +516,4 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
     }
   }
 }
+export { Hopr as default, LibP2P } 
