@@ -32,7 +32,7 @@
   "scripts": {
     "build": "yarn clean && tsc -p .",
     "clean": "rm -rf ./lib",
-    "test": "for i in {1..5}; do jest --runInBand --forceExit; done",
+    "test": "jest --runInBand --forceExit",
     "prepublishOnly": "yarn build",
     "lint": "prettier --check .",
     "lint:fix": "prettier --write ."
@@ -102,7 +102,7 @@
       "ts"
     ],
     "rootDir": "src/network/transport/",
-    "testRegex": "listener.spec.ts$",
+    "testRegex": "index.spec.ts$",
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },
