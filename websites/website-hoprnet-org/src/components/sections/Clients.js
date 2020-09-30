@@ -129,18 +129,22 @@ class Clients extends React.Component {
                   />
                 </a>
               </li>
-              {/* <li className="reveal-from-top" data-reveal-delay="150">
-                <a href="https://medium.com/hoprnet/introducing-our-new-incentivized-testnet-hopr-s%C3%A4ntis-612a05b36932" target="_blank" rel="noopener noreferrer">
+              <li className="reveal-from-top" data-reveal-delay="150">
+                <a
+                  href="https://medium.com/hoprnet/introducing-our-new-incentivized-testnet-hopr-s%C3%A4ntis-612a05b36932"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                   <Image
-                    src={require('@hoprnet/assets/images/partners/xdai.svg')}
+                    src={require('@hoprnet/assets/images/partners/xdai.png')}
                     alt="xDAI Logo"
                     className={imgClasses}
-                    width={124 * 1.75}
-                    height={24 * 1.75}
+                    width={124}
+                    height={24}
                   />
                 </a>
-              </li> */}
-              {/* <li className="reveal-from-top" data-reveal-delay="150">
+              </li>
+              <li className="reveal-from-top" data-reveal-delay="150">
                 <a href="https://en.healthtech.ch/" target="_blank" rel="noopener noreferrer">
                   <Image
                     src={require('@hoprnet/assets/images/partners/health_tech_cluster.png')}
@@ -161,7 +165,7 @@ class Clients extends React.Component {
                     height={24}
                   />
                 </a>
-              </li> */}
+              </li>
             </ul>
             {showQuestion ? (
               <div className="question">
