@@ -15,6 +15,7 @@ import { Interactions } from '../interactions'
 import { Crawler, CRAWL_TIMEOUT, shouldIncludePeerInCrawlResponse } from './crawler'
 import { Crawler as CrawlerInteraction } from '../interactions/network/crawler'
 import Multiaddr from 'multiaddr'
+import { Network } from './index'
 import PeerStore, { BLACKLIST_TIMEOUT, BlacklistedEntry } from './peerStore'
 import { durations } from '@hoprnet/hopr-utils'
 
@@ -43,18 +44,9 @@ describe('test crawler', function () {
         crawler: new CrawlerInteraction(node),
       },
     } as Hopr<HoprCoreConnector>['interactions']
-
-    new Interactions(node)
-    let nps = new PeerStore(node.peerStore.peers.values())
-    node.on('peer:connect', nps.onPeerConnect.bind(nps))
-
-    node.network = {
-      crawler: new Crawler(node.peerInfo.id, nps, node.interactions.network.crawler, node.peerStore, options),
-      peerStore: nps,
-    } as Hopr<HoprCoreConnector>['network']
-
     node.on('peer:connect', (peerInfo: PeerInfo) => node.peerStore.put(peerInfo))
 
+    node.network = new Network(node, node.interactions, {} as any, {crawl: options})
     return (node as unknown) as Hopr<HoprCoreConnector>
   }
 
@@ -172,12 +164,6 @@ describe('test crawler', function () {
       ])
 
       await Alice.network.crawler.crawl()
-
-      // await assert.rejects(
-      //   () => Alice.network.crawler.crawl(),
-      //   Error(`Unable to find enough other nodes in the network.`)
-      // )
-
       Alice.emit('peer:connect', Bob.peerInfo)
       await Alice.network.crawler.crawl()
       Bob.emit('peer:connect', Chris.peerInfo)
@@ -191,6 +177,7 @@ describe('test crawler', function () {
       timeoutCorrectly = true
 
       const after = Date.now() - before
+
       assert(
         timeoutCorrectly && after < 3 * CRAWL_TIMEOUT && after >= 2 * CRAWL_TIMEOUT,
         `Crawling should timeout correctly`

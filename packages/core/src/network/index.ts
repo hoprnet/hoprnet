@@ -9,16 +9,20 @@ import Heartbeat from './heartbeat'
 import PeerStore from './peerStore'
 import Stun from './stun'
 
+
+type TestOpts = {
+  crawl?: { timeoutIntentionally?: boolean }
+}
 class Network {
   public crawler: Crawler
   public heartbeat: Heartbeat
   public peerStore: PeerStore
   public stun?: Stun
 
-  constructor(node: LibP2P, interactions: Interactions<any>, private options: HoprOptions) {
+  constructor(node: LibP2P, interactions: Interactions<any>, private options: HoprOptions, testingOptions?: TestOpts) {
     this.peerStore = new PeerStore(node.peerStore.peers.values())
     this.heartbeat = new Heartbeat(this.peerStore, interactions.network.heartbeat, node.hangUp)
-    this.crawler = new Crawler(node.peerInfo.id, this.peerStore, interactions.network.crawler, node.peerStore)
+    this.crawler = new Crawler(node.peerInfo.id, this.peerStore, interactions.network.crawler, node.peerStore, testingOptions?.crawl)
 
     node.on('peer:connect',  (peerInfo: PeerInfo) => {
       this.peerStore.onPeerConnect(peerInfo)
