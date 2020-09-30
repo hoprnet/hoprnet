@@ -20,16 +20,16 @@ const SetupHero = props => {
         Hey!
         <br />
         <br />
-        Click to download the{' '}
+        Click{' '}
         <a
           href={require(`../assets/documents/HOPR_Quickstart_Manual.pdf`)}
           target="_blank"
           rel="noopener noreferrer"
           className="underline"
         >
-          HOPR Quickstart Manual
-        </a>
-        .
+          here
+        </a>{' '}
+        to download the HOPR Quickstart Manual.
         <br />
         <br />
         If you have any questions, feel free to email us at{' '}
