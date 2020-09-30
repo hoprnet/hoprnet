@@ -13,7 +13,6 @@ const defaultProps = {
   ...SectionProps.defaults,
 }
 
-console.log(process.env)
 const isCompany = false
 
 class Clients extends React.Component {
@@ -60,7 +59,11 @@ class Clients extends React.Component {
             />
             <ul className="list-reset">
               <li className="reveal-from-top" data-reveal-delay="150">
-                <a href="https://ava.do/" target="_blank" rel="noopener noreferrer">
+                <a
+                  href="https://medium.com/hoprnet/attention-hopr-node-runners-3ce80ddf67c2"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                   <Image
                     src={require('@hoprnet/assets/images/partners/avado.svg')}
                     alt="Avado Logo"
@@ -71,7 +74,11 @@ class Clients extends React.Component {
                 </a>
               </li>
               <li className="reveal-from-top" data-reveal-delay="150">
-                <a href="https://www.froriep.com/de/" target="_blank" rel="noopener noreferrer">
+                <a
+                  href="https://www.mondaq.com/shareholders/968208/the-importance-of-governance-in-building-ecosystems"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                   <Image
                     src={require('@hoprnet/assets/images/partners/froriep.png')}
                     alt="Froriep Logo"
@@ -82,7 +89,11 @@ class Clients extends React.Component {
                 </a>
               </li>
               <li className="reveal-from-top" data-reveal-delay="150">
-                <a href="https://elrond.com/" target="_blank" rel="noopener noreferrer">
+                <a
+                  href="https://elrond.com/blog/enhanced-privacy-hopr-tools-network/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                   <Image
                     src={require('@hoprnet/assets/images/partners/elrond.png')}
                     alt="Elrond Logo"
@@ -93,7 +104,11 @@ class Clients extends React.Component {
                 </a>
               </li>
               <li className="reveal-from-top">
-                <a href="https://www.sedimentum.com/" target="_blank" rel="noopener noreferrer">
+                <a
+                  href="https://medium.com/hoprnet/privacy-as-dignity-2fcdc4bd14f7"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                   <Image
                     src={require('@hoprnet/assets/images/partners/sedimentum.png')}
                     alt="Sedimentum Logo"
@@ -111,6 +126,43 @@ class Clients extends React.Component {
                     className={imgClasses}
                     width={124 * 1.75}
                     height={24 * 1.75}
+                  />
+                </a>
+              </li>
+              <li className="reveal-from-top" data-reveal-delay="150">
+                <a
+                  href="https://medium.com/hoprnet/introducing-our-new-incentivized-testnet-hopr-s%C3%A4ntis-612a05b36932"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Image
+                    src={require('@hoprnet/assets/images/partners/xdai.png')}
+                    alt="xDAI Logo"
+                    className={imgClasses}
+                    width={124}
+                    height={24}
+                  />
+                </a>
+              </li>
+              <li className="reveal-from-top" data-reveal-delay="150">
+                <a href="https://en.healthtech.ch/" target="_blank" rel="noopener noreferrer">
+                  <Image
+                    src={require('@hoprnet/assets/images/partners/health_tech_cluster.png')}
+                    alt="Health Tech Cluster Logo"
+                    className={imgClasses}
+                    width={124}
+                    height={24}
+                  />
+                </a>
+              </li>
+              <li className="reveal-from-top" data-reveal-delay="150">
+                <a href="https://www.swiss-medtech.ch/en" target="_blank" rel="noopener noreferrer">
+                  <Image
+                    src={require('@hoprnet/assets/images/partners/swiss_healthcare_startups.png')}
+                    alt="Swiss Healthcare Startups Logo"
+                    className={imgClasses}
+                    width={124}
+                    height={24}
                   />
                 </a>
               </li>

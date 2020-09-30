@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@craco/craco": "^5.6.4",
-    "@hoprnet/assets": "^1.17.0-alpha.0",
+    "@hoprnet/assets": "^1.17.0-alpha.41",
     "classnames": "^2.2.6",
     "lodash": "^4.17.15",
     "lodash.throttle": "^4.1.1",
