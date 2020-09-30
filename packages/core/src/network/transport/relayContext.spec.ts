@@ -7,7 +7,7 @@ describe('test overwritable connection', function () {
       let i = 0
       for (; i < 23; i++) {
         yield new TextEncoder().encode(`iteration ${iteration} - msg no. ${i}`)
-        await new Promise((resolve) => setTimeout(resolve, 123))
+        await new Promise((resolve) => setTimeout(resolve, 12))
       }
 
       return `iteration ${iteration} - msg no. ${i + 1}`
@@ -20,10 +20,11 @@ describe('test overwritable connection', function () {
     setInterval(() => {
       ctx.update(getGenerator())
       iteration++
-    }, 1234)
+    }, 123)
 
     for await (const msg of ctx.source) {
       console.log(new TextDecoder().decode(msg))
     }
+
   })
 })

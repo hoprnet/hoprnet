@@ -2,6 +2,10 @@ import { RelayConnection } from './relayConnection'
 import assert from 'assert'
 import { randomInteger } from '@hoprnet/hopr-utils'
 
+import { Stream } from './types'
+
+import PeerId from 'peer-id'
+
 interface PairType<T> {
   sink(source: AsyncIterable<T>): Promise<void>
   source: AsyncIterable<T>
@@ -17,12 +21,15 @@ describe('test relay connection', function () {
   it('should initiate a relayConnection and let the receiver close the connection prematurely', async function () {
     const AliceBob = Pair<Uint8Array>()
     const BobAlice = Pair<Uint8Array>()
-
+    const Alice = await PeerId.create({ keyType: 'secp256k1' })
+    const Bob = await PeerId.create({ keyType: 'secp256k1' })
     const a = new RelayConnection({
       stream: {
         sink: AliceBob.sink,
         source: BobAlice.source,
       },
+      self: Alice,
+      counterparty: Bob,
     })
 
     const b = new RelayConnection({
@@ -30,6 +37,8 @@ describe('test relay connection', function () {
         sink: BobAlice.sink,
         source: AliceBob.source,
       },
+      self: Bob,
+      counterparty: Alice,
     })
 
     a.sink(
@@ -71,12 +80,15 @@ describe('test relay connection', function () {
   it('should initiate a relayConnection and close the connection by the sender prematurely', async function () {
     const AliceBob = Pair<Uint8Array>()
     const BobAlice = Pair<Uint8Array>()
-
+    const Alice = await PeerId.create({ keyType: 'secp256k1' })
+    const Bob = await PeerId.create({ keyType: 'secp256k1' })
     const a = new RelayConnection({
       stream: {
         sink: AliceBob.sink,
         source: BobAlice.source,
       },
+      self: Alice,
+      counterparty: Bob,
     })
 
     const b = new RelayConnection({
@@ -84,6 +96,8 @@ describe('test relay connection', function () {
         sink: BobAlice.sink,
         source: AliceBob.source,
       },
+      self: Bob,
+      counterparty: Alice,
     })
 
     a.sink(
@@ -120,11 +134,25 @@ describe('test relay connection', function () {
     const AliceBob = Pair<Uint8Array>()
     const BobAlice = Pair<Uint8Array>()
 
+    const Alice = await PeerId.create({ keyType: 'secp256k1' })
+    const Bob = await PeerId.create({ keyType: 'secp256k1' })
+
     const a = new RelayConnection({
       stream: {
         sink: AliceBob.sink,
         source: BobAlice.source,
       },
+      self: Alice,
+      counterparty: Bob,
+      webRTCstream: ({
+        source: (async function* () {
+          let counter = 0
+          while (true) {
+            await new Promise((resolve) => setTimeout(resolve, 80))
+            yield new TextEncoder().encode(`Fancy WebRTC message ${counter++}`)
+          }
+        })(),
+      } as unknown) as Stream,
     })
 
     const b = new RelayConnection({
@@ -132,6 +160,18 @@ describe('test relay connection', function () {
         sink: BobAlice.sink,
         source: AliceBob.source,
       },
+      self: Bob,
+      counterparty: Alice,
+      webRTCstream: ({
+        source: (async function* () {
+          let counter = 0
+          while (true) {
+            await new Promise((resolve) => setTimeout(resolve, 70))
+
+            yield new TextEncoder().encode(`Fancy WebRTC message ${counter++}`)
+          }
+        })(),
+      } as unknown) as Stream,
     })
 
     a.sink(

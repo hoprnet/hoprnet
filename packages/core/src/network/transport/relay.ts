@@ -6,10 +6,24 @@ const verbose = debug('hopr-core:verbose:transport:error')
 import AbortController from 'abort-controller'
 import { AbortError } from 'abortable-iterator'
 import chalk from 'chalk'
-import BL from 'bl'
 
-// @ts-ignore
-import handshake = require('it-handshake')
+import type BL from 'bl'
+
+declare interface Handshake {
+  reader: {
+    next(bytes: number): Promise<BL>
+  }
+  writer: {
+    end(): void
+    push(msg: Uint8Array)
+  }
+  stream: Stream
+  rest(): void
+  write(msg: Uint8Array): void
+  read(): Promise<BL>
+}
+
+const handshake: (stream: Stream) => Handshake = require('it-handshake')
 
 import Multiaddr from 'multiaddr'
 import PeerInfo from 'peer-info'
@@ -25,7 +39,6 @@ import {
   FAIL,
   FAIL_COULD_NOT_REACH_COUNTERPARTY,
   DELIVERY_REGISTER,
-  RELAY_PAYLOAD_PREFIX,
 } from './constants'
 
 import { pubKeyToPeerId } from '../../utils'
@@ -102,7 +115,7 @@ class Relay {
         continue
       }
 
-      return new RelayConnection({ stream })
+      return new RelayConnection({ stream, self: this._peerInfo.id, counterparty: destination })
     }
 
     throw Error(
@@ -115,16 +128,13 @@ class Relay {
   async handleReRegister() {}
 
   async handleRelayConnection(conn: Handler): Promise<void> {
-    const stream = await this.handleHandshake(conn.stream)
+    const { stream, counterparty } = await this.handleHandshake(conn.stream)
 
     if (stream == null) {
       return
     }
 
-    const result = new RelayConnection({ stream })
-
-     
-    this.connHandler?.(result)
+    this.connHandler?.(new RelayConnection({ stream, self: this._peerInfo.id, counterparty }))
   }
 
   private async connectToRelay(relay: PeerInfo, options?: DialOptions): Promise<Connection> {
@@ -191,7 +201,7 @@ class Relay {
     return shaker.stream
   }
 
-  private async handleHandshake(stream: Stream): Promise<Stream> {
+  private async handleHandshake(stream: Stream): Promise<{ stream: Stream; counterparty: PeerId }> {
     let shaker = handshake(stream)
 
     let pubKeySender: Buffer | undefined
@@ -208,9 +218,9 @@ class Relay {
       return
     }
 
-    let sender: PeerId
+    let counterparty: PeerId
     try {
-      sender = await pubKeyToPeerId(pubKeySender)
+      counterparty = await pubKeyToPeerId(pubKeySender)
     } catch (err) {
       error(`Could not decode sender peerId. Error was: ${err}`)
       shaker.write(FAIL)
@@ -221,7 +231,7 @@ class Relay {
     shaker.write(OK)
     shaker.rest()
 
-    return shaker.stream
+    return { stream: shaker.stream, counterparty }
   }
 
   private async handleRelay({ stream, connection }: Handler) {

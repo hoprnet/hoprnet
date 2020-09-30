@@ -137,7 +137,7 @@ describe('should create a socket and connect to it', function () {
       })(),
       conn,
       async (source: AsyncIterable<Uint8Array>) => {
-        setTimeout(() => setImmediate(() => conn.close()), 200)
+        setTimeout(() => setImmediate(() => conn.close()), 300)
         for await (const msg of source) {
           console.log(`received <${new TextDecoder().decode(msg.slice())}>`)
         }

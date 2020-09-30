@@ -5,7 +5,6 @@ import mafmt from 'mafmt'
 import errCode from 'err-code'
 import debug from 'debug'
 import { socketToConn } from './socket-to-conn'
-import myHandshake from './handshake'
 // @ts-ignore
 import libp2p = require('libp2p')
 import Listener from './listener'
@@ -108,84 +107,80 @@ class TCP {
     verbose(`Created TCP stack (Stun: ${this.stunServers?.map((x) => x.toString()).join(',')}`)
   }
 
-  async handleDelivery({ stream, connection, counterparty }: Handler & { counterparty: PeerId }) {
-    verbose('handle delivery', connection.remoteAddr.toString(), counterparty.toB58String())
+  async handleDelivery(relayConn: MultiaddrConnection) {
+    //verbose('handle delivery', connection.remoteAddr.toString(), counterparty.toB58String())
     let conn: Connection
 
-    let webRTCsendBuffer: Pushable<Uint8Array>
-    let webRTCrecvBuffer: Pushable<Uint8Array>
+    // let webRTCsendBuffer: Pushable<Uint8Array>
+    // let webRTCrecvBuffer: Pushable<Uint8Array>
 
-    let socket: Promise<Socket>
+    // let socket: Promise<Socket>
 
-    if (this._useWebRTC) {
-      webRTCsendBuffer = pushable<Uint8Array>()
-      webRTCrecvBuffer = pushable<Uint8Array>()
+    // if (this._useWebRTC) {
+    //   webRTCsendBuffer = pushable<Uint8Array>()
+    //   webRTCrecvBuffer = pushable<Uint8Array>()
 
-      verbose('attempting to upgrade to webRTC from a delivery', connection.remoteAddr.toString())
-      socket = upgradeToWebRTC(webRTCsendBuffer, webRTCrecvBuffer, {
-        _timeoutIntentionallyOnWebRTC: this._timeoutIntentionallyOnWebRTC,
-        _failIntentionallyOnWebRTC: this._failIntentionallyOnWebRTC,
-        _answerIntentionallyWithIncorrectMessages: this._answerIntentionallyWithIncorrectMessages,
-        stunServers: this.stunServers,
-      })
-    }
+    //   // verbose('attempting to upgrade to webRTC from a delivery', connection.remoteAddr.toString())
+    //   socket = upgradeToWebRTC(webRTCsendBuffer, webRTCrecvBuffer, {
+    //     _timeoutIntentionallyOnWebRTC: this._timeoutIntentionallyOnWebRTC,
+    //     _failIntentionallyOnWebRTC: this._failIntentionallyOnWebRTC,
+    //     _answerIntentionallyWithIncorrectMessages: this._answerIntentionallyWithIncorrectMessages,
+    //     stunServers: this.stunServers,
+    //   })
+    // }
 
-    const myStream = myHandshake(webRTCsendBuffer, webRTCrecvBuffer)
+    // const myStream = myHandshake(webRTCsendBuffer, webRTCrecvBuffer)
 
-    pipe(
-      // prettier-ignore
-      stream.source,
-      myStream.webRtcStream.source
-    )
+    // pipe(
+    //   // prettier-ignore
+    //   relayConn.source,
+    //   myStream.webRtcStream.source
+    // )
 
-    pipe(
-      // prettier-ignore
-      myStream.webRtcStream.sink,
-      stream.sink
-    )
+    // pipe(
+    //   // prettier-ignore
+    //   myStream.webRtcStream.sink,
+    //   relayConn.sink
+    // )
 
-    if (this._useWebRTC) {
-      let mAddrConn: MultiaddrConnection
-      let webRTCSocket: Socket
-      try {
-        webRTCSocket = await socket
+    // if (this._useWebRTC) {
+    //   let mAddrConn: MultiaddrConnection
+    //   let webRTCSocket: Socket
+    //   try {
+    //     webRTCSocket = await socket
 
-        webRTCrecvBuffer.end()
-        webRTCsendBuffer.end()
-        verbose(`attempting upgrade to direct webRTC connection to ${counterparty.toB58String()}`)
+    //     webRTCrecvBuffer.end()
+    //     webRTCsendBuffer.end()
+    //     // verbose(`attempting upgrade to direct webRTC connection to ${counterparty.toB58String()}`)
 
-        mAddrConn = socketToConn(webRTCSocket, {
-          remoteAddr: Multiaddr(`/p2p/${counterparty.toB58String()}`),
-          localAddr: Multiaddr(`/p2p/${this._peerInfo.id.toB58String()}`),
-        })
+    //     relayConn.close()
+    //     mAddrConn = socketToConn(webRTCSocket, {
+    //       remoteAddr: Multiaddr(``), // Multiaddr(`/p2p/${counterparty.toB58String()}`),
+    //       localAddr: Multiaddr(`/p2p/${this._peerInfo.id.toB58String()}`),
+    //     })
 
-        conn = await this._upgrader.upgradeInbound(mAddrConn)
+    //     conn = await this._upgrader.upgradeInbound(mAddrConn)
 
-        this.connHandler?.(conn)
+    //     this.connHandler?.(conn)
 
-        return
-      } catch (err) {
-        error(`Could not upgrade to WebRTC direct connection. Error was: ${err} (${counterparty.toB58String()})`)
+    //     return
+    //   } catch (err) {
+    //     // error(`Could not upgrade to WebRTC direct connection. Error was: ${err} (${counterparty.toB58String()})`)
 
-        webRTCrecvBuffer.end()
-        webRTCsendBuffer.end()
+    //     webRTCrecvBuffer.end()
+    //     webRTCsendBuffer.end()
 
-        if (mAddrConn != null) {
-          mAddrConn.close()
-        } else if (webRTCSocket != null) {
-          webRTCSocket.destroy()
-        }
-      }
-    }
+    //     if (mAddrConn != null) {
+    //       mAddrConn.close()
+    //     } else if (webRTCSocket != null) {
+    //       webRTCSocket.destroy()
+    //     }
+    //   }
+    // }
 
     try {
-      conn = await this._upgrader.upgradeInbound(
-        this.relayToConn({
-          stream: myStream.relayStream,
-          counterparty,
-          connection,
-        })
-      )
+      // @ts-ignore
+      conn = await this._upgrader.upgradeInbound(relayConn)
     } catch (err) {
       error(`Could not upgrade relayed connection. Error was: ${err}`)
       return
@@ -239,7 +234,7 @@ class TCP {
     const destination = PeerId.createFromCID(ma.getPeerId())
 
     // Check whether we know some relays that we can use
-    const potentialRelays = this.relays?.filter((peerInfo: PeerInfo) => !peerInfo.id.isEqual(destination))
+    const potentialRelays = this.relays?.filter((peerInfo: PeerInfo) => !peerInfo.id.equals(destination))
 
     if (potentialRelays == null || potentialRelays.length == 0) {
       throw Error(
@@ -263,85 +258,79 @@ class TCP {
 
     const relayConnection = await this._relay.establishRelayedConnection(ma, relays, options)
 
-    let conn: Connection
+    // if (options?.signal?.aborted) {
+    //   try {
+    //     await relayConnection.close()
+    //   } catch (err) {
+    //     error(err)
+    //   }
 
-    if (options?.signal?.aborted) {
-      try {
-        await relayConnection.connection.close()
-      } catch (err) {
-        error(err)
-      }
+    //   throw new AbortError()
+    // }
 
-      throw new AbortError()
-    }
+    // let socket: Promise<Socket>
 
-    let socket: Promise<Socket>
+    // if (this._useWebRTC) {
+    //   webRTCsendBuffer = pushable<Uint8Array>()
+    //   webRTCrecvBuffer = pushable<Uint8Array>()
 
-    if (this._useWebRTC) {
-      webRTCsendBuffer = pushable<Uint8Array>()
-      webRTCrecvBuffer = pushable<Uint8Array>()
+    //   verbose('attempting to upgrade a relay dial to webRTC')
+    //   socket = upgradeToWebRTC(webRTCsendBuffer, webRTCrecvBuffer, {
+    //     initiator: true,
+    //     _timeoutIntentionallyOnWebRTC: this._timeoutIntentionallyOnWebRTC,
+    //     _failIntentionallyOnWebRTC: this._failIntentionallyOnWebRTC,
+    //     _answerIntentionallyWithIncorrectMessages: this._answerIntentionallyWithIncorrectMessages,
+    //     stunServers: this.stunServers,
+    //   })
+    // }
 
-      verbose('attempting to upgrade a relay dial to webRTC')
-      socket = upgradeToWebRTC(webRTCsendBuffer, webRTCrecvBuffer, {
-        initiator: true,
-        _timeoutIntentionallyOnWebRTC: this._timeoutIntentionallyOnWebRTC,
-        _failIntentionallyOnWebRTC: this._failIntentionallyOnWebRTC,
-        _answerIntentionallyWithIncorrectMessages: this._answerIntentionallyWithIncorrectMessages,
-        stunServers: this.stunServers,
-      })
-    }
+    // const stream = myHandshake(webRTCsendBuffer, webRTCrecvBuffer, { signal: options?.signal })
 
-    const stream = myHandshake(webRTCsendBuffer, webRTCrecvBuffer, { signal: options?.signal })
+    // pipe(
+    //   // prettier-ignore
+    //   relayConnection.source,
+    //   stream.webRtcStream.source
+    // )
 
-    pipe(
-      // prettier-ignore
-      relayConnection.stream.source,
-      stream.webRtcStream.source
-    )
+    // pipe(
+    //   // prettier-ignore
+    //   stream.webRtcStream.sink,
+    //   relayConnection.sink
+    // )
 
-    pipe(
-      // prettier-ignore
-      stream.webRtcStream.sink,
-      relayConnection.stream.sink
-    )
+    // if (this._useWebRTC) {
+    //   let mAddrConn: MultiaddrConnection
+    //   let webRTCSocket: Socket
+    //   try {
+    //     webRTCSocket = await socket
 
-    if (this._useWebRTC) {
-      let mAddrConn: MultiaddrConnection
-      let webRTCSocket: Socket
-      try {
-        webRTCSocket = await socket
+    //     webRTCsendBuffer.end()
+    //     webRTCrecvBuffer.end()
 
-        webRTCsendBuffer.end()
-        webRTCrecvBuffer.end()
+    //     relayConnection.close()
 
-        mAddrConn = socketToConn(webRTCSocket, {
-          signal: options.signal,
-          remoteAddr: Multiaddr(`/p2p/${destination.toB58String()}`),
-          localAddr: Multiaddr(`/p2p/${this._peerInfo.id.toB58String()}`),
-        })
+    //     mAddrConn = socketToConn(webRTCSocket, {
+    //       signal: options.signal,
+    //       remoteAddr: Multiaddr(`/p2p/${destination.toB58String()}`),
+    //       localAddr: Multiaddr(`/p2p/${this._peerInfo.id.toB58String()}`),
+    //     })
 
-        return await this._upgrader.upgradeOutbound(mAddrConn)
-      } catch (err) {
-        error(`error while dialling: ${err}`)
+    //     return await this._upgrader.upgradeOutbound(mAddrConn)
+    //   } catch (err) {
+    //     error(`error while dialling: ${err}`)
 
-        webRTCsendBuffer.end()
-        webRTCrecvBuffer.end()
+    //     webRTCsendBuffer.end()
+    //     webRTCrecvBuffer.end()
 
-        if (mAddrConn != null) {
-          mAddrConn.close()
-        } else if (webRTCSocket != null) {
-          webRTCSocket.destroy()
-        }
-      }
-    }
+    //     if (mAddrConn != null) {
+    //       mAddrConn.close()
+    //     } else if (webRTCSocket != null) {
+    //       webRTCSocket.destroy()
+    //     }
+    //   }
+    // }
 
-    return await this._upgrader.upgradeOutbound(
-      this.relayToConn({
-        stream: stream.relayStream,
-        counterparty: destination,
-        connection: relayConnection.connection,
-      })
-    )
+    return await this._upgrader.upgradeOutbound(relayConnection)
   }
 
   async dialDirectly(ma: Multiaddr, options?: DialOptions): Promise<Connection> {
@@ -450,41 +439,6 @@ class TCP {
     return multiaddrs.filter((ma: Multiaddr) => {
       return mafmt.TCP.matches(ma.decapsulateCode(CODE_P2P)) || mafmt.P2P.matches(ma)
     })
-  }
-
-  private relayToConn({
-    connection,
-    stream,
-    counterparty,
-  }: {
-    connection: Connection
-    stream: Stream
-    counterparty: PeerId
-  }): MultiaddrConnection {
-    const maConn: MultiaddrConnection = {
-      ...stream,
-      conn: stream,
-      localAddr: Multiaddr(`/p2p/${this._peerInfo.id.toB58String()}`),
-      remoteAddr: Multiaddr(`/p2p/${counterparty.toB58String()}`),
-      async close(err?: Error) {
-        if (err !== undefined) {
-          error(err)
-        }
-
-        try {
-          await connection.close()
-        } catch (err) {
-          error(err)
-        }
-
-        maConn.timeline.close = Date.now()
-      },
-      timeline: {
-        open: Date.now(),
-      },
-    }
-
-    return maConn
   }
 
   /**
