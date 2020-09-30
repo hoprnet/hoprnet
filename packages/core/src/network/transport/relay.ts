@@ -14,9 +14,7 @@ import handshake = require('it-handshake')
 import type Multiaddr from 'multiaddr'
 import PeerInfo from 'peer-info'
 import PeerId from 'peer-id'
-
-// @ts-ignore
-import libp2p = require('libp2p')
+import libp2p from 'libp2p'
 
 import {
   RELAY_CIRCUIT_TIMEOUT,
@@ -53,8 +51,11 @@ class Relay {
   private connHandler: (conn: Handler & { counterparty: PeerId }) => void | undefined
 
   constructor(libp2p: libp2p, _connHandler?: (conn: Handler) => void) {
+    //@ts-ignore
     this._dialer = libp2p.dialer
+    //@ts-ignore
     this._registrar = libp2p.registrar
+    //@ts-ignore
     this._dht = libp2p._dht
     this._peerInfo = libp2p.peerInfo
 

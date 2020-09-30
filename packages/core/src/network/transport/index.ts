@@ -6,8 +6,7 @@ import errCode from 'err-code'
 import debug from 'debug'
 import { socketToConn } from './socket-to-conn'
 import myHandshake from './handshake'
-// @ts-ignore
-import libp2p = require('libp2p')
+import libp2p from 'libp2p'
 import Listener from './listener'
 import { USE_WEBRTC, CODE_P2P } from './constants'
 import Multiaddr from 'multiaddr'

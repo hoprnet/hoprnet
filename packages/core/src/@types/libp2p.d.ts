@@ -1,5 +1,7 @@
 declare module "libp2p" {
   export default class LibP2P {
+    constructor(options: any): LibP2P
+    static create(options: any): any
     // @TODO add libp2p types
     emit: (event: string, ...args: any[]) => void;
     dial: (addr: Multiaddr | PeerInfo | PeerId, options?: { signal: AbortSignal }) => Promise<Handler>;

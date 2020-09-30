@@ -1,8 +1,6 @@
 import assert from 'assert'
 import AbortController from 'abort-controller'
-
-// @ts-ignore
-import libp2p = require('libp2p')
+import libp2p from 'libp2p'
 
 // @ts-ignore
 import MPLEX = require('libp2p-mplex')
@@ -88,7 +86,7 @@ describe('should create a socket and connect to it', function () {
       },
     })
 
-    node.handle(TEST_PROTOCOL, (handler: Handler) => {
+    node.handle([TEST_PROTOCOL], (handler: Handler) => {
       pipe(
         /* prettier-ignore */
         handler.stream,
@@ -737,6 +735,7 @@ describe('should create a socket and connect to it', function () {
 
   it('should accept TCP addresses and p2p addresses', async function () {
     const node = await generateNode({ id: 0 })
+    //@ts-ignore
     const TransportModule = new TCP({ upgrader: node.upgrader, libp2p: node })
 
     const p2pMultiaddr = Multiaddr(`/p2p/${node.peerInfo.id.toB58String()}`)

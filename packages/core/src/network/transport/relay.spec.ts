@@ -1,6 +1,4 @@
-// @ts-ignore
-import libp2p = require('libp2p')
-
+import libp2p from 'libp2p' 
 // @ts-ignore
 import MPLEX = require('libp2p-mplex')
 // @ts-ignore
@@ -37,7 +35,7 @@ describe('should create a socket and connect to it', function () {
     ipv4?: boolean
     ipv6?: boolean
     connHandler?: (conn: Handler & { counterparty: PeerId }) => void
-  }): Promise<libp2p> {
+  }): Promise<any> {
     const peerInfo = new PeerInfo(await privKeyToPeerId(privKeys[options.id]))
 
     if (options.ipv4) {
@@ -73,9 +71,10 @@ describe('should create a socket and connect to it', function () {
       },
     })
 
+    //@ts-ignore
     node.relay = new Relay(node, options.connHandler)
 
-    node.handle(TEST_PROTOCOL, (handler: Handler) => {
+    node.handle([TEST_PROTOCOL], (handler: Handler) => {
       pipe(
         /* prettier-ignore */
         handler.stream,
