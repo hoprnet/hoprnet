@@ -2,60 +2,111 @@ import type IChannel from '.'
 import { u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
 import { Hash, TicketEpoch, Balance, SignedTicket, Ticket, AcknowledgedTicket } from '../types'
 import { pubKeyToAccountId, computeWinningProbability, isWinningTicket, checkChallenge } from '../utils'
-import assert from 'assert'
 import type HoprEthereum from '..'
 import { HASHED_SECRET_WIDTH } from '../hashedSecret'
 
 const DEFAULT_WIN_PROB = 1
-
 const EMPTY_PRE_IMAGE = new Uint8Array(HASHED_SECRET_WIDTH).fill(0x00)
 
 class TicketStatic {
+  private readonly INVALID_MESSAGES = {
+    NO_PRE_IMAGE: 'PreImage is empty.',
+    INVALID_CHALLENGE: 'Invalid challenge.',
+    NOT_WINNING: 'Not a winning ticket.',
+  }
+
   constructor(public coreConnector: HoprEthereum) {}
 
-  async submit(ticket: AcknowledgedTicket): Promise<void> {
-    const { hoprChannels, signTransaction, account, utils } = this.coreConnector
-    const { r, s, v } = utils.getSignatureParameters((await ticket.signedTicket).signature)
+  public async submit(
+    ticket: AcknowledgedTicket,
+    ticketIndex: Uint8Array
+  ): Promise<
+    | {
+        status: 'SUCCESS'
+        receipt: string
+      }
+    | {
+        status: 'FAILURE'
+        message: string
+      }
+    | {
+        status: 'ERROR'
+        error: Error | string
+      }
+  > {
+    const ticketChallenge = ticket.response
 
-    assert(
-      await checkChallenge((await ticket.signedTicket).ticket.challenge, ticket.response),
-      'checks that the given response fulfills the challenge that has been signed by counterparty'
-    )
+    try {
+      this.coreConnector.log('Submitting ticket', ticketChallenge)
 
-    if (u8aEquals(ticket.preImage, EMPTY_PRE_IMAGE)) {
-      throw Error(`PreImage is empty. Please set the preImage before submitting.`)
-    }
-    assert(
-      await isWinningTicket(
+      const { hoprChannels, signTransaction, account, utils } = this.coreConnector
+      const { r, s, v } = utils.getSignatureParameters((await ticket.signedTicket).signature)
+
+      const hasPreImage = !u8aEquals(ticket.preImage, EMPTY_PRE_IMAGE)
+      if (!hasPreImage) {
+        this.coreConnector.log(`Failed to submit ticket ${ticketChallenge}: ${this.INVALID_MESSAGES.NO_PRE_IMAGE}`)
+        return {
+          status: 'FAILURE',
+          message: this.INVALID_MESSAGES.NO_PRE_IMAGE,
+        }
+      }
+
+      const validChallenge = await checkChallenge((await ticket.signedTicket).ticket.challenge, ticket.response)
+      if (!validChallenge) {
+        this.coreConnector.log(`Failed to submit ticket ${ticketChallenge}: ${this.INVALID_MESSAGES.INVALID_CHALLENGE}`)
+        return {
+          status: 'FAILURE',
+          message: this.INVALID_MESSAGES.INVALID_CHALLENGE,
+        }
+      }
+
+      const isWinning = await isWinningTicket(
         await (await ticket.signedTicket).ticket.hash,
         ticket.response,
         ticket.preImage,
         (await ticket.signedTicket).ticket.winProb
       )
-    )
-
-    const transaction = await signTransaction(
-      hoprChannels.methods.redeemTicket(
-        u8aToHex(ticket.preImage),
-        u8aToHex(ticket.response),
-        (await ticket.signedTicket).ticket.amount.toString(),
-        u8aToHex((await ticket.signedTicket).ticket.winProb),
-        u8aToHex(r),
-        u8aToHex(s),
-        v + 27
-      ),
-      {
-        from: (await account.address).toHex(),
-        to: hoprChannels.options.address,
-        nonce: (await account.nonce).valueOf(),
+      if (!isWinning) {
+        this.coreConnector.log(`Failed to submit ticket ${ticketChallenge}: ${this.INVALID_MESSAGES.NOT_WINNING}`)
+        return {
+          status: 'FAILURE',
+          message: this.INVALID_MESSAGES.NOT_WINNING,
+        }
       }
-    )
 
-    ticket.redeemed = true
+      const transaction = await signTransaction(
+        hoprChannels.methods.redeemTicket(
+          u8aToHex(ticket.preImage),
+          u8aToHex(ticket.response),
+          (await ticket.signedTicket).ticket.amount.toString(),
+          u8aToHex((await ticket.signedTicket).ticket.winProb),
+          u8aToHex(r),
+          u8aToHex(s),
+          v + 27
+        ),
+        {
+          from: (await account.address).toHex(),
+          to: hoprChannels.options.address,
+          nonce: (await account.nonce).valueOf(),
+        }
+      )
 
-    await transaction.send()
+      await transaction.send()
+      ticket.redeemed = true
+      this.coreConnector.account.updateLocalState(ticket.preImage)
 
-    this.coreConnector.account.updateLocalState(ticket.preImage)
+      this.coreConnector.log('Successfully submitted ticket', ticketChallenge)
+      return {
+        status: 'SUCCESS',
+        receipt: transaction.transactionHash,
+      }
+    } catch (err) {
+      this.coreConnector.log('Unexpected error when submitting ticket', ticketChallenge, err)
+      return {
+        status: 'ERROR',
+        error: err,
+      }
+    }
   }
 }
 

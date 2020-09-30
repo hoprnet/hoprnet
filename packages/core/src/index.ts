@@ -32,7 +32,7 @@ import PeerInfo from 'peer-info'
 import { Handler } from './network/transport/types'
 
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import type { HoprCoreConnectorStatic } from '@hoprnet/hopr-core-connector-interface'
+import type { HoprCoreConnectorStatic, Types } from '@hoprnet/hopr-core-connector-interface'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 
 import { Interactions } from './interactions'
@@ -406,5 +406,106 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
     }
     createDirectoryIfNotExists(dbPath)
     return levelup(leveldown(dbPath))
+  }
+
+  /**
+   * Get all acknowledged tickets
+   * @returns an array of all acknowledged tickets
+   */
+  public async getAcknowledgedTickets(): Promise<
+    {
+      ackTicket: Types.AcknowledgedTicket
+      index: Uint8Array
+    }[]
+  > {
+    const { AcknowledgedTicket } = this.paymentChannels.types
+    const acknowledgedTicketSize = AcknowledgedTicket.SIZE(this.paymentChannels)
+    let promises: {
+      ackTicket: Types.AcknowledgedTicket
+      index: Uint8Array
+    }[] = []
+
+    return new Promise((resolve, reject) => {
+      this.db
+        .createReadStream({
+          gte: Buffer.from(this.dbKeys.AcknowledgedTickets(new Uint8Array(0x00))),
+        })
+        .on('error', (err) => reject(err))
+        .on('data', ({ key, value }: { key: Buffer; value: Buffer }) => {
+          if (value.buffer.byteLength !== acknowledgedTicketSize) return
+
+          const index = this.dbKeys.AcknowledgedTicketsParse(key)
+          const ackTicket = AcknowledgedTicket.create(this.paymentChannels, {
+            bytes: value.buffer,
+            offset: value.byteOffset,
+          })
+
+          promises.push({
+            ackTicket,
+            index,
+          })
+        })
+        .on('end', () => resolve(Promise.all(promises)))
+    })
+  }
+
+  /**
+   * Update Acknowledged Ticket in database
+   * @param ackTicket Uint8Array
+   * @param index Uint8Array
+   */
+  public async updateAcknowledgedTicket(ackTicket: Types.AcknowledgedTicket, index: Uint8Array): Promise<void> {
+    await this.db.put(Buffer.from(this.dbKeys.AcknowledgedTickets(index)), Buffer.from(ackTicket))
+  }
+
+  /**
+   * Delete Acknowledged Ticket in database
+   * @param index Uint8Array
+   */
+  public async deleteAcknowledgedTicket(index: Uint8Array): Promise<void> {
+    await this.db.del(Buffer.from(this.dbKeys.AcknowledgedTickets(index)))
+  }
+
+  /**
+   * Submit Acknowledged Ticket and update database
+   * @param ackTicket Uint8Array
+   * @param index Uint8Array
+   */
+  public async submitAcknowledgedTicket(
+    ackTicket: Types.AcknowledgedTicket,
+    index: Uint8Array
+  ): Promise<
+    | {
+        status: 'SUCCESS'
+        receipt: string
+      }
+    | {
+        status: 'FAILURE'
+        message: string
+      }
+    | {
+        status: 'ERROR'
+        error: Error | string
+      }
+  > {
+    try {
+      const result = await this.paymentChannels.channel.tickets.submit(ackTicket, index)
+
+      if (result.status === 'SUCCESS') {
+        ackTicket.redeemed = true
+        await this.updateAcknowledgedTicket(ackTicket, index)
+      } else if (result.status === 'FAILURE') {
+        await this.deleteAcknowledgedTicket(index)
+      } else if (result.status === 'ERROR') {
+        await this.deleteAcknowledgedTicket(index)
+      }
+
+      return result
+    } catch (err) {
+      return {
+        status: 'ERROR',
+        error: err,
+      }
+    }
   }
 }

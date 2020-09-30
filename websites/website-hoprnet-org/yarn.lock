@@ -1219,10 +1219,10 @@
   dependencies:
     "@hapi/hoek" "^8.3.0"
 
-"@hoprnet/assets@1.1.0":
-  version "1.1.0"
-  resolved "https://registry.yarnpkg.com/@hoprnet/assets/-/assets-1.1.0.tgz#dc39648b791b9da1ca5adcf552c042d41a675e20"
-  integrity sha512-Ycq7zn/RmooX3WbiQoY+FfGNNou6bx1l17RKxz79VjWJb14ahBUoFPaiJZtH54excc/eERROlEJ6iRIHztscAQ==
+"@hoprnet/assets@^1.17.0-alpha.0":
+  version "1.17.0-alpha.28"
+  resolved "https://registry.yarnpkg.com/@hoprnet/assets/-/assets-1.17.0-alpha.28.tgz#c6bf03c39db26a589828ef9fc7e81099ce2b6ccf"
+  integrity sha512-0By76USlIph1ouLDi/jwgH8ODuWcAQRMB+8P2ifuCMACl02aNULPXdwkkauvHLH5B7HhCDcoRfnY041w1+Mg/A==
 
 "@jest/console@^24.7.1", "@jest/console@^24.9.0":
   version "24.9.0"

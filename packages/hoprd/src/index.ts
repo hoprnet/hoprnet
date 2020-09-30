@@ -18,8 +18,6 @@ import chalk from 'chalk'
 import * as yargs from 'yargs';
 import { startServer } from '@hoprnet/hopr-server'
 
-// @ts-ignore
-chalk.level = 0 // We need bare strings
 let debugLog = debug('hoprd')
 
 /**
@@ -57,7 +55,7 @@ const argv = (
   })
   .option('provider', {
     describe: 'A provider url for the Network you specified',
-    default: "wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36"
+    default: "wss://xdai.poanetwork.dev/wss"
   })
   .option('host', {
     describe: 'The network host to run the HOPR node on.',
@@ -185,4 +183,5 @@ async function main() {
     logs.logFatalError('' + e)
   }
 }
+
 main();
