@@ -197,14 +197,10 @@ class TCP {
    * @returns {Connection} An upgraded Connection
    */
   async dial(ma: Multiaddr, options?: DialOptions): Promise<Connection> {
-    if (!this.isRealisticAddress(ma)) {
-      return Promise.reject(new Error('Filtering unrealistic address'))
-    }
-
     options = options || {}
 
     let error: Error
-    if (['ip4', 'ip6', 'dns4', 'dns6'].includes(ma.protoNames()[0])) {
+    if (['ip4', 'ip6', 'dns4', 'dns6'].includes(ma.protoNames()[0]) && this.isRealisticAddress(ma)) {
       try {
         verbose('attempting to dial directly', ma.toString())
         return await this.dialDirectly(ma, options)
@@ -425,6 +421,7 @@ class TCP {
       this.connHandler = handler
     }
 
+    console.log(`creating listener`)
     return new Listener(this.connHandler, this._upgrader, this.stunServers)
   }
 
