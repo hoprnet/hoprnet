@@ -1,4 +1,12 @@
 declare module "libp2p" {
+  export type PeerStore = {
+    has(peerInfo: PeerId): boolean
+    get(peerId: PeerId): PeerInfo | undefined
+    put(peerInfo: PeerInfo, options?: { silent: boolean }): PeerInfo
+    peers: Map<string, PeerInfo>
+    remove(peer: PeerId): void
+  }
+
   export default class LibP2P {
     constructor(options: any): LibP2P
     static create(options: any): any

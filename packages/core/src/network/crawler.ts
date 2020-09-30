@@ -14,7 +14,7 @@ import { peerHasOnlyPublicAddresses, isOnPrivateNet, PRIVATE_NETS } from '../fil
 import debug from 'debug'
 import Multiaddr from 'multiaddr'
 import { Crawler as CrawlInteraction } from '../interactions/network/crawler'
-import { PeerStore } from '../index'
+import { PeerStore } from 'libp2p'
 
 const log = debug('hopr-core:crawler')
 const verbose = debug('hopr-core:verbose:crawler')

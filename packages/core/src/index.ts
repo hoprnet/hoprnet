@@ -1,5 +1,4 @@
 import LibP2P from 'libp2p'
-
 // @ts-ignore
 import MPLEX = require('libp2p-mplex')
 // @ts-ignore
@@ -66,15 +65,6 @@ export type HoprOptions = {
 }
 
 const MAX_ITERATIONS_PATH_SELECTION = 2000
-
-export type PeerStore = {
-  has(peerInfo: PeerId): boolean
-  get(peerId: PeerId): PeerInfo | undefined
-  put(peerInfo: PeerInfo, options?: { silent: boolean }): PeerInfo
-  peers: Map<string, PeerInfo>
-  remove(peer: PeerId): void
-}
-
 
 class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
   public interactions: Interactions<Chain>
