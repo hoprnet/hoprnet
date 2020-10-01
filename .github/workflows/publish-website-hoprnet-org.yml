@@ -25,4 +25,5 @@ jobs:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
           vercel-project-id: ${{ secrets.VERCEL_HOPRNET_ORG_PROJECT_ID }}
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          scope: ${{ secrets.VERCEL_ORG_ID }}
           github-comment: true
