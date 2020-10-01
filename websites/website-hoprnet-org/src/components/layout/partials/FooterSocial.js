@@ -4,6 +4,7 @@ import { ReactComponent as Twitter } from '../../assets/images/icons/twitter.svg
 import { ReactComponent as Telegram } from '../../assets/images/icons/telegram.svg'
 import { ReactComponent as Linkedin } from '../../assets/images/icons/linkedin.svg'
 import { ReactComponent as Github } from '../../assets/images/icons/github.svg'
+import { ReactComponent as Medium } from '../../assets/images/icons/medium.svg'
 import { ReactComponent as Youtube } from '../../assets/images/icons/youtube.svg'
 import { ReactComponent as Discord } from '../../assets/images/icons/discord.svg'
 
@@ -39,6 +40,11 @@ const FooterSocial = ({ className, invertColor, ...props }) => {
         <li>
           <a href="https://github.com/hoprnet" target="_blank" rel="noopener noreferrer">
             <Github style={style} />
+          </a>
+        </li>
+        <li>
+          <a href="https://medium.com/hoprnet" target="_blank" rel="noopener noreferrer">
+            <Medium style={style} />
           </a>
         </li>
         <li>

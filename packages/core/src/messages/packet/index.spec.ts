@@ -15,8 +15,11 @@ import { MAX_HOPS } from '../../constants'
 import LevelUp from 'levelup'
 import MemDown from 'memdown'
 
+import BN from 'bn.js'
+
 import Debug from 'debug'
 import { ACKNOWLEDGED_TICKET_INDEX_LENGTH } from '../../dbKeys'
+import { Channel } from '@hoprnet/hopr-core-connector-interface/src/dbKeys'
 const log = Debug(`hopr-core:testing`)
 
 const TWO_SECONDS = durations.seconds(2)
@@ -66,6 +69,37 @@ describe('test packet composition and decomposition', function () {
       const nodes = await Promise.all(Array.from({ length: MAX_HOPS + 1 }).map((_value, index) => generateNode(index)))
 
       connectionHelper(nodes)
+
+      console.log(new nodes[0].paymentChannels.types.ChannelBalance(undefined, {
+        balance: new BN(200), balance_a: new BN(100)
+      }), async (bal) => {
+        const channel = nodes[0].paymentChannels.types.Channel.createFunded(bal)
+        const signedChannel = new nodes[0].paymentChannels.types.SignedChannel(undefined, {
+          channel, signature: await channel.sign(nodes[0].peerInfo.id.privKey.marshal(), undefined)
+        } as any)
+        return signedChannel
+      })
+
+      function openChannel(a: number, b: number) {
+        nodes[a].paymentChannels.channel.create(
+          nodes[b].peerInfo.id.pubKey.marshal(),
+          async () => nodes[b].peerInfo.id.pubKey.marshal(),
+          new nodes[a].paymentChannels.types.ChannelBalance(undefined, {
+            balance: new BN(200), balance_a: new BN(100)
+          }), async (bal) => {
+            const channel = nodes[a].paymentChannels.types.Channel.createFunded(bal)
+            const signedChannel = new nodes[a].paymentChannels.types.SignedChannel(undefined, {
+              channel, signature: await channel.sign(nodes[b].peerInfo.id.privKey.marshal(), undefined)
+            } as any)
+            return signedChannel
+          })
+      }
+
+      for (let i = 0; i < MAX_HOPS - 1; i++) {
+        for (let j = i + 1; j < MAX_HOPS; j++) {
+          openChannel(i, j);
+        }
+      }
 
       const testMessages: Uint8Array[] = []
 
@@ -161,7 +195,7 @@ function connectionHelper<Chain extends HoprCoreConnector>(nodes: Hopr<Chain>[])
   }
 }
 
-const NOOP = () => {}
+const NOOP = () => { }
 
 function cleanUpReceiveChecker<Chain extends HoprCoreConnector>(nodes: Hopr<Chain>[]) {
   for (const node of nodes) {
