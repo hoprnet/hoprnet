@@ -2,9 +2,9 @@ name: HOPR Workflow
 on:
   push:
     branches: ["**"]
-    paths:
-      - "!docs/**"
-      - "!websites/**"
+    paths-ignore:
+      - "docs/**"
+      - "websites/**"
   pull_request:
     types: [closed]
 
