@@ -1,157 +1,94 @@
-import type { Pushable } from 'it-pushable'
 import { AbortError } from 'abortable-iterator'
-import type { Socket } from 'net'
-import Peer from 'simple-peer'
+import SimplePeer from 'simple-peer'
 import debug from 'debug'
-import pipe from 'it-pipe'
 // @ts-ignore
 import wrtc = require('wrtc')
 import { WEBRTC_TIMEOUT } from './constants'
-import { randomBytes } from 'crypto'
 import type Multiaddr from 'multiaddr'
 
 const log = debug('hopr-core:transport')
 const error = debug('hopr-core:transport:error')
 const verbose = debug('hopr-core:verbose:transport:webrtc')
 
-const _encoder = new TextEncoder()
-const _decoder = new TextDecoder()
 
-export default function upgradetoWebRTC(
-  sinkBuffer: Pushable<Uint8Array>,
-  srcBuffer: Pushable<Uint8Array>,
-  options?: {
-    initiator?: boolean
-    signal?: AbortSignal
-    // ONLY FOR TESTING
-    _timeoutIntentionallyOnWebRTC?: Promise<void>
-    _failIntentionallyOnWebRTC?: boolean
-    _answerIntentionallyWithIncorrectMessages?: boolean
-    // END ONLY FOR TESTING
-    stunServers?: Multiaddr[]
+class WebRTCUpgrader {
+  private _stunServers?: {
+    iceServers?: {
+      urls: string
+    }[]
   }
-): Promise<Socket> {
-  if (options?.signal?.aborted) {
-    verbose('Signal was aborted')
-    throw new AbortError()
+  constructor({ stunServers }: { stunServers?: Multiaddr[] }) {
+    this._stunServers = {
+      iceServers: stunServers?.map((ma: Multiaddr) => {
+        const options = ma.toOptions()
+
+        return { urls: `stun:${options.host}:${options.port}` }
+      }),
+    }
   }
 
-  return new Promise<Socket>(async (resolve, reject) => {
-    let webRTCconfig = {
+  upgradeOutbound(signal?: AbortSignal) {
+    return this._connect(true)
+  }
+
+  upgradeInbound(signal?: AbortSignal) {
+    return this._connect(false)
+  }
+
+  private _connect(initiator: boolean) {
+    console.log(`inside _connect`)
+    const channel = new SimplePeer({
       wrtc,
-      initiator: options?.initiator || false,
+      initiator,
       trickle: true,
       // @ts-ignore
       allowHalfTrickle: true,
-      config: {
-        iceServers: options?.stunServers?.map((ma: Multiaddr) => {
-          const options = ma.toOptions()
+      config: this._stunServers,
+    })
 
-          return { urls: `stun:${options.host}:${options.port}` }
-        }),
-      },
-    }
+    // const onTimeout = () => {
+    //   verbose('Timeout upgrading to webrtc', channel.address())
+    //   channel.destroy()
+    // }
 
-    const channel = new Peer(webRTCconfig)
+    // const done = async (err?: Error) => {
+    //   verbose('Completed')
 
-    let timeout: NodeJS.Timeout
+    //   channel.removeListener('iceTimeout', onTimeout)
+    //   channel.removeListener('connect', onConnect)
+    //   channel.removeListener('error', onError)
 
-    const onTimeout = () => {
-      verbose('Timeout upgrading to webrtc', channel.address())
-      clearTimeout(timeout)
-      channel.destroy()
-      reject(new Error('timeout'))
-    }
+    //   //options?.signal?.removeEventListener('abort', onAbort)
 
-    timeout = setTimeout(() => onTimeout(), WEBRTC_TIMEOUT)
+    //   if (err) {
+    //     verbose('Failed', err)
+    //     channel.destroy()
+    //   }
+    // }
 
-    const done = async (err?: Error) => {
-      verbose('Completed')
-      clearTimeout(timeout)
+    // // const onAbort = () => {
+    // //   channel.destroy()
+    // //   verbose('abort')
+    // // }
 
-      channel.removeListener('iceTimeout', onTimeout)
-      channel.removeListener('connect', onConnect)
-      channel.removeListener('error', onError)
-      channel.removeListener('signal', onSignal)
+    // const onConnect = (): void => {
+    //   verbose('connected')
+    //   done()
+    // }
 
-      if (options?._timeoutIntentionallyOnWebRTC !== undefined) {
-        await options?._timeoutIntentionallyOnWebRTC
-      }
+    // const onError = (err?: Error) => {
+    //   log(`WebRTC with failed. Error was: ${err}`)
+    //   done(err)
+    // }
 
-      options?.signal?.removeEventListener('abort', onAbort)
+    // channel.once('error', onError)
+    // channel.once('connect', onConnect)
+    // channel.once('iceTimeout', onTimeout)
 
-      if (err || options?._failIntentionallyOnWebRTC) {
-        verbose('Failed', err)
-        channel.destroy()
-        reject(err)
-      } else {
-        resolve((channel as unknown) as Socket)
-      }
-    }
+    // options?.signal?.addEventListener('abort', onAbort)
 
-    const onAbort = () => {
-      channel.destroy()
-      clearTimeout(timeout)
-      verbose('abort')
-      reject()
-    }
-
-    const onSignal = (data: string): void => {
-      if (options?.signal?.aborted) {
-        return
-      }
-
-      if (options?._answerIntentionallyWithIncorrectMessages) {
-        sinkBuffer.push(randomBytes(31))
-      } else {
-        sinkBuffer.push(_encoder.encode(JSON.stringify(data)))
-      }
-    }
-
-    const onConnect = (): void => {
-      verbose('connected')
-      clearTimeout(timeout)
-      done()
-    }
-
-    const onError = (err?: Error) => {
-      log(`WebRTC with failed. Error was: ${err}`)
-      clearTimeout(timeout)
-      done(err)
-    }
-
-    if (options?.signal?.aborted) {
-      return reject(new AbortError())
-    }
-
-    channel.on('signal', onSignal)
-    channel.once('error', onError)
-    channel.once('connect', onConnect)
-    channel.once('iceTimeout', onTimeout)
-
-    options?.signal?.addEventListener('abort', onAbort)
-
-    pipe(
-      /* prettier-ignore */
-      srcBuffer,
-      async (source: AsyncIterable<Uint8Array>) => {
-        for await (const msg of source) {
-          if (msg == null) {
-            continue
-          }
-
-          if (options?.signal?.aborted) {
-            return
-          }
-
-          try {
-            channel.signal(JSON.parse(_decoder.decode(msg.slice())))
-          } catch (err) {
-            error(err)
-            continue
-          }
-        }
-      }
-    )
-  })
+    return channel
+  }
 }
+
+export { WebRTCUpgrader }
