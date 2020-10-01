@@ -101,7 +101,7 @@
       "json",
       "ts"
     ],
-    "rootDir": "src/network/transport/",
+    "rootDir": "src/messages/packet",
     "testRegex": "index.spec.ts$",
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
