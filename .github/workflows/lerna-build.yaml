@@ -1,7 +1,10 @@
 name: HOPR Workflow
 on:
   push:
-    branches: "*"
+    branches: ["**"]
+    paths-ignore:
+      - "docs/**"
+      - "websites/**"
   pull_request:
     types: [closed]
 
@@ -98,23 +101,21 @@ jobs:
           git push origin master
           node_modules/.bin/lerna publish from-package --yes
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
+          NODE_AUTH_TOKEN:
+            ${{ secrets.NPM_TOKEN }}
             #- name: Push a tag
             #if: |
             #github.event_name == 'pull_request' &&
             #github.event.action == 'closed' &&
-            #github.event.pull_request.merged == true 
+            #github.event.pull_request.merged == true
             #run: |
             #(PACKAGE_VERSION=$(node -p -e "require('./package.json').version"); git tag v$PACKAGE_VERSION && git push origin v$PACKAGE_VERSION)
-
             #- name: Publish to GPR
             # if: |
             #github.event_name == 'pull_request' &&
             #github.event.action == 'closed' &&
-            #github.event.pull_request.merged == true 
+            #github.event.pull_request.merged == true
             #run: |
-
             #echo //npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }} > .npmrc
             #node_modules/.bin/lerna publish from-package --yes --registry https://npm.pkg.github.com/
             #env:
@@ -159,7 +160,7 @@ jobs:
       - name: Setup Google Cloud Credentials
         uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
         with:
-          version: '290.0.1'
+          version: "290.0.1"
           service_account_key: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
           export_default_credentials: true
       - name: Set Project for Google Cloud HOPR Association
@@ -222,7 +223,7 @@ jobs:
         with:
           name: hopr-chat-nodebin-${{ matrix.displayName }}.zip
           path: packages/chat/hopr-chat-nodebin-${{ matrix.displayName }}.zip
-          if-no-files-found: error 
+          if-no-files-found: error
 
   publish_chat_dist:
     name: Creates release with node binary per OS
