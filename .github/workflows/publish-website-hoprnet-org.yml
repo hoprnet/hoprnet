@@ -30,7 +30,7 @@ jobs:
           github-comment: true
       - name: Vercel Action (production)
         uses: amondnet/vercel-action@v19.0.1+3
-        if: github.ref != 'refs/heads/master'
+        if: github.ref == 'refs/heads/master'
         id: now-deployment
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
