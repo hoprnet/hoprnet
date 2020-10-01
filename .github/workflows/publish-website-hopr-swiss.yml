@@ -5,11 +5,11 @@ on:
     branches: ["**"]
     paths:
       - ".github/workflows/**"
-      - "websites/website-hopr-swiss/**"
+      - "websites/hopr-swiss/**"
 
 defaults:
   run:
-    working-directory: websites/website-hopr-swiss
+    working-directory: websites/hopr-swiss
 
 jobs:
   website:
