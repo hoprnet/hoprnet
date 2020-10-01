@@ -1,28 +1,22 @@
 import Hopr from '../..'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-
 import HoprEthereum from '@hoprnet/hopr-core-ethereum'
-
-import { Ganache } from '@hoprnet/hopr-testing'
+import { Ganache, getNewPort} from '@hoprnet/hopr-testing'
 import { migrate, fund } from '@hoprnet/hopr-ethereum'
-
 import assert from 'assert'
-
 import { u8aEquals, durations } from '@hoprnet/hopr-utils'
-
 import { MAX_HOPS } from '../../constants'
-
 import LevelUp from 'levelup'
 import MemDown from 'memdown'
-
 import Debug from 'debug'
 import { ACKNOWLEDGED_TICKET_INDEX_LENGTH } from '../../dbKeys'
+
 const log = Debug(`hopr-core:testing`)
 
 const TWO_SECONDS = durations.seconds(2)
 
-async function startTestnet() {
-  const ganache = new Ganache()
+async function startTestnet(port) {
+  const ganache = new Ganache({port})
 
   await ganache.start()
   await migrate()
@@ -31,7 +25,9 @@ async function startTestnet() {
   return ganache
 }
 
-async function generateNode(id: number): Promise<Hopr<HoprEthereum>> {
+async function generateNode(id: number, port: number): Promise<Hopr<HoprEthereum>> {
+
+  const GANACHE_URI = `ws://127.0.0.1:${port}`
   // Start HOPR in DEBUG_MODE and use demo seeds
   const node = (await Hopr.create({
     id,
@@ -47,13 +43,14 @@ async function generateNode(id: number): Promise<Hopr<HoprEthereum>> {
   return node
 }
 
-const GANACHE_URI = `ws://127.0.0.1:9545`
 
 describe('test packet composition and decomposition', function () {
   let testnet: Ganache
+  let port: number 
 
   beforeEach(async function () {
-    testnet = await startTestnet()
+    port = getNewPort()
+    testnet = await startTestnet(port)
   }, durations.seconds(30))
 
   afterEach(async function () {
@@ -63,7 +60,9 @@ describe('test packet composition and decomposition', function () {
   it(
     'should create packets and decompose them',
     async function () {
-      const nodes = await Promise.all(Array.from({ length: MAX_HOPS + 1 }).map((_value, index) => generateNode(index)))
+      const nodes = await Promise.all(
+                      Array.from({ length: MAX_HOPS + 1 })
+                            .map((_value, index) => generateNode(index, port)))
 
       connectionHelper(nodes)
 
@@ -101,8 +100,6 @@ describe('test packet composition and decomposition', function () {
           nodes.slice(i + 1, nodes.length - 1).map((node) => node.peerInfo.id)
         )
       }
-
-      await new Promise((resolve) => setTimeout(resolve, 700))
 
       for (let i = 0; i < nodes.length; i++) {
         const tickets = []
