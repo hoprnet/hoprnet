@@ -3,8 +3,8 @@ on:
   push:
     branches: ["**"]
     paths:
-      - ".github/workflows/**"
-      - "packages/**"
+      - "!docs/**"
+      - "!websites/**"
   pull_request:
     types: [closed]
 
