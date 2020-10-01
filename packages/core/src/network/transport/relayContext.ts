@@ -66,7 +66,6 @@ class RelayContext {
             }
           }
           
-          console.log(`relaying message <${new TextDecoder().decode((await msg).value.slice())}>`)
           yield (await msg).value
 
           msgReceived = false
