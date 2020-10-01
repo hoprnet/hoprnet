@@ -17,7 +17,7 @@ const SetupHero = props => {
   return (
     <GenericSection id="notfound" {...props}>
       <div className="textContainer">
-        Hey!
+        Hello there!
         <br />
         <br />
         Click{' '}
@@ -38,9 +38,16 @@ const SetupHero = props => {
         </a>{' '}
         or message us in our{' '}
         <a href="https://t.me/hoprnet" target="_blank" rel="noopener noreferrer" className="underline">
-          telegram
+          community
         </a>{' '}
-        channel.
+        telegram channel.
+        <br />
+        <br />
+        New features and updates will be announced over our{' '}
+        <a href="https://t.me/HOPRannouncements" target="_blank" rel="noopener noreferrer" className="underline">
+          announcements
+        </a>{' '}
+        telegram channel.
       </div>
     </GenericSection>
   )
