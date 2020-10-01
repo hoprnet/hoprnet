@@ -20,7 +20,6 @@ jobs:
       - name: Vercel Action (preview)
         uses: amondnet/vercel-action@v19.0.1+3
         if: github.ref != 'refs/heads/master'
-        id: now-deployment
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
@@ -31,7 +30,6 @@ jobs:
       - name: Vercel Action (production)
         uses: amondnet/vercel-action@v19.0.1+3
         if: github.ref == 'refs/heads/master'
-        id: now-deployment
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
