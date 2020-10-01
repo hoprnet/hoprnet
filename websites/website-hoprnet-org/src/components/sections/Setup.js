@@ -17,21 +17,30 @@ const SetupHero = props => {
   return (
     <GenericSection id="notfound" {...props}>
       <div className="textContainer">
-        Hey - we will have all setup instructions here as of Oct 1st.
+        Hey!
         <br />
         <br />
-        If you have any questions in the meantime, pls email us at{' '}
+        Click{' '}
+        <a
+          href={require(`../assets/documents/HOPR_Quickstart_Manual.pdf`)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline"
+        >
+          here
+        </a>{' '}
+        to download the HOPR Quickstart Manual.
+        <br />
+        <br />
+        If you have any questions, feel free to email us at{' '}
         <a href="mailto:First100@HOPRnet.org" target="_blank" rel="noopener noreferrer" className="underline">
           First100@HOPRnet.org
         </a>{' '}
-        or checkout our{' '}
+        or message us in our{' '}
         <a href="https://t.me/hoprnet" target="_blank" rel="noopener noreferrer" className="underline">
           telegram
         </a>{' '}
-        channels for more.
-      </div>
-      <div className="circleContainer">
-        <div className="circle" />
+        channel.
       </div>
     </GenericSection>
   )

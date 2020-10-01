@@ -68,13 +68,13 @@ class HeroFull extends React.Component {
                     <Button
                       color="primary"
                       tag="a"
-                      href="/node"
+                      href="https://saentis.hoprnet.org"
                       target="_blank"
                       className="reveal-from-top"
                       rel="noopener noreferrer"
                       data-reveal-delay="400"
                     >
-                      Order a HOPR Node PC
+                      Join Incentivized Testnet
                     </Button>
                   </>
                 )}

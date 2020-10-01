@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-chat",
-  "version": "1.17.0-alpha.40",
+  "version": "1.17.0-alpha.41",
   "description": "Interactive chat PoC for HOPR Protocol",
   "main": "lib/index.js",
   "scripts": {
@@ -32,10 +32,17 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+<<<<<<< HEAD
     "@hoprnet/hopr-core": "^1.17.0-alpha.40",
     "@hoprnet/hopr-core-connector-interface": "^1.17.0-alpha.40",
     "@hoprnet/hopr-utils": "^1.17.0-alpha.40",
     "@vercel/ncc": "^0.24.1",
+=======
+    "@hoprnet/hopr-core": "^1.17.0-alpha.41",
+    "@hoprnet/hopr-core-connector-interface": "^1.17.0-alpha.41",
+    "@hoprnet/hopr-utils": "^1.17.0-alpha.41",
+    "@zeit/ncc": "^0.22.3",
+>>>>>>> 2a2688a3662a4e25ef64a4bdf949e5875e33927a
     "bignumber.js": "^9.0.0",
     "bn.js": "~5.1.2",
     "bs58": "^4.0.1",
