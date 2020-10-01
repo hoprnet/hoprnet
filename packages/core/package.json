@@ -30,7 +30,7 @@
     "url": "https://github.com/hoprnet/hopr-core.git"
   },
   "scripts": {
-    "build": "yarn clean && tsc -p . && cp src/**/*.d.ts lib",
+    "build": "yarn clean && tsc -p .",
     "clean": "rm -rf ./lib",
     "test": "for i in {1..5}; do jest --runInBand --forceExit; done",
     "prepublishOnly": "yarn build",
