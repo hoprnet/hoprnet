@@ -7,6 +7,8 @@ import AbortController from 'abort-controller'
 import { AbortError } from 'abortable-iterator'
 import chalk from 'chalk'
 
+import type { WebRTCUpgrader } from './webrtc'
+
 import type BL from 'bl'
 
 declare interface Handshake {
@@ -46,6 +48,8 @@ import { u8aEquals } from '@hoprnet/hopr-utils'
 
 import { RelayContext } from './relayContext'
 
+import { RelayConnection } from './relayConnection'
+
 import type {
   Connection,
   Dialer,
@@ -56,7 +60,6 @@ import type {
   Registrar,
   Stream,
 } from './types'
-import { RelayConnection } from './relayConnection'
 
 class Relay {
   private _dialer: Dialer
@@ -64,10 +67,11 @@ class Relay {
   private _dht: { peerRouting: PeerRouting } | undefined
   private _peerInfo: PeerInfo
   private _streams: Map<string, Map<string, RelayContext>>
+  private _webRTCUpgrader?: WebRTCUpgrader
 
   private connHandler: (conn: MultiaddrConnection) => void | undefined
 
-  constructor(libp2p: libp2p, _connHandler?: (conn: MultiaddrConnection) => void) {
+  constructor(libp2p: libp2p, _connHandler?: (conn: MultiaddrConnection) => void, webRTCUpgrader?: WebRTCUpgrader) {
     this._dialer = libp2p.dialer
     this._registrar = libp2p.registrar
     this._dht = libp2p._dht
@@ -76,6 +80,10 @@ class Relay {
     this.connHandler = _connHandler
 
     this._streams = new Map<string, Map<string, RelayContext>>()
+
+    if (webRTCUpgrader != null) {
+      this._webRTCUpgrader = webRTCUpgrader
+    }
 
     libp2p.handle(RELAY_REGISTER, this.handleRelay.bind(this))
     libp2p.handle(DELIVERY_REGISTER, this.handleRelayConnection.bind(this))
@@ -115,7 +123,12 @@ class Relay {
         continue
       }
 
-      return new RelayConnection({ stream, self: this._peerInfo.id, counterparty: destination })
+      return new RelayConnection({
+        stream,
+        self: this._peerInfo.id,
+        counterparty: destination,
+        webRTC: this._webRTCUpgrader?.upgradeOutbound(),
+      })
     }
 
     throw Error(
@@ -134,7 +147,14 @@ class Relay {
       return
     }
 
-    this.connHandler?.(new RelayConnection({ stream, self: this._peerInfo.id, counterparty }))
+    this.connHandler?.(
+      new RelayConnection({
+        stream,
+        self: this._peerInfo.id,
+        counterparty,
+        webRTC: this._webRTCUpgrader?.upgradeInbound(),
+      })
+    )
   }
 
   private async connectToRelay(relay: PeerInfo, options?: DialOptions): Promise<Connection> {

@@ -28,8 +28,6 @@ class RelayConnection implements MultiaddrConnection {
 
   public conn: Stream
 
-  private webRTCmessages: string[] = []
-
   public timeline: {
     open: number
     close?: number
@@ -94,7 +92,8 @@ class RelayConnection implements MultiaddrConnection {
               error(`Received invalid status message ${received.slice(1)}. Dropping message.`)
             }
           } else if (u8aEquals(received.slice(0, 1), RELAY_WEBRTC_PREFIX)) {
-            this.webRTC?.signal(new TextDecoder().decode(received.slice(1)))
+            console.log(`Receiving fancy WebRTC message`, JSON.parse(new TextDecoder().decode(received.slice(1))))
+            this.webRTC?.signal(JSON.parse(new TextDecoder().decode(received.slice(1))))
           } else {
             error(`Received invalid prefix <${received.slice(0, 1)}. Dropping message.`)
           }
@@ -129,7 +128,7 @@ class RelayConnection implements MultiaddrConnection {
           let streamMsg: BL
 
           let webRTCresolved = false
-          let webRTCdone = false
+          let webRTCdone = this.webRTC == null
           let webRTCmsg: Uint8Array | void
 
           function streamSourceFunction({ done, value }: { done: boolean; value?: BL }) {
@@ -155,21 +154,23 @@ class RelayConnection implements MultiaddrConnection {
 
           let webRTCstream: AsyncGenerator<Uint8Array, void, unknown>
           if (this.webRTC != null) {
-            webRTCstream = async function* () {
+            webRTCstream = async function* (this: RelayConnection) {
               let defer = Defer<DeferredPromise<any>>()
               let waiting = false
               const webRTCmessages: Uint8Array[] = []
               let done = false
-              this.webRTC.on('signal', (msg: string) => {
-                webRTCmessages.push(new TextEncoder().encode(msg))
+              function onSignal(msg: any) {
+                webRTCmessages.push(new TextEncoder().encode(JSON.stringify(msg)))
                 if (waiting) {
                   waiting = false
                   defer.resolve(Defer<DeferredPromise<any>>())
                 }
-              })
+              }
+              this.webRTC.on('signal', onSignal)
 
-              this.webRTC.on('connect', () => {
+              this.webRTC.once('connect', () => {
                 done = true
+                this.webRTC.removeListener('signal', onSignal)
                 defer.resolve()
               })
 
@@ -193,7 +194,6 @@ class RelayConnection implements MultiaddrConnection {
             }.call(this)
           }
 
-          // @ts-ignore
           let webRTCPromise: Promise<void>
 
           const promise = this._defer.promise.then(() => {
