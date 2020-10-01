@@ -6,6 +6,8 @@ import Defer, { DeferredPromise } from 'p-defer'
 import { RELAY_PAYLOAD_PREFIX, RELAY_STATUS_PREFIX, RELAY_WEBRTC_PREFIX, STOP } from './constants'
 import { u8aEquals } from '@hoprnet/hopr-utils'
 
+import type { Instance as SimplePeer } from 'simple-peer'
+
 import type PeerId from 'peer-id'
 
 import Debug from 'debug'
@@ -17,7 +19,7 @@ class RelayConnection implements MultiaddrConnection {
   private _stream: Stream
   private _destroyed: boolean
   private _sinkTriggered: boolean
-  private _webRTCstream: Stream
+  private webRTC: SimplePeer
   public localAddr: Multiaddr
   public remoteAddr: Multiaddr
 
@@ -25,6 +27,8 @@ class RelayConnection implements MultiaddrConnection {
   public sink: (source: AsyncIterable<Uint8Array>) => Promise<void>
 
   public conn: Stream
+
+  private webRTCmessages: string[] = []
 
   public timeline: {
     open: number
@@ -35,12 +39,12 @@ class RelayConnection implements MultiaddrConnection {
     stream,
     self,
     counterparty,
-    webRTCstream,
+    webRTC,
   }: {
     stream: Stream
     self: PeerId
     counterparty: PeerId
-    webRTCstream?: Stream
+    webRTC?: SimplePeer
   }) {
     this.timeline = {
       open: Date.now(),
@@ -56,7 +60,7 @@ class RelayConnection implements MultiaddrConnection {
     this.localAddr = Multiaddr(`/p2p/${self.toB58String()}`)
     this.remoteAddr = Multiaddr(`/p2p/${counterparty.toB58String()}`)
 
-    this._webRTCstream = webRTCstream
+    this.webRTC = webRTC
 
     this.source = async function* (this: RelayConnection) {
       const promise = this._defer.promise.then(() => ({ done: true }))
@@ -90,7 +94,7 @@ class RelayConnection implements MultiaddrConnection {
               error(`Received invalid status message ${received.slice(1)}. Dropping message.`)
             }
           } else if (u8aEquals(received.slice(0, 1), RELAY_WEBRTC_PREFIX)) {
-            console.log(`received WebRTC message ${new TextDecoder().decode(received.slice(1))}`)
+            this.webRTC?.signal(new TextDecoder().decode(received.slice(1)))
           } else {
             error(`Received invalid prefix <${received.slice(0, 1)}. Dropping message.`)
           }
@@ -126,7 +130,7 @@ class RelayConnection implements MultiaddrConnection {
 
           let webRTCresolved = false
           let webRTCdone = false
-          let webRTCmsg: Uint8Array
+          let webRTCmsg: Uint8Array | void
 
           function streamSourceFunction({ done, value }: { done: boolean; value?: BL }) {
             streamResolved = true
@@ -140,15 +144,44 @@ class RelayConnection implements MultiaddrConnection {
           // @ts-ignore
           let streamPromise = source.next().then(streamSourceFunction)
 
-          if (this._webRTCstream != null) {
-          }
-          function webRTCSourceFunction({ done, value }: { done?: boolean; value?: Uint8Array }) {
+          function webRTCSourceFunction({ done, value }: { done?: boolean; value: Uint8Array | void }) {
             webRTCresolved = true
             webRTCmsg = value
 
             if (done) {
               webRTCdone = true
             }
+          }
+
+          let webRTCstream: AsyncGenerator<Uint8Array, void, unknown>
+          if (this.webRTC != null) {
+            webRTCstream = async function* () {
+              let defer = Defer<DeferredPromise<any>>()
+              let waiting = false
+              const webRTCmessages: Uint8Array[] = []
+              let done = false
+              this.webRTC.on('signal', (msg: string) => {
+                webRTCmessages.push(new TextEncoder().encode(msg))
+                if (waiting) {
+                  waiting = false
+                  defer.resolve(Defer<DeferredPromise<any>>())
+                }
+              })
+
+              this.webRTC.on('connect', () => {
+                done = true
+              })
+
+              while (!done) {
+                while (webRTCmessages.length > 0) {
+                  yield webRTCmessages.shift()
+                }
+
+                waiting = true
+
+                defer = await defer.promise
+              }
+            }.call(this)
           }
 
           // @ts-ignore
@@ -159,10 +192,9 @@ class RelayConnection implements MultiaddrConnection {
           })
 
           while (true) {
-            if (!webRTCdone && this._webRTCstream != null) {
+            if (!webRTCdone && this.webRTC != null) {
               if (webRTCPromise == null) {
-                // @ts-ignore
-                webRTCPromise = this._webRTCstream.source.next().then(webRTCSourceFunction)
+                webRTCPromise = webRTCstream.next().then(webRTCSourceFunction)
               }
               await Promise.race([
                 // prettier-ignore
@@ -212,8 +244,7 @@ class RelayConnection implements MultiaddrConnection {
               // @ts-ignore
               yield new BL([RELAY_WEBRTC_PREFIX, webRTCmsg])
 
-              // @ts-ignore
-              webRTCPromise = this._webRTCstream.source.next().then(webRTCSourceFunction)
+              webRTCPromise = webRTCstream.next().then(webRTCSourceFunction)
             } else if (streamDone || promiseDone) {
               if (!this._destroyed) {
                 this._destroyed = true

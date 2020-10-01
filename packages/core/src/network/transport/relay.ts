@@ -172,7 +172,7 @@ class Relay {
   }
 
   private async performHandshake(relayConnection: Connection, relay: PeerId, destination: PeerId): Promise<Stream> {
-    let shaker: any
+    let shaker: Handshake
     try {
       shaker = handshake((await relayConnection.newStream([RELAY_REGISTER])).stream)
     } catch (err) {
