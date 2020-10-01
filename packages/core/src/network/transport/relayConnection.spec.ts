@@ -149,7 +149,7 @@ describe('test relay connection', function () {
     setTimeout(() => {
       clearInterval(interval)
       FakeWebRTCAlice.emit('connect')
-    }, 400)
+    }, 200)
 
     const a = new RelayConnection({
       stream: {

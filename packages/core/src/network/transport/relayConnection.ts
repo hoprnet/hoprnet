@@ -170,6 +170,7 @@ class RelayConnection implements MultiaddrConnection {
 
               this.webRTC.on('connect', () => {
                 done = true
+                defer.resolve()
               })
 
               while (!done) {
@@ -177,9 +178,17 @@ class RelayConnection implements MultiaddrConnection {
                   yield webRTCmessages.shift()
                 }
 
+                if (done) {
+                  break
+                }
+
                 waiting = true
 
                 defer = await defer.promise
+
+                if (done) {
+                  break
+                }
               }
             }.call(this)
           }
@@ -216,7 +225,7 @@ class RelayConnection implements MultiaddrConnection {
               streamResolved = false
               let _received = streamMsg.slice()
 
-              if (streamDone || promiseDone) {
+              if (promiseDone || (streamDone && webRTCdone)) {
                 if (_received != null) {
                   yield new BL([(RELAY_PAYLOAD_PREFIX as unknown) as BL, (_received as unknown) as BL])
                 }
@@ -245,7 +254,7 @@ class RelayConnection implements MultiaddrConnection {
               yield new BL([RELAY_WEBRTC_PREFIX, webRTCmsg])
 
               webRTCPromise = webRTCstream.next().then(webRTCSourceFunction)
-            } else if (streamDone || promiseDone) {
+            } else if (promiseDone || (streamDone && webRTCdone)) {
               if (!this._destroyed) {
                 this._destroyed = true
 
