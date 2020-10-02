@@ -12,7 +12,8 @@
     "prepublishOnly": "yarn build",
     "lint": "prettier --check .",
     "lint:fix": "prettier --write .",
-    "dev": "yarn install && yarn build && yarn buildAdmin && node lib/index.js --admin"
+    "start": "node lib/index.js --admin",
+    "dev": "yarn install && yarn build && yarn buildAdmin && yarn start"
   },
   "license": "",
   "dependencies": {
