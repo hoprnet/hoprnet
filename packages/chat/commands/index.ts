@@ -6,7 +6,7 @@ import { AbstractCommand, GlobalState, CommandResponse } from './abstractCommand
 import CloseChannel from './closeChannel'
 import Crawl from './crawl'
 import ListCommands from './listCommands'
-import ListConnectors from './listConnectors'
+// import ListConnectors from './listConnectors'
 import ListOpenChannels from './listOpenChannels'
 import ListConnectedPeers from './listConnected'
 import OpenChannel from './openChannel'
@@ -42,7 +42,7 @@ export class Commands {
       new Crawl(node),
       new Info(node),
       new ListCommands(() => this.commands),
-      new ListConnectors(),
+      // new ListConnectors(),
       new ListConnectedPeers(node),
       new ListOpenChannels(node),
       new Ping(node),

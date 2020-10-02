@@ -12,7 +12,7 @@ import chalk from 'chalk'
 import readline from 'readline'
 import PeerInfo from 'peer-info'
 import clear from 'clear'
-import { parseOptions } from './utils'
+import { parseOptions, yesOrNoQuestion } from './utils'
 import { Commands } from './commands'
 import { renderHoprLogo } from './logo'
 import pkg from './package.json'
@@ -40,15 +40,15 @@ async function runAsRegularNode() {
   commands = new Commands(node, rl)
 
   rl.on('SIGINT', async () => {
-    const question = `Are you sure you want to exit? (${chalk.green('y')}, ${chalk.red('N')}): `
+    const question = 'Are you sure you want to exit?'
+    const shouldTerminate = await yesOrNoQuestion(rl, question)
 
-    const answer = await new Promise<string>((resolve) => rl.question(question, resolve))
-
-    if (answer.match(/^y(es)?$/i)) {
+    if (shouldTerminate) {
       clearString(question, rl)
       await commands.execute('quit')
       return
     }
+
     rl.prompt()
   })
 

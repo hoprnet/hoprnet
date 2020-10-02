@@ -32,36 +32,6 @@ describe('Commands', () => {
     expect(mockNode.ping).toHaveBeenCalled()
   })
 
-  it('commands can save state', async () => {
-    let mockNode: any = jest.fn()
-    let cmds = new mod.Commands(mockNode)
-
-    let ir = await cmds.execute('settings includeRecipient')
-    expect(ir).toMatch(/false/)
-    await cmds.execute('settings includeRecipient true')
-    ir = await cmds.execute('settings includeRecipient')
-    expect(ir).toMatch(/true/)
-    await cmds.execute('settings includeRecipient false')
-    ir = await cmds.execute('settings includeRecipient')
-    expect(ir).toMatch(/false/)
-  })
-
-  it('alias addresses', async () => {
-    let mockNode: any = jest.fn()
-    mockNode.sendMessage = jest.fn()
-    let cmds = new mod.Commands(mockNode)
-
-    let aliases = await cmds.execute('alias')
-    expect(aliases).toEqual('')
-
-    await cmds.execute('alias 16Uiu2HAmQDFS8a4Bj5PGaTqQLME5SZTRNikz9nUPT3G4T6YL9o7V test')
-
-    aliases = await cmds.execute('alias')
-    expect(aliases).toMatch(/test/)
-    await cmds.execute('send test Hello, world')
-    expect(mockNode.sendMessage).toHaveBeenCalled()
-  })
-
   it('version', async () => {
     let mockNode: any = jest.fn()
     let cmds = new mod.Commands(mockNode)
@@ -176,5 +146,58 @@ describe('Commands', () => {
 
     await cmds.execute('withdraw 0x123 native 1')
     expect(mockNode.paymentChannels.withdraw).toHaveBeenCalled()
+  })
+
+  it('settings', async () => {
+    let mockNode: any = jest.fn()
+    let cmds = new mod.Commands(mockNode)
+
+    let ir = await cmds.execute('settings')
+    expect(ir).toContain('includeRecipient')
+    expect(ir).toContain('routing')
+  })
+
+  it('settings includeRecipient', async () => {
+    let mockNode: any = jest.fn()
+    let cmds = new mod.Commands(mockNode)
+
+    let ir = await cmds.execute('settings includeRecipient')
+    expect(ir).toMatch(/false/)
+    await cmds.execute('settings includeRecipient true')
+    ir = await cmds.execute('settings includeRecipient')
+    expect(ir).toMatch(/true/)
+    await cmds.execute('settings includeRecipient false')
+    ir = await cmds.execute('settings includeRecipient')
+    expect(ir).toMatch(/false/)
+  })
+
+  it('settings routing', async () => {
+    let mockNode: any = jest.fn()
+    let cmds = new mod.Commands(mockNode)
+
+    let ir = await cmds.execute('settings routing')
+    expect(ir).toMatch(/direct/)
+    await cmds.execute('settings routing manual')
+    ir = await cmds.execute('settings routing')
+    expect(ir).toMatch(/manual/)
+    await cmds.execute('settings routing direct')
+    ir = await cmds.execute('settings routing')
+    expect(ir).toMatch(/direct/)
+  })
+
+  it('alias addresses', async () => {
+    let mockNode: any = jest.fn()
+    mockNode.sendMessage = jest.fn()
+    let cmds = new mod.Commands(mockNode)
+
+    let aliases = await cmds.execute('alias')
+    expect(aliases).toEqual('')
+
+    await cmds.execute('alias 16Uiu2HAmQDFS8a4Bj5PGaTqQLME5SZTRNikz9nUPT3G4T6YL9o7V test')
+
+    aliases = await cmds.execute('alias')
+    expect(aliases).toMatch(/test/)
+    await cmds.execute('send test Hello, world')
+    expect(mockNode.sendMessage).toHaveBeenCalled()
   })
 })
