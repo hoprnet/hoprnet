@@ -1,40 +1,36 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import type { AutoCompleteResult, CommandResponse } from './abstractCommand'
-import { AbstractCommand, GlobalState } from './abstractCommand'
-
-import chalk from 'chalk'
-
 import type PeerId from 'peer-id'
-
-import { checkPeerIdInput, encodeMessage, getOpenChannels, getPeersIdsAsString, yesOrNoQuestion } from '../utils'
 import { clearString } from '@hoprnet/hopr-utils'
 import { MAX_HOPS } from '@hoprnet/hopr-core/lib/constants'
-
 import readline from 'readline'
+import chalk from 'chalk'
+import { checkPeerIdInput, encodeMessage, getOpenChannels, getPeersIdsAsString } from '../utils'
+import { AbstractCommand, GlobalState } from './abstractCommand'
 
 export abstract class SendMessageBase extends AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {
     super()
   }
 
-  name() {
+  public name() {
     return 'send'
   }
 
-  help() {
+  public help() {
     return 'sends a message to another party'
   }
 
   // Throws if peerid is invalid
-  async _checkPeerId(id: string, settings: GlobalState): Promise<PeerId> {
+  protected async checkPeerId(id: string, settings: GlobalState): Promise<PeerId> {
     if (settings.aliases.has(id)) {
       return settings.aliases.get(id)!
     }
     return await checkPeerIdInput(id)
   }
 
-  async _sendMessage(settings: GlobalState, recipient: PeerId, msg: string): Promise<void> {
+  protected async sendMessage(settings: GlobalState, recipient: PeerId, msg: string): Promise<void> {
     const message = settings.includeRecipient
       ? ((myAddress) => `${myAddress}:${msg}`)(this.node.peerInfo.id.toB58String())
       : msg
@@ -50,7 +46,7 @@ export abstract class SendMessageBase extends AbstractCommand {
     }
   }
 
-  async autocomplete(query: string, line: string, state: GlobalState): Promise<AutoCompleteResult> {
+  public async autocomplete(query: string, line: string, state: GlobalState): Promise<AutoCompleteResult> {
     const allIds = getPeersIdsAsString(this.node, {
       noBootstrapNodes: true,
     }).concat(Array.from(state.aliases.keys()))
@@ -59,17 +55,18 @@ export abstract class SendMessageBase extends AbstractCommand {
 }
 
 export class SendMessage extends SendMessageBase {
-  async execute(query: string, settings: GlobalState): Promise<CommandResponse> {
+  public async execute(query: string, settings: GlobalState): Promise<CommandResponse> {
     const [err, peerIdString, msg] = this._assertUsage(query, ['PeerId', 'Message'], /(\w+)\s(.*)/)
     if (err) return err
 
     let peerId: PeerId
     try {
-      peerId = await this._checkPeerId(peerIdString, settings)
+      peerId = await this.checkPeerId(peerIdString, settings)
     } catch (err) {
       return err.message
     }
-    this._sendMessage(settings, peerId, msg)
+
+    return this.sendMessage(settings, peerId, msg)
   }
 }
 
@@ -82,12 +79,13 @@ export class SendMessageFancy extends SendMessageBase {
    * Encapsulates the functionality that is executed once the user decides to send a message.
    * @param query peerId string to send message to
    */
-  async execute(query: string, state: GlobalState): Promise<string | void> {
+  public async execute(query: string, state: GlobalState): Promise<string | void> {
     const [err, peerIdString] = this._assertUsage(query, ['PeerId'])
     if (err) return err
+
     let peerId: PeerId
     try {
-      peerId = await this._checkPeerId(peerIdString, state)
+      peerId = await this.checkPeerId(peerIdString, state)
     } catch (err) {
       console.log(chalk.red(err.message))
       return
@@ -124,7 +122,7 @@ export class SendMessageFancy extends SendMessageBase {
     }
   }
 
-  async selectIntermediateNodes(rl: readline.Interface, destination: PeerId): Promise<PeerId[]> {
+  public async selectIntermediateNodes(rl: readline.Interface, destination: PeerId): Promise<PeerId[]> {
     let done = false
     let selected: PeerId[] = []
 

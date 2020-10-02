@@ -9,11 +9,11 @@ export default class PrintAddress extends AbstractCommand {
     super()
   }
 
-  name() {
+  public name() {
     return 'myAddress'
   }
 
-  help() {
+  public help() {
     return 'shows the native and HOPR addresses of this node'
   }
 
@@ -22,7 +22,7 @@ export default class PrintAddress extends AbstractCommand {
    * identity that we have on that chain.
    * @notice triggered by the CLI
    */
-  async execute(): Promise<string> {
+  public async execute(): Promise<string> {
     const { utils } = this.node.paymentChannels
 
     const hoprPrefix = 'HOPR Address:'

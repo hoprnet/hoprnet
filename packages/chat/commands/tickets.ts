@@ -1,20 +1,20 @@
-import chalk from 'chalk'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import { moveDecimalPoint } from '@hoprnet/hopr-utils'
+import chalk from 'chalk'
 import { SendMessageBase } from './sendMessage'
-import { countSignedTickets, getSignedTickets } from '../utils'
+import { countSignedTickets, toSignedTickets } from '../utils'
 
 export default class Tickets extends SendMessageBase {
   constructor(public node: Hopr<HoprCoreConnector>) {
     super(node)
   }
 
-  name() {
+  public name() {
     return 'tickets'
   }
 
-  help() {
+  public help() {
     return 'lists information about redeemed and unredeemed tickets'
   }
 
@@ -34,7 +34,7 @@ export default class Tickets extends SendMessageBase {
       }
 
       const ackTickets = results.map((o) => o.ackTicket)
-      const unredeemedResults = countSignedTickets(await getSignedTickets(ackTickets))
+      const unredeemedResults = countSignedTickets(await toSignedTickets(ackTickets))
       const unredeemedAmount = moveDecimalPoint(unredeemedResults.total.toString(), Balance.DECIMALS * -1)
 
       return `Found ${chalk.blue(unredeemedResults.tickets.length)} unredeemed tickets with a sum of ${chalk.blue(

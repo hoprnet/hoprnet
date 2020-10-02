@@ -1,21 +1,25 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
-import { AbstractCommand } from './abstractCommand'
-import type { AutoCompleteResult } from './abstractCommand'
-
 import type PeerId from 'peer-id'
-
-import { checkPeerIdInput, isBootstrapNode, getPeers } from '../utils'
+import type { AutoCompleteResult } from './abstractCommand'
 import chalk from 'chalk'
+import { checkPeerIdInput, isBootstrapNode, getPeers } from '../utils'
+import { AbstractCommand } from './abstractCommand'
 
 export default class Ping extends AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {
     super()
   }
-  name() { return 'ping' }
-  help() { return 'pings another node to check its availability' }
 
-  async execute(query?: string): Promise<string> {
+  public name() {
+    return 'ping'
+  }
+
+  public help() {
+    return 'pings another node to check its availability'
+  }
+
+  public async execute(query?: string): Promise<string> {
     if (query == null) {
       return `Invalid arguments. Expected 'ping <peerId>'. Received '${query}'`
     }
@@ -25,7 +29,7 @@ export default class Ping extends AbstractCommand {
       peerId = await checkPeerIdInput(query)
     } catch (err) {
       return chalk.red(err.message)
-    } 
+    }
 
     let out = ''
     if (isBootstrapNode(this.node, peerId)) {
@@ -40,7 +44,7 @@ export default class Ping extends AbstractCommand {
     }
   }
 
-  async autocomplete(query: string, line: string): Promise<AutoCompleteResult> {
+  public async autocomplete(query: string, line: string): Promise<AutoCompleteResult> {
     const peers = getPeers(this.node)
 
     const peerIds =

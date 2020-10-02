@@ -1,19 +1,13 @@
+import type { HoprOptions } from '@hoprnet/hopr-core'
+import { getBootstrapAddresses } from '@hoprnet/hopr-utils'
 import getopts from 'getopts'
 import chalk from 'chalk'
-
 import PeerInfo from 'peer-info'
-import PeerId from 'peer-id'
-
 import Multiaddr from 'multiaddr'
-
 import ListConnctor from '../commands/listConnectors'
-
 import { displayHelp } from './displayHelp'
 import { decodeMessage } from './message'
-
 import { knownConnectors } from './knownConnectors'
-import type { HoprOptions } from '@hoprnet/hopr-core'
-import { getBootstrapAddresses } from  '@hoprnet/hopr-utils'
 
 const listConnectors = new ListConnctor()
 
@@ -34,21 +28,11 @@ function parseHosts(): HoprOptions['hosts'] {
   }
 
   if (process.env['HOST_IPV6'] !== undefined) {
-    // '\[('
-    // '[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}|'
-    // '[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:\:[0-9a-fA-F]{1,4}|'
-    // '[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:\:[0-9a-fA-F]{1,4}|'
-    // '[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:\:[0-9a-fA-F]{1,4}|'
-    // '[0-9a-fA-F]{1,4}\:\:[0-9a-fA-F]{1,4}|'
-    // '\:\:[0-9a-fA-F]{1,4}|'
-    // '\:\:'
-    // ')\]\:'
-    // '([0-9]{1,6})'
-
     const str = process.env['HOST_IPV6'].replace(/\/\/.+/, '').trim()
     const params = str.match(
       /\[([0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}|[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:\:[0-9a-fA-F]{1,4}|[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:\:[0-9a-fA-F]{1,4}|[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:\:[0-9a-fA-F]{1,4}|[0-9a-fA-F]{1,4}\:\:[0-9a-fA-F]{1,4}|\:\:[0-9a-fA-F]{1,4}|\:\:)\]\:([0-9]{1,6})/
     )
+
     if (params == null || params.length != 3) {
       throw Error(`Invalid IPv6 host. Got ${chalk.yellow(str)}`)
     }
@@ -65,7 +49,7 @@ function parseHosts(): HoprOptions['hosts'] {
 /**
  * Parses the given command-line options and returns a configuration object.
  *
- * @returns
+ * @returns HoprOptions
  */
 export async function parseOptions(): Promise<HoprOptions> {
   const unknownOptions: string[] = []
@@ -156,7 +140,6 @@ export async function parseOptions(): Promise<HoprOptions> {
       )} in ${chalk.yellow('.env')}.`
     )
   }
-
 
   let options: HoprOptions = {
     debug: cli_options.debug || false,

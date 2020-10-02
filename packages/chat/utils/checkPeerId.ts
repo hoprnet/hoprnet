@@ -1,10 +1,7 @@
-import chalk from 'chalk'
-
 import PeerId from 'peer-id'
 // @ts-ignore
 import Multihash from 'multihashes'
 import bs58 from 'bs58'
-
 import { addPubKey } from '@hoprnet/hopr-core/lib/utils'
 
 /**
@@ -15,16 +12,12 @@ import { addPubKey } from '@hoprnet/hopr-core/lib/utils'
  * @param query query that contains the peerId
  */
 export async function checkPeerIdInput(query: string): Promise<PeerId> {
-  let peerId: PeerId
-
   try {
     // Throws an error if the Id is invalid
     Multihash.decode(bs58.decode(query))
 
-    peerId = await addPubKey(PeerId.createFromB58String(query))
+    return await addPubKey(PeerId.createFromB58String(query))
   } catch (err) {
-    throw Error(chalk.red(`Invalid peerId. ${err.message}`))
+    throw Error(`Invalid peerId. ${err.message}`)
   }
-
-  return peerId
 }

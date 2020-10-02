@@ -1,28 +1,28 @@
-import chalk from 'chalk'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
+import chalk from 'chalk'
 import { moveDecimalPoint } from '@hoprnet/hopr-utils'
+import { countSignedTickets, toSignedTickets } from '../utils'
 import { AbstractCommand } from './abstractCommand'
-import { countSignedTickets, getSignedTickets } from '../utils'
 
 export default class RedeemTickets extends AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {
     super()
   }
 
-  name() {
+  public name() {
     return 'redeemTickets'
   }
 
-  help() {
+  public help() {
     return 'redeem tickets'
   }
 
   /**
    * @param query a ticket challange
    */
-  async execute(): Promise<string | void> {
+  public async execute(): Promise<string | void> {
     const { paymentChannels } = this.node
     const { Balance } = paymentChannels.types
 
@@ -45,7 +45,7 @@ export default class RedeemTickets extends AbstractCommand {
         }
       }
 
-      const signedTickets = await getSignedTickets(redeemedTickets)
+      const signedTickets = await toSignedTickets(redeemedTickets)
       const result = countSignedTickets(signedTickets)
       const total = moveDecimalPoint(result.total, Balance.DECIMALS * -1)
 

@@ -47,6 +47,7 @@
     "getopts": "^2.2.5",
     "multihashes": "~0.4.19",
     "peer-info": "~0.17.5",
+    "peer-id": "~0.13",
     "readline": "~1.3.0",
     "rlp": "~2.2.5",
     "typescript": "^3.9.7",

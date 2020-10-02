@@ -1,27 +1,15 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { Currencies } from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
-import chalk from 'chalk'
 import { moveDecimalPoint } from '@hoprnet/hopr-utils'
+import chalk from 'chalk'
 import { AbstractCommand, AutoCompleteResult } from './abstractCommand'
 
-const _arguments = ['recipient (blockchain address)', 'currency (native, hopr)', 'amount (ETH, HOPR)']
-
 export default class Withdraw extends AbstractCommand {
+  private arguments = ['recipient (blockchain address)', 'currency (native, hopr)', 'amount (ETH, HOPR)']
+
   constructor(public node: Hopr<HoprCoreConnector>) {
     super()
-  }
-
-  name(): string {
-    return 'withdraw'
-  }
-
-  help(): string {
-    return 'withdraw native or hopr to a specified recipient'
-  }
-
-  async autocomplete(query?: string): Promise<AutoCompleteResult> {
-    return [_arguments, query ?? '']
   }
 
   /**
@@ -70,11 +58,23 @@ export default class Withdraw extends AbstractCommand {
     }
   }
 
+  public name(): string {
+    return 'withdraw'
+  }
+
+  public help(): string {
+    return 'withdraw native or hopr to a specified recipient'
+  }
+
+  public async autocomplete(query?: string): Promise<AutoCompleteResult> {
+    return [this.arguments, query ?? '']
+  }
+
   /**
    * Withdraws native or hopr balance.
    * @notice triggered by the CLI
    */
-  async execute(query?: string): Promise<string> {
+  public async execute(query?: string): Promise<string> {
     try {
       const { amount, weiAmount, currency, recipient } = await this.checkArgs(query ?? '')
       const { paymentChannels } = this.node

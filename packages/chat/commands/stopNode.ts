@@ -1,8 +1,6 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
-
 import chalk from 'chalk'
-
 import { AbstractCommand } from './abstractCommand'
 
 export default class StopNode extends AbstractCommand {
@@ -10,12 +8,17 @@ export default class StopNode extends AbstractCommand {
     super()
   }
 
-  name() { return 'quit' }
-  help() { return 'stops the node and terminates the process'}
+  public name() {
+    return 'quit'
+  }
+
+  public help() {
+    return 'stops the node and terminates the process'
+  }
   /**
    * Stops the node and kills the process in case it does not quit by itself.
    */
-  async execute(): Promise<void> {
+  public async execute(): Promise<void> {
     const timeout = setTimeout(() => {
       console.log(`Ungracefully stopping node after timeout.`)
       process.exit(0)

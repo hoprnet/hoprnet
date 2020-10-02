@@ -5,7 +5,7 @@ import { clearString } from '@hoprnet/hopr-utils'
 const yes = chalk.green('y')
 const no = chalk.red('N')
 
-export async function yesOrNoQuestion(rl: readline.Interface, message: string) {
+export async function yesOrNoQuestion(rl: readline.Interface, message: string): Promise<boolean> {
   const question = `${message} (${yes}, ${no}): `
   const answer = await new Promise<string>((resolve) => rl.question(question, resolve))
 
