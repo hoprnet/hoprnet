@@ -72,7 +72,7 @@ export function displayHelp() {
   console.log(str)
 }
 
-export function paddingLength(items: string[]): number {
+export function getPaddingLength(items: string[]): number {
   return Math.max(...items.map((str) => str.length)) + EXTRA_PADDING
 }
 
@@ -86,5 +86,29 @@ export function styleValue(value: any): string {
       return chalk.yellow(value)
     default:
       return String(value)
+  }
+}
+
+export function getOptions(
+  options: { value: any; description?: string }[],
+  style: 'compact' | 'vertical' = 'compact'
+): string[] {
+  if (style === 'compact') {
+    return [`Options: ${options.map((o) => String(o.value)).join('|')}`]
+  } else {
+    const padding = getPaddingLength(options.map((o) => String(o.value)))
+
+    return [
+      'Options:',
+      ...options.map((option, index) => {
+        return [
+          // needed to preperly format the array
+          '\n',
+          '- ',
+          styleValue(String(option.value).padEnd(padding)),
+          option.description,
+        ].join('')
+      }),
+    ]
   }
 }

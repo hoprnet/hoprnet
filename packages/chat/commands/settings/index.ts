@@ -1,4 +1,4 @@
-import { paddingLength, styleValue } from '../../utils'
+import { getPaddingLength, styleValue, getOptions } from '../../utils'
 import { AbstractCommand, GlobalState, AutoCompleteResult } from '../abstractCommand'
 import { IncludeRecipient } from './includeRecipient'
 import { Routing } from './routing'
@@ -23,7 +23,7 @@ export default class Settings extends AbstractCommand {
       includeRecipient: new IncludeRecipient(),
       routing: new Routing(),
     }
-    this.paddingLength = paddingLength(Object.keys(this.settings))
+    this.paddingLength = getPaddingLength(Object.keys(this.settings))
   }
 
   public name() {
@@ -71,9 +71,15 @@ export default class Settings extends AbstractCommand {
     // nothing provided, just show all settings
     if (!query) {
       return [
-        this.settingsKeys.map((s) => {
-          return `${this.name()} ${s}`
-        }),
+        getOptions(
+          Object.values(this.settings).map((setting) => {
+            return {
+              value: setting.name(),
+              description: setting.help(),
+            }
+          }),
+          'vertical'
+        ),
         line,
       ]
     }

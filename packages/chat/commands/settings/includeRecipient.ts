@@ -1,6 +1,6 @@
 import chalk from 'chalk'
 import { AbstractCommand, AutoCompleteResult, GlobalState } from '../abstractCommand'
-import { styleValue } from '../../utils'
+import { styleValue, getOptions } from '../../utils'
 
 export class IncludeRecipient extends AbstractCommand {
   private readonly options: GlobalState['includeRecipient'][] = [true, false]
@@ -14,6 +14,7 @@ export class IncludeRecipient extends AbstractCommand {
   }
 
   public async execute(query: string, state: GlobalState): Promise<string | void> {
+    // return the current value of includeRecipient
     if (!query) {
       return styleValue(state.includeRecipient)
     }
@@ -29,7 +30,7 @@ export class IncludeRecipient extends AbstractCommand {
   public async autocomplete(query: string, line: string): Promise<AutoCompleteResult> {
     // nothing provided, just show all options
     if (!query) {
-      return [this.options.map(styleValue), line]
+      return [getOptions(this.options.map((o) => ({ value: o }))), line]
     }
 
     // matches a option partly, show matches options
