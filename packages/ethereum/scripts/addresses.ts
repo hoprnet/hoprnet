@@ -9,7 +9,7 @@ export const HOPR_TOKEN: { [key in Networks]: string } = {
   kovan: '0xDD78859E6714D045a31Caa0075C1523f6E08fFe1',
   private: '0x66DB78F4ADD912a6Cb92b672Dfa09028ecc3085E',
   solkol: undefined,
-  xdai: '0x3cd4b4d97dcad4ee772bc4f0fb0e7605fc86a85b',
+  xdai: '0x12481c3Ed97b32D94E71C2039DBC44432ADD39a0',
 }
 
 export const HOPR_CHANNELS: { [key in Networks]: string } = {

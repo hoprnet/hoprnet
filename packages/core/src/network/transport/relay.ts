@@ -81,9 +81,9 @@ class Relay {
 
     this._streams = new Map<string, Map<string, RelayContext>>()
 
-    if (webRTCUpgrader != null) {
-      this._webRTCUpgrader = webRTCUpgrader
-    }
+    // if (webRTCUpgrader != null) {
+    //   this._webRTCUpgrader = webRTCUpgrader
+    // }
 
     libp2p.handle(RELAY_REGISTER, this.handleRelay.bind(this))
     libp2p.handle(DELIVERY_REGISTER, this.handleRelayConnection.bind(this))
