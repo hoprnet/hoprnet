@@ -26,11 +26,8 @@ const gen2 = (async function* gen2() {
 })()
 
 const it2 = (async function* foo() {
-  let aPromise: Promise<IteratorResult<Uint8Array, Uint8Array>>
-  let bPromise: Promise<IteratorResult<number, number>>
-
-  aPromise = gen1.next()
-  bPromise = gen2.next()
+  let aPromise: Promise<IteratorResult<Uint8Array, Uint8Array>> = gen1.next()
+  let bPromise: Promise<IteratorResult<number, number>> = gen2.next()
 
   let aResolved = false
   let bResolved = false
