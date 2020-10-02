@@ -80,6 +80,11 @@ const argv = (
     describe: 'List all the options used to run the HOPR node, but quit instead of starting',
     default: false
   })
+  .option('bootstrap', {
+    boolean: true,
+    describe: 'run as a bootstrap node',
+    default: false
+  })
   .wrap(Math.min(120, yargs.terminalWidth()))
   .argv
 )
@@ -121,6 +126,7 @@ async function generateNodeOptions(logs: LogStream): Promise<HoprOptions> {
 
   let options: HoprOptions = {
     debug: Boolean(process.env.DEBUG),
+    bootstrapNode: argv.bootstrap,
     network: argv.network,
     bootstrapServers: [... (await getBootstrapAddresses()).values()],
     provider: argv.provider,
