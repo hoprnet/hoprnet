@@ -1,5 +1,6 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
+import type PeerId from 'peer-id'
 import { AutoCompleteResult } from './abstractCommand'
 import { AbstractCommand, GlobalState, CommandResponse } from './abstractCommand'
 import CloseChannel from './closeChannel'
@@ -33,7 +34,7 @@ export class Commands {
     this.state = {
       includeRecipient: false,
       routing: 'direct',
-      aliases: new Map(),
+      aliases: new Map<string, PeerId>(),
     }
 
     this.commands = [
