@@ -53,6 +53,7 @@ jobs:
           git pull origin master
           git push origin master
           node_modules/.bin/lerna publish from-package --yes
+          sleep 5m # Allow NPM registry to catch uo
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -70,6 +71,7 @@ jobs:
           git pull origin master
           git push origin master
           node_modules/.bin/lerna publish from-package --yes
+          sleep 5m # Allow NPM registry to catch uo
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -87,6 +89,7 @@ jobs:
           git pull origin master
           git push origin master
           node_modules/.bin/lerna publish from-package --yes
+          sleep 5m # Allow NPM registry to catch uo
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -104,6 +107,7 @@ jobs:
           git pull origin master
           git push origin master
           node_modules/.bin/lerna publish from-package --yes
+          sleep 5m # Allow NPM registry to catch uo
         env:
           NODE_AUTH_TOKEN:
             ${{ secrets.NPM_TOKEN }}
