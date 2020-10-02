@@ -2,8 +2,11 @@
   "name": "root",
   "private": true,
   "scripts": {
-    "chat": "node packages/chat/lib/index.js",
-    "hoprd": "node packages/hoprd/lib/index.js"
+    "lerna:bootstrap": "lerna bootstrap",
+    "lerna:link": "lerna link --force-local",
+    "lerna:build": "lerna run build",
+    "run:chat": "lerna exec --scope @hoprnet/hopr-chat -- yarn start:monterosa",
+    "run:hoprd": "lerna exec --scope @hoprnet/hoprd -- yarn start --host 0.0.0.0:9092"
   },
   "devDependencies": {
     "lerna": "^3.22.1"
