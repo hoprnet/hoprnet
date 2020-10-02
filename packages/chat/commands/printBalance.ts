@@ -14,8 +14,8 @@ export default class PrintBalance extends AbstractCommand {
     return 'balance'
   }
 
-  help():string {
-    return 'shows our current native and hopr balance'
+  help() {
+    return 'shows our current hopr and native balance'
   }
 
   /**
@@ -26,19 +26,23 @@ export default class PrintBalance extends AbstractCommand {
     const { paymentChannels } = this.node
     const { Balance, NativeBalance } = paymentChannels.types
 
-    const balance = await paymentChannels.account.balance.then((b) => {
+    const hoprPrefix = 'HOPR Balance:'
+    const hoprBalance = await paymentChannels.account.balance.then((b) => {
       return moveDecimalPoint(b.toString(), Balance.DECIMALS * -1)
     })
+
+    // @TODO: use 'NativeBalance' and 'Balance' to display currencies
+    const nativePrefix = 'xDAI Balance:'
     const nativeBalance = await paymentChannels.account.nativeBalance.then((b) => {
       return moveDecimalPoint(b.toString(), NativeBalance.DECIMALS * -1)
     })
 
-    return (
-      // TODO: Revert this
-      [
-        `Account Balance: ${chalk.magenta(balance)} xHOPR`, // ${Balance.SYMBOL}`,
-        `Account Native Balance: ${chalk.magenta(nativeBalance)} xDAI`, // ${NativeBalance.SYMBOL}`,
-      ].join('\n')
-    )
+    const prefixLength = Math.max(hoprPrefix.length, nativePrefix.length) + 2
+
+    // TODO: use 'NativeBalance' and 'Balance' to display currencies
+    return [
+      `${hoprPrefix.padEnd(prefixLength, ' ')}${chalk.blue(hoprBalance)} xHOPR`,
+      `${nativePrefix.padEnd(prefixLength, ' ')}${chalk.blue(nativeBalance)} xDAI`,
+    ].join('\n')
   }
 }
