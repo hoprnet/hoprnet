@@ -174,6 +174,7 @@ class ChannelFactory {
     const hashedSecret = await this.coreConnector.hashedSecret.check()
     if (!hashedSecret.initialized) await this.coreConnector.initOnchainValues()
 
+    console.log(`sign`, sign, `channelBalance`, channelBalance)
     if (await this.isOpen(counterpartyPubKey)) {
       const record = await this.coreConnector.db.get(Buffer.from(this.coreConnector.dbKeys.Channel(counterpartyPubKey)))
       signedChannel = new SignedChannel({
