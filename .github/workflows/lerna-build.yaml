@@ -187,7 +187,7 @@ jobs:
           service_account_key: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
           export_default_credentials: true
       - name: Get version from package.json
-        run: echo ::set-env name=RELEASE::$(node -p -e "require('./packages/chat/package.json').version")
+        run: echo ::set-env name=RELEASE::$(node -p -e "require('./packages/hoprd/package.json').version")
       - name: Set Project for Google Cloud HOPR Association
         working-directory: packages/hoprd
         run: gcloud config set project ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
