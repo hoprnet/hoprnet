@@ -24,7 +24,7 @@ export class MultiSendMessage extends SendMessageBase {
   private async checkArgs(query: string, settings: GlobalState): Promise<PeerId> {
     const [err, id] = this._assertUsage(query, ['PeerId'])
     if (err) throw new Error(err)
-    return await this._checkPeerId(id, settings)
+    return await this.checkPeerId(id, settings)
   }
 
   private async repl(recipient: PeerId, settings: GlobalState): Promise<void> {
@@ -37,7 +37,7 @@ export class MultiSendMessage extends SendMessageBase {
         clearString(message, this.rl)
         this.rl.pause()
         console.log(`[sending message "${message}"]`)
-        await this._sendMessage(settings, recipient, message)
+        await this.sendMessage(settings, recipient, message)
         this.rl.resume()
       }
       await this.repl(recipient, settings)
