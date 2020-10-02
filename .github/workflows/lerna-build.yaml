@@ -132,6 +132,8 @@ jobs:
     needs: [build]
     steps:
       - uses: actions/checkout@v2
+        with:
+          ref: master
       - name: Build Avado
         working-directory: packages/avado
         run: |
@@ -157,6 +159,8 @@ jobs:
     needs: [build]
     steps:
       - uses: actions/checkout@v2
+        with:
+          ref: master
       - name: Setup Google Cloud Credentials
         uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
         with:
@@ -216,6 +220,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
+        with:
+          ref: master
       - uses: actions/setup-node@v1
         with:
           node-version: 12.9.1
@@ -256,8 +262,8 @@ jobs:
     needs: [build_chat_binaries]
     steps:
       - uses: actions/checkout@v2
-      - name: Update from master
-        run: git pull origin master
+        with:
+          ref: master
       - uses: actions/setup-node@v1
         with:
           node-version: 12.9.1
