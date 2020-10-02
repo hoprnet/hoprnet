@@ -2,8 +2,11 @@
   "name": "root",
   "private": true,
   "scripts": {
-    "chat": "node packages/chat/lib/index.js",
-    "hoprd": "node packages/hoprd/lib/index.js"
+    "lerna:bootstrap": "lerna bootstrap",
+    "lerna:link": "lerna link --force-local",
+    "lerna:build": "lerna run build",
+    "run:chat": "node packages/chat/lib/index.js",
+    "run:hoprd:admin": "node packages/hoprd/lib/index.js --admin"
   },
   "devDependencies": {
     "lerna": "^3.22.1"
