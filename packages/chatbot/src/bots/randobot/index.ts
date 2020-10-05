@@ -3,7 +3,6 @@ import { IMessage } from '../../message/message'
 import { generateRandomSentence } from '../../utils/utils'
 import debug from 'debug'
 
-
 const log = debug('hopr-chatbot:randobot')
 
 export class Randombot implements Bot {

@@ -23,7 +23,6 @@ import { BalancedHoprNode, HoprNode } from './coverbot'
 import debug from 'debug'
 import Core from '../../lib/hopr/core'
 
-
 const log = debug('hopr-chatbot:coverbot')
 const error = debug('hopr-chatbot:coverbot:error')
 const { fromWei } = Web3.utils
@@ -53,7 +52,13 @@ export class Coverbot implements Bot {
   network: Networks
   loadedDb: boolean
 
-  constructor({node, hoprBalance, balance}: BalancedHoprNode, nativeAddress: string, address: string, timestamp: Date, twitterTimestamp: Date) {
+  constructor(
+    { node, hoprBalance, balance }: BalancedHoprNode,
+    nativeAddress: string,
+    address: string,
+    timestamp: Date,
+    twitterTimestamp: Date,
+  ) {
     this.node = node
     this.initialBalance = balance
     this.initialHoprBalance = hoprBalance
@@ -178,10 +183,10 @@ export class Coverbot implements Bot {
     log(`- sendMessageFromBot | Sending ${intermediatePeerIds.length} hop message to ${recipient}`)
     log(`- sendMessageFromBot | Message: ${message}`)
     return this.node.send({
-        peerId: recipient,
-        payload: message,
-        intermediatePeerIds,
-        includeRecipient
+      peerId: recipient,
+      payload: message,
+      intermediatePeerIds,
+      includeRecipient,
     })
   }
 
@@ -220,8 +225,7 @@ export class Coverbot implements Bot {
         // this.verifiedHoprNodes.delete(hoprNode.id)
         await this.dumpData()
       } else {
-        this._sendMessageFromBot(_hoprNodeAddress, BotResponses[BotCommands.verify])
-        .catch(err => {
+        this._sendMessageFromBot(_hoprNodeAddress, BotResponses[BotCommands.verify]).catch((err) => {
           error(`Trying to send ${BotCommands.verify} message to ${_hoprNodeAddress} failed.`)
         })
         /*
@@ -237,16 +241,16 @@ export class Coverbot implements Bot {
 
         // 1.
         console.log(`Relaying node ${_hoprNodeAddress}, checking in ${RELAY_VERIFICATION_CYCLE_IN_MS}`)
-        this._sendMessageFromBot(_hoprNodeAddress, NodeStateResponses[NodeStates.onlineNode])
-        .catch(err => {
+        this._sendMessageFromBot(_hoprNodeAddress, NodeStateResponses[NodeStates.onlineNode]).catch((err) => {
           error(`Trying to send ${NodeStates.onlineNode} message to ${_hoprNodeAddress} failed.`)
         })
 
         // 2.
-        this._sendMessageFromBot(this.address, ` Relaying package to ${_hoprNodeAddress}`, [_hoprNodeAddress])
-        .catch(err => {
-          error(`Trying to send RELAY message to ${_hoprNodeAddress} failed.`)
-        })
+        this._sendMessageFromBot(this.address, ` Relaying package to ${_hoprNodeAddress}`, [_hoprNodeAddress]).catch(
+          (err) => {
+            error(`Trying to send RELAY message to ${_hoprNodeAddress} failed.`)
+          },
+        )
 
         // 3.
         this.relayTimeouts.set(
@@ -265,10 +269,11 @@ export class Coverbot implements Bot {
             console.log(`No response from ${_hoprNodeAddress}.`) // Removing as valid node.`)
 
             // 4.1.2
-            this._sendMessageFromBot(_hoprNodeAddress, NodeStateResponses[NodeStates.relayingNodeFailed])
-            .catch(err => {
-              error(`Trying to send ${NodeStates.relayingNodeFailed} message to ${_hoprNodeAddress} failed.`)
-            })
+            this._sendMessageFromBot(_hoprNodeAddress, NodeStateResponses[NodeStates.relayingNodeFailed]).catch(
+              (err) => {
+                error(`Trying to send ${NodeStates.relayingNodeFailed} message to ${_hoprNodeAddress} failed.`)
+              },
+            )
 
             // 4.1.3
             this.relayTimeouts.delete(_hoprNodeAddress)
@@ -342,8 +347,7 @@ export class Coverbot implements Bot {
 
       // 2.
       log(`- handleMessage | Successful Relay: ${relayerAddress}`)
-      this._sendMessageFromBot(relayerAddress, NodeStateResponses[NodeStates.relayingNodeSucceded])
-      .catch(err => {
+      this._sendMessageFromBot(relayerAddress, NodeStateResponses[NodeStates.relayingNodeSucceded]).catch((err) => {
         error(`Trying to send ${NodeStates.relayingNodeSucceded} message to ${relayerAddress} failed.`)
       })
 
@@ -359,7 +363,7 @@ export class Coverbot implements Bot {
 
       await Promise.all([
         this._setEthereumAddressScore(relayerEthereumAddress, newScore),
-        this.node.withdraw({ currency: 'HOPR', recipient: relayerEthereumAddress, amount: `${RELAY_HOPR_REWARD}`}),
+        this.node.withdraw({ currency: 'HOPR', recipient: relayerEthereumAddress, amount: `${RELAY_HOPR_REWARD}` }),
       ])
       console.log(`xHOPR tokens sent to ${relayerAddress}`)
       this._sendMessageFromBot(relayerAddress, NodeStateResponses[NodeStates.verifiedNode])
@@ -381,8 +385,7 @@ export class Coverbot implements Bot {
        */
 
       // 2.
-      this._sendMessageFromBot(message.from, NodeStateResponses[NodeStates.relayingNodeInProgress])
-      .catch(err => {
+      this._sendMessageFromBot(message.from, NodeStateResponses[NodeStates.relayingNodeInProgress]).catch((err) => {
         error(`Trying to send ${NodeStates.relayingNodeInProgress} message to ${message.from} failed.`)
       })
 
@@ -392,10 +395,11 @@ export class Coverbot implements Bot {
 
     let tweet, nodeState
     if (message.text.match(/https:\/\/twitter.com.*?$/i)) {
-      this._sendMessageFromBot(message.from, NodeStateResponses[NodeStates.tweetVerificationInProgress])
-      .catch(err => {
-        error(`Trying to send ${NodeStates.tweetVerificationFailed} message to ${message.from} failed.`)
-      })
+      this._sendMessageFromBot(message.from, NodeStateResponses[NodeStates.tweetVerificationInProgress]).catch(
+        (err) => {
+          error(`Trying to send ${NodeStates.tweetVerificationFailed} message to ${message.from} failed.`)
+        },
+      )
       ;[tweet, nodeState] = await this._verifyTweet(message)
     } else {
       ;[tweet, nodeState] = [undefined, NodeStates.newUnverifiedNode]
@@ -403,27 +407,26 @@ export class Coverbot implements Bot {
 
     switch (nodeState) {
       case NodeStates.newUnverifiedNode:
-        this._sendMessageFromBot(message.from, NodeStateResponses[nodeState])
-        .catch(err => {
+        this._sendMessageFromBot(message.from, NodeStateResponses[nodeState]).catch((err) => {
           error(`Trying to send ${nodeState} message to ${message.from} failed.`)
         })
         break
       case NodeStates.tweetVerificationFailed:
-        this._sendMessageFromBot(message.from, NodeStateResponses[nodeState](this.tweets.get(message.from).status))
-        .catch(err => {
+        this._sendMessageFromBot(
+          message.from,
+          NodeStateResponses[nodeState](this.tweets.get(message.from).status),
+        ).catch((err) => {
           error(`Trying to send ${nodeState} message to ${message.from} failed.`)
         })
         break
       case NodeStates.tweetVerificationSucceeded:
-        this._sendMessageFromBot(message.from, NodeStateResponses[nodeState])
-        .catch(err => {
+        this._sendMessageFromBot(message.from, NodeStateResponses[nodeState]).catch((err) => {
           error(`Trying to send ${nodeState} message to ${message.from} failed.`)
         })
         const [balance, xDaiBalanceNodeState] = await this._verifyBalance(message)
         switch (xDaiBalanceNodeState) {
           case NodeStates.xdaiBalanceFailed:
-            this._sendMessageFromBot(message.from, NodeStateResponses[xDaiBalanceNodeState](balance))
-            .catch(err => {
+            this._sendMessageFromBot(message.from, NodeStateResponses[xDaiBalanceNodeState](balance)).catch((err) => {
               error(`Trying to send ${xDaiBalanceNodeState} message to ${message.from} failed.`)
             })
             break
@@ -442,21 +445,18 @@ export class Coverbot implements Bot {
               await this._setEthereumAddressScore(ethAddress, ScoreRewards.verified)
             }
 
-            this._sendMessageFromBot(message.from, NodeStateResponses[xDaiBalanceNodeState](balance))
-            .catch(err => {
+            this._sendMessageFromBot(message.from, NodeStateResponses[xDaiBalanceNodeState](balance)).catch((err) => {
               error(`Trying to send ${xDaiBalanceNodeState} message to ${message.from} failed.`)
             })
             break
           }
         }
-        this._sendMessageFromBot(message.from, BotResponses[BotCommands.status](xDaiBalanceNodeState))
-        .catch(err => {
+        this._sendMessageFromBot(message.from, BotResponses[BotCommands.status](xDaiBalanceNodeState)).catch((err) => {
           error(`Trying to send ${BotCommands.status} message to ${message.from} failed.`)
         })
         break
     }
-    this._sendMessageFromBot(message.from, BotResponses[BotCommands.status](nodeState))
-    .catch(err => {
+    this._sendMessageFromBot(message.from, BotResponses[BotCommands.status](nodeState)).catch((err) => {
       error(`Trying to send ${BotCommands.status} message to ${message.from} failed.`)
     })
   }

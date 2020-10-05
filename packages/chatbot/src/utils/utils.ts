@@ -1,7 +1,6 @@
 import * as words from '../bots/randobot/words'
 import debug from 'debug'
 
-
 const log = debug('hopr-chatbot:utils')
 
 export const getRandomItemFromList = <T>(items: T[]): T => {
