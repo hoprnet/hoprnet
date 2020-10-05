@@ -25,7 +25,7 @@
     "hooks": {
       "pre-commit": "yarn lint:fix"
     }
-  }
+  },
   "__workspaces": {
     "packages": [
       "packages/*"
