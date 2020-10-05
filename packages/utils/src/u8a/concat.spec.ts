@@ -6,7 +6,7 @@ import { timer, MAX_EXECUTION_TIME_FOR_CONCAT_IN_MS } from '../utils'
 
 import { randomBytes } from 'crypto'
 
-describe('test u8a concat', function () {
+describe('test u8a concat', () => {
   const firstArray = randomBytes(43)
   const secondArray = randomBytes(31)
   const thirdArray = new Uint8Array()
@@ -19,11 +19,14 @@ describe('test u8a concat', function () {
     assert(u8aConcat(undefined, thirdArray).length == 0)
   })
 
-  it(`should run under ${MAX_EXECUTION_TIME_FOR_CONCAT_IN_MS}ms execution time`, () => {
-    assert(timer(() => u8aConcat()) < MAX_EXECUTION_TIME_FOR_CONCAT_IN_MS)
-  })
+  it(
+    `should run under ${MAX_EXECUTION_TIME_FOR_CONCAT_IN_MS}ms execution time`,
+    () => {
+      assert(timer(() => u8aConcat()) < MAX_EXECUTION_TIME_FOR_CONCAT_IN_MS)
+    }
+  )
 
-  it('should concat two Uint8Arrays', function () {
+  it('should concat two Uint8Arrays', () => {
     let tmp: Uint8Array
     tmp = u8aConcat(undefined, firstArray, secondArray)
     assert(u8aEquals(tmp.subarray(0, 43), firstArray) && u8aEquals(tmp.subarray(43), secondArray))
@@ -31,7 +34,10 @@ describe('test u8a concat', function () {
     assert(u8aEquals(tmp.subarray(0, 43), firstArray) && u8aEquals(tmp.subarray(43), secondArray))
   })
 
-  it(`should concat two Uint8Arrays in under ${MAX_EXECUTION_TIME_FOR_CONCAT_IN_MS}ms`, function () {
-    assert(timer(() => u8aConcat(undefined, firstArray, secondArray)) < MAX_EXECUTION_TIME_FOR_CONCAT_IN_MS)
-  })
+  it(
+    `should concat two Uint8Arrays in under ${MAX_EXECUTION_TIME_FOR_CONCAT_IN_MS}ms`,
+    () => {
+      assert(timer(() => u8aConcat(undefined, firstArray, secondArray)) < MAX_EXECUTION_TIME_FOR_CONCAT_IN_MS)
+    }
+  )
 })

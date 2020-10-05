@@ -4,8 +4,8 @@ import { randomSubset } from './randomSubset'
 const SET_SIZE = 50
 const SUBSET_SIZE = 20
 
-describe('testing random subset', function() {
-  it('should return a subset with a filter function', function() {
+describe('testing random subset', () => {
+  it('should return a subset with a filter function', () => {
     assert.deepEqual(randomSubset([1], 1), [1])
 
     assert.deepEqual(randomSubset([1, 2, 3], 3).sort(), [1, 2, 3])
@@ -38,7 +38,7 @@ describe('testing random subset', function() {
     assert(notEqualFound, `Elements should be unordered with very high probability. (This test might fail once in a while)`)
   })
 
-  it('should return a subset', function() {
+  it('should return a subset', () => {
     assert.deepEqual(
       randomSubset([1, 2], 1, (value: number) => value == 1),
       [1]

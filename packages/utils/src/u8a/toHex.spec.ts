@@ -1,8 +1,8 @@
 import { u8aToHex } from './toHex'
 import assert from 'assert'
 
-describe('test toHex', function () {
-  it('should create a Hex string', function () {
+describe('test toHex', () => {
+  it('should create a Hex string', () => {
     assert(u8aToHex(new Uint8Array([])) == '0x')
 
     assert(u8aToHex(new Uint8Array([]), false) == '')

@@ -3,8 +3,8 @@ import assert from 'assert'
 import { existsSync } from 'fs'
 import { clearDirectory, createDirectoryIfNotExists } from '.'
 
-describe('test clean directory', function () {
-  it('should delete the directory structure recursively', function () {
+describe('test clean directory', () => {
+  it('should delete the directory structure recursively', () => {
     const directory = `filesystem_test/test/sth else/`
     createDirectoryIfNotExists(`${__dirname}/${directory}`)
 

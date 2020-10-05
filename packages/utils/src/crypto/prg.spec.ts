@@ -4,8 +4,8 @@ import assert from 'assert'
 import { randomInteger } from '../'
 import { u8aEquals } from '../u8a'
 
-describe('Test Pseudo-Random Generator', async function () {
-  it('should create a digest', function () {
+describe('Test Pseudo-Random Generator', async () => {
+  it('should create a digest', () => {
     const [key, iv] = [randomBytes(PRG.KEY_LENGTH), randomBytes(PRG.IV_LENGTH)]
 
     const prg = PRG.createPRG(key, iv)

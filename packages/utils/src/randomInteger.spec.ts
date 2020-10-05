@@ -1,9 +1,9 @@
 import assert from 'assert'
 import { randomInteger } from './randomInteger'
 
-describe('testing random-number generator', function () {
+describe('testing random-number generator', () => {
   let ATTEMPTS = 100
-  it(`should output values between '0' and '23'`, function () {
+  it(`should output values between '0' and '23'`, () => {
     let result: number
     for (let i = 0; i < ATTEMPTS; i++) {
       result = randomInteger(23)
@@ -12,7 +12,7 @@ describe('testing random-number generator', function () {
     }
   })
 
-  it(`should output values between '31' and '61'`, function () {
+  it(`should output values between '31' and '61'`, () => {
     let result: number
     for (let i = 0; i < ATTEMPTS; i++) {
       result = randomInteger(31, 61)
@@ -21,7 +21,7 @@ describe('testing random-number generator', function () {
     }
   })
 
-  it(`should output values between '0' and '8'`, function () {
+  it(`should output values between '0' and '8'`, () => {
     let result: number
     for (let i = 0; i < ATTEMPTS; i++) {
       result = randomInteger(0, 8)
@@ -30,7 +30,7 @@ describe('testing random-number generator', function () {
     }
   })
 
-  it(`should output values between '23' and '7500000'`, function () {
+  it(`should output values between '23' and '7500000'`, () => {
     let result: number
     for (let i = 0; i < ATTEMPTS; i++) {
       result = randomInteger(23, 7500000)
@@ -39,7 +39,7 @@ describe('testing random-number generator', function () {
     }
   })
 
-  it('should throw error for falsy interval input', function () {
+  it('should throw error for falsy interval input', () => {
     assert.throws(() => randomInteger(2, 1))
 
     assert.throws(() => randomInteger(Math.pow(2, 32)))

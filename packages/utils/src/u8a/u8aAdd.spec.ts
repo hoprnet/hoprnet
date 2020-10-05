@@ -3,8 +3,8 @@ import { u8aEquals } from './equals'
 
 import assert from 'assert'
 
-describe('test u8a addition', function () {
-  it('should add two u8a with modulo', function () {
+describe('test u8a addition', () => {
+  it('should add two u8a with modulo', () => {
     let A = new Uint8Array([1])
     let B = new Uint8Array([1])
 
@@ -27,7 +27,7 @@ describe('test u8a addition', function () {
     assert(u8aEquals(A, new Uint8Array([0, 255])))
   })
   
-  it('should add two u8a with modulo in-place', function () {
+  it('should add two u8a with modulo in-place', () => {
     let A = new Uint8Array([1])
     let B = new Uint8Array([1])
 

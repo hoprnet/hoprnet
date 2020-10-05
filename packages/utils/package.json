@@ -36,6 +36,22 @@
     "jest": "^26.1.0",
     "@types/node": "^12.12.8",
     "ts-node": "^8.10.2",
+    "ts-jest": "^26.1.4",
     "typescript": "^3.9.5"
+  },
+  "jest": {
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
+    "rootDir": "src",
+    "testRegex": "index.spec.ts$",
+    "transform": {
+      "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "coverageDirectory": "../coverage",
+    "testEnvironment": "node",
+    "maxConcurrency": 1
   }
 }
