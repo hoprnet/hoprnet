@@ -8,9 +8,9 @@
     "target": "es2019",
     "strict": true,
     "resolveJsonModule": true,
-    "experimentalDecorators": true, 
+    "experimentalDecorators": true,
     "noEmit": true,
     "declaration": true
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*"]
 }

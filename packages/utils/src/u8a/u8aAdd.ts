@@ -1,7 +1,7 @@
 /**
  * Adds the contents of two arrays together while ignoring the final overflow.
  * Computes a + b mod ( 2^(8 * a.length) - 1)
- * 
+ *
  * @param inplace result is stored in a if set to true
  * @param a first array
  * @param b second array
