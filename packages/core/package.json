@@ -32,7 +32,7 @@
   "scripts": {
     "build": "yarn clean && tsc -p .",
     "clean": "rm -rf ./lib",
-    "test": "jest --runInBand --forceExit",
+    "test": "jest --runInBand --forceExit && jest --runInBand --forceExit && jest --runInBand --forceExit",
     "prepublishOnly": "yarn build"
   },
   "dependencies": {
@@ -97,8 +97,8 @@
       "json",
       "ts"
     ],
-    "rootDir": "src/network/transport/",
-    "testRegex": "index.spec.ts$",
+    "rootDir": "src",
+    "testRegex": ".spec.ts$",
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },
