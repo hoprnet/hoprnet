@@ -9,7 +9,7 @@
   "main": "lib/index.js",
   "scripts": {
     "clean": "rm -rf ./lib",
-    "test": "mocha --parallel",
+    "test": "jest",
     "dev": "yarn clean && tsc -w",
     "build": "yarn clean && tsc -p . --noEmit false",
     "prepare": "yarn build"
@@ -33,17 +33,9 @@
     "typestub-multihashes": "^0.0.4"
   },
   "devDependencies": {
-    "@types/mocha": "^8.0.3",
+    "jest": "^26.1.0",
     "@types/node": "^12.12.8",
-    "mocha": "^8.0.1",
     "ts-node": "^8.10.2",
     "typescript": "^3.9.5"
-  },
-  "mocha": {
-    "extension": [
-      "ts"
-    ],
-    "spec": "src/**/*.spec.ts",
-    "require": "ts-node/register"
   }
 }
