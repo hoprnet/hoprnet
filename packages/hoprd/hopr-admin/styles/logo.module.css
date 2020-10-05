@@ -4,12 +4,12 @@
   position: fixed;
   top: 1rem;
   right: 1rem;
-  z-index:5;
+  z-index: 5;
 }
 
 .logo:hover {
-  cursor:pointer;
+  cursor: pointer;
   border-radius: 50%;
-  box-shadow: 0 0 10px 5px #FFFFA0;
+  box-shadow: 0 0 10px 5px #ffffa0;
   transition: box-shadow 0.6s;
 }

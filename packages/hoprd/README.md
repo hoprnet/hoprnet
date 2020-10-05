@@ -2,16 +2,16 @@
 
 Runs a HOPR Node and the HOPR Admin interface.
 
-
 ## Usage
 
 ```
 hoprd [OPTION]...
 ```
 
-
 ### Options
+
 See `hoprd help` for full list.
+
 ```
   --help      Show help                                                                                        [boolean]
   --version   Show version number                                                                              [boolean]
@@ -26,4 +26,3 @@ See `hoprd help` for full list.
 
 NB:
 `--grpc` runs a [hopr server](https://github.com/hoprnet/hopr-server) instance.
-

@@ -1,4 +1,6 @@
-html {height: 100%;}
+html {
+  height: 100%;
+}
 body {
   background: linear-gradient(#000050, #0000b4); /* Dark Blue to bright blue */
   color: #b4f0ff; /* Sky Blue */
@@ -11,7 +13,7 @@ body {
   bottom: 0rem;
   left: 0rem;
   right: 0rem;
-  background-color:  #000050;
+  background-color: #000050;
   color: #b4f0ff;
   border-top: 1px solid #b4f0ff;
 }
@@ -20,7 +22,7 @@ body {
   background: transparent;
   color: #b4f0ff;
   border: none;
-  width:100%;
+  width: 100%;
   padding: 1rem;
   font-family: monospace;
   font-size: 1.2rem;
@@ -32,4 +34,3 @@ body {
 .send input:disabled::placeholder {
   color: transparent;
 }
-
