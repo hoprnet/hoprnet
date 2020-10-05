@@ -44,7 +44,7 @@ jobs:
           github.event.action == 'closed' &&
           github.event.pull_request.merged == true &&
         run: |
-          git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Versioning robot"
+          git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Linting robot"
           yarn lint:fix
           git commit -a "Fix linting"
       - name: Publish prerelease version
