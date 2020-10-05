@@ -1,5 +1,5 @@
 .connectedPeers {
-  background-color:  #000050;
+  background-color: #000050;
   border: 1rem solid #0000b4;
   position: fixed;
   padding: 1rem 3rem;
@@ -11,7 +11,7 @@
 }
 
 .connectedPeers h2 {
-  text-align:center;
+  text-align: center;
 }
 
 .peer {

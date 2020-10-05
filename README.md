@@ -20,10 +20,9 @@
 ### Developing with this repository
 
 ```sh
-yarn                   # Install tooling
-yarn lerna:bootstrap   # Installs all dependencies
-yarn lerna:link        # Link local dependencies
-yarn lerna:build       # Builds code for running
+yarn             # Install tooling
+yarn bootstrap   # Installs all dependencies
+yarn build       # Builds code for running
 ```
 
 ### Running applications
@@ -35,7 +34,7 @@ yarn run:chat          # Runs hopr chat in terminal
 
 ## HOPR ecosystem
 
-- **Core**: HOPR Protocol definition and source code.
+- [**Core**](./packages/core/README.md): HOPR Protocol definition and source code.
 - **Server**: gRPC-enabled Server to communicate with a HOPR Node
 - **Protos**: Protobuf API for interacting with a HOPR Server
 - **Chat**: Interactive REPL-like chat PoC for HOPR Nodes
