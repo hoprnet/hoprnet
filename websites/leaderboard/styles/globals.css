@@ -5,16 +5,6 @@ body {
   font-family: monospace;
 }
 
-body {
-  padding: 1rem;
-}
-
-a {
-  color:#0000B4;
-  font-weight: bold;
-  text-decoration: none;
-}
-
 a:hover,
 a:focus,
 a:active {
