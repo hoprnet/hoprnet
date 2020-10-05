@@ -183,10 +183,17 @@
     "@ethersproject/rlp" "^5.0.3"
     "@ethersproject/signing-key" "^5.0.4"
 
+<<<<<<< HEAD
 "@hoprnet/hopr-core-connector-interface@^1.17.0-alpha.49":
   version "1.17.0-alpha.49"
   resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-connector-interface/-/hopr-core-connector-interface-1.17.0-alpha.49.tgz#1928d2961abf88e75c334566e7d6943da92e55e5"
   integrity sha512-Bff68TgjEvsxfgMVIbcX/tulZf+ezxARAiXATkXXHAvI1Elnw4jzlkZjqIiRQ6aceWqcxU+VdQ2jlaQILpPZzw==
+=======
+"@hoprnet/hopr-core-connector-interface@^1.17.0-alpha.50":
+  version "1.17.0-alpha.50"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-connector-interface/-/hopr-core-connector-interface-1.17.0-alpha.50.tgz#69198771d29b4e012f0e83f190ba863b11203759"
+  integrity sha512-X5e0uSX11t95wcwvtQS1URMLZBm0eSx4rc9vwJHuT+Ep8sGXlhoSixMXQ2lppTttWewIPs5LlaXI4Q+21kMsUw==
+>>>>>>> 7c4c6fb17da3b5911e3d5c85d6217c988877c255
 
 "@hoprnet/hopr-demo-seeds@1.8.0":
   version "1.8.0"
@@ -195,6 +202,7 @@
   dependencies:
     micro "^9.3.4"
 
+<<<<<<< HEAD
 "@hoprnet/hopr-ethereum@^1.17.0-alpha.49":
   version "1.17.0-alpha.49"
   resolved "https://registry.yarnpkg.com/@hoprnet/hopr-ethereum/-/hopr-ethereum-1.17.0-alpha.49.tgz#9a20b4415da177d6d850b72584d0520a498d942f"
@@ -202,6 +210,15 @@
   dependencies:
     "@hoprnet/hopr-demo-seeds" "1.8.0"
     "@hoprnet/hopr-utils" "^1.17.0-alpha.49"
+=======
+"@hoprnet/hopr-ethereum@^1.17.0-alpha.50":
+  version "1.17.0-alpha.50"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-ethereum/-/hopr-ethereum-1.17.0-alpha.50.tgz#0065fc95bd1de955705f10054aa528f319e74c3c"
+  integrity sha512-oLD4l6XO3KcblwVt5TDzIShCRdLfqJ+iga2NTYXjWi0guKhSOPjhXNuHpItIPE0+JHiO2G7jSYLtYctnh7qFNw==
+  dependencies:
+    "@hoprnet/hopr-demo-seeds" "1.8.0"
+    "@hoprnet/hopr-utils" "^1.17.0-alpha.50"
+>>>>>>> 7c4c6fb17da3b5911e3d5c85d6217c988877c255
     "@openzeppelin/contracts" "^3.0.1"
     "@openzeppelin/test-helpers" "^0.5.5"
     "@truffle/debug-utils" "^4.1.1"
@@ -215,18 +232,32 @@
     ts-node "^8.10.2"
     web3 "^1.2.11"
 
+<<<<<<< HEAD
 "@hoprnet/hopr-testing@^1.17.0-alpha.49":
   version "1.17.0-alpha.49"
   resolved "https://registry.yarnpkg.com/@hoprnet/hopr-testing/-/hopr-testing-1.17.0-alpha.49.tgz#f63331f28785c215830f572eaec09e7520084861"
   integrity sha512-RuMFiUbxkPanOCCJ2MktA7cSFup2BeHqmAupGoCBCwroKUPd1pcPAuzhGdzkBwCswEwT6dS0MR9v6EQiFAA2hQ==
+=======
+"@hoprnet/hopr-testing@^1.17.0-alpha.50":
+  version "1.17.0-alpha.50"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-testing/-/hopr-testing-1.17.0-alpha.50.tgz#a6815d16fafb6fbfe40147a7cfb98eea20cb5ca9"
+  integrity sha512-wMx+oKAJM8I3wnXMCBU1SyClfgMa09XWW70xlxeHFuagZndfRSzU15Gj8RsCehgsWTa6oLexQp17fU7SsYsh/g==
+>>>>>>> 7c4c6fb17da3b5911e3d5c85d6217c988877c255
   dependencies:
     "@hoprnet/hopr-demo-seeds" "1.8.0"
     ganache-core "^2.12.0-beta.0"
 
+<<<<<<< HEAD
 "@hoprnet/hopr-utils@^1.17.0-alpha.49":
   version "1.17.0-alpha.49"
   resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.17.0-alpha.49.tgz#57f3fee01d743b8e5c00472c6eaeac74b5cc5706"
   integrity sha512-7P+gLWAXTUxUmPa7YEulX+cJxyV22HqOBUzdtlcboGbrhtiQgckINJmz6adHlZyxuaD7lYKq6CUVirD1xltUEA==
+=======
+"@hoprnet/hopr-utils@^1.17.0-alpha.50":
+  version "1.17.0-alpha.50"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.17.0-alpha.50.tgz#96e516a2c8ca37aaa341bce52439c80380911c6a"
+  integrity sha512-N4ktP32s+BjLAg+aXQER757YllDhd75h5LSLiYxk6pdeF64KasajVjnfsnr93bkP7pC9o7Ghdgsc08+HqsuzbA==
+>>>>>>> 7c4c6fb17da3b5911e3d5c85d6217c988877c255
   dependencies:
     bignumber.js "^9.0.0"
     libp2p-crypto "^0.17.9"
@@ -1772,9 +1803,15 @@ camelcase@^5.0.0, camelcase@^5.3.1:
   integrity sha512-L28STB170nwWS63UjtlEOE3dldQApaJXZkOI1uMFfzf3rRuPegHaHesyee+YxQ+W6SvRDQV6UrdOdRiR153wJg==
 
 caniuse-lite@^1.0.30000844:
+<<<<<<< HEAD
   version "1.0.30001142"
   resolved "https://registry.yarnpkg.com/caniuse-lite/-/caniuse-lite-1.0.30001142.tgz#a8518fdb5fee03ad95ac9f32a9a1e5999469c250"
   integrity sha512-pDPpn9ankEpBFZXyCv2I4lh1v/ju+bqb78QfKf+w9XgDAFWBwSYPswXqprRdrgQWK0wQnpIbfwRjNHO1HWqvoQ==
+=======
+  version "1.0.30001143"
+  resolved "https://registry.yarnpkg.com/caniuse-lite/-/caniuse-lite-1.0.30001143.tgz#560f2cfb9f313d1d7e52eb8dac0e4e36c8821c0d"
+  integrity sha512-p/PO5YbwmCpBJPxjOiKBvAlUPgF8dExhfEpnsH+ys4N/791WHrYrGg0cyHiAURl5hSbx5vIcjKmQAP6sHDYH3w==
+>>>>>>> 7c4c6fb17da3b5911e3d5c85d6217c988877c255
 
 caseless@~0.12.0:
   version "0.12.0"
