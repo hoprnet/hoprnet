@@ -183,7 +183,7 @@ function HomeContent({
               In your HOPR node, type <strong>includeRecipient</strong> and then “y” so the bot can respond.
             </li>
             <li>
-              Send a message with your tweet to the{' '}
+              Send the URL of your tweet to the{' '}
               <a
                 href="https://docs.hoprnet.org/home/getting-started/saentis-testnet/coverbot"
                 target="_blank"
@@ -199,6 +199,7 @@ function HomeContent({
             </li>
             <li>Wait for a message from CoverBot verifying your tweet.</li>
             <li>You have scored points! Keep your node online to earn more!</li>
+            <li>Every 30s, CoverBot will randomly choose a registered user to relay data and earn more points.</li>
           </ol>
         </section>
 
