@@ -2,13 +2,14 @@ name: Publish Website hopr.swiss
 
 on:
   push:
-    branches: "**"
+    branches: ["**"]
     paths:
-      - "websites/website-hopr-swiss/**"
+      - ".github/workflows/**"
+      - "websites/hopr-swiss/**"
 
 defaults:
   run:
-    working-directory: websites/website-hopr-swiss
+    working-directory: websites/hopr-swiss
 
 jobs:
   website:

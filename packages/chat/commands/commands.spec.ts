@@ -4,7 +4,7 @@ const mod = root.commands
 describe('Commands', () => {
   it('can import commands', () => {
     expect(mod).toBeDefined()
-  }) 
+  })
 
   it('can construct Commands object', () => {
     let mockNode: any = jest.fn()
@@ -32,17 +32,16 @@ describe('Commands', () => {
     expect(mockNode.ping).toHaveBeenCalled()
   })
 
-
   it('commands can save state', async () => {
     let mockNode: any = jest.fn()
     let cmds = new mod.Commands(mockNode)
 
     let ir = await cmds.execute('settings includeRecipient')
     expect(ir).toMatch(/false/)
-    await cmds.execute('includeRecipient true')
+    await cmds.execute('settings includeRecipient true')
     ir = await cmds.execute('settings includeRecipient')
     expect(ir).toMatch(/true/)
-    await cmds.execute('includeRecipient false')
+    await cmds.execute('settings includeRecipient false')
     ir = await cmds.execute('settings includeRecipient')
     expect(ir).toMatch(/false/)
   })
@@ -52,12 +51,12 @@ describe('Commands', () => {
     mockNode.sendMessage = jest.fn()
     let cmds = new mod.Commands(mockNode)
 
-    let aliases = await cmds.execute('settings alias')
+    let aliases = await cmds.execute('alias')
     expect(aliases).toEqual('')
 
     await cmds.execute('alias 16Uiu2HAmQDFS8a4Bj5PGaTqQLME5SZTRNikz9nUPT3G4T6YL9o7V test')
 
-    aliases = await cmds.execute('settings alias')
+    aliases = await cmds.execute('alias')
     expect(aliases).toMatch(/test/)
     await cmds.execute('send test Hello, world')
     expect(mockNode.sendMessage).toHaveBeenCalled()
@@ -78,7 +77,6 @@ describe('Commands', () => {
     let cmds = new mod.Commands(mockNode)
     expect(await cmds.execute('crawl')).toBeFalsy()
     expect(mockNode.network.crawler.crawl).toHaveBeenCalled()
-
   })
 
   it('help', async () => {
@@ -95,16 +93,16 @@ describe('Commands', () => {
   })
   */
 
-  it('myAddress', async() => {
+  it('myAddress', async () => {
     let mockNode: any = jest.fn()
     mockNode.paymentChannels = jest.fn()
     mockNode.paymentChannels.constants = jest.fn()
     mockNode.paymentChannels.utils = jest.fn()
-    mockNode.paymentChannels.utils.pubKeyToAccountId = jest.fn(() => "")
-    mockNode.paymentChannels.constants.CHAIN_NAME = "2CHAINZ"
+    mockNode.paymentChannels.utils.pubKeyToAccountId = jest.fn(() => '')
+    mockNode.paymentChannels.constants.CHAIN_NAME = '2CHAINZ'
     mockNode.peerInfo = jest.fn()
     mockNode.peerInfo.id = jest.fn()
-    mockNode.peerInfo.id.toB58String= jest.fn()
+    mockNode.peerInfo.id.toB58String = jest.fn()
     mockNode.peerInfo.id.pubKey = jest.fn()
     mockNode.peerInfo.id.pubKey.marshal = jest.fn()
 
@@ -121,13 +119,13 @@ describe('Commands', () => {
     expect(await cmds.execute('send unknown-alias Hello, world')).toMatch(/invalid/i)
   })
 
-  it('autocomplete sendmessage', async() => {
+  it('autocomplete sendmessage', async () => {
     let mockNode: any = jest.fn()
     mockNode.sendMessage = jest.fn()
     mockNode.bootstrapServers = []
     mockNode.network = jest.fn()
     mockNode.network.peerStore = jest.fn()
-    mockNode.network.peerStore.peers = [{id: '16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7' }]
+    mockNode.network.peerStore.peers = [{ id: '16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7' }]
 
     let cmds = new mod.Commands(mockNode)
     expect((await cmds.autocomplete('send 16Ui'))[0][0]).toMatch(/send 16U/)
@@ -135,10 +133,10 @@ describe('Commands', () => {
 
     await cmds.execute('alias 16Uiu2HAmQDFS8a4Bj5PGaTqQLME5SZTRNikz9nUPT3G4T6YL9o7V test')
 
-    expect((await cmds.autocomplete('send t'))[0][0]).toBe("send test")
+    expect((await cmds.autocomplete('send t'))[0][0]).toBe('send test')
   })
 
-  it('multisend', async() => {
+  it('multisend', async () => {
     let seq = 0
     let mockNode: any = jest.fn()
     mockNode.sendMessage = jest.fn()
@@ -149,7 +147,7 @@ describe('Commands', () => {
 
     mockReadline.question = jest.fn((question, resolve) => {
       expect(question).toEqual('send >')
-      if (seq == 0){
+      if (seq == 0) {
         resolve('hello')
         seq++
       } else {
@@ -179,6 +177,4 @@ describe('Commands', () => {
     await cmds.execute('withdraw 0x123 native 1')
     expect(mockNode.paymentChannels.withdraw).toHaveBeenCalled()
   })
-
 })
-

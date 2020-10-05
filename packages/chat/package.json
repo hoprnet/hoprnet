@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-chat",
-  "version": "1.17.0-alpha.39",
+  "version": "1.17.0-alpha.50",
   "description": "Interactive chat PoC for HOPR Protocol",
   "main": "lib/index.js",
   "scripts": {
@@ -13,11 +13,12 @@
     "compile": "yarn clean:hopr-chat && ncc build index.ts -o hopr-chat && copyfiles package.json .env.demo start-hopr-chat.bat start-hopr-chat.sh start-hopr-chat.command hopr-chat && yarn util:compile",
     "test": "jest",
     "util:clean:all": "rimraf .alice .bob",
-    "util:create:alice": "mkdirp .alice && copyfiles -a lib/**/**/* .alice && copyfiles .env .alice/",
-    "util:create:bob": "mkdirp .bob && copyfiles -a lib/**/**/* .bob && copyfiles .env .bob/",
+    "util:create:alice": "mkdirp .alice && rimraf .alice/lib && copyfiles -u 1 'lib/**/*' '.alice/lib' && copyfiles .env .alice/",
+    "util:create:bob": "mkdirp .bob && && rimraf .bob/lib && copyfiles -u 1 'lib/**/*' '.bob/lib' && copyfiles .env .bob/",
     "util:compile": "copyfiles node_modules/@hoprnet/hopr-core hopr-chat && move-file hopr-chat/.env.demo hopr-chat/.env",
     "dev": "ts-node index.ts",
     "start": "node lib/index.js",
+    "start:basodino": "ETHEREUM_PROVIDER=wss://xdai.poanetwork.dev/wss HOST_IPV4=0.0.0.0:9091 HOPR_BOOTSTRAP_ADDRESS=_dnsaddr.bootstrap.basodino.develop.hoprnet.org node lib/index.js",
     "start:alice": "yarn util:create:alice && cd .alice && cross-env HOST_IPV4=0.0.0.0:9091 node lib/index.js -p alice 2>log.alice.txt",
     "start:bob": "yarn util:create:bob && cd .bob && cross-env HOST_IPV4=0.0.0.0:9092 node lib/index.js -p bob 2>log.bob.txt",
     "zip:windows": "yarn clean:zip && rimraf ./hopr-chat/start-hopr-chat.command ./hopr-chat/start-hopr-chat.sh && bestzip hopr-chat-nodebin-windows.zip hopr-chat",
@@ -32,9 +33,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@hoprnet/hopr-core": "^1.17.0-alpha.39",
-    "@hoprnet/hopr-core-connector-interface": "^1.17.0-alpha.39",
-    "@hoprnet/hopr-utils": "^1.17.0-alpha.39",
+    "@hoprnet/hopr-core": "^1.17.0-alpha.50",
+    "@hoprnet/hopr-core-connector-interface": "^1.17.0-alpha.50",
+    "@hoprnet/hopr-utils": "^1.17.0-alpha.50",
     "@zeit/ncc": "^0.22.3",
     "bignumber.js": "^9.0.0",
     "bn.js": "~5.1.2",
@@ -86,6 +87,12 @@
     },
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
+  },
+  "prettier": {
+    "tabWidth": 2,
+    "semi": false,
+    "singleQuote": true,
+    "printWidth": 120
   },
   "publishConfig": {
     "access": "public"
