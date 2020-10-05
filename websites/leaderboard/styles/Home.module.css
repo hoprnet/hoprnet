@@ -1,0 +1,117 @@
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2rem 0;
+}
+
+.title {
+  max-width: 25rem;
+  text-align: left;
+  margin: 0 1rem;
+  line-height: 1.15;
+  font-size: 2rem;
+}
+.h1 {
+  display: flex;
+  align-items: center;
+}
+
+.stats {
+  text-align: right;
+  font-size: 2rem;
+}
+.stats h2 {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.intro {
+  font-size: 1.4rem;
+  max-width: 50rem;
+  margin: 4rem auto;
+}
+
+.score {
+  color: green;
+  font-size: 2rem;
+}
+
+.main {
+  display: flex;
+  justify-content: space-between;
+  height: 100%;
+}
+.padBottom {
+  padding-bottom: 2rem;
+}
+
+.main section {
+  font-size: 1.5rem;
+  border: 1px solid #ccc;
+  border-radius: 1rem;
+  padding: 1rem;
+  margin: 0 1rem;
+  overflow: scroll;
+  flex: 1 1;
+  max-height: 75vh;
+}
+.main h2 {
+  text-align: center;
+  margin: 0;
+}
+.main li {
+  padding-bottom: 1rem;
+}
+
+.conerr {
+  text-align: center;
+  color: red;
+}
+
+.connode {
+  display: flex;
+  padding: 0.5rem;
+  align-items: center;
+}
+
+.connode strong {
+  font-size: 1.2rem;
+  overflow: ellipsis;
+  overflow-wrap: anywhere;
+}
+
+.connode span,
+.connode a {
+  padding: 0 0 0 1rem;
+}
+
+.addr {
+  font-size: 1rem;
+}
+
+.footer {
+  width: 100%;
+  height: 100px;
+  border-top: 1px solid #eaeaea;
+  text-align: center;
+  padding: 1rem;
+  margin-top: 3rem;
+}
+
+.address {
+  cursor: pointer;
+  display: block;
+  text-align: center;
+  padding: 1rem;
+  font-size: 1.2rem;
+  overflow-wrap: anywhere;
+}
+
+.address:hover {
+  background-color: #ffffa0;
+}
+
+.address:active {
+  background-color: white;
+}
