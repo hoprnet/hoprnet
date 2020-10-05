@@ -80,7 +80,7 @@ function HomeContent({
           Object.entries(result || {}).map(([address, score]) => ({
             address,
             score,
-          })),
+          }))
         )
       })
   }, [])
@@ -127,7 +127,9 @@ function HomeContent({
           <h2>Instructions</h2>
           <ol>
             <li>
-              Install the latest version of <a href="https://docs.hoprnet.org/home/getting-started/saentis-testnet/quickstart">HOPR Chat</a>, which will spin up a HOPR node.
+              Install the latest version of{' '}
+              <a href="https://docs.hoprnet.org/home/getting-started/saentis-testnet/quickstart">HOPR Chat</a>, which
+              will spin up a HOPR node.
             </li>
             <li>
               Send <strong>{Math.max(parseFloat(env ? env.COVERBOT_XDAI_THRESHOLD : 0), 0.02)} xDAI</strong> to your{' '}
@@ -191,7 +193,9 @@ function HomeContent({
         <section>
           <div className={styles.padBottom}>
             <h2>Leaderboard</h2>
-            <h3 style={{"paddingLeft": "20px"}} >{ connected.length } verified | {score.length} registered | {connectedNodes} connected</h3>
+            <h3 style={{ paddingLeft: '20px' }}>
+              {connected.length} verified | {score.length} registered | {connectedNodes} connected
+            </h3>
             {(score.length == 0 || connected.length == 0) && (
               <p className={styles.conerr}>
                 <em>No nodes connected...</em>
@@ -230,7 +234,7 @@ function HomeContent({
 export async function getServerSideProps() {
   let api = require('./api/stats')
   const props = await api.get()
-  console.log("API", props);
+  console.log('API', props)
   return { props } // NextJS makes this stupidly complicated
 }
 
