@@ -11,17 +11,16 @@ import { default as Footer } from '../components/Footer/Footer'
 import { default as Header } from '../components/Header/Header'
 import BlockscoutLink from '../components/BlockscoutLink'
 
-
 interface FirebaseStatsRecords {
-  address: string;
-  available: string;
-  locked: string;
-  connected: any[],
-  connectedNodes: any[],
-  hoprChannelContract: string;
-  hoprCoverbotAddress: string;
-  env: EnvironmentProps;
-  refreshed: string;
+  address: string
+  available: string
+  locked: string
+  connected: any[]
+  connectedNodes: any[]
+  hoprChannelContract: string
+  hoprCoverbotAddress: string
+  env: EnvironmentProps
+  refreshed: string
 }
 
 interface ScoredNodeProps {
@@ -35,16 +34,16 @@ interface FirebaseScoreRecords {
 }
 
 interface ScoreMap {
-  address: string;
-  score: number;
+  address: string
+  score: number
 }
 
 interface EnvironmentProps {
-  COVERBOT_XDAI_THRESHOLD: number;
-  COVERBOT_VERIFICATION_CYCLE_IN_MS: number;
-  COVERBOT_DEBUG_MODE: boolean;
-  COVERBOT_CHAIN_PROVIDER: string;
-  COVERBOT_DEBUG_HOPR_ADDRESS: string;
+  COVERBOT_XDAI_THRESHOLD: number
+  COVERBOT_VERIFICATION_CYCLE_IN_MS: number
+  COVERBOT_DEBUG_MODE: boolean
+  COVERBOT_CHAIN_PROVIDER: string
+  COVERBOT_DEBUG_HOPR_ADDRESS: string
 }
 
 const ScoredNode: React.FC<ScoredNodeProps> = ({ address, score, connected }: ScoredNodeProps) => {
@@ -144,7 +143,8 @@ function HomeContent({
               will spin up a HOPR node.
             </li>
             <li>
-              Send <strong>{Math.max(parseFloat(env ? `${env.COVERBOT_XDAI_THRESHOLD}` : '0'), 0.02)} xDAI</strong> to your{' '}
+              Send <strong>{Math.max(parseFloat(env ? `${env.COVERBOT_XDAI_THRESHOLD}` : '0'), 0.02)} xDAI</strong> to
+              your{' '}
               <a
                 href="https://docs.hoprnet.org/home/getting-started/saentis-testnet/funding-your-node"
                 target="_blank"
@@ -231,7 +231,7 @@ export async function getServerSideProps() {
   return { props: stats }
 }
 
-const Home:React.FC<FirebaseStatsRecords> = (props) => {
+const Home: React.FC<FirebaseStatsRecords> = (props) => {
   const { data } = useSWR('/api/stats', fetcher, {
     initialData: props || {},
     refreshInterval: 5000,

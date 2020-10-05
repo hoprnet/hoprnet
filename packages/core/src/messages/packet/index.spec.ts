@@ -1,5 +1,5 @@
 describe('placeholder', () => {
-   it('placeholder', () => {})
+  it('placeholder', () => {})
 })
 // import Hopr from '../..'
 // import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'

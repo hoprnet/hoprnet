@@ -80,7 +80,7 @@ function HomeContent({
           Object.entries(result || {}).map(([address, score]) => ({
             address,
             score,
-          }))
+          })),
         )
       })
   }, [])

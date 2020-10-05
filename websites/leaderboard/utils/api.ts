@@ -1,7 +1,7 @@
 import db from './db'
 import { HOPR_ENVIRONMENT } from './env'
 
-export async function getData({ table }:{ table:string }) {
+export async function getData({ table }: { table: string }) {
   try {
     const snapshot = await db.ref(`/${HOPR_ENVIRONMENT}/${table}`).once('value')
     const data = snapshot.val()
