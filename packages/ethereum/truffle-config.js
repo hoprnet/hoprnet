@@ -48,11 +48,6 @@ module.exports = {
     },
   },
 
-  // default mocha options
-  mocha: {
-    timeout: 200e3,
-  },
-
   // configure your compilers
   compilers: {
     solc: {
