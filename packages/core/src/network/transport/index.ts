@@ -187,7 +187,6 @@ class TCP {
       const relayConnection = await this._relay.establishRelayedConnection(ma, relays, options)
 
       return await this._upgrader.upgradeOutbound(relayConnection)
-
     } else {
       const relayConnection = await this._relay.establishRelayedConnection(ma, relays, options)
 

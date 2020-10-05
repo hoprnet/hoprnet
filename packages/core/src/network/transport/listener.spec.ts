@@ -53,7 +53,7 @@ describe('check listening to sockets', function () {
 
     await Promise.all(stunServers.map((s) => new Promise((resolve) => s.close(resolve))))
 
-    await new Promise(resolve => setTimeout(resolve, 200))
+    await new Promise((resolve) => setTimeout(resolve, 200))
     assert(
       msgReceived[0].msgReceived && msgReceived[1].msgReceived,
       `Stun Server must have received messages from both Listener instances.`
