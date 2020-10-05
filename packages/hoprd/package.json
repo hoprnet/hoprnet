@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hoprd",
-  "version": "1.17.0-alpha.43",
+  "version": "1.17.0-alpha.51",
   "main": "index.js",
   "repository": "git@github.com:hoprnet/hopr-admin.git",
   "author": "Peter Braden (HOPR) <peter.braden@hoprnet.org>",
@@ -12,15 +12,16 @@
     "prepublishOnly": "yarn build",
     "lint": "prettier --check .",
     "lint:fix": "prettier --write .",
-    "dev": "yarn install && yarn build && yarn buildAdmin && node lib/index.js --admin"
+    "start": "node lib/index.js --admin",
+    "dev": "yarn install && yarn build && yarn buildAdmin && yarn start"
   },
   "license": "",
   "dependencies": {
-    "@hoprnet/hopr-chat": "^1.17.0-alpha.43",
-    "@hoprnet/hopr-core": "^1.17.0-alpha.43",
-    "@hoprnet/hopr-core-connector-interface": "^1.17.0-alpha.43",
-    "@hoprnet/hopr-server": "^1.17.0-alpha.43",
-    "@hoprnet/hopr-utils": "^1.17.0-alpha.43",
+    "@hoprnet/hopr-chat": "^1.17.0-alpha.51",
+    "@hoprnet/hopr-core": "^1.17.0-alpha.51",
+    "@hoprnet/hopr-core-connector-interface": "^1.17.0-alpha.51",
+    "@hoprnet/hopr-server": "^1.17.0-alpha.51",
+    "@hoprnet/hopr-utils": "^1.17.0-alpha.51",
     "@types/bs58": "^4.0.1",
     "@types/clear": "^0.1.0",
     "bs58": "^4.0.1",

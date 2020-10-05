@@ -15,6 +15,7 @@ import {
 } from '../types'
 import { ChannelStatus } from '../types/channel'
 import { waitForConfirmation, getId, events, pubKeyToAccountId, sign, isPartyA } from '../utils'
+import { ERRORS } from '../constants'
 
 import type HoprEthereum from '..'
 import Channel from './channel'
@@ -38,6 +39,11 @@ class ChannelFactory {
 
   async increaseFunds(counterparty: AccountId, amount: Balance): Promise<void> {
     try {
+      const balance = await this.coreConnector.account.balance
+      if (balance.isZero()) {
+        throw Error(ERRORS.OOF_HOPR)
+      }
+
       await waitForConfirmation(
         (
           await this.coreConnector.signTransaction(
@@ -168,6 +174,7 @@ class ChannelFactory {
     const hashedSecret = await this.coreConnector.hashedSecret.check()
     if (!hashedSecret.initialized) await this.coreConnector.initOnchainValues()
 
+    console.log(`sign`, sign, `channelBalance`, channelBalance)
     if (await this.isOpen(counterpartyPubKey)) {
       const record = await this.coreConnector.db.get(Buffer.from(this.coreConnector.dbKeys.Channel(counterpartyPubKey)))
       signedChannel = new SignedChannel({

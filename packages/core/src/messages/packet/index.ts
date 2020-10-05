@@ -210,18 +210,12 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     )
 
     if (secrets.length > 1) {
-      const channelBalance = node.paymentChannels.types.ChannelBalance.create(undefined, {
-        balance: new BN(10000),
-        balance_a: new BN(5000),
-      })
 
       log(`before creating channel`)
 
       const channel = await node.paymentChannels.channel.create(
         path[0].pubKey.marshal(),
-        (_counterparty: Uint8Array) => node.interactions.payments.onChainKey.interact(path[0]),
-        channelBalance,
-        (_channelBalance: Types.ChannelBalance) => node.interactions.payments.open.interact(path[0], channelBalance)
+        (_counterparty: Uint8Array) => node.interactions.payments.onChainKey.interact(path[0])
       )
 
       const newFee = new node.paymentChannels.types.Balance(100)

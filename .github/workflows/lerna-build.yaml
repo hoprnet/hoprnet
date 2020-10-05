@@ -50,8 +50,10 @@ jobs:
         run: | # TODO: Assert master branch,
           git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Versioning robot"
           node_modules/.bin/lerna version prerelease --preid "alpha" --yes
+          git pull origin master
           git push origin master
           node_modules/.bin/lerna publish from-package --yes
+          sleep 5m # Allow NPM registry to catch uo
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -66,8 +68,10 @@ jobs:
         run: | # TODO: Assert master branch,
           git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Versioning robot"
           node_modules/.bin/lerna version major --yes
+          git pull origin master
           git push origin master
           node_modules/.bin/lerna publish from-package --yes
+          sleep 5m # Allow NPM registry to catch uo
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -82,8 +86,10 @@ jobs:
         run: | # TODO: Assert master branch,
           git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Versioning robot"
           node_modules/.bin/lerna version minor --yes
+          git pull origin master
           git push origin master
           node_modules/.bin/lerna publish from-package --yes
+          sleep 5m # Allow NPM registry to catch uo
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -98,8 +104,10 @@ jobs:
         run: | # TODO: Assert master branch,
           git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Versioning robot"
           node_modules/.bin/lerna version patch --yes
+          git pull origin master
           git push origin master
           node_modules/.bin/lerna publish from-package --yes
+          sleep 5m # Allow NPM registry to catch uo
         env:
           NODE_AUTH_TOKEN:
             ${{ secrets.NPM_TOKEN }}
@@ -132,6 +140,8 @@ jobs:
     needs: [build]
     steps:
       - uses: actions/checkout@v2
+        with:
+          ref: master
       - name: Build Avado
         working-directory: packages/avado
         run: |
@@ -157,6 +167,8 @@ jobs:
     needs: [build]
     steps:
       - uses: actions/checkout@v2
+        with:
+          ref: master
       - name: Setup Google Cloud Credentials
         uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
         with:
@@ -169,6 +181,31 @@ jobs:
       - name: Building Docker image using Google Cloud Build
         working-directory: packages/chat
         run: gcloud builds submit --tag gcr.io/hoprassociation/hopr-chat:${{ github.sha }}
+
+  build_hoprd_docker:
+    name: Build HOPRD Docker
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'pull_request' &&
+      github.event.action == 'closed' &&
+      github.event.pull_request.merged == true
+    needs: [build]
+    steps:
+      - uses: actions/checkout@v2
+      - name: Setup Google Cloud Credentials
+        uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
+        with:
+          version: "290.0.1"
+          service_account_key: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+          export_default_credentials: true
+      - name: Get version from package.json
+        run: echo ::set-env name=RELEASE::$(node -p -e "require('./packages/hoprd/package.json').version")
+      - name: Set Project for Google Cloud HOPR Association
+        working-directory: packages/hoprd
+        run: gcloud config set project ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
+      - name: Building Docker image using Google Cloud Build
+        working-directory: packages/hoprd
+        run: gcloud builds submit --tag gcr.io/hoprassociation/hoprd:${{ env.RELEASE }}
 
   build_chat_binaries:
     name: Build HOPR Chat Binaries
@@ -191,6 +228,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
+        with:
+          ref: master
       - uses: actions/setup-node@v1
         with:
           node-version: 12.9.1
@@ -231,8 +270,8 @@ jobs:
     needs: [build_chat_binaries]
     steps:
       - uses: actions/checkout@v2
-      - name: Update from master
-        run: git pull origin master
+        with:
+          ref: master
       - uses: actions/setup-node@v1
         with:
           node-version: 12.9.1
