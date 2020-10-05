@@ -1,4 +1,4 @@
-# Development workflow.
+# Development workflow
 
 Principles:
 
@@ -22,7 +22,6 @@ Principles:
 
 - They add a label indicating whether the code is a major, minor or patch
   release. The default, if no label is given, is an alpha release.
-
   If you prefer a different release version, use a tag on the pull request to
   specify, `Major version`, `Minor version` or `Patch version`
 
