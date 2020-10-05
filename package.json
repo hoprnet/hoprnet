@@ -6,7 +6,8 @@
     "lerna:link": "lerna link --force-local",
     "lerna:build": "lerna run build",
     "run:chat": "lerna exec --scope @hoprnet/hopr-chat -- yarn start:basodino",
-    "run:hoprd": "lerna exec --scope @hoprnet/hoprd -- yarn start --host 0.0.0.0:9092"
+    "run:hoprd": "lerna exec --scope @hoprnet/hoprd -- yarn start --host 0.0.0.0:9092",
+    "run:chatbot": "lerna exec --scope @hoprnet/chat-bot -- yarn start:basodino"
   },
   "devDependencies": {
     "lerna": "^3.22.1"

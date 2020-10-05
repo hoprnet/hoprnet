@@ -1,7 +1,7 @@
 import Hopr from '@hoprnet/hopr-core'
 import type { HoprOptions } from '@hoprnet/hopr-core'
 import HoprCoreConnector, { Currencies } from '@hoprnet/hopr-core-connector-interface'
-import { getBootstrapAddresses, u8aToHex } from '@hoprnet/hopr-utils'
+import { getBootstrapAddresses, u8aToHex, parseHosts } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import { EventEmitter } from 'events'
 import { encode, decode } from 'rlp'
@@ -45,6 +45,7 @@ export default class Core {
 
   constructor(
     options: HoprOptions = {
+      hosts: parseHosts(),
       provider: process.env.HOPR_CHATBOT_PROVIDER || 'wss://xdai.poanetwork.dev/wss',
       network: process.env.HOPR_CHATBOT_NETWORK || 'ETHEREUM',
       debug: Boolean(process.env.HOPR_CHABOT_DEBUG) || false,
