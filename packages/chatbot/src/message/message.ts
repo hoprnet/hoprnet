@@ -39,8 +39,9 @@ export class Message extends Uint8Array {
 
   static fromJson(message: IMessage): Message {
     const from = textEncoder.encode(message.from)
+    const colon = textEncoder.encode(':')
     const text = textEncoder.encode(message.text)
 
-    return new Message(u8aConcat(from, text))
+    return new Message(u8aConcat(from, colon, text))
   }
 }
