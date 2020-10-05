@@ -1,108 +1,111 @@
-import myHandshake from './handshake'
-import pushable from 'it-pushable'
-import pipe from 'it-pipe'
-import upgradeToWebRtc from './webrtc'
-import { randomBytes } from 'crypto'
-import assert from 'assert'
-import { u8aEquals } from '@hoprnet/hopr-utils'
-import toIterable = require('stream-to-it')
-import Pair = require('it-pair')
-import {once} from 'events'
+// describe('placeholder', () => {
+//   it('placeholder', () => {})
+// })
+// import myHandshake from './handshake'
 
-describe('test webRTC upgrade with custom handshake', function () {
-  it('should use the extended stream and use it to feed WebRTC', async function () {
-    const AliceBob = Pair()
-    const BobAlice = Pair()
+// import pushable from 'it-pushable'
+// import pipe from 'it-pipe'
 
-    const webRTCsendAlice = pushable<Uint8Array>()
-    const webRTCrecvAlice = pushable<Uint8Array>()
+// import upgradeToWebRtc from './webrtc'
+// import { randomBytes } from 'crypto'
 
-    const webRTCsendBob = pushable<Uint8Array>()
-    const webRTCrecvBob = pushable<Uint8Array>()
+// import assert from 'assert'
 
-    const streamAlice = myHandshake(webRTCsendAlice, webRTCrecvAlice)
-    const streamBob = myHandshake(webRTCsendBob, webRTCrecvBob)
+// import { u8aEquals } from '@hoprnet/hopr-utils'
 
-    pipe(
-      // prettier-ignore
-      BobAlice.source,
-      streamAlice.webRtcStream.source
-    )
+// import toIterable = require('stream-to-it')
 
-    pipe(
-      // prettier-ignore
-      streamBob.webRtcStream.sink,
-      BobAlice.sink
-    )
+// import Pair = require('it-pair')
 
-    pipe(
-      // prettier-ignore
-      AliceBob.source,
-      streamBob.webRtcStream.source
-    )
+// describe('test webRTC upgrade with custom handshake', function () {
+//   it('should use the extended stream and use it to feed WebRTC', async function () {
+//     const AliceBob = Pair()
+//     const BobAlice = Pair()
 
-    pipe(
-      // prettier-ignore
-      streamAlice.webRtcStream.sink,
-      AliceBob.sink
-    )
+//     const webRTCsendAlice = pushable<Uint8Array>()
+//     const webRTCrecvAlice = pushable<Uint8Array>()
 
-    const [preChannelAlice, preChannelBob] = await Promise.all([
-      upgradeToWebRtc(webRTCsendAlice, webRTCrecvAlice, { initiator: true }),
-      upgradeToWebRtc(webRTCsendBob, webRTCrecvBob),
-    ])
+//     const webRTCsendBob = pushable<Uint8Array>()
+//     const webRTCrecvBob = pushable<Uint8Array>()
 
-    const [channelAlice, channelBob] = [preChannelAlice, preChannelBob].map(toIterable.duplex)
+//     const streamAlice = myHandshake(webRTCsendAlice, webRTCrecvAlice)
+//     const streamBob = myHandshake(webRTCsendBob, webRTCrecvBob)
 
-    let messageForBobReceived = false
-    const messageForBob = randomBytes(41)
+//     pipe(
+//       // prettier-ignore
+//       BobAlice.source,
+//       streamAlice.webRtcStream.source
+//     )
 
-    let messageForAliceReceived = false
-    const messageForAlice = randomBytes(23)
+//     pipe(
+//       // prettier-ignore
+//       streamBob.webRtcStream.sink,
+//       BobAlice.sink
+//     )
 
-    const pipeAlicePromise = pipe(
-      // prettier-ignore
-      [messageForBob],
-      channelAlice,
-      async (source: AsyncIterable<Uint8Array>) => {
-        for await (const msg of source) {
-          if (u8aEquals(msg, messageForAlice)) {
-            messageForAliceReceived = true
-          }
-        }
-      }
-    )
+//     pipe(
+//       // prettier-ignore
+//       AliceBob.source,
+//       streamBob.webRtcStream.source
+//     )
 
-    const pipeBobPromise = pipe(
-      // prettier-ignore
-      [messageForAlice],
-      channelBob,
-      async (source: AsyncIterable<Uint8Array>) => {
-        for await (const msg of source) {
-          if (u8aEquals(msg, messageForBob)) {
-            messageForBobReceived = true
-          }
-        }
-      }
-    )
+//     pipe(
+//       // prettier-ignore
+//       streamAlice.webRtcStream.sink,
+//       AliceBob.sink
+//     )
 
-    await Promise.all([pipeAlicePromise, pipeBobPromise])
+//     const [preChannelAlice, preChannelBob] = await Promise.all([
+//       upgradeToWebRtc(webRTCsendAlice, webRTCrecvAlice, { initiator: true }),
+//       upgradeToWebRtc(webRTCsendBob, webRTCrecvBob),
+//     ])
 
-    webRTCsendAlice.end()
-    webRTCsendBob.end()
-    webRTCrecvAlice.end()
-    webRTCrecvBob.end()
+//     const [channelAlice, channelBob] = [preChannelAlice, preChannelBob].map(toIterable.duplex)
 
-    preChannelAlice.destroy()
-    preChannelBob.destroy()
-    await once(preChannelAlice, 'close')
-    await once(preChannelBob, 'close')
+//     let messageForBobReceived = false
+//     const messageForBob = randomBytes(41)
 
-    assert(messageForBobReceived && messageForAliceReceived, `Alice and Bob should have received the right message`)
-  })
-  
-  afterAll(async () => {
-    // Wait for sockets to clear
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-  })
-})
+//     let messageForAliceReceived = false
+//     const messageForAlice = randomBytes(23)
+
+//     const pipeAlicePromise = pipe(
+//       // prettier-ignore
+//       [messageForBob],
+//       channelAlice,
+//       async (source: AsyncIterable<Uint8Array>) => {
+//         for await (const msg of source) {
+//           if (u8aEquals(msg, messageForAlice)) {
+//             messageForAliceReceived = true
+//           }
+//         }
+//       }
+//     )
+
+//     const pipeBobPromise = pipe(
+//       // prettier-ignore
+//       [messageForAlice],
+//       channelBob,
+//       async (source: AsyncIterable<Uint8Array>) => {
+//         for await (const msg of source) {
+//           if (u8aEquals(msg, messageForBob)) {
+//             messageForBobReceived = true
+//           }
+//         }
+//       }
+//     )
+
+//     await Promise.all([pipeAlicePromise, pipeBobPromise])
+
+//     webRTCsendAlice.end()
+//     webRTCsendBob.end()
+//     webRTCrecvAlice.end()
+//     webRTCrecvBob.end()
+
+//     preChannelAlice.destroy()
+//     preChannelBob.destroy()
+
+//     assert(messageForBobReceived && messageForAliceReceived, `Alice and Bob should have received the right message`)
+
+//     await new Promise((resolve) => setTimeout(resolve))
+//   })
+// })
