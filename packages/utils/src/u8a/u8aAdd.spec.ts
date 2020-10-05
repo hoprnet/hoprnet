@@ -26,7 +26,7 @@ describe('test u8a addition', function () {
     assert(u8aEquals(u8aAdd(false, A, B), expected), 'add with overflow')
     assert(u8aEquals(A, new Uint8Array([0, 255])))
   })
-  
+
   it('should add two u8a with modulo in-place', function () {
     let A = new Uint8Array([1])
     let B = new Uint8Array([1])
