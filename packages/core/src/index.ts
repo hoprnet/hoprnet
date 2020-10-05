@@ -497,7 +497,8 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
       } else if (result.status === 'FAILURE') {
         await this.deleteAcknowledgedTicket(index)
       } else if (result.status === 'ERROR') {
-        await this.deleteAcknowledgedTicket(index)
+        // await this.deleteAcknowledgedTicket(index)
+        // @TODO: better handle this
       }
 
       return result

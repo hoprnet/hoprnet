@@ -1,23 +1,41 @@
-import { AbstractCommand, GlobalState, AutoCompleteResult} from './abstractCommand'
-import { checkPeerIdInput, getPeersIdsAsString } from '../utils'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
+import chalk from 'chalk'
+import { AbstractCommand, GlobalState, AutoCompleteResult } from './abstractCommand'
+import { checkPeerIdInput, getPeersIdsAsString, getPaddingLength } from '../utils'
 
 export class Alias extends AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {
     super()
   }
 
-  name() { return 'alias' }
-  help() { return 'alias an address with a more memorable name' }
+  public name() {
+    return 'alias'
+  }
 
-  async execute(query: string, settings: GlobalState): Promise<string | void> {
+  public help() {
+    return 'alias an address with a more memorable name'
+  }
+
+  async execute(query: string, state: GlobalState): Promise<string | void> {
+    if (!query) {
+      const names = Array.from(state.aliases.keys())
+      const peerIds = Array.from(state.aliases.values())
+      const paddingLength = getPaddingLength(names)
+
+      return names
+        .map((name, index) => {
+          return name.padEnd(paddingLength) + chalk.green(peerIds[index].toB58String())
+        })
+        .join('\n')
+    }
+
     const [err, id, name] = this._assertUsage(query, ['PeerId', 'Name'])
     if (err) return err
 
     try {
       let peerId = await checkPeerIdInput(id)
-      settings.aliases.set(name, peerId)
+      state.aliases.set(name, peerId)
     } catch (e) {
       return e
     }
@@ -30,4 +48,3 @@ export class Alias extends AbstractCommand {
     return this._autocompleteByFiltering(query, allIds, line)
   }
 }
-
