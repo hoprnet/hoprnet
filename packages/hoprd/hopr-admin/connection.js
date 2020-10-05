@@ -49,8 +49,7 @@ export class Connection {
 
   connect() {
     console.log('Connecting ...')
-    const protocol = window.location.protocol === 'http' ? 'ws' : 'wss'
-    var client = new WebSocket(protocol + '://' + window.location.host);
+    var client = new WebSocket('ws://' + window.location.host);
     console.log('Web socket created')
 
     client.onopen = () => {

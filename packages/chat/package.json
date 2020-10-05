@@ -18,7 +18,7 @@
     "util:compile": "copyfiles node_modules/@hoprnet/hopr-core hopr-chat && move-file hopr-chat/.env.demo hopr-chat/.env",
     "dev": "ts-node index.ts",
     "start": "node lib/index.js",
-    "start:monterosa": "ETHEREUM_PROVIDER=wss://xdai.poanetwork.dev/wss HOST_IPV4=0.0.0.0:9091 HOPR_BOOTSTRAP_ADDRESS=_dnsaddr.bootstrap.monterosa.develop.hoprnet.org node lib/index.js",
+    "start:basodino": "ETHEREUM_PROVIDER=wss://xdai.poanetwork.dev/wss HOST_IPV4=0.0.0.0:9091 HOPR_BOOTSTRAP_ADDRESS=_dnsaddr.bootstrap.basodino.develop.hoprnet.org node lib/index.js",
     "start:alice": "yarn util:create:alice && cd .alice && cross-env HOST_IPV4=0.0.0.0:9091 node lib/index.js -p alice 2>log.alice.txt",
     "start:bob": "yarn util:create:bob && cd .bob && cross-env HOST_IPV4=0.0.0.0:9092 node lib/index.js -p bob 2>log.bob.txt",
     "zip:windows": "yarn clean:zip && rimraf ./hopr-chat/start-hopr-chat.command ./hopr-chat/start-hopr-chat.sh && bestzip hopr-chat-nodebin-windows.zip hopr-chat",
