@@ -1,36 +1,67 @@
 import Head from 'next/head'
 import styles from '../styles/Home.module.css'
-import Logo from '../components/logo'
 import CopyIcon from '../components/icons/copy'
 import TwitterIcon from '../components/icons/twitter'
 import { useState, useEffect } from 'react'
 import useSWR from 'swr'
 import db from '../utils/db'
+import api from '../utils/api'
 import { HOPR_ENVIRONMENT } from '../utils/env'
+import { default as Footer } from '../components/Footer/Footer'
+import { default as Header } from '../components/Header/Header'
+import BlockscoutLink from '../components/BlockscoutLink'
 
-function BSLink({ id, children }) {
-  return (
-    <a target="_blank" href={'https://blockscout.com/poa/xdai/address/' + id + '/transactions'}>
-      {children}
-    </a>
-  )
+
+interface FirebaseStatsRecords {
+  address: string;
+  available: string;
+  locked: string;
+  connected: any[],
+  connectedNodes: any[],
+  hoprChannelContract: string;
+  hoprCoverbotAddress: string;
+  env: EnvironmentProps;
+  refreshed: string;
 }
 
-function ScoredNode({ address, score, connected }) {
-  var n = connected.find((n) => n.address == address)
+interface ScoredNodeProps {
+  address: string
+  score: number
+  connected: any[]
+}
+
+interface FirebaseScoreRecords {
+  [address: string]: number
+}
+
+interface ScoreMap {
+  address: string;
+  score: number;
+}
+
+interface EnvironmentProps {
+  COVERBOT_XDAI_THRESHOLD: number;
+  COVERBOT_VERIFICATION_CYCLE_IN_MS: number;
+  COVERBOT_DEBUG_MODE: boolean;
+  COVERBOT_CHAIN_PROVIDER: string;
+  COVERBOT_DEBUG_HOPR_ADDRESS: string;
+}
+
+const ScoredNode: React.FC<ScoredNodeProps> = ({ address, score, connected }: ScoredNodeProps) => {
+  const n = connected.find((n) => n.address == address)
   // Find node
   if (n) {
-    var twitterHandle = n.tweetUrl.match(/twitter.com\/([^\/]+)\/.*/i)[1]
+    const twitterHandle = n.tweetUrl.match(/twitter.com\/([^\/]+)\/.*/i)[1]
     return (
       <div className={styles.connode}>
         <span className={styles.score}>{score}</span>
-        <BSLink id={address}>
+        <BlockscoutLink id={address}>
           <strong>@{twitterHandle}</strong>
-        </BSLink>
+        </BlockscoutLink>
         <span className={styles.addr}>
           Node: <abbr title={n.id}>...{n.id.slice(45)}</abbr>
         </span>
-        <a target="_blank" href={n.tweetUrl}>
+        <a rel="noreferrer" target="_blank" href={n.tweetUrl}>
           <TwitterIcon />
         </a>
       </div>
@@ -50,18 +81,18 @@ function ScoredNode({ address, score, connected }) {
 }
 
 function HomeContent({
-  address,
-  available,
-  locked,
-  connected,
-  connectedNodes,
-  hoprChannelContract,
-  hoprCoverbotAddress,
-  env,
-  refreshed,
+  address = '0x000...',
+  available = '',
+  locked = '',
+  connected = [],
+  connectedNodes = [],
+  hoprChannelContract = '0x000...',
+  hoprCoverbotAddress = '0x000...',
+  env = {} as EnvironmentProps,
+  refreshed = new Date().toString(),
 }) {
-  let addressOnClick = () => {
-    let addressClicker = document.createElement('textarea')
+  const addressOnClick = () => {
+    const addressClicker = document.createElement('textarea')
     addressClicker.value = address
     document.body.appendChild(addressClicker)
     addressClicker.select()
@@ -69,19 +100,15 @@ function HomeContent({
     document.body.removeChild(addressClicker)
   }
 
-  const [score, setScore] = useState([])
+  const [score, setScore] = useState<ScoreMap[]>([])
 
   useEffect(() => {
     db.ref(`/${HOPR_ENVIRONMENT}/score`)
       .orderByValue()
       .on('value', (snapshot) => {
-        const result = snapshot.val()
-        setScore(
-          Object.entries(result || {}).map(([address, score]) => ({
-            address,
-            score,
-          })),
-        )
+        const result: FirebaseScoreRecords = snapshot.val() || {}
+        const scoreMap = Object.entries(result || {}).map(([address, score]) => ({ address, score }))
+        setScore(scoreMap)
       })
   }, [])
 
@@ -92,29 +119,14 @@ function HomeContent({
         <script async src="https://platform.twitter.com/widgets.js" charSet="utf-8"></script>
       </Head>
 
-      <header className={styles.header}>
-        <div className={styles.h1}>
-          <Logo />
-          <h1 className={styles.title}>
-            <a href="https://hoprnet.org">HOPR</a> Incentivized Testnet on xDAI
-          </h1>
-        </div>
-
-        <div className={styles.stats}>
-          <div>
-            <strong className="green">{parseFloat(available).toFixed(4)}</strong> xHOPR Available
-          </div>
-          {/* <div>
-            <strong className="blue">{locked}</strong> xHOPR Locked
-          </div> */}
-        </div>
-      </header>
+      <Header {...{ available, locked }} />
 
       <section className={styles.intro}>
         <p>
           Welcome to HOPR Säntis testnet! Follow the instructions below to start earning points. There are HOPR token
-          prizes for the 20 highest scorers, along with 10 random prizes. The testnet will run until October 6th
+          prizes for the 20 highest scorers, along with 10 random prizes. The testnet will run until October 6th.
         </p>
+        <br />
         <p>
           Click <a href="https://docs.hoprnet.org/home/getting-started/saentis-testnet">here</a> for more information
           about the testnet and HOPR. Join our <a href="https://discord.gg/wUSYqpD">Discord</a> for support and
@@ -127,10 +139,12 @@ function HomeContent({
           <h2>Instructions</h2>
           <ol>
             <li>
-              Install the latest version of <a href="https://docs.hoprnet.org/home/getting-started/saentis-testnet/quickstart">HOPR Chat</a>, which will spin up a HOPR node.
+              Install the latest version of{' '}
+              <a href="https://docs.hoprnet.org/home/getting-started/saentis-testnet/quickstart">HOPR Chat</a>, which
+              will spin up a HOPR node.
             </li>
             <li>
-              Send <strong>{Math.max(parseFloat(env ? env.COVERBOT_XDAI_THRESHOLD : 0), 0.02)} xDAI</strong> to your{' '}
+              Send <strong>{Math.max(parseFloat(env ? `${env.COVERBOT_XDAI_THRESHOLD}` : '0'), 0.02)} xDAI</strong> to your{' '}
               <a
                 href="https://docs.hoprnet.org/home/getting-started/saentis-testnet/funding-your-node"
                 target="_blank"
@@ -166,7 +180,7 @@ function HomeContent({
               </>
             </li>
             <li>
-              In your HOPR node, type <strong>includeRecipient</strong> and then "y" so the bot can respond.
+              In your HOPR node, type <strong>includeRecipient</strong> and then “y” so the bot can respond.
             </li>
             <li>
               Send the URL of your tweet to the{' '}
@@ -192,7 +206,9 @@ function HomeContent({
         <section>
           <div className={styles.padBottom}>
             <h2>Leaderboard</h2>
-            <h3 style={{"paddingLeft": "20px"}} >{ connected.length } verified | {score.length} registered | {connectedNodes} connected</h3>
+            <h3 style={{ paddingLeft: '20px' }}>
+              {connected.length} verified | {score.length} registered | {connectedNodes} connected
+            </h3>
             {(score.length == 0 || connected.length == 0) && (
               <p className={styles.conerr}>
                 <em>No nodes connected...</em>
@@ -203,38 +219,24 @@ function HomeContent({
         </section>
       </main>
 
-      <footer className={styles.footer}>
-        <div>
-          <div>
-            <BSLink id={hoprChannelContract}>
-              <strong>Channel:</strong>
-              {hoprChannelContract && hoprChannelContract.slice(0, 8)}...
-            </BSLink>
-          </div>
-          <div>
-            <BSLink id={hoprCoverbotAddress}>
-              <strong>Coverbot:</strong>
-              {hoprCoverbotAddress && hoprCoverbotAddress.slice(0, 8)}...
-            </BSLink>
-          </div>
-        </div>
-        Thanks for helping us create the <a href="https://hoprnet.org/">HOPR</a> network.
-        <br />
-        <br />
-        Last Updated: {refreshed}
-        <script src="https://panther.hoprnet.org/script.js" site="LCFGMVKB" defer></script>
-      </footer>
+      <Footer {...{ hoprChannelContract, hoprCoverbotAddress, styles, refreshed }} />
     </>
   )
 }
 
+const fetcher = (url: string) => fetch(url).then((res) => res.json())
+
 export async function getServerSideProps() {
-  let api = require('./api/stats')
-  const props = await api.get()
-  console.log("API", props);
-  return { props } // NextJS makes this stupidly complicated
+  const stats = await api.getStats()
+  return { props: stats }
 }
 
-export default function Home(props) {
-  return <HomeContent {...props} />
+const Home:React.FC<FirebaseStatsRecords> = (props) => {
+  const { data } = useSWR('/api/stats', fetcher, {
+    initialData: props || {},
+    refreshInterval: 5000,
+  })
+  return <HomeContent {...data} />
 }
+
+export default Home
