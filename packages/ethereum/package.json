@@ -51,11 +51,9 @@
   "devDependencies": {
     "@hoprnet/hopr-testing": "^1.17.0-alpha.52",
     "@types/chai": "^4.2.11",
-    "@types/mocha": "^8.0.1",
     "@types/node": "~12",
     "@types/secp256k1": "^4.0.1",
     "chai": "^4.2.0",
-    "mocha": "^8.1.0",
     "solhint": "^3.1.0",
     "solidity-coverage": "^0.7.9",
     "truffle-typings": "^1.0.8",
