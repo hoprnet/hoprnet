@@ -4,7 +4,7 @@ Principles:
 
 - Track our bugs / enhancements / milestones in one repository.
 - Have the ability to filter them by:
-  - origin: core / chat / core & chat (we can prefix these labels with "pkg:core")
+  - project: core / chat / ..
   - type: bug / enhancement
   - milestone: if applicable, else it's considered in backlog
   - assigne: if applicable, else it's considered unassigned
