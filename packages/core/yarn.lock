@@ -2978,9 +2978,9 @@ jest-resolve@^26.5.0:
     slash "^3.0.0"
 
 jest-runner@^26.5.0:
-  version "26.5.0"
-  resolved "https://registry.yarnpkg.com/jest-runner/-/jest-runner-26.5.0.tgz#77fa74966716ce46a19cfd03ea5e491da4dfc9aa"
-  integrity sha512-+FSgnB4dIwov+kqDPrbyATZ/zLMb5AGSQ7oi6mtrbcw9a0D2npuAworKTRAtgWo+XFZtpZwdH+HQAB5l3KrjWg==
+  version "26.5.1"
+  resolved "https://registry.yarnpkg.com/jest-runner/-/jest-runner-26.5.1.tgz#a56c1e1fbed7470ae69ebd5456ba4d4443c8701f"
+  integrity sha512-gFHXehvMZD8qwNzaIl2MDFFI99m4kKk06H2xh2u4IkC+tHYIJjE5J175l9cbL3RuU2slfS2m57KZgcPZfbTavQ==
   dependencies:
     "@jest/console" "^26.5.0"
     "@jest/environment" "^26.5.0"
