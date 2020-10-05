@@ -1,61 +1,61 @@
 // package: channels
 // file: channels.proto
 
-var channels_pb = require('./channels_pb')
-var grpc = require('@improbable-eng/grpc-web').grpc
+var channels_pb = require("./channels_pb");
+var grpc = require("@improbable-eng/grpc-web").grpc;
 
 var Channels = (function () {
   function Channels() {}
-  Channels.serviceName = 'channels.Channels'
-  return Channels
-})()
+  Channels.serviceName = "channels.Channels";
+  return Channels;
+}());
 
 Channels.GetChannels = {
-  methodName: 'GetChannels',
+  methodName: "GetChannels",
   service: Channels,
   requestStream: false,
   responseStream: false,
   requestType: channels_pb.GetChannelsRequest,
-  responseType: channels_pb.GetChannelsResponse,
-}
+  responseType: channels_pb.GetChannelsResponse
+};
 
 Channels.GetChannelData = {
-  methodName: 'GetChannelData',
+  methodName: "GetChannelData",
   service: Channels,
   requestStream: false,
   responseStream: false,
   requestType: channels_pb.GetChannelDataRequest,
-  responseType: channels_pb.GetChannelDataResponse,
-}
+  responseType: channels_pb.GetChannelDataResponse
+};
 
 Channels.OpenChannel = {
-  methodName: 'OpenChannel',
+  methodName: "OpenChannel",
   service: Channels,
   requestStream: false,
   responseStream: false,
   requestType: channels_pb.OpenChannelRequest,
-  responseType: channels_pb.OpenChannelResponse,
-}
+  responseType: channels_pb.OpenChannelResponse
+};
 
 Channels.CloseChannel = {
-  methodName: 'CloseChannel',
+  methodName: "CloseChannel",
   service: Channels,
   requestStream: false,
   responseStream: false,
   requestType: channels_pb.CloseChannelRequest,
-  responseType: channels_pb.CloseChannelResponse,
-}
+  responseType: channels_pb.CloseChannelResponse
+};
 
-exports.Channels = Channels
+exports.Channels = Channels;
 
 function ChannelsClient(serviceHost, options) {
-  this.serviceHost = serviceHost
-  this.options = options || {}
+  this.serviceHost = serviceHost;
+  this.options = options || {};
 }
 
 ChannelsClient.prototype.getChannels = function getChannels(requestMessage, metadata, callback) {
   if (arguments.length === 2) {
-    callback = arguments[1]
+    callback = arguments[1];
   }
   var client = grpc.unary(Channels.GetChannels, {
     request: requestMessage,
@@ -66,27 +66,27 @@ ChannelsClient.prototype.getChannels = function getChannels(requestMessage, meta
     onEnd: function (response) {
       if (callback) {
         if (response.status !== grpc.Code.OK) {
-          var err = new Error(response.statusMessage)
-          err.code = response.status
-          err.metadata = response.trailers
-          callback(err, null)
+          var err = new Error(response.statusMessage);
+          err.code = response.status;
+          err.metadata = response.trailers;
+          callback(err, null);
         } else {
-          callback(null, response.message)
+          callback(null, response.message);
         }
       }
-    },
-  })
+    }
+  });
   return {
     cancel: function () {
-      callback = null
-      client.close()
-    },
-  }
-}
+      callback = null;
+      client.close();
+    }
+  };
+};
 
 ChannelsClient.prototype.getChannelData = function getChannelData(requestMessage, metadata, callback) {
   if (arguments.length === 2) {
-    callback = arguments[1]
+    callback = arguments[1];
   }
   var client = grpc.unary(Channels.GetChannelData, {
     request: requestMessage,
@@ -97,27 +97,27 @@ ChannelsClient.prototype.getChannelData = function getChannelData(requestMessage
     onEnd: function (response) {
       if (callback) {
         if (response.status !== grpc.Code.OK) {
-          var err = new Error(response.statusMessage)
-          err.code = response.status
-          err.metadata = response.trailers
-          callback(err, null)
+          var err = new Error(response.statusMessage);
+          err.code = response.status;
+          err.metadata = response.trailers;
+          callback(err, null);
         } else {
-          callback(null, response.message)
+          callback(null, response.message);
         }
       }
-    },
-  })
+    }
+  });
   return {
     cancel: function () {
-      callback = null
-      client.close()
-    },
-  }
-}
+      callback = null;
+      client.close();
+    }
+  };
+};
 
 ChannelsClient.prototype.openChannel = function openChannel(requestMessage, metadata, callback) {
   if (arguments.length === 2) {
-    callback = arguments[1]
+    callback = arguments[1];
   }
   var client = grpc.unary(Channels.OpenChannel, {
     request: requestMessage,
@@ -128,27 +128,27 @@ ChannelsClient.prototype.openChannel = function openChannel(requestMessage, meta
     onEnd: function (response) {
       if (callback) {
         if (response.status !== grpc.Code.OK) {
-          var err = new Error(response.statusMessage)
-          err.code = response.status
-          err.metadata = response.trailers
-          callback(err, null)
+          var err = new Error(response.statusMessage);
+          err.code = response.status;
+          err.metadata = response.trailers;
+          callback(err, null);
         } else {
-          callback(null, response.message)
+          callback(null, response.message);
         }
       }
-    },
-  })
+    }
+  });
   return {
     cancel: function () {
-      callback = null
-      client.close()
-    },
-  }
-}
+      callback = null;
+      client.close();
+    }
+  };
+};
 
 ChannelsClient.prototype.closeChannel = function closeChannel(requestMessage, metadata, callback) {
   if (arguments.length === 2) {
-    callback = arguments[1]
+    callback = arguments[1];
   }
   var client = grpc.unary(Channels.CloseChannel, {
     request: requestMessage,
@@ -159,22 +159,23 @@ ChannelsClient.prototype.closeChannel = function closeChannel(requestMessage, me
     onEnd: function (response) {
       if (callback) {
         if (response.status !== grpc.Code.OK) {
-          var err = new Error(response.statusMessage)
-          err.code = response.status
-          err.metadata = response.trailers
-          callback(err, null)
+          var err = new Error(response.statusMessage);
+          err.code = response.status;
+          err.metadata = response.trailers;
+          callback(err, null);
         } else {
-          callback(null, response.message)
+          callback(null, response.message);
         }
       }
-    },
-  })
+    }
+  });
   return {
     cancel: function () {
-      callback = null
-      client.close()
-    },
-  }
-}
+      callback = null;
+      client.close();
+    }
+  };
+};
 
-exports.ChannelsClient = ChannelsClient
+exports.ChannelsClient = ChannelsClient;
+

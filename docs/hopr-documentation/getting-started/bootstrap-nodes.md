@@ -28,19 +28,15 @@ Our **Testnet Bootstrap Nodes** are fixed and deployed via our [GitHub DevOps re
 
 {% tabs %}
 {% tab title="ch-t-01" %}
-
 ```text
 /dns4/ch-test-01.hoprnet.io/tcp/9091/p2p/16Uiu2HAmMUwDHzmFJaATzQPUFgzry5oxvSgWF2Vc553HCpekC4qU
 ```
-
 {% endtab %}
 
 {% tab title="ch-t-02" %}
-
 ```text
 /dns4/ch-test-02.hoprnet.io/tcp/9091/p2p/16Uiu2HAmVFVHwJs7EqeRUtY6EZTtv379CiwvJgdsDfmdywbKfgAq
 ```
-
 {% endtab %}
 {% endtabs %}
 
@@ -48,19 +44,15 @@ These nodes are behind HOPR Services AG DNS registry. In case you want to direct
 
 {% tabs %}
 {% tab title="ch-t-01 \(no-dns\)" %}
-
 ```text
 /ip4/34.65.36.154/tcp/9091/p2p/16Uiu2HAmMUwDHzmFJaATzQPUFgzry5oxvSgWF2Vc553HCpekC4qU
 ```
-
 {% endtab %}
 
 {% tab title="ch-t-02 \(no-dns\)" %}
-
 ```
 /ip4/34.65.198.231/tcp/9091/p2p/16Uiu2HAmVFVHwJs7EqeRUtY6EZTtv379CiwvJgdsDfmdywbKfgAq
 ```
-
 {% endtab %}
 {% endtabs %}
 
@@ -71,3 +63,10 @@ These nodes are behind HOPR Services AG DNS registry. In case you want to direct
 **Status**: ⚠️ Alpha
 
 Our **Develop Bootstrap Nodes** are constantly changing and deployed via our [GitHub DevOps repository](https://github.com/hoprnet/hopr-devops). These are currently being considered _alpha_ technology and are replaced multiple times over the week. To use or test them, please check our [Builds Page](https://github.com/hoprnet/hopr-devops/actions?query=workflow%3ATerraform).
+
+
+
+
+
+
+

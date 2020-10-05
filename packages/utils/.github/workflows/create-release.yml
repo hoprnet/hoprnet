@@ -6,7 +6,7 @@ on:
 
 jobs:
   release:
-    name: Release github version
+    name: Release github version 
     runs-on: ubuntu-latest
 
     steps:

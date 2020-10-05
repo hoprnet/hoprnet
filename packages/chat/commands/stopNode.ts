@@ -10,12 +10,8 @@ export default class StopNode extends AbstractCommand {
     super()
   }
 
-  name() {
-    return 'quit'
-  }
-  help() {
-    return 'stops the node and terminates the process'
-  }
+  name() { return 'quit' }
+  help() { return 'stops the node and terminates the process'}
   /**
    * Stops the node and kills the process in case it does not quit by itself.
    */

@@ -14,6 +14,7 @@
   </p>
 </p>
 
+
 ## Instructions
 
 ### Developing with this repository
@@ -45,9 +46,7 @@ yarn run:chat          # Runs hopr chat in terminal
 - **Assets**: Press and brand materials for HOPR & Association
 
 <!-- CONTACT -->
-
 ## Contact
-
 - Twitter - https://twitter.com/hoprnet
 - Telegram - https://t.me/hoprnet
 - Medium - https://medium.com/hoprnet

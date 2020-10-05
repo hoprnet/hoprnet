@@ -14,12 +14,8 @@ export class MultiSendMessage extends SendMessageBase {
     super(node)
   }
 
-  name() {
-    return 'multisend'
-  }
-  help() {
-    return 'sends multiple messages to another party, "quit" exits.'
-  }
+  name() { return 'multisend' }
+  help() { return 'sends multiple messages to another party, "quit" exits.'}
 
   private async checkArgs(query: string, settings: GlobalState): Promise<PeerId> {
     const [err, id] = this._assertUsage(query, ['PeerId'])
@@ -27,11 +23,11 @@ export class MultiSendMessage extends SendMessageBase {
     return await this._checkPeerId(id, settings)
   }
 
-  private async repl(recipient: PeerId, settings: GlobalState): Promise<void> {
+  private async repl(recipient: PeerId, settings: GlobalState): Promise<void>{
     readline.clearLine(process.stdout, 0)
-    const message = await new Promise<string>((resolve) => this.rl.question('send >', resolve))
+    const message = await new Promise<string>(resolve => this.rl.question('send >', resolve))
     if (message === 'quit') {
-      return
+      return;
     } else {
       if (message) {
         clearString(message, this.rl)
@@ -40,12 +36,12 @@ export class MultiSendMessage extends SendMessageBase {
         await this._sendMessage(settings, recipient, message)
         this.rl.resume()
       }
-      await this.repl(recipient, settings)
+      await this.repl(recipient, settings);
     }
   }
 
   async execute(query: string, settings: GlobalState): Promise<CommandResponse> {
-    let peerId: PeerId
+    let peerId: PeerId;
 
     try {
       peerId = await this.checkArgs(query, settings)
@@ -61,4 +57,5 @@ export class MultiSendMessage extends SendMessageBase {
     }).concat(Array.from(state.aliases.keys()))
     return this._autocompleteByFiltering(query, allIds, line)
   }
+
 }

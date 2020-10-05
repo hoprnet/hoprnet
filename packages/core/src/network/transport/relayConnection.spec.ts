@@ -169,6 +169,7 @@ describe('test relay connection', function () {
       self: Bob,
       counterparty: Alice,
       webRTC: FakeWebRTCBob as SimplePeer,
+
     })
 
     a.sink(

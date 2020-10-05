@@ -1,34 +1,34 @@
 // package: status
 // file: status.proto
 
-var status_pb = require('./status_pb')
-var grpc = require('@improbable-eng/grpc-web').grpc
+var status_pb = require("./status_pb");
+var grpc = require("@improbable-eng/grpc-web").grpc;
 
 var Status = (function () {
   function Status() {}
-  Status.serviceName = 'status.Status'
-  return Status
-})()
+  Status.serviceName = "status.Status";
+  return Status;
+}());
 
 Status.GetStatus = {
-  methodName: 'GetStatus',
+  methodName: "GetStatus",
   service: Status,
   requestStream: false,
   responseStream: false,
   requestType: status_pb.StatusRequest,
-  responseType: status_pb.StatusResponse,
-}
+  responseType: status_pb.StatusResponse
+};
 
-exports.Status = Status
+exports.Status = Status;
 
 function StatusClient(serviceHost, options) {
-  this.serviceHost = serviceHost
-  this.options = options || {}
+  this.serviceHost = serviceHost;
+  this.options = options || {};
 }
 
 StatusClient.prototype.getStatus = function getStatus(requestMessage, metadata, callback) {
   if (arguments.length === 2) {
-    callback = arguments[1]
+    callback = arguments[1];
   }
   var client = grpc.unary(Status.GetStatus, {
     request: requestMessage,
@@ -39,22 +39,23 @@ StatusClient.prototype.getStatus = function getStatus(requestMessage, metadata, 
     onEnd: function (response) {
       if (callback) {
         if (response.status !== grpc.Code.OK) {
-          var err = new Error(response.statusMessage)
-          err.code = response.status
-          err.metadata = response.trailers
-          callback(err, null)
+          var err = new Error(response.statusMessage);
+          err.code = response.status;
+          err.metadata = response.trailers;
+          callback(err, null);
         } else {
-          callback(null, response.message)
+          callback(null, response.message);
         }
       }
-    },
-  })
+    }
+  });
   return {
     cancel: function () {
-      callback = null
-      client.close()
-    },
-  }
-}
+      callback = null;
+      client.close();
+    }
+  };
+};
 
-exports.StatusClient = StatusClient
+exports.StatusClient = StatusClient;
+
