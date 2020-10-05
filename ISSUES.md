@@ -5,7 +5,7 @@ Principles:
 - Track our bugs / enhancements / milestones in one repository.
 - Have the ability to filter them by:
   - project: core / chat / ..
-  - type: bug / enhancement
+  - label: bug / enhancement
   - milestone: if applicable, else it's considered in backlog
   - assigne: if applicable, else it's considered unassigned
 
