@@ -48,7 +48,12 @@ const AboutUs = props => {
             <br />
             <br />
             Learn more about the team that buidls the HOPR network{' '}
-            <a href="https://hopr.swiss/who-is-HOPR#team" target="_blank" rel="noopener noreferrer" className="underline">
+            <a
+              href="https://hopr.swiss/who-is-HOPR#team"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline"
+            >
               here
             </a>
             .

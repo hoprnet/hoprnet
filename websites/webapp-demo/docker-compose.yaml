@@ -1,4 +1,4 @@
-version: "3"
+version: '3'
 
 services:
   server:
@@ -28,8 +28,8 @@ services:
     build:
       context: ./envoy
     ports:
-      - "8080:8080"
-      - "8001:8001"
+      - '8080:8080'
+      - '8001:8001'
     environment:
       - SERVICE_ADDRESS=server
     networks:

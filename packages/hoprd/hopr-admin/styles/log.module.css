@@ -5,8 +5,8 @@
   color: #000050; /* Dark Blue */
   padding: 1rem;
   margin: 0;
-  position: fixed; 
-  top: 4rem; 
+  position: fixed;
+  top: 4rem;
   bottom: 5rem;
   left: 2rem;
   right: 2rem;
@@ -26,7 +26,7 @@
   font-size: 0.7rem;
   display: block;
   opacity: 0.3;
-  text-align:right;
+  text-align: right;
   order: 2;
   flex: 0;
 }

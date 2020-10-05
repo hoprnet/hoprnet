@@ -1,1 +1,1 @@
-export const pseudoRandomId = () => String(Math.random() * 1e18);
+export const pseudoRandomId = () => String(Math.random() * 1e18)

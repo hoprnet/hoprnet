@@ -8,13 +8,15 @@ import { isBootstrapNode } from '../utils'
 import { AbstractCommand } from './abstractCommand'
 
 export default class Crawl extends AbstractCommand {
-  constructor(public node: Hopr<HoprCoreConnector>) {super()}
+  constructor(public node: Hopr<HoprCoreConnector>) {
+    super()
+  }
 
   name() {
     return 'crawl'
   }
 
-  help(){
+  help() {
     return 'crawls the network and tries to find other nodes'
   }
 

@@ -6,7 +6,6 @@ HOPR is a privacy-preserving messaging protocol that incentivizes users to parti
 
 Contains the source code of the whitepaper of [hoprnet.io](https://hoprnet.io).
 
---- 
+---
 
 [**Download compiled whitepaper**](./HOPR___a_Decentralized_and_Metadata_Private_Messaging_Protocol_with_Incentives.pdf)
-

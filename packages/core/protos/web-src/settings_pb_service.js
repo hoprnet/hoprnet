@@ -1,34 +1,34 @@
 // package: ping
 // file: settings.proto
 
-var settings_pb = require("./settings_pb");
-var grpc = require("@improbable-eng/grpc-web").grpc;
+var settings_pb = require('./settings_pb')
+var grpc = require('@improbable-eng/grpc-web').grpc
 
 var Settings = (function () {
   function Settings() {}
-  Settings.serviceName = "ping.Settings";
-  return Settings;
-}());
+  Settings.serviceName = 'ping.Settings'
+  return Settings
+})()
 
 Settings.UpdateSettings = {
-  methodName: "UpdateSettings",
+  methodName: 'UpdateSettings',
   service: Settings,
   requestStream: false,
   responseStream: false,
   requestType: settings_pb.UpdateSettingsRequest,
-  responseType: settings_pb.UpdateSettingsResponse
-};
+  responseType: settings_pb.UpdateSettingsResponse,
+}
 
-exports.Settings = Settings;
+exports.Settings = Settings
 
 function SettingsClient(serviceHost, options) {
-  this.serviceHost = serviceHost;
-  this.options = options || {};
+  this.serviceHost = serviceHost
+  this.options = options || {}
 }
 
 SettingsClient.prototype.updateSettings = function updateSettings(requestMessage, metadata, callback) {
   if (arguments.length === 2) {
-    callback = arguments[1];
+    callback = arguments[1]
   }
   var client = grpc.unary(Settings.UpdateSettings, {
     request: requestMessage,
@@ -39,23 +39,22 @@ SettingsClient.prototype.updateSettings = function updateSettings(requestMessage
     onEnd: function (response) {
       if (callback) {
         if (response.status !== grpc.Code.OK) {
-          var err = new Error(response.statusMessage);
-          err.code = response.status;
-          err.metadata = response.trailers;
-          callback(err, null);
+          var err = new Error(response.statusMessage)
+          err.code = response.status
+          err.metadata = response.trailers
+          callback(err, null)
         } else {
-          callback(null, response.message);
+          callback(null, response.message)
         }
       }
-    }
-  });
+    },
+  })
   return {
     cancel: function () {
-      callback = null;
-      client.close();
-    }
-  };
-};
+      callback = null
+      client.close()
+    },
+  }
+}
 
-exports.SettingsClient = SettingsClient;
-
+exports.SettingsClient = SettingsClient

@@ -1,11 +1,11 @@
-import { useState } from "react";
-import styles from "../styles/Header.module.scss";
-import Connect from "./Connect";
-import store from "../utils/store";
+import { useState } from 'react'
+import styles from '../styles/Header.module.scss'
+import Connect from './Connect'
+import store from '../utils/store'
 
 export default function Header() {
-  const [state] = store.useTracked();
-  const [popupOpened, togglePopup] = useState<boolean>(false);
+  const [state] = store.useTracked()
+  const [popupOpened, togglePopup] = useState<boolean>(false)
 
   return (
     <header className={`${styles.container} section`}>
@@ -17,17 +17,14 @@ export default function Header() {
           <Connect onConnect={() => togglePopup(false)} />
         ) : (
           <div className={styles.statusContainer}>
-            <span className={styles.address}>{state.hoprAddress}</span>{" "}
+            <span className={styles.address}>{state.hoprAddress}</span>{' '}
             <span className={styles.status}>{state.connection}</span>
           </div>
         )}
-        <span
-          className={`${styles.cogwheel} clickable`}
-          onClick={() => togglePopup(!popupOpened)}
-        >
+        <span className={`${styles.cogwheel} clickable`} onClick={() => togglePopup(!popupOpened)}>
           ⚙️
         </span>
       </div>
     </header>
-  );
+  )
 }

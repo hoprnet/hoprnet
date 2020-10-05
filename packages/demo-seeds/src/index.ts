@@ -18,7 +18,7 @@ export const NODE_SEEDS = [
   // Ivy
   '0xf116b2a53c5309de9f7daf424dc7bb5251fbc0975671e60be3e05e1abdfe776b',
   // John
-  '0x1148c9aa73c18e1369cbca1ef4ad9e466edb5f883acd57d3a517495adfdf4631'
+  '0x1148c9aa73c18e1369cbca1ef4ad9e466edb5f883acd57d3a517495adfdf4631',
 ]
 
 export const BOOTSTRAP_SEEDS = [
@@ -29,7 +29,7 @@ export const BOOTSTRAP_SEEDS = [
   // Bootstrap 03
   '0x1ed2372318ace9aa752d9c5531e32cf2e0ee11949bbfee54125cd7d4e4550f89',
   // Bootstrap 04
-  '0x790eec16fce16bf624633602f602373f2b3be9ac03a3e652929c4c731fd3894f'
+  '0x790eec16fce16bf624633602f602373f2b3be9ac03a3e652929c4c731fd3894f',
 ]
 
-export default () => ({ NODE_SEEDS, BOOTSTRAP_SEEDS });
+export default () => ({ NODE_SEEDS, BOOTSTRAP_SEEDS })

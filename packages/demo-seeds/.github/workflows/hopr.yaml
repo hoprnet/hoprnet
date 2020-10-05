@@ -87,7 +87,7 @@ jobs:
         run: npm version major
       - name: Commit back to master
         run: git push origin master
-      
+
       - name: Github release
         uses: actions/create-release@v1
         env:
