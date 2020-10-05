@@ -6,7 +6,7 @@ import dns from 'dns'
 type ServerMap = Map<string, PeerInfo>
 
 
-const BOOTSTRAP_ADDRESS = process.env.HOPR_BOOTSTRAP_ADDRESS || '_dnsaddr.bootstrap.monterosa.develop.hoprnet.org'
+const BOOTSTRAP_ADDRESS = process.env.HOPR_BOOTSTRAP_ADDRESS || '_dnsaddr.bootstrap.basodino.develop.hoprnet.org'
 
 /** Load Bootstrap node addresses.
 *   - If a string of comma separated multiaddrs is passed, use this first
