@@ -17,8 +17,6 @@ Our stable Docker registry can be found in [https://hub.docker.com/r/hopr/chat](
 ```text
 docker pull hopr/chat
 ```
+
 {% endtab %}
 {% endtabs %}
-
-
-

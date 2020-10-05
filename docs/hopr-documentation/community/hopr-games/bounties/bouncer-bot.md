@@ -22,7 +22,7 @@ The existing version of **HOPR Node** available in the store is a bit limited, a
 
 ![An example on how to send a message from a HOPR Node in an AVADO/DAppNode](../../../.gitbook/assets/image%20%2819%29.png)
 
-The bot responses will show up in your terminal logs. 
+The bot responses will show up in your terminal logs.
 
 ![](../../../.gitbook/assets/image%20%2820%29.png)
 
@@ -34,22 +34,20 @@ You are ready to go!
 {% endtab %}
 {% endtabs %}
 
-
-
 #### Additional Requirements
 
-* Twitter Account with &gt;25 followers.
-* xDAI wallet \(e.g. Metamask w/xDAI RPC, [https://xdai.io/](https://xdai.io/)\)
+- Twitter Account with &gt;25 followers.
+- xDAI wallet \(e.g. Metamask w/xDAI RPC, [https://xdai.io/](https://xdai.io/)\)
 
 ### Sessions
 
-* 21st of August at 4pm CEST
-* 23rd of August at 12pm CEST
+- 21st of August at 4pm CEST
+- 23rd of August at 12pm CEST
 
 ### Prices
 
-* 1st Session - 150 xDAI pool, 10 xDAI per participant
-* 2nd Session - 150 xDAI pool, 10 xDAI per participant
+- 1st Session - 150 xDAI pool, 10 xDAI per participant
+- 2nd Session - 150 xDAI pool, 10 xDAI per participant
 
 ### Bot Address
 
@@ -83,7 +81,7 @@ Before entering the party, you need to identify yourself. To do so, run the comm
 Make sure you run `includeRecipient` before proceeding! Otherwise, BouncerBot will not be able to reply to you.
 {% endhint %}
 
-You can always see whether you are including your address in **HOPR Chat** by typing `settings`. 
+You can always see whether you are including your address in **HOPR Chat** by typing `settings`.
 
 ![](../../../.gitbook/assets/image%20%2816%29.png)
 
@@ -102,4 +100,3 @@ Now, you can send messages to `bouncerbot` just by typing `send bouncerbot`.
 Time to get into the party! Message `bouncerbot` to try and enter the party. It might take multiple tries before you can get in. Good luck!
 
 ![](https://media.giphy.com/media/xT5LMWSMSsE5lji9LW/giphy.gif)
-

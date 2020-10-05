@@ -16,4 +16,3 @@ To hide who is communicating with whom, sender and receiver need other parties t
 If there is **no incentive** to run a service that provides anonymity, people that use this network need to rely on altruistic parties who offer such a service for the greater good. Such parties certainly exist, but it is naive to count on them existing in large enough numbers to support a widespread and reliable network. This becomes especially problematic for anyone who relies on such a network or who wants to run an application on top of such a network at scale.
 
 It is therefore necessary to encourage participation by compensating the parties who provide anonymity as a service.
-

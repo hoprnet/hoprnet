@@ -15,7 +15,7 @@ Bounties have been part of the blockchain ecosystem for years. In short, bountie
 Although right now the only way to participate in the HOPR Games Bounties is to run **HOPR Chat,** in the future we'll provide additional ways to run a **HOPR Node.**
 {% endhint %}
 
-To get started with **HOPR Chat**, please visit our quick start ****page to download the **HOPR Chat** binary or follow our advanced setup to compile and run **HOPR Chat** yourself.
+To get started with **HOPR Chat**, please visit our quick start \***\*page to download the **HOPR Chat** binary or follow our advanced setup to compile and run **HOPR Chat\*\* yourself.
 
 {% page-ref page="../../getting-started/hopr-chat/quickstart.md" %}
 
@@ -25,8 +25,7 @@ To get started with **HOPR Chat**, please visit our quick start ****page to down
 
 Completing the HOPR Games bounties will always require you the following:
 
-* Run a **HOPR Node** \(either via **HOPR Chat** or else\)
-* Engage with HOPR‘s social media presence
+- Run a **HOPR Node** \(either via **HOPR Chat** or else\)
+- Engage with HOPR‘s social media presence
 
 Not only this will help us avoid Sybil Attacks \(i.e. bots or individuals just trying to solve the Bounties via spam attacks\), but also helps us showcase use-cases for the **HOPR Protocol** across social media.
-
