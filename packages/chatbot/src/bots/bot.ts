@@ -3,7 +3,6 @@ import wait from 'wait-for-stuff'
 import Core from '../lib/hopr/core'
 import debug from 'debug'
 
-
 const log = debug('hopr-chatbot:bot')
 const error = debug('hopr-chatbot:bot:error')
 
@@ -27,11 +26,12 @@ const listen = async (bot: Bot, node: Core) => {
     }
     const response = bot.handleMessage.call(bot, parsedMessage)
     log('- listen:message | Bot Response', response)
-    bot.automaticResponse && node.send({
-      peerId: parsedMessage.from,
-      payload: Message.fromJson({ from: bot.address, text: ` ${response}` }).toU8a(),
-      intermediatePeerIds: [],
-    })
+    bot.automaticResponse &&
+      node.send({
+        peerId: parsedMessage.from,
+        payload: Message.fromJson({ from: bot.address, text: ` ${response}` }).toU8a(),
+        intermediatePeerIds: [],
+      })
   })
 }
 

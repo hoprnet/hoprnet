@@ -22,4 +22,3 @@ export enum ScoreRewards {
   verified = 100,
   relayed = 10,
 }
-  

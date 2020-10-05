@@ -43,11 +43,13 @@ git clone git@github.com:hoprnet/hopr-chat.git
 To contribute to the project, please follow the next steps to learn how to install the source code's dependencies, compile the project from scratch, and run it locally from your computer.
 
 ### Install depedencies
+
 ```
 yarn
 ```
 
 ### Compiling source code
+
 ```
 yarn build
 ```

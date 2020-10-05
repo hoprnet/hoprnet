@@ -65,7 +65,7 @@ class RelayContext {
               throw Error(`Invalid status message. Got <${received.slice(1)}>`)
             }
           }
-          
+
           yield (await msg).value
 
           msgReceived = false

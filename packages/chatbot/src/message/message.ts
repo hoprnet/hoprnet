@@ -2,7 +2,6 @@ import { TextEncoder, TextDecoder } from 'util'
 import { u8aConcat } from '@hoprnet/hopr-utils'
 import debug from 'debug'
 
-
 const log = debug('hopr-chatbot:message')
 const error = debug('hopr-chatbot:message:error')
 

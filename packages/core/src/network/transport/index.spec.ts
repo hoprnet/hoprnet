@@ -341,7 +341,7 @@ describe('should create a socket and connect to it', function () {
       }
     )
 
-    await new Promise(resolve => setTimeout(resolve, 250))
+    await new Promise((resolve) => setTimeout(resolve, 250))
     stream.close()
     assert(msgReceived, `msg must be received`)
     // await Promise.all([

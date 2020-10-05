@@ -10,7 +10,7 @@
   }
 }
 
-@include media( '<medium' ) {
+@include media('<medium') {
   #documentantion {
     .description {
       padding-bottom: 48px;

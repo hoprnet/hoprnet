@@ -1,4 +1,4 @@
-import { Ganache, getNewPort} from '@hoprnet/hopr-testing'
+import { Ganache, getNewPort } from '@hoprnet/hopr-testing'
 import { migrate } from '@hoprnet/hopr-ethereum'
 import { durations } from '@hoprnet/hopr-utils'
 import HoprCore from '.'

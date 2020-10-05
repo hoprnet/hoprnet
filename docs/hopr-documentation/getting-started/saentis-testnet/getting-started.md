@@ -12,12 +12,12 @@ If this is your first time using HOPR Chat, you'll need to install node.js or Do
 
 ### Step 1: Connect to the HOPR Network
 
-To start using the testnet and making your way up the leaderboard, you'll need to register your HOPR node with our bot, which will then be able to track your score and send you xHOPR tokens for relaying data.  
-  
+To start using the testnet and making your way up the leaderboard, you'll need to register your HOPR node with our bot, which will then be able to track your score and send you xHOPR tokens for relaying data.
+
 There are two ways to connect to the testnet:
 
-* With the HOPR Chat app
-* Using a HOPR Node PC or other hardware node
+- With the HOPR Chat app
+- Using a HOPR Node PC or other hardware node
 
 #### Connecting Using HOPR Chat
 
@@ -66,4 +66,3 @@ Otherwise, please proceed to the [**CoverBot**](coverbot.md) section.
 {% hint style="danger" %}
 We're working on allowing withdrawals from your HOPR node, but for now you should consider the xDAI you send to your node irretrievable. We don't recommend sending more than the minimum xDAI to your node. Having more will not affect your score or the rate at which you receive xHOPR.
 {% endhint %}
-

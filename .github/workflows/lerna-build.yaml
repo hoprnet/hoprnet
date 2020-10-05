@@ -1,10 +1,10 @@
 name: HOPR Workflow
 on:
   push:
-    branches: ["**"]
+    branches: ['**']
     paths-ignore:
-      - "docs/**"
-      - "websites/**"
+      - 'docs/**'
+      - 'websites/**'
   pull_request:
     types: [closed]
 
@@ -25,6 +25,15 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
           registry-url: https://registry.npmjs.org/
+      - name: Lint & Fix
+        if: |
+          github.event_name == 'pull_request' &&
+          github.event.action == 'closed' &&
+          github.event.pull_request.merged == true &&
+        run: |
+          git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Linting robot"
+          yarn lint:fix
+          git commit -a "Fix linting"
       - name: Install node modules
         run: |
           yarn policies set-version ${{ matrix.yarn-version }}
@@ -38,7 +47,6 @@ jobs:
       - name: Test
         run: |
           node_modules/.bin/lerna run test --stream
-
       - name: Publish prerelease version
         if: |
           github.event_name == 'pull_request' &&
@@ -172,7 +180,7 @@ jobs:
       - name: Setup Google Cloud Credentials
         uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
         with:
-          version: "290.0.1"
+          version: '290.0.1'
           service_account_key: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
           export_default_credentials: true
       - name: Set Project for Google Cloud HOPR Association
@@ -195,7 +203,7 @@ jobs:
       - name: Setup Google Cloud Credentials
         uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
         with:
-          version: "290.0.1"
+          version: '290.0.1'
           service_account_key: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
           export_default_credentials: true
       - name: Get version from package.json

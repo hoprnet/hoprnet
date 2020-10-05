@@ -31,9 +31,8 @@ process.title = 'hopr'
 
 let node: Hopr<HoprCoreConnector>
 
-
 async function runAsRegularNode() {
-  let commands: Commands;
+  let commands: Commands
 
   let rl = readline.createInterface({
     input: process.stdin,
@@ -41,8 +40,8 @@ async function runAsRegularNode() {
     // See readline for explanation of this signature.
     completer: async (line: string, cb: (err: Error | undefined, hits: [string[], string]) => void) => {
       let results = await commands.autocomplete(line)
-      cb(undefined, results);
-    }
+      cb(undefined, results)
+    },
   })
 
   commands = new Commands(node, rl)
@@ -113,7 +112,9 @@ async function main() {
   console.log(`Core Version: ${chalk.bold(pkg.dependencies['@hoprnet/hopr-core'])}`)
   console.log(`Utils Version: ${chalk.bold(pkg.dependencies['@hoprnet/hopr-utils'])}`)
   console.log(`Connector Version: ${chalk.bold(pkg.dependencies['@hoprnet/hopr-core-connector-interface'])}\n`)
-  console.log(`Bootstrap Servers: ${(chalk.bold((options.bootstrapServers || []).map((x:PeerInfo) => x.id.toB58String())))}\n`)
+  console.log(
+    `Bootstrap Servers: ${chalk.bold((options.bootstrapServers || []).map((x: PeerInfo) => x.id.toB58String()))}\n`
+  )
 
   try {
     node = await Hopr.create(options)

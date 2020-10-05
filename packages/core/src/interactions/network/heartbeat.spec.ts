@@ -79,26 +79,24 @@ describe('check heartbeat mechanism', function () {
     await Promise.all([Alice.stop(), Bob.stop()])
   })
 
-  it(
-    'should trigger a heartbeat timeout',
-    async function () {
-      const [Alice, Bob] = await Promise.all([
-        /* prettier-ignore */
-        generateNode(),
-        generateNode({ timeoutIntentionally: true }),
-      ])
-      await new Promise((resolve) => setTimeout(resolve, 100))
-      await Alice.dial(Bob.peerInfo)
-      let errorThrown = false
-      let before = Date.now()
-      try {
-        await Alice.interactions.network.heartbeat.interact(Bob.peerInfo.id)
-      } catch (err) {
-        errorThrown = true
-      }
+  it('should trigger a heartbeat timeout', async function () {
+    const [Alice, Bob] = await Promise.all([
+      /* prettier-ignore */
+      generateNode(),
+      generateNode({ timeoutIntentionally: true }),
+    ])
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    await Alice.dial(Bob.peerInfo)
+    let errorThrown = false
+    let before = Date.now()
+    try {
+      await Alice.interactions.network.heartbeat.interact(Bob.peerInfo.id)
+    } catch (err) {
+      errorThrown = true
+    }
 
-      assert(errorThrown && Date.now() - before >= HEARTBEAT_TIMEOUT, 'Should reach a timeout')
+    assert(errorThrown && Date.now() - before >= HEARTBEAT_TIMEOUT, 'Should reach a timeout')
 
-      await Promise.all([Alice.stop(), Bob.stop()])
+    await Promise.all([Alice.stop(), Bob.stop()])
   })
 })
