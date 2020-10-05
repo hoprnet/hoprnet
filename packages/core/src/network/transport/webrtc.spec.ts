@@ -100,6 +100,7 @@ describe('test webRTC upgrade with custom handshake', function () {
 
     assert(messageForBobReceived && messageForAliceReceived, `Alice and Bob should have received the right message`)
   })
+  
   afterAll(async () => {
     // Wait for sockets to clear
     await new Promise((resolve) => setTimeout(resolve, 1000))
