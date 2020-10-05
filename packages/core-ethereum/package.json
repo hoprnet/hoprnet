@@ -53,7 +53,6 @@
     "@types/mocha": "^8.0.3",
     "@types/node": "^12.12.8",
     "@types/secp256k1": "^4.0.1",
-    "husky": "^4.2.5",
     "it-pipe": "^1.1.0",
     "levelup": "^4.4.0",
     "memdown": "^5.1.0",
@@ -64,17 +63,6 @@
     "typechain": "^1.0.5",
     "typechain-target-web3-v1": "^1.0.4",
     "typescript": "^3.9"
-  },
-  "husky": {
-    "hooks": {
-      "pre-commit": "yarn lint"
-    }
-  },
-  "prettier": {
-    "tabWidth": 2,
-    "semi": false,
-    "singleQuote": true,
-    "printWidth": 120
   },
   "mocha": {
     "extension": [

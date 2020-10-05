@@ -13,10 +13,6 @@
     "package.json",
     "yarn.lock"
   ],
-  "engines": {
-    "node": ">=12.9.1",
-    "yarn": ">=1.19.2"
-  },
   "scripts": {
     "build": "yarn clean && tsc -p . --noEmit false",
     "clean": "rm -rf ./lib",
@@ -29,19 +25,6 @@
   },
   "devDependencies": {
     "@types/node": "^13.13.4",
-    "husky": "^4.2.5",
-    "prettier": "^2.0.5",
     "typescript": "^3.8.3"
-  },
-  "husky": {
-    "hooks": {
-      "pre-commit": "yarn lint"
-    }
-  },
-  "prettier": {
-    "tabWidth": 2,
-    "semi": false,
-    "singleQuote": true,
-    "printWidth": 120
   }
 }

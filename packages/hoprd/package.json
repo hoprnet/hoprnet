@@ -42,7 +42,6 @@
     "@types/express": "^4.17.7",
     "@types/node": ">=4.2.0 < 13",
     "@types/ws": "^7.2.6",
-    "husky": "^4.2.5",
     "it-pair": "^1.0.0",
     "jest": "^26.1.0",
     "libp2p-tcp": "^0.14.6",
