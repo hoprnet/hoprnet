@@ -6,15 +6,9 @@
   "type": "service",
   "autoupdate": true,
   "image": {
-    "volumes": [
-      "db:/app/db"
-    ],
-    "environment": [
-      "DEBUG=hopr*"
-    ],
-    "ports": [
-      "3000:3000/tcp"
-    ],
+    "volumes": ["db:/app/db"],
+    "environment": ["DEBUG=hopr*"],
+    "ports": ["3000:3000/tcp"],
     "path": "hopr.avado.dnp.dappnode.eth_0.32.0.tar.xz",
     "hash": "/ipfs/QmdBr9WJNUGJts8FvHT5XFxDhs8cmKWoPjRL31q4RUTzXw",
     "size": 289485172,
