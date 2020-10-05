@@ -8,12 +8,11 @@ To get started with HOPR, we'll use **HOPR Chat**, a [REPL](https://en.wikipedia
 
 To use **HOPR Chat**, your workstation or device running it requires one of the following software:
 
-* [Docker](https://www.docker.com/), a containerisation engine able to virtualise any application. 
-* [Nodejs](https://nodejs.org/en/), a JavaScript runtime built on Chrome's V8 JavaScript engine.
+- [Docker](https://www.docker.com/), a containerisation engine able to virtualise any application.
+- [Nodejs](https://nodejs.org/en/), a JavaScript runtime built on Chrome's V8 JavaScript engine.
 
 To learn how to install Docker or Nodejs to test **HOPR Chat** on your operating system, please use the following links:
 
 {% page-ref page="macos-quickstart.md" %}
 
 {% page-ref page="windows-quickstart.md" %}
-

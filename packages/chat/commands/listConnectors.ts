@@ -4,9 +4,12 @@ import chalk from 'chalk'
 import { knownConnectors } from '../utils/knownConnectors'
 
 export default class ListConnectors extends AbstractCommand {
-
-  name() { return 'listConnectors' }
-  help() { return 'lists all installed blockchain connectors' }
+  name() {
+    return 'listConnectors'
+  }
+  help() {
+    return 'lists all installed blockchain connectors'
+  }
   /**
    * Check which connectors are present right now.
    * @notice triggered by the CLI

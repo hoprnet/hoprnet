@@ -11,10 +11,10 @@ description: >-
 
 Messaging should be done in a _secure_ way. It might seem intuitive what _secure_ means, but digging deeper quickly reveals how _secure_ communication is a complex issue:
 
-1. _Secure_ communications should prevent unauthorised parties from learning the content of the message. This security goal is known as **confidentiality**, ****and can be achieved by reasonable encryption schemes like [AES](https://en.wikipedia.org/wiki/Advanced_Encryption_Standard).
+1. _Secure_ communications should prevent unauthorised parties from learning the content of the message. This security goal is known as **confidentiality**, \*\*\*\*and can be achieved by reasonable encryption schemes like [AES](https://en.wikipedia.org/wiki/Advanced_Encryption_Standard).
 2. _Secure_ communications allow sending a message in a way that such message arrives unchanged, or at least that any manipulations to the message are observable by the designated receiver. This property is known as **integrity** and can be achieved by using a suitable scheme that generates message authentication codes like [HMAC](https://en.wikipedia.org/wiki/HMAC).
 
-The combination of both schemes \(i.e. **confidentiality** and **integrity**\) yields a _construction_ that allows a sender to **hide the content of the message** and **make the integrity of the message verifiable**. 
+The combination of both schemes \(i.e. **confidentiality** and **integrity**\) yields a _construction_ that allows a sender to **hide the content of the message** and **make the integrity of the message verifiable**.
 
 However, this _construction_ does not hide the fact that a particular sender \(e.g.`Alice`\) and receiver \(e.g`Bob`\) pair have exchanged messages. Unfortunately, this _construction_ leaks an _upper bound_ that shows how much communication took place. A possible adversary, therefore, might also distinguish short conversations from longer ones. If the adversary were also able to observe actions that follow the reception of messages, they might be able reason about the content of the observed encrypted data -- all without breaking the encryption scheme. This shows that **in some cases confidentiality and integrity are not sufficient, and thus, it is also necessary to protect metadata**.
 
@@ -32,11 +32,11 @@ As a result, it is necessary to encourage participation **by compensating the pr
 
 ### Introducing HOPR
 
-**HOPR** \(pronounced 'hopper'\) is 
+**HOPR** \(pronounced 'hopper'\) is
 
-* a privacy-preserving messaging protocol \(**HOPR Protocol**\),
-* a decentralised network \(**HOPR Network**\),
-* with an economical incentive \(**HOPR Token**\) on top of a blockchain.
+- a privacy-preserving messaging protocol \(**HOPR Protocol**\),
+- a decentralised network \(**HOPR Network**\),
+- with an economical incentive \(**HOPR Token**\) on top of a blockchain.
 
 Software and hardware implementations of the **HOPR Protocol** can function as **HOPR Nodes**, which in turn create the _decentralised network_ known as the **HOPR Network.** Users of the **HOPR Network** can relay messages through multiple “hops” using different **HOPR** **Nodes**. In exchange of running stable **HOPR Nodes**, these _intermediate nodes_ get paid via a blockchain using _payment channels_, in the form of a probability of earning a digital token \(**HOPR Token**\) as an economical incentive for their services.
 
@@ -44,7 +44,7 @@ Messages relayed in the **HOPR Network** use a secure packet format to avoid lea
 
 ## Architecture
 
-The **HOPR Protocol** consists of two main layers: a **message** delivery layer and a **payment** delivery layer. 
+The **HOPR Protocol** consists of two main layers: a **message** delivery layer and a **payment** delivery layer.
 
 ### Message Delivery
 
@@ -53,4 +53,3 @@ Messages transferred using the **HOPR Protocol** are embedded within SPHINX pack
 ### Payment Layer
 
 The payment layer uses off-chain payments via payment channels to settle balances for HOPR Node operators. In order to process transactions, HOPR Node operators need to stake assets, and upon successful data relay, are given a _ticket_ which has a _probability_ of earning HOPR Tokens. These tokens can then be settled upon closing the payment channel, and used within the network as means of payment for requesting services from other HOPR Nodes.
-

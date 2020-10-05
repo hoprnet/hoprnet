@@ -10,7 +10,7 @@
   }
 }
 
-@include media( '<large' ) {
+@include media('<large') {
   #how {
     .container {
       flex-direction: column;
@@ -21,4 +21,3 @@
     }
   }
 }
-  

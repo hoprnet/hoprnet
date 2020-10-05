@@ -12,8 +12,12 @@ export default class Ping extends AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {
     super()
   }
-  name() { return 'ping' }
-  help() { return 'pings another node to check its availability' }
+  name() {
+    return 'ping'
+  }
+  help() {
+    return 'pings another node to check its availability'
+  }
 
   async execute(query?: string): Promise<string> {
     if (query == null) {
@@ -25,7 +29,7 @@ export default class Ping extends AbstractCommand {
       peerId = await checkPeerIdInput(query)
     } catch (err) {
       return chalk.red(err.message)
-    } 
+    }
 
     let out = ''
     if (isBootstrapNode(this.node, peerId)) {

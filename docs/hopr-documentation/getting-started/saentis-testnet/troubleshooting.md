@@ -4,14 +4,14 @@ description: Answers to common queries
 
 # Troubleshooting
 
-The Säntis testnet is still an early version of the HOPR network. One major goal of this testnet is to try and find bugs and problems. As a result, things may not work as expected, and the UI and UX are less polished than they will be at mainnet.  
-  
+The Säntis testnet is still an early version of the HOPR network. One major goal of this testnet is to try and find bugs and problems. As a result, things may not work as expected, and the UI and UX are less polished than they will be at mainnet.
+
 Here are some common issues you might run into, along with suggested solutions.
 
 ### **I can't connect to the CoverBot**
 
-If you can't connect to the CoverBot, you may need to enable port forwarding on **port 9091** in your router.  
-  
+If you can't connect to the CoverBot, you may need to enable port forwarding on **port 9091** in your router.
+
 To access your router, you'll need to find its IP address.
 
 {% tabs %}
@@ -28,8 +28,8 @@ In most Linux distributions, you can click the Network icon, then Connection Inf
 {% endtab %}
 {% endtabs %}
 
-Once you have your router's IP address, enter it into a browser to access your router settings. You will probably need the router admin password, which is usually found on the back.  
-  
+Once you have your router's IP address, enter it into a browser to access your router settings. You will probably need the router admin password, which is usually found on the back.
+
 Router settings vary by model, but you should find port forwarding in the settings menu. Make a new rule with your device's IP address and Port 9091 as both the start and end of the port range.
 
 ### **HOPR Chat won't start**
@@ -44,12 +44,12 @@ If your node is offline for long enough, the bot will remove your address from i
 
 CoverBot looks for three things when it parses your tweet:
 
-* a valid HOPR address
-* the @hoprnet tag
-* the \#HOPRNetwork hashtag
+- a valid HOPR address
+- the @hoprnet tag
+- the \#HOPRNetwork hashtag
 
-Make sure you have all three of those in your tweet correctly. If you don't know your HOPR address, type `myAddress` at the prompt in HOPR Chat or your hardware node.  
-  
+Make sure you have all three of those in your tweet correctly. If you don't know your HOPR address, type `myAddress` at the prompt in HOPR Chat or your hardware node.
+
 Make sure you're sending the full URL, including https:// . Don't send anything else in your message to the bot. Make sure you have includeRecipient turned on.
 
 If you're sure you've done all this correctly, but it's still not working, try making the tweet as short as possible, including nothing except the three pieces of information required.
@@ -57,6 +57,3 @@ If you're sure you've done all this correctly, but it's still not working, try m
 {% hint style="info" %}
 If these solutions don't work, or you have a problem that isn't listed here, please head to our [Discord channel](https://discord.gg/wUSYqpD) where you can get support for a community member or one of the development team.
 {% endhint %}
-
-
-

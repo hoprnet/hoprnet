@@ -24,18 +24,19 @@ Before doing anything else, you need to install [Docker Desktop](https://hub.doc
 {% tab title="Linux" %}
 Depending of your distribution, please follow the official guidelines for how to install and run Docker on your workstation.
 
-* [Installing Docker in Ubuntu](https://docs.docker.com/engine/install/ubuntu/)
-* [Installing Docker in Fedora](https://docs.docker.com/engine/install/fedora/)
-* [Installing Docker in Debian](https://docs.docker.com/engine/install/debian/)
-* [Installing Docker in CentOS](https://docs.docker.com/engine/install/centos/)
-{% endtab %}
+- [Installing Docker in Ubuntu](https://docs.docker.com/engine/install/ubuntu/)
+- [Installing Docker in Fedora](https://docs.docker.com/engine/install/fedora/)
+- [Installing Docker in Debian](https://docs.docker.com/engine/install/debian/)
+- [Installing Docker in CentOS](https://docs.docker.com/engine/install/centos/)
+  {% endtab %}
 
 {% tab title="macOS" %}
+
 1. Visit [Docker Hub ](https://hub.docker.com/editions/community/docker-ce-desktop-mac/)and download Docker Desktop to your computer.
 2. Follow the wizard steps to ensure Docker is installed.
 3. Ensure the installation was successful by running `docker ps` in your terminal.
-{% endtab %}
-{% endtabs %}
+   {% endtab %}
+   {% endtabs %}
 
 #### Downloading HOPR Chat image from Docker Hub
 
@@ -59,15 +60,19 @@ To install nvm, please follow the instructions in their GitHub website, or run a
 
 {% tabs %}
 {% tab title="cURL" %}
+
 ```
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.35.3/install.sh | bash
 ```
+
 {% endtab %}
 
 {% tab title="Wget" %}
+
 ```text
 wget -qO- https://raw.githubusercontent.com/nvm-sh/nvm/v0.35.3/install.sh | bash
 ```
+
 {% endtab %}
 {% endtabs %}
 
@@ -77,7 +82,7 @@ _Please bear in mind you might need to restart your terminal after running these
 
 After you have downloaded and setup nvm in your machine \(run `nvm ls` to ensure everything is in place\), now you need to install a specific version of Nodejs before running **HOPR Chat**.
 
-At the time of writing, **HOPR Chat** runs on Nodejs `>v12`. Specifically, **HOPR Chat** has been developed and tested in `v12.9.1`, so in case you run on any issues with **HOPR Chat,**  try switch to `v12.9.1` to see if those issues disappear.
+At the time of writing, **HOPR Chat** runs on Nodejs `>v12`. Specifically, **HOPR Chat** has been developed and tested in `v12.9.1`, so in case you run on any issues with **HOPR Chat,** try switch to `v12.9.1` to see if those issues disappear.
 
 To install Nodejs with nvm, run the following
 
@@ -90,7 +95,7 @@ If everything was done properly, you can run `node --version` to see your curren
 
 ![](../../.gitbook/assets/node.gif)
 
-## **Running HOPR Chat** 
+## **Running HOPR Chat**
 
 ### **Using Docker**
 
@@ -98,6 +103,7 @@ To run **HOPR Chat** via Docker**,** you need to copy and paste the following co
 
 {% tabs %}
 {% tab title="ch-t-01" %}
+
 ```text
 docker run -v $(pwd)/db:/app/db \
 -e HOST_IPV4=0.0.0.0:9091 \
@@ -105,9 +111,11 @@ docker run -v $(pwd)/db:/app/db \
 -e ETHEREUM_PROVIDER=wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36 \
 -p 9091:9091 -it hopr/chat -p switzerland
 ```
+
 {% endtab %}
 
 {% tab title="ch-t-02" %}
+
 ```text
 docker run -v $(pwd)/db:/app/db \
 -e HOST_IPV4=0.0.0.0:9091 \
@@ -115,6 +123,7 @@ docker run -v $(pwd)/db:/app/db \
 -e ETHEREUM_PROVIDER=wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36 \
 -p 9091:9091 -it hopr/chat -p switzerland
 ```
+
 {% endtab %}
 {% endtabs %}
 
@@ -181,6 +190,3 @@ Congratulations! You have communicated with another node using a privacy-preserv
 For more information about **HOPR Chat,** such as an introduction to Bootstrap Nodes, go to the **HOPR Chat** general page.
 
 {% page-ref page="../hopr-chat/" %}
-
-
-

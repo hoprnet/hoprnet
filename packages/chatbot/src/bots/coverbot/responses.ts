@@ -1,10 +1,10 @@
-import { TweetState } from "../../lib/twitter/twitter"
-import { COVERBOT_XDAI_THRESHOLD } from "../../utils/env"
-import { RELAY_VERIFICATION_CYCLE_IN_MS } from "./constants"
-import { BotCommands, NodeStates, ScoreRewards } from "./state"
+import { TweetState } from '../../lib/twitter/twitter'
+import { COVERBOT_XDAI_THRESHOLD } from '../../utils/env'
+import { RELAY_VERIFICATION_CYCLE_IN_MS } from './constants'
+import { BotCommands, NodeStates, ScoreRewards } from './state'
 
 export const BotResponses = {
-    [BotCommands.rules]: `\n
+  [BotCommands.rules]: `\n
     Welcome to the xHOPR incentivized network!
 
     1. Load ${COVERBOT_XDAI_THRESHOLD} xDAI into your HOPR Ethereum Address
@@ -14,17 +14,17 @@ export const BotResponses = {
 
     Visit https://saentis.hoprnet.org for more information and scoreboard
   `,
-    [BotCommands.status]: (status: NodeStates) => `\n
+  [BotCommands.status]: (status: NodeStates) => `\n
     Your current status is: ${status}
   `,
-    [BotCommands.verify]: `\n
+  [BotCommands.verify]: `\n
     Verifying if your node is still up...
   `,
 }
 
 export const NodeStateResponses = {
-    [NodeStates.newUnverifiedNode]: BotResponses[BotCommands.rules],
-    [NodeStates.tweetVerificationFailed]: (tweetStatus: TweetState) => `\n
+  [NodeStates.newUnverifiedNode]: BotResponses[BotCommands.rules],
+  [NodeStates.tweetVerificationFailed]: (tweetStatus: TweetState) => `\n
       Your tweet has failed the verification. Please make sure you've included everything.
   
       Here is the current status of your tweet:
@@ -34,22 +34,22 @@ export const NodeStateResponses = {
   
       Please try again with a different tweet.
     `,
-    [NodeStates.tweetVerificationSucceeded]: `\n
+  [NodeStates.tweetVerificationSucceeded]: `\n
       Your tweet has passed verification. Please do no delete this tweet, as I'll
       use it multiple times to verify and connect to your node.
   
       I’ll now check that your HOPR Ethereum address has at least ${COVERBOT_XDAI_THRESHOLD} xDAI.
       If you need xDAI, you always swap DAI to xDAI using https://dai-bridge.poa.network/.
     `,
-    [NodeStates.tweetVerificationInProgress]: `\n
+  [NodeStates.tweetVerificationInProgress]: `\n
       Thank you for your Tweet! I‘ll now try to verify it...
     `,
-    [NodeStates.xdaiBalanceFailed]: (xDaiBalance: number) => `\n
+  [NodeStates.xdaiBalanceFailed]: (xDaiBalance: number) => `\n
       Your node does not have at least ${COVERBOT_XDAI_THRESHOLD} xDAI. Currently, your node has ${xDaiBalance} xDAI.
   
       To participate in our incentivized network, please send the missing amount of xDAI to your node.
     `,
-    [NodeStates.xdaiBalanceSucceeded]: (xDaiBalance: number) => `\n
+  [NodeStates.xdaiBalanceSucceeded]: (xDaiBalance: number) => `\n
       Your node has ${xDaiBalance} xDAI. You're ready to go!
   
       Soon I'll open a payment channel to your node.
@@ -60,11 +60,11 @@ export const NodeStateResponses = {
   
       Thank you for participating in our incentivized network!
     `,
-    [NodeStates.onlineNode]: `\n
+  [NodeStates.onlineNode]: `\n
       Node online! Relaying a message to verify your ability to
       send messages to other nodes in the network.
     `,
-    [NodeStates.verifiedNode]: `\n
+  [NodeStates.verifiedNode]: `\n
       Verification successful! I’ll shortly use you as a cover traffic node
       and pay you in xHOPR tokens for your service.
   
@@ -72,7 +72,7 @@ export const NodeStateResponses = {
   
       Thank you for participating in our incentivized network!
     `,
-    [NodeStates.relayingNodeFailed]: `\n
+  [NodeStates.relayingNodeFailed]: `\n
       Relaying failed. I can reach you, but you can’t reach me...
       
       This could mean other errors though, so please keep trying.
@@ -81,13 +81,13 @@ export const NodeStateResponses = {
   
       Visit our Telegram (https://t.me/hoprnet) for any questions.
     `,
-    [NodeStates.relayingNodeInProgress]: `\n
+  [NodeStates.relayingNodeInProgress]: `\n
       Relaying in progress. I've received your message and I'm now
       waiting for a packet I'm trying to relay via your node. Please wait
       until I receive your packet or ${RELAY_VERIFICATION_CYCLE_IN_MS / 1000}seconds
       elapse. Thank you for your patience!
     `,
-    [NodeStates.relayingNodeSucceded]: `\n
+  [NodeStates.relayingNodeSucceded]: `\n
       Relaying successful! I've obtained a packet anonymously from you,
       and we can move to the next verification step.
     `,
