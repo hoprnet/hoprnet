@@ -1,8 +1,12 @@
 import styles from '../styles/logo.module.css'
 
-export default function Logo(props) {
+interface LogoSVGProps {
+  onClick: React.MouseEventHandler<HTMLDivElement>
+}
+
+export default function LogoSVG({ onClick }: LogoSVGProps) {
   return (
-    <div className={styles.logo} onClick={props.onClick}>
+    <div className={styles.logo} onClick={onClick}>
       <svg
         version="1.1"
         xmlns="http://www.w3.org/2000/svg"
@@ -10,7 +14,7 @@ export default function Logo(props) {
         x="0px"
         y="0px"
         viewBox="0 0 196 196"
-        style={{ enableBackground: 'new 0 0 196 196' }}
+        style={{ enableBackground: 'new 0 0 196 196' } as React.CSSProperties}
         xmlSpace="preserve"
       >
         <circle cx="98" cy="98" r="98" fill="#FFFFA0" />
