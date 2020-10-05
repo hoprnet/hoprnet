@@ -17,20 +17,20 @@
 
 ## Instructions
 
-### Using a prebuilt binary
-
-TODO
-
 ### Developing with this repository
 
 ```sh
-yarn                      # Install tooling
-lerna bootstrap           # Installs all dependencies
-lerna link --force-local  # Link local dependencies
-lerna run build           # builds code
+yarn                   # Install tooling
+yarn lerna:bootstrap   # Installs all dependencies
+yarn lerna:link        # Link local dependencies
+yarn lerna:build       # Builds code for running
+```
 
-# Run Hoprd
-yarn run hoprd --admin --grpc
+### Running applications
+
+```sh
+yarn run:hoprd         # Runs hoprd w/admin (:3000)
+yarn run:chat          # Runs hopr chat in terminal
 ```
 
 ## HOPR ecosystem
