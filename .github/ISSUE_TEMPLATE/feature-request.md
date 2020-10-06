@@ -6,8 +6,12 @@ labels: 'feature'
 assignees: ''
 ---
 
-**Describe the use case**
-A clear and concise description of what problem the feature solves.
+<!--- Provide a general summary of the issue in the Title above -->
 
-**The feature**
-Describe the feature you'd like
+## Describe the feature
+
+<!--- Describe the feature you'd like -->
+
+## Describe the use case
+
+<!--- A clear and concise description of what problem the feature solves-->
