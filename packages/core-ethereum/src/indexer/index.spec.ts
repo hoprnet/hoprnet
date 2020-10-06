@@ -67,15 +67,15 @@ describe('test indexer', function () {
       const uncompressedPubKeyA = publicKeyConvert(userA.pubKey, false).slice(1)
       const uncompressedPubKeyB = publicKeyConvert(userB.pubKey, false).slice(1)
 
-      await connector.hoprChannels.methods
-        .init(
-          u8aToHex(uncompressedPubKeyA.slice(0, 32)),
-          u8aToHex(uncompressedPubKeyA.slice(32, 64)),
-          u8aToHex(randomBytes(27))
-        )
-        .send({
-          from: userA.address.toHex(),
-        })
+      // await connector.hoprChannels.methods
+      //   .init(
+      //     u8aToHex(uncompressedPubKeyA.slice(0, 32)),
+      //     u8aToHex(uncompressedPubKeyA.slice(32, 64)),
+      //     u8aToHex(randomBytes(27))
+      //   )
+      //   .send({
+      //     from: userA.address.toHex(),
+      //   })
 
       await connector.hoprChannels.methods
         .init(
