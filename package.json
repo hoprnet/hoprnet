@@ -26,9 +26,7 @@
     "printWidth": 120
   },
   "husky": {
-    "hooks": {
-      "pre-commit": "yarn lint"
-    }
+    "hooks": {}
   },
   "__workspaces": {
     "packages": [
