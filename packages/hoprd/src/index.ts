@@ -72,7 +72,6 @@ const argv = yargs
   })
   .option('password', {
     describe: 'A password to encrypt your keys',
-    default: '',
   })
   .option('run', {
     describe: 'Run a single hopr command, same syntax as in hopr-admin',
@@ -87,6 +86,10 @@ const argv = yargs
     boolean: true,
     describe: 'run as a bootstrap node',
     default: false,
+  })
+  .option('data', {
+    describe: 'manually specify the database directory to use',
+    default: ''
   })
   .wrap(Math.min(120, yargs.terminalWidth())).argv
 
@@ -130,7 +133,14 @@ async function generateNodeOptions(logs: LogStream): Promise<HoprOptions> {
     provider: argv.provider,
     hosts: parseHosts(),
     output: logMessageToNode,
-    password: argv.password || 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0', // TODO!!!
+  }
+
+  if (argv.password){
+    options.password = argv.password as string
+  }
+
+  if (argv.data && argv.data !== '') {
+    options.dbPath = argv.data
   }
 
   //logs.log(JSON.stringify(options))
