@@ -13,6 +13,7 @@ declare module 'libp2p' {
     // @TODO add libp2p types
     emit: (event: string, ...args: any[]) => void
     dial: (addr: Multiaddr | PeerInfo | PeerId, options?: { signal: AbortSignal }) => Promise<Handler>
+    dialer: any // TODO
     dialProtocol: (
       addr: Multiaddr | PeerInfo | PeerId,
       protocol: string,
@@ -24,7 +25,7 @@ declare module 'libp2p' {
     peerRouting: {
       findPeer: (addr: PeerId) => Promise<PeerInfo>
     }
-    handle: (protocol: string[], handler: (struct: { connection: any; stream: any }) => void) => void
+    handle: (protocol: string | string[], handler: (struct: { connection: any; stream: any }) => void) => void
     on: (str: string, handler: (...props: any[]) => void) => void
     start(): Promise<any>
     stop(): Promise<void>
