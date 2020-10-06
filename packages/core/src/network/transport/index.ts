@@ -5,8 +5,7 @@ import mafmt from 'mafmt'
 import errCode from 'err-code'
 import debug from 'debug'
 import { socketToConn } from './socket-to-conn'
-// @ts-ignore
-import libp2p = require('libp2p')
+import libp2p from 'libp2p'
 import Listener from './listener'
 import { USE_WEBRTC, CODE_P2P } from './constants'
 import Multiaddr from 'multiaddr'
@@ -187,7 +186,6 @@ class TCP {
       const relayConnection = await this._relay.establishRelayedConnection(ma, relays, options)
 
       return await this._upgrader.upgradeOutbound(relayConnection)
-
     } else {
       const relayConnection = await this._relay.establishRelayedConnection(ma, relays, options)
 

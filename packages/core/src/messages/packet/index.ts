@@ -210,11 +210,11 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     )
 
     if (secrets.length > 1) {
-
       log(`before creating channel`)
 
       const channel = await node.paymentChannels.channel.create(
-        path[0].pubKey.marshal(),
+        // prettier-ignore
+        path[0].pubKey.marshal(), 
         (_counterparty: Uint8Array) => node.interactions.payments.onChainKey.interact(path[0])
       )
 

@@ -1,17 +1,17 @@
-# Development workflow.
+# Development workflow
 
 Principles:
+
 - Rely on automation as much as possible.
 - Automated tests should prevent bad deployments. Continuous integration,
-    continuous deployment.
-
+  continuous deployment.
 
 ## Goal Workflow
 
 - A team-member, or an external contributor writes code in a feature branch, or
   in their own fork.
 
-- The PR should track master 
+- The PR should track master
 
 - They create a draft pull-request while they work on the code so we can stay
   up to date on progress.
@@ -22,9 +22,8 @@ Principles:
 
 - They add a label indicating whether the code is a major, minor or patch
   release. The default, if no label is given, is an alpha release.
-  
   If you prefer a different release version, use a tag on the pull request to
-    specify, `Major version`, `Minor version` or `Patch version`
+  specify, `Major version`, `Minor version` or `Patch version`
 
 - Ideally a team member reviews the code, and indicates approval. For external
   contributors, this is mandatory.
@@ -37,5 +36,3 @@ Principles:
   change to master/develop.
 
 - A tag is pushed with that code.
-
-

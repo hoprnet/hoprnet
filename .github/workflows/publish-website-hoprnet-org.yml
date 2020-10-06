@@ -2,10 +2,10 @@ name: Publish Website hoprnet.org
 
 on:
   push:
-    branches: ["**"]
+    branches: ['**']
     paths:
-      - ".github/workflows/**"
-      - "websites/hoprnet-org/**"
+      - '.github/workflows/*-hoprnet-org.yml'
+      - 'websites/hoprnet-org/**'
 
 # currently, the vercel project is looking into the root folder
 # defaults:
@@ -37,4 +37,4 @@ jobs:
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
           scope: ${{ secrets.VERCEL_ORG_ID }}
           github-comment: false
-          vercel-args: "--prod"
+          vercel-args: '--prod'

@@ -1,6 +1,5 @@
-// @ts-ignore
-import libp2p = require('libp2p')
-// @ts-ignore
+/// <reference path="./@types/libp2p.d.ts" />
+import LibP2P from 'libp2p' // @ts-ignore
 import MPLEX = require('libp2p-mplex')
 // @ts-ignore
 import KadDHT = require('libp2p-kad-dht')
@@ -67,7 +66,7 @@ export type HoprOptions = {
 
 const MAX_ITERATIONS_PATH_SELECTION = 2000
 
-export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
+class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
   public interactions: Interactions<Chain>
   public network: Network<Chain>
   public dbKeys = DbKeys
@@ -78,29 +77,6 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
 
   // Allows us to construct HOPR with falsy options
   public _debug: boolean
-
-  // @TODO add libp2p types
-  declare emit: (event: string, ...args: any[]) => void
-  declare dial: (addr: Multiaddr | PeerInfo | PeerId, options?: { signal: AbortSignal }) => Promise<Handler>
-  declare dialProtocol: (
-    addr: Multiaddr | PeerInfo | PeerId,
-    protocol: string,
-    options?: { signal: AbortSignal }
-  ) => Promise<Handler>
-  declare hangUp: (addr: PeerInfo | PeerId | Multiaddr | string) => Promise<void>
-  declare peerInfo: PeerInfo
-  declare peerStore: {
-    has(peerInfo: PeerId): boolean
-    get(peerId: PeerId): PeerInfo | undefined
-    put(peerInfo: PeerInfo, options?: { silent: boolean }): PeerInfo
-    peers: Map<string, PeerInfo>
-    remove(peer: PeerId): void
-  }
-  declare peerRouting: {
-    findPeer: (addr: PeerId) => Promise<PeerInfo>
-  }
-  declare handle: (protocol: string[], handler: (struct: { connection: any; stream: any }) => void) => void
-  declare on: (str: string, handler: (...props: any[]) => void) => void
 
   /**
    * @constructor
@@ -510,3 +486,5 @@ export default class Hopr<Chain extends HoprCoreConnector> extends libp2p {
     }
   }
 }
+
+export { Hopr as default, LibP2P }

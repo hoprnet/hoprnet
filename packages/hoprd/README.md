@@ -2,16 +2,16 @@
 
 Runs a HOPR Node and the HOPR Admin interface.
 
-
 ## Usage
 
 ```
 hoprd [OPTION]...
 ```
 
-
 ### Options
+
 See `hoprd help` for full list.
+
 ```
   --help      Show help                                                                                        [boolean]
   --version   Show version number                                                                              [boolean]
@@ -22,8 +22,9 @@ See `hoprd help` for full list.
   --admin     Run an admin interface on localhost:3000                                        [boolean] [default: false]
   --grpc      Run a gRPC interface                                                            [boolean] [default: false]
   --password  A password to encrypt your keys                                                              [default: ""]
+  --run       Run a single hopr command, same syntax as in hopr-admin                                     [default: ""]
+
 ```
 
 NB:
 `--grpc` runs a [hopr server](https://github.com/hoprnet/hopr-server) instance.
-

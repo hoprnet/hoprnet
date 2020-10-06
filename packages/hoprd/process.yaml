@@ -1,15 +1,14 @@
 apps:
-    - script: ./index.js
-      name: "dev"
-      instances: 1
-      args: "--admin --grpc"
-      env:
-        HOPR_BOOTSTRAP_ADDRESS: _dnsaddr.bootstrap.monterosa.develop.hoprnet.org
-        ETHEREUM_PROVIDER: wss://xdai.poanetwork.dev/wss
-        NEXT_TELEMETRY_DISABLED: 1
-    - script: ./envoy/envoy.sh
-      name: "proxy"
-      instances: 1
-      env:
-        SERVICE_ADDRESS: 0.0.0.0
-
+  - script: ./index.js
+    name: 'dev'
+    instances: 1
+    args: '--admin --grpc'
+    env:
+      HOPR_BOOTSTRAP_ADDRESS: _dnsaddr.bootstrap.basodino.develop.hoprnet.org
+      ETHEREUM_PROVIDER: wss://xdai.poanetwork.dev/wss
+      NEXT_TELEMETRY_DISABLED: 1
+  - script: ./envoy/envoy.sh
+    name: 'proxy'
+    instances: 1
+    env:
+      SERVICE_ADDRESS: 0.0.0.0

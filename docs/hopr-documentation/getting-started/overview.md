@@ -16,7 +16,6 @@ To achieve this, a **HOPR node** implements a connector interface that communica
 
 ![HOPR Protocol Ethereum Blockchain connector architecture](../.gitbook/assets/image%20%2821%29.png)
 
-Although the first instantiation of the **HOPR network** is on the Ethereum blockchain, HOPR is _chain agnostic_**,** which means that **HOPR nodes** can eventually implement different payment channels in different blockchains. 
+Although the first instantiation of the **HOPR network** is on the Ethereum blockchain, HOPR is _chain agnostic_**,** which means that **HOPR nodes** can eventually implement different payment channels in different blockchains.
 
 At the time of writing, HOPR is also able to implement a [Polkadot-enabled payment gateway.](https://github.com/hoprnet/hopr-polkadot)
-

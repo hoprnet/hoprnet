@@ -1,4 +1,4 @@
-import { Ganache } from '@hoprnet/hopr-testing'
+import { Ganache, getNewPort } from '@hoprnet/hopr-testing'
 import { migrate } from '@hoprnet/hopr-ethereum'
 import { durations } from '@hoprnet/hopr-utils'
 import HoprCore from '.'
@@ -28,7 +28,7 @@ describe('test hopr-core', function () {
         hosts: {
           ip4: {
             ip: '0.0.0.0',
-            port: 9091,
+            port: getNewPort(),
           },
         },
       })
@@ -54,7 +54,7 @@ describe('test hopr-core', function () {
         hosts: {
           ip4: {
             ip: '0.0.0.0',
-            port: 9091,
+            port: getNewPort(),
           },
         },
         bootstrapServers: [new PeerInfo(peerId)],

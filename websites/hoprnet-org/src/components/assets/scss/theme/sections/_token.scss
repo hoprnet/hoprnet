@@ -11,17 +11,16 @@
   }
 }
 
-@include media( '<medium' ) {
+@include media('<medium') {
   .token {
     .iframe-container {
       padding-left: 0;
       padding-right: 0;
     }
-  
+
     .mj-w-res-iframe {
       min-width: 300px;
       text-align: center;
     }
   }
 }
-  

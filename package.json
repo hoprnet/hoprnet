@@ -2,11 +2,31 @@
   "name": "root",
   "private": true,
   "scripts": {
-    "chat": "node packages/chat/lib/index.js",
-    "hoprd": "node packages/hoprd/lib/index.js"
+    "lerna:bootstrap": "lerna bootstrap",
+    "lerna:link": "lerna link --force-local",
+    "lerna:build": "lerna run build",
+    "build": "lerna run build",
+    "bootstrap": "lerna bootstrap",
+    "regenerate-lockfiles": "lerna run clean && rm -r packages/*/yarn.lock && yarn bootstrap",
+    "run:chat": "lerna exec --scope @hoprnet/hopr-chat -- yarn start:basodino",
+    "run:hoprd": "lerna exec --scope @hoprnet/hoprd -- yarn start --host 0.0.0.0:9092",
+    "run:chatbot": "lerna exec --scope @hoprnet/chat-bot -- yarn start:basodino",
+    "lint": "prettier --check .",
+    "lint:fix": "prettier --write ."
   },
   "devDependencies": {
+    "prettier": "^2.0.5",
+    "husky": "^4.2.5",
     "lerna": "^3.22.1"
+  },
+  "prettier": {
+    "tabWidth": 2,
+    "semi": false,
+    "singleQuote": true,
+    "printWidth": 120
+  },
+  "husky": {
+    "hooks": {}
   },
   "__workspaces": {
     "packages": [

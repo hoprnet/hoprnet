@@ -171,8 +171,8 @@ class ChannelFactory {
     let channel: Channel
     let signedChannel: SignedChannel
 
-    const hashedSecret = await this.coreConnector.hashedSecret.check()
-    if (!hashedSecret.initialized) await this.coreConnector.initOnchainValues()
+    // const hashedSecret = await this.coreConnector.hashedSecret.check()
+    // if (!hashedSecret.initialized) await this.coreConnector.initOnchainValues()
 
     console.log(`sign`, sign, `channelBalance`, channelBalance)
     if (await this.isOpen(counterpartyPubKey)) {
@@ -214,7 +214,7 @@ class ChannelFactory {
         Buffer.from(signedChannel)
       )
     } else {
-      throw Error('Invalid input parameters.')
+      throw Error('Cannot open channel. Channel is not open and no sign function was given.')
     }
 
     return channel

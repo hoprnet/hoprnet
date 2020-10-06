@@ -40,7 +40,7 @@ export function getExternalIp(
   address: string
 }> {
   return new Promise((resolve, reject) => {
-    verbose('External IP for', multiAddrs.map(m => m.toString()).join(','))
+    verbose('External IP for', multiAddrs.map((m) => m.toString()).join(','))
     const tids = Array.from({ length: multiAddrs.length }).map(stun.generateTransactionId)
 
     let result: {
@@ -87,7 +87,7 @@ export function getExternalIp(
     }
     socket.on('message', msgHandler)
     socket.on('error', (err) => {
-      verbose("Err:", err)
+      verbose('Err:', err)
       reject(err)
     })
 

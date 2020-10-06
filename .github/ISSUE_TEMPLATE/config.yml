@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: HOPR Community Support
+    url: https://discord.gg/5FWSfq7
+    about: Please ask and answer questions here.
+  - name: HOPR Documentation
+    url: http://docs.hoprnet.io/
+    about: HOPR Documentation

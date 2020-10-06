@@ -1,6 +1,6 @@
-// describe('placeholder', () => {
-//   it('placeholder', () => {})
-// })
+describe('placeholder', () => {
+  it('placeholder', () => {})
+})
 // import myHandshake from './handshake'
 
 // import pushable from 'it-pushable'
