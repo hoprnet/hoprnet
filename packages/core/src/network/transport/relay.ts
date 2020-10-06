@@ -6,9 +6,8 @@ const verbose = debug('hopr-core:verbose:transport:error')
 import AbortController from 'abort-controller'
 import { AbortError } from 'abortable-iterator'
 import chalk from 'chalk'
-
+import libp2p from 'libp2p'
 import type { WebRTCUpgrader } from './webrtc'
-
 import type BL from 'bl'
 
 declare interface Handshake {
@@ -31,8 +30,6 @@ import Multiaddr from 'multiaddr'
 import PeerInfo from 'peer-info'
 import PeerId from 'peer-id'
 
-// @ts-ignore
-import libp2p = require('libp2p')
 
 import {
   RELAY_CIRCUIT_TIMEOUT,
@@ -73,7 +70,9 @@ class Relay {
 
   constructor(libp2p: libp2p, _connHandler?: (conn: MultiaddrConnection) => void, webRTCUpgrader?: WebRTCUpgrader) {
     this._dialer = libp2p.dialer
+    //@ts-ignore
     this._registrar = libp2p.registrar
+    //@ts-ignore
     this._dht = libp2p._dht
     this._peerInfo = libp2p.peerInfo
 
