@@ -33,7 +33,7 @@
     "@linkdrop/sdk": "1.1.6",
     "debug": "4.1.1",
     "dotenv": "^8.2.0",
-    "dotenv-parse-variables": "^0.3.0",
+    "dotenv-parse-variables": "^1.0.1",
     "firebase-admin": "^9.1.1",
     "global": "^4.4.0",
     "peer-id": "0.13",
