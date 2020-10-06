@@ -202,6 +202,7 @@ class Relay {
     let answer: Buffer | undefined
     try {
       answer = (await shaker.read())?.slice()
+      log(`received answer ${new TextDecoder().decode(answer)}`)
     } catch (err) {
       throw Error(`Error while reading answer. Error was ${err}`)
     }
@@ -253,6 +254,7 @@ class Relay {
   }
 
   private async handleRelay({ stream, connection }: Handler) {
+    log(`handle relay request`)
     const shaker = handshake(stream)
 
     let pubKeySender: Buffer | undefined
@@ -275,6 +277,7 @@ class Relay {
     let counterparty: PeerId
     try {
       counterparty = await pubKeyToPeerId(pubKeySender)
+      log(`counterparty identified as ${counterparty.toB58String()}`)
     } catch (err) {
       error(
         `Peer ${chalk.yellow(
@@ -293,7 +296,19 @@ class Relay {
       return
     }
 
-    const deliveryStream = (await this.establishForwarding(counterparty)) as Stream
+
+    let deliveryStream 
+    try {
+      deliveryStream = (await this.establishForwarding(counterparty)) as Stream
+    } catch (err) {
+      error(err)
+
+      shaker.write(FAIL_COULD_NOT_REACH_COUNTERPARTY)
+
+      shaker.rest()
+
+      return
+    }
 
     if (deliveryStream == null) {
       // @TODO end deliveryStream
