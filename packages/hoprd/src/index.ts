@@ -76,7 +76,7 @@ const argv = yargs
   })
   .option('run', {
     describe: 'Run a single hopr command, same syntax as in hopr-admin',
-    default: ''
+    default: '',
   })
   .option('dryRun', {
     boolean: true,
@@ -180,15 +180,14 @@ async function main() {
       adminServer.registerNode(node)
     }
 
-    if (argv.run && argv.run !== ''){
+    if (argv.run && argv.run !== '') {
       // Run a single command and then exit.
       let cmds = new commands.Commands(node)
       let resp = await cmds.execute(argv.run)
-      console.log(resp);
+      console.log(resp)
       await node.down()
       process.exit(0)
     }
-    
   } catch (e) {
     console.log(e)
     logs.log('Node failed to start:')
