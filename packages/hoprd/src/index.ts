@@ -1,21 +1,21 @@
-import Hopr from "@hoprnet/hopr-core";
-import type { HoprOptions } from "@hoprnet/hopr-core";
-import type HoprCoreConnector from "@hoprnet/hopr-core-connector-interface";
-import PeerInfo from "peer-info";
-import PeerId from "peer-id";
-import Multiaddr from "multiaddr";
+import Hopr from '@hoprnet/hopr-core'
+import type { HoprOptions } from '@hoprnet/hopr-core'
+import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
+import PeerInfo from 'peer-info'
+import PeerId from 'peer-id'
+import Multiaddr from 'multiaddr'
 import debug from 'debug'
 import { encode, decode } from 'rlp'
 // @ts-ignore
 import Multihash from 'multihashes'
 import bs58 from 'bs58'
 import { addPubKey } from '@hoprnet/hopr-core/lib/utils'
-import { getBootstrapAddresses } from "@hoprnet/hopr-utils"
+import { getBootstrapAddresses } from '@hoprnet/hopr-utils'
 import { commands } from '@hoprnet/hopr-chat'
-import {LogStream, Socket} from './logs'
+import { LogStream, Socket } from './logs'
 import { AdminServer } from './admin'
 import chalk from 'chalk'
-import * as yargs from 'yargs';
+import * as yargs from 'yargs'
 import { startServer } from '@hoprnet/hopr-server'
 
 let debugLog = debug('hoprd')
@@ -46,43 +46,45 @@ export async function checkPeerIdInput(query: string): Promise<PeerId> {
   return peerId
 }
 
-const argv = (
-  yargs
+const argv = yargs
   .option('network', {
     describe: 'Which network to run the HOPR node on',
     default: 'ETHEREUM',
-    choices: ['ETHEREUM']
+    choices: ['ETHEREUM'],
   })
   .option('provider', {
     describe: 'A provider url for the Network you specified',
-    default: "wss://xdai.poanetwork.dev/wss"
+    default: 'wss://xdai.poanetwork.dev/wss',
   })
   .option('host', {
     describe: 'The network host to run the HOPR node on.',
-    default: '0.0.0.0:9091'
+    default: '0.0.0.0:9091',
   })
   .option('admin', {
     boolean: true,
     describe: 'Run an admin interface on localhost:3000',
-    default: false
+    default: false,
   })
   .option('grpc', {
     boolean: true,
     describe: 'Run a gRPC interface',
-    default: false
+    default: false,
   })
   .option('password', {
     describe: 'A password to encrypt your keys',
-    default: ''
+    default: '',
   })
   .option('dryRun', {
     boolean: true,
     describe: 'List all the options used to run the HOPR node, but quit instead of starting',
-    default: false
+    default: false,
   })
-  .wrap(Math.min(120, yargs.terminalWidth()))
-  .argv
-)
+  .option('bootstrap', {
+    boolean: true,
+    describe: 'run as a bootstrap node',
+    default: false,
+  })
+  .wrap(Math.min(120, yargs.terminalWidth())).argv
 
 // TODO this should probably be shared between chat and this, and live in a
 // utils module.
@@ -103,48 +105,44 @@ function parseHosts(): HoprOptions['hosts'] {
   return hosts
 }
 
-
-
 async function generateNodeOptions(logs: LogStream): Promise<HoprOptions> {
-
-  function logMessageToNode(msg: Uint8Array){
-    logs.log("#### NODE RECEIVED MESSAGE ####")
+  function logMessageToNode(msg: Uint8Array) {
+    logs.log('#### NODE RECEIVED MESSAGE ####')
     try {
       let [decoded, time] = decode(msg) as [Buffer, Buffer]
-      logs.log("Message:", decoded.toString())
-      logs.log("Latency:", Date.now() - parseInt(time.toString('hex'), 16) + 'ms')
+      logs.log('Message:', decoded.toString())
+      logs.log('Latency:', Date.now() - parseInt(time.toString('hex'), 16) + 'ms')
     } catch (err) {
-      logs.log("Could not decode message", err)
+      logs.log('Could not decode message', err)
       logs.log(msg.toString())
     }
   }
 
   let options: HoprOptions = {
     debug: Boolean(process.env.DEBUG),
+    bootstrapNode: argv.bootstrap,
     network: argv.network,
-    bootstrapServers: [... (await getBootstrapAddresses()).values()],
+    bootstrapServers: [...(await getBootstrapAddresses()).values()],
     provider: argv.provider,
     hosts: parseHosts(),
     output: logMessageToNode,
-    password: argv.password || 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0' // TODO!!!
-  };
-
+    password: argv.password || 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0', // TODO!!!
+  }
 
   //logs.log(JSON.stringify(options))
   return options
 }
 
-
 async function main() {
-  let node: Hopr<HoprCoreConnector>;
-  let addr: Multiaddr;
+  let node: Hopr<HoprCoreConnector>
+  let addr: Multiaddr
   let logs = new LogStream()
   let adminServer = undefined
 
   if (argv.admin) {
     // We need to setup the admin server before the HOPR node
     // as if the HOPR node fails, we need to put an error message up.
-    adminServer = new AdminServer(logs);
+    adminServer = new AdminServer(logs)
     await adminServer.setup()
   }
 
@@ -156,32 +154,32 @@ async function main() {
   }
 
   try {
-    node = await Hopr.create(options);
+    node = await Hopr.create(options)
     logs.log('Created HOPR Node')
 
-    node.on("peer:connect", (peer: PeerInfo) => {
-      logs.log(`Incoming connection from ${peer.id.toB58String()}.`);
-    });
+    node.on('peer:connect', (peer: PeerInfo) => {
+      logs.log(`Incoming connection from ${peer.id.toB58String()}.`)
+    })
 
-    process.once("exit", async () => {
-      await node.down();
+    process.once('exit', async () => {
+      await node.down()
       logs.log('Process exiting')
-      return;
-    });
+      return
+    })
 
     if (argv.grpc) {
       // Start HOPR server
-      startServer(node, {logger: logs})
+      startServer(node, { logger: logs })
     }
 
     if (adminServer) {
       adminServer.registerNode(node)
     }
-  } catch (e){
+  } catch (e) {
     console.log(e)
-    logs.log("Node failed to start:")
+    logs.log('Node failed to start:')
     logs.logFatalError('' + e)
   }
 }
 
-main();
+main()

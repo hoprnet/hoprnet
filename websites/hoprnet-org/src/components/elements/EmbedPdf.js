@@ -1,12 +1,12 @@
-import 'react-pdf/dist/Page/AnnotationLayer.css';
+import 'react-pdf/dist/Page/AnnotationLayer.css'
 import React from 'react'
 import { SizeMe } from 'react-sizeme'
 import { Document, Page, pdfjs } from 'react-pdf'
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.js`;
+pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.js`
 
 class EmbedPdf extends React.Component {
   constructor(props) {
-    super(props);
+    super(props)
 
     this.state = {
       pageNumber: 1,
@@ -15,14 +15,14 @@ class EmbedPdf extends React.Component {
   }
 
   onDocumentLoadSuccess = ({ numPages }) => {
-    this.setState({ numPages });
+    this.setState({ numPages })
   }
 
   previousPage = () => {
     const { pageNumber } = this.state
 
     this.setState({
-      pageNumber: pageNumber - 1
+      pageNumber: pageNumber - 1,
     })
   }
 
@@ -30,45 +30,32 @@ class EmbedPdf extends React.Component {
     const { pageNumber } = this.state
 
     this.setState({
-      pageNumber: pageNumber + 1
+      pageNumber: pageNumber + 1,
     })
   }
 
   render() {
-    const { src } = this.props;
-    const { pageNumber, numPages } = this.state;
+    const { src } = this.props
+    const { pageNumber, numPages } = this.state
 
     return (
       <SizeMe
         monitorHeight
         refreshRate={500}
-        refreshMode={"debounce"}
+        refreshMode={'debounce'}
         render={({ size }) => (
           <div className="pdfContainer">
-            <Document
-              file={src}
-              onLoadSuccess={this.onDocumentLoadSuccess}
-            >
+            <Document file={src} onLoadSuccess={this.onDocumentLoadSuccess}>
               <Page width={size.width} pageNumber={pageNumber} />
             </Document>
-            <div
-              className="mb-24 pdfPages"
-            >
+            <div className="mb-24 pdfPages">
               <p>
                 Page {pageNumber || (numPages ? 1 : '--')} of {numPages || '--'}
               </p>
-              <button
-                type="button"
-                disabled={pageNumber <= 1}
-                onClick={this.previousPage}
-              >
+              <button type="button" disabled={pageNumber <= 1} onClick={this.previousPage}>
                 Previous
               </button>
-              <button
-                type="button"
-                disabled={pageNumber >= numPages}
-                onClick={this.nextPage}
-              >
+              <button type="button" disabled={pageNumber >= numPages} onClick={this.nextPage}>
                 Next
               </button>
             </div>

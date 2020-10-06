@@ -1,8 +1,8 @@
-import { ReactNode } from "react";
-import styles from "../styles/Layout.module.scss";
-import Header from "./Header";
-import Footer from "./Footer";
-import { store } from "../utils";
+import { ReactNode } from 'react'
+import styles from '../styles/Layout.module.scss'
+import Header from './Header'
+import Footer from './Footer'
+import { store } from '../utils'
 
 export default function Layout(props: { children?: ReactNode }) {
   return (
@@ -13,5 +13,5 @@ export default function Layout(props: { children?: ReactNode }) {
         <Footer />
       </div>
     </store.Provider>
-  );
+  )
 }

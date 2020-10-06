@@ -13,7 +13,7 @@ import { decodeMessage } from './message'
 
 import { knownConnectors } from './knownConnectors'
 import type { HoprOptions } from '@hoprnet/hopr-core'
-import { getBootstrapAddresses } from  '@hoprnet/hopr-utils'
+import { getBootstrapAddresses } from '@hoprnet/hopr-utils'
 
 const listConnectors = new ListConnctor()
 
@@ -156,7 +156,6 @@ export async function parseOptions(): Promise<HoprOptions> {
       )} in ${chalk.yellow('.env')}.`
     )
   }
-
 
   let options: HoprOptions = {
     debug: cli_options.debug || false,

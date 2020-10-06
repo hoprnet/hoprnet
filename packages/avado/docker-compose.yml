@@ -4,7 +4,7 @@ services:
     build:
       context: ../hoprd
       dockerfile: ./Dockerfile
-    image: 'hopr.avado.dnp.dappnode.eth:0.25.0'
+    image: 'hopr.avado.dnp.dappnode.eth:0.34.0'
     restart: always
     volumes:
       - type: volume

@@ -14,28 +14,26 @@
   </p>
 </p>
 
-
 ## Instructions
-
-### Using a prebuilt binary
-
-TODO
 
 ### Developing with this repository
 
 ```sh
-yarn                      # Install tooling
-lerna bootstrap           # Installs all dependencies
-lerna link --force-local  # Link local dependencies
-lerna run build           # builds code
+yarn             # Install tooling
+yarn bootstrap   # Installs all dependencies
+yarn build       # Builds code for running
+```
 
-# Run Hoprd
-yarn run hoprd --admin --grpc
+### Running applications
+
+```sh
+yarn run:hoprd         # Runs hoprd w/admin (:3000)
+yarn run:chat          # Runs hopr chat in terminal
 ```
 
 ## HOPR ecosystem
 
-- **Core**: HOPR Protocol definition and source code.
+- [**Core**](./packages/core/README.md): HOPR Protocol definition and source code.
 - **Server**: gRPC-enabled Server to communicate with a HOPR Node
 - **Protos**: Protobuf API for interacting with a HOPR Server
 - **Chat**: Interactive REPL-like chat PoC for HOPR Nodes
@@ -46,7 +44,9 @@ yarn run hoprd --admin --grpc
 - **Assets**: Press and brand materials for HOPR & Association
 
 <!-- CONTACT -->
+
 ## Contact
+
 - Twitter - https://twitter.com/hoprnet
 - Telegram - https://t.me/hoprnet
 - Medium - https://medium.com/hoprnet

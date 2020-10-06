@@ -20,7 +20,7 @@ As changes are continuous in our codebase, please bear in mind some of this docu
 
 Using Docker allows you quickly get started with **HOPR Chat** without having to download any other software. However, there are hardware requirements you should be aware of.
 
-To use Docker, you will need a device that supports hardware-level virtualisation: VT-x for Intel-based PCs and AMD-V for AMD processors. Most Mac and Linux machines support this out of the box,  but for PC you will need to make sure it's turned on and perhaps enable it in the BIOS settings. It will be different for different BIOS, just look for VT-x / AMD-V switch.
+To use Docker, you will need a device that supports hardware-level virtualisation: VT-x for Intel-based PCs and AMD-V for AMD processors. Most Mac and Linux machines support this out of the box, but for PC you will need to make sure it's turned on and perhaps enable it in the BIOS settings. It will be different for different BIOS, just look for VT-x / AMD-V switch.
 
 Additionally, ensure you have enough memory \(approx. 2 GB\) and disk space \(approx. 1 GB\) before starting.
 
@@ -32,30 +32,33 @@ Before doing anything else, you need to install [Docker Desktop](https://hub.doc
 {% tab title="Linux" %}
 Depending of your distribution, please follow the official guidelines for how to install and run Docker on your workstation.
 
-* [Installing Docker in Ubuntu](https://docs.docker.com/engine/install/ubuntu/)
-* [Installing Docker in Fedora](https://docs.docker.com/engine/install/fedora/)
-* [Installing Docker in Debian](https://docs.docker.com/engine/install/debian/)
-* [Installing Docker in CentOS](https://docs.docker.com/engine/install/centos/)
-{% endtab %}
+- [Installing Docker in Ubuntu](https://docs.docker.com/engine/install/ubuntu/)
+- [Installing Docker in Fedora](https://docs.docker.com/engine/install/fedora/)
+- [Installing Docker in Debian](https://docs.docker.com/engine/install/debian/)
+- [Installing Docker in CentOS](https://docs.docker.com/engine/install/centos/)
+  {% endtab %}
 
 {% tab title="macOS" %}
+
 1. Visit [Docker Hub ](https://hub.docker.com/editions/community/docker-ce-desktop-mac/)and download **Docker Desktop** to your computer.
 2. Follow the wizard steps to ensure Docker is installed.
 3. Ensure the installation was successful by running `docker ps` in your terminal.
-{% endtab %}
+   {% endtab %}
 
 {% tab title="Windows 10 Home" %}
+
 1. Go to [Docker Hub](https://docs.docker.com/toolbox/overview/) to download **Docker Toolbox** to your computer.
 2. Follow-up the wizard steps to ensure Docker is installed.
 3. Ensure the installation was successful by running `docker ps`
-{% endtab %}
+   {% endtab %}
 
 {% tab title="Windows 10 Pro" %}
+
 1. Go to [Docker ](https://www.docker.com/products/docker-desktop)and download **Docker Desktop** to your computer.
 2. Follow-up the wizard steps to ensure Docker is installed.
 3. Ensure the installation was successful by running `docker ps`
-{% endtab %}
-{% endtabs %}
+   {% endtab %}
+   {% endtabs %}
 
 #### Downloading HOPR Chat image from Docker Hub
 
@@ -68,7 +71,7 @@ To ensure your machine has successfully downloaded **HOPR Chat,** run `docker im
 ![HOPR Chat distributed as a Docker image](../../.gitbook/assets/docker_images.gif)
 
 {% hint style="info" %}
-Docker images can quickly go out of date. We recommend reviewing which are the latest images available to be used before downloading one. You can see all our available images and their publication date in our public [Docker registry](https://gcr.io/hoprassociation/hopr-chat). 
+Docker images can quickly go out of date. We recommend reviewing which are the latest images available to be used before downloading one. You can see all our available images and their publication date in our public [Docker registry](https://gcr.io/hoprassociation/hopr-chat).
 {% endhint %}
 
 ### Using Node.js
@@ -79,19 +82,23 @@ Using Node.js allows you to run **HOPR Chat** as a Node.js application, ensuring
 
 To use Node.js, we recommend installing [nvm](https://github.com/nvm-sh/nvm), a Node.js version manager. This ensures we can install and uninstall as many versions of Node.js as needed. It will also help if you have any additional installation requirements for running Node.js. If you're using Windows, you will need [nvm-windows](https://github.com/coreybutler/nvm-windows), which is its PC equivalent.
 
-To install nvm on Linux or macOS, please follow the instructions on their [GitHub website](https://github.com/nvm-sh/nvm), or run any of the following commands in your terminal instead \(we will use nvm `v0.35.3`\) depending on whether you have `curl` or `wget` in your system. 
+To install nvm on Linux or macOS, please follow the instructions on their [GitHub website](https://github.com/nvm-sh/nvm), or run any of the following commands in your terminal instead \(we will use nvm `v0.35.3`\) depending on whether you have `curl` or `wget` in your system.
 
 {% tabs %}
 {% tab title="cURL" %}
+
 ```
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.35.3/install.sh | bash
 ```
+
 {% endtab %}
 
 {% tab title="Wget" %}
+
 ```text
 wget -qO- https://raw.githubusercontent.com/nvm-sh/nvm/v0.35.3/install.sh | bash
 ```
+
 {% endtab %}
 {% endtabs %}
 
@@ -114,7 +121,7 @@ If everything was done properly, you can run `node --version` to see your curren
 
 ![](../../.gitbook/assets/node.gif)
 
-## **Running HOPR Chat** 
+## **Running HOPR Chat**
 
 ### **Using Docker**
 
@@ -124,6 +131,7 @@ To run **HOPR Chat** via Docker**,** you need to copy and paste the following co
 
 {% tabs %}
 {% tab title="ch-t-01" %}
+
 ```text
 docker run -v $(pwd)/db:/app/db \
 -e HOST_IPV4=0.0.0.0:9091 \
@@ -131,9 +139,11 @@ docker run -v $(pwd)/db:/app/db \
 -e ETHEREUM_PROVIDER=wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36 \
 -p 9091:9091 -it hopr/chat -p switzerland
 ```
+
 {% endtab %}
 
 {% tab title="ch-t-02" %}
+
 ```text
 docker run -v $(pwd)/db:/app/db \
 -e HOST_IPV4=0.0.0.0:9091 \
@@ -141,6 +151,7 @@ docker run -v $(pwd)/db:/app/db \
 -e ETHEREUM_PROVIDER=wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36 \
 -p 9091:9091 -it hopr/chat -p switzerland
 ```
+
 {% endtab %}
 {% endtabs %}
 
@@ -148,23 +159,27 @@ docker run -v $(pwd)/db:/app/db \
 
 {% tabs %}
 {% tab title="ch-t-01" %}
+
 ```text
-docker run -v %cd%/db:/app/db ^ 
--e HOST_IPV4=0.0.0.0:9091 ^ 
--e BOOTSTRAP_SERVERS=/ip4/34.65.219.148/tcp/9091/p2p/16Uiu2HAkwSEiK819yvnG84pNFsqXkpFX4uiCaNSwADnmYeAfctRn ^ 
--e ETHEREUM_PROVIDER=wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36 ^ 
+docker run -v %cd%/db:/app/db ^
+-e HOST_IPV4=0.0.0.0:9091 ^
+-e BOOTSTRAP_SERVERS=/ip4/34.65.219.148/tcp/9091/p2p/16Uiu2HAkwSEiK819yvnG84pNFsqXkpFX4uiCaNSwADnmYeAfctRn ^
+-e ETHEREUM_PROVIDER=wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36 ^
 -p 9091:9091 -it hopr/chat -p switzerland
 ```
+
 {% endtab %}
 
 {% tab title="ch-t-02" %}
+
 ```
-docker run -v %cd%/db:/app/db ^ 
--e HOST_IPV4=0.0.0.0:9091 ^ 
--e BOOTSTRAP_SERVERS=/ip4/34.65.148.229/tcp/9091/p2p/16Uiu2HAmRsp3VBLcyPfTBkJYEwS47bewxWqqm4sEpJEtPBLeV93n ^ 
--e ETHEREUM_PROVIDER=wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36 ^ 
+docker run -v %cd%/db:/app/db ^
+-e HOST_IPV4=0.0.0.0:9091 ^
+-e BOOTSTRAP_SERVERS=/ip4/34.65.148.229/tcp/9091/p2p/16Uiu2HAmRsp3VBLcyPfTBkJYEwS47bewxWqqm4sEpJEtPBLeV93n ^
+-e ETHEREUM_PROVIDER=wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36 ^
 -p 9091:9091 -it hopr/chat -p switzerland
 ```
+
 {% endtab %}
 {% endtabs %}
 
@@ -267,4 +282,3 @@ To talk to other users, copy another connected user address and send a message t
 ![Your message will be sent privately through the HOPR network](../../.gitbook/assets/running_hopr_chat_and_sending.gif)
 
 Congratulations! You have communicated with another node using a privacy-preserving decentralised protocol. **HOPR Chat** is just a proof of concept right now, but you can already see the capabilities of the protocol. Click next to learn about **Bootstrap Nodes,** or go back to see the general introduction about **HOPR Chat.**
-

@@ -1,12 +1,13 @@
 import type PeerId from 'peer-id'
 import chalk from 'chalk'
 
-export type AutoCompleteResult = [string[], string] 
-export const emptyAutoCompleteResult = (line: string):AutoCompleteResult => [[''], line]
+export type AutoCompleteResult = [string[], string]
+export const emptyAutoCompleteResult = (line: string): AutoCompleteResult => [[''], line]
 export type CommandResponse = string | void
 
 export type GlobalState = {
   includeRecipient: boolean
+  routing: 'auto' | 'manual' | 'direct'
   aliases: Map<string, PeerId>
 }
 
@@ -29,37 +30,46 @@ export abstract class AbstractCommand {
   // NB. Because we need to pass the whole line back, this assumes that the
   // entire query after the command name is being handled.
   protected _autocompleteByFiltering(query: string, allResults: string[], line: string): AutoCompleteResult {
-    if (allResults.length == 0){ 
+    if (allResults.length == 0) {
       return emptyAutoCompleteResult(line)
     }
     const response = (x: string) => `${this.name()} ${x}`
-    if (!query){ // If the query is an empty string, we show all options.
+    if (!query) {
+      // If the query is an empty string, we show all options.
       return [allResults.map(response), line]
     }
-    let filtered = allResults.filter(x => x.startsWith(query))
-    if (filtered.length == 0){
+    let filtered = allResults.filter((x) => x.startsWith(query))
+    if (filtered.length == 0) {
       return emptyAutoCompleteResult(line) // Readline can't handle empty results
     }
     return [filtered.map(response), line]
   }
 
-
   // returns [error, ...params]
   protected _assertUsage(query: string, parameters: string[], test?: RegExp): string[] {
-    const usage = chalk.red(`usage: ${parameters.map(x => `<${x}>`).join(' ')}`)
-    if (!query && parameters.length) {
+    const usage = chalk.red(`usage: ${parameters.map((x) => `<${x}>`).join(' ')}`)
+
+    if (!query && parameters.length > 0) {
       return [usage]
     }
-    if (!test) {
-      test = new RegExp(parameters.map(x => '(\\w+)' ).join('\\s')) 
+
+    let match: string[] = []
+    // uses RegExp
+    if (test) {
+      match = Array.from(test.exec(query) ?? [])
+      // remove the first match as it is the command name
+      match.shift()
     }
-    const match = test.exec(query)
-    if (!match){
+    // simply split by space
+    else {
+      match = query.split(' ')
+    }
+
+    if (match.length !== parameters.length) {
       return [usage]
     }
 
     //@ts-ignore : The first element is a string|undefined, but typing this is a nightmare
-    return [undefined].concat(parameters.map((x, i) => match[i + 1]))
-
+    return [undefined].concat(parameters.map((x, i) => match[i]))
   }
 }

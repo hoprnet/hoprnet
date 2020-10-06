@@ -1,10 +1,9 @@
 {
   "name": "@hoprnet/hopr-demo-seeds",
-  "version": "1.17.0-alpha.43",
+  "version": "1.17.0-alpha.55",
   "description": "Demo seeds for HOPR testing",
   "license": "GPL-3.0-only",
   "scripts": {
-    "start": "micro",
     "build": "tsc -d -p .",
     "prepare": "yarn build"
   },
@@ -17,10 +16,6 @@
     "web3",
     "messaging"
   ],
-  "engines": {
-    "node": ">= 12.9.1",
-    "yarn": ">= 1.19.2"
-  },
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "homepage": "https://hoprnet.org",
@@ -29,25 +24,7 @@
     "url": "https://github.com/hoprnet/hopr-demo-seeds.git"
   },
   "devDependencies": {
-    "husky": "^4.2.3",
     "typescript": "^3.8.2"
-  },
-  "mocha": {
-    "extension": [
-      "ts"
-    ],
-    "spec": "src/**/*.spec.ts",
-    "require": "ts-node/register"
-  },
-  "prettier": {
-    "printWidth": 160,
-    "semi": false,
-    "singleQuote": true,
-    "quoteProps": "consistent",
-    "arrowParens": "avoid"
-  },
-  "dependencies": {
-    "micro": "^9.3.4"
   },
   "publishConfig": {
     "access": "public"

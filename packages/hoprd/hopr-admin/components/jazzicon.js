@@ -2,9 +2,9 @@
 // https://github.com/MetaMask/metamask-extension/blob/develop/ui/app/components/ui/jazzicon/jazzicon.component.js
 import React, { createRef, PureComponent } from 'react'
 import PropTypes from 'prop-types'
-import dynamic from "next/dynamic";
+import dynamic from 'next/dynamic'
 import jazzicon from 'jazzicon'
-import md5 from 'tiny-hashes/md5';
+import md5 from 'tiny-hashes/md5'
 
 /**
  * Wrapper around the jazzicon library to return a React component, as the library returns an
@@ -24,11 +24,11 @@ export default class Jazzicon extends PureComponent {
 
   container = createRef()
 
-  componentDidMount () {
+  componentDidMount() {
     this.appendJazzicon()
   }
 
-  componentDidUpdate (prevProps) {
+  componentDidUpdate(prevProps) {
     const { address: prevAddress, diameter: prevDiameter } = prevProps
     const { address, diameter } = this.props
 
@@ -38,7 +38,7 @@ export default class Jazzicon extends PureComponent {
     }
   }
 
-  removeExistingChildren () {
+  removeExistingChildren() {
     const { children } = this.container.current
 
     for (let i = 0; i < children.length; i++) {
@@ -46,7 +46,7 @@ export default class Jazzicon extends PureComponent {
     }
   }
 
-  appendJazzicon () {
+  appendJazzicon() {
     if (typeof window !== 'undefined') {
       const { address, diameter } = this.props
       // NB: 'goodenough' transform between B58 string and js int
@@ -55,15 +55,9 @@ export default class Jazzicon extends PureComponent {
     }
   }
 
-  render () {
+  render() {
     const { className, style } = this.props
 
-    return (
-      <div
-        className={className}
-        ref={this.container}
-        style={style}
-      />
-    )
+    return <div className={className} ref={this.container} style={style} />
   }
 }

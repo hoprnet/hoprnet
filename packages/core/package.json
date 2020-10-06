@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core",
-  "version": "1.17.0-alpha.43",
+  "version": "1.17.0-alpha.55",
   "description": "Privacy-preserving messaging protocol with incentivations for relay operators",
   "license": "GPL-3.0-only",
   "keywords": [
@@ -32,15 +32,13 @@
   "scripts": {
     "build": "yarn clean && tsc -p .",
     "clean": "rm -rf ./lib",
-    "test": "for i in {1..5}; do jest --runInBand --forceExit; done",
-    "prepublishOnly": "yarn build",
-    "lint": "prettier --check .",
-    "lint:fix": "prettier --write ."
+    "test": "jest --runInBand --forceExit && jest --runInBand --forceExit && jest --runInBand --forceExit",
+    "prepublishOnly": "yarn build"
   },
   "dependencies": {
-    "@hoprnet/hopr-core-ethereum": "^1.17.0-alpha.43",
+    "@hoprnet/hopr-core-ethereum": "^1.17.0-alpha.55",
     "@hoprnet/hopr-demo-seeds": "1.8.0",
-    "@hoprnet/hopr-utils": "^1.17.0-alpha.43",
+    "@hoprnet/hopr-utils": "^1.17.0-alpha.55",
     "abort-controller": "^3.0.0",
     "abortable-iterator": "^3.0.0",
     "bl": "^4.0.3",
@@ -72,9 +70,9 @@
     "wrtc": "0.4.6"
   },
   "devDependencies": {
-    "@hoprnet/hopr-core-connector-interface": "^1.17.0-alpha.43",
-    "@hoprnet/hopr-ethereum": "^1.17.0-alpha.43",
-    "@hoprnet/hopr-testing": "^1.17.0-alpha.43",
+    "@hoprnet/hopr-core-connector-interface": "^1.17.0-alpha.55",
+    "@hoprnet/hopr-ethereum": "^1.17.0-alpha.55",
+    "@hoprnet/hopr-testing": "^1.17.0-alpha.55",
     "@types/bl": "^2.1.0",
     "@types/debug": "^4.1.5",
     "@types/jest": "^26.0.7",
@@ -85,13 +83,11 @@
     "@types/read": "^0.0.28",
     "@types/secp256k1": "~4.0.1",
     "@types/simple-peer": "^9.6.0",
-    "husky": "^4.2.5",
     "it-pair": "^1.0.0",
     "jest": "^26.1.0",
     "jest-silent-reporter": "^0.2.1",
     "libp2p-tcp": "^0.14.6",
     "memdown": "^5.1.0",
-    "prettier": "^2.0.5",
     "ts-jest": "^26.1.4",
     "typescript": "^3.9.7"
   },
@@ -102,23 +98,12 @@
       "ts"
     ],
     "rootDir": "src",
-    "testRegex": ".*.spec.ts$",
+    "testRegex": ".spec.ts$",
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "coverageDirectory": "../coverage",
     "testEnvironment": "node",
     "maxConcurrency": 1
-  },
-  "prettier": {
-    "tabWidth": 2,
-    "semi": false,
-    "singleQuote": true,
-    "printWidth": 120
-  },
-  "husky": {
-    "hooks": {
-      "pre-commit": "yarn lint:fix"
-    }
   }
 }
