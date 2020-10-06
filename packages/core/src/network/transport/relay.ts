@@ -391,19 +391,20 @@ class Relay {
     newSource: AsyncGenerator<Uint8Array>,
     sink: (stream: AsyncIterable<Uint8Array>) => Promise<void>
   ) {
-    let found = this._streams.get(to)
+    // let found = this._streams.get(to)
 
-    if (found == null) {
-      found = new Map<string, RelayContext>()
-    }
+    // if (found == null) {
+    //   found = new Map<string, RelayContext>()
+    // }
 
-    const ctx = new RelayContext(newSource)
+    // const ctx = new RelayContext(newSource)
 
-    found.set(from, ctx)
+    // found.set(from, ctx)
 
-    this._streams.set(this._peerInfo.id.toB58String(), found)
+    // this._streams.set(this._peerInfo.id.toB58String(), found)
 
-    sink(ctx.source)
+    //sink(ctx.source)
+    sink(newSource)
   }
 }
 
