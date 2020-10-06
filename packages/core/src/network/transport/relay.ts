@@ -419,7 +419,12 @@ class Relay {
     // this._streams.set(this._peerInfo.id.toB58String(), found)
 
     //sink(ctx.source)
-    sink(newSource)
+    sink((async function * () {
+      for await (const msg of newSource) {
+        console.log(`Relaying`, msg)
+        yield msg
+      }
+    })())
   }
 }
 
