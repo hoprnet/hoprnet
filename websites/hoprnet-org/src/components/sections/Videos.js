@@ -37,6 +37,19 @@ const Videos = props => {
               />
             ))}
           </div>
+          <br />
+          <div className="reveal-from-top" data-reveal-delay="150">
+            .. check out more videos in our{' '}
+            <a
+              href="https://www.youtube.com/channel/UC2DzUtC90LXdW7TfT3igasA"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-color-high underline"
+            >
+              youtube channel
+            </a>
+            .
+          </div>
         </div>
       </div>
     </GenericSection>
