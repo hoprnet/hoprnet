@@ -187,7 +187,7 @@ export default class HoprEthereum implements HoprCoreConnector {
           // start channels indexing
           this.indexer.start(),
           // always call init on-chain values,
-          this.initOnchainValues()
+          this.initOnchainValues(),
         ])
 
         this._status = 'initialized'

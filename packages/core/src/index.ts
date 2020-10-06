@@ -1,5 +1,5 @@
 /// <reference path="./@types/libp2p.d.ts" />
-import LibP2P from 'libp2p'// @ts-ignore
+import LibP2P from 'libp2p' // @ts-ignore
 import MPLEX = require('libp2p-mplex')
 // @ts-ignore
 import KadDHT = require('libp2p-kad-dht')

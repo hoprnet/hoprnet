@@ -30,7 +30,6 @@ import Multiaddr from 'multiaddr'
 import PeerInfo from 'peer-info'
 import PeerId from 'peer-id'
 
-
 import {
   RELAY_CIRCUIT_TIMEOUT,
   RELAY_REGISTER,
