@@ -6,9 +6,7 @@ const verbose = debug('hopr-core:verbose:transport:error')
 import AbortController from 'abort-controller'
 import { AbortError } from 'abortable-iterator'
 import chalk from 'chalk'
-
 import type { WebRTCUpgrader } from './webrtc'
-
 import type BL from 'bl'
 
 declare interface Handshake {
@@ -31,7 +29,6 @@ import Multiaddr from 'multiaddr'
 import PeerInfo from 'peer-info'
 import PeerId from 'peer-id'
 import libp2p from 'libp2p'
-
 import {
   RELAY_CIRCUIT_TIMEOUT,
   RELAY_REGISTER,

@@ -4,7 +4,7 @@ on:
   push:
     branches: ['**']
     paths:
-      - '.github/workflows/**'
+      - '.github/workflows/*-hopr-swiss.yml'
       - 'websites/hopr-swiss/**'
 
 defaults:

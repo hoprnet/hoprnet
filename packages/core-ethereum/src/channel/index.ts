@@ -171,8 +171,8 @@ class ChannelFactory {
     let channel: Channel
     let signedChannel: SignedChannel
 
-    const hashedSecret = await this.coreConnector.hashedSecret.check()
-    if (!hashedSecret.initialized) await this.coreConnector.initOnchainValues()
+    // const hashedSecret = await this.coreConnector.hashedSecret.check()
+    // if (!hashedSecret.initialized) await this.coreConnector.initOnchainValues()
 
     console.log(`sign`, sign, `channelBalance`, channelBalance)
     if (await this.isOpen(counterpartyPubKey)) {

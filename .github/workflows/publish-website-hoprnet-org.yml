@@ -4,7 +4,7 @@ on:
   push:
     branches: ['**']
     paths:
-      - '.github/workflows/**'
+      - '.github/workflows/*-hoprnet-org.yml'
       - 'websites/hoprnet-org/**'
 
 # currently, the vercel project is looking into the root folder

@@ -22,6 +22,8 @@ See `hoprd help` for full list.
   --admin     Run an admin interface on localhost:3000                                        [boolean] [default: false]
   --grpc      Run a gRPC interface                                                            [boolean] [default: false]
   --password  A password to encrypt your keys                                                              [default: ""]
+  --run       Run a single hopr command, same syntax as in hopr-admin                                     [default: ""]
+
 ```
 
 NB:

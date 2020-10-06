@@ -1,7 +1,6 @@
 import PeerInfo from 'peer-info'
 import PeerId from 'peer-id'
 import libp2p from 'libp2p'
-
 // @ts-ignore
 import TCP = require('libp2p-tcp')
 // @ts-ignore

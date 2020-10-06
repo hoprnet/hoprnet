@@ -488,4 +488,5 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
     }
   }
 }
+
 export { Hopr as default, LibP2P }

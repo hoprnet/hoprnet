@@ -74,6 +74,10 @@ const argv = yargs
     describe: 'A password to encrypt your keys',
     default: '',
   })
+  .option('run', {
+    describe: 'Run a single hopr command, same syntax as in hopr-admin',
+    default: '',
+  })
   .option('dryRun', {
     boolean: true,
     describe: 'List all the options used to run the HOPR node, but quit instead of starting',
@@ -174,6 +178,15 @@ async function main() {
 
     if (adminServer) {
       adminServer.registerNode(node)
+    }
+
+    if (argv.run && argv.run !== '') {
+      // Run a single command and then exit.
+      let cmds = new commands.Commands(node)
+      let resp = await cmds.execute(argv.run)
+      console.log(resp)
+      await node.down()
+      process.exit(0)
     }
   } catch (e) {
     console.log(e)

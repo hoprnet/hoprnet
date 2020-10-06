@@ -120,8 +120,7 @@ describe('should create a socket and connect to it', function () {
 
     // Make sure that the nodes know each other
     await Promise.all([sender.dial(relay.peerInfo), counterparty.dial(relay.peerInfo)])
-
-    // @ts-ignore
+    //@ts-ignore
     const conn = await sender.relay.establishRelayedConnection(
       Multiaddr(`/p2p/${counterparty.peerInfo.id.toB58String()}`),
       [relay.peerInfo],
