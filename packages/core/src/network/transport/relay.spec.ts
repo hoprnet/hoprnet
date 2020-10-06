@@ -1,5 +1,4 @@
-// @ts-ignore
-import libp2p = require('libp2p')
+import libp2p from 'libp2p'
 
 // @ts-ignore
 import MPLEX = require('libp2p-mplex')
@@ -72,6 +71,7 @@ describe('should create a socket and connect to it', function () {
       },
     })
 
+    //@ts-ignore
     node.relay = new Relay(node, options.connHandler)
 
     node.handle(TEST_PROTOCOL, (handler: Handler) => {
@@ -121,7 +121,7 @@ describe('should create a socket and connect to it', function () {
 
     // Make sure that the nodes know each other
     await Promise.all([sender.dial(relay.peerInfo), counterparty.dial(relay.peerInfo)])
-
+    //@ts-ignore
     const conn = await sender.relay.establishRelayedConnection(
       Multiaddr(`/p2p/${counterparty.peerInfo.id.toB58String()}`),
       [relay.peerInfo],

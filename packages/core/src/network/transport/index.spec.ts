@@ -1,8 +1,6 @@
 import assert from 'assert'
 import AbortController from 'abort-controller'
-
-// @ts-ignore
-import libp2p = require('libp2p')
+import libp2p from 'libp2p'
 
 // @ts-ignore
 import MPLEX = require('libp2p-mplex')
@@ -322,6 +320,7 @@ describe('should create a socket and connect to it', function () {
     connectionHelper([sender, relay])
     connectionHelper([relay, counterparty])
     const INVALID_PORT = 8758
+    // @ts-ignore
     const { stream }: { stream: Connection } = await sender.dialProtocol(
       Multiaddr(`/ip4/127.0.0.1/tcp/${INVALID_PORT}/p2p/${counterparty.peerInfo.id.toB58String()}`),
       TEST_PROTOCOL
@@ -770,7 +769,7 @@ describe('should create a socket and connect to it', function () {
     connectionHelper([relay, counterparty])
 
     const INVALID_PORT = 8758
-
+    // @ts-ignore
     const { stream }: { stream: Connection } = await sender.dialProtocol(
       Multiaddr(`/ip4/127.0.0.1/tcp/${INVALID_PORT}/p2p/${counterparty.peerInfo.id.toB58String()}`),
       TEST_PROTOCOL
