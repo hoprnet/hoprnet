@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-chat",
-  "version": "1.17.0-alpha.56",
+  "version": "1.17.0-alpha.57",
   "description": "Interactive chat PoC for HOPR Protocol",
   "main": "lib/index.js",
   "scripts": {
@@ -33,9 +33,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@hoprnet/hopr-core": "^1.17.0-alpha.56",
-    "@hoprnet/hopr-core-connector-interface": "^1.17.0-alpha.56",
-    "@hoprnet/hopr-utils": "^1.17.0-alpha.56",
+    "@hoprnet/hopr-core": "^1.17.0-alpha.57",
+    "@hoprnet/hopr-core-connector-interface": "^1.17.0-alpha.57",
+    "@hoprnet/hopr-utils": "^1.17.0-alpha.57",
     "@zeit/ncc": "^0.22.3",
     "bignumber.js": "^9.0.0",
     "bn.js": "~5.1.2",
