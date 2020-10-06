@@ -1,4 +1,9 @@
 declare module 'libp2p' {
+  type PeerId = import('peer-id')
+  type PeerInfo = import('peer-info')
+  type Multiaddr = import ('multiaddr')
+  type Handler = import('../network/transport/types').Handler
+
   export type PeerStore = {
     has(peerInfo: PeerId): boolean
     get(peerId: PeerId): PeerInfo | undefined
@@ -8,7 +13,7 @@ declare module 'libp2p' {
   }
 
   export default class LibP2P {
-    constructor(options: any): LibP2P
+    constructor(options: any) //: LibP2P
     static create(options: any): any
     // @TODO add libp2p types
     emit: (event: string, ...args: any[]) => void
