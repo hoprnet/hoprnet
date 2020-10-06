@@ -1,4 +1,4 @@
-# Issue tracking
+# Issue tracking (for team-members only)
 
 Principles:
 
@@ -11,7 +11,12 @@ Principles:
 
 ## Creating an issue
 
-- A team-member, or an external contributor creates an issue using [bug report](./.github/ISSUE_TEMPLATE/bug_report.md) or [feature request](./.github/ISSUE_TEMPLATE/feature-request.md) templates.
+- A team-member, or an external contributor creates an issue using one of our [templates](.github/ISSUE_TEMPLATE), these templates may add some labels by default.
 - A team-member labels the issue accordingly.
 - (Optional) A team-member adds a milestone.
 - (Optional) A team-member assignes a user.
+
+## Why label them using p:\*
+
+- We are using a monorepo
+- A `core` developer should be able to filter `core` tasks

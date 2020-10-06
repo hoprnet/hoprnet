@@ -46,6 +46,10 @@ assignees: ''
 - Browser [e.g. stock browser, safari]
 - Version [e.g. 22] -->
 
+## Logs
+
+<!--- Obligatory if the bug occurred while running HOPR Chat, please attach to this issue the file named "log" or "log.txt" produced in your "hopr-chat" folder. -->
+
 ## Possible Implementation
 
 <!--- Not obligatory, but suggest an idea for implementing addition or change -->
