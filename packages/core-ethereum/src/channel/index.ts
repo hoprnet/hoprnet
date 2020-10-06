@@ -214,7 +214,7 @@ class ChannelFactory {
         Buffer.from(signedChannel)
       )
     } else {
-      throw Error('Invalid input parameters.')
+      throw Error('Cannot open channel. Channel is not open and no sign function was given.')
     }
 
     return channel
