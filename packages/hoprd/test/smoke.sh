@@ -1,5 +1,4 @@
 #/bin/bash
 alias hoprd="node $0/../../lib/index.js"
 
-
-hoprd --password="opensesame" --run "myAddress"
+hoprd --data='alice'  --password="opensesame" --run "myAddress hopr"

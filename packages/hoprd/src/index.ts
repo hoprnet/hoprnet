@@ -135,7 +135,7 @@ async function generateNodeOptions(logs: LogStream): Promise<HoprOptions> {
     output: logMessageToNode,
   }
 
-  if (argv.password){
+  if (argv.password !== undefined){
     options.password = argv.password as string
   }
 

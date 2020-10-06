@@ -104,7 +104,6 @@ async function getFromDatabase(db: LevelUp, pw?: string): Promise<PeerId> {
   try {
     serializedKeyPair = await db.get(Buffer.from(KeyPair))
   } catch (err) {
-    console.log(err)
     return createIdentity(db, pw)
   }
 
