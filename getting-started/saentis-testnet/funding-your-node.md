@@ -4,6 +4,10 @@ description: Funding your node with xDAI to participate in the testnet
 
 # Funding Your Node
 
+{% hint style="danger" %}
+HOPR Säntis has ended. Thank you to everyone who participated. We'll be launching a new testnet soon, codenamed Basòdino. Check back soon for more updates.
+{% endhint %}
+
 The Säntis testnet is being hosted on xDAI Chain, a sidechain of Ethereum. In order to participate in the testnet, you'll need to fund your node with 0.02 xDAI.  
   
 First, you'll need to load some ETH into your Ethereum wallet. [MetaMask](https://metamask.io/) is one of the most widely supported wallets, but there are other options.

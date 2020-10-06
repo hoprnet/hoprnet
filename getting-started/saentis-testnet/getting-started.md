@@ -4,6 +4,10 @@ description: Getting started with Säntis
 
 # Säntis for Previous Users
 
+{% hint style="danger" %}
+HOPR Säntis has ended. Thank you to everyone who participated. We'll be launching a new testnet soon, codenamed Basòdino. Check back soon for more updates.
+{% endhint %}
+
 If you've already run HOPR Chat before, you can connect to Säntis in no time.
 
 {% hint style="info" %}

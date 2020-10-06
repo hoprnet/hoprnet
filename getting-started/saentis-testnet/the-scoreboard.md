@@ -4,6 +4,10 @@ description: Earning rewards on Säntis
 
 # Scoreboard and Prizes
 
+{% hint style="danger" %}
+HOPR Säntis has ended. Thank you to everyone who participated. We'll be launching a new testnet soon, codenamed Basòdino. Check back soon for more updates.
+{% endhint %}
+
 The scoreboard shows the nodes which have earned the most points completing tasks in the testnet. You can check the scoreboard at any time by visiting [https://saentis.hoprnet.org](https://saentis.hoprnet.org)  
   
 You'll receive 100 points the first time you register your node with CoverBot. Every time CoverBot selects your node to relay data, it will send you **1** [**xHOPR token**](../../core-concepts/xhopr-tokens.md) and award you a further 10 points. More ways to earn points will be revealed as Säntis progresses, so keep checking back here for more information.  

@@ -4,6 +4,10 @@ description: Answers to common queries
 
 # Troubleshooting
 
+{% hint style="danger" %}
+HOPR Säntis has ended. Thank you to everyone who participated. We'll be launching a new testnet soon, codenamed Basòdino. Check back soon for more updates.
+{% endhint %}
+
 The Säntis testnet is still an early version of the HOPR network. One major goal of this testnet is to try and find bugs and problems. As a result, things may not work as expected, and the UI and UX are less polished than they will be at mainnet.  
   
 Here are some common issues you might run into, along with suggested solutions.
