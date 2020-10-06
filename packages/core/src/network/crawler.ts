@@ -243,7 +243,7 @@ class Crawler {
     })
   }
 
-  async answerCrawl(callerId: PeerId, callerAddress: Multiaddr): Promise<PeerInfo[]>{
+  async answerCrawl(callerId: PeerId, callerAddress: Multiaddr): Promise<PeerInfo[]> {
     if (this.options?.timeoutIntentionally) {
       await new Promise((resolve) => setTimeout(resolve, CRAWL_TIMEOUT + 100))
     }
@@ -253,9 +253,7 @@ class Crawler {
     const selectedNodes = randomSubset(
       this.networkPeers.peers,
       amountOfNodes,
-      (entry: Entry) =>
-        entry.id !== this.id.toB58String() &&
-        (entry.id !== callerId.toB58String())
+      (entry: Entry) => entry.id !== this.id.toB58String() && entry.id !== callerId.toB58String()
     ).map((peer) => {
       // convert peerId to peerInfo
       const found = this.peerStore.get(PeerId.createFromB58String(peer.id))

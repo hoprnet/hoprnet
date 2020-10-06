@@ -17,7 +17,7 @@ const STUN_TIMEOUT = durations.seconds(4)
 class Stun {
   private socket: Socket
 
-  constructor(private hosts: HoprOptions["hosts"]) {}
+  constructor(private hosts: HoprOptions['hosts']) {}
 
   static getExternalIP(addresses: { hostname: string; port: number }[], usePort?: number): Promise<Interface> {
     return new Promise<Interface>(async (resolve, reject) => {

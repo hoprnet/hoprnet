@@ -1,4 +1,4 @@
-import libp2p from 'libp2p' 
+import libp2p from 'libp2p'
 // @ts-ignore
 import MPLEX = require('libp2p-mplex')
 // @ts-ignore

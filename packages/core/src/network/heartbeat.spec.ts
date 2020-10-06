@@ -40,11 +40,9 @@ describe('check heartbeat mechanism', function () {
       },
     } as Hopr<HoprCoreConnector>['interactions']
 
-
     node.network = new Network(node, node.interactions, {} as any)
 
     node.peerRouting.findPeer = (_: PeerId) => Promise.reject(Error('not implemented'))
-
 
     await node.start()
 
@@ -112,17 +110,12 @@ describe('unit test heartbeat', () => {
   let hangUp = jest.fn(async () => {})
   let peers
   let interaction = {
-    interact: jest.fn(() => {})
+    interact: jest.fn(() => {}),
   } as any
 
   beforeEach(() => {
     const empty = [][Symbol.iterator]()
-    peers = new NetworkPeerStore(empty),
-    heartbeat = new Heartbeat(
-      peers,
-      interaction,
-      hangUp
-    )
+    ;(peers = new NetworkPeerStore(empty)), (heartbeat = new Heartbeat(peers, interaction, hangUp))
   })
 
   it('check nodes is noop with empty store', async () => {
@@ -132,14 +125,14 @@ describe('unit test heartbeat', () => {
   })
 
   it('check nodes is noop with only new peers', async () => {
-    peers.push({id: 'a', lastSeen: Date.now()})
+    peers.push({ id: 'a', lastSeen: Date.now() })
     await heartbeat.checkNodes()
     expect(hangUp.mock.calls.length).toBe(0)
     expect(interaction.interact.mock.calls.length).toBe(0)
   })
 
   it('check nodes interacts with an old peer', async () => {
-    peers.push({id: '16Uiu2HAmShu5QQs3LKEXjzmnqcT8E3YqyxKtVTurWYp8caM5jYJw', lastSeen: 0})
+    peers.push({ id: '16Uiu2HAmShu5QQs3LKEXjzmnqcT8E3YqyxKtVTurWYp8caM5jYJw', lastSeen: 0 })
     await heartbeat.checkNodes()
     expect(hangUp.mock.calls.length).toBe(0)
     expect(interaction.interact.mock.calls.length).toBe(1)

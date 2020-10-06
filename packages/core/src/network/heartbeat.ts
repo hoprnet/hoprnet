@@ -6,12 +6,15 @@ import { Entry } from './peerStore'
 import { EventEmitter } from 'events'
 import PeerInfo from 'peer-info'
 import { randomInteger } from '@hoprnet/hopr-utils'
-import {HEARTBEAT_REFRESH_TIME, HEARTBEAT_INTERVAL_LOWER_BOUND, HEARTBEAT_INTERVAL_UPPER_BOUND, MAX_PARALLEL_CONNECTIONS} from '../constants'
+import {
+  HEARTBEAT_REFRESH_TIME,
+  HEARTBEAT_INTERVAL_LOWER_BOUND,
+  HEARTBEAT_INTERVAL_UPPER_BOUND,
+  MAX_PARALLEL_CONNECTIONS,
+} from '../constants'
 import { Heartbeat as HeartbeatInteraction } from '../interactions/network/heartbeat'
 
-
 const log = debug('hopr-core:heartbeat')
-
 
 class Heartbeat extends EventEmitter {
   timeout: any
@@ -20,8 +23,7 @@ class Heartbeat extends EventEmitter {
     private networkPeers: NetworkPeerStore,
     private interaction: HeartbeatInteraction,
     private hangUp: (addr: PeerId) => Promise<void>
-    ) {
-
+  ) {
     super()
     super.on('beat', this.connectionListener.bind(this))
   }
@@ -36,7 +38,6 @@ class Heartbeat extends EventEmitter {
   }
 
   async checkNodes(): Promise<void> {
-
     log(`Checking nodes`)
     this.networkPeers.debugLog()
 
@@ -46,10 +47,7 @@ class Heartbeat extends EventEmitter {
     const THRESHOLD_TIME = Date.now() - HEARTBEAT_REFRESH_TIME
 
     const queryNode = async (peer: string, token: Token): Promise<void> => {
-      while (
-        tokens.length > 0 &&
-        this.networkPeers.updatedSince(THRESHOLD_TIME)
-      ) {
+      while (tokens.length > 0 && this.networkPeers.updatedSince(THRESHOLD_TIME)) {
         let nextPeer = this.networkPeers.pop()
         let token = tokens.pop() as Token
 
