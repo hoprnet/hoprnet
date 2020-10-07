@@ -28,10 +28,10 @@ jobs:
       - name: Install node modules
         run: |
           yarn policies set-version ${{ matrix.yarn-version }}
-          yarn install --frozen-lockfile
+          NODE_ENV=production yarn install --frozen-lockfile
       - name: Install dependencies and link locally
         run: |
-          yarn bootstrap
+          yarn bootstrap-ci
       - name: Lint & Fix
         if: |
           github.event_name == 'pull_request' &&

@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "bootstrap": "lerna exec -- yarn --mutex network --frozen-lockfile && lerna link --force-local",
+    "bootstrap-ci": "NODE_ENV=production yarn bootstrap",
     "build": "lerna run build",
     "regenerate-lockfiles": "lerna run clean && rm -r packages/*/yarn.lock && yarn exec -- yarn --mutex network",
     "core:test": "cd packages/core && yarn build && yarn test",
