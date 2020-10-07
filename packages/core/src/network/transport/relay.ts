@@ -123,11 +123,12 @@ class Relay {
         continue
       }
 
+      log(`relayed connection established`)
       return new RelayConnection({
         stream,
         self: this._peerInfo.id,
         counterparty: destination,
-        webRTC: this._webRTCUpgrader?.upgradeOutbound(),
+        // webRTC: this._webRTCUpgrader?.upgradeOutbound(),
       })
     }
 
@@ -352,7 +353,7 @@ class Relay {
       shaker.write(OK)
 
       shaker.rest()
-      
+
       log(`overwriting connection between ${connection.remotePeer.toB58String()} and ${counterparty.toB58String()}`)
       const ctxToCounterparty = counterpartyMap.get(connection.remotePeer.toB58String())
 
