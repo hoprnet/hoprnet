@@ -32,7 +32,8 @@
   "scripts": {
     "build": "yarn clean && tsc -p .",
     "clean": "rm -rf ./lib",
-    "test": "jest --runInBand --forceExit && jest --runInBand --forceExit && jest --runInBand --forceExit",
+    "test": "yarn testOnce",
+    "testOnce": "node --trace-warnings node_modules/.bin/jest",
     "prepublishOnly": "yarn build"
   },
   "dependencies": {
