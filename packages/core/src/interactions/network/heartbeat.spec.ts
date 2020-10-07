@@ -57,7 +57,7 @@ describe('check heartbeat mechanism', function () {
     const [Alice, Bob] = await Promise.all([
       /* prettier-ignore */
       generateNode(),
-      generateNode(),
+      generateNode()
     ])
 
     await Alice.dial(Bob.peerInfo)
