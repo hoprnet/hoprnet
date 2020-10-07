@@ -1,4 +1,6 @@
 export enum NodeStates {
+  adminModeDisabled = 'ADMIN_MODE_DISABLED',
+  adminCommandReceived = 'ADMIN_COMMAND_RECEIVED',
   newUnverifiedNode = 'UNVERIFIED',
   tweetVerificationFailed = 'FAILED_TWITTER_VERIFICATION',
   tweetVerificationInProgress = 'IN_PROGRESS_TWITTER_VERIFICATION',
@@ -17,7 +19,8 @@ export enum BotCommands {
   status = 'STATUS',
   verify = 'VERIFY',
   help = 'HELP',
-  stats = 'STATS'
+  stats = 'STATS',
+  admin = 'ADMIN'
 }
 
 export enum ScoreRewards {

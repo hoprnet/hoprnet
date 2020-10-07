@@ -16,7 +16,8 @@ import {
   COVERBOT_VERIFICATION_CYCLE_EXECUTE,
   HOPR_ENVIRONMENT,
   COVERBOT_DEBUG_HOPR_ADDRESS,
-  FIREBASE_DATABASE_URL
+  FIREBASE_DATABASE_URL,
+  COVERBOT_ADMIN_MODE
 } from '../../utils/env'
 import db from './db'
 import { BotCommands, NodeStates, ScoreRewards } from './state'
@@ -81,7 +82,7 @@ export class Coverbot implements Bot {
     log(`- constructor | 🏠 HOPR Address: ${this.address}`)
     log(`- constructor | 🏡 Native Address: ${this.nativeAddress}`)
     log(`- constructor | ⛓ EVM Network: ${COVERBOT_CHAIN_PROVIDER}`)
-    log(`- constructor | 📦 Firebase Database: ${FIREBASE_DATABASE_URL}`)
+    log(`- constructor | 📦 Firebase Database URL: ${FIREBASE_DATABASE_URL}`)
     log(`- constructor | 📦 Root Schema for Firebase: ${HOPR_ENVIRONMENT}`)
     log(`- constructor | 💸 Threshold: ${COVERBOT_XDAI_THRESHOLD}`)
     log(`- constructor | 💰 Native Balance: ${this.initialBalance}`)
@@ -203,17 +204,23 @@ export class Coverbot implements Bot {
 
   protected async _verificationCycle() {
     if (!this.loadedDb) {
+      log(`- verificationCycle | Database ${databaseTextRef} isn‘t loaded, calling this.loadData`)
       await this.loadData()
     }
 
     log(`- verificationCycle | ${COVERBOT_VERIFICATION_CYCLE_IN_MS}ms has passed. Verifying nodes...`)
     COVERBOT_DEBUG_MODE && log(`- verificationCycle | DEBUG mode activated, looking for ${COVERBOT_DEBUG_HOPR_ADDRESS}`)
 
+    log(`- verificationCycle | Getting ready to dump data.`)
     await this.dumpData()
+    log(`- verificationCycle | Dump data process completed.`)
 
     const _verifiedNodes = Array.from(this.verifiedHoprNodes.values())
+    log(`- verificationCycle | ${_verifiedNodes.length} verified nodes read from memory.`)
     const randomIndex = Math.floor(Math.random() * _verifiedNodes.length)
+    log(`- verificationCycle | Random index ${randomIndex} picked to choose a verified node.`)
     const hoprNode: HoprNode = _verifiedNodes[randomIndex]
+    log(`- verificationCycle | Node ${hoprNode} selected at random to go through verification.`)
 
     if (!hoprNode) {
       log(`- verificationCycle | No node from our memory. Skipping...`)
@@ -226,16 +233,19 @@ export class Coverbot implements Bot {
     }
 
     try {
-      log(`- verificationCycle | Verifying node process, looking for tweet ${hoprNode.tweetUrl}`)
+      log(`- verificationCycle | Verifying node process, looking for tweet ${hoprNode.tweetUrl}.`)
       const tweet = new TweetMessage(hoprNode.tweetUrl)
       await tweet.fetch({ mock: COVERBOT_DEBUG_MODE })
+      log(`- verificationCycle | Verifying node process, tweet section. About to get HOPR node from Tweet.`)
       const _hoprNodeAddress = tweet.getHOPRNode({ mock: COVERBOT_DEBUG_MODE, hoprNode: COVERBOT_DEBUG_HOPR_ADDRESS })
+      log(`- verificationCycle | Verifying node process, tweet section. HOPR Node ${_hoprNodeAddress} found.`)
 
       if (_hoprNodeAddress.length === 0) {
         log(`- verificationCycle | No node has been found from our tweet w/content ${tweet.content}`)
         // this.verifiedHoprNodes.delete(hoprNode.id)
         await this.dumpData()
       } else {
+        log(`- verificationCycle | Node ${_hoprNodeAddress} has been found. Trying to notify verification process.`)
         this._sendMessageFromBot(_hoprNodeAddress, BotResponses[BotCommands.verify]).catch((err) => {
           error(`Trying to send ${BotCommands.verify} message to ${_hoprNodeAddress} failed.`)
         })
@@ -251,12 +261,14 @@ export class Coverbot implements Bot {
          */
 
         // 1.
-        console.log(`Relaying node ${_hoprNodeAddress}, checking in ${RELAY_VERIFICATION_CYCLE_IN_MS}`)
+        log(`- verificationCycle | Relaying node ${_hoprNodeAddress}, checking in ${RELAY_VERIFICATION_CYCLE_IN_MS}`)
+        log(`- verificationCycle | Sending 0 hop messages to ${_hoprNodeAddress} to notify relaying process.`)
         this._sendMessageFromBot(_hoprNodeAddress, NodeStateResponses[NodeStates.onlineNode]).catch((err) => {
           error(`Trying to send ${NodeStates.onlineNode} message to ${_hoprNodeAddress} failed.`)
         })
 
         // 2.
+        log(`- verificationCycle | Sending multihop messages to ${_hoprNodeAddress} to start process.`)
         this._sendMessageFromBot(this.address, `verify relay ${_hoprNodeAddress}`, [_hoprNodeAddress]).catch(
           (err) => {
             error(`Trying to send RELAY message to ${_hoprNodeAddress} failed.`)
@@ -277,9 +289,10 @@ export class Coverbot implements Bot {
              */
 
             // 4.1.1
-            console.log(`No response from ${_hoprNodeAddress}.`) // Removing as valid node.`)
+            log(`- verificationCycle | No response from ${_hoprNodeAddress}.`) // Removing as valid node.`)
 
             // 4.1.2
+            log(`- verificationCycle | Sending 0 hop message to ${_hoprNodeAddress} to notify invalid relay`)
             this._sendMessageFromBot(_hoprNodeAddress, NodeStateResponses[NodeStates.relayingNodeFailed]).catch(
               (err) => {
                 error(`Trying to send ${NodeStates.relayingNodeFailed} message to ${_hoprNodeAddress} failed.`)
@@ -287,6 +300,7 @@ export class Coverbot implements Bot {
             )
 
             // 4.1.3
+            log(`- verificationCycle | Removing expired timeout for ${_hoprNodeAddress} from memory.`)
             this.relayTimeouts.delete(_hoprNodeAddress)
 
             // 4.1.4
@@ -491,6 +505,22 @@ export class Coverbot implements Bot {
         this._sendMessageFromBot(message.from, BotResponses[BotCommands.stats](connected.length)).catch((err) => {
           error(`Trying to send ${BotCommands.stats} message to ${message.from} failed.`)
         })
+        break;
+      }
+      case 'admin': {
+        log(`- handleMessage | admin command received`)
+        if(!COVERBOT_ADMIN_MODE) {
+          return this._sendMessageFromBot(message.from, NodeStateResponses[NodeStates.adminModeDisabled]).catch((err) => {
+            error(`Trying to send ${NodeStates.adminModeDisabled} message to ${message.from} failed.`)
+          })
+        } else {
+          this._sendMessageFromBot(message.from, NodeStateResponses[NodeStates.adminCommandReceived]('verificationCycle')).catch((err) => {
+            error(`Trying to send ${NodeStates.adminCommandReceived} message to ${message.from} failed.`)
+          })
+          log(`- handleMessage | admin command :: allowed to go forward`)
+          log(`- handleMessage | admin command :: starting verification cycle`)
+          this._verificationCycle.call(this);
+        }
         break;
       }
       case 'rules': {
