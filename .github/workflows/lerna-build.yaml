@@ -31,7 +31,7 @@ jobs:
           yarn install --frozen-lockfile
       - name: Install dependencies and link locally
         run: |
-          node_modules/.bin/lerna bootstrap --ignore-prepublish --force-local -- --frozen-lockfile
+          yarn bootstrap
       - name: Lint & Fix
         if: |
           github.event_name == 'pull_request' &&
@@ -43,10 +43,13 @@ jobs:
           git commit -a -m "Fix linting"
       - name: Build
         run: |
-          node_modules/.bin/lerna run build
+          yarn build
       - name: Test
         run: |
-          node_modules/.bin/lerna run test --stream
+         yarn test
+         #- name: Test Docker build hoprd 
+         # working-directory: packages/hoprd
+         #run: docker build .
       - name: Publish prerelease version
         if: |
           github.event_name == 'pull_request' &&

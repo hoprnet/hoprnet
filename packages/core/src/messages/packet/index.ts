@@ -50,9 +50,6 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       message: Message
     }
   ) {
-    if (arr == null && struct == null) {
-      throw Error(`Invalid constructor parameters.`)
-    }
     if (arr == null) {
       super(Packet.SIZE(node.paymentChannels))
     } else {
@@ -72,6 +69,10 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     }
 
     this.node = node
+  }
+
+  slice(begin: number = 0, end: number = Packet.SIZE(this.node.paymentChannels)) {
+    return this.subarray(begin, end)
   }
 
   subarray(begin: number = 0, end: number = Packet.SIZE(this.node.paymentChannels)): Uint8Array {
@@ -214,7 +215,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
 
       const channel = await node.paymentChannels.channel.create(
         // prettier-ignore
-        path[0].pubKey.marshal(), 
+        path[0].pubKey.marshal(),
         (_counterparty: Uint8Array) => node.interactions.payments.onChainKey.interact(path[0])
       )
 

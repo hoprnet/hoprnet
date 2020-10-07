@@ -1,7 +1,7 @@
 import { Ganache, getNewPort } from '@hoprnet/hopr-testing'
 import { migrate } from '@hoprnet/hopr-ethereum'
 import { durations } from '@hoprnet/hopr-utils'
-import HoprCore from '.'
+import Hopr from '.'
 import assert from 'assert'
 
 import { privKeyToPeerId } from './utils'
@@ -9,19 +9,30 @@ import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
 import PeerInfo from 'peer-info'
 
 describe('test hopr-core', function () {
-  const ganache = new Ganache()
+  let ganache 
+  let node
 
   beforeAll(async function () {
+    ganache = new Ganache()
     await ganache.start()
     await migrate()
   }, durations.seconds(30))
 
+  afterAll(async function () {
+    await ganache.stop()
+  })
+
+  afterEach(async function(){
+    await node.stop()
+  })
+
   it(
     'should start a node',
     async function () {
-      const node = await HoprCore.create({
+      node = await Hopr.create({
         debug: true,
         bootstrapNode: true,
+        password: '',
         dbPath: process.cwd() + '/testdb',
         network: 'ethereum',
         provider: 'ws://127.0.0.1:9545',
@@ -34,10 +45,8 @@ describe('test hopr-core', function () {
       })
 
       assert(node != null, `Node creation must not lead to 'undefined'`)
-
-      await node.stop()
     },
-    durations.seconds(3)
+    durations.seconds(100)
   )
 
   it(
@@ -45,7 +54,7 @@ describe('test hopr-core', function () {
     async function () {
       const peerId = await privKeyToPeerId(NODE_SEEDS[0])
 
-      const node = await HoprCore.create({
+      node = await Hopr.create({
         debug: true,
         peerId,
         bootstrapNode: true,
@@ -59,13 +68,8 @@ describe('test hopr-core', function () {
         },
         bootstrapServers: [new PeerInfo(peerId)],
       })
-
-      await node.stop()
     },
     durations.seconds(3)
   )
 
-  afterAll(async function () {
-    await ganache.stop()
-  })
 })

@@ -13,5 +13,9 @@ export const peerHasOnlyPublicAddresses = (peer: PeerInfo): boolean => {
 }
 
 export const isOnPrivateNet = (ma: Multiaddr): boolean => {
-  return Boolean(ma.nodeAddress().address.match(PRIVATE_NETS))
+  if (['ip4', 'ip6', 'dns4', 'dns6'].includes(ma.protoNames()[0])) {
+    return Boolean(ma.nodeAddress().address.match(PRIVATE_NETS))
+  }
+  // most likely not on private net
+  return false
 }
