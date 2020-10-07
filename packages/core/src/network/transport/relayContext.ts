@@ -1,6 +1,9 @@
 import { u8aEquals } from '@hoprnet/hopr-utils'
 import Defer, { DeferredPromise } from 'p-defer'
 
+import Debug from 'debug'
+const log = Debug(`hopr-core:transport`)
+
 import { RELAY_PAYLOAD_PREFIX, RELAY_STATUS_PREFIX, STOP } from './constants'
 
 class RelayContext {
@@ -24,6 +27,7 @@ class RelayContext {
       })
 
       while (true) {
+        log(`relay iteration`)
         msg = this._source.next()
 
         await Promise.race([
