@@ -270,7 +270,7 @@ export default class HoprEthereum implements HoprCoreConnector {
       reconnect: {
         auto: true,
         delay: 1000, // ms
-        maxAttempts: 10,
+        maxAttempts: 30,
       },
     })
 
