@@ -5,6 +5,11 @@ const FIRST_OPTION_OFFSET = 1
 const SECOND_OPTION_OFFSET = 5
 const EXTRA_PADDING = 2
 
+export const chalkStrings = {
+  yes: chalk.green('y'),
+  no: chalk.red('N'),
+}
+
 export function displayHelp() {
   let firstOptionMaxLength = 0
   let secondOptionMaxLength = 0

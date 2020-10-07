@@ -9,7 +9,7 @@ import ListCommands from './listCommands'
 // import ListConnectors from './listConnectors'
 import ListOpenChannels from './listOpenChannels'
 import ListConnectedPeers from './listConnected'
-import OpenChannel from './openChannel'
+import { OpenChannelFancy, OpenChannel } from './openChannel'
 import Ping from './ping'
 import PrintAddress from './printAddress'
 import PrintBalance from './printBalance'
@@ -58,10 +58,11 @@ export class Commands {
     ]
 
     if (rl) {
-      this.commands.push(new OpenChannel(node, rl))
+      this.commands.push(new OpenChannelFancy(node, rl))
       this.commands.push(new SendMessageFancy(node, rl))
       this.commands.push(new MultiSendMessage(node, rl))
     } else {
+      this.commands.push(new OpenChannel(node))
       this.commands.push(new SendMessage(node))
     }
 
