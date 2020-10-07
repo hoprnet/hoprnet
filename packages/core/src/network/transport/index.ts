@@ -134,33 +134,37 @@ class TCP {
   async dial(ma: Multiaddr, options?: DialOptions): Promise<Connection> {
     options = options || {}
 
-    // let error: Error
-    // if (['ip4', 'ip6', 'dns4', 'dns6'].includes(ma.protoNames()[0]) && this.isRealisticAddress(ma)) {
-    //   try {
-    //     verbose('attempting to dial directly', ma.toString())
-    //     return await this.dialDirectly(ma, options)
-    //   } catch (err) {
-    //     if (err.code != null && ['ECONNREFUSED', 'ECONNRESET', 'EPIPE'].includes(err.code)) {
-    //       // expected case, continue
-    //       error = err
-    //     } else {
-    //       // Unexpected error, ie:
-    //       // type === aborted
-    //       verbose(`Dial directly unexpected error ${err}`)
-    //       throw err
-    //     }
-    //   }
-    // }
+    let error: Error
+    if (
+      this.relays.some((pInfo) => ma.getPeerId() === pInfo.id.toB58String()) &&
+      ['ip4', 'ip6', 'dns4', 'dns6'].includes(ma.protoNames()[0]) &&
+      this.isRealisticAddress(ma)
+    ) {
+      try {
+        verbose('attempting to dial directly', ma.toString())
+        return await this.dialDirectly(ma, options)
+      } catch (err) {
+        if (err.code != null && ['ECONNREFUSED', 'ECONNRESET', 'EPIPE'].includes(err.code)) {
+          // expected case, continue
+          error = err
+        } else {
+          // Unexpected error, ie:
+          // type === aborted
+          verbose(`Dial directly unexpected error ${err}`)
+          throw err
+        }
+      }
+    }
 
-    // if (this.relays === undefined) {
-    //   throw Error(
-    //     `Could not connect ${chalk.yellow(
-    //       ma.toString()
-    //     )} because we can't connect directly and we have no potential relays.${
-    //       error != null ? ` Connection error was:\n${error}` : ''
-    //     }`
-    //   )
-    // }
+    if (this.relays === undefined) {
+      throw Error(
+        `Could not connect ${chalk.yellow(
+          ma.toString()
+        )} because we can't connect directly and we have no potential relays.${
+          error != null ? ` Connection error was:\n${error}` : ''
+        }`
+      )
+    }
 
     const destination = PeerId.createFromCID(ma.getPeerId())
 
