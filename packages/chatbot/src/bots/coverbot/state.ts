@@ -16,6 +16,8 @@ export enum BotCommands {
   rules = 'RULES',
   status = 'STATUS',
   verify = 'VERIFY',
+  help = 'HELP',
+  stats = 'STATS'
 }
 
 export enum ScoreRewards {

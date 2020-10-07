@@ -5,7 +5,7 @@ import { BotCommands, NodeStates, ScoreRewards } from './state'
 
 export const BotResponses = {
   [BotCommands.rules]: `\n
-    Welcome to the xHOPR incentivized network!
+    Welcome to HOPR incentivized network!
 
     1. Load ${COVERBOT_XDAI_THRESHOLD} xDAI into your HOPR Ethereum Address
     2. Post a tweet with your HOPR Address and the tag #HOPRNetwork
@@ -17,8 +17,20 @@ export const BotResponses = {
   [BotCommands.status]: (status: NodeStates) => `\n
     Your current status is: ${status}
   `,
+  [BotCommands.stats]: (connected: number) => `\n
+    There are currently ${connected} nodes connected.
+  `,
   [BotCommands.verify]: `\n
     Verifying if your node is still up...
+  `,
+  [BotCommands.help]: `\n
+    Hi! My name is coverbot. Please tell me how I can help you by sending a
+    message with the following command:
+
+    verify - Start the verification process for cover traffic
+    status - Request information about your verification
+    rules  - Learn the rules about the incentivation network
+    stats  - Learn about the current stats for the network
   `,
 }
 
