@@ -156,6 +156,7 @@ class Relay {
         // webRTC: this._webRTCUpgrader?.upgradeInbound(),
       })
     )
+    log(`counterparty relayed connection established`)
   }
 
   private async connectToRelay(relay: PeerInfo, options?: DialOptions): Promise<Connection> {
