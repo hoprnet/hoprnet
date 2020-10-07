@@ -10,18 +10,27 @@ import PeerInfo from 'peer-info'
 
 describe('test hopr-core', function () {
   let ganache 
+  let node
 
-  it('start ganache', async function () {
+  beforeAll(async function () {
     ganache = new Ganache({ws: false})
     await ganache.start()
     await migrate()
   }, durations.seconds(30))
 
+  afterAll(async function () {
+    await ganache.stop()
+  })
+
+  afterEach(async function(){
+    await node.stop()
+  })
+
   it(
     'should start a node',
     async function () {
-      const node = await Hopr.create({
-        debug: true,
+      node = await Hopr.create({
+        debug: false, //true,
         bootstrapNode: true,
         password: '',
         dbPath: process.cwd() + '/testdb',
@@ -36,9 +45,6 @@ describe('test hopr-core', function () {
       })
 
       assert(node != null, `Node creation must not lead to 'undefined'`)
-
-      await node.stop()
-
     },
     durations.seconds(100)
   )
@@ -48,7 +54,7 @@ describe('test hopr-core', function () {
     async function () {
       const peerId = await privKeyToPeerId(NODE_SEEDS[0])
 
-      const node = await Hopr.create({
+      node = await Hopr.create({
         debug: true,
         peerId,
         bootstrapNode: true,
@@ -62,13 +68,8 @@ describe('test hopr-core', function () {
         },
         bootstrapServers: [new PeerInfo(peerId)],
       })
-
-      await node.stop()
     },
     durations.seconds(3)
   )
 
-  afterAll(async function () {
-    await ganache.stop()
-  })
 })
