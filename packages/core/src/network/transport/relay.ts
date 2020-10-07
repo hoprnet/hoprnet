@@ -302,7 +302,7 @@ class Relay {
 
     let deliveryStream: Stream
     if (counterpartyMap == null || counterpartyMap.get(connection.remotePeer.toB58String()) == null) {
-      console.log(
+      log(
         `${connection.remotePeer.toB58String()} to ${counterparty.toB58String()} had no connection. Establishing a new one`
       )
       try {
@@ -347,6 +347,7 @@ class Relay {
       }
       senderMap.set(counterparty.toB58String(), ctxToSender)
     } else {
+      log(`overwriting connection between ${connection.remotePeer.toB58String()} and ${counterparty.toB58String()}`)
       const ctxToCounterparty = counterpartyMap.get(connection.remotePeer.toB58String())
 
       if (ctxToCounterparty == null) {
@@ -371,25 +372,6 @@ class Relay {
       }
       shaker.stream.sink(ctxToSender.source)
     }
-
-    // const toSender = shaker.stream as Stream
-    // const toCounterparty = deliveryStream
-
-    // this.updateContext(
-    //   this._peerInfo.id.toB58String(),
-    //   counterparty.toB58String(),
-    //   toCounterparty.source as any,
-    //   toSender.sink,
-    //   false
-    // )
-
-    // this.updateContext(
-    //   counterparty.toB58String(),
-    //   this._peerInfo.id.toB58String(),
-    //   toSender.source as any,
-    //   toCounterparty.sink,
-    //   true
-    // )
   }
 
   private async establishForwarding(counterparty: PeerId) {
