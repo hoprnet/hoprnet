@@ -44,6 +44,8 @@ describe('test Channel class', function () {
   }
 
   before(async function () {
+    this.timeout(60e3)
+
     await ganache.start()
     await migrate()
 
@@ -56,6 +58,8 @@ describe('test Channel class', function () {
   })
 
   beforeEach(async function () {
+    this.timeout(10e3)
+
     funder = await getPrivKeyData(stringToU8a(testconfigs.FUND_ACCOUNT_PRIVATE_KEY))
     const userA = await createAccountAndFund(web3, hoprToken, funder, testconfigs.DEMO_ACCOUNTS[1])
     const userB = await createAccountAndFund(web3, hoprToken, funder, testconfigs.DEMO_ACCOUNTS[2])
@@ -74,6 +78,8 @@ describe('test Channel class', function () {
   })
 
   it('should create a channel and submit tickets', async function () {
+    this.timeout(durations.minutes(1))
+
     const channelBalance = new ChannelBalance(undefined, {
       balance: new BN(123),
       balance_a: new BN(122),
