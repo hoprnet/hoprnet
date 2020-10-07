@@ -9,9 +9,10 @@ import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
 import PeerInfo from 'peer-info'
 
 describe('test hopr-core', function () {
-  const ganache = new Ganache()
+  let ganache 
 
   beforeAll(async function () {
+    ganache = new Ganache()
     await ganache.start()
     await migrate()
   }, durations.seconds(30))
