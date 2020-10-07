@@ -27,9 +27,6 @@
     "printWidth": 120,
     "trailingComma": "none"
   },
-  "husky": {
-    "hooks": {}
-  },
   "__workspaces": {
     "packages": [
       "packages/*"
