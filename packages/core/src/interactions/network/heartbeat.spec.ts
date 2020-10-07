@@ -61,8 +61,6 @@ describe('check heartbeat mechanism', function () {
       generateNode(),
     ])
 
-    await new Promise((resolve) => setTimeout(resolve, 500))
-
     await Alice.dial(Bob.peerInfo)
 
     await Promise.all([
