@@ -30,6 +30,7 @@ describe('check heartbeat mechanism', function () {
       },
     }))
     node.peerInfo.multiaddrs.add(Multiaddr('/ip4/0.0.0.0/tcp/0'))
+    node.peerRouting.findPeer = (_: PeerId) => Promise.reject(Error('not implemented'))
 
     await node.start()
 
