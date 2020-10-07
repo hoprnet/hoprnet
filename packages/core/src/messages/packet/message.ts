@@ -27,6 +27,10 @@ class Message extends Uint8Array {
     return PACKET_SIZE
   }
 
+  slice(begin: number = 0, end: number = Message.SIZE) {
+    return this.subarray(begin, end)
+  }
+
   subarray(begin: number = 0, end: number = Message.SIZE): Uint8Array {
     return new Uint8Array(this.buffer, begin + this.byteOffset, end - begin)
   }
