@@ -5,7 +5,7 @@ import { SendMessageBase } from './sendMessage'
 import readline from 'readline'
 import chalk from 'chalk'
 import type PeerId from 'peer-id'
-import { getPeersIdsAsString } from '../utils'
+import { getPeersIdsAsString, checkPeerIdInput } from '../utils'
 import { GlobalState, AutoCompleteResult, CommandResponse } from './abstractCommand'
 
 export class MultiSendMessage extends SendMessageBase {
@@ -21,13 +21,13 @@ export class MultiSendMessage extends SendMessageBase {
     return 'sends multiple messages to another party, "quit" exits.'
   }
 
-  private async checkArgs(query: string, settings: GlobalState): Promise<PeerId> {
+  private async checkArgs(query: string, state: GlobalState): Promise<PeerId> {
     const [err, id] = this._assertUsage(query, ['PeerId'])
     if (err) throw new Error(err)
-    return await this.checkPeerId(id, settings)
+    return await checkPeerIdInput(id, state)
   }
 
-  private async repl(recipient: PeerId, settings: GlobalState): Promise<void> {
+  private async repl(recipient: PeerId, state: GlobalState): Promise<void> {
     readline.clearLine(process.stdout, 0)
     const message = await new Promise<string>((resolve) => this.rl.question('send >', resolve))
     if (message === 'quit') {
@@ -37,22 +37,22 @@ export class MultiSendMessage extends SendMessageBase {
         clearString(message, this.rl)
         this.rl.pause()
         console.log(`[sending message "${message}"]`)
-        await this.sendMessage(settings, recipient, message)
+        await this.sendMessage(state, recipient, message)
         this.rl.resume()
       }
-      await this.repl(recipient, settings)
+      await this.repl(recipient, state)
     }
   }
 
-  public async execute(query: string, settings: GlobalState): Promise<CommandResponse> {
+  public async execute(query: string, state: GlobalState): Promise<CommandResponse> {
     let peerId: PeerId
 
     try {
-      peerId = await this.checkArgs(query, settings)
+      peerId = await this.checkArgs(query, state)
     } catch (err) {
       return chalk.red(err.message)
     }
-    await this.repl(peerId, settings)
+    await this.repl(peerId, state)
   }
 
   public async autocomplete(query: string, line: string, state: GlobalState): Promise<AutoCompleteResult> {

@@ -6,7 +6,7 @@ import { clearString } from '@hoprnet/hopr-utils'
 import { MAX_HOPS } from '@hoprnet/hopr-core/lib/constants'
 import readline from 'readline'
 import chalk from 'chalk'
-import { checkPeerIdInput, encodeMessage, getOpenChannels, getPeersIdsAsString } from '../utils'
+import { checkPeerIdInput, encodeMessage, getOpenChannels, getPeerIdsAndAliases } from '../utils'
 import { AbstractCommand, GlobalState } from './abstractCommand'
 
 export abstract class SendMessageBase extends AbstractCommand {
@@ -22,16 +22,8 @@ export abstract class SendMessageBase extends AbstractCommand {
     return 'sends a message to another party'
   }
 
-  // Throws if peerid is invalid
-  protected async checkPeerId(id: string, settings: GlobalState): Promise<PeerId> {
-    if (settings.aliases.has(id)) {
-      return settings.aliases.get(id)!
-    }
-    return await checkPeerIdInput(id)
-  }
-
-  protected async sendMessage(settings: GlobalState, recipient: PeerId, msg: string): Promise<void> {
-    const message = settings.includeRecipient
+  protected async sendMessage(state: GlobalState, recipient: PeerId, msg: string): Promise<void> {
+    const message = state.includeRecipient
       ? ((myAddress) => `${myAddress}:${msg}`)(this.node.peerInfo.id.toB58String())
       : msg
 
@@ -47,26 +39,24 @@ export abstract class SendMessageBase extends AbstractCommand {
   }
 
   public async autocomplete(query: string, line: string, state: GlobalState): Promise<AutoCompleteResult> {
-    const allIds = getPeersIdsAsString(this.node, {
-      noBootstrapNodes: true,
-    }).concat(Array.from(state.aliases.keys()))
+    const allIds = getPeerIdsAndAliases(this.node, state)
     return this._autocompleteByFiltering(query, allIds, line)
   }
 }
 
 export class SendMessage extends SendMessageBase {
-  public async execute(query: string, settings: GlobalState): Promise<CommandResponse> {
+  public async execute(query: string, state: GlobalState): Promise<CommandResponse> {
     const [err, peerIdString, msg] = this._assertUsage(query, ['PeerId', 'Message'], /(\w+)\s(.*)/)
     if (err) return err
 
     let peerId: PeerId
     try {
-      peerId = await this.checkPeerId(peerIdString, settings)
+      peerId = await checkPeerIdInput(peerIdString, state)
     } catch (err) {
       return err.message
     }
 
-    return this.sendMessage(settings, peerId, msg)
+    return this.sendMessage(state, peerId, msg)
   }
 }
 
@@ -85,7 +75,7 @@ export class SendMessageFancy extends SendMessageBase {
 
     let peerId: PeerId
     try {
-      peerId = await this.checkPeerId(peerIdString, state)
+      peerId = await checkPeerIdInput(peerIdString, state)
     } catch (err) {
       console.log(chalk.red(err.message))
       return

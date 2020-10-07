@@ -2,9 +2,11 @@ import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import chalk from 'chalk'
 import { AbstractCommand, GlobalState, AutoCompleteResult } from './abstractCommand'
-import { checkPeerIdInput, getPeersIdsAsString, getPaddingLength } from '../utils'
+import { checkPeerIdInput, getPaddingLength, getPeerIdsAndAliases, styleValue } from '../utils'
 
 export class Alias extends AbstractCommand {
+  private parameters = ['PeerId', 'Name']
+
   constructor(public node: Hopr<HoprCoreConnector>) {
     super()
   }
@@ -17,9 +19,16 @@ export class Alias extends AbstractCommand {
     return 'alias an address with a more memorable name'
   }
 
-  async execute(query: string, state: GlobalState): Promise<string | void> {
+  async execute(query: string, state: GlobalState): Promise<string> {
+    // view aliases
     if (!query) {
       const names = Array.from(state.aliases.keys())
+
+      // no aliases found
+      if (names.length === 0) {
+        return `No aliases found.\nTo set an alias, ${this.usage(this.parameters)}`
+      }
+
       const peerIds = Array.from(state.aliases.values())
       const paddingLength = getPaddingLength(names)
 
@@ -30,21 +39,21 @@ export class Alias extends AbstractCommand {
         .join('\n')
     }
 
-    const [err, id, name] = this._assertUsage(query, ['PeerId', 'Name'])
-    if (err) return err
+    const [error, id, name] = this._assertUsage(query, ['PeerId', 'Name'])
+    if (error) return chalk.red(error)
 
     try {
       let peerId = await checkPeerIdInput(id)
       state.aliases.set(name, peerId)
-    } catch (e) {
-      return e
+
+      return `Set alias '${styleValue(name)}' to '${styleValue(peerId)}'.`
+    } catch (error) {
+      return chalk.red(error.message)
     }
   }
 
   async autocomplete(query: string, line: string, state: GlobalState): Promise<AutoCompleteResult> {
-    const allIds = getPeersIdsAsString(this.node, {
-      noBootstrapNodes: true,
-    }).concat(Array.from(state.aliases.keys()))
+    const allIds = getPeerIdsAndAliases(this.node, state)
     return this._autocompleteByFiltering(query, allIds, line)
   }
 }
