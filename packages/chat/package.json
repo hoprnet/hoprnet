@@ -14,7 +14,7 @@
     "test": "jest",
     "util:clean:all": "rimraf .alice .bob",
     "util:create:alice": "mkdirp .alice && rimraf .alice/lib && copyfiles -u 1 'lib/**/*' '.alice/lib' && copyfiles .env .alice/",
-    "util:create:bob": "mkdirp .bob && && rimraf .bob/lib && copyfiles -u 1 'lib/**/*' '.bob/lib' && copyfiles .env .bob/",
+    "util:create:bob": "mkdirp .bob && rimraf .bob/lib && copyfiles -u 1 'lib/**/*' '.bob/lib' && copyfiles .env .bob/",
     "util:compile": "copyfiles node_modules/@hoprnet/hopr-core hopr-chat && move-file hopr-chat/.env.demo hopr-chat/.env",
     "dev": "ts-node index.ts",
     "start": "node lib/index.js",

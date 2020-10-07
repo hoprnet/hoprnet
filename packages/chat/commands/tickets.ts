@@ -2,12 +2,12 @@ import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import { moveDecimalPoint } from '@hoprnet/hopr-utils'
 import chalk from 'chalk'
-import { SendMessageBase } from './sendMessage'
+import { AbstractCommand } from './abstractCommand'
 import { countSignedTickets, toSignedTickets } from '../utils'
 
-export default class Tickets extends SendMessageBase {
+export default class Tickets extends AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {
-    super(node)
+    super()
   }
 
   public name() {
@@ -18,9 +18,6 @@ export default class Tickets extends SendMessageBase {
     return 'lists information about redeemed and unredeemed tickets'
   }
 
-  /**
-   * @param query channelId to query tickets for
-   */
   public async execute(): Promise<string | void> {
     try {
       const { Balance } = this.node.paymentChannels.types

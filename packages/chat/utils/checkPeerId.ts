@@ -30,8 +30,73 @@ export async function checkPeerIdInput(peerIdString: string, state?: GlobalState
   }
 }
 
-export function getPeerIdsAndAliases(node: Hopr<HoprCoreConnector>, state: GlobalState): string[] {
-  return getPeersIdsAsString(node, {
-    noBootstrapNodes: true,
-  }).concat(Array.from(state.aliases.keys()))
+/**
+ * Returns a list of peerIds and aliases.
+ * Optionally, you may choose various options.
+ *
+ * @param node hopr node
+ * @param state global state
+ * @param ops.noBootstrapNodes do not return any bootstrap nodes
+ * @param ops.returnAlias when available, return the peerIds's alias
+ * @param ops.mustBeOnline only return online peerIds
+ * @returns an array of peerIds / aliases
+ */
+export function getPeerIdsAndAliases(
+  node: Hopr<HoprCoreConnector>,
+  state: GlobalState,
+  ops: {
+    noBootstrapNodes: boolean
+    returnAlias: boolean
+    mustBeOnline: boolean
+  } = {
+    noBootstrapNodes: false,
+    returnAlias: false,
+    mustBeOnline: false,
+  }
+): string[] {
+  let peerIds = new Map<
+    string,
+    {
+      value: string
+      isOnline: boolean
+      alias?: string
+    }
+  >()
+
+  // add online peer ids into map
+  getPeersIdsAsString(node, {
+    noBootstrapNodes: ops.noBootstrapNodes,
+  }).forEach((value) => {
+    peerIds.set(value, {
+      value,
+      isOnline: true,
+    })
+  })
+
+  // add aliases peer ids into map
+  Array.from(state.aliases.entries()).forEach(([alias, peerId]) => {
+    const value = peerId.toB58String()
+
+    peerIds.set(value, {
+      value,
+      isOnline: peerIds.has(value),
+      alias,
+    })
+  })
+
+  // remove offline nodes
+  if (ops.mustBeOnline) {
+    for (const item of peerIds.values()) {
+      if (item.isOnline) continue
+      peerIds.delete(item.value)
+    }
+  }
+
+  // return alias if it's available
+  if (ops.returnAlias) {
+    return Array.from(peerIds.values()).map((item) => item.alias || item.value)
+  }
+
+  // return value
+  return Array.from(peerIds.values()).map((item) => item.value)
 }
