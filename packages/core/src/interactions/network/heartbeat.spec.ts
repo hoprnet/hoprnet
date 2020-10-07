@@ -81,7 +81,7 @@ describe('check heartbeat mechanism', function () {
       generateNode(),
       generateNode({ timeoutIntentionally: true }),
     ])
-    await new Promise((resolve) => setTimeout(resolve, 100))
+
     await Alice.dial(Bob.peerInfo)
     let errorThrown = false
     let before = Date.now()
