@@ -1,11 +1,13 @@
 import Ganache from 'ganache-core'
 import { NODE_SEEDS, BOOTSTRAP_SEEDS } from '@hoprnet/hopr-demo-seeds'
+import debug from 'debug'
+const log = debug('hopr-testing:ganache')
 
 const accounts = NODE_SEEDS.concat(BOOTSTRAP_SEEDS)
 const balance = Number(1000000000000000000000000).toString(16)
 
 const DEFAULT_OPS: Ganache.IServerOptions = {
-  ws: true,
+  ws: false,
   port: 9545,
   accounts: accounts.map((account) => ({
     secretKey: account,
@@ -28,14 +30,14 @@ class CustomGanache {
 
   public async start(): Promise<this> {
     return new Promise<this>((resolve, reject) => {
-      console.log('Starting ganache instance')
+      log('Starting ganache instance')
 
       this.server = Ganache.server(this.ops)
 
       // @ts-ignore
       this.server.listen(this.ops.port, (err) => {
         const url = `${this.ops.ws ? 'ws' : 'http'}://127.0.0.1:${this.ops.port}`
-        console.log(`Network ready at ${url}`)
+        log(`Network ready at ${url}`)
         if (err) {
           console.log("Error creating ganache", err)
           return reject()
