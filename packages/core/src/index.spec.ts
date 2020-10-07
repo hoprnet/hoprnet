@@ -13,7 +13,7 @@ describe('test hopr-core', function () {
   let node
 
   beforeAll(async function () {
-    ganache = new Ganache({ws: false})
+    ganache = new Ganache()
     await ganache.start()
     await migrate()
   }, durations.seconds(30))
@@ -30,7 +30,7 @@ describe('test hopr-core', function () {
     'should start a node',
     async function () {
       node = await Hopr.create({
-        debug: false, //true,
+        debug: true,
         bootstrapNode: true,
         password: '',
         dbPath: process.cwd() + '/testdb',
