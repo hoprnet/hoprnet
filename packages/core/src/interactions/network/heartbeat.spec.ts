@@ -23,7 +23,6 @@ import { durations } from '@hoprnet/hopr-utils'
 
 describe('check heartbeat mechanism', function () {
   async function generateNode(options?: { timeoutIntentionally?: boolean }): Promise<Hopr<HoprCoreConnector>> {
-    // @ts-ignore
     const node = (await libp2p.create({
       peerInfo: await PeerInfo.create(await PeerId.create({ keyType: 'secp256k1' })),
       modules: {
