@@ -42,7 +42,6 @@
     "@hoprnet/hopr-demo-seeds": "1.8.0",
     "@hoprnet/hopr-utils": "^1.17.0-alpha.58",
     "@openzeppelin/contracts": "^3.0.1",
-    "@openzeppelin/test-helpers": "^0.5.5",
     "@truffle/debug-utils": "^4.1.1",
     "@truffle/hdwallet-provider": "^1.0.34",
     "bignumber.js": "^9.0.0",
@@ -55,6 +54,7 @@
     "web3": "^1.2.11"
   },
   "devDependencies": {
+    "@openzeppelin/test-helpers": "^0.5.6",
     "@hoprnet/hopr-testing": "^1.17.0-alpha.58",
     "@types/chai": "^4.2.11",
     "@types/mocha": "^8.0.1",
