@@ -2,9 +2,8 @@
   "name": "root",
   "private": true,
   "scripts": {
-    "bootstrap": "lerna exec -- yarn install && lerna link --force-local",
+    "bootstrap": "lerna exec -- yarn && lerna link --force-local",
     "build": "lerna run build",
-    "bootstrap": "lerna bootstrap",
     "regenerate-lockfiles": "lerna run clean && rm -r packages/*/yarn.lock && yarn bootstrap",
     "core:test": "cd packages/core && yarn build && yarn test",
     "run:chat": "lerna exec --scope @hoprnet/hopr-chat -- yarn start:basodino",
