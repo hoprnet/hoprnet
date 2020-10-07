@@ -202,6 +202,9 @@ async function main() {
     console.log(e)
     logs.log('Node failed to start:')
     logs.logFatalError('' + e)
+    if (!argv.admin) { // If the admin interface is running, we should keep process alive
+      process.exit(1)
+    }
   }
 }
 
