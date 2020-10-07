@@ -181,8 +181,10 @@ class TCP {
       )
     }
 
-    verbose('dialing with relay ', ma)
-    return await this.dialWithRelay(ma, potentialRelays, options)
+    verbose('dialing with relay ', ma.toString())
+    const conn = await this.dialWithRelay(ma, potentialRelays, options)
+    log(`relayed connection established`)
+    return conn
   }
 
   async dialWithRelay(ma: Multiaddr, relays: PeerInfo[], options?: DialOptions): Promise<Connection> {

@@ -153,7 +153,7 @@ class Relay {
         stream,
         self: this._peerInfo.id,
         counterparty,
-        webRTC: this._webRTCUpgrader?.upgradeInbound(),
+        // webRTC: this._webRTCUpgrader?.upgradeInbound(),
       })
     )
   }
