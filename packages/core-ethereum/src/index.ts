@@ -1,10 +1,13 @@
-import type { Networks } from './ethereum/addresses'
-import Web3 from 'web3'
 import type { LevelUp } from 'levelup'
-import HoprChannelsAbi from './ethereum/abi/HoprChannels.json'
-import HoprTokenAbi from './ethereum/abi/HoprToken.json'
+import type { WebsocketProvider } from 'web3-core'
 import type { Currencies } from '@hoprnet/hopr-core-connector-interface'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
+import type { Networks } from './ethereum/addresses'
+import type { HoprChannels } from './tsc/web3/HoprChannels'
+import type { HoprToken } from './tsc/web3/HoprToken'
+import Web3 from 'web3'
+import HoprChannelsAbi from './ethereum/abi/HoprChannels.json'
+import HoprTokenAbi from './ethereum/abi/HoprToken.json'
 import chalk from 'chalk'
 import { ChannelFactory } from './channel'
 import types from './types'
@@ -13,14 +16,13 @@ import * as dbkeys from './dbKeys'
 import * as utils from './utils'
 import * as constants from './constants'
 import * as config from './config'
-import type { HoprChannels } from './tsc/web3/HoprChannels'
-import type { HoprToken } from './tsc/web3/HoprToken'
 import Account from './account'
 import HashedSecret from './hashedSecret'
 import Path from './path'
 
 import debug from 'debug'
 const debugLog = debug('hopr-core-ethereum')
+let provider: WebsocketProvider
 
 export default class HoprEthereum implements HoprCoreConnector {
   private _status: 'uninitialized' | 'initialized' | 'started' | 'stopped' = 'uninitialized'
@@ -93,7 +95,7 @@ export default class HoprEthereum implements HoprCoreConnector {
         }
 
         // restart
-        await this.indexer.start()
+        await Promise.all([this.indexer.start(), provider.connect()])
 
         this._status = 'started'
         this.log(chalk.green('Connector started'))
@@ -134,6 +136,7 @@ export default class HoprEthereum implements HoprCoreConnector {
 
         await this.indexer.stop()
         await this.account.stop()
+        provider.disconnect(1000, 'Stopping HOPR node.')
 
         this._status = 'stopped'
         this.log(chalk.green('Connector stopped'))
@@ -263,7 +266,7 @@ export default class HoprEthereum implements HoprCoreConnector {
   ): Promise<HoprEthereum> {
     const providerUri = options?.provider || config.DEFAULT_URI
 
-    const provider = new Web3.providers.WebsocketProvider(providerUri, {
+    provider = new Web3.providers.WebsocketProvider(providerUri, {
       reconnect: {
         auto: true,
         delay: 1000, // ms
