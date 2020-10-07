@@ -12,7 +12,7 @@
     "run:chatbot": "lerna exec --scope @hoprnet/chat-bot -- yarn start:basodino",
     "lint": "prettier --check .",
     "lint:fix": "prettier --write .",
-    "test": "DEBUG=hopr* lerna run test --stream"
+    "test": "lerna run test --stream"
   },
   "dependencies": {
     "lerna": "^3.22.1"
