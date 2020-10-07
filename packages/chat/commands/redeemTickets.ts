@@ -1,9 +1,8 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
-import chalk from 'chalk'
 import { moveDecimalPoint } from '@hoprnet/hopr-utils'
-import { countSignedTickets, toSignedTickets } from '../utils'
+import { countSignedTickets, styleValue, toSignedTickets } from '../utils'
 import { AbstractCommand } from './abstractCommand'
 
 export default class RedeemTickets extends AbstractCommand {
@@ -16,7 +15,7 @@ export default class RedeemTickets extends AbstractCommand {
   }
 
   public help() {
-    return 'redeem tickets'
+    return 'Redeems your tickets'
   }
 
   /**
@@ -36,11 +35,17 @@ export default class RedeemTickets extends AbstractCommand {
         return 'No unredeemed tickets found.'
       }
 
+      console.log(`Redeeming ${styleValue(results.length)} tickets..`)
+
       const redeemedTickets: Types.AcknowledgedTicket[] = []
+      let count = 0
+
       for (const { ackTicket, index } of results) {
+        ++count
         const result = await this.node.submitAcknowledgedTicket(ackTicket, index)
 
         if (result.status === 'SUCCESS') {
+          console.log(`Redeemed ticket ${styleValue(count)}`)
           redeemedTickets.push(ackTicket)
         }
       }
@@ -49,11 +54,11 @@ export default class RedeemTickets extends AbstractCommand {
       const result = countSignedTickets(signedTickets)
       const total = moveDecimalPoint(result.total, Balance.DECIMALS * -1)
 
-      return `Redeemed ${chalk.blue(redeemedTickets.length)} out of ${chalk.blue(
+      return `Redeemed ${styleValue(redeemedTickets.length)} out of ${styleValue(
         results.length
-      )} tickets with a sum of ${chalk.blue(total)} HOPR.`
+      )} tickets with a sum of ${styleValue(total, 'number')} HOPR.`
     } catch (err) {
-      return chalk.red(err.message)
+      return styleValue(err.message, 'failure')
     }
   }
 }

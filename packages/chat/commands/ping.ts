@@ -2,9 +2,8 @@ import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import type PeerId from 'peer-id'
 import type { AutoCompleteResult } from './abstractCommand'
-import chalk from 'chalk'
 import { AbstractCommand, GlobalState } from './abstractCommand'
-import { checkPeerIdInput, isBootstrapNode, getPeerIdsAndAliases } from '../utils'
+import { checkPeerIdInput, isBootstrapNode, getPeerIdsAndAliases, styleValue } from '../utils'
 
 export default class Ping extends AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {
@@ -16,7 +15,7 @@ export default class Ping extends AbstractCommand {
   }
 
   public help() {
-    return 'pings another node to check its availability'
+    return 'Pings another node to check its availability'
   }
 
   public async execute(query: string, state: GlobalState): Promise<string> {
@@ -28,19 +27,19 @@ export default class Ping extends AbstractCommand {
     try {
       peerId = await checkPeerIdInput(query, state)
     } catch (err) {
-      return chalk.red(err.message)
+      return styleValue(err.message, 'failure')
     }
 
     let out = ''
     if (isBootstrapNode(this.node, peerId)) {
-      out += chalk.gray(`Pinging the bootstrap node ...`) + '\n'
+      out += styleValue(`Pinging the bootstrap node ...`, 'highlight') + '\n'
     }
 
     try {
       const latency = await this.node.ping(peerId)
-      return `${out}Pong received in: ${chalk.magenta(String(latency))}ms`
+      return `${out}Pong received in: ${styleValue(latency)} ms`
     } catch (err) {
-      return `${out}Could not ping node. Error was: ${chalk.red(err.message)}`
+      return `${out}Could not ping node. Error was: ${styleValue(err.message, 'failure')}`
     }
   }
 

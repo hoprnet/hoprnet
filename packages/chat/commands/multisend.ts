@@ -3,9 +3,8 @@ import type Hopr from '@hoprnet/hopr-core'
 import { clearString } from '@hoprnet/hopr-utils'
 import { SendMessageBase } from './sendMessage'
 import readline from 'readline'
-import chalk from 'chalk'
 import type PeerId from 'peer-id'
-import { getPeersIdsAsString, checkPeerIdInput } from '../utils'
+import { getPeersIdsAsString, checkPeerIdInput, styleValue } from '../utils'
 import { GlobalState, AutoCompleteResult, CommandResponse } from './abstractCommand'
 
 export class MultiSendMessage extends SendMessageBase {
@@ -18,7 +17,7 @@ export class MultiSendMessage extends SendMessageBase {
   }
 
   public help() {
-    return 'sends multiple messages to another party, "quit" exits.'
+    return 'Sends multiple messages to another party, "quit" exits'
   }
 
   private async checkArgs(query: string, state: GlobalState): Promise<PeerId> {
@@ -50,7 +49,7 @@ export class MultiSendMessage extends SendMessageBase {
     try {
       peerId = await this.checkArgs(query, state)
     } catch (err) {
-      return chalk.red(err.message)
+      return styleValue(err.message, 'failure')
     }
     await this.repl(peerId, state)
   }

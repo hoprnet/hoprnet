@@ -1,8 +1,7 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
-import chalk from 'chalk'
 import PeerId from 'peer-id'
-import { isBootstrapNode } from '../utils'
+import { isBootstrapNode, styleValue } from '../utils'
 import { AbstractCommand } from './abstractCommand'
 
 export default class Crawl extends AbstractCommand {
@@ -15,7 +14,7 @@ export default class Crawl extends AbstractCommand {
   }
 
   public help() {
-    return 'crawls the network and tries to find other nodes'
+    return 'Crawls the network and tries to find other nodes'
   }
 
   /**
@@ -26,9 +25,9 @@ export default class Crawl extends AbstractCommand {
       await this.node.network.crawler.crawl(
         (peer: string) => !isBootstrapNode(this.node, PeerId.createFromB58String(peer))
       )
-      return `Crawled network, connected to ${this.node.peerStore.peers.size} peers`
+      return `Crawled network, connected to ${styleValue(this.node.peerStore.peers.size)} peers`
     } catch (err) {
-      chalk.red(err.message)
+      return styleValue(err.message, 'failure')
     }
   }
 }

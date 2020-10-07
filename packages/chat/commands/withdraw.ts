@@ -2,8 +2,8 @@ import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { Currencies } from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import { moveDecimalPoint } from '@hoprnet/hopr-utils'
-import chalk from 'chalk'
 import { AbstractCommand, AutoCompleteResult } from './abstractCommand'
+import { styleValue } from '../utils'
 
 export default class Withdraw extends AbstractCommand {
   private arguments = ['recipient (blockchain address)', 'currency (native, hopr)', 'amount (ETH, HOPR)']
@@ -63,7 +63,7 @@ export default class Withdraw extends AbstractCommand {
   }
 
   public help(): string {
-    return 'withdraw native or hopr to a specified recipient'
+    return 'Withdraw native or hopr to a specified recipient'
   }
 
   public async autocomplete(query?: string): Promise<AutoCompleteResult> {
@@ -82,11 +82,12 @@ export default class Withdraw extends AbstractCommand {
       const symbol = currency === 'NATIVE' ? NativeBalance.SYMBOL : Balance.SYMBOL
 
       const receipt = await paymentChannels.withdraw(currency, recipient, weiAmount)
-      return `Withdrawing ${chalk.blue(amount)} ${symbol} to ${chalk.green(recipient)}, receipt ${chalk.yellow(
-        receipt
-      )}.`
+      return `Withdrawing ${styleValue(amount, 'number')} ${symbol} to ${styleValue(
+        recipient,
+        'peerId'
+      )}, receipt ${styleValue(receipt, 'hash')}.`
     } catch (err) {
-      return chalk.red(err.message)
+      return styleValue(err.message, 'failure')
     }
   }
 }

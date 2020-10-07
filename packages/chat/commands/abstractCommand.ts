@@ -1,5 +1,5 @@
 import type PeerId from 'peer-id'
-import chalk from 'chalk'
+import { styleValue } from '../utils'
 
 export type AutoCompleteResult = [string[], string]
 export const emptyAutoCompleteResult = (line: string): AutoCompleteResult => [[''], line]
@@ -51,7 +51,7 @@ export abstract class AbstractCommand {
 
   // returns [error, ...params]
   protected _assertUsage(query: string, parameters: string[], test?: RegExp): string[] {
-    const usage = chalk.red(this.usage(parameters))
+    const usage = styleValue(this.usage(parameters), 'failure')
 
     if (!query && parameters.length > 0) {
       return [usage]

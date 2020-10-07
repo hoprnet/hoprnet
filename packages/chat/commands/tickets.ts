@@ -1,9 +1,8 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import { moveDecimalPoint } from '@hoprnet/hopr-utils'
-import chalk from 'chalk'
 import { AbstractCommand } from './abstractCommand'
-import { countSignedTickets, toSignedTickets } from '../utils'
+import { countSignedTickets, toSignedTickets, styleValue } from '../utils'
 
 export default class Tickets extends AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {
@@ -15,7 +14,7 @@ export default class Tickets extends AbstractCommand {
   }
 
   public help() {
-    return 'lists information about redeemed and unredeemed tickets'
+    return 'Displays information about your redeemed and unredeemed tickets'
   }
 
   public async execute(): Promise<string | void> {
@@ -34,11 +33,11 @@ export default class Tickets extends AbstractCommand {
       const unredeemedResults = countSignedTickets(await toSignedTickets(ackTickets))
       const unredeemedAmount = moveDecimalPoint(unredeemedResults.total.toString(), Balance.DECIMALS * -1)
 
-      return `Found ${chalk.blue(unredeemedResults.tickets.length)} unredeemed tickets with a sum of ${chalk.blue(
-        unredeemedAmount
-      )} HOPR.`
+      return `Found ${styleValue(unredeemedResults.tickets.length)} unredeemed tickets with a sum of ${
+        (styleValue(unredeemedAmount), 'number')
+      } HOPR.`
     } catch (err) {
-      return chalk.red(err.message)
+      return styleValue(err.message, 'failure')
     }
   }
 }

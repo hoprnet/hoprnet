@@ -1,7 +1,7 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
-import chalk from 'chalk'
-import { AbstractCommand, GlobalState } from './abstractCommand'
+import { AbstractCommand } from './abstractCommand'
+import { styleValue } from '../utils'
 
 export class Info extends AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {
@@ -16,10 +16,10 @@ export class Info extends AbstractCommand {
     return 'Information about the HOPR Node, including any options it started with'
   }
 
-  public async execute(query: string, settings: GlobalState): Promise<string | void> {
-    // TODO Add connector info etc.
-    return `
-      Bootstrap Servers: ${this.node.bootstrapServers.map((p) => chalk.green(p.id.toB58String()))}
-    `
+  public async execute(): Promise<string> {
+    // @TODO Add connector info etc.
+    return [
+      `Bootstrap Servers: ${this.node.bootstrapServers.map((p) => styleValue(p.id.toB58String(), 'peerId'))}`,
+    ].join('\n')
   }
 }

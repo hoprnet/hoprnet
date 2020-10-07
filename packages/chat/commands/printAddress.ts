@@ -1,8 +1,8 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import { u8aToHex } from '@hoprnet/hopr-utils'
-import chalk from 'chalk'
 import { AbstractCommand } from './abstractCommand'
+import { styleValue } from '../utils'
 
 export default class PrintAddress extends AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {
@@ -14,7 +14,7 @@ export default class PrintAddress extends AbstractCommand {
   }
 
   public help() {
-    return 'shows the native and HOPR addresses of this node'
+    return 'Displays the native and HOPR addresses of this node'
   }
 
   /**
@@ -35,8 +35,8 @@ export default class PrintAddress extends AbstractCommand {
     const prefixLength = Math.max(hoprPrefix.length, nativePrefix.length) + 2
 
     return [
-      `${hoprPrefix.padEnd(prefixLength, ' ')}${chalk.green(hoprAddress)}`,
-      `${nativePrefix.padEnd(prefixLength, ' ')}${chalk.green(nativeAddress)}`,
+      `${hoprPrefix.padEnd(prefixLength, ' ')}${styleValue(hoprAddress, 'peerId')}`,
+      `${nativePrefix.padEnd(prefixLength, ' ')}${styleValue(nativeAddress, 'peerId')}`,
     ].join('\n')
   }
 }

@@ -8,7 +8,7 @@ export default class ListConnectors extends AbstractCommand {
   }
 
   public help() {
-    return 'lists all installed blockchain connectors'
+    return 'Lists all installed blockchain connectors'
   }
   /**
    * Check which connectors are present right now.

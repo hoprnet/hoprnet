@@ -6,7 +6,7 @@ import { clearString } from '@hoprnet/hopr-utils'
 import { MAX_HOPS } from '@hoprnet/hopr-core/lib/constants'
 import readline from 'readline'
 import chalk from 'chalk'
-import { checkPeerIdInput, encodeMessage, getOpenChannels, getPeerIdsAndAliases } from '../utils'
+import { checkPeerIdInput, encodeMessage, getOpenChannels, getPeerIdsAndAliases, styleValue } from '../utils'
 import { AbstractCommand, GlobalState } from './abstractCommand'
 
 export abstract class SendMessageBase extends AbstractCommand {
@@ -19,7 +19,7 @@ export abstract class SendMessageBase extends AbstractCommand {
   }
 
   public help() {
-    return 'sends a message to another party'
+    return 'Sends a message to another party'
   }
 
   protected async sendMessage(state: GlobalState, recipient: PeerId, msg: string): Promise<void> {
@@ -34,7 +34,7 @@ export abstract class SendMessageBase extends AbstractCommand {
         async () => [] // MULTIHOP not supported
       )
     } catch (err) {
-      console.log(chalk.red(err.message))
+      console.log(styleValue(err.message, 'failure'))
     }
   }
 
@@ -81,11 +81,11 @@ export class SendMessageFancy extends SendMessageBase {
     try {
       peerId = await checkPeerIdInput(peerIdString, state)
     } catch (err) {
-      console.log(chalk.red(err.message))
+      console.log(styleValue(err.message, 'failure'))
       return
     }
 
-    const messageQuestion = `${chalk.yellow(`Type your message and press ENTER to send:`)}\n`
+    const messageQuestion = styleValue(`Type your message and press ENTER to send:`, 'highlight') + '\n'
     const parsedMessage = await new Promise<string>((resolve) => this.rl.question(messageQuestion, resolve))
 
     const message = state.includeRecipient
@@ -93,7 +93,7 @@ export class SendMessageFancy extends SendMessageBase {
       : parsedMessage
 
     clearString(messageQuestion + message, this.rl)
-    console.log(`Sending message to ${chalk.blue(query)} ...`)
+    console.log(`Sending message to ${styleValue(query, 'peerId')} ...`)
 
     try {
       // use manual path
@@ -112,7 +112,7 @@ export class SendMessageFancy extends SendMessageBase {
         await this.node.sendMessage(encodeMessage(message), peerId)
       }
     } catch (err) {
-      return chalk.red(err.message)
+      return styleValue(err.message, 'failure')
     }
   }
 
@@ -122,14 +122,16 @@ export class SendMessageFancy extends SendMessageBase {
 
     // ask for node until user fills all nodes or enters an empty id
     while (!done) {
-      console.log(chalk.yellow(`Please select intermediate node ${selected.length}: (leave empty to exit)`))
+      console.log(
+        styleValue(`Please select intermediate node ${styleValue(selected.length)}: (leave empty to exit)`, 'highlight')
+      )
 
       const lastSelected = selected.length > 0 ? selected[selected.length - 1] : this.node.peerInfo.id
       const openChannels = await getOpenChannels(this.node, lastSelected)
       const validPeers = openChannels.map((peer) => peer.toB58String())
 
       if (validPeers.length === 0) {
-        console.log(chalk.yellow(`No peers with open channels found, you may enter a peer manually.`))
+        console.log(styleValue(`No peers with open channels found, you may enter a peer manually.`, 'highlight'))
       }
 
       // detach prompt
@@ -158,14 +160,12 @@ export class SendMessageFancy extends SendMessageBase {
           try {
             peerId = await checkPeerIdInput(query)
           } catch (err) {
-            console.log(chalk.red(err.message))
+            console.log(styleValue(err.message, 'failure'))
             return
           }
 
           readline.moveCursor(process.stdout, -rl.line, -1)
           readline.clearLine(process.stdout, 0)
-
-          console.log(chalk.blue(query))
 
           return resolve(peerId)
         })
@@ -179,11 +179,11 @@ export class SendMessageFancy extends SendMessageBase {
       // @TODO: handle self
       // check if peerId selected is destination peerId
       else if (destination.equals(peerId)) {
-        console.log(chalk.yellow(`Peer selected is same as destination peer.`))
+        console.log(styleValue(`Peer selected is same as destination peer.`, 'failure'))
       }
       // check if peerId selected is already in the list
       else if (selected.find((p) => p.equals(peerId))) {
-        console.log(chalk.yellow(`Peer is already an intermediate peer.`))
+        console.log(styleValue(`Peer is already an intermediate peer.`, 'failure'))
       }
       // update list
       else {

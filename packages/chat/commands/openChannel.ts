@@ -6,7 +6,7 @@ import { startDelayedInterval, u8aToHex, moveDecimalPoint } from '@hoprnet/hopr-
 import BN from 'bn.js'
 import chalk from 'chalk'
 import readline from 'readline'
-import { checkPeerIdInput, getPeers, getOpenChannels } from '../utils'
+import { checkPeerIdInput, getPeers, getOpenChannels, styleValue } from '../utils'
 import { AbstractCommand, AutoCompleteResult } from './abstractCommand'
 
 export abstract class OpenChannelBase extends AbstractCommand {
@@ -19,7 +19,7 @@ export abstract class OpenChannelBase extends AbstractCommand {
   }
 
   public help() {
-    return 'opens a payment channel'
+    return 'Opens a payment channel between you and the counter party provided'
   }
 
   protected async validateAmountToFund(amountToFund: BN): Promise<void> {
@@ -107,7 +107,7 @@ export abstract class OpenChannelBase extends AbstractCommand {
     }, [])
 
     if (peers.length < 1) {
-      console.log(chalk.red(`\nDoesn't know any new node to open a payment channel with.`))
+      console.log(styleValue(`\nDoesn't know any new node to open a payment channel with.`, 'failure'))
       return [[''], line]
     }
 
@@ -137,7 +137,7 @@ export class OpenChannel extends OpenChannelBase {
     try {
       counterParty = await checkPeerIdInput(counterPartyB58Str)
     } catch (err) {
-      return chalk.red(err.message)
+      return styleValue(err.message, 'failure')
     }
 
     const amountToFund = new BN(amountToFundStr)
@@ -146,10 +146,10 @@ export class OpenChannel extends OpenChannelBase {
     try {
       const { channelId } = await this.openChannel(counterParty, amountToFund)
       unsubscribe()
-      return `${chalk.green(`Successfully opened channel`)} ${chalk.yellow(u8aToHex(channelId))}`
+      return `${chalk.green(`Successfully opened channel`)} ${styleValue(u8aToHex(channelId), 'hash')}`
     } catch (err) {
       unsubscribe()
-      return chalk.red(err.message)
+      return styleValue(err.message, 'failure')
     }
   }
 }
@@ -164,9 +164,9 @@ export class OpenChannelFancy extends OpenChannelBase {
     const myAvailableTokens = await account.balance
     const myAvailableTokensDisplay = moveDecimalPoint(myAvailableTokens.toString(), types.Balance.DECIMALS * -1)
 
-    const tokenQuestion = `How many ${types.Balance.SYMBOL} (${chalk.magenta(
-      `${myAvailableTokensDisplay} ${types.Balance.SYMBOL}`
-    )} available) shall get staked? : `
+    const tokenQuestion = `How many ${types.Balance.SYMBOL} (${styleValue(`${myAvailableTokensDisplay}`, 'number')} ${
+      types.Balance.SYMBOL
+    } available) shall get staked? : `
 
     const amountToFund = await new Promise<string>((resolve) => this.rl.question(tokenQuestion, resolve)).then(
       (input) => {
@@ -178,7 +178,7 @@ export class OpenChannelFancy extends OpenChannelBase {
       await this.validateAmountToFund(amountToFund)
       return amountToFund
     } catch (err) {
-      console.log(chalk.red(err.message))
+      console.log(styleValue(err.message, 'failure'))
       return this.selectFundAmount()
     }
   }
@@ -190,14 +190,14 @@ export class OpenChannelFancy extends OpenChannelBase {
    */
   public async execute(query?: string): Promise<string> {
     if (query == null || query == '') {
-      return chalk.red(`Invalid arguments. Expected 'open <peerId>'. Received '${query}'`)
+      return styleValue(`Invalid arguments. Expected 'open <peerId>'. Received '${query}'`, 'failure')
     }
 
     let counterParty: PeerId
     try {
       counterParty = await checkPeerIdInput(query)
     } catch (err) {
-      return chalk.red(err.message)
+      return styleValue(err.message, 'failure')
     }
 
     const amountToFund = await this.selectFundAmount()
@@ -206,10 +206,10 @@ export class OpenChannelFancy extends OpenChannelBase {
     try {
       const { channelId } = await this.openChannel(counterParty, amountToFund)
       unsubscribe()
-      return `${chalk.green(`Successfully opened channel`)} ${chalk.yellow(u8aToHex(channelId))}`
+      return `${chalk.green(`Successfully opened channel`)} ${styleValue(u8aToHex(channelId), 'hash')}`
     } catch (err) {
       unsubscribe()
-      return chalk.red(err.message)
+      return styleValue(err.message, 'failure')
     }
   }
 }

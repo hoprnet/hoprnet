@@ -101,7 +101,7 @@ describe('Commands', () => {
     expect((await cmds.autocomplete('send 16Ui'))[0][0]).toMatch(/send 16U/)
     expect((await cmds.autocomplete('send foo'))[0][0]).toBe('')
 
-    await cmds.execute('alias 16Uiu2HAmQDFS8a4Bj5PGaTqQLME5SZTRNikz9nUPT3G4T6YL9o7V test')
+    await cmds.execute('alias 16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7 test')
 
     expect((await cmds.autocomplete('send t'))[0][0]).toBe('send test')
   })
@@ -191,7 +191,7 @@ describe('Commands', () => {
     let cmds = new mod.Commands(mockNode)
 
     let aliases = await cmds.execute('alias')
-    expect(aliases).toEqual('')
+    expect(aliases).toContain('No aliases found.')
 
     await cmds.execute('alias 16Uiu2HAmQDFS8a4Bj5PGaTqQLME5SZTRNikz9nUPT3G4T6YL9o7V test')
 

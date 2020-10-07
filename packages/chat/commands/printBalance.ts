@@ -1,8 +1,8 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import { moveDecimalPoint } from '@hoprnet/hopr-utils'
-import chalk from 'chalk'
 import { AbstractCommand } from './abstractCommand'
+import { styleValue } from '../utils'
 
 export default class PrintBalance extends AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {
@@ -14,7 +14,7 @@ export default class PrintBalance extends AbstractCommand {
   }
 
   public help() {
-    return 'shows our current hopr and native balance'
+    return 'Displays your current HOPR and native balance'
   }
 
   /**
@@ -40,8 +40,8 @@ export default class PrintBalance extends AbstractCommand {
 
     // TODO: use 'NativeBalance' and 'Balance' to display currencies
     return [
-      `${hoprPrefix.padEnd(prefixLength, ' ')}${chalk.blue(hoprBalance)} xHOPR`,
-      `${nativePrefix.padEnd(prefixLength, ' ')}${chalk.blue(nativeBalance)} xDAI`,
+      `${hoprPrefix.padEnd(prefixLength, ' ')}${styleValue(hoprBalance, 'number')} xHOPR`,
+      `${nativePrefix.padEnd(prefixLength, ' ')}${styleValue(nativeBalance, 'number')} xDAI`,
     ].join('\n')
   }
 }

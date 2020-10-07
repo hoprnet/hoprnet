@@ -1,6 +1,5 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
-import chalk from 'chalk'
 import { AbstractCommand, GlobalState, AutoCompleteResult } from './abstractCommand'
 import { checkPeerIdInput, getPaddingLength, getPeerIdsAndAliases, styleValue } from '../utils'
 
@@ -16,39 +15,39 @@ export class Alias extends AbstractCommand {
   }
 
   public help() {
-    return 'alias an address with a more memorable name'
+    return 'Alias an address with a more memorable name'
   }
 
   async execute(query: string, state: GlobalState): Promise<string> {
     // view aliases
     if (!query) {
-      const names = Array.from(state.aliases.keys())
+      const names = Array.from(state.aliases.keys()).map((name) => `${name} -> `)
 
       // no aliases found
       if (names.length === 0) {
-        return `No aliases found.\nTo set an alias, ${this.usage(this.parameters)}`
+        return `No aliases found.\nTo set an alias use, ${this.usage(this.parameters)}`
       }
 
       const peerIds = Array.from(state.aliases.values())
-      const paddingLength = getPaddingLength(names)
+      const paddingLength = getPaddingLength(names, false)
 
       return names
         .map((name, index) => {
-          return name.padEnd(paddingLength) + chalk.green(peerIds[index].toB58String())
+          return name.padEnd(paddingLength) + styleValue(peerIds[index].toB58String(), 'peerId')
         })
         .join('\n')
     }
 
-    const [error, id, name] = this._assertUsage(query, ['PeerId', 'Name'])
-    if (error) return chalk.red(error)
+    const [error, id, name] = this._assertUsage(query, this.parameters)
+    if (error) return styleValue(error, 'failure')
 
     try {
       let peerId = await checkPeerIdInput(id)
       state.aliases.set(name, peerId)
 
-      return `Set alias '${styleValue(name)}' to '${styleValue(peerId)}'.`
+      return `Set alias '${styleValue(name, 'highlight')}' to '${styleValue(peerId.toB58String(), 'peerId')}'.`
     } catch (error) {
-      return chalk.red(error.message)
+      return styleValue(error.message, 'failure')
     }
   }
 

@@ -1,11 +1,10 @@
 import type { HoprOptions } from '@hoprnet/hopr-core'
 import { getBootstrapAddresses } from '@hoprnet/hopr-utils'
 import getopts from 'getopts'
-import chalk from 'chalk'
 import PeerInfo from 'peer-info'
 import Multiaddr from 'multiaddr'
 import ListConnctor from '../commands/listConnectors'
-import { displayHelp } from './displayHelp'
+import { displayHelp, styleValue } from './displayHelp'
 import { decodeMessage } from './message'
 import { knownConnectors } from './knownConnectors'
 
@@ -18,7 +17,7 @@ function parseHosts(): HoprOptions['hosts'] {
     const str = process.env['HOST_IPV4'].replace(/\/\/.+/, '').trim()
     const params = str.match(/([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})\:([0-9]{1,6})/)
     if (params == null || params.length != 3) {
-      throw Error(`Invalid IPv4 host. Got ${chalk.yellow(str)}`)
+      throw Error(`Invalid IPv4 host. Got ${styleValue(str, 'highlight')}`)
     }
 
     hosts.ip4 = {
@@ -34,7 +33,7 @@ function parseHosts(): HoprOptions['hosts'] {
     )
 
     if (params == null || params.length != 3) {
-      throw Error(`Invalid IPv6 host. Got ${chalk.yellow(str)}`)
+      throw Error(`Invalid IPv6 host. Got ${styleValue(str, 'highlight')}`)
     }
 
     hosts.ip6 = {
@@ -77,7 +76,7 @@ export async function parseOptions(): Promise<HoprOptions> {
   })
 
   if (cli_options._.length > 1) {
-    console.log(`Found more than the allowed options. Got ${chalk.yellow(cli_options._.join(', '))}\n`)
+    console.log(`Found more than the allowed options. Got ${styleValue(cli_options._.join(', '), 'highlight')}\n`)
     displayHelp()
     process.exit(0)
   }
@@ -91,7 +90,7 @@ export async function parseOptions(): Promise<HoprOptions> {
         id = int
       }
     } catch {
-      console.log(chalk.yellow(`Got unknown option '${cli_options._[i]}'.`))
+      console.log(styleValue(`Got unknown option '${cli_options._[i]}'.`, 'failure'))
       displayHelp()
       process.exit(0)
     }
@@ -99,7 +98,10 @@ export async function parseOptions(): Promise<HoprOptions> {
 
   if (unknownOptions.length > 0) {
     console.log(
-      chalk.yellow(`Got unknown option${unknownOptions.length == 1 ? '' : 's'} [${unknownOptions.join(', ')}]\n`)
+      styleValue(
+        `Got unknown option${unknownOptions.length == 1 ? '' : 's'} [${unknownOptions.join(', ')}]\n`,
+        'failure'
+      )
     )
     displayHelp()
     process.exit(0)
@@ -120,7 +122,7 @@ export async function parseOptions(): Promise<HoprOptions> {
   }
 
   if (!knownConnectors.some((connector) => connector[1] == cli_options.network)) {
-    console.log(`Unknown network! <${chalk.red(cli_options.network)}>\n`)
+    console.log(`Unknown network! <${styleValue(cli_options.network, 'failure')}>\n`)
     await listConnectors.execute()
     throw new Error('Cannot launch without a network')
   }
@@ -135,9 +137,9 @@ export async function parseOptions(): Promise<HoprOptions> {
   const provider = process.env[`${cli_options.network.toUpperCase()}_PROVIDER`]
   if (provider === undefined) {
     throw Error(
-      `Could not find any connector for ${chalk.magenta(cli_options.network)}. Please specify ${chalk.yellow(
-        `${cli_options.network.toUpperCase()}_PROVIDER`
-      )} in ${chalk.yellow('.env')}.`
+      `Could not find any connector for ${styleValue(cli_options.network, 'highlight')}. Please specify ${styleValue(
+        `${(cli_options.network.toUpperCase(), 'highlight')}_PROVIDER`
+      )} in ${styleValue('.env', 'highlight')}.`
     )
   }
 
@@ -153,8 +155,8 @@ export async function parseOptions(): Promise<HoprOptions> {
       let str = `\n`
 
       str += `===== New message ======\n`
-      str += `Message: ${chalk.yellow(msg.toString())}\n`
-      str += `Latency: ${chalk.green(latency.toString())} ms\n`
+      str += `Message: ${styleValue(msg.toString(), 'highlight')}\n`
+      str += `Latency: ${styleValue(latency.toString(), 'number')} ms\n`
       str += `========================\n`
 
       console.log(str)
