@@ -337,6 +337,7 @@ class Relay {
         counterpartyMap = new Map<string, RelayContext>()
       }
       counterpartyMap.set(connection.remotePeer.toB58String(), ctxToCounterparty)
+      this._streams.set(counterparty.toB58String(), counterpartyMap)
 
       const ctxToSender = new RelayContext(deliveryStream.source as any)
       shaker.stream.sink(ctxToSender.source)
@@ -346,6 +347,7 @@ class Relay {
         senderMap = new Map<string, RelayContext>()
       }
       senderMap.set(counterparty.toB58String(), ctxToSender)
+      this._streams.set(connection.remotePeer.toB58String(), senderMap)
     } else {
       log(`overwriting connection between ${connection.remotePeer.toB58String()} and ${counterparty.toB58String()}`)
       const ctxToCounterparty = counterpartyMap.get(connection.remotePeer.toB58String())
