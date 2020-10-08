@@ -40,7 +40,7 @@ export function getExternalIp(
   address: string
 }> {
   return new Promise((resolve, reject) => {
-    verbose('External IP for', multiAddrs.map((m) => m.toString()).join(','))
+    verbose(`Getting external IP by using ${multiAddrs.map((m) => m.toString()).join(',')}`)
     const tids = Array.from({ length: multiAddrs.length }).map(stun.generateTransactionId)
 
     let result: {
@@ -52,6 +52,7 @@ export function getExternalIp(
     let timeout: NodeJS.Timeout
 
     const msgHandler = (msg: Buffer) => {
+      verbose(`stun received`)
       const res = stun.createBlank()
 
       if (res.loadBuffer(msg)) {
@@ -78,7 +79,7 @@ export function getExternalIp(
               clearTimeout(timeout)
               resolve({
                 address: attr.address === result.address ? attr.address : undefined,
-                port: attr.port == result.port ? attr.port : undefined,
+                port: attr.port == result.port ? attr.port : undefined
               })
             }
           }
@@ -103,6 +104,7 @@ export function getExternalIp(
         //.setSoftwareAttribute(`${pkg.name}@${pkg.version}`)
         .setFingerprintAttribute()
 
+      verbose(`STUN request sent`)
       socket.send(res.toBuffer(), parseInt(nodeAddress.port, 10), nodeAddress.address)
     })
 

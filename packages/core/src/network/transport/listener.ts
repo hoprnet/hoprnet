@@ -134,6 +134,7 @@ class Listener extends EventEmitter {
       this.stunServers?.length > 0
         ? new Promise((resolve) =>
             this.udpSocket.bind(options.port, async () => {
+              verbose(this.udpSocket)
               try {
                 this.externalAddress = await getExternalIp(this.stunServers, this.udpSocket)
               } catch (err) {
@@ -175,10 +176,11 @@ class Listener extends EventEmitter {
       throw Error(`Listener is not yet ready`)
     }
 
+    log(`addrs`, this.externalAddress)
     let addrs: Multiaddr[] = []
     const address = this.tcpSocket.address() as AddressInfo
 
-    if (this.externalAddress != undefined && this.externalAddress.port == null) {
+    if (this.externalAddress != null && this.externalAddress.port == null) {
       console.log(`Attention: Bidirectional NAT detected. Publishing no public IPv4 address to the DHT`)
 
       addrs.push(Multiaddr(`/p2p/${this.peerId}`))
@@ -208,6 +210,8 @@ class Listener extends EventEmitter {
     } else {
       addrs.push(this.listeningAddr)
     }
+
+    log(`addrs`, this.externalAddress)
 
     return addrs
   }
