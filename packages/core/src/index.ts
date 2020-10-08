@@ -153,6 +153,7 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
       debug: options.debug,
     })) as CoreConnector
 
+    verbose("Created connector, now creating node")
     return await new Hopr<CoreConnector>(options, db, connector).start()
   }
 

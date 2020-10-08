@@ -315,6 +315,7 @@ class TCP {
     }
 
     if (
+      ['ip4', 'ip6', 'dns4', 'dns6'].includes(ma.protoNames()[0]) &&
       this._peerInfo.multiaddrs
         .toArray()
         .map((ma: Multiaddr) => ma.nodeAddress())
