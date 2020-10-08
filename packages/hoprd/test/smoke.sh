@@ -20,11 +20,20 @@ hoprd --data='bob' --host="$BOB_ADDR:$BOB_PORT" --password="opensesame" --bootst
 BOB_PID="$!"
 BOB_MULTIADDR=/ip4/$BOB_ADDR/tcp/$BOB_PORT/p2p/$BOB
 export HOPR_BOOTSTRAP_SERVERS=$BOB_MULTIADDR 
-echo "Bootstrap Bob running as pid $BOB_PID as $BOB on $BOB_ADDR"
+echo "Bootstrap Bob running as pid $BOB_PID on $BOB_MULTIADDR"
 
 # Ping bootstrapnode
 hoprd --data='alice' --password="opensesame" --run="ping $BOB"
 
+# Start charlie
+CHARLIE_ADDR=127.0.0.1
+CHARLIE_PORT=9877
+hoprd --data='charlie' --password="opensesame" --host="$CHARLIE_ADDR:$CHARLIE_PORT" &
+CHARLIE_PID="$!"
+echo "Charlie running as pid $CHARLIE as $CHARLIE on $CHARLIE_ADDR:$CHARLIE_PORT"
+
+# Ping Charlie
+hoprd --data='alice' --password="opensesame" --run="ping $CHARLIE"
 
 
 
@@ -32,3 +41,4 @@ hoprd --data='alice' --password="opensesame" --run="ping $BOB"
 
 # Cleanup
 kill $BOB_PID
+kill $CHARLIE_PID
