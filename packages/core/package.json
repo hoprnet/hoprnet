@@ -12,6 +12,8 @@
   "types": "lib/index.d.ts",
   "files": [
     "lib/",
+    "src/@types/libp2p.d.ts",
+    "src/network/transport/types.ts",
     "!*.spec.ts",
     "!*.spec.d.ts",
     "!*.spec.js",
