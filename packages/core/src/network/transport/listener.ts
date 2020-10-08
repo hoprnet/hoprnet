@@ -131,16 +131,12 @@ class Listener extends EventEmitter {
           resolve()
         })
       ),
-
       new Promise((resolve, reject) =>
         this.udpSocket.bind(options.port, async () => {
-          verbose(this.udpSocket)
-          if (this.stunServers?.length > 0) {
-            try {
-              this.externalAddress = await getExternalIp(this.stunServers, this.udpSocket)
-            } catch (err) {
-              error(`Unable to fetch external address using STUN. Error was: ${err}`)
-            }
+          try {
+            this.externalAddress = await getExternalIp(this.stunServers, this.udpSocket)
+          } catch (err) {
+            error(`Unable to fetch external address using STUN. Error was: ${err}`)
           }
 
           resolve()
@@ -177,7 +173,6 @@ class Listener extends EventEmitter {
       throw Error(`Listener is not yet ready`)
     }
 
-    log(`addrs`, this.externalAddress)
     let addrs: Multiaddr[] = []
     const address = this.tcpSocket.address() as AddressInfo
 
@@ -203,6 +198,8 @@ class Listener extends EventEmitter {
         ).encapsulate(`/p2p/${this.peerId}`)
       )
 
+      console.log(addrs)
+
       addrs.push(
         ...getAddrs(address.port, this.peerId, {
           useIPv6: true
@@ -211,8 +208,6 @@ class Listener extends EventEmitter {
     } else {
       addrs.push(this.listeningAddr)
     }
-
-    log(`addrs`, this.externalAddress)
 
     return addrs
   }
