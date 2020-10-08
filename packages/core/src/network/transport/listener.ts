@@ -38,7 +38,7 @@ async function attemptClose(maConn: MultiaddrConnection) {
 enum State {
   UNINITIALIZED,
   LISTENING,
-  CLOSED,
+  CLOSED
 }
 
 class Listener extends EventEmitter {
@@ -73,14 +73,14 @@ class Listener extends EventEmitter {
       // `udp6` does not seem to work in Node 12.x
       // can receive IPv6 packet and IPv4 after reconnecting the socket
       type: 'udp4',
-      reuseAddr: true,
+      reuseAddr: true
     })
 
     this.state = State.UNINITIALIZED
 
     Promise.all([
       new Promise((resolve) => this.udpSocket.once('listening', resolve)),
-      new Promise((resolve) => this.tcpSocket.once('listening', resolve)),
+      new Promise((resolve) => this.tcpSocket.once('listening', resolve))
     ]).then(() => {
       this.state = State.LISTENING
       this.emit('listening')
@@ -88,7 +88,7 @@ class Listener extends EventEmitter {
 
     Promise.all([
       new Promise((resolve) => this.udpSocket.once('close', resolve)),
-      new Promise((resolve) => this.tcpSocket.once('close', resolve)),
+      new Promise((resolve) => this.tcpSocket.once('close', resolve))
     ]).then(() => this.emit('close'))
 
     this.udpSocket.on('message', (msg: Buffer, rinfo: RemoteInfo) => handleStunRequest(this.udpSocket, msg, rinfo))
@@ -131,20 +131,21 @@ class Listener extends EventEmitter {
           resolve()
         })
       ),
-      this.stunServers?.length > 0
-        ? new Promise((resolve) =>
-            this.udpSocket.bind(options.port, async () => {
-              verbose(this.udpSocket)
-              try {
-                this.externalAddress = await getExternalIp(this.stunServers, this.udpSocket)
-              } catch (err) {
-                error(`Unable to fetch external address using STUN. Error was: ${err}`)
-              }
 
-              resolve()
-            })
-          )
-        : Promise.resolve(),
+      new Promise((resolve, reject) =>
+        this.udpSocket.bind(options.port, async () => {
+          verbose(this.udpSocket)
+          if (this.stunServers?.length > 0) {
+            try {
+              this.externalAddress = await getExternalIp(this.stunServers, this.udpSocket)
+            } catch (err) {
+              error(`Unable to fetch external address using STUN. Error was: ${err}`)
+            }
+          }
+
+          resolve()
+        })
+      )
     ])
 
     this.state = State.LISTENING
@@ -162,7 +163,7 @@ class Listener extends EventEmitter {
             this.tcpSocket.once('close', resolve)
             this.tcpSocket.close()
           })
-        : Promise.resolve(),
+        : Promise.resolve()
     ])
 
     this.state = State.CLOSED
@@ -187,7 +188,7 @@ class Listener extends EventEmitter {
 
       addrs.push(
         ...getAddrs(address.port, this.peerId, {
-          useIPv6: true,
+          useIPv6: true
         })
       )
     } else if (this.externalAddress != null && this.externalAddress.port != null) {
@@ -196,7 +197,7 @@ class Listener extends EventEmitter {
           {
             ...this.externalAddress,
             family: 'IPv4',
-            port: this.externalAddress.port.toString(),
+            port: this.externalAddress.port.toString()
           },
           'tcp'
         ).encapsulate(`/p2p/${this.peerId}`)
@@ -204,7 +205,7 @@ class Listener extends EventEmitter {
 
       addrs.push(
         ...getAddrs(address.port, this.peerId, {
-          useIPv6: true,
+          useIPv6: true
         })
       )
     } else {
