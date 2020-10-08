@@ -104,21 +104,24 @@ export class SendMessageFancy extends SendMessageBase {
     console.log(`Sending message to ${chalk.blue(query)} ...`)
 
     try {
-      // use manual path
-      if (state.routing === 'manual') {
-        await this.node.sendMessage(encodeMessage(message), peerId, async () => {
-          return this.selectIntermediateNodes(this.rl, peerId)
-        })
-      }
       // use random path
-      else if (state.routing === 'auto') {
+      if (state.routing === 'auto') {
         // @TODO: use path finder
         await this.node.sendMessage(encodeMessage(message), peerId)
       }
       // 0 hops
-      else {
+      else if (state.routing === 'direct') {
         await this.node.sendMessage(encodeMessage(message), peerId)
       }
+      else if (state.routing === 'manual') {
+        await this.node.sendMessage(encodeMessage(message), peerId, async () => {
+          return this.selectIntermediateNodes(this.rl, peerId)
+        })
+      } else {
+        let path = await Promise.all(state.routing.split(',').map(async (x) => await checkPeerIdInput(x)))
+        await this.node.sendMessage(encodeMessage(message), peerId, () => Promise.resolve(path))
+      }
+
     } catch (err) {
       return chalk.red(err.message)
     }

@@ -1,6 +1,14 @@
 #/bin/bash
 alias hoprd="node $0/../../lib/index.js"
 
+
+# Variables
+BOB_ADDR=127.0.0.1
+BOB_PORT=9876
+CHARLIE_ADDR=127.0.0.1
+CHARLIE_PORT=9877
+
+
 set -v
 
 # Check databases and funded
@@ -14,8 +22,6 @@ BOB=$(hoprd --data='bob' --password="opensesame" --run="myAddress hopr")
 CHARLIE=$(hoprd --data='charlie'  --password="opensesame" --run "myAddress hopr")
 
 # Run bob as bootstrap node
-BOB_ADDR=127.0.0.1
-BOB_PORT=9876
 hoprd --data='bob' --host="$BOB_ADDR:$BOB_PORT" --password="opensesame" --bootstrap &
 BOB_PID="$!"
 BOB_MULTIADDR=/ip4/$BOB_ADDR/tcp/$BOB_PORT/p2p/$BOB
@@ -26,8 +32,6 @@ echo "Bootstrap Bob running as pid $BOB_PID on $BOB_MULTIADDR"
 hoprd --data='alice' --password="opensesame" --run="ping $BOB"
 
 # Start charlie
-CHARLIE_ADDR=127.0.0.1
-CHARLIE_PORT=9877
 hoprd --data='charlie' --password="opensesame" --host="$CHARLIE_ADDR:$CHARLIE_PORT" &
 CHARLIE_PID="$!"
 echo "Charlie running as pid $CHARLIE as $CHARLIE on $CHARLIE_ADDR:$CHARLIE_PORT"
@@ -35,6 +39,8 @@ echo "Charlie running as pid $CHARLIE as $CHARLIE on $CHARLIE_ADDR:$CHARLIE_PORT
 # Ping Charlie
 hoprd --data='alice' --password="opensesame" --run="crawl; ping $CHARLIE"
 
+# Multihop ping self via Bob and Charlie
+DEBUG=hopr* hoprd --data='alice' --password="opensesame" --settings="{\"route\":\"$BOB,$CHARLIE\"}" --run="crawl; ping $ALICE"
 
 
 
