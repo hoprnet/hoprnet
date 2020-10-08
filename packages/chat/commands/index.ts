@@ -75,6 +75,11 @@ export class Commands {
     }
   }
 
+  public setState(settings: any) {
+    this.state = settings
+
+  }
+
   public allCommands(): string[] {
     return Array.from(this.commandMap.keys())
   }

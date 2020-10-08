@@ -284,8 +284,6 @@ class TCP {
     } else {
       this.connHandler = handler
     }
-
-    console.log(`creating listener`)
     return new Listener(this.connHandler, this._upgrader, this.stunServers)
   }
 
