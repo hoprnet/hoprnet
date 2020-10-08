@@ -22,6 +22,8 @@ export const PUBLIC_STUN_SERVERS = [
 export function handleStunRequest(socket: Socket, data: Buffer, rinfo: RemoteInfo): void {
   const req = stun.createBlank()
 
+  const backup = console.log
+  console.log = () => {}
   // if msg is valid STUN message
   if (req.loadBuffer(data)) {
     // if STUN message is BINDING_REQUEST and valid content
@@ -35,6 +37,7 @@ export function handleStunRequest(socket: Socket, data: Buffer, rinfo: RemoteInf
       socket.send(res.toBuffer(), rinfo.port, rinfo.address)
     }
   }
+  console.log = backup
 }
 
 export function getExternalIp(
@@ -62,6 +65,9 @@ export function getExternalIp(
     const msgHandler = (msg: Buffer) => {
       verbose(`stun received`)
       const res = stun.createBlank()
+
+      const backup = console.log
+      console.log = () => {}
 
       if (res.loadBuffer(msg)) {
         let index: number
@@ -94,6 +100,8 @@ export function getExternalIp(
           }
         }
       }
+      console.log = backup
+
     }
     socket.on('message', msgHandler)
     socket.on('error', (err) => {
