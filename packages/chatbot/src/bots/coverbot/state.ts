@@ -14,23 +14,30 @@ export enum NodeStates {
   verifiedNode = 'VERIFIED',
 }
 
+export enum AdminSubCommands {
+  verificationCycle = 'verificationCycle',
+  help = 'help'
+}
+
 export enum VerifySubCommands {
-  tweet = 'TWEET',
-  status = 'STATUS'
+  tweet = 'tweet',
+  status = 'status',
+  help = 'help'
 }
 
 export enum StatsSubCommands {
-  connected = 'CONNECTED',
-  myself = 'MYSELF',
-  coverbot = 'COVERBOT'
+  connected = 'connected',
+  myself = 'myself',
+  coverbot = 'coverbot',
+  help = 'help'
 }
 
 export enum BotCommands {
-  rules = 'RULES',
-  verify = 'VERIFY',
-  help = 'HELP',
-  stats = 'STATS',
-  admin = 'ADMIN'
+  rules = 'rules',
+  verify = 'verify',
+  help = 'help',
+  stats = 'stats',
+  admin = 'admin'
 }
 
 export enum ScoreRewards {

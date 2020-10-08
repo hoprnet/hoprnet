@@ -20,9 +20,9 @@ import {
   COVERBOT_ADMIN_MODE
 } from '../../utils/env'
 import db from './db'
-import { BotCommands, NodeStates, ScoreRewards, VerifySubCommands, StatsSubCommands } from './state'
+import { BotCommands, NodeStates, ScoreRewards, VerifySubCommands, StatsSubCommands, AdminSubCommands } from './state'
 import { RELAY_VERIFICATION_CYCLE_IN_MS, RELAY_HOPR_REWARD } from './constants'
-import { BotResponses, NodeStateResponses } from './responses'
+import { BotResponses, NodeStateResponses, AdminStateResponses } from './responses'
 import { BalancedHoprNode, HoprNode } from './coverbot'
 import debug from 'debug'
 import Core from '../../lib/hopr/core'
@@ -514,18 +514,39 @@ export class Coverbot implements Bot {
           break;
         }
         case BotCommands.admin: {
-          log(`- handleMessage | admin command received`)
+          log(`- handleMessage | ${BotCommands.admin} command received`)
           if (!COVERBOT_ADMIN_MODE) {
             return this._sendMessageFromBot(message.from, NodeStateResponses[NodeStates.adminModeDisabled]).catch((err) => {
               error(`Trying to send ${NodeStates.adminModeDisabled} message to ${message.from} failed.`)
             })
           } else {
-            this._sendMessageFromBot(message.from, NodeStateResponses[NodeStates.adminCommandReceived]('verificationCycle')).catch((err) => {
-              error(`Trying to send ${NodeStates.adminCommandReceived} message to ${message.from} failed.`)
-            })
-            log(`- handleMessage | admin command :: allowed to go forward`)
-            log(`- handleMessage | admin command :: starting verification cycle`)
-            this._verificationCycle.call(this);
+            log(`- handleMessage | ${BotCommands.admin} command :: allowed to go forward`)
+            switch (instructionWrapper.subcommand) {
+              case AdminSubCommands.help: {
+                log(`- handleMessage | ${BotCommands.admin} command :: ${AdminSubCommands.help} subcommand received`)
+                this._sendMessageFromBot(message.from, AdminStateResponses[AdminSubCommands.help]).catch((err) => {
+                  error(`Trying to send ${AdminSubCommands.help} message to ${message.from} failed.`)
+                })
+                break;
+              }
+              case AdminSubCommands.verificationCycle: {
+                log(`- handleMessage | ${BotCommands.admin} command :: ${AdminSubCommands.verificationCycle} subcommand received`)
+                this._sendMessageFromBot(message.from, AdminStateResponses[AdminSubCommands.verificationCycle]).catch((err) => {
+                  error(`Trying to send ${AdminSubCommands.verificationCycle} message to ${message.from} failed.`)
+                })
+                log(`- handleMessage | ${BotCommands.admin} command :: ${AdminSubCommands.verificationCycle} subcommand :: starting verification cycle`)
+                await this._verificationCycle.call(this);
+                log(`- handleMessage | ${BotCommands.admin} command :: ${AdminSubCommands.verificationCycle} subcommand :: completed verification cycle`)
+                break;
+              }
+              default: {
+                log(`- handleMessage | admin command :: subcommand not understood`)
+                this._sendMessageFromBot(message.from, AdminStateResponses[AdminSubCommands.help]).catch((err) => {
+                  error(`Trying to send ${AdminSubCommands.help} message to ${message.from} failed.`)
+                })
+              }
+            }
+            
           }
           break;
         }

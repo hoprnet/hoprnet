@@ -1,5 +1,5 @@
 import debug from 'debug'
-import { BotCommands, VerifySubCommands, StatsSubCommands } from './state';
+import { BotCommands, VerifySubCommands, StatsSubCommands, AdminSubCommands } from './state';
 
 
 const log = debug('hopr-chatbot:instruction')
@@ -11,7 +11,7 @@ function isPropertyValue<T>(object: T, possibleValue: any): possibleValue is T[k
 
 export default class Instruction {
   command: BotCommands
-  subcommand: VerifySubCommands | StatsSubCommands
+  subcommand: VerifySubCommands | StatsSubCommands | AdminSubCommands
   content: string
   constructor(maybeCommand: string) {
     log(`- constructor | Creating instruction w/maybecommand ${maybeCommand}`)
@@ -31,6 +31,9 @@ export default class Instruction {
         this.subcommand = input;
       } else if (isPropertyValue(StatsSubCommands, input)) {
         log(`- enterInput | Subcommand ${input} accepted as a stats subcommand`)
+        this.subcommand = input;
+      } else if (isPropertyValue(AdminSubCommands, input)) {
+        log(`- enterInput | Subcommand ${input} accepted as a admin subcommand`)
         this.subcommand = input;
       } else {
         error(`- enterInput | Subcommand ${input} rejected as invalid`)

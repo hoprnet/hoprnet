@@ -1,7 +1,7 @@
 import { TweetState } from '../../lib/twitter/twitter'
 import { COVERBOT_XDAI_THRESHOLD } from '../../utils/env'
 import { RELAY_VERIFICATION_CYCLE_IN_MS } from './constants'
-import { BotCommands, NodeStates, ScoreRewards, VerifySubCommands } from './state'
+import { BotCommands, NodeStates, ScoreRewards, VerifySubCommands, AdminSubCommands } from './state'
 
 export const BotResponses = {
   [BotCommands.rules]: `\n
@@ -14,9 +14,6 @@ export const BotResponses = {
 
     Visit https://saentis.hoprnet.org for more information and scoreboard
   `,
-  [VerifySubCommands.status]: (status: NodeStates) => `\n
-    Your current verification status is: ${status}
-  `,
   [BotCommands.stats]: (connected: number) => `\n
     There are currently ${connected} nodes connected.
   `,
@@ -27,11 +24,32 @@ export const BotResponses = {
     Hi! My name is coverbot. Please tell me how I can help you by sending a
     message with the following command:
 
-    verify - Start the verification process for cover traffic
-    status - Request information about your verification
-    rules  - Learn the rules about the incentivation network
-    stats  - Learn about the current stats for the network
+    verify  - Start the verification process for cover traffic
+    stats   - Learn about the current stats for the network
+    rules   - Learn the rules about the incentivation network
+    help    - Show you this message again
+    
+    You can get also request help for each command. E.g verify help.
   `,
+}
+
+export const AdminStateResponses = {
+  [AdminSubCommands.help]: `\n
+    You are using the super admin command. Please run one of the following.
+
+    verificationCycle   - Starts a single verification cycle on all verified nodes.
+    help                - Shows you this message again.
+  `,
+  [AdminSubCommands.verificationCycle]: `\n
+    Starting manually verification cycle. Please review the logs to see the
+    changes done against the system state and database.
+  `
+}
+
+export const VerifyStateResponses = {
+  [VerifySubCommands.status]: (status: NodeStates) => `\n
+    Your current verification status is: ${status}
+  `
 }
 
 export const NodeStateResponses = {
@@ -40,7 +58,7 @@ export const NodeStateResponses = {
     enabled for this session. Sorry!
   `,
   [NodeStates.adminCommandReceived]: (command: string) => `\n
-    The command ${command} was received. Please check the logs of the bot
+    The admin command was received. Please check the logs of the bot
     to see what actions followed your request.
   `,
   [NodeStates.newUnverifiedNode]: BotResponses[BotCommands.rules],
