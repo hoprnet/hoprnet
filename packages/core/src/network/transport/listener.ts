@@ -183,7 +183,7 @@ class Listener extends EventEmitter {
 
       addrs.push(
         ...getAddrs(address.port, this.peerId, {
-          useIPv6: true
+          // useIPv6: true
         })
       )
     } else if (this.externalAddress != null && this.externalAddress.port != null) {
@@ -202,7 +202,7 @@ class Listener extends EventEmitter {
 
       addrs.push(
         ...getAddrs(address.port, this.peerId, {
-          useIPv6: true
+          // useIPv6: true
         })
       )
     } else {
