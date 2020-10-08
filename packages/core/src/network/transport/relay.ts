@@ -438,46 +438,6 @@ class Relay {
 
     return toCounterparty.stream
   }
-
-  private updateContext(
-    to: string,
-    from: string,
-    newSource: AsyncGenerator<Uint8Array> | undefined,
-    sink: (stream: AsyncIterable<Uint8Array>) => Promise<void> | undefined,
-    overwrite: boolean
-  ) {
-    let map = this._streams.get(to)
-
-    if (map == null) {
-      map = new Map<string, RelayContext>()
-    }
-
-    let ctx = map.get(from)
-    if (overwrite || ctx == null) {
-      if (ctx == null) {
-        log(`storing new ctx for connection to ${to} from ${from} - self ${this._peerInfo.id.toB58String()}`)
-      } else {
-        log(`overwriting ctx for connection to ${to} from ${from} - self ${this._peerInfo.id.toB58String()}`)
-      }
-
-      ctx = new RelayContext(newSource)
-
-      map.set(from, ctx)
-      sink(ctx.source)
-      this._streams.set(this._peerInfo.id.toB58String(), map)
-    } else {
-      log(`updating source in ctx for connection to ${to} from ${from} - self ${this._peerInfo.id.toB58String()}`)
-
-      ctx.update(newSource)
-    }
-
-    // sink((async function * () {
-    //   for await (const msg of newSource) {
-    //     console.log(`Relaying`, msg)
-    //     yield msg
-    //   }
-    // })())
-  }
 }
 
 export default Relay
