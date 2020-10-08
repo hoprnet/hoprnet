@@ -50,7 +50,7 @@
     "secp256k1": "4.0.2",
     "truffle": "^5.1.23",
     "truffle-plugin-verify": "^0.4.0",
-    "ts-node": "^8.10.2",
+    "ts-node": "^9.0.0",
     "web3": "^1.2.11"
   },
   "devDependencies": {
