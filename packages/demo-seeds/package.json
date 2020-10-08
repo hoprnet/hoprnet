@@ -24,7 +24,7 @@
     "url": "https://github.com/hoprnet/hopr-demo-seeds.git"
   },
   "devDependencies": {
-    "typescript": "^3.8.2"
+    "typescript": "^4.0.3"
   },
   "publishConfig": {
     "access": "public"
