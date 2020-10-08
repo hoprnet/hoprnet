@@ -13,6 +13,7 @@ import { MAX_HOPS } from '@hoprnet/hopr-core/lib/constants'
 
 import readline from 'readline'
 
+
 export abstract class SendMessageBase extends AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {
     super()
@@ -40,11 +41,17 @@ export abstract class SendMessageBase extends AbstractCommand {
       : msg
 
     try {
-      return await this.node.sendMessage(
-        encodeMessage(message),
-        recipient,
-        async () => [] // MULTIHOP not supported
-      )
+      let m = encodeMessage(message)
+      // use random path
+      if (settings.routing === 'auto') {
+        return await this.node.sendMessage(m, recipient)
+      } else if (settings.routing === 'direct') {
+        // 0 hops
+        return await this.node.sendMessage(m, recipient, async() => [])
+      } else {
+        let path = await Promise.all(settings.routing.split(',').map(async (x) => await checkPeerIdInput(x)))
+        await this.node.sendMessage(m, recipient, () => Promise.resolve(path))
+      }
     } catch (err) {
       console.log(chalk.red(err.message))
     }
@@ -96,32 +103,22 @@ export class SendMessageFancy extends SendMessageBase {
     const messageQuestion = `${chalk.yellow(`Type your message and press ENTER to send:`)}\n`
     const parsedMessage = await new Promise<string>((resolve) => this.rl.question(messageQuestion, resolve))
 
-    const message = state.includeRecipient
-      ? ((myAddress) => `${myAddress}:${parsedMessage}`)(this.node.peerInfo.id.toB58String())
-      : parsedMessage
-
-    clearString(messageQuestion + message, this.rl)
-    console.log(`Sending message to ${chalk.blue(query)} ...`)
-
     try {
-      // use random path
-      if (state.routing === 'auto') {
-        // @TODO: use path finder
-        await this.node.sendMessage(encodeMessage(message), peerId)
-      }
-      // 0 hops
-      else if (state.routing === 'direct') {
-        await this.node.sendMessage(encodeMessage(message), peerId)
-      }
-      else if (state.routing === 'manual') {
+      if (state.routing === 'manual') {
+        // Fancy intermediate selection
+        const message = state.includeRecipient
+          ? ((myAddress) => `${myAddress}:${parsedMessage}`)(this.node.peerInfo.id.toB58String())
+          : parsedMessage
+
+        clearString(messageQuestion + message, this.rl)
+        console.log(`Sending message to ${chalk.blue(query)} ...`)
+
         await this.node.sendMessage(encodeMessage(message), peerId, async () => {
           return this.selectIntermediateNodes(this.rl, peerId)
         })
       } else {
-        let path = await Promise.all(state.routing.split(',').map(async (x) => await checkPeerIdInput(x)))
-        await this.node.sendMessage(encodeMessage(message), peerId, () => Promise.resolve(path))
+        await this._sendMessage(state, peerId, parsedMessage) 
       }
-
     } catch (err) {
       return chalk.red(err.message)
     }
