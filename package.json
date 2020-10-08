@@ -12,7 +12,9 @@
     "run:chatbot": "lerna exec --scope @hoprnet/chat-bot -- yarn start:basodino",
     "lint": "prettier --check .",
     "lint:fix": "prettier --write .",
-    "test": "lerna run test --stream"
+    "test": "lerna run test --stream",
+    "new:install": "lerna exec --concurrency 1 -- yarn --pure-lockfile",
+    "new:install:parallel": "lerna exec -- yarn --pure-lockfile"
   },
   "dependencies": {
     "lerna": "^3.22.1"
@@ -27,13 +29,5 @@
     "singleQuote": true,
     "printWidth": 120,
     "trailingComma": "none"
-  },
-  "__workspaces": {
-    "packages": [
-      "packages/*"
-    ],
-    "nohoist": [
-      "**"
-    ]
   }
 }

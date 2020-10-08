@@ -2,6 +2,8 @@
   "name": "@hoprnet/hopr-core",
   "version": "1.17.0-alpha.58",
   "description": "Privacy-preserving messaging protocol with incentivations for relay operators",
+  "repository": "https://github.com/hoprnet/hoprnet.git",
+  "homepage": "https://hoprnet.org",
   "license": "GPL-3.0-only",
   "keywords": [
     "privacy",
@@ -26,14 +28,9 @@
     "node": "12",
     "yarn": "1"
   },
-  "homepage": "https://hoprnet.org",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/hoprnet/hopr-core.git"
-  },
   "scripts": {
+    "clean": "rimraf ./lib",
     "build": "yarn clean && tsc -p .",
-    "clean": "rm -rf ./lib",
     "test": "yarn testOnce",
     "testOnce": "node --trace-warnings --unhandled-rejections=strict node_modules/.bin/jest --runInBand --forceExit",
     "prepublishOnly": "yarn build"
@@ -86,6 +83,7 @@
     "@types/read": "^0.0.28",
     "@types/secp256k1": "~4.0.1",
     "@types/simple-peer": "^9.6.0",
+    "rimraf": "^3.0.2",
     "it-pair": "^1.0.0",
     "jest": "^26.1.0",
     "jest-silent-reporter": "^0.2.1",

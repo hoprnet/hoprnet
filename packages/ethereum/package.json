@@ -2,11 +2,8 @@
   "name": "@hoprnet/hopr-ethereum",
   "version": "1.17.0-alpha.58",
   "description": "On-chain logic for hoprnet.org",
+  "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/hoprnet/hopr-ethereum.git"
-  },
   "license": "LGPL-3.0-only",
   "main": "./build/lib/scripts/api.js",
   "files": [
@@ -31,7 +28,7 @@
     "network": "ts-node -T ./scripts/cli.ts network",
     "test": "ts-node -T ./scripts/cli.ts test",
     "lint": "prettier --check .",
-    "prepare": "yarn build"
+    "prepublishOnly": "yarn build"
   },
   "husky": {
     "hooks": {
@@ -61,7 +58,6 @@
     "@types/node": "~12",
     "@types/secp256k1": "^4.0.1",
     "chai": "^4.2.0",
-    "husky": "^4.2.5",
     "mocha": "^8.1.0",
     "prettier": "^2.0.5",
     "prettier-plugin-solidity": "^1.0.0-alpha.55",
