@@ -41,10 +41,10 @@ async function generateNode(id: number): Promise<Hopr<HoprEthereum>> {
     connector: HoprEthereum,
     provider: GANACHE_URI,
     network: 'ethereum',
-    debug: true,
+    debug: true
   })) as Hopr<HoprEthereum>
 
-  await node.paymentChannels.initOnchainValues()
+  // await node.paymentChannels.initOnchainValues()
 
   return node
 }
@@ -72,13 +72,13 @@ describe('test packet composition and decomposition', function () {
       console.log(
         new nodes[0].paymentChannels.types.ChannelBalance(undefined, {
           balance: new BN(200),
-          balance_a: new BN(100),
+          balance_a: new BN(100)
         }),
         async (bal) => {
           const channel = nodes[0].paymentChannels.types.Channel.createFunded(bal)
           const signedChannel = new nodes[0].paymentChannels.types.SignedChannel(undefined, {
             channel,
-            signature: await channel.sign(nodes[0].peerInfo.id.privKey.marshal(), undefined),
+            signature: await channel.sign(nodes[0].peerInfo.id.privKey.marshal(), undefined)
           } as any)
           return signedChannel
         }
@@ -87,7 +87,7 @@ describe('test packet composition and decomposition', function () {
       async function openChannel(a: number, b: number) {
         let channelBalance = new nodes[a].paymentChannels.types.ChannelBalance(undefined, {
           balance: new BN(200),
-          balance_a: new BN(100),
+          balance_a: new BN(100)
         })
 
         await nodes[a].paymentChannels.channel.create(
@@ -95,7 +95,7 @@ describe('test packet composition and decomposition', function () {
           async () => nodes[b].peerInfo.id.pubKey.marshal(),
           new nodes[a].paymentChannels.types.ChannelBalance(undefined, {
             balance: new BN(200),
-            balance_a: new BN(100),
+            balance_a: new BN(100)
           }),
           (_channelBalance) => nodes[a].interactions.payments.open.interact(nodes[b].peerInfo.id, channelBalance) as any
         )
@@ -105,11 +105,11 @@ describe('test packet composition and decomposition', function () {
 
       for (let i = 0; i < MAX_HOPS - 1; i++) {
         for (let j = i + 1; j < MAX_HOPS; j++) {
-          queries.push([i,j])
+          queries.push([i, j])
         }
       }
 
-      await Promise.all(queries.map(query => openChannel(query[0], query[1])))
+      await Promise.all(queries.map((query) => openChannel(query[0], query[1])))
 
       console.log(`channels opened`)
 
@@ -159,9 +159,7 @@ describe('test packet composition and decomposition', function () {
               gte: Buffer.from(
                 nodes[i].dbKeys.AcknowledgedTickets(Buffer.alloc(ACKNOWLEDGED_TICKET_INDEX_LENGTH, 0x00))
               ),
-              lt: Buffer.from(
-                nodes[i].dbKeys.AcknowledgedTickets(Buffer.alloc(ACKNOWLEDGED_TICKET_INDEX_LENGTH, 0xff))
-              ),
+              lt: Buffer.from(nodes[i].dbKeys.AcknowledgedTickets(Buffer.alloc(ACKNOWLEDGED_TICKET_INDEX_LENGTH, 0xff)))
             })
             .on('data', (data: Buffer) => {
               const acknowledged = nodes[i].paymentChannels.types.AcknowledgedTicket.create(nodes[i].paymentChannels)
