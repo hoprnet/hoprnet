@@ -13,8 +13,13 @@
     "lint": "prettier --check .",
     "lint:fix": "prettier --write .",
     "test": "lerna run test --stream",
+    "new:resurrect": "lerna exec --concurrency 1 -- yarn",
     "new:install": "lerna exec --concurrency 1 -- yarn --pure-lockfile",
-    "new:install:parallel": "lerna exec -- yarn --pure-lockfile"
+    "new:install:parallel": "lerna exec -- yarn --pure-lockfile",
+    "new:link": "lerna link",
+    "new:build": "lerna exec --concurrency 1 -- yarn build",
+    "new:setup": "yarn new:install && yarn new:link && yarn new:build",
+    "new:jesushelpme": "yarn new:resurrect && yarn new:setup"
   },
   "dependencies": {
     "lerna": "^3.22.1"
