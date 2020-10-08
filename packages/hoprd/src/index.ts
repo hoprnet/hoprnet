@@ -91,6 +91,10 @@ const argv = yargs
     describe: 'manually specify the database directory to use',
     default: ''
   })
+  .option('settings', {
+    descripe: 'Settings, same as in the repl (JSON)',
+    default: '{}'
+  })
   .wrap(Math.min(120, yargs.terminalWidth())).argv
 
 // TODO this should probably be shared between chat and this, and live in a
@@ -152,6 +156,11 @@ async function main() {
   let addr: Multiaddr
   let logs = new LogStream()
   let adminServer = undefined
+  let settings:any = {}
+
+  if (argv.settings) {
+    settings = JSON.parse(argv.settings)
+  }
 
   if (argv.admin) {
     // We need to setup the admin server before the HOPR node
@@ -193,6 +202,9 @@ async function main() {
     if (argv.run && argv.run !== '') {
       // Run a single command and then exit.
       let cmds = new commands.Commands(node)
+      if (argv.settings) {
+        cmds.setState(settings)
+      }
       let resp = await cmds.execute(argv.run)
       console.log(resp)
       await node.down()
