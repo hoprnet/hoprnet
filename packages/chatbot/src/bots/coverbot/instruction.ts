@@ -1,5 +1,5 @@
 import debug from 'debug'
-import { BotCommands, VerifySubCommands, StatsSubCommands, AdminSubCommands } from './state';
+import { BotCommands, AvailableSubCommands, VerifySubCommands, StatsSubCommands, AdminSubCommands } from './types/commands';
 
 
 const log = debug('hopr-chatbot:instruction')
@@ -11,7 +11,7 @@ function isPropertyValue<T>(object: T, possibleValue: any): possibleValue is T[k
 
 export default class Instruction {
   command: BotCommands
-  subcommand: VerifySubCommands | StatsSubCommands | AdminSubCommands
+  subcommand: AvailableSubCommands
   content: string
   constructor(maybeCommand: string) {
     log(`- constructor | Creating instruction w/maybecommand ${maybeCommand}`)

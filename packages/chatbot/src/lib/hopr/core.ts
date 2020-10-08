@@ -112,7 +112,7 @@ export default class Core {
     includeRecipient = false
   }: {
     peerId: string
-    payload: Uint8Array
+    payload: string
     intermediatePeerIds?: string[]
     includeRecipient?: boolean
   }): Promise<{

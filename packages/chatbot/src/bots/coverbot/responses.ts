@@ -1,36 +1,27 @@
-import { TweetState } from '../../lib/twitter/twitter'
 import { COVERBOT_XDAI_THRESHOLD } from '../../utils/env'
-import { RELAY_VERIFICATION_CYCLE_IN_MS } from './constants'
-import { BotCommands, NodeStates, ScoreRewards, VerifySubCommands, AdminSubCommands, StatsSubCommands } from './state'
+import { RELAY_VERIFICATION_CYCLE_IN_MS, ScoreRewards } from './constants'
+import { NodeStates, VerifyTweetStates } from './types/states'
+import { BotCommands, AdminSubCommands, StatsSubCommands, VerifySubCommands } from './types/commands'
 
-export const BotResponses = {
-  [BotCommands.rules]: `\n
-    Welcome to HOPR incentivized network!
-
-    1. Load ${COVERBOT_XDAI_THRESHOLD} xDAI into your HOPR Ethereum Address
-    2. Post a tweet with your HOPR Address and the tag #HOPRNetwork
-    3. Send me the link to your tweet (don't delete it!)
-    4. Every time you're chosen to relay a message, you'll score ${ScoreRewards.relayed} points and receive xHOPR!
-
-    Visit https://saentis.hoprnet.org for more information and scoreboard
-  `,
-  [BotCommands.verify]: `\n
-    Verifying if your node is still up...
-  `,
-  [BotCommands.help]: `\n
-    Hi! My name is coverbot. Please tell me how I can help you by sending a
-    message with the following command:
-
-    verify  - Start the verification process for cover traffic
-    stats   - Learn about the current stats for the network
-    rules   - Learn the rules about the incentivation network
-    help    - Show you this message again
-    
-    You can get also request help for each command. E.g verify help.
-  `,
+type BotResponse = {
+  [key in BotCommands]: string
 }
 
-export const AdminStateResponses = {
+type AdminResponse = {
+  [key in AdminSubCommands]: string
+}
+
+type VerifyResponse = {
+  [key in VerifySubCommands]: string | Function
+}
+
+type StatsResponse = {
+  [key in StatsSubCommands]: string | Function
+}
+
+export type GenericResponse = BotResponse | AdminResponse | VerifyResponse | StatsResponse
+
+export const AdminStateResponses:AdminResponse = {
   [AdminSubCommands.help]: `\n
     You are using the super admin command. Please run one of the following.
 
@@ -48,9 +39,8 @@ export const AdminStateResponses = {
   `
 }
 
-
-export const StatsStateResponses = {
-  [StatsSubCommands.help]:`\n
+export const StatsStateResponses: StatsResponse = {
+  [StatsSubCommands.help]: `\n
     You are using the stats command. Please run one of the following.
 
     connected   - Shows you the amount of connected nodes in the network.
@@ -61,10 +51,60 @@ export const StatsStateResponses = {
   `,
 }
 
-export const VerifyStateResponses = {
+export const VerifyStateResponses:VerifyResponse = {
+  [VerifySubCommands.tweet]: (maybeTweet: string) => `\n
+    You have requested to verify the tweet ${maybeTweet}. Please wait while
+    we fetch its content and verify your node against it.
+
+    Expect a few messages from our side. If you want to know the status of
+    your node, please send "verify status $YOUR_NODE_ADRESS".
+  `,
+  [VerifySubCommands.help]: `\n
+    You are using the verify command. Please run one of the following.
+
+    tweet  $tweet_link    - Sends a tweet to verify your node in the network.
+    status $hopr_address  - Request information about your verification status.
+    help                  - Shows you this message again.
+  `,
   [VerifySubCommands.status]: (status: NodeStates) => `\n
     Your current verification status is: ${status}
   `
+}
+
+export const VerifyTweetStateResponse = {
+  [VerifyTweetStates.tweetInvalid]: (maybeTweet: string) => `\n
+    You passed ${maybeTweet}, but it isn’t a valid tweet. Please try again
+    providing a tweet URL in the form https://twitter.com/$user/status/$id.
+
+    e.g. verify tweet https://twitter.com/jjperezaguinaga/status/1311330405375762433
+    `
+}
+
+export const BotResponses:BotResponse = {
+  [BotCommands.rules]: `\n
+    Welcome to HOPR incentivized network!
+
+    1. Load ${COVERBOT_XDAI_THRESHOLD} xDAI into your HOPR Ethereum Address
+    2. Post a tweet with your HOPR Address and the tag #HOPRNetwork
+    3. Send me the link to your tweet (don't delete it!)
+    4. Every time you're chosen to relay a message, you'll score ${ScoreRewards.relayed} points and receive xHOPR!
+
+    Visit https://saentis.hoprnet.org for more information and scoreboard
+  `,
+  [BotCommands.help]: `\n
+    Hi! My name is coverbot. Please tell me how I can help you by sending a
+    message with the following command:
+
+    verify  - Start the verification process for cover traffic
+    stats   - Learn about the current stats for the network
+    rules   - Learn the rules about the incentivation network
+    help    - Show you this message again
+    
+    You can get also request help for each command. E.g verify help.
+  `,
+  [BotCommands.stats]: StatsStateResponses[StatsSubCommands.help] as string,
+  [BotCommands.verify]: VerifyStateResponses[VerifySubCommands.help] as string,
+  [BotCommands.admin]: AdminStateResponses[AdminSubCommands.help]
 }
 
 export const NodeStateResponses = {
@@ -72,31 +112,27 @@ export const NodeStateResponses = {
     You are trying to use an admin command, but the admin mode hasn’t been
     enabled for this session. Sorry!
   `,
-  [NodeStates.adminCommandReceived]: (command: string) => `\n
-    The admin command was received. Please check the logs of the bot
-    to see what actions followed your request.
-  `,
   [NodeStates.newUnverifiedNode]: BotResponses[BotCommands.rules],
-  [NodeStates.tweetVerificationFailed]: (tweetStatus: TweetState) => `\n
-    Your tweet has failed the verification. Please make sure you've included everything.
+  // [NodeStates.tweetVerificationFailed]: (tweetStatus: TweetState) => `\n
+  //   Your tweet has failed the verification. Please make sure you've included everything.
 
-    Here is the current status of your tweet:
-    1. Tagged @hoprnet: ${tweetStatus.hasMention}
-    2. Used #HOPRNetwork: ${tweetStatus.hasTag}
-    3. Includes this node address: ${tweetStatus.sameNode}
+  //   Here is the current status of your tweet:
+  //   1. Tagged @hoprnet: ${tweetStatus.hasMention}
+  //   2. Used #HOPRNetwork: ${tweetStatus.hasTag}
+  //   3. Includes this node address: ${tweetStatus.sameNode}
 
-    Please try again with a different tweet.
-  `,
-  [NodeStates.tweetVerificationSucceeded]: `\n
-    Your tweet has passed verification. Please do no delete this tweet, as I'll
-    use it multiple times to verify and connect to your node.
+  //   Please try again with a different tweet.
+  // `,
+  // [NodeStates.tweetVerificationSucceeded]: `\n
+  //   Your tweet has passed verification. Please do no delete this tweet, as I'll
+  //   use it multiple times to verify and connect to your node.
 
-    I’ll now check that your HOPR Ethereum address has at least ${COVERBOT_XDAI_THRESHOLD} xDAI.
-    If you need xDAI, you always swap DAI to xDAI using https://dai-bridge.poa.network/.
-  `,
-  [NodeStates.tweetVerificationInProgress]: `\n
-    Thank you for your Tweet! I‘ll now try to verify it...
-  `,
+  //   I’ll now check that your HOPR Ethereum address has at least ${COVERBOT_XDAI_THRESHOLD} xDAI.
+  //   If you need xDAI, you always swap DAI to xDAI using https://dai-bridge.poa.network/.
+  // `,
+  // [NodeStates.tweetVerificationInProgress]: `\n
+  //   Thank you for your Tweet! I‘ll now try to verify it...
+  // `,
   [NodeStates.xdaiBalanceFailed]: (xDaiBalance: number) => `\n
     Your node does not have at least ${COVERBOT_XDAI_THRESHOLD} xDAI. Currently, your node has ${xDaiBalance} xDAI.
 
@@ -145,7 +181,3 @@ export const NodeStateResponses = {
     and we can move to the next verification step.
   `,
 }
-
-export const VERIFY_MESSAGE = `\n
-  
-`
