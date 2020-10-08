@@ -1,6 +1,5 @@
-import chalk from 'chalk'
 import { AbstractCommand, AutoCompleteResult, GlobalState } from '../abstractCommand'
-import { styleValue } from '../../utils'
+import { styleValue, getOptions } from '../../utils'
 
 export class Routing extends AbstractCommand {
   private readonly options: GlobalState['routing'][] = ['auto', 'manual', 'direct']
@@ -10,34 +9,38 @@ export class Routing extends AbstractCommand {
   }
 
   public help() {
-    return 'pick a routing algorithm'
+    return 'The routing algorithm that is used to send messages'
   }
 
   public async execute(query: string, state: GlobalState): Promise<string | void> {
     if (!query) {
-      return styleValue(state.routing)
+      return styleValue(state.routing, 'highlight')
     }
 
     const option = this.options.find((o) => query === o)
 
     if (!option) {
-      return chalk.red('Invalid option.')
+      return styleValue('Invalid option.', 'failure')
     }
 
     state.routing = option
-    return `You have set your “${styleValue(this.name())}” settings to “${styleValue(state.routing)}”.`
+    return `You have set your “${styleValue(this.name(), 'highlight')}” settings to “${styleValue(
+      state.routing,
+      'highlight'
+    )}”.`
   }
 
   public async autocomplete(query: string, line: string): Promise<AutoCompleteResult> {
     // nothing provided, just show all options
     if (!query) {
-      return [this.options.map(styleValue), line]
+      return [getOptions(this.options.map((o) => ({ value: styleValue(o, 'highlight') }))), line]
     }
 
     // matches a option partly, show matches options
     const matchesPartly = this.options.filter((option) => {
       return option.startsWith(query)
     })
+
     if (matchesPartly.length > 0) {
       return [matchesPartly.map((str: string) => `settings ${this.name()} ${str}`), line]
     }
