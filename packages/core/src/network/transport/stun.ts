@@ -13,8 +13,13 @@ export type Interface = {
 
 export const STUN_TIMEOUT = 1000
 
+export const PUBLIC_STUN_SERVERS = [
+  Multiaddr(`/dns4/stun.sipgate.net/udp/3478`),
+  Multiaddr(`/dns4/stun.callwithus.com/udp/3478`),
+  Multiaddr(`/dns4/stun.counterpath.net/udp/3478`)
+]
+
 export function handleStunRequest(socket: Socket, data: Buffer, rinfo: RemoteInfo): void {
-  verbose('Handle stun request')
   const req = stun.createBlank()
 
   // if msg is valid STUN message
@@ -39,8 +44,11 @@ export function getExternalIp(
   port: number
   address: string
 }> {
+  if (multiAddrs == null || multiAddrs.length == 0) {
+    multiAddrs = PUBLIC_STUN_SERVERS
+  }
   return new Promise((resolve, reject) => {
-    verbose('External IP for', multiAddrs.map((m) => m.toString()).join(','))
+    verbose(`Getting external IP by using ${multiAddrs.map((m) => m.toString()).join(',')}`)
     const tids = Array.from({ length: multiAddrs.length }).map(stun.generateTransactionId)
 
     let result: {
@@ -52,10 +60,12 @@ export function getExternalIp(
     let timeout: NodeJS.Timeout
 
     const msgHandler = (msg: Buffer) => {
+      verbose(`stun received`)
       const res = stun.createBlank()
 
       if (res.loadBuffer(msg)) {
         let index: number
+
         if (
           tids.some((tid: string, _index: number) => {
             if (res.isBindingResponseSuccess({ transactionId: tid })) {
@@ -67,7 +77,7 @@ export function getExternalIp(
           })
         ) {
           tids.splice(index, 1)
-          const attr = res.getXorMappedAddressAttribute()
+          const attr = res.getXorMappedAddressAttribute() || res.getMappedAddressAttribute()
 
           if (attr != null) {
             if (result == null) {
@@ -78,7 +88,7 @@ export function getExternalIp(
               clearTimeout(timeout)
               resolve({
                 address: attr.address === result.address ? attr.address : undefined,
-                port: attr.port == result.port ? attr.port : undefined,
+                port: attr.port == result.port ? attr.port : undefined
               })
             }
           }
@@ -103,6 +113,7 @@ export function getExternalIp(
         //.setSoftwareAttribute(`${pkg.name}@${pkg.version}`)
         .setFingerprintAttribute()
 
+      verbose(`STUN request sent`, nodeAddress)
       socket.send(res.toBuffer(), parseInt(nodeAddress.port, 10), nodeAddress.address)
     })
 

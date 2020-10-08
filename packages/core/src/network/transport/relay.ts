@@ -36,7 +36,7 @@ import {
   OK,
   FAIL,
   FAIL_COULD_NOT_REACH_COUNTERPARTY,
-  DELIVERY_REGISTER,
+  DELIVERY_REGISTER
 } from './constants'
 
 import { pubKeyToPeerId } from '../../utils'
@@ -54,10 +54,8 @@ import type {
   MultiaddrConnection,
   PeerRouting,
   Registrar,
-  Stream,
+  Stream
 } from './types'
-import { SrvRecord } from 'dns'
-import { count } from 'console'
 
 class Relay {
   private _dialer: Dialer
@@ -127,7 +125,7 @@ class Relay {
       return new RelayConnection({
         stream,
         self: this._peerInfo.id,
-        counterparty: destination,
+        counterparty: destination
         // webRTC: this._webRTCUpgrader?.upgradeOutbound(),
       })
     }
@@ -152,10 +150,11 @@ class Relay {
       new RelayConnection({
         stream,
         self: this._peerInfo.id,
-        counterparty,
+        counterparty
         // webRTC: this._webRTCUpgrader?.upgradeInbound(),
       })
     )
+    log(`counterparty relayed connection established`)
   }
 
   private async connectToRelay(relay: PeerInfo, options?: DialOptions): Promise<Connection> {
@@ -438,46 +437,6 @@ class Relay {
     }
 
     return toCounterparty.stream
-  }
-
-  private updateContext(
-    to: string,
-    from: string,
-    newSource: AsyncGenerator<Uint8Array> | undefined,
-    sink: (stream: AsyncIterable<Uint8Array>) => Promise<void> | undefined,
-    overwrite: boolean
-  ) {
-    let map = this._streams.get(to)
-
-    if (map == null) {
-      map = new Map<string, RelayContext>()
-    }
-
-    let ctx = map.get(from)
-    if (overwrite || ctx == null) {
-      if (ctx == null) {
-        log(`storing new ctx for connection to ${to} from ${from} - self ${this._peerInfo.id.toB58String()}`)
-      } else {
-        log(`overwriting ctx for connection to ${to} from ${from} - self ${this._peerInfo.id.toB58String()}`)
-      }
-
-      ctx = new RelayContext(newSource)
-
-      map.set(from, ctx)
-      sink(ctx.source)
-      this._streams.set(this._peerInfo.id.toB58String(), map)
-    } else {
-      log(`updating source in ctx for connection to ${to} from ${from} - self ${this._peerInfo.id.toB58String()}`)
-
-      ctx.update(newSource)
-    }
-
-    // sink((async function * () {
-    //   for await (const msg of newSource) {
-    //     console.log(`Relaying`, msg)
-    //     yield msg
-    //   }
-    // })())
   }
 }
 

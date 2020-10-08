@@ -37,7 +37,7 @@ class CustomGanache {
         const url = `${this.ops.ws ? 'ws' : 'http'}://127.0.0.1:${this.ops.port}`
         console.log(`Network ready at ${url}`)
         if (err) {
-          console.log("Error creating ganache", err)
+          console.log('Error creating ganache', err)
           return reject()
         }
         return resolve(this)
