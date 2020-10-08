@@ -12,6 +12,8 @@
   "types": "lib/index.d.ts",
   "files": [
     "lib/",
+    "src/@types/libp2p.d.ts",
+    "src/network/transport/types.ts",
     "!*.spec.ts",
     "!*.spec.d.ts",
     "!*.spec.js",
@@ -32,7 +34,8 @@
   "scripts": {
     "build": "yarn clean && tsc -p .",
     "clean": "rm -rf ./lib",
-    "test": "jest --runInBand --forceExit && jest --runInBand --forceExit && jest --runInBand --forceExit",
+    "test": "yarn testOnce",
+    "testOnce": "node --trace-warnings --unhandled-rejections=strict node_modules/.bin/jest --runInBand --forceExit",
     "prepublishOnly": "yarn build"
   },
   "dependencies": {
@@ -54,8 +57,8 @@
     "libp2p": "~0.27.8",
     "libp2p-crypto": "~0.17.6",
     "libp2p-kad-dht": "~0.18.7",
-    "libp2p-mplex": "~0.9.5",
-    "libp2p-secio": "^0.12.5",
+    "libp2p-mplex": "~0.10.0",
+    "libp2p-secio": "^0.13.1",
     "multiaddr": "^7.4.3",
     "multihashes": "~0.4.19",
     "p-defer": "^3.0.0",
@@ -89,7 +92,7 @@
     "libp2p-tcp": "^0.14.6",
     "memdown": "^5.1.0",
     "ts-jest": "^26.1.4",
-    "typescript": "^3.9.7"
+    "typescript": "^4.0.3"
   },
   "jest": {
     "moduleFileExtensions": [

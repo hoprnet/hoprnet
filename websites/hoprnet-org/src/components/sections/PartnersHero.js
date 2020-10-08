@@ -63,7 +63,7 @@ const Ecosystem = props => {
                 title="The HOPR Advantage"
                 width="800"
                 height="500"
-                src="https://www.youtube-nocookie.com/embed/zvEP4CzXc4w"
+                src="https://www.youtube-nocookie.com/embed/vb7mD8dp11Q"
                 frameBorder="0"
                 allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
