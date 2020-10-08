@@ -51,7 +51,7 @@ class TCP {
     useWebRTC,
     failIntentionallyOnWebRTC,
     timeoutIntentionallyOnWebRTC,
-    answerIntentionallyWithIncorrectMessages,
+    answerIntentionallyWithIncorrectMessages
   }: {
     upgrader: Upgrader
     libp2p: libp2p
@@ -136,7 +136,7 @@ class TCP {
 
     let error: Error
     if (
-      this.relays.some((pInfo) => ma.getPeerId() === pInfo.id.toB58String()) &&
+      (this.relays == null || this.relays.some((pInfo) => ma.getPeerId() === pInfo.id.toB58String())) &&
       ['ip4', 'ip6', 'dns4', 'dns6'].includes(ma.protoNames()[0]) &&
       this.isRealisticAddress(ma)
     ) {
@@ -229,7 +229,7 @@ class TCP {
       log('dialing %j', cOpts)
       const rawSocket = net.createConnection({
         host: cOpts.host,
-        port: cOpts.port,
+        port: cOpts.port
       })
 
       const onError = (err: Error) => {
