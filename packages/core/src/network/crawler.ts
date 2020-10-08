@@ -24,7 +24,11 @@ export const shouldIncludePeerInCrawlResponse = (peer: Multiaddr, them: Multiadd
   // We are being requested a crawl from a node that is on a remote network, so
   // it does not benefit them for us to give them addresses on our private
   // network, therefore let's first filter these out.
-  if (!them.nodeAddress().address.match(PRIVATE_NETS) && isOnPrivateNet(peer)) {
+  if (
+    ['ip4', 'ip6', 'dns4', 'dns6'].includes(them.protoNames()[0]) &&
+    !them.nodeAddress().address.match(PRIVATE_NETS) &&
+    isOnPrivateNet(peer)
+  ) {
     verbose('rejecting peer from crawl results as it only has private addresses, and the requesting node is remote')
     return false // Reject peer
   }

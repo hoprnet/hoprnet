@@ -92,6 +92,10 @@ export function getExternalIp(
     })
 
     multiAddrs.forEach((ma: Multiaddr, index: number) => {
+      if (!['ip4', 'ip6', 'dns4', 'dns6'].includes(ma.protoNames()[0])) {
+        return
+      }
+
       const nodeAddress = ma.nodeAddress()
 
       const res = stun

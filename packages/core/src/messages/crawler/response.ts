@@ -38,6 +38,10 @@ class CrawlResponse extends Uint8Array {
     }
   }
 
+  slice(begin: number = 0, end?: number) {
+    return this.subarray(begin, end)
+  }
+
   subarray(begin: number = 0, end?: number): Uint8Array {
     return new Uint8Array(this.buffer, begin, end != null ? end - begin : undefined)
   }

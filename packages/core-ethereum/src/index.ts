@@ -20,6 +20,8 @@ import Account from './account'
 import HashedSecret from './hashedSecret'
 import Path from './path'
 
+import debug from 'debug'
+const debugLog = debug('hopr-core-ethereum')
 let provider: WebsocketProvider
 
 export default class HoprEthereum implements HoprCoreConnector {
@@ -126,6 +128,7 @@ export default class HoprEthereum implements HoprCoreConnector {
       .then(async () => {
         // connector is starting
         if (typeof this._starting !== 'undefined') {
+          debugLog('Stopping after started')
           this.log("Connector will stop once it's started")
           // @TODO: cancel initializing & starting
           await this._starting
@@ -177,33 +180,27 @@ export default class HoprEthereum implements HoprCoreConnector {
       return this._initializing
     } else if (this._status === 'initialized') {
       this.log('Connector has already initialized')
-      return
+      return Promise.resolve()
     } else if (this._status !== 'uninitialized') {
       throw Error(`invalid status '${this._status}', could not initialize`)
     }
 
-    this._initializing = Promise.resolve()
-      .then(async () => {
-        // initialize stuff
-        await Promise.all([
-          // confirm web3 is connected
-          this.checkWeb3(),
-          // start channels indexing
-          this.indexer.start(),
-          // always call init on-chain values,
-          this.initOnchainValues(),
-        ])
+    this._initializing = new Promise(async (resolve, reject) => {
+      // initialize stuff
+      await Promise.all([
+        // confirm web3 is connected
+        this.checkWeb3(),
+        // start channels indexing
+        this.indexer.start(),
+        // always call init on-chain values,
+        this.initOnchainValues(),
+      ])
 
-        this._status = 'initialized'
-        this.log(chalk.green('Connector initialized'))
-      })
-      .catch((err: Error) => {
-        this.log(`Connector failed to initialize: ${err.message}`)
-      })
-      .finally(() => {
-        this._initializing = undefined
-      })
-
+      this._status = 'initialized'
+      this.log(chalk.green('Connector initialized'))
+      this._initializing = undefined
+      resolve()
+    })
     return this._initializing
   }
 
@@ -273,7 +270,7 @@ export default class HoprEthereum implements HoprCoreConnector {
       reconnect: {
         auto: true,
         delay: 1000, // ms
-        maxAttempts: 10,
+        maxAttempts: 30,
       },
     })
 
