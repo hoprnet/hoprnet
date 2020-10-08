@@ -198,8 +198,6 @@ class Listener extends EventEmitter {
         ).encapsulate(`/p2p/${this.peerId}`)
       )
 
-      console.log(addrs)
-
       addrs.push(
         ...getAddrs(address.port, this.peerId, {
           // useIPv6: true
