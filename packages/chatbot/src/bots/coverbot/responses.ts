@@ -1,7 +1,7 @@
 import { TweetState } from '../../lib/twitter/twitter'
 import { COVERBOT_XDAI_THRESHOLD } from '../../utils/env'
 import { RELAY_VERIFICATION_CYCLE_IN_MS } from './constants'
-import { BotCommands, NodeStates, ScoreRewards, VerifySubCommands, AdminSubCommands } from './state'
+import { BotCommands, NodeStates, ScoreRewards, VerifySubCommands, AdminSubCommands, StatsSubCommands } from './state'
 
 export const BotResponses = {
   [BotCommands.rules]: `\n
@@ -13,9 +13,6 @@ export const BotResponses = {
     4. Every time you're chosen to relay a message, you'll score ${ScoreRewards.relayed} points and receive xHOPR!
 
     Visit https://saentis.hoprnet.org for more information and scoreboard
-  `,
-  [BotCommands.stats]: (connected: number) => `\n
-    There are currently ${connected} nodes connected.
   `,
   [BotCommands.verify]: `\n
     Verifying if your node is still up...
@@ -38,12 +35,30 @@ export const AdminStateResponses = {
     You are using the super admin command. Please run one of the following.
 
     verificationCycle   - Starts a single verification cycle on all verified nodes.
+    saveState           - Saves current state of the bot into the database.
     help                - Shows you this message again.
   `,
   [AdminSubCommands.verificationCycle]: `\n
     Starting manually verification cycle. Please review the logs to see the
     changes done against the system state and database.
+  `,
+  [AdminSubCommands.saveState]: `\n
+    Starting manually saving state to database. Please review the logs to see the
+    changes done against the system state and database.
   `
+}
+
+
+export const StatsStateResponses = {
+  [StatsSubCommands.help]:`\n
+    You are using the stats command. Please run one of the following.
+
+    connected   - Shows you the amount of connected nodes in the network.
+    help        - Shows you this message again.
+  `,
+  [StatsSubCommands.connected]: (connected: number) => `\n
+    There are currently ${connected} nodes connected in the network.
+  `,
 }
 
 export const VerifyStateResponses = {

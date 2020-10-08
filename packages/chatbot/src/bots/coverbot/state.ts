@@ -16,6 +16,7 @@ export enum NodeStates {
 
 export enum AdminSubCommands {
   verificationCycle = 'verificationCycle',
+  saveState = 'saveState',
   help = 'help'
 }
 

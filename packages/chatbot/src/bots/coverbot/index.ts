@@ -22,7 +22,7 @@ import {
 import db from './db'
 import { BotCommands, NodeStates, ScoreRewards, VerifySubCommands, StatsSubCommands, AdminSubCommands } from './state'
 import { RELAY_VERIFICATION_CYCLE_IN_MS, RELAY_HOPR_REWARD } from './constants'
-import { BotResponses, NodeStateResponses, AdminStateResponses } from './responses'
+import { BotResponses, NodeStateResponses, AdminStateResponses, StatsStateResponses } from './responses'
 import { BalancedHoprNode, HoprNode } from './coverbot'
 import debug from 'debug'
 import Core from '../../lib/hopr/core'
@@ -103,6 +103,7 @@ export class Coverbot implements Bot {
     this.verifiedHoprNodes = new Map<string, HoprNode>()
     this.relayTimeouts = new Map<string, NodeJS.Timeout>()
     this.loadData()
+      .catch(err => error(`- constructor | Initial data load failed.`))
   }
 
   private async _getEthereumAddressFromHOPRAddress(hoprAddress: string): Promise<string> {
@@ -138,8 +139,8 @@ export class Coverbot implements Bot {
           return resolve()
         }
         const { state } = snapshot || {};
-        const { connected } = state || []
-
+        log(`- loadData | State ${JSON.stringify(state)} obtained from database`)
+        const connected = state && state.connected ? state.connected : []
         log(`- loadData | Loaded ${connected.length} nodes from our Database (${databaseTextRef})`)
         this.verifiedHoprNodes = this.verifiedHoprNodes.values.length > 0 ? this.verifiedHoprNodes : new Map<string, HoprNode>()
         connected.forEach((n) => this.verifiedHoprNodes.set(n.id, n))
@@ -148,6 +149,7 @@ export class Coverbot implements Bot {
         this.loadedDb = true
         return resolve()
       }).catch(err => {
+        error(`- loadData | Error retrieving data`, err)
         if (error) return reject(error)
       })
     })
@@ -501,16 +503,29 @@ export class Coverbot implements Bot {
           break;
         }
         case BotCommands.stats: {
-          log(`- handleMessage | stats command received`)
+          log(`- handleMessage | ${BotCommands.stats} command received`)
           const snapshot = (await this.database.getSchema(HOPR_ENVIRONMENT)) || {};
-          log(`- handleMessage | stats command :: retrieving snapshot with value ${snapshot}`)
-          const { state } = snapshot || {};
-          log(`- handleMessage | stats command :: retrieving state from snapshot with value ${state}`)
-          const { connected } = state || [];
-          log(`- handleMessage | stats command :: retrieving connected nodes from state with value ${connected}`)
-          this._sendMessageFromBot(message.from, BotResponses[BotCommands.stats](connected.length)).catch((err) => {
-            error(`Trying to send ${BotCommands.stats} message to ${message.from} failed.`)
-          })
+          log(`- handleMessage | ${BotCommands.stats} command :: retrieving snapshot with value ${JSON.stringify(snapshot)}`)
+          const state = snapshot && snapshot.state ? snapshot.state : {};
+          log(`- handleMessage | ${BotCommands.stats} command :: retrieving state with value ${JSON.stringify(state)}`)
+          switch (instructionWrapper.subcommand) {
+            case StatsSubCommands.connected: {
+              log(`- handleMessage | ${BotCommands.stats} command :: ${StatsSubCommands.connected} subcommand received`)
+              log(`- handleMessage | ${BotCommands.stats} command :: ${StatsSubCommands.connected} subcommand retrieving state from snapshot with value ${state}`)
+              const connectedNodes = state && state.connectedNodes ? state.connectedNodes : 0
+              log(`- handleMessage | ${BotCommands.stats} command :: ${StatsSubCommands.connected} subcommand retrieving connected nodes from state with value ${connectedNodes}`)
+              this._sendMessageFromBot(message.from, StatsStateResponses[StatsSubCommands.connected](connectedNodes)).catch((err) => {
+                error(`Trying to send ${BotCommands.stats} message to ${message.from} failed.`)
+              })
+              break;
+            }
+            default: {
+              log(`- handleMessage | ${BotCommands.stats} command :: subcommand not understood`)
+              this._sendMessageFromBot(message.from, StatsStateResponses[StatsSubCommands.help]).catch((err) => {
+                error(`Trying to send ${StatsSubCommands.help} message to ${message.from} failed.`)
+              })
+            }
+          }
           break;
         }
         case BotCommands.admin: {
@@ -539,6 +554,16 @@ export class Coverbot implements Bot {
                 log(`- handleMessage | ${BotCommands.admin} command :: ${AdminSubCommands.verificationCycle} subcommand :: completed verification cycle`)
                 break;
               }
+              case AdminSubCommands.saveState: {
+                log(`- handleMessage | ${BotCommands.admin} command :: ${AdminSubCommands.saveState} subcommand received`)
+                this._sendMessageFromBot(message.from, AdminStateResponses[AdminSubCommands.saveState]).catch((err) => {
+                  error(`Trying to send ${AdminSubCommands.saveState} message to ${message.from} failed.`)
+                })
+                log(`- handleMessage | ${BotCommands.admin} command :: ${AdminSubCommands.saveState} subcommand :: starting saving state`)
+                await this.dumpData()
+                log(`- handleMessage | ${BotCommands.admin} command :: ${AdminSubCommands.saveState} subcommand :: completed saving state`)
+                break;
+              }
               default: {
                 log(`- handleMessage | admin command :: subcommand not understood`)
                 this._sendMessageFromBot(message.from, AdminStateResponses[AdminSubCommands.help]).catch((err) => {
@@ -546,7 +571,7 @@ export class Coverbot implements Bot {
                 })
               }
             }
-            
+
           }
           break;
         }
