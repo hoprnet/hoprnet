@@ -14,9 +14,19 @@ export enum NodeStates {
   verifiedNode = 'VERIFIED',
 }
 
+export enum VerifySubCommands {
+  tweet = 'TWEET',
+  status = 'STATUS'
+}
+
+export enum StatsSubCommands {
+  connected = 'CONNECTED',
+  myself = 'MYSELF',
+  coverbot = 'COVERBOT'
+}
+
 export enum BotCommands {
   rules = 'RULES',
-  status = 'STATUS',
   verify = 'VERIFY',
   help = 'HELP',
   stats = 'STATS',

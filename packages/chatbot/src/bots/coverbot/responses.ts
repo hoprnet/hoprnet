@@ -1,7 +1,7 @@
 import { TweetState } from '../../lib/twitter/twitter'
 import { COVERBOT_XDAI_THRESHOLD } from '../../utils/env'
 import { RELAY_VERIFICATION_CYCLE_IN_MS } from './constants'
-import { BotCommands, NodeStates, ScoreRewards } from './state'
+import { BotCommands, NodeStates, ScoreRewards, VerifySubCommands } from './state'
 
 export const BotResponses = {
   [BotCommands.rules]: `\n
@@ -14,8 +14,8 @@ export const BotResponses = {
 
     Visit https://saentis.hoprnet.org for more information and scoreboard
   `,
-  [BotCommands.status]: (status: NodeStates) => `\n
-    Your current status is: ${status}
+  [VerifySubCommands.status]: (status: NodeStates) => `\n
+    Your current verification status is: ${status}
   `,
   [BotCommands.stats]: (connected: number) => `\n
     There are currently ${connected} nodes connected.
