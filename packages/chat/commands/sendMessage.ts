@@ -42,15 +42,15 @@ export abstract class SendMessageBase extends AbstractCommand {
 
     try {
       let m = encodeMessage(message)
-      // use random path
       if (settings.routing === 'auto') {
+        // use random path
         return await this.node.sendMessage(m, recipient)
       } else if (settings.routing === 'direct') {
         // 0 hops
         return await this.node.sendMessage(m, recipient, async() => [])
       } else {
         let path = await Promise.all(settings.routing.split(',').map(async (x) => await checkPeerIdInput(x)))
-        await this.node.sendMessage(m, recipient, () => Promise.resolve(path))
+        return await this.node.sendMessage(m, recipient, () => Promise.resolve(path))
       }
     } catch (err) {
       console.log(chalk.red(err.message))

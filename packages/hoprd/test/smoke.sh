@@ -39,8 +39,11 @@ echo "Charlie running as pid $CHARLIE as $CHARLIE on $CHARLIE_ADDR:$CHARLIE_PORT
 # Ping Charlie
 hoprd --data='alice' --password="opensesame" --run="crawl; ping $CHARLIE"
 
-# Multihop ping self via Bob and Charlie
-DEBUG=hopr* hoprd --data='alice' --password="opensesame" --settings="{\"route\":\"$BOB,$CHARLIE\"}" --run="crawl; ping $ALICE"
+# Open channel alice -> bob and send a-b-c
+DEBUG=hopr* hoprd --data='alice' --password="opensesame" --run="crawl; open $BOB; send $CHARLIE hi"
+
+# Multihop send self via Bob and Charlie
+#DEBUG=hopr* hoprd --data='alice' --password="opensesame" --settings="{\"route\":\"$BOB,$CHARLIE\"}" --run="crawl; send $ALICE hi"
 
 
 
