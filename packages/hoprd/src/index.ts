@@ -205,8 +205,13 @@ async function main() {
       if (argv.settings) {
         cmds.setState(settings)
       }
-      let resp = await cmds.execute(argv.run)
-      console.log(resp)
+      // We support multiple semicolon separated commands
+      let toRun  = argv.run.split(';')
+      
+      for (let c of toRun) {
+        let resp = await cmds.execute(c)
+        console.log(resp)
+      }
       await node.stop()
       process.exit(0)
     }

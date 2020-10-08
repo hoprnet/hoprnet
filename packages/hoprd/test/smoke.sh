@@ -33,7 +33,7 @@ CHARLIE_PID="$!"
 echo "Charlie running as pid $CHARLIE as $CHARLIE on $CHARLIE_ADDR:$CHARLIE_PORT"
 
 # Ping Charlie
-hoprd --data='alice' --password="opensesame" --run="ping $CHARLIE"
+hoprd --data='alice' --password="opensesame" --run="crawl; ping $CHARLIE"
 
 
 
