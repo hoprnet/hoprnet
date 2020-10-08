@@ -14,13 +14,18 @@ BOB=$(hoprd --data='bob' --password="opensesame" --run="myAddress hopr")
 CHARLIE=$(hoprd --data='charlie'  --password="opensesame" --run "myAddress hopr")
 
 # Run bob as bootstrap node
-BOB_ADDR=127.0.0.1:9876
-hoprd --data='bob' --host="$BOB_ADDR" --password="opensesame" --bootstrap &
+BOB_ADDR=127.0.0.1
+BOB_PORT=9876
+hoprd --data='bob' --host="$BOB_ADDR:$BOB_PORT" --password="opensesame" --bootstrap &
 BOB_PID="$!"
-echo "Bob running as pid $BOB_PID as $BOB on $BOB_ADDR"
+BOB_MULTIADDR=/ip4/$BOB_ADDR/tcp/$BOB_PORT/p2p/$BOB
+export HOPR_BOOTSTRAP_SERVERS=$BOB_MULTIADDR 
+echo "Bootstrap Bob running as pid $BOB_PID as $BOB on $BOB_ADDR"
 
 # Ping bootstrapnode
-HOPR_BOOTSTRAP_SERVER=$BOB_ADDR hoprd --data='alice' --password="opensesame" --run="ping $BOB"
+hoprd --data='alice' --password="opensesame" --run="ping $BOB"
+
+
 
 
 

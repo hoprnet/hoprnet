@@ -185,7 +185,7 @@ async function main() {
     })
 
     process.once('exit', async () => {
-      await node.down()
+      await node.stop()
       logs.log('Process exiting')
       return
     })
@@ -207,7 +207,7 @@ async function main() {
       }
       let resp = await cmds.execute(argv.run)
       console.log(resp)
-      await node.down()
+      await node.stop()
       process.exit(0)
     }
   } catch (e) {
