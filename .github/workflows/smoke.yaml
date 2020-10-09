@@ -19,6 +19,7 @@ jobs:
           node-version: 12
           registry-url: https://registry.npmjs.org/
       - name: Install hoprd
+        shell: bash
         run: |
           #NODE_ENV=production npm install -g @hoprnet/hoprd
           yarn global add $PWD
