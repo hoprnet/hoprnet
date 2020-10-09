@@ -53,19 +53,19 @@ describe('should create a socket and connect to it', function () {
         transport: [TCP],
         streamMuxer: [MPLEX],
         connEncryption: [SECIO],
-        dht: KadDHT,
+        dht: KadDHT
       },
       config: {
         dht: {
-          enabled: false,
+          enabled: false
         },
         relay: {
-          enabled: false,
+          enabled: false
         },
         peerDiscovery: {
-          autoDial: false,
-        },
-      },
+          autoDial: false
+        }
+      }
     })
 
     //@ts-ignore
@@ -86,12 +86,6 @@ describe('should create a socket and connect to it', function () {
   }
 
   it('should create a node and echo a single message', async function () {
-    let testMessagesEchoed = false
-    let testMessagesReplied = false
-    let thirdBatchEchoed = false
-
-    let waitingForSecondBatch = defer<void>()
-
     let [sender, relay, counterparty] = await Promise.all([
       generateNode({ id: 0, ipv4: true }),
       generateNode({ id: 1, ipv4: true }),
@@ -102,18 +96,23 @@ describe('should create a socket and connect to it', function () {
           pipe(
             /* prettier-ignore */
             conn,
-            (source: AsyncIterable<Uint8Array>) => {
-              return (async function* () {
-                for await (const msg of source) {
-                  console.log(`echoing <${new TextDecoder().decode(msg.slice())}>`)
-                  yield msg
-                }
-              })()
-            },
-            conn
+            async function (source: AsyncGenerator<Uint8Array, Uint8Array | void>) {
+              for await (const msg of source) {
+                console.log(`receiving <${new TextDecoder().decode(msg.slice())}>`)
+              }
+            }
+            // (source: AsyncIterable<Uint8Array>) => {
+            //   return (async function* () {
+            //     for await (const msg of source) {
+            //       console.log(`echoing <${new TextDecoder().decode(msg.slice())}>`)
+            //       yield msg
+            //     }
+            //   })()
+            // },
+            // conn
           )
-        },
-      }),
+        }
+      })
     ])
 
     // Make sure that the nodes know each other
@@ -125,75 +124,88 @@ describe('should create a socket and connect to it', function () {
       new WebRTCUpgrader({})
     )
 
-    await pipe(
-      /* prettier-ignore */
-      (async function * () {
-        yield new TextEncoder().encode(`first message`)
+    conn.sink(
+      (async function* () {
+        let i = 0
+        while (true) {
+          yield new TextEncoder().encode(`message ${i++}`)
 
-        await new Promise(resolve => setTimeout(resolve, 100))
-
-        yield new TextEncoder().encode(`second message`)
-      })(),
-      conn,
-      async (source: AsyncIterable<Uint8Array>) => {
-        setTimeout(() => setImmediate(() => conn.close()), 300)
-        for await (const msg of source) {
-          console.log(`received <${new TextDecoder().decode(msg.slice())}>`)
+          await new Promise((resolve) => setTimeout(resolve, 100))
         }
+      })()
+    )
+
+    function drain({ done, value }: { done?: Boolean; value?: Uint8Array }) {
+      if (value != null) {
+        console.log(new TextDecoder().decode(value))
       }
-    )
 
-    await counterparty.stop()
-
-    await new Promise((resolve) => setTimeout(resolve, 200))
-
-    counterparty = await generateNode({
-      id: 2,
-      ipv4: true,
-      connHandler: (conn: MultiaddrConnection) => {
-        pipe(
-          /* prettier-ignore */
-          conn,
-          (source: AsyncIterable<Uint8Array>) => {
-            return (async function* () {
-              for await (const msg of source) {
-                console.log(`echoing <${new TextDecoder().decode(msg.slice())}>`)
-                yield msg
-              }
-            })()
-          },
-          conn
-        )
-      },
-    })
-
-    await counterparty.dial(relay.peerInfo)
-    //@ts-ignore
-    conn = await sender.relay.establishRelayedConnection(
-      Multiaddr(`/p2p/${counterparty.peerInfo.id.toB58String()}`),
-      [relay.peerInfo],
-      new WebRTCUpgrader({})
-    )
-
-    await pipe(
-      /* prettier-ignore */
-      (async function * () {
-        yield new TextEncoder().encode(`first message`)
-
-        await new Promise(resolve => setTimeout(resolve, 100))
-
-        yield new TextEncoder().encode(`second message`)
-      })(),
-      conn,
-      async (source: AsyncIterable<Uint8Array>) => {
-        setTimeout(() => setImmediate(() => conn.close()), 300)
-        for await (const msg of source) {
-          console.log(`received <${new TextDecoder().decode(msg.slice())}>`)
-        }
+      if (!done) {
+        conn.source.next().then(drain)
       }
-    )
+    }
 
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    conn.source.next().then(drain)
+
+    setTimeout(async () => {
+      counterparty.stop()
+      await new Promise((resolve) => setTimeout(resolve, 300))
+
+      counterparty = await generateNode({
+        id: 2,
+        ipv4: true
+      })
+
+      // @ts-ignore
+      let conn = await counterparty.relay.establishRelayedConnection(
+        Multiaddr(`/p2p/${sender.peerInfo.id.toB58String()}`),
+        [relay.peerInfo],
+        new WebRTCUpgrader({})
+      )
+
+      pipe(
+        conn,
+        (source: AsyncIterable<Uint8Array>) => {
+          return (async function* () {
+            for await (const msg of source) {
+              console.log(`echoing <${new TextDecoder().decode(msg.slice())}>`)
+              yield msg
+            }
+          })()
+        },
+        conn
+      )
+    }, 1200)
+
+    // await new Promise((resolve) => setTimeout(resolve, 200))
+
+    // await counterparty.dial(relay.peerInfo)
+    // //@ts-ignore
+    // conn = await sender.relay.establishRelayedConnection(
+    //   Multiaddr(`/p2p/${counterparty.peerInfo.id.toB58String()}`),
+    //   [relay.peerInfo],
+    //   new WebRTCUpgrader({})
+    // )
+
+    // await pipe(
+    //   /* prettier-ignore */
+    //   (async function * () {
+    //     yield new TextEncoder().encode(`first message`)
+
+    //     await new Promise(resolve => setTimeout(resolve, 100))
+
+    //     yield new TextEncoder().encode(`second message`)
+    //   })(),
+    //   conn,
+    //   async (source: AsyncIterable<Uint8Array>) => {
+    //     setTimeout(() => setImmediate(() => conn.close()), 300)
+    //     for await (const msg of source) {
+    //       console.log(`received <${new TextDecoder().decode(msg.slice())}>`)
+    //     }
+    //   }
+    // )
+
+    await new Promise((resolve) => setTimeout(resolve, 4000))
   })
 
   it('should create a node and exchange messages', async function () {

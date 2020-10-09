@@ -40,7 +40,7 @@ import {
 } from './constants'
 
 import { pubKeyToPeerId } from '../../utils'
-import { u8aEquals } from '@hoprnet/hopr-utils'
+import { u8aCompare, u8aEquals } from '@hoprnet/hopr-utils'
 
 import { RelayContext } from './relayContext'
 
@@ -62,7 +62,7 @@ class Relay {
   private _registrar: Registrar
   private _dht: { peerRouting: PeerRouting } | undefined
   private _peerInfo: PeerInfo
-  private _streams: Map<string, Map<string, RelayContext>>
+  private _streams: Map<string, { [index: string]: RelayContext }>
   private _webRTCUpgrader?: WebRTCUpgrader
 
   private connHandler: (conn: MultiaddrConnection) => void | undefined
@@ -77,7 +77,7 @@ class Relay {
 
     this.connHandler = _connHandler
 
-    this._streams = new Map<string, Map<string, RelayContext>>()
+    this._streams = new Map<string, { [index: string]: RelayContext }>()
 
     // if (webRTCUpgrader != null) {
     //   this._webRTCUpgrader = webRTCUpgrader
@@ -122,6 +122,7 @@ class Relay {
       }
 
       log(`relayed connection established`)
+      // @ts-ignore
       return new RelayConnection({
         stream,
         self: this._peerInfo.id,
@@ -147,6 +148,7 @@ class Relay {
     }
 
     this.connHandler?.(
+      // @ts-ignore
       new RelayConnection({
         stream,
         self: this._peerInfo.id,
@@ -254,6 +256,7 @@ class Relay {
 
     return { stream: shaker.stream, counterparty }
   }
+  sender
 
   private async handleRelay({ stream, connection }: Handler) {
     log(`handle relay request`)
@@ -298,85 +301,54 @@ class Relay {
       return
     }
 
-    let counterpartyMap = this._streams.get(counterparty.toB58String())
+    let streams: { [index: string]: RelayContext }
 
-    let deliveryStream: Stream
-    if (counterpartyMap == null || counterpartyMap.get(connection.remotePeer.toB58String()) == null) {
+    const channelId = getId(connection.remotePeer, counterparty)
+    console.log(this._streams)
+
+    if ((streams = this._streams.get(channelId)) == null) {
       log(
         `${connection.remotePeer.toB58String()} to ${counterparty.toB58String()} had no connection. Establishing a new one`
       )
+
+      let forwardingErrThrown = false
+      let deliveryStream: Stream
+
       try {
-        deliveryStream = (await this.establishForwarding(counterparty)) as Stream
+        deliveryStream = await this.establishForwarding(counterparty)
       } catch (err) {
+        forwardingErrThrown = true
         error(err)
-
-        shaker.write(FAIL_COULD_NOT_REACH_COUNTERPARTY)
-
-        shaker.rest()
-
-        return
       }
 
-      if (deliveryStream == null) {
+      if (forwardingErrThrown || deliveryStream == null) {
         // @TODO end deliveryStream
         shaker.write(FAIL_COULD_NOT_REACH_COUNTERPARTY)
-
         shaker.rest()
 
         return
       }
 
       shaker.write(OK)
-
       shaker.rest()
 
-      const ctxToCounterparty = new RelayContext(shaker.stream.source as any)
-      deliveryStream.sink(ctxToCounterparty.source)
+      const senderContext = new RelayContext(shaker.stream)
+      const counterpartyContext = new RelayContext(deliveryStream)
 
-      if (counterpartyMap == null) {
-        counterpartyMap = new Map<string, RelayContext>()
+      senderContext.sink(counterpartyContext.source)
+      counterpartyContext.sink(senderContext.source)
+
+      streams = {
+        [connection.remotePeer.toB58String()]: senderContext,
+        [counterparty.toB58String()]: counterpartyContext
       }
-      counterpartyMap.set(connection.remotePeer.toB58String(), ctxToCounterparty)
-      this._streams.set(counterparty.toB58String(), counterpartyMap)
 
-      const ctxToSender = new RelayContext(deliveryStream.source as any)
-      shaker.stream.sink(ctxToSender.source)
-
-      let senderMap = this._streams.get(connection.remotePeer.toB58String())
-      if (senderMap == null) {
-        senderMap = new Map<string, RelayContext>()
-      }
-      senderMap.set(counterparty.toB58String(), ctxToSender)
-      this._streams.set(connection.remotePeer.toB58String(), senderMap)
+      this._streams.set(channelId, streams)
     } else {
       shaker.write(OK)
-
       shaker.rest()
 
-      log(`overwriting connection between ${connection.remotePeer.toB58String()} and ${counterparty.toB58String()}`)
-      const ctxToCounterparty = counterpartyMap.get(connection.remotePeer.toB58String())
-
-      if (ctxToCounterparty == null) {
-        throw Error(
-          `Could not find existing connection from ${connection.remotePeer.toB58String()} to ${counterparty.toB58String()}`
-        )
-      }
-
-      ctxToCounterparty.update(shaker.stream.source as any)
-
-      const senderMap = this._streams.get(connection.remotePeer.toB58String())
-      if (senderMap == null) {
-        throw Error(
-          `Could not find existing connection from ${counterparty.toB58String()} to ${connection.remotePeer.toB58String()}`
-        )
-      }
-      let ctxToSender = senderMap.get(counterparty.toB58String())
-      if (senderMap == null) {
-        throw Error(
-          `Could not find existing connection from ${counterparty.toB58String()} to ${connection.remotePeer.toB58String()}. Map exists but entry is missing`
-        )
-      }
-      shaker.stream.sink(ctxToSender.source)
+      streams[connection.remotePeer.toB58String()].update(shaker.stream)
     }
   }
 
@@ -437,6 +409,20 @@ class Relay {
     }
 
     return toCounterparty.stream
+  }
+}
+
+function getId(a: PeerId, b: PeerId) {
+  const cmpResult = u8aCompare(a.pubKey.marshal(), b.pubKey.marshal())
+
+  switch (cmpResult) {
+    case 1:
+      return `${a.toB58String()}${b.toB58String()}`
+    case -1:
+      return `${b.toB58String()}${a.toB58String()}`
+
+    default:
+      throw Error(`Invalid compare result`)
   }
 }
 
