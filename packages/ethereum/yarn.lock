@@ -190,18 +190,18 @@
   dependencies:
     micro "^9.3.4"
 
-"@hoprnet/hopr-testing@^1.17.0-alpha.58":
-  version "1.17.0-alpha.58"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-testing/-/hopr-testing-1.17.0-alpha.58.tgz#d00f8f0f2b5c7e1f45ab6ffbab6c20784e7d89e6"
-  integrity sha512-gnUMjbALiN1TFSeEJXqy6TcHikpftVsPjMap6Cc1fdqP0cE/E8Kpv5l8+WWof4RLo88+tFBRx1TF3c04FUMFoQ==
+"@hoprnet/hopr-testing@^1.17.0-alpha.59":
+  version "1.17.0-alpha.60"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-testing/-/hopr-testing-1.17.0-alpha.60.tgz#ca7b2111f366ca7321edfae0dbf97505349fa6be"
+  integrity sha512-vm9X/Kgd2qGylAavbxw6h+LKu/b/fngY7gXSVb3dCbDdPxAbq3SxsFY4uehVWUeDwoSkfeF8+ulYByf0imaJ1A==
   dependencies:
     "@hoprnet/hopr-demo-seeds" "1.8.0"
-    ganache-core "^2.12.0-beta.0"
+    ganache-core "^2.12.1"
 
-"@hoprnet/hopr-utils@^1.17.0-alpha.58":
-  version "1.17.0-alpha.58"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.17.0-alpha.58.tgz#c41ae75b18f66228e8f72b25b78e7834aa051dd7"
-  integrity sha512-2vE9arE9BwIU3C2TcszAOhlhVBd9f1jNrlarzGOGDXn9E4sQyS02ZASpZUZ5PlWhz6ZbnWJ1guTEVMvs98Xpbg==
+"@hoprnet/hopr-utils@^1.17.0-alpha.59":
+  version "1.17.0-alpha.60"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.17.0-alpha.60.tgz#ec8dcc1d36fa23cdc7fabc945e668091eaf39350"
+  integrity sha512-BEDxzGt/pIXRcKhaKmypzBecYrgAJ8uvKMwc0PCwojjNfeUpG9lsZLKmDTzxmVaA1XVWNQrZ9PdYyWLUdJIgqQ==
   dependencies:
     bignumber.js "^9.0.0"
     libp2p-crypto "^0.17.9"
@@ -3943,7 +3943,7 @@ ganache-cli@6.9.0:
     source-map-support "0.5.12"
     yargs "13.2.4"
 
-ganache-core@^2.12.0-beta.0:
+ganache-core@^2.12.0-beta.0, ganache-core@^2.12.1:
   version "2.12.1"
   resolved "https://registry.yarnpkg.com/ganache-core/-/ganache-core-2.12.1.tgz#c21e8f7eca6e15f13756a353928357e0b8960d9e"
   integrity sha512-gycoVl3TChAbL6ZZQrK1gS2cNMheX+JXVBKTpMAzuLHwb5gE1CB1s6YYN3F7rB86opaEuldCSuTJK1dv4xYRAw==

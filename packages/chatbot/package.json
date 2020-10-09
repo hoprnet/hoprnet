@@ -9,6 +9,7 @@
   "license": "GPL-3.0-only",
   "scripts": {
     "prebuild": "rimraf ./dist",
+    "clean": "rimraf ./dist",
     "build": "yarn clean && tsc",
     "firebase:emulators:start": "firebase emulators:start",
     "firebase:login": "firebase login --no-localhost",
