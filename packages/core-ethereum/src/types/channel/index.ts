@@ -9,7 +9,7 @@ enum ChannelStatus {
   UNINITIALISED,
   FUNDING,
   OPEN,
-  PENDING,
+  PENDING
 }
 
 class Channel extends Uint8ArrayE implements Types.Channel {
@@ -45,7 +45,7 @@ class Channel extends Uint8ArrayE implements Types.Channel {
     const balance = this.subarray(0, ChannelBalance.SIZE)
     return new ChannelBalance({
       bytes: balance.buffer,
-      offset: balance.byteOffset,
+      offset: balance.byteOffset
     })
   }
 
@@ -53,7 +53,7 @@ class Channel extends Uint8ArrayE implements Types.Channel {
     if (this._rawState == null) {
       this._rawState = new ChannelState({
         bytes: this.buffer,
-        offset: this.byteOffset + ChannelBalance.SIZE,
+        offset: this.byteOffset + ChannelBalance.SIZE
       })
     }
 
@@ -115,14 +115,14 @@ class Channel extends Uint8ArrayE implements Types.Channel {
   static createFunded(balance: ChannelBalance): Channel {
     return new Channel(undefined, {
       balance,
-      state: new ChannelState(undefined, { state: ChannelStatus.FUNDING }),
+      state: new ChannelState(undefined, { state: ChannelStatus.FUNDING })
     })
   }
 
   static createActive(balance: ChannelBalance): Channel {
     return new Channel(undefined, {
       balance,
-      state: new ChannelState(undefined, { state: ChannelStatus.OPEN }),
+      state: new ChannelState(undefined, { state: ChannelStatus.OPEN })
     })
   }
 
@@ -130,7 +130,7 @@ class Channel extends Uint8ArrayE implements Types.Channel {
     return new Channel(undefined, {
       balance,
       state: new ChannelState(undefined, { state: ChannelStatus.PENDING }),
-      moment,
+      moment
     })
   }
 }

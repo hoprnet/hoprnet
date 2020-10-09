@@ -101,7 +101,6 @@ export function getExternalIp(
         }
       }
       console.log = backup
-
     }
     socket.on('message', msgHandler)
     socket.on('error', (err) => {

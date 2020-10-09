@@ -56,7 +56,7 @@ const it2 = (async function* foo() {
       await Promise.race([
         // prettier-ignore
         aPromise.then(aPromiseFunction),
-        bPromise.then(bPromiseFunction),
+        bPromise.then(bPromiseFunction)
       ])
     }
 

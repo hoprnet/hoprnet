@@ -177,7 +177,7 @@ class Channel implements IChannel {
               {
                 from: (await this.coreConnector.account.address).toHex(),
                 to: this.coreConnector.hoprChannels.options.address,
-                nonce: await this.coreConnector.account.nonce,
+                nonce: await this.coreConnector.account.nonce
               }
             )
           ).send()
@@ -192,7 +192,7 @@ class Channel implements IChannel {
               {
                 from: (await this.coreConnector.account.address).toHex(),
                 to: this.coreConnector.hoprChannels.options.address,
-                nonce: await this.coreConnector.account.nonce,
+                nonce: await this.coreConnector.account.nonce
               }
             )
           ).send()

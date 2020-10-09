@@ -41,7 +41,7 @@ async function runAsRegularNode() {
     completer: async (line: string, cb: (err: Error | undefined, hits: [string[], string]) => void) => {
       let results = await commands.autocomplete(line)
       cb(undefined, results)
-    },
+    }
   })
 
   commands = new Commands(node, rl)

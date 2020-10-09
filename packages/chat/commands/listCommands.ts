@@ -18,7 +18,7 @@ export default class ListCommands extends AbstractCommand {
     return getOptions(
       this.getCommands().map((command) => ({
         value: command.name(),
-        description: command.help(),
+        description: command.help()
       })),
       'vertical'
     ).join('')

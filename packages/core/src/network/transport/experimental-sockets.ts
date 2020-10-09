@@ -13,12 +13,12 @@ async function main() {
 
   const udp4Server = dgram.createSocket({
     type: 'udp4',
-    reuseAddr: true,
+    reuseAddr: true
   })
 
   const udp6Server = dgram.createSocket({
     type: 'udp6',
-    reuseAddr: true,
+    reuseAddr: true
   })
 
   udp4Server.on('message', (msg, info) => {
@@ -32,7 +32,7 @@ async function main() {
   const listeningPromise = Promise.all([
     new Promise((resolve) => tcpServer.once('listening', resolve)),
     new Promise((resolve) => udp4Server.once('listening', resolve)),
-    new Promise((resolve) => udp6Server.once('listening', resolve)),
+    new Promise((resolve) => udp6Server.once('listening', resolve))
   ])
 
   tcpServer.listen(9091)

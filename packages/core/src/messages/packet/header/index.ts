@@ -18,7 +18,7 @@ import {
   PRIVATE_KEY_LENGTH,
   KEY_LENGTH,
   IDENTIFIER_SIZE,
-  DESINATION_SIZE,
+  DESINATION_SIZE
 } from './parameters'
 import PeerId from 'peer-id'
 
@@ -58,7 +58,7 @@ export class Header<Chain extends HoprCoreConnector> extends Uint8Array {
   slice(begin: number = 0, end: number = Header.SIZE) {
     return this.subarray(begin, end)
   }
-  
+
   subarray(begin: number = 0, end: number = Header.SIZE): Uint8Array {
     return new Uint8Array(this.buffer, begin + this.byteOffset, end - begin)
   }
@@ -206,7 +206,7 @@ export class Header<Chain extends HoprCoreConnector> extends Uint8Array {
       let tmpArray = new Uint8Array(Header.SIZE)
       arr = {
         bytes: tmpArray.buffer,
-        offset: tmpArray.byteOffset,
+        offset: tmpArray.byteOffset
       }
     }
 

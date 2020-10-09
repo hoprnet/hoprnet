@@ -28,7 +28,7 @@ export default class PrintAddress extends AbstractCommand {
     const hoprPrefix = 'HOPR Address:'
     const hoprAddress = this.node.peerInfo.id.toB58String()
 
-    if (query.trim() == 'hopr'){
+    if (query.trim() == 'hopr') {
       return hoprAddress
     }
 
@@ -36,7 +36,7 @@ export default class PrintAddress extends AbstractCommand {
     const nativePrefix = 'xDAI Address:'
     const nativeAddress = u8aToHex(await utils.pubKeyToAccountId(this.node.peerInfo.id.pubKey.marshal()))
 
-    if (query.trim() == 'native'){
+    if (query.trim() == 'native') {
       return nativeAddress
     }
 
@@ -44,7 +44,7 @@ export default class PrintAddress extends AbstractCommand {
 
     return [
       `${hoprPrefix.padEnd(prefixLength, ' ')}${chalk.green(hoprAddress)}`,
-      `${nativePrefix.padEnd(prefixLength, ' ')}${chalk.green(nativeAddress)}`,
+      `${nativePrefix.padEnd(prefixLength, ' ')}${chalk.green(nativeAddress)}`
     ].join('\n')
   }
 }
