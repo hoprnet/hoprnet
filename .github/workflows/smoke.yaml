@@ -12,12 +12,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Limit concurrency to 1.
+      - name: Turnstyle
         uses: softprops/turnstyle@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Deploy
-         uses: actions/checkout@v2
+      - uses: actions/checkout@v2
       - name: Use Node.js 12
         uses: actions/setup-node@v1
         with:
