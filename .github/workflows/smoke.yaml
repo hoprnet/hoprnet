@@ -73,10 +73,11 @@ jobs:
           hoprd --data='./test/fixtures/bob' --password="$DBPASS" --host="$BOB_ADDR:$BOB_PORT" --bootstrap &
           BOB_PID="$!"
           BOB_MULTIADDR=/ip4/$BOB_ADDR/tcp/$BOB_PORT/p2p/$BOB
-          HOPR_BOOTSTRAP_SERVERS=$BOB_MULTIADDR 
+          export HOPR_BOOTSTRAP_SERVERS=$BOB_MULTIADDR 
           echo "Bootstrap Bob running as pid $BOB_PID on $BOB_MULTIADDR"
 
           # Ping bootstrapnode
+          hoprd --data='./test/fixtures/alice' --password="$DBPASS" --run="info"
           hoprd --data='./test/fixtures/alice' --password="$DBPASS" --run="ping $BOB"
 
           # Start charlie
