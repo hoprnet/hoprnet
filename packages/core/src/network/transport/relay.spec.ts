@@ -9,7 +9,7 @@ import SECIO = require('libp2p-secio')
 // @ts-ignore
 import TCP from 'libp2p-tcp'
 
-import { Handler, MultiaddrConnection } from './types'
+import { Handler, MultiaddrConnection } from '../../@types/transport'
 
 import Multiaddr from 'multiaddr'
 import PeerInfo from 'peer-info'
@@ -53,19 +53,19 @@ describe('should create a socket and connect to it', function () {
         transport: [TCP],
         streamMuxer: [MPLEX],
         connEncryption: [SECIO],
-        dht: KadDHT,
+        dht: KadDHT
       },
       config: {
         dht: {
-          enabled: false,
+          enabled: false
         },
         relay: {
-          enabled: false,
+          enabled: false
         },
         peerDiscovery: {
-          autoDial: false,
-        },
-      },
+          autoDial: false
+        }
+      }
     })
 
     //@ts-ignore
@@ -112,8 +112,8 @@ describe('should create a socket and connect to it', function () {
             },
             conn
           )
-        },
-      }),
+        }
+      })
     ])
 
     // Make sure that the nodes know each other
@@ -164,7 +164,7 @@ describe('should create a socket and connect to it', function () {
           },
           conn
         )
-      },
+      }
     })
 
     await counterparty.dial(relay.peerInfo)

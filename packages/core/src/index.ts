@@ -1,5 +1,5 @@
-/// <reference path="./@types/libp2p.d.ts" />
-import LibP2P from 'libp2p' // @ts-ignore
+/// <reference path="./@types/libp2p.ts" />
+import LibP2P from 'libp2p'
 import MPLEX = require('libp2p-mplex')
 // @ts-ignore
 import KadDHT = require('libp2p-kad-dht')
@@ -27,8 +27,6 @@ const log = Debug(`hopr-core`)
 
 import PeerId from 'peer-id'
 import PeerInfo from 'peer-info'
-
-import { Handler } from './network/transport/types'
 
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { HoprCoreConnectorStatic, Types } from '@hoprnet/hopr-core-connector-interface'
@@ -91,28 +89,28 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
       // Disable libp2p-switch protections for the moment
       switch: {
         denyTTL: 1,
-        denyAttempts: Infinity,
+        denyAttempts: Infinity
       },
       // The libp2p modules for this libp2p bundle
       modules: {
         transport: [TCP],
         streamMuxer: [MPLEX],
         connEncryption: [SECIO],
-        dht: KadDHT,
+        dht: KadDHT
       },
       config: {
         transport: {
           TCP: {
-            bootstrapServers: options.bootstrapServers,
-          },
+            bootstrapServers: options.bootstrapServers
+          }
         },
         dht: {
-          enabled: true,
+          enabled: true
         },
         relay: {
-          enabled: false,
-        },
-      },
+          enabled: false
+        }
+      }
     })
 
     this.initializedWithOptions = options
@@ -150,10 +148,10 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
 
     let connector = (await Connector.create(db, options.peerInfo.id.privKey.marshal(), {
       provider: options.provider,
-      debug: options.debug,
+      debug: options.debug
     })) as CoreConnector
 
-    verbose("Created connector, now creating node")
+    verbose('Created connector, now creating node')
     return await new Hopr<CoreConnector>(options, db, connector).start()
   }
 
@@ -203,10 +201,10 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
         Promise.all([
           // prettier-ignore
           this.connectToBootstrapServers(),
-          this.network.start(),
+          this.network.start()
         ])
       ),
-      this.paymentChannels?.start(),
+      this.paymentChannels?.start()
     ])
 
     log(`Available under the following addresses:`)
@@ -228,13 +226,13 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
     await Promise.all([
       // prettier-ignore
       this.network.stop(),
-      this.paymentChannels?.stop().then(() => log(`Connector stopped.`)),
+      this.paymentChannels?.stop().then(() => log(`Connector stopped.`))
     ])
 
     await Promise.all([
       // prettier-ignore
       this.db?.close().then(() => log(`Database closed.`)),
-      super.stop(),
+      super.stop()
     ])
 
     // Give the operating system some extra time to close the sockets
@@ -343,7 +341,7 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
     const start = new this.paymentChannels.types.Public(this.peerInfo.id.pubKey.marshal())
     const exclude = [
       destination.pubKey.marshal(),
-      ...this.bootstrapServers.map((pInfo) => pInfo.id.pubKey.marshal()),
+      ...this.bootstrapServers.map((pInfo) => pInfo.id.pubKey.marshal())
     ].map((pubKey) => new this.paymentChannels.types.Public(pubKey))
 
     return await Promise.all(
@@ -405,7 +403,7 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
     return new Promise((resolve, reject) => {
       this.db
         .createReadStream({
-          gte: Buffer.from(this.dbKeys.AcknowledgedTickets(new Uint8Array(0x00))),
+          gte: Buffer.from(this.dbKeys.AcknowledgedTickets(new Uint8Array(0x00)))
         })
         .on('error', (err) => reject(err))
         .on('data', ({ key, value }: { key: Buffer; value: Buffer }) => {
@@ -414,12 +412,12 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
           const index = this.dbKeys.AcknowledgedTicketsParse(key)
           const ackTicket = AcknowledgedTicket.create(this.paymentChannels, {
             bytes: value.buffer,
-            offset: value.byteOffset,
+            offset: value.byteOffset
           })
 
           promises.push({
             ackTicket,
-            index,
+            index
           })
         })
         .on('end', () => resolve(Promise.all(promises)))
@@ -482,7 +480,7 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
     } catch (err) {
       return {
         status: 'ERROR',
-        error: err,
+        error: err
       }
     }
   }

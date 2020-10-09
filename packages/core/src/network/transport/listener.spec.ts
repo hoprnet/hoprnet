@@ -1,7 +1,7 @@
 import assert from 'assert'
 import Listener from './listener'
 import Multiaddr from 'multiaddr'
-import { Connection, Upgrader } from './types'
+import { Connection, Upgrader } from '../../@types/transport'
 import dgram, { Socket, RemoteInfo } from 'dgram'
 import { handleStunRequest } from './stun'
 import PeerId from 'peer-id'
@@ -31,11 +31,11 @@ describe('check listening to sockets', function () {
     // Create objects to pass boolean by reference and NOT by value
     const msgReceived = [
       {
-        msgReceived: Defer<void>(),
+        msgReceived: Defer<void>()
       },
       {
-        msgReceived: Defer<void>(),
-      },
+        msgReceived: Defer<void>()
+      }
     ]
 
     const stunServers = [await startStunServer(9391, msgReceived[0]), await startStunServer(9392, msgReceived[1])]
@@ -43,7 +43,7 @@ describe('check listening to sockets', function () {
     for (let i = 0; i < 2; i++) {
       listener = new Listener(() => {}, (undefined as unknown) as Upgrader, [
         Multiaddr(`/ip4/127.0.0.1/udp/${stunServers[0].address().port}`),
-        Multiaddr(`/ip4/127.0.0.1/udp/${stunServers[1].address().port}`),
+        Multiaddr(`/ip4/127.0.0.1/udp/${stunServers[1].address().port}`)
       ])
       await listener.listen(Multiaddr(`/ip4/127.0.0.1/tcp/9390/p2p/${peerId.toB58String()}`))
       await listener.close()
@@ -83,7 +83,7 @@ describe('check listening to sockets', function () {
             msgReceived[index].received.resolve()
           },
           ({
-            upgradeInbound: async (conn) => conn,
+            upgradeInbound: async (conn) => conn
           } as unknown) as Upgrader,
           stunServers
         )
@@ -96,7 +96,7 @@ describe('check listening to sockets', function () {
 
     for (let i = 0; i < ATTEMPTS; i++) {
       msgReceived = Array.from({ length: AMOUNT_OF_NODES }).map((_) => ({
-        received: Defer(),
+        received: Defer()
       }))
 
       await Promise.all([
@@ -104,7 +104,7 @@ describe('check listening to sockets', function () {
           const socket = net.createConnection(
             {
               host: '127.0.0.1',
-              port: 9390 + (i % 2),
+              port: 9390 + (i % 2)
             },
             () => {
               socket.write(Buffer.from('test'), () => {
@@ -118,7 +118,7 @@ describe('check listening to sockets', function () {
           const socket = net.createConnection(
             {
               host: '::1',
-              port: 9390 + ((i + 1) % 2),
+              port: 9390 + ((i + 1) % 2)
             },
             () => {
               socket.write(Buffer.from('test'), () => {
@@ -128,7 +128,7 @@ describe('check listening to sockets', function () {
             }
           )
         }),
-        Promise.all(msgReceived.map((received) => received.received.promise)),
+        Promise.all(msgReceived.map((received) => received.received.promise))
       ])
     }
 

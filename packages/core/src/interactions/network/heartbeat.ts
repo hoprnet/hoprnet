@@ -7,7 +7,7 @@ import debug from 'debug'
 import AbortController from 'abort-controller'
 import pipe from 'it-pipe'
 import { PROTOCOL_HEARTBEAT } from '../../constants'
-import type { Stream, Connection, Handler } from '../../network/transport/types'
+import type { Stream, Connection, Handler } from '../../@types/transport'
 import type PeerId from 'peer-id'
 
 const error = debug('hopr-core:heartbeat:error')

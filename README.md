@@ -25,9 +25,18 @@ hoprd --admin
 ### Developing with this repository
 
 ```sh
-yarn             # Install tooling
-yarn bootstrap   # Installs all dependencies
-yarn build       # Builds code for running
+yarn          # Install tooling
+yarn setup    # Setups the monorepo
+# all done!
+
+# if you want to regenerate yarn.lock files
+yarn util:regenerate
+yarn setup
+
+# if you run into errors during setup
+yarn util:clean
+yarn util:regenerate
+yarn setup
 ```
 
 ### Running applications

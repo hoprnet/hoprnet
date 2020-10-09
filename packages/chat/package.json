@@ -2,6 +2,8 @@
   "name": "@hoprnet/hopr-chat",
   "version": "1.17.0-alpha.58",
   "description": "Interactive chat PoC for HOPR Protocol",
+  "repository": "https://github.com/hoprnet/hoprnet.git",
+  "homepage": "https://hoprnet.org",
   "main": "lib/index.js",
   "scripts": {
     "build": "yarn clean:lib && tsc -p . --noEmit false",
@@ -86,12 +88,6 @@
     },
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
-  },
-  "prettier": {
-    "tabWidth": 2,
-    "semi": false,
-    "singleQuote": true,
-    "printWidth": 120
   },
   "publishConfig": {
     "access": "public"
