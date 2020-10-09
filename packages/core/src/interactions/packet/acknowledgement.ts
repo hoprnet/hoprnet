@@ -15,7 +15,7 @@ import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '../../'
 import { Acknowledgement } from '../../messages/acknowledgement'
 
-import type { Handler } from '../../network/transport/types'
+import type { Handler } from '../../@types/transport'
 
 import EventEmitter from 'events'
 
@@ -92,7 +92,7 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
       const arr = msg.slice()
       const acknowledgement = new Acknowledgement(this.node.paymentChannels, {
         bytes: arr.buffer,
-        offset: arr.byteOffset,
+        offset: arr.byteOffset
       })
 
       const unAcknowledgedDbKey = this.node.dbKeys.UnAcknowledgedTickets(await acknowledgement.hashedKey)
@@ -119,7 +119,7 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
       if (tmp.length > 0) {
         const unacknowledgedTicket = new UnacknowledgedTicket(this.node.paymentChannels, {
           bytes: tmp.buffer,
-          offset: tmp.byteOffset,
+          offset: tmp.byteOffset
         })
 
         let ticketCounter: Uint8Array
@@ -141,7 +141,7 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
             response: await this.node.paymentChannels.utils.hash(
               u8aConcat(unacknowledgedTicket.secretA, await acknowledgement.hashedKey)
             ),
-            redeemed: false,
+            redeemed: false
           }
         )
 

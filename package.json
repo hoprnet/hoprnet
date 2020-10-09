@@ -2,22 +2,25 @@
   "name": "root",
   "private": true,
   "scripts": {
-    "bootstrap": "lerna exec -- yarn --mutex network --frozen-lockfile && lerna link --force-local",
-    "bootstrap-ci": "NODE_ENV=production yarn bootstrap",
-    "build": "lerna run build",
-    "regenerate-lockfiles": "lerna run clean && rm -r packages/*/yarn.lock && yarn exec -- yarn --mutex network",
-    "core:test": "cd packages/core && yarn build && yarn test",
+    "setup": "yarn util:install && yarn util:link && yarn util:build",
+    "lint": "prettier --check .",
+    "lint:fix": "prettier --write .",
+    "test": "lerna run test --stream",
+    "test:core": "cd packages/core && yarn build && yarn test",
     "run:chat": "lerna exec --scope @hoprnet/hopr-chat -- yarn start:basodino",
     "run:hoprd": "lerna exec --scope @hoprnet/hoprd -- yarn start --host 0.0.0.0:9092",
     "run:chatbot": "lerna exec --scope @hoprnet/chat-bot -- yarn start:basodino",
-    "lint": "prettier --check .",
-    "lint:fix": "prettier --write .",
-    "test": "lerna run test --stream"
+    "util:clean": "lerna clean --yes",
+    "util:regenerate": "lerna exec --concurrency 1 --stream -- yarn",
+    "util:install": "lerna exec --concurrency 1 --stream -- yarn --pure-lockfile",
+    "util:build": "lerna exec --stream -- yarn build",
+    "util:link": "lerna link"
   },
   "dependencies": {
     "lerna": "^3.22.1"
   },
   "devDependencies": {
+    "husky": "^4.2.5",
     "prettier": "^2.0.5"
   },
   "prettier": {
@@ -26,13 +29,5 @@
     "singleQuote": true,
     "printWidth": 120,
     "trailingComma": "none"
-  },
-  "__workspaces": {
-    "packages": [
-      "packages/*"
-    ],
-    "nohoist": [
-      "**"
-    ]
   }
 }

@@ -2,6 +2,8 @@
   "name": "@hoprnet/hopr-server",
   "version": "1.17.0-alpha.58",
   "description": "gRPC Server wrapper around HOPR Node",
+  "repository": "https://github.com/hoprnet/hoprnet.git",
+  "homepage": "https://hoprnet.org",
   "license": "GPL-3.0-only",
   "main": "dist/main.js",
   "files": [
@@ -17,7 +19,7 @@
     "access": "public"
   },
   "scripts": {
-    "clean": "rimraf dist",
+    "clean": "rimraf ./dist",
     "clean:all": "yarn util:clean:all && yarn clean",
     "prebuild": "yarn clean",
     "build": "nest build",
