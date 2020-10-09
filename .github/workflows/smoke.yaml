@@ -34,7 +34,8 @@ jobs:
       - name: Check databases
         shell: bash
         run: |
-          alias hoprd="node packages/hopr/lib/index.js" # TEMP
+          shopt -s expand_aliases
+          alias hoprd="node packages/hopr/lib/index.js"
 
           hoprd --data='./test/fixtures/alice'  --password="$DBPASS" --run "myAddress hopr"
           hoprd --data='./test/fixtures/bob'  --password="$DBPASS" --run "myAddress hopr"
