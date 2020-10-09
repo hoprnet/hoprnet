@@ -28,10 +28,10 @@ jobs:
       - name: Install node modules
         run: |
           yarn policies set-version ${{ matrix.yarn-version }}
-          yarn install --frozen-lockfile
-      - name: Install dependencies and link locally
+          yarn install --pure-lockfile
+      - name: Install dependencies
         run: |
-          yarn bootstrap
+          yarn util:install
       - name: Lint & Fix
         if: |
           github.event_name == 'pull_request' &&
@@ -41,9 +41,9 @@ jobs:
           git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Linting robot"
           yarn lint:fix
           git commit -a -m "Fix linting"
-      - name: Build
+      - name: Link & Build
         run: |
-          yarn build
+          yarn util:link && yarn util:build
       - name: Test
         run: |
           yarn test
