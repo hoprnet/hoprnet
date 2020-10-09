@@ -18,27 +18,24 @@ jobs:
         with:
           node-version: 12
           registry-url: https://registry.npmjs.org/
-      - name: Install node modules
+
+      - name: Temporarily install everything
         run: |
-          yarn policies set-version ${{ matrix.yarn-version }}
           yarn install --frozen-lockfile
-      - name: Install dependencies and link locally
-        run: |
           yarn bootstrap
-      - name: Build
-        run: |
           yarn build
-      - name: Install hoprd
-        shell: bash
-        run: |
+
+          #- name: Install hoprd
+          #shell: bash
+          #run: |
           #NODE_ENV=production npm install -g @hoprnet/hoprd
-          npm install -g .
-        working-directory: packages/hoprd
+          #working-directory: packages/hoprd
 
       - name: Check databases
         shell: bash
         run: |
-          echo $PATH
+          alias hoprd="node packages/hopr/lib/index.js" # TEMP
+
           hoprd --data='./test/fixtures/alice'  --password="$DBPASS" --run "myAddress hopr"
           hoprd --data='./test/fixtures/bob'  --password="$DBPASS" --run "myAddress hopr"
           hoprd --data='./test/fixtures/charlie'  --password="$DBPASS" --run "myAddress hopr"
