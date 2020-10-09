@@ -18,12 +18,20 @@ jobs:
         with:
           node-version: 12
           registry-url: https://registry.npmjs.org/
+      - name: Install node modules
+        run: |
+          yarn policies set-version ${{ matrix.yarn-version }}
+          yarn install --frozen-lockfile
+      - name: Install dependencies and link locally
+        run: |
+          yarn bootstrap
+      - name: Build
+        run: |
+          yarn build
       - name: Install hoprd
         shell: bash
         run: |
           #NODE_ENV=production npm install -g @hoprnet/hoprd
-          yarn install
-          yarn build
           npm install -g .
         working-directory: packages/hoprd
 
