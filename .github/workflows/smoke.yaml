@@ -37,9 +37,9 @@ jobs:
           shopt -s expand_aliases
           alias hoprd="node packages/hoprd/lib/index.js"
 
-          hoprd --data='./test/fixtures/alice' --password="$DBPASS" --run "myAddress hopr" || true
-          hoprd --data='./test/fixtures/bob' --password="$DBPASS" --run "myAddress hopr" || true
-          hoprd --data='./test/fixtures/charlie' --password="$DBPASS" --run "myAddress hopr" || true
+          hoprd --data='./test/fixtures/alice' --password="$DBPASS" --run "myAddress hopr" 
+          hoprd --data='./test/fixtures/bob' --password="$DBPASS" --run "myAddress hopr"
+          hoprd --data='./test/fixtures/charlie' --password="$DBPASS" --run "myAddress hopr"
         env:
           DBPASS: ${{ secrets.SMOKETESTPASSWORD }}
 
@@ -49,6 +49,8 @@ jobs:
           ALICE=$(hoprd --data='alice'  --password="opensesame" --run "myAddress hopr")
           BOB=$(hoprd --data='bob' --password="opensesame" --run="myAddress hopr")
           CHARLIE=$(hoprd --data='charlie'  --password="opensesame" --run "myAddress hopr")
+        env:
+          DBPASS: ${{ secrets.SMOKETESTPASSWORD }}
 
 
       - name: Commit database changes back to repo
