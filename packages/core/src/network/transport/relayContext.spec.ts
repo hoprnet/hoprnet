@@ -1,33 +1,69 @@
+import { u8aConcat } from '@hoprnet/hopr-utils'
+import { RELAY_STATUS_PREFIX, STOP } from './constants'
 import { RelayContext } from './relayContext'
+import { Stream } from './types'
+
+import Debug from 'debug'
+import { resolve } from 'dns'
+const log = Debug(`hopr-core:transport`)
 
 describe('test overwritable connection', function () {
   let iteration = 0
-  function getGenerator(): AsyncGenerator<Uint8Array> {
-    return (async function* () {
-      let i = 0
-      for (; i < 23; i++) {
-        yield new TextEncoder().encode(`iteration ${iteration} - msg no. ${i}`)
-        await new Promise((resolve) => setTimeout(resolve, 12))
-      }
+  let done = false
 
-      return `iteration ${iteration} - msg no. ${i + 1}`
-    })()
+  function getStream(): Stream {
+    return {
+      source: (async function* () {
+        let _iteration = iteration
+        console.log(`source triggered in .spec`)
+        let i = 0
+        for (; i < 7; i++) {
+          yield new TextEncoder().encode(`iteration ${_iteration} - msg no. ${i}`)
+
+          await new Promise((resolve) => setTimeout(resolve, 100))
+        }
+
+        return new TextEncoder().encode(`iteration ${_iteration} - msg no. ${i}`)
+      })(),
+      sink: async (source: Stream['source']) => {
+        let _iteration = iteration
+        console.log(`sinkTriggered`)
+        for await (const msg of source) {
+          console.log(`receiver #${_iteration}`, new TextDecoder().decode(msg))
+        }
+        console.log(`sinkDone`)
+      }
+    }
   }
 
   it('should create a connection and overwrite it', async function () {
-    /*
-    const ctx = new RelayContext(getGenerator())
+    const ctx = new RelayContext(getStream())
 
-    let i = setInterval(() => {
-      ctx.update(getGenerator())
-      iteration++
-    }, 123)
+    let interval = setInterval(
+      () =>
+        setImmediate(() => {
+          ctx.update(getStream())
+          iteration++
+        }),
+      500
+    )
+
+    setTimeout(() => {
+      log(`timeout done`)
+      clearInterval(interval)
+    }, 3000)
+
+    let i = 0
+    ctx.sink((async function * () {
+      await new Promise(resolve => setTimeout(resolve, 123))
+      while (true) {
+        yield new TextEncoder().encode(`msg from initial party #${i++}`)
+        await new Promise(resolve => setTimeout(resolve, 100))
+      }
+    })())
 
     for await (const msg of ctx.source) {
-      console.log(new TextDecoder().decode(msg))
+      console.log(`initial source <${new TextDecoder().decode(msg)}>`)
     }
-
-    clearInterval(i)
-*/
   })
 })

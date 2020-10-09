@@ -1,89 +1,161 @@
-import { u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
+import { u8aConcat, u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
 import Defer, { DeferredPromise } from 'p-defer'
+import BL from 'bl'
+
+import { Stream } from './types'
 
 import Debug from 'debug'
 const log = Debug(`hopr-core:transport`)
+const verbose = Debug(`hopr-core:verbose:transport`)
+
 const error = Debug(`hopr-core:transport:error`)
 
-
-import { RELAY_PAYLOAD_PREFIX, RELAY_STATUS_PREFIX, STOP } from './constants'
+import { RELAY_STATUS_PREFIX, STOP, RESTART } from './constants'
 
 class RelayContext {
-  private _defer: DeferredPromise<AsyncGenerator<Uint8Array>>
+  private _switchPromise: DeferredPromise<Stream>
 
-  public source: AsyncIterable<Uint8Array>
+  public source: Stream['source']
+  public sink: Stream['sink']
 
-  constructor(private _source: AsyncGenerator<Uint8Array>) {
-    this._defer = Defer<AsyncGenerator<Uint8Array>>()
+  constructor(stream: Stream) {
+    this._switchPromise = Defer<Stream>()
 
     this.source = async function* (this: RelayContext) {
-      let itDone = false
+      let sourceReceived = false
+      let sourceMsg: Uint8Array
+      let sourceDone = false
 
-      let msgReceived = false
-      let streamReceived = false
-
-      let msg: Promise<IteratorResult<Uint8Array, Uint8Array>>
-
-      this._defer.promise.then(() => {
-        streamReceived = true
-      })
-
-      while (true) {
-        log(`relay iteration`)
-        msg = this._source.next()
-
-        await Promise.race([
-          msg.then(({ done }) => {
-            if (done) {
-              itDone = true
-            }
-
-            msgReceived = true
-          }),
-          this._defer.promise,
-        ])
-
-        if (itDone || streamReceived) {
-          console.log(`waiting for resolve streamReceived ${streamReceived} itDone ${itDone}`)
-          this._source = await this._defer.promise
-
-          this._defer = Defer()
-
-          streamReceived = false
-
-          this._defer.promise.then(() => {
-            console.log(`stream resolved`)
-            streamReceived = true
-          })
-
-          itDone = false
-          continue
+      function sourceFunction({ value, done }: { value?: Uint8Array | void; done?: boolean | void }) {
+        if (value != null) {
+          sourceReceived = true
+          sourceMsg = value as Uint8Array
         }
 
-        if (msgReceived) {
-          const received = (await msg).value?.slice()
+        if (done) {
+          sourceDone = true
+        }
+      }
 
-          if (u8aEquals(received.slice(0, 1), RELAY_STATUS_PREFIX)) {
-            if (u8aEquals(received.slice(1), STOP)) {
-              log(`STOP received`)
+      let currentSource = stream.source
+
+      let sourcePromise = currentSource.next().then(sourceFunction)
+
+      let streamSwitched = false
+
+      function switchFunction(stream: Stream) {
+        currentSource = stream.source
+        streamSwitched = true
+      }
+      let switchPromise = this._switchPromise.promise.then(switchFunction)
+
+      while (true) {
+        if (!sourceDone) {
+          await Promise.race([
+            // prettier-ignore
+            sourcePromise,
+            switchPromise
+          ])
+        } else {
+          await switchPromise
+        }
+
+        if (sourceReceived) {
+          sourceReceived = false
+          const received = sourceMsg.slice()
+
+          const [PREFIX, SUFFIX] = [received.subarray(0, 1), received.subarray(1)]
+          if (u8aEquals(PREFIX, RELAY_STATUS_PREFIX)) {
+            if (u8aEquals(SUFFIX, STOP)) {
+              verbose(`STOP relayed`)
               break
+            } else if (u8aEquals(SUFFIX, RESTART)) {
+              verbose(`RESTART relayed`)
             } else {
-              error(`Invalid status message. Got <${received.slice(1)}>`)
+              error(`Invalid status message. Got <${u8aToHex(SUFFIX)}>`)
             }
           }
 
-          log(`relaying ${(await msg).value.toString()}`, u8aToHex((await msg).value))
-          yield (await msg).value
+          verbose(`relaying ${new TextDecoder().decode(sourceMsg.slice(1))}`, u8aToHex(sourceMsg.slice()))
 
-          msgReceived = false
+          if (sourceDone) {
+            return sourceMsg
+          }
+
+          yield sourceMsg
+          sourcePromise = currentSource.next().then(sourceFunction)
+        } else if (streamSwitched) {
+          streamSwitched = false
+          sourcePromise = currentSource.next().then(sourceFunction)
+          switchPromise = this._switchPromise.promise.then(switchFunction)
         }
       }
       log(`after relay context return `)
     }.call(this)
+
+    this.sink = ((source: Stream['source']) => {
+      async function* foo(this: RelayContext) {
+        let sourceReceived = false
+        let sourceMsg: Uint8Array | void
+        let sourceDone = false
+
+        function sourceFunction({ value, done }: { value?: Uint8Array | void; done?: boolean | void }) {
+          sourceReceived = true
+          sourceMsg = value
+
+          if (done) {
+            sourceDone = true
+          }
+        }
+
+        let sourcePromise = source.next().then(sourceFunction)
+
+        let streamSwitched = false
+
+        let switchPromise = this._switchPromise.promise.then(() => {
+          streamSwitched = true
+        })
+
+        while (true) {
+          if (!sourceDone) {
+            await Promise.race([
+              // prettier-ignore
+              sourcePromise,
+              switchPromise
+            ])
+          } else {
+            await switchPromise
+          }
+
+          if (sourceReceived) {
+            sourceReceived = false
+
+            if (sourceDone) {
+              return sourceMsg
+            } else {
+              sourcePromise = source.next().then(sourceFunction)
+              yield sourceMsg
+            }
+          } else if (streamSwitched) {
+            break
+          }
+        }
+      }
+      stream.sink(foo.call(this))
+
+      const switchFunction = (stream: Stream) => {
+        this._switchPromise.promise.then(switchFunction)
+        stream.sink(foo.call(this))
+      }
+
+      this._switchPromise.promise.then(switchFunction)
+    }) as Stream['sink']
   }
 
-  update(newStream: AsyncGenerator<Uint8Array>) {
-    this._defer.resolve(newStream)
+  update(newStream: Stream) {
+    log(`updating`)
+    this._switchPromise.resolve(newStream)
+    this._switchPromise = Defer<Stream>()
   }
 }
 
