@@ -93,7 +93,7 @@ jobs:
           hoprd --data='./test/fixtures/alice' --password="$DBPASS" --run="crawl; ping $CHARLIE"
 
           # Open channel alice -> bob and send a-b-c
-          #DEBUG=hopr* hoprd --data='./test/fixtures/alice' --password="$DBPASS" --run="crawl; open $BOB 0.1; send $CHARLIE hi"
+          DEBUG=hopr* hoprd --data='./test/fixtures/alice' --password="$DBPASS" --run="crawl; open $BOB 0.1; send $CHARLIE hi"
 
           # Cleanup
           kill $BOB_PID
