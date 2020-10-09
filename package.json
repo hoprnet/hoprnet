@@ -2,7 +2,7 @@
   "name": "root",
   "private": true,
   "scripts": {
-    "setup": "yarn util:install && yarn util:build && yarn util:link",
+    "setup": "yarn util:install && yarn util:link && yarn util:build",
     "lint": "prettier --check .",
     "lint:fix": "prettier --write .",
     "test": "lerna run test --stream",
