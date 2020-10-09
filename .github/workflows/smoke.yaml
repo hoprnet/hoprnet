@@ -37,9 +37,9 @@ jobs:
           shopt -s expand_aliases
           alias hoprd="node packages/hoprd/lib/index.js"
 
-          hoprd --data='./test/fixtures/alice'  --password="$DBPASS" --run "myAddress hopr" || exit 0
-          hoprd --data='./test/fixtures/bob'  --password="$DBPASS" --run "myAddress hopr" || exit 0
-          hoprd --data='./test/fixtures/charlie'  --password="$DBPASS" --run "myAddress hopr" || exit 0
+          hoprd --data='./test/fixtures/alice' --password="$DBPASS" --run "myAddress hopr" || true
+          hoprd --data='./test/fixtures/bob' --password="$DBPASS" --run "myAddress hopr" || true
+          hoprd --data='./test/fixtures/charlie' --password="$DBPASS" --run "myAddress hopr" || true
         env:
           DBPASS: ${{ secrets.SMOKETESTPASSWORD }}
 
@@ -47,6 +47,6 @@ jobs:
         run: |
           git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Testing robot"
           git add ./test
-          git commit -a
+          git commit -a || true
           git pull origin ${{ github.ref }}
           git push origin ${{ github.ref }}
