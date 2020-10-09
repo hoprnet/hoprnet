@@ -29,6 +29,7 @@ jobs:
       - name: Check databases
         shell: bash
         run: |
+          echo $PATH
           hoprd --data='./test/fixtures/alice'  --password="$DBPASS" --run "myAddress hopr"
           hoprd --data='./test/fixtures/bob'  --password="$DBPASS" --run "myAddress hopr"
           hoprd --data='./test/fixtures/charlie'  --password="$DBPASS" --run "myAddress hopr"
