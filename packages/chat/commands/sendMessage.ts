@@ -52,7 +52,7 @@ export abstract class SendMessageBase extends AbstractCommand {
 
   async autocomplete(query: string, line: string, state: GlobalState): Promise<AutoCompleteResult> {
     const allIds = getPeersIdsAsString(this.node, {
-      noBootstrapNodes: true,
+      noBootstrapNodes: true
     }).concat(Array.from(state.aliases.keys()))
     return this._autocompleteByFiltering(query, allIds, line)
   }

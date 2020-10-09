@@ -27,5 +27,5 @@ export {
   SignedChannel,
   SignedTicket,
   Ticket,
-  TicketEpoch,
+  TicketEpoch
 }

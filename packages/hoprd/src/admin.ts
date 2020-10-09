@@ -41,9 +41,9 @@ export class AdminServer {
       dir: adminPath,
       conf: {
         devIndicators: {
-          autoPrerender: false,
-        },
-      },
+          autoPrerender: false
+        }
+      }
     })
     const handle = this.app.getRequestHandler()
     await this.app.prepare()

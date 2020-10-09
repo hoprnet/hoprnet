@@ -7,7 +7,7 @@ export const cli_options: string[][] = [
   ['-l', '--listConnectors', undefined, 'shows all available connectors'],
   ['-p', '--password', '<password>', 'start HOPR with <password>'],
   ['-v', '--verbose', undefined, 'show debug info'],
-  [undefined, '--debug', undefined, 'run HOPR in debug mode [insecure, only used for development]'],
+  [undefined, '--debug', undefined, 'run HOPR in debug mode [insecure, only used for development]']
   // ['<ID>', undefined, undefined, 'starts HOPR with a demo ID'],
 ].sort((a, b) => {
   let tmpA: string

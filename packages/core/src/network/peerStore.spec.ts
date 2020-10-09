@@ -11,7 +11,7 @@ import { EventEmitter } from 'events'
 function generateNode() {
   class Dummy extends EventEmitter {
     peerStore = {
-      peers: new Map<string, PeerInfo>(),
+      peers: new Map<string, PeerInfo>()
     }
   }
 
@@ -24,12 +24,12 @@ describe('test PeerStore', function () {
     assert(peerStore.length == 0, 'peerStore must be empty')
     peerStore.push({
       id: '1',
-      lastSeen: Date.now(),
+      lastSeen: Date.now()
     })
 
     peerStore.push({
       id: '2',
-      lastSeen: Date.now() - 10,
+      lastSeen: Date.now() - 10
     })
 
     assert(peerStore.top(1)[0].id === '2', `Recently seen peer should be on top.`)
@@ -38,7 +38,7 @@ describe('test PeerStore', function () {
 
     peerStore.push({
       id: '1',
-      lastSeen: Date.now() - 20,
+      lastSeen: Date.now() - 20
     })
 
     assert(peerStore.peers.length == 2, `Updating a peer should not increase the heap size.`)
@@ -71,7 +71,7 @@ describe('test PeerStore', function () {
 
     peerStore.push({
       id: '1',
-      lastSeen: Date.now(),
+      lastSeen: Date.now()
     })
 
     assert(peerStore.length == 0, `adding a blacklisted peers must not change the peerStore`)
@@ -83,7 +83,7 @@ describe('test PeerStore', function () {
 
     peerStore.push({
       id: '1',
-      lastSeen: Date.now(),
+      lastSeen: Date.now()
     })
 
     peerStore.blacklistPeer('1')

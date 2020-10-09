@@ -8,7 +8,7 @@ import { CrawlResponse, CrawlStatus } from '.'
 describe('test crawl response generation', function () {
   it('should create a response', async function () {
     const failingResponse = new CrawlResponse(undefined, {
-      status: CrawlStatus.FAIL,
+      status: CrawlStatus.FAIL
     })
 
     assert(failingResponse.status == CrawlStatus.FAIL, 'Check status')
@@ -16,7 +16,7 @@ describe('test crawl response generation', function () {
     assert.throws(
       () =>
         new CrawlResponse(undefined, {
-          status: CrawlStatus.OK,
+          status: CrawlStatus.OK
         }),
       `Should not create successful crawl responses without peerInfos.`
     )
@@ -27,7 +27,7 @@ describe('test crawl response generation', function () {
 
     const successfulResponse = new CrawlResponse(undefined, {
       status: CrawlStatus.OK,
-      peerInfos,
+      peerInfos
     })
 
     assert(
@@ -45,7 +45,7 @@ describe('test crawl response generation', function () {
 
     const secondSuccessfulResponse = new CrawlResponse(undefined, {
       status: CrawlStatus.OK,
-      peerInfos,
+      peerInfos
     })
 
     assert(

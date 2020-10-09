@@ -26,7 +26,7 @@ export async function getPrivKeyData(_privKey: Uint8Array): Promise<Account> {
   return {
     privKey,
     pubKey,
-    address,
+    address
   }
 }
 
@@ -42,13 +42,13 @@ export async function fundAccount(web3: Web3, hoprToken: HoprToken, funder: Acco
   await web3.eth.sendTransaction({
     value: web3.utils.toWei('1', 'ether'),
     from: funder.address.toHex(),
-    to: account.address.toHex(),
+    to: account.address.toHex()
   })
 
   // mint account some HOPR
   await hoprToken.methods.mint(account.address.toHex(), web3.utils.toWei('1', 'ether'), '0x00', '0x00').send({
     from: funder.address.toHex(),
-    gas: 200e3,
+    gas: 200e3
   })
 }
 
@@ -92,7 +92,7 @@ export async function createAccountAndFund(
  */
 export async function createNode(privKey: Uint8Array, debug: boolean = true): Promise<CoreConnector> {
   return CoreConnector.create(new LevelUp(Memdown()), privKey, {
-    debug,
+    debug
   })
 }
 

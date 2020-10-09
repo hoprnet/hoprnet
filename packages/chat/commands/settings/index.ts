@@ -21,7 +21,7 @@ export default class Settings extends AbstractCommand {
     // to add a new setting, include it here
     this.settings = {
       includeRecipient: new IncludeRecipient(),
-      routing: new Routing(),
+      routing: new Routing()
     }
     this.paddingLength = getPaddingLength(Object.keys(this.settings))
   }
@@ -75,12 +75,12 @@ export default class Settings extends AbstractCommand {
           Object.values(this.settings).map((setting) => {
             return {
               value: setting.name(),
-              description: setting.help(),
+              description: setting.help()
             }
           }),
           'vertical'
         ),
-        line,
+        line
       ]
     }
 

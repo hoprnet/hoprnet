@@ -89,11 +89,11 @@ export default class OpenChannel extends AbstractCommand {
       isPartyA
         ? {
             balance: channelFunding,
-            balance_a: channelFunding,
+            balance_a: channelFunding
           }
         : {
             balance: channelFunding,
-            balance_a: new BN(0),
+            balance_a: new BN(0)
           }
     )
 
@@ -121,7 +121,7 @@ export default class OpenChannel extends AbstractCommand {
   async autocomplete(query: string, line: string): Promise<AutoCompleteResult> {
     const peersWithOpenChannel = await getOpenChannels(this.node, this.node.peerInfo.id)
     const allPeers = getPeers(this.node, {
-      noBootstrapNodes: true,
+      noBootstrapNodes: true
     })
 
     const peers = allPeers.reduce((acc: string[], peer: PeerId) => {

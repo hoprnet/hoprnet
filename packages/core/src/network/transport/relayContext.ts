@@ -5,7 +5,6 @@ import Debug from 'debug'
 const log = Debug(`hopr-core:transport`)
 const error = Debug(`hopr-core:transport:error`)
 
-
 import { RELAY_PAYLOAD_PREFIX, RELAY_STATUS_PREFIX, STOP } from './constants'
 
 class RelayContext {
@@ -40,7 +39,7 @@ class RelayContext {
 
             msgReceived = true
           }),
-          this._defer.promise,
+          this._defer.promise
         ])
 
         if (itDone || streamReceived) {

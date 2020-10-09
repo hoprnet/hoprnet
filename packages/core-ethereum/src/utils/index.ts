@@ -117,7 +117,7 @@ export async function sign(
 
   const response = new Signature(arr, {
     signature: result.signature,
-    recovery: result.recid,
+    recovery: result.recid
   })
 
   return response
@@ -253,7 +253,7 @@ export async function waitFor({
   web3,
   network,
   getCurrentBlock,
-  timestamp,
+  timestamp
 }: {
   web3: Web3
   network: addresses.Networks
@@ -278,7 +278,7 @@ export async function waitFor({
     web3,
     network,
     getCurrentBlock,
-    timestamp: await getCurrentBlock().then((block) => Number(block.timestamp) * 1e3),
+    timestamp: await getCurrentBlock().then((block) => Number(block.timestamp) * 1e3)
   })
 }
 
@@ -367,7 +367,7 @@ export function TransactionSigner(web3: Web3, privKey: Uint8Array) {
         gas: estimatedGas,
         gasPrice: estimatedGasPrice,
         ...txConfig,
-        data: abi,
+        data: abi
       },
       privKeyStr
     )
@@ -382,7 +382,7 @@ export function TransactionSigner(web3: Web3, privKey: Uint8Array) {
 
     return {
       send,
-      transactionHash: signedTransaction.transactionHash,
+      transactionHash: signedTransaction.transactionHash
     }
   }
 }
@@ -425,7 +425,7 @@ export function getSignatureParameters(
   return {
     r: signature.signature.slice(0, 32),
     s: signature.signature.slice(32, 64),
-    v: signature.recovery,
+    v: signature.recovery
   }
 }
 

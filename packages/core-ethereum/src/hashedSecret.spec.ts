@@ -39,9 +39,9 @@ describe('test hashedSecret', function () {
       utils: Utils,
       types: Types,
       options: {
-        debug,
+        debug
       },
-      log: () => {},
+      log: () => {}
     } as unknown) as HoprEthereum
 
     connector.account = new Account(
@@ -114,7 +114,7 @@ describe('test hashedSecret', function () {
           await connector.signTransaction(connector.hoprChannels.methods.setHashedSecret(preImage.preImage.toHex()), {
             from: (await connector.account.address).toHex(),
             to: connector.hoprChannels.options.address,
-            nonce: await connector.account.nonce,
+            nonce: await connector.account.nonce
           })
         ).send()
       )
@@ -197,7 +197,7 @@ describe('test hashedSecret', function () {
           await connector.signTransaction(connector.hoprChannels.methods.setHashedSecret(preImage.preImage.toHex()), {
             from: (await connector.account.address).toHex(),
             to: connector.hoprChannels.options.address,
-            nonce: await connector.account.nonce,
+            nonce: await connector.account.nonce
           })
         ).send()
       )
@@ -227,10 +227,10 @@ describe('test hashedSecret', function () {
         signedTicket: {
           ticket: {
             hash: Promise.resolve(new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))),
-            winProb: Utils.computeWinningProbability(1),
-          },
+            winProb: Utils.computeWinningProbability(1)
+          }
         } as Types.SignedTicket,
-        response: new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff)),
+        response: new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))
       })
 
       assert(
@@ -260,10 +260,10 @@ describe('test hashedSecret', function () {
         signedTicket: {
           ticket: {
             hash: Promise.resolve(new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))),
-            winProb: Utils.computeWinningProbability(0),
-          },
+            winProb: Utils.computeWinningProbability(0)
+          }
         } as Types.SignedTicket,
-        response: new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff)),
+        response: new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))
       })
 
       assert(!(await connector.account.reservePreImageIfIsWinning(notWinnigTicket)), 'falsy ticket should not be a win')
@@ -293,10 +293,10 @@ describe('test hashedSecret', function () {
           signedTicket: {
             ticket: {
               hash: Promise.resolve(new Types.Hash(randomBytes(Types.Hash.SIZE))),
-              winProb: Utils.computeWinningProbability(Math.random()),
-            },
+              winProb: Utils.computeWinningProbability(Math.random())
+            }
           } as Types.SignedTicket,
-          response: new Types.Hash(randomBytes(Types.Hash.SIZE)),
+          response: new Types.Hash(randomBytes(Types.Hash.SIZE))
         })
 
         await connector.account.reservePreImageIfIsWinning(ticket)

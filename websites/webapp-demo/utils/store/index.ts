@@ -12,34 +12,34 @@ const methods: {
 
     dispatch({
       type: 'SET_HOPR_ADDRESS',
-      hoprAddress,
+      hoprAddress
     })
   },
 
   initialize: async (state, dispatch) => {
     dispatch({
-      type: 'RESET',
+      type: 'RESET'
     })
     dispatch({
       type: 'SET_CONNECTION',
-      connection: 'CONNECTING',
+      connection: 'CONNECTING'
     })
     dispatch({
       type: 'SET_HOPR_ADDRESS',
-      hoprAddress: undefined,
+      hoprAddress: undefined
     })
 
     try {
       await methods.getHoprAddress(state, dispatch)
       dispatch({
         type: 'SET_CONNECTION',
-        connection: 'CONNECTED',
+        connection: 'CONNECTED'
       })
     } catch (err) {
       console.error(err)
       dispatch({
         type: 'SET_CONNECTION',
-        connection: 'FAILED',
+        connection: 'FAILED'
       })
     }
 
@@ -58,7 +58,7 @@ const methods: {
         sendByMe: false,
         message,
         createdAt: new Date(),
-        status: 'SUCCESS',
+        status: 'SUCCESS'
       })
     })
   },
@@ -70,7 +70,7 @@ const methods: {
 
     const message = MessageBuffer.fromJson({
       from,
-      text,
+      text
     })
 
     api
@@ -80,7 +80,7 @@ const methods: {
           type: 'UPDATE_MESSAGE_STATUS',
           id,
           counterParty,
-          status: 'SUCCESS',
+          status: 'SUCCESS'
         })
       })
       .catch((err) => {
@@ -89,7 +89,7 @@ const methods: {
           type: 'UPDATE_MESSAGE_STATUS',
           id,
           counterParty,
-          status: 'FAILED',
+          status: 'FAILED'
         })
       })
 
@@ -101,9 +101,9 @@ const methods: {
       sendByMe: true,
       message,
       createdAt: new Date(),
-      status: 'SENDING',
+      status: 'SENDING'
     })
-  },
+  }
 }
 
 export default { initialState, reducer, methods, Provider, useTracked }

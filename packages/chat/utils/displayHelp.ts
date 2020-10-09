@@ -106,9 +106,9 @@ export function getOptions(
           '\n',
           '- ',
           styleValue(String(option.value).padEnd(padding)),
-          option.description,
+          option.description
         ].join('')
-      }),
+      })
     ]
   }
 }

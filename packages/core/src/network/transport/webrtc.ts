@@ -22,7 +22,7 @@ class WebRTCUpgrader {
         const options = ma.toOptions()
 
         return { urls: `stun:${options.host}:${options.port}` }
-      }),
+      })
     }
   }
 
@@ -42,7 +42,7 @@ class WebRTCUpgrader {
       trickle: true,
       // @ts-ignore
       allowHalfTrickle: true,
-      config: this._stunServers,
+      config: this._stunServers
     })
 
     // const onTimeout = () => {

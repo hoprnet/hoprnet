@@ -6,7 +6,7 @@ import {
   deriveTagParameters,
   createMAC,
   deriveTicketKey,
-  derivePRGParameters,
+  derivePRGParameters
 } from '.'
 import { Utils } from '@hoprnet/hopr-core-ethereum'
 import PeerId from 'peer-id'
@@ -42,8 +42,8 @@ describe('test creation & transformation of a header', function () {
   function getNode(): Hopr<HoprCoreConnector> {
     const node = ({
       paymentChannels: {
-        utils: Utils,
-      },
+        utils: Utils
+      }
     } as unknown) as Hopr<HoprCoreConnector>
 
     return node
@@ -71,7 +71,7 @@ describe('test creation & transformation of a header', function () {
         mac,
         transactionKey,
         prgParameters.key,
-        prgParameters.iv,
+        prgParameters.iv
       ]),
       'Keys should all be with high probability different'
     )
@@ -81,7 +81,7 @@ describe('test creation & transformation of a header', function () {
     const peerIds = await Promise.all([
       PeerId.create({ keyType: 'secp256k1' }),
       PeerId.create({ keyType: 'secp256k1' }),
-      PeerId.create({ keyType: 'secp256k1' }),
+      PeerId.create({ keyType: 'secp256k1' })
     ])
 
     const { header, identifier, secrets } = await createAndDecomposeHeader(getNode(), peerIds)
@@ -103,7 +103,7 @@ describe('test creation & transformation of a header', function () {
   it('should create a header with a path less than MAX_HOPS nodes', async function () {
     const peerIds = await Promise.all([
       PeerId.create({ keyType: 'secp256k1' }),
-      PeerId.create({ keyType: 'secp256k1' }),
+      PeerId.create({ keyType: 'secp256k1' })
     ])
 
     const { header, identifier, secrets } = await createAndDecomposeHeader(getNode(), peerIds)

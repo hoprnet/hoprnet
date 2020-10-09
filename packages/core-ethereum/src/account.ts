@@ -35,12 +35,12 @@ class Account {
     this.keys = {
       onChain: {
         privKey,
-        pubKey,
+        pubKey
       },
       offChain: {
         privKey,
-        pubKey,
-      },
+        pubKey
+      }
     }
 
     this._nonceIterator = async function* (this: Account) {
@@ -208,8 +208,8 @@ class Account {
           .SecretHashSet({
             fromBlock: 'latest',
             filter: {
-              account: (await this.address).toHex(),
-            },
+              account: (await this.address).toHex()
+            }
           })
           .on('data', (event) => {
             this.coreConnector.log('new ticketEpoch', event.returnValues.counter)

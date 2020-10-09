@@ -26,19 +26,19 @@ describe('test relay connection', function () {
     const a = new RelayConnection({
       stream: {
         sink: AliceBob.sink,
-        source: BobAlice.source,
+        source: BobAlice.source
       },
       self: Alice,
-      counterparty: Bob,
+      counterparty: Bob
     })
 
     const b = new RelayConnection({
       stream: {
         sink: BobAlice.sink,
-        source: AliceBob.source,
+        source: AliceBob.source
       },
       self: Bob,
-      counterparty: Alice,
+      counterparty: Alice
     })
 
     a.sink(
@@ -69,7 +69,7 @@ describe('test relay connection', function () {
           // @ts-ignore
           a.source.next(),
           // @ts-ignore
-          b.source.next(),
+          b.source.next()
         ])
       ).every(({ done }) => done),
       `Streams must have ended.`
@@ -85,19 +85,19 @@ describe('test relay connection', function () {
     const a = new RelayConnection({
       stream: {
         sink: AliceBob.sink,
-        source: BobAlice.source,
+        source: BobAlice.source
       },
       self: Alice,
-      counterparty: Bob,
+      counterparty: Bob
     })
 
     const b = new RelayConnection({
       stream: {
         sink: BobAlice.sink,
-        source: AliceBob.source,
+        source: AliceBob.source
       },
       self: Bob,
-      counterparty: Alice,
+      counterparty: Alice
     })
 
     a.sink(
@@ -154,21 +154,21 @@ describe('test relay connection', function () {
     const a = new RelayConnection({
       stream: {
         sink: AliceBob.sink,
-        source: BobAlice.source,
+        source: BobAlice.source
       },
       self: Alice,
       counterparty: Bob,
-      webRTC: FakeWebRTCAlice as SimplePeer,
+      webRTC: FakeWebRTCAlice as SimplePeer
     })
 
     const b = new RelayConnection({
       stream: {
         sink: BobAlice.sink,
-        source: AliceBob.source,
+        source: AliceBob.source
       },
       self: Bob,
       counterparty: Alice,
-      webRTC: FakeWebRTCBob as SimplePeer,
+      webRTC: FakeWebRTCBob as SimplePeer
     })
 
     a.sink(
@@ -230,7 +230,7 @@ describe('test relay connection', function () {
         await Promise.race([
           // prettier-ignore
           msgA,
-          msgB,
+          msgB
         ])
       } else if (aDone) {
         await msgB

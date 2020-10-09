@@ -22,7 +22,7 @@ describe('test ticket construction', async function () {
       challenge,
       epoch,
       amount,
-      winProb,
+      winProb
     }
   }
   it('should create new ticket using struct', async function () {
@@ -43,7 +43,7 @@ describe('test ticket construction', async function () {
     const ticketA = new Ticket(undefined, ticketData)
     const ticketB = new Ticket({
       bytes: ticketA.buffer,
-      offset: ticketA.byteOffset,
+      offset: ticketA.byteOffset
     })
 
     assert(ticketB.counterparty.eq(userA), 'wrong counterparty')
@@ -62,7 +62,7 @@ describe('test ticket construction', async function () {
     const ticket = new Ticket(
       {
         bytes: array.buffer,
-        offset: array.byteOffset + offset,
+        offset: array.byteOffset + offset
       },
       ticketData
     )
@@ -89,12 +89,12 @@ describe('test ticket construction', async function () {
       challenge,
       epoch,
       amount,
-      winProb,
+      winProb
     })
 
     const ticketB = new Ticket({
       bytes: ticketA.buffer,
-      offset: ticketA.byteOffset,
+      offset: ticketA.byteOffset
     })
 
     assert(expectedHash.eq(await ticketA.hash), 'ticket hash does not match the expected value')
@@ -105,7 +105,7 @@ describe('test ticket construction', async function () {
       challenge,
       epoch: new TicketEpoch(2),
       amount,
-      winProb,
+      winProb
     })
 
     assert(!expectedHash.eq(await wrongTicket.hash), 'ticket hash must be different')
@@ -126,12 +126,12 @@ describe('test ticket construction', async function () {
       challenge,
       epoch,
       amount,
-      winProb,
+      winProb
     })
 
     const ticketB = new Ticket({
       bytes: ticketA.buffer,
-      offset: ticketA.byteOffset,
+      offset: ticketA.byteOffset
     })
 
     assert(expectedHash.eq(await ticketA.hash), 'ticket hash does not match the expected value')
@@ -142,7 +142,7 @@ describe('test ticket construction', async function () {
       challenge,
       epoch: new TicketEpoch(1),
       amount,
-      winProb,
+      winProb
     })
 
     assert(!expectedHash.eq(await wrongTicket.hash), 'ticket hash must be different')
