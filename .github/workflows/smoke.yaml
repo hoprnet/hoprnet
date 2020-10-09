@@ -46,9 +46,32 @@ jobs:
       - name: Smoke tests
         shell: bash {0}
         run: |
+          shopt -s expand_aliases
+          alias hoprd="node packages/hoprd/lib/index.js"
+
+          # Variables
+          BOB_ADDR=127.0.0.1
+          BOB_PORT=9876
+          CHARLIE_ADDR=127.0.0.1
+          CHARLIE_PORT=9877
+
+          # Store addresses
           ALICE=$(hoprd --data='alice'  --password="opensesame" --run "myAddress hopr")
           BOB=$(hoprd --data='bob' --password="opensesame" --run="myAddress hopr")
           CHARLIE=$(hoprd --data='charlie'  --password="opensesame" --run "myAddress hopr")
+
+          # Run bob as bootstrap node
+          hoprd --data='bob' --host="$BOB_ADDR:$BOB_PORT" --password="opensesame" --bootstrap &
+          BOB_PID="$!"
+          BOB_MULTIADDR=/ip4/$BOB_ADDR/tcp/$BOB_PORT/p2p/$BOB
+          export HOPR_BOOTSTRAP_SERVERS=$BOB_MULTIADDR 
+          echo "Bootstrap Bob running as pid $BOB_PID on $BOB_MULTIADDR"
+
+          # Ping bootstrapnode
+          hoprd --data='alice' --password="opensesame" --run="ping $BOB"
+
+          # Cleanup
+          kill $BOB_PID
         env:
           DBPASS: ${{ secrets.SMOKETESTPASSWORD }}
 
