@@ -35,7 +35,7 @@
   },
   "dependencies": {
     "@hoprnet/hopr-core-ethereum": "^1.17.0-alpha.60",
-    "@hoprnet/hopr-demo-seeds": "1.8.0",
+    "@hoprnet/hopr-demo-seeds": "^1.17.0-alpha.60",
     "@hoprnet/hopr-utils": "^1.17.0-alpha.60",
     "abort-controller": "^3.0.0",
     "abortable-iterator": "^3.0.0",

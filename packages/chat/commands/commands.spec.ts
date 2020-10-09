@@ -43,9 +43,11 @@ describe('Commands', () => {
     mockNode.network = jest.fn()
     mockNode.network.crawler = jest.fn()
     mockNode.network.crawler.crawl = jest.fn()
+    mockNode.peerStore = jest.fn()
+    mockNode.peerStore.peers = []
 
     let cmds = new mod.Commands(mockNode)
-    expect(await cmds.execute('crawl')).toBeFalsy()
+    expect(await cmds.execute('crawl')).toContain('Crawled network, connected to')
     expect(mockNode.network.crawler.crawl).toHaveBeenCalled()
   })
 

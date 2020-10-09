@@ -24,7 +24,7 @@
     "prepublishOnly": "yarn build"
   },
   "dependencies": {
-    "@hoprnet/hopr-demo-seeds": "1.8.0",
+    "@hoprnet/hopr-demo-seeds": "^1.17.0-alpha.60",
     "ganache-core": "^2.12.1"
   },
   "devDependencies": {
