@@ -4,6 +4,7 @@
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
+  "private": true,
   "author": "",
   "license": "GPL-3.0-only",
   "scripts": {
