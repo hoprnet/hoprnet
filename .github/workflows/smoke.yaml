@@ -32,7 +32,7 @@ jobs:
           #working-directory: packages/hoprd
 
       - name: Check databases
-        shell: bash
+        shell: bash {0}
         run: |
           shopt -s expand_aliases
           alias hoprd="node packages/hoprd/lib/index.js"
@@ -44,6 +44,7 @@ jobs:
           DBPASS: ${{ secrets.SMOKETESTPASSWORD }}
 
       - name: Commit database changes back to repo
+        shell: bash {0}
         run: |
           git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Testing robot"
           git add ./test || true
