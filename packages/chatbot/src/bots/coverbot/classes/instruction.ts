@@ -1,5 +1,5 @@
 import debug from 'debug'
-import { BotCommands, AvailableSubCommands, VerifySubCommands, StatsSubCommands, AdminSubCommands } from './types/commands';
+import { BotCommands, AvailableSubCommands, VerifySubCommands, StatsSubCommands, AdminSubCommands } from '../types/commands';
 
 
 const log = debug('hopr-chatbot:instruction')
@@ -22,6 +22,9 @@ export default class Instruction {
       error(`- constructor | Command ${maybeCommand} rejected as invalid`)
       throw new Error(`${maybeCommand} isn‘t a valid command`)
     }
+  }
+  toString() {
+      return `${this.command} ${this.subcommand} ${this.content}`
   }
   enterInput(input: string) {
     if (!this.subcommand) {

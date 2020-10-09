@@ -1,5 +1,5 @@
 export enum AdminSubCommands {
-  verificationCycle = 'verificationCycle',
+  coverTrafficCycle = 'coverTrafficCycle',
   saveState = 'saveState',
   help = 'help'
 }

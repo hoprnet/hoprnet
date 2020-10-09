@@ -1,5 +1,5 @@
 import { COVERBOT_XDAI_THRESHOLD } from '../../utils/env'
-import { RELAY_VERIFICATION_CYCLE_IN_MS, ScoreRewards } from './constants'
+import { RELAY_VERIFICATION_CYCLE_IN_MS, ScoreRewards } from './utils/constants'
 import { NodeStates, VerifyTweetStates } from './types/states'
 import { BotCommands, AdminSubCommands, StatsSubCommands, VerifySubCommands } from './types/commands'
 
@@ -25,11 +25,11 @@ export const AdminStateResponses:AdminResponse = {
   [AdminSubCommands.help]: `\n
     You are using the super admin command. Please run one of the following.
 
-    verificationCycle   - Starts a single verification cycle on all verified nodes.
+    coverTrafficCycle   - Starts a single verification cycle on all verified nodes.
     saveState           - Saves current state of the bot into the database.
     help                - Shows you this message again.
   `,
-  [AdminSubCommands.verificationCycle]: `\n
+  [AdminSubCommands.coverTrafficCycle]: `\n
     Starting manually verification cycle. Please review the logs to see the
     changes done against the system state and database.
   `,
