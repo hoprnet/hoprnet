@@ -2,6 +2,7 @@ import { COVERBOT_XDAI_THRESHOLD } from '../../utils/env'
 import { RELAY_VERIFICATION_CYCLE_IN_MS, ScoreRewards } from './utils/constants'
 import { NodeStates, VerifyTweetStates } from './types/states'
 import { BotCommands, AdminSubCommands, StatsSubCommands, VerifySubCommands } from './types/commands'
+import { TweetState, TweetMessage } from '../../lib/twitter/twitter'
 
 type BotResponse = {
   [key in BotCommands]: string
@@ -21,13 +22,13 @@ type StatsResponse = {
 
 export type GenericResponse = BotResponse | AdminResponse | VerifyResponse | StatsResponse
 
-export const AdminStateResponses:AdminResponse = {
+export const AdminStateResponses: AdminResponse = {
   [AdminSubCommands.help]: `\n
     You are using the super admin command. Please run one of the following.
 
-    coverTrafficCycle   - Starts a single verification cycle on all verified nodes.
-    saveState           - Saves current state of the bot into the database.
-    help                - Shows you this message again.
+    admin coverTrafficCycle   - Starts a single verification cycle on all verified nodes.
+    admin saveState           - Saves current state of the bot into the database.
+    admin help                - Shows you this message again.
   `,
   [AdminSubCommands.coverTrafficCycle]: `\n
     Starting manually verification cycle. Please review the logs to see the
@@ -43,17 +44,17 @@ export const StatsStateResponses: StatsResponse = {
   [StatsSubCommands.help]: `\n
     You are using the stats command. Please run one of the following.
 
-    connected   - Shows you the amount of connected nodes in the network.
-    help        - Shows you this message again.
+    stats connected   - Shows you the amount of connected nodes in the network.
+    stats help        - Shows you this message again.
   `,
   [StatsSubCommands.connected]: (connected: number) => `\n
     There are currently ${connected} nodes connected in the network.
   `,
 }
 
-export const VerifyStateResponses:VerifyResponse = {
+export const VerifyStateResponses: VerifyResponse = {
   [VerifySubCommands.tweet]: (maybeTweet: string) => `\n
-    You have requested to verify the tweet ${maybeTweet}. Please wait while
+    You have requested to verify the tweet "${maybeTweet}". Please wait while
     we fetch its content and verify your node against it.
 
     Expect a few messages from our side. If you want to know the status of
@@ -62,9 +63,9 @@ export const VerifyStateResponses:VerifyResponse = {
   [VerifySubCommands.help]: `\n
     You are using the verify command. Please run one of the following.
 
-    tweet  $tweet_link    - Sends a tweet to verify your node in the network.
-    status $hopr_address  - Request information about your verification status.
-    help                  - Shows you this message again.
+    verify tweet  $tweet_link    - Sends a tweet to verify your node in the network.
+    verify status $hopr_address  - Request information about your verification status.
+    verify help                  - Shows you this message again.
   `,
   [VerifySubCommands.status]: (status: NodeStates) => `\n
     Your current verification status is: ${status}
@@ -77,19 +78,36 @@ export const VerifyTweetStateResponse = {
     providing a tweet URL in the form https://twitter.com/$user/status/$id.
 
     e.g. verify tweet https://twitter.com/jjperezaguinaga/status/1311330405375762433
-    `
+    `,
+  [VerifyTweetStates.tweetVerificationFailed]: (tweetStatus: TweetState) => `\n
+    Your tweet has failed the verification. Please make sure you've included everything.
+
+    Here is the current status of your tweet:
+    1. Tagged @hoprnet: ${tweetStatus.hasMention}
+    2. Used #HOPRNetwork: ${tweetStatus.hasTag}
+    3. Includes this node address: ${tweetStatus.sameNode}
+
+    Please try again with a different tweet.
+  `,
+  [VerifyTweetStates.tweetVerificationSucceeded]: `\n
+    Your tweet has passed verification. Please do no delete this tweet, as I'll
+    use it multiple times to verify and connect to your node.
+
+    I’ll now check that your HOPR Ethereum address has at least ${COVERBOT_XDAI_THRESHOLD} xDAI.
+    If you need xDAI, you always swap DAI to xDAI using https://dai-bridge.poa.network/.
+  `,
 }
 
-export const BotResponses:BotResponse = {
+export const BotResponses: BotResponse = {
   [BotCommands.rules]: `\n
-    Welcome to HOPR incentivized network!
+    Welcome to HOPR incentivized network! Here are the rules:
 
     1. Load ${COVERBOT_XDAI_THRESHOLD} xDAI into your HOPR Ethereum Address
     2. Post a tweet with your HOPR Address and the tag #HOPRNetwork
     3. Send me the link to your tweet (don't delete it!)
     4. Every time you're chosen to relay a message, you'll score ${ScoreRewards.relayed} points and receive xHOPR!
 
-    Visit https://saentis.hoprnet.org for more information and scoreboard
+    Thank you for powering the HOPR Network.
   `,
   [BotCommands.help]: `\n
     Hi! My name is coverbot. Please tell me how I can help you by sending a
@@ -113,26 +131,6 @@ export const NodeStateResponses = {
     enabled for this session. Sorry!
   `,
   [NodeStates.newUnverifiedNode]: BotResponses[BotCommands.rules],
-  // [NodeStates.tweetVerificationFailed]: (tweetStatus: TweetState) => `\n
-  //   Your tweet has failed the verification. Please make sure you've included everything.
-
-  //   Here is the current status of your tweet:
-  //   1. Tagged @hoprnet: ${tweetStatus.hasMention}
-  //   2. Used #HOPRNetwork: ${tweetStatus.hasTag}
-  //   3. Includes this node address: ${tweetStatus.sameNode}
-
-  //   Please try again with a different tweet.
-  // `,
-  // [NodeStates.tweetVerificationSucceeded]: `\n
-  //   Your tweet has passed verification. Please do no delete this tweet, as I'll
-  //   use it multiple times to verify and connect to your node.
-
-  //   I’ll now check that your HOPR Ethereum address has at least ${COVERBOT_XDAI_THRESHOLD} xDAI.
-  //   If you need xDAI, you always swap DAI to xDAI using https://dai-bridge.poa.network/.
-  // `,
-  // [NodeStates.tweetVerificationInProgress]: `\n
-  //   Thank you for your Tweet! I‘ll now try to verify it...
-  // `,
   [NodeStates.xdaiBalanceFailed]: (xDaiBalance: number) => `\n
     Your node does not have at least ${COVERBOT_XDAI_THRESHOLD} xDAI. Currently, your node has ${xDaiBalance} xDAI.
 

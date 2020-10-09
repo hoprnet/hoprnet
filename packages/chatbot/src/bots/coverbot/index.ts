@@ -29,6 +29,7 @@ import { statsReducer } from './reducers/statsReducer'
 import { adminReducer } from './reducers/adminReducer'
 import { rulesReducer } from './reducers/rulesReducer'
 import { loadData, dumpData } from './data/data'
+import { helpReducer } from './reducers/helpReducer'
 
 
 const log = debug('hopr-chatbot:coverbot')
@@ -139,27 +140,39 @@ export class Coverbot implements Bot {
   }
 
   protected async _verifyTweet(message: IMessage): Promise<[TweetMessage, VerifyTweetStates]> {
-    //@TODO: Catch error here.
-    const tweet = new TweetMessage(message.text)
-    this.tweets.set(message.from, tweet)
-
-    await tweet.fetch({ mock: COVERBOT_DEBUG_MODE })
-
-    if (tweet.hasTag('hoprnetwork')) {
-      tweet.status.hasTag = true
+    try {
+      log(`- _verifyTweet | Obtained message: ${message}`)
+      const tweet = new TweetMessage(message.text)
+      log(`- _verifyTweet | Valid tweet with id ${tweet.id} and url ${tweet.url}. Proceeding to fetch content.`)
+      await tweet.fetch({ mock: COVERBOT_DEBUG_MODE })
+      log(`- _verifyTweet | Successfully fetch content for tweet created at ${tweet.created_at}`)
+      this.tweets.set(message.from, tweet)
+      log(`- _verifyTweet | Updated our tweets map. Now we have ${this.tweets.size} tweets in memory.`)
+      log(`- _verifyTweet | Starting validation process for the tweet with id ${tweet.id}.`)
+      if (tweet.hasTag('hoprnetwork')) {
+        log(`- _verifyTweet | Tweet ${tweet.id} has tag #HOPRNetwork.`)
+        tweet.status.hasTag = true
+      }
+      if (tweet.hasMention('hoprnet')) {
+        log(`- _verifyTweet | Tweet ${tweet.id} has mentioned @hoprnet.`)
+        tweet.status.hasMention = true
+      }
+      if (tweet.hasSameHOPRNode(message.from) || COVERBOT_DEBUG_MODE) {
+        log(`- _verifyTweet | Tweet ${tweet.id} comes from the same node that is messaging me.`)
+        tweet.status.sameNode = true
+      }
+      log(`- _verifyTweet | Completed validation process for the tweet with id ${tweet.id}.`)
+      COVERBOT_DEBUG_MODE && log(`- _verifyTweet | DEBUG_MODE enabled, automatically validating tweet.`)
+      COVERBOT_DEBUG_MODE && tweet.validateTweetStatus()
+      const tweetIsValid = tweet.status.isValid()
+      log(`- _verifyTweet | The tweet is considered ${tweetIsValid ? 'valid' : 'invalid'}. Returning result.`)
+      return tweetIsValid
+        ? ([tweet, VerifyTweetStates.tweetVerificationSucceeded])
+        : ([tweet, VerifyTweetStates.tweetVerificationFailed])
+    } catch (err) {
+      error(`- _verifyTweet | Error when trying to verify tweet: ${message}`, err)
+      return ([undefined, VerifyTweetStates.tweetInvalid])
     }
-    if (tweet.hasMention('hoprnet')) {
-      tweet.status.hasMention = true
-    }
-    if (tweet.hasSameHOPRNode(message.from) || COVERBOT_DEBUG_MODE) {
-      tweet.status.sameNode = true
-    }
-
-    COVERBOT_DEBUG_MODE && tweet.validateTweetStatus()
-
-    return tweet.status.isValid()
-      ? [tweet, VerifyTweetStates.tweetVerificationSucceeded]
-      : [tweet, VerifyTweetStates.tweetVerificationFailed]
   }
 
   async handleMessage(message: IMessage) {
@@ -167,7 +180,7 @@ export class Coverbot implements Bot {
 
     const instructionQueue = message.text.split(' ')
     const maybeCommand = instructionQueue.shift()
-    
+
     try {
       const instructionWrapper = new Instruction(maybeCommand)
       while (instructionQueue.length > 0) {
@@ -198,14 +211,14 @@ export class Coverbot implements Bot {
 
         default: {
           log(`- handleMessage | Command was not understood`)
-          rulesReducer.call(this, message)
+          helpReducer.call(this, message)
           break;
         }
       }
 
     } catch (err) {
       log(`- handleMessage | Instruction was not understood`)
-      rulesReducer.call(this, message)
+      helpReducer.call(this, message)
       return;
     }
   }

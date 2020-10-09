@@ -59,17 +59,7 @@
         //     return
         //   }
 
-        //   let tweet, nodeState
-        //   if (instructionWrapper.content.match(/https:\/\/twitter.com.*?$/i)) {
-        //     this._sendMessageFromBot(message.from, NodeStateResponses[NodeStates.tweetVerificationInProgress]).catch(
-        //       (err) => {
-        //         error(`Trying to send ${NodeStates.tweetVerificationFailed} message to ${message.from} failed.`)
-        //       },
-        //     )
-        //       ;[tweet, nodeState] = await this._verifyTweet(message)
-        //   } else {
-        //     ;[tweet, nodeState] = [undefined, NodeStates.newUnverifiedNode]
-        //   }
+        
 
         //   switch (nodeState) {
         //     case NodeStates.newUnverifiedNode:
