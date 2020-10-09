@@ -10,5 +10,5 @@ export const durations = {
   },
   days(days: number) {
     return days * durations.hours(24)
-  },
+  }
 }

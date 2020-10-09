@@ -13,7 +13,7 @@ import { SerializedPeerInfo } from '.'
 function serializePeerInfo(peerInfo: PeerInfo): Uint8Array {
   const result: SerializedPeerInfo = [
     peerInfo.id.toBytes(),
-    peerInfo.multiaddrs.toArray().map((multiaddr: any) => multiaddr.buffer),
+    peerInfo.multiaddrs.toArray().map((multiaddr: any) => multiaddr.buffer)
   ]
 
   if (peerInfo.id.pubKey) {

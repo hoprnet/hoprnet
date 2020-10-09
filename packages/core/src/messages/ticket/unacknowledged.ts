@@ -57,7 +57,7 @@ class UnacknowledgedTicket<Chain extends HoprCoreConnector> extends Uint8Array {
     return new Promise<Types.SignedTicket>(async (resolve) => {
       this._signedTicket = await this.paymentChannels.types.SignedTicket.create({
         bytes: this.buffer,
-        offset: this.signedTicketOffset,
+        offset: this.signedTicketOffset
       })
 
       resolve(this._signedTicket)

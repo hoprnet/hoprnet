@@ -27,7 +27,7 @@ export function decodeMessage(
 
     return {
       latency: Date.now() - parseInt(time.toString('hex'), 16),
-      msg: msg.toString(),
+      msg: msg.toString()
     }
   } catch (err) {
     console.log(
@@ -36,7 +36,7 @@ export function decodeMessage(
 
     return {
       latency: NaN,
-      msg: 'Error: Could not decode message',
+      msg: 'Error: Could not decode message'
     }
   }
 }

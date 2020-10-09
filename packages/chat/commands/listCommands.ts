@@ -19,7 +19,7 @@ export default class ListCommands extends AbstractCommand {
       this.getCommands()
         .map((command) => ({
           value: command.name(),
-          description: command.help(),
+          description: command.help()
         }))
         .sort((a, b) => {
           return String(a.value).localeCompare(String(b.value))

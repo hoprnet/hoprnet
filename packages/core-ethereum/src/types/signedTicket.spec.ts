@@ -21,7 +21,7 @@ const generateTicketData = async (receiver: AccountId) => {
     epoch,
     amount,
     winProb,
-    onChainSecret,
+    onChainSecret
   }
 }
 
@@ -45,12 +45,12 @@ describe('test signedTicket construction', async function () {
 
     await ticket.sign(userAPrivKey, undefined, {
       bytes: signature.buffer,
-      offset: signature.byteOffset,
+      offset: signature.byteOffset
     })
 
     const signedTicket = new SignedTicket(undefined, {
       signature,
-      ticket,
+      ticket
     })
 
     assert(await signedTicket.verify(userAPubKey))
@@ -74,19 +74,19 @@ describe('test signedTicket construction', async function () {
     const ticket = new Ticket(undefined, ticketData)
 
     const signedTicketA = new SignedTicket(undefined, {
-      ticket,
+      ticket
     })
 
     ticket.sign(userAPrivKey, undefined, {
       bytes: signedTicketA.buffer,
-      offset: signedTicketA.signatureOffset,
+      offset: signedTicketA.signatureOffset
     })
 
     assert(await signedTicketA.verify(userAPubKey))
 
     const signedTicketB = new SignedTicket({
       bytes: signedTicketA.buffer,
-      offset: signedTicketA.byteOffset,
+      offset: signedTicketA.byteOffset
     })
 
     assert(await signedTicketB.verify(userAPubKey))
@@ -118,7 +118,7 @@ describe('test signedTicket construction', async function () {
 
     await ticket.sign(userAPrivKey, undefined, {
       bytes: signature.buffer,
-      offset: signature.byteOffset,
+      offset: signature.byteOffset
     })
 
     const offset = randomInteger(1, 31)
@@ -128,11 +128,11 @@ describe('test signedTicket construction', async function () {
     const signedTicket = new SignedTicket(
       {
         bytes: array.buffer,
-        offset: array.byteOffset + offset,
+        offset: array.byteOffset + offset
       },
       {
         ticket,
-        signature,
+        signature
       }
     )
 

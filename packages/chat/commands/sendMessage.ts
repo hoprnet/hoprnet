@@ -5,7 +5,6 @@ import type PeerId from 'peer-id'
 import { clearString } from '@hoprnet/hopr-utils'
 import { MAX_HOPS } from '@hoprnet/hopr-core/lib/constants'
 import readline from 'readline'
-import chalk from 'chalk'
 import { checkPeerIdInput, encodeMessage, getOpenChannels, getPeerIdsAndAliases, styleValue } from '../utils'
 import { AbstractCommand, GlobalState } from './abstractCommand'
 
@@ -42,7 +41,7 @@ export abstract class SendMessageBase extends AbstractCommand {
     const allIds = getPeerIdsAndAliases(this.node, state, {
       noBootstrapNodes: true,
       returnAlias: true,
-      mustBeOnline: true,
+      mustBeOnline: true
     })
     return this._autocompleteByFiltering(query, allIds, line)
   }

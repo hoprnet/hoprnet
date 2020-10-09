@@ -11,13 +11,13 @@ const [userA] = testconfigs.DEMO_ACCOUNTS.map((str: string) => stringToU8a(str))
 const generateChannelData = async () => {
   const balance = new ChannelBalance(undefined, {
     balance: new BN(10),
-    balance_a: new BN(2),
+    balance_a: new BN(2)
   })
   const state = new ChannelState(undefined, { state: ChannelStatus.UNINITIALISED })
 
   return new Channel(undefined, {
     state,
-    balance,
+    balance
   })
 }
 
@@ -28,12 +28,12 @@ describe('test signedChannel construction', async function () {
     const channel = await generateChannelData()
 
     const signedChannel = new SignedChannel(undefined, {
-      channel,
+      channel
     })
 
     await channel.sign(userA, undefined, {
       bytes: signedChannel.buffer,
-      offset: signedChannel.signatureOffset,
+      offset: signedChannel.signatureOffset
     })
 
     assert(await signedChannel.verify(userAPubKey), 'signature must be valid')
@@ -51,16 +51,16 @@ describe('test signedChannel construction', async function () {
 
     await channel.sign(userA, undefined, {
       bytes: signature.buffer,
-      offset: signature.byteOffset,
+      offset: signature.byteOffset
     })
 
     const signedChannelA = new SignedChannel(undefined, {
       signature,
-      channel,
+      channel
     })
     const signedChannelB = new SignedChannel({
       bytes: signedChannelA.buffer,
-      offset: signedChannelA.byteOffset,
+      offset: signedChannelA.byteOffset
     })
 
     assert(await signedChannelA.verify(userAPubKey), 'signature must be valid')
@@ -80,7 +80,7 @@ describe('test signedChannel construction', async function () {
 
     await channel.sign(userA, undefined, {
       bytes: signature.buffer,
-      offset: signature.byteOffset,
+      offset: signature.byteOffset
     })
 
     const offset = randomInteger(1, 31)
@@ -90,11 +90,11 @@ describe('test signedChannel construction', async function () {
     const signedChannel = new SignedChannel(
       {
         bytes: array.buffer,
-        offset: array.byteOffset + offset,
+        offset: array.byteOffset + offset
       },
       {
         channel,
-        signature,
+        signature
       }
     )
 

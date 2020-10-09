@@ -20,7 +20,7 @@ export function parseHosts(): Hosts {
 
     hosts.ip4 = {
       ip: params[1],
-      port: parseInt(params[2]),
+      port: parseInt(params[2])
     }
   }
 
@@ -46,7 +46,7 @@ export function parseHosts(): Hosts {
 
     hosts.ip6 = {
       ip: params[1],
-      port: parseInt(params[2]),
+      port: parseInt(params[2])
     }
   }
 

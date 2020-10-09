@@ -48,7 +48,7 @@ export {
   SignedChannel,
   SignedTicket,
   Ticket,
-  TicketEpoch,
+  TicketEpoch
 }
 
 export default Types

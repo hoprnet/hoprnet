@@ -1,5 +1,16 @@
 import AcknowledgedTicket from './types/acknowledgedTicket'
-import type { AccountId, Balance, Channel as ChannelType, ChannelBalance, Hash, Moment, Public, Signature, SignedChannel, SignedTicket } from './types'
+import type {
+  AccountId,
+  Balance,
+  Channel as ChannelType,
+  ChannelBalance,
+  Hash,
+  Moment,
+  Public,
+  Signature,
+  SignedChannel,
+  SignedTicket
+} from './types'
 
 declare interface ChannelStatic {
   /**
@@ -44,7 +55,10 @@ declare interface ChannelStatic {
    * @param onData applied on all channel instances
    * @param onEnd composes at the end the received data
    */
-  getAll<T, R>(onData: (channel: Channel, ...props: any[]) => Promise<T>, onEnd: (promises: Promise<T>[], ...props: any[]) => R): Promise<R>
+  getAll<T, R>(
+    onData: (channel: Channel, ...props: any[]) => Promise<T>,
+    onEnd: (promises: Promise<T>[], ...props: any[]) => R
+  ): Promise<R>
 
   /**
    * Fetches all channel instances from the database and initiates a settlement on

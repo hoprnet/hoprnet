@@ -28,7 +28,7 @@ export default class Withdraw extends AbstractCommand {
     const [err, amount, currencyRaw, recipient] = this._assertUsage(query, [
       'amount (ETH, HOPR)',
       'currency (native, hopr)',
-      'recipient (blockchain address)',
+      'recipient (blockchain address)'
     ])
 
     if (err) {
@@ -54,7 +54,7 @@ export default class Withdraw extends AbstractCommand {
       amount,
       weiAmount,
       currency,
-      recipient,
+      recipient
     }
   }
 

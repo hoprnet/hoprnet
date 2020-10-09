@@ -46,7 +46,7 @@ class Message extends Uint8Array {
 
       return {
         from,
-        text,
+        text
       }
     } catch (err) {
       console.error(err)

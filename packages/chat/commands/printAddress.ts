@@ -44,7 +44,7 @@ export default class PrintAddress extends AbstractCommand {
 
     return [
       `${hoprPrefix.padEnd(prefixLength, ' ')}${styleValue(hoprAddress, 'peerId')}`,
-      `${nativePrefix.padEnd(prefixLength, ' ')}${styleValue(nativeAddress, 'peerId')}`,
+      `${nativePrefix.padEnd(prefixLength, ' ')}${styleValue(nativeAddress, 'peerId')}`
     ].join('\n')
   }
 }

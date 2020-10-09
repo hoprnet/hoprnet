@@ -83,12 +83,12 @@ export const CHALK_COLORS = {
   failure: chalk.red,
   peerId: chalk.green,
   hash: chalk.yellow,
-  highlight: chalk.yellow,
+  highlight: chalk.yellow
 }
 
 export const CHALK_STRINGS = {
   yes: CHALK_COLORS.success('y'),
-  no: CHALK_COLORS.failure('N'),
+  no: CHALK_COLORS.failure('N')
 }
 
 export function styleValue(value: any, type?: keyof typeof CHALK_COLORS): string {
@@ -115,10 +115,10 @@ export function getOptions(
           '\n',
           '- ',
           styleValue(String(option.value).padEnd(padding), 'highlight'),
-          option.description,
+          option.description
         ].join('')
       }),
-      '\n',
+      '\n'
     ]
   }
 }

@@ -11,13 +11,13 @@ describe('test creation & verification of a challenge', function () {
   it('should create a verifiable challenge', async function () {
     const paymentChannels = ({
       utils: Utils,
-      types: new Types(),
+      types: new Types()
     } as unknown) as HoprCoreConnector
 
     const secret = randomBytes(32)
 
     const peerId = await PeerId.create({
-      keyType: 'secp256k1',
+      keyType: 'secp256k1'
     })
 
     const challenge = await Challenge.create(paymentChannels, secret, new BN(0)).sign(peerId)
