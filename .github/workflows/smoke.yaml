@@ -46,6 +46,7 @@ jobs:
       - name: Commit database changes back to repo
         run: |
           git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Testing robot"
-          git commit ./test/*
+          git add ./test
+          git commit -a
           git pull origin ${{ github.ref }}
           git push origin ${{ github.ref }}
