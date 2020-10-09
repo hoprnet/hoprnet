@@ -43,11 +43,19 @@ jobs:
         env:
           DBPASS: ${{ secrets.SMOKETESTPASSWORD }}
 
+      - name: Smoke tests
+        shell: bash -e
+        run: |
+          ALICE=$(hoprd --data='alice'  --password="opensesame" --run "myAddress hopr")
+          BOB=$(hoprd --data='bob' --password="opensesame" --run="myAddress hopr")
+          CHARLIE=$(hoprd --data='charlie'  --password="opensesame" --run "myAddress hopr")
+
+
       - name: Commit database changes back to repo
         shell: bash -e
         run: |
           git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Testing robot"
           git add ./test || true
-          git commit -a || true
+          git commit -a -m "update databases" || true
           git pull origin ${{ github.ref }}
           git push origin ${{ github.ref }} || true
