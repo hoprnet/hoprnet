@@ -70,8 +70,20 @@ jobs:
           # Ping bootstrapnode
           hoprd --data='./test/fixtures/alice' --password="$DBPASS" --run="ping $BOB"
 
+          # Start charlie
+          hoprd --data='./test/fixtures/charlie' --password="$DBPASS" --host="$CHARLIE_ADDR:$CHARLIE_PORT" &
+          CHARLIE_PID="$!"
+          echo "Charlie running as pid $CHARLIE as $CHARLIE on $CHARLIE_ADDR:$CHARLIE_PORT"
+
+          # Ping Charlie
+          hoprd --data='./test/fixtures/alice' --password="$DBPASS" --run="crawl; ping $CHARLIE"
+
+          # Open channel alice -> bob and send a-b-c
+          DEBUG=hopr* hoprd --data='./test/fixtures/alice' --password="$DBPASS" --run="crawl; open $BOB; send $CHARLIE hi"
+
           # Cleanup
           kill $BOB_PID
+          kill $CHARLIE_PID
         env:
           DBPASS: ${{ secrets.SMOKETESTPASSWORD }}
 
