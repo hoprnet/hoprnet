@@ -39,7 +39,7 @@ describe('test Channel class', function () {
       secretB,
       response: await hash(u8aConcat(secretA, secretB)),
       winProb,
-      challenge,
+      challenge
     }
   }
 
@@ -82,7 +82,7 @@ describe('test Channel class', function () {
 
     const channelBalance = new ChannelBalance(undefined, {
       balance: new BN(123),
-      balance_a: new BN(122),
+      balance_a: new BN(122)
     })
 
     const channel = await coreConnector.channel.create(
@@ -96,10 +96,10 @@ describe('test Channel class', function () {
               await coreConnector.channel.createSignedChannel(undefined, {
                 channel: new ChannelType(undefined, {
                   balance: channelBalance,
-                  state: new ChannelState(undefined, { state: ChannelStatus.FUNDING }),
-                }),
+                  state: new ChannelState(undefined, { state: ChannelStatus.FUNDING })
+                })
               })
-            ).subarray(),
+            ).subarray()
           ],
           counterpartysCoreConnector.channel.handleOpeningRequest.bind(counterpartysCoreConnector.channel),
           async (source: AsyncIterable<Uint8Array>) => {
@@ -117,7 +117,7 @@ describe('test Channel class', function () {
 
         return new SignedChannel({
           bytes: result.buffer,
-          offset: result.byteOffset,
+          offset: result.byteOffset
         })
       }
     )
@@ -125,11 +125,11 @@ describe('test Channel class', function () {
     const firstTicket = await getTicketData()
 
     const firstAckedTicket = new AcknowledgedTicket(coreConnector, undefined, {
-      response: firstTicket.response,
+      response: firstTicket.response
     })
     const signedTicket = await channel.ticket.create(new Balance(1), firstTicket.challenge, firstTicket.winProb, {
       bytes: firstAckedTicket.buffer,
-      offset: firstAckedTicket.signedTicketOffset,
+      offset: firstAckedTicket.signedTicketOffset
     })
 
     assert(
@@ -203,12 +203,12 @@ describe('test Channel class', function () {
     for (let i = 0; i < ATTEMPTS; i++) {
       ticketData = await getTicketData(0.5)
       let ackedTicket = new AcknowledgedTicket(counterpartysCoreConnector, undefined, {
-        response: ticketData.response,
+        response: ticketData.response
       })
 
       nextSignedTicket = await channel.ticket.create(new Balance(1), ticketData.challenge, ticketData.winProb, {
         bytes: ackedTicket.buffer,
-        offset: ackedTicket.signedTicketOffset,
+        offset: ackedTicket.signedTicketOffset
       })
 
       assert(await counterpartysChannel.ticket.verify(nextSignedTicket), `Ticket signature must be valid.`)

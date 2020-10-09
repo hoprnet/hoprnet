@@ -47,7 +47,7 @@ export default class Ping extends AbstractCommand {
     const allIds = getPeerIdsAndAliases(this.node, state, {
       noBootstrapNodes: true,
       returnAlias: true,
-      mustBeOnline: true,
+      mustBeOnline: true
     })
 
     return this._autocompleteByFiltering(query, allIds, line)

@@ -9,7 +9,6 @@ import chalk from 'chalk'
 import { checkPeerIdInput, encodeMessage, getOpenChannels, getPeerIdsAndAliases, styleValue } from '../utils'
 import { AbstractCommand, GlobalState } from './abstractCommand'
 
-
 export abstract class SendMessageBase extends AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {
     super()
@@ -35,7 +34,7 @@ export abstract class SendMessageBase extends AbstractCommand {
         return await this.node.sendMessage(m, recipient)
       } else if (state.routing === 'direct') {
         // 0 hops
-        return await this.node.sendMessage(m, recipient, async() => [])
+        return await this.node.sendMessage(m, recipient, async () => [])
       } else {
         let path = await Promise.all(state.routing.split(',').map(async (x) => await checkPeerIdInput(x)))
         return await this.node.sendMessage(m, recipient, () => Promise.resolve(path))
@@ -49,7 +48,7 @@ export abstract class SendMessageBase extends AbstractCommand {
     const allIds = getPeerIdsAndAliases(this.node, state, {
       noBootstrapNodes: true,
       returnAlias: true,
-      mustBeOnline: true,
+      mustBeOnline: true
     })
     return this._autocompleteByFiltering(query, allIds, line)
   }
@@ -109,7 +108,7 @@ export class SendMessageFancy extends SendMessageBase {
           return this.selectIntermediateNodes(this.rl, peerId)
         })
       } else {
-        await this.sendMessage(state, peerId, parsedMessage) 
+        await this.sendMessage(state, peerId, parsedMessage)
       }
     } catch (err) {
       return styleValue(err.message, 'failure')

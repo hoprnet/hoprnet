@@ -19,7 +19,7 @@ export class Info extends AbstractCommand {
   public async execute(): Promise<string> {
     // @TODO Add connector info etc.
     return [
-      `Bootstrap Servers: ${this.node.bootstrapServers.map((p) => styleValue(p.id.toB58String(), 'peerId'))}`,
+      `Bootstrap Servers: ${this.node.bootstrapServers.map((p) => styleValue(p.id.toB58String(), 'peerId'))}`
     ].join('\n')
   }
 }

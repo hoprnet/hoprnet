@@ -12,7 +12,7 @@ class TicketStatic {
   private readonly INVALID_MESSAGES = {
     NO_PRE_IMAGE: 'PreImage is empty.',
     INVALID_CHALLENGE: 'Invalid challenge.',
-    NOT_WINNING: 'Not a winning ticket.',
+    NOT_WINNING: 'Not a winning ticket.'
   }
 
   constructor(public coreConnector: HoprEthereum) {}
@@ -47,7 +47,7 @@ class TicketStatic {
         this.coreConnector.log(`Failed to submit ticket ${ticketChallenge}: ${this.INVALID_MESSAGES.NO_PRE_IMAGE}`)
         return {
           status: 'FAILURE',
-          message: this.INVALID_MESSAGES.NO_PRE_IMAGE,
+          message: this.INVALID_MESSAGES.NO_PRE_IMAGE
         }
       }
 
@@ -56,7 +56,7 @@ class TicketStatic {
         this.coreConnector.log(`Failed to submit ticket ${ticketChallenge}: ${this.INVALID_MESSAGES.INVALID_CHALLENGE}`)
         return {
           status: 'FAILURE',
-          message: this.INVALID_MESSAGES.INVALID_CHALLENGE,
+          message: this.INVALID_MESSAGES.INVALID_CHALLENGE
         }
       }
 
@@ -70,7 +70,7 @@ class TicketStatic {
         this.coreConnector.log(`Failed to submit ticket ${ticketChallenge}: ${this.INVALID_MESSAGES.NOT_WINNING}`)
         return {
           status: 'FAILURE',
-          message: this.INVALID_MESSAGES.NOT_WINNING,
+          message: this.INVALID_MESSAGES.NOT_WINNING
         }
       }
 
@@ -87,7 +87,7 @@ class TicketStatic {
         {
           from: (await account.address).toHex(),
           to: hoprChannels.options.address,
-          nonce: (await account.nonce).valueOf(),
+          nonce: (await account.nonce).valueOf()
         }
       )
 
@@ -98,13 +98,13 @@ class TicketStatic {
       this.coreConnector.log('Successfully submitted ticket', ticketChallenge)
       return {
         status: 'SUCCESS',
-        receipt: transaction.transactionHash,
+        receipt: transaction.transactionHash
       }
     } catch (err) {
       this.coreConnector.log('Unexpected error when submitting ticket', ticketChallenge, err)
       return {
         status: 'ERROR',
-        error: err,
+        error: err
       }
     }
   }
@@ -136,20 +136,20 @@ class TicketFactory {
     const ticket = new Ticket(
       {
         bytes: signedTicket.buffer,
-        offset: signedTicket.ticketOffset,
+        offset: signedTicket.ticketOffset
       },
       {
         counterparty,
         challenge,
         epoch,
         amount,
-        winProb: ticketWinProb,
+        winProb: ticketWinProb
       }
     )
 
     await ticket.sign(this.channel.coreConnector.account.keys.onChain.privKey, undefined, {
       bytes: signedTicket.buffer,
-      offset: signedTicket.signatureOffset,
+      offset: signedTicket.signatureOffset
     })
 
     return signedTicket

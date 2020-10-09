@@ -17,6 +17,7 @@
 ## Instructions
 
 ### Installing a binary from NPM
+
 ```sh
 npm install -g @hoprnet/hoprd
 hoprd --admin

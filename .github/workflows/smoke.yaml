@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    name: Smoke testing 
+    name: Smoke testing
     runs-on: ubuntu-latest
 
     steps:

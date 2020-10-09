@@ -28,7 +28,7 @@ export function Channel(counterparty: Types.Hash): Uint8Array {
   return allocationHelper([
     [PREFIX.length, PREFIX],
     [channelSubPrefix.length, channelSubPrefix],
-    [counterparty.length, counterparty],
+    [counterparty.length, counterparty]
   ])
 }
 
@@ -46,7 +46,7 @@ export function ChannelKeyParse(arr: Uint8Array): Uint8Array {
 export function ConfirmedBlockNumber(): Uint8Array {
   return allocationHelper([
     [PREFIX.length, PREFIX],
-    [confirmedBlockNumber.length, confirmedBlockNumber],
+    [confirmedBlockNumber.length, confirmedBlockNumber]
   ])
 }
 
@@ -61,7 +61,7 @@ export function ChannelEntry(partyA: Types.Public, partyB: Types.Public): Uint8A
     [channelEntrySubPrefix.length, channelEntrySubPrefix],
     [Public.SIZE, partyA],
     [SEPERATOR.length, SEPERATOR],
-    [Public.SIZE, partyB],
+    [Public.SIZE, partyB]
   ])
 }
 
@@ -90,7 +90,7 @@ export function Challenge(channelId: Types.Hash, challenge: Types.Hash): Uint8Ar
     [challengeSubPrefix.length, challengeSubPrefix],
     [Hash.SIZE, channelId],
     [SEPERATOR.length, SEPERATOR],
-    [Hash.SIZE, challenge],
+    [Hash.SIZE, challenge]
   ])
 }
 
@@ -115,7 +115,7 @@ export function ChannelId(signatureHash: Types.Hash): Uint8Array {
   return allocationHelper([
     [PREFIX.length, PREFIX],
     [channelIdSubPrefix.length, channelIdSubPrefix],
-    [Hash.SIZE, signatureHash],
+    [Hash.SIZE, signatureHash]
   ])
 }
 
@@ -130,7 +130,7 @@ export function Nonce(channelId: Types.Hash, nonce: Types.Hash): Uint8Array {
     [nonceSubPrefix.length, nonceSubPrefix],
     [Hash.SIZE, channelId],
     [SEPERATOR.length, SEPERATOR],
-    [Hash.SIZE, nonce],
+    [Hash.SIZE, nonce]
   ])
 }
 
@@ -143,7 +143,7 @@ export function OnChainSecretIntermediary(iteration: number): Uint8Array {
     [PREFIX.length, PREFIX],
     [onChainSecretIntermediary.length, onChainSecretIntermediary],
     [SEPERATOR.length, SEPERATOR],
-    [ON_CHAIN_SECRET_ITERATION_WIDTH, toU8a(iteration, ON_CHAIN_SECRET_ITERATION_WIDTH)],
+    [ON_CHAIN_SECRET_ITERATION_WIDTH, toU8a(iteration, ON_CHAIN_SECRET_ITERATION_WIDTH)]
   ])
 }
 
@@ -156,7 +156,7 @@ export function AcknowledgedTicket(counterPartyPubKey: Types.Public, challange: 
     [acknowledgedSubPrefix.length, acknowledgedSubPrefix],
     [counterPartyPubKey.length, counterPartyPubKey],
     [SEPERATOR.length, SEPERATOR],
-    [challange.length, challange],
+    [challange.length, challange]
   ])
 }
 
@@ -173,7 +173,7 @@ export function AcknowledgedTicketParse(arr: Uint8Array): [Public, Hash] {
 
   return [
     new Public(arr.slice(counterPartyPubKeyStart, counterPartyPubKeyEnd)),
-    new Hash(arr.slice(challengeStart, challengeEnd)),
+    new Hash(arr.slice(challengeStart, challengeEnd))
   ]
 }
 

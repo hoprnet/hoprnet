@@ -24,7 +24,7 @@ export default class ListOpenChannels extends AbstractCommand {
     return [
       `ChannelId: ${styleValue(channelId, 'hash')}`,
       `PeerId: ${peerId ? styleValue(peerId, 'peerId') : chalk.gray('pre-opened')}`,
-      `Status: ${status ? styleValue(status, 'highlight') : chalk.gray('UNKNOWN')}`,
+      `Status: ${status ? styleValue(status, 'highlight') : chalk.gray('UNKNOWN')}`
     ]
       .map((str) => `\n - ${str}`)
       .join('')

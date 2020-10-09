@@ -22,7 +22,7 @@ function parseHosts(): HoprOptions['hosts'] {
 
     hosts.ip4 = {
       ip: params[1],
-      port: parseInt(params[2]),
+      port: parseInt(params[2])
     }
   }
 
@@ -38,7 +38,7 @@ function parseHosts(): HoprOptions['hosts'] {
 
     hosts.ip6 = {
       ip: params[1],
-      port: parseInt(params[2]),
+      port: parseInt(params[2])
     }
   }
 
@@ -63,16 +63,16 @@ export async function parseOptions(): Promise<HoprOptions> {
       b: 'bootstrapNode',
       h: 'help',
       n: 'network',
-      v: 'verbose',
+      v: 'verbose'
     },
     default: {
       network: 'ethereum',
-      bootstrapNode: false,
+      bootstrapNode: false
     },
     unknown: (option: string) => {
       unknownOptions.push(option)
       return false
-    },
+    }
   })
 
   if (cli_options._.length > 1) {
@@ -161,7 +161,7 @@ export async function parseOptions(): Promise<HoprOptions> {
 
       console.log(str)
     },
-    hosts: parseHosts(),
+    hosts: parseHosts()
   }
 
   if (id != null) {

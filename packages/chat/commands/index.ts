@@ -34,7 +34,7 @@ export class Commands {
     this.state = {
       includeRecipient: false,
       routing: 'direct',
-      aliases: new Map<string, PeerId>(),
+      aliases: new Map<string, PeerId>()
     }
 
     this.commands = [
@@ -54,7 +54,7 @@ export class Commands {
       new RedeemTickets(node),
       new Settings(),
       new Alias(node),
-      new Withdraw(node),
+      new Withdraw(node)
     ]
 
     if (rl) {
@@ -77,7 +77,6 @@ export class Commands {
 
   public setState(settings: any) {
     this.state = settings
-
   }
 
   public allCommands(): string[] {

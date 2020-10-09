@@ -72,11 +72,11 @@ export abstract class OpenChannelBase extends AbstractCommand {
       amPartyA
         ? {
             balance: amountToFund,
-            balance_a: amountToFund,
+            balance_a: amountToFund
           }
         : {
             balance: amountToFund,
-            balance_a: new BN(0),
+            balance_a: new BN(0)
           }
     )
 
@@ -89,14 +89,14 @@ export abstract class OpenChannelBase extends AbstractCommand {
     )
 
     return {
-      channelId,
+      channelId
     }
   }
 
   public async autocomplete(query: string, line: string): Promise<AutoCompleteResult> {
     const peersWithOpenChannel = await getOpenChannels(this.node, this.node.peerInfo.id)
     const allPeers = getPeers(this.node, {
-      noBootstrapNodes: true,
+      noBootstrapNodes: true
     })
 
     const peers = allPeers.reduce((acc: string[], peer: PeerId) => {
@@ -126,7 +126,7 @@ export class OpenChannel extends OpenChannelBase {
   public async execute(query: string): Promise<string> {
     const [err, counterPartyB58Str, amountToFundStr] = this._assertUsage(query, [
       "counterParty's PeerId",
-      'amountToFund',
+      'amountToFund'
     ])
 
     if (err) {

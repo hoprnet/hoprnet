@@ -51,42 +51,42 @@ const argv = yargs
   .option('network', {
     describe: 'Which network to run the HOPR node on',
     default: 'ETHEREUM',
-    choices: ['ETHEREUM'],
+    choices: ['ETHEREUM']
   })
   .option('provider', {
     describe: 'A provider url for the Network you specified',
-    default: 'wss://xdai.poanetwork.dev/wss',
+    default: 'wss://xdai.poanetwork.dev/wss'
   })
   .option('host', {
     describe: 'The network host to run the HOPR node on.',
-    default: '0.0.0.0:9091',
+    default: '0.0.0.0:9091'
   })
   .option('admin', {
     boolean: true,
     describe: 'Run an admin interface on localhost:3000',
-    default: false,
+    default: false
   })
   .option('grpc', {
     boolean: true,
     describe: 'Run a gRPC interface',
-    default: false,
+    default: false
   })
   .option('password', {
-    describe: 'A password to encrypt your keys',
+    describe: 'A password to encrypt your keys'
   })
   .option('run', {
     describe: 'Run a single hopr command, same syntax as in hopr-admin',
-    default: '',
+    default: ''
   })
   .option('dryRun', {
     boolean: true,
     describe: 'List all the options used to run the HOPR node, but quit instead of starting',
-    default: false,
+    default: false
   })
   .option('bootstrap', {
     boolean: true,
     describe: 'run as a bootstrap node',
-    default: false,
+    default: false
   })
   .option('data', {
     describe: 'manually specify the database directory to use',
@@ -111,7 +111,7 @@ function parseHosts(): HoprOptions['hosts'] {
 
     hosts.ip4 = {
       ip: params[1],
-      port: parseInt(params[2]),
+      port: parseInt(params[2])
     }
   }
   return hosts
@@ -137,10 +137,10 @@ async function generateNodeOptions(logs: LogStream): Promise<HoprOptions> {
     bootstrapServers: [...(await getBootstrapAddresses()).values()],
     provider: argv.provider,
     hosts: parseHosts(),
-    output: logMessageToNode,
+    output: logMessageToNode
   }
 
-  if (argv.password !== undefined){
+  if (argv.password !== undefined) {
     options.password = argv.password as string
   }
 
@@ -157,7 +157,7 @@ async function main() {
   let addr: Multiaddr
   let logs = new LogStream()
   let adminServer = undefined
-  let settings:any = {}
+  let settings: any = {}
 
   if (argv.settings) {
     settings = JSON.parse(argv.settings)
@@ -207,8 +207,8 @@ async function main() {
         cmds.setState(settings)
       }
       // We support multiple semicolon separated commands
-      let toRun  = argv.run.split(';')
-      
+      let toRun = argv.run.split(';')
+
       for (let c of toRun) {
         let resp = await cmds.execute(c)
         console.log(resp)
@@ -220,7 +220,8 @@ async function main() {
     console.log(e)
     logs.log('Node failed to start:')
     logs.logFatalError('' + e)
-    if (!argv.admin) { // If the admin interface is running, we should keep process alive
+    if (!argv.admin) {
+      // If the admin interface is running, we should keep process alive
       process.exit(1)
     }
   }

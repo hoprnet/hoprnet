@@ -21,14 +21,14 @@ import { durations } from '@hoprnet/hopr-utils'
 
 describe('check heartbeat mechanism', function () {
   async function generateNode(options?: { timeoutIntentionally?: boolean }) {
-    const node = (await libp2p.create({
+    const node = await libp2p.create({
       peerInfo: await PeerInfo.create(await PeerId.create({ keyType: 'secp256k1' })),
       modules: {
         transport: [TCP],
         streamMuxer: [MPLEX],
-        connEncryption: [SECIO],
-      },
-    }))
+        connEncryption: [SECIO]
+      }
+    })
     node.peerInfo.multiaddrs.add(Multiaddr('/ip4/0.0.0.0/tcp/0'))
     node.peerRouting.findPeer = (_: PeerId) => Promise.reject(Error('not implemented'))
 
@@ -36,12 +36,12 @@ describe('check heartbeat mechanism', function () {
 
     node.interactions = {
       network: {
-        heartbeat: new Heartbeat(node, options),
-      },
+        heartbeat: new Heartbeat(node, options)
+      }
     }
 
     node.network = {
-      heartbeat: new EventEmitter(),
+      heartbeat: new EventEmitter()
     }
 
     return node
@@ -63,7 +63,7 @@ describe('check heartbeat mechanism', function () {
           resolve()
         })
       }),
-      Alice.interactions.network.heartbeat.interact(Bob.peerInfo.id),
+      Alice.interactions.network.heartbeat.interact(Bob.peerInfo.id)
     ])
 
     await Promise.all([Alice.stop(), Bob.stop()])
@@ -73,7 +73,7 @@ describe('check heartbeat mechanism', function () {
     const [Alice, Bob] = await Promise.all([
       /* prettier-ignore */
       generateNode(),
-      generateNode({ timeoutIntentionally: true }),
+      generateNode({ timeoutIntentionally: true })
     ])
 
     await Alice.dial(Bob.peerInfo)

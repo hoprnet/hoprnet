@@ -56,14 +56,14 @@ function getTopics(
       // prettier-ignore
       topic0,
       [u8aToHex(first.slice(1, 33)), u8aToHex(second.slice(1, 33))],
-      [u8aToHex(first.slice(1, 33)), u8aToHex(second.slice(1, 33))],
+      [u8aToHex(first.slice(1, 33)), u8aToHex(second.slice(1, 33))]
     ]
   } else {
     return [
       // prettier-ignore
       topic0,
       first != null ? u8aToHex(first.slice(1, 33)) : undefined,
-      second != null ? u8aToHex(second.slice(1, 33)) : undefined,
+      second != null ? u8aToHex(second.slice(1, 33)) : undefined
     ]
   }
 }
@@ -93,8 +93,8 @@ export function decodeOpenedChannelEvent(_event: Log) {
           new Uint8Array([2 + (parseInt(_event.topics[0].slice(64, 66), 16) % 2)]),
           stringToU8a(_event.topics[2])
         )
-      ),
-    },
+      )
+    }
   }
 }
 
@@ -119,7 +119,7 @@ export function decodeClosedChannelEvent(_event: Log) {
         )
       ),
       partyAAmount: new BN(_event.data.slice(-128, -64), 16),
-      partyBAmount: new BN(_event.data.slice(-64), 16),
-    },
+      partyBAmount: new BN(_event.data.slice(-64), 16)
+    }
   }
 }

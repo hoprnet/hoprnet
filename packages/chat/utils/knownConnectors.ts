@@ -3,5 +3,5 @@
  */
 export const knownConnectors = [
   ['@hoprnet/hopr-core-ethereum', 'ethereum'],
-  ['@hoprnet/hopr-core-polkadot', 'polkadot'],
+  ['@hoprnet/hopr-core-polkadot', 'polkadot']
 ]

@@ -112,7 +112,7 @@ class HashedSecret {
             {
               from: (await this.coreConnector.account.address).toHex(),
               to: this.coreConnector.hoprChannels.options.address,
-              nonce: _nonce,
+              nonce: _nonce
             }
           )
         ).send()
@@ -126,7 +126,7 @@ class HashedSecret {
             {
               from: (await this.coreConnector.account.address).toHex(),
               to: this.coreConnector.hoprChannels.options.address,
-              nonce: _nonce,
+              nonce: _nonce
             }
           )
         ).send()

@@ -35,7 +35,7 @@ class Heartbeat<Chain extends HoprCoreConnector> extends EventEmitter {
 
     this.node.network.peerStore.push({
       id: peerIdString,
-      lastSeen: Date.now(),
+      lastSeen: Date.now()
     })
   }
 
@@ -69,7 +69,7 @@ class Heartbeat<Chain extends HoprCoreConnector> extends EventEmitter {
 
           this.node.network.peerStore.push({
             id: peer,
-            lastSeen: Date.now(),
+            lastSeen: Date.now()
           })
         } catch (err) {
           await this.node.hangUp(currentPeerId)
