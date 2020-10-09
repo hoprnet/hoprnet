@@ -1,7 +1,7 @@
 import debug from 'debug'
 import Instruction from '../classes/instruction';
-import { IMessage } from 'src/message/message';
-import { HOPR_ENVIRONMENT } from 'src/utils/env';
+import { IMessage } from '../../../message/message';
+import { HOPR_ENVIRONMENT } from '../../../utils/env';
 import { BotCommands, StatsSubCommands } from '../types/commands';
 import { StatsStateResponses } from '../responses';
 import { Coverbot } from '..';

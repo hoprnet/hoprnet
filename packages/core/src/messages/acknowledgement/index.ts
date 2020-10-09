@@ -54,6 +54,10 @@ class Acknowledgement<Chain extends HoprCoreConnector> extends Uint8Array {
     this.paymentChannels = paymentChannels
   }
 
+  slice(begin: number = 0, end: number = Acknowledgement.SIZE(this.paymentChannels)) {
+    return this.subarray(begin, end)
+  }
+
   subarray(begin: number = 0, end: number = Acknowledgement.SIZE(this.paymentChannels)): Uint8Array {
     return new Uint8Array(this.buffer, begin + this.byteOffset, end - begin)
   }

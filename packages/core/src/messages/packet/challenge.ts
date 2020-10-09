@@ -31,12 +31,14 @@ class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
       signature: Types.Signature
     }
   ) {
-    if (arr != null && struct == null) {
-      super(arr.bytes, arr.offset, Challenge.SIZE(paymentChannels))
-    } else if (arr == null && struct != null) {
-      super(struct.signature)
+    if (arr == null) {
+      super(Challenge.SIZE(paymentChannels))
     } else {
-      throw Error(`Invalid constructor parameters`)
+      super(arr.bytes, arr.offset, Challenge.SIZE(paymentChannels))
+    }
+
+    if (struct != null) {
+      super(struct.signature)
     }
 
     this.paymentChannels = paymentChannels

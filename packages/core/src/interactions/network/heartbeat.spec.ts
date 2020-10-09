@@ -11,8 +11,6 @@ import SECIO = require('libp2p-secio')
 import Debug from 'debug'
 import chalk from 'chalk'
 
-import Hopr from '../..'
-import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import { Heartbeat, HEARTBEAT_TIMEOUT } from './heartbeat'
 
 import assert from 'assert'
@@ -22,7 +20,7 @@ import { EventEmitter } from 'events'
 import { durations } from '@hoprnet/hopr-utils'
 
 describe('check heartbeat mechanism', function () {
-  async function generateNode(options?: { timeoutIntentionally?: boolean }): Promise<Hopr<HoprCoreConnector>> {
+  async function generateNode(options?: { timeoutIntentionally?: boolean }) {
     const node = (await libp2p.create({
       peerInfo: await PeerInfo.create(await PeerId.create({ keyType: 'secp256k1' })),
       modules: {
@@ -30,37 +28,31 @@ describe('check heartbeat mechanism', function () {
         streamMuxer: [MPLEX],
         connEncryption: [SECIO],
       },
-    })) as Hopr<HoprCoreConnector>
-
+    }))
     node.peerInfo.multiaddrs.add(Multiaddr('/ip4/0.0.0.0/tcp/0'))
+    node.peerRouting.findPeer = (_: PeerId) => Promise.reject(Error('not implemented'))
 
     await node.start()
-
-    node.peerRouting.findPeer = (_: PeerId): Promise<never> => {
-      return Promise.reject(Error('not implemented'))
-    }
 
     node.interactions = {
       network: {
         heartbeat: new Heartbeat(node, options),
       },
-    } as Hopr<HoprCoreConnector>['interactions']
+    }
 
     node.network = {
       heartbeat: new EventEmitter(),
-    } as Hopr<HoprCoreConnector>['network']
+    }
 
-    return (node as unknown) as Hopr<HoprCoreConnector>
+    return node
   }
 
   it('should dispatch a heartbeat', async function () {
     const [Alice, Bob] = await Promise.all([
       /* prettier-ignore */
       generateNode(),
-      generateNode(),
+      generateNode()
     ])
-
-    await new Promise((resolve) => setTimeout(resolve, 100))
 
     await Alice.dial(Bob.peerInfo)
 
@@ -83,7 +75,7 @@ describe('check heartbeat mechanism', function () {
       generateNode(),
       generateNode({ timeoutIntentionally: true }),
     ])
-    await new Promise((resolve) => setTimeout(resolve, 100))
+
     await Alice.dial(Bob.peerInfo)
     let errorThrown = false
     let before = Date.now()
