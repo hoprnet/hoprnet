@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import Hopr from '@hoprnet/hopr-core'
 import type { HoprOptions } from '@hoprnet/hopr-core'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'

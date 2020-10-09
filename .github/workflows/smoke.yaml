@@ -20,7 +20,9 @@ jobs:
           registry-url: https://registry.npmjs.org/
       - name: Install hoprd
         run: |
-          npm install -g @hoprnet/hoprd
+          #NODE_ENV=production npm install -g @hoprnet/hoprd
+          yarn global add $PWD
+        working-directory: packages/hoprd
 
       - name: Check databases
         shell: bash
