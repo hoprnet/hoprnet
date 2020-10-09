@@ -72,7 +72,6 @@ const argv = yargs
   })
   .option('password', {
     describe: 'A password to encrypt your keys',
-    default: '',
   })
   .option('run', {
     describe: 'Run a single hopr command, same syntax as in hopr-admin',
@@ -87,6 +86,14 @@ const argv = yargs
     boolean: true,
     describe: 'run as a bootstrap node',
     default: false,
+  })
+  .option('data', {
+    describe: 'manually specify the database directory to use',
+    default: ''
+  })
+  .option('settings', {
+    descripe: 'Settings, same as in the repl (JSON)',
+    default: '{}'
   })
   .wrap(Math.min(120, yargs.terminalWidth())).argv
 
@@ -130,7 +137,14 @@ async function generateNodeOptions(logs: LogStream): Promise<HoprOptions> {
     provider: argv.provider,
     hosts: parseHosts(),
     output: logMessageToNode,
-    password: argv.password || 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0', // TODO!!!
+  }
+
+  if (argv.password !== undefined){
+    options.password = argv.password as string
+  }
+
+  if (argv.data && argv.data !== '') {
+    options.dbPath = argv.data
   }
 
   //logs.log(JSON.stringify(options))
@@ -142,6 +156,11 @@ async function main() {
   let addr: Multiaddr
   let logs = new LogStream()
   let adminServer = undefined
+  let settings:any = {}
+
+  if (argv.settings) {
+    settings = JSON.parse(argv.settings)
+  }
 
   if (argv.admin) {
     // We need to setup the admin server before the HOPR node
@@ -183,6 +202,9 @@ async function main() {
     if (argv.run && argv.run !== '') {
       // Run a single command and then exit.
       let cmds = new commands.Commands(node)
+      if (argv.settings) {
+        cmds.setState(settings)
+      }
       let resp = await cmds.execute(argv.run)
       console.log(resp)
       await node.down()
@@ -192,6 +214,9 @@ async function main() {
     console.log(e)
     logs.log('Node failed to start:')
     logs.logFatalError('' + e)
+    if (!argv.admin) { // If the admin interface is running, we should keep process alive
+      process.exit(1)
+    }
   }
 }
 

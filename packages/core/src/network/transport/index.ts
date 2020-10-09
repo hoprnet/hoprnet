@@ -143,7 +143,11 @@ class TCP {
     options = options || {}
 
     let error: Error
-    if (['ip4', 'ip6', 'dns4', 'dns6'].includes(ma.protoNames()[0]) && this.isRealisticAddress(ma)) {
+    if (
+      // (this.relays == null || this.relays.some((pInfo) => ma.getPeerId() === pInfo.id.toB58String())) &&
+      ['ip4', 'ip6', 'dns4', 'dns6'].includes(ma.protoNames()[0]) &&
+      this.isRealisticAddress(ma)
+    ) {
       try {
         verbose('attempting to dial directly', ma.toString())
         return await this.dialDirectly(ma, options)
@@ -185,8 +189,10 @@ class TCP {
       )
     }
 
-    verbose('dialing with relay ', ma)
-    return await this.dialWithRelay(ma, potentialRelays, options)
+    verbose('dialing with relay ', ma.toString())
+    const conn = await this.dialWithRelay(ma, potentialRelays, options)
+    log(`relayed connection established`)
+    return conn
   }
 
   async dialWithRelay(ma: Multiaddr, relays: PeerInfo[], options?: DialOptions): Promise<Connection> {
@@ -292,8 +298,6 @@ class TCP {
     } else {
       this.connHandler = handler
     }
-
-    console.log(`creating listener`)
     return new Listener(this.connHandler, this._upgrader, this.stunServers)
   }
 

@@ -131,19 +131,17 @@ class Listener extends EventEmitter {
           resolve()
         })
       ),
-      this.stunServers?.length > 0
-        ? new Promise((resolve) =>
-            this.udpSocket.bind(options.port, async () => {
-              try {
-                this.externalAddress = await getExternalIp(this.stunServers, this.udpSocket)
-              } catch (err) {
-                error(`Unable to fetch external address using STUN. Error was: ${err}`)
-              }
+      new Promise((resolve, reject) =>
+        this.udpSocket.bind(options.port, async () => {
+          try {
+            this.externalAddress = await getExternalIp(this.stunServers, this.udpSocket)
+          } catch (err) {
+            error(`Unable to fetch external address using STUN. Error was: ${err}`)
+          }
 
-              resolve()
-            })
-          )
-        : Promise.resolve()
+          resolve()
+        })
+      )
     ])
 
     this.state = State.LISTENING
@@ -178,14 +176,15 @@ class Listener extends EventEmitter {
     let addrs: Multiaddr[] = []
     const address = this.tcpSocket.address() as AddressInfo
 
-    if (this.externalAddress != undefined && this.externalAddress.port == null) {
+    if (this.externalAddress != null && this.externalAddress.port == null) {
       console.log(`Attention: Bidirectional NAT detected. Publishing no public IPv4 address to the DHT`)
 
       addrs.push(Multiaddr(`/p2p/${this.peerId}`))
 
       addrs.push(
         ...getAddrs(address.port, this.peerId, {
-          useIPv6: true
+          includeLocalhostIPv4: true
+          // useIPv6: true
         })
       )
     } else if (this.externalAddress != null && this.externalAddress.port != null) {
@@ -202,7 +201,8 @@ class Listener extends EventEmitter {
 
       addrs.push(
         ...getAddrs(address.port, this.peerId, {
-          useIPv6: true
+          includeLocalhostIPv4: true
+          // useIPv6: true
         })
       )
     } else {

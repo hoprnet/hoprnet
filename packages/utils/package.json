@@ -36,17 +36,9 @@
     "@types/mocha": "^8.0.3",
     "@types/node": "^12.12.8",
     "rimraf": "^3.0.2",
-    "lint-staged": ">=10",
     "mocha": "^8.0.1",
-    "prettier": "^2.0.5",
     "ts-node": "^9.0.0",
     "typescript": "^4.0.3"
-  },
-  "prettier": {
-    "tabWidth": 2,
-    "semi": false,
-    "singleQuote": true,
-    "printWidth": 120
   },
   "mocha": {
     "extension": [
@@ -54,8 +46,5 @@
     ],
     "spec": "src/**/*.spec.ts",
     "require": "ts-node/register"
-  },
-  "lint-staged": {
-    "*.{ts}": "prettier --write"
   }
 }
