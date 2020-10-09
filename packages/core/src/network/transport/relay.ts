@@ -36,7 +36,7 @@ import {
   OK,
   FAIL,
   FAIL_COULD_NOT_REACH_COUNTERPARTY,
-  DELIVERY_REGISTER,
+  DELIVERY_REGISTER
 } from './constants'
 
 import { pubKeyToPeerId } from '../../utils'
@@ -54,8 +54,8 @@ import type {
   MultiaddrConnection,
   PeerRouting,
   Registrar,
-  Stream,
-} from './types'
+  Stream
+} from '../../@types/transport'
 
 class Relay {
   private _dialer: Dialer
@@ -125,7 +125,7 @@ class Relay {
         stream,
         self: this._peerInfo.id,
         counterparty: destination,
-        webRTC: this._webRTCUpgrader?.upgradeOutbound(),
+        webRTC: this._webRTCUpgrader?.upgradeOutbound()
       })
     }
 
@@ -150,7 +150,7 @@ class Relay {
         stream,
         self: this._peerInfo.id,
         counterparty,
-        webRTC: this._webRTCUpgrader?.upgradeInbound(),
+        webRTC: this._webRTCUpgrader?.upgradeInbound()
       })
     )
   }

@@ -1,7 +1,7 @@
-import { Stream } from './types'
+import { Stream } from '../../@types/transport'
 import Multiaddr from 'multiaddr'
 import BL from 'bl'
-import { MultiaddrConnection } from './types'
+import { MultiaddrConnection } from '../../@types/transport'
 import Defer, { DeferredPromise } from 'p-defer'
 import { RELAY_PAYLOAD_PREFIX, RELAY_STATUS_PREFIX, RELAY_WEBRTC_PREFIX, STOP } from './constants'
 import { u8aEquals } from '@hoprnet/hopr-utils'
@@ -37,7 +37,7 @@ class RelayConnection implements MultiaddrConnection {
     stream,
     self,
     counterparty,
-    webRTC,
+    webRTC
   }: {
     stream: Stream
     self: PeerId
@@ -45,7 +45,7 @@ class RelayConnection implements MultiaddrConnection {
     webRTC?: SimplePeer
   }) {
     this.timeline = {
-      open: Date.now(),
+      open: Date.now()
     }
 
     this._defer = Defer()
@@ -71,7 +71,7 @@ class RelayConnection implements MultiaddrConnection {
           // prettier-ignore
           // @ts-ignore
           this._stream.source.next(),
-          promise,
+          promise
         ])
 
         if (result.value != null) {
@@ -104,7 +104,7 @@ class RelayConnection implements MultiaddrConnection {
                 (async function* () {
                   yield (new BL([
                     (RELAY_STATUS_PREFIX as unknown) as BL,
-                    (STOP as unknown) as BL,
+                    (STOP as unknown) as BL
                   ]) as unknown) as Uint8Array
                 })()
               )
@@ -210,14 +210,14 @@ class RelayConnection implements MultiaddrConnection {
                 // @ts-ignore
                 streamPromise,
                 webRTCPromise,
-                promise,
+                promise
               ])
             } else {
               await Promise.race([
                 // prettier-ignore
                 // @ts-ignore
                 streamPromise,
-                promise,
+                promise
               ])
             }
 
@@ -234,7 +234,7 @@ class RelayConnection implements MultiaddrConnection {
 
                 return (new BL([
                   (RELAY_STATUS_PREFIX as unknown) as BL,
-                  (STOP as unknown) as BL,
+                  (STOP as unknown) as BL
                 ]) as unknown) as Uint8Array
               } else {
                 if (_received == null) {
@@ -260,7 +260,7 @@ class RelayConnection implements MultiaddrConnection {
 
                 return (new BL([
                   (RELAY_STATUS_PREFIX as unknown) as BL,
-                  (STOP as unknown) as BL,
+                  (STOP as unknown) as BL
                 ]) as unknown) as Uint8Array
               }
 

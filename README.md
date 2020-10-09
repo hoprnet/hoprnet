@@ -19,9 +19,8 @@
 ### Developing with this repository
 
 ```sh
-yarn             # Install tooling
-yarn bootstrap   # Installs all dependencies
-yarn build       # Builds code for running
+yarn          # Install tooling
+yarn setup    # Setups the monorepo
 ```
 
 ### Running applications

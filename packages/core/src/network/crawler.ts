@@ -9,7 +9,7 @@ import { MAX_HOPS, CRAWLING_RESPONSE_NODES } from '../constants'
 import type Hopr from '..'
 import { CrawlResponse, CrawlStatus } from '../messages'
 import PeerId from 'peer-id'
-import type { Connection } from './transport/types'
+import type { Connection } from '../@types/transport'
 import type { Entry } from './peerStore'
 import { peerHasOnlyPublicAddresses, isOnPrivateNet, PRIVATE_NETS } from '../filters'
 import debug from 'debug'
@@ -152,7 +152,7 @@ class Crawler<Chain extends HoprCoreConnector> {
             log(`querying ${chalk.blue(peer)}`)
             const peerId = PeerId.createFromB58String(peer)
             peerInfos = await this.node.interactions.network.crawler.interact(peerId, {
-              signal: abort.signal,
+              signal: abort.signal
             })
 
             const peerInfo = this.node.peerStore.get(peerId)
@@ -196,7 +196,7 @@ class Crawler<Chain extends HoprCoreConnector> {
               let beforeInserting = this.node.network.peerStore.length
               this.node.network.peerStore.push({
                 id: peerString,
-                lastSeen: 0,
+                lastSeen: 0
               })
 
               if (comparator == null || comparator(peerString)) {
@@ -273,11 +273,11 @@ class Crawler<Chain extends HoprCoreConnector> {
       if (selectedNodes.length > 0) {
         yield new CrawlResponse(undefined, {
           status: CrawlStatus.OK,
-          peerInfos: selectedNodes,
+          peerInfos: selectedNodes
         })
       } else {
         yield new CrawlResponse(undefined, {
-          status: CrawlStatus.FAIL,
+          status: CrawlStatus.FAIL
         })
       }
     }.call(this)

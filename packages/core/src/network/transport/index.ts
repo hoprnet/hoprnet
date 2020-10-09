@@ -11,7 +11,15 @@ import { USE_WEBRTC, CODE_P2P } from './constants'
 import Multiaddr from 'multiaddr'
 import PeerInfo from 'peer-info'
 import PeerId from 'peer-id'
-import type { Connection, Upgrader, DialOptions, ConnHandler, Handler, Stream, MultiaddrConnection } from './types'
+import type {
+  Connection,
+  Upgrader,
+  DialOptions,
+  ConnHandler,
+  Handler,
+  Stream,
+  MultiaddrConnection
+} from '../../@types/transport'
 import chalk from 'chalk'
 import { WebRTCUpgrader } from './webrtc'
 import Relay from './relay'
@@ -51,7 +59,7 @@ class TCP {
     useWebRTC,
     failIntentionallyOnWebRTC,
     timeoutIntentionallyOnWebRTC,
-    answerIntentionallyWithIncorrectMessages,
+    answerIntentionallyWithIncorrectMessages
   }: {
     upgrader: Upgrader
     libp2p: libp2p
@@ -223,7 +231,7 @@ class TCP {
       log('dialing %j', cOpts)
       const rawSocket = net.createConnection({
         host: cOpts.host,
-        port: cOpts.port,
+        port: cOpts.port
       })
 
       const onError = (err: Error) => {

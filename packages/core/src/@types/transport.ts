@@ -1,7 +1,6 @@
 import type PeerId from 'peer-id'
 import type PeerInfo from 'peer-info'
 import type Multiaddr from 'multiaddr'
-
 import type { EventEmitter } from 'events'
 import type { Server } from 'net'
 
