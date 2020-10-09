@@ -51,7 +51,7 @@ export function getPeerIdsAndAliases(
   } = {
     noBootstrapNodes: false,
     returnAlias: false,
-    mustBeOnline: false,
+    mustBeOnline: false
   }
 ): string[] {
   let peerIds = new Map<
@@ -65,11 +65,11 @@ export function getPeerIdsAndAliases(
 
   // add online peer ids into map
   getPeersIdsAsString(node, {
-    noBootstrapNodes: ops.noBootstrapNodes,
+    noBootstrapNodes: ops.noBootstrapNodes
   }).forEach((value) => {
     peerIds.set(value, {
       value,
-      isOnline: true,
+      isOnline: true
     })
   })
 
@@ -80,7 +80,7 @@ export function getPeerIdsAndAliases(
     peerIds.set(value, {
       value,
       isOnline: peerIds.has(value),
-      alias,
+      alias
     })
   })
 

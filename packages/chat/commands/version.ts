@@ -9,12 +9,12 @@ export default class Version extends AbstractCommand {
   }[] = [
     {
       name: 'hopr-chat',
-      version: pkg.version,
+      version: pkg.version
     },
     {
       name: 'hopr-core',
-      version: pkg.dependencies['@hoprnet/hopr-core'],
-    },
+      version: pkg.dependencies['@hoprnet/hopr-core']
+    }
   ]
 
   public name() {
@@ -28,7 +28,7 @@ export default class Version extends AbstractCommand {
   public async execute(): Promise<string> {
     const items = this.items.map((item) => ({
       name: item.name + ': ',
-      version: styleValue(item.version, 'number'),
+      version: styleValue(item.version, 'number')
     }))
     const paddingLength = getPaddingLength(
       items.map((item) => item.name),
