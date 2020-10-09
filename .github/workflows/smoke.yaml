@@ -22,6 +22,8 @@ jobs:
         shell: bash
         run: |
           #NODE_ENV=production npm install -g @hoprnet/hoprd
+          yarn install
+          yarn build
           npm install -g .
         working-directory: packages/hoprd
 
