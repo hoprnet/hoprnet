@@ -1,0 +1,38 @@
+name: Smoke test
+on:
+  push:
+    branches: ['**']
+    paths-ignore:
+      - 'docs/**'
+      - 'websites/**'
+
+jobs:
+  build:
+    name: Smoke testing 
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Use Node.js 12
+        uses: actions/setup-node@v1
+        with:
+          node-version: 12
+          registry-url: https://registry.npmjs.org/
+      - name: Install hoprd
+        run: |
+          npm install -g @hoprnet/hoprd
+
+      - name: Check databases
+        shell: bash
+        run: |
+          hoprd --data='./test/fixtures/alice'  --password="$DBPASS" --run "myAddress hopr"
+          hoprd --data='./test/fixtures/bob'  --password="$DBPASS" --run "myAddress hopr"
+          hoprd --data='./test/fixtures/charlie'  --password="$DBPASS" --run "myAddress hopr"
+        env:
+          DBPASS: ${{ secrets.SMOKETESTPASSWORD }}
+
+      - name: Commit database changes back to repo
+        run: |
+          git commit ./test/*
+          git pull origin ${{ github.ref }}
+          git push origin ${{ github.ref }}
