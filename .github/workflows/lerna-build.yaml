@@ -41,9 +41,9 @@ jobs:
           git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Linting robot"
           yarn lint:fix
           git commit -a -m "Fix linting"
-      - name: Build & Link
+      - name: Link & Build
         run: |
-          yarn util:build && yarn util:link
+          yarn util:link && yarn util:build
       - name: Test
         run: |
           yarn test
