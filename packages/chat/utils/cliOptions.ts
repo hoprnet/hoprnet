@@ -1,4 +1,4 @@
-// Allowed CLI options
+// allowed CLI options
 // @ts-ignore
 export const cli_options: string[][] = [
   ['-b', '--bootstrapNode', undefined, 'starts HOPR as a bootstrap node'],
@@ -8,10 +8,10 @@ export const cli_options: string[][] = [
   ['-p', '--password', '<password>', 'start HOPR with <password>'],
   ['-v', '--verbose', undefined, 'show debug info'],
   [undefined, '--debug', undefined, 'run HOPR in debug mode [insecure, only used for development]']
-  // ['<ID>', undefined, undefined, 'starts HOPR with a demo ID'],
 ].sort((a, b) => {
   let tmpA: string
   let tmpB: string
+
   if (a[0] === undefined) {
     // @ts-ignore
     tmpA = a[1].slice(2)
@@ -25,5 +25,6 @@ export const cli_options: string[][] = [
   } else {
     tmpB = b[0].slice(1)
   }
+
   return tmpA.localeCompare(tmpB, 'en', { sensitivity: 'base' })
 })

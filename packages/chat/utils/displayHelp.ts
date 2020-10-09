@@ -3,7 +3,6 @@ import { cli_options } from './cliOptions'
 
 const FIRST_OPTION_OFFSET = 1
 const SECOND_OPTION_OFFSET = 5
-const EXTRA_PADDING = 2
 
 export function displayHelp() {
   let firstOptionMaxLength = 0
@@ -72,21 +71,31 @@ export function displayHelp() {
   console.log(str)
 }
 
-export function getPaddingLength(items: string[]): number {
-  return Math.max(...items.map((str) => str.length)) + EXTRA_PADDING
+const EXTRA_PADDING = 2
+export function getPaddingLength(items: string[], addExtraPadding: boolean = true): number {
+  return Math.max(...items.map((str) => str.length)) + (addExtraPadding ? EXTRA_PADDING : 0)
 }
 
-export function styleValue(value: any): string {
-  switch (true) {
-    case typeof value === 'boolean':
-      return chalk.hex('#BA55D3')(value)
-    case typeof value === 'number':
-      return chalk.blue(value)
-    case typeof value === 'string':
-      return chalk.yellow(value)
-    default:
-      return String(value)
-  }
+export const CHALK_COLORS = {
+  boolean: chalk.hex('#BA55D3'),
+  number: chalk.blue,
+  success: chalk.green,
+  failure: chalk.red,
+  peerId: chalk.green,
+  hash: chalk.yellow,
+  highlight: chalk.yellow
+}
+
+export const CHALK_STRINGS = {
+  yes: CHALK_COLORS.success('y'),
+  no: CHALK_COLORS.failure('N')
+}
+
+export function styleValue(value: any, type?: keyof typeof CHALK_COLORS): string {
+  const color: chalk.Chalk = (type && CHALK_COLORS[type]) || (CHALK_COLORS as any)[typeof value]
+
+  if (typeof color === 'undefined') return String(value)
+  return color(value)
 }
 
 export function getOptions(
@@ -94,7 +103,7 @@ export function getOptions(
   style: 'compact' | 'vertical' = 'compact'
 ): string[] {
   if (style === 'compact') {
-    return [`Options: ${options.map((o) => String(o.value)).join('|')}`]
+    return [`Options: ${options.map((o) => String(o.value)).join('|')}`, '\n']
   } else {
     const padding = getPaddingLength(options.map((o) => String(o.value)))
 
@@ -105,10 +114,11 @@ export function getOptions(
           // needed to preperly format the array
           '\n',
           '- ',
-          styleValue(String(option.value).padEnd(padding)),
+          styleValue(String(option.value).padEnd(padding), 'highlight'),
           option.description
         ].join('')
-      })
+      }),
+      '\n'
     ]
   }
 }
