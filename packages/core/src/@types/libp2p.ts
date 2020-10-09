@@ -2,7 +2,7 @@ declare module 'libp2p' {
   type PeerId = import('peer-id')
   type PeerInfo = import('peer-info')
   type Multiaddr = import('multiaddr')
-  type Handler = import('../network/transport/types').Handler
+  type Handler = import('./transport').Handler
 
   export type PeerStore = {
     has(peerInfo: PeerId): boolean

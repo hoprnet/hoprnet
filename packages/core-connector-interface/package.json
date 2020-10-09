@@ -1,7 +1,8 @@
 {
   "name": "@hoprnet/hopr-core-connector-interface",
   "version": "1.17.0-alpha.58",
-  "repository": "https://github.com/hoprnet/hopr-core-connector-interface.git",
+  "description": "",
+  "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "GPL-3.0-only",
   "files": [
@@ -15,27 +16,13 @@
     "node": "12",
     "yarn": "1"
   },
-  "scripts": {
-    "lint": "prettier --check ."
-  },
   "types": "src/index.d.ts",
-  "prettier": {
-    "printWidth": 160,
-    "semi": false,
-    "singleQuote": true,
-    "quoteProps": "consistent",
-    "arrowParens": "avoid"
-  },
-  "husky": {
-    "hooks": {
-      "pre-commit": "yarn lint"
-    }
+  "scripts": {
+    "build": "echo 'Nothing to build'"
   },
   "devDependencies": {
     "@types/bn.js": "^4.11.6",
     "@types/levelup": "^4.3.0",
-    "husky": "^4.2.5",
-    "prettier": "^2.0.5",
     "typescript": "4.0"
   },
   "publishConfig": {
