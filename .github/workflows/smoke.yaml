@@ -48,6 +48,7 @@ jobs:
         run: |
           shopt -s expand_aliases
           alias hoprd="node packages/hoprd/lib/index.js"
+          set -e
 
           # Variables
           BOB_ADDR=127.0.0.1
