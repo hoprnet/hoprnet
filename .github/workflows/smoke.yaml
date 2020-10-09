@@ -22,7 +22,7 @@ jobs:
         run: |
           #NODE_ENV=production npm install -g @hoprnet/hoprd
           yarn global add $PWD
-          echo "::add-path::$(yarn global bin)"
+          echo "$(yarn global bin)" >> $GITHUB_PATH
         working-directory: packages/hoprd
 
       - name: Check databases
