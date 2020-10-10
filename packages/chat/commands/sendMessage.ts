@@ -37,7 +37,7 @@ export abstract class SendMessageBase extends AbstractCommand {
       await this.node.sendMessage(encodeMessage(message), recipient, getIntermediateNodes)
       return ''
     } catch (err) {
-      return styleValue(err.message, 'failure')
+      return styleValue('Could not send message.', 'failure')
     }
   }
 
@@ -60,7 +60,7 @@ export class SendMessage extends SendMessageBase {
     try {
       peerId = await checkPeerIdInput(peerIdString, state)
     } catch (err) {
-      return err.message
+      return styleValue(err.message, 'failure')
     }
 
     return this.sendMessage(state, peerId, msg)
