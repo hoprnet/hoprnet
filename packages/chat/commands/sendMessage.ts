@@ -21,19 +21,23 @@ export abstract class SendMessageBase extends AbstractCommand {
     return 'Sends a message to another party'
   }
 
-  protected async sendMessage(state: GlobalState, recipient: PeerId, msg: string): Promise<void> {
+  protected async sendMessage(
+    state: GlobalState,
+    recipient: PeerId,
+    msg: string,
+    getIntermediateNodes?: () => Promise<PeerId[]>
+  ): Promise<string> {
     const message = state.includeRecipient
       ? ((myAddress) => `${myAddress}:${msg}`)(this.node.peerInfo.id.toB58String())
       : msg
 
+    console.log(`Sending message to ${styleValue(recipient.toB58String(), 'peerId')} ...`)
+
     try {
-      return await this.node.sendMessage(
-        encodeMessage(message),
-        recipient,
-        async () => [] // MULTIHOP not supported
-      )
+      await this.node.sendMessage(encodeMessage(message), recipient, getIntermediateNodes)
+      return ''
     } catch (err) {
-      console.log(styleValue(err.message, 'failure'))
+      return styleValue('Could not send message.', 'failure')
     }
   }
 
@@ -56,7 +60,7 @@ export class SendMessage extends SendMessageBase {
     try {
       peerId = await checkPeerIdInput(peerIdString, state)
     } catch (err) {
-      return err.message
+      return styleValue(err.message, 'failure')
     }
 
     return this.sendMessage(state, peerId, msg)
@@ -72,7 +76,7 @@ export class SendMessageFancy extends SendMessageBase {
    * Encapsulates the functionality that is executed once the user decides to send a message.
    * @param query peerId string to send message to
    */
-  public async execute(query: string, state: GlobalState): Promise<string | void> {
+  public async execute(query: string, state: GlobalState): Promise<string> {
     const [err, peerIdString] = this._assertUsage(query, ['PeerId'])
     if (err) return err
 
@@ -80,35 +84,23 @@ export class SendMessageFancy extends SendMessageBase {
     try {
       peerId = await checkPeerIdInput(peerIdString, state)
     } catch (err) {
-      console.log(styleValue(err.message, 'failure'))
-      return
+      return styleValue(err.message, 'failure')
     }
 
     const messageQuestion = styleValue(`Type your message and press ENTER to send:`, 'highlight') + '\n'
-    const parsedMessage = await new Promise<string>((resolve) => this.rl.question(messageQuestion, resolve))
-
-    const message = state.includeRecipient
-      ? ((myAddress) => `${myAddress}:${parsedMessage}`)(this.node.peerInfo.id.toB58String())
-      : parsedMessage
-
+    const message = await new Promise<string>((resolve) => this.rl.question(messageQuestion, resolve))
     clearString(messageQuestion + message, this.rl)
-    console.log(`Sending message to ${styleValue(query, 'peerId')} ...`)
 
     try {
-      // use manual path
+      // use intermediate nodes
       if (state.routing === 'manual') {
-        await this.node.sendMessage(encodeMessage(message), peerId, async () => {
+        return await this.sendMessage(state, peerId, message, async () => {
           return this.selectIntermediateNodes(this.rl, peerId)
         })
       }
-      // use random path
-      else if (state.routing === 'auto') {
-        // @TODO: use path finder
-        await this.node.sendMessage(encodeMessage(message), peerId)
-      }
-      // 0 hops
+      // 0 HOP
       else {
-        await this.node.sendMessage(encodeMessage(message), peerId)
+        return await this.sendMessage(state, peerId, message, async () => [])
       }
     } catch (err) {
       return styleValue(err.message, 'failure')

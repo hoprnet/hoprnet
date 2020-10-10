@@ -7,7 +7,7 @@ export type CommandResponse = string | void
 
 export type GlobalState = {
   includeRecipient: boolean
-  routing: 'auto' | 'manual' | 'direct'
+  routing: 'manual' | 'direct'
   aliases: Map<string, PeerId>
 }
 
