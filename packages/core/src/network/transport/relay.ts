@@ -122,7 +122,6 @@ class Relay {
       }
 
       log(`relayed connection established`)
-      // @ts-ignore
       return new RelayConnection({
         stream,
         self: this._peerInfo.id,
@@ -148,7 +147,6 @@ class Relay {
     }
 
     this.connHandler?.(
-      // @ts-ignore
       new RelayConnection({
         stream,
         self: this._peerInfo.id,
@@ -300,12 +298,12 @@ class Relay {
       return
     }
 
-    let streams: { [index: string]: RelayContext }
-
     const channelId = getId(connection.remotePeer, counterparty)
     console.log(this._streams)
 
-    if ((streams = this._streams.get(channelId)) == null) {
+    let streams = this._streams.get(channelId)
+
+    if (streams == null) {
       log(
         `${connection.remotePeer.toB58String()} to ${counterparty.toB58String()} had no connection. Establishing a new one`
       )

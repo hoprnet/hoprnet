@@ -61,11 +61,9 @@ class RelayContext {
 
         if (sourceReceived) {
           sourceReceived = false
-          let received: Uint8Array
-
           // Does not forward empty messages
           if (sourceMsg != null) {
-            received = sourceMsg.slice()
+            const received = sourceMsg.slice()
 
             const [PREFIX, SUFFIX] = [received.subarray(0, 1), received.subarray(1)]
             if (u8aEquals(PREFIX, RELAY_STATUS_PREFIX)) {
@@ -98,7 +96,6 @@ class RelayContext {
       }
     }.call(this)
 
-    // @TODO make this function iterative
     this.sink = async (source: Stream['source']) => {
       let currentSink = stream.sink
 
