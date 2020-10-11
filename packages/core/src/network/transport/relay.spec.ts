@@ -132,7 +132,7 @@ describe('should create a socket and connect to it', function () {
 
     function drain({ done, value }: { done?: Boolean; value?: Uint8Array }) {
       if (value != null) {
-        console.log(new TextDecoder().decode(value))
+        console.log(`Received <${new TextDecoder().decode(value)}>`)
       }
 
       if (!done) {

@@ -91,8 +91,9 @@ class RelayContext {
           streamSwitched = false
           sourceDone = false
           currentSource = tmpSource
-          sourcePromise = currentSource.next().then(sourceFunction)
           switchPromise = this._switchPromise.promise.then(switchFunction)
+          yield new BL([(RELAY_STATUS_PREFIX as unknown) as BL, (RESTART as unknown) as BL])
+          sourcePromise = currentSource.next().then(sourceFunction)
         }
       }
     }.call(this)
