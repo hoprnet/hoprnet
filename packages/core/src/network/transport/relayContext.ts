@@ -27,16 +27,15 @@ class RelayContext {
       let sourceDone = false
 
       function sourceFunction({ value, done }: { value?: Uint8Array | void; done?: boolean | void }) {
-        if (value != null) {
-          sourceReceived = true
-          sourceMsg = value as Uint8Array
-        }
+        sourceReceived = true
+        sourceMsg = value as Uint8Array
 
         if (done) {
           sourceDone = true
         }
       }
 
+      let tmpSource: Stream['source']
       let currentSource = stream.source
 
       let sourcePromise = currentSource.next().then(sourceFunction)
@@ -44,7 +43,7 @@ class RelayContext {
       let streamSwitched = false
 
       function switchFunction(stream: Stream) {
-        currentSource = stream.source
+        tmpSource = stream.source
         streamSwitched = true
       }
       let switchPromise = this._switchPromise.promise.then(switchFunction)
@@ -62,38 +61,46 @@ class RelayContext {
 
         if (sourceReceived) {
           sourceReceived = false
-          const received = sourceMsg.slice()
+          let received: Uint8Array
 
-          const [PREFIX, SUFFIX] = [received.subarray(0, 1), received.subarray(1)]
-          if (u8aEquals(PREFIX, RELAY_STATUS_PREFIX)) {
-            if (u8aEquals(SUFFIX, STOP)) {
-              verbose(`STOP relayed`)
-              break
-            } else if (u8aEquals(SUFFIX, RESTART)) {
-              verbose(`RESTART relayed`)
-            } else {
-              error(`Invalid status message. Got <${u8aToHex(SUFFIX)}>`)
+          // Does not forward empty messages
+          if (sourceMsg != null) {
+            received = sourceMsg.slice()
+
+            const [PREFIX, SUFFIX] = [received.subarray(0, 1), received.subarray(1)]
+            if (u8aEquals(PREFIX, RELAY_STATUS_PREFIX)) {
+              if (u8aEquals(SUFFIX, STOP)) {
+                verbose(`STOP relayed`)
+                break
+              } else if (u8aEquals(SUFFIX, RESTART)) {
+                verbose(`RESTART relayed`)
+              } else {
+                error(`Invalid status message. Got <${u8aToHex(SUFFIX)}>`)
+              }
             }
+
+            verbose(`relaying ${new TextDecoder().decode(sourceMsg.slice(1))}`, u8aToHex(sourceMsg.slice()))
+
+            yield sourceMsg
           }
 
-          verbose(`relaying ${new TextDecoder().decode(sourceMsg.slice(1))}`, u8aToHex(sourceMsg.slice()))
-
-          if (sourceDone) {
-            return sourceMsg
+          if (!sourceDone) {
+            sourcePromise = currentSource.next().then(sourceFunction)
           }
-
-          yield sourceMsg
-          sourcePromise = currentSource.next().then(sourceFunction)
         } else if (streamSwitched) {
           streamSwitched = false
+          sourceDone = false
+          currentSource = tmpSource
           sourcePromise = currentSource.next().then(sourceFunction)
           switchPromise = this._switchPromise.promise.then(switchFunction)
         }
       }
-      log(`after relay context return `)
     }.call(this)
 
-    this.sink = ((source: Stream['source']) => {
+    // @TODO make this function iterative
+    this.sink = async (source: Stream['source']) => {
+      let currentSink = stream.sink
+
       async function* foo(this: RelayContext) {
         let sourceReceived = false
         let sourceMsg: Uint8Array | void
@@ -130,32 +137,39 @@ class RelayContext {
           if (sourceReceived) {
             sourceReceived = false
 
-            if (sourceDone) {
-              return sourceMsg
+            // Ignoring empty messages
+            if (sourceMsg != null) {
+              if (sourceDone) {
+                return sourceMsg
+              } else {
+                yield sourceMsg
+              }
             } else {
-              sourcePromise = source.next().then(sourceFunction)
-              yield sourceMsg
+              if (sourceDone) {
+                return
+              }
             }
+
+            sourcePromise = source.next().then(sourceFunction)
           } else if (streamSwitched) {
             break
           }
         }
       }
-      stream.sink(foo.call(this))
 
-      const switchFunction = (stream: Stream) => {
-        this._switchPromise.promise.then(switchFunction)
-        stream.sink(foo.call(this))
+      while (true) {
+        currentSink(foo.call(this))
+
+        currentSink = (await this._switchPromise.promise).sink
       }
-
-      this._switchPromise.promise.then(switchFunction)
-    }) as Stream['sink']
+    }
   }
 
   update(newStream: Stream) {
     log(`updating`)
-    this._switchPromise.resolve(newStream)
+    let tmpPromise = this._switchPromise
     this._switchPromise = Defer<Stream>()
+    tmpPromise.resolve(newStream)
   }
 }
 

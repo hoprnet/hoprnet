@@ -1,10 +1,9 @@
-import { Stream } from './types'
 import Multiaddr from 'multiaddr'
 import BL from 'bl'
-import { MultiaddrConnection } from './types'
+import { MultiaddrConnection, Stream } from './types'
 import Defer, { DeferredPromise } from 'p-defer'
-import { RELAY_PAYLOAD_PREFIX, RELAY_STATUS_PREFIX, RELAY_WEBRTC_PREFIX, STOP } from './constants'
-import { u8aEquals } from '@hoprnet/hopr-utils'
+import { RELAY_PAYLOAD_PREFIX, RELAY_STATUS_PREFIX, RELAY_WEBRTC_PREFIX, RESTART, STOP } from './constants'
+import { u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
 
 import type { Instance as SimplePeer } from 'simple-peer'
 
@@ -12,6 +11,7 @@ import type PeerId from 'peer-id'
 
 import Debug from 'debug'
 
+const log = Debug('hopr-core:transport')
 const error = Debug('hopr-core:transport:error')
 
 class RelayConnection implements MultiaddrConnection {
@@ -23,8 +23,8 @@ class RelayConnection implements MultiaddrConnection {
   public localAddr: Multiaddr
   public remoteAddr: Multiaddr
 
-  public source: AsyncIterable<Uint8Array>
-  public sink: (source: AsyncIterable<Uint8Array>) => Promise<void>
+  public source: Stream['source']
+  public sink: Stream['sink']
 
   public conn: Stream
 
@@ -37,7 +37,7 @@ class RelayConnection implements MultiaddrConnection {
     stream,
     self,
     counterparty,
-    webRTC,
+    webRTC
   }: {
     stream: Stream
     self: PeerId
@@ -45,7 +45,7 @@ class RelayConnection implements MultiaddrConnection {
     webRTC?: SimplePeer
   }) {
     this.timeline = {
-      open: Date.now(),
+      open: Date.now()
     }
 
     this._defer = Defer()
@@ -61,50 +61,75 @@ class RelayConnection implements MultiaddrConnection {
     this.webRTC = webRTC
 
     this.source = async function* (this: RelayConnection) {
-      const promise = this._defer.promise.then(() => ({ done: true }))
+      let promiseDone = false
+
+      const promise = this._defer.promise.then(() => {
+        promiseDone = true
+      })
+
+      let streamResolved = false
+      let streamMsg: Uint8Array | void
+      let streamDone = false
+
+      function streamSourceFunction({ done, value }: { done?: boolean; value?: Uint8Array | void }) {
+        streamResolved = true
+        streamMsg = value
+
+        if (done) {
+          streamDone = done
+        }
+      }
+
+      let streamPromise = this._stream.source.next().then(streamSourceFunction)
 
       while (true) {
-        let result: {
-          done: boolean
-          value: BL
-        } = await Promise.race([
+        await Promise.race([
           // prettier-ignore
-          // @ts-ignore
-          this._stream.source.next(),
-          promise,
+          streamPromise,
+          promise
         ])
 
-        if (result.value != null) {
-          const received = result.value.slice()
+        if (streamResolved) {
+          streamResolved = false
 
-          if (u8aEquals(received.slice(0, 1), RELAY_PAYLOAD_PREFIX)) {
-            if (result.done) {
-              this._destroyed = true
-              return received.slice(1)
+          if (streamMsg != null) {
+            const received = (streamMsg as Uint8Array).slice()
+
+            const [PREFIX, SUFFIX] = [received.subarray(0, 1), received.subarray(1)]
+
+            if (u8aEquals(PREFIX, RELAY_PAYLOAD_PREFIX)) {
+              if (streamDone || promiseDone) {
+                this._destroyed = true
+                return SUFFIX
+              } else {
+                yield SUFFIX
+              }
+            } else if (u8aEquals(PREFIX, RELAY_STATUS_PREFIX)) {
+              if (u8aEquals(SUFFIX, STOP) || streamDone || promiseDone) {
+                this._destroyed = true
+                return
+              } else if (u8aEquals(SUFFIX, RESTART)) {
+                log(`RESTART received`)
+              } else {
+                error(`Received invalid status message ${received.slice(1)}. Dropping message.`)
+              }
+            } else if (u8aEquals(PREFIX, RELAY_WEBRTC_PREFIX)) {
+              // console.log(`Receiving fancy WebRTC message`, JSON.parse(new TextDecoder().decode(received.slice(1))))
+              this.webRTC?.signal(JSON.parse(new TextDecoder().decode(received.slice(1))))
             } else {
-              yield received.slice(1)
+              error(`Received invalid prefix <${u8aToHex(PREFIX)}. Dropping message.`)
             }
-          } else if (u8aEquals(received.slice(0, 1), RELAY_STATUS_PREFIX)) {
-            if (u8aEquals(received.slice(1), STOP) || result.done) {
-              this._destroyed = true
-              return
-            } else {
-              error(`Received invalid status message ${received.slice(1)}. Dropping message.`)
-            }
-          } else if (u8aEquals(received.slice(0, 1), RELAY_WEBRTC_PREFIX)) {
-            // console.log(`Receiving fancy WebRTC message`, JSON.parse(new TextDecoder().decode(received.slice(1))))
-            this.webRTC?.signal(JSON.parse(new TextDecoder().decode(received.slice(1))))
-          } else {
-            error(`Received invalid prefix <${received.slice(0, 1)}. Dropping message.`)
+
+            streamPromise = this._stream.source.next().then(streamSourceFunction)
           }
-        } else if (result.done) {
+        } else if (promiseDone || streamDone) {
           if (!this._destroyed) {
             if (!this._sinkTriggered) {
               this._stream.sink(
                 (async function* () {
                   yield (new BL([
                     (RELAY_STATUS_PREFIX as unknown) as BL,
-                    (STOP as unknown) as BL,
+                    (STOP as unknown) as BL
                   ]) as unknown) as Uint8Array
                 })()
               )
@@ -116,7 +141,7 @@ class RelayConnection implements MultiaddrConnection {
       }
     }.call(this)
 
-    this.sink = (source: AsyncIterable<Uint8Array>): Promise<void> => {
+    this.sink = (source: Stream['source']): Promise<void> => {
       this._sinkTriggered = true
 
       return this._stream.sink(
@@ -125,13 +150,13 @@ class RelayConnection implements MultiaddrConnection {
 
           let streamResolved = false
           let streamDone = false
-          let streamMsg: BL
+          let streamMsg: Uint8Array | void
 
           let webRTCresolved = false
           let webRTCdone = this.webRTC == null
           let webRTCmsg: Uint8Array | void
 
-          function streamSourceFunction({ done, value }: { done: boolean; value?: BL }) {
+          function streamSourceFunction({ done, value }: { done?: boolean; value?: Uint8Array | void }) {
             streamResolved = true
             streamMsg = value
 
@@ -140,7 +165,6 @@ class RelayConnection implements MultiaddrConnection {
             }
           }
 
-          // @ts-ignore
           let streamPromise = source.next().then(streamSourceFunction)
 
           function webRTCSourceFunction({ done, value }: { done?: boolean; value: Uint8Array | void }) {
@@ -152,10 +176,11 @@ class RelayConnection implements MultiaddrConnection {
             }
           }
 
-          let webRTCstream: AsyncGenerator<Uint8Array, void, unknown>
+          let webRTCstream: Stream['source']
+
           if (this.webRTC != null) {
             webRTCstream = async function* (this: RelayConnection) {
-              let defer = Defer<DeferredPromise<any>>()
+              let defer = Defer<void>()
               let waiting = false
               const webRTCmessages: Uint8Array[] = []
               let done = false
@@ -163,7 +188,9 @@ class RelayConnection implements MultiaddrConnection {
                 webRTCmessages.push(new TextEncoder().encode(JSON.stringify(msg)))
                 if (waiting) {
                   waiting = false
-                  defer.resolve(Defer<DeferredPromise<any>>())
+                  let tmpPromise = defer
+                  defer = Defer<void>()
+                  tmpPromise.resolve()
                 }
               }
               this.webRTC.on('signal', onSignal)
@@ -185,7 +212,7 @@ class RelayConnection implements MultiaddrConnection {
 
                 waiting = true
 
-                defer = await defer.promise
+                await defer.promise
 
                 if (done) {
                   break
@@ -207,51 +234,43 @@ class RelayConnection implements MultiaddrConnection {
               }
               await Promise.race([
                 // prettier-ignore
-                // @ts-ignore
                 streamPromise,
                 webRTCPromise,
-                promise,
+                promise
               ])
             } else {
               await Promise.race([
                 // prettier-ignore
-                // @ts-ignore
                 streamPromise,
-                promise,
+                promise
               ])
             }
 
             if (streamResolved && streamMsg != null) {
               streamResolved = false
-              let _received = streamMsg.slice()
 
               if (promiseDone || (streamDone && webRTCdone)) {
-                if (_received != null) {
-                  yield new BL([(RELAY_PAYLOAD_PREFIX as unknown) as BL, (_received as unknown) as BL])
+                if (streamMsg != null) {
+                  yield new BL([(RELAY_PAYLOAD_PREFIX as unknown) as BL, (streamMsg as unknown) as BL])
                 }
 
                 this._destroyed = true
 
                 return (new BL([
                   (RELAY_STATUS_PREFIX as unknown) as BL,
-                  (STOP as unknown) as BL,
+                  (STOP as unknown) as BL
                 ]) as unknown) as Uint8Array
               } else {
-                if (_received == null) {
-                  // @TODO change this to `return` to end the stream
-                  // once we receive an empty message
-                  continue
+                // Drop empty messages
+                if (streamMsg != null) {
+                  yield new BL([(RELAY_PAYLOAD_PREFIX as unknown) as BL, (streamMsg as unknown) as BL])
                 }
 
-                yield new BL([(RELAY_PAYLOAD_PREFIX as unknown) as BL, (_received as unknown) as BL])
-
-                // @ts-ignore
                 streamPromise = source.next().then(streamSourceFunction)
               }
             } else if (webRTCresolved && webRTCmsg != null) {
               webRTCresolved = false
-              // @ts-ignore
-              yield new BL([RELAY_WEBRTC_PREFIX, webRTCmsg])
+              yield new BL([(RELAY_WEBRTC_PREFIX as unknown) as BL, (webRTCmsg as unknown) as BL])
 
               webRTCPromise = webRTCstream.next().then(webRTCSourceFunction)
             } else if (promiseDone || (streamDone && webRTCdone)) {
@@ -260,7 +279,7 @@ class RelayConnection implements MultiaddrConnection {
 
                 return (new BL([
                   (RELAY_STATUS_PREFIX as unknown) as BL,
-                  (STOP as unknown) as BL,
+                  (STOP as unknown) as BL
                 ]) as unknown) as Uint8Array
               }
 

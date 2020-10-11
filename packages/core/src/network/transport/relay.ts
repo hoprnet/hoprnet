@@ -256,7 +256,6 @@ class Relay {
 
     return { stream: shaker.stream, counterparty }
   }
-  sender
 
   private async handleRelay({ stream, connection }: Handler) {
     log(`handle relay request`)

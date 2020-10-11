@@ -9,7 +9,7 @@ import SECIO = require('libp2p-secio')
 // @ts-ignore
 import TCP from 'libp2p-tcp'
 
-import { Handler, MultiaddrConnection } from './types'
+import { Handler, MultiaddrConnection, Stream } from './types'
 
 import Multiaddr from 'multiaddr'
 import PeerInfo from 'peer-info'
@@ -96,20 +96,15 @@ describe('should create a socket and connect to it', function () {
           pipe(
             /* prettier-ignore */
             conn,
-            async function (source: AsyncGenerator<Uint8Array, Uint8Array | void>) {
-              for await (const msg of source) {
-                console.log(`receiving <${new TextDecoder().decode(msg.slice())}>`)
-              }
-            }
-            // (source: AsyncIterable<Uint8Array>) => {
-            //   return (async function* () {
-            //     for await (const msg of source) {
-            //       console.log(`echoing <${new TextDecoder().decode(msg.slice())}>`)
-            //       yield msg
-            //     }
-            //   })()
-            // },
-            // conn
+            (source: Stream['source']) => {
+              return (async function* () {
+                for await (const msg of source) {
+                  console.log(`receiving <${new TextDecoder().decode(msg.slice())}>`)
+                  yield msg
+                }
+              })()
+            },
+            conn
           )
         }
       })
@@ -120,14 +115,14 @@ describe('should create a socket and connect to it', function () {
     //@ts-ignore
     let conn = await sender.relay.establishRelayedConnection(
       Multiaddr(`/p2p/${counterparty.peerInfo.id.toB58String()}`),
-      [relay.peerInfo],
-      new WebRTCUpgrader({})
+      [relay.peerInfo]
+      /* new WebRTCUpgrader({}) */
     )
 
     conn.sink(
       (async function* () {
         let i = 0
-        while (true) {
+        while (i < 12) {
           yield new TextEncoder().encode(`message ${i++}`)
 
           await new Promise((resolve) => setTimeout(resolve, 100))
@@ -159,23 +154,23 @@ describe('should create a socket and connect to it', function () {
       // @ts-ignore
       let conn = await counterparty.relay.establishRelayedConnection(
         Multiaddr(`/p2p/${sender.peerInfo.id.toB58String()}`),
-        [relay.peerInfo],
-        new WebRTCUpgrader({})
+        [relay.peerInfo]
+        /* new WebRTCUpgrader({}) */
       )
 
       pipe(
         conn,
-        (source: AsyncIterable<Uint8Array>) => {
+        (source: Stream['source']) => {
           return (async function* () {
             for await (const msg of source) {
               console.log(`echoing <${new TextDecoder().decode(msg.slice())}>`)
-              yield msg
+              yield new TextEncoder().encode(`Echoed <${new TextDecoder().decode(msg.slice())}>`)
             }
           })()
         },
         conn
       )
-    }, 1200)
+    }, 500)
 
     // await new Promise((resolve) => setTimeout(resolve, 200))
 
@@ -205,7 +200,7 @@ describe('should create a socket and connect to it', function () {
     //   }
     // )
 
-    await new Promise((resolve) => setTimeout(resolve, 4000))
+    await new Promise((resolve) => setTimeout(resolve, 2000))
   })
 
   it('should create a node and exchange messages', async function () {
