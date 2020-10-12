@@ -122,7 +122,7 @@ class TCP {
       conn._close = () => Promise.resolve()
 
       conn.close().then(() => {
-        this._upgrader.upgradeOutbound(relayConn)
+        this._upgrader.upgradeInbound(relayConn)
         console.log(`reconnected in handler`)
       })
     }
