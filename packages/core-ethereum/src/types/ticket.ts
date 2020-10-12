@@ -53,6 +53,14 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
     }
   }
 
+  slice(begin = 0, end = Ticket.SIZE) {
+    return this.subarray(begin, end)
+  }
+
+  subarray(begin = 0, end = Ticket.SIZE) {
+    return new Uint8Array(this.buffer, begin + this.byteOffset, end - begin)
+  }
+
   get counterpartyOffset(): number {
     return this.byteOffset
   }
