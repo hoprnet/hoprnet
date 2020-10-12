@@ -1,4 +1,6 @@
 import libp2p from 'libp2p'
+import Hopr from '../..'
+import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 
 // @ts-ignore
 import MPLEX = require('libp2p-mplex')
@@ -9,7 +11,7 @@ import SECIO = require('libp2p-secio')
 // @ts-ignore
 import TCP from 'libp2p-tcp'
 
-import { Handler, MultiaddrConnection, Stream } from './types'
+import { Handler, MultiaddrConnection, Stream, Upgrader } from './types'
 
 import Multiaddr from 'multiaddr'
 import PeerInfo from 'peer-info'
@@ -32,7 +34,7 @@ describe('should create a socket and connect to it', function () {
     ipv4?: boolean
     ipv6?: boolean
     connHandler?: (conn: MultiaddrConnection) => void
-  }): Promise<libp2p> {
+  }): Promise<Hopr<HoprCoreConnector> & { relay: Relay }> {
     const peerInfo = new PeerInfo(await privKeyToPeerId(privKeys[options.id]))
 
     if (options.ipv4) {
@@ -66,10 +68,9 @@ describe('should create a socket and connect to it', function () {
           autoDial: false
         }
       }
-    })
+    }) as Hopr<HoprCoreConnector> & { relay: Relay }
 
-    //@ts-ignore
-    node.relay = new Relay(node, options.connHandler)
+    node.relay = new Relay(node, (undefined as unknown) as Upgrader, options.connHandler)
 
     node.handle(TEST_PROTOCOL, (handler: Handler) => {
       pipe(
@@ -112,7 +113,7 @@ describe('should create a socket and connect to it', function () {
 
     // Make sure that the nodes know each other
     await Promise.all([sender.dial(relay.peerInfo), counterparty.dial(relay.peerInfo)])
-    //@ts-ignore
+
     let conn = await sender.relay.establishRelayedConnection(
       Multiaddr(`/p2p/${counterparty.peerInfo.id.toB58String()}`),
       [relay.peerInfo]
@@ -130,9 +131,9 @@ describe('should create a socket and connect to it', function () {
       })()
     )
 
-    function drain({ done, value }: { done?: Boolean; value?: Uint8Array }) {
+    function drain({ done, value }: { done?: Boolean; value?: Uint8Array | void }) {
       if (value != null) {
-        console.log(`Received <${new TextDecoder().decode(value)}>`)
+        console.log(`Received <${new TextDecoder().decode(value as Uint8Array)}>`)
       }
 
       if (!done) {
@@ -151,7 +152,6 @@ describe('should create a socket and connect to it', function () {
         ipv4: true
       })
 
-      // @ts-ignore
       let conn = await counterparty.relay.establishRelayedConnection(
         Multiaddr(`/p2p/${sender.peerInfo.id.toB58String()}`),
         [relay.peerInfo]

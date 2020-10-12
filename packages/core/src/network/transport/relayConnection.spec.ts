@@ -25,7 +25,8 @@ describe('test relay connection', function () {
         source: BobAlice.source
       },
       self: Alice,
-      counterparty: Bob
+      counterparty: Bob,
+      onReconnect: () => {}
     })
 
     const b = new RelayConnection({
@@ -34,7 +35,8 @@ describe('test relay connection', function () {
         source: AliceBob.source
       },
       self: Bob,
-      counterparty: Alice
+      counterparty: Alice,
+      onReconnect: () => {}
     })
 
     a.sink(
@@ -83,6 +85,7 @@ describe('test relay connection', function () {
         source: BobAlice.source
       },
       self: Alice,
+      onReconnect: () => {},
       counterparty: Bob
     })
 
@@ -92,6 +95,7 @@ describe('test relay connection', function () {
         source: AliceBob.source
       },
       self: Bob,
+      onReconnect: () => {},
       counterparty: Alice
     })
 
@@ -158,6 +162,7 @@ describe('test relay connection', function () {
       },
       self: Alice,
       counterparty: Bob,
+      onReconnect: () => {},
       webRTC: FakeWebRTCAlice as SimplePeer
     })
 
@@ -168,6 +173,7 @@ describe('test relay connection', function () {
       },
       self: Bob,
       counterparty: Alice,
+      onReconnect: () => {},
       webRTC: FakeWebRTCBob as SimplePeer
     })
 

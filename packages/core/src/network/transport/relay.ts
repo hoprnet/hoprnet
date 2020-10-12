@@ -54,7 +54,8 @@ import type {
   MultiaddrConnection,
   PeerRouting,
   Registrar,
-  Stream
+  Stream,
+  Upgrader
 } from './types'
 
 class Relay {
@@ -63,17 +64,24 @@ class Relay {
   private _dht: { peerRouting: PeerRouting } | undefined
   private _peerInfo: PeerInfo
   private _streams: Map<string, { [index: string]: RelayContext }>
+  private _upgrader: Upgrader
   private _webRTCUpgrader?: WebRTCUpgrader
 
   private connHandler: (conn: MultiaddrConnection) => void | undefined
 
-  constructor(libp2p: libp2p, _connHandler?: (conn: MultiaddrConnection) => void, webRTCUpgrader?: WebRTCUpgrader) {
+  constructor(
+    libp2p: libp2p,
+    upgrader: Upgrader,
+    _connHandler?: (conn: MultiaddrConnection) => void,
+    webRTCUpgrader?: WebRTCUpgrader
+  ) {
     this._dialer = libp2p.dialer
     //@ts-ignore
     this._registrar = libp2p.registrar
     //@ts-ignore
     this._dht = libp2p._dht
     this._peerInfo = libp2p.peerInfo
+    this._upgrader = upgrader
 
     this.connHandler = _connHandler
 
@@ -122,12 +130,20 @@ class Relay {
       }
 
       log(`relayed connection established`)
-      return new RelayConnection({
+
+      // const outboundConnection = await this._upgrader.upgradeOutbound(
+      const outboundConnection = new RelayConnection({
         stream,
         self: this._peerInfo.id,
-        counterparty: destination
+        counterparty: destination,
+        onReconnect() {
+          console.log(`reconnected`)
+        }
         // webRTC: this._webRTCUpgrader?.upgradeOutbound(),
       })
+      // )
+
+      return outboundConnection
     }
 
     throw Error(
@@ -146,14 +162,19 @@ class Relay {
       return
     }
 
-    this.connHandler?.(
-      new RelayConnection({
-        stream,
-        self: this._peerInfo.id,
-        counterparty
-        // webRTC: this._webRTCUpgrader?.upgradeInbound(),
-      })
-    )
+    //const inboundConnection = await this._upgrader.upgradeInbound(
+    const inboundConnection = new RelayConnection({
+      stream,
+      self: this._peerInfo.id,
+      counterparty,
+      onReconnect() {
+        log(`reconnected`)
+      }
+      // webRTC: this._webRTCUpgrader?.upgradeInbound(),
+    })
+    // )
+
+    this.connHandler?.(inboundConnection)
     log(`counterparty relayed connection established`)
   }
 
