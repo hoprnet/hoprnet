@@ -14,6 +14,7 @@
     "util:regenerate": "yarn util:clean && lerna exec --concurrency 1 --stream -- yarn",
     "util:install": "yarn util:clean && lerna exec --concurrency 1 --stream -- yarn --pure-lockfile",
     "util:build": "lerna exec --stream -- yarn build",
+    "build": "lerna exec --stream -- yarn build",
     "util:link": "lerna link"
   },
   "dependencies": {

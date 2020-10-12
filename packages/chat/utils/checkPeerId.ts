@@ -17,7 +17,7 @@ import { getPeersIdsAsString } from './openChannels'
  */
 export async function checkPeerIdInput(peerIdString: string, state?: GlobalState): Promise<PeerId> {
   try {
-    if (typeof state !== 'undefined' && state.aliases.has(peerIdString)) {
+    if (typeof state !== 'undefined' && state.aliases && state.aliases.has(peerIdString)) {
       return state.aliases.get(peerIdString)!
     }
 
