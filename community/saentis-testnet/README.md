@@ -13,6 +13,6 @@ Säntis was an incentivized HOPR testnet which ran on [xDAI Chain](https://www.x
 ![The S&#xE4;ntis web interface](../../.gitbook/assets/saentis-ui%20%281%29.png)
 
 {% hint style="info" %}
-Like all our build, Säntis was named after a mountain in HOPR's home country of Switzerland. On a clear day, you can see six different countries from the summit!
+Like all of our builds, Säntis was named after a mountain in HOPR's home country of Switzerland. On a clear day, you can see six different countries from the summit!
 {% endhint %}
 
