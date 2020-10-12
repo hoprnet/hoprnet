@@ -257,8 +257,8 @@ jobs:
         working-directory: packages/chat
         run: yarn build
       - name: Compile project into nodes bin
-        run: yarn compile
         working-directory: packages/chat
+        run: yarn compile
       - name: Zip node binary for uploading
         working-directory: packages/chat
         run: yarn zip:${{ matrix.displayName }}
