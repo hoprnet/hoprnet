@@ -60,8 +60,8 @@ jobs:
           !contains(github.event.pull_request.labels.*.name, 'Patch Version')
         run: | # TODO: Assert master branch,
           git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Versioning robot"
-          node_modules/.bin/lerna version prerelease --preid "alpha" --yes
           git pull origin master
+          node_modules/.bin/lerna version prerelease --preid "alpha" --yes
           git push origin master
           node_modules/.bin/lerna publish from-package --yes
           sleep 5m # Allow NPM registry to catch uo
@@ -78,8 +78,8 @@ jobs:
           !contains(github.event.pull_request.labels.*.name, 'Patch Version')
         run: | # TODO: Assert master branch,
           git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Versioning robot"
-          node_modules/.bin/lerna version major --yes
           git pull origin master
+          node_modules/.bin/lerna version major --yes
           git push origin master
           node_modules/.bin/lerna publish from-package --yes
           sleep 5m # Allow NPM registry to catch uo
@@ -96,8 +96,8 @@ jobs:
           !contains(github.event.pull_request.labels.*.name, 'Patch Version')
         run: | # TODO: Assert master branch,
           git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Versioning robot"
-          node_modules/.bin/lerna version minor --yes
           git pull origin master
+          node_modules/.bin/lerna version minor --yes
           git push origin master
           node_modules/.bin/lerna publish from-package --yes
           sleep 5m # Allow NPM registry to catch uo
@@ -114,8 +114,8 @@ jobs:
           contains(github.event.pull_request.labels.*.name, 'Patch Version')
         run: | # TODO: Assert master branch,
           git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Versioning robot"
-          node_modules/.bin/lerna version patch --yes
           git pull origin master
+          node_modules/.bin/lerna version patch --yes
           git push origin master
           node_modules/.bin/lerna publish from-package --yes
           sleep 5m # Allow NPM registry to catch uo
@@ -163,8 +163,8 @@ jobs:
 
           git add dappnode_package.json docker-compose.yml releases.json
           git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Versioning robot"
-          git commit -m "Avado CI: new release"
           git pull origin master
+          git commit -m "Avado CI: new release"
           git push origin master
 
   # chat
