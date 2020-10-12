@@ -2,7 +2,7 @@ import { AbstractCommand, AutoCompleteResult, GlobalState } from '../abstractCom
 import { styleValue, getOptions } from '../../utils'
 
 export class Routing extends AbstractCommand {
-  private readonly options: GlobalState['routing'][] = ['auto', 'manual', 'direct']
+  private readonly options: GlobalState['routing'][] = ['manual', 'direct']
 
   public name() {
     return 'routing'
