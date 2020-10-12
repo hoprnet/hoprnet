@@ -6,6 +6,6 @@
   "homepage": "https://hoprnet.org",
   "license": "LGPL-3.0-only",
   "dependencies": {
-    "gitbook-plugin-meta": "^0.1.12"
+    "gitbook-plugin-head-append": "^1.1.1"
   }
 }

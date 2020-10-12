@@ -2,7 +2,7 @@
 # yarn lockfile v1
 
 
-gitbook-plugin-meta@^0.1.12:
-  version "0.1.12"
-  resolved "https://registry.yarnpkg.com/gitbook-plugin-meta/-/gitbook-plugin-meta-0.1.12.tgz#d3bf9a1d4978b0eeb9c4206e41d7edcb3a4cce62"
-  integrity sha1-07+aHUl4sO65xCBuQdftyzpMzmI=
+gitbook-plugin-head-append@^1.1.1:
+  version "1.1.1"
+  resolved "https://registry.yarnpkg.com/gitbook-plugin-head-append/-/gitbook-plugin-head-append-1.1.1.tgz#068e80d55fba2206b90b869b23cb2d9792d59ebf"
+  integrity sha512-rdKmZseklmAXEdDo+5HtEeElOqsTAYwiEui1ssh1q1TPjhlOj1D4RenJZNcgy49hy4/enbUuuOzAzvxxBPpnDA==
