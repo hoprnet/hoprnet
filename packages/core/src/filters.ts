@@ -3,7 +3,7 @@ import Multiaddr from 'multiaddr'
 
 // This should filter IP4's from private networks, as defined by RFC1918
 // It also includes 0.0.0.0 as this is unroutable.
-export const PRIVATE_NETS = /(^127\.)|(^10\.)|(^172\.1[6-9]\.)|(^172\.2[0-9]\.)|(^172\.3[0-1]\.)|(^192\.168\.)|(^0.0.0.0)/
+export const PRIVATE_NETS = /(^127\.)|(^10\.)|(^172\.1[6-9]\.)|(^172\.2[0-9]\.)|(^172\.3[0-1]\.)|(^192\.168\.)|(^0\.0\.0\.0)/
 
 export const peerHasOnlyPrivateAddresses = (peer: PeerInfo): boolean => {
   return peer.multiaddrs.size > 0 && peer.multiaddrs.toArray().filter((ma) => !isOnPrivateNet(ma)).length == 0
