@@ -2,6 +2,7 @@ import { AbstractCommand, AutoCompleteResult, GlobalState } from '../abstractCom
 import { styleValue, getOptions, checkPeerIdInput } from '../../utils'
 
 export class Routing extends AbstractCommand {
+  // there is actually another option which takes in peerIds
   private readonly options: GlobalState['routing'][] = ['manual', 'direct']
 
   public name() {
@@ -23,14 +24,14 @@ export class Routing extends AbstractCommand {
         await Promise.all(query.split(',').map(async (peerId) => await checkPeerIdInput(peerId)))
         state.routing = query
       } catch (err) {
-        return styleValue(`Invalid option ${query}`, 'highlight')
+        return styleValue(`Invalid option ${query}.`, 'failure')
       }
     }
     // provided a mode
     else {
       const option = this.options.find((o) => query === o)
       if (!option) {
-        return styleValue('Invalid option.', 'failure')
+        return styleValue(`Invalid option ${query}.`, 'failure')
       }
 
       state.routing = option
