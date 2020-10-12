@@ -121,14 +121,16 @@ class TCP {
       // @ts-ignore
       conn._close = () => Promise.resolve()
 
+      console.log(`relayConn`, relayConn)
       conn.close().then(() => {
+        console.log(`relayConn inside close`, relayConn)
         this._upgrader.upgradeInbound(relayConn)
         console.log(`reconnected in handler`)
       })
     }
 
     try {
-      let relayConn = await this._relay.handleRelayConnection(handler, onReconnect)
+      relayConn = await this._relay.handleRelayConnection(handler, onReconnect)
 
       conn = await this._upgrader.upgradeInbound(relayConn)
     } catch (err) {
