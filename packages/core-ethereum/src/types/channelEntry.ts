@@ -1,5 +1,4 @@
 import BN from 'bn.js'
-import { u8aConcat } from '@hoprnet/hopr-utils'
 import { UINT256 } from '../types/solidity'
 import { BNE, Uint8ArrayE } from '../types/extended'
 
@@ -16,33 +15,55 @@ class ChannelEntry extends Uint8ArrayE {
       logIndex: BN
     }
   ) {
-    if (arr != null && struct == null) {
+    if (arr == null) {
+      super(ChannelEntry.SIZE)
+    } else {
       super(arr.bytes, arr.offset, ChannelEntry.SIZE)
-    } else if (arr == null && struct != null) {
+    }
+
+    if (struct != null) {
       // we convert values to string because of this issue
       // https://github.com/indutny/bn.js/issues/206
       const blockNumber = new BNE(struct.blockNumber.toString())
       const transactionIndex = new BNE(struct.transactionIndex.toString())
       const logIndex = new BNE(struct.logIndex.toString())
 
-      super(
-        u8aConcat(blockNumber.toU8a(UINT256.SIZE), transactionIndex.toU8a(UINT256.SIZE), logIndex.toU8a(UINT256.SIZE))
-      )
-    } else {
-      throw Error(`Invalid constructor arguments.`)
+      this.set(blockNumber.toU8a(UINT256.SIZE), this.blockNumberOffset - this.byteOffset)
+      this.set(transactionIndex.toU8a(UINT256.SIZE), this.transactionIndexOffset - this.byteOffset)
+      this.set(logIndex.toU8a(UINT256.SIZE), this.logIndexOffset - this.byteOffset)
     }
   }
 
+  slice(begin = 0, end = ChannelEntry.SIZE): Uint8Array {
+    return this.subarray(begin, end)
+  }
+
+  subarray(begin = 0, end = ChannelEntry.SIZE): Uint8Array {
+    return new Uint8Array(this.buffer, begin + this.byteOffset, end - begin)
+  }
+
+  get blockNumberOffset() {
+    return this.byteOffset
+  }
+
   get blockNumber() {
-    return new BNE(this.subarray(0, UINT256.SIZE))
+    return new BNE(new Uint8Array(this.buffer, this.blockNumberOffset, UINT256.SIZE))
+  }
+
+  get transactionIndexOffset() {
+    return this.byteOffset + UINT256.SIZE
   }
 
   get transactionIndex() {
-    return new BNE(this.subarray(UINT256.SIZE, UINT256.SIZE * 2))
+    return new BNE(new Uint8Array(this.buffer, this.transactionIndexOffset, UINT256.SIZE))
+  }
+
+  get logIndexOffset() {
+    return this.byteOffset + UINT256.SIZE + UINT256.SIZE
   }
 
   get logIndex() {
-    return new BNE(this.subarray(UINT256.SIZE * 2, UINT256.SIZE * 3))
+    return new BNE(new Uint8Array(this.buffer, this.logIndexOffset, UINT256.SIZE))
   }
 
   static get SIZE(): number {
