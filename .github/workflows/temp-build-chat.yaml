@@ -7,7 +7,6 @@ on:
 jobs:
   build_chat_binaries:
     name: Build HOPR Chat Binaries
-    needs: [build]
     strategy:
       matrix:
         os: [macos-latest, ubuntu-latest, windows-latest]
