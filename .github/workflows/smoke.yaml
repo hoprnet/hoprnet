@@ -94,7 +94,7 @@ jobs:
           hoprd --data='./test/fixtures/alice' --password="$DBPASS" --run="crawl; ping $CHARLIE"
 
           # Open channel alice -> bob and send a-b-c
-          DEBUG=hopr* hoprd --data='./test/fixtures/alice' --password="$DBPASS" --run="crawl; open $BOB 101; send $CHARLIE hi"
+          DEBUG=hopr* hoprd --data='./test/fixtures/alice' --password="$DBPASS" --run="crawl; open $BOB 10; send $CHARLIE hi"
 
           # Cleanup
           kill $BOB_PID
@@ -111,6 +111,8 @@ jobs:
 
           # See who's around
           DEBUG=hopr* hoprd --data='./test/fixtures/alice' --password="$DBPASS" --run="crawl; listConnectedPeers"
+        env:
+          DBPASS: ${{ secrets.SMOKETESTPASSWORD }}
 
       - name: Commit database changes back to repo
         shell: bash {0}
