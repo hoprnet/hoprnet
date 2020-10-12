@@ -27,7 +27,7 @@ export abstract class SendMessageBase extends AbstractCommand {
     recipient: PeerId,
     msg: string,
     getIntermediateNodes?: () => Promise<PeerId[]>
-  ): Promise<string> {
+  ): Promise<string | void> {
     const message = state.includeRecipient
       ? ((myAddress) => `${myAddress}:${msg}`)(this.node.peerInfo.id.toB58String())
       : msg
@@ -88,7 +88,7 @@ export class SendMessageFancy extends SendMessageBase {
    * Encapsulates the functionality that is executed once the user decides to send a message.
    * @param query peerId string to send message to
    */
-  public async execute(query: string, state: GlobalState): Promise<string> {
+  public async execute(query: string, state: GlobalState): Promise<string | void> {
     const [err, peerIdString] = this._assertUsage(query, ['PeerId'])
     if (err) return err
 
