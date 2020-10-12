@@ -83,6 +83,7 @@ jobs:
           # Ping bootstrapnode
           hoprd --data='./test/fixtures/alice' --password="$DBPASS" --run="info"
           hoprd --data='./test/fixtures/alice' --password="$DBPASS" --run="ping $BOB"
+          hoprd --data='./test/fixtures/alice' --password="$DBPASS" --run="crawl; listConnectedPeers "
 
           # Start charlie
           hoprd --data='./test/fixtures/charlie' --password="$DBPASS" --host="$CHARLIE_ADDR:$CHARLIE_PORT" &
