@@ -12,6 +12,9 @@ deadline_secs=${2:-900}
 # time to wait before every check, in seconds
 wait_secs=${3:-60}
 
+# set directory to this scripts location
+cd "$(dirname "$0")"
+
 start_time=$(date +%s)
 deadline=$(( $start_time + $deadline_secs ))
 # get list of packages that were published
