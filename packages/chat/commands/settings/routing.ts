@@ -1,5 +1,5 @@
 import { AbstractCommand, AutoCompleteResult, GlobalState } from '../abstractCommand'
-import { styleValue, getOptions } from '../../utils'
+import { styleValue, getOptions, checkPeerIdInput } from '../../utils'
 
 export class Routing extends AbstractCommand {
   private readonly options: GlobalState['routing'][] = ['manual', 'direct']
@@ -15,6 +15,17 @@ export class Routing extends AbstractCommand {
   public async execute(query: string, state: GlobalState): Promise<string | void> {
     if (!query) {
       return styleValue(state.routing, 'highlight')
+    }
+
+
+    try {
+      // Multiaddr's separated by ','
+      let path = await Promise.all(query.split(',')
+                              .map(async (x) => await checkPeerIdInput(x)))
+      state.routing = query
+      return "Using manual routing with specified path"
+    } catch (e) {
+      // Not multiaddrs
     }
 
     const option = this.options.find((o) => query === o)
