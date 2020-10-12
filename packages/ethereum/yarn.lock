@@ -183,12 +183,20 @@
     "@ethersproject/rlp" "^5.0.3"
     "@ethersproject/signing-key" "^5.0.4"
 
+<<<<<<< HEAD
 "@hoprnet/hopr-demo-seeds@^1.17.0-alpha.62", "@hoprnet/hopr-demo-seeds@^1.17.0-alpha.63":
+=======
+"@hoprnet/hopr-demo-seeds@^1.17.0-alpha.63":
+>>>>>>> a3a6301c38bf91110c3fc1b085bb526a0f9c24b6
   version "1.17.0-alpha.63"
   resolved "https://registry.yarnpkg.com/@hoprnet/hopr-demo-seeds/-/hopr-demo-seeds-1.17.0-alpha.63.tgz#9d995f0849c7f4185897addbbba7ab21ea06b6c2"
   integrity sha512-1vj9inGkAVPyeVe2uLl7Rip8IE5nye8nzQMbq2FLRvGIF4Pbt9Gmd1K8u7Tk3Yu5eJLkm+7QDvPjKyWw3kF9kw==
 
+<<<<<<< HEAD
 "@hoprnet/hopr-testing@^1.17.0-alpha.62":
+=======
+"@hoprnet/hopr-testing@^1.17.0-alpha.63":
+>>>>>>> a3a6301c38bf91110c3fc1b085bb526a0f9c24b6
   version "1.17.0-alpha.63"
   resolved "https://registry.yarnpkg.com/@hoprnet/hopr-testing/-/hopr-testing-1.17.0-alpha.63.tgz#5f788002b0684f48d5b38db037874b78893957d3"
   integrity sha512-YnRd7i2TYtCAVTT1Va3TIpqmKK0AVzn+7veriRzCwuRdWwom0Dg7yZCP4GnShIMwhhFKe+EjcWwgh+rbNccXYA==
@@ -196,7 +204,11 @@
     "@hoprnet/hopr-demo-seeds" "^1.17.0-alpha.63"
     ganache-core "^2.12.1"
 
+<<<<<<< HEAD
 "@hoprnet/hopr-utils@^1.17.0-alpha.62":
+=======
+"@hoprnet/hopr-utils@^1.17.0-alpha.63":
+>>>>>>> a3a6301c38bf91110c3fc1b085bb526a0f9c24b6
   version "1.17.0-alpha.63"
   resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.17.0-alpha.63.tgz#1598e05bf13d0632cfbde3eb702254b212653b6a"
   integrity sha512-aUO21hTvISBIA0B9f/VpHWyq5tL9NVKR581B3s5imlAamhoEQ0qJjKwAACG7fMcGR7PhWUzSQPpRQmTatnrinw==
@@ -6692,9 +6704,9 @@ prepend-http@^2.0.0:
   integrity sha1-6SQ0v6XqjBn0HN/UAddBo8gZ2Jc=
 
 prettier-plugin-solidity@^1.0.0-alpha.55:
-  version "1.0.0-alpha.58"
-  resolved "https://registry.yarnpkg.com/prettier-plugin-solidity/-/prettier-plugin-solidity-1.0.0-alpha.58.tgz#87e44b21bd9bd6ad4b28b1ac62ccdce59fb82fe3"
-  integrity sha512-G2xj98uEtfTcSc4qZcQ+MLwibpDNhBmOJk9ezTJ7uQLtTMGP1X9PqRnRlJW/vxbStPw/TVvnYD5rXwd1KZbTsg==
+  version "1.0.0-alpha.59"
+  resolved "https://registry.yarnpkg.com/prettier-plugin-solidity/-/prettier-plugin-solidity-1.0.0-alpha.59.tgz#b0cf82fb068537d152d0bc417588d08e952a56c6"
+  integrity sha512-6cE0SWaiYCBoJY4clCfsbWlEEOU4K42Ny6Tg4Jwprgts/q+AVfYnPQ5coRs7zIjYzc4RVspifYPeh+oAg8RpLw==
   dependencies:
     "@solidity-parser/parser" "^0.8.1"
     dir-to-object "^2.0.0"
