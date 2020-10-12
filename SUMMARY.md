@@ -5,15 +5,7 @@
 ## Getting started
 
 * [Overview](getting-started/overview.md)
-* [Säntis Testnet](getting-started/saentis-testnet/README.md)
-  * [First Time Users](getting-started/saentis-testnet/quickstart.md)
-  * [Säntis for Previous Users](getting-started/saentis-testnet/getting-started.md)
-  * [Funding Your Node](getting-started/saentis-testnet/funding-your-node.md)
-  * [Talking with RandoBot](getting-started/saentis-testnet/randobot.md)
-  * [Registering with CoverBot](getting-started/saentis-testnet/coverbot.md)
-  * [Scoreboard and Prizes](getting-started/saentis-testnet/the-scoreboard.md)
-  * [Advanced Setup](getting-started/saentis-testnet/setup.md)
-  * [Troubleshooting](getting-started/saentis-testnet/troubleshooting.md)
+* [First Time Users](getting-started/quickstart.md)
 
 ## Core Concepts
 
@@ -34,4 +26,12 @@
 * [HOPR Games](community/hopr-games/README.md)
   * [Bounties](community/hopr-games/bounties/README.md)
     * [Bouncer Bot](community/hopr-games/bounties/bouncer-bot.md)
+* [Säntis Testnet](community/saentis-testnet/README.md)
+  * [Säntis for Previous Users](community/saentis-testnet/getting-started.md)
+  * [Funding Your Node](community/saentis-testnet/funding-your-node.md)
+  * [Talking with RandoBot](community/saentis-testnet/randobot.md)
+  * [Registering with CoverBot](community/saentis-testnet/coverbot.md)
+  * [Scoreboard and Prizes](community/saentis-testnet/the-scoreboard.md)
+  * [Advanced Setup](community/saentis-testnet/setup.md)
+  * [Troubleshooting](community/saentis-testnet/troubleshooting.md)
 

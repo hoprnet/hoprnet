@@ -17,9 +17,9 @@ Although right now the only way to participate in the HOPR Games Bounties is to 
 
 To get started with **HOPR Chat**, please visit our quick start ****page to download the **HOPR Chat** binary or follow our advanced setup to compile and run **HOPR Chat** yourself.
 
-{% page-ref page="../../../getting-started/saentis-testnet/quickstart.md" %}
+{% page-ref page="../../../getting-started/quickstart.md" %}
 
-{% page-ref page="../../../getting-started/saentis-testnet/setup.md" %}
+{% page-ref page="../../saentis-testnet/setup.md" %}
 
 ### Social Media
 
