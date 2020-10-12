@@ -7,7 +7,7 @@ import debug from 'debug'
 import { socketToConn } from './socket-to-conn'
 import libp2p from 'libp2p'
 import Listener from './listener'
-import { USE_WEBRTC, CODE_P2P } from './constants'
+import { USE_WEBRTC, CODE_P2P, DELIVERY } from './constants'
 import Multiaddr from 'multiaddr'
 import PeerInfo from 'peer-info'
 import PeerId from 'peer-id'
@@ -105,16 +105,31 @@ class TCP {
       this._webRTCUpgrader = new WebRTCUpgrader({ stunServers: this.stunServers })
     }
 
-    this._relay = new Relay(libp2p, (undefined as unknown) as Upgrader, this.handleDelivery.bind(this), this._webRTCUpgrader)
+    libp2p.handle(DELIVERY, this.handleDelivery.bind(this))
+
+    this._relay = new Relay(libp2p, this._webRTCUpgrader)
     verbose(`Created TCP stack (Stun: ${this.stunServers?.map((x) => x.toString()).join(',')}`)
   }
 
-  async handleDelivery(relayConn: MultiaddrConnection) {
+  async handleDelivery(handler: Handler) {
     //verbose('handle delivery', connection.remoteAddr.toString(), counterparty.toB58String())
+
     let conn: Connection
+    let relayConn: MultiaddrConnection
+
+    let onReconnect = () => {
+      // @ts-ignore
+      conn._close = () => Promise.resolve()
+
+      conn.close().then(() => {
+        this._upgrader.upgradeOutbound(relayConn)
+        console.log(`reconnected in handler`)
+      })
+    }
 
     try {
-      // @ts-ignore
+      let relayConn = await this._relay.handleRelayConnection(handler, onReconnect)
+
       conn = await this._upgrader.upgradeInbound(relayConn)
     } catch (err) {
       error(`Could not upgrade relayed connection. Error was: ${err}`)
@@ -189,13 +204,28 @@ class TCP {
 
   async dialWithRelay(ma: Multiaddr, relays: PeerInfo[], options?: DialOptions): Promise<Connection> {
     if (this._useWebRTC) {
-      const relayConnection = await this._relay.establishRelayedConnection(ma, relays, options)
+      const onReconnect = () => {
+        console.log(`reconnect in dialer`)
+      }
+      const relayConnection = await this._relay.establishRelayedConnection(ma, relays, onReconnect, options)
 
       return await this._upgrader.upgradeOutbound(relayConnection)
     } else {
-      const relayConnection = await this._relay.establishRelayedConnection(ma, relays, options)
+      let relayConnection: MultiaddrConnection
+      let conn: Connection
+      const onReconnect = () => {
+        // @ts-ignore
+        conn._close = () => Promise.resolve()
 
-      return await this._upgrader.upgradeOutbound(relayConnection)
+        conn.close().then(() => {
+          this._upgrader.upgradeOutbound(relayConnection)
+          console.log(`reconnect in dialer without WebRTC`)
+        })
+      }
+
+      relayConnection = await this._relay.establishRelayedConnection(ma, relays, onReconnect, options)
+
+      return this._upgrader.upgradeOutbound(relayConnection)
     }
   }
 

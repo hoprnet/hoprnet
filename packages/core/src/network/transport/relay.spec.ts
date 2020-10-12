@@ -23,6 +23,7 @@ import { randomBytes } from 'crypto'
 import { privKeyToPeerId } from '../../utils'
 import defer from 'p-defer'
 import { WebRTCUpgrader } from './webrtc'
+import { DELIVERY } from './constants'
 
 const TEST_PROTOCOL = `/test/0.0.1`
 
@@ -70,7 +71,16 @@ describe('should create a socket and connect to it', function () {
       }
     }) as Hopr<HoprCoreConnector> & { relay: Relay }
 
-    node.relay = new Relay(node, () => {}, options.connHandler)
+    node.relay = new Relay(node)
+
+    node.handle(DELIVERY, (conn) => {
+      function onReconnected() {
+        console.log(`reconnected counterparty`)
+      }
+      node.relay.handleRelayConnection
+        .call(node.relay, conn, onReconnected)
+        .then((relayConn: MultiaddrConnection) => options.connHandler?.(relayConn))
+    })
 
     node.handle(TEST_PROTOCOL, (handler: Handler) => {
       pipe(
@@ -116,7 +126,11 @@ describe('should create a socket and connect to it', function () {
 
     let conn = await sender.relay.establishRelayedConnection(
       Multiaddr(`/p2p/${counterparty.peerInfo.id.toB58String()}`),
-      [relay.peerInfo]
+      [relay.peerInfo],
+      // ignore reconnects
+      () => {
+        console.log(`initiator reconnected`)
+      }
       /* new WebRTCUpgrader({}) */
     )
 
@@ -154,7 +168,9 @@ describe('should create a socket and connect to it', function () {
 
       let conn = await counterparty.relay.establishRelayedConnection(
         Multiaddr(`/p2p/${sender.peerInfo.id.toB58String()}`),
-        [relay.peerInfo]
+        [relay.peerInfo],
+        // ignore reconnects
+        () => {}
         /* new WebRTCUpgrader({}) */
       )
 

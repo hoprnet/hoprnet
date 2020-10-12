@@ -30,14 +30,7 @@ import Multiaddr from 'multiaddr'
 import PeerInfo from 'peer-info'
 import PeerId from 'peer-id'
 
-import {
-  RELAY_CIRCUIT_TIMEOUT,
-  RELAY_REGISTER,
-  OK,
-  FAIL,
-  FAIL_COULD_NOT_REACH_COUNTERPARTY,
-  DELIVERY_REGISTER
-} from './constants'
+import { RELAY_CIRCUIT_TIMEOUT, RELAY, OK, FAIL, FAIL_COULD_NOT_REACH_COUNTERPARTY, DELIVERY } from './constants'
 
 import { pubKeyToPeerId } from '../../utils'
 import { u8aCompare, u8aEquals } from '@hoprnet/hopr-utils'
@@ -54,8 +47,7 @@ import type {
   MultiaddrConnection,
   PeerRouting,
   Registrar,
-  Stream,
-  Upgrader
+  Stream
 } from './types'
 
 class Relay {
@@ -64,26 +56,15 @@ class Relay {
   private _dht: { peerRouting: PeerRouting } | undefined
   private _peerInfo: PeerInfo
   private _streams: Map<string, { [index: string]: RelayContext }>
-  private _onReconnect: () => void
   private _webRTCUpgrader?: WebRTCUpgrader
 
-  private connHandler: (conn: MultiaddrConnection, onReconnect: () => void) => void | undefined
-
-  constructor(
-    libp2p: libp2p,
-    _onReconnect: () => void,
-    _connHandler?: (conn: MultiaddrConnection) => void,
-    webRTCUpgrader?: WebRTCUpgrader
-  ) {
+  constructor(libp2p: libp2p, webRTCUpgrader?: WebRTCUpgrader) {
     this._dialer = libp2p.dialer
     //@ts-ignore
     this._registrar = libp2p.registrar
     //@ts-ignore
     this._dht = libp2p._dht
     this._peerInfo = libp2p.peerInfo
-    this._onReconnect = _onReconnect
-
-    this.connHandler = _connHandler
 
     this._streams = new Map<string, { [index: string]: RelayContext }>()
 
@@ -91,13 +72,13 @@ class Relay {
     //   this._webRTCUpgrader = webRTCUpgrader
     // }
 
-    libp2p.handle(RELAY_REGISTER, this.handleRelay.bind(this))
-    libp2p.handle(DELIVERY_REGISTER, this.handleRelayConnection.bind(this))
+    libp2p.handle(RELAY, this.handleRelay.bind(this))
   }
 
   async establishRelayedConnection(
     ma: Multiaddr,
     relays: PeerInfo[],
+    onReconnect: () => void,
     options?: DialOptions
   ): Promise<MultiaddrConnection> {
     const destination = PeerId.createFromCID(ma.getPeerId())
@@ -113,8 +94,9 @@ class Relay {
     }
 
     for (let i = 0; i < potentialRelays.length; i++) {
-      let relayConnection = this._tryPotentialRelay(potentialRelays[i], destination)
+      let relayConnection = await this._tryPotentialRelay(potentialRelays[i], destination, onReconnect)
 
+      console.log(relayConnection)
       if (relayConnection != null) {
         return relayConnection
       }
@@ -127,7 +109,12 @@ class Relay {
     )
   }
 
-  private async _tryPotentialRelay(potentialRelay: PeerInfo, destination: PeerId, options?: DialOptions) {
+  private async _tryPotentialRelay(
+    potentialRelay: PeerInfo,
+    destination: PeerId,
+    onReconnect: () => void,
+    options?: DialOptions
+  ) {
     let relayConnection: Connection
     try {
       relayConnection = await this.connectToRelay(potentialRelay, options)
@@ -136,11 +123,13 @@ class Relay {
       return
     }
 
+
+
     let stream: Stream
     try {
       stream = await this.performHandshake(relayConnection, potentialRelay.id, destination)
     } catch (err) {
-      error(err)
+      console.log(err)
       return
     }
 
@@ -149,36 +138,32 @@ class Relay {
       return
     }
 
+
     return new RelayConnection({
       stream,
       self: this._peerInfo.id,
       counterparty: destination,
-      onReconnect: this._onReconnect
+      onReconnect
       // webRTC: this._webRTCUpgrader?.upgradeOutbound(),
     })
   }
 
-  async handleReRegister() {}
-
-  async handleRelayConnection(conn: Handler): Promise<void> {
+  async handleRelayConnection(conn: Handler, onReconnect: () => void): Promise<MultiaddrConnection> {
     const { stream, counterparty } = await this.handleHandshake(conn.stream)
 
     if (stream == null) {
       return
     }
 
-    this.connHandler?.(
-      new RelayConnection({
-        stream,
-        self: this._peerInfo.id,
-        counterparty,
-        onReconnect() {
-          log(`reconnected`)
-        }
-        // webRTC: this._webRTCUpgrader?.upgradeInbound(),
-      })
-    )
     log(`counterparty relayed connection established`)
+
+    return new RelayConnection({
+      stream,
+      self: this._peerInfo.id,
+      counterparty,
+      onReconnect
+      // webRTC: this._webRTCUpgrader?.upgradeInbound(),
+    })
   }
 
   private async connectToRelay(relay: PeerInfo, options?: DialOptions): Promise<Connection> {
@@ -218,7 +203,7 @@ class Relay {
   private async performHandshake(relayConnection: Connection, relay: PeerId, destination: PeerId): Promise<Stream> {
     let shaker: Handshake
     try {
-      shaker = handshake((await relayConnection.newStream([RELAY_REGISTER])).stream)
+      shaker = handshake((await relayConnection.newStream([RELAY])).stream)
     } catch (err) {
       throw Error(`failed to establish stream with ${relay.toB58String()}. Error was: ${err}`)
     }
@@ -408,7 +393,7 @@ class Relay {
       }
     }
 
-    const { stream: newStream } = await newConn.newStream([DELIVERY_REGISTER])
+    const { stream: newStream } = await newConn.newStream([DELIVERY])
 
     timeout && clearTimeout(timeout)
 
