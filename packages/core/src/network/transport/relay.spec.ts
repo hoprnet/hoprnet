@@ -70,7 +70,7 @@ describe('should create a socket and connect to it', function () {
       }
     }) as Hopr<HoprCoreConnector> & { relay: Relay }
 
-    node.relay = new Relay(node, (undefined as unknown) as Upgrader, options.connHandler)
+    node.relay = new Relay(node, () => {}, options.connHandler)
 
     node.handle(TEST_PROTOCOL, (handler: Handler) => {
       pipe(

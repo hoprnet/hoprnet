@@ -64,14 +64,14 @@ class Relay {
   private _dht: { peerRouting: PeerRouting } | undefined
   private _peerInfo: PeerInfo
   private _streams: Map<string, { [index: string]: RelayContext }>
-  private _upgrader: Upgrader
+  private _onReconnect: () => void
   private _webRTCUpgrader?: WebRTCUpgrader
 
-  private connHandler: (conn: MultiaddrConnection) => void | undefined
+  private connHandler: (conn: MultiaddrConnection, onReconnect: () => void) => void | undefined
 
   constructor(
     libp2p: libp2p,
-    upgrader: Upgrader,
+    _onReconnect: () => void,
     _connHandler?: (conn: MultiaddrConnection) => void,
     webRTCUpgrader?: WebRTCUpgrader
   ) {
@@ -81,7 +81,7 @@ class Relay {
     //@ts-ignore
     this._dht = libp2p._dht
     this._peerInfo = libp2p.peerInfo
-    this._upgrader = upgrader
+    this._onReconnect = _onReconnect
 
     this.connHandler = _connHandler
 
@@ -113,37 +113,11 @@ class Relay {
     }
 
     for (let i = 0; i < potentialRelays.length; i++) {
-      let relayConnection: Connection
-      try {
-        relayConnection = await this.connectToRelay(potentialRelays[i], options)
-      } catch (err) {
-        error(err)
-        continue
+      let relayConnection = this._tryPotentialRelay(potentialRelays[i], destination)
+
+      if (relayConnection != null) {
+        return relayConnection
       }
-
-      let stream: Stream
-      try {
-        stream = await this.performHandshake(relayConnection, potentialRelays[i].id, destination)
-      } catch (err) {
-        error(err)
-        continue
-      }
-
-      log(`relayed connection established`)
-
-      // const outboundConnection = await this._upgrader.upgradeOutbound(
-      const outboundConnection = new RelayConnection({
-        stream,
-        self: this._peerInfo.id,
-        counterparty: destination,
-        onReconnect() {
-          console.log(`reconnected`)
-        }
-        // webRTC: this._webRTCUpgrader?.upgradeOutbound(),
-      })
-      // )
-
-      return outboundConnection
     }
 
     throw Error(
@@ -151,6 +125,37 @@ class Relay {
         potentialRelays.map((potentialRelay: PeerInfo) => potentialRelay.id.toB58String()).join(`, `)
       )}`
     )
+  }
+
+  private async _tryPotentialRelay(potentialRelay: PeerInfo, destination: PeerId, options?: DialOptions) {
+    let relayConnection: Connection
+    try {
+      relayConnection = await this.connectToRelay(potentialRelay, options)
+    } catch (err) {
+      error(err)
+      return
+    }
+
+    let stream: Stream
+    try {
+      stream = await this.performHandshake(relayConnection, potentialRelay.id, destination)
+    } catch (err) {
+      error(err)
+      return
+    }
+
+    if (stream == null) {
+      error(`Handshake led to empty stream. Giving up.`)
+      return
+    }
+
+    return new RelayConnection({
+      stream,
+      self: this._peerInfo.id,
+      counterparty: destination,
+      onReconnect: this._onReconnect
+      // webRTC: this._webRTCUpgrader?.upgradeOutbound(),
+    })
   }
 
   async handleReRegister() {}
@@ -162,19 +167,17 @@ class Relay {
       return
     }
 
-    //const inboundConnection = await this._upgrader.upgradeInbound(
-    const inboundConnection = new RelayConnection({
-      stream,
-      self: this._peerInfo.id,
-      counterparty,
-      onReconnect() {
-        log(`reconnected`)
-      }
-      // webRTC: this._webRTCUpgrader?.upgradeInbound(),
-    })
-    // )
-
-    this.connHandler?.(inboundConnection)
+    this.connHandler?.(
+      new RelayConnection({
+        stream,
+        self: this._peerInfo.id,
+        counterparty,
+        onReconnect() {
+          log(`reconnected`)
+        }
+        // webRTC: this._webRTCUpgrader?.upgradeInbound(),
+      })
+    )
     log(`counterparty relayed connection established`)
   }
 

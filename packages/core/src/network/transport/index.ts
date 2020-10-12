@@ -105,12 +105,7 @@ class TCP {
       this._webRTCUpgrader = new WebRTCUpgrader({ stunServers: this.stunServers })
     }
 
-    this._relay = new Relay(
-      libp2p,
-      (undefined as unknown) as Upgrader,
-      this.handleDelivery.bind(this),
-      this._webRTCUpgrader
-    )
+    this._relay = new Relay(libp2p, (undefined as unknown) as Upgrader, this.handleDelivery.bind(this), this._webRTCUpgrader)
     verbose(`Created TCP stack (Stun: ${this.stunServers?.map((x) => x.toString()).join(',')}`)
   }
 
