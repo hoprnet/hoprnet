@@ -58,6 +58,7 @@
     "class-validator": "^0.12.2",
     "dotenv-parse-variables": "^1.0.1",
     "grpc": "^1.24.3",
+    "@grpc/proto-loader": "^0.5.4",
     "multiaddr": "^7.5.0",
     "parse-ip-port": "^1.0.0",
     "peer-id": "^0.13.13",
