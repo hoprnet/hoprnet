@@ -1,5 +1,5 @@
 import { AbstractCommand, AutoCompleteResult, GlobalState } from '../abstractCommand'
-import { styleValue, getOptions } from '../../utils'
+import { styleValue, getOptions, checkPeerIdInput } from '../../utils'
 
 export class Routing extends AbstractCommand {
   private readonly options: GlobalState['routing'][] = ['manual', 'direct']
@@ -17,13 +17,25 @@ export class Routing extends AbstractCommand {
       return styleValue(state.routing, 'highlight')
     }
 
-    const option = this.options.find((o) => query === o)
+    // provided peerIds
+    if (query.match(',')) {
+      try {
+        await Promise.all(query.split(',').map(async (peerId) => await checkPeerIdInput(peerId)))
+        state.routing = query
+      } catch (err) {
+        return styleValue(`Invalid option ${query}`, 'highlight')
+      }
+    }
+    // provided a mode
+    else {
+      const option = this.options.find((o) => query === o)
+      if (!option) {
+        return styleValue('Invalid option.', 'failure')
+      }
 
-    if (!option) {
-      return styleValue('Invalid option.', 'failure')
+      state.routing = option
     }
 
-    state.routing = option
     return `You have set your “${styleValue(this.name(), 'highlight')}” settings to “${styleValue(
       state.routing,
       'highlight'
