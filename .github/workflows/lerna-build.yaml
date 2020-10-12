@@ -221,10 +221,10 @@ jobs:
 
   build_chat_binaries:
     name: Build HOPR Chat Binaries
-    if: |
-      github.event_name == 'pull_request' &&
-      github.event.action == 'closed' &&
-      github.event.pull_request.merged == true
+    # if: |
+    #   github.event_name == 'pull_request' &&
+    #   github.event.action == 'closed' &&
+    #   github.event.pull_request.merged == true
     needs: [build]
     strategy:
       matrix:
