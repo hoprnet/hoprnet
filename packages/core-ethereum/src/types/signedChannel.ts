@@ -36,6 +36,14 @@ class SignedChannel extends Uint8ArrayE implements Types.SignedChannel {
     }
   }
 
+  slice(begin = 0, end = SignedChannel.SIZE) {
+    return this.subarray(begin, end)
+  }
+
+  subarray(begin = 0, end = SignedChannel.SIZE): Uint8Array {
+    return new Uint8Array(this.buffer, begin + this.byteOffset, end - begin)
+  }
+
   get signatureOffset(): number {
     return this.byteOffset
   }
