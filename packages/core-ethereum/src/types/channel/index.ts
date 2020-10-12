@@ -41,6 +41,16 @@ class Channel extends Uint8ArrayE implements Types.Channel {
     }
   }
 
+  // @TODO fix SIZE
+  slice(begin = 0, end = Channel.SIZE) {
+    return this.subarray(begin, end)
+  }
+
+  // @TODO fix SIZE
+  subarray(begin = 0, end = Channel.SIZE) {
+    return new Uint8Array(this.buffer, begin + this.byteOffset, end - begin)
+  }
+
   get balance(): ChannelBalance {
     const balance = this.subarray(0, ChannelBalance.SIZE)
     return new ChannelBalance({
@@ -99,6 +109,7 @@ class Channel extends Uint8ArrayE implements Types.Channel {
     return this._status == ChannelStatus.PENDING
   }
 
+  // @TODO fix size
   static get SIZE(): number {
     // const state = stateCountToStatus(_state.toNumber())
     // if ([ChannelStatus.FUNDING, ChannelStatus.OPEN].includes(state)) {

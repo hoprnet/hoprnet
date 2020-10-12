@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import Hopr from '@hoprnet/hopr-core'
 import type { HoprOptions } from '@hoprnet/hopr-core'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
@@ -133,7 +134,7 @@ async function generateNodeOptions(logs: LogStream): Promise<HoprOptions> {
     debug: Boolean(process.env.DEBUG),
     bootstrapNode: argv.bootstrap,
     network: argv.network,
-    bootstrapServers: [...(await getBootstrapAddresses()).values()],
+    bootstrapServers: argv.bootstrap ? [] : [...(await getBootstrapAddresses()).values()],
     provider: argv.provider,
     hosts: parseHosts(),
     output: logMessageToNode
@@ -185,7 +186,7 @@ async function main() {
     })
 
     process.once('exit', async () => {
-      await node.down()
+      await node.stop()
       logs.log('Process exiting')
       return
     })
@@ -205,9 +206,14 @@ async function main() {
       if (argv.settings) {
         cmds.setState(settings)
       }
-      let resp = await cmds.execute(argv.run)
-      console.log(resp)
-      await node.down()
+      // We support multiple semicolon separated commands
+      let toRun = argv.run.split(';')
+
+      for (let c of toRun) {
+        let resp = await cmds.execute(c)
+        console.log(resp)
+      }
+      await node.stop()
       process.exit(0)
     }
   } catch (e) {

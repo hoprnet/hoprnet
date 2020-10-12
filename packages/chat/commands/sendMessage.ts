@@ -5,6 +5,7 @@ import type PeerId from 'peer-id'
 import { clearString } from '@hoprnet/hopr-utils'
 import { MAX_HOPS } from '@hoprnet/hopr-core/lib/constants'
 import readline from 'readline'
+import chalk from 'chalk'
 import { checkPeerIdInput, encodeMessage, getOpenChannels, getPeerIdsAndAliases, styleValue } from '../utils'
 import { AbstractCommand, GlobalState } from './abstractCommand'
 
@@ -26,7 +27,7 @@ export abstract class SendMessageBase extends AbstractCommand {
     recipient: PeerId,
     msg: string,
     getIntermediateNodes?: () => Promise<PeerId[]>
-  ): Promise<string> {
+  ): Promise<string | void> {
     const message = state.includeRecipient
       ? ((myAddress) => `${myAddress}:${msg}`)(this.node.peerInfo.id.toB58String())
       : msg
@@ -34,8 +35,19 @@ export abstract class SendMessageBase extends AbstractCommand {
     console.log(`Sending message to ${styleValue(recipient.toB58String(), 'peerId')} ...`)
 
     try {
-      await this.node.sendMessage(encodeMessage(message), recipient, getIntermediateNodes)
-      return ''
+      let m = encodeMessage(message)
+      /*if (state.routing === 'auto') {
+        // use random path
+        return await this.node.sendMessage(m, recipient)
+      } else
+      */
+      if (state.routing === 'direct') {
+        // 0 hops
+        return await this.node.sendMessage(m, recipient, async () => [])
+      } else {
+        let path = await Promise.all(state.routing.split(',').map(async (x) => await checkPeerIdInput(x)))
+        return await this.node.sendMessage(m, recipient, () => Promise.resolve(path))
+      }
     } catch (err) {
       return styleValue('Could not send message.', 'failure')
     }
@@ -76,7 +88,7 @@ export class SendMessageFancy extends SendMessageBase {
    * Encapsulates the functionality that is executed once the user decides to send a message.
    * @param query peerId string to send message to
    */
-  public async execute(query: string, state: GlobalState): Promise<string> {
+  public async execute(query: string, state: GlobalState): Promise<string | void> {
     const [err, peerIdString] = this._assertUsage(query, ['PeerId'])
     if (err) return err
 
@@ -88,19 +100,23 @@ export class SendMessageFancy extends SendMessageBase {
     }
 
     const messageQuestion = styleValue(`Type your message and press ENTER to send:`, 'highlight') + '\n'
-    const message = await new Promise<string>((resolve) => this.rl.question(messageQuestion, resolve))
-    clearString(messageQuestion + message, this.rl)
+    const parsedMessage = await new Promise<string>((resolve) => this.rl.question(messageQuestion, resolve))
 
     try {
-      // use intermediate nodes
       if (state.routing === 'manual') {
-        return await this.sendMessage(state, peerId, message, async () => {
+        // Fancy intermediate selection
+        const message = state.includeRecipient
+          ? ((myAddress) => `${myAddress}:${parsedMessage}`)(this.node.peerInfo.id.toB58String())
+          : parsedMessage
+
+        clearString(messageQuestion + message, this.rl)
+        console.log(`Sending message to ${styleValue(query, 'peerId')} ...`)
+
+        await this.node.sendMessage(encodeMessage(message), peerId, async () => {
           return this.selectIntermediateNodes(this.rl, peerId)
         })
-      }
-      // 0 HOP
-      else {
-        return await this.sendMessage(state, peerId, message, async () => [])
+      } else {
+        await this.sendMessage(state, peerId, parsedMessage)
       }
     } catch (err) {
       return styleValue(err.message, 'failure')

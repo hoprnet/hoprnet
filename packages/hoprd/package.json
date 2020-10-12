@@ -1,11 +1,14 @@
 {
   "name": "@hoprnet/hoprd",
-  "version": "1.17.0-alpha.63",
+  "version": "1.17.0-alpha.65",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
-  "main": "index.js",
+  "main": "lib/index.js",
   "author": "Peter Braden (HOPR) <peter.braden@hoprnet.org>",
+  "bin": {
+    "hoprd": "lib/index.js"
+  },
   "scripts": {
     "clean": "rimraf ./lib",
     "build": "yarn clean && tsc --project ./tsconfig.json",
@@ -19,11 +22,11 @@
   },
   "license": "",
   "dependencies": {
-    "@hoprnet/hopr-chat": "^1.17.0-alpha.63",
-    "@hoprnet/hopr-core": "^1.17.0-alpha.63",
-    "@hoprnet/hopr-core-connector-interface": "^1.17.0-alpha.63",
-    "@hoprnet/hopr-server": "^1.17.0-alpha.63",
-    "@hoprnet/hopr-utils": "^1.17.0-alpha.63",
+    "@hoprnet/hopr-chat": "^1.17.0-alpha.65",
+    "@hoprnet/hopr-core": "^1.17.0-alpha.65",
+    "@hoprnet/hopr-core-connector-interface": "^1.17.0-alpha.65",
+    "@hoprnet/hopr-server": "^1.17.0-alpha.65",
+    "@hoprnet/hopr-utils": "^1.17.0-alpha.65",
     "@types/bs58": "^4.0.1",
     "@types/clear": "^0.1.0",
     "bs58": "^4.0.1",
