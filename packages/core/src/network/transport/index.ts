@@ -97,7 +97,7 @@ class TCP {
     this._timeoutIntentionallyOnWebRTC = timeoutIntentionallyOnWebRTC
     this._answerIntentionallyWithIncorrectMessages = answerIntentionallyWithIncorrectMessages
     this._failIntentionallyOnWebRTC = failIntentionallyOnWebRTC || false
-    this._useWebRTC = useWebRTC === undefined ? USE_WEBRTC : useWebRTC
+    this._useWebRTC = false // useWebRTC === undefined ? USE_WEBRTC : useWebRTC
     this._peerInfo = libp2p.peerInfo
     this._upgrader = upgrader
 
@@ -151,7 +151,7 @@ class TCP {
 
     let error: Error
     if (
-      // (this.relays == null || this.relays.some((pInfo) => ma.getPeerId() === pInfo.id.toB58String())) &&
+      (this.relays == null || this.relays.some((pInfo) => ma.getPeerId() === pInfo.id.toB58String())) &&
       ['ip4', 'ip6', 'dns4', 'dns6'].includes(ma.protoNames()[0]) &&
       this.isRealisticAddress(ma)
     ) {
