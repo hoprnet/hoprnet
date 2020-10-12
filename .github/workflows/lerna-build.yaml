@@ -47,9 +47,6 @@ jobs:
       - name: Test
         run: |
           yarn test
-          #- name: Test Docker build hoprd 
-          # working-directory: packages/hoprd
-          #run: docker build .
       - name: Publish prerelease version
         if: |
           github.event_name == 'pull_request' &&
@@ -64,10 +61,8 @@ jobs:
           git pull origin master
           git push origin master
           node_modules/.bin/lerna publish from-package --yes
-          sleep 5m # Allow NPM registry to catch uo
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
       - name: Publish major version
         if: |
           github.event_name == 'pull_request' &&
@@ -85,7 +80,6 @@ jobs:
           sleep 5m # Allow NPM registry to catch uo
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
       - name: Publish minor version
         if: |
           github.event_name == 'pull_request' &&
@@ -103,7 +97,6 @@ jobs:
           sleep 5m # Allow NPM registry to catch uo
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
       - name: Publish patch version
         if: |
           github.event_name == 'pull_request' &&
@@ -140,6 +133,10 @@ jobs:
             #env:
             #NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
             #GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Get version from lerna.json
+        run: echo ::set-env name=VERSION::$(node -p -e "require('lerna.json').version")
+      - name: Wait for npm
+        run: scripts/wait-for-npm.sh ${{ env.VERSION }}
 
   avado:
     name: Build Avado
@@ -167,7 +164,6 @@ jobs:
           git pull origin master
           git push origin master
 
-  # chat
   build_chat_docker:
     name: Build HOPR Chat Docker
     runs-on: ubuntu-latest
@@ -193,7 +189,6 @@ jobs:
         working-directory: packages/chat
         run: gcloud builds submit --tag gcr.io/hoprassociation/hopr-chat:${{ github.sha }}
 
-  # chatbot
   build_chatbot_docker:
     name: Build HOPR Chatbot Docker
     runs-on: ubuntu-latest
@@ -269,22 +264,15 @@ jobs:
           ref: master
       - uses: actions/setup-node@v1
         with:
-          node-version: 12.9.1
+          node-version: ${{ matrix.node-version }}
       - name: Setting yarn version
         working-directory: packages/chat
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: yarn policies set-version 1.19.2
-      - name: Cache node_modules
-        id: cache-modules
-        uses: actions/cache@v1
-        with:
-          path: node_modules
-          key: ${{ runner.OS }}-build-${{ hashFiles('package.json') }}
       - name: Install node modules
         working-directory: packages/chat
-        if: steps.cache-modules.outputs.cache-hit != 'true'
-        run: yarn install
+        run: yarn install --pure-lockfile
       - name: Build project into nodejs app
         working-directory: packages/chat
         run: yarn build
@@ -311,7 +299,7 @@ jobs:
           ref: master
       - uses: actions/setup-node@v1
         with:
-          node-version: 12.9.1
+          node-version: ${{ matrix.node-version }}
       - name: Get HOPR Chat (linux)
         uses: actions/download-artifact@v2
         with:
