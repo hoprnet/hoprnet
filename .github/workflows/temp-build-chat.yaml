@@ -1,0 +1,52 @@
+name: Temporary Chat Build
+on:
+  push:
+    branches:
+      - 'fix/chat-binary-release'
+
+jobs:
+  build_chat_binaries:
+    name: Build HOPR Chat Binaries
+    needs: [build]
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            displayName: linux
+          - os: windows-latest
+            displayName: windows
+          - os: macos-latest
+            displayName: macos
+      fail-fast: true
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          ref: master
+      - uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Setting yarn version
+        working-directory: packages/chat
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: yarn policies set-version 1.19.2
+      - name: Install node modules
+        working-directory: packages/chat
+        run: yarn install --pure-lockfile
+      - name: Build project into nodejs app
+        working-directory: packages/chat
+        run: yarn build
+      - name: Compile project into nodes bin
+        working-directory: packages/chat
+        run: yarn compile
+      - name: Zip node binary for uploading
+        working-directory: packages/chat
+        run: yarn zip:${{ matrix.displayName }}
+      - name: Upload binaries to GitHub workflow artifacts store
+        uses: actions/upload-artifact@v2
+        with:
+          name: hopr-chat-nodebin-${{ matrix.displayName }}.zip
+          path: packages/chat/hopr-chat-nodebin-${{ matrix.displayName }}.zip
+          if-no-files-found: error
