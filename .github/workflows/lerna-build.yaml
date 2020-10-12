@@ -114,7 +114,9 @@ jobs:
       - name: Get version from lerna.json
         run: echo ::set-env name=VERSION::$(node -p -e "require('./lerna.json').version")
       - name: Wait for npm
-        run: scripts/wait-for-npm.sh ${{ env.VERSION }}
+        run: |
+          chmod +x ./scripts/wait-for-npm.sh
+          ./scripts/wait-for-npm.sh ${{ env.VERSION }}
 
   avado:
     name: Build Avado
