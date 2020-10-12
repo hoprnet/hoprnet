@@ -15,7 +15,7 @@ import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '../../'
 import pipe from 'it-pipe'
 
-import type { Handler } from '../../network/transport/types'
+import type { Handler } from '../../@types/transport'
 
 import { randomInteger, durations } from '@hoprnet/hopr-utils'
 import { getTokens, Token } from '../../utils'
@@ -89,7 +89,7 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
           const arr = msg.slice()
           const packet = new Packet(this.node, {
             bytes: arr.buffer,
-            offset: arr.byteOffset,
+            offset: arr.byteOffset
           })
 
           this.queue.push(packet)
@@ -133,7 +133,7 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
       setImmediate(async () => {
         const ack = new Acknowledgement(this.node.paymentChannels, undefined, {
           key: ticketKey,
-          challenge: receivedChallenge,
+          challenge: receivedChallenge
         })
 
         await this.node.interactions.packet.acknowledgment.interact(sender, await ack.sign(this.node.peerInfo.id))

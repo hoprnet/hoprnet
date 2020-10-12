@@ -9,7 +9,12 @@ declare interface PathSelection {
    * @param maxIterations amount of iterations before cancelling search
    * @param filter only include nodes that pass this truthy test
    */
-  findPath(start: Public, targetLength: number, maxIterations: number, filter?: (node: Public) => boolean): Promise<Public[]>
+  findPath(
+    start: Public,
+    targetLength: number,
+    maxIterations: number,
+    filter?: (node: Public) => boolean
+  ): Promise<Public[]>
 }
 
 export default PathSelection

@@ -1,9 +1,9 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { Channel as ChannelInstance } from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
-import PeerId from 'peer-id'
 import { u8aEquals } from '@hoprnet/hopr-utils'
 import { pubKeyToPeerId } from '@hoprnet/hopr-core/lib/utils'
+import PeerId from 'peer-id'
 import { isBootstrapNode } from './isBootstrapNode'
 
 /**
@@ -15,7 +15,7 @@ export function getPeers(
   ops: {
     noBootstrapNodes: boolean
   } = {
-    noBootstrapNodes: false,
+    noBootstrapNodes: false
   }
 ): PeerId[] {
   let peers = node.network.peerStore.peers.map((peer) => PeerId.createFromB58String(peer.id))
@@ -38,7 +38,7 @@ export function getPeersIdsAsString(
   ops: {
     noBootstrapNodes: boolean
   } = {
-    noBootstrapNodes: false,
+    noBootstrapNodes: false
   }
 ): string[] {
   return getPeers(node, ops).map((peerId) => peerId.toB58String())
@@ -98,7 +98,7 @@ export async function getPartyOpenChannels(node: Hopr<HoprCoreConnector>, party:
 
   // get indexed open channels
   const channels = await indexer.get({
-    partyA: partyPubKey,
+    partyA: partyPubKey
   })
   // get the counterparty of each channel
   const channelAccountIds = channels.map((channel) => {
@@ -108,11 +108,11 @@ export async function getPartyOpenChannels(node: Hopr<HoprCoreConnector>, party:
   // get available nodes
   const peers = await Promise.all(
     getPeers(node, {
-      noBootstrapNodes: true,
+      noBootstrapNodes: true
     }).map(async (peer) => {
       return {
         peer,
-        accountId: await utils.pubKeyToAccountId(peer.pubKey.marshal()),
+        accountId: await utils.pubKeyToAccountId(peer.pubKey.marshal())
       }
     })
   )
@@ -136,9 +136,9 @@ export async function getPartyOpenChannels(node: Hopr<HoprCoreConnector>, party:
  */
 export async function getOpenChannels(node: Hopr<HoprCoreConnector>, partyPeerId: PeerId): Promise<PeerId[]> {
   const supportsIndexer = typeof node.paymentChannels.indexer !== 'undefined'
-  const partyIfSelf = node.peerInfo.id.equals(partyPeerId)
+  const partyIsSelf = node.peerInfo.id.equals(partyPeerId)
 
-  if (partyIfSelf) {
+  if (partyIsSelf) {
     // if party is self, and indexer not supported
     return getMyOpenChannels(node)
   } else if (supportsIndexer) {

@@ -1,7 +1,9 @@
 {
   "name": "@hoprnet/hopr-core",
-  "version": "1.17.0-alpha.56",
+  "version": "1.17.0-alpha.65",
   "description": "Privacy-preserving messaging protocol with incentivations for relay operators",
+  "repository": "https://github.com/hoprnet/hoprnet.git",
+  "homepage": "https://hoprnet.org",
   "license": "GPL-3.0-only",
   "keywords": [
     "privacy",
@@ -24,21 +26,17 @@
     "node": "12",
     "yarn": "1"
   },
-  "homepage": "https://hoprnet.org",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/hoprnet/hopr-core.git"
-  },
   "scripts": {
+    "clean": "rimraf ./lib",
     "build": "yarn clean && tsc -p .",
-    "clean": "rm -rf ./lib",
-    "test": "jest --runInBand --forceExit && jest --runInBand --forceExit && jest --runInBand --forceExit",
+    "test": "yarn testOnce",
+    "testOnce": "node --trace-warnings --unhandled-rejections=strict node_modules/.bin/jest --runInBand --forceExit",
     "prepublishOnly": "yarn build"
   },
   "dependencies": {
-    "@hoprnet/hopr-core-ethereum": "^1.17.0-alpha.56",
-    "@hoprnet/hopr-demo-seeds": "1.8.0",
-    "@hoprnet/hopr-utils": "^1.17.0-alpha.56",
+    "@hoprnet/hopr-core-ethereum": "^1.17.0-alpha.65",
+    "@hoprnet/hopr-demo-seeds": "^1.17.0-alpha.65",
+    "@hoprnet/hopr-utils": "^1.17.0-alpha.65",
     "abort-controller": "^3.0.0",
     "abortable-iterator": "^3.0.0",
     "bl": "^4.0.3",
@@ -48,14 +46,13 @@
     "heap-js": "^2.1.2",
     "it-handshake": "^1.0.2",
     "it-pipe": "^1.1.0",
-    "it-pushable": "^1.4.0",
     "leveldown": "~5.6.0",
     "levelup": "~4.4.0",
     "libp2p": "~0.27.8",
     "libp2p-crypto": "~0.17.6",
     "libp2p-kad-dht": "~0.18.7",
-    "libp2p-mplex": "~0.9.5",
-    "libp2p-secio": "^0.12.5",
+    "libp2p-mplex": "~0.10.0",
+    "libp2p-secio": "^0.13.1",
     "multiaddr": "^7.4.3",
     "multihashes": "~0.4.19",
     "p-defer": "^3.0.0",
@@ -70,9 +67,9 @@
     "wrtc": "0.4.6"
   },
   "devDependencies": {
-    "@hoprnet/hopr-core-connector-interface": "^1.17.0-alpha.56",
-    "@hoprnet/hopr-ethereum": "^1.17.0-alpha.56",
-    "@hoprnet/hopr-testing": "^1.17.0-alpha.56",
+    "@hoprnet/hopr-core-connector-interface": "^1.17.0-alpha.65",
+    "@hoprnet/hopr-ethereum": "^1.17.0-alpha.65",
+    "@hoprnet/hopr-testing": "^1.17.0-alpha.65",
     "@types/bl": "^2.1.0",
     "@types/debug": "^4.1.5",
     "@types/jest": "^26.0.7",
@@ -85,11 +82,11 @@
     "@types/simple-peer": "^9.6.0",
     "it-pair": "^1.0.0",
     "jest": "^26.1.0",
-    "jest-silent-reporter": "^0.2.1",
     "libp2p-tcp": "^0.14.6",
     "memdown": "^5.1.0",
+    "rimraf": "^3.0.2",
     "ts-jest": "^26.1.4",
-    "typescript": "^3.9.7"
+    "typescript": "^4.0.3"
   },
   "jest": {
     "moduleFileExtensions": [

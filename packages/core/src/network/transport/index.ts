@@ -11,7 +11,15 @@ import { USE_WEBRTC, CODE_P2P } from './constants'
 import Multiaddr from 'multiaddr'
 import PeerInfo from 'peer-info'
 import PeerId from 'peer-id'
-import type { Connection, Upgrader, DialOptions, ConnHandler, Handler, Stream, MultiaddrConnection } from './types'
+import type {
+  Connection,
+  Upgrader,
+  DialOptions,
+  ConnHandler,
+  Handler,
+  Stream,
+  MultiaddrConnection
+} from '../../@types/transport'
 import chalk from 'chalk'
 import { WebRTCUpgrader } from './webrtc'
 import Relay from './relay'
@@ -51,7 +59,7 @@ class TCP {
     useWebRTC,
     failIntentionallyOnWebRTC,
     timeoutIntentionallyOnWebRTC,
-    answerIntentionallyWithIncorrectMessages,
+    answerIntentionallyWithIncorrectMessages
   }: {
     upgrader: Upgrader
     libp2p: libp2p
@@ -135,7 +143,11 @@ class TCP {
     options = options || {}
 
     let error: Error
-    if (['ip4', 'ip6', 'dns4', 'dns6'].includes(ma.protoNames()[0]) && this.isRealisticAddress(ma)) {
+    if (
+      // (this.relays == null || this.relays.some((pInfo) => ma.getPeerId() === pInfo.id.toB58String())) &&
+      ['ip4', 'ip6', 'dns4', 'dns6'].includes(ma.protoNames()[0]) &&
+      this.isRealisticAddress(ma)
+    ) {
       try {
         verbose('attempting to dial directly', ma.toString())
         return await this.dialDirectly(ma, options)
@@ -177,8 +189,10 @@ class TCP {
       )
     }
 
-    verbose('dialing with relay ', ma)
-    return await this.dialWithRelay(ma, potentialRelays, options)
+    verbose('dialing with relay ', ma.toString())
+    const conn = await this.dialWithRelay(ma, potentialRelays, options)
+    log(`relayed connection established`)
+    return conn
   }
 
   async dialWithRelay(ma: Multiaddr, relays: PeerInfo[], options?: DialOptions): Promise<Connection> {
@@ -223,7 +237,7 @@ class TCP {
       log('dialing %j', cOpts)
       const rawSocket = net.createConnection({
         host: cOpts.host,
-        port: cOpts.port,
+        port: cOpts.port
       })
 
       const onError = (err: Error) => {
@@ -284,8 +298,6 @@ class TCP {
     } else {
       this.connHandler = handler
     }
-
-    console.log(`creating listener`)
     return new Listener(this.connHandler, this._upgrader, this.stunServers)
   }
 
@@ -317,6 +329,7 @@ class TCP {
     }
 
     if (
+      ['ip4', 'ip6', 'dns4', 'dns6'].includes(ma.protoNames()[0]) &&
       this._peerInfo.multiaddrs
         .toArray()
         .map((ma: Multiaddr) => ma.nodeAddress())

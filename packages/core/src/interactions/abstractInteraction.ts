@@ -1,4 +1,4 @@
-import type { Handler } from '../network/transport/types'
+import type { Handler } from '../@types/transport'
 
 interface AbstractInteraction {
   protocols: string[]

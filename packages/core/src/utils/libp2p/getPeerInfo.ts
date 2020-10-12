@@ -118,7 +118,8 @@ async function recoverIdentity(serializedKeyPair: Uint8Array, pw?: string): Prom
     try {
       return await deserializeKeyPair(serializedKeyPair, new TextEncoder().encode(pw))
     } catch (err) {
-      log(`Could not recover id from database with given password. Please type it in manually.`)
+      log(`Could not recover id from database with given password.`)
+      process.exit(0)
     }
   }
 
@@ -137,7 +138,7 @@ async function recoverIdentity(serializedKeyPair: Uint8Array, pw?: string): Prom
 }
 
 async function createIdentity(db: LevelUp, pw?: string): Promise<PeerId> {
-  pw = pw || (await askForPassword('Please type in a password to encrypt the secret key.'))
+  pw = pw !== undefined ? pw : await askForPassword('Please type in a password to encrypt the secret key.')
 
   const key = await keys.generateKeyPair('secp256k1', 256)
   const peerId = await PeerId.createFromPrivKey(key.bytes)

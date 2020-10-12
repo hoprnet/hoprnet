@@ -41,9 +41,9 @@ export class AdminServer {
       dir: adminPath,
       conf: {
         devIndicators: {
-          autoPrerender: false,
-        },
-      },
+          autoPrerender: false
+        }
+      }
     })
     const handle = this.app.getRequestHandler()
     await this.app.prepare()
@@ -81,9 +81,13 @@ export class AdminServer {
     this.logs.log('Admin server listening on port ' + this.port)
   }
 
-  registerNode(node: Hopr<HoprCoreConnector>) {
+  registerNode(node: Hopr<HoprCoreConnector>, settings?: any) {
     this.node = node
     this.cmds = new commands.Commands(node)
+    if (settings) {
+      this.cmds.setState(settings)
+    }
+
     // Setup some noise
     connectionReport(this.node, this.logs)
     periodicCrawl(this.node, this.logs)

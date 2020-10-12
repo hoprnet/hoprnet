@@ -7,7 +7,7 @@ import type { AbstractInteraction } from '../abstractInteraction'
 import type PeerInfo from 'peer-info'
 import type PeerId from 'peer-id'
 
-import type { Handler } from '../../network/transport/types'
+import type { Handler } from '../../@types/transport'
 
 import chalk from 'chalk'
 

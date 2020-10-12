@@ -6,7 +6,7 @@ import pipe from 'it-pipe'
 
 import type { AbstractInteraction } from '../abstractInteraction'
 
-import type { Handler } from '../../network/transport/types'
+import type { Handler } from '../../@types/transport'
 
 import { PROTOCOL_PAYMENT_CHANNEL } from '../../constants'
 import type PeerInfo from 'peer-info'
@@ -50,7 +50,7 @@ class Opening<Chain extends HoprCoreConnector> implements AbstractInteraction {
 
     await channel.sign(this.node.paymentChannels.account.keys.onChain.privKey, undefined, {
       bytes: signedChannel.buffer,
-      offset: signedChannel.signatureOffset,
+      offset: signedChannel.signatureOffset
     })
 
     return await pipe(
@@ -77,7 +77,7 @@ class Opening<Chain extends HoprCoreConnector> implements AbstractInteraction {
 
     return this.node.paymentChannels.types.SignedChannel.create({
       bytes: result.buffer,
-      offset: result.byteOffset,
+      offset: result.byteOffset
     })
   }
 }

@@ -9,10 +9,10 @@ const DEFAULT_OPS: Ganache.IServerOptions = {
   port: 9545,
   accounts: accounts.map((account) => ({
     secretKey: account,
-    balance,
+    balance
   })),
   gasLimit: 0xfffffffffff,
-  gasPrice: '1',
+  gasPrice: '1'
 }
 
 class CustomGanache {
@@ -22,7 +22,7 @@ class CustomGanache {
   constructor(customOps: Ganache.IServerOptions = {}) {
     this.ops = {
       ...DEFAULT_OPS,
-      ...customOps,
+      ...customOps
     }
   }
 
@@ -32,9 +32,14 @@ class CustomGanache {
 
       this.server = Ganache.server(this.ops)
 
-      this.server.listen(this.ops.port, () => {
+      // @ts-ignore
+      this.server.listen(this.ops.port, (err) => {
         const url = `${this.ops.ws ? 'ws' : 'http'}://127.0.0.1:${this.ops.port}`
         console.log(`Network ready at ${url}`)
+        if (err) {
+          console.log('Error creating ganache', err)
+          return reject()
+        }
         return resolve(this)
       })
     })

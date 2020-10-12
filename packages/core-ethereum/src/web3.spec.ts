@@ -14,7 +14,7 @@ describe('test web3 connect/reconnect', function () {
 
     web3 = new Web3(
       new Web3.providers.WebsocketProvider(configs.DEFAULT_URI, {
-        reconnect: { auto: true, delay: 500, maxAttempts: 2, onTimeout: true },
+        reconnect: { auto: true, delay: 500, maxAttempts: 2, onTimeout: true }
       })
     )
   })

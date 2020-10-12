@@ -7,7 +7,7 @@ const error = debug('libp2p:tcp:socket:error')
 import toIterable = require('stream-to-it')
 // @ts-ignore
 import toMultiaddr = require('libp2p-utils/src/ip-port-to-multiaddr')
-import { MultiaddrConnection } from './types'
+import { MultiaddrConnection } from '../../@types/transport'
 import type Multiaddr from 'multiaddr'
 import type { Socket } from 'net'
 
@@ -76,6 +76,7 @@ export function socketToConn(
       }
     },
 
+    // @ts-ignore
     source, //: options.signal ? abortable(source, options.signal) : source,
 
     conn: socket,
@@ -124,7 +125,7 @@ export function socketToConn(
           resolve()
         })
       })
-    },
+    }
   }
 
   socket.once('close', () => {

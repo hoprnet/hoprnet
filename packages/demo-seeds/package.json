@@ -1,11 +1,14 @@
 {
   "name": "@hoprnet/hopr-demo-seeds",
-  "version": "1.17.0-alpha.56",
+  "version": "1.17.0-alpha.65",
   "description": "Demo seeds for HOPR testing",
+  "repository": "https://github.com/hoprnet/hoprnet.git",
+  "homepage": "https://hoprnet.org",
   "license": "GPL-3.0-only",
   "scripts": {
-    "build": "tsc -d -p .",
-    "prepare": "yarn build"
+    "clean": "rimraf ./lib",
+    "build": "yarn clean && tsc -d -p .",
+    "prepublishOnly": "yarn build"
   },
   "files": [
     "lib",
@@ -18,13 +21,9 @@
   ],
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
-  "homepage": "https://hoprnet.org",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/hoprnet/hopr-demo-seeds.git"
-  },
   "devDependencies": {
-    "typescript": "^3.8.2"
+    "rimraf": "^3.0.2",
+    "typescript": "^4.0.3"
   },
   "publishConfig": {
     "access": "public"

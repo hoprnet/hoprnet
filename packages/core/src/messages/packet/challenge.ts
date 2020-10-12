@@ -31,12 +31,14 @@ class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
       signature: Types.Signature
     }
   ) {
-    if (arr != null && struct == null) {
-      super(arr.bytes, arr.offset, Challenge.SIZE(paymentChannels))
-    } else if (arr == null && struct != null) {
-      super(struct.signature)
+    if (arr == null) {
+      super(Challenge.SIZE(paymentChannels))
     } else {
-      throw Error(`Invalid constructor parameters`)
+      super(arr.bytes, arr.offset, Challenge.SIZE(paymentChannels))
+    }
+
+    if (struct != null) {
+      super(struct.signature)
     }
 
     this.paymentChannels = paymentChannels
@@ -53,7 +55,7 @@ class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
 
     return this.paymentChannels.types.Signature.create({
       bytes: this.buffer,
-      offset: this.challengeSignatureOffset,
+      offset: this.challengeSignatureOffset
     })
   }
 
@@ -86,7 +88,7 @@ class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
 
     const copiedChallenge = new Challenge<Chain>(this.paymentChannels, {
       bytes: arrCopy.buffer,
-      offset: arrCopy.byteOffset,
+      offset: arrCopy.byteOffset
     })
 
     copiedChallenge._hashedKey = this._hashedKey
@@ -132,7 +134,7 @@ class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
     // const hashedChallenge = hash(Buffer.concat([this._hashedKey, this._fee.toBuffer('be', VALUE_LENGTH)], HASH_LENGTH + VALUE_LENGTH))
     await this.paymentChannels.utils.sign(this.hash, peerId.privKey.marshal(), peerId.pubKey.marshal(), {
       bytes: this.buffer,
-      offset: this.challengeSignatureOffset,
+      offset: this.challengeSignatureOffset
     })
 
     return this
@@ -164,7 +166,7 @@ class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
 
       arr = {
         bytes: tmp.buffer,
-        offset: tmp.byteOffset,
+        offset: tmp.byteOffset
       }
     }
 

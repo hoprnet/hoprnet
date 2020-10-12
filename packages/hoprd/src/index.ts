@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import Hopr from '@hoprnet/hopr-core'
 import type { HoprOptions } from '@hoprnet/hopr-core'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
@@ -50,43 +51,50 @@ const argv = yargs
   .option('network', {
     describe: 'Which network to run the HOPR node on',
     default: 'ETHEREUM',
-    choices: ['ETHEREUM'],
+    choices: ['ETHEREUM']
   })
   .option('provider', {
     describe: 'A provider url for the Network you specified',
-    default: 'wss://xdai.poanetwork.dev/wss',
+    default: 'wss://xdai.poanetwork.dev/wss'
   })
   .option('host', {
     describe: 'The network host to run the HOPR node on.',
-    default: '0.0.0.0:9091',
+    default: '0.0.0.0:9091'
   })
   .option('admin', {
     boolean: true,
     describe: 'Run an admin interface on localhost:3000',
-    default: false,
+    default: false
   })
   .option('grpc', {
     boolean: true,
     describe: 'Run a gRPC interface',
-    default: false,
+    default: false
   })
   .option('password', {
-    describe: 'A password to encrypt your keys',
-    default: '',
+    describe: 'A password to encrypt your keys'
   })
   .option('run', {
     describe: 'Run a single hopr command, same syntax as in hopr-admin',
-    default: '',
+    default: ''
   })
   .option('dryRun', {
     boolean: true,
     describe: 'List all the options used to run the HOPR node, but quit instead of starting',
-    default: false,
+    default: false
   })
   .option('bootstrap', {
     boolean: true,
     describe: 'run as a bootstrap node',
-    default: false,
+    default: false
+  })
+  .option('data', {
+    describe: 'manually specify the database directory to use',
+    default: ''
+  })
+  .option('settings', {
+    descripe: 'Settings, same as in the repl (JSON)',
+    default: '{}'
   })
   .wrap(Math.min(120, yargs.terminalWidth())).argv
 
@@ -103,7 +111,7 @@ function parseHosts(): HoprOptions['hosts'] {
 
     hosts.ip4 = {
       ip: params[1],
-      port: parseInt(params[2]),
+      port: parseInt(params[2])
     }
   }
   return hosts
@@ -126,11 +134,18 @@ async function generateNodeOptions(logs: LogStream): Promise<HoprOptions> {
     debug: Boolean(process.env.DEBUG),
     bootstrapNode: argv.bootstrap,
     network: argv.network,
-    bootstrapServers: [...(await getBootstrapAddresses()).values()],
+    bootstrapServers: argv.bootstrap ? [] : [...(await getBootstrapAddresses()).values()],
     provider: argv.provider,
     hosts: parseHosts(),
-    output: logMessageToNode,
-    password: argv.password || 'open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0', // TODO!!!
+    output: logMessageToNode
+  }
+
+  if (argv.password !== undefined) {
+    options.password = argv.password as string
+  }
+
+  if (argv.data && argv.data !== '') {
+    options.dbPath = argv.data
   }
 
   //logs.log(JSON.stringify(options))
@@ -142,6 +157,11 @@ async function main() {
   let addr: Multiaddr
   let logs = new LogStream()
   let adminServer = undefined
+  let settings: any = {}
+
+  if (argv.settings) {
+    settings = JSON.parse(argv.settings)
+  }
 
   if (argv.admin) {
     // We need to setup the admin server before the HOPR node
@@ -166,7 +186,7 @@ async function main() {
     })
 
     process.once('exit', async () => {
-      await node.down()
+      await node.stop()
       logs.log('Process exiting')
       return
     })
@@ -183,15 +203,27 @@ async function main() {
     if (argv.run && argv.run !== '') {
       // Run a single command and then exit.
       let cmds = new commands.Commands(node)
-      let resp = await cmds.execute(argv.run)
-      console.log(resp)
-      await node.down()
+      if (argv.settings) {
+        cmds.setState(settings)
+      }
+      // We support multiple semicolon separated commands
+      let toRun = argv.run.split(';')
+
+      for (let c of toRun) {
+        let resp = await cmds.execute(c)
+        console.log(resp)
+      }
+      await node.stop()
       process.exit(0)
     }
   } catch (e) {
     console.log(e)
     logs.log('Node failed to start:')
     logs.logFatalError('' + e)
+    if (!argv.admin) {
+      // If the admin interface is running, we should keep process alive
+      process.exit(1)
+    }
   }
 }
 

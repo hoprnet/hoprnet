@@ -7,7 +7,7 @@ import type { Token } from '../utils'
 import { MAX_HOPS, CRAWLING_RESPONSE_NODES } from '../constants'
 import { CrawlResponse, CrawlStatus } from '../messages'
 import PeerId from 'peer-id'
-import type { Connection } from './transport/types'
+import type { Connection } from '../@types/transport'
 import type { Entry } from './peerStore'
 import NetworkPeerStore from './peerStore'
 import { peerHasOnlyPublicAddresses, isOnPrivateNet, PRIVATE_NETS } from '../filters'
@@ -26,7 +26,11 @@ export const shouldIncludePeerInCrawlResponse = (peer: Multiaddr, them: Multiadd
   // We are being requested a crawl from a node that is on a remote network, so
   // it does not benefit them for us to give them addresses on our private
   // network, therefore let's first filter these out.
-  if (!them.nodeAddress().address.match(PRIVATE_NETS) && isOnPrivateNet(peer)) {
+  if (
+    ['ip4', 'ip6', 'dns4', 'dns6'].includes(them.protoNames()[0]) &&
+    !them.nodeAddress().address.match(PRIVATE_NETS) &&
+    isOnPrivateNet(peer)
+  ) {
     verbose('rejecting peer from crawl results as it only has private addresses, and the requesting node is remote')
     return false // Reject peer
   }
@@ -197,7 +201,7 @@ class Crawler {
               let beforeInserting = this.networkPeers.length
               this.networkPeers.push({
                 id: peerString,
-                lastSeen: 0,
+                lastSeen: 0
               })
 
               if (comparator == null || comparator(peerString)) {
@@ -276,11 +280,11 @@ class Crawler {
       if (selectedNodes.length > 0) {
         yield new CrawlResponse(undefined, {
           status: CrawlStatus.OK,
-          peerInfos: selectedNodes,
+          peerInfos: selectedNodes
         })
       } else {
         yield new CrawlResponse(undefined, {
-          status: CrawlStatus.FAIL,
+          status: CrawlStatus.FAIL
         })
       }
     }.call(this)

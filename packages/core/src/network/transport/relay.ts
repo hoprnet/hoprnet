@@ -35,7 +35,7 @@ import {
   OK,
   FAIL,
   FAIL_COULD_NOT_REACH_COUNTERPARTY,
-  DELIVERY_REGISTER,
+  DELIVERY_REGISTER
 } from './constants'
 
 import { pubKeyToPeerId } from '../../utils'
@@ -53,8 +53,8 @@ import type {
   MultiaddrConnection,
   PeerRouting,
   Registrar,
-  Stream,
-} from './types'
+  Stream
+} from '../../@types/transport'
 
 class Relay {
   private _dialer: Dialer
@@ -120,11 +120,12 @@ class Relay {
         continue
       }
 
+      log(`relayed connection established`)
       return new RelayConnection({
         stream,
         self: this._peerInfo.id,
-        counterparty: destination,
-        webRTC: this._webRTCUpgrader?.upgradeOutbound(),
+        counterparty: destination
+        // webRTC: this._webRTCUpgrader?.upgradeOutbound(),
       })
     }
 
@@ -148,10 +149,11 @@ class Relay {
       new RelayConnection({
         stream,
         self: this._peerInfo.id,
-        counterparty,
-        webRTC: this._webRTCUpgrader?.upgradeInbound(),
+        counterparty
+        // webRTC: this._webRTCUpgrader?.upgradeInbound(),
       })
     )
+    log(`counterparty relayed connection established`)
   }
 
   private async connectToRelay(relay: PeerInfo, options?: DialOptions): Promise<Connection> {
@@ -201,6 +203,7 @@ class Relay {
     let answer: Buffer | undefined
     try {
       answer = (await shaker.read())?.slice()
+      log(`received answer ${new TextDecoder().decode(answer)}`)
     } catch (err) {
       throw Error(`Error while reading answer. Error was ${err}`)
     }
@@ -252,6 +255,7 @@ class Relay {
   }
 
   private async handleRelay({ stream, connection }: Handler) {
+    log(`handle relay request`)
     const shaker = handshake(stream)
 
     let pubKeySender: Buffer | undefined
@@ -274,6 +278,7 @@ class Relay {
     let counterparty: PeerId
     try {
       counterparty = await pubKeyToPeerId(pubKeySender)
+      log(`counterparty identified as ${counterparty.toB58String()}`)
     } catch (err) {
       error(
         `Peer ${chalk.yellow(
@@ -292,37 +297,86 @@ class Relay {
       return
     }
 
-    const deliveryStream = (await this.establishForwarding(counterparty)) as Stream
+    let counterpartyMap = this._streams.get(counterparty.toB58String())
 
-    if (deliveryStream == null) {
-      // @TODO end deliveryStream
-      shaker.write(FAIL_COULD_NOT_REACH_COUNTERPARTY)
+    let deliveryStream: Stream
+    if (counterpartyMap == null || counterpartyMap.get(connection.remotePeer.toB58String()) == null) {
+      log(
+        `${connection.remotePeer.toB58String()} to ${counterparty.toB58String()} had no connection. Establishing a new one`
+      )
+      try {
+        deliveryStream = (await this.establishForwarding(counterparty)) as Stream
+      } catch (err) {
+        error(err)
+
+        shaker.write(FAIL_COULD_NOT_REACH_COUNTERPARTY)
+
+        shaker.rest()
+
+        return
+      }
+
+      if (deliveryStream == null) {
+        // @TODO end deliveryStream
+        shaker.write(FAIL_COULD_NOT_REACH_COUNTERPARTY)
+
+        shaker.rest()
+
+        return
+      }
+
+      shaker.write(OK)
 
       shaker.rest()
 
-      return
+      const ctxToCounterparty = new RelayContext(shaker.stream.source as any)
+      deliveryStream.sink(ctxToCounterparty.source)
+
+      if (counterpartyMap == null) {
+        counterpartyMap = new Map<string, RelayContext>()
+      }
+      counterpartyMap.set(connection.remotePeer.toB58String(), ctxToCounterparty)
+      this._streams.set(counterparty.toB58String(), counterpartyMap)
+
+      const ctxToSender = new RelayContext(deliveryStream.source as any)
+      shaker.stream.sink(ctxToSender.source)
+
+      let senderMap = this._streams.get(connection.remotePeer.toB58String())
+      if (senderMap == null) {
+        senderMap = new Map<string, RelayContext>()
+      }
+      senderMap.set(counterparty.toB58String(), ctxToSender)
+      this._streams.set(connection.remotePeer.toB58String(), senderMap)
+    } else {
+      shaker.write(OK)
+
+      shaker.rest()
+
+      log(`overwriting connection between ${connection.remotePeer.toB58String()} and ${counterparty.toB58String()}`)
+      const ctxToCounterparty = counterpartyMap.get(connection.remotePeer.toB58String())
+
+      if (ctxToCounterparty == null) {
+        throw Error(
+          `Could not find existing connection from ${connection.remotePeer.toB58String()} to ${counterparty.toB58String()}`
+        )
+      }
+
+      ctxToCounterparty.update(shaker.stream.source as any)
+
+      const senderMap = this._streams.get(connection.remotePeer.toB58String())
+      if (senderMap == null) {
+        throw Error(
+          `Could not find existing connection from ${counterparty.toB58String()} to ${connection.remotePeer.toB58String()}`
+        )
+      }
+      let ctxToSender = senderMap.get(counterparty.toB58String())
+      if (senderMap == null) {
+        throw Error(
+          `Could not find existing connection from ${counterparty.toB58String()} to ${connection.remotePeer.toB58String()}. Map exists but entry is missing`
+        )
+      }
+      shaker.stream.sink(ctxToSender.source)
     }
-
-    shaker.write(OK)
-
-    shaker.rest()
-
-    const toSender = shaker.stream as Stream
-    const toCounterparty = deliveryStream
-
-    this.updateContext(
-      this._peerInfo.id.toB58String(),
-      counterparty.toB58String(),
-      toCounterparty.source as any,
-      toSender.sink
-    )
-
-    this.updateContext(
-      counterparty.toB58String(),
-      this._peerInfo.id.toB58String(),
-      toSender.source as any,
-      toCounterparty.sink
-    )
   }
 
   private async establishForwarding(counterparty: PeerId) {
@@ -382,27 +436,6 @@ class Relay {
     }
 
     return toCounterparty.stream
-  }
-
-  private async updateContext(
-    to: string,
-    from: string,
-    newSource: AsyncGenerator<Uint8Array>,
-    sink: (stream: AsyncIterable<Uint8Array>) => Promise<void>
-  ) {
-    let found = this._streams.get(to)
-
-    if (found == null) {
-      found = new Map<string, RelayContext>()
-    }
-
-    const ctx = new RelayContext(newSource)
-
-    found.set(from, ctx)
-
-    this._streams.set(this._peerInfo.id.toB58String(), found)
-
-    sink(ctx.source)
   }
 }
 

@@ -39,7 +39,7 @@ class PeerStore {
     for (const peerInfo of existingPeers) {
       this.peers.push({
         id: peerInfo.id.toB58String(),
-        lastSeen: 0,
+        lastSeen: 0
       })
     }
 
@@ -98,7 +98,7 @@ class PeerStore {
     verbose('blacklisting', peer)
     const entry = {
       id: peer,
-      deletedAt: Date.now(),
+      deletedAt: Date.now()
     }
 
     // (Efficiently) pushes peer information into blacklist

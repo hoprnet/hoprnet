@@ -37,6 +37,10 @@ class UnacknowledgedTicket<Chain extends HoprCoreConnector> extends Uint8Array {
     }
   }
 
+  slice(begin: number = 0, end: number = UnacknowledgedTicket.SIZE(this.paymentChannels)) {
+    return this.subarray(begin, end)
+  }
+
   subarray(begin: number = 0, end: number = UnacknowledgedTicket.SIZE(this.paymentChannels)): Uint8Array {
     return new Uint8Array(this.buffer, begin + this.byteOffset, end - begin)
   }
@@ -53,7 +57,7 @@ class UnacknowledgedTicket<Chain extends HoprCoreConnector> extends Uint8Array {
     return new Promise<Types.SignedTicket>(async (resolve) => {
       this._signedTicket = await this.paymentChannels.types.SignedTicket.create({
         bytes: this.buffer,
-        offset: this.signedTicketOffset,
+        offset: this.signedTicketOffset
       })
 
       resolve(this._signedTicket)

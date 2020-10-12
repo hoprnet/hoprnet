@@ -50,9 +50,6 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       message: Message
     }
   ) {
-    if (arr == null && struct == null) {
-      throw Error(`Invalid constructor parameters.`)
-    }
     if (arr == null) {
       super(Packet.SIZE(node.paymentChannels))
     } else {
@@ -72,6 +69,10 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     }
 
     this.node = node
+  }
+
+  slice(begin: number = 0, end: number = Packet.SIZE(this.node.paymentChannels)) {
+    return this.subarray(begin, end)
   }
 
   subarray(begin: number = 0, end: number = Packet.SIZE(this.node.paymentChannels)): Uint8Array {
@@ -102,7 +103,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     return new Promise<Types.SignedTicket>(async (resolve, reject) => {
       this._ticket = await this.node.paymentChannels.types.SignedTicket.create({
         bytes: this.buffer,
-        offset: this.ticketOffset,
+        offset: this.ticketOffset
       })
 
       resolve(this._ticket)
@@ -117,7 +118,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     if (this._challenge == null) {
       this._challenge = new Challenge<Chain>(this.node.paymentChannels, {
         bytes: this.buffer,
-        offset: this.challengeOffset,
+        offset: this.challengeOffset
       })
     }
 
@@ -137,7 +138,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     if (this._message == null) {
       this._message = new Message(true, {
         bytes: this.buffer,
-        offset: this.messageOffset,
+        offset: this.messageOffset
       })
     }
 
@@ -164,12 +165,12 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     const arr = new Uint8Array(Packet.SIZE(node.paymentChannels)).fill(0x00)
     const packet = new Packet<Chain>(node, {
       bytes: arr.buffer,
-      offset: arr.byteOffset,
+      offset: arr.byteOffset
     })
 
     const { header, secrets, identifier } = await Header.create(node, path, {
       bytes: packet.buffer,
-      offset: packet.headerOffset,
+      offset: packet.headerOffset
     })
 
     packet._header = header
@@ -189,13 +190,13 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       fee,
       {
         bytes: packet.buffer,
-        offset: packet.challengeOffset,
+        offset: packet.challengeOffset
       }
     ).sign(node.peerInfo.id)
 
     packet._message = Message.create(msg, {
       bytes: packet.buffer,
-      offset: packet.messageOffset,
+      offset: packet.messageOffset
     }).onionEncrypt(secrets)
 
     const ticketChallenge = await node.paymentChannels.utils.hash(
@@ -212,8 +213,10 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     if (secrets.length > 1) {
       log(`before creating channel`)
 
-      const channel = await node.paymentChannels.channel.create(path[0].pubKey.marshal(), (_counterparty: Uint8Array) =>
-        node.interactions.payments.onChainKey.interact(path[0])
+      const channel = await node.paymentChannels.channel.create(
+        // prettier-ignore
+        path[0].pubKey.marshal(),
+        (_counterparty: Uint8Array) => node.interactions.payments.onChainKey.interact(path[0])
       )
 
       const newFee = new node.paymentChannels.types.Balance(100)
@@ -222,7 +225,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       // @ts-ignore
       packet._ticket = await channel.ticket.create(newFee, ticketChallenge, 1.0, {
         bytes: packet.buffer,
-        offset: packet.ticketOffset,
+        offset: packet.ticketOffset
       })
     } else if (secrets.length == 1) {
       packet._ticket = await node.paymentChannels.channel.createDummyChannelTicket(
@@ -230,7 +233,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
         ticketChallenge,
         {
           bytes: packet.buffer,
-          offset: packet.ticketOffset,
+          offset: packet.ticketOffset
         }
       )
     }
@@ -334,7 +337,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
 
     const unacknowledged = new UnacknowledgedTicket(this.node.paymentChannels, undefined, {
       signedTicket: await this.ticket,
-      secretA: deriveTicketKey(this.header.derivedSecret),
+      secretA: deriveTicketKey(this.header.derivedSecret)
     })
 
     log(
@@ -354,7 +357,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     if (forwardedFunds.gtn(0)) {
       const channelBalance = this.node.paymentChannels.types.ChannelBalance.create(undefined, {
         balance: new BN(10000),
-        balance_a: new BN(5000),
+        balance_a: new BN(5000)
       })
 
       const channel = await this.node.paymentChannels.channel.create(
@@ -371,7 +374,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
         1.0,
         {
           bytes: this.buffer,
-          offset: this.ticketOffset,
+          offset: this.ticketOffset
         }
       )
     } else if (forwardedFunds.isZero()) {
@@ -380,7 +383,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
         this.header.encryptionKey,
         {
           bytes: this.buffer,
-          offset: this.ticketOffset,
+          offset: this.ticketOffset
         }
       )
     } else {
@@ -401,7 +404,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       forwardedFunds,
       {
         bytes: this.buffer,
-        offset: this.challengeOffset,
+        offset: this.challengeOffset
       }
     ).sign(this.node.peerInfo.id)
   }

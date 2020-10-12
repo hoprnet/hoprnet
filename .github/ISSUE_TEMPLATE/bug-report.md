@@ -12,13 +12,19 @@ assignees: ''
 
 <!--- Tell us what should happen -->
 
+(Write your answer here.)
+
 ## Current Behavior
 
 <!--- Tell us what happens instead of the expected behavior -->
 
-## Possible Solution
+(Write your answer here.)
+
+## (Optional) Possible Solution
 
 <!--- Not obligatory, but suggest a fix/reason for the bug, -->
+
+(Write your answer here.)
 
 ## Steps to Reproduce
 
@@ -34,8 +40,9 @@ assignees: ''
 
 <!--- How has this issue affected you? What are you trying to accomplish? -->
 <!--- Providing context helps us come up with a solution that is most useful in the real world -->
-
 <!--- Provide a general summary of the issue in the Title above -->
+
+(Write your answer here.)
 
 ## Detailed Description
 
@@ -46,10 +53,16 @@ assignees: ''
 - Browser [e.g. stock browser, safari]
 - Version [e.g. 22] -->
 
+(Write your answer here.)
+
 ## Logs
 
 <!--- Obligatory if the bug occurred while running HOPR Chat, please attach to this issue the file named "log" or "log.txt" produced in your "hopr-chat" folder. -->
 
-## Possible Implementation
+(Write your answer here.)
+
+## (Optional) Possible Implementation
 
 <!--- Not obligatory, but suggest an idea for implementing addition or change -->
+
+(Write your answer here.)

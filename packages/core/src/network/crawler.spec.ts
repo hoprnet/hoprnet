@@ -29,8 +29,8 @@ describe('test crawler', function () {
       modules: {
         transport: [TCP],
         streamMuxer: [MPLEX],
-        connEncryption: [SECIO],
-      },
+        connEncryption: [SECIO]
+      }
     })) as Hopr<HoprCoreConnector>
 
     node.peerInfo.multiaddrs.add(Multiaddr(addr))
@@ -65,7 +65,7 @@ describe('test crawler', function () {
       generateNode(),
       generateNode(),
       generateNode(),
-      generateNode(),
+      generateNode()
     ])
 
     await Alice.network.crawler.crawl()
@@ -131,7 +131,7 @@ describe('test crawler', function () {
       Bob.stop(),
       Chris.stop(),
       Dave.stop(),
-      Eve.stop(),
+      Eve.stop()
     ])
   })
 
@@ -143,11 +143,11 @@ describe('test crawler', function () {
       const [Alice, Bob, Chris] = await Promise.all([
         generateNode(),
         generateNode({
-          timeoutIntentionally: true,
+          timeoutIntentionally: true
         }),
         generateNode({
-          timeoutIntentionally: true,
-        }),
+          timeoutIntentionally: true
+        })
       ])
 
       await Alice.network.crawler.crawl()
@@ -174,7 +174,7 @@ describe('test crawler', function () {
         /* prettier-ignore */
         Alice.stop(),
         Bob.stop(),
-        Chris.stop(),
+        Chris.stop()
       ])
     },
     durations.seconds(8)

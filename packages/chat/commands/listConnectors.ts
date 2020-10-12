@@ -1,20 +1,20 @@
-import { AbstractCommand } from './abstractCommand'
-
 import chalk from 'chalk'
 import { knownConnectors } from '../utils/knownConnectors'
+import { AbstractCommand } from './abstractCommand'
 
 export default class ListConnectors extends AbstractCommand {
-  name() {
+  public name() {
     return 'listConnectors'
   }
-  help() {
-    return 'lists all installed blockchain connectors'
+
+  public help() {
+    return 'Lists all installed blockchain connectors'
   }
   /**
    * Check which connectors are present right now.
    * @notice triggered by the CLI
    */
-  async execute(): Promise<string> {
+  public async execute(): Promise<string> {
     let str = 'Available connectors:'
     let found = 0
 

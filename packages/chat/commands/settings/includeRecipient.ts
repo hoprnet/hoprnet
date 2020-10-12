@@ -1,4 +1,3 @@
-import chalk from 'chalk'
 import { AbstractCommand, AutoCompleteResult, GlobalState } from '../abstractCommand'
 import { styleValue, getOptions } from '../../utils'
 
@@ -10,7 +9,7 @@ export class IncludeRecipient extends AbstractCommand {
   }
 
   public help() {
-    return 'preprends your address to all messages'
+    return 'Prepends your address to all messages'
   }
 
   public async execute(query: string, state: GlobalState): Promise<string | void> {
@@ -20,25 +19,29 @@ export class IncludeRecipient extends AbstractCommand {
     }
 
     if (!query.match(/true|false/i)) {
-      return chalk.red('Invalid option.')
+      return styleValue(`Invalid option.`, 'failure')
     }
 
     state.includeRecipient = !!query.match(/true/i)
-    return `You have set your “${styleValue(this.name())}” settings to “${styleValue(state.includeRecipient)}”.`
+    return `You have set your “${styleValue(this.name(), 'highlight')}” settings to “${styleValue(
+      state.includeRecipient
+    )}”.`
   }
 
   public async autocomplete(query: string, line: string): Promise<AutoCompleteResult> {
     // nothing provided, just show all options
     if (!query) {
-      return [getOptions(this.options.map((o) => ({ value: o }))), line]
+      return [getOptions(this.options.map((o) => ({ value: styleValue(o, 'boolean') }))), line]
     }
 
     // matches a option partly, show matches options
-    const matchesPartly = this.options.filter((option) => {
-      return String(option).toLowerCase().startsWith(query.toLowerCase())
-    })
+    const matchesPartly = this.options
+      .filter((option) => {
+        return String(option).startsWith(query)
+      })
+      .map((res) => String(res))
     if (matchesPartly.length > 0) {
-      return [matchesPartly.map((str) => `settings ${this.name()} ${String(str)}`), line]
+      return [matchesPartly.map((str: string) => `settings ${this.name()} ${str}`), line]
     }
 
     return [[this.name()], line]

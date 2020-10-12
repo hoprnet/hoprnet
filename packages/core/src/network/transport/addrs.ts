@@ -2,6 +2,10 @@ import { networkInterfaces } from 'os'
 import Multiaddr from 'multiaddr'
 
 export function isAnyAddress(ma: Multiaddr) {
+  if (!['ip4', 'ip6', 'dns4', 'dns6'].includes(ma.protoNames()[0])) {
+    return false
+  }
+
   const cOpts = ma.nodeAddress()
 
   if (cOpts.family === 'IPv4') {
@@ -93,7 +97,7 @@ export function getAddrs(
         Multiaddr.fromNodeAddress(
           {
             ...addresses[j],
-            port: port.toString(),
+            port: port.toString()
           },
           'tcp'
         ).encapsulate(`/p2p/${peerId}`)

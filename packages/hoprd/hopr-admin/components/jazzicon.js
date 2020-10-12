@@ -15,11 +15,11 @@ export default class Jazzicon extends PureComponent {
     address: PropTypes.string.isRequired,
     className: PropTypes.string,
     diameter: PropTypes.number,
-    style: PropTypes.object,
+    style: PropTypes.object
   }
 
   static defaultProps = {
-    diameter: 46,
+    diameter: 46
   }
 
   container = createRef()

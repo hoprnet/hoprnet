@@ -54,6 +54,10 @@ class Acknowledgement<Chain extends HoprCoreConnector> extends Uint8Array {
     this.paymentChannels = paymentChannels
   }
 
+  slice(begin: number = 0, end: number = Acknowledgement.SIZE(this.paymentChannels)) {
+    return this.subarray(begin, end)
+  }
+
   subarray(begin: number = 0, end: number = Acknowledgement.SIZE(this.paymentChannels)): Uint8Array {
     return new Uint8Array(this.buffer, begin + this.byteOffset, end - begin)
   }
@@ -85,7 +89,7 @@ class Acknowledgement<Chain extends HoprCoreConnector> extends Uint8Array {
   get challenge(): Challenge<Chain> {
     return new Challenge<Chain>(this.paymentChannels, {
       bytes: this.buffer,
-      offset: this.challengeOffset,
+      offset: this.challengeOffset
     })
   }
 
@@ -115,7 +119,7 @@ class Acknowledgement<Chain extends HoprCoreConnector> extends Uint8Array {
     return new Promise<Types.Signature>(async (resolve, reject) => {
       this._responseSignature = await this.paymentChannels.types.Signature.create({
         bytes: this.buffer,
-        offset: this.responseSignatureOffset,
+        offset: this.responseSignatureOffset
       })
 
       resolve(this._responseSignature)
@@ -144,7 +148,7 @@ class Acknowledgement<Chain extends HoprCoreConnector> extends Uint8Array {
   async sign(peerId: PeerId): Promise<Acknowledgement<Chain>> {
     await this.paymentChannels.utils.sign(await this.hash, peerId.privKey.marshal(), peerId.pubKey.marshal(), {
       bytes: this.buffer,
-      offset: this.responseSignatureOffset,
+      offset: this.responseSignatureOffset
     })
 
     return this
@@ -170,7 +174,7 @@ class Acknowledgement<Chain extends HoprCoreConnector> extends Uint8Array {
   ): Promise<Acknowledgement<Chain>> {
     const ack = new Acknowledgement(hoprCoreConnector, {
       bytes: new Uint8Array(Acknowledgement.SIZE(hoprCoreConnector)),
-      offset: 0,
+      offset: 0
     })
 
     ack.set(deriveTicketKeyBlinding(derivedSecret), ack.keyOffset - ack.byteOffset)

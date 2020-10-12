@@ -11,7 +11,7 @@ import SECIO = require('libp2p-secio')
 
 import PeerId from 'peer-id'
 
-import { Connection, Handler, Stream } from './types'
+import { Connection, Handler, Stream } from '../../@types/transport'
 
 import TCP from '.'
 import Multiaddr from 'multiaddr'
@@ -61,7 +61,7 @@ describe('should create a socket and connect to it', function () {
         transport: [TCP],
         streamMuxer: [MPLEX],
         connEncryption: [SECIO],
-        dht: KadDHT,
+        dht: KadDHT
       },
       config: {
         transport: {
@@ -70,19 +70,19 @@ describe('should create a socket and connect to it', function () {
             bootstrapServers: [bootstrap],
             failIntentionallyOnWebRTC: options.failIntentionallyOnWebRTC,
             timeoutIntentionallyOnWebRTC: options.timeoutIntentionallyOnWebRTC,
-            answerIntentionallyWithIncorrectMessages: options.answerIntentionallyWithIncorrectMessages,
-          },
+            answerIntentionallyWithIncorrectMessages: options.answerIntentionallyWithIncorrectMessages
+          }
         },
         dht: {
-          enabled: false,
+          enabled: false
         },
         relay: {
-          enabled: false,
+          enabled: false
         },
         peerDiscovery: {
-          autoDial: false,
-        },
-      },
+          autoDial: false
+        }
+      }
     })
 
     node.handle([TEST_PROTOCOL], (handler: Handler) => {
@@ -315,7 +315,7 @@ describe('should create a socket and connect to it', function () {
     const relay = await generateNode({ id: 2, ipv4: true })
     const [sender, counterparty] = await Promise.all([
       generateNode({ id: 0, ipv4: true }, relay.peerInfo),
-      generateNode({ id: 1, ipv4: true }, relay.peerInfo),
+      generateNode({ id: 1, ipv4: true }, relay.peerInfo)
     ])
     connectionHelper([sender, relay])
     connectionHelper([relay, counterparty])
@@ -365,7 +365,7 @@ describe('should create a socket and connect to it', function () {
       /* prettier-ignore */
       sender.stop(),
       counterparty.stop(),
-      relay.stop(),
+      relay.stop()
     ])
   })
 
@@ -762,7 +762,7 @@ describe('should create a socket and connect to it', function () {
 
     const [sender, counterparty] = await Promise.all([
       generateNode({ id: 0, ipv4: true, useWebRTC: false }, relay.peerInfo),
-      generateNode({ id: 1, ipv4: true, useWebRTC: false }, relay.peerInfo),
+      generateNode({ id: 1, ipv4: true, useWebRTC: false }, relay.peerInfo)
     ])
 
     connectionHelper([sender, relay])
@@ -829,7 +829,7 @@ describe('should create a socket and connect to it', function () {
       /* prettier-ignore */
       sender.stop(),
       counterparty.stop(),
-      relay.stop(),
+      relay.stop()
     ])
   })
 

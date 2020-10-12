@@ -33,7 +33,7 @@ class Heartbeat extends EventEmitter {
 
     this.networkPeers.push({
       id: peerIdString,
-      lastSeen: Date.now(),
+      lastSeen: Date.now()
     })
   }
 
@@ -64,7 +64,7 @@ class Heartbeat extends EventEmitter {
 
           this.networkPeers.push({
             id: peer,
-            lastSeen: Date.now(),
+            lastSeen: Date.now()
           })
         } catch (err) {
           await this.hangUp(currentPeerId)
