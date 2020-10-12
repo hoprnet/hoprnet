@@ -46,7 +46,7 @@
     "@types/ws": "^7.2.6",
     "it-pair": "^1.0.0",
     "jest": "^26.1.0",
-    "libp2p-tcp": "^0.14.6",
+    "libp2p-tcp": "^0.15.1",
     "memdown": "^5.1.0",
     "prettier": "^2.0.5",
     "rimraf": "^3.0.2",

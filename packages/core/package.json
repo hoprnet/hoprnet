@@ -82,7 +82,7 @@
     "@types/simple-peer": "^9.6.0",
     "it-pair": "^1.0.0",
     "jest": "^26.1.0",
-    "libp2p-tcp": "^0.14.6",
+    "libp2p-tcp": "^0.15.1",
     "memdown": "^5.1.0",
     "rimraf": "^3.0.2",
     "ts-jest": "^26.1.4",
