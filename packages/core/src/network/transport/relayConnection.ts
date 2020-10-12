@@ -92,7 +92,6 @@ class RelayConnection implements MultiaddrConnection {
               error(`Received invalid status message ${received.slice(1)}. Dropping message.`)
             }
           } else if (u8aEquals(received.slice(0, 1), RELAY_WEBRTC_PREFIX)) {
-            // console.log(`Receiving fancy WebRTC message`, JSON.parse(new TextDecoder().decode(received.slice(1))))
             this.webRTC?.signal(JSON.parse(new TextDecoder().decode(received.slice(1))))
           } else {
             error(`Received invalid prefix <${received.slice(0, 1)}. Dropping message.`)

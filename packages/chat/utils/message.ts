@@ -30,13 +30,9 @@ export function decodeMessage(
       msg: msg.toString()
     }
   } catch (err) {
-    console.log(
-      styleValue(`Could not decode received message '${u8aToHex(encoded)}' Error was ${err.message}.`, 'failure')
-    )
-
     return {
       latency: NaN,
-      msg: 'Error: Could not decode message'
+      msg: `Error: Could not decode message ${u8aToHex(encoded)}`
     }
   }
 }
