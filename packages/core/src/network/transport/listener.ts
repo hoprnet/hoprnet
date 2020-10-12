@@ -183,8 +183,8 @@ class Listener extends EventEmitter {
 
       addrs.push(
         ...getAddrs(address.port, this.peerId, {
-          includeLocalhostIPv4: true
-          // useIPv6: true
+          includeLocalhostIPv4: true,
+          useIPv6: true
         })
       )
     } else if (this.externalAddress != null && this.externalAddress.port != null) {
@@ -201,8 +201,8 @@ class Listener extends EventEmitter {
 
       addrs.push(
         ...getAddrs(address.port, this.peerId, {
-          includeLocalhostIPv4: true
-          // useIPv6: true
+          includeLocalhostIPv4: true,
+          useIPv6: false
         })
       )
     } else {
