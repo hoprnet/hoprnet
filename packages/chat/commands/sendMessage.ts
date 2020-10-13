@@ -5,7 +5,6 @@ import type PeerId from 'peer-id'
 import { clearString } from '@hoprnet/hopr-utils'
 import { MAX_HOPS } from '@hoprnet/hopr-core/lib/constants'
 import readline from 'readline'
-import chalk from 'chalk'
 import { checkPeerIdInput, encodeMessage, getOpenChannels, getPeerIdsAndAliases, styleValue } from '../utils'
 import { AbstractCommand, GlobalState } from './abstractCommand'
 
@@ -22,32 +21,27 @@ export abstract class SendMessageBase extends AbstractCommand {
     return 'Sends a message to another party'
   }
 
+  private insertMyAddress(message: string): string {
+    const myAddress = this.node.peerInfo.id.toB58String()
+    return `${myAddress}:${message}`
+  }
+
+  protected getIntermediateNodesFromRoute(routing: GlobalState['routing']): Promise<PeerId[]> {
+    return Promise.all(routing.split(',').map((peerId) => checkPeerIdInput(peerId)))
+  }
+
   protected async sendMessage(
     state: GlobalState,
     recipient: PeerId,
-    msg: string,
+    rawMessage: string,
     getIntermediateNodes?: () => Promise<PeerId[]>
   ): Promise<string | void> {
-    const message = state.includeRecipient
-      ? ((myAddress) => `${myAddress}:${msg}`)(this.node.peerInfo.id.toB58String())
-      : msg
+    const message = state.includeRecipient ? this.insertMyAddress(rawMessage) : rawMessage
 
     console.log(`Sending message to ${styleValue(recipient.toB58String(), 'peerId')} ...`)
 
     try {
-      let m = encodeMessage(message)
-      /*if (state.routing === 'auto') {
-        // use random path
-        return await this.node.sendMessage(m, recipient)
-      } else
-      */
-      if (state.routing === 'direct') {
-        // 0 hops
-        return await this.node.sendMessage(m, recipient, async () => [])
-      } else {
-        let path = await Promise.all(state.routing.split(',').map(async (x) => await checkPeerIdInput(x)))
-        return await this.node.sendMessage(m, recipient, () => Promise.resolve(path))
-      }
+      await this.node.sendMessage(encodeMessage(message), recipient, getIntermediateNodes)
     } catch (err) {
       return styleValue('Could not send message.', 'failure')
     }
@@ -65,7 +59,7 @@ export abstract class SendMessageBase extends AbstractCommand {
 
 export class SendMessage extends SendMessageBase {
   public async execute(query: string, state: GlobalState): Promise<CommandResponse> {
-    const [err, peerIdString, msg] = this._assertUsage(query, ['PeerId', 'Message'], /(\w+)\s(.*)/)
+    const [err, peerIdString, message] = this._assertUsage(query, ['PeerId', 'Message'], /(\w+)\s(.*)/)
     if (err) return err
 
     let peerId: PeerId
@@ -75,7 +69,24 @@ export class SendMessage extends SendMessageBase {
       return styleValue(err.message, 'failure')
     }
 
-    return this.sendMessage(state, peerId, msg)
+    try {
+      // manual mode
+      if (state.routing === 'manual') {
+        return styleValue('Cannot send a message using manual mode.', 'failure')
+      }
+      // manual mode but with specified peers
+      else if (state.routing.match(',')) {
+        return this.sendMessage(state, peerId, message, async () => {
+          return this.getIntermediateNodesFromRoute(state.routing)
+        })
+      }
+      // direct mode
+      else {
+        return this.sendMessage(state, peerId, message)
+      }
+    } catch (err) {
+      return styleValue(err.message, 'failure')
+    }
   }
 }
 
@@ -100,23 +111,27 @@ export class SendMessageFancy extends SendMessageBase {
     }
 
     const messageQuestion = styleValue(`Type your message and press ENTER to send:`, 'highlight') + '\n'
-    const parsedMessage = await new Promise<string>((resolve) => this.rl.question(messageQuestion, resolve))
+    const message = await new Promise<string>((resolve) => this.rl.question(messageQuestion, resolve))
 
     try {
+      // manual mode
       if (state.routing === 'manual') {
-        // Fancy intermediate selection
-        const message = state.includeRecipient
-          ? ((myAddress) => `${myAddress}:${parsedMessage}`)(this.node.peerInfo.id.toB58String())
-          : parsedMessage
-
         clearString(messageQuestion + message, this.rl)
         console.log(`Sending message to ${styleValue(query, 'peerId')} ...`)
 
-        await this.node.sendMessage(encodeMessage(message), peerId, async () => {
+        return this.sendMessage(state, peerId, message, async () => {
           return this.selectIntermediateNodes(this.rl, peerId)
         })
-      } else {
-        await this.sendMessage(state, peerId, parsedMessage)
+      }
+      // manual mode but with specified peers
+      else if (state.routing.match(',')) {
+        return this.sendMessage(state, peerId, message, async () => {
+          return this.getIntermediateNodesFromRoute(state.routing)
+        })
+      }
+      // direct mode
+      else {
+        return this.sendMessage(state, peerId, message)
       }
     } catch (err) {
       return styleValue(err.message, 'failure')

@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-server",
-  "version": "1.17.0-alpha.65",
+  "version": "1.17.0-alpha.66",
   "description": "gRPC Server wrapper around HOPR Node",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -47,10 +47,11 @@
     "yarn": "1"
   },
   "dependencies": {
-    "@hoprnet/hopr-core": "^1.17.0-alpha.65",
-    "@hoprnet/hopr-core-connector-interface": "^1.17.0-alpha.65",
-    "@hoprnet/hopr-protos": "^1.17.0-alpha.65",
-    "@hoprnet/hopr-utils": "^1.17.0-alpha.65",
+    "@grpc/proto-loader": "^0.5.4",
+    "@hoprnet/hopr-core": "^1.17.0-alpha.66",
+    "@hoprnet/hopr-core-connector-interface": "^1.17.0-alpha.66",
+    "@hoprnet/hopr-protos": "^1.17.0-alpha.66",
+    "@hoprnet/hopr-utils": "^1.17.0-alpha.66",
     "@nestjs/common": "^7.0.0",
     "@nestjs/config": "^0.5.0",
     "@nestjs/core": "^7.0.0",
@@ -58,7 +59,6 @@
     "class-validator": "^0.12.2",
     "dotenv-parse-variables": "^1.0.1",
     "grpc": "^1.24.3",
-    "@grpc/proto-loader": "^0.5.4",
     "multiaddr": "^7.5.0",
     "parse-ip-port": "^1.0.0",
     "peer-id": "^0.13.13",
@@ -69,8 +69,8 @@
     "rxjs": "^6.6.0"
   },
   "devDependencies": {
-    "@hoprnet/hopr-ethereum": "^1.17.0-alpha.65",
-    "@hoprnet/hopr-testing": "^1.17.0-alpha.65",
+    "@hoprnet/hopr-ethereum": "^1.17.0-alpha.66",
+    "@hoprnet/hopr-testing": "^1.17.0-alpha.66",
     "@nestjs/cli": "^7.0.0",
     "@nestjs/schematics": "^7.0.0",
     "@nestjs/testing": "^7.0.0",
