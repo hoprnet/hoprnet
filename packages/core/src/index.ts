@@ -53,7 +53,7 @@ export type HoprOptions = {
   bootstrapNode?: boolean
   network: string
   connector?: HoprCoreConnectorStatic
-  bootstrapServers?: PeerInfo[]
+  bootstrapServers?: Multiaddr[]
   provider: string
   output?: (encoded: Uint8Array) => void
   hosts?: {
@@ -70,7 +70,7 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
   public dbKeys = DbKeys
   public output: (arr: Uint8Array) => void
   public isBootstrapNode: boolean
-  public bootstrapServers: PeerInfo[]
+  public bootstrapServers: Multiaddr[]
   public initializedWithOptions: HoprOptions
 
   // Allows us to construct HOPR with falsy options
@@ -156,13 +156,13 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
   }
 
   /**
-   * Parses the bootstrap servers given in `.env` and tries to connect to each of them.
+   * Parses the bootstrap servers given in options` and tries to connect to each of them.
    *
    * @throws an error if none of the bootstrapservers is online
    */
   async connectToBootstrapServers(): Promise<void> {
     const potentialBootstrapServers = this.bootstrapServers.filter(
-      (addr: PeerInfo) => !addr.id.equals(this.peerInfo.id)
+      (addr: Multiaddr) => addr.getPeerId() != this.peerInfo.id.toB58String()
     )
 
     if (potentialBootstrapServers.length == 0) {
@@ -176,7 +176,7 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
     }
 
     const results = await Promise.all(
-      potentialBootstrapServers.map((addr: PeerInfo) =>
+      potentialBootstrapServers.map((addr: Multiaddr) =>
         this.dial(addr).then(
           () => true,
           () => false
@@ -340,7 +340,7 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
     const start = new this.paymentChannels.types.Public(this.peerInfo.id.pubKey.marshal())
     const exclude = [
       destination.pubKey.marshal(),
-      ...this.bootstrapServers.map((pInfo) => pInfo.id.pubKey.marshal())
+      ...this.bootstrapServers.map((ma) => PeerId.createFromB58String(ma.getPeerId()).pubKey.marshal())
     ].map((pubKey) => new this.paymentChannels.types.Public(pubKey))
 
     return await Promise.all(
