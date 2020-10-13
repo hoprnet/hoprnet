@@ -83,7 +83,6 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
    * @param provider
    */
   constructor(options: HoprOptions, public db: LevelUp, public paymentChannels: Chain) {
-    //@ts-ignore
     super({
       peerInfo: options.peerInfo,
 

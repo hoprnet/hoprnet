@@ -610,18 +610,18 @@
     protobufjs "^6.9.0"
     yargs "^15.3.1"
 
-"@hoprnet/hopr-core-connector-interface@^1.17.0-alpha.66":
-  version "1.17.0-alpha.66"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-connector-interface/-/hopr-core-connector-interface-1.17.0-alpha.66.tgz#38beb575248d63ec0c805472b59c8b614235065f"
-  integrity sha512-wD8YgPK/IcfSVInust/COveILCfkmK2ndXNIZgQYNWPm1nk4SLobslcJu9lP3PbQ3v7cIetuirXykILEWWVhGw==
+"@hoprnet/hopr-core-connector-interface@^1.17.0-alpha.68":
+  version "1.17.0-alpha.68"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-connector-interface/-/hopr-core-connector-interface-1.17.0-alpha.68.tgz#d4f24acac1631ffe60d75224d2f48af5a1d219fd"
+  integrity sha512-kirkH9EfGZydBLSfZEjKDuK6HMG+TBYYZ93oSzd4+GNDg9yxac8bkRaS8MrhyLprFboKlV09pKfV9MV3M0O3/w==
 
-"@hoprnet/hopr-core-ethereum@^1.17.0-alpha.66":
-  version "1.17.0-alpha.66"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-ethereum/-/hopr-core-ethereum-1.17.0-alpha.66.tgz#b57ad0aff576a9f5b67669f09663cbbb6497ae9d"
-  integrity sha512-sKwVpjPma43aa6Xhcz6VicUX77k+G6cCtO7Dw4gF5hJ5T9DxAo25GpwnPoUzhn4JSWqhT4Vqy8T8ZJhJ4JmV5Q==
+"@hoprnet/hopr-core-ethereum@^1.17.0-alpha.68":
+  version "1.17.0-alpha.68"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-ethereum/-/hopr-core-ethereum-1.17.0-alpha.68.tgz#0963c72689d2894dae604b7eae414c5750fc8f5e"
+  integrity sha512-VTOgleOC/iWTNu4NztpDMcgofuk/H4/R7JqgEFTW3umNz7ZCvnf+G7tUH93zWC9IvtC6FBdBGPLus+fTxVvFLw==
   dependencies:
-    "@hoprnet/hopr-ethereum" "^1.17.0-alpha.66"
-    "@hoprnet/hopr-utils" "^1.17.0-alpha.66"
+    "@hoprnet/hopr-ethereum" "^1.17.0-alpha.68"
+    "@hoprnet/hopr-utils" "^1.17.0-alpha.68"
     bn.js "^5.1.2"
     chalk "^4.1.0"
     debug "^4.1.1"
@@ -635,14 +635,14 @@
     web3-eth "^1.2.11"
     web3-eth-contract "^1.2.11"
 
-"@hoprnet/hopr-core@^1.17.0-alpha.66":
-  version "1.17.0-alpha.66"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core/-/hopr-core-1.17.0-alpha.66.tgz#e30e64f6471f3ae2c26be727d8d902285d030eed"
-  integrity sha512-SB8UT5ivNdLcKMcXAly4Gv1opbfH1pwJsDwBrDSkMkjnCw+ZvRVGrpypyAPunFDDrXvCKN2eOC4XkKuVSZ2DGQ==
+"@hoprnet/hopr-core@^1.17.0-alpha.68":
+  version "1.17.0-alpha.68"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core/-/hopr-core-1.17.0-alpha.68.tgz#1414939a656345a63bcbc4ea91f05e36fecba610"
+  integrity sha512-xrTcRrvxtQ19kNRzMDX9T6MN/LcTfD7y0t+pbFxWkLBUhYo79sYX6kVTEbq0uBax0SOQhHEiIlI7t3f8UENizg==
   dependencies:
-    "@hoprnet/hopr-core-ethereum" "^1.17.0-alpha.66"
-    "@hoprnet/hopr-demo-seeds" "^1.17.0-alpha.66"
-    "@hoprnet/hopr-utils" "^1.17.0-alpha.66"
+    "@hoprnet/hopr-core-ethereum" "^1.17.0-alpha.68"
+    "@hoprnet/hopr-demo-seeds" "^1.17.0-alpha.68"
+    "@hoprnet/hopr-utils" "^1.17.0-alpha.68"
     abort-controller "^3.0.0"
     abortable-iterator "^3.0.0"
     bl "^4.0.3"
@@ -660,7 +660,7 @@
     libp2p-mplex "~0.10.0"
     libp2p-secio "^0.13.1"
     multiaddr "^7.4.3"
-    multihashes "~0.4.19"
+    multihashes "~3.0.1"
     p-defer "^3.0.0"
     peer-id "~0.13"
     peer-info "~0.17.5"
@@ -672,18 +672,18 @@
     webrtc-stun "^3.0.0"
     wrtc "0.4.6"
 
-"@hoprnet/hopr-demo-seeds@^1.17.0-alpha.66":
-  version "1.17.0-alpha.66"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-demo-seeds/-/hopr-demo-seeds-1.17.0-alpha.66.tgz#181825cf31078bcf605cfb1891ee7cc2190a808a"
-  integrity sha512-mVAki3Gro+8UBzsNIxXfM9QqnQGXXcIp0IfOokFZPAynfBw33O0+I5DT6DkNesnAFj4P4GnTmxKaPKiRBIP73g==
+"@hoprnet/hopr-demo-seeds@^1.17.0-alpha.68":
+  version "1.17.0-alpha.68"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-demo-seeds/-/hopr-demo-seeds-1.17.0-alpha.68.tgz#228254463522e3918b6feccb283b7a6fa23e89fd"
+  integrity sha512-mBxsI+OH31mH31fhiJI6gVGLzf+7kwUdw1K/atJd3mR8TzOmWg4jyjbhzLeiOXD7/CzLBwpV0B7UI+WcMtT9bQ==
 
-"@hoprnet/hopr-ethereum@^1.17.0-alpha.66":
-  version "1.17.0-alpha.66"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-ethereum/-/hopr-ethereum-1.17.0-alpha.66.tgz#636e6939757ad15ff6548a6bf4b6d608e1a42caf"
-  integrity sha512-Y7mXMKW3Ix0gyL144KIpzdTwZy+tI4l/tEla59lu+T+UtQ/gt/yz5JyiiokPEcS68bex6bPaFXhSAfha44Xxnw==
+"@hoprnet/hopr-ethereum@^1.17.0-alpha.68":
+  version "1.17.0-alpha.68"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-ethereum/-/hopr-ethereum-1.17.0-alpha.68.tgz#06cfb8ac9cefc62f2acc37a16bce10200f34d090"
+  integrity sha512-DQ+i9kInuhEbkJpKtdEFhztdcCMhGJcYQYL5+beo1PZt/zC/+dz87e+o5JOUo2aKOv2zXvRRuJMctXM4PvyeeQ==
   dependencies:
-    "@hoprnet/hopr-demo-seeds" "^1.17.0-alpha.66"
-    "@hoprnet/hopr-utils" "^1.17.0-alpha.66"
+    "@hoprnet/hopr-demo-seeds" "^1.17.0-alpha.68"
+    "@hoprnet/hopr-utils" "^1.17.0-alpha.68"
     "@openzeppelin/contracts" "^3.0.1"
     "@truffle/debug-utils" "^4.1.1"
     "@truffle/hdwallet-provider" "^1.0.34"
@@ -696,10 +696,10 @@
     ts-node "^9.0.0"
     web3 "^1.2.11"
 
-"@hoprnet/hopr-utils@^1.17.0-alpha.66":
-  version "1.17.0-alpha.66"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.17.0-alpha.66.tgz#4e5951966e4b88889d2ac890dd6abac9516cc8ea"
-  integrity sha512-u5O9OwpiYBiANW1VlL5/hictBXbipQUGOuEty93+0YJlYfsHTmmPHIP4tvGOoPuL41eXcrYxNYpBgS5heEu2nA==
+"@hoprnet/hopr-utils@^1.17.0-alpha.68":
+  version "1.17.0-alpha.68"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.17.0-alpha.68.tgz#039af1d8e06b2a82cbed18050aa6e4f4e8a8f3f8"
+  integrity sha512-wN8jepbKdj0KR6uwjtCjrO6uJ8alG4+MCY4jjC+mwSXasqKjVQTfe8jkrV/SXvXJfzDCqn5W4DZMQ3jVxj/AHA==
   dependencies:
     bignumber.js "^9.0.0"
     libp2p-crypto "^0.17.9"
@@ -8655,7 +8655,7 @@ multicodec@^2.0.0, multicodec@^2.0.1:
     uint8arrays "1.0.0"
     varint "^5.0.0"
 
-multihashes@^0.4.14, multihashes@^0.4.15, multihashes@~0.4.15, multihashes@~0.4.19:
+multihashes@^0.4.14, multihashes@^0.4.15, multihashes@~0.4.15:
   version "0.4.21"
   resolved "https://registry.yarnpkg.com/multihashes/-/multihashes-0.4.21.tgz#dc02d525579f334a7909ade8a122dabb58ccfcb5"
   integrity sha512-uVSvmeCWf36pU2nB4/1kzYZjsXD9vofZKpgudqkceYY5g2aZZXJ5r9lxuzoRLl1OAp28XljXsEJ/X/85ZsKmKw==
@@ -8673,7 +8673,7 @@ multihashes@^1.0.1:
     multibase "^1.0.1"
     varint "^5.0.0"
 
-multihashes@^3.0.1:
+multihashes@^3.0.1, multihashes@~3.0.1:
   version "3.0.1"
   resolved "https://registry.yarnpkg.com/multihashes/-/multihashes-3.0.1.tgz#607c243d5e04ec022ac76c9c114e08416216f019"
   integrity sha512-fFY67WOtb0359IjDZxaCU3gJILlkwkFbxbwrK9Bej5+NqNaYztzLOj8/NgMNMg/InxmhK+Uu8S/U4EcqsHzB7Q==
