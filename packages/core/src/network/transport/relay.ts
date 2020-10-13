@@ -159,7 +159,7 @@ class Relay {
     return new RelayConnection({
       stream,
       self: this._peerInfo.id,
-      counterparty: PeerId.createFromCID(conn.connection.remotePeer.toB58String()),
+      counterparty,
       onReconnect
       // webRTC: this._webRTCUpgrader?.upgradeInbound(),
     })
