@@ -122,9 +122,9 @@ class TCP {
       myConn._close = () => Promise.resolve()
 
       console.log(`relayConn`, relayConn)
-      myConn.close().then(() => {
+      myConn.close().then(async () => {
         console.log(`relayConn inside close`, relayConn)
-        this._upgrader.upgradeInbound(relayConn)
+        await this._upgrader.upgradeInbound(relayConn)
         console.log(`reconnected in handler`)
       })
     }
@@ -213,23 +213,23 @@ class TCP {
 
     //   return await this._upgrader.upgradeOutbound(relayConnection)
     // } else {
-      let relayConnection: MultiaddrConnection
-      let newConn: Connection
-      const onReconnect = () => {
-        // @ts-ignore
-        newConn._close = () => Promise.resolve()
+    let relayConnection: MultiaddrConnection
+    let newConn: Connection
+    const onReconnect = () => {
+      // @ts-ignore
+      newConn._close = () => Promise.resolve()
 
-        newConn.close().then(() => {
-          this._upgrader.upgradeInbound(relayConnection)
-          console.log(`reconnect in dialer without WebRTC`)
-        })
-      }
+      newConn.close().then(async () => {
+        await this._upgrader.upgradeInbound(relayConnection)
+        console.log(`reconnect in dialer without WebRTC`)
+      })
+    }
 
-      relayConnection = await this._relay.establishRelayedConnection(ma, relays, onReconnect, options)
+    relayConnection = await this._relay.establishRelayedConnection(ma, relays, onReconnect, options)
 
-      newConn = await this._upgrader.upgradeOutbound(relayConnection)
+    newConn = await this._upgrader.upgradeOutbound(relayConnection)
 
-      return newConn
+    return newConn
     // }
   }
 
