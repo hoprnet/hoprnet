@@ -205,14 +205,14 @@ class TCP {
   }
 
   async dialWithRelay(ma: Multiaddr, relays: PeerInfo[], options?: DialOptions): Promise<Connection> {
-    if (this._useWebRTC) {
-      const onReconnect = () => {
-        console.log(`reconnect in dialer`)
-      }
-      const relayConnection = await this._relay.establishRelayedConnection(ma, relays, onReconnect, options)
+    // if (this._useWebRTC) {
+    //   const onReconnect = () => {
+    //     console.log(`reconnect in dialer`)
+    //   }
+    //   const relayConnection = await this._relay.establishRelayedConnection(ma, relays, onReconnect, options)
 
-      return await this._upgrader.upgradeOutbound(relayConnection)
-    } else {
+    //   return await this._upgrader.upgradeOutbound(relayConnection)
+    // } else {
       let relayConnection: MultiaddrConnection
       let conn: Connection
       const onReconnect = () => {
@@ -228,7 +228,7 @@ class TCP {
       relayConnection = await this._relay.establishRelayedConnection(ma, relays, onReconnect, options)
 
       return this._upgrader.upgradeOutbound(relayConnection)
-    }
+    // }
   }
 
   async dialDirectly(ma: Multiaddr, options?: DialOptions): Promise<Connection> {
