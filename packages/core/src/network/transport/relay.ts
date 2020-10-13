@@ -123,8 +123,6 @@ class Relay {
       return
     }
 
-
-
     let stream: Stream
     try {
       stream = await this.performHandshake(relayConnection, potentialRelay.id, destination)
@@ -138,7 +136,6 @@ class Relay {
       return
     }
 
-
     return new RelayConnection({
       stream,
       self: this._peerInfo.id,
@@ -151,6 +148,8 @@ class Relay {
   async handleRelayConnection(conn: Handler, onReconnect: () => void): Promise<MultiaddrConnection> {
     const { stream, counterparty } = await this.handleHandshake(conn.stream)
 
+    log(`incoming connection from ${counterparty.toB58String()}`)
+
     if (stream == null) {
       return
     }
@@ -160,7 +159,7 @@ class Relay {
     return new RelayConnection({
       stream,
       self: this._peerInfo.id,
-      counterparty,
+      counterparty: PeerId.createFromCID(conn.connection.remotePeer.toB58String()),
       onReconnect
       // webRTC: this._webRTCUpgrader?.upgradeInbound(),
     })
@@ -321,7 +320,7 @@ class Relay {
       let deliveryStream: Stream
 
       try {
-        deliveryStream = await this.establishForwarding(counterparty)
+        deliveryStream = await this.establishForwarding(connection.remotePeer, counterparty)
       } catch (err) {
         forwardingErrThrown = true
         error(err)
@@ -358,7 +357,7 @@ class Relay {
     }
   }
 
-  private async establishForwarding(counterparty: PeerId) {
+  private async establishForwarding(initiator: PeerId, counterparty: PeerId) {
     let timeout: any
 
     let cParty = new PeerInfo(counterparty)
@@ -400,7 +399,7 @@ class Relay {
 
     const toCounterparty = handshake(newStream)
 
-    toCounterparty.write(counterparty.pubKey.marshal())
+    toCounterparty.write(initiator.pubKey.marshal())
 
     let answer: Buffer | undefined
     try {
