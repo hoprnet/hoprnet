@@ -1,7 +1,6 @@
 import type { HoprOptions } from '@hoprnet/hopr-core'
 import { getBootstrapAddresses } from '@hoprnet/hopr-utils'
 import getopts from 'getopts'
-import PeerInfo from 'peer-info'
 import Multiaddr from 'multiaddr'
 import ListConnctor from '../commands/listConnectors'
 import { displayHelp, styleValue } from './displayHelp'
