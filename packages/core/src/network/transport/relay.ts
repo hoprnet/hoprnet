@@ -373,6 +373,7 @@ class Relay {
       try {
         newConn = await this._dialer.connectToPeer(cParty, { signal: abort.signal })
       } catch (err) {
+        error(err)
         if (this._dht != null && !abort.signal.aborted) {
           try {
             cParty = await this._dht.peerRouting.findPeer(cParty.id)

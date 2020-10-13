@@ -136,6 +136,7 @@ class TCP {
       })
       // newConn.close().then(async () => {
       await this._upgrader.upgradeInbound({
+        ...relayConnection,
         sink: BtoA_new.sink,
         source: AtoB_new.source
       } as MultiaddrConnection)
@@ -158,6 +159,7 @@ class TCP {
 
       console.log(`here`)
       newConn = await this._upgrader.upgradeOutbound({
+        ...relayConnection,
         sink: BtoA.sink,
         source: AtoB.source
       } as MultiaddrConnection)
@@ -256,6 +258,7 @@ class TCP {
       })
       // newConn.close().then(async () => {
       await this._upgrader.upgradeInbound({
+        ...relayConnection,
         sink: BtoA_new.sink,
         source: AtoB_new.source
       } as MultiaddrConnection)
@@ -276,6 +279,7 @@ class TCP {
     relayConnection.sink(ctx.source)
 
     newConn = await this._upgrader.upgradeOutbound({
+      ...relayConnection,
       sink: BtoA.sink,
       source: AtoB.source
     } as MultiaddrConnection)
