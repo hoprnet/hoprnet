@@ -114,15 +114,15 @@ class TCP {
   async handleDelivery(handler: Handler) {
     //verbose('handle delivery', connection.remoteAddr.toString(), counterparty.toB58String())
 
-    let conn: Connection
+    let myConn: Connection
     let relayConn: MultiaddrConnection
 
     let onReconnect = () => {
       // @ts-ignore
-      conn._close = () => Promise.resolve()
+      myConn._close = () => Promise.resolve()
 
       console.log(`relayConn`, relayConn)
-      conn.close().then(() => {
+      myConn.close().then(() => {
         console.log(`relayConn inside close`, relayConn)
         this._upgrader.upgradeInbound(relayConn)
         console.log(`reconnected in handler`)
@@ -132,13 +132,13 @@ class TCP {
     try {
       relayConn = await this._relay.handleRelayConnection(handler, onReconnect)
 
-      conn = await this._upgrader.upgradeInbound(relayConn)
+      myConn = await this._upgrader.upgradeInbound(relayConn)
     } catch (err) {
       error(`Could not upgrade relayed connection. Error was: ${err}`)
       return
     }
 
-    this.connHandler?.(conn)
+    this.connHandler?.(myConn)
   }
 
   /**
@@ -214,12 +214,12 @@ class TCP {
     //   return await this._upgrader.upgradeOutbound(relayConnection)
     // } else {
       let relayConnection: MultiaddrConnection
-      let conn: Connection
+      let newConn: Connection
       const onReconnect = () => {
         // @ts-ignore
-        conn._close = () => Promise.resolve()
+        newConn._close = () => Promise.resolve()
 
-        conn.close().then(() => {
+        newConn.close().then(() => {
           this._upgrader.upgradeInbound(relayConnection)
           console.log(`reconnect in dialer without WebRTC`)
         })
@@ -227,7 +227,9 @@ class TCP {
 
       relayConnection = await this._relay.establishRelayedConnection(ma, relays, onReconnect, options)
 
-      return this._upgrader.upgradeOutbound(relayConnection)
+      newConn = await this._upgrader.upgradeOutbound(relayConnection)
+
+      return newConn
     // }
   }
 
