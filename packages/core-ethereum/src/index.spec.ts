@@ -211,7 +211,7 @@ describe.skip('test connector with 0 ETH and 0 HOPR', function () {
   // })
 })
 
-describe.only('test withdraw', function () {
+describe('test withdraw', function () {
   const ganache = new Ganache()
   let web3: Web3
   let hoprToken: HoprToken
