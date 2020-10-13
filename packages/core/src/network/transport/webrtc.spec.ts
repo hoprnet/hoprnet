@@ -32,25 +32,21 @@ describe('placeholder', () => {
 //     const streamBob = myHandshake(webRTCsendBob, webRTCrecvBob)
 
 //     pipe(
-//       // prettier-ignore
 //       BobAlice.source,
 //       streamAlice.webRtcStream.source
 //     )
 
 //     pipe(
-//       // prettier-ignore
 //       streamBob.webRtcStream.sink,
 //       BobAlice.sink
 //     )
 
 //     pipe(
-//       // prettier-ignore
 //       AliceBob.source,
 //       streamBob.webRtcStream.source
 //     )
 
 //     pipe(
-//       // prettier-ignore
 //       streamAlice.webRtcStream.sink,
 //       AliceBob.sink
 //     )
@@ -69,7 +65,6 @@ describe('placeholder', () => {
 //     const messageForAlice = randomBytes(23)
 
 //     const pipeAlicePromise = pipe(
-//       // prettier-ignore
 //       [messageForBob],
 //       channelAlice,
 //       async (source: AsyncIterable<Uint8Array>) => {
@@ -82,7 +77,6 @@ describe('placeholder', () => {
 //     )
 
 //     const pipeBobPromise = pipe(
-//       // prettier-ignore
 //       [messageForAlice],
 //       channelBob,
 //       async (source: AsyncIterable<Uint8Array>) => {
