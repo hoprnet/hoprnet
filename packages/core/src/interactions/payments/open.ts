@@ -21,7 +21,6 @@ class Opening<Chain extends HoprCoreConnector> implements AbstractInteraction<Ch
 
   async handler(struct: Handler) {
     pipe(
-      /** prettier-ignore */
       struct.stream,
       this.node.paymentChannels.channel.handleOpeningRequest.bind(this.node.paymentChannels.channel),
       struct.stream
@@ -53,12 +52,7 @@ class Opening<Chain extends HoprCoreConnector> implements AbstractInteraction<Ch
       offset: signedChannel.signatureOffset
     })
 
-    return await pipe(
-      /* prettier-ignore */
-      [signedChannel],
-      struct.stream,
-      this.collect.bind(this)
-    )
+    return await pipe([signedChannel], struct.stream, this.collect.bind(this))
   }
 
   private async collect(source: any) {

@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/chat-bot",
-  "version": "1.17.0-alpha.67",
+  "version": "1.17.0-alpha.69",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -27,13 +27,13 @@
     "yarn": "1"
   },
   "dependencies": {
-    "@hoprnet/hopr-core": "^1.17.0-alpha.67",
-    "@hoprnet/hopr-core-connector-interface": "^1.17.0-alpha.67",
-    "@hoprnet/hopr-core-ethereum": "^1.17.0-alpha.67",
-    "@hoprnet/hopr-utils": "^1.17.0-alpha.67",
+    "@hoprnet/hopr-core": "^1.17.0-alpha.69",
+    "@hoprnet/hopr-core-connector-interface": "^1.17.0-alpha.69",
+    "@hoprnet/hopr-core-ethereum": "^1.17.0-alpha.69",
+    "@hoprnet/hopr-utils": "^1.17.0-alpha.69",
     "@hoprnet/twitter-api-client": "^0.1.8",
     "@linkdrop/sdk": "1.1.6",
-    "debug": "4.1.1",
+    "debug": "4.2.0",
     "dotenv": "^8.2.0",
     "dotenv-parse-variables": "^1.0.1",
     "firebase-admin": "^9.1.1",

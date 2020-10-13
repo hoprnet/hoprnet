@@ -10,7 +10,7 @@ HOPR Säntis has ended. Thank you to everyone who participated. We'll be launchi
 
 This setup guide will show you how to use **HOPR** by installing **HOPR Chat** on your system using Docker or Node.js. In this step-by-step guide, we will download the necessary software, run **HOPR Chat,** and send a message to another user in the **HOPR network,** in the same way the developers of **HOPR Chat** do. For a faster quick start, use our Quickstart guide.
 
-{% page-ref page="quickstart.md" %}
+{% page-ref page="../../getting-started/quickstart.md" %}
 
 Depending on your device capabilities, pick the method that will work best for you. Using Docker is faster than using Node.js, but has higher hardware and disk space requirements, as well as some virtualization settings enabled. On the other hand, Node.js requires a bit more setup, but can be completed by even limited devices.
 

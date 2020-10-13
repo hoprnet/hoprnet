@@ -227,11 +227,7 @@ describe('test relay connection', function () {
 
     while (true) {
       if (!aDone && !bDone) {
-        await Promise.race([
-          // prettier-ignore
-          msgA,
-          msgB
-        ])
+        await Promise.race([msgA, msgB])
       } else if (aDone) {
         await msgB
       } else if (bDone) {
