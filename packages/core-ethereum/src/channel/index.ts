@@ -347,11 +347,7 @@ class ChannelFactory {
   }
 
   async onceClosed(self: Public, counterparty: Public) {
-    const channelId = await getId(
-      // prettier-ignore
-      await self.toAccountId(),
-      await counterparty.toAccountId()
-    )
+    const channelId = await getId(await self.toAccountId(), await counterparty.toAccountId())
 
     return new Promise((resolve, reject) => {
       const subscription = this.coreConnector.web3.eth.subscribe('logs', {

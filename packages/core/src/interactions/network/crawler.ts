@@ -26,11 +26,7 @@ class Crawler<Chain extends HoprCoreConnector> implements AbstractInteraction<Ch
   }
 
   handler(struct: Handler) {
-    pipe(
-      /* prettier-ignore */
-      this.node.network.crawler.handleCrawlRequest(struct.connection),
-      struct.stream
-    )
+    pipe(this.node.network.crawler.handleCrawlRequest(struct.connection), struct.stream)
   }
 
   interact(counterparty: PeerId, options: { signal: AbortSignal }): Promise<PeerInfo[]> {

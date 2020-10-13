@@ -68,7 +68,6 @@ class RelayConnection implements MultiaddrConnection {
           done: boolean
           value: BL
         } = await Promise.race([
-          // prettier-ignore
           // @ts-ignore
           this._stream.source.next(),
           promise
@@ -206,7 +205,6 @@ class RelayConnection implements MultiaddrConnection {
                 webRTCPromise = webRTCstream.next().then(webRTCSourceFunction)
               }
               await Promise.race([
-                // prettier-ignore
                 // @ts-ignore
                 streamPromise,
                 webRTCPromise,
@@ -214,7 +212,6 @@ class RelayConnection implements MultiaddrConnection {
               ])
             } else {
               await Promise.race([
-                // prettier-ignore
                 // @ts-ignore
                 streamPromise,
                 promise
