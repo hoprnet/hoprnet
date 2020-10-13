@@ -47,6 +47,8 @@ export default class RedeemTickets extends AbstractCommand {
         if (result.status === 'SUCCESS') {
           console.log(`Redeemed ticket ${styleValue(count)}`)
           redeemedTickets.push(ackTicket)
+        } else {
+          console.log(`Failed to redeem ticket ${styleValue(count)}`)
         }
       }
 

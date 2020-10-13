@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "setup": "yarn util:install && yarn util:link && yarn util:build",
+    "build": "yarn util:build",
     "lint": "prettier --check .",
     "lint:fix": "prettier --write .",
     "test": "lerna run test --stream",
@@ -11,10 +12,10 @@
     "run:hoprd": "lerna exec --scope @hoprnet/hoprd -- yarn start --host 0.0.0.0:9092",
     "run:chatbot": "lerna exec --scope @hoprnet/chat-bot -- yarn start:basodino",
     "util:clean": "lerna exec --stream -- rimraf node_modules/@hoprnet",
+    "util:reset": "lerna clean --yes",
     "util:regenerate": "yarn util:clean && lerna exec --concurrency 1 --stream -- yarn",
     "util:install": "yarn util:clean && lerna exec --concurrency 1 --stream -- yarn --pure-lockfile",
     "util:build": "lerna exec --stream -- yarn build",
-    "build": "lerna exec --stream -- yarn build",
     "util:link": "lerna link"
   },
   "dependencies": {
