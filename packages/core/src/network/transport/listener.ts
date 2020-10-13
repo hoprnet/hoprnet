@@ -177,7 +177,7 @@ class Listener extends EventEmitter {
     const address = this.tcpSocket.address() as AddressInfo
 
     if (this.externalAddress != null && this.externalAddress.port == null) {
-      console.log(`Attention: Bidirectional NAT detected. Publishing no public IPv4 address to the DHT`)
+      log(`Attention: Bidirectional NAT detected. Publishing no public IPv4 address to the DHT`)
 
       addrs.push(Multiaddr(`/p2p/${this.peerId}`))
 
