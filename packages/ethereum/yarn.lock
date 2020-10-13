@@ -183,23 +183,23 @@
     "@ethersproject/rlp" "^5.0.3"
     "@ethersproject/signing-key" "^5.0.4"
 
-"@hoprnet/hopr-demo-seeds@^1.17.0-alpha.65":
-  version "1.17.0-alpha.65"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-demo-seeds/-/hopr-demo-seeds-1.17.0-alpha.65.tgz#28944f191dba3a6216856d12b70e1a58b37e1df4"
-  integrity sha512-s9xRU2LPjzktmdunc3DhL+MIZolqGI13c/8E1NR7az+JaYGvqovLv5veYHVP9glosAUGDid8wnQ9cXaoj7oEjA==
+"@hoprnet/hopr-demo-seeds@^1.17.0-alpha.70":
+  version "1.17.0-alpha.70"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-demo-seeds/-/hopr-demo-seeds-1.17.0-alpha.70.tgz#707ce0244e63acc7b8d07cdd2862873eebf94435"
+  integrity sha512-uxyHWxkK8LUcncxpzMp/Xsr7yoKypLNcQ/g2lmfodGZ43s2l/fVJGjRvbnU5K3CLdkjgozC2WhOsZqhEquNBcg==
 
-"@hoprnet/hopr-testing@^1.17.0-alpha.65":
-  version "1.17.0-alpha.65"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-testing/-/hopr-testing-1.17.0-alpha.65.tgz#f73d2b73c1c02aab3ea26a69efe44395467cdc32"
-  integrity sha512-EaId+t1vyCfP8N+QGk0FzUkmuou9D/NV8gnpSokW8VkOHjJB5w8LO+H74/jHoZc/HBS4jsoSMmqi5Ncwx6J3ZQ==
+"@hoprnet/hopr-testing@^1.17.0-alpha.70":
+  version "1.17.0-alpha.70"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-testing/-/hopr-testing-1.17.0-alpha.70.tgz#c15d2720e1d3ec6660cfa936f85903a8edcd6a7e"
+  integrity sha512-aGz4zb/shXma+tJskXZ2R9ljSPas19msu/UaBXblBNozpzV2ZpwFyabUgQECuB5tm7bI010ndDSeL/Xj1Qx1LQ==
   dependencies:
-    "@hoprnet/hopr-demo-seeds" "^1.17.0-alpha.65"
+    "@hoprnet/hopr-demo-seeds" "^1.17.0-alpha.70"
     ganache-core "^2.12.1"
 
-"@hoprnet/hopr-utils@^1.17.0-alpha.65":
-  version "1.17.0-alpha.65"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.17.0-alpha.65.tgz#55d1e80f1f70852090773f255cfb62df58d6eec8"
-  integrity sha512-nLryrKL7WAQaeua+eQyBXa8mMM6M0faifP/jvLOwfs0WhDyhRVpXWWtk6LDwl+2sjNmotkixYrtDMqlu1EoiBA==
+"@hoprnet/hopr-utils@^1.17.0-alpha.70":
+  version "1.17.0-alpha.70"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.17.0-alpha.70.tgz#41ff3079c69cd4c229fa13b49ca4f4c3d91e72dc"
+  integrity sha512-vKp86dQM8YQP07GGqZutDJ7fec/yM18o/tFZRhdqn5c6mm/stl9Q8+OkU0MaAx7hB1QJuNr/gzEmeG9NszpyLg==
   dependencies:
     bignumber.js "^9.0.0"
     libp2p-crypto "^0.17.9"
