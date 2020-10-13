@@ -93,7 +93,11 @@ export abstract class OpenChannelBase extends AbstractCommand {
     }
   }
 
-  public async autocomplete(query: string, line: string): Promise<AutoCompleteResult> {
+  public async autocomplete(query: string = '', line: string = ''): Promise<AutoCompleteResult> {
+    if (!query) {
+      return [[this.name()], line]
+    }
+
     const peersWithOpenChannel = await getOpenChannels(this.node, this.node.peerInfo.id)
     const allPeers = getPeers(this.node, {
       noBootstrapNodes: true
