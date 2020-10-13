@@ -437,5 +437,19 @@
     "uploadedTo": {
       "http://23.254.227.151:5001": "Tue, 13 Oct 2020 07:54:44 GMT"
     }
+  },
+  "0.47.0": {
+    "hash": "/ipfs/QmSy4dsL2knr8LX3KqeX469Ac537mWSXMUdcvTDr3oXopq",
+    "type": "manifest",
+    "uploadedTo": {
+      "http://23.254.227.151:5001": "Tue, 13 Oct 2020 09:12:49 GMT"
+    }
+  },
+  "0.48.0": {
+    "hash": "/ipfs/Qmb67fmFMBowo8uMUfe88dxr7ZUPonht2NvefecRCDCMzF",
+    "type": "manifest",
+    "uploadedTo": {
+      "http://23.254.227.151:5001": "Tue, 13 Oct 2020 10:29:41 GMT"
+    }
   }
 }

@@ -53,14 +53,12 @@ function getTopics(
 
   if (bidirectional) {
     return [
-      // prettier-ignore
       topic0,
       [u8aToHex(first.slice(1, 33)), u8aToHex(second.slice(1, 33))],
       [u8aToHex(first.slice(1, 33)), u8aToHex(second.slice(1, 33))]
     ]
   } else {
     return [
-      // prettier-ignore
       topic0,
       first != null ? u8aToHex(first.slice(1, 33)) : undefined,
       second != null ? u8aToHex(second.slice(1, 33)) : undefined

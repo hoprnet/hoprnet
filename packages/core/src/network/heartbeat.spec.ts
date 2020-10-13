@@ -48,12 +48,7 @@ describe('check heartbeat mechanism', function () {
   }
 
   it('should initialise the heartbeat module and start the heartbeat functionality', async function () {
-    const [Alice, Bob, Chris] = await Promise.all([
-      /* prettier-ignore */
-      generateNode(),
-      generateNode(),
-      generateNode()
-    ])
+    const [Alice, Bob, Chris] = await Promise.all([generateNode(), generateNode(), generateNode()])
 
     await new Promise((resolve) => setTimeout(resolve, 100))
 

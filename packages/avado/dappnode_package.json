@@ -1,6 +1,6 @@
 {
   "name": "hopr.avado.dnp.dappnode.eth",
-  "version": "0.46.0",
+  "version": "0.48.0",
   "description": "The HOPR protocol ensures everyone has control of their privacy, data, and identity. By running a HOPR Node, you can obtain HOPR tokens by relaying data and connect to the HOPR Network.",
   "avatar": "/ipfs/QmX8oTreTovBjr3QmV4UT5nfNbjYxJJJy3dswYVgcYattE",
   "type": "service",
@@ -15,9 +15,9 @@
     "ports": [
       "3000:3000/tcp"
     ],
-    "path": "hopr.avado.dnp.dappnode.eth_0.46.0.tar.xz",
-    "hash": "/ipfs/QmTC44H7617ygXif7EoU1vuS22taoEBEjpJ6c4cpqnAejt",
-    "size": 286841100,
+    "path": "hopr.avado.dnp.dappnode.eth_0.48.0.tar.xz",
+    "hash": "/ipfs/Qme8PLMo1jAHzo4YqcoxXARvzrNwHcwmakJa1LuJGNbKhj",
+    "size": 290348420,
     "restart": "always"
   },
   "author": "HOPR",

@@ -91,18 +91,13 @@ class Heartbeat implements AbstractInteraction {
       const challenge = randomBytes(16)
       const expectedResponse = createHash(HASH_FUNCTION).update(challenge).digest()
 
-      await pipe(
-        /** prettier-ignore */
-        [challenge],
-        struct.stream,
-        async (source: AsyncIterable<Uint8Array>) => {
-          for await (const msg of source) {
-            if (u8aEquals(msg, expectedResponse)) {
-              break
-            }
+      await pipe([challenge], struct.stream, async (source: AsyncIterable<Uint8Array>) => {
+        for await (const msg of source) {
+          if (u8aEquals(msg, expectedResponse)) {
+            break
           }
         }
-      )
+      })
 
       clearTimeout(timeout)
 

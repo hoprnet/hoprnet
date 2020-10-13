@@ -125,14 +125,7 @@ describe('test crawler', function () {
 
     assert(Alice.network.peerStore.has(Bob.peerInfo.id.toB58String()))
 
-    await Promise.all([
-      /* prettier-ignore */
-      Alice.stop(),
-      Bob.stop(),
-      Chris.stop(),
-      Dave.stop(),
-      Eve.stop()
-    ])
+    await Promise.all([Alice.stop(), Bob.stop(), Chris.stop(), Dave.stop(), Eve.stop()])
   })
 
   it(
@@ -170,12 +163,7 @@ describe('test crawler', function () {
         `Crawling should timeout correctly`
       )
 
-      await Promise.all([
-        /* prettier-ignore */
-        Alice.stop(),
-        Bob.stop(),
-        Chris.stop()
-      ])
+      await Promise.all([Alice.stop(), Bob.stop(), Chris.stop()])
     },
     durations.seconds(8)
   )

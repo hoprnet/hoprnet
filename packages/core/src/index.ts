@@ -197,13 +197,7 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
    */
   async start(): Promise<Hopr<Chain>> {
     await Promise.all([
-      super.start().then(() =>
-        Promise.all([
-          // prettier-ignore
-          this.connectToBootstrapServers(),
-          this.network.start()
-        ])
-      ),
+      super.start().then(() => Promise.all([this.connectToBootstrapServers(), this.network.start()])),
       this.paymentChannels?.start()
     ])
 
@@ -223,17 +217,9 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
    * Shuts down the node and saves keys and peerBook in the database
    */
   async stop(): Promise<void> {
-    await Promise.all([
-      // prettier-ignore
-      this.network.stop(),
-      this.paymentChannels?.stop().then(() => log(`Connector stopped.`))
-    ])
+    await Promise.all([this.network.stop(), this.paymentChannels?.stop().then(() => log(`Connector stopped.`))])
 
-    await Promise.all([
-      // prettier-ignore
-      this.db?.close().then(() => log(`Database closed.`)),
-      super.stop()
-    ])
+    await Promise.all([this.db?.close().then(() => log(`Database closed.`)), super.stop()])
 
     // Give the operating system some extra time to close the sockets
     await new Promise((resolve) => setTimeout(resolve, 100))
@@ -276,7 +262,6 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
           verbose('creating packet with path', path.join(', \n'))
           try {
             packet = await Packet.create(
-              /* prettier-ignore */
               this,
               msg.slice(n * PACKET_SIZE, Math.min(msg.length, (n + 1) * PACKET_SIZE)),
               await Promise.all(path.map(addPubKey))

@@ -39,11 +39,7 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
   }
 
   handler(struct: Handler) {
-    pipe(
-      /* prettier-ignore */
-      struct.stream,
-      this.handleHelper.bind(this)
-    )
+    pipe(struct.stream, this.handleHelper.bind(this))
   }
 
   async interact(counterparty: PeerId, acknowledgement: Acknowledgement<Chain>): Promise<void> {
@@ -75,11 +71,7 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
 
       clearTimeout(timeout)
 
-      pipe(
-        /* prettier-ignore */
-        [acknowledgement],
-        struct.stream
-      )
+      pipe([acknowledgement], struct.stream)
 
       if (!aborted) {
         resolve()
