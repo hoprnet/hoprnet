@@ -135,19 +135,19 @@ class TCP {
         sink: AtoB_new.sink,
         source: BtoA_new.source
       })
-      BtoA_new.sink((async function * () {
-        yield new TextEncoder().encode(`test over restarted connection`)
-      })())
-      // newConn.close().then(async () => {
-        for await (const msg of AtoB_new.source) {
-          console.log(`receiving after reconnect`, msg)
-        }
-      // await this._upgrader.upgradeInbound({
-      //   localAddr: relayConnection.localAddr,
-      //   remoteAddr: relayConnection.remoteAddr,
-      //   sink: BtoA_new.sink,
-      //   source: AtoB_new.source
-      // } as MultiaddrConnection)
+      // BtoA_new.sink((async function * () {
+      //   yield new TextEncoder().encode(`test over restarted connection`)
+      // })())
+      // // newConn.close().then(async () => {
+      //   for await (const msg of AtoB_new.source) {
+      //     console.log(`receiving after reconnect`, msg)
+      //   }
+      await this._upgrader.upgradeInbound({
+        localAddr: relayConnection.localAddr,
+        remoteAddr: relayConnection.remoteAddr,
+        sink: BtoA_new.sink,
+        source: AtoB_new.source
+      } as MultiaddrConnection)
       console.log(`reconnect in dialer without WebRTC`)
       // })
     }
@@ -275,19 +275,19 @@ class TCP {
           sink: BtoA_new.sink,
           source: AtoB_new.source
         } as MultiaddrConnection)
-        BtoA_new.sink((async function * () {
-          yield new TextEncoder().encode(`test over restarted connection`)
-        })())
+        // BtoA_new.sink((async function * () {
+        //   yield new TextEncoder().encode(`test over restarted connection`)
+        // })())
         
-        for await (const msg of AtoB_new.source) {
-          console.log(`receiving after reconnect`, msg)
-        }
-        // await this._upgrader.upgradeInbound({
-        //   localAddr: relayConnection.localAddr,
-        //   remoteAddr: relayConnection.remoteAddr,
-        //   sink: BtoA_new.sink,
-        //   source: AtoB_new.source
-        // } as MultiaddrConnection)
+        // for await (const msg of AtoB_new.source) {
+        //   console.log(`receiving after reconnect`, msg)
+        // }
+        await this._upgrader.upgradeInbound({
+          localAddr: relayConnection.localAddr,
+          remoteAddr: relayConnection.remoteAddr,
+          sink: BtoA_new.sink,
+          source: AtoB_new.source
+        } as MultiaddrConnection)
       } catch (err) {
         log(err)
       }

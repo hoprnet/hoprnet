@@ -10,7 +10,7 @@ const verbose = Debug(`hopr-core:verbose:transport`)
 
 const error = Debug(`hopr-core:transport:error`)
 
-import { RELAY_STATUS_PREFIX, STOP, RESTART } from './constants'
+import { RELAY_STATUS_PREFIX, STOP, RESTART, RELAY_WEBRTC_PREFIX, RELAY_PAYLOAD_PREFIX } from './constants'
 
 class RelayContext {
   private _switchPromise: DeferredPromise<Stream>
@@ -19,9 +19,12 @@ class RelayContext {
   public source: Stream['source']
   public sink: Stream['sink']
 
-  constructor(stream: Stream, private options?: {
-    sendRestartMessage: boolean
-  }) {
+  constructor(
+    stream: Stream,
+    private options?: {
+      sendRestartMessage: boolean
+    }
+  ) {
     this._switchPromise = Defer<Stream>()
     this._stream = stream
 
@@ -75,6 +78,10 @@ class RelayContext {
           const received = sourceMsg.slice()
 
           const [PREFIX, SUFFIX] = [received.subarray(0, 1), received.subarray(1)]
+          if ([RELAY_STATUS_PREFIX, RELAY_WEBRTC_PREFIX, RELAY_PAYLOAD_PREFIX].includes(PREFIX)) {
+            error(`Invalid prefix: Got <${PREFIX}>`)
+            continue
+          }
           if (u8aEquals(PREFIX, RELAY_STATUS_PREFIX)) {
             if (u8aEquals(SUFFIX, STOP)) {
               verbose(`STOP relayed`)
