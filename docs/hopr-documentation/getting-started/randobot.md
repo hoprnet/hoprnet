@@ -18,13 +18,13 @@ The HOPR network is fully anonymous by default. That means no-one can see who yo
 
 Obviously, in most use cases we want people who we contact \(but not anyone else!\) to know who is sending them data, so they know who to send data back to and where to send it.
 
-You can manually prepend your address to messages you send, but for convenience you can also instruct HOPR Chat to do this automatically. Type: 
+You can manually prepend your address to messages you send, but for convenience you can also instruct HOPR Chat to do this automatically. Type:
 
 ```text
 settings includeRecipient true
 ```
 
-From now on, every message you send will also be sent with your address. Now when you message the RandoBot, it will know your address and will be able to reply and add you to its database. 
+From now on, every message you send will also be sent with your address. Now when you message the RandoBot, it will know your address and will be able to reply and add you to its database.
 
 ![](../.gitbook/assets/include-recipient.png)
 
@@ -52,7 +52,7 @@ usage: <PeerId> <Name>
 You will want to `alias` the following address, which is the address of randobot in our Säntis network.
 
 ```text
-16Uiu2HAmMpsfMdHGyDENjsWYnMf2mKZCuAFUfkgXLySKLiuMnGcD				
+16Uiu2HAmMpsfMdHGyDENjsWYnMf2mKZCuAFUfkgXLySKLiuMnGcD
 ```
 
 {% hint style="warning" %}
@@ -81,7 +81,7 @@ If successful, RandoBot will pick a series of random words and say those to you.
 ---------- New Packet ----------
 Destination    : 16Uiu2HAm17N3psi92XKnRex8mbWJVoqafzJa6fhVN4zHmoLMt15A
 --------------------------------
-> 
+>
 ===== New message ======
 Message: 16Uiu2HAm17N3psi92XKnRex8mbWJVoqafzJa6fhVN4zHmoLMt15A slimy olden dove
 Latency: 63 ms
@@ -93,6 +93,3 @@ Congratulations! You have successfully sent a message through the HOPR Network!
 {% hint style="info" %}
 If you get a `Timeout Error,` please run `crawl` a few times. At the beginning of your HOPR Chat session, your node might have yet to discover RandoBot, so try again later or report your error to our [Discord](https://discord.gg/5FWSfq7) channel.
 {% endhint %}
-
-
-

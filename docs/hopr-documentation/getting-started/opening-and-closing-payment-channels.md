@@ -8,8 +8,8 @@ Sending data privately through the HOPR network involves multiple hops via relay
 
 ### Opening a Channel
 
-To open a channel with another node, you need to specify the node address and the amount of HOPR you want to fund the channel with.  
-  
+To open a channel with another node, you need to specify the node address and the amount of HOPR you want to fund the channel with.
+
 The syntax for this is currently different between HOPR Chat and a HOPR Avado node.
 
 {% tabs %}
@@ -20,8 +20,8 @@ On HOPR Chat, start by typing:
 open <peer ID>
 ```
 
-Where `<peer ID>` is the HOPR address of the node you want to open a payment channel with.  
-  
+Where `<peer ID>` is the HOPR address of the node you want to open a payment channel with.
+
 You will then be asked what amount of HOPR you want to fund the payment channel with. You cannot choose 0. If your HOPR node has a zero balance, type `exit` to cancel the process, then [**fund your node**](funding-your-node.md) and try again.
 {% endtab %}
 
@@ -66,6 +66,5 @@ openChannels
 
 You will then be shown a list of open channels, along with their status. The two status options are:
 
-* **OPEN -** The channel is currently open and funded, so data can be relayed between your node and the target node.
-* **PENDING** - A request has been placed to close the channel. After the cool-off period \(currently 2 minutes\), the channel is able to be closed.
-
+- **OPEN -** The channel is currently open and funded, so data can be relayed between your node and the target node.
+- **PENDING** - A request has been placed to close the channel. After the cool-off period \(currently 2 minutes\), the channel is able to be closed.
