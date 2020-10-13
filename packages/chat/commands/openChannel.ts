@@ -132,10 +132,7 @@ export class OpenChannel extends OpenChannelBase {
       "counterParty's PeerId",
       'amountToFund'
     ])
-
-    if (err) {
-      throw new Error(err)
-    }
+    if (err) return styleValue(err, 'failure')
 
     let counterParty: PeerId
     try {
@@ -144,7 +141,8 @@ export class OpenChannel extends OpenChannelBase {
       return styleValue(err.message, 'failure')
     }
 
-    const amountToFund = new BN(amountToFundStr)
+    const { types } = this.node.paymentChannels
+    const amountToFund = new BN(moveDecimalPoint(amountToFundStr, types.Balance.DECIMALS))
 
     const unsubscribe = startDelayedInterval(`Submitted transaction. Waiting for confirmation`)
     try {
