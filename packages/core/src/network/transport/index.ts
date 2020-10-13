@@ -117,16 +117,15 @@ class TCP {
     let myConn: Connection
     let relayConn: MultiaddrConnection
 
-    let onReconnect = () => {
+    let onReconnect = async () => {
       // @ts-ignore
-      myConn._close = () => Promise.resolve()
+      // myConn._close = () => Promise.resolve()
 
-      console.log(`relayConn`, relayConn)
-      myConn.close().then(async () => {
-        console.log(`relayConn inside close`, relayConn)
-        await this._upgrader.upgradeInbound(relayConn)
-        console.log(`reconnected in handler`)
-      })
+      // myConn.close().then(async () => {
+      console.log(`relayConn inside close`, relayConn)
+      await this._upgrader.upgradeInbound(relayConn)
+      console.log(`reconnected in handler`)
+      // })
     }
 
     try {
@@ -215,14 +214,14 @@ class TCP {
     // } else {
     let relayConnection: MultiaddrConnection
     let newConn: Connection
-    const onReconnect = () => {
+    const onReconnect = async () => {
       // @ts-ignore
-      newConn._close = () => Promise.resolve()
+      // newConn._close = () => Promise.resolve()
 
-      newConn.close().then(async () => {
-        await this._upgrader.upgradeInbound(relayConnection)
-        console.log(`reconnect in dialer without WebRTC`)
-      })
+      // newConn.close().then(async () => {
+      await this._upgrader.upgradeInbound(relayConnection)
+      console.log(`reconnect in dialer without WebRTC`)
+      // })
     }
 
     relayConnection = await this._relay.establishRelayedConnection(ma, relays, onReconnect, options)
