@@ -43,7 +43,7 @@ class RelayContext {
         ])
 
         if (itDone || streamReceived) {
-          console.log(`waiting for resolve streamReceived ${streamReceived} itDone ${itDone}`)
+          log(`waiting for resolve streamReceived ${streamReceived} itDone ${itDone}`)
           this._source = await this._defer.promise
 
           this._defer = Defer()
@@ -51,7 +51,7 @@ class RelayContext {
           streamReceived = false
 
           this._defer.promise.then(() => {
-            console.log(`stream resolved`)
+            log(`stream resolved`)
             streamReceived = true
           })
 
