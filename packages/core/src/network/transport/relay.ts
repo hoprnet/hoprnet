@@ -46,6 +46,14 @@ import { RelayContext } from './relayContext'
 
 import { RelayConnection } from './relayConnection'
 
+function toPeerInfo(ma: Multiaddr): PeerInfo {
+  // @ts-ignore
+  let pi = new PeerInfo()
+  pi.multiaddrs.add(ma)
+  return pi
+}
+
+
 import type {
   Connection,
   Dialer,
@@ -89,7 +97,7 @@ class Relay {
 
   async establishRelayedConnection(
     ma: Multiaddr,
-    relays: PeerInfo[],
+    relays: Multiaddr[],
     options?: DialOptions
   ): Promise<MultiaddrConnection> {
     const destination = PeerId.createFromCID(ma.getPeerId())
@@ -98,7 +106,7 @@ class Relay {
       throw new AbortError()
     }
 
-    const potentialRelays = relays.filter((relay: PeerInfo) => !relay.id.equals(this._peerInfo.id))
+    const potentialRelays = relays.filter((relay: Multiaddr) => relay.getPeerId() !== this._peerInfo.id.toB58String())
 
     if (potentialRelays.length == 0) {
       throw Error(`Filtered list of relays and there is no one left to establish a connection. `)
@@ -107,7 +115,7 @@ class Relay {
     for (let i = 0; i < potentialRelays.length; i++) {
       let relayConnection: Connection
       try {
-        relayConnection = await this.connectToRelay(potentialRelays[i], options)
+        relayConnection = await this.connectToRelay(toPeerInfo(potentialRelays[i]), options)
       } catch (err) {
         error(err)
         continue
@@ -115,7 +123,7 @@ class Relay {
 
       let stream: Stream
       try {
-        stream = await this.performHandshake(relayConnection, potentialRelays[i].id, destination)
+        stream = await this.performHandshake(relayConnection, PeerId.createFromB58String(potentialRelays[i].getPeerId()), destination)
       } catch (err) {
         error(err)
         continue
@@ -132,7 +140,7 @@ class Relay {
 
     throw Error(
       `Unable to establish a connection to any known relay node. Tried ${chalk.yellow(
-        potentialRelays.map((potentialRelay: PeerInfo) => potentialRelay.id.toB58String()).join(`, `)
+        potentialRelays.map((potentialRelay: Multiaddr) => potentialRelay.getPeerId()).join(`, `)
       )}`
     )
   }
