@@ -19,7 +19,7 @@ To get started with **HOPR Chat**, please visit our quick start ****page to down
 
 {% page-ref page="../../../getting-started/quickstart.md" %}
 
-{% page-ref page="../../saentis-testnet/setup.md" %}
+{% page-ref page="../../../getting-started/setup.md" %}
 
 ### Social Media
 

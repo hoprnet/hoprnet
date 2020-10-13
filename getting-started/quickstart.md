@@ -7,7 +7,7 @@ description: >-
 # First Time Users
 
 {% hint style="warning" %}
-If this is your first time using HOPR, you'll need to install a few things first. This guide will walk you through all the steps. If you've already used HOPR before, click [**here**](../community/saentis-testnet/getting-started.md) for instructions on how to update to the latest version.
+If this is your first time using HOPR, you'll need to install a few things first. This guide will walk you through all the steps. If you've already used HOPR before, click [**here**](getting-started.md) for instructions on how to update to the latest version.
 {% endhint %}
 
 ### Before You Start
@@ -116,15 +116,15 @@ Download the latest version of **HOPR Chat** by clicking in the following link.
 
 {% tabs %}
 {% tab title="Windows" %}
-[Download the latest Windows release.](https://github.com/hoprnet/hopr-chat/releases/download/v1.13.0-saentis.testnet/hopr-chat-nodebin-windows.zip)
+[Download the latest Windows release.](https://github.com/hoprnet/hopr-chat/releases/download/v1.17.0-alpha.basodino.rc-1/hopr-chat-nodebin-macos.zip)
 {% endtab %}
 
 {% tab title="MacOS" %}
-[Download the latest macOS release.](https://github.com/hoprnet/hopr-chat/releases/download/v1.13.0-saentis.testnet/hopr-chat-nodebin-macos.zip)
+[Download the latest macOS release.](https://github.com/hoprnet/hopr-chat/releases/download/v1.17.0-alpha.basodino.rc-1/hopr-chat-nodebin-macos.zip)
 {% endtab %}
 
 {% tab title="Linux" %}
-[Download the latest Linux release.](https://github.com/hoprnet/hopr-chat/releases/download/v1.13.0-saentis.testnet/hopr-chat-nodebin-linux.zip)
+[Download the latest Linux release.](https://github.com/hoprnet/hopr-chat/releases/download/v1.17.0-alpha.basodino.rc-1/hopr-chat-nodebin-linux.zip)
 {% endtab %}
 {% endtabs %}
 
@@ -202,7 +202,7 @@ Running these commands will bring up a screen similar the one shown below. Congr
 
 ## Next Steps
 
-To get started with the Säntis incentivized testnet, visit the [**Funding Your Node**](../community/saentis-testnet/funding-your-node.md) page. To learn more about our network, please go to our **Core Concepts** section. You can also learn how to connect to a different network by going to our [**Advanced Setup**](../community/saentis-testnet/setup.md)**.** For more information and updates about the **HOPR Network**, please follow our [Twitter](https://twitter.com/hoprnet). For questions and additional information, please go to our [Telegram](https://t.me/hoprnet) channel.
+To get started with the testnet, visit the [**Funding Your Node**](funding-your-node.md) page. To learn more about our network, please go to our **Core Concepts** section. You can also learn how to connect to a different network by going to our [**Advanced Setup**](setup.md)**.** For more information and updates about the **HOPR Network**, please follow our [Twitter](https://twitter.com/hoprnet). For questions and additional information, please go to our [Telegram](https://t.me/hoprnet) channel.
 
-If you do not want to connect to the **HOPR Network** anymore, you can just close the terminal window in which you have **HOPR Chat** running. To **uninstall** just delete the `HOPR Chat` folder you downloaded.
+If you want to disconnect from the **HOPR Network**, you can just close the terminal window in which you have **HOPR Chat** running. To **uninstall,** just delete the `HOPR Chat` folder you downloaded.
 
