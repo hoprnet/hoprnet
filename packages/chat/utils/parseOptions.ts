@@ -128,10 +128,10 @@ export async function parseOptions(): Promise<HoprOptions> {
   }
 
   let addr: Multiaddr
-  let bootstrapServerMap = new Map<string, PeerInfo>()
+  let bootstrapServers: Multiaddr[] = []
 
   if (!cli_options.bootstrapNode) {
-    bootstrapServerMap = await getBootstrapAddresses()
+    bootstrapServers = await getBootstrapAddresses()
   }
 
   const provider = process.env[`${cli_options.network.toUpperCase()}_PROVIDER`]
@@ -147,7 +147,7 @@ export async function parseOptions(): Promise<HoprOptions> {
     debug: cli_options.debug || false,
     bootstrapNode: cli_options.bootstrapNode,
     network: cli_options.network,
-    bootstrapServers: [...bootstrapServerMap.values()],
+    bootstrapServers: bootstrapServers,
     provider: provider,
     output(encoded: Uint8Array) {
       const { latency, msg } = decodeMessage(encoded)

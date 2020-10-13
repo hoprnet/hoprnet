@@ -37,6 +37,14 @@ import * as DbKeys from './dbKeys'
 
 const verbose = Debug('hopr-core:verbose')
 
+
+function toPeerInfo(ma: Multiaddr): PeerInfo {
+  // @ts-ignore
+  let pi = new PeerInfo()
+  pi.multiaddrs.add(ma)
+  return pi
+}
+
 interface NetOptions {
   ip: string
   port: number
