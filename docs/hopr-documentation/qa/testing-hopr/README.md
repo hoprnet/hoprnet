@@ -15,6 +15,3 @@ To help us testing HOPR, the HOPR Association team is constantly running _Incent
 The HOPR Association team also conducts releases checklists, where we provide a breakdown of each version performance on minimal tasks as executed by team members, ambassadors, and/or other members of the community. The goal is to provide a trail of features that had been proven to work at some point of time, as to avoid functional regressions usual normal unit or integration tests can not pick up. As these tests are conducted by different individuals in various settings, we are able to identify behaviour that is unexpected on every minor release.
 
 {% embed url="https://docs.google.com/spreadsheets/d/1DJzgFshwWoZE6MEM916WIYYuSmzePaBPIZV0jlIQHU4/edit?usp=sharing" %}
-
-
-

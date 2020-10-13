@@ -24,13 +24,13 @@ In case you do not have a Google Suite account, you can always download the orig
 
 To properly fill the QA checklist, you need to be able to run at least one of the following:
 
-* **HOPR Chat \(source code, Docker image or executable binary\)**
-* **HOPRd \(source code or HOPR PC\)**
+- **HOPR Chat \(source code, Docker image or executable binary\)**
+- **HOPRd \(source code or HOPR PC\)**
 
 In addition, you need to be connected to a network that has one of the following bots running:
 
-* **Randobot**
-* **Coverbot**
+- **Randobot**
+- **Coverbot**
 
 To obtain the latest releases and addresses of these bots per network, please go to our Releases page.
 
@@ -42,8 +42,8 @@ After you have all the information ready, make sure you start a recording softwa
 
 Follow-up all the tasks in the template, and fill them with one of the following
 
-* **OK** - The application behaves as the instructions in the template expects it to.
-* **BUG** - The application does not behave as instructed.
+- **OK** - The application behaves as the instructions in the template expects it to.
+- **BUG** - The application does not behave as instructed.
 
 {% hint style="info" %}
 For using HOPR, bear in mind you'll need both native and hopr tokens in the network you are testing. Reach the team at Discord and/or Telegram to support you with these currencies and/or follow our **Getting Started** instructions for more information.
@@ -54,6 +54,3 @@ For using HOPR, bear in mind you'll need both native and hopr tokens in the netw
 Upon completion of the checklist, make sure to list down all the bugs that you have encountered and submit a [Bug Report](https://github.com/hoprnet/hoprnet/issues/new?assignees=&labels=bug&template=bug-report.md&title=) in our GitHub repository.
 
 Finally, send your recording via [WeTransfer](https://wetransfer.com/) and/or other file sharing application, alongside your checklist file to [qa@hoprnet.org](mailto:qa@hoprnet.org). Please attach the name of the tester and the version in your email.
-
-
-

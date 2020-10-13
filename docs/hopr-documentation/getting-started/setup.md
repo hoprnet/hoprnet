@@ -30,32 +30,24 @@ Before doing anything else, you need to install [Docker Desktop](https://hub.doc
 
 {% tabs %}
 
-
-
 Depending of your distribution, please follow the official guidelines for how to install and run Docker on your workstation.
 
-* [Installing Docker in Ubuntu](https://docs.docker.com/engine/install/ubuntu/)
-* [Installing Docker in Fedora](https://docs.docker.com/engine/install/fedora/)
-* [Installing Docker in Debian](https://docs.docker.com/engine/install/debian/)
-* [Installing Docker in CentOS](https://docs.docker.com/engine/install/centos/)
-
-
+- [Installing Docker in Ubuntu](https://docs.docker.com/engine/install/ubuntu/)
+- [Installing Docker in Fedora](https://docs.docker.com/engine/install/fedora/)
+- [Installing Docker in Debian](https://docs.docker.com/engine/install/debian/)
+- [Installing Docker in CentOS](https://docs.docker.com/engine/install/centos/)
 
 1. Visit [Docker Hub ](https://hub.docker.com/editions/community/docker-ce-desktop-mac/)and download **Docker Desktop** to your computer.
 2. Follow the wizard steps to ensure Docker is installed.
 3. Ensure the installation was successful by running `docker ps` in your terminal.
 
+4. Go to [Docker Hub](https://docs.docker.com/toolbox/overview/) to download **Docker Toolbox** to your computer.
+5. Follow-up the wizard steps to ensure Docker is installed.
+6. Ensure the installation was successful by running `docker ps`
 
-
-1. Go to [Docker Hub](https://docs.docker.com/toolbox/overview/) to download **Docker Toolbox** to your computer.
-2. Follow-up the wizard steps to ensure Docker is installed.
-3. Ensure the installation was successful by running `docker ps`
-
-
-
-1. Go to [Docker ](https://www.docker.com/products/docker-desktop)and download **Docker Desktop** to your computer.
-2. Follow-up the wizard steps to ensure Docker is installed.
-3. Ensure the installation was successful by running `docker ps`
+7. Go to [Docker ](https://www.docker.com/products/docker-desktop)and download **Docker Desktop** to your computer.
+8. Follow-up the wizard steps to ensure Docker is installed.
+9. Ensure the installation was successful by running `docker ps`
 
 #### Downloading HOPR Chat image from Docker Hub
 
@@ -83,15 +75,19 @@ To install nvm on Linux or macOS, please follow the instructions on their [GitHu
 
 {% tabs %}
 {% tab title="cURL" %}
+
 ```text
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.35.3/install.sh | bash
 ```
+
 {% endtab %}
 
 {% tab title="Wget" %}
+
 ```text
 wget -qO- https://raw.githubusercontent.com/nvm-sh/nvm/v0.35.3/install.sh | bash
 ```
+
 {% endtab %}
 {% endtabs %}
 
@@ -124,6 +120,7 @@ To run **HOPR Chat** via Docker**,** you need to copy and paste the following co
 
 {% tabs %}
 {% tab title="ch-t-01" %}
+
 ```text
 docker run -v $(pwd)/db:/app/db \
 -e HOST_IPV4=0.0.0.0:9091 \
@@ -131,9 +128,11 @@ docker run -v $(pwd)/db:/app/db \
 -e ETHEREUM_PROVIDER=wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36 \
 -p 9091:9091 -it hopr/chat -p switzerland
 ```
+
 {% endtab %}
 
 {% tab title="ch-t-02" %}
+
 ```text
 docker run -v $(pwd)/db:/app/db \
 -e HOST_IPV4=0.0.0.0:9091 \
@@ -141,6 +140,7 @@ docker run -v $(pwd)/db:/app/db \
 -e ETHEREUM_PROVIDER=wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36 \
 -p 9091:9091 -it hopr/chat -p switzerland
 ```
+
 {% endtab %}
 {% endtabs %}
 
@@ -148,6 +148,7 @@ docker run -v $(pwd)/db:/app/db \
 
 {% tabs %}
 {% tab title="ch-t-01" %}
+
 ```text
 docker run -v %cd%/db:/app/db ^
 -e HOST_IPV4=0.0.0.0:9091 ^
@@ -155,9 +156,11 @@ docker run -v %cd%/db:/app/db ^
 -e ETHEREUM_PROVIDER=wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36 ^
 -p 9091:9091 -it hopr/chat -p switzerland
 ```
+
 {% endtab %}
 
 {% tab title="ch-t-02" %}
+
 ```text
 docker run -v %cd%/db:/app/db ^
 -e HOST_IPV4=0.0.0.0:9091 ^
@@ -165,6 +168,7 @@ docker run -v %cd%/db:/app/db ^
 -e ETHEREUM_PROVIDER=wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36 ^
 -p 9091:9091 -it hopr/chat -p switzerland
 ```
+
 {% endtab %}
 {% endtabs %}
 
@@ -265,4 +269,3 @@ To talk to other users, copy another connected user address and send a message t
 ![Your message will be sent privately through the HOPR network](../.gitbook/assets/running_hopr_chat_and_sending%20%283%29.gif)
 
 Congratulations! You have communicated with another node using a privacy-preserving decentralised protocol. **HOPR Chat** is just a proof of concept right now, but you can already see the capabilities of the protocol. Click next to learn about **Bootstrap Nodes,** or go back to see the general introduction about **HOPR Chat.**
-
