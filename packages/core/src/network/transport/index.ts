@@ -175,10 +175,6 @@ class TCP {
       )
     }
 
-    if (ma.nodeAddress().address.match(PRIVATE_NETS)){
-      log("POTENTIAL ERROR CONDITION - attempting to dial a peer on a private network via a remote relay", ma)
-    }
-
     const destination = PeerId.createFromCID(ma.getPeerId())
 
     // Check whether we know some relays that we can use
