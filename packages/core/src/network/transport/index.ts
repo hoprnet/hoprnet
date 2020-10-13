@@ -23,6 +23,7 @@ import type {
 import chalk from 'chalk'
 import { WebRTCUpgrader } from './webrtc'
 import Relay from './relay'
+import {PRIVATE_NETS } from '../../filters'
 
 const log = debug('hopr-core:transport')
 const error = debug('hopr-core:transport:error')
@@ -174,6 +175,10 @@ class TCP {
       )
     }
 
+    if (ma.nodeAddress().address.match(PRIVATE_NETS)){
+      log("POTENTIAL ERROR CONDITION - attempting to dial a peer on a private network via a remote relay", ma)
+    }
+
     const destination = PeerId.createFromCID(ma.getPeerId())
 
     // Check whether we know some relays that we can use
@@ -196,15 +201,8 @@ class TCP {
   }
 
   async dialWithRelay(ma: Multiaddr, relays: PeerInfo[], options?: DialOptions): Promise<Connection> {
-    if (this._useWebRTC) {
-      const relayConnection = await this._relay.establishRelayedConnection(ma, relays, options)
-
-      return await this._upgrader.upgradeOutbound(relayConnection)
-    } else {
-      const relayConnection = await this._relay.establishRelayedConnection(ma, relays, options)
-
-      return await this._upgrader.upgradeOutbound(relayConnection)
-    }
+    const relayConnection = await this._relay.establishRelayedConnection(ma, relays, options)
+    return await this._upgrader.upgradeOutbound(relayConnection)
   }
 
   async dialDirectly(ma: Multiaddr, options?: DialOptions): Promise<Connection> {
