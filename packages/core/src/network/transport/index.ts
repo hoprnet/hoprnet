@@ -157,6 +157,8 @@ class TCP {
     const ctx = new RelayContext({
       sink: AtoB.sink,
       source: BtoA.source
+    }, {
+      sendRestartMessage: false
     })
 
     try {
@@ -299,6 +301,8 @@ class TCP {
     const ctx = new RelayContext({
       sink: AtoB.sink,
       source: BtoA.source
+    }, {
+      sendRestartMessage: false
     })
 
     relayConnection = await this._relay.establishRelayedConnection(ma, relays, onReconnect, options)

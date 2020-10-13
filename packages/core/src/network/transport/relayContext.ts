@@ -19,7 +19,9 @@ class RelayContext {
   public source: Stream['source']
   public sink: Stream['sink']
 
-  constructor(stream: Stream) {
+  constructor(stream: Stream, private options?: {
+    sendRestartMessage: boolean
+  }) {
     this._switchPromise = Defer<Stream>()
     this._stream = stream
 
@@ -97,7 +99,9 @@ class RelayContext {
         sourceDone = false
         currentSource = tmpSource
         switchPromise = this._switchPromise.promise.then(switchFunction)
-        yield new BL([(RELAY_STATUS_PREFIX as unknown) as BL, (RESTART as unknown) as BL])
+        if (this.options == null || this.options.sendRestartMessage) {
+          yield new BL([(RELAY_STATUS_PREFIX as unknown) as BL, (RESTART as unknown) as BL])
+        }
         sourcePromise = currentSource.next().then(sourceFunction)
       }
     }
