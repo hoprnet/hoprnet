@@ -35,7 +35,7 @@ class WebRTCUpgrader {
   }
 
   private _connect(initiator: boolean) {
-    console.log(`inside _connect`)
+    log(`inside _connect`)
     const channel = new SimplePeer({
       wrtc,
       initiator,

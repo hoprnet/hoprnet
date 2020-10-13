@@ -111,10 +111,10 @@ export async function reportMemoryUsage(logs: LogStream) {
   const used = process.memoryUsage()
   const usage = process.resourceUsage()
   logs.log(`Process stats: mem ${used.rss / 1024}k (max: ${usage.maxRSS / 1024}k) ` + `cputime: ${usage.userCPUTime}`)
-  setTimeout(() => reportMemoryUsage(logs), 10_000)
+  setTimeout(() => reportMemoryUsage(logs), 60_000)
 }
 
 export async function connectionReport(node: Hopr<HoprCoreConnector>, logs: LogStream) {
   logs.logConnectedPeers(Array.from(node.peerStore.peers.values()).map((p) => p.id.toB58String()))
-  setTimeout(() => connectionReport(node, logs), 10_000)
+  setTimeout(() => connectionReport(node, logs), 60_000)
 }
