@@ -79,7 +79,7 @@ If successful, RandoBot will pick a series of random words and say those to you.
 ---------- New Packet ----------
 Destination    : 16Uiu2HAm17N3psi92XKnRex8mbWJVoqafzJa6fhVN4zHmoLMt15A
 --------------------------------
-> 
+>
 ===== New message ======
 Message: 16Uiu2HAm17N3psi92XKnRex8mbWJVoqafzJa6fhVN4zHmoLMt15A slimy olden dove
 Latency: 63 ms
@@ -91,6 +91,3 @@ Congratulations! You have successfully sent a message through the HOPR Säntis N
 {% hint style="info" %}
 In case you get a `Timeout Error,` please run `crawl` a few times. At the beginning of your HOPR Chat session, your node might have yet to discover RandoBot, so try again later or report your error to our [Discord](https://discord.gg/5FWSfq7) channel.
 {% endhint %}
-
-
-
