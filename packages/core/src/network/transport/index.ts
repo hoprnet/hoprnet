@@ -220,7 +220,7 @@ class TCP {
         conn._close = () => Promise.resolve()
 
         conn.close().then(() => {
-          this._upgrader.upgradeOutbound(relayConnection)
+          this._upgrader.upgradeInbound(relayConnection)
           console.log(`reconnect in dialer without WebRTC`)
         })
       }
