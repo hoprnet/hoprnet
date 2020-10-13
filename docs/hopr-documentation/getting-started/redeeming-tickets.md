@@ -27,3 +27,4 @@ This will redeem all of your tickets. The xHOPR from these tickets will be added
 {% hint style="warning" %}
 Redeeming tickets requires calling the HOPR smart contract, so can take some time. You will be notified as each ticket is redeemed.
 {% endhint %}
+
