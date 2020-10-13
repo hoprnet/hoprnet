@@ -14,7 +14,7 @@ const error = debug('hopr-core:heartbeat:error')
 const verbose = debug('hopr-core:verbose:heartbeat')
 const HASH_FUNCTION = 'blake2s256'
 
-export const HEARTBEAT_TIMEOUT = durations.seconds(3)
+export const HEARTBEAT_TIMEOUT = durations.seconds(5)
 
 class Heartbeat<Chain extends HoprCoreConnector> implements AbstractInteraction<Chain> {
   protocols: string[] = [PROTOCOL_HEARTBEAT]
@@ -78,13 +78,16 @@ class Heartbeat<Chain extends HoprCoreConnector> implements AbstractInteraction<
             return await this.node.dialProtocol(peerInfo, this.protocols[0], { signal: abort.signal })
           })
       } catch (err) {
-        verbose(`heartbeat connection error ${err.name} while dialing ${counterparty.toB58String()} (subsequent)`)
+        verbose(`heartbeat connection error ${err.name} while dialing ${counterparty.toB58String()} (subsequent)`, aborted)
         clearTimeout(timeout)
-        error(err)
+        if (!aborted) {
+          error(err)
+        }
         return reject()
       }
 
       if (aborted) {
+        verbose('aborted but no error')
         return
       }
 

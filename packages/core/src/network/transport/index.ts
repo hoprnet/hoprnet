@@ -153,12 +153,11 @@ class TCP {
         verbose('attempting to dial directly', ma.toString())
         return await this.dialDirectly(ma, options)
       } catch (err) {
-        if (err.code != null && ['ECONNREFUSED', 'ECONNRESET', 'EPIPE'].includes(err.code)) {
+        if (err.code != null && ['ECONNREFUSED', 'ECONNRESET', 'EPIPE'].includes(err.code) || err.type === 'aborted') {
           // expected case, continue
           error = err
         } else {
-          // Unexpected error, ie:
-          // type === aborted
+          // Unexpected error
           verbose(`Dial directly unexpected error ${err}`)
           throw err
         }
