@@ -17,3 +17,4 @@ You can check your xHOPR balance at any time by typing `balance` in HOPR Chat or
 {% hint style="danger" %}
 **IMPORTANT:** The xHOPR token will only work on our HOPR testnets. It is not the final HOPR token that will run on mainnet and for legal reasons xHOPR tokens cannot be transferred to HOPR tokens. Prizes for our testnets will be solely determined by your final score on the testnet leaderboard, not the number of xHOPR tokens you control.
 {% endhint %}
+
