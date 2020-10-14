@@ -146,6 +146,8 @@ jobs:
     needs: [build]
     steps:
       - uses: actions/checkout@v2
+      - name: Get version from package.json
+        run: echo ::set-env name=RELEASE::$(node -p -e "require('./packages/hoprd/package.json').version")
       - name: Build Avado
         working-directory: packages/avado
         run: |
@@ -154,6 +156,7 @@ jobs:
           docker-compose build
           sudo npm install -g @dappnode/dappnodesdk@0.2.9-beta.0
           dappnodesdk increase minor
+          sed -i '' 's/version"[ ]*:[ ]*"[0-9]*\.[0-9]*\.[0-9]*"/version": "${{ env.RELEASE }}"/' ./dappnode_package.json
           sudo dappnodesdk build --provider http://23.254.227.151:5001 
           git add dappnode_package.json docker-compose.yml releases.json
           git pull origin ${{ github.ref }}
