@@ -8,10 +8,9 @@ module.exports = async (deployer, _network, [owner]) => {
   const config = networks[network]
 
   if (config.network_type === 'development') {
-    // in a local environment an ERC777 token requires an ERC1820 registry
+    // ensure we have an ERC1820 registry deployed
+    await singletons.ERC1820Registry(owner)
   }
-  await singletons.ERC1820Registry(owner)
-  process.exit(1)
 
   await deployer.deploy(HoprToken)
 

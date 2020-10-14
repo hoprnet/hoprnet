@@ -58,7 +58,7 @@ module.exports = {
   matic: {
     network_id: '137',
     network_type: 'testnet',
-    gas: 6500000,
+    gas: 20000000,
     gasPrice: 1000000000,
     noVerify: true,
   },

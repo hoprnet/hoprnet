@@ -183,23 +183,24 @@
     "@ethersproject/rlp" "^5.0.3"
     "@ethersproject/signing-key" "^5.0.4"
 
-"@hoprnet/hopr-demo-seeds@^1.17.0-alpha.70":
-  version "1.17.0-alpha.70"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-demo-seeds/-/hopr-demo-seeds-1.17.0-alpha.70.tgz#707ce0244e63acc7b8d07cdd2862873eebf94435"
-  integrity sha512-uxyHWxkK8LUcncxpzMp/Xsr7yoKypLNcQ/g2lmfodGZ43s2l/fVJGjRvbnU5K3CLdkjgozC2WhOsZqhEquNBcg==
+"@hoprnet/hopr-demo-seeds@^1.17.0-alpha.71", "@hoprnet/hopr-demo-seeds@^1.17.0-alpha.76":
+  version "1.17.0-alpha.76"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-demo-seeds/-/hopr-demo-seeds-1.17.0-alpha.76.tgz#ffe8382075475512fba58cf9530796e586d6414e"
+  integrity sha512-XIkcHPr/4HeFErnm18AiNi53IjGBfyYg41EUE5WrF27+AT7KHChxkE/JZyBPKP63t2jzTHxkyNfvi3kdqCD5NQ==
 
-"@hoprnet/hopr-testing@^1.17.0-alpha.70":
-  version "1.17.0-alpha.70"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-testing/-/hopr-testing-1.17.0-alpha.70.tgz#c15d2720e1d3ec6660cfa936f85903a8edcd6a7e"
-  integrity sha512-aGz4zb/shXma+tJskXZ2R9ljSPas19msu/UaBXblBNozpzV2ZpwFyabUgQECuB5tm7bI010ndDSeL/Xj1Qx1LQ==
+"@hoprnet/hopr-testing@^1.17.0-alpha.71":
+  version "1.17.0-alpha.76"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-testing/-/hopr-testing-1.17.0-alpha.76.tgz#6d6997ebefd1dfce44aad6617ec35e851d6eab84"
+  integrity sha512-+WAAY6TmOolFHKGTrZv4YP8bvMo3AXHaYTZnmGWjqlYGlUIkqK0+0bTsrs8oKgWYecOhUqyInxXnBvUt7DoY/w==
   dependencies:
-    "@hoprnet/hopr-demo-seeds" "^1.17.0-alpha.70"
+    "@hoprnet/hopr-demo-seeds" "^1.17.0-alpha.76"
+    debug "^4.1.1"
     ganache-core "^2.12.1"
 
-"@hoprnet/hopr-utils@^1.17.0-alpha.70":
-  version "1.17.0-alpha.70"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.17.0-alpha.70.tgz#41ff3079c69cd4c229fa13b49ca4f4c3d91e72dc"
-  integrity sha512-vKp86dQM8YQP07GGqZutDJ7fec/yM18o/tFZRhdqn5c6mm/stl9Q8+OkU0MaAx7hB1QJuNr/gzEmeG9NszpyLg==
+"@hoprnet/hopr-utils@^1.17.0-alpha.71":
+  version "1.17.0-alpha.76"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.17.0-alpha.76.tgz#880ef1801b6418cddc16c6cbcba731f558b3649a"
+  integrity sha512-D0sAZc1UnCX0bMjRHQh/8yGiEDuhAlAXj/TEcj2PzcVNqdBa4XHwmdt1CZRavQZfxb/joKWDqelkjjv17Si8Hg==
   dependencies:
     bignumber.js "^9.0.0"
     libp2p-crypto "^0.17.9"
@@ -247,10 +248,10 @@
   resolved "https://registry.yarnpkg.com/@openzeppelin/contracts/-/contracts-3.2.0.tgz#3e6b3a7662d8ed64271ade96ef42655db983fd9d"
   integrity sha512-bUOmkSoPkjnUyMiKo6RYnb0VHBk5D9KKDAgNLzF41aqAM3TeE0yGdFF5dVRcV60pZdJLlyFT/jjXIZCWyyEzAQ==
 
-"@openzeppelin/test-helpers@^0.5.6":
-  version "0.5.6"
-  resolved "https://registry.yarnpkg.com/@openzeppelin/test-helpers/-/test-helpers-0.5.6.tgz#cafa3fdb741be9e3ff525916257d6cdce45ed86a"
-  integrity sha512-8U4sR4ed4cFmc6UKj7akUxZzQJKU9P3p/3RbF+urQuRLLhBaB8zSya1m9VB7/anYEZnBmTDk8LuVgAmYaCPs9A==
+"@openzeppelin/test-helpers@^0.5.7":
+  version "0.5.7"
+  resolved "https://registry.yarnpkg.com/@openzeppelin/test-helpers/-/test-helpers-0.5.7.tgz#3e55c575e9d2157ffc018a1f25901bcc4811e604"
+  integrity sha512-wZfLRqtNA+zkjTWRW4UZzHidgDKqQQM4C7+IfhLfzBW/2Vl3uqoj2nL0aR5F9BgDC2972XJffBwziqfQPsjNcA==
   dependencies:
     "@openzeppelin/contract-loader" "^0.4.0"
     "@truffle/contract" "^4.0.35 <4.2.2"
@@ -260,8 +261,8 @@
     ethjs-abi "^0.2.1"
     lodash.flatten "^4.4.0"
     semver "^5.6.0"
-    web3 "^1.2.1"
-    web3-utils "^1.2.1"
+    web3 "^1.2.5"
+    web3-utils "^1.2.5"
 
 "@sindresorhus/is@^0.14.0":
   version "0.14.0"
@@ -9336,7 +9337,7 @@ web3-utils@1.2.2:
     underscore "1.9.1"
     utf8 "3.0.0"
 
-web3-utils@1.3.0, web3-utils@^1.2.1:
+web3-utils@1.3.0, web3-utils@^1.2.5:
   version "1.3.0"
   resolved "https://registry.yarnpkg.com/web3-utils/-/web3-utils-1.3.0.tgz#5bac16e5e0ec9fe7bdcfadb621655e8aa3cf14e1"
   integrity sha512-2mS5axFCbkhicmoDRuJeuo0TVGQDgC2sPi/5dblfVC+PMtX0efrb8Xlttv/eGkq7X4E83Pds34FH98TP2WOUZA==
@@ -9350,7 +9351,7 @@ web3-utils@1.3.0, web3-utils@^1.2.1:
     underscore "1.9.1"
     utf8 "3.0.0"
 
-web3@*, web3@^1.0.0-beta.34, web3@^1.2.1, web3@^1.2.11, web3@^1.3.0:
+web3@*, web3@^1.0.0-beta.34, web3@^1.2.11, web3@^1.2.5, web3@^1.3.0:
   version "1.3.0"
   resolved "https://registry.yarnpkg.com/web3/-/web3-1.3.0.tgz#8fe4cd6e2a21c91904f343ba75717ee4c76bb349"
   integrity sha512-4q9dna0RecnrlgD/bD1C5S+81Untbd6Z/TBD7rb+D5Bvvc0Wxjr4OP70x+LlnwuRDjDtzBwJbNUblh2grlVArw==
