@@ -16,6 +16,7 @@ import chalk from 'chalk'
 import { WebRTCUpgrader } from './webrtc'
 import Relay from './relay'
 import { RelayContext } from './relayContext'
+import { RelayConnection } from './relayConnection'
 
 // @ts-ignore
 const Pair: () => Stream = require('it-pair')
@@ -115,7 +116,7 @@ class TCP {
     verbose(`Created TCP stack (Stun: ${this.stunServers?.map((x) => x.toString()).join(',')}`)
   }
 
-  onReconnect(conn: Connection) {
+  onReconnect(conn: Connection, sw: RelayContext) {
     return async (relayConn: MultiaddrConnection) => {
       if (conn != null) {
         // @ts-ignore
@@ -134,10 +135,31 @@ class TCP {
     let relayConnection: MultiaddrConnection
     let newConn: Connection
 
-    try {
-      relayConnection = await this._relay.handleRelayConnection(handler, this.onReconnect(newConn))
+    let AtoB = Pair()
+    let BtoA = Pair()
 
-      newConn = await this._upgrader.upgradeInbound(relayConnection)
+    let sw = new RelayContext(
+      {
+        sink: AtoB.sink,
+        source: BtoA.source
+      },
+      {
+        sendRestartMessage: false,
+        useRelaySubprotocol: false
+      }
+    )
+
+    try {
+      relayConnection = await this._relay.handleRelayConnection(handler, this.onReconnect(newConn, sw))
+
+      relayConnection.sink(sw.source)
+      sw.sink(relayConnection.source)
+
+      newConn = await this._upgrader.upgradeInbound({
+        ...relayConnection,
+        sink: BtoA.sink,
+        source: AtoB.source
+      })
     } catch (err) {
       error(`Could not upgrade relayed connection. Error was: ${err}`)
       return
@@ -221,7 +243,24 @@ class TCP {
     let relayConnection: MultiaddrConnection
     let newConn: Connection
 
-    relayConnection = await this._relay.establishRelayedConnection(ma, relays, this.onReconnect(newConn), options)
+    const AtoB = Pair()
+    const BtoA = Pair()
+
+    const sw = new RelayContext(
+      {
+        sink: AtoB.sink,
+        source: BtoA.source
+      },
+      {
+        sendRestartMessage: false,
+        useRelaySubprotocol: false
+      }
+    )
+
+    relayConnection = await this._relay.establishRelayedConnection(ma, relays, this.onReconnect(newConn, sw), options)
+
+    relayConnection.sink(sw.source)
+    sw.sink(relayConnection.source)
 
     // BtoA.sink(
     //   (async function* () {
@@ -237,7 +276,11 @@ class TCP {
     //   console.log(new TextDecoder().decode(msg))
     // }
 
-    newConn = await this._upgrader.upgradeOutbound(relayConnection)
+    newConn = await this._upgrader.upgradeOutbound({
+      ...relayConnection,
+      sink: BtoA.sink,
+      source: AtoB.source
+    })
 
     return newConn
     // }
