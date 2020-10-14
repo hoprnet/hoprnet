@@ -128,7 +128,7 @@ describe('should create a socket and connect to it', function () {
       Multiaddr(`/p2p/${counterparty.peerInfo.id.toB58String()}`),
       [relay.peerInfo],
       // ignore reconnects
-      () => {
+      async () => {
         console.log(`initiator reconnected`)
       }
       /* new WebRTCUpgrader({}) */
@@ -170,7 +170,7 @@ describe('should create a socket and connect to it', function () {
         Multiaddr(`/p2p/${sender.peerInfo.id.toB58String()}`),
         [relay.peerInfo],
         // ignore reconnects
-        () => {}
+        async () => {}
         /* new WebRTCUpgrader({}) */
       )
 
