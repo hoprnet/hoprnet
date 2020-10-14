@@ -76,9 +76,10 @@ class RelayContext {
         sourceReceived = false
         // Does not forward empty messages
         if (sourceMsg != null) {
-          const received = sourceMsg.slice()
-
           if (this.options == null || this.options.useRelaySubprotocol) {
+            const received = sourceMsg.slice()
+
+            console.log(`inside use Protocol`)
             const [PREFIX, SUFFIX] = [received.subarray(0, 1), received.subarray(1)]
             if (![RELAY_STATUS_PREFIX[0], RELAY_WEBRTC_PREFIX[0], RELAY_PAYLOAD_PREFIX[0]].includes(PREFIX[0])) {
               error(`Invalid prefix: Got <${u8aToHex(PREFIX)}>`)
@@ -100,11 +101,12 @@ class RelayContext {
             }
 
             verbose(`relaying ${new TextDecoder().decode(sourceMsg.slice(1))}`, u8aToHex(sourceMsg.slice()))
+
+            yield received
           } else {
             verbose(`relaying ${new TextDecoder().decode(sourceMsg)}`)
+            yield sourceMsg
           }
-
-          yield sourceMsg
         }
 
         if (!sourceDone) {
