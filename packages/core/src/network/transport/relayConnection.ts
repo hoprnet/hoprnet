@@ -45,7 +45,7 @@ class RelayConnection implements MultiaddrConnection {
     stream: Stream
     self: PeerId
     counterparty: PeerId
-    onReconnect: () => void
+    onReconnect: (relayConn: MultiaddrConnection) => void
     webRTC?: SimplePeer
   }) {
     this.timeline = {

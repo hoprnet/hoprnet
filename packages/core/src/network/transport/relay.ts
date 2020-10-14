@@ -78,7 +78,7 @@ class Relay {
   async establishRelayedConnection(
     ma: Multiaddr,
     relays: PeerInfo[],
-    onReconnect: () => void,
+    onReconnect: (relayConn: MultiaddrConnection) => void,
     options?: DialOptions
   ): Promise<MultiaddrConnection> {
     const destination = PeerId.createFromCID(ma.getPeerId())
@@ -112,7 +112,7 @@ class Relay {
   private async _tryPotentialRelay(
     potentialRelay: PeerInfo,
     destination: PeerId,
-    onReconnect: () => void,
+    onReconnect: (relayConn: MultiaddrConnection) => void,
     options?: DialOptions
   ) {
     let relayConnection: Connection
@@ -145,7 +145,10 @@ class Relay {
     })
   }
 
-  async handleRelayConnection(conn: Handler, onReconnect: () => void): Promise<MultiaddrConnection> {
+  async handleRelayConnection(
+    conn: Handler,
+    onReconnect: (relayConn: MultiaddrConnection) => void
+  ): Promise<MultiaddrConnection> {
     const { stream, counterparty } = await this.handleHandshake(conn.stream)
 
     log(`incoming connection from ${counterparty.toB58String()}`)

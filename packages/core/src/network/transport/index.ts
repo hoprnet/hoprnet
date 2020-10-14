@@ -116,7 +116,7 @@ class TCP {
   }
 
   onReconnect(conn: Connection, sw: RelayContext) {
-    return async function (relayConn: MultiaddrConnection) {
+    return async (relayConn: MultiaddrConnection) => {
       // @ts-ignore
       conn._close = () => Promise.resolve()
 
@@ -136,7 +136,7 @@ class TCP {
         sink: BtoA_new.sink,
         source: AtoB_new.source
       } as MultiaddrConnection)
-    }.bind(this)
+    }
   }
 
   async handleDelivery(handler: Handler) {
@@ -158,10 +158,7 @@ class TCP {
     )
 
     try {
-      relayConnection = await this._relay.handleRelayConnection(
-        handler,
-        this.onReconnect(newConn, ctx)
-      )
+      relayConnection = await this._relay.handleRelayConnection(handler, this.onReconnect(newConn, ctx))
 
       ctx.sink(relayConnection.source)
       relayConnection.sink(ctx.source)
@@ -266,12 +263,7 @@ class TCP {
       }
     )
 
-    relayConnection = await this._relay.establishRelayedConnection(
-      ma,
-      relays,
-      this.onReconnect(newConn, ctx),
-      options
-    )
+    relayConnection = await this._relay.establishRelayedConnection(ma, relays, this.onReconnect(newConn, ctx), options)
 
     ctx.sink(relayConnection.source)
     relayConnection.sink(ctx.source)
