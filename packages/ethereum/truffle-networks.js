@@ -55,4 +55,11 @@ module.exports = {
     gasPrice: 1000000000,
     noVerify: true,
   },
+  matic: {
+    network_id: '137',
+    network_type: 'testnet',
+    gas: 6500000,
+    gasPrice: 1000000000,
+    noVerify: true,
+  },
 }
