@@ -135,9 +135,10 @@ class TCP {
 
       BtoA_new.sink(
         (async function* () {
+          let i = 0
           while (true) {
             await new Promise((resolve) => setTimeout(resolve, 700))
-            yield new TextEncoder().encode(`test message`)
+            yield new TextEncoder().encode(`test message #${i++}`)
           }
         })()
       )
