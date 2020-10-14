@@ -170,7 +170,8 @@ class TCP {
         source: BtoA.source
       },
       {
-        sendRestartMessage: false
+        sendRestartMessage: false,
+        notUseRelaySubprotocol: true
       }
     )
 
@@ -276,7 +277,8 @@ class TCP {
         source: BtoA.source
       },
       {
-        sendRestartMessage: false
+        sendRestartMessage: false,
+        notUseRelaySubprotocol: true
       }
     )
 
@@ -284,6 +286,20 @@ class TCP {
 
     ctx.sink(relayConnection.source)
     relayConnection.sink(ctx.source)
+
+    // BtoA.sink(
+    //   (async function* () {
+    //     let i = 0
+    //     while (true) {
+    //       await new Promise((resolve) => setTimeout(resolve, 700))
+    //       yield new TextEncoder().encode(`test message #${i++} from initiator`)
+    //     }
+    //   })()
+    // )
+
+    // for await (const msg of AtoB.source) {
+    //   console.log(new TextDecoder().decode(msg))
+    // }
 
     newConn = await this._upgrader.upgradeOutbound({
       ...relayConnection,
