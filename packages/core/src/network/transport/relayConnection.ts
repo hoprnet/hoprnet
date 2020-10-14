@@ -19,7 +19,7 @@ class RelayConnection implements MultiaddrConnection {
   private _stream: Stream
   private _destroyed: boolean
   private _sinkTriggered: boolean
-  private _onReconnect: () => void
+  private _onReconnect: (relayConn: MultiaddrConnection) => void
 
   private webRTC: SimplePeer
   public localAddr: Multiaddr
@@ -120,7 +120,7 @@ class RelayConnection implements MultiaddrConnection {
               this._destroyed = true
               return
             } else if (u8aEquals(SUFFIX, RESTART)) {
-              this._onReconnect()
+              this._onReconnect(this)
               log(`RESTART received`)
 
             } else {

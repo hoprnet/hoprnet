@@ -115,64 +115,62 @@ class TCP {
     verbose(`Created TCP stack (Stun: ${this.stunServers?.map((x) => x.toString()).join(',')}`)
   }
 
-  async handleDelivery(handler: Handler) {
-    //verbose('handle delivery', connection.remoteAddr.toString(), counterparty.toB58String())
-
-    let myConn: Connection
-    let relayConn: MultiaddrConnection
-
-    let relayConnection: MultiaddrConnection
-    let newConn: Connection
-    const onReconnect = async () => {
-      log(`inside reconnect handler`)
+  onReconnect(conn: Connection, sw: RelayContext) {
+    return async function (relayConn: MultiaddrConnection) {
       // @ts-ignore
-      // newConn._close = () => Promise.resolve()
+      conn._close = () => Promise.resolve()
+
+      await conn.close()
 
       const AtoB_new = Pair()
       const BtoA_new = Pair()
 
-      ctx.update({
+      sw.update({
         sink: AtoB_new.sink,
         source: BtoA_new.source
       })
-      // BtoA_new.sink((async function * () {
-      //   yield new TextEncoder().encode(`test over restarted connection`)
-      // })())
-      // // newConn.close().then(async () => {
-      //   for await (const msg of AtoB_new.source) {
-      //     console.log(`receiving after reconnect`, msg)
-      //   }
+
       await this._upgrader.upgradeInbound({
-        localAddr: relayConnection.localAddr,
-        remoteAddr: relayConnection.remoteAddr,
+        localAddr: relayConn.localAddr,
+        remoteAddr: relayConn.remoteAddr,
         sink: BtoA_new.sink,
         source: AtoB_new.source
       } as MultiaddrConnection)
-      console.log(`reconnect in dialer without WebRTC`)
-      // })
-    }
+    }.bind(this)
+  }
+
+  async handleDelivery(handler: Handler) {
+    //verbose('handle delivery', connection.remoteAddr.toString(), counterparty.toB58String())
+
+    let relayConnection: MultiaddrConnection
+    let newConn: Connection
 
     const AtoB = Pair()
     const BtoA = Pair()
-    const ctx = new RelayContext({
-      sink: AtoB.sink,
-      source: BtoA.source
-    }, {
-      sendRestartMessage: false
-    })
+    const ctx = new RelayContext(
+      {
+        sink: AtoB.sink,
+        source: BtoA.source
+      },
+      {
+        sendRestartMessage: false
+      }
+    )
 
     try {
-      relayConnection = await this._relay.handleRelayConnection(handler, onReconnect)
+      relayConnection = await this._relay.handleRelayConnection(
+        handler,
+        this.onReconnect(newConn, ctx)
+      )
 
       ctx.sink(relayConnection.source)
       relayConnection.sink(ctx.source)
 
-      console.log(`here`)
       newConn = await this._upgrader.upgradeOutbound({
         ...relayConnection,
         sink: BtoA.sink,
         source: AtoB.source
-      } as MultiaddrConnection)
+      })
     } catch (err) {
       error(`Could not upgrade relayed connection. Error was: ${err}`)
       return
@@ -255,57 +253,25 @@ class TCP {
     // } else {
     let relayConnection: MultiaddrConnection
     let newConn: Connection
-    const onReconnect = async () => {
-      // @ts-ignore
-      // newConn._close = () => Promise.resolve()
-
-      log(`inside reconnect handler as initiator`)
-      const AtoB_new = Pair()
-      const BtoA_new = Pair()
-
-      ctx.update({
-        sink: AtoB_new.sink,
-        source: BtoA_new.source
-      })
-      // newConn.close().then(async () => {
-      try {
-        console.log({
-          localAddr: relayConnection.localAddr,
-          remoteAddr: relayConnection.remoteAddr,
-          sink: BtoA_new.sink,
-          source: AtoB_new.source
-        } as MultiaddrConnection)
-        // BtoA_new.sink((async function * () {
-        //   yield new TextEncoder().encode(`test over restarted connection`)
-        // })())
-        
-        // for await (const msg of AtoB_new.source) {
-        //   console.log(`receiving after reconnect`, msg)
-        // }
-        await this._upgrader.upgradeInbound({
-          localAddr: relayConnection.localAddr,
-          remoteAddr: relayConnection.remoteAddr,
-          sink: BtoA_new.sink,
-          source: AtoB_new.source
-        } as MultiaddrConnection)
-      } catch (err) {
-        log(err)
-      }
-
-      console.log(`reconnect in dialer without WebRTC`)
-      // })
-    }
 
     const AtoB = Pair()
     const BtoA = Pair()
-    const ctx = new RelayContext({
-      sink: AtoB.sink,
-      source: BtoA.source
-    }, {
-      sendRestartMessage: false
-    })
+    const ctx = new RelayContext(
+      {
+        sink: AtoB.sink,
+        source: BtoA.source
+      },
+      {
+        sendRestartMessage: false
+      }
+    )
 
-    relayConnection = await this._relay.establishRelayedConnection(ma, relays, onReconnect, options)
+    relayConnection = await this._relay.establishRelayedConnection(
+      ma,
+      relays,
+      this.onReconnect(newConn, ctx),
+      options
+    )
 
     ctx.sink(relayConnection.source)
     relayConnection.sink(ctx.source)
@@ -314,7 +280,7 @@ class TCP {
       ...relayConnection,
       sink: BtoA.sink,
       source: AtoB.source
-    } as MultiaddrConnection)
+    })
 
     return newConn
     // }
