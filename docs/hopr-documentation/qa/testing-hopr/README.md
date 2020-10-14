@@ -4,14 +4,14 @@ description: An introduction to our Quality Assurance (QA) process within HOPR
 
 # Testing HOPR
 
-Testing peer-to-peer technologies can often be a challenging task. As the **HOPR Network** is distributed, software releases that the HOPR Association team releases might work in one part of the globe on a given configuration, but fail in another one under a different network setting.
+Testing peer-to-peer technologies is often challenging. As the **HOPR Network** is distributed, software releases that the HOPR Association team releases might work in one part of the globe on a given configuration, but fail in another one under different network settings.
 
-### Incentivized Network
+## Incentivized Network
 
-To help us testing HOPR, the HOPR Association team is constantly running _Incentivized Networks_, where users all over the world run **HOPR Nodes** in exchange of having a chance to obtain rewards in the form of **HOPR Tokens.** Doing so requires users to register with a Twitter account and staking a minimal amount of digital tokens in their **HOPR Nodes.** After a successful resgitration, the nodes are meant to stay online to _Cover traffic_ across the network, while submitting bugs and other anominal behaviour from the network.
+To help us test HOPR, the HOPR Association team frequently runs **incentivized testnets**, where users from all over the world run **HOPR nodes** in exchange for the chance to earn rewards in the form of **HOPR tokens.** To participate, users must register with a Twitter account and stake a minimal amount of digital tokens in their **HOPR nodes** \(the precise token varies between testnets\)**.** After successful resgitration, users should keep their nodes online to relay **cover traffic** across the network, while submitting bugs, feedback and reports of abnormal network behaviour.
 
-### Releases Checklists
+## Release Checklists
 
-The HOPR Association team also conducts releases checklists, where we provide a breakdown of each version performance on minimal tasks as executed by team members, ambassadors, and/or other members of the community. The goal is to provide a trail of features that had been proven to work at some point of time, as to avoid functional regressions usual normal unit or integration tests can not pick up. As these tests are conducted by different individuals in various settings, we are able to identify behaviour that is unexpected on every minor release.
+The HOPR Association team also produces release checklists, where we provide a performance breakdown of each version for basic tasks as executed by team members, ambassadors, and/or other members of the community. The goal is to provide a trail of features that have been proven to work at particular points in time, to avoid functional regressions which standard unit or integration tests cannot pick up. As these tests are conducted by different individuals in various settings, we can identify unexpected behaviour for every minor release.
 
-{% embed url="https://docs.google.com/spreadsheets/d/1DJzgFshwWoZE6MEM916WIYYuSmzePaBPIZV0jlIQHU4/edit?usp=sharing" %}
+{% embed url="https://docs.google.com/spreadsheets/d/1DJzgFshwWoZE6MEM916WIYYuSmzePaBPIZV0jlIQHU4/edit?usp=sharing" caption="" %}

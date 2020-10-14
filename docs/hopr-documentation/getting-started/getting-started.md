@@ -41,7 +41,7 @@ If you want to keep your address from a previous version, copy the `db` folder b
 
 If you have an AVADO Node, it should automatically update to the latest public version of HOPR. After updaing, all you have to do is fund your node, as explained in the next section, and then restart.
 
-![](../.gitbook/assets/avado-no-funds%20%282%29.png)
+![](../.gitbook/assets/avado-no-funds%20%282%29%20%281%29.png)
 
 {% hint style="info" %}
 If you've been invited to test a development build using your AVADO node, select the DappStore in the left-hand menu of your AVADO dashboard and paste the IPFS hash into the search bar. You will see an option to update your HOPR dApp. Click it, and wait for it to install.
@@ -57,7 +57,7 @@ xDAI is a USD stablecoin, so 0.02 xDAI is worth around 2 cents. It costs xDAI to
 
 If your node is unfunded, you can find your xDAI address by simply starting the HOPR Chat client. HOPR Chat will recognize that your node is unfunded, and won't proceed. It will tell you your address, so you can send xDAI. Once your node is funded, you can find your address by typing `myAddress`.
 
-![](../.gitbook/assets/no-funds%20%283%29.png)
+![](../.gitbook/assets/no-funds%20%283%29%20%281%29.png)
 
 {% tabs %}
 {% tab title="First Tab" %}

@@ -78,13 +78,19 @@ class Heartbeat<Chain extends HoprCoreConnector> implements AbstractInteraction<
             return await this.node.dialProtocol(peerInfo, this.protocols[0], { signal: abort.signal })
           })
       } catch (err) {
-        verbose(`heartbeat connection error ${err.name} while dialing ${counterparty.toB58String()} (subsequent)`)
+        verbose(
+          `heartbeat connection error ${err.name} while dialing ${counterparty.toB58String()} (subsequent)`,
+          aborted
+        )
         clearTimeout(timeout)
-        error(err)
+        if (!aborted) {
+          error(err)
+        }
         return reject()
       }
 
       if (aborted) {
+        verbose('aborted but no error')
         return
       }
 
