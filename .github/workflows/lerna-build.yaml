@@ -106,7 +106,7 @@ jobs:
 
       - name: Publish patch version (On pushes to release branches)
         if: |
-          startsWith(github.ref, 'release/') &&
+          startsWith(github.ref, 'refs/heads/release/') &&
           github.event_name == 'push'
         run: |
           git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Versioning robot"
@@ -141,7 +141,7 @@ jobs:
     name: Build Avado (master or release pushes)
     runs-on: ubuntu-latest
     if: |
-      (startsWith(github.ref, 'release/') || github.ref == 'master') &&
+      (startsWith(github.ref, 'refs/heads/release/') || github.ref == 'refs/heads/master') &&
       github.event_name == 'push'
     needs: [build]
     steps:
@@ -168,7 +168,7 @@ jobs:
     name: Build HOPR Chat Docker (master or release pushes)
     runs-on: ubuntu-latest
     if: |
-      (startsWith(github.ref, 'release/') || github.ref == 'master') &&
+      (startsWith(github.ref, 'refs/heads/release/') || github.ref == 'refs/heads/master') &&
       github.event_name == 'push'
     needs: [build]
     steps:
