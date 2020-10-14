@@ -23,7 +23,7 @@ import type {
 import chalk from 'chalk'
 import { WebRTCUpgrader } from './webrtc'
 import Relay from './relay'
-import {PRIVATE_NETS } from '../../filters'
+import { PRIVATE_NETS } from '../../filters'
 
 const log = debug('hopr-core:transport')
 const error = debug('hopr-core:transport:error')
@@ -153,7 +153,10 @@ class TCP {
         verbose('attempting to dial directly', ma.toString())
         return await this.dialDirectly(ma, options)
       } catch (err) {
-        if (err.code != null && ['ECONNREFUSED', 'ECONNRESET', 'EPIPE'].includes(err.code) || err.type === 'aborted') {
+        if (
+          (err.code != null && ['ECONNREFUSED', 'ECONNRESET', 'EPIPE'].includes(err.code)) ||
+          err.type === 'aborted'
+        ) {
           // expected case, continue
           error = err
         } else {

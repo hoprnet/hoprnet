@@ -13,8 +13,8 @@
     "run:chatbot": "lerna exec --scope @hoprnet/chat-bot -- yarn start:basodino",
     "util:clean": "lerna exec --stream -- rimraf node_modules/@hoprnet",
     "util:reset": "lerna clean --yes",
-    "util:regenerate": "yarn util:clean && lerna exec --concurrency 1 --stream -- yarn",
-    "util:install": "yarn util:clean && lerna exec --concurrency 1 --stream -- yarn --pure-lockfile",
+    "util:regenerate": "yarn util:clean && lerna exec --concurrency 1 --stream -- yarn --check-files",
+    "util:install": "yarn util:clean && lerna exec --concurrency 1 --stream -- yarn --pure-lockfile --check-files",
     "util:build": "lerna exec --stream -- yarn build",
     "util:link": "lerna link"
   },
