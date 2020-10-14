@@ -65,7 +65,7 @@ jobs:
           git config --global user.name "HOPR Versioning robot"
           git config pull.rebase false
           git pull origin ${{ github.ref }}
-          node_modules/.bin/lerna version patch --yes --exact --no-push -no-changelog 
+          node_modules/.bin/lerna version patch --yes --exact --no-push --no-changelog 
           git push origin ${{ github.ref }} 
           node_modules/.bin/lerna publish from-package --yes
           sleep 5m # Allow NPM registry to catch uo
