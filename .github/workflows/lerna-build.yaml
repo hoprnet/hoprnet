@@ -106,7 +106,7 @@ jobs:
 
       - name: Publish patch version (On pushes to release branches)
         if: |
-          startsWith(github.ref, 'release/') &&
+          startsWith(github.ref, 'refs/heads/release/') &&
           github.event_name == 'push'
         run: |
           git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Versioning robot"
@@ -141,11 +141,13 @@ jobs:
     name: Build Avado (master or release pushes)
     runs-on: ubuntu-latest
     if: |
-      (startsWith(github.ref, 'release/') || github.ref == 'master') &&
+      (startsWith(github.ref, 'refs/heads/release/') || github.ref == 'refs/heads/master') &&
       github.event_name == 'push'
     needs: [build]
     steps:
       - uses: actions/checkout@v2
+      - name: Get version from package.json
+        run: echo ::set-env name=RELEASE::$(node -p -e "require('./packages/hoprd/package.json').version")
       - name: Build Avado
         working-directory: packages/avado
         run: |
@@ -154,6 +156,7 @@ jobs:
           docker-compose build
           sudo npm install -g @dappnode/dappnodesdk@0.2.9-beta.0
           dappnodesdk increase minor
+          sed -i '' 's/version"[ ]*:[ ]*"[0-9]*\.[0-9]*\.[0-9]*"/version": "${{ env.RELEASE }}"/' ./dappnode_package.json
           sudo dappnodesdk build --provider http://23.254.227.151:5001 
           git add dappnode_package.json docker-compose.yml releases.json
           git pull origin ${{ github.ref }}
@@ -165,7 +168,7 @@ jobs:
     name: Build HOPR Chat Docker (master or release pushes)
     runs-on: ubuntu-latest
     if: |
-      (startsWith(github.ref, 'release/') || github.ref == 'master') &&
+      (startsWith(github.ref, 'refs/heads/release/') || github.ref == 'refs/heads/master') &&
       github.event_name == 'push'
     needs: [build]
     steps:
