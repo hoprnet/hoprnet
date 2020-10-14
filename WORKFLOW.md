@@ -34,7 +34,7 @@ Principles:
 
 ## Branches
 
-- Master is a prerelease branch - tests *must* pass, and code _should_ be stable,
+- Master is a prerelease branch - tests _must_ pass, and code _should_ be stable,
   but we may have issues.
 
 - When we want to do a real release, we cut a `release/` branch. This should
