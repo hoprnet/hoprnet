@@ -17,6 +17,18 @@ Our stable Docker registry can be found in [https://hub.docker.com/r/hopr/chat](
 ```text
 docker pull hopr/chat
 ```
-
 {% endtab %}
 {% endtabs %}
+
+## Version [1.17.0-alpha.72](https://github.com/hoprnet/hoprnet/tree/v1.17.0-alpha.72)
+
+### HOPR Chat
+
+* Source Code - [https://github.com/hoprnet/hoprnet/tree/v1.17.0-alpha.72/packages/chat](https://github.com/hoprnet/hoprnet/tree/v1.17.0-alpha.72/packages/chat)
+* Binary - [https://github.com/hoprnet/hopr-chat/releases/tag/v1.17.0-alpha.basodino.rc-2](https://github.com/hoprnet/hopr-chat/releases/tag/v1.17.0-alpha.basodino.rc-2)
+* Docker Image - gcr.io/hoprassociation/hopr-chat:v1.17.0-alpha.basodino.rc-2
+
+### HOPRd
+
+* Source Code - [https://github.com/hoprnet/hoprnet/tree/v1.17.0-alpha.72/packages/hoprd](https://github.com/hoprnet/hoprnet/tree/v1.17.0-alpha.72/packages/hoprd)
+
