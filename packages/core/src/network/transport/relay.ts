@@ -314,7 +314,7 @@ class Relay {
 
     let streams = this._streams.get(channelId)
 
-    if (streams == null) {
+    // if (streams == null) {
       log(
         `${connection.remotePeer.toB58String()} to ${counterparty.toB58String()} had no connection. Establishing a new one`
       )
@@ -351,13 +351,13 @@ class Relay {
         [counterparty.toB58String()]: counterpartyContext
       }
 
-      this._streams.set(channelId, streams)
-    } else {
-      shaker.write(OK)
-      shaker.rest()
+      // this._streams.set(channelId, streams)
+    // } else {
+    //   shaker.write(OK)
+    //   shaker.rest()
 
-      streams[connection.remotePeer.toB58String()].update(shaker.stream)
-    }
+    //   streams[connection.remotePeer.toB58String()].update(shaker.stream)
+    // }
   }
 
   private async establishForwarding(initiator: PeerId, counterparty: PeerId) {

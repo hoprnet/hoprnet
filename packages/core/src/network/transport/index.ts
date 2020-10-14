@@ -115,9 +115,8 @@ class TCP {
     verbose(`Created TCP stack (Stun: ${this.stunServers?.map((x) => x.toString()).join(',')}`)
   }
 
-  onReconnect(conn: Connection, sw: RelayContext) {
+  onReconnect(conn: Connection) {
     return async (relayConn: MultiaddrConnection) => {
-      console.log(`in reconnect: conn`, conn, `sw`, sw)
       if (conn != null) {
         // @ts-ignore
         conn._close = () => Promise.resolve()
@@ -125,34 +124,7 @@ class TCP {
         await conn.close()
       }
 
-      const AtoB_new = Pair()
-      const BtoA_new = Pair()
-
-      sw.update({
-        sink: AtoB_new.sink,
-        source: BtoA_new.source
-      })
-
-      // BtoA_new.sink(
-      //   (async function* () {
-      //     let i = 0
-      //     while (true) {
-      //       await new Promise((resolve) => setTimeout(resolve, 700))
-      //       yield new TextEncoder().encode(`test message #${i++}`)
-      //     }
-      //   })()
-      // )
-
-      // for await (const msg of AtoB_new.source) {
-      //   console.log(new TextDecoder().decode(msg))
-      // }
-
-      this._upgrader.upgradeInbound({
-        localAddr: relayConn.localAddr,
-        remoteAddr: relayConn.remoteAddr,
-        sink: BtoA_new.sink,
-        source: AtoB_new.source
-      } as MultiaddrConnection)
+      this._upgrader.upgradeInbound(relayConn)
     }
   }
 
@@ -162,30 +134,10 @@ class TCP {
     let relayConnection: MultiaddrConnection
     let newConn: Connection
 
-    const AtoB = Pair()
-    const BtoA = Pair()
-    const ctx = new RelayContext(
-      {
-        sink: AtoB.sink,
-        source: BtoA.source
-      },
-      {
-        sendRestartMessage: false,
-        notUseRelaySubprotocol: true
-      }
-    )
-
     try {
-      relayConnection = await this._relay.handleRelayConnection(handler, this.onReconnect(newConn, ctx))
+      relayConnection = await this._relay.handleRelayConnection(handler, this.onReconnect(newConn))
 
-      ctx.sink(relayConnection.source)
-      relayConnection.sink(ctx.source)
-
-      newConn = await this._upgrader.upgradeInbound({
-        ...relayConnection,
-        sink: BtoA.sink,
-        source: AtoB.source
-      })
+      newConn = await this._upgrader.upgradeInbound(relayConnection)
     } catch (err) {
       error(`Could not upgrade relayed connection. Error was: ${err}`)
       return
@@ -269,23 +221,7 @@ class TCP {
     let relayConnection: MultiaddrConnection
     let newConn: Connection
 
-    const AtoB = Pair()
-    const BtoA = Pair()
-    const ctx = new RelayContext(
-      {
-        sink: AtoB.sink,
-        source: BtoA.source
-      },
-      {
-        sendRestartMessage: false,
-        notUseRelaySubprotocol: true
-      }
-    )
-
-    relayConnection = await this._relay.establishRelayedConnection(ma, relays, this.onReconnect(newConn, ctx), options)
-
-    ctx.sink(relayConnection.source)
-    relayConnection.sink(ctx.source)
+    relayConnection = await this._relay.establishRelayedConnection(ma, relays, this.onReconnect(newConn), options)
 
     // BtoA.sink(
     //   (async function* () {
@@ -301,11 +237,7 @@ class TCP {
     //   console.log(new TextDecoder().decode(msg))
     // }
 
-    newConn = await this._upgrader.upgradeOutbound({
-      ...relayConnection,
-      sink: BtoA.sink,
-      source: AtoB.source
-    })
+    newConn = await this._upgrader.upgradeOutbound(relayConnection)
 
     return newConn
     // }
