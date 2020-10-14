@@ -133,26 +133,26 @@ class TCP {
         source: BtoA_new.source
       })
 
-      BtoA_new.sink(
-        (async function* () {
-          let i = 0
-          while (true) {
-            await new Promise((resolve) => setTimeout(resolve, 700))
-            yield new TextEncoder().encode(`test message #${i++}`)
-          }
-        })()
-      )
+      // BtoA_new.sink(
+      //   (async function* () {
+      //     let i = 0
+      //     while (true) {
+      //       await new Promise((resolve) => setTimeout(resolve, 700))
+      //       yield new TextEncoder().encode(`test message #${i++}`)
+      //     }
+      //   })()
+      // )
 
-      for await (const msg of AtoB_new.source) {
-        console.log(new TextDecoder().decode(msg))
-      }
+      // for await (const msg of AtoB_new.source) {
+      //   console.log(new TextDecoder().decode(msg))
+      // }
 
-      // this._upgrader.upgradeInbound({
-      //   localAddr: relayConn.localAddr,
-      //   remoteAddr: relayConn.remoteAddr,
-      //   sink: BtoA_new.sink,
-      //   source: AtoB_new.source
-      // } as MultiaddrConnection)
+      this._upgrader.upgradeInbound({
+        localAddr: relayConn.localAddr,
+        remoteAddr: relayConn.remoteAddr,
+        sink: BtoA_new.sink,
+        source: AtoB_new.source
+      } as MultiaddrConnection)
     }
   }
 
