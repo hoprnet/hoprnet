@@ -23,6 +23,7 @@ import type {
 import chalk from 'chalk'
 import { WebRTCUpgrader } from './webrtc'
 import Relay from './relay'
+import {PRIVATE_NETS } from '../../filters'
 
 const log = debug('hopr-core:transport')
 const error = debug('hopr-core:transport:error')
@@ -152,12 +153,11 @@ class TCP {
         verbose('attempting to dial directly', ma.toString())
         return await this.dialDirectly(ma, options)
       } catch (err) {
-        if (err.code != null && ['ECONNREFUSED', 'ECONNRESET', 'EPIPE'].includes(err.code)) {
+        if (err.code != null && ['ECONNREFUSED', 'ECONNRESET', 'EPIPE'].includes(err.code) || err.type === 'aborted') {
           // expected case, continue
           error = err
         } else {
-          // Unexpected error, ie:
-          // type === aborted
+          // Unexpected error
           verbose(`Dial directly unexpected error ${err}`)
           throw err
         }
@@ -196,15 +196,8 @@ class TCP {
   }
 
   async dialWithRelay(ma: Multiaddr, relays: PeerInfo[], options?: DialOptions): Promise<Connection> {
-    if (this._useWebRTC) {
-      const relayConnection = await this._relay.establishRelayedConnection(ma, relays, options)
-
-      return await this._upgrader.upgradeOutbound(relayConnection)
-    } else {
-      const relayConnection = await this._relay.establishRelayedConnection(ma, relays, options)
-
-      return await this._upgrader.upgradeOutbound(relayConnection)
-    }
+    const relayConnection = await this._relay.establishRelayedConnection(ma, relays, options)
+    return await this._upgrader.upgradeOutbound(relayConnection)
   }
 
   async dialDirectly(ma: Multiaddr, options?: DialOptions): Promise<Connection> {
