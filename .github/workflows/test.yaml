@@ -22,19 +22,23 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
           registry-url: https://registry.npmjs.org/
+      - uses: actions/cache@v2
+        with:
+          path: '**/node_modules'
+          key: ${{ runner.os }}-modules-${{ hashFiles('**/yarn.lock') }}
       - name: Install node modules
         run: |
           yarn policies set-version ${{ matrix.yarn-version }}
           yarn install --pure-lockfile
       - name: Install dependencies
         run: |
-          yarn util:install
-      - name: Link & Build
+         yarn util:install && yarn util:link 
+      - name: Build
         run: |
-          yarn util:link && yarn util:build
+          yarn util:build
       - name: Test
         run: |
           yarn test
-      - name: Test Docker build hoprd
-        working-directory: packages/hoprd
-        run: docker build .
+#      - name: Test Docker build hoprd 
+#        working-directory: packages/hoprd
+#        run: docker build .
