@@ -115,14 +115,15 @@ class TCP {
     verbose(`Created TCP stack (Stun: ${this.stunServers?.map((x) => x.toString()).join(',')}`)
   }
 
-  onReconnect(_conn: Connection, sw: RelayContext) {
-    let conn = _conn
+  onReconnect(conn: Connection, sw: RelayContext) {
     return async (relayConn: MultiaddrConnection) => {
       console.log(`in reconnect: conn`, conn, `sw`, sw)
-      // @ts-ignore
-      conn._close = () => Promise.resolve()
+      if (conn != null) {
+        // @ts-ignore
+        conn._close = () => Promise.resolve()
 
-      await conn.close()
+        await conn.close()
+      }
 
       const AtoB_new = Pair()
       const BtoA_new = Pair()
