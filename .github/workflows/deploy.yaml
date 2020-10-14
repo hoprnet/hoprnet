@@ -53,7 +53,7 @@ jobs:
           git config --global user.email "noreply@hoprnet.org"
           git config --global user.name "HOPR Versioning robot"
           git pull origin master
-          node_modules/.bin/lerna version prerelease --preid "alpha" --yes
+          node_modules/.bin/lerna version prerelease --preid "alpha" --yes  --exact --no-changelog --force-publish --force-git-tag
           git push origin master
           node_modules/.bin/lerna publish from-package --yes
           sleep 5m # Allow NPM registry to catch uo
@@ -67,7 +67,7 @@ jobs:
           git config --global user.email "noreply@hoprnet.org"
           git config --global user.name "HOPR Versioning robot"
           git pull origin ${{ github.ref }}
-          node_modules/.bin/lerna version patch --yes
+          node_modules/.bin/lerna version patch --yes --exact --no-changelog --force-publish --force-git-tag
           git push origin ${{ github.ref }} 
           node_modules/.bin/lerna publish from-package --yes
           sleep 5m # Allow NPM registry to catch uo
