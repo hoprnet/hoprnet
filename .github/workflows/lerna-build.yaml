@@ -156,13 +156,13 @@ jobs:
       - name: Build Avado
         working-directory: packages/avado
         run: |
+          git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Versioning robot"
+          git pull origin master
           docker-compose build
           sudo npm install -g @dappnode/dappnodesdk@0.2.9-beta.0
           dappnodesdk increase minor
           sudo dappnodesdk build --provider http://23.254.227.151:5001 
-
           git add dappnode_package.json docker-compose.yml releases.json
-          git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Versioning robot"
           git pull origin master
           git commit -m "Avado CI: new release"
           git push origin master
