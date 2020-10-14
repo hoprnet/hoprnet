@@ -104,14 +104,14 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Publish patch version
+      - name: Publish patch version (Only on release branches)
         if: |
+          startsWith(github.ref, 'release/') &&
           github.event_name == 'pull_request' &&
           github.event.action == 'closed' &&
           github.event.pull_request.merged == true &&
           !contains(github.event.pull_request.labels.*.name, 'Major Version') &&
-          !contains(github.event.pull_request.labels.*.name, 'Minor Version') &&
-          contains(github.event.pull_request.labels.*.name, 'Patch Version')
+          !contains(github.event.pull_request.labels.*.name, 'Minor Version')
         run: | # TODO: Assert master branch,
           git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Versioning robot"
           git pull origin master
