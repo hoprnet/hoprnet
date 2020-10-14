@@ -12,7 +12,7 @@ The Säntis testnet is still an early version of the HOPR network. One major goa
 
 Here are some common issues you might run into, along with suggested solutions.
 
-### **I can't connect to the CoverBot**
+## **I can't connect to the CoverBot**
 
 If you can't connect to the CoverBot, you may need to enable port forwarding on **port 9091** in your router.
 
@@ -36,15 +36,15 @@ Once you have your router's IP address, enter it into a browser to access your r
 
 Router settings vary by model, but you should find port forwarding in the settings menu. Make a new rule with your device's IP address and Port 9091 as both the start and end of the port range.
 
-### **HOPR Chat won't start**
+## **HOPR Chat won't start**
 
 Make sure you're using the latest version of HOPR Chat. If you're getting an error message about funding your node, you'll need to send 0.02 xDAI to the address in the message to proceed.
 
-### **My node went offline, and now I'm not getting points**
+## **My node went offline, and now I'm not getting points**
 
 If your node is offline for long enough, the bot will remove your address from its database. Just send it the URL with your tweet again and you'll be added back and will start earning points again
 
-### **CoverBot won't recognize my tweet**
+## **CoverBot won't recognize my tweet**
 
 CoverBot looks for three things when it parses your tweet:
 

@@ -39,3 +39,8 @@
   - [Bounties](community/hopr-games/bounties/README.md)
     - [Bouncer Bot](community/hopr-games/bounties/bouncer-bot.md)
 - [Säntis Testnet \(Ended 06 Oct 2020\)](community/saentis-testnet.md)
+
+## QA
+
+- [Testing HOPR](qa/testing-hopr/README.md)
+  - [Filling a QA checklist](qa/testing-hopr/filling-a-qa-checklist.md)
