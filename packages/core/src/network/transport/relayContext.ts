@@ -79,7 +79,7 @@ class RelayContext {
           const received = sourceMsg.slice()
 
           const [PREFIX, SUFFIX] = [received.subarray(0, 1), received.subarray(1)]
-          if (![RELAY_STATUS_PREFIX, RELAY_WEBRTC_PREFIX, RELAY_PAYLOAD_PREFIX].includes(PREFIX)) {
+          if (![RELAY_STATUS_PREFIX[0], RELAY_WEBRTC_PREFIX[0], RELAY_PAYLOAD_PREFIX[0]].includes(PREFIX[0])) {
             error(`Invalid prefix: Got <${u8aToHex(PREFIX)}>`)
             continue
           }
