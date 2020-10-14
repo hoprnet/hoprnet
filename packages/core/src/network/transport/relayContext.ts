@@ -78,24 +78,31 @@ class RelayContext {
         if (sourceMsg != null) {
           const received = sourceMsg.slice()
 
-          const [PREFIX, SUFFIX] = [received.subarray(0, 1), received.subarray(1)]
-          if (![RELAY_STATUS_PREFIX[0], RELAY_WEBRTC_PREFIX[0], RELAY_PAYLOAD_PREFIX[0]].includes(PREFIX[0])) {
-            error(`Invalid prefix: Got <${u8aToHex(PREFIX)}>`)
-            continue
-          }
-
-          if (u8aEquals(PREFIX, RELAY_STATUS_PREFIX)) {
-            if (u8aEquals(SUFFIX, STOP)) {
-              verbose(`STOP relayed`)
-              break
-            } else if (u8aEquals(SUFFIX, RESTART)) {
-              verbose(`RESTART relayed`)
-            } else {
-              error(`Invalid status message. Got <${u8aToHex(SUFFIX)}>`)
+          if (this.options == null || this.options.useRelaySubprotocol) {
+            const [PREFIX, SUFFIX] = [received.subarray(0, 1), received.subarray(1)]
+            if (![RELAY_STATUS_PREFIX[0], RELAY_WEBRTC_PREFIX[0], RELAY_PAYLOAD_PREFIX[0]].includes(PREFIX[0])) {
+              error(`Invalid prefix: Got <${u8aToHex(PREFIX)}>`)
+              if (!sourceDone) {
+                sourcePromise = currentSource.next().then(sourceFunction)
+              }
+              continue
             }
-          }
 
-          verbose(`relaying ${new TextDecoder().decode(sourceMsg.slice(1))}`, u8aToHex(sourceMsg.slice()))
+            if (u8aEquals(PREFIX, RELAY_STATUS_PREFIX)) {
+              if (u8aEquals(SUFFIX, STOP)) {
+                verbose(`STOP relayed`)
+                break
+              } else if (u8aEquals(SUFFIX, RESTART)) {
+                verbose(`RESTART relayed`)
+              } else {
+                error(`Invalid status message. Got <${u8aToHex(SUFFIX)}>`)
+              }
+            }
+
+            verbose(`relaying ${new TextDecoder().decode(sourceMsg.slice(1))}`, u8aToHex(sourceMsg.slice()))
+          } else {
+            verbose(`relaying ${new TextDecoder().decode(sourceMsg)}`)
+          }
 
           yield sourceMsg
         }
