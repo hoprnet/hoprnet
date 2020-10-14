@@ -39,6 +39,6 @@ jobs:
       - name: Test
         run: |
           yarn test
-      - name: Test Docker build hoprd 
-        working-directory: packages/hoprd
-        run: docker build .
+#      - name: Test Docker build hoprd 
+#        working-directory: packages/hoprd
+#        run: docker build .
