@@ -14,7 +14,7 @@
     "util:clean": "lerna exec --stream -- rimraf node_modules/@hoprnet",
     "util:reset": "lerna clean --yes",
     "util:regenerate": "yarn util:clean && lerna exec --concurrency 1 --stream -- yarn",
-    "util:install": "yarn util:clean && lerna exec --concurrency 1 --stream -- yarn --frozen-lockfile",
+    "util:install": "yarn util:clean && lerna exec --concurrency 1 --stream -- yarn --pure-lockfile",
     "util:build": "lerna exec --stream -- yarn build",
     "util:link": "lerna link"
   },
