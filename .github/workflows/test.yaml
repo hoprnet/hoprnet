@@ -32,7 +32,7 @@ jobs:
           yarn install --pure-lockfile
       - name: Install dependencies
         run: |
-          yarn util:link && yarn util:install
+         yarn util:install && yarn util:link 
       - name: Build
         run: |
           yarn util:build
