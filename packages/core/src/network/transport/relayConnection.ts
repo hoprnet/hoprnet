@@ -19,7 +19,7 @@ class RelayConnection implements MultiaddrConnection {
   private _stream: Stream
   private _destroyed: boolean
   private _sinkTriggered: boolean
-  private _onReconnect: (relayConn: MultiaddrConnection) => void
+  private _onReconnect: (relayConn: MultiaddrConnection) => Promise<void>
 
   private webRTC: SimplePeer
   public localAddr: Multiaddr
@@ -45,7 +45,7 @@ class RelayConnection implements MultiaddrConnection {
     stream: Stream
     self: PeerId
     counterparty: PeerId
-    onReconnect: (relayConn: MultiaddrConnection) => void
+    onReconnect: (relayConn: MultiaddrConnection) => Promise<void>
     webRTC?: SimplePeer
   }) {
     this.timeline = {
@@ -91,6 +91,8 @@ class RelayConnection implements MultiaddrConnection {
       }
     }
 
+    let __reconnectCounter = 0
+
     let streamPromise = this._stream.source.next().then(streamSourceFunction)
 
     while (true) {
@@ -120,9 +122,8 @@ class RelayConnection implements MultiaddrConnection {
               this._destroyed = true
               return
             } else if (u8aEquals(SUFFIX, RESTART)) {
-              this._onReconnect(this)
-              log(`RESTART received`)
-
+              await this._onReconnect(this)
+              log(`RESTART received, reconnectReceived: ${__reconnectCounter++}`)
             } else {
               error(`Received invalid status message ${received.slice(1)}. Dropping message.`)
             }

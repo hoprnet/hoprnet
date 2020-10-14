@@ -132,7 +132,7 @@ class TCP {
         source: BtoA_new.source
       })
 
-      await this._upgrader.upgradeInbound({
+      this._upgrader.upgradeInbound({
         localAddr: relayConn.localAddr,
         remoteAddr: relayConn.remoteAddr,
         sink: BtoA_new.sink,
