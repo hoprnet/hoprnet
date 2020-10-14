@@ -166,7 +166,7 @@ class TCP {
       ctx.sink(relayConnection.source)
       relayConnection.sink(ctx.source)
 
-      newConn = await this._upgrader.upgradeOutbound({
+      newConn = await this._upgrader.upgradeInbound({
         ...relayConnection,
         sink: BtoA.sink,
         source: AtoB.source
