@@ -7,4 +7,3 @@ With this layer of extra data constantly moving through the network, outside obs
 CoverBot will be providing cover traffic to this testnet and rewarding you for helping to relay it. Along the way, we’ll be stress testing the limits of our network and trying to find inventive ways to break it. Finding these issues and fixing them in a safe environment will help us to ensure the network is secure when it launches for real later in the year.
 
 Eventually this cover traffic will need to be fully decentralized, but for now we’re just testing whether the mechanism works. For three weeks, CoverBot will transmit data randomly through the network and back to itself. We’d like your help relaying this data, and in exchange you'll receive points on the scoreboard for a share of the 100,000 HOPR prize fund.
-

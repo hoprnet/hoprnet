@@ -14,8 +14,8 @@ If this is your first time using HOPR Chat, you'll need to install node.js or Do
 
 There are two ways to connect to the testnet:
 
-* With the HOPR Chat app
-* Using your AVADO node \(either a plug-and-play HOPR Node PC or a separate model purchased direct from AVADO\)
+- With the HOPR Chat app
+- Using your AVADO node \(either a plug-and-play HOPR Node PC or a separate model purchased direct from AVADO\)
 
 ### Connecting Using HOPR Chat
 
@@ -72,4 +72,3 @@ If your node is unfunded, you can find your xDAI address by simply starting the 
 If you need more instructions on how to buy and send xDAI, see the **Funding Your Node** section
 
 Otherwise, please proceed to the [**CoverBot**](coverbot.md) section.
-
