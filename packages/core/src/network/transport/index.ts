@@ -117,6 +117,7 @@ class TCP {
 
   onReconnect(conn: Connection, sw: RelayContext) {
     return async (relayConn: MultiaddrConnection) => {
+      console.log(`in reconnect: conn`, conn, `sw`, sw)
       // @ts-ignore
       conn._close = () => Promise.resolve()
 
