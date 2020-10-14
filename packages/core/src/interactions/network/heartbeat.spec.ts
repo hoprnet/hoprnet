@@ -80,5 +80,5 @@ describe('check heartbeat mechanism', function () {
     assert(errorThrown && Date.now() - before >= HEARTBEAT_TIMEOUT, 'Should reach a timeout')
 
     await Promise.all([Alice.stop(), Bob.stop()])
-  }, 10000)
+  })
 })

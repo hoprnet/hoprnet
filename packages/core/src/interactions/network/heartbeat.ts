@@ -14,7 +14,7 @@ const error = debug('hopr-core:heartbeat:error')
 const verbose = debug('hopr-core:verbose:heartbeat')
 const HASH_FUNCTION = 'blake2s256'
 
-export const HEARTBEAT_TIMEOUT = durations.seconds(5)
+export const HEARTBEAT_TIMEOUT = durations.seconds(3)
 
 class Heartbeat<Chain extends HoprCoreConnector> implements AbstractInteraction<Chain> {
   protocols: string[] = [PROTOCOL_HEARTBEAT]
