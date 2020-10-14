@@ -1,4 +1,4 @@
-name: HOPR Workflow
+name: HOPR Test
 on:
   push:
     branches: ['**']
@@ -7,7 +7,7 @@ on:
       - 'websites/**'
 jobs:
   build:
-    name: Build, Test, Publish etc
+    name: Build & Test
     runs-on: ubuntu-latest
 
     strategy:
@@ -29,15 +29,6 @@ jobs:
       - name: Install dependencies
         run: |
           yarn util:install
-      - name: Lint & Fix
-        if: |
-          github.event_name == 'pull_request' &&
-          github.event.action == 'closed' &&
-          github.event.pull_request.merged == true
-        run: |
-          git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Linting robot"
-          yarn lint:fix
-          git commit -a -m "Fix linting"
       - name: Link & Build
         run: |
           yarn util:link && yarn util:build
