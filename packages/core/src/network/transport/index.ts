@@ -115,7 +115,8 @@ class TCP {
     verbose(`Created TCP stack (Stun: ${this.stunServers?.map((x) => x.toString()).join(',')}`)
   }
 
-  onReconnect(conn: Connection, sw: RelayContext) {
+  onReconnect(_conn: Connection, sw: RelayContext) {
+    let conn = _conn
     return async (relayConn: MultiaddrConnection) => {
       console.log(`in reconnect: conn`, conn, `sw`, sw)
       // @ts-ignore
