@@ -42,6 +42,7 @@ jobs:
           git config --global user.name "HOPR Linting robot"
           yarn lint:fix
           git commit -a -m "Fix linting" || true
+          git push origin ${{ github.ref }} 
 
       - name: Link & Build
         run: |
