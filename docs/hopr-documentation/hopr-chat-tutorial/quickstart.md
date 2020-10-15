@@ -12,13 +12,6 @@ If this is your first time using HOPR, you'll need to install a few things first
 
 ### Before You Start
 
-To connect to the **HOPR network**, you will need a **HOPR node** and an **app** to communicate with it. This quick-start guide will walk you through installing the **HOPR Chat** app and its dependencies so you can quickly connect to the **HOPR network.** Please follow the step-by-step instructions to ensure everything works.
-
-To connect to the **HOPR network**, you will need a **HOPR node** and an **app** to communicate with it. This quick-start guide will walk you through installing the **HOPR Chat** app and its dependencies so you can quickly connect to the **HOPR network.** Please follow the step-by-step instructions to ensure everything works.
-
-* With a HOPR Node PC or other AVADO node running the HOPR AVADO dApp
-* With the HOPR Chat app, which runs on most Windows, MacOS and Linux devices and spins up a HOPR node in the background
-
 {% hint style="info" %}
 If you have a HOPR AVADO node, please read the section ****[**Setting Up Your AVADO Node**](../hopr-avado-node-tutorial/setting-up-your-avado-node.md) and the accompanying tutorial. When the tutorial instructs you to set up a second node on your device, return here for more information on how to do that.
 {% endhint %}
