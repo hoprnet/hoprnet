@@ -120,15 +120,15 @@ Download the latest version of **HOPR Chat** by clicking in the following link.
 
 {% tabs %}
 {% tab title="Windows" %}
-[Download the latest Windows release.](https://github.com/hoprnet/hopr-chat/releases/download/v1.17.0-alpha.basodino.rc-1/hopr-chat-nodebin-macos.zip)
+[Download the latest Windows release.](https://github.com/hoprnet/hopr-chat/releases/download/v1.17.0-alpha.basodino.rc-3/hopr-chat-nodebin-windows.zip)
 {% endtab %}
 
 {% tab title="MacOS" %}
-[Download the latest macOS release.](https://github.com/hoprnet/hopr-chat/releases/download/v1.17.0-alpha.basodino.rc-1/hopr-chat-nodebin-macos.zip)
+[Download the latest macOS release.](https://github.com/hoprnet/hopr-chat/releases/download/v1.17.0-alpha.basodino.rc-3/hopr-chat-nodebin-macos.zip)
 {% endtab %}
 
 {% tab title="Linux" %}
-[Download the latest Linux release.](https://github.com/hoprnet/hopr-chat/releases/download/v1.17.0-alpha.basodino.rc-1/hopr-chat-nodebin-linux.zip)
+[Download the latest Linux release.](https://github.com/hoprnet/hopr-chat/releases/download/v1.17.0-alpha.basodino.rc-3/hopr-chat-nodebin-linux.zip)
 {% endtab %}
 {% endtabs %}
 
