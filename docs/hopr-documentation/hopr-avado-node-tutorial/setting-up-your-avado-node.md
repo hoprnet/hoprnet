@@ -14,12 +14,12 @@ If you have another type of AVADO Node, you'll need to install the HOPR dApp. Vi
 
 ### **Connecting to HOPR**
 
-If you have an AVADO Node, it should automatically update to the latest public version of HOPR. After updating, all you have to do is fund your node, as explained[ in the next section](funding-your-avado-node.md), and then restart.
+If you have an AVADO Node, it should automatically update to the latest public version of HOPR. After updating, all you have to do is fund your node, as explained[ **in the next section**](funding-your-avado-node.md), and then restart.
 
 ![](../.gitbook/assets/avado-no-funds%20%282%29.png)
 
 {% hint style="info" %}
-If you've been invited to test a development build using your AVADO node, select the dAppStore in the left-hand menu of your AVADO dashboard and paste the IPFS hash into the search bar. You will see an option to update your HOPR dApp. Click it, and wait for it to install.
+If you've been invited to test a development build using your AVADO node, select the DappStore in the left-hand menu of your AVADO dashboard and paste the IPFS hash into the search bar. You will see an option to update your HOPR dApp. Click it, and wait for it to install.
 {% endhint %}
 
 
