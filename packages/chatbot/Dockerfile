@@ -19,7 +19,7 @@ COPY package*.json ./
 COPY yarn.lock ./
 
 # -- INSTALL STAGE ------------------------------
-RUN yarn install --build-from-source --frozen-lockfile
+RUN yarn install --build-from-source
 
 # -- BUILD STAGE --------------------------------
 FROM base as build
