@@ -50,5 +50,55 @@ To make this simpler, you can also set an alias for your own address. For a refr
 
 Congratulations! You've sent your first multi-hop message on the HOPR network.
 
+{% hint style="info" %}
+Because RandoBot cannot redeem tickets, you'll get all of your staked xHOPR back, even though you sent a multi-hop message. Normally, you would expect the node at the other end of the party to redeem their tickets, reducing your balance slightly.  
+{% endhint %}
+
+Finally, check your balance with `balance`. You'll see that the tokens you staked in the payment channel have been returned to your balance.
+
+```text
+> openChannels
+
+No open channels found.
+```
+
+Now when you type `openChannels`, you should see that there are none. The channel to RandoBot has been successfully closed.
+
+```text
+> close 16Uiu2HAmNtoQri1X4ikUzCqjFQptRSLSVKnVzMmtZiCHCHkdWJr7
+Closing channel, receipt: 0x4c764bc7d3a162ec28670000ca13f2c052c0023bf6ae8dbb546532795f8f4c70
+```
+
+Once two minutes have passed, send the `close` command again:
+
+{% hint style="warning" %}
+The cool-off period in the test net is two minutes. Once HOPR launches, the cool-off period will be much longer and you will be notified when the counterparty initiates channel closure, to ensure everyone has a fair chance to redeem their tickets.
+{% endhint %}
+
+The PENDING status indicates that the channel is in cool-off. This gives the counterparty a chance to claim any unredeemed payment tickets before the channel is closed \(since RandoBot cannot claim tickets, this doesn't apply here\).
+
+```text
+> openChannels
+
+Channel        :  0xb15a70555e5d9bd65afe19823ed3a68838ad02c863143d321146fa5bbc6110af
+CounterParty   :  16Uiu2HAmNtoQri1X4ikUzCqjFQptRSLSVKnVzMmtZiCHCHkdWJr7
+Status         :  PENDING
+Total Balance  :  0.01
+My Balance     :  0
+```
+
+If you now check the status of your channel by typing `openChannels`, you'll see the status has changed to `PENDING`.
+
+```text
+> close 16Uiu2HAmNtoQri1X4ikUzCqjFQptRSLSVKnVzMmtZiCHCHkdWJr7
+Initiated channel closure, receipt: 0xb62fb7c764118dffef63348c1ecaad0caba84d1ee7d3049a3cc916694ba9fea6
+```
+
+You will get a notification that the channel is being closed, along with a receipt.
+
+When you send a multi-hop message, you have to provide a payment for every node along the route. These payments are deducted from the tokens you staked when you opened your payment channel. But it's unlikely you'll have spent all of those tokens. To claim the remainder back, you need to close the payment channel. Type `close <peer ID>` to initiate closure. In this case, the Peer ID is RandoBot's address.
+
+### Close the Payment Channel
+
 ###    
 
