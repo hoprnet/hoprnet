@@ -50,7 +50,8 @@ jobs:
 
       - name: Publish prerelease version (On pushes to master)
         if: github.ref == 'refs/heads/master'
-        run: git config --global user.email "noreply@hoprnet.org"
+        run: |
+          git config --global user.email "noreply@hoprnet.org"
           git config --global user.name "HOPR Versioning robot"
           git config pull.rebase false
           git pull origin master
