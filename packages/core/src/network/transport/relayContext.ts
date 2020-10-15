@@ -101,11 +101,11 @@ class RelayContext {
               }
             }
 
-            verbose(`relaying ${new TextDecoder().decode(sourceMsg.slice(1))}`, u8aToHex(sourceMsg.slice()))
+            verbose(`relaying ${new TextDecoder().decode(SUFFIX)}`, u8aToHex(received))
 
             yield received
           } else {
-            verbose(`forwarding ${new TextDecoder().decode(sourceMsg)}`)
+            verbose(`forwarding ${new TextDecoder().decode(sourceMsg.slice())}`)
             yield sourceMsg
           }
         }
