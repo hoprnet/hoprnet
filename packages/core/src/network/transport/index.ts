@@ -10,7 +10,6 @@ import Listener from './listener'
 import { USE_WEBRTC, CODE_P2P } from './constants'
 import Multiaddr from 'multiaddr'
 import PeerInfo from 'peer-info'
-import PeerId from 'peer-id'
 import type {
   Connection,
   Upgrader,
