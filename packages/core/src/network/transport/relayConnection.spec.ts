@@ -55,7 +55,7 @@ describe('test relay connection', function () {
       console.log(new TextDecoder().decode(msg.slice()))
     }
 
-    for await (const msg of a.source) {
+    for await (const _msg of a.source) {
       throw Error(`there should be no message`)
     }
 
@@ -115,7 +115,7 @@ describe('test relay connection', function () {
       console.log(new TextDecoder().decode(msg.slice()))
     }
 
-    for await (const msg of a.source) {
+    for await (const _msg of a.source) {
       throw Error(`there should be no message`)
     }
 

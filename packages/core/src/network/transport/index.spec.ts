@@ -1,5 +1,4 @@
 import assert from 'assert'
-import AbortController from 'abort-controller'
 import libp2p from 'libp2p'
 
 // @ts-ignore
@@ -11,14 +10,14 @@ import SECIO = require('libp2p-secio')
 
 import PeerId from 'peer-id'
 
-import { Connection, Handler, Stream } from '../../@types/transport'
+import { Connection, Handler} from '../../@types/transport'
 
 import TCP from '.'
 import Multiaddr from 'multiaddr'
 import PeerInfo from 'peer-info'
 import pipe from 'it-pipe'
 
-import { u8aEquals, durations } from '@hoprnet/hopr-utils'
+import { u8aEquals } from '@hoprnet/hopr-utils'
 
 import { randomBytes } from 'crypto'
 import { RELAY_CIRCUIT_TIMEOUT } from './constants'

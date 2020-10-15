@@ -116,7 +116,7 @@ class Acknowledgement<Chain extends HoprCoreConnector> extends Uint8Array {
       return Promise.resolve(this._responseSignature)
     }
 
-    return new Promise<Types.Signature>(async (resolve, reject) => {
+    return new Promise<Types.Signature>(async (resolve) => {
       this._responseSignature = await this.paymentChannels.types.Signature.create({
         bytes: this.buffer,
         offset: this.responseSignatureOffset

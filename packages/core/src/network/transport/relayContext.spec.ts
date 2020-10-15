@@ -1,15 +1,11 @@
-import { u8aConcat } from '@hoprnet/hopr-utils'
-import { RELAY_STATUS_PREFIX, STOP } from './constants'
 import { RelayContext } from './relayContext'
 import { Stream } from '../../@types/transport'
 
 import Debug from 'debug'
-import { resolve } from 'dns'
 const log = Debug(`hopr-core:transport`)
 
 describe('test overwritable connection', function () {
   let iteration = 0
-  let done = false
 
   function getStream(): Stream {
     return {

@@ -17,7 +17,6 @@ import type {
   DialOptions,
   ConnHandler,
   Handler,
-  Stream,
   MultiaddrConnection
 } from '../../@types/transport'
 import chalk from 'chalk'
@@ -47,12 +46,16 @@ class TCP {
   private relays?: PeerInfo[]
   private stunServers: Multiaddr[]
   private _relay: Relay
+  // @ts-ignore
   private _webRTCUpgrader: WebRTCUpgrader
   private connHandler: ConnHandler
 
   // ONLY FOR TESTING
+  //@ts-ignore
   private _failIntentionallyOnWebRTC?: boolean
+  //@ts-ignore
   private _timeoutIntentionallyOnWebRTC?: Promise<void>
+  //@ts-ignore
   private _answerIntentionallyWithIncorrectMessages?: boolean
   // END ONLY FOR TESTING
 

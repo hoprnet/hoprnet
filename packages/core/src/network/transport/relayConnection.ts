@@ -312,11 +312,9 @@ class RelayConnection implements MultiaddrConnection {
     return this._destroyed
   }
 
-  close(err?: Error): Promise<void> {
+  close(): Promise<void> {
     this._defer.resolve()
-
     this.timeline.close = Date.now()
-
     return Promise.resolve()
   }
 }

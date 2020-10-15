@@ -1,5 +1,4 @@
 import type Hopr from '../../'
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { AbstractInteraction } from '../abstractInteraction'
 import { randomBytes, createHash } from 'crypto'
 import { u8aEquals, durations } from '@hoprnet/hopr-utils'

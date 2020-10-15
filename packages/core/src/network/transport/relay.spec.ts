@@ -21,7 +21,6 @@ import Relay from './relay'
 import { randomBytes } from 'crypto'
 
 import { privKeyToPeerId } from '../../utils'
-import defer from 'p-defer'
 import { WebRTCUpgrader } from './webrtc'
 import { DELIVERY } from './constants'
 

@@ -51,9 +51,8 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
       try {
         struct = await this.node
           .dialProtocol(counterparty, this.protocols[0], { signal: abort.signal })
-          .catch(async (err: Error) => {
+          .catch(async () => {
             const peerInfo = await this.node.peerRouting.findPeer(counterparty)
-
             return await this.node.dialProtocol(peerInfo, this.protocols[0], { signal: abort.signal })
           })
       } catch (err) {

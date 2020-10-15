@@ -1,12 +1,10 @@
 import debug from 'debug'
 const log = debug('hopr-core:transport')
 const error = debug('hopr-core:transport:error')
-const verbose = debug('hopr-core:verbose:transport:error')
 
 import AbortController from 'abort-controller'
 import { AbortError } from 'abortable-iterator'
 import chalk from 'chalk'
-import type { WebRTCUpgrader } from './webrtc'
 import type BL from 'bl'
 import type libp2p from 'libp2p'
 declare interface Handshake {
@@ -37,6 +35,7 @@ import { u8aCompare, u8aEquals } from '@hoprnet/hopr-utils'
 import { RelayContext } from './relayContext'
 
 import { RelayConnection } from './relayConnection'
+import { WebRTCUpgrader} from './webrtc'
 
 import type {
   Connection,
