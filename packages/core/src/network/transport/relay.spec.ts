@@ -21,7 +21,7 @@ import Relay from './relay'
 import { randomBytes } from 'crypto'
 
 import { privKeyToPeerId } from '../../utils'
-import { WebRTCUpgrader } from './webrtc'
+// import { WebRTCUpgrader } from './webrtc'
 import { DELIVERY } from './constants'
 
 const TEST_PROTOCOL = `/test/0.0.1`

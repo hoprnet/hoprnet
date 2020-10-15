@@ -1,4 +1,4 @@
-import { u8aConcat, u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
+import { u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
 import Defer, { DeferredPromise } from 'p-defer'
 import BL from 'bl'
 

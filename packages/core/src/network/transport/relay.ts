@@ -35,7 +35,7 @@ import { u8aCompare, u8aEquals } from '@hoprnet/hopr-utils'
 import { RelayContext } from './relayContext'
 
 import { RelayConnection } from './relayConnection'
-import { WebRTCUpgrader} from './webrtc'
+// import { WebRTCUpgrader } from './webrtc'
 
 import type {
   Connection,
@@ -54,9 +54,9 @@ class Relay {
   private _dht: { peerRouting: PeerRouting } | undefined
   private _peerInfo: PeerInfo
   private _streams: Map<string, { [index: string]: RelayContext }>
-  private _webRTCUpgrader?: WebRTCUpgrader
+  // private _webRTCUpgrader?: WebRTCUpgrader
 
-  constructor(libp2p: libp2p, webRTCUpgrader?: WebRTCUpgrader) {
+  constructor(libp2p: libp2p /*, webRTCUpgrader?: WebRTCUpgrader*/) {
     this._dialer = libp2p.dialer
     //@ts-ignore
     this._registrar = libp2p.registrar

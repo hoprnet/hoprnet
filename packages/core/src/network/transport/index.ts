@@ -7,7 +7,7 @@ import debug from 'debug'
 import { socketToConn } from './socket-to-conn'
 import libp2p from 'libp2p'
 import Listener from './listener'
-import { USE_WEBRTC, CODE_P2P, DELIVERY } from './constants'
+import { CODE_P2P, DELIVERY } from './constants'
 import Multiaddr from 'multiaddr'
 import PeerInfo from 'peer-info'
 import PeerId from 'peer-id'
@@ -63,7 +63,7 @@ class TCP {
     upgrader,
     libp2p,
     bootstrapServers,
-    useWebRTC,
+    // useWebRTC,
     failIntentionallyOnWebRTC,
     timeoutIntentionallyOnWebRTC,
     answerIntentionallyWithIncorrectMessages
@@ -122,7 +122,7 @@ class TCP {
 
     libp2p.handle(DELIVERY, this.handleDelivery.bind(this))
 
-    this._relay = new Relay(libp2p, this._webRTCUpgrader)
+    this._relay = new Relay(libp2p /*, this._webRTCUpgrader*/)
     verbose(`Created TCP stack (Stun: ${this.stunServers?.map((x) => x.toString()).join(',')}`)
   }
 
