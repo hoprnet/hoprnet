@@ -118,12 +118,27 @@ class TCP {
 
   onReconnect(conn: Connection, sw: RelayContext) {
     return async (relayConn: MultiaddrConnection) => {
-      // if (conn != null) {
-      //   // @ts-ignore
-      //   conn._close = () => Promise.resolve()
-      //   await conn.close()
-      // }
-      // this._upgrader.upgradeInbound(relayConn)
+      const AtoB = Pair()
+      const BtoA = Pair()
+
+      sw.update({
+        sink: AtoB.sink,
+        source: BtoA.source
+      })
+
+      if (conn != null) {
+        // @ts-ignore
+        conn._close = () => Promise.resolve()
+        await conn.close()
+      }
+
+      this._upgrader
+        .upgradeInbound({
+          ...relayConn,
+          sink: BtoA.sink,
+          source: AtoB.source
+        })
+        .then((conn) => this.connHandler?.(conn))
     }
   }
 
