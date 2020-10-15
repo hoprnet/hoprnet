@@ -1,19 +1,6 @@
 import assert from 'assert'
 
 import PeerStore, { BLACKLIST_TIMEOUT } from './peerStore'
-import PeerInfo from 'peer-info'
-
-import { EventEmitter } from 'events'
-
-function generateNode() {
-  class Dummy extends EventEmitter {
-    peerStore = {
-      peers: new Map<string, PeerInfo>()
-    }
-  }
-
-  return new Dummy() as unknown // as Hopr<HoprCoreConnector>
-}
 
 describe('test PeerStore', function () {
   const empty = [][Symbol.iterator]()

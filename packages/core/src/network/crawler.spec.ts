@@ -11,12 +11,11 @@ import SECIO = require('libp2p-secio')
 
 import Hopr from '..'
 import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import { Interactions } from '../interactions'
-import { Crawler, CRAWL_TIMEOUT, shouldIncludePeerInCrawlResponse } from './crawler'
+import { CRAWL_TIMEOUT, shouldIncludePeerInCrawlResponse } from './crawler'
 import { Crawler as CrawlerInteraction } from '../interactions/network/crawler'
 import Multiaddr from 'multiaddr'
 import { Network } from './index'
-import PeerStore, { BLACKLIST_TIMEOUT, BlacklistedEntry } from './peerStore'
+import { BLACKLIST_TIMEOUT, BlacklistedEntry } from './peerStore'
 import { durations } from '@hoprnet/hopr-utils'
 
 describe('test crawler', function () {
