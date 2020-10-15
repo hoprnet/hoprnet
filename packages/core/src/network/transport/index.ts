@@ -153,19 +153,19 @@ class TCP {
       relayConnection.sink(sw.source)
       sw.sink(relayConnection.source)
 
-      // BtoA.sink(
-      //   (async function* () {
-      //     let i = 0
-      //     while (true) {
-      //       yield new TextEncoder().encode(`test message sent from handler #${i++}`)
-      //       await new Promise((resolve) => setTimeout(resolve, 700))
-      //     }
-      //   })()
-      // )
+      BtoA.sink(
+        (async function* () {
+          let i = 0
+          while (true) {
+            yield new TextEncoder().encode(`test message sent from handler #${i++}`)
+            await new Promise((resolve) => setTimeout(resolve, 1700))
+          }
+        })()
+      )
 
-      // for await (const msg of AtoB.source) {
-      //   console.log(new TextDecoder().decode(msg.slice()))
-      // }
+      for await (const msg of AtoB.source) {
+        console.log(new TextDecoder().decode(msg.slice()))
+      }
       newConn = await this._upgrader.upgradeInbound({
         ...relayConnection,
         sink: BtoA.sink,
@@ -278,7 +278,7 @@ class TCP {
         let i = 0
         while (true) {
           yield new TextEncoder().encode(`test message sent from initiator #${i++}`)
-          await new Promise((resolve) => setTimeout(resolve, 700))
+          await new Promise((resolve) => setTimeout(resolve, 1700))
         }
       })()
     )
