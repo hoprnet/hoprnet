@@ -12,7 +12,7 @@ function generateNode() {
     }
   }
 
-  return (new Dummy() as unknown)// as Hopr<HoprCoreConnector>
+  return new Dummy() as unknown // as Hopr<HoprCoreConnector>
 }
 
 describe('test PeerStore', function () {

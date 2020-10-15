@@ -157,7 +157,7 @@ class Crawler {
             log(`querying ${chalk.blue(peer)}`)
             const peerId = PeerId.createFromB58String(peer)
             peerInfos = await this.crawlInteraction.interact(peerId, {
-              signal: abort.signal,
+              signal: abort.signal
             })
 
             const peerInfo = this.peerStore.get(peerId)

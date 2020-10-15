@@ -10,7 +10,7 @@ import {
   HEARTBEAT_REFRESH_TIME,
   HEARTBEAT_INTERVAL_LOWER_BOUND,
   HEARTBEAT_INTERVAL_UPPER_BOUND,
-  MAX_PARALLEL_CONNECTIONS,
+  MAX_PARALLEL_CONNECTIONS
 } from '../constants'
 import { Heartbeat as HeartbeatInteraction } from '../interactions/network/heartbeat'
 

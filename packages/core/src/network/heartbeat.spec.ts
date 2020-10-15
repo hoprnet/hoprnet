@@ -103,7 +103,7 @@ describe('unit test heartbeat', () => {
   let hangUp = jest.fn(async () => {})
   let peers
   let interaction = {
-    interact: jest.fn(() => {}),
+    interact: jest.fn(() => {})
   } as any
 
   beforeEach(() => {

@@ -39,7 +39,7 @@ describe('test crawler', function () {
 
     node.interactions = ({
       network: {
-        crawler: new CrawlerInteraction(node),
+        crawler: new CrawlerInteraction(node)
         /*
           interact: async (peer) => {
             return Promise.resolve(
@@ -50,7 +50,7 @@ describe('test crawler', function () {
           }
         }
           */
-      },
+      }
     } as any) as Hopr<HoprCoreConnector>['interactions']
 
     node.on('peer:connect', (peerInfo: PeerInfo) => node.peerStore.put(peerInfo))
