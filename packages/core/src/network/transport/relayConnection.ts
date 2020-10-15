@@ -122,7 +122,7 @@ class RelayConnection implements MultiaddrConnection {
               this._destroyed = true
               return
             } else if (u8aEquals(SUFFIX, RESTART)) {
-              await this._onReconnect(this)
+              this._onReconnect(this)
               log(`RESTART received, reconnectReceived: ${__reconnectCounter++}`)
             } else {
               error(`Received invalid status message ${received.slice(1)}. Dropping message.`)
