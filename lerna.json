@@ -4,8 +4,12 @@
   ],
   "npmClient": "yarn",
 <<<<<<< HEAD
+<<<<<<< HEAD
   "version": "1.17.2-alpha.0"
 =======
   "version": "1.17.4"
 >>>>>>> 8c8ef079e4a857f2ab561adb874b3303c008cc3c
+=======
+  "version": "1.18.0-alpha.0"
+>>>>>>> dc8440d94b9ed674e3ce4774306349f2cae3eb75
 }

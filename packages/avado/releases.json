@@ -494,5 +494,12 @@
       "http://23.254.227.151:5001": "Thu, 15 Oct 2020 07:37:01 GMT"
 >>>>>>> 8c8ef079e4a857f2ab561adb874b3303c008cc3c
     }
+  },
+  "1.17.1": {
+    "hash": "/ipfs/QmatxPAoCG8o1pjsuxD6zE6vvtq4SyMAuFHpqf8hn8JY7D",
+    "type": "manifest",
+    "uploadedTo": {
+      "http://23.254.227.151:5001": "Thu, 15 Oct 2020 08:25:18 GMT"
+    }
   }
 }
