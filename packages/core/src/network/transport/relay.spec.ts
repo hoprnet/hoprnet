@@ -18,7 +18,6 @@ import Relay from './relay'
 import { randomBytes } from 'crypto'
 
 import { privKeyToPeerId } from '../../utils'
-import defer from 'p-defer'
 import { WebRTCUpgrader } from './webrtc'
 
 const TEST_PROTOCOL = `/test/0.0.1`
@@ -84,11 +83,6 @@ describe('should create a socket and connect to it', function () {
   }
 
   it('should create a node and echo a single message', async function () {
-    let testMessagesEchoed = false
-    let testMessagesReplied = false
-    let thirdBatchEchoed = false
-
-    let waitingForSecondBatch = defer<void>()
 
     let [sender, relay, counterparty] = await Promise.all([
       generateNode({ id: 0, ipv4: true }),

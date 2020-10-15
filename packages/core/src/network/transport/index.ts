@@ -16,14 +16,11 @@ import type {
   Upgrader,
   DialOptions,
   ConnHandler,
-  Handler,
-  Stream,
   MultiaddrConnection
 } from '../../@types/transport'
 import chalk from 'chalk'
 import { WebRTCUpgrader } from './webrtc'
 import Relay from './relay'
-import { PRIVATE_NETS } from '../../filters'
 
 const log = debug('hopr-core:transport')
 const error = debug('hopr-core:transport:error')
@@ -44,12 +41,16 @@ class TCP {
   private relays?: PeerInfo[]
   private stunServers: Multiaddr[]
   private _relay: Relay
+  // @ts-ignore
   private _webRTCUpgrader: WebRTCUpgrader
   private connHandler: ConnHandler
 
   // ONLY FOR TESTING
+  //@ts-ignore
   private _failIntentionallyOnWebRTC?: boolean
+  //@ts-ignore
   private _timeoutIntentionallyOnWebRTC?: Promise<void>
+  //@ts-ignore
   private _answerIntentionallyWithIncorrectMessages?: boolean
   // END ONLY FOR TESTING
 
@@ -114,7 +115,7 @@ class TCP {
       this._webRTCUpgrader = new WebRTCUpgrader({ stunServers: this.stunServers })
     }
 
-    this._relay = new Relay(libp2p, this.handleDelivery.bind(this), this._webRTCUpgrader)
+    this._relay = new Relay(libp2p, this.handleDelivery.bind(this))
     verbose(`Created TCP stack (Stun: ${this.stunServers?.map((x) => x.toString()).join(',')}`)
   }
 

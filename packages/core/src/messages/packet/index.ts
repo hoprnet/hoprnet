@@ -100,7 +100,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       return Promise.resolve(this._ticket)
     }
 
-    return new Promise<Types.SignedTicket>(async (resolve, reject) => {
+    return new Promise<Types.SignedTicket>(async (resolve) => {
       this._ticket = await this.node.paymentChannels.types.SignedTicket.create({
         bytes: this.buffer,
         offset: this.ticketOffset
@@ -168,7 +168,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       offset: arr.byteOffset
     })
 
-    const { header, secrets, identifier } = await Header.create(node, path, {
+    const { header, secrets } = await Header.create(node, path, {
       bytes: packet.buffer,
       offset: packet.headerOffset
     })
@@ -313,7 +313,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
    * @param target peer Id of the next node
 
    */
-  async prepareForward(sender: PeerId, target: PeerId): Promise<void> {
+  async prepareForward(_sender: PeerId, target: PeerId): Promise<void> {
     if (
       !u8aEquals(
         await this.node.paymentChannels.utils.hash(

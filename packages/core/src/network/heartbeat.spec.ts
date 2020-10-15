@@ -31,7 +31,7 @@ describe('check heartbeat mechanism', function () {
     })) as Hopr<HoprCoreConnector>
 
     node.peerInfo.multiaddrs.add(Multiaddr('/ip4/0.0.0.0/tcp/0'))
-    node.hangUp = async (id) => {}
+    node.hangUp = async (_id) => {}
 
     node.interactions = {
       network: {

@@ -56,9 +56,8 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
       }, ACKNOWLEDGEMENT_TIMEOUT)
 
       try {
-        struct = await this.node.dialProtocol(counterparty, this.protocols[0]).catch(async (err: Error) => {
+        struct = await this.node.dialProtocol(counterparty, this.protocols[0]).catch(async () => {
           const result = await this.node.peerRouting.findPeer(counterparty)
-
           return await this.node.dialProtocol(result, this.protocols[0])
         })
       } catch (err) {

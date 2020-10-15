@@ -131,7 +131,7 @@ class Listener extends EventEmitter {
           resolve()
         })
       ),
-      new Promise((resolve, reject) =>
+      new Promise((resolve) =>
         this.udpSocket.bind(options.port, async () => {
           try {
             this.externalAddress = await getExternalIp(this.stunServers, this.udpSocket)

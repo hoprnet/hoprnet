@@ -1,5 +1,3 @@
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import type Hopr from '..'
 import type { HoprOptions } from '..'
 import type PeerInfo from 'peer-info'
 import type { Interactions } from '../interactions'
