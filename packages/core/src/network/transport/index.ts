@@ -144,9 +144,9 @@ class TCP {
       //   })()
       // )
 
-      // for await (const msg of AtoB.source) {
-      //   console.log(new TextDecoder().decode(msg.slice()))
-      // }
+      for await (const msg of AtoB.source) {
+        console.log(`receiving in reconnect`, new TextDecoder().decode(msg.slice()))
+      }
 
       try {
         this._upgrader
