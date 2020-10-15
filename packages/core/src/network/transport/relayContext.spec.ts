@@ -1,7 +1,7 @@
 import { u8aConcat } from '@hoprnet/hopr-utils'
 import { RELAY_STATUS_PREFIX, STOP } from './constants'
 import { RelayContext } from './relayContext'
-import { Stream } from './types'
+import { Stream } from '../../@types/transport'
 
 import Debug from 'debug'
 import { resolve } from 'dns'
@@ -54,13 +54,15 @@ describe('test overwritable connection', function () {
     }, 3000)
 
     let i = 0
-    ctx.sink((async function * () {
-      await new Promise(resolve => setTimeout(resolve, 123))
-      while (true) {
-        yield new TextEncoder().encode(`msg from initial party #${i++}`)
-        await new Promise(resolve => setTimeout(resolve, 100))
-      }
-    })())
+    ctx.sink(
+      (async function* () {
+        await new Promise((resolve) => setTimeout(resolve, 123))
+        while (true) {
+          yield new TextEncoder().encode(`msg from initial party #${i++}`)
+          await new Promise((resolve) => setTimeout(resolve, 100))
+        }
+      })()
+    )
 
     for await (const msg of ctx.source) {
       console.log(`initial source <${new TextDecoder().decode(msg)}>`)

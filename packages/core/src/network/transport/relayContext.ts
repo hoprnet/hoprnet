@@ -2,7 +2,7 @@ import { u8aConcat, u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
 import Defer, { DeferredPromise } from 'p-defer'
 import BL from 'bl'
 
-import { Stream } from './types'
+import { Stream } from '../../@types/transport'
 
 import Debug from 'debug'
 const log = Debug(`hopr-core:transport`)
