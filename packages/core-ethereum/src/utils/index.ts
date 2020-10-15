@@ -316,6 +316,8 @@ export function getNetworkName(chainId: number): addresses.Networks {
       return 'solkol'
     case 100:
       return 'xdai'
+    case 137:
+      return 'matic'
     default:
       return 'private'
   }

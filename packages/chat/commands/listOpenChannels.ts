@@ -51,11 +51,13 @@ export default class ListOpenChannels extends AbstractCommand {
       },
       {
         name: 'Total Balance',
-        value: styleValue(totalBalance, 'number')
+        // @TODO: use Balance types to get symbol
+        value: `${styleValue(totalBalance, 'number')} Matic`
       },
       {
         name: 'My Balance',
-        value: styleValue(myBalance, 'number')
+        // @TODO: use Balance types to get symbol
+        value: `${styleValue(myBalance, 'number')} Matic`
       }
     ]
 

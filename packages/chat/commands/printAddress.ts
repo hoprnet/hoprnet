@@ -33,7 +33,7 @@ export default class PrintAddress extends AbstractCommand {
     }
 
     // @TODO: use 'NativeBalance' and 'Balance' to display currencies
-    const nativePrefix = 'xDAI Address:'
+    const nativePrefix = 'Matic Address:'
     const nativeAddress = u8aToHex(await utils.pubKeyToAccountId(this.node.peerInfo.id.pubKey.marshal()))
 
     if (query.trim() === 'native') {
