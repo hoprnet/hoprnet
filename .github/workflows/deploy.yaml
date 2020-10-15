@@ -55,7 +55,7 @@ jobs:
           git config --global user.name "HOPR Versioning robot"
           git config pull.rebase false
           git pull origin master
-          node_modules/.bin/lerna version prerelease --preid "alpha" --yes --exact --no-push --no-changelog
+          node_modules/.bin/lerna version preminor --yes --exact --no-push --no-changelog
           git push origin master
           node_modules/.bin/lerna publish from-package --yes
           sleep 5m # Allow NPM registry to catch uo
