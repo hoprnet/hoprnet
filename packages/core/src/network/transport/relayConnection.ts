@@ -1,6 +1,6 @@
 import Multiaddr from 'multiaddr'
 import BL from 'bl'
-import { MultiaddrConnection, Stream } from './types'
+import { MultiaddrConnection, Stream } from '../../@types/transport'
 import Defer, { DeferredPromise } from 'p-defer'
 import { RELAY_PAYLOAD_PREFIX, RELAY_STATUS_PREFIX, RELAY_WEBRTC_PREFIX, RESTART, STOP } from './constants'
 import { u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'

@@ -11,7 +11,7 @@ import {
   deriveTicketKey,
   deriveTicketKeyBlinding,
   deriveTicketLastKey,
-  createMAC,
+  createMAC
 } from './index'
 
 import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
@@ -29,7 +29,7 @@ import {
   ADDRESS_SIZE,
   MAC_SIZE,
   LAST_HOP_SIZE,
-  KEY_LENGTH,
+  KEY_LENGTH
 } from './parameters'
 
 export async function createHeader<Chain extends HoprCoreConnector>(
@@ -211,6 +211,6 @@ export async function createHeader<Chain extends HoprCoreConnector>(
   return {
     header: header,
     secrets: secrets,
-    identifier: identifier,
+    identifier: identifier
   }
 }

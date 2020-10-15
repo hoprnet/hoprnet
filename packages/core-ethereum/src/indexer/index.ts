@@ -119,7 +119,7 @@ class Indexer implements IIndexer {
     return await new Promise<Channel[]>((resolve, reject) => {
       db.createReadStream({
         gte: Buffer.from(dbKeys.ChannelEntry(SMALLEST_PUBLIC_KEY, SMALLEST_PUBLIC_KEY)),
-        lte: Buffer.from(dbKeys.ChannelEntry(BIGGEST_PUBLIC_KEY, BIGGEST_PUBLIC_KEY)),
+        lte: Buffer.from(dbKeys.ChannelEntry(BIGGEST_PUBLIC_KEY, BIGGEST_PUBLIC_KEY))
       })
         .on('error', (err) => reject(err))
         .on('data', ({ key, value }: { key: Buffer; value: Buffer }) => {
@@ -134,13 +134,13 @@ class Indexer implements IIndexer {
 
           const channelEntry = new ChannelEntry({
             bytes: value,
-            offset: value.byteOffset,
+            offset: value.byteOffset
           })
 
           channels.push({
             partyA,
             partyB,
-            channelEntry,
+            channelEntry
           })
         })
         .on('end', () => resolve(channels))
@@ -170,13 +170,13 @@ class Indexer implements IIndexer {
 
     const channelEntry = new ChannelEntry({
       bytes: _entry,
-      offset: _entry.byteOffset,
+      offset: _entry.byteOffset
     })
 
     return {
       partyA,
       partyB,
-      channelEntry,
+      channelEntry
     }
   }
 
@@ -225,13 +225,13 @@ class Indexer implements IIndexer {
       {
         type: 'put',
         key: Buffer.from(dbKeys.ChannelEntry(partyA, partyB)),
-        value: Buffer.from(channelEntry),
+        value: Buffer.from(channelEntry)
       },
       {
         type: 'put',
         key: Buffer.from(dbKeys.ConfirmedBlockNumber()),
-        value: Buffer.from(blockNumber.toU8a()),
-      },
+        value: Buffer.from(blockNumber.toU8a())
+      }
     ])
   }
 
@@ -287,12 +287,12 @@ class Indexer implements IIndexer {
     const newChannelEntry = new ChannelEntry(undefined, {
       blockNumber: new BN(event.blockNumber),
       transactionIndex: new BN(event.transactionIndex),
-      logIndex: new BN(event.logIndex),
+      logIndex: new BN(event.logIndex)
     })
 
     const channels = await this.get({
       partyA,
-      partyB,
+      partyB
     })
 
     if (channels.length > 0 && !isMoreRecent(channels[0].channelEntry, newChannelEntry)) {
@@ -316,12 +316,12 @@ class Indexer implements IIndexer {
     const newChannelEntry = new ChannelEntry(undefined, {
       blockNumber: new BN(event.blockNumber),
       transactionIndex: new BN(event.transactionIndex),
-      logIndex: new BN(event.logIndex),
+      logIndex: new BN(event.logIndex)
     })
 
     const channels = await this.get({
       partyA,
-      partyB,
+      partyB
     })
 
     if (channels.length === 0) {
@@ -378,7 +378,7 @@ class Indexer implements IIndexer {
           .subscribe('logs', {
             address: this.connector.hoprChannels.options.address,
             fromBlock,
-            topics: events.OpenedChannelTopics(undefined, undefined),
+            topics: events.OpenedChannelTopics(undefined, undefined)
           })
           .on('error', (err) => {
             if (!rejected) {
@@ -392,7 +392,7 @@ class Indexer implements IIndexer {
           .subscribe('logs', {
             address: this.connector.hoprChannels.options.address,
             fromBlock,
-            topics: events.ClosedChannelTopics(undefined, undefined),
+            topics: events.ClosedChannelTopics(undefined, undefined)
           })
           .on('error', (err) => {
             if (!rejected) {

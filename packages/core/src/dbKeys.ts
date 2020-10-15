@@ -18,7 +18,7 @@ export function AcknowledgedTickets(index: Uint8Array): Uint8Array {
   return allocationHelper([
     [TICKET_PREFIX.length, TICKET_PREFIX],
     [acknowledgedSubPrefix.length, acknowledgedSubPrefix],
-    [ACKNOWLEDGED_TICKET_INDEX_LENGTH, index],
+    [ACKNOWLEDGED_TICKET_INDEX_LENGTH, index]
   ])
 }
 
@@ -29,7 +29,7 @@ export function AcknowledgedTicketsParse(arr: Uint8Array): Uint8Array {
 export function AcknowledgedTicketCounter() {
   return allocationHelper([
     [TICKET_PREFIX.length, TICKET_PREFIX],
-    [acknowledgedTicketCounter.length, acknowledgedTicketCounter],
+    [acknowledgedTicketCounter.length, acknowledgedTicketCounter]
   ])
 }
 
@@ -38,7 +38,7 @@ export function UnAcknowledgedTickets(hashedKey: Uint8Array): Uint8Array {
     [TICKET_PREFIX.length, TICKET_PREFIX],
     [unAcknowledgedSubPrefix.length, unAcknowledgedSubPrefix],
     [SEPERATOR.length, SEPERATOR],
-    [KEY_LENGTH, hashedKey],
+    [KEY_LENGTH, hashedKey]
   ])
 }
 
@@ -54,7 +54,7 @@ export function PacketTag(tag: Uint8Array): Uint8Array {
     [PACKET_PREFIX.length, PACKET_PREFIX],
     [packetTagSubPrefix.length, packetTagSubPrefix],
     [SEPERATOR.length, SEPERATOR],
-    [tag.length, tag],
+    [tag.length, tag]
   ])
 }
 

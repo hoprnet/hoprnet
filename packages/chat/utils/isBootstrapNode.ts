@@ -1,6 +1,5 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
-
 import type PeerId from 'peer-id'
 
 /**
@@ -14,5 +13,6 @@ export function isBootstrapNode(node: Hopr<HoprCoreConnector>, peerId: PeerId): 
       return true
     }
   }
+
   return false
 }

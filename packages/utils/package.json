@@ -1,18 +1,18 @@
 {
   "name": "@hoprnet/hopr-utils",
-  "homepage": "https://hoprnet.org",
   "description": "HOPR-based utilities to process multiple data structures",
-  "version": "1.17.0-alpha.58",
-  "repository": "git@github.com:hoprnet/hopr-utils.git",
+  "version": "1.21.0-alpha.0",
+  "repository": "https://github.com/hoprnet/hoprnet.git",
+  "homepage": "https://hoprnet.org",
   "license": "LGPL-3.0-only",
   "types": "lib/index.d.ts",
   "main": "lib/index.js",
   "scripts": {
-    "clean": "rm -rf ./lib",
+    "clean": "rimraf ./lib",
     "test": "mocha --parallel",
     "dev": "yarn clean && tsc -w",
     "build": "yarn clean && tsc -p . --noEmit false",
-    "prepare": "yarn build"
+    "prepublishOnly": "yarn build"
   },
   "files": [
     "lib/",
@@ -35,18 +35,10 @@
   "devDependencies": {
     "@types/mocha": "^8.0.3",
     "@types/node": "^12.12.8",
-    "husky": "^4.2.5",
-    "lint-staged": ">=10",
     "mocha": "^8.0.1",
-    "prettier": "^2.0.5",
+    "rimraf": "^3.0.2",
     "ts-node": "^9.0.0",
     "typescript": "^4.0.3"
-  },
-  "prettier": {
-    "tabWidth": 2,
-    "semi": false,
-    "singleQuote": true,
-    "printWidth": 120
   },
   "mocha": {
     "extension": [
@@ -54,13 +46,5 @@
     ],
     "spec": "src/**/*.spec.ts",
     "require": "ts-node/register"
-  },
-  "husky": {
-    "hooks": {
-      "pre-commit": "lint-staged"
-    }
-  },
-  "lint-staged": {
-    "*.{ts}": "prettier --write"
   }
 }

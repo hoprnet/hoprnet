@@ -70,7 +70,7 @@ class AcknowledgedTicket extends Uint8Array {
     return new Promise<SignedTicket>(async (resolve) => {
       this._signedTicket = await this.paymentChannels.types.SignedTicket.create({
         bytes: this.buffer,
-        offset: this.signedTicketOffset,
+        offset: this.signedTicketOffset
       })
 
       resolve(this._signedTicket)

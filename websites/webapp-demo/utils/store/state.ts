@@ -22,7 +22,7 @@ export const initialState: {
   apiUrl: API_URL,
   connection: 'DISCONNECTED',
   hoprAddress: undefined,
-  conversations: new Map([['', new Map()]]), // add anonymous conversation
+  conversations: new Map([['', new Map()]]) // add anonymous conversation
 }
 
 export type IActions =
@@ -76,7 +76,7 @@ export const reducer = (state: typeof initialState, action: IActions): typeof in
         sendByMe: action.sendByMe,
         message: action.message,
         createdAt: action.createdAt,
-        status: action.status,
+        status: action.status
       })
 
       // update conversations
@@ -84,7 +84,7 @@ export const reducer = (state: typeof initialState, action: IActions): typeof in
 
       return {
         ...state,
-        conversations,
+        conversations
       }
     }
     case 'UPDATE_MESSAGE_STATUS': {
@@ -96,7 +96,7 @@ export const reducer = (state: typeof initialState, action: IActions): typeof in
 
       const message: IMessage = conversation.has(action.id)
         ? {
-            ...conversation.get(action.id),
+            ...conversation.get(action.id)
           }
         : undefined
       if (!message) return state
@@ -107,7 +107,7 @@ export const reducer = (state: typeof initialState, action: IActions): typeof in
 
       return {
         ...state,
-        conversations,
+        conversations
       }
     }
     default:

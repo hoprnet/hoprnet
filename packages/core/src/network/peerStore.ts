@@ -1,5 +1,3 @@
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import type Hopr from '..'
 import heap from 'heap-js'
 
 import type PeerInfo from 'peer-info'
@@ -21,7 +19,7 @@ export type BlacklistedEntry = {
 
 export const BLACKLIST_TIMEOUT = durations.seconds(47)
 
-class PeerStore<Chain extends HoprCoreConnector> {
+class PeerStore {
   peers: Entry[]
 
   deletedPeers: BlacklistedEntry[]
@@ -34,20 +32,22 @@ class PeerStore<Chain extends HoprCoreConnector> {
     return b.deletedAt - a.deletedAt
   }
 
-  constructor(node: Hopr<Chain>) {
+  constructor(existingPeers: IterableIterator<PeerInfo>) {
     this.peers = []
     this.deletedPeers = []
 
-    for (const peerInfo of node.peerStore.peers.values()) {
+    for (const peerInfo of existingPeers) {
       this.peers.push({
         id: peerInfo.id.toB58String(),
-        lastSeen: 0,
+        lastSeen: 0
       })
     }
 
-    node.on('peer:connect', (peerInfo: PeerInfo) => this.push({ id: peerInfo.id.toB58String(), lastSeen: Date.now() }))
-
     heap.heapify(this.peers, this.compare)
+  }
+
+  onPeerConnect(peerInfo: PeerInfo) {
+    this.push({ id: peerInfo.id.toB58String(), lastSeen: Date.now() })
   }
 
   push(entry: Entry): number {
@@ -98,7 +98,7 @@ class PeerStore<Chain extends HoprCoreConnector> {
     verbose('blacklisting', peer)
     const entry = {
       id: peer,
-      deletedAt: Date.now(),
+      deletedAt: Date.now()
     }
 
     // (Efficiently) pushes peer information into blacklist
@@ -150,6 +150,15 @@ class PeerStore<Chain extends HoprCoreConnector> {
     ) {
       heap.heappop(this.deletedPeers, this.compareBlackList)
     }
+  }
+
+  public debugLog() {
+    log(`current nodes:`)
+    this.peers.forEach((node: Entry) => log(node.id))
+  }
+
+  updatedSince(ts) {
+    return this.peers.length > 0 && this.top(1)[0].lastSeen < ts
   }
 }
 

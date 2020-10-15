@@ -7,13 +7,13 @@ import type { AbstractInteraction } from '../abstractInteraction'
 import type PeerInfo from 'peer-info'
 import type PeerId from 'peer-id'
 
-import type { Handler } from '../../network/transport/types'
+import type { Handler } from '../../@types/transport'
 
 import chalk from 'chalk'
 
 import pipe from 'it-pipe'
 
-class OnChainKey<Chain extends HoprCoreConnector> implements AbstractInteraction<Chain> {
+class OnChainKey<Chain extends HoprCoreConnector> implements AbstractInteraction {
   protocols: string[] = [PROTOCOL_ONCHAIN_KEY]
 
   constructor(public node: Hopr<Chain>) {
@@ -21,11 +21,7 @@ class OnChainKey<Chain extends HoprCoreConnector> implements AbstractInteraction
   }
 
   handler(struct: Handler) {
-    pipe(
-      /* prettier-ignore */
-      [this.node.paymentChannels.account.keys.onChain.pubKey],
-      struct.stream
-    )
+    pipe([this.node.paymentChannels.account.keys.onChain.pubKey], struct.stream)
   }
 
   async interact(counterparty: PeerId): Promise<Types.Public> {
@@ -45,11 +41,7 @@ class OnChainKey<Chain extends HoprCoreConnector> implements AbstractInteraction
       )
     }
 
-    return pipe(
-      /* prettier-ignore */
-      struct.stream,
-      onReception
-    )
+    return pipe(struct.stream, onReception)
   }
 }
 

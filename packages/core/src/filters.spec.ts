@@ -15,6 +15,10 @@ describe('filters', () => {
     assert(peerHasOnlyPublicAddresses(privatePeer) == false)
     assert(peerHasOnlyPrivateAddresses(privatePeer) == true)
 
+    privatePeer.multiaddrs.add(new Multiaddr('/ip4/0.0.0.0/tcp/9093'))
+    assert(peerHasOnlyPublicAddresses(privatePeer) == false)
+    assert(peerHasOnlyPrivateAddresses(privatePeer) == true)
+
     const publicPeer = await PeerInfo.create(await PeerId.create({ keyType: 'secp256k1' }))
     publicPeer.multiaddrs.add(new Multiaddr('/ip4/123.4.56.7/tcp/9090'))
     assert(peerHasOnlyPublicAddresses(publicPeer) == true)

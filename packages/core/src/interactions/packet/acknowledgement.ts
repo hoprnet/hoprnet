@@ -15,7 +15,7 @@ import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '../../'
 import { Acknowledgement } from '../../messages/acknowledgement'
 
-import type { Handler } from '../../network/transport/types'
+import type { Handler } from '../../@types/transport'
 
 import EventEmitter from 'events'
 
@@ -30,7 +30,7 @@ const ACKNOWLEDGEMENT_TIMEOUT = durations.seconds(2)
 
 class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
   extends EventEmitter
-  implements AbstractInteraction<Chain> {
+  implements AbstractInteraction {
   protocols: string[] = [PROTOCOL_ACKNOWLEDGEMENT]
 
   constructor(public node: Hopr<Chain>) {
@@ -39,11 +39,7 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
   }
 
   handler(struct: Handler) {
-    pipe(
-      /* prettier-ignore */
-      struct.stream,
-      this.handleHelper.bind(this)
-    )
+    pipe(struct.stream, this.handleHelper.bind(this))
   }
 
   async interact(counterparty: PeerId, acknowledgement: Acknowledgement<Chain>): Promise<void> {
@@ -75,11 +71,7 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
 
       clearTimeout(timeout)
 
-      pipe(
-        /* prettier-ignore */
-        [acknowledgement],
-        struct.stream
-      )
+      pipe([acknowledgement], struct.stream)
 
       if (!aborted) {
         resolve()
@@ -92,7 +84,7 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
       const arr = msg.slice()
       const acknowledgement = new Acknowledgement(this.node.paymentChannels, {
         bytes: arr.buffer,
-        offset: arr.byteOffset,
+        offset: arr.byteOffset
       })
 
       const unAcknowledgedDbKey = this.node.dbKeys.UnAcknowledgedTickets(await acknowledgement.hashedKey)
@@ -119,7 +111,7 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
       if (tmp.length > 0) {
         const unacknowledgedTicket = new UnacknowledgedTicket(this.node.paymentChannels, {
           bytes: tmp.buffer,
-          offset: tmp.byteOffset,
+          offset: tmp.byteOffset
         })
 
         let ticketCounter: Uint8Array
@@ -141,7 +133,7 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
             response: await this.node.paymentChannels.utils.hash(
               u8aConcat(unacknowledgedTicket.secretA, await acknowledgement.hashedKey)
             ),
-            redeemed: false,
+            redeemed: false
           }
         )
 

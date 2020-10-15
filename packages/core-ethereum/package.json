@@ -1,19 +1,19 @@
 {
   "name": "@hoprnet/hopr-core-ethereum",
-  "version": "1.17.0-alpha.58",
-  "repository": "git@github.com:hoprnet/hopr-core-ethereum.git",
+  "version": "1.21.0-alpha.0",
+  "description": "",
+  "repository": "https://github.com/hoprnet/hoprnet.git",
+  "homepage": "https://hoprnet.org",
   "license": "LGPL-3.0-only",
   "types": "lib/index.d.ts",
   "main": "lib/index.js",
-  "homepage": "https://hoprnet.org",
   "scripts": {
-    "clean": "rm -rf ./lib",
+    "clean": "rimraf ./lib",
     "test": "mocha --exit",
     "dev": "yarn clean && yarn build:types && tsc -w",
     "build:types": "typechain --target web3-v1 --outDir './src/tsc/web3' './node_modules/@hoprnet/hopr-ethereum/build/extracted/abis/*.json'",
     "build": "yarn clean && yarn build:types && $PWD/scripts/build.sh",
-    "lint": "prettier --check .",
-    "prepare": "yarn build"
+    "prepublishOnly": "yarn build"
   },
   "files": [
     "lib/",
@@ -27,8 +27,8 @@
     "yarn": "1"
   },
   "dependencies": {
-    "@hoprnet/hopr-ethereum": "^1.17.0-alpha.58",
-    "@hoprnet/hopr-utils": "^1.17.0-alpha.58",
+    "@hoprnet/hopr-ethereum": "1.21.0-alpha.0",
+    "@hoprnet/hopr-utils": "1.21.0-alpha.0",
     "bn.js": "^5.1.2",
     "chalk": "^4.1.0",
     "debug": "^4.1.1",
@@ -43,9 +43,9 @@
     "web3-eth-contract": "^1.2.11"
   },
   "devDependencies": {
-    "@hoprnet/hopr-core-connector-interface": "^1.17.0-alpha.58",
-    "@hoprnet/hopr-demo-seeds": "1.8.0",
-    "@hoprnet/hopr-testing": "^1.17.0-alpha.58",
+    "@hoprnet/hopr-core-connector-interface": "1.21.0-alpha.0",
+    "@hoprnet/hopr-demo-seeds": "1.21.0-alpha.0",
+    "@hoprnet/hopr-testing": "1.21.0-alpha.0",
     "@types/debug": "^4.1.5",
     "@types/keccak": "^3.0.1",
     "@types/levelup": "^4.3.0",
@@ -53,28 +53,16 @@
     "@types/mocha": "^8.0.3",
     "@types/node": "^12.12.8",
     "@types/secp256k1": "^4.0.1",
-    "husky": "^4.2.5",
     "it-pipe": "^1.1.0",
     "levelup": "^4.4.0",
     "memdown": "^5.1.0",
     "mocha": "^8.0.1",
-    "prettier": "^2.0.5",
+    "rimraf": "^3.0.2",
     "ts-generator": "^0.0.8",
     "ts-node": "^9.0.0",
     "typechain": "^1.0.5",
     "typechain-target-web3-v1": "^1.0.4",
     "typescript": "^4.0"
-  },
-  "husky": {
-    "hooks": {
-      "pre-commit": "yarn lint"
-    }
-  },
-  "prettier": {
-    "tabWidth": 2,
-    "semi": false,
-    "singleQuote": true,
-    "printWidth": 120
   },
   "mocha": {
     "extension": [

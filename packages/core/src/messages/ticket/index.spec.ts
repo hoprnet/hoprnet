@@ -25,8 +25,8 @@ describe(`check serialization and deserialization of ticket objects`, function (
       dbKeys: DbKeys,
       paymentChannels: ({
         utils: Utils,
-        types: new Types(),
-      } as unknown) as HoprCoreConnector,
+        types: new Types()
+      } as unknown) as HoprCoreConnector
     } as unknown) as Hopr<HoprCoreConnector>
   }
 
@@ -49,26 +49,26 @@ describe(`check serialization and deserialization of ticket objects`, function (
 
     const signedTicket = await node.paymentChannels.types.SignedTicket.create({
       bytes: unAcknowledgedTicket.buffer,
-      offset: unAcknowledgedTicket.signedTicketOffset,
+      offset: unAcknowledgedTicket.signedTicketOffset
     })
 
     const ticket = node.paymentChannels.types.Ticket.create(
       {
         bytes: signedTicket.buffer,
-        offset: signedTicket.ticketOffset,
+        offset: signedTicket.ticketOffset
       },
       {
         amount: new node.paymentChannels.types.Balance(1),
         counterparty: accountB,
         challenge,
         epoch: new node.paymentChannels.types.TicketEpoch(0),
-        winProb: new node.paymentChannels.types.Hash(new Uint8Array(32).fill(0xff)),
+        winProb: new node.paymentChannels.types.Hash(new Uint8Array(32).fill(0xff))
       }
     )
 
     await ticket.sign(peerA.privKey.marshal(), undefined, {
       bytes: signedTicket.buffer,
-      offset: signedTicket.signatureOffset,
+      offset: signedTicket.signatureOffset
     })
 
     assert(await unAcknowledgedTicket.verifySignature(peerA), 'signature must be valid')
@@ -80,7 +80,7 @@ describe(`check serialization and deserialization of ticket objects`, function (
     assert(
       await new UnacknowledgedTicket(node.paymentChannels, {
         bytes: fromDbUnacknowledgedTicket.buffer,
-        offset: fromDbUnacknowledgedTicket.byteOffset,
+        offset: fromDbUnacknowledgedTicket.byteOffset
       }).verifySignature(peerA),
       'signature must be valid'
     )
@@ -89,7 +89,7 @@ describe(`check serialization and deserialization of ticket objects`, function (
       signedTicket,
       response: await node.paymentChannels.utils.hash(u8aConcat(secretA, secretB)),
       preImage: randomBytes(27),
-      redeemed: false,
+      redeemed: false
     })
 
     const FIRST_TICKET = 1

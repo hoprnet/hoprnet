@@ -22,7 +22,7 @@ class WebRTCUpgrader {
         const options = ma.toOptions()
 
         return { urls: `stun:${options.host}:${options.port}` }
-      }),
+      })
     }
   }
 
@@ -35,14 +35,14 @@ class WebRTCUpgrader {
   }
 
   private _connect(initiator: boolean) {
-    console.log(`inside _connect`)
+    log(`inside _connect`)
     const channel = new SimplePeer({
       wrtc,
       initiator,
       trickle: true,
       // @ts-ignore
       allowHalfTrickle: true,
-      config: this._stunServers,
+      config: this._stunServers
     })
 
     // const onTimeout = () => {

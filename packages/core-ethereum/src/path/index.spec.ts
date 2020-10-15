@@ -76,11 +76,11 @@ function generateConnector(edges: Map<Public, Public[]>) {
         return connectedNodes.map((partyB) => {
           return {
             partyA,
-            partyB,
+            partyB
           }
         })
-      },
-    },
+      }
+    }
   } as unknown) as HoprEthereum
 
   connector.path = new Path(connector)

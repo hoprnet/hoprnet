@@ -84,7 +84,7 @@ describe('test indexer', function () {
           u8aToHex(randomBytes(27))
         )
         .send({
-          from: userB.address.toHex(),
+          from: userB.address.toHex()
         })
 
       await hoprToken.methods
@@ -95,11 +95,11 @@ describe('test indexer', function () {
         )
         .send({
           from: userA.address.toHex(),
-          gas: 200e3,
+          gas: 200e3
         })
       await hoprChannels.methods.openChannel(userB.address.toHex()).send({
         from: userA.address.toHex(),
-        gas: 200e3,
+        gas: 200e3
       })
       const channels = await connector.indexer.get()
       assert.equal(channels.length, 0, 'check Channels.store')
@@ -145,7 +145,7 @@ describe('test indexer', function () {
       }
 
       const channels = await connector.indexer.get({
-        partyA,
+        partyA
       })
       const [channel] = channels
       assert.equal(channels.length, 1, 'check Channels.get')
@@ -163,7 +163,7 @@ describe('test indexer', function () {
       }
 
       const channels = await connector.indexer.get({
-        partyB,
+        partyB
       })
       const [channel] = channels
       assert.equal(channels.length, 1, 'check Channels.get')
@@ -183,7 +183,7 @@ describe('test indexer', function () {
 
       const channels = await connector.indexer.get({
         partyA,
-        partyB,
+        partyB
       })
       const [channel] = channels
       assert.equal(channels.length, 1, 'check Channels.get')
@@ -201,7 +201,7 @@ describe('test indexer', function () {
           u8aToHex(randomBytes(27))
         )
         .send({
-          from: userC.address.toHex(),
+          from: userC.address.toHex()
         })
 
       await hoprToken.methods
@@ -212,23 +212,23 @@ describe('test indexer', function () {
         )
         .send({
           from: userA.address.toHex(),
-          gas: 200e3,
+          gas: 200e3
         })
 
       await hoprChannels.methods.openChannel(userC.address.toHex()).send({
         from: userA.address.toHex(),
-        gas: 200e3,
+        gas: 200e3
       })
       const currentBlockNumber = await web3.eth.getBlockNumber()
       await time.advanceBlockTo(web3, currentBlockNumber + configs.MAX_CONFIRMATIONS)
       const channels = await connector.indexer.get()
       assert.equal(channels.length, 2, 'check Channels.store')
       const channelsUsingPartyA = await connector.indexer.get({
-        partyA: userA.pubKey,
+        partyA: userA.pubKey
       })
       assert.equal(channelsUsingPartyA.length, 2, 'check Channels.get')
       const channelsUsingPartyB = await connector.indexer.get({
-        partyB: userB.pubKey,
+        partyB: userB.pubKey
       })
       assert.equal(channelsUsingPartyB.length, 1, 'check Channels.get')
     })
@@ -236,12 +236,12 @@ describe('test indexer', function () {
     it('should not delete channel before confirmations', async function () {
       await hoprChannels.methods.initiateChannelClosure(userB.address.toHex()).send({
         from: userA.address.toHex(),
-        gas: 200e3,
+        gas: 200e3
       })
       await time.increase(web3, Math.floor(CLOSURE_DURATION / 1e3))
       await hoprChannels.methods.claimChannelClosure(userB.address.toHex()).send({
         from: userA.address.toHex(),
-        gas: 200e3,
+        gas: 200e3
       })
       const channels = await connector.indexer.get()
       assert.equal(channels.length, 2, 'check Channels.store')
@@ -266,7 +266,7 @@ describe('test indexer', function () {
           u8aToHex(randomBytes(27))
         )
         .send({
-          from: userD.address.toHex(),
+          from: userD.address.toHex()
         })
 
       await hoprToken.methods
@@ -277,11 +277,11 @@ describe('test indexer', function () {
         )
         .send({
           from: userA.address.toHex(),
-          gas: 200e3,
+          gas: 200e3
         })
       await hoprChannels.methods.openChannel(userD.address.toHex()).send({
         from: userA.address.toHex(),
-        gas: 200e3,
+        gas: 200e3
       })
       const channels = await connector.indexer.get()
       assert.equal(channels.length, 1, 'check Channels.store')
@@ -313,22 +313,22 @@ describe('test indexer', function () {
       await connector.indexer.onOpenedChannel({
         returnValues: {
           opener: new Public(userA.pubKey),
-          counterparty: new Public(userB.pubKey),
+          counterparty: new Public(userB.pubKey)
         },
         blockNumber: 2,
         transactionIndex: 0,
-        logIndex: 0,
+        logIndex: 0
       })
 
       // @ts-ignore
       await connector.indexer.onOpenedChannel({
         returnValues: {
           opener: new Public(userA.pubKey),
-          counterparty: new Public(userB.pubKey),
+          counterparty: new Public(userB.pubKey)
         },
         blockNumber: 1,
         transactionIndex: 0,
-        logIndex: 0,
+        logIndex: 0
       })
 
       const allChannels = await connector.indexer.get()
@@ -342,22 +342,22 @@ describe('test indexer', function () {
       await connector.indexer.onOpenedChannel({
         returnValues: {
           opener: new Public(userA.pubKey),
-          counterparty: new Public(userB.pubKey),
+          counterparty: new Public(userB.pubKey)
         },
         blockNumber: 2,
         transactionIndex: 0,
-        logIndex: 0,
+        logIndex: 0
       })
 
       // @ts-ignore
       await connector.indexer.onClosedChannel({
         returnValues: {
           closer: new Public(userA.pubKey),
-          counterparty: new Public(userB.pubKey),
+          counterparty: new Public(userB.pubKey)
         },
         blockNumber: 1,
         transactionIndex: 0,
-        logIndex: 0,
+        logIndex: 0
       })
 
       const allChannels = await connector.indexer.get()
@@ -370,22 +370,22 @@ describe('test indexer', function () {
       await connector.indexer.onOpenedChannel({
         returnValues: {
           opener: new Public(userA.pubKey),
-          counterparty: new Public(userB.pubKey),
+          counterparty: new Public(userB.pubKey)
         },
         blockNumber: 1,
         transactionIndex: 2,
-        logIndex: 0,
+        logIndex: 0
       })
 
       // @ts-ignore
       await connector.indexer.onOpenedChannel({
         returnValues: {
           opener: new Public(userA.pubKey),
-          counterparty: new Public(userB.pubKey),
+          counterparty: new Public(userB.pubKey)
         },
         blockNumber: 1,
         transactionIndex: 1,
-        logIndex: 0,
+        logIndex: 0
       })
 
       const allChannels = await connector.indexer.get()
@@ -402,22 +402,22 @@ describe('test indexer', function () {
       await connector.indexer.onOpenedChannel({
         returnValues: {
           opener: new Public(userA.pubKey),
-          counterparty: new Public(userB.pubKey),
+          counterparty: new Public(userB.pubKey)
         },
         blockNumber: 1,
         transactionIndex: 2,
-        logIndex: 0,
+        logIndex: 0
       })
 
       // @ts-ignore
       await connector.indexer.onClosedChannel({
         returnValues: {
           closer: new Public(userA.pubKey),
-          counterparty: new Public(userB.pubKey),
+          counterparty: new Public(userB.pubKey)
         },
         blockNumber: 1,
         transactionIndex: 1,
-        logIndex: 0,
+        logIndex: 0
       })
 
       const allChannels = await connector.indexer.get()
@@ -434,22 +434,22 @@ describe('test indexer', function () {
       await connector.indexer.onOpenedChannel({
         returnValues: {
           opener: new Public(userA.pubKey),
-          counterparty: new Public(userB.pubKey),
+          counterparty: new Public(userB.pubKey)
         },
         blockNumber: 1,
         transactionIndex: 0,
-        logIndex: 2,
+        logIndex: 2
       })
 
       // @ts-ignore
       await connector.indexer.onOpenedChannel({
         returnValues: {
           opener: new Public(userA.pubKey),
-          counterparty: new Public(userB.pubKey),
+          counterparty: new Public(userB.pubKey)
         },
         blockNumber: 1,
         transactionIndex: 0,
-        logIndex: 1,
+        logIndex: 1
       })
 
       const allChannels = await connector.indexer.get()
@@ -462,22 +462,22 @@ describe('test indexer', function () {
       await connector.indexer.onOpenedChannel({
         returnValues: {
           opener: new Public(userA.pubKey),
-          counterparty: new Public(userB.pubKey),
+          counterparty: new Public(userB.pubKey)
         },
         blockNumber: 1,
         transactionIndex: 0,
-        logIndex: 2,
+        logIndex: 2
       })
 
       // @ts-ignore
       await connector.indexer.onClosedChannel({
         returnValues: {
           closer: new Public(userA.pubKey),
-          counterparty: new Public(userB.pubKey),
+          counterparty: new Public(userB.pubKey)
         },
         blockNumber: 1,
         transactionIndex: 0,
-        logIndex: 1,
+        logIndex: 1
       })
 
       const allChannels = await connector.indexer.get()
@@ -490,22 +490,22 @@ describe('test indexer', function () {
       await connector.indexer.onOpenedChannel({
         returnValues: {
           opener: new Public(userA.pubKey),
-          counterparty: new Public(userB.pubKey),
+          counterparty: new Public(userB.pubKey)
         },
         blockNumber: 1,
         transactionIndex: 0,
-        logIndex: 2,
+        logIndex: 2
       })
 
       // @ts-ignore
       await connector.indexer.onOpenedChannel({
         returnValues: {
           opener: new Public(userB.pubKey),
-          counterparty: new Public(userC.pubKey),
+          counterparty: new Public(userC.pubKey)
         },
         blockNumber: 1,
         transactionIndex: 0,
-        logIndex: 3,
+        logIndex: 3
       })
 
       const filter1 = (node: Public) => !node.eq(userA.pubKey)

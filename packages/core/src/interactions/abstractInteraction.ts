@@ -1,14 +1,8 @@
-import type Hopr from '..'
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
+import type { Handler } from '../@types/transport'
 
-import type { Handler } from '../network/transport/types'
-
-interface AbstractInteraction<Chain extends HoprCoreConnector> {
+interface AbstractInteraction {
   protocols: string[]
-  node: Hopr<Chain>
-
   handler(struct: Handler): void
-
   interact(...props: any[]): any
 }
 

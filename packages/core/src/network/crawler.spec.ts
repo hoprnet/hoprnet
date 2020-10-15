@@ -15,6 +15,7 @@ import { Interactions } from '../interactions'
 import { Crawler, CRAWL_TIMEOUT, shouldIncludePeerInCrawlResponse } from './crawler'
 import { Crawler as CrawlerInteraction } from '../interactions/network/crawler'
 import Multiaddr from 'multiaddr'
+import { Network } from './index'
 import PeerStore, { BLACKLIST_TIMEOUT, BlacklistedEntry } from './peerStore'
 import { durations } from '@hoprnet/hopr-utils'
 
@@ -28,30 +29,33 @@ describe('test crawler', function () {
       modules: {
         transport: [TCP],
         streamMuxer: [MPLEX],
-        connEncryption: [SECIO],
-      },
+        connEncryption: [SECIO]
+      }
     })) as Hopr<HoprCoreConnector>
 
     node.peerInfo.multiaddrs.add(Multiaddr(addr))
 
     await node.start()
 
-    node.peerRouting.findPeer = (_: PeerId) => Promise.reject('not implemented')
-
-    node.interactions = {
+    node.interactions = ({
       network: {
-        crawler: new CrawlerInteraction(node),
-      },
-    } as Hopr<HoprCoreConnector>['interactions']
-
-    new Interactions(node)
-    node.network = {
-      crawler: new Crawler(node, options),
-      peerStore: new PeerStore(node),
-    } as Hopr<HoprCoreConnector>['network']
+        crawler: new CrawlerInteraction(node)
+        /*
+          interact: async (peer) => {
+            return Promise.resolve(
+              node.network.peerStore.peers.map(
+                x => new PeerInfo(PeerId.createFromB58String((x.id)))
+              )
+            )
+          }
+        }
+          */
+      }
+    } as any) as Hopr<HoprCoreConnector>['interactions']
 
     node.on('peer:connect', (peerInfo: PeerInfo) => node.peerStore.put(peerInfo))
 
+    node.network = new Network(node, node.interactions, {} as any, { crawl: options })
     return (node as unknown) as Hopr<HoprCoreConnector>
   }
 
@@ -61,40 +65,22 @@ describe('test crawler', function () {
       generateNode(),
       generateNode(),
       generateNode(),
-      generateNode(),
+      generateNode()
     ])
 
     await Alice.network.crawler.crawl()
-
-    // await assert.rejects(
-    //   () => Alice.network.crawler.crawl(),
-    //   Error(`Unable to find enough other nodes in the network.`)
-    // )
-
     Alice.emit('peer:connect', Bob.peerInfo)
-
     await Alice.network.crawler.crawl()
 
     assert(Alice.network.peerStore.has(Bob.peerInfo.id.toB58String()))
-    // await assert.rejects(
-    //   () => Alice.network.crawler.crawl(),
-    //   Error(`Unable to find enough other nodes in the network.`)
-    // )
 
     Bob.emit('peer:connect', Chris.peerInfo)
-
     await Alice.network.crawler.crawl()
 
     assert(Alice.network.peerStore.has(Bob.peerInfo.id.toB58String()))
     assert(Alice.network.peerStore.has(Chris.peerInfo.id.toB58String()))
 
-    // await assert.rejects(
-    //   () => Alice.network.crawler.crawl(),
-    //   Error(`Unable to find enough other nodes in the network.`)
-    // )
-
     Chris.emit('peer:connect', Dave.peerInfo)
-
     await Alice.network.crawler.crawl()
 
     assert(Alice.network.peerStore.has(Bob.peerInfo.id.toB58String()))
@@ -108,19 +94,15 @@ describe('test crawler', function () {
 
     // Simulate node failure
     await Bob.stop()
-
     assert(Chris.network.peerStore.has(Bob.peerInfo.id.toB58String()), 'Chris should know about Bob')
-
     // Simulates a heartbeat run that kicks out Bob
     Alice.network.peerStore.blacklistPeer(Bob.peerInfo.id.toB58String())
-
     await Alice.network.crawler.crawl()
 
     assert(
       !Alice.network.peerStore.has(Bob.peerInfo.id.toB58String()),
       'Alice should not add Bob to her peerStore after blacklisting him'
     )
-
     assert(
       Alice.network.peerStore.deletedPeers.some((entry: BlacklistedEntry) => entry.id === Bob.peerInfo.id.toB58String())
     )
@@ -143,14 +125,7 @@ describe('test crawler', function () {
 
     assert(Alice.network.peerStore.has(Bob.peerInfo.id.toB58String()))
 
-    await Promise.all([
-      /* prettier-ignore */
-      Alice.stop(),
-      Bob.stop(),
-      Chris.stop(),
-      Dave.stop(),
-      Eve.stop(),
-    ])
+    await Promise.all([Alice.stop(), Bob.stop(), Chris.stop(), Dave.stop(), Eve.stop()])
   })
 
   it(
@@ -161,20 +136,14 @@ describe('test crawler', function () {
       const [Alice, Bob, Chris] = await Promise.all([
         generateNode(),
         generateNode({
-          timeoutIntentionally: true,
+          timeoutIntentionally: true
         }),
         generateNode({
-          timeoutIntentionally: true,
-        }),
+          timeoutIntentionally: true
+        })
       ])
 
       await Alice.network.crawler.crawl()
-
-      // await assert.rejects(
-      //   () => Alice.network.crawler.crawl(),
-      //   Error(`Unable to find enough other nodes in the network.`)
-      // )
-
       Alice.emit('peer:connect', Bob.peerInfo)
       await Alice.network.crawler.crawl()
       Bob.emit('peer:connect', Chris.peerInfo)
@@ -188,17 +157,13 @@ describe('test crawler', function () {
       timeoutCorrectly = true
 
       const after = Date.now() - before
+
       assert(
         timeoutCorrectly && after < 3 * CRAWL_TIMEOUT && after >= 2 * CRAWL_TIMEOUT,
         `Crawling should timeout correctly`
       )
 
-      await Promise.all([
-        /* prettier-ignore */
-        Alice.stop(),
-        Bob.stop(),
-        Chris.stop(),
-      ])
+      await Promise.all([Alice.stop(), Bob.stop(), Chris.stop()])
     },
     durations.seconds(8)
   )

@@ -1,7 +1,7 @@
 import type Hopr from '../../'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 
-import type { Handler } from '../../network/transport/types'
+import type { Handler } from '../../@types/transport'
 
 import debug from 'debug'
 const log = debug('hopr-core:crawler')
@@ -18,7 +18,7 @@ import PeerId from 'peer-id'
 
 import { CrawlResponse, CrawlStatus } from '../../messages'
 
-class Crawler<Chain extends HoprCoreConnector> implements AbstractInteraction<Chain> {
+class Crawler<Chain extends HoprCoreConnector> implements AbstractInteraction {
   protocols: string[] = [PROTOCOL_CRAWLING]
 
   constructor(public node: Hopr<Chain>) {
@@ -26,11 +26,7 @@ class Crawler<Chain extends HoprCoreConnector> implements AbstractInteraction<Ch
   }
 
   handler(struct: Handler) {
-    pipe(
-      /* prettier-ignore */
-      this.node.network.crawler.handleCrawlRequest(struct.connection),
-      struct.stream
-    )
+    pipe(this.node.network.crawler.handleCrawlRequest(struct.connection), struct.stream)
   }
 
   interact(counterparty: PeerId, options: { signal: AbortSignal }): Promise<PeerInfo[]> {

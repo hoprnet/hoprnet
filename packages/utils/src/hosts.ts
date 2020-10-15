@@ -20,22 +20,11 @@ export function parseHosts(): Hosts {
 
     hosts.ip4 = {
       ip: params[1],
-      port: parseInt(params[2]),
+      port: parseInt(params[2])
     }
   }
 
   if (process.env['HOST_IPV6'] !== undefined) {
-    // '\[('
-    // '[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}|'
-    // '[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:\:[0-9a-fA-F]{1,4}|'
-    // '[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:\:[0-9a-fA-F]{1,4}|'
-    // '[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:\:[0-9a-fA-F]{1,4}|'
-    // '[0-9a-fA-F]{1,4}\:\:[0-9a-fA-F]{1,4}|'
-    // '\:\:[0-9a-fA-F]{1,4}|'
-    // '\:\:'
-    // ')\]\:'
-    // '([0-9]{1,6})'
-
     const str = process.env['HOST_IPV6'].replace(/\/\/.+/, '').trim()
     const params = str.match(
       /\[([0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}|[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:\:[0-9a-fA-F]{1,4}|[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:\:[0-9a-fA-F]{1,4}|[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:\:[0-9a-fA-F]{1,4}|[0-9a-fA-F]{1,4}\:\:[0-9a-fA-F]{1,4}|\:\:[0-9a-fA-F]{1,4}|\:\:)\]\:([0-9]{1,6})/
@@ -46,7 +35,7 @@ export function parseHosts(): Hosts {
 
     hosts.ip6 = {
       ip: params[1],
-      port: parseInt(params[2]),
+      port: parseInt(params[2])
     }
   }
 

@@ -13,7 +13,8 @@ import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import { Heartbeat as HeartbeatInteraction } from '../interactions/network/heartbeat'
 
 import Heartbeat from './heartbeat'
-import PeerStore from './peerStore'
+import NetworkPeerStore from './peerStore'
+import { Network } from './index'
 
 import assert from 'assert'
 import Multiaddr from 'multiaddr'
@@ -25,23 +26,20 @@ describe('check heartbeat mechanism', function () {
       modules: {
         transport: [TCP],
         streamMuxer: [MPLEX],
-        connEncryption: [SECIO],
-      },
+        connEncryption: [SECIO]
+      }
     })) as Hopr<HoprCoreConnector>
 
     node.peerInfo.multiaddrs.add(Multiaddr('/ip4/0.0.0.0/tcp/0'))
+    node.hangUp = async (id) => {}
 
     node.interactions = {
       network: {
-        heartbeat: new HeartbeatInteraction(node),
-      },
+        heartbeat: new HeartbeatInteraction(node)
+      }
     } as Hopr<HoprCoreConnector>['interactions']
 
-    node.network = {
-      heartbeat: new Heartbeat(node),
-      peerStore: new PeerStore(node),
-    } as Hopr<HoprCoreConnector>['network']
-
+    node.network = new Network(node, node.interactions, {} as any)
     node.peerRouting.findPeer = (_: PeerId) => Promise.reject(Error('not implemented'))
 
     await node.start()
@@ -50,12 +48,7 @@ describe('check heartbeat mechanism', function () {
   }
 
   it('should initialise the heartbeat module and start the heartbeat functionality', async function () {
-    const [Alice, Bob, Chris] = await Promise.all([
-      /* prettier-ignore */
-      generateNode(),
-      generateNode(),
-      generateNode(),
-    ])
+    const [Alice, Bob, Chris] = await Promise.all([generateNode(), generateNode(), generateNode()])
 
     await new Promise((resolve) => setTimeout(resolve, 100))
 
@@ -69,7 +62,7 @@ describe('check heartbeat mechanism', function () {
           resolve()
         })
       }),
-      Alice.interactions.network.heartbeat.interact(Bob.peerInfo.id),
+      Alice.interactions.network.heartbeat.interact(Bob.peerInfo.id)
     ])
 
     assert(
@@ -100,7 +93,41 @@ describe('check heartbeat mechanism', function () {
     await Promise.all([
       /* pretier-ignore */
       Alice.stop(),
-      Bob.stop(),
+      Bob.stop()
     ])
+  })
+})
+
+describe('unit test heartbeat', () => {
+  let heartbeat
+  let hangUp = jest.fn(async () => {})
+  let peers
+  let interaction = {
+    interact: jest.fn(() => {})
+  } as any
+
+  beforeEach(() => {
+    const empty = [][Symbol.iterator]()
+    ;(peers = new NetworkPeerStore(empty)), (heartbeat = new Heartbeat(peers, interaction, hangUp))
+  })
+
+  it('check nodes is noop with empty store', async () => {
+    await heartbeat.checkNodes()
+    expect(hangUp.mock.calls.length).toBe(0)
+    expect(interaction.interact.mock.calls.length).toBe(0)
+  })
+
+  it('check nodes is noop with only new peers', async () => {
+    peers.push({ id: 'a', lastSeen: Date.now() })
+    await heartbeat.checkNodes()
+    expect(hangUp.mock.calls.length).toBe(0)
+    expect(interaction.interact.mock.calls.length).toBe(0)
+  })
+
+  it('check nodes interacts with an old peer', async () => {
+    peers.push({ id: '16Uiu2HAmShu5QQs3LKEXjzmnqcT8E3YqyxKtVTurWYp8caM5jYJw', lastSeen: 0 })
+    await heartbeat.checkNodes()
+    expect(hangUp.mock.calls.length).toBe(0)
+    expect(interaction.interact.mock.calls.length).toBe(1)
   })
 })

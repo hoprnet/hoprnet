@@ -7,7 +7,7 @@ import * as utils from '.'
 const pair = {
   privKey: stringToU8a('0x9feaac2858974b0e16f6e3cfa7c21db6c7bbcd2094daa651ff3d5bb48a57b759'),
   pubKey: stringToU8a('0x03950056bd3c566eb3ac90b4e8cb0e93a648bf8000833161d679bd802505b224b5'),
-  address: stringToU8a('0x81E1192eae6d7289A610956CaE1C4b76e083Eb39'),
+  address: stringToU8a('0x81E1192eae6d7289A610956CaE1C4b76e083Eb39')
 }
 
 const generatePair = () => {
@@ -25,7 +25,7 @@ const generatePair = () => {
   return {
     privKey,
     pubKey,
-    address,
+    address
   }
 }
 
@@ -38,8 +38,40 @@ describe('test utils', function () {
     assert(
       u8aEquals(
         await utils.hash(testMsg),
-        /* prettier-ignore */
-        new Uint8Array([232,231,118,38,88,111,115,185,85,54,76,123,75,191,11,183,247,104,94,189,64,232,82,177,100,99,58,74,203,211,36,76])
+        new Uint8Array([
+          232,
+          231,
+          118,
+          38,
+          88,
+          111,
+          115,
+          185,
+          85,
+          54,
+          76,
+          123,
+          75,
+          191,
+          11,
+          183,
+          247,
+          104,
+          94,
+          189,
+          64,
+          232,
+          82,
+          177,
+          100,
+          99,
+          58,
+          74,
+          203,
+          211,
+          36,
+          76
+        ])
       )
     )
   })

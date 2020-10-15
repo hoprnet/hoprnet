@@ -1,6 +1,9 @@
 {
   "name": "@hoprnet/hopr-protos",
-  "version": "1.17.0-alpha.58",
+  "version": "1.21.0-alpha.0",
+  "description": "",
+  "repository": "https://github.com/hoprnet/hoprnet.git",
+  "homepage": "https://hoprnet.org",
   "files": [
     "node/",
     "web/",
@@ -21,11 +24,6 @@
   },
   "publishConfig": {
     "access": "public"
-  },
-  "homepage": "https://hoprnet.org",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/hoprnet/hopr-core.git"
   },
   "engines": {
     "node": ">=12.9.1",

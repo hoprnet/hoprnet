@@ -11,12 +11,19 @@ import { USE_WEBRTC, CODE_P2P, DELIVERY } from './constants'
 import Multiaddr from 'multiaddr'
 import PeerInfo from 'peer-info'
 import PeerId from 'peer-id'
-import type { Connection, Upgrader, DialOptions, ConnHandler, Handler, Stream, MultiaddrConnection } from './types'
+import type {
+  Connection,
+  Upgrader,
+  DialOptions,
+  ConnHandler,
+  Handler,
+  Stream,
+  MultiaddrConnection
+} from '../../@types/transport'
 import chalk from 'chalk'
 import { WebRTCUpgrader } from './webrtc'
 import Relay from './relay'
 import { RelayContext } from './relayContext'
-import { RelayConnection } from './relayConnection'
 
 // @ts-ignore
 const Pair: () => Stream = require('it-pair')
@@ -209,12 +216,14 @@ class TCP {
         verbose('attempting to dial directly', ma.toString())
         return await this.dialDirectly(ma, options)
       } catch (err) {
-        if (err.code != null && ['ECONNREFUSED', 'ECONNRESET', 'EPIPE'].includes(err.code)) {
+        if (
+          (err.code != null && ['ECONNREFUSED', 'ECONNRESET', 'EPIPE'].includes(err.code)) ||
+          err.type === 'aborted'
+        ) {
           // expected case, continue
           error = err
         } else {
-          // Unexpected error, ie:
-          // type === aborted
+          // Unexpected error
           verbose(`Dial directly unexpected error ${err}`)
           throw err
         }
