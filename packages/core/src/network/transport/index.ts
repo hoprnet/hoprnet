@@ -134,13 +134,17 @@ class TCP {
         await conn.close()
       }
 
-      this._upgrader
-        .upgradeInbound({
-          ...relayConn,
-          sink: BtoA.sink,
-          source: AtoB.source
-        })
-        .then((conn) => this.connHandler?.(conn))
+      try {
+        this._upgrader
+          .upgradeInbound({
+            ...relayConn,
+            sink: BtoA.sink,
+            source: AtoB.source
+          })
+          .then((conn) => this.connHandler?.(conn))
+      } catch (err) {
+        console.log(err)
+      }
     }.bind(this)
   }
 
