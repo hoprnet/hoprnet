@@ -151,7 +151,9 @@ class TCP {
       try {
         this._upgrader
           .upgradeInbound({
-            ...relayConn,
+            remoteAddr: relayConn.remoteAddr,
+            localAddr: relayConn.localAddr,
+            timeline: {},
             sink: BtoA.sink,
             source: AtoB.source
           })
