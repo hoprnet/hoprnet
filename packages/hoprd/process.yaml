@@ -2,7 +2,6 @@ apps:
   - script: ./index.js
     name: 'dev'
     instances: 1
-    args: '--password="open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0"'
     env_matic:
       HOPR_BOOTSTRAP_ADDRESS: _dnsaddr.bootstrap.basodino.develop.hoprnet.org
       ETHEREUM_PROVIDER: wss://ws-mainnet.matic.network
