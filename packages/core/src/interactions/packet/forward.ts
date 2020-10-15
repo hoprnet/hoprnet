@@ -24,7 +24,7 @@ const MAX_PARALLEL_JOBS = 20
 
 const FORWARD_TIMEOUT = durations.seconds(6)
 
-class PacketForwardInteraction<Chain extends HoprCoreConnector> implements AbstractInteraction<Chain> {
+class PacketForwardInteraction<Chain extends HoprCoreConnector> implements AbstractInteraction {
   private tokens: Token[] = getTokens(MAX_PARALLEL_JOBS)
   private queue: Packet<Chain>[] = []
   private promises: Promise<void>[] = []
@@ -68,11 +68,7 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
 
       clearTimeout(timeout)
 
-      pipe(
-        /* prettier-ignore */
-        [packet],
-        struct.stream
-      )
+      pipe([packet], struct.stream)
 
       if (!aborted) {
         resolve()
@@ -123,12 +119,7 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
 
       let { receivedChallenge, ticketKey } = await packet.forwardTransform()
 
-      /* prettier-ignore */
-      ;[sender, target] = await Promise.all([
-        /* prettier-ignore */
-        packet.getSenderPeerId(),
-        packet.getTargetPeerId(),
-      ])
+      ;[sender, target] = await Promise.all([packet.getSenderPeerId(), packet.getTargetPeerId()])
 
       setImmediate(async () => {
         const ack = new Acknowledgement(this.node.paymentChannels, undefined, {

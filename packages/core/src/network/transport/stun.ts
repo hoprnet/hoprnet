@@ -28,11 +28,7 @@ export function handleStunRequest(socket: Socket, data: Buffer, rinfo: RemoteInf
   if (req.loadBuffer(data)) {
     // if STUN message is BINDING_REQUEST and valid content
     if (req.isBindingRequest({ fingerprint: true })) {
-      const res = req
-        // prettier-ignore
-        .createBindingResponse(true)
-        .setXorMappedAddressAttribute(rinfo)
-        .setFingerprintAttribute()
+      const res = req.createBindingResponse(true).setXorMappedAddressAttribute(rinfo).setFingerprintAttribute()
 
       socket.send(res.toBuffer(), rinfo.port, rinfo.address)
     }

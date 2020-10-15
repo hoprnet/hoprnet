@@ -43,7 +43,7 @@ export default class Ping extends AbstractCommand {
     }
   }
 
-  public async autocomplete(query: string, line: string, state: GlobalState): Promise<AutoCompleteResult> {
+  public async autocomplete(query: string = '', line: string = '', state: GlobalState): Promise<AutoCompleteResult> {
     const allIds = getPeerIdsAndAliases(this.node, state, {
       noBootstrapNodes: true,
       returnAlias: true,

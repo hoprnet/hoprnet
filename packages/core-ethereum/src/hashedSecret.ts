@@ -104,16 +104,16 @@ class HashedSecret {
       await this.coreConnector.utils.waitForConfirmation(
         (
           await this.coreConnector.signTransaction(
-            this.coreConnector.hoprChannels.methods.init(
-              u8aToHex(uncompressedPubKey.slice(0, 32)),
-              u8aToHex(uncompressedPubKey.slice(32, 64)),
-              u8aToHex(secret)
-            ),
             {
               from: (await this.coreConnector.account.address).toHex(),
               to: this.coreConnector.hoprChannels.options.address,
               nonce: _nonce
-            }
+            },
+            this.coreConnector.hoprChannels.methods.init(
+              u8aToHex(uncompressedPubKey.slice(0, 32)),
+              u8aToHex(uncompressedPubKey.slice(32, 64)),
+              u8aToHex(secret)
+            )
           )
         ).send()
       )
@@ -122,12 +122,12 @@ class HashedSecret {
       await this.coreConnector.utils.waitForConfirmation(
         (
           await this.coreConnector.signTransaction(
-            this.coreConnector.hoprChannels.methods.setHashedSecret(u8aToHex(secret)),
             {
               from: (await this.coreConnector.account.address).toHex(),
               to: this.coreConnector.hoprChannels.options.address,
               nonce: _nonce
-            }
+            },
+            this.coreConnector.hoprChannels.methods.setHashedSecret(u8aToHex(secret))
           )
         ).send()
       )

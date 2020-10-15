@@ -58,7 +58,11 @@ export default class CloseChannel extends AbstractCommand {
     }
   }
 
-  async autocomplete(query: string, line: string): Promise<AutoCompleteResult> {
+  async autocomplete(query: string = '', line: string = ''): Promise<AutoCompleteResult> {
+    if (!query) {
+      return [[this.name()], line]
+    }
+
     let peerIdStrings: string[]
     try {
       peerIdStrings = await this.node.paymentChannels.channel.getAll(

@@ -30,7 +30,7 @@ const ACKNOWLEDGEMENT_TIMEOUT = durations.seconds(2)
 
 class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
   extends EventEmitter
-  implements AbstractInteraction<Chain> {
+  implements AbstractInteraction {
   protocols: string[] = [PROTOCOL_ACKNOWLEDGEMENT]
 
   constructor(public node: Hopr<Chain>) {
@@ -39,11 +39,7 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
   }
 
   handler(struct: Handler) {
-    pipe(
-      /* prettier-ignore */
-      struct.stream,
-      this.handleHelper.bind(this)
-    )
+    pipe(struct.stream, this.handleHelper.bind(this))
   }
 
   async interact(counterparty: PeerId, acknowledgement: Acknowledgement<Chain>): Promise<void> {
@@ -75,11 +71,7 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
 
       clearTimeout(timeout)
 
-      pipe(
-        /* prettier-ignore */
-        [acknowledgement],
-        struct.stream
-      )
+      pipe([acknowledgement], struct.stream)
 
       if (!aborted) {
         resolve()

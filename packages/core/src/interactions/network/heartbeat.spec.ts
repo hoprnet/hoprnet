@@ -48,11 +48,7 @@ describe('check heartbeat mechanism', function () {
   }
 
   it('should dispatch a heartbeat', async function () {
-    const [Alice, Bob] = await Promise.all([
-      /* prettier-ignore */
-      generateNode(),
-      generateNode()
-    ])
+    const [Alice, Bob] = await Promise.all([generateNode(), generateNode()])
 
     await Alice.dial(Bob.peerInfo)
 
@@ -70,11 +66,7 @@ describe('check heartbeat mechanism', function () {
   })
 
   it('should trigger a heartbeat timeout', async function () {
-    const [Alice, Bob] = await Promise.all([
-      /* prettier-ignore */
-      generateNode(),
-      generateNode({ timeoutIntentionally: true })
-    ])
+    const [Alice, Bob] = await Promise.all([generateNode(), generateNode({ timeoutIntentionally: true })])
 
     await Alice.dial(Bob.peerInfo)
     let errorThrown = false

@@ -1,5 +1,4 @@
 import libp2p from 'libp2p'
-
 // @ts-ignore
 import MPLEX = require('libp2p-mplex')
 // @ts-ignore
@@ -71,9 +70,8 @@ describe('should create a socket and connect to it', function () {
     //@ts-ignore
     node.relay = new Relay(node, options.connHandler)
 
-    node.handle(TEST_PROTOCOL, (handler: Handler) => {
+    node.handle([TEST_PROTOCOL], (handler: Handler) => {
       pipe(
-        /* prettier-ignore */
         handler.stream,
         // echoing msg
         handler.stream
@@ -100,7 +98,6 @@ describe('should create a socket and connect to it', function () {
         ipv4: true,
         connHandler: (conn: MultiaddrConnection) => {
           pipe(
-            /* prettier-ignore */
             conn,
             (source: AsyncIterable<Uint8Array>) => {
               return (async function* () {
@@ -126,11 +123,10 @@ describe('should create a socket and connect to it', function () {
     )
 
     await pipe(
-      /* prettier-ignore */
-      (async function * () {
+      (async function* () {
         yield new TextEncoder().encode(`first message`)
 
-        await new Promise(resolve => setTimeout(resolve, 100))
+        await new Promise((resolve) => setTimeout(resolve, 100))
 
         yield new TextEncoder().encode(`second message`)
       })(),
@@ -152,7 +148,6 @@ describe('should create a socket and connect to it', function () {
       ipv4: true,
       connHandler: (conn: MultiaddrConnection) => {
         pipe(
-          /* prettier-ignore */
           conn,
           (source: AsyncIterable<Uint8Array>) => {
             return (async function* () {
@@ -176,11 +171,10 @@ describe('should create a socket and connect to it', function () {
     )
 
     await pipe(
-      /* prettier-ignore */
-      (async function * () {
+      (async function* () {
         yield new TextEncoder().encode(`first message`)
 
-        await new Promise(resolve => setTimeout(resolve, 100))
+        await new Promise((resolve) => setTimeout(resolve, 100))
 
         yield new TextEncoder().encode(`second message`)
       })(),
@@ -209,7 +203,6 @@ describe('should create a socket and connect to it', function () {
     //     ipv4: true,
     //     connHandler: (handler: Handler & { counterparty: PeerId }) => {
     //       pipe(
-    //         /* prettier-ignore */
     //         handler.stream,
     //         (source: AsyncIterable<Uint8Array>) => {
     //           return (async function* () {
@@ -242,7 +235,6 @@ describe('should create a socket and connect to it', function () {
     //   [relay.peerInfo]
     // )
     // await pipe(
-    //   /* prettier-ignore */
     //   (async function * () {
     //     yield new Uint8Array([1])
     //     yield new Uint8Array([2])
@@ -263,7 +255,6 @@ describe('should create a socket and connect to it', function () {
     //   ipv4: true,
     //   connHandler: async (handler: Handler & { counterparty: PeerId }) => {
     //     pipe(
-    //       /* prettier-ignore */
     //       handler.stream,
     //       async (source: AsyncIterable<Uint8Array>) => {
     //         for (let i = 0; i < 2; i++) {
@@ -304,7 +295,6 @@ describe('should create a socket and connect to it', function () {
     //     ipv4: true,
     //     connHandler: (handler: Handler & { counterparty: PeerId }) => {
     //       pipe(
-    //         /* prettier-ignore */
     //         handler.stream,
     //         (source: AsyncIterable<Uint8Array>) => {
     //           return (async function* () {
@@ -330,7 +320,6 @@ describe('should create a socket and connect to it', function () {
     //   [relay.peerInfo]
     // )
     // pipe(
-    //   // prettier-ignore
     //   (async function* () {
     //     yield new Uint8Array([i++])
     //     await new Promise(resolve => setTimeout(resolve, 500))
@@ -343,7 +332,6 @@ describe('should create a socket and connect to it', function () {
     //       ipv4: true,
     //       connHandler: (handler: Handler & { counterparty: PeerId }) => {
     //         pipe(
-    //           /* prettier-ignore */
     //           handler.stream,
     //           (source: AsyncIterable<Uint8Array>) => {
     //             return (async function * () {
@@ -372,7 +360,6 @@ describe('should create a socket and connect to it', function () {
     //       ipv4: true,
     //       connHandler: (handler: Handler & { counterparty: PeerId }) => {
     //         pipe(
-    //           /* prettier-ignore */
     //           handler.stream,
     //           (source: AsyncIterable<Uint8Array>) => {
     //             return (async function * () {

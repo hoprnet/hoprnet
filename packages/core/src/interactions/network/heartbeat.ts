@@ -16,11 +16,11 @@ const HASH_FUNCTION = 'blake2s256'
 
 export const HEARTBEAT_TIMEOUT = durations.seconds(3)
 
-class Heartbeat<Chain extends HoprCoreConnector> implements AbstractInteraction<Chain> {
+class Heartbeat implements AbstractInteraction {
   protocols: string[] = [PROTOCOL_HEARTBEAT]
 
   constructor(
-    public node: Hopr<Chain>,
+    public node: Hopr<any>,
     private options?: {
       timeoutIntentionally?: boolean
     }
@@ -32,7 +32,7 @@ class Heartbeat<Chain extends HoprCoreConnector> implements AbstractInteraction<
     pipe(
       struct.stream,
       (source: any) => {
-        return async function* (this: Heartbeat<Chain>) {
+        return async function* (this: Heartbeat) {
           if (this.options?.timeoutIntentionally) {
             return await new Promise((resolve) => setTimeout(resolve, HEARTBEAT_TIMEOUT + 100))
           }
@@ -78,31 +78,32 @@ class Heartbeat<Chain extends HoprCoreConnector> implements AbstractInteraction<
             return await this.node.dialProtocol(peerInfo, this.protocols[0], { signal: abort.signal })
           })
       } catch (err) {
-        verbose(`heartbeat connection error ${err.name} while dialing ${counterparty.toB58String()} (subsequent)`)
+        verbose(
+          `heartbeat connection error ${err.name} while dialing ${counterparty.toB58String()} (subsequent)`,
+          aborted
+        )
         clearTimeout(timeout)
-        error(err)
+        if (!aborted) {
+          error(err)
+        }
         return reject()
       }
 
       if (aborted) {
+        verbose('aborted but no error')
         return
       }
 
       const challenge = randomBytes(16)
       const expectedResponse = createHash(HASH_FUNCTION).update(challenge).digest()
 
-      await pipe(
-        /** prettier-ignore */
-        [challenge],
-        struct.stream,
-        async (source: AsyncIterable<Uint8Array>) => {
-          for await (const msg of source) {
-            if (u8aEquals(msg, expectedResponse)) {
-              break
-            }
+      await pipe([challenge], struct.stream, async (source: AsyncIterable<Uint8Array>) => {
+        for await (const msg of source) {
+          if (u8aEquals(msg, expectedResponse)) {
+            break
           }
         }
-      )
+      })
 
       clearTimeout(timeout)
 

@@ -173,28 +173,28 @@ class Channel implements IChannel {
 
       if (status === 'OPEN') {
         const tx = await this.coreConnector.signTransaction(
-          this.coreConnector.hoprChannels.methods.initiateChannelClosure(
-            u8aToHex(await this.coreConnector.utils.pubKeyToAccountId(this.counterparty))
-          ),
           {
             from: (await this.coreConnector.account.address).toHex(),
             to: this.coreConnector.hoprChannels.options.address,
             nonce: await this.coreConnector.account.nonce
-          }
+          },
+          this.coreConnector.hoprChannels.methods.initiateChannelClosure(
+            u8aToHex(await this.coreConnector.utils.pubKeyToAccountId(this.counterparty))
+          )
         )
 
         receipt = tx.transactionHash
         tx.send()
       } else if (status === 'PENDING') {
         const tx = await this.coreConnector.signTransaction(
-          this.coreConnector.hoprChannels.methods.claimChannelClosure(
-            u8aToHex(await this.coreConnector.utils.pubKeyToAccountId(this.counterparty))
-          ),
           {
             from: (await this.coreConnector.account.address).toHex(),
             to: this.coreConnector.hoprChannels.options.address,
             nonce: await this.coreConnector.account.nonce
-          }
+          },
+          this.coreConnector.hoprChannels.methods.claimChannelClosure(
+            u8aToHex(await this.coreConnector.utils.pubKeyToAccountId(this.counterparty))
+          )
         )
 
         receipt = tx.transactionHash

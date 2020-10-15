@@ -316,6 +316,8 @@ export function getNetworkName(chainId: number): addresses.Networks {
       return 'solkol'
     case 100:
       return 'xdai'
+    case 137:
+      return 'matic'
     default:
       return 'private'
   }
@@ -350,12 +352,12 @@ export function TransactionSigner(web3: Web3, privKey: Uint8Array) {
   const privKeyStr = new Hash(privKey).toHex()
 
   return async function signTransaction<T>(
-    // return of our contract method in web3.Contract instance
-    txObject: TransactionObject<T>,
     // config put in .send
-    txConfig: TransactionConfig
+    txConfig: TransactionConfig,
+    // return of our contract method in web3.Contract instance
+    txObject?: TransactionObject<T>
   ) {
-    const abi = txObject.encodeABI()
+    const abi = txObject ? txObject.encodeABI() : undefined
     // estimation is not always right, adding some more
     // const estimatedGas = Math.floor((await txObject.estimateGas()) * 1.25)
     const estimatedGas = 200e3
