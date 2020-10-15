@@ -62,7 +62,7 @@ class RelayContext {
     let switchPromise = this._switchPromise.promise.then(switchFunction)
 
     while (true) {
-      console.log(`source iteration`)
+      console.log(`source iteration`, `sourceDone`, sourceDone, `sourcePromise`, sourcePromise, `switchPromise`, switchPromise)
       if (!sourceDone) {
         await Promise.race([
           // prettier-ignore
