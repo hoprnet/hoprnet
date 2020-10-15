@@ -8,7 +8,7 @@ import { AbortError } from 'abortable-iterator'
 import chalk from 'chalk'
 import type { WebRTCUpgrader } from './webrtc'
 import type BL from 'bl'
-import type libp2p from '../../@types/libp2p'
+import type libp2p from 'libp2p'
 declare interface Handshake {
   reader: {
     next(bytes: number): Promise<BL>

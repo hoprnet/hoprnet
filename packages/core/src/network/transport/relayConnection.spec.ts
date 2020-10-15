@@ -5,7 +5,7 @@ import { randomInteger } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import { EventEmitter } from 'events'
 import { Instance as SimplePeer } from 'simple-peer'
-import type { Stream } from './types'
+import type { Stream } from '../../@types/transport'
 
 const TIMEOUT_LOWER_BOUND = 450
 const TIMEOUT_UPPER_BOUND = 650
