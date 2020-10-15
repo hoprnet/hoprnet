@@ -1,6 +1,3 @@
-import type Hopr from '..'
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-
 import assert from 'assert'
 
 import PeerStore, { BLACKLIST_TIMEOUT } from './peerStore'
@@ -15,11 +12,12 @@ function generateNode() {
     }
   }
 
-  return (new Dummy() as unknown) as Hopr<HoprCoreConnector>
+  return (new Dummy() as unknown)// as Hopr<HoprCoreConnector>
 }
 
 describe('test PeerStore', function () {
-  const peerStore = new PeerStore(generateNode())
+  const empty = [][Symbol.iterator]()
+  const peerStore = new PeerStore(empty)
   it('should push and pop elements', function () {
     assert(peerStore.length == 0, 'peerStore must be empty')
     peerStore.push({

@@ -1,5 +1,4 @@
 import libp2p from 'libp2p'
-
 // @ts-ignore
 import MPLEX = require('libp2p-mplex')
 // @ts-ignore
@@ -71,7 +70,7 @@ describe('should create a socket and connect to it', function () {
     //@ts-ignore
     node.relay = new Relay(node, options.connHandler)
 
-    node.handle(TEST_PROTOCOL, (handler: Handler) => {
+    node.handle([TEST_PROTOCOL], (handler: Handler) => {
       pipe(
         handler.stream,
         // echoing msg

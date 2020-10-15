@@ -24,7 +24,7 @@ const MAX_PARALLEL_JOBS = 20
 
 const FORWARD_TIMEOUT = durations.seconds(6)
 
-class PacketForwardInteraction<Chain extends HoprCoreConnector> implements AbstractInteraction<Chain> {
+class PacketForwardInteraction<Chain extends HoprCoreConnector> implements AbstractInteraction {
   private tokens: Token[] = getTokens(MAX_PARALLEL_JOBS)
   private queue: Packet<Chain>[] = []
   private promises: Promise<void>[] = []
