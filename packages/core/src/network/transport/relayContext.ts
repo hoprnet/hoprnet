@@ -122,6 +122,7 @@ class RelayContext {
 
             yield received
           } else {
+            console.log(`sourceMsg`, sourceMsg)
             verbose(`forwarding ${new TextDecoder().decode(sourceMsg.slice())}`)
             yield sourceMsg
           }
