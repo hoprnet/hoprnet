@@ -13,7 +13,7 @@ import { PACKET_SIZE, MAX_HOPS, VERSION } from './constants'
 
 import { Network } from './network'
 
-import { addPubKey, getPeerInfo, pubKeyToPeerId } from './utils'
+import { addPubKey, getPeerId, getAddrs, pubKeyToPeerId } from './utils'
 import { createDirectoryIfNotExists, u8aToHex } from '@hoprnet/hopr-utils'
 import { existsSync } from 'fs'
 
@@ -26,8 +26,6 @@ import Debug from 'debug'
 const log = Debug(`hopr-core`)
 
 import PeerId from 'peer-id'
-import PeerInfo from 'peer-info'
-
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { HoprCoreConnectorStatic, Types } from '@hoprnet/hopr-core-connector-interface'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
@@ -73,19 +71,16 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
   public bootstrapServers: Multiaddr[]
   public initializedWithOptions: HoprOptions
 
-  public id: PeerId
-  public addresses: Multiaddr []
-
   // Allows us to construct HOPR with falsy options
   public _debug: boolean
 
-  /**
-   * @constructor
-   *
-   * @param _options
-   * @param provider
-   */
-  constructor(options: HoprOptions, public db: LevelUp, public paymentChannels: Chain) {
+  private constructor(
+      options: HoprOptions, 
+      public db: LevelUp,
+      public paymentChannels:Chain, 
+      public id: PeerId,
+      public addresses: Multiaddr[]
+  ) {
     super({
       // Disable libp2p-switch protections for the moment
       switch: {
@@ -129,15 +124,17 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
   }
 
   /**
-   * Creates a new node.
+   * Creates a new node
+   * This is necessary as some of the constructor for the node needs to be
+   * asynchronous..
    *
    * @param options the parameters
    */
   static async create<CoreConnector extends HoprCoreConnector>(options: HoprOptions): Promise<Hopr<CoreConnector>> {
     const Connector = options.connector ?? HoprCoreEthereum
     const db = Hopr.openDatabase(options, Connector.constants.CHAIN_NAME, Connector.constants.NETWORK)
-
-    const peerInfo = await getPeerInfo(options, db)
+    const id = await getPeerId(options, db)
+    const addresses = await getAddrs(id, options)
 
     if (
       !options.debug &&
@@ -147,15 +144,13 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
       throw Error(`Cannot start node without a bootstrap server`)
     }
 
-    let connector = (await Connector.create(db, peerInfo.id.privKey.marshal(), {
+    let connector = (await Connector.create(db, id.privKey.marshal(), {
       provider: options.provider,
       debug: options.debug
     })) as CoreConnector
 
     verbose('Created connector, now creating node')
-    let node =  new Hopr<CoreConnector>(options, db, connector)
-    node.id = peerInfo.id
-    node.addresses = peerInfo.multiaddrs.toArray()
+    let node = new Hopr<CoreConnector>(options, db, connector, id, addresses)
     return await node.start()
   }
 
