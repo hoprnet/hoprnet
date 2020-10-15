@@ -314,50 +314,50 @@ class Relay {
 
     let streams = this._streams.get(channelId)
 
-    if (streams == null) {
-      log(
-        `${connection.remotePeer.toB58String()} to ${counterparty.toB58String()} had no connection. Establishing a new one`
-      )
+    // if (streams == null) {
+    log(
+      `${connection.remotePeer.toB58String()} to ${counterparty.toB58String()} had no connection. Establishing a new one`
+    )
 
-      let forwardingErrThrown = false
-      let deliveryStream: Stream
+    let forwardingErrThrown = false
+    let deliveryStream: Stream
 
-      try {
-        deliveryStream = await this.establishForwarding(connection.remotePeer, counterparty)
-      } catch (err) {
-        forwardingErrThrown = true
-        error(err)
-      }
-
-      if (forwardingErrThrown || deliveryStream == null) {
-        // @TODO end deliveryStream
-        shaker.write(FAIL_COULD_NOT_REACH_COUNTERPARTY)
-        shaker.rest()
-
-        return
-      }
-
-      shaker.write(OK)
-      shaker.rest()
-
-      const senderContext = new RelayContext(shaker.stream)
-      const counterpartyContext = new RelayContext(deliveryStream)
-
-      senderContext.sink(counterpartyContext.source)
-      counterpartyContext.sink(senderContext.source)
-
-      streams = {
-        [connection.remotePeer.toB58String()]: senderContext,
-        [counterparty.toB58String()]: counterpartyContext
-      }
-
-      this._streams.set(channelId, streams)
-    } else {
-      shaker.write(OK)
-      shaker.rest()
-
-      streams[connection.remotePeer.toB58String()].update(shaker.stream)
+    try {
+      deliveryStream = await this.establishForwarding(connection.remotePeer, counterparty)
+    } catch (err) {
+      forwardingErrThrown = true
+      error(err)
     }
+
+    if (forwardingErrThrown || deliveryStream == null) {
+      // @TODO end deliveryStream
+      shaker.write(FAIL_COULD_NOT_REACH_COUNTERPARTY)
+      shaker.rest()
+
+      return
+    }
+
+    shaker.write(OK)
+    shaker.rest()
+
+    const senderContext = new RelayContext(shaker.stream)
+    const counterpartyContext = new RelayContext(deliveryStream)
+
+    senderContext.sink(counterpartyContext.source)
+    counterpartyContext.sink(senderContext.source)
+
+    streams = {
+      [connection.remotePeer.toB58String()]: senderContext,
+      [counterparty.toB58String()]: counterpartyContext
+    }
+
+    this._streams.set(channelId, streams)
+    // } else {
+    //   shaker.write(OK)
+    //   shaker.rest()
+
+    //   streams[connection.remotePeer.toB58String()].update(shaker.stream)
+    // }
   }
 
   private async establishForwarding(initiator: PeerId, counterparty: PeerId) {
