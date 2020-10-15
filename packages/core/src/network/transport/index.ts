@@ -148,19 +148,19 @@ class TCP {
         console.log(`receiving in reconnect`, new TextDecoder().decode(msg.slice()))
       }
 
-      try {
-        this._upgrader
-          .upgradeInbound({
-            remoteAddr: relayConn.remoteAddr,
-            localAddr: relayConn.localAddr,
-            timeline: {},
-            sink: BtoA.sink,
-            source: AtoB.source
-          })
-          .then((conn) => this.connHandler?.(conn))
-      } catch (err) {
-        console.log(err)
-      }
+      // try {
+      //   this._upgrader
+      //     .upgradeInbound({
+      //       remoteAddr: relayConn.remoteAddr,
+      //       localAddr: relayConn.localAddr,
+      //       timeline: {},
+      //       sink: BtoA.sink,
+      //       source: AtoB.source
+      //     })
+      //     .then((conn) => this.connHandler?.(conn))
+      // } catch (err) {
+      //   console.log(err)
+      // }
     }.bind(this)
   }
 
