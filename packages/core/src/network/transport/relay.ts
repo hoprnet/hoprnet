@@ -1,12 +1,10 @@
 import debug from 'debug'
 const log = debug('hopr-core:transport')
 const error = debug('hopr-core:transport:error')
-const verbose = debug('hopr-core:verbose:transport:error')
 
 import AbortController from 'abort-controller'
 import { AbortError } from 'abortable-iterator'
 import chalk from 'chalk'
-import type { WebRTCUpgrader } from './webrtc'
 import type BL from 'bl'
 
 declare interface Handshake {
@@ -62,11 +60,10 @@ class Relay {
   private _dht: { peerRouting: PeerRouting } | undefined
   private _peerInfo: PeerInfo
   private _streams: Map<string, Map<string, RelayContext>>
-  private _webRTCUpgrader?: WebRTCUpgrader
 
   private connHandler: (conn: MultiaddrConnection) => void | undefined
 
-  constructor(libp2p: libp2p, _connHandler?: (conn: MultiaddrConnection) => void, webRTCUpgrader?: WebRTCUpgrader) {
+  constructor(libp2p: libp2p, _connHandler?: (conn: MultiaddrConnection) => void) {
     this._dialer = libp2p.dialer
     //@ts-ignore
     this._registrar = libp2p.registrar
