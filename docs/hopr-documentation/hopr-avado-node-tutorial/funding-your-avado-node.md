@@ -7,7 +7,7 @@ description: Funding your AVADO node
 Next, you need to send tokens to your HOPR node. To use HOPR, you'll need two types of token: 
 
 * a HOPR token
-* the [**native token**](../core-concepts/native-tokens.md) of the blockchain the HOPR token is linked to
+* the [**native token**](../core-concepts/tokens/native-tokens.md) of the blockchain the HOPR token is linked to
 
 In our current testnet, the native token is xDAI \(xDAI is a sidechain of Ethereum\) and the HOPR token is xHOPR\).
 
@@ -21,7 +21,7 @@ If your node is unfunded, you can find your xDAI address by simply starting the 
 
 ![](../.gitbook/assets/avado-no-funds%20%282%29.png)
 
-You can ask for xDAI in our [**Telegram**](https://t.me/hoprnet) or [**Discord**](https://discord.gg/dEAWC4G) channels. A HOPR ambassador will be glad to fund your wallet. If you need more instructions on how to buy and send xDAI, head [**here**](../core-concepts/native-tokens.md#getting-xdai).
+You can ask for xDAI in our [**Telegram**](https://t.me/hoprnet) or [**Discord**](https://discord.gg/dEAWC4G) channels. A HOPR ambassador will be glad to fund your wallet. If you need more instructions on how to buy and send xDAI, head [**here**](../core-concepts/tokens/native-tokens.md#getting-xdai).
 
 {% hint style="warning" %}
 You'll spend a \(very\) small amount of xDAI when you perform actions which interact with the HOPR smart contracts, such as opening and closing payment channels and redeeming tickets after relaying data.  

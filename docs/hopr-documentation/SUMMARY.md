@@ -44,8 +44,9 @@
 * [Bootstrap Nodes](core-concepts/bootstrap-nodes.md)
 * [Cover Traffic](core-concepts/cover-traffic/README.md)
   * [Registering with CoverBot](core-concepts/cover-traffic/coverbot.md)
-* [Native Tokens](core-concepts/native-tokens.md)
-* [xHOPR Tokens](core-concepts/xhopr-tokens.md)
+* [Tokens](core-concepts/tokens/README.md)
+  * [Native Tokens](core-concepts/tokens/native-tokens.md)
+  * [xHOPR Tokens](core-concepts/tokens/xhopr-tokens.md)
 * [Payment Channels](core-concepts/payment-channels.md)
 * [Tickets](core-concepts/tickets.md)
 
