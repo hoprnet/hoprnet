@@ -123,9 +123,10 @@ class RelayConnection implements MultiaddrConnection {
               return
             } else if (u8aEquals(SUFFIX, RESTART)) {
               this._onReconnect(this)
-              yield
+              
               // @TODO replace timeout by something more meaningful
-              // await new Promise((resolve) => setTimeout(resolve, 100))
+              await new Promise((resolve) => setTimeout(resolve, 100))
+              yield
               log(`RESTART received, reconnectReceived: ${__reconnectCounter++}`)
             } else {
               error(`Received invalid status message ${received.slice(1)}. Dropping message.`)
