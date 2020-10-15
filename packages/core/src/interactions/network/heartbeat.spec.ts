@@ -7,17 +7,10 @@ import TCP = require('libp2p-tcp')
 import MPLEX = require('libp2p-mplex')
 // @ts-ignore
 import SECIO = require('libp2p-secio')
-
-import Debug from 'debug'
-import chalk from 'chalk'
-
 import { Heartbeat, HEARTBEAT_TIMEOUT } from './heartbeat'
-
 import assert from 'assert'
 import Multiaddr from 'multiaddr'
-
 import { EventEmitter } from 'events'
-import { durations } from '@hoprnet/hopr-utils'
 
 describe('check heartbeat mechanism', function () {
   async function generateNode(options?: { timeoutIntentionally?: boolean }) {
