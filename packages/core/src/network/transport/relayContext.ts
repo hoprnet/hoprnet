@@ -62,6 +62,7 @@ class RelayContext {
     let switchPromise = this._switchPromise.promise.then(switchFunction)
 
     while (true) {
+      console.log(`source iteration`)
       if (!sourceDone) {
         await Promise.race([
           // prettier-ignore
@@ -104,7 +105,7 @@ class RelayContext {
 
             yield received
           } else {
-            verbose(`relaying ${new TextDecoder().decode(sourceMsg)}`)
+            verbose(`forwarding ${new TextDecoder().decode(sourceMsg)}`)
             yield sourceMsg
           }
         }

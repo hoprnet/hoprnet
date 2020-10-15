@@ -153,13 +153,15 @@ class TCP {
       relayConnection.sink(sw.source)
       sw.sink(relayConnection.source)
 
-      BtoA.sink((async function* () {
-        let i = 0
-        while (true) {
-          yield new TextEncoder().encode(`test message sent from handler #${i}`)
-          await new Promise(resolve => setTimeout(resolve, 300))
-        }
-      })())
+      BtoA.sink(
+        (async function* () {
+          let i = 0
+          while (true) {
+            yield new TextEncoder().encode(`test message sent from handler #${i++}`)
+            await new Promise((resolve) => setTimeout(resolve, 700))
+          }
+        })()
+      )
 
       for await (const msg of AtoB.source) {
         console.log(new TextDecoder().decode(msg.slice()))
@@ -271,13 +273,15 @@ class TCP {
     relayConnection.sink(sw.source)
     sw.sink(relayConnection.source)
 
-    BtoA.sink((async function* () {
-      let i = 0
-      while (true) {
-        yield new TextEncoder().encode(`test message sent from handler #${i}`)
-        await new Promise(resolve => setTimeout(resolve, 300))
-      }
-    })())
+    BtoA.sink(
+      (async function* () {
+        let i = 0
+        while (true) {
+          yield new TextEncoder().encode(`test message sent from initiator #${i++}`)
+          await new Promise((resolve) => setTimeout(resolve, 700))
+        }
+      })()
+    )
 
     for await (const msg of AtoB.source) {
       console.log(new TextDecoder().decode(msg.slice()))
