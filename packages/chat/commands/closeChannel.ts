@@ -49,9 +49,9 @@ export default class CloseChannel extends AbstractCommand {
       const receipt = await channel.initiateSettlement()
 
       if (status === 'PENDING') {
-        return `${chalk.green(`Closing channel, receipt: ${styleValue(receipt, 'hash')}`)}}.`
+        return `${chalk.green(`Closing channel, receipt: ${styleValue(receipt, 'hash')}`)}.`
       } else {
-        return `${chalk.green(`Initiated channel closure, receipt: ${styleValue(receipt, 'hash')}`)}}.`
+        return `${chalk.green(`Initiated channel closure, receipt: ${styleValue(receipt, 'hash')}`)}.`
       }
     } catch (err) {
       return styleValue(err.message, 'failure')
@@ -59,10 +59,6 @@ export default class CloseChannel extends AbstractCommand {
   }
 
   async autocomplete(query: string = '', line: string = ''): Promise<AutoCompleteResult> {
-    if (!query) {
-      return [[this.name()], line]
-    }
-
     let peerIdStrings: string[]
     try {
       peerIdStrings = await this.node.paymentChannels.channel.getAll(

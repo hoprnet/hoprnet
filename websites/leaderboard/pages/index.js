@@ -102,10 +102,10 @@ function HomeContent({
 
         <div className={styles.stats}>
           <div>
-            <strong className="green">{parseFloat(available).toFixed(4)}</strong> xHOPR Available
+            <strong className="green">{parseFloat(available).toFixed(4)}</strong> HOPR Available
           </div>
           {/* <div>
-            <strong className="blue">{locked}</strong> xHOPR Locked
+            <strong className="blue">{locked}</strong> HOPR Locked
           </div> */}
         </div>
       </header>

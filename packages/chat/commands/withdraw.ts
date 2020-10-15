@@ -6,7 +6,7 @@ import { AbstractCommand, AutoCompleteResult } from './abstractCommand'
 import { styleValue } from '../utils'
 
 export default class Withdraw extends AbstractCommand {
-  private arguments = ['recipient (blockchain address)', 'currency (native, hopr)', 'amount (ETH, HOPR)']
+  private arguments = ['amount (ETH, HOPR)', 'currency (native, hopr)', 'recipient (blockchain address)']
 
   constructor(public node: Hopr<HoprCoreConnector>) {
     super()
@@ -24,12 +24,7 @@ export default class Withdraw extends AbstractCommand {
     recipient: string
   }> {
     const { NativeBalance, Balance } = this.node.paymentChannels.types
-
-    const [err, amount, currencyRaw, recipient] = this._assertUsage(query, [
-      'amount (ETH, HOPR)',
-      'currency (native, hopr)',
-      'recipient (blockchain address)'
-    ])
+    const [err, amount, currencyRaw, recipient] = this._assertUsage(query, this.arguments)
 
     if (err) {
       throw new Error(err)

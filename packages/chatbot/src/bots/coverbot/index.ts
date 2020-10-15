@@ -340,7 +340,7 @@ export class Coverbot implements Bot {
        * 2. Let's notify the user about the successful relay.
        * 3. Let's recover the timeout from our relayerTimeout
        *    and clear it before it removes the node.
-       * 4. Let's pay the good node some sweet xHOPR for being alive
+       * 4. Let's pay the good node some sweet HOPR for being alive
        *    and relaying messages successfully.
        */
       const relayerAddress = getHOPRNodeAddressFromContent(message.text)
@@ -365,7 +365,7 @@ export class Coverbot implements Bot {
         this._setEthereumAddressScore(relayerEthereumAddress, newScore),
         this.node.withdraw({ currency: 'HOPR', recipient: relayerEthereumAddress, amount: `${RELAY_HOPR_REWARD}` }),
       ])
-      console.log(`xHOPR tokens sent to ${relayerAddress}`)
+      console.log(`HOPR tokens sent to ${relayerAddress}`)
       this._sendMessageFromBot(relayerAddress, NodeStateResponses[NodeStates.verifiedNode])
 
       // 1.

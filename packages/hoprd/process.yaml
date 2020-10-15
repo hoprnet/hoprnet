@@ -5,7 +5,7 @@ apps:
     args: '--admin --password="open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0"'
     env:
       HOPR_BOOTSTRAP_ADDRESS: _dnsaddr.bootstrap.basodino.develop.hoprnet.org
-      ETHEREUM_PROVIDER: wss://xdai.poanetwork.dev/wss
+      ETHEREUM_PROVIDER: wss://ws-mainnet.matic.network
       NEXT_TELEMETRY_DISABLED: 1
   - script: ./envoy/envoy.sh
     name: 'proxy'

@@ -24,7 +24,7 @@
   - [Troubleshooting](core-concepts/hopr-chat/troubleshooting.md)
 - [Bootstrap Nodes](core-concepts/bootstrap-nodes.md)
 - [Cover Traffic](core-concepts/cover-traffic.md)
-- [xHOPR Tokens](core-concepts/xhopr-tokens.md)
+- [HOPR Tokens](core-concepts/HOPR-tokens.md)
 - [Payment Channels](core-concepts/payment-channels.md)
 - [Tickets](core-concepts/tickets.md)
 

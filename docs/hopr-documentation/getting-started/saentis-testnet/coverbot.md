@@ -29,7 +29,7 @@ HOPR:      16Uiu2HAm34oK6EyA2SuFo9rHXpm5Kwy6C8MeJ26JaRFBzgdQqVpZ
 {% hint style="info" %}
 There are two addresses associated with your node: the Ethereum address is used to fund your account and pay for gas fees on the blockchain, the HOPR address is where you'll send messages and receive HOPR tokens.
 
-For the purposes of the testnet, Ethereum is actually xDAI and HOPR is actually xHOPR.
+For the purposes of the testnet, Ethereum is actually xDAI and HOPR is actually HOPR.
 {% endhint %}
 
 ## Step 2: Send a Tweet
@@ -72,11 +72,11 @@ If this is the first time you've registered this node / tweet in the testnet, yo
 
 ## Step 5: Stay Online to Earn Points!
 
-Now that your address is whitelisted with the bot, you can score points by relaying cover traffic and receiving xHOPR tokens.
+Now that your address is whitelisted with the bot, you can score points by relaying cover traffic and receiving HOPR tokens.
 
 Every 30 seconds, the bot will randomly select an address from the whitelist and ping it to check that it's online. If is, it will send cover traffic to itself via that node.
 
-If the CoverBot selects your address, you'll receive an xHOPR token and 10 points will be added to your score. You'll also receive a verification message.
+If the CoverBot selects your address, you'll receive an HOPR token and 10 points will be added to your score. You'll also receive a verification message.
 
 ![](../../.gitbook/assets/verification-2.png)
 
