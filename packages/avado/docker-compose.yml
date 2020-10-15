@@ -11,6 +11,7 @@ services:
         source: db
         target: /app/db
     ports:
+      - '9091:9091'
       - '3000:3000'
       - '53:53'
     dns:
