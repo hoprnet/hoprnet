@@ -154,7 +154,9 @@ class TCP {
           .upgradeInbound({
             remoteAddr: relayConn.remoteAddr,
             localAddr: relayConn.localAddr,
-            timeline: {},
+            timeline: {
+              opened: Date.now()
+            },
             sink: BtoA.sink,
             source: AtoB.source
           })
