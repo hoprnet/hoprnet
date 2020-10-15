@@ -6,7 +6,7 @@ description: How to open and close payment channels
 
 Sending data privately through the HOPR network involves multiple hops via relay nodes. Nodes are incentivized for providing this service, so hops are only possible between nodes with open and funded payment channels. Payment channels are funded with HOPR tokens, and any unspent HOPR tokens are returned once the payment channel is closed. To fund your node with HOPR tokens see [**Funding Your Node**](funding-your-node.md).
 
-### Opening a Channel
+## Opening a Channel
 
 To open a channel with another node, you need to specify the node address and the amount of HOPR you want to fund the channel with.
 
@@ -38,7 +38,7 @@ Where `<peer ID>` is the HOPR address of the node you want to open a payment cha
 
 Opening a payment channel involves an interaction with the HOPR smart contract, so this can take some time. You will be notified when the channel has been opened and will receive a receipt. You can use this to view the transaction on the xDAI chain, by visiting an xDAI block explorer such as [**this one**](https://blockscout.com/poa/xdai/).
 
-### Closing a Channel
+## Closing a Channel
 
 To close a channel, type:
 
@@ -56,7 +56,7 @@ After two minutes, you can use the `close` command again to fully close the chan
 
 Once a payment channel is closed, any unspent HOPR tokens in the channel will be returned to your balance. You can check this by typing `balance`.
 
-### Viewing Your Channels
+## Viewing Your Channels
 
 To view your currently opened payment channels, type:
 

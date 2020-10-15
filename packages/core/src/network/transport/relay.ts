@@ -305,7 +305,7 @@ class Relay {
         `${connection.remotePeer.toB58String()} to ${counterparty.toB58String()} had no connection. Establishing a new one`
       )
       try {
-        deliveryStream = (await this.establishForwarding(counterparty)) as Stream
+        deliveryStream = (await this.establishForwarding(connection.remotePeer, counterparty)) as Stream
       } catch (err) {
         error(err)
 
@@ -379,7 +379,7 @@ class Relay {
     }
   }
 
-  private async establishForwarding(counterparty: PeerId) {
+  private async establishForwarding(initiator: PeerId, counterparty: PeerId) {
     let timeout: any
 
     let cParty = new PeerInfo(counterparty)
@@ -420,7 +420,7 @@ class Relay {
 
     const toCounterparty = handshake(newStream)
 
-    toCounterparty.write(counterparty.pubKey.marshal())
+    toCounterparty.write(initiator.pubKey.marshal())
 
     let answer: Buffer | undefined
     try {

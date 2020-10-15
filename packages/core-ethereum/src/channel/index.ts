@@ -47,6 +47,11 @@ class ChannelFactory {
       await waitForConfirmation(
         (
           await this.coreConnector.signTransaction(
+            {
+              from: (await this.coreConnector.account.address).toHex(),
+              to: this.coreConnector.hoprToken.options.address,
+              nonce: await this.coreConnector.account.nonce
+            },
             this.coreConnector.hoprToken.methods.send(
               this.coreConnector.hoprChannels.options.address,
               amount.toString(),
@@ -54,12 +59,7 @@ class ChannelFactory {
                 ['address', 'address'],
                 [(await this.coreConnector.account.address).toHex(), counterparty.toHex()]
               )
-            ),
-            {
-              from: (await this.coreConnector.account.address).toHex(),
-              to: this.coreConnector.hoprToken.options.address,
-              nonce: await this.coreConnector.account.nonce
-            }
+            )
           )
         ).send()
       )
@@ -198,12 +198,12 @@ class ChannelFactory {
       await waitForConfirmation(
         (
           await this.coreConnector.signTransaction(
-            this.coreConnector.hoprChannels.methods.openChannel(counterparty.toHex()),
             {
               from: (await this.coreConnector.account.address).toHex(),
               to: this.coreConnector.hoprChannels.options.address,
               nonce: await this.coreConnector.account.nonce
-            }
+            },
+            this.coreConnector.hoprChannels.methods.openChannel(counterparty.toHex())
           )
         ).send()
       )
