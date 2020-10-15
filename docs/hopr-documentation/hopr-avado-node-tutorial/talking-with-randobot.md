@@ -63,7 +63,7 @@ Since HOPR Addresses can be hard to remember, we created the `alias` command, wh
 usage: <PeerId> <Name>
 ```
 
-You will want to `alias` the following address, which is the address of randobot in our testnet
+You will want to `alias` the following address, which is the address of RandoBot in our testnet
 
 ```text
 16Uiu2HAmNtoQri1X4ikUzCqjFQptRSLSVKnVzMmtZiCHCHkdWJr7
@@ -78,6 +78,8 @@ Type the following:
 ```text
 alias 16Uiu2HAmNtoQri1X4ikUzCqjFQptRSLSVKnVzMmtZiCHCHkdWJr7 randobot
 ```
+
+You will receive a notification that the alias has been set.
 
 ![Setting an alias for RandoBot](../.gitbook/assets/avado-alias-randobot.png)
 
