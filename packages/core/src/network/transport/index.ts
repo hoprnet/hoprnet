@@ -167,8 +167,7 @@ class TCP {
       //   console.log(new TextDecoder().decode(msg.slice()))
       // }
       newConn = await this._upgrader.upgradeInbound({
-        localAddr: relayConnection.localAddr,
-        remoteAddr: relayConnection.remoteAddr,
+        ...relayConnection,
         sink: BtoA.sink,
         source: AtoB.source
       } as MultiaddrConnection)
@@ -290,8 +289,7 @@ class TCP {
 
     try {
       newConn = await this._upgrader.upgradeOutbound({
-        localAddr: relayConnection.localAddr,
-        remoteAddr: relayConnection.remoteAddr,
+        ...relayConnection,
         sink: BtoA.sink,
         source: AtoB.source
       } as MultiaddrConnection)
