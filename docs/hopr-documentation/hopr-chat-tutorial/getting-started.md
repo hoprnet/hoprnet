@@ -12,8 +12,6 @@ If this is your first time using HOPR Chat, you'll need to install node.js or Do
 
 ## Step 1: Connect to the HOPR Network
 
-## Step 1: Connect to the HOPR Network
-
 There are two ways to connect to the testnet:
 
 * With the HOPR Chat app
