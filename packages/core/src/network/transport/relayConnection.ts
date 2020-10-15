@@ -123,7 +123,7 @@ class RelayConnection implements MultiaddrConnection {
               return
             } else if (u8aEquals(SUFFIX, RESTART)) {
               this._onReconnect(this)
-              
+
               // @TODO replace timeout by something more meaningful
               await new Promise((resolve) => setTimeout(resolve, 100))
               yield
@@ -137,8 +137,6 @@ class RelayConnection implements MultiaddrConnection {
           } else {
             error(`Received invalid prefix <${u8aToHex(PREFIX)}. Dropping message.`)
           }
-
-          log(`Received message in relay connection <${new TextDecoder().decode(SUFFIX)}`)
 
           streamPromise = this._stream.source.next().then(streamSourceFunction)
         }

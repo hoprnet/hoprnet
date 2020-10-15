@@ -117,9 +117,7 @@ class TCP {
   }
 
   onReconnect(conn: Connection, sw: RelayContext) {
-    console.log(`this before anonymous function`, this)
     return async function (relayConn: MultiaddrConnection) {
-      console.log(`this inside reconnect`, this)
       const AtoB = Pair()
       const BtoA = Pair()
 
@@ -128,26 +126,11 @@ class TCP {
         source: BtoA.source
       })
 
-      // if (conn != null) {
-      //   // @ts-ignore
-      //   conn._close = () => Promise.resolve()
-      //   await conn.close()
-      // }
-
-      // BtoA.sink(
-      //   (async function* () {
-      //     let i = 0
-      //     while (true) {
-      //       yield new TextEncoder().encode(`test message sent from handler #${i++}`)
-      //       await new Promise((resolve) => setTimeout(resolve, 1700))
-      //     }
-      //   })()
-      // )
-
-      // console.log(`before await`)
-      // for await (const msg of AtoB.source) {
-      //   console.log(`receiving in reconnect`, new TextDecoder().decode(msg.slice()))
-      // }
+      if (conn != null) {
+        // @ts-ignore
+        conn._close = () => Promise.resolve()
+        await conn.close()
+      }
 
       try {
         this._upgrader
@@ -162,7 +145,7 @@ class TCP {
           })
           .then((conn) => this.connHandler?.(conn))
       } catch (err) {
-        console.log(err)
+        error(err)
       }
     }.bind(this)
   }
@@ -193,19 +176,6 @@ class TCP {
       relayConnection.sink(sw.source)
       sw.sink(relayConnection.source)
 
-      // BtoA.sink(
-      //   (async function* () {
-      //     let i = 0
-      //     while (true) {
-      //       yield new TextEncoder().encode(`test message sent from handler #${i++}`)
-      //       await new Promise((resolve) => setTimeout(resolve, 1700))
-      //     }
-      //   })()
-      // )
-
-      // for await (const msg of AtoB.source) {
-      //   console.log(new TextDecoder().decode(msg.slice()))
-      // }
       newConn = await this._upgrader.upgradeInbound({
         ...relayConnection,
         sink: BtoA.sink,

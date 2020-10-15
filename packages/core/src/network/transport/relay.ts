@@ -96,7 +96,6 @@ class Relay {
     for (let i = 0; i < potentialRelays.length; i++) {
       let relayConnection = await this._tryPotentialRelay(potentialRelays[i], destination, onReconnect)
 
-      console.log(relayConnection)
       if (relayConnection != null) {
         return relayConnection
       }
@@ -127,7 +126,7 @@ class Relay {
     try {
       stream = await this.performHandshake(relayConnection, potentialRelay.id, destination)
     } catch (err) {
-      console.log(err)
+      error(err)
       return
     }
 

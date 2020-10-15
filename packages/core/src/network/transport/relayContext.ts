@@ -62,15 +62,6 @@ class RelayContext {
     let switchPromise = this._switchPromise.promise.then(switchFunction)
 
     while (true) {
-      console.log(
-        `source iteration`,
-        `sourceDone`,
-        sourceDone,
-        `sourcePromise`,
-        sourcePromise,
-        `switchPromise`,
-        switchPromise
-      )
       if (!sourceDone) {
         await Promise.race([
           // prettier-ignore
@@ -80,15 +71,6 @@ class RelayContext {
       } else {
         await switchPromise
       }
-      console.log(
-        `source iteration after promise.race`,
-        `sourceDone`,
-        sourceDone,
-        `sourcePromise`,
-        sourcePromise,
-        `switchPromise`,
-        switchPromise
-      )
 
       if (sourceReceived) {
         sourceReceived = false
@@ -97,7 +79,6 @@ class RelayContext {
           if (this.options == null || this.options.useRelaySubprotocol) {
             const received = sourceMsg.slice()
 
-            console.log(`inside use Protocol`)
             const [PREFIX, SUFFIX] = [received.subarray(0, 1), received.subarray(1)]
             if (![RELAY_STATUS_PREFIX[0], RELAY_WEBRTC_PREFIX[0], RELAY_PAYLOAD_PREFIX[0]].includes(PREFIX[0])) {
               error(`Invalid prefix: Got <${u8aToHex(PREFIX)}>`)
@@ -122,7 +103,6 @@ class RelayContext {
 
             yield received
           } else {
-            verbose(`sourceMsg`, sourceMsg)
             verbose(`forwarding ${new TextDecoder().decode(sourceMsg.slice())}`)
             yield sourceMsg
           }
@@ -140,10 +120,9 @@ class RelayContext {
         sourceDone = false
         currentSource = tmpSource
         switchPromise = this._switchPromise.promise.then(switchFunction)
-        console.log(`################### streamSwitched ###################`)
+        verbose(`################### streamSwitched ###################`)
         if (this.options == null || this.options.sendRestartMessage) {
           yield new BL([(RELAY_STATUS_PREFIX as unknown) as BL, (RESTART as unknown) as BL])
-          console.log(`restart sent`)
         }
         sourcePromise = currentSource.next().then(sourceFunction)
       }
