@@ -134,34 +134,34 @@ class TCP {
       //   await conn.close()
       // }
 
-      BtoA.sink(
-        (async function* () {
-          let i = 0
-          while (true) {
-            yield new TextEncoder().encode(`test message sent from handler #${i++}`)
-            await new Promise((resolve) => setTimeout(resolve, 1700))
-          }
-        })()
-      )
+      // BtoA.sink(
+      //   (async function* () {
+      //     let i = 0
+      //     while (true) {
+      //       yield new TextEncoder().encode(`test message sent from handler #${i++}`)
+      //       await new Promise((resolve) => setTimeout(resolve, 1700))
+      //     }
+      //   })()
+      // )
 
-      console.log(`before await`)
-      for await (const msg of AtoB.source) {
-        console.log(`receiving in reconnect`, new TextDecoder().decode(msg.slice()))
-      }
-
-      // try {
-      //   this._upgrader
-      //     .upgradeInbound({
-      //       remoteAddr: relayConn.remoteAddr,
-      //       localAddr: relayConn.localAddr,
-      //       timeline: {},
-      //       sink: BtoA.sink,
-      //       source: AtoB.source
-      //     })
-      //     .then((conn) => this.connHandler?.(conn))
-      // } catch (err) {
-      //   console.log(err)
+      // console.log(`before await`)
+      // for await (const msg of AtoB.source) {
+      //   console.log(`receiving in reconnect`, new TextDecoder().decode(msg.slice()))
       // }
+
+      try {
+        this._upgrader
+          .upgradeInbound({
+            remoteAddr: relayConn.remoteAddr,
+            localAddr: relayConn.localAddr,
+            timeline: {},
+            sink: BtoA.sink,
+            source: AtoB.source
+          })
+          .then((conn) => this.connHandler?.(conn))
+      } catch (err) {
+        console.log(err)
+      }
     }.bind(this)
   }
 
