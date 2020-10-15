@@ -155,7 +155,7 @@ class TCP {
             remoteAddr: relayConn.remoteAddr,
             localAddr: relayConn.localAddr,
             timeline: {
-              opened: Date.now()
+              open: Date.now()
             },
             sink: BtoA.sink,
             source: AtoB.source
