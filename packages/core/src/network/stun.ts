@@ -101,7 +101,7 @@ class Stun {
   }
 
   async startServer(port = undefined) {
-    return new Promise(async (resolve, reject) => {
+    return new Promise(async (resolve) => {
       this.socket = this.getSocket()
 
       this.socket.on('message', (msg, rinfo) => {

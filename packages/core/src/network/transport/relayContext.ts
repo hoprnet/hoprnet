@@ -5,7 +5,7 @@ import Debug from 'debug'
 const log = Debug(`hopr-core:transport`)
 const error = Debug(`hopr-core:transport:error`)
 
-import { RELAY_PAYLOAD_PREFIX, RELAY_STATUS_PREFIX, STOP } from './constants'
+import { RELAY_STATUS_PREFIX, STOP } from './constants'
 
 class RelayContext {
   private _defer: DeferredPromise<AsyncGenerator<Uint8Array>>
