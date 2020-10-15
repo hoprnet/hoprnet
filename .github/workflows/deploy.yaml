@@ -108,7 +108,9 @@ jobs:
       - name: Build Avado
         working-directory: packages/avado
         run: |
-          git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Versioning robot"
+          git config --global user.email "noreply@hoprnet.org"
+          git config --global user.name "HOPR Versioning robot"
+          git config pull.rebase false
           git pull origin ${{ github.ref }}
           docker-compose build
           sudo npm install -g @dappnode/dappnodesdk@0.2.9-beta.0
@@ -116,8 +118,8 @@ jobs:
           sed -i 's/version"[ ]*:[ ]*"[0-9]*\.[0-9]*\.[0-9]*"/version": "${{ env.RELEASE }}"/' ./dappnode_package.json
           sudo dappnodesdk build --provider http://23.254.227.151:5001 
           git add dappnode_package.json docker-compose.yml releases.json
-          git pull origin ${{ github.ref }}
           git commit -m "Avado CI: new release"
+          git pull origin ${{ github.ref }}
           git push origin ${{ github.ref }}
 
   # chat
@@ -140,27 +142,27 @@ jobs:
         working-directory: packages/chat
         run: gcloud builds submit --tag gcr.io/hoprassociation/hopr-chat:${{ github.sha }}
 
-  # chatbot
+   # chatbot
   build_chatbot_docker:
     name: Build HOPR Chatbot Docker
     runs-on: ubuntu-latest
     needs: [build]
     steps:
-      - uses: actions/checkout@v2
-        with:
-          ref: master
-      - name: Setup Google Cloud Credentials
-        uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
-        with:
-          version: '290.0.1'
-          service_account_key: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
-          export_default_credentials: true
-      - name: Set Project for Google Cloud HOPR Association
-        working-directory: packages/chatbot
-        run: gcloud config set project ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
-      - name: Building Docker image using Google Cloud Build
-        working-directory: packages/chatbot
-        run: gcloud builds submit --tag gcr.io/hoprassociation/hopr-chatbot:${{ github.sha }}
+     - uses: actions/checkout@v2
+       with:
+         ref: master
+     - name: Setup Google Cloud Credentials
+       uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
+       with:
+         version: '290.0.1'
+         service_account_key: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+         export_default_credentials: true
+     - name: Set Project for Google Cloud HOPR Association
+       working-directory: packages/chatbot
+       run: gcloud config set project ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
+     - name: Building Docker image using Google Cloud Build
+       working-directory: packages/chatbot
+       run: gcloud builds submit --tag gcr.io/hoprassociation/hopr-chatbot:${{ github.sha }}
 
   build_hoprd_docker:
     name: Build HOPRD Docker

@@ -167,23 +167,23 @@
     "@ethersproject/rlp" "^5.0.3"
     "@ethersproject/signing-key" "^5.0.4"
 
-"@hoprnet/hopr-core-connector-interface@1.17.1":
-  version "1.17.1"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-connector-interface/-/hopr-core-connector-interface-1.17.1.tgz#e0b8bd7b3db5ec75a9b544a5d5699a2549cc63cd"
-  integrity sha512-ifpRGHlQVWzgUfC/L1I2jR36HksLmzE+/30m9YB4gl9FR/2T6vl7XJyfw/zIEF9CifBCD8KS3LSPKw0SYWYn1g==
+"@hoprnet/hopr-core-connector-interface@1.17.4":
+  version "1.17.4"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-connector-interface/-/hopr-core-connector-interface-1.17.4.tgz#b2781382d50f5d4132214f3a16523a12c7fa1aaa"
+  integrity sha512-dUHNqtTmoxTs66fVVgqyUY5U5TeTeosTXOOyVTSEI7PzF1NGMfnZTCSmb7MbM92PHTOnBfUXkCsPwPPR+JLqUg==
 
-"@hoprnet/hopr-demo-seeds@1.17.1":
-  version "1.17.1"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-demo-seeds/-/hopr-demo-seeds-1.17.1.tgz#e9bb69265d1a766f8adddf5e27c0db5d00cab09c"
-  integrity sha512-+2759Lo8qjwYCiGzz5PDo6lZSgxWvM9t82jbvwfu7199j95Cy6FP0eCXpn2nkrMujav4vPtktTU542+LtWayLg==
+"@hoprnet/hopr-demo-seeds@1.17.4":
+  version "1.17.4"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-demo-seeds/-/hopr-demo-seeds-1.17.4.tgz#9ae5253e1d09fb8d58305318071bf7380da8abac"
+  integrity sha512-JmyCx+7Fb7nKT9293T0s2VLILMTHLB+XAWVZS1fR/IXtqlszGSB0WJzgRiAivcqhUnHTsDLyRs8B8PG3wnU4bA==
 
-"@hoprnet/hopr-ethereum@1.17.1":
-  version "1.17.1"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-ethereum/-/hopr-ethereum-1.17.1.tgz#226de40bda3a430813ce10254e58252ef863cff8"
-  integrity sha512-HpBZ+TWBDeOJQeeg6MSmXBG45SnRM3A9cXkH4TqyhWTfEq8Ioc7hQpDCBmHu7bkkood7c4w5wVIPFCechTFsUA==
+"@hoprnet/hopr-ethereum@1.17.4":
+  version "1.17.4"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-ethereum/-/hopr-ethereum-1.17.4.tgz#f268c74de1d48d7b871089890da7a65cd4709e10"
+  integrity sha512-b9v+xvomnrtg4UY3ODPe/gzqAoZMHOijZbyglEAxKi2nxcSZ3pwMd636VIpGHEYUQkyjzbHCKlZhrJMQBfe/OA==
   dependencies:
-    "@hoprnet/hopr-demo-seeds" "1.17.1"
-    "@hoprnet/hopr-utils" "1.17.1"
+    "@hoprnet/hopr-demo-seeds" "1.17.4"
+    "@hoprnet/hopr-utils" "1.17.4"
     "@openzeppelin/contracts" "^3.0.1"
     "@truffle/debug-utils" "^4.1.1"
     "@truffle/hdwallet-provider" "^1.0.34"
@@ -196,19 +196,19 @@
     ts-node "^9.0.0"
     web3 "^1.2.11"
 
-"@hoprnet/hopr-testing@1.17.1":
-  version "1.17.1"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-testing/-/hopr-testing-1.17.1.tgz#1e613459da359e47b9393a1d0daeaab59c18a5b8"
-  integrity sha512-/obgdvSCJlPbyk3+3SDUyj/CJ62fGm/U6QXF0rn34rkbEL0BZXpW2X5BuqLeMoYWoZCDMljXrryGgNM6AQSjZg==
+"@hoprnet/hopr-testing@1.17.4":
+  version "1.17.4"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-testing/-/hopr-testing-1.17.4.tgz#1ebb4abf7f0a678d73d18af1005bc6fb7da9ae24"
+  integrity sha512-cGMTA0fa2v8DIKZupB0yvH9ShUz73I7vg3z8WCdWipo3uYrdjezYg4+hhCQ4QYAFC46g05mINTtRNVJTiw5xaw==
   dependencies:
-    "@hoprnet/hopr-demo-seeds" "1.17.1"
+    "@hoprnet/hopr-demo-seeds" "1.17.4"
     debug "^4.1.1"
     ganache-core "^2.12.1"
 
-"@hoprnet/hopr-utils@1.17.1":
-  version "1.17.1"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.17.1.tgz#65fcf7a3f031118ad9ff7397b3c82a39f2066e7e"
-  integrity sha512-Jn6NZP685Go+7rd5OfWLpdMw7gcIT5UrS1GmNpDG3NvwLNgevMVTQiXT84W2rxb//0fHuS+TjC/dIz5Nfwy58A==
+"@hoprnet/hopr-utils@1.17.4":
+  version "1.17.4"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.17.4.tgz#f5f7c8f99b94b5d30118b39b6d802bb088d601a7"
+  integrity sha512-GtPHVF54v3kRF+H7xqLFUXGUhOd+le+KATGh1ItcSZDBL3yc6VLOrZQqps0yqv80/IWJEKLvjvlPvNW9QkKsig==
   dependencies:
     bignumber.js "^9.0.0"
     libp2p-crypto "^0.17.9"
@@ -455,11 +455,6 @@
   version "1.19.1"
   resolved "https://registry.yarnpkg.com/@types/prettier/-/prettier-1.19.1.tgz#33509849f8e679e4add158959fdb086440e9553f"
   integrity sha512-5qOlnZscTn4xxM5MeGXAMOsIOIKIbh9e85zJWfBRVPlRMEVawzoPhINYbRGkBZCI8LxvBe7tJCdWiarA99OZfQ==
-
-"@types/prettier@^2.1.1":
-  version "2.1.2"
-  resolved "https://registry.yarnpkg.com/@types/prettier/-/prettier-2.1.2.tgz#4929992f87a0129f4960a110faeb526210562e7b"
-  integrity sha512-IiPhNnenzkqdSdQH3ifk9LoX7oQe61ZlDdDO4+MUv6FyWdPGDPr26gCPVs3oguZEMq//nFZZpwUZcVuNJsG+DQ==
 
 "@types/resolve@^0.0.8":
   version "0.0.8"
@@ -5528,11 +5523,6 @@ prettier@^1.14.2:
   resolved "https://registry.yarnpkg.com/prettier/-/prettier-1.19.1.tgz#f7d7f5ff8a9cd872a7be4ca142095956a60797cb"
   integrity sha512-s7PoyDv/II1ObgQunCbB9PdLmUcBZcnWOcxDh7O0N/UwDEsHyqkW+Qh28jW+mVuCdx7gLB0BotYI1Y6uI9iyew==
 
-prettier@^2.1.2:
-  version "2.1.2"
-  resolved "https://registry.yarnpkg.com/prettier/-/prettier-2.1.2.tgz#3050700dae2e4c8b67c4c3f666cdb8af405e1ce5"
-  integrity sha512-16c7K+x4qVlJg9rEbXl7HEGmQyZlG4R9AgP+oHKRMsMsuk8s+ATStlf1NpDqyBI1HpVyfjLOeMhH2LvuNvV5Vg==
-
 private@^0.1.6, private@^0.1.8:
   version "0.1.8"
   resolved "https://registry.yarnpkg.com/private/-/private-0.1.8.tgz#2381edb3689f7a53d653190060fcf822d2f368ff"
@@ -6660,21 +6650,6 @@ ts-generator@^0.0.8:
     glob "^7.1.2"
     mkdirp "^0.5.1"
     prettier "^1.14.2"
-    resolve "^1.8.1"
-    ts-essentials "^1.0.0"
-
-ts-generator@^0.1.1:
-  version "0.1.1"
-  resolved "https://registry.yarnpkg.com/ts-generator/-/ts-generator-0.1.1.tgz#af46f2fb88a6db1f9785977e9590e7bcd79220ab"
-  integrity sha512-N+ahhZxTLYu1HNTQetwWcx3so8hcYbkKBHTr4b4/YgObFTIKkOSSsaa+nal12w8mfrJAyzJfETXawbNjSfP2gQ==
-  dependencies:
-    "@types/mkdirp" "^0.5.2"
-    "@types/prettier" "^2.1.1"
-    "@types/resolve" "^0.0.8"
-    chalk "^2.4.1"
-    glob "^7.1.2"
-    mkdirp "^0.5.1"
-    prettier "^2.1.2"
     resolve "^1.8.1"
     ts-essentials "^1.0.0"
 
