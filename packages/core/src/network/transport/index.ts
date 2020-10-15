@@ -117,7 +117,9 @@ class TCP {
   }
 
   onReconnect(conn: Connection, sw: RelayContext) {
-    return async (relayConn: MultiaddrConnection) => {
+    console.log(`this before anonymous function`, this)
+    return async function (relayConn: MultiaddrConnection) {
+      console.log(`this inside reconnect`, this)
       const AtoB = Pair()
       const BtoA = Pair()
 
@@ -139,7 +141,7 @@ class TCP {
           source: AtoB.source
         })
         .then((conn) => this.connHandler?.(conn))
-    }
+    }.bind(this)
   }
 
   async handleDelivery(handler: Handler) {
