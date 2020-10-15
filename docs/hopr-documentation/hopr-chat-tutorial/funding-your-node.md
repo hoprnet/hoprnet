@@ -6,12 +6,8 @@ description: Funding your node with native and HOPR tokens
 
 Next, you need to send tokens to your HOPR node. To use HOPR, you'll need two types of token: 
 
-HOPR testnets run on xDAI Chain, a sidechain of Ethereum. In order to participate in the testnet, you'll need to fund your node with 0.02 xDAI.
-
 * a HOPR token
 * the native token of the blockchain the HOPR token is linked to
-
-First, you'll need to load some ETH into your Ethereum wallet. [MetaMask](https://metamask.io/) is one of the most widely supported wallets, but there are other options.
 
 In our current testnet, the native token is xDAI \(xDAI is a sidechain of Ethereum\) and the HOPR token is xHOPR\).
 
