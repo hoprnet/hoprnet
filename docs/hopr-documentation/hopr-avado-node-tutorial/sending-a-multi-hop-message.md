@@ -36,19 +36,19 @@ Type `balance`, and you'll see that your xHOPR balance has reduced by the amount
 
 ### Check Your Channel Status
 
-You can check on your payment channels by typing `openChannels`.
+You can check on your payment channels by typing `openChannels`:
 
 ![Currently open channels](../.gitbook/assets/avado-open-channels.png)
 
 ### Send A Multi-Hop Message
 
-Now let's send your first multi-hop message! We'll send it from your node, via randobot, and back to your node. Find your address using `myAddress`. Then type `send <your address> <intermediate node> <your message>`.
+Now let's send your first multi-hop message! We'll send it from your node, via randobot, and back to your node. Find your address using `myAddress`. Then type:`send <your address> <intermediate node> <your message>`.
 
 {% hint style="info" %}
 To make this simpler, you can also set an alias for your own address. For a refresher on aliases, visit [**this page**](talking-with-randobot.md#step-3-set-an-alias).
 {% endhint %}
 
-
+Congratulations! You've sent your first multi-hop message on the HOPR network.
 
 ###    
 

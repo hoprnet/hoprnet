@@ -26,3 +26,7 @@ You'll see the following notification:
 
 You can check your routing settings at any time by typing `settings`.
 
+{% hint style="info" %}
+To revert to zero-hop messages, type `settings routing direct`
+{% endhint %}
+

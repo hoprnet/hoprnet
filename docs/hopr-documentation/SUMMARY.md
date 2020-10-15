@@ -16,7 +16,6 @@
 * [Messaging Randobot](hopr-avado-node-tutorial/talking-with-randobot.md)
 * [Changing Your Routing Settings](hopr-avado-node-tutorial/changing-your-routing-settings.md)
 * [Sending A Multi-hop Message Using A Payment Channel](hopr-avado-node-tutorial/sending-a-multi-hop-message.md)
-* [Setting Up A Second Node](hopr-avado-node-tutorial/setting-up-a-second-node.md)
 * [Earning and Redeeming Tickets](hopr-avado-node-tutorial/redeeming-tickets.md)
 * [Withdrawing Funds](hopr-avado-node-tutorial/withdrawing-funds.md)
 
