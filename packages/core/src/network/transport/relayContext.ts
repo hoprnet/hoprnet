@@ -62,7 +62,15 @@ class RelayContext {
     let switchPromise = this._switchPromise.promise.then(switchFunction)
 
     while (true) {
-      console.log(`source iteration`, `sourceDone`, sourceDone, `sourcePromise`, sourcePromise, `switchPromise`, switchPromise)
+      console.log(
+        `source iteration`,
+        `sourceDone`,
+        sourceDone,
+        `sourcePromise`,
+        sourcePromise,
+        `switchPromise`,
+        switchPromise
+      )
       if (!sourceDone) {
         await Promise.race([
           // prettier-ignore
@@ -72,8 +80,15 @@ class RelayContext {
       } else {
         await switchPromise
       }
-      console.log(`source iteration after promise.race`, `sourceDone`, sourceDone, `sourcePromise`, sourcePromise, `switchPromise`, switchPromise)
-
+      console.log(
+        `source iteration after promise.race`,
+        `sourceDone`,
+        sourceDone,
+        `sourcePromise`,
+        sourcePromise,
+        `switchPromise`,
+        switchPromise
+      )
 
       if (sourceReceived) {
         sourceReceived = false
@@ -118,13 +133,14 @@ class RelayContext {
       } else if (streamSwitched) {
         streamSwitched = false
         // @TODO replace this by a mutex
-        await new Promise(resolve => setTimeout(resolve, 100))
+        await new Promise((resolve) => setTimeout(resolve, 100))
         sourceDone = false
         currentSource = tmpSource
         switchPromise = this._switchPromise.promise.then(switchFunction)
         console.log(`################### streamSwitched ###################`)
         if (this.options == null || this.options.sendRestartMessage) {
           yield new BL([(RELAY_STATUS_PREFIX as unknown) as BL, (RESTART as unknown) as BL])
+          console.log(`restart sent`)
         }
         sourcePromise = currentSource.next().then(sourceFunction)
       }
