@@ -14,7 +14,7 @@ To connect to the **HOPR network**, you will need a **HOPR node** and an **app**
   
 Currently, there are two main ways to build this setup:
 
-* With a [HOPR Node PC](https://hoprnet.org/node) or other [AVADO node](https://ava.do/) running the HOPR AVADO dApp
+* With a [**HOPR Node PC**](https://hoprnet.org/node) or other [**AVADO node**](https://ava.do/) running the HOPR AVADO dApp
 * With the HOPR Chat app, which runs on most Windows, MacOS and Linux devices and spins up a HOPR node in the background
 
 If you own a HOPR AVADO hardware node, please head to the [**HOPR AVADO Nodes**](hopr-avado-node-tutorial/setting-up-your-avado-node.md) section of our documentation, where you can learn more about your hardware node and complete a short tutorial demonstrating the fundamentals of the HOPR network.  
