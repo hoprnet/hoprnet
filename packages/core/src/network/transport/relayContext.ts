@@ -125,6 +125,8 @@ class RelayContext {
             verbose(`forwarding ${new TextDecoder().decode(sourceMsg.slice())}`)
             yield sourceMsg
           }
+        } else {
+          verbose(`empty message dropped`)
         }
 
         if (!sourceDone) {
