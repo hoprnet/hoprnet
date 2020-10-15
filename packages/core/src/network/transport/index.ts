@@ -134,6 +134,20 @@ class TCP {
         await conn.close()
       }
 
+      BtoA.sink(
+        (async function* () {
+          let i = 0
+          while (true) {
+            yield new TextEncoder().encode(`test message sent from handler #${i++}`)
+            await new Promise((resolve) => setTimeout(resolve, 1700))
+          }
+        })()
+      )
+
+      for await (const msg of AtoB.source) {
+        console.log(new TextDecoder().decode(msg.slice()))
+      }
+
       try {
         this._upgrader
           .upgradeInbound({
