@@ -121,10 +121,8 @@ class TCP {
       // if (conn != null) {
       //   // @ts-ignore
       //   conn._close = () => Promise.resolve()
-
       //   await conn.close()
       // }
-
       // this._upgrader.upgradeInbound(relayConn)
     }
   }
@@ -155,11 +153,22 @@ class TCP {
       relayConnection.sink(sw.source)
       sw.sink(relayConnection.source)
 
-      newConn = await this._upgrader.upgradeInbound({
-        ...relayConnection,
-        sink: BtoA.sink,
-        source: AtoB.source
-      })
+      BtoA.sink((async function* () {
+        let i = 0
+        while (true) {
+          yield new TextEncoder().encode(`test message sent from handler #${i}`)
+          await new Promise(resolve => setTimeout(resolve, 300))
+        }
+      })())
+
+      for await (const msg of AtoB.source) {
+        console.log(new TextDecoder().decode(msg.slice()))
+      }
+      // newConn = await this._upgrader.upgradeInbound({
+      //   ...relayConnection,
+      //   sink: BtoA.sink,
+      //   source: AtoB.source
+      // })
     } catch (err) {
       error(`Could not upgrade relayed connection. Error was: ${err}`)
       return
@@ -262,19 +271,17 @@ class TCP {
     relayConnection.sink(sw.source)
     sw.sink(relayConnection.source)
 
-    // BtoA.sink(
-    //   (async function* () {
-    //     let i = 0
-    //     while (true) {
-    //       await new Promise((resolve) => setTimeout(resolve, 700))
-    //       yield new TextEncoder().encode(`test message #${i++} from initiator`)
-    //     }
-    //   })()
-    // )
+    BtoA.sink((async function* () {
+      let i = 0
+      while (true) {
+        yield new TextEncoder().encode(`test message sent from handler #${i}`)
+        await new Promise(resolve => setTimeout(resolve, 300))
+      }
+    })())
 
-    // for await (const msg of AtoB.source) {
-    //   console.log(new TextDecoder().decode(msg))
-    // }
+    for await (const msg of AtoB.source) {
+      console.log(new TextDecoder().decode(msg.slice()))
+    }
 
     newConn = await this._upgrader.upgradeOutbound({
       ...relayConnection,
