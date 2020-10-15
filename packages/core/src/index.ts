@@ -48,7 +48,6 @@ export type HoprOptions = {
   db?: LevelUp
   dbPath?: string
   peerId?: PeerId
-  peerInfo?: PeerInfo
   password?: string
   id?: number
   bootstrapNode?: boolean
@@ -85,8 +84,6 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
    */
   constructor(options: HoprOptions, public db: LevelUp, public paymentChannels: Chain) {
     super({
-      peerInfo: options.peerInfo,
-
       // Disable libp2p-switch protections for the moment
       switch: {
         denyTTL: 1,
@@ -137,7 +134,7 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
     const Connector = options.connector ?? HoprCoreEthereum
     const db = Hopr.openDatabase(options, Connector.constants.CHAIN_NAME, Connector.constants.NETWORK)
 
-    options.peerInfo = options.peerInfo || (await getPeerInfo(options, db))
+    const peerInfo = await getPeerInfo(options, db)
 
     if (
       !options.debug &&
@@ -147,7 +144,7 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
       throw Error(`Cannot start node without a bootstrap server`)
     }
 
-    let connector = (await Connector.create(db, options.peerInfo.id.privKey.marshal(), {
+    let connector = (await Connector.create(db, peerInfo.id.privKey.marshal(), {
       provider: options.provider,
       debug: options.debug
     })) as CoreConnector

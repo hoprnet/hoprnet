@@ -150,21 +150,13 @@ async function createIdentity(db: LevelUp, pw?: string): Promise<PeerId> {
 }
 
 async function getPeerInfo(options: HoprOptions, db?: LevelUp): Promise<PeerInfo> {
-  if (db == null && (options == null || (options != null && options.peerInfo == null && options.peerId == null))) {
-    throw Error('Invalid input parameter. Please set a valid peerInfo or pass a database handle.')
+  if (db == null && (options == null || (options != null && options.peerId == null))) {
+    throw Error('Invalid input parameter. Please set a valid peerId or pass a database handle.')
   }
-
   const addrs = await getAddrs(options)
-
   let peerInfo: PeerInfo
-  if (options.peerInfo != null) {
-    peerInfo = options.peerInfo
-  } else {
-    peerInfo = new PeerInfo(await getPeerId(options, db))
-  }
-
+  peerInfo = new PeerInfo(await getPeerId(options, db))
   addrs.forEach((addr: Multiaddr) => peerInfo.multiaddrs.add(addr.encapsulate(`/p2p/${peerInfo.id.toB58String()}`)))
-
   return peerInfo
 }
 
