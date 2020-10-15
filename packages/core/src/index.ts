@@ -73,6 +73,9 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
   public bootstrapServers: Multiaddr[]
   public initializedWithOptions: HoprOptions
 
+  public id: PeerId
+  public addresses: Multiaddr []
+
   // Allows us to construct HOPR with falsy options
   public _debug: boolean
 
@@ -120,7 +123,7 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
     this.network = new Network(this, this.interactions, options)
 
     verbose('# STARTED NODE')
-    verbose('ID', this.peerInfo.id.toB58String())
+    verbose('ID', this.id.toB58String())
     verbose('Protocol version', VERSION)
     this._debug = options.debug
   }
@@ -150,7 +153,10 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
     })) as CoreConnector
 
     verbose('Created connector, now creating node')
-    return await new Hopr<CoreConnector>(options, db, connector).start()
+    let node =  new Hopr<CoreConnector>(options, db, connector)
+    node.id = peerInfo.id
+    node.addresses = peerInfo.multiaddrs.toArray()
+    return await node.start()
   }
 
   /**

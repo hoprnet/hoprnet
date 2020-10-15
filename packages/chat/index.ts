@@ -119,7 +119,7 @@ async function main() {
 
   console.log('Successfully started HOPR Chat.\n')
   console.log(
-    `Your HOPR Chat node is available at the following addresses:\n ${node.peerInfo.multiaddrs.toArray().join('\n ')}\n`
+    `Your HOPR Chat node is available at the following addresses:\n ${node.addresses.map(ma => ma.toString()).join('\n ')}\n`
   )
   console.log('Use the “help” command to see which commands are available.\n')
 
