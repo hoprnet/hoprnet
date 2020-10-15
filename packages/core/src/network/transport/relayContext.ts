@@ -118,6 +118,8 @@ class RelayContext {
       } else if (streamSwitched) {
         streamSwitched = false
         sourceDone = false
+        // @TODO replace this by a mutex
+        await new Promise(resolve => setTimeout(resolve, 100))
         currentSource = tmpSource
         switchPromise = this._switchPromise.promise.then(switchFunction)
         console.log(`################### streamSwitched ###################`)
