@@ -128,11 +128,11 @@ class TCP {
         source: BtoA.source
       })
 
-      if (conn != null) {
-        // @ts-ignore
-        conn._close = () => Promise.resolve()
-        await conn.close()
-      }
+      // if (conn != null) {
+      //   // @ts-ignore
+      //   conn._close = () => Promise.resolve()
+      //   await conn.close()
+      // }
 
       BtoA.sink(
         (async function* () {
