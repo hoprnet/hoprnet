@@ -66,7 +66,7 @@ const MAX_ITERATIONS_PATH_SELECTION = 2000
 
 class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
   public interactions: Interactions<Chain>
-  public network: Network<Chain>
+  public network: Network
   public dbKeys = DbKeys
   public output: (arr: Uint8Array) => void
   public isBootstrapNode: boolean
@@ -119,7 +119,7 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
     this.isBootstrapNode = options.bootstrapNode || false
 
     this.interactions = new Interactions(this)
-    this.network = new Network(this, options)
+    this.network = new Network(this, this.interactions, options)
 
     verbose('# STARTED NODE')
     verbose('ID', this.peerInfo.id.toB58String())

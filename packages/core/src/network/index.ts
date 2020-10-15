@@ -1,25 +1,41 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '..'
 import type { HoprOptions } from '..'
-
+import type PeerInfo from 'peer-info'
+import type { Interactions } from '../interactions'
+import type { LibP2P } from '../index'
 import { Crawler } from './crawler'
 import Heartbeat from './heartbeat'
 import PeerStore from './peerStore'
 import Stun from './stun'
 
-class Network<Chain extends HoprCoreConnector> {
-  public crawler: Crawler<Chain>
-  public heartbeat: Heartbeat<Chain>
-  public peerStore: PeerStore<Chain>
+type TestOpts = {
+  crawl?: { timeoutIntentionally?: boolean }
+}
+class Network {
+  public crawler: Crawler
+  public heartbeat: Heartbeat
+  public peerStore: PeerStore
   public stun?: Stun
 
-  constructor(node: Hopr<Chain>, private options: HoprOptions) {
-    this.crawler = new Crawler(node)
-    this.heartbeat = new Heartbeat(node)
-    this.peerStore = new PeerStore(node)
+  constructor(node: LibP2P, interactions: Interactions<any>, private options: HoprOptions, testingOptions?: TestOpts) {
+    this.peerStore = new PeerStore(node.peerStore.peers.values())
+    this.heartbeat = new Heartbeat(this.peerStore, interactions.network.heartbeat, node.hangUp)
+    this.crawler = new Crawler(
+      node.peerInfo.id,
+      this.peerStore,
+      interactions.network.crawler,
+      node.peerStore,
+      testingOptions?.crawl
+    )
+
+    node.on('peer:connect', (peerInfo: PeerInfo) => {
+      this.peerStore.onPeerConnect(peerInfo)
+      this.heartbeat.connectionListener(peerInfo)
+    })
 
     if (options.bootstrapNode) {
-      this.stun = new Stun(options)
+      this.stun = new Stun(options.hosts)
     }
   }
 

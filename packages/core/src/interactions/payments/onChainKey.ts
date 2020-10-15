@@ -13,7 +13,7 @@ import chalk from 'chalk'
 
 import pipe from 'it-pipe'
 
-class OnChainKey<Chain extends HoprCoreConnector> implements AbstractInteraction<Chain> {
+class OnChainKey<Chain extends HoprCoreConnector> implements AbstractInteraction {
   protocols: string[] = [PROTOCOL_ONCHAIN_KEY]
 
   constructor(public node: Hopr<Chain>) {

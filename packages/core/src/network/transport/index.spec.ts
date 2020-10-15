@@ -85,7 +85,7 @@ describe('should create a socket and connect to it', function () {
       }
     })
 
-    node.handle(TEST_PROTOCOL, (handler: Handler) => {
+    node.handle([TEST_PROTOCOL], (handler: Handler) => {
       pipe(
         handler.stream,
         // echoing msg

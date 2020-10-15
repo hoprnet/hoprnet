@@ -7,7 +7,7 @@ import { Heartbeat } from './heartbeat'
 
 class NetworkInteractions<Chain extends HoprCoreConnector> {
   crawler: Crawler<Chain>
-  heartbeat: Heartbeat<Chain>
+  heartbeat: Heartbeat
 
   constructor(node: Hopr<Chain>) {
     this.crawler = new Crawler(node)

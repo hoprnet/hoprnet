@@ -16,11 +16,11 @@ const HASH_FUNCTION = 'blake2s256'
 
 export const HEARTBEAT_TIMEOUT = durations.seconds(3)
 
-class Heartbeat<Chain extends HoprCoreConnector> implements AbstractInteraction<Chain> {
+class Heartbeat implements AbstractInteraction {
   protocols: string[] = [PROTOCOL_HEARTBEAT]
 
   constructor(
-    public node: Hopr<Chain>,
+    public node: Hopr<any>,
     private options?: {
       timeoutIntentionally?: boolean
     }
@@ -32,7 +32,7 @@ class Heartbeat<Chain extends HoprCoreConnector> implements AbstractInteraction<
     pipe(
       struct.stream,
       (source: any) => {
-        return async function* (this: Heartbeat<Chain>) {
+        return async function* (this: Heartbeat) {
           if (this.options?.timeoutIntentionally) {
             return await new Promise((resolve) => setTimeout(resolve, HEARTBEAT_TIMEOUT + 100))
           }
