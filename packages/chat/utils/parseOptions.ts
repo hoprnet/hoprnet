@@ -1,5 +1,5 @@
 import type { HoprOptions } from '@hoprnet/hopr-core'
-import { getBootstrapAddresses } from '@hoprnet/hopr-utils'
+import { getBootstrapAddresses, parseHosts } from '@hoprnet/hopr-utils'
 import getopts from 'getopts'
 import PeerInfo from 'peer-info'
 import Multiaddr from 'multiaddr'
@@ -9,41 +9,6 @@ import { decodeMessage } from './message'
 import { knownConnectors } from './knownConnectors'
 
 const listConnectors = new ListConnctor()
-
-function parseHosts(): HoprOptions['hosts'] {
-  const hosts: HoprOptions['hosts'] = {}
-
-  if (process.env['HOST_IPV4'] !== undefined) {
-    const str = process.env['HOST_IPV4'].replace(/\/\/.+/, '').trim()
-    const params = str.match(/([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})\:([0-9]{1,6})/)
-    if (params == null || params.length != 3) {
-      throw Error(`Invalid IPv4 host. Got ${styleValue(str, 'highlight')}`)
-    }
-
-    hosts.ip4 = {
-      ip: params[1],
-      port: parseInt(params[2])
-    }
-  }
-
-  if (process.env['HOST_IPV6'] !== undefined) {
-    const str = process.env['HOST_IPV6'].replace(/\/\/.+/, '').trim()
-    const params = str.match(
-      /\[([0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}|[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:\:[0-9a-fA-F]{1,4}|[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:\:[0-9a-fA-F]{1,4}|[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:\:[0-9a-fA-F]{1,4}|[0-9a-fA-F]{1,4}\:\:[0-9a-fA-F]{1,4}|\:\:[0-9a-fA-F]{1,4}|\:\:)\]\:([0-9]{1,6})/
-    )
-
-    if (params == null || params.length != 3) {
-      throw Error(`Invalid IPv6 host. Got ${styleValue(str, 'highlight')}`)
-    }
-
-    hosts.ip6 = {
-      ip: params[1],
-      port: parseInt(params[2])
-    }
-  }
-
-  return hosts
-}
 
 /**
  * Parses the given command-line options and returns a configuration object.
