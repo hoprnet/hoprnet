@@ -13,15 +13,15 @@ describe('test acknowledgement generation', function () {
   it('should generate a valid acknowledgement', async function () {
     const paymentChannels = ({
       utils: Utils,
-      types: new Types(),
+      types: new Types()
     } as unknown) as HoprCoreConnector
 
     const sender = await PeerId.create({
-      keyType: 'secp256k1',
+      keyType: 'secp256k1'
     })
 
     const receiver = await PeerId.create({
-      keyType: 'secp256k1',
+      keyType: 'secp256k1'
     })
 
     const secret = randomBytes(32)

@@ -92,7 +92,7 @@ describe('test connector', function () {
           await Promise.all([
             once(),
             hoprToken.methods.transfer(receiver.address.toHex(), 1).send({ from: owner.address.toHex() }),
-            hoprToken.methods.transfer(receiver.address.toHex(), 1).send({ from: owner.address.toHex() }),
+            hoprToken.methods.transfer(receiver.address.toHex(), 1).send({ from: owner.address.toHex() })
           ])
           await hoprToken.methods.transfer(receiver.address.toHex(), 1).send({ from: owner.address.toHex() })
 
@@ -234,7 +234,7 @@ describe('test withdraw', function () {
     connector = await createNode(alice.privKey)
 
     await hoprToken.methods.mint(alice.address.toHex(), 100, '0x0', '0x0').send({
-      from: alice.address.toHex(),
+      from: alice.address.toHex()
     })
 
     await connector.start()

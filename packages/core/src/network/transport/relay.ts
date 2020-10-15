@@ -48,7 +48,7 @@ import type {
   PeerRouting,
   Registrar,
   Stream
-} from './types'
+} from '../../@types/transport'
 
 class Relay {
   private _dialer: Dialer

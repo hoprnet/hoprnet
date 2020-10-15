@@ -6,7 +6,7 @@ import pipe from 'it-pipe'
 
 import type { AbstractInteraction } from '../abstractInteraction'
 
-import type { Handler } from '../../network/transport/types'
+import type { Handler } from '../../@types/transport'
 
 import { PROTOCOL_PAYMENT_CHANNEL } from '../../constants'
 import type PeerInfo from 'peer-info'
@@ -21,7 +21,6 @@ class Opening<Chain extends HoprCoreConnector> implements AbstractInteraction<Ch
 
   async handler(struct: Handler) {
     pipe(
-      /** prettier-ignore */
       struct.stream,
       this.node.paymentChannels.channel.handleOpeningRequest.bind(this.node.paymentChannels.channel),
       struct.stream
@@ -50,15 +49,10 @@ class Opening<Chain extends HoprCoreConnector> implements AbstractInteraction<Ch
 
     await channel.sign(this.node.paymentChannels.account.keys.onChain.privKey, undefined, {
       bytes: signedChannel.buffer,
-      offset: signedChannel.signatureOffset,
+      offset: signedChannel.signatureOffset
     })
 
-    return await pipe(
-      /* prettier-ignore */
-      [signedChannel],
-      struct.stream,
-      this.collect.bind(this)
-    )
+    return await pipe([signedChannel], struct.stream, this.collect.bind(this))
   }
 
   private async collect(source: any) {
@@ -77,7 +71,7 @@ class Opening<Chain extends HoprCoreConnector> implements AbstractInteraction<Ch
 
     return this.node.paymentChannels.types.SignedChannel.create({
       bytes: result.buffer,
-      offset: result.byteOffset,
+      offset: result.byteOffset
     })
   }
 }

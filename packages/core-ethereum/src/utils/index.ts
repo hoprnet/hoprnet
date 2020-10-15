@@ -117,7 +117,7 @@ export async function sign(
 
   const response = new Signature(arr, {
     signature: result.signature,
-    recovery: result.recid,
+    recovery: result.recid
   })
 
   return response
@@ -253,7 +253,7 @@ export async function waitFor({
   web3,
   network,
   getCurrentBlock,
-  timestamp,
+  timestamp
 }: {
   web3: Web3
   network: addresses.Networks
@@ -278,7 +278,7 @@ export async function waitFor({
     web3,
     network,
     getCurrentBlock,
-    timestamp: await getCurrentBlock().then((block) => Number(block.timestamp) * 1e3),
+    timestamp: await getCurrentBlock().then((block) => Number(block.timestamp) * 1e3)
   })
 }
 
@@ -316,6 +316,8 @@ export function getNetworkName(chainId: number): addresses.Networks {
       return 'solkol'
     case 100:
       return 'xdai'
+    case 137:
+      return 'matic'
     default:
       return 'private'
   }
@@ -350,24 +352,22 @@ export function TransactionSigner(web3: Web3, privKey: Uint8Array) {
   const privKeyStr = new Hash(privKey).toHex()
 
   return async function signTransaction<T>(
-    // return of our contract method in web3.Contract instance
-    txObject: TransactionObject<T>,
     // config put in .send
-    txConfig: TransactionConfig
+    txConfig: TransactionConfig,
+    // return of our contract method in web3.Contract instance
+    txObject?: TransactionObject<T>
   ) {
-    const abi = txObject.encodeABI()
-    // estimation is not always right, adding some more
-    // const estimatedGas = Math.floor((await txObject.estimateGas()) * 1.25)
-    const estimatedGas = 200e3
-    const estimatedGasPrice = 1e9
+    const abi = txObject ? txObject.encodeABI() : undefined
+    const gas = 200e3
+    const gasPrice = 1e9
 
     // @TODO: provide some of the values to avoid multiple calls
     const signedTransaction = await web3.eth.accounts.signTransaction(
       {
-        gas: estimatedGas,
-        gasPrice: estimatedGasPrice,
+        gas,
+        gasPrice,
         ...txConfig,
-        data: abi,
+        data: abi
       },
       privKeyStr
     )
@@ -382,7 +382,7 @@ export function TransactionSigner(web3: Web3, privKey: Uint8Array) {
 
     return {
       send,
-      transactionHash: signedTransaction.transactionHash,
+      transactionHash: signedTransaction.transactionHash
     }
   }
 }
@@ -425,7 +425,7 @@ export function getSignatureParameters(
   return {
     r: signature.signature.slice(0, 32),
     s: signature.signature.slice(32, 64),
-    v: signature.recovery,
+    v: signature.recovery
   }
 }
 

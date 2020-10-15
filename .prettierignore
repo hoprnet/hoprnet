@@ -26,3 +26,6 @@ packages/core-ethereum/src/tsc/web3
 
 # prettier breaks scss
 *.scss
+
+# Breaks github actions with recursive commits
+.github

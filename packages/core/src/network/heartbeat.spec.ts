@@ -25,21 +25,21 @@ describe('check heartbeat mechanism', function () {
       modules: {
         transport: [TCP],
         streamMuxer: [MPLEX],
-        connEncryption: [SECIO],
-      },
+        connEncryption: [SECIO]
+      }
     })) as Hopr<HoprCoreConnector>
 
     node.peerInfo.multiaddrs.add(Multiaddr('/ip4/0.0.0.0/tcp/0'))
 
     node.interactions = {
       network: {
-        heartbeat: new HeartbeatInteraction(node),
-      },
+        heartbeat: new HeartbeatInteraction(node)
+      }
     } as Hopr<HoprCoreConnector>['interactions']
 
     node.network = {
       heartbeat: new Heartbeat(node),
-      peerStore: new PeerStore(node),
+      peerStore: new PeerStore(node)
     } as Hopr<HoprCoreConnector>['network']
 
     node.peerRouting.findPeer = (_: PeerId) => Promise.reject(Error('not implemented'))
@@ -50,12 +50,7 @@ describe('check heartbeat mechanism', function () {
   }
 
   it('should initialise the heartbeat module and start the heartbeat functionality', async function () {
-    const [Alice, Bob, Chris] = await Promise.all([
-      /* prettier-ignore */
-      generateNode(),
-      generateNode(),
-      generateNode(),
-    ])
+    const [Alice, Bob, Chris] = await Promise.all([generateNode(), generateNode(), generateNode()])
 
     await new Promise((resolve) => setTimeout(resolve, 100))
 
@@ -69,7 +64,7 @@ describe('check heartbeat mechanism', function () {
           resolve()
         })
       }),
-      Alice.interactions.network.heartbeat.interact(Bob.peerInfo.id),
+      Alice.interactions.network.heartbeat.interact(Bob.peerInfo.id)
     ])
 
     assert(
@@ -100,7 +95,7 @@ describe('check heartbeat mechanism', function () {
     await Promise.all([
       /* pretier-ignore */
       Alice.stop(),
-      Bob.stop(),
+      Bob.stop()
     ])
   })
 })

@@ -11,7 +11,7 @@ import {
   SignedChannel,
   SignedTicket,
   Ticket,
-  TicketEpoch,
+  TicketEpoch
 } from '../types'
 import { ChannelStatus } from '../types/channel'
 import { waitForConfirmation, getId, events, pubKeyToAccountId, sign, isPartyA } from '../utils'
@@ -47,6 +47,11 @@ class ChannelFactory {
       await waitForConfirmation(
         (
           await this.coreConnector.signTransaction(
+            {
+              from: (await this.coreConnector.account.address).toHex(),
+              to: this.coreConnector.hoprToken.options.address,
+              nonce: await this.coreConnector.account.nonce
+            },
             this.coreConnector.hoprToken.methods.send(
               this.coreConnector.hoprChannels.options.address,
               amount.toString(),
@@ -54,12 +59,7 @@ class ChannelFactory {
                 ['address', 'address'],
                 [(await this.coreConnector.account.address).toHex(), counterparty.toHex()]
               )
-            ),
-            {
-              from: (await this.coreConnector.account.address).toHex(),
-              to: this.coreConnector.hoprToken.options.address,
-              nonce: await this.coreConnector.account.nonce,
-            }
+            )
           )
         ).send()
       )
@@ -86,7 +86,7 @@ class ChannelFactory {
             throw err
           }
         }
-      ),
+      )
     ])
 
     if (onChain != offChain) {
@@ -120,20 +120,20 @@ class ChannelFactory {
     const ticket = new Ticket(
       {
         bytes: signedTicket.buffer,
-        offset: signedTicket.ticketOffset,
+        offset: signedTicket.ticketOffset
       },
       {
         counterparty,
         challenge,
         epoch: new TicketEpoch(0),
         amount: new Balance(0),
-        winProb,
+        winProb
       }
     )
 
     await sign(await ticket.hash, this.coreConnector.account.keys.onChain.privKey, undefined, {
       bytes: signedTicket.buffer,
-      offset: signedTicket.signatureOffset,
+      offset: signedTicket.signatureOffset
     })
 
     return signedTicket
@@ -154,7 +154,7 @@ class ChannelFactory {
     if (signedChannel.signature.eq(EMPTY_SIGNATURE)) {
       await signedChannel.channel.sign(this.coreConnector.account.keys.onChain.privKey, undefined, {
         bytes: signedChannel.buffer,
-        offset: signedChannel.signatureOffset,
+        offset: signedChannel.signatureOffset
       })
     }
 
@@ -174,12 +174,11 @@ class ChannelFactory {
     // const hashedSecret = await this.coreConnector.hashedSecret.check()
     // if (!hashedSecret.initialized) await this.coreConnector.initOnchainValues()
 
-    console.log(`sign`, sign, `channelBalance`, channelBalance)
     if (await this.isOpen(counterpartyPubKey)) {
       const record = await this.coreConnector.db.get(Buffer.from(this.coreConnector.dbKeys.Channel(counterpartyPubKey)))
       signedChannel = new SignedChannel({
         bytes: record.buffer,
-        offset: record.byteOffset,
+        offset: record.byteOffset
       })
       channel = new Channel(this.coreConnector, counterpartyPubKey, signedChannel)
     } else if (sign != null && channelBalance != null) {
@@ -199,12 +198,12 @@ class ChannelFactory {
       await waitForConfirmation(
         (
           await this.coreConnector.signTransaction(
-            this.coreConnector.hoprChannels.methods.openChannel(counterparty.toHex()),
             {
               from: (await this.coreConnector.account.address).toHex(),
               to: this.coreConnector.hoprChannels.options.address,
-              nonce: await this.coreConnector.account.nonce,
-            }
+              nonce: await this.coreConnector.account.nonce
+            },
+            this.coreConnector.hoprChannels.methods.openChannel(counterparty.toHex())
           )
         ).send()
       )
@@ -226,13 +225,13 @@ class ChannelFactory {
       this.coreConnector.db
         .createReadStream({
           gte: Buffer.from(this.coreConnector.dbKeys.Channel(new Uint8Array(Hash.SIZE).fill(0x00))),
-          lte: Buffer.from(this.coreConnector.dbKeys.Channel(new Uint8Array(Hash.SIZE).fill(0xff))),
+          lte: Buffer.from(this.coreConnector.dbKeys.Channel(new Uint8Array(Hash.SIZE).fill(0xff)))
         })
         .on('error', (err) => reject(err))
         .on('data', ({ key, value }: { key: Buffer; value: Buffer }) => {
           const signedChannel = new SignedChannel({
             bytes: value.buffer,
-            offset: value.byteOffset,
+            offset: value.byteOffset
           })
 
           promises.push(
@@ -266,7 +265,7 @@ class ChannelFactory {
         const msg = _msg.slice()
         const signedChannel = new SignedChannel({
           bytes: msg.buffer,
-          offset: msg.byteOffset,
+          offset: msg.byteOffset
         })
 
         const counterpartyPubKey = await signedChannel.signer
@@ -326,7 +325,7 @@ class ChannelFactory {
     return new Promise((resolve, reject) => {
       const subscription = this.coreConnector.web3.eth.subscribe('logs', {
         address: this.coreConnector.hoprChannels.options.address,
-        topics: events.OpenedChannelTopics(self, counterparty, true),
+        topics: events.OpenedChannelTopics(self, counterparty, true)
       })
 
       subscription
@@ -348,16 +347,12 @@ class ChannelFactory {
   }
 
   async onceClosed(self: Public, counterparty: Public) {
-    const channelId = await getId(
-      // prettier-ignore
-      await self.toAccountId(),
-      await counterparty.toAccountId()
-    )
+    const channelId = await getId(await self.toAccountId(), await counterparty.toAccountId())
 
     return new Promise((resolve, reject) => {
       const subscription = this.coreConnector.web3.eth.subscribe('logs', {
         address: this.coreConnector.hoprChannels.options.address,
-        topics: events.ClosedChannelTopics(self, counterparty, true),
+        topics: events.ClosedChannelTopics(self, counterparty, true)
       })
 
       subscription

@@ -193,7 +193,7 @@ export default class HoprEthereum implements HoprCoreConnector {
         // start channels indexing
         this.indexer.start(),
         // always call init on-chain values,
-        this.initOnchainValues(),
+        this.initOnchainValues()
       ])
 
       this._status = 'initialized'
@@ -225,21 +225,24 @@ export default class HoprEthereum implements HoprCoreConnector {
     return new Promise<string>(async (resolve, reject) => {
       try {
         if (currency === 'NATIVE') {
-          this.web3.eth
-            .sendTransaction({
-              from: (await this.account.address).toHex(),
-              to: recipient,
-              nonce: await this.account.nonce,
-              value: amount,
-            })
-            .on('transactionHash', (txHash) => resolve(txHash))
-            .catch((err) => reject(err))
-        } else {
-          const tx = await this.signTransaction(this.hoprToken.methods.transfer(recipient, amount), {
+          const tx = await this.signTransaction({
             from: (await this.account.address).toHex(),
-            to: this.hoprToken.options.address,
+            to: recipient,
             nonce: await this.account.nonce,
+            value: amount
           })
+
+          tx.send()
+          resolve(tx.transactionHash)
+        } else {
+          const tx = await this.signTransaction(
+            {
+              from: (await this.account.address).toHex(),
+              to: this.hoprToken.options.address,
+              nonce: await this.account.nonce
+            },
+            this.hoprToken.methods.transfer(recipient, amount)
+          )
 
           tx.send()
           resolve(tx.transactionHash)
@@ -270,17 +273,13 @@ export default class HoprEthereum implements HoprCoreConnector {
       reconnect: {
         auto: true,
         delay: 1000, // ms
-        maxAttempts: 30,
-      },
+        maxAttempts: 30
+      }
     })
 
     const web3 = new Web3(provider)
 
-    const [chainId, publicKey] = await Promise.all([
-      /* prettier-ignore */
-      utils.getChainId(web3),
-      utils.privKeyToPubKey(seed),
-    ])
+    const [chainId, publicKey] = await Promise.all([utils.getChainId(web3), utils.privKeyToPubKey(seed)])
     const network = utils.getNetworkName(chainId) as Networks
 
     if (typeof config.CHANNELS_ADDRESSES[network] === 'undefined') {

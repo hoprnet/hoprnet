@@ -41,7 +41,7 @@ class PeerStore<Chain extends HoprCoreConnector> {
     for (const peerInfo of node.peerStore.peers.values()) {
       this.peers.push({
         id: peerInfo.id.toB58String(),
-        lastSeen: 0,
+        lastSeen: 0
       })
     }
 
@@ -98,7 +98,7 @@ class PeerStore<Chain extends HoprCoreConnector> {
     verbose('blacklisting', peer)
     const entry = {
       id: peer,
-      deletedAt: Date.now(),
+      deletedAt: Date.now()
     }
 
     // (Efficiently) pushes peer information into blacklist

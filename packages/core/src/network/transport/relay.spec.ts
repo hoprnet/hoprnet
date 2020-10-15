@@ -11,7 +11,7 @@ import SECIO = require('libp2p-secio')
 // @ts-ignore
 import TCP from 'libp2p-tcp'
 
-import { Handler, MultiaddrConnection, Stream, Upgrader } from './types'
+import { Handler, MultiaddrConnection, Stream } from '../../@types/transport'
 
 import Multiaddr from 'multiaddr'
 import PeerInfo from 'peer-info'
@@ -84,7 +84,6 @@ describe('should create a socket and connect to it', function () {
 
     node.handle(TEST_PROTOCOL, (handler: Handler) => {
       pipe(
-        /* prettier-ignore */
         handler.stream,
         // echoing msg
         handler.stream
@@ -105,7 +104,6 @@ describe('should create a socket and connect to it', function () {
         ipv4: true,
         connHandler: (conn: MultiaddrConnection) => {
           pipe(
-            /* prettier-ignore */
             conn,
             (source: Stream['source']) => {
               return (async function* () {
@@ -232,7 +230,6 @@ describe('should create a socket and connect to it', function () {
     //     ipv4: true,
     //     connHandler: (handler: Handler & { counterparty: PeerId }) => {
     //       pipe(
-    //         /* prettier-ignore */
     //         handler.stream,
     //         (source: AsyncIterable<Uint8Array>) => {
     //           return (async function* () {
@@ -265,7 +262,6 @@ describe('should create a socket and connect to it', function () {
     //   [relay.peerInfo]
     // )
     // await pipe(
-    //   /* prettier-ignore */
     //   (async function * () {
     //     yield new Uint8Array([1])
     //     yield new Uint8Array([2])
@@ -286,7 +282,6 @@ describe('should create a socket and connect to it', function () {
     //   ipv4: true,
     //   connHandler: async (handler: Handler & { counterparty: PeerId }) => {
     //     pipe(
-    //       /* prettier-ignore */
     //       handler.stream,
     //       async (source: AsyncIterable<Uint8Array>) => {
     //         for (let i = 0; i < 2; i++) {
@@ -327,7 +322,6 @@ describe('should create a socket and connect to it', function () {
     //     ipv4: true,
     //     connHandler: (handler: Handler & { counterparty: PeerId }) => {
     //       pipe(
-    //         /* prettier-ignore */
     //         handler.stream,
     //         (source: AsyncIterable<Uint8Array>) => {
     //           return (async function* () {
@@ -353,7 +347,6 @@ describe('should create a socket and connect to it', function () {
     //   [relay.peerInfo]
     // )
     // pipe(
-    //   // prettier-ignore
     //   (async function* () {
     //     yield new Uint8Array([i++])
     //     await new Promise(resolve => setTimeout(resolve, 500))
@@ -366,7 +359,6 @@ describe('should create a socket and connect to it', function () {
     //       ipv4: true,
     //       connHandler: (handler: Handler & { counterparty: PeerId }) => {
     //         pipe(
-    //           /* prettier-ignore */
     //           handler.stream,
     //           (source: AsyncIterable<Uint8Array>) => {
     //             return (async function * () {
@@ -395,7 +387,6 @@ describe('should create a socket and connect to it', function () {
     //       ipv4: true,
     //       connHandler: (handler: Handler & { counterparty: PeerId }) => {
     //         pipe(
-    //           /* prettier-ignore */
     //           handler.stream,
     //           (source: AsyncIterable<Uint8Array>) => {
     //             return (async function * () {

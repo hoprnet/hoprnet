@@ -1,8 +1,9 @@
 {
   "name": "@hoprnet/hopr-testing",
-  "version": "1.17.0-alpha.58",
-  "repository": "https://github.com/hoprnet/hopr-testing.git",
-  "homepage": "https://hoprnet.org/",
+  "version": "1.17.6",
+  "description": "",
+  "repository": "https://github.com/hoprnet/hoprnet.git",
+  "homepage": "https://hoprnet.org",
   "license": "GPL-3.0-only",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
@@ -14,34 +15,23 @@
     "yarn.lock"
   ],
   "engines": {
-    "node": ">=12.9.1",
-    "yarn": ">=1.19.2"
+    "node": "12",
+    "yarn": "1"
   },
   "scripts": {
+    "clean": "rimraf ./lib",
     "build": "yarn clean && tsc -p . --noEmit false",
-    "clean": "rm -rf ./lib",
-    "lint": "prettier --check .",
-    "prepare": "yarn build"
+    "prepublishOnly": "yarn build"
   },
   "dependencies": {
-    "@hoprnet/hopr-demo-seeds": "1.8.0",
+    "@hoprnet/hopr-demo-seeds": "1.17.6",
+    "debug": "^4.1.1",
     "ganache-core": "^2.12.1"
   },
   "devDependencies": {
     "@types/node": "^13.13.4",
-    "husky": "^4.2.5",
     "prettier": "^2.0.5",
+    "rimraf": "^3.0.2",
     "typescript": "^4.0.3"
-  },
-  "husky": {
-    "hooks": {
-      "pre-commit": "yarn lint"
-    }
-  },
-  "prettier": {
-    "tabWidth": 2,
-    "semi": false,
-    "singleQuote": true,
-    "printWidth": 120
   }
 }

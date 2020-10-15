@@ -8,7 +8,7 @@ import {
   KEYPAIR_SCRYPT_PARAMS,
   KEYPAIR_IV_LENGTH,
   KEYPAIR_CIPHER_KEY_LENGTH,
-  KEYPAIR_MESSAGE_DIGEST_ALGORITHM,
+  KEYPAIR_MESSAGE_DIGEST_ALGORITHM
 } from '.'
 
 /**
@@ -30,6 +30,6 @@ export async function serializeKeyPair(peerId: PeerId, password: Uint8Array) {
   return encode([
     salt,
     createHmac(KEYPAIR_MESSAGE_DIGEST_ALGORITHM, key).update(encodedCipherText).digest(),
-    encodedCipherText,
+    encodedCipherText
   ])
 }

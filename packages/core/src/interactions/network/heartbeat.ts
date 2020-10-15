@@ -7,7 +7,7 @@ import debug from 'debug'
 import AbortController from 'abort-controller'
 import pipe from 'it-pipe'
 import { PROTOCOL_HEARTBEAT } from '../../constants'
-import type { Stream, Connection, Handler } from '../../network/transport/types'
+import type { Stream, Connection, Handler } from '../../@types/transport'
 import type PeerId from 'peer-id'
 
 const error = debug('hopr-core:heartbeat:error')
@@ -91,18 +91,13 @@ class Heartbeat<Chain extends HoprCoreConnector> implements AbstractInteraction<
       const challenge = randomBytes(16)
       const expectedResponse = createHash(HASH_FUNCTION).update(challenge).digest()
 
-      await pipe(
-        /** prettier-ignore */
-        [challenge],
-        struct.stream,
-        async (source: AsyncIterable<Uint8Array>) => {
-          for await (const msg of source) {
-            if (u8aEquals(msg, expectedResponse)) {
-              break
-            }
+      await pipe([challenge], struct.stream, async (source: AsyncIterable<Uint8Array>) => {
+        for await (const msg of source) {
+          if (u8aEquals(msg, expectedResponse)) {
+            break
           }
         }
-      )
+      })
 
       clearTimeout(timeout)
 

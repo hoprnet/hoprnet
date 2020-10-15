@@ -22,11 +22,11 @@ const Header: React.FC<HeaderProps> = ({ available = '', locked = '' }: HeaderPr
       <Box d="flex" className={styles.stats}>
         <Box>
           <p>
-            <strong className="green">{available.length > 1 ? parseFloat(available).toFixed(4) : '0.00'}</strong> xHOPR
+            <strong className="green">{available.length > 1 ? parseFloat(available).toFixed(4) : '0.00'}</strong> HOPR
             Available
           </p>
           <p>
-            <strong className="blue">{locked.length > 1 ? parseFloat(locked).toFixed(4) : '0.00'}</strong> xHOPR Sent
+            <strong className="blue">{locked.length > 1 ? parseFloat(locked).toFixed(4) : '0.00'}</strong> HOPR Sent
           </p>
         </Box>
         <Box ml="10px">

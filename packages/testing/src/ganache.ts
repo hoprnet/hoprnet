@@ -9,10 +9,10 @@ const DEFAULT_OPS: Ganache.IServerOptions = {
   port: 9545,
   accounts: accounts.map((account) => ({
     secretKey: account,
-    balance,
+    balance
   })),
   gasLimit: 0xfffffffffff,
-  gasPrice: '1',
+  gasPrice: '1'
 }
 
 class CustomGanache {
@@ -22,7 +22,7 @@ class CustomGanache {
   constructor(customOps: Ganache.IServerOptions = {}) {
     this.ops = {
       ...DEFAULT_OPS,
-      ...customOps,
+      ...customOps
     }
   }
 

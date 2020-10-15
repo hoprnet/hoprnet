@@ -28,8 +28,8 @@ describe('test crawler', function () {
       modules: {
         transport: [TCP],
         streamMuxer: [MPLEX],
-        connEncryption: [SECIO],
-      },
+        connEncryption: [SECIO]
+      }
     })) as Hopr<HoprCoreConnector>
 
     node.peerInfo.multiaddrs.add(Multiaddr(addr))
@@ -40,14 +40,14 @@ describe('test crawler', function () {
 
     node.interactions = {
       network: {
-        crawler: new CrawlerInteraction(node),
-      },
+        crawler: new CrawlerInteraction(node)
+      }
     } as Hopr<HoprCoreConnector>['interactions']
 
     new Interactions(node)
     node.network = {
       crawler: new Crawler(node, options),
-      peerStore: new PeerStore(node),
+      peerStore: new PeerStore(node)
     } as Hopr<HoprCoreConnector>['network']
 
     node.on('peer:connect', (peerInfo: PeerInfo) => node.peerStore.put(peerInfo))
@@ -61,7 +61,7 @@ describe('test crawler', function () {
       generateNode(),
       generateNode(),
       generateNode(),
-      generateNode(),
+      generateNode()
     ])
 
     await Alice.network.crawler.crawl()
@@ -143,14 +143,7 @@ describe('test crawler', function () {
 
     assert(Alice.network.peerStore.has(Bob.peerInfo.id.toB58String()))
 
-    await Promise.all([
-      /* prettier-ignore */
-      Alice.stop(),
-      Bob.stop(),
-      Chris.stop(),
-      Dave.stop(),
-      Eve.stop(),
-    ])
+    await Promise.all([Alice.stop(), Bob.stop(), Chris.stop(), Dave.stop(), Eve.stop()])
   })
 
   it(
@@ -161,11 +154,11 @@ describe('test crawler', function () {
       const [Alice, Bob, Chris] = await Promise.all([
         generateNode(),
         generateNode({
-          timeoutIntentionally: true,
+          timeoutIntentionally: true
         }),
         generateNode({
-          timeoutIntentionally: true,
-        }),
+          timeoutIntentionally: true
+        })
       ])
 
       await Alice.network.crawler.crawl()
@@ -193,12 +186,7 @@ describe('test crawler', function () {
         `Crawling should timeout correctly`
       )
 
-      await Promise.all([
-        /* prettier-ignore */
-        Alice.stop(),
-        Bob.stop(),
-        Chris.stop(),
-      ])
+      await Promise.all([Alice.stop(), Bob.stop(), Chris.stop()])
     },
     durations.seconds(8)
   )

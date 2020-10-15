@@ -7,7 +7,6 @@ import { Stream } from './types'
 import Debug from 'debug'
 const log = Debug(`hopr-core:transport`)
 const verbose = Debug(`hopr-core:verbose:transport`)
-
 const error = Debug(`hopr-core:transport:error`)
 
 import { RELAY_STATUS_PREFIX, STOP, RESTART, RELAY_WEBRTC_PREFIX, RELAY_PAYLOAD_PREFIX } from './constants'

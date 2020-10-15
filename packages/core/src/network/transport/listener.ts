@@ -10,7 +10,7 @@ const verbose = debug('hopr-core:verbose:listener:error')
 
 import { socketToConn } from './socket-to-conn'
 import { CODE_P2P } from './constants'
-import { MultiaddrConnection, Connection, Upgrader, Libp2pServer } from './types'
+import { MultiaddrConnection, Connection, Upgrader, Libp2pServer } from '../../@types/transport'
 import Multiaddr from 'multiaddr'
 
 import { handleStunRequest, getExternalIp } from './stun'
@@ -177,7 +177,7 @@ class Listener extends EventEmitter {
     const address = this.tcpSocket.address() as AddressInfo
 
     if (this.externalAddress != null && this.externalAddress.port == null) {
-      console.log(`Attention: Bidirectional NAT detected. Publishing no public IPv4 address to the DHT`)
+      log(`Attention: Bidirectional NAT detected. Publishing no public IPv4 address to the DHT`)
 
       addrs.push(Multiaddr(`/p2p/${this.peerId}`))
 

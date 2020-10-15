@@ -9,7 +9,7 @@ import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
 import PeerInfo from 'peer-info'
 
 describe('test hopr-core', function () {
-  let ganache 
+  let ganache
   let node
 
   beforeAll(async function () {
@@ -22,7 +22,7 @@ describe('test hopr-core', function () {
     await ganache.stop()
   })
 
-  afterEach(async function(){
+  afterEach(async function () {
     await node.stop()
   })
 
@@ -39,9 +39,9 @@ describe('test hopr-core', function () {
         hosts: {
           ip4: {
             ip: '0.0.0.0',
-            port: getNewPort(),
-          },
-        },
+            port: getNewPort()
+          }
+        }
       })
 
       assert(node != null, `Node creation must not lead to 'undefined'`)
@@ -63,13 +63,12 @@ describe('test hopr-core', function () {
         hosts: {
           ip4: {
             ip: '0.0.0.0',
-            port: getNewPort(),
-          },
+            port: getNewPort()
+          }
         },
-        bootstrapServers: [new PeerInfo(peerId)],
+        bootstrapServers: [new PeerInfo(peerId)]
       })
     },
     durations.seconds(3)
   )
-
 })

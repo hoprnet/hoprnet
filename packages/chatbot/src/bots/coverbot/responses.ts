@@ -5,12 +5,12 @@ import { BotCommands, NodeStates, ScoreRewards } from './state'
 
 export const BotResponses = {
   [BotCommands.rules]: `\n
-    Welcome to the xHOPR incentivized network!
+    Welcome to the HOPR incentivized network!
 
     1. Load ${COVERBOT_XDAI_THRESHOLD} xDAI into your HOPR Ethereum Address
     2. Post a tweet with your HOPR Address and the tag #HOPRNetwork
     3. Send me the link to your tweet (don't delete it!)
-    4. Every time you're chosen to relay a message, you'll score ${ScoreRewards.relayed} points and receive xHOPR!
+    4. Every time you're chosen to relay a message, you'll score ${ScoreRewards.relayed} points and receive HOPR!
 
     Visit https://saentis.hoprnet.org for more information and scoreboard
   `,
@@ -66,7 +66,7 @@ export const NodeStateResponses = {
     `,
   [NodeStates.verifiedNode]: `\n
       Verification successful! I’ll shortly use you as a cover traffic node
-      and pay you in xHOPR tokens for your service.
+      and pay you in HOPR tokens for your service.
   
       For more information, go to https://saentis.hoprnet.org
   

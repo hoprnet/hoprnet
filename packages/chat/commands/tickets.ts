@@ -1,26 +1,22 @@
-import chalk from 'chalk'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import { moveDecimalPoint } from '@hoprnet/hopr-utils'
-import { SendMessageBase } from './sendMessage'
-import { countSignedTickets, getSignedTickets } from '../utils'
+import { AbstractCommand } from './abstractCommand'
+import { countSignedTickets, toSignedTickets, styleValue } from '../utils'
 
-export default class Tickets extends SendMessageBase {
+export default class Tickets extends AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {
-    super(node)
+    super()
   }
 
-  name() {
+  public name() {
     return 'tickets'
   }
 
-  help() {
-    return 'lists information about redeemed and unredeemed tickets'
+  public help() {
+    return 'Displays information about your redeemed and unredeemed tickets'
   }
 
-  /**
-   * @param query channelId to query tickets for
-   */
   public async execute(): Promise<string | void> {
     try {
       const { Balance } = this.node.paymentChannels.types
@@ -34,14 +30,15 @@ export default class Tickets extends SendMessageBase {
       }
 
       const ackTickets = results.map((o) => o.ackTicket)
-      const unredeemedResults = countSignedTickets(await getSignedTickets(ackTickets))
+      const unredeemedResults = countSignedTickets(await toSignedTickets(ackTickets))
       const unredeemedAmount = moveDecimalPoint(unredeemedResults.total.toString(), Balance.DECIMALS * -1)
 
-      return `Found ${chalk.blue(unredeemedResults.tickets.length)} unredeemed tickets with a sum of ${chalk.blue(
-        unredeemedAmount
+      return `Found ${styleValue(unredeemedResults.tickets.length)} unredeemed tickets with a sum of ${styleValue(
+        unredeemedAmount,
+        'number'
       )} HOPR.`
     } catch (err) {
-      return chalk.red(err.message)
+      return styleValue(err.message, 'failure')
     }
   }
 }
