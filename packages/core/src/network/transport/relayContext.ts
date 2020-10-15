@@ -72,6 +72,8 @@ class RelayContext {
       } else {
         await switchPromise
       }
+      console.log(`source iteration after promise.race`, `sourceDone`, sourceDone, `sourcePromise`, sourcePromise, `switchPromise`, switchPromise)
+
 
       if (sourceReceived) {
         sourceReceived = false
