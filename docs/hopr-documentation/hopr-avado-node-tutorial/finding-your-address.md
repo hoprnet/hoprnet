@@ -36,7 +36,3 @@ To find your own address, type `myAddress`. Once again, you'll need to click the
   
 Now that we've scoped out the network, it's time to start sending some messages. The next section will explain how.
 
-
-
-
-
