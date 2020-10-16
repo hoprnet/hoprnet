@@ -1,0 +1,57 @@
+body {
+  font-family: "Nunito", sans-serif;
+  background: $white-alt;
+}
+
+//
+.main-container {
+  width: 100%;
+  margin: auto;
+  left: 3%;
+  position: relative;
+}
+
+.menu-container {
+  margin: auto;
+  left: 3%;
+  right: 3%;
+  position: absolute;
+}
+
+// TEXT
+p.paragraph-copy {
+  font-size: 0.9em;
+  letter-spacing: 0.01em;
+  text-align: center;
+  color: #414141;
+  font-weight: 200;
+  span {
+    font-weight: 600;
+  }
+}
+p.paragraph {
+  font-weight: normal;
+  font-size: 0.9em;
+  letter-spacing: 0.01em;
+  line-height: 1.5em;
+  text-align: left;
+  color: #414141;
+  span {
+    font-weight: 600;
+  }
+}
+
+//
+hr {
+  margin: 3vh 0;
+  height: 0.02em;
+  background: #e3e3e3;
+  border: 0;
+}
+
+hr.hr-alert {
+  margin: 1em 0 .5em 0;
+  height: 0.02em;
+  background: #e3e3e3;
+  border: 0;
+}

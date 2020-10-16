@@ -1,0 +1,81 @@
+.box {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  p {
+    padding: 0;
+    margin: 0;
+  }
+}
+
+.box {
+  padding: 1em;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: $shadow;
+}
+
+.box-border {
+  border-radius: 8px;
+  border: 1px solid #e3e3e3;
+  display: flex;
+  flex-wrap: wrap;
+  & > div {
+    width: 50%;
+    padding: 1em 2em;
+    box-sizing: border-box;
+
+    &:nth-last-child(2) {
+        border-top: 1px solid #e3e3e3;
+        border-right: 0px solid #e3e3e3;
+      }
+    &:nth-last-child(3) {
+      border-left: 1px solid #e3e3e3;
+    }
+    &:last-child {
+      border-top: 1px solid #e3e3e3;
+      border-left: 1px solid #e3e3e3;
+    }
+    h3,
+    p {
+      padding: 0;
+      margin: 0;
+    }
+    h3{
+        font-size: 1em;
+        font-weight: 700;
+    }
+    p {
+      color: $black;
+      font-size: 0.89em;
+      font-weight: 600;
+    }
+
+    &:nth-child(even) {
+      h3 {
+        color: $blue;
+      }
+    }
+    &:nth-child(odd) {
+      h3 {
+        color: $green;
+      }
+    }
+  }
+}
+
+
+.box-info{
+    p{
+        color: $black;
+        font-size: 1em;
+        font-weight:200 ;
+        span{
+            font-size: 0.89em;
+            font-weight: 600;
+        }
+    }
+}
