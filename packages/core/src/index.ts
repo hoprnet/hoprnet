@@ -313,6 +313,11 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
     return {latency, info}
   }
 
+
+  getConnectedPeers(): PeerId[] {
+    return this.network.networkPeers.peers.map(x => x.id)
+  }
+
   /**
    * Takes a destination and samples randomly intermediate nodes
    * that will relay that message before it reaches its destination.

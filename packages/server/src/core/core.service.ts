@@ -143,7 +143,7 @@ export class CoreService {
     const id = this.node.peerInfo.id.toB58String()
     const multiAddresses = this.node.peerInfo.multiaddrs.toArray().map((multiaddr) => multiaddr.toString())
 
-    const connectedNodes = this.node.network.networkPeers.peers.length
+    const connectedNodes = this.node.getConnectedPeers().length
 
     return {
       id,

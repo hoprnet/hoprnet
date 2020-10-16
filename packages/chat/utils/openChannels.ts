@@ -18,12 +18,10 @@ export function getPeers(
     noBootstrapNodes: false
   }
 ): PeerId[] {
-  let peers = node.network.networkPeers.peers.map((peer) => peer.id)
+  let peers = node.getConnectedPeers()
 
   if (ops.noBootstrapNodes) {
-    peers = peers.filter((peerId) => {
-      return !isBootstrapNode(node, peerId)
-    })
+    peers = peers.filter((peerId) => !isBootstrapNode(node, peerId))
   }
 
   return peers
