@@ -16,9 +16,9 @@ class CrawlResponse extends Uint8Array {
     if (arr != null && struct == null) {
       super(arr)
     } else if (arr == null && struct != null) {
-      if (struct.addresses  == null) {
+      if (struct.addresses == null) {
         if (struct.status == CrawlStatus.OK) {
-          throw Error(`Cannot have successful crawling responses without any peerInfos.`)
+          throw Error(`Cannot have successful crawling responses without any addresses.`)
         }
         super(u8aConcat(toU8a(struct.status, ENUM_LENGTH)))
       } else if (struct.status == CrawlStatus.OK) {
