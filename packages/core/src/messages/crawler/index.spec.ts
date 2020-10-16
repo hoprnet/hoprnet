@@ -37,7 +37,7 @@ describe('test crawl response generation', function () {
     )
 
     const id2 = await PeerId.create({ keyType: 'secp256k1' })
-    addresses.push(new Multiaddr(`/ip4/192.168.1.1/tcp/90191/p2p/${id2.toB58String()}`))
+    addresses.push(new Multiaddr(`/ip4/192.168.1.1/tcp/9011/p2p/${id2.toB58String()}`))
 
     const secondSuccessfulResponse = new CrawlResponse(undefined, {
       status: CrawlStatus.OK,

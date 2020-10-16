@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/chat-bot",
-  "version": "1.22.0-alpha.0",
+  "version": "1.23.0-alpha.0",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -27,10 +27,10 @@
     "yarn": "1"
   },
   "dependencies": {
-    "@hoprnet/hopr-core": "1.22.0-alpha.0",
-    "@hoprnet/hopr-core-connector-interface": "1.22.0-alpha.0",
-    "@hoprnet/hopr-core-ethereum": "1.22.0-alpha.0",
-    "@hoprnet/hopr-utils": "1.22.0-alpha.0",
+    "@hoprnet/hopr-core": "1.23.0-alpha.0",
+    "@hoprnet/hopr-core-connector-interface": "1.23.0-alpha.0",
+    "@hoprnet/hopr-core-ethereum": "1.23.0-alpha.0",
+    "@hoprnet/hopr-utils": "1.23.0-alpha.0",
     "@hoprnet/twitter-api-client": "^0.1.8",
     "@linkdrop/sdk": "1.1.6",
     "debug": "4.2.0",
@@ -51,7 +51,7 @@
     "@types/jest": "26.0.3",
     "@types/node": "~12",
     "@typescript-eslint/eslint-plugin": "4.0.0",
-    "@typescript-eslint/parser": "3.0.2",
+    "@typescript-eslint/parser": "3.10.1",
     "eslint": "7.11.0",
     "eslint-config-prettier": "^6.10.0",
     "eslint-plugin-import": "^2.20.1",
