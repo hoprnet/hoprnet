@@ -15,6 +15,7 @@ To withdraw xDAI, simply specify the amount and the destination address. Because
 ```text
 withdraw [amount] native [ETH address]
 ```
+
 {% endtab %}
 
 {% tab title="Withdrawing xHOPR" %}
@@ -25,6 +26,6 @@ To withdraw, type:
 ```text
 withdraw [amount] HOPR [ETH address]
 ```
+
 {% endtab %}
 {% endtabs %}
-

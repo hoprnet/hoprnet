@@ -7,8 +7,8 @@ description: How to open and close payment channels
 Sending data privately through the HOPR network involves multiple hops via relay nodes. Nodes are incentivized for providing this service, so hops are only possible between nodes with open and funded payment channels. Payment channels are funded with HOPR tokens, and any unspent HOPR tokens are returned once the payment channel is closed. To fund your node with HOPR tokens see [**Funding Your Node**](funding-your-node.md).
 
 {% hint style="danger" %}
-Payment channels need to be funded with HOPR tokens. Before we proceed, make sure you have xHOPR in your node. You can type `balance` to check.   
-  
+Payment channels need to be funded with HOPR tokens. Before we proceed, make sure you have xHOPR in your node. You can type `balance` to check.
+
 These xHOPR won't be spent \(RandoBot has no way to redeem tickets to claim xHOPR\), but you still need to stake them in the channel. To get xHOPR, ask in our Telegram or Discord channel. Remember you need to send to you wallet \(xDAI\) address, not the HOPR address.
 {% endhint %}
 
@@ -18,8 +18,8 @@ These xHOPR won't be spent \(RandoBot has no way to redeem tickets to claim xHOP
 
 To open a channel with another node, you need to specify the node address and the amount of HOPR you want to fund the channel with.
 
-To open a payment channel in HOPR Chat, you need to type `open`, followed by the address of the node you want to open the channel to. You will then be asked for the amount of xHOPR you want to fund the channel with.  
-  
+To open a payment channel in HOPR Chat, you need to type `open`, followed by the address of the node you want to open the channel to. You will then be asked for the amount of xHOPR you want to fund the channel with.
+
 So to open a channel to RandoBot and fund it with 0.01 xHOPR, type:
 
 ```text
@@ -30,7 +30,7 @@ You'll then be asked how much HOPR you want to stake, along with your balance fo
 
 ```text
 > open 16Uiu2HAmNtoQri1X4ikUzCqjFQptRSLSVKnVzMmtZiCHCHkdWJr7
-How many HOPR (0.0080000000000268 HOPR available) shall get staked? : 
+How many HOPR (0.0080000000000268 HOPR available) shall get staked? :
 ```
 
 At the prompt, type an amount to stake. Fees in the testnet are minimal, so any amount should be fine. For example:
@@ -108,7 +108,7 @@ To make things easier, you can press `Tab` to autocomplete the node address. If 
 Sending message to myNode ...
 Sending message to 16Uiu2HAmHcHPaB9a64oMRWVESThWQyKAqKCS1QNg5q3sGiia4wce ...
 Please select intermediate node 0: (leave empty to exit)
-16Uiu2HAmNtoQri1X4ikUzCqjFQptRSLSVKnVzMmtZiCHCHkdWJr7     
+16Uiu2HAmNtoQri1X4ikUzCqjFQptRSLSVKnVzMmtZiCHCHkdWJr7
 ```
 
 You will now be asked to enter the node address for the second hop. Since there are no more payment channels to hop through, just press `Enter` and the process will end. The message will now be sent to your node via RandoBot.
@@ -175,4 +175,3 @@ Finally, check your balance with `balance`. You'll see that the tokens you stake
 {% hint style="info" %}
 Because RandoBot cannot redeem tickets, you'll get all of your staked xHOPR back, even though you sent a multi-hop message. Normally, you would expect the node at the other end of the party to redeem their tickets, reducing your balance slightly.  
 {% endhint %}
-

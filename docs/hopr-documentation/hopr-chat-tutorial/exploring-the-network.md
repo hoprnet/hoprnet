@@ -4,8 +4,8 @@ description: 'Checking for other online nodes, and finding your HOPR node addres
 
 # Exploring The Network
 
-Now that your node is up and running, it's time to explore the network.   
-  
+Now that your node is up and running, it's time to explore the network.
+
 Type `crawl` and you will see a message detailing how many other nodes are visible to your node. For example:
 
 ```text
@@ -21,7 +21,7 @@ Next, type `listConnectedPeers` to see the addresses of the other nodes which ar
 
 ```text
 > listConnectedPeers
-Connected to: 
+Connected to:
  - 16Uiu2HAmV5PD9zKrNyY6cvCo7WWKXCLze7gGg3sz5XFfEooyaS9x
  - 16Uiu2HAmPLuTQ3KqQM2wGSyPm7gwXNeaR9R92mAEFCgL9r4e8uTx
  - 16Uiu2HAmHBYFwcBnv51WNLpd91VjTkysQXPVEAv9q9GVNDJN3Wci
@@ -41,4 +41,3 @@ xDAI Address:  0xabe565d06c810dac59a02560ea4ea83cda2e995f
 ```
 
 Now that we've scoped out the network, it's time to start sending some messages. The next section will explain how.
-

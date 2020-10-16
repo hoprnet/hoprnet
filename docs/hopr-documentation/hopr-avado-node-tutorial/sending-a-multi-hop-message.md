@@ -4,20 +4,20 @@ description: Send your first multi-hop message
 
 # Sending A Multi-hop Message Using A Payment Channel
 
-When you send data via HOPR, there needs to be an open and funded payment channel between every two nodes in the route \(except the penultimate node and the recipient\). For example, if we send a message from Alejandro to Zoe via Betty, Chao and Dmitry, there needs to be three open funded channels: between Alejandro and Betty, Betty and Chao, and Chao and Dmitry.  
-  
+When you send data via HOPR, there needs to be an open and funded payment channel between every two nodes in the route \(except the penultimate node and the recipient\). For example, if we send a message from Alejandro to Zoe via Betty, Chao and Dmitry, there needs to be three open funded channels: between Alejandro and Betty, Betty and Chao, and Chao and Dmitry.
+
 This is because HOPR is an incentivized mixnet, and users need to be able to prove they have the funds available to send data. \(Also, opening and closing payment channels happens on the blockchain, which takes time. It's not possible to open payment channels on demand and still send data quickly.\)
 
 {% hint style="danger" %}
-Payment channels need to be funded with HOPR tokens. Before we proceed, make sure you have xHOPR in your node. You can type `balance` to check.   
-  
+Payment channels need to be funded with HOPR tokens. Before we proceed, make sure you have xHOPR in your node. You can type `balance` to check.
+
 These xHOPR won't be spent \(RandoBot has no way to redeem tickets to claim xHOPR\), but you still need to stake them in the channel. To get xHOPR, ask in our Telegram or Discord channel. Remember you need to send to you wallet \(xDAI\) address, not the HOPR address.
 {% endhint %}
 
 ### Open A Payment Channel To RandoBot
 
-To open a payment channel on your AVADO node, you need to type `open`, followed by the address of the node you want to open the channel to, followed by the amount of xHOPR you want to fund the channel with.  
-  
+To open a payment channel on your AVADO node, you need to type `open`, followed by the address of the node you want to open the channel to, followed by the amount of xHOPR you want to fund the channel with.
+
 So to open a channel to RandoBot and fund it with 0.01 xHOPR, type:
 
 ```text
@@ -99,4 +99,3 @@ Finally, check your balance with `balance`. You'll see that the tokens you stake
 {% hint style="info" %}
 Because RandoBot cannot redeem tickets, you'll get all of your staked xHOPR back, even though you sent a multi-hop message. Normally, you would expect the node at the other end of the party to redeem their tickets, reducing your balance slightly.
 {% endhint %}
-

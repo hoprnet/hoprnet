@@ -24,7 +24,7 @@ If everything if working correctly, you should receive a pong back from the bot.
 
 ![](../.gitbook/assets/avado-ping-randobot.png)
 
-If you can't ping the bot, please check the [**Troubleshooting**](../hopr-chat-tutorial/troubleshooting.md) ****guide or ask for help in Telegram or Discord.
+If you can't ping the bot, please check the [**Troubleshooting**](../hopr-chat-tutorial/troubleshooting.md) \*\*\*\*guide or ask for help in Telegram or Discord.
 
 ## Step 2: Turn On includeRecipient
 
@@ -104,4 +104,3 @@ Congratulations! You have successfully sent a message through the HOPR Network!
 {% hint style="info" %}
 If you get a `Timeout Error,` please run `crawl` a few times. At the beginning of your HOPR Chat session, your node might have yet to discover RandoBot, so try again later or report your error to our [Discord](https://discord.gg/5FWSfq7) channel.
 {% endhint %}
-

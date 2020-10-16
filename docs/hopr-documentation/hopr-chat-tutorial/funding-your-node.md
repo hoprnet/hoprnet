@@ -4,10 +4,10 @@ description: Funding your node with native and HOPR tokens
 
 # Funding Your Node
 
-Next, you need to send tokens to your HOPR node. To use HOPR, you'll need two types of token: 
+Next, you need to send tokens to your HOPR node. To use HOPR, you'll need two types of token:
 
-* a HOPR token
-* the native token of the blockchain the HOPR token is linked to
+- a HOPR token
+- the native token of the blockchain the HOPR token is linked to
 
 In our current testnet, the native token is xDAI \(xDAI is a sidechain of Ethereum\) and the HOPR token is xHOPR\).
 
@@ -24,8 +24,8 @@ If your node is unfunded, you can find your xDAI address by simply starting the 
 You can ask for xDAI in our [**Telegram**](https://t.me/hoprnet) or [**Discord**](https://discord.gg/dEAWC4G) channels. A HOPR ambassador will be glad to fund your wallet. If you need more instructions on how to buy and send xDAI, head [**here**](../core-concepts/tokens/native-tokens.md#getting-xdai).
 
 {% hint style="warning" %}
-You'll spend a \(very\) small amount of xDAI when you perform actions which interact with the HOPR smart contracts, such as opening and closing payment channels and redeeming tickets after relaying data.  
-  
+You'll spend a \(very\) small amount of xDAI when you perform actions which interact with the HOPR smart contracts, such as opening and closing payment channels and redeeming tickets after relaying data.
+
 Currently, HOPR Chat doesn't always notify you if an action has failed due to lack of funds. So if things aren't behaving as expected use `balance` to check you aren't low on xDAI. More notifications will be added in future versions.
 {% endhint %}
 
@@ -35,8 +35,8 @@ Later, you can check your balance by typing `balance`\(because the HOPR mainnet 
 
 ### Getting xHOPR
 
-There are two ways to get xHOPR on your node: sending it directly to the node address or earning it by relaying data and redeeming tickets. For testing purposes, we recommend funding your node directly. Ask in [**Telegram**](https://t.me/hoprnet) or [**Discord**](https://discord.gg/dEAWC4G) and one of our ambassadors will fund your node.  
-  
+There are two ways to get xHOPR on your node: sending it directly to the node address or earning it by relaying data and redeeming tickets. For testing purposes, we recommend funding your node directly. Ask in [**Telegram**](https://t.me/hoprnet) or [**Discord**](https://discord.gg/dEAWC4G) and one of our ambassadors will fund your node.
+
 To learn more about earning xHOPR by relaying data, see the sections on [**Multi-hop messages**](opening-and-closing-payment-channels.md) and [**Tickets**](redeeming-tickets.md).
 
 ### Checking Your Balance
@@ -54,6 +54,7 @@ To withdraw xDAI, simply specify the amount and the destination address. Because
 ```text
 withdraw [amount] ETH [ETH address]
 ```
+
 {% endtab %}
 
 {% tab title="Withdrawing xHOPR" %}
@@ -64,6 +65,6 @@ To withdraw, type:
 ```text
 withdraw [amount] HOPR [ETH address]
 ```
+
 {% endtab %}
 {% endtabs %}
-
