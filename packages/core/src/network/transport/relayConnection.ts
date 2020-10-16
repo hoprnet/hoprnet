@@ -129,7 +129,7 @@ class RelayConnection implements MultiaddrConnection {
               yield
               log(`RESTART received, reconnectReceived: ${__reconnectCounter++}`)
             } else {
-              error(`Received invalid status message ${received.slice(1)}. Dropping message.`)
+              error(`Received invalid status message ${SUFFIX}. Dropping message.`)
             }
           } else if (u8aEquals(PREFIX, RELAY_WEBRTC_PREFIX)) {
             // console.log(`Receiving fancy WebRTC message`, JSON.parse(new TextDecoder().decode(received.slice(1))))
