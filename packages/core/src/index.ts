@@ -306,12 +306,7 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
     if (!PeerId.isPeerId(destination)) {
       throw Error(`Expecting a non-empty destination.`)
     }
-
-    try {
-      return await this.interactions.network.heartbeat.interact(destination)
-    } catch (err) {
-      throw Error(`node unreachable`)
-    }
+    return await this.interactions.network.heartbeat.interact(destination)
   }
 
   /**
