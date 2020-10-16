@@ -2,13 +2,18 @@ body {
   font-family: "Nunito", sans-serif;
   background: $white-alt;
 }
-
+// 
+.only-mobile-view{
+  @media (min-width: 767px)  {
+    display:none!important;
+  }
+}
 //
 .main-container {
-  width: 100%;
+  box-sizing: border-box;
   margin: auto;
-  left: 3%;
-  position: relative;
+  display: block;
+  width: 90%;
 }
 
 .menu-container {

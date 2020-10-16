@@ -21,22 +21,30 @@ const Menu = ({ activaMenu }) => {
         <div className="menu-container">
           <div>
             <ul>
-              <li className="active">
-                <img src="/assets/icons/home.svg" alt="hopr HOME" />
-                <p>HOME</p>
-              </li>
-              <li>
-                <img src="/assets/icons/top.svg" alt="hopr Top ASSETS" />
-                <p>TOP ASSETS</p>
-              </li>
-              <li>
-                <img src="/assets/icons/discord.svg" alt="hopr DISCORD" />
-                <p>DISCORD</p>
-              </li>
-              <li>
-                <img src="/assets/icons/help.svg" alt="hopr HELP" />
-                <p>HELP</p>
-              </li>
+              <Link href="/">
+                <li className="active">
+                  <img src="/assets/icons/home.svg" alt="hopr HOME" />
+                  <p>HOME</p>
+                </li>
+              </Link>
+              <Link href="/top-assets">
+                <li>
+                  <img src="/assets/icons/top.svg" alt="hopr Top ASSETS" />
+                  <p>TOP ASSETS</p>
+                </li>
+              </Link>
+              <Link href="https://discord.com/invite/wUSYqpD">
+                <li>
+                  <img src="/assets/icons/discord.svg" alt="hopr DISCORD" />
+                  <p>DISCORD</p>
+                </li>
+              </Link>
+              <Link href="/help">
+                <li>
+                  <img src="/assets/icons/help.svg" alt="hopr HELP" />
+                  <p>HELP</p>
+                </li>
+              </Link>
             </ul>
 
             <hr />

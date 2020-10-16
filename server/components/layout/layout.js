@@ -10,12 +10,12 @@ const Layout = ({ children }) => {
   const [activaMenu, setactivaMenu] = useState(false);
 
   return (
-    <div>
+    <>
       <Head>
         <title>hopr</title>
       </Head>
       <header>
-        <nav className="navbar">
+        <nav className="navbar only-mobile-view">
           <div className="icon-logo">
             <img  className={[activaMenu ? "open" : ""]} src="/assets/brand/logo.svg" alt="hopr" />
           </div>
@@ -56,7 +56,7 @@ const Layout = ({ children }) => {
           Thanks for helping us create the <span> HOPR network. </span>
         </p>
       </div>
-    </div>
+    </>
   );
 };
 
