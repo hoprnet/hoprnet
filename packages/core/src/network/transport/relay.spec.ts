@@ -83,7 +83,6 @@ describe('should create a socket and connect to it', function () {
   }
 
   it('should create a node and echo a single message', async function () {
-
     let [sender, relay, counterparty] = await Promise.all([
       generateNode({ id: 0, ipv4: true }),
       generateNode({ id: 1, ipv4: true }),

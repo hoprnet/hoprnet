@@ -25,13 +25,13 @@ docker pull hopr/chat
 
 ### HOPR Chat
 
-- Source Code - https://github.com/hoprnet/hoprnet/tree/v1.17.0-alpha.73/packages/chat
-- Binary - https://github.com/hoprnet/hopr-chat/releases/tag/v1.17.0-alpha.basodino.rc-3
+- Source Code - [https://github.com/hoprnet/hoprnet/tree/v1.17.0-alpha.73/packages/chat](https://github.com/hoprnet/hoprnet/tree/v1.17.0-alpha.73/packages/chat)
+- Binary - [https://github.com/hoprnet/hopr-chat/releases/tag/v1.17.0-alpha.basodino.rc-3](https://github.com/hoprnet/hopr-chat/releases/tag/v1.17.0-alpha.basodino.rc-3)
 - Docker Image - gcr.io/hoprassociation/hopr-chat:v1.17.0-alpha.basodino.rc-3
 
 ### HOPRd
 
-- Source Code - https://github.com/hoprnet/hoprnet/tree/v1.17.0-alpha.73/packages/hoprd
+- Source Code - [https://github.com/hoprnet/hoprnet/tree/v1.17.0-alpha.73/packages/hoprd](https://github.com/hoprnet/hoprnet/tree/v1.17.0-alpha.73/packages/hoprd)
 
 ### Others
 

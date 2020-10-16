@@ -10,7 +10,7 @@ import SECIO = require('libp2p-secio')
 
 import PeerId from 'peer-id'
 
-import { Connection, Handler} from '../../@types/transport'
+import { Connection, Handler } from '../../@types/transport'
 
 import TCP from '.'
 import Multiaddr from 'multiaddr'
