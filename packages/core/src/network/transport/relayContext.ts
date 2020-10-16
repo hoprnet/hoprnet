@@ -94,7 +94,8 @@ class RelayContext {
               } else if (u8aEquals(SUFFIX, RESTART)) {
                 verbose(`RESTART relayed`)
               } else {
-                error(`Invalid status message. Got <${u8aToHex(SUFFIX)}>`)
+                error(`received status message`, SUFFIX)
+                //error(`Invalid status message. Got <${u8aToHex(SUFFIX)}>`)
               }
             }
 

@@ -305,15 +305,11 @@ class TCP {
     //   console.log(new TextDecoder().decode(msg.slice()))
     // }
 
-    try {
-      newConn = await this._upgrader.upgradeOutbound({
-        ...relayConnection,
-        sink: BtoA.sink,
-        source: AtoB.source
-      } as MultiaddrConnection)
-    } catch (err) {
-      console.log(err)
-    }
+    newConn = await this._upgrader.upgradeOutbound({
+      ...relayConnection,
+      sink: BtoA.sink,
+      source: AtoB.source
+    } as MultiaddrConnection)
 
     return newConn
     // }
