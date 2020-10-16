@@ -151,6 +151,7 @@
 
 .box .box-main-area{
   padding: 0 1em;
+  overflow: hidden;
   p{
     color: $black;
     font-size: 0.9em;
@@ -182,4 +183,8 @@
       }
     }
   }
+}
+
+.box-main-area .box-container-table{
+  padding: 0!important;
 }

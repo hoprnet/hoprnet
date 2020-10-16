@@ -1,6 +1,10 @@
+
 import Layout from "../components/layout/layout.js";
 
+
+
 export default function Home() {
+
   return (
     <Layout>
       <div className="box">
@@ -27,7 +31,9 @@ export default function Home() {
           </div>
         </div>
         <div className="box-main-area">
+          <div className="box-container-table">
 
+          </div>
         </div>
       </div>
     </Layout>

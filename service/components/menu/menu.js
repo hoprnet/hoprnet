@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { useRouter } from 'next/router';
+import { useRouter } from "next/router";
 import Link from "next/link";
 import "../../styles/main.scss";
 
-const useUser = () => ({ user: null, loading: false })
+const useUser = () => ({ user: null, loading: false });
 
 const Menu = ({ activaMenu }) => {
   const router = useRouter();
@@ -18,7 +18,6 @@ const Menu = ({ activaMenu }) => {
       setModal(false);
     }, 4000);
   };
-  
 
   return (
     <>
@@ -27,25 +26,27 @@ const Menu = ({ activaMenu }) => {
           <div>
             <ul>
               <Link href="/">
-                <li className={[router.pathname == "/" ? "active" : ""]} >
+                <li className={[router.pathname == "/" ? "active" : ""]}>
                   <img src="/assets/icons/home.svg" alt="hopr HOME" />
                   <p>HOME</p>
                 </li>
               </Link>
               <Link href="/top-assets">
-              <li className={[router.pathname == "/top-assets" ? "active" : ""]} >
+                <li
+                  className={[router.pathname == "/top-assets" ? "active" : ""]}
+                >
                   <img src="/assets/icons/top.svg" alt="hopr Top ASSETS" />
                   <p>TOP ASSETS</p>
                 </li>
               </Link>
               <Link href="https://discord.com/invite/wUSYqpD">
-              <li >
+                <li>
                   <img src="/assets/icons/discord.svg" alt="hopr DISCORD" />
                   <p>DISCORD</p>
                 </li>
               </Link>
               <Link href="/help">
-              <li className={[router.pathname == "/help" ? "active" : ""]} >
+                <li className={[router.pathname == "/help" ? "active" : ""]}>
                   <img src="/assets/icons/help.svg" alt="hopr HELP" />
                   <p>HELP</p>
                 </li>
@@ -55,9 +56,9 @@ const Menu = ({ activaMenu }) => {
             <hr />
             <div className="quick-code">
               <p>HOPR node</p>
-              <div className="hash">
+              <div className="hash" onClick={() => copyCodeToClipboard()}>
                 <p>{hash}</p>
-                <div onClick={() => copyCodeToClipboard()}>
+                <div>
                   <img src="/assets/icons/copy.svg" alt="copy" />
                 </div>
               </div>
@@ -65,13 +66,16 @@ const Menu = ({ activaMenu }) => {
             <hr />
             <div className="twitter-line-menu">
               <div>
-                <a href="#" target="_blank">
+                <a href="https://twitter.com/hoprnet" target="_blank">
                   <img src="/assets/icons/twitter.svg" alt="twitter" />
                   <p>@hoprnet</p>
                 </a>
               </div>
               <div>
-                <a href="#" target="_blank">
+                <a
+                  href="https://twitter.com/intent/tweet?original_referer=https%3A%2F%2Fsaentis.hoprnet.org%2F&amp;ref_src=twsrc%5Etfw&amp;related=hoprnet&amp;text=Signing%20up%20to%20earn%20%24HOPR%20on%20the%20%23HOPRnetwork.%20My%20%40hoprnet%20address%20is%3A%20&amp;tw_p=tweetbutton"
+                  target="_blank"
+                >
                   <img src="/assets/icons/twitter.svg" alt="twitter" />
                   <p>#HOPRNetwork</p>
                 </a>
