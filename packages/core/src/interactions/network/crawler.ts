@@ -13,8 +13,8 @@ import chalk from 'chalk'
 import type { AbstractInteraction } from '../abstractInteraction'
 
 import { PROTOCOL_CRAWLING } from '../../constants'
-import type PeerInfo from 'peer-info'
 import PeerId from 'peer-id'
+import Multiaddr from 'multiaddr'
 
 import { CrawlResponse, CrawlStatus } from '../../messages'
 
@@ -29,9 +29,9 @@ class Crawler<Chain extends HoprCoreConnector> implements AbstractInteraction {
     pipe(this.node.network.crawler.handleCrawlRequest(struct.connection), struct.stream)
   }
 
-  interact(counterparty: PeerId, options: { signal: AbortSignal }): Promise<PeerInfo[]> {
+  interact(counterparty: PeerId, options: { signal: AbortSignal }): Promise<Multiaddr[]> {
     verbose('crawl interact', counterparty.toB58String())
-    return new Promise<PeerInfo[]>(async (resolve) => {
+    return new Promise<Multiaddr[]>(async (resolve) => {
       let resolved = false
       const onAbort = () => {
         options.signal.removeEventListener('abort', onAbort)
@@ -62,7 +62,7 @@ class Crawler<Chain extends HoprCoreConnector> implements AbstractInteraction {
         return
       }
 
-      const peerInfos = []
+      const addresses = []
       for await (const encodedResponse of struct.stream.source) {
         let decodedResponse: any
         try {
@@ -75,11 +75,11 @@ class Crawler<Chain extends HoprCoreConnector> implements AbstractInteraction {
           continue
         }
 
-        peerInfos.push(...(await decodedResponse.peerInfos))
+        addresses.push(...(await decodedResponse.addresses))
       }
 
       if (!resolved) {
-        return resolve(peerInfos)
+        return resolve(addresses)
       }
     })
   }

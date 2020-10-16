@@ -1,5 +1,4 @@
 import chalk from 'chalk'
-import PeerInfo from 'peer-info'
 import AbortController from 'abort-controller'
 import { getTokens } from '../utils'
 import { randomSubset, randomInteger } from '@hoprnet/hopr-utils'
@@ -14,10 +13,10 @@ import { peerHasOnlyPublicAddresses, isOnPrivateNet, PRIVATE_NETS } from '../fil
 import debug from 'debug'
 import Multiaddr from 'multiaddr'
 import { Crawler as CrawlInteraction } from '../interactions/network/crawler'
-import { PeerStore } from 'libp2p'
 
 const log = debug('hopr-core:crawler')
 const verbose = debug('hopr-core:verbose:crawler')
+const blue = chalk.blue
 
 const MAX_PARALLEL_REQUESTS = 7
 export const CRAWL_TIMEOUT = 2 * 1000
@@ -42,7 +41,8 @@ class Crawler {
     private id: PeerId,
     private networkPeers: NetworkPeerStore,
     private crawlInteraction: CrawlInteraction<any>,
-    private peerStore: PeerStore,
+    private getPeer: (PeerId) => Multiaddr[],
+    private putPeer: (Multiaddr) => void, 
     private options?: {
       timeoutIntentionally?: boolean
     }
@@ -135,7 +135,7 @@ class Crawler {
        * that were previously unknown.
        */
       const queryNode = async (peer: string, token: Token): Promise<void> => {
-        let peerInfos: PeerInfo[]
+        let addresses: Multiaddr[]
 
         if (isDone()) {
           promises[token] = undefined
@@ -154,44 +154,34 @@ class Crawler {
           contactedPeerIds.add(peer)
 
           try {
-            log(`querying ${chalk.blue(peer)}`)
+            log(`querying ${blue(peer)}`)
             const peerId = PeerId.createFromB58String(peer)
-            peerInfos = await this.crawlInteraction.interact(peerId, {
+            addresses = await this.crawlInteraction.interact(peerId, {
               signal: abort.signal
             })
 
-            const peerInfo = this.peerStore.get(peerId)
-            if (peerInfo && peerHasOnlyPublicAddresses(peerInfo)) {
+            const addrs = this.getPeer(peerId)
+            if (addrs && peerHasOnlyPublicAddresses(addrs)) {
               // The node we are connecting to is on a remote network
               // and gives us addresses on a private network, then they are
               // not going to work for us. We should filter these out when we are
               // requested for a crawl, but in this instance they have given us
               // some anyway.
-              peerInfos.forEach((p) => {
-                p.multiaddrs.forEach((ma) => {
-                  if (isOnPrivateNet(ma)) {
-                    p.multiaddrs.delete(ma)
-                  }
-                })
-              })
+              addresses = addresses.filter((ma) => !isOnPrivateNet(ma))
             }
 
-            log(
-              `received [${peerInfos.map((p) => chalk.blue(p.id.toB58String())).join(', ')}] from peer ${chalk.blue(
-                peer
-              )}`
-            )
+            log(`received [${addresses.map((p) => blue(p.getPeerId())).join(', ')}] from peer ${blue(peer)}`)
           } catch (err) {
             verbose('error querying peer', err)
-            peerInfos = undefined
+            addresses = undefined
             errors.push(err)
             continue
           }
 
-          for (let i = 0; i < peerInfos.length; i++) {
-            const peerString = peerInfos[i].id.toB58String()
+          for (let i = 0; i < addresses.length; i++) {
+            const peerString = addresses[i].getPeerId()
 
-            if (peerInfos[i].id.isEqual(this.id)) {
+            if (addresses[i].getPeerId() == this.id.toB58String()) {
               continue
             }
 
@@ -207,7 +197,7 @@ class Crawler {
               if (comparator == null || comparator(peerString)) {
                 current = current + this.networkPeers.length - beforeInserting
               }
-              this.peerStore.put(peerInfos[i])
+              this.putPeer(addresses[i])
             }
           }
 
@@ -247,7 +237,7 @@ class Crawler {
     })
   }
 
-  async answerCrawl(callerId: PeerId, callerAddress: Multiaddr): Promise<PeerInfo[]> {
+  async answerCrawl(callerId: PeerId, callerAddress: Multiaddr): Promise<Multiaddr[]> {
     if (this.options?.timeoutIntentionally) {
       await new Promise((resolve) => setTimeout(resolve, CRAWL_TIMEOUT + 100))
     }
@@ -259,18 +249,10 @@ class Crawler {
       amountOfNodes,
       (entry: Entry) => entry.id !== this.id.toB58String() && entry.id !== callerId.toB58String()
     ).map((peer) => {
-      // convert peerId to peerInfo
-      const found = this.peerStore.get(PeerId.createFromB58String(peer.id))
-      const result = new PeerInfo(PeerId.createFromB58String(peer.id))
-      if (found) {
-        found.multiaddrs
-          .toArray()
-          .filter((ma) => shouldIncludePeerInCrawlResponse(ma, callerAddress))
-          .forEach((ma) => result.multiaddrs.add(ma))
-      }
-      return result
+      const found = this.getPeer(PeerId.createFromB58String(peer.id))
+      return found.filter((ma) => shouldIncludePeerInCrawlResponse(ma, callerAddress))
     })
-    return selectedNodes
+    return selectedNodes.flat()
   }
 
   handleCrawlRequest(conn: Connection) {
@@ -280,7 +262,7 @@ class Crawler {
       if (selectedNodes.length > 0) {
         yield new CrawlResponse(undefined, {
           status: CrawlStatus.OK,
-          peerInfos: selectedNodes
+          addresses: selectedNodes
         })
       } else {
         yield new CrawlResponse(undefined, {
