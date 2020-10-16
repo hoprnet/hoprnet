@@ -18,7 +18,7 @@ export function getPeers(
     noBootstrapNodes: false
   }
 ): PeerId[] {
-  let peers = node.network.peerStore.peers.map((peer) => PeerId.createFromB58String(peer.id))
+  let peers = node.network.networkPeers.peers.map((peer) => peer.id)
 
   if (ops.noBootstrapNodes) {
     peers = peers.filter((peerId) => {

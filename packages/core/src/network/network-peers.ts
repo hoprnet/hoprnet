@@ -92,6 +92,10 @@ class NetworkPeers {
     return this.peers.findIndex((entry: Entry) => entry.id === peer) >= 0
   }
 
+  hasBlacklisted(peer:PeerId): boolean {
+    return this.deletedPeers.findIndex((entry: BlacklistedEntry) => entry.id === peer) >= 0
+  }
+
   top(n: number): Entry[] {
     return heap.heaptop(this.peers, n, this.compare)
   }

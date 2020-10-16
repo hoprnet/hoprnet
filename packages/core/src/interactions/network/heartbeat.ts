@@ -15,11 +15,6 @@ const HASH_FUNCTION = 'blake2s256'
 
 export const HEARTBEAT_TIMEOUT = durations.seconds(3)
 
-export type HeartbeatResponse = {
-  latency: number,
-  info: string,
-}
-
 class Heartbeat implements AbstractInteraction {
   protocols: string[] = [PROTOCOL_HEARTBEAT]
 
@@ -53,10 +48,10 @@ class Heartbeat implements AbstractInteraction {
   }
 
 
-  async interact(counterparty: PeerId): Promise<HeartbeatResponse> {
+  async interact(counterparty: PeerId): Promise<number> {
     const start = Date.now()
 
-    return new Promise<HeartbeatResponse>(async (resolve, reject) => {
+    return new Promise<number>(async (resolve, reject) => {
       // There is an assumption here that we 'know' how to contact this peer
       // and therefore we are immediately trying to dial, rather than checking
       // our peerRouting info first.
@@ -115,10 +110,7 @@ class Heartbeat implements AbstractInteraction {
       clearTimeout(timeout)
 
       if (!aborted) {
-        resolve({
-          latency: Date.now() - start,
-          info: ''
-        })
+        resolve(Date.now() - start)
       }
     })
 

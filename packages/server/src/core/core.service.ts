@@ -143,7 +143,7 @@ export class CoreService {
     const id = this.node.peerInfo.id.toB58String()
     const multiAddresses = this.node.peerInfo.multiaddrs.toArray().map((multiaddr) => multiaddr.toString())
 
-    const connectedNodes = this.node.network.peerStore.peers.length
+    const connectedNodes = this.node.network.networkPeers.peers.length
 
     return {
       id,
@@ -158,7 +158,7 @@ export class CoreService {
   ): Promise<{
     latency: number
   }> {
-    const latency = await this.node.ping(PeerId.createFromB58String(peerId))
+    const { latency } = await this.node.ping(PeerId.createFromB58String(peerId))
 
     return {
       latency,

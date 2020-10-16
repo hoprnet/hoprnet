@@ -30,7 +30,6 @@ import PeerInfo from 'peer-info'
 
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { HoprCoreConnectorStatic, Types } from '@hoprnet/hopr-core-connector-interface'
-import type { HeartbeatResponse } from './interactions/network/heartbeat'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 
 import { Interactions } from './interactions'
@@ -302,11 +301,16 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
    * @param destination PeerId of the node
    * @returns latency
    */
-  async ping(destination: PeerId): Promise<HeartbeatResponse> {
+  async ping(destination: PeerId): Promise<{info: string, latency: number}> {
     if (!PeerId.isPeerId(destination)) {
       throw Error(`Expecting a non-empty destination.`)
     }
-    return await this.interactions.network.heartbeat.interact(destination)
+    let info = ''
+    if (this.network.networkPeers.hasBlacklisted(destination)){
+      info = '[Ping blacklisted peer]'
+    }
+    let latency = await this.interactions.network.heartbeat.interact(destination)
+    return {latency, info}
   }
 
   /**
