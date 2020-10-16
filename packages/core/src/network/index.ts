@@ -3,7 +3,7 @@ import type { Interactions } from '../interactions'
 import type { LibP2P } from '../index'
 import { Crawler } from './crawler'
 import Heartbeat from './heartbeat'
-import PeerStore from './peerStore'
+import NetworkPeers from './network-peers'
 import Stun from './stun'
 import Multiaddr from 'multiaddr'
 import PeerId from 'peer-id'
@@ -15,7 +15,7 @@ type TestOpts = {
 class Network {
   public crawler: Crawler
   public heartbeat: Heartbeat
-  public peerStore: PeerStore
+  public networkPeers: NetworkPeers
   public stun?: Stun
 
   constructor(node: LibP2P, interactions: Interactions<any>, private options: HoprOptions, testingOptions?: TestOpts) {
@@ -30,11 +30,11 @@ class Network {
       return node.peerStore.get(id).multiaddrs.toArray()
     }
 
-    this.peerStore = new PeerStore(node.peerStore.peers.values())
-    this.heartbeat = new Heartbeat(this.peerStore, interactions.network.heartbeat, node.hangUp)
+    this.networkPeers = new NetworkPeers(node.peerStore.peers.values())
+    this.heartbeat = new Heartbeat(this.networkPeers, interactions.network.heartbeat, node.hangUp)
     this.crawler = new Crawler(
       node.peerInfo.id,
-      this.peerStore,
+      this.networkPeers,
       interactions.network.crawler,
       getPeer,
       putPeer,
@@ -42,7 +42,7 @@ class Network {
     )
 
     node.on('peer:connect', (peerInfo: PeerInfo) => {
-      this.peerStore.onPeerConnect(peerInfo)
+      this.networkPeers.onPeerConnect(peerInfo)
       this.heartbeat.connectionListener(peerInfo)
     })
 

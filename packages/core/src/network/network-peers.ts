@@ -4,8 +4,8 @@ import type PeerInfo from 'peer-info'
 import { durations } from '@hoprnet/hopr-utils'
 
 import debug from 'debug'
-const log = debug('hopr-core:peerStore')
-const verbose = debug('hopr-core:verbose:peerStore')
+const log = debug('hopr-core:network-peers')
+const verbose = debug('hopr-core:verbose:network-peers')
 
 export type Entry = {
   id: string
@@ -19,7 +19,7 @@ export type BlacklistedEntry = {
 
 export const BLACKLIST_TIMEOUT = durations.seconds(47)
 
-class PeerStore {
+class NetworkPeers {
   peers: Entry[]
 
   deletedPeers: BlacklistedEntry[]
@@ -162,4 +162,4 @@ class PeerStore {
   }
 }
 
-export default PeerStore
+export default NetworkPeers

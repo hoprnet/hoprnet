@@ -1,4 +1,4 @@
-import NetworkPeerStore from './peerStore'
+import NetworkPeerStore from './network-peers'
 import debug from 'debug'
 import { getTokens, Token } from '../utils'
 import PeerId from 'peer-id'

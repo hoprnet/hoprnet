@@ -13,7 +13,7 @@ import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import { Heartbeat as HeartbeatInteraction } from '../interactions/network/heartbeat'
 
 import Heartbeat from './heartbeat'
-import NetworkPeerStore from './peerStore'
+import NetworkPeerStore from './network-peers'
 import { Network } from './index'
 
 import assert from 'assert'
@@ -66,29 +66,29 @@ describe('check heartbeat mechanism', function () {
     ])
 
     assert(
-      !Chris.network.peerStore.has(Alice.peerInfo.id.toB58String()),
+      !Chris.network.networkPeers.has(Alice.peerInfo.id.toB58String()),
       `Chris should not know about Alice in the beginning.`
     )
 
     await Alice.dial(Chris.peerInfo)
 
     // Check that the internal state is as expected
-    assert(Alice.network.peerStore.has(Chris.peerInfo.id.toB58String()), `Alice should know about Chris now.`)
-    assert(Alice.network.peerStore.has(Bob.peerInfo.id.toB58String()), `Alice should know about Bob now.`)
-    assert(Chris.network.peerStore.has(Alice.peerInfo.id.toB58String()), `Chris should know about Alice now.`)
-    assert(Bob.network.peerStore.has(Alice.peerInfo.id.toB58String()), `Bob should know about Alice now.`)
+    assert(Alice.network.networkPeers.has(Chris.peerInfo.id.toB58String()), `Alice should know about Chris now.`)
+    assert(Alice.network.networkPeers.has(Bob.peerInfo.id.toB58String()), `Alice should know about Bob now.`)
+    assert(Chris.network.networkPeers.has(Alice.peerInfo.id.toB58String()), `Chris should know about Alice now.`)
+    assert(Bob.network.networkPeers.has(Alice.peerInfo.id.toB58String()), `Bob should know about Alice now.`)
 
     // Simulate a node failure
     await Chris.stop()
 
-    for (let i = 0; i < Alice.network.peerStore.peers.length; i++) {
-      Alice.network.peerStore.peers[i].lastSeen = 0
+    for (let i = 0; i < Alice.network.networkPeers.peers.length; i++) {
+      Alice.network.networkPeers.peers[i].lastSeen = 0
     }
 
     // Check whether a node failure gets detected
     await Alice.network.heartbeat.checkNodes()
 
-    assert(!Alice.network.peerStore.has(Chris.peerInfo.id.toB58String()), `Alice should have removed Chris.`)
+    assert(!Alice.network.networkPeers.has(Chris.peerInfo.id.toB58String()), `Alice should have removed Chris.`)
 
     await Promise.all([
       /* pretier-ignore */

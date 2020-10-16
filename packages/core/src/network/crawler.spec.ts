@@ -15,7 +15,7 @@ import { CRAWL_TIMEOUT, shouldIncludePeerInCrawlResponse } from './crawler'
 import { Crawler as CrawlerInteraction } from '../interactions/network/crawler'
 import Multiaddr from 'multiaddr'
 import { Network } from './index'
-import { BLACKLIST_TIMEOUT, BlacklistedEntry } from './peerStore'
+import { BLACKLIST_TIMEOUT, BlacklistedEntry } from './network-peers'
 import { durations } from '@hoprnet/hopr-utils'
 
 describe('test crawler', function () {
@@ -42,7 +42,7 @@ describe('test crawler', function () {
         /*
           interact: async (peer) => {
             return Promise.resolve(
-              node.network.peerStore.peers.map(
+              node.network.networkPeers.peers.map(
                 x => new PeerInfo(PeerId.createFromB58String((x.id)))
               )
             )
@@ -52,9 +52,9 @@ describe('test crawler', function () {
       }
     } as any) as Hopr<HoprCoreConnector>['interactions']
 
-    node.on('peer:connect', (peerInfo: PeerInfo) => node.peerStore.put(peerInfo))
 
     node.network = new Network(node, node.interactions, {} as any, { crawl: options })
+    node.on('peer:connect', (peerInfo: PeerInfo) => node.peerStore.put(peerInfo))
     return (node as unknown) as Hopr<HoprCoreConnector>
   }
 
@@ -71,20 +71,20 @@ describe('test crawler', function () {
     Alice.emit('peer:connect', Bob.peerInfo)
     await Alice.network.crawler.crawl()
 
-    assert(Alice.network.peerStore.has(Bob.peerInfo.id.toB58String()))
+    assert(Alice.network.networkPeers.has(Bob.peerInfo.id.toB58String()))
 
     Bob.emit('peer:connect', Chris.peerInfo)
     await Alice.network.crawler.crawl()
 
-    assert(Alice.network.peerStore.has(Bob.peerInfo.id.toB58String()))
-    assert(Alice.network.peerStore.has(Chris.peerInfo.id.toB58String()))
+    assert(Alice.network.networkPeers.has(Bob.peerInfo.id.toB58String()))
+    assert(Alice.network.networkPeers.has(Chris.peerInfo.id.toB58String()))
 
     Chris.emit('peer:connect', Dave.peerInfo)
     await Alice.network.crawler.crawl()
 
-    assert(Alice.network.peerStore.has(Bob.peerInfo.id.toB58String()))
-    assert(Alice.network.peerStore.has(Chris.peerInfo.id.toB58String()))
-    assert(Alice.network.peerStore.has(Dave.peerInfo.id.toB58String()))
+    assert(Alice.network.networkPeers.has(Bob.peerInfo.id.toB58String()))
+    assert(Alice.network.networkPeers.has(Chris.peerInfo.id.toB58String()))
+    assert(Alice.network.networkPeers.has(Dave.peerInfo.id.toB58String()))
 
     Bob.emit('peer:connect', Alice.peerInfo)
     Dave.emit('peer:connect', Eve.peerInfo)
@@ -93,36 +93,36 @@ describe('test crawler', function () {
 
     // Simulate node failure
     await Bob.stop()
-    assert(Chris.network.peerStore.has(Bob.peerInfo.id.toB58String()), 'Chris should know about Bob')
+    assert(Chris.network.networkPeers.has(Bob.peerInfo.id.toB58String()), 'Chris should know about Bob')
     // Simulates a heartbeat run that kicks out Bob
-    Alice.network.peerStore.blacklistPeer(Bob.peerInfo.id.toB58String())
+    Alice.network.networkPeers.blacklistPeer(Bob.peerInfo.id.toB58String())
     await Alice.network.crawler.crawl()
 
     assert(
-      !Alice.network.peerStore.has(Bob.peerInfo.id.toB58String()),
-      'Alice should not add Bob to her peerStore after blacklisting him'
+      !Alice.network.networkPeers.has(Bob.peerInfo.id.toB58String()),
+      'Alice should not add Bob to her networkPeers after blacklisting him'
     )
     assert(
-      Alice.network.peerStore.deletedPeers.some((entry: BlacklistedEntry) => entry.id === Bob.peerInfo.id.toB58String())
+      Alice.network.networkPeers.deletedPeers.some((entry: BlacklistedEntry) => entry.id === Bob.peerInfo.id.toB58String())
     )
 
     // Remove Bob from blacklist
-    Alice.network.peerStore.deletedPeers[0].deletedAt -= BLACKLIST_TIMEOUT + 1
+    Alice.network.networkPeers.deletedPeers[0].deletedAt -= BLACKLIST_TIMEOUT + 1
 
     Alice.emit('peer:connect', Chris.peerInfo)
 
     await Alice.network.crawler.crawl()
 
-    assert(Alice.network.peerStore.deletedPeers.length == 0)
+    assert(Alice.network.networkPeers.deletedPeers.length == 0)
 
-    // Alice.network.peerStore.push({
+    // Alice.network.networkPeers.push({
     //   id: Bob.peerInfo.id.toB58String(),
     //   lastSeen: Date.now()
     // })
 
     await new Promise((resolve) => setTimeout(resolve, 50))
 
-    assert(Alice.network.peerStore.has(Bob.peerInfo.id.toB58String()))
+    assert(Alice.network.networkPeers.has(Bob.peerInfo.id.toB58String()))
 
     await Promise.all([Alice.stop(), Bob.stop(), Chris.stop(), Dave.stop(), Eve.stop()])
   })
