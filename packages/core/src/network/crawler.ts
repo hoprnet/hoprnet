@@ -1,7 +1,7 @@
 import chalk from 'chalk'
 import AbortController from 'abort-controller'
 import { getTokens } from '../utils'
-import { randomSubset, randomInteger } from '@hoprnet/hopr-utils'
+import { randomInteger } from '@hoprnet/hopr-utils'
 import type { Token } from '../utils'
 import { MAX_HOPS, CRAWLING_RESPONSE_NODES } from '../constants'
 import { CrawlResponse, CrawlStatus } from '../messages'
@@ -241,18 +241,12 @@ class Crawler {
     if (this.options?.timeoutIntentionally) {
       await new Promise((resolve) => setTimeout(resolve, CRAWL_TIMEOUT + 100))
     }
-
-    const amountOfNodes = Math.min(CRAWLING_RESPONSE_NODES, this.networkPeers.peers.length)
-
-    const selectedNodes = randomSubset(
-      this.networkPeers.peers,
-      amountOfNodes,
-      (entry: Entry) => entry.id !== this.id.toB58String() && entry.id !== callerId.toB58String()
-    ).map((peer) => {
-      const found = this.getPeer(PeerId.createFromB58String(peer.id))
-      return found.filter((ma) => shouldIncludePeerInCrawlResponse(ma, callerAddress))
-    })
-    return selectedNodes.flat()
+    return this.networkPeers
+                .randomSubset(CRAWLING_RESPONSE_NODES)
+                .filter((id: PeerId) => !id.equals(this.id) && !id.equals(callerId))
+                .map(this.getPeer) // NB: Multiple addrs per peer.
+                .flat()
+                .filter(ma => shouldIncludePeerInCrawlResponse(ma, callerAddress))
   }
 
   handleCrawlRequest(conn: Connection) {

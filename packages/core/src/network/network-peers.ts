@@ -1,6 +1,8 @@
 import heap from 'heap-js'
+import { randomSubset } from '@hoprnet/hopr-utils'
 
 import type PeerInfo from 'peer-info'
+import PeerId from 'peer-id'
 import { durations } from '@hoprnet/hopr-utils'
 
 import debug from 'debug'
@@ -45,6 +47,12 @@ class NetworkPeers {
 
     heap.heapify(this.peers, this.compare)
   }
+
+  // Get a random sample of non-blacklisted peers.
+  randomSubset(size: number): PeerId[] {
+    return randomSubset(this.peers, size)
+              .map((e: Entry) => PeerId.createFromB58String(e.id))
+  } 
 
   onPeerConnect(peerInfo: PeerInfo) {
     this.push({ id: peerInfo.id.toB58String(), lastSeen: Date.now() })
