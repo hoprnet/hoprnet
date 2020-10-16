@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useRouter } from 'next/router';
 import Link from "next/link";
 import Head from "next/head";
 import Menu from "../menu/menu";
@@ -7,6 +8,7 @@ import DataUpdateKnow from "../data-view/data-update-know";
 import "../../styles/main.scss";
 
 const Layout = ({ children }) => {
+  const router = useRouter();
   const [activaMenu, setactivaMenu] = useState(false);
 
   return (
@@ -34,8 +36,8 @@ const Layout = ({ children }) => {
       </header>
       <Menu activaMenu={activaMenu} />
       <div className="main-container">
-        <section className="about">
-          <div className="">
+        <section className={"about " + [router.pathname != "/" ? "aux-margin" : ""]} >
+         <div className={[router.pathname != "/" ? "only-desktop-view" : ""]}>
             <p className="paragraph">
               Welcome to <span>HOPR Säntis testnet!</span> Follow the
               instructions below to start earning points. There are{" "}

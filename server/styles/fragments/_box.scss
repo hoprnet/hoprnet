@@ -12,10 +12,19 @@
 }
 
 .box {
-  padding: 1em;
+  padding: 1em 0;
   border-radius: 8px;
   background: #fff;
   box-shadow: $shadow;
+}
+
+.box{
+  hr{
+    margin: 1em 0 1em 0;
+    height: 0.02em;
+    background: #e3e3e3;
+    border: 0;
+  }
 }
 
 .box-border {
@@ -29,9 +38,9 @@
     box-sizing: border-box;
 
     &:nth-last-child(2) {
-        border-top: 1px solid #e3e3e3;
-        border-right: 0px solid #e3e3e3;
-      }
+      border-top: 1px solid #e3e3e3;
+      border-right: 0px solid #e3e3e3;
+    }
     &:nth-last-child(3) {
       border-left: 1px solid #e3e3e3;
     }
@@ -44,9 +53,9 @@
       padding: 0;
       margin: 0;
     }
-    h3{
-        font-size: 1em;
-        font-weight: 700;
+    h3 {
+      font-size: 1em;
+      font-weight: 700;
     }
     p {
       color: $black;
@@ -67,15 +76,100 @@
   }
 }
 
-
-.box-info{
-    p{
-        color: $black;
-        font-size: 1em;
-        font-weight:200 ;
-        span{
-            font-size: 0.89em;
-            font-weight: 600;
-        }
+.box-info {
+  p {
+    color: $black;
+    font-size: 1em;
+    font-weight: 200;
+    span {
+      font-size: 0.89em;
+      font-weight: 600;
     }
+  }
+}
+
+// MAIN INFO
+.box .box-top-area {
+  & > div {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 1em;
+    h1 {
+      font-size: 1.21em;
+      font-weight: 600;
+      color: $black;
+    }
+    .box-btn {
+      button {
+        border: 0;
+        border-radius: 3px;
+        background: $white-alt;
+        color: $black;
+        padding: 0.44em 0.55em;
+
+        font-weight: 600;
+        font-size: 1em;
+
+        img {
+          margin-right: 0.5em;
+        }
+      }
+    }
+  }
+}
+
+.box .box-menu-optional {
+  background: $white-alt;
+  margin: 0.5em 0 0 0;
+  border-top: 1px solid #ebebeb;
+  border-bottom: 1px solid #ebebeb;
+  ul{
+    margin: 0;
+    padding: 0.2em 0;
+    list-style: none;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    li{
+      float: left;
+      font-weight: 600;
+      font-size: 0.89em;
+      color: #C4C4C4;
+      &.active{
+        color: $black;
+        background: #fff;
+        border: 1px solid #ebebeb;
+        border-radius: 4px;
+        padding: 0.4em;
+      }
+    }
+  }
+}
+
+
+.box .box-main-area{
+  padding: 0 1em;
+  p{
+    color: $black;
+    font-size: 0.9em;
+    line-height: 1.8em;
+    font-weight: 400;
+  }
+  .quick-code{
+    margin: 0.5em 0;
+    .hash{
+      padding: 0.5em 0.5em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      p{
+        font-size: 0.8em;
+      }
+      img{
+        width: 1em;
+      }
+    }
+  }
 }

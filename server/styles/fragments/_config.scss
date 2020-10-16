@@ -2,10 +2,16 @@ body {
   font-family: "Nunito", sans-serif;
   background: $white-alt;
 }
-// 
-.only-mobile-view{
-  @media (min-width: 767px)  {
-    display:none!important;
+//
+.only-mobile-view {
+  @media (min-width: 767px) {
+    display: none !important;
+  }
+}
+.only-desktop-view {
+  display: none;
+  @media (min-width: 767px) {
+    display: block;
   }
 }
 //
@@ -55,7 +61,7 @@ hr {
 }
 
 hr.hr-alert {
-  margin: 1em 0 .5em 0;
+  margin: 1em 0 0.5em 0;
   height: 0.02em;
   background: #e3e3e3;
   border: 0;

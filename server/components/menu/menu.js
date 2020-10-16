@@ -7,8 +7,6 @@ const useUser = () => ({ user: null, loading: false })
 
 const Menu = ({ activaMenu }) => {
   const router = useRouter();
-  
-
   const [hash, setHash] = useState(
     "16Uiu2HAmRE4fVtp8dF6H62NzRcx6LGUTL5fBRTdnAfZXjveP5Kz9"
   );

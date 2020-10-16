@@ -4,17 +4,31 @@ export default function Home() {
   return (
     <Layout>
       <div className="box">
-        <p>
-          Lorem Ipsum is simply dummy text of the printing and typesetting
-          industry. Lorem Ipsum has been the industry's standard dummy text ever
-          since the 1500s, when an unknown printer took a galley of type and
-          scrambled it to make a type specimen book. It has survived not only
-          five centuries, but also the leap into electronic typesetting,
-          remaining essentially unchanged. It was popularised in the 1960s with
-          the release of Letraset sheets containing Lorem Ipsum passages, and
-          more recently with desktop publishing software like Aldus PageMaker
-          including versions of Lorem Ipsum.
-        </p>
+        <div className="box-top-area">
+          <div>
+            <div className="box-title">
+              <h1>Leaderboard</h1>
+            </div>
+            <div className="box-btn">
+              <button>
+                <img src="/assets/icons/refresh.svg" alt="refresh now" />
+                refresh now
+              </button>
+            </div>
+          </div>
+
+          <div className="box-menu-optional">
+            <ul>
+              <li className="active">All</li>
+              <li>Verified</li>
+              <li>Registered</li>
+              <li>Connected</li>
+            </ul>
+          </div>
+        </div>
+        <div className="box-main-area">
+
+        </div>
       </div>
     </Layout>
   );
