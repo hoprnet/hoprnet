@@ -29,13 +29,12 @@ RUN yarn install --build-from-source
 # -- BUILD STAGE --------------------------------
 
 FROM base as build
+
+# build `hoprd` and `hopr-admin`
 COPY src src
 COPY hopr-admin hopr-admin
 COPY tsconfig.json tsconfig.json
-
-RUN yarn build 
-#RUN npm prune --production --no-audit
-#RUN yarn cache clean
+RUN yarn build
 
 # -- RUNTIME STAGE ------------------------------\
 
