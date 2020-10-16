@@ -183,24 +183,24 @@
     "@ethersproject/rlp" "^5.0.3"
     "@ethersproject/signing-key" "^5.0.4"
 
-"@hoprnet/hopr-demo-seeds@1.17.7":
-  version "1.17.7"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-demo-seeds/-/hopr-demo-seeds-1.17.7.tgz#a27e8abbb72ad877643517cdea43b1948788cf37"
-  integrity sha512-KtFR18vY8ly9WMskFDYwAbZHDUKvXGS0a03JEE6/ohmjeifzvMkcchCjs8GQ6xvWBpZB1FmkPIf9msXJ5raIPQ==
+"@hoprnet/hopr-demo-seeds@1.17.8":
+  version "1.17.8"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-demo-seeds/-/hopr-demo-seeds-1.17.8.tgz#654aecdd42fd4168ea81aa12c53c717a316d1662"
+  integrity sha512-R0o/3AoJhm92bNtnhtTNLV+E9HVXyS0YB1Q2eht5mBPnzTIGYEu8O+gpJ2v18OTaKoSFFSIFXH/VWq1YLMQRXA==
 
-"@hoprnet/hopr-testing@1.17.7":
-  version "1.17.7"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-testing/-/hopr-testing-1.17.7.tgz#3a920351eef0554830b4d8ae86cfe4216c059b5e"
-  integrity sha512-q1Jpgtnah31yj1OO9zXbkOq63ffpnIrrxcyPRtnfqkNy00/Iwy3vuRol0uBQEluc5OOmbtCfKwRz6NI4w83UTw==
+"@hoprnet/hopr-testing@1.17.8":
+  version "1.17.8"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-testing/-/hopr-testing-1.17.8.tgz#7746a0b0505fe0710b45e0533886ea0ce2505bcb"
+  integrity sha512-cIpH6Fe1u10PQBBSbjdwJ70e5zoa8ypKZZGImElBh03JJYx/s2vcgRTBRb/dia6qbZA3ZGsAK8mdE6jHQCNEBg==
   dependencies:
-    "@hoprnet/hopr-demo-seeds" "1.17.7"
+    "@hoprnet/hopr-demo-seeds" "1.17.8"
     debug "^4.1.1"
     ganache-core "^2.12.1"
 
-"@hoprnet/hopr-utils@1.17.7":
-  version "1.17.7"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.17.7.tgz#7d3f71b496458c0d9d6f1d9631edd949693ba2d9"
-  integrity sha512-uAmzrj3BgSds4Q9QaS0rwgVSUWPyTzQMfSEwTXEwZJe9JZ5FNcKn1kiw1w/Vt7Q6Nh1FOgyGe5su+jK6RsCivg==
+"@hoprnet/hopr-utils@1.17.8":
+  version "1.17.8"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.17.8.tgz#5babc4c1c9c6eef8d80b1bac94359363b61b1fce"
+  integrity sha512-TQl+F5tMV1QXEzQae2I0aKOrKfo0HPQEx2w+lhOeE0ISuC766Sm4qk3jC1pF7PyaFBha99rzSMh2Sc06gYyskw==
   dependencies:
     bignumber.js "^9.0.0"
     libp2p-crypto "^0.17.9"
