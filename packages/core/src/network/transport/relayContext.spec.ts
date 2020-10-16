@@ -8,7 +8,6 @@ const log = Debug(`hopr-core:transport`)
 
 describe('test overwritable connection', function () {
   let iteration = 0
-  let done = false
 
   function getStream(): Stream {
     return {
@@ -36,7 +35,10 @@ describe('test overwritable connection', function () {
   }
 
   it('should create a connection and overwrite it', async function () {
-    const ctx = new RelayContext(getStream())
+    const ctx = new RelayContext(getStream(), {
+      useRelaySubprotocol: false,
+      sendRestartMessage: true
+    })
 
     let interval = setInterval(
       () =>
@@ -47,7 +49,10 @@ describe('test overwritable connection', function () {
       500
     )
 
+    let done = false
+
     setTimeout(() => {
+      done = true
       log(`timeout done`)
       clearInterval(interval)
     }, 3000)
@@ -56,15 +61,20 @@ describe('test overwritable connection', function () {
     ctx.sink(
       (async function* () {
         await new Promise((resolve) => setTimeout(resolve, 123))
-        while (true) {
+        while (i < 28) {
           yield new TextEncoder().encode(`msg from initial party #${i++}`)
           await new Promise((resolve) => setTimeout(resolve, 100))
         }
       })()
     )
 
+    // @TODO count messages
+
     for await (const msg of ctx.source) {
-      console.log(`initial source <${new TextDecoder().decode(msg)}>`)
+      if (done) {
+        break
+      }
+      console.log(`initial source <${new TextDecoder().decode(msg.slice())}>`)
     }
   })
 })

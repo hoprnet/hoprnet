@@ -42,7 +42,7 @@ describe('test relay connection', function () {
     a.sink(
       (async function* () {
         let i = 0
-        while (true) {
+        while (i < 17) {
           yield new TextEncoder().encode(`message ${i++}`)
           await new Promise((resolve) => setTimeout(resolve, 100))
         }
