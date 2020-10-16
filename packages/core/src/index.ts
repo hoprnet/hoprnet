@@ -37,6 +37,11 @@ import * as DbKeys from './dbKeys'
 
 const verbose = Debug('hopr-core:verbose')
 
+export type PingResponse = {
+  latency: number,
+  info: string,
+}
+
 interface NetOptions {
   ip: string
   port: number
@@ -301,7 +306,7 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
    * @param destination PeerId of the node
    * @returns latency
    */
-  async ping(destination: PeerId): Promise<number> {
+  async ping(destination: PeerId): Promise<PingResponse> {
     if (!PeerId.isPeerId(destination)) {
       throw Error(`Expecting a non-empty destination.`)
     }
@@ -309,7 +314,10 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
     const start = Date.now()
     try {
       await this.interactions.network.heartbeat.interact(destination)
-      return Date.now() - start
+      return {
+        latency: Date.now() - start,
+        info: ''
+      }
     } catch (err) {
       throw Error(`node unreachable`)
     }
