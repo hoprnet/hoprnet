@@ -30,17 +30,13 @@ import PeerInfo from 'peer-info'
 
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { HoprCoreConnectorStatic, Types } from '@hoprnet/hopr-core-connector-interface'
+import type { HeartbeatResponse } from './interactions/network/heartbeat'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 
 import { Interactions } from './interactions'
 import * as DbKeys from './dbKeys'
 
 const verbose = Debug('hopr-core:verbose')
-
-export type PingResponse = {
-  latency: number,
-  info: string,
-}
 
 interface NetOptions {
   ip: string
@@ -306,18 +302,13 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
    * @param destination PeerId of the node
    * @returns latency
    */
-  async ping(destination: PeerId): Promise<PingResponse> {
+  async ping(destination: PeerId): Promise<HeartbeatResponse> {
     if (!PeerId.isPeerId(destination)) {
       throw Error(`Expecting a non-empty destination.`)
     }
 
-    const start = Date.now()
     try {
-      await this.interactions.network.heartbeat.interact(destination)
-      return {
-        latency: Date.now() - start,
-        info: ''
-      }
+      return await this.interactions.network.heartbeat.interact(destination)
     } catch (err) {
       throw Error(`node unreachable`)
     }
