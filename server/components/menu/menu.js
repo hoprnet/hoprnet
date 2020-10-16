@@ -1,8 +1,14 @@
-import React, { useState, useEffect, ref } from "react";
+import React, { useState, useEffect } from "react";
+import { useRouter } from 'next/router';
 import Link from "next/link";
 import "../../styles/main.scss";
 
+const useUser = () => ({ user: null, loading: false })
+
 const Menu = ({ activaMenu }) => {
+  const router = useRouter();
+  
+
   const [hash, setHash] = useState(
     "16Uiu2HAmRE4fVtp8dF6H62NzRcx6LGUTL5fBRTdnAfZXjveP5Kz9"
   );
@@ -14,6 +20,7 @@ const Menu = ({ activaMenu }) => {
       setModal(false);
     }, 4000);
   };
+  
 
   return (
     <>
@@ -22,25 +29,25 @@ const Menu = ({ activaMenu }) => {
           <div>
             <ul>
               <Link href="/">
-                <li className="active">
+                <li className={[router.pathname == "/" ? "active" : ""]} >
                   <img src="/assets/icons/home.svg" alt="hopr HOME" />
                   <p>HOME</p>
                 </li>
               </Link>
               <Link href="/top-assets">
-                <li>
+              <li className={[router.pathname == "/top-assets" ? "active" : ""]} >
                   <img src="/assets/icons/top.svg" alt="hopr Top ASSETS" />
                   <p>TOP ASSETS</p>
                 </li>
               </Link>
               <Link href="https://discord.com/invite/wUSYqpD">
-                <li>
+              <li >
                   <img src="/assets/icons/discord.svg" alt="hopr DISCORD" />
                   <p>DISCORD</p>
                 </li>
               </Link>
               <Link href="/help">
-                <li>
+              <li className={[router.pathname == "/help" ? "active" : ""]} >
                   <img src="/assets/icons/help.svg" alt="hopr HELP" />
                   <p>HELP</p>
                 </li>
