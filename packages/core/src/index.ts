@@ -109,6 +109,11 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
       }
     })
 
+    // TODO remove - required by LibP2P
+    this.peerInfo = new PeerInfo(this.id)
+    this.multiaddrs.forEach(ma => this.peerInfo.multiaddrs.add(ma))
+
+
     this.initializedWithOptions = options
     this.output = options.output || console.log
     this.bootstrapServers = options.bootstrapServers || []
