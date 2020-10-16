@@ -22,12 +22,21 @@ class Network {
 
     // These are temporary, and will be replaced by accessors to the addressBook
     const putPeer = (ma: Multiaddr) => {
-      const pinfo = new PeerInfo(PeerId.createFromB58String(ma.getPeerId()))
+      if (!ma.getPeerId()) {
+        throw new Error('Cannot store a peer without an ID')
+      }
+      const pinfo = new PeerInfo(PeerId.createFromCID(ma.getPeerId()))
       pinfo.multiaddrs.add(ma)
       node.peerStore.put(pinfo)
     }
     const getPeer = (id: PeerId): Multiaddr[] => {
-      return node.peerStore.get(id).multiaddrs.toArray()
+      let addrs = node.peerStore.get(id).multiaddrs.toArray()
+      return addrs.map(a => {
+        if (!a.getPeerId()){
+          return a.encapsulate(`/p2p/${id.toB58String()}`)
+        }
+        return a
+      })
     }
 
     this.networkPeers = new NetworkPeers(node.peerStore.peers.values())

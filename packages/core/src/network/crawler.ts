@@ -249,12 +249,8 @@ class Crawler {
       amountOfNodes,
       (entry: Entry) => entry.id !== this.id.toB58String() && entry.id !== callerId.toB58String()
     ).map((peer) => {
-      // convert peerId to peerInfo
       const found = this.getPeer(PeerId.createFromB58String(peer.id))
-      if (found) {
-        return found.filter((ma) => shouldIncludePeerInCrawlResponse(ma, callerAddress))
-      }
-      return []
+      return found.filter((ma) => shouldIncludePeerInCrawlResponse(ma, callerAddress))
     })
     return selectedNodes.flat()
   }
