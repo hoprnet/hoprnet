@@ -16,8 +16,7 @@
     "util:regenerate": "yarn util:clean && lerna exec --concurrency 1 --stream -- yarn --check-files --no-audit",
     "util:install": "yarn util:clean && lerna exec --concurrency 1 --stream -- yarn --frozen-lockfile --check-files --no-audit",
     "util:build": "lerna exec --stream -- yarn build",
-    "util:link": "lerna link",
-    "version": "yarn util:regenerate && git add packages/*/package-lock.json"
+    "util:link": "lerna link"
   },
   "dependencies": {
     "lerna": "^3.22.1"

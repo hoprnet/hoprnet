@@ -58,7 +58,6 @@ jobs:
           node_modules/.bin/lerna version preminor --yes --exact --no-push --no-changelog
           git push origin master
           node_modules/.bin/lerna publish from-package --yes
-          sleep 5m # Allow NPM registry to catch uo
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -73,10 +72,19 @@ jobs:
           node_modules/.bin/lerna version patch --yes --exact --no-push --no-changelog 
           git push origin ${{ github.ref }} 
           node_modules/.bin/lerna publish from-package --yes
-          sleep 5m # Allow NPM registry to catch uo
         env:
           NODE_AUTH_TOKEN:
             ${{ secrets.NPM_TOKEN }}
+
+        - name: Wait for NPM, and regenerate lockfiles
+          run: |
+            sleep 5m # Allow NPM registry to catch uo
+            yarn util:regenerate
+            git add package/*/yarn.lock
+            git commit -m "Regenerate lockfiles"
+            git pull origin ${{ github.ref }}
+            git push origin ${{ github.ref }} 
+
 
             #- name: Push a tag
             #if: |

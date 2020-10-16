@@ -293,10 +293,10 @@
   dependencies:
     source-map-support "^0.5.16"
 
-"@truffle/codec@^0.6.4":
-  version "0.6.4"
-  resolved "https://registry.yarnpkg.com/@truffle/codec/-/codec-0.6.4.tgz#674074553f9baec1a1a1f37e89b59fabbf865e57"
-  integrity sha512-inTYczuEnml9OjqQyYmg6EG8M2WdwgQn3X3lhzmwfg19JNO1Z3rwjRRu3Hx0vD3OR6moaAjMXy6VBoPhyuoJLQ==
+"@truffle/codec@^0.7.0":
+  version "0.7.0"
+  resolved "https://registry.yarnpkg.com/@truffle/codec/-/codec-0.7.0.tgz#256efe174961744671f0df44190211e20b5e0c98"
+  integrity sha512-MBTXyCIdzseSN95K+igwaX0098tx97+1d6vD2Oi6UMM3af6VSD8qUJ/h1GngeDkQ8WAS61H4KVlIl9CKhdAQgQ==
   dependencies:
     big.js "^5.2.2"
     bn.js "^4.11.8"
@@ -340,11 +340,11 @@
     web3-utils "1.2.1"
 
 "@truffle/debug-utils@^4.1.1":
-  version "4.2.11"
-  resolved "https://registry.yarnpkg.com/@truffle/debug-utils/-/debug-utils-4.2.11.tgz#8bb47a9efd020a9dcd4e12e24221af2cef1bf82b"
-  integrity sha512-mcu5vhVLRUoOXm6yKn+X7Z7gTtNNk9k7czNGRQyS6dD0K4cTSwap0UjTBR9a4P9eAo7aTcr1dChLS5Ups6cdXg==
+  version "4.2.12"
+  resolved "https://registry.yarnpkg.com/@truffle/debug-utils/-/debug-utils-4.2.12.tgz#0e7be451b6396da11e8a24293ad66ca3491ada7a"
+  integrity sha512-M/XUUWc/5Vh6ukHshHxxuC92DsrXJoNaLRqA1LTzA2UhCT67RYdWWT9Vi40DXiQqKh/k9+XGAqk9syJ0JGXd9A==
   dependencies:
-    "@truffle/codec" "^0.6.4"
+    "@truffle/codec" "^0.7.0"
     "@trufflesuite/chromafi" "^2.2.0"
     chalk "^2.4.2"
     debug "^4.1.0"
@@ -8072,9 +8072,9 @@ truffle-typings@^1.0.8:
     "@types/web3" "^1.0.18"
 
 truffle@^5.1.23:
-  version "5.1.48"
-  resolved "https://registry.yarnpkg.com/truffle/-/truffle-5.1.48.tgz#43c78cb1fa8f51496a66de7bddfd6726ad132676"
-  integrity sha512-Z8485qH5Db8P05dVy7SHQHcaa+hXAekvPcVkkv8zONsVBqOmS3q48eajukdeKNbLlfPWb3m7TYdPzrGFBDcFiQ==
+  version "5.1.49"
+  resolved "https://registry.yarnpkg.com/truffle/-/truffle-5.1.49.tgz#c9edc95192047ff4d170fcad235d26d0c4545de5"
+  integrity sha512-SkCfYRPhruowxH+qpJBAvM0u5+j/LK51U85ErXeiuRhyCNEWMNjUtISHTlEZ0KLr0Kki68iXk+o2UekN4Nlp5g==
   dependencies:
     app-module-path "^2.2.0"
     mocha "8.1.2"
