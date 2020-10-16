@@ -15,7 +15,8 @@ import { CRAWL_TIMEOUT, shouldIncludePeerInCrawlResponse } from './crawler'
 import { Crawler as CrawlerInteraction } from '../interactions/network/crawler'
 import Multiaddr from 'multiaddr'
 import { Network } from './index'
-import { BLACKLIST_TIMEOUT, BlacklistedEntry } from './network-peers'
+import { BlacklistedEntry } from './network-peers'
+import { BLACKLIST_TIMEOUT } from '../constants'
 import { durations } from '@hoprnet/hopr-utils'
 
 describe('test crawler', function () {
@@ -71,20 +72,20 @@ describe('test crawler', function () {
     Alice.emit('peer:connect', Bob.peerInfo)
     await Alice.network.crawler.crawl()
 
-    assert(Alice.network.networkPeers.has(Bob.peerInfo.id.toB58String()))
+    assert(Alice.network.networkPeers.has(Bob.peerInfo.id))
 
     Bob.emit('peer:connect', Chris.peerInfo)
     await Alice.network.crawler.crawl()
 
-    assert(Alice.network.networkPeers.has(Bob.peerInfo.id.toB58String()))
-    assert(Alice.network.networkPeers.has(Chris.peerInfo.id.toB58String()))
+    assert(Alice.network.networkPeers.has(Bob.peerInfo.id))
+    assert(Alice.network.networkPeers.has(Chris.peerInfo.id))
 
     Chris.emit('peer:connect', Dave.peerInfo)
     await Alice.network.crawler.crawl()
 
-    assert(Alice.network.networkPeers.has(Bob.peerInfo.id.toB58String()))
-    assert(Alice.network.networkPeers.has(Chris.peerInfo.id.toB58String()))
-    assert(Alice.network.networkPeers.has(Dave.peerInfo.id.toB58String()))
+    assert(Alice.network.networkPeers.has(Bob.peerInfo.id))
+    assert(Alice.network.networkPeers.has(Chris.peerInfo.id))
+    assert(Alice.network.networkPeers.has(Dave.peerInfo.id))
 
     Bob.emit('peer:connect', Alice.peerInfo)
     Dave.emit('peer:connect', Eve.peerInfo)
@@ -93,17 +94,17 @@ describe('test crawler', function () {
 
     // Simulate node failure
     await Bob.stop()
-    assert(Chris.network.networkPeers.has(Bob.peerInfo.id.toB58String()), 'Chris should know about Bob')
+    assert(Chris.network.networkPeers.has(Bob.peerInfo.id), 'Chris should know about Bob')
     // Simulates a heartbeat run that kicks out Bob
-    Alice.network.networkPeers.blacklistPeer(Bob.peerInfo.id.toB58String())
+    Alice.network.networkPeers.blacklistPeer(Bob.peerInfo.id)
     await Alice.network.crawler.crawl()
 
     assert(
-      !Alice.network.networkPeers.has(Bob.peerInfo.id.toB58String()),
+      !Alice.network.networkPeers.has(Bob.peerInfo.id),
       'Alice should not add Bob to her networkPeers after blacklisting him'
     )
     assert(
-      Alice.network.networkPeers.deletedPeers.some((entry: BlacklistedEntry) => entry.id === Bob.peerInfo.id.toB58String())
+      Alice.network.networkPeers.deletedPeers.some((entry: BlacklistedEntry) => entry.id.equals(Bob.peerInfo.id))
     )
 
     // Remove Bob from blacklist
@@ -122,7 +123,7 @@ describe('test crawler', function () {
 
     await new Promise((resolve) => setTimeout(resolve, 50))
 
-    assert(Alice.network.networkPeers.has(Bob.peerInfo.id.toB58String()))
+    assert(Alice.network.networkPeers.has(Bob.peerInfo.id))
 
     await Promise.all([Alice.stop(), Bob.stop(), Chris.stop(), Dave.stop(), Eve.stop()])
   })

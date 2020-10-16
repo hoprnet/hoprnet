@@ -3,23 +3,21 @@ import { randomSubset } from '@hoprnet/hopr-utils'
 
 import type PeerInfo from 'peer-info'
 import PeerId from 'peer-id'
-import { durations } from '@hoprnet/hopr-utils'
+import { BLACKLIST_TIMEOUT } from '../constants'
 
 import debug from 'debug'
 const log = debug('hopr-core:network-peers')
 const verbose = debug('hopr-core:verbose:network-peers')
 
 export type Entry = {
-  id: string
+  id: PeerId
   lastSeen: number
 }
 
 export type BlacklistedEntry = {
-  id: string
+  id: PeerId
   deletedAt: number
 }
-
-export const BLACKLIST_TIMEOUT = durations.seconds(47)
 
 class NetworkPeers {
   peers: Entry[]
@@ -40,7 +38,7 @@ class NetworkPeers {
 
     for (const peerInfo of existingPeers) {
       this.peers.push({
-        id: peerInfo.id.toB58String(),
+        id: peerInfo.id,
         lastSeen: 0
       })
     }
@@ -50,12 +48,12 @@ class NetworkPeers {
 
   // Get a random sample of non-blacklisted peers.
   randomSubset(size: number): PeerId[] {
-    return randomSubset(this.peers, size)
-              .map((e: Entry) => PeerId.createFromB58String(e.id))
+    return randomSubset(this.peers, Math.min(size, this.peers.length))
+              .map((e: Entry) => e.id)
   } 
 
   onPeerConnect(peerInfo: PeerInfo) {
-    this.push({ id: peerInfo.id.toB58String(), lastSeen: Date.now() })
+    this.push({ id: peerInfo.id, lastSeen: Date.now() })
   }
 
   push(entry: Entry): number {
@@ -90,7 +88,7 @@ class NetworkPeers {
     heap.heapreplace(this.peers, newEntry, this.compare)
   }
 
-  has(peer: string): boolean {
+  has(peer: PeerId): boolean {
     return this.peers.findIndex((entry: Entry) => entry.id === peer) >= 0
   }
 
@@ -102,7 +100,7 @@ class NetworkPeers {
     return heap.heappop(this.peers, this.compare)
   }
 
-  blacklistPeer(peer: string): number {
+  blacklistPeer(peer: PeerId): number {
     verbose('blacklisting', peer)
     const entry = {
       id: peer,
@@ -167,6 +165,10 @@ class NetworkPeers {
 
   updatedSince(ts) {
     return this.peers.length > 0 && this.top(1)[0].lastSeen < ts
+  }
+
+  reset(){
+    this.peers = []
   }
 }
 

@@ -50,8 +50,6 @@ describe('check heartbeat mechanism', function () {
   it('should initialise the heartbeat module and start the heartbeat functionality', async function () {
     const [Alice, Bob, Chris] = await Promise.all([generateNode(), generateNode(), generateNode()])
 
-    await new Promise((resolve) => setTimeout(resolve, 100))
-
     await Alice.dial(Bob.peerInfo)
 
     // Check whether our event listener is triggered by heartbeat interactions
@@ -66,17 +64,17 @@ describe('check heartbeat mechanism', function () {
     ])
 
     assert(
-      !Chris.network.networkPeers.has(Alice.peerInfo.id.toB58String()),
+      !Chris.network.networkPeers.has(Alice.peerInfo.id),
       `Chris should not know about Alice in the beginning.`
     )
 
     await Alice.dial(Chris.peerInfo)
 
     // Check that the internal state is as expected
-    assert(Alice.network.networkPeers.has(Chris.peerInfo.id.toB58String()), `Alice should know about Chris now.`)
-    assert(Alice.network.networkPeers.has(Bob.peerInfo.id.toB58String()), `Alice should know about Bob now.`)
-    assert(Chris.network.networkPeers.has(Alice.peerInfo.id.toB58String()), `Chris should know about Alice now.`)
-    assert(Bob.network.networkPeers.has(Alice.peerInfo.id.toB58String()), `Bob should know about Alice now.`)
+    assert(Alice.network.networkPeers.has(Chris.peerInfo.id), `Alice should know about Chris now.`)
+    assert(Alice.network.networkPeers.has(Bob.peerInfo.id), `Alice should know about Bob now.`)
+    assert(Chris.network.networkPeers.has(Alice.peerInfo.id), `Chris should know about Alice now.`)
+    assert(Bob.network.networkPeers.has(Alice.peerInfo.id), `Bob should know about Alice now.`)
 
     // Simulate a node failure
     await Chris.stop()
@@ -88,7 +86,7 @@ describe('check heartbeat mechanism', function () {
     // Check whether a node failure gets detected
     await Alice.network.heartbeat.checkNodes()
 
-    assert(!Alice.network.networkPeers.has(Chris.peerInfo.id.toB58String()), `Alice should have removed Chris.`)
+    assert(!Alice.network.networkPeers.has(Chris.peerInfo.id), `Alice should have removed Chris.`)
 
     await Promise.all([
       /* pretier-ignore */

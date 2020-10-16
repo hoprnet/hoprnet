@@ -29,6 +29,7 @@ class Network {
       pinfo.multiaddrs.add(ma)
       node.peerStore.put(pinfo)
     }
+
     const getPeer = (id: PeerId): Multiaddr[] => {
       let addrs = node.peerStore.get(id).multiaddrs.toArray()
       return addrs.map(a => {

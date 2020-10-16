@@ -52,7 +52,7 @@ class Crawler {
    *
    * @param comparator
    */
-  async crawl(comparator?: (peer: string) => boolean): Promise<void> {
+  async crawl(comparator?: (peer: PeerId) => boolean): Promise<void> {
     verbose('creating a crawl')
     return new Promise(async (resolve) => {
       let aborted = false
@@ -60,9 +60,9 @@ class Crawler {
       const errors: Error[] = []
 
       // fast non-inclusion check
-      const contactedPeerIds = new Set<string>() // @TODO could be replaced by a bloom filter
+      const contactedPeerIds = new Set<PeerId>()
 
-      let unContactedPeers: string[] = [] // @TODO add new peerIds lazily
+      let unContactedPeers: PeerId[] = [] // @TODO add new peerIds lazily
 
       let before = 0 // number of peers before crawling
       let current = 0 // current number of peers
@@ -108,7 +108,7 @@ class Crawler {
        * Returns a random node and removes it from the array.
        * Swaps in the last element of the array with the element removed.
        */
-      const removeRandomNode = (): string => {
+      const removeRandomNode = (): PeerId => {
         if (unContactedPeers.length == 0) {
           throw Error(`Cannot pick a random node because there are none.`)
         }
@@ -116,11 +116,11 @@ class Crawler {
         const index = randomInteger(0, unContactedPeers.length)
 
         if (index == unContactedPeers.length - 1) {
-          return unContactedPeers.pop() as string
+          return unContactedPeers.pop()
         }
 
-        const selected: string = unContactedPeers[index]
-        unContactedPeers[index] = unContactedPeers.pop() as string
+        const selected  = unContactedPeers[index]
+        unContactedPeers[index] = unContactedPeers.pop()
 
         return selected
       }
@@ -134,7 +134,7 @@ class Crawler {
        * Connect to another peer and returns a promise that resolves to all received nodes
        * that were previously unknown.
        */
-      const queryNode = async (peer: string, token: Token): Promise<void> => {
+      const queryNode = async (peer: PeerId, token: Token): Promise<void> => {
         let addresses: Multiaddr[]
 
         if (isDone()) {
@@ -154,13 +154,12 @@ class Crawler {
           contactedPeerIds.add(peer)
 
           try {
-            log(`querying ${blue(peer)}`)
-            const peerId = PeerId.createFromB58String(peer)
-            addresses = await this.crawlInteraction.interact(peerId, {
+            log(`querying ${blue(peer.toB58String())}`)
+            addresses = await this.crawlInteraction.interact(peer, {
               signal: abort.signal
             })
 
-            const addrs = this.getPeer(peerId)
+            const addrs = this.getPeer(peer)
             if (addrs && peerHasOnlyPublicAddresses(addrs)) {
               // The node we are connecting to is on a remote network
               // and gives us addresses on a private network, then they are
@@ -179,22 +178,22 @@ class Crawler {
           }
 
           for (let i = 0; i < addresses.length; i++) {
-            const peerString = addresses[i].getPeerId()
+            const peer = PeerId.createFromCID(addresses[i].getPeerId())
 
             if (addresses[i].getPeerId() == this.id.toB58String()) {
               continue
             }
 
-            if (!contactedPeerIds.has(peerString) && !unContactedPeers.includes(peerString)) {
-              unContactedPeers.push(peerString)
+            if (!contactedPeerIds.has(peer) && !unContactedPeers.includes(peer)) {
+              unContactedPeers.push(peer)
 
               let beforeInserting = this.networkPeers.length
               this.networkPeers.push({
-                id: peerString,
+                id: peer,
                 lastSeen: 0
               })
 
-              if (comparator == null || comparator(peerString)) {
+              if (comparator == null || comparator(peer)) {
                 current = current + this.networkPeers.length - beforeInserting
               }
               this.putPeer(addresses[i])
@@ -266,7 +265,7 @@ class Crawler {
     }.call(this)
   }
 
-  printStatsAndErrors(contactedPeerIds: Set<string>, errors: Error[], now: number, before: number) {
+  printStatsAndErrors(contactedPeerIds: Set<PeerId>, errors: Error[], now: number, before: number) {
     if (errors.length > 0) {
       log(
         `Errors while crawling:${errors.reduce((acc, err) => {
@@ -277,8 +276,8 @@ class Crawler {
     }
 
     let contactedNodes = ``
-    contactedPeerIds.forEach((peerId: string) => {
-      contactedNodes += `\n        ${peerId}`
+    contactedPeerIds.forEach((peerId: PeerId) => {
+      contactedNodes += `\n        ${peerId.toB58String()}`
     })
 
     log(
