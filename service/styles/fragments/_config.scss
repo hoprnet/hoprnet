@@ -15,11 +15,18 @@ body {
   }
 }
 //
+
 .main-container {
   box-sizing: border-box;
   margin: auto;
   display: block;
   width: 90%;
+  @media (min-width: 767px) {
+    display: flex;
+    justify-content: space-between;
+    height: fit-content;
+    margin-top: 5vh;
+  }
 }
 
 .menu-container {
@@ -41,14 +48,14 @@ p.paragraph-copy {
   }
 }
 p.paragraph {
-  font-weight: normal;
+  font-weight: 400;
   font-size: 0.9em;
   letter-spacing: 0.01em;
   line-height: 1.5em;
   text-align: left;
   color: #414141;
   span {
-    font-weight: 600;
+    font-weight: 700;
   }
 }
 
@@ -65,4 +72,14 @@ hr.hr-alert {
   height: 0.02em;
   background: #e3e3e3;
   border: 0;
+}
+
+//
+.icon-logo-desktop {
+  width: 90%;
+  margin: auto;
+  img {
+    width: 8em;
+    margin-top: 2em;
+  }
 }

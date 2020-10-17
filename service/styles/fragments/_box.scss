@@ -16,10 +16,15 @@
   border-radius: 8px;
   background: #fff;
   box-shadow: $shadow;
+  @media (min-width: 767px) {
+    display: block;
+    width: 50vw;
+    height: fit-content;
+  }
 }
 
-.box{
-  hr{
+.box {
+  hr {
     margin: 1em 0 1em 0;
     height: 0.02em;
     background: #e3e3e3;
@@ -110,9 +115,15 @@
 
         font-weight: 600;
         font-size: 1em;
-
+        cursor: pointer;
+        transition: all 350ms ease-in-out;
         img {
           margin-right: 0.5em;
+        }
+        &:hover {
+          background: #ebebeb;
+          color: #c4c4c4;
+          transition: all 350ms ease-in-out;
         }
       }
     }
@@ -124,7 +135,7 @@
   margin: 0.5em 0 0 0;
   border-top: 1px solid #ebebeb;
   border-bottom: 1px solid #ebebeb;
-  ul{
+  ul {
     margin: 0;
     padding: 0.2em 0;
     list-style: none;
@@ -132,12 +143,12 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    li{
+    li {
       float: left;
       font-weight: 600;
       font-size: 0.89em;
-      color: #C4C4C4;
-      &.active{
+      color: #c4c4c4;
+      &.active {
         color: $black;
         background: #fff;
         border: 1px solid #ebebeb;
@@ -148,35 +159,34 @@
   }
 }
 
-
-.box .box-main-area{
+.box .box-main-area {
   padding: 0 1em;
   overflow: hidden;
-  p{
+  p {
     color: $black;
     font-size: 0.9em;
     line-height: 1.8em;
     font-weight: 400;
   }
-  .quick-code{
+  .quick-code {
     margin: 0.5em 0;
-    .hash{
+    .hash {
       padding: 0.5em 0.5em;
       display: flex;
       align-items: center;
       justify-content: center;
-      p{
+      p {
         font-size: 0.8em;
       }
-      img{
+      img {
         width: 1em;
       }
     }
   }
-  .twitter-line-menu{
-    & > div{
-      a{
-        img{
+  .twitter-line-menu {
+    & > div {
+      a {
+        img {
           filter: grayscale(1);
           opacity: 0.3;
         }
@@ -185,6 +195,6 @@
   }
 }
 
-.box-main-area .box-container-table{
-  padding: 0!important;
+.box-main-area .box-container-table {
+  padding: 0 !important;
 }

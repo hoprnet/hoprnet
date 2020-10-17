@@ -1,3 +1,73 @@
-section.aux-margin{
-    margin-top: 1.5em;
+section.aux-margin {
+  overflow: hidden;
+  margin-top: 1.5em;
+}
+
+section.area-left-desktop {
+  overflow: hidden;
+  .twitter-line-menu {
+    margin-top: 1em;
+    flex-direction: column;
+    & > div {
+      margin: 0.5em 0;
+      a {
+        img {
+          filter: grayscale(1);
+          opacity: 0.3;
+          transition: all 350ms ease-in-out;
+        }
+        p {
+          font-size: 1em;
+        }
+        &:hover {
+          img {
+            transition: all 350ms ease-in-out;
+            filter: grayscale(0);
+            opacity: 1;
+          }
+        }
+      }
+    }
+  }
+}
+
+section.right-side {
+  overflow: hidden;
+  width: 300px;
+  .paragraph {
+    font-size: 1em;
+    margin: 0;
+  }
+  .box-border {
+    border: 0;
+    & > div {
+      width: 100%;
+      padding: 0.5em 1em;
+      box-sizing: border-box;
+      text-align: center;
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      border: 0;
+      h3 {
+        font-size: 1.3em;
+        font-weight: 600;
+        margin-right: 1em;
+      }
+      p {
+        font-size: 1em;
+      }
+    }
+  }
+
+  .box-info {
+    text-align: end;
+    & > div {
+      p {
+        span {
+          width: 70%;
+        }
+      }
+    }
+  }
 }

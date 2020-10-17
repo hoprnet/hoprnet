@@ -12,7 +12,7 @@ const DataBoxCloud = ({ children }) => {
         <p>xHOPR Available</p>
       </div>
       <div>
-        <h3 className="num">993.334223</h3>
+        <h3 className="num">0</h3>
         <p>Payout Time</p>
       </div>
       <div>
@@ -20,7 +20,7 @@ const DataBoxCloud = ({ children }) => {
         <p>xHOPR Sent</p>
       </div>
       <div>
-        <h3 className="num">993.334223</h3>
+        <h3 className="num">0</h3>
         <p>Payout Value</p>
       </div>
     </div>
