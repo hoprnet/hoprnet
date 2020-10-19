@@ -55,7 +55,6 @@ export class Routing extends AbstractCommand {
       if (options.find((o) => o === query)) {
         state.routing = query as any
       } else {
-        console.log('buga buga')
         const peerIds = await queryToPeerIds(query)
 
         if (peerIds.length === 0) {
@@ -77,7 +76,7 @@ export class Routing extends AbstractCommand {
 
       return `${message}.`
     } catch (err) {
-      return styleValue(`Invalid option ${query}.`, 'failure')
+      return styleValue(err.message, 'failure')
     }
   }
 
