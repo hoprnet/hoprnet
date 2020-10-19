@@ -72,9 +72,8 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
   public _network: Network
   // Allows us to construct HOPR with falsy options
   public _debug: boolean
+  public _dbKeys = DbKeys
 
-
-  public dbKeys = DbKeys
   public output: (arr: Uint8Array) => void
   public isBootstrapNode: boolean
   public bootstrapServers: PeerInfo[]
@@ -275,7 +274,7 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
             return reject(err)
           }
 
-          const unAcknowledgedDBKey = this.dbKeys.UnAcknowledgedTickets(packet.challenge.hash)
+          const unAcknowledgedDBKey = this._dbKeys.UnAcknowledgedTickets(packet.challenge.hash)
 
           await this.db.put(Buffer.from(unAcknowledgedDBKey), Buffer.from(''))
 
@@ -480,13 +479,13 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
     return new Promise((resolve, reject) => {
       this.db
         .createReadStream({
-          gte: Buffer.from(this.dbKeys.AcknowledgedTickets(new Uint8Array(0x00)))
+          gte: Buffer.from(this._dbKeys.AcknowledgedTickets(new Uint8Array(0x00)))
         })
         .on('error', (err) => reject(err))
         .on('data', ({ key, value }: { key: Buffer; value: Buffer }) => {
           if (value.buffer.byteLength !== acknowledgedTicketSize) return
 
-          const index = this.dbKeys.AcknowledgedTicketsParse(key)
+          const index = this._dbKeys.AcknowledgedTicketsParse(key)
           const ackTicket = AcknowledgedTicket.create(this.paymentChannels, {
             bytes: value.buffer,
             offset: value.byteOffset
@@ -507,7 +506,7 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
    * @param index Uint8Array
    */
   public async updateAcknowledgedTicket(ackTicket: Types.AcknowledgedTicket, index: Uint8Array): Promise<void> {
-    await this.db.put(Buffer.from(this.dbKeys.AcknowledgedTickets(index)), Buffer.from(ackTicket))
+    await this.db.put(Buffer.from(this._dbKeys.AcknowledgedTickets(index)), Buffer.from(ackTicket))
   }
 
   /**
@@ -515,7 +514,7 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
    * @param index Uint8Array
    */
   public async deleteAcknowledgedTicket(index: Uint8Array): Promise<void> {
-    await this.db.del(Buffer.from(this.dbKeys.AcknowledgedTickets(index)))
+    await this.db.del(Buffer.from(this._dbKeys.AcknowledgedTickets(index)))
   }
 
   /**

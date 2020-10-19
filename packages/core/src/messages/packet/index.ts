@@ -344,7 +344,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       `we are ${this.node.peerInfo.id.toB58String()}`
     )
     await this.node.db.put(
-      Buffer.from(this.node.dbKeys.UnAcknowledgedTickets(this.header.hashedKeyHalf)),
+      Buffer.from(this.node._dbKeys.UnAcknowledgedTickets(this.header.hashedKeyHalf)),
       Buffer.from(unacknowledged)
     )
 
