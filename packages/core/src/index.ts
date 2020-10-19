@@ -323,8 +323,8 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
     return this._network.networkPeers.peers.map(x => x.id)
   }
 
-  async crawl(): Promise<void>{
-    return this._network.crawler.crawl()
+  async crawl(filter?: (peer: PeerId) => boolean): Promise<void>{
+    return this._network.crawler.crawl(filter)
   }
 
 
@@ -334,7 +334,7 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
    * @param counterParty the counter party's peerId
    * @param amountToFund the amount to fund in HOPR(wei)
    */
-  protected async openChannel(
+  public async openChannel(
     counterParty: PeerId,
     amountToFund: BN
   ): Promise<{
@@ -388,6 +388,22 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
     }
   }
 
+
+  public async closeChannel(peerId: PeerId): Promise<string> {
+      const channel = await this.paymentChannels.channel.create(
+        peerId.pubKey.marshal(),
+        async (counterparty: Uint8Array) =>
+          this._interactions.payments.onChainKey.interact(await pubKeyToPeerId(counterparty))
+      )
+
+      const status = await channel.status
+
+      if (!(status === 'OPEN' || status === 'PENDING')) {
+        throw new Error('To close a channel, it must be open or pending for closure')
+      }
+
+      return await channel.initiateSettlement()
+  }
 
 
 

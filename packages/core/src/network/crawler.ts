@@ -50,9 +50,9 @@ class Crawler {
 
   /**
    *
-   * @param comparator
+   * @param filter 
    */
-  async crawl(comparator?: (peer: PeerId) => boolean): Promise<void> {
+  async crawl(filter?: (peer: PeerId) => boolean): Promise<void> {
     verbose('creating a crawl')
     return new Promise(async (resolve) => {
       let aborted = false
@@ -84,13 +84,13 @@ class Crawler {
       unContactedPeers.push(...this.networkPeers.peers.map((entry: Entry) => entry.id))
       verbose(`added ${unContactedPeers.length} peers to crawl list`)
 
-      if (comparator != null) {
+      if (filter != null) {
         for (let i = 0; i < unContactedPeers.length; i++) {
-          if (comparator(unContactedPeers[i])) {
+          if (filter(unContactedPeers[i])) {
             before += 1
           }
         }
-        verbose('comparator passed; number of peers before: ', before)
+        verbose('filter passed; number of peers before: ', before)
       } else {
         before = unContactedPeers.length
       }
@@ -193,7 +193,7 @@ class Crawler {
                 lastSeen: 0
               })
 
-              if (comparator == null || comparator(peer)) {
+              if (filter == null || filter(peer)) {
                 current = current + this.networkPeers.length - beforeInserting
               }
               this.putPeer(addresses[i])
