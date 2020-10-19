@@ -389,7 +389,7 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
   }
 
 
-  public async closeChannel(peerId: PeerId): Promise<string> {
+  public async closeChannel(peerId: PeerId): Promise<{receipt: string, status: string}> {
       const channel = await this.paymentChannels.channel.create(
         peerId.pubKey.marshal(),
         async (counterparty: Uint8Array) =>
@@ -402,7 +402,8 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
         throw new Error('To close a channel, it must be open or pending for closure')
       }
 
-      return await channel.initiateSettlement()
+      const receipt = await channel.initiateSettlement()
+      return {receipt, status}
   }
 
 
