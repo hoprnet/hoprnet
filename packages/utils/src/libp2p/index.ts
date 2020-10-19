@@ -4,10 +4,10 @@ import * as multihashes from 'typestub-multihashes'
 
 /**
  * Regular expresion used to match b58Strings
- * 
+ *
  */
 
- export const b58StringRegex = /16Uiu2HA[A-Za-z0-9]{1,45}/i
+export const b58StringRegex = /16Uiu2HA[A-Za-z0-9]{1,45}/i
 
 /**
  * Takes a peerId and returns its corresponding public key.
@@ -29,14 +29,14 @@ export async function convertPubKeyFromB58String(b58string: string): Promise<Pub
 }
 
 /**
- * 
+ *
  * Returns true or false if given string does not contain a b58string
- * 
+ *
  * @param string arbitrary content with maybe a b58string
  */
 export function hasB58String(content: string): Boolean {
   const hasMatcheableContent = content.match(b58StringRegex)
-  if(hasMatcheableContent) {
+  if (hasMatcheableContent) {
     const [maybeB58String] = hasMatcheableContent
     const b58String = maybeB58String.substr(0, 53)
     return b58String.length === 53
@@ -46,14 +46,14 @@ export function hasB58String(content: string): Boolean {
 }
 
 /**
- * 
+ *
  * Returns the b58String within a given content. Returns empty string if none is found.
- * 
+ *
  * @param string arbitrary content with maybe a b58string
  */
 export function getB58String(content: string): string {
   const hasMatcheableContent = content.match(b58StringRegex)
-  if(hasMatcheableContent) {
+  if (hasMatcheableContent) {
     const [maybeB58String] = hasMatcheableContent
     const b58String = maybeB58String.substr(0, 53)
     return b58String
