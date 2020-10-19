@@ -1,6 +1,6 @@
 import debug from 'debug'
 import fetch from 'isomorphic-fetch'
-import { HOPR_NETWORK, HOPR_DATABASE_URL, EnvironmentProps } from './env'
+import { HOPR_DATABASE_URL, EnvironmentProps } from './env'
 
 
 const log = debug('hopr-leaderboard:firebase')
@@ -20,8 +20,7 @@ export interface FirebaseStateRecords {
 }
 
 export interface FirebaseScoreMap {
-  address: string
-  score: number
+  [address: string]: number
 }
 
 export enum FirebaseNetworkSchema {
@@ -33,7 +32,7 @@ export enum FirebaseNetworkTables {
   'state' = 'state'
 }
 
-export type FirebaseResponse = FirebaseScoreMap[] | FirebaseStateRecords
+export type FirebaseResponse = FirebaseScoreMap | FirebaseStateRecords
 
 class FirebaseDatabase {
   databaseUrl: string

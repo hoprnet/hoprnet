@@ -11,6 +11,7 @@ import BlockscoutLink from '../components/BlockscoutLink'
 import { EnvironmentProps } from '../utils/env'
 import { FirebaseScoreMap, FirebaseStateRecords } from '../utils/db'
 
+
 interface ScoredNodeProps {
   address: string
   score: number
@@ -70,18 +71,20 @@ function HomeContent({
     document.body.removeChild(addressClicker)
   }
 
-  const [score, setScore] = useState<FirebaseScoreMap[]>([])
+  const [score, setScore] = useState<FirebaseScoreMap>({})
 
   useEffect(() => {
     const fetchScore = async () => {
       const apiScoreResponse = await api.getScore()
       if (apiScoreResponse.data) {
-        const score: FirebaseScoreMap[] = apiScoreResponse.data as FirebaseScoreMap[]
+        const score: FirebaseScoreMap = apiScoreResponse.data as FirebaseScoreMap
         setScore(score)
       }
     }
     fetchScore()
   }, [])
+
+  const scoreArray = Object.keys(score).map((key) => ({ address: key, score: score[key] }));
 
   return (
     <>
@@ -138,18 +141,16 @@ function HomeContent({
               In your HOPR node, type <strong>myAddress</strong> to find your node address.
             </li>
             <li>
-              <>
-                Tweet your HOPR node address with the tag <strong>#HOPRNetwork</strong> and <strong>@hoprnet</strong>.{' '}
-                <a
-                  href="https://twitter.com/intent/tweet?ref_src=twsrc%5Etfw"
-                  className="twitter-hashtag-button"
-                  data-text="Signing up to earn $HOPR on the #HOPRnetwork. My @hoprnet address is: "
-                  data-related="hoprnet"
-                  data-show-count="false"
-                >
-                  Tweet #hoprnetwork
+              Tweet your HOPR node address with the tag <strong>#HOPRNetwork</strong> and <strong>@hoprnet</strong>.{' '}
+              <a
+                href="https://twitter.com/intent/tweet?ref_src=twsrc%5Etfw"
+                className="twitter-hashtag-button"
+                data-text="Signing up to earn $HOPR on the #HOPRnetwork. My @hoprnet address is: "
+                data-related="hoprnet"
+                data-show-count="false"
+              >
+                Tweet #hoprnetwork
                 </a>
-              </>
             </li>
             <li>
               In your HOPR node, type <strong>includeRecipient</strong> and then “y” so the bot can respond.
@@ -181,12 +182,12 @@ function HomeContent({
             <h3 style={{ paddingLeft: '20px' }}>
               {connected.length} verified | {score.length} registered | {connectedNodes} connected
             </h3>
-            {(score.length == 0 || connected.length == 0) && (
+            {(scoreArray.length == 0 || connected.length == 0) && (
               <p className={styles.conerr}>
                 <em>No nodes connected...</em>
               </p>
             )}
-            {score.length > 0 && score.map((n) => <ScoredNode key={n.address} {...n} connected={connected} />)}
+            {scoreArray.length > 0 && scoreArray.map((n) => <ScoredNode key={n.address} {...n} connected={connected} />)}
           </div>
         </section>
       </main>
@@ -208,6 +209,7 @@ const Home: React.FC<FirebaseStateRecords> = (props) => {
     initialData: props || {},
     refreshInterval: 5000,
   })
+  console.log('Home', data);
   return <HomeContent {...data} />
 }
 

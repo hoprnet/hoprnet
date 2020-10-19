@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "cross-env NEXT_PUBLIC_HOPR_NETWORK=develop next dev",
+    "dev": "cross-env DEBUG=hopr-leaderboard* NEXT_PUBLIC_HOPR_NETWORK=develop next dev",
     "dev:basodino:1-17-5": "cross-env DEBUG=hopr-leaderboard* NEXT_PUBLIC_HOPR_NETWORK=basodino-develop-1-17-5 next dev",
     "build": "cross-env NEXT_PUBLIC_HOPR_NETWORK=$NEXT_PUBLIC_HOPR_NETWORK next build",
     "type-check": "tsc",
