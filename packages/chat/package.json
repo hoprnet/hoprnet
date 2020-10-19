@@ -60,7 +60,7 @@
     "@types/bs58": "^4.0.1",
     "@types/clear": "^0.1.0",
     "@types/jest": "^26.0.10",
-    "@types/node": ">=4.2.0 < 13",
+    "@types/node": ">=4.2.0 < 15",
     "bestzip": "^2.1.6",
     "copyfiles": "^2.3.0",
     "cross-env": "^7.0.2",
