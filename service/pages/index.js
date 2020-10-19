@@ -4,31 +4,18 @@ import api from '../utils/api'
 import Table from "rc-table";
 
 export default function Home() {
-
-  const [score, setScore] = useState({})
-  const [stats, setStats] = useState({});
+  const [data, setData] = useState({})
 
   useEffect(() => {
-    const fetchScore = async () => {
-      const apiScoreResponse = await api.getScore();
-      if (apiScoreResponse.data) {
-        setScore(apiScoreResponse.data);
+    const fetchData = async () => {
+      const response = await api.getAllData();
+      if (response.data) {
+        console.log('All data: ', response.data);
+        setData(response.data);
       }
     }
-    fetchScore();
+    fetchData();
   }, []);
-
-  useEffect(() => {
-    const fetchStats = async () => {
-      const apiStats = await api.getState();
-      debugger;
-      if (apiStats.data) {
-        setScore(apiStats.data);
-      }
-    }
-    fetchStats();
-  }, []);
-
 
   const columns = [
     {
