@@ -43,7 +43,7 @@ const LeftSide = ({ activaMenu }) => {
             <p>TOP ASSETS</p>
           </div>
         </Link>
-        <Link href="https://discord.com/invite/wUSYqpD">
+        <Link href="https://discord.com/invite/wUSYqpD" target="_blank">
           <div className="menu-item-desktop ">
             <img src="/assets/icons/discord.svg" alt="hopr DISCORD" />
             <p>DISCORD</p>
