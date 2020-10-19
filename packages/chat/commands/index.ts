@@ -32,9 +32,10 @@ export class Commands {
 
   constructor(public node: Hopr<HoprCoreConnector>, rl?: readline.Interface) {
     this.state = {
+      aliases: new Map<string, PeerId>(),
       includeRecipient: false,
       routing: 'direct',
-      aliases: new Map<string, PeerId>()
+      routingPath: []
     }
 
     this.commands = [

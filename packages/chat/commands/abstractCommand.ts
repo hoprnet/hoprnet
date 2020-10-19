@@ -6,9 +6,10 @@ export const emptyAutoCompleteResult = (line: string): AutoCompleteResult => [['
 export type CommandResponse = string | void
 
 export type GlobalState = {
-  includeRecipient: boolean
-  routing: string
   aliases: Map<string, PeerId>
+  includeRecipient: boolean
+  routing: 'direct' | 'manual'
+  routingPath: PeerId[]
 }
 
 // REPL Command
