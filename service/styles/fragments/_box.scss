@@ -235,7 +235,20 @@
   padding: 0 !important;
 }
 
-
-.box-container-table{
-  
+.box-coming-son {
+  display: flex;
+  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  height: 400px;
+  img {
+    width: 250px;
+    filter: grayscale(1) opacity(0.5);
+  }
+  p {
+    color: #ccc;
+    font-size: 1.5em;
+    text-transform: lowercase;
+    letter-spacing: 0.5px;
+  }
 }
