@@ -1,23 +1,38 @@
-import db from './db'
-import { HOPR_ENVIRONMENT } from './env'
+import db, { FirebaseResponse, FirebaseNetworkSchema, FirebaseNetworkTables } from './db'
+import { HOPR_NETWORK } from './env'
 
-export async function getData({ table }: { table: string }) {
+export type APIFirebaseResponse = {
+  data: FirebaseResponse
+  status: number
+}
+
+export type APIResponseVoid = {
+  data: null
+  status: 500
+}
+
+export type APIResponse = APIFirebaseResponse | APIResponseVoid
+
+export async function getData(table: FirebaseNetworkTables): Promise<APIResponse> {
   try {
-    const snapshot = await db.ref(`/${HOPR_ENVIRONMENT}/${table}`).once('value')
-    const data = snapshot.val()
-    return data || {}
+    const queryResponse = await db.getTable(HOPR_NETWORK as FirebaseNetworkSchema, table)
+    if (queryResponse.data) {
+      return { data: queryResponse.data, status: 200 }
+    } else {
+      return { data: null, status: 500 }
+    }
   } catch (e) {
     console.log(e)
-    return {}
+    return { data: null, status: 500 }
   }
 }
 
-export async function getStats() {
-  return getData({ table: 'state' })
+export async function getState() {
+  return getData(FirebaseNetworkTables.state)
 }
 
 export async function getScore() {
-  return getData({ table: 'score' })
+  return getData(FirebaseNetworkTables.score)
 }
 
-export default { getStats, getScore }
+export default { getState, getScore }
