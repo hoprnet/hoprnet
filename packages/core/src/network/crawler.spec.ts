@@ -77,7 +77,7 @@ describe('test crawler', function () {
     Bob.node.emit('peer:connect', Chris.node.peerInfo)
     await Alice.network.crawler.crawl()
 
-    assert(Bob.network.networkPeers.had(Chris.node.peerInfo.id))
+    assert(Bob.network.networkPeers.has(Chris.node.peerInfo.id))
     assert(Alice.network.networkPeers.has(Bob.node.peerInfo.id))
     assert(Alice.network.networkPeers.has(Chris.node.peerInfo.id))
 
