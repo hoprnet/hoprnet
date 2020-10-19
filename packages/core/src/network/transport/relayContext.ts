@@ -80,9 +80,9 @@ class RelayContext {
       ])
 
       if (timeoutDone) {
-        clearTimeout(timeout)
         return -1
       } else {
+        clearTimeout(timeout)
         return Date.now() - start
       }
     }
@@ -279,6 +279,8 @@ class RelayContext {
 
           sourcePromise = source.next().then(sourceFunction)
         } else if (statusMessageAvailable) {
+          log(`statusPromise`, this._statusMessagePromise)
+          log(`sinking status messages`, this._statusMessages)
           while (this._statusMessages.length > 0) {
             yield this._statusMessages.shift()
           }
