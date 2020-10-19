@@ -35,6 +35,7 @@ import BN from 'bn.js'
 
 import { Interactions } from './interactions'
 import * as DbKeys from './dbKeys'
+import type { Connection } from './@types/transport'
 
 const verbose = Debug('hopr-core:verbose')
 
@@ -127,7 +128,13 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
     this.bootstrapServers = options.bootstrapServers || []
     this.isBootstrapNode = options.bootstrapNode || false
 
-    this._interactions = new Interactions(this)
+
+    
+    this._interactions = new Interactions(
+        this,
+        (conn: Connection) => this._network.crawler.handleCrawlRequest(conn),
+        (remotePeer: PeerId) => this._network.heartbeat.emit('beat', remotePeer)
+    )
     this._network = new Network(this, this._interactions, options)
 
     verbose('# STARTED NODE')

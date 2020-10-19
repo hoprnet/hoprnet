@@ -43,7 +43,7 @@ describe('check heartbeat mechanism', function () {
 
     const interactions = ({
       network: {
-        heartbeat: new HeartbeatInteraction(node)
+        heartbeat: new HeartbeatInteraction(node, (remotePeer) => network.heartbeat.emit('beat', remotePeer))
       }
     }) as Interactions<any>
 

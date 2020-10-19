@@ -25,7 +25,6 @@ type Mocks = {
   interactions: Interactions<any>
 }
 
-
 describe('test crawler', function () {
   async function generateMocks(
     options?: { timeoutIntentionally: boolean },
@@ -46,14 +45,14 @@ describe('test crawler', function () {
 
     const interactions = ({
       network: {
-        crawler: new CrawlerInteraction(node)
+        crawler: new CrawlerInteraction(node, (conn) => network.crawler.handleCrawlRequest(conn) )
       }
     }) as Interactions<any>
 
     const network = new Network(node, interactions, {} as any, { crawl: options })
 
-    node.getConnectedPeers = () => network.networkPeers.peers.map(x => x.id)
     node.on('peer:connect', (peerInfo: PeerInfo) => node.peerStore.put(peerInfo))
+
     return {
       node,
       interactions,

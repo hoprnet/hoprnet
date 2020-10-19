@@ -1,4 +1,3 @@
-import type Hopr from '../../'
 import type { AbstractInteraction } from '../abstractInteraction'
 import { randomBytes, createHash } from 'crypto'
 import { u8aEquals, durations } from '@hoprnet/hopr-utils'
@@ -8,6 +7,7 @@ import pipe from 'it-pipe'
 import { PROTOCOL_HEARTBEAT } from '../../constants'
 import type { Stream, Connection, Handler } from '../../@types/transport'
 import type PeerId from 'peer-id'
+import { LibP2P } from '../../'
 
 const error = debug('hopr-core:heartbeat:error')
 const verbose = debug('hopr-core:verbose:heartbeat')
@@ -19,7 +19,8 @@ class Heartbeat implements AbstractInteraction {
   protocols: string[] = [PROTOCOL_HEARTBEAT]
 
   constructor(
-    public node: Hopr<any>,
+    private node: LibP2P,
+    private heartbeat: (remotePeer: PeerId) => void,
     private options?: {
       timeoutIntentionally?: boolean
     }
@@ -37,7 +38,7 @@ class Heartbeat implements AbstractInteraction {
           }
 
           for await (const msg of source) {
-            this.node._network.heartbeat.emit('beat', struct.connection.remotePeer)
+            this.heartbeat(struct.connection.remotePeer)
             verbose('beat')
             yield createHash(HASH_FUNCTION).update(msg.slice()).digest()
           }

@@ -40,7 +40,7 @@ class Crawler {
   constructor(
     private id: PeerId,
     private networkPeers: NetworkPeerStore,
-    private crawlInteraction: CrawlInteraction<any>,
+    private crawlInteraction: CrawlInteraction,
     private getPeer: (PeerId) => Multiaddr[],
     private putPeer: (Multiaddr) => void, 
     private options?: {
