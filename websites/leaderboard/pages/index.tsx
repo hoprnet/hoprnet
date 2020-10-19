@@ -180,7 +180,7 @@ function HomeContent({
           <div className={styles.padBottom}>
             <h2>Leaderboard</h2>
             <h3 style={{ paddingLeft: '20px' }}>
-              {connected.length} verified | {score.length} registered | {connectedNodes} connected
+              {connected.length} verified | {scoreArray.length} registered | {connectedNodes} connected
             </h3>
             {(scoreArray.length == 0 || connected.length == 0) && (
               <p className={styles.conerr}>
