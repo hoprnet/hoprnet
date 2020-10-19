@@ -317,6 +317,8 @@ class Relay {
 
     if (streams != null) {
       verbose(`stream between ${connection.remotePeer.toB58String()} and ${counterparty.toB58String()} exists.`)
+      verbose(streams[counterparty.toB58String()].ping)
+      verbose(await streams[counterparty.toB58String()].ping())
       if ((await streams[connection.remotePeer.toB58String()].ping()) > 0) {
         verbose(`stream to ${counterparty.toB58String()} is alive. Using existing stream`)
 
