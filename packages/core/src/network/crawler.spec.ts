@@ -47,16 +47,6 @@ describe('test crawler', function () {
     const interactions = ({
       network: {
         crawler: new CrawlerInteraction(node)
-        /*
-          interact: async (peer) => {
-            return Promise.resolve(
-              node.network.networkPeers.peers.map(
-                x => new PeerInfo(PeerId.createFromB58String((x.id)))
-              )
-            )
-          }
-        }
-          */
       }
     }) as Interactions<any>
 
