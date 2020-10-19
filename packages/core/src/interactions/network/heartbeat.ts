@@ -37,7 +37,7 @@ class Heartbeat implements AbstractInteraction {
           }
 
           for await (const msg of source) {
-            this.node.network.heartbeat.emit('beat', struct.connection.remotePeer)
+            this.node._network.heartbeat.emit('beat', struct.connection.remotePeer)
             verbose('beat')
             yield createHash(HASH_FUNCTION).update(msg.slice()).digest()
           }

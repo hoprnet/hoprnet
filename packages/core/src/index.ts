@@ -65,16 +65,20 @@ export type HoprOptions = {
 const MAX_ITERATIONS_PATH_SELECTION = 2000
 
 class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
-  public interactions: Interactions<Chain>
-  public network: Network
+
+  // TODO make these actually private
+  public _interactions: Interactions<Chain>
+  public _network: Network
+  // Allows us to construct HOPR with falsy options
+  public _debug: boolean
+
+
   public dbKeys = DbKeys
   public output: (arr: Uint8Array) => void
   public isBootstrapNode: boolean
   public bootstrapServers: PeerInfo[]
   public initializedWithOptions: HoprOptions
 
-  // Allows us to construct HOPR with falsy options
-  public _debug: boolean
 
   /**
    * @constructor
@@ -118,8 +122,8 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
     this.bootstrapServers = options.bootstrapServers || []
     this.isBootstrapNode = options.bootstrapNode || false
 
-    this.interactions = new Interactions(this)
-    this.network = new Network(this, this.interactions, options)
+    this._interactions = new Interactions(this)
+    this._network = new Network(this, this._interactions, options)
 
     verbose('# STARTED NODE')
     verbose('ID', this.peerInfo.id.toB58String())
@@ -197,7 +201,7 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
    */
   async start(): Promise<Hopr<Chain>> {
     await Promise.all([
-      super.start().then(() => Promise.all([this.connectToBootstrapServers(), this.network.start()])),
+      super.start().then(() => Promise.all([this.connectToBootstrapServers(), this._network.start()])),
       this.paymentChannels?.start()
     ])
 
@@ -217,7 +221,7 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
    * Shuts down the node and saves keys and peerBook in the database
    */
   async stop(): Promise<void> {
-    await Promise.all([this.network.stop(), this.paymentChannels?.stop().then(() => log(`Connector stopped.`))])
+    await Promise.all([this._network.stop(), this.paymentChannels?.stop().then(() => log(`Connector stopped.`))])
 
     await Promise.all([this.db?.close().then(() => log(`Database closed.`)), super.stop()])
 
@@ -274,12 +278,12 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
 
           await this.db.put(Buffer.from(unAcknowledgedDBKey), Buffer.from(''))
 
-          this.interactions.packet.acknowledgment.once(u8aToHex(unAcknowledgedDBKey), () => {
+          this._interactions.packet.acknowledgment.once(u8aToHex(unAcknowledgedDBKey), () => {
             resolve()
           })
 
           try {
-            await this.interactions.packet.forward.interact(path[0], packet)
+            await this._interactions.packet.forward.interact(path[0], packet)
           } catch (err) {
             return reject(err)
           }
@@ -306,16 +310,20 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
       throw Error(`Expecting a non-empty destination.`)
     }
     let info = ''
-    if (this.network.networkPeers.hasBlacklisted(destination)){
+    if (this._network.networkPeers.hasBlacklisted(destination)){
       info = '[Ping blacklisted peer]'
     }
-    let latency = await this.interactions.network.heartbeat.interact(destination)
+    let latency = await this._interactions.network.heartbeat.interact(destination)
     return {latency, info}
   }
 
 
   getConnectedPeers(): PeerId[] {
-    return this.network.networkPeers.peers.map(x => x.id)
+    return this._network.networkPeers.peers.map(x => x.id)
+  }
+
+  async crawl(): Promise<void>{
+    return this._network.crawler.crawl()
   }
 
   /**

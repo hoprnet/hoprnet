@@ -97,7 +97,7 @@ describe('test packet composition and decomposition', function () {
             balance: new BN(200),
             balance_a: new BN(100)
           }),
-          (_channelBalance) => nodes[a].interactions.payments.open.interact(nodes[b].peerInfo.id, channelBalance) as any
+          (_channelBalance) => nodes[a]._interactions.payments.open.interact(nodes[b].peerInfo.id, channelBalance) as any
         )
       }
 

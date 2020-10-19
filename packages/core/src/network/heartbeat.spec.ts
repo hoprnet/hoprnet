@@ -33,13 +33,13 @@ describe('check heartbeat mechanism', function () {
     node.peerInfo.multiaddrs.add(Multiaddr('/ip4/0.0.0.0/tcp/0'))
     node.hangUp = async (_id) => {}
 
-    node.interactions = {
+    node._interactions = {
       network: {
         heartbeat: new HeartbeatInteraction(node)
       }
-    } as Hopr<HoprCoreConnector>['interactions']
+    } as Hopr<HoprCoreConnector>['_interactions']
 
-    node.network = new Network(node, node.interactions, {} as any)
+    node._network = new Network(node, node._interactions, {} as any)
     node.peerRouting.findPeer = (_: PeerId) => Promise.reject(Error('not implemented'))
 
     await node.start()
@@ -55,38 +55,38 @@ describe('check heartbeat mechanism', function () {
     // Check whether our event listener is triggered by heartbeat interactions
     await Promise.all([
       new Promise(async (resolve) => {
-        Bob.network.heartbeat.once('beat', (peerId: PeerId) => {
+        Bob._network.heartbeat.once('beat', (peerId: PeerId) => {
           assert(Alice.peerInfo.id.isEqual(peerId), `Incoming connection must come from Alice`)
           resolve()
         })
       }),
-      Alice.interactions.network.heartbeat.interact(Bob.peerInfo.id)
+      Alice._interactions.network.heartbeat.interact(Bob.peerInfo.id)
     ])
 
     assert(
-      !Chris.network.networkPeers.has(Alice.peerInfo.id),
+      !Chris.getConnectedPeers().includes(Alice.peerInfo.id),
       `Chris should not know about Alice in the beginning.`
     )
 
     await Alice.dial(Chris.peerInfo)
 
     // Check that the internal state is as expected
-    assert(Alice.network.networkPeers.has(Chris.peerInfo.id), `Alice should know about Chris now.`)
-    assert(Alice.network.networkPeers.has(Bob.peerInfo.id), `Alice should know about Bob now.`)
-    assert(Chris.network.networkPeers.has(Alice.peerInfo.id), `Chris should know about Alice now.`)
-    assert(Bob.network.networkPeers.has(Alice.peerInfo.id), `Bob should know about Alice now.`)
+    assert(Alice.getConnectedPeers().includes(Chris.peerInfo.id), `Alice should know about Chris now.`)
+    assert(Alice.getConnectedPeers().includes(Bob.peerInfo.id), `Alice should know about Bob now.`)
+    assert(Chris.getConnectedPeers().includes(Alice.peerInfo.id), `Chris should know about Alice now.`)
+    assert(Bob.getConnectedPeers().includes(Alice.peerInfo.id), `Bob should know about Alice now.`)
 
     // Simulate a node failure
     await Chris.stop()
 
-    for (let i = 0; i < Alice.network.networkPeers.peers.length; i++) {
-      Alice.network.networkPeers.peers[i].lastSeen = 0
+    for (let i = 0; i < Alice._network.networkPeers.peers.length; i++) {
+      Alice._network.networkPeers.peers[i].lastSeen = 0
     }
 
     // Check whether a node failure gets detected
-    await Alice.network.heartbeat.checkNodes()
+    await Alice._network.heartbeat.checkNodes()
 
-    assert(!Alice.network.networkPeers.has(Chris.peerInfo.id), `Alice should have removed Chris.`)
+    assert(!Alice.getConnectedPeers().includes(Chris.peerInfo.id), `Alice should have removed Chris.`)
 
     await Promise.all([
       /* pretier-ignore */

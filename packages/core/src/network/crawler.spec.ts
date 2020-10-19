@@ -37,7 +37,7 @@ describe('test crawler', function () {
 
     await node.start()
 
-    node.interactions = ({
+    node._interactions = ({
       network: {
         crawler: new CrawlerInteraction(node)
         /*
@@ -51,10 +51,10 @@ describe('test crawler', function () {
         }
           */
       }
-    } as any) as Hopr<HoprCoreConnector>['interactions']
+    } as any) as Hopr<HoprCoreConnector>['_interactions']
 
 
-    node.network = new Network(node, node.interactions, {} as any, { crawl: options })
+    node._network = new Network(node, node._interactions, {} as any, { crawl: options })
     node.on('peer:connect', (peerInfo: PeerInfo) => node.peerStore.put(peerInfo))
     return (node as unknown) as Hopr<HoprCoreConnector>
   }
@@ -68,53 +68,53 @@ describe('test crawler', function () {
       generateNode()
     ])
 
-    await Alice.network.crawler.crawl()
+    await Alice.crawl()
     Alice.emit('peer:connect', Bob.peerInfo)
-    await Alice.network.crawler.crawl()
+    await Alice.crawl()
 
-    assert(Alice.network.networkPeers.has(Bob.peerInfo.id))
+    assert(Alice.getConnectedPeers().includes(Bob.peerInfo.id))
 
     Bob.emit('peer:connect', Chris.peerInfo)
-    await Alice.network.crawler.crawl()
+    await Alice.crawl()
 
-    assert(Alice.network.networkPeers.has(Bob.peerInfo.id))
-    assert(Alice.network.networkPeers.has(Chris.peerInfo.id))
+    assert(Alice.getConnectedPeers().includes(Bob.peerInfo.id))
+    assert(Alice.getConnectedPeers().includes(Chris.peerInfo.id))
 
     Chris.emit('peer:connect', Dave.peerInfo)
-    await Alice.network.crawler.crawl()
+    await Alice.crawl()
 
-    assert(Alice.network.networkPeers.has(Bob.peerInfo.id))
-    assert(Alice.network.networkPeers.has(Chris.peerInfo.id))
-    assert(Alice.network.networkPeers.has(Dave.peerInfo.id))
+    assert(Alice.getConnectedPeers().includes(Bob.peerInfo.id))
+    assert(Alice.getConnectedPeers().includes(Chris.peerInfo.id))
+    assert(Alice.getConnectedPeers().includes(Dave.peerInfo.id))
 
     Bob.emit('peer:connect', Alice.peerInfo)
     Dave.emit('peer:connect', Eve.peerInfo)
 
-    await Bob.network.crawler.crawl()
+    await Bob.crawl()
 
     // Simulate node failure
     await Bob.stop()
-    assert(Chris.network.networkPeers.has(Bob.peerInfo.id), 'Chris should know about Bob')
+    assert(Chris.getConnectedPeers().includes(Bob.peerInfo.id), 'Chris should know about Bob')
     // Simulates a heartbeat run that kicks out Bob
-    Alice.network.networkPeers.blacklistPeer(Bob.peerInfo.id)
-    await Alice.network.crawler.crawl()
+    Alice._network.networkPeers.blacklistPeer(Bob.peerInfo.id)
+    await Alice.crawl()
 
     assert(
-      !Alice.network.networkPeers.has(Bob.peerInfo.id),
+      !Alice.getConnectedPeers().includes(Bob.peerInfo.id),
       'Alice should not add Bob to her networkPeers after blacklisting him'
     )
     assert(
-      Alice.network.networkPeers.deletedPeers.some((entry: BlacklistedEntry) => entry.id.equals(Bob.peerInfo.id))
+      Alice._network.networkPeers.deletedPeers.some((entry: BlacklistedEntry) => entry.id.equals(Bob.peerInfo.id))
     )
 
     // Remove Bob from blacklist
-    Alice.network.networkPeers.deletedPeers[0].deletedAt -= BLACKLIST_TIMEOUT + 1
+    Alice._network.networkPeers.deletedPeers[0].deletedAt -= BLACKLIST_TIMEOUT + 1
 
     Alice.emit('peer:connect', Chris.peerInfo)
 
-    await Alice.network.crawler.crawl()
+    await Alice.crawl()
 
-    assert(Alice.network.networkPeers.deletedPeers.length == 0)
+    assert(Alice._network.networkPeers.deletedPeers.length == 0)
 
     // Alice.network.networkPeers.push({
     //   id: Bob.peerInfo.id.toB58String(),
@@ -123,7 +123,7 @@ describe('test crawler', function () {
 
     await new Promise((resolve) => setTimeout(resolve, 50))
 
-    assert(Alice.network.networkPeers.has(Bob.peerInfo.id))
+    assert(Alice.getConnectedPeers().includes(Bob.peerInfo.id))
 
     await Promise.all([Alice.stop(), Bob.stop(), Chris.stop(), Dave.stop(), Eve.stop()])
   })
@@ -143,15 +143,15 @@ describe('test crawler', function () {
         })
       ])
 
-      await Alice.network.crawler.crawl()
+      await Alice.crawl()
       Alice.emit('peer:connect', Bob.peerInfo)
-      await Alice.network.crawler.crawl()
+      await Alice.crawl()
       Bob.emit('peer:connect', Chris.peerInfo)
-      await Alice.network.crawler.crawl()
+      await Alice.crawl()
 
       await new Promise((resolve) => setTimeout(resolve, 100))
       await Bob.stop()
-      await Alice.network.crawler.crawl()
+      await Alice.crawl()
       await new Promise((resolve) => setTimeout(resolve, 200))
 
       timeoutCorrectly = true
