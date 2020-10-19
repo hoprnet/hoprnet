@@ -45,7 +45,10 @@ describe('test crawler', function () {
 
     const interactions = ({
       network: {
-        crawler: new CrawlerInteraction(node, (conn) => network.crawler.handleCrawlRequest(conn) )
+        crawler: new CrawlerInteraction(node, (conn) => {
+          console.log("crawl")
+          network.crawler.handleCrawlRequest(conn) 
+        })
       }
     }) as Interactions<any>
 
