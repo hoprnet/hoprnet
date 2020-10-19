@@ -1,23 +1,25 @@
 import React, { useState, useEffect } from "react";
 import Layout from "../components/layout/layout.js";
+import api from '../utils/api'
 import Table from "rc-table";
 
 export default function Home() {
-  const [API_CORE, SetAPI_CORE] = useState(null);
 
-  
+  const [score, setScore] = useState({})
+
   useEffect(() => {
-    getData();
+    const fetchScore = async () => {
+      const apiScoreResponse = await api.getScore();
+      debugger;
+      if (apiScoreResponse.data) {
+        const score = apiScoreResponse.data ;
+        setScore(score);
+        debugger;
+      }
+    }
+    fetchScore();
   }, []);
 
-  const getData = async () => {
-    const data = await fetch(
-      "https://hopr-coverbot.firebaseio.com/basodino-develop-1-17-5/state.json"
-    );
-    const cleanData = await data.json();
-    console.log(cleanData)
-    SetAPI_CORE(cleanData.connected);
-  };
 
   const columns = [
     {
@@ -69,7 +71,7 @@ export default function Home() {
         </div>
         <div className="box-main-area">
           <div className="box-container-table">
-            <Table useFixedHeader={true} columns={columns} data={API_CORE} rowKey={(e) => e.id} />
+            {/* <Table useFixedHeader={true} columns={columns} data={score} rowKey={(e) => e.id} /> */}
           </div>
         </div>
       </div>
