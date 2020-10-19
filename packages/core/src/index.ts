@@ -31,6 +31,7 @@ import PeerInfo from 'peer-info'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { HoprCoreConnectorStatic, Types } from '@hoprnet/hopr-core-connector-interface'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
+import BN from 'bn.js'
 
 import { Interactions } from './interactions'
 import * as DbKeys from './dbKeys'
@@ -325,6 +326,70 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
   async crawl(): Promise<void>{
     return this._network.crawler.crawl()
   }
+
+
+  /**
+   * Open a payment channel
+   *
+   * @param counterParty the counter party's peerId
+   * @param amountToFund the amount to fund in HOPR(wei)
+   */
+  protected async openChannel(
+    counterParty: PeerId,
+    amountToFund: BN
+  ): Promise<{
+    channelId: Types.Hash
+  }> {
+    const { utils, types, account } = this.paymentChannels
+    const self = this.peerInfo.id
+
+    const channelId = await utils.getId(
+      await utils.pubKeyToAccountId(self.pubKey.marshal()),
+      await utils.pubKeyToAccountId(counterParty.pubKey.marshal())
+    )
+
+    const myAvailableTokens = await account.balance
+
+    // validate 'amountToFund'
+    if (amountToFund.lten(0)) {
+      throw Error(`Invalid 'amountToFund' provided: ${amountToFund.toString(10)}`)
+    } else if (amountToFund.gt(myAvailableTokens)) {
+      throw Error(`You don't have enough tokens: ${amountToFund.toString(10)}<${myAvailableTokens.toString(10)}`)
+    }
+
+    const amPartyA = utils.isPartyA(
+      await utils.pubKeyToAccountId(self.pubKey.marshal()),
+      await utils.pubKeyToAccountId(counterParty.pubKey.marshal())
+    )
+
+    const channelBalance = types.ChannelBalance.create(
+      undefined,
+      amPartyA
+        ? {
+            balance: amountToFund,
+            balance_a: amountToFund
+          }
+        : {
+            balance: amountToFund,
+            balance_a: new BN(0)
+          }
+    )
+
+    await this.paymentChannels.channel.create(
+      counterParty.pubKey.marshal(),
+      async () => this._interactions.payments.onChainKey.interact(counterParty),
+      channelBalance,
+      (balance: Types.ChannelBalance): Promise<Types.SignedChannel> =>
+        this._interactions.payments.open.interact(counterParty, balance)
+    )
+
+    return {
+      channelId
+    }
+  }
+
+
+
 
   /**
    * Takes a destination and samples randomly intermediate nodes
