@@ -4,6 +4,8 @@ import Table from "rc-table";
 
 export default function Home() {
   const [API_CORE, SetAPI_CORE] = useState(null);
+
+  
   useEffect(() => {
     getData();
   }, []);
@@ -13,6 +15,7 @@ export default function Home() {
       "https://hopr-coverbot.firebaseio.com/basodino-develop-1-17-5/state.json"
     );
     const cleanData = await data.json();
+    console.log(cleanData)
     SetAPI_CORE(cleanData.connected);
   };
 
