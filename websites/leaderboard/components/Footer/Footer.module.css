@@ -13,3 +13,14 @@
   font-weight: bold;
   text-decoration: underline;
 }
+
+.handles {
+  display: flex;
+  justify-content: center;
+}
+
+.handles img {
+  width: 20px;
+  margin: 0px 10px 0px 10px;
+  filter: invert(1);
+}

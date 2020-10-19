@@ -1,4 +1,5 @@
 import BlockscoutLink from '../BlockscoutLink'
+import { handles } from './handles'
 import styles from './Footer.module.css'
 
 interface FooterProps {
@@ -25,10 +26,20 @@ const Footer: React.FC<FooterProps> = ({ hoprChannelContract, hoprCoverbotAddres
         </div>
       </div>
       Thanks for helping us create the <a href="https://hoprnet.org/">HOPR</a> network.
+      <div className={styles.handles}>
+        {handles.map(({ name, icon, url }) => {
+          return (
+            <div key={name}>
+              <a href={url} target="_blank" rel="noopener noreferrer">
+                <img src={icon} />
+              </a>
+            </div>
+          )
+        })}
+      </div>
       <br />
       <br />
       Last Updated: {refreshed}
-      <script src="https://panther.hoprnet.org/script.js" data-site="LCFGMVKB" defer></script>
     </footer>
   )
 }
