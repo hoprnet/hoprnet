@@ -3,7 +3,7 @@ import BL from 'bl'
 import { MultiaddrConnection, Stream } from '../../@types/transport'
 import Defer, { DeferredPromise } from 'p-defer'
 import { RELAY_PAYLOAD_PREFIX, RELAY_STATUS_PREFIX, RELAY_WEBRTC_PREFIX, RESTART, STOP } from './constants'
-import { u8aCompare, u8aConcat, u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
+import { u8aConcat, u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
 
 import type { Instance as SimplePeer } from 'simple-peer'
 
@@ -280,7 +280,7 @@ class RelayConnection implements MultiaddrConnection {
 
               this._destroyed = true
 
-              return u8aCompare(RELAY_STATUS_PREFIX, STOP)
+              return u8aConcat(RELAY_STATUS_PREFIX, STOP)
             } else {
               // Drop empty messages
               if (streamMsg != null) {

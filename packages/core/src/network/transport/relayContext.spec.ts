@@ -52,7 +52,7 @@ describe('test overwritable connection', function () {
   it('should create a connection and overwrite it', async function () {
     const ctx = new RelayContext(getStream({ usePrefix: false }), {
       useRelaySubprotocol: false,
-      sendRestartMessage: true
+      sendRestartMessage: false
     })
 
     let interval = setInterval(
