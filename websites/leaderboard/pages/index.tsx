@@ -11,7 +11,6 @@ import BlockscoutLink from '../components/BlockscoutLink'
 import { EnvironmentProps } from '../utils/env'
 import { FirebaseScoreMap, FirebaseStateRecords } from '../utils/db'
 
-
 interface ScoredNodeProps {
   address: string
   score: number
@@ -84,7 +83,7 @@ function HomeContent({
     fetchScore()
   }, [])
 
-  const scoreArray = Object.keys(score).map((key) => ({ address: key, score: score[key] }));
+  const scoreArray = Object.keys(score).map((key) => ({ address: key, score: score[key] }))
 
   return (
     <>
@@ -150,7 +149,7 @@ function HomeContent({
                 data-show-count="false"
               >
                 Tweet #hoprnetwork
-                </a>
+              </a>
             </li>
             <li>
               In your HOPR node, type <strong>includeRecipient</strong> and then “y” so the bot can respond.
@@ -187,7 +186,8 @@ function HomeContent({
                 <em>No nodes connected...</em>
               </p>
             )}
-            {scoreArray.length > 0 && scoreArray.map((n) => <ScoredNode key={n.address} {...n} connected={connected} />)}
+            {scoreArray.length > 0 &&
+              scoreArray.map((n) => <ScoredNode key={n.address} {...n} connected={connected} />)}
           </div>
         </section>
       </main>
@@ -209,7 +209,7 @@ const Home: React.FC<FirebaseStateRecords> = (props) => {
     initialData: props || {},
     refreshInterval: 5000,
   })
-  console.log('Home', data);
+  console.log('Home', data)
   return <HomeContent {...data} />
 }
 

@@ -2,10 +2,8 @@ import debug from 'debug'
 import fetch from 'isomorphic-fetch'
 import { HOPR_DATABASE_URL, EnvironmentProps } from './env'
 
-
 const log = debug('hopr-leaderboard:firebase')
 const error = debug('hopr-leaderboard:firebase:error')
-
 
 export interface FirebaseStateRecords {
   address: string
@@ -24,12 +22,12 @@ export interface FirebaseScoreMap {
 }
 
 export enum FirebaseNetworkSchema {
-  'basodino' = 'basodino'
+  'basodino' = 'basodino',
 }
 
 export enum FirebaseNetworkTables {
   'score' = 'score',
-  'state' = 'state'
+  'state' = 'state',
 }
 
 export type FirebaseResponse = FirebaseScoreMap | FirebaseStateRecords
@@ -43,8 +41,9 @@ class FirebaseDatabase {
 
   private async resolveResponse(response: void | Response) {
     if (response) {
-      const json: FirebaseResponse = await response.json()
-        .catch(err => error(`- resolveResponse | json :: Error parsing data from response`, err))
+      const json: FirebaseResponse = await response
+        .json()
+        .catch((err) => error(`- resolveResponse | json :: Error parsing data from response`, err))
       log(`- resolveResponse | Retrieved json ${JSON.stringify(json)}`)
       return { data: json, status: 200 }
     } else {
@@ -56,8 +55,9 @@ class FirebaseDatabase {
   public async getSchema(schema: FirebaseNetworkSchema) {
     try {
       log(`- getSchema | Retrieving schema ${schema} from ${this.databaseUrl}`)
-      const response = await fetch(`${this.databaseUrl}${schema}.json`)
-        .catch(err => error(`- getSchema | fetch :: Error retrieve data from database`, err))
+      const response = await fetch(`${this.databaseUrl}${schema}.json`).catch((err) =>
+        error(`- getSchema | fetch :: Error retrieve data from database`, err),
+      )
       return this.resolveResponse(response)
     } catch (err) {
       error(`- getSchema | catch :: Error retrieving data`, err)

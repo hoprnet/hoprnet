@@ -12,5 +12,5 @@ export interface EnvironmentProps {
 
 console.log('env', {
   HOPR_NETWORK,
-  HOPR_DATABASE_URL
+  HOPR_DATABASE_URL,
 })

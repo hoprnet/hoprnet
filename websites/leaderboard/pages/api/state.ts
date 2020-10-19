@@ -6,7 +6,7 @@ export default async (_req: NextApiRequest, res: NextApiResponse): Promise<Fireb
   res.statusCode = 200
   const response = await getState()
   if (response.data) {
-    const data = response.data as FirebaseStateRecords;
+    const data = response.data as FirebaseStateRecords
     return res.json(data)
   } else {
     return res.json({})

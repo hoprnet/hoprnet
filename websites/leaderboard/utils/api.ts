@@ -2,7 +2,7 @@ import db, { FirebaseResponse, FirebaseNetworkSchema, FirebaseNetworkTables } fr
 import { HOPR_NETWORK } from './env'
 
 export type APIFirebaseResponse = {
-  data: FirebaseResponse,
+  data: FirebaseResponse
   status: number
 }
 
