@@ -83,7 +83,7 @@ function runAsBootstrapNode() {
   })
 
   process.once('exit', async () => {
-    await node.down()
+    await node.stop()
     return
   })
 }

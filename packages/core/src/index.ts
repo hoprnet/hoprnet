@@ -86,7 +86,7 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
    * @param _options
    * @param provider
    */
-  constructor(options: HoprOptions, public db: LevelUp, public paymentChannels: Chain) {
+  private constructor(options: HoprOptions, public db: LevelUp, public paymentChannels: Chain) {
     super({
       peerInfo: options.peerInfo,
 
@@ -136,7 +136,7 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
    *
    * @param options the parameters
    */
-  static async create<CoreConnector extends HoprCoreConnector>(options: HoprOptions): Promise<Hopr<CoreConnector>> {
+  public static async create<CoreConnector extends HoprCoreConnector>(options: HoprOptions): Promise<Hopr<CoreConnector>> {
     const Connector = options.connector ?? HoprCoreEthereum
     const db = Hopr.openDatabase(options, Connector.constants.CHAIN_NAME, Connector.constants.NETWORK)
 
@@ -164,7 +164,7 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
    *
    * @throws an error if none of the bootstrapservers is online
    */
-  async connectToBootstrapServers(): Promise<void> {
+  private async connectToBootstrapServers(): Promise<void> {
     const potentialBootstrapServers = this.bootstrapServers.filter(
       (addr: PeerInfo) => !addr.id.equals(this.peerInfo.id)
     )
@@ -199,7 +199,7 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
    *
    * @param options
    */
-  async start(): Promise<Hopr<Chain>> {
+  public async start(): Promise<Hopr<Chain>> {
     await Promise.all([
       super.start().then(() => Promise.all([this.connectToBootstrapServers(), this._network.start()])),
       this.paymentChannels?.start()
@@ -212,15 +212,10 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
     return this
   }
 
-  async down(): Promise<void> {
-    log('DEPRECATED use stop() not down()')
-    return this.stop()
-  }
-
   /**
    * Shuts down the node and saves keys and peerBook in the database
    */
-  async stop(): Promise<void> {
+  public async stop(): Promise<void> {
     await Promise.all([this._network.stop(), this.paymentChannels?.stop().then(() => log(`Connector stopped.`))])
 
     await Promise.all([this.db?.close().then(() => log(`Database closed.`)), super.stop()])
@@ -305,7 +300,7 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
    * @param destination PeerId of the node
    * @returns latency
    */
-  async ping(destination: PeerId): Promise<{info: string, latency: number}> {
+  public async ping(destination: PeerId): Promise<{info: string, latency: number}> {
     if (!PeerId.isPeerId(destination)) {
       throw Error(`Expecting a non-empty destination.`)
     }
@@ -318,14 +313,13 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
   }
 
 
-  getConnectedPeers(): PeerId[] {
+  public getConnectedPeers(): PeerId[] {
     return this._network.networkPeers.peers.map(x => x.id)
   }
 
-  async crawl(filter?: (peer: PeerId) => boolean): Promise<void>{
+  public async crawl(filter?: (peer: PeerId) => boolean): Promise<void>{
     return this._network.crawler.crawl(filter)
   }
-
 
   /**
    * Open a payment channel
@@ -432,7 +426,7 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
     )
   }
 
-  static openDatabase(options: HoprOptions, chainName: string, network: string): LevelUp {
+  private static openDatabase(options: HoprOptions, chainName: string, network: string): LevelUp {
     if (options.db) {
       return options.db
     }
