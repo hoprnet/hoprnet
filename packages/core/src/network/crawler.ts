@@ -21,6 +21,11 @@ const blue = chalk.blue
 const MAX_PARALLEL_REQUESTS = 7
 export const CRAWL_TIMEOUT = 2 * 1000
 
+export type CrawlInfo = {
+  contactedPeerIds: Set<PeerId>
+  errors: (Error | string)[]
+}
+
 export const shouldIncludePeerInCrawlResponse = (peer: Multiaddr, them: Multiaddr): boolean => {
   // We are being requested a crawl from a node that is on a remote network, so
   // it does not benefit them for us to give them addresses on our private
@@ -52,7 +57,7 @@ class Crawler {
    *
    * @param filter 
    */
-  async crawl(filter?: (peer: PeerId) => boolean): Promise<void> {
+  async crawl(filter?: (peer: PeerId) => boolean): Promise<CrawlInfo> {
     verbose('creating a crawl')
     return new Promise(async (resolve) => {
       let aborted = false
@@ -74,7 +79,10 @@ class Crawler {
         verbose('aborting crawl due to timeout')
         abort.abort()
         this.printStatsAndErrors(contactedPeerIds, errors, current, before)
-        resolve()
+        resolve({
+          contactedPeerIds,
+          errors
+        })
       }, CRAWL_TIMEOUT)
 
       log(`Crawling started`)
@@ -180,7 +188,7 @@ class Crawler {
           for (let i = 0; i < addresses.length; i++) {
             const peer = PeerId.createFromCID(addresses[i].getPeerId())
 
-            if (addresses[i].getPeerId() == this.id.toB58String()) {
+            if (peer.equals(this.id)) {
               continue
             }
 
@@ -226,7 +234,9 @@ class Crawler {
         this.printStatsAndErrors(contactedPeerIds, errors, current, before)
 
         verbose('crawl complete')
-        resolve()
+        resolve({
+          contactedPeerIds, errors
+        })
       }
 
       // @TODO re-enable this once routing is done properly.
