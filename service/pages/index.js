@@ -5,13 +5,16 @@ import Table from "rc-table";
 
 export default function Home() {
   const [data, setData] = useState({})
+  const [dataTable, setDataTable] = useState({})
 
   useEffect(() => {
     const fetchData = async () => {
       const response = await api.getAllData();
       if (response.data) {
-        console.log('All data: ', response.data);
+        // console.log('All data: ', response.data);
         setData(response.data);
+        setDataTable(response.data.connected)
+        console.log(response.data.connected)
       }
     }
     fetchData();
@@ -29,6 +32,11 @@ export default function Home() {
       key: "id",
     },
     {
+      title: "score",
+      dataIndex: "score",
+      key: "score",
+    },
+    {
       title: "tweetId",
       dataIndex: "tweetId",
       key: "tweetId",
@@ -39,6 +47,7 @@ export default function Home() {
       key: "tweetUrl",
     },
   ];
+
 
   return (
     <Layout>
@@ -67,7 +76,7 @@ export default function Home() {
         </div>
         <div className="box-main-area">
           <div className="box-container-table">
-            {/* <Table useFixedHeader={true} columns={columns} data={score} rowKey={(e) => e.id} /> */}
+            {/* <Table columns={columns} data={dataTable} rowKey={(e) => e.id} /> */}
           </div>
         </div>
       </div>

@@ -28,21 +28,13 @@
       color: #e3e3e3;
       transition: all 350msqq cubic-bezier(0.785, 0.135, 0.15, 0.86);
     }
-    &:first-child {
-      border-bottom: 0.5px solid #e3e3e3;
-      border-right: 0.5px solid #e3e3e3;
-    }
     &:nth-last-child(3) {
-      border-left: 0.5px solid #e3e3e3;
-      border-bottom: 0.5px solid #e3e3e3;
+      border-left: 0.05px solid #e3e3e3;
+      border-bottom: 0.05px solid #e3e3e3;
     }
     &:nth-last-child(2) {
-      border-top: 0.5px solid #e3e3e3;
-      border-right: 0.5px solid #e3e3e3;
-    }
-    &:last-child {
-      border-top: 0.5px solid #e3e3e3;
-      border-left: 0.5px solid #e3e3e3;
+      border-top: 0.05px solid #e3e3e3;
+      border-right: 0.05px solid #e3e3e3;
     }
     &:hover {
       img {

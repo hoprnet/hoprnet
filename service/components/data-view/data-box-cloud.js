@@ -2,8 +2,7 @@ import React, { useState, useEffect } from "react";
 import api from '../../utils/api'
 import "../../styles/main.scss";
 
-const DataBoxCloud = ({ children }) => {
-  const [activaMenu, setactivaMenu] = useState(false);
+const DataBoxCloud = () => {
   const [API_Available, SetAPI_Available] = useState(null);
   const [API_Balance, SetAPI_Balance] = useState(null);
   const [API_HoprChannelContract, SetAPI_HoprChannelContract] = useState(null);

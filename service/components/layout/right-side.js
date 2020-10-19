@@ -3,7 +3,7 @@ import DataBoxCloud from "../data-view/data-box-cloud";
 import DataUpdateKnow from "../data-view/data-update-know";
 import "../../styles/main.scss";
 
-const RightSide = ({ activaMenu }) => {
+const RightSide = () => {
   return (
     <section className="right-side only-desktop-view">
       <p className="paragraph">
