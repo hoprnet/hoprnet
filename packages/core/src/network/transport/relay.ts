@@ -52,7 +52,6 @@ import type {
   Registrar,
   Stream
 } from '../../@types/transport'
-import { time } from '@hoprnet/hopr-core-ethereum/lib/utils'
 
 class Relay {
   private _dialer: Dialer
@@ -349,6 +348,10 @@ class Relay {
       // @TODO end deliveryStream
       shaker.write(FAIL_COULD_NOT_REACH_COUNTERPARTY)
       shaker.rest()
+
+      if (streams != null) {
+        this._streams.delete(channelId)
+      }
 
       return
     }
