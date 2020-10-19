@@ -22,7 +22,7 @@ describe(`check serialization and deserialization of ticket objects`, function (
   function getNode(): Hopr<HoprCoreConnector> {
     return ({
       db: LevelUp(Memdown()),
-      dbKeys: DbKeys,
+      _dbKeys: DbKeys,
       paymentChannels: ({
         utils: Utils,
         types: new Types()
