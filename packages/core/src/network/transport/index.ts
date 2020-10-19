@@ -169,7 +169,7 @@ class TCP {
       },
       {
         sendRestartMessage: false,
-        useRelaySubprotocol: false
+        useRelaySubprotocol: true
       }
     )
 
@@ -278,7 +278,7 @@ class TCP {
       },
       {
         sendRestartMessage: false,
-        useRelaySubprotocol: false
+        useRelaySubprotocol: true
       }
     )
 

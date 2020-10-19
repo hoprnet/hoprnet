@@ -187,11 +187,12 @@ class RelayContext {
               }
             }
 
-            verbose(`relaying ${new TextDecoder().decode(SUFFIX)}`, u8aToHex(received))
-
+            //verbose(`relaying ${new TextDecoder().decode(SUFFIX)}`, u8aToHex(received))
+            verbose(`relaying`, SUFFIX)
             yield received
           } else {
-            verbose(`forwarding ${new TextDecoder().decode(sourceMsg.slice())}`)
+            //verbose(`forwarding ${new TextDecoder().decode(sourceMsg.slice())}`)
+            verbose(`forwarding`, sourceMsg)
             yield sourceMsg
           }
         } else {
