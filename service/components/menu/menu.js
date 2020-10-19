@@ -39,7 +39,7 @@ const Menu = ({ activaMenu }) => {
                   <p>TOP ASSETS</p>
                 </li>
               </Link>
-              <Link href="https://discord.com/invite/wUSYqpD">
+              <Link href="https://discord.com/invite/wUSYqpD" target="_blank">
                 <li>
                   <img src="/assets/icons/discord.svg" alt="hopr DISCORD" />
                   <p>DISCORD</p>
