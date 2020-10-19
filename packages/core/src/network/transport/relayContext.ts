@@ -29,6 +29,8 @@ class RelayContext {
 
   public source: Stream['source']
   public sink: Stream['sink']
+  public ping: (ms?: number) => Promise<number>
+  public update: (newStream: Stream) => void
 
   constructor(
     stream: Stream,
@@ -45,6 +47,52 @@ class RelayContext {
     this.source = this._createSource.call(this)
 
     this.sink = this._createSink.bind(this)
+
+    this.ping = async (ms: number = DEFAULT_PING_TIMEOUT) => {
+      if (this.options != null && !this.options.useRelaySubprotocol) {
+        throw Error(`Cannot use ping without relaySubprotocol`)
+      }
+
+      let start = Date.now()
+      this._pingResponsePromise = Defer<void>()
+
+      let timeoutDone = false
+      let timeout: NodeJS.Timeout
+
+      const timeoutPromise = new Promise((resolve) => {
+        timeout = (setTimeout(() => {
+          console.log(timeoutDone)
+          timeoutDone = true
+          resolve()
+        }, ms) as unknown) as NodeJS.Timeout
+      })
+
+      let tmpPromise = this._statusMessagePromise
+
+      this._statusMessagePromise = Defer<void>()
+      this._statusMessages.push(u8aConcat(RELAY_STATUS_PREFIX, PING))
+      tmpPromise.resolve()
+
+      await Promise.race([
+        // prettier-ignore
+        timeoutPromise,
+        this._pingResponsePromise.promise
+      ])
+
+      if (timeoutDone) {
+        clearTimeout(timeout)
+        return -1
+      } else {
+        return Date.now() - start
+      }
+    }
+
+    this.update = (newStream: Stream) => {
+      log(`updating`)
+      let tmpPromise = this._switchPromise
+      this._switchPromise = Defer<Stream>()
+      tmpPromise.resolve(newStream)
+    }
   }
 
   private async *_createSource() {
@@ -245,52 +293,6 @@ class RelayContext {
       currentSink(drain.call(this))
 
       currentSink = (await this._switchPromise.promise).sink
-    }
-  }
-
-  public update(newStream: Stream) {
-    log(`updating`)
-    let tmpPromise = this._switchPromise
-    this._switchPromise = Defer<Stream>()
-    tmpPromise.resolve(newStream)
-  }
-
-  public async ping(ms: number = DEFAULT_PING_TIMEOUT) {
-    if (this.options != null && !this.options.useRelaySubprotocol) {
-      throw Error(`Cannot use ping without relaySubprotocol`)
-    }
-
-    let start = Date.now()
-    this._pingResponsePromise = Defer<void>()
-
-    let timeoutDone = false
-    let timeout: NodeJS.Timeout
-
-    const timeoutPromise = new Promise((resolve) => {
-      timeout = (setTimeout(() => {
-        console.log(timeoutDone)
-        timeoutDone = true
-        resolve()
-      }, ms) as unknown) as NodeJS.Timeout
-    })
-
-    let tmpPromise = this._statusMessagePromise
-
-    this._statusMessagePromise = Defer<void>()
-    this._statusMessages.push(u8aConcat(RELAY_STATUS_PREFIX, PING))
-    tmpPromise.resolve()
-
-    await Promise.race([
-      // prettier-ignore
-      timeoutPromise,
-      this._pingResponsePromise.promise
-    ])
-
-    if (timeoutDone) {
-      clearTimeout(timeout)
-      return -1
-    } else {
-      return Date.now() - start
     }
   }
 }
