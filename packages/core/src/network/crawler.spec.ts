@@ -43,11 +43,11 @@ describe('test crawler', function () {
 
     await node.start()
 
+
     const interactions = ({
       network: {
         crawler: new CrawlerInteraction(node, (conn) => {
-          console.log("crawl")
-          network.crawler.handleCrawlRequest(conn) 
+          return network.crawler.handleCrawlRequest(conn) 
         })
       }
     }) as Interactions<any>
@@ -78,9 +78,10 @@ describe('test crawler', function () {
     assert(Alice.network.networkPeers.has(Bob.node.peerInfo.id))
 
     Bob.node.emit('peer:connect', Chris.node.peerInfo)
+    assert(Bob.network.networkPeers.has(Chris.node.peerInfo.id))
+
     await Alice.network.crawler.crawl()
 
-    assert(Bob.network.networkPeers.has(Chris.node.peerInfo.id))
     assert(Alice.network.networkPeers.has(Bob.node.peerInfo.id))
     assert(Alice.network.networkPeers.has(Chris.node.peerInfo.id))
 
@@ -131,7 +132,6 @@ describe('test crawler', function () {
 
     await Promise.all([Alice.node.stop(), Bob.node.stop(), Chris.node.stop(), Dave.node.stop(), Eve.node.stop()])
   })
-
   it(
     'should crawl the network and timeout while crawling',
     async function () {
