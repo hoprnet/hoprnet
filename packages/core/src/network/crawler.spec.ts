@@ -50,9 +50,9 @@ describe('test crawler', function () {
       }
     }) as Interactions<any>
 
-    const network = new Network(node, node._interactions, {} as any, { crawl: options })
+    const network = new Network(node, interactions, {} as any, { crawl: options })
 
-    node.getConnectedPeers = () => node._network.networkPeers.peers.map(x => x.id)
+    node.getConnectedPeers = () => network.networkPeers.peers.map(x => x.id)
     node.on('peer:connect', (peerInfo: PeerInfo) => node.peerStore.put(peerInfo))
     return {
       node,
