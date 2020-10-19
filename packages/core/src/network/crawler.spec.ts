@@ -73,16 +73,14 @@ describe('test crawler', function () {
 
     await Alice.network.crawler.crawl()
     Alice.node.emit('peer:connect', Bob.node.peerInfo)
-    let info = await Alice.network.crawler.crawl()
-    assert(info.contactedPeerIds.size === 1)
+    await Alice.network.crawler.crawl()
 
     assert(Alice.network.networkPeers.has(Bob.node.peerInfo.id))
 
     Bob.node.emit('peer:connect', Chris.node.peerInfo)
     assert(Bob.network.networkPeers.has(Chris.node.peerInfo.id))
 
-    info = await Alice.network.crawler.crawl()
-    assert(info.contactedPeerIds.size === 2)
+    await Alice.network.crawler.crawl()
     assert(Alice.network.networkPeers.has(Bob.node.peerInfo.id))
     assert(Alice.network.networkPeers.has(Chris.node.peerInfo.id))
 
