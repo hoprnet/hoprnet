@@ -43,6 +43,11 @@ interface NetOptions {
   port: number
 }
 
+type OperationSuccess = {status: 'SUCCESS', receipt: string}
+type OperationFailure = {status: 'FAILURE', message: string}
+type OperationError = {status: 'ERROR', error: Error | string}
+export type OperationStatus = OperationSuccess | OperationFailure | OperationError
+
 export type HoprOptions = {
   debug: boolean
   db?: LevelUp
@@ -407,7 +412,7 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
    *
    * @param destination instance of peerInfo that contains the peerId of the destination
    */
-  async getIntermediateNodes(destination: PeerId): Promise<PeerId[]> {
+  private async getIntermediateNodes(destination: PeerId): Promise<PeerId[]> {
     const start = new this.paymentChannels.types.Public(this.peerInfo.id.pubKey.marshal())
     const exclude = [
       destination.pubKey.marshal(),
@@ -499,7 +504,7 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
    * @param ackTicket Uint8Array
    * @param index Uint8Array
    */
-  public async updateAcknowledgedTicket(ackTicket: Types.AcknowledgedTicket, index: Uint8Array): Promise<void> {
+  private async updateAcknowledgedTicket(ackTicket: Types.AcknowledgedTicket, index: Uint8Array): Promise<void> {
     await this.db.put(Buffer.from(this._dbKeys.AcknowledgedTickets(index)), Buffer.from(ackTicket))
   }
 
@@ -519,20 +524,7 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
   public async submitAcknowledgedTicket(
     ackTicket: Types.AcknowledgedTicket,
     index: Uint8Array
-  ): Promise<
-    | {
-        status: 'SUCCESS'
-        receipt: string
-      }
-    | {
-        status: 'FAILURE'
-        message: string
-      }
-    | {
-        status: 'ERROR'
-        error: Error | string
-      }
-  > {
+  ): Promise<OperationStatus> {
     try {
       const result = await this.paymentChannels.channel.tickets.submit(ackTicket, index)
 
