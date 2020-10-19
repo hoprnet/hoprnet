@@ -65,6 +65,9 @@ hr {
   height: 0.02em;
   background: #e3e3e3;
   border: 0;
+  @media (min-width: 767px) {
+    margin: 1vh 0;
+  }
 }
 
 hr.hr-alert {

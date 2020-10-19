@@ -1,7 +1,6 @@
 import Layout from "../components/layout/layout.js";
 
 export default function TopAssets() {
-
   return (
     <Layout>
       <div className="box">
@@ -20,18 +19,13 @@ export default function TopAssets() {
         </div>
         <div className="box-main-area">
           <div className="box-container-table">
-          <div className="box-coming-son">
-          <img src="/assets/giff/globe_outline.gif" alt="refresh now" />
-          <p>
-            Coming Son
-          </p>
-          </div>
+            <div className="box-coming-soon">
+              <img src="/assets/giff/globe_outline.gif" alt="refresh now" />
+              <p>coming soon</p>
+            </div>
           </div>
         </div>
       </div>
     </Layout>
   );
 }
-
-
-

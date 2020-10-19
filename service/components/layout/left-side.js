@@ -5,7 +5,7 @@ import "../../styles/main.scss";
 
 const useUser = () => ({ user: null, loading: false });
 
-const LeftSide = ({ activaMenu }) => {
+const LeftSide = () => {
   const router = useRouter();
   const [hash, setHash] = useState(
     "16Uiu2HAmRE4fVtp8dF6H62NzRcx6LGUTL5fBRTdnAfZXjveP5Kz9"

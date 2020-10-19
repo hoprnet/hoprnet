@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/router";
-import Link from "next/link";
 import Head from "next/head";
 import Menu from "../menu/menu";
 import LeftSide from "./left-side";

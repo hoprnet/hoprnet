@@ -19,9 +19,10 @@
   overflow: hidden;
   @media (min-width: 767px) {
     display: block;
-    width: 50vw;
+    width: 100%;
     height: fit-content;
-    overflow: auto;
+    overflow: hidden;
+    margin: 0 2vw;
   }
 }
 
@@ -235,7 +236,7 @@
   padding: 0 !important;
 }
 
-.box-coming-son {
+.box-coming-soon {
   display: flex;
   justify-content: center;
   flex-direction: column;
@@ -246,9 +247,13 @@
     filter: grayscale(1) opacity(0.5);
   }
   p {
-    color: #ccc;
-    font-size: 1.5em;
-    text-transform: lowercase;
-    letter-spacing: 0.5px;
+    color: #ccc !important;
+    font-size: 1.5em !important;
+    text-transform: lowercase !important;
+    letter-spacing: 0.5px !important;
   }
+}
+
+.box-container-table {
+  overflow: scroll;
 }
