@@ -242,7 +242,7 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
    * @param intermediateNodes optional set path manually
    * the acknowledgement of the first hop
    */
-  async sendMessage(
+  public async sendMessage(
     msg: Uint8Array,
     destination: PeerId,
     getIntermediateNodesManually?: () => Promise<PeerId[]>
@@ -386,7 +386,6 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
     }
   }
 
-
   public async closeChannel(peerId: PeerId): Promise<{receipt: string, status: string}> {
       const channel = await this.paymentChannels.channel.create(
         peerId.pubKey.marshal(),
@@ -403,8 +402,6 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
       const receipt = await channel.initiateSettlement()
       return {receipt, status}
   }
-
-
 
   /**
    * Takes a destination and samples randomly intermediate nodes
@@ -512,7 +509,7 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
    * Delete Acknowledged Ticket in database
    * @param index Uint8Array
    */
-  public async deleteAcknowledgedTicket(index: Uint8Array): Promise<void> {
+  private async deleteAcknowledgedTicket(index: Uint8Array): Promise<void> {
     await this.db.del(Buffer.from(this._dbKeys.AcknowledgedTickets(index)))
   }
 
