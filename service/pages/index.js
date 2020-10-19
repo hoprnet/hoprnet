@@ -5,7 +5,7 @@ import Table from "rc-table";
 
 export default function Home() {
   const [data, setData] = useState({})
-  const [dataTable, setDataTable] = useState({})
+  const [dataTable, setDataTable] = useState(false)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -76,7 +76,9 @@ export default function Home() {
         </div>
         <div className="box-main-area">
           <div className="box-container-table">
-            <Table columns={columns} data={dataTable} rowKey={(e) => e.id} />
+            {dataTable && (
+              <Table columns={columns} data={dataTable} rowKey={(e) => e.id} />
+            )}
           </div>
         </div>
       </div>
