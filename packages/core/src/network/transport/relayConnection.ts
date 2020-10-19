@@ -129,13 +129,13 @@ class RelayConnection implements MultiaddrConnection {
               yield
               log(`RESTART received, reconnectReceived: ${__reconnectCounter++}`)
             } else {
-              error(`Received invalid status message ${SUFFIX}. Dropping message.`)
+              error(`Received invalid status message ${u8aToHex(SUFFIX || new Uint8Array([]))}. Dropping message.`)
             }
           } else if (u8aEquals(PREFIX, RELAY_WEBRTC_PREFIX)) {
             // console.log(`Receiving fancy WebRTC message`, JSON.parse(new TextDecoder().decode(received.slice(1))))
             this.webRTC?.signal(JSON.parse(new TextDecoder().decode(received.slice(1))))
           } else {
-            error(`Received invalid prefix <${u8aToHex(PREFIX)}. Dropping message.`)
+            error(`Received invalid prefix <${u8aToHex(PREFIX || new Uint8Array([]))}. Dropping message.`)
           }
 
           streamPromise = this._stream.source.next().then(streamSourceFunction)

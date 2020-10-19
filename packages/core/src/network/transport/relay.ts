@@ -10,6 +10,9 @@ import libp2p from 'libp2p'
 import type { WebRTCUpgrader } from './webrtc'
 import type BL from 'bl'
 
+// @ts-ignore
+const Pair: () => Stream = require('it-pair')
+
 declare interface Handshake {
   reader: {
     next(bytes: number): Promise<BL>
@@ -49,6 +52,7 @@ import type {
   Registrar,
   Stream
 } from '../../@types/transport'
+import { time } from '@hoprnet/hopr-core-ethereum/lib/utils'
 
 class Relay {
   private _dialer: Dialer
@@ -313,50 +317,58 @@ class Relay {
 
     let streams = this._streams.get(channelId)
 
-    if (streams == null) {
-      log(
-        `${connection.remotePeer.toB58String()} to ${counterparty.toB58String()} had no connection. Establishing a new one`
-      )
+    if (streams != null) {
+      verbose(`stream between ${connection.remotePeer.toB58String()} and ${counterparty.toB58String()} exists.`)
+      if ((await streams[counterparty.toB58String()].ping()) > 0) {
+        verbose(`stream to ${counterparty.toB58String()} is alive. Using existing stream`)
 
-      let forwardingErrThrown = false
-      let deliveryStream: Stream
-
-      try {
-        deliveryStream = await this.establishForwarding(connection.remotePeer, counterparty)
-      } catch (err) {
-        forwardingErrThrown = true
-        error(err)
-      }
-
-      if (forwardingErrThrown || deliveryStream == null) {
-        // @TODO end deliveryStream
-        shaker.write(FAIL_COULD_NOT_REACH_COUNTERPARTY)
+        shaker.write(OK)
         shaker.rest()
+
+        streams[connection.remotePeer.toB58String()].update(shaker.stream)
 
         return
       }
-
-      shaker.write(OK)
-      shaker.rest()
-
-      const senderContext = new RelayContext(shaker.stream)
-      const counterpartyContext = new RelayContext(deliveryStream)
-
-      senderContext.sink(counterpartyContext.source)
-      counterpartyContext.sink(senderContext.source)
-
-      streams = {
-        [connection.remotePeer.toB58String()]: senderContext,
-        [counterparty.toB58String()]: counterpartyContext
-      }
-
-      this._streams.set(channelId, streams)
-    } else {
-      shaker.write(OK)
-      shaker.rest()
-
-      streams[connection.remotePeer.toB58String()].update(shaker.stream)
+      verbose(`stream to ${counterparty.toB58String()} is NOT alive. Establishing a new one`)
     }
+
+    log(
+      `${connection.remotePeer.toB58String()} to ${counterparty.toB58String()} had no connection. Establishing a new one`
+    )
+
+    let forwardingErrThrown = false
+    let deliveryStream: Stream
+
+    try {
+      deliveryStream = await this.establishForwarding(connection.remotePeer, counterparty)
+    } catch (err) {
+      forwardingErrThrown = true
+      error(err)
+    }
+
+    if (forwardingErrThrown || deliveryStream == null) {
+      // @TODO end deliveryStream
+      shaker.write(FAIL_COULD_NOT_REACH_COUNTERPARTY)
+      shaker.rest()
+
+      return
+    }
+
+    shaker.write(OK)
+    shaker.rest()
+
+    const senderContext = new RelayContext(shaker.stream)
+    const counterpartyContext = new RelayContext(deliveryStream)
+
+    senderContext.sink(counterpartyContext.source)
+    counterpartyContext.sink(senderContext.source)
+
+    streams = {
+      [connection.remotePeer.toB58String()]: senderContext,
+      [counterparty.toB58String()]: counterpartyContext
+    }
+
+    this._streams.set(channelId, streams)
   }
 
   private async establishForwarding(initiator: PeerId, counterparty: PeerId) {
