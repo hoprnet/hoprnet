@@ -1,9 +1,6 @@
 import Hopr from '@hoprnet/hopr-core'
-import type { HoprOptions } from '@hoprnet/hopr-core'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import { commands } from '@hoprnet/hopr-chat'
-import { LogStream, Socket } from './logs'
-import express from 'express'
 import http from 'http'
 import fs from 'fs'
 import ws from 'ws'
@@ -13,6 +10,8 @@ import { parse } from 'url'
 import next from 'next'
 import type { Server } from 'http'
 import stripAnsi from 'strip-ansi'
+import { LogStream } from './logs'
+import { NODE_ENV } from './env'
 
 let debugLog = debug('hoprd:admin')
 
@@ -37,7 +36,7 @@ export class AdminServer {
     debugLog('using', adminPath)
 
     this.app = next({
-      dev: true,
+      dev: NODE_ENV === 'development',
       dir: adminPath,
       conf: {
         devIndicators: {

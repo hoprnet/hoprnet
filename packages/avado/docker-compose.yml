@@ -4,13 +4,14 @@ services:
     build:
       context: ../hoprd
       dockerfile: ./Dockerfile
-    image: 'hopr.avado.dnp.dappnode.eth:1.17.1'
+    image: 'hopr.avado.dnp.dappnode.eth:1.17.10'
     restart: always
     volumes:
       - type: volume
         source: db
         target: /app/db
     ports:
+      - '9091:9091'
       - '3000:3000'
       - '53:53'
     dns:
