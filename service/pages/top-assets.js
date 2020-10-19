@@ -20,7 +20,12 @@ export default function TopAssets() {
         </div>
         <div className="box-main-area">
           <div className="box-container-table">
-            {/* <Table columns={columns} data={dataTable} rowKey={(e) => e.id} /> */}
+          <div className="box-coming-son">
+          <img src="/assets/giff/globe_outline.gif" alt="refresh now" />
+          <p>
+            Coming Son
+          </p>
+          </div>
           </div>
         </div>
       </div>

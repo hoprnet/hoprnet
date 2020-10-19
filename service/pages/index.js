@@ -76,7 +76,7 @@ export default function Home() {
         </div>
         <div className="box-main-area">
           <div className="box-container-table">
-            {/* <Table columns={columns} data={dataTable} rowKey={(e) => e.id} /> */}
+            <Table columns={columns} data={dataTable} rowKey={(e) => e.id} />
           </div>
         </div>
       </div>
