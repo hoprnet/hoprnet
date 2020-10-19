@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import Head from "next/head";
+import api from '../../utils/api'
 import "../../styles/main.scss";
 
 const DataBoxCloud = ({ children }) => {
@@ -10,19 +10,18 @@ const DataBoxCloud = ({ children }) => {
   const [API_HoprCoverbotAddress, SetAPI_HoprCoverbotAddress] = useState(null);
 
   useEffect(() => {
-    getData();
+    const fetchStats = async () => {
+      const apiStats = await api.getState();
+      if (apiStats.data) {
+        SetAPI_Available(apiStats.data.available);
+        SetAPI_Balance(apiStats.data.balance);
+        SetAPI_HoprChannelContract(apiStats.data.hoprChannelContract);
+        SetAPI_HoprCoverbotAddress(apiStats.data.hoprCoverbotAddress);
+      }
+    }
+    fetchStats();
   }, []);
 
-  const getData = async () => {
-    const data = await fetch(
-      "https://hopr-coverbot.firebaseio.com/basodino-develop-1-17-5/state.json"
-    );
-    const cleanData = await data.json();
-    SetAPI_Available(cleanData.available);
-    SetAPI_Balance(cleanData.balance);
-    SetAPI_HoprChannelContract(cleanData.hoprChannelContract);
-    SetAPI_HoprCoverbotAddress(cleanData.hoprCoverbotAddress);
-  };
 
   return (
     <div className="box-border">
