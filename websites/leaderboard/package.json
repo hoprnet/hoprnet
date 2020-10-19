@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "cross-env NEXT_PUBLIC_HOPR_ENVIRONMENT=develop next dev",
-    "dev:testnet": "cross-env NEXT_PUBLIC_HOPR_ENVIRONMENT=testnet next dev",
+    "dev:basodino": "cross-env NEXT_PUBLIC_HOPR_ENVIRONMENT=basodino-develop-1-17-5 next dev",
     "build": "cross-env NEXT_PUBLIC_HOPR_ENVIRONMENT=$NEXT_PUBLIC_HOPR_ENVIRONMENT next build",
     "type-check": "tsc",
     "lint": "eslint '*/**/*.{js,ts,tsx}' --quiet --fix",
