@@ -35,6 +35,7 @@ COPY src src
 COPY hopr-admin hopr-admin
 COPY tsconfig.json tsconfig.json
 RUN yarn build
+RUN yarn buildAdmin
 
 # -- RUNTIME STAGE ------------------------------\
 
