@@ -19,7 +19,6 @@ class Network {
   public stun?: Stun
 
   constructor(node: LibP2P, interactions: Interactions<any>, private options: HoprOptions, testingOptions?: TestOpts) {
-
     // These are temporary, and will be replaced by accessors to the addressBook
     const putPeer = (ma: Multiaddr) => {
       if (!ma.getPeerId()) {
@@ -31,8 +30,8 @@ class Network {
     }
     const getPeer = (id: PeerId): Multiaddr[] => {
       let addrs = node.peerStore.get(id).multiaddrs.toArray()
-      return addrs.map(a => {
-        if (!a.getPeerId()){
+      return addrs.map((a) => {
+        if (!a.getPeerId()) {
           return a.encapsulate(`/p2p/${id.toB58String()}`)
         }
         return a
@@ -59,7 +58,6 @@ class Network {
       this.stun = new Stun(options.hosts)
     }
   }
-
 
   async start() {
     if (this.options.bootstrapNode) {

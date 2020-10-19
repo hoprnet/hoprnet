@@ -27,7 +27,7 @@ describe('test crawl response generation', function () {
 
     const successfulResponse = new CrawlResponse(undefined, {
       status: CrawlStatus.OK,
-      addresses 
+      addresses
     })
 
     assert(
@@ -41,12 +41,12 @@ describe('test crawl response generation', function () {
 
     const secondSuccessfulResponse = new CrawlResponse(undefined, {
       status: CrawlStatus.OK,
-      addresses, 
+      addresses
     })
 
     assert(
       (await secondSuccessfulResponse.addresses).every(
-        (ma:Multiaddr, i: number) => ma.toString() == addresses[i].toString() 
+        (ma: Multiaddr, i: number) => ma.toString() == addresses[i].toString()
       ),
       'Check multiple peerInfos'
     )

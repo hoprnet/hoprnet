@@ -42,7 +42,7 @@ class Crawler {
     private networkPeers: NetworkPeerStore,
     private crawlInteraction: CrawlInteraction<any>,
     private getPeer: (PeerId) => Multiaddr[],
-    private putPeer: (Multiaddr) => void, 
+    private putPeer: (Multiaddr) => void,
     private options?: {
       timeoutIntentionally?: boolean
     }
