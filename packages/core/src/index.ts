@@ -30,6 +30,7 @@ import PeerInfo from 'peer-info'
 
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { HoprCoreConnectorStatic, Types } from '@hoprnet/hopr-core-connector-interface'
+import type { CrawlInfo } from './network/crawler'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
 
@@ -329,7 +330,7 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
     return this._network.networkPeers.peers.map(x => x.id)
   }
 
-  public async crawl(filter?: (peer: PeerId) => boolean): Promise<void>{
+  public async crawl(filter?: (peer: PeerId) => boolean): Promise<CrawlInfo>{
     return this._network.crawler.crawl(filter)
   }
 

@@ -116,8 +116,9 @@ describe('unit test heartbeat', () => {
   } as any
 
   beforeEach(() => {
-    const empty = [][Symbol.iterator]()
-    ;(peers = new NetworkPeerStore(empty)), (heartbeat = new Heartbeat(peers, interaction, hangUp))
+    const empty = [][Symbol.iterator]();
+    peers = new NetworkPeerStore(empty)
+    heartbeat = new Heartbeat(peers, interaction, hangUp)
   })
 
   it('check nodes is noop with empty store', async () => {
@@ -127,14 +128,14 @@ describe('unit test heartbeat', () => {
   })
 
   it('check nodes is noop with only new peers', async () => {
-    peers.push({ id: 'a', lastSeen: Date.now() })
+    peers.push({ id: PeerId.createFromB58String('16Uiu2HAmShu5QQs3LKEXjzmnqcT8E3YqyxKtVTurWYp8caM5jYJq'), lastSeen: Date.now() })
     await heartbeat.checkNodes()
     expect(hangUp.mock.calls.length).toBe(0)
     expect(interaction.interact.mock.calls.length).toBe(0)
   })
 
   it('check nodes interacts with an old peer', async () => {
-    peers.push({ id: '16Uiu2HAmShu5QQs3LKEXjzmnqcT8E3YqyxKtVTurWYp8caM5jYJw', lastSeen: 0 })
+    peers.push({ id: PeerId.createFromB58String('16Uiu2HAmShu5QQs3LKEXjzmnqcT8E3YqyxKtVTurWYp8caM5jYJw'), lastSeen: 0 })
     await heartbeat.checkNodes()
     expect(hangUp.mock.calls.length).toBe(0)
     expect(interaction.interact.mock.calls.length).toBe(1)

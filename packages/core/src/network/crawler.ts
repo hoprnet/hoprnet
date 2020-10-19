@@ -22,8 +22,12 @@ const MAX_PARALLEL_REQUESTS = 7
 export const CRAWL_TIMEOUT = 2 * 1000
 
 export type CrawlInfo = {
-  contactedPeerIds: Set<PeerId>
+  //contactedPeerIds: Set<PeerId>
   errors: (Error | string)[]
+}
+
+let toPeer = (s: string): PeerId =>  {
+  return PeerId.createFromB58String(s)
 }
 
 export const shouldIncludePeerInCrawlResponse = (peer: Multiaddr, them: Multiaddr): boolean => {
@@ -57,7 +61,7 @@ class Crawler {
    *
    * @param filter 
    */
-  async crawl(filter?: (peer: PeerId) => boolean): Promise<CrawlInfo> {
+  async crawl(filter?: (peer: PeerId) => boolean): Promise<void> {
     verbose('creating a crawl')
     return new Promise(async (resolve) => {
       let aborted = false
@@ -65,9 +69,9 @@ class Crawler {
       const errors: Error[] = []
 
       // fast non-inclusion check
-      const contactedPeerIds = new Set<PeerId>()
+      const contactedPeerIds = new Set<string>()
 
-      let unContactedPeers: PeerId[] = [] // @TODO add new peerIds lazily
+      let unContactedPeers: string[] = [] // @TODO add new peerIds lazily
 
       let before = 0 // number of peers before crawling
       let current = 0 // current number of peers
@@ -79,22 +83,19 @@ class Crawler {
         verbose('aborting crawl due to timeout')
         abort.abort()
         this.printStatsAndErrors(contactedPeerIds, errors, current, before)
-        resolve({
-          contactedPeerIds,
-          errors
-        })
+        resolve()
       }, CRAWL_TIMEOUT)
 
       log(`Crawling started`)
 
       this.networkPeers.cleanupBlacklist()
 
-      unContactedPeers.push(...this.networkPeers.peers.map((entry: Entry) => entry.id))
+      unContactedPeers.push(...this.networkPeers.peers.map((entry: Entry) => entry.id.toB58String()))
       verbose(`added ${unContactedPeers.length} peers to crawl list`)
 
       if (filter != null) {
         for (let i = 0; i < unContactedPeers.length; i++) {
-          if (filter(unContactedPeers[i])) {
+          if (filter(toPeer(unContactedPeers[i]))) {
             before += 1
           }
         }
@@ -124,13 +125,13 @@ class Crawler {
         const index = randomInteger(0, unContactedPeers.length)
 
         if (index == unContactedPeers.length - 1) {
-          return unContactedPeers.pop()
+          return toPeer(unContactedPeers.pop())
         }
 
         const selected  = unContactedPeers[index]
         unContactedPeers[index] = unContactedPeers.pop()
 
-        return selected
+        return toPeer(selected)
       }
 
       /**
@@ -159,7 +160,7 @@ class Crawler {
         }
 
         while (true) {
-          contactedPeerIds.add(peer)
+          contactedPeerIds.add(peer.toB58String())
 
           try {
             log(`querying ${blue(peer.toB58String())}`)
@@ -192,8 +193,8 @@ class Crawler {
               continue
             }
 
-            if (!contactedPeerIds.has(peer) && !unContactedPeers.includes(peer)) {
-              unContactedPeers.push(peer)
+            if (!contactedPeerIds.has(peer.toB58String()) && !unContactedPeers.find(x => x == peer.toB58String())) {
+              unContactedPeers.push(peer.toB58String())
 
               let beforeInserting = this.networkPeers.length
               this.networkPeers.push({
@@ -234,9 +235,7 @@ class Crawler {
         this.printStatsAndErrors(contactedPeerIds, errors, current, before)
 
         verbose('crawl complete')
-        resolve({
-          contactedPeerIds, errors
-        })
+        resolve()
       }
 
       // @TODO re-enable this once routing is done properly.
@@ -275,7 +274,7 @@ class Crawler {
     }.call(this)
   }
 
-  printStatsAndErrors(contactedPeerIds: Set<PeerId>, errors: Error[], now: number, before: number) {
+  printStatsAndErrors(contactedPeerIds: Set<string>, errors: Error[], now: number, before: number) {
     if (errors.length > 0) {
       log(
         `Errors while crawling:${errors.reduce((acc, err) => {
@@ -286,8 +285,8 @@ class Crawler {
     }
 
     let contactedNodes = ``
-    contactedPeerIds.forEach((peerId: PeerId) => {
-      contactedNodes += `\n        ${peerId.toB58String()}`
+    contactedPeerIds.forEach((p: string) => {
+      contactedNodes += `\n        ${p}`
     })
 
     log(
