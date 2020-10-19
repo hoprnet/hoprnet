@@ -50,7 +50,6 @@ describe('test crawler', function () {
     }) as Interactions<any>
 
     const network = new Network(node, interactions, {} as any, { crawl: options })
-
     node.on('peer:connect', (peerInfo: PeerInfo) => node.peerStore.put(peerInfo))
 
     return {
@@ -78,6 +77,7 @@ describe('test crawler', function () {
     Bob.node.emit('peer:connect', Chris.node.peerInfo)
     await Alice.network.crawler.crawl()
 
+    assert(Bob.network.networkPeers.had(Chris.node.peerInfo.id))
     assert(Alice.network.networkPeers.has(Bob.node.peerInfo.id))
     assert(Alice.network.networkPeers.has(Chris.node.peerInfo.id))
 
