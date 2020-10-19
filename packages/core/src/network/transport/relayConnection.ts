@@ -3,7 +3,7 @@ import BL from 'bl'
 import { MultiaddrConnection, Stream } from '../../@types/transport'
 import Defer, { DeferredPromise } from 'p-defer'
 import { RELAY_PAYLOAD_PREFIX, RELAY_STATUS_PREFIX, RELAY_WEBRTC_PREFIX, RESTART, STOP } from './constants'
-import { u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
+import { u8aCompare, u8aConcat, u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
 
 import type { Instance as SimplePeer } from 'simple-peer'
 
@@ -27,6 +27,7 @@ class RelayConnection implements MultiaddrConnection {
 
   public source: Stream['source']
   public sink: Stream['sink']
+  public close: (err?: Error) => Promise<void>
 
   public conn: Stream
 
@@ -69,6 +70,14 @@ class RelayConnection implements MultiaddrConnection {
     this.source = this._createSource.call(this)
 
     this.sink = this._createSink.bind(this)
+
+    this.close = (err?: Error): Promise<void> => {
+      this._defer.resolve()
+
+      this.timeline.close = Date.now()
+
+      return Promise.resolve()
+    }
   }
 
   private async *_createSource() {
@@ -145,10 +154,7 @@ class RelayConnection implements MultiaddrConnection {
           if (!this._sinkTriggered) {
             this._stream.sink(
               (async function* () {
-                yield (new BL([
-                  (RELAY_STATUS_PREFIX as unknown) as BL,
-                  (STOP as unknown) as BL
-                ]) as unknown) as Uint8Array
+                yield u8aConcat(RELAY_STATUS_PREFIX, STOP)
               })()
             )
           }
@@ -274,10 +280,7 @@ class RelayConnection implements MultiaddrConnection {
 
               this._destroyed = true
 
-              return (new BL([
-                (RELAY_STATUS_PREFIX as unknown) as BL,
-                (STOP as unknown) as BL
-              ]) as unknown) as Uint8Array
+              return u8aCompare(RELAY_STATUS_PREFIX, STOP)
             } else {
               // Drop empty messages
               if (streamMsg != null) {
@@ -310,14 +313,6 @@ class RelayConnection implements MultiaddrConnection {
 
   get destroyed(): boolean {
     return this._destroyed
-  }
-
-  close(err?: Error): Promise<void> {
-    this._defer.resolve()
-
-    this.timeline.close = Date.now()
-
-    return Promise.resolve()
   }
 }
 

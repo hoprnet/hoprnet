@@ -1,5 +1,5 @@
 import { u8aConcat } from '@hoprnet/hopr-utils'
-import { RELAY_PAYLOAD_PREFIX, RELAY_STATUS_PREFIX, STOP } from './constants'
+import { RELAY_PAYLOAD_PREFIX } from './constants'
 import { RelayContext } from './relayContext'
 import { Stream } from '../../@types/transport'
 
@@ -49,49 +49,49 @@ describe('test overwritable connection', function () {
     }
   }
 
-  // it('should create a connection and overwrite it', async function () {
-  //   const ctx = new RelayContext(getStream({ usePrefix: false }), {
-  //     useRelaySubprotocol: false,
-  //     sendRestartMessage: true
-  //   })
+  it('should create a connection and overwrite it', async function () {
+    const ctx = new RelayContext(getStream({ usePrefix: false }), {
+      useRelaySubprotocol: false,
+      sendRestartMessage: true
+    })
 
-  //   let interval = setInterval(
-  //     () =>
-  //       setImmediate(() => {
-  //         ctx.update(getStream({ usePrefix: false }))
-  //         iteration++
-  //       }),
-  //     500
-  //   )
+    let interval = setInterval(
+      () =>
+        setImmediate(() => {
+          ctx.update(getStream({ usePrefix: false }))
+          iteration++
+        }),
+      500
+    )
 
-  //   let done = false
+    let done = false
 
-  //   setTimeout(() => {
-  //     done = true
-  //     log(`timeout done`)
-  //     clearInterval(interval)
-  //   }, 3000)
+    setTimeout(() => {
+      done = true
+      log(`timeout done`)
+      clearInterval(interval)
+    }, 3000)
 
-  //   let i = 0
-  //   ctx.sink(
-  //     (async function* () {
-  //       await new Promise((resolve) => setTimeout(resolve, 123))
-  //       while (i < 28) {
-  //         yield new TextEncoder().encode(`msg from initial party #${i++}`)
-  //         await new Promise((resolve) => setTimeout(resolve, 100))
-  //       }
-  //     })()
-  //   )
+    let i = 0
+    ctx.sink(
+      (async function* () {
+        await new Promise((resolve) => setTimeout(resolve, 123))
+        while (i < 28) {
+          yield new TextEncoder().encode(`msg from initial party #${i++}`)
+          await new Promise((resolve) => setTimeout(resolve, 100))
+        }
+      })()
+    )
 
-  //   // @TODO count messages
+    // @TODO count messages
 
-  //   for await (const msg of ctx.source) {
-  //     if (done) {
-  //       break
-  //     }
-  //     console.log(`initial source <${new TextDecoder().decode(msg.slice())}>`)
-  //   }
-  // })
+    for await (const msg of ctx.source) {
+      if (done) {
+        break
+      }
+      console.log(`initial source <${new TextDecoder().decode(msg.slice())}>`)
+    }
+  })
 
   it('should simulate relay usage', async function () {
     const streamA = getStream({ usePrefix: true })
@@ -130,6 +130,6 @@ describe('test overwritable connection', function () {
 
     console.log(`ping`, await ctxA.ping())
 
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    await new Promise((resolve) => setTimeout(resolve, 2000))
   })
 })

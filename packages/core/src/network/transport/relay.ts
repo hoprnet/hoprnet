@@ -313,7 +313,6 @@ class Relay {
     }
 
     const channelId = getId(connection.remotePeer, counterparty)
-    console.log(this._streams)
 
     let streams = this._streams.get(channelId)
 

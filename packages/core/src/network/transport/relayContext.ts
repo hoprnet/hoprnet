@@ -268,11 +268,11 @@ class RelayContext {
     let timeout: NodeJS.Timeout
 
     const timeoutPromise = new Promise((resolve) => {
-      timeout = setTimeout(() => {
+      timeout = (setTimeout(() => {
         console.log(timeoutDone)
         timeoutDone = true
         resolve()
-      }, ms)
+      }, ms) as unknown) as NodeJS.Timeout
     })
 
     let tmpPromise = this._statusMessagePromise

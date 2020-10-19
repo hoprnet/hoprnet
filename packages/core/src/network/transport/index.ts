@@ -24,7 +24,6 @@ import chalk from 'chalk'
 import { WebRTCUpgrader } from './webrtc'
 import Relay from './relay'
 import { RelayContext } from './relayContext'
-import { RelayConnection } from './relayConnection'
 
 // @ts-ignore
 const Pair: () => Stream = require('it-pair')
@@ -143,15 +142,11 @@ class TCP {
       try {
         this._upgrader
           .upgradeInbound({
-            remoteAddr: relayConn.remoteAddr,
-            localAddr: relayConn.localAddr,
-            timeline: {
-              open: Date.now()
-            },
+            ...relayConn,
             sink: BtoA.sink,
             source: AtoB.source
           })
-          .then((conn) => this.connHandler?.(conn))
+          .then((conn: Connection) => this.connHandler?.(conn))
       } catch (err) {
         error(err)
       }
@@ -188,7 +183,7 @@ class TCP {
         ...relayConnection,
         sink: BtoA.sink,
         source: AtoB.source
-      } as MultiaddrConnection)
+      })
     } catch (err) {
       error(`Could not upgrade relayed connection. Error was: ${err}`)
       return
@@ -209,7 +204,8 @@ class TCP {
 
     let error: Error
     if (
-      (this.relays == null || this.relays.some((pInfo) => ma.getPeerId() === pInfo.id.toB58String())) &&
+      // uncommenting next line forces our node to use a relayed connection to any node execpt for the bootstrap server
+      //(this.relays == null || this.relays.some((pInfo) => ma.getPeerId() === pInfo.id.toB58String())) &&
       ['ip4', 'ip6', 'dns4', 'dns6'].includes(ma.protoNames()[0]) &&
       this.isRealisticAddress(ma)
     ) {
@@ -291,25 +287,11 @@ class TCP {
     relayConnection.sink(sw.source)
     sw.sink(relayConnection.source)
 
-    // BtoA.sink(
-    //   (async function* () {
-    //     let i = 0
-    //     while (true) {
-    //       yield new TextEncoder().encode(`test message sent from initiator #${i++}`)
-    //       await new Promise((resolve) => setTimeout(resolve, 1700))
-    //     }
-    //   })()
-    // )
-
-    // for await (const msg of AtoB.source) {
-    //   console.log(new TextDecoder().decode(msg.slice()))
-    // }
-
     newConn = await this._upgrader.upgradeOutbound({
       ...relayConnection,
       sink: BtoA.sink,
       source: AtoB.source
-    } as MultiaddrConnection)
+    })
 
     return newConn
     // }
