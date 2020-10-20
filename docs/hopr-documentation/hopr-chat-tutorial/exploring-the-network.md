@@ -32,12 +32,14 @@ Connected to:
 The list of connected peers will sometimes show fewer nodes than the number returned by `crawl.` This is because nodes which go offline are not immediately removed from your node's list of possible connections.
 {% endhint %}
 
+### Finding Your Address
+
 To find your own address, type `myAddress`. This will also show the ETH wallet address you used to fund your account. For example:
 
 ```text
 > myAddress
 HOPR Address:  16Uiu2HAmEvFnLE6cjcAaXCFv4K2zP5Sb8HHXSAEQbBVzVJyCczg5
-xDAI Address:  0xabe565d06c810dac59a02560ea4ea83cda2e995f
+Matic Address:  0xabe565d06c810dac59a02560ea4ea83cda2e995f
 ```
 
 Now that we've scoped out the network, it's time to start sending some messages. The next section will explain how.

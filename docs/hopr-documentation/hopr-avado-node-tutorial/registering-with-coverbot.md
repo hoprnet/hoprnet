@@ -1,10 +1,8 @@
 ---
-description: >-
-  More information about CoverBot, which simulates sending cover traffic through
-  the HOPR network
+description: Register with the CoverBot to start participating in the testnet.
 ---
 
-# Registering with CoverBot
+# Registering With CoverBot
 
 Mixnets need cover traffic to ensure that users retain their privacy even when organic network usage is low. HOPR will employ federated and then fully decentralized cover traffic as development progresses, but for these early testnets cover traffic is simulated by a bot, CoverBot.
 
@@ -22,7 +20,7 @@ Before you register with CoverBot, you'll need the following things:
 * `includeRecipient` turned on
 * A Twitter account
 
-The first two items were covered in the previous sections in this tutorial, [**Exploring the Network**](exploring-the-network.md#finding-your-address) and [**Messaging RandoBot**](randobot.md#step-2-turn-on-includerecipient), respectively.
+The first two items were covered in the previous sections in this tutorial, [**Exploring the Network**](../hopr-chat-tutorial/exploring-the-network.md#finding-your-address) and [**Messaging RandoBot**](../hopr-chat-tutorial/randobot.md#step-2-turn-on-includerecipient), respectively.
 
 ## Step 2: Send a Tweet
 
@@ -53,12 +51,16 @@ The bot should be able to parse any tweet which includes these three things, so 
 Now that you've sent your tweet, you need to register with the bot. Copy the full URL of your tweet and send it as a message in HOPR Chat to the bot. Type:
 
 ```text
-send 16Uiu2HAm2bug99ub54UT2U3P94XPji8vXJFgXTsJTnt4eQ9Tmime
+send 16Uiu2HAm2bug99ub54UT2U3P94XPji8vXJFgXTsJTnt4eQ9Tmime [URL of your tweet]
 ```
 
-Then press Enter. Now paste the URL of your tweet and press Enter again. The bot will now check your tweet and will send you a verification message if you're successful.
+Then press Enter. 
 
-![](../.gitbook/assets/verification-1%20%282%29%20%281%29%20%281%29%20%281%29.png)
+![](../.gitbook/assets/coverbot-avado-success.png)
+
+  
+  
+The bot will now check your tweet and will send you a verification message if you're successful. If there's an error, the bot will try and explain what has gone wrong so you can fix it.
 
 ## Step 4: Stay Online to Earn Tickets!
 
@@ -66,9 +68,9 @@ Now that your address is whitelisted with the bot, you can earn tickets by relay
 
 Every 30 seconds, the bot will randomly select an address from the whitelist and ping it to check that it's online. If is, it will send cover traffic to itself via that node.
 
-If the CoverBot selects your address, you'll receive a ticket which can be redeemed for HOPR. You'll also receive a verification message.
+![](../.gitbook/assets/coverbot-avado-relaying.png)
 
-![](../.gitbook/assets/verification-2%20%282%29%20%281%29%20%281%29%20%281%29.png)
+If the CoverBot selects your address, you'll receive a ticket which can be redeemed for HOPR. You'll also receive a verification message.
 
 {% hint style="info" %}
 The more your node is online, the greater your chance of earning tickets, so try to maximize your node uptime.

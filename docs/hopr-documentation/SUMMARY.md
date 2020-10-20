@@ -27,8 +27,9 @@
 * [Funding Your AVADO Node](hopr-avado-node-tutorial/funding-your-avado-node.md)
 * [Exploring The Network](hopr-avado-node-tutorial/finding-your-address.md)
 * [Messaging Randobot](hopr-avado-node-tutorial/talking-with-randobot.md)
-* [Changing Your Routing Settings](hopr-avado-node-tutorial/changing-your-routing-settings.md)
+* [Registering With CoverBot](hopr-avado-node-tutorial/registering-with-coverbot.md)
 * [Earning and Redeeming Tickets](hopr-avado-node-tutorial/redeeming-tickets.md)
+* [Changing Your Routing Settings](hopr-avado-node-tutorial/changing-your-routing-settings.md)
 * [Sending A Multi-hop Message Using A Payment Channel](hopr-avado-node-tutorial/sending-a-multi-hop-message.md)
 * [Withdrawing Funds](hopr-avado-node-tutorial/withdrawing-funds.md)
 
@@ -59,6 +60,8 @@
   * [Bounties](community/hopr-games/bounties/README.md)
     * [Bouncer Bot](community/hopr-games/bounties/bouncer-bot.md)
 * [Säntis Testnet \(Ended 06 Oct 2020\)](community/saentis-testnet.md)
+* [Basòdino Testnet \(Runs 20th Oct - 4th Nov\)](community/basodino-testnet-runs-20th-oct-4th-nov/README.md)
+  * [Prize Fund and Scoreboard](community/basodino-testnet-runs-20th-oct-4th-nov/prize-fund-and-scoreboard.md)
 
 ## QA
 
