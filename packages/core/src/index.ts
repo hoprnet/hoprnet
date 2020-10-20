@@ -37,6 +37,7 @@ import BN from 'bn.js'
 import { Interactions } from './interactions'
 import * as DbKeys from './dbKeys'
 import type { Connection } from './@types/transport'
+import EventEmitter from 'events'
 
 const verbose = Debug('hopr-core:verbose')
 
@@ -72,7 +73,7 @@ export type HoprOptions = {
 
 const MAX_ITERATIONS_PATH_SELECTION = 2000
 
-class Hopr<Chain extends HoprCoreConnector> {
+class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
 
   // TODO make these actually private - Do not rely on any of these properties!
   public _interactions: Interactions<Chain>
@@ -95,6 +96,7 @@ class Hopr<Chain extends HoprCoreConnector> {
    * @param provider
    */
   private constructor(options: HoprOptions, public db: LevelUp, public paymentChannels: Chain) {
+    super()
     this._libp2p = LibP2P.create({
       peerInfo: options.peerInfo,
 
@@ -123,6 +125,10 @@ class Hopr<Chain extends HoprCoreConnector> {
           enabled: false
         }
       }
+    })
+
+    this._libp2p.on('peer:connect', (peer: PeerInfo) => {
+      this.emit('hopr:peer:connection', peer.id)
     })
 
     this.initializedWithOptions = options

@@ -11,6 +11,7 @@ import { clearString } from '@hoprnet/hopr-utils'
 import chalk from 'chalk'
 import readline from 'readline'
 import PeerInfo from 'peer-info'
+import PeerId from 'peer-id'
 import clear from 'clear'
 import { parseOptions, yesOrNoQuestion } from './utils'
 import { Commands } from './commands'
@@ -78,8 +79,8 @@ async function runAsRegularNode() {
 function runAsBootstrapNode() {
   console.log(`... running as bootstrap node!.`)
 
-  node._libp2p.on('peer:connect', (peer: PeerInfo) => {
-    console.log(`Incoming connection from ${chalk.blue(peer.id.toB58String())}.`)
+  node.on('hopr:peer:connection', (peer: PeerId) => {
+    console.log(`Incoming connection from ${chalk.blue(peer.toB58String())}.`)
   })
 
   process.once('exit', async () => {
