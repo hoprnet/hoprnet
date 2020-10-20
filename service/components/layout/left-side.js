@@ -43,12 +43,14 @@ const LeftSide = () => {
             <p>TOP ASSETS</p>
           </div>
         </Link>
-        <Link href="https://discord.com/invite/wUSYqpD" target="_blank">
+        
           <div className="menu-item-desktop ">
-            <img src="/assets/icons/discord.svg" alt="hopr DISCORD" />
-            <p>DISCORD</p>
+            <a target="_blank"  href="https://discord.com/invite/wUSYqpD" rel="noopener noreferrer">
+              <img src="/assets/icons/discord.svg" alt="hopr DISCORD" />
+              <p>DISCORD</p>
+            </a>
           </div>
-        </Link>
+        
         <Link href="/help">
           <div
             className={
