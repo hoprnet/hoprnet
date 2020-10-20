@@ -77,7 +77,7 @@ const Menu = ({ activaMenu }) => {
                   target="_blank"
                 >
                   <img src="/assets/icons/twitter.svg" alt="twitter" />
-                  <p>#HOPRNetwork</p>
+                  <p>#basodino</p>
                 </a>
               </div>
             </div>
