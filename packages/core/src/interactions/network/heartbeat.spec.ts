@@ -14,7 +14,7 @@ import { EventEmitter } from 'events'
 import * as constants from '../../constants';
 
 // @ts-ignore
-constants.HEARTBEAT_TIMEOUT = 30
+constants.HEARTBEAT_TIMEOUT = 300
 
 describe('check heartbeat mechanism', function () {
   async function generateNode(options?: { timeoutIntentionally?: boolean }) {
