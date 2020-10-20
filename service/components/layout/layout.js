@@ -59,12 +59,11 @@ const Layout = ({ children }) => {
         >
           <div className={[router.pathname != "/" ? "only-desktop-view" : ""]}>
             <p className="paragraph">
-              Welcome to <span>HOPR Säntis testnet!</span> Follow the
+              Welcome to <span>HOPR Basadino testnet!</span> Follow the
               instructions below to start earning points. There are{" "}
               <span>HOPR token</span> prizes for the <span>20</span> highest
               scorers, along with <span>10</span> random prizes. The testnet
-              will run until
-              <span>October 6th.</span>
+              will run until <span>October 6th.</span>
             </p>
           </div>
         </section>
@@ -81,7 +80,7 @@ const Layout = ({ children }) => {
           </p>
         </section>
         {/*  */}
-      <RightSide/>
+        <RightSide />
         {/*  */}
       </div>
     </>

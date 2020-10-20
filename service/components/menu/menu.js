@@ -73,7 +73,7 @@ const Menu = ({ activaMenu }) => {
               </div>
               <div>
                 <a
-                  href="https://twitter.com/intent/tweet?original_referer=https%3A%2F%2Fsaentis.hoprnet.org%2F&amp;ref_src=twsrc%5Etfw&amp;related=hoprnet&amp;text=Signing%20up%20to%20earn%20%24HOPR%20on%20the%20%23HOPRnetwork.%20My%20%40hoprnet%20address%20is%3A%20&amp;tw_p=tweetbutton"
+                  href="https://twitter.com/intent/tweet?original_referer=https%3A%2F%2Fnetwork.hoprnet.org%2F&amp;ref_src=twsrc%5Etfw&amp;related=hoprnet&amp;text=Signing%20up%20to%20earn%20%24HOPR%20on%20the%20%23basodino.%20My%20%40hoprnet%20address%20is%3A%20&amp;tw_p=tweetbutton"
                   target="_blank"
                 >
                   <img src="/assets/icons/twitter.svg" alt="twitter" />

@@ -33,12 +33,19 @@ export default function Help() {
             <hr />
             <p>
               Install the latest version of HOPR Chat, which will spin up a HOPR
-              node. Send 0.02 xDAI to your node. You can get xDAI from ETH on
-              xdai.io or ping us on Telegram. In your HOPR node, type myAddress
-              to find your node address. Tweet your HOPR node address with the
-              tag #basodino and @hoprnet. In your HOPR node, type
-              includeRecipient and then “y” so the bot can respond. Send the URL
-              of your tweet to the CoverBot using the send command:
+              node. Send 0.02 Matic to your node. You can get Matic from ETH on{" "}
+              <a href="https://wallet.matic.network" target="_blank">
+                wallet.matic.network
+              </a>{" "}
+              or ping us on{" "}
+              <a href="https://t.me/hoprnet" target="_blank">
+                Telegram
+              </a>
+              . In your HOPR node, type myAddress to find your node address.
+              Tweet your HOPR node address with the tag #basodino and @hoprnet.
+              In your HOPR node, type includeRecipient and then “y” so the bot
+              can respond. Send the URL of your tweet to the CoverBot using the
+              send command:
             </p>
             <div className="quick-code">
               <div className="hash" onClick={() => copyCodeToClipboard()}>
@@ -64,7 +71,7 @@ export default function Help() {
               </div>
               <div>
                 <a
-                  href="https://twitter.com/intent/tweet?original_referer=https%3A%2F%2Fsaentis.hoprnet.org%2F&amp;ref_src=twsrc%5Etfw&amp;related=hoprnet&amp;text=Signing%20up%20to%20earn%20%24HOPR%20on%20the%20%23HOPRnetwork.%20My%20%40hoprnet%20address%20is%3A%20&amp;tw_p=tweetbutton"
+                  href="https://twitter.com/intent/tweet?original_referer=https%3A%2F%2Fnetwork.hoprnet.org%2F&amp;ref_src=twsrc%5Etfw&amp;related=hoprnet&amp;text=Signing%20up%20to%20earn%20%24HOPR%20on%20the%20%23basodino.%20My%20%40hoprnet%20address%20is%3A%20&amp;tw_p=tweetbutton"
                   target="_blank"
                 >
                   <img src="/assets/icons/twitter.svg" alt="twitter" />
