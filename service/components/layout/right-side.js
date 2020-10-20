@@ -7,10 +7,11 @@ const RightSide = () => {
   return (
     <section className="right-side only-desktop-view">
       <p className="paragraph">
-        Welcome to <span>HOPR Basadino testnet!</span> Follow the instructions
-        below to start earning points. There are <span>HOPR token</span> prizes
-        for the <span>20</span> highest scorers, along with <span>10</span>{" "}
-        random prizes. The testnet will run until <span>October 6th.</span>
+        Welcome to <span>HOPR Basòdino testnet!</span> Click HELP on the left
+        for instructions. Registration is open. CoverBot will begin relaying
+        data on 21st Oct at 3pm CET. The <span>200</span> highest scorers will
+        win a share of <span>200,000 HOPR</span>. The testnet will run until{" "}
+        <span>Nov 4th</span>.
       </p>
       <hr />
       <DataBoxCloud />
