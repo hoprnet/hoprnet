@@ -1,3 +1,7 @@
+---
+description: Earning tickets for relaying data and redeeming them for HOPR
+---
+
 # Earning and Redeeming Tickets
 
 The HOPR private mixnet is kept secure using proof-of-relay. This mechanism ensures that nodes do not receive payment until they have completed their relaying duties.
