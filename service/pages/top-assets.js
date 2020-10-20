@@ -20,44 +20,81 @@ export default function TopAssets() {
     fetchData();
   }, []);
 
+  
+  const columns = [
+    {
+      title: "address",
+      dataIndex: "address",
+      key: "address",
+    },
+    {
+      title: "id",
+      dataIndex: "id",
+      key: "id",
+    },
+    {
+      title: "score",
+      dataIndex: "score",
+      key: "score",
+    },
+    {
+      title: "tweetId",
+      dataIndex: "tweetId",
+      key: "tweetId",
+    },
+    {
+      title: "tweetUrl",
+      dataIndex: "tweetUrl",
+      key: "tweetUrl",
+    },
+  ];
+
   return (
     <Layout>
-      <div className="box">
+      <div className="box special-table-top">
         <div className="box-top-area">
           <div>
             <div className="box-title">
               <h1>Top Assets</h1>
             </div>
-            <div className="box-btn">
-              <button>
-                <img src="/assets/icons/refresh.svg" alt="refresh now" />
-                refresh now
-              </button>
-            </div>
           </div>
         </div>
-        <div className="box-main-area">
+        <div className="box-main-area remove-all-padding aux-add-top ">
           <div className="box-container-table">
-            <div className="box-coming-soon">
               {data && (
-                <ul>
+                <table id="date">
+                <thead>
+                  <tr>
+                    {columns.map((e, index) => {
+                      const { title, key } = e;
+                      return <th scope="col" key={key}>{title}</th>;
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
                   {data.map(item => {
                     const { id, address, score, tweetId, tweetUrl } = item;
                     return (
-                      <li>
-                        <address>
-                          {id}<br/>
-                          {address}<br/>
-                          {score}<br/>
-                          {tweetId}<br/>
-                          {tweetUrl}
-                        </address>
-                      </li>
+                      <tr key={id}>
+                        <td data-type="score" data-label="score">{score}</td>
+                        <td data-label="address">{address}</td>
+                        <td data-label="id">{id}</td>
+                        <td data-label="tweetId">{tweetId}</td>
+                        <td data-label="tweetUrl">
+                          <a href={tweetUrl}>
+                            <img
+                              src="/assets/icons/twitter.svg"
+                              alt="twitter"
+                            />
+                          </a>
+                        </td>
+                      </tr>
                     );
                   })}
-                </ul>
+                 </tbody>
+              </table>
               )}
-            </div>
+            
           </div>
         </div>
       </div>

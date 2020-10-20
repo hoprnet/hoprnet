@@ -101,7 +101,6 @@ export default function Home() {
                   </tr>
                 </thead>
                 <tbody>
-                  {/* <tr>.map</tr> */}
                   {dataTable.map((e, index) => {
                     const { address, id, score, tweetId, tweetUrl } = e;
                     return (

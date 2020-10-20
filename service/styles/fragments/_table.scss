@@ -31,9 +31,15 @@ table caption {
 }
 
 table tr {
-  background-color: #fff;
+ 
   border: 0.5px solid #f6f7fc;
   padding: 0.35em;
+  &:nth-child(even) {
+    background: #f7f7f796;
+  }
+  &:nth-child(odd) {
+    background:white ;
+  }
   td {
     white-space: nowrap;
     overflow: hidden;
