@@ -3,24 +3,30 @@ import Layout from "../components/layout/layout.js";
 import api from "../utils/api";
 
 export default function TopAssets() {
-  const [data, setData] = useState([]);
+  const [data, setData] = useState(undefined);
+  const allNodes = (data
+    ? data.scoreArray.map((score) => {
+        const node = data.connected.find((node) => node.id === score.address);
+
+        return {
+          online: !!node,
+          ...score,
+          ...(node || {}),
+        };
+      })
+    : []
+  ).sort((a, b) => b.score - a.score);
+
+  const nodes = allNodes.slice(0, allNodes.length > 6 ? 5 : allNodes.length);
 
   useEffect(() => {
     const fetchData = async () => {
       const response = await api.getAllData();
-      if (response.data) {
-        if (response.data.connected) {
-          let connected = response.data.connected.sort((a, b) => b.score - a.score);
-          if (connected.length) {
-            setData(connected.slice(0, connected.length > 6 ? 5 : connected.length));
-          }
-        }
-      }
+      if (response.data) setData(response.data);
     };
     fetchData();
   }, []);
 
-  
   const columns = [
     {
       title: "address",
@@ -61,26 +67,37 @@ export default function TopAssets() {
         </div>
         <div className="box-main-area remove-all-padding aux-add-top ">
           <div className="box-container-table">
-              {data && (
-                <table id="date">
+            {nodes && (
+              <table id="date">
                 <thead>
                   <tr>
                     {columns.map((e, index) => {
                       const { title, key } = e;
-                      return <th scope="col" key={key}>{title}</th>;
+                      return (
+                        <th scope="col" key={key}>
+                          {title}
+                        </th>
+                      );
                     })}
                   </tr>
                 </thead>
                 <tbody>
-                  {data.map(item => {
+                  {nodes.map((item) => {
                     const { id, address, score, tweetId, tweetUrl } = item;
                     return (
                       <tr key={id}>
-                        <td data-type="score" data-label="score">
-                          <span > <img src="/assets/icons/top.svg" alt="hopr Top ASSETS" /></span>
-                          {score}</td>
                         <td data-label="address">{address}</td>
                         <td data-label="id">{id}</td>
+                        <td data-type="score" data-label="score">
+                          <span>
+                            {" "}
+                            <img
+                              src="/assets/icons/top.svg"
+                              alt="hopr Top ASSETS"
+                            />
+                          </span>
+                          {score}
+                        </td>
                         <td data-label="tweetId">{tweetId}</td>
                         <td data-label="tweetUrl">
                           <a href={tweetUrl}>
@@ -93,10 +110,9 @@ export default function TopAssets() {
                       </tr>
                     );
                   })}
-                 </tbody>
+                </tbody>
               </table>
-              )}
-            
+            )}
           </div>
         </div>
       </div>
