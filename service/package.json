@@ -13,7 +13,6 @@
     "isomorphic-fetch": "^3.0.0",
     "next": "9.5.5",
     "node-sass": "^4.14.1",
-    "rc-table": "^7.10.2",
     "react": "16.14.0",
     "react-dom": "16.14.0"
   }

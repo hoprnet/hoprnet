@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import Layout from "../components/layout/layout.js";
 import api from '../utils/api'
-import Table from "rc-table";
+
 
 export default function Home() {
   const [data, setData] = useState({})
@@ -77,7 +77,22 @@ export default function Home() {
         <div className="box-main-area">
           <div className="box-container-table">
             {dataTable && (
-              <Table   width={300} useFixedHeader={true} className="main-table" columns={columns} data={dataTable} rowKey={(e) => e.id} />
+            <table id='date'>
+            <tbody>
+               {/* <tr>.map</tr> */}
+               {dataTable.map((e, index)=>{
+                 const { address, id, tweetId, tweetUrl } = e;
+                return(
+                  <tr key={id}>
+                  <td>{address}</td>
+                   <td>{id}</td>
+                   <td>{tweetId}</td>
+                   <td><a href={tweetUrl}><img src="/assets/icons/twitter.svg" alt="twitter" /></a></td>
+                </tr>
+                )
+               })}
+            </tbody>
+         </table>
             )}
           </div>
         </div>
@@ -85,3 +100,5 @@ export default function Home() {
     </Layout>
   );
 }
+
+
