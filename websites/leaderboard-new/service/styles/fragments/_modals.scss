@@ -42,10 +42,20 @@
   justify-content: center;
   flex-direction: column;
   overflow: hidden;
+ 
   .icon-logo {
     img {
       width: 3.4em;
       object-fit: cover;
+    }
+  }
+  @media (min-width: 767px) {
+    width: fit-content;
+    .icon-logo {
+      img {
+        width: 7em;
+        object-fit: cover;
+      }
     }
   }
   .content {

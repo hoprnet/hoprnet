@@ -28,7 +28,7 @@ export default function Help() {
   return (
     <>
       <Layout>
-        <div className="box">
+        <div className="box help-area">
           <div className="box-top-area">
             <div>
               <div className="box-title">
