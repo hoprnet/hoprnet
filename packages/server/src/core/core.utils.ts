@@ -37,7 +37,7 @@ export function mustBeStarted(): MethodDecorator {
  */
 export function isBootstrapNode(node: Hopr<HoprCoreConnector>, peerId: PeerId): boolean {
   for (let i = 0; i < node.bootstrapServers.length; i++) {
-    if (peerId.isEqual(node.bootstrapServers[i].id)) {
+    if (peerId.toB58String() === node.bootstrapServers[i].getPeerId()) {
       return true
     }
   }
