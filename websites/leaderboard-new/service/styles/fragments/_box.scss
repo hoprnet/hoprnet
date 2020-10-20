@@ -91,10 +91,11 @@
 
 .box-info {
   p {
-    color: $black;
+    color: #dadada;
     font-size: 1em;
-    font-weight: 200;
+    font-weight: 400; 
     span {
+      color: $black;
       font-size: 0.89em;
       font-weight: 600;
     }

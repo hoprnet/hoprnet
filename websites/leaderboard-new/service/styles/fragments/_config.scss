@@ -167,3 +167,33 @@ a.aux-help-twitter{
   color: #50A8E7;
   }
 }
+// icon
+.icon-help-online{
+  box-sizing: border-box;
+  padding-left: 2em;
+ div{
+  width: 17px;
+  height: 17px;
+  border-radius: 100%;
+ }
+  .online{
+    background:#7CEE78;
+    border:1.5px solid darken(#7CEE78, 17);
+    &::before{
+      content: "ONLINE";
+      margin-left: 27px;
+      color: #dadada;
+      text-transform: lowercase;
+    }
+  }
+  .offline{
+    background: #EE696B;
+    border:1.5px solid darken(#EE696B, 17);
+    &::before{
+      content: "OFFLINE";
+      margin-left: 27px;
+      color: #dadada;
+      text-transform: lowercase;
+    }
+  }
+}

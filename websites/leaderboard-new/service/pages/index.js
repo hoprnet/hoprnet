@@ -101,7 +101,7 @@ export default function Home() {
                     const { online, address, id, score, tweetUrl } = e;
                     return (
                       <tr key={id}>
-                        <td data-label="online">{online ? "🟢" : "🔴"}</td>
+                        <td className="icon-help-online" data-label="online"><div className={[online ? "online" : "offline"]}></div></td>
                         <td data-label="address">{address}</td>
                         <td data-label="id">{id}</td>
                         <td data-type="score" data-label="score">
