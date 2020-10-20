@@ -1,6 +1,7 @@
 import PeerId from 'peer-id'
-import { keys as libp2p_crypto, PublicKey } from 'libp2p-crypto'
-import * as multihashes from 'typestub-multihashes'
+import { keys, PublicKey } from 'libp2p-crypto'
+// @ts-ignore
+import * as multihashes from 'multihashes'
 
 /**
  * Takes a peerId and returns its corresponding public key.
@@ -8,7 +9,7 @@ import * as multihashes from 'typestub-multihashes'
  * @param peerId the PeerId used to generate a public key
  */
 export async function convertPubKeyFromPeerId(peerId: PeerId): Promise<PublicKey> {
-  return await libp2p_crypto.unmarshalPublicKey(multihashes.decode(peerId.toBytes()).digest)
+  return await keys.unmarshalPublicKey(multihashes.decode(peerId.toBytes()).digest)
 }
 
 /**
