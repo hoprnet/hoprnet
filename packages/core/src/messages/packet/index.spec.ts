@@ -35,7 +35,7 @@ async function startTestnet() {
 
 async function generateNode(id: number): Promise<Hopr<HoprEthereum>> {
   // Start HOPR in DEBUG_MODE and use demo seeds
-  const node = (await Hopr.create({
+  return (await Hopr.create({
     id,
     db: new LevelUp(MemDown()),
     connector: HoprEthereum,
@@ -43,10 +43,6 @@ async function generateNode(id: number): Promise<Hopr<HoprEthereum>> {
     network: 'ethereum',
     debug: true
   })) as Hopr<HoprEthereum>
-
-  // await node.paymentChannels.initOnchainValues()
-
-  return node
 }
 
 const GANACHE_URI = `ws://127.0.0.1:9545`
@@ -59,7 +55,9 @@ describe('test packet composition and decomposition', function () {
   }, durations.seconds(30))
 
   afterEach(async function () {
-    await testnet.stop()
+    if (testnet) {
+      await testnet.stop()
+    }
   })
 
   it(
