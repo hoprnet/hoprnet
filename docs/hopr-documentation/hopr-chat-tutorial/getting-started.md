@@ -14,15 +14,15 @@ If this is your first time using HOPR Chat, you'll need to install node.js or Do
 
 {% tabs %}
 {% tab title="Windows" %}
-[Download the latest Windows release](https://github.com/hoprnet/hopr-chat/releases/download/v1.17.0-alpha.basodino.rc-3/hopr-chat-nodebin-windows.zip)
+[Download the latest Windows release](https://github.com/hoprnet/hopr-chat/releases/download/v1.17.14-basodino-testnet/hopr-chat-nodebin-windows.zip)
 {% endtab %}
 
 {% tab title="MacOS" %}
-[Download the latest MacOS release](https://github.com/hoprnet/hopr-chat/releases/download/v1.17.0-alpha.basodino.rc-3/hopr-chat-nodebin-macos.zip)
+[Download the latest MacOS release](https://github.com/hoprnet/hopr-chat/releases/download/v1.17.14-basodino-testnet/hopr-chat-nodebin-macos.zip)
 {% endtab %}
 
 {% tab title="Linux" %}
-[Download the latest Linux release](https://github.com/hoprnet/hopr-chat/releases/download/v1.17.0-alpha.basodino.rc-3/hopr-chat-nodebin-linux.zip)
+[Download the latest Linux release](https://github.com/hoprnet/hopr-chat/releases/download/v1.17.14-basodino-testnet/hopr-chat-nodebin-linux.zip)
 {% endtab %}
 {% endtabs %}
 
