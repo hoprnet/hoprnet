@@ -81,7 +81,6 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   // Allows us to construct HOPR with falsy options
   public _debug: boolean
   public _dbKeys = DbKeys
-  public _libp2p: LibP2P
 
   public output: (arr: Uint8Array) => void
   public isBootstrapNode: boolean
@@ -95,38 +94,8 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
    * @param _options
    * @param provider
    */
-  private constructor(options: HoprOptions, public db: LevelUp, public paymentChannels: Chain) {
+  private constructor(options: HoprOptions, public _libp2p: LibP2P, public db: LevelUp, public paymentChannels: Chain) {
     super()
-    this._libp2p = LibP2P.create({
-      peerInfo: options.peerInfo,
-
-      // Disable libp2p-switch protections for the moment
-      switch: {
-        denyTTL: 1,
-        denyAttempts: Infinity
-      },
-      // The libp2p modules for this libp2p bundle
-      modules: {
-        transport: [TCP],
-        streamMuxer: [MPLEX],
-        connEncryption: [SECIO],
-        dht: KadDHT
-      },
-      config: {
-        transport: {
-          TCP: {
-            bootstrapServers: options.bootstrapServers
-          }
-        },
-        dht: {
-          enabled: true
-        },
-        relay: {
-          enabled: false
-        }
-      }
-    })
-
     this._libp2p.on('peer:connect', (peer: PeerInfo) => {
       this.emit('hopr:peer:connection', peer.id)
     })
@@ -141,8 +110,6 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     }
     this.bootstrapServers = options.bootstrapServers || []
     this.isBootstrapNode = options.bootstrapNode || false
-
-
     
     this._interactions = new Interactions(
         this,
@@ -182,7 +149,37 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     })) as CoreConnector
 
     verbose('Created connector, now creating node')
-    return await new Hopr<CoreConnector>(options, db, connector).start()
+
+    const libp2p = await LibP2P.create({
+      peerInfo: options.peerInfo,
+
+      // Disable libp2p-switch protections for the moment
+      switch: {
+        denyTTL: 1,
+        denyAttempts: Infinity
+      },
+      // The libp2p modules for this libp2p bundle
+      modules: {
+        transport: [TCP],
+        streamMuxer: [MPLEX],
+        connEncryption: [SECIO],
+        dht: KadDHT
+      },
+      config: {
+        transport: {
+          TCP: {
+            bootstrapServers: options.bootstrapServers
+          }
+        },
+        dht: {
+          enabled: true
+        },
+        relay: {
+          enabled: false
+        }
+      }
+    })
+    return await new Hopr<CoreConnector>(options, libp2p, db, connector).start()
   }
 
   /**
