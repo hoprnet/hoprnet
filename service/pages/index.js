@@ -96,7 +96,7 @@ export default function Home() {
                   <tr>
                     {columns.map((e, index) => {
                       const { title, key } = e;
-                      return <th key={key}>{title}</th>;
+                      return <th scope="col" key={key}>{title}</th>;
                     })}
                   </tr>
                 </thead>
@@ -106,11 +106,11 @@ export default function Home() {
                     const { address, id, score, tweetId, tweetUrl } = e;
                     return (
                       <tr key={id}>
-                        <td data-type="score">{score}</td>
-                        <td>{address}</td>
-                        <td>{id}</td>
-                        <td>{tweetId}</td>
-                        <td>
+                        <td data-type="score" data-label="score">{score}</td>
+                        <td data-label="address">{address}</td>
+                        <td data-label="id">{id}</td>
+                        <td data-label="tweetId">{tweetId}</td>
+                        <td data-label="tweetUrl">
                           <a href={tweetUrl}>
                             <img
                               src="/assets/icons/twitter.svg"
