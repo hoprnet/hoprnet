@@ -22,9 +22,3 @@ To get MATIC, you'll need to add the network to your Ethereum wallet. [MetaMask]
 
 Once you've sent MATIC to your node, restart it. When your node restarts, your balance will be automatically detected and you can proceed.
 
-## Getting xHOPR
-
-There are two ways to get xHOPR on your node: sending it directly to the node address or earning it by relaying data and redeeming tickets. For testing purposes, we recommend funding your node directly. Ask in Telegram or Discord and one of our ambassadors will fund your node.
-
-To learn more about earning xHOPR by relaying data, see the sections on [**Multi-hop messages**](../../hopr-avado-node-tutorial/sending-a-multi-hop-message.md) and [**Tickets**](../../hopr-chat-tutorial/redeeming-tickets.md).
-
