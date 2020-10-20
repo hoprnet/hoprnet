@@ -1,32 +1,27 @@
-import type Hopr from '../../'
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-
 import type { Handler } from '../../@types/transport'
-
 import debug from 'debug'
-const log = debug('hopr-core:crawler')
-const verbose = debug('hopr-core:verbose:crawl-interaction')
-
 import pipe from 'it-pipe'
 import chalk from 'chalk'
-
 import type { AbstractInteraction } from '../abstractInteraction'
-
 import { PROTOCOL_CRAWLING } from '../../constants'
 import PeerId from 'peer-id'
 import Multiaddr from 'multiaddr'
-
 import { CrawlResponse, CrawlStatus } from '../../messages'
+import { LibP2P } from '../../'
+import type { Connection } from '../../@types/transport'
 
-class Crawler<Chain extends HoprCoreConnector> implements AbstractInteraction {
+const log = debug('hopr-core:crawler')
+const verbose = debug('hopr-core:verbose:crawl-interaction')
+
+class Crawler implements AbstractInteraction {
   protocols: string[] = [PROTOCOL_CRAWLING]
 
-  constructor(public node: Hopr<Chain>) {
+  constructor(private node: LibP2P, private handleCrawlRequest: (conn: Connection) => void) {
     this.node.handle(this.protocols, this.handler.bind(this))
   }
 
   handler(struct: Handler) {
-    pipe(this.node.network.crawler.handleCrawlRequest(struct.connection), struct.stream)
+    pipe(this.handleCrawlRequest(struct.connection), struct.stream)
   }
 
   interact(counterparty: PeerId, options: { signal: AbortSignal }): Promise<Multiaddr[]> {

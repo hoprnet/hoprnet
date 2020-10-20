@@ -7,10 +7,14 @@ import TCP = require('libp2p-tcp')
 import MPLEX = require('libp2p-mplex')
 // @ts-ignore
 import SECIO = require('libp2p-secio')
-import { Heartbeat, HEARTBEAT_TIMEOUT } from './heartbeat'
+import { Heartbeat } from './heartbeat'
 import assert from 'assert'
 import Multiaddr from 'multiaddr'
 import { EventEmitter } from 'events'
+import * as constants from '../../constants';
+
+// @ts-ignore
+constants.HEARTBEAT_TIMEOUT = 300
 
 describe('check heartbeat mechanism', function () {
   async function generateNode(options?: { timeoutIntentionally?: boolean }) {
@@ -29,7 +33,7 @@ describe('check heartbeat mechanism', function () {
 
     node.interactions = {
       network: {
-        heartbeat: new Heartbeat(node, options)
+        heartbeat: new Heartbeat(node, (remotePeer) => node.network.heartbeat.emit('beat', remotePeer),  options)
       }
     }
 
@@ -70,7 +74,8 @@ describe('check heartbeat mechanism', function () {
       errorThrown = true
     }
 
-    assert(errorThrown && Date.now() - before >= HEARTBEAT_TIMEOUT, 'Should reach a timeout')
+    assert(errorThrown, 'Should throw an error')
+    assert(Date.now() - before >= constants.HEARTBEAT_TIMEOUT, 'Should reach a timeout')
 
     await Promise.all([Alice.stop(), Bob.stop()])
   })

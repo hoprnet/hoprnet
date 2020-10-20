@@ -86,7 +86,7 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
         offset: arr.byteOffset
       })
 
-      const unAcknowledgedDbKey = this.node.dbKeys.UnAcknowledgedTickets(await acknowledgement.hashedKey)
+      const unAcknowledgedDbKey = this.node._dbKeys.UnAcknowledgedTickets(await acknowledgement.hashedKey)
 
       let tmp: Uint8Array
       try {
@@ -116,7 +116,7 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
         let ticketCounter: Uint8Array
         try {
           ticketCounter = toU8a(
-            u8aToNumber(await this.node.db.get(Buffer.from(this.node.dbKeys.AcknowledgedTicketCounter()))) + 1,
+            u8aToNumber(await this.node.db.get(Buffer.from(this.node._dbKeys.AcknowledgedTicketCounter()))) + 1,
             ACKNOWLEDGED_TICKET_INDEX_LENGTH
           )
         } catch (err) {
@@ -141,7 +141,7 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
           await this.node.db.del(Buffer.from(unAcknowledgedDbKey))
         }
 
-        const acknowledgedDbKey = this.node.dbKeys.AcknowledgedTickets(ticketCounter)
+        const acknowledgedDbKey = this.node._dbKeys.AcknowledgedTickets(ticketCounter)
 
         log(`storing ticket`, ticketCounter, `we are`, this.node.peerInfo.id.toB58String())
 
@@ -150,7 +150,7 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
             .batch()
             .del(Buffer.from(unAcknowledgedDbKey))
             .put(Buffer.from(acknowledgedDbKey), Buffer.from(acknowledgedTicket))
-            .put(Buffer.from(this.node.dbKeys.AcknowledgedTicketCounter()), Buffer.from(ticketCounter))
+            .put(Buffer.from(this.node._dbKeys.AcknowledgedTicketCounter()), Buffer.from(ticketCounter))
             .write()
         } catch (err) {
           error(`Error while writing to database. Error was ${chalk.red(err.message)}.`)

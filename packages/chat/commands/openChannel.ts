@@ -33,65 +33,6 @@ export abstract class OpenChannelBase extends AbstractCommand {
     }
   }
 
-  /**
-   * Open's a payment channel
-   *
-   * @param counterParty the counter party's peerId
-   * @param amountToFund the amount to fund in HOPR(wei)
-   */
-  protected async openChannel(
-    counterParty: PeerId,
-    amountToFund: BN
-  ): Promise<{
-    channelId: Types.Hash
-  }> {
-    const { utils, types, account } = this.node.paymentChannels
-    const self = this.node.peerInfo.id
-
-    const channelId = await utils.getId(
-      await utils.pubKeyToAccountId(self.pubKey.marshal()),
-      await utils.pubKeyToAccountId(counterParty.pubKey.marshal())
-    )
-
-    const myAvailableTokens = await account.balance
-
-    // validate 'amountToFund'
-    if (amountToFund.lten(0)) {
-      throw Error(`Invalid 'amountToFund' provided: ${amountToFund.toString(10)}`)
-    } else if (amountToFund.gt(myAvailableTokens)) {
-      throw Error(`You don't have enough tokens: ${amountToFund.toString(10)}<${myAvailableTokens.toString(10)}`)
-    }
-
-    const amPartyA = utils.isPartyA(
-      await utils.pubKeyToAccountId(self.pubKey.marshal()),
-      await utils.pubKeyToAccountId(counterParty.pubKey.marshal())
-    )
-
-    const channelBalance = types.ChannelBalance.create(
-      undefined,
-      amPartyA
-        ? {
-            balance: amountToFund,
-            balance_a: amountToFund
-          }
-        : {
-            balance: amountToFund,
-            balance_a: new BN(0)
-          }
-    )
-
-    await this.node.paymentChannels.channel.create(
-      counterParty.pubKey.marshal(),
-      async () => this.node.interactions.payments.onChainKey.interact(counterParty),
-      channelBalance,
-      (balance: Types.ChannelBalance): Promise<Types.SignedChannel> =>
-        this.node.interactions.payments.open.interact(counterParty, balance)
-    )
-
-    return {
-      channelId
-    }
-  }
 
   public async autocomplete(query: string = '', line: string = ''): Promise<AutoCompleteResult> {
     if (!query) {
@@ -146,7 +87,7 @@ export class OpenChannel extends OpenChannelBase {
 
     const unsubscribe = startDelayedInterval(`Submitted transaction. Waiting for confirmation`)
     try {
-      const { channelId } = await this.openChannel(counterParty, amountToFund)
+      const { channelId } = await this.node.openChannel(counterParty, amountToFund)
       unsubscribe()
       return `${chalk.green(`Successfully opened channel`)} ${styleValue(u8aToHex(channelId), 'hash')}`
     } catch (err) {
@@ -206,7 +147,7 @@ export class OpenChannelFancy extends OpenChannelBase {
 
     const unsubscribe = startDelayedInterval(`Submitted transaction. Waiting for confirmation`)
     try {
-      const { channelId } = await this.openChannel(counterParty, amountToFund)
+      const { channelId } = await this.node.openChannel(counterParty, amountToFund)
       unsubscribe()
       return `${chalk.green(`Successfully opened channel`)} ${styleValue(u8aToHex(channelId), 'hash')}`
     } catch (err) {
