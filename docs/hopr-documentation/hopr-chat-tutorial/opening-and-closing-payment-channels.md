@@ -39,7 +39,6 @@ At the prompt, type an amount to stake. Fees in the testnet are minimal, so any 
 How many HOPR (0.0080000000000268 HOPR available) shall get staked? : 0.001
 <Submitted transaction. Waiting for confirmation>
 ............
-
 ```
 
 Opening a payment channel involves an interaction with the HOPR smart contract, so this can take some time. You will be notified when the channel has been opened and will receive a receipt. You can use this to view the transaction on the xDAI chain, by visiting an xDAI block explorer such as [**this one**](https://blockscout.com/poa/xdai/).
@@ -64,7 +63,6 @@ CounterParty   :  16Uiu2HAmNtoQri1X4ikUzCqjFQptRSLSVKnVzMmtZiCHCHkdWJr7
 Status         :  OPEN
 Total Balance  :  0.001
 My Balance     :  0
-
 ```
 
 You will then be shown a list of open channels, along with their status. The two status options are:
@@ -173,5 +171,6 @@ No open channels found.
 Finally, check your balance with `balance`. You'll see that the tokens you staked in the payment channel have been returned to your balance.
 
 {% hint style="info" %}
-Because RandoBot cannot redeem tickets, you'll get all of your staked xHOPR back, even though you sent a multi-hop message. Normally, you would expect the node at the other end of the party to redeem their tickets, reducing your balance slightly.  
+Because RandoBot cannot redeem tickets, you'll get all of your staked xHOPR back, even though you sent a multi-hop message. Normally, you would expect the node at the other end of the party to redeem their tickets, reducing your balance slightly.
 {% endhint %}
+

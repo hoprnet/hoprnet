@@ -14,7 +14,7 @@ Payment channels need to be funded with HOPR tokens. Before we proceed, make sur
 These xHOPR won't be spent \(RandoBot has no way to redeem tickets to claim xHOPR\), but you still need to stake them in the channel. To get xHOPR, ask in our Telegram or Discord channel. Remember you need to send to you wallet \(xDAI\) address, not the HOPR address.
 {% endhint %}
 
-### Open A Payment Channel To RandoBot
+## Open A Payment Channel To RandoBot
 
 To open a payment channel on your AVADO node, you need to type `open`, followed by the address of the node you want to open the channel to, followed by the amount of xHOPR you want to fund the channel with.
 
@@ -26,7 +26,7 @@ open 16Uiu2HAmNtoQri1X4ikUzCqjFQptRSLSVKnVzMmtZiCHCHkdWJr7 0.01
 
 This can take a few seconds to work, because your node will need to interact with the HOPR smart contract. Once it does, you'll see a notification that the channel has been opened, along with a receipt.
 
-![Opening a channel to RandoBot](../.gitbook/assets/avado-channel-to-randobot.png)
+![Opening a channel to RandoBot](../.gitbook/assets/avado-channel-to-randobot%20%281%29.png)
 
 {% hint style="info" %}
 You can verify any of the receipts you get on an xDAI block explorer. For example: [https://blockscout.com/poa/xdai/](https://blockscout.com/poa/xdai/)
@@ -34,13 +34,13 @@ You can verify any of the receipts you get on an xDAI block explorer. For exampl
 
 Type `balance`, and you'll see that your xHOPR balance has reduced by the amount you funded the channel with. Your xDAI balance will also have slightly decreased. This is the fee for opening the payment channel.
 
-### Check Your Channel Status
+## Check Your Channel Status
 
 You can check on your payment channels by typing `openChannels`:
 
-![Currently open channels](../.gitbook/assets/avado-open-channels.png)
+![Currently open channels](../.gitbook/assets/avado-open-channels%20%281%29.png)
 
-### Send A Multi-Hop Message
+## Send A Multi-Hop Message
 
 Now let's send your first multi-hop message! We'll send it from your node, via randobot, and back to your node. Find your address using `myAddress`. Then type:`send <your address> <intermediate node> <your message>`.
 
@@ -50,7 +50,7 @@ To make this simpler, you can also set an alias for your own address. For a refr
 
 Congratulations! You've sent your first multi-hop message on the HOPR network.
 
-### Close the Payment Channel
+## Close the Payment Channel
 
 When you send a multi-hop message, you have to provide a payment for every node along the route. These payments are deducted from the tokens you staked when you opened your payment channel. But it's unlikely you'll have spent all of those tokens. To claim the remainder back, you need to close the payment channel. Type `close <peer ID>` to initiate closure. In this case, the Peer ID is RandoBot's address.
 
@@ -99,3 +99,4 @@ Finally, check your balance with `balance`. You'll see that the tokens you stake
 {% hint style="info" %}
 Because RandoBot cannot redeem tickets, you'll get all of your staked xHOPR back, even though you sent a multi-hop message. Normally, you would expect the node at the other end of the party to redeem their tickets, reducing your balance slightly.
 {% endhint %}
+
