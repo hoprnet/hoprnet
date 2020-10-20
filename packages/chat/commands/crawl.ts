@@ -26,7 +26,7 @@ export default class Crawl extends AbstractCommand {
         (peer: PeerId) => !isBootstrapNode(this.node, peer)
       )
       return `
-        Crawled network, contacted ${styleValue(info.contacted)} peers. 
+        Crawled network, contacted ${styleValue(info.contacted.length)} peers. 
         Connected to ${styleValue(this.node.getConnectedPeers().length)} peers
       `
     } catch (err) {

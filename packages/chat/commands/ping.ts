@@ -39,7 +39,10 @@ export default class Ping extends AbstractCommand {
       const {info, latency} = await this.node.ping(peerId)
       return `${out}Pong received in: ${styleValue(latency)} ms ${info}`
     } catch (err) {
-      return `${out}Could not ping node. Error was: ${styleValue(err.message, 'failure')}`
+      if (err.message) {
+        return `${out}Could not ping node. Error was: ${styleValue(err.message, 'failure')}`
+      }
+      return `${out}Could not ping node. Unknown error.`
     }
   }
 
