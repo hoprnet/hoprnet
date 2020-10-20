@@ -132,7 +132,13 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     })
 
     this.initializedWithOptions = options
-    this.output = options.output || console.log
+    this.output = (arr: Uint8Array) => {
+      this.emit('hopr:message', arr)
+      if (options.output){
+        log('DEPRECATED: options.output is replaced with a hopr:message event')
+        options.output(arr)
+      }
+    }
     this.bootstrapServers = options.bootstrapServers || []
     this.isBootstrapNode = options.bootstrapNode || false
 

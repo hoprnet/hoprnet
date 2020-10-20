@@ -117,7 +117,33 @@ function parseHosts(): HoprOptions['hosts'] {
   return hosts
 }
 
-async function generateNodeOptions(logs: LogStream): Promise<HoprOptions> {
+async function generateNodeOptions(): Promise<HoprOptions> {
+  let options: HoprOptions = {
+    debug: Boolean(process.env.DEBUG),
+    bootstrapNode: argv.bootstrap,
+    network: argv.network,
+    bootstrapServers: argv.bootstrap ? [] : [...(await getBootstrapAddresses()).values()],
+    provider: argv.provider,
+    hosts: parseHosts(),
+  }
+
+  if (argv.password !== undefined) {
+    options.password = argv.password as string
+  }
+
+  if (argv.data && argv.data !== '') {
+    options.dbPath = argv.data
+  }
+  return options
+}
+
+async function main() {
+  let node: Hopr<HoprCoreConnector>
+  let addr: Multiaddr
+  let logs = new LogStream()
+  let adminServer = undefined
+  let settings: any = {}
+
   function logMessageToNode(msg: Uint8Array) {
     logs.log('#### NODE RECEIVED MESSAGE ####')
     try {
@@ -130,34 +156,6 @@ async function generateNodeOptions(logs: LogStream): Promise<HoprOptions> {
     }
   }
 
-  let options: HoprOptions = {
-    debug: Boolean(process.env.DEBUG),
-    bootstrapNode: argv.bootstrap,
-    network: argv.network,
-    bootstrapServers: argv.bootstrap ? [] : [...(await getBootstrapAddresses()).values()],
-    provider: argv.provider,
-    hosts: parseHosts(),
-    output: logMessageToNode
-  }
-
-  if (argv.password !== undefined) {
-    options.password = argv.password as string
-  }
-
-  if (argv.data && argv.data !== '') {
-    options.dbPath = argv.data
-  }
-
-  //logs.log(JSON.stringify(options))
-  return options
-}
-
-async function main() {
-  let node: Hopr<HoprCoreConnector>
-  let addr: Multiaddr
-  let logs = new LogStream()
-  let adminServer = undefined
-  let settings: any = {}
 
   if (argv.settings) {
     settings = JSON.parse(argv.settings)
@@ -171,7 +169,7 @@ async function main() {
   }
 
   logs.log('Creating HOPR Node')
-  let options = await generateNodeOptions(logs)
+  let options = await generateNodeOptions()
   if (argv.dryRun) {
     console.log(JSON.stringify(options, undefined, 2))
     process.exit(0)
@@ -181,9 +179,11 @@ async function main() {
     node = await Hopr.create(options)
     logs.log('Created HOPR Node')
 
-    node.on('hoprpeer:connection', (peer: PeerId) => {
+    node.on('hopr:peer:connection', (peer: PeerId) => {
       logs.log(`Incoming connection from ${peer.toB58String()}.`)
     })
+
+    node.on('hopr:message', logMessageToNode)
 
     process.once('exit', async () => {
       await node.stop()
