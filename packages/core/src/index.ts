@@ -318,6 +318,9 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
       throw Error(`Expecting a non-empty destination.`)
     }
     let info = ''
+    if (!this._network.networkPeers.has(destination)){ 
+      info = '[Pinging unknown peer]'
+    }
     if (this._network.networkPeers.hasBlacklisted(destination)){
       info = '[Ping blacklisted peer]'
     }

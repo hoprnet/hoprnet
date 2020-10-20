@@ -30,7 +30,10 @@ export default class Crawl extends AbstractCommand {
         Connected to ${styleValue(this.node.getConnectedPeers().length)} peers
       `
     } catch (err) {
-      return styleValue(err.message, 'failure')
+      if (err && err.message) {
+        return styleValue(err.message, 'failure')
+      }
+      return `Unknown error ${err}`
     }
   }
 }
