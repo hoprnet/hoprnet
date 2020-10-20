@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
 import "../../styles/main.scss";
+import TweetBasodino from "../tweet-basodino";
 
 const useUser = () => ({ user: null, loading: false });
 
@@ -77,13 +78,10 @@ const LeftSide = () => {
           </a>
         </div>
         <div>
-          <a
-            href="https://twitter.com/intent/tweet?original_referer=https%3A%2F%2Fnetwork.hoprnet.org%2F&amp;ref_src=twsrc%5Etfw&amp;related=hoprnet&amp;text=Signing%20up%20to%20earn%20%24HOPR%20on%20the%20%23basodino.%20My%20%40hoprnet%20address%20is%3A%20&amp;tw_p=tweetbutton"
-            target="_blank"
-          >
+          <TweetBasodino>
             <img src="/assets/icons/twitter.svg" alt="twitter" />
-            <p>#basodino</p>
-          </a>
+            <p>#Basodino</p>
+          </TweetBasodino>
         </div>
       </div>
     </section>
