@@ -3,14 +3,22 @@ import { useRouter } from "next/router";
 import Link from "next/link";
 import "../../styles/main.scss";
 import TweetBasodino from "../tweet-basodino";
-
-const useUser = () => ({ user: null, loading: false });
+import api from "../../utils/api";
 
 const Menu = ({ activaMenu }) => {
   const router = useRouter();
   const [hash, setHash] = useState(
-    "16Uiu2HAmRE4fVtp8dF6H62NzRcx6LGUTL5fBRTdnAfZXjveP5Kz9"
+    "16Uiu2HAm7KxaBkgd9ENvhf5qAkp1c6Q5Q1dXe8HBDzxLN4SxAVw6"
   );
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const response = await api.getAllData();
+      if (response.data) setHash(response.data.address);
+    };
+    fetchData();
+  }, []);
+
   const [modal, setModal] = useState(false);
   const copyCodeToClipboard = () => {
     navigator.clipboard.writeText(hash);

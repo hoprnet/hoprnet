@@ -4,20 +4,11 @@ import api from "../utils/api";
 
 export default function Home() {
   const [data, setData] = useState(undefined);
+  console.log("data", data);
   const nodesVerified = data ? data.connected.length : 0;
-  const nodesRegistered = data ? data.scoreArray.length : 0;
+  const nodesRegistered = data ? data.nodes.length : 0;
   const nodesConnected = data ? data.connectedNodes : 0;
-  const nodes = data
-    ? data.scoreArray.map((score) => {
-        const node = data.connected.find((node) => node.id === score.address);
-
-        return {
-          online: !!node,
-          ...score,
-          ...(node || {}),
-        };
-      })
-    : [];
+  const nodes = data ? data.nodes : [];
 
   useEffect(() => {
     const fetchData = async () => {
@@ -100,7 +91,7 @@ export default function Home() {
               <table id="date">
                 <thead>
                   <tr>
-                    {columns.map((e, index) => {
+                    {columns.map((e) => {
                       const { title, key } = e;
                       return (
                         <th scope="col" key={key}>
@@ -111,7 +102,7 @@ export default function Home() {
                   </tr>
                 </thead>
                 <tbody>
-                  {nodes.map((e, index) => {
+                  {nodes.map((e) => {
                     const { online, address, id, score, tweetId, tweetUrl } = e;
                     return (
                       <tr key={id}>

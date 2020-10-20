@@ -1,24 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
 import "../../styles/main.scss";
 import TweetBasodino from "../tweet-basodino";
 
-const useUser = () => ({ user: null, loading: false });
-
 const LeftSide = () => {
   const router = useRouter();
-  const [hash, setHash] = useState(
-    "16Uiu2HAmRE4fVtp8dF6H62NzRcx6LGUTL5fBRTdnAfZXjveP5Kz9"
-  );
-  const [modal, setModal] = useState(false);
-  const copyCodeToClipboard = () => {
-    navigator.clipboard.writeText(hash);
-    setModal(true);
-    setTimeout(() => {
-      setModal(false);
-    }, 4000);
-  };
 
   return (
     <section className="area-left-desktop">
