@@ -1,16 +1,16 @@
-name: Publish Website leaderboard.hoprnet.org
+name: Publish Website network.hoprnet.org
 
 on:
   push:
     branches: ['**']
     paths:
-      - '.github/workflows/*-leaderboard.yml'
-      - 'websites/leaderboard/**'
+      - '.github/workflows/*-leaderboard-new.yml'
+      - 'websites/leaderboard-new/**'
 
 # currently, the vercel project is looking into the root folder
 # defaults:
 #   run:
-#     working-directory: websites/leaderboard
+#     working-directory: websites/leaderboard-new
 
 jobs:
   deploy:
