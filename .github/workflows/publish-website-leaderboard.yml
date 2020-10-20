@@ -20,7 +20,7 @@ jobs:
       - name: Vercel Action (preview)
         uses: amondnet/vercel-action@77cb0ce3642a451f7f18d63821c0e26f7adead9a
         # if: github.ref != 'refs/heads/master'
-        if: startsWith(github.ref, 'refs/heads/release/') !== true
+        if: startsWith(github.ref, 'refs/heads/release/') != true
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
