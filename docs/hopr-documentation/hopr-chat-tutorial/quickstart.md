@@ -13,7 +13,7 @@ If this is your first time using HOPR, you'll need to install a few things first
 ### Before You Start
 
 {% hint style="info" %}
-If you have a HOPR AVADO node, please read the section \***\*\[**Setting Up Your AVADO Node\*\*\]\(../hopr-avado-node-tutorial/setting-up-your-avado-node.md\) and the accompanying tutorial. When the tutorial instructs you to set up a second node on your device, return here for more information on how to do that.
+If you have a HOPR AVADO node, please read the section [**Setting Up Your AVADO Node**](../hopr-avado-node-tutorial/setting-up-your-avado-node.md) and the accompanying tutorial. When the tutorial instructs you to set up a second node on your device, return here for more information on how to do that.
 {% endhint %}
 
 This quick-start guide will walk you through installing the **HOPR Chat** app and its dependencies so you can quickly connect to the **HOPR network.** Please follow the step-by-step instructions to ensure everything works.
