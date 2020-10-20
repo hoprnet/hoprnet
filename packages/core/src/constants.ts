@@ -26,3 +26,4 @@ export const HEARTBEAT_INTERVAL_UPPER_BOUND = 59 * 1000
 export const MAX_PARALLEL_CONNECTIONS = 10
 
 export const BLACKLIST_TIMEOUT = durations.seconds(47)
+export const HEARTBEAT_TIMEOUT = durations.seconds(3)
