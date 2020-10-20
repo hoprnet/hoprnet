@@ -22,7 +22,7 @@ const MAX_PARALLEL_REQUESTS = 7
 export const CRAWL_TIMEOUT = 2 * 1000
 
 export type CrawlInfo = {
-  //contactedPeerIds: Set<PeerId>
+  contacted: PeerId[]
   errors: (Error | string)[]
 }
 
@@ -61,7 +61,7 @@ class Crawler {
    *
    * @param filter 
    */
-  async crawl(filter?: (peer: PeerId) => boolean): Promise<void> {
+  async crawl(filter?: (peer: PeerId) => boolean): Promise<CrawlInfo> {
     verbose('creating a crawl')
     return new Promise(async (resolve) => {
       let aborted = false
@@ -83,7 +83,10 @@ class Crawler {
         verbose('aborting crawl due to timeout')
         abort.abort()
         this.printStatsAndErrors(contactedPeerIds, errors, current, before)
-        resolve()
+        resolve({
+          contacted: Array.from(contactedPeerIds.values()).map(x => toPeer(x)),
+          errors
+        })
       }, CRAWL_TIMEOUT)
 
       log(`Crawling started`)
@@ -235,7 +238,10 @@ class Crawler {
         this.printStatsAndErrors(contactedPeerIds, errors, current, before)
 
         verbose('crawl complete')
-        resolve()
+        resolve({
+          contacted: Array.from(contactedPeerIds.values()).map(x => toPeer(x)),
+          errors
+        })
       }
 
       // @TODO re-enable this once routing is done properly.
