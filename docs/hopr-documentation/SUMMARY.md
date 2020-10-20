@@ -4,7 +4,7 @@
 
 ## Getting started
 
-* [First Time Users: Start Here](getting-started/start-here.md)
+* [First Time Users: Start Here](getting-started/hopr-chat.md)
 
 ## HOPR Chat Tutorial
 
