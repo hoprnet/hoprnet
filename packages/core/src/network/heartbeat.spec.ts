@@ -38,6 +38,7 @@ describe('check heartbeat mechanism', function () {
     })) 
 
     node.peerInfo.multiaddrs.add(Multiaddr(addr))
+    node.hangUp = async (_id) => {} // Need to override this in tests.
 
     await node.start()
 
