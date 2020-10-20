@@ -44,7 +44,7 @@
 * [Cover Traffic](core-concepts/cover-traffic.md)
 * [Tokens](core-concepts/tokens/README.md)
   * [Native Tokens](core-concepts/tokens/native-tokens.md)
-  * [xHOPR Tokens](core-concepts/tokens/xhopr-tokens.md)
+  * [Testnet HOPR Tokens](core-concepts/tokens/hopr-tokens.md)
 * [Payment Channels](core-concepts/payment-channels.md)
 * [Tickets](core-concepts/tickets.md)
 

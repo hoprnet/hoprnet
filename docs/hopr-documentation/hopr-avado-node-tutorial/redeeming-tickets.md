@@ -2,7 +2,7 @@
 
 The HOPR private mixnet is kept secure using proof-of-relay. This mechanism ensures that nodes do not receive payment until they have completed their relaying duties.
 
-When you receive data to relay from an upstream node, it will be accompanied by half of an encrypted payment key. You will only receive the second half when you relay the data to the next node in the chain. Once you have both halves of the payment key, they are automatically combined to form a **ticket**. These tickets can be redeemed for HOPR tokens \([**xHOPR**](../core-concepts/tokens/xhopr-tokens.md) in our testnets\).
+When you receive data to relay from an upstream node, it will be accompanied by half of an encrypted payment key. You will only receive the second half when you relay the data to the next node in the chain. Once you have both halves of the payment key, they are automatically combined to form a **ticket**. These tickets can be redeemed for HOPR tokens \([**xHOPR**](../core-concepts/tokens/hopr-tokens.md) in our testnets\).
 
 To seem how many tickets you currently have, type:
 
