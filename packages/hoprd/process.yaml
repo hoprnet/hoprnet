@@ -2,6 +2,10 @@ apps:
   - script: ./index.js
     name: 'dev'
     instances: 1
+    env_matic-testnet:
+      HOPR_BOOTSTRAP_ADDRESS: _dnsaddr.bootstrap.basodino.testnet.hoprnet.org
+      ETHEREUM_PROVIDER: wss://ws-mainnet.matic.network
+      NEXT_TELEMETRY_DISABLED: 1
     env_matic:
       HOPR_BOOTSTRAP_ADDRESS: _dnsaddr.bootstrap.basodino.develop.hoprnet.org
       ETHEREUM_PROVIDER: wss://ws-mainnet.matic.network
