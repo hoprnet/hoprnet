@@ -39,8 +39,12 @@ When you press restart, you'll see the following warning:
 
 ![](../.gitbook/assets/avado-restart-warning.png)
 
-This is fine. Just click "Restart" to proceed.  
-  
+This is fine. Just click "Restart" to proceed.
+
+{% hint style="warning" %}
+If you run into an error at this stage, please do a hard restart on your HOPR AVADO Node by restarting the device itself.
+{% endhint %}
+
 When your node restarts, your MATIC balance will be automatically detected and you can proceed.
 
 ## Getting Testnet HOPR
