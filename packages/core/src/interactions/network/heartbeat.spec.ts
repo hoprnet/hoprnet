@@ -29,7 +29,7 @@ describe('check heartbeat mechanism', function () {
 
     node.interactions = {
       network: {
-        heartbeat: new Heartbeat(node, (remotePeer) => node.interactions.network.heartbeat.emit('beat', remotePeer),  options)
+        heartbeat: new Heartbeat(node, (remotePeer) => node.network.heartbeat.emit('beat', remotePeer),  options)
       }
     }
 
