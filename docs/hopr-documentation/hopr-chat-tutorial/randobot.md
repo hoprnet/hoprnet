@@ -17,13 +17,13 @@ RandoBot is one in a series of bots running on the HOPR network which will be fa
 First, let's make sure your node can reach RandoBot. Type:
 
 ```text
-ping 16Uiu2HAmNtoQri1X4ikUzCqjFQptRSLSVKnVzMmtZiCHCHkdWJr7
+ping 16Uiu2HAmCK23BB3RW82MkTBjUjNCKya9Xcb5S85AXPvzjfk2gXNm
 ```
 
 If everything if working correctly, you should receive a pong back from the bot. For example:
 
 ```text
-​​​> ping 16Uiu2HAmNtoQri1X4ikUzCqjFQptRSLSVKnVzMmtZiCHCHkdWJr7
+​​​> ping 16Uiu2HAmCK23BB3RW82MkTBjUjNCKya9Xcb5S85AXPvzjfk2gXNm
 Pong received in: 144 ms
 ```
 
@@ -74,7 +74,7 @@ usage: <PeerId> <Name>
 You will want to `alias` RandoBot's address:
 
 ```text
-16Uiu2HAmNtoQri1X4ikUzCqjFQptRSLSVKnVzMmtZiCHCHkdWJr7
+16Uiu2HAmCK23BB3RW82MkTBjUjNCKya9Xcb5S85AXPvzjfk2gXNm
 ```
 
 {% hint style="warning" %}
@@ -84,14 +84,14 @@ Bear in mind the address of RandoBot might change over time. If you are unable t
 Within HOPR Chat, then run the following:
 
 ```text
-alias 16Uiu2HAmNtoQri1X4ikUzCqjFQptRSLSVKnVzMmtZiCHCHkdWJr7 randobot
+alias 16Uiu2HAmCK23BB3RW82MkTBjUjNCKya9Xcb5S85AXPvzjfk2gXNm randobot
 ```
 
 You'll receive a notification confirming the alias:
 
 ```text
-> alias 16Uiu2HAmNtoQri1X4ikUzCqjFQptRSLSVKnVzMmtZiCHCHkdWJr7 randobot
-Set alias 'randobot' to '16Uiu2HAmNtoQri1X4ikUzCqjFQptRSLSVKnVzMmtZiCHCHkdWJr7'.
+> alias 16Uiu2HAmCK23BB3RW82MkTBjUjNCKya9Xcb5S85AXPvzjfk2gXNm randobot
+Set alias 'randobot' to '16Uiu2HAmCK23BB3RW82MkTBjUjNCKya9Xcb5S85AXPvzjfk2gXNm'.
 ```
 
 {% hint style="warning" %}
@@ -112,11 +112,11 @@ If successful, RandoBot will pick a series of random words and say those to you.
 
 ```text
 ---------- New Packet ----------
-Destination    : 16Uiu2HAm17N3psi92XKnRex8mbWJVoqafzJa6fhVN4zHmoLMt15A
+Destination    : 16Uiu2HAmCK23BB3RW82MkTBjUjNCKya9Xcb5S85AXPvzjfk2gXNm
 --------------------------------
 >
 ===== New message ======
-Message: 16Uiu2HAm17N3psi92XKnRex8mbWJVoqafzJa6fhVN4zHmoLMt15A slimy olden dove
+Message: 16Uiu2HAmCK23BB3RW82MkTBjUjNCKya9Xcb5S85AXPvzjfk2gXNm slimy olden dove
 Latency: 63 ms
 ========================
 ```

@@ -22,14 +22,12 @@ Communication is achieved using **HOPR addresses.** To find your node's address,
 
 ```text
 > myAddress
-ethereum:  0x9e95cdcb480f133b0c1af70613d1488ee01bf53e
-HOPR:      16Uiu2HAm34oK6EyA2SuFo9rHXpm5Kwy6C8MeJ26JaRFBzgdQqVpZ
+HOPR Address:   16Uiu2HAmFvcKebkd2VBFfn2UiXTfLfBrWkdDXeuU6LVbf9C9cjn4
+Matic Address:  0x4309416d5a13cecd4801e83c43517bc1f52a8fe8
 ```
 
 {% hint style="info" %}
-There are two addresses associated with your node: the Ethereum address is used to fund your account and pay for gas fees on the blockchain, the HOPR address is where you'll send messages and receive HOPR tokens.
-
-For the purposes of the testnet, Ethereum is actually xDAI and HOPR is actually xHOPR.
+There are two addresses associated with your node: the MATIC address is used to fund your account and pay for gas fees on the blockchain, the HOPR address is where you'll send messages and receive HOPR tokens.
 {% endhint %}
 
 ## Step 1: Send a Tweet
@@ -66,9 +64,13 @@ From now on, every message you send will also be sent with your address. Now whe
 
 ## Step 4: Register With The Bot
 
-Now that you've sent your tweet, and turned on `includeRecipient`, you need to register with the bot. Copy the full URL of your tweet and send it as a message in HOPR Chat to the bot.
+Now that you've sent your tweet, and turned on `includeRecipient`, you need to register with the bot. Copy the full URL of your tweet and send it as a message in HOPR Chat to the bot. Type:
 
-Type `send 16Uiu2HAmDutxTfS5rTvBNU4BmmBC86fEkScEHFSiV17YkKLD4rxA` then press Enter. Now paste the URL of your tweet and press Enter again. The bot will now check your tweet and will send you a verification message if you're successful.
+```text
+send 16Uiu2HAm2bug99ub54UT2U3P94XPji8vXJFgXTsJTnt4eQ9Tmime
+```
+
+Then press Enter. Now paste the URL of your tweet and press Enter again. The bot will now check your tweet and will send you a verification message if you're successful.
 
 ![](../.gitbook/assets/verification-1%20%282%29%20%281%29%20%281%29%20%281%29.png)
 
@@ -78,7 +80,7 @@ Now that your address is whitelisted with the bot, you can earn tickets by relay
 
 Every 30 seconds, the bot will randomly select an address from the whitelist and ping it to check that it's online. If is, it will send cover traffic to itself via that node.
 
-If the CoverBot selects your address, you'll receive a ticket which can be redeemed for xHOPR. You'll also receive a verification message.
+If the CoverBot selects your address, you'll receive a ticket which can be redeemed for HOPR. You'll also receive a verification message.
 
 ![](../.gitbook/assets/verification-2%20%282%29%20%281%29%20%281%29%20%281%29.png)
 

@@ -17,7 +17,7 @@ RandoBot is one in a series of bots running on the HOPR network which will be fa
 First, let's make sure your node can reach RandoBot. Click in the blue bar at the bottom of your screen \(where it says "type 'help' for full list of commands"\). Then type:
 
 ```text
-ping 16Uiu2HAmNtoQri1X4ikUzCqjFQptRSLSVKnVzMmtZiCHCHkdWJr7
+16Uiu2HAmCK23BB3RW82MkTBjUjNCKya9Xcb5S85AXPvzjfk2gXNm
 ```
 
 If everything if working correctly, you should receive a pong back from the bot.
@@ -66,7 +66,7 @@ usage: <PeerId> <Name>
 You will want to `alias` the following address, which is the address of RandoBot in our testnet
 
 ```text
-16Uiu2HAmNtoQri1X4ikUzCqjFQptRSLSVKnVzMmtZiCHCHkdWJr7
+16Uiu2HAmCK23BB3RW82MkTBjUjNCKya9Xcb5S85AXPvzjfk2gXNm
 ```
 
 {% hint style="warning" %}
@@ -76,7 +76,7 @@ Bear in mind the address of RandoBot might change over time. If you are unable t
 Type the following:
 
 ```text
-alias 16Uiu2HAmNtoQri1X4ikUzCqjFQptRSLSVKnVzMmtZiCHCHkdWJr7 randobot
+alias 16Uiu2HAmCK23BB3RW82MkTBjUjNCKya9Xcb5S85AXPvzjfk2gXNm randobot
 ```
 
 You will receive a notification that the alias has been set.
