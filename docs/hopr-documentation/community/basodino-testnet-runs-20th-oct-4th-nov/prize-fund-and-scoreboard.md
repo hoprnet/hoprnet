@@ -16,10 +16,12 @@ HOPR Basòdino is an incentivized testnet with a 200,000 HOPR prize fund. Partic
 | 6 | 6,000 |
 | 7 | 4,000 |
 | 8 | 3,000 |
-| 9 |  |
-| 10 |  |
-| 11-20 |  |
-| 21-50 |  |
-| 51-100 |  |
-| 101-200 |  |
+| 9 | 2,500 |
+| 10 | 2,000 |
+| 11-20 | 1,500 |
+| 21-50 | 1,000 |
+| 51-100 | 500 |
+| 101-200 | 200 |
+
+You can view the current scores at [**network.hoprnet.org**](https://network.hoprnet.org).
 
