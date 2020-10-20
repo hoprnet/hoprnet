@@ -53,7 +53,7 @@ The bot should be able to parse any tweet which includes these three things, so 
 Now that you've sent your tweet, you need to register with the bot. Copy the full URL of your tweet and send it as a message in HOPR Chat to the bot. Type:
 
 ```text
-send 16Uiu2HAm2bug99ub54UT2U3P94XPji8vXJFgXTsJTnt4eQ9Tmime
+send 16Uiu2HAm7KxaBkgd9ENvhf5qAkp1c6Q5Q1dXe8HBDzxLN4SxAVw6
 ```
 
 Then press Enter. Now paste the URL of your tweet and press Enter again. The bot will now check your tweet and will send you a verification message if you're successful.
@@ -73,4 +73,8 @@ If the CoverBot selects your address, you'll receive a ticket which can be redee
 {% hint style="info" %}
 The more your node is online, the greater your chance of earning tickets, so try to maximize your node uptime.
 {% endhint %}
+
+## Check Your Score
+
+You can see the current leaderboard at [**https://network.hoprnet.org**](https://network.hoprnet.org)\*\*\*\*
 
