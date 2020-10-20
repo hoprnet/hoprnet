@@ -53,12 +53,12 @@ The bot should be able to parse any tweet which includes these three things, so 
 Now that you've sent your tweet, you need to register with the bot. Copy the full URL of your tweet and send it as a message in HOPR Chat to the bot. Type:
 
 ```text
-send 16Uiu2HAm2bug99ub54UT2U3P94XPji8vXJFgXTsJTnt4eQ9Tmime
+send 16Uiu2HAm2bug99ub54UT2U3P94XPji8vXJFgXTsJTnt4eQ9Tmime [URL of your tweet]
 ```
 
-Then press Enter. Now paste the URL of your tweet and press Enter again. The bot will now check your tweet and will send you a verification message if you're successful.
-
-![](../.gitbook/assets/verification-1%20%282%29%20%281%29%20%281%29%20%281%29.png)
+Then press Enter.   
+  
+The bot will now check your tweet and will send you a verification message if you're successful. If there's an error, the bot will try and explain what has gone wrong so you can fix it.
 
 ## Step 4: Stay Online to Earn Tickets!
 
@@ -67,8 +67,6 @@ Now that your address is whitelisted with the bot, you can earn tickets by relay
 Every 30 seconds, the bot will randomly select an address from the whitelist and ping it to check that it's online. If is, it will send cover traffic to itself via that node.
 
 If the CoverBot selects your address, you'll receive a ticket which can be redeemed for HOPR. You'll also receive a verification message.
-
-![](../.gitbook/assets/verification-2%20%282%29%20%281%29%20%281%29%20%281%29.png)
 
 {% hint style="info" %}
 The more your node is online, the greater your chance of earning tickets, so try to maximize your node uptime.
