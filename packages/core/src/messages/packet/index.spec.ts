@@ -78,7 +78,7 @@ describe('test packet composition and decomposition', function () {
           const channel = nodes[0].paymentChannels.types.Channel.createFunded(bal)
           const signedChannel = new nodes[0].paymentChannels.types.SignedChannel(undefined, {
             channel,
-            signature: await channel.sign(nodes[0].peerInfo.id.privKey.marshal(), undefined)
+            signature: await channel.sign(nodes[0].getId().privKey.marshal(), undefined)
           } as any)
           return signedChannel
         }
@@ -91,13 +91,13 @@ describe('test packet composition and decomposition', function () {
         })
 
         await nodes[a].paymentChannels.channel.create(
-          nodes[b].peerInfo.id.pubKey.marshal(),
-          async () => nodes[b].peerInfo.id.pubKey.marshal(),
+          nodes[b].getId().pubKey.marshal(),
+          async () => nodes[b].getId().pubKey.marshal(),
           new nodes[a].paymentChannels.types.ChannelBalance(undefined, {
             balance: new BN(200),
             balance_a: new BN(100)
           }),
-          (_channelBalance) => nodes[a]._interactions.payments.open.interact(nodes[b].peerInfo.id, channelBalance) as any
+          (_channelBalance) => nodes[a]._interactions.payments.open.interact(nodes[b].getId(), channelBalance) as any
         )
       }
 
@@ -123,8 +123,8 @@ describe('test packet composition and decomposition', function () {
 
       for (let i = 1; i <= MAX_HOPS; i++) {
         msgReceivedPromises.push(receiveChecker(testMessages.slice(i - 1, i), nodes[i]))
-        await nodes[0].sendMessage(testMessages[i - 1], nodes[i].peerInfo.id, async () =>
-          nodes.slice(1, i).map((node) => node.peerInfo.id)
+        await nodes[0].sendMessage(testMessages[i - 1], nodes[i].getId(), async () =>
+          nodes.slice(1, i).map((node) => node.getId())
         )
       }
 
@@ -143,8 +143,8 @@ describe('test packet composition and decomposition', function () {
       msgReceivedPromises.push(receiveChecker(testMessages.slice(1, 3), nodes[nodes.length - 1]))
 
       for (let i = 1; i <= MAX_HOPS - 1; i++) {
-        await nodes[i].sendMessage(testMessages[i], nodes[nodes.length - 1].peerInfo.id, async () =>
-          nodes.slice(i + 1, nodes.length - 1).map((node) => node.peerInfo.id)
+        await nodes[i].sendMessage(testMessages[i], nodes[nodes.length - 1].getId(), async () =>
+          nodes.slice(i + 1, nodes.length - 1).map((node) => node.getId())
         )
       }
 
@@ -199,8 +199,8 @@ describe('test packet composition and decomposition', function () {
 function connectionHelper<Chain extends HoprCoreConnector>(nodes: Hopr<Chain>[]) {
   for (let i = 0; i < nodes.length; i++) {
     for (let j = i + 1; j < nodes.length; j++) {
-      nodes[i].peerStore.put(nodes[j].peerInfo)
-      nodes[j].peerStore.put(nodes[i].peerInfo)
+      nodes[i]._libp2p.peerStore.put(nodes[j]._libp2p.peerInfo)
+      nodes[j]._libp2p.peerStore.put(nodes[i]._libp2p.peerInfo)
     }
   }
 }

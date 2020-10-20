@@ -17,7 +17,7 @@ class OnChainKey<Chain extends HoprCoreConnector> implements AbstractInteraction
   protocols: string[] = [PROTOCOL_ONCHAIN_KEY]
 
   constructor(public node: Hopr<Chain>) {
-    this.node.handle(this.protocols, this.handler.bind(this))
+    this.node._libp2p.handle(this.protocols, this.handler.bind(this))
   }
 
   handler(struct: Handler) {
@@ -28,10 +28,10 @@ class OnChainKey<Chain extends HoprCoreConnector> implements AbstractInteraction
     let struct: Handler
 
     try {
-      struct = await this.node.dialProtocol(counterparty, this.protocols[0]).catch(async (_: Error) => {
-        return this.node.peerRouting
+      struct = await this.node._libp2p.dialProtocol(counterparty, this.protocols[0]).catch(async (_: Error) => {
+        return this.node._libp2p.peerRouting
           .findPeer(counterparty)
-          .then((peerInfo: PeerInfo) => this.node.dialProtocol(peerInfo, this.protocols[0]))
+          .then((peerInfo: PeerInfo) => this.node._libp2p.dialProtocol(peerInfo, this.protocols[0]))
       })
     } catch (err) {
       throw Error(

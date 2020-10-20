@@ -78,7 +78,7 @@ async function runAsRegularNode() {
 function runAsBootstrapNode() {
   console.log(`... running as bootstrap node!.`)
 
-  node.on('peer:connect', (peer: PeerInfo) => {
+  node._libp2p.on('peer:connect', (peer: PeerInfo) => {
     console.log(`Incoming connection from ${chalk.blue(peer.id.toB58String())}.`)
   })
 
@@ -118,7 +118,7 @@ async function main() {
 
   console.log('Successfully started HOPR Chat.\n')
   console.log(
-    `Your HOPR Chat node is available at the following addresses:\n ${node.peerInfo.multiaddrs.toArray().join('\n ')}\n`
+    `Your HOPR Chat node is available at the following addresses:\n ${node.getAddresses().join('\n ')}\n`
   )
   console.log('Use the “help” command to see which commands are available.\n')
 

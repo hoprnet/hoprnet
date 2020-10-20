@@ -32,7 +32,7 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
   protocols: string[] = [PROTOCOL_STRING]
 
   constructor(public node: Hopr<Chain>) {
-    this.node.handle(this.protocols, this.handler.bind(this))
+    this.node._libp2p.handle(this.protocols, this.handler.bind(this))
   }
 
   async interact(counterparty: PeerId, packet: Packet<Chain>): Promise<void> {
@@ -49,11 +49,11 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
       }, FORWARD_TIMEOUT)
 
       try {
-        struct = await this.node
+        struct = await this.node._libp2p
           .dialProtocol(counterparty, this.protocols[0], { signal: abort.signal })
           .catch(async () => {
-            const peerInfo = await this.node.peerRouting.findPeer(counterparty)
-            return await this.node.dialProtocol(peerInfo, this.protocols[0], { signal: abort.signal })
+            const peerInfo = await this.node._libp2p.peerRouting.findPeer(counterparty)
+            return await this.node._libp2p.dialProtocol(peerInfo, this.protocols[0], { signal: abort.signal })
           })
       } catch (err) {
         log(`Could not transfer packet to ${counterparty.toB58String()}. Error was: ${chalk.red(err.message)}.`)
@@ -82,7 +82,7 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
       async (source: AsyncIterable<Uint8Array>): Promise<void> => {
         for await (const msg of source) {
           const arr = msg.slice()
-          const packet = new Packet(this.node, {
+          const packet = new Packet(this.node, this.node._libp2p, {
             bytes: arr.buffer,
             offset: arr.byteOffset
           })
@@ -126,10 +126,10 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
           challenge: receivedChallenge
         })
 
-        await this.node._interactions.packet.acknowledgment.interact(sender, await ack.sign(this.node.peerInfo.id))
+        await this.node._interactions.packet.acknowledgment.interact(sender, await ack.sign(this.node.getId()))
       })
 
-      if (this.node.peerInfo.id.isEqual(target)) {
+      if (this.node.getId().isEqual(target)) {
         this.node.output(packet.message.plaintext)
       } else {
         await this.interact(target, packet)

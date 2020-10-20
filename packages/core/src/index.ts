@@ -72,14 +72,15 @@ export type HoprOptions = {
 
 const MAX_ITERATIONS_PATH_SELECTION = 2000
 
-class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
+class Hopr<Chain extends HoprCoreConnector> {
 
-  // TODO make these actually private
+  // TODO make these actually private - Do not rely on any of these properties!
   public _interactions: Interactions<Chain>
   public _network: Network
   // Allows us to construct HOPR with falsy options
   public _debug: boolean
   public _dbKeys = DbKeys
+  public _libp2p: LibP2P
 
   public output: (arr: Uint8Array) => void
   public isBootstrapNode: boolean
@@ -94,7 +95,7 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
    * @param provider
    */
   private constructor(options: HoprOptions, public db: LevelUp, public paymentChannels: Chain) {
-    super({
+    this._libp2p = LibP2P.create({
       peerInfo: options.peerInfo,
 
       // Disable libp2p-switch protections for the moment
@@ -136,10 +137,10 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
         (conn: Connection) => this._network.crawler.handleCrawlRequest(conn),
         (remotePeer: PeerId) => this._network.heartbeat.emit('beat', remotePeer)
     )
-    this._network = new Network(this, this._interactions, options)
+    this._network = new Network(this._libp2p, this._interactions, options)
 
     verbose('# STARTED NODE')
-    verbose('ID', this.peerInfo.id.toB58String())
+    verbose('ID', this._libp2p.peerInfo.id.toB58String())
     verbose('Protocol version', VERSION)
     this._debug = options.debug
   }
@@ -179,7 +180,7 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
    */
   private async connectToBootstrapServers(): Promise<void> {
     const potentialBootstrapServers = this.bootstrapServers.filter(
-      (addr: PeerInfo) => !addr.id.equals(this.peerInfo.id)
+      (addr: PeerInfo) => !addr.id.equals(this._libp2p.peerInfo.id)
     )
 
     if (potentialBootstrapServers.length == 0) {
@@ -194,7 +195,7 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
 
     const results = await Promise.all(
       potentialBootstrapServers.map((addr: PeerInfo) =>
-        this.dial(addr).then(
+        this._libp2p.dial(addr).then(
           () => true,
           () => false
         )
@@ -214,13 +215,13 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
    */
   public async start(): Promise<Hopr<Chain>> {
     await Promise.all([
-      super.start().then(() => Promise.all([this.connectToBootstrapServers(), this._network.start()])),
+      this._libp2p.start().then(() => Promise.all([this.connectToBootstrapServers(), this._network.start()])),
       this.paymentChannels?.start()
     ])
 
     log(`Available under the following addresses:`)
 
-    this.peerInfo.multiaddrs.forEach((ma: Multiaddr) => log(ma.toString()))
+    this._libp2p.peerInfo.multiaddrs.forEach((ma: Multiaddr) => log(ma.toString()))
 
     return this
   }
@@ -231,10 +232,22 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
   public async stop(): Promise<void> {
     await Promise.all([this._network.stop(), this.paymentChannels?.stop().then(() => log(`Connector stopped.`))])
 
-    await Promise.all([this.db?.close().then(() => log(`Database closed.`)), super.stop()])
+    await Promise.all([this.db?.close().then(() => log(`Database closed.`)), this._libp2p.stop()])
 
     // Give the operating system some extra time to close the sockets
     await new Promise((resolve) => setTimeout(resolve, 100))
+  }
+
+
+  public getId(): PeerId {
+    return this._libp2p.peerInfo.id
+  }
+
+  /* 
+   * List the addresses the node is available on
+   */
+  public getAddresses(): Multiaddr[] {
+    return this._libp2p.peerInfo.multiaddrs.toArray()
   }
 
   /**
@@ -275,6 +288,7 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
           try {
             packet = await Packet.create(
               this,
+              this._libp2p,
               msg.slice(n * PACKET_SIZE, Math.min(msg.length, (n + 1) * PACKET_SIZE)),
               await Promise.all(path.map(addPubKey))
             )
@@ -350,7 +364,7 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
     channelId: Types.Hash
   }> {
     const { utils, types, account } = this.paymentChannels
-    const self = this.peerInfo.id
+    const self = this._libp2p.peerInfo.id
 
     const channelId = await utils.getId(
       await utils.pubKeyToAccountId(self.pubKey.marshal()),
@@ -421,7 +435,7 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
    * @param destination instance of peerInfo that contains the peerId of the destination
    */
   private async getIntermediateNodes(destination: PeerId): Promise<PeerId[]> {
-    const start = new this.paymentChannels.types.Public(this.peerInfo.id.pubKey.marshal())
+    const start = new this.paymentChannels.types.Public(this._libp2p.peerInfo.id.pubKey.marshal())
     const exclude = [
       destination.pubKey.marshal(),
       ...this.bootstrapServers.map((pInfo) => pInfo.id.pubKey.marshal())

@@ -181,7 +181,7 @@ async function main() {
     node = await Hopr.create(options)
     logs.log('Created HOPR Node')
 
-    node.on('peer:connect', (peer: PeerInfo) => {
+    node._libp2p.on('peer:connect', (peer: PeerInfo) => {
       logs.log(`Incoming connection from ${peer.id.toB58String()}.`)
     })
 
