@@ -214,7 +214,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       log(`before creating channel`)
 
       const channel = await node.paymentChannels.channel.create(path[0].pubKey.marshal(), (_counterparty: Uint8Array) =>
-        node.interactions.payments.onChainKey.interact(path[0])
+        node._interactions.payments.onChainKey.interact(path[0])
       )
 
       const newFee = new node.paymentChannels.types.Balance(100)
@@ -344,7 +344,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       `we are ${this.node.peerInfo.id.toB58String()}`
     )
     await this.node.db.put(
-      Buffer.from(this.node.dbKeys.UnAcknowledgedTickets(this.header.hashedKeyHalf)),
+      Buffer.from(this.node._dbKeys.UnAcknowledgedTickets(this.header.hashedKeyHalf)),
       Buffer.from(unacknowledged)
     )
 
@@ -360,9 +360,9 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
 
       const channel = await this.node.paymentChannels.channel.create(
         target.pubKey.marshal(),
-        (_counterparty: Uint8Array) => this.node.interactions.payments.onChainKey.interact(target),
+        (_counterparty: Uint8Array) => this.node._interactions.payments.onChainKey.interact(target),
         channelBalance,
-        (_channelBalance: Types.ChannelBalance) => this.node.interactions.payments.open.interact(target, channelBalance)
+        (_channelBalance: Types.ChannelBalance) => this.node._interactions.payments.open.interact(target, channelBalance)
       )
 
       this._ticket = await channel.ticket.create(

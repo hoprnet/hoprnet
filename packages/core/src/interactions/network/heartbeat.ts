@@ -1,25 +1,24 @@
-import type Hopr from '../../'
 import type { AbstractInteraction } from '../abstractInteraction'
 import { randomBytes, createHash } from 'crypto'
-import { u8aEquals, durations } from '@hoprnet/hopr-utils'
+import { u8aEquals } from '@hoprnet/hopr-utils'
 import debug from 'debug'
 import AbortController from 'abort-controller'
 import pipe from 'it-pipe'
-import { PROTOCOL_HEARTBEAT } from '../../constants'
+import { PROTOCOL_HEARTBEAT, HEARTBEAT_TIMEOUT } from '../../constants'
 import type { Stream, Connection, Handler } from '../../@types/transport'
 import type PeerId from 'peer-id'
+import { LibP2P } from '../../'
 
 const error = debug('hopr-core:heartbeat:error')
 const verbose = debug('hopr-core:verbose:heartbeat')
 const HASH_FUNCTION = 'blake2s256'
 
-export const HEARTBEAT_TIMEOUT = durations.seconds(3)
-
 class Heartbeat implements AbstractInteraction {
   protocols: string[] = [PROTOCOL_HEARTBEAT]
 
   constructor(
-    public node: Hopr<any>,
+    private node: LibP2P,
+    private heartbeat: (remotePeer: PeerId) => void,
     private options?: {
       timeoutIntentionally?: boolean
     }
@@ -28,27 +27,31 @@ class Heartbeat implements AbstractInteraction {
   }
 
   handler(struct: { connection: Connection; stream: Stream }) {
+    const self = this
     pipe(
       struct.stream,
       (source: any) => {
-        return async function* (this: Heartbeat) {
-          if (this.options?.timeoutIntentionally) {
+        return (async function* () {
+          if (self.options?.timeoutIntentionally) {
             return await new Promise((resolve) => setTimeout(resolve, HEARTBEAT_TIMEOUT + 100))
           }
 
           for await (const msg of source) {
-            this.node.network.heartbeat.emit('beat', struct.connection.remotePeer)
+            self.heartbeat(struct.connection.remotePeer)
             verbose('beat')
             yield createHash(HASH_FUNCTION).update(msg.slice()).digest()
           }
-        }.call(this)
+        })()
       },
       struct.stream
     )
   }
 
-  async interact(counterparty: PeerId): Promise<void> {
-    return new Promise<void>(async (resolve, reject) => {
+
+  async interact(counterparty: PeerId): Promise<number> {
+    const start = Date.now()
+
+    return new Promise<number>(async (resolve, reject) => {
       // There is an assumption here that we 'know' how to contact this peer
       // and therefore we are immediately trying to dial, rather than checking
       // our peerRouting info first.
@@ -107,9 +110,10 @@ class Heartbeat implements AbstractInteraction {
       clearTimeout(timeout)
 
       if (!aborted) {
-        resolve()
+        resolve(Date.now() - start)
       }
     })
+
   }
 }
 

@@ -1,4 +1,4 @@
-import NetworkPeerStore from './peerStore'
+import NetworkPeerStore from './network-peers'
 import debug from 'debug'
 import { getTokens, Token } from '../utils'
 import PeerId from 'peer-id'
@@ -28,10 +28,8 @@ class Heartbeat extends EventEmitter {
   }
 
   connectionListener(peer: PeerId | PeerInfo) {
-    const peerIdString = (PeerId.isPeerId(peer) ? peer : peer.id).toB58String()
-
     this.networkPeers.push({
-      id: peerIdString,
+      id: (PeerId.isPeerId(peer) ? peer : peer.id),
       lastSeen: Date.now()
     })
   }
@@ -45,7 +43,7 @@ class Heartbeat extends EventEmitter {
 
     const THRESHOLD_TIME = Date.now() - HEARTBEAT_REFRESH_TIME
 
-    const queryNode = async (peer: string, token: Token): Promise<void> => {
+    const queryNode = async (peer: PeerId, token: Token): Promise<void> => {
       while (tokens.length > 0 && this.networkPeers.updatedSince(THRESHOLD_TIME)) {
         let nextPeer = this.networkPeers.pop()
         let token = tokens.pop() as Token
@@ -56,23 +54,19 @@ class Heartbeat extends EventEmitter {
       let currentPeerId: PeerId
 
       while (true) {
-        currentPeerId = PeerId.createFromB58String(peer)
+        currentPeerId = peer
 
         try {
           await this.interaction.interact(currentPeerId)
 
           this.networkPeers.push({
-            id: peer,
+            id: currentPeerId,
             lastSeen: Date.now()
           })
         } catch (err) {
           await this.hangUp(currentPeerId)
           this.networkPeers.blacklistPeer(peer)
-
-          // ONLY FOR TESTING
-          log(`Deleted node ${peer}`)
-          this.networkPeers.debugLog()
-          // END ONLY FOR TESTING
+          log(`Blacklisting node ${peer}`)
         }
 
         if (this.networkPeers.updatedSince(THRESHOLD_TIME)) {

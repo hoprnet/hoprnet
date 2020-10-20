@@ -98,7 +98,7 @@ export class AdminServer {
 const CRAWL_TIMEOUT = 100_000 // ~15 mins
 export async function periodicCrawl(node: Hopr<HoprCoreConnector>, logs: LogStream) {
   try {
-    await node.network.crawler.crawl()
+    await node.crawl()
     logs.log('Crawled network')
   } catch (err) {
     logs.log('Failed to crawl')

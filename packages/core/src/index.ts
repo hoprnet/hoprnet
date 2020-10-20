@@ -30,10 +30,13 @@ import PeerInfo from 'peer-info'
 
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { HoprCoreConnectorStatic, Types } from '@hoprnet/hopr-core-connector-interface'
+import type { CrawlInfo } from './network/crawler'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
+import BN from 'bn.js'
 
 import { Interactions } from './interactions'
 import * as DbKeys from './dbKeys'
+import type { Connection } from './@types/transport'
 
 const verbose = Debug('hopr-core:verbose')
 
@@ -41,6 +44,11 @@ interface NetOptions {
   ip: string
   port: number
 }
+
+type OperationSuccess = {status: 'SUCCESS', receipt: string}
+type OperationFailure = {status: 'FAILURE', message: string}
+type OperationError = {status: 'ERROR', error: Error | string}
+export type OperationStatus = OperationSuccess | OperationFailure | OperationError
 
 export type HoprOptions = {
   debug: boolean
@@ -65,16 +73,19 @@ export type HoprOptions = {
 const MAX_ITERATIONS_PATH_SELECTION = 2000
 
 class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
-  public interactions: Interactions<Chain>
-  public network: Network
-  public dbKeys = DbKeys
+
+  // TODO make these actually private
+  public _interactions: Interactions<Chain>
+  public _network: Network
+  // Allows us to construct HOPR with falsy options
+  public _debug: boolean
+  public _dbKeys = DbKeys
+
   public output: (arr: Uint8Array) => void
   public isBootstrapNode: boolean
   public bootstrapServers: PeerInfo[]
   public initializedWithOptions: HoprOptions
 
-  // Allows us to construct HOPR with falsy options
-  public _debug: boolean
 
   /**
    * @constructor
@@ -82,7 +93,7 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
    * @param _options
    * @param provider
    */
-  constructor(options: HoprOptions, public db: LevelUp, public paymentChannels: Chain) {
+  private constructor(options: HoprOptions, public db: LevelUp, public paymentChannels: Chain) {
     super({
       peerInfo: options.peerInfo,
 
@@ -118,8 +129,14 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
     this.bootstrapServers = options.bootstrapServers || []
     this.isBootstrapNode = options.bootstrapNode || false
 
-    this.interactions = new Interactions(this)
-    this.network = new Network(this, this.interactions, options)
+
+    
+    this._interactions = new Interactions(
+        this,
+        (conn: Connection) => this._network.crawler.handleCrawlRequest(conn),
+        (remotePeer: PeerId) => this._network.heartbeat.emit('beat', remotePeer)
+    )
+    this._network = new Network(this, this._interactions, options)
 
     verbose('# STARTED NODE')
     verbose('ID', this.peerInfo.id.toB58String())
@@ -132,7 +149,7 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
    *
    * @param options the parameters
    */
-  static async create<CoreConnector extends HoprCoreConnector>(options: HoprOptions): Promise<Hopr<CoreConnector>> {
+  public static async create<CoreConnector extends HoprCoreConnector>(options: HoprOptions): Promise<Hopr<CoreConnector>> {
     const Connector = options.connector ?? HoprCoreEthereum
     const db = Hopr.openDatabase(options, Connector.constants.CHAIN_NAME, Connector.constants.NETWORK)
 
@@ -160,7 +177,7 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
    *
    * @throws an error if none of the bootstrapservers is online
    */
-  async connectToBootstrapServers(): Promise<void> {
+  private async connectToBootstrapServers(): Promise<void> {
     const potentialBootstrapServers = this.bootstrapServers.filter(
       (addr: PeerInfo) => !addr.id.equals(this.peerInfo.id)
     )
@@ -195,9 +212,9 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
    *
    * @param options
    */
-  async start(): Promise<Hopr<Chain>> {
+  public async start(): Promise<Hopr<Chain>> {
     await Promise.all([
-      super.start().then(() => Promise.all([this.connectToBootstrapServers(), this.network.start()])),
+      super.start().then(() => Promise.all([this.connectToBootstrapServers(), this._network.start()])),
       this.paymentChannels?.start()
     ])
 
@@ -208,16 +225,11 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
     return this
   }
 
-  async down(): Promise<void> {
-    log('DEPRECATED use stop() not down()')
-    return this.stop()
-  }
-
   /**
    * Shuts down the node and saves keys and peerBook in the database
    */
-  async stop(): Promise<void> {
-    await Promise.all([this.network.stop(), this.paymentChannels?.stop().then(() => log(`Connector stopped.`))])
+  public async stop(): Promise<void> {
+    await Promise.all([this._network.stop(), this.paymentChannels?.stop().then(() => log(`Connector stopped.`))])
 
     await Promise.all([this.db?.close().then(() => log(`Database closed.`)), super.stop()])
 
@@ -238,7 +250,7 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
    * @param intermediateNodes optional set path manually
    * the acknowledgement of the first hop
    */
-  async sendMessage(
+  public async sendMessage(
     msg: Uint8Array,
     destination: PeerId,
     getIntermediateNodesManually?: () => Promise<PeerId[]>
@@ -270,16 +282,16 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
             return reject(err)
           }
 
-          const unAcknowledgedDBKey = this.dbKeys.UnAcknowledgedTickets(packet.challenge.hash)
+          const unAcknowledgedDBKey = this._dbKeys.UnAcknowledgedTickets(packet.challenge.hash)
 
           await this.db.put(Buffer.from(unAcknowledgedDBKey), Buffer.from(''))
 
-          this.interactions.packet.acknowledgment.once(u8aToHex(unAcknowledgedDBKey), () => {
+          this._interactions.packet.acknowledgment.once(u8aToHex(unAcknowledgedDBKey), () => {
             resolve()
           })
 
           try {
-            await this.interactions.packet.forward.interact(path[0], packet)
+            await this._interactions.packet.forward.interact(path[0], packet)
           } catch (err) {
             return reject(err)
           }
@@ -301,18 +313,105 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
    * @param destination PeerId of the node
    * @returns latency
    */
-  async ping(destination: PeerId): Promise<number> {
+  public async ping(destination: PeerId): Promise<{info: string, latency: number}> {
     if (!PeerId.isPeerId(destination)) {
       throw Error(`Expecting a non-empty destination.`)
     }
-
-    const start = Date.now()
-    try {
-      await this.interactions.network.heartbeat.interact(destination)
-      return Date.now() - start
-    } catch (err) {
-      throw Error(`node unreachable`)
+    let info = ''
+    if (!this._network.networkPeers.has(destination)){ 
+      info = '[Pinging unknown peer]'
     }
+    if (this._network.networkPeers.hasBlacklisted(destination)){
+      info = '[Ping blacklisted peer]'
+    }
+    let latency = await this._interactions.network.heartbeat.interact(destination)
+    return {latency, info}
+  }
+
+
+  public getConnectedPeers(): PeerId[] {
+    return this._network.networkPeers.peers.map(x => x.id)
+  }
+
+  public async crawl(filter?: (peer: PeerId) => boolean): Promise<CrawlInfo>{
+    return this._network.crawler.crawl(filter)
+  }
+
+  /**
+   * Open a payment channel
+   *
+   * @param counterParty the counter party's peerId
+   * @param amountToFund the amount to fund in HOPR(wei)
+   */
+  public async openChannel(
+    counterParty: PeerId,
+    amountToFund: BN
+  ): Promise<{
+    channelId: Types.Hash
+  }> {
+    const { utils, types, account } = this.paymentChannels
+    const self = this.peerInfo.id
+
+    const channelId = await utils.getId(
+      await utils.pubKeyToAccountId(self.pubKey.marshal()),
+      await utils.pubKeyToAccountId(counterParty.pubKey.marshal())
+    )
+
+    const myAvailableTokens = await account.balance
+
+    // validate 'amountToFund'
+    if (amountToFund.lten(0)) {
+      throw Error(`Invalid 'amountToFund' provided: ${amountToFund.toString(10)}`)
+    } else if (amountToFund.gt(myAvailableTokens)) {
+      throw Error(`You don't have enough tokens: ${amountToFund.toString(10)}<${myAvailableTokens.toString(10)}`)
+    }
+
+    const amPartyA = utils.isPartyA(
+      await utils.pubKeyToAccountId(self.pubKey.marshal()),
+      await utils.pubKeyToAccountId(counterParty.pubKey.marshal())
+    )
+
+    const channelBalance = types.ChannelBalance.create(
+      undefined,
+      amPartyA
+        ? {
+            balance: amountToFund,
+            balance_a: amountToFund
+          }
+        : {
+            balance: amountToFund,
+            balance_a: new BN(0)
+          }
+    )
+
+    await this.paymentChannels.channel.create(
+      counterParty.pubKey.marshal(),
+      async () => this._interactions.payments.onChainKey.interact(counterParty),
+      channelBalance,
+      (balance: Types.ChannelBalance): Promise<Types.SignedChannel> =>
+        this._interactions.payments.open.interact(counterParty, balance)
+    )
+
+    return {
+      channelId
+    }
+  }
+
+  public async closeChannel(peerId: PeerId): Promise<{receipt: string, status: string}> {
+      const channel = await this.paymentChannels.channel.create(
+        peerId.pubKey.marshal(),
+        async (counterparty: Uint8Array) =>
+          this._interactions.payments.onChainKey.interact(await pubKeyToPeerId(counterparty))
+      )
+
+      const status = await channel.status
+
+      if (!(status === 'OPEN' || status === 'PENDING')) {
+        throw new Error('To close a channel, it must be open or pending for closure')
+      }
+
+      const receipt = await channel.initiateSettlement()
+      return {receipt, status}
   }
 
   /**
@@ -321,7 +420,7 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
    *
    * @param destination instance of peerInfo that contains the peerId of the destination
    */
-  async getIntermediateNodes(destination: PeerId): Promise<PeerId[]> {
+  private async getIntermediateNodes(destination: PeerId): Promise<PeerId[]> {
     const start = new this.paymentChannels.types.Public(this.peerInfo.id.pubKey.marshal())
     const exclude = [
       destination.pubKey.marshal(),
@@ -340,7 +439,7 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
     )
   }
 
-  static openDatabase(options: HoprOptions, chainName: string, network: string): LevelUp {
+  private static openDatabase(options: HoprOptions, chainName: string, network: string): LevelUp {
     if (options.db) {
       return options.db
     }
@@ -387,13 +486,13 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
     return new Promise((resolve, reject) => {
       this.db
         .createReadStream({
-          gte: Buffer.from(this.dbKeys.AcknowledgedTickets(new Uint8Array(0x00)))
+          gte: Buffer.from(this._dbKeys.AcknowledgedTickets(new Uint8Array(0x00)))
         })
         .on('error', (err) => reject(err))
         .on('data', ({ key, value }: { key: Buffer; value: Buffer }) => {
           if (value.buffer.byteLength !== acknowledgedTicketSize) return
 
-          const index = this.dbKeys.AcknowledgedTicketsParse(key)
+          const index = this._dbKeys.AcknowledgedTicketsParse(key)
           const ackTicket = AcknowledgedTicket.create(this.paymentChannels, {
             bytes: value.buffer,
             offset: value.byteOffset
@@ -413,16 +512,16 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
    * @param ackTicket Uint8Array
    * @param index Uint8Array
    */
-  public async updateAcknowledgedTicket(ackTicket: Types.AcknowledgedTicket, index: Uint8Array): Promise<void> {
-    await this.db.put(Buffer.from(this.dbKeys.AcknowledgedTickets(index)), Buffer.from(ackTicket))
+  private async updateAcknowledgedTicket(ackTicket: Types.AcknowledgedTicket, index: Uint8Array): Promise<void> {
+    await this.db.put(Buffer.from(this._dbKeys.AcknowledgedTickets(index)), Buffer.from(ackTicket))
   }
 
   /**
    * Delete Acknowledged Ticket in database
    * @param index Uint8Array
    */
-  public async deleteAcknowledgedTicket(index: Uint8Array): Promise<void> {
-    await this.db.del(Buffer.from(this.dbKeys.AcknowledgedTickets(index)))
+  private async deleteAcknowledgedTicket(index: Uint8Array): Promise<void> {
+    await this.db.del(Buffer.from(this._dbKeys.AcknowledgedTickets(index)))
   }
 
   /**
@@ -433,20 +532,7 @@ class Hopr<Chain extends HoprCoreConnector> extends LibP2P {
   public async submitAcknowledgedTicket(
     ackTicket: Types.AcknowledgedTicket,
     index: Uint8Array
-  ): Promise<
-    | {
-        status: 'SUCCESS'
-        receipt: string
-      }
-    | {
-        status: 'FAILURE'
-        message: string
-      }
-    | {
-        status: 'ERROR'
-        error: Error | string
-      }
-  > {
+  ): Promise<OperationStatus> {
     try {
       const result = await this.paymentChannels.channel.tickets.submit(ackTicket, index)
 

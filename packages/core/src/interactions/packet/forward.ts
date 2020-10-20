@@ -126,7 +126,7 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
           challenge: receivedChallenge
         })
 
-        await this.node.interactions.packet.acknowledgment.interact(sender, await ack.sign(this.node.peerInfo.id))
+        await this.node._interactions.packet.acknowledgment.interact(sender, await ack.sign(this.node.peerInfo.id))
       })
 
       if (this.node.peerInfo.id.isEqual(target)) {

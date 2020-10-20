@@ -55,7 +55,7 @@ export function getExternalIp(
       port: number
     }
 
-    let timeout: NodeJS.Timeout
+    let timeout
 
     const msgHandler = (msg: Buffer) => {
       verbose(`stun received`)

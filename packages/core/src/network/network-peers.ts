@@ -1,25 +1,25 @@
 import heap from 'heap-js'
+import { randomSubset } from '@hoprnet/hopr-utils'
 
 import type PeerInfo from 'peer-info'
-import { durations } from '@hoprnet/hopr-utils'
+import PeerId from 'peer-id'
+import { BLACKLIST_TIMEOUT } from '../constants'
 
 import debug from 'debug'
-const log = debug('hopr-core:peerStore')
-const verbose = debug('hopr-core:verbose:peerStore')
+const log = debug('hopr-core:network-peers')
+const verbose = debug('hopr-core:verbose:network-peers')
 
 export type Entry = {
-  id: string
+  id: PeerId
   lastSeen: number
 }
 
 export type BlacklistedEntry = {
-  id: string
+  id: PeerId
   deletedAt: number
 }
 
-export const BLACKLIST_TIMEOUT = durations.seconds(47)
-
-class PeerStore {
+class NetworkPeers {
   peers: Entry[]
 
   deletedPeers: BlacklistedEntry[]
@@ -38,7 +38,7 @@ class PeerStore {
 
     for (const peerInfo of existingPeers) {
       this.peers.push({
-        id: peerInfo.id.toB58String(),
+        id: peerInfo.id,
         lastSeen: 0
       })
     }
@@ -46,27 +46,33 @@ class PeerStore {
     heap.heapify(this.peers, this.compare)
   }
 
+  // Get a random sample of non-blacklisted peers.
+  randomSubset(size: number): PeerId[] {
+    return randomSubset(this.peers, Math.min(size, this.peers.length))
+              .map((e: Entry) => e.id)
+  } 
+
   onPeerConnect(peerInfo: PeerInfo) {
-    this.push({ id: peerInfo.id.toB58String(), lastSeen: Date.now() })
+    this.push({ id: peerInfo.id, lastSeen: Date.now() })
   }
 
   push(entry: Entry): number {
-    verbose('adding', entry.id)
+    verbose('adding', entry.id.toB58String())
     const THRESHOLD_TIMEOUT = Date.now() - BLACKLIST_TIMEOUT
     this.cleanupBlacklist(THRESHOLD_TIMEOUT)
 
-    const blacklistIndex = this.deletedPeers.findIndex((e: BlacklistedEntry) => e.id === entry.id)
+    const blacklistIndex = this.deletedPeers.findIndex((e: BlacklistedEntry) => e.id.equals(entry.id))
 
     if (blacklistIndex >= 0) {
       log(
-        `Not adding peer ${entry.id} because it got blacklisted at ${new Date(
+        `Not adding peer ${entry.id.toB58String()} because it got blacklisted at ${new Date(
           this.deletedPeers[blacklistIndex].deletedAt
         ).toString()}`
       )
       return this.peers.length
     }
 
-    const index = this.peers.findIndex((e: Entry) => e.id === entry.id)
+    const index = this.peers.findIndex((e: Entry) => e.id.equals(entry.id))
     if (index >= 0) {
       this.peers[index] = entry
       heap.heapify(this.peers, this.compare)
@@ -82,8 +88,12 @@ class PeerStore {
     heap.heapreplace(this.peers, newEntry, this.compare)
   }
 
-  has(peer: string): boolean {
-    return this.peers.findIndex((entry: Entry) => entry.id === peer) >= 0
+  has(peer: PeerId): boolean {
+    return this.peers.findIndex((entry: Entry) => entry.id.equals(peer)) >= 0
+  }
+
+  hasBlacklisted(peer:PeerId): boolean {
+    return this.deletedPeers.findIndex((entry: BlacklistedEntry) => entry.id.equals(peer)) >= 0
   }
 
   top(n: number): Entry[] {
@@ -94,8 +104,8 @@ class PeerStore {
     return heap.heappop(this.peers, this.compare)
   }
 
-  blacklistPeer(peer: string): number {
-    verbose('blacklisting', peer)
+  blacklistPeer(peer: PeerId): number {
+    verbose('blacklisting', peer.toB58String())
     const entry = {
       id: peer,
       deletedAt: Date.now()
@@ -103,7 +113,7 @@ class PeerStore {
 
     // (Efficiently) pushes peer information into blacklist
     const THRESHOLD_TIMEOUT = Date.now() - BLACKLIST_TIMEOUT
-    const blacklistIndex = this.deletedPeers.findIndex((e: BlacklistedEntry) => e.id === peer)
+    const blacklistIndex = this.deletedPeers.findIndex((e: BlacklistedEntry) => e.id.equals(peer))
     if (blacklistIndex >= 0) {
       this.deletedPeers[blacklistIndex] = entry
       heap.heapify(this.deletedPeers, this.compareBlackList)
@@ -121,7 +131,7 @@ class PeerStore {
     this.cleanupBlacklist(THRESHOLD_TIMEOUT)
 
     // Removes the peer information from our peerstore
-    const index = this.peers.findIndex((e: Entry) => e.id === entry.id)
+    const index = this.peers.findIndex((e: Entry) => e.id.equals(entry.id))
     if (index >= 0) {
       if (index == this.peers.length - 1) {
         this.peers.pop()
@@ -154,12 +164,16 @@ class PeerStore {
 
   public debugLog() {
     log(`current nodes:`)
-    this.peers.forEach((node: Entry) => log(node.id))
+    this.peers.forEach((node: Entry) => log(node.id.toB58String()))
   }
 
   updatedSince(ts) {
     return this.peers.length > 0 && this.top(1)[0].lastSeen < ts
   }
+
+  reset(){
+    this.peers = []
+  }
 }
 
-export default PeerStore
+export default NetworkPeers

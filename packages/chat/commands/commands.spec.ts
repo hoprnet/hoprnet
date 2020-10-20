@@ -24,7 +24,7 @@ describe('Commands', () => {
   it('ping', async () => {
     let mockNode: any = jest.fn()
     mockNode.bootstrapServers = []
-    mockNode.ping = jest.fn()
+    mockNode.ping = jest.fn(() => ({info: '', latency: 10}))
     let mockPeerId = '16Uiu2HAkyXRaL7fKu4qcjaKuo4WXizrpK63Ltd6kG2tH6oSV58AW'
 
     let cmds = new mod.Commands(mockNode)
@@ -40,15 +40,11 @@ describe('Commands', () => {
 
   it('crawl', async () => {
     let mockNode: any = jest.fn()
-    mockNode.network = jest.fn()
-    mockNode.network.crawler = jest.fn()
-    mockNode.network.crawler.crawl = jest.fn()
-    mockNode.peerStore = jest.fn()
-    mockNode.peerStore.peers = []
+    mockNode.getConnectedPeers = () => []
+    mockNode.crawl = jest.fn(() => ({contacted: []}))
 
     let cmds = new mod.Commands(mockNode)
-    expect(await cmds.execute('crawl')).toContain('Crawled network, connected to')
-    expect(mockNode.network.crawler.crawl).toHaveBeenCalled()
+    expect(await cmds.execute('crawl')).toContain('Crawled network, contacted')
   })
 
   it('help', async () => {
@@ -95,9 +91,7 @@ describe('Commands', () => {
     let mockNode: any = jest.fn()
     mockNode.sendMessage = jest.fn()
     mockNode.bootstrapServers = []
-    mockNode.network = jest.fn()
-    mockNode.network.peerStore = jest.fn()
-    mockNode.network.peerStore.peers = [{ id: '16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7' }]
+    mockNode.getConnectedPeers = () => [{ toB58String: () => '16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7' }]
 
     let cmds = new mod.Commands(mockNode)
     expect((await cmds.autocomplete('send 16Ui'))[0][0]).toMatch(/send 16U/)
