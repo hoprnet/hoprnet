@@ -76,7 +76,9 @@ export default function TopAssets() {
                     const { id, address, score, tweetId, tweetUrl } = item;
                     return (
                       <tr key={id}>
-                        <td data-type="score" data-label="score">{score}</td>
+                        <td data-type="score" data-label="score">
+                          <span > <img src="/assets/icons/top.svg" alt="hopr Top ASSETS" /></span>
+                          {score}</td>
                         <td data-label="address">{address}</td>
                         <td data-label="id">{id}</td>
                         <td data-label="tweetId">{tweetId}</td>
