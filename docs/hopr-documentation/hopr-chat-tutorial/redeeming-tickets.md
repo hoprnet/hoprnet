@@ -20,13 +20,25 @@ To see how many tickets you currently have, type:
 tickets
 ```
 
+You'll see how many unredeemed tickets you currently have, along with their value in HOPR.
+
+```text
+tickets
+Found 3 unredeemed tickets with a value of 0.000000000000000297 HOPR
+```
+
 To redeem your tickets, type:
 
 ```text
 redeemTickets
 ```
 
-This will attempt to redeem all of your tickets. The HOPR from these tickets will be added to your balance.
+This will attempt to redeem all of your tickets. The HOPR from these tickets will be added to your balance. You'll get a notification as each ticket is redeemed, liked this:
+
+```text
+Redeemed 2 out of 5 tickets with a sum of 0.0000000000000002 HOPR 
+
+```
 
 {% hint style="warning" %}
 Redeeming tickets requires calling the HOPR smart contract, so can take some time. You will be notified as each ticket is redeemed.
