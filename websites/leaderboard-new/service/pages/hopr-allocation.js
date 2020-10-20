@@ -7,16 +7,30 @@ export default function HoprAllocation() {
   const allNodes = data ? data.nodes.sort((a, b) => b.score - a.score) : [];
 
   const nodes = allNodes.slice(0, allNodes.length > 6 ? 5 : allNodes.length);
-
+  
   useEffect(() => {
     const fetchData = async () => {
       const response = await api.getAllData();
+      
       if (response.data) setData(response.data);
     };
     fetchData();
   }, []);
 
+  const sfn = (key) =>{
+    if (nodes){
+      if(nodes.length){
+        setData(nodes.sort((a, b) => b[key] - a[key]));
+      }
+    }
+  };
+
   const columns = [
+    {
+      title: "score",
+      dataIndex: "score",
+      key: "score",
+    },
     {
       title: "address",
       dataIndex: "address",
@@ -27,11 +41,7 @@ export default function HoprAllocation() {
       dataIndex: "id",
       key: "id",
     },
-    {
-      title: "score",
-      dataIndex: "score",
-      key: "score",
-    },
+   
     {
       title: "tweetUrl",
       dataIndex: "tweetUrl",
@@ -58,7 +68,7 @@ export default function HoprAllocation() {
                     {columns.map((e, index) => {
                       const { title, key } = e;
                       return (
-                        <th scope="col" key={key}>
+                        <th onClick={() => sfn({key})} scope="col" key={key}>
                           {title}
                         </th>
                       );
@@ -70,11 +80,8 @@ export default function HoprAllocation() {
                     const { id, address, score,  tweetUrl } = item;
                     return (
                       <tr key={id}>
-                        <td data-label="address">{address}</td>
-                        <td data-label="id">{id}</td>
-                        <td data-type="score" data-label="score">
-                          <span>
-                            {" "}
+                         <td data-type="score" data-label="score">
+                         <span>
                             <img
                               src="/assets/icons/top.svg"
                               alt="hopr Top ASSETS"
@@ -82,7 +89,8 @@ export default function HoprAllocation() {
                           </span>
                           {score}
                         </td>
-                       
+                        <td data-label="address">{address}</td>
+                        <td data-label="id">{id}</td>
                         <td data-label="tweetUrl">
                           <a href={tweetUrl}>
                             <img
