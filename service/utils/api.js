@@ -24,31 +24,29 @@ export async function getScore() {
 }
 
 export async function getAllData() {
-  let stats = await getData(FirebaseNetworkTables.state),
-    scores = await getData(FirebaseNetworkTables.score),
-    sKey = '';
+  const [state, score] = await Promise.all([
+    getData(FirebaseNetworkTables.state).then((res) => res.data),
+    getData(FirebaseNetworkTables.score).then((res) => res.data),
+  ]);
 
-  if (stats) {
-    if (stats.data) {
-      stats.data.scoreArray = [];
-      for (sKey in scores.data) {
-        stats.data.scoreArray.push({
-          address: sKey,
-          score: scores.data[sKey],
-        });
-      }
+  const nodes = Object.entries(score).map(([id, score]) => {
+    const node = state.connected.find((node) => node.id === id) || {};
 
-      stats.data.connected.map(item => {
-        let exist = stats.data.scoreArray.find(single => single.address === item.address);
+    return {
+      online: !!node.address,
+      address: node.address || "?",
+      id: id || "?",
+      score: score || "?",
+      tweetId: node.tweetId || "?",
+      tweetUrl: node.tweetUrl || "?",
+    };
+  });
 
-        if (exist) {
-          item.score = exist.score;
-        }
-      });
-    }
-  }
+  state.nodes = nodes;
 
-  return stats;
+  return {
+    data: state,
+  };
 }
 
 export default { getState, getScore, getAllData };

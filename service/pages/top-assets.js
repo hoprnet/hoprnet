@@ -4,18 +4,7 @@ import api from "../utils/api";
 
 export default function TopAssets() {
   const [data, setData] = useState(undefined);
-  const allNodes = (data
-    ? data.scoreArray.map((score) => {
-        const node = data.connected.find((node) => node.id === score.address);
-
-        return {
-          online: !!node,
-          ...score,
-          ...(node || {}),
-        };
-      })
-    : []
-  ).sort((a, b) => b.score - a.score);
+  const allNodes = data ? data.nodes.sort((a, b) => b.score - a.score) : [];
 
   const nodes = allNodes.slice(0, allNodes.length > 6 ? 5 : allNodes.length);
 
