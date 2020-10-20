@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from "react";
 import Layout from "../components/layout/layout.js";
-import api from '../utils/api'
-
+import api from "../utils/api";
 
 export default function Home() {
-  const [data, setData] = useState({})
-  const [dataTable, setDataTable] = useState(false)
+  const [data, setData] = useState({});
+  const [dataTable, setDataTable] = useState(false);
+  const [dataConnectedNodes, setDataConnectedNodes] = useState(false);
+  const [dataVerified, setDataVerified] = useState(false);
+  const [dataRegistered, setDataRegistered] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -13,10 +15,14 @@ export default function Home() {
       if (response.data) {
         // console.log('All data: ', response.data);
         setData(response.data);
-        setDataTable(response.data.connected)
-        console.log(response.data.connected)
+        console.log(response.data);
+        setDataTable(response.data.connected);
+        setDataConnectedNodes(response.data.connectedNodes);
+        setDataRegistered(response.data.scoreArray.length);
+        setDataVerified(response.data.connected.length);
+        console.log(response.data.connected);
       }
-    }
+    };
     fetchData();
   }, []);
 
@@ -48,7 +54,6 @@ export default function Home() {
     },
   ];
 
-
   return (
     <Layout>
       <div className="box">
@@ -68,31 +73,56 @@ export default function Home() {
           <div className="box-menu-optional">
             <ul>
               <li className="active">All</li>
-              <li>Verified</li>
-              <li>Registered</li>
-              <li>Connected</li>
+              <li>
+                {dataVerified && <span>{dataVerified}</span>}
+                Verified
+              </li>
+              <li>
+                {dataRegistered && <span>{dataRegistered}</span>}
+                Registered
+              </li>
+              <li>
+                {dataConnectedNodes && <span>{dataConnectedNodes}</span>}
+                Connected
+              </li>
             </ul>
           </div>
         </div>
-        <div className="box-main-area">
+        <div className="box-main-area remove-all-padding">
           <div className="box-container-table">
             {dataTable && (
-            <table id='date'>
-            <tbody>
-               {/* <tr>.map</tr> */}
-               {dataTable.map((e, index)=>{
-                 const { address, id, tweetId, tweetUrl } = e;
-                return(
-                  <tr key={id}>
-                  <td>{address}</td>
-                   <td>{id}</td>
-                   <td>{tweetId}</td>
-                   <td><a href={tweetUrl}><img src="/assets/icons/twitter.svg" alt="twitter" /></a></td>
-                </tr>
-                )
-               })}
-            </tbody>
-         </table>
+              <table id="date">
+                <thead>
+                  <tr>
+                    {columns.map((e, index) => {
+                      const { title, key } = e;
+                      return <th key={key}>{title}</th>;
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {/* <tr>.map</tr> */}
+                  {dataTable.map((e, index) => {
+                    const { address, id, score, tweetId, tweetUrl } = e;
+                    return (
+                      <tr key={id}>
+                        <td data-type="score">{score}</td>
+                        <td>{address}</td>
+                        <td>{id}</td>
+                        <td>{tweetId}</td>
+                        <td>
+                          <a href={tweetUrl}>
+                            <img
+                              src="/assets/icons/twitter.svg"
+                              alt="twitter"
+                            />
+                          </a>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             )}
           </div>
         </div>
@@ -100,5 +130,3 @@ export default function Home() {
     </Layout>
   );
 }
-
-
