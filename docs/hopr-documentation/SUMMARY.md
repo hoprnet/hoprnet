@@ -28,8 +28,8 @@
 * [Exploring The Network](hopr-avado-node-tutorial/finding-your-address.md)
 * [Messaging Randobot](hopr-avado-node-tutorial/talking-with-randobot.md)
 * [Registering With CoverBot](hopr-avado-node-tutorial/registering-with-coverbot.md)
-* [Changing Your Routing Settings](hopr-avado-node-tutorial/changing-your-routing-settings.md)
 * [Earning and Redeeming Tickets](hopr-avado-node-tutorial/redeeming-tickets.md)
+* [Changing Your Routing Settings](hopr-avado-node-tutorial/changing-your-routing-settings.md)
 * [Sending A Multi-hop Message Using A Payment Channel](hopr-avado-node-tutorial/sending-a-multi-hop-message.md)
 * [Withdrawing Funds](hopr-avado-node-tutorial/withdrawing-funds.md)
 

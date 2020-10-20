@@ -54,7 +54,11 @@ Now that you've sent your tweet, you need to register with the bot. Copy the ful
 send 16Uiu2HAm2bug99ub54UT2U3P94XPji8vXJFgXTsJTnt4eQ9Tmime [URL of your tweet]
 ```
 
-Then press Enter.   
+Then press Enter. 
+
+![](../.gitbook/assets/coverbot-avado-success.png)
+
+  
   
 The bot will now check your tweet and will send you a verification message if you're successful. If there's an error, the bot will try and explain what has gone wrong so you can fix it.
 
@@ -63,6 +67,8 @@ The bot will now check your tweet and will send you a verification message if yo
 Now that your address is whitelisted with the bot, you can earn tickets by relaying data.
 
 Every 30 seconds, the bot will randomly select an address from the whitelist and ping it to check that it's online. If is, it will send cover traffic to itself via that node.
+
+![](../.gitbook/assets/coverbot-avado-relaying.png)
 
 If the CoverBot selects your address, you'll receive a ticket which can be redeemed for HOPR. You'll also receive a verification message.
 
