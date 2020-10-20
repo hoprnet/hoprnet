@@ -10,7 +10,6 @@ import Listener from './listener'
 import { USE_WEBRTC, CODE_P2P } from './constants'
 import Multiaddr from 'multiaddr'
 import PeerInfo from 'peer-info'
-import PeerId from 'peer-id'
 import type { Connection, Upgrader, DialOptions, ConnHandler, MultiaddrConnection } from '../../@types/transport'
 import chalk from 'chalk'
 import { WebRTCUpgrader } from './webrtc'
@@ -32,7 +31,7 @@ class TCP {
   private _useWebRTC: boolean
   private _upgrader: Upgrader
   private _peerInfo: PeerInfo
-  private relays?: PeerInfo[]
+  private relays?: Multiaddr[]
   private stunServers: Multiaddr[]
   private _relay: Relay
   // @ts-ignore
@@ -59,7 +58,7 @@ class TCP {
   }: {
     upgrader: Upgrader
     libp2p: libp2p
-    bootstrapServers?: PeerInfo[]
+    bootstrapServers?: Multiaddr[]
     useWebRTC?: boolean
     failIntentionallyOnWebRTC?: boolean
     timeoutIntentionallyOnWebRTC?: Promise<void>
@@ -75,25 +74,22 @@ class TCP {
 
     if (bootstrapServers?.length > 0) {
       this.relays = bootstrapServers.filter(
-        (peerInfo: PeerInfo) => peerInfo !== undefined && !libp2p.peerInfo.id.isEqual(peerInfo.id)
+        (ma: Multiaddr) => (ma !== undefined && libp2p.peerInfo.id.toB58String() !== ma.getPeerId())
       )
 
       this.stunServers = []
       for (let i = 0; i < this.relays.length; i++) {
-        const multiaddrs = this.relays[i].multiaddrs.toArray()
-        for (let j = 0; j < multiaddrs.length; j++) {
-          const opts = multiaddrs[j].toOptions()
+        const opts = this.relays[i].toOptions()
 
-          switch (opts.family) {
-            case 'ipv6':
-              // We do not use STUN for IPv6 for the moment
-              break
-            case 'ipv4':
-              this.stunServers.push(multiaddrs[j])
-              break
-            default:
-              throw Error('Invalid family')
-          }
+        switch (opts.family) {
+          case 'ipv6':
+            // We do not use STUN for IPv6 for the moment
+            break
+          case 'ipv4':
+            this.stunServers.push(this.relays[i])
+            break
+          default:
+            throw Error('Invalid family')
         }
       }
     }
@@ -172,10 +168,8 @@ class TCP {
       )
     }
 
-    const destination = PeerId.createFromCID(ma.getPeerId())
-
     // Check whether we know some relays that we can use
-    const potentialRelays = this.relays?.filter((peerInfo: PeerInfo) => !peerInfo.id.equals(destination))
+    const potentialRelays = this.relays?.filter((r: Multiaddr) => r.getPeerId() !== ma.getPeerId())
 
     if (potentialRelays == null || potentialRelays.length == 0) {
       throw Error(
@@ -193,7 +187,7 @@ class TCP {
     return conn
   }
 
-  async dialWithRelay(ma: Multiaddr, relays: PeerInfo[], options?: DialOptions): Promise<Connection> {
+  async dialWithRelay(ma: Multiaddr, relays: Multiaddr[], options?: DialOptions): Promise<Connection> {
     const relayConnection = await this._relay.establishRelayedConnection(ma, relays, options)
     return await this._upgrader.upgradeOutbound(relayConnection)
   }

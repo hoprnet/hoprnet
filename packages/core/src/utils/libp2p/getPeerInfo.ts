@@ -9,7 +9,6 @@ const log = debug('hopr-core:libp2p')
 
 import { NODE_SEEDS, BOOTSTRAP_SEEDS } from '@hoprnet/hopr-demo-seeds'
 
-import PeerInfo from 'peer-info'
 import PeerId from 'peer-id'
 import Multiaddr from 'multiaddr'
 
@@ -18,7 +17,7 @@ import { KeyPair } from '../../dbKeys'
 /**
  * Assemble the addresses that we are using
  */
-async function getAddrs(options: HoprOptions): Promise<Multiaddr[]> {
+async function getAddrs(id: PeerId, options: HoprOptions): Promise<Multiaddr[]> {
   const addrs = []
 
   if (options.hosts === undefined || (options.hosts.ip4 === undefined && options.hosts.ip6 === undefined)) {
@@ -55,8 +54,7 @@ async function getAddrs(options: HoprOptions): Promise<Multiaddr[]> {
       addrs.push(Multiaddr(`/ip6/${options.hosts.ip6.ip}/tcp/${ip6Port}`))
     }
   }
-
-  return addrs
+  return addrs.map((addr: Multiaddr) => addr.encapsulate(`/p2p/${id.toB58String()}`))
 }
 
 /**
@@ -149,23 +147,4 @@ async function createIdentity(db: LevelUp, pw?: string): Promise<PeerId> {
   return peerId
 }
 
-async function getPeerInfo(options: HoprOptions, db?: LevelUp): Promise<PeerInfo> {
-  if (db == null && (options == null || (options != null && options.peerInfo == null && options.peerId == null))) {
-    throw Error('Invalid input parameter. Please set a valid peerInfo or pass a database handle.')
-  }
-
-  const addrs = await getAddrs(options)
-
-  let peerInfo: PeerInfo
-  if (options.peerInfo != null) {
-    peerInfo = options.peerInfo
-  } else {
-    peerInfo = new PeerInfo(await getPeerId(options, db))
-  }
-
-  addrs.forEach((addr: Multiaddr) => peerInfo.multiaddrs.add(addr.encapsulate(`/p2p/${peerInfo.id.toB58String()}`)))
-
-  return peerInfo
-}
-
-export { getPeerInfo }
+export { getPeerId, getAddrs }
