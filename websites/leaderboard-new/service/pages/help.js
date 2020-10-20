@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import Layout from "../components/layout/layout.js";
+import TweetBasodino from "../components/tweet-basodino";
 
 export default function Help() {
-  const [hash, setHash] = useState(
+  const [hash] = useState(
     "16Uiu2HAmRE4fVtp8dF6H62NzRcx6LGUTL5fBRTdnAfZXjveP5Kz9"
   );
 
@@ -14,6 +15,7 @@ export default function Help() {
       setModal(false);
     }, 4000);
   };
+
   return (
     <>
       <Layout>
@@ -31,29 +33,74 @@ export default function Help() {
 
           <div className="box-main-area">
             <hr />
-            <p>
-              Install the latest version of HOPR Chat, which will spin up a HOPR
-              node. Send 0.02 xDAI to your node. You can get xDAI from ETH on
-              xdai.io or ping us on Telegram. In your HOPR node, type myAddress
-              to find your node address. Tweet your HOPR node address with the
-              tag #basodino and @hoprnet. In your HOPR node, type
-              includeRecipient and then “y” so the bot can respond. Send the URL
-              of your tweet to the CoverBot using the send command:
-            </p>
-            <div className="quick-code">
-              <div className="hash" onClick={() => copyCodeToClipboard()}>
-                <p>{hash}</p>
-                <div>
-                  <img src="/assets/icons/copy.svg" alt="copy" />
+            <ol>
+              <li>
+                Install the latest version of{" "}
+                <a
+                  href="https://github.com/hoprnet/hopr-chat/releases"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  HOPR Chat
+                </a>
+                , which will spin up a HOPR node.
+              </li>
+              <li>
+                Send <strong>0.02 Matic</strong> to your node. You can get Matic
+                from ETH on{" "}
+                <a
+                  href="//wallet.matic.network"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  wallet.matic.network
+                </a>{" "}
+                or ping us on{" "}
+                <a href="//t.me/hoprnet" target="_blank" rel="noreferrer">
+                  Telegram
+                </a>
+                .
+              </li>
+              <li>
+                In your HOPR node, type <strong>myAddress</strong> to find your
+                node address.
+              </li>
+              <li>
+                Tweet your HOPR node address with the tag{" "}
+                <strong>#Basodino</strong> and <strong>@hoprnet</strong>.{" "}
+                <TweetBasodino>
+                  <img src="/assets/icons/twitter.svg" alt="twitter" />{" "}
+                  #Basodino
+                </TweetBasodino>
+              </li>
+              <li>
+                In your HOPR node, type{" "}
+                <strong>settings includeRecipient true</strong> so the bot can
+                respond.
+              </li>
+              <li>
+                Send the URL of your tweet to the <strong>CoverBot</strong>{" "}
+                using the <strong>send</strong> command. You may need to use{" "}
+                <strong>crawl</strong> first.
+                <br />
+                <div className="quick-code">
+                  <div className="hash" onClick={() => copyCodeToClipboard()}>
+                    <p>{hash}</p>
+                    <div>
+                      <img src="/assets/icons/copy.svg" alt="copy" />
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-            <p>
-              Wait for a message from CoverBot verifying your tweet. You have
-              scored points! Keep your node online to earn more! Every 30s,
-              CoverBot will randomly choose a registered user to relay data and
-              earn more points.
-            </p>
+              </li>
+              <li>Wait for a message from CoverBot verifying your tweet.</li>
+              <li>
+                You have scored points! Keep your node online to earn more!
+              </li>
+              <li>
+                Every 30s, CoverBot will randomly choose a registered user to
+                relay data and earn more points.
+              </li>
+            </ol>
             <hr />
             <div className="twitter-line-menu">
               <div>
@@ -63,13 +110,10 @@ export default function Help() {
                 </a>
               </div>
               <div>
-                <a
-                  href="https://twitter.com/intent/tweet?original_referer=https%3A%2F%2Fsaentis.hoprnet.org%2F&amp;ref_src=twsrc%5Etfw&amp;related=hoprnet&amp;text=Signing%20up%20to%20earn%20%24HOPR%20on%20the%20%23HOPRnetwork.%20My%20%40hoprnet%20address%20is%3A%20&amp;tw_p=tweetbutton"
-                  target="_blank"
-                >
-                  <img src="/assets/icons/twitter.svg" alt="twitter" />
-                  <p>#basodino</p>
-                </a>
+                <TweetBasodino>
+                  <img src="/assets/icons/twitter.svg" alt="twitter" />{" "}
+                  <p>#Basodino</p>
+                </TweetBasodino>
               </div>
             </div>
           </div>

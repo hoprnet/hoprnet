@@ -3,30 +3,36 @@ import Layout from "../components/layout/layout.js";
 import api from "../utils/api";
 
 export default function Home() {
-  const [data, setData] = useState({});
-  const [dataTable, setDataTable] = useState(false);
-  const [dataConnectedNodes, setDataConnectedNodes] = useState(false);
-  const [dataVerified, setDataVerified] = useState(false);
-  const [dataRegistered, setDataRegistered] = useState(false);
+  const [data, setData] = useState(undefined);
+  const nodesVerified = data ? data.connected.length : 0;
+  const nodesRegistered = data ? data.scoreArray.length : 0;
+  const nodesConnected = data ? data.connectedNodes : 0;
+  const nodes = data
+    ? data.scoreArray.map((score) => {
+        const node = data.connected.find((node) => node.id === score.address);
+
+        return {
+          online: !!node,
+          ...score,
+          ...(node || {}),
+        };
+      })
+    : [];
 
   useEffect(() => {
     const fetchData = async () => {
       const response = await api.getAllData();
-      if (response.data) {
-        // console.log('All data: ', response.data);
-        setData(response.data);
-        console.log(response.data);
-        setDataTable(response.data.connected);
-        setDataConnectedNodes(response.data.connectedNodes);
-        setDataRegistered(response.data.scoreArray.length);
-        setDataVerified(response.data.connected.length);
-        console.log(response.data.connected);
-      }
+      if (response.data) setData(response.data);
     };
     fetchData();
   }, []);
 
   const columns = [
+    {
+      title: "online",
+      dataIndex: "online",
+      key: "online",
+    },
     {
       title: "address",
       dataIndex: "address",
@@ -74,15 +80,15 @@ export default function Home() {
             <ul>
               <li className="active">All</li>
               <li>
-                {dataVerified && <span>{dataVerified}</span>}
+                {nodesVerified && <span>{nodesVerified}</span>}
                 Verified
               </li>
               <li>
-                {dataRegistered && <span>{dataRegistered}</span>}
+                {nodesRegistered && <span>{nodesRegistered}</span>}
                 Registered
               </li>
               <li>
-                {dataConnectedNodes && <span>{dataConnectedNodes}</span>}
+                {nodesConnected && <span>{nodesConnected}</span>}
                 Connected
               </li>
             </ul>
@@ -90,24 +96,31 @@ export default function Home() {
         </div>
         <div className="box-main-area remove-all-padding">
           <div className="box-container-table">
-            {dataTable && (
+            {nodes && (
               <table id="date">
                 <thead>
                   <tr>
                     {columns.map((e, index) => {
                       const { title, key } = e;
-                      return <th scope="col" key={key}>{title}</th>;
+                      return (
+                        <th scope="col" key={key}>
+                          {title}
+                        </th>
+                      );
                     })}
                   </tr>
                 </thead>
                 <tbody>
-                  {dataTable.map((e, index) => {
-                    const { address, id, score, tweetId, tweetUrl } = e;
+                  {nodes.map((e, index) => {
+                    const { online, address, id, score, tweetId, tweetUrl } = e;
                     return (
                       <tr key={id}>
-                        <td data-type="score" data-label="score">{score}</td>
+                        <td data-label="online">{online ? "🟢" : "🔴"}</td>
                         <td data-label="address">{address}</td>
                         <td data-label="id">{id}</td>
+                        <td data-type="score" data-label="score">
+                          {score}
+                        </td>
                         <td data-label="tweetId">{tweetId}</td>
                         <td data-label="tweetUrl">
                           <a href={tweetUrl}>
