@@ -40,11 +40,6 @@ export default function Home() {
       key: "score",
     },
     {
-      title: "tweetId",
-      dataIndex: "tweetId",
-      key: "tweetId",
-    },
-    {
       title: "tweetUrl",
       dataIndex: "tweetUrl",
       key: "tweetUrl",
@@ -103,7 +98,7 @@ export default function Home() {
                 </thead>
                 <tbody>
                   {nodes.map((e) => {
-                    const { online, address, id, score, tweetId, tweetUrl } = e;
+                    const { online, address, id, score, tweetUrl } = e;
                     return (
                       <tr key={id}>
                         <td data-label="online">{online ? "🟢" : "🔴"}</td>
@@ -112,7 +107,6 @@ export default function Home() {
                         <td data-type="score" data-label="score">
                           {score}
                         </td>
-                        <td data-label="tweetId">{tweetId}</td>
                         <td data-label="tweetUrl">
                           <a href={tweetUrl}>
                             <img

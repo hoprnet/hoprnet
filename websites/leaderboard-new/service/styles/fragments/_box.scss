@@ -133,7 +133,7 @@
         }
         &:hover {
           background: #ebebeb;
-          color: #c4c4c4;
+          color: $greyLabel;
           transition: all 350ms ease-in-out;
         }
       }
@@ -166,7 +166,7 @@
       float: left;
       font-weight: 600;
       font-size: 0.89em;
-      color: #c4c4c4;
+      color: $greyLabel;
       cursor: pointer;
       transition: all 350ms ease-in-out;
       span {

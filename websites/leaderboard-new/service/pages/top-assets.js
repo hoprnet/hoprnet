@@ -33,11 +33,6 @@ export default function TopAssets() {
       key: "score",
     },
     {
-      title: "tweetId",
-      dataIndex: "tweetId",
-      key: "tweetId",
-    },
-    {
       title: "tweetUrl",
       dataIndex: "tweetUrl",
       key: "tweetUrl",
@@ -72,7 +67,7 @@ export default function TopAssets() {
                 </thead>
                 <tbody>
                   {nodes.map((item) => {
-                    const { id, address, score, tweetId, tweetUrl } = item;
+                    const { id, address, score,  tweetUrl } = item;
                     return (
                       <tr key={id}>
                         <td data-label="address">{address}</td>
@@ -87,7 +82,7 @@ export default function TopAssets() {
                           </span>
                           {score}
                         </td>
-                        <td data-label="tweetId">{tweetId}</td>
+                       
                         <td data-label="tweetUrl">
                           <a href={tweetUrl}>
                             <img
