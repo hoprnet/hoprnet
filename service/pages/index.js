@@ -77,7 +77,7 @@ export default function Home() {
         <div className="box-main-area">
           <div className="box-container-table">
             {dataTable && (
-              <Table className="main-table" columns={columns} data={dataTable} rowKey={(e) => e.id} />
+              <Table   width={300} useFixedHeader={true} className="main-table" columns={columns} data={dataTable} rowKey={(e) => e.id} />
             )}
           </div>
         </div>

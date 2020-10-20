@@ -4,7 +4,11 @@
 }
 
 table{
+    border-collapse: separate;
     thead{
 
+    }
+    tr{
+        height: 34px;
     }
 }
