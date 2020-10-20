@@ -43,6 +43,13 @@ table tr {
       color: #331cfa;
       font-weight: 600;
     }
+    img{
+      transition: all 350ms ease-in-out;
+      &:hover{
+        filter: grayscale(1);
+        transition: all 350ms ease-in-out;
+      }
+    }
   }
 }
 

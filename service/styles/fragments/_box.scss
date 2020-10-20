@@ -154,16 +154,13 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    overflow: scroll;
+    overflow: auto;
 
     @media (min-width: 767px) {
       margin: 0;
       padding: 0.5em 0;
       list-style: none;
-      width: 80%;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
+    
     }
     li {
       float: left;
@@ -205,7 +202,7 @@
     line-height: 1.8em;
     font-weight: 400;
     @media (min-width: 767px) {
-      font-size: 1.24em;
+      font-size: 1.05em;
       line-height: 1.89em;
     }
   }
@@ -262,7 +259,7 @@
 .box-main-area .box-container-table {
   padding: 0 !important;
   height: 400px;
-  overflow: scroll;
+  overflow: auto;
 }
 
 .box-coming-soon {

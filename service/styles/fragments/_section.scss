@@ -35,8 +35,9 @@ section.right-side {
   overflow: hidden;
   width: 300px;
   .paragraph {
-    font-size: 1em;
+    font-size: 0.98em;
     margin: 0;
+    text-align: justify;
   }
   .box-border {
     width: 100%;
@@ -58,7 +59,7 @@ section.right-side {
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        width: 250px;
+        width: 80%;
         text-align: end;
       }
       p {
