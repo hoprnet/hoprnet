@@ -1,4 +1,4 @@
-import { Stream } from '../../@types/transport'
+import { Stream } from 'LibP2P'
 import Multiaddr from 'multiaddr'
 import BL from 'bl'
 import { MultiaddrConnection } from '../../@types/transport'

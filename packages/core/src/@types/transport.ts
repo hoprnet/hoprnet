@@ -1,3 +1,5 @@
+/// <reference path="../@types/libp2p.ts" />
+import { Connection, Stream } from 'libp2p'
 import type PeerId from 'peer-id'
 import type PeerInfo from 'peer-info'
 import type Multiaddr from 'multiaddr'
@@ -7,11 +9,6 @@ import type { Server } from 'net'
 export interface DialOptions {
   signal?: AbortSignal
   relay?: PeerId | PeerInfo
-}
-
-export type Stream = {
-  sink: (source: AsyncIterable<Uint8Array>) => Promise<void>
-  source: AsyncIterable<Uint8Array>
 }
 
 export type Handler = {
@@ -38,30 +35,6 @@ export interface Upgrader {
 
 export interface PeerRouting {
   findPeer(peerId: PeerId): Promise<PeerInfo>
-}
-
-export interface Connection {
-  localAddr: Multiaddr
-  remoteAddr: Multiaddr
-  localPeer: PeerId
-  remotePeer: PeerId
-  newStream(
-    protocols?: string[]
-  ): Promise<{
-    protocol: string
-    stream: Stream
-  }>
-  close(): Promise<void>
-  getStreams(): any[]
-  stat: {
-    direction: 'outbound' | 'inbound'
-    timeline: {
-      open: number
-      upgraded: number
-    }
-    multiplexer?: any
-    encryption?: any
-  }
 }
 
 export interface PeerStore {

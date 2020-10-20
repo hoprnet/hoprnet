@@ -3,6 +3,36 @@ declare module 'libp2p' {
   type PeerId = import('peer-id')
   type Multiaddr = import('multiaddr')
   type Handler = import('./transport').Handler
+  type EventEmitter = import('events').EventEmitter
+
+  export type Stream = {
+    sink: (source: AsyncIterable<Uint8Array>) => Promise<void>
+    source: AsyncIterable<Uint8Array>
+  }
+
+  export interface Connection {
+    localAddr: Multiaddr
+    remoteAddr: Multiaddr
+    localPeer: PeerId
+    remotePeer: PeerId
+    newStream(
+      protocols?: string[]
+    ): Promise<{
+      protocol: string
+      stream: Stream
+    }>
+    close(): Promise<void>
+    getStreams(): any[]
+    stat: {
+      direction: 'outbound' | 'inbound'
+      timeline: {
+        open: number
+        upgraded: number
+      }
+      multiplexer?: any
+      encryption?: any
+    }
+  }
 
   export type PeerInfo = { 
     id: PeerId;
@@ -42,5 +72,7 @@ declare module 'libp2p' {
     on: (str: string, handler: (...props: any[]) => void) => void
     start(): Promise<any>
     stop(): Promise<void>
+
+    connectionManager: EventEmitter
   }
 }

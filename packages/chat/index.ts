@@ -10,7 +10,6 @@ import Hopr from '@hoprnet/hopr-core'
 import { clearString } from '@hoprnet/hopr-utils'
 import chalk from 'chalk'
 import readline from 'readline'
-import PeerInfo from 'peer-info'
 import Multiaddr from 'multiaddr'
 import clear from 'clear'
 import { parseOptions, yesOrNoQuestion } from './utils'
@@ -79,7 +78,7 @@ async function runAsRegularNode() {
 function runAsBootstrapNode() {
   console.log(`... running as bootstrap node!.`)
 
-  node.on('peer:connect', (peer: PeerInfo) => {
+  node.connectionManager.on('peer:connect', (conn: Connection) => {
     console.log(`Incoming connection from ${chalk.blue(peer.id.toB58String())}.`)
   })
 

@@ -26,7 +26,7 @@
     "yarn": ">=1.19.2"
   },
   "dependencies": {
-    "peer-id": "~0.14.2",
+    "peer-id": "0.14.2",
     "multiaddr": "8.0.0",
     "bignumber.js": "^9.0.0",
     "libp2p-crypto": "^0.17.6",
