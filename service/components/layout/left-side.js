@@ -43,14 +43,18 @@ const LeftSide = () => {
             <p>TOP ASSETS</p>
           </div>
         </Link>
-        
-          <div className="menu-item-desktop ">
-            <a target="_blank"  href="https://discord.com/invite/wUSYqpD" rel="noopener noreferrer">
-              <img src="/assets/icons/discord.svg" alt="hopr DISCORD" />
-              <p>DISCORD</p>
-            </a>
-          </div>
-        
+
+        <div className="menu-item-desktop ">
+          <a
+            target="_blank"
+            href="https://discord.com/invite/wUSYqpD"
+            rel="noopener noreferrer"
+          >
+            <img src="/assets/icons/discord.svg" alt="hopr DISCORD" />
+            <p>DISCORD</p>
+          </a>
+        </div>
+
         <Link href="/help">
           <div
             className={
@@ -78,7 +82,7 @@ const LeftSide = () => {
             target="_blank"
           >
             <img src="/assets/icons/twitter.svg" alt="twitter" />
-            <p>#HOPRNetwork</p>
+            <p>#basodino</p>
           </a>
         </div>
       </div>

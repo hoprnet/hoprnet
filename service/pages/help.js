@@ -36,7 +36,7 @@ export default function Help() {
               node. Send 0.02 xDAI to your node. You can get xDAI from ETH on
               xdai.io or ping us on Telegram. In your HOPR node, type myAddress
               to find your node address. Tweet your HOPR node address with the
-              tag #HOPRNetwork and @hoprnet. In your HOPR node, type
+              tag #basodino and @hoprnet. In your HOPR node, type
               includeRecipient and then “y” so the bot can respond. Send the URL
               of your tweet to the CoverBot using the send command:
             </p>
@@ -68,7 +68,7 @@ export default function Help() {
                   target="_blank"
                 >
                   <img src="/assets/icons/twitter.svg" alt="twitter" />
-                  <p>#HOPRNetwork</p>
+                  <p>#basodino</p>
                 </a>
               </div>
             </div>
