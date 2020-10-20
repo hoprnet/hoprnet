@@ -14,7 +14,7 @@ When you receive data to relay from an upstream node, it will be accompanied by 
 You need to redeem any unredeemed tickets before the corresponding payment channel is closed. Every payment channel has a cool-off after closure is initialized to give both parties a chance to complete ticket redemption.
 {% endhint %}
 
-To seem how many tickets you currently have, type:
+To see how many tickets you currently have, type:
 
 ```text
 tickets
