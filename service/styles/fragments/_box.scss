@@ -91,10 +91,11 @@
 
 .box-info {
   p {
-    color: $black;
+    color: #dadada;
     font-size: 1em;
-    font-weight: 200;
+    font-weight: 400; 
     span {
+      color: $black;
       font-size: 0.89em;
       font-weight: 600;
     }
@@ -133,7 +134,7 @@
         }
         &:hover {
           background: #ebebeb;
-          color: #c4c4c4;
+          color: $greyLabel;
           transition: all 350ms ease-in-out;
         }
       }
@@ -166,7 +167,7 @@
       float: left;
       font-weight: 600;
       font-size: 0.89em;
-      color: #c4c4c4;
+      color: $greyLabel;
       cursor: pointer;
       transition: all 350ms ease-in-out;
       span {
@@ -196,6 +197,38 @@
 .box .box-main-area {
   padding: 0 1em;
   overflow: hidden;
+  ol li{
+    line-height: normal;
+    margin-bottom: 0.33em;
+    color: $black;
+    a{
+      text-decoration: none;
+      position: relative;
+      color: #50A8E7;
+      img,span{
+        position: relative;
+        transition: all 450ms ease-in-out;
+      }
+      &::before{
+        background-color: #f7f7f7;
+        content: "";
+        height: 100%;
+        position: absolute;
+        width: 0%;
+        transition: all 350ms ease-in-out;
+      }
+      &:hover{
+        span{
+          font-weight: 600;
+          transition: all 450ms ease-in-out;
+        }
+        &::before{
+          width: 100%;
+          transition: all 350ms ease-in-out;
+        }
+      }
+    }
+  }
   p {
     color: $black;
     font-size: 0.9em;

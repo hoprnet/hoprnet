@@ -2,21 +2,35 @@ import React, { useState, useEffect } from "react";
 import Layout from "../components/layout/layout.js";
 import api from "../utils/api";
 
-export default function TopAssets() {
+export default function HoprAllocation() {
   const [data, setData] = useState(undefined);
   const allNodes = data ? data.nodes.sort((a, b) => b.score - a.score) : [];
 
   const nodes = allNodes.slice(0, allNodes.length > 6 ? 5 : allNodes.length);
-
+  
   useEffect(() => {
     const fetchData = async () => {
       const response = await api.getAllData();
+      
       if (response.data) setData(response.data);
     };
     fetchData();
   }, []);
 
+  const sfn = (key) =>{
+    if (nodes){
+      if(nodes.length){
+        setData(nodes.sort((a, b) => b[key] - a[key]));
+      }
+    }
+  };
+
   const columns = [
+    {
+      title: "score",
+      dataIndex: "score",
+      key: "score",
+    },
     {
       title: "address",
       dataIndex: "address",
@@ -27,16 +41,7 @@ export default function TopAssets() {
       dataIndex: "id",
       key: "id",
     },
-    {
-      title: "score",
-      dataIndex: "score",
-      key: "score",
-    },
-    {
-      title: "tweetId",
-      dataIndex: "tweetId",
-      key: "tweetId",
-    },
+   
     {
       title: "tweetUrl",
       dataIndex: "tweetUrl",
@@ -50,7 +55,7 @@ export default function TopAssets() {
         <div className="box-top-area">
           <div>
             <div className="box-title">
-              <h1>Top Assets</h1>
+              <h1>Hopr Allocation</h1>
             </div>
           </div>
         </div>
@@ -63,7 +68,7 @@ export default function TopAssets() {
                     {columns.map((e, index) => {
                       const { title, key } = e;
                       return (
-                        <th scope="col" key={key}>
+                        <th onClick={() => sfn({key})} scope="col" key={key}>
                           {title}
                         </th>
                       );
@@ -72,14 +77,11 @@ export default function TopAssets() {
                 </thead>
                 <tbody>
                   {nodes.map((item) => {
-                    const { id, address, score, tweetId, tweetUrl } = item;
+                    const { id, address, score,  tweetUrl } = item;
                     return (
                       <tr key={id}>
-                        <td data-label="address">{address}</td>
-                        <td data-label="id">{id}</td>
-                        <td data-type="score" data-label="score">
-                          <span>
-                            {" "}
+                         <td data-type="score" data-label="score">
+                         <span>
                             <img
                               src="/assets/icons/top.svg"
                               alt="hopr Top ASSETS"
@@ -87,7 +89,8 @@ export default function TopAssets() {
                           </span>
                           {score}
                         </td>
-                        <td data-label="tweetId">{tweetId}</td>
+                        <td data-label="address">{address}</td>
+                        <td data-label="id">{id}</td>
                         <td data-label="tweetUrl">
                           <a href={tweetUrl}>
                             <img
