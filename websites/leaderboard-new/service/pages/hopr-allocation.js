@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import Layout from "../components/layout/layout.js";
 import api from "../utils/api";
 
-export default function TopAssets() {
+export default function HoprAllocation() {
   const [data, setData] = useState(undefined);
   const allNodes = data ? data.nodes.sort((a, b) => b.score - a.score) : [];
 
@@ -45,7 +45,7 @@ export default function TopAssets() {
         <div className="box-top-area">
           <div>
             <div className="box-title">
-              <h1>Top Assets</h1>
+              <h1>Hopr Allocation</h1>
             </div>
           </div>
         </div>

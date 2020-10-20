@@ -41,15 +41,15 @@ const LeftSide = () => {
             <p>HOME</p>
           </div>
         </Link>
-        <Link href="/top-assets">
+        <Link href="/hopr-allocation">
           <div
             className={
               "menu-item-desktop " +
-              [router.pathname == "/top-assets" ? "active" : ""]
+              [router.pathname == "/hopr-allocation" ? "active" : ""]
             }
           >
-            <img src="/assets/icons/top.svg" alt="hopr Top ASSETS" />
-            <p>TOP ASSETS</p>
+            <img src="/assets/icons/top.svg" alt="hopr HOPR ALLOCATION" />
+            <p>HOPR <br/> ALLOCATION</p>
           </div>
         </Link>
 
