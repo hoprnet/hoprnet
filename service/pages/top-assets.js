@@ -1,6 +1,25 @@
+import React, { useState, useEffect } from "react";
 import Layout from "../components/layout/layout.js";
+import api from "../utils/api";
 
 export default function TopAssets() {
+  const [data, setData] = useState([]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const response = await api.getAllData();
+      if (response.data) {
+        if (response.data.connected) {
+          let connected = response.data.connected.sort((a, b) => b.score - a.score);
+          if (connected.length) {
+            setData(connected.slice(0, connected.length > 6 ? 5 : connected.length));
+          }
+        }
+      }
+    };
+    fetchData();
+  }, []);
+
   return (
     <Layout>
       <div className="box">
@@ -20,8 +39,24 @@ export default function TopAssets() {
         <div className="box-main-area">
           <div className="box-container-table">
             <div className="box-coming-soon">
-              <img src="/assets/giff/globe_outline.gif" alt="refresh now" />
-              <p>coming soon</p>
+              {data && (
+                <ul>
+                  {data.map(item => {
+                    const { id, address, score, tweetId, tweetUrl } = item;
+                    return (
+                      <li>
+                        <address>
+                          {id}<br/>
+                          {address}<br/>
+                          {score}<br/>
+                          {tweetId}<br/>
+                          {tweetUrl}
+                        </address>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
             </div>
           </div>
         </div>
