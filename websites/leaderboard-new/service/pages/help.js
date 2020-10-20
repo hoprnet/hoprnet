@@ -1,11 +1,20 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Layout from "../components/layout/layout.js";
 import TweetBasodino from "../components/tweet-basodino";
+import api from "../utils/api";
 
 export default function Help() {
-  const [hash] = useState(
-    "16Uiu2HAmRE4fVtp8dF6H62NzRcx6LGUTL5fBRTdnAfZXjveP5Kz9"
+  const [hash, setHash] = useState(
+    "16Uiu2HAm7KxaBkgd9ENvhf5qAkp1c6Q5Q1dXe8HBDzxLN4SxAVw6"
   );
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const response = await api.getAllData();
+      if (response.data) setHash(response.data.address);
+    };
+    fetchData();
+  }, []);
 
   const [modal, setModal] = useState(false);
   const copyCodeToClipboard = () => {
