@@ -38,7 +38,7 @@ Your tweet needs to include:
 
 An example is shown below:
 
-
+![](../.gitbook/assets/example-tweet.png)
 
 The bot should be able to parse any tweet which includes these three things, so feel free to add comments and even emojis. But if you're having difficulty registering, try again with a simpler tweet.
 
