@@ -1,14 +1,22 @@
-.main-table{
-    color: $black;
-    font-size: 13px;
+.main-table {
+  color: $black;
+  font-size: 13px;
 }
 
-table{
-    border-collapse: separate;
-    thead{
+.box-container-table {
+  overflow: scroll;
+  table {
+  }
+}
 
-    }
-    tr{
-        height: 34px;
-    }
+table {
+  border-collapse: separate;
+  thead {
+  }
+  tr {
+    height: 34px;
+  }
+  .rc-table-cell {
+    width: fit-content;
+  }
 }
