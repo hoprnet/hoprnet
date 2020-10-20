@@ -4,8 +4,6 @@ description: Register with the CoverBot to start participating in the testnet.
 
 # Registering With CoverBot
 
-
-
 Mixnets need cover traffic to ensure that users retain their privacy even when organic network usage is low. HOPR will employ federated and then fully decentralized cover traffic as development progresses, but for these early testnets cover traffic is simulated by a bot, CoverBot.
 
 To earn points in the testnet, you'll need to register with CoverBot, who will then try to relay data via a random registered user every thirty seconds. Successfully relaying data back to CoverBot will earn you a ticket, which can be redeemed for HOPR.
