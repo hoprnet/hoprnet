@@ -50,7 +50,7 @@ export default function Help() {
                   target="_blank"
                   rel="noreferrer"
                 >
-                  HOPR Chat
+                 <span> HOPR Chat</span>
                 </a>
                 , which will spin up a HOPR node.
               </li>
@@ -62,11 +62,11 @@ export default function Help() {
                   target="_blank"
                   rel="noreferrer"
                 >
-                  wallet.matic.network
+                  <span>wallet.matic.network</span>
                 </a>{" "}
                 or ping us on{" "}
                 <a href="//t.me/hoprnet" target="_blank" rel="noreferrer">
-                  Telegram
+                  <span>Telegram</span>
                 </a>
                 .
               </li>
@@ -79,7 +79,7 @@ export default function Help() {
                 <strong>#Basodino</strong> and <strong>@hoprnet</strong>.{" "}
                 <TweetBasodino>
                   <img src="/assets/icons/twitter.svg" alt="twitter" />{" "}
-                  #Basodino
+                 <span>#Basodino</span>
                 </TweetBasodino>
               </li>
               <li>
@@ -112,18 +112,18 @@ export default function Help() {
             </ol>
             <hr />
             <div className="twitter-line-menu">
-              <div>
-                <a href="https://twitter.com/hoprnet" target="_blank">
-                  <img src="/assets/icons/twitter.svg" alt="twitter" />
+              <a className="aux-help-twitter" href="https://twitter.com/hoprnet" target="_blank">
+                <div>
+                 <img
+                    src="/assets/icons/twitter.svg"
+                    alt="twitter"
+                  />
+                </div>
+                 <div>
                   <p>@hoprnet</p>
-                </a>
-              </div>
-              <div>
-                <TweetBasodino>
-                  <img src="/assets/icons/twitter.svg" alt="twitter" />{" "}
-                  <p>#Basodino</p>
-                </TweetBasodino>
-              </div>
+                  <span>click here to tweet</span>
+                </div> 
+              </a>
             </div>
           </div>
         </div>

@@ -105,3 +105,44 @@ hr.hr-alert {
     }
   }
 }
+
+
+//
+
+a.aux-help-twitter{
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  p,span{
+    margin: 0;
+    padding: 0;
+  }
+  p{
+    line-height: normal!important;
+    color: #50A8E7!important;
+    transition: all 350ms ease-in-out;
+  }
+  span{
+    font-size: 13px;
+    font-weight: 400;
+    letter-spacing: 0.5px;
+    color: $black;
+    transition: all 350ms ease-in-out;
+  }
+  &:hover{
+    p{
+      color: $black!important;
+      transition: all 350ms ease-in-out;
+    }
+    span{
+
+      color: #50A8E7;
+      transition: all 350ms ease-in-out;
+    }
+  }
+  &>div{
+    &:first-child{
+      margin-right: 1em;
+    }
+  }
+}
