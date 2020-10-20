@@ -4,7 +4,7 @@ on:
   push:
     branches: ['**']
     paths:
-      - '.github/workflows/*-leaderboard-new.yml'
+      - '.github/workflows/*-leaderboard.yml'
       - 'websites/leaderboard-new/**'
 
 # currently, the vercel project is looking into the root folder
@@ -19,7 +19,8 @@ jobs:
       - uses: actions/checkout@v1
       - name: Vercel Action (preview)
         uses: amondnet/vercel-action@77cb0ce3642a451f7f18d63821c0e26f7adead9a
-        if: github.ref != 'refs/heads/master'
+        # if: github.ref != 'refs/heads/master'
+        if: startsWith(github.ref, 'refs/heads/release/') !== true
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
@@ -29,7 +30,8 @@ jobs:
           github-comment: true
       - name: Vercel Action (production)
         uses: amondnet/vercel-action@77cb0ce3642a451f7f18d63821c0e26f7adead9a
-        if: github.ref == 'refs/heads/master'
+        # if: github.ref == 'refs/heads/master'
+        if: startsWith(github.ref, 'refs/heads/release/')
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
