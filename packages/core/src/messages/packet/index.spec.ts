@@ -157,7 +157,9 @@ describe('test packet composition and decomposition', function () {
               gte: Buffer.from(
                 nodes[i]._dbKeys.AcknowledgedTickets(Buffer.alloc(ACKNOWLEDGED_TICKET_INDEX_LENGTH, 0x00))
               ),
-              lt: Buffer.from(nodes[i]._dbKeys.AcknowledgedTickets(Buffer.alloc(ACKNOWLEDGED_TICKET_INDEX_LENGTH, 0xff)))
+              lt: Buffer.from(
+                nodes[i]._dbKeys.AcknowledgedTickets(Buffer.alloc(ACKNOWLEDGED_TICKET_INDEX_LENGTH, 0xff))
+              )
             })
             .on('data', (data: Buffer) => {
               const acknowledged = nodes[i].paymentChannels.types.AcknowledgedTicket.create(nodes[i].paymentChannels)

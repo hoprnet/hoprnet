@@ -35,7 +35,7 @@ export default class CloseChannel extends AbstractCommand {
     }
 
     try {
-      const {status, receipt} = await this.node.closeChannel(peerId)
+      const { status, receipt } = await this.node.closeChannel(peerId)
 
       if (status === 'PENDING') {
         return `${chalk.green(`Closing channel, receipt: ${styleValue(receipt, 'hash')}`)}}.`

@@ -30,27 +30,26 @@ describe('test crawler', function () {
     options?: { timeoutIntentionally: boolean },
     addr = '/ip4/0.0.0.0/tcp/0'
   ): Promise<Mocks> {
-    const node = (await libp2p.create({
+    const node = await libp2p.create({
       peerInfo: await PeerInfo.create(await PeerId.create({ keyType: 'secp256k1' })),
       modules: {
         transport: [TCP],
         streamMuxer: [MPLEX],
         connEncryption: [SECIO]
       }
-    })) 
+    })
 
     node.peerInfo.multiaddrs.add(Multiaddr(addr))
 
     await node.start()
 
-
-    const interactions = ({
+    const interactions = {
       network: {
         crawler: new CrawlerInteraction(node, (conn) => {
-          return network.crawler.handleCrawlRequest(conn) 
+          return network.crawler.handleCrawlRequest(conn)
         })
       }
-    }) as Interactions<any>
+    } as Interactions<any>
 
     const network = new Network(node, interactions, {} as any, { crawl: options })
     node.on('peer:connect', (peerInfo: PeerInfo) => node.peerStore.put(peerInfo))
