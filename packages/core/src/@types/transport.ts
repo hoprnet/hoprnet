@@ -1,14 +1,13 @@
 /// <reference path="../@types/libp2p.ts" />
 import { Connection, Stream } from 'libp2p'
 import type PeerId from 'peer-id'
-import type PeerInfo from 'peer-info'
 import type Multiaddr from 'multiaddr'
 import type { EventEmitter } from 'events'
 import type { Server } from 'net'
 
 export interface DialOptions {
   signal?: AbortSignal
-  relay?: PeerId | PeerInfo
+  relay?: PeerId 
 }
 
 export type Handler = {
