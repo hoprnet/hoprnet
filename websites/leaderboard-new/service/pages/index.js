@@ -2,9 +2,42 @@ import React, { useState, useEffect } from "react";
 import Layout from "../components/layout/layout.js";
 import api from "../utils/api";
 
+const columnsDefaults = [
+  {
+    title: "online",
+    dataIndex: "online",
+    key: "online",
+    className: 'sortBy asc',
+  },
+  {
+    title: "address",
+    dataIndex: "address",
+    key: "address",
+    className: 'sortBy',
+  },
+  {
+    title: "id",
+    dataIndex: "id",
+    key: "id",
+    className: 'sortBy ',
+  },
+  {
+    title: "score",
+    dataIndex: "score",
+    key: "score",
+    className: 'sortBy',
+  },
+  {
+    title: "tweetUrl",
+    dataIndex: "tweetUrl",
+    key: "tweetUrl",
+  },
+];
+
 export default function Home() {
   const [data, setData] = useState(undefined);
-  console.log("data", data);
+  const [columns, setColumns] = useState(columnsDefaults);
+
   const nodesVerified = data ? data.connected.length : 0;
   const nodesRegistered = data ? data.nodes.length : 0;
   const nodesConnected = data ? data.connectedNodes : 0;
@@ -18,33 +51,48 @@ export default function Home() {
     fetchData();
   }, []);
 
-  const columns = [
-    {
-      title: "online",
-      dataIndex: "online",
-      key: "online",
-    },
-    {
-      title: "address",
-      dataIndex: "address",
-      key: "address",
-    },
-    {
-      title: "id",
-      dataIndex: "id",
-      key: "id",
-    },
-    {
-      title: "score",
-      dataIndex: "score",
-      key: "score",
-    },
-    {
-      title: "tweetUrl",
-      dataIndex: "tweetUrl",
-      key: "tweetUrl",
-    },
-  ];
+  const getIntBase = key => {
+    switch(key) {
+      case 'address':
+        return 16;
+      case 'id':
+        return 36;
+      default:
+        return 10;
+    }
+  };
+
+  const onClickSort = key => {
+    let sSort = '',
+      aColumns = [...columns];
+
+    aColumns.map(item => {
+      if (item.key === key) {
+        sSort = item.className.replace('sortBy', '').trim();
+        sSort = sSort === 'asc' ? 'desc' : 'asc';
+      }
+      if (item.className !== undefined) {
+        item.className = 'sortBy'
+      }
+    });
+    aColumns.find(item => item.key === key).className = 'sortBy ' + sSort;
+
+    let aNew = { ...data };
+    aNew.nodes = aNew.nodes.sort((a, b) => {
+      let iBase = getIntBase(key),
+        convertA = parseInt(a[key], iBase),
+        convertB = parseInt(b[key], iBase)
+
+      if (sSort === 'asc') {
+        return convertA - convertB;
+      } else {
+        return convertB - convertA;
+      }
+    });
+
+    setData(aNew);
+    setColumns(aColumns);
+  };
 
   return (
     <Layout>
@@ -86,10 +134,15 @@ export default function Home() {
               <table id="date">
                 <thead>
                   <tr>
-                    {columns.map((e) => {
-                      const { title, key } = e;
+                    {columns.map(e => {
+                      const { title, key, className } = e;
                       return (
-                        <th scope="col" key={key}>
+                        <th
+                          className={className}
+                          onClick={className ? () => onClickSort(key) : ''}
+                          scope="col"
+                          key={key}
+                        >
                           {title}
                         </th>
                       );

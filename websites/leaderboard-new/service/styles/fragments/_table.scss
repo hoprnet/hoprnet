@@ -22,8 +22,26 @@ table thead tr {
     font-size: 1em;
     text-transform: lowercase;
     color: #cbcccf;
+    cursor: pointer;
+    transition: all 350ms ease-in-out;
+    &.asc{
+      color: $blue;
+      font-weight: 600;
+      &::before{
+        content: "▾";
+        margin-right: 0.4em;
+        color: $blue;
+        
+      }
+    }
+    &:hover{
+      color: $blue;
+      transition: all 350ms ease-in-out;
+    }
   }
 }
+
+
 
 table caption {
   font-size: 1.5em;
@@ -70,7 +88,7 @@ table td {
 
 table th {
   font-size: 0.85em;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.005em;
   text-transform: uppercase;
 }
 

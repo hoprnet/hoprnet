@@ -2,52 +2,93 @@ import React, { useState, useEffect } from "react";
 import Layout from "../components/layout/layout.js";
 import api from "../utils/api";
 
+const columnsDefaults = [
+  {
+    title: "score",
+    dataIndex: "score",
+    key: "score",
+    className: 'sortBy asc',
+  },
+  {
+    title: "address",
+    dataIndex: "address",
+    key: "address",
+    className: 'sortBy',
+  },
+  {
+    title: "id",
+    dataIndex: "id",
+    key: "id",
+    className: 'sortBy',
+  },
+  {
+    title: "tweetUrl",
+    dataIndex: "tweetUrl",
+    key: "tweetUrl",
+  },
+];
+
 export default function HoprAllocation() {
   const [data, setData] = useState(undefined);
-  const allNodes = data ? data.nodes.sort((a, b) => b.score - a.score) : [];
+  const [columns, setColumns] = useState(columnsDefaults);
 
-  const nodes = allNodes.slice(0, allNodes.length > 6 ? 5 : allNodes.length);
-  
   useEffect(() => {
     const fetchData = async () => {
       const response = await api.getAllData();
-      
-      if (response.data) setData(response.data);
+      if (response.data) {
+        const allNodes = response.data.nodes.sort((a, b) => b.score - a.score),
+          nodes = allNodes.slice(0, allNodes.length > 6 ? 5 : allNodes.length);
+
+        setData(nodes);
+      };
     };
+
     fetchData();
   }, []);
 
-  const sfn = (key) =>{
-    if (nodes){
-      if(nodes.length){
-        setData(nodes.sort((a, b) => b[key] - a[key]));
-      }
+  const getIntBase = key => {
+    switch(key) {
+      case 'address':
+        return 16;
+      case 'id':
+        return 36;
+      default:
+        return 10;
     }
   };
 
-  const columns = [
-    {
-      title: "score",
-      dataIndex: "score",
-      key: "score",
-    },
-    {
-      title: "address",
-      dataIndex: "address",
-      key: "address",
-    },
-    {
-      title: "id",
-      dataIndex: "id",
-      key: "id",
-    },
-   
-    {
-      title: "tweetUrl",
-      dataIndex: "tweetUrl",
-      key: "tweetUrl",
-    },
-  ];
+  const onClickSort = key => {
+    let sSort = '',
+      aColumns = [...columns];
+
+    aColumns.map(item => {
+      if (item.key === key) {
+        sSort = item.className.replace('sortBy', '').trim();
+        sSort = sSort === 'asc' ? 'desc' : 'asc';
+      }
+
+      if (item.className !== undefined) {
+        item.className = 'sortBy'
+      }
+    });
+    aColumns.find(item => item.key === key).className = 'sortBy ' + sSort;
+
+    let aNew = [...data];
+    aNew = aNew.sort((a, b) => {
+      let iBase = getIntBase(key),
+        convertA = parseInt(a[key], iBase),
+        convertB = parseInt(b[key], iBase)
+
+      if (sSort === 'asc') {
+        return convertA - convertB;
+      } else {
+        return convertB - convertA;
+      }
+    });
+
+    setData(aNew);
+    setColumns(aColumns);
+  };
 
   return (
     <Layout>
@@ -61,14 +102,19 @@ export default function HoprAllocation() {
         </div>
         <div className="box-main-area remove-all-padding aux-add-top ">
           <div className="box-container-table">
-            {nodes && (
+            {data && (
               <table id="date">
                 <thead>
                   <tr>
-                    {columns.map((e, index) => {
-                      const { title, key } = e;
+                    {columns.map(e => {
+                      const { title, key, className } = e;
                       return (
-                        <th onClick={() => sfn({key})} scope="col" key={key}>
+                        <th
+                          className={className}
+                          onClick={className ? () => onClickSort(key) : ''}
+                          scope="col"
+                          key={key}
+                        >
                           {title}
                         </th>
                       );
@@ -76,7 +122,7 @@ export default function HoprAllocation() {
                   </tr>
                 </thead>
                 <tbody>
-                  {nodes.map((item) => {
+                  {data.map((item) => {
                     const { id, address, score,  tweetUrl } = item;
                     return (
                       <tr key={id}>
