@@ -2,6 +2,9 @@ import React, { useState, useEffect } from "react";
 import Layout from "../components/layout/layout.js";
 import api from "../utils/api";
 
+// how many nodes to display
+const MAX_NODES = 200
+
 const columnsDefaults = [
   {
     title: "score",
@@ -38,7 +41,7 @@ export default function HoprAllocation() {
       const response = await api.getAllData();
       if (response.data) {
         const allNodes = response.data.nodes.sort((a, b) => b.score - a.score),
-          nodes = allNodes.slice(0, allNodes.length > 6 ? 5 : allNodes.length);
+          nodes = allNodes.slice(0, allNodes.length >= MAX_NODES ? MAX_NODES : allNodes.length);
 
         setData(nodes);
       };
