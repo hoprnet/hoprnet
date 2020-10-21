@@ -158,3 +158,19 @@ table th {
     border-bottom: 0;
   }
 }
+
+// 
+.table-link-on{
+  text-decoration: none;
+  background: #fff;
+  border: 0.5px solid #ebebeb;
+  border-radius: 4px;
+  padding: 0.27em;
+  color:$black;
+  line-height: normal;
+  transition: all 350ms ease-in-out;
+  &:hover{
+    color: $colorLink;
+    transition: all 350ms ease-in-out;
+  }
+}

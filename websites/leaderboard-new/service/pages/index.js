@@ -86,9 +86,9 @@ export default function Home() {
         convertB = parseInt(b[key], iBase)
 
       if (sSort === 'asc') {
-        return convertA - convertB;
-      } else {
         return convertB - convertA;
+      } else {
+        return convertA - convertB;
       }
     });
 
@@ -134,6 +134,7 @@ export default function Home() {
           <div className="box-container-table">
             {nodes && (
               <table id="date">
+                <colgroup span="4" class="columns"></colgroup>
                 <thead>
                   <tr>
                     {columns.map(e => {
@@ -157,8 +158,17 @@ export default function Home() {
                     return (
                       <tr key={id}>
                         <td className="icon-help-online" data-label="online"><div className={[online ? "online" : "offline"]}></div></td>
-                        <td data-label="address">{address}</td>
-                        <td data-label="id">{id}</td>
+                        <td data-label="address">
+                          <a  
+                          className="table-link-on"
+                          target="_blank"
+                          href={'https://explorer.matic.network/address/'+address}
+                          rel="noopener noreferrer">{address}
+                          </a>  
+                        </td>
+                        <td data-label="id">
+                        {id}
+                        </td>
                         <td data-type="score" data-label="score">
                           {score}
                         </td>

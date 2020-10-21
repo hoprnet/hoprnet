@@ -10,7 +10,6 @@ export async function getData(table) {
       return { data: null, status: 500 };
     }
   } catch (e) {
-    console.log(e);
     return { data: null, status: 500 };
   }
 }
