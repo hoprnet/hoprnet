@@ -450,6 +450,7 @@ class RelayConnection implements MultiaddrConnection {
         streamSwitched = false
         currentSource = tmpSource
         streamDone = false
+        this._switchPromise = Defer<Stream['source']>()
         switchPromise = this._switchPromise.promise.then(switchFunction)
         log(`RelayConnection: sink migrated`, currentSource)
       }
