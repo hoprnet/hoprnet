@@ -132,7 +132,7 @@ class RelayContext {
           const [PREFIX, SUFFIX] = [received.subarray(0, 1), received.subarray(1)]
 
           if (![RELAY_STATUS_PREFIX[0], RELAY_WEBRTC_PREFIX[0], RELAY_PAYLOAD_PREFIX[0]].includes(PREFIX[0])) {
-            error(`Invalid prefix: Got <${u8aToHex(PREFIX)}>`)
+            error(`Invalid prefix: Got <${u8aToHex(PREFIX)}>. Dropping message in relayContext.`)
             if (!sourceDone) {
               sourcePromise = currentSource.next().then(sourceFunction)
             }
@@ -263,6 +263,7 @@ class RelayContext {
 
           sourcePromise = source.next().then(sourceFunction)
         } else if (statusMessageAvailable) {
+          statusMessageAvailable = false
           while (this._statusMessages.length > 0) {
             yield this._statusMessages.shift()
           }
