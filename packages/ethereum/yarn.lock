@@ -183,6 +183,7 @@
     "@ethersproject/rlp" "^5.0.3"
     "@ethersproject/signing-key" "^5.0.4"
 
+<<<<<<< HEAD
 "@hoprnet/hopr-demo-seeds@1.24.0-alpha.0":
   version "1.24.0-alpha.0"
   resolved "https://registry.yarnpkg.com/@hoprnet/hopr-demo-seeds/-/hopr-demo-seeds-1.24.0-alpha.0.tgz#8f9548b63fd8e530b9a25c50de56eeb0aa2e67ca"
@@ -201,6 +202,26 @@
   version "1.24.0-alpha.0"
   resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.24.0-alpha.0.tgz#cf43f2d3d29b38411d10ef63fa62d1c013925bea"
   integrity sha512-EL176LrIaj7Xmk8ln6Gw0Cb0oUJtnWAo+sWXSTsSeSCIvZuHDArL6Z1CVIrtWtdiafmWRZFdSNjfzfFw89lCNw==
+=======
+"@hoprnet/hopr-demo-seeds@1.25.0-alpha.0":
+  version "1.25.0-alpha.0"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-demo-seeds/-/hopr-demo-seeds-1.25.0-alpha.0.tgz#a4eb87d18c189068a2d0e6b0736f9f2afd739369"
+  integrity sha512-b/VSLL41PpXvn5YcuXHvMyimLwWGAeWi1WAsnFsnb2mVKGBTgDAG2awkx+0EsMBXlS577fCymCVj5i2v4P1gXA==
+
+"@hoprnet/hopr-testing@1.25.0-alpha.0":
+  version "1.25.0-alpha.0"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-testing/-/hopr-testing-1.25.0-alpha.0.tgz#226e03b474d19370bfc13397b56fd5c4006122b4"
+  integrity sha512-EiJgoYlhkDu4+7qeOlleYzJN+7+uCighf2nfIomv4G8kAxxplrOqFUkmtUKteHoh0QnfKxgeeLSEUfkjkK8f7w==
+  dependencies:
+    "@hoprnet/hopr-demo-seeds" "1.25.0-alpha.0"
+    debug "^4.1.1"
+    ganache-core "^2.12.1"
+
+"@hoprnet/hopr-utils@1.25.0-alpha.0":
+  version "1.25.0-alpha.0"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.25.0-alpha.0.tgz#6448199f1d36c89ae8c3c968929e49b3e5c852db"
+  integrity sha512-JN7Lyh820SAmYDvGpos7VKT28n1VGochZy61HAbGS+p+GH6js19ZlryWMoCFEDjyCy6Tb/nTNbHGMi5kHAYVzg==
+>>>>>>> f08479ba5d588103307c8c9116bfa12f661e1f85
   dependencies:
     bignumber.js "^9.0.0"
     libp2p-crypto "^0.17.9"
@@ -362,9 +383,9 @@
   integrity sha512-x55rtRuNfRO1azmZ30iR0pf0OJ6flQqbax1hJz+Avk1K5fdmOv5cr22s9qFnwTWnS6Bw0jvJEoR0ITsM7cPKtQ==
 
 "@truffle/hdwallet-provider@^1.0.34":
-  version "1.1.0"
-  resolved "https://registry.yarnpkg.com/@truffle/hdwallet-provider/-/hdwallet-provider-1.1.0.tgz#caca30225ee18c69fdd6403b4de23ca316796922"
-  integrity sha512-hblrGs0w/S8Ij7BrmUju6GEK35NWQs2Hxc6SMBrz4chlwd9vcBzMWCGoCtYwYOi2d6o9jOv17+bLk9KNlTZR8g==
+  version "1.1.1"
+  resolved "https://registry.yarnpkg.com/@truffle/hdwallet-provider/-/hdwallet-provider-1.1.1.tgz#951f16cf3ca412c7c0e58efddb0eb0f32b127317"
+  integrity sha512-Gw5lk2dUs6NhLcaF49FuuL3Qv1Setpgr9uUhf7voIS/1OD4ar2CW9Zv7QJiR5m0PD/b8SUqbIckq0evY4Mendg==
   dependencies:
     "@trufflesuite/web3-provider-engine" "15.0.13-1"
     "@types/web3" "^1.0.20"
@@ -513,9 +534,9 @@
     "@types/node" "*"
 
 "@types/chai@^4.1.4", "@types/chai@^4.2.11":
-  version "4.2.13"
-  resolved "https://registry.yarnpkg.com/@types/chai/-/chai-4.2.13.tgz#8a3801f6655179d1803d81e94a2e4aaf317abd16"
-  integrity sha512-o3SGYRlOpvLFpwJA6Sl1UPOwKFEvE4FxTEB/c9XHI2whdnd4kmPVkNLL8gY4vWGBxWWDumzLbKsAhEH5SKn37Q==
+  version "4.2.14"
+  resolved "https://registry.yarnpkg.com/@types/chai/-/chai-4.2.14.tgz#44d2dd0b5de6185089375d976b4ec5caf6861193"
+  integrity sha512-G+ITQPXkwTrslfG5L/BksmbLUA0M1iybEsmCWPqzSxsRRhJZimBKJkoMi8fr/CPygPTj4zO5pJH7I2/cm9M7SQ==
 
 "@types/glob@^7.1.1":
   version "7.1.3"
@@ -3347,15 +3368,7 @@ ethereumjs-abi@0.6.7:
     bn.js "^4.11.8"
     ethereumjs-util "^6.0.0"
 
-ethereumjs-abi@^0.6.8:
-  version "0.6.8"
-  resolved "https://registry.yarnpkg.com/ethereumjs-abi/-/ethereumjs-abi-0.6.8.tgz#71bc152db099f70e62f108b7cdfca1b362c6fcae"
-  integrity sha512-Tx0r/iXI6r+lRsdvkFDlut0N08jWMnKRZ6Gkq+Nmw75lZe4e6o3EkSnkaBP5NF6+m5PTGAr9JP43N3LyeoglsA==
-  dependencies:
-    bn.js "^4.11.8"
-    ethereumjs-util "^6.0.0"
-
-"ethereumjs-abi@git+https://github.com/ethereumjs/ethereumjs-abi.git":
+ethereumjs-abi@^0.6.8, "ethereumjs-abi@git+https://github.com/ethereumjs/ethereumjs-abi.git":
   version "0.6.8"
   resolved "git+https://github.com/ethereumjs/ethereumjs-abi.git#1ce6a1d64235fabe2aaf827fd606def55693508f"
   dependencies:

@@ -45,9 +45,9 @@ interface NetOptions {
   port: number
 }
 
-type OperationSuccess = {status: 'SUCCESS', receipt: string}
-type OperationFailure = {status: 'FAILURE', message: string}
-type OperationError = {status: 'ERROR', error: Error | string}
+type OperationSuccess = { status: 'SUCCESS'; receipt: string }
+type OperationFailure = { status: 'FAILURE'; message: string }
+type OperationError = { status: 'ERROR'; error: Error | string }
 export type OperationStatus = OperationSuccess | OperationFailure | OperationError
 
 export type HoprOptions = {
@@ -72,7 +72,6 @@ export type HoprOptions = {
 const MAX_ITERATIONS_PATH_SELECTION = 2000
 
 class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
-
   // TODO make these actually private - Do not rely on any of these properties!
   public _interactions: Interactions<Chain>
   public _network: Network
@@ -84,7 +83,6 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   public isBootstrapNode: boolean
   public bootstrapServers: Multiaddr[]
   public initializedWithOptions: HoprOptions
-
 
   /**
    * @constructor
@@ -108,11 +106,15 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     }
     this.bootstrapServers = options.bootstrapServers || []
     this.isBootstrapNode = options.bootstrapNode || false
+<<<<<<< HEAD
     
+=======
+
+>>>>>>> f08479ba5d588103307c8c9116bfa12f661e1f85
     this._interactions = new Interactions(
-        this,
-        (conn: Connection) => this._network.crawler.handleCrawlRequest(conn),
-        (remotePeer: PeerId) => this._network.heartbeat.emit('beat', remotePeer)
+      this,
+      (conn: Connection) => this._network.crawler.handleCrawlRequest(conn),
+      (remotePeer: PeerId) => this._network.heartbeat.emit('beat', remotePeer)
     )
     this._network = new Network(this._libp2p, this._interactions, options)
 
@@ -129,7 +131,9 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
    *
    * @param options the parameters
    */
-  public static async create<CoreConnector extends HoprCoreConnector>(options: HoprOptions): Promise<Hopr<CoreConnector>> {
+  public static async create<CoreConnector extends HoprCoreConnector>(
+    options: HoprOptions
+  ): Promise<Hopr<CoreConnector>> {
     const Connector = options.connector ?? HoprCoreEthereum
     const db = Hopr.openDatabase(options, Connector.constants.CHAIN_NAME, Connector.constants.NETWORK)
     const id = await getPeerId(options, db)
@@ -335,27 +339,26 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
    * @param destination PeerId of the node
    * @returns latency
    */
-  public async ping(destination: PeerId): Promise<{info: string, latency: number}> {
+  public async ping(destination: PeerId): Promise<{ info: string; latency: number }> {
     if (!PeerId.isPeerId(destination)) {
       throw Error(`Expecting a non-empty destination.`)
     }
     let info = ''
-    if (!this._network.networkPeers.has(destination)){ 
+    if (!this._network.networkPeers.has(destination)) {
       info = '[Pinging unknown peer]'
     }
-    if (this._network.networkPeers.hasBlacklisted(destination)){
+    if (this._network.networkPeers.hasBlacklisted(destination)) {
       info = '[Ping blacklisted peer]'
     }
     let latency = await this._interactions.network.heartbeat.interact(destination)
-    return {latency, info}
+    return { latency, info }
   }
-
 
   public getConnectedPeers(): PeerId[] {
-    return this._network.networkPeers.peers.map(x => x.id)
+    return this._network.networkPeers.peers.map((x) => x.id)
   }
 
-  public async crawl(filter?: (peer: PeerId) => boolean): Promise<CrawlInfo>{
+  public async crawl(filter?: (peer: PeerId) => boolean): Promise<CrawlInfo> {
     return this._network.crawler.crawl(filter)
   }
 
@@ -419,21 +422,21 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     }
   }
 
-  public async closeChannel(peerId: PeerId): Promise<{receipt: string, status: string}> {
-      const channel = await this.paymentChannels.channel.create(
-        peerId.pubKey.marshal(),
-        async (counterparty: Uint8Array) =>
-          this._interactions.payments.onChainKey.interact(await pubKeyToPeerId(counterparty))
-      )
+  public async closeChannel(peerId: PeerId): Promise<{ receipt: string; status: string }> {
+    const channel = await this.paymentChannels.channel.create(
+      peerId.pubKey.marshal(),
+      async (counterparty: Uint8Array) =>
+        this._interactions.payments.onChainKey.interact(await pubKeyToPeerId(counterparty))
+    )
 
-      const status = await channel.status
+    const status = await channel.status
 
-      if (!(status === 'OPEN' || status === 'PENDING')) {
-        throw new Error('To close a channel, it must be open or pending for closure')
-      }
+    if (!(status === 'OPEN' || status === 'PENDING')) {
+      throw new Error('To close a channel, it must be open or pending for closure')
+    }
 
-      const receipt = await channel.initiateSettlement()
-      return {receipt, status}
+    const receipt = await channel.initiateSettlement()
+    return { receipt, status }
   }
 
   /**

@@ -48,9 +48,8 @@ class NetworkPeers {
 
   // Get a random sample of non-blacklisted peers.
   randomSubset(size: number): PeerId[] {
-    return randomSubset(this.peers, Math.min(size, this.peers.length))
-              .map((e: Entry) => e.id)
-  } 
+    return randomSubset(this.peers, Math.min(size, this.peers.length)).map((e: Entry) => e.id)
+  }
 
   onPeerConnect(peerInfo: PeerInfo) {
     this.push({ id: peerInfo.id, lastSeen: Date.now() })
@@ -92,7 +91,7 @@ class NetworkPeers {
     return this.peers.findIndex((entry: Entry) => entry.id.equals(peer)) >= 0
   }
 
-  hasBlacklisted(peer:PeerId): boolean {
+  hasBlacklisted(peer: PeerId): boolean {
     return this.deletedPeers.findIndex((entry: BlacklistedEntry) => entry.id.equals(peer)) >= 0
   }
 
@@ -171,7 +170,7 @@ class NetworkPeers {
     return this.peers.length > 0 && this.top(1)[0].lastSeen < ts
   }
 
-  reset(){
+  reset() {
     this.peers = []
   }
 }

@@ -11,7 +11,7 @@ import { Heartbeat } from './heartbeat'
 import assert from 'assert'
 import Multiaddr from 'multiaddr'
 import { EventEmitter } from 'events'
-import * as constants from '../../constants';
+import * as constants from '../../constants'
 
 // @ts-ignore
 constants.HEARTBEAT_TIMEOUT = 300
@@ -33,7 +33,7 @@ describe('check heartbeat mechanism', function () {
 
     node.interactions = {
       network: {
-        heartbeat: new Heartbeat(node, (remotePeer) => node.network.heartbeat.emit('beat', remotePeer),  options)
+        heartbeat: new Heartbeat(node, (remotePeer) => node.network.heartbeat.emit('beat', remotePeer), options)
       }
     }
 

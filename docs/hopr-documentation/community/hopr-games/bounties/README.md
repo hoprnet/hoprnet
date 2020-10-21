@@ -17,16 +17,16 @@ Although right now the only way to participate in the HOPR Games Bounties is to 
 
 To get started with **HOPR Chat**, please visit our quick start \***\*page to download the** HOPR Chat **binary or follow our advanced setup to compile and run** HOPR Chat\*\* yourself.
 
-{% page-ref page="../../../hopr-chat-tutorial/quickstart.md" %}
+{% page-ref page="../../../getting-started/quickstart.md" %}
 
-{% page-ref page="../../../hopr-chat-tutorial/setup.md" %}
+{% page-ref page="../../../getting-started/setup.md" %}
 
 ## Social Media
 
 Completing the HOPR Games bounties will always require you the following:
 
-* Run a **HOPR Node** \(either via **HOPR Chat** or else\)
-* Engage with HOPR‘s social media presence
+- Run a **HOPR Node** \(either via **HOPR Chat** or else\)
+- Engage with HOPR‘s social media presence
 
 Not only this will help us avoid Sybil Attacks \(i.e. bots or individuals just trying to solve the Bounties via spam attacks\), but also helps us showcase use-cases for the **HOPR Protocol** across social media.
 
@@ -44,16 +44,15 @@ There are a few things different on the xDAI network compared to vanilla Ethereu
 
 Upon successfully complete a HOPR Games bounty, you will receive a URL with pre-paid funds for you to claim. The URL is created by [LinkDrop](https://linkdrop.io/), and looks similar to this:
 
-![LinkDrop creates you a claimable link on your browser.](../../../.gitbook/assets/image%20%2817%29%20%282%29%20%281%29%20%281%29%20%281%29.png)
+![LinkDrop creates you a claimable link on your browser.](../../../.gitbook/assets/image%20%2817%29%20%282%29%20%281%29.png)
 
 ## Timeframes & Support
 
 Bounties are usually launched on a **bi-weekly basis**, and we try to support multiple timezones whenever possible. All our bounties will be shared over our social media channels, and you can reach the HOPR Association team members via these same channels to get some support.
 
-* Twitter - [https://twitter.com/hoprnet](https://twitter.com/hoprnet)
-* Telegram - [https://t.me/hoprnet](https://t.me/hoprnet)
-* Medium - [https://medium.com/hoprnet](https://medium.com/hoprnet)
-* Reddit - [https://www.reddit.com/r/HOPR/](https://www.reddit.com/r/HOPR/)
-* Email - [contact@hoprnet.org](mailto:contact@hoprnet.org)
-* Discord - [https://discord.gg/5FWSfq7](https://discord.gg/5FWSfq7)
-
+- Twitter - [https://twitter.com/hoprnet](https://twitter.com/hoprnet)
+- Telegram - [https://t.me/hoprnet](https://t.me/hoprnet)
+- Medium - [https://medium.com/hoprnet](https://medium.com/hoprnet)
+- Reddit - [https://www.reddit.com/r/HOPR/](https://www.reddit.com/r/HOPR/)
+- Email - [contact@hoprnet.org](mailto:contact@hoprnet.org)
+- Discord - [https://discord.gg/5FWSfq7](https://discord.gg/5FWSfq7)
