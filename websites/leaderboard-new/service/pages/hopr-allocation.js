@@ -193,7 +193,7 @@ export default function HoprAllocation() {
                        <td data-label="rank">
                           {rank}
                        </td>
-                       <td data-label="rank">
+                       <td data-label="prize">
                           {prize}
                        </td>
                      </tr>

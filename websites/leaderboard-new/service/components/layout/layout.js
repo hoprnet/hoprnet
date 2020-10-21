@@ -4,6 +4,7 @@ import Head from "next/head";
 import Menu from "../menu/menu";
 import LeftSide from "./left-side";
 import RightSide from "./right-side";
+import CopieParagraph from "../data-view/copie-paragraph";
 import DataBoxCloud from "../data-view/data-box-cloud";
 import DataUpdateKnow from "../data-view/data-update-know";
 import "../../styles/main.scss";
@@ -60,14 +61,7 @@ const Layout = ({ children }) => {
           }
         >
           <div className={[router.pathname != "/" ? "only-desktop-view" : ""]}>
-            <p className="paragraph">
-              Welcome to <span>HOPR Basòdino testnet!</span> Visit HELP in the
-              menu for instructions. Registration is open. CoverBot will begin
-              relaying data on <span>21st Oct</span> at <span>3pm CET</span>.
-              The <span>200</span> highest scorers will win a share of{" "}
-              <span>200,000 HOPR</span>. The testnet will run until{" "}
-              <span>Nov 4th</span>.
-            </p>
+           <CopieParagraph/>
           </div>
         </section>
         {children}

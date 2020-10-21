@@ -7,11 +7,31 @@
         display: flex;
         align-items: center;
         justify-content: flex-start;
+        flex-direction: column;
+        @media (min-width: 767px) {
+            flex-direction: row;
+        }
+    }
+    .area-links-remember{
+        display: flex;
+        width: 100%;
+        justify-content: space-around;
+        @media (min-width: 767px) {
+            width: fit-content;
+        }
     }
     p{
         color: $black!important;
         font-size: 1em!important;
         font-weight: 400!important;
+        letter-spacing: -0.5px!important;
+        text-align: center;
+        line-height: normal;
+        margin-bottom: 0.89em;
+        @media (min-width: 767px) {
+            margin-bottom: 0;
+            text-align:start;
+        }
     }
     a{
         display: flex;
