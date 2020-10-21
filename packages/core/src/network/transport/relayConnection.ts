@@ -90,9 +90,9 @@ class RelayConnection implements MultiaddrConnection {
 
     this.source = this._createSource.call(this)
 
-    this.sink = this._createSink.bind(this)
-
     this._stream.sink(this.sinkFunction())
+
+    this.sink = this._createSink.bind(this)
 
     this.close = (err?: Error): Promise<void> => {
       this._defer.resolve()
@@ -386,6 +386,7 @@ class RelayConnection implements MultiaddrConnection {
           closePromise
         ])
       } else {
+        log(`RelayConnection: streamDone && webRTCdone`, currentSource)
         await Promise.race([
           // prettier-ignore
           statusPromise,
