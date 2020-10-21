@@ -21,22 +21,14 @@ docker pull hopr/chat
 {% endtab %}
 {% endtabs %}
 
-## Version [1.17.0-alpha.73](https://github.com/hoprnet/hoprnet/tree/v1.17.0-alpha.73)
+## Version [1.17.0-alpha.72](https://github.com/hoprnet/hoprnet/tree/v1.17.0-alpha.72)
 
 ### HOPR Chat
 
-- Source Code - [https://github.com/hoprnet/hoprnet/tree/v1.17.0-alpha.73/packages/chat](https://github.com/hoprnet/hoprnet/tree/v1.17.0-alpha.73/packages/chat)
-- Binary - [https://github.com/hoprnet/hopr-chat/releases/tag/v1.17.0-alpha.basodino.rc-3](https://github.com/hoprnet/hopr-chat/releases/tag/v1.17.0-alpha.basodino.rc-3)
-- Docker Image - gcr.io/hoprassociation/hopr-chat:v1.17.0-alpha.basodino.rc-3
+- Source Code - [https://github.com/hoprnet/hoprnet/tree/v1.17.0-alpha.72/packages/chat](https://github.com/hoprnet/hoprnet/tree/v1.17.0-alpha.72/packages/chat)
+- Binary - [https://github.com/hoprnet/hopr-chat/releases/tag/v1.17.0-alpha.basodino.rc-2](https://github.com/hoprnet/hopr-chat/releases/tag/v1.17.0-alpha.basodino.rc-2)
+- Docker Image - gcr.io/hoprassociation/hopr-chat:v1.17.0-alpha.basodino.rc-2
 
 ### HOPRd
 
-- Source Code - [https://github.com/hoprnet/hoprnet/tree/v1.17.0-alpha.73/packages/hoprd](https://github.com/hoprnet/hoprnet/tree/v1.17.0-alpha.73/packages/hoprd)
-
-### Others
-
-- Token - 0x12481c3Ed97b32D94E71C2039DBC44432ADD39a0
-- Randobot - 16Uiu2HAmNtoQri1X4ikUzCqjFQptRSLSVKnVzMmtZiCHCHkdWJr7
-- Coverbot - 16Uiu2HAmHBYFwcBnv51WNLpd91VjTkysQXPVEAv9q9GVNDJN3Wci
-- Bootstrap - 16Uiu2HAmV5PD9zKrNyY6cvCo7WWKXCLze7gGg3sz5XFfEooyaS9x
-- Network - basodino-develop-1-17-0-alpha-73
+- Source Code - [https://github.com/hoprnet/hoprnet/tree/v1.17.0-alpha.72/packages/hoprd](https://github.com/hoprnet/hoprnet/tree/v1.17.0-alpha.72/packages/hoprd)
