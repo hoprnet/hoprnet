@@ -32,13 +32,7 @@ class RelayContext {
   public ping: (ms?: number) => Promise<number>
   public update: (newStream: Stream) => void
 
-  constructor(
-    stream: Stream,
-    private options?: {
-      sendRestartMessage: boolean
-      useRelaySubprotocol: boolean
-    }
-  ) {
+  constructor(stream: Stream) {
     this._switchPromise = Defer<Stream>()
     this._statusMessagePromise = Defer<void>()
     this._statusMessages = []
@@ -49,10 +43,6 @@ class RelayContext {
     this.sink = this._createSink.bind(this)
 
     this.ping = async (ms: number = DEFAULT_PING_TIMEOUT) => {
-      if (this.options != null && !this.options.useRelaySubprotocol) {
-        throw Error(`Cannot use ping without relaySubprotocol`)
-      }
-
       let start = Date.now()
       this._pingResponsePromise = Defer<void>()
 
@@ -137,64 +127,58 @@ class RelayContext {
         sourceReceived = false
         // Does not forward empty messages
         if (sourceMsg != null) {
-          if (this.options == null || this.options.useRelaySubprotocol) {
-            const received = sourceMsg.slice()
+          const received = sourceMsg.slice()
 
-            const [PREFIX, SUFFIX] = [received.subarray(0, 1), received.subarray(1)]
+          const [PREFIX, SUFFIX] = [received.subarray(0, 1), received.subarray(1)]
 
-            if (![RELAY_STATUS_PREFIX[0], RELAY_WEBRTC_PREFIX[0], RELAY_PAYLOAD_PREFIX[0]].includes(PREFIX[0])) {
-              error(`Invalid prefix: Got <${u8aToHex(PREFIX)}>`)
+          if (![RELAY_STATUS_PREFIX[0], RELAY_WEBRTC_PREFIX[0], RELAY_PAYLOAD_PREFIX[0]].includes(PREFIX[0])) {
+            error(`Invalid prefix: Got <${u8aToHex(PREFIX)}>`)
+            if (!sourceDone) {
+              sourcePromise = currentSource.next().then(sourceFunction)
+            }
+            continue
+          }
+
+          if (u8aEquals(PREFIX, RELAY_STATUS_PREFIX)) {
+            if (u8aEquals(SUFFIX, STOP)) {
+              verbose(`STOP relayed`)
+              break
+            } else if (u8aEquals(SUFFIX, RESTART)) {
+              verbose(`RESTART relayed`)
+            } else if (u8aEquals(SUFFIX, PING)) {
+              verbose(`PING received`)
+              this._statusMessages.push(u8aConcat(RELAY_STATUS_PREFIX, PING_RESPONSE))
+
+              let tmpPromise = this._statusMessagePromise
+              this._statusMessagePromise = Defer<void>()
+              tmpPromise.resolve()
+
               if (!sourceDone) {
                 sourcePromise = currentSource.next().then(sourceFunction)
               }
+
+              // Don't forward ping to receiver
               continue
-            }
+            } else if (u8aEquals(SUFFIX, PING_RESPONSE)) {
+              verbose(`PONG received`)
 
-            if (u8aEquals(PREFIX, RELAY_STATUS_PREFIX)) {
-              if (u8aEquals(SUFFIX, STOP)) {
-                verbose(`STOP relayed`)
-                break
-              } else if (u8aEquals(SUFFIX, RESTART)) {
-                verbose(`RESTART relayed`)
-              } else if (u8aEquals(SUFFIX, PING)) {
-                verbose(`PING received`)
-                this._statusMessages.push(u8aConcat(RELAY_STATUS_PREFIX, PING_RESPONSE))
+              this._pingResponsePromise?.resolve()
 
-                let tmpPromise = this._statusMessagePromise
-                this._statusMessagePromise = Defer<void>()
-                tmpPromise.resolve()
-
-                if (!sourceDone) {
-                  sourcePromise = currentSource.next().then(sourceFunction)
-                }
-
-                // Don't forward ping to receiver
-                continue
-              } else if (u8aEquals(SUFFIX, PING_RESPONSE)) {
-                verbose(`PONG received`)
-
-                this._pingResponsePromise?.resolve()
-
-                if (!sourceDone) {
-                  sourcePromise = currentSource.next().then(sourceFunction)
-                }
-
-                // Don't forward pong message to receiver
-                continue
-              } else {
-                error(`received status message`, SUFFIX)
-                //error(`Invalid status message. Got <${u8aToHex(SUFFIX)}>`)
+              if (!sourceDone) {
+                sourcePromise = currentSource.next().then(sourceFunction)
               }
-            }
 
-            //verbose(`relaying ${new TextDecoder().decode(SUFFIX)}`, u8aToHex(received))
-            verbose(`relaying`, SUFFIX)
-            yield received
-          } else {
-            //verbose(`forwarding ${new TextDecoder().decode(sourceMsg.slice())}`)
-            verbose(`forwarding`, sourceMsg)
-            yield sourceMsg
+              // Don't forward pong message to receiver
+              continue
+            } else {
+              error(`received status message`, SUFFIX)
+              //error(`Invalid status message. Got <${u8aToHex(SUFFIX)}>`)
+            }
           }
+
+          //verbose(`relaying ${new TextDecoder().decode(SUFFIX)}`, u8aToHex(received))
+          verbose(`relaying`, SUFFIX)
+          yield received
         } else {
           verbose(`empty message dropped`)
         }
@@ -205,14 +189,13 @@ class RelayContext {
       } else if (streamSwitched) {
         streamSwitched = false
         // @TODO replace this by a mutex
-        await new Promise((resolve) => setTimeout(resolve, 100))
+        // await new Promise((resolve) => setTimeout(resolve, 100))
         sourceDone = false
         currentSource = tmpSource
         switchPromise = this._switchPromise.promise.then(switchFunction)
         verbose(`################### streamSwitched ###################`)
-        if (this.options == null || this.options.sendRestartMessage) {
-          yield u8aConcat(RELAY_STATUS_PREFIX, RESTART)
-        }
+        yield u8aConcat(RELAY_STATUS_PREFIX, RESTART)
+
         sourcePromise = currentSource.next().then(sourceFunction)
       }
     }
@@ -280,11 +263,10 @@ class RelayContext {
 
           sourcePromise = source.next().then(sourceFunction)
         } else if (statusMessageAvailable) {
-          log(`statusPromise`, this._statusMessagePromise)
-          log(`sinking status messages`, this._statusMessages)
           while (this._statusMessages.length > 0) {
             yield this._statusMessages.shift()
           }
+
           statusPromise = this._statusMessagePromise.promise.then(statusSourceFunction)
         } else if (streamSwitched) {
           break

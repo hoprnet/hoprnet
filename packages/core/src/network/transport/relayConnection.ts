@@ -2,7 +2,15 @@ import Multiaddr from 'multiaddr'
 import BL from 'bl'
 import { MultiaddrConnection, Stream } from '../../@types/transport'
 import Defer, { DeferredPromise } from 'p-defer'
-import { RELAY_PAYLOAD_PREFIX, RELAY_STATUS_PREFIX, RELAY_WEBRTC_PREFIX, RESTART, STOP } from './constants'
+import {
+  RELAY_PAYLOAD_PREFIX,
+  RELAY_STATUS_PREFIX,
+  RELAY_WEBRTC_PREFIX,
+  RESTART,
+  STOP,
+  PING,
+  PING_RESPONSE
+} from './constants'
 import { u8aConcat, u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
 
 import type { Instance as SimplePeer } from 'simple-peer'
@@ -19,6 +27,11 @@ class RelayConnection implements MultiaddrConnection {
   private _stream: Stream
   private _destroyed: boolean
   private _sinkTriggered: boolean
+
+  private _switchPromise: DeferredPromise<Stream['source']>
+  private _statusMessagePromise: DeferredPromise<void>
+  private _statusMessages: Uint8Array[]
+
   private _onReconnect: (relayConn: MultiaddrConnection) => Promise<void>
 
   private webRTC: SimplePeer
@@ -55,6 +68,10 @@ class RelayConnection implements MultiaddrConnection {
 
     this._defer = Defer()
 
+    this._switchPromise = Defer<Stream['source']>()
+    this._statusMessagePromise = Defer<void>()
+    this._statusMessages = []
+
     this._destroyed = false
     this._sinkTriggered = false
 
@@ -71,6 +88,8 @@ class RelayConnection implements MultiaddrConnection {
 
     this.sink = this._createSink.bind(this)
 
+    this._stream.sink(this.sinkFunction())
+
     this.close = (err?: Error): Promise<void> => {
       this._defer.resolve()
 
@@ -81,17 +100,26 @@ class RelayConnection implements MultiaddrConnection {
   }
 
   private async *_createSource() {
-    let promiseDone = false
+    let streamClosed = false
 
-    const promise = this._defer.promise.then(() => {
-      promiseDone = true
+    const closePromise = this._defer.promise.then(() => {
+      streamClosed = true
     })
 
     let streamResolved = false
     let streamMsg: Uint8Array | void
     let streamDone = false
 
-    function streamSourceFunction({ done, value }: { done?: boolean; value?: Uint8Array | void }) {
+    let currentSource = this._stream.source
+
+    let streamSwitched = false
+
+    function switchFunction() {
+      streamSwitched = true
+    }
+
+    let switchPromise = this._switchPromise.promise.then(switchFunction)
+    function sourceFunction({ done, value }: { done?: boolean; value?: Uint8Array | void }) {
       streamResolved = true
       streamMsg = value
 
@@ -102,14 +130,19 @@ class RelayConnection implements MultiaddrConnection {
 
     let __reconnectCounter = 0
 
-    let streamPromise = this._stream.source.next().then(streamSourceFunction)
+    let streamPromise = currentSource.next().then(sourceFunction)
 
     while (true) {
-      await Promise.race([
-        // prettier-ignore
-        streamPromise,
-        promise
-      ])
+      if (!streamDone) {
+        await Promise.race([
+          // prettier-ignore
+          streamPromise,
+          switchPromise,
+          closePromise
+        ])
+      } else {
+        await switchPromise
+      }
 
       if (streamResolved) {
         streamResolved = false
@@ -120,14 +153,14 @@ class RelayConnection implements MultiaddrConnection {
           const [PREFIX, SUFFIX] = [received.subarray(0, 1), received.subarray(1)]
 
           if (u8aEquals(PREFIX, RELAY_PAYLOAD_PREFIX)) {
-            if (streamDone || promiseDone) {
+            if (streamDone || streamClosed) {
               this._destroyed = true
               return SUFFIX
             } else {
               yield SUFFIX
             }
           } else if (u8aEquals(PREFIX, RELAY_STATUS_PREFIX)) {
-            if (u8aEquals(SUFFIX, STOP) || streamDone || promiseDone) {
+            if (u8aEquals(SUFFIX, STOP)) {
               this._destroyed = true
               return
             } else if (u8aEquals(SUFFIX, RESTART)) {
@@ -137,6 +170,20 @@ class RelayConnection implements MultiaddrConnection {
               await new Promise((resolve) => setTimeout(resolve, 100))
               yield
               log(`RESTART received, reconnectReceived: ${__reconnectCounter++}`)
+            } else if (u8aEquals(SUFFIX, PING)) {
+              log(`PING received`)
+              this._statusMessages.push(u8aConcat(RELAY_STATUS_PREFIX, PING_RESPONSE))
+
+              let tmpPromise = this._statusMessagePromise
+              this._statusMessagePromise = Defer<void>()
+              tmpPromise.resolve()
+
+              if (!streamDone) {
+                streamPromise = currentSource.next().then(sourceFunction)
+              }
+
+              // Don't forward ping to receiver
+              continue
             } else {
               error(`Received invalid status message ${u8aToHex(SUFFIX || new Uint8Array([]))}. Dropping message.`)
             }
@@ -147,9 +194,12 @@ class RelayConnection implements MultiaddrConnection {
             error(`Received invalid prefix <${u8aToHex(PREFIX || new Uint8Array([]))}. Dropping message.`)
           }
 
-          streamPromise = this._stream.source.next().then(streamSourceFunction)
+          streamPromise = currentSource.next().then(sourceFunction)
         }
-      } else if (promiseDone || streamDone) {
+      } else if (streamSwitched) {
+        log(`################### streamSwitched relayConnection ###################`)
+        break
+      } else if (streamClosed || streamDone) {
         if (!this._destroyed) {
           if (!this._sinkTriggered) {
             this._stream.sink(
@@ -166,149 +216,228 @@ class RelayConnection implements MultiaddrConnection {
   }
 
   private async _createSink(source: Stream['source']) {
+    let tmpPromise = this._switchPromise
+    this._switchPromise = Defer<Stream['source']>()
+    tmpPromise.resolve(source)
+
     this._sinkTriggered = true
+  }
 
-    return this._stream.sink(
-      async function* (this: RelayConnection) {
-        let promiseDone = false
+  private async *getWebRTCStream(this: RelayConnection) {
+    let defer = Defer<void>()
+    let waiting = false
+    const webRTCmessages: Uint8Array[] = []
+    let done = false
+    function onSignal(msg: any) {
+      webRTCmessages.push(new TextEncoder().encode(JSON.stringify(msg)))
+      if (waiting) {
+        waiting = false
+        let tmpPromise = defer
+        defer = Defer<void>()
+        tmpPromise.resolve()
+      }
+    }
+    this.webRTC.on('signal', onSignal)
 
-        let streamResolved = false
-        let streamDone = false
-        let streamMsg: Uint8Array | void
+    this.webRTC.once('connect', () => {
+      done = true
+      this.webRTC.removeListener('signal', onSignal)
+      defer.resolve()
+    })
 
-        let webRTCresolved = false
-        let webRTCdone = this.webRTC == null
-        let webRTCmsg: Uint8Array | void
+    while (!done) {
+      while (webRTCmessages.length > 0) {
+        yield webRTCmessages.shift()
+      }
 
-        function streamSourceFunction({ done, value }: { done?: boolean; value?: Uint8Array | void }) {
-          streamResolved = true
-          streamMsg = value
+      if (done) {
+        break
+      }
 
-          if (done) {
-            streamDone = true
-          }
+      waiting = true
+
+      await defer.promise
+
+      if (done) {
+        break
+      }
+    }
+  }
+
+  private async *sinkFunction(this: RelayConnection) {
+    let streamResolved = false
+    let streamDone = true
+    let streamMsg: Uint8Array | void
+
+    let webRTCresolved = false
+    let webRTCdone = this.webRTC == null
+    let webRTCmsg: Uint8Array | void
+
+    let streamClosed = false
+
+    const closePromise = this._defer.promise.then(() => {
+      streamClosed = true
+    })
+
+    let currentSource: Stream['source']
+    let tmpSource: Stream['source']
+    let streamPromise: Promise<void>
+
+    function streamSourceFunction({ done, value }: { done?: boolean; value?: Uint8Array | void }) {
+      streamResolved = true
+      streamMsg = value
+
+      if (done) {
+        streamDone = true
+      }
+    }
+
+    function webRTCSourceFunction({ done, value }: { done?: boolean; value: Uint8Array | void }) {
+      webRTCresolved = true
+      webRTCmsg = value
+
+      if (done) {
+        webRTCdone = true
+      }
+    }
+
+    let statusMessageAvailable = this._statusMessages.length > 0
+
+    function statusSourceFunction() {
+      statusMessageAvailable = true
+    }
+
+    let statusPromise =
+      this._statusMessages.length > 0
+        ? Promise.resolve()
+        : this._statusMessagePromise.promise.then(statusSourceFunction)
+
+    let webRTCstream: Stream['source']
+
+    let webRTCPromise: Promise<void>
+
+    let streamSwitched = false
+
+    function switchFunction(newSource: Stream['source']) {
+      streamSwitched = true
+      tmpSource = newSource
+    }
+
+    let switchPromise = this._switchPromise.promise.then(switchFunction)
+
+    while (true) {
+      if (!webRTCdone && !streamDone) {
+        if (streamPromise == null) {
+          streamPromise = currentSource.next().then(streamSourceFunction)
+        }
+        if (webRTCstream == null) {
+          webRTCstream = this.getWebRTCStream.call(this)
+        }
+        if (webRTCPromise == null) {
+          webRTCPromise = webRTCstream.next().then(webRTCSourceFunction)
+        }
+        await Promise.race([
+          // prettier-ignore
+          streamPromise,
+          statusPromise,
+          webRTCPromise,
+          switchPromise,
+          closePromise
+        ])
+      } else if (!webRTCdone) {
+        if (webRTCstream == null) {
+          webRTCstream = this.getWebRTCStream.call(this)
+        }
+        if (webRTCPromise == null) {
+          webRTCPromise = webRTCstream.next().then(webRTCSourceFunction)
+        }
+        await Promise.race([
+          // prettier-ignore
+          statusPromise,
+          webRTCPromise,
+          switchPromise,
+          closePromise
+        ])
+      } else if (!streamDone) {
+        if (streamPromise == null) {
+          streamPromise = currentSource.next().then(streamSourceFunction)
         }
 
-        let streamPromise = source.next().then(streamSourceFunction)
+        await Promise.race([
+          // prettier-ignore
+          streamPromise,
+          statusPromise,
+          switchPromise,
+          closePromise
+        ])
+      } else {
+        await Promise.race([
+          // prettier-ignore
+          statusPromise,
+          switchPromise,
+          closePromise
+        ])
+      }
 
-        function webRTCSourceFunction({ done, value }: { done?: boolean; value: Uint8Array | void }) {
-          webRTCresolved = true
-          webRTCmsg = value
+      if (streamResolved) {
+        streamResolved = false
 
-          if (done) {
-            webRTCdone = true
-          }
+        // Drop empty messages
+        if (streamMsg != null) {
+          yield (new BL([
+            (RELAY_PAYLOAD_PREFIX as unknown) as BL,
+            (streamMsg as unknown) as BL
+          ]) as unknown) as Uint8Array
         }
 
-        let webRTCstream: Stream['source']
+        if (streamClosed || (streamDone && webRTCdone)) {
+          this._destroyed = true
 
-        if (this.webRTC != null) {
-          webRTCstream = async function* (this: RelayConnection) {
-            let defer = Defer<void>()
-            let waiting = false
-            const webRTCmessages: Uint8Array[] = []
-            let done = false
-            function onSignal(msg: any) {
-              webRTCmessages.push(new TextEncoder().encode(JSON.stringify(msg)))
-              if (waiting) {
-                waiting = false
-                let tmpPromise = defer
-                defer = Defer<void>()
-                tmpPromise.resolve()
-              }
-            }
-            this.webRTC.on('signal', onSignal)
+          return u8aConcat(RELAY_STATUS_PREFIX, STOP)
+        } else {
+          streamPromise = currentSource.next().then(streamSourceFunction)
+        }
+      } else if (webRTCresolved) {
+        webRTCresolved = false
 
-            this.webRTC.once('connect', () => {
-              done = true
-              this.webRTC.removeListener('signal', onSignal)
-              defer.resolve()
-            })
-
-            while (!done) {
-              while (webRTCmessages.length > 0) {
-                yield webRTCmessages.shift()
-              }
-
-              if (done) {
-                break
-              }
-
-              waiting = true
-
-              await defer.promise
-
-              if (done) {
-                break
-              }
-            }
-          }.call(this)
+        // Drop empty WebRTC messages
+        if (webRTCmsg != null) {
+          yield (new BL([
+            (RELAY_WEBRTC_PREFIX as unknown) as BL,
+            (webRTCmsg as unknown) as BL
+          ]) as unknown) as Uint8Array
         }
 
-        let webRTCPromise: Promise<void>
+        webRTCPromise = webRTCstream.next().then(webRTCSourceFunction)
+      } else if (streamClosed) {
+        if (!this._destroyed) {
+          this._destroyed = true
 
-        const promise = this._defer.promise.then(() => {
-          promiseDone = true
-        })
-
-        while (true) {
-          if (!webRTCdone && this.webRTC != null) {
-            if (webRTCPromise == null) {
-              webRTCPromise = webRTCstream.next().then(webRTCSourceFunction)
-            }
-            await Promise.race([
-              // prettier-ignore
-              streamPromise,
-              webRTCPromise,
-              promise
-            ])
-          } else {
-            await Promise.race([
-              // prettier-ignore
-              streamPromise,
-              promise
-            ])
-          }
-
-          if (streamResolved && streamMsg != null) {
-            streamResolved = false
-
-            if (promiseDone || (streamDone && webRTCdone)) {
-              if (streamMsg != null) {
-                yield new BL([(RELAY_PAYLOAD_PREFIX as unknown) as BL, (streamMsg as unknown) as BL])
-              }
-
-              this._destroyed = true
-
-              return u8aConcat(RELAY_STATUS_PREFIX, STOP)
-            } else {
-              // Drop empty messages
-              if (streamMsg != null) {
-                yield new BL([(RELAY_PAYLOAD_PREFIX as unknown) as BL, (streamMsg as unknown) as BL])
-              }
-
-              streamPromise = source.next().then(streamSourceFunction)
-            }
-          } else if (webRTCresolved && webRTCmsg != null) {
-            webRTCresolved = false
-            yield new BL([(RELAY_WEBRTC_PREFIX as unknown) as BL, (webRTCmsg as unknown) as BL])
-
-            webRTCPromise = webRTCstream.next().then(webRTCSourceFunction)
-          } else if (promiseDone || (streamDone && webRTCdone)) {
-            if (!this._destroyed) {
-              this._destroyed = true
-
-              return (new BL([
-                (RELAY_STATUS_PREFIX as unknown) as BL,
-                (STOP as unknown) as BL
-              ]) as unknown) as Uint8Array
-            }
-
-            return
-          }
+          return u8aConcat(RELAY_STATUS_PREFIX, STOP)
         }
-      }.call(this)
-    )
+
+        return
+      } else if (statusMessageAvailable) {
+        while (this._statusMessages.length > 0) {
+          yield this._statusMessages.shift()
+        }
+
+        statusPromise = this._statusMessagePromise.promise.then(statusSourceFunction)
+      } else if (streamSwitched) {
+        currentSource = tmpSource
+        streamDone = false
+        switchPromise = this._switchPromise.promise.then(switchFunction)
+      }
+    }
+  }
+
+  switch(): Stream {
+    log(`updating`)
+
+    return {
+      source: this._createSource(),
+      sink: this._createSink.bind(this)
+    } as Stream
   }
 
   get destroyed(): boolean {

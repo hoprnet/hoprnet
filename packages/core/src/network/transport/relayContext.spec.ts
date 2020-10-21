@@ -1,20 +1,23 @@
 import { u8aConcat } from '@hoprnet/hopr-utils'
 import { RELAY_PAYLOAD_PREFIX } from './constants'
 import { RelayContext } from './relayContext'
+import { RelayConnection } from './relayConnection'
 import { Stream } from '../../@types/transport'
 
 const Pair: () => Stream = require('it-pair')
 
 import Debug from 'debug'
+import PeerId from 'peer-id'
 const log = Debug(`hopr-core:transport`)
 
 describe('test overwritable connection', function () {
   let iteration = 0
 
   function getStream({ usePrefix }: { usePrefix: boolean }): Stream {
+    let _iteration = iteration
+
     return {
       source: (async function* () {
-        let _iteration = iteration
         console.log(`source triggered in .spec`)
         let i = 0
         let msg: Uint8Array
@@ -29,106 +32,158 @@ describe('test overwritable connection', function () {
           await new Promise((resolve) => setTimeout(resolve, 100))
         }
 
-        return new TextEncoder().encode(`iteration ${_iteration} - msg no. ${i}`)
+        let lastMsg = new TextEncoder().encode(`iteration ${_iteration} - msg no. ${i}`)
+        if (usePrefix) {
+          return u8aConcat(RELAY_PAYLOAD_PREFIX, lastMsg)
+        } else {
+          return lastMsg
+        }
       })(),
       sink: async (source: Stream['source']) => {
-        let _iteration = iteration
-        console.log(`sinkTriggered`)
         let msg: Uint8Array
         for await (const _msg of source) {
-          if (usePrefix) {
-            msg = _msg.slice(1)
-          } else {
-            msg = _msg.slice()
-          }
+          if (_msg != null) {
+            if (usePrefix) {
+              msg = _msg.slice(1)
+            } else {
+              msg = _msg.slice()
+            }
 
-          console.log(`receiver #${_iteration}`, new TextDecoder().decode(msg))
+            console.log(`receiver #${_iteration}`, new TextDecoder().decode(msg))
+          } else {
+            console.log(`received empty message`, _msg)
+          }
         }
         console.log(`sinkDone`)
       }
     }
   }
 
-  it('should create a connection and overwrite it', async function () {
-    const ctx = new RelayContext(getStream({ usePrefix: false }), {
-      useRelaySubprotocol: false,
-      sendRestartMessage: false
+  // it('should create a connection and overwrite it', async function () {
+  //   const ctx = new RelayContext(getStream({ usePrefix: true }))
+
+  //   let interval = setInterval(
+  //     () =>
+  //       setImmediate(() => {
+  //         ctx.update(getStream({ usePrefix: true }))
+  //         iteration++
+  //       }),
+  //     500
+  //   )
+
+  //   let done = false
+
+  //   setTimeout(() => {
+  //     done = true
+  //     log(`timeout done`)
+  //     clearInterval(interval)
+  //   }, 3000)
+
+  //   let i = 0
+  //   ctx.sink(
+  //     (async function* () {
+  //       await new Promise((resolve) => setTimeout(resolve, 123))
+  //       while (i < 28) {
+  //         yield u8aConcat(RELAY_PAYLOAD_PREFIX, new TextEncoder().encode(`msg from initial party #${i++}`))
+  //         await new Promise((resolve) => setTimeout(resolve, 100))
+  //       }
+  //     })()
+  //   )
+
+  //   // @TODO count messages
+
+  //   for await (const msg of ctx.source) {
+  //     if (done) {
+  //       break
+  //     }
+  //     console.log(`initial source <${new TextDecoder().decode(msg.slice())}>`)
+  //   }
+  // })
+
+  // it('should simulate relay usage', async function () {
+  //   const streamA = getStream({ usePrefix: true })
+  //   const streamB = getStream({ usePrefix: true })
+
+  //   const [self, counterparty] = await Promise.all(
+  //     Array.from({ length: 2 }).map(() => PeerId.create({ keyType: 'secp256k1' }))
+  //   )
+
+  //   const AtoB = Pair()
+  //   const BtoA = Pair()
+
+  //   const ctxA = new RelayConnection({
+  //     stream: {
+  //       sink: AtoB.sink,
+  //       source: BtoA.source
+  //     },
+  //     onReconnect: async () => {},
+  //     self,
+  //     counterparty
+  //   })
+
+  //   const ctxB = new RelayContext({
+  //     sink: BtoA.sink,
+  //     source: AtoB.source
+  //   })
+
+  //   streamA.sink(ctxA.source)
+  //   ctxA.sink(streamA.source)
+
+  //   streamB.sink(ctxB.source)
+  //   ctxB.sink(streamB.source)
+
+  //   console.log(`ping`, await ctxB.ping())
+
+  //   await new Promise((resolve) => setTimeout(resolve, 2000))
+  // })
+
+  it('should simulate a reconnect', async function () {
+    const connectionA = Pair()
+    const connectionB = Pair()
+
+    const ctxSender = new RelayContext({
+      sink: connectionA.sink,
+      source: connectionB.source
     })
 
-    let interval = setInterval(
-      () =>
-        setImmediate(() => {
-          ctx.update(getStream({ usePrefix: false }))
-          iteration++
-        }),
-      500
+    const ctxCounterparty = new RelayContext(getStream({ usePrefix: true }))
+
+    ctxSender.sink(ctxCounterparty.source)
+    ctxCounterparty.sink(ctxSender.source)
+
+    const [self, counterparty] = await Promise.all(
+      Array.from({ length: 2 }).map(() => PeerId.create({ keyType: 'secp256k1' }))
     )
 
-    let done = false
+    iteration++
+    const receiverStream = getStream({ usePrefix: false })
+
+    const ctx = new RelayConnection({
+      stream: {
+        sink: connectionB.sink,
+        source: connectionA.source
+      },
+      self,
+      counterparty,
+      onReconnect: async () => {
+        console.log(`reconnected`)
+        const newStream = ctx.switch()
+
+        iteration++
+        const demoStream = getStream({ usePrefix: false })
+
+        newStream.sink(demoStream.source)
+        demoStream.sink(newStream.source)
+      }
+    })
+
+    ctx.sink(receiverStream.source)
+    receiverStream.sink(ctx.source)
 
     setTimeout(() => {
-      done = true
-      log(`timeout done`)
-      clearInterval(interval)
-    }, 3000)
-
-    let i = 0
-    ctx.sink(
-      (async function* () {
-        await new Promise((resolve) => setTimeout(resolve, 123))
-        while (i < 28) {
-          yield new TextEncoder().encode(`msg from initial party #${i++}`)
-          await new Promise((resolve) => setTimeout(resolve, 100))
-        }
-      })()
-    )
-
-    // @TODO count messages
-
-    for await (const msg of ctx.source) {
-      if (done) {
-        break
-      }
-      console.log(`initial source <${new TextDecoder().decode(msg.slice())}>`)
-    }
-  })
-
-  it('should simulate relay usage', async function () {
-    const streamA = getStream({ usePrefix: true })
-    const streamB = getStream({ usePrefix: true })
-
-    const AtoB = Pair()
-    const BtoA = Pair()
-
-    const ctxA = new RelayContext(
-      {
-        sink: AtoB.sink,
-        source: BtoA.source
-      },
-      {
-        useRelaySubprotocol: true,
-        sendRestartMessage: true
-      }
-    )
-
-    const ctxB = new RelayContext(
-      {
-        sink: BtoA.sink,
-        source: AtoB.source
-      },
-      {
-        useRelaySubprotocol: true,
-        sendRestartMessage: true
-      }
-    )
-
-    streamA.sink(ctxA.source)
-    ctxA.sink(streamA.source)
-
-    streamB.sink(ctxB.source)
-    ctxB.sink(streamB.source)
-
-    console.log(`ping`, await ctxA.ping())
+      iteration++
+      ctxCounterparty.update(getStream({ usePrefix: true }))
+    }, 500)
 
     await new Promise((resolve) => setTimeout(resolve, 2000))
   })
