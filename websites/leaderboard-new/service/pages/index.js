@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 import Layout from "../components/layout/layout.js";
+import BoxRemember from "../components/micro-components/box-remember";
+
 import api from "../utils/api";
 
 const columnsDefaults = [
@@ -175,6 +177,7 @@ export default function Home() {
               </table>
             )}
           </div>
+           <BoxRemember/>
         </div>
       </div>
     </Layout>

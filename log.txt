@@ -1,0 +1,14 @@
+Debugger attached.
+Waiting for the debugger to disconnect...
+internal/modules/cjs/loader.js:896
+  throw err;
+  ^
+
+Error: Cannot find module '/Users/david/Documents/dev/hopn-oficial/hoprnet/chat/lib/index.js'
+    at Function.Module._resolveFilename (internal/modules/cjs/loader.js:893:15)
+    at Function.Module._load (internal/modules/cjs/loader.js:743:27)
+    at Function.executeUserEntryPoint [as runMain] (internal/modules/run_main.js:72:12)
+    at internal/main/run_main_module.js:17:47 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: []
+}

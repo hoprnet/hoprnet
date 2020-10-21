@@ -1,0 +1,44 @@
+.area-remember{
+    background: #fafafa;
+    box-shadow: 1px -2px 5px 0px #0000001f;
+    padding: 1em;
+    border-top: 0.5px solid #e3e3e359;
+    & > div{
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+    }
+    p{
+        color: $black!important;
+        font-size: 1em!important;
+        font-weight: 600!important;
+    }
+    a{
+        display: flex;
+        text-decoration: none;
+        img{
+            width: 1em;
+            margin: 0 0.5em;
+            opacity: 0.5;
+            filter: grayscale(1);
+            transition: all 350ms ease-in-out;
+        }
+        span{
+            color: $black!important; 
+            font-size: 1em!important;
+            font-weight: 600!important;
+            transition: all 450ms ease-in-out;
+        }
+        &:hover{
+            span{
+                color: #50A8E7!important;
+                transition: all 450ms ease-in-out;
+            }
+            img{
+                opacity: 1;
+                filter: grayscale(0);
+                transition: all 350ms ease-in-out;
+            }
+        }
+    }
+}

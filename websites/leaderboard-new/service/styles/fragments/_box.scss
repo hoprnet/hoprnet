@@ -12,7 +12,7 @@
 }
 
 .box {
-  padding: 1em 0;
+  padding: 1em 0 0 0;
   border-radius: 8px;
   background: #fff;
   box-shadow: $shadow;
@@ -219,7 +219,6 @@
       }
       &:hover{
         span{
-          font-weight: 600;
           transition: all 450ms ease-in-out;
         }
         &::before{
@@ -278,6 +277,7 @@
     }
   }
   .twitter-line-menu {
+    margin-bottom: 1em;
     & > div {
       a {
         img {
