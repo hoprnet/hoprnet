@@ -148,24 +148,23 @@ a.aux-help-twitter{
 }
 
 // 
+
 .aux-link-out{
   text-decoration: none;
   color: $black;
   font-weight: 600;
   transition: all 350ms ease-in-out;
-  img{
-    height: 12px;
-    margin: 0 0.05em;
-  }
+  border-bottom: 1px solid $grey;
   span{
     display: inline-flex;
     align-items: center;
     justify-content: center;
   }
   &:hover{
-  transition: all 350ms ease-in-out;
-  color: #50A8E7;
-  }
+    transition: all 350ms ease-in-out;
+    color: #50A8E7;
+    border-bottom: 1px solid transparent;
+    }
 }
 // icon
 .icon-help-online{
