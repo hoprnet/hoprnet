@@ -325,6 +325,7 @@ class RelayConnection implements MultiaddrConnection {
     let streamSwitched = false
 
     function switchFunction(newSource: Stream['source']) {
+      log(`RelayConnection: source received`)
       streamSwitched = true
       tmpSource = newSource
     }
@@ -385,11 +386,14 @@ class RelayConnection implements MultiaddrConnection {
         ])
       }
 
+      log(`RelayConnection: sink after await`)
+
       if (streamResolved) {
         streamResolved = false
 
         // Drop empty messages
         if (streamMsg != null) {
+          log(`RelayConnection: sink yielding`, streamMsg)
           yield (new BL([
             (RELAY_PAYLOAD_PREFIX as unknown) as BL,
             (streamMsg as unknown) as BL
