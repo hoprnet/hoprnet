@@ -9,11 +9,12 @@ import libp2p from 'libp2p'
 import Listener from './listener'
 import { USE_WEBRTC, CODE_P2P } from './constants'
 import Multiaddr from 'multiaddr'
-import PeerInfo from 'peer-info'
-import type { Connection, Upgrader, DialOptions, ConnHandler, MultiaddrConnection } from '../../@types/transport'
+import type { Upgrader, DialOptions, ConnHandler, MultiaddrConnection } from '../../@types/transport'
+import type { Connection } from 'libp2p'
 import chalk from 'chalk'
 import { WebRTCUpgrader } from './webrtc'
 import Relay from './relay'
+import PeerId from 'peer-id'
 
 const log = debug('hopr-core:transport')
 const error = debug('hopr-core:transport:error')
@@ -30,13 +31,14 @@ class TCP {
 
   private _useWebRTC: boolean
   private _upgrader: Upgrader
-  private _peerInfo: PeerInfo
   private relays?: Multiaddr[]
   private stunServers: Multiaddr[]
   private _relay: Relay
   // @ts-ignore
   private _webRTCUpgrader: WebRTCUpgrader
   private connHandler: ConnHandler
+  private id: PeerId
+  private multiaddrs: Multiaddr[]
 
   // ONLY FOR TESTING
   //@ts-ignore
@@ -74,7 +76,7 @@ class TCP {
 
     if (bootstrapServers?.length > 0) {
       this.relays = bootstrapServers.filter(
-        (ma: Multiaddr) => (ma !== undefined && libp2p.peerInfo.id.toB58String() !== ma.getPeerId())
+        (ma: Multiaddr) => (ma !== undefined && libp2p.peerId.toB58String() !== ma.getPeerId())
       )
 
       this.stunServers = []
@@ -98,8 +100,9 @@ class TCP {
     this._answerIntentionallyWithIncorrectMessages = answerIntentionallyWithIncorrectMessages
     this._failIntentionallyOnWebRTC = failIntentionallyOnWebRTC || false
     this._useWebRTC = useWebRTC === undefined ? USE_WEBRTC : useWebRTC
-    this._peerInfo = libp2p.peerInfo
     this._upgrader = upgrader
+    this.id = libp2p.peerId
+    this.multiaddrs = libp2p.multiaddrs
 
     if (this._useWebRTC) {
       this._webRTCUpgrader = new WebRTCUpgrader({ stunServers: this.stunServers })
@@ -193,7 +196,7 @@ class TCP {
   }
 
   async dialDirectly(ma: Multiaddr, options?: DialOptions): Promise<Connection> {
-    log(`[${chalk.blue(this._peerInfo.id.toB58String())}] dialing ${chalk.yellow(ma.toString())} directly`)
+    log(`[${chalk.blue(this.id.toB58String())}] dialing ${chalk.yellow(ma.toString())} directly`)
     const socket = await this._connect(ma, options)
     const maConn = socketToConn(socket, { remoteAddr: ma, signal: options?.signal })
 
@@ -304,7 +307,7 @@ class TCP {
    * @param ma Multiaddr to check
    */
   private isRealisticAddress(ma: Multiaddr): boolean {
-    if (ma.getPeerId() === this._peerInfo.id.toB58String()) {
+    if (ma.getPeerId() === this.id.toB58String()) {
       log('Tried to dial self, skipping.')
       return false
     }
@@ -315,8 +318,7 @@ class TCP {
 
     if (
       ['ip4', 'ip6', 'dns4', 'dns6'].includes(ma.protoNames()[0]) &&
-      this._peerInfo.multiaddrs
-        .toArray()
+      this.multiaddrs
         .map((ma: Multiaddr) => ma.nodeAddress())
         .filter(
           (x) =>
