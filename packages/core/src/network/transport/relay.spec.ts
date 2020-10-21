@@ -107,11 +107,11 @@ describe('should create a socket and connect to it', function () {
     ])
 
     // Make sure that the nodes know each other
-    await Promise.all([sender.dial(relay.peerInfo), counterparty.dial(relay.peerInfo)])
+    await Promise.all([sender.dial(relay.peerId), counterparty.dial(relay.peerId)])
     //@ts-ignore
     let conn = await sender.relay.establishRelayedConnection(
-      Multiaddr(`/p2p/${counterparty.peerInfo.id.toB58String()}`),
-      [relay.peerInfo],
+      Multiaddr(`/p2p/${counterparty.peerId.toB58String()}`),
+      [relay.peerId],
       new WebRTCUpgrader({})
     )
 
@@ -155,11 +155,11 @@ describe('should create a socket and connect to it', function () {
       }
     })
 
-    await counterparty.dial(relay.peerInfo)
+    await counterparty.dial(relay.peerId)
     //@ts-ignore
     conn = await sender.relay.establishRelayedConnection(
-      Multiaddr(`/p2p/${counterparty.peerInfo.id.toB58String()}`),
-      [relay.peerInfo],
+      Multiaddr(`/p2p/${counterparty.peerId.toB58String()}`),
+      [relay.peerId],
       new WebRTCUpgrader({})
     )
 

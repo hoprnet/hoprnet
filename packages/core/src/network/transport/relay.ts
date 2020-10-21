@@ -27,6 +27,7 @@ import Multiaddr from 'multiaddr'
 import PeerInfo from 'peer-info'
 import PeerId from 'peer-id'
 import libp2p from 'libp2p'
+import type { Connection, Stream } from 'libp2p'
 import {
   RELAY_CIRCUIT_TIMEOUT,
   RELAY_REGISTER,
@@ -52,22 +53,20 @@ function toPeerInfo(ma: Multiaddr): PeerInfo {
 
 
 import type {
-  Connection,
   Dialer,
   DialOptions,
   Handler,
   MultiaddrConnection,
   PeerRouting,
   Registrar,
-  Stream
 } from '../../@types/transport'
 
 class Relay {
   private _dialer: Dialer
   private _registrar: Registrar
   private _dht: { peerRouting: PeerRouting } | undefined
-  private _peerInfo: PeerInfo
   private _streams: Map<string, Map<string, RelayContext>>
+  private id: PeerId
 
   private connHandler: (conn: MultiaddrConnection) => void | undefined
 
@@ -77,11 +76,11 @@ class Relay {
     this._registrar = libp2p.registrar
     //@ts-ignore
     this._dht = libp2p._dht
-    this._peerInfo = libp2p.peerInfo
 
     this.connHandler = _connHandler
 
     this._streams = new Map<string, Map<string, RelayContext>>()
+    this.id = libp2p.peerId
 
     // if (webRTCUpgrader != null) {
     //   this._webRTCUpgrader = webRTCUpgrader
@@ -102,7 +101,7 @@ class Relay {
       throw new AbortError()
     }
 
-    const potentialRelays = relays.filter((relay: Multiaddr) => relay.getPeerId() !== this._peerInfo.id.toB58String())
+    const potentialRelays = relays.filter((relay: Multiaddr) => relay.getPeerId() !== this.id.toB58String())
 
     if (potentialRelays.length == 0) {
       throw Error(`Filtered list of relays and there is no one left to establish a connection. `)
@@ -128,7 +127,7 @@ class Relay {
       log(`relayed connection established`)
       return new RelayConnection({
         stream,
-        self: this._peerInfo.id,
+        self: this.id,
         counterparty: destination
         // webRTC: this._webRTCUpgrader?.upgradeOutbound(),
       })
@@ -153,7 +152,7 @@ class Relay {
     this.connHandler?.(
       new RelayConnection({
         stream,
-        self: this._peerInfo.id,
+        self: this.id,
         counterparty
         // webRTC: this._webRTCUpgrader?.upgradeInbound(),
       })
