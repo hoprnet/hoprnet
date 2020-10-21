@@ -131,7 +131,7 @@ async function generateNodeOptions(logs: LogStream): Promise<HoprOptions> {
   }
 
   let options: HoprOptions = {
-    debug: Boolean(process.env.DEBUG),
+    debug: Boolean(process.env.HOPR_DEBUG),
     bootstrapNode: argv.bootstrap,
     network: argv.network,
     bootstrapServers: argv.bootstrap ? [] : [...(await getBootstrapAddresses()).values()],
