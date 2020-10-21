@@ -388,6 +388,8 @@ class RelayConnection implements MultiaddrConnection {
             (RELAY_PAYLOAD_PREFIX as unknown) as BL,
             (streamMsg as unknown) as BL
           ]) as unknown) as Uint8Array
+        } else {
+          log(`dropping empty message in relayConnection`)
         }
 
         if (streamClosed || (streamDone && webRTCdone)) {
@@ -418,12 +420,14 @@ class RelayConnection implements MultiaddrConnection {
 
         return
       } else if (statusMessageAvailable) {
+        statusMessageAvailable = false
         while (this._statusMessages.length > 0) {
           yield this._statusMessages.shift()
         }
 
         statusPromise = this._statusMessagePromise.promise.then(statusSourceFunction)
       } else if (streamSwitched) {
+        streamSwitched = false
         currentSource = tmpSource
         streamDone = false
         switchPromise = this._switchPromise.promise.then(switchFunction)
