@@ -443,6 +443,7 @@ class RelayConnection implements MultiaddrConnection {
         currentSource = tmpSource
         streamDone = false
         switchPromise = this._switchPromise.promise.then(switchFunction)
+        log(`RelayConnection: sink migrated`, currentSource)
       }
     }
   }

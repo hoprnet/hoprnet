@@ -131,6 +131,8 @@ class TCP {
         await conn.close()
       }
 
+      await new Promise(resolve => setTimeout(resolve, 200))
+
       try {
         this._upgrader
           .upgradeInbound(relayConn.switch())
