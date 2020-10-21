@@ -134,7 +134,6 @@ export default function Home() {
           <div className="box-container-table">
             {nodes && (
               <table id="date">
-                <colgroup span="4" class="columns"></colgroup>
                 <thead>
                   <tr>
                     {columns.map(e => {
@@ -142,7 +141,7 @@ export default function Home() {
                       return (
                         <th
                           className={className}
-                          onClick={className ? () => onClickSort(key) : ''}
+                          onClick={className ? () => onClickSort(key) : null}
                           scope="col"
                           key={key}
                         >
