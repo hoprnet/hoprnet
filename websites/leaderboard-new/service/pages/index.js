@@ -163,7 +163,8 @@ export default function Home() {
                           className="table-link-on"
                           target="_blank"
                           href={'https://explorer.matic.network/address/'+address}
-                          rel="noopener noreferrer">{address}
+                          rel="noopener noreferrer">
+                            {address}
                           </a>  
                         </td>
                         <td data-label="id">

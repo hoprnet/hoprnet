@@ -107,8 +107,8 @@
   & > div {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    padding: 0.5em 1em 1em 0.5em;
+    align-items: center;    
+    padding: 0 1em;
     h1 {
       font-size: 1.21em;
       font-weight: 600;
@@ -199,7 +199,7 @@
   overflow: hidden;
   ol li{
     line-height: normal;
-    margin-bottom: 0.33em;
+    margin-bottom: 0.55em;
     color: $black;
     a{
       text-decoration: none;

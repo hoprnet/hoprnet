@@ -207,3 +207,23 @@ a.aux-help-twitter{
     }
   }
 }
+
+// 
+
+.link-top-blog{
+  text-decoration: none;
+  transition: all 350ms ease-in-out;
+  img{
+    width: 14px;
+    opacity: 0.34;
+    transition: all 450ms ease-in-out;
+  }
+  &:hover{
+    transition: all 350ms ease-in-out;
+    color: $colorLink;
+    img{
+      opacity: 1;
+      transition: all 450ms ease-in-out;
+    }
+  }
+}
