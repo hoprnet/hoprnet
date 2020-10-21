@@ -73,6 +73,9 @@ declare module 'libp2p' {
     start(): Promise<any>
     stop(): Promise<void>
 
+    multiaddrs: Multiaddr[]
     connectionManager: EventEmitter
+
+    peerId: PeerId // ATTN: Not documented API
   }
 }
