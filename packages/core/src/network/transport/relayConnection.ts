@@ -135,7 +135,7 @@ class RelayConnection implements MultiaddrConnection {
 
     let __reconnectCounter = 0
 
-    let streamPromise = currentSource.next().then(sourceFunction)
+    let streamPromise = this._stream.source.next().then(sourceFunction)
 
     while (true) {
       if (!streamDone) {
@@ -171,10 +171,11 @@ class RelayConnection implements MultiaddrConnection {
               return
             } else if (u8aEquals(SUFFIX, RESTART)) {
               this._onReconnect(this)
+              log(`RelayConnection: RECONNECT received`)
 
               // @TODO replace timeout by something more meaningful
-              await new Promise((resolve) => setTimeout(resolve, 100))
-              yield
+              // await new Promise((resolve) => setTimeout(resolve, 100))
+
               log(`RESTART received, reconnectReceived: ${__reconnectCounter++}`)
             } else if (u8aEquals(SUFFIX, PING)) {
               log(`PING received`)
@@ -185,7 +186,7 @@ class RelayConnection implements MultiaddrConnection {
               tmpPromise.resolve()
 
               if (!streamDone) {
-                streamPromise = currentSource.next().then(sourceFunction)
+                streamPromise = this._stream.source.next().then(sourceFunction)
               }
 
               // Don't forward ping to receiver
@@ -200,7 +201,7 @@ class RelayConnection implements MultiaddrConnection {
             error(`Received invalid prefix <${u8aToHex(PREFIX || new Uint8Array([]))}. Dropping message.`)
           }
 
-          streamPromise = currentSource.next().then(sourceFunction)
+          streamPromise = this._stream.source.next().then(sourceFunction)
         }
       } else if (streamSwitched) {
         log(`################### streamSwitched relayConnection ###################`)
@@ -407,8 +408,8 @@ class RelayConnection implements MultiaddrConnection {
 
           return u8aConcat(RELAY_STATUS_PREFIX, STOP)
         } else {
-          log(`RelayConnection: sink -> currentSource.next()`)
           streamPromise = currentSource.next().then(streamSourceFunction)
+          log(`RelayConnection: sink -> currentSource.next()`, streamPromise)
         }
       } else if (webRTCresolved) {
         webRTCresolved = false
