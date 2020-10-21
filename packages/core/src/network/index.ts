@@ -7,7 +7,7 @@ import NetworkPeers from './network-peers'
 import Stun from './stun'
 import Multiaddr from 'multiaddr'
 import PeerId from 'peer-id'
-import PeerInfo from 'peer-info'
+import type { Connection } from 'libp2p'
 
 type TestOpts = {
   crawl?: { timeoutIntentionally?: boolean }
@@ -29,7 +29,7 @@ class Network {
     }
 
     const getPeer = (id: PeerId): Multiaddr[] => {
-      let addrs = node.peerStore.addressBook.get(id).multiaddrs.toArray()
+      let addrs = node.peerStore.addressBook.get(id)
       return addrs.map((a) => {
         if (!a.getPeerId()) {
           return a.encapsulate(`/p2p/${id.toB58String()}`)
@@ -49,9 +49,9 @@ class Network {
       testingOptions?.crawl
     )
 
-    node.on('peer:connect', (peerInfo: PeerInfo) => {
-      this.networkPeers.onPeerConnect(peerInfo)
-      this.heartbeat.connectionListener(peerInfo)
+    node.on('peer:connect', (conn: Connection) => {
+      this.networkPeers.onPeerConnect(conn.remotePeer)
+      this.heartbeat.connectionListener(conn.remotePeer)
     })
 
     if (options.bootstrapNode) {

@@ -14,7 +14,6 @@ import { Handler } from '../../@types/transport'
 
 import TCP from '.'
 import Multiaddr from 'multiaddr'
-import PeerInfo from 'peer-info'
 import pipe from 'it-pipe'
 
 import { u8aEquals } from '@hoprnet/hopr-utils'
@@ -40,22 +39,23 @@ describe('should create a socket and connect to it', function () {
     },
     bootstrap?: Multiaddr 
   ): Promise<libp2p> {
-    const peerInfo = new PeerInfo(await PeerId.create({ keyType: 'secp256k1' }))
+    const peerId = await PeerId.create({ keyType: 'secp256k1' })
+    const addresses = []
 
     if (options.ipv4) {
-      peerInfo.multiaddrs.add(
-        Multiaddr(`/ip4/127.0.0.1/tcp/${9090 + 2 * options.id}`).encapsulate(`/p2p/${peerInfo.id.toB58String()}`)
+      addresses.push(
+        Multiaddr(`/ip4/127.0.0.1/tcp/${9090 + 2 * options.id}`).encapsulate(`/p2p/${peerId.toB58String()}`)
       )
     }
 
     if (options.ipv6) {
-      peerInfo.multiaddrs.add(
-        Multiaddr(`/ip6/::1/tcp/${9090 + 2 * options.id + 1}`).encapsulate(`/p2p/${peerInfo.id.toB58String()}`)
+      addresses.push(
+        Multiaddr(`/ip6/::1/tcp/${9090 + 2 * options.id + 1}`).encapsulate(`/p2p/${peerId.toB58String()}`)
       )
     }
 
     const node = new libp2p({
-      peerInfo,
+      peerId, addresses,
       modules: {
         transport: [TCP],
         streamMuxer: [MPLEX],

@@ -12,8 +12,7 @@ const IDS = [
 ].map((x) => PeerId.createFromB58String(x))
 
 describe('test PeerStore', function () {
-  const empty = [][Symbol.iterator]()
-  const networkPeers = new PeerStore(empty)
+  const networkPeers = new PeerStore([])
 
   it('should push and pop elements', function () {
     assert(networkPeers.length == 0, 'networkPeers must be empty')
