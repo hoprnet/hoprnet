@@ -171,10 +171,10 @@ class RelayConnection implements MultiaddrConnection {
               return
             } else if (u8aEquals(SUFFIX, RESTART)) {
               this._onReconnect(this)
-              log(`RelayConnection: RECONNECT received`)
+              streamDone = true
 
               // @TODO replace timeout by something more meaningful
-              await new Promise((resolve) => setTimeout(resolve, 100))
+              // await new Promise((resolve) => setTimeout(resolve, 100))
 
               log(`RESTART received, reconnectReceived: ${__reconnectCounter++}`)
             } else if (u8aEquals(SUFFIX, PING)) {
