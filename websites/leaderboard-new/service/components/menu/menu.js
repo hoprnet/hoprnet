@@ -40,12 +40,12 @@ const Menu = ({ activaMenu }) => {
                   <p>HOME</p>
                 </li>
               </Link>
-              <Link href="/top-assets">
+              <Link href="/hopr-allocation">
                 <li
-                  className={[router.pathname == "/top-assets" ? "active" : ""]}
+                  className={[router.pathname == "/hopr-allocation" ? "active" : ""]}
                 >
-                  <img src="/assets/icons/top.svg" alt="hopr Top ASSETS" />
-                  <p>TOP ASSETS</p>
+                  <img src="/assets/icons/top.svg" alt="hopr HOPR ALLOCATION" />
+                  <p>HOPR ALLOCATION</p>
                 </li>
               </Link>
               <Link href="https://discord.com/invite/wUSYqpD" target="_blank">
