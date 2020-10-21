@@ -386,7 +386,7 @@ class RelayConnection implements MultiaddrConnection {
         ])
       }
 
-      log(`RelayConnection: sink after await`)
+      log(`RelayConnection: sink after await`, streamResolved, webRTCresolved, statusMessageAvailable, streamSwitched)
 
       if (streamResolved) {
         streamResolved = false
