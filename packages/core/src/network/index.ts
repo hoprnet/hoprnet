@@ -24,13 +24,12 @@ class Network {
       if (!ma.getPeerId()) {
         throw new Error('Cannot store a peer without an ID')
       }
-      const pinfo = new PeerInfo(PeerId.createFromCID(ma.getPeerId()))
-      pinfo.multiaddrs.add(ma)
-      node.peerStore.put(pinfo)
+      const pid = PeerId.createFromCID(ma.getPeerId())
+      node.peerStore.addressBook.add(pid, ma)
     }
 
     const getPeer = (id: PeerId): Multiaddr[] => {
-      let addrs = node.peerStore.get(id).multiaddrs.toArray()
+      let addrs = node.peerStore.addressBook.get(id).multiaddrs.toArray()
       return addrs.map((a) => {
         if (!a.getPeerId()) {
           return a.encapsulate(`/p2p/${id.toB58String()}`)
@@ -39,10 +38,10 @@ class Network {
       })
     }
 
-    this.networkPeers = new NetworkPeers(node.peerStore.peers.values())
+    this.networkPeers = new NetworkPeers(Array.from(node.peerStore.peers.values()).map(x => x.id))
     this.heartbeat = new Heartbeat(this.networkPeers, interactions.network.heartbeat, node.hangUp)
     this.crawler = new Crawler(
-      node.peerInfo.id,
+      node.peerId,
       this.networkPeers,
       interactions.network.crawler,
       getPeer,

@@ -106,11 +106,6 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     }
     this.bootstrapServers = options.bootstrapServers || []
     this.isBootstrapNode = options.bootstrapNode || false
-<<<<<<< HEAD
-    
-=======
-
->>>>>>> f08479ba5d588103307c8c9116bfa12f661e1f85
     this._interactions = new Interactions(
       this,
       (conn: Connection) => this._network.crawler.handleCrawlRequest(conn),

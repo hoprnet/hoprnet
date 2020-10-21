@@ -24,7 +24,6 @@ declare interface Handshake {
 const handshake: (stream: Stream) => Handshake = require('it-handshake')
 
 import Multiaddr from 'multiaddr'
-import PeerInfo from 'peer-info'
 import PeerId from 'peer-id'
 import libp2p from 'libp2p'
 import type { Connection, Stream } from 'libp2p'
@@ -43,14 +42,6 @@ import { u8aEquals } from '@hoprnet/hopr-utils'
 import { RelayContext } from './relayContext'
 
 import { RelayConnection } from './relayConnection'
-
-function toPeerInfo(ma: Multiaddr): PeerInfo {
-  // @ts-ignore
-  let pi = new PeerInfo()
-  pi.multiaddrs.add(ma)
-  return pi
-}
-
 
 import type {
   Dialer,
@@ -110,7 +101,7 @@ class Relay {
     for (let i = 0; i < potentialRelays.length; i++) {
       let relayConnection: Connection
       try {
-        relayConnection = await this.connectToRelay(toPeerInfo(potentialRelays[i]), options)
+        relayConnection = await this.connectToRelay(PeerId.createFromB58String(potentialRelays[i].getPeerId()), options)
       } catch (err) {
         error(err)
         continue
@@ -160,21 +151,21 @@ class Relay {
     log(`counterparty relayed connection established`)
   }
 
-  private async connectToRelay(relay: PeerInfo, options?: DialOptions): Promise<Connection> {
+  private async connectToRelay(relay: PeerId, options?: DialOptions): Promise<Connection> {
     let relayConnection = this._registrar.getConnection(relay)
 
     if (relayConnection == null) {
       try {
         relayConnection = await this._dialer.connectToPeer(relay, { signal: options?.signal })
       } catch (err) {
-        log(`Could not reach potential relay ${relay.id.toB58String()}. Error was: ${err}`)
+        log(`Could not reach potential relay ${relay.toB58String()}. Error was: ${err}`)
         if (this._dht != null && (options == null || options.signal == null || !options.signal.aborted)) {
-          let newAddress = await this._dht.peerRouting.findPeer(relay.id)
+          let newAddress = await this._dht.peerRouting.findPeer(relay)
 
           try {
             relayConnection = await this._dialer.connectToPeer(newAddress, { signal: options?.signal })
           } catch (err) {
-            log(`Dialling potential relay ${relay.id.toB58String()} after querying DHT failed. Error was ${err}`)
+            log(`Dialling potential relay ${relay.toB58String()} after querying DHT failed. Error was ${err}`)
           }
         }
       }
@@ -386,9 +377,7 @@ class Relay {
   private async establishForwarding(initiator: PeerId, counterparty: PeerId) {
     let timeout: any
 
-    let cParty = new PeerInfo(counterparty)
-
-    let newConn = this._registrar.getConnection(cParty)
+    let newConn = this._registrar.getConnection(counterparty)
 
     if (!newConn) {
       const abort = new AbortController()
@@ -396,13 +385,13 @@ class Relay {
       timeout = setTimeout(() => abort.abort(), RELAY_CIRCUIT_TIMEOUT)
 
       try {
-        newConn = await this._dialer.connectToPeer(cParty, { signal: abort.signal })
+        newConn = await this._dialer.connectToPeer(counterparty, { signal: abort.signal })
       } catch (err) {
         if (this._dht != null && !abort.signal.aborted) {
           try {
-            cParty = await this._dht.peerRouting.findPeer(cParty.id)
+            counterparty = await this._dht.peerRouting.findPeer(counterparty)
 
-            newConn = await this._dialer.connectToPeer(cParty, { signal: abort.signal })
+            newConn = await this._dialer.connectToPeer(counterparty, { signal: abort.signal })
           } catch (err) {
             clearTimeout(timeout)
 

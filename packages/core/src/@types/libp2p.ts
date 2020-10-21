@@ -48,6 +48,7 @@ declare module 'libp2p' {
 
     addressBook: {
       add(id: PeerId, addr: Multiaddr)
+      get(id: PeerId): Multiaddr[]
     }
   }
 
