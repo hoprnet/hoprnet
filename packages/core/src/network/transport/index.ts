@@ -130,9 +130,8 @@ class TCP {
         conn._close = () => Promise.resolve()
         await conn.close()
       }
-
-      await new Promise(resolve => setTimeout(resolve, 200))
-
+      
+      log(`####### inside reconnect #######`)
       try {
         this._upgrader
           .upgradeInbound(relayConn.switch())
