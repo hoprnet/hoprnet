@@ -28,29 +28,29 @@ describe('check heartbeat mechanism', function () {
     options?: { timeoutIntentionally: boolean },
     addr = '/ip4/0.0.0.0/tcp/0'
   ): Promise<Mocks> {
-    const node = (await libp2p.create({
+    const node = await libp2p.create({
       peerInfo: await PeerInfo.create(await PeerId.create({ keyType: 'secp256k1' })),
       modules: {
         transport: [TCP],
         streamMuxer: [MPLEX],
         connEncryption: [SECIO]
       }
-    })) 
+    })
 
     node.peerInfo.multiaddrs.add(Multiaddr(addr))
     node.hangUp = async (_id) => {} // Need to override this in tests.
 
     await node.start()
 
-    const interactions = ({
+    const interactions = {
       network: {
         heartbeat: new HeartbeatInteraction(node, (remotePeer) => network.heartbeat.emit('beat', remotePeer))
       }
-    }) as Interactions<any>
+    } as Interactions<any>
 
     const network = new Network(node, interactions, {} as any, { crawl: options })
 
-    node.getConnectedPeers = () => node._network.networkPeers.peers.map(x => x.id)
+    node.getConnectedPeers = () => node._network.networkPeers.peers.map((x) => x.id)
     node.on('peer:connect', (peerInfo: PeerInfo) => node.peerStore.put(peerInfo))
     return {
       node,
@@ -117,7 +117,7 @@ describe('unit test heartbeat', () => {
   } as any
 
   beforeEach(() => {
-    const empty = [][Symbol.iterator]();
+    const empty = [][Symbol.iterator]()
     peers = new NetworkPeerStore(empty)
     heartbeat = new Heartbeat(peers, interaction, hangUp)
   })
@@ -129,7 +129,10 @@ describe('unit test heartbeat', () => {
   })
 
   it('check nodes is noop with only new peers', async () => {
-    peers.push({ id: PeerId.createFromB58String('16Uiu2HAmShu5QQs3LKEXjzmnqcT8E3YqyxKtVTurWYp8caM5jYJq'), lastSeen: Date.now() })
+    peers.push({
+      id: PeerId.createFromB58String('16Uiu2HAmShu5QQs3LKEXjzmnqcT8E3YqyxKtVTurWYp8caM5jYJq'),
+      lastSeen: Date.now()
+    })
     await heartbeat.checkNodes()
     expect(hangUp.mock.calls.length).toBe(0)
     expect(interaction.interact.mock.calls.length).toBe(0)

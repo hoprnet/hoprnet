@@ -33,7 +33,6 @@ export abstract class OpenChannelBase extends AbstractCommand {
     }
   }
 
-
   public async autocomplete(query: string = '', line: string = ''): Promise<AutoCompleteResult> {
     if (!query) {
       return [[this.name()], line]

@@ -97,7 +97,8 @@ describe('test packet composition and decomposition', function () {
             balance: new BN(200),
             balance_a: new BN(100)
           }),
-          (_channelBalance) => nodes[a]._interactions.payments.open.interact(nodes[b].peerInfo.id, channelBalance) as any
+          (_channelBalance) =>
+            nodes[a]._interactions.payments.open.interact(nodes[b].peerInfo.id, channelBalance) as any
         )
       }
 
@@ -159,7 +160,9 @@ describe('test packet composition and decomposition', function () {
               gte: Buffer.from(
                 nodes[i]._dbKeys.AcknowledgedTickets(Buffer.alloc(ACKNOWLEDGED_TICKET_INDEX_LENGTH, 0x00))
               ),
-              lt: Buffer.from(nodes[i]._dbKeys.AcknowledgedTickets(Buffer.alloc(ACKNOWLEDGED_TICKET_INDEX_LENGTH, 0xff)))
+              lt: Buffer.from(
+                nodes[i]._dbKeys.AcknowledgedTickets(Buffer.alloc(ACKNOWLEDGED_TICKET_INDEX_LENGTH, 0xff))
+              )
             })
             .on('data', (data: Buffer) => {
               const acknowledged = nodes[i].paymentChannels.types.AcknowledgedTicket.create(nodes[i].paymentChannels)

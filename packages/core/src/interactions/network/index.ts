@@ -8,11 +8,7 @@ class NetworkInteractions {
   crawler: Crawler
   heartbeat: Heartbeat
 
-  constructor(
-    node: LibP2P,
-    handleCrawlRequest: (conn: Connection) => void,
-    heartbeat: (remotePeer: PeerId) => void,
-  ) {
+  constructor(node: LibP2P, handleCrawlRequest: (conn: Connection) => void, heartbeat: (remotePeer: PeerId) => void) {
     this.crawler = new Crawler(node, handleCrawlRequest)
     this.heartbeat = new Heartbeat(node, heartbeat)
   }

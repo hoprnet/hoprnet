@@ -26,7 +26,7 @@ export type CrawlInfo = {
   errors: (Error | string)[]
 }
 
-let toPeer = (s: string): PeerId =>  {
+let toPeer = (s: string): PeerId => {
   return PeerId.createFromB58String(s)
 }
 
@@ -59,7 +59,7 @@ class Crawler {
 
   /**
    *
-   * @param filter 
+   * @param filter
    */
   async crawl(filter?: (peer: PeerId) => boolean): Promise<CrawlInfo> {
     verbose('creating a crawl')
@@ -84,7 +84,7 @@ class Crawler {
         abort.abort()
         this.printStatsAndErrors(contactedPeerIds, errors, current, before)
         resolve({
-          contacted: Array.from(contactedPeerIds.values()).map(x => toPeer(x)),
+          contacted: Array.from(contactedPeerIds.values()).map((x) => toPeer(x)),
           errors
         })
       }, CRAWL_TIMEOUT)
@@ -131,7 +131,7 @@ class Crawler {
           return toPeer(unContactedPeers.pop())
         }
 
-        const selected  = unContactedPeers[index]
+        const selected = unContactedPeers[index]
         unContactedPeers[index] = unContactedPeers.pop()
 
         return toPeer(selected)
@@ -196,7 +196,7 @@ class Crawler {
               continue
             }
 
-            if (!contactedPeerIds.has(peer.toB58String()) && !unContactedPeers.find(x => x == peer.toB58String())) {
+            if (!contactedPeerIds.has(peer.toB58String()) && !unContactedPeers.find((x) => x == peer.toB58String())) {
               unContactedPeers.push(peer.toB58String())
 
               let beforeInserting = this.networkPeers.length
@@ -239,7 +239,7 @@ class Crawler {
 
         verbose('crawl complete')
         resolve({
-          contacted: Array.from(contactedPeerIds.values()).map(x => toPeer(x)),
+          contacted: Array.from(contactedPeerIds.values()).map((x) => toPeer(x)),
           errors
         })
       }
@@ -256,11 +256,11 @@ class Crawler {
       await new Promise((resolve) => setTimeout(resolve, CRAWL_TIMEOUT + 100))
     }
     return this.networkPeers
-                .randomSubset(CRAWLING_RESPONSE_NODES)
-                .filter((id: PeerId) => !id.equals(this.id) && !id.equals(callerId))
-                .map(this.getPeer) // NB: Multiple addrs per peer.
-                .flat()
-                .filter(ma => shouldIncludePeerInCrawlResponse(ma, callerAddress))
+      .randomSubset(CRAWLING_RESPONSE_NODES)
+      .filter((id: PeerId) => !id.equals(this.id) && !id.equals(callerId))
+      .map(this.getPeer) // NB: Multiple addrs per peer.
+      .flat()
+      .filter((ma) => shouldIncludePeerInCrawlResponse(ma, callerAddress))
   }
 
   handleCrawlRequest(conn: Connection) {

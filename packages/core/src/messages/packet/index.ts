@@ -362,7 +362,8 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
         target.pubKey.marshal(),
         (_counterparty: Uint8Array) => this.node._interactions.payments.onChainKey.interact(target),
         channelBalance,
-        (_channelBalance: Types.ChannelBalance) => this.node._interactions.payments.open.interact(target, channelBalance)
+        (_channelBalance: Types.ChannelBalance) =>
+          this.node._interactions.payments.open.interact(target, channelBalance)
       )
 
       this._ticket = await channel.ticket.create(

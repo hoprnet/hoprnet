@@ -48,9 +48,9 @@ If your node is offline for long enough, the bot will remove your address from i
 
 CoverBot looks for three things when it parses your tweet:
 
-* a valid HOPR address
-* the @hoprnet tag
-* the \#HOPRNetwork hashtag
+- a valid HOPR address
+- the @hoprnet tag
+- the \#HOPRNetwork hashtag
 
 Make sure you have all three of those in your tweet correctly. If you don't know your HOPR address, type `myAddress` at the prompt in HOPR Chat or your hardware node.
 
@@ -61,4 +61,3 @@ If you're sure you've done all this correctly, but it's still not working, try m
 {% hint style="info" %}
 If these solutions don't work, or you have a problem that isn't listed here, please head to our [Discord channel](https://discord.gg/wUSYqpD) where you can get support for a community member or one of the development team.
 {% endhint %}
-
