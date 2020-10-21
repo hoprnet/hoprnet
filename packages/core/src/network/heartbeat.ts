@@ -29,7 +29,7 @@ class Heartbeat extends EventEmitter {
 
   connectionListener(peer: PeerId | PeerInfo) {
     this.networkPeers.push({
-      id: (PeerId.isPeerId(peer) ? peer : peer.id),
+      id: PeerId.isPeerId(peer) ? peer : peer.id,
       lastSeen: Date.now()
     })
   }

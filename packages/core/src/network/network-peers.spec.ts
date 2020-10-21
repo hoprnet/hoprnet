@@ -4,20 +4,18 @@ import PeerId from 'peer-id'
 
 import PeerStore from './network-peers'
 
-const IDS = ([
+const IDS = [
   '16Uiu2HAmDaiXdDZbcFvCXd1ZvaxnrXbLNSEt8jH7iEFqv4A3suZU',
   '16Uiu2HAmKae7qFncLFydcqCCqTXVFojtafVktXpSRSRZyDqZpkbP',
   '16Uiu2HAmHxG2fj7MUNzopRy3SKLfeEHgzbBQJp6tc8WGkLmVddBE',
   '16Uiu2HAm4cvqqFbFnYU5jFT1HKvA7N2GZYx2XKUec5hFSeJRDgL9'
-]).map(x => PeerId.createFromB58String(x))
+].map((x) => PeerId.createFromB58String(x))
 
 describe('test PeerStore', function () {
-
   const empty = [][Symbol.iterator]()
   const networkPeers = new PeerStore(empty)
 
   it('should push and pop elements', function () {
-
     assert(networkPeers.length == 0, 'networkPeers must be empty')
     networkPeers.push({
       id: IDS[0],
@@ -52,19 +50,15 @@ describe('test PeerStore', function () {
     networkPeers.reset()
   })
 
-  it('should allow randomSubset to be taken of peer ids', function() {
-
-    IDS.forEach(id => {
+  it('should allow randomSubset to be taken of peer ids', function () {
+    IDS.forEach((id) => {
       networkPeers.push({
         id,
         lastSeen: Date.now()
       })
     })
 
-
     networkPeers.randomSubset(3)
-
-
 
     networkPeers.reset()
   })
@@ -78,7 +72,7 @@ describe('test PeerStore', function () {
     assert(networkPeers.deletedPeers.length == 1, `blacklist must contain the just blacklisted node`)
 
     networkPeers.push({
-      id:  IDS[0],
+      id: IDS[0],
       lastSeen: Date.now()
     })
 

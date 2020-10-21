@@ -6,8 +6,8 @@ description: Funding your AVADO node
 
 Next, you need to send tokens to your HOPR node. To use HOPR, you'll need two types of token:
 
-* a HOPR token
-* the native token of the blockchain the HOPR token is linked to
+- a HOPR token
+- the native token of the blockchain the HOPR token is linked to
 
 In our current testnet, the native token is MATIC and the HOPR token is hosted on the Matic Network.
 
@@ -57,9 +57,6 @@ To learn more about earning testnet HOPR by relaying data, see the sections on [
 
 You can check your balance by typing `balance`. You'll see something like this:
 
-
-
 ## Withdrawing Funds
 
 To withdraw funds from your node, use the `withdraw` command.
-
