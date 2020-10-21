@@ -47,7 +47,6 @@ class Heartbeat implements AbstractInteraction {
     )
   }
 
-
   async interact(counterparty: PeerId): Promise<number> {
     const start = Date.now()
 
@@ -113,7 +112,6 @@ class Heartbeat implements AbstractInteraction {
         resolve(Date.now() - start)
       }
     })
-
   }
 }
 

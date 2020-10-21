@@ -85,4 +85,3 @@ If the CoverBot selects your address, you'll receive a ticket which can be redee
 {% hint style="info" %}
 The more your node is online, the greater your chance of earning tickets, so try to maximize your node uptime.
 {% endhint %}
-

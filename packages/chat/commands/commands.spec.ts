@@ -24,7 +24,7 @@ describe('Commands', () => {
   it('ping', async () => {
     let mockNode: any = jest.fn()
     mockNode.bootstrapServers = []
-    mockNode.ping = jest.fn(() => ({info: '', latency: 10}))
+    mockNode.ping = jest.fn(() => ({ info: '', latency: 10 }))
     let mockPeerId = '16Uiu2HAkyXRaL7fKu4qcjaKuo4WXizrpK63Ltd6kG2tH6oSV58AW'
 
     let cmds = new mod.Commands(mockNode)
@@ -41,7 +41,7 @@ describe('Commands', () => {
   it('crawl', async () => {
     let mockNode: any = jest.fn()
     mockNode.getConnectedPeers = () => []
-    mockNode.crawl = jest.fn(() => ({contacted: []}))
+    mockNode.crawl = jest.fn(() => ({ contacted: [] }))
 
     let cmds = new mod.Commands(mockNode)
     expect(await cmds.execute('crawl')).toContain('Crawled network, contacted')

@@ -247,7 +247,7 @@ export class CoreService {
 
     // @ts-ignore @TODO: properly export types in h-c-e
     const channelFunding = new Balance(10)
-    
+
     await this.node.openChannel(counterParty, channelFunding)
     return channelId
   }

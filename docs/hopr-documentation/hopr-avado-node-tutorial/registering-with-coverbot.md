@@ -16,9 +16,9 @@ CoverBot is the latest in a series of bots running on the HOPR network which wil
 
 Before you register with CoverBot, you'll need the following things:
 
-* Your HOPR address
-* `includeRecipient` turned on
-* A Twitter account
+- Your HOPR address
+- `includeRecipient` turned on
+- A Twitter account
 
 The first two items were covered in the previous sections in this tutorial, [**Exploring the Network**](../hopr-chat-tutorial/exploring-the-network.md#finding-your-address) and [**Messaging RandoBot**](../hopr-chat-tutorial/randobot.md#step-2-turn-on-includerecipient), respectively.
 
@@ -30,11 +30,11 @@ First, you need to send a tweet which will be used to verify your participation 
 Your Twitter handle will be your name on the testnet scoreboard.
 {% endhint %}
 
-Your tweet needs to include: 
+Your tweet needs to include:
 
-* your HOPR address
-* the @hoprnet handle
-* the \#Basodino hashtag
+- your HOPR address
+- the @hoprnet handle
+- the \#Basodino hashtag
 
 An example is shown below:
 
@@ -54,12 +54,10 @@ Now that you've sent your tweet, you need to register with the bot. Copy the ful
 send 16Uiu2HAm7KxaBkgd9ENvhf5qAkp1c6Q5Q1dXe8HBDzxLN4SxAVw6 [URL of your tweet]
 ```
 
-Then press Enter. 
+Then press Enter.
 
 ![](../.gitbook/assets/coverbot-avado-success.png)
 
-  
-  
 The bot will now check your tweet and will send you a verification message if you're successful. If there's an error, the bot will try and explain what has gone wrong so you can fix it.
 
 ## Step 4: Stay Online to Earn Tickets!
@@ -79,4 +77,3 @@ The more your node is online, the greater your chance of earning tickets, so try
 ## Check Your Score
 
 You can see the current leaderboard at [**https://network.hoprnet.org**](https://network.hoprnet.org)\*\*\*\*
-
