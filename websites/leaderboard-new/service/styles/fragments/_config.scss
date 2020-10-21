@@ -148,13 +148,11 @@ a.aux-help-twitter{
 }
 
 // 
-
-.aux-link-out{
+.right-side a{
   text-decoration: none;
   color: $black;
   font-weight: 600;
   transition: all 350ms ease-in-out;
-  border-bottom: 1px solid $grey;
   span{
     display: inline-flex;
     align-items: center;
@@ -163,8 +161,21 @@ a.aux-help-twitter{
   &:hover{
     transition: all 350ms ease-in-out;
     color: #50A8E7;
+  }
+}
+
+.aux-link-out-to-post{
+  border-bottom: 1px solid $grey;
+  &:hover{
     border-bottom: 1px solid transparent;
     }
+}
+
+.aux-link-out{
+  img{
+    height: 12px;
+    margin: 0 0.05em;
+  }
 }
 // icon
 .icon-help-online{
