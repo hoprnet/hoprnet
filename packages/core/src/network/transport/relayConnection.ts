@@ -158,6 +158,7 @@ class RelayConnection implements MultiaddrConnection {
           const [PREFIX, SUFFIX] = [received.subarray(0, 1), received.subarray(1)]
 
           if (u8aEquals(PREFIX, RELAY_PAYLOAD_PREFIX)) {
+            log(`RelayConnection: Delivering`, SUFFIX)
             if (streamDone || streamClosed) {
               this._destroyed = true
               return SUFFIX
