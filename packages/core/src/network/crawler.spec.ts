@@ -1,7 +1,7 @@
 import assert from 'assert'
-import PeerInfo from 'peer-info'
 import PeerId from 'peer-id'
 import libp2p from 'libp2p'
+import type { Connection } from 'libp2p'
 // @ts-ignore
 import TCP = require('libp2p-tcp')
 // @ts-ignore
@@ -25,13 +25,17 @@ type Mocks = {
   interactions: Interactions<any>
 }
 
+let mockConnection = (p: PeerId): Connection => {
+  return { remotePeer: p } as Connection
+}
+
 describe('test crawler', function () {
   async function generateMocks(
     options?: { timeoutIntentionally: boolean },
     addr = '/ip4/0.0.0.0/tcp/0'
   ): Promise<Mocks> {
     const node = await libp2p.create({
-      peerInfo: await PeerInfo.create(await PeerId.create({ keyType: 'secp256k1' })),
+      peerId: await PeerId.create({ keyType: 'secp256k1' }),
       modules: {
         transport: [TCP],
         streamMuxer: [MPLEX],
@@ -52,7 +56,7 @@ describe('test crawler', function () {
     } as Interactions<any>
 
     const network = new Network(node, interactions, {} as any, { crawl: options })
-    node.on('peer:connect', (peerInfo: PeerInfo) => node.peerStore.put(peerInfo))
+    node.on('peer:connect', (conn: Connection) => node.peerStore.put(conn.remotePeer))
 
     return {
       node,
@@ -71,49 +75,49 @@ describe('test crawler', function () {
     ])
 
     await Alice.network.crawler.crawl()
-    Alice.node.emit('peer:connect', Bob.node.peerInfo)
+    Alice.node.emit('peer:connect', mockConnection(Bob.node.peerId))
     await Alice.network.crawler.crawl()
 
-    assert(Alice.network.networkPeers.has(Bob.node.peerInfo.id))
+    assert(Alice.network.networkPeers.has(Bob.node.peerId))
 
-    Bob.node.emit('peer:connect', Chris.node.peerInfo)
-    assert(Bob.network.networkPeers.has(Chris.node.peerInfo.id))
+    Bob.node.emit('peer:connect',  mockConnection(Chris.node.peerId))
+    assert(Bob.network.networkPeers.has(Chris.node.peerId))
 
     await Alice.network.crawler.crawl()
-    assert(Alice.network.networkPeers.has(Bob.node.peerInfo.id))
-    assert(Alice.network.networkPeers.has(Chris.node.peerInfo.id))
+    assert(Alice.network.networkPeers.has(Bob.node.peerId))
+    assert(Alice.network.networkPeers.has(Chris.node.peerId))
 
-    Chris.node.emit('peer:connect', Dave.node.peerInfo)
+    Chris.node.emit('peer:connect',  mockConnection(Dave.node.peerId))
     await Alice.network.crawler.crawl()
 
-    assert(Alice.network.networkPeers.has(Bob.node.peerInfo.id))
-    assert(Alice.network.networkPeers.has(Chris.node.peerInfo.id))
-    assert(Alice.network.networkPeers.has(Dave.node.peerInfo.id))
+    assert(Alice.network.networkPeers.has(Bob.node.peerId))
+    assert(Alice.network.networkPeers.has(Chris.node.peerId))
+    assert(Alice.network.networkPeers.has(Dave.node.peerId))
 
-    Bob.node.emit('peer:connect', Alice.node.peerInfo)
-    Dave.node.emit('peer:connect', Eve.node.peerInfo)
+    Bob.node.emit('peer:connect', mockConnection(Alice.node.peerId))
+    Dave.node.emit('peer:connect', mockConnection(Eve.node.peerId))
 
     await Bob.network.crawler.crawl()
 
     // Simulate node failure
     await Bob.node.stop()
-    assert(Chris.network.networkPeers.has(Bob.node.peerInfo.id), 'Chris should know about Bob')
+    assert(Chris.network.networkPeers.has(Bob.node.peerId), 'Chris should know about Bob')
     // Simulates a heartbeat run that kicks out Bob
-    Alice.network.networkPeers.blacklistPeer(Bob.node.peerInfo.id)
+    Alice.network.networkPeers.blacklistPeer(Bob.node.peerId)
     await Alice.network.crawler.crawl()
 
     assert(
-      !Alice.network.networkPeers.has(Bob.node.peerInfo.id),
+      !Alice.network.networkPeers.has(Bob.node.peerId),
       'Alice should not add Bob to her networkPeers after blacklisting him'
     )
     assert(
-      Alice.network.networkPeers.deletedPeers.some((entry: BlacklistedEntry) => entry.id.equals(Bob.node.peerInfo.id))
+      Alice.network.networkPeers.deletedPeers.some((entry: BlacklistedEntry) => entry.id.equals(Bob.node.peerId))
     )
 
     // Remove Bob from blacklist
     Alice.network.networkPeers.deletedPeers[0].deletedAt -= BLACKLIST_TIMEOUT + 1
 
-    Alice.node.emit('peer:connect', Chris.node.peerInfo)
+    Alice.node.emit('peer:connect', mockConnection(Chris.node.peerId))
 
     await Alice.network.crawler.crawl()
 
@@ -126,7 +130,7 @@ describe('test crawler', function () {
 
     await new Promise((resolve) => setTimeout(resolve, 50))
 
-    assert(Alice.network.networkPeers.has(Bob.node.peerInfo.id))
+    assert(Alice.network.networkPeers.has(Bob.node.peerId))
 
     await Promise.all([Alice.node.stop(), Bob.node.stop(), Chris.node.stop(), Dave.node.stop(), Eve.node.stop()])
   })
@@ -146,9 +150,9 @@ describe('test crawler', function () {
       ])
 
       await Alice.network.crawler.crawl()
-      Alice.node.emit('peer:connect', Bob.node.peerInfo)
+      Alice.node.emit('peer:connect', mockConnection(Bob.node.peerId))
       await Alice.network.crawler.crawl()
-      Bob.node.emit('peer:connect', Chris.node.peerInfo)
+      Bob.node.emit('peer:connect', mockConnection(Chris.node.peerId))
       await Alice.network.crawler.crawl()
 
       await new Promise((resolve) => setTimeout(resolve, 100))
