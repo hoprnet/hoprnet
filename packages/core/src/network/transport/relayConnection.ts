@@ -29,6 +29,8 @@ class RelayConnection implements MultiaddrConnection {
   private _sinkTriggered: boolean
 
   private _switchPromise: DeferredPromise<Stream['source']>
+  private _switchPromiseSource: DeferredPromise<void>
+
   private _statusMessagePromise: DeferredPromise<void>
   private _statusMessages: Uint8Array[]
 
@@ -69,6 +71,8 @@ class RelayConnection implements MultiaddrConnection {
     this._defer = Defer()
 
     this._switchPromise = Defer<Stream['source']>()
+    this._switchPromiseSource = Defer<void>()
+
     this._statusMessagePromise = Defer<void>()
     this._statusMessages = []
 
@@ -118,7 +122,8 @@ class RelayConnection implements MultiaddrConnection {
       streamSwitched = true
     }
 
-    let switchPromise = this._switchPromise.promise.then(switchFunction)
+    let switchPromise = this._switchPromiseSource.promise.then(switchFunction)
+
     function sourceFunction({ done, value }: { done?: boolean; value?: Uint8Array | void }) {
       streamResolved = true
       streamMsg = value
@@ -223,7 +228,7 @@ class RelayConnection implements MultiaddrConnection {
     this._sinkTriggered = true
   }
 
-  private async *getWebRTCStream(this: RelayConnection) {
+  private async *_getWebRTCStream(this: RelayConnection) {
     let defer = Defer<void>()
     let waiting = false
     const webRTCmessages: Uint8Array[] = []
@@ -331,7 +336,7 @@ class RelayConnection implements MultiaddrConnection {
           streamPromise = currentSource.next().then(streamSourceFunction)
         }
         if (webRTCstream == null) {
-          webRTCstream = this.getWebRTCStream.call(this)
+          webRTCstream = this._getWebRTCStream.call(this)
         }
         if (webRTCPromise == null) {
           webRTCPromise = webRTCstream.next().then(webRTCSourceFunction)
@@ -346,7 +351,7 @@ class RelayConnection implements MultiaddrConnection {
         ])
       } else if (!webRTCdone) {
         if (webRTCstream == null) {
-          webRTCstream = this.getWebRTCStream.call(this)
+          webRTCstream = this._getWebRTCStream.call(this)
         }
         if (webRTCPromise == null) {
           webRTCPromise = webRTCstream.next().then(webRTCSourceFunction)
@@ -437,6 +442,10 @@ class RelayConnection implements MultiaddrConnection {
 
   switch(): Stream {
     log(`updating`)
+
+    let tmpPromise = this._switchPromiseSource
+    this._switchPromiseSource = Defer<void>()
+    tmpPromise.resolve()
 
     return {
       source: this._createSource(),
