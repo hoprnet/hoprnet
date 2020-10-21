@@ -5,8 +5,47 @@ section.aux-margin {
 
 section.area-left-desktop {
   width: 303px;
-  .twitter-line-menu {
+  .copy-line-token{
     margin-top: 1em;
+    h4{
+      padding: 0;
+      margin: 0;
+      color: $grey;
+      font-weight: 400;
+      margin-bottom: 0.1em;
+    }
+    .hash{
+      margin: 0;
+      padding: 0;
+      justify-content: flex-end;
+      flex-direction: row-reverse;
+      cursor: pointer;
+      p{
+        transition: all 450ms ease-in-out;
+        color: $greyLabel;
+        font-weight: 500;
+        font-size: 1em;
+        width: 100px;
+      }
+      img{
+         transition: all 350ms ease-in-out;
+         margin-right: 0.5em;
+      }
+      &:hover{
+        p{
+          color: darken($greyLabel, 17);
+          transition: all 450ms ease-in-out;
+        }
+        img{
+          transition: all 350ms ease-in-out;
+          filter: brightness(0.5);
+          opacity: 1;
+        }
+      }
+    }
+  }
+  .twitter-line-menu {
+
     flex-direction: column;
     & > div {
       margin: 0.5em 0;

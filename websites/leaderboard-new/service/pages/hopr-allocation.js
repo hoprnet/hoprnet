@@ -4,28 +4,22 @@ import api from "../utils/api";
 
 const columnsDefaults = [
   {
-    title: "online",
-    dataIndex: "online",
-    key: "online",
+    title: "score",
+    dataIndex: "score",
+    key: "score",
     className: 'sortBy asc',
   },
   {
     title: "address",
     dataIndex: "address",
     key: "address",
-    className: 'sortBy asc',
+    className: 'sortBy',
   },
   {
     title: "id",
     dataIndex: "id",
     key: "id",
-    className: 'sortBy asc',
-  },
-  {
-    title: "score",
-    dataIndex: "score",
-    key: "score",
-    className: 'sortBy asc',
+    className: 'sortBy',
   },
   {
     title: "tweetUrl",
@@ -35,20 +29,21 @@ const columnsDefaults = [
   },
 ];
 
-export default function Home() {
+export default function HoprAllocation() {
   const [data, setData] = useState(undefined);
   const [columns, setColumns] = useState(columnsDefaults);
-
-  const nodesVerified = data ? data.connected.length : 0;
-  const nodesRegistered = data ? data.nodes.length : 0;
-  const nodesConnected = data ? data.connectedNodes : 0;
-  const nodes = data ? data.nodes : [];
 
   useEffect(() => {
     const fetchData = async () => {
       const response = await api.getAllData();
-      if (response.data) setData(response.data);
+      if (response.data) {
+        const allNodes = response.data.nodes.sort((a, b) => b.score - a.score),
+          nodes = allNodes.slice(0, allNodes.length > 6 ? 5 : allNodes.length);
+
+        setData(nodes);
+      };
     };
+
     fetchData();
   }, []);
 
@@ -76,8 +71,8 @@ export default function Home() {
     });
     aColumns.find(item => item.key === key).className = 'sortBy ' + sSort;
 
-    let aNew = { ...data };
-    aNew.nodes = aNew.nodes.sort((a, b) => {
+    let aNew = [...data];
+    aNew = aNew.sort((a, b) => {
       let iBase = getIntBase(key),
         convertA = parseInt(a[key], iBase),
         convertB = parseInt(b[key], iBase)
@@ -95,41 +90,17 @@ export default function Home() {
 
   return (
     <Layout>
-      <div className="box">
+      <div className="box special-table-top">
         <div className="box-top-area">
           <div>
             <div className="box-title">
-              <h1>Leaderboard</h1>
+              <h1>Hopr Allocation</h1>
             </div>
-            <div className="box-btn">
-              <button>
-                <img src="/assets/icons/refresh.svg" alt="refresh now" />
-                refresh now
-              </button>
-            </div>
-          </div>
-
-          <div className="box-menu-optional">
-            <ul>
-              <li className="active">All</li>
-              <li>
-                {nodesVerified && <span>{nodesVerified}</span>}
-                Verified
-              </li>
-              <li>
-                {nodesRegistered && <span>{nodesRegistered}</span>}
-                Registered
-              </li>
-              <li>
-                {nodesConnected && <span>{nodesConnected}</span>}
-                Connected
-              </li>
-            </ul>
           </div>
         </div>
-        <div className="box-main-area remove-all-padding">
+        <div className="box-main-area remove-all-padding aux-add-top ">
           <div className="box-container-table">
-            {nodes && (
+            {data && (
               <table id="date">
                 <thead>
                   <tr>
@@ -149,16 +120,21 @@ export default function Home() {
                   </tr>
                 </thead>
                 <tbody>
-                  {nodes.map((e) => {
-                    const { online, address, id, score, tweetUrl } = e;
+                  {data.map((item) => {
+                    const { id, address, score,  tweetUrl } = item;
                     return (
                       <tr key={id}>
-                        <td className="icon-help-online" data-label="online"><div className={[online ? "online" : "offline"]}></div></td>
-                        <td data-label="address">{address}</td>
-                        <td data-label="id">{id}</td>
-                        <td data-type="score" data-label="score">
+                         <td data-type="score" data-label="score">
+                         <span>
+                            <img
+                              src="/assets/icons/top.svg"
+                              alt="hopr Top ASSETS"
+                            />
+                          </span>
                           {score}
                         </td>
+                        <td data-label="address">{address}</td>
+                        <td data-label="id">{id}</td>
                         <td data-label="tweetUrl">
                           <a href={tweetUrl}>
                             <img
