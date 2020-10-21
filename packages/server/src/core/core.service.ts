@@ -140,8 +140,8 @@ export class CoreService {
       await this.node.crawl()
     } catch {}
 
-    const id = this.node.peerInfo.id.toB58String()
-    const multiAddresses = this.node.peerInfo.multiaddrs.toArray().map((multiaddr) => multiaddr.toString())
+    const id = this.node.getId().toB58String()
+    const multiAddresses = this.node.getAddresses().map((multiaddr) => multiaddr.toString())
 
     const connectedNodes = this.node.getConnectedPeers().length
 
@@ -179,9 +179,9 @@ export class CoreService {
   @mustBeStarted()
   async getAddress(type: 'native' | 'hopr'): Promise<string> {
     if (type === 'native') {
-      return this.node.paymentChannels.utils.pubKeyToAccountId(this.node.peerInfo.id.pubKey.marshal()).then(u8aToHex)
+      return this.node.paymentChannels.utils.pubKeyToAccountId(this.node.getId().pubKey.marshal()).then(u8aToHex)
     } else {
-      return this.node.peerInfo.id.toB58String()
+      return this.node.getId().toB58String()
     }
   }
 
@@ -235,7 +235,7 @@ export class CoreService {
     const connector = this.node.paymentChannels
     const { isPartyA, getId, pubKeyToAccountId } = connector.utils
     const { ChannelBalance, Balance } = connector.types
-    const self = this.node.peerInfo.id
+    const self = this.node.getId()
     const selfPubKey = self.pubKey.marshal()
     const selfAccountId = await pubKeyToAccountId(selfPubKey)
     const counterParty = PeerId.createFromB58String(peerId)

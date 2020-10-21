@@ -22,7 +22,7 @@ export abstract class SendMessageBase extends AbstractCommand {
   }
 
   private insertMyAddress(message: string): string {
-    const myAddress = this.node.peerInfo.id.toB58String()
+    const myAddress = this.node.getId().toB58String()
     return `${myAddress}:${message}`
   }
 
@@ -149,7 +149,7 @@ export class SendMessageFancy extends SendMessageBase {
         styleValue(`Please select intermediate node ${styleValue(selected.length)}: (leave empty to exit)`, 'highlight')
       )
 
-      const lastSelected = selected.length > 0 ? selected[selected.length - 1] : this.node.peerInfo.id
+      const lastSelected = selected.length > 0 ? selected[selected.length - 1] : this.node.getId()
       const openChannels = await getOpenChannels(this.node, lastSelected)
       const validPeers = openChannels.map((peer) => peer.toB58String())
 

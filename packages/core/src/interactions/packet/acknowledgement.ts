@@ -35,7 +35,7 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
 
   constructor(public node: Hopr<Chain>) {
     super()
-    this.node.handle(this.protocols, this.handler.bind(this))
+    this.node._libp2p.handle(this.protocols, this.handler.bind(this))
   }
 
   handler(struct: Handler) {
@@ -56,9 +56,9 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
       }, ACKNOWLEDGEMENT_TIMEOUT)
 
       try {
-        struct = await this.node.dialProtocol(counterparty, this.protocols[0]).catch(async () => {
-          const result = await this.node.peerRouting.findPeer(counterparty)
-          return await this.node.dialProtocol(result, this.protocols[0])
+        struct = await this.node._libp2p.dialProtocol(counterparty, this.protocols[0]).catch(async () => {
+          const result = await this.node._libp2p.peerRouting.findPeer(counterparty)
+          return await this.node._libp2p.dialProtocol(result, this.protocols[0])
         })
       } catch (err) {
         clearTimeout(timeout)
@@ -143,7 +143,7 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
 
         const acknowledgedDbKey = this.node._dbKeys.AcknowledgedTickets(ticketCounter)
 
-        log(`storing ticket`, ticketCounter, `we are`, this.node.peerInfo.id.toB58String())
+        log(`storing ticket`, ticketCounter, `we are`, this.node.getId().toB58String())
 
         try {
           await this.node.db

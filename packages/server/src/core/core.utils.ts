@@ -139,7 +139,7 @@ export async function getPartyOpenChannels(node: Hopr<HoprCoreConnector>, party:
  */
 export async function getOpenChannels(node: Hopr<HoprCoreConnector>, partyPeerId: PeerId): Promise<PeerId[]> {
   const supportsIndexer = typeof node.paymentChannels.indexer !== 'undefined'
-  const partyIfSelf = node.peerInfo.id.equals(partyPeerId)
+  const partyIfSelf = node.getId().equals(partyPeerId)
 
   if (partyIfSelf) {
     // if party is self

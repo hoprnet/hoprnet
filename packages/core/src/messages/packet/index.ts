@@ -1,4 +1,5 @@
 import BN from 'bn.js'
+import LibP2P from 'libp2p'
 import chalk from 'chalk'
 
 import PeerId from 'peer-id'
@@ -36,9 +37,11 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
   private _message?: Message
 
   private node: Hopr<Chain>
+  private libp2p: LibP2P
 
   constructor(
     node: Hopr<Chain>,
+    libp2p: LibP2P,
     arr?: {
       bytes: ArrayBuffer
       offset: number
@@ -69,6 +72,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     }
 
     this.node = node
+    this.libp2p = libp2p
   }
 
   slice(begin: number = 0, end: number = Packet.SIZE(this.node.paymentChannels)) {
@@ -159,11 +163,12 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
    */
   static async create<Chain extends HoprCoreConnector>(
     node: Hopr<Chain>,
+    libp2p: LibP2P,
     msg: Uint8Array,
     path: PeerId[]
   ): Promise<Packet<Chain>> {
     const arr = new Uint8Array(Packet.SIZE(node.paymentChannels)).fill(0x00)
-    const packet = new Packet<Chain>(node, {
+    const packet = new Packet<Chain>(node, libp2p, {
       bytes: arr.buffer,
       offset: arr.byteOffset
     })
@@ -192,7 +197,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
         bytes: packet.buffer,
         offset: packet.challengeOffset
       }
-    ).sign(node.peerInfo.id)
+    ).sign(libp2p.peerInfo.id)
 
     packet._message = Message.create(msg, {
       bytes: packet.buffer,
@@ -248,7 +253,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     receivedChallenge: Challenge<Chain>
     ticketKey: Uint8Array
   }> {
-    this.header.deriveSecret(this.node.peerInfo.id.privKey.marshal())
+    this.header.deriveSecret(this.libp2p.peerInfo.id.privKey.marshal())
 
     if (await this.testAndSetTag(this.node.db)) {
       verbose('Error setting tag')
@@ -262,7 +267,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
 
     this.header.extractHeaderInformation()
 
-    let isRecipient = u8aEquals(this.node.peerInfo.id.pubKey.marshal(), this.header.address)
+    let isRecipient = u8aEquals(this.libp2p.peerInfo.id.pubKey.marshal(), this.header.address)
 
     let sender: PeerId, target: PeerId
     if (!isRecipient) {
@@ -329,7 +334,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     }
 
     const channelIdOutgoing = await this.node.paymentChannels.utils.getId(
-      await this.node.paymentChannels.utils.pubKeyToAccountId(this.node.peerInfo.id.pubKey.marshal()),
+      await this.node.paymentChannels.utils.pubKeyToAccountId(this.libp2p.peerInfo.id.pubKey.marshal()),
       await this.node.paymentChannels.utils.pubKeyToAccountId(target.pubKey.marshal())
     )
 
@@ -341,7 +346,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     log(
       `During forward: storing hashedKey`,
       u8aToHex(this.header.hashedKeyHalf),
-      `we are ${this.node.peerInfo.id.toB58String()}`
+      `we are ${this.libp2p.peerInfo.id.toB58String()}`
     )
     await this.node.db.put(
       Buffer.from(this.node._dbKeys.UnAcknowledgedTickets(this.header.hashedKeyHalf)),
@@ -404,7 +409,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
         bytes: this.buffer,
         offset: this.challengeOffset
       }
-    ).sign(this.node.peerInfo.id)
+    ).sign(this.libp2p.peerInfo.id)
   }
 
   /**

@@ -11,6 +11,8 @@ import { clearString } from '@hoprnet/hopr-utils'
 import chalk from 'chalk'
 import readline from 'readline'
 import Multiaddr from 'multiaddr'
+import PeerInfo from 'peer-info'
+import PeerId from 'peer-id'
 import clear from 'clear'
 import { parseOptions, yesOrNoQuestion } from './utils'
 import { Commands } from './commands'
@@ -78,8 +80,8 @@ async function runAsRegularNode() {
 function runAsBootstrapNode() {
   console.log(`... running as bootstrap node!.`)
 
-  node.connectionManager.on('peer:connect', (conn: Connection) => {
-    console.log(`Incoming connection from ${chalk.blue(peer.id.toB58String())}.`)
+  node.on('hopr:peer:connection', (peer: PeerId) => {
+    console.log(`Incoming connection from ${chalk.blue(peer.toB58String())}.`)
   })
 
   process.once('exit', async () => {
@@ -118,7 +120,7 @@ async function main() {
 
   console.log('Successfully started HOPR Chat.\n')
   console.log(
-    `Your HOPR Chat node is available at the following addresses:\n ${node.addresses.map(ma => ma.toString()).join('\n ')}\n`
+    `Your HOPR Chat node is available at the following addresses:\n ${node.getAddresses().join('\n ')}\n`
   )
   console.log('Use the “help” command to see which commands are available.\n')
 
