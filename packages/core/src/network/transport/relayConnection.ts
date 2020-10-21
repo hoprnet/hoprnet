@@ -223,10 +223,10 @@ class RelayConnection implements MultiaddrConnection {
   }
 
   private async _createSink(source: Stream['source']) {
-    log(`RelayConnection: sink triggered`)
     let tmpPromise = this._switchPromise
     this._switchPromise = Defer<Stream['source']>()
     tmpPromise.resolve(source)
+    log(`RelayConnection: sink triggered`)
 
     this._sinkTriggered = true
   }
@@ -335,8 +335,9 @@ class RelayConnection implements MultiaddrConnection {
     let switchPromise = this._switchPromise.promise.then(switchFunction)
 
     while (true) {
-      log(`RelayConnection: sink iteration`)
+      log(`RelayConnection: sink iteration`, webRTCdone, streamDone)
       if (!webRTCdone && !streamDone) {
+        log(`RelayConnection: !webRTCdone && !streamDone`)
         if (streamPromise == null) {
           streamPromise = currentSource.next().then(streamSourceFunction)
         }
@@ -355,6 +356,8 @@ class RelayConnection implements MultiaddrConnection {
           closePromise
         ])
       } else if (!webRTCdone) {
+        log(`RelayConnection: !webRTCdone`)
+
         if (webRTCstream == null) {
           webRTCstream = this._getWebRTCStream.call(this)
         }
@@ -369,6 +372,8 @@ class RelayConnection implements MultiaddrConnection {
           closePromise
         ])
       } else if (!streamDone) {
+        log(`RelayConnection: !streamDone`, currentSource)
+
         if (streamPromise == null) {
           streamPromise = currentSource.next().then(streamSourceFunction)
         }
