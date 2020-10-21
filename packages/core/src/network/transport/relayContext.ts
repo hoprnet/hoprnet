@@ -188,12 +188,12 @@ class RelayContext {
         }
       } else if (streamSwitched) {
         streamSwitched = false
-        // @TODO replace this by a mutex
-        // await new Promise((resolve) => setTimeout(resolve, 100))
         sourceDone = false
         currentSource = tmpSource
         switchPromise = this._switchPromise.promise.then(switchFunction)
         verbose(`################### streamSwitched ###################`)
+        // @TODO replace this by a mutex
+        await new Promise((resolve) => setTimeout(resolve, 100))
         yield u8aConcat(RELAY_STATUS_PREFIX, RESTART)
 
         sourcePromise = currentSource.next().then(sourceFunction)
@@ -264,6 +264,7 @@ class RelayContext {
           sourcePromise = source.next().then(sourceFunction)
         } else if (statusMessageAvailable) {
           statusMessageAvailable = false
+
           while (this._statusMessages.length > 0) {
             yield this._statusMessages.shift()
           }
