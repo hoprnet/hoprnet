@@ -83,7 +83,6 @@ export default function HoprAllocation() {
         return convertB - convertA;
       }
     });
-    console.log('Sort nodes:', aNew);
 
     setData(aNew);
     setColumns(aColumns);
@@ -105,7 +104,7 @@ export default function HoprAllocation() {
               <table id="date">
                 <thead>
                   <tr>
-                    {columns.map((e, index) => {
+                    {columns.map(e => {
                       const { title, key, className } = e;
                       return (
                         <th
