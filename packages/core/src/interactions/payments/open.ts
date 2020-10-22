@@ -6,7 +6,7 @@ import pipe from 'it-pipe'
 
 import type { AbstractInteraction } from '../abstractInteraction'
 
-import type { Handler } from '../../@types/transport'
+import type { Handler } from 'libp2p'
 
 import { PROTOCOL_PAYMENT_CHANNEL } from '../../constants'
 import type PeerId from 'peer-id'

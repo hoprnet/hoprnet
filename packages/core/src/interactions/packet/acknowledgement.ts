@@ -15,7 +15,7 @@ import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '../../'
 import { Acknowledgement } from '../../messages/acknowledgement'
 
-import type { Handler } from '../../@types/transport'
+import type { Handler } from 'libp2p'
 
 import EventEmitter from 'events'
 

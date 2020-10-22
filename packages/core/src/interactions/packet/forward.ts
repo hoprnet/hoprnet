@@ -15,7 +15,7 @@ import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '../../'
 import pipe from 'it-pipe'
 
-import type { Handler } from '../../@types/transport'
+import type { Handler } from 'libp2p'
 
 import { randomInteger, durations } from '@hoprnet/hopr-utils'
 import { getTokens, Token } from '../../utils'

@@ -11,7 +11,7 @@ const verbose = debug('hopr-core:verbose:listener:error')
 import type { Connection } from 'libp2p'
 import { socketToConn } from './socket-to-conn'
 import { CODE_P2P } from './constants'
-import { MultiaddrConnection, Upgrader, Libp2pServer } from '../../@types/transport'
+import { MultiaddrConnection, Upgrader} from 'libp2p'
 import Multiaddr from 'multiaddr'
 
 import { handleStunRequest, getExternalIp } from './stun'
@@ -67,7 +67,7 @@ class Listener extends EventEmitter {
     this.__connections = []
     this.upgrader = upgrader
 
-    this.tcpSocket = net.createServer(this.onTCPConnection.bind(this)) as Libp2pServer
+    this.tcpSocket = net.createServer(this.onTCPConnection.bind(this))
 
     this.udpSocket = dgram.createSocket({
       // @TODO

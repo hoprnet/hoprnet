@@ -50,7 +50,7 @@ import type {
   MultiaddrConnection,
   PeerRouting,
   Registrar,
-} from '../../@types/transport'
+} from 'libp2p'
 
 class Relay {
   private _dialer: Dialer
@@ -160,10 +160,10 @@ class Relay {
       } catch (err) {
         log(`Could not reach potential relay ${relay.toB58String()}. Error was: ${err}`)
         if (this._dht != null && (options == null || options.signal == null || !options.signal.aborted)) {
-          let newAddress = await this._dht.peerRouting.findPeer(relay)
+          let {id} = await this._dht.peerRouting.findPeer(relay)
 
           try {
-            relayConnection = await this._dialer.connectToPeer(newAddress, { signal: options?.signal })
+            relayConnection = await this._dialer.connectToPeer(id, { signal: options?.signal })
           } catch (err) {
             log(`Dialling potential relay ${relay.toB58String()} after querying DHT failed. Error was ${err}`)
           }
@@ -389,7 +389,7 @@ class Relay {
       } catch (err) {
         if (this._dht != null && !abort.signal.aborted) {
           try {
-            counterparty = await this._dht.peerRouting.findPeer(counterparty)
+            counterparty = (await this._dht.peerRouting.findPeer(counterparty)).id
 
             newConn = await this._dialer.connectToPeer(counterparty, { signal: abort.signal })
           } catch (err) {

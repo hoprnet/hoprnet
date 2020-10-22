@@ -1,7 +1,7 @@
 import { Stream } from 'LibP2P'
 import Multiaddr from 'multiaddr'
 import BL from 'bl'
-import { MultiaddrConnection } from '../../@types/transport'
+import { MultiaddrConnection } from 'libp2p'
 import Defer, { DeferredPromise } from 'p-defer'
 import { RELAY_PAYLOAD_PREFIX, RELAY_STATUS_PREFIX, RELAY_WEBRTC_PREFIX, STOP } from './constants'
 import { u8aEquals } from '@hoprnet/hopr-utils'

@@ -1,4 +1,3 @@
-import type { Handler } from '../../@types/transport'
 import debug from 'debug'
 import pipe from 'it-pipe'
 import chalk from 'chalk'
@@ -8,7 +7,7 @@ import PeerId from 'peer-id'
 import Multiaddr from 'multiaddr'
 import { CrawlResponse, CrawlStatus } from '../../messages'
 import { LibP2P } from '../../'
-import type { Connection } from 'libp2p'
+import type { Connection, Handler } from 'libp2p'
 
 const log = debug('hopr-core:crawler')
 const verbose = debug('hopr-core:verbose:crawl-interaction')

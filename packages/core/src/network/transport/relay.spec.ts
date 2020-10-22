@@ -8,7 +8,7 @@ import SECIO = require('libp2p-secio')
 // @ts-ignore
 import TCP from 'libp2p-tcp'
 
-import { Handler, MultiaddrConnection } from '../../@types/transport'
+import { Handler, MultiaddrConnection } from 'libp2p'
 
 import Multiaddr from 'multiaddr'
 import pipe from 'it-pipe'

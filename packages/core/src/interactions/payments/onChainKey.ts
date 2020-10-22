@@ -6,7 +6,7 @@ import { PROTOCOL_ONCHAIN_KEY } from '../../constants'
 import type { AbstractInteraction } from '../abstractInteraction'
 import type PeerId from 'peer-id'
 
-import type { Handler } from '../../@types/transport'
+import type { Handler } from 'libp2p'
 
 import chalk from 'chalk'
 

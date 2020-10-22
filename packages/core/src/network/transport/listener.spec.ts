@@ -1,7 +1,7 @@
 import assert from 'assert'
 import Listener from './listener'
 import Multiaddr from 'multiaddr'
-import { Upgrader } from '../../@types/transport'
+import { Upgrader } from 'libp2p'
 import type { Connection } from 'libp2p'
 import dgram, { Socket, RemoteInfo } from 'dgram'
 import { handleStunRequest } from './stun'
