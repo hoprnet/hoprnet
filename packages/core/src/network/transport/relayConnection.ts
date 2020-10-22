@@ -148,6 +148,8 @@ class RelayConnection implements MultiaddrConnection {
         if (streamMsg != null) {
           const received = (streamMsg as Uint8Array).slice()
 
+          log(`received`, received)
+
           const [PREFIX, SUFFIX] = [received.subarray(0, 1), received.subarray(1)]
 
           if (u8aEquals(PREFIX, RELAY_PAYLOAD_PREFIX)) {
