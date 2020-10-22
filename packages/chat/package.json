@@ -52,6 +52,7 @@
     "peer-info": "~0.17.5",
     "readline": "~1.3.0",
     "rlp": "~2.2.5",
+    "multiaddr": "8.0.0",
     "typescript": "^4.0.3"
   },
   "devDependencies": {
