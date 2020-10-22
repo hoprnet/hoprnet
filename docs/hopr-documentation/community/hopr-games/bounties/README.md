@@ -17,9 +17,9 @@ Although right now the only way to participate in the HOPR Games Bounties is to 
 
 To get started with **HOPR Chat**, please visit our quick start \***\*page to download the** HOPR Chat **binary or follow our advanced setup to compile and run** HOPR Chat\*\* yourself.
 
-{% page-ref page="../../../getting-started/quickstart.md" %}
+{% page-ref page="../../../hopr-chat-tutorial/quickstart.md" %}
 
-{% page-ref page="../../../getting-started/setup.md" %}
+{% page-ref page="../../../hopr-chat-tutorial/setup.md" %}
 
 ## Social Media
 
@@ -44,7 +44,7 @@ There are a few things different on the xDAI network compared to vanilla Ethereu
 
 Upon successfully complete a HOPR Games bounty, you will receive a URL with pre-paid funds for you to claim. The URL is created by [LinkDrop](https://linkdrop.io/), and looks similar to this:
 
-![LinkDrop creates you a claimable link on your browser.](../../../.gitbook/assets/image%20%2817%29%20%282%29%20%281%29.png)
+![LinkDrop creates you a claimable link on your browser.](../../../.gitbook/assets/image%20%2817%29%20%282%29%20%281%29%20%281%29%20%281%29.png)
 
 ## Timeframes & Support
 
