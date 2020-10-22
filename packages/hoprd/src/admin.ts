@@ -115,6 +115,6 @@ export async function reportMemoryUsage(logs: LogStream) {
 }
 
 export async function connectionReport(node: Hopr<HoprCoreConnector>, logs: LogStream) {
-  logs.logConnectedPeers(Array.from(node.peerStore.peers.values()).map((p) => p.id.toB58String()))
+  logs.logConnectedPeers(node.getConnectedPeers().map((p) => p.toB58String()))
   setTimeout(() => connectionReport(node, logs), 60_000)
 }

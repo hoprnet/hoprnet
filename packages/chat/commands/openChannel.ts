@@ -38,7 +38,7 @@ export abstract class OpenChannelBase extends AbstractCommand {
       return [[this.name()], line]
     }
 
-    const peersWithOpenChannel = await getOpenChannels(this.node, this.node.peerInfo.id)
+    const peersWithOpenChannel = await getOpenChannels(this.node, this.node.getId())
     const allPeers = getPeers(this.node, {
       noBootstrapNodes: true
     })

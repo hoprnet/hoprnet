@@ -18,7 +18,7 @@ class Interactions<Chain extends HoprCoreConnector> {
     heartbeat: (remotePeer: PeerId) => void
   ) {
     this.payments = new PaymentInteractions(node)
-    this.network = new NetworkInteractions(node, handleCrawlRequest, heartbeat)
+    this.network = new NetworkInteractions(node._libp2p, handleCrawlRequest, heartbeat)
     this.packet = new PacketInteractions(node)
   }
 }
