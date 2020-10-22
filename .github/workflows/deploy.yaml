@@ -80,8 +80,8 @@ jobs:
         run: |
           sleep 5m # Allow NPM registry to catch uo
           yarn util:regenerate
-          git add package/*/yarn.lock
-          git commit -m "Regenerate lockfiles"
+          git add packages/*/yarn.lock || true
+          git commit -m "Regenerate lockfiles" || true
           git pull origin ${{ github.ref }}
           git push origin ${{ github.ref }} 
 
