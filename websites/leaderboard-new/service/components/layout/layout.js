@@ -1,17 +1,17 @@
-import React, { useState, useEffect } from "react";
-import { useRouter } from "next/router";
-import Head from "next/head";
-import Menu from "../menu/menu";
-import LeftSide from "./left-side";
-import RightSide from "./right-side";
-import CopieParagraph from "../data-view/copie-paragraph";
-import DataBoxCloud from "../data-view/data-box-cloud";
-import DataUpdateKnow from "../data-view/data-update-know";
-import "../../styles/main.scss";
+import React, { useState, useEffect } from 'react'
+import { useRouter } from 'next/router'
+import Head from 'next/head'
+import Menu from '../menu/menu'
+import LeftSide from './left-side'
+import RightSide from './right-side'
+import CopieParagraph from '../data-view/copie-paragraph'
+import DataBoxCloud from '../data-view/data-box-cloud'
+import DataUpdateKnow from '../data-view/data-update-know'
+import '../../styles/main.scss'
 
 const Layout = ({ children }) => {
-  const router = useRouter();
-  const [activaMenu, setactivaMenu] = useState(false);
+  const router = useRouter()
+  const [activaMenu, setactivaMenu] = useState(false)
 
   return (
     <>
@@ -21,16 +21,9 @@ const Layout = ({ children }) => {
       <header>
         <nav className="navbar only-mobile-view">
           <div className="icon-logo">
-            <img
-              className={[activaMenu ? "open" : ""]}
-              src="/assets/brand/logo.svg"
-              alt="hopr"
-            />
+            <img className={[activaMenu ? 'open' : '']} src="/assets/brand/logo.svg" alt="hopr" />
           </div>
-          <div
-            className={"icon-menu " + [activaMenu ? "open" : ""]}
-            onClick={() => setactivaMenu(!activaMenu)}
-          >
+          <div className={'icon-menu ' + [activaMenu ? 'open' : '']} onClick={() => setactivaMenu(!activaMenu)}>
             <span></span>
             <span></span>
             <span></span>
@@ -42,7 +35,7 @@ const Layout = ({ children }) => {
         {/*  */}
         <div className=" only-desktop-view ">
           <div className="icon-logo-desktop">
-            <a href="https://hoprnet.org/" target="_blank"  rel="noopener noreferrer">
+            <a href="https://hoprnet.org/" target="_blank" rel="noopener noreferrer">
               <img src="/assets/brand/logo.svg" alt="hopr" />
             </a>
           </div>
@@ -54,14 +47,9 @@ const Layout = ({ children }) => {
         <div className="only-desktop-view">
           <LeftSide />
         </div>
-        <section
-          className={
-            "about only-mobile-view " +
-            [router.pathname != "/" ? "aux-margin" : ""]
-          }
-        >
-          <div className={[router.pathname != "/" ? "only-desktop-view" : ""]}>
-           <CopieParagraph/>
+        <section className={'about only-mobile-view ' + [router.pathname != '/' ? 'aux-margin' : '']}>
+          <div className={[router.pathname != '/' ? 'only-desktop-view' : '']}>
+            <CopieParagraph />
           </div>
         </section>
         {children}
@@ -81,7 +69,7 @@ const Layout = ({ children }) => {
         {/*  */}
       </div>
     </>
-  );
-};
+  )
+}
 
-export default Layout;
+export default Layout

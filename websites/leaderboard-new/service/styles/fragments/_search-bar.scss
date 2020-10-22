@@ -1,0 +1,52 @@
+.container-search-bar {
+  padding: 1em !important;
+  margin-top: 1em;
+  border-top: 1px solid $grey;
+  border-bottom: 1px solid $grey;
+  background: #f7f7f7;
+  input {
+    border: 1px solid $grey;
+    border-radius: 4px;
+    outline: 0;
+    box-sizing: border-box;
+    padding: 0 0.5em;
+    height: 44px;
+    width: 70%;
+    color: $greyLabel;
+    transition: all 350ms ease-in-out;
+    &::placeholder {
+      color: $grey;
+    }
+    &:focus,
+    &:active {
+      outline: 0;
+      box-shadow: $shadow;
+      transition: all 350ms ease-in-out;
+    }
+  }
+  .btn-search {
+    width: 89px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: $colorLink;
+    border-radius: 4px;
+    box-shadow: $shadow;
+    transition: all 350ms ease-in-out;
+    img {
+      width: 16px;
+      height: 16px;
+      filter: invert(1);
+    }
+    &:hover {
+      background: darken($colorLink, 17);
+    }
+    &:focus,
+    &:active {
+      transition: all 350ms ease-in-out;
+      box-shadow: 0;
+      background: darken($colorLink, 17);
+    }
+  }
+}

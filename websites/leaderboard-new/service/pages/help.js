@@ -1,29 +1,27 @@
-import React, { useState, useEffect } from "react";
-import Layout from "../components/layout/layout.js";
-import TweetBasodino from "../components/tweet-basodino";
-import api from "../utils/api";
+import React, { useState, useEffect } from 'react'
+import Layout from '../components/layout/layout.js'
+import TweetBasodino from '../components/tweet-basodino'
+import api from '../utils/api'
 
 export default function Help() {
-  const [hash, setHash] = useState(
-    "16Uiu2HAm7KxaBkgd9ENvhf5qAkp1c6Q5Q1dXe8HBDzxLN4SxAVw6"
-  );
+  const [hash, setHash] = useState('16Uiu2HAm7KxaBkgd9ENvhf5qAkp1c6Q5Q1dXe8HBDzxLN4SxAVw6')
 
   useEffect(() => {
     const fetchData = async () => {
-      const response = await api.getAllData();
-      if (response.data) setHash(response.data.address);
-    };
-    fetchData();
-  }, []);
+      const response = await api.getAllData()
+      if (response.data) setHash(response.data.address)
+    }
+    fetchData()
+  }, [])
 
-  const [modal, setModal] = useState(false);
+  const [modal, setModal] = useState(false)
   const copyCodeToClipboard = () => {
-    navigator.clipboard.writeText(hash);
-    setModal(true);
+    navigator.clipboard.writeText(hash)
+    setModal(true)
     setTimeout(() => {
-      setModal(false);
-    }, 4000);
-  };
+      setModal(false)
+    }, 4000)
+  }
 
   return (
     <>
@@ -44,53 +42,38 @@ export default function Help() {
             <hr />
             <ol>
               <li>
-                Install the latest version of{" "}
-                <a
-                  href="https://github.com/hoprnet/hopr-chat/releases"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                 <span> HOPR Chat</span>
+                Install the latest version of{' '}
+                <a href="https://github.com/hoprnet/hopr-chat/releases" target="_blank" rel="noreferrer">
+                  <span> HOPR Chat</span>
                 </a>
                 , which will spin up a HOPR node.
               </li>
               <li>
-                Send <strong>0.02 Matic</strong> to your node. You can get Matic
-                from ETH on{" "}
-                <a
-                  href="//wallet.matic.network"
-                  target="_blank"
-                  rel="noreferrer"
-                >
+                Send <strong>0.02 Matic</strong> to your node. You can get Matic from ETH on{' '}
+                <a href="//wallet.matic.network" target="_blank" rel="noreferrer">
                   <span>wallet.matic.network</span>
-                </a>{" "}
-                or ping us on{" "}
+                </a>{' '}
+                or ping us on{' '}
                 <a href="//t.me/hoprnet" target="_blank" rel="noreferrer">
                   <span>Telegram</span>
                 </a>
                 .
               </li>
               <li>
-                In your HOPR node, type <strong>myAddress</strong> to find your
-                node address.
+                In your HOPR node, type <strong>myAddress</strong> to find your node address.
               </li>
               <li>
-                Tweet your HOPR node address with the tag{" "}
-                <strong>#Basodino</strong> and <strong>@hoprnet</strong>.{" "}
+                Tweet your HOPR node address with the tag <strong>#Basodino</strong> and <strong>@hoprnet</strong>.{' '}
                 <TweetBasodino>
-                  <img src="/assets/icons/twitter.svg" alt="twitter" />{" "}
-                 <span>#Basodino</span>
+                  <img src="/assets/icons/twitter.svg" alt="twitter" /> <span>#Basodino</span>
                 </TweetBasodino>
               </li>
               <li>
-                In your HOPR node, type{" "}
-                <strong>settings includeRecipient true</strong> so the bot can
-                respond.
+                In your HOPR node, type <strong>settings includeRecipient true</strong> so the bot can respond.
               </li>
               <li>
-                Send the URL of your tweet to the <strong>CoverBot</strong>{" "}
-                using the <strong>send</strong> command. You may need to use{" "}
-                <strong>crawl</strong> first.
+                Send the URL of your tweet to the <strong>CoverBot</strong> using the <strong>send</strong> command. You
+                may need to use <strong>crawl</strong> first.
                 <br />
                 <div className="quick-code">
                   <div className="hash" onClick={() => copyCodeToClipboard()}>
@@ -102,33 +85,25 @@ export default function Help() {
                 </div>
               </li>
               <li>Wait for a message from CoverBot verifying your tweet.</li>
-              <li>
-                You have scored points! Keep your node online to earn more!
-              </li>
-              <li>
-                Every 30s, CoverBot will randomly choose a registered user to
-                relay data and earn more points.
-              </li>
+              <li>You have scored points! Keep your node online to earn more!</li>
+              <li>Every 30s, CoverBot will randomly choose a registered user to relay data and earn more points.</li>
             </ol>
             <hr />
             <div className="twitter-line-menu">
               <a className="aux-help-twitter" href="https://twitter.com/hoprnet" target="_blank">
                 <div>
-                 <img
-                    src="/assets/icons/twitter.svg"
-                    alt="twitter"
-                  />
+                  <img src="/assets/icons/twitter.svg" alt="twitter" />
                 </div>
-                 <div>
+                <div>
                   <p>@hoprnet</p>
                   <span>click here to tweet</span>
-                </div> 
+                </div>
               </a>
             </div>
           </div>
         </div>
       </Layout>
-      <div className={"modal-copy-menu " + [modal ? "show-modal-menu" : ""]}>
+      <div className={'modal-copy-menu ' + [modal ? 'show-modal-menu' : '']}>
         <div className="box-modal-copy">
           <div className="icon-logo">
             <img src="/assets/brand/logo.svg" alt="hopr" />
@@ -147,5 +122,5 @@ export default function Help() {
         </div>
       </div>
     </>
-  );
+  )
 }
