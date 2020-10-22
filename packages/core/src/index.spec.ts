@@ -66,9 +66,9 @@ describe('test hopr-core', function () {
             port: getNewPort()
           }
         },
-        bootstrapServers: [new Multiaddr('/p2p/' + peerId)]
+        bootstrapServers: [new Multiaddr('/p2p/' + peerId.toB58String())]
       })
     },
-    durations.seconds(3)
+    durations.seconds(5)
   )
 })
