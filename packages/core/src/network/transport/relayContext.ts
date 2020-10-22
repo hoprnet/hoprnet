@@ -248,6 +248,7 @@ class RelayContext {
 
           // Ignoring empty messages
           if (sourceMsg != null) {
+            log(`sinking`, (sourceMsg as Uint8Array).slice())
             if (sourceDone) {
               return sourceMsg
             } else {
