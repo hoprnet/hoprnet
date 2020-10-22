@@ -202,7 +202,7 @@ class RelayConnection implements MultiaddrConnection {
             error(`Received invalid prefix <${u8aToHex(PREFIX || new Uint8Array([]))}. Dropping message.`)
           }
         } else {
-          log(`dropping empty messagein source function`)
+          log(`dropping empty message in source function`)
         }
 
         streamPromise = this._stream.source.next().then(sourceFunction)

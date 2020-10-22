@@ -162,7 +162,16 @@ class Relay {
     log(`counterparty relayed connection established`)
 
     return new RelayConnection({
-      stream,
+      stream: {
+        source: (async function * () {
+          for await (const msg of stream.source) {
+            log(`received low-level`, msg.slice())
+
+            yield msg
+          }
+        }()),
+        sink: stream.sink
+      },
       self: this._peerInfo.id,
       counterparty,
       onReconnect
