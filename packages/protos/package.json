@@ -41,7 +41,7 @@
   },
   "devDependencies": {
     "@types/google-protobuf": "^3.7.2",
-    "@types/node": "^12.11.0",
+    "@types/node": "^14.14.2",
     "glob": "^7.1.6",
     "grpc-tools": "^1.9.0",
     "microbundle": "^0.12.2",
