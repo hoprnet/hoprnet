@@ -131,6 +131,7 @@ class RelayConnection implements MultiaddrConnection {
     let streamPromise = this._stream.source.next().then(sourceFunction)
 
     while (true) {
+      log(`source iteration`)
       if (!streamDone) {
         await Promise.race([
           // prettier-ignore
@@ -143,6 +144,7 @@ class RelayConnection implements MultiaddrConnection {
       }
 
       if (streamResolved) {
+        log(`handling message`)
         streamResolved = false
 
         if (streamMsg != null) {
@@ -171,7 +173,7 @@ class RelayConnection implements MultiaddrConnection {
 
               this._onReconnect(this)
 
-              log(`after reconnect`, (await this._stream.source.next()))
+              // log(`after reconnect`, (await this._stream.source.next()))
 
               // end stream
               break
@@ -203,6 +205,9 @@ class RelayConnection implements MultiaddrConnection {
 
           streamPromise = this._stream.source.next().then(sourceFunction)
         }
+
+        streamPromise = this._stream.source.next().then(sourceFunction)
+
         // } else if (streamSwitched) {
         //   log(`################### streamSwitched relayConnection ###################`)
         //   break
