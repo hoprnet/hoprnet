@@ -165,7 +165,7 @@ class RelayConnection implements MultiaddrConnection {
           } else if (u8aEquals(PREFIX, RELAY_STATUS_PREFIX)) {
             if (u8aEquals(SUFFIX, STOP)) {
               this._destroyed = true
-              return
+              break
             } else if (u8aEquals(SUFFIX, RESTART)) {
               log(`RESTART received, reconnectReceived: ${__reconnectCounter++}. Ending stream ...`)
 
@@ -184,7 +184,6 @@ class RelayConnection implements MultiaddrConnection {
               this._statusMessages.push(u8aConcat(RELAY_STATUS_PREFIX, PING_RESPONSE))
 
               let tmpPromise = this._statusMessagePromise
-              this._statusMessagePromise = Defer<void>()
               tmpPromise.resolve()
 
               if (!streamDone) {
@@ -202,8 +201,8 @@ class RelayConnection implements MultiaddrConnection {
           } else {
             error(`Received invalid prefix <${u8aToHex(PREFIX || new Uint8Array([]))}. Dropping message.`)
           }
-
-          streamPromise = this._stream.source.next().then(sourceFunction)
+        } else {
+          log(`dropping empty messagein source function`)
         }
 
         streamPromise = this._stream.source.next().then(sourceFunction)
@@ -434,7 +433,9 @@ class RelayConnection implements MultiaddrConnection {
           ]) as unknown) as Uint8Array
         }
 
-        webRTCPromise = webRTCstream.next().then(webRTCSourceFunction)
+        if (!webRTCdone) {
+          webRTCPromise = webRTCstream.next().then(webRTCSourceFunction)
+        }
       } else if (streamClosed) {
         if (!this._destroyed) {
           this._destroyed = true
@@ -442,12 +443,14 @@ class RelayConnection implements MultiaddrConnection {
           return u8aConcat(RELAY_STATUS_PREFIX, STOP)
         }
 
-        return
+        break
       } else if (statusMessageAvailable) {
         statusMessageAvailable = false
         while (this._statusMessages.length > 0) {
           yield this._statusMessages.shift()
         }
+
+        this._statusMessagePromise = Defer<void>()
 
         statusPromise = this._statusMessagePromise.promise.then(statusSourceFunction)
       } else if (streamSwitched) {
