@@ -149,9 +149,7 @@ class RelayContext {
               verbose(`PING received`)
               this._statusMessages.push(u8aConcat(RELAY_STATUS_PREFIX, PING_RESPONSE))
 
-              let tmpPromise = this._statusMessagePromise
-              this._statusMessagePromise = Defer<void>()
-              tmpPromise.resolve()
+              this._statusMessagePromise.resolve()
 
               if (!sourceDone) {
                 sourcePromise = currentSource.next().then(sourceFunction)
@@ -268,6 +266,8 @@ class RelayContext {
           while (this._statusMessages.length > 0) {
             yield this._statusMessages.shift()
           }
+
+          this._statusMessagePromise = Defer<void>()
 
           statusPromise = this._statusMessagePromise.promise.then(statusSourceFunction)
         } else if (streamSwitched) {
