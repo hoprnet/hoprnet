@@ -29,7 +29,6 @@ class RelayConnection implements MultiaddrConnection {
   private _sinkTriggered: boolean
 
   private _switchPromise: DeferredPromise<Stream['source']>
-  private _switchPromiseSource: DeferredPromise<void>
 
   private _statusMessagePromise: DeferredPromise<void>
   private _statusMessages: Uint8Array[]
@@ -73,7 +72,6 @@ class RelayConnection implements MultiaddrConnection {
     this._defer = Defer()
 
     this._switchPromise = Defer<Stream['source']>()
-    this._switchPromiseSource = Defer<void>()
 
     this._statusMessagePromise = Defer<void>()
     this._statusMessages = []
@@ -119,14 +117,6 @@ class RelayConnection implements MultiaddrConnection {
     let streamMsg: Uint8Array | void
     let streamDone = false
 
-    let streamSwitched = false
-
-    function switchFunction() {
-      streamSwitched = true
-    }
-
-    let switchPromise = this._switchPromiseSource.promise.then(switchFunction)
-
     function sourceFunction({ done, value }: { done?: boolean; value?: Uint8Array | void }) {
       streamResolved = true
       streamMsg = value
@@ -145,11 +135,11 @@ class RelayConnection implements MultiaddrConnection {
         await Promise.race([
           // prettier-ignore
           streamPromise,
-          switchPromise,
+          //switchPromise,
           closePromise
         ])
       } else {
-        await switchPromise
+        //await switchPromise
       }
 
       if (streamResolved) {
@@ -173,7 +163,7 @@ class RelayConnection implements MultiaddrConnection {
               this._destroyed = true
               return
             } else if (u8aEquals(SUFFIX, RESTART)) {
-              log(`RESTART received, reconnectReceived: ${__reconnectCounter++}`)
+              log(`RESTART received, reconnectReceived: ${__reconnectCounter++}. Ending stream ...`)
 
               return this._onReconnect(this)
 
@@ -205,9 +195,9 @@ class RelayConnection implements MultiaddrConnection {
 
           streamPromise = this._stream.source.next().then(sourceFunction)
         }
-      } else if (streamSwitched) {
-        log(`################### streamSwitched relayConnection ###################`)
-        break
+        // } else if (streamSwitched) {
+        //   log(`################### streamSwitched relayConnection ###################`)
+        //   break
       } else if (streamClosed || streamDone) {
         if (!this._destroyed) {
           if (!this._sinkTriggered) {
@@ -460,10 +450,6 @@ class RelayConnection implements MultiaddrConnection {
 
   switch(): MultiaddrConnection {
     log(`updating`)
-
-    let tmpPromise = this._switchPromiseSource
-    this._switchPromiseSource = Defer<void>()
-    tmpPromise.resolve()
 
     return {
       ...this,
