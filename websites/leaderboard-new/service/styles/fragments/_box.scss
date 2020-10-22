@@ -131,6 +131,14 @@
         transition: all 350ms ease-in-out;
         img {
           margin-right: 0.5em;
+          transition: all 400ms;
+        }
+        &:focus{
+          outline-color: transparent;
+          img {
+            transform: rotate(360deg);
+            transition: all 400ms;
+          }
         }
         &:hover {
           background: #ebebeb;

@@ -4,39 +4,40 @@ import BoxRemember from "../components/micro-components/box-remember";
 
 import api from "../utils/api";
 
-const columnsDefaults = [
-  {
-    title: "online",
-    dataIndex: "online",
-    key: "online",
-    className: 'sortBy asc',
-  },
-  {
-    title: "address",
-    dataIndex: "address",
-    key: "address",
-    className: 'sortBy',
-  },
-  {
-    title: "id",
-    dataIndex: "id",
-    key: "id",
-    className: 'sortBy ',
-  },
-  {
-    title: "score",
-    dataIndex: "score",
-    key: "score",
-    className: 'sortBy',
-  },
-  {
-    title: "tweetUrl",
-    dataIndex: "tweetUrl",
-    key: "tweetUrl",
-  },
-];
+
 
 export default function Home() {
+  const columnsDefaults = [
+    {
+      title: "online",
+      dataIndex: "online",
+      key: "online",
+      className: 'sortBy asc',
+    },
+    {
+      title: "address",
+      dataIndex: "address",
+      key: "address",
+      className: 'sortBy',
+    },
+    {
+      title: "id",
+      dataIndex: "id",
+      key: "id",
+      className: 'sortBy ',
+    },
+    {
+      title: "score",
+      dataIndex: "score",
+      key: "score",
+      className: 'sortBy',
+    },
+    {
+      title: "tweetUrl",
+      dataIndex: "tweetUrl",
+      key: "tweetUrl",
+    },
+  ];
   const [data, setData] = useState(undefined);
   const [columns, setColumns] = useState(columnsDefaults);
 
@@ -45,12 +46,20 @@ export default function Home() {
   const nodesConnected = data ? data.connectedNodes : 0;
   const nodes = data ? data.nodes : [];
 
-  useEffect(() => {
+
+  const callAPI = () =>{
     const fetchData = async () => {
       const response = await api.getAllData();
-      if (response.data) setData(response.data);
+      if (response.data) {
+        setData(response.data);
+        setColumns(columnsDefaults);
+      }
     };
     fetchData();
+  }
+
+  useEffect(() => {
+    callAPI();
   }, []);
 
   const getIntBase = key => {
@@ -63,6 +72,9 @@ export default function Home() {
         return 10;
     }
   };
+
+ 
+
 
   const onClickSort = key => {
     let sSort = '',
@@ -105,7 +117,7 @@ export default function Home() {
               <h1>Leaderboard</h1>
             </div>
             <div className="box-btn">
-              <button>
+              <button onClick={() => callAPI()}> 
                 <img src="/assets/icons/refresh.svg" alt="refresh now" />
                 refresh now
               </button>
@@ -157,7 +169,7 @@ export default function Home() {
                     return (
                       <tr key={id}>
                         <td className="icon-help-online" data-label="online"><div className={[online ? "online" : "offline"]}></div></td>
-                        <td data-label="address">
+                        <td data-label="address" data-RAW={address}>
                           <a  
                           className="table-link-on"
                           target="_blank"
@@ -166,7 +178,7 @@ export default function Home() {
                             {address}
                           </a>  
                         </td>
-                        <td data-label="id">
+                        <td data-label="id" data-RAW={id}>
                         {id}
                         </td>
                         <td data-type="score" data-label="score">

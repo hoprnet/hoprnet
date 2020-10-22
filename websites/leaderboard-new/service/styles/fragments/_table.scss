@@ -42,7 +42,10 @@ table thead tr {
   }
 }
 
-
+thead tr{
+  border-top: 0.5px solid #e3e3e359!important;
+  background: #f7f7f796!important;
+}
 
 table caption {
   font-size: 1.5em;
@@ -59,22 +62,83 @@ table tr {
     border-top: 0.5px solid transparent;
   }
   &:nth-child(even) {
-    background:white ;
-  }
-  &:nth-child(odd) {
     background: #f7f7f796;
   }
+  &:nth-child(odd) {
+    background:white ;
+    
+  }
   td {
+    display: flex;
+    align-items: center;
     white-space: nowrap;
-    overflow: hidden;
     text-overflow: ellipsis;
     color: $black;
+    justify-content: space-between;
+
+    &[data-label="online"]{
+      flex-direction: row-reverse;
+    }
+    &[data-label="address"]{
+      overflow: scroll;
+      flex-direction: column!important;
+      &:hover{
+        &::before{
+          opacity: 1;
+          position: absolute;
+          transform: translateY(-100%);
+          background: #0C00A1;
+          width: fit-content;
+          box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.06);
+          box-sizing: border-box;
+          color: #fff;
+          padding: 0.5em;
+          border-radius: 2px;
+          transition: all 300ms ease-in-out;
+        }
+      }
+    }
+
+    &[data-label="id"] {
+      overflow: scroll;
+      flex-direction: column!important;
+      &::before{
+        content: attr(data-RAW);
+        transition: all 300ms ease-in-out;
+      }
+      &:hover{
+        &::before{
+          opacity: 1;
+          position: absolute;
+          transform: translateY(-100%);
+          background: #0C00A1;
+          width: fit-content;
+          box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.06);
+          box-sizing: border-box;
+          color: #fff;
+          padding: 0.5em;
+          border-radius: 2px;
+          transition: all 300ms ease-in-out;
+        }
+      }
+    }
+
+    @media (min-width: 767px) {  
+      justify-content: center;
+      flex-direction: row;
+     
+      display: table-cell;
+      &[data-label="address"],
+      &[data-label="id"] {
+        overflow: hidden;
+      } 
+      &[data-label="online"]{
+        flex-direction: row;
+      }
+    }
     &[data-type="score"] {
       color: #331cfa;
       font-weight: 600;
-      display: flex;
-      align-items: center;
-      justify-content: center;
     }
     img{
       transition: all 350ms ease-in-out;
@@ -125,9 +189,9 @@ table th {
   }
 
   table tr {
-    border-bottom: 3px solid #ddd;
+    border-bottom: 0px;
     display: block;
-    margin-bottom: 0.625em;
+    margin-bottom: 0em;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -166,11 +230,13 @@ table th {
   border: 0.5px solid #ebebeb;
   border-radius: 4px;
   padding: 0.27em;
-  color:$black;
+  color: $colorLink;
   line-height: normal;
   transition: all 350ms ease-in-out;
   &:hover{
-    color: $colorLink;
+    color:$black;
     transition: all 350ms ease-in-out;
   }
 }
+
+

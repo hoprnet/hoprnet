@@ -180,7 +180,9 @@ a.aux-help-twitter{
 // icon
 .icon-help-online{
   box-sizing: border-box;
-  padding-left: 2em;
+  @media (min-width: 767px) {
+    padding-left: 2em;
+  }
  div{
   width: 17px;
   height: 17px;
@@ -189,6 +191,7 @@ a.aux-help-twitter{
   .online{
     background:#7CEE78;
     border:1.5px solid darken(#7CEE78, 17);
+    
     &::before{
       content: "ONLINE";
       margin-left: 27px;

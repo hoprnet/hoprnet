@@ -25,7 +25,6 @@ class FirebaseDatabase {
             err
           )
         );
-      console.log(`- resolveResponse | Retrieved json ${JSON.stringify(json)}`);
       return { data: json, status: 200 };
     } else {
       console.error(`- resolveResponse | Failed to retrieve data.`);
@@ -35,7 +34,6 @@ class FirebaseDatabase {
 
   async getSchema(schema) {
     try {
-      console.log(`- getSchema | Retrieving schema ${schema} from ${this.databaseUrl}`);
       const response = await fetch(
         `${this.databaseUrl}${schema}.json`
       ).catch((err) =>
@@ -50,9 +48,6 @@ class FirebaseDatabase {
 
   async getTable(schema, table) {
     try {
-      console.log(
-        `- getTable | Retrieving table ${table} within schema ${schema} from ${this.databaseUrl}`
-      );
       const response = await fetch(
         `${this.databaseUrl}${schema}/${table}.json`
       );
