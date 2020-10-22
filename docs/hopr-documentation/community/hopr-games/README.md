@@ -8,7 +8,7 @@ description: >-
 
 In order to showcase the usage of the HOPR Protocol, the HOPR Association has created the **HOPR Games**, an interactive online games, bounties and experiments challenges meant to be accomplished using the HOPR Protocol.
 
-![](../../.gitbook/assets/hopr_tweet%20%282%29%20%281%29%20%281%29%20%281%29.gif)
+![](../../.gitbook/assets/hopr_tweet%20%282%29%20%281%29.gif)
 
 ## Goals
 

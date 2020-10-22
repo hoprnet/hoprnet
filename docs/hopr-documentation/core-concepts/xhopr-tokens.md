@@ -1,5 +1,5 @@
 ---
-description: 'The rundown on HOPR, the token used for the Säntis testnet'
+description: 'The rundown on HOPR, the token used for our testnets'
 ---
 
 # HOPR Tokens
@@ -14,6 +14,6 @@ HOPR works like the HOPR token will: you receive it for relaying and mixing data
 
 You can check your HOPR balance at any time by typing `balance` in HOPR Chat or in your HOPR PC Node. This will also show you your xDAI balance.
 
-{% hint style="info" %}
-**IMPORTANT:** The HOPR token will only work on Säntis testnet. It is not the final HOPR token that will run on mainnet and for legal reasons HOPR tokens cannot be transferred to HOPR tokens. Prizes for the Säntis testnet will be solely determined by your final score on the leaderboard, not the number of HOPR tokens you control.
+{% hint style="danger" %}
+**IMPORTANT:** The HOPR token will only work on our HOPR testnets. It is not the final HOPR token that will run on mainnet and for legal reasons HOPR tokens cannot be transferred to HOPR tokens. Prizes for our testnets will be solely determined by your final score on the testnet leaderboard, not the number of HOPR tokens you control.
 {% endhint %}
