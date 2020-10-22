@@ -221,9 +221,7 @@ class RelayConnection implements MultiaddrConnection {
   }
 
   private async _createSink(source: Stream['source']) {
-    let tmpPromise = this._switchPromise
-    // this._switchPromise = Defer<Stream['source']>()
-    tmpPromise.resolve(source)
+    this._switchPromise.resolve(source)
     log(`RelayConnection: sink triggered`)
 
     this._sinkTriggered = true
