@@ -25,7 +25,7 @@ class Network {
         throw new Error('Cannot store a peer without an ID')
       }
       const pid = PeerId.createFromCID(ma.getPeerId())
-      node.peerStore.addressBook.add(pid, ma)
+      node.peerStore.addressBook.add(pid, [ma])
     }
 
     const getPeer = (id: PeerId): Multiaddr[] => {

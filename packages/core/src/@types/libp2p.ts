@@ -33,27 +33,27 @@ declare module 'libp2p' {
     }
   }
 
-  export type PeerInfo = { 
-    id: PeerId;
-    addresses: Array<Multiaddr>;
-    metadata: Map<string, Buffer>;
-    protocols: Array<string>
-  }
-
   export type PeerRoute = { 
     id: PeerId;
     multiaddrs: Multiaddr[];
   }
 
   export type PeerStore = {
-    get(peerId: PeerId):  PeerInfo | undefined
-    peers: Map<string, PeerInfo>
+    //https://github.com/libp2p/js-libp2p/blob/master/doc/API.md#peerstoreget 
+    get(peerId: PeerId):  { id: PeerId, addresses: Array<Multiaddr>, metadata: Map<string, Buffer>, protocols: Array<string> } | undefined
+    peers: Map<string, { id: PeerId, addresses: Array<Multiaddr>, metadata: Map<string, Buffer>, protocols: Array<string> }>
     delete(peer: PeerId): void
 
+    // https://github.com/libp2p/js-libp2p/blob/master/doc/API.md#peerstoreaddressbookadd
     addressBook: {
-      add(id: PeerId, addr: Multiaddr)
-      get(id: PeerId): Multiaddr[]
+      add(id: PeerId, addr: Array<Multiaddr>)
+      delete(id: PeerId)
+      get(id: PeerId): Array<Multiaddr>
+      getMultiaddrsForPeer(id: PeerId): Array<string>
+      set(peerId: PeerId, multiaddrs: Array<Multiaddr>)
     }
+
+    protoBook: {} // TODO
   }
   export interface DialOptions {
     signal?: AbortSignal
