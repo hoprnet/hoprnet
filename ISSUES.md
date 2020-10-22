@@ -12,7 +12,8 @@ Principles:
 ## Creating an issue
 
 - A team-member, or an external contributor creates an issue using one of our [templates](.github/ISSUE_TEMPLATE), these templates may add some labels by default.
-- A team-member labels the issue accordingly.
+- All new issues will contain a 'needs review' label.
+- A team-member may review the new issue and label it accordingly, then he/she may remove 'needs-review' label.
 - (Optional) A team-member adds it to a milestone.
 - (Optional) A team-member assignes a user.
 - (Optional) A team-member adds it to a project.
@@ -21,3 +22,7 @@ Principles:
 
 - We are using a monorepo
 - Possibility to filter by `project`
+
+## Why we add label 'needs review' by default
+
+Makes it easy for an issue maintainer to filter by 'needs review' and review the issues.
