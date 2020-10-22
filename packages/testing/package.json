@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-testing",
-  "version": "1.17.17",
+  "version": "1.17.18",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -24,7 +24,7 @@
     "prepublishOnly": "yarn build"
   },
   "dependencies": {
-    "@hoprnet/hopr-demo-seeds": "1.17.17",
+    "@hoprnet/hopr-demo-seeds": "1.17.18",
     "debug": "^4.1.1",
     "ganache-core": "^2.12.1"
   },
