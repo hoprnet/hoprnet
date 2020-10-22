@@ -138,7 +138,7 @@ class TCP {
         let i = 0
         while (i < 7) {
           yield new TextEncoder().encode(`message #${i++}`)
-          await new Promise(resolve => setTimeout(resolve, 70))
+          await new Promise(resolve => setTimeout(resolve, 20))
         }
       })())
 
