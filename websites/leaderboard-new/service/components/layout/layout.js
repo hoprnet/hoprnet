@@ -42,7 +42,6 @@ const Layout = ({ children }) => {
         </div>
       </header>
       <Menu activaMenu={activaMenu} />
-
       <div className="main-container">
         <div className="only-desktop-view">
           <LeftSide />
