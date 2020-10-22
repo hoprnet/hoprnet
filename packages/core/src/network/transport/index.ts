@@ -125,6 +125,7 @@ class TCP {
 
   onReconnect(conn: Connection) {
     return async function (relayConn: RelayConnection) {
+      const newStream = relayConn.switch()
       if (conn != null) {
         // @ts-ignore
         conn._close = () => Promise.resolve()
@@ -133,7 +134,7 @@ class TCP {
 
       log(`####### inside reconnect #######`)
       try {
-        this._upgrader.upgradeInbound(relayConn.switch()).then((conn: Connection) => this.connHandler?.(conn))
+        this._upgrader.upgradeInbound(newStream).then((conn: Connection) => this.connHandler?.(conn))
       } catch (err) {
         error(err)
       }
