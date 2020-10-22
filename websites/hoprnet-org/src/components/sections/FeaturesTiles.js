@@ -48,7 +48,7 @@ class FeaturesTiles extends React.Component {
 
     const sectionHeader = {
       title: 'HOPR Is',
-      paragraph: undefined,
+      paragraph: '<p>HOPR is a protocol that relies on economic incentives on top of a blockchain. To incentivize people to run nodes supporting the network, we rely on token economics to reward users for powering the p2p network that the protocol creates</p>',
     }
 
     const sectionHeader2 = {
