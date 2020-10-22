@@ -133,11 +133,23 @@ class TCP {
       }
 
       log(`####### inside reconnect #######`)
-      try {
-        this._upgrader.upgradeInbound(newStream).then((conn: Connection) => this.connHandler?.(conn))
-      } catch (err) {
-        error(err)
+
+      newStream.sink((async function * () {
+        let i = 0
+        while (i < 7) {
+          yield new TextEncoder().encode(`message #${i++}`)
+          await new Promise(resolve => setTimeout(resolve, 70))
+        }
+      })())
+
+      for await (const msg of newStream.source) {
+        log(`received in reconnect:`, msg?.slice())
       }
+      // try {
+      //   this._upgrader.upgradeInbound(newStream).then((conn: Connection) => this.connHandler?.(conn))
+      // } catch (err) {
+      //   error(err)
+      // }
     }.bind(this)
   }
 
