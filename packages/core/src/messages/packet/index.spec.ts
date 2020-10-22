@@ -19,6 +19,8 @@ import BN from 'bn.js'
 
 import Debug from 'debug'
 import { ACKNOWLEDGED_TICKET_INDEX_LENGTH } from '../../dbKeys'
+import { connectionHelper } from '../../test-utils'
+
 const log = Debug(`hopr-core:testing`)
 
 const TWO_SECONDS = durations.seconds(2)
@@ -65,7 +67,7 @@ describe('test packet composition and decomposition', function () {
     async function () {
       const nodes = await Promise.all(Array.from({ length: MAX_HOPS + 1 }).map((_value, index) => generateNode(index)))
 
-      connectionHelper(nodes)
+      connectionHelper(nodes.map(n => n._libp2p))
 
       console.log(
         new nodes[0].paymentChannels.types.ChannelBalance(undefined, {
@@ -191,19 +193,6 @@ describe('test packet composition and decomposition', function () {
     durations.seconds(25)
   )
 })
-
-/**
- * Introduce the nodes to each other
- * @param nodes Hopr nodes
- */
-function connectionHelper<Chain extends HoprCoreConnector>(nodes: Hopr<Chain>[]) {
-  for (let i = 0; i < nodes.length; i++) {
-    for (let j = i + 1; j < nodes.length; j++) {
-      nodes[i]._libp2p.peerStore.put(nodes[j]._libp2p.peerInfo)
-      nodes[j]._libp2p.peerStore.put(nodes[i]._libp2p.peerInfo)
-    }
-  }
-}
 
 const NOOP = () => {}
 

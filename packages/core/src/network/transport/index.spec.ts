@@ -20,6 +20,7 @@ import { u8aEquals } from '@hoprnet/hopr-utils'
 
 import { randomBytes } from 'crypto'
 import { RELAY_CIRCUIT_TIMEOUT } from './constants'
+import { connectionHelper } from '../../test-utils'
 
 const TEST_PROTOCOL = `/test/0.0.1`
 
@@ -868,16 +869,3 @@ describe('should create a socket and connect to it', function () {
   //   ])
   // })
 })
-
-/**
- * Informs each node about the others existence.
- * @param nodes Hopr nodes
- */
-function connectionHelper(nodes: libp2p[]) {
-  for (let i = 0; i < nodes.length; i++) {
-    for (let j = i + 1; j < nodes.length; j++) {
-      nodes[i].peerStore.addressBook.add(nodes[j].peerId, nodes[j].multiaddrs[0])
-      nodes[j].peerStore.addressBook.add(nodes[i].peerId, nodes[i].multiaddrs[0])
-    }
-  }
-}

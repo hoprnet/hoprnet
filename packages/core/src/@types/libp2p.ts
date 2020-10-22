@@ -41,6 +41,11 @@ declare module 'libp2p' {
     protocols: Array<string>
   }
 
+  export type PeerRoute = { 
+    id: PeerId;
+    multiaddrs: Multiaddr[];
+  }
+
   export type PeerStore = {
     get(peerId: PeerId):  PeerInfo | undefined
     peers: Map<string, PeerInfo>
@@ -67,7 +72,7 @@ declare module 'libp2p' {
     hangUp: (addr: PeerId | Multiaddr | string) => Promise<void>
     peerStore: PeerStore
     peerRouting: {
-      findPeer: (addr: PeerId) => Promise<{ id: PeerId, multiaddrs: Multiaddr[] }>
+      findPeer: (addr: PeerId) => Promise<PeerRoute>
     }
     handle: (protocol: string | string[], handler: (struct: { connection: any; stream: any }) => void) => void
     on: (str: string, handler: (...props: any[]) => void) => void
