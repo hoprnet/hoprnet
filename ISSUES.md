@@ -26,5 +26,3 @@ Principles:
 ## Why we add label 'needs review' by default
 
 Makes it easy for an issue maintainer to filter by 'needs review' and review the issues.
-
-temp
