@@ -22,7 +22,7 @@ class CrawlResponse extends Uint8Array {
         }
         super(u8aConcat(toU8a(struct.status, ENUM_LENGTH)))
       } else if (struct.status == CrawlStatus.OK) {
-        super(u8aConcat(toU8a(struct.status, ENUM_LENGTH), encode(struct.addresses.map((ma: Multiaddr) => ma.buffer))))
+        super(u8aConcat(toU8a(struct.status, ENUM_LENGTH), encode(struct.addresses.map((ma: Multiaddr) => ma.bytes))))
       } else {
         throw Error(`Invalid creation parameters.`)
       }
