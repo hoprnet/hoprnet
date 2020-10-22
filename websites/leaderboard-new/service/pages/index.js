@@ -169,7 +169,7 @@ export default function Home() {
                     return (
                       <tr key={id}>
                         <td className="icon-help-online" data-label="online"><div className={[online ? "online" : "offline"]}></div></td>
-                        <td data-label="address" data-RAW={address}>
+                        <td data-label="address" data-raw={address}>
                           <a  
                           className="table-link-on"
                           target="_blank"
@@ -178,14 +178,16 @@ export default function Home() {
                             {address}
                           </a>  
                         </td>
-                        <td data-label="id" data-RAW={id}>
+                        <td data-label="id" data-raw={id}>
                         {id}
                         </td>
                         <td data-type="score" data-label="score">
                           {score}
                         </td>
                         <td data-label="tweetUrl">
-                          <a href={tweetUrl}>
+                          <a target="_blank"
+                            href={tweetUrl} 
+                            rel="noopener noreferrer">
                             <img
                               src="/assets/icons/twitter.svg"
                               alt="twitter"

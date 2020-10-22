@@ -103,7 +103,7 @@ table tr {
       overflow: scroll;
       flex-direction: column!important;
       &::before{
-        content: attr(data-RAW);
+        content: attr(data-raw);
         transition: all 300ms ease-in-out;
       }
       &:hover{

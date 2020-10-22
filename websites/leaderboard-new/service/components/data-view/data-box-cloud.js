@@ -1,29 +1,31 @@
 import React, { useState, useEffect } from "react";
-import api from '../../utils/api'
 import "../../styles/main.scss";
 
 const DataBoxCloud = () => {
+  const [token, setToken] = useState(
+    "0x4774fEd3f2838f504006BE53155cA9cbDDEe9f0c"
+  );
+  const [channel, setChannel] = useState(
+    "0x25E2e5D8EcC4fE46a9505079Ed29266779dC7D6f"
+  );
 
-
-  useEffect(() => {
-    const fetchStats = async () => {
-      const apiStats = await api.getState();
-   
-    }
-    fetchStats();
-  }, []);
-
+  const copyCodeToClipboard = (aux) => {
+     navigator.clipboard.writeText(aux);
+    // setModal(true);
+    // setTimeout(() => {
+    //   setModal(false);
+    // }, 4000);
+  };
 
   return (
     <div className="box-border">
-      <div>
-        <h3 className="num"> 0x4774fEd3f2838f504006BE53155cA9cbDDEe9f0c </h3>
+      <div onClick={() => copyCodeToClipboard(token)}>
+        <h3 className="num"> {token} </h3>
         <p>HOPR token address</p>
       </div>
-     
-      <div>
-        <h3 className="num"> 0x25E2e5D8EcC4fE46a9505079Ed29266779dC7D6f </h3>
-        <p>HOPR payment channe</p>
+      <div onClick={() => copyCodeToClipboard(channel)}>
+        <h3 className="num"> {channel} </h3>
+        <p>HOPR payment channel</p>
       </div>
     </div>
   );
