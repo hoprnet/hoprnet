@@ -61,14 +61,6 @@ export default function Home() {
     callAPI()
   }, [])
 
-  const getForSearchBar = () => {
-    debugger
-    if (searchTerm != undefined && searchTerm.length >= 0) {
-      console.log(1)
-    } else {
-      console.log(0)
-    }
-  }
 
   const getIntBase = (key) => {
     switch (key) {
@@ -115,7 +107,9 @@ export default function Home() {
 
   return (
     <Layout>
-      <BoxDataTable nodesVerified={nodesVerified} nodesRegistered={nodesRegistered} nodesConnected={nodesConnected} />
+      <div className="only-mobile-view">
+        <BoxDataTable nodesVerified={nodesVerified} nodesRegistered={nodesRegistered} nodesConnected={nodesConnected} />
+      </div>
       <div className="box">
         <div className="box-top-area">
           <div>
@@ -130,7 +124,7 @@ export default function Home() {
             </div>
           </div>
 
-          <SearchBar searchTerm={searchTerm} setSearchTerm={setSearchTerm} getForSearchBar={getForSearchBar} />
+          <SearchBar searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
         </div>
         <div className="box-main-area remove-all-padding">
           <div className="box-container-table">
@@ -156,14 +150,11 @@ export default function Home() {
                 <tbody>
                   {nodes.map((e) => {
                     const { online, address, id, score, tweetUrl } = e
-
                     if (searchTerm.length > 0) {
-                      debugger
                       if (
                         address.toLowerCase().indexOf(searchTerm.toLowerCase()) >= 0 ||
                         id.toLowerCase().indexOf(searchTerm.toLowerCase()) >= 0
                       ) {
-                        debugger
                         return (
                           <tr key={id}>
                             <td className="icon-help-online" data-label="online">

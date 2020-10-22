@@ -165,12 +165,14 @@ a.aux-help-twitter {
 
 .aux-link-out-to-post {
   border-bottom: 1px solid $grey;
+  text-decoration: none;
   &:hover {
     border-bottom: 1px solid transparent;
   }
 }
 
 .aux-link-out {
+  text-decoration: none;
   img {
     height: 12px;
     margin: 0 0.05em;
