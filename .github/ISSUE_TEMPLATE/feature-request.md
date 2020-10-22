@@ -2,7 +2,9 @@
 name: Feature Request
 about: Request a new feature, or change to an existing one
 title: ''
-labels: 'feature'
+labels:
+  - 'feature'
+  - 'needs review'
 assignees: ''
 ---
 
