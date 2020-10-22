@@ -170,7 +170,7 @@ class RelayConnection implements MultiaddrConnection {
               this._onReconnect(this)
 
               // end stream
-              return
+              break
               // @TODO replace timeout by something more meaningful
               // await new Promise((resolve) => setTimeout(resolve, 100))
             } else if (u8aEquals(SUFFIX, PING)) {
@@ -216,6 +216,8 @@ class RelayConnection implements MultiaddrConnection {
         return
       }
     }
+
+    console.log(`returned`)
   }
 
   private async _createSink(source: Stream['source']) {
