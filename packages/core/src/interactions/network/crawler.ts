@@ -8,7 +8,7 @@ import PeerId from 'peer-id'
 import Multiaddr from 'multiaddr'
 import { CrawlResponse, CrawlStatus } from '../../messages'
 import { LibP2P } from '../../'
-import type { Connection } from '../../@types/transport'
+import type { Connection } from 'libp2p'
 
 const log = debug('hopr-core:crawler')
 const verbose = debug('hopr-core:verbose:crawl-interaction')
@@ -44,9 +44,9 @@ class Crawler implements AbstractInteraction {
         struct = await this.node
           .dialProtocol(counterparty, this.protocols[0], { signal: options.signal })
           .catch(async (_: Error) => {
-            const peerInfo = await this.node.peerRouting.findPeer(counterparty)
+            const { id } = await this.node.peerRouting.findPeer(counterparty)
 
-            return await this.node.dialProtocol(peerInfo, this.protocols[0], { signal: options.signal })
+            return await this.node.dialProtocol(id, this.protocols[0], { signal: options.signal })
           })
       } catch (err) {
         log(`Could not ask node ${counterparty.toB58String()} for other nodes. Error was: ${chalk.red(err.message)}.`)

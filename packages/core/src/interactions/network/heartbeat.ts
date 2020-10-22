@@ -5,7 +5,8 @@ import debug from 'debug'
 import AbortController from 'abort-controller'
 import pipe from 'it-pipe'
 import { PROTOCOL_HEARTBEAT, HEARTBEAT_TIMEOUT } from '../../constants'
-import type { Stream, Connection, Handler } from '../../@types/transport'
+import type {Handler } from '../../@types/transport'
+import type { Stream, Connection } from 'libp2p'
 import type PeerId from 'peer-id'
 import { LibP2P } from '../../'
 
@@ -74,9 +75,9 @@ class Heartbeat implements AbstractInteraction {
           .dialProtocol(counterparty, this.protocols[0], { signal: abort.signal })
           .catch(async (err: Error) => {
             verbose(`heartbeat connection error ${err.name} while dialing ${counterparty.toB58String()} (initial)`)
-            const peerInfo = await this.node.peerRouting.findPeer(counterparty)
+            const { id } = await this.node.peerRouting.findPeer(counterparty)
             //verbose('trying with peer info', peerInfo)
-            return await this.node.dialProtocol(peerInfo, this.protocols[0], { signal: abort.signal })
+            return await this.node.dialProtocol(id, this.protocols[0], { signal: abort.signal })
           })
       } catch (err) {
         verbose(

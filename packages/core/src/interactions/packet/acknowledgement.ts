@@ -57,8 +57,8 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
 
       try {
         struct = await this.node._libp2p.dialProtocol(counterparty, this.protocols[0]).catch(async () => {
-          const result = await this.node._libp2p.peerRouting.findPeer(counterparty)
-          return await this.node._libp2p.dialProtocol(result, this.protocols[0])
+          const { id } = await this.node._libp2p.peerRouting.findPeer(counterparty)
+          return await this.node._libp2p.dialProtocol(id, this.protocols[0])
         })
       } catch (err) {
         clearTimeout(timeout)

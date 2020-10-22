@@ -52,8 +52,8 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
         struct = await this.node._libp2p
           .dialProtocol(counterparty, this.protocols[0], { signal: abort.signal })
           .catch(async () => {
-            const peerInfo = await this.node._libp2p.peerRouting.findPeer(counterparty)
-            return await this.node._libp2p.dialProtocol(peerInfo, this.protocols[0], { signal: abort.signal })
+            const { id } = await this.node._libp2p.peerRouting.findPeer(counterparty)
+            return await this.node._libp2p.dialProtocol(id, this.protocols[0], { signal: abort.signal })
           })
       } catch (err) {
         log(`Could not transfer packet to ${counterparty.toB58String()}. Error was: ${chalk.red(err.message)}.`)

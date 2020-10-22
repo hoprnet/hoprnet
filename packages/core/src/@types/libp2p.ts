@@ -2,7 +2,6 @@
 declare module 'libp2p' {
   type PeerId = import('peer-id')
   type Multiaddr = import('multiaddr')
-  type Handler = import('./transport').Handler
   type EventEmitter = import('events').EventEmitter
 
   export type Stream = {
@@ -55,6 +54,50 @@ declare module 'libp2p' {
       add(id: PeerId, addr: Multiaddr)
       get(id: PeerId): Multiaddr[]
     }
+  }
+  export interface DialOptions {
+    signal?: AbortSignal
+    relay?: PeerId 
+  }
+
+  export type Handler = {
+    stream: Stream
+    connection?: Connection
+    protocol?: string
+  }
+
+  export interface MultiaddrConnection extends Stream {
+    close(err?: Error): Promise<void>
+    conn: any
+    remoteAddr: Multiaddr
+    localAddr?: Multiaddr
+    timeline: {
+      open: number
+      close?: number
+    }
+  }
+
+  export interface Upgrader {
+    upgradeOutbound(multiaddrConnection: MultiaddrConnection): Promise<Connection>
+    upgradeInbound(multiaddrConnection: MultiaddrConnection): Promise<Connection>
+  }
+
+  export interface Registrar {
+    getConnection(peer: PeerInfo): Connection | undefined
+    handle(protocol: string, handler: Handler): void
+  }
+
+  export interface Dialer {
+    connectToPeer(peer: PeerInfo, options?: any): Promise<Connection>
+  }
+
+  export type ConnHandler = (conn: Connection) => void
+
+
+  export interface Listener extends EventEmitter {
+    close(): void
+    listen(ma: Multiaddr): Promise<void>
+    getAddrs(): Multiaddr[]
   }
 
   export default class LibP2P {
