@@ -171,6 +171,8 @@ class RelayConnection implements MultiaddrConnection {
 
               this._onReconnect(this)
 
+              log(`after reconnect`, (await this._stream.source.next()).value)
+
               // end stream
               break
               // @TODO replace timeout by something more meaningful
