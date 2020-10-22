@@ -183,24 +183,24 @@
     "@ethersproject/rlp" "^5.0.3"
     "@ethersproject/signing-key" "^5.0.4"
 
-"@hoprnet/hopr-demo-seeds@1.17.16":
-  version "1.17.16"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-demo-seeds/-/hopr-demo-seeds-1.17.16.tgz#58ad161a253ae9d14d95c330046af169bc1d35be"
-  integrity sha512-rQsyyLI9BN/532szRl9sPvXrc/FWUUFVKWZUrwJpMuiDKsRhI1Udp5ZQRzOQSCWFnYEDg0UmSeklqnNFCT8g8A==
+"@hoprnet/hopr-demo-seeds@1.17.17":
+  version "1.17.17"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-demo-seeds/-/hopr-demo-seeds-1.17.17.tgz#69ac4a5207c44e21216836005d3ebb0b89f28747"
+  integrity sha512-p+wJBGcRES9v1YXAYwIcYAbga8akbv+nV7fycEaRK/Sb8ZgYTe65GJfkiRa8ccjTePPpNDOkykKFN+hr2X5FUw==
 
-"@hoprnet/hopr-testing@1.17.16":
-  version "1.17.16"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-testing/-/hopr-testing-1.17.16.tgz#fc09d2bcd19abddb3de8f760ce879fe49a1a63cd"
-  integrity sha512-Iyig8nZjQvUcyMK43TI1eOhWbUJtgyRDS2ULTHFLm/8nQWtot0amGauaSNHtdy5ycaZSVjiLLHjp/J/a1ZWRTg==
+"@hoprnet/hopr-testing@1.17.17":
+  version "1.17.17"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-testing/-/hopr-testing-1.17.17.tgz#a5baa5dd9931dc04a49af0d16d60551b825c3a7a"
+  integrity sha512-7zCTinqW27a/VeHYsQqya8ehXI5MdtAw8oallHeNnFBTGpP9lm9RefEGcI0nBZ7U7qMSSqNqEhHKsTlLW63W0w==
   dependencies:
-    "@hoprnet/hopr-demo-seeds" "1.17.16"
+    "@hoprnet/hopr-demo-seeds" "1.17.17"
     debug "^4.1.1"
     ganache-core "^2.12.1"
 
-"@hoprnet/hopr-utils@1.17.16":
-  version "1.17.16"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.17.16.tgz#c88fafcb92ad4eb59293521c44be3735b68ec590"
-  integrity sha512-Qo5Yw6zvcXhgguM3lG8/VWPbZ/13Ka6U3K+HgTnLNPvazUShA6CvbL/KRDrapocZGFJxTN8d8l3sIya90jxaQw==
+"@hoprnet/hopr-utils@1.17.17":
+  version "1.17.17"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.17.17.tgz#8ed2ac921620bdb4657f31262ec6b11737c081d0"
+  integrity sha512-vXxQMh1zwmsSSA/+lpRkZRDy+a/huuLQxo6EQbIlyTT5S/L9v9XA1iQPi/frGC03Ag5CCqIQQdXO/zv18pxSGw==
   dependencies:
     bignumber.js "^9.0.0"
     libp2p-crypto "^0.17.9"

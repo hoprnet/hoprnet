@@ -68,7 +68,7 @@ export class SendMessage extends SendMessageBase {
       }
 
       // manual mode
-      if (state.routing === 'manual') {
+      if (state.routing === 'manual' && state.routingPath.length === 0) {
         throw Error('Cannot send a message using manual mode.')
       }
       // direct mode
