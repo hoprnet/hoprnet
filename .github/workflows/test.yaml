@@ -5,6 +5,8 @@ on:
     paths-ignore:
       - 'docs/**'
       - 'websites/**'
+      - '.github/workflows/publish-website-*.yml'
+
 jobs:
   build:
     name: Build & Test
@@ -22,10 +24,10 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
           registry-url: https://registry.npmjs.org/
-      - uses: actions/cache@v2
-        with:
-          path: '**/node_modules'
-          key: ${{ runner.os }}-modules-${{ hashFiles('**/yarn.lock') }}
+            #      - uses: actions/cache@v2
+            #        with:
+            #          path: '**/node_modules'
+            #          key: ${{ runner.os }}-modules-${{ hashFiles('**/yarn.lock') }}
       - name: Install node modules
         run: |
           yarn policies set-version ${{ matrix.yarn-version }}
