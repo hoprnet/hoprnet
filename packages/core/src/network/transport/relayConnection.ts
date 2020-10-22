@@ -1,4 +1,4 @@
-import { Stream } from 'LibP2P'
+import { Stream } from 'libp2p'
 import Multiaddr from 'multiaddr'
 import BL from 'bl'
 import { MultiaddrConnection } from 'libp2p'
