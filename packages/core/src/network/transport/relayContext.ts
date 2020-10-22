@@ -191,7 +191,7 @@ class RelayContext {
         switchPromise = this._switchPromise.promise.then(switchFunction)
         verbose(`################### streamSwitched ###################`)
         // @TODO replace this by a mutex
-        await new Promise((resolve) => setTimeout(resolve, 100))
+        // await new Promise((resolve) => setTimeout(resolve, 100))
         yield u8aConcat(RELAY_STATUS_PREFIX, RESTART)
 
         sourcePromise = currentSource.next().then(sourceFunction)
@@ -254,9 +254,7 @@ class RelayContext {
               yield sourceMsg
             }
           } else {
-            if (sourceDone) {
-              return
-            }
+            log(`dropping empty message`)
           }
 
           sourcePromise = source.next().then(sourceFunction)
