@@ -165,6 +165,8 @@ class RelayConnection implements MultiaddrConnection {
             } else if (u8aEquals(SUFFIX, RESTART)) {
               log(`RESTART received, reconnectReceived: ${__reconnectCounter++}. Ending stream ...`)
 
+              this._sinkSourceDone = true
+
               this._onReconnect(this)
 
               // end stream
@@ -442,8 +444,8 @@ class RelayConnection implements MultiaddrConnection {
       } else if (streamSwitched) {
         streamSwitched = false
         currentSource = tmpSource
-        this._sinkSourceDone = false
         this._switchPromise = Defer<Stream['source']>()
+        this._sinkSourceDone = false
         streamPromise = currentSource.next().then(streamSourceFunction)
         switchPromise = this._switchPromise.promise.then(switchFunction)
         log(`RelayConnection: sink migrated`, currentSource)
