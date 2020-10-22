@@ -124,10 +124,10 @@
     "@ethersproject/rlp" "^5.0.3"
     "@ethersproject/signing-key" "^5.0.4"
 
-"@hoprnet/hopr-demo-seeds@1.29.0-alpha.0":
-  version "1.29.0-alpha.0"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-demo-seeds/-/hopr-demo-seeds-1.29.0-alpha.0.tgz#600c970f7a640e7004c111524d7d83696c0aae3d"
-  integrity sha512-uH3R0zG+EsEIj4j8muk0xRtxnAEvsouhvz2rG5/28S/UObRonEQYUbslrSGg6WnXSal/BoXqIJ1NBEM+LdzSeg==
+"@hoprnet/hopr-demo-seeds@1.30.0-alpha.0":
+  version "1.30.0-alpha.0"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-demo-seeds/-/hopr-demo-seeds-1.30.0-alpha.0.tgz#99d9e5ed6e912d5c95b9069ad611d4252c53e96d"
+  integrity sha512-UVJAB5BorLzzymkbxbrCAqDGj+9+cWHrBxilSoHZzPpdG9q9UZWncj2M4ZtpRlYh7ZbX/PJsEBKEE+mZi3y91Q==
 
 "@sindresorhus/is@^0.14.0":
   version "0.14.0"
