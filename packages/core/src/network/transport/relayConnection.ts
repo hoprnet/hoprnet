@@ -165,8 +165,10 @@ class RelayConnection implements MultiaddrConnection {
             } else if (u8aEquals(SUFFIX, RESTART)) {
               log(`RESTART received, reconnectReceived: ${__reconnectCounter++}. Ending stream ...`)
 
-              return this._onReconnect(this)
+              this._onReconnect(this)
 
+              // end stream
+              return
               // @TODO replace timeout by something more meaningful
               // await new Promise((resolve) => setTimeout(resolve, 100))
             } else if (u8aEquals(SUFFIX, PING)) {
@@ -399,7 +401,7 @@ class RelayConnection implements MultiaddrConnection {
             (streamMsg as unknown) as BL
           ]) as unknown) as Uint8Array
         } else {
-          log(`dropping empty message in relayConnection`)
+          log(`dropping empty message in relayConnection [in sinkFunction]`)
         }
 
         if (streamClosed || (this._sinkSourceDone && webRTCdone)) {
@@ -442,6 +444,7 @@ class RelayConnection implements MultiaddrConnection {
         currentSource = tmpSource
         this._sinkSourceDone = false
         this._switchPromise = Defer<Stream['source']>()
+        streamPromise = currentSource.next().then(streamSourceFunction)
         switchPromise = this._switchPromise.promise.then(switchFunction)
         log(`RelayConnection: sink migrated`, currentSource)
       }
