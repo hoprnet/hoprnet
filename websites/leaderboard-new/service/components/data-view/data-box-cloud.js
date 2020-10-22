@@ -11,10 +11,6 @@ const DataBoxCloud = () => {
 
   const copyCodeToClipboard = (aux) => {
      navigator.clipboard.writeText(aux);
-    // setModal(true);
-    // setTimeout(() => {
-    //   setModal(false);
-    // }, 4000);
   };
 
   return (
