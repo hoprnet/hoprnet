@@ -17,9 +17,9 @@ body {
   }
 }
 .only-desktop-view {
-  display: none;
+  display: none!important;
   @media (min-width: 767px) {
-    display: block;
+    display: block!important;
   }
 }
 //

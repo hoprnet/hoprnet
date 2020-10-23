@@ -3,6 +3,8 @@ import Layout from '../components/layout/layout.js'
 import BoxRemember from '../components/micro-components/box-remember'
 import BoxDataTable from '../components/data-view/box-data-table'
 import SearchBar from '../components/micro-components/search-bar'
+import TrCustom from '../components/micro-components/tr-custom'
+import SuperBoxSearch from '../components/micro-components/super-box-search'
 
 import api from '../utils/api'
 
@@ -41,6 +43,7 @@ export default function Home() {
   const [data, setData] = useState(undefined)
   const [columns, setColumns] = useState(columnsDefaults)
   const [searchTerm, setSearchTerm] = useState('')
+  const [match, setMatch] = useState(0)
   const nodesVerified = data ? data.connected.length : 0
   const nodesRegistered = data ? data.nodes.length : 0
   const nodesConnected = data ? data.connectedNodes : 0
@@ -52,6 +55,7 @@ export default function Home() {
       if (response.data) {
         setData(response.data)
         setColumns(columnsDefaults)
+        setMatch(response.data.nodes.length)
       }
     }
     fetchData()
@@ -61,6 +65,24 @@ export default function Home() {
     callAPI()
   }, [])
 
+  useEffect(() => {
+    let count = 0
+    
+    if (nodes) {
+      if (nodes.length) {
+        count = nodes.length
+        if (searchTerm != '' && searchTerm != undefined) {
+          let auxcount = nodes.filter(
+            (acum) =>
+            acum.address.toLowerCase().indexOf(searchTerm.toLowerCase()) >= 0 ||
+            acum.id.toLowerCase().indexOf(searchTerm.toLowerCase()) >= 0
+          )
+          count = auxcount.length;
+        }
+      }
+    }
+    setMatch(count)
+  }, [searchTerm])
 
   const getIntBase = (key) => {
     switch (key) {
@@ -124,7 +146,19 @@ export default function Home() {
             </div>
           </div>
 
-          <SearchBar searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
+          <div className="only-mobile-view remove-all-padding">
+            <SearchBar searchTerm={searchTerm} setSearchTerm={setSearchTerm} match={match}/>
+          </div>
+          <div className="only-desktop-view remove-all-padding ">
+            <SuperBoxSearch
+              nodesVerified={nodesVerified}
+              nodesRegistered={nodesRegistered}
+              nodesConnected={nodesConnected}
+              searchTerm={searchTerm}
+              setSearchTerm={setSearchTerm}
+              match={match}
+            />
+          </div>
         </div>
         <div className="box-main-area remove-all-padding">
           <div className="box-container-table">
@@ -156,62 +190,26 @@ export default function Home() {
                         id.toLowerCase().indexOf(searchTerm.toLowerCase()) >= 0
                       ) {
                         return (
-                          <tr key={id}>
-                            <td className="icon-help-online" data-label="online">
-                              <div className={[online ? 'online' : 'offline']}></div>
-                            </td>
-                            <td data-label="address" data-raw={address}>
-                              <a
-                                className="table-link-on"
-                                target="_blank"
-                                href={'https://explorer.matic.network/address/' + address}
-                                rel="noopener noreferrer"
-                              >
-                                {address}
-                              </a>
-                            </td>
-                            <td data-label="id" data-raw={id}>
-                              {id}
-                            </td>
-                            <td data-type="score" data-label="score">
-                              {score}
-                            </td>
-                            <td data-label="tweetUrl">
-                              <a target="_blank" href={tweetUrl} rel="noopener noreferrer">
-                                <img src="/assets/icons/twitter.svg" alt="twitter" />
-                              </a>
-                            </td>
-                          </tr>
+                          <TrCustom
+                            key={id}
+                            online={online}
+                            address={address}
+                            id={id}
+                            score={score}
+                            tweetUrl={tweetUrl}
+                          />
                         )
                       }
                     } else {
                       return (
-                        <tr key={id}>
-                          <td className="icon-help-online" data-label="online">
-                            <div className={[online ? 'online' : 'offline']}></div>
-                          </td>
-                          <td data-label="address" data-raw={address}>
-                            <a
-                              className="table-link-on"
-                              target="_blank"
-                              href={'https://explorer.matic.network/address/' + address}
-                              rel="noopener noreferrer"
-                            >
-                              {address}
-                            </a>
-                          </td>
-                          <td data-label="id" data-raw={id}>
-                            {id}
-                          </td>
-                          <td data-type="score" data-label="score">
-                            {score}
-                          </td>
-                          <td data-label="tweetUrl">
-                            <a target="_blank" href={tweetUrl} rel="noopener noreferrer">
-                              <img src="/assets/icons/twitter.svg" alt="twitter" />
-                            </a>
-                          </td>
-                        </tr>
+                        <TrCustom
+                          key={id}
+                          online={online}
+                          address={address}
+                          id={id}
+                          score={score}
+                          tweetUrl={tweetUrl}
+                        />
                       )
                     }
                   })}

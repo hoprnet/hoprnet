@@ -79,21 +79,6 @@ table tr {
     &[data-label='address'] {
       overflow: scroll;
       flex-direction: column !important;
-      &:hover {
-        &::before {
-          opacity: 1;
-          position: absolute;
-          transform: translateY(-100%);
-          background: #0c00a1;
-          width: fit-content;
-          box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.06);
-          box-sizing: border-box;
-          color: #fff;
-          padding: 0.5em;
-          border-radius: 2px;
-          transition: all 300ms ease-in-out;
-        }
-      }
     }
 
     &[data-label='id'] {
@@ -216,6 +201,19 @@ table th {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  table td {
+    &[data-label='address'],
+    &[data-label='id'] {
+      &::before {
+        margin-bottom: 0.34em;
+      }
+    }
+    &[data-label='id'] {
+      font-size: 10px;
+      
+    }
   }
 
   table td:last-child {

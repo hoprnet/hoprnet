@@ -13,6 +13,7 @@
 
 .box {
   padding: 1em 0 0 0;
+  border: 1px solid $grey;
   border-radius: 8px;
   background: #fff;
   box-shadow: $shadow;
@@ -46,16 +47,10 @@
     width: 50%;
     padding: 1em 2em;
     box-sizing: border-box;
-
-    &:nth-last-child(2) {
-      border-top: 1px solid #e3e3e3;
+    &:first-child {
       border-right: 0px solid #e3e3e3;
     }
-    &:nth-last-child(3) {
-      border-left: 1px solid #e3e3e3;
-    }
     &:last-child {
-      border-top: 1px solid #e3e3e3;
       border-left: 1px solid #e3e3e3;
     }
     h3,
@@ -124,7 +119,7 @@
         background: $white-alt;
         color: $black;
         padding: 0.44em 0.55em;
-
+        border: 1px solid $grey;
         font-weight: 600;
         font-size: 1em;
         cursor: pointer;
@@ -153,14 +148,15 @@
 .table-esp-data {
   display: flex;
   justify-content: space-between;
-  background: #F6F7F9;
-  margin:  0;
+  background: #f6f7f9;
+  margin: 0 0 1em 0;
+  
   & > div {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    height: 114px;
+    height: 100%;
     & > div {
       display: flex;
       flex-direction: column;
@@ -170,8 +166,9 @@
       overflow: hidden;
       background: #fff;
       box-shadow: $shadow;
-      height: 89px;
-      width: 89px;
+      height: 100px;
+      width: 100px;
+      border: 1px solid $grey;
       border-radius: 8px;
     }
     span {
@@ -179,10 +176,11 @@
       font-size: 1em;
     }
     p {
-      margin-top: 0.034em;
-      font-weight: 400;
-      font-size: 13px;
-      color: #3421F8;
+      margin-top: 0.5em;
+      margin-bottom: 0;
+      font-weight: 600;
+      font-size: 0.88em;
+      color: $black;
       letter-spacing: 0;
     }
   }
@@ -286,7 +284,10 @@
 
 .box-main-area .box-container-table {
   padding: 0 !important;
-  height: 400px;
+  height: 700px;
+  @media (min-width: 767px) {
+    height: 500px;
+  }
   overflow: auto;
 }
 
