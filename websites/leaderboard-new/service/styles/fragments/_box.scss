@@ -85,6 +85,7 @@
 }
 
 .box-info {
+  text-align: center;
   p {
     color: #dadada;
     font-size: 1em;
@@ -165,7 +166,6 @@
       box-sizing: border-box;
       overflow: hidden;
       background: #fff;
-      box-shadow: $shadow;
       height: 55px;
       width: 110px;
       border: 1px solid $grey;

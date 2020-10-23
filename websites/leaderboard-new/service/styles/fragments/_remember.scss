@@ -25,12 +25,12 @@
     font-size: 1em !important;
     font-weight: 400 !important;
     letter-spacing: -0.5px !important;
-    text-align: center;
-    line-height: normal;
-    margin-bottom: 0.89em;
+    text-align: center!important;
+    line-height: normal!important;
+    margin-bottom: 0.89em!important;
     @media (min-width: 767px) {
-      margin-bottom: 0;
-      text-align: start;
+      margin-bottom: 0!important;
+      text-align: start!important;
     }
   }
   a {
