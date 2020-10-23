@@ -212,7 +212,9 @@ table th {
     }
     &[data-label='id'] {
       font-size: 10px;
-      
+      &::before {
+        font-size: 1.34em;
+      }
     }
   }
 

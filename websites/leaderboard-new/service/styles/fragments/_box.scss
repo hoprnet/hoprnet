@@ -161,13 +161,13 @@
       display: flex;
       flex-direction: column;
       justify-content: center;
-      padding: 0.34em;
+      padding: 0.44em;
       box-sizing: border-box;
       overflow: hidden;
       background: #fff;
       box-shadow: $shadow;
-      height: 100px;
-      width: 100px;
+      height: 55px;
+      width: 110px;
       border: 1px solid $grey;
       border-radius: 8px;
     }
@@ -176,7 +176,7 @@
       font-size: 1em;
     }
     p {
-      margin-top: 0.5em;
+      margin-top: 0.21em;
       margin-bottom: 0;
       font-weight: 600;
       font-size: 0.88em;
