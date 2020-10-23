@@ -133,7 +133,6 @@ class RelayConnection implements MultiaddrConnection {
       ])
 
       if (streamResolved) {
-        log(`handling message`)
         streamResolved = false
 
         if (streamMsg != null) {
