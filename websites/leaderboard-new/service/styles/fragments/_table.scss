@@ -8,7 +8,7 @@
 }
 
 table {
-  border: 1px solid #ccc;
+  border: 1px solid transparent;
   border-collapse: collapse;
   margin: 0;
   padding: 0;
@@ -22,7 +22,27 @@ table thead tr {
     font-size: 1em;
     text-transform: lowercase;
     color: #cbcccf;
+    cursor: pointer;
+    transition: all 350ms ease-in-out;
+    &.asc {
+      color: $blue;
+      font-weight: 600;
+      &::before {
+        content: '▾';
+        margin-right: 0.4em;
+        color: $blue;
+      }
+    }
+    &:hover {
+      color: $blue;
+      transition: all 350ms ease-in-out;
+    }
   }
+}
+
+thead tr {
+  border-top: 0.5px solid #e3e3e359 !important;
+  background: #f7f7f796 !important;
 }
 
 table caption {
@@ -31,34 +51,94 @@ table caption {
 }
 
 table tr {
- 
-  border: 0.5px solid #f6f7fc;
+  border-top: 0.5px solid #e3e3e359;
+  border-bottom: 0.5px solid #e3e3e359;
+  border-left: 0px !important;
+  border-right: 0px !important;
   padding: 0.35em;
+  &:first-child {
+    border-top: 0.5px solid transparent;
+  }
   &:nth-child(even) {
     background: #f7f7f796;
   }
   &:nth-child(odd) {
-    background:white ;
+    background: white;
   }
   td {
+    display: flex;
+    align-items: center;
     white-space: nowrap;
-    overflow: hidden;
     text-overflow: ellipsis;
     color: $black;
-    &[data-type="score"] {
+    justify-content: space-between;
+
+    &[data-label='online'] {
+      flex-direction: row-reverse;
+    }
+    &[data-label='address'] {
+      overflow: scroll;
+      flex-direction: column !important;
+    }
+
+    &[data-label='id'] {
+      overflow: scroll;
+      flex-direction: column !important;
+      //
+      @media (min-width: 767px) {
+        cursor: pointer;
+        &::before {
+          content: attr(data-raw);
+          transition: all 200ms ease-in-out;
+        }
+        &:hover {
+          &::before {
+            opacity: 1;
+            position: absolute;
+            transform: translateY(-100%);
+            background: #0c00a1;
+            width: fit-content;
+            box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.06);
+            box-sizing: border-box;
+            color: #fff;
+            padding: 0.5em;
+            border-radius: 2px;
+            transition: all 200ms ease-in-out;
+          }
+        }
+      }
+    }
+
+    @media (min-width: 767px) {
+      justify-content: center;
+      flex-direction: row;
+
+      display: table-cell;
+      &[data-label='address'],
+      &[data-label='id'] {
+        overflow: hidden;
+      }
+      &[data-label='online'] {
+        flex-direction: row;
+      }
+    }
+    &[data-type='score'] {
       color: #331cfa;
       font-weight: 600;
-      display: flex;
-      align-items: center;
-      justify-content: center;
     }
-    img{
+    img {
       transition: all 350ms ease-in-out;
-      &:hover{
+      &:hover {
         filter: grayscale(1);
         transition: all 350ms ease-in-out;
       }
     }
+  }
+}
+
+#date thead tr {
+  th {
+    border-top: 0.5px solid #e3e3e359 !important;
   }
 }
 
@@ -70,7 +150,7 @@ table td {
 
 table th {
   font-size: 0.85em;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.005em;
   text-transform: uppercase;
 }
 
@@ -95,9 +175,9 @@ table th {
   }
 
   table tr {
-    border-bottom: 3px solid #ddd;
+    border-bottom: 0px;
     display: block;
-    margin-bottom: 0.625em;
+    margin-bottom: 0em;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -124,7 +204,49 @@ table th {
     text-overflow: ellipsis;
   }
 
+  table td {
+    &[data-label='address'],
+    &[data-label='id'] {
+      &::before {
+        margin-bottom: 0.34em;
+      }
+    }
+    &[data-label='id'] {
+      font-size: 10px;
+      &::before {
+        font-size: 1.34em;
+      }
+    }
+  }
+
   table td:last-child {
     border-bottom: 0;
+  }
+}
+
+//
+.table-link-on {
+  text-decoration: none;
+  background: #fff;
+  border: 0px;
+  color: $colorLink;
+  line-height: normal;
+  transition: all 450ms ease-in-out;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  img{
+    height: 0.89em;
+    margin-right: 0.5em;
+    filter: grayscale(1);
+    transition: all 350ms ease-in-out;
+  }
+  &:hover {
+    color: $black;
+    transition: all 450ms ease-in-out;
+    img{
+      filter: grayscale(0);
+      transition: all 350ms ease-in-out;
+    }
   }
 }

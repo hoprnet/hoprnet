@@ -3,8 +3,6 @@ import api from "../../utils/api";
 import "../../styles/main.scss";
 
 const DataUpdateKnow = () => {
-  // const [API_Channel, SetAPI_Channel] = useState(null);
-  // const [API_Coverbot, SetAPI_Coverbot] = useState(null);
   const [API_LastUpdated, SetAPI_LastUpdated] = useState(null);
 
   useEffect(() => {
@@ -20,16 +18,6 @@ const DataUpdateKnow = () => {
 
   return (
     <div className="box-info">
-      {/* <div>
-        <p>
-          Channel: <span>0x83cA7023c4B1EDB137E1d87B3D05F</span>
-        </p>
-      </div>
-      <div>
-        <p>
-          Coverbot: <span>0x1d157417E639ACA5581D96236089…</span>
-        </p>
-      </div> */}
       <div>
         <p>
           Last Updated: <span>{API_LastUpdated}</span>
