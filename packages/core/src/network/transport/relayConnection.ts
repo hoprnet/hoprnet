@@ -412,6 +412,14 @@ class RelayConnection implements MultiaddrConnection {
           log(`dropping empty message in relayConnection [in sinkFunction]`)
         }
 
+        console.log(
+          `streamClosed`,
+          streamClosed,
+          `this._sinkSourceDone`,
+          this._sinkSourceDone,
+          `webRTCdone`,
+          webRTCdone
+        )
         if (streamClosed || (this._sinkSourceDone && webRTCdone)) {
           this._destroyed = true
 
