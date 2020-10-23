@@ -394,7 +394,6 @@ class RelayConnection implements MultiaddrConnection {
           return u8aConcat(RELAY_STATUS_PREFIX, STOP)
         } else {
           streamPromise = currentSource.next().then(streamSourceFunction(iteration))
-          log(`RelayConnection: sink -> currentSource.next()`, streamPromise)
         }
       } else if (webRTCresolved) {
         webRTCresolved = false
