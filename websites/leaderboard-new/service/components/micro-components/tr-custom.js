@@ -15,11 +15,11 @@ const TrCustom = ({ online, address, id, score, tweetUrl }) => {
           rel="noopener noreferrer"
         >
           <img src="/assets/icons/link.svg" alt="link" />
-          {address}
+         <div> {address.slice(0, 5)}<span>...</span>{address.slice(-5)}</div>
         </a>
       </td>
       <td data-label="id" data-raw={id}>
-        {id}
+        <div>{id.slice(0, 5)}<span>...</span>{id.slice(-5)}</div>
       </td>
       <td data-type="score" data-label="score">
         {score}

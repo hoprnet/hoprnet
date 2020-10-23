@@ -28,7 +28,7 @@ table thead tr {
       color: $blue;
       font-weight: 600;
       &::before {
-        content: '▾';
+        content: "▾";
         margin-right: 0.4em;
         color: $blue;
       }
@@ -72,28 +72,34 @@ table tr {
     text-overflow: ellipsis;
     color: $black;
     justify-content: space-between;
-
-    &[data-label='online'] {
-      flex-direction: row-reverse;
+    &[data-label="address"],
+    &[data-label="id"] {
+      div {
+        font-size: 1em;
+      }
+      span {
+        letter-spacing: -0.5px;
+        font-size: 0.89em;
+      }
     }
-    &[data-label='address'] {
+    &[data-label="address"] {
       overflow: scroll;
-      flex-direction: column !important;
     }
 
-    &[data-label='id'] {
+    &[data-label="id"] {
       overflow: scroll;
-      flex-direction: column !important;
+
       //
       @media (min-width: 767px) {
         cursor: pointer;
         &::before {
-          content: attr(data-raw);
+          opacity: 0;
           transition: all 200ms ease-in-out;
         }
         &:hover {
           &::before {
             opacity: 1;
+            content: attr(data-raw);
             position: absolute;
             transform: translateY(-100%);
             background: #0c00a1;
@@ -114,15 +120,15 @@ table tr {
       flex-direction: row;
 
       display: table-cell;
-      &[data-label='address'],
-      &[data-label='id'] {
+      &[data-label="address"],
+      &[data-label="id"] {
         overflow: hidden;
       }
-      &[data-label='online'] {
+      &[data-label="online"] {
         flex-direction: row;
       }
     }
-    &[data-type='score'] {
+    &[data-type="score"] {
       color: #331cfa;
       font-weight: 600;
     }
@@ -175,7 +181,8 @@ table th {
   }
 
   table tr {
-    border-bottom: 0px;
+    
+    border-bottom: 1px solid $grey;
     display: block;
     margin-bottom: 0em;
     white-space: nowrap;
@@ -184,7 +191,7 @@ table th {
   }
 
   table td {
-    border-bottom: 1px solid #ddd;
+    border-bottom: 1px solid rgba($grey, 0.44);
     display: block;
     font-size: 0.8em;
     text-align: right;
@@ -204,21 +211,6 @@ table th {
     text-overflow: ellipsis;
   }
 
-  table td {
-    &[data-label='address'],
-    &[data-label='id'] {
-      &::before {
-        margin-bottom: 0.34em;
-      }
-    }
-    &[data-label='id'] {
-      font-size: 10px;
-      &::before {
-        font-size: 1.34em;
-      }
-    }
-  }
-
   table td:last-child {
     border-bottom: 0;
   }
@@ -227,15 +219,14 @@ table th {
 //
 .table-link-on {
   text-decoration: none;
-  background: #fff;
-  border: 0px;
   color: $colorLink;
   line-height: normal;
   transition: all 450ms ease-in-out;
   display: flex;
+  justify-content: center;
   align-items: center;
   box-sizing: border-box;
-  img{
+  img {
     height: 0.89em;
     margin-right: 0.5em;
     filter: grayscale(1);
@@ -244,7 +235,7 @@ table th {
   &:hover {
     color: $black;
     transition: all 450ms ease-in-out;
-    img{
+    img {
       filter: grayscale(0);
       transition: all 350ms ease-in-out;
     }

@@ -1,5 +1,5 @@
 body {
-  font-family: 'Source Code Pro', monospace;
+  font-family: "Source Code Pro", monospace;
   background: $white-alt;
 }
 
@@ -17,9 +17,9 @@ body {
   }
 }
 .only-desktop-view {
-  display: none!important;
+  display: none !important;
   @media (min-width: 767px) {
-    display: block!important;
+    display: block !important;
   }
 }
 //
@@ -189,14 +189,25 @@ a.aux-help-twitter {
     height: 17px;
     border-radius: 100%;
   }
+  .online,
+  .offline {
+    @media screen and (max-width: 600px) {
+      transform: translateX(-500%);
+      box-sizing: border-box;
+      &::before {
+        font-weight: 600;
+        color:$black!important;
+      }
+    }
+  }
   .online {
     background: #7cee78;
     border: 1.5px solid darken(#7cee78, 17);
 
     &::before {
-      content: 'ONLINE';
+      content: "ONLINE";
       margin-left: 27px;
-      color: #dadada;
+      color: $grey;
       text-transform: lowercase;
     }
   }
@@ -204,9 +215,9 @@ a.aux-help-twitter {
     background: #ee696b;
     border: 1.5px solid darken(#ee696b, 17);
     &::before {
-      content: 'OFFLINE';
+      content: "OFFLINE";
       margin-left: 27px;
-      color: #dadada;
+      color: $grey;
       text-transform: lowercase;
     }
   }
