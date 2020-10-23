@@ -2,7 +2,7 @@ name: Publish Website hoprnet.org
 
 on:
   push:
-    branches: [master]
+    branches: [master, release/*]
     paths:
       - '.github/workflows/*-hoprnet-org.yml'
       - 'websites/hoprnet-org/**'
@@ -35,7 +35,7 @@ jobs:
           github-comment: true
       - name: Vercel Action (production)
         uses: amondnet/vercel-action@77cb0ce3642a451f7f18d63821c0e26f7adead9a
-        if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
