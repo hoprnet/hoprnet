@@ -139,15 +139,7 @@ class Relay {
     }
 
     return new RelayConnection({
-      stream: {
-        source: (async function * () {
-          for await (const msg of stream.source) {
-            log(`received low-level`, msg.slice())
-            yield msg
-          }
-        }()),
-        sink: stream.sink
-      },
+      stream,
       self: this._peerInfo.id,
       counterparty: destination,
       onReconnect
@@ -170,16 +162,7 @@ class Relay {
     log(`counterparty relayed connection established`)
 
     return new RelayConnection({
-      stream: {
-        source: (async function * () {
-          for await (const msg of stream.source) {
-            log(`received low-level`, msg.slice())
-
-            yield msg
-          }
-        }()),
-        sink: stream.sink
-      },
+      stream,
       self: this._peerInfo.id,
       counterparty,
       onReconnect
