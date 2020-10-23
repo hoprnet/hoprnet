@@ -2,7 +2,7 @@ name: Publish Website hopr.swiss
 
 on:
   push:
-    branches: [master]
+    branches: [master, release/*]
     paths:
       - '.github/workflows/*-hopr-swiss.yml'
       - 'websites/hopr-swiss/**'
@@ -58,7 +58,7 @@ jobs:
             --platform "managed" \
             --allow-unauthenticated
       - name: Deploy (production)
-        if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')
         run: |-
           gcloud run deploy hopr-swiss \
             --quiet \
