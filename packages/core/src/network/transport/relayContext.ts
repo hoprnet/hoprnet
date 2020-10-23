@@ -51,7 +51,7 @@ class RelayContext {
 
       const timeoutPromise = new Promise((resolve) => {
         timeout = (setTimeout(() => {
-          console.log(timeoutDone)
+          log(`ping timeout done`)
           timeoutDone = true
           resolve()
         }, ms) as unknown) as NodeJS.Timeout
@@ -202,35 +202,35 @@ class RelayContext {
   private async _createSink(source: Stream['source']) {
     let currentSink = this._stream.sink
 
+    let sourceReceived = false
+    let sourceMsg: Uint8Array | void
+    let sourceDone = false
+
+    const sourceFunction = ({ value, done }: { value?: Uint8Array | void; done?: boolean | void }) => {
+      sourceReceived = true
+      sourceMsg = value
+
+      if (done) {
+        sourceDone = true
+      }
+    }
+
+    let sourcePromise = source.next().then(sourceFunction)
+
+    let streamSwitched = false
+    let statusMessageAvailable = false
+
+    const switchFunction = () => {
+      streamSwitched = true
+    }
+    let switchPromise = this._switchPromise.promise.then(switchFunction)
+
+    const statusSourceFunction = () => {
+      statusMessageAvailable = true
+    }
+    let statusPromise = this._statusMessagePromise.promise.then(statusSourceFunction)
+
     async function* drain(this: RelayContext) {
-      let sourceReceived = false
-      let sourceMsg: Uint8Array | void
-      let sourceDone = false
-
-      function sourceFunction({ value, done }: { value?: Uint8Array | void; done?: boolean | void }) {
-        sourceReceived = true
-        sourceMsg = value
-
-        if (done) {
-          sourceDone = true
-        }
-      }
-
-      let sourcePromise = source.next().then(sourceFunction)
-
-      let streamSwitched = false
-      let statusMessageAvailable = false
-
-      let switchPromise = this._switchPromise.promise.then(() => {
-        streamSwitched = true
-      })
-
-      function statusSourceFunction() {
-        statusMessageAvailable = true
-      }
-
-      let statusPromise = this._statusMessagePromise.promise.then(statusSourceFunction)
-
       while (true) {
         if (!sourceDone) {
           await Promise.race([
@@ -270,6 +270,8 @@ class RelayContext {
 
           statusPromise = this._statusMessagePromise.promise.then(statusSourceFunction)
         } else if (streamSwitched) {
+          streamSwitched = false
+          switchPromise = this._switchPromise.promise.then(switchFunction)
           break
         }
       }

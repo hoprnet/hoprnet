@@ -170,6 +170,7 @@ describe('test overwritable connection', function () {
         const newStream = ctx.switch()
 
         iteration++
+        console.log(`in reconnect: iteration ${iteration}`)
         const demoStream = getStream({ usePrefix: false })
 
         newStream.sink(demoStream.source)
