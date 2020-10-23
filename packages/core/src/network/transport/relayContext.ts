@@ -132,7 +132,7 @@ class RelayContext {
           const [PREFIX, SUFFIX] = [received.subarray(0, 1), received.subarray(1)]
 
           if (![RELAY_STATUS_PREFIX[0], RELAY_WEBRTC_PREFIX[0], RELAY_PAYLOAD_PREFIX[0]].includes(PREFIX[0])) {
-            error(`Invalid prefix: Got <${u8aToHex(PREFIX)}>. Dropping message in relayContext.`)
+            error(`Invalid prefix: Got <${u8aToHex(PREFIX || new Uint8Array([]))}>. Dropping message in relayContext.`)
             if (!sourceDone) {
               sourcePromise = currentSource.next().then(sourceFunction)
             }
@@ -169,13 +169,10 @@ class RelayContext {
               // Don't forward pong message to receiver
               continue
             } else {
-              error(`received status message`, SUFFIX)
-              //error(`Invalid status message. Got <${u8aToHex(SUFFIX)}>`)
+              error(`Invalid status message. Got <${u8aToHex(SUFFIX || new Uint8Array([]))}>`)
             }
           }
 
-          //verbose(`relaying ${new TextDecoder().decode(SUFFIX)}`, u8aToHex(received))
-          verbose(`relaying`, SUFFIX)
           yield received
         } else {
           verbose(`empty message dropped`)
@@ -189,9 +186,6 @@ class RelayContext {
         sourceDone = false
         currentSource = tmpSource
         switchPromise = this._switchPromise.promise.then(switchFunction)
-        verbose(`################### streamSwitched ###################`)
-        // @TODO replace this by a mutex
-        // await new Promise((resolve) => setTimeout(resolve, 100))
         yield u8aConcat(RELAY_STATUS_PREFIX, RESTART)
 
         sourcePromise = currentSource.next().then(sourceFunction)

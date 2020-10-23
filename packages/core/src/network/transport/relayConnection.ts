@@ -122,22 +122,15 @@ class RelayConnection implements MultiaddrConnection {
       }
     }
 
-    let __reconnectCounter = 0
-
     let streamPromise = this._stream.source.next().then(sourceFunction)
 
-    while (true) {
-      log(`source iteration`)
-      if (!streamDone) {
-        await Promise.race([
-          // prettier-ignore
-          streamPromise,
-          //switchPromise,
-          closePromise
-        ])
-      } else {
-        //await switchPromise
-      }
+    while (!streamDone) {
+      await Promise.race([
+        // prettier-ignore
+        streamPromise,
+        //switchPromise,
+        closePromise
+      ])
 
       if (streamResolved) {
         log(`handling message`)
@@ -151,7 +144,6 @@ class RelayConnection implements MultiaddrConnection {
           const [PREFIX, SUFFIX] = [received.subarray(0, 1), received.subarray(1)]
 
           if (u8aEquals(PREFIX, RELAY_PAYLOAD_PREFIX)) {
-            log(`RelayConnection: Delivering`, SUFFIX)
             if (streamDone || streamClosed) {
               this._destroyed = true
               return SUFFIX
@@ -163,16 +155,12 @@ class RelayConnection implements MultiaddrConnection {
               this._destroyed = true
               break
             } else if (u8aEquals(SUFFIX, RESTART)) {
-              log(`RESTART received, reconnectReceived: ${__reconnectCounter++}. Ending stream ...`)
+              log(`RESTART received. Ending stream ...`)
 
               this._onReconnect(this)
 
-              // log(`after reconnect`, (await this._stream.source.next()))
-
               // end stream
               break
-              // @TODO replace timeout by something more meaningful
-              // await new Promise((resolve) => setTimeout(resolve, 100))
             } else if (u8aEquals(SUFFIX, PING)) {
               log(`PING received`)
               this._statusMessages.push(u8aConcat(RELAY_STATUS_PREFIX, PING_RESPONSE))
@@ -200,10 +188,6 @@ class RelayConnection implements MultiaddrConnection {
         }
 
         streamPromise = this._stream.source.next().then(sourceFunction)
-
-        // } else if (streamSwitched) {
-        //   log(`################### streamSwitched relayConnection ###################`)
-        //   break
       } else if (streamClosed || streamDone) {
         if (!this._destroyed) {
           if (!this._sinkTriggered) {
@@ -218,13 +202,10 @@ class RelayConnection implements MultiaddrConnection {
         return
       }
     }
-
-    console.log(`returned`)
   }
 
   private async _createSink(source: Stream['source']) {
     this._switchPromise.resolve(source)
-    log(`RelayConnection: sink triggered`)
 
     this._sinkTriggered = true
   }
@@ -298,8 +279,6 @@ class RelayConnection implements MultiaddrConnection {
       done?: boolean
       value?: Uint8Array | void
     }) => {
-      console.log(`inside streamSourceFunction:`, done, value, `iteration`, iteration, `_iteration`, _iteration)
-
       if (iteration == _iteration) {
         streamResolved = true
         streamMsg = value
@@ -337,7 +316,6 @@ class RelayConnection implements MultiaddrConnection {
     let streamSwitched = false
 
     const switchFunction = (newSource: Stream['source']) => {
-      log(`RelayConnection: source received`)
       streamSwitched = true
       tmpSource = newSource
       iteration++
@@ -346,9 +324,7 @@ class RelayConnection implements MultiaddrConnection {
     let switchPromise = this._switchPromise.promise.then(switchFunction)
 
     while (true) {
-      log(`RelayConnection: sink iteration`, webRTCdone, streamDone)
       if (!webRTCdone && !streamDone) {
-        log(`RelayConnection: !webRTCdone && !streamDone`)
         if (streamPromise == null) {
           streamPromise = currentSource.next().then(streamSourceFunction(iteration))
         }
@@ -367,8 +343,6 @@ class RelayConnection implements MultiaddrConnection {
           closePromise
         ])
       } else if (!webRTCdone) {
-        log(`RelayConnection: !webRTCdone`)
-
         if (webRTCstream == null) {
           webRTCstream = this._getWebRTCStream.call(this)
         }
@@ -383,8 +357,6 @@ class RelayConnection implements MultiaddrConnection {
           closePromise
         ])
       } else if (!streamDone) {
-        log(`RelayConnection: !streamDone`, currentSource)
-
         if (streamPromise == null) {
           streamPromise = currentSource.next().then(streamSourceFunction(iteration))
         }
@@ -397,7 +369,6 @@ class RelayConnection implements MultiaddrConnection {
           closePromise
         ])
       } else {
-        log(`RelayConnection: streamDone && webRTCdone`, currentSource)
         await Promise.race([
           // prettier-ignore
           statusPromise,
@@ -406,14 +377,11 @@ class RelayConnection implements MultiaddrConnection {
         ])
       }
 
-      log(`RelayConnection: sink after await`, streamResolved, webRTCresolved, statusMessageAvailable, streamSwitched)
-
       if (streamResolved) {
         streamResolved = false
 
         // Drop empty messages
         if (streamMsg != null) {
-          log(`RelayConnection: sink yielding`, streamMsg)
           yield (new BL([
             (RELAY_PAYLOAD_PREFIX as unknown) as BL,
             (streamMsg as unknown) as BL
@@ -422,7 +390,6 @@ class RelayConnection implements MultiaddrConnection {
           log(`dropping empty message in relayConnection [in sinkFunction]`)
         }
 
-        console.log(`streamClosed`, streamClosed, `streamDone`, streamDone, `webRTCdone`, webRTCdone)
         if (streamClosed || (streamDone && webRTCdone)) {
           this._destroyed = true
 
@@ -469,14 +436,11 @@ class RelayConnection implements MultiaddrConnection {
         streamDone = false
         streamPromise = currentSource.next().then(streamSourceFunction(iteration))
         switchPromise = this._switchPromise.promise.then(switchFunction)
-        log(`RelayConnection: sink migrated`, currentSource)
       }
     }
   }
 
   switch(): MultiaddrConnection {
-    log(`updating`)
-
     return {
       ...this,
       source: this._createSource(),
