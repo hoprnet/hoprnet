@@ -1,42 +1,53 @@
-import React, { useState, useEffect } from 'react'
-import { useRouter } from 'next/router'
-import Link from 'next/link'
-import '../../styles/main.scss'
-import TweetBasodino from '../tweet-basodino'
-import api from '../../utils/api'
+import React, { useState, useEffect } from "react";
+import { useRouter } from "next/router";
+import Link from "next/link";
+import "../../styles/main.scss";
+import TweetBasodino from "../tweet-basodino";
+import api from "../../utils/api";
 
 const LeftSide = () => {
-  const router = useRouter()
-  const [hash, setHash] = useState('16Uiu2HAm7KxaBkgd9ENvhf5qAkp1c6Q5Q1dXe8HBDzxLN4SxAVw6')
+  const router = useRouter();
+  const [hash, setHash] = useState(
+    "16Uiu2HAm7KxaBkgd9ENvhf5qAkp1c6Q5Q1dXe8HBDzxLN4SxAVw6"
+  );
 
   useEffect(() => {
     const fetchData = async () => {
-      const response = await api.getAllData()
-      if (response.data) setHash(response.data.address)
-    }
-    fetchData()
-  }, [])
+      const response = await api.getAllData();
+      if (response.data) setHash(response.data.address);
+    };
+    fetchData();
+  }, []);
 
-  const [modal, setModal] = useState(false)
+  const [modal, setModal] = useState(false);
   const copyCodeToClipboard = () => {
-    navigator.clipboard.writeText(hash)
-    setModal(true)
+    navigator.clipboard.writeText(hash);
+    setModal(true);
     setTimeout(() => {
-      setModal(false)
-    }, 4000)
-  }
+      setModal(false);
+    }, 4000);
+  };
 
   return (
     <section className="area-left-desktop">
       <div className="menu-desktop">
         <Link href="/">
-          <div className={'menu-item-desktop ' + [router.pathname == '/' ? 'active' : '']}>
+          <div
+            className={
+              "menu-item-desktop " + [router.pathname == "/" ? "active" : ""]
+            }
+          >
             <img src="/assets/icons/home.svg" alt="hopr HOME" />
             <p>HOME</p>
           </div>
         </Link>
         <Link href="/hopr-allocation">
-          <div className={'menu-item-desktop ' + [router.pathname == '/hopr-allocation' ? 'active' : '']}>
+          <div
+            className={
+              "menu-item-desktop " +
+              [router.pathname == "/hopr-allocation" ? "active" : ""]
+            }
+          >
             <img src="/assets/icons/horp_icon.svg" alt="hopr HOPR ALLOCATION" />
             <p>
               HOPR <br /> ALLOCATION
@@ -45,14 +56,23 @@ const LeftSide = () => {
         </Link>
 
         <div className="menu-item-desktop ">
-          <a target="_blank" href="https://discord.com/invite/wUSYqpD" rel="noopener noreferrer">
+          <a
+            target="_blank"
+            href="https://discord.com/invite/wUSYqpD"
+            rel="noopener noreferrer"
+          >
             <img src="/assets/icons/discord.svg" alt="hopr DISCORD" />
             <p>DISCORD</p>
           </a>
         </div>
 
         <Link href="/help">
-          <div className={'menu-item-desktop ' + [router.pathname == '/help' ? 'active' : '']}>
+          <div
+            className={
+              "menu-item-desktop " +
+              [router.pathname == "/help" ? "active" : ""]
+            }
+          >
             <img src="/assets/icons/help.svg" alt="hopr HELP" />
             <p>HELP</p>
           </div>
@@ -84,7 +104,7 @@ const LeftSide = () => {
         </div>
       </div>
     </section>
-  )
-}
+  );
+};
 
-export default LeftSide
+export default LeftSide;

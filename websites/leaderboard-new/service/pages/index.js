@@ -67,17 +67,17 @@ export default function Home() {
 
   useEffect(() => {
     let count = 0
-    
+
     if (nodes) {
       if (nodes.length) {
         count = nodes.length
         if (searchTerm != '' && searchTerm != undefined) {
           let auxcount = nodes.filter(
             (acum) =>
-            acum.address.toLowerCase().indexOf(searchTerm.toLowerCase()) >= 0 ||
-            acum.id.toLowerCase().indexOf(searchTerm.toLowerCase()) >= 0
+              acum.address.toLowerCase().indexOf(searchTerm.toLowerCase()) >= 0 ||
+              acum.id.toLowerCase().indexOf(searchTerm.toLowerCase()) >= 0
           )
-          count = auxcount.length;
+          count = auxcount.length
         }
       }
     }
@@ -147,7 +147,7 @@ export default function Home() {
           </div>
 
           <div className="only-mobile-view remove-all-padding">
-            <SearchBar searchTerm={searchTerm} setSearchTerm={setSearchTerm} match={match}/>
+            <SearchBar searchTerm={searchTerm} setSearchTerm={setSearchTerm} match={match} />
           </div>
           <div className="only-desktop-view remove-all-padding ">
             <SuperBoxSearch

@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-ethereum",
-  "version": "1.17.16",
+  "version": "1.17.18",
   "description": "On-chain logic for hoprnet.org",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -36,8 +36,8 @@
     }
   },
   "dependencies": {
-    "@hoprnet/hopr-demo-seeds": "1.17.16",
-    "@hoprnet/hopr-utils": "1.17.16",
+    "@hoprnet/hopr-demo-seeds": "1.17.18",
+    "@hoprnet/hopr-utils": "1.17.18",
     "@openzeppelin/contracts": "^3.0.1",
     "@truffle/debug-utils": "^4.1.1",
     "@truffle/hdwallet-provider": "^1.0.34",
@@ -51,7 +51,7 @@
     "web3": "^1.2.11"
   },
   "devDependencies": {
-    "@hoprnet/hopr-testing": "1.17.16",
+    "@hoprnet/hopr-testing": "1.17.18",
     "@openzeppelin/test-helpers": "0.5.6",
     "@types/chai": "^4.2.11",
     "@types/mocha": "^8.0.1",

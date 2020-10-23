@@ -1206,14 +1206,14 @@
   resolved "https://registry.yarnpkg.com/@hapi/hoek/-/hoek-9.1.0.tgz#6c9eafc78c1529248f8f4d92b0799a712b6052c6"
   integrity sha512-i9YbZPN3QgfighY/1X1Pu118VUz2Fmmhd6b2n0/O8YVgGGfw0FbUYoA97k7FkpGJ+pLCFEDLUmAPPV4D1kpeFw==
 
-"@hoprnet/hopr-chat@1.17.15":
-  version "1.17.15"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-chat/-/hopr-chat-1.17.15.tgz#2701f12ab09792bc4495797cd065b5463ad21c68"
-  integrity sha512-xEVEJO3/zIc/sVuQQwP0KChhoYU5EGKPMFzoQNjwy+Q97btNx2sby767hHb9r7lsNwXqXGSx/i/K+UE3O7JjJg==
+"@hoprnet/hopr-chat@1.17.17":
+  version "1.17.17"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-chat/-/hopr-chat-1.17.17.tgz#11e443602ca55fd53b5a5045997ab37bdc97e4e6"
+  integrity sha512-E0fs+JWSdLFUXThCMqn9J4ao+xTmNYan0XY3+r2snGZytLfgOaKspu6cGeVHbrJe2jt7XfnKxroegrmioWcKDw==
   dependencies:
-    "@hoprnet/hopr-core" "1.17.15"
-    "@hoprnet/hopr-core-connector-interface" "1.17.15"
-    "@hoprnet/hopr-utils" "1.17.15"
+    "@hoprnet/hopr-core" "1.17.17"
+    "@hoprnet/hopr-core-connector-interface" "1.17.17"
+    "@hoprnet/hopr-utils" "1.17.17"
     "@zeit/ncc" "^0.22.3"
     bignumber.js "^9.0.0"
     bn.js "~5.1.2"
@@ -1230,18 +1230,18 @@
     rlp "~2.2.5"
     typescript "^4.0.3"
 
-"@hoprnet/hopr-core-connector-interface@1.17.15":
-  version "1.17.15"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-connector-interface/-/hopr-core-connector-interface-1.17.15.tgz#cfd65cbe874d72d67fcf085bf6458ca2e68c8572"
-  integrity sha512-yfFV2qTEgTRkL5Vj2qTHTKxJ8C5KCQE6uvZs69vbq0w0GMnnV5YPY99jbuKpVcDKz8g3kaKHkVp66X3yeurNCg==
+"@hoprnet/hopr-core-connector-interface@1.17.17":
+  version "1.17.17"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-connector-interface/-/hopr-core-connector-interface-1.17.17.tgz#697c894e3fc850237157e502d391fc2238eaf93e"
+  integrity sha512-9+Eof7oJ4jKENIRn1VJCUMnW9tVLlD3wkr1EeKAk980tBAr1tyymBcgswxR7B8sPImwL+gyBiVrImVPZMhxapQ==
 
-"@hoprnet/hopr-core-ethereum@1.17.15":
-  version "1.17.15"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-ethereum/-/hopr-core-ethereum-1.17.15.tgz#8040548a97abd317e52791f21a19ba548a9c4c15"
-  integrity sha512-qO147+B9NPNzkE1RrNoKG4s1BFQNT42r5q4JKX1YUMgnQS1bf1CErZrenfha1vXkYiakMI/kgjS1fVb0auxVFA==
+"@hoprnet/hopr-core-ethereum@1.17.17":
+  version "1.17.17"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-ethereum/-/hopr-core-ethereum-1.17.17.tgz#1e3dc3deb1ac466ca82195df6d27427a8d4057a2"
+  integrity sha512-wKrS9l3PL4T7QJMwtkiHtz78dYN5XDmgA1JyBhldYtmMI/kQeMfhiC+k7FlSRvWYdq8bd6vmO8FF3LruhH8Q0g==
   dependencies:
-    "@hoprnet/hopr-ethereum" "1.17.15"
-    "@hoprnet/hopr-utils" "1.17.15"
+    "@hoprnet/hopr-ethereum" "1.17.17"
+    "@hoprnet/hopr-utils" "1.17.17"
     bn.js "^5.1.2"
     chalk "^4.1.0"
     debug "^4.1.1"
@@ -1255,14 +1255,14 @@
     web3-eth "^1.2.11"
     web3-eth-contract "^1.2.11"
 
-"@hoprnet/hopr-core@1.17.15":
-  version "1.17.15"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core/-/hopr-core-1.17.15.tgz#05a07cb3c6e75f7aa52d12632afb4372682d5210"
-  integrity sha512-FDNINZXG6+wBLr3x0LC4QEVn3CGLmulccaBD+6tkLwS0GMgjudjQEG4XslvlExKUonnpEWSeaIqx3xiLKm2Kdw==
+"@hoprnet/hopr-core@1.17.17":
+  version "1.17.17"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core/-/hopr-core-1.17.17.tgz#f17343853d96de7d0b33b7dc363360b34a149e6c"
+  integrity sha512-oe7sEDaPCiCJZFxakwfoquvr4MYPJzrUri/8oAg7yXczEWifMufCeg3mwB82yRHsiQ9XfXU1WgUYXrZqPkjWvA==
   dependencies:
-    "@hoprnet/hopr-core-ethereum" "1.17.15"
-    "@hoprnet/hopr-demo-seeds" "1.17.15"
-    "@hoprnet/hopr-utils" "1.17.15"
+    "@hoprnet/hopr-core-ethereum" "1.17.17"
+    "@hoprnet/hopr-demo-seeds" "1.17.17"
+    "@hoprnet/hopr-utils" "1.17.17"
     abort-controller "^3.0.0"
     abortable-iterator "^3.0.0"
     bl "^4.0.3"
@@ -1292,18 +1292,18 @@
     webrtc-stun "^3.0.0"
     wrtc "0.4.6"
 
-"@hoprnet/hopr-demo-seeds@1.17.15":
-  version "1.17.15"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-demo-seeds/-/hopr-demo-seeds-1.17.15.tgz#55a856e1d3b837a4e21826908c9807ae13fba559"
-  integrity sha512-uxYr+tba7Xm6X1P2u7sexkr+MEsacxKH1WyzfsY6m+ygiZfHkNmluk7Fd2LHCvtp7Q2kxz1jcM8IKoC/GO6k+w==
+"@hoprnet/hopr-demo-seeds@1.17.17":
+  version "1.17.17"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-demo-seeds/-/hopr-demo-seeds-1.17.17.tgz#69ac4a5207c44e21216836005d3ebb0b89f28747"
+  integrity sha512-p+wJBGcRES9v1YXAYwIcYAbga8akbv+nV7fycEaRK/Sb8ZgYTe65GJfkiRa8ccjTePPpNDOkykKFN+hr2X5FUw==
 
-"@hoprnet/hopr-ethereum@1.17.15":
-  version "1.17.15"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-ethereum/-/hopr-ethereum-1.17.15.tgz#d6a9fcac763dc32dc003f32f7391ff594e79ffd9"
-  integrity sha512-pPwdjYBAFj3VCw1MZpD12iIkpn2jUBCloJjQ7AvbjRP6nZRcUGAscjtd+DQHtGE7vbNGbjVdHWqTM+UD7dW7UQ==
+"@hoprnet/hopr-ethereum@1.17.17":
+  version "1.17.17"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-ethereum/-/hopr-ethereum-1.17.17.tgz#caf3eb27263dd054a0086c92cb51bc4a586ddd4d"
+  integrity sha512-0aFokTfZpK3OSXts/2ypk3cZ/a/9Z/Q4KE4P1FlnN5Q5Nk5Maohrr/zdBjsEwCGoTV1Z9vu9+TMO2gpYFshyRw==
   dependencies:
-    "@hoprnet/hopr-demo-seeds" "1.17.15"
-    "@hoprnet/hopr-utils" "1.17.15"
+    "@hoprnet/hopr-demo-seeds" "1.17.17"
+    "@hoprnet/hopr-utils" "1.17.17"
     "@openzeppelin/contracts" "^3.0.1"
     "@truffle/debug-utils" "^4.1.1"
     "@truffle/hdwallet-provider" "^1.0.34"
@@ -1316,24 +1316,24 @@
     ts-node "^9.0.0"
     web3 "^1.2.11"
 
-"@hoprnet/hopr-protos@1.17.15":
-  version "1.17.15"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-protos/-/hopr-protos-1.17.15.tgz#1e8b2e7eafe568b1519b2508b71b16af27000443"
-  integrity sha512-1bEi2nONFqFwmDYBnE8B5P3xia+zGEfdBXbvoKtUHwADvP/Lr0pM1N66inCCb08f0iyT12MMEu2j10gcQc/Jbw==
+"@hoprnet/hopr-protos@1.17.17":
+  version "1.17.17"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-protos/-/hopr-protos-1.17.17.tgz#d08882588b973026684777a239e7623b54847f91"
+  integrity sha512-0a6UrNH5okfWj/VEMZPqE1GF1OhVJV92624LDEc1ZCde1wQsJr08kAoRGS1hH8pH5J1QY/1Yr9GuR+qKkv/Saw==
   dependencies:
     google-protobuf "^3.12.2"
     grpc "^1.24.3"
 
-"@hoprnet/hopr-server@1.17.15":
-  version "1.17.15"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-server/-/hopr-server-1.17.15.tgz#d05496a705bc1b58076ef818c1e3ebdc00834043"
-  integrity sha512-U10Hz/Ol+h4fox6uMLCvMEwcSPR2ZFgCLgsOPu3y4jpLwozcSihPp2j4r9cMbArHy6UEOYKVUKnPxDzEEN/ngw==
+"@hoprnet/hopr-server@1.17.17":
+  version "1.17.17"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-server/-/hopr-server-1.17.17.tgz#0642188cf6288a218c8844b41e1d609e7684b720"
+  integrity sha512-dBKKEswTBmZ+asiGbo3IHNsxwIRT3uGSduBjwpAaAsKFPkms3QGGqrchrWtQBkj2aHxdiF5djA2ImI7O075OPQ==
   dependencies:
     "@grpc/proto-loader" "^0.5.4"
-    "@hoprnet/hopr-core" "1.17.15"
-    "@hoprnet/hopr-core-connector-interface" "1.17.15"
-    "@hoprnet/hopr-protos" "1.17.15"
-    "@hoprnet/hopr-utils" "1.17.15"
+    "@hoprnet/hopr-core" "1.17.17"
+    "@hoprnet/hopr-core-connector-interface" "1.17.17"
+    "@hoprnet/hopr-protos" "1.17.17"
+    "@hoprnet/hopr-utils" "1.17.17"
     "@nestjs/common" "^7.0.0"
     "@nestjs/config" "^0.5.0"
     "@nestjs/core" "^7.0.0"
@@ -1350,10 +1350,10 @@
     rlp "^2.2.6"
     rxjs "^6.6.0"
 
-"@hoprnet/hopr-utils@1.17.15":
-  version "1.17.15"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.17.15.tgz#8377b4c0feb5a4eed0715f949ea51c213490bcba"
-  integrity sha512-uwSDRwM8QpG8yuhyhZFdZeXLdQhKJgcGfhiP1VNdiZn+U5n9f5RVA2k7TeQpf4gzyb/5bncaaeatC1rIxBzpSg==
+"@hoprnet/hopr-utils@1.17.17":
+  version "1.17.17"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.17.17.tgz#8ed2ac921620bdb4657f31262ec6b11737c081d0"
+  integrity sha512-vXxQMh1zwmsSSA/+lpRkZRDy+a/huuLQxo6EQbIlyTT5S/L9v9XA1iQPi/frGC03Ag5CCqIQQdXO/zv18pxSGw==
   dependencies:
     bignumber.js "^9.0.0"
     libp2p-crypto "^0.17.9"

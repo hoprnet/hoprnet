@@ -42,18 +42,27 @@ export default function Help() {
             <hr />
             <ol>
               <li>
-                Install the latest version of{' '}
-                <a href="https://github.com/hoprnet/hopr-chat/releases" target="_blank" rel="noreferrer">
+    Install the latest version of{" "}
+                <a
+                  href="https://github.com/hoprnet/hopr-chat/releases"
+                  target="_blank"
+                  rel="noreferrer"
+                >
                   <span> HOPR Chat</span>
                 </a>
                 , which will spin up a HOPR node.
               </li>
               <li>
-                Send <strong>0.02 Matic</strong> to your node. You can get Matic from ETH on{' '}
-                <a href="//wallet.matic.network" target="_blank" rel="noreferrer">
+             Send <strong>0.02 Matic</strong> to your node. You can get Matic
+                from ETH on{" "}
+                <a
+                  href="//wallet.matic.network"
+                  target="_blank"
+                  rel="noreferrer"
+                >
                   <span>wallet.matic.network</span>
-                </a>{' '}
-                or ping us on{' '}
+                </a>{" "}
+                or ping us on{" "}
                 <a href="//t.me/hoprnet" target="_blank" rel="noreferrer">
                   <span>Telegram</span>
                 </a>
@@ -65,7 +74,8 @@ export default function Help() {
               <li>
                 Tweet your HOPR node address with the tag <strong>#Basodino</strong> and <strong>@hoprnet</strong>.{' '}
                 <TweetBasodino>
-                  <img src="/assets/icons/twitter.svg" alt="twitter" /> <span>#Basodino</span>
+                   <img src="/assets/icons/twitter.svg" alt="twitter" />{" "}
+                  <span>#Basodino</span>
                 </TweetBasodino>
               </li>
               <li>
@@ -90,7 +100,11 @@ export default function Help() {
             </ol>
             <hr />
             <div className="twitter-line-menu">
-              <a className="aux-help-twitter" href="https://twitter.com/hoprnet" target="_blank">
+              <a
+                className="aux-help-twitter"
+                href="https://twitter.com/hoprnet"
+                target="_blank"
+              >
                 <div>
                   <img src="/assets/icons/twitter.svg" alt="twitter" />
                 </div>

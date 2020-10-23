@@ -39,8 +39,15 @@ const Menu = ({ activaMenu }) => {
                 </li>
               </Link>
               <Link href="/hopr-allocation">
-                <li className={[router.pathname == '/hopr-allocation' ? 'active' : '']}>
-                  <img src="/assets/icons/horp_icon.svg" alt="hopr HOPR ALLOCATION" />
+                 <li
+                  className={[
+                    router.pathname == "/hopr-allocation" ? "active" : "",
+                  ]}
+                >
+                  <img
+                    src="/assets/icons/horp_icon.svg"
+                    alt="hopr HOPR ALLOCATION"
+                  />
                   <p>HOPR ALLOCATION</p>
                 </li>
               </Link>

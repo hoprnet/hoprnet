@@ -35,7 +35,12 @@ const Layout = ({ children }) => {
         {/*  */}
         <div className=" only-desktop-view ">
           <div className="icon-logo-desktop">
-            <a href="https://hoprnet.org/" target="_blank" rel="noopener noreferrer">
+<div className="icon-logo-desktop">
+            <a
+              href="https://hoprnet.org/"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               <img src="/assets/brand/logo.svg" alt="hopr" />
             </a>
           </div>
