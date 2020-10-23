@@ -169,8 +169,6 @@ class RelayConnection implements MultiaddrConnection {
             } else if (u8aEquals(SUFFIX, RESTART)) {
               log(`RESTART received, reconnectReceived: ${__reconnectCounter++}. Ending stream ...`)
 
-              this._sinkSourceDone = true
-
               this._onReconnect(this)
 
               // log(`after reconnect`, (await this._stream.source.next()))
