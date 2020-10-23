@@ -297,6 +297,7 @@ class RelayConnection implements MultiaddrConnection {
       streamMsg = value
 
       if (done) {
+        console.log(`inside streamSourceFunction: Setting _sinkSourceDone to true`)
         this._sinkSourceDone = true
       }
     }
