@@ -2,6 +2,12 @@ name: Publish Website hopr.swiss
 
 on:
   push:
+    branches: [master]
+    paths:
+      - '.github/workflows/*-hopr-swiss.yml'
+      - 'websites/hopr-swiss/**'
+  pull_request:
+    types: [opened, synchronize]
     branches: ['**']
     paths:
       - '.github/workflows/*-hopr-swiss.yml'

@@ -2,6 +2,12 @@ name: Publish Website network.hoprnet.org
 
 on:
   push:
+    branches: [master]
+    paths:
+      - '.github/workflows/*-leaderboard.yml'
+      - 'websites/leaderboard-new/**'
+  pull_request:
+    types: [opened, synchronize]
     branches: ['**']
     paths:
       - '.github/workflows/*-leaderboard.yml'
