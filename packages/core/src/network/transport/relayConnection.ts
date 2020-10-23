@@ -45,8 +45,6 @@ class RelayConnection implements MultiaddrConnection {
 
   public conn: Stream
 
-  private _sinkSourceDone: boolean
-
   public timeline: {
     open: number
     close?: number
@@ -87,8 +85,6 @@ class RelayConnection implements MultiaddrConnection {
     this.remoteAddr = Multiaddr(`/p2p/${counterparty.toB58String()}`)
 
     this.webRTC = webRTC
-
-    this._sinkSourceDone = true
 
     this.source = this._createSource.call(this)
 
@@ -277,6 +273,7 @@ class RelayConnection implements MultiaddrConnection {
   private async *sinkFunction(this: RelayConnection) {
     let streamResolved = false
     let streamMsg: Uint8Array | void
+    let streamDone = true
 
     let webRTCresolved = false
     let webRTCdone = this.webRTC == null
@@ -293,12 +290,13 @@ class RelayConnection implements MultiaddrConnection {
     let streamPromise: Promise<void>
 
     const streamSourceFunction = ({ done, value }: { done?: boolean; value?: Uint8Array | void }) => {
+      console.log(`inside streamSourceFunction:`, done, value)
+
       streamResolved = true
       streamMsg = value
 
       if (done) {
-        console.log(`inside streamSourceFunction: Setting _sinkSourceDone to true`)
-        this._sinkSourceDone = true
+        streamDone = true
       }
     }
 
@@ -337,8 +335,8 @@ class RelayConnection implements MultiaddrConnection {
     let switchPromise = this._switchPromise.promise.then(switchFunction)
 
     while (true) {
-      log(`RelayConnection: sink iteration`, webRTCdone, this._sinkSourceDone)
-      if (!webRTCdone && !this._sinkSourceDone) {
+      log(`RelayConnection: sink iteration`, webRTCdone, streamDone)
+      if (!webRTCdone && !streamDone) {
         log(`RelayConnection: !webRTCdone && !streamDone`)
         if (streamPromise == null) {
           streamPromise = currentSource.next().then(streamSourceFunction)
@@ -373,7 +371,7 @@ class RelayConnection implements MultiaddrConnection {
           switchPromise,
           closePromise
         ])
-      } else if (!this._sinkSourceDone) {
+      } else if (!streamDone) {
         log(`RelayConnection: !streamDone`, currentSource)
 
         if (streamPromise == null) {
@@ -416,12 +414,12 @@ class RelayConnection implements MultiaddrConnection {
         console.log(
           `streamClosed`,
           streamClosed,
-          `this._sinkSourceDone`,
-          this._sinkSourceDone,
+          `streamDone`,
+          streamDone,
           `webRTCdone`,
           webRTCdone
         )
-        if (streamClosed || (this._sinkSourceDone && webRTCdone)) {
+        if (streamClosed || (streamDone && webRTCdone)) {
           this._destroyed = true
 
           return u8aConcat(RELAY_STATUS_PREFIX, STOP)
@@ -464,7 +462,7 @@ class RelayConnection implements MultiaddrConnection {
         streamSwitched = false
         currentSource = tmpSource
         this._switchPromise = Defer<Stream['source']>()
-        this._sinkSourceDone = false
+        streamDone = false
         streamPromise = currentSource.next().then(streamSourceFunction)
         switchPromise = this._switchPromise.promise.then(switchFunction)
         log(`RelayConnection: sink migrated`, currentSource)
