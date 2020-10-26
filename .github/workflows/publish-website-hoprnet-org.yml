@@ -2,7 +2,7 @@ name: Publish Website hoprnet.org
 
 on:
   push:
-    branches: [master, release/*]
+    branches: ['**']
     paths:
       - '.github/workflows/*-hoprnet-org.yml'
       - 'websites/hoprnet-org/**'
