@@ -7,7 +7,7 @@ on:
     paths:
       - '.github/workflows/*-leaderboard.yml'
       - 'websites/leaderboard-new/**'
-  pull_request_target:
+  pull_request:
     types: [opened, synchronize]
     branches: ['**']
     paths:
@@ -27,7 +27,7 @@ jobs:
       - id: step1
         run: echo "::set-output name=test::${{ github.event_name }}"
       - id: step2
-        run: echo "::set-output name=test::${{ github.event_name != 'pull_request_target' }}"
+        run: echo "::set-output name=test::${{ github.event_name != 'pull_request' }}"
       # - name: Vercel Action (preview)
       #   uses: amondnet/vercel-action@77cb0ce3642a451f7f18d63821c0e26f7adead9a
       #   if: github.ref != 'refs/heads/master' && !startsWith(github.ref, 'refs/heads/release/')
