@@ -18,17 +18,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
-      - uses: actions/checkout@v1
-      - name: Echo ref
-        run: echo '${{ github.ref }}'
-      - name: Echo base_ref
-        run: echo '${{ github.base_ref }}'
-      - name: Echo head_ref
-        run: echo '${{ github.head_ref }}'
-      - name: Echo event_name
-        run: echo '${{ github.event_name }}'
-      - name: Echo repository
-        run: echo '${{ github.repository }}'
       - name: Vercel Action (preview)
         uses: amondnet/vercel-action@77cb0ce3642a451f7f18d63821c0e26f7adead9a
         if: github.ref != 'refs/heads/master' && !startsWith(github.ref, 'refs/heads/release/')
@@ -42,7 +31,7 @@ jobs:
           github-comment: ${{ github.event_name != 'pull_request_target' }}
       - name: Vercel Action (production)
         uses: amondnet/vercel-action@77cb0ce3642a451f7f18d63821c0e26f7adead9a
-        if: github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')
+        if: github.event_name != 'pull_request_target' && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/'))
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
