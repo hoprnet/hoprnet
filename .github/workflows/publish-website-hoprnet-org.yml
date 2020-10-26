@@ -6,7 +6,7 @@ on:
     paths:
       - '.github/workflows/*-hoprnet-org.yml'
       - 'websites/hoprnet-org/**'
-  pull_request:
+  pull_request_target:
     types: [opened, synchronize]
     branches: ['**']
     paths:
