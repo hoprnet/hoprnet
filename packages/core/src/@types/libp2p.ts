@@ -48,7 +48,7 @@ declare module 'libp2p' {
     addressBook: {
       add(id: PeerId, addr: Array<Multiaddr>)
       delete(id: PeerId)
-      get(id: PeerId): Array<Multiaddr>
+      get(id: PeerId): Array<{multiaddr: Multiaddr}>
       getMultiaddrsForPeer(id: PeerId): Array<string>
       set(peerId: PeerId, multiaddrs: Array<Multiaddr>)
     }

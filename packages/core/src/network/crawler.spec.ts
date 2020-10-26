@@ -1,15 +1,7 @@
 import assert from 'assert'
 import PeerId from 'peer-id'
-import libp2p from 'libp2p'
 import type { Connection } from 'libp2p'
-// @ts-ignore
-import TCP = require('libp2p-tcp')
-// @ts-ignore
-import MPLEX = require('libp2p-mplex')
-// @ts-ignore
-import SECIO = require('libp2p-secio')
 
-import { LibP2P } from '..'
 import { CRAWL_TIMEOUT, shouldIncludePeerInCrawlResponse } from './crawler'
 import { Crawler as CrawlerInteraction } from '../interactions/network/crawler'
 import Multiaddr from 'multiaddr'
@@ -18,52 +10,40 @@ import { Interactions } from '../interactions'
 import { BlacklistedEntry } from './network-peers'
 import { BLACKLIST_TIMEOUT } from '../constants'
 import { durations } from '@hoprnet/hopr-utils'
+import { generateLibP2PMock } from '../test-utils'
 
-type Mocks = {
-  node: LibP2P
-  network: Network
-  interactions: Interactions<any>
+let mockConnection = (p: PeerId, addr: Multiaddr): Connection => {
+  return { remotePeer: p, remoteAddr: addr } as Connection
 }
 
-let mockConnection = (p: PeerId): Connection => {
-  return { remotePeer: p } as Connection
+async function generateMocks(
+  options?: { timeoutIntentionally: boolean },
+  addr = '/ip4/0.0.0.0/tcp/0'
+){
+  const {node, address} = await generateLibP2PMock(addr)
+
+  await node.start()
+
+  const interactions = {
+    network: {
+      crawler: new CrawlerInteraction(node, (conn) => {
+        return network.crawler.handleCrawlRequest(conn)
+      })
+    }
+  } as Interactions<any>
+
+  const network = new Network(node, interactions, {} as any, { crawl: options })
+  node.connectionManager.on('peer:connect', (conn: Connection) => node.peerStore.addressBook.add(conn.remotePeer, [conn.remoteAddr]))
+
+  return {
+    node,
+    address,
+    interactions,
+    network
+  }
 }
 
 describe('test crawler', function () {
-  async function generateMocks(
-    options?: { timeoutIntentionally: boolean },
-    addr = '/ip4/0.0.0.0/tcp/0'
-  ): Promise<Mocks> {
-    const node = await libp2p.create({
-      peerId: await PeerId.create({ keyType: 'secp256k1' }),
-      modules: {
-        transport: [TCP],
-        streamMuxer: [MPLEX],
-        connEncryption: [SECIO]
-      }
-    })
-
-    node.multiaddrs.add(Multiaddr(addr))
-
-    await node.start()
-
-    const interactions = {
-      network: {
-        crawler: new CrawlerInteraction(node, (conn) => {
-          return network.crawler.handleCrawlRequest(conn)
-        })
-      }
-    } as Interactions<any>
-
-    const network = new Network(node, interactions, {} as any, { crawl: options })
-    node.on('peer:connect', (conn: Connection) => node.peerStore.put(conn.remotePeer))
-
-    return {
-      node,
-      interactions,
-      network
-    }
-  }
 
   it('should crawl the network and find some nodes', async function () {
     const [Alice, Bob, Chris, Dave, Eve] = await Promise.all([
@@ -75,27 +55,27 @@ describe('test crawler', function () {
     ])
 
     await Alice.network.crawler.crawl()
-    Alice.node.emit('peer:connect', mockConnection(Bob.node.peerId))
+    Alice.node.connectionManager.emit('peer:connect', mockConnection(Bob.node.peerId, Bob.address))
     await Alice.network.crawler.crawl()
 
     assert(Alice.network.networkPeers.has(Bob.node.peerId))
 
-    Bob.node.emit('peer:connect',  mockConnection(Chris.node.peerId))
+    Bob.node.connectionManager.emit('peer:connect',  mockConnection(Chris.node.peerId, Chris.address))
     assert(Bob.network.networkPeers.has(Chris.node.peerId))
 
     await Alice.network.crawler.crawl()
     assert(Alice.network.networkPeers.has(Bob.node.peerId))
     assert(Alice.network.networkPeers.has(Chris.node.peerId))
 
-    Chris.node.emit('peer:connect',  mockConnection(Dave.node.peerId))
+    Chris.node.connectionManager.emit('peer:connect',  mockConnection(Dave.node.peerId, Dave.address))
     await Alice.network.crawler.crawl()
 
     assert(Alice.network.networkPeers.has(Bob.node.peerId))
     assert(Alice.network.networkPeers.has(Chris.node.peerId))
     assert(Alice.network.networkPeers.has(Dave.node.peerId))
 
-    Bob.node.emit('peer:connect', mockConnection(Alice.node.peerId))
-    Dave.node.emit('peer:connect', mockConnection(Eve.node.peerId))
+    Bob.node.connectionManager.emit('peer:connect', mockConnection(Alice.node.peerId, Alice.address))
+    Dave.node.connectionManager.emit('peer:connect', mockConnection(Eve.node.peerId, Eve.address))
 
     await Bob.network.crawler.crawl()
 
@@ -117,7 +97,7 @@ describe('test crawler', function () {
     // Remove Bob from blacklist
     Alice.network.networkPeers.deletedPeers[0].deletedAt -= BLACKLIST_TIMEOUT + 1
 
-    Alice.node.emit('peer:connect', mockConnection(Chris.node.peerId))
+    Alice.node.connectionManager.emit('peer:connect', mockConnection(Chris.node.peerId, Chris.address))
 
     await Alice.network.crawler.crawl()
 
@@ -150,9 +130,9 @@ describe('test crawler', function () {
       ])
 
       await Alice.network.crawler.crawl()
-      Alice.node.emit('peer:connect', mockConnection(Bob.node.peerId))
+      Alice.node.connectionManager.emit('peer:connect', mockConnection(Bob.node.peerId, Bob.address))
       await Alice.network.crawler.crawl()
-      Bob.node.emit('peer:connect', mockConnection(Chris.node.peerId))
+      Bob.node.connectionManager.emit('peer:connect', mockConnection(Chris.node.peerId, Chris.address))
       await Alice.network.crawler.crawl()
 
       await new Promise((resolve) => setTimeout(resolve, 100))
