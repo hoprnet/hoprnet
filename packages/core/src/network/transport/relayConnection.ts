@@ -116,7 +116,7 @@ class RelayConnection implements MultiaddrConnection {
       streamResolved = true
       streamMsg = value
 
-      console.log(`setting streamDone to true`, done, value )
+      console.log(`setting streamDone to true`, done, value)
       if (done) {
         streamDone = done
       }
