@@ -1,67 +1,36 @@
-import PeerId from 'peer-id'
-import libp2p from 'libp2p'
-import type {Connection} from 'libp2p'
-// @ts-ignore
-import TCP = require('libp2p-tcp')
-// @ts-ignore
-import MPLEX = require('libp2p-mplex')
-// @ts-ignore
-import SECIO = require('libp2p-secio')
-import { Heartbeat as HeartbeatInteraction } from '../interactions/network/heartbeat'
 import Heartbeat from './heartbeat'
 import NetworkPeerStore from './network-peers'
-import { Network } from './index'
-
+import PeerId from 'peer-id'
 import assert from 'assert'
-import Multiaddr from 'multiaddr'
-import { LibP2P } from '..'
+import { generateLibP2PMock } from '../test-utils'
 import { Interactions } from '../interactions'
+import { Network } from '../network'
+import type {Connection} from 'libp2p'
+import { Heartbeat as HeartbeatInteraction } from '../interactions/network/heartbeat'
 
-type Mocks = {
-  node: LibP2P
-  address: Multiaddr
-  network: Network
-  interactions: Interactions<any>
+
+async function generateMocks(
+  options?: { timeoutIntentionally: boolean },
+  addr = '/ip4/0.0.0.0/tcp/0'
+) {
+  const {node, address} = await generateLibP2PMock(addr)
+
+  const interactions = {
+    network: {
+      heartbeat: new HeartbeatInteraction(node, (remotePeer) => network.heartbeat.emit('beat', remotePeer))
+    }
+  } as Interactions<any>
+
+  const network = new Network(node, interactions, {} as any, { crawl: options })
+
+  node.on('peer:connect', (connection: Connection) => node.peerStore.addressBook.add(connection.remotePeer, [connection.remoteAddr]))
+
+  return {
+    node, address, network, interactions
+  }
 }
 
 describe('check heartbeat mechanism', function () {
-  
-  async function generateMocks(
-    options?: { timeoutIntentionally: boolean },
-    addr = '/ip4/0.0.0.0/tcp/0'
-  ): Promise<Mocks> {
-    const node = await libp2p.create({
-      peerId: await PeerId.create({ keyType: 'secp256k1' }),
-      addresses: { listen: [Multiaddr(addr)] },
-      modules: {
-        transport: [TCP],
-        streamMuxer: [MPLEX],
-        connEncryption: [SECIO]
-      }
-    })
-
-    node.hangUp = async (_id) => {} // Need to override this in tests.
-
-    await node.start()
-
-    const interactions = {
-      network: {
-        heartbeat: new HeartbeatInteraction(node, (remotePeer) => network.heartbeat.emit('beat', remotePeer))
-      }
-    } as Interactions<any>
-
-    const network = new Network(node, interactions, {} as any, { crawl: options })
-
-    node.getConnectedPeers = () => node._network.networkPeers.peers.map((x) => x.id)
-    node.on('peer:connect', (connection: Connection) => node.peerStore.addressBook.put(connection.remotePeer.id))
-    return {
-      node,
-      address: node.multiaddrs[0].encapsulate('/p2p/' + node.peerId.toB58String()),
-      interactions,
-      network
-    }
-  }
-
   it('should initialise the heartbeat module and start the heartbeat functionality', async function () {
     const [Alice, Bob, Chris] = await Promise.all([generateMocks(), generateMocks(), generateMocks()])
 
