@@ -123,7 +123,6 @@ declare module 'libp2p' {
       findPeer: (addr: PeerId) => Promise<PeerRoute>
     }
     handle: (protocol: string | string[], handler: (struct: { connection: any; stream: any }) => void) => void
-    on: (str: string, handler: (...props: any[]) => void) => void
     start(): Promise<any>
     stop(): Promise<void>
 

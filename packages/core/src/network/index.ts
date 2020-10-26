@@ -49,7 +49,7 @@ class Network {
       testingOptions?.crawl
     )
 
-    node.on('peer:connect', (conn: Connection) => {
+    node.connectionManager.on('peer:connect', (conn: Connection) => {
       this.networkPeers.onPeerConnect(conn.remotePeer)
       this.heartbeat.connectionListener(conn.remotePeer)
     })

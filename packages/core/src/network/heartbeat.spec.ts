@@ -7,7 +7,8 @@ import { Interactions } from '../interactions'
 import { Network } from '../network'
 import type {Connection} from 'libp2p'
 import { Heartbeat as HeartbeatInteraction } from '../interactions/network/heartbeat'
-
+import debug from 'debug'
+const log = debug('hopr:heartbeat-tests')
 
 async function generateMocks(
   options?: { timeoutIntentionally: boolean },
@@ -23,7 +24,10 @@ async function generateMocks(
 
   const network = new Network(node, interactions, {} as any, { crawl: options })
 
-  node.on('peer:connect', (connection: Connection) => node.peerStore.addressBook.add(connection.remotePeer, [connection.remoteAddr]))
+  node.connectionManager.on('peer:connect', (connection: Connection) => {
+    log("> Connection from", connection.remotePeer)
+    node.peerStore.addressBook.add(connection.remotePeer, [connection.remoteAddr])
+  })
 
   return {
     node, address, network, interactions
@@ -40,6 +44,7 @@ describe('check heartbeat mechanism', function () {
     await Promise.all([
       new Promise(async (resolve) => {
         Bob.network.heartbeat.once('beat', (peerId: PeerId) => {
+          log('bob heartbeat from alice')
           assert(Alice.node.peerId.isEqual(peerId), `Incoming connection must come from Alice`)
           resolve()
         })
