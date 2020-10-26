@@ -116,6 +116,7 @@ class RelayConnection implements MultiaddrConnection {
       streamResolved = true
       streamMsg = value
 
+      console.log(`setting streamDone to true`, done, value )
       if (done) {
         streamDone = done
       }
@@ -179,6 +180,8 @@ class RelayConnection implements MultiaddrConnection {
 
         if (!streamDone) {
           streamPromise = this._stream.source.next().then(sourceFunction)
+        } else {
+          console.log(`ending stream`)
         }
       } else if (streamClosed || streamDone) {
         if (!this._destroyed) {
