@@ -7,22 +7,28 @@ on:
       - '.github/workflows/*-hoprnet-org.yml'
       - 'websites/hoprnet-org/**'
   pull_request_target:
-    types: [opened, synchronize]
     branches: ['**']
     paths:
       - '.github/workflows/*-hoprnet-org.yml'
       - 'websites/hoprnet-org/**'
-
-# currently, the vercel project is looking into the root folder
-# defaults:
-#   run:
-#     working-directory: websites/hoprnet-org
+    types: [opened, synchronize]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
+      - uses: actions/checkout@v1
+      - name: Echo ref
+        run: echo '${{ github.ref }}'
+      - name: Echo base_ref
+        run: echo '${{ github.base_ref }}'
+      - name: Echo head_ref
+        run: echo '${{ github.head_ref }}'
+      - name: Echo event_name
+        run: echo '${{ github.event_name }}'
+      - name: Echo repository
+        run: echo '${{ github.repository }}'
       - name: Vercel Action (preview)
         uses: amondnet/vercel-action@77cb0ce3642a451f7f18d63821c0e26f7adead9a
         if: github.ref != 'refs/heads/master' && !startsWith(github.ref, 'refs/heads/release/')
