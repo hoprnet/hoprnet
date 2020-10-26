@@ -102,7 +102,6 @@ class RelayConnection implements MultiaddrConnection {
   }
 
   private async *_createSource() {
-    log(`source called`)
     let streamClosed = false
 
     const closePromise = this._defer.promise.then(() => {
@@ -128,7 +127,6 @@ class RelayConnection implements MultiaddrConnection {
       await Promise.race([
         // prettier-ignore
         streamPromise,
-        //switchPromise,
         closePromise
       ])
 
@@ -165,12 +163,7 @@ class RelayConnection implements MultiaddrConnection {
               let tmpPromise = this._statusMessagePromise
               tmpPromise.resolve()
 
-              if (!streamDone) {
-                streamPromise = this._stream.source.next().then(sourceFunction)
-              }
-
               // Don't forward ping to receiver
-              continue
             } else {
               error(`Received invalid status message ${u8aToHex(SUFFIX || new Uint8Array([]))}. Dropping message.`)
             }
@@ -184,7 +177,9 @@ class RelayConnection implements MultiaddrConnection {
           log(`dropping empty message in source function`)
         }
 
-        streamPromise = this._stream.source.next().then(sourceFunction)
+        if (!streamDone) {
+          streamPromise = this._stream.source.next().then(sourceFunction)
+        }
       } else if (streamClosed || streamDone) {
         if (!this._destroyed) {
           if (!this._sinkTriggered) {
