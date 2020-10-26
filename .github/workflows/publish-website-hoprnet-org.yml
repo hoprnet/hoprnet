@@ -24,8 +24,6 @@ jobs:
         run: echo '${{ github.base_ref }}'
       - name: Echo head_ref
         run: echo '${{ github.head_ref }}'
-      - name: Echo head_ref
-        run: echo '${{ github.head_ref }}'
       - name: Echo event_name
         run: echo '${{ github.event_name }}'
       - name: Echo repository
