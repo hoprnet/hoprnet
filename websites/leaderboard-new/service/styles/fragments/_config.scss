@@ -1,6 +1,9 @@
 body {
   font-family: "Source Code Pro", monospace;
   background: $white-alt;
+  @media (min-width: 767px) {
+  overflow:hidden;
+  }
 }
 
 .aux-add-top {

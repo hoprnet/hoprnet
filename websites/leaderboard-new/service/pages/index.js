@@ -63,6 +63,9 @@ export default function Home() {
 
   useEffect(() => {
     callAPI();
+    return () =>{
+      setData(undefined)
+    }
   }, []);
 
   useEffect(() => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import CopieParagraph from "../data-view/copie-paragraph";
 import DataBoxCloud from "../data-view/data-box-cloud";
 import DataUpdateKnow from "../data-view/data-update-know";
