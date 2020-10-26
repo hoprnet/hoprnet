@@ -7,11 +7,11 @@ on:
       - '.github/workflows/*-hopr-swiss.yml'
       - 'websites/hopr-swiss/**'
   pull_request_target:
-    types: [opened, synchronize]
     branches: ['**']
     paths:
       - '.github/workflows/*-hopr-swiss.yml'
       - 'websites/hopr-swiss/**'
+    types: [opened, synchronize]
 
 defaults:
   run:
@@ -49,7 +49,7 @@ jobs:
       - name: Set Project for Google Cloud HOPR Association
         run: gcloud config set project ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
       - name: Deploy (preview)
-        if: github.ref != 'refs/heads/master' && !startsWith(github.ref, 'refs/heads/release/')
+        if: github.event_name == 'pull_request_target' || (github.ref != 'refs/heads/master' && !startsWith(github.ref, 'refs/heads/release/'))
         run: |-
           gcloud run deploy hopr-swiss-dev \
             --quiet \
@@ -58,7 +58,7 @@ jobs:
             --platform "managed" \
             --allow-unauthenticated
       - name: Deploy (production)
-        if: github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')
+        if: github.event_name != 'pull_request_target' && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/'))
         run: |-
           gcloud run deploy hopr-swiss \
             --quiet \
