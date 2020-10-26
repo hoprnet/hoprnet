@@ -8,6 +8,7 @@ class Home extends React.Component {
   render() {
     return (
       <React.Fragment>
+        <h1>hello</h1>
         <HoprCircle />
         <HeroFull />
         <News id="news" />
