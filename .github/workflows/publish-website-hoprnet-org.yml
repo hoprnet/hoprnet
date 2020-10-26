@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@v1
       - name: Vercel Action (preview)
         uses: amondnet/vercel-action@77cb0ce3642a451f7f18d63821c0e26f7adead9a
-        if: github.ref != 'refs/heads/master' && !startsWith(github.ref, 'refs/heads/release/')
+        if: github.event_name == 'pull_request_target' || (github.ref != 'refs/heads/master' && !startsWith(github.ref, 'refs/heads/release/'))
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
