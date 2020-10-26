@@ -56,7 +56,7 @@ describe('should create a socket and connect to it', function () {
     }
 
     const node = new libp2p({
-      peerId, addresses,
+      peerId, addresses: {listen: addresses},
       modules: {
         transport: [TCP],
         streamMuxer: [MPLEX],

@@ -39,7 +39,6 @@ export async function generateLibP2PMock(
     }
   })
 
-  node.hangUp = async (_id) => {} // Need to override this in tests.
   await node.start()
 
   return {
