@@ -40,8 +40,8 @@ declare module 'libp2p' {
 
   export type PeerStore = {
     //https://github.com/libp2p/js-libp2p/blob/master/doc/API.md#peerstoreget 
-    get(peerId: PeerId):  { id: PeerId, addresses: Array<Multiaddr>, metadata: Map<string, Buffer>, protocols: Array<string> } | undefined
-    peers: Map<string, { id: PeerId, addresses: Array<Multiaddr>, metadata: Map<string, Buffer>, protocols: Array<string> }>
+    get(peerId: PeerId):  { id: PeerId, addresses: Array<Multiaddr>, metadata: Map<string, Uint8Array>, protocols: Array<string> } | undefined
+    peers: Map<string, { id: PeerId, addresses: Array<Multiaddr>, metadata: Map<string, Uint8Array>, protocols: Array<string> }>
     delete(peer: PeerId): void
 
     // https://github.com/libp2p/js-libp2p/blob/master/doc/API.md#peerstoreaddressbookadd

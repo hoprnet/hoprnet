@@ -187,8 +187,9 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
    */
   private async connectToBootstrapServers(): Promise<void> {
     const potentialBootstrapServers = this.bootstrapServers.filter(
-      (addr: Multiaddr) => addr.getPeerId() != this.getId().toB58String()
+      (addr) => addr.getPeerId() != this.getId().toB58String()
     )
+    verbose('bootstrap', potentialBootstrapServers)
 
     if (potentialBootstrapServers.length == 0) {
       if (this._debug != true && !this.isBootstrapNode) {
@@ -208,6 +209,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
         )
       )
     )
+    verbose('bootstrap status', results)
 
     if (!results.some((online: boolean) => online)) {
       throw Error('Unable to connect to any known bootstrap server.')

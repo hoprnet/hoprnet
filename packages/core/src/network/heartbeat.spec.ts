@@ -19,17 +19,20 @@ import { Interactions } from '../interactions'
 
 type Mocks = {
   node: LibP2P
+  address: Multiaddr
   network: Network
   interactions: Interactions<any>
 }
 
 describe('check heartbeat mechanism', function () {
+  
   async function generateMocks(
     options?: { timeoutIntentionally: boolean },
     addr = '/ip4/0.0.0.0/tcp/0'
   ): Promise<Mocks> {
     const node = await libp2p.create({
       peerId: await PeerId.create({ keyType: 'secp256k1' }),
+      addresses: { listen: [Multiaddr(addr)] },
       modules: {
         transport: [TCP],
         streamMuxer: [MPLEX],
@@ -37,7 +40,6 @@ describe('check heartbeat mechanism', function () {
       }
     })
 
-    node.multiaddrs.add(Multiaddr(addr))
     node.hangUp = async (_id) => {} // Need to override this in tests.
 
     await node.start()
@@ -54,6 +56,7 @@ describe('check heartbeat mechanism', function () {
     node.on('peer:connect', (connection: Connection) => node.peerStore.addressBook.put(connection.remotePeer.id))
     return {
       node,
+      address: node.multiaddrs[0].encapsulate('/p2p/' + node.peerId.toB58String()),
       interactions,
       network
     }
@@ -62,7 +65,7 @@ describe('check heartbeat mechanism', function () {
   it('should initialise the heartbeat module and start the heartbeat functionality', async function () {
     const [Alice, Bob, Chris] = await Promise.all([generateMocks(), generateMocks(), generateMocks()])
 
-    await Alice.node.dial(Bob.node.peerId)
+    await Alice.node.dial(Bob.address)
 
     // Check whether our event listener is triggered by heartbeat interactions
     await Promise.all([
@@ -80,7 +83,7 @@ describe('check heartbeat mechanism', function () {
       `Chris should not know about Alice in the beginning.`
     )
 
-    await Alice.node.dial(Chris.node.peerId)
+    await Alice.node.dial(Chris.address)
 
     // Check that the internal state is as expected
     assert(Alice.network.networkPeers.has(Chris.node.peerId), `Alice should know about Chris now.`)

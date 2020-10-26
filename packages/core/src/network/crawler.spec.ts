@@ -43,7 +43,7 @@ describe('test crawler', function () {
       }
     })
 
-    node.peerInfo.multiaddrs.add(Multiaddr(addr))
+    node.multiaddrs.add(Multiaddr(addr))
 
     await node.start()
 
