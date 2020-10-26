@@ -5,7 +5,7 @@ const CopieParagraph = () => {
   return (
     <>
       <p className="paragraph">
-        Welcome to{" "}
+        Welcome to {" "}
         <a
           className="aux-link-out-to-post"
           target="_blank"

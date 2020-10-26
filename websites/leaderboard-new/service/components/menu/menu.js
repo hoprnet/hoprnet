@@ -3,31 +3,9 @@ import { useRouter } from "next/router";
 import Link from "next/link";
 import "../../styles/main.scss";
 import TweetBasodino from "../tweet-basodino";
-import api from "../../utils/api";
 
-const Menu = ({ activaMenu }) => {
+const Menu = ({ activaMenu, hash, copyCodeToClipboard}) => {
   const router = useRouter();
-  const [hash, setHash] = useState(
-    "16Uiu2HAm7KxaBkgd9ENvhf5qAkp1c6Q5Q1dXe8HBDzxLN4SxAVw6"
-  );
-
-  useEffect(() => {
-    const fetchData = async () => {
-      const response = await api.getAllData();
-      if (response.data) setHash(response.data.address);
-    };
-    fetchData();
-  }, []);
-
-  const [modal, setModal] = useState(false);
-  const copyCodeToClipboard = () => {
-    navigator.clipboard.writeText(hash);
-    setModal(true);
-    setTimeout(() => {
-      setModal(false);
-    }, 4000);
-  };
-
   return (
     <>
       <div className={"menu-mobile " + [activaMenu ? "open-menu" : ""]}>
@@ -66,12 +44,11 @@ const Menu = ({ activaMenu }) => {
                 </li>
               </Link>
             </ul>
-
             <hr />
             <div className="quick-code">
               <p>HOPR node</p>
               <div className="hash" onClick={() => copyCodeToClipboard()}>
-                <p>{hash}</p>
+                <p>{hash.slice(0, 8)}<span>...</span>{hash.slice(-8)}</p>
                 <div>
                   <img src="/assets/icons/copy.svg" alt="copy" />
                 </div>
@@ -94,26 +71,7 @@ const Menu = ({ activaMenu }) => {
             </div>
           </div>
         </div>
-        {/*  */}
-      </div>
-      <div className={"modal-copy-menu " + [modal ? "show-modal-menu" : ""]}>
-        <div className="box-modal-copy">
-          <div className="icon-logo">
-            <img src="/assets/brand/logo.svg" alt="hopr" />
-          </div>
-          <div className="content">
-            <div>
-              <p>{hash}</p>
-            </div>
-            <h5>copied to clipboard</h5>
-            <hr className="hr-alert" />
-            <p className="copy-alert">
-              this message is only informative it <br />
-              closes itself in <span>4 seconds.</span>
-            </p>
-          </div>
-        </div>
-      </div>
+      </div>   
     </>
   );
 };

@@ -28,6 +28,7 @@
         opacity: 0.64;
         letter-spacing: 0.03em;
         font-size: 1.13em;
+        text-transform:lowercase;
         transition: all 350ms ease-in-out;
       }
       img {
@@ -73,7 +74,7 @@
   box-sizing: border-box;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   p {
     color: $black;
     font-size: 0.8em;

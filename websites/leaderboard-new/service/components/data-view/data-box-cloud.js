@@ -1,31 +1,16 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import "../../styles/main.scss";
 
-import api from "../../utils/api";
-
-const DataBoxCloud = () => {
-  const [Address, setAddress] = useState("");
-  const [channel, setChannel] = useState("");
+const DataBoxCloud = ({address, channel}) => {
 
   const copyCodeToClipboard = (aux) => {
     navigator.clipboard.writeText(aux);
   };
-
-  useEffect(() => {
-    const fetchData = async () => {
-      const response = await api.getAllData();
-      if (response.data) {
-        setAddress(response.data.hoprCoverbotAddress);
-        setChannel(response.data.hoprChannelContract);
-      }
-    };
-    fetchData();
-  }, []);
-
+ 
   return (
     <div className="box-border">
-      <div onClick={() => copyCodeToClipboard(token)}>
-        <h3 className="num"> {Address} </h3>
+      <div onClick={() => copyCodeToClipboard(address)}>
+        <h3 className="num"> {address} </h3>
         <p>HOPR token address</p>
       </div>
       <div onClick={() => copyCodeToClipboard(channel)}>
