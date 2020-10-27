@@ -27,18 +27,14 @@ async function generateNode(options: {
   connHandler?: (conn: MultiaddrConnection) => void
 }): Promise<{node: libp2p, relay: Relay}> {
   const peerId = await privKeyToPeerId(privKeys[options.id])
-  const addresses = []
+  let addresses = []
 
   if (options.ipv4) {
-    addresses.push(
-      Multiaddr(`/ip4/127.0.0.1/tcp/${9490 + 2 * options.id}`).encapsulate(`/p2p/${peerId.toB58String()}`)
-    )
+    addresses = [Multiaddr(`/ip4/127.0.0.1/tcp/${9490 + 2 * options.id}`).encapsulate(`/p2p/${peerId.toB58String()}`)]
   }
 
   if (options.ipv6) {
-    addresses.push(
-      Multiaddr(`/ip6/::1/tcp/${9490 + 2 * options.id + 1}`).encapsulate(`/p2p/${peerId.toB58String()}`)
-    )
+    addresses = [Multiaddr(`/ip6/::1/tcp/${9490 + 2 * options.id + 1}`).encapsulate(`/p2p/${peerId.toB58String()}`)]
   }
 
   const node = new libp2p({
@@ -155,19 +151,15 @@ describe('should create a socket and connect to it', function () {
     })
 
     await counterparty.node.dial(getAddress(relayer.node))
-    //@ts-ignore
     conn = await sender.relay.establishRelayedConnection(
       Multiaddr(`/p2p/${counterparty.node.peerId.toB58String()}`),
-      relayer.node.multiaddrs,
-      {}//new WebRTCUpgrader({})
+      relayer.node.multiaddrs
     )
 
     await pipe(
       (async function* () {
         yield new TextEncoder().encode(`first message`)
-
         await new Promise((resolve) => setTimeout(resolve, 100))
-
         yield new TextEncoder().encode(`second message`)
       })(),
       conn,

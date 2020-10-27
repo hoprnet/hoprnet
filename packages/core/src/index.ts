@@ -56,7 +56,7 @@ export type HoprOptions = {
   dbPath?: string
   peerId?: PeerId
   password?: string
-  id?: number
+  id?: number // TODO - kill this opaque accessor of db files...
   bootstrapNode?: boolean
   network: string
   connector?: HoprCoreConnectorStatic

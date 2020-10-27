@@ -1,22 +1,14 @@
 import Hopr from '../..'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-
 import HoprEthereum from '@hoprnet/hopr-core-ethereum'
-
 import { Ganache } from '@hoprnet/hopr-testing'
 import { migrate, fund } from '@hoprnet/hopr-ethereum'
-
 import assert from 'assert'
-
 import { u8aEquals, durations } from '@hoprnet/hopr-utils'
-
 import { MAX_HOPS } from '../../constants'
-
 import LevelUp from 'levelup'
 import MemDown from 'memdown'
-
 import BN from 'bn.js'
-
 import Debug from 'debug'
 import { ACKNOWLEDGED_TICKET_INDEX_LENGTH } from '../../dbKeys'
 import { connectionHelper } from '../../test-utils'
@@ -85,6 +77,7 @@ describe('test packet composition and decomposition', function () {
       )
 
       async function openChannel(a: number, b: number) {
+        console.log(nodes[a].getId().pubKey.marshal())
         let channelBalance = new nodes[a].paymentChannels.types.ChannelBalance(undefined, {
           balance: new BN(200),
           balance_a: new BN(100)
@@ -92,7 +85,7 @@ describe('test packet composition and decomposition', function () {
 
         await nodes[a].paymentChannels.channel.create(
           nodes[b].getId().pubKey.marshal(),
-          async () => nodes[b].getId().pubKey.marshal(),
+          undefined,//async () => nodes[b].getId().pubKey.marshal(),
           new nodes[a].paymentChannels.types.ChannelBalance(undefined, {
             balance: new BN(200),
             balance_a: new BN(100)
@@ -180,8 +173,7 @@ describe('test packet composition and decomposition', function () {
 
         for (let k = 0; k < tickets.length; k++) {
           console.log((await tickets[k].signedTicket).ticket.amount)
-          // @ts-ignore
-          await nodes[i].paymentChannels.channel.tickets.submit(tickets[k])
+          await nodes[i].paymentChannels.channel.tickets.submit(tickets[k], undefined as any)
           console.log(`ticket submitted`)
         }
       }
