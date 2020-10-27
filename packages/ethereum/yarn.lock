@@ -293,10 +293,10 @@
   dependencies:
     source-map-support "^0.5.16"
 
-"@truffle/codec@^0.7.0":
-  version "0.7.0"
-  resolved "https://registry.yarnpkg.com/@truffle/codec/-/codec-0.7.0.tgz#256efe174961744671f0df44190211e20b5e0c98"
-  integrity sha512-MBTXyCIdzseSN95K+igwaX0098tx97+1d6vD2Oi6UMM3af6VSD8qUJ/h1GngeDkQ8WAS61H4KVlIl9CKhdAQgQ==
+"@truffle/codec@^0.7.1":
+  version "0.7.1"
+  resolved "https://registry.yarnpkg.com/@truffle/codec/-/codec-0.7.1.tgz#2ef0fa40109040796afbebb8812c872122100ae4"
+  integrity sha512-mNd6KnW6J0UB1zafGBXDlTEbCMvWpmPAJmzv7aF/nAIaN/F8UePSCiQ1OTQP39Rprj6GFiCCaWVnBAwum6UGSg==
   dependencies:
     big.js "^5.2.2"
     bn.js "^4.11.8"
@@ -309,7 +309,7 @@
     semver "^6.3.0"
     source-map-support "^0.5.19"
     utf8 "^3.0.0"
-    web3-utils "1.2.1"
+    web3-utils "1.2.9"
 
 "@truffle/contract-schema@^3.1.0":
   version "3.3.0"
@@ -340,11 +340,11 @@
     web3-utils "1.2.1"
 
 "@truffle/debug-utils@^4.1.1":
-  version "4.2.12"
-  resolved "https://registry.yarnpkg.com/@truffle/debug-utils/-/debug-utils-4.2.12.tgz#0e7be451b6396da11e8a24293ad66ca3491ada7a"
-  integrity sha512-M/XUUWc/5Vh6ukHshHxxuC92DsrXJoNaLRqA1LTzA2UhCT67RYdWWT9Vi40DXiQqKh/k9+XGAqk9syJ0JGXd9A==
+  version "4.2.13"
+  resolved "https://registry.yarnpkg.com/@truffle/debug-utils/-/debug-utils-4.2.13.tgz#d4014c0c089ad5b6ff5441f07ddadf5579f4f504"
+  integrity sha512-c2NG2JINg6tWufNQHUl5mFStLJ8IyG8TV5gu8DTkKSdV8/7D6NwYqFPoqQr9OjO3jJ+siFhXIYUUBd3WEw7vlQ==
   dependencies:
-    "@truffle/codec" "^0.7.0"
+    "@truffle/codec" "^0.7.1"
     "@trufflesuite/chromafi" "^2.2.0"
     chalk "^2.4.2"
     debug "^4.1.0"
@@ -9319,6 +9319,20 @@ web3-utils@1.2.2:
   version "1.2.2"
   resolved "https://registry.yarnpkg.com/web3-utils/-/web3-utils-1.2.2.tgz#b53a08c40d2c3f31d3c4a28e7d749405df99c8c0"
   integrity sha512-joF+s3243TY5cL7Z7y4h1JsJpUCf/kmFmj+eJar7Y2yNIGVcW961VyrAms75tjUysSuHaUQ3eQXjBEUJueT52A==
+  dependencies:
+    bn.js "4.11.8"
+    eth-lib "0.2.7"
+    ethereum-bloom-filters "^1.0.6"
+    ethjs-unit "0.1.6"
+    number-to-bn "1.7.0"
+    randombytes "^2.1.0"
+    underscore "1.9.1"
+    utf8 "3.0.0"
+
+web3-utils@1.2.9:
+  version "1.2.9"
+  resolved "https://registry.yarnpkg.com/web3-utils/-/web3-utils-1.2.9.tgz#abe11735221627da943971ef1a630868fb9c61f3"
+  integrity sha512-9hcpuis3n/LxFzEVjwnVgvJzTirS2S9/MiNAa7l4WOEoywY+BSNwnRX4MuHnjkh9NY25B6QOjuNG6FNnSjTw1w==
   dependencies:
     bn.js "4.11.8"
     eth-lib "0.2.7"
