@@ -179,9 +179,30 @@
       margin-top: 0.21em;
       margin-bottom: 0;
       font-weight: 600;
-      font-size: 0.88em;
-      color: $black;
-      letter-spacing: 0;
+      font-size: 0.89em;
+      color: $greyLabel;
+      cursor: pointer;
+      transition: all 350ms ease-in-out;
+      span {
+        background: #fff;
+        border: 0.5px solid #ebebeb;
+        border-radius: 4px;
+        padding: 0.4em;
+        margin:0 0.5em;
+        color: $black;
+        line-height: normal;
+      }
+      &:hover {
+        transition: all 350ms ease-in-out;
+        color: $black;
+      }
+      &.active {
+        color: $black;
+        background: #fff;
+        border: 1px solid #ebebeb;
+        border-radius: 4px;
+        padding: 0.4em;
+      }
     }
   }
 }
