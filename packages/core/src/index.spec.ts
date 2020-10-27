@@ -23,9 +23,7 @@ describe('test hopr-core', function () {
   })
 
   afterEach(async function () {
-    if (node.isRunning()) {
-      await node.stop()
-    }
+    await node.stop()
   })
 
   it(
