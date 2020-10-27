@@ -5,3 +5,5 @@ db
 
 *.swp
 .vercel
+
+.DS_Store
