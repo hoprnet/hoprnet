@@ -358,16 +358,14 @@ export function TransactionSigner(web3: Web3, privKey: Uint8Array) {
     txObject?: TransactionObject<T>
   ) {
     const abi = txObject ? txObject.encodeABI() : undefined
-    // estimation is not always right, adding some more
-    // const estimatedGas = Math.floor((await txObject.estimateGas()) * 1.25)
-    const estimatedGas = 200e3
-    const estimatedGasPrice = 1e9
+    const gas = 200e3
+    const gasPrice = 1e9
 
     // @TODO: provide some of the values to avoid multiple calls
     const signedTransaction = await web3.eth.accounts.signTransaction(
       {
-        gas: estimatedGas,
-        gasPrice: estimatedGasPrice,
+        gas,
+        gasPrice,
         ...txConfig,
         data: abi
       },

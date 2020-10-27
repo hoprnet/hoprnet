@@ -4,46 +4,17 @@ import CopyIcon from '../components/icons/copy'
 import TwitterIcon from '../components/icons/twitter'
 import { useState, useEffect } from 'react'
 import useSWR from 'swr'
-import db from '../utils/db'
 import api from '../utils/api'
-import { HOPR_ENVIRONMENT } from '../utils/env'
 import { default as Footer } from '../components/Footer/Footer'
 import { default as Header } from '../components/Header/Header'
 import BlockscoutLink from '../components/BlockscoutLink'
-
-interface FirebaseStatsRecords {
-  address: string
-  available: string
-  locked: string
-  connected: any[]
-  connectedNodes: any[]
-  hoprChannelContract: string
-  hoprCoverbotAddress: string
-  env: EnvironmentProps
-  refreshed: string
-}
+import { EnvironmentProps } from '../utils/env'
+import { FirebaseScoreMap, FirebaseStateRecords } from '../utils/db'
 
 interface ScoredNodeProps {
   address: string
   score: number
   connected: any[]
-}
-
-interface FirebaseScoreRecords {
-  [address: string]: number
-}
-
-interface ScoreMap {
-  address: string
-  score: number
-}
-
-interface EnvironmentProps {
-  COVERBOT_XDAI_THRESHOLD: number
-  COVERBOT_VERIFICATION_CYCLE_IN_MS: number
-  COVERBOT_DEBUG_MODE: boolean
-  COVERBOT_CHAIN_PROVIDER: string
-  COVERBOT_DEBUG_HOPR_ADDRESS: string
 }
 
 const ScoredNode: React.FC<ScoredNodeProps> = ({ address, score, connected }: ScoredNodeProps) => {
@@ -99,17 +70,20 @@ function HomeContent({
     document.body.removeChild(addressClicker)
   }
 
-  const [score, setScore] = useState<ScoreMap[]>([])
+  const [score, setScore] = useState<FirebaseScoreMap>({})
 
   useEffect(() => {
-    db.ref(`/${HOPR_ENVIRONMENT}/score`)
-      .orderByValue()
-      .on('value', (snapshot) => {
-        const result: FirebaseScoreRecords = snapshot.val() || {}
-        const scoreMap = Object.entries(result || {}).map(([address, score]) => ({ address, score }))
-        setScore(scoreMap)
-      })
+    const fetchScore = async () => {
+      const apiScoreResponse = await api.getScore()
+      if (apiScoreResponse.data) {
+        const score: FirebaseScoreMap = apiScoreResponse.data as FirebaseScoreMap
+        setScore(score)
+      }
+    }
+    fetchScore()
   }, [])
+
+  const scoreArray = Object.keys(score).map((key) => ({ address: key, score: score[key] }))
 
   return (
     <>
@@ -166,18 +140,16 @@ function HomeContent({
               In your HOPR node, type <strong>myAddress</strong> to find your node address.
             </li>
             <li>
-              <>
-                Tweet your HOPR node address with the tag <strong>#HOPRNetwork</strong> and <strong>@hoprnet</strong>.{' '}
-                <a
-                  href="https://twitter.com/intent/tweet?ref_src=twsrc%5Etfw"
-                  className="twitter-hashtag-button"
-                  data-text="Signing up to earn $HOPR on the #HOPRnetwork. My @hoprnet address is: "
-                  data-related="hoprnet"
-                  data-show-count="false"
-                >
-                  Tweet #hoprnetwork
-                </a>
-              </>
+              Tweet your HOPR node address with the tag <strong>#HOPRNetwork</strong> and <strong>@hoprnet</strong>.{' '}
+              <a
+                href="https://twitter.com/intent/tweet?ref_src=twsrc%5Etfw"
+                className="twitter-hashtag-button"
+                data-text="Signing up to earn $HOPR on the #HOPRnetwork. My @hoprnet address is: "
+                data-related="hoprnet"
+                data-show-count="false"
+              >
+                Tweet #hoprnetwork
+              </a>
             </li>
             <li>
               In your HOPR node, type <strong>includeRecipient</strong> and then “y” so the bot can respond.
@@ -207,14 +179,15 @@ function HomeContent({
           <div className={styles.padBottom}>
             <h2>Leaderboard</h2>
             <h3 style={{ paddingLeft: '20px' }}>
-              {connected.length} verified | {score.length} registered | {connectedNodes} connected
+              {connected.length} verified | {scoreArray.length} registered | {connectedNodes} connected
             </h3>
-            {(score.length == 0 || connected.length == 0) && (
+            {(scoreArray.length == 0 || connected.length == 0) && (
               <p className={styles.conerr}>
                 <em>No nodes connected...</em>
               </p>
             )}
-            {score.length > 0 && score.map((n) => <ScoredNode key={n.address} {...n} connected={connected} />)}
+            {scoreArray.length > 0 &&
+              scoreArray.map((n) => <ScoredNode key={n.address} {...n} connected={connected} />)}
           </div>
         </section>
       </main>
@@ -227,15 +200,16 @@ function HomeContent({
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
 export async function getServerSideProps() {
-  const stats = await api.getStats()
-  return { props: stats }
+  const state = await api.getState()
+  return { props: state }
 }
 
-const Home: React.FC<FirebaseStatsRecords> = (props) => {
-  const { data } = useSWR('/api/stats', fetcher, {
+const Home: React.FC<FirebaseStateRecords> = (props) => {
+  const { data } = useSWR('/api/state', fetcher, {
     initialData: props || {},
     refreshInterval: 5000,
   })
+  console.log('Home', data)
   return <HomeContent {...data} />
 }
 

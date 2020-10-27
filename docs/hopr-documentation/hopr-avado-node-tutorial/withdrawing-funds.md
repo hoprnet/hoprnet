@@ -4,7 +4,7 @@ description: How to withdraw funds from your node
 
 # Withdrawing Funds
 
-You can withdraw xDAI or xHOPR from your node to an Ethereum address of your choice.
+You can withdraw xDAI or HOPR from your node to an Ethereum address of your choice.
 
 To withdraw funds from your node, use the `withdraw` command.
 
@@ -18,8 +18,8 @@ withdraw [amount] native [ETH address]
 
 {% endtab %}
 
-{% tab title="Withdrawing xHOPR" %}
-To withdraw xHOPR, you'll need to add xHOPR to your wallet so it can recognise your balance. The smart contract address is: 0x12481c3Ed97b32D94E71C2039DBC44432ADD39a0
+{% tab title="Withdrawing HOPR" %}
+To withdraw HOPR, you'll need to add HOPR to your wallet so it can recognise your balance. The smart contract address is: 0x12481c3Ed97b32D94E71C2039DBC44432ADD39a0
 
 To withdraw, type:
 

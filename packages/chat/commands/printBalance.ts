@@ -40,7 +40,7 @@ export default class PrintBalance extends AbstractCommand {
 
     // TODO: use 'NativeBalance' and 'Balance' to display currencies
     return [
-      `${hoprPrefix.padEnd(prefixLength, ' ')}${styleValue(hoprBalance, 'number')} xHOPR`,
+      `${hoprPrefix.padEnd(prefixLength, ' ')}${styleValue(hoprBalance, 'number')} HOPR`,
       `${nativePrefix.padEnd(prefixLength, ' ')}${styleValue(nativeBalance, 'number')} Matic`
     ].join('\n')
   }

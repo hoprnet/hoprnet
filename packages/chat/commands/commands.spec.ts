@@ -136,7 +136,7 @@ describe('Commands', () => {
     mockNode.paymentChannels.withdraw = jest.fn()
 
     let cmds = new mod.Commands(mockNode)
-    expect((await cmds.autocomplete('withdraw'))[0][0]).toMatch(/recipient \(blockchain address\)/)
+    expect((await cmds.autocomplete('withdraw'))[0][0]).toMatch(/amount \(ETH, HOPR\)/)
 
     await cmds.execute('withdraw 0x123 native 1')
     expect(mockNode.paymentChannels.withdraw).toHaveBeenCalled()

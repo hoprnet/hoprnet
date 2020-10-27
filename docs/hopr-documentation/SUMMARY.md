@@ -43,9 +43,13 @@
   - [Routing Settings](core-concepts/proof-of-relay/routing-settings.md)
 - [Bootstrap Nodes](core-concepts/bootstrap-nodes.md)
 - [Cover Traffic](core-concepts/cover-traffic.md)
+<<<<<<< HEAD
 - [Tokens](core-concepts/tokens/README.md)
   - [Native Tokens](core-concepts/tokens/native-tokens.md)
   - [Testnet HOPR Tokens](core-concepts/tokens/hopr-tokens.md)
+=======
+- [HOPR Tokens](core-concepts/HOPR-tokens.md)
+>>>>>>> 2738cefd6e757a993a6305ce2458b9e9b8d4dddf
 - [Payment Channels](core-concepts/payment-channels.md)
 - [Tickets](core-concepts/tickets.md)
 
