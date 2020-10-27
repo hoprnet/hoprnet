@@ -12,14 +12,15 @@
 }
 
 .box {
-  padding: 1em 0;
+  padding: 1em 0 0 0;
+  border: 1px solid $grey;
   border-radius: 8px;
   background: #fff;
   box-shadow: $shadow;
   overflow: hidden;
   @media (min-width: 767px) {
     display: block;
-    width: 50vw;
+    width: 55vw;
     height: fit-content;
     overflow: hidden;
     margin: 0 1em;
@@ -46,16 +47,10 @@
     width: 50%;
     padding: 1em 2em;
     box-sizing: border-box;
-
-    &:nth-last-child(2) {
-      border-top: 1px solid #e3e3e3;
+    &:first-child {
       border-right: 0px solid #e3e3e3;
     }
-    &:nth-last-child(3) {
-      border-left: 1px solid #e3e3e3;
-    }
     &:last-child {
-      border-top: 1px solid #e3e3e3;
       border-left: 1px solid #e3e3e3;
     }
     h3,
@@ -90,10 +85,11 @@
 }
 
 .box-info {
+  text-align: center;
   p {
     color: #dadada;
     font-size: 1em;
-    font-weight: 400; 
+    font-weight: 400;
     span {
       color: $black;
       font-size: 0.89em;
@@ -124,13 +120,21 @@
         background: $white-alt;
         color: $black;
         padding: 0.44em 0.55em;
-
+        border: 1px solid $grey;
         font-weight: 600;
         font-size: 1em;
         cursor: pointer;
         transition: all 350ms ease-in-out;
         img {
           margin-right: 0.5em;
+          transition: all 400ms;
+        }
+        &:focus {
+          outline-color: transparent;
+          img {
+            transform: rotate(360deg);
+            transition: all 400ms;
+          }
         }
         &:hover {
           background: #ebebeb;
@@ -142,54 +146,42 @@
   }
 }
 
-.box .box-menu-optional {
-  background: $white-alt;
-  margin: 0.5em 0 0 0;
-  border-top: 1px solid #ebebeb;
-  border-bottom: 1px solid #ebebeb;
-  ul {
-    margin: 0;
-    padding: 0.5em 0;
-    list-style: none;
-    width: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    overflow: auto;
+.table-esp-data {
+  display: flex;
+  justify-content: space-between;
+  background: #f6f7f9;
+  margin: 0 0 1em 0;
 
-    @media (min-width: 767px) {
-      margin: 0;
-      padding: 0.5em 0;
-      list-style: none;
-    
+  & > div {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    & > div {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 0.44em;
+      box-sizing: border-box;
+      overflow: hidden;
+      background: #fff;
+      height: 55px;
+      width: 110px;
+      border: 1px solid $grey;
+      border-radius: 8px;
     }
-    li {
-      float: left;
+    span {
+      font-weight: 700;
+      font-size: 1em;
+    }
+    p {
+      margin-top: 0.21em;
+      margin-bottom: 0;
       font-weight: 600;
-      font-size: 0.89em;
-      color: $greyLabel;
-      cursor: pointer;
-      transition: all 350ms ease-in-out;
-      span {
-        background: #fff;
-        border: 0.5px solid #ebebeb;
-        border-radius: 4px;
-        padding: 0.4em;
-        margin:0 0.5em;
-        color: $black;
-        line-height: normal;
-      }
-      &:hover {
-        transition: all 350ms ease-in-out;
-        color: $black;
-      }
-      &.active {
-        color: $black;
-        background: #fff;
-        border: 1px solid #ebebeb;
-        border-radius: 4px;
-        padding: 0.4em;
-      }
+      font-size: 0.88em;
+      color: $black;
+      letter-spacing: 0;
     }
   }
 }
@@ -197,19 +189,20 @@
 .box .box-main-area {
   padding: 0 1em;
   overflow: hidden;
-  ol li{
+  ol li {
     line-height: normal;
-    margin-bottom: 0.33em;
+    margin-bottom: 0.55em;
     color: $black;
-    a{
+    a {
       text-decoration: none;
       position: relative;
-      color: #50A8E7;
-      img,span{
+      color: #50a8e7;
+      img,
+      span {
         position: relative;
         transition: all 450ms ease-in-out;
       }
-      &::before{
+      &::before {
         background-color: #f7f7f7;
         content: "";
         height: 100%;
@@ -217,12 +210,11 @@
         width: 0%;
         transition: all 350ms ease-in-out;
       }
-      &:hover{
-        span{
-          font-weight: 600;
+      &:hover {
+        span {
           transition: all 450ms ease-in-out;
         }
-        &::before{
+        &::before {
           width: 100%;
           transition: all 350ms ease-in-out;
         }
@@ -278,6 +270,7 @@
     }
   }
   .twitter-line-menu {
+    margin-bottom: 1em;
     & > div {
       a {
         img {
@@ -291,7 +284,11 @@
 
 .box-main-area .box-container-table {
   padding: 0 !important;
-  height: 400px;
+  height: 700px;
+  @media (min-width: 767px) {
+    height: 500px;
+    position: relative;
+  }
   overflow: auto;
 }
 
@@ -312,3 +309,4 @@
     letter-spacing: 0.5px !important;
   }
 }
+

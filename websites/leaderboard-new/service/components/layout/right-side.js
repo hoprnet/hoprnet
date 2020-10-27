@@ -1,31 +1,17 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
+import CopieParagraph from "../data-view/copie-paragraph";
 import DataBoxCloud from "../data-view/data-box-cloud";
 import DataUpdateKnow from "../data-view/data-update-know";
 import "../../styles/main.scss";
 
-const RightSide = () => {
+const RightSide = ({ address, channel, API_LastUpdated }) => {
   return (
     <section className="right-side only-desktop-view">
-      <p className="paragraph">
-        Welcome to <span>HOPR Basòdino testnet!</span> Visit HELP in the menu
-        for instructions. Registration is open. CoverBot will begin relaying
-        data on <span>21st Oct</span> at <span>3pm CET</span>. The{" "}
-        <span>200</span> highest scorers will win a share of{" "}
-        <span>200,000 HOPR</span>. The testnet will run until{" "}
-        <span>Nov 4th</span>.{" "}
-        <a  
-        className="aux-link-out"
-          target="_blank"
-          href="https://medium.com/hoprnet"
-          rel="noopener noreferrer">
-          
-           follow us on <span>[<img src="/assets/icons/medium.svg" alt="medium" />] medium.</span>
-        </a>
-      </p>
+      <CopieParagraph />
       <hr />
-      <DataBoxCloud />
+      <DataBoxCloud address={address} channel={channel} />
       <hr />
-      <DataUpdateKnow />
+      <DataUpdateKnow API_LastUpdated={API_LastUpdated} />
     </section>
   );
 };

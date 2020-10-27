@@ -1,45 +1,21 @@
-import React, { useState, useEffect } from "react";
-import api from '../../utils/api'
+import React from "react";
 import "../../styles/main.scss";
 
-const DataBoxCloud = () => {
-  const [API_Available, SetAPI_Available] = useState(null);
-  const [API_Balance, SetAPI_Balance] = useState(null);
-  const [API_HoprChannelContract, SetAPI_HoprChannelContract] = useState(null);
-  const [API_HoprCoverbotAddress, SetAPI_HoprCoverbotAddress] = useState(null);
+const DataBoxCloud = ({address, channel}) => {
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      const apiStats = await api.getState();
-      if (apiStats.data) {
-        SetAPI_Available(apiStats.data.available);
-        SetAPI_Balance(apiStats.data.balance);
-        SetAPI_HoprChannelContract(apiStats.data.hoprChannelContract);
-        SetAPI_HoprCoverbotAddress(apiStats.data.hoprCoverbotAddress);
-      }
-    }
-    fetchStats();
-  }, []);
-
-
+  const copyCodeToClipboard = (aux) => {
+    navigator.clipboard.writeText(aux);
+  };
+ 
   return (
     <div className="box-border">
-      <div>
-        <h3 className="num"> {API_Available}</h3>
-        <p>Available</p>
+      <div onClick={() => copyCodeToClipboard(address)}>
+        <h3 className="num"> {address} </h3>
+        <p>HOPR token address</p>
       </div>
-     
-      <div>
-        <h3 className="num"> {API_Balance}</h3>
-        <p>Balance</p>
-      </div>
-      <div>
-        <h3 className="num"> {API_HoprChannelContract}</h3>
-        <p>Hopr Channel Contract</p>
-      </div>
-      <div>
-        <h3 className="num">{API_HoprCoverbotAddress}</h3>
-        <p>Hopr Coverbot Address</p>
+      <div onClick={() => copyCodeToClipboard(channel)}>
+        <h3 className="num"> {channel} </h3>
+        <p>HOPR payment channel</p>
       </div>
     </div>
   );

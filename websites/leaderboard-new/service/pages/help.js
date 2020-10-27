@@ -50,7 +50,7 @@ export default function Help() {
                   target="_blank"
                   rel="noreferrer"
                 >
-                 <span> HOPR Chat</span>
+                  <span> HOPR Chat</span>
                 </a>
                 , which will spin up a HOPR node.
               </li>
@@ -79,7 +79,7 @@ export default function Help() {
                 <strong>#Basodino</strong> and <strong>@hoprnet</strong>.{" "}
                 <TweetBasodino>
                   <img src="/assets/icons/twitter.svg" alt="twitter" />{" "}
-                 <span>#Basodino</span>
+                  <span>#Basodino</span>
                 </TweetBasodino>
               </li>
               <li>
@@ -112,17 +112,18 @@ export default function Help() {
             </ol>
             <hr />
             <div className="twitter-line-menu">
-              <a className="aux-help-twitter" href="https://twitter.com/hoprnet" target="_blank">
+              <a
+                className="aux-help-twitter"
+                href="https://twitter.com/hoprnet"
+                target="_blank"
+              >
                 <div>
-                 <img
-                    src="/assets/icons/twitter.svg"
-                    alt="twitter"
-                  />
+                  <img src="/assets/icons/twitter.svg" alt="twitter" />
                 </div>
-                 <div>
+                <div>
                   <p>@hoprnet</p>
                   <span>click here to tweet</span>
-                </div> 
+                </div>
               </a>
             </div>
           </div>

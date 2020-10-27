@@ -1,32 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
 import "../../styles/main.scss";
 import TweetBasodino from "../tweet-basodino";
-import api from "../../utils/api";
 
-const LeftSide = () => {
+const LeftSide = ({hash,copyCodeToClipboard}) => {
   const router = useRouter();
-  const [hash, setHash] = useState(
-    "16Uiu2HAm7KxaBkgd9ENvhf5qAkp1c6Q5Q1dXe8HBDzxLN4SxAVw6"
-  );
-
-  useEffect(() => {
-    const fetchData = async () => {
-      const response = await api.getAllData();
-      if (response.data) setHash(response.data.address);
-    };
-    fetchData();
-  }, []);
-
-  const [modal, setModal] = useState(false);
-  const copyCodeToClipboard = () => {
-    navigator.clipboard.writeText(hash);
-    setModal(true);
-    setTimeout(() => {
-      setModal(false);
-    }, 4000);
-  };
 
   return (
     <section className="area-left-desktop">
@@ -48,8 +27,10 @@ const LeftSide = () => {
               [router.pathname == "/hopr-allocation" ? "active" : ""]
             }
           >
-            <img src="/assets/icons/top.svg" alt="hopr HOPR ALLOCATION" />
-            <p>HOPR <br/> ALLOCATION</p>
+            <img src="/assets/icons/horp_icon.svg" alt="hopr HOPR ALLOCATION" />
+            <p>
+              HOPR <br /> ALLOCATION
+            </p>
           </div>
         </Link>
 
@@ -78,11 +59,9 @@ const LeftSide = () => {
       </div>
       {/*  */}
       <div className="copy-line-token">
-        <h4>
-        HOPR node
-        </h4>
+        <h4>HOPR node</h4>
         <div className="hash" onClick={() => copyCodeToClipboard()}>
-            <p>{hash}</p>
+          <p>{hash}</p>
           <div>
             <img src="/assets/icons/copy.svg" alt="copy" />
           </div>
