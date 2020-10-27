@@ -29,7 +29,7 @@
     "peer-id": "0.14.2",
     "multiaddr": "8.0.0",
     "bignumber.js": "^9.0.0",
-    "libp2p-crypto": "^0.17.6",
+    "libp2p-crypto": "0.18.0",
     "strip-ansi": "^6.0.0",
     "multihashes": "~3.0.1"
   },

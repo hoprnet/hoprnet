@@ -6468,7 +6468,26 @@ levn@~0.3.0:
     prelude-ls "~1.1.2"
     type-check "~0.3.2"
 
-libp2p-crypto@^0.17.7, libp2p-crypto@^0.17.9, libp2p-crypto@~0.17.6:
+libp2p-crypto@0.18.0, libp2p-crypto@^0.18.0:
+  version "0.18.0"
+  resolved "https://registry.yarnpkg.com/libp2p-crypto/-/libp2p-crypto-0.18.0.tgz#b467c68e48cb62342c897e5615ae4addbf41dfe2"
+  integrity sha512-zNMHDwf2J4t1LRjrBPMiSa4+14u0SfZRu66FyIVZtOnBGo3V/8imbJsOp8RPT8IgeHRN7EVIUt9lp8dcgXHMOw==
+  dependencies:
+    err-code "^2.0.0"
+    is-typedarray "^1.0.0"
+    iso-random-stream "^1.1.0"
+    keypair "^1.0.1"
+    multibase "^3.0.0"
+    multicodec "^2.0.0"
+    multihashing-async "^2.0.1"
+    node-forge "^0.9.1"
+    pem-jwk "^2.0.0"
+    protons "^2.0.0"
+    secp256k1 "^4.0.0"
+    uint8arrays "^1.1.0"
+    ursa-optional "^0.10.1"
+
+libp2p-crypto@^0.17.7, libp2p-crypto@^0.17.9:
   version "0.17.9"
   resolved "https://registry.yarnpkg.com/libp2p-crypto/-/libp2p-crypto-0.17.9.tgz#2d2cd0b852c6a54d4d33f10be6ca8856c2d24870"
   integrity sha512-nH3vTfQ4UqhZ1SORTP7HOsmFdJBs604Qy0Xi3IFFtU6ofYt+rFAZ2QNgo4MH1ZTT38/LEM374N9K7yzj1IQm0g==
@@ -6486,25 +6505,6 @@ libp2p-crypto@^0.17.7, libp2p-crypto@^0.17.9, libp2p-crypto@~0.17.6:
     protons "^1.2.1"
     secp256k1 "^4.0.0"
     uint8arrays "^1.0.0"
-    ursa-optional "^0.10.1"
-
-libp2p-crypto@^0.18.0:
-  version "0.18.0"
-  resolved "https://registry.yarnpkg.com/libp2p-crypto/-/libp2p-crypto-0.18.0.tgz#b467c68e48cb62342c897e5615ae4addbf41dfe2"
-  integrity sha512-zNMHDwf2J4t1LRjrBPMiSa4+14u0SfZRu66FyIVZtOnBGo3V/8imbJsOp8RPT8IgeHRN7EVIUt9lp8dcgXHMOw==
-  dependencies:
-    err-code "^2.0.0"
-    is-typedarray "^1.0.0"
-    iso-random-stream "^1.1.0"
-    keypair "^1.0.1"
-    multibase "^3.0.0"
-    multicodec "^2.0.0"
-    multihashing-async "^2.0.1"
-    node-forge "^0.9.1"
-    pem-jwk "^2.0.0"
-    protons "^2.0.0"
-    secp256k1 "^4.0.0"
-    uint8arrays "^1.1.0"
     ursa-optional "^0.10.1"
 
 libp2p-interfaces@^0.3.2:
