@@ -190,7 +190,7 @@ class Crawler {
           }
 
           for (let i = 0; i < addresses.length; i++) {
-            if (!addresses[i].getPeerId()){
+            if (!addresses[i].getPeerId()) {
               throw Error('address does not contain peer id: ' + addresses[i].toString())
             }
             const peer = PeerId.createFromCID(addresses[i].getPeerId())
