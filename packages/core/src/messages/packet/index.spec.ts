@@ -77,7 +77,6 @@ describe('test packet composition and decomposition', function () {
       )
 
       async function openChannel(a: number, b: number) {
-        console.log(":>>", nodes[a].getId().pubKey.marshal().length)
         let channelBalance = new nodes[a].paymentChannels.types.ChannelBalance(undefined, {
           balance: new BN(200),
           balance_a: new BN(100)

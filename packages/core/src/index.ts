@@ -152,7 +152,8 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     verbose('Created connector, now creating node')
 
     const libp2p = await LibP2P.create({
-      addresses,
+      peerId: id,
+      addresses: {listen: addresses},
       // Disable libp2p-switch protections for the moment
       switch: {
         denyTTL: 1,
