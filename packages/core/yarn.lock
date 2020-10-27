@@ -6673,21 +6673,7 @@ libp2p-secio@0.13.1:
     protons "^2.0.0"
     uint8arrays "^1.1.0"
 
-libp2p-tcp@^0.14.5, libp2p-tcp@^0.14.6:
-  version "0.14.6"
-  resolved "https://registry.yarnpkg.com/libp2p-tcp/-/libp2p-tcp-0.14.6.tgz#a0c98ebe2be2f1d3d6bf22ea8b991e51978180ac"
-  integrity sha512-DeOdaH5QGVMKZflJmZq3dSWROxzD/YU1MFDxfi+DT4JVMcxfVMd+SpVEPMyk2wyA28H4AdGIRsH78yPjlFIyZQ==
-  dependencies:
-    abortable-iterator "^3.0.0"
-    class-is "^1.1.0"
-    debug "^4.1.1"
-    err-code "^2.0.0"
-    libp2p-utils "^0.1.2"
-    mafmt "^7.1.0"
-    multiaddr "^7.5.0"
-    stream-to-it "^0.2.2"
-
-libp2p-tcp@^0.15.0:
+libp2p-tcp@0.15.1, libp2p-tcp@^0.15.0:
   version "0.15.1"
   resolved "https://registry.yarnpkg.com/libp2p-tcp/-/libp2p-tcp-0.15.1.tgz#644b83abf46f213ee9476d2db4135636f0a17d17"
   integrity sha512-alvgZ3lSNUyiz4vJOqvm6RpMQN9d17gSJa+VT+2pYLGf82o8pX3QvyhltMkBG7u9I+qZAkD6L27s8o0h38dpOg==
@@ -6699,6 +6685,20 @@ libp2p-tcp@^0.15.0:
     libp2p-utils "^0.2.0"
     mafmt "^8.0.0"
     multiaddr "^8.0.0"
+    stream-to-it "^0.2.2"
+
+libp2p-tcp@^0.14.5:
+  version "0.14.6"
+  resolved "https://registry.yarnpkg.com/libp2p-tcp/-/libp2p-tcp-0.14.6.tgz#a0c98ebe2be2f1d3d6bf22ea8b991e51978180ac"
+  integrity sha512-DeOdaH5QGVMKZflJmZq3dSWROxzD/YU1MFDxfi+DT4JVMcxfVMd+SpVEPMyk2wyA28H4AdGIRsH78yPjlFIyZQ==
+  dependencies:
+    abortable-iterator "^3.0.0"
+    class-is "^1.1.0"
+    debug "^4.1.1"
+    err-code "^2.0.0"
+    libp2p-utils "^0.1.2"
+    mafmt "^7.1.0"
+    multiaddr "^7.5.0"
     stream-to-it "^0.2.2"
 
 libp2p-utils@^0.1.2:
@@ -8180,7 +8180,7 @@ peer-id@0.14.2, peer-id@^0.14.0:
     protons "^2.0.0"
     uint8arrays "^1.1.0"
 
-peer-id@^0.13.13, peer-id@~0.13.2:
+peer-id@^0.13.13:
   version "0.13.13"
   resolved "https://registry.yarnpkg.com/peer-id/-/peer-id-0.13.13.tgz#63c3561f1e602ec9d7a205103488256d59dd299a"
   integrity sha512-5FpBXN6PDTcHs51gkHWPf0OIQZAO3Z10i6lWc+GaoxTU4bQHtsoKFnhxoXo5Ze04JblpzIrtowkluLSCLP1WYg==
@@ -8192,16 +8192,6 @@ peer-id@^0.13.13, peer-id@~0.13.2:
     minimist "^1.2.5"
     multihashes "^1.0.1"
     protons "^1.0.2"
-
-peer-info@~0.17.5:
-  version "0.17.5"
-  resolved "https://registry.yarnpkg.com/peer-info/-/peer-info-0.17.5.tgz#80afc709e03069cf94a29d8fcfa0426140fa7b69"
-  integrity sha512-ebbbnvdCnb0onWuW+QNXO4KvLPuQ+kih3zezhov2uxHqA6VLbtzMUyQ06IHtwYLr50AYYWyBOSn17g4zEBsFpw==
-  dependencies:
-    mafmt "^7.1.0"
-    multiaddr "^7.3.0"
-    peer-id "~0.13.2"
-    unique-by "^1.0.0"
 
 pem-jwk@^2.0.0:
   version "2.0.0"
@@ -9952,11 +9942,6 @@ union-value@^1.0.0:
     get-value "^2.0.6"
     is-extendable "^0.1.1"
     set-value "^2.0.1"
-
-unique-by@^1.0.0:
-  version "1.0.0"
-  resolved "https://registry.yarnpkg.com/unique-by/-/unique-by-1.0.0.tgz#5220c86ba7bc572fb713ad74651470cb644212bd"
-  integrity sha1-UiDIa6e8Vy+3E610ZRRwy2RCEr0=
 
 universalify@^0.1.0:
   version "0.1.2"
