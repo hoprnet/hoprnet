@@ -10,17 +10,17 @@ import SECIO = require('libp2p-secio')
 
 import PeerId from 'peer-id'
 
-import { Connection, Handler } from '../../@types/transport'
+import { Handler } from 'libp2p'
 
 import TCP from '.'
 import Multiaddr from 'multiaddr'
-import PeerInfo from 'peer-info'
 import pipe from 'it-pipe'
 
 import { u8aEquals } from '@hoprnet/hopr-utils'
 
 import { randomBytes } from 'crypto'
 import { RELAY_CIRCUIT_TIMEOUT } from './constants'
+import { connectionHelper } from '../../test-utils'
 
 const TEST_PROTOCOL = `/test/0.0.1`
 
@@ -38,24 +38,24 @@ describe('should create a socket and connect to it', function () {
       timeoutIntentionallyOnWebRTC?: Promise<void>
       answerIntentionallyWithIncorrectMessages?: boolean
     },
-    bootstrap?: PeerInfo
+    bootstrap?: Multiaddr
   ): Promise<libp2p> {
-    const peerInfo = new PeerInfo(await PeerId.create({ keyType: 'secp256k1' }))
+    const peerId = await PeerId.create({ keyType: 'secp256k1' })
+    const addresses = []
 
     if (options.ipv4) {
-      peerInfo.multiaddrs.add(
-        Multiaddr(`/ip4/127.0.0.1/tcp/${9090 + 2 * options.id}`).encapsulate(`/p2p/${peerInfo.id.toB58String()}`)
+      addresses.push(
+        Multiaddr(`/ip4/127.0.0.1/tcp/${9090 + 2 * options.id}`).encapsulate(`/p2p/${peerId.toB58String()}`)
       )
     }
 
     if (options.ipv6) {
-      peerInfo.multiaddrs.add(
-        Multiaddr(`/ip6/::1/tcp/${9090 + 2 * options.id + 1}`).encapsulate(`/p2p/${peerInfo.id.toB58String()}`)
-      )
+      addresses.push(Multiaddr(`/ip6/::1/tcp/${9090 + 2 * options.id + 1}`).encapsulate(`/p2p/${peerId.toB58String()}`))
     }
 
     const node = new libp2p({
-      peerInfo,
+      peerId,
+      addresses: { listen: addresses },
       modules: {
         transport: [TCP],
         streamMuxer: [MPLEX],
@@ -307,15 +307,15 @@ describe('should create a socket and connect to it', function () {
   it('should set up a relayed connection and upgrade to WebRTC', async function () {
     const relay = await generateNode({ id: 2, ipv4: true })
     const [sender, counterparty] = await Promise.all([
-      generateNode({ id: 0, ipv4: true }, relay.peerInfo),
-      generateNode({ id: 1, ipv4: true }, relay.peerInfo)
+      generateNode({ id: 0, ipv4: true }, relay.multiaddrs[0]),
+      generateNode({ id: 1, ipv4: true }, relay.multiaddrs[0])
     ])
     connectionHelper([sender, relay])
     connectionHelper([relay, counterparty])
     const INVALID_PORT = 8758
     // @ts-ignore
     const { stream }: { stream: Connection } = await sender.dialProtocol(
-      Multiaddr(`/ip4/127.0.0.1/tcp/${INVALID_PORT}/p2p/${counterparty.peerInfo.id.toB58String()}`),
+      Multiaddr(`/ip4/127.0.0.1/tcp/${INVALID_PORT}/p2p/${counterparty.peerId.toB58String()}`),
       TEST_PROTOCOL
     )
     let msgReceived = false
@@ -731,8 +731,8 @@ describe('should create a socket and connect to it', function () {
     const relay = await generateNode({ id: 2, ipv4: true })
 
     const [sender, counterparty] = await Promise.all([
-      generateNode({ id: 0, ipv4: true, useWebRTC: false }, relay.peerInfo),
-      generateNode({ id: 1, ipv4: true, useWebRTC: false }, relay.peerInfo)
+      generateNode({ id: 0, ipv4: true, useWebRTC: false }, relay.multiaddrs[0]),
+      generateNode({ id: 1, ipv4: true, useWebRTC: false }, relay.multiaddrs[0])
     ])
 
     connectionHelper([sender, relay])
@@ -741,7 +741,7 @@ describe('should create a socket and connect to it', function () {
     const INVALID_PORT = 8758
     // @ts-ignore
     const { stream }: { stream: Connection } = await sender.dialProtocol(
-      Multiaddr(`/ip4/127.0.0.1/tcp/${INVALID_PORT}/p2p/${counterparty.peerInfo.id.toB58String()}`),
+      Multiaddr(`/ip4/127.0.0.1/tcp/${INVALID_PORT}/p2p/${counterparty.peerId.toB58String()}`),
       TEST_PROTOCOL
     )
 
@@ -868,16 +868,3 @@ describe('should create a socket and connect to it', function () {
   //   ])
   // })
 })
-
-/**
- * Informs each node about the others existence.
- * @param nodes Hopr nodes
- */
-function connectionHelper(nodes: libp2p[]) {
-  for (let i = 0; i < nodes.length; i++) {
-    for (let j = i + 1; j < nodes.length; j++) {
-      nodes[i].peerStore.put(nodes[j].peerInfo)
-      nodes[j].peerStore.put(nodes[i].peerInfo)
-    }
-  }
-}

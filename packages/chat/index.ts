@@ -10,7 +10,7 @@ import Hopr from '@hoprnet/hopr-core'
 import { clearString } from '@hoprnet/hopr-utils'
 import chalk from 'chalk'
 import readline from 'readline'
-import PeerInfo from 'peer-info'
+import Multiaddr from 'multiaddr'
 import PeerId from 'peer-id'
 import clear from 'clear'
 import { parseOptions, yesOrNoQuestion } from './utils'
@@ -107,7 +107,7 @@ async function main() {
   console.log(`Utils Version: ${chalk.bold(pkg.dependencies['@hoprnet/hopr-utils'])}`)
   console.log(`Connector Version: ${chalk.bold(pkg.dependencies['@hoprnet/hopr-core-connector-interface'])}\n`)
   console.log(
-    `Bootstrap Servers: ${chalk.bold((options.bootstrapServers || []).map((x: PeerInfo) => x.id.toB58String()))}\n`
+    `Bootstrap Servers: ${chalk.bold((options.bootstrapServers || []).map((x: Multiaddr) => x.getPeerId()))}\n`
   )
 
   try {

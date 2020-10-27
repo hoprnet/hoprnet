@@ -1,4 +1,4 @@
-import type { Handler } from '../@types/transport'
+import type { Handler } from 'libp2p'
 
 interface AbstractInteraction {
   protocols: string[]

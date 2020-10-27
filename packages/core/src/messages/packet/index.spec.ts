@@ -1,24 +1,18 @@
 import Hopr from '../..'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-
 import HoprEthereum from '@hoprnet/hopr-core-ethereum'
-
 import { Ganache } from '@hoprnet/hopr-testing'
 import { migrate, fund } from '@hoprnet/hopr-ethereum'
-
 import assert from 'assert'
-
 import { u8aEquals, durations } from '@hoprnet/hopr-utils'
-
 import { MAX_HOPS } from '../../constants'
-
 import LevelUp from 'levelup'
 import MemDown from 'memdown'
-
 import BN from 'bn.js'
-
 import Debug from 'debug'
 import { ACKNOWLEDGED_TICKET_INDEX_LENGTH } from '../../dbKeys'
+import { connectionHelper } from '../../test-utils'
+
 const log = Debug(`hopr-core:testing`)
 
 const TWO_SECONDS = durations.seconds(2)
@@ -65,7 +59,7 @@ describe('test packet composition and decomposition', function () {
     async function () {
       const nodes = await Promise.all(Array.from({ length: MAX_HOPS + 1 }).map((_value, index) => generateNode(index)))
 
-      connectionHelper(nodes)
+      connectionHelper(nodes.map((n) => n._libp2p))
 
       console.log(
         new nodes[0].paymentChannels.types.ChannelBalance(undefined, {
@@ -90,7 +84,7 @@ describe('test packet composition and decomposition', function () {
 
         await nodes[a].paymentChannels.channel.create(
           nodes[b].getId().pubKey.marshal(),
-          async () => nodes[b].getId().pubKey.marshal(),
+          undefined, //async () => nodes[b].getId().pubKey.marshal(),
           new nodes[a].paymentChannels.types.ChannelBalance(undefined, {
             balance: new BN(200),
             balance_a: new BN(100)
@@ -178,8 +172,7 @@ describe('test packet composition and decomposition', function () {
 
         for (let k = 0; k < tickets.length; k++) {
           console.log((await tickets[k].signedTicket).ticket.amount)
-          // @ts-ignore
-          await nodes[i].paymentChannels.channel.tickets.submit(tickets[k])
+          await nodes[i].paymentChannels.channel.tickets.submit(tickets[k], undefined as any)
           console.log(`ticket submitted`)
         }
       }
@@ -191,19 +184,6 @@ describe('test packet composition and decomposition', function () {
     durations.seconds(25)
   )
 })
-
-/**
- * Introduce the nodes to each other
- * @param nodes Hopr nodes
- */
-function connectionHelper<Chain extends HoprCoreConnector>(nodes: Hopr<Chain>[]) {
-  for (let i = 0; i < nodes.length; i++) {
-    for (let j = i + 1; j < nodes.length; j++) {
-      nodes[i]._libp2p.peerStore.put(nodes[j]._libp2p.peerInfo)
-      nodes[j]._libp2p.peerStore.put(nodes[i]._libp2p.peerInfo)
-    }
-  }
-}
 
 const NOOP = () => {}
 
