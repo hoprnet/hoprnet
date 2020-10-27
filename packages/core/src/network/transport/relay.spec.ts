@@ -15,6 +15,7 @@ import Relay from './relay'
 import { randomBytes } from 'crypto'
 import { privKeyToPeerId } from '../../utils'
 import { getAddress } from '../../test-utils'
+import assert from 'assert'
 
 const TEST_PROTOCOL = `/test/0.0.1`
 
@@ -171,6 +172,7 @@ describe('should create a socket and connect to it', function () {
       }
     )
 
+    await Promise.all(([sender, relayer, counterparty]).map(x => x.node.stop()))
     await new Promise((resolve) => setTimeout(resolve, 200))
   })
 
@@ -430,18 +432,18 @@ describe('should create a socket and connect to it', function () {
   })
 
   it('should not use itself as relay node', async function () {
-    // let [sender, counterparty] = await Promise.all([
-    //   generateNode({ id: 0, ipv4: true }),
-    //   generateNode({ id: 2, ipv4: true }),
-    // ])
-    // let errThrown = false
-    // try {
-    //   await sender.relay.establishRelayedConnection(Multiaddr(`/p2p/${counterparty.peerInfo.id.toB58String()}`), [
-    //     sender.peerInfo,
-    //   ])
-    // } catch (err) {
-    //   errThrown = true
-    // }
-    // assert(errThrown, `Must throw an error if there is no other opportunity than calling ourself`)
+    let [sender, counterparty] = await Promise.all([
+       generateNode({ id: 0, ipv4: true }),
+       generateNode({ id: 2, ipv4: true }),
+     ])
+     let errThrown = false
+     try {
+       await sender.relay.establishRelayedConnection(Multiaddr(`/p2p/${counterparty.node.peerId.toB58String()}`),
+         sender.node.multiaddrs
+       )
+     } catch (err) {
+       errThrown = true
+     }
+     assert(errThrown, `Must throw an error if there is no other opportunity than calling ourself`)
   })
 })
