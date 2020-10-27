@@ -55,27 +55,20 @@ describe('test hopr-core', function () {
     `should not call ourself`,
     async function () {
       const peerId = await privKeyToPeerId(NODE_SEEDS[0])
-      let errored = false
-
-      try {
-        node = await Hopr.create({
-          debug: true,
-          peerId,
-          bootstrapNode: true,
-          network: 'ethereum',
-          provider: 'ws://127.0.0.1:9545',
-          hosts: {
-            ip4: {
-              ip: '0.0.0.0',
-              port: getNewPort()
-            }
-          },
-          bootstrapServers: [new Multiaddr('/p2p/' + peerId.toB58String())]
-        })
-      } catch (e) {
-        errored = true
-      }
-      assert(errored)
+      node = await Hopr.create({
+        debug: true,
+        peerId,
+        bootstrapNode: true,
+        network: 'ethereum',
+        provider: 'ws://127.0.0.1:9545',
+        hosts: {
+          ip4: {
+            ip: '0.0.0.0',
+            port: getNewPort()
+          }
+        },
+        bootstrapServers: [new Multiaddr('/p2p/' + peerId.toB58String())]
+      })
     },
     durations.seconds(5)
   )

@@ -16,6 +16,8 @@ async function generateMocks(
 ) {
   const {node, address} = await generateLibP2PMock(addr)
 
+  node.hangUp = async (_id) => {} // Need to override this as we don't have real conns
+
   const interactions = {
     network: {
       heartbeat: new HeartbeatInteraction(node, (remotePeer) => network.heartbeat.emit('beat', remotePeer))
