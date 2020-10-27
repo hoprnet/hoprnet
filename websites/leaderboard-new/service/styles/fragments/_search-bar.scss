@@ -28,10 +28,13 @@ input.search {
   padding: 0 0.5em;
   height: 44px;
   width: 100%;
-  color: $greyLabel;
+  font-weight: 400;
+  color: $black;
   transition: all 200ms ease-in-out;
   &::placeholder {
-    color: $grey;
+    color: $greyLabel;
+    font-weight: 400;
+    font-size: 1em;
   }
   &:focus,
   &:active {
@@ -85,7 +88,7 @@ input.search {
         margin-bottom: 0;
         font-weight: 400;
         font-size: 0.88em;
-        color: $greyLabel;
+        color: $black;
         letter-spacing: 0;
       }
     }
