@@ -84,6 +84,8 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   public bootstrapServers: Multiaddr[]
   public initializedWithOptions: HoprOptions
 
+  private running: boolean;
+
   /**
    * @constructor
    *
@@ -231,6 +233,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     log(`Available under the following addresses:`)
 
     this._libp2p.multiaddrs.forEach((ma: Multiaddr) => log(ma.toString()))
+    this.running = true
 
     return this
   }
@@ -239,6 +242,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
    * Shuts down the node and saves keys and peerBook in the database
    */
   public async stop(): Promise<void> {
+    this.running = false
     await Promise.all([this._network.stop(), this.paymentChannels?.stop().then(() => log(`Connector stopped.`))])
 
     await Promise.all([this.db?.close().then(() => log(`Database closed.`)), this._libp2p.stop()])
@@ -247,6 +251,10 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     await new Promise((resolve) => setTimeout(resolve, 100))
   }
 
+
+  public isRunning(): boolean{
+    return this.running
+  }
 
   public getId(): PeerId {
     return this._libp2p.peerId // Not a documented API, but in the sourceu
