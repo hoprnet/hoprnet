@@ -29,17 +29,20 @@ RUN yarn install --build-from-source
 # -- BUILD STAGE --------------------------------
 
 FROM base as build
+
+# build `hoprd` and `hopr-admin`
 COPY src src
 COPY hopr-admin hopr-admin
 COPY tsconfig.json tsconfig.json
-
-RUN yarn build 
-#RUN npm prune --production --no-audit
-#RUN yarn cache clean
+RUN yarn build
+RUN yarn buildAdmin
 
 # -- RUNTIME STAGE ------------------------------\
 
 FROM node:12.9.1-buster AS runtime
+
+# specify network, this will be passed to process.yaml --env
+ARG network
 
 # install envoy
 RUN apt-get update && \
@@ -78,6 +81,11 @@ COPY envoy/envoy.sh /app/envoy/envoy.sh
 # PM2
 COPY process.yaml /app/process.yaml
 
+# Docker Entrypoint
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+# we cannot specify a build-arg in the entrypoint :(
+RUN sed -i "s|replaced_by_dockerfile_network|${network}|g" docker-entrypoint.sh
+
 VOLUME ["/app/db"]
 
 #? Hopr-server gRPC
@@ -92,5 +100,4 @@ EXPOSE 8081
 # Admin web server
 EXPOSE 3000
 
-CMD ["pm2-runtime", "process.yaml"]
-
+ENTRYPOINT ["./docker-entrypoint.sh"]

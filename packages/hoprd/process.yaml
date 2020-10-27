@@ -2,10 +2,17 @@ apps:
   - script: ./index.js
     name: 'dev'
     instances: 1
-    args: '--admin --password="open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0"'
-    env:
+    env_matic-testnet:
+      HOPR_BOOTSTRAP_ADDRESS: _dnsaddr.bootstrap.basodino.testnet.hoprnet.org
+      ETHEREUM_PROVIDER: wss://ws-mainnet.matic.network
+      NEXT_TELEMETRY_DISABLED: 1
+    env_matic:
       HOPR_BOOTSTRAP_ADDRESS: _dnsaddr.bootstrap.basodino.develop.hoprnet.org
-      ETHEREUM_PROVIDER: wss://xdai.poanetwork.dev/wss
+      ETHEREUM_PROVIDER: wss://ws-mainnet.matic.network
+      NEXT_TELEMETRY_DISABLED: 1
+    env_xdai:
+      HOPR_BOOTSTRAP_ADDRESS: _dnsaddr.bootstrap.saentis.develop.hoprnet.org
+      ETHEREUM_PROVIDER: wss://xdai.poanetwork.dev/wss​
       NEXT_TELEMETRY_DISABLED: 1
   - script: ./envoy/envoy.sh
     name: 'proxy'
