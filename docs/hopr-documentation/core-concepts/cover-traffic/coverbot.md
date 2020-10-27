@@ -8,7 +8,7 @@ description: >-
 
 Mixnets need cover traffic to ensure that users retain their privacy even when organic network usage is low. HOPR will employ federated and then fully decentralized cover traffic as development progresses, but for these early testnets cover traffic is simulated by a bot, CoverBot.
 
-Users register with CoverBot, who then tries to relay data via a random registered user every thirty seconds. Successfully relaying data back to CoverBot will earn you a ticket, which can be redeemed for HOPR.
+Users register with CoverBot, who then tries to relay data via a random registered user every thirty seconds. Successfully relaying data back to CoverBot will earn you a ticket, which can be redeemed for xHOPR.
 
 {% hint style="info" %}
 CoverBot is the latest in a series of bots running on the HOPR network which will be familiar from participants in our regular bounties and gaming sessions. We'll be adding more bots as our testnets progress, including more ways to earn points.
@@ -29,7 +29,7 @@ HOPR:      16Uiu2HAm34oK6EyA2SuFo9rHXpm5Kwy6C8MeJ26JaRFBzgdQqVpZ
 {% hint style="info" %}
 There are two addresses associated with your node: the Ethereum address is used to fund your account and pay for gas fees on the blockchain, the HOPR address is where you'll send messages and receive HOPR tokens.
 
-For the purposes of the testnet, Ethereum is actually xDAI and HOPR is actually HOPR.
+For the purposes of the testnet, Ethereum is actually xDAI and HOPR is actually xHOPR.
 {% endhint %}
 
 ## Step 2: Send a Tweet
@@ -78,7 +78,7 @@ Now that your address is whitelisted with the bot, you can earn tickets by relay
 
 Every 30 seconds, the bot will randomly select an address from the whitelist and ping it to check that it's online. If is, it will send cover traffic to itself via that node.
 
-If the CoverBot selects your address, you'll receive a ticket which can be redeemed for HOPR. You'll also receive a verification message.
+If the CoverBot selects your address, you'll receive a ticket which can be redeemed for xHOPR. You'll also receive a verification message.
 
 ![](../../.gitbook/assets/verification-2%20%282%29%20%281%29%20%281%29%20%281%29.png)
 
