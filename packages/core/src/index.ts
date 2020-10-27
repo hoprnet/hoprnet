@@ -1,6 +1,6 @@
 /// <reference path="./@types/libp2p.ts" />
 import LibP2P from 'libp2p'
-import type {Connection} from 'libp2p'
+import type { Connection } from 'libp2p'
 import MPLEX = require('libp2p-mplex')
 // @ts-ignore
 import KadDHT = require('libp2p-kad-dht')
@@ -38,7 +38,6 @@ import * as DbKeys from './dbKeys'
 import EventEmitter from 'events'
 
 const verbose = Debug('hopr-core:verbose')
-
 
 interface NetOptions {
   ip: string
@@ -84,7 +83,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   public bootstrapServers: Multiaddr[]
   public initializedWithOptions: HoprOptions
 
-  private running: boolean;
+  private running: boolean
 
   /**
    * @constructor
@@ -153,7 +152,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
 
     const libp2p = await LibP2P.create({
       peerId: id,
-      addresses: {listen: addresses},
+      addresses: { listen: addresses },
       // Disable libp2p-switch protections for the moment
       switch: {
         denyTTL: 1,
@@ -254,7 +253,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     await new Promise((resolve) => setTimeout(resolve, 100))
   }
 
-  public isRunning(): boolean{
+  public isRunning(): boolean {
     return this.running
   }
 

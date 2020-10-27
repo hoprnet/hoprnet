@@ -59,7 +59,7 @@ describe('test packet composition and decomposition', function () {
     async function () {
       const nodes = await Promise.all(Array.from({ length: MAX_HOPS + 1 }).map((_value, index) => generateNode(index)))
 
-      connectionHelper(nodes.map(n => n._libp2p))
+      connectionHelper(nodes.map((n) => n._libp2p))
 
       console.log(
         new nodes[0].paymentChannels.types.ChannelBalance(undefined, {
@@ -84,7 +84,7 @@ describe('test packet composition and decomposition', function () {
 
         await nodes[a].paymentChannels.channel.create(
           nodes[b].getId().pubKey.marshal(),
-          undefined,//async () => nodes[b].getId().pubKey.marshal(),
+          undefined, //async () => nodes[b].getId().pubKey.marshal(),
           new nodes[a].paymentChannels.types.ChannelBalance(undefined, {
             balance: new BN(200),
             balance_a: new BN(100)

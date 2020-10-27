@@ -5,16 +5,13 @@ import assert from 'assert'
 import { generateLibP2PMock } from '../test-utils'
 import { Interactions } from '../interactions'
 import { Network } from '../network'
-import type {Connection} from 'libp2p'
+import type { Connection } from 'libp2p'
 import { Heartbeat as HeartbeatInteraction } from '../interactions/network/heartbeat'
 import debug from 'debug'
 const log = debug('hopr:heartbeat-tests')
 
-async function generateMocks(
-  options?: { timeoutIntentionally: boolean },
-  addr = '/ip4/0.0.0.0/tcp/0'
-) {
-  const {node, address} = await generateLibP2PMock(addr)
+async function generateMocks(options?: { timeoutIntentionally: boolean }, addr = '/ip4/0.0.0.0/tcp/0') {
+  const { node, address } = await generateLibP2PMock(addr)
 
   node.hangUp = async (_id) => {} // Need to override this as we don't have real conns
 
@@ -27,12 +24,15 @@ async function generateMocks(
   const network = new Network(node, interactions, {} as any, { crawl: options })
 
   node.connectionManager.on('peer:connect', (connection: Connection) => {
-    log("> Connection from", connection.remotePeer)
+    log('> Connection from', connection.remotePeer)
     node.peerStore.addressBook.add(connection.remotePeer, [connection.remoteAddr])
   })
 
   return {
-    node, address, network, interactions
+    node,
+    address,
+    network,
+    interactions
   }
 }
 
@@ -54,10 +54,7 @@ describe('check heartbeat mechanism', function () {
       Alice.interactions.network.heartbeat.interact(Bob.node.peerId)
     ])
 
-    assert(
-      !Chris.network.networkPeers.has(Alice.node.peerId),
-      `Chris should not know about Alice in the beginning.`
-    )
+    assert(!Chris.network.networkPeers.has(Alice.node.peerId), `Chris should not know about Alice in the beginning.`)
 
     await Alice.node.dial(Chris.address)
 

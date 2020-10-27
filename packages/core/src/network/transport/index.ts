@@ -76,7 +76,7 @@ class TCP {
 
     if (bootstrapServers?.length > 0) {
       this.relays = bootstrapServers.filter(
-        (ma: Multiaddr) => (ma !== undefined && libp2p.peerId.toB58String() !== ma.getPeerId())
+        (ma: Multiaddr) => ma !== undefined && libp2p.peerId.toB58String() !== ma.getPeerId()
       )
 
       this.stunServers = []

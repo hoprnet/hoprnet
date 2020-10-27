@@ -43,14 +43,7 @@ import { RelayContext } from './relayContext'
 
 import { RelayConnection } from './relayConnection'
 
-import type {
-  Dialer,
-  DialOptions,
-  Handler,
-  MultiaddrConnection,
-  PeerRouting,
-  Registrar,
-} from 'libp2p'
+import type { Dialer, DialOptions, Handler, MultiaddrConnection, PeerRouting, Registrar } from 'libp2p'
 
 class Relay {
   private _dialer: Dialer
@@ -92,7 +85,7 @@ class Relay {
       throw new AbortError()
     }
 
-    const potentialRelays = relays.filter(relay => relay.getPeerId() !== this.id.toB58String())
+    const potentialRelays = relays.filter((relay) => relay.getPeerId() !== this.id.toB58String())
 
     if (potentialRelays.length == 0) {
       throw Error(`Filtered list of relays and there is no one left to establish a connection. `)
@@ -109,7 +102,11 @@ class Relay {
 
       let stream: Stream
       try {
-        stream = await this.performHandshake(relayConnection, PeerId.createFromB58String(potentialRelays[i].getPeerId()), destination)
+        stream = await this.performHandshake(
+          relayConnection,
+          PeerId.createFromB58String(potentialRelays[i].getPeerId()),
+          destination
+        )
       } catch (err) {
         error(err)
         continue
@@ -160,7 +157,7 @@ class Relay {
       } catch (err) {
         log(`Could not reach potential relay ${relay.toB58String()}. Error was: ${err}`)
         if (this._dht != null && (options == null || options.signal == null || !options.signal.aborted)) {
-          let {id} = await this._dht.peerRouting.findPeer(relay)
+          let { id } = await this._dht.peerRouting.findPeer(relay)
 
           try {
             relayConnection = await this._dialer.connectToPeer(id, { signal: options?.signal })

@@ -16,7 +16,7 @@ constants.HEARTBEAT_TIMEOUT = 300
 
 describe('check heartbeat mechanism', function () {
   async function generateNode(options?: { timeoutIntentionally?: boolean }) {
-    const {node, address} = await generateLibP2PMock()
+    const { node, address } = await generateLibP2PMock()
 
     node.peerRouting.findPeer = (_: PeerId) => Promise.reject(Error('not implemented'))
 
@@ -31,7 +31,6 @@ describe('check heartbeat mechanism', function () {
         heartbeat: new Heartbeat(node, (remotePeer) => network.heartbeat.emit('beat', remotePeer), options)
       }
     }
-
 
     return {
       node,

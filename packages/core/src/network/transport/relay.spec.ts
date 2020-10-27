@@ -26,7 +26,7 @@ async function generateNode(options: {
   ipv4?: boolean
   ipv6?: boolean
   connHandler?: (conn: MultiaddrConnection) => void
-}): Promise<{node: libp2p, relay: Relay}> {
+}): Promise<{ node: libp2p; relay: Relay }> {
   const peerId = await privKeyToPeerId(privKeys[options.id])
   let addresses = []
 
@@ -39,7 +39,8 @@ async function generateNode(options: {
   }
 
   const node = new libp2p({
-    peerId, addresses: {listen: addresses},
+    peerId,
+    addresses: { listen: addresses },
     modules: {
       transport: [TCP],
       streamMuxer: [MPLEX],
@@ -78,7 +79,6 @@ async function generateNode(options: {
 }
 
 describe('should create a socket and connect to it', function () {
-
   it('should create a node and echo a single message', async function () {
     let [sender, relayer, counterparty] = await Promise.all([
       generateNode({ id: 0, ipv4: true }),
@@ -172,7 +172,7 @@ describe('should create a socket and connect to it', function () {
       }
     )
 
-    await Promise.all(([sender, relayer, counterparty]).map(x => x.node.stop()))
+    await Promise.all([sender, relayer, counterparty].map((x) => x.node.stop()))
     await new Promise((resolve) => setTimeout(resolve, 200))
   })
 
@@ -433,17 +433,18 @@ describe('should create a socket and connect to it', function () {
 
   it('should not use itself as relay node', async function () {
     let [sender, counterparty] = await Promise.all([
-       generateNode({ id: 0, ipv4: true }),
-       generateNode({ id: 2, ipv4: true }),
-     ])
-     let errThrown = false
-     try {
-       await sender.relay.establishRelayedConnection(Multiaddr(`/p2p/${counterparty.node.peerId.toB58String()}`),
-         sender.node.multiaddrs
-       )
-     } catch (err) {
-       errThrown = true
-     }
-     assert(errThrown, `Must throw an error if there is no other opportunity than calling ourself`)
+      generateNode({ id: 0, ipv4: true }),
+      generateNode({ id: 2, ipv4: true })
+    ])
+    let errThrown = false
+    try {
+      await sender.relay.establishRelayedConnection(
+        Multiaddr(`/p2p/${counterparty.node.peerId.toB58String()}`),
+        sender.node.multiaddrs
+      )
+    } catch (err) {
+      errThrown = true
+    }
+    assert(errThrown, `Must throw an error if there is no other opportunity than calling ourself`)
   })
 })

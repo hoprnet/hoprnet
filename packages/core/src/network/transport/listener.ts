@@ -11,7 +11,7 @@ const verbose = debug('hopr-core:verbose:listener:error')
 import type { Connection } from 'libp2p'
 import { socketToConn } from './socket-to-conn'
 import { CODE_P2P } from './constants'
-import { MultiaddrConnection, Upgrader} from 'libp2p'
+import { MultiaddrConnection, Upgrader } from 'libp2p'
 import Multiaddr from 'multiaddr'
 
 import { handleStunRequest, getExternalIp } from './stun'

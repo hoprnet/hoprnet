@@ -1,4 +1,3 @@
-
 declare module 'libp2p' {
   type PeerId = import('peer-id')
   type Multiaddr = import('multiaddr')
@@ -33,22 +32,29 @@ declare module 'libp2p' {
     }
   }
 
-  export type PeerRoute = { 
-    id: PeerId;
-    multiaddrs: Multiaddr[];
+  export type PeerRoute = {
+    id: PeerId
+    multiaddrs: Multiaddr[]
   }
 
   export type PeerStore = {
-    //https://github.com/libp2p/js-libp2p/blob/master/doc/API.md#peerstoreget 
-    get(peerId: PeerId):  { id: PeerId, addresses: Array<Multiaddr>, metadata: Map<string, Uint8Array>, protocols: Array<string> } | undefined
-    peers: Map<string, { id: PeerId, addresses: Array<Multiaddr>, metadata: Map<string, Uint8Array>, protocols: Array<string> }>
+    //https://github.com/libp2p/js-libp2p/blob/master/doc/API.md#peerstoreget
+    get(
+      peerId: PeerId
+    ):
+      | { id: PeerId; addresses: Array<Multiaddr>; metadata: Map<string, Uint8Array>; protocols: Array<string> }
+      | undefined
+    peers: Map<
+      string,
+      { id: PeerId; addresses: Array<Multiaddr>; metadata: Map<string, Uint8Array>; protocols: Array<string> }
+    >
     delete(peer: PeerId): void
 
     // https://github.com/libp2p/js-libp2p/blob/master/doc/API.md#peerstoreaddressbookadd
     addressBook: {
       add(id: PeerId, addr: Array<Multiaddr>)
       delete(id: PeerId)
-      get(id: PeerId): Array<{multiaddr: Multiaddr}>
+      get(id: PeerId): Array<{ multiaddr: Multiaddr }>
       getMultiaddrsForPeer(id: PeerId): Array<string>
       set(peerId: PeerId, multiaddrs: Array<Multiaddr>)
     }
@@ -57,7 +63,7 @@ declare module 'libp2p' {
   }
   export interface DialOptions {
     signal?: AbortSignal
-    relay?: PeerId 
+    relay?: PeerId
   }
 
   export type Handler = {
@@ -79,7 +85,7 @@ declare module 'libp2p' {
 
   //https://github.com/libp2p/js-libp2p-interfaces/tree/master/src/peer-routing
   export interface PeerRouting {
-    findPeer(peerId: PeerId): Promise<{ id: PeerId, multiaddrs: Multiaddr[] }>
+    findPeer(peerId: PeerId): Promise<{ id: PeerId; multiaddrs: Multiaddr[] }>
   }
 
   export interface Upgrader {
@@ -98,7 +104,6 @@ declare module 'libp2p' {
 
   export type ConnHandler = (conn: Connection) => void
 
-
   export interface Listener extends EventEmitter {
     close(): void
     listen(ma: Multiaddr): Promise<void>
@@ -112,11 +117,7 @@ declare module 'libp2p' {
     emit: (event: string, ...args: any[]) => void
     dial: (addr: Multiaddr | PeerId, options?: { signal: AbortSignal }) => Promise<Handler>
     dialer: any // TODO
-    dialProtocol: (
-      addr: Multiaddr | PeerId,
-      protocol: string,
-      options?: { signal: AbortSignal }
-    ) => Promise<Handler>
+    dialProtocol: (addr: Multiaddr | PeerId, protocol: string, options?: { signal: AbortSignal }) => Promise<Handler>
     hangUp: (addr: PeerId | Multiaddr | string) => Promise<void>
     peerStore: PeerStore
     peerRouting: {

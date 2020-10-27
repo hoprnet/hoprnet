@@ -38,7 +38,7 @@ class Network {
       })
     }
 
-    this.networkPeers = new NetworkPeers(Array.from(node.peerStore.peers.values()).map(x => x.id))
+    this.networkPeers = new NetworkPeers(Array.from(node.peerStore.peers.values()).map((x) => x.id))
     this.heartbeat = new Heartbeat(this.networkPeers, interactions.network.heartbeat, node.hangUp)
     this.crawler = new Crawler(
       node.peerId,

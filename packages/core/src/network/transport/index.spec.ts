@@ -38,7 +38,7 @@ describe('should create a socket and connect to it', function () {
       timeoutIntentionallyOnWebRTC?: Promise<void>
       answerIntentionallyWithIncorrectMessages?: boolean
     },
-    bootstrap?: Multiaddr 
+    bootstrap?: Multiaddr
   ): Promise<libp2p> {
     const peerId = await PeerId.create({ keyType: 'secp256k1' })
     const addresses = []
@@ -50,13 +50,12 @@ describe('should create a socket and connect to it', function () {
     }
 
     if (options.ipv6) {
-      addresses.push(
-        Multiaddr(`/ip6/::1/tcp/${9090 + 2 * options.id + 1}`).encapsulate(`/p2p/${peerId.toB58String()}`)
-      )
+      addresses.push(Multiaddr(`/ip6/::1/tcp/${9090 + 2 * options.id + 1}`).encapsulate(`/p2p/${peerId.toB58String()}`))
     }
 
     const node = new libp2p({
-      peerId, addresses: {listen: addresses},
+      peerId,
+      addresses: { listen: addresses },
       modules: {
         transport: [TCP],
         streamMuxer: [MPLEX],

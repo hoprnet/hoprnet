@@ -23,7 +23,7 @@ export function connectionHelper(nodes: LibP2P[]) {
 
 export function getAddress(node: LibP2P): Multiaddr {
   let addr = node.multiaddrs[0]
-  if (!addr.getPeerId()){
+  if (!addr.getPeerId()) {
     addr = addr.encapsulate('/p2p/' + node.peerId.toB58String())
   }
   return addr
@@ -34,9 +34,7 @@ export type LibP2PMocks = {
   address: Multiaddr
 }
 
-export async function generateLibP2PMock(
-  addr = '/ip4/0.0.0.0/tcp/0'
-): Promise<LibP2PMocks>{
+export async function generateLibP2PMock(addr = '/ip4/0.0.0.0/tcp/0'): Promise<LibP2PMocks> {
   const node = await LibP2P.create({
     peerId: await PeerId.create({ keyType: 'secp256k1' }),
     addresses: { listen: [Multiaddr(addr)] },
@@ -51,6 +49,6 @@ export async function generateLibP2PMock(
 
   return {
     node,
-    address: getAddress(node),
+    address: getAddress(node)
   }
 }
