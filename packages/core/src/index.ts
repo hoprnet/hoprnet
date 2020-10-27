@@ -101,7 +101,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     this.initializedWithOptions = options
     this.output = (arr: Uint8Array) => {
       this.emit('hopr:message', arr)
-      if (options.output){
+      if (options.output) {
         log('DEPRECATED: options.output is replaced with a hopr:message event')
         options.output(arr)
       }
@@ -251,7 +251,6 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     await new Promise((resolve) => setTimeout(resolve, 100))
   }
 
-
   public isRunning(): boolean{
     return this.running
   }
@@ -260,7 +259,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     return this._libp2p.peerId // Not a documented API, but in the sourceu
   }
 
-  /* 
+  /*
    * List the addresses the node is available on
    */
   public getAddresses(): Multiaddr[] {

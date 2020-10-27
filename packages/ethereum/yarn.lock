@@ -183,24 +183,24 @@
     "@ethersproject/rlp" "^5.0.3"
     "@ethersproject/signing-key" "^5.0.4"
 
-"@hoprnet/hopr-demo-seeds@1.32.0-alpha.0":
-  version "1.32.0-alpha.0"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-demo-seeds/-/hopr-demo-seeds-1.32.0-alpha.0.tgz#3b223b3b513e1741de359a6165c2c395b748737e"
-  integrity sha512-ySOfQMHlY28MazxwYMDdZCBk52xuDj77S0VbBmCpF3TEyhW+h+XEqWYpBkPyuC4w+vDCgeK0K9tEokCE15wxcg==
+"@hoprnet/hopr-demo-seeds@1.37.0-alpha.0":
+  version "1.37.0-alpha.0"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-demo-seeds/-/hopr-demo-seeds-1.37.0-alpha.0.tgz#a605f5750eb9287532932cb6ba5f4ee393890516"
+  integrity sha512-jPIflL2mW3hGmzpSvT+JiXQH1+JpTcHkr3hvuPYTtQ7jxvneEPQ/Wd37wpbAX9Wg3bOO5j8LkPch3nOOBpjfRg==
 
-"@hoprnet/hopr-testing@1.32.0-alpha.0":
-  version "1.32.0-alpha.0"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-testing/-/hopr-testing-1.32.0-alpha.0.tgz#4a4cd8a6dc3560f64767a807e894ff11557871fc"
-  integrity sha512-2iXNNBrgI17S8jPO94QTgli0BUwOBnq0pXN7SztyfQLpEQKUXaNqjaOSAa+ZJcHDEthIrCnV1LnTVRbkc+cKOA==
+"@hoprnet/hopr-testing@1.37.0-alpha.0":
+  version "1.37.0-alpha.0"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-testing/-/hopr-testing-1.37.0-alpha.0.tgz#ecd914dd230ef951d5a99de6c16c64cbd6e5aa8e"
+  integrity sha512-ahMI58iYCgoCm26t1cWqRXioObE84/Lfo+KX/ktrh1YhyJ8/XJGyERE87DZGhEVSCrj7seq3hww0/sBHqJjW8w==
   dependencies:
-    "@hoprnet/hopr-demo-seeds" "1.32.0-alpha.0"
+    "@hoprnet/hopr-demo-seeds" "1.37.0-alpha.0"
     debug "^4.1.1"
-    ganache-core "^2.12.1"
+    ganache-core "2.13.0"
 
-"@hoprnet/hopr-utils@1.32.0-alpha.0":
-  version "1.32.0-alpha.0"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.32.0-alpha.0.tgz#fb3345fb2051a9762efa27732cb52f09869fefb5"
-  integrity sha512-M76s6ARv2FqdSY9yy3GVz+7wbmTFMzOAcTC4x7ysu6AFQEfbkUl8lowfqQ1t4q7IHAIgOdMBfEDnlUnRuZUg3w==
+"@hoprnet/hopr-utils@1.37.0-alpha.0":
+  version "1.37.0-alpha.0"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.37.0-alpha.0.tgz#81f57de08ccb7e3bc23b389944da6f99e8656acf"
+  integrity sha512-OM2340Yql5L1AGuf7nE9OwRzLMVrqSW2paw1WuBR4dJK/Sk+GT0OyK/ER+Bdki78zLEsuc6PEiyyhss7sxgblA==
   dependencies:
     bignumber.js "^9.0.0"
     libp2p-crypto "^0.17.9"
@@ -293,10 +293,10 @@
   dependencies:
     source-map-support "^0.5.16"
 
-"@truffle/codec@^0.7.0":
-  version "0.7.0"
-  resolved "https://registry.yarnpkg.com/@truffle/codec/-/codec-0.7.0.tgz#256efe174961744671f0df44190211e20b5e0c98"
-  integrity sha512-MBTXyCIdzseSN95K+igwaX0098tx97+1d6vD2Oi6UMM3af6VSD8qUJ/h1GngeDkQ8WAS61H4KVlIl9CKhdAQgQ==
+"@truffle/codec@^0.7.1":
+  version "0.7.1"
+  resolved "https://registry.yarnpkg.com/@truffle/codec/-/codec-0.7.1.tgz#2ef0fa40109040796afbebb8812c872122100ae4"
+  integrity sha512-mNd6KnW6J0UB1zafGBXDlTEbCMvWpmPAJmzv7aF/nAIaN/F8UePSCiQ1OTQP39Rprj6GFiCCaWVnBAwum6UGSg==
   dependencies:
     big.js "^5.2.2"
     bn.js "^4.11.8"
@@ -309,7 +309,7 @@
     semver "^6.3.0"
     source-map-support "^0.5.19"
     utf8 "^3.0.0"
-    web3-utils "1.2.1"
+    web3-utils "1.2.9"
 
 "@truffle/contract-schema@^3.1.0":
   version "3.3.0"
@@ -340,11 +340,11 @@
     web3-utils "1.2.1"
 
 "@truffle/debug-utils@^4.1.1":
-  version "4.2.12"
-  resolved "https://registry.yarnpkg.com/@truffle/debug-utils/-/debug-utils-4.2.12.tgz#0e7be451b6396da11e8a24293ad66ca3491ada7a"
-  integrity sha512-M/XUUWc/5Vh6ukHshHxxuC92DsrXJoNaLRqA1LTzA2UhCT67RYdWWT9Vi40DXiQqKh/k9+XGAqk9syJ0JGXd9A==
+  version "4.2.13"
+  resolved "https://registry.yarnpkg.com/@truffle/debug-utils/-/debug-utils-4.2.13.tgz#d4014c0c089ad5b6ff5441f07ddadf5579f4f504"
+  integrity sha512-c2NG2JINg6tWufNQHUl5mFStLJ8IyG8TV5gu8DTkKSdV8/7D6NwYqFPoqQr9OjO3jJ+siFhXIYUUBd3WEw7vlQ==
   dependencies:
-    "@truffle/codec" "^0.7.0"
+    "@truffle/codec" "^0.7.1"
     "@trufflesuite/chromafi" "^2.2.0"
     chalk "^2.4.2"
     debug "^4.1.0"
@@ -4112,7 +4112,7 @@ ganache-core@2.12.1:
     ethereumjs-wallet "0.6.5"
     web3 "1.2.11"
 
-ganache-core@^2.12.1:
+ganache-core@2.13.0:
   version "2.13.0"
   resolved "https://registry.yarnpkg.com/ganache-core/-/ganache-core-2.13.0.tgz#e211d995eb806a1cd792096a989cf624417f0f7c"
   integrity sha512-yTSsesDBwPh+34ZN2w5SZoPNVbR0Gn75InvQc2D1zUdy9prED6R2sVbefSyiXFR/uwZK9NrIVS1+HcEtgQVb9Q==
@@ -8197,9 +8197,9 @@ typedarray@^0.0.6:
   integrity sha1-hnrHTjhkGHsdPUfZlqeOxciDB3c=
 
 typescript@^4.0:
-  version "4.0.3"
-  resolved "https://registry.yarnpkg.com/typescript/-/typescript-4.0.3.tgz#153bbd468ef07725c1df9c77e8b453f8d36abba5"
-  integrity sha512-tEu6DGxGgRJPb/mVPIZ48e69xCn2yRmCgYmDugAVwmJ6o+0u1RI18eO7E7WBTLYLaEVVOhwQmcdhQHweux/WPg==
+  version "4.0.5"
+  resolved "https://registry.yarnpkg.com/typescript/-/typescript-4.0.5.tgz#ae9dddfd1069f1cb5beb3ef3b2170dd7c1332389"
+  integrity sha512-ywmr/VrTVCmNTJ6iV2LwIrfG1P+lv6luD8sUJs+2eI9NLGigaN+nUQc13iHqisq7bra9lnmUSYqbJvegraBOPQ==
 
 typestub-multihashes@^0.0.4:
   version "0.0.4"
@@ -9319,6 +9319,20 @@ web3-utils@1.2.2:
   version "1.2.2"
   resolved "https://registry.yarnpkg.com/web3-utils/-/web3-utils-1.2.2.tgz#b53a08c40d2c3f31d3c4a28e7d749405df99c8c0"
   integrity sha512-joF+s3243TY5cL7Z7y4h1JsJpUCf/kmFmj+eJar7Y2yNIGVcW961VyrAms75tjUysSuHaUQ3eQXjBEUJueT52A==
+  dependencies:
+    bn.js "4.11.8"
+    eth-lib "0.2.7"
+    ethereum-bloom-filters "^1.0.6"
+    ethjs-unit "0.1.6"
+    number-to-bn "1.7.0"
+    randombytes "^2.1.0"
+    underscore "1.9.1"
+    utf8 "3.0.0"
+
+web3-utils@1.2.9:
+  version "1.2.9"
+  resolved "https://registry.yarnpkg.com/web3-utils/-/web3-utils-1.2.9.tgz#abe11735221627da943971ef1a630868fb9c61f3"
+  integrity sha512-9hcpuis3n/LxFzEVjwnVgvJzTirS2S9/MiNAa7l4WOEoywY+BSNwnRX4MuHnjkh9NY25B6QOjuNG6FNnSjTw1w==
   dependencies:
     bn.js "4.11.8"
     eth-lib "0.2.7"

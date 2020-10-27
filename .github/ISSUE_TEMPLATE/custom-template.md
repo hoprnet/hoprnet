@@ -2,7 +2,7 @@
 name: Custom Template
 about: Blank template for other issue types
 title: ''
-labels: ''
+labels: 'needs review'
 assignees: ''
 ---
 

@@ -123,7 +123,7 @@ async function generateNodeOptions(): Promise<HoprOptions> {
     network: argv.network,
     bootstrapServers: argv.bootstrap ? [] : [...(await getBootstrapAddresses()).values()],
     provider: argv.provider,
-    hosts: parseHosts(),
+    hosts: parseHosts()
   }
 
   if (argv.password !== undefined) {
@@ -154,7 +154,6 @@ async function main() {
       logs.log(msg.toString())
     }
   }
-
 
   if (argv.settings) {
     settings = JSON.parse(argv.settings)

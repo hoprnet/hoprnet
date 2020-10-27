@@ -124,10 +124,10 @@
     "@ethersproject/rlp" "^5.0.3"
     "@ethersproject/signing-key" "^5.0.4"
 
-"@hoprnet/hopr-demo-seeds@1.32.0-alpha.0":
-  version "1.32.0-alpha.0"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-demo-seeds/-/hopr-demo-seeds-1.32.0-alpha.0.tgz#3b223b3b513e1741de359a6165c2c395b748737e"
-  integrity sha512-ySOfQMHlY28MazxwYMDdZCBk52xuDj77S0VbBmCpF3TEyhW+h+XEqWYpBkPyuC4w+vDCgeK0K9tEokCE15wxcg==
+"@hoprnet/hopr-demo-seeds@1.37.0-alpha.0":
+  version "1.37.0-alpha.0"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-demo-seeds/-/hopr-demo-seeds-1.37.0-alpha.0.tgz#a605f5750eb9287532932cb6ba5f4ee393890516"
+  integrity sha512-jPIflL2mW3hGmzpSvT+JiXQH1+JpTcHkr3hvuPYTtQ7jxvneEPQ/Wd37wpbAX9Wg3bOO5j8LkPch3nOOBpjfRg==
 
 "@sindresorhus/is@^0.14.0":
   version "0.14.0"
@@ -4879,9 +4879,9 @@ typedarray@^0.0.6:
   integrity sha1-hnrHTjhkGHsdPUfZlqeOxciDB3c=
 
 typescript@^4.0.3:
-  version "4.0.3"
-  resolved "https://registry.yarnpkg.com/typescript/-/typescript-4.0.3.tgz#153bbd468ef07725c1df9c77e8b453f8d36abba5"
-  integrity sha512-tEu6DGxGgRJPb/mVPIZ48e69xCn2yRmCgYmDugAVwmJ6o+0u1RI18eO7E7WBTLYLaEVVOhwQmcdhQHweux/WPg==
+  version "4.0.5"
+  resolved "https://registry.yarnpkg.com/typescript/-/typescript-4.0.5.tgz#ae9dddfd1069f1cb5beb3ef3b2170dd7c1332389"
+  integrity sha512-ywmr/VrTVCmNTJ6iV2LwIrfG1P+lv6luD8sUJs+2eI9NLGigaN+nUQc13iHqisq7bra9lnmUSYqbJvegraBOPQ==
 
 typewise-core@^1.2, typewise-core@^1.2.0:
   version "1.2.0"
