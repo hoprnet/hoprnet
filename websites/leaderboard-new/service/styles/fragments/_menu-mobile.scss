@@ -94,7 +94,7 @@
     a {
       display: inline-flex;
       text-decoration: none;
-      color: #bcbcbc;
+      color: $greyLabel;
       img {
         margin-right: 0.5em;
       }
@@ -102,8 +102,8 @@
         padding: 0;
         margin: 0;
         transition: all 350ms ease-in-out;
-        font-weight: 600;
-        font-size: 0.89em;
+        font-weight: 400;
+        font-size: 1em;
       }
       &:hover {
         p {
