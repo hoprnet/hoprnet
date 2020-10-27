@@ -26,11 +26,12 @@
     "yarn": ">=1.19.2"
   },
   "dependencies": {
+    "peer-id": "0.14.2",
+    "multiaddr": "8.0.0",
     "bignumber.js": "^9.0.0",
-    "libp2p-crypto": "^0.17.9",
-    "peer-info": "^0.17.5",
+    "libp2p-crypto": "0.18.0",
     "strip-ansi": "^6.0.0",
-    "typestub-multihashes": "^0.0.4"
+    "multihashes": "~3.0.1"
   },
   "devDependencies": {
     "@types/mocha": "^8.0.3",

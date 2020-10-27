@@ -1,92 +1,68 @@
-import PeerInfo from 'peer-info'
-import PeerId from 'peer-id'
-import libp2p from 'libp2p'
-// @ts-ignore
-import TCP = require('libp2p-tcp')
-// @ts-ignore
-import MPLEX = require('libp2p-mplex')
-// @ts-ignore
-import SECIO = require('libp2p-secio')
-import { Heartbeat as HeartbeatInteraction } from '../interactions/network/heartbeat'
 import Heartbeat from './heartbeat'
 import NetworkPeerStore from './network-peers'
-import { Network } from './index'
-
+import PeerId from 'peer-id'
 import assert from 'assert'
-import Multiaddr from 'multiaddr'
-import { LibP2P } from '..'
+import { generateLibP2PMock } from '../test-utils'
 import { Interactions } from '../interactions'
+import { Network } from '../network'
+import type { Connection } from 'libp2p'
+import { Heartbeat as HeartbeatInteraction } from '../interactions/network/heartbeat'
+import debug from 'debug'
+const log = debug('hopr:heartbeat-tests')
 
-type Mocks = {
-  node: LibP2P
-  network: Network
-  interactions: Interactions<any>
+async function generateMocks(options?: { timeoutIntentionally: boolean }, addr = '/ip4/0.0.0.0/tcp/0') {
+  const { node, address } = await generateLibP2PMock(addr)
+
+  node.hangUp = async (_id) => {} // Need to override this as we don't have real conns
+
+  const interactions = {
+    network: {
+      heartbeat: new HeartbeatInteraction(node, (remotePeer) => network.heartbeat.emit('beat', remotePeer))
+    }
+  } as Interactions<any>
+
+  const network = new Network(node, interactions, {} as any, { crawl: options })
+
+  node.connectionManager.on('peer:connect', (connection: Connection) => {
+    log('> Connection from', connection.remotePeer)
+    node.peerStore.addressBook.add(connection.remotePeer, [connection.remoteAddr])
+  })
+
+  return {
+    node,
+    address,
+    network,
+    interactions
+  }
 }
 
 describe('check heartbeat mechanism', function () {
-  async function generateMocks(
-    options?: { timeoutIntentionally: boolean },
-    addr = '/ip4/0.0.0.0/tcp/0'
-  ): Promise<Mocks> {
-    const node = await libp2p.create({
-      peerInfo: await PeerInfo.create(await PeerId.create({ keyType: 'secp256k1' })),
-      modules: {
-        transport: [TCP],
-        streamMuxer: [MPLEX],
-        connEncryption: [SECIO]
-      }
-    })
-
-    node.peerInfo.multiaddrs.add(Multiaddr(addr))
-    node.hangUp = async (_id) => {} // Need to override this in tests.
-
-    await node.start()
-
-    const interactions = {
-      network: {
-        heartbeat: new HeartbeatInteraction(node, (remotePeer) => network.heartbeat.emit('beat', remotePeer))
-      }
-    } as Interactions<any>
-
-    const network = new Network(node, interactions, {} as any, { crawl: options })
-
-    node.getConnectedPeers = () => node._network.networkPeers.peers.map((x) => x.id)
-    node.on('peer:connect', (peerInfo: PeerInfo) => node.peerStore.put(peerInfo))
-    return {
-      node,
-      interactions,
-      network
-    }
-  }
-
   it('should initialise the heartbeat module and start the heartbeat functionality', async function () {
     const [Alice, Bob, Chris] = await Promise.all([generateMocks(), generateMocks(), generateMocks()])
 
-    await Alice.node.dial(Bob.node.peerInfo)
+    await Alice.node.dial(Bob.address)
 
     // Check whether our event listener is triggered by heartbeat interactions
     await Promise.all([
       new Promise(async (resolve) => {
         Bob.network.heartbeat.once('beat', (peerId: PeerId) => {
-          assert(Alice.node.peerInfo.id.isEqual(peerId), `Incoming connection must come from Alice`)
+          log('bob heartbeat from alice')
+          assert(Alice.node.peerId.isEqual(peerId), `Incoming connection must come from Alice`)
           resolve()
         })
       }),
-      Alice.interactions.network.heartbeat.interact(Bob.node.peerInfo.id)
+      Alice.interactions.network.heartbeat.interact(Bob.node.peerId)
     ])
 
-    assert(
-      !Chris.network.networkPeers.has(Alice.node.peerInfo.id),
-      `Chris should not know about Alice in the beginning.`
-    )
+    assert(!Chris.network.networkPeers.has(Alice.node.peerId), `Chris should not know about Alice in the beginning.`)
 
-    await Alice.node.dial(Chris.node.peerInfo)
+    await Alice.node.dial(Chris.address)
 
     // Check that the internal state is as expected
-    assert(Alice.network.networkPeers.has(Chris.node.peerInfo.id), `Alice should know about Chris now.`)
-    assert(Alice.network.networkPeers.has(Bob.node.peerInfo.id), `Alice should know about Bob now.`)
-    assert(Chris.network.networkPeers.has(Alice.node.peerInfo.id), `Chris should know about Alice now.`)
-    assert(Bob.network.networkPeers.has(Alice.node.peerInfo.id), `Bob should know about Alice now.`)
+    assert(Alice.network.networkPeers.has(Chris.node.peerId), `Alice should know about Chris now.`)
+    assert(Alice.network.networkPeers.has(Bob.node.peerId), `Alice should know about Bob now.`)
+    assert(Chris.network.networkPeers.has(Alice.node.peerId), `Chris should know about Alice now.`)
+    assert(Bob.network.networkPeers.has(Alice.node.peerId), `Bob should know about Alice now.`)
 
     // Simulate a node failure
     await Chris.node.stop()
@@ -98,7 +74,7 @@ describe('check heartbeat mechanism', function () {
     // Check whether a node failure gets detected
     await Alice.network.heartbeat.checkNodes()
 
-    assert(!Alice.network.networkPeers.has(Chris.node.peerInfo.id), `Alice should have removed Chris.`)
+    assert(!Alice.network.networkPeers.has(Chris.node.peerId), `Alice should have removed Chris.`)
 
     await Promise.all([
       /* pretier-ignore */
@@ -117,8 +93,7 @@ describe('unit test heartbeat', () => {
   } as any
 
   beforeEach(() => {
-    const empty = [][Symbol.iterator]()
-    peers = new NetworkPeerStore(empty)
+    peers = new NetworkPeerStore([])
     heartbeat = new Heartbeat(peers, interaction, hangUp)
   })
 

@@ -61,7 +61,7 @@ export default class Core {
       log('- start | Creating HOPR Node')
       this.node = await Hopr.create({
         ...this.options,
-        bootstrapServers: [...(await getBootstrapAddresses()).values()],
+        bootstrapServers: await getBootstrapAddresses(),
       })
       log('- start | Created HOPR Node')
       this.started = true
@@ -83,7 +83,7 @@ export default class Core {
 
   @Core.mustBeStarted()
   getBootstrapServers(): string {
-      return this.node.bootstrapServers.map(node => node.id.toB58String()).join(',')
+      return this.node.bootstrapServers.map(node => node.getPeerId()).join(',')
   }
 
   @Core.mustBeStarted()

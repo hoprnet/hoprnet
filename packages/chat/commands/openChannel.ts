@@ -44,7 +44,7 @@ export abstract class OpenChannelBase extends AbstractCommand {
     })
 
     const peers = allPeers.reduce((acc: string[], peer: PeerId) => {
-      if (!peersWithOpenChannel.find((p: PeerId) => p.id.equals(peer.id))) {
+      if (!peersWithOpenChannel.find((p: PeerId) => p.equals(peer.id))) {
         acc.push(peer.toB58String())
       }
       return acc

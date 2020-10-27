@@ -7,7 +7,7 @@ import NetworkPeers from './network-peers'
 import Stun from './stun'
 import Multiaddr from 'multiaddr'
 import PeerId from 'peer-id'
-import PeerInfo from 'peer-info'
+import type { Connection } from 'libp2p'
 
 type TestOpts = {
   crawl?: { timeoutIntentionally?: boolean }
@@ -24,25 +24,24 @@ class Network {
       if (!ma.getPeerId()) {
         throw new Error('Cannot store a peer without an ID')
       }
-      const pinfo = new PeerInfo(PeerId.createFromCID(ma.getPeerId()))
-      pinfo.multiaddrs.add(ma)
-      node.peerStore.put(pinfo)
+      const pid = PeerId.createFromCID(ma.getPeerId())
+      node.peerStore.addressBook.add(pid, [ma])
     }
 
     const getPeer = (id: PeerId): Multiaddr[] => {
-      let addrs = node.peerStore.get(id).multiaddrs.toArray()
+      let addrs = node.peerStore.addressBook.get(id)
       return addrs.map((a) => {
-        if (!a.getPeerId()) {
-          return a.encapsulate(`/p2p/${id.toB58String()}`)
+        if (!a.multiaddr.getPeerId()) {
+          return a.multiaddr.encapsulate(`/p2p/${id.toB58String()}`)
         }
-        return a
+        return a.multiaddr
       })
     }
 
-    this.networkPeers = new NetworkPeers(node.peerStore.peers.values())
+    this.networkPeers = new NetworkPeers(Array.from(node.peerStore.peers.values()).map((x) => x.id))
     this.heartbeat = new Heartbeat(this.networkPeers, interactions.network.heartbeat, node.hangUp)
     this.crawler = new Crawler(
-      node.peerInfo.id,
+      node.peerId,
       this.networkPeers,
       interactions.network.crawler,
       getPeer,
@@ -50,9 +49,9 @@ class Network {
       testingOptions?.crawl
     )
 
-    node.on('peer:connect', (peerInfo: PeerInfo) => {
-      this.networkPeers.onPeerConnect(peerInfo)
-      this.heartbeat.connectionListener(peerInfo)
+    node.connectionManager.on('peer:connect', (conn: Connection) => {
+      this.networkPeers.onPeerConnect(conn.remotePeer)
+      this.heartbeat.connectionListener(conn.remotePeer)
     })
 
     if (options.bootstrapNode) {

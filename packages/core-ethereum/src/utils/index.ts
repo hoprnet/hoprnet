@@ -58,7 +58,7 @@ export function getId(self: AccountId, counterparty: AccountId): Promise<Hash> {
 export async function privKeyToPubKey(privKey: Uint8Array): Promise<Uint8Array> {
   if (privKey.length != constants.PRIVATE_KEY_LENGTH)
     throw Error(
-      `Invalid input parameter. Expected a Buffer of size ${constants.PRIVATE_KEY_LENGTH}. Got '${typeof privKey}'${
+      `Invalid input parameter. Expected a Uint8Array of size ${constants.PRIVATE_KEY_LENGTH}. Got '${typeof privKey}'${
         privKey.length ? ` of length ${privKey.length}` : ''
       }.`
     )
@@ -74,7 +74,7 @@ export async function privKeyToPubKey(privKey: Uint8Array): Promise<Uint8Array> 
 export async function pubKeyToAccountId(pubKey: Uint8Array): Promise<AccountId> {
   if (pubKey.length != constants.COMPRESSED_PUBLIC_KEY_LENGTH)
     throw Error(
-      `Invalid input parameter. Expected a Buffer of size ${
+      `Invalid input parameter. Expected a Uint8Array of size ${
         constants.COMPRESSED_PUBLIC_KEY_LENGTH
       }. Got '${typeof pubKey}'${pubKey.length ? ` of length ${pubKey.length}` : ''}.`
     )

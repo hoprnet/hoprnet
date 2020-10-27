@@ -15,7 +15,7 @@ import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '../../'
 import pipe from 'it-pipe'
 
-import type { Handler } from '../../@types/transport'
+import type { Handler } from 'libp2p'
 
 import { randomInteger, durations } from '@hoprnet/hopr-utils'
 import { getTokens, Token } from '../../utils'
@@ -52,8 +52,8 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
         struct = await this.node._libp2p
           .dialProtocol(counterparty, this.protocols[0], { signal: abort.signal })
           .catch(async () => {
-            const peerInfo = await this.node._libp2p.peerRouting.findPeer(counterparty)
-            return await this.node._libp2p.dialProtocol(peerInfo, this.protocols[0], { signal: abort.signal })
+            const { id } = await this.node._libp2p.peerRouting.findPeer(counterparty)
+            return await this.node._libp2p.dialProtocol(id, this.protocols[0], { signal: abort.signal })
           })
       } catch (err) {
         log(`Could not transfer packet to ${counterparty.toB58String()}. Error was: ${chalk.red(err.message)}.`)

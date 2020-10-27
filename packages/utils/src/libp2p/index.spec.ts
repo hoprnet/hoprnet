@@ -1,7 +1,8 @@
 import assert from 'assert'
 import PeerId from 'peer-id'
 import { convertPubKeyFromPeerId, convertPubKeyFromB58String } from '.'
-import * as multihashes from 'typestub-multihashes'
+// @ts-ignore
+import * as multihashes from 'multihashes'
 
 describe(`test convertPubKeyFromPeerId`, function () {
   it(`should equal to a newly created pubkey from PeerId`, async function () {

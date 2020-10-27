@@ -2,7 +2,6 @@
 import Hopr from '@hoprnet/hopr-core'
 import type { HoprOptions } from '@hoprnet/hopr-core'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import PeerInfo from 'peer-info'
 import PeerId from 'peer-id'
 import Multiaddr from 'multiaddr'
 import debug from 'debug'
