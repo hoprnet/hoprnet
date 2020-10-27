@@ -9,81 +9,81 @@ import SECIO = require('libp2p-secio')
 import TCP from 'libp2p-tcp'
 
 import { Handler, MultiaddrConnection } from 'libp2p'
-
 import Multiaddr from 'multiaddr'
 import pipe from 'it-pipe'
-
 import Relay from './relay'
 import { randomBytes } from 'crypto'
-
 import { privKeyToPeerId } from '../../utils'
-import { WebRTCUpgrader } from './webrtc'
+import { getAddress } from '../../test-utils'
 
 const TEST_PROTOCOL = `/test/0.0.1`
 
 const privKeys = [randomBytes(32), randomBytes(32), randomBytes(32)]
 
-describe('should create a socket and connect to it', function () {
-  async function generateNode(options: {
-    id: number
-    ipv4?: boolean
-    ipv6?: boolean
-    connHandler?: (conn: MultiaddrConnection) => void
-  }): Promise<libp2p> {
-    const peerId = await privKeyToPeerId(privKeys[options.id])
-    const addresses = []
+async function generateNode(options: {
+  id: number
+  ipv4?: boolean
+  ipv6?: boolean
+  connHandler?: (conn: MultiaddrConnection) => void
+}): Promise<{node: libp2p, relay: Relay}> {
+  const peerId = await privKeyToPeerId(privKeys[options.id])
+  const addresses = []
 
-    if (options.ipv4) {
-      addresses.push(
-        Multiaddr(`/ip4/127.0.0.1/tcp/${9490 + 2 * options.id}`).encapsulate(`/p2p/${peerId.toB58String()}`)
-      )
-    }
-
-    if (options.ipv6) {
-      addresses.push(
-        Multiaddr(`/ip6/::1/tcp/${9490 + 2 * options.id + 1}`).encapsulate(`/p2p/${peerId.toB58String()}`)
-      )
-    }
-
-    const node = new libp2p({
-      peerId, addresses: {listen: addresses},
-      modules: {
-        transport: [TCP],
-        streamMuxer: [MPLEX],
-        connEncryption: [SECIO],
-        dht: KadDHT
-      },
-      config: {
-        dht: {
-          enabled: false
-        },
-        relay: {
-          enabled: false
-        },
-        peerDiscovery: {
-          autoDial: false
-        }
-      }
-    })
-
-    //@ts-ignore
-    node.relay = new Relay(node, options.connHandler)
-
-    node.handle([TEST_PROTOCOL], (handler: Handler) => {
-      pipe(
-        handler.stream,
-        // echoing msg
-        handler.stream
-      )
-    })
-
-    await node.start()
-
-    return node
+  if (options.ipv4) {
+    addresses.push(
+      Multiaddr(`/ip4/127.0.0.1/tcp/${9490 + 2 * options.id}`).encapsulate(`/p2p/${peerId.toB58String()}`)
+    )
   }
 
+  if (options.ipv6) {
+    addresses.push(
+      Multiaddr(`/ip6/::1/tcp/${9490 + 2 * options.id + 1}`).encapsulate(`/p2p/${peerId.toB58String()}`)
+    )
+  }
+
+  const node = new libp2p({
+    peerId, addresses: {listen: addresses},
+    modules: {
+      transport: [TCP],
+      streamMuxer: [MPLEX],
+      connEncryption: [SECIO],
+      dht: KadDHT
+    },
+    config: {
+      dht: {
+        enabled: false
+      },
+      relay: {
+        enabled: false
+      },
+      peerDiscovery: {
+        autoDial: false
+      }
+    }
+  })
+
+  let relay = new Relay(node, options.connHandler)
+
+  node.handle([TEST_PROTOCOL], (handler: Handler) => {
+    pipe(
+      handler.stream,
+      // echoing msg
+      handler.stream
+    )
+  })
+
+  await node.start()
+
+  return {
+    node,
+    relay
+  }
+}
+
+describe('should create a socket and connect to it', function () {
+
   it('should create a node and echo a single message', async function () {
-    let [sender, relay, counterparty] = await Promise.all([
+    let [sender, relayer, counterparty] = await Promise.all([
       generateNode({ id: 0, ipv4: true }),
       generateNode({ id: 1, ipv4: true }),
       generateNode({
@@ -107,12 +107,11 @@ describe('should create a socket and connect to it', function () {
     ])
 
     // Make sure that the nodes know each other
-    await Promise.all([sender.dial(relay.peerId), counterparty.dial(relay.peerId)])
-    //@ts-ignore
+    await Promise.all([sender.node.dial(getAddress(relayer.node)), counterparty.node.dial(getAddress(relayer.node))])
+
     let conn = await sender.relay.establishRelayedConnection(
-      Multiaddr(`/p2p/${counterparty.peerId.toB58String()}`),
-      [relay.peerId],
-      new WebRTCUpgrader({})
+      Multiaddr(`/p2p/${counterparty.node.peerId.toB58String()}`),
+      relayer.node.multiaddrs
     )
 
     await pipe(
@@ -132,7 +131,7 @@ describe('should create a socket and connect to it', function () {
       }
     )
 
-    await counterparty.stop()
+    await counterparty.node.stop()
 
     await new Promise((resolve) => setTimeout(resolve, 200))
 
@@ -155,12 +154,12 @@ describe('should create a socket and connect to it', function () {
       }
     })
 
-    await counterparty.dial(relay.peerId)
+    await counterparty.node.dial(getAddress(relayer.node))
     //@ts-ignore
     conn = await sender.relay.establishRelayedConnection(
-      Multiaddr(`/p2p/${counterparty.peerId.toB58String()}`),
-      [relay.peerId],
-      new WebRTCUpgrader({})
+      Multiaddr(`/p2p/${counterparty.node.peerId.toB58String()}`),
+      relayer.node.multiaddrs,
+      {}//new WebRTCUpgrader({})
     )
 
     await pipe(

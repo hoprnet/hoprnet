@@ -92,7 +92,7 @@ class Relay {
       throw new AbortError()
     }
 
-    const potentialRelays = relays.filter((relay: Multiaddr) => relay.getPeerId() !== this.id.toB58String())
+    const potentialRelays = relays.filter(relay => relay.getPeerId() !== this.id.toB58String())
 
     if (potentialRelays.length == 0) {
       throw Error(`Filtered list of relays and there is no one left to establish a connection. `)
