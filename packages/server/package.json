@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-server",
-  "version": "1.17.18",
+  "version": "1.17.19",
   "description": "gRPC Server wrapper around HOPR Node",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -48,10 +48,10 @@
   },
   "dependencies": {
     "@grpc/proto-loader": "^0.5.4",
-    "@hoprnet/hopr-core": "1.17.18",
-    "@hoprnet/hopr-core-connector-interface": "1.17.18",
-    "@hoprnet/hopr-protos": "1.17.18",
-    "@hoprnet/hopr-utils": "1.17.18",
+    "@hoprnet/hopr-core": "1.17.19",
+    "@hoprnet/hopr-core-connector-interface": "1.17.19",
+    "@hoprnet/hopr-protos": "1.17.19",
+    "@hoprnet/hopr-utils": "1.17.19",
     "@nestjs/common": "^7.0.0",
     "@nestjs/config": "^0.5.0",
     "@nestjs/core": "^7.0.0",
@@ -69,8 +69,8 @@
     "rxjs": "^6.6.0"
   },
   "devDependencies": {
-    "@hoprnet/hopr-ethereum": "1.17.18",
-    "@hoprnet/hopr-testing": "1.17.18",
+    "@hoprnet/hopr-ethereum": "1.17.19",
+    "@hoprnet/hopr-testing": "1.17.19",
     "@nestjs/cli": "^7.0.0",
     "@nestjs/schematics": "^7.0.0",
     "@nestjs/testing": "^7.0.0",
