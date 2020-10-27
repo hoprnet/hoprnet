@@ -9677,19 +9677,6 @@ pbkdf2@^3.0.17, pbkdf2@^3.0.3, pbkdf2@^3.0.9:
     safe-buffer "^5.0.1"
     sha.js "^2.4.8"
 
-peer-id@0.13, peer-id@^0.13.13:
-  version "0.13.13"
-  resolved "https://registry.yarnpkg.com/peer-id/-/peer-id-0.13.13.tgz#63c3561f1e602ec9d7a205103488256d59dd299a"
-  integrity sha512-5FpBXN6PDTcHs51gkHWPf0OIQZAO3Z10i6lWc+GaoxTU4bQHtsoKFnhxoXo5Ze04JblpzIrtowkluLSCLP1WYg==
-  dependencies:
-    buffer "^5.5.0"
-    cids "^0.8.0"
-    class-is "^1.1.0"
-    libp2p-crypto "^0.17.7"
-    minimist "^1.2.5"
-    multihashes "^1.0.1"
-    protons "^1.0.2"
-
 peer-id@0.14.2, peer-id@^0.14.0:
   version "0.14.2"
   resolved "https://registry.yarnpkg.com/peer-id/-/peer-id-0.14.2.tgz#3ddd752092a54f06b750b5e67d0db98fb4ee40bc"
@@ -9702,6 +9689,19 @@ peer-id@0.14.2, peer-id@^0.14.0:
     multihashes "^3.0.1"
     protons "^2.0.0"
     uint8arrays "^1.1.0"
+
+peer-id@^0.13.13:
+  version "0.13.13"
+  resolved "https://registry.yarnpkg.com/peer-id/-/peer-id-0.13.13.tgz#63c3561f1e602ec9d7a205103488256d59dd299a"
+  integrity sha512-5FpBXN6PDTcHs51gkHWPf0OIQZAO3Z10i6lWc+GaoxTU4bQHtsoKFnhxoXo5Ze04JblpzIrtowkluLSCLP1WYg==
+  dependencies:
+    buffer "^5.5.0"
+    cids "^0.8.0"
+    class-is "^1.1.0"
+    libp2p-crypto "^0.17.7"
+    minimist "^1.2.5"
+    multihashes "^1.0.1"
+    protons "^1.0.2"
 
 pem-jwk@^2.0.0:
   version "2.0.0"

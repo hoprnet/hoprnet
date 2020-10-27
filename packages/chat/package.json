@@ -49,8 +49,7 @@
     "getopts": "^2.2.5",
     "multiaddr": "8.0.0",
     "multihashes": "~3.0.1",
-    "peer-id": "~0.13",
-    "peer-info": "~0.17.5",
+    "peer-id": "0.14.2",
     "readline": "~1.3.0",
     "rlp": "~2.2.5",
     "typescript": "^4.0.3"

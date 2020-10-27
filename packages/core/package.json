@@ -57,7 +57,7 @@
     "multiaddr": "8.0.0",
     "multihashes": "3.0.1",
     "p-defer": "^3.0.0",
-    "peer-id": "~0.13",
+    "peer-id": "0.14.2",
     "peer-info": "~0.17.5",
     "read": "~1.0.7",
     "rlp": "~2.2.6",
