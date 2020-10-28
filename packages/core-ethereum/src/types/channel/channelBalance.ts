@@ -31,6 +31,14 @@ class ChannelBalance extends Uint8ArrayE implements Types.ChannelBalance {
     }
   }
 
+  slice(begin = 0, end = ChannelBalance.SIZE) {
+    return this.subarray(begin, end)
+  }
+
+  subarray(begin = 0, end = ChannelBalance.SIZE) {
+    return new Uint8Array(this.buffer, begin + this.byteOffset, end - begin)
+  }
+
   get balanceOffset(): number {
     return this.byteOffset
   }

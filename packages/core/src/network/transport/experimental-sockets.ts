@@ -21,11 +21,11 @@ async function main() {
     reuseAddr: true
   })
 
-  udp4Server.on('message', (msg, info) => {
+  udp4Server.on('message', (msg, _info) => {
     console.log(`received over udp4`, new TextDecoder().decode(msg))
   })
 
-  udp6Server.on('message', (msg, info) => {
+  udp6Server.on('message', (msg, _info) => {
     console.log(`received over udp6`, new TextDecoder().decode(msg))
   })
 

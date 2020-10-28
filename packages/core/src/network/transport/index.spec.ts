@@ -1,5 +1,4 @@
 import assert from 'assert'
-import AbortController from 'abort-controller'
 import libp2p from 'libp2p'
 
 // @ts-ignore
@@ -11,17 +10,17 @@ import SECIO = require('libp2p-secio')
 
 import PeerId from 'peer-id'
 
-import { Connection, Handler, Stream } from '../../@types/transport'
+import { Handler } from 'libp2p'
 
 import TCP from '.'
 import Multiaddr from 'multiaddr'
-import PeerInfo from 'peer-info'
 import pipe from 'it-pipe'
 
-import { u8aEquals, durations } from '@hoprnet/hopr-utils'
+import { u8aEquals } from '@hoprnet/hopr-utils'
 
 import { randomBytes } from 'crypto'
 import { RELAY_CIRCUIT_TIMEOUT } from './constants'
+import { connectionHelper } from '../../test-utils'
 
 const TEST_PROTOCOL = `/test/0.0.1`
 
@@ -39,24 +38,24 @@ describe('should create a socket and connect to it', function () {
       timeoutIntentionallyOnWebRTC?: Promise<void>
       answerIntentionallyWithIncorrectMessages?: boolean
     },
-    bootstrap?: PeerInfo
+    bootstrap?: Multiaddr
   ): Promise<libp2p> {
-    const peerInfo = new PeerInfo(await PeerId.create({ keyType: 'secp256k1' }))
+    const peerId = await PeerId.create({ keyType: 'secp256k1' })
+    const addresses = []
 
     if (options.ipv4) {
-      peerInfo.multiaddrs.add(
-        Multiaddr(`/ip4/127.0.0.1/tcp/${9090 + 2 * options.id}`).encapsulate(`/p2p/${peerInfo.id.toB58String()}`)
+      addresses.push(
+        Multiaddr(`/ip4/127.0.0.1/tcp/${9090 + 2 * options.id}`).encapsulate(`/p2p/${peerId.toB58String()}`)
       )
     }
 
     if (options.ipv6) {
-      peerInfo.multiaddrs.add(
-        Multiaddr(`/ip6/::1/tcp/${9090 + 2 * options.id + 1}`).encapsulate(`/p2p/${peerInfo.id.toB58String()}`)
-      )
+      addresses.push(Multiaddr(`/ip6/::1/tcp/${9090 + 2 * options.id + 1}`).encapsulate(`/p2p/${peerId.toB58String()}`))
     }
 
     const node = new libp2p({
-      peerInfo,
+      peerId,
+      addresses: { listen: addresses },
       modules: {
         transport: [TCP],
         streamMuxer: [MPLEX],
@@ -85,9 +84,8 @@ describe('should create a socket and connect to it', function () {
       }
     })
 
-    node.handle(TEST_PROTOCOL, (handler: Handler) => {
+    node.handle([TEST_PROTOCOL], (handler: Handler) => {
       pipe(
-        /* prettier-ignore */
         handler.stream,
         // echoing msg
         handler.stream
@@ -114,7 +112,6 @@ describe('should create a socket and connect to it', function () {
   //   const testMessage = randomBytes(123)
 
   //   await pipe(
-  //     /* prettier-ignore */
   //     [testMessage],
   //     stream,
   //     async (source: AsyncIterable<Uint8Array>) => {
@@ -156,7 +153,6 @@ describe('should create a socket and connect to it', function () {
   //   // ])
 
   //   await Promise.all([
-  //     /* prettier-ignore */
   //     sender.stop(),
   //     counterparty.stop(),
   //   ])
@@ -177,7 +173,6 @@ describe('should create a socket and connect to it', function () {
   //   const testMessage = randomBytes(123)
 
   //   await pipe(
-  //     /* prettier-ignore */
   //     [testMessage],
   //     stream,
   //     async (source: AsyncIterable<Uint8Array>) => {
@@ -270,7 +265,6 @@ describe('should create a socket and connect to it', function () {
   //   assert(errThrown, `Must throw error in case other node node is not reachable`)
 
   //   await Promise.all([
-  //     /* prettier-ignore */
   //     sender.stop(),
   //     relay.stop(),
   //   ])
@@ -305,7 +299,6 @@ describe('should create a socket and connect to it', function () {
   //   assert(errThrown, `Must throw error in case other node is not reachable`)
 
   //   await Promise.all([
-  //     /* prettier-ignore */
   //     sender.stop(),
   //     relay.stop(),
   //   ])
@@ -314,31 +307,26 @@ describe('should create a socket and connect to it', function () {
   it('should set up a relayed connection and upgrade to WebRTC', async function () {
     const relay = await generateNode({ id: 2, ipv4: true })
     const [sender, counterparty] = await Promise.all([
-      generateNode({ id: 0, ipv4: true }, relay.peerInfo),
-      generateNode({ id: 1, ipv4: true }, relay.peerInfo)
+      generateNode({ id: 0, ipv4: true }, relay.multiaddrs[0]),
+      generateNode({ id: 1, ipv4: true }, relay.multiaddrs[0])
     ])
     connectionHelper([sender, relay])
     connectionHelper([relay, counterparty])
     const INVALID_PORT = 8758
     // @ts-ignore
     const { stream }: { stream: Connection } = await sender.dialProtocol(
-      Multiaddr(`/ip4/127.0.0.1/tcp/${INVALID_PORT}/p2p/${counterparty.peerInfo.id.toB58String()}`),
+      Multiaddr(`/ip4/127.0.0.1/tcp/${INVALID_PORT}/p2p/${counterparty.peerId.toB58String()}`),
       TEST_PROTOCOL
     )
     let msgReceived = false
     const testMessage = randomBytes(33)
-    await pipe(
-      /* prettier-ignore */
-      [testMessage],
-      stream,
-      async (source: AsyncIterable<Uint8Array>) => {
-        for await (const msg of source) {
-          assert(u8aEquals(msg.slice(), testMessage), 'sent message and received message must be identical')
-          msgReceived = true
-          return
-        }
+    await pipe([testMessage], stream, async (source: AsyncIterable<Uint8Array>) => {
+      for await (const msg of source) {
+        assert(u8aEquals(msg.slice(), testMessage), 'sent message and received message must be identical')
+        msgReceived = true
+        return
       }
-    )
+    })
 
     await new Promise((resolve) => setTimeout(resolve, 250))
     stream.close()
@@ -361,12 +349,7 @@ describe('should create a socket and connect to it', function () {
     //   sender.hangUp(new PeerInfo(counterparty.peerInfo.id)),
     //   counterparty.hangUp(new PeerInfo(sender.peerInfo.id)),
     // ])
-    await Promise.all([
-      /* prettier-ignore */
-      sender.stop(),
-      counterparty.stop(),
-      relay.stop()
-    ])
+    await Promise.all([sender.stop(), counterparty.stop(), relay.stop()])
   })
 
   // it('should set up a relayed connection and fail while upgrading to WebRTC', async function () {
@@ -390,7 +373,6 @@ describe('should create a socket and connect to it', function () {
 
   //   const testMessage = randomBytes(123)
   //   await pipe(
-  //     /* prettier-ignore */
   //     [testMessage],
   //     conn.stream,
   //     async (source: AsyncIterable<Uint8Array>) => {
@@ -405,7 +387,6 @@ describe('should create a socket and connect to it', function () {
   //   assert(msgReceived, `message must be received`)
 
   //   await Promise.all([
-  //     /* prettier-ignore */
   //     sender.stop(),
   //     counterparty.stop(),
   //     relay.stop(),
@@ -438,7 +419,6 @@ describe('should create a socket and connect to it', function () {
 
   //     const testMessage = randomBytes(123)
   //     await pipe(
-  //       /* prettier-ignore */
   //       [testMessage],
   //       conn.stream,
   //       async (source: AsyncIterable<Uint8Array>) => {
@@ -453,7 +433,6 @@ describe('should create a socket and connect to it', function () {
   //     assert(msgReceived, `message must be received`)
 
   //     await Promise.all([
-  //       /* prettier-ignore */
   //       sender.stop(),
   //       counterparty.stop(),
   //       relay.stop(),
@@ -501,7 +480,6 @@ describe('should create a socket and connect to it', function () {
 
   //   const testMessage = randomBytes(123)
   //   await pipe(
-  //     /* prettier-ignore */
   //     [testMessage],
   //     conn.stream,
   //     async (source: AsyncIterable<Uint8Array>) => {
@@ -543,7 +521,6 @@ describe('should create a socket and connect to it', function () {
   //   let relayStopped = false
 
   //   await pipe(
-  //     /* prettier-ignore */
   //     (async function * () {
   //       yield firstMessage
   //       await new Promise<void>(resolve => setTimeout(resolve, 500)),
@@ -586,7 +563,6 @@ describe('should create a socket and connect to it', function () {
   //   ])
 
   //   await Promise.all([
-  //     /* prettier-ignore */
   //     sender.stop(),
   //     counterparty.stop(),
   //   ])
@@ -610,7 +586,6 @@ describe('should create a socket and connect to it', function () {
   //   const testMessage = randomBytes(33)
 
   //   await pipe(
-  //     /* prettier-ignore */
   //     [testMessage],
   //     conn.stream,
   //     async (source: AsyncIterable<Uint8Array>) => {
@@ -625,7 +600,6 @@ describe('should create a socket and connect to it', function () {
   //   assert(msgReceived, `msg must be received`)
 
   //   await Promise.all([
-  //     /* prettier-ignore */
   //     sender.stop(),
   //     counterparty.stop(),
   //     relay.stop(),
@@ -656,7 +630,6 @@ describe('should create a socket and connect to it', function () {
   //   const testMessage = randomBytes(33)
 
   //   await pipe(
-  //     /* prettier-ignore */
   //     [testMessage],
   //     stream,
   //     async (source: AsyncIterable<Uint8Array>) => {
@@ -673,7 +646,6 @@ describe('should create a socket and connect to it', function () {
   //   // assert(Date.now() - now >= WEBRTC_TIMEOUT, `Connection should not be established before WebRTC timeout.`)
 
   //   await Promise.all([
-  //     /* prettier-ignore */
   //     sender.stop(),
   //     counterparty.stop(),
   //     relay.stop(),
@@ -700,7 +672,6 @@ describe('should create a socket and connect to it', function () {
   //   const testMessage = randomBytes(33)
 
   //   await pipe(
-  //     /* prettier-ignore */
   //     [testMessage],
   //     conn.stream,
   //     async (source: AsyncIterable<Uint8Array>) => {
@@ -717,7 +688,6 @@ describe('should create a socket and connect to it', function () {
   //   // assert(Date.now() - now >= WEBRTC_TIMEOUT, `Connection should not be established before WebRTC timeout.`)
 
   //   await Promise.all([
-  //     /* prettier-ignore */
   //     sender.stop(),
   //     counterparty.stop(),
   //     relay.stop(),
@@ -761,8 +731,8 @@ describe('should create a socket and connect to it', function () {
     const relay = await generateNode({ id: 2, ipv4: true })
 
     const [sender, counterparty] = await Promise.all([
-      generateNode({ id: 0, ipv4: true, useWebRTC: false }, relay.peerInfo),
-      generateNode({ id: 1, ipv4: true, useWebRTC: false }, relay.peerInfo)
+      generateNode({ id: 0, ipv4: true, useWebRTC: false }, relay.multiaddrs[0]),
+      generateNode({ id: 1, ipv4: true, useWebRTC: false }, relay.multiaddrs[0])
     ])
 
     connectionHelper([sender, relay])
@@ -771,28 +741,23 @@ describe('should create a socket and connect to it', function () {
     const INVALID_PORT = 8758
     // @ts-ignore
     const { stream }: { stream: Connection } = await sender.dialProtocol(
-      Multiaddr(`/ip4/127.0.0.1/tcp/${INVALID_PORT}/p2p/${counterparty.peerInfo.id.toB58String()}`),
+      Multiaddr(`/ip4/127.0.0.1/tcp/${INVALID_PORT}/p2p/${counterparty.peerId.toB58String()}`),
       TEST_PROTOCOL
     )
 
     const testMessage = new TextEncoder().encode('12356')
 
     let msgReceived = false
-    await pipe(
-      /* prettier-ignore */
-      [testMessage],
-      stream,
-      async (source: AsyncIterable<Uint8Array>) => {
-        for await (const msg of source) {
-          console.log(`receiving relayed connection. message`, new TextDecoder().decode(msg.slice()))
-          if (u8aEquals(msg.slice(), testMessage)) {
-            msgReceived = true
+    await pipe([testMessage], stream, async (source: AsyncIterable<Uint8Array>) => {
+      for await (const msg of source) {
+        console.log(`receiving relayed connection. message`, new TextDecoder().decode(msg.slice()))
+        if (u8aEquals(msg.slice(), testMessage)) {
+          msgReceived = true
 
-            return
-          }
+          return
         }
       }
-    )
+    })
 
     stream.close()
 
@@ -825,12 +790,7 @@ describe('should create a socket and connect to it', function () {
     //   counterparty.hangUp(new PeerInfo(sender.peerInfo.id)),
     // ])
 
-    await Promise.all([
-      /* prettier-ignore */
-      sender.stop(),
-      counterparty.stop(),
-      relay.stop()
-    ])
+    await Promise.all([sender.stop(), counterparty.stop(), relay.stop()])
   })
 
   // it('should set up a relayed connection, exchange messages, then reconnect with a different address and exchange messages', async function () {
@@ -855,7 +815,6 @@ describe('should create a socket and connect to it', function () {
 
   //   let msgReceived = false
   //   await pipe(
-  //     /* prettier-ignore */
   //     [testMessage],
   //     stream,
   //     async (source: AsyncIterable<Uint8Array>) => {
@@ -887,7 +846,6 @@ describe('should create a socket and connect to it', function () {
 
   //   let secondMessageReceived = false
   //   await pipe(
-  //     /* prettier-ignore */
   //     [secondMessage],
   //     secondStream,
   //     async (source: AsyncIterable<Uint8Array>) => {
@@ -904,23 +862,9 @@ describe('should create a socket and connect to it', function () {
   //   assert(secondMessageReceived, `counterparty should receive message after reconnecting to relay node`)
 
   //   await Promise.all([
-  //     /* prettier-ignore */
   //     sender.stop(),
   //     counterparty.stop(),
   //     relay.stop(),
   //   ])
   // })
 })
-
-/**
- * Informs each node about the others existence.
- * @param nodes Hopr nodes
- */
-function connectionHelper(nodes: libp2p[]) {
-  for (let i = 0; i < nodes.length; i++) {
-    for (let j = i + 1; j < nodes.length; j++) {
-      nodes[i].peerStore.put(nodes[j].peerInfo)
-      nodes[j].peerStore.put(nodes[i].peerInfo)
-    }
-  }
-}

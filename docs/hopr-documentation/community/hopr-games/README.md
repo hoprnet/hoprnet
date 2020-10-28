@@ -4,13 +4,13 @@ description: >-
   of the HOPR Protocol, sponsored by the HOPR Association.
 ---
 
-# HOPR Games
+# HOPR Games \(On Hiatus\)
 
 In order to showcase the usage of the HOPR Protocol, the HOPR Association has created the **HOPR Games**, an interactive online games, bounties and experiments challenges meant to be accomplished using the HOPR Protocol.
 
-![](../../.gitbook/assets/hopr_tweet.gif)
+![](../../.gitbook/assets/hopr_tweet%20%282%29%20%281%29%20%281%29%20%281%29.gif)
 
-### Goals
+## Goals
 
 The HOPR Games are meant to help grow and develop HOPR as a project by interacting with our community and learning about their experience with the product. The following are the goals the HOPR Association has in mind when organising HOPR Games sessions:
 
@@ -20,7 +20,7 @@ The HOPR Games are meant to help grow and develop HOPR as a project by interacti
 - **Enhance the project \(δ\).** We want to expand the functionality of the protocol, its applications and use cases around it. By listening to our users, we can find organic features which solve problems for both experienced and novice users.
 - **Test protocol \(ε\).** We want to push the limits of our technology beyond our shared understanding of what it can and cannot do. To ensure HOPR can withstand a production load, we need to challenge it at every step.
 
-### Activities
+## Activities
 
 Activities are actions or events community members can participate in during HOPR Games to earn rewards from the HOPR Association. In exchange for completing an activity, a community member will be rewarded with native digital tokens \(e.g. xDAI\).
 
@@ -30,14 +30,14 @@ We'll soon release the capability to issue non-transferable \$HOPR tokens as rew
 
 Activities are split into three categories: **bounties**, **games**, and **experiments**. Activities in each category help the HOPR Association to target specific individuals and achieve different goals:
 
-#### Bounties
+### Bounties
 
 Bounties are **short-lived**, **asynchronous**, **specific** and have expected results. Bounties are **bi-weekly**, and use **eurogame**-like dynamics to be completed \(i.e., no direct competition, although there may be indirect competition in the form of time pressure or a limited prize fund\).
 
-#### Games
+### Games
 
 Games are **short-lived**, **synchronous**, **open-ended** and can have unexpected results \(e.g. no winners might be an outcome of a game\). Games are **bi-weekly**, and use **amerigame**-like dynamics to be completed \(i.e., direct competition against other users\).
 
-#### Experiments
+### Experiments
 
 Experiments are **long-lived**, **asynchronous**, **open-ended** and can have **unexpected** results. Experiments are **monthly** or **quarterly**, have little notice, and are meant to test our project.

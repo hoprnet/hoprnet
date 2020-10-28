@@ -15,7 +15,7 @@ import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '../../'
 import { Acknowledgement } from '../../messages/acknowledgement'
 
-import type { Handler } from '../../@types/transport'
+import type { Handler } from 'libp2p'
 
 import EventEmitter from 'events'
 
@@ -30,20 +30,16 @@ const ACKNOWLEDGEMENT_TIMEOUT = durations.seconds(2)
 
 class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
   extends EventEmitter
-  implements AbstractInteraction<Chain> {
+  implements AbstractInteraction {
   protocols: string[] = [PROTOCOL_ACKNOWLEDGEMENT]
 
   constructor(public node: Hopr<Chain>) {
     super()
-    this.node.handle(this.protocols, this.handler.bind(this))
+    this.node._libp2p.handle(this.protocols, this.handler.bind(this))
   }
 
   handler(struct: Handler) {
-    pipe(
-      /* prettier-ignore */
-      struct.stream,
-      this.handleHelper.bind(this)
-    )
+    pipe(struct.stream, this.handleHelper.bind(this))
   }
 
   async interact(counterparty: PeerId, acknowledgement: Acknowledgement<Chain>): Promise<void> {
@@ -60,10 +56,9 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
       }, ACKNOWLEDGEMENT_TIMEOUT)
 
       try {
-        struct = await this.node.dialProtocol(counterparty, this.protocols[0]).catch(async (err: Error) => {
-          const result = await this.node.peerRouting.findPeer(counterparty)
-
-          return await this.node.dialProtocol(result, this.protocols[0])
+        struct = await this.node._libp2p.dialProtocol(counterparty, this.protocols[0]).catch(async () => {
+          const { id } = await this.node._libp2p.peerRouting.findPeer(counterparty)
+          return await this.node._libp2p.dialProtocol(id, this.protocols[0])
         })
       } catch (err) {
         clearTimeout(timeout)
@@ -75,11 +70,7 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
 
       clearTimeout(timeout)
 
-      pipe(
-        /* prettier-ignore */
-        [acknowledgement],
-        struct.stream
-      )
+      pipe([acknowledgement], struct.stream)
 
       if (!aborted) {
         resolve()
@@ -95,7 +86,7 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
         offset: arr.byteOffset
       })
 
-      const unAcknowledgedDbKey = this.node.dbKeys.UnAcknowledgedTickets(await acknowledgement.hashedKey)
+      const unAcknowledgedDbKey = this.node._dbKeys.UnAcknowledgedTickets(await acknowledgement.hashedKey)
 
       let tmp: Uint8Array
       try {
@@ -125,7 +116,7 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
         let ticketCounter: Uint8Array
         try {
           ticketCounter = toU8a(
-            u8aToNumber(await this.node.db.get(Buffer.from(this.node.dbKeys.AcknowledgedTicketCounter()))) + 1,
+            u8aToNumber(await this.node.db.get(Buffer.from(this.node._dbKeys.AcknowledgedTicketCounter()))) + 1,
             ACKNOWLEDGED_TICKET_INDEX_LENGTH
           )
         } catch (err) {
@@ -150,16 +141,16 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
           await this.node.db.del(Buffer.from(unAcknowledgedDbKey))
         }
 
-        const acknowledgedDbKey = this.node.dbKeys.AcknowledgedTickets(ticketCounter)
+        const acknowledgedDbKey = this.node._dbKeys.AcknowledgedTickets(ticketCounter)
 
-        log(`storing ticket`, ticketCounter, `we are`, this.node.peerInfo.id.toB58String())
+        log(`storing ticket`, ticketCounter, `we are`, this.node.getId().toB58String())
 
         try {
           await this.node.db
             .batch()
             .del(Buffer.from(unAcknowledgedDbKey))
             .put(Buffer.from(acknowledgedDbKey), Buffer.from(acknowledgedTicket))
-            .put(Buffer.from(this.node.dbKeys.AcknowledgedTicketCounter()), Buffer.from(ticketCounter))
+            .put(Buffer.from(this.node._dbKeys.AcknowledgedTicketCounter()), Buffer.from(ticketCounter))
             .write()
         } catch (err) {
           error(`Error while writing to database. Error was ${chalk.red(err.message)}.`)

@@ -1,33 +1,32 @@
-import { SendMessageBase } from './sendMessage'
-import { AbstractCommand, GlobalState } from './abstractCommand'
-import type { AutoCompleteResult, CommandResponse } from './abstractCommand'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
-import readline from 'readline'
-import chalk from 'chalk'
-import type PeerId from 'peer-id'
-import { getPeersIdsAsString } from '../utils'
 import { clearString } from '@hoprnet/hopr-utils'
+import { SendMessageBase } from './sendMessage'
+import readline from 'readline'
+import type PeerId from 'peer-id'
+import { getPeersIdsAsString, checkPeerIdInput, styleValue } from '../utils'
+import { GlobalState, AutoCompleteResult, CommandResponse } from './abstractCommand'
 
 export class MultiSendMessage extends SendMessageBase {
   constructor(public node: Hopr<HoprCoreConnector>, public rl: readline.Interface) {
     super(node)
   }
 
-  name() {
+  public name() {
     return 'multisend'
   }
-  help() {
-    return 'sends multiple messages to another party, "quit" exits.'
+
+  public help() {
+    return 'Sends multiple messages to another party, "quit" exits'
   }
 
-  private async checkArgs(query: string, settings: GlobalState): Promise<PeerId> {
+  private async checkArgs(query: string, state: GlobalState): Promise<PeerId> {
     const [err, id] = this._assertUsage(query, ['PeerId'])
     if (err) throw new Error(err)
-    return await this._checkPeerId(id, settings)
+    return await checkPeerIdInput(id, state)
   }
 
-  private async repl(recipient: PeerId, settings: GlobalState): Promise<void> {
+  private async repl(recipient: PeerId, state: GlobalState): Promise<void> {
     readline.clearLine(process.stdout, 0)
     const message = await new Promise<string>((resolve) => this.rl.question('send >', resolve))
     if (message === 'quit') {
@@ -37,25 +36,25 @@ export class MultiSendMessage extends SendMessageBase {
         clearString(message, this.rl)
         this.rl.pause()
         console.log(`[sending message "${message}"]`)
-        await this._sendMessage(settings, recipient, message)
+        await this.sendMessage(state, recipient, message)
         this.rl.resume()
       }
-      await this.repl(recipient, settings)
+      await this.repl(recipient, state)
     }
   }
 
-  async execute(query: string, settings: GlobalState): Promise<CommandResponse> {
+  public async execute(query: string, state: GlobalState): Promise<CommandResponse> {
     let peerId: PeerId
 
     try {
-      peerId = await this.checkArgs(query, settings)
+      peerId = await this.checkArgs(query, state)
     } catch (err) {
-      return chalk.red(err.message)
+      return styleValue(err.message, 'failure')
     }
-    await this.repl(peerId, settings)
+    await this.repl(peerId, state)
   }
 
-  async autocomplete(query: string, line: string, state: GlobalState): Promise<AutoCompleteResult> {
+  public async autocomplete(query: string, line: string, state: GlobalState): Promise<AutoCompleteResult> {
     const allIds = getPeersIdsAsString(this.node, {
       noBootstrapNodes: true
     }).concat(Array.from(state.aliases.keys()))

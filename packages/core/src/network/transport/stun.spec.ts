@@ -5,8 +5,6 @@ import Multiaddr from 'multiaddr'
 import assert from 'assert'
 import { once } from 'events'
 
-const TIMEOUT = 1000
-
 describe('test STUN', function () {
   let client
   let servers

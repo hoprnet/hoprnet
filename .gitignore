@@ -1,10 +1,9 @@
 node_modules
+.DS_Store
 
 db
 
 *.swp
 .vercel
 
-alice
-bob
-charlie
+.DS_Store

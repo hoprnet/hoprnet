@@ -1,25 +1,19 @@
 import dotenv from 'dotenv'
 // @ts-ignore
 const dotenvExpand = require('dotenv-expand')
-
 const env = dotenv.config()
 dotenvExpand(env)
 
-import chalk from 'chalk'
-
-import readline from 'readline'
-
-import PeerInfo from 'peer-info'
-
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-
-import Hopr from '@hoprnet/hopr-core'
 import type { HoprOptions } from '@hoprnet/hopr-core'
-
-import clear from 'clear'
-
-import { parseOptions } from './utils'
+import Hopr from '@hoprnet/hopr-core'
 import { clearString } from '@hoprnet/hopr-utils'
+import chalk from 'chalk'
+import readline from 'readline'
+import Multiaddr from 'multiaddr'
+import PeerId from 'peer-id'
+import clear from 'clear'
+import { parseOptions, yesOrNoQuestion } from './utils'
 import { Commands } from './commands'
 import { renderHoprLogo } from './logo'
 import pkg from './package.json'
@@ -47,15 +41,15 @@ async function runAsRegularNode() {
   commands = new Commands(node, rl)
 
   rl.on('SIGINT', async () => {
-    const question = `Are you sure you want to exit? (${chalk.green('y')}, ${chalk.red('N')}): `
+    const question = 'Are you sure you want to exit?'
+    const shouldTerminate = await yesOrNoQuestion(rl, question)
 
-    const answer = await new Promise<string>((resolve) => rl.question(question, resolve))
-
-    if (answer.match(/^y(es)?$/i)) {
+    if (shouldTerminate) {
       clearString(question, rl)
       await commands.execute('quit')
       return
     }
+
     rl.prompt()
   })
 
@@ -85,12 +79,12 @@ async function runAsRegularNode() {
 function runAsBootstrapNode() {
   console.log(`... running as bootstrap node!.`)
 
-  node.on('peer:connect', (peer: PeerInfo) => {
-    console.log(`Incoming connection from ${chalk.blue(peer.id.toB58String())}.`)
+  node.on('hopr:peer:connection', (peer: PeerId) => {
+    console.log(`Incoming connection from ${chalk.blue(peer.toB58String())}.`)
   })
 
   process.once('exit', async () => {
-    await node.down()
+    await node.stop()
     return
   })
 }
@@ -113,7 +107,7 @@ async function main() {
   console.log(`Utils Version: ${chalk.bold(pkg.dependencies['@hoprnet/hopr-utils'])}`)
   console.log(`Connector Version: ${chalk.bold(pkg.dependencies['@hoprnet/hopr-core-connector-interface'])}\n`)
   console.log(
-    `Bootstrap Servers: ${chalk.bold((options.bootstrapServers || []).map((x: PeerInfo) => x.id.toB58String()))}\n`
+    `Bootstrap Servers: ${chalk.bold((options.bootstrapServers || []).map((x: Multiaddr) => x.getPeerId()))}\n`
   )
 
   try {
@@ -124,9 +118,7 @@ async function main() {
   }
 
   console.log('Successfully started HOPR Chat.\n')
-  console.log(
-    `Your HOPR Chat node is available at the following addresses:\n ${node.peerInfo.multiaddrs.toArray().join('\n ')}\n`
-  )
+  console.log(`Your HOPR Chat node is available at the following addresses:\n ${node.getAddresses().join('\n ')}\n`)
   console.log('Use the “help” command to see which commands are available.\n')
 
   if (options.bootstrapNode) {

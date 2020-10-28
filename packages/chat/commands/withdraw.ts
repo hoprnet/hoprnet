@@ -1,27 +1,15 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { Currencies } from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
-import chalk from 'chalk'
 import { moveDecimalPoint } from '@hoprnet/hopr-utils'
 import { AbstractCommand, AutoCompleteResult } from './abstractCommand'
-
-const _arguments = ['recipient (blockchain address)', 'currency (native, hopr)', 'amount (ETH, HOPR)']
+import { styleValue } from '../utils'
 
 export default class Withdraw extends AbstractCommand {
+  private arguments = ['amount (ETH, HOPR)', 'currency (native, hopr)', 'recipient (blockchain address)']
+
   constructor(public node: Hopr<HoprCoreConnector>) {
     super()
-  }
-
-  name(): string {
-    return 'withdraw'
-  }
-
-  help(): string {
-    return 'withdraw native or hopr to a specified recipient'
-  }
-
-  async autocomplete(query?: string): Promise<AutoCompleteResult> {
-    return [_arguments, query ?? '']
   }
 
   /**
@@ -36,12 +24,7 @@ export default class Withdraw extends AbstractCommand {
     recipient: string
   }> {
     const { NativeBalance, Balance } = this.node.paymentChannels.types
-
-    const [err, amount, currencyRaw, recipient] = this._assertUsage(query, [
-      'amount (ETH, HOPR)',
-      'currency (native, hopr)',
-      'recipient (blockchain address)'
-    ])
+    const [err, amount, currencyRaw, recipient] = this._assertUsage(query, this.arguments)
 
     if (err) {
       throw new Error(err)
@@ -70,11 +53,23 @@ export default class Withdraw extends AbstractCommand {
     }
   }
 
+  public name(): string {
+    return 'withdraw'
+  }
+
+  public help(): string {
+    return 'Withdraw native or hopr to a specified recipient'
+  }
+
+  public async autocomplete(query?: string): Promise<AutoCompleteResult> {
+    return [this.arguments, query ?? '']
+  }
+
   /**
    * Withdraws native or hopr balance.
    * @notice triggered by the CLI
    */
-  async execute(query?: string): Promise<string> {
+  public async execute(query?: string): Promise<string> {
     try {
       const { amount, weiAmount, currency, recipient } = await this.checkArgs(query ?? '')
       const { paymentChannels } = this.node
@@ -82,11 +77,12 @@ export default class Withdraw extends AbstractCommand {
       const symbol = currency === 'NATIVE' ? NativeBalance.SYMBOL : Balance.SYMBOL
 
       const receipt = await paymentChannels.withdraw(currency, recipient, weiAmount)
-      return `Withdrawing ${chalk.blue(amount)} ${symbol} to ${chalk.green(recipient)}, receipt ${chalk.yellow(
-        receipt
-      )}.`
+      return `Withdrawing ${styleValue(amount, 'number')} ${symbol} to ${styleValue(
+        recipient,
+        'peerId'
+      )}, receipt ${styleValue(receipt, 'hash')}.`
     } catch (err) {
-      return chalk.red(err.message)
+      return styleValue(err.message, 'failure')
     }
   }
 }

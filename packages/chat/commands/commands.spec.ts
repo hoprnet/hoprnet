@@ -24,42 +24,12 @@ describe('Commands', () => {
   it('ping', async () => {
     let mockNode: any = jest.fn()
     mockNode.bootstrapServers = []
-    mockNode.ping = jest.fn()
+    mockNode.ping = jest.fn(() => ({ info: '', latency: 10 }))
     let mockPeerId = '16Uiu2HAkyXRaL7fKu4qcjaKuo4WXizrpK63Ltd6kG2tH6oSV58AW'
 
     let cmds = new mod.Commands(mockNode)
     expect(await cmds.execute(`ping  ${mockPeerId}`)).toMatch(/pong/i)
     expect(mockNode.ping).toHaveBeenCalled()
-  })
-
-  it('commands can save state', async () => {
-    let mockNode: any = jest.fn()
-    let cmds = new mod.Commands(mockNode)
-
-    let ir = await cmds.execute('settings includeRecipient')
-    expect(ir).toMatch(/false/)
-    await cmds.execute('settings includeRecipient true')
-    ir = await cmds.execute('settings includeRecipient')
-    expect(ir).toMatch(/true/)
-    await cmds.execute('settings includeRecipient false')
-    ir = await cmds.execute('settings includeRecipient')
-    expect(ir).toMatch(/false/)
-  })
-
-  it('alias addresses', async () => {
-    let mockNode: any = jest.fn()
-    mockNode.sendMessage = jest.fn()
-    let cmds = new mod.Commands(mockNode)
-
-    let aliases = await cmds.execute('alias')
-    expect(aliases).toEqual('')
-
-    await cmds.execute('alias 16Uiu2HAmQDFS8a4Bj5PGaTqQLME5SZTRNikz9nUPT3G4T6YL9o7V test')
-
-    aliases = await cmds.execute('alias')
-    expect(aliases).toMatch(/test/)
-    await cmds.execute('send test Hello, world')
-    expect(mockNode.sendMessage).toHaveBeenCalled()
   })
 
   it('version', async () => {
@@ -70,13 +40,11 @@ describe('Commands', () => {
 
   it('crawl', async () => {
     let mockNode: any = jest.fn()
-    mockNode.network = jest.fn()
-    mockNode.network.crawler = jest.fn()
-    mockNode.network.crawler.crawl = jest.fn()
+    mockNode.getConnectedPeers = () => []
+    mockNode.crawl = jest.fn(() => ({ contacted: [] }))
 
     let cmds = new mod.Commands(mockNode)
-    expect(await cmds.execute('crawl')).toBeFalsy()
-    expect(mockNode.network.crawler.crawl).toHaveBeenCalled()
+    expect(await cmds.execute('crawl')).toContain('Crawled network, contacted')
   })
 
   it('help', async () => {
@@ -100,12 +68,10 @@ describe('Commands', () => {
     mockNode.paymentChannels.utils = jest.fn()
     mockNode.paymentChannels.utils.pubKeyToAccountId = jest.fn(() => '')
     mockNode.paymentChannels.constants.CHAIN_NAME = '2CHAINZ'
-    mockNode.peerInfo = jest.fn()
-    mockNode.peerInfo.id = jest.fn()
-    mockNode.peerInfo.id.toB58String = jest.fn()
-    mockNode.peerInfo.id.pubKey = jest.fn()
-    mockNode.peerInfo.id.pubKey.marshal = jest.fn()
-
+    mockNode.getId = jest.fn(() => ({
+      toB58String: jest.fn(),
+      pubKey: { marshal: jest.fn() }
+    }))
     let cmds = new mod.Commands(mockNode)
     expect(await cmds.execute('myAddress')).toMatch(/HOPR/)
   })
@@ -123,15 +89,13 @@ describe('Commands', () => {
     let mockNode: any = jest.fn()
     mockNode.sendMessage = jest.fn()
     mockNode.bootstrapServers = []
-    mockNode.network = jest.fn()
-    mockNode.network.peerStore = jest.fn()
-    mockNode.network.peerStore.peers = [{ id: '16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7' }]
+    mockNode.getConnectedPeers = () => [{ toB58String: () => '16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7' }]
 
     let cmds = new mod.Commands(mockNode)
     expect((await cmds.autocomplete('send 16Ui'))[0][0]).toMatch(/send 16U/)
     expect((await cmds.autocomplete('send foo'))[0][0]).toBe('')
 
-    await cmds.execute('alias 16Uiu2HAmQDFS8a4Bj5PGaTqQLME5SZTRNikz9nUPT3G4T6YL9o7V test')
+    await cmds.execute('alias 16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7 test')
 
     expect((await cmds.autocomplete('send t'))[0][0]).toBe('send test')
   })
@@ -172,9 +136,62 @@ describe('Commands', () => {
     mockNode.paymentChannels.withdraw = jest.fn()
 
     let cmds = new mod.Commands(mockNode)
-    expect((await cmds.autocomplete('withdraw'))[0][0]).toMatch(/recipient \(blockchain address\)/)
+    expect((await cmds.autocomplete('withdraw'))[0][0]).toMatch(/amount \(ETH, HOPR\)/)
 
     await cmds.execute('withdraw 0x123 native 1')
     expect(mockNode.paymentChannels.withdraw).toHaveBeenCalled()
+  })
+
+  it('settings', async () => {
+    let mockNode: any = jest.fn()
+    let cmds = new mod.Commands(mockNode)
+
+    let ir = await cmds.execute('settings')
+    expect(ir).toContain('includeRecipient')
+    expect(ir).toContain('routing')
+  })
+
+  it('settings includeRecipient', async () => {
+    let mockNode: any = jest.fn()
+    let cmds = new mod.Commands(mockNode)
+
+    let ir = await cmds.execute('settings includeRecipient')
+    expect(ir).toMatch(/false/)
+    await cmds.execute('settings includeRecipient true')
+    ir = await cmds.execute('settings includeRecipient')
+    expect(ir).toMatch(/true/)
+    await cmds.execute('settings includeRecipient false')
+    ir = await cmds.execute('settings includeRecipient')
+    expect(ir).toMatch(/false/)
+  })
+
+  it('settings routing', async () => {
+    let mockNode: any = jest.fn()
+    let cmds = new mod.Commands(mockNode)
+
+    let ir = await cmds.execute('settings routing')
+    expect(ir).toMatch(/direct/)
+    await cmds.execute('settings routing manual')
+    ir = await cmds.execute('settings routing')
+    expect(ir).toMatch(/manual/)
+    await cmds.execute('settings routing direct')
+    ir = await cmds.execute('settings routing')
+    expect(ir).toMatch(/direct/)
+  })
+
+  it('alias addresses', async () => {
+    let mockNode: any = jest.fn()
+    mockNode.sendMessage = jest.fn()
+    let cmds = new mod.Commands(mockNode)
+
+    let aliases = await cmds.execute('alias')
+    expect(aliases).toContain('No aliases found.')
+
+    await cmds.execute('alias 16Uiu2HAmQDFS8a4Bj5PGaTqQLME5SZTRNikz9nUPT3G4T6YL9o7V test')
+
+    aliases = await cmds.execute('alias')
+    expect(aliases).toMatch(/test/)
+    await cmds.execute('send test Hello, world')
+    expect(mockNode.sendMessage).toHaveBeenCalled()
   })
 })

@@ -5,7 +5,7 @@ import Debug from 'debug'
 const log = Debug(`hopr-core:transport`)
 const error = Debug(`hopr-core:transport:error`)
 
-import { RELAY_PAYLOAD_PREFIX, RELAY_STATUS_PREFIX, STOP } from './constants'
+import { RELAY_STATUS_PREFIX, STOP } from './constants'
 
 class RelayContext {
   private _defer: DeferredPromise<AsyncGenerator<Uint8Array>>
@@ -43,7 +43,7 @@ class RelayContext {
         ])
 
         if (itDone || streamReceived) {
-          console.log(`waiting for resolve streamReceived ${streamReceived} itDone ${itDone}`)
+          log(`waiting for resolve streamReceived ${streamReceived} itDone ${itDone}`)
           this._source = await this._defer.promise
 
           this._defer = Defer()
@@ -51,7 +51,7 @@ class RelayContext {
           streamReceived = false
 
           this._defer.promise.then(() => {
-            console.log(`stream resolved`)
+            log(`stream resolved`)
             streamReceived = true
           })
 

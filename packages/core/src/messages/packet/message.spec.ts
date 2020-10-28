@@ -14,13 +14,12 @@ describe('test messages', function () {
 
     assert(
       u8aEquals(
-        /* prettier-ignore */
         u8aConcat(
-        new Uint8Array([0, 0, 0, 4]),
-        PADDING,
-        testMessage,
-        new Uint8Array(PACKET_SIZE - PADDING.length - LENGTH_PREFIX_LENGTH - testMessage.length)
-      ),
+          new Uint8Array([0, 0, 0, 4]),
+          PADDING,
+          testMessage,
+          new Uint8Array(PACKET_SIZE - PADDING.length - LENGTH_PREFIX_LENGTH - testMessage.length)
+        ),
         msg
       )
     )

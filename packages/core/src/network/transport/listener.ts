@@ -8,9 +8,10 @@ const log = debug('hopr-core:transport:listener')
 const error = debug('hopr-core:transport:listener:error')
 const verbose = debug('hopr-core:verbose:listener:error')
 
+import type { Connection } from 'libp2p'
 import { socketToConn } from './socket-to-conn'
 import { CODE_P2P } from './constants'
-import { MultiaddrConnection, Connection, Upgrader, Libp2pServer } from '../../@types/transport'
+import { MultiaddrConnection, Upgrader } from 'libp2p'
 import Multiaddr from 'multiaddr'
 
 import { handleStunRequest, getExternalIp } from './stun'
@@ -66,7 +67,7 @@ class Listener extends EventEmitter {
     this.__connections = []
     this.upgrader = upgrader
 
-    this.tcpSocket = net.createServer(this.onTCPConnection.bind(this)) as Libp2pServer
+    this.tcpSocket = net.createServer(this.onTCPConnection.bind(this))
 
     this.udpSocket = dgram.createSocket({
       // @TODO
@@ -131,7 +132,7 @@ class Listener extends EventEmitter {
           resolve()
         })
       ),
-      new Promise((resolve, reject) =>
+      new Promise((resolve) =>
         this.udpSocket.bind(options.port, async () => {
           try {
             this.externalAddress = await getExternalIp(this.stunServers, this.udpSocket)
@@ -177,7 +178,7 @@ class Listener extends EventEmitter {
     const address = this.tcpSocket.address() as AddressInfo
 
     if (this.externalAddress != null && this.externalAddress.port == null) {
-      console.log(`Attention: Bidirectional NAT detected. Publishing no public IPv4 address to the DHT`)
+      log(`Attention: Bidirectional NAT detected. Publishing no public IPv4 address to the DHT`)
 
       addrs.push(Multiaddr(`/p2p/${this.peerId}`))
 

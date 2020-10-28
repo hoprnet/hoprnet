@@ -4,6 +4,10 @@ description: Learn the advanced setup information for using HOPR Chat on your sy
 
 # Advanced Setup
 
+{% hint style="danger" %}
+HOPR Säntis has ended. Thank you to everyone who participated. We'll be launching a new testnet soon, codenamed Basòdino. Check back soon for more updates.
+{% endhint %}
+
 This setup guide will show you how to use **HOPR** by installing **HOPR Chat** on your system using Docker or Node.js. In this step-by-step guide, we will download the necessary software, run **HOPR Chat,** and send a message to another user in the **HOPR network,** in the same way the developers of **HOPR Chat** do. For a faster quick start, use our Quickstart guide.
 
 {% page-ref page="quickstart.md" %}

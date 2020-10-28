@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "setup": "yarn util:install && yarn util:link && yarn util:build",
+    "build": "yarn util:build",
     "lint": "prettier --check .",
     "lint:fix": "prettier --write .",
     "test": "lerna run test --stream",
@@ -10,9 +11,10 @@
     "run:chat": "lerna exec --scope @hoprnet/hopr-chat -- yarn start:basodino",
     "run:hoprd": "lerna exec --scope @hoprnet/hoprd -- yarn start --host 0.0.0.0:9092",
     "run:chatbot": "lerna exec --scope @hoprnet/chat-bot -- yarn start:basodino",
-    "util:clean": "lerna clean --yes",
-    "util:regenerate": "lerna exec --concurrency 1 --stream -- yarn",
-    "util:install": "lerna exec --concurrency 1 --stream -- yarn --pure-lockfile",
+    "util:clean": "lerna exec --stream -- rimraf node_modules/@hoprnet",
+    "util:reset": "lerna clean --yes",
+    "util:regenerate": "yarn util:clean && lerna exec --concurrency 1 --stream -- yarn --check-files --no-audit",
+    "util:install": "yarn util:clean && lerna exec --concurrency 1 --stream -- yarn --frozen-lockfile --check-files --no-audit",
     "util:build": "lerna exec --stream -- yarn build",
     "util:link": "lerna link"
   },
@@ -21,7 +23,8 @@
   },
   "devDependencies": {
     "husky": "^4.2.5",
-    "prettier": "^2.0.5"
+    "prettier": "^2.0.5",
+    "rimraf": "^3.0.2"
   },
   "prettier": {
     "tabWidth": 2,

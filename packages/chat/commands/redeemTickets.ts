@@ -1,28 +1,27 @@
-import chalk from 'chalk'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import { moveDecimalPoint } from '@hoprnet/hopr-utils'
+import { countSignedTickets, styleValue, toSignedTickets } from '../utils'
 import { AbstractCommand } from './abstractCommand'
-import { countSignedTickets, getSignedTickets } from '../utils'
 
 export default class RedeemTickets extends AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {
     super()
   }
 
-  name() {
+  public name() {
     return 'redeemTickets'
   }
 
-  help() {
-    return 'redeem tickets'
+  public help() {
+    return 'Redeems your tickets'
   }
 
   /**
    * @param query a ticket challange
    */
-  async execute(): Promise<string | void> {
+  public async execute(): Promise<string | void> {
     const { paymentChannels } = this.node
     const { Balance } = paymentChannels.types
 
@@ -36,24 +35,32 @@ export default class RedeemTickets extends AbstractCommand {
         return 'No unredeemed tickets found.'
       }
 
+      console.log(`Redeeming ${styleValue(results.length)} tickets..`)
+
       const redeemedTickets: Types.AcknowledgedTicket[] = []
+      let count = 0
+
       for (const { ackTicket, index } of results) {
+        ++count
         const result = await this.node.submitAcknowledgedTicket(ackTicket, index)
 
         if (result.status === 'SUCCESS') {
+          console.log(`Redeemed ticket ${styleValue(count)}`)
           redeemedTickets.push(ackTicket)
+        } else {
+          console.log(`Failed to redeem ticket ${styleValue(count)}`)
         }
       }
 
-      const signedTickets = await getSignedTickets(redeemedTickets)
+      const signedTickets = await toSignedTickets(redeemedTickets)
       const result = countSignedTickets(signedTickets)
       const total = moveDecimalPoint(result.total, Balance.DECIMALS * -1)
 
-      return `Redeemed ${chalk.blue(redeemedTickets.length)} out of ${chalk.blue(
+      return `Redeemed ${styleValue(redeemedTickets.length)} out of ${styleValue(
         results.length
-      )} tickets with a sum of ${chalk.blue(total)} HOPR.`
+      )} tickets with a sum of ${styleValue(total, 'number')} HOPR.`
     } catch (err) {
-      return chalk.red(err.message)
+      return styleValue(err.message, 'failure')
     }
   }
 }

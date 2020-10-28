@@ -1,5 +1,4 @@
 import libp2p from 'libp2p'
-
 // @ts-ignore
 import MPLEX = require('libp2p-mplex')
 // @ts-ignore
@@ -9,90 +8,79 @@ import SECIO = require('libp2p-secio')
 // @ts-ignore
 import TCP from 'libp2p-tcp'
 
-import { Handler, MultiaddrConnection } from '../../@types/transport'
-
+import { Handler, MultiaddrConnection } from 'libp2p'
 import Multiaddr from 'multiaddr'
-import PeerInfo from 'peer-info'
 import pipe from 'it-pipe'
-
 import Relay from './relay'
 import { randomBytes } from 'crypto'
-
 import { privKeyToPeerId } from '../../utils'
-import defer from 'p-defer'
-import { WebRTCUpgrader } from './webrtc'
+import { getAddress } from '../../test-utils'
+import assert from 'assert'
 
 const TEST_PROTOCOL = `/test/0.0.1`
 
 const privKeys = [randomBytes(32), randomBytes(32), randomBytes(32)]
 
-describe('should create a socket and connect to it', function () {
-  async function generateNode(options: {
-    id: number
-    ipv4?: boolean
-    ipv6?: boolean
-    connHandler?: (conn: MultiaddrConnection) => void
-  }): Promise<libp2p> {
-    const peerInfo = new PeerInfo(await privKeyToPeerId(privKeys[options.id]))
+async function generateNode(options: {
+  id: number
+  ipv4?: boolean
+  ipv6?: boolean
+  connHandler?: (conn: MultiaddrConnection) => void
+}): Promise<{ node: libp2p; relay: Relay }> {
+  const peerId = await privKeyToPeerId(privKeys[options.id])
+  let addresses = []
 
-    if (options.ipv4) {
-      peerInfo.multiaddrs.add(
-        Multiaddr(`/ip4/127.0.0.1/tcp/${9490 + 2 * options.id}`).encapsulate(`/p2p/${peerInfo.id.toB58String()}`)
-      )
-    }
-
-    if (options.ipv6) {
-      peerInfo.multiaddrs.add(
-        Multiaddr(`/ip6/::1/tcp/${9490 + 2 * options.id + 1}`).encapsulate(`/p2p/${peerInfo.id.toB58String()}`)
-      )
-    }
-
-    const node = new libp2p({
-      peerInfo,
-      modules: {
-        transport: [TCP],
-        streamMuxer: [MPLEX],
-        connEncryption: [SECIO],
-        dht: KadDHT
-      },
-      config: {
-        dht: {
-          enabled: false
-        },
-        relay: {
-          enabled: false
-        },
-        peerDiscovery: {
-          autoDial: false
-        }
-      }
-    })
-
-    //@ts-ignore
-    node.relay = new Relay(node, options.connHandler)
-
-    node.handle(TEST_PROTOCOL, (handler: Handler) => {
-      pipe(
-        /* prettier-ignore */
-        handler.stream,
-        // echoing msg
-        handler.stream
-      )
-    })
-
-    await node.start()
-
-    return node
+  if (options.ipv4) {
+    addresses = [Multiaddr(`/ip4/127.0.0.1/tcp/${9490 + 2 * options.id}`).encapsulate(`/p2p/${peerId.toB58String()}`)]
   }
 
+  if (options.ipv6) {
+    addresses = [Multiaddr(`/ip6/::1/tcp/${9490 + 2 * options.id + 1}`).encapsulate(`/p2p/${peerId.toB58String()}`)]
+  }
+
+  const node = new libp2p({
+    peerId,
+    addresses: { listen: addresses },
+    modules: {
+      transport: [TCP],
+      streamMuxer: [MPLEX],
+      connEncryption: [SECIO],
+      dht: KadDHT
+    },
+    config: {
+      dht: {
+        enabled: false
+      },
+      relay: {
+        enabled: false
+      },
+      peerDiscovery: {
+        autoDial: false
+      }
+    }
+  })
+
+  let relay = new Relay(node, options.connHandler)
+
+  node.handle([TEST_PROTOCOL], (handler: Handler) => {
+    pipe(
+      handler.stream,
+      // echoing msg
+      handler.stream
+    )
+  })
+
+  await node.start()
+
+  return {
+    node,
+    relay
+  }
+}
+
+describe('should create a socket and connect to it', function () {
   it('should create a node and echo a single message', async function () {
-    let testMessagesEchoed = false
-    let testMessagesReplied = false
-    let thirdBatchEchoed = false
-
-    let waitingForSecondBatch = defer<void>()
-
-    let [sender, relay, counterparty] = await Promise.all([
+    let [sender, relayer, counterparty] = await Promise.all([
       generateNode({ id: 0, ipv4: true }),
       generateNode({ id: 1, ipv4: true }),
       generateNode({
@@ -100,7 +88,6 @@ describe('should create a socket and connect to it', function () {
         ipv4: true,
         connHandler: (conn: MultiaddrConnection) => {
           pipe(
-            /* prettier-ignore */
             conn,
             (source: AsyncIterable<Uint8Array>) => {
               return (async function* () {
@@ -117,20 +104,18 @@ describe('should create a socket and connect to it', function () {
     ])
 
     // Make sure that the nodes know each other
-    await Promise.all([sender.dial(relay.peerInfo), counterparty.dial(relay.peerInfo)])
-    //@ts-ignore
+    await Promise.all([sender.node.dial(getAddress(relayer.node)), counterparty.node.dial(getAddress(relayer.node))])
+
     let conn = await sender.relay.establishRelayedConnection(
-      Multiaddr(`/p2p/${counterparty.peerInfo.id.toB58String()}`),
-      [relay.peerInfo],
-      new WebRTCUpgrader({})
+      Multiaddr(`/p2p/${counterparty.node.peerId.toB58String()}`),
+      relayer.node.multiaddrs
     )
 
     await pipe(
-      /* prettier-ignore */
-      (async function * () {
+      (async function* () {
         yield new TextEncoder().encode(`first message`)
 
-        await new Promise(resolve => setTimeout(resolve, 100))
+        await new Promise((resolve) => setTimeout(resolve, 100))
 
         yield new TextEncoder().encode(`second message`)
       })(),
@@ -143,7 +128,7 @@ describe('should create a socket and connect to it', function () {
       }
     )
 
-    await counterparty.stop()
+    await counterparty.node.stop()
 
     await new Promise((resolve) => setTimeout(resolve, 200))
 
@@ -152,7 +137,6 @@ describe('should create a socket and connect to it', function () {
       ipv4: true,
       connHandler: (conn: MultiaddrConnection) => {
         pipe(
-          /* prettier-ignore */
           conn,
           (source: AsyncIterable<Uint8Array>) => {
             return (async function* () {
@@ -167,21 +151,16 @@ describe('should create a socket and connect to it', function () {
       }
     })
 
-    await counterparty.dial(relay.peerInfo)
-    //@ts-ignore
+    await counterparty.node.dial(getAddress(relayer.node))
     conn = await sender.relay.establishRelayedConnection(
-      Multiaddr(`/p2p/${counterparty.peerInfo.id.toB58String()}`),
-      [relay.peerInfo],
-      new WebRTCUpgrader({})
+      Multiaddr(`/p2p/${counterparty.node.peerId.toB58String()}`),
+      relayer.node.multiaddrs
     )
 
     await pipe(
-      /* prettier-ignore */
-      (async function * () {
+      (async function* () {
         yield new TextEncoder().encode(`first message`)
-
-        await new Promise(resolve => setTimeout(resolve, 100))
-
+        await new Promise((resolve) => setTimeout(resolve, 100))
         yield new TextEncoder().encode(`second message`)
       })(),
       conn,
@@ -193,6 +172,7 @@ describe('should create a socket and connect to it', function () {
       }
     )
 
+    await Promise.all([sender, relayer, counterparty].map((x) => x.node.stop()))
     await new Promise((resolve) => setTimeout(resolve, 200))
   })
 
@@ -209,7 +189,6 @@ describe('should create a socket and connect to it', function () {
     //     ipv4: true,
     //     connHandler: (handler: Handler & { counterparty: PeerId }) => {
     //       pipe(
-    //         /* prettier-ignore */
     //         handler.stream,
     //         (source: AsyncIterable<Uint8Array>) => {
     //           return (async function* () {
@@ -242,7 +221,6 @@ describe('should create a socket and connect to it', function () {
     //   [relay.peerInfo]
     // )
     // await pipe(
-    //   /* prettier-ignore */
     //   (async function * () {
     //     yield new Uint8Array([1])
     //     yield new Uint8Array([2])
@@ -263,7 +241,6 @@ describe('should create a socket and connect to it', function () {
     //   ipv4: true,
     //   connHandler: async (handler: Handler & { counterparty: PeerId }) => {
     //     pipe(
-    //       /* prettier-ignore */
     //       handler.stream,
     //       async (source: AsyncIterable<Uint8Array>) => {
     //         for (let i = 0; i < 2; i++) {
@@ -304,7 +281,6 @@ describe('should create a socket and connect to it', function () {
     //     ipv4: true,
     //     connHandler: (handler: Handler & { counterparty: PeerId }) => {
     //       pipe(
-    //         /* prettier-ignore */
     //         handler.stream,
     //         (source: AsyncIterable<Uint8Array>) => {
     //           return (async function* () {
@@ -330,7 +306,6 @@ describe('should create a socket and connect to it', function () {
     //   [relay.peerInfo]
     // )
     // pipe(
-    //   // prettier-ignore
     //   (async function* () {
     //     yield new Uint8Array([i++])
     //     await new Promise(resolve => setTimeout(resolve, 500))
@@ -343,7 +318,6 @@ describe('should create a socket and connect to it', function () {
     //       ipv4: true,
     //       connHandler: (handler: Handler & { counterparty: PeerId }) => {
     //         pipe(
-    //           /* prettier-ignore */
     //           handler.stream,
     //           (source: AsyncIterable<Uint8Array>) => {
     //             return (async function * () {
@@ -372,7 +346,6 @@ describe('should create a socket and connect to it', function () {
     //       ipv4: true,
     //       connHandler: (handler: Handler & { counterparty: PeerId }) => {
     //         pipe(
-    //           /* prettier-ignore */
     //           handler.stream,
     //           (source: AsyncIterable<Uint8Array>) => {
     //             return (async function * () {
@@ -459,18 +432,19 @@ describe('should create a socket and connect to it', function () {
   })
 
   it('should not use itself as relay node', async function () {
-    // let [sender, counterparty] = await Promise.all([
-    //   generateNode({ id: 0, ipv4: true }),
-    //   generateNode({ id: 2, ipv4: true }),
-    // ])
-    // let errThrown = false
-    // try {
-    //   await sender.relay.establishRelayedConnection(Multiaddr(`/p2p/${counterparty.peerInfo.id.toB58String()}`), [
-    //     sender.peerInfo,
-    //   ])
-    // } catch (err) {
-    //   errThrown = true
-    // }
-    // assert(errThrown, `Must throw an error if there is no other opportunity than calling ourself`)
+    let [sender, counterparty] = await Promise.all([
+      generateNode({ id: 0, ipv4: true }),
+      generateNode({ id: 2, ipv4: true })
+    ])
+    let errThrown = false
+    try {
+      await sender.relay.establishRelayedConnection(
+        Multiaddr(`/p2p/${counterparty.node.peerId.toB58String()}`),
+        sender.node.multiaddrs
+      )
+    } catch (err) {
+      errThrown = true
+    }
+    assert(errThrown, `Must throw an error if there is no other opportunity than calling ourself`)
   })
 })

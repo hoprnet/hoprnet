@@ -1,0 +1,47 @@
+name: HOPR Test
+on:
+  push:
+    branches: ['**']
+    paths-ignore:
+      - 'docs/**'
+      - 'websites/**'
+      - '.github/workflows/publish-website-*.yml'
+
+jobs:
+  build:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [12]
+        yarn-version: [1]
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node-version }}
+          registry-url: https://registry.npmjs.org/
+            #      - uses: actions/cache@v2
+            #        with:
+            #          path: '**/node_modules'
+            #          key: ${{ runner.os }}-modules-${{ hashFiles('**/yarn.lock') }}
+      - name: Install node modules
+        run: |
+          yarn policies set-version ${{ matrix.yarn-version }}
+          yarn install --pure-lockfile
+      - name: Install dependencies
+        run: |
+          yarn util:install && yarn util:link
+      - name: Build
+        run: |
+          yarn util:build
+      - name: Test
+        run: |
+          yarn test
+
+#      - name: Test Docker build hoprd
+#        working-directory: packages/hoprd
+#        run: docker build .

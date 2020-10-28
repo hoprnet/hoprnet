@@ -1,41 +1,31 @@
-import type Hopr from '../../'
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-
-import type { Handler } from '../../@types/transport'
-
 import debug from 'debug'
+import pipe from 'it-pipe'
+import chalk from 'chalk'
+import type { AbstractInteraction } from '../abstractInteraction'
+import { PROTOCOL_CRAWLING } from '../../constants'
+import PeerId from 'peer-id'
+import Multiaddr from 'multiaddr'
+import { CrawlResponse, CrawlStatus } from '../../messages'
+import { LibP2P } from '../../'
+import type { Connection, Handler } from 'libp2p'
+
 const log = debug('hopr-core:crawler')
 const verbose = debug('hopr-core:verbose:crawl-interaction')
 
-import pipe from 'it-pipe'
-import chalk from 'chalk'
-
-import type { AbstractInteraction } from '../abstractInteraction'
-
-import { PROTOCOL_CRAWLING } from '../../constants'
-import type PeerInfo from 'peer-info'
-import PeerId from 'peer-id'
-
-import { CrawlResponse, CrawlStatus } from '../../messages'
-
-class Crawler<Chain extends HoprCoreConnector> implements AbstractInteraction<Chain> {
+class Crawler implements AbstractInteraction {
   protocols: string[] = [PROTOCOL_CRAWLING]
 
-  constructor(public node: Hopr<Chain>) {
+  constructor(private node: LibP2P, private handleCrawlRequest: (conn: Connection) => void) {
     this.node.handle(this.protocols, this.handler.bind(this))
   }
 
   handler(struct: Handler) {
-    pipe(
-      /* prettier-ignore */
-      this.node.network.crawler.handleCrawlRequest(struct.connection),
-      struct.stream
-    )
+    pipe(this.handleCrawlRequest(struct.connection), struct.stream)
   }
 
-  interact(counterparty: PeerId, options: { signal: AbortSignal }): Promise<PeerInfo[]> {
+  interact(counterparty: PeerId, options: { signal: AbortSignal }): Promise<Multiaddr[]> {
     verbose('crawl interact', counterparty.toB58String())
-    return new Promise<PeerInfo[]>(async (resolve) => {
+    return new Promise<Multiaddr[]>(async (resolve) => {
       let resolved = false
       const onAbort = () => {
         options.signal.removeEventListener('abort', onAbort)
@@ -53,9 +43,9 @@ class Crawler<Chain extends HoprCoreConnector> implements AbstractInteraction<Ch
         struct = await this.node
           .dialProtocol(counterparty, this.protocols[0], { signal: options.signal })
           .catch(async (_: Error) => {
-            const peerInfo = await this.node.peerRouting.findPeer(counterparty)
+            const { id } = await this.node.peerRouting.findPeer(counterparty)
 
-            return await this.node.dialProtocol(peerInfo, this.protocols[0], { signal: options.signal })
+            return await this.node.dialProtocol(id, this.protocols[0], { signal: options.signal })
           })
       } catch (err) {
         log(`Could not ask node ${counterparty.toB58String()} for other nodes. Error was: ${chalk.red(err.message)}.`)
@@ -66,7 +56,7 @@ class Crawler<Chain extends HoprCoreConnector> implements AbstractInteraction<Ch
         return
       }
 
-      const peerInfos = []
+      const addresses = []
       for await (const encodedResponse of struct.stream.source) {
         let decodedResponse: any
         try {
@@ -79,11 +69,11 @@ class Crawler<Chain extends HoprCoreConnector> implements AbstractInteraction<Ch
           continue
         }
 
-        peerInfos.push(...(await decodedResponse.peerInfos))
+        addresses.push(...(await decodedResponse.addresses))
       }
 
       if (!resolved) {
-        return resolve(peerInfos)
+        return resolve(addresses)
       }
     })
   }

@@ -6,10 +6,10 @@ import { AbstractCommand, GlobalState, CommandResponse } from './abstractCommand
 import CloseChannel from './closeChannel'
 import Crawl from './crawl'
 import ListCommands from './listCommands'
-import ListConnectors from './listConnectors'
+// import ListConnectors from './listConnectors'
 import ListOpenChannels from './listOpenChannels'
-import ListConnectedPeers from './list-connected'
-import OpenChannel from './openChannel'
+import ListConnectedPeers from './listConnected'
+import { OpenChannelFancy, OpenChannel } from './openChannel'
 import Ping from './ping'
 import PrintAddress from './printAddress'
 import PrintBalance from './printBalance'
@@ -32,9 +32,10 @@ export class Commands {
 
   constructor(public node: Hopr<HoprCoreConnector>, rl?: readline.Interface) {
     this.state = {
+      aliases: new Map<string, PeerId>(),
       includeRecipient: false,
       routing: 'direct',
-      aliases: new Map<string, PeerId>()
+      routingPath: []
     }
 
     this.commands = [
@@ -42,7 +43,7 @@ export class Commands {
       new Crawl(node),
       new Info(node),
       new ListCommands(() => this.commands),
-      new ListConnectors(),
+      // new ListConnectors(),
       new ListConnectedPeers(node),
       new ListOpenChannels(node),
       new Ping(node),
@@ -58,10 +59,11 @@ export class Commands {
     ]
 
     if (rl) {
-      this.commands.push(new OpenChannel(node, rl))
+      this.commands.push(new OpenChannelFancy(node, rl))
       this.commands.push(new SendMessageFancy(node, rl))
       this.commands.push(new MultiSendMessage(node, rl))
     } else {
+      this.commands.push(new OpenChannel(node))
       this.commands.push(new SendMessage(node))
     }
 

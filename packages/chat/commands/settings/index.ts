@@ -2,7 +2,6 @@ import { getPaddingLength, styleValue, getOptions } from '../../utils'
 import { AbstractCommand, GlobalState, AutoCompleteResult } from '../abstractCommand'
 import { IncludeRecipient } from './includeRecipient'
 import { Routing } from './routing'
-import chalk from 'chalk'
 
 // to add a new setting, include it here and in class this.settings
 type SettingsDirectory = {
@@ -64,7 +63,7 @@ export default class Settings extends AbstractCommand {
       return this.settings[matchesASetting].execute(option, state)
     }
 
-    return chalk.red(`Setting “${styleValue(setting)}” does not exist.`)
+    return styleValue(`Setting “${styleValue(setting)}” does not exist.`, 'failure')
   }
 
   public async autocomplete(query: string, line: string): Promise<AutoCompleteResult> {

@@ -1,14 +1,15 @@
 import type PeerId from 'peer-id'
-import chalk from 'chalk'
+import { styleValue } from '../utils'
 
 export type AutoCompleteResult = [string[], string]
 export const emptyAutoCompleteResult = (line: string): AutoCompleteResult => [[''], line]
 export type CommandResponse = string | void
 
 export type GlobalState = {
-  includeRecipient: boolean
-  routing: 'auto' | 'manual' | 'direct'
   aliases: Map<string, PeerId>
+  includeRecipient: boolean
+  routing: 'direct' | 'manual'
+  routingPath: PeerId[]
 }
 
 // REPL Command
@@ -45,9 +46,13 @@ export abstract class AbstractCommand {
     return [filtered.map(response), line]
   }
 
+  protected usage(parameters: string[]): string {
+    return `usage: ${parameters.map((x) => `<${x}>`).join(' ')}`
+  }
+
   // returns [error, ...params]
   protected _assertUsage(query: string, parameters: string[], test?: RegExp): string[] {
-    const usage = chalk.red(`usage: ${parameters.map((x) => `<${x}>`).join(' ')}`)
+    const usage = styleValue(this.usage(parameters), 'failure')
 
     if (!query && parameters.length > 0) {
       return [usage]

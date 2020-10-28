@@ -1,9 +1,17 @@
 import Web3 from 'web3'
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
-import { BYTES32 } from './solidity'
 import { ADDRESS_LENGTH } from '../constants'
+import { Uint8ArrayE } from './extended'
 
-class AccountId extends BYTES32 implements Types.AccountId {
+class AccountId extends Uint8ArrayE implements Types.AccountId {
+  slice(begin = 0, end = AccountId.SIZE): Uint8Array {
+    return this.subarray(begin, end)
+  }
+
+  subarray(begin = 0, end = AccountId.SIZE): Uint8Array {
+    return new Uint8Array(this.buffer, begin + this.byteOffset, end - begin)
+  }
+
   static get SIZE(): number {
     return ADDRESS_LENGTH
   }

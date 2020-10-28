@@ -45,6 +45,14 @@ class SignedTicket extends Uint8ArrayE implements Types.SignedTicket {
     }
   }
 
+  slice(begin = 0, end = SignedTicket.SIZE) {
+    return this.subarray(begin, end)
+  }
+
+  subarray(begin = 0, end = SignedTicket.SIZE) {
+    return new Uint8Array(this.buffer, begin + this.byteOffset, end - begin)
+  }
+
   get ticketOffset(): number {
     return this.byteOffset + Signature.SIZE
   }

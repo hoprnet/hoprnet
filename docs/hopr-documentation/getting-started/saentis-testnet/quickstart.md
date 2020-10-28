@@ -6,6 +6,10 @@ description: >-
 
 # First Time Users
 
+{% hint style="danger" %}
+HOPR Säntis has ended. Thank you to everyone who participated. We'll be launching a new testnet soon, codenamed Basòdino. Check back soon for more updates.
+{% endhint %}
+
 {% hint style="warning" %}
 If Säntis is your first time using HOPR, you'll need to install a few things first. This guide will walk you through all the steps. If you've already used HOPR before, click [**here**](getting-started.md) for instructions on how to update to the latest version.
 {% endhint %}

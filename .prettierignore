@@ -26,3 +26,10 @@ packages/core-ethereum/src/tsc/web3
 
 # prettier breaks scss
 *.scss
+
+# Breaks github actions with recursive commits
+.github
+
+# @TODO: this is ignored for now until we move
+# this repo from bitbucket to github
+websites/leaderboard-new

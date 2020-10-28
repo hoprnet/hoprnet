@@ -100,12 +100,12 @@ export const VerifyTweetStateResponse = {
 
 export const BotResponses: BotResponse = {
   [BotCommands.rules]: `\n
-    Welcome to HOPR incentivized network! Here are the rules:
+    Welcome to the HOPR incentivized network!
 
     1. Load ${COVERBOT_XDAI_THRESHOLD} xDAI into your HOPR Ethereum Address
     2. Post a tweet with your HOPR Address and the tag #HOPRNetwork
     3. Send me the link to your tweet (don't delete it!)
-    4. Every time you're chosen to relay a message, you'll score ${ScoreRewards.relayed} points and receive xHOPR!
+    4. Every time you're chosen to relay a message, you'll score ${ScoreRewards.relayed} points and receive HOPR!
 
     Thank you for powering the HOPR Network.
   `,

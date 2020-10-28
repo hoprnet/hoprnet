@@ -37,7 +37,7 @@ export function mustBeStarted(): MethodDecorator {
  */
 export function isBootstrapNode(node: Hopr<HoprCoreConnector>, peerId: PeerId): boolean {
   for (let i = 0; i < node.bootstrapServers.length; i++) {
-    if (peerId.isEqual(node.bootstrapServers[i].id)) {
+    if (peerId.toB58String() === node.bootstrapServers[i].getPeerId()) {
       return true
     }
   }
@@ -56,7 +56,7 @@ export function getPeers(
     noBootstrapNodes: false,
   },
 ): PeerId[] {
-  let peers = node.network.peerStore.peers.map((peer) => PeerId.createFromB58String(peer.id))
+  let peers = node.getConnectedPeers()
 
   if (ops.noBootstrapNodes) {
     peers = peers.filter((peerId) => {
@@ -139,7 +139,7 @@ export async function getPartyOpenChannels(node: Hopr<HoprCoreConnector>, party:
  */
 export async function getOpenChannels(node: Hopr<HoprCoreConnector>, partyPeerId: PeerId): Promise<PeerId[]> {
   const supportsIndexer = typeof node.paymentChannels.indexer !== 'undefined'
-  const partyIfSelf = node.peerInfo.id.equals(partyPeerId)
+  const partyIfSelf = node.getId().equals(partyPeerId)
 
   if (partyIfSelf) {
     // if party is self

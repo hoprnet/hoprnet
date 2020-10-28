@@ -5,5 +5,6 @@ export const colors: {
 } = {
   kovan: 'purple',
   xdai: '#48A9A6',
+  matic: '#15429d',
   private: 'grey',
 }

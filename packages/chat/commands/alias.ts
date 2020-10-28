@@ -1,10 +1,11 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
-import chalk from 'chalk'
 import { AbstractCommand, GlobalState, AutoCompleteResult } from './abstractCommand'
-import { checkPeerIdInput, getPeersIdsAsString, getPaddingLength } from '../utils'
+import { checkPeerIdInput, getPaddingLength, getPeerIdsAndAliases, styleValue } from '../utils'
 
 export class Alias extends AbstractCommand {
+  private parameters = ['PeerId', 'Name']
+
   constructor(public node: Hopr<HoprCoreConnector>) {
     super()
   }
@@ -14,37 +15,44 @@ export class Alias extends AbstractCommand {
   }
 
   public help() {
-    return 'alias an address with a more memorable name'
+    return 'Alias an address with a more memorable name'
   }
 
-  async execute(query: string, state: GlobalState): Promise<string | void> {
+  async execute(query: string, state: GlobalState): Promise<string> {
+    // view aliases
     if (!query) {
-      const names = Array.from(state.aliases.keys())
+      const names = Array.from(state.aliases.keys()).map((name) => `${name} -> `)
+
+      // no aliases found
+      if (names.length === 0) {
+        return `No aliases found.\nTo set an alias use, ${this.usage(this.parameters)}`
+      }
+
       const peerIds = Array.from(state.aliases.values())
-      const paddingLength = getPaddingLength(names)
+      const paddingLength = getPaddingLength(names, false)
 
       return names
         .map((name, index) => {
-          return name.padEnd(paddingLength) + chalk.green(peerIds[index].toB58String())
+          return name.padEnd(paddingLength) + styleValue(peerIds[index].toB58String(), 'peerId')
         })
         .join('\n')
     }
 
-    const [err, id, name] = this._assertUsage(query, ['PeerId', 'Name'])
-    if (err) return err
+    const [error, id, name] = this._assertUsage(query, this.parameters)
+    if (error) return styleValue(error, 'failure')
 
     try {
       let peerId = await checkPeerIdInput(id)
       state.aliases.set(name, peerId)
-    } catch (e) {
-      return e
+
+      return `Set alias '${styleValue(name, 'highlight')}' to '${styleValue(peerId.toB58String(), 'peerId')}'.`
+    } catch (error) {
+      return styleValue(error.message, 'failure')
     }
   }
 
   async autocomplete(query: string, line: string, state: GlobalState): Promise<AutoCompleteResult> {
-    const allIds = getPeersIdsAsString(this.node, {
-      noBootstrapNodes: true
-    }).concat(Array.from(state.aliases.keys()))
+    const allIds = getPeerIdsAndAliases(this.node, state)
     return this._autocompleteByFiltering(query, allIds, line)
   }
 }

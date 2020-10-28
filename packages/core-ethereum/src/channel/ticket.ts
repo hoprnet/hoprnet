@@ -75,6 +75,11 @@ class TicketStatic {
       }
 
       const transaction = await signTransaction(
+        {
+          from: (await account.address).toHex(),
+          to: hoprChannels.options.address,
+          nonce: (await account.nonce).valueOf()
+        },
         hoprChannels.methods.redeemTicket(
           u8aToHex(ticket.preImage),
           u8aToHex(ticket.response),
@@ -83,12 +88,7 @@ class TicketStatic {
           u8aToHex(r),
           u8aToHex(s),
           v + 27
-        ),
-        {
-          from: (await account.address).toHex(),
-          to: hoprChannels.options.address,
-          nonce: (await account.nonce).valueOf()
-        }
+        )
       )
 
       await transaction.send()

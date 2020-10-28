@@ -4,38 +4,33 @@ import type { Types } from '@hoprnet/hopr-core-connector-interface'
 
 import { PROTOCOL_ONCHAIN_KEY } from '../../constants'
 import type { AbstractInteraction } from '../abstractInteraction'
-import type PeerInfo from 'peer-info'
 import type PeerId from 'peer-id'
 
-import type { Handler } from '../../@types/transport'
+import type { Handler } from 'libp2p'
 
 import chalk from 'chalk'
 
 import pipe from 'it-pipe'
 
-class OnChainKey<Chain extends HoprCoreConnector> implements AbstractInteraction<Chain> {
+class OnChainKey<Chain extends HoprCoreConnector> implements AbstractInteraction {
   protocols: string[] = [PROTOCOL_ONCHAIN_KEY]
 
   constructor(public node: Hopr<Chain>) {
-    this.node.handle(this.protocols, this.handler.bind(this))
+    this.node._libp2p.handle(this.protocols, this.handler.bind(this))
   }
 
   handler(struct: Handler) {
-    pipe(
-      /* prettier-ignore */
-      [this.node.paymentChannels.account.keys.onChain.pubKey],
-      struct.stream
-    )
+    pipe([this.node.paymentChannels.account.keys.onChain.pubKey], struct.stream)
   }
 
   async interact(counterparty: PeerId): Promise<Types.Public> {
     let struct: Handler
 
     try {
-      struct = await this.node.dialProtocol(counterparty, this.protocols[0]).catch(async (_: Error) => {
-        return this.node.peerRouting
+      struct = await this.node._libp2p.dialProtocol(counterparty, this.protocols[0]).catch(async (_: Error) => {
+        return this.node._libp2p.peerRouting
           .findPeer(counterparty)
-          .then((peerInfo: PeerInfo) => this.node.dialProtocol(peerInfo, this.protocols[0]))
+          .then((peerRoute) => this.node._libp2p.dialProtocol(peerRoute.id, this.protocols[0]))
       })
     } catch (err) {
       throw Error(
@@ -45,11 +40,7 @@ class OnChainKey<Chain extends HoprCoreConnector> implements AbstractInteraction
       )
     }
 
-    return pipe(
-      /* prettier-ignore */
-      struct.stream,
-      onReception
-    )
+    return pipe(struct.stream, onReception)
   }
 }
 

@@ -1,9 +1,6 @@
 import Hopr from '@hoprnet/hopr-core'
-import type { HoprOptions } from '@hoprnet/hopr-core'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import { commands } from '@hoprnet/hopr-chat'
-import { LogStream, Socket } from './logs'
-import express from 'express'
 import http from 'http'
 import fs from 'fs'
 import ws from 'ws'
@@ -13,6 +10,8 @@ import { parse } from 'url'
 import next from 'next'
 import type { Server } from 'http'
 import stripAnsi from 'strip-ansi'
+import { LogStream } from './logs'
+import { NODE_ENV } from './env'
 
 let debugLog = debug('hoprd:admin')
 
@@ -37,7 +36,7 @@ export class AdminServer {
     debugLog('using', adminPath)
 
     this.app = next({
-      dev: true,
+      dev: NODE_ENV === 'development',
       dir: adminPath,
       conf: {
         devIndicators: {
@@ -98,7 +97,7 @@ export class AdminServer {
 const CRAWL_TIMEOUT = 100_000 // ~15 mins
 export async function periodicCrawl(node: Hopr<HoprCoreConnector>, logs: LogStream) {
   try {
-    await node.network.crawler.crawl()
+    await node.crawl()
     logs.log('Crawled network')
   } catch (err) {
     logs.log('Failed to crawl')
@@ -111,10 +110,10 @@ export async function reportMemoryUsage(logs: LogStream) {
   const used = process.memoryUsage()
   const usage = process.resourceUsage()
   logs.log(`Process stats: mem ${used.rss / 1024}k (max: ${usage.maxRSS / 1024}k) ` + `cputime: ${usage.userCPUTime}`)
-  setTimeout(() => reportMemoryUsage(logs), 10_000)
+  setTimeout(() => reportMemoryUsage(logs), 60_000)
 }
 
 export async function connectionReport(node: Hopr<HoprCoreConnector>, logs: LogStream) {
-  logs.logConnectedPeers(Array.from(node.peerStore.peers.values()).map((p) => p.id.toB58String()))
-  setTimeout(() => connectionReport(node, logs), 10_000)
+  logs.logConnectedPeers(node.getConnectedPeers().map((p) => p.toB58String()))
+  setTimeout(() => connectionReport(node, logs), 60_000)
 }

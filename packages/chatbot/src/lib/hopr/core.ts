@@ -62,7 +62,7 @@ export default class Core {
       log('- start | Creating HOPR Node')
       this.node = await Hopr.create({
         ...this.options,
-        bootstrapServers: [...(await getBootstrapAddresses()).values()],
+        bootstrapServers: await getBootstrapAddresses(),
       })
       log('- start | Created HOPR Node')
       this.started = true
@@ -84,7 +84,7 @@ export default class Core {
 
   @Core.mustBeStarted()
   getBootstrapServers(): string {
-      return this.node.bootstrapServers.map(node => node.id.toB58String()).join(',')
+      return this.node.bootstrapServers.map(node => node.getPeerId()).join(',')
   }
 
   @Core.mustBeStarted()
@@ -102,7 +102,7 @@ export default class Core {
 
   @Core.mustBeStarted()
   listConnectedPeers(): number {
-      return Array.from(this.node.peerStore.peers.values()).length
+      return this.node.getConnectedPeers().length
   }
 
   @Core.mustBeStarted()
@@ -132,9 +132,9 @@ export default class Core {
   @Core.mustBeStarted()
   async address(type: 'native' | 'hopr'): Promise<string> {
     if (type === 'native') {
-      return this.node.paymentChannels.utils.pubKeyToAccountId(this.node.peerInfo.id.pubKey.marshal()).then(u8aToHex)
+      return this.node.paymentChannels.utils.pubKeyToAccountId(this.node.getId().pubKey.marshal()).then(u8aToHex)
     } else {
-      return this.node.peerInfo.id.toB58String()
+      return this.node.getId().toB58String()
     }
   }
 }

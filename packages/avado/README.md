@@ -20,7 +20,7 @@ First connect to the VPN or Wifi of your AVADO box, then do
 
 it will give you an IPFS hash as output
 
-Note: Usually you will develop locally using `docker-compose build` and `docker-compose up` untill your package works & use the building in the AVADO package format whenever you want to run the same on the AVADO box.
+Note: Usually you will develop locally using `docker-compose build --build-arg network="matic"` and `docker-compose up` untill your package works & use the building in the AVADO package format whenever you want to run the same on the AVADO box.
 
 ### Installing the package
 

@@ -1,11 +1,7 @@
 import { CrawlStatus } from '.'
-
-import PeerInfo from 'peer-info'
-
 import { encode, decode } from 'rlp'
-
-import { serializePeerInfo, deserializePeerInfo } from '../../utils'
 import { u8aConcat, u8aToNumber, toU8a } from '@hoprnet/hopr-utils'
+import Multiaddr from 'multiaddr'
 
 const ENUM_LENGTH = 1
 
@@ -14,24 +10,19 @@ class CrawlResponse extends Uint8Array {
     arr?: Uint8Array,
     struct?: {
       status: CrawlStatus
-      peerInfos?: PeerInfo[]
+      addresses?: Multiaddr[]
     }
   ) {
     if (arr != null && struct == null) {
       super(arr)
     } else if (arr == null && struct != null) {
-      if (struct.peerInfos == null) {
+      if (struct.addresses == null) {
         if (struct.status == CrawlStatus.OK) {
-          throw Error(`Cannot have successful crawling responses without any peerInfos.`)
+          throw Error(`Cannot have successful crawling responses without any addresses.`)
         }
         super(u8aConcat(toU8a(struct.status, ENUM_LENGTH)))
       } else if (struct.status == CrawlStatus.OK) {
-        super(
-          u8aConcat(
-            toU8a(struct.status, ENUM_LENGTH),
-            encode(struct.peerInfos.map((peerInfo: PeerInfo) => serializePeerInfo(peerInfo)))
-          )
-        )
+        super(u8aConcat(toU8a(struct.status, ENUM_LENGTH), encode(struct.addresses.map((ma: Multiaddr) => ma.bytes))))
       } else {
         throw Error(`Invalid creation parameters.`)
       }
@@ -54,12 +45,12 @@ class CrawlResponse extends Uint8Array {
     return u8aToNumber(this.statusRaw)
   }
 
-  get peerInfosRaw(): Uint8Array {
+  get addressesRaw(): Uint8Array {
     return this.subarray(ENUM_LENGTH, this.length)
   }
 
-  get peerInfos(): Promise<PeerInfo[]> {
-    return Promise.all((decode(this.peerInfosRaw) as Buffer[]).map((arr: Buffer) => deserializePeerInfo(arr)))
+  get addresses(): Promise<Multiaddr[]> {
+    return Promise.all((decode(this.addressesRaw) as Buffer[]).map((arr: Buffer) => new Multiaddr(arr)))
   }
 }
 

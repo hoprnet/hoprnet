@@ -111,11 +111,14 @@ describe('test hashedSecret', function () {
 
       await connector.utils.waitForConfirmation(
         (
-          await connector.signTransaction(connector.hoprChannels.methods.setHashedSecret(preImage.preImage.toHex()), {
-            from: (await connector.account.address).toHex(),
-            to: connector.hoprChannels.options.address,
-            nonce: await connector.account.nonce
-          })
+          await connector.signTransaction(
+            {
+              from: (await connector.account.address).toHex(),
+              to: connector.hoprChannels.options.address,
+              nonce: await connector.account.nonce
+            },
+            connector.hoprChannels.methods.setHashedSecret(preImage.preImage.toHex())
+          )
         ).send()
       )
       let updatedOnChainHash = new Types.Hash(
@@ -194,11 +197,14 @@ describe('test hashedSecret', function () {
 
       await connector.utils.waitForConfirmation(
         (
-          await connector.signTransaction(connector.hoprChannels.methods.setHashedSecret(preImage.preImage.toHex()), {
-            from: (await connector.account.address).toHex(),
-            to: connector.hoprChannels.options.address,
-            nonce: await connector.account.nonce
-          })
+          await connector.signTransaction(
+            {
+              from: (await connector.account.address).toHex(),
+              to: connector.hoprChannels.options.address,
+              nonce: await connector.account.nonce
+            },
+            connector.hoprChannels.methods.setHashedSecret(preImage.preImage.toHex())
+          )
         ).send()
       )
 

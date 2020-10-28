@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core-ethereum",
-  "version": "1.17.0-alpha.59",
+  "version": "1.39.0-alpha.0",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -27,8 +27,8 @@
     "yarn": "1"
   },
   "dependencies": {
-    "@hoprnet/hopr-ethereum": "^1.17.0-alpha.59",
-    "@hoprnet/hopr-utils": "^1.17.0-alpha.59",
+    "@hoprnet/hopr-ethereum": "1.39.0-alpha.0",
+    "@hoprnet/hopr-utils": "1.39.0-alpha.0",
     "bn.js": "^5.1.2",
     "chalk": "^4.1.0",
     "debug": "^4.1.1",
@@ -43,9 +43,9 @@
     "web3-eth-contract": "^1.2.11"
   },
   "devDependencies": {
-    "@hoprnet/hopr-core-connector-interface": "^1.17.0-alpha.59",
-    "@hoprnet/hopr-demo-seeds": "1.8.0",
-    "@hoprnet/hopr-testing": "^1.17.0-alpha.59",
+    "@hoprnet/hopr-core-connector-interface": "1.39.0-alpha.0",
+    "@hoprnet/hopr-demo-seeds": "1.39.0-alpha.0",
+    "@hoprnet/hopr-testing": "1.39.0-alpha.0",
     "@types/debug": "^4.1.5",
     "@types/keccak": "^3.0.1",
     "@types/levelup": "^4.3.0",
@@ -58,7 +58,7 @@
     "memdown": "^5.1.0",
     "mocha": "^8.0.1",
     "rimraf": "^3.0.2",
-    "ts-generator": "^0.0.8",
+    "ts-generator": "^0.1.1",
     "ts-node": "^9.0.0",
     "typechain": "^1.0.5",
     "typechain-target-web3-v1": "^1.0.4",

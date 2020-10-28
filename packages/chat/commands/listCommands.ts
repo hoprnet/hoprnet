@@ -11,15 +11,19 @@ export default class ListCommands extends AbstractCommand {
   }
 
   public help() {
-    return 'shows this help page'
+    return 'Displays all the command options'
   }
 
   public execute(): string {
     return getOptions(
-      this.getCommands().map((command) => ({
-        value: command.name(),
-        description: command.help()
-      })),
+      this.getCommands()
+        .map((command) => ({
+          value: command.name(),
+          description: command.help()
+        }))
+        .sort((a, b) => {
+          return String(a.value).localeCompare(String(b.value))
+        }),
       'vertical'
     ).join('')
   }

@@ -1,3 +1,5 @@
+import { durations } from '@hoprnet/hopr-utils'
+
 export const CRAWLING_RESPONSE_NODES = 10
 // export const RELAY_FEE = toWei('100', 'wei')
 export const PACKET_SIZE = 500
@@ -16,3 +18,12 @@ export const PROTOCOL_PAYMENT_CHANNEL = `/${PROTOCOL_NAME}/payment/open/${VERSIO
 export const PROTOCOL_ONCHAIN_KEY = `/${PROTOCOL_NAME}/onChainKey/${VERSION}`
 export const PROTOCOL_HEARTBEAT = `/${PROTOCOL_NAME}/heartbeat/${VERSION}`
 export const DEFAULT_STUN_PORT = 3478
+
+export const HEARTBEAT_REFRESH_TIME = 103 * 1000
+export const HEARTBEAT_INTERVAL_LOWER_BOUND = 41 * 1000
+export const HEARTBEAT_INTERVAL_UPPER_BOUND = 59 * 1000
+
+export const MAX_PARALLEL_CONNECTIONS = 10
+
+export const BLACKLIST_TIMEOUT = durations.seconds(47)
+export const HEARTBEAT_TIMEOUT = durations.seconds(3)

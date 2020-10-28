@@ -4,6 +4,10 @@ description: An incentivized HOPR testnet running on xDAI Chain
 
 # Säntis Testnet
 
+{% hint style="danger" %}
+HOPR Säntis has ended. Thank you to everyone who participated. We'll be launching a new testnet soon, codenamed Basòdino. Check back soon for more updates.
+{% endhint %}
+
 Säntis is an incentivized HOPR testnet which will run on [xDAI Chain](https://www.xdaichain.com/) for three weeks, and provides community members with their first chance to earn HOPR tokens.
 
 Connect a node to Säntis to help us test the network, find bugs, and learn how HOPR works. You'll also earn points which can win you a share of 100,000 HOPR tokens when mainnet launches later in the year.

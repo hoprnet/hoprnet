@@ -6,22 +6,20 @@ import pipe from 'it-pipe'
 
 import type { AbstractInteraction } from '../abstractInteraction'
 
-import type { Handler } from '../../@types/transport'
+import type { Handler } from 'libp2p'
 
 import { PROTOCOL_PAYMENT_CHANNEL } from '../../constants'
-import type PeerInfo from 'peer-info'
 import type PeerId from 'peer-id'
 
-class Opening<Chain extends HoprCoreConnector> implements AbstractInteraction<Chain> {
+class Opening<Chain extends HoprCoreConnector> implements AbstractInteraction {
   protocols: string[] = [PROTOCOL_PAYMENT_CHANNEL]
 
   constructor(public node: Hopr<Chain>) {
-    this.node.handle(this.protocols, this.handler.bind(this))
+    this.node._libp2p.handle(this.protocols, this.handler.bind(this))
   }
 
   async handler(struct: Handler) {
     pipe(
-      /** prettier-ignore */
       struct.stream,
       this.node.paymentChannels.channel.handleOpeningRequest.bind(this.node.paymentChannels.channel),
       struct.stream
@@ -32,10 +30,10 @@ class Opening<Chain extends HoprCoreConnector> implements AbstractInteraction<Ch
     let struct: Handler
 
     try {
-      struct = await this.node.dialProtocol(counterparty, this.protocols[0]).catch(async (_: Error) => {
-        return this.node.peerRouting
+      struct = await this.node._libp2p.dialProtocol(counterparty, this.protocols[0]).catch(async (_: Error) => {
+        return this.node._libp2p.peerRouting
           .findPeer(counterparty)
-          .then((peerInfo: PeerInfo) => this.node.dialProtocol(peerInfo, this.protocols[0]))
+          .then((peerRoute) => this.node._libp2p.dialProtocol(peerRoute.id, this.protocols[0]))
       })
     } catch (err) {
       throw Error(
@@ -53,12 +51,7 @@ class Opening<Chain extends HoprCoreConnector> implements AbstractInteraction<Ch
       offset: signedChannel.signatureOffset
     })
 
-    return await pipe(
-      /* prettier-ignore */
-      [signedChannel],
-      struct.stream,
-      this.collect.bind(this)
-    )
+    return await pipe([signedChannel], struct.stream, this.collect.bind(this))
   }
 
   private async collect(source: any) {

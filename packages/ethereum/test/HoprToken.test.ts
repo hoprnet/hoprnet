@@ -15,7 +15,7 @@ contract('HoprToken', function ([owner, userA]) {
   })
 
   it("should have symbol 'HOPR'", async function () {
-    expect(await hoprToken.symbol()).to.be.equal('xHOPR', 'wrong symbol')
+    expect(await hoprToken.symbol()).to.be.equal('HOPR', 'wrong symbol')
   })
 
   it("should have a supply of '0'", async function () {

@@ -1,9 +1,5 @@
 import path from 'path'
 import { spawn } from 'child_process'
-import debug from 'debug'
-
-const log = debug('hopr-ethereum')
-const error = debug('hopr-ethereum:error')
 
 export const root = path.join(__dirname, '..', '..', '..')
 
@@ -18,8 +14,8 @@ export const bash = (cmd: string): Promise<void> => {
       child.stdout.setEncoding('utf8')
       child.stderr.setEncoding('utf8')
 
-      child.stdout.on('data', log)
-      child.stderr.on('data', error)
+      child.stdout.on('data', console.log)
+      child.stderr.on('data', console.error)
 
       child.on('exit', (code) => {
         if (code === 0) {

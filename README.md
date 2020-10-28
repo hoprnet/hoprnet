@@ -19,6 +19,13 @@
 
 ## Instructions
 
+### Installing a binary from NPM
+
+```sh
+npm install -g @hoprnet/hoprd
+hoprd --admin
+```
+
 ### Developing with this repository
 
 ```sh
@@ -31,7 +38,7 @@ yarn util:regenerate
 yarn setup
 
 # if you run into errors during setup
-yarn util:clean
+yarn util:reset
 yarn util:regenerate
 yarn setup
 ```

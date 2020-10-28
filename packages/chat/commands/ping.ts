@@ -1,68 +1,58 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
-import { AbstractCommand } from './abstractCommand'
-import type { AutoCompleteResult } from './abstractCommand'
-
 import type PeerId from 'peer-id'
-
-import { checkPeerIdInput, isBootstrapNode, getPeers } from '../utils'
-import chalk from 'chalk'
+import type { AutoCompleteResult } from './abstractCommand'
+import { AbstractCommand, GlobalState } from './abstractCommand'
+import { checkPeerIdInput, isBootstrapNode, getPeerIdsAndAliases, styleValue } from '../utils'
 
 export default class Ping extends AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {
     super()
   }
-  name() {
+
+  public name() {
     return 'ping'
   }
-  help() {
-    return 'pings another node to check its availability'
+
+  public help() {
+    return 'Pings another node to check its availability'
   }
 
-  async execute(query?: string): Promise<string> {
-    if (query == null) {
+  public async execute(query: string, state: GlobalState): Promise<string> {
+    if (!query) {
       return `Invalid arguments. Expected 'ping <peerId>'. Received '${query}'`
     }
 
     let peerId: PeerId
     try {
-      peerId = await checkPeerIdInput(query)
+      peerId = await checkPeerIdInput(query, state)
     } catch (err) {
-      return chalk.red(err.message)
+      return styleValue(err.message, 'failure')
     }
 
     let out = ''
     if (isBootstrapNode(this.node, peerId)) {
-      out += chalk.gray(`Pinging the bootstrap node ...`) + '\n'
+      out += styleValue(`Pinging the bootstrap node ...`, 'highlight') + '\n'
     }
 
     try {
-      const latency = await this.node.ping(peerId)
-      return `${out}Pong received in: ${chalk.magenta(String(latency))}ms`
+      const { info, latency } = await this.node.ping(peerId)
+      return `${out}Pong received in: ${styleValue(latency)} ms ${info}`
     } catch (err) {
-      return `${out}Could not ping node. Error was: ${chalk.red(err.message)}`
+      if (err && err.message) {
+        return `${out}Could not ping node. Error was: ${styleValue(err.message, 'failure')}`
+      }
+      return `${out}Could not ping node. Unknown error.`
     }
   }
 
-  async autocomplete(query: string, line: string): Promise<AutoCompleteResult> {
-    const peers = getPeers(this.node)
+  public async autocomplete(query: string = '', line: string = '', state: GlobalState): Promise<AutoCompleteResult> {
+    const allIds = getPeerIdsAndAliases(this.node, state, {
+      noBootstrapNodes: true,
+      returnAlias: true,
+      mustBeOnline: true
+    })
 
-    const peerIds =
-      !query || query.length == 0
-        ? peers.map((peer) => peer.toB58String())
-        : peers.reduce((acc: string[], peer: PeerId) => {
-            const peerString = peer.toB58String()
-            if (peerString.startsWith(query)) {
-              acc.push(peerString)
-            }
-
-            return acc
-          }, [])
-
-    if (!peerIds.length) {
-      return [[''], line]
-    }
-
-    return [peerIds.map((peerId: string) => `ping ${peerId}`), line]
+    return this._autocompleteByFiltering(query, allIds, line)
   }
 }

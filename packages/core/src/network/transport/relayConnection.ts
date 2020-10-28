@@ -1,7 +1,7 @@
-import { Stream } from '../../@types/transport'
+import { Stream } from 'libp2p'
 import Multiaddr from 'multiaddr'
 import BL from 'bl'
-import { MultiaddrConnection } from '../../@types/transport'
+import { MultiaddrConnection } from 'libp2p'
 import Defer, { DeferredPromise } from 'p-defer'
 import { RELAY_PAYLOAD_PREFIX, RELAY_STATUS_PREFIX, RELAY_WEBRTC_PREFIX, STOP } from './constants'
 import { u8aEquals } from '@hoprnet/hopr-utils'
@@ -68,7 +68,6 @@ class RelayConnection implements MultiaddrConnection {
           done: boolean
           value: BL
         } = await Promise.race([
-          // prettier-ignore
           // @ts-ignore
           this._stream.source.next(),
           promise
@@ -206,7 +205,6 @@ class RelayConnection implements MultiaddrConnection {
                 webRTCPromise = webRTCstream.next().then(webRTCSourceFunction)
               }
               await Promise.race([
-                // prettier-ignore
                 // @ts-ignore
                 streamPromise,
                 webRTCPromise,
@@ -214,7 +212,6 @@ class RelayConnection implements MultiaddrConnection {
               ])
             } else {
               await Promise.race([
-                // prettier-ignore
                 // @ts-ignore
                 streamPromise,
                 promise
@@ -276,11 +273,9 @@ class RelayConnection implements MultiaddrConnection {
     return this._destroyed
   }
 
-  close(err?: Error): Promise<void> {
+  close(): Promise<void> {
     this._defer.resolve()
-
     this.timeline.close = Date.now()
-
     return Promise.resolve()
   }
 }

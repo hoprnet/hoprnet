@@ -1,20 +1,20 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import { u8aToHex } from '@hoprnet/hopr-utils'
-import chalk from 'chalk'
 import { AbstractCommand } from './abstractCommand'
+import { styleValue } from '../utils'
 
 export default class PrintAddress extends AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {
     super()
   }
 
-  name() {
+  public name() {
     return 'myAddress'
   }
 
-  help() {
-    return 'shows the native and HOPR addresses of this node'
+  public help() {
+    return 'Displays the native and HOPR addresses of this node'
   }
 
   /**
@@ -22,29 +22,29 @@ export default class PrintAddress extends AbstractCommand {
    * identity that we have on that chain.
    * @notice triggered by the CLI
    */
-  async execute(query: string): Promise<string> {
+  public async execute(query: string): Promise<string> {
     const { utils } = this.node.paymentChannels
 
     const hoprPrefix = 'HOPR Address:'
-    const hoprAddress = this.node.peerInfo.id.toB58String()
+    const hoprAddress = this.node.getId().toB58String()
 
-    if (query.trim() == 'hopr') {
+    if (query.trim() === 'hopr') {
       return hoprAddress
     }
 
     // @TODO: use 'NativeBalance' and 'Balance' to display currencies
-    const nativePrefix = 'xDAI Address:'
-    const nativeAddress = u8aToHex(await utils.pubKeyToAccountId(this.node.peerInfo.id.pubKey.marshal()))
+    const nativePrefix = 'Matic Address:'
+    const nativeAddress = u8aToHex(await utils.pubKeyToAccountId(this.node.getId().pubKey.marshal()))
 
-    if (query.trim() == 'native') {
+    if (query.trim() === 'native') {
       return nativeAddress
     }
 
     const prefixLength = Math.max(hoprPrefix.length, nativePrefix.length) + 2
 
     return [
-      `${hoprPrefix.padEnd(prefixLength, ' ')}${chalk.green(hoprAddress)}`,
-      `${nativePrefix.padEnd(prefixLength, ' ')}${chalk.green(nativeAddress)}`
+      `${hoprPrefix.padEnd(prefixLength, ' ')}${styleValue(hoprAddress, 'peerId')}`,
+      `${nativePrefix.padEnd(prefixLength, ' ')}${styleValue(nativeAddress, 'peerId')}`
     ].join('\n')
   }
 }

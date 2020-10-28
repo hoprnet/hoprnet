@@ -1,0 +1,105 @@
+.navbar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  overflow: hidden;
+  padding: 0.89em;
+  width: 100%;
+  border-bottom: 0.5px solid #e0e0e0;
+  box-sizing: border-box;
+  img {
+    width: 5em;
+  }
+  .icon-logo {
+    z-index: 5;
+    filter: grayscale(0);
+    transition: all 350ms ease-in-out;
+    .open {
+      transition: all 350ms ease-in-out;
+      filter: grayscale(1);
+    }
+  }
+  .icon-menu {
+    &::before {
+      content: '';
+      background-color: #ffffff;
+      width: 53px;
+      height: 38px;
+      position: absolute;
+      transform: translate3d(-5px, -7px, 0);
+      border-radius: 3px;
+    }
+    z-index: 3;
+    width: 60px;
+    height: 22px;
+    position: relative;
+    margin: 0;
+    transform: rotate(0deg);
+
+    cursor: pointer;
+    span {
+      position: absolute;
+      height: 3px;
+      width: 21px;
+      background: $black;
+      opacity: 1;
+      transition: 0.25s ease-in-out;
+      transform: rotate(0deg);
+    }
+    span:nth-child(even) {
+      left: 35%;
+      border-radius: 0 9px 9px 0;
+    }
+    span:nth-child(odd) {
+      left: 0px;
+      border-radius: 9px 0 0 9px;
+    }
+    span:nth-child(1),
+    span:nth-child(2) {
+      top: 0px;
+    }
+    span:nth-child(3),
+    span:nth-child(4) {
+      top: 11px;
+    }
+    span:nth-child(5),
+    span:nth-child(6) {
+      top: 21px;
+    }
+    &.open {
+      span:nth-child(1),
+      span:nth-child(6) {
+        transform: rotate(45deg);
+      }
+      span:nth-child(2),
+      span:nth-child(5) {
+        transform: rotate(-45deg);
+      }
+      span:nth-child(1) {
+        left: 5px;
+        top: 7px;
+      }
+      span:nth-child(2) {
+        left: 16px;
+        top: 7px;
+      }
+      span:nth-child(3) {
+        left: -50%;
+        opacity: 0;
+      }
+      span:nth-child(4) {
+        left: 100%;
+        opacity: 0;
+      }
+      span:nth-child(5) {
+        left: 5px;
+        top: 18px;
+      }
+      span:nth-child(6) {
+        left: calc(35% - 5px);
+        top: 18px;
+      }
+    }
+  }
+}

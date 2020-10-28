@@ -20,11 +20,6 @@ Principles:
 
 - When the code is ready, they mark the pull-request as ready to review.
 
-- They add a label indicating whether the code is a major, minor or patch
-  release. The default, if no label is given, is an alpha release.
-  If you prefer a different release version, use a tag on the pull request to
-  specify, `Major version`, `Minor version` or `Patch version`
-
 - Ideally a team member reviews the code, and indicates approval. For external
   contributors, this is mandatory.
 
@@ -36,3 +31,18 @@ Principles:
   change to master/develop.
 
 - A tag is pushed with that code.
+
+## Branches
+
+- Master is a prerelease branch - tests _must_ pass, and code _should_ be stable,
+  but we may have issues.
+
+- When we want to do a real release, we cut a `release/` branch. This should
+  bump the minor or major version (todo. workout tags)
+
+- Pushes to release branches should trigger a `patch` release.
+
+- Bugfixes to releases should be PR's to release branches. The release branch
+  should then be pulled back into master.
+
+- Master tracks releases, but releases do not track master.

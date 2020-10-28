@@ -25,6 +25,14 @@ class Signature extends Uint8ArrayE implements Types.Signature {
     }
   }
 
+  slice(begin = 0, end = Signature.SIZE) {
+    return this.subarray(begin, end)
+  }
+
+  subarray(begin = 0, end = Signature.SIZE) {
+    return new Uint8Array(this.buffer, begin + this.byteOffset, end - begin)
+  }
+
   get signatureOffset(): number {
     return this.byteOffset
   }

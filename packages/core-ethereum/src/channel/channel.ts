@@ -3,7 +3,7 @@ import { u8aToHex } from '@hoprnet/hopr-utils'
 import { Balance, Channel as ChannelType, Hash, Moment, Public, SignedChannel } from '../types'
 import TicketFactory from './ticket'
 import { ChannelStatus } from '../types/channel'
-import { waitForConfirmation, waitFor, hash } from '../utils'
+import { hash } from '../utils'
 
 import type HoprEthereum from '..'
 
@@ -21,7 +21,7 @@ class Channel implements IChannel {
 
     // check if channel still exists
     this.status.then((status) => {
-      if (status === ChannelStatus.UNINITIALISED) {
+      if (status === 'UNINITIALISED') {
         this.coreConnector.log.log('found channel off-chain but its closed on-chain')
         this.onClose()
       }
@@ -35,7 +35,7 @@ class Channel implements IChannel {
     this.ticket = new TicketFactory(this)
   }
 
-  private get channel(): Promise<OnChainChannel> {
+  private get onChainChannel(): Promise<OnChainChannel> {
     return new Promise<OnChainChannel>(async (resolve, reject) => {
       try {
         return resolve(await this.coreConnector.channel.getOnChainState(await this.channelId))
@@ -45,17 +45,20 @@ class Channel implements IChannel {
     })
   }
 
-  private get status(): Promise<ChannelStatus> {
-    return new Promise<ChannelStatus>(async (resolve, reject) => {
+  get status() {
+    return new Promise<'UNINITIALISED' | 'FUNDING' | 'OPEN' | 'PENDING'>(async (resolve, reject) => {
       try {
-        const channel = await this.channel
+        const channel = await this.onChainChannel
         const status = Number(channel.stateCounter) % 10
 
         if (status >= Object.keys(ChannelStatus).length) {
           throw Error("status like this doesn't exist")
         }
 
-        return resolve(status)
+        if (status === ChannelStatus.UNINITIALISED) return resolve('UNINITIALISED')
+        else if (status === ChannelStatus.FUNDING) return resolve('FUNDING')
+        else if (status === ChannelStatus.OPEN) return resolve('OPEN')
+        return resolve('PENDING')
       } catch (error) {
         return reject(error)
       }
@@ -94,7 +97,7 @@ class Channel implements IChannel {
 
     return new Promise<Moment>(async (resolve, reject) => {
       try {
-        this._settlementWindow = new Moment((await this.channel).closureTime)
+        this._settlementWindow = new Moment((await this.onChainChannel).closureTime)
       } catch (error) {
         return reject(error)
       }
@@ -110,7 +113,7 @@ class Channel implements IChannel {
   get balance(): Promise<Balance> {
     return new Promise<Balance>(async (resolve, reject) => {
       try {
-        return resolve(new Balance((await this.channel).deposit))
+        return resolve(new Balance((await this.onChainChannel).deposit))
       } catch (error) {
         return reject(error)
       }
@@ -120,7 +123,7 @@ class Channel implements IChannel {
   get balance_a(): Promise<Balance> {
     return new Promise<Balance>(async (resolve, reject) => {
       try {
-        return resolve(new Balance((await this.channel).partyABalance))
+        return resolve(new Balance((await this.onChainChannel).partyABalance))
       } catch (error) {
         return reject(error)
       }
@@ -159,47 +162,46 @@ class Channel implements IChannel {
     })
   }
 
-  async initiateSettlement(): Promise<void> {
+  async initiateSettlement(): Promise<string> {
     const status = await this.status
+    let receipt: string
 
     try {
-      if (!(status === ChannelStatus.OPEN || status === ChannelStatus.PENDING)) {
+      if (!(status === 'OPEN' || status === 'PENDING')) {
         throw Error("channel must be 'OPEN' or 'PENDING'")
       }
 
-      if (status === ChannelStatus.OPEN) {
-        await waitForConfirmation(
-          (
-            await this.coreConnector.signTransaction(
-              this.coreConnector.hoprChannels.methods.initiateChannelClosure(
-                u8aToHex(await this.coreConnector.utils.pubKeyToAccountId(this.counterparty))
-              ),
-              {
-                from: (await this.coreConnector.account.address).toHex(),
-                to: this.coreConnector.hoprChannels.options.address,
-                nonce: await this.coreConnector.account.nonce
-              }
-            )
-          ).send()
-        )
-      } else if (status === ChannelStatus.PENDING) {
-        await waitForConfirmation(
-          (
-            await this.coreConnector.signTransaction(
-              this.coreConnector.hoprChannels.methods.claimChannelClosure(
-                u8aToHex(await this.coreConnector.utils.pubKeyToAccountId(this.counterparty))
-              ),
-              {
-                from: (await this.coreConnector.account.address).toHex(),
-                to: this.coreConnector.hoprChannels.options.address,
-                nonce: await this.coreConnector.account.nonce
-              }
-            )
-          ).send()
+      if (status === 'OPEN') {
+        const tx = await this.coreConnector.signTransaction(
+          {
+            from: (await this.coreConnector.account.address).toHex(),
+            to: this.coreConnector.hoprChannels.options.address,
+            nonce: await this.coreConnector.account.nonce
+          },
+          this.coreConnector.hoprChannels.methods.initiateChannelClosure(
+            u8aToHex(await this.coreConnector.utils.pubKeyToAccountId(this.counterparty))
+          )
         )
 
-        await this.onClose()
+        receipt = tx.transactionHash
+        tx.send()
+      } else if (status === 'PENDING') {
+        const tx = await this.coreConnector.signTransaction(
+          {
+            from: (await this.coreConnector.account.address).toHex(),
+            to: this.coreConnector.hoprChannels.options.address,
+            nonce: await this.coreConnector.account.nonce
+          },
+          this.coreConnector.hoprChannels.methods.claimChannelClosure(
+            u8aToHex(await this.coreConnector.utils.pubKeyToAccountId(this.counterparty))
+          )
+        )
+
+        receipt = tx.transactionHash
+        tx.send()
       }
+
+      return receipt
     } catch (error) {
       throw error
     }

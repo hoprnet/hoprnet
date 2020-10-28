@@ -28,11 +28,7 @@ export function handleStunRequest(socket: Socket, data: Buffer, rinfo: RemoteInf
   if (req.loadBuffer(data)) {
     // if STUN message is BINDING_REQUEST and valid content
     if (req.isBindingRequest({ fingerprint: true })) {
-      const res = req
-        // prettier-ignore
-        .createBindingResponse(true)
-        .setXorMappedAddressAttribute(rinfo)
-        .setFingerprintAttribute()
+      const res = req.createBindingResponse(true).setXorMappedAddressAttribute(rinfo).setFingerprintAttribute()
 
       socket.send(res.toBuffer(), rinfo.port, rinfo.address)
     }
@@ -59,8 +55,7 @@ export function getExternalIp(
       port: number
     }
 
-    let finished = false
-    let timeout: NodeJS.Timeout
+    let timeout
 
     const msgHandler = (msg: Buffer) => {
       verbose(`stun received`)
@@ -90,7 +85,6 @@ export function getExternalIp(
               result = attr
             } else if (tids.length == 0 || attr.port != result.port || attr.address !== result.address) {
               socket.removeListener('message', msgHandler)
-              finished = true
               clearTimeout(timeout)
               resolve({
                 address: attr.address === result.address ? attr.address : undefined,
@@ -125,7 +119,6 @@ export function getExternalIp(
     })
 
     timeout = setTimeout(() => {
-      finished = true
       if (result == null) {
         reject(Error(`Timeout. Could not complete STUN request in time.`))
       } else {

@@ -15,7 +15,7 @@ import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '../../'
 import pipe from 'it-pipe'
 
-import type { Handler } from '../../@types/transport'
+import type { Handler } from 'libp2p'
 
 import { randomInteger, durations } from '@hoprnet/hopr-utils'
 import { getTokens, Token } from '../../utils'
@@ -24,7 +24,7 @@ const MAX_PARALLEL_JOBS = 20
 
 const FORWARD_TIMEOUT = durations.seconds(6)
 
-class PacketForwardInteraction<Chain extends HoprCoreConnector> implements AbstractInteraction<Chain> {
+class PacketForwardInteraction<Chain extends HoprCoreConnector> implements AbstractInteraction {
   private tokens: Token[] = getTokens(MAX_PARALLEL_JOBS)
   private queue: Packet<Chain>[] = []
   private promises: Promise<void>[] = []
@@ -32,7 +32,7 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
   protocols: string[] = [PROTOCOL_STRING]
 
   constructor(public node: Hopr<Chain>) {
-    this.node.handle(this.protocols, this.handler.bind(this))
+    this.node._libp2p.handle(this.protocols, this.handler.bind(this))
   }
 
   async interact(counterparty: PeerId, packet: Packet<Chain>): Promise<void> {
@@ -49,12 +49,11 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
       }, FORWARD_TIMEOUT)
 
       try {
-        struct = await this.node
+        struct = await this.node._libp2p
           .dialProtocol(counterparty, this.protocols[0], { signal: abort.signal })
-          .catch(async (err: Error) => {
-            const peerInfo = await this.node.peerRouting.findPeer(counterparty)
-
-            return await this.node.dialProtocol(peerInfo, this.protocols[0], { signal: abort.signal })
+          .catch(async () => {
+            const { id } = await this.node._libp2p.peerRouting.findPeer(counterparty)
+            return await this.node._libp2p.dialProtocol(id, this.protocols[0], { signal: abort.signal })
           })
       } catch (err) {
         log(`Could not transfer packet to ${counterparty.toB58String()}. Error was: ${chalk.red(err.message)}.`)
@@ -68,11 +67,7 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
 
       clearTimeout(timeout)
 
-      pipe(
-        /* prettier-ignore */
-        [packet],
-        struct.stream
-      )
+      pipe([packet], struct.stream)
 
       if (!aborted) {
         resolve()
@@ -87,7 +82,7 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
       async (source: AsyncIterable<Uint8Array>): Promise<void> => {
         for await (const msg of source) {
           const arr = msg.slice()
-          const packet = new Packet(this.node, {
+          const packet = new Packet(this.node, this.node._libp2p, {
             bytes: arr.buffer,
             offset: arr.byteOffset
           })
@@ -123,12 +118,7 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
 
       let { receivedChallenge, ticketKey } = await packet.forwardTransform()
 
-      /* prettier-ignore */
-      ;[sender, target] = await Promise.all([
-        /* prettier-ignore */
-        packet.getSenderPeerId(),
-        packet.getTargetPeerId(),
-      ])
+      ;[sender, target] = await Promise.all([packet.getSenderPeerId(), packet.getTargetPeerId()])
 
       setImmediate(async () => {
         const ack = new Acknowledgement(this.node.paymentChannels, undefined, {
@@ -136,10 +126,10 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
           challenge: receivedChallenge
         })
 
-        await this.node.interactions.packet.acknowledgment.interact(sender, await ack.sign(this.node.peerInfo.id))
+        await this.node._interactions.packet.acknowledgment.interact(sender, await ack.sign(this.node.getId()))
       })
 
-      if (this.node.peerInfo.id.isEqual(target)) {
+      if (this.node.getId().isEqual(target)) {
         this.node.output(packet.message.plaintext)
       } else {
         await this.interact(target, packet)

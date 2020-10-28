@@ -47,6 +47,11 @@ class ChannelFactory {
       await waitForConfirmation(
         (
           await this.coreConnector.signTransaction(
+            {
+              from: (await this.coreConnector.account.address).toHex(),
+              to: this.coreConnector.hoprToken.options.address,
+              nonce: await this.coreConnector.account.nonce
+            },
             this.coreConnector.hoprToken.methods.send(
               this.coreConnector.hoprChannels.options.address,
               amount.toString(),
@@ -54,12 +59,7 @@ class ChannelFactory {
                 ['address', 'address'],
                 [(await this.coreConnector.account.address).toHex(), counterparty.toHex()]
               )
-            ),
-            {
-              from: (await this.coreConnector.account.address).toHex(),
-              to: this.coreConnector.hoprToken.options.address,
-              nonce: await this.coreConnector.account.nonce
-            }
+            )
           )
         ).send()
       )
@@ -174,7 +174,6 @@ class ChannelFactory {
     // const hashedSecret = await this.coreConnector.hashedSecret.check()
     // if (!hashedSecret.initialized) await this.coreConnector.initOnchainValues()
 
-    console.log(`sign`, sign, `channelBalance`, channelBalance)
     if (await this.isOpen(counterpartyPubKey)) {
       const record = await this.coreConnector.db.get(Buffer.from(this.coreConnector.dbKeys.Channel(counterpartyPubKey)))
       signedChannel = new SignedChannel({
@@ -199,12 +198,12 @@ class ChannelFactory {
       await waitForConfirmation(
         (
           await this.coreConnector.signTransaction(
-            this.coreConnector.hoprChannels.methods.openChannel(counterparty.toHex()),
             {
               from: (await this.coreConnector.account.address).toHex(),
               to: this.coreConnector.hoprChannels.options.address,
               nonce: await this.coreConnector.account.nonce
-            }
+            },
+            this.coreConnector.hoprChannels.methods.openChannel(counterparty.toHex())
           )
         ).send()
       )
@@ -348,11 +347,7 @@ class ChannelFactory {
   }
 
   async onceClosed(self: Public, counterparty: Public) {
-    const channelId = await getId(
-      // prettier-ignore
-      await self.toAccountId(),
-      await counterparty.toAccountId()
-    )
+    const channelId = await getId(await self.toAccountId(), await counterparty.toAccountId())
 
     return new Promise((resolve, reject) => {
       const subscription = this.coreConnector.web3.eth.subscribe('logs', {

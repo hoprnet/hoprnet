@@ -132,6 +132,9 @@ declare interface Channel {
   // Timestamp once the channel can be settled
   readonly settlementWindow: Promise<Moment>
 
+  // Current status of the channel
+  readonly status: Promise<'UNINITIALISED' | 'FUNDING' | 'OPEN' | 'PENDING'>
+
   // Current state of the channel, i.e. `FUNDED` with `1 HOPR / 3 HOPR`
   readonly state: Promise<ChannelType>
 
@@ -185,7 +188,7 @@ declare interface Channel {
   /**
    * Initiates a settlement for this channel.
    */
-  initiateSettlement(): Promise<void>
+  initiateSettlement(): Promise<string>
 }
 
 declare var Channel: ChannelStatic

@@ -1,9 +1,9 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { Channel as ChannelInstance } from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
-import PeerId from 'peer-id'
 import { u8aEquals } from '@hoprnet/hopr-utils'
 import { pubKeyToPeerId } from '@hoprnet/hopr-core/lib/utils'
+import PeerId from 'peer-id'
 import { isBootstrapNode } from './isBootstrapNode'
 
 /**
@@ -18,12 +18,10 @@ export function getPeers(
     noBootstrapNodes: false
   }
 ): PeerId[] {
-  let peers = node.network.peerStore.peers.map((peer) => PeerId.createFromB58String(peer.id))
+  let peers = node.getConnectedPeers()
 
   if (ops.noBootstrapNodes) {
-    peers = peers.filter((peerId) => {
-      return !isBootstrapNode(node, peerId)
-    })
+    peers = peers.filter((peerId) => !isBootstrapNode(node, peerId))
   }
 
   return peers
@@ -136,9 +134,9 @@ export async function getPartyOpenChannels(node: Hopr<HoprCoreConnector>, party:
  */
 export async function getOpenChannels(node: Hopr<HoprCoreConnector>, partyPeerId: PeerId): Promise<PeerId[]> {
   const supportsIndexer = typeof node.paymentChannels.indexer !== 'undefined'
-  const partyIfSelf = node.peerInfo.id.equals(partyPeerId)
+  const partyIsSelf = node.getId().equals(partyPeerId)
 
-  if (partyIfSelf) {
+  if (partyIsSelf) {
     // if party is self, and indexer not supported
     return getMyOpenChannels(node)
   } else if (supportsIndexer) {

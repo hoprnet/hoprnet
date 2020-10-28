@@ -1,24 +1,18 @@
 import Hopr from '../..'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-
 import HoprEthereum from '@hoprnet/hopr-core-ethereum'
-
 import { Ganache } from '@hoprnet/hopr-testing'
 import { migrate, fund } from '@hoprnet/hopr-ethereum'
-
 import assert from 'assert'
-
 import { u8aEquals, durations } from '@hoprnet/hopr-utils'
-
 import { MAX_HOPS } from '../../constants'
-
 import LevelUp from 'levelup'
 import MemDown from 'memdown'
-
 import BN from 'bn.js'
-
 import Debug from 'debug'
 import { ACKNOWLEDGED_TICKET_INDEX_LENGTH } from '../../dbKeys'
+import { connectionHelper } from '../../test-utils'
+
 const log = Debug(`hopr-core:testing`)
 
 const TWO_SECONDS = durations.seconds(2)
@@ -35,7 +29,7 @@ async function startTestnet() {
 
 async function generateNode(id: number): Promise<Hopr<HoprEthereum>> {
   // Start HOPR in DEBUG_MODE and use demo seeds
-  const node = (await Hopr.create({
+  return (await Hopr.create({
     id,
     db: new LevelUp(MemDown()),
     connector: HoprEthereum,
@@ -43,10 +37,6 @@ async function generateNode(id: number): Promise<Hopr<HoprEthereum>> {
     network: 'ethereum',
     debug: true
   })) as Hopr<HoprEthereum>
-
-  // await node.paymentChannels.initOnchainValues()
-
-  return node
 }
 
 const GANACHE_URI = `ws://127.0.0.1:9545`
@@ -59,7 +49,9 @@ describe('test packet composition and decomposition', function () {
   }, durations.seconds(30))
 
   afterEach(async function () {
-    await testnet.stop()
+    if (testnet) {
+      await testnet.stop()
+    }
   })
 
   it(
@@ -67,7 +59,7 @@ describe('test packet composition and decomposition', function () {
     async function () {
       const nodes = await Promise.all(Array.from({ length: MAX_HOPS + 1 }).map((_value, index) => generateNode(index)))
 
-      connectionHelper(nodes)
+      connectionHelper(nodes.map((n) => n._libp2p))
 
       console.log(
         new nodes[0].paymentChannels.types.ChannelBalance(undefined, {
@@ -78,7 +70,7 @@ describe('test packet composition and decomposition', function () {
           const channel = nodes[0].paymentChannels.types.Channel.createFunded(bal)
           const signedChannel = new nodes[0].paymentChannels.types.SignedChannel(undefined, {
             channel,
-            signature: await channel.sign(nodes[0].peerInfo.id.privKey.marshal(), undefined)
+            signature: await channel.sign(nodes[0].getId().privKey.marshal(), undefined)
           } as any)
           return signedChannel
         }
@@ -91,13 +83,13 @@ describe('test packet composition and decomposition', function () {
         })
 
         await nodes[a].paymentChannels.channel.create(
-          nodes[b].peerInfo.id.pubKey.marshal(),
-          async () => nodes[b].peerInfo.id.pubKey.marshal(),
+          nodes[b].getId().pubKey.marshal(),
+          undefined, //async () => nodes[b].getId().pubKey.marshal(),
           new nodes[a].paymentChannels.types.ChannelBalance(undefined, {
             balance: new BN(200),
             balance_a: new BN(100)
           }),
-          (_channelBalance) => nodes[a].interactions.payments.open.interact(nodes[b].peerInfo.id, channelBalance) as any
+          (_channelBalance) => nodes[a]._interactions.payments.open.interact(nodes[b].getId(), channelBalance) as any
         )
       }
 
@@ -123,8 +115,8 @@ describe('test packet composition and decomposition', function () {
 
       for (let i = 1; i <= MAX_HOPS; i++) {
         msgReceivedPromises.push(receiveChecker(testMessages.slice(i - 1, i), nodes[i]))
-        await nodes[0].sendMessage(testMessages[i - 1], nodes[i].peerInfo.id, async () =>
-          nodes.slice(1, i).map((node) => node.peerInfo.id)
+        await nodes[0].sendMessage(testMessages[i - 1], nodes[i].getId(), async () =>
+          nodes.slice(1, i).map((node) => node.getId())
         )
       }
 
@@ -143,8 +135,8 @@ describe('test packet composition and decomposition', function () {
       msgReceivedPromises.push(receiveChecker(testMessages.slice(1, 3), nodes[nodes.length - 1]))
 
       for (let i = 1; i <= MAX_HOPS - 1; i++) {
-        await nodes[i].sendMessage(testMessages[i], nodes[nodes.length - 1].peerInfo.id, async () =>
-          nodes.slice(i + 1, nodes.length - 1).map((node) => node.peerInfo.id)
+        await nodes[i].sendMessage(testMessages[i], nodes[nodes.length - 1].getId(), async () =>
+          nodes.slice(i + 1, nodes.length - 1).map((node) => node.getId())
         )
       }
 
@@ -157,9 +149,11 @@ describe('test packet composition and decomposition', function () {
           nodes[i].db
             .createValueStream({
               gte: Buffer.from(
-                nodes[i].dbKeys.AcknowledgedTickets(Buffer.alloc(ACKNOWLEDGED_TICKET_INDEX_LENGTH, 0x00))
+                nodes[i]._dbKeys.AcknowledgedTickets(Buffer.alloc(ACKNOWLEDGED_TICKET_INDEX_LENGTH, 0x00))
               ),
-              lt: Buffer.from(nodes[i].dbKeys.AcknowledgedTickets(Buffer.alloc(ACKNOWLEDGED_TICKET_INDEX_LENGTH, 0xff)))
+              lt: Buffer.from(
+                nodes[i]._dbKeys.AcknowledgedTickets(Buffer.alloc(ACKNOWLEDGED_TICKET_INDEX_LENGTH, 0xff))
+              )
             })
             .on('data', (data: Buffer) => {
               const acknowledged = nodes[i].paymentChannels.types.AcknowledgedTicket.create(nodes[i].paymentChannels)
@@ -178,8 +172,7 @@ describe('test packet composition and decomposition', function () {
 
         for (let k = 0; k < tickets.length; k++) {
           console.log((await tickets[k].signedTicket).ticket.amount)
-          // @ts-ignore
-          await nodes[i].paymentChannels.channel.tickets.submit(tickets[k])
+          await nodes[i].paymentChannels.channel.tickets.submit(tickets[k], undefined as any)
           console.log(`ticket submitted`)
         }
       }
@@ -191,19 +184,6 @@ describe('test packet composition and decomposition', function () {
     durations.seconds(25)
   )
 })
-
-/**
- * Introduce the nodes to each other
- * @param nodes Hopr nodes
- */
-function connectionHelper<Chain extends HoprCoreConnector>(nodes: Hopr<Chain>[]) {
-  for (let i = 0; i < nodes.length; i++) {
-    for (let j = i + 1; j < nodes.length; j++) {
-      nodes[i].peerStore.put(nodes[j].peerInfo)
-      nodes[j].peerStore.put(nodes[i].peerInfo)
-    }
-  }
-}
 
 const NOOP = () => {}
 

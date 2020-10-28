@@ -4,9 +4,8 @@ const process = require('process')
 const HDWalletProvider = require('@truffle/hdwallet-provider')
 const networks = require('./truffle-networks')
 
-const { PRIVATE_KEY, INFURA, ETHERSCAN } = process.env
-const canMigrate = typeof PRIVATE_KEY !== 'undefined' && typeof INFURA !== 'undefined'
-// const canVerify = typeof ETHERSCAN !== 'undefined'
+const { PRIVATE_KEY, ETHERSCAN, INFURA, MATIC } = process.env
+const canMigrate = typeof PRIVATE_KEY !== 'undefined' && typeof INFURA !== 'undefined' && MATIC !== 'undefined'
 
 module.exports = {
   networks: {
@@ -45,6 +44,12 @@ module.exports = {
     xdai: canMigrate && {
       ...networks.xdai,
       provider: () => new HDWalletProvider(PRIVATE_KEY, 'https://xdai.poanetwork.dev'),
+    },
+
+    // block explorer: https://explorer.matic.network
+    matic: canMigrate && {
+      ...networks.matic,
+      provider: () => new HDWalletProvider(PRIVATE_KEY, `https://rpc-mainnet.maticvigil.com/v1/${MATIC}`),
     },
   },
 

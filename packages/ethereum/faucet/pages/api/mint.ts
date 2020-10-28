@@ -11,6 +11,7 @@ const { PRIVATE_KEY, INFURA } = process.env
 const getProvider = (network: addresses.Networks): string => {
   if (['kovan'].includes(network)) return `https://${network}.infura.io/v3/${INFURA}`
   else if (network === 'xdai') return 'https://xdai.poanetwork.dev'
+  else if (network === 'matic') return 'https://explorer.matic.network/'
   else return `ws://${networksConfig.development.host}:${networksConfig.development.port}`
 }
 

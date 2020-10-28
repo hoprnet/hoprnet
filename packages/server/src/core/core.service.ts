@@ -137,13 +137,13 @@ export class CoreService {
     connectedNodes: number
   }> {
     try {
-      await this.node.network.crawler.crawl()
+      await this.node.crawl()
     } catch {}
 
-    const id = this.node.peerInfo.id.toB58String()
-    const multiAddresses = this.node.peerInfo.multiaddrs.toArray().map((multiaddr) => multiaddr.toString())
+    const id = this.node.getId().toB58String()
+    const multiAddresses = this.node.getAddresses().map((multiaddr) => multiaddr.toString())
 
-    const connectedNodes = this.node.network.peerStore.peers.length
+    const connectedNodes = this.node.getConnectedPeers().length
 
     return {
       id,
@@ -158,7 +158,7 @@ export class CoreService {
   ): Promise<{
     latency: number
   }> {
-    const latency = await this.node.ping(PeerId.createFromB58String(peerId))
+    const { latency } = await this.node.ping(PeerId.createFromB58String(peerId))
 
     return {
       latency,
@@ -179,9 +179,9 @@ export class CoreService {
   @mustBeStarted()
   async getAddress(type: 'native' | 'hopr'): Promise<string> {
     if (type === 'native') {
-      return this.node.paymentChannels.utils.pubKeyToAccountId(this.node.peerInfo.id.pubKey.marshal()).then(u8aToHex)
+      return this.node.paymentChannels.utils.pubKeyToAccountId(this.node.getId().pubKey.marshal()).then(u8aToHex)
     } else {
-      return this.node.peerInfo.id.toB58String()
+      return this.node.getId().toB58String()
     }
   }
 
@@ -235,7 +235,7 @@ export class CoreService {
     const connector = this.node.paymentChannels
     const { isPartyA, getId, pubKeyToAccountId } = connector.utils
     const { ChannelBalance, Balance } = connector.types
-    const self = this.node.peerInfo.id
+    const self = this.node.getId()
     const selfPubKey = self.pubKey.marshal()
     const selfAccountId = await pubKeyToAccountId(selfPubKey)
     const counterParty = PeerId.createFromB58String(peerId)
@@ -248,30 +248,7 @@ export class CoreService {
     // @ts-ignore @TODO: properly export types in h-c-e
     const channelFunding = new Balance(10)
 
-    // @TODO: update proto to provide open channel funding amount
-    const channelBalance = ChannelBalance.create(
-      undefined,
-      selfIsPartyA
-        ? {
-            balance: channelFunding,
-            balance_a: channelFunding,
-          }
-        : {
-            balance: channelFunding,
-            // @ts-ignore
-            balance_a: new Balance(0),
-          },
-    )
-
-    await connector.channel.create(
-      counterPartyPubKey,
-      async () => this.node.interactions.payments.onChainKey.interact(counterParty),
-      channelBalance,
-      (balance: Types.ChannelBalance): Promise<Types.SignedChannel> => {
-        return this.node.interactions.payments.open.interact(counterParty, balance)
-      },
-    )
-
+    await this.node.openChannel(counterParty, channelFunding)
     return channelId
   }
 

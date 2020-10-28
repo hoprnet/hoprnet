@@ -53,11 +53,7 @@ const it2 = (async function* foo() {
 
   while (true) {
     if (!aFinished && !bFinished) {
-      await Promise.race([
-        // prettier-ignore
-        aPromise.then(aPromiseFunction),
-        bPromise.then(bPromiseFunction)
-      ])
+      await Promise.race([aPromise.then(aPromiseFunction), bPromise.then(bPromiseFunction)])
     }
 
     if (aFinished) {

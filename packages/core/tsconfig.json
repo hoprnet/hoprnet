@@ -8,6 +8,8 @@
     "declaration": true,
     "skipLibCheck": true,
     "sourceMap": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "allowJs": true
   },
   "exclude": ["lib"],

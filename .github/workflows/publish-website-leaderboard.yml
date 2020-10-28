@@ -1,16 +1,17 @@
-name: Publish Website leaderboard.hoprnet.org
+name: Publish Website network.hoprnet.org
 
 on:
   push:
     branches: ['**']
     paths:
       - '.github/workflows/*-leaderboard.yml'
-      - 'websites/leaderboard/**'
-
-# currently, the vercel project is looking into the root folder
-# defaults:
-#   run:
-#     working-directory: websites/leaderboard
+      - 'websites/leaderboard-new/**'
+  pull_request_target:
+    branches: ['**']
+    paths:
+      - '.github/workflows/*-leaderboard.yml'
+      - 'websites/leaderboard-new/**'
+    types: [opened, synchronize]
 
 jobs:
   deploy:
@@ -19,17 +20,18 @@ jobs:
       - uses: actions/checkout@v1
       - name: Vercel Action (preview)
         uses: amondnet/vercel-action@77cb0ce3642a451f7f18d63821c0e26f7adead9a
-        if: github.ref != 'refs/heads/master'
+        if: github.event_name == 'pull_request_target' || (github.ref != 'refs/heads/master' && !startsWith(github.ref, 'refs/heads/release/'))
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
           vercel-project-id: ${{ secrets.VERCEL_LEADERBOARD_HOPRNET_ORG_PROJECT_ID }}
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
           scope: ${{ secrets.VERCEL_ORG_ID }}
-          github-comment: true
+          # 'amondnet/vercel-action' does not support 'pull_request_target'
+          github-comment: ${{ github.event_name != 'pull_request_target' }}
       - name: Vercel Action (production)
         uses: amondnet/vercel-action@77cb0ce3642a451f7f18d63821c0e26f7adead9a
-        if: github.ref == 'refs/heads/master'
+        if: github.event_name != 'pull_request_target' && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/'))
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           vercel-token: ${{ secrets.VERCEL_TOKEN }}

@@ -1,6 +1,7 @@
-import { RelayContext } from './relayContext'
+//import { RelayContext } from './relayContext'
 
 describe('test overwritable connection', function () {
+  /*
   let iteration = 0
   function getGenerator(): AsyncGenerator<Uint8Array> {
     return (async function* () {
@@ -13,6 +14,7 @@ describe('test overwritable connection', function () {
       return `iteration ${iteration} - msg no. ${i + 1}`
     })()
   }
+*/
 
   it('should create a connection and overwrite it', async function () {
     /*
