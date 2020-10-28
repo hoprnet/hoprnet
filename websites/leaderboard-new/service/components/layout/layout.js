@@ -13,7 +13,7 @@ import api from '../../utils/api'
 
 const Layout = ({ children }) => {
   const router = useRouter()
-  const [darkMode, setDarkMode] = useState(false)
+  const [darkMode, setDarkMode] = useState(undefined)
   const [modal, setModal] = useState(false)
   const [activaMenu, setactivaMenu] = useState(false)
   const [API_LastUpdated, SetAPI_LastUpdated] = useState(null)
@@ -30,13 +30,18 @@ const Layout = ({ children }) => {
   }
 
   const chenageMode = () => {
-    if (!darkMode) {
+    if (darkMode) {
       document.body.classList.add('dark-mode')
     } else {
       document.body.classList.remove('dark-mode')
     }
-    setDarkMode(!darkMode)
   }
+  useEffect(() => {
+    if (darkMode != undefined) {
+      localStorage.setItem('darkMode', darkMode)
+      chenageMode()
+    }
+  }, [darkMode])
 
   useEffect(() => {
     const fetchData = async () => {
@@ -50,10 +55,12 @@ const Layout = ({ children }) => {
       }
     }
     fetchData()
-    // if(activaMenu){
-
-    // }
+    let isSet = localStorage.getItem('darkMode')
+    if (isSet) {
+      setDarkMode(isSet === 'true')
+    }
   }, [])
+
   return (
     <>
       <Head>
@@ -86,19 +93,25 @@ const Layout = ({ children }) => {
           </div>
           <div className="active-darkmode">
             <label className="switch">
-              <input type="checkbox" onChange={() => chenageMode()} />
+              <input type="checkbox" onChange={() => setDarkMode(darkMode)} checked={[darkMode ? true : false ]} />
               <span className="slider round">
                 <img
                   className="icon-darkmode"
                   src={'/assets/icons/' + [darkMode ? 'luna.svg' : 'dom.svg']}
-                  alt="hopr"
+                  alt="hopr darkmode"
                 />
               </span>
             </label>
           </div>
         </div>
       </header>
-      <Menu darkMode={darkMode} chenageMode={chenageMode} activaMenu={activaMenu} hash={hash} copyCodeToClipboard={copyCodeToClipboard} />
+      <Menu
+        darkMode={darkMode}
+        chenageMode={chenageMode}
+        activaMenu={activaMenu}
+        hash={hash}
+        copyCodeToClipboard={copyCodeToClipboard}
+      />
       <div className="main-container">
         <div className="only-desktop-view">
           <LeftSide hash={hash} copyCodeToClipboard={copyCodeToClipboard} />

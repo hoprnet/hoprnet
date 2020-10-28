@@ -1,7 +1,7 @@
 body.dark-mode {
   background: black;
   filter: invert(1) hue-rotate(180deg);
-  img {
+  .icon-logo-desktop img {
     filter: invert(1) hue-rotate(180deg) !important;
   }
 }
@@ -24,6 +24,7 @@ body.dark-mode {
   display: inline-block;
   width: 60px;
   height: 34px;
+  cursor: pointer;
 }
 
 /* Hide default HTML checkbox */
