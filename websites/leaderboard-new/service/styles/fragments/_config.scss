@@ -1,8 +1,10 @@
+
 body {
   font-family: "Source Code Pro", monospace;
   background: $white-alt;
   @media (min-width: 767px) {
   overflow:hidden;
+  height: 100vh;
   }
 }
 

@@ -1,11 +1,10 @@
 .menu-mobile {
   background: #fff;
   top: 0;
-  position: fixed;
-  width: 100%;
+  display: none;
   left: 0;
   height: 100%;
-  z-index: 2;
+  z-index: -1;
   transition: all 1s cubic-bezier(0.785, 0.135, 0.15, 0.86);
   transform: translateX(100%);
 
@@ -56,8 +55,12 @@
 }
 
 .open-menu {
-  transition: all 1s cubic-bezier(0.785, 0.135, 0.15, 0.86);
+  transition: transition 1s cubic-bezier(0.785, 0.135, 0.15, 0.86);
   transform: translateX(0%);
+  display: block;
+  position: fixed;
+  width: 100%;
+  z-index: 2;
 }
 
 .quick-code {
