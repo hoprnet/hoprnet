@@ -1,9 +1,0 @@
-runtime: python27
-api_version: 1
-threadsafe: true
-
-handlers:
-  - url: /.well-known/matrix
-    static_dir: well-known/matrix
-    http_headers:
-      Access-Control-Allow-Origin: https://hoprnet.modular.im
