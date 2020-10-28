@@ -1,6 +1,9 @@
 {
   "name": "root",
   "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "setup": "yarn util:install && yarn util:link && yarn util:build",
     "build": "yarn util:build",
@@ -22,7 +25,6 @@
     "lerna": "^3.22.1"
   },
   "devDependencies": {
-    "husky": "^4.2.5",
     "prettier": "^2.0.5",
     "rimraf": "^3.0.2"
   },
