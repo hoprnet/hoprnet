@@ -4,7 +4,6 @@ on:
     branches: ['master', 'release/*']
     paths-ignore:
       - 'docs/**'
-      - 'websites/**'
 
 jobs:
   build:

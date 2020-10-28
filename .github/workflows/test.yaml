@@ -1,10 +1,11 @@
 name: HOPR Test
+
 on:
   push:
     branches: ['**']
     paths-ignore:
       - 'docs/**'
-      - 'websites/**'
+
 jobs:
   build:
     name: Build & Test
