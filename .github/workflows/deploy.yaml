@@ -4,8 +4,6 @@ on:
     branches: ['master', 'release/*']
     paths-ignore:
       - 'docs/**'
-      - 'websites/**'
-      - '.github/workflows/publish-website-*.yml'
 
 jobs:
   build:

@@ -1,4 +1,0 @@
-node_modules
-websites/**/node_modules
-packages/**/node_modules
-build

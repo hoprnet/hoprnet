@@ -1,11 +1,10 @@
 name: Smoke test
+
 on:
   push:
     branches: ['master']
     paths-ignore:
       - 'docs/**'
-      - 'websites/**'
-      - '.github/workflows/publish-website-*.yml'
 
 jobs:
   build:
