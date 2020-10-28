@@ -26,10 +26,6 @@ export abstract class SendMessageBase extends AbstractCommand {
     return `${myAddress}:${message}`
   }
 
-  protected getIntermediateNodesFromRoute(routing: GlobalState['routing']): Promise<PeerId[]> {
-    return Promise.all(routing.split(',').map((peerId) => checkPeerIdInput(peerId)))
-  }
-
   protected async sendMessage(
     state: GlobalState,
     recipient: PeerId,
@@ -60,30 +56,32 @@ export abstract class SendMessageBase extends AbstractCommand {
 
 export class SendMessage extends SendMessageBase {
   public async execute(query: string, state: GlobalState): Promise<CommandResponse> {
-    const [err, peerIdString, message] = this._assertUsage(query, ['PeerId', 'Message'], /(\w+)\s(.*)/)
-    if (err) return err
-
-    let peerId: PeerId
     try {
-      peerId = await checkPeerIdInput(peerIdString, state)
-    } catch (err) {
-      return styleValue(err.message, 'failure')
-    }
+      const [err, peerIdString, message] = this._assertUsage(query, ['PeerId', 'Message'], /(\w+)\s(.*)/)
+      if (err) throw Error(err)
 
-    try {
-      // manual mode
-      if (state.routing === 'manual') {
-        return styleValue('Cannot send a message using manual mode.', 'failure')
+      let peerId: PeerId
+      try {
+        peerId = await checkPeerIdInput(peerIdString, state)
+      } catch (err) {
+        throw err
       }
-      // manual mode but with specified peers
-      else if (state.routing.match(',')) {
-        return this.sendMessage(state, peerId, message, async () => {
-          return this.getIntermediateNodesFromRoute(state.routing)
-        })
+
+      // manual mode
+      if (state.routing === 'manual' && state.routingPath.length === 0) {
+        throw Error('Cannot send a message using manual mode.')
       }
       // direct mode
-      else {
-        return this.sendMessage(state, peerId, message)
+      else if (state.routing === 'direct') {
+        return this.sendMessage(state, peerId, message, async () => [])
+      }
+      // peerIds are specified in `state.routing`
+      else if (state.routingPath.length > 0) {
+        return this.sendMessage(state, peerId, message, async () => {
+          return state.routingPath
+        })
+      } else {
+        throw Error(`Routing '${state.routing}' does not exist.`)
       }
     } catch (err) {
       return styleValue(err.message, 'failure')
@@ -101,20 +99,20 @@ export class SendMessageFancy extends SendMessageBase {
    * @param query peerId string to send message to
    */
   public async execute(query: string, state: GlobalState): Promise<string | void> {
-    const [err, peerIdString] = this._assertUsage(query, ['PeerId'])
-    if (err) return err
-
-    let peerId: PeerId
     try {
-      peerId = await checkPeerIdInput(peerIdString, state)
-    } catch (err) {
-      return styleValue(err.message, 'failure')
-    }
+      const [err, peerIdString] = this._assertUsage(query, ['PeerId'])
+      if (err) throw Error(err)
 
-    const messageQuestion = styleValue(`Type your message and press ENTER to send:`, 'highlight') + '\n'
-    const message = await new Promise<string>((resolve) => this.rl.question(messageQuestion, resolve))
+      let peerId: PeerId
+      try {
+        peerId = await checkPeerIdInput(peerIdString, state)
+      } catch (err) {
+        throw err
+      }
 
-    try {
+      const messageQuestion = styleValue(`Type your message and press ENTER to send:`, 'highlight') + '\n'
+      const message = await new Promise<string>((resolve) => this.rl.question(messageQuestion, resolve))
+
       // manual mode
       if (state.routing === 'manual') {
         clearString(messageQuestion + message, this.rl)
@@ -124,15 +122,17 @@ export class SendMessageFancy extends SendMessageBase {
           return this.selectIntermediateNodes(this.rl, peerId)
         })
       }
-      // manual mode but with specified peers
-      else if (state.routing.match(',')) {
-        return this.sendMessage(state, peerId, message, async () => {
-          return this.getIntermediateNodesFromRoute(state.routing)
-        })
-      }
       // direct mode
-      else {
-        return this.sendMessage(state, peerId, message)
+      else if (state.routing === 'direct') {
+        return this.sendMessage(state, peerId, message, async () => [])
+      }
+      // peerIds are specified in `state.routing`
+      else if (state.routingPath.length > 0) {
+        return this.sendMessage(state, peerId, message, async () => {
+          return state.routingPath
+        })
+      } else {
+        throw Error(`Routing '${state.routing}' does not exist.`)
       }
     } catch (err) {
       return styleValue(err.message, 'failure')

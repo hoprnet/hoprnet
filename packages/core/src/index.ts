@@ -1,5 +1,6 @@
 /// <reference path="./@types/libp2p.ts" />
 import LibP2P from 'libp2p'
+import type { Connection } from 'libp2p'
 import MPLEX = require('libp2p-mplex')
 // @ts-ignore
 import KadDHT = require('libp2p-kad-dht')
@@ -13,7 +14,7 @@ import { PACKET_SIZE, MAX_HOPS, VERSION } from './constants'
 
 import { Network } from './network'
 
-import { addPubKey, getPeerInfo, pubKeyToPeerId } from './utils'
+import { addPubKey, getPeerId, getAddrs, pubKeyToPeerId } from './utils'
 import { createDirectoryIfNotExists, u8aToHex } from '@hoprnet/hopr-utils'
 import { existsSync } from 'fs'
 
@@ -26,8 +27,6 @@ import Debug from 'debug'
 const log = Debug(`hopr-core`)
 
 import PeerId from 'peer-id'
-import PeerInfo from 'peer-info'
-
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { HoprCoreConnectorStatic, Types } from '@hoprnet/hopr-core-connector-interface'
 import type { CrawlInfo } from './network/crawler'
@@ -36,7 +35,6 @@ import BN from 'bn.js'
 
 import { Interactions } from './interactions'
 import * as DbKeys from './dbKeys'
-import type { Connection } from './@types/transport'
 import EventEmitter from 'events'
 
 const verbose = Debug('hopr-core:verbose')
@@ -56,13 +54,12 @@ export type HoprOptions = {
   db?: LevelUp
   dbPath?: string
   peerId?: PeerId
-  peerInfo?: PeerInfo
   password?: string
-  id?: number
+  id?: number // TODO - kill this opaque accessor of db files...
   bootstrapNode?: boolean
   network: string
   connector?: HoprCoreConnectorStatic
-  bootstrapServers?: PeerInfo[]
+  bootstrapServers?: Multiaddr[]
   provider: string
   output?: (encoded: Uint8Array) => void
   hosts?: {
@@ -83,8 +80,10 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
 
   public output: (arr: Uint8Array) => void
   public isBootstrapNode: boolean
-  public bootstrapServers: PeerInfo[]
+  public bootstrapServers: Multiaddr[]
   public initializedWithOptions: HoprOptions
+
+  private running: boolean
 
   /**
    * @constructor
@@ -94,8 +93,8 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
    */
   private constructor(options: HoprOptions, public _libp2p: LibP2P, public db: LevelUp, public paymentChannels: Chain) {
     super()
-    this._libp2p.on('peer:connect', (peer: PeerInfo) => {
-      this.emit('hopr:peer:connection', peer.id)
+    this._libp2p.connectionManager.on('peer:connect', (conn: Connection) => {
+      this.emit('hopr:peer:connection', conn.remotePeer.id)
     })
 
     this.initializedWithOptions = options
@@ -108,7 +107,6 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     }
     this.bootstrapServers = options.bootstrapServers || []
     this.isBootstrapNode = options.bootstrapNode || false
-
     this._interactions = new Interactions(
       this,
       (conn: Connection) => this._network.crawler.handleCrawlRequest(conn),
@@ -117,13 +115,15 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     this._network = new Network(this._libp2p, this._interactions, options)
 
     verbose('# STARTED NODE')
-    verbose('ID', this._libp2p.peerInfo.id.toB58String())
+    verbose('ID', this.getId().toB58String())
     verbose('Protocol version', VERSION)
     this._debug = options.debug
   }
 
   /**
-   * Creates a new node.
+   * Creates a new node
+   * This is necessary as some of the constructor for the node needs to be
+   * asynchronous..
    *
    * @param options the parameters
    */
@@ -132,8 +132,8 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   ): Promise<Hopr<CoreConnector>> {
     const Connector = options.connector ?? HoprCoreEthereum
     const db = Hopr.openDatabase(options, Connector.constants.CHAIN_NAME, Connector.constants.NETWORK)
-
-    options.peerInfo = options.peerInfo || (await getPeerInfo(options, db))
+    const id = await getPeerId(options, db)
+    const addresses = await getAddrs(id, options)
 
     if (
       !options.debug &&
@@ -143,7 +143,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       throw Error(`Cannot start node without a bootstrap server`)
     }
 
-    let connector = (await Connector.create(db, options.peerInfo.id.privKey.marshal(), {
+    let connector = (await Connector.create(db, id.privKey.marshal(), {
       provider: options.provider,
       debug: options.debug
     })) as CoreConnector
@@ -151,8 +151,8 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     verbose('Created connector, now creating node')
 
     const libp2p = await LibP2P.create({
-      peerInfo: options.peerInfo,
-
+      peerId: id,
+      addresses: { listen: addresses },
       // Disable libp2p-switch protections for the moment
       switch: {
         denyTTL: 1,
@@ -183,14 +183,15 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   }
 
   /**
-   * Parses the bootstrap servers given in `.env` and tries to connect to each of them.
+   * Parses the bootstrap servers given in options` and tries to connect to each of them.
    *
    * @throws an error if none of the bootstrapservers is online
    */
   private async connectToBootstrapServers(): Promise<void> {
     const potentialBootstrapServers = this.bootstrapServers.filter(
-      (addr: PeerInfo) => !addr.id.equals(this._libp2p.peerInfo.id)
+      (addr) => addr.getPeerId() != this.getId().toB58String()
     )
+    verbose('bootstrap', potentialBootstrapServers)
 
     if (potentialBootstrapServers.length == 0) {
       if (this._debug != true && !this.isBootstrapNode) {
@@ -203,13 +204,14 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     }
 
     const results = await Promise.all(
-      potentialBootstrapServers.map((addr: PeerInfo) =>
+      potentialBootstrapServers.map((addr: Multiaddr) =>
         this._libp2p.dial(addr).then(
           () => true,
           () => false
         )
       )
     )
+    verbose('bootstrap status', results)
 
     if (!results.some((online: boolean) => online)) {
       throw Error('Unable to connect to any known bootstrap server.')
@@ -230,8 +232,8 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
 
     log(`Available under the following addresses:`)
 
-    this._libp2p.peerInfo.multiaddrs.forEach((ma: Multiaddr) => log(ma.toString()))
-
+    this._libp2p.multiaddrs.forEach((ma: Multiaddr) => log(ma.toString()))
+    this.running = true
     return this
   }
 
@@ -239,6 +241,10 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
    * Shuts down the node and saves keys and peerBook in the database
    */
   public async stop(): Promise<void> {
+    if (!this.running) {
+      return Promise.resolve()
+    }
+    this.running = false
     await Promise.all([this._network.stop(), this.paymentChannels?.stop().then(() => log(`Connector stopped.`))])
 
     await Promise.all([this.db?.close().then(() => log(`Database closed.`)), this._libp2p.stop()])
@@ -247,15 +253,19 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     await new Promise((resolve) => setTimeout(resolve, 100))
   }
 
+  public isRunning(): boolean {
+    return this.running
+  }
+
   public getId(): PeerId {
-    return this._libp2p.peerInfo.id
+    return this._libp2p.peerId // Not a documented API, but in the sourceu
   }
 
   /*
    * List the addresses the node is available on
    */
   public getAddresses(): Multiaddr[] {
-    return this._libp2p.peerInfo.multiaddrs.toArray()
+    return this._libp2p.multiaddrs
   }
 
   /**
@@ -371,7 +381,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     channelId: Types.Hash
   }> {
     const { utils, types, account } = this.paymentChannels
-    const self = this._libp2p.peerInfo.id
+    const self = this.getId()
 
     const channelId = await utils.getId(
       await utils.pubKeyToAccountId(self.pubKey.marshal()),
@@ -442,10 +452,10 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
    * @param destination instance of peerInfo that contains the peerId of the destination
    */
   private async getIntermediateNodes(destination: PeerId): Promise<PeerId[]> {
-    const start = new this.paymentChannels.types.Public(this._libp2p.peerInfo.id.pubKey.marshal())
+    const start = new this.paymentChannels.types.Public(this.getId().pubKey.marshal())
     const exclude = [
       destination.pubKey.marshal(),
-      ...this.bootstrapServers.map((pInfo) => pInfo.id.pubKey.marshal())
+      ...this.bootstrapServers.map((ma) => PeerId.createFromB58String(ma.getPeerId()).pubKey.marshal())
     ].map((pubKey) => new this.paymentChannels.types.Public(pubKey))
 
     return await Promise.all(

@@ -6,7 +6,7 @@ import assert from 'assert'
 
 import { privKeyToPeerId } from './utils'
 import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
-import PeerInfo from 'peer-info'
+import Multiaddr from 'multiaddr'
 
 describe('test hopr-core', function () {
   let ganache
@@ -53,7 +53,6 @@ describe('test hopr-core', function () {
     `should not call ourself`,
     async function () {
       const peerId = await privKeyToPeerId(NODE_SEEDS[0])
-
       node = await Hopr.create({
         debug: true,
         peerId,
@@ -66,9 +65,9 @@ describe('test hopr-core', function () {
             port: getNewPort()
           }
         },
-        bootstrapServers: [new PeerInfo(peerId)]
+        bootstrapServers: [new Multiaddr('/p2p/' + peerId.toB58String())]
       })
     },
-    durations.seconds(3)
+    durations.seconds(5)
   )
 })

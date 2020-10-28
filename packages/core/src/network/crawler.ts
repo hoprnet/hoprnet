@@ -6,7 +6,7 @@ import type { Token } from '../utils'
 import { MAX_HOPS, CRAWLING_RESPONSE_NODES } from '../constants'
 import { CrawlResponse, CrawlStatus } from '../messages'
 import PeerId from 'peer-id'
-import type { Connection } from '../@types/transport'
+import type { Connection } from 'libp2p'
 import type { Entry } from './network-peers'
 import NetworkPeerStore from './network-peers'
 import { peerHasOnlyPublicAddresses, isOnPrivateNet, PRIVATE_NETS } from '../filters'
@@ -184,12 +184,15 @@ class Crawler {
             log(`received [${addresses.map((p) => blue(p.getPeerId())).join(', ')}] from peer ${blue(peer)}`)
           } catch (err) {
             verbose('error querying peer', err)
-            addresses = undefined
+            addresses = []
             errors.push(err)
             continue
           }
 
           for (let i = 0; i < addresses.length; i++) {
+            if (!addresses[i].getPeerId()) {
+              throw Error('address does not contain peer id: ' + addresses[i].toString())
+            }
             const peer = PeerId.createFromCID(addresses[i].getPeerId())
 
             if (peer.equals(this.id)) {

@@ -1,7 +1,7 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '..'
 import PeerId from 'peer-id'
-import type { Connection } from '../@types/transport'
+import type { Connection } from 'libp2p'
 
 import { PaymentInteractions } from './payments'
 import { NetworkInteractions } from './network'

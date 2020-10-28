@@ -1,7 +1,6 @@
 import heap from 'heap-js'
 import { randomSubset } from '@hoprnet/hopr-utils'
 
-import type PeerInfo from 'peer-info'
 import PeerId from 'peer-id'
 import { BLACKLIST_TIMEOUT } from '../constants'
 
@@ -32,13 +31,13 @@ class NetworkPeers {
     return b.deletedAt - a.deletedAt
   }
 
-  constructor(existingPeers: IterableIterator<PeerInfo>) {
+  constructor(existingPeers: Array<PeerId>) {
     this.peers = []
     this.deletedPeers = []
 
-    for (const peerInfo of existingPeers) {
+    for (const peer of existingPeers) {
       this.peers.push({
-        id: peerInfo.id,
+        id: peer,
         lastSeen: 0
       })
     }
@@ -51,8 +50,8 @@ class NetworkPeers {
     return randomSubset(this.peers, Math.min(size, this.peers.length)).map((e: Entry) => e.id)
   }
 
-  onPeerConnect(peerInfo: PeerInfo) {
-    this.push({ id: peerInfo.id, lastSeen: Date.now() })
+  onPeerConnect(peerId: PeerId) {
+    this.push({ id: peerId, lastSeen: Date.now() })
   }
 
   push(entry: Entry): number {

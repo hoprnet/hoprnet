@@ -3,7 +3,6 @@ import debug from 'debug'
 import { getTokens, Token } from '../utils'
 import PeerId from 'peer-id'
 import { EventEmitter } from 'events'
-import PeerInfo from 'peer-info'
 import { randomInteger } from '@hoprnet/hopr-utils'
 import {
   HEARTBEAT_REFRESH_TIME,
@@ -27,9 +26,9 @@ class Heartbeat extends EventEmitter {
     super.on('beat', this.connectionListener.bind(this))
   }
 
-  connectionListener(peer: PeerId | PeerInfo) {
+  connectionListener(peer: PeerId) {
     this.networkPeers.push({
-      id: PeerId.isPeerId(peer) ? peer : peer.id,
+      id: peer,
       lastSeen: Date.now()
     })
   }
