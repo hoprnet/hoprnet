@@ -8,7 +8,7 @@ const assertMatch = (test: any, pattern: RegExp) => {
   assert(test.match(pattern), `should match ${pattern}`)
 }
 
-let mockNode = sinon.fake() 
+let mockNode = sinon.fake()
 
 describe('Commands', () => {
   it('can import commands', () => {
@@ -38,7 +38,7 @@ describe('Commands', () => {
 
   it('version', async () => {
     let cmds = new mod.Commands(mockNode)
-    assertMatch(await cmds.execute('version'), /hopr-core/)  
+    assertMatch(await cmds.execute('version'), /hopr-core/)
   })
 
   it('crawl', async () => {
@@ -64,11 +64,11 @@ describe('Commands', () => {
   */
 
   it('myAddress', async () => {
-    let mockNode = sinon.fake() 
+    let mockNode = sinon.fake()
     mockNode.paymentChannels = sinon.fake()
     mockNode.paymentChannels.constants = sinon.fake()
     mockNode.paymentChannels.utils = sinon.fake()
-    mockNode.paymentChannels.utils.pubKeyToAccountId = sinon.fake.returns('') 
+    mockNode.paymentChannels.utils.pubKeyToAccountId = sinon.fake.returns('')
     mockNode.paymentChannels.constants.CHAIN_NAME = '2CHAINZ'
     mockNode.getId = sinon.fake.returns({
       toB58String: sinon.fake(),
