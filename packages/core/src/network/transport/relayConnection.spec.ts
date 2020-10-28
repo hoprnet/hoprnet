@@ -53,8 +53,8 @@ describe('test relay connection', function () {
 
     setTimeout(() => setImmediate(() => b.close()), randomInteger(TIMEOUT_LOWER_BOUND, TIMEOUT_UPPER_BOUND))
 
-    for await (const msg of b.source) {
-      console.log(new TextDecoder().decode(msg.slice()))
+    for await (const _msg of b.source) {
+      //console.log(new TextDecoder().decode(msg.slice()))
     }
 
     for await (const _msg of a.source) {
@@ -112,8 +112,8 @@ describe('test relay connection', function () {
     )
     setTimeout(() => setImmediate(() => a.close()), randomInteger(TIMEOUT_LOWER_BOUND, TIMEOUT_UPPER_BOUND))
 
-    for await (const msg of b.source) {
-      console.log(new TextDecoder().decode(msg.slice()))
+    for await (const _msg of b.source) {
+      //console.log(new TextDecoder().decode(msg.slice()))
     }
 
     for await (const _msg of a.source) {
@@ -139,11 +139,11 @@ describe('test relay connection', function () {
 
     const FakeWebRTCAlice = new EventEmitter()
     // @ts-ignore
-    FakeWebRTCAlice.signal = (msg: string) => console.log(`received fancy WebRTC message`, msg)
+    FakeWebRTCAlice.signal = (_msg: string) => {} //console.log(`received fancy WebRTC message`, msg)
 
     const FakeWebRTCBob = new EventEmitter()
     // @ts-ignore
-    FakeWebRTCBob.signal = (msg: string) => console.log(`received fancy WebRTC message`, msg)
+    FakeWebRTCBob.signal = (_msg: string) => {}//console.log(`received fancy WebRTC message`, msg)
 
     const interval = setInterval(() => FakeWebRTCAlice.emit(`signal`, { msg: 'Fake signal' }), 50)
     setTimeout(() => {
@@ -242,7 +242,7 @@ describe('test relay connection', function () {
         if (aDone && bDone) {
           break
         } else {
-          console.log(new TextDecoder().decode((await msgA).value))
+          //console.log(new TextDecoder().decode((await msgA).value))
         }
 
         //@ts-ignore
@@ -255,7 +255,7 @@ describe('test relay connection', function () {
         if (aDone && bDone) {
           break
         } else {
-          console.log(new TextDecoder().decode((await msgB).value))
+          //console.log(new TextDecoder().decode((await msgB).value))
         }
         //@ts-ignore
         msgB = b.source.next().then(bFunction)

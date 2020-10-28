@@ -92,7 +92,7 @@ describe('should create a socket and connect to it', function () {
             (source: AsyncIterable<Uint8Array>) => {
               return (async function* () {
                 for await (const msg of source) {
-                  console.log(`echoing <${new TextDecoder().decode(msg.slice())}>`)
+                  //console.log(`echoing <${new TextDecoder().decode(msg.slice())}>`)
                   yield msg
                 }
               })()
@@ -122,8 +122,8 @@ describe('should create a socket and connect to it', function () {
       conn,
       async (source: AsyncIterable<Uint8Array>) => {
         setTimeout(() => setImmediate(() => conn.close()), 300)
-        for await (const msg of source) {
-          console.log(`received <${new TextDecoder().decode(msg.slice())}>`)
+        for await (const _msg of source) {
+          //console.log(`received <${new TextDecoder().decode(msg.slice())}>`)
         }
       }
     )
@@ -141,7 +141,7 @@ describe('should create a socket and connect to it', function () {
           (source: AsyncIterable<Uint8Array>) => {
             return (async function* () {
               for await (const msg of source) {
-                console.log(`echoing <${new TextDecoder().decode(msg.slice())}>`)
+                //console.log(`echoing <${new TextDecoder().decode(msg.slice())}>`)
                 yield msg
               }
             })()

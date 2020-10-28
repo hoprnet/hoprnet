@@ -102,8 +102,8 @@ describe('unit test heartbeat', () => {
 
   it('check nodes is noop with empty store', async () => {
     await heartbeat.checkNodes()
-    assert(hangUp.mock.calls.length == 0)
-    assert(interaction.interact.mock.calls.length === 0)
+    assert(hangUp.callCount == 0)
+    assert(interaction.callCound === 0)
   })
 
   it('check nodes is noop with only new peers', async () => {
@@ -112,14 +112,14 @@ describe('unit test heartbeat', () => {
       lastSeen: Date.now()
     })
     await heartbeat.checkNodes()
-    assert(hangUp.mock.calls.length === 0)
-    assert(interaction.interact.mock.calls.length === 0)
+    assert(hangUp.callCount === 0)
+    assert(interaction.callCount === 0)
   })
 
   it('check nodes interacts with an old peer', async () => {
     peers.push({ id: PeerId.createFromB58String('16Uiu2HAmShu5QQs3LKEXjzmnqcT8E3YqyxKtVTurWYp8caM5jYJw'), lastSeen: 0 })
     await heartbeat.checkNodes()
-    assert(hangUp.mock.calls.length === 0)
-    assert(interaction.interact.mock.calls.length === 1)
+    assert(hangUp.callCount === 0)
+    assert(interaction.callCount === 1)
   })
 })

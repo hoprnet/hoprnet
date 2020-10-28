@@ -29,7 +29,8 @@ async function generateNode(id: number): Promise<Hopr<HoprEthereum>> {
 
 const GANACHE_URI = `ws://127.0.0.1:9545`
 
-describe('test packet composition and decomposition', function () {
+describe('packet/index.spec.ts test packet composition and decomposition', function () {
+  this.timeout(30000)
 
   it(
     'should create packets and decompose them',
@@ -38,20 +39,18 @@ describe('test packet composition and decomposition', function () {
 
       connectionHelper(nodes.map((n) => n._libp2p))
 
-      console.log(
-        new nodes[0].paymentChannels.types.ChannelBalance(undefined, {
-          balance: new BN(200),
-          balance_a: new BN(100)
-        }),
-        async (bal) => {
-          const channel = nodes[0].paymentChannels.types.Channel.createFunded(bal)
-          const signedChannel = new nodes[0].paymentChannels.types.SignedChannel(undefined, {
-            channel,
-            signature: await channel.sign(nodes[0].getId().privKey.marshal(), undefined)
-          } as any)
-          return signedChannel
-        }
-      )
+      new nodes[0].paymentChannels.types.ChannelBalance(undefined, {
+        balance: new BN(200),
+        balance_a: new BN(100)
+      }),
+      async (bal) => {
+        const channel = nodes[0].paymentChannels.types.Channel.createFunded(bal)
+        const signedChannel = new nodes[0].paymentChannels.types.SignedChannel(undefined, {
+          channel,
+          signature: await channel.sign(nodes[0].getId().privKey.marshal(), undefined)
+        } as any)
+        return signedChannel
+      }
 
       async function openChannel(a: number, b: number) {
         let channelBalance = new nodes[a].paymentChannels.types.ChannelBalance(undefined, {
@@ -79,8 +78,6 @@ describe('test packet composition and decomposition', function () {
       }
 
       await Promise.all(queries.map((query) => openChannel(query[0], query[1])))
-
-      console.log(`channels opened`)
 
       const testMessages: Uint8Array[] = []
 
@@ -145,12 +142,8 @@ describe('test packet composition and decomposition', function () {
           continue
         }
 
-        console.log(tickets.length)
-
         for (let k = 0; k < tickets.length; k++) {
-          console.log((await tickets[k].signedTicket).ticket.amount)
           await nodes[i].paymentChannels.channel.tickets.submit(tickets[k], undefined as any)
-          console.log(`ticket submitted`)
         }
       }
 

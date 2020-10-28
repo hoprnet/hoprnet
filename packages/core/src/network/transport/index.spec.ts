@@ -748,7 +748,7 @@ describe('should create a socket and connect to it', function () {
     let msgReceived = false
     await pipe([testMessage], stream, async (source: AsyncIterable<Uint8Array>) => {
       for await (const msg of source) {
-        console.log(`receiving relayed connection. message`, new TextDecoder().decode(msg.slice()))
+        //console.log(`receiving relayed connection. message`, new TextDecoder().decode(msg.slice()))
         if (u8aEquals(msg.slice(), testMessage)) {
           msgReceived = true
 
