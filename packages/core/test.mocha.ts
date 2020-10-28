@@ -1,8 +1,10 @@
 import { Ganache } from '@hoprnet/hopr-testing'
 import { migrate, fund } from '@hoprnet/hopr-ethereum'
 
+let ganache
+
 export const mochaGlobalSetup = async () => {
-  let ganache = new Ganache()
+  ganache = new Ganache()
   await ganache.start()
   await migrate()
   await fund(4)
