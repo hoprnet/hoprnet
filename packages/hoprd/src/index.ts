@@ -16,7 +16,6 @@ import { LogStream, Socket } from './logs'
 import { AdminServer } from './admin'
 import chalk from 'chalk'
 import * as yargs from 'yargs'
-import { startServer } from '@hoprnet/hopr-server'
 
 let debugLog = debug('hoprd')
 
@@ -63,11 +62,6 @@ const argv = yargs
   .option('admin', {
     boolean: true,
     describe: 'Run an admin interface on localhost:3000',
-    default: false
-  })
-  .option('grpc', {
-    boolean: true,
-    describe: 'Run a gRPC interface',
     default: false
   })
   .option('password', {
@@ -188,11 +182,6 @@ async function main() {
       logs.log('Process exiting')
       return
     })
-
-    if (argv.grpc) {
-      // Start HOPR server
-      startServer(node, { logger: logs })
-    }
 
     if (adminServer) {
       adminServer.registerNode(node)
