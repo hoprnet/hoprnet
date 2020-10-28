@@ -78,7 +78,7 @@ async function generateNode(options: {
   }
 }
 
-describe('should create a socket and connect to it', function () {
+describe('transport/relay.spec.ts should create a socket and connect to it', function () {
   it('should create a node and echo a single message', async function () {
     let [sender, relayer, counterparty] = await Promise.all([
       generateNode({ id: 0, ipv4: true }),

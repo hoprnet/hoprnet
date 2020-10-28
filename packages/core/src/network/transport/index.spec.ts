@@ -23,7 +23,8 @@ import { connectionHelper } from '../../test-utils'
 
 const TEST_PROTOCOL = `/test/0.0.1`
 
-describe('should create a socket and connect to it', function () {
+describe('transport/index.spec.tc should create a socket and connect to it', function () {
+  this.timeout(5000)
 
   async function generateNode(
     options: {
