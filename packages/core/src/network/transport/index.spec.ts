@@ -19,13 +19,11 @@ import pipe from 'it-pipe'
 import { u8aEquals } from '@hoprnet/hopr-utils'
 
 import { randomBytes } from 'crypto'
-import { RELAY_CIRCUIT_TIMEOUT } from './constants'
 import { connectionHelper } from '../../test-utils'
 
 const TEST_PROTOCOL = `/test/0.0.1`
 
 describe('should create a socket and connect to it', function () {
-  jest.setTimeout(RELAY_CIRCUIT_TIMEOUT * 3)
 
   async function generateNode(
     options: {

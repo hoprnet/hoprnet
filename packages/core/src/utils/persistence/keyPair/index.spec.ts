@@ -11,7 +11,6 @@ import { randomInteger, u8aEquals } from '@hoprnet/hopr-utils'
 
 describe('test serialisation and deserialisation of encrypted keypair', function () {
   it('should serialize and deserialize a keypair', async function () {
-    jest.setTimeout(5000)
     const password = randomBytes(randomInteger(1, 33))
 
     const peerId = await PeerId.create({ keyType: 'secp256k1' })

@@ -1,6 +1,4 @@
-import { Ganache, getNewPort } from '@hoprnet/hopr-testing'
-import { migrate } from '@hoprnet/hopr-ethereum'
-import { durations } from '@hoprnet/hopr-utils'
+import { getNewPort } from '@hoprnet/hopr-testing'
 import Hopr from '.'
 import assert from 'assert'
 
@@ -9,18 +7,7 @@ import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
 import Multiaddr from 'multiaddr'
 
 describe('test hopr-core', function () {
-  let ganache
   let node
-
-  beforeAll(async function () {
-    ganache = new Ganache()
-    await ganache.start()
-    await migrate()
-  }, durations.seconds(30))
-
-  afterAll(async function () {
-    await ganache.stop()
-  })
 
   afterEach(async function () {
     await node.stop()
@@ -45,9 +32,7 @@ describe('test hopr-core', function () {
       })
 
       assert(node != null, `Node creation must not lead to 'undefined'`)
-    },
-    durations.seconds(100)
-  )
+    })
 
   it(
     `should not call ourself`,
@@ -67,7 +52,5 @@ describe('test hopr-core', function () {
         },
         bootstrapServers: [new Multiaddr('/p2p/' + peerId.toB58String())]
       })
-    },
-    durations.seconds(5)
-  )
+    })
 })

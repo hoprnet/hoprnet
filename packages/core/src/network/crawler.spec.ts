@@ -9,7 +9,6 @@ import { Network } from './index'
 import { Interactions } from '../interactions'
 import { BlacklistedEntry } from './network-peers'
 import { BLACKLIST_TIMEOUT } from '../constants'
-import { durations } from '@hoprnet/hopr-utils'
 import { generateLibP2PMock } from '../test-utils'
 
 let mockConnection = (p: PeerId, addr: Multiaddr): Connection => {
@@ -146,9 +145,7 @@ describe('test crawler', function () {
       )
 
       await Promise.all([Alice.node.stop(), Bob.node.stop(), Chris.node.stop()])
-    },
-    durations.seconds(8)
-  )
+    })
   it('shouldIncludePeerInCrawlResponse', async () => {
     assert(
       shouldIncludePeerInCrawlResponse(Multiaddr('/ip4/123.4.5.6/tcp/5000'), Multiaddr('/ip4/12.34.56.7/tcp/5000'))
