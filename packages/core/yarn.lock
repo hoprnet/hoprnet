@@ -5464,10 +5464,10 @@ ltgt@~2.1.1:
   resolved "https://registry.yarnpkg.com/ltgt/-/ltgt-2.1.3.tgz#10851a06d9964b971178441c23c9e52698eece34"
   integrity sha1-EIUaBtmWS5cReEQcI8nlJpjuzjQ=
 
-mafmt@8.0.0, mafmt@^8.0.0:
-  version "8.0.0"
-  resolved "https://registry.yarnpkg.com/mafmt/-/mafmt-8.0.0.tgz#6a9ad6aafa66d484310698baf2acff3b8ecf1d74"
-  integrity sha512-MdaeaqZxjoYYWvlhr1GQ7sbsR3+L3s8QL0VtCuja+Iax3EhqAEgluSWPJezSDLyns7Ds4DGRyoq5+eIU7UDang==
+mafmt@8.0.1, mafmt@^8.0.0:
+  version "8.0.1"
+  resolved "https://registry.yarnpkg.com/mafmt/-/mafmt-8.0.1.tgz#2c2ba61a84a66e58552100f163caef1a1267b276"
+  integrity sha512-A2z9CQp8C9koExHLdYs2tGzwYgCWuEfp+M+QNKe+qQif+YwYRq0+wJ9019SP7Go9TLx0I6+ylx01RqIxZ8RuHw==
   dependencies:
     multiaddr "^8.0.0"
 
