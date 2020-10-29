@@ -1,15 +1,15 @@
-import type { Indexer as IIndexer } from '@hoprnet/hopr-core-connector-interface'
+import type {Indexer as IIndexer} from '@hoprnet/hopr-core-connector-interface'
 import type HoprEthereum from '..'
 import BN from 'bn.js'
 import chalk from 'chalk'
-import { Subscription } from 'web3-core-subscriptions'
-import { BlockHeader } from 'web3-eth'
-import { u8aToNumber, u8aConcat, u8aToHex } from '@hoprnet/hopr-utils'
-import { ChannelEntry, Public } from '../types'
-import { Log, isPartyA, events } from '../utils'
-import { MAX_CONFIRMATIONS } from '../config'
-import { ContractEventLog } from '../tsc/web3/types'
-import { Log as OnChainLog } from 'web3-core'
+import {Subscription} from 'web3-core-subscriptions'
+import {BlockHeader} from 'web3-eth'
+import {u8aToNumber, u8aConcat, u8aToHex} from '@hoprnet/hopr-utils'
+import {ChannelEntry, Public} from '../types'
+import {Log, isPartyA, events} from '../utils'
+import {MAX_CONFIRMATIONS} from '../config'
+import {ContractEventLog} from '../tsc/web3/types'
+import {Log as OnChainLog} from 'web3-core'
 import Heap from 'heap-js'
 
 // we save up some memory by only caching the event data we use
@@ -17,10 +17,10 @@ type LightEvent<E extends ContractEventLog<any>> = Pick<
   E,
   'event' | 'blockNumber' | 'transactionHash' | 'transactionIndex' | 'logIndex' | 'returnValues'
 >
-type Channel = { partyA: Public; partyB: Public; channelEntry: ChannelEntry }
-export type OpenedChannelEvent = LightEvent<ContractEventLog<{ opener: Public; counterparty: Public }>>
+type Channel = {partyA: Public; partyB: Public; channelEntry: ChannelEntry}
+export type OpenedChannelEvent = LightEvent<ContractEventLog<{opener: Public; counterparty: Public}>>
 export type ClosedChannelEvent = LightEvent<
-  ContractEventLog<{ closer: Public; counterparty: Public; partyAAmount?: BN; partyBAmount?: BN }>
+  ContractEventLog<{closer: Public; counterparty: Public; partyAAmount?: BN; partyBAmount?: BN}>
 >
 
 const SMALLEST_PUBLIC_KEY = new Public(u8aConcat(new Uint8Array([0x02]), new Uint8Array(32).fill(0x00)))
@@ -93,7 +93,7 @@ class Indexer implements IIndexer {
    * @returns promise that resolves to true or false
    */
   public async has(partyA: Public, partyB: Public): Promise<boolean> {
-    const { dbKeys, db } = this.connector
+    const {dbKeys, db} = this.connector
 
     try {
       await db.get(Buffer.from(dbKeys.ChannelEntry(partyA, partyB)))
@@ -113,7 +113,7 @@ class Indexer implements IIndexer {
    * @returns promise that resolves to a list of channel entries
    */
   private async getAll(party: Public | undefined, filter?: (node: Public) => boolean): Promise<Channel[]> {
-    const { dbKeys, db } = this.connector
+    const {dbKeys, db} = this.connector
     const channels: Channel[] = []
 
     return await new Promise<Channel[]>((resolve, reject) => {
@@ -122,7 +122,7 @@ class Indexer implements IIndexer {
         lte: Buffer.from(dbKeys.ChannelEntry(BIGGEST_PUBLIC_KEY, BIGGEST_PUBLIC_KEY))
       })
         .on('error', (err) => reject(err))
-        .on('data', ({ key, value }: { key: Buffer; value: Buffer }) => {
+        .on('data', ({key, value}: {key: Buffer; value: Buffer}) => {
           const [partyA, partyB] = dbKeys.ChannelEntryParse(key)
 
           if (
@@ -153,7 +153,7 @@ class Indexer implements IIndexer {
    * @returns promise that resolves to a channel entry or undefined if not found
    */
   private async getSingle(partyA: Public, partyB: Public): Promise<Channel | undefined> {
-    const { dbKeys, db } = this.connector
+    const {dbKeys, db} = this.connector
 
     let _entry: Uint8Array | undefined
     try {
@@ -192,10 +192,7 @@ class Indexer implements IIndexer {
    * @param query
    * @returns promise that resolves to a list of channel entries
    */
-  public async get(
-    query?: { partyA?: Public; partyB?: Public },
-    filter?: (node: Public) => boolean
-  ): Promise<Channel[]> {
+  public async get(query?: {partyA?: Public; partyB?: Public}, filter?: (node: Public) => boolean): Promise<Channel[]> {
     if (query == null) {
       // query not provided, get all channels
       return this.getAll(undefined, filter)
@@ -214,8 +211,8 @@ class Indexer implements IIndexer {
   }
 
   private async store(partyA: Public, partyB: Public, channelEntry: ChannelEntry): Promise<void> {
-    const { dbKeys, db } = this.connector
-    const { blockNumber, logIndex, transactionIndex } = channelEntry
+    const {dbKeys, db} = this.connector
+    const {blockNumber, logIndex, transactionIndex} = channelEntry
 
     this.log(
       `storing channel ${partyA.toHex()}-${partyB.toHex()}:${blockNumber.toString()}-${transactionIndex.toString()}-${logIndex.toString()}`
@@ -239,7 +236,7 @@ class Indexer implements IIndexer {
   private async delete(partyA: Public, partyB: Public): Promise<void> {
     this.log(`deleting channel ${u8aToHex(partyA)}-${u8aToHex(partyB)}`)
 
-    const { dbKeys, db } = this.connector
+    const {dbKeys, db} = this.connector
 
     const key = Buffer.from(dbKeys.ChannelEntry(partyA, partyB))
 

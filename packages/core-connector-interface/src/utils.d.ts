@@ -1,4 +1,4 @@
-import type { AccountId, Hash, Signature, Balance } from './types'
+import type {AccountId, Hash, Signature, Balance} from './types'
 
 /**
  * Decides whether we take the role of partyA in the channel with `counterparty`.

@@ -1,23 +1,22 @@
 import assert from 'assert'
 import PeerId from 'peer-id'
-import type { Connection } from 'libp2p'
+import type {Connection} from 'libp2p'
 
-import { CRAWL_TIMEOUT, shouldIncludePeerInCrawlResponse } from './crawler'
-import { Crawler as CrawlerInteraction } from '../interactions/network/crawler'
+import {CRAWL_TIMEOUT, shouldIncludePeerInCrawlResponse} from './crawler'
+import {Crawler as CrawlerInteraction} from '../interactions/network/crawler'
 import Multiaddr from 'multiaddr'
-import { Network } from './index'
-import { Interactions } from '../interactions'
-import { BlacklistedEntry } from './network-peers'
-import { BLACKLIST_TIMEOUT } from '../constants'
-import { durations } from '@hoprnet/hopr-utils'
-import { generateLibP2PMock } from '../test-utils'
+import {Network} from './index'
+import {Interactions} from '../interactions'
+import {BlacklistedEntry} from './network-peers'
+import {BLACKLIST_TIMEOUT} from '../constants'
+import {generateLibP2PMock} from '../test-utils'
 
 let mockConnection = (p: PeerId, addr: Multiaddr): Connection => {
-  return { remotePeer: p, remoteAddr: addr } as Connection
+  return {remotePeer: p, remoteAddr: addr} as Connection
 }
 
-async function generateMocks(options?: { timeoutIntentionally: boolean }, addr = '/ip4/0.0.0.0/tcp/0') {
-  const { node, address } = await generateLibP2PMock(addr)
+async function generateMocks(options?: {timeoutIntentionally: boolean}, addr = '/ip4/0.0.0.0/tcp/0') {
+  const {node, address} = await generateLibP2PMock(addr)
 
   await node.start()
 
@@ -29,7 +28,7 @@ async function generateMocks(options?: { timeoutIntentionally: boolean }, addr =
     }
   } as Interactions<any>
 
-  const network = new Network(node, interactions, {} as any, { crawl: options })
+  const network = new Network(node, interactions, {} as any, {crawl: options})
   node.connectionManager.on('peer:connect', (conn: Connection) =>
     node.peerStore.addressBook.add(conn.remotePeer, [conn.remoteAddr])
   )
@@ -42,7 +41,7 @@ async function generateMocks(options?: { timeoutIntentionally: boolean }, addr =
   }
 }
 
-describe('test crawler', function () {
+describe('network/crawler test crawler', function () {
   it('should crawl the network and find some nodes', async function () {
     const [Alice, Bob, Chris, Dave, Eve] = await Promise.all([
       generateMocks(),
@@ -110,45 +109,42 @@ describe('test crawler', function () {
 
     await Promise.all([Alice.node.stop(), Bob.node.stop(), Chris.node.stop(), Dave.node.stop(), Eve.node.stop()])
   })
-  it(
-    'should crawl the network and timeout while crawling',
-    async function () {
-      let timeoutCorrectly = false
-      let before = Date.now()
-      const [Alice, Bob, Chris] = await Promise.all([
-        generateMocks(),
-        generateMocks({
-          timeoutIntentionally: true
-        }),
-        generateMocks({
-          timeoutIntentionally: true
-        })
-      ])
+  it('should crawl the network and timeout while crawling', async function () {
+    this.timeout(5000)
+    let timeoutCorrectly = false
+    let before = Date.now()
+    const [Alice, Bob, Chris] = await Promise.all([
+      generateMocks(),
+      generateMocks({
+        timeoutIntentionally: true
+      }),
+      generateMocks({
+        timeoutIntentionally: true
+      })
+    ])
 
-      await Alice.network.crawler.crawl()
-      Alice.node.connectionManager.emit('peer:connect', mockConnection(Bob.node.peerId, Bob.address))
-      await Alice.network.crawler.crawl()
-      Bob.node.connectionManager.emit('peer:connect', mockConnection(Chris.node.peerId, Chris.address))
-      await Alice.network.crawler.crawl()
+    await Alice.network.crawler.crawl()
+    Alice.node.connectionManager.emit('peer:connect', mockConnection(Bob.node.peerId, Bob.address))
+    await Alice.network.crawler.crawl()
+    Bob.node.connectionManager.emit('peer:connect', mockConnection(Chris.node.peerId, Chris.address))
+    await Alice.network.crawler.crawl()
 
-      await new Promise((resolve) => setTimeout(resolve, 100))
-      await Bob.node.stop()
-      await Alice.network.crawler.crawl()
-      await new Promise((resolve) => setTimeout(resolve, 200))
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    await Bob.node.stop()
+    await Alice.network.crawler.crawl()
+    await new Promise((resolve) => setTimeout(resolve, 200))
 
-      timeoutCorrectly = true
+    timeoutCorrectly = true
 
-      const after = Date.now() - before
+    const after = Date.now() - before
 
-      assert(
-        timeoutCorrectly && after < 3 * CRAWL_TIMEOUT && after >= 2 * CRAWL_TIMEOUT,
-        `Crawling should timeout correctly`
-      )
+    assert(
+      timeoutCorrectly && after < 3 * CRAWL_TIMEOUT && after >= 2 * CRAWL_TIMEOUT,
+      `Crawling should timeout correctly`
+    )
 
-      await Promise.all([Alice.node.stop(), Bob.node.stop(), Chris.node.stop()])
-    },
-    durations.seconds(8)
-  )
+    await Promise.all([Alice.node.stop(), Bob.node.stop(), Chris.node.stop()])
+  })
   it('shouldIncludePeerInCrawlResponse', async () => {
     assert(
       shouldIncludePeerInCrawlResponse(Multiaddr('/ip4/123.4.5.6/tcp/5000'), Multiaddr('/ip4/12.34.56.7/tcp/5000'))

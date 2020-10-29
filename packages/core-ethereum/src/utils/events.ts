@@ -1,7 +1,7 @@
-import { Public } from '../types'
-import { u8aToHex, u8aConcat, stringToU8a } from '@hoprnet/hopr-utils'
+import {Public} from '../types'
+import {u8aToHex, u8aConcat, stringToU8a} from '@hoprnet/hopr-utils'
 import createKeccakHash from 'keccak'
-import type { Log } from 'web3-core'
+import type {Log} from 'web3-core'
 import BN from 'bn.js'
 
 const rawOpenedChannelTopic = createKeccakHash('keccak256').update('OpenedChannel(uint,uint)').digest()

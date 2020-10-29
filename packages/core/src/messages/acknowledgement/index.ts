@@ -1,10 +1,10 @@
 import secp256k1 from 'secp256k1'
 
-import { u8aConcat } from '@hoprnet/hopr-utils'
-import { deriveTicketKeyBlinding } from '../packet/header'
-import { KEY_LENGTH } from '../packet/header/parameters'
-import { Challenge } from '../packet/challenge'
-import HoprCoreConnector, { Types } from '@hoprnet/hopr-core-connector-interface'
+import {u8aConcat} from '@hoprnet/hopr-utils'
+import {deriveTicketKeyBlinding} from '../packet/header'
+import {KEY_LENGTH} from '../packet/header/parameters'
+import {Challenge} from '../packet/challenge'
+import HoprCoreConnector, {Types} from '@hoprnet/hopr-core-connector-interface'
 import PeerId from 'peer-id'
 
 /**
@@ -188,4 +188,4 @@ class Acknowledgement<Chain extends HoprCoreConnector> extends Uint8Array {
   }
 }
 
-export { Acknowledgement }
+export {Acknowledgement}

@@ -1,6 +1,6 @@
 /// <reference path="./@types/libp2p.ts" />
 import LibP2P from 'libp2p'
-import type { Connection } from 'libp2p'
+import type {Connection} from 'libp2p'
 import MPLEX = require('libp2p-mplex')
 // @ts-ignore
 import KadDHT = require('libp2p-kad-dht')
@@ -9,16 +9,16 @@ import SECIO = require('libp2p-secio')
 
 import TCP from './network/transport'
 
-import { Packet } from './messages/packet'
-import { PACKET_SIZE, MAX_HOPS, VERSION } from './constants'
+import {Packet} from './messages/packet'
+import {PACKET_SIZE, MAX_HOPS, VERSION} from './constants'
 
-import { Network } from './network'
+import {Network} from './network'
 
-import { addPubKey, getPeerId, getAddrs, pubKeyToPeerId } from './utils'
-import { createDirectoryIfNotExists, u8aToHex } from '@hoprnet/hopr-utils'
-import { existsSync } from 'fs'
+import {addPubKey, getPeerId, getAddrs, pubKeyToPeerId} from './utils'
+import {createDirectoryIfNotExists, u8aToHex} from '@hoprnet/hopr-utils'
+import {existsSync} from 'fs'
 
-import levelup, { LevelUp } from 'levelup'
+import levelup, {LevelUp} from 'levelup'
 import leveldown from 'leveldown'
 import Multiaddr from 'multiaddr'
 import chalk from 'chalk'
@@ -28,12 +28,12 @@ const log = Debug(`hopr-core`)
 
 import PeerId from 'peer-id'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import type { HoprCoreConnectorStatic, Types } from '@hoprnet/hopr-core-connector-interface'
-import type { CrawlInfo } from './network/crawler'
+import type {HoprCoreConnectorStatic, Types} from '@hoprnet/hopr-core-connector-interface'
+import type {CrawlInfo} from './network/crawler'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
 
-import { Interactions } from './interactions'
+import {Interactions} from './interactions'
 import * as DbKeys from './dbKeys'
 import EventEmitter from 'events'
 
@@ -44,9 +44,9 @@ interface NetOptions {
   port: number
 }
 
-type OperationSuccess = { status: 'SUCCESS'; receipt: string }
-type OperationFailure = { status: 'FAILURE'; message: string }
-type OperationError = { status: 'ERROR'; error: Error | string }
+type OperationSuccess = {status: 'SUCCESS'; receipt: string}
+type OperationFailure = {status: 'FAILURE'; message: string}
+type OperationError = {status: 'ERROR'; error: Error | string}
 export type OperationStatus = OperationSuccess | OperationFailure | OperationError
 
 export type HoprOptions = {
@@ -152,7 +152,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
 
     const libp2p = await LibP2P.create({
       peerId: id,
-      addresses: { listen: addresses },
+      addresses: {listen: addresses},
       // Disable libp2p-switch protections for the moment
       switch: {
         denyTTL: 1,
@@ -345,7 +345,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
    * @param destination PeerId of the node
    * @returns latency
    */
-  public async ping(destination: PeerId): Promise<{ info: string; latency: number }> {
+  public async ping(destination: PeerId): Promise<{info: string; latency: number}> {
     if (!PeerId.isPeerId(destination)) {
       throw Error(`Expecting a non-empty destination.`)
     }
@@ -357,7 +357,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       info = '[Ping blacklisted peer]'
     }
     let latency = await this._interactions.network.heartbeat.interact(destination)
-    return { latency, info }
+    return {latency, info}
   }
 
   public getConnectedPeers(): PeerId[] {
@@ -380,7 +380,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   ): Promise<{
     channelId: Types.Hash
   }> {
-    const { utils, types, account } = this.paymentChannels
+    const {utils, types, account} = this.paymentChannels
     const self = this.getId()
 
     const channelId = await utils.getId(
@@ -428,7 +428,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     }
   }
 
-  public async closeChannel(peerId: PeerId): Promise<{ receipt: string; status: string }> {
+  public async closeChannel(peerId: PeerId): Promise<{receipt: string; status: string}> {
     const channel = await this.paymentChannels.channel.create(
       peerId.pubKey.marshal(),
       async (counterparty: Uint8Array) =>
@@ -442,7 +442,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     }
 
     const receipt = await channel.initiateSettlement()
-    return { receipt, status }
+    return {receipt, status}
   }
 
   /**
@@ -507,7 +507,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       index: Uint8Array
     }[]
   > {
-    const { AcknowledgedTicket } = this.paymentChannels.types
+    const {AcknowledgedTicket} = this.paymentChannels.types
     const acknowledgedTicketSize = AcknowledgedTicket.SIZE(this.paymentChannels)
     let promises: {
       ackTicket: Types.AcknowledgedTicket
@@ -520,7 +520,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
           gte: Buffer.from(this._dbKeys.AcknowledgedTickets(new Uint8Array(0x00)))
         })
         .on('error', (err) => reject(err))
-        .on('data', ({ key, value }: { key: Buffer; value: Buffer }) => {
+        .on('data', ({key, value}: {key: Buffer; value: Buffer}) => {
           if (value.buffer.byteLength !== acknowledgedTicketSize) return
 
           const index = this._dbKeys.AcknowledgedTicketsParse(key)
@@ -587,4 +587,4 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   }
 }
 
-export { Hopr as default, LibP2P }
+export {Hopr as default, LibP2P}
