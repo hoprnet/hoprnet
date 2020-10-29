@@ -1,9 +1,0 @@
-apps:
-  - script: ./dist/main.js
-    name: 'hopr-server'
-    instances: 1
-  - script: ./envoy/envoy.sh
-    name: 'envoy'
-    instances: 1
-    env:
-      SERVICE_ADDRESS: 127.0.0.1

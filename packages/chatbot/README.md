@@ -3,10 +3,6 @@
 
 **HOPR** is a privacy-preserving messaging **protocol** which enables the creation of a secure communication network via relay nodes powered by economic incentives using digital tokens. **HOPR Chatbot** is a proof-of-concept aimed to showcase the capabilities of a **HOPR Node** by using our gRPC-enabled **HOPR Server**, which listens to messages and replies to the recipients of them, whenever their address is included in the original message.
 
-## Overview
-
-**HOPR Chatbot** is a `node.js` application that connects to an instance of a [**HOPR Server**](https://github.com/hoprnet/hopr-server), and listens to any calls done against such server. Upon receiving a message with a valid recipient, it provides an answer given the bot that is currently loaded. At the time of writing, **HOPR Chatbot** dynamically loads bots based in the `ENV` given, and each bot has different capabilities.
-
 ### Existing Bots
 
 - [🃏 Randobot](./src/randobot/index.ts): Generates random words when messaged.
@@ -31,10 +27,6 @@ We have bundled a working version of [**HOPR Server**](https://github.com/hoprne
 
 1. Install dependancies: `yarn`
 2. Start bot: `API_URL=127.0.0.1:50051 yarn start`
-
-## Deployment
-
-Right now, we have a `Dockerfile` that bundles bot a `hopr-server` and a `hopr-chatbot` instance by relying on `pm2` to manage both process. This practice is [frown upon in the Docker ecosystem](https://docs.docker.com/config/containers/multi-service_container/), but simplifies our deployment process. To build such image, you can simply do `docker build -f chatbot.Dockerfile . -t hoprnet/chatbot:latest`.
 
 ## Additional information
 
