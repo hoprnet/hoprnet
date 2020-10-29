@@ -1,7 +1,8 @@
+import {web3, network} from 'hardhat'
 import Web3 from 'web3'
-import { singletons } from '@openzeppelin/test-helpers'
-import { durations } from '@hoprnet/hopr-utils'
-import { migrationOptions as allMigrationOptions } from './utils/networks'
+import {singletons} from '@openzeppelin/test-helpers'
+import {durations} from '@hoprnet/hopr-utils'
+import {migrationOptions as allMigrationOptions} from './utils/networks'
 
 const SECS_CLOSURE = Math.floor(durations.minutes(1) / 1e3)
 const MAX_MINT_AMOUNT = Web3.utils.toWei('100000000', 'ether')
@@ -9,31 +10,30 @@ const MAX_MINT_DURATION = Math.floor(durations.days(365) / 1e3)
 const SINGLE_FAUCET_MINTER = true
 const EXTERNAL_FAUCET_MINTER = '0x1A387b5103f28bc6601d085A3dDC878dEE631A56'
 
-async function main(taskArguments, hre, runSuper) {
+async function main() {
   const [deployer] = await web3.eth.getAccounts()
 
-  const networkName = hre.network.name
-  const migrationOptions = allMigrationOptions[networkName]
-  if (!migrationOptions) throw Error(`Could not found network config for network '${hre.network.name}'.`)
+  const migrationOptions = allMigrationOptions[network.name]
+  if (!migrationOptions) throw Error(`Could not found network config for network '${network.name}'.`)
 
   console.log('Migrating with config:', {
-    networkName,
+    network: network.name,
     migrationOptions
   })
 
   // deploy ERC1820Registry
   console.log('Deploying ERC1820Registry')
-  await singletons.ERC1820Registry(deployer)
-  console.log(`Deployed ERC1820Registry`)
+  const ERC1820Registry = await singletons.ERC1820Registry(deployer)
+  console.log(`Deployed or Found ERC1820Registry: ${ERC1820Registry.address}`)
 
   // deploy HoprToken
-  const HoprToken = hre.artifacts.require('HoprToken')
+  const HoprToken = artifacts.require('HoprToken')
   console.log('Deploying hoprToken')
-  const hoprToken = await HoprToken.new({ from: deployer })
+  const hoprToken = await HoprToken.new()
   console.log(`Deployed hoprToken: ${hoprToken.address}`)
   const minterRole = await hoprToken.MINTER_ROLE()
 
-  if (hre.network.name === 'hardhat') {
+  if (network.name === 'hardhat') {
     await hoprToken.grantRole(minterRole, deployer)
   }
 
@@ -66,7 +66,7 @@ async function main(taskArguments, hre, runSuper) {
     const pauserRole = await hoprFaucet.PAUSER_ROLE()
     const minterRole = await hoprFaucet.MINTER_ROLE()
 
-    if (hre.network.name === 'hardhat') {
+    if (network.name === 'hardhat') {
       await hoprFaucet.grantRole(pauserRole, deployer)
       await hoprFaucet.grantRole(minterRole, hoprFaucet.address)
     }
@@ -84,4 +84,9 @@ async function main(taskArguments, hre, runSuper) {
   }
 }
 
-export default main
+main()
+  .then(() => process.exit(0))
+  .catch((error) => {
+    console.error(error)
+    process.exit(1)
+  })

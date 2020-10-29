@@ -293,7 +293,7 @@
   resolved "https://registry.yarnpkg.com/@openzeppelin/contracts/-/contracts-3.2.0.tgz#3e6b3a7662d8ed64271ade96ef42655db983fd9d"
   integrity sha512-bUOmkSoPkjnUyMiKo6RYnb0VHBk5D9KKDAgNLzF41aqAM3TeE0yGdFF5dVRcV60pZdJLlyFT/jjXIZCWyyEzAQ==
 
-"@openzeppelin/test-helpers@^0.5.7":
+"@openzeppelin/test-helpers@^0.5.9":
   version "0.5.9"
   resolved "https://registry.yarnpkg.com/@openzeppelin/test-helpers/-/test-helpers-0.5.9.tgz#7cf4b0f068b21391aea03a839d1dc43d7434049b"
   integrity sha512-pnY4E8vC7Ifdg2ptjHOJzdF4paRctOjwkjgD/fbxdwECs5dXUNMuAyG49bPPoJ5hqceEVbzseLF+iTr8z5j47w==

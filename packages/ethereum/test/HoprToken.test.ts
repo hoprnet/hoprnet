@@ -1,6 +1,7 @@
-import { expect } from 'chai'
-import { expectRevert } from '@openzeppelin/test-helpers'
-import { HoprTokenInstance } from '../scripts/utils/typechain'
+import {expect} from 'chai'
+import {singletons, expectRevert} from '@openzeppelin/test-helpers'
+import {web3} from 'hardhat'
+import {HoprTokenInstance} from '../types'
 
 const HoprToken = artifacts.require('HoprToken')
 
@@ -10,10 +11,12 @@ describe('HoprToken', function () {
   let hoprToken: HoprTokenInstance
 
   before(async function () {
-    console.log(HoprToken)
-    hoprToken = await HoprToken.new()
     ;[owner, userA] = await web3.eth.getAccounts()
-    hoprToken = await HoprToken.deployed()
+
+    // migrate contracts
+    await singletons.ERC1820Registry(owner)
+    hoprToken = await HoprToken.new()
+    await hoprToken.grantRole(await hoprToken.MINTER_ROLE(), owner)
   })
 
   it("should be named 'HOPR Token'", async function () {

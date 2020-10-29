@@ -7,9 +7,10 @@
     "sourceMap": true,
     "esModuleInterop": true,
     "skipLibCheck": false,
-    "outDir": "lib"
+    "outDir": "lib",
+    "types": ["./types"]
   },
   "files": ["./hardhat.config.ts"],
-  "include": ["contracts", "test", "scripts"],
+  "include": ["types", "test", "scripts"],
   "exclude": ["lib", "temp"]
 }

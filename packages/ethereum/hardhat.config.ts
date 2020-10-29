@@ -5,15 +5,14 @@ import 'hardhat-typechain'
 import '@nomiclabs/hardhat-truffle5'
 import '@nomiclabs/hardhat-etherscan'
 
-import { HardhatUserConfig, task } from 'hardhat/config'
-import { mapValues } from 'lodash'
-import { getRpcOptions } from './scripts/utils/networks'
-import migrate from './scripts/migrate'
+import type {HardhatUserConfig} from 'hardhat/config'
+import {mapValues} from 'lodash'
+import {getRpcOptions} from './scripts/utils/networks'
 
-const { PRIVATE_KEY, INFURA, MATIC_VIGIL, ETHERSCAN } = process.env
+const {PRIVATE_KEY, INFURA, MATIC_VIGIL, ETHERSCAN} = process.env
 
 const publicNetworks: HardhatUserConfig['networks'] = mapValues(
-  getRpcOptions({ infura: INFURA, maticvigil: MATIC_VIGIL }),
+  getRpcOptions({infura: INFURA, maticvigil: MATIC_VIGIL}),
   (config) =>
     ({
       chainId: config.chainId,
@@ -50,14 +49,12 @@ const hardhatConfig: HardhatUserConfig = {
     artifacts: './hardhat/artifacts'
   },
   typechain: {
-    outDir: './scripts/utils/typechain',
+    outDir: './types',
     target: 'truffle-v5'
   },
   etherscan: {
     apiKey: ETHERSCAN
   }
 }
-
-task('migrate', 'Migrate contracts').setAction(migrate)
 
 export default hardhatConfig

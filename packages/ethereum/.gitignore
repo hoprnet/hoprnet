@@ -34,4 +34,4 @@ temp
 hardhat
 
 # typechain
-./scripts/utils/typechain
+types
