@@ -14,6 +14,7 @@ jobs:
     strategy:
       matrix:
         node-version: [12]
+        package: ['core', 'ethereum', 'all']
 
     steps:
       - uses: actions/checkout@v2
@@ -22,20 +23,32 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
           registry-url: https://registry.npmjs.org/
-            #      - uses: actions/cache@v2
-            #        with:
-            #          path: '**/node_modules'
-            #          key: ${{ runner.os }}-modules-${{ hashFiles('**/yarn.lock') }}
+      - uses: actions/cache@v2
+        with:
+          path: 'node_modules'
+          key: ${{ runner.os }}-modules-${{ hashFiles('yarn.lock') }}
       - name: Install dependencies
         run: |
           yarn
           yarn setup
-      - name: Build
+      - name: Build (all)
+        if: matrix.package == all 
         run: |
-          yarn build
-      - name: Test
+          lerna run build --ignore core --ignore ethereum
+
+      - name: Test (all)
+        if: matrix.package == all 
         run: |
-          yarn test
+          lerna run test --ignore core --ignore ethereum
+
+      - name: Build ${{ matrix.package }}
+        if: matrix.package != all 
+        run: |
+          lerna run build --scope ${{ matrix.package }}
+      - name: Test ${{ matrix.package }}
+        if: matrix.package != all 
+        run: |
+          lerna run test --scope ${{ matrix.package }}
 
 #      - name: Test Docker build hoprd
 #        working-directory: packages/hoprd
