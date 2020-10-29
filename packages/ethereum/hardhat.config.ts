@@ -28,7 +28,7 @@ const hardhatConfig: HardhatUserConfig = {
   networks: {
     hardhat: {
       accounts: {
-        // specify truffle's default mnemonic as we are expecting it in various areas
+        // specify truffle's default mnemonic as we are expecting it in various areas in our codebase
         mnemonic: 'candy maple cake sugar pudding cream honey rich smooth crumble sweet treat'
       }
     },
