@@ -32,21 +32,21 @@ jobs:
           yarn
           yarn setup
       - name: Build (all)
-        if: matrix.package == all 
+        if: matrix.package == 'all' 
         run: |
           lerna run build --ignore core --ignore ethereum
 
       - name: Test (all)
-        if: matrix.package == all 
+        if: matrix.package == 'all'
         run: |
           lerna run test --ignore core --ignore ethereum
 
       - name: Build ${{ matrix.package }}
-        if: matrix.package != all 
+        if: matrix.package != 'all'
         run: |
           lerna run build --scope ${{ matrix.package }}
       - name: Test ${{ matrix.package }}
-        if: matrix.package != all 
+        if: matrix.package != 'all' 
         run: |
           lerna run test --scope ${{ matrix.package }}
 
