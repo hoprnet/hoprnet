@@ -1,8 +1,8 @@
-import {expect} from 'chai'
-import {singletons, expectRevert} from '@openzeppelin/test-helpers'
-import {web3} from 'hardhat'
-import {HoprTokenInstance} from '../types'
-import {vmErrorMessage} from './utils'
+import { expect } from 'chai'
+import { singletons, expectRevert } from '@openzeppelin/test-helpers'
+import { web3 } from 'hardhat'
+import { HoprTokenInstance } from '../types'
+import { vmErrorMessage } from './utils'
 
 const HoprToken = artifacts.require('HoprToken')
 

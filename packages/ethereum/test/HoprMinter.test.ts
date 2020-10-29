@@ -1,7 +1,7 @@
-import type {AsyncReturnType} from 'type-fest'
-import {singletons, time, expectRevert} from '@openzeppelin/test-helpers'
-import {HoprMinterContract, HoprMinterInstance, HoprTokenContract, HoprTokenInstance} from '../types'
-import {vmErrorMessage} from './utils'
+import type { AsyncReturnType } from 'type-fest'
+import { singletons, time, expectRevert } from '@openzeppelin/test-helpers'
+import { HoprMinterContract, HoprMinterInstance, HoprTokenContract, HoprTokenInstance } from '../types'
+import { vmErrorMessage } from './utils'
 
 const HoprToken: HoprTokenContract = artifacts.require('HoprToken')
 const HoprMinter: HoprMinterContract = artifacts.require('HoprMinter')

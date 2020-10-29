@@ -4,6 +4,15 @@
   "description": "On-chain logic for hoprnet.org",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "license": "LGPL-3.0-only",
+  "files": [
+    "contracts/",
+    "scripts/",
+    "!*.test.ts"
+  ],
+  "engines": {
+    "yarn": "1",
+    "node": "12"
+  },
   "scripts": {
     "build": "hardhat compile",
     "migrate": "hardhat run ./scripts/migrate.ts",

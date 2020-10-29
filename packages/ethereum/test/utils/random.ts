@@ -1,14 +1,14 @@
 import BigNumber from 'bignumber.js'
 import BN from 'bn.js'
 import Web3 from 'web3'
-import {publicKeyConvert} from 'secp256k1'
-import {stringToU8a, u8aToHex, u8aConcat} from '@hoprnet/hopr-utils'
+import { publicKeyConvert } from 'secp256k1'
+import { stringToU8a, u8aToHex, u8aConcat } from '@hoprnet/hopr-utils'
 
 const web3 = new Web3()
 
 export const MAX_UINT256 = new BigNumber(2).pow(256).minus(1)
 
-export const keccak256 = (...args: {type: string; value: string | number}[]): string => {
+export const keccak256 = (...args: { type: string; value: string | number }[]): string => {
   return Web3.utils.soliditySha3(...((args as unknown) as any))
 }
 
@@ -75,8 +75,8 @@ export const getChannelId = (partyA: string, partyB: string) => {
   )
 }
 
-export const encode = (items: {type: string; value: string}[]): string => {
-  const {types, values} = items.reduce(
+export const encode = (items: { type: string; value: string }[]): string => {
+  const { types, values } = items.reduce(
     (result, item) => {
       result.types.push(item.type)
       result.values.push(item.value)
@@ -135,7 +135,7 @@ export const checkEvent = (
     u8aToHex(compressedPubKeyB.slice(1))
   ].sort()
 
-  return receipt.rawLogs.some((log: {topics: string[]}) => {
+  return receipt.rawLogs.some((log: { topics: string[] }) => {
     const sortedTopics = log.topics.sort()
 
     let i = 0

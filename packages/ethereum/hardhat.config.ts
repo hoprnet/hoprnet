@@ -4,17 +4,18 @@ require('dotenv').config()
 import 'hardhat-typechain'
 import '@nomiclabs/hardhat-truffle5'
 import '@nomiclabs/hardhat-etherscan'
+import '@nomiclabs/hardhat-solhint'
 
-import type {HardhatUserConfig} from 'hardhat/config'
+import type { HardhatUserConfig } from 'hardhat/config'
 import Web3 from 'web3'
-import {mapValues} from 'lodash'
-import {getRpcOptions} from './scripts/utils/networks'
-import {NODE_SEEDS} from '@hoprnet/hopr-demo-seeds'
+import { mapValues } from 'lodash'
+import { getRpcOptions } from './scripts/utils/networks'
+import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
 
-const {PRIVATE_KEY, INFURA, MATIC_VIGIL, ETHERSCAN} = process.env
+const { PRIVATE_KEY, INFURA, MATIC_VIGIL, ETHERSCAN } = process.env
 
 const publicNetworks: HardhatUserConfig['networks'] = mapValues(
-  getRpcOptions({infura: INFURA, maticvigil: MATIC_VIGIL}),
+  getRpcOptions({ infura: INFURA, maticvigil: MATIC_VIGIL }),
   (config) =>
     ({
       chainId: config.chainId,

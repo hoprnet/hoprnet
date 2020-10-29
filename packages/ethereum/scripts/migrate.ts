@@ -1,8 +1,8 @@
-import {web3, network} from 'hardhat'
+import { web3, network } from 'hardhat'
 import Web3 from 'web3'
-import {singletons} from '@openzeppelin/test-helpers'
-import {durations} from '@hoprnet/hopr-utils'
-import {migrationOptions as allMigrationOptions} from './utils/networks'
+import { singletons } from '@openzeppelin/test-helpers'
+import { durations } from '@hoprnet/hopr-utils'
+import { migrationOptions as allMigrationOptions } from './utils/networks'
 
 const SECS_CLOSURE = Math.floor(durations.minutes(1) / 1e3)
 const MAX_MINT_AMOUNT = Web3.utils.toWei('100000000', 'ether')

@@ -1,6 +1,6 @@
-import {singletons, expectRevert, expectEvent, constants} from '@openzeppelin/test-helpers'
-import {HoprFaucetContract, HoprFaucetInstance, HoprTokenContract, HoprTokenInstance} from '../types'
-import {vmErrorMessage} from './utils'
+import { singletons, expectRevert, expectEvent, constants } from '@openzeppelin/test-helpers'
+import { HoprFaucetContract, HoprFaucetInstance, HoprTokenContract, HoprTokenInstance } from '../types'
+import { vmErrorMessage } from './utils'
 
 const HoprToken: HoprTokenContract = artifacts.require('HoprToken')
 const HoprFaucet: HoprFaucetContract = artifacts.require('HoprFaucet')

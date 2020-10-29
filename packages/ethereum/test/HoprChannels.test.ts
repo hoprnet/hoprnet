@@ -1,10 +1,10 @@
-import type {AsyncReturnType} from 'type-fest'
-import {singletons, BN, time, expectEvent, expectRevert, constants} from '@openzeppelin/test-helpers'
-import {NODE_SEEDS} from '@hoprnet/hopr-demo-seeds'
-import {HoprChannelsContract, HoprChannelsInstance, HoprTokenContract, HoprTokenInstance} from '../types'
-import {recoverSigner, keccak256, Ticket, getChannelId, getParties, Fund, checkEvent, vmErrorMessage} from './utils'
-import {stringToU8a, u8aToHex} from '@hoprnet/hopr-utils'
-import {randomBytes} from 'crypto'
+import type { AsyncReturnType } from 'type-fest'
+import { singletons, BN, time, expectEvent, expectRevert, constants } from '@openzeppelin/test-helpers'
+import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
+import { HoprChannelsContract, HoprChannelsInstance, HoprTokenContract, HoprTokenInstance } from '../types'
+import { recoverSigner, keccak256, Ticket, getChannelId, getParties, Fund, checkEvent, vmErrorMessage } from './utils'
+import { stringToU8a, u8aToHex } from '@hoprnet/hopr-utils'
+import { randomBytes } from 'crypto'
 import secp256k1 from 'secp256k1'
 
 const HoprToken: HoprTokenContract = artifacts.require('HoprToken')
@@ -60,7 +60,7 @@ describe('HoprChannels', function () {
     context("make payments between 'partyA' and 'partyB' using a fresh channel and 'fundChannel'", function () {
       const partyASecret1 = keccak256({
         type: 'bytes27',
-        value: keccak256({type: 'string', value: 'partyA secret 1'}).slice(0, 56)
+        value: keccak256({ type: 'string', value: 'partyA secret 1' }).slice(0, 56)
       }).slice(0, 56)
       const partyASecret2 = keccak256({
         type: 'bytes27',
@@ -68,7 +68,7 @@ describe('HoprChannels', function () {
       }).slice(0, 56)
       const partyBSecret1 = keccak256({
         type: 'bytes27',
-        value: keccak256({type: 'string', value: 'partyB secret 1'}).slice(0, 56)
+        value: keccak256({ type: 'string', value: 'partyB secret 1' }).slice(0, 56)
       }).slice(0, 56)
       const partyBSecret2 = keccak256({
         type: 'bytes27',
@@ -151,7 +151,7 @@ describe('HoprChannels', function () {
           signerPrivKey: partyAPrivKey,
           porSecret: keccak256({
             type: 'bytes32',
-            value: keccak256({type: 'string', value: 'por secret'})
+            value: keccak256({ type: 'string', value: 'por secret' })
           }),
           counterPartySecret: partyASecret2,
           amount: web3.utils.toWei('0.2', 'ether'),
@@ -171,7 +171,7 @@ describe('HoprChannels', function () {
           signerPrivKey: partyAPrivKey,
           porSecret: keccak256({
             type: 'bytes32',
-            value: keccak256({type: 'string', value: 'por secret'})
+            value: keccak256({ type: 'string', value: 'por secret' })
           }),
           counterPartySecret: partyBSecret2,
           amount: web3.utils.toWei('0.2', 'ether'),
@@ -206,7 +206,7 @@ describe('HoprChannels', function () {
           signerPrivKey: partyBPrivKey,
           porSecret: keccak256({
             type: 'bytes32',
-            value: keccak256({type: 'string', value: 'por secret'})
+            value: keccak256({ type: 'string', value: 'por secret' })
           }),
           counterPartySecret: partyASecret2,
           amount: web3.utils.toWei('0.2', 'ether'),
@@ -221,7 +221,7 @@ describe('HoprChannels', function () {
           ticket.r,
           ticket.s,
           ticket.v,
-          {from: partyA}
+          { from: partyA }
         )
         const channel = await hoprChannels.channels(getChannelId(partyA, partyB)).then(formatChannel)
         expect(channel.deposit.eq(new BN(depositAmount).mul(new BN(2)))).to.be.equal(true, 'wrong deposit')
@@ -238,7 +238,7 @@ describe('HoprChannels', function () {
           signerPrivKey: partyAPrivKey,
           porSecret: keccak256({
             type: 'bytes32',
-            value: keccak256({type: 'string', value: 'por secret'})
+            value: keccak256({ type: 'string', value: 'por secret' })
           }),
           counterPartySecret: partyBSecret2,
           amount: web3.utils.toWei('1.2', 'ether'),
@@ -254,7 +254,7 @@ describe('HoprChannels', function () {
           ticket.r,
           ticket.s,
           ticket.v,
-          {from: partyB}
+          { from: partyB }
         )
         const channel = await hoprChannels.channels(getChannelId(partyA, partyB)).then(formatChannel)
         expect(channel.deposit.eq(new BN(depositAmount).mul(new BN(2)))).to.be.equal(true, 'wrong deposit')
@@ -285,7 +285,7 @@ describe('HoprChannels', function () {
           signerPrivKey: partyBPrivKey,
           porSecret: keccak256({
             type: 'bytes32',
-            value: keccak256({type: 'string', value: 'por secret'})
+            value: keccak256({ type: 'string', value: 'por secret' })
           }),
           counterPartySecret: partyASecret1,
           amount: web3.utils.toWei('0.5', 'ether'),
@@ -300,7 +300,7 @@ describe('HoprChannels', function () {
           ticket.r,
           ticket.s,
           ticket.v,
-          {from: partyA}
+          { from: partyA }
         )
         const channel = await hoprChannels.channels(getChannelId(partyA, partyB)).then(formatChannel)
         expect(channel.deposit.eq(new BN(depositAmount).mul(new BN(2)))).to.be.equal(true, 'wrong deposit')
@@ -335,7 +335,7 @@ describe('HoprChannels', function () {
       function () {
         const partyASecret1 = keccak256({
           type: 'bytes27',
-          value: keccak256({type: 'string', value: 'partyA secret 2'}).slice(0, 56)
+          value: keccak256({ type: 'string', value: 'partyA secret 2' }).slice(0, 56)
         }).slice(0, 56)
         const partyASecret2 = keccak256({
           type: 'bytes27',
@@ -343,7 +343,7 @@ describe('HoprChannels', function () {
         }).slice(0, 56)
         const partyBSecret1 = keccak256({
           type: 'bytes27',
-          value: keccak256({type: 'string', value: 'partyB secret 2'}).slice(0, 56)
+          value: keccak256({ type: 'string', value: 'partyB secret 2' }).slice(0, 56)
         }).slice(0, 56)
         const partyBSecret2 = keccak256({
           type: 'bytes27',
@@ -405,7 +405,7 @@ describe('HoprChannels', function () {
             signerPrivKey: partyAPrivKey,
             porSecret: keccak256({
               type: 'bytes32',
-              value: keccak256({type: 'string', value: 'por secret'})
+              value: keccak256({ type: 'string', value: 'por secret' })
             }),
             counterPartySecret: partyASecret2,
             amount: web3.utils.toWei('0.3', 'ether'),
@@ -428,7 +428,7 @@ describe('HoprChannels', function () {
             signerPrivKey: partyAPrivKey,
             porSecret: keccak256({
               type: 'bytes32',
-              value: keccak256({type: 'string', value: 'por secret a'})
+              value: keccak256({ type: 'string', value: 'por secret a' })
             }),
             counterPartySecret: partyBSecret2,
             amount: web3.utils.toWei('0.7', 'ether'),
@@ -465,7 +465,7 @@ describe('HoprChannels', function () {
             signerPrivKey: partyBPrivKey,
             porSecret: keccak256({
               type: 'bytes32',
-              value: keccak256({type: 'string', value: 'por secret a'})
+              value: keccak256({ type: 'string', value: 'por secret a' })
             }),
             counterPartySecret: partyASecret2,
             amount: web3.utils.toWei('0.3', 'ether'),
@@ -480,7 +480,7 @@ describe('HoprChannels', function () {
             ticket.r,
             ticket.s,
             ticket.v,
-            {from: partyA}
+            { from: partyA }
           )
           const channel = await hoprChannels.channels(getChannelId(partyA, partyB)).then(formatChannel)
           expect(channel.deposit.eq(new BN(depositAmount))).to.be.equal(true, 'wrong deposit')
@@ -498,7 +498,7 @@ describe('HoprChannels', function () {
             signerPrivKey: partyAPrivKey,
             porSecret: keccak256({
               type: 'bytes32',
-              value: keccak256({type: 'string', value: 'por secret a'})
+              value: keccak256({ type: 'string', value: 'por secret a' })
             }),
             counterPartySecret: partyBSecret2,
             amount: web3.utils.toWei('0.5', 'ether'),
@@ -513,7 +513,7 @@ describe('HoprChannels', function () {
             ticket.r,
             ticket.s,
             ticket.v,
-            {from: partyB}
+            { from: partyB }
           )
           const channel = await hoprChannels.channels(getChannelId(partyA, partyB)).then(formatChannel)
           expect(channel.deposit.eq(new BN(depositAmount))).to.be.equal(true, 'wrong deposit')
@@ -543,7 +543,7 @@ describe('HoprChannels', function () {
             signerPrivKey: partyBPrivKey,
             porSecret: keccak256({
               type: 'bytes32',
-              value: keccak256({type: 'string', value: 'por secret a'})
+              value: keccak256({ type: 'string', value: 'por secret a' })
             }),
             counterPartySecret: partyASecret1,
             amount: web3.utils.toWei('1', 'ether'),
@@ -558,7 +558,7 @@ describe('HoprChannels', function () {
             ticket.r,
             ticket.s,
             ticket.v,
-            {from: partyA}
+            { from: partyA }
           )
           const channel = await hoprChannels.channels(getChannelId(partyA, partyB)).then(formatChannel)
           expect(channel.deposit.eq(new BN(depositAmount))).to.be.equal(true, 'wrong deposit')
@@ -787,7 +787,7 @@ describe('HoprChannels', function () {
         signerPrivKey: partyAPrivKey,
         porSecret: keccak256({
           type: 'bytes32',
-          value: keccak256({type: 'string', value: 'por secret'})
+          value: keccak256({ type: 'string', value: 'por secret' })
         }),
         amount: web3.utils.toWei('0.2', 'ether'),
         counter: 1,
@@ -830,7 +830,7 @@ describe('HoprChannels', function () {
         }
       )
 
-      const preImageB = keccak256({type: 'string', value: 'partyB secret'})
+      const preImageB = keccak256({ type: 'string', value: 'partyB secret' })
 
       const secretHashB = keccak256({
         type: 'bytes32',
@@ -865,7 +865,7 @@ describe('HoprChannels', function () {
         signerPrivKey: partyAPrivKey,
         porSecret: keccak256({
           type: 'bytes32',
-          value: keccak256({type: 'string', value: 'por secret'})
+          value: keccak256({ type: 'string', value: 'por secret' })
         }),
         amount: web3.utils.toWei('0.2', 'ether'),
         counter: 1,
