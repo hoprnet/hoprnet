@@ -55,21 +55,21 @@ describe('network/crawler test crawler', function () {
     Alice.node.connectionManager.emit('peer:connect', mockConnection(Bob.node.peerId, Bob.address))
     await Alice.network.crawler.crawl()
 
-    assert(Alice.network.networkPeers.has(Bob.node.peerId))
+    assert(Alice.network.networkPeers.has(Bob.node.peerId), "Alice should know about Bob")
 
     Bob.node.connectionManager.emit('peer:connect', mockConnection(Chris.node.peerId, Chris.address))
-    assert(Bob.network.networkPeers.has(Chris.node.peerId))
+    assert(Bob.network.networkPeers.has(Chris.node.peerId), "Bob should know about Chris")
 
     await Alice.network.crawler.crawl()
-    assert(Alice.network.networkPeers.has(Bob.node.peerId))
+    assert(Alice.network.networkPeers.has(Bob.node.peerId), "Alice should know about Bob")
     assert(Alice.network.networkPeers.has(Chris.node.peerId))
 
     Chris.node.connectionManager.emit('peer:connect', mockConnection(Dave.node.peerId, Dave.address))
     await Alice.network.crawler.crawl()
 
-    assert(Alice.network.networkPeers.has(Bob.node.peerId))
-    assert(Alice.network.networkPeers.has(Chris.node.peerId))
-    assert(Alice.network.networkPeers.has(Dave.node.peerId))
+    assert(Alice.network.networkPeers.has(Bob.node.peerId), "Alice should know about Bob")
+    assert(Alice.network.networkPeers.has(Chris.node.peerId), "Alice should know about Chris")
+    assert(Alice.network.networkPeers.has(Dave.node.peerId), "Alice should know about Dave")
 
     Bob.node.connectionManager.emit('peer:connect', mockConnection(Alice.node.peerId, Alice.address))
     Dave.node.connectionManager.emit('peer:connect', mockConnection(Eve.node.peerId, Eve.address))
