@@ -34,21 +34,21 @@ jobs:
       - name: Build (all)
         if: matrix.package == 'all' 
         run: |
-          node_modules/.bin/lerna version run build --ignore core --ignore ethereum
+          node_modules/.bin/lerna run build --ignore core --ignore ethereum
 
       - name: Test (all)
         if: matrix.package == 'all'
         run: |
-          node_modules/.bin/lerna version run test --ignore core --ignore ethereum
+          node_modules/.bin/lerna run test --ignore core --ignore ethereum
 
       - name: Build ${{ matrix.package }}
         if: matrix.package != 'all'
         run: |
-          node_modules/.bin/lerna version run build --scope ${{ matrix.package }}
+          node_modules/.bin/lerna run build --scope ${{ matrix.package }}
       - name: Test ${{ matrix.package }}
         if: matrix.package != 'all' 
         run: |
-          node_modules/.bin/lerna version run test --scope ${{ matrix.package }}
+          node_modules/.bin/lerna run test --scope ${{ matrix.package }}
 
 #      - name: Test Docker build hoprd
 #        working-directory: packages/hoprd
