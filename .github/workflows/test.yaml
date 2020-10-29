@@ -27,13 +27,10 @@ jobs:
             #        with:
             #          path: '**/node_modules'
             #          key: ${{ runner.os }}-modules-${{ hashFiles('**/yarn.lock') }}
-      - name: Install node modules
-        run: |
-          yarn policies set-version ${{ matrix.yarn-version }}
-          yarn install --pure-lockfile
       - name: Install dependencies
         run: |
           yarn
+          yarn setup
       - name: Build
         run: |
           yarn build
