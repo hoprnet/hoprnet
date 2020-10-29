@@ -1,4 +1,4 @@
-import { Public } from './types'
+import {Public} from './types'
 
 declare interface PathSelection {
   /**

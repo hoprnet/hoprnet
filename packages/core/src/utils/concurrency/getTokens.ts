@@ -10,4 +10,4 @@ function getTokens(amount: number): Token[] {
   return result
 }
 
-export { getTokens }
+export {getTokens}

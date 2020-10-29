@@ -1,10 +1,10 @@
-import { RelayConnection } from './relayConnection'
+import {RelayConnection} from './relayConnection'
 import assert from 'assert'
-import { randomInteger } from '@hoprnet/hopr-utils'
+import {randomInteger} from '@hoprnet/hopr-utils'
 
 import PeerId from 'peer-id'
-import { EventEmitter } from 'events'
-import { Instance as SimplePeer } from 'simple-peer'
+import {EventEmitter} from 'events'
+import {Instance as SimplePeer} from 'simple-peer'
 
 interface PairType<T> {
   sink(source: AsyncIterable<T>): Promise<void>
@@ -21,8 +21,8 @@ describe('test relay connection', function () {
   it('should initiate a relayConnection and let the receiver close the connection prematurely', async function () {
     const AliceBob = Pair<Uint8Array>()
     const BobAlice = Pair<Uint8Array>()
-    const Alice = await PeerId.create({ keyType: 'secp256k1' })
-    const Bob = await PeerId.create({ keyType: 'secp256k1' })
+    const Alice = await PeerId.create({keyType: 'secp256k1'})
+    const Bob = await PeerId.create({keyType: 'secp256k1'})
     const a = new RelayConnection({
       stream: {
         sink: AliceBob.sink,
@@ -53,8 +53,8 @@ describe('test relay connection', function () {
 
     setTimeout(() => setImmediate(() => b.close()), randomInteger(TIMEOUT_LOWER_BOUND, TIMEOUT_UPPER_BOUND))
 
-    for await (const msg of b.source) {
-      console.log(new TextDecoder().decode(msg.slice()))
+    for await (const _msg of b.source) {
+      //console.log(new TextDecoder().decode(msg.slice()))
     }
 
     for await (const _msg of a.source) {
@@ -71,7 +71,7 @@ describe('test relay connection', function () {
           // @ts-ignore
           b.source.next()
         ])
-      ).every(({ done }) => done),
+      ).every(({done}) => done),
       `Streams must have ended.`
     )
     assert(b.destroyed && a.destroyed, `both parties must have marked the connection as destroyed`)
@@ -80,8 +80,8 @@ describe('test relay connection', function () {
   it('should initiate a relayConnection and close the connection by the sender prematurely', async function () {
     const AliceBob = Pair<Uint8Array>()
     const BobAlice = Pair<Uint8Array>()
-    const Alice = await PeerId.create({ keyType: 'secp256k1' })
-    const Bob = await PeerId.create({ keyType: 'secp256k1' })
+    const Alice = await PeerId.create({keyType: 'secp256k1'})
+    const Bob = await PeerId.create({keyType: 'secp256k1'})
     const a = new RelayConnection({
       stream: {
         sink: AliceBob.sink,
@@ -112,8 +112,8 @@ describe('test relay connection', function () {
     )
     setTimeout(() => setImmediate(() => a.close()), randomInteger(TIMEOUT_LOWER_BOUND, TIMEOUT_UPPER_BOUND))
 
-    for await (const msg of b.source) {
-      console.log(new TextDecoder().decode(msg.slice()))
+    for await (const _msg of b.source) {
+      //console.log(new TextDecoder().decode(msg.slice()))
     }
 
     for await (const _msg of a.source) {
@@ -124,7 +124,7 @@ describe('test relay connection', function () {
 
     assert(
       // @ts-ignore
-      (await Promise.all([a.source.next(), b.source.next()])).every(({ done }) => done),
+      (await Promise.all([a.source.next(), b.source.next()])).every(({done}) => done),
       `Streams must have ended.`
     )
     assert(b.destroyed && a.destroyed, `both parties must have marked the connection as destroyed`)
@@ -134,18 +134,18 @@ describe('test relay connection', function () {
     const AliceBob = Pair<Uint8Array>()
     const BobAlice = Pair<Uint8Array>()
 
-    const Alice = await PeerId.create({ keyType: 'secp256k1' })
-    const Bob = await PeerId.create({ keyType: 'secp256k1' })
+    const Alice = await PeerId.create({keyType: 'secp256k1'})
+    const Bob = await PeerId.create({keyType: 'secp256k1'})
 
     const FakeWebRTCAlice = new EventEmitter()
     // @ts-ignore
-    FakeWebRTCAlice.signal = (msg: string) => console.log(`received fancy WebRTC message`, msg)
+    FakeWebRTCAlice.signal = (_msg: string) => {} //console.log(`received fancy WebRTC message`, msg)
 
     const FakeWebRTCBob = new EventEmitter()
     // @ts-ignore
-    FakeWebRTCBob.signal = (msg: string) => console.log(`received fancy WebRTC message`, msg)
+    FakeWebRTCBob.signal = (_msg: string) => {} //console.log(`received fancy WebRTC message`, msg)
 
-    const interval = setInterval(() => FakeWebRTCAlice.emit(`signal`, { msg: 'Fake signal' }), 50)
+    const interval = setInterval(() => FakeWebRTCAlice.emit(`signal`, {msg: 'Fake signal'}), 50)
     setTimeout(() => {
       clearInterval(interval)
       FakeWebRTCAlice.emit('connect')
@@ -203,20 +203,20 @@ describe('test relay connection', function () {
     let aDone = false
     let bDone = false
 
-    function aFunction({ done, value }) {
+    function aFunction({done, value}) {
       msgAReceived = true
       if (done) {
         aDone = true
       }
-      return { done, value }
+      return {done, value}
     }
 
-    function bFunction({ done, value }) {
+    function bFunction({done, value}) {
       msgBReceived = true
       if (done) {
         bDone = true
       }
-      return { done, value }
+      return {done, value}
     }
 
     // @ts-ignore
@@ -242,7 +242,7 @@ describe('test relay connection', function () {
         if (aDone && bDone) {
           break
         } else {
-          console.log(new TextDecoder().decode((await msgA).value))
+          //console.log(new TextDecoder().decode((await msgA).value))
         }
 
         //@ts-ignore
@@ -255,7 +255,7 @@ describe('test relay connection', function () {
         if (aDone && bDone) {
           break
         } else {
-          console.log(new TextDecoder().decode((await msgB).value))
+          //console.log(new TextDecoder().decode((await msgB).value))
         }
         //@ts-ignore
         msgB = b.source.next().then(bFunction)
@@ -264,7 +264,7 @@ describe('test relay connection', function () {
 
     assert(
       // @ts-ignore
-      (await Promise.all([a.source.next(), b.source.next()])).every(({ done }) => done),
+      (await Promise.all([a.source.next(), b.source.next()])).every(({done}) => done),
       `both stream should have ended`
     )
 

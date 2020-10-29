@@ -8,7 +8,7 @@ const assertMatch = (test: any, pattern: RegExp) => {
   assert(test.match(pattern), `should match ${pattern}`)
 }
 
-let mockNode = sinon.fake() 
+let mockNode = sinon.fake()
 
 describe('Commands', () => {
   it('can import commands', () => {
@@ -29,7 +29,7 @@ describe('Commands', () => {
 
   it('ping', async () => {
     mockNode.bootstrapServers = []
-    mockNode.ping = sinon.fake.returns({ info: '', latency: 10 })
+    mockNode.ping = sinon.fake.returns({info: '', latency: 10})
     let mockPeerId = '16Uiu2HAkyXRaL7fKu4qcjaKuo4WXizrpK63Ltd6kG2tH6oSV58AW'
     let cmds = new mod.Commands(mockNode)
     assertMatch(await cmds.execute(`ping  ${mockPeerId}`), /pong/i)
@@ -38,12 +38,12 @@ describe('Commands', () => {
 
   it('version', async () => {
     let cmds = new mod.Commands(mockNode)
-    assertMatch(await cmds.execute('version'), /hopr-core/)  
+    assertMatch(await cmds.execute('version'), /hopr-core/)
   })
 
   it('crawl', async () => {
     mockNode.getConnectedPeers = () => []
-    mockNode.crawl = sinon.fake.returns({ contacted: [] })
+    mockNode.crawl = sinon.fake.returns({contacted: []})
 
     let cmds = new mod.Commands(mockNode)
     assertMatch(await cmds.execute('crawl'), /Crawled network, contacted/)
@@ -64,15 +64,15 @@ describe('Commands', () => {
   */
 
   it('myAddress', async () => {
-    let mockNode = sinon.fake() 
+    let mockNode = sinon.fake()
     mockNode.paymentChannels = sinon.fake()
     mockNode.paymentChannels.constants = sinon.fake()
     mockNode.paymentChannels.utils = sinon.fake()
-    mockNode.paymentChannels.utils.pubKeyToAccountId = sinon.fake.returns('') 
+    mockNode.paymentChannels.utils.pubKeyToAccountId = sinon.fake.returns('')
     mockNode.paymentChannels.constants.CHAIN_NAME = '2CHAINZ'
     mockNode.getId = sinon.fake.returns({
       toB58String: sinon.fake(),
-      pubKey: { marshal: sinon.fake() }
+      pubKey: {marshal: sinon.fake()}
     })
     let cmds = new mod.Commands(mockNode)
     assertMatch(await cmds.execute('myAddress'), /HOPR/)
@@ -90,7 +90,7 @@ describe('Commands', () => {
     let mockNode: any = sinon.fake()
     mockNode.sendMessage = sinon.fake()
     mockNode.bootstrapServers = []
-    mockNode.getConnectedPeers = () => [{ toB58String: () => '16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7' }]
+    mockNode.getConnectedPeers = () => [{toB58String: () => '16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7'}]
 
     let cmds = new mod.Commands(mockNode)
     assertMatch((await cmds.autocomplete('send 16Ui'))[0][0], /send 16U/)

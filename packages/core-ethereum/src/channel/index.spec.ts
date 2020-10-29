@@ -1,18 +1,18 @@
-import { randomBytes } from 'crypto'
-import { Ganache } from '@hoprnet/hopr-testing'
-import { migrate } from '@hoprnet/hopr-ethereum'
+import {randomBytes} from 'crypto'
+import {Ganache} from '@hoprnet/hopr-testing'
+import {migrate} from '@hoprnet/hopr-ethereum'
 import assert from 'assert'
-import { stringToU8a, u8aEquals, u8aConcat, durations } from '@hoprnet/hopr-utils'
+import {stringToU8a, u8aEquals, u8aConcat, durations} from '@hoprnet/hopr-utils'
 import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
-import { getPrivKeyData, createAccountAndFund, createNode } from '../utils/testing.spec'
-import { createChallenge, hash } from '../utils'
+import {getPrivKeyData, createAccountAndFund, createNode} from '../utils/testing.spec'
+import {createChallenge, hash} from '../utils'
 import BN from 'bn.js'
 import pipe from 'it-pipe'
 import Web3 from 'web3'
-import { HoprToken } from '../tsc/web3/HoprToken'
-import { Await } from '../tsc/utils'
-import { Channel as ChannelType, ChannelStatus, ChannelBalance, ChannelState } from '../types/channel'
-import { AcknowledgedTicket, Balance, SignedChannel, SignedTicket } from '../types'
+import {HoprToken} from '../tsc/web3/HoprToken'
+import {Await} from '../tsc/utils'
+import {Channel as ChannelType, ChannelStatus, ChannelBalance, ChannelState} from '../types/channel'
+import {AcknowledgedTicket, Balance, SignedChannel, SignedTicket} from '../types'
 import CoreConnector from '..'
 import Channel from '.'
 import * as testconfigs from '../config.spec'
@@ -96,7 +96,7 @@ describe('test Channel class', function () {
               await coreConnector.channel.createSignedChannel(undefined, {
                 channel: new ChannelType(undefined, {
                   balance: channelBalance,
-                  state: new ChannelState(undefined, { state: ChannelStatus.FUNDING })
+                  state: new ChannelState(undefined, {state: ChannelStatus.FUNDING})
                 })
               })
             ).subarray()

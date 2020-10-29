@@ -1,22 +1,21 @@
 #!/usr/bin/env node
 import Hopr from '@hoprnet/hopr-core'
-import type { HoprOptions } from '@hoprnet/hopr-core'
+import type {HoprOptions} from '@hoprnet/hopr-core'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import PeerId from 'peer-id'
 import Multiaddr from 'multiaddr'
 import debug from 'debug'
-import { encode, decode } from 'rlp'
+import {encode, decode} from 'rlp'
 // @ts-ignore
 import Multihash from 'multihashes'
 import bs58 from 'bs58'
-import { addPubKey } from '@hoprnet/hopr-core/lib/utils'
-import { getBootstrapAddresses } from '@hoprnet/hopr-utils'
-import { commands } from '@hoprnet/hopr-chat'
-import { LogStream, Socket } from './logs'
-import { AdminServer } from './admin'
+import {addPubKey} from '@hoprnet/hopr-core/lib/utils'
+import {getBootstrapAddresses} from '@hoprnet/hopr-utils'
+import {commands} from '@hoprnet/hopr-chat'
+import {LogStream, Socket} from './logs'
+import {AdminServer} from './admin'
 import chalk from 'chalk'
 import * as yargs from 'yargs'
-import { startServer } from '@hoprnet/hopr-server'
 
 let debugLog = debug('hoprd')
 
@@ -63,11 +62,6 @@ const argv = yargs
   .option('admin', {
     boolean: true,
     describe: 'Run an admin interface on localhost:3000',
-    default: false
-  })
-  .option('grpc', {
-    boolean: true,
-    describe: 'Run a gRPC interface',
     default: false
   })
   .option('password', {
@@ -188,11 +182,6 @@ async function main() {
       logs.log('Process exiting')
       return
     })
-
-    if (argv.grpc) {
-      // Start HOPR server
-      startServer(node, { logger: logs })
-    }
 
     if (adminServer) {
       adminServer.registerNode(node)

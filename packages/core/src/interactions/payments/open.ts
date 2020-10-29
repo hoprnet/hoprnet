@@ -1,14 +1,14 @@
 import type Hopr from '../../'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import type { Types } from '@hoprnet/hopr-core-connector-interface'
+import type {Types} from '@hoprnet/hopr-core-connector-interface'
 
 import pipe from 'it-pipe'
 
-import type { AbstractInteraction } from '../abstractInteraction'
+import type {AbstractInteraction} from '../abstractInteraction'
 
-import type { Handler } from 'libp2p'
+import type {Handler} from 'libp2p'
 
-import { PROTOCOL_PAYMENT_CHANNEL } from '../../constants'
+import {PROTOCOL_PAYMENT_CHANNEL} from '../../constants'
 import type PeerId from 'peer-id'
 
 class Opening<Chain extends HoprCoreConnector> implements AbstractInteraction {
@@ -44,7 +44,7 @@ class Opening<Chain extends HoprCoreConnector> implements AbstractInteraction {
     }
 
     const channel = this.node.paymentChannels.types.Channel.createFunded(channelBalance)
-    const signedChannel = await this.node.paymentChannels.types.SignedChannel.create(undefined, { channel })
+    const signedChannel = await this.node.paymentChannels.types.SignedChannel.create(undefined, {channel})
 
     await channel.sign(this.node.paymentChannels.account.keys.onChain.privKey, undefined, {
       bytes: signedChannel.buffer,
@@ -75,4 +75,4 @@ class Opening<Chain extends HoprCoreConnector> implements AbstractInteraction {
   }
 }
 
-export { Opening }
+export {Opening}

@@ -2,16 +2,19 @@ import Heartbeat from './heartbeat'
 import NetworkPeerStore from './network-peers'
 import PeerId from 'peer-id'
 import assert from 'assert'
-import { generateLibP2PMock } from '../test-utils'
-import { Interactions } from '../interactions'
-import { Network } from '../network'
-import type { Connection } from 'libp2p'
-import { Heartbeat as HeartbeatInteraction } from '../interactions/network/heartbeat'
+import {generateLibP2PMock} from '../test-utils'
+import {Interactions} from '../interactions'
+import {Network} from '../network'
+import type {Connection} from 'libp2p'
+import {Heartbeat as HeartbeatInteraction} from '../interactions/network/heartbeat'
 import debug from 'debug'
+// @ts-ignore
+import sinon from 'sinon'
+
 const log = debug('hopr:heartbeat-tests')
 
-async function generateMocks(options?: { timeoutIntentionally: boolean }, addr = '/ip4/0.0.0.0/tcp/0') {
-  const { node, address } = await generateLibP2PMock(addr)
+async function generateMocks(options?: {timeoutIntentionally: boolean}, addr = '/ip4/0.0.0.0/tcp/0') {
+  const {node, address} = await generateLibP2PMock(addr)
 
   node.hangUp = async (_id) => {} // Need to override this as we don't have real conns
 
@@ -21,7 +24,7 @@ async function generateMocks(options?: { timeoutIntentionally: boolean }, addr =
     }
   } as Interactions<any>
 
-  const network = new Network(node, interactions, {} as any, { crawl: options })
+  const network = new Network(node, interactions, {} as any, {crawl: options})
 
   node.connectionManager.on('peer:connect', (connection: Connection) => {
     log('> Connection from', connection.remotePeer)
@@ -58,7 +61,7 @@ describe('check heartbeat mechanism', function () {
 
     await Alice.node.dial(Chris.address)
 
-    // Check that the internal state is as expected
+    // Check that the internal state is as asserted
     assert(Alice.network.networkPeers.has(Chris.node.peerId), `Alice should know about Chris now.`)
     assert(Alice.network.networkPeers.has(Bob.node.peerId), `Alice should know about Bob now.`)
     assert(Chris.network.networkPeers.has(Alice.node.peerId), `Chris should know about Alice now.`)
@@ -86,10 +89,10 @@ describe('check heartbeat mechanism', function () {
 
 describe('unit test heartbeat', () => {
   let heartbeat
-  let hangUp = jest.fn(async () => {})
+  let hangUp = sinon.fake()
   let peers
   let interaction = {
-    interact: jest.fn(() => {})
+    interact: sinon.fake()
   } as any
 
   beforeEach(() => {
@@ -99,8 +102,8 @@ describe('unit test heartbeat', () => {
 
   it('check nodes is noop with empty store', async () => {
     await heartbeat.checkNodes()
-    expect(hangUp.mock.calls.length).toBe(0)
-    expect(interaction.interact.mock.calls.length).toBe(0)
+    assert(hangUp.notCalled)
+    assert(interaction.interact.notCalled)
   })
 
   it('check nodes is noop with only new peers', async () => {
@@ -109,14 +112,14 @@ describe('unit test heartbeat', () => {
       lastSeen: Date.now()
     })
     await heartbeat.checkNodes()
-    expect(hangUp.mock.calls.length).toBe(0)
-    expect(interaction.interact.mock.calls.length).toBe(0)
+    assert(hangUp.notCalled)
+    assert(interaction.interact.notCalled)
   })
 
   it('check nodes interacts with an old peer', async () => {
-    peers.push({ id: PeerId.createFromB58String('16Uiu2HAmShu5QQs3LKEXjzmnqcT8E3YqyxKtVTurWYp8caM5jYJw'), lastSeen: 0 })
+    peers.push({id: PeerId.createFromB58String('16Uiu2HAmShu5QQs3LKEXjzmnqcT8E3YqyxKtVTurWYp8caM5jYJw'), lastSeen: 0})
     await heartbeat.checkNodes()
-    expect(hangUp.mock.calls.length).toBe(0)
-    expect(interaction.interact.mock.calls.length).toBe(1)
+    assert(hangUp.notCalled)
+    assert(interaction.interact.calledOnce)
   })
 })

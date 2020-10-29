@@ -1,7 +1,7 @@
 import assert from 'assert'
 
-import { existsSync } from 'fs'
-import { clearDirectory, createDirectoryIfNotExists } from '.'
+import {existsSync} from 'fs'
+import {clearDirectory, createDirectoryIfNotExists} from '.'
 
 describe('test clean directory', function () {
   it('should delete the directory structure recursively', function () {

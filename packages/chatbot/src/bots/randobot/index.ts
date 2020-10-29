@@ -1,6 +1,6 @@
-import { Bot } from '../bot'
-import { IMessage } from '../../message/message'
-import { generateRandomSentence } from '../../utils/utils'
+import {Bot} from '../bot'
+import {IMessage} from '../../message/message'
+import {generateRandomSentence} from '../../utils/utils'
 import debug from 'debug'
 
 const log = debug('hopr-chatbot:randobot')

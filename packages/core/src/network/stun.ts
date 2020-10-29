@@ -1,10 +1,10 @@
-import dgram, { Socket } from 'dgram'
+import dgram, {Socket} from 'dgram'
 import * as stun from 'webrtc-stun'
-import { HoprOptions } from '..'
+import {HoprOptions} from '..'
 
-import { DEFAULT_STUN_PORT } from '../constants'
+import {DEFAULT_STUN_PORT} from '../constants'
 
-import { durations } from '@hoprnet/hopr-utils'
+import {durations} from '@hoprnet/hopr-utils'
 
 export type Interface = {
   family: 'IPv4' | 'IPv6'
@@ -19,7 +19,7 @@ class Stun {
 
   constructor(private hosts: HoprOptions['hosts']) {}
 
-  static getExternalIP(addresses: { hostname: string; port: number }[], usePort?: number): Promise<Interface> {
+  static getExternalIP(addresses: {hostname: string; port: number}[], usePort?: number): Promise<Interface> {
     return new Promise<Interface>(async (resolve, reject) => {
       let attr: Interface
 
@@ -32,7 +32,7 @@ class Stun {
           reject(new Error(`Timeout during STUN request.`))
         }
       }, STUN_TIMEOUT)
-      const socket = dgram.createSocket({ type: 'udp4' })
+      const socket = dgram.createSocket({type: 'udp4'})
       const tids = []
 
       for (let i = 0; i < addresses.length; i++) {
@@ -51,7 +51,7 @@ class Stun {
         if (res.loadBuffer(msg)) {
           if (
             tids.some((tid, index, array) => {
-              if (res.isBindingResponseSuccess({ transactionId: tid, fingerprint: true })) {
+              if (res.isBindingResponseSuccess({transactionId: tid, fingerprint: true})) {
                 array.splice(index, 1)
                 return true
               }
@@ -91,11 +91,11 @@ class Stun {
 
   getSocket() {
     if (this.hosts.ip4 !== undefined && this.hosts.ip6 !== undefined) {
-      return dgram.createSocket({ type: 'udp6' })
+      return dgram.createSocket({type: 'udp6'})
     } else if (this.hosts.ip4 !== undefined) {
-      return dgram.createSocket({ type: 'udp4' })
+      return dgram.createSocket({type: 'udp4'})
     } else if (this.hosts.ip6 !== undefined) {
-      return dgram.createSocket({ type: 'udp6', ipv6Only: true })
+      return dgram.createSocket({type: 'udp6', ipv6Only: true})
     }
     throw Error(`Cannot create STUN socket due to invalid configuration.`)
   }
@@ -110,7 +110,7 @@ class Stun {
         // if msg is valid STUN message
         if (req.loadBuffer(msg)) {
           // if STUN message is BINDING_REQUEST and valid content
-          if (req.isBindingRequest({ fingerprint: true })) {
+          if (req.isBindingRequest({fingerprint: true})) {
             const res = req.createBindingResponse(true).setXorMappedAddressAttribute(rinfo).setFingerprintAttribute()
 
             this.socket.send(res.toBuffer(), rinfo.port, rinfo.address)
