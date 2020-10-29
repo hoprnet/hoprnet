@@ -14,7 +14,7 @@ jobs:
     strategy:
       matrix:
         node-version: [12]
-        package: ['@hoprnet/hopr-utils', '@hoprnet/hopr-core', '@hoprnet/hopr-ethereum', 'all']
+        package: ['utils', 'core', 'ethereum', 'all']
 
     steps:
       - uses: actions/checkout@v2
@@ -46,11 +46,11 @@ jobs:
       - name: Build ${{ matrix.package }}
         if: matrix.package != 'all'
         run: |
-          node_modules/.bin/lerna run build --include-dependencies --scope ${{ matrix.package }}
+          node_modules/.bin/lerna run build --include-dependencies --scope @hoprnet/hopr-${{ matrix.package }}
       - name: Test ${{ matrix.package }}
         if: matrix.package != 'all' 
         run: |
-          node_modules/.bin/lerna run test --scope ${{ matrix.package }}
+          node_modules/.bin/lerna run test --scope @hoprnet/hopr-${{ matrix.package }}
 
 #      - name: Test Docker build hoprd
 #        working-directory: packages/hoprd
