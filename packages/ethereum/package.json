@@ -15,8 +15,10 @@
   },
   "scripts": {
     "build": "hardhat compile",
+    "test": "hardhat test --no-compile --network hardhat",
+    "network": "hardhat node --network hardhat",
     "migrate": "hardhat migrate",
-    "test": "hardhat test",
+    "fund": "hardhat fund",
     "prepublishOnly": "yarn build"
   },
   "dependencies": {

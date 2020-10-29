@@ -1,7 +1,8 @@
-import type { HardhatArguments, HardhatRuntimeEnvironment } from 'hardhat/types'
+import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
 import Web3 from 'web3'
 import { durations } from '@hoprnet/hopr-utils'
-import { migrationOptions as allMigrationOptions } from './utils/networks'
+import { migrationOptions as allMigrationOptions, MigrationOptions } from './utils/networks'
+import { singletons } from '@openzeppelin/test-helpers'
 
 const SECS_CLOSURE = Math.floor(durations.minutes(1) / 1e3)
 const MAX_MINT_AMOUNT = Web3.utils.toWei('100000000', 'ether')
@@ -9,18 +10,26 @@ const MAX_MINT_DURATION = Math.floor(durations.days(365) / 1e3)
 const SINGLE_FAUCET_MINTER = true
 const EXTERNAL_FAUCET_MINTER = '0x1A387b5103f28bc6601d085A3dDC878dEE631A56'
 
-async function main(_args: HardhatArguments, { web3, network }: HardhatRuntimeEnvironment) {
-  // this must be lazily loaded as it breaks hardhat
-  const { singletons } = require('@openzeppelin/test-helpers')
+async function main(
+  providedMigrationOptions: Partial<MigrationOptions>,
+  { web3, network, artifacts }: HardhatRuntimeEnvironment,
+  _runSuper: RunSuperFunction<any>
+) {
+  const networkMigrationOptions = allMigrationOptions[network.name]
+  if (!networkMigrationOptions) throw Error(`Could not found network config for network '${network.name}'.`)
+
+  const migrationOptions: MigrationOptions = {
+    shouldVerify: providedMigrationOptions.shouldVerify ?? networkMigrationOptions.shouldVerify,
+    mintUsing: providedMigrationOptions.mintUsing ?? networkMigrationOptions.mintUsing,
+    revokeRoles: providedMigrationOptions.revokeRoles ?? networkMigrationOptions.revokeRoles
+  }
 
   const [deployer] = await web3.eth.getAccounts()
+  console.log(deployer)
 
-  const migrationOptions = allMigrationOptions[network.name]
-  if (!migrationOptions) throw Error(`Could not found network config for network '${network.name}'.`)
-
-  console.log('Migrating with config:', {
+  console.log('Running task "migrate" with config:', {
     network: network.name,
-    migrationOptions
+    ...migrationOptions
   })
 
   // deploy ERC1820Registry
@@ -35,7 +44,7 @@ async function main(_args: HardhatArguments, { web3, network }: HardhatRuntimeEn
   console.log(`Deployed hoprToken: ${hoprToken.address}`)
   const minterRole = await hoprToken.MINTER_ROLE()
 
-  if (network.name === 'hardhat') {
+  if (!migrationOptions.revokeRoles) {
     await hoprToken.grantRole(minterRole, deployer)
   }
 
@@ -68,7 +77,7 @@ async function main(_args: HardhatArguments, { web3, network }: HardhatRuntimeEn
     const pauserRole = await hoprFaucet.PAUSER_ROLE()
     const minterRole = await hoprFaucet.MINTER_ROLE()
 
-    if (network.name === 'hardhat') {
+    if (!migrationOptions.revokeRoles) {
       await hoprFaucet.grantRole(pauserRole, deployer)
       await hoprFaucet.grantRole(minterRole, hoprFaucet.address)
     }

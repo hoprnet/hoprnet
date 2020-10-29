@@ -1,4 +1,4 @@
-export type PrivateNetwork = 'hardhat'
+export type PrivateNetwork = 'localhost'
 export type PublicNetwork = 'mainnet' | 'kovan' | 'xdai' | 'matic'
 export type Network = PublicNetwork | PrivateNetwork
 export type MigrationOptions = {
@@ -13,7 +13,7 @@ export type RpcOptions = {
 }
 
 export const migrationOptions: { [key in Network]: MigrationOptions } = {
-  hardhat: {
+  localhost: {
     shouldVerify: false,
     mintUsing: 'minter',
     revokeRoles: false
