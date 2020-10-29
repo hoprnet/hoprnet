@@ -29,6 +29,8 @@ class RelayConnection implements MultiaddrConnection {
   private _sinkTriggered: boolean
 
   private _switchPromise: DeferredPromise<Stream['source']>
+  private _msgPromise: DeferredPromise<void>
+  private _msgs: { done: boolean; value: Uint8Array }[]
 
   private _statusMessagePromise: DeferredPromise<void>
   private _statusMessages: Uint8Array[]
@@ -70,6 +72,9 @@ class RelayConnection implements MultiaddrConnection {
     this._defer = Defer()
 
     this._switchPromise = Defer<Stream['source']>()
+    this._msgPromise = Defer<void>()
+
+    this._msgs = []
 
     this._statusMessagePromise = Defer<void>()
     this._statusMessages = []
@@ -99,9 +104,11 @@ class RelayConnection implements MultiaddrConnection {
 
       return Promise.resolve()
     }
+
+    this._drainSource()
   }
 
-  private async *_createSource() {
+  private async _drainSource() {
     let streamClosed = false
 
     const closePromise = this._defer.promise.then(() => {
@@ -116,7 +123,7 @@ class RelayConnection implements MultiaddrConnection {
       streamResolved = true
       streamMsg = value
 
-      console.log(`setting streamDone to true`, done, value)
+      log(`setting streamDone`, done, value)
       if (done) {
         streamDone = done
       }
@@ -142,18 +149,27 @@ class RelayConnection implements MultiaddrConnection {
           if (u8aEquals(PREFIX, RELAY_PAYLOAD_PREFIX)) {
             if (streamDone || streamClosed) {
               this._destroyed = true
-              return SUFFIX
+              this._msgs.push({ done: true, value: SUFFIX })
+              this._msgPromise?.resolve()
+              break
             } else {
-              yield SUFFIX
+              this._msgs.push({ done: false, value: SUFFIX })
+              this._msgPromise?.resolve()
             }
           } else if (u8aEquals(PREFIX, RELAY_STATUS_PREFIX)) {
             if (u8aEquals(SUFFIX, STOP)) {
               this._destroyed = true
+              this._msgs.push({ done: true, value: undefined })
+              this._msgPromise?.resolve()
+
               break
             } else if (u8aEquals(SUFFIX, RESTART)) {
               log(`RESTART received. Ending stream ...`)
 
               this._onReconnect(this)
+
+              this._msgs.push({ done: true, value: undefined })
+              this._msgPromise?.resolve()
 
               // end stream
               break
@@ -194,8 +210,26 @@ class RelayConnection implements MultiaddrConnection {
           }
           this._destroyed = true
         }
-        return
+        break
       }
+    }
+  }
+
+  private async *_createSource() {
+    while (true) {
+      while (this._msgs.length > 0) {
+        let current = this._msgs.shift()
+
+        if (current.done) {
+          return current.value
+        } else {
+          yield current.value
+        }
+      }
+
+      this._msgPromise = Defer<void>()
+
+      await this._msgPromise.promise
     }
   }
 

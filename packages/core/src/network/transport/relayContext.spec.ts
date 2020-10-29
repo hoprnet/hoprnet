@@ -18,7 +18,7 @@ describe('test overwritable connection', function () {
 
     return {
       source: (async function* () {
-        console.log(`source triggered in .spec`)
+        log(`source triggered in .spec`)
         let i = 0
         let msg: Uint8Array
         for (; i < 7; i++) {
@@ -181,11 +181,17 @@ describe('test overwritable connection', function () {
     ctx.sink(receiverStream.source)
     receiverStream.sink(ctx.source)
 
+    let pingPromise
     setTimeout(() => {
       iteration++
+      pingPromise = ctxSender.ping()
       ctxCounterparty.update(getStream({ usePrefix: true }))
     }, 500)
 
+
     await new Promise((resolve) => setTimeout(resolve, 2000))
+
+    log(`ping`, await pingPromise)
+
   })
 })
