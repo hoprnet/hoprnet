@@ -32,5 +32,5 @@ export const bash = (cmd: string): Promise<void> => {
 }
 
 export const getOperations = () => {
-  return ['patch', 'build', 'coverage', 'fund', 'migrate', 'network', 'test', 'verify']
+  return ['build', 'coverage', 'fund', 'migrate', 'network', 'test', 'verify']
 }

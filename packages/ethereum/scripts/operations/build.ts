@@ -1,4 +1,3 @@
-import patch from './patch'
 import extractBuild from './extract-build'
 import { bash, root } from './utils'
 
@@ -16,10 +15,9 @@ const actions: Action[] = [
   { before: 'compiling contracts', cmd: 'npx truffle compile', after: SUCCESS_MSG },
   {
     before: "generating contracts' typescript types",
-    cmd: `npx typechain --target truffle --outDir ${root}/types/truffle-contracts ${root}/build/contracts/*.json`,
+    cmd: `npx typechain --target truffle-v5 --outDir ${root}/types/truffle-contracts ${root}/build/contracts/*.json`,
     after: SUCCESS_MSG,
   },
-  { before: 'applying patches', cmd: patch, after: SUCCESS_MSG },
   {
     before: 'extracting compiled output',
     cmd: extractBuild,
