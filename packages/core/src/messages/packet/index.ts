@@ -197,7 +197,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
         bytes: packet.buffer,
         offset: packet.challengeOffset
       }
-    ).sign(libp2p.peerInfo.id)
+    ).sign(libp2p.peerId)
 
     packet._message = Message.create(msg, {
       bytes: packet.buffer,
@@ -253,7 +253,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     receivedChallenge: Challenge<Chain>
     ticketKey: Uint8Array
   }> {
-    this.header.deriveSecret(this.libp2p.peerInfo.id.privKey.marshal())
+    this.header.deriveSecret(this.libp2p.peerId.privKey.marshal())
 
     if (await this.testAndSetTag(this.node.db)) {
       verbose('Error setting tag')
@@ -267,7 +267,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
 
     this.header.extractHeaderInformation()
 
-    let isRecipient = u8aEquals(this.libp2p.peerInfo.id.pubKey.marshal(), this.header.address)
+    let isRecipient = u8aEquals(this.libp2p.peerId.pubKey.marshal(), this.header.address)
 
     let sender: PeerId, target: PeerId
     if (!isRecipient) {
@@ -334,7 +334,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     }
 
     const channelIdOutgoing = await this.node.paymentChannels.utils.getId(
-      await this.node.paymentChannels.utils.pubKeyToAccountId(this.libp2p.peerInfo.id.pubKey.marshal()),
+      await this.node.paymentChannels.utils.pubKeyToAccountId(this.libp2p.peerId.pubKey.marshal()),
       await this.node.paymentChannels.utils.pubKeyToAccountId(target.pubKey.marshal())
     )
 
@@ -346,7 +346,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     log(
       `During forward: storing hashedKey`,
       u8aToHex(this.header.hashedKeyHalf),
-      `we are ${this.libp2p.peerInfo.id.toB58String()}`
+      `we are ${this.libp2p.peerId.toB58String()}`
     )
     await this.node.db.put(
       Buffer.from(this.node._dbKeys.UnAcknowledgedTickets(this.header.hashedKeyHalf)),
@@ -410,7 +410,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
         bytes: this.buffer,
         offset: this.challengeOffset
       }
-    ).sign(this.libp2p.peerInfo.id)
+    ).sign(this.libp2p.peerId)
   }
 
   /**

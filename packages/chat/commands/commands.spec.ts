@@ -1,197 +1,198 @@
 import * as root from '../index'
+import assert from 'assert'
+// @ts-ignore
+import sinon from 'sinon'
 const mod = root.commands
+
+const assertMatch = (test: any, pattern: RegExp) => {
+  assert(test.match(pattern), `should match ${pattern}`)
+}
+
+let mockNode = sinon.fake()
 
 describe('Commands', () => {
   it('can import commands', () => {
-    expect(mod).toBeDefined()
+    assert(mod)
   })
 
   it('can construct Commands object', () => {
-    let mockNode: any = jest.fn()
-    expect(mod.Commands).toBeDefined()
+    assert(mod.Commands)
     let cmds = new mod.Commands(mockNode)
-    expect(cmds).toBeTruthy()
+    assert(cmds)
   })
 
   it('responds to nonsense commands', async () => {
-    let mockNode: any = jest.fn()
-    expect(mod.Commands).toBeDefined()
+    assert(mod.Commands)
     let cmds = new mod.Commands(mockNode)
-
-    expect(await cmds.execute('not-a-real-command')).toMatch(/unknown command/i)
+    assertMatch(await cmds.execute('not-a-real-command'), /unknown command/i)
   })
 
   it('ping', async () => {
-    let mockNode: any = jest.fn()
     mockNode.bootstrapServers = []
-    mockNode.ping = jest.fn(() => ({ info: '', latency: 10 }))
+    mockNode.ping = sinon.fake.returns({ info: '', latency: 10 })
     let mockPeerId = '16Uiu2HAkyXRaL7fKu4qcjaKuo4WXizrpK63Ltd6kG2tH6oSV58AW'
-
     let cmds = new mod.Commands(mockNode)
-    expect(await cmds.execute(`ping  ${mockPeerId}`)).toMatch(/pong/i)
-    expect(mockNode.ping).toHaveBeenCalled()
+    assertMatch(await cmds.execute(`ping  ${mockPeerId}`), /pong/i)
+    assert(mockNode.ping.calledOnce)
   })
 
   it('version', async () => {
-    let mockNode: any = jest.fn()
     let cmds = new mod.Commands(mockNode)
-    expect(await cmds.execute('version')).toMatch(/hopr-core/)
+    assertMatch(await cmds.execute('version'), /hopr-core/)
   })
 
   it('crawl', async () => {
-    let mockNode: any = jest.fn()
     mockNode.getConnectedPeers = () => []
-    mockNode.crawl = jest.fn(() => ({ contacted: [] }))
+    mockNode.crawl = sinon.fake.returns({ contacted: [] })
 
     let cmds = new mod.Commands(mockNode)
-    expect(await cmds.execute('crawl')).toContain('Crawled network, contacted')
+    assertMatch(await cmds.execute('crawl'), /Crawled network, contacted/)
   })
 
   it('help', async () => {
-    let mockNode: any = jest.fn()
+    let mockNode: any = sinon.fake()
     let cmds = new mod.Commands(mockNode)
-    expect(await cmds.execute('help')).toMatch(/help/)
+    assertMatch(await cmds.execute('help'), /help/)
   })
 
   /* DISABLED as broken in monorepo. TODO fix
   it('listConnectors', async() => {
-    let mockNode: any = jest.fn()
+    let mockNode: any = sinon.fake()
     let cmds = new mod.Commands(mockNode)
-    expect(await cmds.execute('listConnectors')).toMatch(/ethereum/)
+    assert(await cmds.execute('listConnectors')).toMatch(/ethereum/)
   })
   */
 
   it('myAddress', async () => {
-    let mockNode: any = jest.fn()
-    mockNode.paymentChannels = jest.fn()
-    mockNode.paymentChannels.constants = jest.fn()
-    mockNode.paymentChannels.utils = jest.fn()
-    mockNode.paymentChannels.utils.pubKeyToAccountId = jest.fn(() => '')
+    let mockNode = sinon.fake()
+    mockNode.paymentChannels = sinon.fake()
+    mockNode.paymentChannels.constants = sinon.fake()
+    mockNode.paymentChannels.utils = sinon.fake()
+    mockNode.paymentChannels.utils.pubKeyToAccountId = sinon.fake.returns('')
     mockNode.paymentChannels.constants.CHAIN_NAME = '2CHAINZ'
-    mockNode.getId = jest.fn(() => ({
-      toB58String: jest.fn(),
-      pubKey: { marshal: jest.fn() }
-    }))
+    mockNode.getId = sinon.fake.returns({
+      toB58String: sinon.fake(),
+      pubKey: { marshal: sinon.fake() }
+    })
     let cmds = new mod.Commands(mockNode)
-    expect(await cmds.execute('myAddress')).toMatch(/HOPR/)
+    assertMatch(await cmds.execute('myAddress'), /HOPR/)
   })
 
   it('send message', async () => {
-    let mockNode: any = jest.fn()
-    mockNode.sendMessage = jest.fn()
+    mockNode.sendMessage = sinon.fake()
     let cmds = new mod.Commands(mockNode)
     await cmds.execute('send 16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7 Hello, world')
-    expect(mockNode.sendMessage).toHaveBeenCalled()
-    expect(await cmds.execute('send unknown-alias Hello, world')).toMatch(/invalid/i)
+    assert(mockNode.sendMessage.calledOnce)
+    assertMatch(await cmds.execute('send unknown-alias Hello, world'), /invalid/i)
   })
 
   it('autocomplete sendmessage', async () => {
-    let mockNode: any = jest.fn()
-    mockNode.sendMessage = jest.fn()
+    let mockNode: any = sinon.fake()
+    mockNode.sendMessage = sinon.fake()
     mockNode.bootstrapServers = []
     mockNode.getConnectedPeers = () => [{ toB58String: () => '16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7' }]
 
     let cmds = new mod.Commands(mockNode)
-    expect((await cmds.autocomplete('send 16Ui'))[0][0]).toMatch(/send 16U/)
-    expect((await cmds.autocomplete('send foo'))[0][0]).toBe('')
+    assertMatch((await cmds.autocomplete('send 16Ui'))[0][0], /send 16U/)
+    assert((await cmds.autocomplete('send foo'))[0][0] == '')
 
     await cmds.execute('alias 16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7 test')
 
-    expect((await cmds.autocomplete('send t'))[0][0]).toBe('send test')
+    assert((await cmds.autocomplete('send t'))[0][0] == 'send test')
   })
 
   it('multisend', async () => {
     let seq = 0
-    let mockNode: any = jest.fn()
-    mockNode.sendMessage = jest.fn()
-    let mockReadline: any = jest.fn()
-    mockReadline.write = jest.fn()
-    mockReadline.pause = jest.fn()
-    mockReadline.resume = jest.fn()
+    let mockNode = sinon.fake()
+    mockNode.sendMessage = sinon.fake()
 
-    mockReadline.question = jest.fn((question, resolve) => {
-      expect(question).toEqual('send >')
+    let mockReadline = sinon.fake()
+    mockReadline.write = sinon.fake()
+    mockReadline.pause = sinon.fake()
+    mockReadline.resume = sinon.fake()
+
+    mockReadline.question = sinon.fake((question: any, resolve: any) => {
+      assert(question == 'send >', 'question matches')
       if (seq == 0) {
         resolve('hello')
         seq++
       } else {
-        expect(mockNode.sendMessage).toHaveBeenCalled()
+        assert(mockNode.sendMessage.calledOnce)
         resolve('quit')
       }
     })
 
     let cmds = new mod.Commands(mockNode, mockReadline)
-
     await cmds.execute('alias 16Uiu2HAmQDFS8a4Bj5PGaTqQLME5SZTRNikz9nUPT3G4T6YL9o7V test2')
     await cmds.execute('multisend test2')
-    expect(mockReadline.question).toHaveBeenCalled()
+    assert(mockReadline.question.calledTwice, 'called once')
   })
 
   it('withdraw', async () => {
-    let mockNode: any = jest.fn()
-    mockNode.paymentChannels = jest.fn()
-    mockNode.paymentChannels.types = jest.fn()
-    mockNode.paymentChannels.types.Balance = jest.fn()
-    mockNode.paymentChannels.types.NativeBalance = jest.fn()
-    mockNode.paymentChannels.withdraw = jest.fn()
+    let mockNode: any = sinon.fake()
+    mockNode.paymentChannels = sinon.fake()
+    mockNode.paymentChannels.types = sinon.fake()
+    mockNode.paymentChannels.types.Balance = sinon.fake()
+    mockNode.paymentChannels.types.NativeBalance = sinon.fake()
+    mockNode.paymentChannels.withdraw = sinon.fake()
 
     let cmds = new mod.Commands(mockNode)
-    expect((await cmds.autocomplete('withdraw'))[0][0]).toMatch(/recipient \(blockchain address\)/)
+    assertMatch((await cmds.autocomplete('withdraw'))[0][0], /amount \(ETH, HOPR\)/)
 
     await cmds.execute('withdraw 0x123 native 1')
-    expect(mockNode.paymentChannels.withdraw).toHaveBeenCalled()
+    assert(mockNode.paymentChannels.withdraw.calledOnce)
   })
 
   it('settings', async () => {
-    let mockNode: any = jest.fn()
+    let mockNode: any = sinon.fake()
     let cmds = new mod.Commands(mockNode)
 
     let ir = await cmds.execute('settings')
-    expect(ir).toContain('includeRecipient')
-    expect(ir).toContain('routing')
+    assertMatch(ir, /includeRecipient/)
+    assertMatch(ir, /routing/)
   })
 
   it('settings includeRecipient', async () => {
-    let mockNode: any = jest.fn()
+    let mockNode: any = sinon.fake()
     let cmds = new mod.Commands(mockNode)
 
     let ir = await cmds.execute('settings includeRecipient')
-    expect(ir).toMatch(/false/)
+    assertMatch(ir, /false/)
     await cmds.execute('settings includeRecipient true')
     ir = await cmds.execute('settings includeRecipient')
-    expect(ir).toMatch(/true/)
+    assertMatch(ir, /true/)
     await cmds.execute('settings includeRecipient false')
     ir = await cmds.execute('settings includeRecipient')
-    expect(ir).toMatch(/false/)
+    assertMatch(ir, /false/)
   })
 
   it('settings routing', async () => {
-    let mockNode: any = jest.fn()
+    let mockNode: any = sinon.fake()
     let cmds = new mod.Commands(mockNode)
 
     let ir = await cmds.execute('settings routing')
-    expect(ir).toMatch(/direct/)
+    assertMatch(ir, /direct/)
     await cmds.execute('settings routing manual')
     ir = await cmds.execute('settings routing')
-    expect(ir).toMatch(/manual/)
+    assertMatch(ir, /manual/)
     await cmds.execute('settings routing direct')
     ir = await cmds.execute('settings routing')
-    expect(ir).toMatch(/direct/)
+    assertMatch(ir, /direct/)
   })
 
   it('alias addresses', async () => {
-    let mockNode: any = jest.fn()
-    mockNode.sendMessage = jest.fn()
+    let mockNode: any = sinon.fake()
+    mockNode.sendMessage = sinon.fake()
     let cmds = new mod.Commands(mockNode)
 
     let aliases = await cmds.execute('alias')
-    expect(aliases).toContain('No aliases found.')
+    assertMatch(aliases, /No aliases found./)
 
     await cmds.execute('alias 16Uiu2HAmQDFS8a4Bj5PGaTqQLME5SZTRNikz9nUPT3G4T6YL9o7V test')
 
     aliases = await cmds.execute('alias')
-    expect(aliases).toMatch(/test/)
+    assertMatch(aliases, /test/)
     await cmds.execute('send test Hello, world')
-    expect(mockNode.sendMessage).toHaveBeenCalled()
+    assert(mockNode.sendMessage.calledOnce)
   })
 })

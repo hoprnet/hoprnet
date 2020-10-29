@@ -82,9 +82,8 @@ export default class ListOpenChannels extends AbstractCommand {
 
       for (const channel of channels) {
         const id = u8aToHex(await channel.channelId)
-        const counterParty = channel.counterparty
 
-        if (!counterParty) {
+        if (!channel.counterparty) {
           result.push(
             this.generateOutput({
               id,
@@ -93,16 +92,29 @@ export default class ListOpenChannels extends AbstractCommand {
             })
           )
         } else {
+          const counterParty = await utils.pubKeyToAccountId(channel.counterparty)
+
+          // @TODO: batch query
+          const channelData = await Promise.all([
+            channel.offChainCounterparty,
+            channel.status,
+            channel.balance,
+            channel.balance_a
+          ]).then(([offChainCounterparty, status, balance, balance_a]) => ({
+            offChainCounterparty,
+            status,
+            balance,
+            balance_a
+          }))
+
           const selfIsPartyA = utils.isPartyA(self, counterParty)
-          const totalBalance = moveDecimalPoint((await channel.balance).toString(), types.Balance.DECIMALS * -1)
+          const totalBalance = moveDecimalPoint(channelData.balance.toString(), types.Balance.DECIMALS * -1)
           const myBalance = moveDecimalPoint(
-            selfIsPartyA
-              ? (await channel.balance_a).toString()
-              : (await channel.balance).sub(await channel.balance_a).toString(),
+            selfIsPartyA ? channelData.balance_a.toString() : channelData.balance.sub(channelData.balance_a).toString(),
             types.Balance.DECIMALS * -1
           )
-          const peerId = (await pubKeyToPeerId(await channel.offChainCounterparty)).toB58String()
-          const status = await channel.status
+          const peerId = (await pubKeyToPeerId(channelData.offChainCounterparty)).toB58String()
+          const status = channelData.status
 
           result.push(
             this.generateOutput({

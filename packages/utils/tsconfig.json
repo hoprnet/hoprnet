@@ -10,6 +10,7 @@
     "resolveJsonModule": true,
     "experimentalDecorators": true,
     "noEmit": true,
+    "skipLibCheck": true,
     "declaration": true
   },
   "include": ["src/**/*"]

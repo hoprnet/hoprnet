@@ -9,9 +9,8 @@
     "skipLibCheck": true,
     "sourceMap": true,
     "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "allowJs": true
+    "noUnusedParameters": true
   },
-  "exclude": ["lib"],
+  "exclude": ["lib", "node_modules"],
   "include": ["src/**/*.ts"]
 }

@@ -2,7 +2,6 @@
 import Hopr from '@hoprnet/hopr-core'
 import type { HoprOptions } from '@hoprnet/hopr-core'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import PeerInfo from 'peer-info'
 import PeerId from 'peer-id'
 import Multiaddr from 'multiaddr'
 import debug from 'debug'
@@ -17,7 +16,6 @@ import { LogStream, Socket } from './logs'
 import { AdminServer } from './admin'
 import chalk from 'chalk'
 import * as yargs from 'yargs'
-import { startServer } from '@hoprnet/hopr-server'
 
 let debugLog = debug('hoprd')
 
@@ -55,7 +53,7 @@ const argv = yargs
   })
   .option('provider', {
     describe: 'A provider url for the Network you specified',
-    default: 'wss://xdai.poanetwork.dev/wss'
+    default: 'wss://ws-mainnet.matic.network'
   })
   .option('host', {
     describe: 'The network host to run the HOPR node on.',
@@ -64,11 +62,6 @@ const argv = yargs
   .option('admin', {
     boolean: true,
     describe: 'Run an admin interface on localhost:3000',
-    default: false
-  })
-  .option('grpc', {
-    boolean: true,
-    describe: 'Run a gRPC interface',
     default: false
   })
   .option('password', {
@@ -119,7 +112,7 @@ function parseHosts(): HoprOptions['hosts'] {
 
 async function generateNodeOptions(): Promise<HoprOptions> {
   let options: HoprOptions = {
-    debug: Boolean(process.env.DEBUG),
+    debug: Boolean(process.env.HOPR_DEBUG),
     bootstrapNode: argv.bootstrap,
     network: argv.network,
     bootstrapServers: argv.bootstrap ? [] : [...(await getBootstrapAddresses()).values()],
@@ -189,11 +182,6 @@ async function main() {
       logs.log('Process exiting')
       return
     })
-
-    if (argv.grpc) {
-      // Start HOPR server
-      startServer(node, { logger: logs })
-    }
 
     if (adminServer) {
       adminServer.registerNode(node)

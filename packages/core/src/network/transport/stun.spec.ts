@@ -9,7 +9,7 @@ describe('test STUN', function () {
   let client
   let servers
 
-  beforeAll(() => {
+  beforeEach(() => {
     servers = Array.from({ length: 4 }).map((_) => {
       const server = dgram.createSocket('udp4')
       server.on('message', (msg: Buffer, rinfo: RemoteInfo) => handleStunRequest(server, msg, rinfo))
@@ -48,7 +48,7 @@ describe('test STUN', function () {
     */
   })
 
-  afterAll(async () => {
+  afterEach(async () => {
     await Promise.all(
       servers.map((server) => {
         server.close()

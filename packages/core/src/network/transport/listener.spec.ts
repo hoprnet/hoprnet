@@ -1,14 +1,16 @@
 import assert from 'assert'
 import Listener from './listener'
 import Multiaddr from 'multiaddr'
-import { Connection, Upgrader } from '../../@types/transport'
+import { Upgrader } from 'libp2p'
+import type { Connection } from 'libp2p'
 import dgram, { Socket, RemoteInfo } from 'dgram'
 import { handleStunRequest } from './stun'
 import PeerId from 'peer-id'
 import net from 'net'
 import Defer, { DeferredPromise } from 'p-defer'
 
-describe('check listening to sockets', function () {
+describe('transport/listener.spec check listening to sockets', function () {
+  this.timeout(5000)
   async function startStunServer(port: number, state: { msgReceived: DeferredPromise<void> }): Promise<Socket> {
     const promises: Promise<void>[] = []
     const socket = dgram.createSocket('udp4')

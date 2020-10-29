@@ -15,7 +15,7 @@ import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '../../'
 import { Acknowledgement } from '../../messages/acknowledgement'
 
-import type { Handler } from '../../@types/transport'
+import type { Handler } from 'libp2p'
 
 import EventEmitter from 'events'
 
@@ -57,8 +57,8 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
 
       try {
         struct = await this.node._libp2p.dialProtocol(counterparty, this.protocols[0]).catch(async () => {
-          const result = await this.node._libp2p.peerRouting.findPeer(counterparty)
-          return await this.node._libp2p.dialProtocol(result, this.protocols[0])
+          const { id } = await this.node._libp2p.peerRouting.findPeer(counterparty)
+          return await this.node._libp2p.dialProtocol(id, this.protocols[0])
         })
       } catch (err) {
         clearTimeout(timeout)

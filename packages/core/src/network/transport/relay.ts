@@ -24,9 +24,9 @@ declare interface Handshake {
 const handshake: (stream: Stream) => Handshake = require('it-handshake')
 
 import Multiaddr from 'multiaddr'
-import PeerInfo from 'peer-info'
 import PeerId from 'peer-id'
 import libp2p from 'libp2p'
+import type { Connection, Stream } from 'libp2p'
 import {
   RELAY_CIRCUIT_TIMEOUT,
   RELAY_REGISTER,
@@ -43,23 +43,14 @@ import { RelayContext } from './relayContext'
 
 import { RelayConnection } from './relayConnection'
 
-import type {
-  Connection,
-  Dialer,
-  DialOptions,
-  Handler,
-  MultiaddrConnection,
-  PeerRouting,
-  Registrar,
-  Stream
-} from '../../@types/transport'
+import type { Dialer, DialOptions, Handler, MultiaddrConnection, PeerRouting, Registrar } from 'libp2p'
 
 class Relay {
   private _dialer: Dialer
   private _registrar: Registrar
   private _dht: { peerRouting: PeerRouting } | undefined
-  private _peerInfo: PeerInfo
   private _streams: Map<string, Map<string, RelayContext>>
+  private id: PeerId
 
   private connHandler: (conn: MultiaddrConnection) => void | undefined
 
@@ -69,11 +60,11 @@ class Relay {
     this._registrar = libp2p.registrar
     //@ts-ignore
     this._dht = libp2p._dht
-    this._peerInfo = libp2p.peerInfo
 
     this.connHandler = _connHandler
 
     this._streams = new Map<string, Map<string, RelayContext>>()
+    this.id = libp2p.peerId
 
     // if (webRTCUpgrader != null) {
     //   this._webRTCUpgrader = webRTCUpgrader
@@ -85,7 +76,7 @@ class Relay {
 
   async establishRelayedConnection(
     ma: Multiaddr,
-    relays: PeerInfo[],
+    relays: Multiaddr[],
     options?: DialOptions
   ): Promise<MultiaddrConnection> {
     const destination = PeerId.createFromCID(ma.getPeerId())
@@ -94,7 +85,7 @@ class Relay {
       throw new AbortError()
     }
 
-    const potentialRelays = relays.filter((relay: PeerInfo) => !relay.id.equals(this._peerInfo.id))
+    const potentialRelays = relays.filter((relay) => relay.getPeerId() !== this.id.toB58String())
 
     if (potentialRelays.length == 0) {
       throw Error(`Filtered list of relays and there is no one left to establish a connection. `)
@@ -103,7 +94,7 @@ class Relay {
     for (let i = 0; i < potentialRelays.length; i++) {
       let relayConnection: Connection
       try {
-        relayConnection = await this.connectToRelay(potentialRelays[i], options)
+        relayConnection = await this.connectToRelay(PeerId.createFromB58String(potentialRelays[i].getPeerId()), options)
       } catch (err) {
         error(err)
         continue
@@ -111,7 +102,11 @@ class Relay {
 
       let stream: Stream
       try {
-        stream = await this.performHandshake(relayConnection, potentialRelays[i].id, destination)
+        stream = await this.performHandshake(
+          relayConnection,
+          PeerId.createFromB58String(potentialRelays[i].getPeerId()),
+          destination
+        )
       } catch (err) {
         error(err)
         continue
@@ -120,7 +115,7 @@ class Relay {
       log(`relayed connection established`)
       return new RelayConnection({
         stream,
-        self: this._peerInfo.id,
+        self: this.id,
         counterparty: destination
         // webRTC: this._webRTCUpgrader?.upgradeOutbound(),
       })
@@ -128,7 +123,7 @@ class Relay {
 
     throw Error(
       `Unable to establish a connection to any known relay node. Tried ${chalk.yellow(
-        potentialRelays.map((potentialRelay: PeerInfo) => potentialRelay.id.toB58String()).join(`, `)
+        potentialRelays.map((potentialRelay: Multiaddr) => potentialRelay.getPeerId()).join(`, `)
       )}`
     )
   }
@@ -145,7 +140,7 @@ class Relay {
     this.connHandler?.(
       new RelayConnection({
         stream,
-        self: this._peerInfo.id,
+        self: this.id,
         counterparty
         // webRTC: this._webRTCUpgrader?.upgradeInbound(),
       })
@@ -153,21 +148,21 @@ class Relay {
     log(`counterparty relayed connection established`)
   }
 
-  private async connectToRelay(relay: PeerInfo, options?: DialOptions): Promise<Connection> {
+  private async connectToRelay(relay: PeerId, options?: DialOptions): Promise<Connection> {
     let relayConnection = this._registrar.getConnection(relay)
 
     if (relayConnection == null) {
       try {
         relayConnection = await this._dialer.connectToPeer(relay, { signal: options?.signal })
       } catch (err) {
-        log(`Could not reach potential relay ${relay.id.toB58String()}. Error was: ${err}`)
+        log(`Could not reach potential relay ${relay.toB58String()}. Error was: ${err}`)
         if (this._dht != null && (options == null || options.signal == null || !options.signal.aborted)) {
-          let newAddress = await this._dht.peerRouting.findPeer(relay.id)
+          let { id } = await this._dht.peerRouting.findPeer(relay)
 
           try {
-            relayConnection = await this._dialer.connectToPeer(newAddress, { signal: options?.signal })
+            relayConnection = await this._dialer.connectToPeer(id, { signal: options?.signal })
           } catch (err) {
-            log(`Dialling potential relay ${relay.id.toB58String()} after querying DHT failed. Error was ${err}`)
+            log(`Dialling potential relay ${relay.toB58String()} after querying DHT failed. Error was ${err}`)
           }
         }
       }
@@ -379,9 +374,7 @@ class Relay {
   private async establishForwarding(initiator: PeerId, counterparty: PeerId) {
     let timeout: any
 
-    let cParty = new PeerInfo(counterparty)
-
-    let newConn = this._registrar.getConnection(cParty)
+    let newConn = this._registrar.getConnection(counterparty)
 
     if (!newConn) {
       const abort = new AbortController()
@@ -389,13 +382,13 @@ class Relay {
       timeout = setTimeout(() => abort.abort(), RELAY_CIRCUIT_TIMEOUT)
 
       try {
-        newConn = await this._dialer.connectToPeer(cParty, { signal: abort.signal })
+        newConn = await this._dialer.connectToPeer(counterparty, { signal: abort.signal })
       } catch (err) {
         if (this._dht != null && !abort.signal.aborted) {
           try {
-            cParty = await this._dht.peerRouting.findPeer(cParty.id)
+            counterparty = (await this._dht.peerRouting.findPeer(counterparty)).id
 
-            newConn = await this._dialer.connectToPeer(cParty, { signal: abort.signal })
+            newConn = await this._dialer.connectToPeer(counterparty, { signal: abort.signal })
           } catch (err) {
             clearTimeout(timeout)
 

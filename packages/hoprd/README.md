@@ -20,11 +20,7 @@ See `hoprd help` for full list.
                                                [default: "wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36"]
   --host      The network host to run the HOPR node on.                                        [default: "0.0.0.0:9091"]
   --admin     Run an admin interface on localhost:3000                                        [boolean] [default: false]
-  --grpc      Run a gRPC interface                                                            [boolean] [default: false]
   --password  A password to encrypt your keys                                                              [default: ""]
   --run       Run a single hopr command, same syntax as in hopr-admin                                     [default: ""]
 
 ```
-
-NB:
-`--grpc` runs a [hopr server](https://github.com/hoprnet/hopr-server) instance.
