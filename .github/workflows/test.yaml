@@ -33,10 +33,10 @@ jobs:
           yarn install --pure-lockfile
       - name: Install dependencies
         run: |
-          yarn util:install && yarn util:link
+          yarn
       - name: Build
         run: |
-          yarn util:build
+          yarn build
       - name: Test
         run: |
           yarn test
