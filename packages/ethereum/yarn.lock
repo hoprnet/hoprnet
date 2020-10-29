@@ -183,24 +183,24 @@
     "@ethersproject/rlp" "^5.0.3"
     "@ethersproject/signing-key" "^5.0.4"
 
-"@hoprnet/hopr-demo-seeds@1.49.0-alpha.0":
-  version "1.49.0-alpha.0"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-demo-seeds/-/hopr-demo-seeds-1.49.0-alpha.0.tgz#af59b1ff424234bf1cafdac8ce0921d12f28edd9"
-  integrity sha512-1WgDmz4cZoXrRDt967f+lW9Q+zvmtUkzIM+Sqq5KZNJBVgMRcdA/70/OTSB5HHXD6agyNIEwF89sIt+NPlnzaw==
+"@hoprnet/hopr-demo-seeds@1.50.0-alpha.0":
+  version "1.50.0-alpha.0"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-demo-seeds/-/hopr-demo-seeds-1.50.0-alpha.0.tgz#e3f914106ca3bec31f9180e0ee28471b756b01be"
+  integrity sha512-ypeC3d2FRAAEZ27+g/BMck+lIH0XCqoIJe4jIYizfAEFiQwwKD6FBUvdvN9RAVD0IvdU3BLomtM4iyKKBpaNvA==
 
-"@hoprnet/hopr-testing@1.49.0-alpha.0":
-  version "1.49.0-alpha.0"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-testing/-/hopr-testing-1.49.0-alpha.0.tgz#9a2a29bf66b52459cb75b751a11d31f7a6247831"
-  integrity sha512-P1gm3+uuD6oipWLi4OuMIvfjxVZEJqeviDfMmpYS7pi5ZerfgvC17naZYLCgSSqp9RJfbNR8PK5Khsdc9IvI7Q==
+"@hoprnet/hopr-testing@1.50.0-alpha.0":
+  version "1.50.0-alpha.0"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-testing/-/hopr-testing-1.50.0-alpha.0.tgz#3216313f30c4a98a825452e82afae1c889b4b8af"
+  integrity sha512-cZ5E91L0pfdN+Fq1SjXG9G0302Ubm3lQs6xdGsio3mYn9UIgYREG2IwAWpTuLIzUWuqluOq850Y0jvR8EX+9zw==
   dependencies:
-    "@hoprnet/hopr-demo-seeds" "1.49.0-alpha.0"
+    "@hoprnet/hopr-demo-seeds" "1.50.0-alpha.0"
     debug "^4.1.1"
-    ganache-core "2.13.0"
+    ganache-core "2.13.1"
 
-"@hoprnet/hopr-utils@1.49.0-alpha.0":
-  version "1.49.0-alpha.0"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.49.0-alpha.0.tgz#f3df776a696f6ff0db028d0ec83e4b1dcd597d1b"
-  integrity sha512-NEtUS96aYrXOQOM4+aV2m7Fgz95pvqNom7h3RfEGWwdBVqyn4r/peVFFuOvol3HAG5/ehYhFz58tAYTaG5gHSg==
+"@hoprnet/hopr-utils@1.50.0-alpha.0":
+  version "1.50.0-alpha.0"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.50.0-alpha.0.tgz#c8af5d7b057a74aea3699ea750611f7de2f513c7"
+  integrity sha512-mx3fhrKOQSX985dAQCvYOIdtqunF/Lhh7/0cq/UT9ulS5GRRxcmoOybWEN6bojbY4VVsb/ZSEaKtq/Fduq2JxQ==
   dependencies:
     bignumber.js "^9.0.0"
     libp2p-crypto "0.18.0"
@@ -3199,18 +3199,6 @@ eth-rpc-errors@^3.0.0:
   dependencies:
     fast-safe-stringify "^2.0.6"
 
-eth-sig-util@2.3.0:
-  version "2.3.0"
-  resolved "https://registry.yarnpkg.com/eth-sig-util/-/eth-sig-util-2.3.0.tgz#c54a6ac8e8796f7e25f59cf436982a930e645231"
-  integrity sha512-ugD1AvaggvKaZDgnS19W5qOfepjGc7qHrt7TrAaL54gJw9SHvgIXJ3r2xOMW30RWJZNP+1GlTOy5oye7yXA4xA==
-  dependencies:
-    buffer "^5.2.1"
-    elliptic "^6.4.0"
-    ethereumjs-abi "0.6.5"
-    ethereumjs-util "^5.1.1"
-    tweetnacl "^1.0.0"
-    tweetnacl-util "^0.15.0"
-
 eth-sig-util@^1.4.2:
   version "1.4.2"
   resolved "https://registry.yarnpkg.com/eth-sig-util/-/eth-sig-util-1.4.2.tgz#8d958202c7edbaae839707fba6f09ff327606210"
@@ -3319,14 +3307,6 @@ ethereumjs-abi@0.6.5:
   dependencies:
     bn.js "^4.10.0"
     ethereumjs-util "^4.3.0"
-
-ethereumjs-abi@0.6.7:
-  version "0.6.7"
-  resolved "https://registry.yarnpkg.com/ethereumjs-abi/-/ethereumjs-abi-0.6.7.tgz#d1d1c5cdb8d910a7d97645ba9e93be5d153bba2e"
-  integrity sha512-EMLOA8ICO5yAaXDhjVEfYjsJIXYutY8ufTE93eEKwsVtp2usQreKwsDTJ9zvam3omYqNuffr8IONIqb2uUslGQ==
-  dependencies:
-    bn.js "^4.11.8"
-    ethereumjs-util "^6.0.0"
 
 ethereumjs-abi@0.6.8, ethereumjs-abi@^0.6.8, "ethereumjs-abi@git+https://github.com/ethereumjs/ethereumjs-abi.git":
   version "0.6.8"
@@ -4049,43 +4029,6 @@ ganache-cli@^6.11.0:
     ethereumjs-util "6.2.1"
     source-map-support "0.5.12"
     yargs "13.2.4"
-
-ganache-core@2.13.0:
-  version "2.13.0"
-  resolved "https://registry.yarnpkg.com/ganache-core/-/ganache-core-2.13.0.tgz#e211d995eb806a1cd792096a989cf624417f0f7c"
-  integrity sha512-yTSsesDBwPh+34ZN2w5SZoPNVbR0Gn75InvQc2D1zUdy9prED6R2sVbefSyiXFR/uwZK9NrIVS1+HcEtgQVb9Q==
-  dependencies:
-    abstract-leveldown "3.0.0"
-    async "2.6.2"
-    bip39 "2.5.0"
-    cachedown "1.0.0"
-    clone "2.1.2"
-    debug "3.2.6"
-    encoding-down "5.0.4"
-    eth-sig-util "2.3.0"
-    ethereumjs-abi "0.6.7"
-    ethereumjs-account "3.0.0"
-    ethereumjs-block "2.2.2"
-    ethereumjs-common "1.5.0"
-    ethereumjs-tx "2.1.2"
-    ethereumjs-util "6.2.1"
-    ethereumjs-vm "4.2.0"
-    heap "0.2.6"
-    keccak "3.0.1"
-    level-sublevel "6.6.4"
-    levelup "3.1.1"
-    lodash "4.17.20"
-    lru-cache "5.1.1"
-    merkle-patricia-tree "3.0.0"
-    patch-package "6.2.2"
-    seedrandom "3.0.1"
-    source-map-support "0.5.12"
-    tmp "0.1.0"
-    web3-provider-engine "14.2.1"
-    websocket "1.0.32"
-  optionalDependencies:
-    ethereumjs-wallet "0.6.5"
-    web3 "1.2.11"
 
 ganache-core@2.13.1:
   version "2.13.1"

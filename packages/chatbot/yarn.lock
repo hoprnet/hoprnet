@@ -383,18 +383,18 @@
     protobufjs "^6.9.0"
     yargs "^15.3.1"
 
-"@hoprnet/hopr-core-connector-interface@1.49.0-alpha.0":
-  version "1.49.0-alpha.0"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-connector-interface/-/hopr-core-connector-interface-1.49.0-alpha.0.tgz#dfd7bba7673894358c5cd02bae5d49dc7e24ec01"
-  integrity sha512-n/dGGMoxR3j/HDxFpxcsu92baNC22+7ZJErYtTAkaWcT5hujewwaGOFVF1J2G3KAFS3hG2BB2M2cdi0iCws/Og==
+"@hoprnet/hopr-core-connector-interface@1.50.0-alpha.0":
+  version "1.50.0-alpha.0"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-connector-interface/-/hopr-core-connector-interface-1.50.0-alpha.0.tgz#a203a89ead85e314d4436bb5697c0166c06b1bae"
+  integrity sha512-7eLrX/QEVn/Mfn3pXeaCJJpOrUpZRvFpzDIqLlYAOW2qlZ692DNKNcupcOlHRy335LssHF4fGDQvqIa57D/9ow==
 
-"@hoprnet/hopr-core-ethereum@1.49.0-alpha.0":
-  version "1.49.0-alpha.0"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-ethereum/-/hopr-core-ethereum-1.49.0-alpha.0.tgz#b0ac5dc0208b24ad2a85e8e204c8075faff5ceda"
-  integrity sha512-yOGbBxGhcdlmy4vfvX5dwL/lUhu/hkHXbpCfKEvE2ez9NCqSANElhL2BUFZe5n+vfpOs/OmjWfE3vBndgXmKpg==
+"@hoprnet/hopr-core-ethereum@1.50.0-alpha.0":
+  version "1.50.0-alpha.0"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-ethereum/-/hopr-core-ethereum-1.50.0-alpha.0.tgz#121140281f8cae36b4ffdfde11d8e585efcb0e9a"
+  integrity sha512-mDOpIBbVRfvtoRR4p69q6NcyRtVjdIjMQ169yXz5YihnE5hvamryHGAlp69wg/gDKmn8Yu17cTdiR3ctsPEpoA==
   dependencies:
-    "@hoprnet/hopr-ethereum" "1.49.0-alpha.0"
-    "@hoprnet/hopr-utils" "1.49.0-alpha.0"
+    "@hoprnet/hopr-ethereum" "1.50.0-alpha.0"
+    "@hoprnet/hopr-utils" "1.50.0-alpha.0"
     bn.js "^5.1.2"
     chalk "^4.1.0"
     debug "^4.1.1"
@@ -408,14 +408,14 @@
     web3-eth "^1.2.11"
     web3-eth-contract "^1.2.11"
 
-"@hoprnet/hopr-core@1.49.0-alpha.0":
-  version "1.49.0-alpha.0"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core/-/hopr-core-1.49.0-alpha.0.tgz#34a5f38a5962d5f6d8b888e6f0fd034d7416cba2"
-  integrity sha512-3wtLCxmYCYKqzy4lHRqk3Yr2jhxqfmbjAbL5xchfwQPxnJ2FiJq+qwPW0+DSBIOTlTp+ORobiz0pFkzYOwK7nA==
+"@hoprnet/hopr-core@1.50.0-alpha.0":
+  version "1.50.0-alpha.0"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core/-/hopr-core-1.50.0-alpha.0.tgz#23ff29b9bfe9559217d9942e8f53d2803355f5d6"
+  integrity sha512-2ZhU2JrkS+AoSLSz+gQCiMFSIccxXNmelWGSm2hVVVxENjtAdlkYybe60ZlWrqjs9m+tBScppwG5neBhUmCPrg==
   dependencies:
-    "@hoprnet/hopr-core-ethereum" "1.49.0-alpha.0"
-    "@hoprnet/hopr-demo-seeds" "1.49.0-alpha.0"
-    "@hoprnet/hopr-utils" "1.49.0-alpha.0"
+    "@hoprnet/hopr-core-ethereum" "1.50.0-alpha.0"
+    "@hoprnet/hopr-demo-seeds" "1.50.0-alpha.0"
+    "@hoprnet/hopr-utils" "1.50.0-alpha.0"
     abort-controller "^3.0.0"
     abortable-iterator "^3.0.0"
     bl "^4.0.3"
@@ -445,34 +445,34 @@
     webrtc-stun "^3.0.0"
     wrtc "0.4.6"
 
-"@hoprnet/hopr-demo-seeds@1.49.0-alpha.0":
-  version "1.49.0-alpha.0"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-demo-seeds/-/hopr-demo-seeds-1.49.0-alpha.0.tgz#af59b1ff424234bf1cafdac8ce0921d12f28edd9"
-  integrity sha512-1WgDmz4cZoXrRDt967f+lW9Q+zvmtUkzIM+Sqq5KZNJBVgMRcdA/70/OTSB5HHXD6agyNIEwF89sIt+NPlnzaw==
+"@hoprnet/hopr-demo-seeds@1.50.0-alpha.0":
+  version "1.50.0-alpha.0"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-demo-seeds/-/hopr-demo-seeds-1.50.0-alpha.0.tgz#e3f914106ca3bec31f9180e0ee28471b756b01be"
+  integrity sha512-ypeC3d2FRAAEZ27+g/BMck+lIH0XCqoIJe4jIYizfAEFiQwwKD6FBUvdvN9RAVD0IvdU3BLomtM4iyKKBpaNvA==
 
-"@hoprnet/hopr-ethereum@1.49.0-alpha.0":
-  version "1.49.0-alpha.0"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-ethereum/-/hopr-ethereum-1.49.0-alpha.0.tgz#0253443c968420365478213856d3117c69dd54d3"
-  integrity sha512-XxEmWpuFcegR57fNBJdyRIavOB3VYD/xeNfy5+jA3qgYwC1BPZ/g3l0dwsmDD5bNe2BMOQINNQ4wDObuD+Et7w==
+"@hoprnet/hopr-ethereum@1.50.0-alpha.0":
+  version "1.50.0-alpha.0"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-ethereum/-/hopr-ethereum-1.50.0-alpha.0.tgz#5b58fa7323cd4c3dae6ad91b41b0264d6f03353d"
+  integrity sha512-1l9cfywd4Cc3smu6XyD/kR6yri/9u9Z0TLictO8wI2qx4Iob4nk6zp9oBrf8Gyz7d5nIDDYVIK0T2RjLrqeDDw==
   dependencies:
-    "@hoprnet/hopr-demo-seeds" "1.49.0-alpha.0"
-    "@hoprnet/hopr-utils" "1.49.0-alpha.0"
+    "@hoprnet/hopr-demo-seeds" "1.50.0-alpha.0"
+    "@hoprnet/hopr-utils" "1.50.0-alpha.0"
     "@openzeppelin/contracts" "^3.0.1"
     "@truffle/debug-utils" "^4.1.1"
     "@truffle/hdwallet-provider" "^1.0.34"
     bignumber.js "^9.0.0"
     dotenv "^8.2.0"
-    ganache-core "2.12.1"
+    ganache-core "2.13.1"
     secp256k1 "4.0.2"
     truffle "^5.1.23"
     truffle-plugin-verify "^0.5.0"
     ts-node "^9.0.0"
     web3 "^1.2.11"
 
-"@hoprnet/hopr-utils@1.49.0-alpha.0":
-  version "1.49.0-alpha.0"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.49.0-alpha.0.tgz#f3df776a696f6ff0db028d0ec83e4b1dcd597d1b"
-  integrity sha512-NEtUS96aYrXOQOM4+aV2m7Fgz95pvqNom7h3RfEGWwdBVqyn4r/peVFFuOvol3HAG5/ehYhFz58tAYTaG5gHSg==
+"@hoprnet/hopr-utils@1.50.0-alpha.0":
+  version "1.50.0-alpha.0"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.50.0-alpha.0.tgz#c8af5d7b057a74aea3699ea750611f7de2f513c7"
+  integrity sha512-mx3fhrKOQSX985dAQCvYOIdtqunF/Lhh7/0cq/UT9ulS5GRRxcmoOybWEN6bojbY4VVsb/ZSEaKtq/Fduq2JxQ==
   dependencies:
     bignumber.js "^9.0.0"
     libp2p-crypto "0.18.0"
@@ -3891,6 +3891,18 @@ eth-sig-util@^1.4.2:
     ethereumjs-abi "git+https://github.com/ethereumjs/ethereumjs-abi.git"
     ethereumjs-util "^5.1.1"
 
+eth-sig-util@^2.0.0:
+  version "2.5.3"
+  resolved "https://registry.yarnpkg.com/eth-sig-util/-/eth-sig-util-2.5.3.tgz#6938308b38226e0b3085435474900b03036abcbe"
+  integrity sha512-KpXbCKmmBUNUTGh9MRKmNkIPietfhzBqqYqysDavLseIiMUGl95k6UcPEkALAZlj41e9E6yioYXc1PC333RKqw==
+  dependencies:
+    buffer "^5.2.1"
+    elliptic "^6.4.0"
+    ethereumjs-abi "0.6.5"
+    ethereumjs-util "^5.1.1"
+    tweetnacl "^1.0.0"
+    tweetnacl-util "^0.15.0"
+
 eth-tx-summary@^3.1.2:
   version "3.2.4"
   resolved "https://registry.yarnpkg.com/eth-tx-summary/-/eth-tx-summary-3.2.4.tgz#e10eb95eb57cdfe549bf29f97f1e4f1db679035c"
@@ -3987,7 +3999,7 @@ ethereumjs-abi@0.6.7:
     bn.js "^4.11.8"
     ethereumjs-util "^6.0.0"
 
-ethereumjs-abi@^0.6.8:
+ethereumjs-abi@0.6.8, ethereumjs-abi@^0.6.8:
   version "0.6.8"
   resolved "https://registry.yarnpkg.com/ethereumjs-abi/-/ethereumjs-abi-0.6.8.tgz#71bc152db099f70e62f108b7cdfca1b362c6fcae"
   integrity sha512-Tx0r/iXI6r+lRsdvkFDlut0N08jWMnKRZ6Gkq+Nmw75lZe4e6o3EkSnkaBP5NF6+m5PTGAr9JP43N3LyeoglsA==
@@ -4680,10 +4692,10 @@ futoin-hkdf@~1.3.2:
   resolved "https://registry.yarnpkg.com/futoin-hkdf/-/futoin-hkdf-1.3.2.tgz#cd9a09153e3db7d166b9717f872991a4950430cd"
   integrity sha512-3EVi3ETTyJg5PSXlxLCaUVVn0pSbDf62L3Gwxne7Uq+d8adOSNWQAad4gg7WToHkcgnCJb3Wlb1P8r4Evj4GPw==
 
-ganache-core@2.12.1:
-  version "2.12.1"
-  resolved "https://registry.yarnpkg.com/ganache-core/-/ganache-core-2.12.1.tgz#c21e8f7eca6e15f13756a353928357e0b8960d9e"
-  integrity sha512-gycoVl3TChAbL6ZZQrK1gS2cNMheX+JXVBKTpMAzuLHwb5gE1CB1s6YYN3F7rB86opaEuldCSuTJK1dv4xYRAw==
+ganache-core@2.13.1:
+  version "2.13.1"
+  resolved "https://registry.yarnpkg.com/ganache-core/-/ganache-core-2.13.1.tgz#bf60399a2dd084e1090db91cbbc7ed3885dc01e4"
+  integrity sha512-Ewg+kNcDqXtOohe7jCcP+ZUv9EMzOx2MoqOYYP3BCfxrDh3KjBXXaKK+Let7li0TghAs9lxmBgevZku35j5YzA==
   dependencies:
     abstract-leveldown "3.0.0"
     async "2.6.2"
@@ -4692,8 +4704,8 @@ ganache-core@2.12.1:
     clone "2.1.2"
     debug "3.2.6"
     encoding-down "5.0.4"
-    eth-sig-util "2.3.0"
-    ethereumjs-abi "0.6.7"
+    eth-sig-util "^2.0.0"
+    ethereumjs-abi "0.6.8"
     ethereumjs-account "3.0.0"
     ethereumjs-block "2.2.2"
     ethereumjs-common "1.5.0"
@@ -4701,11 +4713,13 @@ ganache-core@2.12.1:
     ethereumjs-util "6.2.1"
     ethereumjs-vm "4.2.0"
     heap "0.2.6"
+    keccak "3.0.1"
     level-sublevel "6.6.4"
     levelup "3.1.1"
-    lodash "4.17.14"
+    lodash "4.17.20"
     lru-cache "5.1.1"
-    merkle-patricia-tree "2.3.2"
+    merkle-patricia-tree "3.0.0"
+    patch-package "6.2.2"
     seedrandom "3.0.1"
     source-map-support "0.5.12"
     tmp "0.1.0"
@@ -6835,11 +6849,6 @@ lodash.sum@^4.0.2:
   resolved "https://registry.yarnpkg.com/lodash.sum/-/lodash.sum-4.0.2.tgz#ad90e397965d803d4f1ff7aa5b2d0197f3b4637b"
   integrity sha1-rZDjl5ZdgD1PH/eqWy0Bl/O0Y3s=
 
-lodash@4.17.14:
-  version "4.17.14"
-  resolved "https://registry.yarnpkg.com/lodash/-/lodash-4.17.14.tgz#9ce487ae66c96254fe20b599f21b6816028078ba"
-  integrity sha512-mmKYbW3GLuJeX+iGP+Y7Gp1AiGHGbXHCOh/jZmrawMmsE7MS4znI3RL2FsjbqOyMayHInjOeykW7PEajUk1/xw==
-
 lodash@4.17.20, lodash@^4.15.0, lodash@^4.17.11, lodash@^4.17.14, lodash@^4.17.15, lodash@^4.17.19, lodash@^4.17.4:
   version "4.17.20"
   resolved "https://registry.yarnpkg.com/lodash/-/lodash-4.17.20.tgz#b44a9b6297bcb698f1c51a3545a2b3b368d59c52"
@@ -7028,20 +7037,6 @@ merge2@^1.3.0:
   resolved "https://registry.yarnpkg.com/merge2/-/merge2-1.4.1.tgz#4368892f885e907455a6fd7dc55c0c9d404990ae"
   integrity sha512-8q7VEgMJW4J8tcfVPy8g09NcQwZdbwFEqhe/WZkoIzjn/3TGDwtOCYtXGxA3O8tPzpczCCDgv+P2P5y00ZJOOg==
 
-merkle-patricia-tree@2.3.2, merkle-patricia-tree@^2.1.2, merkle-patricia-tree@^2.3.2:
-  version "2.3.2"
-  resolved "https://registry.yarnpkg.com/merkle-patricia-tree/-/merkle-patricia-tree-2.3.2.tgz#982ca1b5a0fde00eed2f6aeed1f9152860b8208a"
-  integrity sha512-81PW5m8oz/pz3GvsAwbauj7Y00rqm81Tzad77tHBwU7pIAtN+TJnMSOJhxBKflSVYhptMMb9RskhqHqrSm1V+g==
-  dependencies:
-    async "^1.4.2"
-    ethereumjs-util "^5.0.0"
-    level-ws "0.0.0"
-    levelup "^1.2.1"
-    memdown "^1.0.0"
-    readable-stream "^2.0.0"
-    rlp "^2.0.0"
-    semaphore ">=1.0.1"
-
 merkle-patricia-tree@3.0.0:
   version "3.0.0"
   resolved "https://registry.yarnpkg.com/merkle-patricia-tree/-/merkle-patricia-tree-3.0.0.tgz#448d85415565df72febc33ca362b8b614f5a58f8"
@@ -7052,6 +7047,20 @@ merkle-patricia-tree@3.0.0:
     level-mem "^3.0.1"
     level-ws "^1.0.0"
     readable-stream "^3.0.6"
+    rlp "^2.0.0"
+    semaphore ">=1.0.1"
+
+merkle-patricia-tree@^2.1.2, merkle-patricia-tree@^2.3.2:
+  version "2.3.2"
+  resolved "https://registry.yarnpkg.com/merkle-patricia-tree/-/merkle-patricia-tree-2.3.2.tgz#982ca1b5a0fde00eed2f6aeed1f9152860b8208a"
+  integrity sha512-81PW5m8oz/pz3GvsAwbauj7Y00rqm81Tzad77tHBwU7pIAtN+TJnMSOJhxBKflSVYhptMMb9RskhqHqrSm1V+g==
+  dependencies:
+    async "^1.4.2"
+    ethereumjs-util "^5.0.0"
+    level-ws "0.0.0"
+    levelup "^1.2.1"
+    memdown "^1.0.0"
+    readable-stream "^2.0.0"
     rlp "^2.0.0"
     semaphore ">=1.0.1"
 
