@@ -2,6 +2,7 @@ import {expect} from 'chai'
 import {singletons, expectRevert} from '@openzeppelin/test-helpers'
 import {web3} from 'hardhat'
 import {HoprTokenInstance} from '../types'
+import {vmErrorMessage} from './utils'
 
 const HoprToken = artifacts.require('HoprToken')
 
@@ -38,7 +39,7 @@ describe('HoprToken', function () {
       hoprToken.mint(userA, 1, '0x00', '0x00', {
         from: userA
       }),
-      'HoprToken: caller does not have minter role'
+      vmErrorMessage('HoprToken: caller does not have minter role')
     )
   })
 

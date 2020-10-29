@@ -6,8 +6,10 @@ import '@nomiclabs/hardhat-truffle5'
 import '@nomiclabs/hardhat-etherscan'
 
 import type {HardhatUserConfig} from 'hardhat/config'
+import Web3 from 'web3'
 import {mapValues} from 'lodash'
 import {getRpcOptions} from './scripts/utils/networks'
+import {NODE_SEEDS} from '@hoprnet/hopr-demo-seeds'
 
 const {PRIVATE_KEY, INFURA, MATIC_VIGIL, ETHERSCAN} = process.env
 
@@ -26,10 +28,10 @@ const hardhatConfig: HardhatUserConfig = {
   defaultNetwork: 'hardhat',
   networks: {
     hardhat: {
-      accounts: {
-        // specify truffle's default mnemonic as we are expecting it in various areas in our codebase
-        mnemonic: 'candy maple cake sugar pudding cream honey rich smooth crumble sweet treat'
-      }
+      accounts: NODE_SEEDS.map((privateKey) => ({
+        privateKey,
+        balance: Web3.utils.toWei('10000', 'ether')
+      }))
     },
     ...publicNetworks
   },
