@@ -10,9 +10,8 @@
     "resolveJsonModule": true,
     "experimentalDecorators": true,
     "declaration": true,
-    "typeRoots": ["./node_modules/@types", "./types"],
-    "types": ["node", "truffle-contracts"]
+    "typeRoots": ["types"]
   },
-  "include": ["scripts/**/*.ts"],
-  "exclude": ["test/openzeppelin-contracts"]
+  "include": ["scripts/**/*.ts", "types"],
+  "exclude": ["test/openzeppelin-contracts", "build"]
 }

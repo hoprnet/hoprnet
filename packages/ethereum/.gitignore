@@ -32,3 +32,9 @@ scTopics
 
 # Exclude built npm packages
 *.tgz
+
+# @TODO: remove this once refactor is done
+temp
+
+# Hardhat
+hardhat
