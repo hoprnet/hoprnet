@@ -30,16 +30,18 @@ jobs:
       - name: Install dependencies
         run: |
           yarn
-          yarn setup
+          node_modules/.bin/lerna bootstrap
+          node_modules/.bin/lerna link 
+
       - name: Build (all)
         if: matrix.package == 'all' 
         run: |
-          node_modules/.bin/lerna run build --ignore core --ignore ethereum
+          node_modules/.bin/lerna run build --ignore @hoprnet/hopr-core --ignore @hoprnet/hopr-ethereum
 
       - name: Test (all)
         if: matrix.package == 'all'
         run: |
-          node_modules/.bin/lerna run test --ignore core --ignore ethereum
+          node_modules/.bin/lerna run test --ignore @hoprnet/hopr-core --ignore @hoprnet/hopr-ethereum
 
       - name: Build ${{ matrix.package }}
         if: matrix.package != 'all'
