@@ -1,5 +1,5 @@
 import assert from 'assert'
-import { durations } from './time'
+import {durations} from './time'
 
 describe('test time', function () {
   context('durations', function () {

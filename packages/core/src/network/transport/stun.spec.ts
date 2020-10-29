@@ -1,16 +1,16 @@
-import dgram, { RemoteInfo } from 'dgram'
-import type { Socket } from 'dgram'
-import { getExternalIp, handleStunRequest } from './stun'
+import dgram, {RemoteInfo} from 'dgram'
+import type {Socket} from 'dgram'
+import {getExternalIp, handleStunRequest} from './stun'
 import Multiaddr from 'multiaddr'
 import assert from 'assert'
-import { once } from 'events'
+import {once} from 'events'
 
 describe('test STUN', function () {
   let client
   let servers
 
-  beforeAll(() => {
-    servers = Array.from({ length: 4 }).map((_) => {
+  beforeEach(() => {
+    servers = Array.from({length: 4}).map((_) => {
       const server = dgram.createSocket('udp4')
       server.on('message', (msg: Buffer, rinfo: RemoteInfo) => handleStunRequest(server, msg, rinfo))
       server.on('error', (e) => {
@@ -48,7 +48,7 @@ describe('test STUN', function () {
     */
   })
 
-  afterAll(async () => {
+  afterEach(async () => {
     await Promise.all(
       servers.map((server) => {
         server.close()

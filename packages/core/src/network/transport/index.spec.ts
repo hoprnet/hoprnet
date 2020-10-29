@@ -10,22 +10,21 @@ import SECIO = require('libp2p-secio')
 
 import PeerId from 'peer-id'
 
-import { Handler } from 'libp2p'
+import {Handler} from 'libp2p'
 
 import TCP from '.'
 import Multiaddr from 'multiaddr'
 import pipe from 'it-pipe'
 
-import { u8aEquals } from '@hoprnet/hopr-utils'
+import {u8aEquals} from '@hoprnet/hopr-utils'
 
-import { randomBytes } from 'crypto'
-import { RELAY_CIRCUIT_TIMEOUT } from './constants'
-import { connectionHelper } from '../../test-utils'
+import {randomBytes} from 'crypto'
+import {connectionHelper} from '../../test-utils'
 
 const TEST_PROTOCOL = `/test/0.0.1`
 
-describe('should create a socket and connect to it', function () {
-  jest.setTimeout(RELAY_CIRCUIT_TIMEOUT * 3)
+describe('transport/index.spec.tc should create a socket and connect to it', function () {
+  this.timeout(5000)
 
   async function generateNode(
     options: {
@@ -40,7 +39,7 @@ describe('should create a socket and connect to it', function () {
     },
     bootstrap?: Multiaddr
   ): Promise<libp2p> {
-    const peerId = await PeerId.create({ keyType: 'secp256k1' })
+    const peerId = await PeerId.create({keyType: 'secp256k1'})
     const addresses = []
 
     if (options.ipv4) {
@@ -55,7 +54,7 @@ describe('should create a socket and connect to it', function () {
 
     const node = new libp2p({
       peerId,
-      addresses: { listen: addresses },
+      addresses: {listen: addresses},
       modules: {
         transport: [TCP],
         streamMuxer: [MPLEX],
@@ -305,16 +304,16 @@ describe('should create a socket and connect to it', function () {
   // })
 
   it('should set up a relayed connection and upgrade to WebRTC', async function () {
-    const relay = await generateNode({ id: 2, ipv4: true })
+    const relay = await generateNode({id: 2, ipv4: true})
     const [sender, counterparty] = await Promise.all([
-      generateNode({ id: 0, ipv4: true }, relay.multiaddrs[0]),
-      generateNode({ id: 1, ipv4: true }, relay.multiaddrs[0])
+      generateNode({id: 0, ipv4: true}, relay.multiaddrs[0]),
+      generateNode({id: 1, ipv4: true}, relay.multiaddrs[0])
     ])
     connectionHelper([sender, relay])
     connectionHelper([relay, counterparty])
     const INVALID_PORT = 8758
     // @ts-ignore
-    const { stream }: { stream: Connection } = await sender.dialProtocol(
+    const {stream}: {stream: Connection} = await sender.dialProtocol(
       Multiaddr(`/ip4/127.0.0.1/tcp/${INVALID_PORT}/p2p/${counterparty.peerId.toB58String()}`),
       TEST_PROTOCOL
     )
@@ -728,11 +727,11 @@ describe('should create a socket and connect to it', function () {
   // })
 
   it('should set up a relayed connection and exchange messages', async function () {
-    const relay = await generateNode({ id: 2, ipv4: true })
+    const relay = await generateNode({id: 2, ipv4: true})
 
     const [sender, counterparty] = await Promise.all([
-      generateNode({ id: 0, ipv4: true, useWebRTC: false }, relay.multiaddrs[0]),
-      generateNode({ id: 1, ipv4: true, useWebRTC: false }, relay.multiaddrs[0])
+      generateNode({id: 0, ipv4: true, useWebRTC: false}, relay.multiaddrs[0]),
+      generateNode({id: 1, ipv4: true, useWebRTC: false}, relay.multiaddrs[0])
     ])
 
     connectionHelper([sender, relay])
@@ -740,7 +739,7 @@ describe('should create a socket and connect to it', function () {
 
     const INVALID_PORT = 8758
     // @ts-ignore
-    const { stream }: { stream: Connection } = await sender.dialProtocol(
+    const {stream}: {stream: Connection} = await sender.dialProtocol(
       Multiaddr(`/ip4/127.0.0.1/tcp/${INVALID_PORT}/p2p/${counterparty.peerId.toB58String()}`),
       TEST_PROTOCOL
     )
@@ -750,7 +749,7 @@ describe('should create a socket and connect to it', function () {
     let msgReceived = false
     await pipe([testMessage], stream, async (source: AsyncIterable<Uint8Array>) => {
       for await (const msg of source) {
-        console.log(`receiving relayed connection. message`, new TextDecoder().decode(msg.slice()))
+        //console.log(`receiving relayed connection. message`, new TextDecoder().decode(msg.slice()))
         if (u8aEquals(msg.slice(), testMessage)) {
           msgReceived = true
 

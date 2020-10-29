@@ -1,7 +1,7 @@
 import type HoprEthereum from '../'
-import { Public } from '../types'
+import {Public} from '../types'
 import Heap from 'heap-js'
-import { randomInteger } from '@hoprnet/hopr-utils'
+import {randomInteger} from '@hoprnet/hopr-utils'
 
 type Path = Public[]
 
@@ -20,7 +20,7 @@ class PathFinder {
 
     // Preprocessing
     queue.addAll(
-      (await this.coreConnector.indexer.get({ partyA: start })).map((channel) => {
+      (await this.coreConnector.indexer.get({partyA: start})).map((channel) => {
         if (start.eq(channel.partyA)) {
           return [channel.partyB]
         } else {
@@ -43,7 +43,7 @@ class PathFinder {
 
       const newNodes = (
         await this.coreConnector.indexer.get(
-          { partyA: lastNode },
+          {partyA: lastNode},
           (node: Public) => !currentPath.includes(node) && (filter == null || filter(node))
         )
       ).map((channel) => {

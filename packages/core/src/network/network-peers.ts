@@ -1,8 +1,8 @@
 import heap from 'heap-js'
-import { randomSubset } from '@hoprnet/hopr-utils'
+import {randomSubset} from '@hoprnet/hopr-utils'
 
 import PeerId from 'peer-id'
-import { BLACKLIST_TIMEOUT } from '../constants'
+import {BLACKLIST_TIMEOUT} from '../constants'
 
 import debug from 'debug'
 const log = debug('hopr-core:network-peers')
@@ -51,7 +51,7 @@ class NetworkPeers {
   }
 
   onPeerConnect(peerId: PeerId) {
-    this.push({ id: peerId, lastSeen: Date.now() })
+    this.push({id: peerId, lastSeen: Date.now()})
   }
 
   push(entry: Entry): number {

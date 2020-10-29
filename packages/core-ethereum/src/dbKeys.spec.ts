@@ -1,11 +1,11 @@
 import assert from 'assert'
-import { randomBytes } from 'crypto'
-import { u8aConcat, u8aEquals } from '@hoprnet/hopr-utils'
-import { Hash } from './types'
+import {randomBytes} from 'crypto'
+import {u8aConcat, u8aEquals} from '@hoprnet/hopr-utils'
+import {Hash} from './types'
 import * as dbKeys from './dbKeys'
-import { getId } from './utils'
-import { getPrivKeyData } from './utils/testing.spec'
-import { Await } from './tsc/utils'
+import {getId} from './utils'
+import {getPrivKeyData} from './utils/testing.spec'
+import {Await} from './tsc/utils'
 
 const encoder = new TextEncoder()
 

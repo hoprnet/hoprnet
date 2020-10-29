@@ -1,13 +1,13 @@
-import type { AbstractInteraction } from '../abstractInteraction'
-import { randomBytes, createHash } from 'crypto'
-import { u8aEquals } from '@hoprnet/hopr-utils'
+import type {AbstractInteraction} from '../abstractInteraction'
+import {randomBytes, createHash} from 'crypto'
+import {u8aEquals} from '@hoprnet/hopr-utils'
 import debug from 'debug'
 import AbortController from 'abort-controller'
 import pipe from 'it-pipe'
-import { PROTOCOL_HEARTBEAT, HEARTBEAT_TIMEOUT } from '../../constants'
-import type { Stream, Connection, Handler } from 'libp2p'
+import {PROTOCOL_HEARTBEAT, HEARTBEAT_TIMEOUT} from '../../constants'
+import type {Stream, Connection, Handler} from 'libp2p'
 import type PeerId from 'peer-id'
-import { LibP2P } from '../../'
+import {LibP2P} from '../../'
 
 const error = debug('hopr-core:heartbeat:error')
 const verbose = debug('hopr-core:verbose:heartbeat')
@@ -26,7 +26,7 @@ class Heartbeat implements AbstractInteraction {
     this.node.handle(this.protocols, this.handler.bind(this))
   }
 
-  handler(struct: { connection: Connection; stream: Stream }) {
+  handler(struct: {connection: Connection; stream: Stream}) {
     const self = this
     pipe(
       struct.stream,
@@ -71,12 +71,12 @@ class Heartbeat implements AbstractInteraction {
 
       try {
         struct = await this.node
-          .dialProtocol(counterparty, this.protocols[0], { signal: abort.signal })
+          .dialProtocol(counterparty, this.protocols[0], {signal: abort.signal})
           .catch(async (err: Error) => {
             verbose(`heartbeat connection error ${err.name} while dialing ${counterparty.toB58String()} (initial)`)
-            const { id } = await this.node.peerRouting.findPeer(counterparty)
+            const {id} = await this.node.peerRouting.findPeer(counterparty)
             //verbose('trying with peer info', peerInfo)
-            return await this.node.dialProtocol(id, this.protocols[0], { signal: abort.signal })
+            return await this.node.dialProtocol(id, this.protocols[0], {signal: abort.signal})
           })
       } catch (err) {
         verbose(
@@ -115,4 +115,4 @@ class Heartbeat implements AbstractInteraction {
   }
 }
 
-export { Heartbeat }
+export {Heartbeat}

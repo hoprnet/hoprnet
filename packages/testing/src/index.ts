@@ -1,4 +1,4 @@
-export { default as Ganache } from './ganache'
+export {default as Ganache} from './ganache'
 
 let port = 64000 // Use ports in 64XXX range.
 export function getNewPort(): number {

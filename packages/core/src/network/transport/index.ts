@@ -1,18 +1,18 @@
 import net from 'net'
-import { AbortError } from 'abortable-iterator'
-import type { Socket } from 'net'
+import {AbortError} from 'abortable-iterator'
+import type {Socket} from 'net'
 import mafmt from 'mafmt'
 import errCode from 'err-code'
 import debug from 'debug'
-import { socketToConn } from './socket-to-conn'
+import {socketToConn} from './socket-to-conn'
 import libp2p from 'libp2p'
 import Listener from './listener'
-import { USE_WEBRTC, CODE_P2P } from './constants'
+import {USE_WEBRTC, CODE_P2P} from './constants'
 import Multiaddr from 'multiaddr'
-import type { Upgrader, DialOptions, ConnHandler, MultiaddrConnection } from 'libp2p'
-import type { Connection } from 'libp2p'
+import type {Upgrader, DialOptions, ConnHandler, MultiaddrConnection} from 'libp2p'
+import type {Connection} from 'libp2p'
 import chalk from 'chalk'
-import { WebRTCUpgrader } from './webrtc'
+import {WebRTCUpgrader} from './webrtc'
 import Relay from './relay'
 import PeerId from 'peer-id'
 
@@ -105,7 +105,7 @@ class TCP {
     this.multiaddrs = libp2p.multiaddrs
 
     if (this._useWebRTC) {
-      this._webRTCUpgrader = new WebRTCUpgrader({ stunServers: this.stunServers })
+      this._webRTCUpgrader = new WebRTCUpgrader({stunServers: this.stunServers})
     }
 
     this._relay = new Relay(libp2p, this.handleDelivery.bind(this))
@@ -198,7 +198,7 @@ class TCP {
   async dialDirectly(ma: Multiaddr, options?: DialOptions): Promise<Connection> {
     log(`[${chalk.blue(this.id.toB58String())}] dialing ${chalk.yellow(ma.toString())} directly`)
     const socket = await this._connect(ma, options)
-    const maConn = socketToConn(socket, { remoteAddr: ma, signal: options?.signal })
+    const maConn = socketToConn(socket, {remoteAddr: ma, signal: options?.signal})
 
     log('new outbound direct connection %s', maConn.remoteAddr)
     const conn = await this._upgrader.upgradeOutbound(maConn)
