@@ -41,7 +41,7 @@ async function generateMocks(options?: { timeoutIntentionally: boolean }, addr =
   }
 }
 
-describe('test crawler', function () {
+describe('network/crawler test crawler', function () {
   it('should crawl the network and find some nodes', async function () {
     const [Alice, Bob, Chris, Dave, Eve] = await Promise.all([
       generateMocks(),
@@ -112,6 +112,7 @@ describe('test crawler', function () {
   it(
     'should crawl the network and timeout while crawling',
     async function () {
+      this.timeout(5000)
       let timeoutCorrectly = false
       let before = Date.now()
       const [Alice, Bob, Chris] = await Promise.all([

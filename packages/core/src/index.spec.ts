@@ -16,6 +16,8 @@ describe('test hopr-core', function () {
   it(
     'should start a node',
     async function () {
+      this.timeout(5000)
+
       node = await Hopr.create({
         debug: true,
         bootstrapNode: true,
@@ -37,6 +39,8 @@ describe('test hopr-core', function () {
   it(
     `should not call ourself`,
     async function () {
+      this.timeout(5000)
+
       const peerId = await privKeyToPeerId(NODE_SEEDS[0])
       node = await Hopr.create({
         debug: true,
