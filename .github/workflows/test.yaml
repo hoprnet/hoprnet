@@ -46,7 +46,7 @@ jobs:
       - name: Build ${{ matrix.package }}
         if: matrix.package != 'all'
         run: |
-          node_modules/.bin/lerna run build --scope ${{ matrix.package }}
+          node_modules/.bin/lerna run build --include-dependencies --scope ${{ matrix.package }}
       - name: Test ${{ matrix.package }}
         if: matrix.package != 'all' 
         run: |
