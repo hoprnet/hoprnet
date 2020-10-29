@@ -15,7 +15,7 @@
   },
   "scripts": {
     "build": "hardhat compile",
-    "migrate": "hardhat run ./scripts/migrate.ts",
+    "migrate": "hardhat migrate",
     "test": "hardhat test",
     "prepublishOnly": "yarn build"
   },

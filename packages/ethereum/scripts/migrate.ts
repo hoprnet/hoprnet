@@ -1,6 +1,5 @@
-import { web3, network } from 'hardhat'
+import type { HardhatArguments, HardhatRuntimeEnvironment } from 'hardhat/types'
 import Web3 from 'web3'
-import { singletons } from '@openzeppelin/test-helpers'
 import { durations } from '@hoprnet/hopr-utils'
 import { migrationOptions as allMigrationOptions } from './utils/networks'
 
@@ -10,7 +9,10 @@ const MAX_MINT_DURATION = Math.floor(durations.days(365) / 1e3)
 const SINGLE_FAUCET_MINTER = true
 const EXTERNAL_FAUCET_MINTER = '0x1A387b5103f28bc6601d085A3dDC878dEE631A56'
 
-async function main() {
+async function main(_args: HardhatArguments, { web3, network }: HardhatRuntimeEnvironment) {
+  // this must be lazily loaded as it breaks hardhat
+  const { singletons } = require('@openzeppelin/test-helpers')
+
   const [deployer] = await web3.eth.getAccounts()
 
   const migrationOptions = allMigrationOptions[network.name]
@@ -84,9 +86,4 @@ async function main() {
   }
 }
 
-main()
-  .then(() => process.exit(0))
-  .catch((error) => {
-    console.error(error)
-    process.exit(1)
-  })
+export default main

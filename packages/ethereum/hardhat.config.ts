@@ -6,11 +6,12 @@ import '@nomiclabs/hardhat-truffle5'
 import '@nomiclabs/hardhat-etherscan'
 import '@nomiclabs/hardhat-solhint'
 
-import type { HardhatUserConfig } from 'hardhat/config'
+import { HardhatUserConfig, task } from 'hardhat/config'
+import { NODE_SEEDS, BOOTSTRAP_SEEDS } from '@hoprnet/hopr-demo-seeds'
 import Web3 from 'web3'
 import { mapValues } from 'lodash'
 import { getRpcOptions } from './scripts/utils/networks'
-import { NODE_SEEDS, BOOTSTRAP_SEEDS } from '@hoprnet/hopr-demo-seeds'
+import migrate from './scripts/migrate'
 
 const { PRIVATE_KEY, INFURA, MATIC_VIGIL, ETHERSCAN } = process.env
 
@@ -61,5 +62,9 @@ const hardhatConfig: HardhatUserConfig = {
     apiKey: ETHERSCAN
   }
 }
+
+// create our own migration task since there isn't one implemented
+// see https://github.com/nomiclabs/hardhat/issues/381
+task('migrate', 'Migrate contracts', migrate)
 
 export default hardhatConfig
