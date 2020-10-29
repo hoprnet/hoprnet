@@ -36,7 +36,7 @@ jobs:
       - name: Build (all)
         if: matrix.package == 'all' 
         run: |
-          node_modules/.bin/lerna run build --ignore @hoprnet/hopr-core --ignore @hoprnet/hopr-ethereum
+          node_modules/.bin/lerna run build --include-dependencies --ignore @hoprnet/hopr-core --ignore @hoprnet/hopr-ethereum
 
       - name: Test (all)
         if: matrix.package == 'all'
