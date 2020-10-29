@@ -10,7 +10,7 @@ import type { HardhatUserConfig } from 'hardhat/config'
 import Web3 from 'web3'
 import { mapValues } from 'lodash'
 import { getRpcOptions } from './scripts/utils/networks'
-import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
+import { NODE_SEEDS, BOOTSTRAP_SEEDS } from '@hoprnet/hopr-demo-seeds'
 
 const { PRIVATE_KEY, INFURA, MATIC_VIGIL, ETHERSCAN } = process.env
 
@@ -25,14 +25,16 @@ const publicNetworks: HardhatUserConfig['networks'] = mapValues(
     } as HardhatUserConfig['networks']['hardhat'])
 )
 
+const demoAccounts = NODE_SEEDS.concat(BOOTSTRAP_SEEDS).map((privateKey) => ({
+  privateKey,
+  balance: Web3.utils.toWei('10000', 'ether')
+}))
+
 const hardhatConfig: HardhatUserConfig = {
   defaultNetwork: 'hardhat',
   networks: {
     hardhat: {
-      accounts: NODE_SEEDS.map((privateKey) => ({
-        privateKey,
-        balance: Web3.utils.toWei('10000', 'ether')
-      }))
+      accounts: demoAccounts
     },
     ...publicNetworks
   },
