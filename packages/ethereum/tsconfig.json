@@ -1,18 +1,15 @@
 {
   "compilerOptions": {
-    "esModuleInterop": true,
-    "outDir": "./build/lib",
-    "noImplicitAny": false,
-    "allowJs": true,
-    "lib": ["es2019", "dom"],
+    "lib": ["ES2020"],
     "module": "commonjs",
-    "target": "es2019",
-    "resolveJsonModule": true,
-    "experimentalDecorators": true,
+    "target": "ES2019",
     "declaration": true,
-    "typeRoots": ["./node_modules/@types", "./types"],
-    "types": ["node", "truffle-contracts"]
+    "sourceMap": true,
+    "esModuleInterop": true,
+    "skipLibCheck": false,
+    "outDir": "lib"
   },
-  "include": ["scripts/**/*.ts"],
-  "exclude": ["test/openzeppelin-contracts"]
+  "files": ["./hardhat.config.ts"],
+  "include": ["contracts", "test", "scripts"],
+  "exclude": ["lib", "temp"]
 }
