@@ -494,6 +494,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       verbose('db does not exist, creating')
     }
     createDirectoryIfNotExists(dbPath)
+    // @ts-ignore
     return levelup(leveldown(dbPath))
   }
 

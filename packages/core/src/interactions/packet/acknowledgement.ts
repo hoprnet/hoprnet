@@ -90,7 +90,7 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
 
       let tmp: Uint8Array
       try {
-        tmp = await this.node.db.get(Buffer.from(unAcknowledgedDbKey))
+        tmp = await this.node.db.get(Buffer.from(unAcknowledgedDbKey)) as Uint8Array
       } catch (err) {
         if (err.notFound) {
           error(
@@ -116,7 +116,7 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
         let ticketCounter: Uint8Array
         try {
           ticketCounter = toU8a(
-            u8aToNumber(await this.node.db.get(Buffer.from(this.node._dbKeys.AcknowledgedTicketCounter()))) + 1,
+            u8aToNumber(await this.node.db.get(Buffer.from(this.node._dbKeys.AcknowledgedTicketCounter())) as Uint8Array) + 1,
             ACKNOWLEDGED_TICKET_INDEX_LENGTH
           )
         } catch (err) {
