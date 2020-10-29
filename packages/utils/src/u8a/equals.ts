@@ -43,4 +43,4 @@ function u8aEquals(a: Uint8Array, b: Uint8Array, ...arrays: Uint8Array[]) {
   return true
 }
 
-export {u8aEquals}
+export { u8aEquals }

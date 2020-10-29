@@ -1,13 +1,13 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import type {Channel as ChannelInstance} from '@hoprnet/hopr-core-connector-interface'
+import type { Channel as ChannelInstance } from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import type PeerId from 'peer-id'
-import type {AutoCompleteResult} from './abstractCommand'
+import type { AutoCompleteResult } from './abstractCommand'
 import chalk from 'chalk'
-import {u8aToHex} from '@hoprnet/hopr-utils'
-import {pubKeyToPeerId} from '@hoprnet/hopr-core/lib/utils'
-import {AbstractCommand} from './abstractCommand'
-import {checkPeerIdInput, styleValue} from '../utils'
+import { u8aToHex } from '@hoprnet/hopr-utils'
+import { pubKeyToPeerId } from '@hoprnet/hopr-core/lib/utils'
+import { AbstractCommand } from './abstractCommand'
+import { checkPeerIdInput, styleValue } from '../utils'
 
 export default class CloseChannel extends AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {
@@ -35,7 +35,7 @@ export default class CloseChannel extends AbstractCommand {
     }
 
     try {
-      const {status, receipt} = await this.node.closeChannel(peerId)
+      const { status, receipt } = await this.node.closeChannel(peerId)
 
       if (status === 'PENDING') {
         return `${chalk.green(`Closing channel, receipt: ${styleValue(receipt, 'hash')}`)}.`

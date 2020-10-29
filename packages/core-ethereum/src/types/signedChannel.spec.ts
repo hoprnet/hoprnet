@@ -1,8 +1,8 @@
 import assert from 'assert'
 import BN from 'bn.js'
-import {stringToU8a, randomInteger} from '@hoprnet/hopr-utils'
-import {Channel, ChannelBalance, ChannelStatus, ChannelState} from './channel'
-import {SignedChannel, Signature, Hash} from '.'
+import { stringToU8a, randomInteger } from '@hoprnet/hopr-utils'
+import { Channel, ChannelBalance, ChannelStatus, ChannelState } from './channel'
+import { SignedChannel, Signature, Hash } from '.'
 import * as utils from '../utils'
 import * as testconfigs from '../config.spec'
 
@@ -13,7 +13,7 @@ const generateChannelData = async () => {
     balance: new BN(10),
     balance_a: new BN(2)
   })
-  const state = new ChannelState(undefined, {state: ChannelStatus.UNINITIALISED})
+  const state = new ChannelState(undefined, { state: ChannelStatus.UNINITIALISED })
 
   return new Channel(undefined, {
     state,

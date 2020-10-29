@@ -1,6 +1,6 @@
 import Stun from './stun'
 import assert from 'assert'
-import {HoprOptions} from '..'
+import { HoprOptions } from '..'
 
 describe('test the STUN functionalities', function () {
   async function generateNode(options: HoprOptions) {

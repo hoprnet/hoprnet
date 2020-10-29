@@ -1,7 +1,7 @@
-import {toU8a} from './toU8a'
-import {u8aConcat} from './concat'
+import { toU8a } from './toU8a'
+import { u8aConcat } from './concat'
 
-import {LENGTH_PREFIX_LENGTH} from '.'
+import { LENGTH_PREFIX_LENGTH } from '.'
 /**
  * Adds a length-prefix to a Uint8Array
  * @param arg data to add padding

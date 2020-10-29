@@ -1,22 +1,22 @@
 import assert from 'assert'
 import PeerId from 'peer-id'
-import type {Connection} from 'libp2p'
+import type { Connection } from 'libp2p'
 
-import {CRAWL_TIMEOUT, shouldIncludePeerInCrawlResponse} from './crawler'
-import {Crawler as CrawlerInteraction} from '../interactions/network/crawler'
+import { CRAWL_TIMEOUT, shouldIncludePeerInCrawlResponse } from './crawler'
+import { Crawler as CrawlerInteraction } from '../interactions/network/crawler'
 import Multiaddr from 'multiaddr'
-import {Network} from './index'
-import {Interactions} from '../interactions'
-import {BlacklistedEntry} from './network-peers'
-import {BLACKLIST_TIMEOUT} from '../constants'
-import {generateLibP2PMock} from '../test-utils'
+import { Network } from './index'
+import { Interactions } from '../interactions'
+import { BlacklistedEntry } from './network-peers'
+import { BLACKLIST_TIMEOUT } from '../constants'
+import { generateLibP2PMock } from '../test-utils'
 
 let mockConnection = (p: PeerId, addr: Multiaddr): Connection => {
-  return {remotePeer: p, remoteAddr: addr} as Connection
+  return { remotePeer: p, remoteAddr: addr } as Connection
 }
 
-async function generateMocks(options?: {timeoutIntentionally: boolean}, addr = '/ip4/0.0.0.0/tcp/0') {
-  const {node, address} = await generateLibP2PMock(addr)
+async function generateMocks(options?: { timeoutIntentionally: boolean }, addr = '/ip4/0.0.0.0/tcp/0') {
+  const { node, address } = await generateLibP2PMock(addr)
 
   await node.start()
 
@@ -28,7 +28,7 @@ async function generateMocks(options?: {timeoutIntentionally: boolean}, addr = '
     }
   } as Interactions<any>
 
-  const network = new Network(node, interactions, {} as any, {crawl: options})
+  const network = new Network(node, interactions, {} as any, { crawl: options })
   node.connectionManager.on('peer:connect', (conn: Connection) =>
     node.peerStore.addressBook.add(conn.remotePeer, [conn.remoteAddr])
   )

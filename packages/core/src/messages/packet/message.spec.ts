@@ -1,9 +1,9 @@
 import assert from 'assert'
-import {PACKET_SIZE} from '../../constants'
-import Message, {PADDING} from './message'
-import {u8aConcat, u8aEquals, LENGTH_PREFIX_LENGTH} from '@hoprnet/hopr-utils'
-import {randomBytes} from 'crypto'
-import {PRIVATE_KEY_LENGTH} from './header/parameters'
+import { PACKET_SIZE } from '../../constants'
+import Message, { PADDING } from './message'
+import { u8aConcat, u8aEquals, LENGTH_PREFIX_LENGTH } from '@hoprnet/hopr-utils'
+import { randomBytes } from 'crypto'
+import { PRIVATE_KEY_LENGTH } from './header/parameters'
 import secp256k1 from 'secp256k1'
 
 describe('test messages', function () {

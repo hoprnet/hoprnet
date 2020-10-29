@@ -1,18 +1,18 @@
 import chalk from 'chalk'
 import AbortController from 'abort-controller'
-import {getTokens} from '../utils'
-import {randomInteger} from '@hoprnet/hopr-utils'
-import type {Token} from '../utils'
-import {MAX_HOPS, CRAWLING_RESPONSE_NODES} from '../constants'
-import {CrawlResponse, CrawlStatus} from '../messages'
+import { getTokens } from '../utils'
+import { randomInteger } from '@hoprnet/hopr-utils'
+import type { Token } from '../utils'
+import { MAX_HOPS, CRAWLING_RESPONSE_NODES } from '../constants'
+import { CrawlResponse, CrawlStatus } from '../messages'
 import PeerId from 'peer-id'
-import type {Connection} from 'libp2p'
-import type {Entry} from './network-peers'
+import type { Connection } from 'libp2p'
+import type { Entry } from './network-peers'
 import NetworkPeerStore from './network-peers'
-import {peerHasOnlyPublicAddresses, isOnPrivateNet, PRIVATE_NETS} from '../filters'
+import { peerHasOnlyPublicAddresses, isOnPrivateNet, PRIVATE_NETS } from '../filters'
 import debug from 'debug'
 import Multiaddr from 'multiaddr'
-import {Crawler as CrawlInteraction} from '../interactions/network/crawler'
+import { Crawler as CrawlInteraction } from '../interactions/network/crawler'
 
 const log = debug('hopr-core:crawler')
 const verbose = debug('hopr-core:verbose:crawler')
@@ -140,7 +140,7 @@ class Crawler {
       /**
        * Stores the crawling "threads"
        */
-      const promises: Promise<void>[] = Array.from({length: MAX_PARALLEL_REQUESTS})
+      const promises: Promise<void>[] = Array.from({ length: MAX_PARALLEL_REQUESTS })
 
       /**
        * Connect to another peer and returns a promise that resolves to all received nodes
@@ -306,4 +306,4 @@ class Crawler {
   }
 }
 
-export {Crawler}
+export { Crawler }

@@ -27,7 +27,7 @@ export class LogStream {
   }
 
   log(...args: string[]) {
-    const msg = {type: 'log', msg: `${args.join(' ')}`, ts: new Date().toISOString()}
+    const msg = { type: 'log', msg: `${args.join(' ')}`, ts: new Date().toISOString() }
     this._log(msg)
   }
 
@@ -36,7 +36,7 @@ export class LogStream {
   }
 
   logFatalError(message: string) {
-    const msg = {type: 'fatal-error', msg: message, ts: new Date().toISOString()}
+    const msg = { type: 'fatal-error', msg: message, ts: new Date().toISOString() }
     this._log(msg)
   }
 
@@ -53,12 +53,12 @@ export class LogStream {
   }
 
   logFullLine(...args: string[]) {
-    const msg = {type: 'log', msg: `${args.join(' ')}`, ts: new Date().toISOString()}
+    const msg = { type: 'log', msg: `${args.join(' ')}`, ts: new Date().toISOString() }
     this._log(msg)
   }
 
   logConnectedPeers(peers: string[]) {
-    const msg = {type: 'connected', msg: peers.join(','), ts: new Date().toISOString()}
+    const msg = { type: 'connected', msg: peers.join(','), ts: new Date().toISOString() }
     this._log(msg)
   }
 

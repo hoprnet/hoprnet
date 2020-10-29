@@ -10,16 +10,16 @@ import SECIO = require('libp2p-secio')
 
 import PeerId from 'peer-id'
 
-import {Handler} from 'libp2p'
+import { Handler } from 'libp2p'
 
 import TCP from '.'
 import Multiaddr from 'multiaddr'
 import pipe from 'it-pipe'
 
-import {u8aEquals} from '@hoprnet/hopr-utils'
+import { u8aEquals } from '@hoprnet/hopr-utils'
 
-import {randomBytes} from 'crypto'
-import {connectionHelper} from '../../test-utils'
+import { randomBytes } from 'crypto'
+import { connectionHelper } from '../../test-utils'
 
 const TEST_PROTOCOL = `/test/0.0.1`
 
@@ -39,7 +39,7 @@ describe('transport/index.spec.tc should create a socket and connect to it', fun
     },
     bootstrap?: Multiaddr
   ): Promise<libp2p> {
-    const peerId = await PeerId.create({keyType: 'secp256k1'})
+    const peerId = await PeerId.create({ keyType: 'secp256k1' })
     const addresses = []
 
     if (options.ipv4) {
@@ -54,7 +54,7 @@ describe('transport/index.spec.tc should create a socket and connect to it', fun
 
     const node = new libp2p({
       peerId,
-      addresses: {listen: addresses},
+      addresses: { listen: addresses },
       modules: {
         transport: [TCP],
         streamMuxer: [MPLEX],
@@ -304,16 +304,16 @@ describe('transport/index.spec.tc should create a socket and connect to it', fun
   // })
 
   it('should set up a relayed connection and upgrade to WebRTC', async function () {
-    const relay = await generateNode({id: 2, ipv4: true})
+    const relay = await generateNode({ id: 2, ipv4: true })
     const [sender, counterparty] = await Promise.all([
-      generateNode({id: 0, ipv4: true}, relay.multiaddrs[0]),
-      generateNode({id: 1, ipv4: true}, relay.multiaddrs[0])
+      generateNode({ id: 0, ipv4: true }, relay.multiaddrs[0]),
+      generateNode({ id: 1, ipv4: true }, relay.multiaddrs[0])
     ])
     connectionHelper([sender, relay])
     connectionHelper([relay, counterparty])
     const INVALID_PORT = 8758
     // @ts-ignore
-    const {stream}: {stream: Connection} = await sender.dialProtocol(
+    const { stream }: { stream: Connection } = await sender.dialProtocol(
       Multiaddr(`/ip4/127.0.0.1/tcp/${INVALID_PORT}/p2p/${counterparty.peerId.toB58String()}`),
       TEST_PROTOCOL
     )
@@ -727,11 +727,11 @@ describe('transport/index.spec.tc should create a socket and connect to it', fun
   // })
 
   it('should set up a relayed connection and exchange messages', async function () {
-    const relay = await generateNode({id: 2, ipv4: true})
+    const relay = await generateNode({ id: 2, ipv4: true })
 
     const [sender, counterparty] = await Promise.all([
-      generateNode({id: 0, ipv4: true, useWebRTC: false}, relay.multiaddrs[0]),
-      generateNode({id: 1, ipv4: true, useWebRTC: false}, relay.multiaddrs[0])
+      generateNode({ id: 0, ipv4: true, useWebRTC: false }, relay.multiaddrs[0]),
+      generateNode({ id: 1, ipv4: true, useWebRTC: false }, relay.multiaddrs[0])
     ])
 
     connectionHelper([sender, relay])
@@ -739,7 +739,7 @@ describe('transport/index.spec.tc should create a socket and connect to it', fun
 
     const INVALID_PORT = 8758
     // @ts-ignore
-    const {stream}: {stream: Connection} = await sender.dialProtocol(
+    const { stream }: { stream: Connection } = await sender.dialProtocol(
       Multiaddr(`/ip4/127.0.0.1/tcp/${INVALID_PORT}/p2p/${counterparty.peerId.toB58String()}`),
       TEST_PROTOCOL
     )

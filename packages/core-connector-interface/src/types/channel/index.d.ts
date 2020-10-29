@@ -1,4 +1,4 @@
-import {Moment, Hash, Signature} from '..'
+import { Moment, Hash, Signature } from '..'
 
 import ChannelBalance from './balance'
 import ChannelState from './state'
@@ -41,4 +41,4 @@ declare interface Channel {
 
 declare var Channel: ChannelStatic
 
-export {Channel, ChannelBalance, ChannelState}
+export { Channel, ChannelBalance, ChannelState }

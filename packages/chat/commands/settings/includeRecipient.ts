@@ -1,5 +1,5 @@
-import {AbstractCommand, AutoCompleteResult, GlobalState} from '../abstractCommand'
-import {styleValue, getOptions} from '../../utils'
+import { AbstractCommand, AutoCompleteResult, GlobalState } from '../abstractCommand'
+import { styleValue, getOptions } from '../../utils'
 
 export class IncludeRecipient extends AbstractCommand {
   private readonly options: GlobalState['includeRecipient'][] = [true, false]
@@ -31,7 +31,7 @@ export class IncludeRecipient extends AbstractCommand {
   public async autocomplete(query: string, line: string): Promise<AutoCompleteResult> {
     // nothing provided, just show all options
     if (!query) {
-      return [getOptions(this.options.map((o) => ({value: styleValue(o, 'boolean')}))), line]
+      return [getOptions(this.options.map((o) => ({ value: styleValue(o, 'boolean') }))), line]
     }
 
     // matches a option partly, show matches options

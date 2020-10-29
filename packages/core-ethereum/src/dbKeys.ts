@@ -1,9 +1,9 @@
 /*
   Helper functions which generate database keys
 */
-import {toU8a} from '@hoprnet/hopr-utils'
-import {Hash, Public} from './types'
-import type {Types} from '@hoprnet/hopr-core-connector-interface'
+import { toU8a } from '@hoprnet/hopr-utils'
+import { Hash, Public } from './types'
+import type { Types } from '@hoprnet/hopr-core-connector-interface'
 
 const encoder = new TextEncoder()
 const PREFIX = encoder.encode('payments-')

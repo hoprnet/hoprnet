@@ -3,15 +3,15 @@ import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 
 import assert from 'assert'
 
-import {randomBytes} from 'crypto'
+import { randomBytes } from 'crypto'
 
-import {UnacknowledgedTicket} from '.'
+import { UnacknowledgedTicket } from '.'
 
-import {NODE_SEEDS} from '@hoprnet/hopr-demo-seeds'
+import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
 
-import {Types, Utils} from '@hoprnet/hopr-core-ethereum'
-import {privKeyToPeerId} from '../../utils'
-import {toU8a, u8aConcat, u8aToNumber} from '@hoprnet/hopr-utils'
+import { Types, Utils } from '@hoprnet/hopr-core-ethereum'
+import { privKeyToPeerId } from '../../utils'
+import { toU8a, u8aConcat, u8aToNumber } from '@hoprnet/hopr-utils'
 
 import LevelUp from 'levelup'
 import Memdown from 'memdown'

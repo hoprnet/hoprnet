@@ -1,7 +1,7 @@
-import {Crawler} from './crawler'
-import {Heartbeat} from './heartbeat'
-import {LibP2P} from '../../'
-import type {Connection} from 'libp2p'
+import { Crawler } from './crawler'
+import { Heartbeat } from './heartbeat'
+import { LibP2P } from '../../'
+import type { Connection } from 'libp2p'
 import PeerId from 'peer-id'
 
 class NetworkInteractions {
@@ -14,4 +14,4 @@ class NetworkInteractions {
   }
 }
 
-export {NetworkInteractions}
+export { NetworkInteractions }

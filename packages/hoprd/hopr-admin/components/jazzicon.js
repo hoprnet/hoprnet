@@ -1,6 +1,6 @@
 // Hacks based on
 // https://github.com/MetaMask/metamask-extension/blob/develop/ui/app/components/ui/jazzicon/jazzicon.component.js
-import React, {createRef, PureComponent} from 'react'
+import React, { createRef, PureComponent } from 'react'
 import PropTypes from 'prop-types'
 import dynamic from 'next/dynamic'
 import jazzicon from 'jazzicon'
@@ -29,8 +29,8 @@ export default class Jazzicon extends PureComponent {
   }
 
   componentDidUpdate(prevProps) {
-    const {address: prevAddress, diameter: prevDiameter} = prevProps
-    const {address, diameter} = this.props
+    const { address: prevAddress, diameter: prevDiameter } = prevProps
+    const { address, diameter } = this.props
 
     if (address !== prevAddress || diameter !== prevDiameter) {
       this.removeExistingChildren()
@@ -39,7 +39,7 @@ export default class Jazzicon extends PureComponent {
   }
 
   removeExistingChildren() {
-    const {children} = this.container.current
+    const { children } = this.container.current
 
     for (let i = 0; i < children.length; i++) {
       this.container.current.removeChild(children[i])
@@ -48,7 +48,7 @@ export default class Jazzicon extends PureComponent {
 
   appendJazzicon() {
     if (typeof window !== 'undefined') {
-      const {address, diameter} = this.props
+      const { address, diameter } = this.props
       // NB: 'goodenough' transform between B58 string and js int
       const image = jazzicon(diameter, parseInt(md5(address).slice(-10), 16))
       this.container.current.appendChild(image)
@@ -56,7 +56,7 @@ export default class Jazzicon extends PureComponent {
   }
 
   render() {
-    const {className, style} = this.props
+    const { className, style } = this.props
 
     return <div className={className} ref={this.container} style={style} />
   }

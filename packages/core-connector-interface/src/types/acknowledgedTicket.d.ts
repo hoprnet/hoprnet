@@ -1,13 +1,13 @@
 import type HoprCoreConnector from '..'
-import {Hash, SignedTicket} from '.'
+import { Hash, SignedTicket } from '.'
 
 declare interface AcknowledgedTicketStatic {
   SIZE(coreConnector: HoprCoreConnector): number
 
   create(
     coreConnector: HoprCoreConnector,
-    arr?: {bytes: ArrayBuffer; offset: number},
-    struct?: {signedTicket?: SignedTicket; response?: Hash; preImage?: Hash; redeemed?: boolean}
+    arr?: { bytes: ArrayBuffer; offset: number },
+    struct?: { signedTicket?: SignedTicket; response?: Hash; preImage?: Hash; redeemed?: boolean }
   ): AcknowledgedTicket
 }
 

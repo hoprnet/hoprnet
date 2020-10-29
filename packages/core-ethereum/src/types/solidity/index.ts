@@ -1,1 +1,1 @@
-export {default as UINT256} from './uint256'
+export { default as UINT256 } from './uint256'

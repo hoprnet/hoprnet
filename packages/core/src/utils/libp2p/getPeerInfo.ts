@@ -1,18 +1,18 @@
-import {HoprOptions} from '../../'
+import { HoprOptions } from '../../'
 
-import {keys} from 'libp2p-crypto'
-import {LevelUp} from 'levelup'
+import { keys } from 'libp2p-crypto'
+import { LevelUp } from 'levelup'
 import chalk from 'chalk'
-import {deserializeKeyPair, serializeKeyPair, askForPassword, privKeyToPeerId} from '..'
+import { deserializeKeyPair, serializeKeyPair, askForPassword, privKeyToPeerId } from '..'
 import debug from 'debug'
 const log = debug('hopr-core:libp2p')
 
-import {NODE_SEEDS, BOOTSTRAP_SEEDS} from '@hoprnet/hopr-demo-seeds'
+import { NODE_SEEDS, BOOTSTRAP_SEEDS } from '@hoprnet/hopr-demo-seeds'
 
 import PeerId from 'peer-id'
 import Multiaddr from 'multiaddr'
 
-import {KeyPair} from '../../dbKeys'
+import { KeyPair } from '../../dbKeys'
 
 /**
  * Assemble the addresses that we are using
@@ -147,4 +147,4 @@ async function createIdentity(db: LevelUp, pw?: string): Promise<PeerId> {
   return peerId
 }
 
-export {getPeerId, getAddrs}
+export { getPeerId, getAddrs }

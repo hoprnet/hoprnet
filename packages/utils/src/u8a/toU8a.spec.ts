@@ -1,5 +1,5 @@
 import assert from 'assert'
-import {toU8a, stringToU8a} from './toU8a'
+import { toU8a, stringToU8a } from './toU8a'
 
 describe('test number to u8a', function () {
   it('should return a u8a', function () {

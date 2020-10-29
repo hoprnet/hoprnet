@@ -8,20 +8,20 @@ import {
   deriveTicketKey,
   derivePRGParameters
 } from '.'
-import {Utils} from '@hoprnet/hopr-core-ethereum'
+import { Utils } from '@hoprnet/hopr-core-ethereum'
 import PeerId from 'peer-id'
 import Hopr from '../../../'
 import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import {randomBytes} from 'crypto'
+import { randomBytes } from 'crypto'
 import secp256k1 from 'secp256k1'
-import {u8aEquals} from '@hoprnet/hopr-utils'
+import { u8aEquals } from '@hoprnet/hopr-utils'
 
 describe('test creation & transformation of a header', function () {
   async function createAndDecomposeHeader(
     node: Hopr<HoprCoreConnector>,
     peerIds: PeerId[]
-  ): Promise<{header: Header<HoprCoreConnector>; identifier: Uint8Array; secrets: Uint8Array[]}> {
-    const {header, identifier, secrets} = await Header.create<HoprCoreConnector>(node, peerIds)
+  ): Promise<{ header: Header<HoprCoreConnector>; identifier: Uint8Array; secrets: Uint8Array[] }> {
+    const { header, identifier, secrets } = await Header.create<HoprCoreConnector>(node, peerIds)
 
     for (let i = 0; i < peerIds.length - 1; i++) {
       header.deriveSecret(peerIds[i].privKey.marshal())
@@ -36,7 +36,7 @@ describe('test creation & transformation of a header', function () {
       header.transformForNextNode()
     }
 
-    return {header, identifier, secrets}
+    return { header, identifier, secrets }
   }
 
   function getNode(): Hopr<HoprCoreConnector> {
@@ -79,12 +79,12 @@ describe('test creation & transformation of a header', function () {
 
   it('should create a header', async function () {
     const peerIds = await Promise.all([
-      PeerId.create({keyType: 'secp256k1'}),
-      PeerId.create({keyType: 'secp256k1'}),
-      PeerId.create({keyType: 'secp256k1'})
+      PeerId.create({ keyType: 'secp256k1' }),
+      PeerId.create({ keyType: 'secp256k1' }),
+      PeerId.create({ keyType: 'secp256k1' })
     ])
 
-    const {header, identifier, secrets} = await createAndDecomposeHeader(getNode(), peerIds)
+    const { header, identifier, secrets } = await createAndDecomposeHeader(getNode(), peerIds)
 
     header.deriveSecret(peerIds[2].privKey.marshal(), true)
     assert(u8aEquals(header.derivedSecret, secrets[2]), `pre-computed secret and derived secret should be the same`)
@@ -101,9 +101,12 @@ describe('test creation & transformation of a header', function () {
   })
 
   it('should create a header with a path less than MAX_HOPS nodes', async function () {
-    const peerIds = await Promise.all([PeerId.create({keyType: 'secp256k1'}), PeerId.create({keyType: 'secp256k1'})])
+    const peerIds = await Promise.all([
+      PeerId.create({ keyType: 'secp256k1' }),
+      PeerId.create({ keyType: 'secp256k1' })
+    ])
 
-    const {header, identifier, secrets} = await createAndDecomposeHeader(getNode(), peerIds)
+    const { header, identifier, secrets } = await createAndDecomposeHeader(getNode(), peerIds)
 
     header.deriveSecret(peerIds[1].privKey.marshal(), true)
     assert(u8aEquals(header.derivedSecret, secrets[1]), `pre-computed secret and derived secret should be the same`)
@@ -120,9 +123,9 @@ describe('test creation & transformation of a header', function () {
   })
 
   it('should create a header with exactly two nodes', async function () {
-    const peerIds = [await PeerId.create({keyType: 'secp256k1'})]
+    const peerIds = [await PeerId.create({ keyType: 'secp256k1' })]
 
-    const {header, identifier, secrets} = await createAndDecomposeHeader(getNode(), peerIds)
+    const { header, identifier, secrets } = await createAndDecomposeHeader(getNode(), peerIds)
 
     header.deriveSecret(peerIds[0].privKey.marshal(), true)
     assert(u8aEquals(header.derivedSecret, secrets[0]), `pre-computed secret and derived secret should be the same`)

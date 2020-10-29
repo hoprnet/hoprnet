@@ -1,5 +1,5 @@
 import chalk from 'chalk'
-import {cli_options} from './cliOptions'
+import { cli_options } from './cliOptions'
 
 const FIRST_OPTION_OFFSET = 1
 const SECOND_OPTION_OFFSET = 5
@@ -99,7 +99,7 @@ export function styleValue(value: any, type?: keyof typeof CHALK_COLORS): string
 }
 
 export function getOptions(
-  options: {value: any; description?: string}[],
+  options: { value: any; description?: string }[],
   style: 'compact' | 'vertical' = 'compact'
 ): string[] {
   if (style === 'compact') {

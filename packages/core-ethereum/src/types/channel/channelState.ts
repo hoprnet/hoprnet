@@ -1,7 +1,7 @@
-import {Types} from '@hoprnet/hopr-core-connector-interface'
+import { Types } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
 
-import {u8aToNumber, toU8a} from '@hoprnet/hopr-utils'
+import { u8aToNumber, toU8a } from '@hoprnet/hopr-utils'
 
 class ChannelState extends Uint8Array implements Types.ChannelState {
   constructor(
