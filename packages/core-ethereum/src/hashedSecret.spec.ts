@@ -153,7 +153,7 @@ describe('test hashedSecret', function () {
         )
       }
 
-      const masterSecret = await connector.db.get(Buffer.from(connector.dbKeys.OnChainSecretIntermediary(0)))
+      const masterSecret = await connector.db.get(Buffer.from(connector.dbKeys.OnChainSecretIntermediary(0))) as Uint8Array
 
       await checkIndex(1, masterSecret, false)
 

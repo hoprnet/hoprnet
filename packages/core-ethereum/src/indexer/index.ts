@@ -77,7 +77,7 @@ class Indexer implements IIndexer {
    */
   private async getLatestConfirmedBlockNumber(): Promise<number> {
     try {
-      return u8aToNumber(await this.connector.db.get(Buffer.from(this.connector.dbKeys.ConfirmedBlockNumber())))
+      return u8aToNumber(await this.connector.db.get(Buffer.from(this.connector.dbKeys.ConfirmedBlockNumber())) as Uint8Array)
     } catch (err) {
       if (err.notFound == null) {
         throw err
@@ -157,7 +157,7 @@ class Indexer implements IIndexer {
 
     let _entry: Uint8Array | undefined
     try {
-      _entry = await db.get(Buffer.from(dbKeys.ChannelEntry(partyA, partyB)))
+      _entry = await db.get(Buffer.from(dbKeys.ChannelEntry(partyA, partyB))) as Uint8Array
     } catch (err) {
       if (err.notFound) {
         return

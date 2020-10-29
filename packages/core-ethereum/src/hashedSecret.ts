@@ -34,7 +34,7 @@ class HashedSecret {
    */
   private async getOffChainSecret(): Promise<Hash | undefined> {
     try {
-      return await this.coreConnector.db.get(Buffer.from(this.coreConnector.dbKeys.OnChainSecret()))
+      return await this.coreConnector.db.get(Buffer.from(this.coreConnector.dbKeys.OnChainSecret())) as any
     } catch {
       return undefined
     }
@@ -142,7 +142,7 @@ class HashedSecret {
       try {
         intermediary = await this.coreConnector.db.get(
           Buffer.from(this.coreConnector.dbKeys.OnChainSecretIntermediary(closestIntermediary))
-        )
+        ) as Uint8Array
         break
       } catch (err) {
         if (!err.notFound) {
@@ -154,7 +154,7 @@ class HashedSecret {
 
     if (closestIntermediary == 0) {
       try {
-        intermediary = await this.coreConnector.db.get(Buffer.from(this.coreConnector.dbKeys.OnChainSecret()))
+        intermediary = await this.coreConnector.db.get(Buffer.from(this.coreConnector.dbKeys.OnChainSecret())) as Uint8Array
       } catch (err) {
         if (!err.notFound) {
           throw err
@@ -196,7 +196,7 @@ class HashedSecret {
         try {
           intermediary = await this.coreConnector.db.get(
             Buffer.from(this.coreConnector.dbKeys.OnChainSecretIntermediary(closestIntermediary))
-          )
+          ) as Uint8Array
           break
         } catch (err) {
           if (err.notFound) {
