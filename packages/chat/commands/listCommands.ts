@@ -1,5 +1,5 @@
-import { AbstractCommand } from './abstractCommand'
-import { getOptions } from '../utils'
+import {AbstractCommand} from './abstractCommand'
+import {getOptions} from '../utils'
 
 export default class ListCommands extends AbstractCommand {
   constructor(private getCommands: () => AbstractCommand[]) {

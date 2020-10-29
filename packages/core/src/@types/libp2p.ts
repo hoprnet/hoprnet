@@ -42,11 +42,11 @@ declare module 'libp2p' {
     get(
       peerId: PeerId
     ):
-      | { id: PeerId; addresses: Array<Multiaddr>; metadata: Map<string, Uint8Array>; protocols: Array<string> }
+      | {id: PeerId; addresses: Array<Multiaddr>; metadata: Map<string, Uint8Array>; protocols: Array<string>}
       | undefined
     peers: Map<
       string,
-      { id: PeerId; addresses: Array<Multiaddr>; metadata: Map<string, Uint8Array>; protocols: Array<string> }
+      {id: PeerId; addresses: Array<Multiaddr>; metadata: Map<string, Uint8Array>; protocols: Array<string>}
     >
     delete(peer: PeerId): void
 
@@ -54,7 +54,7 @@ declare module 'libp2p' {
     addressBook: {
       add(id: PeerId, addr: Array<Multiaddr>)
       delete(id: PeerId)
-      get(id: PeerId): Array<{ multiaddr: Multiaddr }>
+      get(id: PeerId): Array<{multiaddr: Multiaddr}>
       getMultiaddrsForPeer(id: PeerId): Array<string>
       set(peerId: PeerId, multiaddrs: Array<Multiaddr>)
     }
@@ -85,7 +85,7 @@ declare module 'libp2p' {
 
   //https://github.com/libp2p/js-libp2p-interfaces/tree/master/src/peer-routing
   export interface PeerRouting {
-    findPeer(peerId: PeerId): Promise<{ id: PeerId; multiaddrs: Multiaddr[] }>
+    findPeer(peerId: PeerId): Promise<{id: PeerId; multiaddrs: Multiaddr[]}>
   }
 
   export interface Upgrader {
@@ -115,15 +115,15 @@ declare module 'libp2p' {
     static create(options: any): any
     // @TODO add libp2p types
     emit: (event: string, ...args: any[]) => void
-    dial: (addr: Multiaddr | PeerId, options?: { signal: AbortSignal }) => Promise<Handler>
+    dial: (addr: Multiaddr | PeerId, options?: {signal: AbortSignal}) => Promise<Handler>
     dialer: any // TODO
-    dialProtocol: (addr: Multiaddr | PeerId, protocol: string, options?: { signal: AbortSignal }) => Promise<Handler>
+    dialProtocol: (addr: Multiaddr | PeerId, protocol: string, options?: {signal: AbortSignal}) => Promise<Handler>
     hangUp: (addr: PeerId | Multiaddr | string) => Promise<void>
     peerStore: PeerStore
     peerRouting: {
       findPeer: (addr: PeerId) => Promise<PeerRoute>
     }
-    handle: (protocol: string | string[], handler: (struct: { connection: any; stream: any }) => void) => void
+    handle: (protocol: string | string[], handler: (struct: {connection: any; stream: any}) => void) => void
     start(): Promise<any>
     stop(): Promise<void>
 

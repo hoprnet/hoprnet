@@ -1,5 +1,5 @@
 import assert from 'assert'
-import { BLACKLIST_TIMEOUT } from '../constants'
+import {BLACKLIST_TIMEOUT} from '../constants'
 import PeerId from 'peer-id'
 
 import PeerStore from './network-peers'

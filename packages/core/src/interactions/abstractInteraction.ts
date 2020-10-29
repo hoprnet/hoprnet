@@ -1,4 +1,4 @@
-import type { Handler } from 'libp2p'
+import type {Handler} from 'libp2p'
 
 interface AbstractInteraction {
   protocols: string[]
@@ -6,4 +6,4 @@ interface AbstractInteraction {
   interact(...props: any[]): any
 }
 
-export { AbstractInteraction }
+export {AbstractInteraction}

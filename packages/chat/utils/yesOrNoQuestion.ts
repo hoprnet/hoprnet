@@ -1,6 +1,6 @@
 import type readline from 'readline'
-import { clearString } from '@hoprnet/hopr-utils'
-import { CHALK_STRINGS } from './displayHelp'
+import {clearString} from '@hoprnet/hopr-utils'
+import {CHALK_STRINGS} from './displayHelp'
 
 export async function yesOrNoQuestion(rl: readline.Interface, message: string): Promise<boolean> {
   const question = `${message} (${CHALK_STRINGS.yes}, ${CHALK_STRINGS.no}): `

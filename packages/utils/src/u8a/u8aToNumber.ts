@@ -17,4 +17,4 @@ function u8aToNumber(arr: Uint8Array): number {
   return result
 }
 
-export { u8aToNumber }
+export {u8aToNumber}

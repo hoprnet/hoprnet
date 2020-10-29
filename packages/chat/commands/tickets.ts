@@ -1,8 +1,8 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
-import { moveDecimalPoint } from '@hoprnet/hopr-utils'
-import { AbstractCommand } from './abstractCommand'
-import { countSignedTickets, toSignedTickets, styleValue } from '../utils'
+import {moveDecimalPoint} from '@hoprnet/hopr-utils'
+import {AbstractCommand} from './abstractCommand'
+import {countSignedTickets, toSignedTickets, styleValue} from '../utils'
 
 export default class Tickets extends AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {
@@ -19,7 +19,7 @@ export default class Tickets extends AbstractCommand {
 
   public async execute(): Promise<string | void> {
     try {
-      const { Balance } = this.node.paymentChannels.types
+      const {Balance} = this.node.paymentChannels.types
 
       const results = await this.node.getAcknowledgedTickets().then((tickets) => {
         return tickets.filter((ticket) => !ticket.ackTicket.redeemed)

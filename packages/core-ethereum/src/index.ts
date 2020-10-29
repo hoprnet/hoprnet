@@ -1,15 +1,15 @@
-import type { LevelUp } from 'levelup'
-import type { WebsocketProvider } from 'web3-core'
-import type { Currencies } from '@hoprnet/hopr-core-connector-interface'
+import type {LevelUp} from 'levelup'
+import type {WebsocketProvider} from 'web3-core'
+import type {Currencies} from '@hoprnet/hopr-core-connector-interface'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import type { Networks } from './ethereum/addresses'
-import type { HoprChannels } from './tsc/web3/HoprChannels'
-import type { HoprToken } from './tsc/web3/HoprToken'
+import type {Networks} from './ethereum/addresses'
+import type {HoprChannels} from './tsc/web3/HoprChannels'
+import type {HoprToken} from './tsc/web3/HoprToken'
 import Web3 from 'web3'
 import HoprChannelsAbi from './ethereum/abi/HoprChannels.json'
 import HoprTokenAbi from './ethereum/abi/HoprToken.json'
 import chalk from 'chalk'
-import { ChannelFactory } from './channel'
+import {ChannelFactory} from './channel'
 import types from './types'
 import Indexer from './indexer'
 import * as dbkeys from './dbKeys'
@@ -265,7 +265,7 @@ export default class HoprEthereum implements HoprCoreConnector {
   static async create(
     db: LevelUp,
     seed: Uint8Array,
-    options?: { id?: number; provider?: string; debug?: boolean }
+    options?: {id?: number; provider?: string; debug?: boolean}
   ): Promise<HoprEthereum> {
     const providerUri = options?.provider || config.DEFAULT_URI
 
@@ -299,7 +299,7 @@ export default class HoprEthereum implements HoprCoreConnector {
       network,
       hoprChannels,
       hoprToken,
-      { debug: options?.debug || false },
+      {debug: options?.debug || false},
       seed,
       publicKey
     )

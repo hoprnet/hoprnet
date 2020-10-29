@@ -1,9 +1,9 @@
 import secp256k1 from 'secp256k1'
-import type { Types } from '@hoprnet/hopr-core-connector-interface'
+import type {Types} from '@hoprnet/hopr-core-connector-interface'
 import Signature from './signature'
-import { Channel } from './channel'
-import { Uint8ArrayE } from '../types/extended'
-import { verify } from '../utils'
+import {Channel} from './channel'
+import {Uint8ArrayE} from '../types/extended'
+import {verify} from '../utils'
 
 class SignedChannel extends Uint8ArrayE implements Types.SignedChannel {
   private _signature?: Signature

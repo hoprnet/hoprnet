@@ -1,13 +1,13 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import type { Types } from '@hoprnet/hopr-core-connector-interface'
+import type {Types} from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import type PeerId from 'peer-id'
-import { startDelayedInterval, u8aToHex, moveDecimalPoint } from '@hoprnet/hopr-utils'
+import {startDelayedInterval, u8aToHex, moveDecimalPoint} from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import chalk from 'chalk'
 import readline from 'readline'
-import { checkPeerIdInput, getPeers, getOpenChannels, styleValue } from '../utils'
-import { AbstractCommand, AutoCompleteResult } from './abstractCommand'
+import {checkPeerIdInput, getPeers, getOpenChannels, styleValue} from '../utils'
+import {AbstractCommand, AutoCompleteResult} from './abstractCommand'
 
 export abstract class OpenChannelBase extends AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {
@@ -23,7 +23,7 @@ export abstract class OpenChannelBase extends AbstractCommand {
   }
 
   protected async validateAmountToFund(amountToFund: BN): Promise<void> {
-    const { account } = this.node.paymentChannels
+    const {account} = this.node.paymentChannels
     const myAvailableTokens = await account.balance
 
     if (amountToFund.lten(0)) {
@@ -81,12 +81,12 @@ export class OpenChannel extends OpenChannelBase {
       return styleValue(err.message, 'failure')
     }
 
-    const { types } = this.node.paymentChannels
+    const {types} = this.node.paymentChannels
     const amountToFund = new BN(moveDecimalPoint(amountToFundStr, types.Balance.DECIMALS))
 
     const unsubscribe = startDelayedInterval(`Submitted transaction. Waiting for confirmation`)
     try {
-      const { channelId } = await this.node.openChannel(counterParty, amountToFund)
+      const {channelId} = await this.node.openChannel(counterParty, amountToFund)
       unsubscribe()
       return `${chalk.green(`Successfully opened channel`)} ${styleValue(u8aToHex(channelId), 'hash')}`
     } catch (err) {
@@ -102,7 +102,7 @@ export class OpenChannelFancy extends OpenChannelBase {
   }
 
   private async selectFundAmount(): Promise<BN> {
-    const { types, account } = this.node.paymentChannels
+    const {types, account} = this.node.paymentChannels
     const myAvailableTokens = await account.balance
     const myAvailableTokensDisplay = moveDecimalPoint(myAvailableTokens.toString(), types.Balance.DECIMALS * -1)
 
@@ -146,7 +146,7 @@ export class OpenChannelFancy extends OpenChannelBase {
 
     const unsubscribe = startDelayedInterval(`Submitted transaction. Waiting for confirmation`)
     try {
-      const { channelId } = await this.node.openChannel(counterParty, amountToFund)
+      const {channelId} = await this.node.openChannel(counterParty, amountToFund)
       unsubscribe()
       return `${chalk.green(`Successfully opened channel`)} ${styleValue(u8aToHex(channelId), 'hash')}`
     } catch (err) {

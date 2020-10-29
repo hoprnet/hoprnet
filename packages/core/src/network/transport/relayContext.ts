@@ -1,11 +1,11 @@
-import { u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
-import Defer, { DeferredPromise } from 'p-defer'
+import {u8aEquals, u8aToHex} from '@hoprnet/hopr-utils'
+import Defer, {DeferredPromise} from 'p-defer'
 
 import Debug from 'debug'
 const log = Debug(`hopr-core:transport`)
 const error = Debug(`hopr-core:transport:error`)
 
-import { RELAY_STATUS_PREFIX, STOP } from './constants'
+import {RELAY_STATUS_PREFIX, STOP} from './constants'
 
 class RelayContext {
   private _defer: DeferredPromise<AsyncGenerator<Uint8Array>>
@@ -32,7 +32,7 @@ class RelayContext {
         msg = this._source.next()
 
         await Promise.race([
-          msg.then(({ done }) => {
+          msg.then(({done}) => {
             if (done) {
               itDone = true
             }
@@ -86,4 +86,4 @@ class RelayContext {
   }
 }
 
-export { RelayContext }
+export {RelayContext}

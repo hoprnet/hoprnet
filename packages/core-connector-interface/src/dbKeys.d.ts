@@ -1,4 +1,4 @@
-import type { AccountId, Hash } from './types'
+import type {AccountId, Hash} from './types'
 
 /**
  * Returns the db-key under which the channel is saved.

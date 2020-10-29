@@ -1,7 +1,7 @@
 import Web3 from 'web3'
-import type { Types } from '@hoprnet/hopr-core-connector-interface'
-import { ADDRESS_LENGTH } from '../constants'
-import { Uint8ArrayE } from './extended'
+import type {Types} from '@hoprnet/hopr-core-connector-interface'
+import {ADDRESS_LENGTH} from '../constants'
+import {Uint8ArrayE} from './extended'
 
 class AccountId extends Uint8ArrayE implements Types.AccountId {
   slice(begin = 0, end = AccountId.SIZE): Uint8Array {

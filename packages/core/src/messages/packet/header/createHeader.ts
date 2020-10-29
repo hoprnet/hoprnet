@@ -1,7 +1,7 @@
 import secp256k1 from 'secp256k1'
-import { randomBytes } from 'crypto'
-import { u8aXOR, u8aConcat, PRG } from '@hoprnet/hopr-utils'
-import { MAX_HOPS } from '../../../constants'
+import {randomBytes} from 'crypto'
+import {u8aXOR, u8aConcat, PRG} from '@hoprnet/hopr-utils'
+import {MAX_HOPS} from '../../../constants'
 
 import {
   Header,
@@ -117,7 +117,7 @@ export async function createHeader<Chain extends HoprCoreConnector>(
     let end: number = LAST_HOP_SIZE + MAX_HOPS * PER_HOP_SIZE
 
     for (let index = 0; index < secrets.length - 1; index++) {
-      let { key, iv } = derivePRGParameters(secrets[index])
+      let {key, iv} = derivePRGParameters(secrets[index])
 
       start -= PER_HOP_SIZE
       length += PER_HOP_SIZE
@@ -132,7 +132,7 @@ export async function createHeader<Chain extends HoprCoreConnector>(
     const tmp = new Uint8Array(BETA_LENGTH - PER_HOP_SIZE)
 
     for (let i = secrets.length; i > 0; i--) {
-      const { key, iv } = derivePRGParameters(secrets[i - 1])
+      const {key, iv} = derivePRGParameters(secrets[i - 1])
 
       let paddingLength = (MAX_HOPS - secrets.length) * PER_HOP_SIZE
 

@@ -1,8 +1,8 @@
-import { COMPRESSED_PUBLIC_KEY_LENGTH } from '../constants'
-import { Types } from '@hoprnet/hopr-core-connector-interface'
-import { privKeyToPubKey, pubKeyToAccountId } from '../utils'
+import {COMPRESSED_PUBLIC_KEY_LENGTH} from '../constants'
+import {Types} from '@hoprnet/hopr-core-connector-interface'
+import {privKeyToPubKey, pubKeyToAccountId} from '../utils'
 import AccountId from './accountId'
-import { Uint8ArrayE } from './extended'
+import {Uint8ArrayE} from './extended'
 
 class Public extends Uint8ArrayE implements Types.Public {
   get NAME() {

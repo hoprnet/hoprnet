@@ -1,6 +1,6 @@
-import { u8aConcat, u8aEquals } from '@hoprnet/hopr-utils'
+import {u8aConcat, u8aEquals} from '@hoprnet/hopr-utils'
 
-import HoprCoreConnector, { Types } from '@hoprnet/hopr-core-connector-interface'
+import HoprCoreConnector, {Types} from '@hoprnet/hopr-core-connector-interface'
 import PeerId from 'peer-id'
 
 class UnacknowledgedTicket<Chain extends HoprCoreConnector> extends Uint8Array {
@@ -100,4 +100,4 @@ class UnacknowledgedTicket<Chain extends HoprCoreConnector> extends Uint8Array {
   }
 }
 
-export { UnacknowledgedTicket }
+export {UnacknowledgedTicket}

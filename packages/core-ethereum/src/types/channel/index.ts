@@ -1,7 +1,7 @@
-import type { Types } from '@hoprnet/hopr-core-connector-interface'
-import { Moment } from '..'
-import { Uint8ArrayE } from '../extended'
-import { hash, stateCountToStatus, sign } from '../../utils'
+import type {Types} from '@hoprnet/hopr-core-connector-interface'
+import {Moment} from '..'
+import {Uint8ArrayE} from '../extended'
+import {hash, stateCountToStatus, sign} from '../../utils'
 import ChannelState from './channelState'
 import ChannelBalance from './channelBalance'
 
@@ -126,24 +126,24 @@ class Channel extends Uint8ArrayE implements Types.Channel {
   static createFunded(balance: ChannelBalance): Channel {
     return new Channel(undefined, {
       balance,
-      state: new ChannelState(undefined, { state: ChannelStatus.FUNDING })
+      state: new ChannelState(undefined, {state: ChannelStatus.FUNDING})
     })
   }
 
   static createActive(balance: ChannelBalance): Channel {
     return new Channel(undefined, {
       balance,
-      state: new ChannelState(undefined, { state: ChannelStatus.OPEN })
+      state: new ChannelState(undefined, {state: ChannelStatus.OPEN})
     })
   }
 
   static createPending(moment: Moment, balance: ChannelBalance): Channel {
     return new Channel(undefined, {
       balance,
-      state: new ChannelState(undefined, { state: ChannelStatus.PENDING }),
+      state: new ChannelState(undefined, {state: ChannelStatus.PENDING}),
       moment
     })
   }
 }
 
-export { Channel, ChannelBalance, ChannelState, ChannelStatus }
+export {Channel, ChannelBalance, ChannelState, ChannelStatus}

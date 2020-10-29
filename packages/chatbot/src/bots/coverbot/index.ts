@@ -1,12 +1,12 @@
-import { getHOPRNodeAddressFromContent } from '../../utils/utils'
+import {getHOPRNodeAddressFromContent} from '../../utils/utils'
 import Web3 from 'web3'
-import { Bot } from '../bot'
-import { IMessage } from '../../message/message'
-import { TweetMessage, TweetState } from '../../lib/twitter/twitter'
+import {Bot} from '../bot'
+import {IMessage} from '../../message/message'
+import {TweetMessage, TweetState} from '../../lib/twitter/twitter'
 //@TODO: Isolate these utilities to avoid importing the entire package
-import { convertPubKeyFromB58String, u8aToHex } from '@hoprnet/hopr-utils'
-import { Utils } from '@hoprnet/hopr-core-ethereum'
-import { Networks, HOPR_CHANNELS } from '@hoprnet/hopr-core-ethereum/lib/ethereum/addresses'
+import {convertPubKeyFromB58String, u8aToHex} from '@hoprnet/hopr-utils'
+import {Utils} from '@hoprnet/hopr-core-ethereum'
+import {Networks, HOPR_CHANNELS} from '@hoprnet/hopr-core-ethereum/lib/ethereum/addresses'
 import {
   COVERBOT_DEBUG_MODE,
   COVERBOT_CHAIN_PROVIDER,
@@ -16,16 +16,16 @@ import {
   COVERBOT_DEBUG_HOPR_ADDRESS,
 } from '../../utils/env'
 import db from './db'
-import { BotCommands, NodeStates, ScoreRewards } from './state'
-import { RELAY_VERIFICATION_CYCLE_IN_MS, RELAY_HOPR_REWARD } from './constants'
-import { BotResponses, NodeStateResponses } from './responses'
-import { BalancedHoprNode, HoprNode } from './coverbot'
+import {BotCommands, NodeStates, ScoreRewards} from './state'
+import {RELAY_VERIFICATION_CYCLE_IN_MS, RELAY_HOPR_REWARD} from './constants'
+import {BotResponses, NodeStateResponses} from './responses'
+import {BalancedHoprNode, HoprNode} from './coverbot'
 import debug from 'debug'
 import Core from '../../lib/hopr/core'
 
 const log = debug('hopr-chatbot:coverbot')
 const error = debug('hopr-chatbot:coverbot:error')
-const { fromWei } = Web3.utils
+const {fromWei} = Web3.utils
 
 const scoreDbRef = db.ref(`/${HOPR_ENVIRONMENT}/score`)
 const stateDbRef = db.ref(`/${HOPR_ENVIRONMENT}/state`)
@@ -53,7 +53,7 @@ export class Coverbot implements Bot {
   loadedDb: boolean
 
   constructor(
-    { node, hoprBalance, balance }: BalancedHoprNode,
+    {node, hoprBalance, balance}: BalancedHoprNode,
     nativeAddress: string,
     address: string,
     timestamp: Date,
@@ -217,8 +217,8 @@ export class Coverbot implements Bot {
     try {
       log(`- verificationCycle | Verifying node process, looking for tweet ${hoprNode.tweetUrl}`)
       const tweet = new TweetMessage(hoprNode.tweetUrl)
-      await tweet.fetch({ mock: COVERBOT_DEBUG_MODE })
-      const _hoprNodeAddress = tweet.getHOPRNode({ mock: COVERBOT_DEBUG_MODE, hoprNode: COVERBOT_DEBUG_HOPR_ADDRESS })
+      await tweet.fetch({mock: COVERBOT_DEBUG_MODE})
+      const _hoprNodeAddress = tweet.getHOPRNode({mock: COVERBOT_DEBUG_MODE, hoprNode: COVERBOT_DEBUG_HOPR_ADDRESS})
 
       if (_hoprNodeAddress.length === 0) {
         log(`- verificationCycle | No node has been found from our tweet w/content ${tweet.content}`)
@@ -310,7 +310,7 @@ export class Coverbot implements Bot {
     const tweet = new TweetMessage(message.text)
     this.tweets.set(message.from, tweet)
 
-    await tweet.fetch({ mock: COVERBOT_DEBUG_MODE })
+    await tweet.fetch({mock: COVERBOT_DEBUG_MODE})
 
     if (tweet.hasTag('hoprnetwork')) {
       tweet.status.hasTag = true
@@ -363,7 +363,7 @@ export class Coverbot implements Bot {
 
       await Promise.all([
         this._setEthereumAddressScore(relayerEthereumAddress, newScore),
-        this.node.withdraw({ currency: 'HOPR', recipient: relayerEthereumAddress, amount: `${RELAY_HOPR_REWARD}` }),
+        this.node.withdraw({currency: 'HOPR', recipient: relayerEthereumAddress, amount: `${RELAY_HOPR_REWARD}`}),
       ])
       console.log(`HOPR tokens sent to ${relayerAddress}`)
       this._sendMessageFromBot(relayerAddress, NodeStateResponses[NodeStates.verifiedNode])

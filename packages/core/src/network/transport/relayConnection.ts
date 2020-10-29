@@ -1,12 +1,12 @@
-import { Stream } from 'libp2p'
+import {Stream} from 'libp2p'
 import Multiaddr from 'multiaddr'
 import BL from 'bl'
-import { MultiaddrConnection } from 'libp2p'
-import Defer, { DeferredPromise } from 'p-defer'
-import { RELAY_PAYLOAD_PREFIX, RELAY_STATUS_PREFIX, RELAY_WEBRTC_PREFIX, STOP } from './constants'
-import { u8aEquals } from '@hoprnet/hopr-utils'
+import {MultiaddrConnection} from 'libp2p'
+import Defer, {DeferredPromise} from 'p-defer'
+import {RELAY_PAYLOAD_PREFIX, RELAY_STATUS_PREFIX, RELAY_WEBRTC_PREFIX, STOP} from './constants'
+import {u8aEquals} from '@hoprnet/hopr-utils'
 
-import type { Instance as SimplePeer } from 'simple-peer'
+import type {Instance as SimplePeer} from 'simple-peer'
 
 import type PeerId from 'peer-id'
 
@@ -61,7 +61,7 @@ class RelayConnection implements MultiaddrConnection {
     this.webRTC = webRTC
 
     this.source = async function* (this: RelayConnection) {
-      const promise = this._defer.promise.then(() => ({ done: true }))
+      const promise = this._defer.promise.then(() => ({done: true}))
 
       while (true) {
         let result: {
@@ -130,7 +130,7 @@ class RelayConnection implements MultiaddrConnection {
           let webRTCdone = this.webRTC == null
           let webRTCmsg: Uint8Array | void
 
-          function streamSourceFunction({ done, value }: { done: boolean; value?: BL }) {
+          function streamSourceFunction({done, value}: {done: boolean; value?: BL}) {
             streamResolved = true
             streamMsg = value
 
@@ -142,7 +142,7 @@ class RelayConnection implements MultiaddrConnection {
           // @ts-ignore
           let streamPromise = source.next().then(streamSourceFunction)
 
-          function webRTCSourceFunction({ done, value }: { done?: boolean; value: Uint8Array | void }) {
+          function webRTCSourceFunction({done, value}: {done?: boolean; value: Uint8Array | void}) {
             webRTCresolved = true
             webRTCmsg = value
 
@@ -280,4 +280,4 @@ class RelayConnection implements MultiaddrConnection {
   }
 }
 
-export { RelayConnection }
+export {RelayConnection}

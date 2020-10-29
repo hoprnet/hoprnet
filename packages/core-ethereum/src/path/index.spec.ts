@@ -1,8 +1,8 @@
 import assert from 'assert'
 import type HoprEthereum from '..'
-import { randomBytes } from 'crypto'
-import { Public } from '../types'
-import { gcd } from '@hoprnet/hopr-utils'
+import {randomBytes} from 'crypto'
+import {Public} from '../types'
+import {gcd} from '@hoprnet/hopr-utils'
 
 import Path from '.'
 
@@ -25,14 +25,14 @@ async function generateGraph(nodesCount: number) {
   const edges = new Map<Public, Public[]>()
 
   if (nodesCount <= 1) {
-    return { nodes, edges }
+    return {nodes, edges}
   }
 
   if (nodesCount == 2) {
     edges.set(nodes[0], [nodes[1]])
     edges.set(nodes[1], [nodes[0]])
 
-    return { nodes, edges }
+    return {nodes, edges}
   }
 
   // find generators
@@ -56,13 +56,13 @@ async function generateGraph(nodesCount: number) {
     edges.set(a, nodesFromA)
   }
 
-  return { nodes, edges }
+  return {nodes, edges}
 }
 
 function generateConnector(edges: Map<Public, Public[]>) {
   const connector = ({
     indexer: {
-      get({ partyA }: { partyA: Public }, filter?: (node: Public) => boolean) {
+      get({partyA}: {partyA: Public}, filter?: (node: Public) => boolean) {
         let connectedNodes = edges.get(partyA)
 
         if (filter != null) {
@@ -114,7 +114,7 @@ const MAX_ITERATIONS = 1000
 
 describe('test pathfinder', function () {
   it('should find a path', async function () {
-    const { nodes, edges } = await generateGraph(101)
+    const {nodes, edges} = await generateGraph(101)
 
     const connector = generateConnector(edges)
 

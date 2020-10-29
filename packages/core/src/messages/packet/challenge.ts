@@ -1,10 +1,10 @@
 import secp256k1 from 'secp256k1'
 import PeerId from 'peer-id'
 
-import HoprCoreConnector, { Types } from '@hoprnet/hopr-core-connector-interface'
+import HoprCoreConnector, {Types} from '@hoprnet/hopr-core-connector-interface'
 
 import BN from 'bn.js'
-import { u8aConcat } from '@hoprnet/hopr-utils'
+import {u8aConcat} from '@hoprnet/hopr-utils'
 
 const KEY_LENGTH = 32
 
@@ -195,4 +195,4 @@ class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
   }
 }
 
-export { Challenge }
+export {Challenge}

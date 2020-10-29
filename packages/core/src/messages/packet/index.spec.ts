@@ -2,14 +2,14 @@ import Hopr from '../..'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import HoprEthereum from '@hoprnet/hopr-core-ethereum'
 import assert from 'assert'
-import { u8aEquals, durations } from '@hoprnet/hopr-utils'
-import { MAX_HOPS } from '../../constants'
+import {u8aEquals, durations} from '@hoprnet/hopr-utils'
+import {MAX_HOPS} from '../../constants'
 import LevelUp from 'levelup'
 import MemDown from 'memdown'
 import BN from 'bn.js'
 import Debug from 'debug'
-import { ACKNOWLEDGED_TICKET_INDEX_LENGTH } from '../../dbKeys'
-import { connectionHelper } from '../../test-utils'
+import {ACKNOWLEDGED_TICKET_INDEX_LENGTH} from '../../dbKeys'
+import {connectionHelper} from '../../test-utils'
 
 const log = Debug(`hopr-core:testing`)
 
@@ -32,17 +32,15 @@ const GANACHE_URI = `ws://127.0.0.1:9545`
 describe('packet/index.spec.ts test packet composition and decomposition', function () {
   this.timeout(30000)
 
-  it(
-    'should create packets and decompose them',
-    async function () {
-      const nodes = await Promise.all(Array.from({ length: MAX_HOPS + 1 }).map((_value, index) => generateNode(index)))
+  it('should create packets and decompose them', async function () {
+    const nodes = await Promise.all(Array.from({length: MAX_HOPS + 1}).map((_value, index) => generateNode(index)))
 
-      connectionHelper(nodes.map((n) => n._libp2p))
+    connectionHelper(nodes.map((n) => n._libp2p))
 
-      new nodes[0].paymentChannels.types.ChannelBalance(undefined, {
-        balance: new BN(200),
-        balance_a: new BN(100)
-      }),
+    new nodes[0].paymentChannels.types.ChannelBalance(undefined, {
+      balance: new BN(200),
+      balance_a: new BN(100)
+    }),
       async (bal) => {
         const channel = nodes[0].paymentChannels.types.Channel.createFunded(bal)
         const signedChannel = new nodes[0].paymentChannels.types.SignedChannel(undefined, {
@@ -52,105 +50,103 @@ describe('packet/index.spec.ts test packet composition and decomposition', funct
         return signedChannel
       }
 
-      async function openChannel(a: number, b: number) {
-        let channelBalance = new nodes[a].paymentChannels.types.ChannelBalance(undefined, {
+    async function openChannel(a: number, b: number) {
+      let channelBalance = new nodes[a].paymentChannels.types.ChannelBalance(undefined, {
+        balance: new BN(200),
+        balance_a: new BN(100)
+      })
+
+      await nodes[a].paymentChannels.channel.create(
+        nodes[b].getId().pubKey.marshal(),
+        undefined, //async () => nodes[b].getId().pubKey.marshal(),
+        new nodes[a].paymentChannels.types.ChannelBalance(undefined, {
           balance: new BN(200),
           balance_a: new BN(100)
-        })
+        }),
+        (_channelBalance) => nodes[a]._interactions.payments.open.interact(nodes[b].getId(), channelBalance) as any
+      )
+    }
 
-        await nodes[a].paymentChannels.channel.create(
-          nodes[b].getId().pubKey.marshal(),
-          undefined, //async () => nodes[b].getId().pubKey.marshal(),
-          new nodes[a].paymentChannels.types.ChannelBalance(undefined, {
-            balance: new BN(200),
-            balance_a: new BN(100)
-          }),
-          (_channelBalance) => nodes[a]._interactions.payments.open.interact(nodes[b].getId(), channelBalance) as any
-        )
+    const queries: [number, number][] = []
+
+    for (let i = 0; i < MAX_HOPS - 1; i++) {
+      for (let j = i + 1; j < MAX_HOPS; j++) {
+        queries.push([i, j])
+      }
+    }
+
+    await Promise.all(queries.map((query) => openChannel(query[0], query[1])))
+
+    const testMessages: Uint8Array[] = []
+
+    for (let i = 0; i < MAX_HOPS; i++) {
+      testMessages.push(new TextEncoder().encode(`test message #${i}`))
+    }
+
+    let msgReceivedPromises = []
+
+    for (let i = 1; i <= MAX_HOPS; i++) {
+      msgReceivedPromises.push(receiveChecker(testMessages.slice(i - 1, i), nodes[i]))
+      await nodes[0].sendMessage(testMessages[i - 1], nodes[i].getId(), async () =>
+        nodes.slice(1, i).map((node) => node.getId())
+      )
+    }
+
+    const timeout = setTimeout(() => {
+      assert.fail(`No message received`)
+    }, TWO_SECONDS)
+
+    await Promise.all(msgReceivedPromises)
+
+    clearTimeout(timeout)
+
+    cleanUpReceiveChecker(nodes)
+
+    msgReceivedPromises = []
+
+    msgReceivedPromises.push(receiveChecker(testMessages.slice(1, 3), nodes[nodes.length - 1]))
+
+    for (let i = 1; i <= MAX_HOPS - 1; i++) {
+      await nodes[i].sendMessage(testMessages[i], nodes[nodes.length - 1].getId(), async () =>
+        nodes.slice(i + 1, nodes.length - 1).map((node) => node.getId())
+      )
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 700))
+
+    for (let i = 0; i < nodes.length; i++) {
+      const tickets = []
+
+      await new Promise((resolve) =>
+        nodes[i].db
+          .createValueStream({
+            gte: Buffer.from(
+              nodes[i]._dbKeys.AcknowledgedTickets(Buffer.alloc(ACKNOWLEDGED_TICKET_INDEX_LENGTH, 0x00))
+            ),
+            lt: Buffer.from(nodes[i]._dbKeys.AcknowledgedTickets(Buffer.alloc(ACKNOWLEDGED_TICKET_INDEX_LENGTH, 0xff)))
+          })
+          .on('data', (data: Buffer) => {
+            const acknowledged = nodes[i].paymentChannels.types.AcknowledgedTicket.create(nodes[i].paymentChannels)
+            acknowledged.set(data)
+
+            tickets.push(acknowledged)
+          })
+          .on('end', resolve)
+      )
+
+      if (tickets.length == 0) {
+        continue
       }
 
-      const queries: [number, number][] = []
-
-      for (let i = 0; i < MAX_HOPS - 1; i++) {
-        for (let j = i + 1; j < MAX_HOPS; j++) {
-          queries.push([i, j])
-        }
+      for (let k = 0; k < tickets.length; k++) {
+        await nodes[i].paymentChannels.channel.tickets.submit(tickets[k], undefined as any)
       }
+    }
 
-      await Promise.all(queries.map((query) => openChannel(query[0], query[1])))
+    log(`after Promise.all`)
 
-      const testMessages: Uint8Array[] = []
-
-      for (let i = 0; i < MAX_HOPS; i++) {
-        testMessages.push(new TextEncoder().encode(`test message #${i}`))
-      }
-
-      let msgReceivedPromises = []
-
-      for (let i = 1; i <= MAX_HOPS; i++) {
-        msgReceivedPromises.push(receiveChecker(testMessages.slice(i - 1, i), nodes[i]))
-        await nodes[0].sendMessage(testMessages[i - 1], nodes[i].getId(), async () =>
-          nodes.slice(1, i).map((node) => node.getId())
-        )
-      }
-
-      const timeout = setTimeout(() => {
-        assert.fail(`No message received`)
-      }, TWO_SECONDS)
-
-      await Promise.all(msgReceivedPromises)
-
-      clearTimeout(timeout)
-
-      cleanUpReceiveChecker(nodes)
-
-      msgReceivedPromises = []
-
-      msgReceivedPromises.push(receiveChecker(testMessages.slice(1, 3), nodes[nodes.length - 1]))
-
-      for (let i = 1; i <= MAX_HOPS - 1; i++) {
-        await nodes[i].sendMessage(testMessages[i], nodes[nodes.length - 1].getId(), async () =>
-          nodes.slice(i + 1, nodes.length - 1).map((node) => node.getId())
-        )
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, 700))
-
-      for (let i = 0; i < nodes.length; i++) {
-        const tickets = []
-
-        await new Promise((resolve) =>
-          nodes[i].db
-            .createValueStream({
-              gte: Buffer.from(
-                nodes[i]._dbKeys.AcknowledgedTickets(Buffer.alloc(ACKNOWLEDGED_TICKET_INDEX_LENGTH, 0x00))
-              ),
-              lt: Buffer.from(
-                nodes[i]._dbKeys.AcknowledgedTickets(Buffer.alloc(ACKNOWLEDGED_TICKET_INDEX_LENGTH, 0xff))
-              )
-            })
-            .on('data', (data: Buffer) => {
-              const acknowledged = nodes[i].paymentChannels.types.AcknowledgedTicket.create(nodes[i].paymentChannels)
-              acknowledged.set(data)
-
-              tickets.push(acknowledged)
-            })
-            .on('end', resolve)
-        )
-
-        if (tickets.length == 0) {
-          continue
-        }
-
-        for (let k = 0; k < tickets.length; k++) {
-          await nodes[i].paymentChannels.channel.tickets.submit(tickets[k], undefined as any)
-        }
-      }
-
-      log(`after Promise.all`)
-
-      await Promise.all(nodes.map((node: Hopr<HoprEthereum>) => node.stop()))
-    })
+    await Promise.all(nodes.map((node: Hopr<HoprEthereum>) => node.stop()))
+  })
 })
 
 const NOOP = () => {}
