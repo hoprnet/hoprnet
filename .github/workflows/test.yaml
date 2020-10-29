@@ -14,7 +14,7 @@ jobs:
     strategy:
       matrix:
         node-version: [12]
-        package: ['@hoprnet/hopr-core', '@hoprnet/hopr-ethereum', 'all']
+        package: ['@hoprnet/hopr-utils', '@hoprnet/hopr-core', '@hoprnet/hopr-ethereum', 'all']
 
     steps:
       - uses: actions/checkout@v2
