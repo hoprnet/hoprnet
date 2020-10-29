@@ -220,6 +220,7 @@ class RelayConnection implements MultiaddrConnection {
       while (this._msgs.length > 0) {
         let current = this._msgs.shift()
 
+        console.log(`current`, current)
         if (current.done) {
           return current.value
         } else {
