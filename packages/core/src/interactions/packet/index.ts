@@ -1,8 +1,8 @@
 import type Hopr from '../..'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 
-import {PacketForwardInteraction} from './forward'
-import {PacketAcknowledgementInteraction} from './acknowledgement'
+import { PacketForwardInteraction } from './forward'
+import { PacketAcknowledgementInteraction } from './acknowledgement'
 
 class PacketInteractions<Chain extends HoprCoreConnector> {
   acknowledgment: PacketAcknowledgementInteraction<Chain>
@@ -14,4 +14,4 @@ class PacketInteractions<Chain extends HoprCoreConnector> {
   }
 }
 
-export {PacketInteractions}
+export { PacketInteractions }

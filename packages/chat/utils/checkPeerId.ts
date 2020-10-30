@@ -1,12 +1,12 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
-import type {GlobalState} from '../commands/abstractCommand'
+import type { GlobalState } from '../commands/abstractCommand'
 import PeerId from 'peer-id'
 // @ts-ignore
 import Multihash from 'multihashes'
 import bs58 from 'bs58'
-import {addPubKey} from '@hoprnet/hopr-core/lib/utils'
-import {getPeersIdsAsString} from './openChannels'
+import { addPubKey } from '@hoprnet/hopr-core/lib/utils'
+import { getPeersIdsAsString } from './openChannels'
 
 /**
  * Takes a string, and checks whether it's an alias or a valid peerId,

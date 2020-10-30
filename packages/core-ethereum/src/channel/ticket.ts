@@ -1,9 +1,9 @@
 import type IChannel from '.'
-import {u8aEquals, u8aToHex} from '@hoprnet/hopr-utils'
-import {Hash, TicketEpoch, Balance, SignedTicket, Ticket, AcknowledgedTicket} from '../types'
-import {pubKeyToAccountId, computeWinningProbability, isWinningTicket, checkChallenge} from '../utils'
+import { u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
+import { Hash, TicketEpoch, Balance, SignedTicket, Ticket, AcknowledgedTicket } from '../types'
+import { pubKeyToAccountId, computeWinningProbability, isWinningTicket, checkChallenge } from '../utils'
 import type HoprEthereum from '..'
-import {HASHED_SECRET_WIDTH} from '../hashedSecret'
+import { HASHED_SECRET_WIDTH } from '../hashedSecret'
 
 const DEFAULT_WIN_PROB = 1
 const EMPTY_PRE_IMAGE = new Uint8Array(HASHED_SECRET_WIDTH).fill(0x00)
@@ -39,8 +39,8 @@ class TicketStatic {
     try {
       this.coreConnector.log('Submitting ticket', ticketChallenge)
 
-      const {hoprChannels, signTransaction, account, utils} = this.coreConnector
-      const {r, s, v} = utils.getSignatureParameters((await ticket.signedTicket).signature)
+      const { hoprChannels, signTransaction, account, utils } = this.coreConnector
+      const { r, s, v } = utils.getSignatureParameters((await ticket.signedTicket).signature)
 
       const hasPreImage = !u8aEquals(ticket.preImage, EMPTY_PRE_IMAGE)
       if (!hasPreImage) {
@@ -171,5 +171,5 @@ class TicketFactory {
   }
 }
 
-export {TicketStatic}
+export { TicketStatic }
 export default TicketFactory

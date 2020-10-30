@@ -1,5 +1,5 @@
 import assert from 'assert'
-import {u8aXOR} from './xor'
+import { u8aXOR } from './xor'
 
 describe('testing XORing Uint8Array', function () {
   it('should XOR two arrays', function () {

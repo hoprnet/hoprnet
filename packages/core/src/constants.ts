@@ -1,4 +1,4 @@
-import {durations} from '@hoprnet/hopr-utils'
+import { durations } from '@hoprnet/hopr-utils'
 
 export const CRAWLING_RESPONSE_NODES = 10
 // export const RELAY_FEE = toWei('100', 'wei')

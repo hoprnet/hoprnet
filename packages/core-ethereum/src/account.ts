@@ -1,11 +1,11 @@
 import type HoprEthereum from '.'
-import {stringToU8a, u8aEquals} from '@hoprnet/hopr-utils'
-import {AccountId, AcknowledgedTicket, Balance, Hash, NativeBalance, TicketEpoch} from './types'
-import {isWinningTicket, pubKeyToAccountId} from './utils'
-import {ContractEventEmitter} from './tsc/web3/types'
-import {PreImageResult} from './hashedSecret'
+import { stringToU8a, u8aEquals } from '@hoprnet/hopr-utils'
+import { AccountId, AcknowledgedTicket, Balance, Hash, NativeBalance, TicketEpoch } from './types'
+import { isWinningTicket, pubKeyToAccountId } from './utils'
+import { ContractEventEmitter } from './tsc/web3/types'
+import { PreImageResult } from './hashedSecret'
 
-import {HASHED_SECRET_WIDTH} from './hashedSecret'
+import { HASHED_SECRET_WIDTH } from './hashedSecret'
 export const EMPTY_HASHED_SECRET = new Uint8Array(HASHED_SECRET_WIDTH).fill(0x00)
 
 class Account {

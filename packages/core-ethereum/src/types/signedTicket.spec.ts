@@ -1,9 +1,9 @@
 import assert from 'assert'
-import {randomBytes} from 'crypto'
-import {stringToU8a, randomInteger} from '@hoprnet/hopr-utils'
+import { randomBytes } from 'crypto'
+import { stringToU8a, randomInteger } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
-import {AccountId, Ticket, Hash, TicketEpoch, Balance, Signature, SignedTicket} from '.'
-import {pubKeyToAccountId, privKeyToPubKey} from '../utils'
+import { AccountId, Ticket, Hash, TicketEpoch, Balance, Signature, SignedTicket } from '.'
+import { pubKeyToAccountId, privKeyToPubKey } from '../utils'
 import * as testconfigs from '../config.spec'
 
 const WIN_PROB = new BN(1)

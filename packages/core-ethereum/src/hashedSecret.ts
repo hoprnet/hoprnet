@@ -1,14 +1,14 @@
 import type HoprEthereum from '.'
-import {isWinningTicket} from './utils'
-import {Hash} from './types'
+import { isWinningTicket } from './utils'
+import { Hash } from './types'
 
 import Debug from 'debug'
 const log = Debug('hopr-core-ethereum:hashedSecret')
 
-import {randomBytes} from 'crypto'
-import {u8aEquals, u8aToHex, u8aConcat} from '@hoprnet/hopr-utils'
-import {publicKeyConvert} from 'secp256k1'
-import {AcknowledgedTicket} from './types'
+import { randomBytes } from 'crypto'
+import { u8aEquals, u8aToHex, u8aConcat } from '@hoprnet/hopr-utils'
+import { publicKeyConvert } from 'secp256k1'
+import { AcknowledgedTicket } from './types'
 
 export const GIANT_STEP_WIDTH = 10000
 export const TOTAL_ITERATIONS = 100000
@@ -231,7 +231,7 @@ class HashedSecret {
       throw Error('Preimage not found')
     }
 
-    return {preImage: new Hash(intermediary), index}
+    return { preImage: new Hash(intermediary), index }
   }
 
   /**
@@ -250,21 +250,21 @@ class HashedSecret {
 
     // both are empty
     if (bothEmpty) {
-      return {initialized: false}
+      return { initialized: false }
     }
     // both exist
     else if (bothExist) {
       try {
         await this.findPreImage(onChainSecret)
-        return {initialized: true, onChainSecret, offChainSecret}
+        return { initialized: true, onChainSecret, offChainSecret }
       } catch (err) {
         log(err)
-        return {initialized: false, onChainSecret, offChainSecret}
+        return { initialized: false, onChainSecret, offChainSecret }
       }
     }
     // only one of them exists
     else {
-      return {initialized: false, onChainSecret, offChainSecret}
+      return { initialized: false, onChainSecret, offChainSecret }
     }
   }
 
@@ -272,7 +272,7 @@ class HashedSecret {
    * Initializes hashedSecret.
    */
   public async initialize(nonce?: number): Promise<void> {
-    const {initialized, onChainSecret, offChainSecret} = await this.check()
+    const { initialized, onChainSecret, offChainSecret } = await this.check()
     if (initialized) {
       log(`Secret is initialized.`)
       return

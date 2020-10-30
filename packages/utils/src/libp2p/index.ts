@@ -1,5 +1,5 @@
 import PeerId from 'peer-id'
-import {keys, PublicKey} from 'libp2p-crypto'
+import { keys, PublicKey } from 'libp2p-crypto'
 // @ts-ignore
 import * as multihashes from 'multihashes'
 

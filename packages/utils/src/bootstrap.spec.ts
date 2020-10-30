@@ -1,5 +1,5 @@
 import assert from 'assert'
-import {getBootstrapAddresses} from './bootstrap'
+import { getBootstrapAddresses } from './bootstrap'
 
 describe('getBootstrapAddresses', function () {
   it('passed addresses resolved first', async function () {

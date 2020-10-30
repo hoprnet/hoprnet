@@ -1,20 +1,20 @@
-import {serializeKeyPair} from './serialize'
-import {deserializeKeyPair} from './deserialize'
+import { serializeKeyPair } from './serialize'
+import { deserializeKeyPair } from './deserialize'
 
-import {decode, encode} from 'rlp'
+import { decode, encode } from 'rlp'
 import PeerId from 'peer-id'
 
-import {randomBytes} from 'crypto'
+import { randomBytes } from 'crypto'
 import assert from 'assert'
 
-import {randomInteger, u8aEquals} from '@hoprnet/hopr-utils'
+import { randomInteger, u8aEquals } from '@hoprnet/hopr-utils'
 
 describe('keypair/index.spec.ts test serialisation and deserialisation of encrypted keypair', function () {
   it('should serialize and deserialize a keypair', async function () {
     this.timeout(5000)
     const password = randomBytes(randomInteger(1, 33))
 
-    const peerId = await PeerId.create({keyType: 'secp256k1'})
+    const peerId = await PeerId.create({ keyType: 'secp256k1' })
 
     assert(
       !u8aEquals(await serializeKeyPair(peerId, password), await serializeKeyPair(peerId, password)),

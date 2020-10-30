@@ -2,11 +2,11 @@ import secp256k1 from 'secp256k1'
 import hkdf from 'futoin-hkdf'
 import crypto from 'crypto'
 
-import {createHeader as createHeaderHelper} from './createHeader'
+import { createHeader as createHeaderHelper } from './createHeader'
 import Hopr from '../../..'
-import {u8aXOR, u8aConcat, u8aEquals, u8aToHex, PRP, PRG} from '@hoprnet/hopr-utils'
+import { u8aXOR, u8aConcat, u8aEquals, u8aToHex, PRP, PRG } from '@hoprnet/hopr-utils'
 
-import {MAX_HOPS} from '../../../constants'
+import { MAX_HOPS } from '../../../constants'
 
 import {
   COMPRESSED_PUBLIC_KEY_LENGTH,
@@ -51,7 +51,7 @@ export class Header<_Chain extends HoprCoreConnector> extends Uint8Array {
   tmpData?: Uint8Array
   derivedSecretLastNode?: Uint8Array
 
-  constructor(arr: {bytes: ArrayBuffer; offset: number}) {
+  constructor(arr: { bytes: ArrayBuffer; offset: number }) {
     super(arr.bytes, arr.offset, Header.SIZE)
   }
 
@@ -127,10 +127,10 @@ export class Header<_Chain extends HoprCoreConnector> extends Uint8Array {
   }
 
   extractHeaderInformation(lastNode: boolean = false): void {
-    const {key, iv} = derivePRGParameters(this.derivedSecret)
+    const { key, iv } = derivePRGParameters(this.derivedSecret)
 
     if (lastNode) {
-      const {key, iv} = derivePRGParameters(this.derivedSecret)
+      const { key, iv } = derivePRGParameters(this.derivedSecret)
 
       this.tmpData.set(
         u8aXOR(
@@ -224,7 +224,7 @@ export function deriveTagParameters(secret: Uint8Array): Uint8Array {
     throw Error('Secret must be a public key.')
   }
 
-  return hkdf(Buffer.from(secret), TAG_SIZE, {salt: HASH_KEY_TAGGING})
+  return hkdf(Buffer.from(secret), TAG_SIZE, { salt: HASH_KEY_TAGGING })
 }
 
 export function deriveCipherParameters(secret: Uint8Array): CipherParameters {
@@ -232,12 +232,12 @@ export function deriveCipherParameters(secret: Uint8Array): CipherParameters {
     throw Error('Secret must be a public key')
   }
 
-  const keyAndIV = hkdf(Buffer.from(secret), PRP.KEY_LENGTH + PRP.IV_LENGTH, {salt: HASH_KEY_PRP})
+  const keyAndIV = hkdf(Buffer.from(secret), PRP.KEY_LENGTH + PRP.IV_LENGTH, { salt: HASH_KEY_PRP })
 
   const key = keyAndIV.subarray(0, PRP.KEY_LENGTH)
   const iv = keyAndIV.subarray(PRP.KEY_LENGTH)
 
-  return {key, iv}
+  return { key, iv }
 }
 
 export function derivePRGParameters(secret: Uint8Array): PRGParameters {
@@ -245,12 +245,12 @@ export function derivePRGParameters(secret: Uint8Array): PRGParameters {
     throw Error('Secret must be a public key')
   }
 
-  const keyAndIV = hkdf(Buffer.from(secret), PRG.KEY_LENGTH + PRG.IV_LENGTH, {salt: HASH_KEY_PRG})
+  const keyAndIV = hkdf(Buffer.from(secret), PRG.KEY_LENGTH + PRG.IV_LENGTH, { salt: HASH_KEY_PRG })
 
   const key = keyAndIV.subarray(0, PRG.KEY_LENGTH)
   const iv = keyAndIV.subarray(PRG.KEY_LENGTH, PRG.KEY_LENGTH + PRG.IV_LENGTH)
 
-  return {key, iv}
+  return { key, iv }
 }
 
 export function deriveBlinding(alpha: Uint8Array, secret: Uint8Array): Uint8Array {
@@ -262,7 +262,7 @@ export function deriveBlinding(alpha: Uint8Array, secret: Uint8Array): Uint8Arra
     throw Error('Alpha must be a public key')
   }
 
-  return hkdf(Buffer.from(u8aConcat(alpha, secret)), PRIVATE_KEY_LENGTH, {salt: HASH_KEY_BLINDINGS})
+  return hkdf(Buffer.from(u8aConcat(alpha, secret)), PRIVATE_KEY_LENGTH, { salt: HASH_KEY_BLINDINGS })
 }
 
 function derivationHelper(secret: Uint8Array, salt: string) {
@@ -270,7 +270,7 @@ function derivationHelper(secret: Uint8Array, salt: string) {
     throw Error('Secret must be a public key')
   }
 
-  return hkdf(Buffer.from(secret), KEY_LENGTH, {salt})
+  return hkdf(Buffer.from(secret), KEY_LENGTH, { salt })
 }
 
 export function deriveTicketKey(secret: Uint8Array): Uint8Array {
@@ -294,7 +294,7 @@ export function createMAC(secret: Uint8Array, msg: Uint8Array): Uint8Array {
     throw Error('Secret must be a public key')
   }
 
-  const key = hkdf(Buffer.from(secret), MAC_KEY_LENGTH, {salt: HASH_KEY_HMAC})
+  const key = hkdf(Buffer.from(secret), MAC_KEY_LENGTH, { salt: HASH_KEY_HMAC })
 
   return crypto.createHmac('sha256', key).update(msg).digest()
 }

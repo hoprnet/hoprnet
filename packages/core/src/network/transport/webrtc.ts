@@ -16,12 +16,12 @@ class WebRTCUpgrader {
       urls: string
     }[]
   }
-  constructor({stunServers}: {stunServers?: Multiaddr[]}) {
+  constructor({ stunServers }: { stunServers?: Multiaddr[] }) {
     this._stunServers = {
       iceServers: stunServers?.map((ma: Multiaddr) => {
         const options = ma.toOptions()
 
-        return {urls: `stun:${options.host}:${options.port}`}
+        return { urls: `stun:${options.host}:${options.port}` }
       })
     }
   }
@@ -90,4 +90,4 @@ class WebRTCUpgrader {
   }
 }
 
-export {WebRTCUpgrader}
+export { WebRTCUpgrader }

@@ -1,4 +1,4 @@
-import {u8aToHex, u8aEquals} from '@hoprnet/hopr-utils'
+import { u8aToHex, u8aEquals } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import {
   AccountId,
@@ -13,19 +13,19 @@ import {
   Ticket,
   TicketEpoch
 } from '../types'
-import {ChannelStatus} from '../types/channel'
-import {waitForConfirmation, getId, events, pubKeyToAccountId, sign, isPartyA} from '../utils'
-import {ERRORS} from '../constants'
+import { ChannelStatus } from '../types/channel'
+import { waitForConfirmation, getId, events, pubKeyToAccountId, sign, isPartyA } from '../utils'
+import { ERRORS } from '../constants'
 
 import type HoprEthereum from '..'
 import Channel from './channel'
 
-import {Uint8ArrayE} from '../types/extended'
+import { Uint8ArrayE } from '../types/extended'
 
-import {CHANNEL_STATES} from './constants'
-import {OnChainChannel} from './types'
-import {Log} from 'web3-core'
-import {TicketStatic} from './ticket'
+import { CHANNEL_STATES } from './constants'
+import { OnChainChannel } from './types'
+import { Log } from 'web3-core'
+import { TicketStatic } from './ticket'
 
 const EMPTY_SIGNATURE = new Uint8Array(Signature.SIZE).fill(0x00)
 const WIN_PROB = new BN(1)
@@ -230,7 +230,7 @@ class ChannelFactory {
           lte: Buffer.from(this.coreConnector.dbKeys.Channel(new Uint8Array(Hash.SIZE).fill(0xff)))
         })
         .on('error', (err) => reject(err))
-        .on('data', ({key, value}: {key: Buffer; value: Buffer}) => {
+        .on('data', ({ key, value }: { key: Buffer; value: Buffer }) => {
           const signedChannel = new SignedChannel({
             bytes: value.buffer,
             offset: value.byteOffset
@@ -334,7 +334,7 @@ class ChannelFactory {
         .on('data', async (data: Log) => {
           const event = events.decodeOpenedChannelEvent(data)
 
-          const {opener, counterparty} = event.returnValues
+          const { opener, counterparty } = event.returnValues
           const _channelId = await getId(await opener.toAccountId(), await counterparty.toAccountId())
 
           if (!u8aEquals(_channelId, channelId)) {
@@ -361,7 +361,7 @@ class ChannelFactory {
         .on('data', async (data: Log) => {
           const event = events.decodeClosedChannelEvent(data)
 
-          const {closer, counterparty} = event.returnValues
+          const { closer, counterparty } = event.returnValues
           const _channelId = await getId(await closer.toAccountId(), await counterparty.toAccountId())
 
           if (!u8aEquals(_channelId, channelId)) {
@@ -376,6 +376,6 @@ class ChannelFactory {
   }
 }
 
-export {ChannelFactory}
+export { ChannelFactory }
 
 export default Channel

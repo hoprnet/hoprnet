@@ -1,12 +1,12 @@
 import type Hopr from '../../'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import type {Types} from '@hoprnet/hopr-core-connector-interface'
+import type { Types } from '@hoprnet/hopr-core-connector-interface'
 
-import {PROTOCOL_ONCHAIN_KEY} from '../../constants'
-import type {AbstractInteraction} from '../abstractInteraction'
+import { PROTOCOL_ONCHAIN_KEY } from '../../constants'
+import type { AbstractInteraction } from '../abstractInteraction'
 import type PeerId from 'peer-id'
 
-import type {Handler} from 'libp2p'
+import type { Handler } from 'libp2p'
 
 import chalk from 'chalk'
 
@@ -62,4 +62,4 @@ async function onReception(source: any): Promise<Types.Public> {
   return new this.node.paymentChannels.types.Public(result)
 }
 
-export {OnChainKey}
+export { OnChainKey }

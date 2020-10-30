@@ -1,12 +1,12 @@
-import React, {useEffect, useState} from 'react'
+import React, { useEffect, useState } from 'react'
 import Head from 'next/head'
 import styles from '../styles/Home.module.css'
 import Logo from '../components/logo'
-import {Logs} from '../components/log'
-import {Connection} from '../connection'
+import { Logs } from '../components/log'
+import { Connection } from '../connection'
 import dynamic from 'next/dynamic'
 
-const Jazzicon = dynamic(() => import('../components/jazzicon'), {ssr: false})
+const Jazzicon = dynamic(() => import('../components/jazzicon'), { ssr: false })
 
 export default function Home() {
   let connection

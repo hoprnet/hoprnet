@@ -1,6 +1,6 @@
 import BN from 'bn.js'
-import type {Types} from '@hoprnet/hopr-core-connector-interface'
-import {Uint8ArrayE} from '../extended'
+import type { Types } from '@hoprnet/hopr-core-connector-interface'
+import { Uint8ArrayE } from '../extended'
 import Balance from '../balance'
 
 class ChannelBalance extends Uint8ArrayE implements Types.ChannelBalance {

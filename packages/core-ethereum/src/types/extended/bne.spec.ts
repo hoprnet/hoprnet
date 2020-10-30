@@ -1,7 +1,7 @@
 import assert from 'assert'
 import BNE from './bne'
 
-import {u8aEquals} from '@hoprnet/hopr-utils'
+import { u8aEquals } from '@hoprnet/hopr-utils'
 
 describe('test BNE', function () {
   it('should return a Uint8Array', function () {

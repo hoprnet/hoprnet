@@ -3,7 +3,7 @@ const log = debug('hopr-core:transport')
 const error = debug('hopr-core:transport:error')
 
 import AbortController from 'abort-controller'
-import {AbortError} from 'abortable-iterator'
+import { AbortError } from 'abortable-iterator'
 import chalk from 'chalk'
 import type BL from 'bl'
 
@@ -26,7 +26,7 @@ const handshake: (stream: Stream) => Handshake = require('it-handshake')
 import Multiaddr from 'multiaddr'
 import PeerId from 'peer-id'
 import libp2p from 'libp2p'
-import type {Connection, Stream} from 'libp2p'
+import type { Connection, Stream } from 'libp2p'
 import {
   RELAY_CIRCUIT_TIMEOUT,
   RELAY_REGISTER,
@@ -36,19 +36,19 @@ import {
   DELIVERY_REGISTER
 } from './constants'
 
-import {pubKeyToPeerId} from '../../utils'
-import {u8aEquals} from '@hoprnet/hopr-utils'
+import { pubKeyToPeerId } from '../../utils'
+import { u8aEquals } from '@hoprnet/hopr-utils'
 
-import {RelayContext} from './relayContext'
+import { RelayContext } from './relayContext'
 
-import {RelayConnection} from './relayConnection'
+import { RelayConnection } from './relayConnection'
 
-import type {Dialer, DialOptions, Handler, MultiaddrConnection, PeerRouting, Registrar} from 'libp2p'
+import type { Dialer, DialOptions, Handler, MultiaddrConnection, PeerRouting, Registrar } from 'libp2p'
 
 class Relay {
   private _dialer: Dialer
   private _registrar: Registrar
-  private _dht: {peerRouting: PeerRouting} | undefined
+  private _dht: { peerRouting: PeerRouting } | undefined
   private _streams: Map<string, Map<string, RelayContext>>
   private id: PeerId
 
@@ -131,7 +131,7 @@ class Relay {
   async handleReRegister() {}
 
   async handleRelayConnection(conn: Handler): Promise<void> {
-    const {stream, counterparty} = await this.handleHandshake(conn.stream)
+    const { stream, counterparty } = await this.handleHandshake(conn.stream)
 
     if (stream == null) {
       return
@@ -153,14 +153,14 @@ class Relay {
 
     if (relayConnection == null) {
       try {
-        relayConnection = await this._dialer.connectToPeer(relay, {signal: options?.signal})
+        relayConnection = await this._dialer.connectToPeer(relay, { signal: options?.signal })
       } catch (err) {
         log(`Could not reach potential relay ${relay.toB58String()}. Error was: ${err}`)
         if (this._dht != null && (options == null || options.signal == null || !options.signal.aborted)) {
-          let {id} = await this._dht.peerRouting.findPeer(relay)
+          let { id } = await this._dht.peerRouting.findPeer(relay)
 
           try {
-            relayConnection = await this._dialer.connectToPeer(id, {signal: options?.signal})
+            relayConnection = await this._dialer.connectToPeer(id, { signal: options?.signal })
           } catch (err) {
             log(`Dialling potential relay ${relay.toB58String()} after querying DHT failed. Error was ${err}`)
           }
@@ -213,7 +213,7 @@ class Relay {
     return shaker.stream
   }
 
-  private async handleHandshake(stream: Stream): Promise<{stream: Stream; counterparty: PeerId}> {
+  private async handleHandshake(stream: Stream): Promise<{ stream: Stream; counterparty: PeerId }> {
     let shaker = handshake(stream)
 
     let pubKeySender: Buffer | undefined
@@ -243,10 +243,10 @@ class Relay {
     shaker.write(OK)
     shaker.rest()
 
-    return {stream: shaker.stream, counterparty}
+    return { stream: shaker.stream, counterparty }
   }
 
-  private async handleRelay({stream, connection}: Handler) {
+  private async handleRelay({ stream, connection }: Handler) {
     log(`handle relay request`)
     const shaker = handshake(stream)
 
@@ -382,13 +382,13 @@ class Relay {
       timeout = setTimeout(() => abort.abort(), RELAY_CIRCUIT_TIMEOUT)
 
       try {
-        newConn = await this._dialer.connectToPeer(counterparty, {signal: abort.signal})
+        newConn = await this._dialer.connectToPeer(counterparty, { signal: abort.signal })
       } catch (err) {
         if (this._dht != null && !abort.signal.aborted) {
           try {
             counterparty = (await this._dht.peerRouting.findPeer(counterparty)).id
 
-            newConn = await this._dialer.connectToPeer(counterparty, {signal: abort.signal})
+            newConn = await this._dialer.connectToPeer(counterparty, { signal: abort.signal })
           } catch (err) {
             clearTimeout(timeout)
 
@@ -404,7 +404,7 @@ class Relay {
       }
     }
 
-    const {stream: newStream} = await newConn.newStream([DELIVERY_REGISTER])
+    const { stream: newStream } = await newConn.newStream([DELIVERY_REGISTER])
 
     timeout && clearTimeout(timeout)
 

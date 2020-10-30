@@ -1,7 +1,7 @@
-import {TweetState} from '../../lib/twitter/twitter'
-import {COVERBOT_XDAI_THRESHOLD} from '../../utils/env'
-import {RELAY_VERIFICATION_CYCLE_IN_MS} from './constants'
-import {BotCommands, NodeStates, ScoreRewards} from './state'
+import { TweetState } from '../../lib/twitter/twitter'
+import { COVERBOT_XDAI_THRESHOLD } from '../../utils/env'
+import { RELAY_VERIFICATION_CYCLE_IN_MS } from './constants'
+import { BotCommands, NodeStates, ScoreRewards } from './state'
 
 export const BotResponses = {
   [BotCommands.rules]: `\n

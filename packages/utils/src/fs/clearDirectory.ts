@@ -1,4 +1,4 @@
-import {existsSync, readdirSync, lstatSync, unlinkSync, rmdirSync} from 'fs'
+import { existsSync, readdirSync, lstatSync, unlinkSync, rmdirSync } from 'fs'
 /**
  * Deletes recursively (and synchronously) all files in a directory.
  *

@@ -1,11 +1,11 @@
 import assert from 'assert'
-import {Challenge} from './challenge'
-import {Utils, Types} from '@hoprnet/hopr-core-ethereum'
+import { Challenge } from './challenge'
+import { Utils, Types } from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
 import PeerId from 'peer-id'
 import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import {randomBytes} from 'crypto'
-import {u8aEquals} from '@hoprnet/hopr-utils'
+import { randomBytes } from 'crypto'
+import { u8aEquals } from '@hoprnet/hopr-utils'
 
 describe('test creation & verification of a challenge', function () {
   it('should create a verifiable challenge', async function () {

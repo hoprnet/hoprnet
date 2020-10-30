@@ -2,14 +2,14 @@ import Hopr from '../..'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import HoprEthereum from '@hoprnet/hopr-core-ethereum'
 import assert from 'assert'
-import {u8aEquals, durations} from '@hoprnet/hopr-utils'
-import {MAX_HOPS} from '../../constants'
+import { u8aEquals, durations } from '@hoprnet/hopr-utils'
+import { MAX_HOPS } from '../../constants'
 import LevelUp from 'levelup'
 import MemDown from 'memdown'
 import BN from 'bn.js'
 import Debug from 'debug'
-import {ACKNOWLEDGED_TICKET_INDEX_LENGTH} from '../../dbKeys'
-import {connectionHelper} from '../../test-utils'
+import { ACKNOWLEDGED_TICKET_INDEX_LENGTH } from '../../dbKeys'
+import { connectionHelper } from '../../test-utils'
 
 const log = Debug(`hopr-core:testing`)
 
@@ -33,7 +33,7 @@ describe('packet/index.spec.ts test packet composition and decomposition', funct
   this.timeout(30000)
 
   it('should create packets and decompose them', async function () {
-    const nodes = await Promise.all(Array.from({length: MAX_HOPS + 1}).map((_value, index) => generateNode(index)))
+    const nodes = await Promise.all(Array.from({ length: MAX_HOPS + 1 }).map((_value, index) => generateNode(index)))
 
     connectionHelper(nodes.map((n) => n._libp2p))
 

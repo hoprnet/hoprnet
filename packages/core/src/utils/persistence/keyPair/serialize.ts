@@ -1,6 +1,6 @@
 import PeerId from 'peer-id'
-import {encode} from 'rlp'
-import {randomBytes, createCipheriv, scryptSync, createHmac} from 'crypto'
+import { encode } from 'rlp'
+import { randomBytes, createCipheriv, scryptSync, createHmac } from 'crypto'
 
 import {
   KEYPAIR_CIPHER_ALGORITHM,

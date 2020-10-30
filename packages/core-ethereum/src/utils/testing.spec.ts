@@ -1,12 +1,12 @@
-import {randomBytes} from 'crypto'
+import { randomBytes } from 'crypto'
 import Web3 from 'web3'
 import LevelUp from 'levelup'
 import Memdown from 'memdown'
-import {stringToU8a} from '@hoprnet/hopr-utils'
-import {privKeyToPubKey} from '.'
+import { stringToU8a } from '@hoprnet/hopr-utils'
+import { privKeyToPubKey } from '.'
 import CoreConnector from '..'
-import {AccountId, Hash, Public} from '../types'
-import {HoprToken} from '../tsc/web3/HoprToken'
+import { AccountId, Hash, Public } from '../types'
+import { HoprToken } from '../tsc/web3/HoprToken'
 
 export type Account = {
   privKey: Hash

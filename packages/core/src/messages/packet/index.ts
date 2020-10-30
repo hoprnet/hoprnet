@@ -5,21 +5,21 @@ import chalk from 'chalk'
 import PeerId from 'peer-id'
 const RELAY_FEE = 1
 
-import {pubKeyToPeerId} from '../../utils'
-import {u8aConcat, u8aEquals, u8aToHex} from '@hoprnet/hopr-utils'
+import { pubKeyToPeerId } from '../../utils'
+import { u8aConcat, u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
 
-import {Header, deriveTicketKey, deriveTicketKeyBlinding, deriveTagParameters, deriveTicketLastKey} from './header'
-import {Challenge} from './challenge'
-import {PacketTag} from '../../dbKeys'
+import { Header, deriveTicketKey, deriveTicketKeyBlinding, deriveTagParameters, deriveTicketLastKey } from './header'
+import { Challenge } from './challenge'
+import { PacketTag } from '../../dbKeys'
 import Message from './message'
-import {LevelUp} from 'levelup'
+import { LevelUp } from 'levelup'
 
 import Debug from 'debug'
 
 import Hopr from '../../'
 
-import HoprCoreConnector, {Types} from '@hoprnet/hopr-core-connector-interface'
-import {UnacknowledgedTicket} from '../ticket'
+import HoprCoreConnector, { Types } from '@hoprnet/hopr-core-connector-interface'
+import { UnacknowledgedTicket } from '../ticket'
 
 const log = Debug('hopr-core:message:packet')
 const verbose = Debug('hopr-core:verbose:message:packet')
@@ -89,7 +89,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
 
   get header(): Header<Chain> {
     if (this._header == null) {
-      this._header = new Header<Chain>({bytes: this.buffer, offset: this.headerOffset})
+      this._header = new Header<Chain>({ bytes: this.buffer, offset: this.headerOffset })
     }
 
     return this._header
@@ -173,7 +173,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       offset: arr.byteOffset
     })
 
-    const {header, secrets} = await Header.create(node, path, {
+    const { header, secrets } = await Header.create(node, path, {
       bytes: packet.buffer,
       offset: packet.headerOffset
     })
@@ -291,7 +291,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       await this.prepareForward(sender, target)
     }
 
-    return {receivedChallenge, ticketKey}
+    return { receivedChallenge, ticketKey }
   }
 
   /**

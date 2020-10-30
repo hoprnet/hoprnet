@@ -1,4 +1,4 @@
-import {IMessage, Message} from '../message/message'
+import { IMessage, Message } from '../message/message'
 import wait from 'wait-for-stuff'
 import Core from '../lib/hopr/core'
 import debug from 'debug'
@@ -29,7 +29,7 @@ const listen = async (bot: Bot, node: Core) => {
     bot.automaticResponse &&
       node.send({
         peerId: parsedMessage.from,
-        payload: Message.fromJson({from: bot.address, text: ` ${response}`}).toU8a(),
+        payload: Message.fromJson({ from: bot.address, text: ` ${response}` }).toU8a(),
         intermediatePeerIds: [],
       })
   })

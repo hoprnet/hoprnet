@@ -32,4 +32,4 @@ export const BOOTSTRAP_SEEDS = [
   '0x790eec16fce16bf624633602f602373f2b3be9ac03a3e652929c4c731fd3894f'
 ]
 
-export default () => ({NODE_SEEDS, BOOTSTRAP_SEEDS})
+export default () => ({ NODE_SEEDS, BOOTSTRAP_SEEDS })

@@ -1,13 +1,13 @@
-import type {Channel as IChannel} from '@hoprnet/hopr-core-connector-interface'
-import {u8aToHex} from '@hoprnet/hopr-utils'
-import {Balance, Channel as ChannelType, Hash, Moment, Public, SignedChannel} from '../types'
+import type { Channel as IChannel } from '@hoprnet/hopr-core-connector-interface'
+import { u8aToHex } from '@hoprnet/hopr-utils'
+import { Balance, Channel as ChannelType, Hash, Moment, Public, SignedChannel } from '../types'
 import TicketFactory from './ticket'
-import {ChannelStatus} from '../types/channel'
-import {hash} from '../utils'
+import { ChannelStatus } from '../types/channel'
+import { hash } from '../utils'
 
 import type HoprEthereum from '..'
 
-import {OnChainChannel} from './types'
+import { OnChainChannel } from './types'
 
 class Channel implements IChannel {
   private _signedChannel: SignedChannel

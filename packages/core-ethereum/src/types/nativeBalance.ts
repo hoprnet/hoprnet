@@ -1,5 +1,5 @@
-import type {Types} from '@hoprnet/hopr-core-connector-interface'
-import {UINT256} from './solidity'
+import type { Types } from '@hoprnet/hopr-core-connector-interface'
+import { UINT256 } from './solidity'
 
 class NativeBalance extends UINT256 implements Types.NativeBalance {
   static get SYMBOL(): string {

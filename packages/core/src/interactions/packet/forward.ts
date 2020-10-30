@@ -1,6 +1,6 @@
-import {PROTOCOL_STRING} from '../../constants'
-import {Packet} from '../../messages/packet'
-import {Acknowledgement} from '../../messages/acknowledgement'
+import { PROTOCOL_STRING } from '../../constants'
+import { Packet } from '../../messages/packet'
+import { Acknowledgement } from '../../messages/acknowledgement'
 
 import debug from 'debug'
 const log = debug('hopr-core:forward')
@@ -10,15 +10,15 @@ import chalk from 'chalk'
 
 import AbortController from 'abort-controller'
 
-import type {AbstractInteraction} from '../abstractInteraction'
+import type { AbstractInteraction } from '../abstractInteraction'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '../../'
 import pipe from 'it-pipe'
 
-import type {Handler} from 'libp2p'
+import type { Handler } from 'libp2p'
 
-import {randomInteger, durations} from '@hoprnet/hopr-utils'
-import {getTokens, Token} from '../../utils'
+import { randomInteger, durations } from '@hoprnet/hopr-utils'
+import { getTokens, Token } from '../../utils'
 
 const MAX_PARALLEL_JOBS = 20
 
@@ -50,10 +50,10 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
 
       try {
         struct = await this.node._libp2p
-          .dialProtocol(counterparty, this.protocols[0], {signal: abort.signal})
+          .dialProtocol(counterparty, this.protocols[0], { signal: abort.signal })
           .catch(async () => {
-            const {id} = await this.node._libp2p.peerRouting.findPeer(counterparty)
-            return await this.node._libp2p.dialProtocol(id, this.protocols[0], {signal: abort.signal})
+            const { id } = await this.node._libp2p.peerRouting.findPeer(counterparty)
+            return await this.node._libp2p.dialProtocol(id, this.protocols[0], { signal: abort.signal })
           })
       } catch (err) {
         log(`Could not transfer packet to ${counterparty.toB58String()}. Error was: ${chalk.red(err.message)}.`)
@@ -116,7 +116,7 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
         this.queue[index] = this.queue.pop() as Packet<Chain>
       }
 
-      let {receivedChallenge, ticketKey} = await packet.forwardTransform()
+      let { receivedChallenge, ticketKey } = await packet.forwardTransform()
 
       ;[sender, target] = await Promise.all([packet.getSenderPeerId(), packet.getTargetPeerId()])
 
@@ -141,4 +141,4 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
   }
 }
 
-export {PacketForwardInteraction}
+export { PacketForwardInteraction }

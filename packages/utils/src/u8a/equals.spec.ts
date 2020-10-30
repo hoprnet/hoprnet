@@ -1,8 +1,8 @@
 import assert from 'assert'
 
-import {u8aEquals} from './equals'
+import { u8aEquals } from './equals'
 
-import {randomBytes} from 'crypto'
+import { randomBytes } from 'crypto'
 
 describe('test u8a equals', function () {
   it('should check whether two (or more) Uint8Arrays are equal', function () {
