@@ -5,14 +5,17 @@
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "license": "LGPL-3.0-only",
   "files": [
-    "contracts/"
+    "contracts/",
+    "lib/",
+    "!*.test.ts"
   ],
   "engines": {
     "yarn": "1",
     "node": "12"
   },
   "scripts": {
-    "build": "hardhat compile",
+    "build:sol": "hardhat compile",
+    "build": "hardhat compile && hardhat extract && tsc",
     "test": "hardhat test --no-compile --network hardhat",
     "network": "hardhat node --network hardhat",
     "migrate": "hardhat migrate",

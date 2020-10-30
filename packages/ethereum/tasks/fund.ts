@@ -2,7 +2,7 @@ import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
 
 async function main(
   { address, amount, accounts: providedAccounts }: { address: string; amount: string; accounts: string[] },
-  { web3, network, artifacts }: HardhatRuntimeEnvironment,
+  { web3, network }: HardhatRuntimeEnvironment,
   _runSuper: RunSuperFunction<any>
 ) {
   const HoprToken = artifacts.require('HoprToken')

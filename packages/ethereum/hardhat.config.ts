@@ -10,7 +10,7 @@ import { HardhatUserConfig, task, types } from 'hardhat/config'
 import { NODE_SEEDS, BOOTSTRAP_SEEDS } from '@hoprnet/hopr-demo-seeds'
 import Web3 from 'web3'
 import { mapValues } from 'lodash'
-import { MigrationOptions, getRpcOptions } from './scripts/utils/networks'
+import { MigrationOptions, getRpcOptions } from './utils/networks'
 
 const { PRIVATE_KEY, INFURA, MATIC_VIGIL, ETHERSCAN } = process.env
 
@@ -71,7 +71,7 @@ const hardhatConfig: HardhatUserConfig = {
 task('migrate', 'Migrate contracts', async (...args: any[]) => {
   // lazy load this as it breaks hardhat due to '@openzeppelin/test-helpers'
   // also required because we need to build typechain first
-  return (await import('./scripts/migrate')).default(args[0], args[1], args[2])
+  return (await import('./tasks/migrate')).default(args[0], args[1], args[2])
 })
   .addOptionalParam<MigrationOptions['shouldVerify']>(
     'shouldVerify',
@@ -93,10 +93,14 @@ task('migrate', 'Migrate contracts', async (...args: any[]) => {
   )
 
 task('fund', 'Fund demo accounts', async (...args: any[]) => {
-  return (await import('./scripts/fund')).default(args[0], args[1], args[2])
+  return (await import('./tasks/fund')).default(args[0], args[1], args[2])
 })
   .addParam<string>('address', 'HoprToken contract address', undefined, types.string)
   .addOptionalParam<string>('amount', 'Amount of HOPR to fund', Web3.utils.toWei('1000000', 'ether'), types.string)
   .addOptionalParam<string[]>('accounts', 'Accounts to fund', [], types.json)
+
+task('extract', 'Extract ABIs to specified folder', async (...args: any[]) => {
+  return (await import('./tasks/extract')).default(args[0], args[1], args[2])
+}).addFlag('target', 'Folder to output contents to')
 
 export default hardhatConfig

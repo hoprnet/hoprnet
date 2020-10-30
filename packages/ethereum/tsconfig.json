@@ -11,6 +11,6 @@
     "types": ["./types"]
   },
   "files": ["./hardhat.config.ts"],
-  "include": ["types", "test", "scripts"],
+  "include": ["types", "test", "tasks", "utils", "chain"],
   "exclude": ["lib", "temp"]
 }

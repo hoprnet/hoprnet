@@ -1,8 +1,9 @@
 import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
 import Web3 from 'web3'
 import { durations } from '@hoprnet/hopr-utils'
-import { migrationOptions as allMigrationOptions, MigrationOptions } from './utils/networks'
 import { singletons } from '@openzeppelin/test-helpers'
+import { migrationOptions as allMigrationOptions, MigrationOptions } from '../utils/networks'
+import updateAddresses from '../utils/updateAddresses'
 
 const SECS_CLOSURE = Math.floor(durations.minutes(1) / 1e3)
 const MAX_MINT_AMOUNT = Web3.utils.toWei('100000000', 'ether')
@@ -12,7 +13,7 @@ const EXTERNAL_FAUCET_MINTER = '0x1A387b5103f28bc6601d085A3dDC878dEE631A56'
 
 async function main(
   providedMigrationOptions: Partial<MigrationOptions>,
-  { web3, network, artifacts }: HardhatRuntimeEnvironment,
+  { web3, network }: HardhatRuntimeEnvironment,
   _runSuper: RunSuperFunction<any>
 ) {
   const networkMigrationOptions = allMigrationOptions[network.name]
@@ -32,6 +33,9 @@ async function main(
     ...migrationOptions
   })
 
+  // store addresses
+  const addresses = {}
+
   // deploy ERC1820Registry
   console.log('Deploying ERC1820Registry')
   const ERC1820Registry = await singletons.ERC1820Registry(deployer)
@@ -42,6 +46,7 @@ async function main(
   console.log('Deploying hoprToken')
   const hoprToken = await HoprToken.new()
   console.log(`Deployed hoprToken: ${hoprToken.address}`)
+  addresses['HoprToken'] = hoprToken.address
   const minterRole = await hoprToken.MINTER_ROLE()
 
   if (!migrationOptions.revokeRoles) {
@@ -53,6 +58,7 @@ async function main(
   console.log('Deploying hoprChannels')
   const hoprChannels = await HoprChannels.new(hoprToken.address, SECS_CLOSURE)
   console.log(`Deployed hoprChannels: ${hoprChannels.address}`)
+  addresses['HoprChannels'] = hoprChannels.address
 
   // deploy HoprMinter
   if (migrationOptions.mintUsing === 'minter') {
@@ -60,6 +66,7 @@ async function main(
     console.log('Deploying hoprMinter')
     const hoprMinter = await HoprMinter.new(hoprToken.address, MAX_MINT_AMOUNT, MAX_MINT_DURATION)
     console.log(`Deployed hoprMinter: ${hoprMinter.address}`)
+    addresses['HoprMinter'] = hoprMinter.address
 
     if (migrationOptions.revokeRoles) {
       await hoprToken.grantRole(minterRole, hoprMinter.address)
@@ -74,6 +81,7 @@ async function main(
     console.log('Deploying hoprFaucet')
     const hoprFaucet = await HoprFaucet.new(hoprToken.address, SINGLE_FAUCET_MINTER)
     console.log(`Deployed hoprFaucet: ${hoprFaucet.address}`)
+    addresses['HoprFaucet'] = hoprFaucet.address
     const pauserRole = await hoprFaucet.PAUSER_ROLE()
     const minterRole = await hoprFaucet.MINTER_ROLE()
 
@@ -93,6 +101,10 @@ async function main(
       await hoprToken.grantRole(minterRole, hoprFaucet.address)
     }
   }
+
+  console.log('Updating addresses.json')
+  await updateAddresses(network.name, addresses)
+  console.log('Updated addresses.json')
 }
 
 export default main
