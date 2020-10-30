@@ -1,8 +1,8 @@
-import { PRG } from './prg'
-import { randomBytes } from 'crypto'
+import {PRG} from './prg'
+import {randomBytes} from 'crypto'
 import assert from 'assert'
-import { randomInteger } from '../'
-import { u8aEquals } from '../u8a'
+import {randomInteger} from '../'
+import {u8aEquals} from '../u8a'
 
 describe('Test Pseudo-Random Generator', async function () {
   it('should create a digest', function () {

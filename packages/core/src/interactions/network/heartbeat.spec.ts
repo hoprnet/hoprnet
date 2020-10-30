@@ -5,18 +5,18 @@ import TCP = require('libp2p-tcp')
 import MPLEX = require('libp2p-mplex')
 // @ts-ignore
 import SECIO = require('libp2p-secio')
-import { Heartbeat } from './heartbeat'
+import {Heartbeat} from './heartbeat'
 import assert from 'assert'
-import { EventEmitter } from 'events'
+import {EventEmitter} from 'events'
 import * as constants from '../../constants'
-import { generateLibP2PMock } from '../../test-utils'
+import {generateLibP2PMock} from '../../test-utils'
 
 // @ts-ignore
 constants.HEARTBEAT_TIMEOUT = 300
 
 describe('check heartbeat mechanism', function () {
-  async function generateNode(options?: { timeoutIntentionally?: boolean }) {
-    const { node, address } = await generateLibP2PMock()
+  async function generateNode(options?: {timeoutIntentionally?: boolean}) {
+    const {node, address} = await generateLibP2PMock()
 
     node.peerRouting.findPeer = (_: PeerId) => Promise.reject(Error('not implemented'))
 
@@ -59,7 +59,7 @@ describe('check heartbeat mechanism', function () {
   })
 
   it('should trigger a heartbeat timeout', async function () {
-    const [Alice, Bob] = await Promise.all([generateNode(), generateNode({ timeoutIntentionally: true })])
+    const [Alice, Bob] = await Promise.all([generateNode(), generateNode({timeoutIntentionally: true})])
 
     await Alice.node.dial(Bob.address)
     let errorThrown = false

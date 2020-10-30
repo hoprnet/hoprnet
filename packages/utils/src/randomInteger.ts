@@ -1,4 +1,4 @@
-import { randomBytes } from 'crypto'
+import {randomBytes} from 'crypto'
 
 const MAX_SAFE_INTEGER = 2147483647
 /**

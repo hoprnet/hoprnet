@@ -1,7 +1,7 @@
-import { getPaddingLength, styleValue, getOptions } from '../../utils'
-import { AbstractCommand, GlobalState, AutoCompleteResult } from '../abstractCommand'
-import { IncludeRecipient } from './includeRecipient'
-import { Routing } from './routing'
+import {getPaddingLength, styleValue, getOptions} from '../../utils'
+import {AbstractCommand, GlobalState, AutoCompleteResult} from '../abstractCommand'
+import {IncludeRecipient} from './includeRecipient'
+import {Routing} from './routing'
 
 // to add a new setting, include it here and in class this.settings
 type SettingsDirectory = {

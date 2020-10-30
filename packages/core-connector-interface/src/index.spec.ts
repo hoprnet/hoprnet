@@ -5,8 +5,8 @@
  */
 
 import HoprCoreConnector from '.'
-import type { LevelUp } from 'levelup'
-import type { Balance, Hash, Public, AcknowledgedTicket } from './types'
+import type {LevelUp} from 'levelup'
+import type {Balance, Hash, Public, AcknowledgedTicket} from './types'
 
 async function main() {
   const coreConnector = await HoprCoreConnector.create(

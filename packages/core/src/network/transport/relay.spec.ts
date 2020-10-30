@@ -8,13 +8,13 @@ import SECIO = require('libp2p-secio')
 // @ts-ignore
 import TCP from 'libp2p-tcp'
 
-import { Handler, MultiaddrConnection } from 'libp2p'
+import {Handler, MultiaddrConnection} from 'libp2p'
 import Multiaddr from 'multiaddr'
 import pipe from 'it-pipe'
 import Relay from './relay'
-import { randomBytes } from 'crypto'
-import { privKeyToPeerId } from '../../utils'
-import { getAddress } from '../../test-utils'
+import {randomBytes} from 'crypto'
+import {privKeyToPeerId} from '../../utils'
+import {getAddress} from '../../test-utils'
 import assert from 'assert'
 
 const TEST_PROTOCOL = `/test/0.0.1`
@@ -26,7 +26,7 @@ async function generateNode(options: {
   ipv4?: boolean
   ipv6?: boolean
   connHandler?: (conn: MultiaddrConnection) => void
-}): Promise<{ node: libp2p; relay: Relay }> {
+}): Promise<{node: libp2p; relay: Relay}> {
   const peerId = await privKeyToPeerId(privKeys[options.id])
   let addresses = []
 
@@ -40,7 +40,7 @@ async function generateNode(options: {
 
   const node = new libp2p({
     peerId,
-    addresses: { listen: addresses },
+    addresses: {listen: addresses},
     modules: {
       transport: [TCP],
       streamMuxer: [MPLEX],
@@ -81,8 +81,8 @@ async function generateNode(options: {
 describe('transport/relay.spec.ts should create a socket and connect to it', function () {
   it('should create a node and echo a single message', async function () {
     let [sender, relayer, counterparty] = await Promise.all([
-      generateNode({ id: 0, ipv4: true }),
-      generateNode({ id: 1, ipv4: true }),
+      generateNode({id: 0, ipv4: true}),
+      generateNode({id: 1, ipv4: true}),
       generateNode({
         id: 2,
         ipv4: true,
@@ -433,8 +433,8 @@ describe('transport/relay.spec.ts should create a socket and connect to it', fun
 
   it('should not use itself as relay node', async function () {
     let [sender, counterparty] = await Promise.all([
-      generateNode({ id: 0, ipv4: true }),
-      generateNode({ id: 2, ipv4: true })
+      generateNode({id: 0, ipv4: true}),
+      generateNode({id: 2, ipv4: true})
     ])
     let errThrown = false
     try {

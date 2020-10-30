@@ -1,7 +1,7 @@
-import { PRP } from './prp'
-import { u8aEquals } from '../u8a'
+import {PRP} from './prp'
+import {u8aEquals} from '../u8a'
 import assert from 'assert'
-import { randomBytes } from 'crypto'
+import {randomBytes} from 'crypto'
 
 describe(`test Pseudo-Random Permutation`, function () {
   it(`should 'encrypt' and 'decrypt' a U8a`, function () {

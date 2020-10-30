@@ -1,4 +1,4 @@
-import { AbstractInteraction } from '../abstractInteraction'
+import {AbstractInteraction} from '../abstractInteraction'
 
 import pipe from 'it-pipe'
 import PeerId from 'peer-id'
@@ -13,18 +13,18 @@ import chalk from 'chalk'
 
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '../../'
-import { Acknowledgement } from '../../messages/acknowledgement'
+import {Acknowledgement} from '../../messages/acknowledgement'
 
-import type { Handler } from 'libp2p'
+import type {Handler} from 'libp2p'
 
 import EventEmitter from 'events'
 
-import { PROTOCOL_ACKNOWLEDGEMENT } from '../../constants'
-import { u8aToHex, durations, u8aConcat, toU8a, u8aToNumber } from '@hoprnet/hopr-utils'
-import { pubKeyToPeerId } from '../../utils'
-import { UnacknowledgedTicket } from '../../messages/ticket'
+import {PROTOCOL_ACKNOWLEDGEMENT} from '../../constants'
+import {u8aToHex, durations, u8aConcat, toU8a, u8aToNumber} from '@hoprnet/hopr-utils'
+import {pubKeyToPeerId} from '../../utils'
+import {UnacknowledgedTicket} from '../../messages/ticket'
 
-import { ACKNOWLEDGED_TICKET_INDEX_LENGTH } from '../../dbKeys'
+import {ACKNOWLEDGED_TICKET_INDEX_LENGTH} from '../../dbKeys'
 
 const ACKNOWLEDGEMENT_TIMEOUT = durations.seconds(2)
 
@@ -57,7 +57,7 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
 
       try {
         struct = await this.node._libp2p.dialProtocol(counterparty, this.protocols[0]).catch(async () => {
-          const { id } = await this.node._libp2p.peerRouting.findPeer(counterparty)
+          const {id} = await this.node._libp2p.peerRouting.findPeer(counterparty)
           return await this.node._libp2p.dialProtocol(id, this.protocols[0])
         })
       } catch (err) {
@@ -90,7 +90,7 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
 
       let tmp: Uint8Array
       try {
-        tmp = await this.node.db.get(Buffer.from(unAcknowledgedDbKey)) as Uint8Array
+        tmp = (await this.node.db.get(Buffer.from(unAcknowledgedDbKey))) as Uint8Array
       } catch (err) {
         if (err.notFound) {
           error(
@@ -116,7 +116,9 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
         let ticketCounter: Uint8Array
         try {
           ticketCounter = toU8a(
-            u8aToNumber(await this.node.db.get(Buffer.from(this.node._dbKeys.AcknowledgedTicketCounter())) as Uint8Array) + 1,
+            u8aToNumber(
+              (await this.node.db.get(Buffer.from(this.node._dbKeys.AcknowledgedTicketCounter()))) as Uint8Array
+            ) + 1,
             ACKNOWLEDGED_TICKET_INDEX_LENGTH
           )
         } catch (err) {
@@ -165,4 +167,4 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
   }
 }
 
-export { PacketAcknowledgementInteraction }
+export {PacketAcknowledgementInteraction}

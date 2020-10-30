@@ -1,5 +1,5 @@
-import { Ganache } from '@hoprnet/hopr-testing'
-import { migrate, fund } from '@hoprnet/hopr-ethereum'
+import {Ganache} from '@hoprnet/hopr-testing'
+import {migrate, fund} from '@hoprnet/hopr-ethereum'
 
 let ganache
 

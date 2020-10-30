@@ -1,9 +1,9 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import type { Currencies } from '@hoprnet/hopr-core-connector-interface'
+import type {Currencies} from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
-import { moveDecimalPoint } from '@hoprnet/hopr-utils'
-import { AbstractCommand, AutoCompleteResult } from './abstractCommand'
-import { styleValue } from '../utils'
+import {moveDecimalPoint} from '@hoprnet/hopr-utils'
+import {AbstractCommand, AutoCompleteResult} from './abstractCommand'
+import {styleValue} from '../utils'
 
 export default class Withdraw extends AbstractCommand {
   private arguments = ['amount (ETH, HOPR)', 'currency (native, hopr)', 'recipient (blockchain address)']
@@ -23,7 +23,7 @@ export default class Withdraw extends AbstractCommand {
     currency: Currencies
     recipient: string
   }> {
-    const { NativeBalance, Balance } = this.node.paymentChannels.types
+    const {NativeBalance, Balance} = this.node.paymentChannels.types
     const [err, amount, currencyRaw, recipient] = this._assertUsage(query, this.arguments)
 
     if (err) {
@@ -71,9 +71,9 @@ export default class Withdraw extends AbstractCommand {
    */
   public async execute(query?: string): Promise<string> {
     try {
-      const { amount, weiAmount, currency, recipient } = await this.checkArgs(query ?? '')
-      const { paymentChannels } = this.node
-      const { NativeBalance, Balance } = paymentChannels.types
+      const {amount, weiAmount, currency, recipient} = await this.checkArgs(query ?? '')
+      const {paymentChannels} = this.node
+      const {NativeBalance, Balance} = paymentChannels.types
       const symbol = currency === 'NATIVE' ? NativeBalance.SYMBOL : Balance.SYMBOL
 
       const receipt = await paymentChannels.withdraw(currency, recipient, weiAmount)

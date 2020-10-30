@@ -1,17 +1,17 @@
 import assert from 'assert'
 import Listener from './listener'
 import Multiaddr from 'multiaddr'
-import { Upgrader } from 'libp2p'
-import type { Connection } from 'libp2p'
-import dgram, { Socket, RemoteInfo } from 'dgram'
-import { handleStunRequest } from './stun'
+import {Upgrader} from 'libp2p'
+import type {Connection} from 'libp2p'
+import dgram, {Socket, RemoteInfo} from 'dgram'
+import {handleStunRequest} from './stun'
 import PeerId from 'peer-id'
 import net from 'net'
-import Defer, { DeferredPromise } from 'p-defer'
+import Defer, {DeferredPromise} from 'p-defer'
 
 describe('transport/listener.spec check listening to sockets', function () {
   this.timeout(5000)
-  async function startStunServer(port: number, state: { msgReceived: DeferredPromise<void> }): Promise<Socket> {
+  async function startStunServer(port: number, state: {msgReceived: DeferredPromise<void>}): Promise<Socket> {
     const promises: Promise<void>[] = []
     const socket = dgram.createSocket('udp4')
 
@@ -29,7 +29,7 @@ describe('transport/listener.spec check listening to sockets', function () {
   }
   it('should successfully recreate the socket', async function () {
     let listener: Listener
-    const peerId = await PeerId.create({ keyType: 'secp256k1' })
+    const peerId = await PeerId.create({keyType: 'secp256k1'})
     // Create objects to pass boolean by reference and NOT by value
     const msgReceived = [
       {
@@ -67,11 +67,11 @@ describe('transport/listener.spec check listening to sockets', function () {
 
     const ATTEMPTS = 5
 
-    let msgReceived: { received: DeferredPromise<void> }[]
+    let msgReceived: {received: DeferredPromise<void>}[]
 
     const listeners = await Promise.all(
-      Array.from({ length: AMOUNT_OF_NODES }).map(async (_, index) => {
-        const peerId = await PeerId.create({ keyType: 'secp256k1' })
+      Array.from({length: AMOUNT_OF_NODES}).map(async (_, index) => {
+        const peerId = await PeerId.create({keyType: 'secp256k1'})
 
         const stunServers = []
         for (let i = 0; i < AMOUNT_OF_NODES; i++) {
@@ -97,7 +97,7 @@ describe('transport/listener.spec check listening to sockets', function () {
     )
 
     for (let i = 0; i < ATTEMPTS; i++) {
-      msgReceived = Array.from({ length: AMOUNT_OF_NODES }).map((_) => ({
+      msgReceived = Array.from({length: AMOUNT_OF_NODES}).map((_) => ({
         received: Defer()
       }))
 

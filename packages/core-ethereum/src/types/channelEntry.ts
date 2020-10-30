@@ -1,6 +1,6 @@
 import BN from 'bn.js'
-import { UINT256 } from '../types/solidity'
-import { BNE, Uint8ArrayE } from '../types/extended'
+import {UINT256} from '../types/solidity'
+import {BNE, Uint8ArrayE} from '../types/extended'
 
 // @TODO: we should optimize this since it will use more storage than needed
 class ChannelEntry extends Uint8ArrayE {

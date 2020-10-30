@@ -1,10 +1,10 @@
-import React, { useEffect, useState, useRef } from 'react'
+import React, {useEffect, useState, useRef} from 'react'
 import styles from '../styles/log.module.css'
 import dynamic from 'next/dynamic'
 
-const Jazzicon = dynamic(() => import('../components/jazzicon'), { ssr: false })
+const Jazzicon = dynamic(() => import('../components/jazzicon'), {ssr: false})
 
-export function AbbreviatedId({ id }) {
+export function AbbreviatedId({id}) {
   let [expanded, setExpanded] = useState(false)
   if (expanded) {
     return <span className={styles.logId}>{id}</span>
@@ -58,7 +58,7 @@ export function Logs(props) {
   let container = useRef(null)
 
   useEffect(() => {
-    container.current.scrollIntoView({ block: 'end', behaviour: 'smooth' })
+    container.current.scrollIntoView({block: 'end', behaviour: 'smooth'})
   })
 
   let cls = styles.logs + ' ' + (props.connecting ? styles.connecting : '')

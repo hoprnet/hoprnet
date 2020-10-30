@@ -1,10 +1,10 @@
 import assert from 'assert'
 
-import { u8aConcat } from './concat'
-import { u8aEquals } from './equals'
-import { timer, MAX_EXECUTION_TIME_FOR_CONCAT_IN_MS } from '../utils'
+import {u8aConcat} from './concat'
+import {u8aEquals} from './equals'
+import {timer, MAX_EXECUTION_TIME_FOR_CONCAT_IN_MS} from '../utils'
 
-import { randomBytes } from 'crypto'
+import {randomBytes} from 'crypto'
 
 describe('test u8a concat', function () {
   const firstArray = randomBytes(43)
