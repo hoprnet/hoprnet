@@ -81,25 +81,15 @@ jobs:
           git pull origin ${{ github.ref }}
           git push origin ${{ github.ref }} 
 
-
-            #- name: Push a tag
-            #if: |
-            #github.event_name == 'pull_request' &&
-            #github.event.action == 'closed' &&
-            #github.event.pull_request.merged == true
-            #run: |
-            #(PACKAGE_VERSION=$(node -p -e "require('./package.json').version"); git tag v$PACKAGE_VERSION && git push origin v$PACKAGE_VERSION)
-            #- name: Publish to GPR
-            # if: |
-            #github.event_name == 'pull_request' &&
-            #github.event.action == 'closed' &&
-            #github.event.pull_request.merged == true
-            #run: |
-            #echo //npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }} > .npmrc
-            #node_modules/.bin/lerna publish from-package --yes --registry https://npm.pkg.github.com/
-            #env:
-            #NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-            #GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish to GPR
+        if: |
+          startsWith(github.ref, 'refs/heads/release/')
+        run: |
+          echo //npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }} > .npmrc
+          node_modules/.bin/lerna publish from-package --yes --registry https://npm.pkg.github.com/
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   avado:
     name: Build Avado (master or release pushes)
