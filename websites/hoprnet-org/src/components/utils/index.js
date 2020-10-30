@@ -1,5 +1,0 @@
-export { default as AppRoute } from './AppRoute'
-export { default as insertScript } from './insertScript'
-export { default as ScrollReveal } from './ScrollReveal'
-export { default as ScrollToTop } from './ScrollToTop'
-export * from './SectionProps'

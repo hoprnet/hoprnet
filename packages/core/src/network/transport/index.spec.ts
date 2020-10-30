@@ -19,13 +19,12 @@ import pipe from 'it-pipe'
 import { u8aEquals } from '@hoprnet/hopr-utils'
 
 import { randomBytes } from 'crypto'
-import { RELAY_CIRCUIT_TIMEOUT } from './constants'
 import { connectionHelper } from '../../test-utils'
 
 const TEST_PROTOCOL = `/test/0.0.1`
 
-describe('should create a socket and connect to it', function () {
-  jest.setTimeout(RELAY_CIRCUIT_TIMEOUT * 3)
+describe('transport/index.spec.tc should create a socket and connect to it', function () {
+  this.timeout(5000)
 
   async function generateNode(
     options: {
@@ -750,7 +749,7 @@ describe('should create a socket and connect to it', function () {
     let msgReceived = false
     await pipe([testMessage], stream, async (source: AsyncIterable<Uint8Array>) => {
       for await (const msg of source) {
-        console.log(`receiving relayed connection. message`, new TextDecoder().decode(msg.slice()))
+        //console.log(`receiving relayed connection. message`, new TextDecoder().decode(msg.slice()))
         if (u8aEquals(msg.slice(), testMessage)) {
           msgReceived = true
 

@@ -12,6 +12,7 @@
     "resolveJsonModule": true,
     "target": "es2019",
     "sourceMap": true,
+    "skipLibCheck": true,
     "outDir": "dist",
     "baseUrl": ".",
     "rootDir": "src"
