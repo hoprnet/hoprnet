@@ -4,8 +4,8 @@ declare module 'libp2p' {
   type EventEmitter = import('events').EventEmitter
 
   export type Stream = {
-    sink: (source: AsyncIterable<Uint8Array>) => Promise<void>
-    source: AsyncIterable<Uint8Array>
+    sink: (source: AsyncGenerator<Uint8Array, Uint8Array | void>) => Promise<void>
+    source: AsyncGenerator<Uint8Array, Uint8Array | void>
   }
 
   export interface Connection {
