@@ -1,5 +1,5 @@
-import net, { AddressInfo, Socket as TCPSocket } from 'net'
-import dgram, { RemoteInfo } from 'dgram'
+import net, {AddressInfo, Socket as TCPSocket} from 'net'
+import dgram, {RemoteInfo} from 'dgram'
 
 import EventEmitter from 'events'
 import debug from 'debug'
@@ -8,14 +8,14 @@ const log = debug('hopr-core:transport:listener')
 const error = debug('hopr-core:transport:listener:error')
 const verbose = debug('hopr-core:verbose:listener:error')
 
-import type { Connection } from 'libp2p'
-import { socketToConn } from './socket-to-conn'
-import { CODE_P2P } from './constants'
-import { MultiaddrConnection, Upgrader } from 'libp2p'
+import type {Connection} from 'libp2p'
+import {socketToConn} from './socket-to-conn'
+import {CODE_P2P} from './constants'
+import {MultiaddrConnection, Upgrader} from 'libp2p'
 import Multiaddr from 'multiaddr'
 
-import { handleStunRequest, getExternalIp } from './stun'
-import { getAddrs } from './addrs'
+import {handleStunRequest, getExternalIp} from './stun'
+import {getAddrs} from './addrs'
 
 const SOCKET_CLOSE_TIMEOUT = 400
 
@@ -232,7 +232,7 @@ class Listener extends EventEmitter {
     let maConn: MultiaddrConnection
     let conn: Connection
     try {
-      maConn = socketToConn(socket, { listeningAddr: this.listeningAddr })
+      maConn = socketToConn(socket, {listeningAddr: this.listeningAddr})
       log('new inbound connection %s', maConn.remoteAddr)
       conn = await this.upgrader.upgradeInbound(maConn)
     } catch (err) {

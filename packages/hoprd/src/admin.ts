@@ -1,17 +1,17 @@
 import Hopr from '@hoprnet/hopr-core'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import { commands } from '@hoprnet/hopr-chat'
+import {commands} from '@hoprnet/hopr-chat'
 import http from 'http'
 import fs from 'fs'
 import ws from 'ws'
 import path from 'path'
 import debug from 'debug'
-import { parse } from 'url'
+import {parse} from 'url'
 import next from 'next'
-import type { Server } from 'http'
+import type {Server} from 'http'
 import stripAnsi from 'strip-ansi'
-import { LogStream } from './logs'
-import { NODE_ENV } from './env'
+import {LogStream} from './logs'
+import {NODE_ENV} from './env'
 
 let debugLog = debug('hoprd:admin')
 
@@ -52,7 +52,7 @@ export class AdminServer {
       handle(req, res, parsedUrl)
     })
 
-    this.wsServer = new ws.Server({ server: this.server })
+    this.wsServer = new ws.Server({server: this.server})
 
     this.wsServer.on('connection', (socket: any) => {
       socket.on('message', (message: string) => {

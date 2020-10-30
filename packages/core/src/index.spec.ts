@@ -1,9 +1,9 @@
-import { getNewPort } from '@hoprnet/hopr-testing'
+import {getNewPort} from '@hoprnet/hopr-testing'
 import Hopr from '.'
 import assert from 'assert'
 
-import { privKeyToPeerId } from './utils'
-import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
+import {privKeyToPeerId} from './utils'
+import {NODE_SEEDS} from '@hoprnet/hopr-demo-seeds'
 import Multiaddr from 'multiaddr'
 
 describe('test hopr-core', function () {

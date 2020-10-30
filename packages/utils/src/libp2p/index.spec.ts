@@ -1,13 +1,13 @@
 import assert from 'assert'
 import PeerId from 'peer-id'
-import { convertPubKeyFromPeerId, convertPubKeyFromB58String, hasB58String, getB58String } from '.'
-import { validTweetsMap } from './tweets'
+import {convertPubKeyFromPeerId, convertPubKeyFromB58String, hasB58String, getB58String} from '.'
+import {validTweetsMap} from './tweets'
 // @ts-ignore
 import * as multihashes from 'multihashes'
 
 describe(`test convertPubKeyFromPeerId`, function () {
   it(`should equal to a newly created pubkey from PeerId`, async function () {
-    const id = await PeerId.create({ keyType: 'secp256k1', bits: 256 })
+    const id = await PeerId.create({keyType: 'secp256k1', bits: 256})
     const pubKey = await convertPubKeyFromPeerId(id)
     assert(id.pubKey.toString() === pubKey.toString())
   })

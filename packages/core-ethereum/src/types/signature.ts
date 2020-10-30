@@ -1,6 +1,6 @@
-import type { Types } from '@hoprnet/hopr-core-connector-interface'
-import { Uint8ArrayE } from '../types/extended'
-import { SIGNATURE_LENGTH, SIGNATURE_RECOVERY_LENGTH } from '../constants'
+import type {Types} from '@hoprnet/hopr-core-connector-interface'
+import {Uint8ArrayE} from '../types/extended'
+import {SIGNATURE_LENGTH, SIGNATURE_RECOVERY_LENGTH} from '../constants'
 
 class Signature extends Uint8ArrayE implements Types.Signature {
   constructor(

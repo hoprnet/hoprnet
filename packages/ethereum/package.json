@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-ethereum",
-  "version": "1.49.0-alpha.0",
+  "version": "1.52.0-alpha.0",
   "description": "On-chain logic for hoprnet.org",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "license": "LGPL-3.0-only",

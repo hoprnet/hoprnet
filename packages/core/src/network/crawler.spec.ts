@@ -1,22 +1,22 @@
 import assert from 'assert'
 import PeerId from 'peer-id'
-import type { Connection } from 'libp2p'
+import type {Connection} from 'libp2p'
 
-import { CRAWL_TIMEOUT, shouldIncludePeerInCrawlResponse } from './crawler'
-import { Crawler as CrawlerInteraction } from '../interactions/network/crawler'
+import {CRAWL_TIMEOUT, shouldIncludePeerInCrawlResponse} from './crawler'
+import {Crawler as CrawlerInteraction} from '../interactions/network/crawler'
 import Multiaddr from 'multiaddr'
-import { Network } from './index'
-import { Interactions } from '../interactions'
-import { BlacklistedEntry } from './network-peers'
-import { BLACKLIST_TIMEOUT } from '../constants'
-import { generateLibP2PMock } from '../test-utils'
+import {Network} from './index'
+import {Interactions} from '../interactions'
+import {BlacklistedEntry} from './network-peers'
+import {BLACKLIST_TIMEOUT} from '../constants'
+import {generateLibP2PMock} from '../test-utils'
 
 let mockConnection = (p: PeerId, addr: Multiaddr): Connection => {
-  return { remotePeer: p, remoteAddr: addr } as Connection
+  return {remotePeer: p, remoteAddr: addr} as Connection
 }
 
-async function generateMocks(options?: { timeoutIntentionally: boolean }, addr = '/ip4/0.0.0.0/tcp/0') {
-  const { node, address } = await generateLibP2PMock(addr)
+async function generateMocks(options?: {timeoutIntentionally: boolean}, addr = '/ip4/0.0.0.0/tcp/0') {
+  const {node, address} = await generateLibP2PMock(addr)
 
   await node.start()
 
@@ -28,7 +28,7 @@ async function generateMocks(options?: { timeoutIntentionally: boolean }, addr =
     }
   } as Interactions<any>
 
-  const network = new Network(node, interactions, {} as any, { crawl: options })
+  const network = new Network(node, interactions, {} as any, {crawl: options})
   node.connectionManager.on('peer:connect', (conn: Connection) =>
     node.peerStore.addressBook.add(conn.remotePeer, [conn.remoteAddr])
   )
@@ -57,21 +57,21 @@ describe('network/crawler test crawler', function () {
     Alice.node.connectionManager.emit('peer:connect', mockConnection(Bob.node.peerId, Bob.address))
     await Alice.network.crawler.crawl()
 
-    assert(Alice.network.networkPeers.has(Bob.node.peerId))
+    assert(Alice.network.networkPeers.has(Bob.node.peerId), 'Alice should know about Bob')
 
     Bob.node.connectionManager.emit('peer:connect', mockConnection(Chris.node.peerId, Chris.address))
-    assert(Bob.network.networkPeers.has(Chris.node.peerId))
+    assert(Bob.network.networkPeers.has(Chris.node.peerId), 'Bob should know about Chris')
 
     await Alice.network.crawler.crawl()
-    assert(Alice.network.networkPeers.has(Bob.node.peerId))
-    assert(Alice.network.networkPeers.has(Chris.node.peerId))
+    assert(Alice.network.networkPeers.has(Bob.node.peerId), 'Alice should know about Bob')
+    assert(Alice.network.networkPeers.has(Chris.node.peerId), 'Alice should know about Chris')
 
     Chris.node.connectionManager.emit('peer:connect', mockConnection(Dave.node.peerId, Dave.address))
     await Alice.network.crawler.crawl()
 
-    assert(Alice.network.networkPeers.has(Bob.node.peerId))
-    assert(Alice.network.networkPeers.has(Chris.node.peerId))
-    assert(Alice.network.networkPeers.has(Dave.node.peerId))
+    assert(Alice.network.networkPeers.has(Bob.node.peerId), 'Alice should know about Bob')
+    assert(Alice.network.networkPeers.has(Chris.node.peerId), 'Alice should know about Chris')
+    assert(Alice.network.networkPeers.has(Dave.node.peerId), 'Alice should know about Dave')
 
     Bob.node.connectionManager.emit('peer:connect', mockConnection(Alice.node.peerId, Alice.address))
     Dave.node.connectionManager.emit('peer:connect', mockConnection(Eve.node.peerId, Eve.address))
@@ -89,7 +89,7 @@ describe('network/crawler test crawler', function () {
       !Alice.network.networkPeers.has(Bob.node.peerId),
       'Alice should not add Bob to her networkPeers after blacklisting him'
     )
-    assert(Alice.network.networkPeers.deletedPeers.some((entry: BlacklistedEntry) => entry.id.equals(Bob.node.peerId)))
+    assert(Alice.network.networkPeers.deletedPeers.some((entry: BlacklistedEntry) => entry.id.equals(Bob.node.peerId)), 'Alice should have blacklisted Bob')
 
     // Remove Bob from blacklist
     Alice.network.networkPeers.deletedPeers[0].deletedAt -= BLACKLIST_TIMEOUT + 1
@@ -98,7 +98,7 @@ describe('network/crawler test crawler', function () {
 
     await Alice.network.crawler.crawl()
 
-    assert(Alice.network.networkPeers.deletedPeers.length == 0)
+    assert(Alice.network.networkPeers.deletedPeers.length == 0, 'Alice should have no deleted peers')
 
     // Alice.network.networkPeers.push({
     //   id: Bob.peerInfo.id.toB58String(),
@@ -107,7 +107,7 @@ describe('network/crawler test crawler', function () {
 
     await new Promise((resolve) => setTimeout(resolve, 50))
 
-    assert(Alice.network.networkPeers.has(Bob.node.peerId))
+    assert(Alice.network.networkPeers.has(Bob.node.peerId), 'Alice should know Bob again')
 
     await Promise.all([Alice.node.stop(), Bob.node.stop(), Chris.node.stop(), Dave.node.stop(), Eve.node.stop()])
   })

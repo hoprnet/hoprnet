@@ -1,4 +1,4 @@
-import { Message } from './message'
+import {Message} from './message'
 import assert from 'assert'
 
 describe('test Message', () => {

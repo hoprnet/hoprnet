@@ -146,7 +146,7 @@ export class Coverbot implements Bot {
     //@TODO: Ideally we move this to a more suitable place.
     if (!this.ethereumAddress) {
       this.chainId = await Utils.getChainId(this.xdaiWeb3)
-      this.network = Utils.getNetworkName(this.chainId) as Networks
+      this.network = Utils.getNetworkName(this.chainId) as Network
       this.ethereumAddress = await this._getEthereumAddressFromHOPRAddress(this.address)
     }
 

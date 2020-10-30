@@ -3,15 +3,15 @@ import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 
 import assert from 'assert'
 
-import { randomBytes } from 'crypto'
+import {randomBytes} from 'crypto'
 
-import { UnacknowledgedTicket } from '.'
+import {UnacknowledgedTicket} from '.'
 
-import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
+import {NODE_SEEDS} from '@hoprnet/hopr-demo-seeds'
 
-import { Types, Utils } from '@hoprnet/hopr-core-ethereum'
-import { privKeyToPeerId } from '../../utils'
-import { toU8a, u8aConcat, u8aToNumber } from '@hoprnet/hopr-utils'
+import {Types, Utils} from '@hoprnet/hopr-core-ethereum'
+import {privKeyToPeerId} from '../../utils'
+import {toU8a, u8aConcat, u8aToNumber} from '@hoprnet/hopr-utils'
 
 import LevelUp from 'levelup'
 import Memdown from 'memdown'
@@ -75,7 +75,7 @@ describe(`check serialization and deserialization of ticket objects`, function (
 
     await node.db.put(node._dbKeys.UnAcknowledgedTickets(challenge), Buffer.from(unAcknowledgedTicket))
 
-    const fromDbUnacknowledgedTicket = await node.db.get(node._dbKeys.UnAcknowledgedTickets(challenge))
+    const fromDbUnacknowledgedTicket = (await node.db.get(node._dbKeys.UnAcknowledgedTickets(challenge))) as Uint8Array
 
     assert(
       await new UnacknowledgedTicket(node.paymentChannels, {
@@ -98,7 +98,7 @@ describe(`check serialization and deserialization of ticket objects`, function (
       Buffer.from(toU8a(FIRST_TICKET, DbKeys.ACKNOWLEDGED_TICKET_INDEX_LENGTH))
     )
 
-    const counter = await node.db.get(Buffer.from(node._dbKeys.AcknowledgedTicketCounter()))
+    const counter = (await node.db.get(Buffer.from(node._dbKeys.AcknowledgedTicketCounter()))) as Uint8Array
 
     assert(u8aToNumber(counter) == FIRST_TICKET)
 

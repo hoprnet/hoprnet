@@ -1,8 +1,8 @@
-import { CrawlResponse } from './response'
+import {CrawlResponse} from './response'
 
 enum CrawlStatus {
   OK,
   FAIL
 }
 
-export { CrawlStatus, CrawlResponse }
+export {CrawlStatus, CrawlResponse}

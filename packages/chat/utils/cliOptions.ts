@@ -26,5 +26,5 @@ export const cli_options: string[][] = [
     tmpB = b[0].slice(1)
   }
 
-  return tmpA.localeCompare(tmpB, 'en', { sensitivity: 'base' })
+  return tmpA.localeCompare(tmpB, 'en', {sensitivity: 'base'})
 })

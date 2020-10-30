@@ -1,5 +1,5 @@
 import Ganache from 'ganache-core'
-import { NODE_SEEDS, BOOTSTRAP_SEEDS } from '@hoprnet/hopr-demo-seeds'
+import {NODE_SEEDS, BOOTSTRAP_SEEDS} from '@hoprnet/hopr-demo-seeds'
 
 const accounts = NODE_SEEDS.concat(BOOTSTRAP_SEEDS)
 const balance = Number(1000000000000000000000000).toString(16)
