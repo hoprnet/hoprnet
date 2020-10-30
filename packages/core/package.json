@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core",
-  "version": "1.51.0-alpha.0",
+  "version": "1.52.0-alpha.0",
   "description": "Privacy-preserving messaging protocol with incentivations for relay operators",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -31,9 +31,9 @@
     "prepublishOnly": "yarn build"
   },
   "dependencies": {
-    "@hoprnet/hopr-core-ethereum": "1.51.0-alpha.0",
-    "@hoprnet/hopr-demo-seeds": "1.51.0-alpha.0",
-    "@hoprnet/hopr-utils": "1.51.0-alpha.0",
+    "@hoprnet/hopr-core-ethereum": "1.52.0-alpha.0",
+    "@hoprnet/hopr-demo-seeds": "1.52.0-alpha.0",
+    "@hoprnet/hopr-utils": "1.52.0-alpha.0",
     "abort-controller": "^3.0.0",
     "abortable-iterator": "^3.0.0",
     "bl": "^4.0.3",
@@ -64,9 +64,9 @@
     "wrtc": "0.4.6"
   },
   "devDependencies": {
-    "@hoprnet/hopr-core-connector-interface": "1.51.0-alpha.0",
-    "@hoprnet/hopr-ethereum": "1.51.0-alpha.0",
-    "@hoprnet/hopr-testing": "1.51.0-alpha.0",
+    "@hoprnet/hopr-core-connector-interface": "1.52.0-alpha.0",
+    "@hoprnet/hopr-ethereum": "1.52.0-alpha.0",
+    "@hoprnet/hopr-testing": "1.52.0-alpha.0",
     "@types/bl": "^2.1.0",
     "@types/debug": "^4.1.5",
     "@types/leveldown": "^4.0.2",
