@@ -6,11 +6,10 @@
     "declaration": true,
     "sourceMap": true,
     "esModuleInterop": true,
-    "skipLibCheck": false,
+    "resolveJsonModule": true,
     "outDir": "lib",
     "types": ["./types"]
   },
-  "files": ["./hardhat.config.ts"],
-  "include": ["types", "test", "tasks", "utils", "chain"],
+  "include": ["./hardhat.config.ts", "index.ts", "types", "test", "tasks", "utils", "chain"],
   "exclude": ["lib", "temp"]
 }

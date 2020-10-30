@@ -2,11 +2,12 @@ import assert from 'assert'
 import BN from 'bn.js'
 import Web3 from 'web3'
 import { Ganache } from '@hoprnet/hopr-testing'
-import { migrate, fund } from '@hoprnet/hopr-ethereum'
+import { compile, migrate, fund } from '@hoprnet/hopr-ethereum'
+import addresses from '@hoprnet/hopr-ethereum/chain/addresses'
 import { durations, u8aToHex } from '@hoprnet/hopr-utils'
 import { stringToU8a } from '@hoprnet/hopr-utils'
-import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
-import HoprChannelsAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprChannels.json'
+import HoprTokenAbi from '@hoprnet/hopr-ethereum/chain/abis/HoprToken.json'
+import HoprChannelsAbi from '@hoprnet/hopr-ethereum/chain/abis/HoprChannels.json'
 import * as testconfigs from '../config.spec'
 import * as configs from '../config'
 import { time, wait, isPartyA } from '../utils'
@@ -35,12 +36,13 @@ describe('test indexer', function () {
     this.timeout(60e3)
 
     await ganache.start()
+    await compile()
     await migrate()
-    await fund(4)
+    await fund(`--address ${addresses?.localhost?.HoprToken} --accounts-to-fund 4`)
 
     web3 = new Web3(configs.DEFAULT_URI)
-    hoprToken = new web3.eth.Contract(HoprTokenAbi as any, configs.TOKEN_ADDRESSES.private)
-    hoprChannels = new web3.eth.Contract(HoprChannelsAbi as any, configs.CHANNELS_ADDRESSES.private)
+    hoprToken = new web3.eth.Contract(HoprTokenAbi as any, addresses?.localhost?.HoprToken)
+    hoprChannels = new web3.eth.Contract(HoprChannelsAbi as any, addresses?.localhost?.HoprChannels)
 
     userA = await getPrivKeyData(stringToU8a(testconfigs.FUND_ACCOUNT_PRIVATE_KEY))
     // userA < userB

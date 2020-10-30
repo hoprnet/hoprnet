@@ -3,8 +3,9 @@ import Web3 from 'web3'
 import { stringToU8a, u8aEquals } from '@hoprnet/hopr-utils'
 import { Ganache } from '@hoprnet/hopr-testing'
 import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
-import { migrate, fund } from '@hoprnet/hopr-ethereum'
-import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
+import { compile, migrate, fund } from '@hoprnet/hopr-ethereum'
+import HoprTokenAbi from '@hoprnet/hopr-ethereum/chain/abis/HoprToken.json'
+import addresses from '@hoprnet/hopr-ethereum/chain/addresses'
 import HoprEthereum from '.'
 import { HoprToken } from './tsc/web3/HoprToken'
 import { Await } from './tsc/utils'
@@ -25,12 +26,13 @@ describe('test connector', function () {
     this.timeout(30e3)
 
     await ganache.start()
+    await compile()
     await migrate()
-    await fund(2)
+    await fund(`--address ${addresses?.localhost?.HoprToken} --accounts-to-fund 2`)
 
     owner = await getPrivKeyData(stringToU8a(testconfigs.FUND_ACCOUNT_PRIVATE_KEY))
     web3 = new Web3(configs.DEFAULT_URI)
-    hoprToken = new web3.eth.Contract(HoprTokenAbi as any, configs.TOKEN_ADDRESSES.private)
+    hoprToken = new web3.eth.Contract(HoprTokenAbi as any, addresses?.localhost?.HoprToken)
     connector = await createNode(owner.privKey)
 
     await connector.start()
@@ -131,11 +133,12 @@ describe.skip('test connector with 0 ETH and 0 HOPR', function () {
     this.timeout(60e3)
 
     await ganache.start()
+    await compile()
     await migrate()
 
     owner = await getPrivKeyData(randomBytes(32))
     web3 = new Web3(configs.DEFAULT_URI)
-    hoprToken = new web3.eth.Contract(HoprTokenAbi as any, configs.TOKEN_ADDRESSES.private)
+    hoprToken = new web3.eth.Contract(HoprTokenAbi as any, addresses?.localhost?.HoprToken)
     connector = await createNode(owner.privKey)
 
     await connector.start()
@@ -223,14 +226,15 @@ describe('test withdraw', function () {
     this.timeout(60e3)
 
     await ganache.start()
+    await compile()
     await migrate()
-    await fund(1)
+    await fund(`--address ${addresses?.localhost?.HoprToken} --accounts-to-fund 2`)
 
     alice = await getPrivKeyData(stringToU8a(NODE_SEEDS[0]))
     bob = await getPrivKeyData(randomBytes(32))
 
     web3 = new Web3(configs.DEFAULT_URI)
-    hoprToken = new web3.eth.Contract(HoprTokenAbi as any, configs.TOKEN_ADDRESSES.private)
+    hoprToken = new web3.eth.Contract(HoprTokenAbi as any, addresses?.localhost?.HoprToken)
     connector = await createNode(alice.privKey)
 
     await hoprToken.methods.mint(alice.address.toHex(), 100, '0x0', '0x0').send({

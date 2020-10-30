@@ -4,49 +4,50 @@
   "description": "On-chain logic for hoprnet.org",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "license": "LGPL-3.0-only",
+  "main": "./lib/index.js",
   "files": [
     "contracts/",
     "lib/",
     "!*.test.ts"
   ],
-  "engines": {
-    "yarn": "1",
-    "node": "12"
-  },
   "scripts": {
-    "build:sol": "hardhat compile",
-    "build": "hardhat compile && hardhat extract && tsc",
-    "test": "hardhat test --no-compile --network hardhat",
-    "network": "hardhat node --network hardhat",
-    "migrate": "hardhat migrate",
+    "build": "yarn build:sol && tsc",
+    "build:sol": "hardhat compile && hardhat extract",
     "fund": "hardhat fund",
-    "prepublishOnly": "yarn build"
+    "migrate": "hardhat migrate",
+    "network": "hardhat node --network hardhat",
+    "prepublishOnly": "yarn build",
+    "test": "hardhat test --no-compile --network hardhat"
   },
   "dependencies": {
+    "@hoprnet/hopr-demo-seeds": "1.49.0-alpha.0",
     "@hoprnet/hopr-utils": "1.49.0-alpha.0",
+    "@nomiclabs/hardhat-etherscan": "^2.0.0",
+    "@nomiclabs/hardhat-solhint": "^2.0.0",
+    "@nomiclabs/hardhat-truffle5": "^2.0.0",
     "@nomiclabs/hardhat-web3": "^2.0.0",
     "@openzeppelin/contracts": "^3.0.1",
+    "@typechain/truffle-v5": "^2.0.2",
+    "hardhat-typechain": "^0.3.3",
+    "ts-generator": "^0.1.1",
+    "ts-node": "^9.0.0",
+    "typechain": "^3.0.0",
+    "dotenv": "^8.2.0",
+    "hardhat": "^2.0.2",
     "lodash": "^4.17.20",
     "type-fest": "^0.18.0",
     "web3": "^1.3.0"
   },
   "devDependencies": {
-    "@hoprnet/hopr-demo-seeds": "1.49.0-alpha.0",
-    "@nomiclabs/hardhat-etherscan": "^2.0.0",
-    "@nomiclabs/hardhat-solhint": "^2.0.0",
-    "@nomiclabs/hardhat-truffle5": "^2.0.0",
     "@openzeppelin/test-helpers": "^0.5.9",
-    "@typechain/truffle-v5": "^2.0.2",
     "@types/chai": "^4.2.14",
     "@types/lodash": "^4.14.162",
     "@types/mocha": "^8.0.3",
     "chai": "^4.2.0",
-    "dotenv": "^8.2.0",
-    "hardhat": "^2.0.2",
-    "hardhat-typechain": "^0.3.3",
-    "ts-generator": "^0.1.1",
-    "ts-node": "^9.0.0",
-    "typechain": "^3.0.0",
     "typescript": "^4.0.5"
+  },
+  "engines": {
+    "node": "12",
+    "yarn": "1"
   }
 }

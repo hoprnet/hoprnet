@@ -5,10 +5,11 @@ import type CoreConnector from '.'
 import assert from 'assert'
 import Web3 from 'web3'
 import { Ganache } from '@hoprnet/hopr-testing'
-import { migrate } from '@hoprnet/hopr-ethereum'
+import { compile, migrate } from '@hoprnet/hopr-ethereum'
 import { stringToU8a, durations } from '@hoprnet/hopr-utils'
-import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
-import HoprChannelsAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprChannels.json'
+import HoprTokenAbi from '@hoprnet/hopr-ethereum/chain/abis/HoprToken.json'
+import HoprChannelsAbi from '@hoprnet/hopr-ethereum/chain/abis/HoprChannels.json'
+import addresses from '@hoprnet/hopr-ethereum/chain/addresses'
 import { getPrivKeyData, createAccountAndFund, createNode, disconnectWeb3 } from './utils/testing.spec'
 import * as testconfigs from './config.spec'
 import * as configs from './config'
@@ -27,11 +28,12 @@ describe('test Account class', function () {
     this.timeout(60e3)
 
     await ganache.start()
+    await compile()
     await migrate()
 
     web3 = new Web3(configs.DEFAULT_URI)
-    hoprToken = new web3.eth.Contract(HoprTokenAbi as any, configs.TOKEN_ADDRESSES.private)
-    hoprChannels = new web3.eth.Contract(HoprChannelsAbi as any, configs.CHANNELS_ADDRESSES.private)
+    hoprToken = new web3.eth.Contract(HoprTokenAbi as any, addresses.localhost?.HoprToken)
+    hoprChannels = new web3.eth.Contract(HoprChannelsAbi as any, addresses.localhost?.HoprChannels)
   })
 
   after(async function () {

@@ -1,14 +1,14 @@
 import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
 
 async function main(
-  { address, amount, accounts: providedAccounts }: { address: string; amount: string; accounts: string[] },
-  { web3, network }: HardhatRuntimeEnvironment,
+  { address, amount, accountsToFund }: { address: string; amount: string; accountsToFund: number },
+  { web3, network, artifacts }: HardhatRuntimeEnvironment,
   _runSuper: RunSuperFunction<any>
 ) {
   const HoprToken = artifacts.require('HoprToken')
   const hoprToken = await HoprToken.at(address)
 
-  const accounts = providedAccounts.length > 0 ? providedAccounts : await web3.eth.getAccounts()
+  const accounts = (await web3.eth.getAccounts()).slice(0, accountsToFund)
   const owner = accounts[0]
 
   console.log('Running task "fund" with config:', {

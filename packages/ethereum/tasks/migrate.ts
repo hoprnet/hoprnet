@@ -13,7 +13,7 @@ const EXTERNAL_FAUCET_MINTER = '0x1A387b5103f28bc6601d085A3dDC878dEE631A56'
 
 async function main(
   providedMigrationOptions: Partial<MigrationOptions>,
-  { web3, network }: HardhatRuntimeEnvironment,
+  { web3, network, artifacts }: HardhatRuntimeEnvironment,
   _runSuper: RunSuperFunction<any>
 ) {
   const networkMigrationOptions = allMigrationOptions[network.name]
@@ -104,7 +104,7 @@ async function main(
 
   console.log('Updating addresses.json')
   await updateAddresses(network.name, addresses)
-  console.log('Updated addresses.json')
+  console.log(`Updated addresses.json for ${network.name} network`)
 }
 
 export default main

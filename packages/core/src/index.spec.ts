@@ -22,7 +22,7 @@ describe('test hopr-core', function () {
       password: '',
       dbPath: process.cwd() + '/testdb',
       network: 'ethereum',
-      provider: 'ws://127.0.0.1:9545',
+      provider: 'ws://127.0.0.1:8545',
       hosts: {
         ip4: {
           ip: '0.0.0.0',
@@ -43,7 +43,7 @@ describe('test hopr-core', function () {
       peerId,
       bootstrapNode: true,
       network: 'ethereum',
-      provider: 'ws://127.0.0.1:9545',
+      provider: 'ws://127.0.0.1:8545',
       hosts: {
         ip4: {
           ip: '0.0.0.0',

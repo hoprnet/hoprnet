@@ -21,7 +21,7 @@ const publicNetworks: HardhatUserConfig['networks'] = mapValues(
       chainId: config.chainId,
       url: config.httpUrl,
       gasMultiplier: 1.1,
-      accounts: [PRIVATE_KEY]
+      accounts: PRIVATE_KEY ? [PRIVATE_KEY] : []
     } as HardhatUserConfig['networks']['hardhat'])
 )
 
@@ -97,7 +97,7 @@ task('fund', 'Fund demo accounts', async (...args: any[]) => {
 })
   .addParam<string>('address', 'HoprToken contract address', undefined, types.string)
   .addOptionalParam<string>('amount', 'Amount of HOPR to fund', Web3.utils.toWei('1000000', 'ether'), types.string)
-  .addOptionalParam<string[]>('accounts', 'Accounts to fund', [], types.json)
+  .addOptionalParam<number>('accountsToFund', 'Amount of accounts to fund from demo seeds', 0, types.int)
 
 task('extract', 'Extract ABIs to specified folder', async (...args: any[]) => {
   return (await import('./tasks/extract')).default(args[0], args[1], args[2])

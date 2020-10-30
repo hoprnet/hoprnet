@@ -1,7 +1,7 @@
 {
   "localhost": {
-    "HoprToken": "0x630172aBF96ac273EE624c83ffcCe3061eDe176b",
-    "HoprChannels": "0xe1BF97B69366d92566A910643dCeF629050647e7",
-    "HoprMinter": "0x1929f70a2a6637A7da661D476A214f4f5FE35745"
+    "HoprToken": "0x66DB78F4ADD912a6Cb92b672Dfa09028ecc3085E",
+    "HoprChannels": "0x0a67180CF519aDF27f1FD32F7255bBa00B536FC6",
+    "HoprMinter": "0x6c97048D67c39ADCe38bbB228fc1bA415fc8f096"
   }
 }
