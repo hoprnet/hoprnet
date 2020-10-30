@@ -13,7 +13,6 @@ jobs:
     strategy:
       matrix:
         node-version: [12]
-        yarn-version: [1]
 
     steps:
       - uses: actions/checkout@v2
@@ -24,16 +23,14 @@ jobs:
           registry-url: https://registry.npmjs.org/
       - uses: actions/cache@v2
         with:
-          path: '**/node_modules'
-          key: ${{ runner.os }}-modules-${{ hashFiles('**/yarn.lock') }}
-      - name: Install node modules
-        run: |
-          yarn policies set-version ${{ matrix.yarn-version }}
-          yarn install --pure-lockfile
+          path: 'node_modules'
+          key: ${{ runner.os }}-modules-${{ hashFiles('yarn.lock') }}
 
-      - name: Install dependencies
+      - name: Install dependencies 
+        if: steps.cache.outputs.cache-hit != 'true'
         run: |
-          yarn util:install
+          yarn
+          node_modules/.bin/lerna bootstrap
 
       - name: Lint & Fix
         run: |
@@ -45,7 +42,7 @@ jobs:
 
       - name: Link & Build
         run: |
-          yarn util:link && yarn util:build
+          yarn util:link && yarn build
 
       - name: Publish prerelease version (On pushes to master)
         if: github.ref == 'refs/heads/master'
