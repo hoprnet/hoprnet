@@ -9,7 +9,7 @@ import Memdown from 'memdown'
 import LevelUp from 'levelup'
 import { Ganache } from '@hoprnet/hopr-testing'
 import addresses from '@hoprnet/hopr-ethereum/chain/addresses'
-import { compile, migrate, fund } from '@hoprnet/hopr-ethereum'
+import { migrate, fund } from '@hoprnet/hopr-ethereum'
 import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
 import Web3 from 'web3'
 import * as testconfigs from './config.spec'
@@ -25,14 +25,9 @@ const EMPTY_HASHED_SECRET = new Uint8Array(HASHED_SECRET_WIDTH).fill(0x00)
 const FUND_ARGS = `--address ${addresses?.localhost?.HoprToken} --accounts-to-fund 1`
 
 describe('test hashedSecret', function () {
-  this.timeout(durations.minutes(15))
+  this.timeout(durations.minutes(5))
   const ganache = new Ganache()
   let connector: HoprEthereum
-
-  before(async function () {
-    this.timeout(durations.minutes(1))
-    await compile()
-  })
 
   async function generateConnector(debug?: boolean): Promise<HoprEthereum> {
     let web3 = new Web3(configs.DEFAULT_URI)
@@ -92,7 +87,7 @@ describe('test hashedSecret', function () {
   // }
 
   describe('random pre-image', function () {
-    this.timeout(durations.minutes(5))
+    this.timeout(durations.minutes(2))
 
     before(async function () {
       this.timeout(durations.minutes(1))
@@ -179,7 +174,7 @@ describe('test hashedSecret', function () {
   })
 
   describe('deterministic debug pre-image', function () {
-    this.timeout(durations.minutes(5))
+    this.timeout(durations.minutes(2))
 
     before(async function () {
       this.timeout(durations.minutes(1))
@@ -334,7 +329,7 @@ describe('test hashedSecret', function () {
   })
 
   describe('integration', function () {
-    this.timeout(durations.minutes(5))
+    this.timeout(durations.minutes(2))
 
     before(async function () {
       this.timeout(durations.minutes(1))

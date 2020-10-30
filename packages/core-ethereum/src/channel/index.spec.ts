@@ -1,6 +1,6 @@
 import { randomBytes } from 'crypto'
 import { Ganache } from '@hoprnet/hopr-testing'
-import { compile, migrate } from '@hoprnet/hopr-ethereum'
+import { migrate } from '@hoprnet/hopr-ethereum'
 import assert from 'assert'
 import { stringToU8a, u8aEquals, u8aConcat, durations } from '@hoprnet/hopr-utils'
 import HoprTokenAbi from '@hoprnet/hopr-ethereum/chain/abis/HoprToken.json'
@@ -48,7 +48,6 @@ describe('test Channel class', function () {
     this.timeout(60e3)
 
     await ganache.start()
-    await compile()
     await migrate()
 
     web3 = new Web3(configs.DEFAULT_URI)

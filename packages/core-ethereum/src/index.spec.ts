@@ -1,9 +1,9 @@
 import assert from 'assert'
 import Web3 from 'web3'
-import { stringToU8a, u8aEquals } from '@hoprnet/hopr-utils'
+import { stringToU8a, u8aEquals, durations } from '@hoprnet/hopr-utils'
 import { Ganache } from '@hoprnet/hopr-testing'
 import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
-import { compile, migrate, fund } from '@hoprnet/hopr-ethereum'
+import { migrate, fund } from '@hoprnet/hopr-ethereum'
 import HoprTokenAbi from '@hoprnet/hopr-ethereum/chain/abis/HoprToken.json'
 import addresses from '@hoprnet/hopr-ethereum/chain/addresses'
 import HoprEthereum from '.'
@@ -23,10 +23,9 @@ describe('test connector', function () {
   let connector: HoprEthereum
 
   before(async function () {
-    this.timeout(30e3)
+    this.timeout(durations.minutes(1))
 
     await ganache.start()
-    await compile()
     await migrate()
     await fund(`--address ${addresses?.localhost?.HoprToken} --accounts-to-fund 2`)
 
@@ -133,7 +132,6 @@ describe.skip('test connector with 0 ETH and 0 HOPR', function () {
     this.timeout(60e3)
 
     await ganache.start()
-    await compile()
     await migrate()
 
     owner = await getPrivKeyData(randomBytes(32))
@@ -226,7 +224,6 @@ describe('test withdraw', function () {
     this.timeout(60e3)
 
     await ganache.start()
-    await compile()
     await migrate()
     await fund(`--address ${addresses?.localhost?.HoprToken} --accounts-to-fund 2`)
 

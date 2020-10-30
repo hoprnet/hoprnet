@@ -5,7 +5,7 @@ import type CoreConnector from '.'
 import assert from 'assert'
 import Web3 from 'web3'
 import { Ganache } from '@hoprnet/hopr-testing'
-import { compile, migrate } from '@hoprnet/hopr-ethereum'
+import { migrate } from '@hoprnet/hopr-ethereum'
 import { stringToU8a, durations } from '@hoprnet/hopr-utils'
 import HoprTokenAbi from '@hoprnet/hopr-ethereum/chain/abis/HoprToken.json'
 import HoprChannelsAbi from '@hoprnet/hopr-ethereum/chain/abis/HoprChannels.json'
@@ -25,10 +25,9 @@ describe('test Account class', function () {
   let user: Await<ReturnType<typeof getPrivKeyData>>
 
   before(async function () {
-    this.timeout(60e3)
+    this.timeout(durations.minutes(2))
 
     await ganache.start()
-    await compile()
     await migrate()
 
     web3 = new Web3(configs.DEFAULT_URI)
@@ -63,16 +62,12 @@ describe('test Account class', function () {
     })
 
     it('should be 2 after setting new secret', async function () {
-      this.timeout(durations.seconds(4))
-
       const ticketEpoch = await coreConnector.account.ticketEpoch
 
       assert.equal(ticketEpoch.toString(), '2', 'ticketEpoch is wrong')
     })
 
     it('should be 3 after reconnecting to web3', async function () {
-      this.timeout(durations.seconds(4))
-
       await disconnectWeb3(coreConnector.web3)
 
       // wait for reconnection

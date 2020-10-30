@@ -6,7 +6,8 @@ import { TweetMessage, TweetState } from '../../lib/twitter/twitter'
 //@TODO: Isolate these utilities to avoid importing the entire package
 import { convertPubKeyFromB58String, u8aToHex } from '@hoprnet/hopr-utils'
 import { Utils } from '@hoprnet/hopr-core-ethereum'
-import { Networks, HOPR_CHANNELS } from '@hoprnet/hopr-core-ethereum/lib/ethereum/addresses'
+import type { Network } from '@hoprnet/hopr-ethereum/utils/networks'
+import addresses from '@hoprnet/hopr-ethereum/chain/addresses'
 import {
   COVERBOT_DEBUG_MODE,
   COVERBOT_CHAIN_PROVIDER,
@@ -49,7 +50,7 @@ export class Coverbot implements Bot {
   xdaiWeb3: Web3
   ethereumAddress: string
   chainId: number
-  network: Networks
+  network: Network
   loadedDb: boolean
 
   constructor(
@@ -161,7 +162,7 @@ export class Coverbot implements Bot {
         COVERBOT_XDAI_THRESHOLD,
       },
       hoprCoverbotAddress: await this._getEthereumAddressFromHOPRAddress(this.address),
-      hoprChannelContract: HOPR_CHANNELS[this.network],
+      hoprChannelContract: addresses[this.network].HoprChannels,
       address: this.address,
       balance: fromWei(await this.xdaiWeb3.eth.getBalance(this.ethereumAddress)),
       available: fromWei(await this.node.getHoprBalance()),

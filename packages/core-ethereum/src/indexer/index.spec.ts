@@ -2,7 +2,7 @@ import assert from 'assert'
 import BN from 'bn.js'
 import Web3 from 'web3'
 import { Ganache } from '@hoprnet/hopr-testing'
-import { compile, migrate, fund } from '@hoprnet/hopr-ethereum'
+import { migrate, fund } from '@hoprnet/hopr-ethereum'
 import addresses from '@hoprnet/hopr-ethereum/chain/addresses'
 import { durations, u8aToHex } from '@hoprnet/hopr-utils'
 import { stringToU8a } from '@hoprnet/hopr-utils'
@@ -36,7 +36,6 @@ describe('test indexer', function () {
     this.timeout(60e3)
 
     await ganache.start()
-    await compile()
     await migrate()
     await fund(`--address ${addresses?.localhost?.HoprToken} --accounts-to-fund 4`)
 

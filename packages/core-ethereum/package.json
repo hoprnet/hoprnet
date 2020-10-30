@@ -69,7 +69,9 @@
       "ts"
     ],
     "spec": "src/**/*.spec.ts",
-    "require": "ts-node/register"
+    "require": [
+      "ts-node/register"
+    ]
   },
   "publishConfig": {
     "access": "public"
