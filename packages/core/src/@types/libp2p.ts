@@ -37,6 +37,15 @@ declare module 'libp2p' {
     multiaddrs: Multiaddr[]
   }
 
+  // https://github.com/libp2p/js-libp2p/blob/master/doc/API.md#peerstoreaddressbookadd
+  type AddressBook = {
+    add(id: PeerId, addr: Array<Multiaddr>): AddressBook
+    delete(id: PeerId): boolean
+    get(id: PeerId): Array<{ multiaddr: Multiaddr }>
+    getMultiaddrsForPeer(id: PeerId): Array<string>
+    set(peerId: PeerId, multiaddrs: Array<Multiaddr>): AddressBook
+  }
+
   export type PeerStore = {
     //https://github.com/libp2p/js-libp2p/blob/master/doc/API.md#peerstoreget
     get(
@@ -50,14 +59,7 @@ declare module 'libp2p' {
     >
     delete(peer: PeerId): void
 
-    // https://github.com/libp2p/js-libp2p/blob/master/doc/API.md#peerstoreaddressbookadd
-    addressBook: {
-      add(id: PeerId, addr: Array<Multiaddr>)
-      delete(id: PeerId)
-      get(id: PeerId): Array<{ multiaddr: Multiaddr }>
-      getMultiaddrsForPeer(id: PeerId): Array<string>
-      set(peerId: PeerId, multiaddrs: Array<Multiaddr>)
-    }
+    addressBook: AddressBook
 
     protoBook: {} // TODO
   }
