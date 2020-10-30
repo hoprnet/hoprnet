@@ -52,7 +52,3 @@ jobs:
         if: matrix.package != 'all' 
         run: |
           node_modules/.bin/lerna run test --scope @hoprnet/hopr-${{ matrix.package }}
-
-#      - name: Test Docker build hoprd
-#        working-directory: packages/hoprd
-#        run: docker build .
