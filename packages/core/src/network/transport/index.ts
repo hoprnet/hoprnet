@@ -7,14 +7,14 @@ import debug from 'debug'
 import { socketToConn } from './socket-to-conn'
 import libp2p from 'libp2p'
 import Listener from './listener'
-import { USE_WEBRTC, CODE_P2P } from './constants'
+import { CODE_P2P, DELIVERY } from './constants'
 import Multiaddr from 'multiaddr'
-import type { Upgrader, DialOptions, ConnHandler, MultiaddrConnection } from 'libp2p'
-import type { Connection } from 'libp2p'
-import chalk from 'chalk'
-import { WebRTCUpgrader } from './webrtc'
-import Relay from './relay'
 import PeerId from 'peer-id'
+import type { Connection, Upgrader, DialOptions, ConnHandler, Handler, MultiaddrConnection } from 'libp2p'
+import chalk from 'chalk'
+// import { WebRTCUpgrader } from './webrtc'
+import Relay from './relay'
+import { RelayConnection } from './relayConnection'
 
 const log = debug('hopr-core:transport')
 const error = debug('hopr-core:transport:error')
@@ -29,34 +29,20 @@ class TCP {
     return 'TCP'
   }
 
-  private _useWebRTC: boolean
+  // private _useWebRTC: boolean
   private _upgrader: Upgrader
+  private _peerId: PeerId
+  private _multiaddrs: Multiaddr[]
   private relays?: Multiaddr[]
   private stunServers: Multiaddr[]
   private _relay: Relay
-  // @ts-ignore
-  private _webRTCUpgrader: WebRTCUpgrader
+  // private _webRTCUpgrader: WebRTCUpgrader
   private connHandler: ConnHandler
-  private id: PeerId
-  private multiaddrs: Multiaddr[]
-
-  // ONLY FOR TESTING
-  //@ts-ignore
-  private _failIntentionallyOnWebRTC?: boolean
-  //@ts-ignore
-  private _timeoutIntentionallyOnWebRTC?: Promise<void>
-  //@ts-ignore
-  private _answerIntentionallyWithIncorrectMessages?: boolean
-  // END ONLY FOR TESTING
 
   constructor({
     upgrader,
     libp2p,
-    bootstrapServers,
-    useWebRTC,
-    failIntentionallyOnWebRTC,
-    timeoutIntentionallyOnWebRTC,
-    answerIntentionallyWithIncorrectMessages
+    bootstrapServers
   }: {
     upgrader: Upgrader
     libp2p: libp2p
@@ -76,7 +62,7 @@ class TCP {
 
     if (bootstrapServers?.length > 0) {
       this.relays = bootstrapServers.filter(
-        (ma: Multiaddr) => ma !== undefined && libp2p.peerId.toB58String() !== ma.getPeerId()
+        (ma: Multiaddr) => ma !== undefined && !libp2p.peerId.equals(PeerId.createFromCID(ma.getPeerId()))
       )
 
       this.stunServers = []
@@ -96,35 +82,55 @@ class TCP {
       }
     }
 
-    this._timeoutIntentionallyOnWebRTC = timeoutIntentionallyOnWebRTC
-    this._answerIntentionallyWithIncorrectMessages = answerIntentionallyWithIncorrectMessages
-    this._failIntentionallyOnWebRTC = failIntentionallyOnWebRTC || false
-    this._useWebRTC = useWebRTC === undefined ? USE_WEBRTC : useWebRTC
+    // this._useWebRTC = false // useWebRTC === undefined ? USE_WEBRTC : useWebRTC
+    this._peerId = libp2p.peerId
+    this._multiaddrs = libp2p.multiaddrs
     this._upgrader = upgrader
-    this.id = libp2p.peerId
-    this.multiaddrs = libp2p.multiaddrs
 
-    if (this._useWebRTC) {
-      this._webRTCUpgrader = new WebRTCUpgrader({ stunServers: this.stunServers })
-    }
+    // if (this._useWebRTC) {
+    //   this._webRTCUpgrader = new WebRTCUpgrader({ stunServers: this.stunServers })
+    // }
 
-    this._relay = new Relay(libp2p, this.handleDelivery.bind(this))
+    libp2p.handle(DELIVERY, this.handleDelivery.bind(this))
+
+    this._relay = new Relay(libp2p /*, this._webRTCUpgrader*/)
     verbose(`Created TCP stack (Stun: ${this.stunServers?.map((x) => x.toString()).join(',')}`)
   }
 
-  async handleDelivery(relayConn: MultiaddrConnection) {
+  onReconnect(conn: Connection) {
+    return async function (relayConn: RelayConnection) {
+      const newStream = relayConn.switch()
+      if (conn != null) {
+        // @ts-ignore
+        conn._close = () => Promise.resolve()
+        await conn.close()
+      }
+
+      log(`####### inside reconnect #######`)
+
+      try {
+        this._upgrader.upgradeInbound(newStream).then((conn: Connection) => this.connHandler?.(conn))
+      } catch (err) {
+        error(err)
+      }
+    }.bind(this)
+  }
+
+  async handleDelivery(handler: Handler) {
     //verbose('handle delivery', connection.remoteAddr.toString(), counterparty.toB58String())
-    let conn: Connection
+
+    let newConn: Connection
 
     try {
-      // @ts-ignore
-      conn = await this._upgrader.upgradeInbound(relayConn)
+      let relayConnection = await this._relay.handleRelayConnection(handler, this.onReconnect(newConn))
+
+      newConn = await this._upgrader.upgradeInbound(relayConnection)
     } catch (err) {
       error(`Could not upgrade relayed connection. Error was: ${err}`)
       return
     }
 
-    this.connHandler?.(conn)
+    this.connHandler?.(newConn)
   }
 
   /**
@@ -139,7 +145,8 @@ class TCP {
 
     let error: Error
     if (
-      // (this.relays == null || this.relays.some((pInfo) => ma.getPeerId() === pInfo.id.toB58String())) &&
+      // uncommenting next line forces our node to use a relayed connection to any node execpt for the bootstrap server
+      (this.relays == null || this.relays.some((mAddr: Multiaddr) => ma.getPeerId() === mAddr.getPeerId())) &&
       ['ip4', 'ip6', 'dns4', 'dns6'].includes(ma.protoNames()[0]) &&
       this.isRealisticAddress(ma)
     ) {
@@ -154,7 +161,8 @@ class TCP {
           // expected case, continue
           error = err
         } else {
-          // Unexpected error
+          // Unexpected error, ie:
+          // type === aborted
           verbose(`Dial directly unexpected error ${err}`)
           throw err
         }
@@ -172,7 +180,7 @@ class TCP {
     }
 
     // Check whether we know some relays that we can use
-    const potentialRelays = this.relays?.filter((r: Multiaddr) => r.getPeerId() !== ma.getPeerId())
+    const potentialRelays = this.relays?.filter((mAddr: Multiaddr) => mAddr.getPeerId() !== ma.getPeerId())
 
     if (potentialRelays == null || potentialRelays.length == 0) {
       throw Error(
@@ -191,12 +199,27 @@ class TCP {
   }
 
   async dialWithRelay(ma: Multiaddr, relays: Multiaddr[], options?: DialOptions): Promise<Connection> {
-    const relayConnection = await this._relay.establishRelayedConnection(ma, relays, options)
-    return await this._upgrader.upgradeOutbound(relayConnection)
+    // if (this._useWebRTC) {
+    //   const onReconnect = () => {
+    //     console.log(`reconnect in dialer`)
+    //   }
+    //   const relayConnection = await this._relay.establishRelayedConnection(ma, relays, onReconnect, options)
+
+    //   return await this._upgrader.upgradeOutbound(relayConnection)
+    // } else {
+    let relayConnection: MultiaddrConnection
+    let newConn: Connection
+
+    relayConnection = await this._relay.establishRelayedConnection(ma, relays, this.onReconnect(newConn), options)
+
+    newConn = await this._upgrader.upgradeOutbound(relayConnection)
+
+    return newConn
+    // }
   }
 
   async dialDirectly(ma: Multiaddr, options?: DialOptions): Promise<Connection> {
-    log(`[${chalk.blue(this.id.toB58String())}] dialing ${chalk.yellow(ma.toString())} directly`)
+    log(`[${chalk.blue(this._peerId.toB58String())}] dialing ${chalk.yellow(ma.toString())} directly`)
     const socket = await this._connect(ma, options)
     const maConn = socketToConn(socket, { remoteAddr: ma, signal: options?.signal })
 
@@ -307,7 +330,7 @@ class TCP {
    * @param ma Multiaddr to check
    */
   private isRealisticAddress(ma: Multiaddr): boolean {
-    if (ma.getPeerId() === this.id.toB58String()) {
+    if (ma.getPeerId() === this._peerId.toB58String()) {
       log('Tried to dial self, skipping.')
       return false
     }
@@ -318,7 +341,7 @@ class TCP {
 
     if (
       ['ip4', 'ip6', 'dns4', 'dns6'].includes(ma.protoNames()[0]) &&
-      this.multiaddrs
+      this._multiaddrs
         .map((ma: Multiaddr) => ma.nodeAddress())
         .filter(
           (x) =>

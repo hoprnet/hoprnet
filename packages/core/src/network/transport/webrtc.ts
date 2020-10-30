@@ -1,14 +1,14 @@
-//import { AbortError } from 'abortable-iterator'
+// import { AbortError } from 'abortable-iterator'
 import SimplePeer from 'simple-peer'
 import debug from 'debug'
 // @ts-ignore
 import wrtc = require('wrtc')
-//import { WEBRTC_TIMEOUT } from './constants'
+// import { WEBRTC_TIMEOUT } from './constants'
 import type Multiaddr from 'multiaddr'
 
 const log = debug('hopr-core:transport')
-//const error = debug('hopr-core:transport:error')
-//const verbose = debug('hopr-core:verbose:transport:webrtc')
+// const error = debug('hopr-core:transport:error')
+// const verbose = debug('hopr-core:verbose:transport:webrtc')
 
 class WebRTCUpgrader {
   private _stunServers?: {

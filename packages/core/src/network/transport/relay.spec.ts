@@ -8,79 +8,99 @@ import SECIO = require('libp2p-secio')
 // @ts-ignore
 import TCP from 'libp2p-tcp'
 
-import { Handler, MultiaddrConnection } from 'libp2p'
+import { Handler, MultiaddrConnection, Stream } from 'libp2p'
+
 import Multiaddr from 'multiaddr'
 import pipe from 'it-pipe'
+
 import Relay from './relay'
 import { randomBytes } from 'crypto'
-import { privKeyToPeerId } from '../../utils'
-import { getAddress } from '../../test-utils'
 import assert from 'assert'
+
+import { privKeyToPeerId } from '../../utils'
+// import defer from 'p-defer'
+// import { WebRTCUpgrader } from './webrtc'
+import { DELIVERY } from './constants'
 
 const TEST_PROTOCOL = `/test/0.0.1`
 
 const privKeys = [randomBytes(32), randomBytes(32), randomBytes(32)]
 
-async function generateNode(options: {
-  id: number
-  ipv4?: boolean
-  ipv6?: boolean
-  connHandler?: (conn: MultiaddrConnection) => void
-}): Promise<{ node: libp2p; relay: Relay }> {
-  const peerId = await privKeyToPeerId(privKeys[options.id])
-  let addresses = []
+describe('should create a socket and connect to it', function () {
+  async function generateNode(options: {
+    id: number
+    ipv4?: boolean
+    ipv6?: boolean
+    connHandler?: (conn: MultiaddrConnection) => void
+  }): Promise<{ node: libp2p; relay: Relay }> {
+    const peerId = await privKeyToPeerId(privKeys[options.id])
 
-  if (options.ipv4) {
-    addresses = [Multiaddr(`/ip4/127.0.0.1/tcp/${9490 + 2 * options.id}`).encapsulate(`/p2p/${peerId.toB58String()}`)]
-  }
-
-  if (options.ipv6) {
-    addresses = [Multiaddr(`/ip6/::1/tcp/${9490 + 2 * options.id + 1}`).encapsulate(`/p2p/${peerId.toB58String()}`)]
-  }
-
-  const node = new libp2p({
-    peerId,
-    addresses: { listen: addresses },
-    modules: {
-      transport: [TCP],
-      streamMuxer: [MPLEX],
-      connEncryption: [SECIO],
-      dht: KadDHT
-    },
-    config: {
-      dht: {
-        enabled: false
-      },
-      relay: {
-        enabled: false
-      },
-      peerDiscovery: {
-        autoDial: false
-      }
+    let addresses = {
+      listen: []
     }
-  })
+    if (options.ipv4) {
+      addresses.listen.push(
+        Multiaddr(`/ip4/127.0.0.1/tcp/${9490 + 2 * options.id}`).encapsulate(`/p2p/${peerId.toB58String()}`)
+      )
+    }
 
-  let relay = new Relay(node, options.connHandler)
+    if (options.ipv6) {
+      addresses.listen.push(
+        Multiaddr(`/ip6/::1/tcp/${9490 + 2 * options.id + 1}`).encapsulate(`/p2p/${peerId.toB58String()}`)
+      )
+    }
 
-  node.handle([TEST_PROTOCOL], (handler: Handler) => {
-    pipe(
-      handler.stream,
-      // echoing msg
-      handler.stream
-    )
-  })
+    const node = new libp2p({
+      peerId,
+      addresses,
+      modules: {
+        transport: [TCP],
+        streamMuxer: [MPLEX],
+        connEncryption: [SECIO],
+        dht: KadDHT
+      },
+      config: {
+        dht: {
+          enabled: false
+        },
+        relay: {
+          enabled: false
+        },
+        peerDiscovery: {
+          autoDial: false
+        }
+      }
+    })
 
-  await node.start()
+    let relay = new Relay(node)
 
-  return {
-    node,
-    relay
+    node.handle(DELIVERY, (conn) => {
+      function onReconnected() {
+        console.log(`reconnected counterparty`)
+      }
+      relay.handleRelayConnection
+        .call(relay, conn, onReconnected)
+        .then((relayConn: MultiaddrConnection) => options.connHandler?.(relayConn))
+    })
+
+    node.handle(TEST_PROTOCOL, (handler: Handler) => {
+      pipe(
+        handler.stream,
+        // echoing msg
+        handler.stream
+      )
+    })
+
+    await node.start()
+
+    return {
+      node,
+      relay
+    }
   }
-}
 
-describe('transport/relay.spec.ts should create a socket and connect to it', function () {
   it('should create a node and echo a single message', async function () {
-    let [sender, relayer, counterparty] = await Promise.all([
+    let [sender, relay, counterparty] = await Promise.all([
       generateNode({ id: 0, ipv4: true }),
       generateNode({ id: 1, ipv4: true }),
       generateNode({
@@ -89,10 +109,10 @@ describe('transport/relay.spec.ts should create a socket and connect to it', fun
         connHandler: (conn: MultiaddrConnection) => {
           pipe(
             conn,
-            (source: AsyncIterable<Uint8Array>) => {
+            (source: Stream['source']) => {
               return (async function* () {
                 for await (const msg of source) {
-                  //console.log(`echoing <${new TextDecoder().decode(msg.slice())}>`)
+                  console.log(`receiving <${new TextDecoder().decode(msg.slice())}>`)
                   yield msg
                 }
               })()
@@ -104,76 +124,101 @@ describe('transport/relay.spec.ts should create a socket and connect to it', fun
     ])
 
     // Make sure that the nodes know each other
-    await Promise.all([sender.node.dial(getAddress(relayer.node)), counterparty.node.dial(getAddress(relayer.node))])
+    await Promise.all([sender.node.dial(relay.node.peerId), counterparty.node.dial(relay.node.peerId)])
 
     let conn = await sender.relay.establishRelayedConnection(
       Multiaddr(`/p2p/${counterparty.node.peerId.toB58String()}`),
-      relayer.node.multiaddrs
+      [relay.node.multiaddrs[0]],
+      // ignore reconnects
+      async () => {
+        console.log(`initiator reconnected`)
+      }
+      /* new WebRTCUpgrader({}) */
     )
 
-    await pipe(
+    conn.sink(
       (async function* () {
-        yield new TextEncoder().encode(`first message`)
+        let i = 0
+        while (i < 12) {
+          yield new TextEncoder().encode(`message ${i++}`)
 
-        await new Promise((resolve) => setTimeout(resolve, 100))
-
-        yield new TextEncoder().encode(`second message`)
-      })(),
-      conn,
-      async (source: AsyncIterable<Uint8Array>) => {
-        setTimeout(() => setImmediate(() => conn.close()), 300)
-        for await (const _msg of source) {
-          //console.log(`received <${new TextDecoder().decode(msg.slice())}>`)
+          await new Promise((resolve) => setTimeout(resolve, 100))
         }
-      }
+      })()
     )
 
-    await counterparty.node.stop()
-
-    await new Promise((resolve) => setTimeout(resolve, 200))
-
-    counterparty = await generateNode({
-      id: 2,
-      ipv4: true,
-      connHandler: (conn: MultiaddrConnection) => {
-        pipe(
-          conn,
-          (source: AsyncIterable<Uint8Array>) => {
-            return (async function* () {
-              for await (const msg of source) {
-                //console.log(`echoing <${new TextDecoder().decode(msg.slice())}>`)
-                yield msg
-              }
-            })()
-          },
-          conn
-        )
+    function drain({ done, value }: { done?: Boolean; value?: Uint8Array | void }) {
+      if (value != null) {
+        console.log(`Received <${new TextDecoder().decode(value as Uint8Array)}>`)
       }
-    })
 
-    await counterparty.node.dial(getAddress(relayer.node))
-    conn = await sender.relay.establishRelayedConnection(
-      Multiaddr(`/p2p/${counterparty.node.peerId.toB58String()}`),
-      relayer.node.multiaddrs
-    )
-
-    await pipe(
-      (async function* () {
-        yield new TextEncoder().encode(`first message`)
-        await new Promise((resolve) => setTimeout(resolve, 100))
-        yield new TextEncoder().encode(`second message`)
-      })(),
-      conn,
-      async (source: AsyncIterable<Uint8Array>) => {
-        setTimeout(() => setImmediate(() => conn.close()), 300)
-        for await (const msg of source) {
-          console.log(`received <${new TextDecoder().decode(msg.slice())}>`)
-        }
+      if (!done) {
+        conn.source.next().then(drain)
       }
-    )
+    }
 
-    await Promise.all([sender, relayer, counterparty].map((x) => x.node.stop()))
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    conn.source.next().then(drain)
+
+    setTimeout(async () => {
+      counterparty.node.stop()
+      await new Promise((resolve) => setTimeout(resolve, 300))
+
+      counterparty = await generateNode({
+        id: 2,
+        ipv4: true
+      })
+
+      let conn = await counterparty.relay.establishRelayedConnection(
+        Multiaddr(`/p2p/${sender.node.peerId.toB58String()}`),
+        [relay.node.multiaddrs[0]],
+        // ignore reconnects
+        async () => {}
+        /* new WebRTCUpgrader({}) */
+      )
+
+      pipe(
+        conn,
+        (source: Stream['source']) => {
+          return (async function* () {
+            for await (const msg of source) {
+              console.log(`echoing <${new TextDecoder().decode(msg.slice())}>`)
+              yield new TextEncoder().encode(`Echoed <${new TextDecoder().decode(msg.slice())}>`)
+            }
+          })()
+        },
+        conn
+      )
+    }, 500)
+
+    // await new Promise((resolve) => setTimeout(resolve, 200))
+
+    // await counterparty.dial(relay.peerInfo)
+    // //@ts-ignore
+    // conn = await sender.relay.establishRelayedConnection(
+    //   Multiaddr(`/p2p/${counterparty.peerInfo.id.toB58String()}`),
+    //   [relay.peerInfo],
+    //   new WebRTCUpgrader({})
+    // )
+
+    // await pipe(
+    //   /* prettier-ignore */
+    //   (async function * () {
+    //     yield new TextEncoder().encode(`first message`)
+
+    //     await new Promise(resolve => setTimeout(resolve, 100))
+
+    //     yield new TextEncoder().encode(`second message`)
+    //   })(),
+    //   conn,
+    //   async (source: AsyncIterable<Uint8Array>) => {
+    //     setTimeout(() => setImmediate(() => conn.close()), 300)
+    //     for await (const msg of source) {
+    //       console.log(`received <${new TextDecoder().decode(msg.slice())}>`)
+    //     }
+    //   }
+    // )
+
+    await new Promise((resolve) => setTimeout(resolve, 2000))
   })
 
   it('should create a node and exchange messages', async function () {
@@ -434,13 +479,13 @@ describe('transport/relay.spec.ts should create a socket and connect to it', fun
   it('should not use itself as relay node', async function () {
     let [sender, counterparty] = await Promise.all([
       generateNode({ id: 0, ipv4: true }),
-      generateNode({ id: 2, ipv4: true })
+      generateNode({ id: 2, ipv4: true }),
     ])
     let errThrown = false
     try {
-      await sender.relay.establishRelayedConnection(
-        Multiaddr(`/p2p/${counterparty.node.peerId.toB58String()}`),
-        sender.node.multiaddrs
+      await sender.relay.establishRelayedConnection(Multiaddr(`/p2p/${counterparty.node.peerId.toB58String()}`),
+        sender.node.multiaddrs,
+        async () => {}
       )
     } catch (err) {
       errThrown = true

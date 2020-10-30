@@ -55,7 +55,9 @@ export function getExternalIp(
       port: number
     }
 
-    let timeout
+    // @TODO add assert call
+    // let _finished = false
+    let timeout: NodeJS.Timeout
 
     const msgHandler = (msg: Buffer) => {
       verbose(`stun received`)
@@ -85,6 +87,8 @@ export function getExternalIp(
               result = attr
             } else if (tids.length == 0 || attr.port != result.port || attr.address !== result.address) {
               socket.removeListener('message', msgHandler)
+              // @TODO add assert call
+              // _finished = true
               clearTimeout(timeout)
               resolve({
                 address: attr.address === result.address ? attr.address : undefined,
@@ -119,6 +123,8 @@ export function getExternalIp(
     })
 
     timeout = setTimeout(() => {
+      // @TODO add assert call
+      // _finished = true
       if (result == null) {
         reject(Error(`Timeout. Could not complete STUN request in time.`))
       } else {
