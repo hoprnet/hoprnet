@@ -11,7 +11,7 @@
     "clean": "rimraf ./lib",
     "test": "mocha --exit",
     "dev": "yarn clean && yarn build:types && tsc -w",
-    "build:types": "typechain --target web3-v1 --outDir './src/tsc/web3' './node_modules/@hoprnet/hopr-ethereum/chain/abis/*.json'",
+    "build:types": "typechain --target web3-v1 --outDir './src/tsc/web3' '../../node_modules/@hoprnet/hopr-ethereum/chain/abis/*.json'",
     "build": "yarn clean && yarn build:types && mkdir -p ./lib/tsc/web3 && cp -R ./src/tsc/web3 ./lib/tsc/web3 && tsc",
     "prepublishOnly": "yarn build"
   },
