@@ -32,6 +32,7 @@ jobs:
         run: |
           yarn
           node_modules/.bin/lerna bootstrap
+          yarn autoclean --force
 
       - name: Lint & Fix
         run: |
