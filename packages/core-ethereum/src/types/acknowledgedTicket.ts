@@ -1,7 +1,7 @@
 import type HoprEthereum from '../'
-import {Hash, SignedTicket} from '.'
+import { Hash, SignedTicket } from '.'
 
-import {HASHED_SECRET_WIDTH} from '../hashedSecret'
+import { HASHED_SECRET_WIDTH } from '../hashedSecret'
 
 // @TODO this is a duplicate of the same class in hopr-core
 class AcknowledgedTicket extends Uint8Array {
@@ -136,8 +136,8 @@ class AcknowledgedTicket extends Uint8Array {
 
   static create(
     coreConnector: HoprEthereum,
-    arr?: {bytes: ArrayBuffer; offset: number},
-    struct?: {signedTicket?: SignedTicket; response?: Hash; preImage?: Hash; redeemed?: boolean}
+    arr?: { bytes: ArrayBuffer; offset: number },
+    struct?: { signedTicket?: SignedTicket; response?: Hash; preImage?: Hash; redeemed?: boolean }
   ) {
     return new AcknowledgedTicket(coreConnector, arr, struct)
   }

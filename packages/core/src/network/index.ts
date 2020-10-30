@@ -1,16 +1,16 @@
-import type {HoprOptions} from '..'
-import type {Interactions} from '../interactions'
-import type {LibP2P} from '../index'
-import {Crawler} from './crawler'
+import type { HoprOptions } from '..'
+import type { Interactions } from '../interactions'
+import type { LibP2P } from '../index'
+import { Crawler } from './crawler'
 import Heartbeat from './heartbeat'
 import NetworkPeers from './network-peers'
 import Stun from './stun'
 import Multiaddr from 'multiaddr'
 import PeerId from 'peer-id'
-import type {Connection} from 'libp2p'
+import type { Connection } from 'libp2p'
 
 type TestOpts = {
-  crawl?: {timeoutIntentionally?: boolean}
+  crawl?: { timeoutIntentionally?: boolean }
 }
 class Network {
   public crawler: Crawler
@@ -76,4 +76,4 @@ class Network {
   }
 }
 
-export {Network}
+export { Network }

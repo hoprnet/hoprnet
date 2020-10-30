@@ -1,6 +1,6 @@
 import PeerId from 'peer-id'
-import {keys as libp2p_crypto} from 'libp2p-crypto'
-import {stringToU8a} from '@hoprnet/hopr-utils'
+import { keys as libp2p_crypto } from 'libp2p-crypto'
+import { stringToU8a } from '@hoprnet/hopr-utils'
 
 const COMPRESSED_PUBLIC_KEY_LENGTH = 33
 

@@ -1,8 +1,8 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
-import {moveDecimalPoint} from '@hoprnet/hopr-utils'
-import {AbstractCommand} from './abstractCommand'
-import {styleValue} from '../utils'
+import { moveDecimalPoint } from '@hoprnet/hopr-utils'
+import { AbstractCommand } from './abstractCommand'
+import { styleValue } from '../utils'
 
 export default class PrintBalance extends AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {
@@ -22,8 +22,8 @@ export default class PrintBalance extends AbstractCommand {
    * @notice triggered by the CLI
    */
   public async execute(): Promise<string> {
-    const {paymentChannels} = this.node
-    const {Balance, NativeBalance} = paymentChannels.types
+    const { paymentChannels } = this.node
+    const { Balance, NativeBalance } = paymentChannels.types
 
     const hoprPrefix = 'HOPR Balance:'
     const hoprBalance = await paymentChannels.account.balance.then((b) => {

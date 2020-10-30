@@ -1,6 +1,6 @@
-import {AbstractCommand} from './abstractCommand'
+import { AbstractCommand } from './abstractCommand'
 import pkg from '../package.json'
-import {styleValue, getPaddingLength} from '../utils'
+import { styleValue, getPaddingLength } from '../utils'
 
 export default class Version extends AbstractCommand {
   private items: {

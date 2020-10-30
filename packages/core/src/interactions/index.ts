@@ -1,11 +1,11 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '..'
 import PeerId from 'peer-id'
-import type {Connection} from 'libp2p'
+import type { Connection } from 'libp2p'
 
-import {PaymentInteractions} from './payments'
-import {NetworkInteractions} from './network'
-import {PacketInteractions} from './packet'
+import { PaymentInteractions } from './payments'
+import { NetworkInteractions } from './network'
+import { PacketInteractions } from './packet'
 
 class Interactions<Chain extends HoprCoreConnector> {
   public payments: PaymentInteractions<Chain>
@@ -23,4 +23,4 @@ class Interactions<Chain extends HoprCoreConnector> {
   }
 }
 
-export {Interactions}
+export { Interactions }

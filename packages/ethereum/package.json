@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-ethereum",
-  "version": "1.47.0-alpha.0",
+  "version": "1.52.0-alpha.0",
   "description": "On-chain logic for hoprnet.org",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -36,8 +36,8 @@
     }
   },
   "dependencies": {
-    "@hoprnet/hopr-demo-seeds": "1.47.0-alpha.0",
-    "@hoprnet/hopr-utils": "1.47.0-alpha.0",
+    "@hoprnet/hopr-demo-seeds": "1.52.0-alpha.0",
+    "@hoprnet/hopr-utils": "1.52.0-alpha.0",
     "@openzeppelin/contracts": "^3.0.1",
     "@truffle/debug-utils": "^4.1.1",
     "@truffle/hdwallet-provider": "^1.0.34",
@@ -46,12 +46,12 @@
     "ganache-core": "2.13.1",
     "secp256k1": "4.0.2",
     "truffle": "^5.1.23",
-    "truffle-plugin-verify": "^0.4.0",
+    "truffle-plugin-verify": "^0.5.0",
     "ts-node": "^9.0.0",
     "web3": "^1.2.11"
   },
   "devDependencies": {
-    "@hoprnet/hopr-testing": "1.47.0-alpha.0",
+    "@hoprnet/hopr-testing": "1.52.0-alpha.0",
     "@openzeppelin/test-helpers": "0.5.6",
     "@typechain/truffle-v5": "1.0.0",
     "@types/chai": "^4.2.11",

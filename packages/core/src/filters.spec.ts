@@ -1,4 +1,4 @@
-import {peerHasOnlyPublicAddresses, peerHasOnlyPrivateAddresses} from './filters'
+import { peerHasOnlyPublicAddresses, peerHasOnlyPrivateAddresses } from './filters'
 import assert from 'assert'
 import Multiaddr from 'multiaddr'
 

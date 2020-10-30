@@ -36,8 +36,8 @@ export type LibP2PMocks = {
 
 export async function generateLibP2PMock(addr = '/ip4/0.0.0.0/tcp/0'): Promise<LibP2PMocks> {
   const node = await LibP2P.create({
-    peerId: await PeerId.create({keyType: 'secp256k1'}),
-    addresses: {listen: [Multiaddr(addr)]},
+    peerId: await PeerId.create({ keyType: 'secp256k1' }),
+    addresses: { listen: [Multiaddr(addr)] },
     modules: {
       transport: [TCP],
       streamMuxer: [MPLEX],

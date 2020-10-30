@@ -1,6 +1,6 @@
 import assert from 'assert'
-import {lengthPrefixedToU8a} from './lengthPrefixedToU8a'
-import {toLengthPrefixedU8a} from './toLengthPrefixedU8a'
+import { lengthPrefixedToU8a } from './lengthPrefixedToU8a'
+import { toLengthPrefixedU8a } from './toLengthPrefixedU8a'
 
 describe('test length-prefixed to u8a', function () {
   it('should convert a length-prefixed u8a to u8a', function () {

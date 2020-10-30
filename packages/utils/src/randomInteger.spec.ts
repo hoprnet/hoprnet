@@ -1,5 +1,5 @@
 import assert from 'assert'
-import {randomInteger} from './randomInteger'
+import { randomInteger } from './randomInteger'
 
 describe('testing random-number generator', function () {
   let ATTEMPTS = 100

@@ -1,4 +1,4 @@
-import {networkInterfaces} from 'os'
+import { networkInterfaces } from 'os'
 import Multiaddr from 'multiaddr'
 
 export function isAnyAddress(ma: Multiaddr) {

@@ -1,8 +1,8 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
-import {u8aToHex} from '@hoprnet/hopr-utils'
-import {AbstractCommand} from './abstractCommand'
-import {styleValue} from '../utils'
+import { u8aToHex } from '@hoprnet/hopr-utils'
+import { AbstractCommand } from './abstractCommand'
+import { styleValue } from '../utils'
 
 export default class PrintAddress extends AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {
@@ -23,7 +23,7 @@ export default class PrintAddress extends AbstractCommand {
    * @notice triggered by the CLI
    */
   public async execute(query: string): Promise<string> {
-    const {utils} = this.node.paymentChannels
+    const { utils } = this.node.paymentChannels
 
     const hoprPrefix = 'HOPR Address:'
     const hoprAddress = this.node.getId().toB58String()

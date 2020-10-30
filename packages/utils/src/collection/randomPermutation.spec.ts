@@ -1,5 +1,5 @@
 import assert from 'assert'
-import {randomPermutation} from './randomPermutation'
+import { randomPermutation } from './randomPermutation'
 
 describe('testing random permutation', function () {
   let ATTEMPTS = 2

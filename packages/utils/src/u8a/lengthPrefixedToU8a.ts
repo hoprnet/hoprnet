@@ -1,5 +1,5 @@
-import {LENGTH_PREFIX_LENGTH} from './constants'
-import {u8aToNumber} from './u8aToNumber'
+import { LENGTH_PREFIX_LENGTH } from './constants'
+import { u8aToNumber } from './u8aToNumber'
 
 /**
  * Decodes a length-prefixed array and returns the encoded data.

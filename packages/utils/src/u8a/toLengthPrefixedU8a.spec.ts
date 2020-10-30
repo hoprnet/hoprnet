@@ -1,6 +1,6 @@
 import assert from 'assert'
-import {toLengthPrefixedU8a} from './toLengthPrefixedU8a'
-import {u8aConcat} from './concat'
+import { toLengthPrefixedU8a } from './toLengthPrefixedU8a'
+import { u8aConcat } from './concat'
 
 describe('test u8a to length-prefixed u8a', function () {
   it('should return a length-prefixed u8a', function () {

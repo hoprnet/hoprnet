@@ -1,7 +1,7 @@
 import assert from 'assert'
-import {randomBytes} from 'crypto'
+import { randomBytes } from 'crypto'
 import secp256k1 from 'secp256k1'
-import {stringToU8a, u8aEquals} from '@hoprnet/hopr-utils'
+import { stringToU8a, u8aEquals } from '@hoprnet/hopr-utils'
 import * as utils from '.'
 
 const pair = {
@@ -77,7 +77,7 @@ describe('test utils', function () {
   })
 
   it('should sign and verify signer', async function () {
-    const {privKey, pubKey} = generatePair()
+    const { privKey, pubKey } = generatePair()
 
     const message = generateMsg()
     const signature = await utils.sign(message, privKey)
@@ -87,7 +87,7 @@ describe('test utils', function () {
   })
 
   it('should sign and verify messages', async function () {
-    const {privKey, pubKey} = generatePair()
+    const { privKey, pubKey } = generatePair()
 
     const message = generateMsg()
     const signature = await utils.sign(message, privKey)

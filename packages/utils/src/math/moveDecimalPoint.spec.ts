@@ -1,5 +1,5 @@
 import assert from 'assert'
-import {moveDecimalPoint} from './moveDecimalPoint'
+import { moveDecimalPoint } from './moveDecimalPoint'
 
 describe('test moveDecimalPoint', function () {
   it('should result to 100', function () {

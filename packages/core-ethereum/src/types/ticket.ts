@@ -1,9 +1,9 @@
-import type {Types} from '@hoprnet/hopr-core-connector-interface'
+import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
-import {stringToU8a, u8aToHex} from '@hoprnet/hopr-utils'
-import {AccountId, Balance, Hash, Signature, TicketEpoch} from '.'
-import {Uint8ArrayE} from '../types/extended'
-import {sign} from '../utils'
+import { stringToU8a, u8aToHex } from '@hoprnet/hopr-utils'
+import { AccountId, Balance, Hash, Signature, TicketEpoch } from '.'
+import { Uint8ArrayE } from '../types/extended'
+import { sign } from '../utils'
 
 import Web3 from 'web3'
 const web3 = new Web3()

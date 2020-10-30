@@ -1,18 +1,18 @@
 import assert from 'assert'
 import Web3 from 'web3'
-import {stringToU8a, u8aEquals} from '@hoprnet/hopr-utils'
-import {Ganache} from '@hoprnet/hopr-testing'
-import {NODE_SEEDS} from '@hoprnet/hopr-demo-seeds'
-import {migrate, fund} from '@hoprnet/hopr-ethereum'
+import { stringToU8a, u8aEquals } from '@hoprnet/hopr-utils'
+import { Ganache } from '@hoprnet/hopr-testing'
+import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
+import { migrate, fund } from '@hoprnet/hopr-ethereum'
 import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
 import HoprEthereum from '.'
-import {HoprToken} from './tsc/web3/HoprToken'
-import {Await} from './tsc/utils'
-import {cleanupPromiEvent} from './utils'
-import {createNode, getPrivKeyData, createAccountAndFund} from './utils/testing.spec'
+import { HoprToken } from './tsc/web3/HoprToken'
+import { Await } from './tsc/utils'
+import { cleanupPromiEvent } from './utils'
+import { createNode, getPrivKeyData, createAccountAndFund } from './utils/testing.spec'
 import * as testconfigs from './config.spec'
 import * as configs from './config'
-import {randomBytes} from 'crypto'
+import { randomBytes } from 'crypto'
 
 describe('test connector', function () {
   const ganache = new Ganache()
@@ -47,7 +47,7 @@ describe('test connector', function () {
     it('should generate nonces in parallel', async function () {
       const latestNonce = await web3.eth.getTransactionCount(owner.address.toHex())
       const results = await Promise.all(
-        Array.from({length: parallel}).map(async (_, expectedNonce) => {
+        Array.from({ length: parallel }).map(async (_, expectedNonce) => {
           const nonce = await connector.account.nonce
           return nonce === latestNonce + expectedNonce
         })
@@ -91,10 +91,10 @@ describe('test connector', function () {
 
           await Promise.all([
             once(),
-            hoprToken.methods.transfer(receiver.address.toHex(), 1).send({from: owner.address.toHex()}),
-            hoprToken.methods.transfer(receiver.address.toHex(), 1).send({from: owner.address.toHex()})
+            hoprToken.methods.transfer(receiver.address.toHex(), 1).send({ from: owner.address.toHex() }),
+            hoprToken.methods.transfer(receiver.address.toHex(), 1).send({ from: owner.address.toHex() })
           ])
-          await hoprToken.methods.transfer(receiver.address.toHex(), 1).send({from: owner.address.toHex()})
+          await hoprToken.methods.transfer(receiver.address.toHex(), 1).send({ from: owner.address.toHex() })
 
           assert.equal(numberOfEvents, 1, 'check cleanupPromiEvent')
           return resolve()

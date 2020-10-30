@@ -1,5 +1,5 @@
 import type PeerId from 'peer-id'
-import {styleValue} from '../utils'
+import { styleValue } from '../utils'
 
 export type AutoCompleteResult = [string[], string]
 export const emptyAutoCompleteResult = (line: string): AutoCompleteResult => [[''], line]

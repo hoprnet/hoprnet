@@ -1,12 +1,12 @@
 import assert from 'assert'
 import PeerId from 'peer-id'
-import {Acknowledgement} from '.'
-import {Challenge} from '../packet/challenge'
-import {u8aEquals} from '@hoprnet/hopr-utils'
+import { Acknowledgement } from '.'
+import { Challenge } from '../packet/challenge'
+import { u8aEquals } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
-import {Utils, Types} from '@hoprnet/hopr-core-ethereum'
+import { Utils, Types } from '@hoprnet/hopr-core-ethereum'
 import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import {randomBytes} from 'crypto'
+import { randomBytes } from 'crypto'
 import secp256k1 from 'secp256k1'
 
 describe('test acknowledgement generation', function () {

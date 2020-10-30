@@ -1,4 +1,4 @@
-import {durations} from '../time'
+import { durations } from '../time'
 
 /**
  * Starts an interval after a timeout.

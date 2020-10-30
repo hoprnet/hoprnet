@@ -1,5 +1,5 @@
 import assert from 'assert'
-import {u8aCompare, A_EQUALS_B, A_STRICLY_LESS_THAN_B, A_STRICTLY_GREATER_THAN_B} from './u8aCompare'
+import { u8aCompare, A_EQUALS_B, A_STRICLY_LESS_THAN_B, A_STRICTLY_GREATER_THAN_B } from './u8aCompare'
 
 describe('test u8aCompare', function () {
   it('should compare uint8Arrays', function () {

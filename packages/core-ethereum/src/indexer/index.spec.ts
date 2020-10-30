@@ -1,22 +1,22 @@
 import assert from 'assert'
 import BN from 'bn.js'
 import Web3 from 'web3'
-import {Ganache} from '@hoprnet/hopr-testing'
-import {migrate, fund} from '@hoprnet/hopr-ethereum'
-import {durations, u8aToHex} from '@hoprnet/hopr-utils'
-import {stringToU8a} from '@hoprnet/hopr-utils'
+import { Ganache } from '@hoprnet/hopr-testing'
+import { migrate, fund } from '@hoprnet/hopr-ethereum'
+import { durations, u8aToHex } from '@hoprnet/hopr-utils'
+import { stringToU8a } from '@hoprnet/hopr-utils'
 import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
 import HoprChannelsAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprChannels.json'
 import * as testconfigs from '../config.spec'
 import * as configs from '../config'
-import {time, wait, isPartyA} from '../utils'
-import {Account, getPrivKeyData, createAccountAndFund, createNode} from '../utils/testing.spec'
-import {HoprToken} from '../tsc/web3/HoprToken'
-import {HoprChannels} from '../tsc/web3/HoprChannels'
+import { time, wait, isPartyA } from '../utils'
+import { Account, getPrivKeyData, createAccountAndFund, createNode } from '../utils/testing.spec'
+import { HoprToken } from '../tsc/web3/HoprToken'
+import { HoprChannels } from '../tsc/web3/HoprChannels'
 import type CoreConnector from '..'
-import {Public} from '../types'
-import {publicKeyConvert} from 'secp256k1'
-import {randomBytes} from 'crypto'
+import { Public } from '../types'
+import { publicKeyConvert } from 'secp256k1'
+import { randomBytes } from 'crypto'
 
 const CLOSURE_DURATION = durations.days(3)
 
@@ -517,7 +517,7 @@ describe('test indexer', function () {
       assert.equal(allChannelsFilter1.length, 1, 'check filter function')
       assert.equal(allChannelsFilter2.length, 0, 'check filter function')
 
-      const allChannelsFilter3 = await connector.indexer.get({partyA: new Public(userB.pubKey)}, filter1)
+      const allChannelsFilter3 = await connector.indexer.get({ partyA: new Public(userB.pubKey) }, filter1)
       assert.equal(allChannelsFilter3.length, 1, 'check filter function')
     })
   })

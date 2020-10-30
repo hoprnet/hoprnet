@@ -1,4 +1,4 @@
-import type {LevelUp} from 'levelup'
+import type { LevelUp } from 'levelup'
 import type * as Utils from './utils'
 import type Channel from './channel'
 import type * as Types from './types'
@@ -18,7 +18,7 @@ declare interface HoprCoreConnectorStatic {
    * @param options.provider URI that is used to connect to the blockchain
    * @param options.debug run connector in debug mode if set to true
    */
-  create(db: LevelUp, seed: Uint8Array, options?: {provider?: string; debug?: boolean}): Promise<HoprCoreConnector>
+  create(db: LevelUp, seed: Uint8Array, options?: { provider?: string; debug?: boolean }): Promise<HoprCoreConnector>
 
   readonly constants: typeof Constants
 }
@@ -146,6 +146,6 @@ declare interface HoprCoreConnector {
 
 declare var HoprCoreConnector: HoprCoreConnectorStatic
 
-export {Utils, Types, DbKeys, Constants, Channel, Indexer, HoprCoreConnectorStatic}
+export { Utils, Types, DbKeys, Constants, Channel, Indexer, HoprCoreConnectorStatic }
 
 export default HoprCoreConnector

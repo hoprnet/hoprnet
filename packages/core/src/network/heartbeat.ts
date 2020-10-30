@@ -1,16 +1,16 @@
 import NetworkPeerStore from './network-peers'
 import debug from 'debug'
-import {getTokens, Token} from '../utils'
+import { getTokens, Token } from '../utils'
 import PeerId from 'peer-id'
-import {EventEmitter} from 'events'
-import {randomInteger} from '@hoprnet/hopr-utils'
+import { EventEmitter } from 'events'
+import { randomInteger } from '@hoprnet/hopr-utils'
 import {
   HEARTBEAT_REFRESH_TIME,
   HEARTBEAT_INTERVAL_LOWER_BOUND,
   HEARTBEAT_INTERVAL_UPPER_BOUND,
   MAX_PARALLEL_CONNECTIONS
 } from '../constants'
-import {Heartbeat as HeartbeatInteraction} from '../interactions/network/heartbeat'
+import { Heartbeat as HeartbeatInteraction } from '../interactions/network/heartbeat'
 
 const log = debug('hopr-core:heartbeat')
 
@@ -37,7 +37,7 @@ class Heartbeat extends EventEmitter {
     log(`Checking nodes`)
     this.networkPeers.debugLog()
 
-    const promises: Promise<void>[] = Array.from({length: MAX_PARALLEL_CONNECTIONS})
+    const promises: Promise<void>[] = Array.from({ length: MAX_PARALLEL_CONNECTIONS })
     const tokens = getTokens(MAX_PARALLEL_CONNECTIONS)
 
     const THRESHOLD_TIME = Date.now() - HEARTBEAT_REFRESH_TIME

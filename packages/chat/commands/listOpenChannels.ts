@@ -1,11 +1,11 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
-import {pubKeyToPeerId} from '@hoprnet/hopr-core/lib/utils'
-import {moveDecimalPoint, u8aToHex} from '@hoprnet/hopr-utils'
+import { pubKeyToPeerId } from '@hoprnet/hopr-core/lib/utils'
+import { moveDecimalPoint, u8aToHex } from '@hoprnet/hopr-utils'
 import chalk from 'chalk'
-import {getMyOpenChannelInstances} from '../utils/openChannels'
-import {AbstractCommand} from './abstractCommand'
-import {getPaddingLength, styleValue} from '../utils'
+import { getMyOpenChannelInstances } from '../utils/openChannels'
+import { AbstractCommand } from './abstractCommand'
+import { getPaddingLength, styleValue } from '../utils'
 
 export default class ListOpenChannels extends AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {
@@ -71,7 +71,7 @@ export default class ListOpenChannels extends AbstractCommand {
    */
   async execute(): Promise<string | void> {
     try {
-      const {utils, types} = this.node.paymentChannels
+      const { utils, types } = this.node.paymentChannels
       const self = await this.node.paymentChannels.account.address
       const channels = await getMyOpenChannelInstances(this.node)
       const result: string[] = []

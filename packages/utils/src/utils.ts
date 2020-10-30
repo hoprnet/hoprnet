@@ -1,4 +1,4 @@
-import {performance} from 'perf_hooks'
+import { performance } from 'perf_hooks'
 
 export function timer(fn: () => void): number {
   const start = performance.now()
