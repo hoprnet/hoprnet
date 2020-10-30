@@ -134,19 +134,6 @@ class TCP {
 
       log(`####### inside reconnect #######`)
 
-      // newStream.sink(
-      //   (async function* () {
-      //     let i = 0
-      //     while (i < 7) {
-      //       yield new TextEncoder().encode(`message #${i++}`)
-      //       await new Promise((resolve) => setTimeout(resolve, 20))
-      //     }
-      //   })()
-      // )
-
-      // for await (const msg of newStream.source) {
-      //   log(`received in reconnect:`, msg?.slice())
-      // }
       try {
         this._upgrader.upgradeInbound(newStream).then((conn: Connection) => this.connHandler?.(conn))
       } catch (err) {
@@ -250,19 +237,6 @@ class TCP {
 
     relayConnection = await this._relay.establishRelayedConnection(ma, relays, this.onReconnect(newConn), options)
 
-    // relayConnection.sink(
-    //   (async function* () {
-    //     let i = 0
-    //     while (i < 7) {
-    //       yield new TextEncoder().encode(`message #${i++}`)
-    //       await new Promise((resolve) => setTimeout(resolve, 20))
-    //     }
-    //   })()
-    // )
-
-    // for await (const msg of relayConnection.source) {
-    //   log(`received in initiator:`, msg?.slice())
-    // }
     newConn = await this._upgrader.upgradeOutbound(relayConnection)
 
     return newConn
