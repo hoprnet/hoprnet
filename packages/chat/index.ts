@@ -5,17 +5,17 @@ const env = dotenv.config()
 dotenvExpand(env)
 
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import type { HoprOptions } from '@hoprnet/hopr-core'
+import type {HoprOptions} from '@hoprnet/hopr-core'
 import Hopr from '@hoprnet/hopr-core'
-import { clearString } from '@hoprnet/hopr-utils'
+import {clearString} from '@hoprnet/hopr-utils'
 import chalk from 'chalk'
 import readline from 'readline'
 import Multiaddr from 'multiaddr'
 import PeerId from 'peer-id'
 import clear from 'clear'
-import { parseOptions, yesOrNoQuestion } from './utils'
-import { Commands } from './commands'
-import { renderHoprLogo } from './logo'
+import {parseOptions, yesOrNoQuestion} from './utils'
+import {Commands} from './commands'
+import {renderHoprLogo} from './logo'
 import pkg from './package.json'
 
 export * as commands from './commands'

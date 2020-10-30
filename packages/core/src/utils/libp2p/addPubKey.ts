@@ -1,5 +1,5 @@
 import PeerId from 'peer-id'
-import { keys as libp2p_crypto } from 'libp2p-crypto'
+import {keys as libp2p_crypto} from 'libp2p-crypto'
 // @ts-ignore
 import Multihash = require('multihashes')
 

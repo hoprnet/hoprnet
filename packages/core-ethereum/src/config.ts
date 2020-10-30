@@ -1,4 +1,4 @@
-import { HOPR_TOKEN, HOPR_CHANNELS } from './ethereum/addresses'
+import {HOPR_TOKEN, HOPR_CHANNELS} from './ethereum/addresses'
 
 export const DEFAULT_URI = 'ws://127.0.0.1:9545/'
 

@@ -1,4 +1,4 @@
-import { LogStream } from './logs'
+import {LogStream} from './logs'
 
 describe('LogStream', () => {
   it('create logger', () => {

@@ -1,7 +1,7 @@
-import { PACKET_SIZE } from '../../constants'
-import { deriveCipherParameters } from './header'
+import {PACKET_SIZE} from '../../constants'
+import {deriveCipherParameters} from './header'
 
-import { toLengthPrefixedU8a, lengthPrefixedToU8a, PRP } from '@hoprnet/hopr-utils'
+import {toLengthPrefixedU8a, lengthPrefixedToU8a, PRP} from '@hoprnet/hopr-utils'
 
 export const PADDING = new TextEncoder().encode('PADDING')
 
@@ -81,7 +81,7 @@ class Message extends Uint8Array {
     this.encrypted = true
 
     for (let i = secrets.length; i > 0; i--) {
-      const { key, iv } = deriveCipherParameters(secrets[i - 1])
+      const {key, iv} = deriveCipherParameters(secrets[i - 1])
 
       PRP.createPRP(key, iv).permutate(this)
     }
@@ -90,7 +90,7 @@ class Message extends Uint8Array {
   }
 
   decrypt(secret: Uint8Array): Message {
-    const { key, iv } = deriveCipherParameters(secret)
+    const {key, iv} = deriveCipherParameters(secret)
 
     PRP.createPRP(key, iv).inverse(this)
 

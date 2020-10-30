@@ -7,9 +7,9 @@ const error = debug('libp2p:tcp:socket:error')
 import toIterable = require('stream-to-it')
 // @ts-ignore
 import toMultiaddr = require('libp2p-utils/src/ip-port-to-multiaddr')
-import { MultiaddrConnection } from 'libp2p'
+import {MultiaddrConnection} from 'libp2p'
 import type Multiaddr from 'multiaddr'
-import type { Socket } from 'net'
+import type {Socket} from 'net'
 
 const SOCKET_CLOSE_TIMEOUT = 2000
 
@@ -49,7 +49,7 @@ export function socketToConn(
     options.localAddr = options.remoteAddr
   }
 
-  const { sink, source } = toIterable.duplex(socket)
+  const {sink, source} = toIterable.duplex(socket)
   const maConn: MultiaddrConnection = {
     async sink(source) {
       if (options.signal) {
@@ -86,7 +86,7 @@ export function socketToConn(
     // If the remote address was passed, use it - it may have the peer ID encapsulated
     remoteAddr: options.remoteAddr || toWebrtcMultiaddr(socket.remoteAddress, socket.remotePort),
 
-    timeline: { open: Date.now() },
+    timeline: {open: Date.now()},
 
     close() {
       if (socket.destroyed) return

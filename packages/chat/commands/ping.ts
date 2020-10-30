@@ -1,9 +1,9 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import type PeerId from 'peer-id'
-import type { AutoCompleteResult } from './abstractCommand'
-import { AbstractCommand, GlobalState } from './abstractCommand'
-import { checkPeerIdInput, isBootstrapNode, getPeerIdsAndAliases, styleValue } from '../utils'
+import type {AutoCompleteResult} from './abstractCommand'
+import {AbstractCommand, GlobalState} from './abstractCommand'
+import {checkPeerIdInput, isBootstrapNode, getPeerIdsAndAliases, styleValue} from '../utils'
 
 export default class Ping extends AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {
@@ -36,7 +36,7 @@ export default class Ping extends AbstractCommand {
     }
 
     try {
-      const { info, latency } = await this.node.ping(peerId)
+      const {info, latency} = await this.node.ping(peerId)
       return `${out}Pong received in: ${styleValue(latency)} ms ${info}`
     } catch (err) {
       if (err && err.message) {

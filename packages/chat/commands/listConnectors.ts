@@ -1,6 +1,6 @@
 import chalk from 'chalk'
-import { knownConnectors } from '../utils/knownConnectors'
-import { AbstractCommand } from './abstractCommand'
+import {knownConnectors} from '../utils/knownConnectors'
+import {AbstractCommand} from './abstractCommand'
 
 export default class ListConnectors extends AbstractCommand {
   public name() {

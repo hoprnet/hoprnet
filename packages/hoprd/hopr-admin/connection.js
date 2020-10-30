@@ -33,8 +33,8 @@ export class Connection {
 
         // Let's elaborate on certain error messages:
         if (msg.msg.indexOf('account has no funds') > -1) {
-          this.logs.push({ msg: '- Please send 0.1 Matic to the account', ts: new Date().toISOString() })
-          this.logs.push({ msg: '- Then restart the node', ts: new Date().toISOString() })
+          this.logs.push({msg: '- Please send 0.1 Matic to the account', ts: new Date().toISOString()})
+          this.logs.push({msg: '- Then restart the node', ts: new Date().toISOString()})
         }
 
         this.setMessages(this.logs.slice(0)) // Need a clone

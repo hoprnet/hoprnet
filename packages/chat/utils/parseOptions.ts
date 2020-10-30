@@ -1,11 +1,11 @@
-import type { HoprOptions } from '@hoprnet/hopr-core'
-import { getBootstrapAddresses, parseHosts } from '@hoprnet/hopr-utils'
+import type {HoprOptions} from '@hoprnet/hopr-core'
+import {getBootstrapAddresses, parseHosts} from '@hoprnet/hopr-utils'
 import getopts from 'getopts'
 import Multiaddr from 'multiaddr'
 import ListConnctor from '../commands/listConnectors'
-import { displayHelp, styleValue } from './displayHelp'
-import { decodeMessage } from './message'
-import { knownConnectors } from './knownConnectors'
+import {displayHelp, styleValue} from './displayHelp'
+import {decodeMessage} from './message'
+import {knownConnectors} from './knownConnectors'
 
 const listConnectors = new ListConnctor()
 
@@ -114,7 +114,7 @@ export async function parseOptions(): Promise<HoprOptions> {
     bootstrapServers: bootstrapServers,
     provider: provider,
     output(encoded: Uint8Array) {
-      const { latency, msg } = decodeMessage(encoded)
+      const {latency, msg} = decodeMessage(encoded)
 
       let str = `\n`
 

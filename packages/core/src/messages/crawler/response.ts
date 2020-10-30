@@ -1,6 +1,6 @@
-import { CrawlStatus } from '.'
-import { encode, decode } from 'rlp'
-import { u8aConcat, u8aToNumber, toU8a } from '@hoprnet/hopr-utils'
+import {CrawlStatus} from '.'
+import {encode, decode} from 'rlp'
+import {u8aConcat, u8aToNumber, toU8a} from '@hoprnet/hopr-utils'
 import Multiaddr from 'multiaddr'
 
 const ENUM_LENGTH = 1
@@ -54,4 +54,4 @@ class CrawlResponse extends Uint8Array {
   }
 }
 
-export { CrawlResponse }
+export {CrawlResponse}

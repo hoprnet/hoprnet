@@ -2,7 +2,7 @@
   copied from OZ's text-helpers and modified to include a web3 param
   @TODO: find a way to re-use this through the original repo
 */
-import { promisify } from 'util'
+import {promisify} from 'util'
 import BN from 'bn.js'
 import Web3 from 'web3'
 

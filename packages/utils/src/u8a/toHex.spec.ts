@@ -1,4 +1,4 @@
-import { u8aToHex } from './toHex'
+import {u8aToHex} from './toHex'
 import assert from 'assert'
 
 describe('test toHex', function () {

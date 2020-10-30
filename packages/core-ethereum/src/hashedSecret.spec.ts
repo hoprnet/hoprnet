@@ -3,20 +3,20 @@ import type HoprEthereum from '.'
 import * as DbKeys from './dbKeys'
 import * as Utils from './utils'
 import * as Types from './types'
-import PreImage, { GIANT_STEP_WIDTH, TOTAL_ITERATIONS, HASHED_SECRET_WIDTH } from './hashedSecret'
-import { randomInteger, u8aEquals, durations, stringToU8a } from '@hoprnet/hopr-utils'
+import PreImage, {GIANT_STEP_WIDTH, TOTAL_ITERATIONS, HASHED_SECRET_WIDTH} from './hashedSecret'
+import {randomInteger, u8aEquals, durations, stringToU8a} from '@hoprnet/hopr-utils'
 import Memdown from 'memdown'
 import LevelUp from 'levelup'
-import { Ganache } from '@hoprnet/hopr-testing'
-import { migrate, fund } from '@hoprnet/hopr-ethereum'
-import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
+import {Ganache} from '@hoprnet/hopr-testing'
+import {migrate, fund} from '@hoprnet/hopr-ethereum'
+import {NODE_SEEDS} from '@hoprnet/hopr-demo-seeds'
 import Web3 from 'web3'
 import * as testconfigs from './config.spec'
 import * as configs from './config'
 import HoprChannelsAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprChannels.json'
 import Account from './account'
-import { addresses } from '@hoprnet/hopr-ethereum'
-import { randomBytes } from 'crypto'
+import {addresses} from '@hoprnet/hopr-ethereum'
+import {randomBytes} from 'crypto'
 
 const EMPTY_HASHED_SECRET = new Uint8Array(HASHED_SECRET_WIDTH).fill(0x00)
 
@@ -153,7 +153,9 @@ describe('test hashedSecret', function () {
         )
       }
 
-      const masterSecret = await connector.db.get(Buffer.from(connector.dbKeys.OnChainSecretIntermediary(0))) as Uint8Array
+      const masterSecret = (await connector.db.get(
+        Buffer.from(connector.dbKeys.OnChainSecretIntermediary(0))
+      )) as Uint8Array
 
       await checkIndex(1, masterSecret, false)
 

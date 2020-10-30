@@ -1,8 +1,8 @@
 import Hopr from '../..'
 import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 
-import { Opening } from './open'
-import { OnChainKey } from './onChainKey'
+import {Opening} from './open'
+import {OnChainKey} from './onChainKey'
 
 class PaymentInteractions<Chain extends HoprCoreConnector> {
   open: Opening<Chain>
@@ -14,4 +14,4 @@ class PaymentInteractions<Chain extends HoprCoreConnector> {
   }
 }
 
-export { PaymentInteractions }
+export {PaymentInteractions}

@@ -1,5 +1,5 @@
 import assert from 'assert'
-import { randomSubset } from './randomSubset'
+import {randomSubset} from './randomSubset'
 
 const SET_SIZE = 50
 const SUBSET_SIZE = 20

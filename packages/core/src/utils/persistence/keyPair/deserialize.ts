@@ -1,5 +1,5 @@
-import { decode } from 'rlp'
-import { createCipheriv, scryptSync, createHmac } from 'crypto'
+import {decode} from 'rlp'
+import {createCipheriv, scryptSync, createHmac} from 'crypto'
 import PeerId from 'peer-id'
 
 import {
@@ -10,7 +10,7 @@ import {
   KEYPAIR_CIPHER_KEY_LENGTH,
   KEYPAIR_MESSAGE_DIGEST_ALGORITHM
 } from '.'
-import { u8aEquals } from '@hoprnet/hopr-utils'
+import {u8aEquals} from '@hoprnet/hopr-utils'
 
 /**
  * Deserializes a serialized key pair and returns a peerId.

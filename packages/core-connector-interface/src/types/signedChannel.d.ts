@@ -1,4 +1,4 @@
-import { Channel } from './channel'
+import {Channel} from './channel'
 import Signature from './signature'
 
 declare interface SignedChannelStatic {

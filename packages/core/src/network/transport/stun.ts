@@ -1,5 +1,5 @@
 import * as stun from 'webrtc-stun'
-import type { Socket, RemoteInfo } from 'dgram'
+import type {Socket, RemoteInfo} from 'dgram'
 import Multiaddr from 'multiaddr'
 import debug from 'debug'
 
@@ -27,7 +27,7 @@ export function handleStunRequest(socket: Socket, data: Buffer, rinfo: RemoteInf
   // if msg is valid STUN message
   if (req.loadBuffer(data)) {
     // if STUN message is BINDING_REQUEST and valid content
-    if (req.isBindingRequest({ fingerprint: true })) {
+    if (req.isBindingRequest({fingerprint: true})) {
       const res = req.createBindingResponse(true).setXorMappedAddressAttribute(rinfo).setFingerprintAttribute()
 
       socket.send(res.toBuffer(), rinfo.port, rinfo.address)
@@ -48,7 +48,7 @@ export function getExternalIp(
   }
   return new Promise((resolve, reject) => {
     verbose(`Getting external IP by using ${multiAddrs.map((m) => m.toString()).join(',')}`)
-    const tids = Array.from({ length: multiAddrs.length }).map(stun.generateTransactionId)
+    const tids = Array.from({length: multiAddrs.length}).map(stun.generateTransactionId)
 
     let result: {
       address: string
@@ -69,7 +69,7 @@ export function getExternalIp(
 
         if (
           tids.some((tid: string, _index: number) => {
-            if (res.isBindingResponseSuccess({ transactionId: tid })) {
+            if (res.isBindingResponseSuccess({transactionId: tid})) {
               index = _index
               return true
             }

@@ -1,22 +1,22 @@
 import * as addresses from '../ethereum/addresses'
-import type { TransactionObject } from '../tsc/web3/types'
+import type {TransactionObject} from '../tsc/web3/types'
 import assert from 'assert'
-import { publicKeyConvert, publicKeyCreate, ecdsaSign, ecdsaRecover, ecdsaVerify } from 'secp256k1'
+import {publicKeyConvert, publicKeyCreate, ecdsaSign, ecdsaRecover, ecdsaVerify} from 'secp256k1'
 import createKeccakHash from 'keccak'
-import { PromiEvent, TransactionReceipt, TransactionConfig } from 'web3-core'
-import { BlockTransactionString } from 'web3-eth'
+import {PromiEvent, TransactionReceipt, TransactionConfig} from 'web3-core'
+import {BlockTransactionString} from 'web3-eth'
 import Web3 from 'web3'
 import Debug from 'debug'
-import { u8aCompare, u8aConcat, u8aEquals, A_STRICLY_LESS_THAN_B, A_EQUALS_B, gcd } from '@hoprnet/hopr-utils'
-import { AccountId, Balance, Hash, Signature } from '../types'
-import { ContractEventEmitter } from '../tsc/web3/types'
-import { ChannelStatus } from '../types/channel'
+import {u8aCompare, u8aConcat, u8aEquals, A_STRICLY_LESS_THAN_B, A_EQUALS_B, gcd} from '@hoprnet/hopr-utils'
+import {AccountId, Balance, Hash, Signature} from '../types'
+import {ContractEventEmitter} from '../tsc/web3/types'
+import {ChannelStatus} from '../types/channel'
 import * as constants from '../constants'
 import * as time from './time'
 import * as events from './events'
 import BN from 'bn.js'
 
-export { time, events }
+export {time, events}
 
 /**
  * @param self our node's accountId

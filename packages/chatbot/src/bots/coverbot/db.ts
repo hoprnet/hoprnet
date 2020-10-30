@@ -1,4 +1,4 @@
-import admin, { ServiceAccount } from 'firebase-admin'
+import admin, {ServiceAccount} from 'firebase-admin'
 
 const firebasePrivateKey = Buffer.from(process.env.FIREBASE_PRIVATE_KEY, 'base64').toString()
 
