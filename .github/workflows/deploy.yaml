@@ -28,7 +28,6 @@ jobs:
           key: ${{ runner.os }}-modules-${{ hashFiles('yarn.lock') }}
 
       - name: Install dependencies 
-        if: steps.cache.outputs.cache-hit != 'true'
         run: |
           yarn
           node_modules/.bin/lerna bootstrap
