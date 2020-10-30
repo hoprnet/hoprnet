@@ -62,7 +62,7 @@ describe('network/crawler test crawler', function () {
 
     await Alice.network.crawler.crawl()
     assert(Alice.network.networkPeers.has(Bob.node.peerId), 'Alice should know about Bob')
-    assert(Alice.network.networkPeers.has(Chris.node.peerId))
+    assert(Alice.network.networkPeers.has(Chris.node.peerId), 'Alice should know about Chris')
 
     Chris.node.connectionManager.emit('peer:connect', mockConnection(Dave.node.peerId, Dave.address))
     await Alice.network.crawler.crawl()
@@ -87,7 +87,7 @@ describe('network/crawler test crawler', function () {
       !Alice.network.networkPeers.has(Bob.node.peerId),
       'Alice should not add Bob to her networkPeers after blacklisting him'
     )
-    assert(Alice.network.networkPeers.deletedPeers.some((entry: BlacklistedEntry) => entry.id.equals(Bob.node.peerId)))
+    assert(Alice.network.networkPeers.deletedPeers.some((entry: BlacklistedEntry) => entry.id.equals(Bob.node.peerId)), 'Alice should have blacklisted Bob')
 
     // Remove Bob from blacklist
     Alice.network.networkPeers.deletedPeers[0].deletedAt -= BLACKLIST_TIMEOUT + 1
@@ -96,7 +96,7 @@ describe('network/crawler test crawler', function () {
 
     await Alice.network.crawler.crawl()
 
-    assert(Alice.network.networkPeers.deletedPeers.length == 0)
+    assert(Alice.network.networkPeers.deletedPeers.length == 0, 'Alice should have no deleted peers')
 
     // Alice.network.networkPeers.push({
     //   id: Bob.peerInfo.id.toB58String(),
@@ -105,7 +105,7 @@ describe('network/crawler test crawler', function () {
 
     await new Promise((resolve) => setTimeout(resolve, 50))
 
-    assert(Alice.network.networkPeers.has(Bob.node.peerId))
+    assert(Alice.network.networkPeers.has(Bob.node.peerId), 'Alice should know Bob again')
 
     await Promise.all([Alice.node.stop(), Bob.node.stop(), Chris.node.stop(), Dave.node.stop(), Eve.node.stop()])
   })
