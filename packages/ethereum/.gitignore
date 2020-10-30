@@ -27,6 +27,9 @@ scTopics
 # Exclude built npm packages
 *.tgz
 
+# distribution files
+lib
+
 # @TODO: remove this once refactor is complete
 temp
 

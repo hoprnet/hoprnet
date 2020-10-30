@@ -5,9 +5,7 @@
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "license": "LGPL-3.0-only",
   "files": [
-    "contracts/",
-    "scripts/",
-    "!*.test.ts"
+    "contracts/"
   ],
   "engines": {
     "yarn": "1",
