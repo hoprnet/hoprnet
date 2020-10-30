@@ -12,9 +12,7 @@ const error = debug('hopr-chatbot:reducers:stats:error')
 
 export async function statsReducer(this: Coverbot, instructionWrapper: Instruction, message: IMessage) {
   log(`- statsReducer | Starting statsReducer with instruction ${instructionWrapper.toString()} and message ${message.text} from ${message.from}`)
-  const snapshot = (await this.database.getSchema(HOPR_ENVIRONMENT)) || {};
-  log(`- statsReducer | ${BotCommands.stats} command :: retrieving snapshot with value ${JSON.stringify(snapshot)}`)
-  const state = snapshot && snapshot.state ? snapshot.state : {};
+  const state = (await this.database.getTable(HOPR_ENVIRONMENT, 'state')) || {};
   log(`- statsReducer | ${BotCommands.stats} command :: retrieving state with value ${JSON.stringify(state)}`)
   switch (instructionWrapper.subcommand) {
     case StatsSubCommands.connected: {

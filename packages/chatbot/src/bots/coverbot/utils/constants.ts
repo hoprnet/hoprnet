@@ -6,7 +6,7 @@ export const RELAY_HOPR_REWARD = 1000000000000000 // 0.001 HOPR
 
 export const scoreDbRef = db.ref(`/${HOPR_ENVIRONMENT}/score`)
 export const stateDbRef = db.ref(`/${HOPR_ENVIRONMENT}/state`)
-export const databaseTextRef = `${FIREBASE_DATABASE_URL} @ Table ${HOPR_ENVIRONMENT}`
+export const databaseTextRef = `${FIREBASE_DATABASE_URL} @ Schema ${HOPR_ENVIRONMENT}`
 
 export enum ScoreRewards {
   verified = 100,

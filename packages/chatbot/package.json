@@ -55,6 +55,7 @@
     "@types/node": "~12",
     "@typescript-eslint/eslint-plugin": "4.0.0",
     "@typescript-eslint/parser": "3.10.1",
+    "console-table-printer": "^2.4.33",
     "eslint": "7.12.1",
     "eslint-config-prettier": "^6.10.0",
     "eslint-plugin-import": "^2.20.1",
