@@ -58,16 +58,16 @@ jobs:
           alias hoprd="node packages/hoprd/lib/index.js"
 
           echo "alice"
-          hoprd --data='./test/fixtures/alice' --password="$DBPASS" --run "myAddress" 
-          hoprd --data='./test/fixtures/alice' --password="$DBPASS" --run "balance" 
+          hoprd --data='./test/fixtures/alice' --password="$DBPASS" --bootstrap --run "myAddress" 
+          hoprd --data='./test/fixtures/alice' --password="$DBPASS" --bootstrap --run "balance" 
 
           echo "bob"
-          hoprd --data='./test/fixtures/bob' --password="$DBPASS" --run "myAddress"
-          hoprd --data='./test/fixtures/bob' --password="$DBPASS" --run "balance"
+          hoprd --data='./test/fixtures/bob' --password="$DBPASS" --bootstrap --run "myAddress"
+          hoprd --data='./test/fixtures/bob' --password="$DBPASS" --bootstrap --run "balance"
 
           echo "charlie"
-          hoprd --data='./test/fixtures/charlie' --password="$DBPASS" --run "myAddress"
-          hoprd --data='./test/fixtures/charlie' --password="$DBPASS" --run "balance"
+          hoprd --data='./test/fixtures/charlie' --password="$DBPASS" --bootstrap --run "myAddress"
+          hoprd --data='./test/fixtures/charlie' --password="$DBPASS" --bootstrap --run "balance"
         env:
           DBPASS: ${{ secrets.SMOKETESTPASSWORD }}
 
