@@ -90,7 +90,10 @@ class RelayContext {
     let sourceMsg: Uint8Array
     let sourceDone = false
 
-    function sourceFunction({ value, done }: { value?: Uint8Array | void; done?: boolean | void }) {
+    let iteration = 0
+     const sourceFunction = (_iteration: number) => ({ value, done }: { value?: Uint8Array | void; done?: boolean | void }) {
+      console.log(`source iteration`, iteration, `_iteration`, _iteration)
+
       sourceReceived = true
       sourceMsg = value as Uint8Array
 
@@ -102,7 +105,7 @@ class RelayContext {
     let tmpSource: Stream['source']
     let currentSource = this._stream.source
 
-    let sourcePromise = currentSource.next().then(sourceFunction)
+    let sourcePromise = currentSource.next().then(sourceFunction(iteration))
 
     let streamSwitched = false
 
@@ -134,7 +137,7 @@ class RelayContext {
           if (![RELAY_STATUS_PREFIX[0], RELAY_WEBRTC_PREFIX[0], RELAY_PAYLOAD_PREFIX[0]].includes(PREFIX[0])) {
             error(`Invalid prefix: Got <${u8aToHex(PREFIX || new Uint8Array([]))}>. Dropping message in relayContext.`)
             if (!sourceDone) {
-              sourcePromise = currentSource.next().then(sourceFunction)
+              sourcePromise = currentSource.next().then(sourceFunction(iteration))
             }
             continue
           }
@@ -152,7 +155,7 @@ class RelayContext {
               this._statusMessagePromise.resolve()
 
               if (!sourceDone) {
-                sourcePromise = currentSource.next().then(sourceFunction)
+                sourcePromise = currentSource.next().then(sourceFunction(iteration))
               }
 
               // Don't forward ping to receiver
@@ -163,7 +166,7 @@ class RelayContext {
               this._pingResponsePromise?.resolve()
 
               if (!sourceDone) {
-                sourcePromise = currentSource.next().then(sourceFunction)
+                sourcePromise = currentSource.next().then(sourceFunction(iteration))
               }
 
               // Don't forward pong message to receiver
@@ -179,7 +182,7 @@ class RelayContext {
         }
 
         if (!sourceDone) {
-          sourcePromise = currentSource.next().then(sourceFunction)
+          sourcePromise = currentSource.next().then(sourceFunction(iteration))
         }
       } else if (streamSwitched) {
         streamSwitched = false
@@ -188,7 +191,7 @@ class RelayContext {
         switchPromise = this._switchPromise.promise.then(switchFunction)
         yield u8aConcat(RELAY_STATUS_PREFIX, RESTART)
 
-        sourcePromise = currentSource.next().then(sourceFunction)
+        sourcePromise = currentSource.next().then(sourceFunction(++iteration))
       }
     }
   }
