@@ -23,11 +23,28 @@ jobs:
           node-version: 12
           registry-url: https://registry.npmjs.org/
 
-      - name: Temporarily install everything
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn cache dir)"
+      - uses: actions/cache@v1
+        id: yarn-cache # use this to check for `cache-hit` (`steps.yarn-cache.outputs.cache-hit != 'true'`)
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+
+      - name: Install dependencies
         run: |
-          yarn install --pure-lockfile
-          yarn util:install
-          yarn util:link && yarn util:build
+          yarn --prefer-offline
+          node_modules/.bin/lerna bootstrap
+
+      - name: Build (all)
+        if: matrix.package == 'all' 
+        run: |
+          node_modules/.bin/lerna link 
+          node_modules/.bin/lerna run build --include-dependencies --ignore @hoprnet/hopr-core --ignore @hoprnet/hopr-ethereum --ignore @hoprnet/hopr-core-ethereum
+
 
           #- name: Install hoprd
           #shell: bash
