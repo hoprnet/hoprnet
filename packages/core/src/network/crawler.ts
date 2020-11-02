@@ -181,7 +181,7 @@ class Crawler {
               addresses = addresses.filter((ma) => !isOnPrivateNet(ma))
             }
 
-            log(`received [${addresses.map((p: Multiaddr) => blue(p.getPeerId())).join(', ')}] from peer ${blue(peer)}`)
+            log(`received [${addresses.map((p: Multiaddr) => blue(p.getPeerId())).join(', ')}] from peer ${blue(peer.toB58String())}`)
           } catch (err) {
             verbose('error querying peer', err)
             addresses = []
