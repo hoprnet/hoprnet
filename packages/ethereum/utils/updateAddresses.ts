@@ -1,7 +1,7 @@
 import { join } from 'path'
-import { promises } from 'fs'
+import { promises, existsSync } from 'fs'
 
-const { stat, mkdir, readFile, writeFile } = promises
+const { mkdir, readFile, writeFile } = promises
 const DIR = join(__dirname, '..', 'chain')
 const FILE_DIR = join(DIR, 'addresses.json')
 
@@ -11,7 +11,7 @@ async function main(
     [name: string]: string
   }
 ): Promise<void> {
-  if (!(await stat(DIR)).isDirectory()) {
+  if (!existsSync(DIR)) {
     await mkdir(DIR, { recursive: true })
   }
 

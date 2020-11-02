@@ -1,14 +1,14 @@
 import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
 import { join, basename } from 'path'
-import { promises } from 'fs'
+import { existsSync, promises } from 'fs'
 
-const { stat, mkdir, writeFile } = promises
+const { mkdir, writeFile } = promises
 const DIR = join(__dirname, '..', 'chain', 'abis')
 
 async function main(_args: any, { artifacts }: HardhatRuntimeEnvironment, _runSuper: RunSuperFunction<any>) {
   console.log('Extracting ABIs')
 
-  if (!(await stat(DIR)).isDirectory()) {
+  if (!existsSync(DIR)) {
     await mkdir(DIR, { recursive: true })
   }
 
