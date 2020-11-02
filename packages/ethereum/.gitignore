@@ -38,3 +38,6 @@ hardhat
 
 # typechain
 types
+
+# exclude generated ABIs
+chain/abis
