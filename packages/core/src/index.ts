@@ -94,7 +94,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   private constructor(options: HoprOptions, public _libp2p: LibP2P, public db: LevelUp, public paymentChannels: Chain) {
     super()
     this._libp2p.connectionManager.on('peer:connect', (conn: Connection) => {
-      this.emit('hopr:peer:connection', conn.remotePeer.id)
+      this.emit('hopr:peer:connection', conn.remotePeer)
     })
 
     this.initializedWithOptions = options

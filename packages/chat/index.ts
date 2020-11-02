@@ -80,8 +80,7 @@ function runAsBootstrapNode() {
   console.log(`... running as bootstrap node!.`)
 
   node.on('hopr:peer:connection', (peer: PeerId) => {
-    console.log(peer)
-    // console.log(`Incoming connection from ${chalk.blue(peer.toB58String())}.`)
+    console.log(`Incoming connection from ${chalk.blue(peer.toB58String())}.`)
   })
 
   process.once('exit', async () => {
