@@ -12,14 +12,13 @@ import addresses from '@hoprnet/hopr-ethereum/chain/addresses'
 import { migrate, fund } from '@hoprnet/hopr-ethereum'
 import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
 import Web3 from 'web3'
+import type { WebsocketProvider } from 'web3-core'
 import * as testconfigs from './config.spec'
 import * as configs from './config'
 import HoprChannelsAbi from '@hoprnet/hopr-ethereum/chain/abis/HoprChannels.json'
 import Account from './account'
 import type { Network } from '@hoprnet/hopr-ethereum/lib/utils/networks'
 import { randomBytes } from 'crypto'
-
-console.log('addresses', addresses)
 
 const EMPTY_HASHED_SECRET = new Uint8Array(HASHED_SECRET_WIDTH).fill(0x00)
 const FUND_ARGS = `--address ${addresses?.localhost?.HoprToken} --accounts-to-fund 1`
@@ -55,6 +54,11 @@ describe('test hashedSecret', function () {
     )
 
     connector.hashedSecret = new PreImage(connector)
+
+    connector.stop = async () => {
+      await connector.account.stop()
+      ;(web3.eth.currentProvider as WebsocketProvider).disconnect(1000, 'Stopping HOPR node.')
+    }
 
     return connector
   }
@@ -99,6 +103,7 @@ describe('test hashedSecret', function () {
     })
 
     after(async function () {
+      await connector.stop()
       await ganache.stop()
     })
 
@@ -148,7 +153,7 @@ describe('test hashedSecret', function () {
     })
 
     // // Commented due expensive operations
-    // it.skip('should generate a hashed secret and recover a pre-Image', async function () {
+    // it('should generate a hashed secret and recover a pre-Image', async function () {
     //   this.timeout(durations.seconds(22))
     //   await connector.hashedSecret.initialize()
 
@@ -186,6 +191,7 @@ describe('test hashedSecret', function () {
     })
 
     after(async function () {
+      await connector.stop()
       await ganache.stop()
     })
 
@@ -341,6 +347,7 @@ describe('test hashedSecret', function () {
     })
 
     after(async function () {
+      await connector.stop()
       await ganache.stop()
     })
 

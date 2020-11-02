@@ -7,7 +7,7 @@ import { PromiEvent, TransactionReceipt, TransactionConfig } from 'web3-core'
 import { BlockTransactionString } from 'web3-eth'
 import Web3 from 'web3'
 import Debug from 'debug'
-import { u8aCompare, u8aConcat, u8aEquals, A_STRICLY_LESS_THAN_B, A_EQUALS_B } from '@hoprnet/hopr-utils'
+import { u8aCompare, u8aConcat, u8aEquals, A_STRICLY_LESS_THAN_B, A_EQUALS_B, durations } from '@hoprnet/hopr-utils'
 import { AccountId, Balance, Hash, Signature } from '../types'
 import { ContractEventEmitter } from '../tsc/web3/types'
 import { ChannelStatus } from '../types/channel'
@@ -208,7 +208,7 @@ export function convertUnit(amount: Balance, sourceUnit: 'eth' | 'wei', targetUn
 }
 
 /**
- * Wait until block has been confirmed.
+ * Wait until transaction has been mined.
  *
  * @typeparam T Our PromiEvent
  * @param event Our event, returned by web3
@@ -232,6 +232,34 @@ export async function waitForConfirmation<T extends PromiEvent<any>>(event: T) {
           return reject(err)
         }
       })
+  })
+}
+
+/**
+ * Wait until transaction has been mined.
+ *
+ * @param txHash transaction hash
+ * @returns the transaction receipt
+ */
+export async function waitForConfirmationUsingHash(web3: Web3, txHash: string, timeout: number = durations.minutes(5)) {
+  return new Promise<TransactionReceipt>(async (resolve, reject) => {
+    const timer = setTimeout(() => reject('Waited for txHash confirmation too long.'), timeout)
+
+    try {
+      let mined = false
+      let receipt: TransactionReceipt
+
+      while (!mined) {
+        receipt = await web3.eth.getTransactionReceipt(txHash)
+        mined = !!receipt?.blockNumber
+      }
+
+      return resolve(receipt)
+    } catch (err) {
+      return reject(err.message)
+    } finally {
+      clearTimeout(timer)
+    }
   })
 }
 
