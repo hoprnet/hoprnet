@@ -782,10 +782,10 @@ ms@2.1.2, ms@^2.1.1:
   resolved "https://registry.yarnpkg.com/ms/-/ms-2.1.2.tgz#d09d1f357b443f493382a8eb3ccd183872ae6009"
   integrity sha512-sGkPx+VjMtmA6MX27oA4FBFELFCZZ4S4XqeGOXCv68tT+jb3vk/RyaKWP0PTKyWtmLSM0b+adUTEvbs1PEaH2w==
 
-multiaddr@8.1.0:
-  version "8.1.0"
-  resolved "https://registry.yarnpkg.com/multiaddr/-/multiaddr-8.1.0.tgz#1a842b4687c8b689fa01a4be4d71f362d6d63ea2"
-  integrity sha512-+It1mP0EH+VDzC6AsPvXjRuOPYxJJ7jV2Stwi+A+qXgeMaaWNV1mqB3VZhIaSsPFB5o3Y/I7U6tZ3IneBSFyiw==
+multiaddr@8.1.1:
+  version "8.1.1"
+  resolved "https://registry.yarnpkg.com/multiaddr/-/multiaddr-8.1.1.tgz#d86315deed93752fa68b4199fee56f8b4a516a2b"
+  integrity sha512-Dyur7rWX44MlgKIqVA2dYPOZx/UwG60PVSffJ5S17uo6Pu31lftJXShMEfPtUDGHnyALAOWOuC3X/iPhDtw4Vg==
   dependencies:
     cids "^1.0.0"
     class-is "^1.1.0"
