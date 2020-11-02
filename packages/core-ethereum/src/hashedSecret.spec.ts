@@ -371,9 +371,9 @@ describe('test hashedSecret', function () {
     })
 
     it('should submit hashedSecret when on-chain secret is missing', async function () {
+      this.timeout(durations.minutes(2))
       const db = connector.db
 
-      this.timeout(durations.minutes(1))
       await ganache.stop()
       await ganache.start()
       await migrate()
