@@ -6,6 +6,7 @@ import PeerId from 'peer-id'
 import { EventEmitter } from 'events'
 import { encode, decode } from 'rlp'
 import debug from 'debug'
+import { Message } from '../../message/message'
 
 
 const log = debug('hopr-chatbot:core')
@@ -112,7 +113,7 @@ export default class Core {
     includeRecipient = false
   }: {
     peerId: string
-    payload: Uint8Array
+    payload: string | Uint8Array
     intermediatePeerIds?: string[]
     includeRecipient?: boolean
   }): Promise<{
