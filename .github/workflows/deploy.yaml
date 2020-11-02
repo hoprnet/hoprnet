@@ -45,6 +45,24 @@ jobs:
         run: |
           yarn util:link && yarn build
 
+      - name: Get version from package.json
+        run: echo "PREVIOUS_RELEASE=$(node -p -e "require('./packages/hoprd/package.json').version")" >> $GITHUB_ENV
+
+      # Goal is, every push to master increments c from a.b.0-prerelease-c to
+      # a.b.0-prerelease-(c+1)
+      # Of course this begs the question, how do we ever increment b?
+      # If there is a released branch with a.b.c, then we know we also have to
+      # increment b.
+      - name: Is there a published version of this?
+        if: github.ref == 'refs/heads/master'
+        run: |
+          PREVIOUS_RELEASE_MAJ_MIN=$(echo ${{ env.PREVIOUS_RELEASE }} | sed 's/\(\.[0-9]*\-alpha\)*\.[0-9]*$//')
+          FIND_NPM=$(npm view @hoprnet/hopr-core@$PREVIOUS_RELEASE_MAJ_MIN --json)
+          # preminor Goes a.b.0-next.0 to a.(b+1).0-next.0
+          # prerelease Goes a.b.0-next.c to a.b.0-next.(c+1)
+          VERSION_TYPE=$([ ${#FIND_NPM} -ge 1 ] && echo "preminor" || echo "prerelease")
+          echo "VERSION_TYPE=${VERSION_TYPE}" >> $GITHUB_ENV
+          echo "RELEASE TYPE: ${VERSION_TYPE} (${PREVIOUS_RELEASE_MAJ_MIN})"
       - name: Publish prerelease version (On pushes to master)
         if: github.ref == 'refs/heads/master'
         run: |
@@ -52,12 +70,14 @@ jobs:
           git config --global user.name "HOPR Versioning robot"
           git config pull.rebase false
           git pull origin master
-          node_modules/.bin/lerna version preminor --yes --exact --no-push --no-changelog
+          node_modules/.bin/lerna version ${{ env.VERSION_TYPE }} --yes --exact --no-push --no-changelog --preid next 
           git push origin master
           node_modules/.bin/lerna publish from-package --yes
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+      # Pushing a PR to a release branch should increment the patch version in
+      # accordance with semver.
       - name: Publish patch version (On pushes to release branches)
         if: |
           startsWith(github.ref, 'refs/heads/release/')

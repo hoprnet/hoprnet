@@ -14,7 +14,7 @@ jobs:
     strategy:
       matrix:
         node-version: [12]
-        package: ['utils', 'core', 'ethereum', 'all']
+        package: ['core', 'ethereum', 'all', 'core-ethereum']
 
     steps:
       - uses: actions/checkout@v2
@@ -44,12 +44,12 @@ jobs:
         if: matrix.package == 'all' 
         run: |
           node_modules/.bin/lerna link 
-          node_modules/.bin/lerna run build --include-dependencies --ignore @hoprnet/hopr-core --ignore @hoprnet/hopr-ethereum
+          node_modules/.bin/lerna run build --include-dependencies --ignore @hoprnet/hopr-core --ignore @hoprnet/hopr-ethereum --ignore @hoprnet/hopr-core-ethereum
 
       - name: Test (all)
         if: matrix.package == 'all'
         run: |
-          node_modules/.bin/lerna run test --ignore @hoprnet/hopr-core --ignore @hoprnet/hopr-ethereum
+          node_modules/.bin/lerna run test --ignore @hoprnet/hopr-core --ignore @hoprnet/hopr-ethereum --ignore @hoprnet/hopr-core-ethereum
 
       - name: Build ${{ matrix.package }}
         if: matrix.package != 'all'

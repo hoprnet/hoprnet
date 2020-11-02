@@ -1,8 +1,7 @@
 export enum NodeStates {
+  adminModeDisabled = 'ADMIN_MODE_DISABLED',
+  adminCommandReceived = 'ADMIN_COMMAND_RECEIVED',
   newUnverifiedNode = 'UNVERIFIED',
-  tweetVerificationFailed = 'FAILED_TWITTER_VERIFICATION',
-  tweetVerificationInProgress = 'IN_PROGRESS_TWITTER_VERIFICATION',
-  tweetVerificationSucceeded = 'SUCCEEDED_TWITTER_VERIFICATION',
   xdaiBalanceFailed = 'FAILED_XDAI_BALANCE_VERIFICATION',
   xdaiBalanceSucceeded = 'SUCCEEDED_XDAI_BALANCE_VERIFICATION',
   relayingNodeFailed = 'FAILED_RELAYING_PACKET',
@@ -12,13 +11,9 @@ export enum NodeStates {
   verifiedNode = 'VERIFIED',
 }
 
-export enum BotCommands {
-  rules = 'RULES',
-  status = 'STATUS',
-  verify = 'VERIFY',
-}
-
-export enum ScoreRewards {
-  verified = 100,
-  relayed = 10,
+export enum VerifyTweetStates {
+  tweetInvalid = 'INVALID_TWEET',
+  tweetVerificationFailed = 'FAILED_TWITTER_VERIFICATION',
+  tweetVerificationInProgress = 'IN_PROGRESS_TWITTER_VERIFICATION',
+  tweetVerificationSucceeded = 'SUCCEEDED_TWITTER_VERIFICATION',
 }

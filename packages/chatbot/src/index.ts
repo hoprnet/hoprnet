@@ -49,6 +49,6 @@ const main = async () => {
 }
 
 main().catch((err) => {
-  error('Fatal Error:', err)
+  error('- main | Exception:', err)
   process.exit()
 })
