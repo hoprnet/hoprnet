@@ -22,7 +22,7 @@ const formatChannel = (res: AsyncReturnType<HoprChannelsInstance['channels']>) =
   stateCounter: res[3]
 })
 
-describe('HoprChannels', function () {
+describe.skip('HoprChannels', function () {
   const partyAPrivKey = NODE_SEEDS[1]
   const partyBPrivKey = NODE_SEEDS[0]
   const depositAmount = web3.utils.toWei('1', 'ether')
