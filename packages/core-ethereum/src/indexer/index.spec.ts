@@ -22,6 +22,8 @@ import { randomBytes } from 'crypto'
 const CLOSURE_DURATION = durations.days(3)
 
 describe('test indexer', function () {
+  this.timeout(durations.minutes(5))
+
   const ganache = new Ganache()
   let web3: Web3
   let hoprToken: HoprToken
@@ -33,7 +35,7 @@ describe('test indexer', function () {
   let userD: Account
 
   before(async function () {
-    this.timeout(60e3)
+    this.timeout(durations.minutes(1))
 
     await ganache.start()
     await migrate()
@@ -63,7 +65,7 @@ describe('test indexer', function () {
 
   context('intergration tests', function () {
     it('should not store channel before confirmations', async function () {
-      this.timeout(5e3)
+      this.timeout(durations.seconds(5))
 
       const uncompressedPubKeyA = publicKeyConvert(userA.pubKey, false).slice(1)
       const uncompressedPubKeyB = publicKeyConvert(userB.pubKey, false).slice(1)
@@ -192,7 +194,7 @@ describe('test indexer', function () {
       assert(channel.partyB.eq(partyB), 'check Channels.get')
     })
     it('should store another channel', async function () {
-      this.timeout(5e3)
+      this.timeout(durations.seconds(5))
       const uncompressedPubKeyC = publicKeyConvert(userC.pubKey, false).slice(1)
 
       await connector.hoprChannels.methods
@@ -256,7 +258,7 @@ describe('test indexer', function () {
     })
 
     it('should stop indexer and open new channel', async function () {
-      this.timeout(5e3)
+      this.timeout(durations.seconds(5))
       assert(await connector.indexer.stop(), 'could not stop indexer')
       const uncompressedPubKeyD = publicKeyConvert(userD.pubKey, false).slice(1)
 
@@ -296,7 +298,7 @@ describe('test indexer', function () {
     })
 
     it('should start indexer', async function () {
-      this.timeout(5e3)
+      this.timeout(durations.seconds(5))
       assert(await connector.indexer.start(), 'could not start indexer')
       await wait(1e3)
       const channels = await connector.indexer.get()

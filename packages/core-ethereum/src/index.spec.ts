@@ -16,6 +16,8 @@ import * as configs from './config'
 import { randomBytes } from 'crypto'
 
 describe('test connector', function () {
+  this.timeout(durations.minutes(5))
+
   const ganache = new Ganache()
   let owner: Await<ReturnType<typeof getPrivKeyData>>
   let web3: Web3
@@ -121,6 +123,8 @@ describe('test connector', function () {
 })
 
 describe('test withdraw', function () {
+  this.timeout(durations.minutes(5))
+
   const ganache = new Ganache()
   let web3: Web3
   let hoprToken: HoprToken
@@ -129,7 +133,7 @@ describe('test withdraw', function () {
   let bob: Await<ReturnType<typeof getPrivKeyData>>
 
   before(async function () {
-    this.timeout(60e3)
+    this.timeout(durations.minutes(1))
 
     await ganache.start()
     await migrate()

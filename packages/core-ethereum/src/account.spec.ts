@@ -16,6 +16,8 @@ import * as configs from './config'
 import { wait } from './utils'
 
 describe('test Account class', function () {
+  this.timeout(durations.minutes(5))
+
   const ganache = new Ganache()
   let web3: Web3
   let hoprToken: HoprToken
@@ -25,7 +27,7 @@ describe('test Account class', function () {
   let user: Await<ReturnType<typeof getPrivKeyData>>
 
   before(async function () {
-    this.timeout(durations.minutes(2))
+    this.timeout(durations.minutes(1))
 
     await ganache.start()
     await migrate()
@@ -68,7 +70,7 @@ describe('test Account class', function () {
     })
 
     it('should be 3 after reconnecting to web3', async function () {
-      this.timeout(10e3)
+      this.timeout(durations.seconds(10))
       await disconnectWeb3(coreConnector.web3)
 
       // wait for reconnection

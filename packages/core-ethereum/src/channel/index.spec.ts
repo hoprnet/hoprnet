@@ -45,7 +45,7 @@ describe('test Channel class', function () {
   }
 
   before(async function () {
-    this.timeout(60e3)
+    this.timeout(durations.minutes(1))
 
     await ganache.start()
     await migrate()
@@ -59,7 +59,7 @@ describe('test Channel class', function () {
   })
 
   beforeEach(async function () {
-    this.timeout(10e3)
+    this.timeout(durations.seconds(10))
 
     funder = await getPrivKeyData(stringToU8a(testconfigs.FUND_ACCOUNT_PRIVATE_KEY))
     const userA = await createAccountAndFund(web3, hoprToken, funder, testconfigs.DEMO_ACCOUNTS[1])

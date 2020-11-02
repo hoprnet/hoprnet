@@ -24,7 +24,7 @@ const EMPTY_HASHED_SECRET = new Uint8Array(HASHED_SECRET_WIDTH).fill(0x00)
 const FUND_ARGS = `--address ${addresses?.localhost?.HoprToken} --accounts-to-fund 1`
 
 describe('test hashedSecret', function () {
-  this.timeout(durations.minutes(5))
+  this.timeout(durations.minutes(10))
   const ganache = new Ganache()
   let connector: HoprEthereum
 
