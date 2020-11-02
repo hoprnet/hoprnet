@@ -91,7 +91,7 @@ class RelayContext {
     let sourceDone = false
 
     let iteration = 0
-     const sourceFunction = (_iteration: number) => ({ value, done }: { value?: Uint8Array | void; done?: boolean | void }) {
+     const sourceFunction = (_iteration: number) => ({ value, done }: { value?: Uint8Array | void; done?: boolean | void }) => {
       console.log(`source iteration`, iteration, `_iteration`, _iteration)
 
       sourceReceived = true
