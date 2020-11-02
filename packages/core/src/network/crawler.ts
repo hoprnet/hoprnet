@@ -262,12 +262,6 @@ class Crawler {
       await new Promise((resolve) => setTimeout(resolve, CRAWL_TIMEOUT + 100))
     }
 
-    console.log(this.networkPeers
-      .randomSubset(CRAWLING_RESPONSE_NODES, (id: PeerId) => !id.equals(this.id) && !id.equals(callerId))
-      .map(this.getPeer) // NB: Multiple addrs per peer.
-      .flat()
-      .filter((ma: Multiaddr) => shouldIncludePeerInCrawlResponse(ma, callerAddress)))
-      
     return this.networkPeers
       .randomSubset(CRAWLING_RESPONSE_NODES, (id: PeerId) => !id.equals(this.id) && !id.equals(callerId))
       .map(this.getPeer) // NB: Multiple addrs per peer.
@@ -275,21 +269,27 @@ class Crawler {
       .filter((ma: Multiaddr) => shouldIncludePeerInCrawlResponse(ma, callerAddress))
   }
 
-  handleCrawlRequest(conn: Connection) {
+  async *handleCrawlRequest(this: Crawler, conn: Connection) {
     verbose('crawl requested')
-    return async function* (this: Crawler) {
-      const selectedNodes = await this.answerCrawl(conn.remotePeer, conn.remoteAddr)
-      if (selectedNodes.length > 0) {
-        yield new CrawlResponse(undefined, {
+    const selectedNodes = await this.answerCrawl(conn.remotePeer, conn.remoteAddr)
+    log(`crawl answer`, selectedNodes)
+    if (selectedNodes.length > 0) {
+      log(
+        `Encoded`,
+        new CrawlResponse(undefined, {
           status: CrawlStatus.OK,
           addresses: selectedNodes
         })
-      } else {
-        yield new CrawlResponse(undefined, {
-          status: CrawlStatus.FAIL
-        })
-      }
-    }.call(this)
+      )
+      yield new CrawlResponse(undefined, {
+        status: CrawlStatus.OK,
+        addresses: selectedNodes
+      })
+    } else {
+      yield new CrawlResponse(undefined, {
+        status: CrawlStatus.FAIL
+      })
+    }
   }
 
   printStatsAndErrors(contactedPeerIds: Set<string>, errors: Error[], now: number, before: number) {
