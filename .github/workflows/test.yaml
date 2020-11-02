@@ -75,6 +75,6 @@ jobs:
           FIND_NPM=$(npm view @hoprnet/hopr-core@$PREVIOUS_RELEASE_MAJ_MIN --json)
           # preminor Goes a.b.0-next.0 to a.(b+1).0-next.0
           # prerelease Goes a.b.0-next.c to a.b.0-next.(c+1)
-          VERSION_TYPE=$([ $FIND_NPM -ge 1 ] && echo "preminor" || echo "prerelease")
+          VERSION_TYPE=$([ ${#FIND_NPM} -ge 1 ] && echo "preminor" || echo "prerelease")
           echo "VERSION_TYPE=${VERSION_TYPE}" >> $GITHUB_ENV
           echo "RELEASE TYPE: ${VERSION_TYPE} (${PREVIOUS_RELEASE_MAJ_MIN})"
