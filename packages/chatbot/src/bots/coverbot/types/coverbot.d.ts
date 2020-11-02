@@ -1,4 +1,4 @@
-import Core from '../../lib/hopr/core'
+import Core from '../../../lib/hopr/core'
 
 export type HoprNode = {
   id: string

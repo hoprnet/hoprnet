@@ -12,6 +12,9 @@
   <p align="center">
     HOPR is a privacy-preserving messaging protocol which enables the creation of a secure communication network via relay nodes powered by economic incentives using digital tokens.
   </p>
+  <p align="center">
+    <img src="https://img.shields.io/badge/Gitpod-ready--to--code-blue?logo=gitpod" alt="Gitpod">
+  </p>
 </p>
 
 ## Instructions
