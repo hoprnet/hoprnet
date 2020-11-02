@@ -2,7 +2,7 @@ name: Smoke test
 
 on:
   push:
-    branches: ['master']
+    branches: ['**']
     paths-ignore:
       - 'docs/**'
 
