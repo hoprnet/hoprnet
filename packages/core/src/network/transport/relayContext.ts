@@ -200,7 +200,16 @@ class RelayContext {
     let sourceMsg: Uint8Array | void
     let sourceDone = false
 
-    const sourceFunction = ({ value, done }: { value?: Uint8Array | void; done?: boolean | void }) => {
+    let iteration = 0
+    const sourceFunction = (_iteration: number) => ({
+      value,
+      done
+    }: {
+      value?: Uint8Array | void
+      done?: boolean | void
+    }) => {
+      console.log(`iteration`, iteration, `_iteration`, _iteration)
+      console.log(`yielding`, value, done)
       sourceReceived = true
       sourceMsg = value
 
@@ -209,7 +218,7 @@ class RelayContext {
       }
     }
 
-    let sourcePromise = source.next().then(sourceFunction)
+    let sourcePromise = source.next().then(sourceFunction(iteration))
 
     let streamSwitched = false
     let statusMessageAvailable = false
@@ -251,7 +260,7 @@ class RelayContext {
             log(`dropping empty message`)
           }
 
-          sourcePromise = source.next().then(sourceFunction)
+          sourcePromise = source.next().then(sourceFunction(iteration))
         } else if (statusMessageAvailable) {
           statusMessageAvailable = false
 
@@ -274,6 +283,8 @@ class RelayContext {
       currentSink(drain.call(this))
 
       currentSink = (await this._switchPromise.promise).sink
+
+      iteration++
     }
   }
 }
