@@ -37,8 +37,7 @@ describe('test crawl response generation', function () {
     })
 
     assert(
-      successfulResponse.status == CrawlStatus.OK &&
-        (await successfulResponse.addresses)[0].getPeerId() == id.toB58String(),
+      successfulResponse.status == CrawlStatus.OK && successfulResponse.addresses[0].getPeerId() == id.toB58String(),
       'Check status & peerInfo'
     )
 
@@ -51,9 +50,7 @@ describe('test crawl response generation', function () {
     })
 
     assert(
-      (await secondSuccessfulResponse.addresses).every(
-        (ma: Multiaddr, i: number) => ma.toString() == addresses[i].toString()
-      ),
+      secondSuccessfulResponse.addresses.every((ma: Multiaddr, i: number) => ma.toString() == addresses[i].toString()),
       'Check multiple peerInfos'
     )
   })

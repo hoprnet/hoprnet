@@ -74,7 +74,7 @@ class Crawler implements AbstractInteraction {
           continue
         }
 
-        addresses.push(...(await decodedResponse.addresses))
+        addresses.push(...decodedResponse.addresses)
       }
 
       if (!resolved) {

@@ -41,9 +41,14 @@ class CrawlResponse extends Uint8Array {
       }
 
       if (struct != null) {
-        let addrsLength =
-          struct.addresses.reduce((acc, addr) => acc + addr.bytes.length, 0) +
-          struct.addresses.length * ADDRESS_SIZE_LENGTH
+        let addrsLength: number
+        if (struct.status == CrawlStatus.OK) {
+          addrsLength =
+            struct.addresses.reduce((acc, addr) => acc + addr.bytes.length, 0) +
+            struct.addresses.length * ADDRESS_SIZE_LENGTH
+        } else {
+          addrsLength = 0
+        }
 
         if (addrsLength + CrawlResponse.SIZE > arr.bytes.byteLength + arr.offset) {
           throw Error(
@@ -56,9 +61,14 @@ class CrawlResponse extends Uint8Array {
 
       super(arr.bytes, arr.offset, length)
     } else {
-      let addrsLength =
-        struct.addresses.reduce((acc, addr) => acc + addr.bytes.length, 0) +
-        struct.addresses.length * ADDRESS_SIZE_LENGTH
+      let addrsLength: number
+      if (struct.status == CrawlStatus.OK) {
+        addrsLength =
+          struct.addresses.reduce((acc, addr) => acc + addr.bytes.length, 0) +
+          struct.addresses.length * ADDRESS_SIZE_LENGTH
+      } else {
+        addrsLength = 0
+      }
 
       super(CrawlResponse.SIZE + addrsLength)
 
@@ -68,19 +78,21 @@ class CrawlResponse extends Uint8Array {
     if (struct != null) {
       this.set(new Uint8Array([struct.status]), SIZE_LENGTH)
 
-      let offset = CrawlResponse.SIZE
-      for (let i = 0; i < struct.addresses.length; i++) {
-        if (struct.addresses[i].bytes.length > (1 << (ADDRESS_SIZE_LENGTH * 8)) - 1) {
-          throw Error(
-            `Invalid Multiaddr. Multiaddr has length ${
-              struct.addresses[i].bytes.length
-            } but we accept only multiaddrs of length ${(1 << (ADDRESS_SIZE_LENGTH * 8)) - 1}`
-          )
-        }
-        this.set(toU8a(struct.addresses[i].bytes.length, ADDRESS_SIZE_LENGTH), offset)
-        this.set(struct.addresses[i].bytes, offset + ADDRESS_SIZE_LENGTH)
+      if (struct.status == CrawlStatus.OK) {
+        let offset = CrawlResponse.SIZE
+        for (let i = 0; i < struct.addresses.length; i++) {
+          if (struct.addresses[i].bytes.length > (1 << (ADDRESS_SIZE_LENGTH * 8)) - 1) {
+            throw Error(
+              `Invalid Multiaddr. Multiaddr has length ${
+                struct.addresses[i].bytes.length
+              } but we accept only multiaddrs of length ${(1 << (ADDRESS_SIZE_LENGTH * 8)) - 1}`
+            )
+          }
+          this.set(toU8a(struct.addresses[i].bytes.length, ADDRESS_SIZE_LENGTH), offset)
+          this.set(struct.addresses[i].bytes, offset + ADDRESS_SIZE_LENGTH)
 
-        offset += ADDRESS_SIZE_LENGTH + struct.addresses[i].bytes.length
+          offset += ADDRESS_SIZE_LENGTH + struct.addresses[i].bytes.length
+        }
       }
     }
   }

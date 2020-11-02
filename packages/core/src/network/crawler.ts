@@ -272,15 +272,7 @@ class Crawler {
   async *handleCrawlRequest(this: Crawler, conn: Connection) {
     verbose('crawl requested')
     const selectedNodes = await this.answerCrawl(conn.remotePeer, conn.remoteAddr)
-    log(`crawl answer`, selectedNodes)
     if (selectedNodes.length > 0) {
-      log(
-        `Encoded`,
-        new CrawlResponse(undefined, {
-          status: CrawlStatus.OK,
-          addresses: selectedNodes
-        })
-      )
       yield new CrawlResponse(undefined, {
         status: CrawlStatus.OK,
         addresses: selectedNodes
