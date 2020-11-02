@@ -40,10 +40,9 @@ jobs:
           node_modules/.bin/lerna bootstrap
 
       - name: Build (all)
-        if: matrix.package == 'all' 
         run: |
           node_modules/.bin/lerna link 
-          node_modules/.bin/lerna run build --include-dependencies --ignore @hoprnet/hopr-core --ignore @hoprnet/hopr-ethereum --ignore @hoprnet/hopr-core-ethereum
+          node_modules/.bin/lerna run build 
 
 
           #- name: Install hoprd
