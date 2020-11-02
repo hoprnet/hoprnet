@@ -25,7 +25,7 @@ const Fund: IFund = ({ web3, stateCounter, initiator, deposit, partyAAmount, not
     { type: 'address', value: initiator },
     { type: 'uint256', value: deposit },
     { type: 'uint256', value: partyAAmount },
-    { type: 'uint256', value: notAfter },
+    { type: 'uint256', value: notAfter }
   ])
 
   const { signature, r, s, v } = signMessage(web3, encodedFund, signerPrivKey)
@@ -35,7 +35,7 @@ const Fund: IFund = ({ web3, stateCounter, initiator, deposit, partyAAmount, not
     signature,
     r,
     s,
-    v,
+    v
   }
 }
 

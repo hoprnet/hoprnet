@@ -11,7 +11,8 @@ import {
 } from '../../../utils/env'
 import { Utils } from '@hoprnet/hopr-core-ethereum'
 import { HoprNode } from '../types/coverbot'
-import { Networks, HOPR_CHANNELS } from '@hoprnet/hopr-core-ethereum/lib/ethereum/addresses'
+import addresses from '@hoprnet/hopr-ethereum/lib/chain/addresses'
+import type { Network } from '@hoprnet/hopr-ethereum/lib/utils/networks'
 import Web3 from 'web3'
 import { convertPubKeyFromB58String, u8aToHex } from '@hoprnet/hopr-utils'
 
@@ -77,7 +78,7 @@ export async function dumpData(this: Coverbot) {
   //@TODO: Ideally we move this to a more suitable place.
   if (!this.ethereumAddress) {
     this.chainId = await Utils.getChainId(this.xdaiWeb3)
-    this.network = Utils.getNetworkName(this.chainId) as Networks
+    this.network = Utils.getNetworkName(this.chainId) as Network
     this.ethereumAddress = await _getEthereumAddressFromHOPRAddress(this.address)
   }
 
@@ -93,7 +94,7 @@ export async function dumpData(this: Coverbot) {
       COVERBOT_XDAI_THRESHOLD,
     },
     hoprCoverbotAddress: await _getEthereumAddressFromHOPRAddress(this.address),
-    hoprChannelContract: HOPR_CHANNELS[this.network],
+    hoprChannelContract: addresses[this.network].HoprChannels,
     address: this.address,
     balance: fromWei(await this.xdaiWeb3.eth.getBalance(this.ethereumAddress)),
     available: fromWei(await this.node.getHoprBalance()),

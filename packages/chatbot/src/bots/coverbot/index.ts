@@ -6,7 +6,8 @@ import FirebaseDatabase from '../../lib/firebase/api'
 //@TODO: Isolate these utilities to avoid importing the entire package
 import { convertPubKeyFromB58String, u8aToHex } from '@hoprnet/hopr-utils'
 import { Utils } from '@hoprnet/hopr-core-ethereum'
-import { Networks } from '@hoprnet/hopr-core-ethereum/lib/ethereum/addresses'
+import type { Network } from '@hoprnet/hopr-ethereum/utils/networks'
+import addresses from '@hoprnet/hopr-ethereum/chain/addresses'
 import {
   COVERBOT_DEBUG_MODE,
   COVERBOT_CHAIN_PROVIDER,
@@ -54,7 +55,7 @@ export class Coverbot implements Bot {
   xdaiWeb3: Web3
   ethereumAddress: string
   chainId: number
-  network: Networks
+  network: Network
   loadedDb: boolean
 
   constructor(

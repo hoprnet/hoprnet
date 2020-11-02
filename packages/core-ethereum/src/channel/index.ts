@@ -175,7 +175,9 @@ class ChannelFactory {
     // if (!hashedSecret.initialized) await this.coreConnector.initOnchainValues()
 
     if (await this.isOpen(counterpartyPubKey)) {
-      const record = await this.coreConnector.db.get(Buffer.from(this.coreConnector.dbKeys.Channel(counterpartyPubKey)))
+      const record = (await this.coreConnector.db.get(
+        Buffer.from(this.coreConnector.dbKeys.Channel(counterpartyPubKey))
+      )) as Uint8Array
       signedChannel = new SignedChannel({
         bytes: record.buffer,
         offset: record.byteOffset
@@ -301,7 +303,7 @@ class ChannelFactory {
   }
 
   getOffChainState(counterparty: Uint8Array): Promise<SignedChannel> {
-    return this.coreConnector.db.get(Buffer.from(this.coreConnector.dbKeys.Channel(counterparty)))
+    return this.coreConnector.db.get(Buffer.from(this.coreConnector.dbKeys.Channel(counterparty))) as any
   }
 
   saveOffChainState(counterparty: Uint8Array, signedChannel: SignedChannel) {

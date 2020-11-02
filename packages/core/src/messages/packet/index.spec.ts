@@ -27,7 +27,7 @@ async function generateNode(id: number): Promise<Hopr<HoprEthereum>> {
   })) as Hopr<HoprEthereum>
 }
 
-const GANACHE_URI = `ws://127.0.0.1:9545`
+const GANACHE_URI = `ws://127.0.0.1:8545`
 
 describe('packet/index.spec.ts test packet composition and decomposition', function () {
   this.timeout(30000)
