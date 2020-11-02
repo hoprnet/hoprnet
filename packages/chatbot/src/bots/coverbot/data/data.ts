@@ -1,6 +1,6 @@
 import debug from 'debug'
-import { Coverbot } from ".."
-import { Table } from 'console-table-printer';
+import { Coverbot } from '..'
+import { Table } from 'console-table-printer'
 import { databaseTextRef, stateDbRef, scoreDbRef } from '../utils/constants'
 import {
   COVERBOT_DEBUG_MODE,
@@ -14,7 +14,6 @@ import { HoprNode } from '../types/coverbot'
 import { Networks, HOPR_CHANNELS } from '@hoprnet/hopr-core-ethereum/lib/ethereum/addresses'
 import Web3 from 'web3'
 import { convertPubKeyFromB58String, u8aToHex } from '@hoprnet/hopr-utils'
-
 
 const log = debug('hopr-chatbot:data')
 const error = debug('hopr-chatbot:data:error')
@@ -47,25 +46,29 @@ export async function _setEthereumAddressScore(ethereumAddress: string, score: n
 export async function loadData(this: Coverbot): Promise<void> {
   log(`- loadData | Loading data from Database (${databaseTextRef})`)
   return new Promise((resolve, reject) => {
-    this.database.getTable(HOPR_ENVIRONMENT, 'state').then(state => {
-      if (!state) {
-        log(`- loadData | Database (${databaseTextRef}) hasn’t been created`)
+    this.database
+      .getTable(HOPR_ENVIRONMENT, 'state')
+      .then((state) => {
+        if (!state) {
+          log(`- loadData | Database (${databaseTextRef}) hasn’t been created`)
+          return resolve()
+        }
+        const { env, connected = [], ...substate } = state
+        log(`- loadData | Env: ${JSON.stringify(env)} obtained from database`)
+        log(`- loadData | Loaded ${connected.length} nodes from our Database (${databaseTextRef})`)
+
+        this.verifiedHoprNodes =
+          this.verifiedHoprNodes.values.length > 0 ? this.verifiedHoprNodes : new Map<string, HoprNode>()
+        connected.forEach((n) => this.verifiedHoprNodes.set(n.id, n))
+        log(`- loadData | Updated ${Array.from(this.verifiedHoprNodes.values()).length} verified nodes in memory`)
+
+        this.loadedDb = true
         return resolve()
-      }
-      const { env, connected = [], ...substate } = state
-      log(`- loadData | Env: ${JSON.stringify(env)} obtained from database`)      
-      log(`- loadData | Loaded ${connected.length} nodes from our Database (${databaseTextRef})`)
-
-      this.verifiedHoprNodes = this.verifiedHoprNodes.values.length > 0 ? this.verifiedHoprNodes : new Map<string, HoprNode>()
-      connected.forEach((n) => this.verifiedHoprNodes.set(n.id, n))
-      log(`- loadData | Updated ${Array.from(this.verifiedHoprNodes.values()).length} verified nodes in memory`)
-
-      this.loadedDb = true
-      return resolve()
-    }).catch(err => {
-      error(`- loadData | Error retrieving data`, err)
-      if (err) return reject(err)
-    })
+      })
+      .catch((err) => {
+        error(`- loadData | Error retrieving data`, err)
+        if (err) return reject(err)
+      })
   })
 }
 

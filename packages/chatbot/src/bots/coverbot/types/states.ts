@@ -17,4 +17,3 @@ export enum VerifyTweetStates {
   tweetVerificationInProgress = 'IN_PROGRESS_TWITTER_VERIFICATION',
   tweetVerificationSucceeded = 'SUCCEEDED_TWITTER_VERIFICATION',
 }
-

@@ -1,18 +1,18 @@
 export enum AdminSubCommands {
   coverTrafficCycle = 'coverTrafficCycle',
   saveState = 'saveState',
-  help = 'help'
+  help = 'help',
 }
 
 export enum VerifySubCommands {
   tweet = 'tweet',
   status = 'status',
-  help = 'help'
+  help = 'help',
 }
 
 export enum StatsSubCommands {
   connected = 'connected',
-  help = 'help'
+  help = 'help',
 }
 
 export enum BotCommands {
@@ -20,7 +20,7 @@ export enum BotCommands {
   help = 'help',
   admin = 'admin',
   verify = 'verify',
-  stats = 'stats'
+  stats = 'stats',
 }
 
 export type AvailableSubCommands = VerifySubCommands | StatsSubCommands | AdminSubCommands

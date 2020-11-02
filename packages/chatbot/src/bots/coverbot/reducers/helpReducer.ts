@@ -1,9 +1,8 @@
 import debug from 'debug'
-import { IMessage } from 'src/message/message';
-import { Coverbot } from '..';
-import { BotResponses } from '../responses';
-import { BotCommands } from '../types/commands';
-
+import { IMessage } from 'src/message/message'
+import { Coverbot } from '..'
+import { BotResponses } from '../responses'
+import { BotCommands } from '../types/commands'
 
 const log = debug('hopr-chatbot:reducers:help')
 const error = debug('hopr-chatbot:reducers:help:error')

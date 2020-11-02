@@ -31,7 +31,6 @@ import { rulesReducer } from './reducers/rulesReducer'
 import { loadData, dumpData } from './data/data'
 import { helpReducer } from './reducers/helpReducer'
 
-
 const log = debug('hopr-chatbot:coverbot')
 const error = debug('hopr-chatbot:coverbot:error')
 
@@ -97,12 +96,13 @@ export class Coverbot implements Bot {
     this.network = null
 
     this.xdaiWeb3 = new Web3(new Web3.providers.HttpProvider(COVERBOT_CHAIN_PROVIDER))
-    this.verificationTimeout = COVERBOT_VERIFICATION_CYCLE_EXECUTE && setInterval(this._startCycles.bind(this), COVERBOT_VERIFICATION_CYCLE_IN_MS)
+    this.verificationTimeout =
+      COVERBOT_VERIFICATION_CYCLE_EXECUTE &&
+      setInterval(this._startCycles.bind(this), COVERBOT_VERIFICATION_CYCLE_IN_MS)
 
     this.verifiedHoprNodes = new Map<string, HoprNode>()
     this.relayTimeouts = new Map<string, NodeJS.Timeout>()
-    this._loadData()
-      .catch(err => error(`- constructor | Initial data load failed.`, err))
+    this._loadData().catch((err) => error(`- constructor | Initial data load failed.`, err))
   }
 
   protected _loadData() {
@@ -167,11 +167,11 @@ export class Coverbot implements Bot {
       const tweetIsValid = tweet.status.isValid()
       log(`- _verifyTweet | The tweet is considered ${tweetIsValid ? 'valid' : 'invalid'}. Returning result.`)
       return tweetIsValid
-        ? ([tweet, VerifyTweetStates.tweetVerificationSucceeded])
-        : ([tweet, VerifyTweetStates.tweetVerificationFailed])
+        ? [tweet, VerifyTweetStates.tweetVerificationSucceeded]
+        : [tweet, VerifyTweetStates.tweetVerificationFailed]
     } catch (err) {
       error(`- _verifyTweet | Error when trying to verify tweet: ${message}`, err)
-      return ([undefined, VerifyTweetStates.tweetInvalid])
+      return [undefined, VerifyTweetStates.tweetInvalid]
     }
   }
 
@@ -191,35 +191,34 @@ export class Coverbot implements Bot {
         case BotCommands.verify: {
           log(`- handleMessage | ${BotCommands.verify} command received`)
           verificatorReducer.call(this, instructionWrapper, message)
-          break;
+          break
         }
         case BotCommands.stats: {
           log(`- handleMessage | ${BotCommands.stats} command received`)
           statsReducer.call(this, instructionWrapper, message)
-          break;
+          break
         }
         case BotCommands.admin: {
           log(`- handleMessage | ${BotCommands.admin} command received`)
           adminReducer.call(this, instructionWrapper, message)
-          break;
+          break
         }
         case BotCommands.rules: {
           log(`- handleMessage | ${BotCommands.rules} command received`)
           rulesReducer.call(this, message)
-          break;
+          break
         }
 
         default: {
           log(`- handleMessage | Command was not understood`)
           helpReducer.call(this, message)
-          break;
+          break
         }
       }
-
     } catch (err) {
       log(`- handleMessage | Instruction was not understood`)
       helpReducer.call(this, message)
-      return;
+      return
     }
   }
 }

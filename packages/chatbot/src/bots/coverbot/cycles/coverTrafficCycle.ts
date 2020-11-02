@@ -8,7 +8,6 @@ import { NodeStates } from '../types/states'
 import { RELAY_VERIFICATION_CYCLE_IN_MS, databaseTextRef } from '../utils/constants'
 import { Coverbot } from '..'
 
-
 const log = debug('hopr-chatbot:coverTraffic')
 const error = debug('hopr-chatbot:coverTraffic:error')
 
@@ -79,11 +78,9 @@ export async function coverTrafficCycle(this: Coverbot) {
 
       // 2.
       log(`- coverTrafficCycle | Sending multihop messages to ${_hoprNodeAddress} to start process.`)
-      this._sendMessageFromBot(this.address, `verify relay ${_hoprNodeAddress}`, [_hoprNodeAddress]).catch(
-        (err) => {
-          error(`Trying to send RELAY message to ${_hoprNodeAddress} failed.`, err)
-        },
-      )
+      this._sendMessageFromBot(this.address, `verify relay ${_hoprNodeAddress}`, [_hoprNodeAddress]).catch((err) => {
+        error(`Trying to send RELAY message to ${_hoprNodeAddress} failed.`, err)
+      })
 
       // 3.
       this.relayTimeouts.set(
@@ -103,11 +100,9 @@ export async function coverTrafficCycle(this: Coverbot) {
 
           // 4.1.2
           log(`- coverTrafficCycle | Sending 0 hop message to ${_hoprNodeAddress} to notify invalid relay`)
-          this._sendMessageFromBot(_hoprNodeAddress, NodeStateResponses[NodeStates.relayingNodeFailed]).catch(
-            (err) => {
-              error(`Trying to send ${NodeStates.relayingNodeFailed} message to ${_hoprNodeAddress} failed.`, err)
-            },
-          )
+          this._sendMessageFromBot(_hoprNodeAddress, NodeStateResponses[NodeStates.relayingNodeFailed]).catch((err) => {
+            error(`Trying to send ${NodeStates.relayingNodeFailed} message to ${_hoprNodeAddress} failed.`, err)
+          })
 
           // 4.1.3
           log(`- coverTrafficCycle | Removing expired timeout for ${_hoprNodeAddress} from memory.`)

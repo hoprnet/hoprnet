@@ -37,7 +37,7 @@ export const AdminStateResponses: AdminResponse = {
   [AdminSubCommands.saveState]: `\n
     Starting manually saving state to database. Please review the logs to see the
     changes done against the system state and database.
-  `
+  `,
 }
 
 export const StatsStateResponses: StatsResponse = {
@@ -69,7 +69,7 @@ export const VerifyStateResponses: VerifyResponse = {
   `,
   [VerifySubCommands.status]: (status: NodeStates) => `\n
     Your current verification status is: ${status}
-  `
+  `,
 }
 
 export const VerifyTweetStateResponse = {
@@ -122,7 +122,7 @@ export const BotResponses: BotResponse = {
   `,
   [BotCommands.stats]: StatsStateResponses[StatsSubCommands.help] as string,
   [BotCommands.verify]: VerifyStateResponses[VerifySubCommands.help] as string,
-  [BotCommands.admin]: AdminStateResponses[AdminSubCommands.help]
+  [BotCommands.admin]: AdminStateResponses[AdminSubCommands.help],
 }
 
 export const NodeStateResponses = {
