@@ -22,8 +22,7 @@ const formatChannel = (res: AsyncReturnType<HoprChannelsInstance['channels']>) =
   stateCounter: res[3]
 })
 
-// @TODO: failing since hardhat migration
-describe.skip('HoprChannels', function () {
+describe('HoprChannels', function () {
   const partyAPrivKey = NODE_SEEDS[1]
   const partyBPrivKey = NODE_SEEDS[0]
   const depositAmount = web3.utils.toWei('1', 'ether')
