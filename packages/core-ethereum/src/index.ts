@@ -283,15 +283,15 @@ export default class HoprEthereum implements HoprCoreConnector {
     const [chainId, publicKey] = await Promise.all([utils.getChainId(web3), utils.privKeyToPubKey(seed)])
     const network = utils.getNetworkName(chainId) as Network
 
-    if (typeof addresses?.localhost?.HoprChannels === 'undefined') {
+    if (typeof addresses?.[network]?.HoprChannels === 'undefined') {
       throw Error(`channel contract address from network ${network} not found`)
     }
-    if (typeof addresses?.localhost?.HoprToken === 'undefined') {
+    if (typeof addresses?.[network]?.HoprToken === 'undefined') {
       throw Error(`token contract address from network ${network} not found`)
     }
 
-    const hoprChannels = new web3.eth.Contract(HoprChannelsAbi as any, addresses?.localhost?.HoprChannels)
-    const hoprToken = new web3.eth.Contract(HoprTokenAbi as any, addresses?.localhost?.HoprToken)
+    const hoprChannels = new web3.eth.Contract(HoprChannelsAbi as any, addresses?.[network]?.HoprChannels)
+    const hoprToken = new web3.eth.Contract(HoprTokenAbi as any, addresses?.[network]?.HoprToken)
 
     const coreConnector = new HoprEthereum(
       db,
