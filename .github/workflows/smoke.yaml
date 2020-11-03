@@ -85,9 +85,9 @@ jobs:
           CHARLIE_PORT=9877
 
           # Store addresses
-          ALICE=$(hoprd --data='./test/fixtures/alice' --password="$DBPASS" --run "myAddress hopr")
-          BOB=$(hoprd --data='./test/fixtures/bob' --password="$DBPASS" --run="myAddress hopr")
-          CHARLIE=$(hoprd --data='./test/fixtures/charlie' --password="$DBPASS" --run "myAddress hopr")
+          ALICE=$(hoprd --data='./test/fixtures/alice' --password="$DBPASS" --bootstrap --run "myAddress hopr")
+          BOB=$(hoprd --data='./test/fixtures/bob' --password="$DBPASS" --bootstrap --run="myAddress hopr")
+          CHARLIE=$(hoprd --data='./test/fixtures/charlie' --password="$DBPASS" --bootstrap --run "myAddress hopr")
 
           # Run bob as bootstrap node
           hoprd --data='./test/fixtures/bob' --password="$DBPASS" --host="$BOB_ADDR:$BOB_PORT" --bootstrap &
