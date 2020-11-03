@@ -144,6 +144,7 @@ describe('should create a socket and connect to it', function () {
 
           await new Promise((resolve) => setTimeout(resolve, 100))
         }
+        return new TextEncoder().encode(`message ${i}`)
       })()
     )
 
@@ -479,11 +480,12 @@ describe('should create a socket and connect to it', function () {
   it('should not use itself as relay node', async function () {
     let [sender, counterparty] = await Promise.all([
       generateNode({ id: 0, ipv4: true }),
-      generateNode({ id: 2, ipv4: true }),
+      generateNode({ id: 2, ipv4: true })
     ])
     let errThrown = false
     try {
-      await sender.relay.establishRelayedConnection(Multiaddr(`/p2p/${counterparty.node.peerId.toB58String()}`),
+      await sender.relay.establishRelayedConnection(
+        Multiaddr(`/p2p/${counterparty.node.peerId.toB58String()}`),
         sender.node.multiaddrs,
         async () => {}
       )

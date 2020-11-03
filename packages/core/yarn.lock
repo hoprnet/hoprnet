@@ -1925,17 +1925,6 @@ cids@^0.7.1:
     multicodec "^1.0.0"
     multihashes "~0.4.15"
 
-cids@^0.8.0, cids@~0.8.0:
-  version "0.8.3"
-  resolved "https://registry.yarnpkg.com/cids/-/cids-0.8.3.tgz#aaf48ac8ed857c3d37dad94d8db1d8c9407b92db"
-  integrity sha512-yoXTbV3llpm+EBGWKeL9xKtksPE/s6DPoDSY4fn8I8TEW1zehWXPSB0pwAXVDlLaOlrw+sNynj995uD9abmPhA==
-  dependencies:
-    buffer "^5.6.0"
-    class-is "^1.1.0"
-    multibase "^1.0.0"
-    multicodec "^1.0.1"
-    multihashes "^1.0.1"
-
 cids@^1.0.0:
   version "1.0.2"
   resolved "https://registry.yarnpkg.com/cids/-/cids-1.0.2.tgz#04ebadd65e5600a07feb16db594160f087c6eab3"
@@ -4964,53 +4953,6 @@ libp2p-crypto@0.18.0, libp2p-crypto@^0.18.0:
     uint8arrays "^1.1.0"
     ursa-optional "^0.10.1"
 
-libp2p-crypto@^0.17.7:
-  version "0.17.9"
-  resolved "https://registry.yarnpkg.com/libp2p-crypto/-/libp2p-crypto-0.17.9.tgz#2d2cd0b852c6a54d4d33f10be6ca8856c2d24870"
-  integrity sha512-nH3vTfQ4UqhZ1SORTP7HOsmFdJBs604Qy0Xi3IFFtU6ofYt+rFAZ2QNgo4MH1ZTT38/LEM374N9K7yzj1IQm0g==
-  dependencies:
-    buffer "^5.5.0"
-    err-code "^2.0.0"
-    is-typedarray "^1.0.0"
-    iso-random-stream "^1.1.0"
-    keypair "^1.0.1"
-    multibase "^1.0.1"
-    multicodec "^1.0.4"
-    multihashing-async "^0.8.1"
-    node-forge "^0.9.1"
-    pem-jwk "^2.0.0"
-    protons "^1.2.1"
-    secp256k1 "^4.0.0"
-    uint8arrays "^1.0.0"
-    ursa-optional "^0.10.1"
-
-libp2p-interfaces@^0.3.2:
-  version "0.3.2"
-  resolved "https://registry.yarnpkg.com/libp2p-interfaces/-/libp2p-interfaces-0.3.2.tgz#c92ad0769722e28b8a9478d362f39f61540a2a65"
-  integrity sha512-EZviUYO5d4T/mYwDFMC/tVvLiS95+Ui8agn/DovsnUhlYPojLJJNapEJYFqFbgKqP+dxpMVMZ5CyJXD334qsuA==
-  dependencies:
-    abort-controller "^3.0.0"
-    abortable-iterator "^3.0.0"
-    buffer "^5.6.0"
-    chai "^4.2.0"
-    chai-checkmark "^1.0.1"
-    class-is "^1.1.0"
-    delay "^4.3.0"
-    detect-node "^2.0.4"
-    dirty-chai "^2.0.1"
-    err-code "^2.0.0"
-    it-goodbye "^2.0.1"
-    it-pair "^1.0.0"
-    it-pipe "^1.1.0"
-    libp2p-tcp "^0.14.5"
-    multiaddr "^7.5.0"
-    p-defer "^3.0.0"
-    p-limit "^2.3.0"
-    p-wait-for "^3.1.0"
-    peer-id "^0.13.13"
-    sinon "^9.0.2"
-    streaming-iterables "^5.0.2"
-
 libp2p-interfaces@^0.4.0:
   version "0.4.1"
   resolved "https://registry.yarnpkg.com/libp2p-interfaces/-/libp2p-interfaces-0.4.1.tgz#1610034845e7ceb7cf93b5309945cf5ea698c9ee"
@@ -5071,10 +5013,10 @@ libp2p-interfaces@^0.5.1:
     streaming-iterables "^5.0.2"
     uint8arrays "^1.1.0"
 
-libp2p-kad-dht@0.20.0:
-  version "0.20.0"
-  resolved "https://registry.yarnpkg.com/libp2p-kad-dht/-/libp2p-kad-dht-0.20.0.tgz#599638b99f40045bc2444179db544e43b5a1dd97"
-  integrity sha512-OoZf+QTVs5tQvrQPtaNrRim/ZgHIbRtD4DKDfaDUYEQWZZ+QqqwZHOXjjPbrf/BRYqRLXO10/ywAsdkNVpYj4g==
+libp2p-kad-dht@0.20.1:
+  version "0.20.1"
+  resolved "https://registry.yarnpkg.com/libp2p-kad-dht/-/libp2p-kad-dht-0.20.1.tgz#fa72ded6dcc18fccd4a4a891849de88cd06ddc00"
+  integrity sha512-khffe6L6O6oU53LO8BrI3bULH4i6FLibvFEyV+7FAPXnFYhTKHa9TsIifkL/MEAfLI0hI9QN4NwMf0DpOLMvDA==
   dependencies:
     abort-controller "^3.0.0"
     async "^2.6.2"
@@ -5089,7 +5031,7 @@ libp2p-kad-dht@0.20.0:
     it-pipe "^1.1.0"
     k-bucket "^5.0.0"
     libp2p-crypto "^0.18.0"
-    libp2p-interfaces "^0.3.2"
+    libp2p-interfaces "^0.4.0"
     libp2p-record "^0.9.0"
     multiaddr "^8.0.0"
     multihashing-async "^2.0.1"
@@ -5164,31 +5106,6 @@ libp2p-tcp@0.15.1, libp2p-tcp@^0.15.0:
     multiaddr "^8.0.0"
     stream-to-it "^0.2.2"
 
-libp2p-tcp@^0.14.5:
-  version "0.14.6"
-  resolved "https://registry.yarnpkg.com/libp2p-tcp/-/libp2p-tcp-0.14.6.tgz#a0c98ebe2be2f1d3d6bf22ea8b991e51978180ac"
-  integrity sha512-DeOdaH5QGVMKZflJmZq3dSWROxzD/YU1MFDxfi+DT4JVMcxfVMd+SpVEPMyk2wyA28H4AdGIRsH78yPjlFIyZQ==
-  dependencies:
-    abortable-iterator "^3.0.0"
-    class-is "^1.1.0"
-    debug "^4.1.1"
-    err-code "^2.0.0"
-    libp2p-utils "^0.1.2"
-    mafmt "^7.1.0"
-    multiaddr "^7.5.0"
-    stream-to-it "^0.2.2"
-
-libp2p-utils@^0.1.2:
-  version "0.1.3"
-  resolved "https://registry.yarnpkg.com/libp2p-utils/-/libp2p-utils-0.1.3.tgz#ed38956b974bba139e3b05c8506f7ba1177138b1"
-  integrity sha512-ApiQu45O+wTArSuAA8I0FR+CRf9lqoVTR1iGqSPx57x3iCzAtf3uKEOFxUDkgdWCnhpo04VKr2TLzxEYvkxd/w==
-  dependencies:
-    abortable-iterator "^3.0.0"
-    debug "^4.1.1"
-    err-code "^2.0.3"
-    ip-address "^6.1.0"
-    multiaddr "^7.5.0"
-
 libp2p-utils@^0.2.0:
   version "0.2.1"
   resolved "https://registry.yarnpkg.com/libp2p-utils/-/libp2p-utils-0.2.1.tgz#56e22d58f99de20a80cac085a1a45232d42165f6"
@@ -5202,10 +5119,10 @@ libp2p-utils@^0.2.0:
     multiaddr "^8.0.0"
     private-ip "^1.0.5"
 
-libp2p@0.29.0:
-  version "0.29.0"
-  resolved "https://registry.yarnpkg.com/libp2p/-/libp2p-0.29.0.tgz#56d55630b834111b8d0c62724e139461672d5bfd"
-  integrity sha512-eALoJ0vpsonRwzLpdPY2/272RIl2MImIg2QToqLb+wBChcSQFB4U/r3LU8rZqEaDfRNupOBG/rx67gJTWC0h2Q==
+libp2p@0.29.2:
+  version "0.29.2"
+  resolved "https://registry.yarnpkg.com/libp2p/-/libp2p-0.29.2.tgz#d7604688e2627582b10338a6ac6989572fd6d74d"
+  integrity sha512-figd1NEBHNMpRCztxH4ZJl4flu+lMiFPMbNTkkoDES6FSZ0+wI7C72z579jh63eN124rsxpFRZaPYmpbKXi9CQ==
   dependencies:
     abort-controller "^3.0.0"
     aggregate-error "^3.0.1"
@@ -5238,7 +5155,7 @@ libp2p@0.29.0:
     p-any "^3.0.0"
     p-fifo "^1.0.0"
     p-settle "^4.0.1"
-    peer-id "^0.14.0"
+    peer-id "^0.14.2"
     protons "^2.0.0"
     retimer "^2.0.0"
     sanitize-filename "^1.6.3"
@@ -5386,13 +5303,6 @@ mafmt@8.0.1, mafmt@^8.0.0:
   integrity sha512-A2z9CQp8C9koExHLdYs2tGzwYgCWuEfp+M+QNKe+qQif+YwYRq0+wJ9019SP7Go9TLx0I6+ylx01RqIxZ8RuHw==
   dependencies:
     multiaddr "^8.0.0"
-
-mafmt@^7.1.0:
-  version "7.1.0"
-  resolved "https://registry.yarnpkg.com/mafmt/-/mafmt-7.1.0.tgz#4126f6d0eded070ace7dbbb6fb04977412d380b5"
-  integrity sha512-vpeo9S+hepT3k2h5iFxzEHvvR0GPBx9uKaErmnRzYNcaKb03DgOArjEMlgG4a9LcuZZ89a3I8xbeto487n26eA==
-  dependencies:
-    multiaddr "^7.3.0"
 
 make-error@^1.1.1:
   version "1.3.6"
@@ -5731,30 +5641,10 @@ multiaddr@8.1.0, multiaddr@^8.0.0:
     uint8arrays "^1.1.0"
     varint "^5.0.0"
 
-multiaddr@^7.3.0, multiaddr@^7.5.0:
-  version "7.5.0"
-  resolved "https://registry.yarnpkg.com/multiaddr/-/multiaddr-7.5.0.tgz#976c88e256e512263445ab03b3b68c003d5f485e"
-  integrity sha512-GvhHsIGDULh06jyb6ev+VfREH9evJCFIRnh3jUt9iEZ6XDbyoisZRFEI9bMvK/AiR6y66y6P+eoBw9mBYMhMvw==
-  dependencies:
-    buffer "^5.5.0"
-    cids "~0.8.0"
-    class-is "^1.1.0"
-    is-ip "^3.1.0"
-    multibase "^0.7.0"
-    varint "^5.0.0"
-
 multibase@^0.7.0:
   version "0.7.0"
   resolved "https://registry.yarnpkg.com/multibase/-/multibase-0.7.0.tgz#1adfc1c50abe05eefeb5091ac0c2728d6b84581b"
   integrity sha512-TW8q03O0f6PNFTQDvh3xxH03c8CjGaaYrjkl9UQPG6rz53TQzzxJVCIWVjzcbN/Q5Y53Zd0IBQBMVktVgNx4Fg==
-  dependencies:
-    base-x "^3.0.8"
-    buffer "^5.5.0"
-
-multibase@^1.0.0, multibase@^1.0.1:
-  version "1.0.1"
-  resolved "https://registry.yarnpkg.com/multibase/-/multibase-1.0.1.tgz#4adbe1de0be8a1ab0274328b653c3f1903476724"
-  integrity sha512-KcCxpBVY8fdVKu4dJMAahq4F/2Z/9xqEjIiR7PiMe7LRGeorFn2NLmicN6nLBCqQvft6MG2Lc9X5P0IdyvnxEw==
   dependencies:
     base-x "^3.0.8"
     buffer "^5.5.0"
@@ -5782,7 +5672,7 @@ multicodec@^0.5.5:
   dependencies:
     varint "^5.0.0"
 
-multicodec@^1.0.0, multicodec@^1.0.1, multicodec@^1.0.4:
+multicodec@^1.0.0:
   version "1.0.4"
   resolved "https://registry.yarnpkg.com/multicodec/-/multicodec-1.0.4.tgz#46ac064657c40380c28367c90304d8ed175a714f"
   integrity sha512-NDd7FeS3QamVtbgfvu5h7fd1IlbaC4EQ0/pgU4zqE2vdHCmBGsUa0TiM8/TdSeG6BMPC92OOCf8F1ocE/Wkrrg==
@@ -5815,27 +5705,6 @@ multihashes@^0.4.15, multihashes@~0.4.15:
     buffer "^5.5.0"
     multibase "^0.7.0"
     varint "^5.0.0"
-
-multihashes@^1.0.1:
-  version "1.0.1"
-  resolved "https://registry.yarnpkg.com/multihashes/-/multihashes-1.0.1.tgz#a89415d68283cf6287c6e219e304e75ce7fb73fe"
-  integrity sha512-S27Tepg4i8atNiFaU5ZOm3+gl3KQlUanLs/jWcBxQHFttgq+5x1OgbQmf2d8axJ/48zYGBd/wT9d723USMFduw==
-  dependencies:
-    buffer "^5.6.0"
-    multibase "^1.0.1"
-    varint "^5.0.0"
-
-multihashing-async@^0.8.1:
-  version "0.8.2"
-  resolved "https://registry.yarnpkg.com/multihashing-async/-/multihashing-async-0.8.2.tgz#3d5da05df27d83be923f6d04143a0954ff87f27f"
-  integrity sha512-2lKa1autuCy8x7KIEj9aVNbAb3aIMRFYIwN7mq/zD4pxgNIVgGlm+f6GKY4880EOF2Y3GktHYssRy7TAJQ2DyQ==
-  dependencies:
-    blakejs "^1.1.0"
-    buffer "^5.4.3"
-    err-code "^2.0.0"
-    js-sha3 "^0.8.0"
-    multihashes "^1.0.1"
-    murmurhash3js-revisited "^3.0.0"
 
 multihashing-async@^2.0.1:
   version "2.0.1"
@@ -6485,7 +6354,7 @@ pbkdf2@^3.0.17, pbkdf2@^3.0.3, pbkdf2@^3.0.9:
     safe-buffer "^5.0.1"
     sha.js "^2.4.8"
 
-peer-id@0.14.2, peer-id@^0.14.0:
+peer-id@0.14.2, peer-id@^0.14.0, peer-id@^0.14.2:
   version "0.14.2"
   resolved "https://registry.yarnpkg.com/peer-id/-/peer-id-0.14.2.tgz#3ddd752092a54f06b750b5e67d0db98fb4ee40bc"
   integrity sha512-8iZWaUT7jq8rVyyFZUHYUwFCvhoI5B1Q2MAJjUF9MTf4TsNRQPnod4Mycf2jrK/uXFBN5/9K1NhPoieFyz/PRw==
@@ -6497,19 +6366,6 @@ peer-id@0.14.2, peer-id@^0.14.0:
     multihashes "^3.0.1"
     protons "^2.0.0"
     uint8arrays "^1.1.0"
-
-peer-id@^0.13.13:
-  version "0.13.13"
-  resolved "https://registry.yarnpkg.com/peer-id/-/peer-id-0.13.13.tgz#63c3561f1e602ec9d7a205103488256d59dd299a"
-  integrity sha512-5FpBXN6PDTcHs51gkHWPf0OIQZAO3Z10i6lWc+GaoxTU4bQHtsoKFnhxoXo5Ze04JblpzIrtowkluLSCLP1WYg==
-  dependencies:
-    buffer "^5.5.0"
-    cids "^0.8.0"
-    class-is "^1.1.0"
-    libp2p-crypto "^0.17.7"
-    minimist "^1.2.5"
-    multihashes "^1.0.1"
-    protons "^1.0.2"
 
 pem-jwk@^2.0.0:
   version "2.0.0"
@@ -6601,16 +6457,6 @@ protocol-buffers-schema@^3.3.1:
   version "3.4.0"
   resolved "https://registry.yarnpkg.com/protocol-buffers-schema/-/protocol-buffers-schema-3.4.0.tgz#2f0ea31ca96627d680bf2fefae7ebfa2b6453eae"
   integrity sha512-G/2kcamPF2S49W5yaMGdIpkG6+5wZF0fzBteLKgEHjbNzqjZQ85aAs1iJGto31EJaSTkNvHs5IXuHSaTLWBAiA==
-
-protons@^1.0.2, protons@^1.2.1:
-  version "1.2.1"
-  resolved "https://registry.yarnpkg.com/protons/-/protons-1.2.1.tgz#5f1e0db8b2139469cd1c3b4e332a4c2d95d0a218"
-  integrity sha512-2oqDyc/SN+tNcJf8XxrXhYL7sQn2/OMl8mSdD7NVGsWjMEmAbks4eDVnCyf0vAoRbBWyWTEXWk4D8XfuKVl3zg==
-  dependencies:
-    buffer "^5.5.0"
-    protocol-buffers-schema "^3.3.1"
-    signed-varint "^2.0.1"
-    varint "^5.0.0"
 
 protons@^2.0.0:
   version "2.0.0"

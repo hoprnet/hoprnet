@@ -42,6 +42,7 @@ describe('test relay connection', function () {
           yield new TextEncoder().encode(`message ${i++}`)
           await new Promise((resolve) => setTimeout(resolve, 100))
         }
+        return new TextEncoder().encode(`message ${i}`)
       })()
     )
 
