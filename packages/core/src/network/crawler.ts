@@ -26,7 +26,7 @@ export type CrawlInfo = {
   errors: (Error | string)[]
 }
 
-let toPeer = (s: string): PeerId => {
+let stringToPeerId = (s: string): PeerId => {
   return PeerId.createFromB58String(s)
 }
 
@@ -50,8 +50,8 @@ class Crawler {
     private id: PeerId,
     private networkPeers: NetworkPeerStore,
     private crawlInteraction: CrawlInteraction,
-    private getPeer: (PeerId) => Multiaddr[],
-    private putPeer: (Multiaddr) => void,
+    private getPeer: (peer: PeerId) => Multiaddr[],
+    private putPeer: (ma: Multiaddr) => void,
     private options?: {
       timeoutIntentionally?: boolean
     }
@@ -61,7 +61,7 @@ class Crawler {
    *
    * @param filter
    */
-  async crawl(filter?: (peer: PeerId) => boolean): Promise<CrawlInfo> {
+  crawl(filter?: (peer: PeerId) => boolean): Promise<CrawlInfo> {
     verbose('creating a crawl')
     return new Promise(async (resolve) => {
       let aborted = false
@@ -84,7 +84,7 @@ class Crawler {
         abort.abort()
         this.printStatsAndErrors(contactedPeerIds, errors, current, before)
         resolve({
-          contacted: Array.from(contactedPeerIds.values()).map((x) => toPeer(x)),
+          contacted: Array.from(contactedPeerIds.values()).map((x) => stringToPeerId(x)),
           errors
         })
       }, CRAWL_TIMEOUT)
@@ -98,7 +98,7 @@ class Crawler {
 
       if (filter != null) {
         for (let i = 0; i < unContactedPeers.length; i++) {
-          if (filter(toPeer(unContactedPeers[i]))) {
+          if (filter(stringToPeerId(unContactedPeers[i]))) {
             before += 1
           }
         }
@@ -128,13 +128,13 @@ class Crawler {
         const index = randomInteger(0, unContactedPeers.length)
 
         if (index == unContactedPeers.length - 1) {
-          return toPeer(unContactedPeers.pop())
+          return stringToPeerId(unContactedPeers.pop())
         }
 
         const selected = unContactedPeers[index]
         unContactedPeers[index] = unContactedPeers.pop()
 
-        return toPeer(selected)
+        return stringToPeerId(selected)
       }
 
       /**
@@ -181,7 +181,7 @@ class Crawler {
               addresses = addresses.filter((ma) => !isOnPrivateNet(ma))
             }
 
-            log(`received [${addresses.map((p) => blue(p.getPeerId())).join(', ')}] from peer ${blue(peer)}`)
+            log(`received [${addresses.map((p: Multiaddr) => blue(p.getPeerId())).join(', ')}] from peer ${blue(peer.toB58String())}`)
           } catch (err) {
             verbose('error querying peer', err)
             addresses = []
@@ -199,7 +199,10 @@ class Crawler {
               continue
             }
 
-            if (!contactedPeerIds.has(peer.toB58String()) && !unContactedPeers.find((x) => x == peer.toB58String())) {
+            if (
+              !contactedPeerIds.has(peer.toB58String()) &&
+              !unContactedPeers.find((unContactedPeer: string) => unContactedPeer === peer.toB58String())
+            ) {
               unContactedPeers.push(peer.toB58String())
 
               let beforeInserting = this.networkPeers.length
@@ -242,7 +245,7 @@ class Crawler {
 
         verbose('crawl complete')
         resolve({
-          contacted: Array.from(contactedPeerIds.values()).map((x) => toPeer(x)),
+          contacted: Array.from(contactedPeerIds.values()).map((x: string) => stringToPeerId(x)),
           errors
         })
       }
@@ -258,29 +261,27 @@ class Crawler {
     if (this.options?.timeoutIntentionally) {
       await new Promise((resolve) => setTimeout(resolve, CRAWL_TIMEOUT + 100))
     }
+
     return this.networkPeers
-      .randomSubset(CRAWLING_RESPONSE_NODES)
-      .filter((id: PeerId) => !id.equals(this.id) && !id.equals(callerId))
+      .randomSubset(CRAWLING_RESPONSE_NODES, (id: PeerId) => !id.equals(this.id) && !id.equals(callerId))
       .map(this.getPeer) // NB: Multiple addrs per peer.
       .flat()
-      .filter((ma) => shouldIncludePeerInCrawlResponse(ma, callerAddress))
+      .filter((ma: Multiaddr) => shouldIncludePeerInCrawlResponse(ma, callerAddress))
   }
 
-  handleCrawlRequest(conn: Connection) {
+  async *handleCrawlRequest(this: Crawler, conn: Connection) {
     verbose('crawl requested')
-    return async function* (this: Crawler) {
-      const selectedNodes = await this.answerCrawl(conn.remotePeer, conn.remoteAddr)
-      if (selectedNodes.length > 0) {
-        yield new CrawlResponse(undefined, {
-          status: CrawlStatus.OK,
-          addresses: selectedNodes
-        })
-      } else {
-        yield new CrawlResponse(undefined, {
-          status: CrawlStatus.FAIL
-        })
-      }
-    }.call(this)
+    const selectedNodes = await this.answerCrawl(conn.remotePeer, conn.remoteAddr)
+    if (selectedNodes.length > 0) {
+      yield new CrawlResponse(undefined, {
+        status: CrawlStatus.OK,
+        addresses: selectedNodes
+      })
+    } else {
+      yield new CrawlResponse(undefined, {
+        status: CrawlStatus.FAIL
+      })
+    }
   }
 
   printStatsAndErrors(contactedPeerIds: Set<string>, errors: Error[], now: number, before: number) {

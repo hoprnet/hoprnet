@@ -46,8 +46,12 @@ class NetworkPeers {
   }
 
   // Get a random sample of non-blacklisted peers.
-  randomSubset(size: number): PeerId[] {
-    return randomSubset(this.peers, Math.min(size, this.peers.length)).map((e: Entry) => e.id)
+  randomSubset(size: number, filter?: (peer: PeerId) => boolean): PeerId[] {
+    return randomSubset(
+      this.peers,
+      Math.min(size, this.peers.length),
+      filter != null ? (entry: Entry) => filter(entry.id) : undefined
+    ).map((e: Entry) => e.id)
   }
 
   onPeerConnect(peerId: PeerId) {

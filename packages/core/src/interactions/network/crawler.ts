@@ -59,8 +59,13 @@ class Crawler implements AbstractInteraction {
       const addresses = []
       for await (const encodedResponse of struct.stream.source) {
         let decodedResponse: any
+
+        let _received = encodedResponse.slice()
         try {
-          decodedResponse = new CrawlResponse(encodedResponse.slice())
+          decodedResponse = new CrawlResponse({
+            bytes: _received.buffer,
+            offset: _received.byteOffset
+          })
         } catch {
           continue
         }
@@ -69,7 +74,7 @@ class Crawler implements AbstractInteraction {
           continue
         }
 
-        addresses.push(...(await decodedResponse.addresses))
+        addresses.push(...decodedResponse.addresses)
       }
 
       if (!resolved) {

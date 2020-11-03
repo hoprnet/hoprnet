@@ -20,7 +20,13 @@ describe('test crawl response generation', function () {
       `Should not create successful crawl responses without peerInfos.`
     )
 
-    assert(new CrawlResponse(failingResponse).status == CrawlStatus.FAIL, 'Check status after parsing.')
+    assert(
+      new CrawlResponse({
+        bytes: failingResponse.buffer,
+        offset: failingResponse.byteOffset
+      }).status == CrawlStatus.FAIL,
+      'Check status after parsing.'
+    )
 
     const id = await PeerId.create({ keyType: 'secp256k1' })
     const addresses = [new Multiaddr(`/ip4/127.0.0.1/tcp/9091/p2p/${id.toB58String()}`)]
@@ -31,8 +37,7 @@ describe('test crawl response generation', function () {
     })
 
     assert(
-      successfulResponse.status == CrawlStatus.OK &&
-        (await successfulResponse.addresses)[0].getPeerId() == id.toB58String(),
+      successfulResponse.status == CrawlStatus.OK && successfulResponse.addresses[0].getPeerId() == id.toB58String(),
       'Check status & peerInfo'
     )
 
@@ -45,9 +50,7 @@ describe('test crawl response generation', function () {
     })
 
     assert(
-      (await secondSuccessfulResponse.addresses).every(
-        (ma: Multiaddr, i: number) => ma.toString() == addresses[i].toString()
-      ),
+      secondSuccessfulResponse.addresses.every((ma: Multiaddr, i: number) => ma.toString() == addresses[i].toString()),
       'Check multiple peerInfos'
     )
   })
