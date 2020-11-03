@@ -30,8 +30,8 @@ CHARLIE=$(hoprd --data="$FIXTURES/charlie" --password="$DBPASS" --bootstrap --ru
 
 function finish {
   # Cleanup
-  if [ -v $BOB_PID ]; then kill $BOB_PID; fi
-  if [ -v $CHARLIE_PID ]; then kill $CHARLIE_PID; fi
+  if [[ -n "$BOB_PID" ]]; then kill $BOB_PID; fi
+  if [[ -n "$CHARLIE_PID" ]]; then kill $CHARLIE_PID; fi
 }
 trap finish EXIT
 
@@ -56,5 +56,5 @@ echo "Charlie running as pid $CHARLIE as $CHARLIE on $CHARLIE_ADDR:$CHARLIE_PORT
 hoprd --data="$FIXTURES/alice" --password="$DBPASS" --run="crawl; ping $CHARLIE"
 
 # Open channel alice -> bob and send a-b-c
-DEBUG=hopr* hoprd --data="$FIXTURES/alice" --password="$DBPASS" --run="crawl; open $BOB 10; send $CHARLIE hi"
+#DEBUG=hopr* hoprd --data="$FIXTURES/alice" --password="$DBPASS" --run="crawl; open $BOB 0.01; send $CHARLIE hi"
 

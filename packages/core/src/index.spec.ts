@@ -42,6 +42,7 @@ describe('test hopr-core', function () {
     node = await Hopr.create({
       debug: true,
       peerId,
+      createDbIfNotExist: true,
       bootstrapNode: true,
       network: 'ethereum',
       provider: 'ws://127.0.0.1:8545',
