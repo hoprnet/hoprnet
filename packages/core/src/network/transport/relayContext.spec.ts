@@ -189,7 +189,6 @@
 //       ctxCounterparty.update(getStream({ usePrefix: true }))
 //     }, 500)
 
-
 //     await new Promise((resolve) => setTimeout(resolve, 2000))
 
 //     log(`ping`, await pingPromise)
