@@ -201,7 +201,7 @@ class RelayConnection implements MultiaddrConnection {
           if (!this._sinkTriggered) {
             this._stream.sink(
               (async function* () {
-                yield u8aConcat(RELAY_STATUS_PREFIX, STOP)
+                return u8aConcat(RELAY_STATUS_PREFIX, STOP)
               })()
             )
           }
