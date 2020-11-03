@@ -85,4 +85,4 @@ jobs:
           git add ./test || true
           git commit -a -m "update databases" || true
           git pull origin ${{ github.ref }}
-          git push origin ${{ github.ref }} || true
+          #git push origin ${{ github.ref }} || true
