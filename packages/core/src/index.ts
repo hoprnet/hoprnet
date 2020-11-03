@@ -498,7 +498,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       if (options.createDbIfNotExist) {
         createDirectoryIfNotExists(dbPath)
       } else {
-        throw new Error("Database does not exist: " + dbPath)
+        throw new Error('Database does not exist: ' + dbPath)
       }
     }
     // @ts-ignore
