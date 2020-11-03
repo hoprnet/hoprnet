@@ -28,6 +28,13 @@ ALICE=$(hoprd --data="$FIXTURES/alice" --password="$DBPASS" --bootstrap --run "m
 BOB=$(hoprd --data="$FIXTURES/bob" --password="$DBPASS" --bootstrap --run="myAddress hopr")
 CHARLIE=$(hoprd --data="$FIXTURES/charlie" --password="$DBPASS" --bootstrap --run "myAddress hopr")
 
+function finish {
+  # Cleanup
+  if [ -v $BOB_PID ]; then kill $BOB_PID; fi
+  if [ -v $CHARLIE_PID ]; then kill $CHARLIE_PID; fi
+}
+trap finish EXIT
+
 # Run bob as bootstrap node
 hoprd --data="$FIXTURES/bob" --password="$DBPASS" --host="$BOB_ADDR:$BOB_PORT" --bootstrap &
 BOB_PID="$!"
@@ -51,6 +58,3 @@ hoprd --data="$FIXTURES/alice" --password="$DBPASS" --run="crawl; ping $CHARLIE"
 # Open channel alice -> bob and send a-b-c
 DEBUG=hopr* hoprd --data="$FIXTURES/alice" --password="$DBPASS" --run="crawl; open $BOB 10; send $CHARLIE hi"
 
-# Cleanup
-kill $BOB_PID
-kill $CHARLIE_PID
