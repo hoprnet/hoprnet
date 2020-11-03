@@ -20,10 +20,7 @@ RUN apt-get update && \
     cmake \
     wget
 
-ENV YARN_VERSION 1.19.2
-RUN yarn policies set-version $YARN_VERSION
 COPY package.json .
-COPY yarn.lock .
 RUN yarn install --build-from-source
 
 # -- BUILD STAGE --------------------------------

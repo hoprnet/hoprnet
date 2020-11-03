@@ -7,3 +7,5 @@ db
 .vercel
 
 .DS_Store
+
+test/local-fixtures

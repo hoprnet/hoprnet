@@ -85,6 +85,11 @@ const argv = yargs
     describe: 'manually specify the database directory to use',
     default: ''
   })
+  .option('init', {
+    boolean: true,
+    describe: "initialize a database if it doesn't already exist",
+    default: false
+  })
   .option('settings', {
     descripe: 'Settings, same as in the repl (JSON)',
     default: '{}'
@@ -114,6 +119,7 @@ async function generateNodeOptions(): Promise<HoprOptions> {
   let options: HoprOptions = {
     debug: Boolean(process.env.HOPR_DEBUG),
     bootstrapNode: argv.bootstrap,
+    createDbIfNotExist: argv.init,
     network: argv.network,
     bootstrapServers: argv.bootstrap ? [] : [...(await getBootstrapAddresses()).values()],
     provider: argv.provider,
