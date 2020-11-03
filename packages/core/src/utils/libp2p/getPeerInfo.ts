@@ -5,7 +5,7 @@ import { LevelUp } from 'levelup'
 import chalk from 'chalk'
 import { deserializeKeyPair, serializeKeyPair, askForPassword, privKeyToPeerId } from '..'
 import debug from 'debug'
-const log = debug('hopr-core:libp2p')
+const log = debug('hopr-core:peer-info')
 
 import { NODE_SEEDS, BOOTSTRAP_SEEDS } from '@hoprnet/hopr-demo-seeds'
 
@@ -102,6 +102,8 @@ async function getFromDatabase(db: LevelUp, pw?: string): Promise<PeerId> {
   try {
     serializedKeyPair = (await db.get(Buffer.from(KeyPair))) as Uint8Array
   } catch (err) {
+    log('Error loading keys from db', err)
+    // No identity in database
     return createIdentity(db, pw)
   }
 
@@ -116,8 +118,9 @@ async function recoverIdentity(serializedKeyPair: Uint8Array, pw?: string): Prom
     try {
       return await deserializeKeyPair(serializedKeyPair, new TextEncoder().encode(pw))
     } catch (err) {
-      log(`Could not recover id from database with given password.`)
-      process.exit(0)
+      // Exit with error message
+      console.log(`Could not recover id from database with given password.`)
+      process.exit(1)
     }
   }
 

@@ -36,6 +36,7 @@ import BN from 'bn.js'
 import { Interactions } from './interactions'
 import * as DbKeys from './dbKeys'
 import EventEmitter from 'events'
+import path from 'path'
 
 const verbose = Debug('hopr-core:verbose')
 
@@ -53,6 +54,7 @@ export type HoprOptions = {
   debug: boolean
   db?: LevelUp
   dbPath?: string
+  createDbIfNotExist?: boolean
   peerId?: PeerId
   password?: string
   id?: number // TODO - kill this opaque accessor of db files...
@@ -488,12 +490,17 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
         dbPath += `node`
       }
     }
+    dbPath = path.resolve(dbPath)
 
     verbose('using db at ', dbPath)
     if (!existsSync(dbPath)) {
-      verbose('db does not exist, creating')
+      verbose('db does not exist, creating?:', options.createDbIfNotExist)
+      if (options.createDbIfNotExist) {
+        createDirectoryIfNotExists(dbPath)
+      } else {
+        throw new Error("Database does not exist: " + dbPath)
+      }
     }
-    createDirectoryIfNotExists(dbPath)
     // @ts-ignore
     return levelup(leveldown(dbPath))
   }
