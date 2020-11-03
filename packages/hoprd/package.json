@@ -36,7 +36,7 @@
     "next": "^9.5.2",
     "peer-id": "0",
     "react": "17.0.1",
-    "react-dom": "16.14.0",
+    "react-dom": "17.0.1",
     "rlp": "^2.2.6",
     "tiny-hashes": "^1.0.1",
     "yargs": "^16.0.3"
