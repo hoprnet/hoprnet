@@ -77,18 +77,6 @@ jobs:
         env:
           DBPASS: ${{ secrets.SMOKETESTPASSWORD }}
 
-      - name: Integration tests with defaults
-        shell: bash {0}
-        run: |
-          shopt -s expand_aliases
-          alias hoprd="node packages/hoprd/lib/index.js"
-          set -e
-
-          # See who's around
-          DEBUG=hopr* hoprd --data='./test/fixtures/alice' --password="$DBPASS" --run="crawl; listConnectedPeers"
-        env:
-          DBPASS: ${{ secrets.SMOKETESTPASSWORD }}
-
       - name: Commit database changes back to repo
         shell: bash {0}
         run: |
