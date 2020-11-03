@@ -12,15 +12,15 @@ CHARLIE_PORT=9877
 
 # Check Databases
 echo "alice"
-hoprd --data="$FIXTURES/alice" --password="$DBPASS" --bootstrap --run "myAddress" 
+hoprd --data="$FIXTURES/alice" --password="$DBPASS" --init --bootstrap --run "myAddress" 
 hoprd --data="$FIXTURES/alice" --password="$DBPASS" --bootstrap --run "balance" 
 
 echo "bob"
-hoprd --data="$FIXTURES/bob" --password="$DBPASS" --bootstrap --run "myAddress"
+hoprd --data="$FIXTURES/bob" --password="$DBPASS" --init --bootstrap --run "myAddress"
 hoprd --data="$FIXTURES/bob" --password="$DBPASS" --bootstrap --run "balance"
 
 echo "charlie"
-hoprd --data="$FIXTURES/charlie" --password="$DBPASS" --bootstrap --run "myAddress"
+hoprd --data="$FIXTURES/charlie" --password="$DBPASS" --init --bootstrap --run "myAddress"
 hoprd --data="$FIXTURES/charlie" --password="$DBPASS" --bootstrap --run "balance"
 
 # Store addresses
