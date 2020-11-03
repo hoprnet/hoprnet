@@ -54,7 +54,7 @@
     "@types/mocha": "^8.0.3",
     "@types/node": "~12",
     "@typescript-eslint/eslint-plugin": "4.0.0",
-    "@typescript-eslint/parser": "4.6.0",
+    "@typescript-eslint/parser": "4.6.1",
     "console-table-printer": "^2.4.33",
     "eslint": "7.12.1",
     "eslint-config-prettier": "^6.10.0",
