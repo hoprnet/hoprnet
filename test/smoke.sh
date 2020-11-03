@@ -1,5 +1,8 @@
 #!/bin/bash
 set -e
+shopt -s expand_aliases
+
+alias hoprd="node packages/hoprd/lib/index.js"
 
 # Variables
 BOB_ADDR=127.0.0.1

@@ -73,10 +73,7 @@ jobs:
 
       - name: Smoke tests
         shell: bash {0}
-        run: |
-          shopt -s expand_aliases
-          alias hoprd="node packages/hoprd/lib/index.js"
-          ./test/smoke.sh
+        run: ./test/smoke.sh
         env:
           DBPASS: ${{ secrets.SMOKETESTPASSWORD }}
 
