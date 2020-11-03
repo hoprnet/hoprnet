@@ -66,7 +66,7 @@ function shouldBehaveLikeERC20(errorPrefix, initialSupply, initialHolder, recipi
               expectEvent.inLogs(logs, 'Transfer', {
                 from: tokenOwner,
                 to: to,
-                value: amount,
+                value: amount
               })
             })
 
@@ -76,7 +76,7 @@ function shouldBehaveLikeERC20(errorPrefix, initialSupply, initialHolder, recipi
               expectEvent.inLogs(logs, 'Approval', {
                 owner: tokenOwner,
                 spender: spender,
-                value: await this.token.allowance(tokenOwner, spender),
+                value: await this.token.allowance(tokenOwner, spender)
               })
             })
           })
@@ -191,7 +191,7 @@ function shouldBehaveLikeERC20Transfer(errorPrefix, from, to, balance, transfer)
         expectEvent.inLogs(logs, 'Transfer', {
           from,
           to,
-          value: amount,
+          value: amount
         })
       })
     })
@@ -213,7 +213,7 @@ function shouldBehaveLikeERC20Transfer(errorPrefix, from, to, balance, transfer)
         expectEvent.inLogs(logs, 'Transfer', {
           from,
           to,
-          value: amount,
+          value: amount
         })
       })
     })
@@ -240,7 +240,7 @@ function shouldBehaveLikeERC20Approve(errorPrefix, owner, spender, supply, appro
         expectEvent.inLogs(logs, 'Approval', {
           owner: owner,
           spender: spender,
-          value: amount,
+          value: amount
         })
       })
 
@@ -274,7 +274,7 @@ function shouldBehaveLikeERC20Approve(errorPrefix, owner, spender, supply, appro
         expectEvent.inLogs(logs, 'Approval', {
           owner: owner,
           spender: spender,
-          value: amount,
+          value: amount
         })
       })
 
@@ -310,5 +310,5 @@ function shouldBehaveLikeERC20Approve(errorPrefix, owner, spender, supply, appro
 module.exports = {
   shouldBehaveLikeERC20,
   shouldBehaveLikeERC20Transfer,
-  shouldBehaveLikeERC20Approve,
+  shouldBehaveLikeERC20Approve
 }

@@ -9,7 +9,7 @@ const {
   shouldBehaveLikeERC777UnauthorizedOperatorSendBurn,
   shouldBehaveLikeERC777InternalMint,
   shouldBehaveLikeERC777SendBurnMintInternalWithReceiveHook,
-  shouldBehaveLikeERC777SendBurnWithSendHook,
+  shouldBehaveLikeERC777SendBurnWithSendHook
 } = require('./ERC777.behavior')
 
 const { shouldBehaveLikeERC20, shouldBehaveLikeERC20Approve } = require('../ERC20/ERC20.behavior')

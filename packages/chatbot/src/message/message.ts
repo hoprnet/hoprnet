@@ -26,7 +26,7 @@ export class Message extends Uint8Array {
     try {
       const from = this.subarray(0, 53)
       const text = this.subarray(54, this.length)
-
+      log(`${from}:${text}`)
       return {
         from: textDecoder.decode(from),
         text: textDecoder.decode(text),

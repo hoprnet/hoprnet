@@ -100,7 +100,7 @@ async function getPeerId(options: HoprOptions, db?: LevelUp): Promise<PeerId> {
 async function getFromDatabase(db: LevelUp, pw?: string): Promise<PeerId> {
   let serializedKeyPair: Uint8Array
   try {
-    serializedKeyPair = await db.get(Buffer.from(KeyPair))
+    serializedKeyPair = (await db.get(Buffer.from(KeyPair))) as Uint8Array
   } catch (err) {
     return createIdentity(db, pw)
   }

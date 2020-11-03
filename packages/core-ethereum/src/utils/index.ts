@@ -1,5 +1,5 @@
-import * as addresses from '../ethereum/addresses'
 import type { TransactionObject } from '../tsc/web3/types'
+import type { Network } from '@hoprnet/hopr-ethereum/utils/networks'
 import assert from 'assert'
 import { publicKeyConvert, publicKeyCreate, ecdsaSign, ecdsaRecover, ecdsaVerify } from 'secp256k1'
 import createKeccakHash from 'keccak'
@@ -7,7 +7,7 @@ import { PromiEvent, TransactionReceipt, TransactionConfig } from 'web3-core'
 import { BlockTransactionString } from 'web3-eth'
 import Web3 from 'web3'
 import Debug from 'debug'
-import { u8aCompare, u8aConcat, u8aEquals, A_STRICLY_LESS_THAN_B, A_EQUALS_B, gcd } from '@hoprnet/hopr-utils'
+import { u8aCompare, u8aConcat, u8aEquals, A_STRICLY_LESS_THAN_B, A_EQUALS_B, durations } from '@hoprnet/hopr-utils'
 import { AccountId, Balance, Hash, Signature } from '../types'
 import { ContractEventEmitter } from '../tsc/web3/types'
 import { ChannelStatus } from '../types/channel'
@@ -208,7 +208,7 @@ export function convertUnit(amount: Balance, sourceUnit: 'eth' | 'wei', targetUn
 }
 
 /**
- * Wait until block has been confirmed.
+ * Wait until transaction has been mined.
  *
  * @typeparam T Our PromiEvent
  * @param event Our event, returned by web3
@@ -236,6 +236,34 @@ export async function waitForConfirmation<T extends PromiEvent<any>>(event: T) {
 }
 
 /**
+ * Wait until transaction has been mined.
+ *
+ * @param txHash transaction hash
+ * @returns the transaction receipt
+ */
+export async function waitForConfirmationUsingHash(web3: Web3, txHash: string, timeout: number = durations.minutes(5)) {
+  return new Promise<TransactionReceipt>(async (resolve, reject) => {
+    const timer = setTimeout(() => reject('Waited for txHash confirmation too long.'), timeout)
+
+    try {
+      let mined = false
+      let receipt: TransactionReceipt
+
+      while (!mined) {
+        receipt = await web3.eth.getTransactionReceipt(txHash)
+        mined = !!receipt?.blockNumber
+      }
+
+      return resolve(receipt)
+    } catch (err) {
+      return reject(err.message)
+    } finally {
+      clearTimeout(timer)
+    }
+  })
+}
+
+/**
  * An asychronous setTimeout.
  *
  * @param ms milliseconds to wait
@@ -256,7 +284,7 @@ export async function waitFor({
   timestamp
 }: {
   web3: Web3
-  network: addresses.Networks
+  network: Network
   getCurrentBlock: () => Promise<BlockTransactionString>
   timestamp?: number
 }): Promise<void> {
@@ -268,7 +296,7 @@ export async function waitFor({
 
   const diff = now - timestamp || 60
 
-  if (network === 'private') {
+  if (network === 'localhost') {
     await time.increase(web3, diff)
   } else {
     await wait(diff * 1e3)
@@ -298,28 +326,28 @@ export async function getChainId(web3: Web3): Promise<number> {
  * @param web3 a web3 instance
  * @returns the network's name
  */
-export function getNetworkName(chainId: number): addresses.Networks {
+export function getNetworkName(chainId: number): Network {
   switch (chainId) {
     case 1:
       return 'mainnet'
-    case 2:
-      return 'morden'
-    case 3:
-      return 'ropsten'
-    case 4:
-      return 'rinkeby'
-    case 5:
-      return 'goerli'
+    // case 2:
+    //   return 'morden'
+    // case 3:
+    //   return 'ropsten'
+    // case 4:
+    //   return 'rinkeby'
+    // case 5:
+    //   return 'goerli'
     case 42:
       return 'kovan'
-    case 77:
-      return 'solkol'
+    // case 77:
+    //   return 'solkol'
     case 100:
       return 'xdai'
     case 137:
       return 'matic'
     default:
-      return 'private'
+      return 'localhost'
   }
 }
 

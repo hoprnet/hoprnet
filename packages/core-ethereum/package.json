@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core-ethereum",
-  "version": "1.52.0-alpha.0",
+  "version": "1.54.0-next.6",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -11,8 +11,8 @@
     "clean": "rimraf ./lib",
     "test": "mocha --exit",
     "dev": "yarn clean && yarn build:types && tsc -w",
-    "build:types": "typechain --target web3-v1 --outDir './src/tsc/web3' './node_modules/@hoprnet/hopr-ethereum/build/extracted/abis/*.json'",
-    "build": "yarn clean && yarn build:types && $PWD/scripts/build.sh",
+    "build:types": "typechain --target web3-v1 --outDir './src/tsc/web3' '../../node_modules/@hoprnet/hopr-ethereum/chain/abis/*.json'",
+    "build": "yarn clean && yarn build:types && mkdir -p ./lib/tsc/web3 && cp -R ./src/tsc/web3 ./lib/tsc/web3 && tsc",
     "prepublishOnly": "yarn build"
   },
   "files": [
@@ -27,8 +27,8 @@
     "yarn": "1"
   },
   "dependencies": {
-    "@hoprnet/hopr-ethereum": "1.52.0-alpha.0",
-    "@hoprnet/hopr-utils": "1.52.0-alpha.0",
+    "@hoprnet/hopr-ethereum": "1.54.0-next.6",
+    "@hoprnet/hopr-utils": "1.54.0-next.6",
     "bn.js": "^5.1.2",
     "chalk": "^4.1.0",
     "debug": "^4.1.1",
@@ -43,9 +43,9 @@
     "web3-eth-contract": "^1.2.11"
   },
   "devDependencies": {
-    "@hoprnet/hopr-core-connector-interface": "1.52.0-alpha.0",
-    "@hoprnet/hopr-demo-seeds": "1.52.0-alpha.0",
-    "@hoprnet/hopr-testing": "1.52.0-alpha.0",
+    "@hoprnet/hopr-core-connector-interface": "1.54.0-next.6",
+    "@hoprnet/hopr-demo-seeds": "1.54.0-next.6",
+    "@hoprnet/hopr-testing": "1.54.0-next.6",
     "@types/debug": "^4.1.5",
     "@types/keccak": "^3.0.1",
     "@types/levelup": "^4.3.0",
@@ -60,7 +60,7 @@
     "rimraf": "^3.0.2",
     "ts-generator": "^0.1.1",
     "ts-node": "^9.0.0",
-    "typechain": "^1.0.5",
+    "typechain": "^3.0.0",
     "typechain-target-web3-v1": "^1.0.4",
     "typescript": "^4.0"
   },
@@ -69,7 +69,9 @@
       "ts"
     ],
     "spec": "src/**/*.spec.ts",
-    "require": "ts-node/register"
+    "require": [
+      "ts-node/register"
+    ]
   },
   "publishConfig": {
     "access": "public"

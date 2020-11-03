@@ -189,7 +189,7 @@ function shouldSendTokens(from, operator, to, amount, data, operatorData) {
         to,
         amount,
         data,
-        operatorData: null,
+        operatorData: null
       })
     } else {
       ;({ logs } = await this.token.operatorSend(from, to, amount, data, operatorData, { from: operator }))
@@ -199,14 +199,14 @@ function shouldSendTokens(from, operator, to, amount, data, operatorData) {
         to,
         amount,
         data,
-        operatorData,
+        operatorData
       })
     }
 
     expectEvent.inLogs(logs, 'Transfer', {
       from,
       to,
-      value: amount,
+      value: amount
     })
 
     const finalTotalSupply = await this.token.totalSupply()
@@ -242,7 +242,7 @@ function shouldBurnTokens(from, operator, amount, data, operatorData) {
         from,
         amount,
         data,
-        operatorData: null,
+        operatorData: null
       })
     } else {
       ;({ logs } = await this.token.operatorBurn(from, amount, data, operatorData, { from: operator }))
@@ -251,14 +251,14 @@ function shouldBurnTokens(from, operator, amount, data, operatorData) {
         from,
         amount,
         data,
-        operatorData,
+        operatorData
       })
     }
 
     expectEvent.inLogs(logs, 'Transfer', {
       from,
       to: ZERO_ADDRESS,
-      value: amount,
+      value: amount
     })
 
     const finalTotalSupply = await this.token.totalSupply()
@@ -292,13 +292,13 @@ function shouldInternalMintTokens(operator, to, amount, data, operatorData) {
       to,
       amount,
       data,
-      operatorData,
+      operatorData
     })
 
     expectEvent.inLogs(logs, 'Transfer', {
       from: ZERO_ADDRESS,
       to,
-      value: amount,
+      value: amount
     })
 
     const finalTotalSupply = await this.token.totalSupply()
@@ -359,7 +359,7 @@ function shouldBehaveLikeERC777SendBurnMintInternalWithReceiveHook(operator, amo
 
     it('TokensRecipient receives operatorSend data and is called after state mutation', async function () {
       const { tx } = await this.token.operatorSend(this.sender, this.recipient, amount, data, operatorData, {
-        from: operator,
+        from: operator
       })
 
       const postSenderBalance = await this.token.balanceOf(this.sender)
@@ -457,7 +457,7 @@ function shouldBehaveLikeERC777SendBurnWithSendHook(operator, amount, data, oper
       const preRecipientBalance = await this.token.balanceOf(this.recipient)
 
       const { tx } = await this.token.operatorSend(this.sender, this.recipient, amount, data, operatorData, {
-        from: operator,
+        from: operator
       })
 
       await assertTokensToSendCalled(
@@ -540,7 +540,7 @@ async function assertTokensReceivedCalled(
     operatorData,
     token: token.address,
     fromBalance,
-    toBalance,
+    toBalance
   })
 }
 
@@ -565,7 +565,7 @@ async function assertTokensToSendCalled(
     operatorData,
     token: token.address,
     fromBalance,
-    toBalance,
+    toBalance
   })
 }
 
@@ -593,5 +593,5 @@ module.exports = {
   shouldBehaveLikeERC777UnauthorizedOperatorSendBurn,
   shouldBehaveLikeERC777InternalMint,
   shouldBehaveLikeERC777SendBurnMintInternalWithReceiveHook,
-  shouldBehaveLikeERC777SendBurnWithSendHook,
+  shouldBehaveLikeERC777SendBurnWithSendHook
 }

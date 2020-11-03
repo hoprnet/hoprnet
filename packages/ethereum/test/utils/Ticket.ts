@@ -15,7 +15,7 @@ const Ticket = ({
   amount,
   counter,
   winProbPercent,
-  counterPartySecret,
+  counterPartySecret
 }: {
   web3: any
   sender: string
@@ -48,7 +48,7 @@ const Ticket = ({
   if (counterPartySecret != null) {
     hashedCounterPartySecret = keccak256({
       type: 'bytes27',
-      value: counterPartySecret,
+      value: counterPartySecret
     }).slice(0, 56)
   }
 
@@ -64,7 +64,7 @@ const Ticket = ({
     [challenge, 'bytes', 32],
     [counter, 'number', 3],
     [amount, 'number', 12],
-    [winProb, 'bytes', 32],
+    [winProb, 'bytes', 32]
   ]
 
   const encodedTicket = raw
@@ -92,7 +92,7 @@ const Ticket = ({
     hashedCounterPartySecret,
     r,
     s,
-    v,
+    v
   }
 }
 

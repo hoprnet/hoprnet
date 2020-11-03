@@ -1,13 +1,23 @@
-import { expectRevert } from '@openzeppelin/test-helpers'
-import { HoprTokenContract, HoprTokenInstance } from '../types/truffle-contracts'
+import { expect } from 'chai'
+import { singletons, expectRevert } from '@openzeppelin/test-helpers'
+import { web3 } from 'hardhat'
+import { HoprTokenInstance } from '../types'
+import { vmErrorMessage } from './utils'
 
-const HoprToken: HoprTokenContract = artifacts.require('HoprToken')
+const HoprToken = artifacts.require('HoprToken')
 
-contract('HoprToken', function ([owner, userA]) {
+describe('HoprToken', function () {
+  let owner: string
+  let userA: string
   let hoprToken: HoprTokenInstance
 
   before(async function () {
-    hoprToken = await HoprToken.deployed()
+    ;[owner, userA] = await web3.eth.getAccounts()
+
+    // migrate contracts
+    await singletons.ERC1820Registry(owner)
+    hoprToken = await HoprToken.new()
+    await hoprToken.grantRole(await hoprToken.MINTER_ROLE(), owner)
   })
 
   it("should be named 'HOPR Token'", async function () {
@@ -27,9 +37,9 @@ contract('HoprToken', function ([owner, userA]) {
   it('should fail mint', async function () {
     await expectRevert(
       hoprToken.mint(userA, 1, '0x00', '0x00', {
-        from: userA,
+        from: userA
       }),
-      'HoprToken: caller does not have minter role'
+      vmErrorMessage('HoprToken: caller does not have minter role')
     )
   })
 
@@ -43,7 +53,7 @@ contract('HoprToken', function ([owner, userA]) {
     const amount = web3.utils.toWei('1', 'ether')
 
     await hoprToken.mint(owner, amount, '0x00', '0x00', {
-      from: owner,
+      from: owner
     })
 
     const balance = await hoprToken.balanceOf(owner).then((res) => res.toString())

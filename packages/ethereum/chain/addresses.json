@@ -1,0 +1,22 @@
+{
+  "localhost": {
+    "HoprToken": "0x66DB78F4ADD912a6Cb92b672Dfa09028ecc3085E",
+    "HoprChannels": "0x0a67180CF519aDF27f1FD32F7255bBa00B536FC6",
+    "HoprMinter": "0x6c97048D67c39ADCe38bbB228fc1bA415fc8f096"
+  },
+  "kovan": {
+    "HoprToken": "0xDD78859E6714D045a31Caa0075C1523f6E08fFe1",
+    "HoprChannels": "0x6eCe0EC9E5F408e664ACc397A8Ac7241841c6658",
+    "HoprFaucet": "0x034869aaF67F09296303D2d42dceEc53F4F04533"
+  },
+  "xdai": {
+    "HoprToken": "0x12481c3Ed97b32D94E71C2039DBC44432ADD39a0",
+    "HoprChannels": "0x75E35d2Db3193670C8a55308180C2c3aD63A6ab5",
+    "HoprMinter": "0x522de7D16aF21A255D2bC6EB24e6F9d93bD307a1"
+  },
+  "matic": {
+    "HoprToken": "0x4774fEd3f2838f504006BE53155cA9cbDDEe9f0c",
+    "HoprChannels": "0x25E2e5D8EcC4fE46a9505079Ed29266779dC7D6f",
+    "HoprMinter": "0x83c3Df21FeDFF9f92669953ac12686Cf144e375C"
+  }
+}

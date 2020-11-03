@@ -7,14 +7,17 @@ import Web3 from 'web3'
 import { Ganache } from '@hoprnet/hopr-testing'
 import { migrate } from '@hoprnet/hopr-ethereum'
 import { stringToU8a, durations } from '@hoprnet/hopr-utils'
-import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
-import HoprChannelsAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprChannels.json'
+import HoprTokenAbi from '@hoprnet/hopr-ethereum/chain/abis/HoprToken.json'
+import HoprChannelsAbi from '@hoprnet/hopr-ethereum/chain/abis/HoprChannels.json'
+import addresses from '@hoprnet/hopr-ethereum/chain/addresses'
 import { getPrivKeyData, createAccountAndFund, createNode, disconnectWeb3 } from './utils/testing.spec'
 import * as testconfigs from './config.spec'
 import * as configs from './config'
 import { wait } from './utils'
 
 describe('test Account class', function () {
+  this.timeout(durations.minutes(5))
+
   const ganache = new Ganache()
   let web3: Web3
   let hoprToken: HoprToken
@@ -24,14 +27,14 @@ describe('test Account class', function () {
   let user: Await<ReturnType<typeof getPrivKeyData>>
 
   before(async function () {
-    this.timeout(60e3)
+    this.timeout(durations.minutes(1))
 
     await ganache.start()
     await migrate()
 
     web3 = new Web3(configs.DEFAULT_URI)
-    hoprToken = new web3.eth.Contract(HoprTokenAbi as any, configs.TOKEN_ADDRESSES.private)
-    hoprChannels = new web3.eth.Contract(HoprChannelsAbi as any, configs.CHANNELS_ADDRESSES.private)
+    hoprToken = new web3.eth.Contract(HoprTokenAbi as any, addresses.localhost?.HoprToken)
+    hoprChannels = new web3.eth.Contract(HoprChannelsAbi as any, addresses.localhost?.HoprChannels)
   })
 
   after(async function () {
@@ -61,16 +64,13 @@ describe('test Account class', function () {
     })
 
     it('should be 2 after setting new secret', async function () {
-      this.timeout(durations.seconds(4))
-
       const ticketEpoch = await coreConnector.account.ticketEpoch
 
       assert.equal(ticketEpoch.toString(), '2', 'ticketEpoch is wrong')
     })
 
     it('should be 3 after reconnecting to web3', async function () {
-      this.timeout(durations.seconds(4))
-
+      this.timeout(durations.seconds(10))
       await disconnectWeb3(coreConnector.web3)
 
       // wait for reconnection

@@ -53,3 +53,7 @@ db
 
 # service accounts
 service-account.json
+
+# coverage
+coverage
+test-report.html
