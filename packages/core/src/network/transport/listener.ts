@@ -1,7 +1,7 @@
 import net, { AddressInfo, Socket as TCPSocket } from 'net'
 import dgram, { RemoteInfo } from 'dgram'
 
-import EventEmitter from 'events'
+import { EventEmitter } from 'events'
 import debug from 'debug'
 
 import { socketToConn } from './socket-to-conn'

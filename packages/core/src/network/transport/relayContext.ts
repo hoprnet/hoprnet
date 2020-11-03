@@ -98,8 +98,8 @@ class RelayContext {
       value?: Uint8Array | void
       done?: boolean | void
     }) => {
-      console.log(`source iteration`, iteration, `_iteration`, _iteration)
-      console.log(`source yielding`, value, done)
+      //console.log(`source iteration`, iteration, `_iteration`, _iteration)
+      //console.log(`source yielding`, value, done)
 
       sourceReceived = true
       sourceMsg = value as Uint8Array
@@ -218,8 +218,8 @@ class RelayContext {
       value?: Uint8Array | void
       done?: boolean | void
     }) => {
-      console.log(`iteration`, iteration, `_iteration`, _iteration)
-      console.log(`yielding`, value, done)
+      // console.log(`iteration`, iteration, `_iteration`, _iteration)
+      // console.log(`yielding`, value, done)
       sourceReceived = true
       sourceMsg = value
 
