@@ -118,7 +118,10 @@ class TCP {
       try {
         let newConn = await this._upgrader.upgradeInbound(newStream)
 
+        console.log(this._connectionManager.connections)
         this._connectionManager.connections.set(relayConn.remoteAddr.getPeerId(), [newConn])
+
+        console.log(this._connectionManager.connections)
 
         this.connHandler?.(newConn)
       } catch (err) {
