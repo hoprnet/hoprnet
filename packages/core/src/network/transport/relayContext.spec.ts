@@ -3,6 +3,7 @@ import { RELAY_PAYLOAD_PREFIX } from './constants'
 import { RelayContext } from './relayContext'
 import { RelayConnection } from './relayConnection'
 import type { Stream } from 'libp2p'
+import assert from 'assert'
 
 import Pair from 'it-pair'
 
@@ -189,8 +190,10 @@ describe('test overwritable connection', function () {
       ctxCounterparty.update(getStream({ usePrefix: true }))
     }, 200)
 
-    await new Promise((resolve) => setTimeout(resolve, 2000))
+    await new Promise((resolve) => setTimeout(resolve, 1000))
 
-    log(`ping`, await pingPromise)
+    assert((await pingPromise) > 0)
+
+    await ctx.close()
   })
 })
