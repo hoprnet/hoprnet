@@ -16,5 +16,5 @@ export const abis: {
   HoprToken: require('./abis/HoprToken.json'),
   HoprChannels: require('./abis/HoprChannels.json'),
   HoprMinter: require('./abis/HoprMinter.json'),
-  HoprFaucet: require('./abis/HoprFauce.json')
+  HoprFaucet: require('./abis/HoprFaucet.json')
 }
