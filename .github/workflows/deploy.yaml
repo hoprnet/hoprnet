@@ -1,7 +1,7 @@
 name: HOPR Deploy
 on:
   push:
-    branches: ['master', 'release/*']
+    branches: ['master', 'release/**']
     paths-ignore:
       - 'docs/**'
 
@@ -32,14 +32,6 @@ jobs:
           yarn
           node_modules/.bin/lerna bootstrap
           yarn autoclean --force
-
-      - name: Lint & Fix
-        run: |
-          git config --global user.email "noreply@hoprnet.org"
-          git config --global user.name "HOPR Linting robot"
-          yarn lint:fix
-          git commit -a -m "Fix linting" || true
-          git push origin ${{ github.ref }}
 
       - name: Link & Build
         run: |
