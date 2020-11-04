@@ -6,7 +6,7 @@ import FirebaseDatabase from '../../lib/firebase/api'
 //@TODO: Isolate these utilities to avoid importing the entire package
 import { convertPubKeyFromB58String, u8aToHex } from '@hoprnet/hopr-utils'
 import { Utils } from '@hoprnet/hopr-core-ethereum'
-import type { Network } from '@hoprnet/hopr-ethereum/lib/utils/networks'
+import type { Network } from '@hoprnet/hopr-ethereum//utils/networks'
 import {
   COVERBOT_DEBUG_MODE,
   COVERBOT_CHAIN_PROVIDER,

@@ -11,8 +11,8 @@ import {
 } from '../../../utils/env'
 import { Utils } from '@hoprnet/hopr-core-ethereum'
 import { HoprNode } from '../types/coverbot'
-import addresses from '@hoprnet/hopr-ethereum/lib/chain/addresses'
-import type { Network } from '@hoprnet/hopr-ethereum/lib/utils/networks'
+import addresses from '@hoprnet/hopr-ethereum//chain/addresses'
+import type { Network } from '@hoprnet/hopr-ethereum//utils/networks'
 import Web3 from 'web3'
 import { convertPubKeyFromB58String, u8aToHex } from '@hoprnet/hopr-utils'
 

@@ -11,3 +11,5 @@ export async function migrate(args: string = '') {
 export async function fund(args: string = '') {
   await runner(`yarn fund${args ? ' ' + args : ''}`)
 }
+
+export * from './chain'

@@ -1,5 +1,5 @@
 import { Ganache } from '@hoprnet/hopr-testing'
-import addresses from '@hoprnet/hopr-ethereum/lib/chain/addresses'
+import addresses from '@hoprnet/hopr-ethereum//chain/addresses'
 import { compile, migrate, fund } from '@hoprnet/hopr-ethereum'
 
 let ganache
