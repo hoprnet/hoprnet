@@ -1,5 +1,5 @@
 import type { TransactionObject } from '../tsc/web3/types'
-import type { Network } from '@hoprnet/hopr-ethereum//utils/networks'
+import type { Network } from '@hoprnet/hopr-ethereum/utils/networks'
 import assert from 'assert'
 import { publicKeyConvert, publicKeyCreate, ecdsaSign, ecdsaRecover, ecdsaVerify } from 'secp256k1'
 import createKeccakHash from 'keccak'
