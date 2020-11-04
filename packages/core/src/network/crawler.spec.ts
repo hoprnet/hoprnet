@@ -152,13 +152,14 @@ describe('network/crawler test crawler', function () {
 
     await Promise.all([Alice.node.stop(), Bob.node.stop(), Chris.node.stop()])
   })
-  it('shouldIncludePeerInCrawlResponse', async () => {
-    assert(
-      shouldIncludePeerInCrawlResponse(Multiaddr('/ip4/123.4.5.6/tcp/5000'), Multiaddr('/ip4/12.34.56.7/tcp/5000'))
-    )
-    assert(shouldIncludePeerInCrawlResponse(Multiaddr('/ip4/127.0.0.1/tcp/1000'), Multiaddr('/ip4/127.0.0.1/tcp/5000')))
-    assert(
-      !shouldIncludePeerInCrawlResponse(Multiaddr('/ip4/127.0.0.1/tcp/5000'), Multiaddr('/ip4/12.34.56.7/tcp/5000'))
-    )
-  })
+  // @TODO redo crawl filtering
+  // it('shouldIncludePeerInCrawlResponse', async () => {
+  //   assert(
+  //     shouldIncludePeerInCrawlResponse(Multiaddr('/ip4/123.4.5.6/tcp/5000'), Multiaddr('/ip4/12.34.56.7/tcp/5000'))
+  //   )
+  //   assert(shouldIncludePeerInCrawlResponse(Multiaddr('/ip4/127.0.0.1/tcp/1000'), Multiaddr('/ip4/127.0.0.1/tcp/5000')))
+  //   assert(
+  //     !shouldIncludePeerInCrawlResponse(Multiaddr('/ip4/127.0.0.1/tcp/5000'), Multiaddr('/ip4/12.34.56.7/tcp/5000'))
+  //   )
+  // })
 })
