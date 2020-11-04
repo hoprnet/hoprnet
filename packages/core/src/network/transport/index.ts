@@ -104,24 +104,12 @@ class TCP {
     return async function (this: TCP, relayConn: RelayConnection) {
       const newStream = relayConn.switch()
 
-      // if (conn != null) {
-      //   // @ts-ignore
-      //   conn._close = () => Promise.resolve()
-      //   await conn.close()
-      // }
-
-      console.log(`in reconnect before hangUp`, PeerId.createFromCID(relayConn.remoteAddr.getPeerId()))
-      // console.log(this._getAll(PeerId.createFromCID(relayConn.remoteAddr.getPeerId())))
-
       log(`####### inside reconnect #######`)
 
       try {
         let newConn = await this._upgrader.upgradeInbound(newStream)
 
-        console.log(this._connectionManager.connections)
         this._connectionManager.connections.set(relayConn.remoteAddr.getPeerId(), [newConn])
-
-        console.log(this._connectionManager.connections)
 
         this.connHandler?.(newConn)
       } catch (err) {
@@ -132,8 +120,6 @@ class TCP {
   }
 
   async handleDelivery(handler: Handler) {
-    //verbose('handle delivery', connection.remoteAddr.toString(), counterparty.toB58String())
-
     let newConn: Connection
 
     try {

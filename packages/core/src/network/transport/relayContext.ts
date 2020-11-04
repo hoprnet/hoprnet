@@ -92,8 +92,6 @@ class RelayContext {
 
     let iteration = 0
     const sourceFunction = (_iteration: number) => (arg: { value?: Uint8Array; done?: boolean }) => {
-      console.log(`source yielding`, arg.value != null ? `msg` : undefined, arg.done)
-
       sourceReceived = true
       sourceMsg = arg.value
 
