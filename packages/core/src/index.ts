@@ -171,6 +171,9 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
             bootstrapServers: options.bootstrapServers
           }
         },
+        peerDiscovery: {
+          autoDial: false
+        },
         dht: {
           enabled: true
         },
