@@ -95,7 +95,7 @@ class TCP {
 
     libp2p.handle(DELIVERY, this.handleDelivery.bind(this))
 
-    this._relay = new Relay(libp2p /*, this._webRTCUpgrader*/)
+    this._relay = new Relay(libp2p, this._webRTCUpgrader)
     verbose(`Created TCP stack (Stun: ${this.stunServers?.map((x) => x.toString()).join(',')}`)
   }
 
