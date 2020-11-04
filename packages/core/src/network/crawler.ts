@@ -9,7 +9,7 @@ import PeerId from 'peer-id'
 import type { Connection } from 'libp2p'
 import type { Entry } from './network-peers'
 import NetworkPeerStore from './network-peers'
-import { peerHasOnlyPublicAddresses, isOnPrivateNet, PRIVATE_NETS } from '../filters'
+import { peerHasOnlyPublicAddresses, isOnPrivateNet /*, PRIVATE_NETS */ } from '../filters'
 import debug from 'debug'
 import Multiaddr from 'multiaddr'
 import { Crawler as CrawlInteraction } from '../interactions/network/crawler'
@@ -181,7 +181,11 @@ class Crawler {
               addresses = addresses.filter((ma) => !isOnPrivateNet(ma))
             }
 
-            log(`received [${addresses.map((p: Multiaddr) => blue(p.getPeerId())).join(', ')}] from peer ${blue(peer.toB58String())}`)
+            log(
+              `received [${addresses.map((p: Multiaddr) => blue(p.getPeerId())).join(', ')}] from peer ${blue(
+                peer.toB58String()
+              )}`
+            )
           } catch (err) {
             verbose('error querying peer', err)
             addresses = []
