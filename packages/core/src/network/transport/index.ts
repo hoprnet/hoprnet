@@ -100,7 +100,7 @@ class TCP {
     verbose(`Created TCP stack (Stun: ${this.stunServers?.map((x) => x.toString()).join(',')}`)
   }
 
-  onReconnect(this: TCP, conn: Connection) {
+  onReconnect(this: TCP, _conn: Connection) {
     return async function (this: TCP, relayConn: RelayConnection) {
       const newStream = relayConn.switch()
 
