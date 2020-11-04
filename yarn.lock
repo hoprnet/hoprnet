@@ -6848,9 +6848,9 @@ console-control-strings@^1.0.0, console-control-strings@~1.1.0:
   integrity sha1-PXz0Rk22RG6mRL9LOVB/mFEAjo4=
 
 console-table-printer@^2.4.33:
-  version "2.4.35"
-  resolved "https://registry.yarnpkg.com/console-table-printer/-/console-table-printer-2.4.35.tgz#100063fb667b0c60bee944dd0663563222d80230"
-  integrity sha512-KSrfDUTOB1ObSoBjVww7wJZWD1ayqYM9xsivY0PIVKAw+7tW8o7/nzy/cOaeLzpN+lYNCKr9SRj1oyO5WIoHLQ==
+  version "2.4.36"
+  resolved "https://registry.yarnpkg.com/console-table-printer/-/console-table-printer-2.4.36.tgz#256f2ca4fcafd1922d26f9618c2de22f4451c89d"
+  integrity sha512-BHGKiwghWRlIVVmuaC1//ah2c5/HbED49qxaLqYJiRlmMNO6b6ogAl94LkQsFSjotpFfiZNfgu4u40lgGcHORA==
 
 constants-browserify@^1.0.0:
   version "1.0.0"
