@@ -113,7 +113,6 @@ class TCP {
 
         this.connHandler?.(newConn)
       } catch (err) {
-        console.log(err)
         error(err)
       }
     }.bind(this)
