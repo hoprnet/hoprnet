@@ -183,7 +183,11 @@ class RelayConnection implements MultiaddrConnection {
             }
           } else if (u8aEquals(PREFIX, RELAY_WEBRTC_PREFIX)) {
             // console.log(`Receiving fancy WebRTC message`, JSON.parse(new TextDecoder().decode(received.slice(1))))
-            this.webRTC?.signal(JSON.parse(new TextDecoder().decode(received.slice(1))))
+            try {
+              this.webRTC?.signal(JSON.parse(new TextDecoder().decode(received.slice(1))))
+            } catch (err) {
+              console.log(`WebRTC error:`, err)
+            }
           } else {
             error(`Received invalid prefix <${u8aToHex(PREFIX || new Uint8Array([]))}. Dropping message.`)
           }
