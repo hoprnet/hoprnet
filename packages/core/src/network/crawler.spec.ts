@@ -108,7 +108,7 @@ describe('network/crawler test crawler', function () {
     //   lastSeen: Date.now()
     // })
 
-    await new Promise((resolve) => setTimeout(resolve, 50))
+    await new Promise((resolve) => setTimeout(resolve, 500))
 
     assert(Alice.network.networkPeers.has(Bob.node.peerId), 'Alice should know Bob again')
 

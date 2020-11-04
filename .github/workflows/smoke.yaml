@@ -2,7 +2,7 @@ name: Smoke test
 
 on:
   push:
-    branches: ['master']
+    branches: ['**']
     paths-ignore:
       - 'docs/**'
 
@@ -23,11 +23,27 @@ jobs:
           node-version: 12
           registry-url: https://registry.npmjs.org/
 
-      - name: Temporarily install everything
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn cache dir)"
+      - uses: actions/cache@v1
+        id: yarn-cache # use this to check for `cache-hit` (`steps.yarn-cache.outputs.cache-hit != 'true'`)
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+
+      - name: Install dependencies
         run: |
-          yarn install --pure-lockfile
-          yarn util:install
-          yarn util:link && yarn util:build
+          yarn --prefer-offline
+          node_modules/.bin/lerna bootstrap
+
+      - name: Build (all)
+        run: |
+          node_modules/.bin/lerna link 
+          node_modules/.bin/lerna run build 
+
 
           #- name: Install hoprd
           #shell: bash
@@ -42,77 +58,25 @@ jobs:
           alias hoprd="node packages/hoprd/lib/index.js"
 
           echo "alice"
-          hoprd --data='./test/fixtures/alice' --password="$DBPASS" --run "myAddress" 
-          hoprd --data='./test/fixtures/alice' --password="$DBPASS" --run "balance" 
+          hoprd --data='./test/fixtures/alice' --password="$DBPASS" --bootstrap --run "myAddress" 
+          hoprd --data='./test/fixtures/alice' --password="$DBPASS" --bootstrap --run "balance" 
 
           echo "bob"
-          hoprd --data='./test/fixtures/bob' --password="$DBPASS" --run "myAddress"
-          hoprd --data='./test/fixtures/bob' --password="$DBPASS" --run "balance"
+          hoprd --data='./test/fixtures/bob' --password="$DBPASS" --bootstrap --run "myAddress"
+          hoprd --data='./test/fixtures/bob' --password="$DBPASS" --bootstrap --run "balance"
 
           echo "charlie"
-          hoprd --data='./test/fixtures/charlie' --password="$DBPASS" --run "myAddress"
-          hoprd --data='./test/fixtures/charlie' --password="$DBPASS" --run "balance"
+          hoprd --data='./test/fixtures/charlie' --password="$DBPASS" --bootstrap --run "myAddress"
+          hoprd --data='./test/fixtures/charlie' --password="$DBPASS" --bootstrap --run "balance"
         env:
           DBPASS: ${{ secrets.SMOKETESTPASSWORD }}
 
       - name: Smoke tests
         shell: bash {0}
-        run: |
-          shopt -s expand_aliases
-          alias hoprd="node packages/hoprd/lib/index.js"
-          set -e
-
-          # Variables
-          BOB_ADDR=127.0.0.1
-          BOB_PORT=9876
-          CHARLIE_ADDR=127.0.0.1
-          CHARLIE_PORT=9877
-
-          # Store addresses
-          ALICE=$(hoprd --data='./test/fixtures/alice' --password="$DBPASS" --run "myAddress hopr")
-          BOB=$(hoprd --data='./test/fixtures/bob' --password="$DBPASS" --run="myAddress hopr")
-          CHARLIE=$(hoprd --data='./test/fixtures/charlie' --password="$DBPASS" --run "myAddress hopr")
-
-          # Run bob as bootstrap node
-          hoprd --data='./test/fixtures/bob' --password="$DBPASS" --host="$BOB_ADDR:$BOB_PORT" --bootstrap &
-          BOB_PID="$!"
-          BOB_MULTIADDR=/ip4/$BOB_ADDR/tcp/$BOB_PORT/p2p/$BOB
-          export HOPR_BOOTSTRAP_SERVERS=$BOB_MULTIADDR 
-          echo "Bootstrap Bob running as pid $BOB_PID on $BOB_MULTIADDR"
-
-          # Ping bootstrapnode
-          hoprd --data='./test/fixtures/alice' --password="$DBPASS" --run="info"
-          hoprd --data='./test/fixtures/alice' --password="$DBPASS" --run="ping $BOB"
-          hoprd --data='./test/fixtures/alice' --password="$DBPASS" --run="crawl; listConnectedPeers "
-
-          # Start charlie
-          hoprd --data='./test/fixtures/charlie' --password="$DBPASS" --host="$CHARLIE_ADDR:$CHARLIE_PORT" &
-          CHARLIE_PID="$!"
-          echo "Charlie running as pid $CHARLIE as $CHARLIE on $CHARLIE_ADDR:$CHARLIE_PORT"
-
-          # Ping Charlie
-          hoprd --data='./test/fixtures/alice' --password="$DBPASS" --run="crawl; ping $CHARLIE"
-
-          # Open channel alice -> bob and send a-b-c
-          DEBUG=hopr* hoprd --data='./test/fixtures/alice' --password="$DBPASS" --run="crawl; open $BOB 10; send $CHARLIE hi"
-
-          # Cleanup
-          kill $BOB_PID
-          kill $CHARLIE_PID
+        run: ./test/smoke.sh
         env:
           DBPASS: ${{ secrets.SMOKETESTPASSWORD }}
-
-      - name: Integration tests with defaults
-        shell: bash {0}
-        run: |
-          shopt -s expand_aliases
-          alias hoprd="node packages/hoprd/lib/index.js"
-          set -e
-
-          # See who's around
-          DEBUG=hopr* hoprd --data='./test/fixtures/alice' --password="$DBPASS" --run="crawl; listConnectedPeers"
-        env:
-          DBPASS: ${{ secrets.SMOKETESTPASSWORD }}
+          FIXTURES: ./test/fixtures
 
       - name: Commit database changes back to repo
         shell: bash {0}
@@ -121,4 +85,4 @@ jobs:
           git add ./test || true
           git commit -a -m "update databases" || true
           git pull origin ${{ github.ref }}
-          git push origin ${{ github.ref }} || true
+          #git push origin ${{ github.ref }} || true
