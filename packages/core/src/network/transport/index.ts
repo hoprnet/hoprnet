@@ -147,7 +147,7 @@ class TCP {
     let error: Error
     if (
       // uncommenting next line forces our node to use a relayed connection to any node execpt for the bootstrap server
-      (this.relays == null || this.relays.some((mAddr: Multiaddr) => ma.getPeerId() === mAddr.getPeerId())) &&
+      // (this.relays == null || this.relays.some((mAddr: Multiaddr) => ma.getPeerId() === mAddr.getPeerId())) &&
       ['ip4', 'ip6', 'dns4', 'dns6'].includes(ma.protoNames()[0]) &&
       this.isRealisticAddress(ma)
     ) {
