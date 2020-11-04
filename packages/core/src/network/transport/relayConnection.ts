@@ -23,7 +23,7 @@ const log = Debug('hopr-core:transport')
 const error = Debug('hopr-core:transport:error')
 
 class RelayConnection implements MultiaddrConnection {
-  private _defer: DeferredPromise<void>
+  private _closePromise: DeferredPromise<void>
   private _stream: Stream
   private _destroyed: boolean
   private _sinkTriggered: boolean
@@ -71,7 +71,7 @@ class RelayConnection implements MultiaddrConnection {
       open: Date.now()
     }
 
-    this._defer = Defer()
+    this._closePromise = Defer()
 
     this._switchPromise = Defer<Stream['source']>()
     this._msgPromise = Defer<void>()
@@ -102,7 +102,7 @@ class RelayConnection implements MultiaddrConnection {
     this.sink = this._createSink.bind(this)
 
     this.close = (_err?: Error): Promise<void> => {
-      this._defer.resolve()
+      this._closePromise.resolve()
 
       this.timeline.close = Date.now()
 
@@ -115,20 +115,20 @@ class RelayConnection implements MultiaddrConnection {
   private async _drainSource() {
     let streamClosed = false
 
-    const closePromise = this._defer.promise.then(() => {
+    const closePromise = this._closePromise.promise.then(() => {
       streamClosed = true
     })
 
     let streamResolved = false
-    let streamMsg: Uint8Array | void
+    let streamMsg: Uint8Array
     let streamDone = false
 
-    function sourceFunction({ done, value }: { done?: boolean; value?: Uint8Array | void }) {
+    function sourceFunction(arg: { done?: boolean; value?: Uint8Array }) {
       streamResolved = true
-      streamMsg = value
+      streamMsg = arg.value
 
-      if (done) {
-        streamDone = done
+      if (arg.done) {
+        streamDone = arg.done
       }
     }
 
@@ -194,7 +194,7 @@ class RelayConnection implements MultiaddrConnection {
         if (!streamDone) {
           streamPromise = this._stream.source.next().then(sourceFunction)
         } else {
-          console.log(`ending stream`)
+          log(`ending stream because 'streamDone' was set to 'true'.`)
         }
       } else if (streamClosed || streamDone) {
         if (!this._destroyed) {
@@ -207,6 +207,7 @@ class RelayConnection implements MultiaddrConnection {
           }
           this._destroyed = true
         }
+        this._msgs.push({ done: true, iteration: this._iteration })
         break
       }
     }
@@ -215,7 +216,7 @@ class RelayConnection implements MultiaddrConnection {
   private async *_createSource(i: number) {
     while (true) {
       if (i < this._iteration) {
-        return { done: true }
+        break
       }
 
       while (this._msgs.length > 0) {
@@ -241,6 +242,8 @@ class RelayConnection implements MultiaddrConnection {
 
       await this._msgPromise.promise
     }
+
+    return { done: true }
   }
 
   private async _createSink(source: Stream['source']) {
@@ -301,7 +304,7 @@ class RelayConnection implements MultiaddrConnection {
 
     let streamClosed = false
 
-    const closePromise = this._defer.promise.then(() => {
+    const closePromise = this._closePromise.promise.then(() => {
       streamClosed = true
     })
 
@@ -311,28 +314,22 @@ class RelayConnection implements MultiaddrConnection {
 
     let iteration = 0
 
-    const streamSourceFunction = (_iteration: number) => ({
-      done,
-      value
-    }: {
-      done?: boolean
-      value?: Uint8Array | void
-    }) => {
+    const streamSourceFunction = (_iteration: number) => (arg: { done?: boolean; value?: Uint8Array }) => {
       if (iteration == _iteration) {
         streamResolved = true
-        streamMsg = value
+        streamMsg = arg.value
 
-        if (done) {
+        if (arg.done) {
           streamDone = true
         }
       }
     }
 
-    const webRTCSourceFunction = ({ done, value }: { done?: boolean; value: Uint8Array | void }) => {
+    const webRTCSourceFunction = (arg: { done?: boolean; value?: Uint8Array }) => {
       webRTCresolved = true
-      webRTCmsg = value
+      webRTCmsg = arg.value
 
-      if (done) {
+      if (arg.done) {
         webRTCdone = true
       }
     }
@@ -429,7 +426,7 @@ class RelayConnection implements MultiaddrConnection {
           log(`dropping empty message in relayConnection [in sinkFunction]`)
         }
 
-        if (streamClosed || (streamDone && webRTCdone)) {
+        if (streamClosed) {
           this._destroyed = true
 
           return u8aConcat(RELAY_STATUS_PREFIX, STOP)

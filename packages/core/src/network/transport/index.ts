@@ -36,6 +36,7 @@ class TCP {
   private relays?: Multiaddr[]
   private stunServers: Multiaddr[]
   private _relay: Relay
+  private _connectionManager: any
   // private _webRTCUpgrader: WebRTCUpgrader
   private connHandler: ConnHandler
 
@@ -86,6 +87,8 @@ class TCP {
     this._peerId = libp2p.peerId
     this._multiaddrs = libp2p.multiaddrs
     this._upgrader = upgrader
+    // @ts-ignore
+    this._connectionManager = libp2p.connectionManager
 
     // if (this._useWebRTC) {
     //   this._webRTCUpgrader = new WebRTCUpgrader({ stunServers: this.stunServers })
@@ -97,19 +100,18 @@ class TCP {
     verbose(`Created TCP stack (Stun: ${this.stunServers?.map((x) => x.toString()).join(',')}`)
   }
 
-  onReconnect(conn: Connection) {
-    return async function (relayConn: RelayConnection) {
+  onReconnect(this: TCP, _conn: Connection) {
+    return async function (this: TCP, relayConn: RelayConnection) {
       const newStream = relayConn.switch()
-      if (conn != null) {
-        // @ts-ignore
-        conn._close = () => Promise.resolve()
-        await conn.close()
-      }
 
       log(`####### inside reconnect #######`)
 
       try {
-        this._upgrader.upgradeInbound(newStream).then((conn: Connection) => this.connHandler?.(conn))
+        let newConn = await this._upgrader.upgradeInbound(newStream)
+
+        this._connectionManager.connections.set(relayConn.remoteAddr.getPeerId(), [newConn])
+
+        this.connHandler?.(newConn)
       } catch (err) {
         error(err)
       }
@@ -117,8 +119,6 @@ class TCP {
   }
 
   async handleDelivery(handler: Handler) {
-    //verbose('handle delivery', connection.remoteAddr.toString(), counterparty.toB58String())
-
     let newConn: Connection
 
     try {
@@ -146,7 +146,7 @@ class TCP {
     let error: Error
     if (
       // uncommenting next line forces our node to use a relayed connection to any node execpt for the bootstrap server
-      (this.relays == null || this.relays.some((mAddr: Multiaddr) => ma.getPeerId() === mAddr.getPeerId())) &&
+      // (this.relays == null || this.relays.some((mAddr: Multiaddr) => ma.getPeerId() === mAddr.getPeerId())) &&
       ['ip4', 'ip6', 'dns4', 'dns6'].includes(ma.protoNames()[0]) &&
       this.isRealisticAddress(ma)
     ) {
