@@ -36,7 +36,7 @@ class TCP {
   private relays?: Multiaddr[]
   private stunServers: Multiaddr[]
   private _relay: Relay
-  private _getAll: (peer: PeerId) => Connection[]
+  private _connectionManager: any
   // private _webRTCUpgrader: WebRTCUpgrader
   private connHandler: ConnHandler
 
@@ -88,7 +88,7 @@ class TCP {
     this._multiaddrs = libp2p.multiaddrs
     this._upgrader = upgrader
     // @ts-ignore
-    this._getAll = libp2p.connectionManager.getAll.bind(libp2p.connectionManager)
+    this._connectionManager = libp2p.connectionManager
 
     // if (this._useWebRTC) {
     //   this._webRTCUpgrader = new WebRTCUpgrader({ stunServers: this.stunServers })
@@ -111,13 +111,18 @@ class TCP {
       // }
 
       console.log(`in reconnect before hangUp`, PeerId.createFromCID(relayConn.remoteAddr.getPeerId()))
-      console.log(this._getAll(PeerId.createFromCID(relayConn.remoteAddr.getPeerId())))
+      // console.log(this._getAll(PeerId.createFromCID(relayConn.remoteAddr.getPeerId())))
 
       log(`####### inside reconnect #######`)
 
       try {
-        this._upgrader.upgradeInbound(newStream).then((conn: Connection) => this.connHandler?.(conn))
+        let newConn = await this._upgrader.upgradeInbound(newStream)
+
+        this._connectionManager.connections.set(relayConn.remoteAddr.getPeerId(), [newConn])
+
+        this.connHandler?.(newConn)
       } catch (err) {
+        console.log(err)
         error(err)
       }
     }.bind(this)
