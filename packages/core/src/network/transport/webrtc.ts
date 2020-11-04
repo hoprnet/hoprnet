@@ -59,7 +59,11 @@ class WebRTCUpgrader {
 
     const onError = (err?: Error) => {
       log(`WebRTC with failed. Error was: ${err}`)
-      done(err)
+
+      channel.removeListener('iceTimeout', onTimeout)
+      channel.removeListener('connect', onConnect)
+
+      signal?.removeEventListener('abort', onAbort)
     }
 
     const done = async (err?: Error) => {
@@ -77,7 +81,7 @@ class WebRTCUpgrader {
       }
     }
 
-    channel.once('error', onError)
+    channel.on('error', onError)
     channel.once('connect', onConnect)
     channel.once('iceTimeout', onTimeout)
 
