@@ -12,4 +12,5 @@ export async function fund(args: string = '') {
   await runner(`yarn fund${args ? ' ' + args : ''}`)
 }
 
+export * from './utils/networks'
 export * from './chain'

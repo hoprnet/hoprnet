@@ -8,17 +8,17 @@ import { u8aEquals, durations, stringToU8a } from '@hoprnet/hopr-utils'
 import Memdown from 'memdown'
 import LevelUp from 'levelup'
 import { Ganache } from '@hoprnet/hopr-testing'
-import addresses from '@hoprnet/hopr-ethereum/chain/addresses'
+import { Network, addresses, abis } from '@hoprnet/hopr-ethereum'
 import { migrate, fund } from '@hoprnet/hopr-ethereum'
 import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
 import Web3 from 'web3'
 import type { WebsocketProvider } from 'web3-core'
 import * as testconfigs from './config.spec'
 import * as configs from './config'
-import HoprChannelsAbi from '@hoprnet/hopr-ethereum/chain/abis/HoprChannels.json'
 import Account from './account'
-import type { Network } from '@hoprnet/hopr-ethereum/utils/networks'
 import { randomBytes } from 'crypto'
+
+const HoprChannelsAbi = abis.HoprChannels
 
 const EMPTY_HASHED_SECRET = new Uint8Array(HASHED_SECRET_WIDTH).fill(0x00)
 const FUND_ARGS = `--address ${addresses?.localhost?.HoprToken} --accounts-to-fund 1`
