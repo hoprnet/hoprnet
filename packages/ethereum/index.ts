@@ -1,4 +1,3 @@
-// require('ts-node/register')
 import runner from './utils/runner'
 
 export async function compile(args: string = '') {
