@@ -208,6 +208,7 @@ class RelayConnection implements MultiaddrConnection {
           this._destroyed = true
         }
         this._msgs.push({ done: true, iteration: this._iteration })
+        break
       }
     }
   }
@@ -215,7 +216,7 @@ class RelayConnection implements MultiaddrConnection {
   private async *_createSource(i: number) {
     while (true) {
       if (i < this._iteration) {
-        return { done: true }
+        break
       }
 
       while (this._msgs.length > 0) {
@@ -241,6 +242,8 @@ class RelayConnection implements MultiaddrConnection {
 
       await this._msgPromise.promise
     }
+
+    return { done: true }
   }
 
   private async _createSink(source: Stream['source']) {

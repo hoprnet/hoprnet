@@ -92,12 +92,7 @@ class RelayContext {
 
     let iteration = 0
     const sourceFunction = (_iteration: number) => (arg: { value?: Uint8Array; done?: boolean }) => {
-      console.log(`source iteration`, iteration, `_iteration`, _iteration)
-      console.log(
-        `source yielding`,
-        arg.value != null ? new TextDecoder().decode(arg.value.slice()) : undefined,
-        arg.done
-      )
+      console.log(`source yielding`, arg.value != null ? `msg` : undefined, arg.done)
 
       sourceReceived = true
       sourceMsg = arg.value
@@ -214,11 +209,7 @@ class RelayContext {
 
     let iteration = 0
     const sourceFunction = (arg: { value?: Uint8Array; done?: boolean }) => {
-      console.log(
-        `yielding`,
-        arg.value != null ? new TextDecoder().decode((arg.value as Uint8Array).slice()) : undefined,
-        arg.done
-      )
+      console.log(`yielding`, arg.value != null ? `msg` : undefined, arg.done)
       sourceReceived = true
       sourceMsg = arg.value
 
