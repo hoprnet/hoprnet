@@ -88,7 +88,7 @@ class TCP {
     this._multiaddrs = libp2p.multiaddrs
     this._upgrader = upgrader
     // @ts-ignore
-    this._getAll = libp2p.connectionManager.getAll
+    this._getAll = libp2p.connectionManager.getAll.bind(libp2p.connectionManager)
 
     // if (this._useWebRTC) {
     //   this._webRTCUpgrader = new WebRTCUpgrader({ stunServers: this.stunServers })
