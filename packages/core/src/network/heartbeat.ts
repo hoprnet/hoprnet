@@ -65,7 +65,7 @@ class Heartbeat extends EventEmitter {
         } catch (err) {
           await this.hangUp(currentPeerId)
           this.networkPeers.blacklistPeer(peer)
-          log(`Blacklisting node ${peer}`)
+          log(`Blacklisting node ${peer.toB58String()}`)
         }
 
         if (this.networkPeers.updatedSince(THRESHOLD_TIME)) {

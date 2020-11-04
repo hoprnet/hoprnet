@@ -36,6 +36,7 @@ class TCP {
   private relays?: Multiaddr[]
   private stunServers: Multiaddr[]
   private _relay: Relay
+  private _hangUp: (peer: PeerId) => Promise<void>
   // private _webRTCUpgrader: WebRTCUpgrader
   private connHandler: ConnHandler
 
@@ -86,6 +87,7 @@ class TCP {
     this._peerId = libp2p.peerId
     this._multiaddrs = libp2p.multiaddrs
     this._upgrader = upgrader
+    this._hangUp = libp2p.hangUp.bind(libp2p)
 
     // if (this._useWebRTC) {
     //   this._webRTCUpgrader = new WebRTCUpgrader({ stunServers: this.stunServers })
@@ -97,14 +99,17 @@ class TCP {
     verbose(`Created TCP stack (Stun: ${this.stunServers?.map((x) => x.toString()).join(',')}`)
   }
 
-  onReconnect(conn: Connection) {
-    return async function (relayConn: RelayConnection) {
+  onReconnect(this: TCP, _conn: Connection) {
+    return async function (this: TCP, relayConn: RelayConnection) {
       const newStream = relayConn.switch()
-      if (conn != null) {
-        // @ts-ignore
-        conn._close = () => Promise.resolve()
-        await conn.close()
-      }
+      // if (conn != null) {
+      //   // @ts-ignore
+      //   conn._close = () => Promise.resolve()
+      //   await conn.close()
+      // }
+
+      console.log(`in reconnect before hangUp`, PeerId.createFromCID(relayConn.remoteAddr.getPeerId()))
+      await this._hangUp(PeerId.createFromCID(relayConn.remoteAddr.getPeerId()))
 
       log(`####### inside reconnect #######`)
 
