@@ -12,7 +12,7 @@ import Multiaddr from 'multiaddr'
 import PeerId from 'peer-id'
 import type { Connection, Upgrader, DialOptions, ConnHandler, Handler, MultiaddrConnection } from 'libp2p'
 import chalk from 'chalk'
-// import { WebRTCUpgrader } from './webrtc'
+import { WebRTCUpgrader } from './webrtc'
 import Relay from './relay'
 import { RelayConnection } from './relayConnection'
 
@@ -29,7 +29,7 @@ class TCP {
     return 'TCP'
   }
 
-  // private _useWebRTC: boolean
+  private _useWebRTC: boolean
   private _upgrader: Upgrader
   private _peerId: PeerId
   private _multiaddrs: Multiaddr[]
@@ -37,7 +37,7 @@ class TCP {
   private stunServers: Multiaddr[]
   private _relay: Relay
   private _connectionManager: any
-  // private _webRTCUpgrader: WebRTCUpgrader
+  private _webRTCUpgrader: WebRTCUpgrader
   private connHandler: ConnHandler
 
   constructor({
@@ -83,16 +83,15 @@ class TCP {
       }
     }
 
-    // this._useWebRTC = false // useWebRTC === undefined ? USE_WEBRTC : useWebRTC
+    this._useWebRTC = true // useWebRTC === undefined ? USE_WEBRTC : useWebRTC
     this._peerId = libp2p.peerId
     this._multiaddrs = libp2p.multiaddrs
     this._upgrader = upgrader
-    // @ts-ignore
     this._connectionManager = libp2p.connectionManager
 
-    // if (this._useWebRTC) {
-    //   this._webRTCUpgrader = new WebRTCUpgrader({ stunServers: this.stunServers })
-    // }
+    if (this._useWebRTC) {
+      this._webRTCUpgrader = new WebRTCUpgrader({ stunServers: this.stunServers })
+    }
 
     libp2p.handle(DELIVERY, this.handleDelivery.bind(this))
 
@@ -146,7 +145,7 @@ class TCP {
     let error: Error
     if (
       // uncommenting next line forces our node to use a relayed connection to any node execpt for the bootstrap server
-      // (this.relays == null || this.relays.some((mAddr: Multiaddr) => ma.getPeerId() === mAddr.getPeerId())) &&
+      (this.relays == null || this.relays.some((mAddr: Multiaddr) => ma.getPeerId() === mAddr.getPeerId())) &&
       ['ip4', 'ip6', 'dns4', 'dns6'].includes(ma.protoNames()[0]) &&
       this.isRealisticAddress(ma)
     ) {

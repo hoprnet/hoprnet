@@ -9,7 +9,7 @@ import AbortController from 'abort-controller'
 import { AbortError } from 'abortable-iterator'
 import chalk from 'chalk'
 import libp2p from 'libp2p'
-// import type { WebRTCUpgrader } from './webrtc'
+import { WebRTCUpgrader } from './webrtc'
 
 import handshake, { Handshake } from 'it-handshake'
 
@@ -42,9 +42,9 @@ class Relay {
   private _dht: { peerRouting: PeerRouting } | undefined
   private _peerId: PeerId
   private _streams: Map<string, { [index: string]: RelayContext }>
-  // private _webRTCUpgrader?: WebRTCUpgrader
+  private _webRTCUpgrader?: WebRTCUpgrader
 
-  constructor(libp2p: libp2p /*, webRTCUpgrader?: WebRTCUpgrader*/) {
+  constructor(libp2p: libp2p, webRTCUpgrader?: WebRTCUpgrader) {
     this._dialer = libp2p.dialer
     //@ts-ignore
     this._registrar = libp2p.registrar
@@ -54,9 +54,9 @@ class Relay {
 
     this._streams = new Map<string, { [index: string]: RelayContext }>()
 
-    // if (webRTCUpgrader != null) {
-    //   this._webRTCUpgrader = webRTCUpgrader
-    // }
+    if (webRTCUpgrader != null) {
+      this._webRTCUpgrader = webRTCUpgrader
+    }
 
     libp2p.handle(RELAY, this.handleRelay.bind(this))
   }
@@ -129,8 +129,8 @@ class Relay {
       stream,
       self: this._peerId,
       counterparty: destination,
-      onReconnect
-      // webRTC: this._webRTCUpgrader?.upgradeOutbound(),
+      onReconnect,
+      webRTC: this._webRTCUpgrader?.upgradeOutbound()
     })
   }
 
@@ -152,8 +152,8 @@ class Relay {
       stream,
       self: this._peerId,
       counterparty,
-      onReconnect
-      // webRTC: this._webRTCUpgrader?.upgradeInbound(),
+      onReconnect,
+      webRTC: this._webRTCUpgrader?.upgradeInbound()
     })
   }
 

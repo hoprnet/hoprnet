@@ -104,6 +104,10 @@ declare module 'libp2p' {
     connectToPeer(peer: PeerId | Multiaddr | string, options?: any): Promise<Connection>
   }
 
+  export interface ConnectionManager extends EventEmitter {
+    connections: Map<string, [Connection]>
+  }
+
   export type ConnHandler = (conn: Connection) => void
 
   export interface Listener extends EventEmitter {
@@ -130,7 +134,7 @@ declare module 'libp2p' {
     stop(): Promise<void>
 
     multiaddrs: Multiaddr[]
-    connectionManager: EventEmitter
+    connectionManager: ConnectionManager
 
     peerId: PeerId // ATTN: Not documented API
   }
