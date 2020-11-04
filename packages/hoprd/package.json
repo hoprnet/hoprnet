@@ -15,8 +15,6 @@
     "buildAdmin": "next build hopr-admin",
     "test": "mocha",
     "prepublishOnly": "yarn build",
-    "lint": "prettier --check .",
-    "lint:fix": "prettier --write .",
     "start": "node lib/index.js --admin",
     "dev": "yarn install && yarn build && yarn buildAdmin && yarn start"
   },
@@ -52,7 +50,6 @@
     "libp2p-tcp": "^0.14.6",
     "memdown": "^5.1.0",
     "mocha": "^8.0.1",
-    "prettier": "^2.0.5",
     "rimraf": "^3.0.2",
     "typescript": "^4.0.3"
   },

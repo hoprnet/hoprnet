@@ -29,12 +29,6 @@
     "node": ">=12.9.1",
     "yarn": "1"
   },
-  "prettier": {
-    "tabWidth": 2,
-    "semi": false,
-    "singleQuote": true,
-    "printWidth": 120
-  },
   "dependencies": {
     "google-protobuf": "^3.12.2",
     "grpc": "^1.24.3"
