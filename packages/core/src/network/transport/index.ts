@@ -99,14 +99,15 @@ class TCP {
     verbose(`Created TCP stack (Stun: ${this.stunServers?.map((x) => x.toString()).join(',')}`)
   }
 
-  onReconnect(this: TCP, _conn: Connection) {
+  onReconnect(this: TCP, conn: Connection) {
     return async function (this: TCP, relayConn: RelayConnection) {
       const newStream = relayConn.switch()
-      // if (conn != null) {
-      //   // @ts-ignore
-      //   conn._close = () => Promise.resolve()
-      //   await conn.close()
-      // }
+
+      if (conn != null) {
+        // @ts-ignore
+        conn._close = () => Promise.resolve()
+        await conn.close()
+      }
 
       console.log(`in reconnect before hangUp`, PeerId.createFromCID(relayConn.remoteAddr.getPeerId()))
       await this._hangUp(PeerId.createFromCID(relayConn.remoteAddr.getPeerId()))
