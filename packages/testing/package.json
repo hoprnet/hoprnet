@@ -15,8 +15,7 @@
     "yarn.lock"
   ],
   "engines": {
-    "node": "12",
-    "yarn": "1"
+    "node": "12"
   },
   "scripts": {
     "clean": "rimraf ./lib",

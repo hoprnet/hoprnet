@@ -26,8 +26,7 @@
     "access": "public"
   },
   "engines": {
-    "node": ">=12.9.1",
-    "yarn": "1"
+    "node": ">=12.9.1"
   },
   "dependencies": {
     "google-protobuf": "^3.12.2",
