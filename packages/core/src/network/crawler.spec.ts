@@ -2,7 +2,7 @@ import assert from 'assert'
 import PeerId from 'peer-id'
 import type { Connection } from 'libp2p'
 
-import { CRAWL_TIMEOUT, shouldIncludePeerInCrawlResponse } from './crawler'
+import { CRAWL_TIMEOUT /*, shouldIncludePeerInCrawlResponse */ } from './crawler'
 import { Crawler as CrawlerInteraction } from '../interactions/network/crawler'
 import Multiaddr from 'multiaddr'
 import { Network } from './index'
