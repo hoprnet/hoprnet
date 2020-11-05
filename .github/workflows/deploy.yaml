@@ -245,7 +245,8 @@ jobs:
         run: |
           gcloud compute instances delete hopr-develop-bootstrap \
             --keep-disks=data \
-            --zone=europe-west6-a
+            --zone=europe-west6-a \
+            --no-user-output-enabled || true
 
       - name: Spawn new BS node
         run: |
