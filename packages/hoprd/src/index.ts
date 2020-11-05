@@ -176,7 +176,7 @@ async function main() {
   try {
     node = await Hopr.create(options)
     logs.log('Created HOPR Node')
-    
+
     node.on('hopr:message', logMessageToNode)
 
     process.once('exit', async () => {
