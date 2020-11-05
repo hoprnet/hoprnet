@@ -376,7 +376,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     return this._network.crawler.crawl(filter)
   }
 
-  private async periodicCrawl(){
+  private async periodicCrawl() {
     let crawlInfo = await this.crawl()
     this.emit('hopr:crawl:completed', crawlInfo)
     this.crawlTimeout = setTimeout(() => this.periodicCrawl(), CRAWL_TIMEOUT)
