@@ -38,7 +38,7 @@ class RelayConnection implements MultiaddrConnection {
   private _iteration: number
 
   private _onReconnect: (newStream: MultiaddrConnection, counterparty: PeerId) => Promise<void>
-  private _webRTCUpgradeInbound: () => SimplePeer
+  // private _webRTCUpgradeInbound: () => SimplePeer
 
   public webRTC: SimplePeer
   public localAddr: Multiaddr
