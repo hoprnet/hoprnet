@@ -472,6 +472,7 @@ class RelayConnection implements MultiaddrConnection {
 
         statusPromise = this._statusMessagePromise.promise.then(statusSourceFunction)
       } else if (streamSwitched) {
+        log(`RelayConnection: after stream switch sink operation`, iteration)
         streamSwitched = false
         currentSource = tmpSource
         this._switchPromise = Defer<Stream['source']>()
@@ -479,7 +480,7 @@ class RelayConnection implements MultiaddrConnection {
         streamPromise = currentSource.next().then(streamSourceFunction(iteration))
         switchPromise = this._switchPromise.promise.then(switchFunction)
 
-        if (this.webRTC != null) {
+        if (iteration > 1 && this.webRTC != null) {
           log(`resetting WebRTC`)
           try {
             this.webRTC.destroy()
