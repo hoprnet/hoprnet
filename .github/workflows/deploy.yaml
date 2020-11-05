@@ -259,7 +259,7 @@ jobs:
             --boot-disk-size=10GB --boot-disk-type=pd-standard \
             --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096 \
             --container-image=gcr.io/hoprassociation/hoprd:${{ env.RELEASE }} \
-            --container-arg="--password" --container-arg="switzerland" \
+            --container-arg="--password" --container-arg="${{ secrets.BS_PASSWORD }}" \
             --container-arg="--env" --container-arg="matic" \
             --container-arg="--bootstrap" --container-arg="true" \
             --container-arg="--admin" \
