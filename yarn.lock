@@ -13147,10 +13147,10 @@ libp2p@0.29.0:
     varint "^5.0.0"
     xsalsa20 "^1.0.2"
 
-libp2p@0.29.2:
-  version "0.29.2"
-  resolved "https://registry.yarnpkg.com/libp2p/-/libp2p-0.29.2.tgz#d7604688e2627582b10338a6ac6989572fd6d74d"
-  integrity sha512-figd1NEBHNMpRCztxH4ZJl4flu+lMiFPMbNTkkoDES6FSZ0+wI7C72z579jh63eN124rsxpFRZaPYmpbKXi9CQ==
+libp2p@0.29.3:
+  version "0.29.3"
+  resolved "https://registry.yarnpkg.com/libp2p/-/libp2p-0.29.3.tgz#9cee0f44a300a5ac22f2805e5da57d98df442664"
+  integrity sha512-voILMLwpDqe/KafqaeH7CsmMNtOagV7ln6vNl0/2Lgq4zyY+vCmlzULRaStSagU+9V0QWoSoPmIgQdZ/Ydelhw==
   dependencies:
     abort-controller "^3.0.0"
     aggregate-error "^3.0.1"
@@ -13175,7 +13175,7 @@ libp2p@0.29.2:
     mafmt "^8.0.0"
     merge-options "^2.0.0"
     moving-average "^1.0.0"
-    multiaddr "^8.0.0"
+    multiaddr "^8.1.0"
     multicodec "^2.0.0"
     multistream-select "^1.0.0"
     mutable-proxy "^1.0.0"
@@ -14516,7 +14516,7 @@ multiaddr@8.0.0:
     uint8arrays "^1.1.0"
     varint "^5.0.0"
 
-multiaddr@8.1.1, multiaddr@^8.0.0:
+multiaddr@8.1.1, multiaddr@^8.0.0, multiaddr@^8.1.0:
   version "8.1.1"
   resolved "https://registry.yarnpkg.com/multiaddr/-/multiaddr-8.1.1.tgz#d86315deed93752fa68b4199fee56f8b4a516a2b"
   integrity sha512-Dyur7rWX44MlgKIqVA2dYPOZx/UwG60PVSffJ5S17uo6Pu31lftJXShMEfPtUDGHnyALAOWOuC3X/iPhDtw4Vg==
