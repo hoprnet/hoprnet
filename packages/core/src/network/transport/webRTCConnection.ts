@@ -5,10 +5,9 @@ import type { Instance as SimplePeer } from 'simple-peer'
 import Multiaddr from 'multiaddr'
 import type PeerId from 'peer-id'
 import { durations } from '@hoprnet/hopr-utils'
+import toIterable from 'stream-to-it'
 
 const WEBRTC_UPGRADE_TIMEOUT = durations.seconds(7)
-
-import toIterable from 'stream-to-it'
 
 class WebRTCConnection implements MultiaddrConnection {
   private _switchPromise: DeferredPromise<void>
@@ -25,19 +24,25 @@ class WebRTCConnection implements MultiaddrConnection {
 
   public sink: Stream['sink']
 
+  private channel: SimplePeer
+
+  public conn: MultiaddrConnection
+
   public timeline: {
     open: number
     closed?: number
   }
 
-  constructor(public conn: MultiaddrConnection, private channel: SimplePeer, self: PeerId, counterparty: PeerId) {
+  constructor(opts: { conn: MultiaddrConnection; channel: SimplePeer; self: PeerId; counterparty: PeerId }) {
+    this.channel = opts.channel
+    this.conn = opts.conn
     this._destroyed = false
     this._switchPromise = Defer<void>()
     this._webRTCStateKnown = false
     this._webRTCAvailable = false
 
-    this.remoteAddr = Multiaddr(`/p2p/${self.toB58String()}`)
-    this.localAddr = Multiaddr(`/p2p/${counterparty.toB58String()}`)
+    this.remoteAddr = Multiaddr(`/p2p/${opts.self.toB58String()}`)
+    this.localAddr = Multiaddr(`/p2p/${opts.counterparty.toB58String()}`)
 
     this.channel.on('connect', () => {
       if (this._webRTCTimeout != null) {
@@ -66,21 +71,22 @@ class WebRTCConnection implements MultiaddrConnection {
     this.channel.on('iceTimeout', endWebRTCUpgrade)
     this.channel.on('error', endWebRTCUpgrade)
 
-    this.sink = async (source: AsyncGenerator<Uint8Array, Uint8Array | void>) => {
+    this.sink = async (source: Stream['source']) => {
       this.conn.sink(
         async function* (this: WebRTCConnection) {
           if (this._webRTCTimeout == null) {
             this._webRTCTimeout = setTimeout(endWebRTCUpgrade, WEBRTC_UPGRADE_TIMEOUT)
           }
+
           let sourceReceived = false
-          let sourceMsg: Uint8Array | void
+          let sourceMsg: Uint8Array | undefined
           let sourceDone = false
 
-          function sourceFunction({ value, done }: { value?: Uint8Array | void; done?: boolean | void }) {
+          function sourceFunction(arg: { value?: Uint8Array; done?: boolean }) {
             sourceReceived = true
-            sourceMsg = value
+            sourceMsg = arg.value
 
-            if (done) {
+            if (arg.done) {
               sourceDone = true
             }
           }
@@ -141,8 +147,9 @@ class WebRTCConnection implements MultiaddrConnection {
       if (this._webRTCTimeout == null) {
         this._webRTCTimeout = setTimeout(endWebRTCUpgrade, WEBRTC_UPGRADE_TIMEOUT)
       }
+
       let streamMsgReceived = false
-      let streamMsg: Uint8Array | void
+      let streamMsg: Uint8Array | undefined
       let streamDone = false
 
       function streamSourceFunction(arg: { value?: Uint8Array; done?: boolean }) {
@@ -225,7 +232,8 @@ class WebRTCConnection implements MultiaddrConnection {
     if (this._migrated) {
       return Promise.resolve(this.channel.destroy())
     } else {
-      return Promise.all([this.channel.destroy(), this.conn.close()]).then(() => {})
+      this.channel.destroy()
+      return this.conn.close()
     }
   }
 }

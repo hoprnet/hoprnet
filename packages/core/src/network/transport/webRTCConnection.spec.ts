@@ -22,8 +22,8 @@ async function main() {
   // await new Promise(resolve => {
   // })
 
-  const a = new WebRTCConnection(
-    new RelayConnection({
+  const a = new WebRTCConnection({
+    conn: new RelayConnection({
       stream: {
         sink: AliceBob.sink,
         source: BobAlice.source
@@ -33,13 +33,13 @@ async function main() {
       webRTC: PeerAlice,
       onReconnect: async () => {}
     }),
-    PeerAlice,
-    Alice,
-    Bob
-  )
+    self: Alice,
+    counterparty: Bob,
+    channel: PeerAlice
+  })
 
-  const b = new WebRTCConnection(
-    new RelayConnection({
+  const b = new WebRTCConnection({
+    conn: new RelayConnection({
       stream: {
         sink: BobAlice.sink,
         source: AliceBob.source
@@ -49,10 +49,10 @@ async function main() {
       webRTC: PeerBob,
       onReconnect: async () => {}
     }),
-    PeerBob,
-    Bob,
-    Alice
-  )
+    self: Bob,
+    counterparty: Alice,
+    channel: PeerBob
+  })
 
   a.sink(
     (async function* () {
