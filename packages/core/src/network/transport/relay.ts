@@ -130,7 +130,8 @@ class Relay {
       self: this._peerId,
       counterparty: destination,
       onReconnect,
-      webRTC: this._webRTCUpgrader?.upgradeOutbound()
+      webRTC: this._webRTCUpgrader?.upgradeOutbound(),
+      webRTCUpgradeInbound: this._webRTCUpgrader.upgradeInbound.bind(this._webRTCUpgrader)
     })
   }
 
@@ -153,7 +154,8 @@ class Relay {
       self: this._peerId,
       counterparty,
       onReconnect,
-      webRTC: this._webRTCUpgrader?.upgradeInbound()
+      webRTC: this._webRTCUpgrader?.upgradeInbound(),
+      webRTCUpgradeInbound: this._webRTCUpgrader.upgradeInbound.bind(this._webRTCUpgrader)
     })
   }
 
