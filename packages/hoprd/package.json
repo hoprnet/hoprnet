@@ -20,7 +20,7 @@
     "test": "mocha",
     "prepublishOnly": "yarn build && yarn buildAdmin",
     "start": "node lib/index.js --admin",
-    "dev": "yarn install && yarn build && yarn buildAdmin && yarn start"
+    "dev": "yarn build && yarn buildAdmin && NODE_ENV=development yarn start"
   },
   "license": "",
   "dependencies": {

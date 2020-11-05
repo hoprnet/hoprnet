@@ -11,13 +11,14 @@
     "!*.test.ts"
   ],
   "scripts": {
-    "build": "yarn build:sol && tsc && cp -R ./chain/abis ./lib/chain/abis",
+    "clean": "rimraf ./lib && rimraf ./types",
+    "build": "yarn clean && yarn build:sol && tsc && cp -R ./chain/abis ./lib/chain/abis",
     "build:sol": "hardhat compile && hardhat extract",
     "fund": "hardhat fund",
     "migrate": "hardhat migrate",
     "network": "hardhat node --network hardhat",
-    "prepublishOnly": "yarn build",
-    "test": "hardhat test --no-compile --network hardhat"
+    "test": "hardhat test --no-compile --network hardhat",
+    "prepublishOnly": "yarn build"
   },
   "dependencies": {
     "@hoprnet/hopr-demo-seeds": "1.54.0-next.28",
@@ -47,6 +48,7 @@
     "@types/node": "~12",
     "@types/secp256k1": "^4.0.1",
     "chai": "^4.2.0",
+    "rimraf": "^3.0.2",
     "typescript": "^4.0.5"
   },
   "engines": {
