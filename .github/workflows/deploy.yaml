@@ -142,37 +142,9 @@ jobs:
           git push origin ${{ github.ref }}
           # http://go.ava.do/install/<IPFS HASH>
 
-  # chat
-  build_chat_docker:
-    name: Build HOPR Chat Docker (master or release pushes)
-    runs-on: ubuntu-latest
-    needs: [build]
-    steps:
-      - uses: actions/checkout@v2
-      - name: Update repo from latest pushes.
-        run: |
-          git config --global user.email "noreply@hoprnet.org"
-          git config --global user.name "HOPR Versioning robot"
-          git config pull.rebase false
-          git pull origin ${{ github.ref }} # This should pull new packages with versions etc.
-      - name: Setup Google Cloud Credentials
-        uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
-        with:
-          version: '290.0.1'
-          service_account_key: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
-          export_default_credentials: true
-      - name: Get version from package.json
-        run: echo "RELEASE=$(node -p -e "require('./packages/hoprd/package.json').version")" >> $GITHUB_ENV 
-      - name: Set Project for Google Cloud HOPR Association
-        working-directory: packages/chat
-        run: gcloud config set project ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
-      - name: Building Docker image using Google Cloud Build
-        working-directory: packages/chat
-        run: gcloud builds submit --tag gcr.io/hoprassociation/hopr-chat:${{ env.RELEASE }}
-
-   # chatbot
+  # chatbot
   build_chatbot_docker:
-    name: Build HOPR Chatbot Docker
+    name: Build HOPR Chatbot Docker (master or release pushes)
     runs-on: ubuntu-latest
     needs: [build]
     steps:
