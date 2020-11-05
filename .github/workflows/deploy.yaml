@@ -240,7 +240,10 @@ jobs:
           export_default_credentials: true
       - name: Kill old master BS node
         run: |
-          gcloud compute instances delete hopr-develop-bootstrap --keep-disks=data
+          gcloud compute instances delete hopr-develop-bootstrap \
+            --keep-disks=data \
+            --zone=europe-west6-a
+
       - name: Spawn new BS node
         run: |
           gcloud compute instances create-with-container hopr-develop-bootstrap \
