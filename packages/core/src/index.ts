@@ -10,7 +10,7 @@ import SECIO = require('libp2p-secio')
 import TCP from './network/transport'
 
 import { Packet } from './messages/packet'
-import { PACKET_SIZE, MAX_HOPS, VERSION } from './constants'
+import { PACKET_SIZE, MAX_HOPS, VERSION, CRAWL_TIMEOUT } from './constants'
 
 import { Network } from './network'
 
@@ -86,6 +86,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   public initializedWithOptions: HoprOptions
 
   private running: boolean
+  private crawlTimeout: NodeJS.Timeout
 
   /**
    * @constructor
@@ -238,6 +239,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     log(`Available under the following addresses:`)
 
     this._libp2p.multiaddrs.forEach((ma: Multiaddr) => log(ma.toString()))
+    await this.periodicCrawl()
     this.running = true
     return this
   }
@@ -249,6 +251,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     if (!this.running) {
       return Promise.resolve()
     }
+    clearTimeout(this.crawlTimeout)
     this.running = false
     await Promise.all([this._network.stop(), this.paymentChannels?.stop().then(() => log(`Connector stopped.`))])
 
@@ -371,6 +374,12 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
 
   public async crawl(filter?: (peer: PeerId) => boolean): Promise<CrawlInfo> {
     return this._network.crawler.crawl(filter)
+  }
+
+  private async periodicCrawl(){
+    let crawlInfo = await this.crawl()
+    this.emit('hopr:crawl:completed', crawlInfo)
+    this.crawlTimeout = setTimeout(() => this.periodicCrawl(), CRAWL_TIMEOUT)
   }
 
   /**
