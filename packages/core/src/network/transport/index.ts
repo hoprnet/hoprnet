@@ -14,7 +14,6 @@ import type { Connection, Upgrader, DialOptions, ConnHandler, Handler, Multiaddr
 import chalk from 'chalk'
 import { WebRTCUpgrader } from './webrtc'
 import Relay from './relay'
-import { RelayConnection } from './relayConnection'
 
 const log = debug('hopr-core:transport')
 const error = debug('hopr-core:transport:error')
@@ -99,29 +98,25 @@ class TCP {
     verbose(`Created TCP stack (Stun: ${this.stunServers?.map((x) => x.toString()).join(',')}`)
   }
 
-  onReconnect(this: TCP, _conn: Connection) {
-    return async function (this: TCP, relayConn: RelayConnection) {
-      const newStream = relayConn.switch()
+  async onReconnect(this: TCP, newStream: MultiaddrConnection, counterparty: PeerId) {
+    log(`####### inside reconnect #######`)
 
-      log(`####### inside reconnect #######`)
+    try {
+      let newConn = await this._upgrader.upgradeInbound(newStream)
 
-      try {
-        let newConn = await this._upgrader.upgradeInbound(newStream)
+      this._connectionManager.connections.set(counterparty.toB58String(), [newConn])
 
-        this._connectionManager.connections.set(relayConn.remoteAddr.getPeerId(), [newConn])
-
-        this.connHandler?.(newConn)
-      } catch (err) {
-        error(err)
-      }
-    }.bind(this)
+      this.connHandler?.(newConn)
+    } catch (err) {
+      error(err)
+    }
   }
 
   async handleDelivery(handler: Handler) {
     let newConn: Connection
 
     try {
-      let relayConnection = await this._relay.handleRelayConnection(handler, this.onReconnect(newConn))
+      let relayConnection = await this._relay.handleRelayConnection(handler, this.onReconnect)
 
       newConn = await this._upgrader.upgradeInbound(relayConnection)
     } catch (err) {
@@ -198,23 +193,14 @@ class TCP {
   }
 
   async dialWithRelay(ma: Multiaddr, relays: Multiaddr[], options?: DialOptions): Promise<Connection> {
-    // if (this._useWebRTC) {
-    //   const onReconnect = () => {
-    //     console.log(`reconnect in dialer`)
-    //   }
-    //   const relayConnection = await this._relay.establishRelayedConnection(ma, relays, onReconnect, options)
-
-    //   return await this._upgrader.upgradeOutbound(relayConnection)
-    // } else {
     let relayConnection: MultiaddrConnection
     let newConn: Connection
 
-    relayConnection = await this._relay.establishRelayedConnection(ma, relays, this.onReconnect(newConn), options)
+    relayConnection = await this._relay.establishRelayedConnection(ma, relays, this.onReconnect, options)
 
     newConn = await this._upgrader.upgradeOutbound(relayConnection)
 
     return newConn
-    // }
   }
 
   async dialDirectly(ma: Multiaddr, options?: DialOptions): Promise<Connection> {

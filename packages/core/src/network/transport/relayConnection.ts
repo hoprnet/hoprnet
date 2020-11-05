@@ -37,11 +37,14 @@ class RelayConnection implements MultiaddrConnection {
 
   private _iteration: number
 
-  private _onReconnect: (relayConn: MultiaddrConnection) => Promise<void>
+  private _onReconnect: (newStream: MultiaddrConnection, counterparty: PeerId) => Promise<void>
+  private _webRTCUpgradeInbound: () => SimplePeer
 
   private webRTC: SimplePeer
   public localAddr: Multiaddr
   public remoteAddr: Multiaddr
+
+  private _counterparty: PeerId
 
   public source: Stream['source']
   public sink: Stream['sink']
@@ -54,18 +57,13 @@ class RelayConnection implements MultiaddrConnection {
     close?: number
   }
 
-  constructor({
-    stream,
-    self,
-    counterparty,
-    webRTC,
-    onReconnect
-  }: {
+  constructor(opts: {
     stream: Stream
     self: PeerId
     counterparty: PeerId
-    onReconnect: (relayConn: MultiaddrConnection) => Promise<void>
     webRTC?: SimplePeer
+    onReconnect: (newStream: MultiaddrConnection, counterparty: PeerId) => Promise<void>
+    webRTCUpgradeInbound?: () => SimplePeer
   }) {
     this.timeline = {
       open: Date.now()
@@ -84,14 +82,17 @@ class RelayConnection implements MultiaddrConnection {
     this._destroyed = false
     this._sinkTriggered = false
 
-    this._stream = stream
+    this._stream = opts.stream
 
-    this._onReconnect = onReconnect
+    this._onReconnect = opts.onReconnect
+    this._webRTCUpgradeInbound = this._webRTCUpgradeInbound
 
-    this.localAddr = Multiaddr(`/p2p/${self.toB58String()}`)
-    this.remoteAddr = Multiaddr(`/p2p/${counterparty.toB58String()}`)
+    this._counterparty = opts.counterparty
 
-    this.webRTC = webRTC
+    this.localAddr = Multiaddr(`/p2p/${opts.self.toB58String()}`)
+    this.remoteAddr = Multiaddr(`/p2p/${opts.counterparty.toB58String()}`)
+
+    this.webRTC = opts.webRTC
 
     this._iteration = 0
 
@@ -169,7 +170,7 @@ class RelayConnection implements MultiaddrConnection {
             } else if (u8aEquals(SUFFIX, RESTART)) {
               log(`RESTART received. Ending stream ...`)
 
-              this._onReconnect(this)
+              this._onReconnect(this.switch(), this._counterparty)
             } else if (u8aEquals(SUFFIX, PING)) {
               log(`PING received`)
               this._statusMessages.push(u8aConcat(RELAY_STATUS_PREFIX, PING_RESPONSE))
@@ -250,13 +251,13 @@ class RelayConnection implements MultiaddrConnection {
     return { done: true }
   }
 
-  private async _createSink(source: Stream['source']) {
+  private _createSink(source: Stream['source']): void {
     this._switchPromise.resolve(source)
 
     this._sinkTriggered = true
   }
 
-  private async *_getWebRTCStream(this: RelayConnection) {
+  private async *_getWebRTCStream(this: RelayConnection): Stream['source'] {
     let defer = Defer<void>()
     let waiting = false
     const webRTCmessages: Uint8Array[] = []
@@ -295,16 +296,18 @@ class RelayConnection implements MultiaddrConnection {
         break
       }
     }
+
+    return undefined
   }
 
-  private async *sinkFunction(this: RelayConnection) {
+  private async *sinkFunction(this: RelayConnection): Stream['source'] {
     let streamResolved = false
-    let streamMsg: Uint8Array | void
+    let streamMsg: Uint8Array | undefined
     let streamDone = true
 
     let webRTCresolved = false
     let webRTCdone = this.webRTC == null
-    let webRTCmsg: Uint8Array | void
+    let webRTCmsg: Uint8Array | undefined
 
     let streamClosed = false
 
@@ -369,7 +372,7 @@ class RelayConnection implements MultiaddrConnection {
           streamPromise = currentSource.next().then(streamSourceFunction(iteration))
         }
         if (webRTCstream == null) {
-          webRTCstream = this._getWebRTCStream.call(this)
+          webRTCstream = this._getWebRTCStream()
         }
         if (webRTCPromise == null) {
           webRTCPromise = webRTCstream.next().then(webRTCSourceFunction)
@@ -475,6 +478,20 @@ class RelayConnection implements MultiaddrConnection {
         streamDone = false
         streamPromise = currentSource.next().then(streamSourceFunction(iteration))
         switchPromise = this._switchPromise.promise.then(switchFunction)
+
+        if (this.webRTC != null) {
+          log(`resetting WebRTC`)
+          try {
+            this.webRTC.destroy()
+          } catch (err) {
+            err(`WebRTC error:`, err)
+          }
+          this.webRTC = this._webRTCUpgradeInbound()
+          webRTCdone = false
+          webRTCstream = this._getWebRTCStream()
+          webRTCPromise = webRTCstream.next().then(webRTCSourceFunction)
+          log(`resetting WebRTC done`)
+        }
       }
     }
   }
@@ -490,8 +507,6 @@ class RelayConnection implements MultiaddrConnection {
   get destroyed(): boolean {
     return this._destroyed
   }
-
-  // @TODO add close function
 }
 
 export { RelayConnection }
