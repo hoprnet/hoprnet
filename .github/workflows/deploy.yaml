@@ -238,6 +238,9 @@ jobs:
           version: '290.0.1'
           service_account_key: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
           export_default_credentials: true
+      - name: Set Project for Google Cloud HOPR Association
+        working-directory: packages/hoprd
+        run: gcloud config set project ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
       - name: Kill old master BS node
         run: |
           gcloud compute instances delete hopr-develop-bootstrap \
