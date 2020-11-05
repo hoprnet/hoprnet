@@ -251,10 +251,12 @@ class RelayConnection implements MultiaddrConnection {
     return { done: true }
   }
 
-  private _createSink(source: Stream['source']): void {
+  private _createSink(source: Stream['source']): Promise<void> {
     this._switchPromise.resolve(source)
 
     this._sinkTriggered = true
+
+    return Promise.resolve()
   }
 
   private async *_getWebRTCStream(this: RelayConnection): Stream['source'] {
