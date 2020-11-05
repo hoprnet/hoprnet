@@ -85,7 +85,7 @@ class RelayConnection implements MultiaddrConnection {
     this._stream = opts.stream
 
     this._onReconnect = opts.onReconnect
-    this._webRTCUpgradeInbound = this._webRTCUpgradeInbound
+    this._webRTCUpgradeInbound = opts.webRTCUpgradeInbound
 
     this._counterparty = opts.counterparty
 
