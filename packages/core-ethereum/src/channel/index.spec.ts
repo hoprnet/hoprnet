@@ -3,8 +3,7 @@ import { Ganache } from '@hoprnet/hopr-testing'
 import { migrate } from '@hoprnet/hopr-ethereum'
 import assert from 'assert'
 import { stringToU8a, u8aEquals, u8aConcat, durations } from '@hoprnet/hopr-utils'
-import HoprTokenAbi from '@hoprnet/hopr-ethereum/chain/abis/HoprToken.json'
-import addresses from '@hoprnet/hopr-ethereum/chain/addresses'
+import { addresses, abis } from '@hoprnet/hopr-ethereum'
 import { getPrivKeyData, createAccountAndFund, createNode } from '../utils/testing.spec'
 import { createChallenge, hash } from '../utils'
 import BN from 'bn.js'
@@ -19,6 +18,7 @@ import Channel from '.'
 import * as testconfigs from '../config.spec'
 import * as configs from '../config'
 
+const HoprTokenAbi = abis.HoprToken
 const DEFAULT_WIN_PROB = 1
 
 describe('test Channel class', function () {
