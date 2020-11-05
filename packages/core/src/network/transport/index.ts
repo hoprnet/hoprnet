@@ -116,7 +116,7 @@ class TCP {
     let newConn: Connection
 
     try {
-      let relayConnection = await this._relay.handleRelayConnection(handler, this.onReconnect)
+      let relayConnection = await this._relay.handleRelayConnection(handler, this.onReconnect.bind(this))
 
       newConn = await this._upgrader.upgradeInbound(relayConnection)
     } catch (err) {
@@ -196,7 +196,7 @@ class TCP {
     let relayConnection: MultiaddrConnection
     let newConn: Connection
 
-    relayConnection = await this._relay.establishRelayedConnection(ma, relays, this.onReconnect, options)
+    relayConnection = await this._relay.establishRelayedConnection(ma, relays, this.onReconnect.bind(this), options)
 
     newConn = await this._upgrader.upgradeOutbound(relayConnection)
 
