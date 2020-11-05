@@ -87,23 +87,14 @@ export class AdminServer {
       this.cmds.setState(settings)
     }
 
+    this.node.on('hopr:crawl:completed', () => {
+      this.logs.log('Crawled network')
+    })
+
     // Setup some noise
     connectionReport(this.node, this.logs)
-    periodicCrawl(this.node, this.logs)
     reportMemoryUsage(this.logs)
   }
-}
-
-const CRAWL_TIMEOUT = 100_000 // ~15 mins
-export async function periodicCrawl(node: Hopr<HoprCoreConnector>, logs: LogStream) {
-  try {
-    await node.crawl()
-    logs.log('Crawled network')
-  } catch (err) {
-    logs.log('Failed to crawl')
-    logs.log(err)
-  }
-  setTimeout(() => periodicCrawl(node, logs), CRAWL_TIMEOUT)
 }
 
 export async function reportMemoryUsage(logs: LogStream) {
