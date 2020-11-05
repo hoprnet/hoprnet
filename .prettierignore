@@ -30,3 +30,5 @@ packages/core-ethereum/src/tsc/web3
 
 # Breaks github actions with recursive commits
 .github
+
+lerna.json
