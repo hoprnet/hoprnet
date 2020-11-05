@@ -3470,10 +3470,10 @@
   resolved "https://registry.yarnpkg.com/@tsconfig/node12/-/node12-1.0.7.tgz#677bd9117e8164dc319987dd6ff5fc1ba6fbf18b"
   integrity sha512-dgasobK/Y0wVMswcipr3k0HpevxFJLijN03A8mYfEPvWvOs14v0ZlYTR4kIgMx8g4+fTyTFv8/jLCIfRqLDJ4A==
 
-"@typechain/truffle-v5@^2.0.2":
-  version "2.0.2"
-  resolved "https://registry.yarnpkg.com/@typechain/truffle-v5/-/truffle-v5-2.0.2.tgz#709a78ffb120f52c693818fea72e0b0d146c3454"
-  integrity sha512-g4N2kfol1S3g/QUkmpzukCGZiKWUdXsSms1be/+W4+R0DPMz1Q/76tY+C6bD7G/KeLhkiDKcnZFmNVNcAgjIfQ==
+"@typechain/truffle-v5@^3.0.0":
+  version "3.0.0"
+  resolved "https://registry.yarnpkg.com/@typechain/truffle-v5/-/truffle-v5-3.0.0.tgz#b6ac355a9dc00cf489be5b04c3ea181b8288844f"
+  integrity sha512-VxVujI2gygQ2fC42qulFKu0rM/i7v02yg0AVG1LtgnmppYUHIEf46HwLOtfMY1Sd3mBMVqc0ewi3UNnnNKNABQ==
 
 "@types/abstract-leveldown@*":
   version "5.0.1"
