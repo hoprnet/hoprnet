@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hoprd",
-  "version": "1.54.0-next.30",
+  "version": "1.54.0-next.31",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -24,11 +24,11 @@
   },
   "license": "",
   "dependencies": {
-    "@hoprnet/hopr-chat": "1.54.0-next.30",
-    "@hoprnet/hopr-core": "1.54.0-next.30",
-    "@hoprnet/hopr-core-connector-interface": "1.54.0-next.30",
+    "@hoprnet/hopr-chat": "1.54.0-next.31",
+    "@hoprnet/hopr-core": "1.54.0-next.31",
+    "@hoprnet/hopr-core-connector-interface": "1.54.0-next.31",
     "@hoprnet/hopr-server": "1.45.0-alpha.0",
-    "@hoprnet/hopr-utils": "1.54.0-next.30",
+    "@hoprnet/hopr-utils": "1.54.0-next.31",
     "@types/bs58": "^4.0.1",
     "@types/clear": "^0.1.0",
     "@types/yargs": "^15.0.9",
