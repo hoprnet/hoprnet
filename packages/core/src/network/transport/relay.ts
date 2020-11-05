@@ -24,6 +24,7 @@ import { u8aCompare, u8aEquals } from '@hoprnet/hopr-utils'
 import { RelayContext } from './relayContext'
 
 import { RelayConnection } from './relayConnection'
+import { WebRTCConnection } from './webRTCConnection'
 
 import type {
   Connection,
@@ -125,14 +126,29 @@ class Relay {
       return
     }
 
-    return new RelayConnection({
-      stream,
-      self: this._peerId,
-      counterparty: destination,
-      onReconnect,
-      webRTC: this._webRTCUpgrader?.upgradeOutbound(),
-      webRTCUpgradeInbound: this._webRTCUpgrader.upgradeInbound.bind(this._webRTCUpgrader)
-    })
+    if (this._webRTCUpgrader != null) {
+      let channel = this._webRTCUpgrader.upgradeOutbound()
+      return new WebRTCConnection({
+        conn: new RelayConnection({
+          stream,
+          self: this._peerId,
+          counterparty: destination,
+          onReconnect,
+          webRTC: channel,
+          webRTCUpgradeInbound: this._webRTCUpgrader.upgradeInbound.bind(this._webRTCUpgrader)
+        }),
+        self: this._peerId,
+        counterparty: destination,
+        channel
+      })
+    } else {
+      return new RelayConnection({
+        stream,
+        self: this._peerId,
+        counterparty: destination,
+        onReconnect
+      })
+    }
   }
 
   async handleRelayConnection(
@@ -149,14 +165,29 @@ class Relay {
 
     log(`counterparty relayed connection established`)
 
-    return new RelayConnection({
-      stream,
-      self: this._peerId,
-      counterparty,
-      onReconnect,
-      webRTC: this._webRTCUpgrader?.upgradeInbound(),
-      webRTCUpgradeInbound: this._webRTCUpgrader.upgradeInbound.bind(this._webRTCUpgrader)
-    })
+    if (this._webRTCUpgrader != null) {
+      let channel = this._webRTCUpgrader.upgradeInbound()
+      return new WebRTCConnection({
+        conn: new RelayConnection({
+          stream,
+          self: this._peerId,
+          counterparty,
+          onReconnect,
+          webRTC: channel,
+          webRTCUpgradeInbound: this._webRTCUpgrader.upgradeInbound.bind(this._webRTCUpgrader)
+        }),
+        self: this._peerId,
+        counterparty,
+        channel
+      })
+    } else {
+      return new RelayConnection({
+        stream,
+        self: this._peerId,
+        counterparty,
+        onReconnect
+      })
+    }
   }
 
   private async connectToRelay(relay: Multiaddr, options?: DialOptions): Promise<Connection> {

@@ -10,10 +10,20 @@ import Listener from './listener'
 import { CODE_P2P, DELIVERY } from './constants'
 import Multiaddr from 'multiaddr'
 import PeerId from 'peer-id'
-import type { Connection, Upgrader, DialOptions, ConnHandler, Handler, MultiaddrConnection } from 'libp2p'
+import type {
+  Connection,
+  Upgrader,
+  DialOptions,
+  ConnHandler,
+  Handler,
+  MultiaddrConnection,
+  ConnectionManager
+} from 'libp2p'
 import chalk from 'chalk'
 import { WebRTCUpgrader } from './webrtc'
 import Relay from './relay'
+import { WebRTCConnection } from './webRTCConnection'
+import type { RelayConnection } from './relayConnection'
 
 const log = debug('hopr-core:transport')
 const error = debug('hopr-core:transport:error')
@@ -35,7 +45,7 @@ class TCP {
   private relays?: Multiaddr[]
   private stunServers: Multiaddr[]
   private _relay: Relay
-  private _connectionManager: any
+  private _connectionManager: ConnectionManager
   private _webRTCUpgrader: WebRTCUpgrader
   private connHandler: ConnHandler
 
@@ -102,6 +112,15 @@ class TCP {
     log(`####### inside reconnect #######`)
 
     try {
+      if (this._webRTCUpgrader != null) {
+        newStream = new WebRTCConnection({
+          conn: newStream,
+          self: this._peerId,
+          counterparty,
+          channel: (newStream as RelayConnection)._tmpWebRTC || (newStream as RelayConnection).webRTC
+        })
+      }
+
       let newConn = await this._upgrader.upgradeInbound(newStream)
 
       this._connectionManager.connections.set(counterparty.toB58String(), [newConn])
@@ -193,14 +212,9 @@ class TCP {
   }
 
   async dialWithRelay(ma: Multiaddr, relays: Multiaddr[], options?: DialOptions): Promise<Connection> {
-    let relayConnection: MultiaddrConnection
-    let newConn: Connection
+    let conn = await this._relay.establishRelayedConnection(ma, relays, this.onReconnect.bind(this), options)
 
-    relayConnection = await this._relay.establishRelayedConnection(ma, relays, this.onReconnect.bind(this), options)
-
-    newConn = await this._upgrader.upgradeOutbound(relayConnection)
-
-    return newConn
+    return await this._upgrader.upgradeOutbound(conn)
   }
 
   async dialDirectly(ma: Multiaddr, options?: DialOptions): Promise<Connection> {
