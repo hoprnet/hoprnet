@@ -24,7 +24,7 @@ export default class ListOpenChannels extends AbstractCommand {
     const toDisplay = [
       ['Channel', styleValue(id, 'hash')],
       ['CounterParty', peerId ? styleValue(peerId, 'peerId') : chalk.gray('pre-opened')],
-      [ 'Status', styleValue(status, 'highlight')],
+      ['Status', styleValue(status, 'highlight')],
       ['Total Balance', `${styleValue(totalBalance, 'number')} ${NativeBalance.SYMBOL}`],
       ['My Balance', `${styleValue(myBalance, 'number')} ${NativeBalance.SYMBOL}`]
     ]
