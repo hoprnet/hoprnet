@@ -6,6 +6,11 @@ import chalk from 'chalk'
 import { AbstractCommand } from './abstractCommand'
 import { getPaddingLength, styleValue } from '../utils'
 
+type ResultTuple = {
+  name: string
+  value: string
+}
+
 export default class ListOpenChannels extends AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {
     super()
@@ -26,10 +31,7 @@ export default class ListOpenChannels extends AbstractCommand {
     peerId?: string,
     status?: string
   ): string {
-    const toDisplay: {
-      name: string
-      value: string
-    }[] = [
+    const toDisplay: ResultTuple[] = [
       {
         name: 'Channel',
         value: styleValue(id, 'hash')
@@ -64,59 +66,51 @@ export default class ListOpenChannels extends AbstractCommand {
    */
   async execute(): Promise<string | void> {
     try {
+      const channels = (await this.node.getAllOpenChannels())
       const { utils, types } = this.node.paymentChannels
-      const self = await this.node.paymentChannels.account.address
-      const channels = await this.node.getAllOpenChannels()
       const result: string[] = []
-
-      if (channels.length === 0) {
-        return `\nNo open channels found.`
-      }
 
       for (const channel of channels) {
         const id = u8aToHex(await channel.channelId)
+        const status = await channel.status
 
         if (!channel.counterparty) {
-          result.push(
-            this.generateOutput(id, '0', '0')
-          )
-        } else {
-          const counterParty = await utils.pubKeyToAccountId(channel.counterparty)
-
-          // @TODO: batch query
-          const channelData = await Promise.all([
-            channel.offChainCounterparty,
-            channel.status,
-            channel.balance,
-            channel.balance_a
-          ]).then(([offChainCounterparty, status, balance, balance_a]) => ({
-            offChainCounterparty,
-            status,
-            balance,
-            balance_a
-          }))
-
-          const selfIsPartyA = utils.isPartyA(self, counterParty)
-          const totalBalance = moveDecimalPoint(channelData.balance.toString(), types.Balance.DECIMALS * -1)
-          const myBalance = moveDecimalPoint(
-            selfIsPartyA ? channelData.balance_a.toString() : channelData.balance.sub(channelData.balance_a).toString(),
-            types.Balance.DECIMALS * -1
-          )
-          const peerId = (await pubKeyToPeerId(channelData.offChainCounterparty)).toB58String()
-          const status = channelData.status
-
-          result.push(
-            this.generateOutput(
-              id,
-              myBalance,
-              totalBalance,
-              peerId,
-              status
-            )
-          )
+          // Skip channels with no counterparty re #398
+          continue
         }
-      }
 
+        if (status === 'UNINITIALISED'){
+          // Skip uninitialized channels re #398
+          continue
+        }
+
+        const [ offChainCounterparty, balance, balance_a ] = await Promise.all([
+          channel.offChainCounterparty,
+          channel.balance,
+          channel.balance_a
+        ])
+
+        const selfIsPartyA = utils.isPartyA(await this.node.paymentChannels.account.address, await utils.pubKeyToAccountId(channel.counterparty))
+        const totalBalance = moveDecimalPoint(balance.toString(), types.Balance.DECIMALS * -1)
+        const myBalance = moveDecimalPoint(
+          selfIsPartyA ? balance_a.toString() : balance.sub(balance_a).toString(),
+          types.Balance.DECIMALS * -1
+        )
+        const peerId = (await pubKeyToPeerId(offChainCounterparty)).toB58String()
+
+        result.push(
+          this.generateOutput(
+            id,
+            myBalance,
+            totalBalance,
+            peerId,
+            status
+          )
+        )
+      }
+      if (result.length === 0) {
+        return `\nNo open channels found.`
+      }
       return result.join('\n\n')
     } catch (err) {
       return styleValue(err.message, 'failure')
