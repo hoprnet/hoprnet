@@ -19,19 +19,13 @@ export default class ListOpenChannels extends AbstractCommand {
     return 'Lists your currently open channels'
   }
 
-  private generateOutput({
-    id,
-    myBalance,
-    totalBalance,
-    peerId,
-    status
-  }: {
-    id: string
-    myBalance: string
-    totalBalance: string
-    peerId?: string
+  private generateOutput(
+    id: string,
+    myBalance: string,
+    totalBalance: string,
+    peerId?: string,
     status?: string
-  }): string {
+  ): string {
     const toDisplay: {
       name: string
       value: string
@@ -84,11 +78,7 @@ export default class ListOpenChannels extends AbstractCommand {
 
         if (!channel.counterparty) {
           result.push(
-            this.generateOutput({
-              id,
-              totalBalance: '0',
-              myBalance: '0'
-            })
+            this.generateOutput(id, '0', '0')
           )
         } else {
           const counterParty = await utils.pubKeyToAccountId(channel.counterparty)
@@ -116,13 +106,13 @@ export default class ListOpenChannels extends AbstractCommand {
           const status = channelData.status
 
           result.push(
-            this.generateOutput({
+            this.generateOutput(
               id,
-              totalBalance,
               myBalance,
+              totalBalance,
               peerId,
               status
-            })
+            )
           )
         }
       }
