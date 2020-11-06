@@ -24,7 +24,7 @@ export function LogLine(props) {
   let match
 
   let lastIndex = 0
-  const idRegex = /(\w{53})/g // NB: Cannot be global variable, has state!
+  const idRegex = /(\b\w{53})\b/g // NB: Cannot be global variable, has state!
 
   while ((match = idRegex.exec(raw)) !== null) {
     console.log('>', match, msg)

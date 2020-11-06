@@ -15,12 +15,12 @@
   ],
   "scripts": {
     "clean": "rimraf ./lib",
-    "build": "yarn clean && tsc --project ./tsconfig.json",
+    "build": "yarn clean && tsc --project ./tsconfig.json && yarn buildAdmin",
     "buildAdmin": "next build hopr-admin",
     "test": "mocha",
-    "prepublishOnly": "yarn build && yarn buildAdmin",
+    "prepublishOnly": "yarn build",
     "start": "node lib/index.js --admin",
-    "dev": "yarn build && yarn buildAdmin && NODE_ENV=development yarn start"
+    "dev": "yarn build  && NODE_ENV=development yarn start"
   },
   "license": "",
   "dependencies": {
