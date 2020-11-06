@@ -6,11 +6,6 @@ import chalk from 'chalk'
 import { AbstractCommand } from './abstractCommand'
 import { getPaddingLength, styleValue } from '../utils'
 
-type ResultTuple = {
-  name: string
-  value: string
-}
-
 export default class ListOpenChannels extends AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {
     super()
@@ -28,37 +23,19 @@ export default class ListOpenChannels extends AbstractCommand {
     id: string,
     myBalance: string,
     totalBalance: string,
-    peerId?: string,
-    status?: string
+    peerId: string,
+    status: string
   ): string {
-    const toDisplay: ResultTuple[] = [
-      {
-        name: 'Channel',
-        value: styleValue(id, 'hash')
-      },
-      {
-        name: 'CounterParty',
-        value: peerId ? styleValue(peerId, 'peerId') : chalk.gray('pre-opened')
-      },
-      {
-        name: 'Status',
-        value: status ? styleValue(status, 'highlight') : chalk.gray('UNKNOWN')
-      },
-      {
-        name: 'Total Balance',
-        // @TODO: use Balance types to get symbol
-        value: `${styleValue(totalBalance, 'number')} Matic`
-      },
-      {
-        name: 'My Balance',
-        // @TODO: use Balance types to get symbol
-        value: `${styleValue(myBalance, 'number')} Matic`
-      }
+    const { NativeBalance, Balance } = this.node.paymentChannels.types
+    const toDisplay = [
+      ['Channel', styleValue(id, 'hash')],
+      ['CounterParty', peerId ? styleValue(peerId, 'peerId') : chalk.gray('pre-opened')],
+      [ 'Status', styleValue(status, 'highlight')],
+      ['Total Balance', `${styleValue(totalBalance, 'number')}  ${Balance.SYMBOL}`],
+      ['My Balance', `${styleValue(myBalance, 'number')} ${Balance.SYMBOL}`]
     ]
-
-    const paddingLength = getPaddingLength(toDisplay.map((o) => o.name))
-
-    return toDisplay.map((o) => `\n${o.name.padEnd(paddingLength)}:  ${o.value}`).join('')
+    const paddingLength = getPaddingLength(toDisplay.map((o) => o[0]))
+    return toDisplay.map((o) => `${o[0].padEnd(paddingLength)}:  ${o[1]}`).join('\n')
   }
 
   /**
