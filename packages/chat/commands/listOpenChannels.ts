@@ -19,18 +19,12 @@ export default class ListOpenChannels extends AbstractCommand {
     return 'Lists your currently open channels'
   }
 
-  private generateOutput(
-    id: string,
-    myBalance: string,
-    totalBalance: string,
-    peerId: string,
-    status: string
-  ): string {
+  private generateOutput(id: string, myBalance: string, totalBalance: string, peerId: string, status: string): string {
     const { NativeBalance, Balance } = this.node.paymentChannels.types
     const toDisplay = [
       ['Channel', styleValue(id, 'hash')],
       ['CounterParty', peerId ? styleValue(peerId, 'peerId') : chalk.gray('pre-opened')],
-      [ 'Status', styleValue(status, 'highlight')],
+      ['Status', styleValue(status, 'highlight')],
       ['Total Balance', `${styleValue(totalBalance, 'number')}  ${Balance.SYMBOL}`],
       ['My Balance', `${styleValue(myBalance, 'number')} ${Balance.SYMBOL}`]
     ]
