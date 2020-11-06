@@ -19,7 +19,7 @@
     "buildAdmin": "next build hopr-admin",
     "test": "mocha",
     "prepublishOnly": "yarn build && yarn buildAdmin",
-    "start": "node lib/index.js --admin",
+    "start": "node lib/index.js",
     "dev": "yarn build && yarn buildAdmin && NODE_ENV=development yarn start"
   },
   "license": "",
