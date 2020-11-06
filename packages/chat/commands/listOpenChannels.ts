@@ -66,7 +66,7 @@ export default class ListOpenChannels extends AbstractCommand {
    */
   async execute(): Promise<string | void> {
     try {
-      const channels = (await this.node.getAllOpenChannels())
+      const channels = await this.node.getAllOpenChannels()
       const { utils, types } = this.node.paymentChannels
       const result: string[] = []
 
@@ -79,18 +79,21 @@ export default class ListOpenChannels extends AbstractCommand {
           continue
         }
 
-        if (status === 'UNINITIALISED'){
+        if (status === 'UNINITIALISED') {
           // Skip uninitialized channels re #398
           continue
         }
 
-        const [ offChainCounterparty, balance, balance_a ] = await Promise.all([
+        const [offChainCounterparty, balance, balance_a] = await Promise.all([
           channel.offChainCounterparty,
           channel.balance,
           channel.balance_a
         ])
 
-        const selfIsPartyA = utils.isPartyA(await this.node.paymentChannels.account.address, await utils.pubKeyToAccountId(channel.counterparty))
+        const selfIsPartyA = utils.isPartyA(
+          await this.node.paymentChannels.account.address,
+          await utils.pubKeyToAccountId(channel.counterparty)
+        )
         const totalBalance = moveDecimalPoint(balance.toString(), types.Balance.DECIMALS * -1)
         const myBalance = moveDecimalPoint(
           selfIsPartyA ? balance_a.toString() : balance.sub(balance_a).toString(),
@@ -98,15 +101,7 @@ export default class ListOpenChannels extends AbstractCommand {
         )
         const peerId = (await pubKeyToPeerId(offChainCounterparty)).toB58String()
 
-        result.push(
-          this.generateOutput(
-            id,
-            myBalance,
-            totalBalance,
-            peerId,
-            status
-          )
-        )
+        result.push(this.generateOutput(id, myBalance, totalBalance, peerId, status))
       }
       if (result.length === 0) {
         return `\nNo open channels found.`
