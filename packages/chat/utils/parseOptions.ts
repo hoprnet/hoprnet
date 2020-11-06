@@ -18,7 +18,7 @@ export async function parseOptions(): Promise<HoprOptions> {
   const unknownOptions: string[] = []
 
   let cli_options = getopts(process.argv.slice(2), {
-    boolean: ['debug', 'bootstrapNode', 'help', 'listConnectors', 'verbose'],
+    boolean: ['debug', 'bootstrapNode', 'help', 'listConnectors', 'verbose', 'init'],
     string: ['network', 'password'],
     alias: {
       l: 'listConnectors',
@@ -27,7 +27,8 @@ export async function parseOptions(): Promise<HoprOptions> {
       b: 'bootstrapNode',
       h: 'help',
       n: 'network',
-      v: 'verbose'
+      v: 'verbose',
+      i: 'init'
     },
     default: {
       network: 'ethereum',
@@ -113,6 +114,7 @@ export async function parseOptions(): Promise<HoprOptions> {
     network: cli_options.network,
     bootstrapServers: bootstrapServers,
     provider: provider,
+    createDbIfNotExist: cli_options.init || false,
     output(encoded: Uint8Array) {
       const { latency, msg } = decodeMessage(encoded)
 
