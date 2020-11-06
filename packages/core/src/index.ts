@@ -607,9 +607,12 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   }
 
   public async getAllOpenChannels(): Promise<Channel[]> {
-    return this.paymentChannels.channel.getAll(channel => Promise.resolve(channel), async(promises: Promise<Channel>[]) => {
-      return await Promise.all(promises)
-    })
+    return this.paymentChannels.channel.getAll(
+      (channel) => Promise.resolve(channel),
+      async (promises: Promise<Channel>[]) => {
+        return await Promise.all(promises)
+      }
+    )
   }
 }
 
