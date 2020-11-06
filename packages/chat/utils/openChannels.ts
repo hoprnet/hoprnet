@@ -43,35 +43,11 @@ export function getPeersIdsAsString(
 }
 
 /**
- * Get node's open channel instances by looking into connector's DB.
- * @returns a promise that resolves to an array of peer ids
- */
-export function getMyOpenChannelInstances(node: Hopr<HoprCoreConnector>): Promise<ChannelInstance[]> {
-  return new Promise<ChannelInstance[]>((resolve, reject) => {
-    try {
-      let channels: ChannelInstance[] = []
-
-      node.paymentChannels.channel.getAll(
-        async (channel: ChannelInstance) => {
-          channels.push(channel)
-        },
-        async (promises: Promise<void>[]) => {
-          await Promise.all(promises)
-          return resolve(channels)
-        }
-      )
-    } catch (err) {
-      return reject(err)
-    }
-  })
-}
-
-/**
  * Get node's counterParties by looking into the open channels stored in the DB.
  * @returns a promise that resolves to an array of peer ids
  */
 export async function getMyOpenChannels(node: Hopr<HoprCoreConnector>): Promise<PeerId[]> {
-  const openChannels = await getMyOpenChannelInstances(node)
+  const openChannels = await node.getAllOpenChannels() 
 
   return Promise.all(
     openChannels.map(async (channel) => {

@@ -57,7 +57,7 @@ declare interface ChannelStatic {
    */
   getAll<T, R>(
     onData: (channel: Channel, ...props: any[]) => Promise<T>,
-    onEnd: (promises: Promise<T>[], ...props: any[]) => R
+    onEnd: (promises: Promise<T>[], ...props: any[]) => Promise<R>
   ): Promise<R>
 
   /**

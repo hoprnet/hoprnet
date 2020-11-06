@@ -221,7 +221,7 @@ class ChannelFactory {
     return channel
   }
 
-  getAll<T, R>(onData: (channel: Channel) => Promise<T>, onEnd: (promises: Promise<T>[]) => R): Promise<R> {
+  getAll<T, R>(onData: (channel: Channel) => Promise<T>, onEnd: (promises: Promise<T>[]) => Promise<R>): Promise<R> {
     const promises: Promise<T>[] = []
     return new Promise<R>((resolve, reject) => {
       this.coreConnector.db
@@ -240,7 +240,7 @@ class ChannelFactory {
             onData(new Channel(this.coreConnector, this.coreConnector.dbKeys.ChannelKeyParse(key), signedChannel))
           )
         })
-        .on('end', () => resolve(onEnd(promises)))
+        .on('end', () => onEnd(promises).then(resolve))
     })
   }
 

@@ -3,7 +3,6 @@ import type Hopr from '@hoprnet/hopr-core'
 import { pubKeyToPeerId } from '@hoprnet/hopr-core/lib/utils'
 import { moveDecimalPoint, u8aToHex } from '@hoprnet/hopr-utils'
 import chalk from 'chalk'
-import { getMyOpenChannelInstances } from '../utils/openChannels'
 import { AbstractCommand } from './abstractCommand'
 import { getPaddingLength, styleValue } from '../utils'
 
@@ -73,7 +72,7 @@ export default class ListOpenChannels extends AbstractCommand {
     try {
       const { utils, types } = this.node.paymentChannels
       const self = await this.node.paymentChannels.account.address
-      const channels = await getMyOpenChannelInstances(this.node)
+      const channels = await this.node.getAllOpenChannels()
       const result: string[] = []
 
       if (channels.length === 0) {
