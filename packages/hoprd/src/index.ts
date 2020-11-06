@@ -177,10 +177,6 @@ async function main() {
     node = await Hopr.create(options)
     logs.log('Created HOPR Node')
 
-    node.on('hopr:peer:connection', (peer: PeerId) => {
-      logs.log(`Incoming connection from ${peer.toB58String()}.`)
-    })
-
     node.on('hopr:message', logMessageToNode)
 
     process.once('exit', async () => {

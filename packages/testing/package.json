@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-testing",
-  "version": "1.54.0-next.15",
+  "version": "1.54.0-next.36",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -15,8 +15,7 @@
     "yarn.lock"
   ],
   "engines": {
-    "node": "12",
-    "yarn": "1"
+    "node": "12"
   },
   "scripts": {
     "clean": "rimraf ./lib",
@@ -24,13 +23,12 @@
     "prepublishOnly": "yarn build"
   },
   "dependencies": {
-    "@hoprnet/hopr-demo-seeds": "1.54.0-next.15",
+    "@hoprnet/hopr-demo-seeds": "1.54.0-next.36",
     "debug": "^4.1.1",
     "ganache-core": "2.13.1"
   },
   "devDependencies": {
     "@types/node": "^13.13.4",
-    "prettier": "^2.0.5",
     "rimraf": "^3.0.2",
     "typescript": "^4.0.3"
   }

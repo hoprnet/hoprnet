@@ -50,6 +50,10 @@ yarn run:hoprd         # Runs hoprd w/admin (:3000)
 yarn run:chat          # Runs hopr chat in terminal
 ```
 
+### Docker images
+
+All our docker images can be found [here](https://console.cloud.google.com/gcr/images/hoprassociation/GLOBAL) and are prefixed as `gcr.io/hoprassociation/$PROJECT:$RELEASE`. Stable releases live in [Docker Hub](https://hub.docker.com/u/hopr)
+
 ## HOPR ecosystem
 
 - [**Core**](./packages/core/README.md): HOPR Protocol definition and source code.
