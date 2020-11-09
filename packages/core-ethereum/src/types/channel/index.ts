@@ -1,16 +1,10 @@
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
+import { ChannelStatus } from '@hoprnet/hopr-core-connector-interface'
 import { Moment } from '..'
 import { Uint8ArrayE } from '../extended'
 import { hash, stateCountToStatus, sign } from '../../utils'
 import ChannelState from './channelState'
 import ChannelBalance from './channelBalance'
-
-enum ChannelStatus {
-  UNINITIALISED,
-  FUNDING,
-  OPEN,
-  PENDING
-}
 
 class Channel extends Uint8ArrayE implements Types.Channel {
   private _rawState?: ChannelState

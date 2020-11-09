@@ -28,7 +28,7 @@ const log = Debug(`hopr-core`)
 
 import PeerId from 'peer-id'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import type { HoprCoreConnectorStatic, Types, Channel } from '@hoprnet/hopr-core-connector-interface'
+import { HoprCoreConnectorStatic, Types, Channel, ChannelStatus } from '@hoprnet/hopr-core-connector-interface'
 import type { CrawlInfo } from './network/crawler'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
@@ -442,7 +442,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     }
   }
 
-  public async closeChannel(peerId: PeerId): Promise<{ receipt: string; status: string }> {
+  public async closeChannel(peerId: PeerId): Promise<{ receipt: string; status: ChannelStatus }> {
     const channel = await this.paymentChannels.channel.create(
       peerId.pubKey.marshal(),
       async (counterparty: Uint8Array) =>
@@ -451,7 +451,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
 
     const status = await channel.status
 
-    if (!(status === 'OPEN' || status === 'PENDING')) {
+    if (!(status === ChannelStatus.OPEN || status === ChannelStatus.PENDING)) {
       throw new Error('To close a channel, it must be open or pending for closure')
     }
 

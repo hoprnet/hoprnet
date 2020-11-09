@@ -125,6 +125,25 @@ declare interface ChannelStatic {
   }
 }
 
+export enum ChannelStatus {
+  UNINITIALISED = 0,
+  FUNDING = 1,
+  OPEN = 2,
+  PENDING = 3
+}
+
+export interface ChannelData {
+  readonly channelId: Hash
+  readonly settlementWindow: Moment
+  readonly status: ChannelStatus 
+  readonly state: ChannelType
+  readonly balanceA: Balance
+  readonly balance: Balance
+  readonly currentBalance: Balance
+  readonly counterparty: AccountId
+  readonly offChainCounterparty: Uint8Array
+}
+
 declare interface Channel {
   // Id of the channel
   readonly channelId: Promise<Hash>
@@ -133,7 +152,7 @@ declare interface Channel {
   readonly settlementWindow: Promise<Moment>
 
   // Current status of the channel
-  readonly status: Promise<'UNINITIALISED' | 'FUNDING' | 'OPEN' | 'PENDING'>
+  readonly status: Promise<ChannelStatus>
 
   // Current state of the channel, i.e. `FUNDED` with `1 HOPR / 3 HOPR`
   readonly state: Promise<ChannelType>
@@ -189,6 +208,8 @@ declare interface Channel {
    * Initiates a settlement for this channel.
    */
   initiateSettlement(): Promise<string>
+
+  load(): Promise<ChannelData>
 }
 
 declare var Channel: ChannelStatic

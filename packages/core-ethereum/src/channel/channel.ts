@@ -1,4 +1,4 @@
-import type { Channel as IChannel } from '@hoprnet/hopr-core-connector-interface'
+import type { Channel as IChannel, ChannelData } from '@hoprnet/hopr-core-connector-interface'
 import { u8aToHex } from '@hoprnet/hopr-utils'
 import { Balance, Channel as ChannelType, Hash, Moment, Public, SignedChannel } from '../types'
 import TicketFactory from './ticket'
@@ -21,7 +21,7 @@ class Channel implements IChannel {
 
     // check if channel still exists
     this.status.then((status) => {
-      if (status === 'UNINITIALISED') {
+      if (status === ChannelStatus.UNINITIALISED) {
         this.coreConnector.log.log('found channel off-chain but its closed on-chain')
         this.onClose()
       }
@@ -45,20 +45,50 @@ class Channel implements IChannel {
     })
   }
 
+  async load(): Promise<ChannelData>{
+    const [
+      channelId,
+      settlementWindow,
+      status,
+      state,
+      balanceA,
+      balance,
+      currentBalance,
+      counterparty,
+      offChainCounterparty
+    ] = await Promise.all([
+      this.channelId,
+      this.settlementWindow,
+      this.status,
+      this.state,
+      this.balance_a,
+      this.balance,
+      this.currentBalance,
+      this.counterparty,
+      this.offChainCounterparty
+    ])
+    return {
+      channelId,
+      settlementWindow,
+      status,
+      state,
+      balanceA,
+      balance,
+      currentBalance,
+      counterparty,
+      offChainCounterparty
+    }
+  }
+
   get status() {
-    return new Promise<'UNINITIALISED' | 'FUNDING' | 'OPEN' | 'PENDING'>(async (resolve, reject) => {
+    return new Promise<ChannelStatus>(async (resolve, reject) => {
       try {
         const channel = await this.onChainChannel
         const status = Number(channel.stateCounter) % 10
-
         if (status >= Object.keys(ChannelStatus).length) {
           throw Error("status like this doesn't exist")
         }
-
-        if (status === ChannelStatus.UNINITIALISED) return resolve('UNINITIALISED')
-        else if (status === ChannelStatus.FUNDING) return resolve('FUNDING')
-        else if (status === ChannelStatus.OPEN) return resolve('OPEN')
-        return resolve('PENDING')
+        return resolve(status)
       } catch (error) {
         return reject(error)
       }
@@ -167,11 +197,11 @@ class Channel implements IChannel {
     let receipt: string
 
     try {
-      if (!(status === 'OPEN' || status === 'PENDING')) {
+      if (!(status === ChannelStatus.OPEN || status === ChannelStatus.PENDING)) {
         throw Error("channel must be 'OPEN' or 'PENDING'")
       }
 
-      if (status === 'OPEN') {
+      if (status === ChannelStatus.OPEN) {
         const tx = await this.coreConnector.signTransaction(
           {
             from: (await this.coreConnector.account.address).toHex(),
@@ -185,7 +215,7 @@ class Channel implements IChannel {
 
         receipt = tx.transactionHash
         tx.send()
-      } else if (status === 'PENDING') {
+      } else if (status === ChannelStatus.PENDING) {
         const tx = await this.coreConnector.signTransaction(
           {
             from: (await this.coreConnector.account.address).toHex(),

@@ -1,4 +1,5 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
+import { ChannelStatus } from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import { pubKeyToPeerId } from '@hoprnet/hopr-core/lib/utils'
 import { moveDecimalPoint, u8aToHex } from '@hoprnet/hopr-utils'
@@ -19,12 +20,13 @@ export default class ListOpenChannels extends AbstractCommand {
     return 'Lists your currently open channels'
   }
 
-  private generateOutput(id: string, myBalance: string, totalBalance: string, peerId: string, status: string): string {
+  private generateOutput(id: string, myBalance: string, totalBalance: string, peerId: string, status: ChannelStatus): string {
     const { NativeBalance, Balance } = this.node.paymentChannels.types
+    let statusString = (['UNINITIALISED', 'FUNDING', 'OPEN', 'PENDING'])[status]
     return `
       Channel         ${styleValue(id, 'hash')}
       CounterParty    ${styleValue(peerId, 'peerId')}
-      Status          ${styleValue(status, 'highlight')}
+      Status          ${styleValue(statusString, 'highlight')}
       Total Balance   ${styleValue(totalBalance, 'nativeBalance')}
       My Balance      ${styleValue(myBalance, 'nativeBalance')}
     `
@@ -48,7 +50,7 @@ export default class ListOpenChannels extends AbstractCommand {
           continue
         }
 
-        if (status === 'UNINITIALISED') {
+        if (status === ChannelStatus.UNINITIALISED) {
           // Skip uninitialized channels re #398
           continue
         }

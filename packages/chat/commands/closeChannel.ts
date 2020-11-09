@@ -1,5 +1,5 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import type { Channel as ChannelInstance } from '@hoprnet/hopr-core-connector-interface'
+import { Channel as ChannelInstance, ChannelStatus } from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import type PeerId from 'peer-id'
 import type { AutoCompleteResult } from './abstractCommand'
@@ -37,7 +37,7 @@ export default class CloseChannel extends AbstractCommand {
     try {
       const { status, receipt } = await this.node.closeChannel(peerId)
 
-      if (status === 'PENDING') {
+      if (status === ChannelStatus.PENDING) {
         return `${chalk.green(`Closing channel, receipt: ${styleValue(receipt, 'hash')}`)}.`
       } else {
         return `${chalk.green(`Initiated channel closure, receipt: ${styleValue(receipt, 'hash')}`)}.`
