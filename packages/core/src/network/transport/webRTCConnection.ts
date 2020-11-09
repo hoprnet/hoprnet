@@ -130,42 +130,41 @@ class WebRTCConnection implements MultiaddrConnection {
       )
 
       if (!this._webRTCStateKnown || this._webRTCAvailable) {
-        this._switchPromise.promise.then(() => {
-          clearTimeout(this._webRTCTimeout)
-          if (this._webRTCAvailable) {
-            const sink = toIterable.sink(this.channel)
-            this._migrated = true
+        await this._switchPromise.promise
+        clearTimeout(this._webRTCTimeout)
+        if (this._webRTCAvailable) {
+          const sink = toIterable.sink(this.channel)
+          this._migrated = true
 
-            sink(
-              (async function* () {
-                console.log(`start sinking into WebRTC`)
-                // await sourcePromise
+          sink(
+            (async function* () {
+              console.log(`start sinking into WebRTC`)
+              // await sourcePromise
 
-                if (!sourceDone) {
+              if (!sourceDone) {
+                // console.log(`sinking into WebRTC`, Buffer.from(sourceMsg.slice()))
+
+                // if (sourceReceived) {
+                //   yield sourceMsg.slice()
+                // }
+
+                for await (const msg of source) {
                   console.log(`sinking into WebRTC`, Buffer.from(sourceMsg.slice()))
 
-                  if (sourceReceived) {
-                    yield sourceMsg.slice()
-                  }
-
-                  for await (const msg of source) {
-                    console.log(`sinking into WebRTC`, Buffer.from(sourceMsg.slice()))
-
-                    yield Buffer.from(msg.slice())
-                  }
-                  // yield* source
+                  yield Buffer.from(msg.slice())
                 }
-              })()
-            )
+                // yield* source
+              }
+            })()
+          )
 
-            // setImmediate(() => {
-            //   this.conn.close().then(() => {
-            //     console.log(`sink migrated`)
-            //     this._migrated = true
-            //   })
-            // })
-          }
-        })
+          // setImmediate(() => {
+          //   this.conn.close().then(() => {
+          //     console.log(`sink migrated`)
+          //     this._migrated = true
+          //   })
+          // })
+        }
       }
     }
 
@@ -231,13 +230,6 @@ class WebRTCConnection implements MultiaddrConnection {
         //   yield streamMsg
         //   streamPromise = this.conn.source.next().then(streamSourceFunction)
         // }
-
-        console.log(`getting from relayConnection after switch`, streamMsgReceived, new TextDecoder().decode(streamMsg))
-
-        if (streamMsgReceived) {
-          yield streamMsg
-          streamMsgReceived = false
-        }
 
         if (this._webRTCAvailable) {
           // setImmediate(() => {
