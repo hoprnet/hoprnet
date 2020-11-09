@@ -26,30 +26,19 @@ import { RelayContext } from './relayContext'
 import { RelayConnection } from './relayConnection'
 import { WebRTCConnection } from './webRTCConnection'
 
-import type {
-  Connection,
-  Dialer,
-  DialOptions,
-  Handler,
-  MultiaddrConnection,
-  PeerRouting,
-  Registrar,
-  Stream
-} from 'libp2p'
+import type { Connection, DialOptions, Handler, MultiaddrConnection, Stream } from 'libp2p'
 
 class Relay {
-  private _dialer: Dialer
-  private _registrar: Registrar
-  private _dht: { peerRouting: PeerRouting } | undefined
+  private _dialer: libp2p['dialer']
+  private _registrar: libp2p['registrar']
+  private _dht: libp2p['_dht']
   private _peerId: PeerId
   private _streams: Map<string, { [index: string]: RelayContext }>
   private _webRTCUpgrader?: WebRTCUpgrader
 
   constructor(libp2p: libp2p, webRTCUpgrader?: WebRTCUpgrader) {
     this._dialer = libp2p.dialer
-    //@ts-ignore
     this._registrar = libp2p.registrar
-    //@ts-ignore
     this._dht = libp2p._dht
     this._peerId = libp2p.peerId
 
