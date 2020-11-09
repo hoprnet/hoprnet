@@ -22,7 +22,7 @@ const formatChannel = (res: AsyncReturnType<HoprChannelsInstance['channels']>) =
   stateCounter: res[3]
 })
 
-describe.skip('HoprChannels', function () {
+describe('HoprChannels', function () {
   const partyAPrivKey = NODE_SEEDS[1]
   const partyBPrivKey = NODE_SEEDS[0]
   const depositAmount = web3.utils.toWei('1', 'ether')
@@ -597,7 +597,7 @@ describe.skip('HoprChannels', function () {
       const secretHash = keccak256({
         type: 'string',
         value: 'partyB secret'
-      }).slice(0, 54)
+      }).slice(0, 56)
 
       const pubKey = secp256k1.publicKeyCreate(stringToU8a(partyBPrivKey), false).slice(1)
 
@@ -609,7 +609,7 @@ describe.skip('HoprChannels', function () {
 
       expectEvent(response, 'SecretHashSet', {
         account: partyB,
-        secretHash: secretHash + '00',
+        secretHash: secretHash,
         counter: '1'
       })
     })
@@ -618,7 +618,7 @@ describe.skip('HoprChannels', function () {
       const secretHash = keccak256({
         type: 'string',
         value: 'partyB secret'
-      }).slice(0, 54)
+      }).slice(0, 56)
 
       // Note that there is a tiny probability that we have reached a point
       await expectRevert(
@@ -647,7 +647,7 @@ describe.skip('HoprChannels', function () {
 
       expectEvent(response, 'SecretHashSet', {
         account: partyB,
-        secretHash: secretHash + '00',
+        secretHash: secretHash,
         counter: '1'
       })
 
@@ -675,7 +675,7 @@ describe.skip('HoprChannels', function () {
       const secretHash = keccak256({
         type: 'string',
         value: 'partyB secret'
-      }).slice(0, 54)
+      }).slice(0, 56)
 
       const pubKey = secp256k1.publicKeyCreate(stringToU8a(partyBPrivKey), false).slice(1)
 
@@ -698,7 +698,7 @@ describe.skip('HoprChannels', function () {
       const secretHash2 = keccak256({
         type: 'string',
         value: 'partyB secret #2'
-      }).slice(0, 54)
+      }).slice(0, 56)
 
       const response = await hoprChannels.setHashedSecret(secretHash2, {
         from: partyB
@@ -706,7 +706,7 @@ describe.skip('HoprChannels', function () {
 
       expectEvent(response, 'SecretHashSet', {
         account: partyB,
-        secretHash: secretHash2 + '00',
+        secretHash: secretHash2,
         counter: '2'
       })
     })
@@ -715,7 +715,7 @@ describe.skip('HoprChannels', function () {
       const secretHashA = keccak256({
         type: 'string',
         value: 'partyA secret'
-      }).slice(0, 54)
+      }).slice(0, 56)
 
       const pubKeyA = secp256k1.publicKeyCreate(stringToU8a(partyAPrivKey), false).slice(1)
 
@@ -731,7 +731,7 @@ describe.skip('HoprChannels', function () {
       const secretHashB = keccak256({
         type: 'string',
         value: 'partyA secret'
-      }).slice(0, 54)
+      }).slice(0, 56)
 
       const pubKeyB = secp256k1.publicKeyCreate(stringToU8a(partyBPrivKey), false).slice(1)
 
@@ -760,15 +760,16 @@ describe.skip('HoprChannels', function () {
         checkEvent(receipt.receipt, 'FundedChannel(address,uint,uint,uint,uint)', compressedPubKeyA, compressedPubKeyB)
       ).to.be.equal(true, 'wrong event')
 
-      expect(receipt.receipt.rawLogs[2].topics[1]).to.be.equal(
-        u8aToHex(compressedPubKeyA.slice(1)),
-        'wrong first public key'
-      )
+      const logEntry = receipt.receipt.rawLogs.find((rawLog) => {
+        return (
+          rawLog.topics[1] === u8aToHex(compressedPubKeyA.slice(1)) &&
+          rawLog.topics[2] === u8aToHex(compressedPubKeyB.slice(1))
+        )
+      })
 
-      expect(receipt.receipt.rawLogs[2].topics[2]).to.be.equal(
-        u8aToHex(compressedPubKeyB.slice(1)),
-        'wrong second public key'
-      )
+      expect(logEntry).to.exist
+      expect(logEntry.topics[1]).to.be.equal(u8aToHex(compressedPubKeyA.slice(1)), 'wrong first public key')
+      expect(logEntry.topics[2]).to.be.equal(u8aToHex(compressedPubKeyB.slice(1)), 'wrong second public key')
 
       const channel = await hoprChannels.channels(getChannelId(partyA, partyB)).then(formatChannel)
 
@@ -817,7 +818,7 @@ describe.skip('HoprChannels', function () {
       const secretHashA = keccak256({
         type: 'string',
         value: 'partyA secret'
-      }).slice(0, 54)
+      }).slice(0, 56)
 
       const pubKeyA = secp256k1.publicKeyCreate(stringToU8a(partyAPrivKey), false).slice(1)
 
@@ -830,12 +831,12 @@ describe.skip('HoprChannels', function () {
         }
       )
 
-      const preImageB = keccak256({ type: 'string', value: 'partyB secret' })
+      const preImageB = keccak256({ type: 'string', value: 'partyB secret' }).slice(0, 56)
 
       const secretHashB = keccak256({
-        type: 'bytes32',
+        type: 'bytes27',
         value: preImageB
-      }).slice(0, 54)
+      }).slice(0, 56)
 
       const pubKeyB = secp256k1.publicKeyCreate(stringToU8a(partyBPrivKey), false).slice(1)
 
@@ -900,7 +901,7 @@ describe.skip('HoprChannels', function () {
       const secretHashA = keccak256({
         type: 'string',
         value: 'partyA secret'
-      }).slice(0, 54)
+      }).slice(0, 56)
 
       const pubKeyA = secp256k1.publicKeyCreate(stringToU8a(partyAPrivKey), false).slice(1)
 
@@ -916,7 +917,7 @@ describe.skip('HoprChannels', function () {
       const secretHashB = keccak256({
         type: 'string',
         value: 'partyA secret'
-      }).slice(0, 54)
+      }).slice(0, 56)
 
       const pubKeyB = secp256k1.publicKeyCreate(stringToU8a(partyBPrivKey), false).slice(1)
 
@@ -969,7 +970,7 @@ describe.skip('HoprChannels', function () {
       const secretHashA = keccak256({
         type: 'string',
         value: 'partyA secret'
-      }).slice(0, 54)
+      }).slice(0, 56)
 
       const pubKeyA = secp256k1.publicKeyCreate(stringToU8a(partyAPrivKey), false).slice(1)
 
@@ -985,7 +986,7 @@ describe.skip('HoprChannels', function () {
       const secretHashB = keccak256({
         type: 'string',
         value: 'partyA secret'
-      }).slice(0, 54)
+      }).slice(0, 56)
 
       const pubKeyB = secp256k1.publicKeyCreate(stringToU8a(partyBPrivKey), false).slice(1)
 
