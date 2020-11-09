@@ -37,7 +37,6 @@ This will attempt to redeem all of your tickets. The HOPR from these tickets wil
 
 ```text
 Redeemed 2 out of 5 tickets with a sum of 0.0000000000000002 HOPR
-
 ```
 
 {% hint style="warning" %}
@@ -47,3 +46,4 @@ Redeeming tickets requires calling the HOPR smart contract, so can take some tim
 {% hint style="danger" %}
 Redeeming tickets requires calling the HOPR smart contract, so will incur a small fee in the native currency. Make sure you have enough in your `balance` to complete this action.
 {% endhint %}
+
