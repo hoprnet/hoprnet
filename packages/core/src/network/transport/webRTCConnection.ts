@@ -148,12 +148,12 @@ class WebRTCConnection implements MultiaddrConnection {
               })()
             )
 
-            setImmediate(() => {
-              this.conn.close().then(() => {
-                console.log(`sink migrated`)
-                this._migrated = true
-              })
-            })
+            // setImmediate(() => {
+            //   this.conn.close().then(() => {
+            //     console.log(`sink migrated`)
+            //     this._migrated = true
+            //   })
+            // })
           }
         })
       }
@@ -230,12 +230,12 @@ class WebRTCConnection implements MultiaddrConnection {
         // yield streamMsg
 
         if (this._webRTCAvailable) {
-          setImmediate(() => {
-            this.conn.close().then(() => {
-              this._migrated = true
-              console.log(`source migrated`)
-            })
-          })
+          // setImmediate(() => {
+          //   this.conn.close().then(() => {
+          //     this._migrated = true
+          //     console.log(`source migrated`)
+          //   })
+          // })
 
           yield* this.channel[Symbol.asyncIterator]() as Stream['source']
         }
