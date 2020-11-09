@@ -111,7 +111,7 @@ class WebRTCConnection implements MultiaddrConnection {
                   break
                 }
 
-                console.log(`sinking into relay connection`, new TextDecoder().decode(sourceMsg.slice()))
+                console.log(`sinking into relay connection`, sourceMsg)
 
                 yield sourceMsg
                 sourcePromise = source.next().then(sourceFunction)
@@ -139,7 +139,8 @@ class WebRTCConnection implements MultiaddrConnection {
 
             sink(
               (async function* () {
-                await sourcePromise
+                console.log(`start sinking into WebRTC`)
+                // await sourcePromise
 
                 if (!sourceDone) {
                   console.log(`sinking into WebRTC`, Buffer.from(sourceMsg))
