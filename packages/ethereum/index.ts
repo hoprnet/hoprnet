@@ -1,4 +1,3 @@
-// require('ts-node/register')
 import runner from './utils/runner'
 
 export async function compile(args: string = '') {
@@ -12,3 +11,6 @@ export async function migrate(args: string = '') {
 export async function fund(args: string = '') {
   await runner(`yarn fund${args ? ' ' + args : ''}`)
 }
+
+export * from './utils/networks'
+export * from './chain'
