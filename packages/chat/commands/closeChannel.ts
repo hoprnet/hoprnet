@@ -4,7 +4,6 @@ import type Hopr from '@hoprnet/hopr-core'
 import type PeerId from 'peer-id'
 import type { AutoCompleteResult } from './abstractCommand'
 import chalk from 'chalk'
-import { u8aToHex } from '@hoprnet/hopr-utils'
 import { pubKeyToPeerId } from '@hoprnet/hopr-core/lib/utils'
 import { AbstractCommand } from './abstractCommand'
 import { checkPeerIdInput, styleValue } from '../utils'
@@ -38,9 +37,14 @@ export default class CloseChannel extends AbstractCommand {
       const { status, receipt } = await this.node.closeChannel(peerId)
 
       if (status === 'PENDING') {
-        return `${chalk.green(`Closing channel, receipt: ${styleValue(receipt, 'hash')}`)}.`
+        return `${chalk.green(`Closing channel. Receipt: ${styleValue(receipt, 'hash')}`)}.`
       } else {
-        return `${chalk.green(`Initiated channel closure, receipt: ${styleValue(receipt, 'hash')}`)}.`
+        return `${chalk.green(
+          `Initiated channel closure, the channel must remain open for at least 2 minutes. Please send the close command again once the cool-off has passed. Receipt: ${styleValue(
+            receipt,
+            'hash'
+          )}`
+        )}.`
       }
     } catch (err) {
       return styleValue(err.message, 'failure')

@@ -3470,10 +3470,10 @@
   resolved "https://registry.yarnpkg.com/@tsconfig/node12/-/node12-1.0.7.tgz#677bd9117e8164dc319987dd6ff5fc1ba6fbf18b"
   integrity sha512-dgasobK/Y0wVMswcipr3k0HpevxFJLijN03A8mYfEPvWvOs14v0ZlYTR4kIgMx8g4+fTyTFv8/jLCIfRqLDJ4A==
 
-"@typechain/truffle-v5@^2.0.2":
-  version "2.0.2"
-  resolved "https://registry.yarnpkg.com/@typechain/truffle-v5/-/truffle-v5-2.0.2.tgz#709a78ffb120f52c693818fea72e0b0d146c3454"
-  integrity sha512-g4N2kfol1S3g/QUkmpzukCGZiKWUdXsSms1be/+W4+R0DPMz1Q/76tY+C6bD7G/KeLhkiDKcnZFmNVNcAgjIfQ==
+"@typechain/truffle-v5@^3.0.0":
+  version "3.0.0"
+  resolved "https://registry.yarnpkg.com/@typechain/truffle-v5/-/truffle-v5-3.0.0.tgz#b6ac355a9dc00cf489be5b04c3ea181b8288844f"
+  integrity sha512-VxVujI2gygQ2fC42qulFKu0rM/i7v02yg0AVG1LtgnmppYUHIEf46HwLOtfMY1Sd3mBMVqc0ewi3UNnnNKNABQ==
 
 "@types/abstract-leveldown@*":
   version "5.0.1"
@@ -3648,9 +3648,9 @@
     "@types/node" "*"
 
 "@types/lodash@^4.14.162":
-  version "4.14.164"
-  resolved "https://registry.yarnpkg.com/@types/lodash/-/lodash-4.14.164.tgz#52348bcf909ac7b4c1bcbeda5c23135176e5dfa0"
-  integrity sha512-fXCEmONnrtbYUc5014avwBeMdhHHO8YJCkOBflUL9EoJBSKZ1dei+VO74fA7JkTHZ1GvZack2TyIw5U+1lT8jg==
+  version "4.14.165"
+  resolved "https://registry.yarnpkg.com/@types/lodash/-/lodash-4.14.165.tgz#74d55d947452e2de0742bad65270433b63a8c30f"
+  integrity sha512-tjSSOTHhI5mCHTy/OOXYIhi2Wt1qcbHmuXD1Ha7q70CgI/I71afO4XtLb/cVexki1oVYchpul/TOuu3Arcdxrg==
 
 "@types/long@*", "@types/long@^4.0.0", "@types/long@^4.0.1":
   version "4.0.1"
@@ -6848,9 +6848,9 @@ console-control-strings@^1.0.0, console-control-strings@~1.1.0:
   integrity sha1-PXz0Rk22RG6mRL9LOVB/mFEAjo4=
 
 console-table-printer@^2.4.33:
-  version "2.4.36"
-  resolved "https://registry.yarnpkg.com/console-table-printer/-/console-table-printer-2.4.36.tgz#256f2ca4fcafd1922d26f9618c2de22f4451c89d"
-  integrity sha512-BHGKiwghWRlIVVmuaC1//ah2c5/HbED49qxaLqYJiRlmMNO6b6ogAl94LkQsFSjotpFfiZNfgu4u40lgGcHORA==
+  version "2.5.1"
+  resolved "https://registry.yarnpkg.com/console-table-printer/-/console-table-printer-2.5.1.tgz#dfbd7cc9b5a0e9bae8f88e2d8061fad740867bdd"
+  integrity sha512-mBHNuisXIcYPkyjBfV/LUox+JbDFZYax4NHHzZJSh7eaprArNqIZz7iUFNfcfJtfJlOtWwsbbqyF7+42Ztsfgw==
 
 constants-browserify@^1.0.0:
   version "1.0.0"
@@ -8501,10 +8501,10 @@ eslint-visitor-keys@^2.0.0:
   resolved "https://registry.yarnpkg.com/eslint-visitor-keys/-/eslint-visitor-keys-2.0.0.tgz#21fdc8fbcd9c795cc0321f0563702095751511a8"
   integrity sha512-QudtT6av5WXels9WjIM7qz1XD1cWGvX4gGXvp/zBn9nXG02D0utdU3Em2m/QjTnrsk6bBjmCygl3rmj118msQQ==
 
-eslint@7.12.1:
-  version "7.12.1"
-  resolved "https://registry.yarnpkg.com/eslint/-/eslint-7.12.1.tgz#bd9a81fa67a6cfd51656cdb88812ce49ccec5801"
-  integrity sha512-HlMTEdr/LicJfN08LB3nM1rRYliDXOmfoO4vj39xN6BLpFzF00hbwBoqHk8UcJ2M/3nlARZWy/mslvGEuZFvsg==
+eslint@7.13.0:
+  version "7.13.0"
+  resolved "https://registry.yarnpkg.com/eslint/-/eslint-7.13.0.tgz#7f180126c0dcdef327bfb54b211d7802decc08da"
+  integrity sha512-uCORMuOO8tUzJmsdRtrvcGq5qposf7Rw0LwkTJkoDbOycVQtQjmnhZSuLQnozLE4TmAzlMVV45eCHmQ1OpDKUQ==
   dependencies:
     "@babel/code-frame" "^7.0.0"
     "@eslint/eslintrc" "^0.2.1"
@@ -9716,9 +9716,9 @@ firebase-admin@^9.1.1:
     "@google-cloud/storage" "^5.3.0"
 
 firebase-tools@^8.12.0:
-  version "8.14.1"
-  resolved "https://registry.yarnpkg.com/firebase-tools/-/firebase-tools-8.14.1.tgz#acef0784174c6e2d03133fe477c79fad7abcd247"
-  integrity sha512-okNru+nobU03BfVLXdCkbrdRYoQQKG3m4scoFXUSIkyw8b1ys0JkEz+HzBjpFg9qKYHu3aVI2y6C8mwFEGNOPg==
+  version "8.15.1"
+  resolved "https://registry.yarnpkg.com/firebase-tools/-/firebase-tools-8.15.1.tgz#1d94d0ecc74f5e592ccb70fc54e92a508bd7f5b2"
+  integrity sha512-u2Kn2w5rWZLybBNmThVppHvZq5/23aZfBcvT0eon26bxX+nK7ApV6KS4DyaDR1tBH4vqL9LVHBVy0lVhAe2EyQ==
   dependencies:
     "@google-cloud/pubsub" "^1.7.0"
     JSONStream "^1.2.1"
@@ -9752,6 +9752,7 @@ firebase-tools@^8.12.0:
     marked-terminal "^3.3.0"
     minimatch "^3.0.4"
     morgan "^1.10.0"
+    node-fetch "^2.6.1"
     open "^6.3.0"
     ora "^3.4.0"
     plist "^3.0.1"
@@ -13147,10 +13148,10 @@ libp2p@0.29.0:
     varint "^5.0.0"
     xsalsa20 "^1.0.2"
 
-libp2p@0.29.2:
-  version "0.29.2"
-  resolved "https://registry.yarnpkg.com/libp2p/-/libp2p-0.29.2.tgz#d7604688e2627582b10338a6ac6989572fd6d74d"
-  integrity sha512-figd1NEBHNMpRCztxH4ZJl4flu+lMiFPMbNTkkoDES6FSZ0+wI7C72z579jh63eN124rsxpFRZaPYmpbKXi9CQ==
+libp2p@0.29.3:
+  version "0.29.3"
+  resolved "https://registry.yarnpkg.com/libp2p/-/libp2p-0.29.3.tgz#9cee0f44a300a5ac22f2805e5da57d98df442664"
+  integrity sha512-voILMLwpDqe/KafqaeH7CsmMNtOagV7ln6vNl0/2Lgq4zyY+vCmlzULRaStSagU+9V0QWoSoPmIgQdZ/Ydelhw==
   dependencies:
     abort-controller "^3.0.0"
     aggregate-error "^3.0.1"
@@ -13175,7 +13176,7 @@ libp2p@0.29.2:
     mafmt "^8.0.0"
     merge-options "^2.0.0"
     moving-average "^1.0.0"
-    multiaddr "^8.0.0"
+    multiaddr "^8.1.0"
     multicodec "^2.0.0"
     multistream-select "^1.0.0"
     mutable-proxy "^1.0.0"
@@ -14516,7 +14517,7 @@ multiaddr@8.0.0:
     uint8arrays "^1.1.0"
     varint "^5.0.0"
 
-multiaddr@8.1.1, multiaddr@^8.0.0:
+multiaddr@8.1.1, multiaddr@^8.0.0, multiaddr@^8.1.0:
   version "8.1.1"
   resolved "https://registry.yarnpkg.com/multiaddr/-/multiaddr-8.1.1.tgz#d86315deed93752fa68b4199fee56f8b4a516a2b"
   integrity sha512-Dyur7rWX44MlgKIqVA2dYPOZx/UwG60PVSffJ5S17uo6Pu31lftJXShMEfPtUDGHnyALAOWOuC3X/iPhDtw4Vg==
@@ -19638,9 +19639,9 @@ ts-generator@^0.1.1:
     ts-essentials "^1.0.0"
 
 ts-loader@^8.0.4:
-  version "8.0.8"
-  resolved "https://registry.yarnpkg.com/ts-loader/-/ts-loader-8.0.8.tgz#5c514c895d3b2462bf0148f63da0c22b227f7867"
-  integrity sha512-wihija1i2Ub9FxKFoEgx/phToJiDZKLIbTFURgf4Efxla2QuVucDO6ZpHf2jNJsRtDQfBId0g+1HF0biIjoT6Q==
+  version "8.0.10"
+  resolved "https://registry.yarnpkg.com/ts-loader/-/ts-loader-8.0.10.tgz#4af4afb8d26847290cd010df93a4c172df92278f"
+  integrity sha512-5fVbbZldz6LQi6RQ0v1P7lZ98CZGlQyM8b4xGZXw3G/XUqL8GIH+Ib6H01nImPhkHZ9+PVXZgTb+v3fRsaIHlg==
   dependencies:
     chalk "^2.3.0"
     enhanced-resolve "^4.0.0"
@@ -19828,10 +19829,10 @@ typechain-target-web3-v1@^1.0.4:
     lodash "^4.17.15"
     web3 "^1.2.4"
 
-typechain@^3.0.0:
-  version "3.0.0"
-  resolved "https://registry.yarnpkg.com/typechain/-/typechain-3.0.0.tgz#d5a47700831f238e43f7429b987b4bb54849b92e"
-  integrity sha512-ft4KVmiN3zH4JUFu2WJBrwfHeDf772Tt2d8bssDTo/YcckKW2D+OwFrHXRC6hJvO3mHjFQTihoMV6fJOi0Hngg==
+typechain@^4.0.0:
+  version "4.0.0"
+  resolved "https://registry.yarnpkg.com/typechain/-/typechain-4.0.0.tgz#8a81fe40c4020b370f0c4671b7f966134d20c58c"
+  integrity sha512-XQUojf02bXyxXNGI0WeCphnh++5eWr9wYH8jm0XqHNv8yENpFrRyX8ffVlkhCnDOOB/jEJJVQytLAOU+Qn0N9Q==
   dependencies:
     command-line-args "^4.0.7"
     debug "^4.1.1"
