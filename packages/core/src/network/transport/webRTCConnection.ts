@@ -44,15 +44,17 @@ class WebRTCConnection implements MultiaddrConnection {
     this.remoteAddr = Multiaddr(`/p2p/${opts.counterparty.toB58String()}`)
     this.localAddr = Multiaddr(`/p2p/${opts.self.toB58String()}`)
 
+    this.timeline = {
+      open: Date.now()
+    }
+    
     this.channel.on('connect', () => {
       if (this._webRTCTimeout != null) {
         clearTimeout(this._webRTCTimeout)
       }
 
       console.log(`available after connect`)
-      this.timeline = {
-        open: Date.now()
-      }
+
       this._webRTCStateKnown = true
       this._webRTCAvailable = true
       this._switchPromise.resolve()
