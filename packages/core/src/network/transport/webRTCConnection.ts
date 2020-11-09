@@ -221,9 +221,7 @@ class WebRTCConnection implements MultiaddrConnection {
         //   streamPromise = this.conn.source.next().then(streamSourceFunction)
         // }
 
-        console.log(`waiting`)
-
-        console.log(`getting from relayConnection after switch`, new TextDecoder().decode(streamMsg))
+        console.log(`getting from relayConnection after switch`, streamMsgReceived)
 
         if (streamMsgReceived) {
           yield streamMsg
