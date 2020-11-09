@@ -22,7 +22,7 @@ const formatChannel = (res: AsyncReturnType<HoprChannelsInstance['channels']>) =
   stateCounter: res[3]
 })
 
-describe.skip('HoprChannels', function () {
+describe('HoprChannels', function () {
   const partyAPrivKey = NODE_SEEDS[1]
   const partyBPrivKey = NODE_SEEDS[0]
   const depositAmount = web3.utils.toWei('1', 'ether')
@@ -817,7 +817,7 @@ describe.skip('HoprChannels', function () {
       const secretHashA = keccak256({
         type: 'string',
         value: 'partyA secret'
-      }).slice(0, 54)
+      }).slice(0, 56)
 
       const pubKeyA = secp256k1.publicKeyCreate(stringToU8a(partyAPrivKey), false).slice(1)
 
@@ -830,12 +830,12 @@ describe.skip('HoprChannels', function () {
         }
       )
 
-      const preImageB = keccak256({ type: 'string', value: 'partyB secret' })
+      const preImageB = keccak256({ type: 'string', value: 'partyB secret' }).slice(0, 56)
 
       const secretHashB = keccak256({
-        type: 'bytes32',
+        type: 'bytes27',
         value: preImageB
-      }).slice(0, 54)
+      }).slice(0, 56)
 
       const pubKeyB = secp256k1.publicKeyCreate(stringToU8a(partyBPrivKey), false).slice(1)
 
