@@ -98,8 +98,8 @@ class WebRTCConnection implements MultiaddrConnection {
             if (!this._webRTCStateKnown) {
               await Promise.race([
                 // prettier-ignore
-                sourcePromise,
-                this._switchPromise.promise
+                sourcePromise
+                // this._switchPromise.promise
               ])
 
               if (sourceReceived) {
@@ -193,8 +193,8 @@ class WebRTCConnection implements MultiaddrConnection {
         if (!this._webRTCStateKnown) {
           await Promise.race([
             // prettier-ignore
-            streamPromise,
-            this._switchPromise.promise
+            streamPromise
+            // this._switchPromise.promise
           ])
 
           if (streamMsgReceived) {
@@ -232,7 +232,7 @@ class WebRTCConnection implements MultiaddrConnection {
         //   streamPromise = this.conn.source.next().then(streamSourceFunction)
         // }
 
-        console.log(`getting from relayConnection after switch`, streamMsgReceived)
+        console.log(`getting from relayConnection after switch`, streamMsgReceived, new TextDecoder().decode(streamMsg))
 
         if (streamMsgReceived) {
           yield streamMsg
