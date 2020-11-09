@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-protos",
-  "version": "1.17.18",
+  "version": "1.54.0-next.42",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -26,14 +26,7 @@
     "access": "public"
   },
   "engines": {
-    "node": ">=12.9.1",
-    "yarn": "1"
-  },
-  "prettier": {
-    "tabWidth": 2,
-    "semi": false,
-    "singleQuote": true,
-    "printWidth": 120
+    "node": ">=12.9.1"
   },
   "dependencies": {
     "google-protobuf": "^3.12.2",

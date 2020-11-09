@@ -17,11 +17,13 @@ export const OK = new TextEncoder().encode('OK')
 export const FAIL = new TextEncoder().encode('FAIL')
 export const FAIL_COULD_NOT_REACH_COUNTERPARTY = new TextEncoder().encode('FAIL_COULD_NOT_REACH_COUNTERPARTY')
 export const STOP = new TextEncoder().encode('STOP')
+export const RESTART = new TextEncoder().encode('RESTART')
+export const PING = new TextEncoder().encode('PING')
+export const PING_RESPONSE = new TextEncoder().encode('PING_RESPONSE')
 
 export const RELAY_PAYLOAD_PREFIX = new Uint8Array([0])
 export const RELAY_STATUS_PREFIX = new Uint8Array([1])
 export const RELAY_WEBRTC_PREFIX = new Uint8Array([2])
 
-export const RELAY_REGISTER = `/hopr/relay-register/${VERSION}`
-export const DELIVERY_REGISTER = `/hopr/delivery-register/${VERSION}`
-export const DELIVERY_REREGISTER = `/hopr/delivery-reregister/${VERSION}`
+export const RELAY = `/hopr/relay-register/${VERSION}`
+export const DELIVERY = `/hopr/delivery-register/${VERSION}`

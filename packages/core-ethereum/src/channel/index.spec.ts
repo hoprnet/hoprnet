@@ -3,7 +3,7 @@ import { Ganache } from '@hoprnet/hopr-testing'
 import { migrate } from '@hoprnet/hopr-ethereum'
 import assert from 'assert'
 import { stringToU8a, u8aEquals, u8aConcat, durations } from '@hoprnet/hopr-utils'
-import HoprTokenAbi from '@hoprnet/hopr-ethereum/build/extracted/abis/HoprToken.json'
+import { addresses, abis } from '@hoprnet/hopr-ethereum'
 import { getPrivKeyData, createAccountAndFund, createNode } from '../utils/testing.spec'
 import { createChallenge, hash } from '../utils'
 import BN from 'bn.js'
@@ -18,6 +18,7 @@ import Channel from '.'
 import * as testconfigs from '../config.spec'
 import * as configs from '../config'
 
+const HoprTokenAbi = abis.HoprToken
 const DEFAULT_WIN_PROB = 1
 
 describe('test Channel class', function () {
@@ -44,13 +45,13 @@ describe('test Channel class', function () {
   }
 
   before(async function () {
-    this.timeout(60e3)
+    this.timeout(durations.minutes(1))
 
     await ganache.start()
     await migrate()
 
     web3 = new Web3(configs.DEFAULT_URI)
-    hoprToken = new web3.eth.Contract(HoprTokenAbi as any, configs.TOKEN_ADDRESSES.private)
+    hoprToken = new web3.eth.Contract(HoprTokenAbi as any, addresses?.localhost?.HoprToken)
   })
 
   after(async function () {
@@ -58,7 +59,7 @@ describe('test Channel class', function () {
   })
 
   beforeEach(async function () {
-    this.timeout(10e3)
+    this.timeout(durations.seconds(10))
 
     funder = await getPrivKeyData(stringToU8a(testconfigs.FUND_ACCOUNT_PRIVATE_KEY))
     const userA = await createAccountAndFund(web3, hoprToken, funder, testconfigs.DEMO_ACCOUNTS[1])

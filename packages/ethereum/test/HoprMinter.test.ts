@@ -1,21 +1,19 @@
-import { time, expectRevert } from '@openzeppelin/test-helpers'
-import {
-  HoprMinterContract,
-  HoprMinterInstance,
-  HoprTokenContract,
-  HoprTokenInstance,
-} from '../types/truffle-contracts'
-import { PromiseType } from '../types/typescript'
+import type { AsyncReturnType } from 'type-fest'
+import { singletons, time, expectRevert } from '@openzeppelin/test-helpers'
+import { HoprMinterContract, HoprMinterInstance, HoprTokenContract, HoprTokenInstance } from '../types'
+import { vmErrorMessage } from './utils'
 
 const HoprToken: HoprTokenContract = artifacts.require('HoprToken')
 const HoprMinter: HoprMinterContract = artifacts.require('HoprMinter')
 
-const formatAccount = (res: PromiseType<HoprMinterInstance['accounts']>) => ({
+const formatAccount = (res: AsyncReturnType<HoprMinterInstance['accounts']>) => ({
   balance: res[0],
-  lastClaim: res[1],
+  lastClaim: res[1]
 })
 
-contract('HoprMinter', function ([owner, user]) {
+describe('HoprMinter', function () {
+  let owner: string
+  let user: string
   let hoprToken: HoprTokenInstance
   let hoprMinter: HoprMinterInstance
 
@@ -24,12 +22,15 @@ contract('HoprMinter', function ([owner, user]) {
   const duration = time.duration.days(100)
 
   const reset = async () => {
+    ;[owner, user] = await web3.eth.getAccounts()
+
+    await singletons.ERC1820Registry(owner)
     hoprToken = await HoprToken.new()
     hoprMinter = await HoprMinter.new(hoprToken.address, maxAmount, duration)
 
     // make HoprMinter the only minter
     await hoprToken.grantRole(await hoprToken.MINTER_ROLE(), hoprMinter.address, {
-      from: owner,
+      from: owner
     })
   }
 
@@ -42,7 +43,7 @@ contract('HoprMinter', function ([owner, user]) {
     it("'user' should fail to 'increaseBalance'", async function () {
       await expectRevert.unspecified(
         hoprMinter.increaseBalance(user, '1', {
-          from: user,
+          from: user
         })
       )
     })
@@ -52,18 +53,18 @@ contract('HoprMinter', function ([owner, user]) {
 
       await expectRevert(
         hoprMinter.increaseBalance(user, '1', {
-          from: owner,
+          from: owner
         }),
-        'HoprMinter: deadline passed'
+        vmErrorMessage('HoprMinter: deadline passed')
       )
     })
 
     it("should fail to 'increaseBalance' past maximum", async function () {
       await expectRevert(
         hoprMinter.increaseBalance(user, web3.utils.toBN(maxAmount).add(web3.utils.toBN(1)).toString(), {
-          from: owner,
+          from: owner
         }),
-        'HoprMinter: maximum allowed tokens to mint reached'
+        vmErrorMessage('HoprMinter: maximum allowed tokens to mint reached')
       )
     })
   })
@@ -76,13 +77,13 @@ contract('HoprMinter', function ([owner, user]) {
 
     it('claim 50 HOPR after 50 days', async function () {
       await hoprMinter.increaseBalance(user, web3.utils.toWei('100', 'ether'), {
-        from: owner,
+        from: owner
       })
 
       await time.increase(time.duration.days(50))
 
       await hoprMinter.claim({
-        from: user,
+        from: user
       })
 
       const minterBalance = await hoprMinter
@@ -107,7 +108,7 @@ contract('HoprMinter', function ([owner, user]) {
       await time.increase(time.duration.days(25))
 
       await hoprMinter.claimFor(user, {
-        from: owner,
+        from: owner
       })
 
       const minterBalance = await hoprMinter
@@ -130,7 +131,7 @@ contract('HoprMinter', function ([owner, user]) {
 
     it("increase user's minter balance by 75", async function () {
       await hoprMinter.increaseBalance(user, web3.utils.toWei('75', 'ether'), {
-        from: owner,
+        from: owner
       })
 
       const minterBalance = await hoprMinter
@@ -151,7 +152,7 @@ contract('HoprMinter', function ([owner, user]) {
       await time.increase(time.duration.days(15))
 
       await hoprMinter.claim({
-        from: user,
+        from: user
       })
 
       const minterBalance = await hoprMinter
@@ -176,7 +177,7 @@ contract('HoprMinter', function ([owner, user]) {
       await time.increase(time.duration.years(1))
 
       await hoprMinter.claim({
-        from: user,
+        from: user
       })
 
       const minterBalance = await hoprMinter

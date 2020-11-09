@@ -1,7 +1,6 @@
 import type { HoprOptions } from '@hoprnet/hopr-core'
-import { getBootstrapAddresses } from '@hoprnet/hopr-utils'
+import { getBootstrapAddresses, parseHosts } from '@hoprnet/hopr-utils'
 import getopts from 'getopts'
-import PeerInfo from 'peer-info'
 import Multiaddr from 'multiaddr'
 import ListConnctor from '../commands/listConnectors'
 import { displayHelp, styleValue } from './displayHelp'
@@ -9,41 +8,6 @@ import { decodeMessage } from './message'
 import { knownConnectors } from './knownConnectors'
 
 const listConnectors = new ListConnctor()
-
-function parseHosts(): HoprOptions['hosts'] {
-  const hosts: HoprOptions['hosts'] = {}
-
-  if (process.env['HOST_IPV4'] !== undefined) {
-    const str = process.env['HOST_IPV4'].replace(/\/\/.+/, '').trim()
-    const params = str.match(/([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})\:([0-9]{1,6})/)
-    if (params == null || params.length != 3) {
-      throw Error(`Invalid IPv4 host. Got ${styleValue(str, 'highlight')}`)
-    }
-
-    hosts.ip4 = {
-      ip: params[1],
-      port: parseInt(params[2])
-    }
-  }
-
-  if (process.env['HOST_IPV6'] !== undefined) {
-    const str = process.env['HOST_IPV6'].replace(/\/\/.+/, '').trim()
-    const params = str.match(
-      /\[([0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}|[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:\:[0-9a-fA-F]{1,4}|[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:\:[0-9a-fA-F]{1,4}|[0-9a-fA-F]{1,4}\:[0-9a-fA-F]{1,4}\:\:[0-9a-fA-F]{1,4}|[0-9a-fA-F]{1,4}\:\:[0-9a-fA-F]{1,4}|\:\:[0-9a-fA-F]{1,4}|\:\:)\]\:([0-9]{1,6})/
-    )
-
-    if (params == null || params.length != 3) {
-      throw Error(`Invalid IPv6 host. Got ${styleValue(str, 'highlight')}`)
-    }
-
-    hosts.ip6 = {
-      ip: params[1],
-      port: parseInt(params[2])
-    }
-  }
-
-  return hosts
-}
 
 /**
  * Parses the given command-line options and returns a configuration object.
@@ -54,7 +18,7 @@ export async function parseOptions(): Promise<HoprOptions> {
   const unknownOptions: string[] = []
 
   let cli_options = getopts(process.argv.slice(2), {
-    boolean: ['debug', 'bootstrapNode', 'help', 'listConnectors', 'verbose'],
+    boolean: ['debug', 'bootstrapNode', 'help', 'listConnectors', 'verbose', 'init'],
     string: ['network', 'password'],
     alias: {
       l: 'listConnectors',
@@ -63,7 +27,8 @@ export async function parseOptions(): Promise<HoprOptions> {
       b: 'bootstrapNode',
       h: 'help',
       n: 'network',
-      v: 'verbose'
+      v: 'verbose',
+      i: 'init'
     },
     default: {
       network: 'ethereum',
@@ -128,10 +93,10 @@ export async function parseOptions(): Promise<HoprOptions> {
   }
 
   let addr: Multiaddr
-  let bootstrapServerMap = new Map<string, PeerInfo>()
+  let bootstrapServers: Multiaddr[] = []
 
   if (!cli_options.bootstrapNode) {
-    bootstrapServerMap = await getBootstrapAddresses()
+    bootstrapServers = await getBootstrapAddresses()
   }
 
   const provider = process.env[`${cli_options.network.toUpperCase()}_PROVIDER`]
@@ -147,8 +112,9 @@ export async function parseOptions(): Promise<HoprOptions> {
     debug: cli_options.debug || false,
     bootstrapNode: cli_options.bootstrapNode,
     network: cli_options.network,
-    bootstrapServers: [...bootstrapServerMap.values()],
+    bootstrapServers: bootstrapServers,
     provider: provider,
+    createDbIfNotExist: cli_options.init || false,
     output(encoded: Uint8Array) {
       const { latency, msg } = decodeMessage(encoded)
 

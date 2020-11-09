@@ -1,4 +1,5 @@
 import { Message } from './message'
+import assert from 'assert'
 
 describe('test Message', () => {
   const from = '16Uiu2HAkyuTGEAywCMrGg4nv6sA37k2HtXb2NHBfoGzi2KrGVZo2'
@@ -19,13 +20,13 @@ describe('test Message', () => {
       text,
     })
 
-    expect(message.toU8a()).toStrictEqual(buffer)
+    assert.deepEqual(message.toU8a(), buffer)
   })
 
   it('should initialize Message from buffer', () => {
     const message = new Message(buffer)
 
-    expect(message.toU8a()).toStrictEqual(buffer)
+    assert.deepEqual(message.toU8a(), buffer)
   })
 
   it('Message json should be correct', () => {
@@ -36,7 +37,7 @@ describe('test Message', () => {
 
     const parsed = message.toJson()
 
-    expect(parsed.from).toBe(from)
-    expect(parsed.text).toBe(text)
+    assert(parsed.from === from)
+    assert(parsed.text === text)
   })
 })

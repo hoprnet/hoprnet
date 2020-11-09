@@ -6,7 +6,7 @@ const balance = Number(1000000000000000000000000).toString(16)
 
 const DEFAULT_OPS: Ganache.IServerOptions = {
   ws: true,
-  port: 9545,
+  port: 8545,
   accounts: accounts.map((account) => ({
     secretKey: account,
     balance

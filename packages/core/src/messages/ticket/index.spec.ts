@@ -22,7 +22,7 @@ describe(`check serialization and deserialization of ticket objects`, function (
   function getNode(): Hopr<HoprCoreConnector> {
     return ({
       db: LevelUp(Memdown()),
-      dbKeys: DbKeys,
+      _dbKeys: DbKeys,
       paymentChannels: ({
         utils: Utils,
         types: new Types()
@@ -36,7 +36,7 @@ describe(`check serialization and deserialization of ticket objects`, function (
     const peerA = await privKeyToPeerId(NODE_SEEDS[0])
     const peerB = await privKeyToPeerId(NODE_SEEDS[1])
 
-    const accountA = await node.paymentChannels.utils.pubKeyToAccountId(peerA.pubKey.marshal())
+    //const accountA = await node.paymentChannels.utils.pubKeyToAccountId(peerA.pubKey.marshal())
     const accountB = await node.paymentChannels.utils.pubKeyToAccountId(peerB.pubKey.marshal())
 
     const secretA = randomBytes(32)
@@ -73,9 +73,9 @@ describe(`check serialization and deserialization of ticket objects`, function (
 
     assert(await unAcknowledgedTicket.verifySignature(peerA), 'signature must be valid')
 
-    await node.db.put(node.dbKeys.UnAcknowledgedTickets(challenge), Buffer.from(unAcknowledgedTicket))
+    await node.db.put(node._dbKeys.UnAcknowledgedTickets(challenge), Buffer.from(unAcknowledgedTicket))
 
-    const fromDbUnacknowledgedTicket = await node.db.get(node.dbKeys.UnAcknowledgedTickets(challenge))
+    const fromDbUnacknowledgedTicket = (await node.db.get(node._dbKeys.UnAcknowledgedTickets(challenge))) as Uint8Array
 
     assert(
       await new UnacknowledgedTicket(node.paymentChannels, {
@@ -94,16 +94,16 @@ describe(`check serialization and deserialization of ticket objects`, function (
 
     const FIRST_TICKET = 1
     await node.db.put(
-      Buffer.from(node.dbKeys.AcknowledgedTicketCounter()),
+      Buffer.from(node._dbKeys.AcknowledgedTicketCounter()),
       Buffer.from(toU8a(FIRST_TICKET, DbKeys.ACKNOWLEDGED_TICKET_INDEX_LENGTH))
     )
 
-    const counter = await node.db.get(Buffer.from(node.dbKeys.AcknowledgedTicketCounter()))
+    const counter = (await node.db.get(Buffer.from(node._dbKeys.AcknowledgedTicketCounter()))) as Uint8Array
 
     assert(u8aToNumber(counter) == FIRST_TICKET)
 
-    await node.db.put(Buffer.from(node.dbKeys.AcknowledgedTickets(counter)), Buffer.from(acknowledgedDbEntry))
+    await node.db.put(Buffer.from(node._dbKeys.AcknowledgedTickets(counter)), Buffer.from(acknowledgedDbEntry))
 
-    const fromDbtmp = await node.db.get(Buffer.from(node.dbKeys.AcknowledgedTickets(counter)))
+    //const fromDbtmp = await node.db.get(Buffer.from(node.dbKeys.AcknowledgedTickets(counter)))
   })
 })

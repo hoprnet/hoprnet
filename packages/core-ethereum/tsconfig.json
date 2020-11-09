@@ -9,7 +9,9 @@
     "resolveJsonModule": true,
     "experimentalDecorators": true,
     "declaration": true,
+    "skipLibCheck": true,
     "sourceMap": true
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["lib"]
 }

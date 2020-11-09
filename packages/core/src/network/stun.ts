@@ -17,7 +17,7 @@ const STUN_TIMEOUT = durations.seconds(4)
 class Stun {
   private socket: Socket
 
-  constructor(private options: HoprOptions) {}
+  constructor(private hosts: HoprOptions['hosts']) {}
 
   static getExternalIP(addresses: { hostname: string; port: number }[], usePort?: number): Promise<Interface> {
     return new Promise<Interface>(async (resolve, reject) => {
@@ -90,18 +90,18 @@ class Stun {
   }
 
   getSocket() {
-    if (this.options.hosts.ip4 !== undefined && this.options.hosts.ip6 !== undefined) {
+    if (this.hosts.ip4 !== undefined && this.hosts.ip6 !== undefined) {
       return dgram.createSocket({ type: 'udp6' })
-    } else if (this.options.hosts.ip4 !== undefined) {
+    } else if (this.hosts.ip4 !== undefined) {
       return dgram.createSocket({ type: 'udp4' })
-    } else if (this.options.hosts.ip6 !== undefined) {
+    } else if (this.hosts.ip6 !== undefined) {
       return dgram.createSocket({ type: 'udp6', ipv6Only: true })
     }
     throw Error(`Cannot create STUN socket due to invalid configuration.`)
   }
 
   async startServer(port = undefined) {
-    return new Promise(async (resolve, reject) => {
+    return new Promise(async (resolve) => {
       this.socket = this.getSocket()
 
       this.socket.on('message', (msg, rinfo) => {

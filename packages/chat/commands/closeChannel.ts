@@ -34,18 +34,7 @@ export default class CloseChannel extends AbstractCommand {
     }
 
     try {
-      const channel = await this.node.paymentChannels.channel.create(
-        peerId.pubKey.marshal(),
-        async (counterparty: Uint8Array) =>
-          this.node.interactions.payments.onChainKey.interact(await pubKeyToPeerId(counterparty))
-      )
-
-      const status = await channel.status
-      if (!(status === 'OPEN' || status === 'PENDING')) {
-        return styleValue('To close a channel, it must be open or pending for closure')
-      }
-
-      const receipt = await channel.initiateSettlement()
+      const { status, receipt } = await this.node.closeChannel(peerId)
 
       if (status === 'PENDING') {
         return `${chalk.green(`Closing channel. Receipt: ${styleValue(receipt, 'hash')}`)}.`

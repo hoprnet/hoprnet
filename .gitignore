@@ -1,6 +1,11 @@
 node_modules
+.DS_Store
 
 db
 
 *.swp
 .vercel
+
+.DS_Store
+
+test/local-fixtures

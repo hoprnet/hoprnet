@@ -2,7 +2,6 @@
 import Hopr from '@hoprnet/hopr-core'
 import type { HoprOptions } from '@hoprnet/hopr-core'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import PeerInfo from 'peer-info'
 import PeerId from 'peer-id'
 import Multiaddr from 'multiaddr'
 import debug from 'debug'
@@ -17,7 +16,6 @@ import { LogStream, Socket } from './logs'
 import { AdminServer } from './admin'
 import chalk from 'chalk'
 import * as yargs from 'yargs'
-import { startServer } from '@hoprnet/hopr-server'
 
 let debugLog = debug('hoprd')
 
@@ -66,11 +64,6 @@ const argv = yargs
     describe: 'Run an admin interface on localhost:3000',
     default: false
   })
-  .option('grpc', {
-    boolean: true,
-    describe: 'Run a gRPC interface',
-    default: false
-  })
   .option('password', {
     describe: 'A password to encrypt your keys'
   })
@@ -91,6 +84,11 @@ const argv = yargs
   .option('data', {
     describe: 'manually specify the database directory to use',
     default: ''
+  })
+  .option('init', {
+    boolean: true,
+    describe: "initialize a database if it doesn't already exist",
+    default: false
   })
   .option('settings', {
     descripe: 'Settings, same as in the repl (JSON)',
@@ -117,7 +115,34 @@ function parseHosts(): HoprOptions['hosts'] {
   return hosts
 }
 
-async function generateNodeOptions(logs: LogStream): Promise<HoprOptions> {
+async function generateNodeOptions(): Promise<HoprOptions> {
+  let options: HoprOptions = {
+    debug: Boolean(process.env.HOPR_DEBUG),
+    bootstrapNode: argv.bootstrap,
+    createDbIfNotExist: argv.init,
+    network: argv.network,
+    bootstrapServers: argv.bootstrap ? [] : [...(await getBootstrapAddresses()).values()],
+    provider: argv.provider,
+    hosts: parseHosts()
+  }
+
+  if (argv.password !== undefined) {
+    options.password = argv.password as string
+  }
+
+  if (argv.data && argv.data !== '') {
+    options.dbPath = argv.data
+  }
+  return options
+}
+
+async function main() {
+  let node: Hopr<HoprCoreConnector>
+  let addr: Multiaddr
+  let logs = new LogStream()
+  let adminServer = undefined
+  let settings: any = {}
+
   function logMessageToNode(msg: Uint8Array) {
     logs.log('#### NODE RECEIVED MESSAGE ####')
     try {
@@ -129,35 +154,6 @@ async function generateNodeOptions(logs: LogStream): Promise<HoprOptions> {
       logs.log(msg.toString())
     }
   }
-
-  let options: HoprOptions = {
-    debug: Boolean(process.env.HOPR_DEBUG),
-    bootstrapNode: argv.bootstrap,
-    network: argv.network,
-    bootstrapServers: argv.bootstrap ? [] : [...(await getBootstrapAddresses()).values()],
-    provider: argv.provider,
-    hosts: parseHosts(),
-    output: logMessageToNode
-  }
-
-  if (argv.password !== undefined) {
-    options.password = argv.password as string
-  }
-
-  if (argv.data && argv.data !== '') {
-    options.dbPath = argv.data
-  }
-
-  //logs.log(JSON.stringify(options))
-  return options
-}
-
-async function main() {
-  let node: Hopr<HoprCoreConnector>
-  let addr: Multiaddr
-  let logs = new LogStream()
-  let adminServer = undefined
-  let settings: any = {}
 
   if (argv.settings) {
     settings = JSON.parse(argv.settings)
@@ -171,7 +167,7 @@ async function main() {
   }
 
   logs.log('Creating HOPR Node')
-  let options = await generateNodeOptions(logs)
+  let options = await generateNodeOptions()
   if (argv.dryRun) {
     console.log(JSON.stringify(options, undefined, 2))
     process.exit(0)
@@ -181,20 +177,13 @@ async function main() {
     node = await Hopr.create(options)
     logs.log('Created HOPR Node')
 
-    node.on('peer:connect', (peer: PeerInfo) => {
-      logs.log(`Incoming connection from ${peer.id.toB58String()}.`)
-    })
+    node.on('hopr:message', logMessageToNode)
 
     process.once('exit', async () => {
       await node.stop()
       logs.log('Process exiting')
       return
     })
-
-    if (argv.grpc) {
-      // Start HOPR server
-      startServer(node, { logger: logs })
-    }
 
     if (adminServer) {
       adminServer.registerNode(node)

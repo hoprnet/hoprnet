@@ -1,3 +1,4 @@
+import assert from 'assert'
 var mod: any
 
 describe('test chat commands can be imported as a module', () => {
@@ -6,6 +7,6 @@ describe('test chat commands can be imported as a module', () => {
   })
 
   it('can import commands', () => {
-    expect(mod.commands).toBeTruthy()
+    assert(mod.commands)
   })
 })

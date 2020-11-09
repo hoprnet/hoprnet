@@ -16,7 +16,6 @@ RUN apt-get update && \
     wget
 
 COPY package*.json ./
-COPY yarn.lock ./
 
 # -- INSTALL STAGE ------------------------------
 RUN yarn install --build-from-source

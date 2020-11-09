@@ -60,7 +60,7 @@ class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
   }
 
   get signatureHash(): Promise<Types.Hash> {
-    return new Promise(async (resolve, reject) => {
+    return new Promise(async (resolve) => {
       resolve(await this.paymentChannels.utils.hash(await this.challengeSignature))
     })
   }

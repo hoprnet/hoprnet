@@ -47,7 +47,7 @@ export type PRGParameters = {
   iv: Uint8Array
 }
 
-export class Header<Chain extends HoprCoreConnector> extends Uint8Array {
+export class Header<_Chain extends HoprCoreConnector> extends Uint8Array {
   tmpData?: Uint8Array
   derivedSecretLastNode?: Uint8Array
 

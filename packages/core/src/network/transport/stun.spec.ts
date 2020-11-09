@@ -5,13 +5,13 @@ import Multiaddr from 'multiaddr'
 import assert from 'assert'
 import { once } from 'events'
 
-const TIMEOUT = 1000
+// const TIMEOUT = 1000
 
 describe('test STUN', function () {
   let client
   let servers
 
-  beforeAll(() => {
+  before(() => {
     servers = Array.from({ length: 4 }).map((_) => {
       const server = dgram.createSocket('udp4')
       server.on('message', (msg: Buffer, rinfo: RemoteInfo) => handleStunRequest(server, msg, rinfo))
@@ -50,7 +50,7 @@ describe('test STUN', function () {
     */
   })
 
-  afterAll(async () => {
+  after(async () => {
     await Promise.all(
       servers.map((server) => {
         server.close()

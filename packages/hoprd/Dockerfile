@@ -1,5 +1,5 @@
 #
-# Run HOPRd and and Envoy proxy within a single container.
+# Run HOPRd  within a single container.
 #
 # NB. This is not a long term solution, so you probably don't want to rely on 
 # this, our ultimate goal is a single HOPRd process, but this is a quick solution
@@ -23,7 +23,6 @@ RUN apt-get update && \
 ENV YARN_VERSION 1.19.2
 RUN yarn policies set-version $YARN_VERSION
 COPY package.json .
-COPY yarn.lock .
 RUN yarn install --build-from-source
 
 # -- BUILD STAGE --------------------------------
@@ -44,25 +43,6 @@ FROM node:12.9.1-buster AS runtime
 # specify network, this will be passed to process.yaml --env
 ARG network
 
-# install envoy
-RUN apt-get update && \
-    apt-get install -y \
-    apt-transport-https \
-    ca-certificates \
-    curl \
-    gnupg-agent \
-    software-properties-common \
-    gettext
-
-RUN curl -sL 'https://getenvoy.io/gpg' | apt-key add -
-
-RUN apt-key fingerprint 6FF974DB
-
-RUN add-apt-repository \
-  "deb [arch=amd64] https://dl.bintray.com/tetrate/getenvoy-deb $(lsb_release -cs) stable"
-
-RUN apt-get update && apt-get install -y getenvoy-envoy
-
 # install yarn
 RUN yarn global add pm2
 
@@ -75,9 +55,6 @@ COPY --from=build /hoprd/hopr-admin /app/hopr-admin
 COPY --from=build /hoprd/node_modules /app/node_modules
 COPY --from=build /hoprd/package.json /app/package.json
 
-# Envoy
-COPY envoy/envoy.yaml /app/envoy/envoy.yaml
-COPY envoy/envoy.sh /app/envoy/envoy.sh
 # PM2
 COPY process.yaml /app/process.yaml
 
@@ -92,11 +69,6 @@ VOLUME ["/app/db"]
 EXPOSE 9091
 # Hopr-server gRPC
 EXPOSE 50051
-# Envoy -> Hopr-server
-EXPOSE 8080
-
-# Envoy Error log
-EXPOSE 8081
 # Admin web server
 EXPOSE 3000
 

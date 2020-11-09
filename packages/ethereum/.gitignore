@@ -8,12 +8,6 @@ yarn-error.log
 # Exclude IDE stuff
 .vscode/
 
-# Exclude solidity builds
-build/
-
-# Exclude typechain builds
-types/truffle-contracts/
-
 # Coverage directory used by tools like istanbul
 coverage*
 .coverage*
@@ -32,3 +26,18 @@ scTopics
 
 # Exclude built npm packages
 *.tgz
+
+# distribution files
+lib
+
+# @TODO: remove this once refactor is complete
+temp
+
+# Hardhat
+hardhat
+
+# typechain
+types
+
+# exclude generated ABIs
+chain/abis

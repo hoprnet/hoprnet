@@ -480,11 +480,18 @@
       "http://23.254.227.151:5001": "Wed, 14 Oct 2020 07:47:34 GMT"
     }
   },
-  "1.17.1": {
-    "hash": "/ipfs/QmS9qBKXi8BtLHCst8x7BR2MeY1uzcR1cYqfGyzMC1rNQS",
+  "0.53.0": {
+    "hash": "/ipfs/QmREb8s1uzeuVgbPhy4xv4zo8TCY8imxmZhPtsx55gGf2L",
     "type": "manifest",
     "uploadedTo": {
-      "http://23.254.227.151:5001": "Thu, 15 Oct 2020 07:37:01 GMT"
+      "http://23.254.227.151:5001": "Wed, 14 Oct 2020 09:14:27 GMT"
+    }
+  },
+  "1.17.1": {
+    "hash": "/ipfs/QmatxPAoCG8o1pjsuxD6zE6vvtq4SyMAuFHpqf8hn8JY7D",
+    "type": "manifest",
+    "uploadedTo": {
+      "http://23.254.227.151:5001": "Thu, 15 Oct 2020 08:25:18 GMT"
     }
   },
   "1.17.10": {

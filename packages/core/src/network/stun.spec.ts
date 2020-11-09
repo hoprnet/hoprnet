@@ -4,7 +4,7 @@ import { HoprOptions } from '..'
 
 describe('test the STUN functionalities', function () {
   async function generateNode(options: HoprOptions) {
-    const node = new Stun(options)
+    const node = new Stun(options.hosts)
 
     if (options.bootstrapNode) {
       await node.startServer(3480)

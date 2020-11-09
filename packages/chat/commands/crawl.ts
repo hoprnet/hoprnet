@@ -22,12 +22,16 @@ export default class Crawl extends AbstractCommand {
    */
   public async execute(): Promise<string | void> {
     try {
-      await this.node.network.crawler.crawl(
-        (peer: string) => !isBootstrapNode(this.node, PeerId.createFromB58String(peer))
-      )
-      return `Crawled network, connected to ${styleValue(this.node.peerStore.peers.size)} peers`
+      let info = await this.node.crawl((peer: PeerId) => !isBootstrapNode(this.node, peer))
+      return `
+        Crawled network, contacted ${styleValue(info.contacted.length)} peers. 
+        Connected to ${styleValue(this.node.getConnectedPeers().length)} peers
+      `
     } catch (err) {
-      return styleValue(err.message, 'failure')
+      if (err && err.message) {
+        return styleValue(err.message, 'failure')
+      }
+      return `Unknown error ${err}`
     }
   }
 }

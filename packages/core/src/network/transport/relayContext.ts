@@ -1,88 +1,301 @@
-import { u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
+import { u8aConcat, u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
 import Defer, { DeferredPromise } from 'p-defer'
+
+import type { Stream } from 'libp2p'
 
 import Debug from 'debug'
 const log = Debug(`hopr-core:transport`)
+const verbose = Debug(`hopr-core:verbose:transport`)
 const error = Debug(`hopr-core:transport:error`)
 
-import { RELAY_PAYLOAD_PREFIX, RELAY_STATUS_PREFIX, STOP } from './constants'
+import {
+  RELAY_STATUS_PREFIX,
+  STOP,
+  RESTART,
+  RELAY_WEBRTC_PREFIX,
+  RELAY_PAYLOAD_PREFIX,
+  PING,
+  PING_RESPONSE
+} from './constants'
+
+const DEFAULT_PING_TIMEOUT = 300
 
 class RelayContext {
-  private _defer: DeferredPromise<AsyncGenerator<Uint8Array>>
+  private _switchPromise: DeferredPromise<Stream>
+  private _statusMessagePromise: DeferredPromise<void>
+  private _statusMessages: Uint8Array[]
+  private _pingResponsePromise: DeferredPromise<void>
+  private _stream: Stream
 
-  public source: AsyncIterable<Uint8Array>
+  public source: Stream['source']
+  public sink: Stream['sink']
+  public ping: (ms?: number) => Promise<number>
+  public update: (newStream: Stream) => void
 
-  constructor(private _source: AsyncGenerator<Uint8Array>) {
-    this._defer = Defer<AsyncGenerator<Uint8Array>>()
+  constructor(stream: Stream) {
+    this._switchPromise = Defer<Stream>()
+    this._statusMessagePromise = Defer<void>()
+    this._statusMessages = []
+    this._stream = stream
 
-    this.source = async function* (this: RelayContext) {
-      let itDone = false
+    this.source = this._createSource.call(this)
 
-      let msgReceived = false
-      let streamReceived = false
+    this.sink = this._createSink.bind(this)
 
-      let msg: Promise<IteratorResult<Uint8Array, Uint8Array>>
+    this.ping = async (ms: number = DEFAULT_PING_TIMEOUT) => {
+      let start = Date.now()
+      this._pingResponsePromise = Defer<void>()
 
-      this._defer.promise.then(() => {
-        streamReceived = true
+      let timeoutDone = false
+      let timeout: NodeJS.Timeout
+
+      const timeoutPromise = new Promise((resolve) => {
+        timeout = (setTimeout(() => {
+          log(`ping timeout done`)
+          timeoutDone = true
+          resolve()
+        }, ms) as unknown) as NodeJS.Timeout
       })
 
-      while (true) {
-        log(`relay iteration`)
-        msg = this._source.next()
+      let tmpPromise = this._statusMessagePromise
 
+      this._statusMessagePromise = Defer<void>()
+      this._statusMessages.push(u8aConcat(RELAY_STATUS_PREFIX, PING))
+      tmpPromise.resolve()
+
+      await Promise.race([
+        // prettier-ignore
+        timeoutPromise,
+        this._pingResponsePromise.promise
+      ])
+
+      if (timeoutDone) {
+        return -1
+      } else {
+        clearTimeout(timeout)
+        return Date.now() - start
+      }
+    }
+
+    this.update = (newStream: Stream) => {
+      log(`updating`)
+      let tmpPromise = this._switchPromise
+      this._switchPromise = Defer<Stream>()
+      tmpPromise.resolve(newStream)
+    }
+  }
+
+  private async *_createSource() {
+    let sourceReceived = false
+    let sourceMsg: Uint8Array
+    let sourceDone = false
+
+    let iteration = 0
+    const sourceFunction = (_iteration: number) => (arg: { value?: Uint8Array; done?: boolean }) => {
+      sourceReceived = true
+      sourceMsg = arg.value
+
+      if (arg.done) {
+        sourceDone = true
+      }
+    }
+
+    let tmpSource: Stream['source']
+    let currentSource = this._stream.source
+
+    let sourcePromise = currentSource.next().then(sourceFunction(iteration))
+
+    let streamSwitched = false
+
+    function switchFunction(stream: Stream) {
+      tmpSource = stream.source
+      streamSwitched = true
+    }
+    let switchPromise = this._switchPromise.promise.then(switchFunction)
+
+    while (true) {
+      if (!sourceDone) {
         await Promise.race([
-          msg.then(({ done }) => {
-            if (done) {
-              itDone = true
-            }
-
-            msgReceived = true
-          }),
-          this._defer.promise
+          // prettier-ignore
+          sourcePromise,
+          switchPromise
         ])
+      } else {
+        await switchPromise
+      }
 
-        if (itDone || streamReceived) {
-          log(`waiting for resolve streamReceived ${streamReceived} itDone ${itDone}`)
-          this._source = await this._defer.promise
+      if (sourceReceived) {
+        sourceReceived = false
+        // Does not forward empty messages
+        if (sourceMsg != null) {
+          const received = sourceMsg.slice()
 
-          this._defer = Defer()
+          const [PREFIX, SUFFIX] = [received.subarray(0, 1), received.subarray(1)]
 
-          streamReceived = false
+          if (
+            !u8aEquals(RELAY_STATUS_PREFIX, PREFIX) &&
+            !u8aEquals(RELAY_WEBRTC_PREFIX, PREFIX) &&
+            !u8aEquals(RELAY_PAYLOAD_PREFIX, PREFIX)
+          ) {
+            error(`Invalid prefix: Got <${u8aToHex(PREFIX || new Uint8Array([]))}>. Dropping message in relayContext.`)
+            if (!sourceDone) {
+              sourcePromise = currentSource.next().then(sourceFunction(iteration))
+            }
+            continue
+          }
 
-          this._defer.promise.then(() => {
-            log(`stream resolved`)
-            streamReceived = true
-          })
+          if (u8aEquals(PREFIX, RELAY_STATUS_PREFIX)) {
+            if (u8aEquals(SUFFIX, STOP)) {
+              verbose(`STOP relayed`)
+              return received
+            } else if (u8aEquals(SUFFIX, RESTART)) {
+              verbose(`RESTART relayed`)
+            } else if (u8aEquals(SUFFIX, PING)) {
+              verbose(`PING received`)
+              this._statusMessages.push(u8aConcat(RELAY_STATUS_PREFIX, PING_RESPONSE))
 
-          itDone = false
-          continue
-        }
+              this._statusMessagePromise.resolve()
 
-        if (msgReceived) {
-          const received = (await msg).value?.slice()
+              if (!sourceDone) {
+                sourcePromise = currentSource.next().then(sourceFunction(iteration))
+              }
 
-          if (u8aEquals(received.slice(0, 1), RELAY_STATUS_PREFIX)) {
-            if (u8aEquals(received.slice(1), STOP)) {
-              log(`STOP received`)
-              break
+              // Don't forward ping
+              continue
+            } else if (u8aEquals(SUFFIX, PING_RESPONSE)) {
+              verbose(`PONG received`)
+
+              this._pingResponsePromise?.resolve()
+
+              if (!sourceDone) {
+                sourcePromise = currentSource.next().then(sourceFunction(iteration))
+              }
+
+              // Don't forward pong message
+              continue
             } else {
-              error(`Invalid status message. Got <${received.slice(1)}>`)
+              error(`Invalid status message. Got <${u8aToHex(SUFFIX || new Uint8Array([]))}>`)
             }
           }
 
-          log(`relaying ${(await msg).value.toString()}`, u8aToHex((await msg).value))
-          yield (await msg).value
-
-          msgReceived = false
+          yield received
+        } else {
+          verbose(`empty message dropped`)
         }
+
+        if (!sourceDone) {
+          sourcePromise = currentSource.next().then(sourceFunction(iteration))
+        }
+      } else if (streamSwitched) {
+        streamSwitched = false
+        sourceDone = false
+        currentSource = tmpSource
+        switchPromise = this._switchPromise.promise.then(switchFunction)
+        yield u8aConcat(RELAY_STATUS_PREFIX, RESTART)
+
+        sourcePromise = currentSource.next().then(sourceFunction(++iteration))
       }
-      log(`after relay context return `)
-    }.call(this)
+    }
   }
 
-  update(newStream: AsyncGenerator<Uint8Array>) {
-    this._defer.resolve(newStream)
+  private async _createSink(source: Stream['source']) {
+    let currentSink = this._stream.sink
+
+    let sourceReceived = false
+    let sourceMsg: Uint8Array | undefined
+    let sourceDone = false
+
+    let iteration = 0
+    const sourceFunction = (arg: { value?: Uint8Array; done?: boolean }) => {
+      sourceReceived = true
+      sourceMsg = arg.value
+
+      if (arg.done) {
+        sourceDone = true
+      }
+    }
+
+    let sourcePromise = source.next().then(sourceFunction)
+
+    let streamSwitched = false
+    let statusMessageAvailable = false
+
+    const switchFunction = () => {
+      streamSwitched = true
+    }
+
+    const statusSourceFunction = () => {
+      statusMessageAvailable = true
+    }
+    let statusPromise = this._statusMessagePromise.promise.then(statusSourceFunction)
+
+    async function* drain(this: RelayContext, _iteration: number) {
+      streamSwitched = false
+
+      let switchPromise = this._switchPromise.promise.then(switchFunction)
+
+      while (!sourceDone) {
+        if (iteration != _iteration) {
+          break
+        }
+
+        await Promise.race([
+          // prettier-ignore
+          sourcePromise,
+          statusPromise,
+          switchPromise
+        ])
+
+        if (iteration != _iteration) {
+          break
+        }
+
+        if (sourceReceived) {
+          sourceReceived = false
+
+          // Ignoring empty messages
+          if (sourceMsg != null) {
+            let received = sourceMsg.slice()
+
+            let [PREFIX, SUFFIX] = [received.slice(0, 1), received.slice(1)]
+
+            if (sourceDone || (u8aEquals(PREFIX, RELAY_STATUS_PREFIX) && u8aEquals(SUFFIX, STOP))) {
+              return received
+            } else {
+              yield received
+            }
+          } else {
+            log(`dropping empty message`)
+          }
+
+          if (!sourceDone) {
+            sourcePromise = source.next().then(sourceFunction)
+          }
+        } else if (statusMessageAvailable) {
+          statusMessageAvailable = false
+
+          while (this._statusMessages.length > 0) {
+            yield this._statusMessages.shift()
+          }
+
+          if (!sourceDone) {
+            this._statusMessagePromise = Defer<void>()
+
+            statusPromise = this._statusMessagePromise.promise.then(statusSourceFunction)
+          }
+        } else if (streamSwitched) {
+          break
+        }
+      }
+    }
+
+    while (!sourceDone) {
+      currentSink(drain.call(this, iteration))
+
+      currentSink = (await this._switchPromise.promise).sink
+
+      iteration++
+    }
   }
 }
 

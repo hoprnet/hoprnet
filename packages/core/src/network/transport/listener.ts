@@ -1,20 +1,21 @@
 import net, { AddressInfo, Socket as TCPSocket } from 'net'
 import dgram, { RemoteInfo } from 'dgram'
 
-import EventEmitter from 'events'
+import { EventEmitter } from 'events'
 import debug from 'debug'
-
-const log = debug('hopr-core:transport:listener')
-const error = debug('hopr-core:transport:listener:error')
-const verbose = debug('hopr-core:verbose:listener:error')
 
 import { socketToConn } from './socket-to-conn'
 import { CODE_P2P } from './constants'
-import { MultiaddrConnection, Connection, Upgrader, Libp2pServer } from '../../@types/transport'
+import type { Connection } from 'libp2p'
+import { MultiaddrConnection, Upgrader } from 'libp2p'
 import Multiaddr from 'multiaddr'
 
 import { handleStunRequest, getExternalIp } from './stun'
 import { getAddrs } from './addrs'
+
+const log = debug('hopr-core:transport:listener')
+const error = debug('hopr-core:transport:listener:error')
+const verbose = debug('hopr-core:verbose:listener:error')
 
 const SOCKET_CLOSE_TIMEOUT = 400
 
@@ -66,7 +67,7 @@ class Listener extends EventEmitter {
     this.__connections = []
     this.upgrader = upgrader
 
-    this.tcpSocket = net.createServer(this.onTCPConnection.bind(this)) as Libp2pServer
+    this.tcpSocket = net.createServer(this.onTCPConnection.bind(this))
 
     this.udpSocket = dgram.createSocket({
       // @TODO
@@ -131,7 +132,8 @@ class Listener extends EventEmitter {
           resolve()
         })
       ),
-      new Promise((resolve, reject) =>
+      // @TODO handle socket bind error(s)
+      new Promise((resolve /*, reject*/) =>
         this.udpSocket.bind(options.port, async () => {
           try {
             this.externalAddress = await getExternalIp(this.stunServers, this.udpSocket)
@@ -183,8 +185,8 @@ class Listener extends EventEmitter {
 
       addrs.push(
         ...getAddrs(address.port, this.peerId, {
-          includeLocalhostIPv4: true
-          // useIPv6: true
+          includeLocalhostIPv4: true,
+          useIPv6: false
         })
       )
     } else if (this.externalAddress != null && this.externalAddress.port != null) {
@@ -201,8 +203,8 @@ class Listener extends EventEmitter {
 
       addrs.push(
         ...getAddrs(address.port, this.peerId, {
-          includeLocalhostIPv4: true
-          // useIPv6: true
+          includeLocalhostIPv4: true,
+          useIPv6: false
         })
       )
     } else {

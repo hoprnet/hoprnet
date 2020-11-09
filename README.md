@@ -12,6 +12,9 @@
   <p align="center">
     HOPR is a privacy-preserving messaging protocol which enables the creation of a secure communication network via relay nodes powered by economic incentives using digital tokens.
   </p>
+  <p align="center">
+    <img src="https://img.shields.io/badge/Gitpod-ready--to--code-blue?logo=gitpod" alt="Gitpod">
+  </p>
 </p>
 
 ## Instructions
@@ -46,6 +49,10 @@ yarn setup
 yarn run:hoprd         # Runs hoprd w/admin (:3000)
 yarn run:chat          # Runs hopr chat in terminal
 ```
+
+### Docker images
+
+All our docker images can be found [here](https://console.cloud.google.com/gcr/images/hoprassociation/GLOBAL) and are prefixed as `gcr.io/hoprassociation/$PROJECT:$RELEASE`. Stable releases live in [Docker Hub](https://hub.docker.com/u/hopr)
 
 ## HOPR ecosystem
 

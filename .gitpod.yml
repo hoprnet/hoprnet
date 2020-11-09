@@ -1,0 +1,5 @@
+tasks:
+  - init: yarn && yarn setup
+
+ports:
+  - port: 3000-9095

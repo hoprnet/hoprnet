@@ -2,12 +2,10 @@ import type { LevelUp } from 'levelup'
 import type { WebsocketProvider } from 'web3-core'
 import type { Currencies } from '@hoprnet/hopr-core-connector-interface'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import type { Networks } from './ethereum/addresses'
 import type { HoprChannels } from './tsc/web3/HoprChannels'
 import type { HoprToken } from './tsc/web3/HoprToken'
 import Web3 from 'web3'
-import HoprChannelsAbi from './ethereum/abi/HoprChannels.json'
-import HoprTokenAbi from './ethereum/abi/HoprToken.json'
+import { Network, addresses, abis } from '@hoprnet/hopr-ethereum'
 import chalk from 'chalk'
 import { ChannelFactory } from './channel'
 import types from './types'
@@ -19,8 +17,11 @@ import * as config from './config'
 import Account from './account'
 import HashedSecret from './hashedSecret'
 import Path from './path'
-
 import debug from 'debug'
+
+const HoprChannelsAbi = abis.HoprChannels
+const HoprTokenAbi = abis.HoprToken
+
 const debugLog = debug('hopr-core-ethereum')
 let provider: WebsocketProvider
 
@@ -43,7 +44,7 @@ export default class HoprEthereum implements HoprCoreConnector {
     public db: LevelUp,
     public web3: Web3,
     public chainId: number,
-    public network: Networks,
+    public network: Network,
     public hoprChannels: HoprChannels,
     public hoprToken: HoprToken,
     public options: {
@@ -280,17 +281,17 @@ export default class HoprEthereum implements HoprCoreConnector {
     const web3 = new Web3(provider)
 
     const [chainId, publicKey] = await Promise.all([utils.getChainId(web3), utils.privKeyToPubKey(seed)])
-    const network = utils.getNetworkName(chainId) as Networks
+    const network = utils.getNetworkName(chainId) as Network
 
-    if (typeof config.CHANNELS_ADDRESSES[network] === 'undefined') {
+    if (typeof addresses?.[network]?.HoprChannels === 'undefined') {
       throw Error(`channel contract address from network ${network} not found`)
     }
-    if (typeof config.TOKEN_ADDRESSES[network] === 'undefined') {
+    if (typeof addresses?.[network]?.HoprToken === 'undefined') {
       throw Error(`token contract address from network ${network} not found`)
     }
 
-    const hoprChannels = new web3.eth.Contract(HoprChannelsAbi as any, config.CHANNELS_ADDRESSES[network])
-    const hoprToken = new web3.eth.Contract(HoprTokenAbi as any, config.TOKEN_ADDRESSES[network])
+    const hoprChannels = new web3.eth.Contract(HoprChannelsAbi as any, addresses?.[network]?.HoprChannels)
+    const hoprToken = new web3.eth.Contract(HoprTokenAbi as any, addresses?.[network]?.HoprToken)
 
     const coreConnector = new HoprEthereum(
       db,

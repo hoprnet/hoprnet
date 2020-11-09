@@ -1,15 +1,18 @@
+/// <reference path="../../@types/it-handshake.ts" />
+/// <reference path="../../@types/stream-to-it.ts" />
+
 import abortable from 'abortable-iterator'
 import debug from 'debug'
-const log = debug('libp2p:tcp:socket')
-const error = debug('libp2p:tcp:socket:error')
+import toIterable from 'stream-to-it'
 
-// @ts-ignore
-import toIterable = require('stream-to-it')
-// @ts-ignore
 import toMultiaddr = require('libp2p-utils/src/ip-port-to-multiaddr')
-import { MultiaddrConnection } from '../../@types/transport'
+
+import { MultiaddrConnection, Stream } from 'libp2p'
 import type Multiaddr from 'multiaddr'
 import type { Socket } from 'net'
+
+const log = debug('libp2p:tcp:socket')
+const error = debug('libp2p:tcp:socket:error')
 
 const SOCKET_CLOSE_TIMEOUT = 2000
 
@@ -53,7 +56,7 @@ export function socketToConn(
   const maConn: MultiaddrConnection = {
     async sink(source) {
       if (options.signal) {
-        source = abortable(source, options?.signal)
+        source = abortable(source, options?.signal) as Stream['source']
       }
 
       try {

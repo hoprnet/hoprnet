@@ -20,8 +20,8 @@ export class Info extends AbstractCommand {
   public async execute(): Promise<string> {
     // @TODO Add connector info etc.
     return [
-      `Bootstrap Servers: ${this.node.bootstrapServers.map((p) => styleValue(p.id.toB58String(), 'peerId'))}`,
-      `Available at: ${this.node.peerInfo.multiaddrs.toArray().map((ma: Multiaddr) => ma.toString())}`
+      `Bootstrap Servers: ${this.node.bootstrapServers.map((p) => styleValue(p.getPeerId(), 'peerId'))}`,
+      `Available at: ${this.node.getAddresses().map((ma: Multiaddr) => ma.toString())}`
     ].join('\n')
   }
 }
