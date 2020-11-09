@@ -41,8 +41,8 @@ class WebRTCConnection implements MultiaddrConnection {
     this._webRTCStateKnown = false
     this._webRTCAvailable = false
 
-    this.remoteAddr = Multiaddr(`/p2p/${opts.self.toB58String()}`)
-    this.localAddr = Multiaddr(`/p2p/${opts.counterparty.toB58String()}`)
+    this.remoteAddr = Multiaddr(`/p2p/${opts.counterparty.toB58String()}`)
+    this.localAddr = Multiaddr(`/p2p/${opts.self.toB58String()}`)
 
     this.channel.on('connect', () => {
       if (this._webRTCTimeout != null) {

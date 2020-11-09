@@ -92,7 +92,7 @@ class TCP {
       }
     }
 
-    this._useWebRTC = false // useWebRTC === undefined ? USE_WEBRTC : useWebRTC
+    this._useWebRTC = true // useWebRTC === undefined ? USE_WEBRTC : useWebRTC
     this._peerId = libp2p.peerId
     this._multiaddrs = libp2p.multiaddrs
     this._upgrader = upgrader
