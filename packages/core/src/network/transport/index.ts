@@ -92,7 +92,7 @@ class TCP {
       }
     }
 
-    this._useWebRTC = true // useWebRTC === undefined ? USE_WEBRTC : useWebRTC
+    this._useWebRTC = false // useWebRTC === undefined ? USE_WEBRTC : useWebRTC
     this._peerId = libp2p.peerId
     this._multiaddrs = libp2p.multiaddrs
     this._upgrader = upgrader
@@ -105,7 +105,7 @@ class TCP {
     libp2p.handle(DELIVERY, this.handleDelivery.bind(this))
 
     this._relay = new Relay(libp2p, this._webRTCUpgrader)
-    verbose(`Created TCP stack (Stun: ${this.stunServers?.map((x) => x.toString()).join(',')}`)
+    verbose(`Created TCP stack (Stun: ${this.stunServers?.map((server: Multiaddr) => server.toString()).join(',')}`)
   }
 
   async onReconnect(this: TCP, newStream: MultiaddrConnection, counterparty: PeerId) {
