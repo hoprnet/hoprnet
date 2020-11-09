@@ -271,6 +271,9 @@ class ChannelFactory {
         })
 
         const counterpartyPubKey = await signedChannel.signer
+
+        /*
+        // Fund both ways
         const counterparty = await pubKeyToAccountId(counterpartyPubKey)
         const channelBalance = signedChannel.channel.balance
 
@@ -291,6 +294,7 @@ class ChannelFactory {
             }
           }
         }
+        */
 
         // listen for opening event and update DB
         this.coreConnector.channel

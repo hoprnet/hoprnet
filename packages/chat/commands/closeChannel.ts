@@ -37,9 +37,14 @@ export default class CloseChannel extends AbstractCommand {
       const { status, receipt } = await this.node.closeChannel(peerId)
 
       if (status === ChannelStatus.PENDING) {
-        return `${chalk.green(`Closing channel, receipt: ${styleValue(receipt, 'hash')}`)}.`
+        return `${chalk.green(`Closing channel. Receipt: ${styleValue(receipt, 'hash')}`)}.`
       } else {
-        return `${chalk.green(`Initiated channel closure, receipt: ${styleValue(receipt, 'hash')}`)}.`
+        return `${chalk.green(
+          `Initiated channel closure, the channel must remain open for at least 2 minutes. Please send the close command again once the cool-off has passed. Receipt: ${styleValue(
+            receipt,
+            'hash'
+          )}`
+        )}.`
       }
     } catch (err) {
       return styleValue(err.message, 'failure')
