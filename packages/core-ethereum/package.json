@@ -27,6 +27,7 @@
     "yarn": "1"
   },
   "dependencies": {
+    "@hoprnet/hopr-core-connector-interface": "1.54.0-next.42",
     "@hoprnet/hopr-ethereum": "1.54.0-next.42",
     "@hoprnet/hopr-utils": "1.54.0-next.42",
     "bn.js": "^5.1.2",
@@ -43,7 +44,6 @@
     "web3-eth-contract": "^1.2.11"
   },
   "devDependencies": {
-    "@hoprnet/hopr-core-connector-interface": "1.54.0-next.42",
     "@hoprnet/hopr-demo-seeds": "1.54.0-next.42",
     "@hoprnet/hopr-testing": "1.54.0-next.42",
     "@types/debug": "^4.1.5",

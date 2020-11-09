@@ -13,7 +13,7 @@ import {
   Ticket,
   TicketEpoch
 } from '../types'
-import { ChannelStatus} from '../types/channel'
+import { ChannelStatus } from '../types/channel'
 import { waitForConfirmation, getId, events, pubKeyToAccountId, sign, isPartyA } from '../utils'
 import { ERRORS } from '../constants'
 
