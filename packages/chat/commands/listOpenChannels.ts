@@ -4,7 +4,7 @@ import { pubKeyToPeerId } from '@hoprnet/hopr-core/lib/utils'
 import { moveDecimalPoint, u8aToHex } from '@hoprnet/hopr-utils'
 import chalk from 'chalk'
 import { AbstractCommand } from './abstractCommand'
-import { getPaddingLength, styleValue } from '../utils'
+import { styleValue } from '../utils'
 
 export default class ListOpenChannels extends AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {
@@ -25,8 +25,8 @@ export default class ListOpenChannels extends AbstractCommand {
       Channel         ${styleValue(id, 'hash')}
       CounterParty    ${styleValue(peerId, 'peerId')}
       Status          ${styleValue(status, 'highlight')}
-      Total Balance   ${styleValue(totalBalance, 'number')} ${NativeBalance.SYMBOL}
-      My Balance      ${styleValue(myBalance, 'number')} ${NativeBalance.SYMBOL}
+      Total Balance   ${styleValue(totalBalance, 'nativeBalance')}
+      My Balance      ${styleValue(myBalance, 'nativeBalance')}
     `
   }
 

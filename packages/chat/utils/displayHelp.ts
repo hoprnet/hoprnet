@@ -83,7 +83,8 @@ export const CHALK_COLORS = {
   failure: chalk.red,
   peerId: chalk.green,
   hash: chalk.yellow,
-  highlight: chalk.yellow
+  highlight: chalk.yellow,
+  nativeBalance: chalk.blue
 }
 
 export const CHALK_STRINGS = {
@@ -95,6 +96,10 @@ export function styleValue(value: any, type?: keyof typeof CHALK_COLORS): string
   const color: chalk.Chalk = (type && CHALK_COLORS[type]) || (CHALK_COLORS as any)[typeof value]
 
   if (typeof color === 'undefined') return String(value)
+
+  if (type == 'nativeBalance') {
+    value = value + ' MATIC'
+  }
   return color(value)
 }
 
