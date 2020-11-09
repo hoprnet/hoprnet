@@ -47,7 +47,7 @@ class WebRTCConnection implements MultiaddrConnection {
     this.timeline = {
       open: Date.now()
     }
-    
+
     this.channel.on('connect', () => {
       if (this._webRTCTimeout != null) {
         clearTimeout(this._webRTCTimeout)
