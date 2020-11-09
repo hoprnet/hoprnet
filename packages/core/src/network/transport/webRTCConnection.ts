@@ -238,7 +238,6 @@ class WebRTCConnection implements MultiaddrConnection {
           yield streamMsg
           streamMsgReceived = false
         }
-        yield streamMsg
 
         if (this._webRTCAvailable) {
           // setImmediate(() => {
