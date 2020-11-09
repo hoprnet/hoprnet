@@ -45,7 +45,7 @@ class Channel implements IChannel {
     })
   }
 
-  async load(): Promise<ChannelData>{
+  async load(): Promise<ChannelData> {
     const [
       channelId,
       settlementWindow,
