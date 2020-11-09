@@ -78,7 +78,6 @@ class WebRTCConnection implements MultiaddrConnection {
       let sourceDone = false
 
       function sourceFunction(arg: IteratorResult<Uint8Array, void>) {
-        console.log(`sinking `, arg)
         sourceReceived = true
         sourceDone = arg.done
 
@@ -110,7 +109,7 @@ class WebRTCConnection implements MultiaddrConnection {
                   break
                 }
 
-                console.log(`sinking into relay connection`, sourceMsg)
+                console.log(`sinking into relay connection`, new TextDecoder().decode(sourceMsg))
 
                 yield sourceMsg
                 sourcePromise = source.next().then(sourceFunction)
@@ -126,6 +125,7 @@ class WebRTCConnection implements MultiaddrConnection {
               yield* source
             }
           }
+          console.log(`returned`)
         }.call(this)
       )
 
@@ -140,7 +140,7 @@ class WebRTCConnection implements MultiaddrConnection {
                 await sourcePromise
 
                 if (!sourceDone) {
-                  console.log(`sinking into WebRTC`, sourceMsg)
+                  console.log(`sinking into WebRTC`, new TextDecoder().decode(sourceMsg))
                   yield sourceMsg
 
                   yield* source
@@ -214,11 +214,18 @@ class WebRTCConnection implements MultiaddrConnection {
       if (this._webRTCAvailable || !this._webRTCStateKnown) {
         await this._switchPromise.promise
 
-        await streamPromise
+        // while (!streamDone) {
+        //   await streamPromise
 
-        console.log(`getting from relayConnection after switch`, streamMsg)
+        //   yield streamMsg
+        //   streamPromise = this.conn.source.next().then(streamSourceFunction)
+        // }
 
-        yield streamMsg
+        console.log(`waiting`)
+
+        console.log(`getting from relayConnection after switch`, new TextDecoder().decode(streamMsg))
+
+        // yield streamMsg
 
         if (this._webRTCAvailable) {
           setImmediate(() => {
@@ -227,6 +234,7 @@ class WebRTCConnection implements MultiaddrConnection {
               console.log(`source migrated`)
             })
           })
+
           yield* this.channel[Symbol.asyncIterator]() as Stream['source']
         }
       }
