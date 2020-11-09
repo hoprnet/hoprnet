@@ -49,9 +49,8 @@ class WebRTCConnection implements MultiaddrConnection {
     }
 
     this.channel.on('connect', () => {
-      if (this._webRTCTimeout != null) {
         clearTimeout(this._webRTCTimeout)
-      }
+      
 
       console.log(`available after connect`)
 
@@ -133,6 +132,7 @@ class WebRTCConnection implements MultiaddrConnection {
 
       if (!this._webRTCStateKnown || this._webRTCAvailable) {
         this._switchPromise.promise.then(() => {
+          clearTimeout(this._webRTCTimeout)
           if (this._webRTCAvailable) {
             const sink = toIterable.sink(this.channel)
             this._migrated = true
@@ -220,6 +220,7 @@ class WebRTCConnection implements MultiaddrConnection {
       }
 
       if (this._webRTCAvailable || !this._webRTCStateKnown) {
+        clearTimeout(this._webRTCTimeout)
         await this._switchPromise.promise
 
         // while (!streamDone) {
