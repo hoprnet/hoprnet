@@ -146,20 +146,20 @@ jobs:
         run: |
           echo "RELEASE=0.100.0" >> $GITHUB_ENV # Set this to an arbitrary number less than 1 
 
-          #      - name: Build Avado
-          #        working-directory: packages/avado
-          #        run: |
-          #          docker-compose build
-          #          sudo npm install -g @dappnode/dappnodesdk@0.2.9-beta.0
-          #          dappnodesdk increase minor
-          #          sed -i 's/version"[ ]*:[ ]*"[0-9]*\.[0-9]*\.[0-9]*"/version": "${{ env.RELEASE }}"/' ./dappnode_package.json
-          #          cat ./dappnode_package.json | grep 'version'
-          #          sudo dappnodesdk build --provider http://80.208.229.228:5001
-          #          git add dappnode_package.json docker-compose.yml releases.json
-          #          git commit -m "Avado CI: new release"
-          #          git pull origin ${{ github.ref }}
-          #          git push origin ${{ github.ref }}
-          #          # http://go.ava.do/install/<IPFS HASH>
+      - name: Build Avado
+        working-directory: packages/avado
+        run: |
+          docker-compose build
+          sudo npm install -g @dappnode/dappnodesdk@0.2.9-beta.0
+          dappnodesdk increase minor
+          sed -i 's/version"[ ]*:[ ]*"[0-9]*\.[0-9]*\.[0-9]*"/version": "${{ env.RELEASE }}"/' ./dappnode_package.json
+          cat ./dappnode_package.json | grep 'version'
+          sudo dappnodesdk build --provider http://80.208.229.228:5001
+          git add dappnode_package.json docker-compose.yml releases.json
+          git commit -m "Avado CI: new release"
+          git pull origin ${{ github.ref }}
+          git push origin ${{ github.ref }}
+          # http://go.ava.do/install/<IPFS HASH>
 
   # chatbot
   build_chatbot_docker:
