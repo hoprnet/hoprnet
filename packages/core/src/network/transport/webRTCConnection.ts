@@ -144,12 +144,12 @@ class WebRTCConnection implements MultiaddrConnection {
 
                 if (!sourceDone) {
                   console.log(`sinking into WebRTC`, Buffer.from(sourceMsg.slice()))
-                  yield sourceMsg
+                  yield sourceMsg.slice()
 
                   for await (const msg of source) {
                     console.log(`sinking into WebRTC`, Buffer.from(sourceMsg.slice()))
 
-                    yield Buffer.from(msg)
+                    yield Buffer.from(msg.slice())
                   }
                   // yield* source
                 }
