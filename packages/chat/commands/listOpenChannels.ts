@@ -42,37 +42,28 @@ export default class ListOpenChannels extends AbstractCommand {
       const result: string[] = []
 
       for (const channel of channels) {
-        const id = u8aToHex(await channel.channelId)
-        const status = await channel.status
-
         if (!channel.counterparty) {
           // Skip channels with no counterparty re #398
           continue
         }
 
-        if (status === ChannelStatus.UNINITIALISED) {
+        if (channel.status === ChannelStatus.UNINITIALISED) {
           // Skip uninitialized channels re #398
           continue
         }
-
-        const [offChainCounterparty, balance, balance_a] = await Promise.all([
-          channel.offChainCounterparty,
-          channel.balance,
-          channel.balance_a
-        ])
 
         const selfIsPartyA = utils.isPartyA(
           await this.node.paymentChannels.account.address,
           await utils.pubKeyToAccountId(channel.counterparty)
         )
-        const totalBalance = moveDecimalPoint(balance.toString(), types.Balance.DECIMALS * -1)
+        const totalBalance = moveDecimalPoint(channel.balance.toString(), types.Balance.DECIMALS * -1)
         const myBalance = moveDecimalPoint(
-          selfIsPartyA ? balance_a.toString() : balance.sub(balance_a).toString(),
+          selfIsPartyA ? channel.balanceA.toString() : channel.balance.sub(channel.balanceA).toString(),
           types.Balance.DECIMALS * -1
         )
-        const peerId = (await pubKeyToPeerId(offChainCounterparty)).toB58String()
+        const peerId = (await pubKeyToPeerId(channel.offChainCounterparty)).toB58String()
 
-        result.push(this.generateOutput(id, myBalance, totalBalance, peerId, status))
+        result.push(this.generateOutput(u8aToHex(channel.channelId), myBalance, totalBalance, peerId, channel.status))
       }
       if (result.length === 0) {
         return `\nNo open channels found.`

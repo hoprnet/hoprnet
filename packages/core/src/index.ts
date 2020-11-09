@@ -28,7 +28,7 @@ const log = Debug(`hopr-core`)
 
 import PeerId from 'peer-id'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import { HoprCoreConnectorStatic, Types, Channel, ChannelStatus } from '@hoprnet/hopr-core-connector-interface'
+import { HoprCoreConnectorStatic, Types, Channel, ChannelStatus, ChannelData } from '@hoprnet/hopr-core-connector-interface'
 import type { CrawlInfo } from './network/crawler'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
@@ -606,13 +606,13 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     }
   }
 
-  public async getAllOpenChannels(): Promise<Channel[]> {
-    return this.paymentChannels.channel.getAll(
+  public async getAllOpenChannels(): Promise<ChannelData[]> {
+    return Promise.all((await this.paymentChannels.channel.getAll(
       (channel) => Promise.resolve(channel),
       async (promises: Promise<Channel>[]) => {
         return await Promise.all(promises)
       }
-    )
+    )).map(x => x.load()))
   }
 }
 
