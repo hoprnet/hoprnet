@@ -114,7 +114,7 @@ export function getOptions(
 
     return [
       'Options:',
-      ...options.map((option, index) => {
+      ...options.map((option) => {
         return [
           // needed to preperly format the array
           '\n',

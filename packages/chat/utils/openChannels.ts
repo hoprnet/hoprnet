@@ -1,5 +1,5 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import type { Channel as ChannelInstance } from '@hoprnet/hopr-core-connector-interface'
+import { ChannelData } from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import { u8aEquals } from '@hoprnet/hopr-utils'
 import { pubKeyToPeerId } from '@hoprnet/hopr-core/lib/utils'
@@ -21,7 +21,7 @@ export function getPeers(
   let peers = node.getConnectedPeers()
 
   if (ops.noBootstrapNodes) {
-    peers = peers.filter((peerId) => !isBootstrapNode(node, peerId))
+    peers = peers.filter((peerId: PeerId) => !isBootstrapNode(node, peerId))
   }
 
   return peers
@@ -47,16 +47,10 @@ export function getPeersIdsAsString(
  * @returns a promise that resolves to an array of peer ids
  */
 export async function getMyOpenChannels(node: Hopr<HoprCoreConnector>): Promise<PeerId[]> {
-  const openChannels = await node.getAllOpenChannels()
-
   return Promise.all(
-    openChannels.map(async (channel) => {
-      const pubKey = await channel.offChainCounterparty
-      const peerId = await pubKeyToPeerId(pubKey)
-
-      return peerId
-    })
-  )
+      (await node.getAllOpenChannels()).map(async (channel: ChannelData) => {
+    return await pubKeyToPeerId(channel.offChainCounterparty)
+  }))
 }
 
 /**
@@ -75,7 +69,7 @@ export async function getPartyOpenChannels(node: Hopr<HoprCoreConnector>, party:
     partyA: partyPubKey
   })
   // get the counterparty of each channel
-  const channelAccountIds = channels.map((channel) => {
+  const channelAccountIds = channels.map((channel: any) => {
     return u8aEquals(channel.partyA, partyPubKey) ? channel.partyB : channel.partyA
   })
 
@@ -93,7 +87,7 @@ export async function getPartyOpenChannels(node: Hopr<HoprCoreConnector>, party:
 
   return peers.reduce((acc: PeerId[], { peer, accountId }) => {
     if (
-      channelAccountIds.find((channelAccountId) => {
+      channelAccountIds.find((channelAccountId: Uint8Array) => {
         return u8aEquals(accountId, channelAccountId)
       })
     ) {

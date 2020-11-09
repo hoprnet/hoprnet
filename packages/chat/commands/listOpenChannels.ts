@@ -3,7 +3,6 @@ import { ChannelStatus } from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import { pubKeyToPeerId } from '@hoprnet/hopr-core/lib/utils'
 import { moveDecimalPoint, u8aToHex } from '@hoprnet/hopr-utils'
-import chalk from 'chalk'
 import { AbstractCommand } from './abstractCommand'
 import { styleValue } from '../utils'
 
@@ -21,7 +20,6 @@ export default class ListOpenChannels extends AbstractCommand {
   }
 
   private generateOutput(id: string, myBalance: string, totalBalance: string, peerId: string, status: ChannelStatus): string {
-    const { NativeBalance, Balance } = this.node.paymentChannels.types
     let statusString = (['UNINITIALISED', 'FUNDING', 'OPEN', 'PENDING'])[status]
     return `
       Channel         ${styleValue(id, 'hash')}
@@ -62,7 +60,6 @@ export default class ListOpenChannels extends AbstractCommand {
           types.Balance.DECIMALS * -1
         )
         const peerId = (await pubKeyToPeerId(channel.offChainCounterparty)).toB58String()
-
         result.push(this.generateOutput(u8aToHex(channel.channelId), myBalance, totalBalance, peerId, channel.status))
       }
       if (result.length === 0) {
