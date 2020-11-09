@@ -49,8 +49,7 @@ class WebRTCConnection implements MultiaddrConnection {
     }
 
     this.channel.on('connect', () => {
-        clearTimeout(this._webRTCTimeout)
-      
+      clearTimeout(this._webRTCTimeout)
 
       console.log(`available after connect`)
 
