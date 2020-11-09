@@ -44,14 +44,8 @@
     "web3-eth-contract": "^1.2.11"
   },
   "devDependencies": {
-<<<<<<< HEAD
     "@hoprnet/hopr-demo-seeds": "1.54.0-next.42",
     "@hoprnet/hopr-testing": "1.54.0-next.42",
-=======
-    "@hoprnet/hopr-core-connector-interface": "1.54.0-next.44",
-    "@hoprnet/hopr-demo-seeds": "1.54.0-next.44",
-    "@hoprnet/hopr-testing": "1.54.0-next.44",
->>>>>>> bdba6d0d131c792dd0aea2a9f969c875ec675180
     "@types/debug": "^4.1.5",
     "@types/keccak": "^3.0.1",
     "@types/levelup": "^4.3.0",
