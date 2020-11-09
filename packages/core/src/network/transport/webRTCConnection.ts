@@ -110,6 +110,8 @@ class WebRTCConnection implements MultiaddrConnection {
                   break
                 }
 
+                console.log(`sinking into relay connection`, sourceMsg)
+
                 yield sourceMsg
                 sourcePromise = source.next().then(sourceFunction)
               }
@@ -138,6 +140,7 @@ class WebRTCConnection implements MultiaddrConnection {
                 await sourcePromise
 
                 if (!sourceDone) {
+                  console.log(`sinking into WebRTC`, sourceMsg)
                   yield sourceMsg
 
                   yield* source
@@ -191,6 +194,8 @@ class WebRTCConnection implements MultiaddrConnection {
               break
             }
 
+            console.log(`getting from relayConnection`, streamMsg)
+
             yield streamMsg
             streamPromise = this.conn.source.next().then(streamSourceFunction)
           }
@@ -208,6 +213,12 @@ class WebRTCConnection implements MultiaddrConnection {
 
       if (this._webRTCAvailable || !this._webRTCStateKnown) {
         await this._switchPromise.promise
+
+        await streamPromise
+
+        console.log(`getting from relayConnection after switch`, streamMsg)
+
+        yield streamMsg
 
         if (this._webRTCAvailable) {
           setImmediate(() => {
