@@ -47,7 +47,7 @@ class WebRTCConnection implements MultiaddrConnection {
     this.timeline = {
       open: Date.now()
     }
-    
+
     this.channel.on('connect', () => {
       if (this._webRTCTimeout != null) {
         clearTimeout(this._webRTCTimeout)
@@ -145,7 +145,12 @@ class WebRTCConnection implements MultiaddrConnection {
                   console.log(`sinking into WebRTC`, new TextDecoder().decode(sourceMsg))
                   yield sourceMsg
 
-                  yield* source
+                  for await (const msg of source) {
+                    console.log(`sinking into WebRTC`, sourceMsg)
+
+                    yield msg
+                  }
+                  // yield* source
                 }
               })()
             )
@@ -239,7 +244,11 @@ class WebRTCConnection implements MultiaddrConnection {
           //   })
           // })
 
-          yield* this.channel[Symbol.asyncIterator]() as Stream['source']
+          for await (const msg of this.channel[Symbol.asyncIterator]() as Stream['source']) {
+            console.log(`yield from WebRTC source`, msg)
+            yield msg
+            //yield* this.channel[Symbol.asyncIterator]() as Stream['source']
+          }
         }
       }
     }.call(this)
