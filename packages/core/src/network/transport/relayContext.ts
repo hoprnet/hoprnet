@@ -85,18 +85,18 @@ class RelayContext {
     }
   }
 
-  private async *_createSource() {
+  private async *_createSource(): Stream['source'] {
     let sourceReceived = false
     let sourceMsg: Uint8Array
     let sourceDone = false
 
     let iteration = 0
-    const sourceFunction = (_iteration: number) => (arg: { value?: Uint8Array; done?: boolean }) => {
+    const sourceFunction = (_iteration: number) => (arg: IteratorResult<Uint8Array, void>) => {
       sourceReceived = true
-      sourceMsg = arg.value
+      sourceDone = arg.done
 
-      if (arg.done) {
-        sourceDone = true
+      if (!arg.done) {
+        sourceMsg = arg.value as Uint8Array
       }
     }
 
@@ -126,66 +126,62 @@ class RelayContext {
 
       if (sourceReceived) {
         sourceReceived = false
-        // Does not forward empty messages
-        if (sourceMsg != null) {
-          const received = sourceMsg.slice()
 
-          const [PREFIX, SUFFIX] = [received.subarray(0, 1), received.subarray(1)]
-
-          if (
-            !u8aEquals(RELAY_STATUS_PREFIX, PREFIX) &&
-            !u8aEquals(RELAY_WEBRTC_PREFIX, PREFIX) &&
-            !u8aEquals(RELAY_PAYLOAD_PREFIX, PREFIX)
-          ) {
-            error(`Invalid prefix: Got <${u8aToHex(PREFIX || new Uint8Array([]))}>. Dropping message in relayContext.`)
-            if (!sourceDone) {
-              sourcePromise = currentSource.next().then(sourceFunction(iteration))
-            }
-            continue
-          }
-
-          if (u8aEquals(PREFIX, RELAY_STATUS_PREFIX)) {
-            if (u8aEquals(SUFFIX, STOP)) {
-              verbose(`STOP relayed`)
-              return received
-            } else if (u8aEquals(SUFFIX, RESTART)) {
-              verbose(`RESTART relayed`)
-            } else if (u8aEquals(SUFFIX, PING)) {
-              verbose(`PING received`)
-              this._statusMessages.push(u8aConcat(RELAY_STATUS_PREFIX, PING_RESPONSE))
-
-              this._statusMessagePromise.resolve()
-
-              if (!sourceDone) {
-                sourcePromise = currentSource.next().then(sourceFunction(iteration))
-              }
-
-              // Don't forward ping
-              continue
-            } else if (u8aEquals(SUFFIX, PING_RESPONSE)) {
-              verbose(`PONG received`)
-
-              this._pingResponsePromise?.resolve()
-
-              if (!sourceDone) {
-                sourcePromise = currentSource.next().then(sourceFunction(iteration))
-              }
-
-              // Don't forward pong message
-              continue
-            } else {
-              error(`Invalid status message. Got <${u8aToHex(SUFFIX || new Uint8Array([]))}>`)
-            }
-          }
-
-          yield received
-        } else {
-          verbose(`empty message dropped`)
+        if (sourceDone) {
+          sourcePromise = undefined
+          continue
         }
 
-        if (!sourceDone) {
+        const received = sourceMsg.slice()
+
+        const [PREFIX, SUFFIX] = [received.subarray(0, 1), received.subarray(1)]
+
+        if (
+          !u8aEquals(RELAY_STATUS_PREFIX, PREFIX) &&
+          !u8aEquals(RELAY_WEBRTC_PREFIX, PREFIX) &&
+          !u8aEquals(RELAY_PAYLOAD_PREFIX, PREFIX)
+        ) {
+          error(`Invalid prefix: Got <${u8aToHex(PREFIX || new Uint8Array([]))}>. Dropping message in relayContext.`)
+
           sourcePromise = currentSource.next().then(sourceFunction(iteration))
+
+          continue
         }
+
+        if (u8aEquals(PREFIX, RELAY_STATUS_PREFIX)) {
+          if (u8aEquals(SUFFIX, STOP)) {
+            verbose(`STOP relayed`)
+            yield received
+            break
+          } else if (u8aEquals(SUFFIX, RESTART)) {
+            verbose(`RESTART relayed`)
+          } else if (u8aEquals(SUFFIX, PING)) {
+            verbose(`PING received`)
+            this._statusMessages.push(u8aConcat(RELAY_STATUS_PREFIX, PING_RESPONSE))
+
+            this._statusMessagePromise.resolve()
+
+            sourcePromise = currentSource.next().then(sourceFunction(iteration))
+
+            // Don't forward ping
+            continue
+          } else if (u8aEquals(SUFFIX, PING_RESPONSE)) {
+            verbose(`PONG received`)
+
+            this._pingResponsePromise?.resolve()
+
+            sourcePromise = currentSource.next().then(sourceFunction(iteration))
+
+            // Don't forward pong message
+            continue
+          } else {
+            error(`Invalid status message. Got <${u8aToHex(SUFFIX || new Uint8Array([]))}>`)
+          }
+        }
+
+        yield received
+
+        sourcePromise = currentSource.next().then(sourceFunction(iteration))
       } else if (streamSwitched) {
         streamSwitched = false
         sourceDone = false
@@ -198,20 +194,20 @@ class RelayContext {
     }
   }
 
-  private async _createSink(source: Stream['source']) {
+  private async _createSink(source: Stream['source']): Promise<void> {
     let currentSink = this._stream.sink
 
     let sourceReceived = false
-    let sourceMsg: Uint8Array | undefined
+    let sourceMsg: Uint8Array
     let sourceDone = false
 
     let iteration = 0
-    const sourceFunction = (arg: { value?: Uint8Array; done?: boolean }) => {
+    const sourceFunction = (arg: IteratorResult<Uint8Array, void>) => {
       sourceReceived = true
-      sourceMsg = arg.value
+      sourceDone = arg.done
 
-      if (arg.done) {
-        sourceDone = true
+      if (!arg.done) {
+        sourceMsg = arg.value as Uint8Array
       }
     }
 
@@ -253,24 +249,22 @@ class RelayContext {
         if (sourceReceived) {
           sourceReceived = false
 
-          // Ignoring empty messages
-          if (sourceMsg != null) {
-            let received = sourceMsg.slice()
+          if (sourceDone) {
+            break
+          }
 
-            let [PREFIX, SUFFIX] = [received.slice(0, 1), received.slice(1)]
+          let received = sourceMsg.slice()
 
-            if (sourceDone || (u8aEquals(PREFIX, RELAY_STATUS_PREFIX) && u8aEquals(SUFFIX, STOP))) {
-              return received
-            } else {
-              yield received
-            }
+          let [PREFIX, SUFFIX] = [received.slice(0, 1), received.slice(1)]
+
+          if (u8aEquals(PREFIX, RELAY_STATUS_PREFIX) && u8aEquals(SUFFIX, STOP)) {
+            yield received
+            break
           } else {
-            log(`dropping empty message`)
+            yield received
           }
 
-          if (!sourceDone) {
-            sourcePromise = source.next().then(sourceFunction)
-          }
+          sourcePromise = source.next().then(sourceFunction)
         } else if (statusMessageAvailable) {
           statusMessageAvailable = false
 

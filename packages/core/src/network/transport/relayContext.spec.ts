@@ -33,13 +33,6 @@ describe('test overwritable connection', function () {
 
           //await new Promise((resolve) => setTimeout(resolve, 40))
         }
-
-        let lastMsg = new TextEncoder().encode(`iteration ${_iteration} - msg no. ${i}`)
-        if (usePrefix) {
-          return u8aConcat(RELAY_PAYLOAD_PREFIX, lastMsg)
-        } else {
-          return lastMsg
-        }
       })(),
       sink: async (source: Stream['source']) => {
         let msg: Uint8Array

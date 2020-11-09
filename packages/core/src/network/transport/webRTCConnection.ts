@@ -59,6 +59,7 @@ class WebRTCConnection implements MultiaddrConnection {
     })
 
     const endWebRTCUpgrade = () => {
+      clearTimeout(this._webRTCTimeout)
       console.log(`error thrown`)
       this._webRTCStateKnown = true
       this._webRTCAvailable = false
@@ -71,27 +72,27 @@ class WebRTCConnection implements MultiaddrConnection {
     this.channel.on('iceTimeout', endWebRTCUpgrade)
     this.channel.on('error', endWebRTCUpgrade)
 
-    this.sink = async (source: Stream['source']) => {
+    this.sink = async (source: Stream['source']): Promise<void> => {
+      let sourceReceived = false
+      let sourceMsg: Uint8Array
+      let sourceDone = false
+
+      function sourceFunction(arg: IteratorResult<Uint8Array, void>) {
+        sourceReceived = true
+        sourceDone = arg.done
+
+        if (!arg.done) {
+          sourceMsg = arg.value as Uint8Array
+        }
+      }
+
+      let sourcePromise = source.next().then(sourceFunction)
+
       this.conn.sink(
-        async function* (this: WebRTCConnection) {
+        async function* (this: WebRTCConnection): Stream['source'] {
           if (this._webRTCTimeout == null) {
             this._webRTCTimeout = setTimeout(endWebRTCUpgrade, WEBRTC_UPGRADE_TIMEOUT)
           }
-
-          let sourceReceived = false
-          let sourceMsg: Uint8Array | undefined
-          let sourceDone = false
-
-          function sourceFunction(arg: { value?: Uint8Array; done?: boolean }) {
-            sourceReceived = true
-            sourceMsg = arg.value
-
-            if (arg.done) {
-              sourceDone = true
-            }
-          }
-
-          let sourcePromise = source.next().then(sourceFunction)
 
           while (!this._webRTCAvailable) {
             if (!this._webRTCStateKnown) {
@@ -104,60 +105,71 @@ class WebRTCConnection implements MultiaddrConnection {
               if (sourceReceived) {
                 sourceReceived = false
 
-                if (sourceDone && this._webRTCStateKnown && !this._webRTCAvailable) {
-                  return sourceMsg
-                } else if (sourceDone) {
-                  yield sourceMsg
+                if (sourceDone) {
                   break
-                } else {
-                  sourcePromise = source.next().then(sourceFunction)
-                  yield sourceMsg
                 }
+
+                yield sourceMsg
+                sourcePromise = source.next().then(sourceFunction)
               }
             } else {
               await sourcePromise
+
               if (sourceDone) {
-                return sourceMsg
-              } else {
-                yield sourceMsg
-                yield* source
+                break
               }
+
+              yield sourceMsg
+              yield* source
             }
           }
         }.call(this)
       )
 
-      this._switchPromise.promise.then(() => {
-        if (this._webRTCAvailable) {
-          const sink = toIterable.sink(this.channel)
-          this._migrated = true
+      if (!this._webRTCStateKnown || this._webRTCAvailable) {
+        this._switchPromise.promise.then(() => {
+          if (this._webRTCAvailable) {
+            const sink = toIterable.sink(this.channel)
+            this._migrated = true
 
-          sink(source)
-          setImmediate(() => {
-            this.conn.close().then(() => {
-              console.log(`sink migrated`)
-              this._migrated = true
+            sink(
+              (async function* () {
+                await sourcePromise
+
+                if (!sourceDone) {
+                  yield sourceMsg
+
+                  yield* source
+                }
+              })()
+            )
+
+            setImmediate(() => {
+              this.conn.close().then(() => {
+                console.log(`sink migrated`)
+                this._migrated = true
+              })
             })
-          })
-        }
-      })
+          }
+        })
+      }
     }
 
-    this.source = async function* (this: WebRTCConnection) {
+    this.source = async function* (this: WebRTCConnection): Stream['source'] {
       if (this._webRTCTimeout == null) {
         this._webRTCTimeout = setTimeout(endWebRTCUpgrade, WEBRTC_UPGRADE_TIMEOUT)
       }
 
       let streamMsgReceived = false
-      let streamMsg: Uint8Array | undefined
+      let streamMsg: Uint8Array
       let streamDone = false
 
-      function streamSourceFunction(arg: { value?: Uint8Array; done?: boolean }) {
+      function streamSourceFunction(arg: IteratorResult<Uint8Array, void>) {
         streamMsgReceived = true
-        streamMsg = arg.value
+        streamDone = arg.done
 
-        if (arg.done) {
-          streamDone = true
+        if (!arg.done) {
+          streamMsg = arg.value as Uint8Array
         }
       }
 
@@ -173,40 +185,38 @@ class WebRTCConnection implements MultiaddrConnection {
 
           if (streamMsgReceived) {
             streamMsgReceived = false
-            if (streamDone && this._webRTCStateKnown && !this._webRTCAvailable) {
-              return streamMsg
-            } else if (streamDone) {
-              yield streamMsg
+
+            if (streamDone) {
               break
-            } else {
-              streamPromise = this.conn.source.next().then(streamSourceFunction)
-              yield streamMsg
             }
+
+            yield streamMsg
+            streamPromise = this.conn.source.next().then(streamSourceFunction)
           }
         } else {
           await streamPromise
 
           if (streamDone) {
-            return streamMsg
-          } else {
-            yield streamMsg
-            yield* this.conn.source
+            break
           }
+
+          yield streamMsg
+          yield* this.conn.source
         }
       }
 
-      await this._switchPromise.promise
+      if (this._webRTCAvailable || !this._webRTCStateKnown) {
+        await this._switchPromise.promise
 
-      if (this._webRTCAvailable) {
-        setImmediate(() => {
-          this.conn.close().then(() => {
-            this._migrated = true
-            console.log(`source migrated`)
+        if (this._webRTCAvailable) {
+          setImmediate(() => {
+            this.conn.close().then(() => {
+              this._migrated = true
+              console.log(`source migrated`)
+            })
           })
-        })
-        yield* this.channel[Symbol.asyncIterator]()
-      } else {
-        return
+          yield* this.channel[Symbol.asyncIterator]() as Stream['source']
+        }
       }
     }.call(this)
   }
