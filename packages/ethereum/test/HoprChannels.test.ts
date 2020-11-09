@@ -760,18 +760,16 @@ describe('HoprChannels', function () {
         checkEvent(receipt.receipt, 'FundedChannel(address,uint,uint,uint,uint)', compressedPubKeyA, compressedPubKeyB)
       ).to.be.equal(true, 'wrong event')
 
-      console.log("rawLogs", receipt.receipt.rawLogs)
-      console.log("pubKey", u8aToHex(compressedPubKeyA.slice(1)))
+      const logEntry = receipt.receipt.rawLogs.find((rawLog) => {
+        return (
+          rawLog.topics[1] === u8aToHex(compressedPubKeyA.slice(1)) &&
+          rawLog.topics[2] === u8aToHex(compressedPubKeyB.slice(1))
+        )
+      })
 
-      expect(receipt.receipt.rawLogs[2].topics[1]).to.be.equal(
-        u8aToHex(compressedPubKeyA.slice(1)),
-        'wrong first public key'
-      )
-
-      expect(receipt.receipt.rawLogs[2].topics[2]).to.be.equal(
-        u8aToHex(compressedPubKeyB.slice(1)),
-        'wrong second public key'
-      )
+      expect(logEntry).to.exist
+      expect(logEntry.topics[1]).to.be.equal(u8aToHex(compressedPubKeyA.slice(1)), 'wrong first public key')
+      expect(logEntry.topics[2]).to.be.equal(u8aToHex(compressedPubKeyB.slice(1)), 'wrong second public key')
 
       const channel = await hoprChannels.channels(getChannelId(partyA, partyB)).then(formatChannel)
 
