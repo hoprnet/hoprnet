@@ -10,7 +10,7 @@ import SECIO = require('libp2p-secio')
 import TCP from './network/transport'
 
 import { Packet } from './messages/packet'
-import { PACKET_SIZE, MAX_HOPS, VERSION } from './constants'
+import { PACKET_SIZE, MAX_HOPS, VERSION, CRAWL_TIMEOUT } from './constants'
 
 import { Network } from './network'
 
@@ -37,6 +37,7 @@ import { Interactions } from './interactions'
 import * as DbKeys from './dbKeys'
 import EventEmitter from 'events'
 import path from 'path'
+import { Mixer } from './mixer'
 
 const verbose = Debug('hopr-core:verbose')
 
@@ -86,6 +87,8 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   public initializedWithOptions: HoprOptions
 
   private running: boolean
+  private crawlTimeout: NodeJS.Timeout
+  private mixer: Mixer<Chain>
 
   /**
    * @constructor
@@ -99,6 +102,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       this.emit('hopr:peer:connection', conn.remotePeer)
     })
 
+    this.mixer = new Mixer()
     this.initializedWithOptions = options
     this.output = (arr: Uint8Array) => {
       this.emit('hopr:message', arr)
@@ -111,6 +115,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     this.isBootstrapNode = options.bootstrapNode || false
     this._interactions = new Interactions(
       this,
+      this.mixer,
       (conn: Connection) => this._network.crawler.handleCrawlRequest(conn),
       (remotePeer: PeerId) => this._network.heartbeat.emit('beat', remotePeer)
     )
@@ -172,6 +177,9 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
           TCP: {
             bootstrapServers: options.bootstrapServers
           }
+        },
+        peerDiscovery: {
+          autoDial: false
         },
         dht: {
           enabled: true
@@ -235,6 +243,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     log(`Available under the following addresses:`)
 
     this._libp2p.multiaddrs.forEach((ma: Multiaddr) => log(ma.toString()))
+    await this.periodicCrawl()
     this.running = true
     return this
   }
@@ -246,6 +255,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     if (!this.running) {
       return Promise.resolve()
     }
+    clearTimeout(this.crawlTimeout)
     this.running = false
     await Promise.all([this._network.stop(), this.paymentChannels?.stop().then(() => log(`Connector stopped.`))])
 
@@ -368,6 +378,12 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
 
   public async crawl(filter?: (peer: PeerId) => boolean): Promise<CrawlInfo> {
     return this._network.crawler.crawl(filter)
+  }
+
+  private async periodicCrawl() {
+    let crawlInfo = await this.crawl()
+    this.emit('hopr:crawl:completed', crawlInfo)
+    this.crawlTimeout = setTimeout(() => this.periodicCrawl(), CRAWL_TIMEOUT)
   }
 
   /**

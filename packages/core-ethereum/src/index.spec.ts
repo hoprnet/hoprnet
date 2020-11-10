@@ -3,9 +3,7 @@ import Web3 from 'web3'
 import { stringToU8a, durations } from '@hoprnet/hopr-utils'
 import { Ganache } from '@hoprnet/hopr-testing'
 import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
-import { migrate, fund } from '@hoprnet/hopr-ethereum'
-import HoprTokenAbi from '@hoprnet/hopr-ethereum/chain/abis/HoprToken.json'
-import addresses from '@hoprnet/hopr-ethereum/chain/addresses'
+import { migrate, fund, addresses, abis } from '@hoprnet/hopr-ethereum'
 import HoprEthereum from '.'
 import { HoprToken } from './tsc/web3/HoprToken'
 import { Await } from './tsc/utils'
@@ -14,6 +12,8 @@ import { createNode, getPrivKeyData, createAccountAndFund } from './utils/testin
 import * as testconfigs from './config.spec'
 import * as configs from './config'
 import { randomBytes } from 'crypto'
+
+const HoprTokenAbi = abis.HoprToken
 
 describe('test connector', function () {
   this.timeout(durations.minutes(5))

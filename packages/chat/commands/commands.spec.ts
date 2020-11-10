@@ -195,4 +195,15 @@ describe('Commands', () => {
     await cmds.execute('send test Hello, world')
     assert(mockNode.sendMessage.calledOnce)
   })
+
+  it('close channel', async () => {
+    let mockNode: any = sinon.fake()
+    mockNode.closeChannel = sinon.fake(async () => ({
+      status: undefined
+    }))
+
+    let cmds = new mod.Commands(mockNode)
+    const r = await cmds.execute('close 16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7')
+    assertMatch(r, /Initiated channel closure/)
+  })
 })

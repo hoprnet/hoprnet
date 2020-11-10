@@ -20,19 +20,19 @@ To get MATIC for yourself, you'll need to add the network to your Ethereum walle
 
 To configure the MATIC Network, click the Network button at the top of your Metamask wallet.
 
-![](../../.gitbook/assets/matic-metamask-1.png)
+![](../../.gitbook/assets/matic-metamask-1%20%281%29.png)
 
 A drop-down menu will appear. Click "Custom RPC"
 
-![](../../.gitbook/assets/matic-metamask-2.png)
+![](../../.gitbook/assets/matic-metamask-2%20%281%29.png)
 
 A form will appear. Fill in the fields with the following information:
 
 - **Network Name:** Matic Mainnet
-- **New RPC URL:** https://rpc-mainnet.matic.network
+- **New RPC URL:** [https://rpc-mainnet.matic.network](https://rpc-mainnet.matic.network)
 - **ChainID:** 137
 - **Symbol:** MATIC
-- **Block Explorer URL:** https://explorer.matic.network
+- **Block Explorer URL:** [https://explorer.matic.network](https://explorer.matic.network)
 
 To get MATIC, you can use the MATIC bridge at [https://wallet.matic.network/](https://wallet.matic.network/) to convert them from ETH. You can also use a tool such as [Uniswap](https://app.uniswap.org).
 

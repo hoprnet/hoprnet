@@ -2,12 +2,10 @@ import type { LevelUp } from 'levelup'
 import type { WebsocketProvider } from 'web3-core'
 import type { Currencies } from '@hoprnet/hopr-core-connector-interface'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import type { Network } from '@hoprnet/hopr-ethereum/utils/networks'
 import type { HoprChannels } from './tsc/web3/HoprChannels'
 import type { HoprToken } from './tsc/web3/HoprToken'
 import Web3 from 'web3'
-import HoprChannelsAbi from '@hoprnet/hopr-ethereum/chain/abis/HoprChannels.json'
-import HoprTokenAbi from '@hoprnet/hopr-ethereum/chain/abis/HoprToken.json'
+import { Network, addresses, abis } from '@hoprnet/hopr-ethereum'
 import chalk from 'chalk'
 import { ChannelFactory } from './channel'
 import types from './types'
@@ -19,9 +17,11 @@ import * as config from './config'
 import Account from './account'
 import HashedSecret from './hashedSecret'
 import Path from './path'
-
 import debug from 'debug'
-import addresses from '@hoprnet/hopr-ethereum/chain/addresses'
+
+const HoprChannelsAbi = abis.HoprChannels
+const HoprTokenAbi = abis.HoprToken
+
 const debugLog = debug('hopr-core-ethereum')
 let provider: WebsocketProvider
 

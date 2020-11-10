@@ -91,20 +91,11 @@ class RelayContext {
     let sourceDone = false
 
     let iteration = 0
-    const sourceFunction = (_iteration: number) => ({
-      value,
-      done
-    }: {
-      value?: Uint8Array | void
-      done?: boolean | void
-    }) => {
-      //console.log(`source iteration`, iteration, `_iteration`, _iteration)
-      //console.log(`source yielding`, value, done)
-
+    const sourceFunction = (_iteration: number) => (arg: { value?: Uint8Array; done?: boolean }) => {
       sourceReceived = true
-      sourceMsg = value as Uint8Array
+      sourceMsg = arg.value
 
-      if (done) {
+      if (arg.done) {
         sourceDone = true
       }
     }
@@ -141,7 +132,11 @@ class RelayContext {
 
           const [PREFIX, SUFFIX] = [received.subarray(0, 1), received.subarray(1)]
 
-          if (![RELAY_STATUS_PREFIX[0], RELAY_WEBRTC_PREFIX[0], RELAY_PAYLOAD_PREFIX[0]].includes(PREFIX[0])) {
+          if (
+            !u8aEquals(RELAY_STATUS_PREFIX, PREFIX) &&
+            !u8aEquals(RELAY_WEBRTC_PREFIX, PREFIX) &&
+            !u8aEquals(RELAY_PAYLOAD_PREFIX, PREFIX)
+          ) {
             error(`Invalid prefix: Got <${u8aToHex(PREFIX || new Uint8Array([]))}>. Dropping message in relayContext.`)
             if (!sourceDone) {
               sourcePromise = currentSource.next().then(sourceFunction(iteration))
@@ -152,7 +147,7 @@ class RelayContext {
           if (u8aEquals(PREFIX, RELAY_STATUS_PREFIX)) {
             if (u8aEquals(SUFFIX, STOP)) {
               verbose(`STOP relayed`)
-              break
+              return received
             } else if (u8aEquals(SUFFIX, RESTART)) {
               verbose(`RESTART relayed`)
             } else if (u8aEquals(SUFFIX, PING)) {
@@ -165,7 +160,7 @@ class RelayContext {
                 sourcePromise = currentSource.next().then(sourceFunction(iteration))
               }
 
-              // Don't forward ping to receiver
+              // Don't forward ping
               continue
             } else if (u8aEquals(SUFFIX, PING_RESPONSE)) {
               verbose(`PONG received`)
@@ -176,7 +171,7 @@ class RelayContext {
                 sourcePromise = currentSource.next().then(sourceFunction(iteration))
               }
 
-              // Don't forward pong message to receiver
+              // Don't forward pong message
               continue
             } else {
               error(`Invalid status message. Got <${u8aToHex(SUFFIX || new Uint8Array([]))}>`)
@@ -207,28 +202,20 @@ class RelayContext {
     let currentSink = this._stream.sink
 
     let sourceReceived = false
-    let sourceMsg: Uint8Array | void
+    let sourceMsg: Uint8Array | undefined
     let sourceDone = false
 
     let iteration = 0
-    const sourceFunction = (_iteration: number) => ({
-      value,
-      done
-    }: {
-      value?: Uint8Array | void
-      done?: boolean | void
-    }) => {
-      // console.log(`iteration`, iteration, `_iteration`, _iteration)
-      // console.log(`yielding`, value, done)
+    const sourceFunction = (arg: { value?: Uint8Array; done?: boolean }) => {
       sourceReceived = true
-      sourceMsg = value
+      sourceMsg = arg.value
 
-      if (done) {
+      if (arg.done) {
         sourceDone = true
       }
     }
 
-    let sourcePromise = source.next().then(sourceFunction(iteration))
+    let sourcePromise = source.next().then(sourceFunction)
 
     let streamSwitched = false
     let statusMessageAvailable = false
@@ -236,24 +223,31 @@ class RelayContext {
     const switchFunction = () => {
       streamSwitched = true
     }
-    let switchPromise = this._switchPromise.promise.then(switchFunction)
 
     const statusSourceFunction = () => {
       statusMessageAvailable = true
     }
     let statusPromise = this._statusMessagePromise.promise.then(statusSourceFunction)
 
-    async function* drain(this: RelayContext) {
-      while (true) {
-        if (!sourceDone) {
-          await Promise.race([
-            // prettier-ignore
-            sourcePromise,
-            statusPromise,
-            switchPromise
-          ])
-        } else {
-          await switchPromise
+    async function* drain(this: RelayContext, _iteration: number) {
+      streamSwitched = false
+
+      let switchPromise = this._switchPromise.promise.then(switchFunction)
+
+      while (!sourceDone) {
+        if (iteration != _iteration) {
+          break
+        }
+
+        await Promise.race([
+          // prettier-ignore
+          sourcePromise,
+          statusPromise,
+          switchPromise
+        ])
+
+        if (iteration != _iteration) {
+          break
         }
 
         if (sourceReceived) {
@@ -261,16 +255,22 @@ class RelayContext {
 
           // Ignoring empty messages
           if (sourceMsg != null) {
-            if (sourceDone) {
-              return sourceMsg
+            let received = sourceMsg.slice()
+
+            let [PREFIX, SUFFIX] = [received.slice(0, 1), received.slice(1)]
+
+            if (sourceDone || (u8aEquals(PREFIX, RELAY_STATUS_PREFIX) && u8aEquals(SUFFIX, STOP))) {
+              return received
             } else {
-              yield sourceMsg
+              yield received
             }
           } else {
             log(`dropping empty message`)
           }
 
-          sourcePromise = source.next().then(sourceFunction(iteration))
+          if (!sourceDone) {
+            sourcePromise = source.next().then(sourceFunction)
+          }
         } else if (statusMessageAvailable) {
           statusMessageAvailable = false
 
@@ -278,19 +278,19 @@ class RelayContext {
             yield this._statusMessages.shift()
           }
 
-          this._statusMessagePromise = Defer<void>()
+          if (!sourceDone) {
+            this._statusMessagePromise = Defer<void>()
 
-          statusPromise = this._statusMessagePromise.promise.then(statusSourceFunction)
+            statusPromise = this._statusMessagePromise.promise.then(statusSourceFunction)
+          }
         } else if (streamSwitched) {
-          streamSwitched = false
-          switchPromise = this._switchPromise.promise.then(switchFunction)
           break
         }
       }
     }
 
-    while (true) {
-      currentSink(drain.call(this))
+    while (!sourceDone) {
+      currentSink(drain.call(this, iteration))
 
       currentSink = (await this._switchPromise.promise).sink
 

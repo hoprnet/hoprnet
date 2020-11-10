@@ -17,21 +17,20 @@ import pipe from 'it-pipe'
 
 import type { Handler } from 'libp2p'
 
-import { randomInteger, durations } from '@hoprnet/hopr-utils'
+import { durations } from '@hoprnet/hopr-utils'
 import { getTokens, Token } from '../../utils'
+import { Mixer } from '../../mixer'
 
 const MAX_PARALLEL_JOBS = 20
-
 const FORWARD_TIMEOUT = durations.seconds(6)
 
 class PacketForwardInteraction<Chain extends HoprCoreConnector> implements AbstractInteraction {
   private tokens: Token[] = getTokens(MAX_PARALLEL_JOBS)
-  private queue: Packet<Chain>[] = []
   private promises: Promise<void>[] = []
 
   protocols: string[] = [PROTOCOL_STRING]
 
-  constructor(public node: Hopr<Chain>) {
+  constructor(public node: Hopr<Chain>, private mixer: Mixer<Chain>) {
     this.node._libp2p.handle(this.protocols, this.handler.bind(this))
   }
 
@@ -87,7 +86,7 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
             offset: arr.byteOffset
           })
 
-          this.queue.push(packet)
+          this.mixer.push(packet)
 
           if (this.tokens.length > 0) {
             const token = this.tokens.pop() as Token
@@ -103,36 +102,31 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
     let packet: Packet<Chain>
     let sender: PeerId, target: PeerId
 
-    // Check for unserviced packets
-    while (this.queue.length > 0) {
-      // Pick a random one
-      const index = randomInteger(0, this.queue.length)
+    while (this.mixer.notEmpty()) {
+      if (this.mixer.poppable()) {
+        packet = this.mixer.pop()
 
-      if (index == this.queue.length - 1) {
-        packet = this.queue.pop() as Packet<Chain>
-      } else {
-        packet = this.queue[index]
+        let { receivedChallenge, ticketKey } = await packet.forwardTransform()
 
-        this.queue[index] = this.queue.pop() as Packet<Chain>
-      }
+        ;[sender, target] = await Promise.all([packet.getSenderPeerId(), packet.getTargetPeerId()])
 
-      let { receivedChallenge, ticketKey } = await packet.forwardTransform()
+        setImmediate(async () => {
+          const ack = new Acknowledgement(this.node.paymentChannels, undefined, {
+            key: ticketKey,
+            challenge: receivedChallenge
+          })
 
-      ;[sender, target] = await Promise.all([packet.getSenderPeerId(), packet.getTargetPeerId()])
-
-      setImmediate(async () => {
-        const ack = new Acknowledgement(this.node.paymentChannels, undefined, {
-          key: ticketKey,
-          challenge: receivedChallenge
+          await this.node._interactions.packet.acknowledgment.interact(sender, await ack.sign(this.node.getId()))
         })
 
-        await this.node._interactions.packet.acknowledgment.interact(sender, await ack.sign(this.node.getId()))
-      })
-
-      if (this.node.getId().isEqual(target)) {
-        this.node.output(packet.message.plaintext)
+        if (this.node.getId().isEqual(target)) {
+          this.node.output(packet.message.plaintext)
+        } else {
+          await this.interact(target, packet)
+        }
       } else {
-        await this.interact(target, packet)
+        // Wait a bit for packet
+        await new Promise((resolve) => setTimeout(resolve, this.mixer.WAIT_TIME))
       }
     }
 

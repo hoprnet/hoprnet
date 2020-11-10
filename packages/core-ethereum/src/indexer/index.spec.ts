@@ -2,12 +2,9 @@ import assert from 'assert'
 import BN from 'bn.js'
 import Web3 from 'web3'
 import { Ganache } from '@hoprnet/hopr-testing'
-import { migrate, fund } from '@hoprnet/hopr-ethereum'
-import addresses from '@hoprnet/hopr-ethereum/chain/addresses'
+import { migrate, fund, addresses, abis } from '@hoprnet/hopr-ethereum'
 import { durations, u8aToHex } from '@hoprnet/hopr-utils'
 import { stringToU8a } from '@hoprnet/hopr-utils'
-import HoprTokenAbi from '@hoprnet/hopr-ethereum/chain/abis/HoprToken.json'
-import HoprChannelsAbi from '@hoprnet/hopr-ethereum/chain/abis/HoprChannels.json'
 import * as testconfigs from '../config.spec'
 import * as configs from '../config'
 import { time, wait, isPartyA } from '../utils'
@@ -19,6 +16,8 @@ import { Public } from '../types'
 import { publicKeyConvert } from 'secp256k1'
 import { randomBytes } from 'crypto'
 
+const HoprTokenAbi = abis.HoprToken
+const HoprChannelsAbi = abis.HoprChannels
 const CLOSURE_DURATION = durations.days(3)
 
 describe('test indexer', function () {

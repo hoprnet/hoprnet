@@ -37,7 +37,6 @@ This will attempt to redeem all of your tickets. The HOPR from these tickets wil
 
 ```text
 Redeemed 2 out of 5 tickets with a sum of 0.0000000000000002 HOPR
-
 ```
 
 {% hint style="warning" %}
