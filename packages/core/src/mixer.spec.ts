@@ -5,7 +5,7 @@ import { MAX_PACKET_DELAY } from './constants'
 
 let i = 0
 let fakePacket = () => {
-  return i++ as unknown as Packet<any>
+  return (i++ as unknown) as Packet<any>
 }
 
 let time = 0
@@ -55,7 +55,7 @@ describe('test mixer ', function () {
 
   it('probabilistic test, packet ordering', async function () {
     const m = new Mixer(fakeIncrementer)
-    for (let x = 0; x < 1000; x ++){
+    for (let x = 0; x < 1000; x++) {
       m.push(fakePacket())
     }
     assert(m.poppable() === false, 'packets are not immediately poppable')
@@ -63,15 +63,14 @@ describe('test mixer ', function () {
     assert(m.poppable() === true, 'packets are poppable after max delay')
     let ordered = true
     let prev = 0
-    for (let x = 0; x < 1000; x ++){
-      assert(m.poppable(), "should be poppable after " + x)
-      let next = m.pop() as unknown as number // cast back to fake
+    for (let x = 0; x < 1000; x++) {
+      assert(m.poppable(), 'should be poppable after ' + x)
+      let next = (m.pop() as unknown) as number // cast back to fake
       if (next <= prev) {
         ordered = false
       }
       prev = next
     }
-    assert(!ordered, "packets should be shuffled")
+    assert(!ordered, 'packets should be shuffled')
   })
-
 })
