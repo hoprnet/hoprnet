@@ -273,8 +273,8 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     if (!isRecipient) {
       ;[sender, target] = await Promise.all([this.getSenderPeerId(), this.getTargetPeerId()])
 
-      // perform various ticket validation checks before receiving ACK
-      // NOTE: validating things is not performant at all :(
+      // perform various ticket validation checks before receiving an ACK
+      // NOTE: validating tickets is not performant at all
 
       const chain = this.node.paymentChannels
       const myAccountId = await chain.account.address
@@ -284,7 +284,8 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       const ticket = (await this.ticket).ticket
       const amPartyA = chain.utils.isPartyA(myAccountId, counterpartyAccountId)
 
-      // channel MUST be open
+      // channel MUST be open,
+      // (performance) we are making a request to blockchain
       const channelIsOpen = await chain.channel.isOpen(counterpartyAccountId)
       if (!channelIsOpen) {
         throw Error(`Payment channel with '${u8aToHex(counterpartyAccountId)}' is not open`)
@@ -304,6 +305,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       }
 
       // get all tickets between me and counterparty
+      // (performance) no way to filter tickets of counterparty
       const tickets: Types.Ticket[] = await Promise.all([
         this.node.tickets.getUnacknowledgedTickets(),
         this.node.tickets.getAcknowledgedTickets()

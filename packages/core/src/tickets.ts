@@ -78,7 +78,7 @@ class Tickets<Chain extends HoprCoreConnector> {
   }
 
   /**
-   * Update Acknowledged Ticket in database
+   * Update acknowledged ticket in database
    * @param ackTicket Uint8Array
    * @param index Uint8Array
    */
@@ -87,7 +87,7 @@ class Tickets<Chain extends HoprCoreConnector> {
   }
 
   /**
-   * Delete Acknowledged Ticket in database
+   * Delete acknowledged ticket in database
    * @param index Uint8Array
    */
   public async deleteAcknowledgedTicket(index: Uint8Array): Promise<void> {
@@ -95,7 +95,7 @@ class Tickets<Chain extends HoprCoreConnector> {
   }
 
   /**
-   * Submit Acknowledged Ticket and update database
+   * Submit acknowledged ticket and update database
    * @param ackTicket Uint8Array
    * @param index Uint8Array
    */
