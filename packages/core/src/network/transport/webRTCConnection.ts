@@ -156,30 +156,9 @@ class WebRTCConnection implements MultiaddrConnection {
               await defer.promise
               console.log(`start sinking into WebRTC`)
 
-              // await sourcePromise
-
-              //if (!sourceDone) {
-              // console.log(`sinking into WebRTC`, Buffer.from(sourceMsg.slice()))
-
-              // console.log(sourcePromise)
-              // await sourcePromise
-
-              // console.log(`sinking into WebRTC before for await`, new TextDecoder().decode(sourceMsg.slice()))
-
-              // yield sourceMsg
-
-              // if (sourceReceived) {
-              //   sourceReceived = false
-              //   yield sourceMsg.slice()
-              // }
-
               for await (const msg of source) {
-                console.log(`sinking into WebRTC`, new TextDecoder().decode(msg.slice()))
-
                 yield Buffer.from(msg.slice())
               }
-              // yield* source
-              // }
             })()
           )
 
