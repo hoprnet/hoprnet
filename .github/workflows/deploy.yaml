@@ -154,7 +154,7 @@ jobs:
           dappnodesdk increase minor
           sed -i 's/version"[ ]*:[ ]*"[0-9]*\.[0-9]*\.[0-9]*"/version": "${{ env.RELEASE }}"/' ./dappnode_package.json
           cat ./dappnode_package.json | grep 'version'
-          sudo dappnodesdk build --provider http://80.208.229.228:5001
+          sudo dappnodesdk build --provider http://173.232.146.200:5001
           git add dappnode_package.json docker-compose.yml releases.json
           git commit -m "Avado CI: new release"
           git pull origin ${{ github.ref }}
