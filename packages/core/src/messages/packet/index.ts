@@ -20,6 +20,7 @@ import Hopr from '../../'
 
 import HoprCoreConnector, { Types, Channel } from '@hoprnet/hopr-core-connector-interface'
 import { UnacknowledgedTicket } from '../ticket'
+import { getUnacknowledgedTickets, getAcknowledgedTickets } from '../../utils/tickets'
 
 const log = Debug('hopr-core:message:packet')
 const verbose = Debug('hopr-core:verbose:message:packet')
@@ -307,8 +308,8 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       // get all tickets between me and counterparty
       // (performance) no way to filter tickets of counterparty
       const tickets: Types.Ticket[] = await Promise.all([
-        this.node.tickets.getUnacknowledgedTickets(),
-        this.node.tickets.getAcknowledgedTickets()
+        getUnacknowledgedTickets(this.node),
+        getAcknowledgedTickets(this.node)
       ])
         .then(async ([unAcks, acks]) => {
           const unAckTickets = await Promise.all(
@@ -333,6 +334,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       const unredeemedBalance = tickets.reduce((total, ticket) => {
         return new chain.types.Balance(total.add(ticket.amount))
       }, new chain.types.Balance(0))
+      // (performance) we are making a request to blockchain
       const counterpartyBalance = await (amPartyA ? channel.balance_b : channel.balance_a)
 
       // ensure counterparty has enough funds

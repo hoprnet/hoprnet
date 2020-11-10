@@ -34,7 +34,7 @@ import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
 
 import { Interactions } from './interactions'
-import Tickets from './tickets'
+import { getAcknowledgedTickets, submitAcknowledgedTicket } from './utils/tickets'
 import * as DbKeys from './dbKeys'
 import EventEmitter from 'events'
 import path from 'path'
@@ -80,7 +80,6 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   public isBootstrapNode: boolean
   public bootstrapServers: Multiaddr[]
   public initializedWithOptions: HoprOptions
-  public tickets: Tickets<Chain>
 
   private running: boolean
   private crawlTimeout: NodeJS.Timeout
@@ -107,7 +106,6 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     }
     this.bootstrapServers = options.bootstrapServers || []
     this.isBootstrapNode = options.bootstrapNode || false
-    this.tickets = new Tickets(this)
     this._interactions = new Interactions(
       this,
       (conn: Connection) => this._network.crawler.handleCrawlRequest(conn),
@@ -455,6 +453,17 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
 
     const receipt = await channel.initiateSettlement()
     return { receipt, status }
+  }
+
+  public async getAcknowledgedTickets() {
+    return getAcknowledgedTickets(this)
+  }
+
+  public async submitAcknowledgedTicket(
+    ackTicket: Parameters<typeof submitAcknowledgedTicket>['1'],
+    index: Parameters<typeof submitAcknowledgedTicket>['2']
+  ) {
+    return submitAcknowledgedTicket(this, ackTicket, index)
   }
 
   /**
