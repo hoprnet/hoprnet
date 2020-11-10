@@ -126,8 +126,8 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
         }
       } else {
         // Wait a bit for packet
-        await new Promise(resolve => setTimeout(resolve, this.mixer.WAIT_TIME))
-      } 
+        await new Promise((resolve) => setTimeout(resolve, this.mixer.WAIT_TIME))
+      }
     }
 
     this.promises[token] = undefined
