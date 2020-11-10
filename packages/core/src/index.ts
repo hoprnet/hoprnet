@@ -88,7 +88,6 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
 
   private running: boolean
   private crawlTimeout: NodeJS.Timeout
-
   private mixer: Mixer<Chain>
 
   /**

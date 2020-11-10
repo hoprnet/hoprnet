@@ -9,9 +9,9 @@ const log = debug('hopr-core:mixer')
 type HeapElement = [number, Packet<any>]
 
 let comparator = (a: HeapElement, b: HeapElement): number => {
-  if (b[0] > a[0]) {
+  if (b[0] < a[0]) {
     return 1
-  } else if (b[0] < a[0]) {
+  } else if (b[0] > a[0]) {
     return -1
   }
   return 0
@@ -26,7 +26,7 @@ let comparator = (a: HeapElement, b: HeapElement): number => {
 export class Mixer<Chain extends HoprCoreConnector> {
   private queue: Heap<HeapElement>
 
-  constructor() {
+  constructor(private incrementer = Date.now) {
     this.queue = new Heap(comparator)
   }
 
@@ -37,22 +37,28 @@ export class Mixer<Chain extends HoprCoreConnector> {
   // Can we pop an element?.
   poppable(): boolean {
     log(`Mixer has ${this.queue.length} elements`)
-    return this.queue.peek()[0] > this.due()
+    if (!this.queue.length) {
+      return false
+    }
+    return this.queue.peek()[0] < this.due()
   }
 
   pop(): Packet<Chain> {
+    if (!this.queue.length) {
+      throw new Error('No packet is ready to be popped from mixer')
+    }
     let elem = this.queue.pop()
-    if (elem[0] <= this.due()) {
+    if (!elem || elem[0] > this.due()) {
       throw new Error('No packet is ready to be popped from mixer')
     }
     return elem[1]
   }
 
   private due(): number {
-    return Date.now()
+    return this.incrementer()
   }
 
   private getPriority(): number {
-    return Date.now() + randomInteger(0, MAX_PACKET_DELAY)
+    return this.incrementer() + randomInteger(1, MAX_PACKET_DELAY)
   }
 }
