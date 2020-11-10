@@ -17,21 +17,20 @@ import pipe from 'it-pipe'
 
 import type { Handler } from 'libp2p'
 
-import { randomInteger, durations } from '@hoprnet/hopr-utils'
+import { durations } from '@hoprnet/hopr-utils'
 import { getTokens, Token } from '../../utils'
+import { Mixer } from '../../mixer'
 
 const MAX_PARALLEL_JOBS = 20
-
 const FORWARD_TIMEOUT = durations.seconds(6)
 
 class PacketForwardInteraction<Chain extends HoprCoreConnector> implements AbstractInteraction {
   private tokens: Token[] = getTokens(MAX_PARALLEL_JOBS)
-  private queue: Packet<Chain>[] = []
   private promises: Promise<void>[] = []
 
   protocols: string[] = [PROTOCOL_STRING]
 
-  constructor(public node: Hopr<Chain>) {
+  constructor(public node: Hopr<Chain>, private mixer: Mixer<Chain>) {
     this.node._libp2p.handle(this.protocols, this.handler.bind(this))
   }
 
@@ -87,7 +86,7 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
             offset: arr.byteOffset
           })
 
-          this.queue.push(packet)
+          this.mixer.push(packet)
 
           if (this.tokens.length > 0) {
             const token = this.tokens.pop() as Token
@@ -104,17 +103,9 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
     let sender: PeerId, target: PeerId
 
     // Check for unserviced packets
-    while (this.queue.length > 0) {
+    while (this.mixer.poppable()) {
       // Pick a random one
-      const index = randomInteger(0, this.queue.length)
-
-      if (index == this.queue.length - 1) {
-        packet = this.queue.pop() as Packet<Chain>
-      } else {
-        packet = this.queue[index]
-
-        this.queue[index] = this.queue.pop() as Packet<Chain>
-      }
+      packet = this.mixer.pop()
 
       let { receivedChallenge, ticketKey } = await packet.forwardTransform()
 
