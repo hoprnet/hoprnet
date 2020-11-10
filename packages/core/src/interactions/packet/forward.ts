@@ -102,29 +102,32 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
     let packet: Packet<Chain>
     let sender: PeerId, target: PeerId
 
-    // Check for unserviced packets
-    while (this.mixer.poppable()) {
-      // Pick a random one
-      packet = this.mixer.pop()
+    while (this.mixer.notEmpty()) {
+      if (this.mixer.poppable()) {
+        packet = this.mixer.pop()
 
-      let { receivedChallenge, ticketKey } = await packet.forwardTransform()
+        let { receivedChallenge, ticketKey } = await packet.forwardTransform()
 
-      ;[sender, target] = await Promise.all([packet.getSenderPeerId(), packet.getTargetPeerId()])
+        ;[sender, target] = await Promise.all([packet.getSenderPeerId(), packet.getTargetPeerId()])
 
-      setImmediate(async () => {
-        const ack = new Acknowledgement(this.node.paymentChannels, undefined, {
-          key: ticketKey,
-          challenge: receivedChallenge
+        setImmediate(async () => {
+          const ack = new Acknowledgement(this.node.paymentChannels, undefined, {
+            key: ticketKey,
+            challenge: receivedChallenge
+          })
+
+          await this.node._interactions.packet.acknowledgment.interact(sender, await ack.sign(this.node.getId()))
         })
 
-        await this.node._interactions.packet.acknowledgment.interact(sender, await ack.sign(this.node.getId()))
-      })
-
-      if (this.node.getId().isEqual(target)) {
-        this.node.output(packet.message.plaintext)
+        if (this.node.getId().isEqual(target)) {
+          this.node.output(packet.message.plaintext)
+        } else {
+          await this.interact(target, packet)
+        }
       } else {
-        await this.interact(target, packet)
-      }
+        // Wait a bit for packet
+        await new Promise(resolve => setTimeout(resolve, this.mixer.WAIT_TIME))
+      } 
     }
 
     this.promises[token] = undefined

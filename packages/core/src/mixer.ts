@@ -8,7 +8,7 @@ const log = debug('hopr-core:mixer')
 
 type HeapElement = [number, Packet<any>]
 
-let comparator = (a: HeapElement, b: HeapElement): number => {
+const comparator = (a: HeapElement, b: HeapElement): number => {
   if (b[0] < a[0]) {
     return 1
   } else if (b[0] > a[0]) {
@@ -25,6 +25,8 @@ let comparator = (a: HeapElement, b: HeapElement): number => {
  */
 export class Mixer<Chain extends HoprCoreConnector> {
   private queue: Heap<HeapElement>
+
+  public WAIT_TIME = MAX_PACKET_DELAY
 
   constructor(private incrementer = Date.now) {
     this.queue = new Heap(comparator)
@@ -44,14 +46,14 @@ export class Mixer<Chain extends HoprCoreConnector> {
   }
 
   pop(): Packet<Chain> {
-    if (!this.queue.length) {
+    if (!this.poppable()) {
       throw new Error('No packet is ready to be popped from mixer')
     }
-    let elem = this.queue.pop()
-    if (!elem || elem[0] > this.due()) {
-      throw new Error('No packet is ready to be popped from mixer')
-    }
-    return elem[1]
+    return this.queue.pop()[1]
+  }
+
+  notEmpty(): boolean {
+    return this.queue.length > 0
   }
 
   private due(): number {
