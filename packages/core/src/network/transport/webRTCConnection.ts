@@ -119,7 +119,9 @@ class WebRTCConnection implements MultiaddrConnection {
                   `this._webRTCStateKnown`,
                   this._webRTCStateKnown
                 )
-                sourcePromise = source.next().then(sourceFunction)
+                if (!this._webRTCAvailable) {
+                  sourcePromise = source.next().then(sourceFunction)
+                }
               }
             } else {
               await sourcePromise
