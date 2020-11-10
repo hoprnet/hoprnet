@@ -61,6 +61,27 @@ declare interface ChannelStatic {
   ): Promise<R>
 
   /**
+   * Get stored channel
+   * @param counterPartyPubKey the public key of the counterparty in which we have a stored channel with
+   * @returns a promise tha resolves into a 'SignedChannel'
+   */
+  getOffChainState(counterparty: Uint8Array): Promise<SignedChannel>
+
+  /**
+   * Get on-chain channel data
+   * @param counterPartyPubKey the public key of the counterparty in which we have a channel with
+   * @returns a promise tha resolves into on chain channel data
+   */
+  getOnChainState(
+    channelId: Hash
+  ): Promise<{
+    deposit: string
+    partyABalance: string
+    closureTime: string
+    stateCounter: string
+  }>
+
+  /**
    * Fetches all channel instances from the database and initiates a settlement on
    * each of them.
    * @param props additional arguments
@@ -140,6 +161,8 @@ declare interface Channel {
 
   // Current balance of partyA
   readonly balance_a: Promise<Balance>
+  // Current balance of partyB
+  readonly balance_b: Promise<Balance>
 
   // Current total balance (sum of balance_a and balance_b)
   readonly balance: Promise<Balance>

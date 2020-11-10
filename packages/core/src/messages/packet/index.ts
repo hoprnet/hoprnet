@@ -18,7 +18,7 @@ import Debug from 'debug'
 
 import Hopr from '../../'
 
-import HoprCoreConnector, { Types } from '@hoprnet/hopr-core-connector-interface'
+import HoprCoreConnector, { Types, Channel } from '@hoprnet/hopr-core-connector-interface'
 import { UnacknowledgedTicket } from '../ticket'
 
 const log = Debug('hopr-core:message:packet')
@@ -273,10 +273,69 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     if (!isRecipient) {
       ;[sender, target] = await Promise.all([this.getSenderPeerId(), this.getTargetPeerId()])
 
-      // check if channel exists
+      // perform various ticket validation checks before receiving ACK
+      // NOTE: validating things is not performant at all :(
 
-      if (!(await this.node.paymentChannels.channel.isOpen(new Uint8Array(sender.pubKey.marshal())))) {
-        throw Error('Payment channel is not open')
+      const chain = this.node.paymentChannels
+      const myAccountId = await chain.account.address
+      const counterpartyPubKey = sender.pubKey.marshal()
+      const counterpartyAccountId = await chain.utils.pubKeyToAccountId(counterpartyPubKey)
+      // const channelId = await chain.utils.getId(myAccountId, counterpartyAccountId)
+      const ticket = (await this.ticket).ticket
+      const amPartyA = chain.utils.isPartyA(myAccountId, counterpartyAccountId)
+
+      // channel MUST be open
+      const channelIsOpen = await chain.channel.isOpen(counterpartyAccountId)
+      if (!channelIsOpen) {
+        throw Error(`Payment channel with '${u8aToHex(counterpartyAccountId)}' is not open`)
+      }
+
+      // channel MUST exist in our DB
+      let channel: Channel
+      try {
+        channel = await chain.channel.create(
+          counterpartyPubKey,
+          async () => new chain.types.Public(counterpartyPubKey),
+          undefined,
+          undefined
+        )
+      } catch (err) {
+        throw Error(`Stored payment channel with '${u8aToHex(counterpartyAccountId)}' not found`)
+      }
+
+      // get all tickets between me and counterparty
+      const tickets: Types.Ticket[] = await Promise.all([
+        this.node.tickets.getUnacknowledgedTickets(),
+        this.node.tickets.getAcknowledgedTickets()
+      ])
+        .then(async ([unAcks, acks]) => {
+          const unAckTickets = await Promise.all(
+            unAcks.map(async (unAck) => {
+              return (await unAck.signedTicket).ticket
+            })
+          )
+
+          const ackTickets = await Promise.all(
+            acks.map(async (ack) => {
+              return (await ack.ackTicket.signedTicket).ticket
+            })
+          )
+
+          return [...unAckTickets, ...ackTickets]
+        })
+        .then((tickets) => {
+          return tickets.filter((ticket) => u8aEquals(ticket.counterparty, counterpartyAccountId))
+        })
+
+      // calculate total unredeemed balance
+      const unredeemedBalance = tickets.reduce((total, ticket) => {
+        return new chain.types.Balance(total.add(ticket.amount))
+      }, new chain.types.Balance(0))
+      const counterpartyBalance = await (amPartyA ? channel.balance_b : channel.balance_a)
+
+      // ensure counterparty has enough funds
+      if (unredeemedBalance.add(new chain.types.Balance(ticket.amount)).lt(counterpartyBalance)) {
+        throw Error(`Counterparty ${u8aToHex(counterpartyAccountId)} doesn't have enough funds in payment channel.`)
       }
     }
 

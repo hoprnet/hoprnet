@@ -17,6 +17,10 @@ class TicketStatic {
 
   constructor(public coreConnector: HoprEthereum) {}
 
+  // check before received ACK
+  // check after received ACK
+  // check when submitting
+
   public async submit(
     ticket: AcknowledgedTicket,
     ticketIndex: Uint8Array
@@ -41,6 +45,11 @@ class TicketStatic {
 
       const { hoprChannels, signTransaction, account, utils } = this.coreConnector
       const { r, s, v } = utils.getSignatureParameters((await ticket.signedTicket).signature)
+
+      // on-chain channel has funds
+      // all valid tickets amount should be 0.001
+      // on-chain "call" method to verify
+      // remove old UNACK tickets
 
       const hasPreImage = !u8aEquals(ticket.preImage, EMPTY_PRE_IMAGE)
       if (!hasPreImage) {

@@ -34,6 +34,7 @@ import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
 
 import { Interactions } from './interactions'
+import Tickets from './tickets'
 import * as DbKeys from './dbKeys'
 import EventEmitter from 'events'
 import path from 'path'
@@ -44,11 +45,6 @@ interface NetOptions {
   ip: string
   port: number
 }
-
-type OperationSuccess = { status: 'SUCCESS'; receipt: string }
-type OperationFailure = { status: 'FAILURE'; message: string }
-type OperationError = { status: 'ERROR'; error: Error | string }
-export type OperationStatus = OperationSuccess | OperationFailure | OperationError
 
 export type HoprOptions = {
   debug: boolean
@@ -84,6 +80,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   public isBootstrapNode: boolean
   public bootstrapServers: Multiaddr[]
   public initializedWithOptions: HoprOptions
+  public tickets: Tickets<Chain>
 
   private running: boolean
   private crawlTimeout: NodeJS.Timeout
@@ -110,6 +107,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     }
     this.bootstrapServers = options.bootstrapServers || []
     this.isBootstrapNode = options.bootstrapNode || false
+    this.tickets = new Tickets(this)
     this._interactions = new Interactions(
       this,
       (conn: Connection) => this._network.crawler.handleCrawlRequest(conn),
@@ -515,95 +513,6 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     }
     // @ts-ignore
     return levelup(leveldown(dbPath))
-  }
-
-  /**
-   * Get all acknowledged tickets
-   * @returns an array of all acknowledged tickets
-   */
-  public async getAcknowledgedTickets(): Promise<
-    {
-      ackTicket: Types.AcknowledgedTicket
-      index: Uint8Array
-    }[]
-  > {
-    const { AcknowledgedTicket } = this.paymentChannels.types
-    const acknowledgedTicketSize = AcknowledgedTicket.SIZE(this.paymentChannels)
-    let promises: {
-      ackTicket: Types.AcknowledgedTicket
-      index: Uint8Array
-    }[] = []
-
-    return new Promise((resolve, reject) => {
-      this.db
-        .createReadStream({
-          gte: Buffer.from(this._dbKeys.AcknowledgedTickets(new Uint8Array(0x00)))
-        })
-        .on('error', (err) => reject(err))
-        .on('data', ({ key, value }: { key: Buffer; value: Buffer }) => {
-          if (value.buffer.byteLength !== acknowledgedTicketSize) return
-
-          const index = this._dbKeys.AcknowledgedTicketsParse(key)
-          const ackTicket = AcknowledgedTicket.create(this.paymentChannels, {
-            bytes: value.buffer,
-            offset: value.byteOffset
-          })
-
-          promises.push({
-            ackTicket,
-            index
-          })
-        })
-        .on('end', () => resolve(Promise.all(promises)))
-    })
-  }
-
-  /**
-   * Update Acknowledged Ticket in database
-   * @param ackTicket Uint8Array
-   * @param index Uint8Array
-   */
-  private async updateAcknowledgedTicket(ackTicket: Types.AcknowledgedTicket, index: Uint8Array): Promise<void> {
-    await this.db.put(Buffer.from(this._dbKeys.AcknowledgedTickets(index)), Buffer.from(ackTicket))
-  }
-
-  /**
-   * Delete Acknowledged Ticket in database
-   * @param index Uint8Array
-   */
-  private async deleteAcknowledgedTicket(index: Uint8Array): Promise<void> {
-    await this.db.del(Buffer.from(this._dbKeys.AcknowledgedTickets(index)))
-  }
-
-  /**
-   * Submit Acknowledged Ticket and update database
-   * @param ackTicket Uint8Array
-   * @param index Uint8Array
-   */
-  public async submitAcknowledgedTicket(
-    ackTicket: Types.AcknowledgedTicket,
-    index: Uint8Array
-  ): Promise<OperationStatus> {
-    try {
-      const result = await this.paymentChannels.channel.tickets.submit(ackTicket, index)
-
-      if (result.status === 'SUCCESS') {
-        ackTicket.redeemed = true
-        await this.updateAcknowledgedTicket(ackTicket, index)
-      } else if (result.status === 'FAILURE') {
-        await this.deleteAcknowledgedTicket(index)
-      } else if (result.status === 'ERROR') {
-        await this.deleteAcknowledgedTicket(index)
-        // @TODO: better handle this
-      }
-
-      return result
-    } catch (err) {
-      return {
-        status: 'ERROR',
-        error: err
-      }
-    }
   }
 }
 

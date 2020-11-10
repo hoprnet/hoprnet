@@ -27,7 +27,7 @@ export default class RedeemTickets extends AbstractCommand {
 
     try {
       // get only unredeemed tickets
-      const results = await this.node.getAcknowledgedTickets().then((tickets) => {
+      const results = await this.node.tickets.getAcknowledgedTickets().then((tickets) => {
         return tickets.filter((ticket) => !ticket.ackTicket.redeemed)
       })
 
@@ -42,7 +42,7 @@ export default class RedeemTickets extends AbstractCommand {
 
       for (const { ackTicket, index } of results) {
         ++count
-        const result = await this.node.submitAcknowledgedTicket(ackTicket, index)
+        const result = await this.node.tickets.submitAcknowledgedTicket(ackTicket, index)
 
         if (result.status === 'SUCCESS') {
           console.log(`Redeemed ticket ${styleValue(count)}`)
