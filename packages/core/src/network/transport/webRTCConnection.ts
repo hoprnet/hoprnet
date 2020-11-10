@@ -143,7 +143,6 @@ class WebRTCConnection implements MultiaddrConnection {
       if (!this._webRTCStateKnown || this._webRTCAvailable) {
         await this._switchPromise.promise
 
-        await defer.promise
         clearTimeout(this._webRTCTimeout)
         if (this._webRTCAvailable) {
           const sink = toIterable.sink(this.channel)
@@ -152,6 +151,8 @@ class WebRTCConnection implements MultiaddrConnection {
           sink(
             (async function* () {
               console.log(`start sinking into WebRTC`)
+              await defer.promise
+
               // await sourcePromise
 
               if (!sourceDone) {
