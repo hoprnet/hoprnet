@@ -123,6 +123,8 @@ class WebRTCConnection implements MultiaddrConnection {
                 )
                 if (!this._webRTCAvailable) {
                   sourcePromise = source.next().then(sourceFunction)
+                } else {
+                  defer.resolve()
                 }
               }
             } else {
@@ -136,7 +138,7 @@ class WebRTCConnection implements MultiaddrConnection {
               yield* source
             }
           }
-          defer.resolve()
+          console.log(`sink returned`)
         }.call(this)
       )
 
@@ -150,33 +152,33 @@ class WebRTCConnection implements MultiaddrConnection {
 
           sink(
             (async function* () {
-              console.log(`start sinking into WebRTC`)
               await defer.promise
+              console.log(`start sinking into WebRTC`)
 
               // await sourcePromise
 
-              if (!sourceDone) {
-                // console.log(`sinking into WebRTC`, Buffer.from(sourceMsg.slice()))
+              //if (!sourceDone) {
+              // console.log(`sinking into WebRTC`, Buffer.from(sourceMsg.slice()))
 
-                // console.log(sourcePromise)
-                // await sourcePromise
+              // console.log(sourcePromise)
+              // await sourcePromise
 
-                // console.log(`sinking into WebRTC before for await`, new TextDecoder().decode(sourceMsg.slice()))
+              // console.log(`sinking into WebRTC before for await`, new TextDecoder().decode(sourceMsg.slice()))
 
-                // yield sourceMsg
+              // yield sourceMsg
 
-                // if (sourceReceived) {
-                //   sourceReceived = false
-                //   yield sourceMsg.slice()
-                // }
+              // if (sourceReceived) {
+              //   sourceReceived = false
+              //   yield sourceMsg.slice()
+              // }
 
-                for await (const msg of source) {
-                  console.log(`sinking into WebRTC`, new TextDecoder().decode(msg.slice()))
+              for await (const msg of source) {
+                console.log(`sinking into WebRTC`, new TextDecoder().decode(msg.slice()))
 
-                  yield Buffer.from(msg.slice())
-                }
-                // yield* source
+                yield Buffer.from(msg.slice())
               }
+              // yield* source
+              // }
             })()
           )
 
@@ -200,6 +202,7 @@ class WebRTCConnection implements MultiaddrConnection {
       let streamDone = false
 
       function streamSourceFunction(arg: IteratorResult<Uint8Array, void>) {
+        console.log(`webRTCConnection source`, arg)
         streamMsgReceived = true
         streamDone = arg.done
 
@@ -210,39 +213,42 @@ class WebRTCConnection implements MultiaddrConnection {
 
       let streamPromise = this.conn.source.next().then(streamSourceFunction)
 
-      while (!this._webRTCAvailable) {
-        if (!this._webRTCStateKnown) {
-          await Promise.race([
-            // prettier-ignore
-            streamPromise
-            // this._switchPromise.promise
-          ])
+      while (true) {
+        // if (!this._webRTCStateKnown) {
+        await Promise.race([
+          // prettier-ignore
+          streamPromise
+          // this._switchPromise.promise
+        ])
 
-          if (streamMsgReceived) {
-            streamMsgReceived = false
+        if (streamMsgReceived) {
+          console.log(`stream iteration`)
+          streamMsgReceived = false
 
-            if (streamDone) {
-              break
-            }
-
-            console.log(`getting from relayConnection`, streamMsg)
-
-            yield streamMsg
-            streamPromise = this.conn.source.next().then(streamSourceFunction)
-          }
-        } else {
-          await streamPromise
-
-          if (streamDone) {
+          if (streamDone || streamMsg.length == 0) {
             break
           }
 
+          console.log(`getting from relayConnection`, streamMsg)
+
           yield streamMsg
-          yield* this.conn.source
+          streamPromise = this.conn.source.next().then(streamSourceFunction)
         }
+        // } else {
+        //   await streamPromise
+
+        //   if (streamDone) {
+        //     break
+        //   }
+
+        //   yield streamMsg
+        //   yield* this.conn.source
+        // }
       }
 
       if (this._webRTCAvailable || !this._webRTCStateKnown) {
+        console.log(`here`)
+
         clearTimeout(this._webRTCTimeout)
         await this._switchPromise.promise
 

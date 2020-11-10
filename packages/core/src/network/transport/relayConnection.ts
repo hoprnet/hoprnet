@@ -240,7 +240,19 @@ class RelayConnection implements MultiaddrConnection {
   }
 
   private _createSink(source: Stream['source']): Promise<void> {
-    this._switchPromise.resolve(source)
+    this._switchPromise.resolve(
+      (async function* () {
+        let result: IteratorResult<Uint8Array> = { done: false, value: undefined }
+
+        while (!result.done) {
+          result = await source.next()
+
+          console.log(`in relay connection`, result)
+
+          yield result.value
+        }
+      })()
+    )
 
     this._sinkTriggered = true
 
