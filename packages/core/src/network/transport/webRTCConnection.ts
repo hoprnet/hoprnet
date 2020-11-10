@@ -88,6 +88,8 @@ class WebRTCConnection implements MultiaddrConnection {
 
       let sourcePromise = source.next().then(sourceFunction)
 
+      let defer = Defer<void>()
+
       this.conn.sink(
         async function* (this: WebRTCConnection): Stream['source'] {
           if (this._webRTCTimeout == null) {
@@ -134,13 +136,14 @@ class WebRTCConnection implements MultiaddrConnection {
               yield* source
             }
           }
-          console.log(`returned`)
+          defer.resolve()
         }.call(this)
       )
 
       if (!this._webRTCStateKnown || this._webRTCAvailable) {
         await this._switchPromise.promise
 
+        await defer.promise
         clearTimeout(this._webRTCTimeout)
         if (this._webRTCAvailable) {
           const sink = toIterable.sink(this.channel)
