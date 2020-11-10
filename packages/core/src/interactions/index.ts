@@ -6,6 +6,7 @@ import type { Connection } from 'libp2p'
 import { PaymentInteractions } from './payments'
 import { NetworkInteractions } from './network'
 import { PacketInteractions } from './packet'
+import { Mixer } from '../mixer'
 
 class Interactions<Chain extends HoprCoreConnector> {
   public payments: PaymentInteractions<Chain>
@@ -14,12 +15,13 @@ class Interactions<Chain extends HoprCoreConnector> {
 
   constructor(
     node: Hopr<Chain>,
+    mixer: Mixer<Chain>,
     handleCrawlRequest: (conn: Connection) => void,
     heartbeat: (remotePeer: PeerId) => void
   ) {
     this.payments = new PaymentInteractions(node)
     this.network = new NetworkInteractions(node._libp2p, handleCrawlRequest, heartbeat)
-    this.packet = new PacketInteractions(node)
+    this.packet = new PacketInteractions(node, mixer)
   }
 }
 
