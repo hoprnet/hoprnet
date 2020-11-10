@@ -90,15 +90,15 @@ jobs:
         run: |
           sleep 5m # Allow NPM registry to catch uo
 
-      - name: Publish to GPR
-        if: |
-          startsWith(github.ref, 'refs/heads/release/')
-        run: |
-          echo //npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }} > .npmrc
-          node_modules/.bin/lerna publish from-package --yes --registry https://npm.pkg.github.com/
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          #      - name: Publish to GPR
+          #        if: |
+          #          startsWith(github.ref, 'refs/heads/release/')
+          #        run: |
+          #          echo //npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }} > .npmrc
+          #          node_modules/.bin/lerna publish from-package --yes --registry https://npm.pkg.github.com/
+          #        env:
+          #          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          #          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   release:
     name: Create Github Release
