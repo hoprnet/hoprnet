@@ -4,7 +4,7 @@ import assert from 'assert'
 
 let i = 0
 let fakePacket = () => {
-  return i++ as unknown as Packet<any>
+  return (i++ as unknown) as Packet<any>
 }
 
 describe('test mixer ', function () {
