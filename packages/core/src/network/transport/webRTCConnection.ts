@@ -109,9 +109,16 @@ class WebRTCConnection implements MultiaddrConnection {
                   break
                 }
 
-                console.log(`sinking into relay connection`, sourceMsg)
+                // console.log(`sinking into relay connection`, new TextDecoder().decode(sourceMsg))
 
                 yield sourceMsg
+
+                console.log(
+                  `this._webRTCAvailable`,
+                  this._webRTCAvailable,
+                  `this._webRTCStateKnown`,
+                  this._webRTCStateKnown
+                )
                 sourcePromise = source.next().then(sourceFunction)
               }
             } else {
@@ -131,6 +138,7 @@ class WebRTCConnection implements MultiaddrConnection {
 
       if (!this._webRTCStateKnown || this._webRTCAvailable) {
         await this._switchPromise.promise
+
         clearTimeout(this._webRTCTimeout)
         if (this._webRTCAvailable) {
           const sink = toIterable.sink(this.channel)
@@ -144,12 +152,20 @@ class WebRTCConnection implements MultiaddrConnection {
               if (!sourceDone) {
                 // console.log(`sinking into WebRTC`, Buffer.from(sourceMsg.slice()))
 
+                // console.log(sourcePromise)
+                // await sourcePromise
+
+                // console.log(`sinking into WebRTC before for await`, new TextDecoder().decode(sourceMsg.slice()))
+
+                // yield sourceMsg
+
                 // if (sourceReceived) {
+                //   sourceReceived = false
                 //   yield sourceMsg.slice()
                 // }
 
                 for await (const msg of source) {
-                  console.log(`sinking into WebRTC`, Buffer.from(sourceMsg.slice()))
+                  console.log(`sinking into WebRTC`, new TextDecoder().decode(msg.slice()))
 
                   yield Buffer.from(msg.slice())
                 }
@@ -240,7 +256,7 @@ class WebRTCConnection implements MultiaddrConnection {
           // })
 
           for await (const msg of this.channel[Symbol.asyncIterator]() as Stream['source']) {
-            console.log(`yield from WebRTC source`, msg)
+            console.log(`yield from WebRTC source`, msg /*, new TextDecoder().decode(msg) */)
             yield msg
             //yield* this.channel[Symbol.asyncIterator]() as Stream['source']
           }
