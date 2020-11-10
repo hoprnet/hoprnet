@@ -8,34 +8,30 @@ const log = debug('hopr-core:mixer')
 
 type HeapElement = [number, Packet<any>]
 
-
 let comparator = (a: HeapElement, b: HeapElement): number => {
   if (b[0] > a[0]) {
-    return 1;
+    return 1
   } else if (b[0] < a[0]) {
-    return -1;
+    return -1
   }
-  return 0;
+  return 0
 }
 
 /**
-* Mix packets.
-*
-* Currently an MVP version, that simply adds a random interval to their
-* priority.
-*/
+ * Mix packets.
+ *
+ * Currently an MVP version, that simply adds a random interval to their
+ * priority.
+ */
 export class Mixer<Chain extends HoprCoreConnector> {
   private queue: Heap<HeapElement>
 
-  constructor(){
+  constructor() {
     this.queue = new Heap(comparator)
   }
 
-  push(p: Packet<Chain>){
-    this.queue.push([
-      this.getPriority(),
-      p
-    ])
+  push(p: Packet<Chain>) {
+    this.queue.push([this.getPriority(), p])
   }
 
   // Can we pop an element?.
@@ -52,11 +48,11 @@ export class Mixer<Chain extends HoprCoreConnector> {
     return elem[1]
   }
 
-  private due(): number{
+  private due(): number {
     return Date.now()
   }
 
-  private getPriority(): number{
-    return Date.now() + randomInteger(0, MAX_PACKET_DELAY) 
+  private getPriority(): number {
+    return Date.now() + randomInteger(0, MAX_PACKET_DELAY)
   }
 }
