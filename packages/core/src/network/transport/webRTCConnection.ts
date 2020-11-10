@@ -121,6 +121,7 @@ class WebRTCConnection implements MultiaddrConnection {
                   `this._webRTCStateKnown`,
                   this._webRTCStateKnown
                 )
+
                 if (!this._webRTCAvailable) {
                   sourcePromise = source.next().then(sourceFunction)
                 } else {
@@ -234,16 +235,6 @@ class WebRTCConnection implements MultiaddrConnection {
           yield streamMsg
           streamPromise = this.conn.source.next().then(streamSourceFunction)
         }
-        // } else {
-        //   await streamPromise
-
-        //   if (streamDone) {
-        //     break
-        //   }
-
-        //   yield streamMsg
-        //   yield* this.conn.source
-        // }
       }
 
       if (this._webRTCAvailable || !this._webRTCStateKnown) {
@@ -259,20 +250,15 @@ class WebRTCConnection implements MultiaddrConnection {
         //   streamPromise = this.conn.source.next().then(streamSourceFunction)
         // }
 
-        if (this._webRTCAvailable) {
-          // setImmediate(() => {
-          //   this.conn.close().then(() => {
-          //     this._migrated = true
-          //     console.log(`source migrated`)
-          //   })
-          // })
+        //if (this._webRTCAvailable) {
+        // setImmediate(() => {
+        //   this.conn.close().then(() => {
+        //     this._migrated = true
+        //     console.log(`source migrated`)
+        //   })
+        // })
 
-          for await (const msg of this.channel[Symbol.asyncIterator]() as Stream['source']) {
-            console.log(`yield from WebRTC source`, msg /*, new TextDecoder().decode(msg) */)
-            yield msg
-            //yield* this.channel[Symbol.asyncIterator]() as Stream['source']
-          }
-        }
+        yield* this.channel[Symbol.asyncIterator]() as Stream['source']
       }
     }.call(this)
   }
