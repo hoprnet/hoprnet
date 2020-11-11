@@ -1,5 +1,4 @@
 import type { HoprToken } from './tsc/web3/HoprToken'
-import type { HoprChannels } from './tsc/web3/HoprChannels'
 import type { Await } from './tsc/utils'
 import type CoreConnector from '.'
 import assert from 'assert'
@@ -21,7 +20,6 @@ describe('test Account class', function () {
   const ganache = new Ganache()
   let web3: Web3
   let hoprToken: HoprToken
-  let hoprChannels: HoprChannels
   let coreConnector: CoreConnector
   let funder: Await<ReturnType<typeof getPrivKeyData>>
   let user: Await<ReturnType<typeof getPrivKeyData>>
@@ -34,7 +32,7 @@ describe('test Account class', function () {
 
     web3 = new Web3(configs.DEFAULT_URI)
     hoprToken = new web3.eth.Contract(HoprTokenAbi as any, addresses.localhost?.HoprToken)
-    hoprChannels = new web3.eth.Contract(HoprChannelsAbi as any, addresses.localhost?.HoprChannels)
+    new web3.eth.Contract(HoprChannelsAbi as any, addresses.localhost?.HoprChannels)
   })
 
   after(async function () {

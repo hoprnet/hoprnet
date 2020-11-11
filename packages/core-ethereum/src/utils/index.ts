@@ -102,7 +102,7 @@ export async function hash(msg: Uint8Array): Promise<Hash> {
 export async function sign(
   msg: Uint8Array,
   privKey: Uint8Array,
-  pubKey?: Uint8Array,
+  _pubKey?: Uint8Array,
   arr?: {
     bytes: ArrayBuffer
     offset: number
