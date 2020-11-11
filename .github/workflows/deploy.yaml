@@ -160,6 +160,7 @@ jobs:
           git commit -m "Avado CI: new release"
           git pull origin ${{ github.ref }}
           git push origin ${{ github.ref }}
+
           # http://go.ava.do/install/<IPFS HASH>
 
   # chatbot
