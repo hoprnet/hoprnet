@@ -123,8 +123,6 @@ class WebRTCConnection implements MultiaddrConnection {
 
                 if (!this._webRTCAvailable) {
                   sourcePromise = source.next().then(sourceFunction)
-                } else {
-                  defer.resolve()
                 }
               }
             } else {
@@ -139,6 +137,7 @@ class WebRTCConnection implements MultiaddrConnection {
               yield* source
             }
           }
+          defer.resolve()
           console.log(`sink returned`)
         }.call(this)
       )
