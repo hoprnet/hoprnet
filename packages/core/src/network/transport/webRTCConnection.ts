@@ -7,7 +7,7 @@ import type PeerId from 'peer-id'
 import { durations } from '@hoprnet/hopr-utils'
 import toIterable from 'stream-to-it'
 
-const WEBRTC_UPGRADE_TIMEOUT = durations.seconds(7)
+const WEBRTC_UPGRADE_TIMEOUT = durations.seconds(1)
 
 class WebRTCConnection implements MultiaddrConnection {
   private _switchPromise: DeferredPromise<void>
@@ -47,13 +47,13 @@ class WebRTCConnection implements MultiaddrConnection {
       open: Date.now()
     }
 
-    this.channel.on('connect', () => {
+    this.channel.once('connect', () => {
       clearTimeout(this._webRTCTimeout)
 
       console.log(`available after connect`)
 
-      // this._webRTCStateKnown = true
-      // this._webRTCAvailable = true
+      this._webRTCStateKnown = true
+      this._webRTCAvailable = true
       this._switchPromise.resolve()
     })
 
@@ -68,8 +68,8 @@ class WebRTCConnection implements MultiaddrConnection {
       })
     }
 
-    this.channel.on('iceTimeout', endWebRTCUpgrade)
-    this.channel.on('error', endWebRTCUpgrade)
+    this.channel.once('iceTimeout', endWebRTCUpgrade)
+    this.channel.once('error', endWebRTCUpgrade)
 
     this.sink = async (source: Stream['source']): Promise<void> => {
       let sourceReceived = false
